@@ -69,7 +69,7 @@ import sys
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -266,20 +266,80 @@ def replay_game(game: dict[str, Any], *, sp_index, means, sims: int) -> list[dic
     return rows
 
 
-def score(rows: list[dict[str, Any]], *, lines: list[float]) -> dict[str, Any]:
+def calibrate_dist(dist: Mapping[str, Any], *, shift: float, spread: float) -> dict[str, float]:
+    """Shift the location and scale the spread of a totals histogram.
+
+    `corrected = mu + shift + (draw - mu) * spread`, where `mu` is the sim's own
+    mean. Applied to the DISTRIBUTION rather than to the mean, so the two
+    corrections stay separable and either can be measured alone -- CLAUDE.md's
+    rule is that two mechanisms added together can interact, and it has a
+    measured case of a NEGATIVE interaction in 4 of 4 markets.
+
+    IT COSTS THE LUMPINESS, and that is the honest trade. Scaling smears the
+    mass that sits exactly on 7 and 3, which is the property that made the
+    empirical histogram better than a normal in the first place. A shift alone
+    preserves it (every draw moves by the same amount); a spread scale does not.
+    That is a reason to prefer the smallest correction that works, and a reason
+    the variants below are reported side by side instead of collapsed.
+    """
+    pairs: list[tuple[float, float]] = []
+    total = 0.0
+    for raw, count in dist.items():
+        try:
+            value, n = float(raw), float(count)
+        except (TypeError, ValueError):
+            return {}
+        pairs.append((value, n))
+        total += n
+    if total <= 0:
+        return {}
+    mu = sum(v * n for v, n in pairs) / total
+    out: dict[str, float] = {}
+    for value, n in pairs:
+        moved = mu + shift + (value - mu) * spread
+        key = f"{moved:.4f}"
+        out[key] = out.get(key, 0.0) + n
+    return out
+
+
+def score(rows: list[dict[str, Any]], *, lines: list[float],
+          shift: float = 0.0, spread: float = 1.0) -> dict[str, Any]:
     """Calibration by predicted-probability bucket, plus the hostile baseline."""
     buckets: dict[tuple[float, float], list[tuple[float, int]]] = collections.defaultdict(list)
     abs_err_model: list[float] = []
     abs_err_frozen: list[float] = []
+    # SIGNED, because MAE hides direction and direction is the whole question
+    # here: a distribution that is too LOW and one that is too NARROW produce
+    # the same "realised over-rate exceeds predicted" pattern, and they need
+    # opposite fixes. `signed = projected - actual`, so NEGATIVE means the model
+    # projects fewer points than the game produced.
+    signed_err_model: list[float] = []
+    sim_spread: list[float] = []
 
     for row in rows:
         actual = row["actual_total"]
         if row.get("projected_total") is not None:
-            abs_err_model.append(abs(float(row["projected_total"]) - actual))
+            projected = float(row["projected_total"]) + shift
+            abs_err_model.append(abs(projected - actual))
+            signed_err_model.append(projected - actual)
+        dist = row.get("total_dist") or {}
+        if dist:
+            # The sim's own SD, to separate "too low" from "too narrow".
+            try:
+                pairs = [(float(k), int(v)) for k, v in dist.items()]
+                n = sum(c for _, c in pairs)
+                mu = sum(v * c for v, c in pairs) / n
+                var = sum(c * (v - mu) ** 2 for v, c in pairs) / n
+                sim_spread.append(var ** 0.5)
+            except (TypeError, ValueError, ZeroDivisionError):
+                pass
         # FROZEN: nobody scores again. Free to anyone watching.
         abs_err_frozen.append(abs(row["total_at_cutoff"] - actual))
+        dist_for_scoring = row["total_dist"]
+        if shift or spread != 1.0:
+            dist_for_scoring = calibrate_dist(dist_for_scoring, shift=shift, spread=spread)
         for line in lines:
-            prob = _p_over(row["total_dist"], line)
+            prob = _p_over(dist_for_scoring, line)
             if prob is None:
                 continue
             if actual == line:
@@ -316,6 +376,10 @@ def score(rows: list[dict[str, Any]], *, lines: list[float]) -> dict[str, Any]:
             round(sum(1 for r in rows if r["possession_unknown"]) / len(rows), 4) if rows else None
         ),
         "mae_projection": round(statistics.fmean(abs_err_model), 3) if abs_err_model else None,
+        # NEGATIVE = the model projects FEWER points than the game produced.
+        "bias_projection": round(statistics.fmean(signed_err_model), 3) if signed_err_model else None,
+        "sim_total_sd_mean": round(statistics.fmean(sim_spread), 3) if sim_spread else None,
+        "residual_sd": round(statistics.pstdev(signed_err_model), 3) if len(signed_err_model) > 1 else None,
         "mae_frozen": round(statistics.fmean(abs_err_frozen), 3) if abs_err_frozen else None,
         "beats_frozen": (
             (statistics.fmean(abs_err_model) < statistics.fmean(abs_err_frozen))
@@ -355,6 +419,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=None, help="max games, for a smoke run")
     parser.add_argument("--ratings-file", default=None,
                         help="JSON {team: [offense, defense]}; provenance is reported")
+    parser.add_argument("--shift", type=float, default=0.0,
+                        help="points added to the total (location correction)")
+    parser.add_argument("--spread", type=float, default=1.0,
+                        help="multiplier on the distribution spread")
+    parser.add_argument("--dump-rows", default=None,
+                        help="save replay rows so variants can be scored without re-simulating")
+    parser.add_argument("--score-only", default=None,
+                        help="score saved rows instead of simulating")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
@@ -362,6 +434,24 @@ def main(argv: list[str] | None = None) -> int:
     if not dates:
         print("give --window or --dates", flush=True)
         return 2
+
+    # SIMULATE ONCE, SCORE MANY. Each variant is a different reading of the
+    # SAME draws, so re-simulating per variant would add Monte Carlo noise
+    # between them and make a comparison of corrections partly a comparison of
+    # random seeds.
+    if args.score_only:
+        saved = json.loads(Path(args.score_only).read_text(encoding="utf-8"))
+        rows = saved["rows"]
+        lines = [float(x) for x in str(args.lines).split(",") if x.strip()]
+        result = score(rows, lines=lines, shift=args.shift, spread=args.spread)
+        result.update({k: saved.get(k) for k in
+                       ("dates", "completed_games_found", "duplicate_events_skipped",
+                        "games_unrated_refused", "ratings_source", "sims_per_cutoff")})
+        result["calibration_shift"] = args.shift
+        result["calibration_spread"] = args.spread
+        result["scored_from"] = args.score_only
+        print(json.dumps(result, indent=1, sort_keys=True))
+        return 0
 
     ratings_provenance = "production sp_offense_defense_rating"
     if args.ratings_file:
@@ -412,8 +502,20 @@ def main(argv: list[str] | None = None) -> int:
             unrated += 1
         rows.extend(replayed)
 
+    if args.dump_rows:
+        Path(args.dump_rows).write_text(json.dumps({
+            "rows": rows,
+            "dates": len(dates),
+            "completed_games_found": len(games),
+            "duplicate_events_skipped": duplicates,
+            "games_unrated_refused": unrated,
+            "ratings_source": ratings_provenance,
+            "sims_per_cutoff": args.sims,
+        }), encoding="utf-8")
+        print(f"dumped {len(rows)} rows -> {args.dump_rows}", flush=True)
+
     lines = [float(x) for x in str(args.lines).split(",") if x.strip()]
-    result = score(rows, lines=lines)
+    result = score(rows, lines=lines, shift=args.shift, spread=args.spread)
     result["dates"] = len(dates)
     result["completed_games_found"] = len(games)
     result["duplicate_events_skipped"] = duplicates
@@ -421,6 +523,8 @@ def main(argv: list[str] | None = None) -> int:
     result["sims_per_cutoff"] = args.sims
     result["lines_scored"] = lines
     result["ratings_source"] = ratings_provenance
+    result["calibration_shift"] = args.shift
+    result["calibration_spread"] = args.spread
 
     if args.json:
         print(json.dumps(result, indent=1, sort_keys=True))

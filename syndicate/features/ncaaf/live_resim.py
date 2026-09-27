@@ -351,6 +351,76 @@ def _positive_int(value: Any, *, default: int, hi: int) -> int:
     return parsed
 
 
+# LIVE TOTALS CALIBRATION, measured 2026-09-26 and applied to TOTALS ONLY.
+#
+# The cutoff-replay grade (`scripts/backtest_ncaaf_live_totals.py`) run on
+# production ratings over 187 completed games / 561 cutoff rows found the live
+# totals estimator wrong in TWO independent ways:
+#
+#     location    projected - actual = -2.165 points   (the sim runs LOW)
+#     dispersion  sim SD 8.45 vs residual SD 10.73     (too NARROW, ratio 0.79)
+#
+# Either alone leaves most of the miss: on identical draws the worst
+# predicted-probability bucket went 0.1463 -> 0.0790 (shift only) -> 0.0837
+# (spread only) -> 0.0492 (both). CLAUDE.md warns that two mechanisms added
+# together can interact NEGATIVELY (measured: 4 of 4 markets); here they are
+# COMPLEMENTARY, and that was checked rather than assumed.
+#
+# VALIDATED OUT OF SAMPLE, because the constants were fitted on the same games
+# they were then scored against, which flatters by construction. Refitting on
+# the EARLIER 101 games only and scoring the LATER 86 it had never seen:
+# worst bucket 0.1797 -> 0.0646, i.e. better out of sample than in. The shipped
+# constants are then refitted on the FULL sample, which is the standard order:
+# validate the method out of sample, estimate the parameter on everything.
+#
+# RESIDUAL, NOT CLAIMED AS FIXED: the out-of-sample bias only fell from -2.96 to
+# -1.32, because the true bias DRIFTS between windows and this is a constant.
+# It should be refitted as the season accumulates.
+#
+# TOTALS ONLY. `margin_dist` and `home_margin_mean` are NOT corrected: the grade
+# measured totals, and applying an unmeasured correction to the margin would be
+# exactly the substitution this module refuses everywhere else.
+def _live_total_bias_points() -> float:
+    raw = str(os.environ.get("NCAAF_LIVE_TOTAL_BIAS_POINTS") or "").strip()
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return 2.165
+
+
+def _live_total_spread_scale() -> float:
+    raw = str(os.environ.get("NCAAF_LIVE_TOTAL_SPREAD_SCALE") or "").strip()
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return 1.270
+    return value if value > 0 else 1.270
+
+
+def calibrate_total_distribution(totals: list[int]) -> tuple[float, dict[str, int]]:
+    """`(corrected_mean, corrected_histogram)` for rest-of-game totals.
+
+    `corrected = mu + shift + (draw - mu) * spread`. The histogram keys are
+    rounded back to whole points because a total IS a whole number of points;
+    rounding after the transform keeps the support on the real lattice rather
+    than inventing fractional totals the game cannot produce.
+    """
+    if not totals:
+        return 0.0, {}
+    shift = _live_total_bias_points()
+    spread = _live_total_spread_scale()
+    mu = sum(totals) / len(totals)
+    out: dict[str, int] = {}
+    moved_sum = 0.0
+    for value in totals:
+        moved = mu + shift + (value - mu) * spread
+        moved = max(0.0, moved)  # a total cannot be negative
+        key = str(int(round(moved)))
+        out[key] = out.get(key, 0) + 1
+        moved_sum += moved
+    return moved_sum / len(totals), out
+
+
 def resim_live_game(
     state: NcaafLiveGameState,
     *,
@@ -455,15 +525,16 @@ def resim_live_game(
     for value in margins:
         key = str(value)
         margin_dist[key] = margin_dist.get(key, 0) + 1
-    for value in totals:
-        key = str(value)
-        total_dist[key] = total_dist.get(key, 0) + 1
+    # CALIBRATED. `total_mean` below is the corrected mean, so the board's
+    # displayed live total stops running ~2.2 points low.
+    calibrated_total_mean, total_dist = calibrate_total_distribution(totals)
 
     return {
         "home_win_prob": round(home_win_prob, 6),
         "sims_run": ran,
         "home_margin_mean": round(sum(margins) / ran, 3),
-        "total_mean": round(sum(totals) / ran, 3),
+        "total_mean": round(calibrated_total_mean, 3),
+        "total_mean_uncalibrated": round(sum(totals) / ran, 3),
         "possession_unknown": possession_unknown,
         "ties": ties,
         # Same shape as the pregame sidecar's `margin_dist` / `total_points_dist`

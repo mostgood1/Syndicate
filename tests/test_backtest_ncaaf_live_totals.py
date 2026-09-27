@@ -143,9 +143,15 @@ def test_a_ratings_file_is_read_in_both_shapes(tmp_path):
     path = tmp_path / "r.json"
     path.write_text(json.dumps({"Texas": [12.0, -4.0], "UTSA": {"offense": 1.0, "defense": 2.0}}),
                     encoding="utf-8")
+    from scripts.generate_smartsim2_ncaaf_projections import norm
+
     table = bt._ratings_from_file(path)
-    assert table["Texas"] == (12.0, -4.0)
-    assert table["UTSA"] == (1.0, 2.0)
+    # KEYED THROUGH `norm`, because `sp_offense_defense_rating` looks up
+    # `sp_index.get(norm(team))`. Keying on the raw name matched nothing and
+    # every game came back "unrated" -- indistinguishable from an FBS-vs-FCS
+    # refusal, which would have silently emptied the sample.
+    assert table[norm("Texas")] == (12.0, -4.0)
+    assert table[norm("UTSA")] == (1.0, 2.0)
 
 
 def test_an_empty_ratings_file_RAISES_rather_than_returning_neutral(tmp_path):
