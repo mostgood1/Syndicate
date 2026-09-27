@@ -21,11 +21,21 @@ quarter and a similar scoreline. That is the whole model. It has no parameters
 to overfit, which after a night of fitted constants going wrong in production is
 a feature rather than a limitation.
 
-THE MARGIN CONDITIONER IS NOT DECORATION. A team trailing by 21 in the fourth
-throws on every down; a team leading by 21 runs the clock out. So REST is not
-independent of the margin it follows, and the fit MEASURES that correlation
-rather than assuming it -- `margin_rest_correlation_by_period` rides in the
-artifact so a reader can see whether the dimension earns its place.
+THE MARGIN CONDITIONER IS SIGNED, AND THAT IS THE POINT OF SCHEMA 2. A team
+trailing by 21 in the fourth throws on every down; a team leading by 21 runs the
+clock out, so REST is not independent of the margin it follows. Schema 1
+additionally MIRRORED each observation onto "the leader", assuming leading-home
+and leading-away were the same thing. Measured on 2025 they are not: REST is
+home-positive whoever leads (home leading +1.076, away leading +1.176, tied
+-0.011), so the mirror discarded about +2.25 points of home-field advantage.
+Schema 2 keeps everything home-positive and buckets by SIGNED margin, so
+`H4-10` and `A4-10` are different cells and home advantage lives in the data.
+
+THE COST IS CELL SIZE, and it is real: signed buckets are roughly half the size,
+so a fit on too few seasons falls back to the pooled quarter for most requests
+and quietly stops conditioning on margin at all -- measured, a 3-season fit
+answered 90 of 99 requests from the pool. `rest_distribution` names its source
+for exactly this reason: `cell:2|A4-10` and `pooled:2` are different claims.
 
 WHAT IT DELIBERATELY DOES NOT DO:
 
@@ -59,6 +69,15 @@ __all__ = [
 # Q2" are different amounts of remaining football and the fit only knows one.
 SUPPORTED_PERIODS = (1, 2, 3)
 
+# SCHEMA 2 IS UNFOLDED. Schema 1 mirrored observations onto "the leader's
+# perspective" and required the caller to negate a trailing team's draw back.
+# Reading a schema-1 artifact with schema-2 code would apply a LEADER's
+# distribution to a trailing team without negating it -- a home team down ten
+# reported as a ten-point favourite, which is precisely the inversion
+# `price_distribution_market` warns about. So the version is CHECKED, not
+# assumed, and an old artifact is refused rather than silently misread.
+SUPPORTED_SCHEMA_VERSIONS = (2,)
+
 
 def score_clock_model_path(data_root: Any) -> Path:
     """Where the fitted artifact lives, beside the other NFL source data."""
@@ -80,15 +99,22 @@ class ScoreClockModel:
     cell_n: Mapping[str, int]
 
     def _bucket(self, margin: int) -> str:
-        a = abs(int(margin))
+        """SIGNED, in the home-positive frame: `H4-10`, `A11-17`, `TIED`."""
+        m = int(margin)
+        if m == 0:
+            return "TIED"
+        side = "H" if m > 0 else "A"
+        a = abs(m)
         for label in self.margin_buckets:
-            lo, _, hi = label.partition("-")
+            if not label or label == "TIED" or label[0] != side:
+                continue
+            lo, _, hi = label[1:].partition("-")
             try:
                 if int(lo) <= a <= int(hi):
                     return label
             except ValueError:
                 continue
-        return self.margin_buckets[-1] if self.margin_buckets else ""
+        return ""
 
     def rest_distribution(self, *, period: int, margin_at: int
                           ) -> tuple[dict[str, int], str] | None:
@@ -114,22 +140,20 @@ class ScoreClockModel:
                             ) -> tuple[dict[str, int], str] | None:
         """`({final_margin: count}, source)` in the HOME-POSITIVE frame.
 
-        THE SIGN IS UNFOLDED HERE. The fit folds every observation onto the
-        leader's perspective to double its cells, so a trailing home team's draw
-        must be negated back before it means "home margin". Getting this
-        backwards would produce a confident distribution pointed the wrong way,
-        which is the inversion `price_distribution_market` warns about and which
-        once put 0.74 on MLB underdogs.
+        THERE IS NO SIGN TO UNFOLD. Schema 2 keeps every observation
+        home-positive and conditions on a SIGNED margin bucket, so the cell for
+        a trailing home team already describes trailing home teams -- including
+        the home-field advantage that the schema-1 fold averaged away (measured
+        +2.25 points). The draw is simply added to the board.
         """
         got = self.rest_distribution(period=period, margin_at=margin_at)
         if got is None:
             return None
         rest, source = got
-        sign = -1 if int(margin_at) < 0 else 1
         out: dict[str, int] = {}
         for raw, count in rest.items():
             try:
-                value = int(margin_at) + sign * int(float(raw))
+                value = int(margin_at) + int(float(raw))
             except (TypeError, ValueError):
                 return None
             key = str(value)
@@ -171,6 +195,12 @@ def load_score_clock_model(path: Any) -> ScoreClockModel | None:
     except Exception:  # noqa: BLE001
         return None
     try:
+        version = int(raw.get("schema_version") or 0)
+        if version not in SUPPORTED_SCHEMA_VERSIONS:
+            # REFUSED, not migrated. A schema-1 artifact is FOLDED and this code
+            # does not unfold; reading it would point a trailing team's
+            # distribution the wrong way. Refit rather than reinterpret.
+            return None
         pooled = raw["pooled_by_period"]
         cells = raw["cells"]
         if not pooled:

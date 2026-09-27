@@ -30,6 +30,13 @@ assert it never saw its own games. That is the discipline the NCAAF totals
 correction skipped on 2026-09-26, when constants fitted on 22-day-stale ratings
 went to production and had to be withdrawn the same night.
 
+EXCLUDE 2020 FROM ANY FIT THAT CARES ABOUT HOME ADVANTAGE. That season was
+played in empty or near-empty stadiums and home-field advantage was measurably
+reduced, so it is not a sample from the same process as the seasons this model
+is applied to. Schema 2 exists specifically to stop averaging home advantage
+away; feeding it a season where the advantage was suppressed would put the
+distortion back by a different route.
+
     py -3 scripts/fit_nfl_score_clock.py --seasons 2023,2024,2025 \
         --out data/nfl_source/score_clock_margin_2023_2025.json
 """
@@ -50,7 +57,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from scripts.backtest_nfl_live_totals import completed_games  # noqa: E402
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # Cutoffs are quarter boundaries, for the same reason the replay harness uses
 # them: the score is exact and the clock is 0:00, so no play-by-play is needed
@@ -69,18 +76,34 @@ MIN_CELL_N = 60
 
 
 def margin_bucket(margin: int) -> str:
-    """The bucket label for a margin, by ABSOLUTE value and signed separately.
+    """SIGNED bucket in the HOME-POSITIVE frame. `H4-10`, `A11-17`, `TIED`.
 
-    The sign is kept out of the bucket and applied to the distribution instead
-    (see `fit`), because the dynamics are symmetric -- trailing by 14 is the
-    mirror of leading by 14 -- and splitting the sign would halve every cell for
-    no gain.
+    SCHEMA 2 STOPPED FOLDING, and the reason is measured. Schema 1 mirrored
+    every observation onto "the leader's perspective" to double its cells, which
+    assumes leading-home and leading-away are mirror images. On 2025 they are
+    not: rest-of-game margin is HOME-POSITIVE regardless of who leads --
+
+        home leading  n=394  mean REST +1.076
+        away leading  n=329  mean REST +1.176
+        tied          n= 93  mean REST -0.011
+
+    -- so the fold discarded about +2.25 points of home-field advantage, and no
+    amount of conditioning on |margin| could recover it because the information
+    was destroyed before bucketing. Unfolded, home advantage simply lives in the
+    data: an `A4-10` cell already knows the trailing home team tends to gain.
+
+    The cost is cells roughly half the size, which is why `MIN_CELL_N` still
+    guards them and thin cells still fall back to the pooled quarter.
     """
-    a = abs(int(margin))
+    m = int(margin)
+    if m == 0:
+        return "TIED"
+    side = "H" if m > 0 else "A"
+    a = abs(m)
     for lo, hi in MARGIN_BUCKETS:
         if lo <= a <= hi:
-            return f"{lo}-{hi}"
-    return f"{MARGIN_BUCKETS[-1][0]}-{MARGIN_BUCKETS[-1][1]}"
+            return f"{side}{lo}-{hi}"
+    return f"{side}{MARGIN_BUCKETS[-1][0]}-{MARGIN_BUCKETS[-1][1]}"
 
 
 def observations(seasons: list[int], weeks: list[int], *, seasontype: int = 2
@@ -116,13 +139,11 @@ def _histogram(values: list[int]) -> dict[str, int]:
 
 
 def fit(obs: list[dict[str, Any]]) -> dict[str, Any]:
-    """The artifact: rest-of-game margin distributions by (period, bucket).
+    """The artifact: rest-of-game margin distributions by (period, SIGNED bucket).
 
-    THE SIGN IS FOLDED. An observation with a NEGATIVE margin at the cutoff is
-    mirrored -- both its margin and its rest are negated -- so that every cell
-    describes "the leader's perspective". That doubles the sample per cell and
-    encodes the symmetry explicitly instead of hoping the data splits evenly.
-    A caller reading a cell for a trailing team negates the draw back.
+    EVERYTHING IS HOME-POSITIVE AND NOTHING IS MIRRORED. A caller adds the cell's
+    draw to the margin on the board and is done -- there is no sign to unfold and
+    therefore no sign to get backwards.
     """
     cells: dict[str, list[int]] = collections.defaultdict(list)
     pooled: dict[int, list[int]] = collections.defaultdict(list)
@@ -131,10 +152,11 @@ def fit(obs: list[dict[str, Any]]) -> dict[str, Any]:
     for o in obs:
         p, at, rest = int(o["period"]), int(o["margin_at"]), int(o["rest"])
         corr_input[p].append((at, rest))
-        sign = -1 if at < 0 else 1
-        at_f, rest_f = at * sign, rest * sign
-        pooled[p].append(rest_f)
-        cells[f"{p}|{margin_bucket(at_f)}"].append(rest_f)
+        # NO FOLD. Everything stays in the HOME-POSITIVE frame, so home-field
+        # advantage is carried by the cells instead of being averaged out of
+        # them -- see `margin_bucket` for the measurement that forced this.
+        pooled[p].append(rest)
+        cells[f"{p}|{margin_bucket(at)}"].append(rest)
 
     correlation: dict[str, Any] = {}
     for p, pairs in sorted(corr_input.items()):
@@ -152,7 +174,15 @@ def fit(obs: list[dict[str, Any]]) -> dict[str, Any]:
         "observations": len(obs),
         "games": len({o["event_id"] for o in obs}),
         "min_cell_n": MIN_CELL_N,
-        "margin_buckets": [f"{lo}-{hi}" for lo, hi in MARGIN_BUCKETS],
+        # THE SIGNED LABELS, i.e. exactly the keys `cells` is bucketed by.
+        # Emitting the UNSIGNED list here while keying cells signed made the
+        # consumer's lookup miss every cell and fall back to the pooled quarter
+        # -- silently, because falling back is legitimate behaviour. Measured
+        # before the fix: 86 of 99 graded requests answered from the pool
+        # despite only 2 of 27 cells being underpowered.
+        "margin_buckets": (["TIED"]
+                           + [f"H{lo}-{hi}" for lo, hi in MARGIN_BUCKETS]
+                           + [f"A{lo}-{hi}" for lo, hi in MARGIN_BUCKETS]),
         # THE CORRELATION IS PUBLISHED, not assumed. If it is ~0 the margin
         # conditioner is buying nothing and a reader should say so rather than
         # inheriting a model that carries a dimension it does not need.
