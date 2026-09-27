@@ -169,3 +169,81 @@ def test_the_WORKER_tick_actually_calls_the_capture():
     inner = lr._maybe_capture_prop_snapshot.__code__.co_names
     assert "record_quarter_snapshot" in inner
     assert "fetch_player_stat_rows" in inner
+
+
+def test_captures_are_written_to_the_WRITE_root_not_the_probing_READ_root():
+    """`#389`/`#441`, and this shipped wrong once already.
+
+    `default_nfl_source_root()` decides a root by PROBING for
+    `upcoming_recs_*.csv` -- an unrelated family the repo mirror ships and the
+    mounted disk does not -- so it resolves to `/opt/render/project/src/data`,
+    the CHECKOUT, which every deploy replaces. Projections were written there
+    for days while the guard read the mounted disk.
+
+    A capture is the worst thing to put in an ephemeral location: the data
+    cannot be regenerated, so a wipe is not a stale artifact, it is a lost
+    slate. Asserted on the code object because a comment naming the right
+    function is exactly what was there while the wrong one was being called.
+    """
+    from syndicate.features.nfl import live_prop_capture as c
+
+    names = c.default_capture_dir.__code__.co_names
+    assert "nfl_artifact_output_root" in names, "capture is using a probing READ root"
+    assert "default_nfl_source_root" not in names
+
+
+def test_the_worker_hook_uses_the_capture_modules_own_root_helper():
+    from syndicate.features.nfl import live_resim as lr
+
+    names = lr._maybe_capture_prop_snapshot.__code__.co_names
+    assert "default_capture_dir" in names
+
+
+def test_capture_fires_at_HALFTIME_when_the_game_is_not_simulatable(monkeypatch, tmp_path):
+    """The flaw that cost a live slate, pinned as behaviour.
+
+    The first version gated on `isinstance(resolved, NflLiveGameState)` -- on
+    the game being SIMULATABLE. `live_state_from_row` refuses a game that is
+    not "in progress", and a game AT a quarter boundary is in a break.
+    Measured 22:07Z: LV@NO sat at `Q2 0:00` while the tick reported
+    `live_resimmed 3` against 4 live games. The capture returned silently at
+    exactly the moments it exists for.
+
+    So the hook must read the RAW row and must NOT care what the sim made of
+    it: a game at halftime has already produced the Q2 production.
+    """
+    from syndicate.features.nfl import live_resim as lr
+
+    calls = {}
+    monkeypatch.setattr(lr, "PROP_CAPTURE_CLOCK_SECONDS", 120)
+    import syndicate.features.nfl.live_player_box as box
+    monkeypatch.setattr(box, "fetch_player_stat_rows",
+                        lambda e: [{"player": "T.Kelce", "rec_yards": 64.0}])
+    import syndicate.features.nfl.live_prop_capture as cap
+    monkeypatch.setattr(cap, "record_quarter_snapshot",
+                        lambda root, **kw: calls.update(kw) or 1)
+
+    # A halftime row: period 2, clock 0, and a REFUSAL from the sim side.
+    row = {"state": "pre", "period": 2, "clock_seconds": 0,
+           "home_score": 13, "away_score": 13, "event_id": "401772999"}
+    refusal = lr.NflResimRefusal("game_not_in_progress", "halftime")
+    lr._maybe_capture_prop_snapshot(row, refusal, date_str="2026-09-27")
+
+    assert calls.get("event_id") == "401772999", (
+        "halftime was skipped -- the capture is still gated on simulatability"
+    )
+    assert calls.get("period") == 2
+    assert calls.get("clock_seconds") == 0
+
+
+def test_a_FINAL_game_is_not_captured_as_a_boundary(monkeypatch):
+    """Q4's end is the final box, which is not lossy and is fetched elsewhere."""
+    from syndicate.features.nfl import live_resim as lr
+
+    calls = {}
+    import syndicate.features.nfl.live_prop_capture as cap
+    monkeypatch.setattr(cap, "record_quarter_snapshot", lambda root, **kw: calls.update(kw))
+    lr._maybe_capture_prop_snapshot(
+        {"state": "final", "period": 3, "clock_seconds": 0, "event_id": "E9"},
+        None, date_str="2026-09-27")
+    assert not calls

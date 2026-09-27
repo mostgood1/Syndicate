@@ -40,6 +40,7 @@ __all__ = [
     "CAPTURE_SCHEMA_VERSION",
     "capture_enabled",
     "capture_path",
+    "default_capture_dir",
     "snapshot_rows",
     "record_quarter_snapshot",
 ]
@@ -74,19 +75,29 @@ def capture_enabled() -> bool:
     return raw not in {"off", "0", "false", "no"}
 
 
-def default_capture_root() -> Any:
-    """The NFL source root production actually writes to.
+def default_capture_dir() -> Path:
+    """Where captures are WRITTEN. `nfl_artifact_output_root`, not the read root.
 
-    Resolved through `sources.default_nfl_source_root`, which honours
-    `SYNDICATE_NFL_SOURCE_ROOT` then `SYNDICATE_DATA_ROOT` then the checkout --
-    so on Render this lands on the MOUNTED DISK and not in the ephemeral
-    checkout, which every deploy replaces. A capture written to the checkout
-    would be discarded by the next deploy, which is the same trap
-    `sp_ratings_durable_path` exists to avoid.
+    THE FIRST VERSION OF THIS WAS WRONG AND SHIPPED WRONG, which is why the
+    correction is stated here rather than quietly swapped. It used
+    `default_nfl_source_root()`, whose docstring says in terms that it resolves
+    a root by PROBING for `upcoming_recs_*.csv` -- an unrelated artifact family
+    the repo mirror ships and the mounted disk does not. `#389`/`#441` measured
+    that exact selector sending NFL writes to
+
+        /opt/render/project/src/data/nfl_source     <- the CHECKOUT, ephemeral
+
+    instead of `/opt/render/project/data/nfl_source`, the mounted disk, so every
+    run wrote a real artifact somewhere nothing reads and every deploy discarded
+    it. A capture is the worst possible thing to put there: the data cannot be
+    regenerated, so a wiped capture is not a stale artifact, it is a lost slate.
+
+    `nfl_artifact_output_root()` is the write-side twin that exists for this --
+    env var, else the shared data root, NO filesystem probing.
     """
-    from syndicate.features.nfl.sources import default_nfl_source_root
+    from syndicate.features.nfl.sources import nfl_artifact_output_root
 
-    return default_nfl_source_root().parent
+    return nfl_artifact_output_root() / "live_prop_capture"
 
 
 def capture_path(data_root: Any, date_str: str) -> Path:
@@ -97,7 +108,7 @@ def capture_path(data_root: Any, date_str: str) -> Path:
     times in 16.8 h on 2026-09-27. A partially written JSON array is unreadable;
     a partially written JSONL file loses at most its last line.
     """
-    return Path(data_root) / "nfl_source" / "live_prop_capture" / f"{date_str}.jsonl"
+    return Path(data_root) / "live_prop_capture" / f"{date_str}.jsonl"
 
 
 def snapshot_rows(

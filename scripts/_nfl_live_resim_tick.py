@@ -81,6 +81,15 @@ def normalise_live_row(row: Mapping[str, Any]) -> dict[str, Any]:
         "clock_seconds": _clock_seconds(row),
         # Absent on purpose -- see the docstring. The producer marginalises.
         "possession_owner": None,
+        # CARRIED THROUGH FOR THE PROP CAPTURE, added 2026-09-27 after it cost a
+        # live slate. `live_state_from_row` does not need this, so the adapter
+        # dropped it -- and `nfl/live_resim._maybe_capture_prop_snapshot` reads
+        # it to fetch the per-quarter player box. With the field absent the
+        # capture returned silently on every game of every tick: zero CAPTURED
+        # lines AND zero FAILED lines for 37 minutes with three games sitting
+        # inside the capture window. An adapter that drops a field its consumer
+        # needs looks exactly like a feature nobody enabled.
+        "event_id": row.get("event_id"),
     }
 
 
