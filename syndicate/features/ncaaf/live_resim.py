@@ -54,47 +54,63 @@ TWO MARKET FAMILIES: the moneyline and TOTALS. The lane carries
 interval from `simsRun` the same way it does for MLB. Nothing here relaxes
 `PRICEABLE_SIGMA`.
 
-TOTALS BECAME PRICEABLE ON 2026-09-26, BY MEASUREMENT AND NOT BY DECISION.
+TOTALS BECAME PRICEABLE ON 2026-09-26 BY MEASUREMENT.
 `scripts/backtest_ncaaf_live_totals.py` replays this module's own
 `resim_live_game` from quarter boundaries in completed games -- the score is
 exact and the clock is 0:00 there, so no play-by-play is needed -- and scores
-its histogram against the real final total. Over 561 cutoff rows / 187 games,
-at production's 120 sims and production's SP+ ratings:
+its histogram against the real final total. Publishing was and remains right:
+the distribution reaching the pricer took the board's withheld reason
+`live_resim_published_no_distribution_for_this_market` from 112 to 7 and
+priceable rows from 4 to 16, measured on production.
 
-    worst predicted-probability bucket   0.1463  ->  0.0492
-    signed bias                         -2.165   ->  -0.081  points
-    MAE 8.282 against a FROZEN baseline's 27.046
-    out of sample (fit on 101 games, scored on 86)  0.1797 -> 0.0646
+**THE CORRECTION THAT SHIPPED WITH IT WAS WRONG AND WAS WITHDRAWN THE SAME
+NIGHT, and the reason is worth more than the fix.** The grade that produced
+`shift +2.165` ran against SP+ ratings stamped `fetched_at 2026-09-05`,
+`verified=False` -- 22 days stale. The harness printed that provenance on every
+run; nobody read it. Re-run over the SAME dates with the ratings production
+actually uses, on 546 Saturday rows / 182 games:
 
-`#499`'s WNBA precedent -- a measured worst bucket of 0.150 -- is met and
-beaten. The correction itself lives in `calibrate_total_distribution`, and
-`total_dist` is returned ALREADY CORRECTED so the board prices exactly the
-numbers that were graded.
+    uncorrected totals bias   +0.171   95% CI over games [-1.176, +1.538]
+    worst bucket uncorrected  0.0556
+    worst bucket AT +2.165    0.1558   <- the shipped correction made it WORSE
 
-SPREADS FOLLOWED ON 2026-09-27, ON THEIR OWN GRADE AND A DAY LATER. Totals
-shipped first and `marginDist` was deliberately withheld for one commit,
-because the totals grade licensed totals and nothing else. `--market margin`
-then scored the same function over 570 rows / 190 games:
+The -2.165 was a property of stale ratings, not of the simulator. So
+`calibrate_total_distribution` is now IDENTITY, and `#499`'s 0.150 bar is
+cleared by the UNCORRECTED estimator at 0.0556. A stale-input artifact is
+indistinguishable from a model defect at every level except the input's own
+provenance field -- which is why that field is now the first thing a grade
+reports.
 
-    worst predicted-probability bucket   0.0954  ->  0.0448
-    signed bias                         -1.058   ->  +0.002  points
-    direction                   9 of 10 one way  ->  5 of 10
+SPREADS FOLLOWED ON 2026-09-27, on their own grade, and their correction was
+REFIT the same night for the same stale-ratings reason. `marginDist` was
+deliberately withheld for one commit because the totals grade licensed totals
+and nothing else. Publishing it opened live spreads. The constant, refit on the
+SATURDAY population with fresh ratings (546 rows / 182 games):
 
-so `marginDist` is published too and `price_distribution_market` prices live
-spreads. `calibrate_margin_distribution` holds that correction; unlike the
-totals one it does NOT clamp, because a margin is signed and clamping would
+    uncorrected       worst 0.0411   bias -0.387  CI over games [-1.644, +0.896]
+    first shipped     worst 0.0869   bias +0.673  <- +1.06/1.30, too large
+    REFIT +0.387/1.10 worst 0.0397   bias -0.000
+
+Saturday is the right population because NCAAF live games are overwhelmingly a
+Saturday event, and day of week is EXOGENOUS -- a "dates with >= 20 games"
+filter selects nearly the same rows by looking at the data, and silently drops
+opening Saturday 2026-08-29. `calibrate_margin_distribution` holds it and,
+unlike the totals one, does NOT clamp: a margin is signed and clamping would
 delete every away-win draw.
 
-TWO THINGS THAT GRADE IS NOT. (1) It is WEAKER than the totals grade: out of
-sample on a game-balanced split it reached 0.1105, against totals' 0.0646, and
-the margin bias drifts hard across the season (-0.485 early, -1.631 late), so a
-constant undercorrects recent games. (2) It does not make the moneyline and the
-spread arithmetically identical: `home_win_prob` is counted from the RAW
-margins while `marginDist` is corrected, a measured 0.12-1.87pp disagreement at
-the pivot. That is far inside the ~9.13pp publish bar at 120 sims, so the two
-cannot print contradictory edges, and a test fails if it ever widens.
+WHAT THIS CORRECTION IS NOT. The improvement is 0.0014 and the bias CI spans
+zero, so identity would also be defensible; it is retained as measurably
+not-worse, not as something the evidence demands. A CLAIM MADE EARLIER AND
+RETRACTED: that the margin bias "drifts hard across the season" (-0.485 early
+vs -1.631 late). It does not. That split was confounded by WHICH DATES fell in
+each half -- 31 midweek games sat mostly in the early one -- and on well-powered
+Saturdays the halves read -1.496 and -1.927. Restricted properly the difference
+is mild and its interval spans zero.
 
-TOTALS BECAME PRICEABLE FIRST, on 2026-09-26; that grade is above.
+COHERENCE: `home_win_prob` is counted from the RAW margins while `marginDist`
+is corrected, a measured 0.12-1.87pp disagreement at the pivot. Far inside the
+~9.13pp publish bar at 120 sims, so the two cannot print contradictory edges,
+and a test fails if it ever widens.
 
 **NO FALLBACK TO THE PREGAME PROBABILITY, EVER** (`#414`). The re-sim used to
 ship a live mean beside a `modelProbOver` that was bit-identical to the pregame
@@ -416,12 +432,37 @@ def _positive_int(value: Any, *, default: int, hi: int) -> int:
 # became legitimate once `--market margin` produced a number. See
 # `calibrate_margin_distribution` below for that grade and for how much weaker
 # its evidence is than this one's.
+# ---------------------------------------------------------------------------
+# THE TOTALS CORRECTION IS WITHDRAWN (2026-09-27, hours after it shipped). It
+# was fitted on STALE SP+ RATINGS and it made production WORSE.
+# ---------------------------------------------------------------------------
+#
+# The grade that produced `shift +2.165` ran against a `sp_ratings_2026.json`
+# whose `fetched_at` was 2026-09-05 -- 22 days old, `verified=False`. The
+# harness printed that provenance on every run and it was not read. Re-run over
+# the SAME dates with the ratings production actually uses (fetched
+# 2026-09-27T01:10Z, `verified=True`), on 546 Saturday rows / 182 games:
+#
+#     uncorrected totals bias   +0.171   95% CI over games [-1.176, +1.538]
+#     worst bucket uncorrected  0.0556
+#     worst bucket AT +2.165    0.1558   <- the shipped correction, nearly the
+#                                          `#499` bar, bias pushed to +2.336
+#
+# So the -2.165 that justified the correction was an artifact of stale ratings,
+# not a property of the simulator. With fresh ratings the bias cannot be
+# distinguished from zero, and the Saturday-weighted fit is -0.171 -- which in
+# an INTEGER histogram rounds away entirely, so shipping it would be false
+# precision dressed as a correction. Identity it is.
+#
+# WHAT THIS DOES NOT UNDO: publishing `totalRunsDist` was still right. The
+# distribution reaching the pricer is what took the withheld reason from 112 to
+# 7; only the transform applied to it was wrong.
 def _live_total_bias_points() -> float:
     raw = str(os.environ.get("NCAAF_LIVE_TOTAL_BIAS_POINTS") or "").strip()
     try:
         return float(raw)
     except (TypeError, ValueError):
-        return 2.165
+        return 0.0
 
 
 def _live_total_spread_scale() -> float:
@@ -429,8 +470,8 @@ def _live_total_spread_scale() -> float:
     try:
         value = float(raw)
     except (TypeError, ValueError):
-        return 1.270
-    return value if value > 0 else 1.270
+        return 1.0
+    return value if value > 0 else 1.0
 
 
 def calibrate_total_distribution(totals: list[int]) -> tuple[float, dict[str, int]]:
@@ -492,12 +533,28 @@ def calibrate_total_distribution(totals: list[int]) -> tuple[float, dict[str, in
 # HARD ACROSS THE SEASON: -0.485 over the earlier half, -1.631 over the later.
 # A single constant cannot track that, so it UNDERCORRECTS recent games. Refit
 # as the season accumulates; do not read 0.0448 as the live number.
+# REFIT 2026-09-27 ON THE SATURDAY POPULATION WITH FRESH RATINGS. The first
+# constants (+1.06 / 1.30) came from the same stale-ratings sample as the totals
+# ones and were likewise too large: on 546 Saturday rows / 182 games they took
+# the worst bucket from 0.0411 UP to 0.0869 and pushed the bias from -0.387 to
+# +0.673. Saturday-weighted is the right population because NCAAF live games are
+# overwhelmingly a Saturday event, and the day of week is exogenous -- a
+# "dates with >= 20 games" filter picks nearly the same rows but is chosen by
+# looking at the data, and it silently drops opening Saturday 2026-08-29.
+#
+#     uncorrected      worst 0.0411   bias -0.387  CI over games [-1.644, +0.896]
+#     REFIT +0.387/1.10 worst 0.0397  bias -0.000
+#
+# THE IMPROVEMENT IS 0.0014 AND THE CI SPANS ZERO. This is a correction retained
+# because it was asked for and is measurably not worse, NOT one the evidence
+# demands; identity would also be defensible. Both defaults are env-overridable
+# precisely so this can be moved without a deploy.
 def _live_margin_bias_points() -> float:
     raw = str(os.environ.get("NCAAF_LIVE_MARGIN_BIAS_POINTS") or "").strip()
     try:
         return float(raw)
     except (TypeError, ValueError):
-        return 1.06
+        return 0.387
 
 
 def _live_margin_spread_scale() -> float:
@@ -505,8 +562,8 @@ def _live_margin_spread_scale() -> float:
     try:
         value = float(raw)
     except (TypeError, ValueError):
-        return 1.30
-    return value if value > 0 else 1.30
+        return 1.10
+    return value if value > 0 else 1.10
 
 
 def calibrate_margin_distribution(margins: list[int]) -> tuple[float, dict[str, int]]:

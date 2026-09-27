@@ -199,13 +199,21 @@ def test_the_lens_publishes_BOTH_graded_distributions():
     assert lane["projection"]["marginDist"] == {"17": 300}
 
 
-def test_the_published_total_histogram_is_the_CALIBRATED_one():
-    """The board must price the numbers that were graded.
+def test_the_TOTALS_transform_is_IDENTITY_and_the_lens_publishes_the_raw_draws():
+    """The totals correction was WITHDRAWN on 2026-09-27, hours after shipping.
 
-    `resim_live_game` corrects `total_dist` in place and reports
-    `total_mean_uncalibrated` beside it. If the lens ever published the RAW
-    draws next to a corrected `total`, the displayed projection and the price
-    would disagree -- and the 0.0492 reading would describe neither.
+    `shift +2.165` had been fitted on a grade that ran against a
+    `sp_ratings_2026.json` stamped `fetched_at 2026-09-05`, `verified=False` --
+    22 days stale. Re-run over the same dates with the ratings production uses,
+    on 546 Saturday rows / 182 games, the uncorrected bias is +0.171 with a
+    bootstrap CI over games of [-1.176, +1.538], and the shipped correction took
+    the worst bucket from 0.0556 UP to 0.1558.
+
+    So the transform is identity, and this test pins that the board prices the
+    draws the simulator actually produced. It is deliberately NOT written as
+    "corrected == raw" on a hand-made fixture: any sub-0.5 shift rounds away in
+    an integer histogram, so such a fixture would pass against a real and wrong
+    correction. It asserts on the MEAN, which a shift does move.
     """
     from syndicate.features.ncaaf.live_resim import (
         NcaafLiveGameState, build_game_lens, calibrate_total_distribution,
@@ -213,24 +221,27 @@ def test_the_published_total_histogram_is_the_CALIBRATED_one():
 
     totals = [20, 27, 31, 38, 45, 52]
     corrected_mean, corrected = calibrate_total_distribution(totals)
-    raw = {}
+    raw_mean = sum(totals) / len(totals)
+    assert corrected_mean == pytest.approx(raw_mean, abs=1e-9), (
+        "the totals transform is shifting the mean -- the correction was withdrawn"
+    )
+    counted = {}
     for t in totals:
-        raw[str(t)] = raw.get(str(t), 0) + 1
-    assert corrected != raw, "the fixture cannot distinguish corrected from raw"
+        counted[str(t)] = counted.get(str(t), 0) + 1
+    assert corrected == counted
 
+    # And what reaches the pricer is exactly what the sim returned.
     state = NcaafLiveGameState(
         home_team="Texas", away_team="UTSA", period=2, clock_seconds=0,
         home_score=10, away_score=7, possession_owner=None, as_of="2026-09-19",
     )
-    lanes = build_game_lens(
+    lane = build_game_lens(
         state,
         {
-            "home_win_prob": 0.55, "sims_run": 120, "home_margin_mean": 3.0,
-            "total_mean": corrected_mean, "total_mean_uncalibrated": sum(totals) / len(totals),
-            "possession_unknown": False, "ties": 0,
+            "home_win_prob": 0.55, "sims_run": 6, "home_margin_mean": 3.0,
+            "total_mean": corrected_mean, "possession_unknown": False, "ties": 0,
             "margin_dist": {"3": 6}, "total_dist": corrected,
         },
         live_state_as_of="2026-09-19",
-    )
-    assert lanes[0]["projection"]["totalRunsDist"] == corrected
-    assert lanes[0]["projection"]["totalRunsDist"] != raw
+    )[0]
+    assert lane["projection"]["totalRunsDist"] == corrected
