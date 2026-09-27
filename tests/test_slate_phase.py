@@ -190,3 +190,24 @@ def test_read_refuses_stale_missing_and_garbage():
     assert sp.read_published_phases(read=lambda p: 1 / 0, now_epoch=NOW)["sports"] == {}
     fresh = sp.read_published_phases(read=store.get, now_epoch=NOW + 5, path="p")
     assert set(fresh["sports"]) == {"nfl"}, "an unknown phase value must not reach the board"
+
+
+def test_soccer_never_starts_soon_but_can_be_live():
+    """User decision 2026-09-27: soccer is excluded from starting_soon."""
+    soon = _phase(40 * 60, sport="soccer")
+    assert soon.phase == sp.PHASE_PREGAME and soon.reason == "starting_soon_excluded"
+    assert _phase(-120, sport="soccer").phase == sp.PHASE_PREGAME, "no kickoff grace either"
+    assert _phase(10, is_live=True, sport="soccer").phase == sp.PHASE_LIVE
+    assert sp.apply_starting_soon_interval("soccer", 7200, soon, env=ON) == (7200, None)
+
+
+def test_soccer_cadence_questions_never_run_the_checker():
+    calls = []
+    sp._LIVE_CACHE.clear()
+    phase = sp.current_phase(
+        "soccer", now_epoch=NOW, date_str="d", next_fixture=lambda s, now_epoch: now_epoch + 600,
+        live_checkers={"soccer": lambda d: calls.append(d) or False}, need_live=False, env=ON,
+    )
+    assert phase.phase == sp.PHASE_PREGAME and calls == []
+    assert sp.is_starting_soon("soccer", now_epoch=NOW, date_str="d", next_fixture=lambda s, now_epoch: now_epoch + 600,
+                               live_checkers={}, env=ON) is False

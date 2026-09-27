@@ -27,11 +27,12 @@ running** -- so the stale NFL prices were PROPS, which ride only the 2h combined
 1. Deploy refresh-worker from main with `SYNDICATE_SLATE_PHASE_OBSERVE=true` in a quiet
    window (can ride the held `worker-memory-heartbeat` deploy); verify `SLATE_PHASE` lines
    appear and cadence is unchanged. Record in `deploys.md`.
-2. Credit estimate per sport BEFORE enabling starting-soon (credits/sweep x added sweeps).
+2. **Credit ESTIMATE done 2026-09-27 (NOT a measurement -- verify on the first enabled Sunday).** Added full sweeps per 3h window: nfl/ncaaf/nba/nhl/ncaab ~+5.5 (2h baseline -> 30 min + T-75/T-10); mlb ~+3 (already 1h via `SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_MLB=3600` + existing T-windows); wnba ~+3.5; soccer 0 (excluded). Per-sweep cost, props = markets x regions(`us`) x events: nfl 9 mkts x ~16 events (8-day window) ~150; ncaaf ~1,170 (figure from `fetch_ncaaf_oddsapi_props_local.events_in_scope` docstring, not a ledger reading); nba 13 mkts x ~10 ~140; nhl ~0 (no book markets); mlb UNMEASURED (ledger says so). Per day: ncaaf ~3,700 (4 windows/wk -- every window re-prices the whole 8-day slate), nfl ~540 (4 windows/wk + injury-forced sweeps), mlb ~300-1,500, wnba ~50; nba +~770 from late Oct. **Total ~4.6-5.8K/day now, ~5.4-6.6K with NBA = ~160-200K/month, ~3-4% of the 5M plan**, +9-11% on the last recorded burn (~61.8K/day, 2026-09-19). Upper-bound-ish: `launch_refresh_run` contention will drop some. Biggest lever if needed: `SYNDICATE_SLATE_STARTING_SOON_SWEEP_INTERVAL_SECONDS_NCAAF=3600` roughly halves NCAAF's share. VERIFY: `/api/ops/oddsapi/quota` `by_sport` before/after the first enabled NFL Sunday + NCAAF Saturday.
 3. Enable starting-soon on an NFL Sunday; verify NFL launches <= 30 min apart inside T-3h,
    `T_WINDOW_SWEEP_DUE` with `nfl:ramp:`/`nfl:closing:`, `NFL_INJURIES_FETCH_LAUNCHING interval_s=900`.
 4. Board label per sport -- BUILT 2026-09-27 (`GET /api/intelligence/slate-phases`, sport tabs show LIVE / SOON · countdown); shows nothing until the observe flag is on for a worker.
-5. **Known limits:** nflverse injuries follow practice reports, NOT game-day inactives (needs
+5. **Soccer is EXCLUDED** (user, 2026-09-27): `STARTING_SOON_EXCLUDED_SPORTS`; its own league-scoped path already sweeps every tick inside 3h, and the 600 s cooldown would have ~tripled it.
+6. **Known limits:** nflverse injuries follow practice reports, NOT game-day inactives (needs
    another source); NCAAF has no injury feed; NCAAB has no live checker, so its T-windows
    keep firing mid-slate, bounded only by the min gap.
 
