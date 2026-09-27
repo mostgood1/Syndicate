@@ -752,6 +752,15 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET — moved `soccer-live-goal-window-from-paths` (owner abacd435 idle 6.1d, block last modified 243m ago) to `lanes_closed.md`. The other 10 CLOSED blocks WAIT (owner idle < 240m). Table: `.syndicate/log/2026-09-27.md`.
 
+### nfl-upcoming-recs-sibling-root — OPEN — opened 2026-09-27 — session 2aff0397-c3cb-5c6f-8719-4d90ab9ce110
+- **STATUS 2026-09-27: fix on branch `claude/nfl-upcoming-recs-sibling-root` (user: "apply the nfl fix in its own PR"). Verified offline: target test FAIL -> OK; `tests.test_archives` 386 OK (2 skipped); `tests/test_nfl*.py` 71 failing IDENTICAL by name before/after (pre-existing). Production roots all carry `nfl_source` (render.yaml SYNDICATE_NFL_SOURCE_ROOT, data_root/nfl_source, checkout mirror), so no real root is dropped. Close on merge + CI `test` green.**
+- Goal: NFL week summaries never read upcoming_recs_*.csv from a non-nfl_source root (the sibling NFL-Betting repo); test_archives green again on CI
+- Files: syndicate/features/nfl/sources.py
+- Hypothesis: _upcoming_recs_paths (from 7761ce59, #672) globs every _source_roots() entry, including the sibling repo root that _first_existing_root already skips
+- Falsification test: If the test still fails with non-nfl_source roots skipped, the fallback comes from elsewhere
+- Verification: test_nfl_week_summaries_do_not_fall_back_to_sibling_repo fails before / passes after; python -m unittest tests.test_archives OK; tests/test_nfl*.py failure set identical before/after
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

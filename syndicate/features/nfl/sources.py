@@ -528,6 +528,13 @@ def _upcoming_recs_paths() -> list[Path]:
     """
     seen: dict[str, Path] = {}
     for root in _source_roots():
+        # Syndicate-owned roots only, the same rule `_first_existing_root`
+        # applies: `_source_roots()` can include a sibling repo's data dir
+        # (`NFL-Betting/nfl_compare/data`), and reading recs from it is the
+        # source-app fallback `test_nfl_week_summaries_do_not_fall_back_to_sibling_repo`
+        # forbids. Widening this glob to every root (`#672`) re-admitted it.
+        if "nfl_source" not in {part.lower() for part in root.parts}:
+            continue
         try:
             paths = sorted(root.glob("upcoming_recs_*.csv"))
         except OSError:
