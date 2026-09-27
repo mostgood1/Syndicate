@@ -42562,3 +42562,30 @@ The 09:43 PM CT row and its measurement row say the margin bias "DRIFTS across t
 ### Still true from the earlier rows
 
 Publishing the distributions was right and stands: `live_resim_published_no_distribution_for_this_market` 112 -> 7 and priceable 4 -> 16, measured. Only the transform applied to the published draws was wrong.
+
+## 2026-09-27 06:40 CDT (11:40Z) — READING: live-odds-worker, soccer goal windows off the real clock (`9c28e63d`) — **MET, narrowly**
+
+Scheduled task `soccer-goal-window-served-read-0926`, lane `soccer-live-goal-window-from-paths`. Read-only against production; the only writes are this ledger.
+
+- **service / live commit:** live-odds-worker `srv-d91dpertqb8s73co8lt0`, live deploy `ec10612a` (finished 2026-09-25T22:56:21Z, on origin/main). `git merge-base --is-ancestor 9c28e63d ec10612a` = true, and the six files `9c28e63d` touched are byte-identical between the two commits (`git diff --stat` empty). So the code being read is the shipped code, **but the live process is not the 09-21 deploy**: four later deploys sit on top of it, which matters for the cost comparison below.
+- **window:** 49 reads, every 10 min, 2026-09-27T03:33:41Z .. 11:25:21Z (both Central dates 09-26 and 09-27, all 10 leagues, 10-20 files per read, 0 fetch errors). Reads with a game in play (status not FT/HT, clock > 0): **6, from 03:33Z to 04:24Z** — the late MLS slate only (LA Galaxy-Colorado 761841, San Jose-Portland 761843, Vancouver-D.C. United 761842; Real Salt Lake-New England 761840 was already at 90'+3' on the first read). The 04:24:49Z read repeats the 04:23:46Z artifact exactly (a poller restart one minute later), so there are **5 DISTINCT in-play reads spanning 50 minutes**. From 04:34Z to 11:25Z, every live_state file was re-written seconds before each read, with 0 games — the writer was alive; nothing was in play before 11:33Z. No European match was read.
+- **PRESENCE:** 25 game-observations (all games present in every file, in play or not), every one with numeric `next_5_min` and `next_10_min` in [0, 1]. 0 failures. (The served keys are `next_5_min` / `next_10_min`, not `next_5` / `next_10` as registered.)
+- **INVARIANT next_5 <= next_10:** holds on 25 of 25. Whenever both are positive, next_5 is strictly smaller (e.g. 761843 at 80', 3-0: 0.1167 vs 0.3633).
+- **INVARIANT next_5 == next_10 at clock_remaining <= 300:** holds on 4 of 4 — **but all four are clock_remaining = 0.0 in second-half stoppage (90'+1' .. 90'+4'), both values 0.0.** No read landed with 1-300 s left, so the non-trivial case of this invariant was NOT exercised. It holds; it was not really tested.
+- **HEALTH (from 2026-09-27T03:33Z):** `Traceback` 0 lines, `LEAGUE_POLL_FAILED` 0 lines; each query printed `# COVERED  nothing matched`. The log fetch covered 03:34:01Z .. 11:34:51Z.
+- **COST (reported, not gating).** Per-(league, date) gap between consecutive `live_state_*.json (<n> live games` writes with n > 0, bucketed by the total in play across all files:
+
+| total in play | 2026-09-20 (old code) | 2026-09-27 | n gaps |
+|---|---|---|---|
+| 1-2 | 123 s | 147 s | 1 |
+| 3-5 | 200 s | **141 s** | 25 |
+| 6-9 | 190 s | — | 0 |
+| 10+ | 267 s | — | 0 |
+
+This is the COMBINED effect of `9c28e63d`, `c612db03`, `858a1763` and whatever the four later deploys up to `ec10612a` changed on this service. It is also a one-league, three-match slate against a ten-league baseline. Directional only: 3-5 in play ran about 30% faster (200 s -> 141 s); the 1-2 bucket is a single gap.
+
+**verify: MET** by the registered rule: presence and both invariants on 5 distinct reads over 50 minutes with matches in play, health 0/0 COVERED. **Caveats that bound the claim:** one league, three matches, and the `<= 300 s` equality only seen at 0 s.
+
+**Two things seen in passing, both outside this lane's change (leads, not graded):**
+1. **First-half stoppage is served as the second half.** 761843 at `status_detail 45'+6'`, `status_period 1`, was served as `half 2, clock_remaining 2700` — so its windows (0.15 / 0.30) describe the opening of the second half, not the remaining first-half stoppage time.
+2. **Second-half stoppage serves a 0.0 goal chance.** At 90'+1' .. 90'+4', `clock_remaining = 0.0` and both windows are exactly 0.0, although goals are scored in stoppage time.
