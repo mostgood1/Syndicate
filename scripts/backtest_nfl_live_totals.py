@@ -354,7 +354,8 @@ def margin_lines_for(row: Mapping[str, Any]) -> list[float]:
 
 
 def replay_game(game: Mapping[str, Any], *, ratings: Mapping[str, Any],
-                sims: int, band: str = "respect") -> tuple[list[dict[str, Any]], dict[str, int]]:
+                sims: int, band: str = "respect",
+                rating_sd: float = 0.0) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """One completed game -> (rows, refusals_by_reason).
 
     CALLS THE SHIPPED FUNCTION. Re-implementing its loop would measure
@@ -402,7 +403,7 @@ def replay_game(game: Mapping[str, Any], *, ratings: Mapping[str, Any],
                 state,
                 home_offense=home_pair[0], home_defense=home_pair[1],
                 away_offense=away_pair[0], away_defense=away_pair[1],
-                sims=sims, env=RESIM_ENV,
+                sims=sims, env=RESIM_ENV, rating_sd=rating_sd,
             )
             if not isinstance(result, dict):
                 reason = getattr(result, "reason", "unknown_refusal")
@@ -639,6 +640,9 @@ def main(argv: list[str] | None = None) -> int:
                              "as fetched from production; provenance is reported")
     parser.add_argument("--lines", default=DEFAULT_TOTAL_LINES)
     parser.add_argument("--market", default="total", choices=("total", "margin"))
+    parser.add_argument("--rating-sd", type=float, default=0.0,
+                        help="per-rating sd for RATING UNCERTAINTY PROPAGATION; "
+                             "0 = off and bit-identical to the point estimate")
     parser.add_argument("--band", default="respect", choices=("respect", "bypass"),
                         help="respect = grade what production would publish; "
                              "bypass = diagnostic, measures what the band costs")
@@ -712,7 +716,8 @@ def main(argv: list[str] | None = None) -> int:
             refusals["no_ratings_artifact_for_week"] = refusals.get("no_ratings_artifact_for_week", 0) + 1
             continue
         game_rows, game_refusals = replay_game(
-            game, ratings=entry[0], sims=sims, band=args.band)
+            game, ratings=entry[0], sims=sims, band=args.band,
+            rating_sd=args.rating_sd)
         for reason, count in game_refusals.items():
             refusals[reason] = refusals.get(reason, 0) + count
         if not game_rows:

@@ -54,6 +54,7 @@ registration is a two-entry change rather than a translation layer.
 from __future__ import annotations
 
 import os
+import random
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -266,6 +267,111 @@ def ratings_are_degenerate(
     return abs(home_net - away_net) < RATING_SEPARATION_FLOOR
 
 
+# ---------------------------------------------------------------------------
+# RATING UNCERTAINTY PROPAGATION. The distribution is too narrow because the
+# simulator treats a noisy rating as a certain one.
+# ---------------------------------------------------------------------------
+#
+# MEASURED 2026-09-27 over 80 cutoff rows / 32 games, margins, split by the
+# rating source the artifact itself declares:
+#
+#     wk1  prior_season_fallback   sim_sd 8.414   residual_sd 10.219
+#     wk2+3 rolling / blend        sim_sd 8.504   residual_sd 14.153
+#
+# `sim_sd` IS FLAT while `residual_sd` swings four points with the SOURCE. The
+# simulator's spread cannot be the explanation for a difference the simulator
+# does not know about: what changes between those rows is how well-determined
+# the ratings are. wk1's come from a full prior season; wk2's come from one week
+# of games. The missing variance is RATING uncertainty, not game variance.
+#
+# THIS IS ALSO WHY A GLOBAL SPREAD CONSTANT CANNOT WORK, and one was refused on
+# exactly this evidence: the widening required is x1.214 on wk1 and x1.664 on
+# wk2+3, so any single scale is wrong for whichever half it was not fitted on.
+# Fitted anyway on a 221-point grid it reached a worst bucket of 0.1177 -- under
+# `#499`'s bar -- and INVERTED out of sample (test 0.254 -> 0.3495), partly by
+# evacuating the failing bucket below the power floor (0.9-1.0: n=83 -> n=9).
+#
+# THE CONSTANTS BELOW ARE PROVISIONAL, and the first derivation of them was
+# WRONG in a way worth recording. Required extra variance is
+# `residual_sd^2 - sim_sd^2` (5.80 pts for wk1, 11.31 for wk2+3). Converting
+# that to rating units by the engine's sensitivity of ~11.4 margin points per
+# 1.0 of net separation, then halving because net separation is
+# `(ho+hd) - (ao+ad)` whose variance is 4*sd^2, gives per-rating sd 0.254 and
+# 0.496 -- and PREDICTS a widening of roughly 1.6x at 0.496.
+#
+# MEASURED, it is 1.17x:
+#
+#     rating_sd 0.000 -> margin sd 11.379   1.000x
+#     rating_sd 0.254 -> margin sd 11.853   1.042x
+#     rating_sd 0.496 -> margin sd 13.327   1.171x
+#     rating_sd 0.750 -> margin sd 14.478   1.272x
+#
+# The 11.4 slope was taken across LARGE separations and the engine's response
+# SATURATES (separation 2.0 -> +16.4 margin, 4.0 -> +23.9, 8.0 -> +29.1), so the
+# local slope around an operating point is far smaller than the global one, and
+# perturbing symmetrically across a concave response yields less spread than the
+# linear approximation. **A sensitivity measured over the wrong range is the same
+# class of error as a threshold measured in the wrong units** -- which is what
+# `RATING_SEPARATION_FLOOR` above turned out to be.
+#
+# So the mapping source -> sd must be fitted EMPIRICALLY against the observed
+# widening, not computed from a slope. That fit is what `--rating-sd` on
+# `scripts/backtest_nfl_live_totals.py` exists to run, and until it reports
+# these two numbers are a starting point and nothing is switched on.
+#
+# READ THE SANITY CHECK BEFORE TRUSTING ANY OUTPUT OF THIS: those uncertainties
+# are the SAME ORDER as the ratings' own dispersion (net sd 0.381 / 0.866 /
+# 0.329 for wk1/2/3). The ratings carry about as much noise as signal, which is
+# precisely what a model losing to a frozen baseline looks like. Propagating
+# this honestly will pull probabilities TOWARD the score-implied baseline. That
+# is the correct direction, not a bug.
+#
+# DEFAULT OFF. NFL live re-sim is ENABLED in production (measured today:
+# `NFL_LIVE_RESIM {"enabled": true, "games": 16}`) and prices the MONEYLINE, so
+# switching this on changes live published probabilities. It ships inert and
+# turns on after its own grade, which is the sequence NCAAF's totals correction
+# skipped.
+_RATING_UNCERTAINTY_BY_SOURCE = {
+    "prior_season_fallback": 0.254,
+    "current_season_rolling": 0.496,
+    "current_season_blend": 0.496,
+}
+_RATING_UNCERTAINTY_DEFAULT = 0.496
+
+
+def rating_uncertainty_for_source(source: Any) -> float:
+    """Per-rating sd for a declared `rating_source`. UNKNOWN IS THE WIDE ONE.
+
+    An unrecognised source is treated as the NOISIEST case, not the cleanest:
+    `learnings.md` forbids mapping unknown onto the permissive branch, and here
+    the permissive branch is "this rating is well determined", which would
+    publish a confident probability off a source nobody has measured.
+    """
+    key = str(source or "").strip().lower()
+    return _RATING_UNCERTAINTY_BY_SOURCE.get(key, _RATING_UNCERTAINTY_DEFAULT)
+
+
+def _perturbed_ratings(
+    seed: int, sd: float,
+    home_offense: float, home_defense: float,
+    away_offense: float, away_defense: float,
+) -> tuple[float, float, float, float]:
+    """The four ratings resampled for ONE simulation, deterministically.
+
+    Seeded from the sim's own seed so a replay of the same seed reproduces the
+    same draw -- a harness that could not reproduce its own rows could not
+    compare two variants on the SAME draws, which is how a calibration sweep
+    turns into a comparison of random seeds.
+    """
+    rng = random.Random(("nfl-rating-uncertainty", seed, sd).__hash__())
+    return (
+        home_offense + rng.gauss(0.0, sd),
+        home_defense + rng.gauss(0.0, sd),
+        away_offense + rng.gauss(0.0, sd),
+        away_defense + rng.gauss(0.0, sd),
+    )
+
+
 def _histogram(values: list[int]) -> dict[str, int]:
     """`{value: count}` over integer draws, keyed by str so it survives JSON.
 
@@ -289,6 +395,7 @@ def resim_live_game(
     sims: int | None = None,
     profile: Any = NFL_CALIBRATION_PROFILE,
     env: Mapping[str, str] | None = None,
+    rating_sd: float = 0.0,
 ) -> dict[str, Any] | NflResimRefusal:
     """Rest-of-game Monte Carlo from `state`, or a refusal. Never raises.
 
@@ -350,6 +457,11 @@ def resim_live_game(
     plans = ([("home", 25), ("away", 25)] if state.possession_owner is None
              else [(state.possession_owner, int(state.field_position))])
 
+    # ZERO IS OFF AND IS BIT-IDENTICAL TO THE PREVIOUS BEHAVIOUR: the branch
+    # below is not entered, `base` is used unchanged, and the same seeds produce
+    # the same games. That is asserted by a test rather than assumed.
+    sd = max(0.0, float(rating_sd or 0.0))
+
     started = time.time()
     home_wins = 0
     ties = 0
@@ -359,13 +471,25 @@ def resim_live_game(
     per_plan = max(1, n // len(plans))
     for owner, field_position in plans:
         for seed in range(1, per_plan + 1):
+            call = base
+            if sd > 0.0:
+                # RESAMPLED PER SIMULATION, so each draw is a game played by a
+                # plausible version of these teams rather than by the point
+                # estimate. Perturbing the INPUT and letting the engine respond
+                # is what makes the widening game-specific: a well-determined
+                # rating barely moves, a one-week rating moves a lot.
+                ho, hd, ao, ad = _perturbed_ratings(
+                    seed, sd, home_offense, home_defense, away_offense, away_defense)
+                call = dict(base,
+                            home_offense_rating=ho, home_defense_rating=hd,
+                            away_offense_rating=ao, away_defense_rating=ad)
             try:
                 out = simulate_game(
                     SmartSim2SimulationInput(
                         seed=seed,
                         initial_possession_owner=owner,
                         initial_field_position=field_position,
-                        **base,
+                        **call,
                     ),
                     profile=profile,
                 )
@@ -430,6 +554,9 @@ def resim_live_game(
         # `run_margin_dist` and what `price_distribution_market` expects.
         "margin_dist": _histogram(margins),
         "total_dist": _histogram(totals),
+        # AUDITABLE: a reader can always tell whether a published probability
+        # came from the point estimate or from resampled ratings.
+        "rating_sd": round(sd, 6),
         "possession_marginalised": state.possession_owner is None,
         "elapsed_seconds": round(time.time() - started, 3),
     }
