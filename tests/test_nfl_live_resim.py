@@ -422,18 +422,26 @@ def test_it_is_DETERMINISTIC_so_two_variants_compare_on_the_same_draws():
     assert a["margin_dist"] == b["margin_dist"]
 
 
-def test_an_UNKNOWN_rating_source_gets_the_WIDE_uncertainty_not_the_narrow_one():
+def test_an_UNKNOWN_rating_source_is_never_MORE_CONFIDENT_than_a_known_one():
     """Unknown must not take the permissive branch.
 
-    Here 'permissive' means 'this rating is well determined', which would
+    Here "permissive" means "this rating is well determined", which would
     publish a confident probability off a source nobody has measured.
+
+    THE ASSERTION IS `>= max(known)`, NOT `> some narrow entry`. An earlier
+    version compared a narrow source against a wide one, which baked in the
+    assumption that the table HAS distinct values. The empirical fit collapsed
+    it to a single value -- at rating_sd 1.0 the two sources came back at ratio
+    1.088 and 0.906, straddling 1.0, so a per-source distinction is not
+    warranted by evidence. A test that fails when the table becomes honest was
+    testing the table, not the rule.
     """
     from syndicate.features.nfl import live_resim as lr
 
-    wide = lr.rating_uncertainty_for_source("current_season_rolling")
-    narrow = lr.rating_uncertainty_for_source("prior_season_fallback")
-    assert narrow < wide
+    widest = max(lr._RATING_UNCERTAINTY_BY_SOURCE.values())
     for unknown in ("", None, "some_new_source_nobody_graded"):
-        assert lr.rating_uncertainty_for_source(unknown) == wide, (
-            f"{unknown!r} was treated as well-determined"
+        assert lr.rating_uncertainty_for_source(unknown) >= widest, (
+            f"{unknown!r} is treated as better determined than a measured source"
         )
+    for known, sd in lr._RATING_UNCERTAINTY_BY_SOURCE.items():
+        assert lr.rating_uncertainty_for_source(known) == sd

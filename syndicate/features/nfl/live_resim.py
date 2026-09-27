@@ -314,10 +314,18 @@ def ratings_are_degenerate(
 # class of error as a threshold measured in the wrong units** -- which is what
 # `RATING_SEPARATION_FLOOR` above turned out to be.
 #
-# So the mapping source -> sd must be fitted EMPIRICALLY against the observed
-# widening, not computed from a slope. That fit is what `--rating-sd` on
-# `scripts/backtest_nfl_live_totals.py` exists to run, and until it reports
-# these two numbers are a starting point and nothing is switched on.
+# So the mapping source -> sd was fitted EMPIRICALLY against the observed
+# widening rather than computed from a slope. That fit has now RUN; see the
+# table below for what it returned and why it collapsed to a single value.
+#
+# WHAT THE FIT DOES NOT BUY, stated here so the number above is not misread as a
+# green light: with dispersion matched at rating_sd 1.0 the worst powered bucket
+# is 0.2410 against `#499`'s 0.150 bar, all ten buckets still powered, and MAE
+# 9.596 still LOSES to a frozen baseline's 7.522. Fixing the spread did not make
+# this model publishable -- the remaining error is RESOLUTION, not calibration.
+# It also costs coverage: refused cutoffs rise 19 -> 30 as honest uncertainty
+# pulls more games into the uninformative band. That is the correct trade and it
+# is still a trade.
 #
 # READ THE SANITY CHECK BEFORE TRUSTING ANY OUTPUT OF THIS: those uncertainties
 # are the SAME ORDER as the ratings' own dispersion (net sd 0.381 / 0.866 /
@@ -331,12 +339,37 @@ def ratings_are_degenerate(
 # switching this on changes live published probabilities. It ships inert and
 # turns on after its own grade, which is the sequence NCAAF's totals correction
 # skipped.
+# FITTED EMPIRICALLY 2026-09-27, replacing the slope-derived 0.254 / 0.496.
+# Swept `--rating-sd` over the full replay and compared on the 51 rows COMMON to
+# every run, because raising the sd pulls probabilities toward 0.5 and pushes
+# rows into `UNINFORMATIVE_BAND` -- the scored sample shrank 80 -> 69 -> 56, so a
+# naive cross-sweep comparison is partly selection, not calibration:
+#
+#     rating_sd 0.0   sim_sd  7.761   residual_sd 12.244   ratio 0.634
+#     rating_sd 1.0   sim_sd  9.818   residual_sd 11.659   ratio 0.842
+#     rating_sd 2.0   sim_sd 12.965   residual_sd 10.832   ratio 1.197
+#
+# The mismatch closes monotonically on a FIXED sample, so the mechanism does what
+# it was built to do. ~1.0 is the defensible setting; 2.0 over-widens.
+#
+# AND A SINGLE VALUE FITS BOTH SOURCES, so the per-source split this table was
+# invented for is NOT warranted by the evidence. At rating_sd 1.0:
+#
+#     wk1 prior_season_fallback   sim_sd 10.439  residual_sd  9.591  ratio 1.088
+#     wk2+3 rolling / blend       sim_sd 11.029  residual_sd 12.172  ratio 0.906
+#
+# Those straddle 1.0 within ~10%. The x1.214-vs-x1.664 gap that motivated a
+# per-source map was an artifact of measuring the required widening on the POINT
+# estimate, where rating noise is entirely absent from the spread; once it is
+# propagated, the two sources need nearly the same sd. The table is kept as the
+# hook for a later refit ON EVIDENCE, with both entries at the fitted value
+# rather than at numbers that would imply a distinction nothing has measured.
 _RATING_UNCERTAINTY_BY_SOURCE = {
-    "prior_season_fallback": 0.254,
-    "current_season_rolling": 0.496,
-    "current_season_blend": 0.496,
+    "prior_season_fallback": 1.0,
+    "current_season_rolling": 1.0,
+    "current_season_blend": 1.0,
 }
-_RATING_UNCERTAINTY_DEFAULT = 0.496
+_RATING_UNCERTAINTY_DEFAULT = 1.0
 
 
 def rating_uncertainty_for_source(source: Any) -> float:
