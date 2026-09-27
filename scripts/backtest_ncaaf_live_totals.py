@@ -303,6 +303,45 @@ def calibrate_dist(dist: Mapping[str, Any], *, shift: float, spread: float) -> d
     return out
 
 
+
+# A FIXED LADDER OF LINES WORKS FOR TOTALS AND IS DEGENERATE FOR MARGINS.
+# Totals cluster: 45.5/52.5/59.5 straddle nearly every college game, so a fixed
+# ladder produces predicted probabilities across the whole 0-1 range. Margins do
+# NOT cluster -- each game has its own centre. Measured 2026-09-27 on a ladder of
+# -10.5..+10.5: **3,988 of 3,990 cells landed in the 0.9-1.0 bucket**, because a
+# game like San Jose State @ USC carries a margin distribution spanning +3..+56
+# and every line on that ladder sits below all of it. The grade reported a worst
+# gap of 0.0004 and meant nothing whatever: it measured almost no cell where the
+# model was ever uncertain, which is the only place calibration is interesting.
+#
+# So the ladder is CENTRED PER GAME -- but the anchor MUST NOT BE THE MODEL.
+#
+# THE SECOND WRONG ANSWER, and it looked right: anchoring on the distribution's
+# own median. It produces a healthy spread of predicted probabilities, and it is
+# STRUCTURALLY BLIND TO THE ONLY THING IT WAS ADDED TO MEASURE. A location shift
+# moves the distribution and the anchor together, so every predicted probability
+# is unchanged and the calibration is invariant to it. Measured 2026-09-27:
+# fitting a shift on a training half and scoring the test half returned a worst
+# bucket of 0.1036 -> 0.1036, IDENTICAL to four decimal places, at a shift that
+# demonstrably moved the signed bias. A number that cannot move is not evidence.
+#
+# THE ANCHOR IS THE FROZEN MARGIN: the score differential already on the board at
+# the cutoff. It is observed, not modelled, so a location correction genuinely
+# changes P(cover) at a fixed line -- which is what a real market line does too,
+# since a live spread is quoted against the game in front of it and does not
+# move when our estimator does. Half-point lines, so nothing can push.
+MARGIN_LINE_OFFSETS = (-14.0, -7.0, -3.0, 0.0, 3.0, 7.0, 14.0)
+
+
+def margin_lines_for(row: Mapping[str, Any]) -> list[float]:
+    """Half-point lines straddling the MODEL-INDEPENDENT frozen margin."""
+    try:
+        away_at, home_at = row["score_at_cutoff"]
+        frozen = float(home_at) - float(away_at)
+    except (KeyError, TypeError, ValueError):
+        return []
+    return [frozen + off + 0.5 for off in MARGIN_LINE_OFFSETS]
+
 def score(rows: list[dict[str, Any]], *, lines: list[float],
           shift: float = 0.0, spread: float = 1.0,
           market: str = "total") -> dict[str, Any]:
@@ -328,7 +367,7 @@ def score(rows: list[dict[str, Any]], *, lines: list[float],
             projected = float(row[proj_key]) + shift
             abs_err_model.append(abs(projected - actual))
             signed_err_model.append(projected - actual)
-        dist = row.get("total_dist") or {}
+        dist = row.get("margin_dist" if market == "margin" else "total_dist") or {}
         if dist:
             # The sim's own SD, to separate "too low" from "too narrow".
             try:
@@ -345,7 +384,8 @@ def score(rows: list[dict[str, Any]], *, lines: list[float],
         dist_for_scoring = row["margin_dist"] if market == "margin" else row["total_dist"]
         if shift or spread != 1.0:
             dist_for_scoring = calibrate_dist(dist_for_scoring, shift=shift, spread=spread)
-        for line in lines:
+        row_lines = margin_lines_for(row) if market == "margin" else lines
+        for line in row_lines:
             prob = _p_over(dist_for_scoring, line)
             if prob is None:
                 continue

@@ -71,12 +71,30 @@ beaten. The correction itself lives in `calibrate_total_distribution`, and
 `total_dist` is returned ALREADY CORRECTED so the board prices exactly the
 numbers that were graded.
 
-THE REST-OF-GAME MARGIN DISTRIBUTION IS STILL **NOT** PUBLISHED, though this
-re-sim has it in hand. `live_gameline_join` would price SPREADS off `marginDist`
-the moment it appeared, and the grade above measured totals -- margins have
-never been scored, and `calibrate_total_distribution` deliberately does not
-correct them. The asymmetry is deliberate: a measurement licenses the market it
-measured and no other. `projection.homeMargin` stays a display field.
+SPREADS FOLLOWED ON 2026-09-27, ON THEIR OWN GRADE AND A DAY LATER. Totals
+shipped first and `marginDist` was deliberately withheld for one commit,
+because the totals grade licensed totals and nothing else. `--market margin`
+then scored the same function over 570 rows / 190 games:
+
+    worst predicted-probability bucket   0.0954  ->  0.0448
+    signed bias                         -1.058   ->  +0.002  points
+    direction                   9 of 10 one way  ->  5 of 10
+
+so `marginDist` is published too and `price_distribution_market` prices live
+spreads. `calibrate_margin_distribution` holds that correction; unlike the
+totals one it does NOT clamp, because a margin is signed and clamping would
+delete every away-win draw.
+
+TWO THINGS THAT GRADE IS NOT. (1) It is WEAKER than the totals grade: out of
+sample on a game-balanced split it reached 0.1105, against totals' 0.0646, and
+the margin bias drifts hard across the season (-0.485 early, -1.631 late), so a
+constant undercorrects recent games. (2) It does not make the moneyline and the
+spread arithmetically identical: `home_win_prob` is counted from the RAW
+margins while `marginDist` is corrected, a measured 0.12-1.87pp disagreement at
+the pivot. That is far inside the ~9.13pp publish bar at 120 sims, so the two
+cannot print contradictory edges, and a test fails if it ever widens.
+
+TOTALS BECAME PRICEABLE FIRST, on 2026-09-26; that grade is above.
 
 **NO FALLBACK TO THE PREGAME PROBABILITY, EVER** (`#414`). The re-sim used to
 ship a live mean beside a `modelProbOver` that was bit-identical to the pregame
@@ -393,9 +411,11 @@ def _positive_int(value: Any, *, default: int, hi: int) -> int:
 # -1.32, because the true bias DRIFTS between windows and this is a constant.
 # It should be refitted as the season accumulates.
 #
-# TOTALS ONLY. `margin_dist` and `home_margin_mean` are NOT corrected: the grade
-# measured totals, and applying an unmeasured correction to the margin would be
-# exactly the substitution this module refuses everywhere else.
+# THE MARGIN IS CORRECTED TOO, ON ITS OWN GRADE (2026-09-27), and the paragraph
+# that used to sit here saying it was not is kept in spirit: the correction only
+# became legitimate once `--market margin` produced a number. See
+# `calibrate_margin_distribution` below for that grade and for how much weaker
+# its evidence is than this one's.
 def _live_total_bias_points() -> float:
     raw = str(os.environ.get("NCAAF_LIVE_TOTAL_BIAS_POINTS") or "").strip()
     try:
@@ -435,6 +455,83 @@ def calibrate_total_distribution(totals: list[int]) -> tuple[float, dict[str, in
         out[key] = out.get(key, 0) + 1
         moved_sum += moved
     return moved_sum / len(totals), out
+
+
+# --------------------------------------------------------------------------
+# THE MARGIN CORRECTION. Weaker evidence than the totals one above, stated here
+# rather than in a commit message, because the next reader decides whether to
+# trust a spread price on it.
+# --------------------------------------------------------------------------
+#
+# GRADED 2026-09-27 by the same cutoff-replay harness, `--market margin`, over
+# 570 rows / 190 completed games at production's 120 sims and production's SP+
+# ratings. Uncorrected: worst predicted-probability bucket 0.0954, signed bias
+# -1.058 points, and realised exceeding predicted in 9 of 10 buckets -- the
+# same one-way signature that got the FIRST totals grade refused at 0.1499.
+# Corrected (shift +1.06, spread 1.30): worst bucket 0.0448, bias +0.002,
+# direction balanced at 5 of 10. All ten buckets powered, n 252-957.
+#
+# TWO HARNESS DEFECTS WERE FOUND AND FIXED BEFORE THIS NUMBER MEANT ANYTHING,
+# and both produced a healthy-looking reading first:
+#   1. A FIXED line ladder (-10.5..+10.5) put 3,988 of 3,990 cells in the
+#      0.9-1.0 bucket and reported a worst gap of 0.0004. Totals cluster and
+#      margins do not -- each game has its own centre.
+#   2. Anchoring the ladder on the DISTRIBUTION'S OWN MEDIAN fixed the spread of
+#      predictions and was structurally blind to location: a shift moves the
+#      distribution and the anchor together, so the calibration was invariant to
+#      the very bias it was added to measure (0.1036 -> 0.1036, identical to
+#      four decimals). The anchor is now the FROZEN MARGIN -- the score already
+#      on the board -- which is observed, not modelled.
+#
+# HOW THIS IS WEAKER THAN THE TOTALS CORRECTION, and it is not a footnote.
+# Out of sample on a game-balanced split (95 games fitted, 95 unseen), the test
+# half improved 0.1320 -> 0.1105. It generalises, and 0.1105 still clears
+# `#499`'s 0.150 bar -- but totals reached 0.0646 on the same test, and the
+# margin's residual out-of-sample bias is -1.381 points against the totals'
+# -1.32 on a much larger correction. The reason is that THE MARGIN BIAS DRIFTS
+# HARD ACROSS THE SEASON: -0.485 over the earlier half, -1.631 over the later.
+# A single constant cannot track that, so it UNDERCORRECTS recent games. Refit
+# as the season accumulates; do not read 0.0448 as the live number.
+def _live_margin_bias_points() -> float:
+    raw = str(os.environ.get("NCAAF_LIVE_MARGIN_BIAS_POINTS") or "").strip()
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return 1.06
+
+
+def _live_margin_spread_scale() -> float:
+    raw = str(os.environ.get("NCAAF_LIVE_MARGIN_SPREAD_SCALE") or "").strip()
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return 1.30
+    return value if value > 0 else 1.30
+
+
+def calibrate_margin_distribution(margins: list[int]) -> tuple[float, dict[str, int]]:
+    """`(corrected_mean, corrected_histogram)` for rest-of-game home margins.
+
+    Same transform as the totals calibrator -- `mu + shift + (draw - mu) * spread`
+    -- with one deliberate difference: THERE IS NO CLAMP. A total cannot be
+    negative and is clamped at zero; a home margin is signed, and clamping it
+    would silently delete every away-win draw and turn a close game into a
+    guaranteed home cover. The frame stays HOME-POSITIVE, matching
+    `run_margin_dist` and what `price_distribution_market` expects.
+    """
+    if not margins:
+        return 0.0, {}
+    shift = _live_margin_bias_points()
+    spread = _live_margin_spread_scale()
+    mu = sum(margins) / len(margins)
+    out: dict[str, int] = {}
+    moved_sum = 0.0
+    for value in margins:
+        moved = mu + shift + (value - mu) * spread
+        key = str(int(round(moved)))
+        out[key] = out.get(key, 0) + 1
+        moved_sum += moved
+    return moved_sum / len(margins), out
 
 
 def resim_live_game(
@@ -536,19 +633,19 @@ def resim_live_game(
     # score the SHIPPED function; re-implementing the loop would measure
     # something production does not run, which is the same error as scoring
     # against ratings production never used.
-    margin_dist: dict[str, int] = {}
-    total_dist: dict[str, int] = {}
-    for value in margins:
-        key = str(value)
-        margin_dist[key] = margin_dist.get(key, 0) + 1
-    # CALIBRATED. `total_mean` below is the corrected mean, so the board's
-    # displayed live total stops running ~2.2 points low.
+    # BOTH FAMILIES ARE CALIBRATED, each on its own grade. `total_mean` and
+    # `home_margin_mean` below are the CORRECTED means, so the board's displayed
+    # live total stops running ~2.2 points low and its displayed live margin
+    # stops running ~1.06 points against the home side. The uncalibrated means
+    # ride alongside so a reader can always recover what the sim actually drew.
     calibrated_total_mean, total_dist = calibrate_total_distribution(totals)
+    calibrated_margin_mean, margin_dist = calibrate_margin_distribution(margins)
 
     return {
         "home_win_prob": round(home_win_prob, 6),
         "sims_run": ran,
-        "home_margin_mean": round(sum(margins) / ran, 3),
+        "home_margin_mean": round(calibrated_margin_mean, 3),
+        "home_margin_mean_uncalibrated": round(sum(margins) / ran, 3),
         "total_mean": round(calibrated_total_mean, 3),
         "total_mean_uncalibrated": round(sum(totals) / ran, 3),
         "possession_unknown": possession_unknown,
@@ -630,6 +727,7 @@ def build_game_lens(
             "homeMargin": result["home_margin_mean"],
             "total": result["total_mean"],
             "totalRunsDist": result.get("total_dist") or {},
+            "marginDist": result.get("margin_dist") or {},
             "homeScore": state.home_score,
             "awayScore": state.away_score,
             "period": state.period,

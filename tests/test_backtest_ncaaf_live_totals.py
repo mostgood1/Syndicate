@@ -174,25 +174,17 @@ def test_a_ratings_file_of_junk_pairs_RAISES(tmp_path):
 # the gate this harness exists to inform
 # --------------------------------------------------------------------------
 
-def test_the_lens_publishes_TOTALS_and_still_withholds_the_MARGIN():
-    """The gate opened for the market that was graded, and only that one.
+def test_the_lens_publishes_BOTH_graded_distributions():
+    """Both markets opened, each on its OWN grade -- never on the other's.
 
-    `totalRunsDist` is published because the cutoff-replay grade scored this
-    module's own `resim_live_game` to a worst predicted-probability bucket of
-    0.0492 over 561 rows / 187 games -- past `#499`'s WNBA precedent of 0.150.
-
-    `marginDist` is NOT, because that grade measured TOTALS. Publishing it
-    would open spread pricing in `live_gameline_join.price_distribution_market`
-    on an estimator nothing has scored and that `calibrate_total_distribution`
-    does not correct. If a margin grade later clears, this test changes with
-    it -- deliberately, in the same commit as the evidence.
+    Totals cleared first (worst bucket 0.0492, 561 rows / 187 games). Margins
+    followed on a separate `--market margin` grade (0.0954 -> 0.0448 corrected,
+    570 rows / 190 games), which is why the keys arrived in two commits and not
+    one. If a future reader deletes either, the market it prices goes back to
+    refusing by name rather than to guessing.
     """
     from syndicate.features.ncaaf.live_resim import NcaafLiveGameState, build_game_lens
 
-    # BEHAVIOURAL, not a source grep. The first version of this test read the
-    # source and failed on the COMMENT that explains the omission -- matching
-    # prose about a key rather than the key itself, which is the same mistake
-    # `check_lane_invariants` catches on a Files line.
     state = NcaafLiveGameState(
         home_team="Texas", away_team="UTSA", period=3, clock_seconds=0,
         home_score=23, away_score=6, possession_owner=None, as_of="2026-09-19",
@@ -202,16 +194,9 @@ def test_the_lens_publishes_TOTALS_and_still_withholds_the_MARGIN():
         "total_mean": 29.0, "possession_unknown": True, "ties": 0,
         "margin_dist": {"17": 300}, "total_dist": {"29": 300},
     }
-    lanes = build_game_lens(state, result, live_state_as_of="2026-09-19")
-    assert lanes, "no lane produced"
-    lane = lanes[0]
-
-    assert lane["projection"]["totalRunsDist"] == {"29": 300}, (
-        "totals pricing is closed -- the graded market must reach the pricer"
-    )
-    flat = json.dumps(lane, sort_keys=True, default=str)
-    for key in ("marginDist", "margin_dist"):
-        assert key not in flat, f"the lens now carries {key} -- SPREAD pricing would open ungraded"
+    lane = build_game_lens(state, result, live_state_as_of="2026-09-19")[0]
+    assert lane["projection"]["totalRunsDist"] == {"29": 300}
+    assert lane["projection"]["marginDist"] == {"17": 300}
 
 
 def test_the_published_total_histogram_is_the_CALIBRATED_one():

@@ -208,32 +208,59 @@ def test_the_refused_stamp_is_rejected_by_the_join_and_the_priced_one_is_accepte
     assert projection["sims_run"] == 40
 
 
-def test_the_lane_publishes_TOTALS_and_still_withholds_the_MARGIN():
-    """`#499`'s bar was MET for totals on 2026-09-26, and only for totals.
+def test_the_lane_publishes_BOTH_graded_distributions():
+    """`#499`'s bar was met by TOTALS on 2026-09-26 and by MARGINS on 09-27.
 
-    The cutoff-replay grade (`scripts/backtest_ncaaf_live_totals.py`) scored
-    THIS function over 561 rows / 187 games at production's 120 sims and
-    production's SP+ ratings: worst predicted-probability bucket 0.0492 after
-    the location correction, against WNBA's precedent of 0.150. So
-    `totalRunsDist` reaches `price_distribution_market` and totals are
-    priceable.
+    Each key rests on its own cutoff-replay grade of THIS function at
+    production's 120 sims and production's SP+ ratings:
 
-    `marginDist` does not. That grade measured totals; the margin estimator has
-    never been scored and `calibrate_total_distribution` does not correct it.
-    Publishing it would open SPREAD pricing on the strength of another
-    market's evidence.
+        totals   worst bucket 0.1463 -> 0.0492   (561 rows / 187 games)
+        margins  worst bucket 0.0954 -> 0.0448   (570 rows / 190 games)
+
+    Both histograms are the CALIBRATED ones, so the board prices what was
+    graded. A real histogram, not an empty dict -- `{}` would satisfy a key
+    check while `price_distribution_market` withheld every row exactly as
+    before.
     """
     state = lr.NcaafLiveGameState(away_team="B", home_team="A", period=3,
                                   clock_seconds=400, home_score=17, away_score=14,
                                   possession_owner="home")
     lane = lr.build_game_lens(state, _resim(state))[0]
-    assert "marginDist" not in lane["projection"], "spread pricing opened ungraded"
-    dist = lane["projection"]["totalRunsDist"]
-    assert dist, "totals pricing is still shut"
-    # A REAL HISTOGRAM off the real sim path, not an empty dict that would
-    # satisfy the key check while `price_distribution_market` withheld every
-    # row with `no_live_distribution` exactly as before.
-    assert sum(dist.values()) == lane["simsRun"]
+    for key in ("totalRunsDist", "marginDist"):
+        dist = lane["projection"][key]
+        assert dist, f"{key} is empty -- pricing stays shut"
+        assert sum(dist.values()) == lane["simsRun"]
+
+
+def test_the_margin_calibration_is_SIGNED_and_never_clamps_away_wins():
+    """The totals calibrator clamps at zero. This one MUST NOT.
+
+    A total cannot be negative, so clamping it is right. A home margin is
+    signed, and clamping would delete every away-win draw -- turning a game the
+    home side is losing into a guaranteed cover, at exactly the lines a live
+    spread is quoted on. This is the one place the two calibrators deliberately
+    differ, so it gets a test rather than a comment.
+    """
+    corrected_mean, corrected = lr.calibrate_margin_distribution([-21, -14, -7, 0, 7])
+    assert corrected, "no histogram produced"
+    values = [float(k) for k in corrected]
+    assert min(values) < 0, "away-win draws were clamped away"
+    assert sum(corrected.values()) == 5, "draws were lost"
+    assert corrected_mean < 0, "a losing position became a winning one"
+
+
+def test_the_margin_correction_moves_the_distribution_TOWARD_HOME():
+    """The graded bias was -1.058 points: the sim runs against the home side.
+
+    `off != on` on the correction itself, so a constant silently reset to 0.0
+    cannot pass. Checked on the MEAN rather than a single bucket because the
+    spread term moves individual draws both ways.
+    """
+    draws = [-7, -3, 0, 3, 7, 10, 14]
+    raw_mean = sum(draws) / len(draws)
+    corrected_mean, _ = lr.calibrate_margin_distribution(draws)
+    assert corrected_mean > raw_mean, "the correction is inert or points the wrong way"
+    assert corrected_mean - raw_mean == pytest.approx(lr._live_margin_bias_points(), abs=1e-6)
 
 
 # --------------------------------------------------------------------------
@@ -380,13 +407,17 @@ def test_REACHABILITY_a_published_total_actually_prices_through_the_real_join():
     assert off["withheld_reason"] == REASON_NO_LIVE_DISTRIBUTION
 
 
-def test_REACHABILITY_spreads_stay_refused_for_the_named_reason():
-    """The margin gate must be visible as a refusal, not as an absence.
+def test_REACHABILITY_spreads_now_price_through_the_real_join():
+    """off != on for SPREADS, through the shipped functions, nothing stubbed.
 
-    `no_live_distribution` on a spreads row is the diagnostic that says the
-    margin grade has not happened yet. If this ever starts passing, someone
-    published `marginDist` and the reason to look for is its grade.
+    This test previously asserted the opposite -- that a spreads row refused
+    with `no_live_distribution` because the margin estimator had never been
+    graded. It has been graded now (`--market margin`, 570 rows / 190 games,
+    worst bucket 0.0448 corrected), so the assertion flips in the same commit
+    as the evidence, which is the only honest way for a gate test to change.
     """
+    import copy
+
     from syndicate.features.shared.live_gameline_join import (
         REASON_NO_LIVE_DISTRIBUTION,
         lens_sources_for_sport,
@@ -394,16 +425,55 @@ def test_REACHABILITY_spreads_stay_refused_for_the_named_reason():
         price_distribution_market,
     )
 
+    sources = lens_sources_for_sport("ncaaf")
     state = lr.NcaafLiveGameState(away_team="B", home_team="A", period=3,
                                   clock_seconds=400, home_score=17, away_score=14,
                                   possession_owner="home")
-    hit = live_gameline_from_lens(
-        lr.build_game_lens(state, _resim(state)), sources=lens_sources_for_sport("ncaaf"),
-    )
-    assert hit["margin_dist"] == {}
-    verdict = price_distribution_market(
-        dist=hit["margin_dist"], line=-3.5, side="home", market="spreads",
+    lanes = lr.build_game_lens(state, _resim(state, sims=120))
+    hit = live_gameline_from_lens(lanes, sources=sources)
+    assert hit["margin_dist"], "the join dropped the margin distribution"
+
+    line = float(lanes[0]["projection"]["homeMargin"])
+    on = price_distribution_market(
+        dist=hit["margin_dist"], line=line, side="home", market="spreads",
         market_prob=0.5, sims=hit["sims_run"], sport="ncaaf",
     )
-    assert verdict["priceable"] is False
-    assert verdict["withheld_reason"] == REASON_NO_LIVE_DISTRIBUTION
+    assert on["model_prob"] is not None
+    assert on["withheld_reason"] != REASON_NO_LIVE_DISTRIBUTION
+
+    old = copy.deepcopy(lanes)
+    old[0]["projection"].pop("marginDist")
+    old_hit = live_gameline_from_lens(old, sources=sources)
+    off = price_distribution_market(
+        dist=old_hit["margin_dist"], line=line, side="home", market="spreads",
+        market_prob=0.5, sims=old_hit["sims_run"], sport="ncaaf",
+    )
+    assert off["model_prob"] is None
+    assert off["withheld_reason"] == REASON_NO_LIVE_DISTRIBUTION
+
+
+def test_the_moneyline_and_the_spread_stay_COHERENT_after_calibration():
+    """A known, bounded incoherence -- recorded rather than discovered later.
+
+    `home_win_prob` is counted from the RAW margins; `marginDist` is corrected.
+    So the moneyline and a spread priced at the pivot no longer imply exactly
+    the same win probability. Measured on three live states the gap is
+    0.12-1.87pp, far inside the ~9.13pp publish bar at 120 sims, so it cannot
+    produce two published edges that contradict each other. This test is the
+    tripwire: if a future change to either estimator widens the gap past the
+    bar, the board would start doing that, and this fails first.
+    """
+    from syndicate.features.shared.prop_projections import _dist_prob_over
+
+    for home_score, away_score, period in ((17, 14, 3), (7, 7, 2), (3, 10, 3)):
+        state = lr.NcaafLiveGameState(away_team="B", home_team="A", period=period,
+                                      clock_seconds=400, home_score=home_score,
+                                      away_score=away_score, possession_owner="home")
+        result = _resim(state, sims=400)
+        pivot = _dist_prob_over(result["margin_dist"], 0.5)
+        gap_pp = abs(result["home_win_prob"] - pivot) * 100.0
+        assert gap_pp < 5.0, (
+            f"moneyline vs spread disagree by {gap_pp:.2f}pp at {home_score}-{away_score} "
+            f"Q{period} -- approaching the publish bar, so the board could print "
+            f"contradictory edges on the same team"
+        )
