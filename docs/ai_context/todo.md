@@ -1,5 +1,40 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#689` — **"Slate starting soon" did not exist: inside T-3h five of eight sports swept LESS often, not more** — MERGED 2026-09-27 as `d9323f9f` (PR mostgood1/Syndicate#106), lane `slate-starting-soon-phase`, session 2aff0397 — **DARK: both flags off, nothing deployed**
+
+**Reading that opened it (user, 2026-09-27 ~10:45 CT):** NFL 75 min before its 12:00
+kickoffs with stale odds. The refresh loop had two modes and a GLOBAL switch
+(`effective_phase` = live when ANY sport is live). The fixture ladder's `< 3h` tier
+returns None to hand off to the T-75/T-10 ramp, which had providers for
+mlb/wnba/soccer ONLY -- so nfl/ncaaf/nba/nhl/ncaab fell back to the flat 2h baseline
+exactly inside T-3h. NFL injuries polled on a fixed 6h timer. **Follow-up reading
+(user, same day): the NFL lines autorun (`NFL_LINES_AUTORUN_LAUNCHED`, 150 s) WAS
+running** -- so the stale NFL prices were PROPS, which ride only the 2h combined sweep.
+
+**Built** (`syndicate/features/shared/slate_phase.py`): per-sport `pregame` /
+`starting_soon` (T-3h, +1h grace past a start the live checker has not flipped) /
+`live`, from the loop's own fixture clock and `_LIVE_STATUS_CHECKERS`.
+- `SYNDICATE_SLATE_PHASE_OBSERVE` (absent = OFF): prints `SLATE_PHASE sport=.. from=.. to=..`
+  and fills `meta.slatePhases`; changes NO cadence. Own flag because observing costs
+  schedule fetches + ESPN subprocesses (the tick tests caught it ungated).
+- `SYNDICATE_SLATE_STARTING_SOON_ENABLED` (absent = OFF; implies observe): sweep interval
+  <= 1800 s (can only SHORTEN), T-75/T-10 for nfl/ncaaf/nba/nhl/ncaab via the schedule
+  adapter with a 300 s min-gap guard, 600 s relaunch cooldown + off-hours ceiling, NFL
+  injuries/news every 900 s, NFL injury-file change forces an NFL ODDS sweep (not a
+  resim: the NFL sim applies no injury adjustment).
+
+**OPEN / owed:**
+1. Deploy refresh-worker from main with `SYNDICATE_SLATE_PHASE_OBSERVE=true` in a quiet
+   window (can ride the held `worker-memory-heartbeat` deploy); verify `SLATE_PHASE` lines
+   appear and cadence is unchanged. Record in `deploys.md`.
+2. Credit estimate per sport BEFORE enabling starting-soon (credits/sweep x added sweeps).
+3. Enable starting-soon on an NFL Sunday; verify NFL launches <= 30 min apart inside T-3h,
+   `T_WINDOW_SWEEP_DUE` with `nfl:ramp:`/`nfl:closing:`, `NFL_INJURIES_FETCH_LAUNCHING interval_s=900`.
+4. Board label per sport -- BUILT 2026-09-27 (`GET /api/intelligence/slate-phases`, sport tabs show LIVE / SOON · countdown); shows nothing until the observe flag is on for a worker.
+5. **Known limits:** nflverse injuries follow practice reports, NOT game-day inactives (needs
+   another source); NCAAF has no injury feed; NCAAB has no live checker, so its T-windows
+   keep firing mid-slate, bounded only by the min gap.
+
 ### `#688` — **The live-tier coverage matrix was maintained BY HAND, and was wrong in three of eight rows within two hours** — BUILT 2026-09-24, lane `live-tier-coverage-check`, session 4ab694ed — **OPEN: the checker gates; the engine gaps it now makes visible are untouched**
 
 `scripts/live_tier_coverage_check.py` derives the matrix by IMPORTING the four

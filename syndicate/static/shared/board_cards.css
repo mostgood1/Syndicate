@@ -586,6 +586,9 @@ body.syndicate-body .cards-shell {
 
 .board-badge--live { background: rgba(59, 130, 246, 0.16); color: #d7e9ff; border-color: rgba(59, 130, 246, 0.38); }
 .board-badge--pregame { background: rgba(168, 85, 247, 0.16); color: #efe0ff; border-color: rgba(168, 85, 247, 0.38); }
+/* Slate phase on a sport tab: the sport's first game is within ~3h. */
+.board-badge--starting-soon { background: rgba(255, 149, 0, 0.16); color: #ffe0b3; border-color: rgba(255, 149, 0, 0.42); }
+.board-badge--tab { margin-left: 6px; padding: 1px 6px; vertical-align: middle; }
 .board-badge--confidence { background: rgba(46, 204, 113, 0.16); color: #d6ffe4; border-color: rgba(46, 204, 113, 0.38); }
 /* Layer 1 market-board additions: join_status badges (matched/no
    coverage/needs resim), distinct from the Layer 2 live/pregame/

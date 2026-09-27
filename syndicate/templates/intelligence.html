@@ -842,6 +842,57 @@
     });
   }
 
+  // Slate phase per sport (lane `slate-starting-soon-phase`). Published by the
+  // observing worker; the board only reads it. Empty until observing is on,
+  // and emptied again when the published file goes stale, so no label is
+  // ever left claiming "starting soon" after the fact.
+  let slatePhases = {};
+
+  function formatStartsIn(epochSeconds) {
+    if (!Number.isFinite(epochSeconds)) return "";
+    const minutes = Math.round((epochSeconds * 1000 - Date.now()) / 60000);
+    if (minutes <= 0) return "now";
+    const hours = Math.floor(minutes / 60);
+    return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+  }
+
+  function slatePhaseBadge(sport) {
+    const row = slatePhases[sport];
+    if (!row) return "";
+    if (row.phase === "live") {
+      return '<span class="board-badge board-badge--live board-badge--tab" data-slate-phase="live" title="A game in this sport is in progress">Live</span>';
+    }
+    if (row.phase === "starting_soon") {
+      const startsIn = formatStartsIn(Number(row.next_start_epoch));
+      const text = startsIn && startsIn !== "now" ? `Soon · ${startsIn}` : "Starting";
+      const title = startsIn === "now" ? "First game is due to start" : `First game starts in ${startsIn}`;
+      return `<span class="board-badge board-badge--starting-soon board-badge--tab" data-slate-phase="starting_soon" title="${escapeHtml(title)}">${escapeHtml(text)}</span>`;
+    }
+    return "";
+  }
+
+  function decorateSportTabs() {
+    const container = document.getElementById("board-sport-tabs");
+    if (!container) return;
+    container.querySelectorAll("[data-tab-value]").forEach((button) => {
+      button.querySelectorAll("[data-slate-phase]").forEach((node) => node.remove());
+      const badge = slatePhaseBadge(button.getAttribute("data-tab-value"));
+      if (badge) button.insertAdjacentHTML("beforeend", badge);
+    });
+  }
+
+  async function loadSlatePhases() {
+    try {
+      const response = await fetch("/api/intelligence/slate-phases", { headers: { Accept: "application/json" } });
+      if (!response.ok) return;
+      const payload = await response.json();
+      slatePhases = payload && payload.available && payload.sports ? payload.sports : {};
+    } catch (_error) {
+      slatePhases = {};
+    }
+    decorateSportTabs();
+  }
+
   function renderFilterTabs() {
     // Sport and game-state tabs used to call loadIntelligence({forceRefresh:
     // true}) here -- a full server round trip. Two problems: (1) the board
@@ -890,6 +941,7 @@
       renderFilterTabs();
       renderBoardBody();
     });
+    decorateSportTabs();
     renderTabs("board-state-tabs", STATE_TABS, state.gameState, (value) => {
       state.gameState = value;
       syncUrlState();
@@ -4487,6 +4539,7 @@
   window.SyndicateAskBar.init();
   setRefreshStatus("Loading board…", "loading");
 
+  void loadSlatePhases();
   if (initialIntelligenceResponse && Object.keys(initialIntelligenceResponse).length > 0) {
     const merged = mergeVersionedIntelligenceResponse(initialIntelligenceResponse);
     lastVersion = initialIntelligenceResponse.version ?? lastVersion;
@@ -4506,7 +4559,7 @@
   window.SyndicatePolling.startFromPolicy(
     {},
     {
-      onTick: () => { void loadGameChips(); return loadIntelligence({ background: true }); },
+      onTick: () => { void loadGameChips(); void loadSlatePhases(); return loadIntelligence({ background: true }); },
       onIdle: () => setRefreshStatus("Auto-refresh paused while idle. Move the mouse or press a key to resume.", "idle"),
     },
     { enabled: true, intervalMs: 60000, refreshOnVisible: true, refreshOnFocus: true, skipWhenHidden: true, preventOverlap: true, idleTimeoutMs: 15 * 60 * 1000 }

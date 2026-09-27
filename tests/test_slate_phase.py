@@ -164,3 +164,29 @@ def test_need_live_false_skips_the_checker_outside_the_window():
         live_checkers={"nhl": checker}, need_live=False,
     )
     assert near.phase == sp.PHASE_LIVE and calls == ["d"]
+
+
+# --- publishing to the web board ---------------------------------------------
+
+
+def test_publish_then_read_round_trip():
+    store = {}
+    phases = {
+        "nfl": sp.SlatePhase("nfl", sp.PHASE_STARTING_SOON, 4500.0, "within_10800s"),
+        "mlb": sp.SlatePhase("mlb", sp.PHASE_LIVE, None, "game_in_progress"),
+    }
+    sp.publish_phases(phases, now_epoch=NOW, write=store.__setitem__, path="p", env={"RENDER_SERVICE_NAME": "refresh-worker"})
+    out = sp.read_published_phases(read=store.get, now_epoch=NOW + 60, path="p")
+    assert out["available"] is True and out["service"] == "refresh-worker"
+    assert out["sports"]["nfl"] == {"phase": "starting_soon", "next_start_epoch": NOW + 4500.0}
+    assert out["sports"]["mlb"] == {"phase": "live", "next_start_epoch": None}
+
+
+def test_read_refuses_stale_missing_and_garbage():
+    store = {"p": {"written_at_epoch": NOW, "sports": {"nfl": {"phase": "starting_soon"}, "x": {"phase": "bogus"}}}}
+    stale = sp.read_published_phases(read=store.get, now_epoch=NOW + sp.PUBLISHED_MAX_AGE_SECONDS + 1, path="p")
+    assert stale["available"] is False and stale["reason"] == "stale" and stale["sports"] == {}
+    assert sp.read_published_phases(read=lambda p: None, now_epoch=NOW)["reason"] == "not_published"
+    assert sp.read_published_phases(read=lambda p: 1 / 0, now_epoch=NOW)["sports"] == {}
+    fresh = sp.read_published_phases(read=store.get, now_epoch=NOW + 5, path="p")
+    assert set(fresh["sports"]) == {"nfl"}, "an unknown phase value must not reach the board"

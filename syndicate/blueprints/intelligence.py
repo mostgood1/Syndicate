@@ -3028,6 +3028,18 @@ def run_intelligence():
     return jsonify({"ok": True, "selected_date": selected_date, "launched": launched, "refresh": normalize_timestamped_payload(launch_result), "queued": True})
 
 
+@intelligence_bp.get("/api/intelligence/slate-phases")
+def intelligence_slate_phases_api():
+    """Each sport's slate phase (pregame / starting_soon / live) for the board's
+    sport tabs. READ-ONLY: the observing worker resolves and publishes it
+    (`slate_phase.publish_phases`); this route never computes a phase, because
+    doing so costs schedule fetches and ESPN subprocesses. Missing or stale
+    means an empty `sports` map and no label -- never a guessed one."""
+    from syndicate.features.shared.slate_phase import read_published_phases
+
+    return jsonify(read_published_phases(read=read_json_file))
+
+
 @intelligence_bp.get("/api/intelligence/status")
 def intelligence_status_api():
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
