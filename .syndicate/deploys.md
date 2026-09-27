@@ -42453,3 +42453,42 @@ SHARED guard's "game is final".
 **NOT CLAIMED:** that any of these probabilities are good. smartsim2 is measured
 LOSING to the close at game level and says so on every row, segments included,
 with an explicit note that no per-segment skill measurement exists yet.
+
+---
+
+## 2026-09-26 09:43 PM CT — refresh-worker `8948cb9a` (lane `ncaaf-live-totals-distribution`) — NCAAF live totals AND spreads become priceable, each on its own cutoff-replay grade. **MEASUREMENT OWED — this row is an open obligation until the board artifact rebuilds after the deploy.**
+
+Deploy `dep-das85dgjo6nc73aklaag`, trigger=api, created 2026-09-27T02:43:02Z. Previous live `fadd57e0` (21:14:41Z). Claim held by the lane; preflight CLEAR on a 46s-old sample, "only infrastructure processes running".
+
+### What shipped
+
+`build_game_lens` now carries `totalRunsDist` (`d4b5e9ba`) and `marginDist` (`8948cb9a`), so `live_gameline_join.price_distribution_market` can answer live totals and spreads instead of refusing them. Both histograms are the CALIBRATED ones.
+
+| market | worst bucket | signed bias | sample | out of sample |
+|---|---|---|---|---|
+| totals | 0.1463 -> **0.0492** | -2.165 -> -0.081 pts | 561 rows / 187 games | 0.1797 -> 0.0646 |
+| margins | 0.0954 -> **0.0448** | -1.058 -> +0.002 pts | 570 rows / 190 games | 0.1320 -> 0.1105 |
+
+Both at production's `DEFAULT_SIMS = 120` and production's SP+ ratings. `#499`'s bar is a measured 0.150.
+
+### baseline, read 2026-09-27T02:42:50Z (12 minutes before the deploy went live)
+
+    withheld live_resim_published_no_distribution_for_this_market   112
+    rows_live_gameline_priceable                                      4
+    board generated_at                        2026-09-27T02:42:55Z
+
+### verify: THE COUNT FALLING IS NOT THE TEST. `live_resim_published_no_distribution_for_this_market` must reach NEAR ZERO, and only on a board whose `generated_at` is AFTER the deploy's `finishedAt`.
+
+**Why the obvious reading would be worthless.** That counter moves on its own as games start and finish: measured on the OLD code across 80 polls between 02:03Z and 02:40Z it ranged 112-188 with no deploy at all. "It fell" is therefore not evidence of anything. The reason can only be emitted when the distribution is EMPTY, so once both keys publish it should go to ~0 rather than merely down — a state 80 polls of natural drift never produced.
+
+**And the artifact must be rebuilt first.** A live deploy is not a republished board; reading before the worker's next publish measures the old code and reads as a failed fix.
+
+### NOT claimed
+
+- That a flood of edges appears. The bar is `|edge| >= 2.0 * se * 100`, ~9.13pp at 120 sims, so published edges stay rare by design.
+- That the margin correction is as well-evidenced as the totals one. Out of sample it reached 0.1105 against totals' 0.0646, and the margin bias DRIFTS across the season (-0.485 earlier half, -1.631 later), so a constant undercorrects recent games and should be refit.
+- Coherence: `home_win_prob` is counted from RAW margins while `marginDist` is corrected — a measured 0.12-1.87pp disagreement at the pivot, inside the publish bar, with a test that fails if it widens.
+
+### A PREFLIGHT DEFECT FOUND WHILE WAITING, worth more than this deploy
+
+refresh-worker's preflight samples the process list from `ALL_PROCESS_MEMORY` log lines — and that heartbeat thread is started and stopped INSIDE a `refresh_odds_sources` run (`scripts/refresh_odds_sources.py:3561`). So the sample exists only while an odds refresh is running, which is exactly when jobs are in flight. The two states are therefore: odds refresh running -> fresh sample showing jobs -> HOLD; nothing running -> sample ages past 180s -> UNKNOWN. **Measured: 80 consecutive polls over 37 minutes returned 41 HOLD and 39 UNKNOWN and zero CLEAR.** The CLEAR that finally allowed this deploy came from a 46s-old sample taken in the gap after a run ended — a narrow band, reached by luck rather than by design. `check_deploy_safety.py` (live endpoints) and `deploy_preflight.py` (stale process list) disagreed at the same instant more than once during this wait.
