@@ -15,6 +15,10 @@ the reading taken while things are worst is the one that must not be dropped.
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
+import textwrap
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -382,26 +386,48 @@ def test_untracked_census_deduplicates_shared_strings():
     #
     # The delta is the quantity the test was always about: five references to
     # one ~2MB string must add ~2MB, not ~10MB.
-    saved = mo._UNTRACKED_CENSUS_STATE["count"]
-    try:
-        before = _list_holder_mb(mo.log_untracked_bytes_census("unit-test-dedupe-baseline"))
+    #
+    # AND IN A FRESH INTERPRETER, because a delta is still a function of every
+    # other thread in the process. Measured on CI 2026-09-27: (before, after) =
+    # (42.4, 6.2) -- 36 MB of some earlier test's lists released by a leftover
+    # thread between the two censuses (the census already runs `gc.collect()`).
+    # A test must not be a function of its runner.
+    script = textwrap.dedent(
+        """
+        import json, os, sys
+        sys.path.insert(0, os.getcwd())
+        from syndicate.features.shared import memory_observability as mo
 
-        shared = "y" * 2_000_000
-        holder = [shared, shared, shared, shared, shared]  # one object, five refs
-        try:
-            after = _list_holder_mb(mo.log_untracked_bytes_census("unit-test-dedupe"))
-        finally:
-            del holder, shared
+        def listed(out):
+            return dict((n, mb) for n, mb, _c in out["top_holders_mb"]).get("list", 0.0)
 
-        grew_by = after - before
-        assert grew_by < 6, (before, after, grew_by)
-        # REACHABILITY, and without it the assertion above is vacuous: a census
-        # that saw nothing at all would report a delta of 0 and "pass". The
-        # string is ~1.9MB, so anything at or above ~1.5MB proves it was
-        # actually counted once.
-        assert grew_by >= 1.5, (before, after, grew_by)
-    finally:
-        mo._UNTRACKED_CENSUS_STATE["count"] = saved
+        def main():
+            # Locals, not module globals: the census credits a string to the
+            # FIRST holder it walks, and a global is reached via `__main__`'s
+            # dict before the list -- the list bucket would never move.
+            before = listed(mo.log_untracked_bytes_census("unit-test-dedupe-baseline"))
+            shared = "y" * 2_000_000
+            holder = [shared, shared, shared, shared, shared]  # one object, five refs
+            after = listed(mo.log_untracked_bytes_census("unit-test-dedupe"))
+            print("DEDUPE_RESULT " + json.dumps([before, after]), flush=True)
+            return holder
+
+        main()
+        """
+    )
+    proc = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True,
+                          timeout=120, cwd=str(Path(__file__).resolve().parents[1]))
+    line = next((l for l in proc.stdout.splitlines() if l.startswith("DEDUPE_RESULT ")), None)
+    assert line is not None, (proc.returncode, proc.stdout[-800:], proc.stderr[-800:])
+    before, after = json.loads(line[len("DEDUPE_RESULT "):])
+
+    grew_by = after - before
+    assert grew_by < 6, (before, after, grew_by)
+    # REACHABILITY, and without it the assertion above is vacuous: a census
+    # that saw nothing at all would report a delta of 0 and "pass". The
+    # string is ~1.9MB, so anything at or above ~1.5MB proves it was
+    # actually counted once.
+    assert grew_by >= 1.5, (before, after, grew_by)
 
 
 def test_untracked_census_reports_what_fraction_of_anon_it_explains():

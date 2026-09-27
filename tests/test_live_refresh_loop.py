@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import threading
 import time as _real_time
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -130,6 +131,16 @@ class LiveRefreshLoopTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         live_refresh_loop._LIVE_REFRESH_LOOP_STOP.set()
+        # ...and then CLEAR it. The event is process-wide (the live-odds worker
+        # imports the same object), so leaving it set told every later test in
+        # this xdist worker that the loop was stopping -- the in-play capture
+        # loop in `test_inplay_board_cadence` then never ticked (CI 2026-09-27).
+        # Join first so a thread this test started sees the set before the clear.
+        thread = live_refresh_loop._LIVE_REFRESH_LOOP_THREAD
+        if isinstance(thread, threading.Thread) and thread.is_alive():
+            thread.join(timeout=5)
+        if not (isinstance(thread, threading.Thread) and thread.is_alive()):
+            live_refresh_loop._LIVE_REFRESH_LOOP_STOP.clear()
         live_refresh_loop._LIVE_REFRESH_LOOP_THREAD = None
         live_refresh_loop._release_process_lock()
         live_refresh_loop._LAST_LINEUP_INJURY_CHANGED_SPORTS = set()
