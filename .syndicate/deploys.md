@@ -42522,3 +42522,43 @@ Rows that used to die at the distribution gate now pass it and meet the NEXT gat
 **EDGES: 2 -> 16.** Eight-fold, and it is the weaker half of this reading — `rows_live_gameline_edged` depends on where the market is, not only on whether we can price. The counter that belongs to this change is the withheld reason, and that is the one that collapsed.
 
 Claim released. NOT claimed: that these prices are profitable. The margin correction in particular is fitted on a season whose bias drifts (-0.485 earlier half, -1.631 later) and reached only 0.1105 out of sample; it should be refit as the season accumulates.
+
+---
+
+## 2026-09-26 10:49 PM CT — refresh-worker `7f27b31c` (lane `ncaaf-live-totals-distribution`) — WITHDRAW the totals correction, refit the margin one. **Both had been fitted on 22-day-stale SP+ ratings and both made calibration WORSE.**
+
+Deploy `dep-das94ifpn0mc73fccphg`, created 03:49:29Z, finished 03:52:38Z. Preflight CLEAR on a 32 s sample. Claim held then released.
+
+### THE ROOT CAUSE, which is worth more than the fix
+
+The grades behind `total shift +2.165` and `margin shift +1.06` ran against a `sp_ratings_2026.json` stamped `fetched_at 2026-09-05`, `verified=False` — 22 days stale. **The harness printed that provenance on every single run and it was not read.** Re-run over the SAME dates with the ratings production actually uses (`fetched_at 2026-09-27T01:10:56Z`, `verified=True`), Saturday population, 546 rows / 182 games, production's own 120 sims:
+
+| market | uncorrected | at the shipped constant |
+|---|---|---|
+| totals | worst **0.0556**, bias +0.171, CI over games [-1.176, +1.538] | worst **0.1558**, bias +2.336 |
+| margin | worst **0.0411**, bias -0.387, CI over games [-1.644, +0.896] | worst **0.0869**, bias +0.673 |
+
+The `-2.165` that justified a totals correction was a property of stale ratings, not of the simulator. A stale-input artifact is indistinguishable from a model defect at every level except the input's own provenance field.
+
+### What shipped
+
+- **Totals correction WITHDRAWN to identity.** Saturday-weighted fit is -0.171, and any sub-0.5 shift rounds away entirely in an integer histogram; shipping it would be false precision. The UNCORRECTED estimator clears `#499`'s 0.150 bar at 0.0556.
+- **Margin refit to +0.387 / spread 1.10**, Saturday-weighted (user decision). Saturday because live NCAAF is overwhelmingly a Saturday event and day-of-week is EXOGENOUS — a "dates with >=20 games" filter picks nearly the same rows but is chosen by looking at the data and silently drops opening Saturday 2026-08-29. Improvement is 0.0411 -> 0.0397, i.e. **0.0014, with a bias CI spanning zero**: retained as measurably not-worse, not as something the evidence demands. Both constants stay env-overridable.
+
+### verify: DEPLOY VERIFIED LIVE; THE PRODUCTION A/B IS **INCONCLUSIVE** AND IS NOT BEING COUNTED
+
+Verified: live commit `7f27b31c`, board artifact rebuilt `03:56:31Z` (after `finishedAt 03:52:38Z`), coverage healthy (`no_live_distribution=2`).
+
+**NOT verified, and the design is why.** The intended measurement was a paired per-row delta in `live_model_prob_over` on `(game, market, segment, line)`, predicting totals P(over) falls ~0.10 once a +2.165 shift is removed. Result: totals n=10, mean -0.0550, **5 fell and 5 ROSE, none unchanged**. Pairing controls for ROW IDENTITY but NOT FOR GAME STATE, and the two snapshots are 8.5 minutes apart: individual rows swung ±0.14 to ±0.27 because teams scored (Rice @ Fresno State spreads +0.2666 across Q2 0:00). **The confounder is larger than the effect**, so this says nothing either way, and the right sign on the mean is not evidence.
+
+`priceable` and `edged` both fell to 0 as the slate ended and markets settled, so no better window existed tonight.
+
+**The calibration claim therefore rests on the offline refit against production ratings, not on this board reading.** A production A/B of a calibration constant needs snapshots matched on GAME STATE (period, clock, score), which the lens carries and this harness did not capture. That is the next improvement, not a footnote.
+
+### A CLAIM MADE TWICE, IN THIS LEDGER, NOW RETRACTED
+
+The 09:43 PM CT row and its measurement row say the margin bias "DRIFTS across the season (-0.485 earlier half, -1.631 later)". **It does not.** That split was confounded by WHICH DATES fell in each half — 31 midweek games with a +2.326 bias sat mostly in the early one. On well-powered Saturdays the halves read -1.496 and -1.927, a mild difference whose interval spans zero. Every interval quoted here is bootstrapped OVER GAMES: three cutoffs from one game share that game's outcome, and a row-level bootstrap reports an interval far too tight.
+
+### Still true from the earlier rows
+
+Publishing the distributions was right and stands: `live_resim_published_no_distribution_for_this_market` 112 -> 7 and priceable 4 -> 16, measured. Only the transform applied to the published draws was wrong.

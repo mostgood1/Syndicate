@@ -4876,3 +4876,42 @@ One event gives an interval, not a rate. It cannot tell "rare" apart from
   was correct in design, and a ledger entry that had to be withdrawn.
 
 ---
+
+### 2026-09-27 — FORBIDDEN: fitting a correction without reading the PROVENANCE of the inputs the grade ran on. A stale input produces a bias that looks exactly like a model defect, and the correction you derive from it is a new defect you deployed yourself.
+
+- **What happened.** I graded NCAAF's live totals estimator, measured a signed bias of
+  **-2.165 points**, fitted `shift +2.165`, validated it (worst predicted-probability bucket
+  0.1463 -> 0.0492, plus an out-of-sample check), shipped it, and deployed it. The grade had
+  run against `sp_ratings_2026.json` stamped `fetched_at 2026-09-05`, `verified=False` --
+  **22 days stale**. Re-run over the SAME dates with the ratings production actually uses:
+  uncorrected bias **+0.171**, CI over games [-1.176, +1.538], and my correction took the
+  worst bucket from **0.0556 UP to 0.1558**. The margin correction (+1.06) was the same
+  story: 0.0411 -> 0.0869.
+- **Why:** the `-2.165` was a property of the INPUT, not of the simulator. A model fed
+  three-week-old team ratings really is biased -- and correcting the model for it bakes the
+  staleness into the estimator, so the correction is wrong by exactly that much the moment
+  the ratings refresh. Production refreshes them.
+- **The harness printed it every single time:**
+  `[sp_ratings] season=2026 source=cache teams=138 fetched_at=2026-09-05T21:43:09 verified=False`.
+  I read `teams=138` (the field that says the ratings EXIST) and never read `fetched_at` or
+  `verified` (the fields that say whether they are the ones production uses). Same shape as
+  `feedback_read_the_field_you_already_have`, applied to an input rather than a payload.
+- **How to apply:** a grade that produces a CONSTANT must print, and its ledger row must
+  quote, the provenance of every input it fitted on -- for a cache: the fetch time, the
+  freshness verdict, and how that compares with what production reads. Absent provenance is
+  STALE, not fresh. And before deploying a correction, re-run the grade once against
+  deliberately-refreshed inputs: if the constant moves materially, you measured the input.
+- **Second rule, from the failed verification.** I then tried to verify the fix in production
+  by pairing `live_model_prob_over` per `(game, market, line)` across two board snapshots.
+  Pairing controlled for ROW IDENTITY but not for GAME STATE, and the snapshots were 8.5
+  minutes apart: rows swung ±0.14 to ±0.27 because teams scored, against a predicted effect
+  of ~0.10. **5 fell, 5 rose.** A paired design whose confounder is larger than its effect
+  measures nothing -- match on the state the quantity depends on (period, clock, score), or
+  say the reading is unobtainable. The mean moved the predicted direction and that was NOT
+  evidence.
+- **Cost:** two corrections deployed to production that made live totals and spreads
+  calibration worse for about an hour, a retracted "the bias drifts across the season" claim
+  that was an artifact of low-n midweek dates landing in one half of a split, and three
+  ledger rows that had to be corrected by a fourth.
+
+---
