@@ -417,6 +417,40 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
     }
 
 
+# Which side tokens say "the thing happened" and which say it did not. The live
+# index carries P(OVER); a row on the negative side prices its complement. A
+# closed set on purpose -- an unknown token refuses rather than defaulting to the
+# affirmative, which would silently price the wrong leg.
+_AFFIRMATIVE_SIDES = frozenset({"over", "yes"})
+_NEGATIVE_SIDES = frozenset({"under", "no"})
+
+
+def _row_side_and_prob(row: Mapping[str, Any], live_prob_over: Any) -> tuple[str | None, float | None]:
+    """The ROW's side that has a modelled fair, and the live probability of THAT side.
+
+    `(None, None)` when the row does not name exactly one side the margin model
+    filled, or names one whose polarity is not known -- the modelled path then
+    refuses, exactly as `attach_modelled_fair_edges` does for pregame rows.
+    """
+    modelled = row.get("modelled_fair")
+    if not isinstance(modelled, Mapping) or not modelled:
+        return None, None
+    keys = {str(k).strip().lower() for k in modelled}
+    sides = [str(s).strip().lower() for s in (row.get("sides") or []) if str(s).strip()]
+    matched = [s for s in sides if s in keys]
+    if len(matched) != 1:
+        return None, None
+    side = matched[0]
+    prob = _as_float(live_prob_over)
+    if prob is None:
+        return None, None
+    if side in _AFFIRMATIVE_SIDES:
+        return side, prob
+    if side in _NEGATIVE_SIDES:
+        return side, 1.0 - prob
+    return None, None
+
+
 def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[str, Any]) -> dict[str, Any]:
     """Overlay live projections onto LIVE rows. Returns a coverage payload.
 
@@ -833,14 +867,25 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
                 #
                 # Counted separately from `edged` so the board's two edge
                 # populations can never be summed by accident.
-                if had_pregame and devig_detail == "one_sided_quote":
-                    modelled = modelled_fair_edge(
-                        row,
-                        model_prob=live_prob,
-                        side=projection.get("side") or hit.get("side"),
-                    )
+                #
+                # THE SIDE PRICED IS THE ROW'S, AND IT IS STAMPED `[2026-09-28, lane
+                # live-props-model-probability]`. This used to price
+                # `projection["side"]` and stamp nothing, and
+                # `layer2_board._modelled_fair_edge_for` refuses an edge that does
+                # not name the side it was priced for -- so every edge this branch
+                # produced reached the board as None. Measured: 2026-09-27
+                # 23:16-23:49Z refresh-worker logged `edged_modelled=20..47` on
+                # soccer, while the population ledger recorded a model edge on 0 of
+                # 3,547 live-aware soccer props over 09-14..09-28. Same rule as
+                # `board_enrichment.attach_modelled_fair_edges`: the KEY comes from
+                # the row, the POLARITY converts the live P(over), and anything
+                # unplaceable refuses rather than guessing a leg.
+                priced_side, side_prob = _row_side_and_prob(row, live_prob)
+                if had_pregame and devig_detail == "one_sided_quote" and priced_side is not None:
+                    modelled = modelled_fair_edge(row, model_prob=side_prob, side=priced_side)
                     if modelled:
                         projection.update(modelled)
+                        projection["modelled_fair_side"] = priced_side
                         projection["live_prob_over"] = live_prob
                         # `edge_vs_market_pct` stays absent-and-explained rather
                         # than blank: the de-vig genuinely has no answer, and the
