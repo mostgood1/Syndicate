@@ -42969,3 +42969,69 @@ games=0` (no WNBA game today -- expected), `NFL_PROJECTION_PULL ok=True`; `Trace
 09-29 population part: `gs=live kind=prop market=player_points` rows with `me` non-null.
 Also read the lens snapshot SIZE on the first live build (test measured +5.5 KB JSON per live
 player) -- a size regression is a memory question on this service.
+
+## 2026-09-28 18:22Z — refresh-worker `c3874b91` (lane `layer2-triad-alignment`) — LIVE, and the change is INERT
+
+    deploy   dep-datb0pou01pc73du7rvg   refresh-worker  f9506b26 -> c3874b91
+    fired    18:22:31Z      live 18:28:24Z
+    claim    layer2-triad-alignment, acquired 18:22:03Z
+    baseline read 18:22:12Z from LIVE f9506b26: `_DISCRETE_COUNT_STATS` 0
+             occurrences, `SPREAD_SHRINKAGE_K` 0.  Target: 5 and 2.
+    preflight CLEAR -- only infrastructure processes, no sim or board build in
+             flight, spacing satisfied.
+
+**EXPECTATION NOT MET, and the deploy is not the reason.** The predicted reading
+was NFL prop probabilities showing the new model. They do not.
+
+### Why this deploy was taken at all
+
+`bffcd1b4` (another session's live-odds-worker deploy, 18:04:52Z) carried
+`cf2cdbae` -- my NFL prop spread change -- to web and live-odds-worker as
+collateral while refresh-worker, which BUILDS the prop artifacts, did not have
+it. Completing the rollout was chosen over leaving a silent three-way split.
+
+### The verification gate worked, and then a SECOND gate was missing
+
+Gating on the deployed SHA alone would have read a board built at 18:26:44Z --
+**100 seconds BEFORE the deploy finished** -- as proof of the deployed code. The
+watcher held for a genuine rebuild, which landed 18:32:37Z.
+
+**And the rebuilt board still carries the OLD model.** `board rebuilt` is not the
+gate that mattered:
+
+    projection.generated_at on the rebuilt board:  2026-09-28T11:27:00-05:00
+                                                   (= 16:27Z, ~2 h BEFORE the deploy)
+    served Passing TDs   model_prob_over 0.9911 and 0.9772
+    served Interceptions model_prob_over 0.6915
+
+**0.9911 is arithmetically impossible under the shipped model.** P(over 0.5)
+= 1 - e^-lambda, so 0.9911 implies **lambda = 4.72 passing TDs per game** and
+0.9772 implies 3.78. No quarterback averages that. The shipped code returns
+**0.7422** for a plausible QB (raw 1.5 TD/g, n=3, line 0.5). These are pre-deploy
+continuous-model values.
+
+### The real gate: the PROP ARTIFACT, not the board
+
+`nfl_prop_projections` reads `read_nfl_prop_projection_artifact`, written by
+`scripts/build_nfl_prop_projections.py`. `props.py` skips recomputation outright
+when the artifact answers (`if artifact_rows is not None: continue`). So a board
+rebuild re-joins existing projections and never re-prices them. **The model
+change reaches production only when that artifact is rebuilt** -- CLAUDE.md's own
+rule in a new costume: publishing is not sufficient, a new input needs a REBUILD
+or it is silently ignored.
+
+### State
+
+    web               4b5ebc0a   has cf2cdbae, not c3874b91
+    live-odds-worker  bffcd1b4   has cf2cdbae, not c3874b91
+    refresh-worker    c3874b91   has both -- and produces nothing new until the
+                                 prop artifact is regenerated
+
+**OWED:** a reading after `build_nfl_prop_projections` next runs. The falsifiable
+signature was written BEFORE this board was read and stands unchanged: Poisson
+`interceptions` P(over 0.5) must fall in **[0.419, 0.712]** across raw rates
+0.2-2.5 and n 3-14, and **no discrete-market row may sit near 0 or 1**. Today's
+board has two rows above 0.98, which is the failing reading, not a passing one.
+
+Nothing is broken by this deploy: the code is strictly better where it runs, and
+where it does not run yet the board is exactly what it was this morning.
