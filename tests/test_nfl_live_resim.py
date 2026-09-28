@@ -449,3 +449,37 @@ def test_an_UNKNOWN_rating_source_is_never_MORE_CONFIDENT_than_a_known_one():
         )
     for known, sd in lr._RATING_UNCERTAINTY_BY_SOURCE.items():
         assert lr.rating_uncertainty_for_source(known) == sd
+
+
+# --------------------------------------------------------------------------
+# The prop-capture SWEEP runs on any tick, not only on a capturable boundary.
+# --------------------------------------------------------------------------
+
+def test_the_capture_sweep_runs_on_a_NON_capturable_row(monkeypatch):
+    """The recovery must not depend on the thing it exists to recover from.
+
+    `publish_pending_captures` pushes captures written before the push existed.
+    Hooked inside `record_quarter_snapshot` it fires only on a genuine boundary
+    ATTEMPT -- and MEASURED 2026-09-28, this tick ran every ~5 min emitting
+    `PROP_CAPTURE_TICK no_period_or_clock=16` while the next boundary was 9.5 h
+    away (one game, kickoff 00:15Z). A file already sitting on disk would have
+    waited those 9.5 h. So the sweep sits ABOVE every early return, and this
+    pins it there with the most hostile row: one that returns immediately.
+    """
+    import syndicate.features.nfl.live_prop_capture as cap
+    from syndicate.features.nfl import live_resim as lr
+
+    calls: list = []
+    monkeypatch.setattr(cap, "publish_pending_captures",
+                        lambda *a, **k: calls.append(1) or 0)
+
+    # `no_row` -- the earliest return there is.
+    assert lr._maybe_capture_prop_snapshot(None, None, date_str="2026-09-28") == "no_row"
+    assert calls, "the sweep never ran on a non-capturable row"
+
+    # and the real production shape: a row with neither period nor clock, which
+    # is what 16 of 16 games reported all afternoon.
+    calls.clear()
+    got = lr._maybe_capture_prop_snapshot({"state": "pre"}, None, date_str="2026-09-28")
+    assert got == "no_period_or_clock"
+    assert calls, "the sweep never ran on the shape production actually emits"

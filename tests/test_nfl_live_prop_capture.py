@@ -363,3 +363,58 @@ def test_the_IDEMPOTENT_second_call_does_not_push_again(tmp_path, monkeypatch):
         cap.record_quarter_snapshot(tmp_path, event_id="e2", period=2,
                                     date_str="2026-09-28", player_rows=rows)
     assert len(pushed) == 1, f"re-pushed on every tick: {len(pushed)} publishes"
+
+
+def test_a_capture_STRANDED_before_the_push_existed_is_recovered(tmp_path, monkeypatch):
+    """The deploy that made the path retrievable must not leave the only
+    existing capture unretrievable.
+
+    2026-09-27 captured 62 rows (event 401872962, period 3) before any push
+    existed. Its `.done` marker is set, so that boundary is never re-captured,
+    so `record_quarter_snapshot`'s own publish is never reached for it -- the
+    rows would sit on the mounted disk, allowlisted, with no code path able to
+    send them. Fixing the mechanism for the next case while the case that
+    motivated it stays broken is the same mistake as the allowlist itself.
+    """
+    import syndicate.features.shared.artifact_publisher as ap
+    from syndicate.features.nfl import live_prop_capture as cap
+
+    stranded = cap.capture_path(tmp_path, "2026-09-27")
+    stranded.parent.mkdir(parents=True, exist_ok=True)
+    stranded.write_text('{"player": "Stranded"}\n', encoding="utf-8")
+    stranded.with_suffix(".401872962.p3.done").write_text("", encoding="utf-8")
+
+    pushed: list = []
+    monkeypatch.setattr(ap, "publish_hot_artifact",
+                        lambda path, **kw: pushed.append(Path(path)) or True)
+    monkeypatch.setattr(cap, "_SWEEP_DONE", False)
+
+    cap.record_quarter_snapshot(
+        tmp_path, event_id="other", period=1, date_str="2026-09-28",
+        player_rows=[{"player_name": "Today", "rush_yards": 1}])
+
+    assert stranded in pushed, (
+        "yesterday's capture was never pushed -- allowlisted and still unreachable")
+
+
+def test_the_sweep_runs_ONCE_per_process(tmp_path, monkeypatch):
+    """`#241` restarted production in a loop over periodic worker work. A
+    directory scan on every tick is exactly that shape."""
+    import syndicate.features.shared.artifact_publisher as ap
+    from syndicate.features.nfl import live_prop_capture as cap
+
+    old = cap.capture_path(tmp_path, "2026-09-26")
+    old.parent.mkdir(parents=True, exist_ok=True)
+    old.write_text('{"player": "Old"}\n', encoding="utf-8")
+
+    pushed: list = []
+    monkeypatch.setattr(ap, "publish_hot_artifact",
+                        lambda path, **kw: pushed.append(Path(path)) or True)
+    monkeypatch.setattr(cap, "_SWEEP_DONE", False)
+
+    for period in (1, 2, 3):
+        cap.record_quarter_snapshot(
+            tmp_path, event_id=f"e{period}", period=period, date_str="2026-09-28",
+            player_rows=[{"player_name": "P", "rush_yards": period}])
+
+    assert pushed.count(old) == 1, f"swept {pushed.count(old)} times, not once"

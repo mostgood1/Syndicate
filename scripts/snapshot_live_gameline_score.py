@@ -147,6 +147,16 @@ def main() -> int:
         print(f"NO_DATA_FOR_DATE sport={args.sport} date={args.date} -- "
               f"board served the date but retained no live-gameline score")
         return 6
+    if not score and not doc.get("rows") and doc.get("total_rows") == 0:
+        # AN EMPTY SLATE IS NOT A DISABLED SCORER. Measured 2026-09-28, the
+        # off-day between the regular season (ended 09-27) and the Wild Card
+        # round (09-29): the board served `total_rows: 0`, no markets, and NO
+        # `live_gameline_score` key at all -- and this script called it
+        # SCORER_DISABLED (exit 3, "a REAL FINDING"). The two are told apart by
+        # the board itself: a board with rows and no block is still exit 3.
+        print(f"NO_SLATE sport={args.sport} date={served} -- the board served zero rows "
+              f"(no games on this date); nothing to record")
+        return 7
     if not score.get("enabled"):
         print(f"SCORER_DISABLED sport={args.sport} -- nothing to record")
         return 3
@@ -289,18 +299,57 @@ def main() -> int:
     print(f"  ledger written={row['ledger_written']} candidates={row['ledger_candidates']} "
           f"priceable={row['rows_priceable']} "
           f"(v2 discriminator satisfied: {bool((row['ledger_written'] or 0) > (row['rows_priceable'] or 0))})")
+    # THE LINE-PRICED MARKETS, PRINTED. Scored on every build since contract 3
+    # (2026-09-08) and retained since 2026-09-24, but never PRINTED -- so the
+    # nightly report read only the h2h Brier and the market-mix line below
+    # called totals and spreads "refused". A session reported exactly that to
+    # the user on 2026-09-28. The headline here is the point error against the
+    # LINE (the market's own forecast); the hit rate against 0.50 is shown but
+    # is not a market comparison -- `bucket_realised_performance.py` measured
+    # "always over" and "side with the current score" beating 0.50 by 12-22pp.
+    pf = row.get("point_forecast") or {}
+    for fam in ("totals", "spreads"):
+        cut = ((pf.get(fam) or {}).get("fresh_quotes_only")) or {}
+        if not cut.get("n"):
+            print(f"  {fam:8s} point-forecast (fresh) NO DATA")
+            continue
+        print(f"  {fam:8s} point-forecast (fresh) games={cut.get('games')} n={cut.get('n')} "
+              f"model_mae={cut.get('model_mae')} line_mae={cut.get('line_mae')} "
+              f"model_minus_line_mae={cut.get('model_minus_line_mae')} "
+              f"hit_rate={cut.get('hit_rate')} (vs 0.50, se {cut.get('se_pp_on_games')}pp on games)")
+    seg_blocks = ((row.get("segments") or {}).get("by_segment")) or {}
+    for seg in sorted(seg_blocks):
+        allr = (seg_blocks[seg] or {}).get("all_records") or {}
+        mp, mk = allr.get("model_paired") or {}, allr.get("market") or {}
+        if mk.get("n"):
+            print(f"  segment {seg} h2h (all_records, paired) games={seg_blocks[seg].get('games_with_outcome')} "
+                  f"model_brier={mp.get('brier')} market_brier={mk.get('brier')} "
+                  f"diff={allr.get('model_minus_market_brier')} n={mp.get('n')}/{mk.get('n')}")
     # PRINTED, not merely retained. The Brier above is uninterpretable without
     # the market mix beneath it, and a number a reader has to go looking for is
-    # how the P(over) defect survived ten nightly captures. `scored=` is the
-    # count actually behind the Brier; anything else on the line was refused.
+    # how the P(over) defect survived ten nightly captures. Each market is
+    # labelled with HOW it was scored: `brier` (h2h, probability vs outcome),
+    # `point-forecast` (totals/spreads, the model's mean vs the line), or
+    # `unscored` for a market in neither set. The label used to read
+    # `(refused)` for everything outside the Brier, which stopped being true
+    # when contract 3 shipped.
     by_market = row.get("records_by_market") or {}
     if by_market:
         scored = set(row.get("scored_markets") or [])
+        pf_markets = set(row.get("point_forecast_markets") or [])
+
+        def _how(name: str) -> str:
+            if name in scored:
+                return "brier"
+            if name in pf_markets or name.split("_")[0] in pf_markets:
+                return "point-forecast"
+            return "unscored"
+
         mix = " ".join(
-            f"{name}={count}{'' if name in scored else '(refused)'}"
+            f"{name}={count}({_how(name)})"
             for name, count in sorted(by_market.items(), key=lambda kv: -kv[1])
         )
-        print(f"  markets scored={sorted(scored)} | {mix}")
+        print(f"  markets | {mix}")
     else:
         # ABSENT, and said so. A board older than `75cf9aec` emits no market
         # counters at all, and that is not the same as a slate with no records.

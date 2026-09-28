@@ -282,6 +282,220 @@ def pool(rows, cut):
     }
 
 
+# ---------------------------------------------------------------------------
+# THE LINE-PRICED MARKETS (totals, spreads) -- scorer contract 3.
+#
+# WHY THIS SECTION EXISTS. The scorer has scored totals and spreads on every
+# build since 2026-09-08 (the model's POINT FORECAST against the LINE, which is
+# the market's own forecast for a -110/-110 market), and the history has kept
+# it since 2026-09-24 -- but this tool pooled only the h2h Brier. So the nightly
+# report never mentioned them, and on 2026-09-28 a session told the user they
+# were "not scored" off a printout that labelled them `(refused)`.
+#
+# THE HEADLINE IS THE POINT ERROR, NOT THE HIT RATE. `model_minus_line_mae`
+# compares two forecasts of the same number on the same rows: NEGATIVE means
+# the model's mean sat closer to the actual than the line did. The hit rate
+# against 0.50 is printed beside it but is NOT a market comparison --
+# `bucket_realised_performance.py` measured "always back the over" and "side
+# with the current score" winning 12-22pp above 0.50 on this same ledger, so a
+# model that copies either looks skilled against a coin.
+#
+# SAME DISCIPLINE AS THE BRIER POOL: games are the independent unit (a date's
+# figure is weighted by that family's own game count, never by rows); per date
+# the capture with the MOST games is kept, and on a tie a board capture is
+# preferred over a ledger re-score (the board's measurement is the reference a
+# re-score is checked against, not the other way round); a date with outcomes
+# and no point-forecast data is named, not skipped.
+# ---------------------------------------------------------------------------
+PF_FAMILIES = ("totals", "spreads")
+
+
+def pf_cut(row, family, cut):
+    """The per-date point-forecast figures for one family, or None."""
+    block = ((row.get("point_forecast") or {}).get(family) or {}).get(cut) or {}
+    if not block.get("n") or block.get("model_mae") is None or block.get("line_mae") is None:
+        return None
+    return block
+
+
+def best_pf_per_date(rows, family, cut):
+    best = {}
+    for row in rows:
+        vals = pf_cut(row, family, cut)
+        if vals is None or not vals.get("games"):
+            continue
+        prior = best.get(row["date"])
+        if prior is None:
+            best[row["date"]] = row
+            continue
+        prior_games = pf_cut(prior, family, cut)["games"]
+        if vals["games"] > prior_games or (
+            vals["games"] == prior_games
+            and prior.get("rescored_from_ledger") and not row.get("rescored_from_ledger")
+        ):
+            best[row["date"]] = row
+    return best
+
+
+def pool_point_forecast(rows, family, cut):
+    """Game-weighted pool of one family's point-forecast figures over ONE era."""
+    eras = {row_era(r) for r in rows}
+    if len(eras) > 1:
+        raise ValueError("refusing to pool across scorer eras %s" % sorted(eras))
+    best = best_pf_per_date(rows, family, cut)
+    games = 0
+    acc = {"model_mae": 0.0, "line_mae": 0.0, "hit_rate": 0.0}
+    se_sq = 0.0
+    per_date = {}
+    for date in sorted(best):
+        vals = pf_cut(best[date], family, cut)
+        g = vals["games"]
+        games += g
+        for key in acc:
+            acc[key] += vals[key] * g
+        if vals.get("se_pp_on_games") is not None:
+            se_sq += (vals["se_pp_on_games"] * g) ** 2
+        per_date[date] = {
+            "games": g, "n": vals["n"], "model_mae": vals["model_mae"],
+            "line_mae": vals["line_mae"],
+            "model_minus_line_mae": vals["model_mae"] - vals["line_mae"],
+            "hit_rate": vals["hit_rate"],
+            "rescored": bool(best[date].get("rescored_from_ledger")),
+            "population": row_population(best[date]),
+        }
+    if not games:
+        return {"family": family, "cut": cut, "dates": 0, "games": 0, "per_date": {}}
+    model_mae = acc["model_mae"] / games
+    line_mae = acc["line_mae"] / games
+    return {
+        "family": family, "cut": cut, "dates": len(best), "games": games,
+        "model_mae": model_mae, "line_mae": line_mae,
+        "model_minus_line_mae": model_mae - line_mae,
+        "hit_rate": acc["hit_rate"] / games,
+        # Treats dates as independent, which they are (different games).
+        "se_pp_on_games": (se_sq ** 0.5) / games,
+        "per_date": per_date,
+    }
+
+
+def pf_coverage_gap(rows, family, cut):
+    """Dates with outcomes, on or after the first date this family was scored,
+    that contribute nothing to it. Before the first scored date the family did
+    not exist (ledger v5, 2026-09-06 late) -- that is structural, not a gap."""
+    covered, games_by_date = set(), {}
+    for row in rows:
+        date, games = row.get("date"), row.get("games_with_outcome") or 0
+        if not date or not games:
+            continue
+        games_by_date[date] = max(games_by_date.get(date, 0), games)
+        if pf_cut(row, family, cut) is not None:
+            covered.add(date)
+    if not covered:
+        return []
+    first = min(covered)
+    return sorted((d, g) for d, g in games_by_date.items() if d >= first and d not in covered)
+
+
+def pool_segment_h2h(rows, segment):
+    """Game-weighted PAIRED Brier pool of one segment's h2h observations.
+
+    `all_records` is the cut: first5 observation rows carry no quote age and
+    are never priceable, so the fresh and priceable cuts are empty by
+    construction (not a gap). Rows are written only when the rounded
+    probability moves, so n counts probability CHANGES, not builds.
+    """
+    best = {}
+    for row in rows:
+        block = (((row.get("segments") or {}).get("by_segment") or {}).get(segment) or {})
+        allr = block.get("all_records") or {}
+        mp, mk = allr.get("model_paired") or {}, allr.get("market") or {}
+        g = block.get("games_with_outcome") or 0
+        if not g or mp.get("brier") is None or mk.get("brier") is None:
+            continue
+        prior = best.get(row["date"])
+        if prior is None or g > prior[0] or (
+            g == prior[0] and prior[1].get("rescored_from_ledger")
+            and not row.get("rescored_from_ledger")
+        ):
+            best[row["date"]] = (g, row, mp, mk)
+    games = 0
+    model = market = 0.0
+    per_date = {}
+    for date in sorted(best):
+        g, row, mp, mk = best[date]
+        games += g
+        model += mp["brier"] * g
+        market += mk["brier"] * g
+        per_date[date] = {"games": g, "model": mp["brier"], "market": mk["brier"],
+                          "diff": mp["brier"] - mk["brier"], "n": mk.get("n"),
+                          "rescored": bool(row.get("rescored_from_ledger"))}
+    if not games:
+        return {"segment": segment, "dates": 0, "games": 0, "per_date": {}}
+    return {"segment": segment, "dates": len(best), "games": games,
+            "model": model / games, "market": market / games,
+            "diff": (model - market) / games, "per_date": per_date}
+
+
+def print_point_forecast(rows, cut):
+    """The totals/spreads and segment section. Returns (json block, stale)."""
+    post = [r for r in rows if row_era(r) == POST]
+    out = {}
+    stale = False
+    newest = latest_dated(post)
+    for family in PF_FAMILIES:
+        res = pool_point_forecast(post, family, cut)
+        gap = pf_coverage_gap(post, family, cut)
+        res["coverage_gap"] = [{"date": d, "games": g} for d, g in gap]
+        out[family] = res
+        print("\n=== point-forecast | %s | cut=%s | %d dates, %d games ==="
+              % (family, cut, res["dates"], res["games"]))
+        if not res["games"]:
+            print("  No row carries point_forecast.%s.%s. Nothing to pool." % (family, cut))
+            continue
+        print("%-12s%6s%7s%11s%10s%13s%9s"
+              % ("date", "games", "n", "model_mae", "line_mae", "model-line", "hit"))
+        for date, d in res["per_date"].items():
+            print("%-12s%6d%7d%11.3f%10.3f%+13.3f%9.3f%s"
+                  % (date, d["games"], d["n"], d["model_mae"], d["line_mae"],
+                     d["model_minus_line_mae"], d["hit_rate"],
+                     "  (rescored)" if d["rescored"] else ""))
+        print("%-12s%6d%7s%11.3f%10.3f%+13.3f%9.3f"
+              % ("POOLED", res["games"], "", res["model_mae"], res["line_mae"],
+                 res["model_minus_line_mae"], res["hit_rate"]))
+        print("  model-line = model mean's error MINUS the line's, in runs; NEGATIVE = "
+              "the model was closer to the actual than the market's line. GAMES are "
+              "the unit (%d)." % res["games"])
+        print("  hit = share of rows where the actual landed on the model's side of "
+              "the line (se ~%.1fpp on games). NOT a market comparison: 'always over' "
+              "and 'side with the current score' also beat 0.50 "
+              "(bucket_realised_performance.py)." % res["se_pp_on_games"])
+        if gap:
+            print("  ** COVERAGE GAP -- dates with outcomes and no %s point-forecast "
+                  "data: %s **" % (family, ", ".join("%s (%d games)" % x for x in gap)))
+            if newest in {d for d, _ in gap}:
+                stale = True
+                print("  ** STALE: the most recent date with outcomes (%s) carries no "
+                      "%s point-forecast data. **" % (newest, family))
+    seg = pool_segment_h2h(post, "first5")
+    out["segments"] = {"first5_h2h": seg}
+    print("\n=== segment first5 h2h (observation rows, all_records, PAIRED) | "
+          "%d dates, %d games ===" % (seg["dates"], seg["games"]))
+    if seg["games"]:
+        print("%-12s%6s%7s%10s%10s%11s" % ("date", "games", "n", "model", "market", "diff"))
+        for date, d in seg["per_date"].items():
+            print("%-12s%6d%7s%10.5f%10.5f%+11.5f%s"
+                  % (date, d["games"], d["n"], d["model"], d["market"], d["diff"],
+                     "  (rescored)" if d["rescored"] else ""))
+        print("%-12s%6d%7s%10.5f%10.5f%+11.5f"
+              % ("POOLED", seg["games"], "", seg["model"], seg["market"], seg["diff"]))
+        print("  Brier, NEGATIVE diff = model beat the market. first5 is NOT published "
+              "(recorded as an observation only), so this is its only skill reading. "
+              "A level first five is a push and is not scored.")
+    else:
+        print("  No row carries segments.by_segment.first5 yet.")
+    return out, stale
+
+
 def load(path):
     rows = []
     with open(path, encoding="utf-8") as fh:
@@ -389,6 +603,10 @@ def main(argv=None):
               "pooled number across the boundary measures the scorer fix, not "
               "the model (learnings.md:3430).")
 
+    pf_stale = False
+    if POST in wanted:
+        out["point_forecast"], pf_stale = print_point_forecast(rows, args.cut)
+
     # Scope the gap to the eras being REPORTED, and WITHIN those, to eras that
     # actually carry the cut. A post-fix query listing pre-fix dates -- which
     # legitimately predate the cut -- buries the one date that matters under
@@ -430,7 +648,7 @@ def main(argv=None):
         with open(args.json_out, "w", encoding="utf-8") as fh:
             json.dump(out, fh, indent=2, sort_keys=True)
         print("\nwrote %s" % args.json_out)
-    if stale and not args.allow_stale_cut:
+    if (stale or pf_stale) and not args.allow_stale_cut:
         return 3
     return 0
 

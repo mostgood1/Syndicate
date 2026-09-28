@@ -102,6 +102,11 @@ _SCORE_CUTS = ("all_records", "last_per_game", "priceable_only")
 # / 16 games). Two allowlists for one contract is the defect; a shared constant
 # is the fix, because a test that merely COMPARES two lists still lets both go
 # stale against the scorer.
+#
+# `segments` (2026-09-28, lane gameline-spread-total-scoring): the per-segment
+# blocks `live_gameline_segment_actuals.segment_score_blocks` attaches. Named
+# here in the SAME change that creates it, because the failure above is exactly
+# a block the board serves and no history keeps.
 RETAINED_SCORE_KEYS = (
     "finals_index", "unscored", "reason",
     "records_by_market", "scored_markets",
@@ -109,6 +114,7 @@ RETAINED_SCORE_KEYS = (
     "unmeasured", "point_forecast", "segment_actuals_supplied",
     "fresh_quotes_only", "fresh_quote_seconds", "quote_age_absent",
     "by_quote_age", "by_quote_age_cumulative",
+    "segments",
 )
 
 

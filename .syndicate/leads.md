@@ -35,6 +35,7 @@ because the work kept deviating:
 ---
 
 ## Open
+- [ ] 2026-09-28 — from `gameline-spread-total-scoring` — the MLB live-gameline LEDGER COPY served by `/api/ops/artifacts/stream` (web's disk) is TRUNCATED on some dates: 09-27's copy stops at 20:51:40Z mid-slate (131 full-game h2h rows vs the board's 184), and 7 of 21 dates 09-06..09-26 (09-10/11/15/17/19/20/21) cannot reproduce the board's retained h2h figures under any single-game exclusion — so any offline re-score/backtest built on the web copy silently runs on a partial day. Likely the publish sweep stopping before the worker's last writes. — evidence: `scripts/rescore_live_gameline_date.py --expect-from-history --search-exclusions` refusals, 2026-09-28
 - [ ] 2026-09-25 — from `mlb-traditional-dh-join` — `tests/test_nhl_chip_start_time.py::test_a_pregame_nhl_chip_shows_its_start_time` is DATE-DEPENDENT and fails every day that is not 2026-09-22: it asserts `status_token == "6:00P CT"` while the code correctly prefixes the day for a chip that is not today, so it reads `Tue Sep 22 — 6:00P CT`. Pre-existing and unrelated to the doubleheader fix — the test imports `game_chip_scoreboard` / `home`, neither of which that lane touched, and `status_token` is built in `game_chip_scoreboard.py`. A red test in the area is how a new one hides — evidence: `py -3 -m pytest tests/test_nhl_chip_start_time.py -q`
 - [ ] 2026-09-24 — from `lanes-budget-attribution` — `.claude/hooks/session-start.sh` in the PRIMARY tree matches NONE of the last 20 commits to that file and is LONGER than origin/main's current copy (28,012 vs 29,153 vs prev 27,968 normalised chars), so every session started there runs a digest hook that is in no commit on any ref. It is therefore not safe to copy a fix into that tree, and a fix pushed to origin/main is INERT for those sessions **[RETRACTED 2026-09-24: WRONG, and the alarming half was the wrong half. That file holds NO local edits — it matches commit `4dfd298a` (2026-09-08) BYTE-FOR-BYTE after LF normalisation, its only non-upstream line was the original `BLOAT` one-liner my own change replaced, and exactly ONE commit has touched it since. The 'matches NONE of the last 20 commits' reading came from a PowerShell check piping `git show` through `Out-String`, which transcodes the file's em-dashes, so every comparison failed on ENCODING rather than content (`feedback_shell_layer_transcodes_bytes` names exactly this). WHAT SURVIVES, and it was the actionable part: the file WAS stale, the fix WAS inert there, and copying it in was safe all along. Done 2026-09-24 in lane `primary-tree-hook-sync`, together with `scripts/lane_census.py` — because syncing the hook alone left the attribution still silent: it shells out to `lane_census.py --budget-digest`, which that tree's copy predated, so it failed open. Presence is not reachability. `.claude/hooks/ledger_caps.py` was already current and `lane_claims.py` is still stale but the feature works against it, so the guard was deliberately NOT touched.]** — evidence: compare `(Get-Content .claude/hooks/session-start.sh -Raw)` in `C:\Users\tempadmin\OneDrive\Coding\Syndicate` against `git show <rev>:.claude/hooks/session-start.sh` over `git log -20 --` that path
 - [ ] 2026-09-24 — from `lane-archive-debt` — two repo tools disagree on the OPEN-lane count by 5: the session-start digest and a header census both say 39 (38 on origin/main), `scripts/check_lane_invariants.py` says 34, on the same file in the same second. Both are self-consistent before AND after an archive run, so neither is wrong about CHANGE — but any absolute OPEN count quoted from either is unsourced — evidence: `py -3 scripts/check_lane_invariants.py` prints `48 headings, 34 OPEN` while the digest's OPEN LANES line prints 39
@@ -945,3 +946,50 @@ already refused to touch it for this reason.
 larger sample (worst powered bucket 0.3185, MAE 10.146 losing to frozen 8.213).
 
 ---
+
+## 2026-09-28 — the NFL prop-capture SWEEP is hooked one level too low (lane `nfl-live-resim-activation` owns the right spot)
+
+From lane `nfl-ncaaf-live-props`. `live_prop_capture.publish_pending_captures()`
+(`2d22031f`) recovers captures written before the push existed. It belongs at the
+TOP of `live_resim._maybe_capture_prop_snapshot`, before its early returns
+(`no_row`, `no_period_or_clock`, `period_not_capturable`, `outside_window`,
+`final`, `no_event_id`, `no_player_rows`), so it runs on ANY tick after a boot.
+
+`lane-guard` blocked that edit: `syndicate/features/nfl/live_resim.py` is claimed
+by OPEN lane `nfl-live-resim-activation` (claim source `origin/main@43c73fbc`).
+So it is hooked at the top of `record_quarter_snapshot` instead, which fires only
+on a genuine boundary ATTEMPT. **Consequence:** a slate that produces no
+capturable boundary leaves a stranded capture unpublished for another day.
+
+One call, before `if not isinstance(row, Mapping)`. Whoever holds that lane can
+move it in a two-line edit; the comment in `record_quarter_snapshot` says the
+same thing at the call site.
+
+## 2026-09-28 — the two lane guards read DIFFERENT per-session markers, so one of them enforces against the wrong lane
+
+Found while taking an authorised cross-lane override (lane `nfl-ncaaf-live-props`).
+
+`lane-guard.py` (PreToolUse) resolves the marker under `CLAUDE_PROJECT_DIR` — the
+PRIMARY tree. `lane-postwrite-check.py` read the copy inside the WORKTREE. Both
+files existed for session `4ab694ed` and held DIFFERENT slugs:
+
+    primary  .syndicate/.current-lane.4ab694ed...  = nfl-ncaaf-live-props
+    worktree .syndicate/.current-lane.4ab694ed...  = nfl-score-clock-model   <- stale
+
+So the post-write warning named a lane this session had left hours earlier, while
+the pre-write guard was enforcing the current one. **Every session working from a
+worktree — which the protocol requires — can carry two markers that drift apart,
+and nothing reports the drift.**
+
+Why it matters beyond a confusing message: the post-write check is the ONLY guard
+that sees shell writes (`lane-guard` hooks Edit/Write/MultiEdit/NotebookEdit
+only). A stale worktree marker makes its "Your lane:" line wrong, which is
+exactly the field a reader uses to decide whether a flagged write was theirs.
+`project_lane_guard_reads_primary_tree` records the pre-write half of this; the
+post-write half is a second, independent source.
+
+**Fix belongs in `lane_marker.current_lane()`, not in either hook** — one
+resolution order, applied by both, with the divergence reported rather than
+silently resolved (this repo's own standing rule: a guard that maps an unknown
+onto a permissive branch is worse than one that refuses). Synced by hand today;
+that is not a fix.
