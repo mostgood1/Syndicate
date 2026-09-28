@@ -59,17 +59,35 @@ A model asserting 0.02% and 98.4% on ordinary prop lines is not carrying a
 suppressed edge; it is wrong. The guard is the only thing standing between those
 numbers and the board's ranking.
 
-## A SECOND, independent defect found on the way
+## RETRACTED: the "placeholder 0.500 fair" was NOT a defect `[corrected 2026-09-28, same session, before any code changed]`
 
-**24% of NFL rows (12 of 50, all props) price against `market_fair_prob_over`
-of EXACTLY 0.500** — a placeholder, not a market fair, across different players
-and different lines. Their |edge| median is 48.44 against 21.92 for real-fair
-rows. An "edge" against a placeholder is just the model's distance from a coin
-flip wearing the name of a market disagreement. NCAAF has 15 such rows (7.5%),
-all game rows.
+**This section first claimed a second defect: that 24% of NFL rows priced against
+a `market_fair_prob_over` of EXACTLY 0.500 -- "a placeholder, not a fair". THAT
+WAS WRONG, and the user had already approved fixing it on the strength of the
+claim.** It was withdrawn before a line changed, by recomputing the de-vig from
+the book prices the same payload carries:
 
-**And 39 of 44 NFL rows carry `model_skill.sample_games = 0`** — unmeasured. Only
-5 carry `measured_market_skill` (15 games).
+    row                             recomputed no-vig   served fair
+    Deshaun Watson   Pass   187.5        0.5000            0.5
+    Dontayvion Wicks Rec     41.5        0.5002            0.5
+    Colston Loveland Rec     35.5        0.4992            0.5
+    Makai Lemon      Rec     27.5        0.4987            0.5
+    D'Andre Swift    Rec     10.5        0.4964            0.5
+
+NFL prop markets are quoted near-symmetrically -- Watson is DraftKings -112/-112
+and FanDuel -114/-114 -- so the de-vigged fair genuinely IS 0.500. It is correct
+market data, and `_no_vig_over_probability` produced varied fairs on the other 38
+of 50 rows, so the function works.
+
+**WHAT MADE IT LOOK LIKE A PLACEHOLDER:** exactly-0.500 across twelve rows with
+different players and lines reads as a sentinel, and the |edge| median on those
+rows (48.44) is far worse than on the rest (21.92), which invited the reading
+that the fair was fake. The causation runs the other way: `edge = model_prob -
+fair`, so a 0.500 fair is simply where a confident-but-wrong model shows its
+widest arithmetic gap. **The spread of the edge was evidence about the MODEL and
+it was attributed to the MARKET.**
+
+The inputs were two book prices sitting in the payload the whole time.
 
 ## What was NEARLY reported and was wrong
 

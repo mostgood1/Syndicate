@@ -76,10 +76,13 @@ Served examples: `model=0.0002 fair=0.5101` (Judkins rush 55.5),
 are the failure it exists for. 39 of 44 NFL rows also carry
 `model_skill.sample_games = 0`.
 
-**SECOND DEFECT:** 12 of 50 NFL rows (24%, all props) price against
-`market_fair_prob_over` EXACTLY 0.500 -- a placeholder, not a fair. Their |edge|
-median is 48.44. An edge against a placeholder is the model's distance from a
-coin flip wearing a market's name.
+**A SECOND DEFECT WAS CLAIMED HERE AND IS RETRACTED** `[same day, before any code
+changed]`: that 12 of 50 NFL rows price against a "placeholder" 0.500 fair.
+Recomputing the de-vig from the served book prices gives 0.4964-0.5002 on exactly
+those rows -- NFL props are quoted near-symmetrically (Watson DK -112/-112, FD
+-114/-114), so 0.500 is CORRECT market data. Their larger |edge| median (48.44 vs
+21.92) is evidence about the MODEL, not the market: `edge = model_prob - fair`, so
+a 0.500 fair is where a confident-but-wrong model shows its widest arithmetic gap.
 
 **NOT A REGRESSION, and nearly filed as one:** NFL game `projection` coverage
 reads 6% only because the board mixes three slate dates. Tonight's game is 5/5 =
