@@ -87,7 +87,28 @@ session worktree (`data/` is excluded), so the implied sds are back-derived from
 production and the estimator is read from source, but no individual player's log
 was inspected.
 
-Full working: `.syndicate/findings_2026-09-28_nfl_prop_model_diagnosis.md`.
+**SWEPT OUT OF SAMPLE 2026-09-28** (`scripts/calibrate_nfl_spread_shrinkage.py`,
+fit 2022-23, reported 2024-25, graded through the PRODUCTION probability function
+against real settled outcomes). SELECTED `estimator=stdev, k=3.0` on a genuine
+convex minimum, with `stdev` beating `pstdev` at every k. **Held out on the SAME
+28,618 rows: Brier 0.192516 -> 0.189037 (-0.003479), cov80 0.7011 -> 0.7541.**
+Estimator fix -0.001989, shrinkage a further -0.001490 -- roughly equal, so
+shipping one leaves half the gain. **STILL A PARTIAL FIX: cov80 0.7541 against a
+0.80 target**, so the distribution remains too narrow after both.
+
+**A COVERAGE "WIN" THAT IS NOT ONE:** 39,094 of 67,712 held-out rows are
+unpriceable today (`raw sd == 0`) and any shrinkage rescues them -- but measured
+on 2025, **99.4% are STRUCTURAL ZEROS** (`mean == 0`: a receiver's passing yards).
+Counted, never folded into the Brier. The first pilot showed shrinkage winning by
+-0.0516 purely because those rows entered one arm and not the other; pinning the
+population removed the entire effect and the real one is 15x smaller.
+
+**MUST SHIP WITH IT:** `_COVER_PROBABILITY_BLEND_WEIGHT` was fitted on top of the
+current too-narrow sd, so `k=3` is best GIVEN that blend; widening the sd requires
+re-fitting it in the same pass.
+
+Full working: `.syndicate/findings_2026-09-28_nfl_prop_model_diagnosis.md` and
+`.syndicate/findings_2026-09-28_nfl_spread_shrinkage_sweep.md`.
 
 ## [nfl-model-edge-suppressed] NFL'S MODEL EDGE REACHES 3% OF THE SERVED BOARD, AND THE 15-POINT GUARD IS RIGHT TO REJECT IT `[measured 2026-09-28 on the served payload, lane layer2-triad-alignment]`
 
