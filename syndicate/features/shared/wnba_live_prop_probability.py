@@ -113,7 +113,9 @@ _RESIDUAL_BUCKETS_BY_MARKET: dict[str, tuple[tuple[float, float, float, float], 
         (0.0, 5.0, 0.66, 1.00),
     ),
 }
-# Kept for readers of the old name: the points table.
+# The residual tables no longer PRICE anything (every market is on the NegBin remainder
+# since 2026-09-28); they stay as the measured interval the grader and tooling report
+# against. Kept for readers of the old name: the points table.
 _RESIDUAL_BUCKETS = _RESIDUAL_BUCKETS_BY_MARKET["points"]
 MEASURED_MARKETS = frozenset(_RESIDUAL_BUCKETS_BY_MARKET)
 
@@ -161,9 +163,25 @@ REASON_NO_CURRENT = "count_market_needs_the_banked_stat_to_price_the_remainder"
 # shooters (~15 pregame minutes, <1 expected three) were over-priced by up to 22 pp -- the
 # live RATE after a few minutes is the problem there, and the old minutes cap had hidden it.
 #
+# POINTS JOINED `[2026-09-28, user: "try the game-state minutes on points" -> "Ship it now"]`.
+# NegBin on rate x game-state minutes, r per bucket. September, all / rotation: worst line-level
+# gap 6.5 / 9.4 -> 4.8 / 7.1 pp and Brier skill +0.372 / +0.429 -> +0.410 / +0.471 against the
+# normal it replaces; c flat ~1.12 in every bucket. CAVEAT, stated because it matters: September
+# was ALSO used to pick this variant (the variant chosen blind on August -- projection minutes --
+# lost Brier on September), so that September reading is NOT a clean holdout. August (in
+# selection): 5.0 / 4.7 pp at skill +0.425 / +0.468 vs the normal's 5.5 / 3.6 at +0.393 / +0.441.
+# The first clean read is live data (2026-09-29 onward).
+#
 # (low, high, c, r) per remaining-minutes bucket.
-MINUTES_MODEL_MARKETS = frozenset({"rebounds", "assists"})
+MINUTES_MODEL_MARKETS = frozenset({"points", "rebounds", "assists"})
 _NEGBIN_REMAINDER: dict[str, tuple[tuple[float, float, float, float], ...]] = {
+    "points": (
+        (30.0, float("inf"), 1.12, 7.0),
+        (20.0, 30.0, 1.12, 4.0),
+        (10.0, 20.0, 1.12, 1.5),
+        (5.0, 10.0, 1.14, 0.75),
+        (0.0, 5.0, 1.12, 0.5),
+    ),
     "rebounds": (
         (30.0, float("inf"), 0.78, 7.0),
         (20.0, 30.0, 0.82, 7.0),
@@ -283,15 +301,9 @@ def _negbin_sf(k: int, mean: float, r: float) -> float:
 def grid_center_and_sd(projected: Any, current: Any, minutes_remaining: Any, market: str,
                        *, rate: Any = None, expected_minutes: Any = None) -> tuple[float, float] | None:
     """Where the priced distribution sits and how wide, for sizing a line grid."""
-    if str(market or "") in COUNT_MARKETS:
-        nb = negbin_remainder(projected, current, minutes_remaining, market,
-                              rate=rate, expected_minutes=expected_minutes)
-        return None if nb is None else (nb["center"], nb["sd"])
-    proj = _as_number(projected)
-    sigma = residual_sigma(minutes_remaining, market)
-    if proj is None or sigma is None or sigma <= 0.0:
-        return None
-    return proj, sigma
+    nb = negbin_remainder(projected, current, minutes_remaining, market,
+                          rate=rate, expected_minutes=expected_minutes)
+    return None if nb is None else (nb["center"], nb["sd"])
 
 
 def residual_sigma(minutes_remaining: Any, market: str = "points") -> float | None:
@@ -314,10 +326,6 @@ def residual_sigma(minutes_remaining: Any, market: str = "points") -> float | No
             # Widened only where the observed tail is fatter than normal.
             return max(sd, p90 / _Z90)
     return None
-
-
-def _normal_cdf(z: float) -> float:
-    return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
 
 
 def live_prop_prob_over(
@@ -353,37 +361,26 @@ def live_prop_prob_over(
         out["unavailable_reason"] = REASON_NO_LINE
         return out
 
-    if str(market or "") not in MEASURED_MARKETS:
+    if str(market or "") not in COUNT_MARKETS:
         out["unavailable_reason"] = REASON_NO_MEASURED_MARKET
         return out
-    if str(market) in COUNT_MARKETS:
-        # A COUNT market is priced on the player-scaled remainder, never the normal.
-        # Without the banked stat there is no remainder to price, so it refuses --
-        # falling back to the normal would restore the miscalibration this replaced.
-        if _as_number(current) is None:
-            out["unavailable_reason"] = REASON_NO_CURRENT
-            return out
-        nb = negbin_remainder(projection, current, minutes_remaining, market,
-                              rate=rate, expected_minutes=expected_minutes)
-        if nb is None:
-            out["unavailable_reason"] = REASON_NO_MINUTES_REMAINING
-            return out
-        out["residual_sigma"] = round(nb["sd"], 4)
-        out["basis"] = "measured_negbin_remainder"
-        needed = math.ceil(target - float(current))
-        out["prob_over"] = round(_negbin_sf(needed, nb["mean"], nb["dispersion"]), 6)
+    # EVERY market is priced on the player-scaled remainder `[2026-09-28]`; the normal
+    # branch that priced points was removed when points moved (it had no caller left).
+    # Without the banked stat there is no remainder to price, so it refuses.
+    if _as_number(current) is None:
+        out["unavailable_reason"] = REASON_NO_CURRENT
         return out
-    sigma = residual_sigma(minutes_remaining, market)
-    if sigma is None or sigma <= 0.0:
-        # No measured interval for this state. A 0.0 here would read as perfect
-        # precision and make every edge priceable -- the substitution this
-        # codebase has already paid for once (`PHI @ MIN se=0.0`).
+    nb = negbin_remainder(projection, current, minutes_remaining, market,
+                          rate=rate, expected_minutes=expected_minutes)
+    if nb is None:
+        # No fitted remainder for this state -- never a default spread, which would
+        # price a state nobody measured.
         out["unavailable_reason"] = REASON_NO_MINUTES_REMAINING
         return out
-
-    out["residual_sigma"] = round(sigma, 4)
-    out["basis"] = "measured_residual_normal"
-    # P(final >= line). A prop line of 17.5 cannot be landed on exactly, so no
-    # continuity correction is applied -- the half-point IS the correction.
-    out["prob_over"] = round(1.0 - _normal_cdf((target - projection) / sigma), 6)
+    out["residual_sigma"] = round(nb["sd"], 4)
+    out["basis"] = "measured_negbin_remainder"
+    # P(final >= line). Lines are half-points, so ceil(line - banked) is the count
+    # of further units needed; no continuity correction.
+    needed = math.ceil(target - float(current))
+    out["prob_over"] = round(_negbin_sf(needed, nb["mean"], nb["dispersion"]), 6)
     return out

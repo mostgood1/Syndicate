@@ -420,6 +420,7 @@ def _attach_live_props(games: list[dict[str, Any]], date_str: str) -> None:
             # which hurts low counts most. Rebounds/assists/threes keep their single
             # pregame line (priced on their own tables, which beat the old points
             # table); widening them waits on a player-scaled spread.
+            # POINTS is priced on the same NegBin remainder since 2026-09-28 (still gridded).
             # REBOUNDS JOINED on the player-scaled NegBin remainder (Sep 3.0 pp); ASSISTS
             # joins once priced on the remaining-minutes model (Sep 3.5 pp, Aug 5.1).
             # Threes (5.9 on the old minutes) stays at one line: its bench-shooter rate,

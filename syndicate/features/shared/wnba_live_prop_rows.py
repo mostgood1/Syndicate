@@ -200,7 +200,22 @@ def build_live_prop_rows(
                 ),
                 "basis": verdict.get("basis"),
                 "unavailable_reason": verdict.get("unavailable_reason"),
+                # The projection's OWN number (pregame-anchored rate x rule minutes). The
+                # pricer reads THIS -- threes prices off it -- never the displayed value.
+                "projection_rule": verdict.get("projected"),
             }
+            # THE DISPLAYED LIVE PROJECTION IS WHAT PRICES THE ROW `[2026-09-28]`. The
+            # pricer's centre (banked + NegBin mean, on the game-state minutes) can sit on
+            # the other side of a line from the rule projection -- measured in this file's
+            # tests: displayed over 17.5 while P(over) was 0.28. A projection and a
+            # probability that disagree about the side is the shape `live_projection_join`
+            # already fixed once for MLB. Unpriceable state -> the rule projection stays.
+            placed = grid_center_and_sd(
+                verdict.get("projected"), row["current"], verdict.get("minutes_remaining"), market,
+                rate=row.get("rate"), expected_minutes=row.get("expected_remaining_minutes"),
+            )
+            if placed is not None and row["liveProjectedStat"] is not None:
+                row["liveProjectedStat"] = round(placed[0], 3)
             # PHASE 3(b): the probability the prop join keys on, from the
             # MEASURED residual (see `wnba_live_prop_probability`). Emitted ONLY
             # when a line is supplied for this (player, market) -- a probability
@@ -213,7 +228,7 @@ def build_live_prop_rows(
             if market in grid:
                 line_set = _grid_lines(
                     line,
-                    projected=row["liveProjectedStat"],
+                    projected=row["projection_rule"],
                     current=row["current"],
                     minutes_remaining=verdict.get("minutes_remaining"),
                     market=market,
@@ -303,7 +318,7 @@ def _grid_lines(supplied: Any, *, projected: Any, current: Any, minutes_remainin
 def _price_row(row: dict[str, Any], line: Any, verdict: Mapping[str, Any]) -> None:
     """Stamp `line` and its measured-residual probability onto `row`."""
     priced = live_prop_prob_over(
-        projected=row["liveProjectedStat"],
+        projected=row.get("projection_rule", row["liveProjectedStat"]),
         line=line,
         minutes_remaining=verdict.get("minutes_remaining"),
         market=row.get("market") or "points",

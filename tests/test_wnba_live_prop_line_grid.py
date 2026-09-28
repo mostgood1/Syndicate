@@ -58,9 +58,11 @@ def test_a_live_line_off_the_pregame_line_is_indexed_with_a_probability():
 def test_every_grid_line_is_priced_by_the_unchanged_rule():
     built, _ = _snapshot(grid_markets=("points",))
     pts = [r for r in built["rows"] if r["market"] == "points"]
-    proj = pts[0]["liveProjectedStat"]
     for r in pts:
-        expect = live_prop_prob_over(projected=proj, line=r["line"], minutes_remaining=r["minutes_remaining"])
+        expect = live_prop_prob_over(projected=r["projection_rule"], line=r["line"],
+                                     minutes_remaining=r["minutes_remaining"], market="points",
+                                     current=r["current"], rate=r["rate"],
+                                     expected_minutes=r["expected_remaining_minutes"])
         assert r["liveModelProbOver"] == expect["prob_over"]
 
 
@@ -191,15 +193,16 @@ def test_snapshot_size_per_player_three_markets_is_bounded():
 from syndicate.features.shared import wnba_live_prop_probability as prob  # noqa: E402
 
 
-def test_count_markets_are_REACHED_by_the_negbin_and_points_is_not():
-    """REACHABILITY (off != on): the basis stamp says which model priced the row."""
+def test_every_market_is_REACHED_by_the_negbin():
+    """REACHABILITY (off != on): the basis stamp says which model priced the row.
+    Points moved onto the NegBin on 2026-09-28; nothing prices on the normal now."""
     built, _ = _snapshot(grid_markets=("points", "rebounds"))
     bases = {r["market"]: r.get("liveModelProbOver") is not None and prob.live_prop_prob_over(
         projected=r["liveProjectedStat"], line=r["line"], minutes_remaining=r["minutes_remaining"],
         market=r["market"], current=r["current"], rate=r["rate"],
         expected_minutes=r["expected_remaining_minutes"])["basis"] for r in built["rows"] if r["line"] is not None}
     assert bases["rebounds"] == "measured_negbin_remainder"
-    assert bases["points"] == "measured_residual_normal"
+    assert bases["points"] == "measured_negbin_remainder"
 
 
 def test_the_spread_scales_with_the_players_own_remainder():

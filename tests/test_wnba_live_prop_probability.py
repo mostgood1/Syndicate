@@ -45,57 +45,61 @@ class SigmaTableTests(unittest.TestCase):
 
 
 class ProbabilityTests(unittest.TestCase):
-    def test_a_projection_on_the_line_is_a_coin_flip(self) -> None:
-        out = live_prop_prob_over(projected=17.5, line=17.5, minutes_remaining=15.0)
-        self.assertAlmostEqual(out["prob_over"], 0.5, places=6)
+    """`[2026-09-28]` Points prices on the NegBin remainder over the game-state
+    remaining-minutes model, like rebounds/assists -- the normal branch that these
+    tests used to pin was removed when it lost its last caller. The properties that
+    matter carry over; the normal-specific ones (exact symmetry, a coin flip at the
+    line) do not hold for a skewed count and are not asserted."""
 
-    def test_above_the_line_exceeds_a_half_and_below_it_falls_short(self) -> None:
-        over = live_prop_prob_over(projected=22.0, line=17.5, minutes_remaining=15.0)
-        under = live_prop_prob_over(projected=13.0, line=17.5, minutes_remaining=15.0)
-        self.assertGreater(over["prob_over"], 0.5)
-        self.assertLess(under["prob_over"], 0.5)
-        # Symmetric about the line, because the residual is modelled normal.
-        self.assertAlmostEqual(over["prob_over"] + under["prob_over"], 1.0, places=3)
+    KW = dict(projected=20.0, minutes_remaining=15.0, market="points", current=10.0)
 
-    def test_the_SAME_gap_is_more_confident_later_in_the_game(self) -> None:
-        """The point of the bucketing: 4 points clear of the line means much
-        more with 2 minutes left than with 25."""
-        early = live_prop_prob_over(projected=21.5, line=17.5, minutes_remaining=25.0)
-        late = live_prop_prob_over(projected=21.5, line=17.5, minutes_remaining=2.0)
-        self.assertGreater(late["prob_over"], early["prob_over"])
+    def test_more_expected_production_raises_the_over(self) -> None:
+        slow = live_prop_prob_over(line=17.5, rate=0.3, expected_minutes=15.0, **self.KW)
+        fast = live_prop_prob_over(line=17.5, rate=0.8, expected_minutes=15.0, **self.KW)
+        self.assertGreater(fast["prob_over"], slow["prob_over"])
+
+    def test_more_minutes_left_raises_the_over(self) -> None:
+        few = live_prop_prob_over(line=17.5, rate=0.5, expected_minutes=4.0, **self.KW)
+        many = live_prop_prob_over(line=17.5, rate=0.5, expected_minutes=20.0, **self.KW)
+        self.assertGreater(many["prob_over"], few["prob_over"])
 
     def test_it_stays_a_probability(self) -> None:
-        for projection in (0.0, 5.0, 40.0, 80.0):
-            with self.subTest(projection=projection):
-                out = live_prop_prob_over(projected=projection, line=17.5,
-                                          minutes_remaining=8.0)
+        for rate in (0.0, 0.2, 1.0, 3.0):
+            with self.subTest(rate=rate):
+                out = live_prop_prob_over(line=17.5, rate=rate, expected_minutes=12.0, **self.KW)
                 self.assertGreaterEqual(out["prob_over"], 0.0)
                 self.assertLessEqual(out["prob_over"], 1.0)
 
-    def test_it_carries_the_sigma_that_produced_it(self) -> None:
-        out = live_prop_prob_over(projected=20.0, line=17.5, minutes_remaining=15.0)
-        self.assertAlmostEqual(out["residual_sigma"], 5.54, places=2)
-        self.assertEqual(out["basis"], "measured_residual_normal")
+    def test_a_line_already_reached_is_one(self) -> None:
+        out = live_prop_prob_over(line=9.5, rate=0.5, expected_minutes=12.0, **self.KW)
+        self.assertEqual(out["prob_over"], 1.0)
+
+    def test_it_carries_the_spread_that_produced_it(self) -> None:
+        out = live_prop_prob_over(line=17.5, rate=0.5, expected_minutes=15.0, **self.KW)
+        self.assertEqual(out["basis"], "measured_negbin_remainder")
+        self.assertGreater(out["residual_sigma"], 0.0)
 
 
 class RefusalTests(unittest.TestCase):
     def test_no_projection_no_price(self) -> None:
-        out = live_prop_prob_over(projected=None, line=17.5, minutes_remaining=10.0)
+        out = live_prop_prob_over(projected=None, line=17.5, minutes_remaining=10.0,
+                                  current=10.0, rate=0.5, expected_minutes=10.0)
         self.assertIsNone(out["prob_over"])
         self.assertEqual(out["unavailable_reason"], REASON_NO_PROJECTION)
 
     def test_no_line_no_price(self) -> None:
-        out = live_prop_prob_over(projected=20.0, line=None, minutes_remaining=10.0)
+        out = live_prop_prob_over(projected=20.0, line=None, minutes_remaining=10.0,
+                                  current=10.0, rate=0.5, expected_minutes=10.0)
         self.assertIsNone(out["prob_over"])
         self.assertEqual(out["unavailable_reason"], REASON_NO_LINE)
 
-    def test_unknown_minutes_remaining_REFUSES_rather_than_guessing(self) -> None:
-        """THE GUARD. A default sigma here would price a state never measured,
-        and a 0.0 would make every edge clear its bar."""
+    def test_unknown_remaining_minutes_REFUSES_rather_than_guessing(self) -> None:
+        """THE GUARD. No game-state minutes means no fitted remainder; a default
+        would price a state nobody measured."""
         for bad in (None, -1.0, "later"):
             with self.subTest(bad=bad):
-                out = live_prop_prob_over(projected=20.0, line=17.5,
-                                          minutes_remaining=bad)
+                out = live_prop_prob_over(projected=20.0, line=17.5, minutes_remaining=10.0,
+                                          current=10.0, rate=0.5, expected_minutes=bad)
                 self.assertIsNone(out["prob_over"])
                 self.assertEqual(out["unavailable_reason"], REASON_NO_MINUTES_REMAINING)
 

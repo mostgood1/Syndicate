@@ -128,12 +128,18 @@ class PricingTests(unittest.TestCase):
             self.assertEqual(row["not_priced_reason"], "no_line_to_price_against")
         self.assertEqual(out["unpriced_by_reason"]["no_line_to_price_against"], 4)
 
-    def test_the_projection_above_its_line_prices_over_a_half(self) -> None:
-        out = build_live_prop_rows([_LIVE], _sim([_ANCHOR]),
-                                   game_minutes_remaining=21.0, lines=self.LINES)
-        pts = next(r for r in out["rows"] if r["market"] == "points")
-        self.assertGreater(pts["liveProjectedStat"], 17.5, "guard: projection is over")
-        self.assertGreater(pts["liveModelProbOver"], 0.5)
+    def test_the_displayed_projection_and_the_price_agree_about_the_side(self) -> None:
+        """`[2026-09-28]` The displayed live projection is the PRICED centre, so a
+        projection clearly over a line never ships with P(over) under a half, or the
+        reverse. Before, the rule projection read over 17.5 beside P(over) 0.28."""
+        for line in (8.5, 12.5, 17.5, 22.5, 27.5):
+            with self.subTest(line=line):
+                out = build_live_prop_rows([_LIVE], _sim([_ANCHOR]), game_minutes_remaining=21.0,
+                                           lines={("paige bueckers", "points"): line})
+                pts = next(r for r in out["rows"] if r["market"] == "points")
+                gap = pts["liveProjectedStat"] - line
+                if abs(gap) >= 2.0:
+                    self.assertEqual(gap > 0, pts["liveModelProbOver"] > 0.5)
 
     def test_an_unprojectable_row_is_never_priced(self) -> None:
         """No projection, no price -- the refusal must not be routed around by
@@ -145,14 +151,16 @@ class PricingTests(unittest.TestCase):
         for row in out["rows"]:
             self.assertIsNone(row["liveModelProbOver"])
 
-    def test_unknown_minutes_remaining_refuses_even_with_a_line(self) -> None:
-        """The sigma table is a MEASUREMENT and does not cover states it never
-        saw. `game_minutes_remaining=None` leaves the projection's own
-        `minutes_remaining` set, so this pins the pass-through, not a default."""
+    def test_unknown_game_clock_refuses_even_with_a_line(self) -> None:
+        """`[2026-09-28]` Points prices on the game-state remaining-minutes model,
+        which needs the game clock. Without it the row REFUSES by name -- it does
+        not fall back to the rule minutes, whose table priced a different model."""
         out = build_live_prop_rows([_LIVE], _sim([_ANCHOR]), lines=self.LINES)
         pts = next(r for r in out["rows"] if r["market"] == "points")
-        self.assertIsNotNone(pts["minutes_remaining"], "guard: it is known here")
-        self.assertIsNotNone(pts["liveModelProbOver"], "so it prices")
+        self.assertIsNotNone(pts["minutes_remaining"], "guard: the RULE minutes are known")
+        self.assertIsNone(pts["expected_remaining_minutes"], "guard: the model minutes are not")
+        self.assertIsNone(pts["liveModelProbOver"])
+        self.assertIsNotNone(pts["not_priced_reason"])
 
 
 if __name__ == "__main__":
