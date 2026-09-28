@@ -247,3 +247,52 @@ def test_a_FINAL_game_is_not_captured_as_a_boundary(monkeypatch):
         {"state": "final", "period": 3, "clock_seconds": 0, "event_id": "E9"},
         None, date_str="2026-09-27")
     assert not calls
+
+
+def test_the_PRODUCERS_OWN_ROW_SHAPE_is_captured_not_an_invented_one(tmp_path):
+    """The test that would have caught bug six, built from the producer's names.
+
+    `_merged_player_rows` emits `{"player_name", "team_abbr", **_ROW_FIELDS}`.
+    The capture looked for `player`/`name` and invented stat names
+    (`pass_completions`, `interceptions`, `total_yards`), so on the first real
+    boundary of 2026-09-27 every row was dropped, an empty file was written, and
+    the tick still logged `captured=1`.
+
+    Every fixture in this file used `{"player": ...}` and passed throughout --
+    which is why they are not evidence about the producer. This one is built
+    FROM `live_player_box._ROW_FIELDS`, so it fails if either side is renamed.
+    """
+    from syndicate.features.nfl.live_player_box import _ROW_FIELDS
+    from syndicate.features.nfl import live_prop_capture as c
+
+    producer_row = {"player_name": "P.Mahomes", "team_abbr": "KC",
+                    **{f: 0.0 for f in _ROW_FIELDS}}
+    producer_row["pass_yards"] = 180.0
+    producer_row["completions"] = 14.0
+
+    rows = c.snapshot_rows(event_id="E1", period=2, date_str="2026-09-27",
+                           player_rows=[producer_row])
+    assert len(rows) == 1, "the producer's own row shape was dropped"
+    rec = rows[0]
+    assert rec["player"] == "P.Mahomes"
+    assert rec["team"] == "KC"
+    assert rec["pass_yards"] == 180.0
+    assert rec["completions"] == 14.0
+
+    # EVERY captured field must be one the producer actually emits.
+    assert set(c.CAPTURED_FIELDS) <= set(_ROW_FIELDS), (
+        f"capturing fields the producer does not emit: "
+        f"{sorted(set(c.CAPTURED_FIELDS) - set(_ROW_FIELDS))}"
+    )
+
+
+def test_a_write_that_stores_NOTHING_is_not_reported_as_captured():
+    """`captured=1` on an empty write is a success signal that is not one."""
+    from syndicate.features.nfl import live_resim as lr
+
+    names = lr._maybe_capture_prop_snapshot.__code__.co_names
+    assert "record_quarter_snapshot" in names
+    src_consts = lr._maybe_capture_prop_snapshot.__code__.co_consts
+    assert "wrote_nothing" in src_consts, (
+        "the hook does not distinguish a real write from a call that stored nothing"
+    )

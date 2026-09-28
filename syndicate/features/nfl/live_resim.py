@@ -875,7 +875,11 @@ def _maybe_capture_prop_snapshot(row: Any, resolved: Any, *, date_str: str) -> s
             print("[nfl_live_resim] PROP_CAPTURE_SKIPPED reason=no_player_rows "
                   f"event={event_id} period={period}", flush=True)
             return "no_player_rows"
-        record_quarter_snapshot(
+        # THE RETURN VALUE IS CHECKED. Reporting "captured" because the writer
+        # was CALLED is a success signal that is not one -- measured 01:44:39Z,
+        # the tick logged `captured=1` while every row had been dropped on a
+        # field-name mismatch and nothing reached disk.
+        written = record_quarter_snapshot(
             default_capture_dir().parent,
             event_id=event_id,
             period=period,
@@ -885,6 +889,10 @@ def _maybe_capture_prop_snapshot(row: Any, resolved: Any, *, date_str: str) -> s
             away_score=row.get("away_score"),
             clock_seconds=clock,
         )
+        if not written:
+            print("[nfl_live_resim] PROP_CAPTURE_SKIPPED reason=wrote_nothing "
+                  f"event={event_id} period={period} box_rows={len(rows)}", flush=True)
+            return "wrote_nothing"
         return "captured"
     except Exception as exc:  # noqa: BLE001
         print(f"[nfl_live_resim] PROP_CAPTURE_FAILED {type(exc).__name__}: {exc}", flush=True)

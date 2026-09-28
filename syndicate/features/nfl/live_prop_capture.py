@@ -55,11 +55,17 @@ CAPTURE_PERIODS = (1, 2, 3)
 # The fields a prop model needs, and only those. `live_player_box` merges ESPN's
 # stat groups into these names already; re-deriving them here would be a second
 # copy of a mapping that is allowed to change.
+# EXACTLY `live_player_box._ROW_FIELDS`, verified against it rather than guessed.
+# The first version invented plausible names -- `pass_completions`,
+# `interceptions`, `total_yards`, `td_scored` -- none of which the producer emits
+# (`completions`, `pass_int`, and no derived totals on the UNFILTERED grading
+# rows). Guessing a producer's field names is how a capture writes rows with
+# every stat missing and still looks like it worked.
 CAPTURED_FIELDS = (
-    "pass_yards", "rush_yards", "rec_yards", "total_yards",
-    "receptions", "pass_td", "rush_td", "rec_td", "td_scored",
-    "pass_attempts", "pass_completions", "rush_attempts", "targets",
-    "interceptions",
+    "pass_yards", "rush_yards", "rec_yards",
+    "pass_td", "rush_td", "rec_td",
+    "completions", "pass_attempts", "pass_int",
+    "rush_attempts", "receptions", "targets",
 )
 
 
@@ -130,7 +136,15 @@ def snapshot_rows(
         return []
     out: list[dict[str, Any]] = []
     for row in player_rows or ():
-        name = str(row.get("player") or row.get("name") or "").strip()
+        # `player_name` IS THE PRODUCER'S KEY, and this cost the first real
+        # boundary of the night. `_merged_player_rows` builds
+        # `{"player_name": ..., "team_abbr": ...}`; this looked for `player`/
+        # `name`, matched nothing, dropped EVERY row, and wrote an empty file --
+        # while the tick reported `captured=1`, because the caller did not check
+        # what the writer returned. Two failures stacked: a wrong field name and
+        # a success signal that was not one.
+        name = str(row.get("player_name") or row.get("player")
+                   or row.get("name") or "").strip()
         if not name:
             # NO SYNTHETIC KEY. A row that cannot be joined back to a player is
             # not a cheap observation, it is an unattributable one, and it would
@@ -142,7 +156,7 @@ def snapshot_rows(
             "event_id": str(event_id),
             "period": int(period),
             "player": name,
-            "team": str(row.get("team") or "").strip() or None,
+            "team": str(row.get("team_abbr") or row.get("team") or "").strip() or None,
         }
         if home_score is not None:
             rec["home_score_at"] = int(home_score)
