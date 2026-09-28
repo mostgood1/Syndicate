@@ -857,6 +857,30 @@ death, never life — do not invert it.
 - Verification: On a live slate, layer2 rows for each gated sport show non-zero count of non-null 'actual', and the same reading is zero on the pre-change tree
 - Blocked by: none
 
+### nfl-live-gameline-full-rows — OPEN — opened 2026-09-28 — session 3b474634-19d1-487d-bc28-3b3cc0bd2b1d
+- Goal: NFL live FULL-GAME rows (h2h/spreads/totals) reach the live-gameline ledger and live_gameline_score scores >0 NFL games on a Sunday slate, where 2026-09-27 scored 0
+- Files: none yet -- the adopting session declares them after tracing; this lane was opened for delegation
+- Hypothesis: Measured 2026-09-28 on the 09-27 NFL ledger (web mirror, 3,000 records 17:04Z-00:24Z): EVERY record is a segment row (h1/h2/q1-q4, all withheld segment_is_not_full_game) and ZERO are segment=full, so the full-game live join never produced a row it could record. Suspect: the NFL full-game rows never get a live projection the join accepts (lens/resim source not admitted), not the scorer
+- Falsification test: If the worker-side ledger (not the web mirror, which truncates -- leads.md 2026-09-28) DOES hold NFL full-game rows for 09-27, the defect is the mirror/scorer join, not the producer
+- Verification: /api/board/book-grid?sport=nfl&date=<a Sunday after the fix> serves live_gameline_score.games_with_outcome > 0 and records_by_market with h2h/spreads/totals; the 28d model-scorecard shows nfl game live games > 0
+- Blocked by: none
+
+### live-props-model-probability — OPEN — opened 2026-09-28 — session 3b474634-19d1-487d-bc28-3b3cc0bd2b1d
+- Goal: LIVE prop rows reaching the model-scorecard carry a model probability, so its 28d live-prop cells grade > 0 games for NFL, NCAAF and soccer (0 today) and grow for WNBA (11) -- sport by sport, each measured
+- Files: none yet -- the adopting session declares them after tracing; this lane was opened for delegation
+- Hypothesis: Measured 2026-09-28 on reports/model_scorecard/model_scorecard_latest.json (generated 11:32Z), 28d window: live prop graded game-cells mlb 229, wnba 11, ncaaf 0, nfl 0, soccer 0, while pregame props grade in every sport. model_scorecard.py's own header (2026-09-21) says live rows carry no model edge. Suspect: the live prop join publishes rows to the opportunity_population_ledger without p_model/model_edge_pct, so they are ungradeable by construction
+- Falsification test: If live prop rows DO carry model_edge_pct in the recorder parts and are dropped by the grader instead, the defect is grading, not recording
+- Verification: model_scorecard_latest.json windows.28d.cells for phase=live, non-h2h/spreads/totals markets: games > 0 for nfl/ncaaf/soccer after a slate following the fix
+- Blocked by: none
+
+### mlb-prop-grading-player-match — OPEN — opened 2026-09-28 — session 3b474634-19d1-487d-bc28-3b3cc0bd2b1d
+- Goal: MLB prop rows ungraded as prop_player_not_in_boxscore (9,728 in the 28d scorecard) and prop_no_commence_time (1,278) are shrunk to genuine voids: each remaining row is a player who truly did not play, measured on a sample against StatsAPI boxscores
+- Files: none yet -- the adopting session declares them after tracing; this lane was opened for delegation
+- Hypothesis: Measured 2026-09-28, model_scorecard_latest.json coverage.ungraded_by_sport.mlb: prop_player_not_in_boxscore 9728, prop_no_commence_time 1278, against ~156k graded MLB rows. The volume is too large to be DNPs alone; suspect a player NAME match miss (accents, Jr., initials) in MlbPropGrader (syndicate/features/mlb/prop_outcomes.py)
+- Falsification test: If a 200-row sample of prop_player_not_in_boxscore rows is >=90% true DNPs (player absent from the game's boxscore under any spelling), the pile is correct voiding and the lane closes as EXONERATED
+- Verification: the next model-scorecard run reports prop_player_not_in_boxscore reduced by the measured name-miss fraction, with graded MLB prop games up correspondingly; grader version change stamped (history resets by design)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
