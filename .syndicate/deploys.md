@@ -43062,3 +43062,60 @@ today -- expected); `Traceback` since 18:42:16Z: 0 (read 18:44:20Z). NOT yet exe
 projected vs the 3..5 baseline; population part `gs=live kind=prop` with `me` non-null for
 player_points, player_rebounds, player_assists separately; lens snapshot size (test: ~10.4 KB
 JSON per live player for three markets). Task `wnba-live-prop-grid-reading-0929`.
+
+## 2026-09-28 18:53Z — web `c3874b91` (lane `layer2-triad-alignment`) — the split is CLOSED
+
+    deploy   dep-datbf72d0e5s73be13eg   web  4b5ebc0a -> c3874b91
+    fired    18:53:16Z      live 18:59:38Z
+    claim    layer2-triad-alignment, acquired 18:52:56Z
+    baseline read 18:53:06Z from LIVE 4b5ebc0a:
+             `_DISCRETE_COUNT_STATS` 0  (web lacked the discrete model)
+             `SPREAD_SHRINKAGE_K`    2  (web ALREADY had the spread fix)
+    preflight CLEAR.
+
+**EXPECTATION MET.** `web_has_nfl_discrete_count_model: false -> true`.
+
+### VERIFIED BY CONTENT, not by SHA
+
+    service            SHA         discrete   spread
+    web                c3874b91        5         2
+    refresh-worker     c3874b91        5         2
+    live-odds-worker   33da9fc0        5         2
+
+web served HTTP 200, 200 rows, `build_age_seconds` 15.2 immediately after.
+
+**All three services now carry BOTH model changes.** Exact SHA equality was not
+reachable in one deploy and was not attempted: live-odds-worker sits on
+`33da9fc0` because another lane deployed it, and targeting that would have pushed
+their WNBA grid change onto a service they had chosen not to deploy. `c3874b91`
+was taken instead -- the minimal forward move that matches the service which
+BUILDS the artifacts web reads.
+
+### How this split came to exist, recorded because the pattern will recur
+
+`cf2cdbae` was graded, deliberately HELD, and reached production three times as
+COLLATERAL in other lanes' deploys of `origin/main` -- to web and live-odds-worker
+via `bffcd1b4` (18:04Z), then to live-odds-worker again via `33da9fc0` (18:42Z).
+Each time the other session verified the ancestry itself and told me, which is
+the system working; but it means a change I was holding for a measurement went
+live three times before I measured it. Deploying `origin/main` is correct and
+this is the documented cost of it. The defence is not to deploy less, it is that
+the holder gets told -- which happened, twice, unprompted.
+
+### STILL OWED, and unchanged by this deploy
+
+**The NFL prop model is live on all three services and IN EFFECT ON NONE.**
+`props.py` skips recomputation when the projection artifact answers, and that
+artifact was built 16:27Z -- before any of this. Its rebuild is gated on
+refresh-worker's daily autorun (`SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS`,
+86400 default), next due ~16:27Z 2026-09-29, AFTER tonight's 00:15Z game. It will
+not trigger early: the artifact is neither missing, empty, nor stale.
+
+Running the build locally was considered and REFUSED: this machine's
+`pbp_2026.csv` holds weeks 1-2 only (dated 2026-09-22) and `nfl_target_week(2026)`
+resolves to 1 here, so a local build published to production would have replaced a
+better artifact with a worse one aimed at the wrong week.
+
+The falsifiable signature stands, written before any board was read: Poisson
+`interceptions` P(over 0.5) in **[0.419, 0.712]**, and NO discrete-market row near
+0 or 1.
