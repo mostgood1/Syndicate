@@ -181,7 +181,9 @@ def test_marker_from_a_worktree_lands_in_the_PRIMARY_tree(tmp_path):
     assert r.returncode == 0, r.stderr
     primary = main / ".syndicate" / ".current-lane.sess-1"
     assert primary.read_text(encoding="utf-8") == "new-lane"
-    assert not (wt / ".syndicate" / ".current-lane.sess-1").exists()
+    # ...AND beside the worktree's lanes.md, which lane-postwrite-check reads.
+    local = wt / ".syndicate" / ".current-lane.sess-1"
+    assert local.read_text(encoding="utf-8") == "new-lane"
 
 
 def test_marker_outside_git_stays_beside_lanes(tmp_path):

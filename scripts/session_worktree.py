@@ -342,11 +342,60 @@ def _run_checkers(cwd: Path) -> None:
     return duplicated
 
 
+def _carries_lane(tree: Path, slug: str) -> bool:
+    """Does `tree`'s `.syndicate/lanes.md` hold a block headed `### <slug> `?"""
+    try:
+        text = (tree / ".syndicate" / "lanes.md").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    return re.search(rf"^###\s+{re.escape(slug)}\s", text, re.M) is not None
+
+
+def _land_target(slug: str, root: Path, cwd: Path | None = None) -> tuple[Path, str]:
+    """The (worktree, branch) that `land --lane <slug>` pushes.
+
+    A worktree is named after the lane that OPENED it, but a session can open a
+    second lane inside it. `land` used to accept only `<root>/<slug>`, so the
+    second lane could be landed only under the first lane's name. Measured
+    2026-09-28: `land --lane lane-open-marker-primary-tree` -> `FATAL: no
+    worktree at .../lane-open-marker-primary-tree`, from inside the worktree
+    that held that lane's commit.
+
+    Order: `<root>/<slug>` if it exists (unchanged). Otherwise, the session
+    worktrees whose `lanes.md` carries a `### <slug> ` block. The one containing
+    `cwd` wins, because that is the session running `land`. Exactly one
+    candidate is used. Several with none containing `cwd` REFUSE, because every
+    worktree rebased after the lane reached main carries its block, and
+    guessing among them would push someone else's branch.
+    """
+    path = _path_for(slug, root)
+    if path.exists():
+        return path, BRANCH_PREFIX + slug
+    here = (cwd or Path.cwd()).resolve()
+    candidates = []
+    for w in _session_worktrees():
+        tree = Path(w.get("worktree", "")).resolve()
+        if _carries_lane(tree, slug):
+            candidates.append((tree, w["branch"][len("refs/heads/"):]))
+    for tree, branch in candidates:
+        if here == tree or tree in here.parents:
+            return tree, branch
+    if len(candidates) == 1:
+        return candidates[0]
+    if not candidates:
+        raise SystemExit(f"FATAL: no worktree at {path}, and no session worktree's "
+                         f".syndicate/lanes.md carries lane '{slug}' -- open it first")
+    names = ", ".join(str(t) for t, _ in candidates)
+    raise SystemExit(f"FATAL: lane '{slug}' is in {len(candidates)} session worktrees "
+                     f"({names}). Run land from inside the one to push, or pass "
+                     f"that worktree's own lane name.")
+
+
 def cmd_land(args) -> int:
     slug = _slug(args.lane)
-    path, branch = _path_for(slug, args.root), BRANCH_PREFIX + slug
-    if not path.exists():
-        raise SystemExit(f"FATAL: no worktree at {path} -- open it first")
+    path, branch = _land_target(slug, args.root)
+    if path != _path_for(slug, args.root):
+        print(f"lane '{slug}' lands from worktree {path} ({branch})")
 
     dirty = git("status", "--porcelain", cwd=path).stdout.splitlines()
     if dirty:

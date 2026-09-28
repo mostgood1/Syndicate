@@ -213,10 +213,19 @@ def main() -> int:
         # Per-session marker ONLY. The bare `.syndicate/.current-lane` is a single
         # shared slot and writing it makes every other session with no marker of
         # its own read as owning YOUR lane (`lane.md` step 6).
-        marker = marker_dir(lanes_path) / f".current-lane.{a.session}"
-        marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.write_text(a.slug, encoding="utf-8")
-        print(f"marker written: {marker}")
+        #
+        # BOTH TREES, when they differ. `deploy-guard` and `lane-guard` read the
+        # PRIMARY tree (`CLAUDE_PROJECT_DIR`), and `lane-postwrite-check` reads
+        # the tree the command ran in (`payload["cwd"]`), which is the worktree.
+        # Writing only the primary copy (02338706) fixed the first pair and
+        # blinded the second: measured 2026-09-28, the next shell edit of this
+        # lane's OWN file warned `Your lane: 'none'`.
+        dirs = [marker_dir(lanes_path), lanes_path.resolve().parent]
+        for d in dict.fromkeys(dirs):
+            marker = d / f".current-lane.{a.session}"
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.write_text(a.slug, encoding="utf-8")
+            print(f"marker written: {marker}")
     return 0
 
 

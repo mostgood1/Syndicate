@@ -914,6 +914,15 @@ death, never life — do not invert it.
 - Blocked by: none
 - Result: **GOAL MET.** `marker_dir()` resolves the primary tree from `git rev-parse --git-common-dir`, run from the directory holding `--lanes`. Outside git, the marker still goes beside `lanes.md`. `tests/test_lane_open.py`: a real repo + worktree in `tmp_path` puts the marker in main's `.syndicate/` and not the worktree's. It fails on the old tool and passes on the new; all 12 pass. Local tooling, no deploy. Files released.
 
+### land-any-lane-in-worktree — CLOSED 2026-09-28 — opened 2026-09-28 — session acb76ba7-70eb-4b26-b7b8-3cb425e6a6a0
+- Goal: session_worktree.py land --lane X lands from the session worktree whose lanes.md carries lane X, not only from <root>/X
+- Files: scripts/session_worktree.py (cmd_land + a resolver ONLY), tests/test_session_worktree_land.py (NEW), scripts/lane_open.py (marker placement ONLY), tests/test_lane_open.py
+- Hypothesis: cmd_land derives path = <root>/<slug>, so a second lane opened inside an existing worktree cannot be landed under its own name (observed 2026-09-28: FATAL no worktree at .../lane-open-marker-primary-tree).
+- Falsification test: n/a
+- Verification: tests: second lane in worktree A lands from A; cwd preferred when several worktrees carry it; ambiguous refuses; unknown lane still FATAL
+- Blocked by: none
+- Result: **GOAL MET.** `_land_target()` resolves the worktree to land. `<root>/<slug>` wins if it exists. Otherwise it picks the session worktree whose `lanes.md` carries `### <slug> `, preferring the one containing cwd. Several candidates with none containing cwd REFUSE, and none at all is still FATAL. `tests/test_session_worktree_land.py` has 5 tests on a real origin + worktrees. The reproduction fails on the old script with the exact 09-28 FATAL; 24/24 pass across land/close/lane_open. **Also fixed a regression from `02338706`:** `lane-postwrite-check` reads the marker from the command's cwd (the worktree) while deploy-guard/lane-guard read the primary tree, so a primary-only marker read as `Your lane: 'none'`. `lane_open.py` now writes both. Landed with the new `land --lane land-any-lane-in-worktree` from worktree `ops-snapshot-index-join-path`. Files released.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
