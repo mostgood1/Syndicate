@@ -42928,3 +42928,10 @@ Caveat: the band refuses coin-flip states, so a close MNF may price few ticks --
 full-slate reading.
 
 **Partial reading 2026-09-28 12:58 PM CT (lane nfl-live-gameline-full-rows, refresh-worker f9506b26):** `/api/ops/live-lens/snapshot-index?sport=nfl` (web 4b5ebc0a, now reading `nfl_live_resim.json`) shows the snapshot generated 12:50:59 CDT naming games by FULL club name (`atlanta falcons` / `green bay packers`, 16 of 16, `skipped_no_team_names 0`) -- the tri-code half of the fix is live. `indexed 0` / `sources_seen {pregame: 16}` is expected: 15 final + MNF not started, so no priced lane exists yet. The camelCase half is still unexercised until MNF.
+
+## 2026-09-28 18:02Z (13:02 CDT) -- READING -- cron `model-scorecard` `5a3c6af2`, manual run `crn-dam0ao942hec73cge0rg-1790617678` (user: "yes, trigger the run now") -- lane `mlb-prop-grading-player-match` -- **PASS**
+- Run `POST /v1/cron-jobs/.../runs` 17:47:57Z; `cron_job_run_started` 17:47:58Z, `cron_job_run_ended` **successful** 18:01:47Z. Artifact `generated_at` 17:49:21Z.
+- **expect HELD:** `grader.sport_versions.mlb` = `mlb/1+props:2620e9f68486` (was `8ae1b75ebefa`), same in the saved state. `run.reset` = `sport_versions_changed:mlb,ncaab` -- exactly the two sports predicted, no core reset.
+- **The fix reached production, per date:** `prop_player_not_in_boxscore` 09-14 169 -> 142 (-27) and 09-20 787 -> 744 (-43) -- EXACTLY the offline replay's moved-row counts for those dates (27, 43; all Leo Bernal / Rafael Flores Jr.). Other re-graded dates also fell: 09-15 391->350, 09-16 414->371, 09-17 725->697, 09-18 844->775, 09-19 323->273, 09-27 1484->1398; 09-21 204->204. Total on the 9 re-graded dates 5,341 -> 4,954 (-387, 7.2%).
+- **After the reset MLB covers 9 dates / 112 games, not 14 / 188 -- BY DESIGN, not a loss:** `board_dates_to_fetch` takes today, yesterday and the oldest incomplete dates up to `--max-board-dates 10`, so 09-22..09-26 re-grade on the 2026-09-29 11:30Z scheduled run. Check that run shows 14 MLB dates again.
+- `prop_no_commence_time` 1,277 in 28d, all on 09-14..09-21 (producer fixed `0b5518ab`); ages out by 10-20.
