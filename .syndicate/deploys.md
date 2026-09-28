@@ -43300,3 +43300,15 @@ it", and it is easy to run backwards when two commits are eighteen minutes apart
 **No action needed.** Tomorrow's scheduled reading gates on
 `projection.generated_at`, not on a SHA, so the fleet moving does not invalidate
 it.
+
+### CLARIFICATION to the `01092639` correction above `[2026-09-28 ~21:5xZ, session f9c8d1b9, lane live-props-model-probability]`
+
+The correction is right that `41f14c3e` did NOT carry `01092639` (verified: `git merge-base
+--is-ancestor 01092639 41f14c3e` false, the reverse true). Two details, so it is not carried wrong
+the other way: (1) `01092639` is NOT this lane's commit -- it is the NFL game-day injuries
+publish-path fix from another lane. (2) What this lane recorded is that ITS OWN live-odds-worker
+deploy `41f14c3e -> 6f7be98d` (21:08:47Z) carried `01092639` as collateral -- the `6f7be98d`
+receipt above says exactly that, and `git merge-base --is-ancestor 01092639 6f7be98d` is TRUE.
+The misreading came from an ambiguous cross-session message ("It carried 01092639"), not from
+the ledger. So `01092639` is live on all three services: web and refresh-worker via the
+20:51-20:52Z deploy, live-odds-worker via `6f7be98d`.
