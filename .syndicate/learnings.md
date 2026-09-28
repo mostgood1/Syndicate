@@ -4975,3 +4975,11 @@ this instrument read healthy while the thing it measures is broken.**
 ## 2026-09-28 — an "unreproducible CI flake" was a production bug: never `print` inside a signal handler (session 2aff0397)
 
 BELIEF OVERTURNED: `test_worker_shutdown` end-to-end failing once on CI with empty output was treated as unexplained noise. It was the shutdown handler losing its record: a signal that lands while `sys.stdout`'s BufferedWriter lock is held runs the handler inside that flush, every `print` there raises "reentrant call", and the `finally: os._exit(0)` exits silently -- the RECORD_FAILED fallback line too, because it also used `print`. Fixed with `os.write` (#113). RULE: in a signal handler write with `os.write` to a raw fd, never `print`/logging. And when a test fails with no diagnosis, the first push is DIAGNOSTICS in the assertion message (here: the child's returncode), not a re-run -- the next CI failure then named the mechanism.
+
+## 2026-09-28 (session 273dc243, lane nfl-live-gameline-full-rows) - "VERIFIED" on a slate where nothing priced verified only the refusal path
+
+**What happened.** `nfl-live-resim-activation` closed its goal on `sources_seen {pregame: 16}` -- every lane a refusal. That reading proves refusals are rejected; it cannot see the PRICED lane, which carried snake-case fields the join never reads, and named games by tri-code where the grid uses full names. On 09-27 the re-sim priced 1-4 games per tick for ten hours and the join indexed zero. The unit fixtures named games "Dallas Cowboys" -- the cheaper path production never takes. Same class as the entry above, second instance the same day.
+
+**Rule:** a join verification must include at least one ACCEPTED record (`indexed >= 1`) on production-shaped input; an all-refusal reading verifies the refusal branch only and must say so. Fixtures feeding a join must use the identifiers the production producer actually emits (here: the projection CSV's tri-codes).
+
+---
