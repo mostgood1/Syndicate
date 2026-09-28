@@ -42840,3 +42840,31 @@ starts 09-29); the served MLB board has 0 rows, so the block cannot appear until
 `live_gameline_score.segments.lookup` (`fetched`, `games_answered`, `refused_by_reason`) and
 `segments.by_segment.first5.all_records.market.n`. The nightly task
 `live-gameline-accuracy-snapshot` prints the `segment first5 h2h` line from the same block.
+
+## 2026-09-28 11:56 AM CT — refresh-worker `1d64a4b2` (lane `live-props-model-probability`) — soccer's live modelled prop edges reach `model_edge_pct`. **MEASUREMENT OWED: next LIVE soccer slate.**
+
+    deploy dep-dat9of8u01pc73d3ueug   refresh-worker 15ddf78e -> 1d64a4b2
+    fired 16:56:29Z   live 16:59:30.927839Z   trigger=api   status=live (deploys API poll)
+    preflight CLEAR 16:54:2xZ (infrastructure processes only, no sim; 15ddf78e is an ancestor)
+    baseline read 16:54:09Z: opportunity_population 2026-09-26/27 soccer part000,
+        gs=live kind=prop, la=True, me non-null      0 of 211 (09-26), 0 of 24 (09-27)
+    collateral (on main, other lanes): 1e7dba02 wnba actual-so-far, 99a4345d nfl prop sd,
+        26be8898 / 3392fb97 offline tooling
+
+**What shipped.** `live_projection_join`'s `#539` one-sided branch now prices the ROW's side
+(polarity-converting the live P(over)) and stamps `modelled_fair_side`. Without the stamp
+`layer2_board._modelled_fair_edge_for` returned None, so every live modelled edge reached the
+candidate -- and the population ledger the scorecard grades -- as null. Production before:
+refresh-worker `LIVE_PROJECTION_JOIN sport=soccer edged_modelled=20..47` (09-27 23:16-23:49Z)
+against `me` on 0 of 3,547 live-aware soccer props (09-14..09-28). User-approved cross-lane
+write into `accuracy-assessment-0914`'s file, logged in that block.
+
+**Measured after.** First post-deploy Layer 2 build 17:03:41Z logged the soccer join line
+(`reason=no soccer live player props`, nothing in play -- expected); `Traceback` since
+16:59:30Z: 0 (read 17:03:55Z). Code path NOT yet exercised: no live soccer match today.
+
+**verify:** on the next live soccer slate, (a) refresh-worker `LIVE_PROJECTION_JOIN
+sport=soccer edged_modelled>0`, and (b) the population part for that date: `gs=live
+kind=prop la=True` rows with `me` non-null > 0. (b) < (a) is expected -- the board drops
+edges beyond `_MODEL_EDGE_MAX_POINTS = 15.0` -- so report both. Then the next model-scorecard
+run: soccer live-prop cells in `windows.28d` with games > 0.
