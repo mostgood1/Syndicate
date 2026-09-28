@@ -291,7 +291,11 @@ def test_budget_exhaustion_refuses_BY_NAME_rather_than_shortening_the_slate():
         "2026-09-14", games=many, live_index=index,
         ratings={f"H{i}": (27.0, 19.0) for i in range(6)}
         | {f"A{i}": (20.0, 24.0) for i in range(6)},
-        sims=20, budget_seconds=1.0, env={"SYNDICATE_NFL_LIVE_RESIM": "1"},
+        # 0.0, not 1.0: the budget is checked BEFORE each game, and on a fast
+        # runner all six finished inside 1.0s (measured 1.13s, 0 refused), so
+        # the old assertion depended on machine speed and went red on CI
+        # 2026-09-28. A zero budget refuses every game, deterministically.
+        sims=20, budget_seconds=0.0, env={"SYNDICATE_NFL_LIVE_RESIM": "1"},
     )
     reasons = snap["coverage"]["refusals_by_reason"]
     assert snap["coverage"]["games"] == 6
@@ -299,7 +303,7 @@ def test_budget_exhaustion_refuses_BY_NAME_rather_than_shortening_the_slate():
     # simply vanished would break this and nothing else would notice.
     assert snap["coverage"]["live_resimmed"] + snap["coverage"]["refused"] == 6
     assert "budget_seconds" in snap["coverage"]
-    assert reasons  # something refused; which reason depends on machine speed
+    assert reasons == {"tick_budget_exhausted": 6}, "refused BY NAME, every game"
 
 
 # --------------------------------------------------------------------------
