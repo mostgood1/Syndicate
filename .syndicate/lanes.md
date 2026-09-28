@@ -824,6 +824,14 @@ death, never life — do not invert it.
 - Verification: Full suite locally before/after the fix with failure sets diffed; CI pytest-baseline green on the PR head and on main after merge
 - Blocked by: none
 
+### gameline-spread-total-scoring — OPEN — opened 2026-09-28 — session 3b474634-19d1-487d-bc28-3b3cc0bd2b1d
+- Goal: MLB live totals/spreads are REPORTED and POOLED, not just computed: (a) the nightly snapshot prints the point-forecast result and no longer labels scored markets 'refused'; (b) pool_live_gameline_trend.py pools point_forecast per market over GAMES; (c) every date back to the first ledger carrying model means (ledger v5, ~2026-09-07) has a history row with point_forecast; (d) the board build passes MLB segment actuals so first5 h2h observations are scored instead of 'segment_actual_unavailable', and past first5 h2h observation dates are rescored
+- Files: scripts/snapshot_live_gameline_score.py, scripts/pool_live_gameline_trend.py, scripts/rescore_live_gameline_date.py, syndicate/features/shared/book_grid_artifact.py, syndicate/features/mlb/live_gameline_segment_actuals.py (NEW), tests/test_live_gameline_segment_actuals_mlb.py (NEW), tests/test_pool_live_gameline_point_forecast.py (NEW), reports/live_gameline_accuracy/history.jsonl (APPEND ONLY)
+- Hypothesis: n/a (build + backfill). Known limits, measured 2026-09-28 on the 09-27 ledger: first5 totals/spreads rows carry NO model mean (join records an h2h-only observation, live_gameline_join.py ~1648), first1/first3 have no model projection at all, and pre-v5 ledger rows (5876bbc9) carry no means -- none of those are recoverable by scoring work
+- Falsification test: If first5 h2h observation rows cannot be joined to a game_pk (they carry game_pk=None, event_id only) then (d) needs a join fix first; if a v5 ledger date's rescore cannot reproduce its retained h2h all_records exactly, that date is refused, not appended
+- Verification: pool tool prints a point_forecast section with per-date rows from ~09-07 to 09-27; a board build after the refresh-worker deploy serves live_gameline_score.segment_actuals_supplied=true and unmeasured.segment_actual_unavailable drops below the segment-row count with first5 h2h scored
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
