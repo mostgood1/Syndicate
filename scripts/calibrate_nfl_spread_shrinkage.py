@@ -170,6 +170,19 @@ def collect(seasons: list[int], stats: list[str], min_week: int) -> list[dict[st
                 prior_sd = _sd_prior_pool(pool)
                 if prior_sd is None:
                     continue
+                # The league's typical COEFFICIENT OF VARIATION for this stat,
+                # from the same no-lookahead pool. Multiplied by a row's own mean
+                # it gives a usage-scaled prior.
+                cvs = []
+                for vals_p in pool.values():
+                    if len(vals_p) >= MIN_PRIOR_GAMES_FOR_POOL:
+                        m = statistics.fmean(vals_p)
+                        sd_p = statistics.stdev(vals_p)
+                        if m > 0 and sd_p > 0:
+                            cvs.append(sd_p / m)
+                prior_cv = statistics.median(cvs) if cvs else None
+                if prior_cv is None:
+                    continue
                 for pid, wk in by_player.items():
                     if w not in wk:
                         continue
@@ -183,6 +196,7 @@ def collect(seasons: list[int], stats: list[str], min_week: int) -> list[dict[st
                         "raw_pstdev": statistics.pstdev(vals),
                         "raw_stdev": statistics.stdev(vals),
                         "prior_sd": prior_sd,
+                        "prior_cv": prior_cv,
                         "actual": wk[w][stat],
                     })
     return obs
@@ -203,6 +217,26 @@ def ladder(mean: float, prior_sd: float) -> list[float]:
     return out
 
 
+def _prior_for(o: dict[str, Any], estimator: str) -> float:
+    """The prior this arm shrinks toward.
+
+    `stdev_cv` EXISTS BECAUSE A FLAT PER-STAT PRIOR IS THE WRONG SHAPE, and that
+    was measured rather than argued. The league-median per-player sd for
+    `rushing_yards` over 2022-23 is 10.2, computed across 564 "rushers" who are
+    mostly marginal; a workhorse back's own sd is ~25. Shrinking him toward 10.2
+    makes him NARROWER, which is the opposite of the intent -- and on the
+    high-usage population the board actually quotes, flat-prior shrinkage was
+    monotonically harmful in both Brier and coverage (cov80 0.7356 at k=0 down to
+    0.5557 at k=20).
+
+    A prior proportional to the player's OWN mean carries the usage level with
+    it, so a starter is shrunk toward a starter-sized spread.
+    """
+    if estimator == "stdev_cv":
+        return o["prior_cv"] * o["mean"]
+    return o["prior_sd"]
+
+
 def scorable(o: dict[str, Any], *, k: float, estimator: str) -> bool:
     """Would production attach a probability to this row under these settings?
 
@@ -211,7 +245,8 @@ def scorable(o: dict[str, Any], *, k: float, estimator: str) -> bool:
     """
     raw = o["raw_pstdev"] if estimator == "pstdev" else o["raw_stdev"]
     n = o["n"]
-    sd = (n * raw + k * o["prior_sd"]) / (n + k) if (n + k) > 0 else raw
+    prior = _prior_for(o, estimator)
+    sd = (n * raw + k * prior) / (n + k) if (n + k) > 0 else raw
     return sd > 0
 
 
@@ -237,12 +272,18 @@ def score(obs: list[dict[str, Any]], *, k: float, estimator: str,
     cells = 0
     inside = 0
     counted = 0
+    # CALIBRATION BY PREDICTED-PROBABILITY BUCKET -- the platform's own bar
+    # (`#499`: worst POWERED bucket gap vs 0.150). Brier and 80% coverage can
+    # disagree (they did: Brier bottoms at k=8 while coverage passes 0.80 at
+    # k~1.5), and a single aggregate cannot say WHERE a model is wrong. This can.
+    buckets = [[0.0, 0] for _ in range(10)]
     for i, o in enumerate(obs):
         if only is not None and i not in only:
             continue
         raw = o["raw_pstdev"] if estimator == "pstdev" else o["raw_stdev"]
         n = o["n"]
-        sd = (n * raw + k * o["prior_sd"]) / (n + k) if (n + k) > 0 else raw
+        prior = _prior_for(o, estimator)
+        sd = (n * raw + k * prior) / (n + k) if (n + k) > 0 else raw
         if sd <= 0:
             continue
         counted += 1
@@ -253,13 +294,34 @@ def score(obs: list[dict[str, Any]], *, k: float, estimator: str,
                                             stdev=sd, n=n, line=line)
             if p is None:
                 continue
-            sq += (p - (1.0 if o["actual"] > line else 0.0)) ** 2
+            hit = 1.0 if o["actual"] > line else 0.0
+            sq += (p - hit) ** 2
             cells += 1
+            b = buckets[min(9, int(p * 10))]
+            b[0] += hit
+            b[1] += 1
+    MIN_BUCKET_N = 30
+    calib = []
+    worst_gap = None
+    for idx, (hits, n_b) in enumerate(buckets):
+        if n_b <= 0:
+            continue
+        predicted = (idx + 0.5) / 10.0
+        realised = hits / n_b
+        powered = n_b >= MIN_BUCKET_N
+        gap = abs(predicted - realised)
+        calib.append({"bucket": f"{idx/10:.1f}-{(idx+1)/10:.1f}", "n": n_b,
+                      "predicted": round(predicted, 3), "realised": round(realised, 4),
+                      "gap": round(gap, 4), "powered": powered})
+        if powered and (worst_gap is None or gap > worst_gap):
+            worst_gap = gap
     return {
         "k": k, "estimator": estimator,
         "brier": round(sq / cells, 6) if cells else None,
         "cells": cells, "rows": counted,
         "coverage_80": round(inside / counted, 4) if counted else None,
+        "worst_powered_bucket_gap": round(worst_gap, 4) if worst_gap is not None else None,
+        "calibration": calib,
     }
 
 
@@ -272,6 +334,21 @@ def main() -> int:
     parser.add_argument("--min-week", type=int, default=3)
     parser.add_argument("--stats", default=",".join(SWEPT_STATS))
     parser.add_argument("--out", default="")
+    parser.add_argument("--cache", default="",
+                        help="JSON path: reuse a previous collection instead of "
+                             "re-reading four seasons of play-by-play.")
+    parser.add_argument(
+        "--min-mean-pct", type=float, default=0.0,
+        help=(
+            "Keep only rows whose rolling mean is at or above this percentile of "
+            "that stat's POSITIVE means. THE POPULATION THIS CONSTANT IS FITTED ON "
+            "MUST MATCH THE ONE IT IS APPLIED TO: the raw observation set is "
+            "dominated by marginal players (564 'rushers' in 2022-23, median "
+            "per-player sd 10.2 against a workhorse back's ~25), while the BOARD "
+            "only ever quotes props for high-usage players. A constant fitted on "
+            "the first population and shipped to the second can shrink a starter's "
+            "distribution NARROWER, which is the opposite of the intent."
+        ))
     args = parser.parse_args()
 
     seasons = [int(s) for s in args.seasons.split(",") if s.strip()]
@@ -281,7 +358,26 @@ def main() -> int:
     held = [s for s in seasons if s not in fit]
 
     print(f"collecting {seasons} stats={len(stats)} min_week={args.min_week} ...", flush=True)
-    obs = collect(seasons, stats, args.min_week)
+    cache = Path(args.cache) if args.cache else None
+    if cache and cache.is_file():
+        obs = json.loads(cache.read_text(encoding="utf-8"))
+        print(f"reused cached collection: {len(obs)} rows from {cache}", flush=True)
+    else:
+        obs = collect(seasons, stats, args.min_week)
+        if cache:
+            cache.write_text(json.dumps(obs), encoding="utf-8")
+            print(f"cached collection -> {cache}", flush=True)
+    if args.min_mean_pct > 0:
+        before = len(obs)
+        cuts: dict[str, float] = {}
+        for stat in stats:
+            means = sorted(o["mean"] for o in obs if o["stat"] == stat and o["mean"] > 0)
+            if means:
+                i = min(len(means) - 1, int(len(means) * args.min_mean_pct / 100.0))
+                cuts[stat] = means[i]
+        obs = [o for o in obs if o["mean"] >= cuts.get(o["stat"], 0.0)]
+        print(f"usage filter p{args.min_mean_pct:g}: {before} -> {len(obs)} rows; "
+              f"cuts={ {k: round(v, 2) for k, v in cuts.items()} }", flush=True)
     fit_obs = [o for o in obs if o["season"] in fit]
     held_obs = [o for o in obs if o["season"] not in fit]
     print(f"observations: {len(obs)}  fit={len(fit_obs)} ({sorted(fit)})  "
@@ -296,7 +392,7 @@ def main() -> int:
     # separately as `rows_rescued`.
     def common(pop: list[dict[str, Any]]) -> set[int]:
         idx = {i for i in range(len(pop))}
-        for estimator in ("pstdev", "stdev"):
+        for estimator in ("pstdev", "stdev", "stdev_cv"):
             for k in cands + [0.0]:
                 idx &= {i for i in idx if scorable(pop[i], k=k, estimator=estimator)}
         return idx
@@ -307,13 +403,14 @@ def main() -> int:
           f"held-out {len(held_common)}/{len(held_obs)}", flush=True)
 
     rows = []
-    for estimator in ("pstdev", "stdev"):
+    for estimator in ("pstdev", "stdev", "stdev_cv"):
         for k in cands:
             r = score(fit_obs, k=k, estimator=estimator, only=fit_common)
             r["arm"] = "fit"
             rows.append(r)
-            print(f"  fit  {estimator:7s} k={k:5.1f}  brier={r['brier']}  "
-                  f"cov80={r['coverage_80']}  cells={r['cells']}", flush=True)
+            print(f"  fit  {estimator:8s} k={k:5.1f}  brier={r['brier']}  "
+                  f"cov80={r['coverage_80']}  worstBucket={r['worst_powered_bucket_gap']}  "
+                  f"cells={r['cells']}", flush=True)
 
     scored = [r for r in rows if r["brier"] is not None]
     if not scored:

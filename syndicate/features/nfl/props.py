@@ -202,6 +202,36 @@ def _safe_float(value: Any) -> float | None:
 # Normal-only behavior) rather than shipping a fitted correction that
 # didn't generalize. Full sweep: reports/nfl_cover_probability_blend_
 # calibration.json.
+# RE-FITTED 2026-09-28 AFTER `player_rate` SWITCHED `pstdev` -> `stdev`, AND
+# DELIBERATELY UNCHANGED BY THAT RE-FIT.
+#
+# `docs/ai_context/model_engine_standard.md` requires that adding a mechanism to
+# a calibrated engine re-fits the rates that were absorbing it, so widening the
+# spread meant this table had to be re-derived rather than assumed still valid.
+# `scripts/calibrate_nfl_cover_probability_blend.py` was re-run on the new sd
+# (fit 2022-23, scored 2024-25). Result:
+#
+#     market             old w    refit w     delta    OOS improvement
+#     passing_yards      0.689    0.6890    +0.0000       +0.000203
+#     passing_attempts   1.000    1.0000    +0.0000       +0.006381
+#     rushing_yards      0.573    0.5731    +0.0001       +0.004600
+#     rushing_attempts   0.550    0.5504    +0.0004       +0.002123
+#     receptions         0.137    0.1367    -0.0003       +0.000016
+#     receiving_yards    0.216    0.2158    -0.0002       +0.000065
+#     passing_tds        0.000    0.3155    +0.3155       -0.000862   REJECTED
+#     interceptions      0.000    0.1329    +0.1329       -0.000164   REJECTED
+#
+# SIX OF EIGHT ARE UNCHANGED TO FOUR DECIMALS -- the blend weight is insensitive
+# to this sd change, which is the finding, not a formality. The two that moved
+# are the markets clipped at zero, and both are WORSE on the held-out seasons, so
+# the calibrator's own select-on-fit / score-on-held-out discipline rejects them.
+# Adopting a weight that loses out of sample because it won in sample is the
+# exact failure that discipline exists to prevent.
+#
+# THIS TABLE IS STILL FITTED ON THE CURRENT SPREAD. A future change to the sd --
+# the usage-scaled prior under evaluation in
+# `scripts/calibrate_nfl_spread_shrinkage.py` (`stdev_cv`) -- requires re-running
+# this calibrator again before shipping.
 _COVER_PROBABILITY_BLEND_WEIGHT: dict[str, float] = {
     "passing_yards": 0.689,
     "passing_attempts": 1.0,

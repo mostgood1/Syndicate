@@ -538,7 +538,40 @@ def player_rate(season: int, week: int, player_id: str, stat: str) -> tuple[floa
         return None, None, len(values)
     if _zero_game_imputation_applies(stat, log) and _zero_game_imputation_enabled():
         values = values + [0.0] * _zero_involvement_weeks(log, before_week=week)
-    return statistics.fmean(values), statistics.pstdev(values), len(values)
+    # `stdev`, NOT `pstdev`, and the difference is not pedantry at these n.
+    #
+    # These games are a SAMPLE used to estimate the player's true game-to-game
+    # spread for a game that has not happened yet. `pstdev` divides by n and so
+    # describes the spread OF THESE GAMES; `stdev` divides by n-1 and estimates
+    # the spread of the process that generated them. The first understates the
+    # second by `sqrt((n-1)/n)`:
+    #
+    #     n=2  -29.3%     n=3  -18.4%     n=4  -13.4%     n=8  -6.5%
+    #
+    # and this function filters `row["week"] < week`, so n IS 3 at week 4. The
+    # consequence reached the board: the model's own implied sd, back-derived
+    # from its served rows on 2026-09-28, was 0.97 for rushing ATTEMPTS -- a
+    # back's carry count known to within one carry -- and 86% of NFL model edges
+    # then exceeded `layer2_board._MODEL_EDGE_MAX_POINTS` and were dropped, so
+    # the model reached 3% of served rows against NCAAF's 55%.
+    #
+    # MEASURED, not reasoned (`scripts/calibrate_nfl_spread_shrinkage.py`, fit
+    # 2022-23, reported 2024-25, graded through `_nfl_prop_model_probability`
+    # against real settled outcomes, all arms on an identical row set):
+    #
+    #     all rows        Brier 0.192516 -> 0.190527   cov80 0.7011 -> 0.7448
+    #     high-usage p70  Brier 0.219752 -> 0.217536   cov80 0.6791 -> 0.7258
+    #
+    # It is the only arm that improved BOTH populations. Shrinking the spread
+    # toward a flat per-stat league prior was swept alongside and REFUSED: it won
+    # on all rows and was monotonically HARMFUL on the high-usage rows the board
+    # actually quotes, because that prior is dominated by marginal players
+    # (median `rushing_yards` sd 10.2 across 564 "rushers" against a workhorse's
+    # ~25), so it made starters NARROWER. A usage-scaled prior is still open.
+    #
+    # STILL TOO NARROW AFTER THIS, and stated so nobody reads it as solved:
+    # cov80 0.7258 against a 0.80 target.
+    return statistics.fmean(values), statistics.stdev(values), len(values)
 
 
 # `#471`: the raw per-player MLE rate badly underestimates `anytime_td` at

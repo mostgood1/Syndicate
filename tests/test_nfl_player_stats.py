@@ -120,6 +120,51 @@ class NflPlayerStatsTests(unittest.TestCase):
         self.assertIsNone(mean)
         self.assertEqual(n, 1)
 
+    def test_player_rate_returns_the_SAMPLE_sd_not_the_population_sd(self) -> None:
+        """`stdev` (n-1), not `pstdev` (n) -- and at these n it is not pedantry.
+
+        These games are a SAMPLE used to estimate the spread of a game that has
+        not happened yet, so the n-1 estimator is the right one. `pstdev`
+        understates it by `sqrt((n-1)/n)`: 29.3% at n=2, 18.4% at n=3 -- and
+        `player_rate` filters `week < week`, so n IS 3 at week 4.
+
+        Two games of 200 and 220: pstdev 10.0, stdev 14.142. This pins the
+        second, so a revert to the population estimator fails here rather than
+        silently narrowing every NFL prop distribution on the board again.
+        """
+        self._write_pbp(2025, [
+            _play(game_id="2025_01_KC_DEN", week="1", passer_player_id="QB1",
+                  passer_player_name="P.One", passing_yards="200", pass_attempt="1"),
+            _play(game_id="2025_02_KC_LV", week="2", passer_player_id="QB1",
+                  passer_player_name="P.One", passing_yards="220", pass_attempt="1"),
+        ])
+        mean, stdev, n = player_stats.player_rate(2025, 3, "QB1", "passing_yards")
+        self.assertEqual(n, 2)
+        self.assertAlmostEqual(mean, 210.0)
+        self.assertAlmostEqual(stdev, 14.142135623730951, places=6)
+        self.assertNotAlmostEqual(stdev, 10.0, places=6)
+
+    def test_a_WIDER_sd_moves_the_cover_probability_off_near_certainty(self) -> None:
+        """The board-visible consequence, asserted rather than assumed.
+
+        The served model emitted `0.9952` for a rushing-attempts line 2.5 under
+        its own projection, which back-derives to an implied sd near 1.0 -- a
+        back's carry count known to within one carry. The narrower the sd, the
+        closer an ordinary gap is driven to certainty, and past 15 probability
+        points of edge `layer2_board` drops the row entirely.
+        """
+        from syndicate.features.nfl.props import _nfl_prop_model_probability
+
+        narrow = _nfl_prop_model_probability(
+            stat="rushing_attempts", mean=17.0, stdev=1.0, n=3, line=14.5)
+        wider = _nfl_prop_model_probability(
+            stat="rushing_attempts", mean=17.0, stdev=4.5, n=3, line=14.5)
+        self.assertIsNotNone(narrow)
+        self.assertIsNotNone(wider)
+        self.assertGreater(narrow, 0.97, "the narrow sd should read as near-certain")
+        self.assertLess(wider, narrow, "a wider sd must pull the probability back")
+        self.assertLess(wider, 0.90, "a realistic sd should not read as near-certain")
+
     def test_player_rate_excludes_current_and_later_weeks(self) -> None:
         self._write_pbp(2025, [
             _play(game_id="2025_01_KC_DEN", week="1", passer_player_id="QB1", passer_player_name="P.One", passing_yards="200", pass_attempt="1"),
