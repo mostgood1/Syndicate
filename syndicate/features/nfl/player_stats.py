@@ -569,9 +569,87 @@ def player_rate(season: int, week: int, player_id: str, stat: str) -> tuple[floa
     # (median `rushing_yards` sd 10.2 across 564 "rushers" against a workhorse's
     # ~25), so it made starters NARROWER. A usage-scaled prior is still open.
     #
-    # STILL TOO NARROW AFTER THIS, and stated so nobody reads it as solved:
-    # cov80 0.7258 against a 0.80 target.
-    return statistics.fmean(values), statistics.stdev(values), len(values)
+    mean = statistics.fmean(values)
+    return mean, shrink_spread(statistics.stdev(values), len(values), mean, stat), len(values)
+
+
+#: The league's typical COEFFICIENT OF VARIATION per market -- median per-player
+#: `sd/mean`, derived from the FIT SEASONS ONLY (2022-2023), so 2024-2025 stayed
+#: held out for the grade and 2026 is wholly unseen.
+#:
+#: A CV RATHER THAN AN ABSOLUTE SD, and that distinction was measured, not
+#: assumed. A flat per-stat prior sd was swept first and REFUSED: the league
+#: median `rushing_yards` sd over 2022-23 is 10.2, computed across 564 "rushers"
+#: who are overwhelmingly marginal, while a workhorse back's own sd is ~25.
+#: Shrinking him toward 10.2 makes him NARROWER -- the exact opposite of the
+#: defect being fixed. On the high-usage rows the board actually quotes, flat
+#: shrinkage was monotonically harmful in BOTH Brier and coverage (cov80 0.7356
+#: at k=0 falling to 0.5557 at k=20). A CV carries the usage level with it, so a
+#: starter is shrunk toward a starter-sized spread.
+LEAGUE_SPREAD_CV: dict[str, float] = {
+    "passing_yards": 0.4256,
+    "passing_attempts": 0.5444,
+    "passing_tds": 0.9354,
+    "rushing_yards": 1.2271,
+    "rushing_attempts": 0.9129,
+    "receiving_yards": 0.9424,
+    "receptions": 0.7092,
+    "interceptions": 1.2766,
+}
+
+#: Shrinkage weight for the SPREAD, the same `k/(n+k)` shape
+#: `ANYTIME_TD_SHRINKAGE_K` uses for the mean. SWEPT AND SELECTED, not guessed:
+#: `scripts/calibrate_nfl_spread_shrinkage.py`, fit 2022-23, reported 2024-25,
+#: graded through `_nfl_prop_model_probability` against real settled outcomes,
+#: every arm scored on an IDENTICAL row set.
+#:
+#: HELD OUT 2024-2025, high-usage p70, same 8,629 rows:
+#:
+#:     arm                       Brier     cov80   worst bucket   #499 bar 0.150
+#:     pstdev  k=0 (was prod)  0.219744   0.6791     0.2229           FAIL
+#:     stdev   k=0             0.217529   0.7258     0.2135           FAIL
+#:     stdev+cv k=4            0.212150   0.8694     0.0943           pass
+#:     stdev+cv k=6            0.212121   0.8906     0.0929           pass
+#:     stdev+cv k=8            0.212196   0.9033     0.0721           pass
+#:
+#: k=6 is the Brier minimum out of sample as well as in fit, and it is the first
+#: configuration to PASS the platform's calibration bar at all.
+#:
+#: THE ONE NUMBER THAT IS NOT IMPROVED BY THIS, recorded rather than buried:
+#: 80% interval coverage OVERSHOOTS to 0.8906. The distribution went from too
+#: narrow to somewhat too wide. Brier and the bucket gap both still prefer this,
+#: and being too wide costs opportunities while being too narrow manufactures
+#: false edges, but it is not calibrated and should not be described as such.
+SPREAD_SHRINKAGE_K = 6.0
+
+
+def spread_shrinkage_enabled() -> bool:
+    """DEFAULT ON, stated because the code's default is what decides.
+
+    `off`/`0`/`false`/`no` restores the unshrunk sample sd without a deploy, so
+    the mechanism has a reachability test (`off != on`) rather than only
+    correctness tests -- the model-engine standard's requirement for anything
+    behind a flag.
+    """
+    raw = str(os.environ.get("SYNDICATE_NFL_SPREAD_SHRINKAGE") or "").strip().lower()
+    return raw not in {"off", "0", "false", "no"}
+
+
+def shrink_spread(raw_sd: float, n: int, mean: float, stat: str) -> float:
+    """`(n*raw_sd + k*cv*mean) / (n+k)` -- the spread's analogue of `#471`.
+
+    NO SHRINKAGE WHEN THE MEAN IS NOT POSITIVE. The prior is `cv * mean`, so a
+    mean of zero makes it zero, and blending toward zero would make an already
+    narrow distribution NARROWER -- turning the fix into the defect for exactly
+    the players with the least evidence. Those rows keep the raw sample sd.
+    """
+    if not spread_shrinkage_enabled():
+        return raw_sd
+    cv = LEAGUE_SPREAD_CV.get(stat)
+    if cv is None or mean is None or mean <= 0 or n <= 0:
+        return raw_sd
+    k = SPREAD_SHRINKAGE_K
+    return (n * raw_sd + k * cv * float(mean)) / (n + k)
 
 
 # `#471`: the raw per-player MLE rate badly underestimates `anytime_td` at

@@ -124,14 +124,31 @@ def _cached_game_log(cache: dict[tuple[int, str], list[dict[str, Any]]], season:
 
 
 def _rate_from_log(log: list[dict[str, Any]], week: int, stat: str) -> tuple[float | None, float | None, int]:
-    """Identical math to player_stats.player_rate, operating on an
-    already-fetched log instead of re-fetching it -- see
-    `_cached_game_log`'s docstring for why this is a local re-derivation
-    rather than a call to the production function."""
+    """Same math as `player_stats.player_rate`, on an already-fetched log.
+
+    **IT SAID "IDENTICAL MATH" AND HAD STOPPED BEING IDENTICAL, silently, and
+    that is why the spread terms are now imported instead of retyped.**
+
+    Measured 2026-09-28: `player_rate` moved from `statistics.pstdev` to
+    `statistics.stdev` and gained a usage-scaled shrinkage; this function kept
+    calling `pstdev`. Because `calibrate_nfl_cover_probability_blend.py` reads
+    the model through `collect_raw` -> here, and NOT through the production
+    function, a blend re-fit run specifically to re-calibrate the weights ON TOP
+    OF the new spread produced numbers identical to six decimal places across all
+    eight markets -- because it had never seen the new spread at all. The
+    re-fit's own purpose was defeated invisibly, and it was caught only because
+    two independent runs agreeing that exactly was impossible.
+
+    `_cached_game_log`'s reason for a local re-derivation is about avoiding a
+    re-FETCH, which is still valid. It was never a reason to re-implement the
+    estimator, so the estimator is now called, not copied.
+    """
     values = [row[stat] for row in log if row["week"] < week]
     if len(values) < 2:
         return None, None, len(values)
-    return statistics.fmean(values), statistics.pstdev(values), len(values)
+    mean = statistics.fmean(values)
+    return mean, player_stats.shrink_spread(
+        statistics.stdev(values), len(values), mean, stat), len(values)
 
 
 def corr(xs: list[float], ys: list[float]) -> float | None:

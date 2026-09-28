@@ -483,3 +483,109 @@ def test_the_capture_sweep_runs_on_a_NON_capturable_row(monkeypatch):
     got = lr._maybe_capture_prop_snapshot({"state": "pre"}, None, date_str="2026-09-28")
     assert got == "no_period_or_clock"
     assert calls, "the sweep never ran on the shape production actually emits"
+
+
+# --------------------------------------------------------------------------
+# THE JOIN HALF, IN PRODUCTION'S SHAPE. Every fixture above names games by FULL
+# club name ("Dallas Cowboys"); production's tick builds them from the smartsim2
+# projection CSV, which carries TRI-CODES ("dal"). The fixtures took the cheaper
+# path, and on 2026-09-27 the real one produced `sources_seen {live_resim: 4}`,
+# `indexed 0`, and no NFL full-game row in the live-gameline ledger all slate.
+# These drive the snapshot the worker actually writes into the board's own join
+# and ledger builder, so each one goes red if either defect comes back.
+# --------------------------------------------------------------------------
+from syndicate.features.shared.live_gameline_join import (  # noqa: E402
+    REASON_PUBLISH_DISABLED,
+    attach_live_gamelines,
+    build_live_gameline_index,
+    lens_sources_for_sport,
+)
+from syndicate.features.shared.live_gameline_ledger import build_records  # noqa: E402
+
+# Tri-codes, exactly as `_run_nfl_live_resim_tick` builds them from
+# `smartsim2_projections_<season>_wk<N>.csv` (measured: `phi`, `chi`, `la`, ...).
+PROD_GAMES = [{"away_team": "dal", "home_team": "phi", "live_key": "dal@phi"}]
+PROD_RATINGS = {"phi": (27.0, 19.0), "dal": (20.0, 24.0)}
+# Late and decided, so the re-sim PRICES rather than refusing on the band.
+DECIDED_ROW = {
+    "state": "live", "period": 4, "clock_seconds": 60,
+    "home_score": 38, "away_score": 3, "possession_owner": "home",
+    "down": 1, "distance": 10, "field_position": 30,
+}
+
+
+def _prod_snapshot():
+    snap = build_live_lens_snapshot(
+        "2026-09-27", games=PROD_GAMES, live_index={"dal@phi": DECIDED_ROW},
+        ratings=PROD_RATINGS, sims=40, env={"SYNDICATE_NFL_LIVE_RESIM": "1"},
+    )
+    assert snap["coverage"]["live_resimmed"] == 1, snap["coverage"]
+    return snap
+
+
+def _grid_row(market, line=None, market_prob=0.97):
+    # The grid carries FULL club names; that is the other half of the key.
+    return {"kind": "game", "market": market, "segment": "full", "line": line,
+            "away_team": "Dallas Cowboys", "home_team": "Philadelphia Eagles",
+            "age_seconds": 30.0, "game": {"state": "live"},
+            "projection": {"market_fair_prob_over": market_prob}}
+
+
+def test_the_snapshot_names_games_by_FULL_club_name_and_keeps_the_code():
+    game = _prod_snapshot()["games"][0]
+    assert (game["away_name"], game["home_name"]) == ("dallas cowboys", "philadelphia eagles")
+    assert (game["away_code"], game["home_code"]) == ("dal", "phi")
+
+
+def test_a_PRICED_lane_is_INDEXED_by_the_board_join():
+    """The 2026-09-27 defect in one assertion: `indexed 0` with a live lane present."""
+    diag: dict = {}
+    index = build_live_gameline_index(_prod_snapshot(), sources=lens_sources_for_sport("nfl"),
+                                      sport="nfl", diagnostics=diag)
+    assert diag["indexed"] == 1, diag
+    hit = index[("dallas cowboys", "philadelphia eagles")]
+    assert hit["home_win_prob"] > 0.65
+    assert hit["sims_run"] == 40
+    # Final-game means, which is what the scorer grades spreads/totals on.
+    assert hit["total_mean"] >= 41 and hit["home_margin"] >= 35 - 7
+    # And NO distribution: the grade said do not price NFL spreads/totals.
+    assert hit["margin_dist"] == {} and hit["total_runs_dist"] == {}
+
+
+def test_full_game_rows_reach_the_LEDGER_and_totals_are_withheld_by_name(monkeypatch):
+    monkeypatch.delenv("SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS", raising=False)
+    index = build_live_gameline_index(_prod_snapshot(), sources=lens_sources_for_sport("nfl"),
+                                      sport="nfl")
+    grid = [_grid_row("h2h"), _grid_row("totals", line=44.5, market_prob=0.5),
+            _grid_row("spreads", line=-10.5, market_prob=0.5)]
+    attach_live_gamelines(grid, index, sport="nfl")
+    records = build_records(grid, sport="nfl", date_str="2026-09-27")
+    by_market = {r["market"]: r for r in records}
+    assert set(by_market) == {"h2h", "totals", "spreads"}, records
+    assert all(r["segment"] == "full" for r in records)
+    assert by_market["h2h"]["model_home_win_prob"] is not None
+    assert by_market["totals"]["model_total_mean"] is not None
+    assert by_market["spreads"]["model_margin_mean"] is not None
+    for market in ("totals", "spreads"):
+        assert by_market[market]["priceable"] is False
+        assert by_market[market]["withheld_reason"] == \
+            "live_resim_published_no_distribution_for_this_market"
+
+
+def test_publish_switch_keeps_NFL_h2h_RECORDED_but_never_priceable(monkeypatch):
+    """`[2026-09-28, user decision]`: NFL live rows are scored, not published."""
+    monkeypatch.setenv("SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS", "nfl")
+    index = build_live_gameline_index(_prod_snapshot(), sources=lens_sources_for_sport("nfl"),
+                                      sport="nfl")
+    grid = [_grid_row("h2h", market_prob=0.60)]
+    attach_live_gamelines(grid, index, sport="nfl")
+    (rec,) = build_records(grid, sport="nfl", date_str="2026-09-27")
+    assert rec["priceable"] is False
+    assert rec["withheld_reason"] == REASON_PUBLISH_DISABLED
+    assert rec["model_home_win_prob"] is not None
+    # off != on: the SAME row prices without the switch, so the env key is what
+    # keeps it off the board -- not some other gate that happens to refuse it.
+    monkeypatch.delenv("SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS")
+    grid = [_grid_row("h2h", market_prob=0.60)]
+    attach_live_gamelines(grid, index, sport="nfl")
+    assert grid[0]["live_gameline"]["priceable"] is True

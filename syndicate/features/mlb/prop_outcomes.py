@@ -20,6 +20,7 @@ those bets; counting them as a loss would manufacture winning unders.
 from __future__ import annotations
 
 import json
+import re
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -119,12 +120,52 @@ def player_actual(market: Any, player_name: Any, feed: Mapping[str, Any]) -> tup
     else:
         contexts = cards._actual_pitching_context_by_name(dict(feed))
         reader = cards._actual_pitcher_stat_value
-    for variant in cards._market_name_variants(player_name):
-        row = contexts.get(variant)
-        if row:
-            value = reader(row.get("stats"), prop_key)
-            return (value, None) if value is not None else (None, "stat_absent")
+    row = next((contexts[v] for v in cards._market_name_variants(player_name) if contexts.get(v)), None)
+    row = row or _folded_match(player_name, contexts)
+    if row:
+        value = reader(row.get("stats"), prop_key)
+        return (value, None) if value is not None else (None, "stat_absent")
     return None, "player_not_in_boxscore"
+
+
+#: Dropped by `_name_tokens`: StatsAPI writes `Rafael Flores Jr.` where the odds feed writes `rafael flores`.
+_NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
+#: The shorter first name of a prefix match must be at least this long, so an initial never matches.
+_MIN_FIRST_NAME_PREFIX = 3
+
+
+def _name_tokens(name: Any) -> tuple[str, ...]:
+    """The name folded past `cards._normalize_live_name`: punctuation and generational suffixes too."""
+    text = re.sub(r"[^a-z ]", " ", re.sub(r"[.']", "", cards._normalize_live_name(name)))  # J.P. -> jp
+    return tuple(token for token in text.split() if token not in _NAME_SUFFIXES)
+
+
+def _folded_match(player_name: Any, contexts: Mapping[str, Mapping[str, Any]]) -> Mapping[str, Any] | None:
+    """The box-score row the page's own variants missed, or None -- only ever a UNIQUE match.
+
+    Runs only after `cards._market_name_variants` found nothing, so it can grade a row that was
+    ungraded but never change one that was graded. Measured 2026-09-28 over 2,882
+    `player_not_in_boxscore` rows: the misses among players who did play were exactly
+    `rafael flores` / `Rafael Flores Jr.` (a suffix) and `leonardo bernal` / `Leo Bernal` (a
+    first-name prefix). A name matching two players who played is ambiguous and stays unmatched:
+    a wrong player's stat grades a bet, a void only drops it.
+    """
+    want = _name_tokens(player_name)
+    if len(want) < 2:
+        return None
+    folded = [(_name_tokens(name), row) for name, row in contexts.items()]
+    exact = [row for tokens, row in folded if tokens == want]
+    if exact:
+        return exact[0] if len(exact) == 1 else None
+
+    def first_name_prefix(tokens: tuple[str, ...]) -> bool:
+        if len(tokens) != len(want) or tokens[1:] != want[1:]:
+            return False
+        short, long_ = sorted((tokens[0], want[0]), key=len)
+        return len(short) >= _MIN_FIRST_NAME_PREFIX and long_.startswith(short)
+
+    prefixed = [row for tokens, row in folded if first_name_prefix(tokens)]
+    return prefixed[0] if len(prefixed) == 1 else None
 
 
 def schedule_games(payload: Any) -> list[dict[str, Any]]:

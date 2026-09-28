@@ -234,8 +234,16 @@ def grader_signature(bs: Any, settler: Any) -> tuple[str, dict[str, str], dict[s
     core = digest((bs.grade_population, bs.settle_from_score, bs.scorecard_record, bs.SCORECARD.grade,
                    bs.SCORECARD.match_chip))
     sport_versions = dict(settler.sport_versions)
-    sport_versions["mlb"] = (f"{sport_versions.get('mlb', 'unavailable:mlb')}+props:"
-                             f"{digest((prop_outcomes.MlbPropGrader.settle, prop_outcomes.MlbPropGrader.final_score))}")
+    # The WHOLE settle path, not its two entry points: until 2026-09-28 this hashed only `settle` and
+    # `final_score`, so a change to finding the game or matching the player's name (lane
+    # `mlb-prop-grading-player-match`) would have pooled two grader versions without a reset.
+    from syndicate.features.mlb import cards
+
+    prop_grader = (prop_outcomes.MlbPropGrader.settle, prop_outcomes.MlbPropGrader.final_score,
+                   prop_outcomes.MlbPropGrader._final_game, prop_outcomes.match_game, prop_outcomes.player_actual,
+                   prop_outcomes._name_tokens, prop_outcomes._folded_match,
+                   cards._normalize_live_name, cards._market_name_variants)
+    sport_versions["mlb"] = f"{sport_versions.get('mlb', 'unavailable:mlb')}+props:{digest(prop_grader)}"
     signature = json.dumps({"scorecard": msc.SCORECARD_VERSION, "core_code": core}, sort_keys=True)
     grader = {"scorecard": msc.SCORECARD_VERSION, "core_code": core, "sport_versions": sport_versions,
               "settlers": settler.versions, "settlers_unavailable": sorted(settler.unavailable)}

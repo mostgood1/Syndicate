@@ -42840,3 +42840,47 @@ starts 09-29); the served MLB board has 0 rows, so the block cannot appear until
 `live_gameline_score.segments.lookup` (`fetched`, `games_answered`, `refused_by_reason`) and
 `segments.by_segment.first5.all_records.market.n`. The nightly task
 `live-gameline-accuracy-snapshot` prints the `segment first5 h2h` line from the same block.
+
+## 2026-09-28 11:56 AM CT — refresh-worker `1d64a4b2` (lane `live-props-model-probability`) — soccer's live modelled prop edges reach `model_edge_pct`. **MEASUREMENT OWED: next LIVE soccer slate.**
+
+    deploy dep-dat9of8u01pc73d3ueug   refresh-worker 15ddf78e -> 1d64a4b2
+    fired 16:56:29Z   live 16:59:30.927839Z   trigger=api   status=live (deploys API poll)
+    preflight CLEAR 16:54:2xZ (infrastructure processes only, no sim; 15ddf78e is an ancestor)
+    baseline read 16:54:09Z: opportunity_population 2026-09-26/27 soccer part000,
+        gs=live kind=prop, la=True, me non-null      0 of 211 (09-26), 0 of 24 (09-27)
+    collateral (on main, other lanes): 1e7dba02 wnba actual-so-far, 99a4345d nfl prop sd,
+        26be8898 / 3392fb97 offline tooling
+
+**What shipped.** `live_projection_join`'s `#539` one-sided branch now prices the ROW's side
+(polarity-converting the live P(over)) and stamps `modelled_fair_side`. Without the stamp
+`layer2_board._modelled_fair_edge_for` returned None, so every live modelled edge reached the
+candidate -- and the population ledger the scorecard grades -- as null. Production before:
+refresh-worker `LIVE_PROJECTION_JOIN sport=soccer edged_modelled=20..47` (09-27 23:16-23:49Z)
+against `me` on 0 of 3,547 live-aware soccer props (09-14..09-28). User-approved cross-lane
+write into `accuracy-assessment-0914`'s file, logged in that block.
+
+**Measured after.** First post-deploy Layer 2 build 17:03:41Z logged the soccer join line
+(`reason=no soccer live player props`, nothing in play -- expected); `Traceback` since
+16:59:30Z: 0 (read 17:03:55Z). Code path NOT yet exercised: no live soccer match today.
+
+**verify:** on the next live soccer slate, (a) refresh-worker `LIVE_PROJECTION_JOIN
+sport=soccer edged_modelled>0`, and (b) the population part for that date: `gs=live
+kind=prop la=True` rows with `me` non-null > 0. (b) < (a) is expected -- the board drops
+edges beyond `_MODEL_EDGE_MAX_POINTS = 15.0` -- so report both. Then the next model-scorecard
+run: soccer live-prop cells in `windows.28d` with games > 0.
+
+## 2026-09-28 17:07:22Z (12:07 CDT) -- DEPLOY -- cron `model-scorecard` (`crn-dam0ao942hec73cge0rg`) `4e6542f7` -> `5a3c6af2` -- lane `mlb-prop-grading-player-match` (session 249f998b)
+- **What:** `5a3c6af2` -- MLB prop grader name fold (Leo Bernal / Rafael Flores Jr.) + the scorecard's MLB grader version now hashes the whole prop settle path. User: "yes, take the claim and fix both names", then "yes, deploy".
+- **Locks:** `deploy_claim` acquired 17:03:05Z (token-released after live); preflight CLEAR 17:03Z, no cron run in flight (newest run started 11:30:31Z, ended). Deploy `dep-dat9snk9v7es73b3ongg` created 17:05:34Z, trigger `api`, built commit `5a3c6af2` (= origin/main tip, read back from the deploy), live 17:07:22Z (`finishedAt`).
+- **BLAST RADIUS -- a cron deploys the BRANCH TIP:** the cron was on `4e6542f7` (09-21), so every commit on main since then reached it too. Enumerated BEFORE deploying by computing `grader_signature` at the tip against the live artifact's `grader` block: core `7fed663d478b` SAME, scorecard `model_scorecard/1` SAME, nba/ncaaf/nfl/nhl/soccer/wnba SAME, **mlb DIFF**, ncaab None -> `espn/1` (newly registered, out of season, no history to lose).
+- **HISTORY RESET, BY DESIGN:** MLB grader version `mlb/1+props:8ae1b75ebefa` -> `mlb/1+props:2620e9f68486`; `model_scorecard.load_state` drops MLB's 188 graded games (baseline read 17:02:54Z) and MLB re-accumulates from the next run. No other sport resets. The old digest hashed only `settle` + `final_score`, so without this the name change would have pooled two grader versions.
+- **expect:** `mlb_grader_version=mlb/1+props:2620e9f68486` (baseline `mlb/1+props:8ae1b75ebefa`, read 17:02:54Z).
+- **Offline evidence (production population parts 09-14/09-20/09-25/09-26, old vs new grader row by row):** exactly 150 rows `player_not_in_boxscore` -> graded (78 loss, 72 win), all Leo Bernal / Rafael Flores Jr.; 0 previously graded rows changed; the 2,732 left are 2,732 true DNPs against StatsAPI box scores.
+- **verify: OWED -- the 2026-09-29 11:30Z scheduled run.** Readings: the run log's `STATE ... reset=` naming MLB and `GRADER` carrying `mlb/1+props:2620e9f68486`; `model_scorecard_latest.json` `grader.sport_versions.mlb` = that value; `coverage.ungraded_by_sport.mlb` has 0 `prop_player_not_in_boxscore` rows for Leo Bernal / Rafael Flores Jr. on any date they played (check via the population parts, not the count). The 28d count itself is NOT comparable across the reset -- the window restarts.
+
+## 2026-09-28 12:11-12:18 PM CT (17:11:53Z -> live 17:18:24Z) — web `451f9fa6` -> `4b5ebc0a` (`dep-dat9vm0jo6nc73erilig`) — lane `ops-snapshot-index-join-path` — **GOAL MET: the snapshot-index diagnostic now reads the file the NFL game-line join reads.**
+- Change: `/api/ops/live-lens/snapshot-index` resolves its file through `board_enrichment._LIVE_GAMELINE_SNAPSHOT_PATHS` (imported, not copied). For `nfl` that is `nfl_live_resim.json`; it had hard-coded `<sport>_live_lens.json`. The prop half reads the prop join's file, reported as `prop_path`.
+- Collateral: 29 commits `451f9fa6..4b5ebc0a`, all already on origin/main, no `render.yaml`. Other lanes' web-reachable files: `nfl/live_resim.py`, `nfl/player_stats.py`, `nfl/props.py`, `nfl/live_prop_capture.py`, `mlb/live_gameline_segment_actuals.py`, `mlb/prop_outcomes.py`, `shared/live_projection_join.py`, `shared/live_gameline_accuracy.py`, `shared/book_grid_artifact.py`, `shared/wnba_live_prop_rows.py`.
+- Preflight CLEAR 17:11Z (infra processes only). Claim held by this lane.
+- Baseline 17:09:43Z: `?sport=nfl` -> `path=/opt/render/project/data/live/nfl_live_lens.json`, no `prop_path`, 16 games, `index_size 0`, `sources_seen {}`.
+- verify: 17:19:14Z, 50 s after live. `?sport=nfl` -> `path=/opt/render/project/data/live/nfl_live_resim.json`, `prop_path=.../nfl_live_lens.json`, 16 games, `index_size 0`, `sources_seen {pregame: 16}`. `sources_seen` moved `{}` -> `{pregame: 16}`, so the endpoint reads different bytes, not the same file under a new label. `?sport=wnba`: `path == prop_path == .../wnba_live_lens.json`, unchanged. `index_size 0` is expected: the re-sim stamps `pregame` on every game with no NFL game in progress (Monday afternoon).

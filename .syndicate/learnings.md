@@ -4963,6 +4963,14 @@ this instrument read healthy while the thing it measures is broken.**
 - **Rule:** before calling a skip reason a join bug, classify a sample of it against the source of truth. Volume alone says nothing about which class dominates.
 
 ---
+## 2026-09-28 (session f9c8d1b9, lane live-props-model-probability) - A producer test that asserts its OWN field proves nothing about the reader
+
+**What happened.** `#539` (2026-08-23) priced soccer's one-sided live props and its eleven tests asserted `edge_vs_modelled_fair_pct` on the projection. The board reads that number through `layer2_board._modelled_fair_edge_for`, which ALSO requires `modelled_fair_side` -- a companion field only the pregame sweep wrote. Every test was green for five weeks while the path delivered 0 of 3,547 edges to the board and the scorecard.
+
+**Rule:** when a producer writes a field another module consumes, at least one test must drive the real producer into the real consumer and assert the CONSUMER's output. And a lane hypothesis naming one end of a pipeline ("recording drops it" / "grading drops it") must be tested at every hop between the two, not only the two named ends -- here the defect sat in neither.
+
+---
+
 
 ## 2026-09-28 — an "unreproducible CI flake" was a production bug: never `print` inside a signal handler (session 2aff0397)
 

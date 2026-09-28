@@ -67,6 +67,7 @@ from syndicate.features.football.sim_engine.smartsim2.contracts import (
     SmartSim2SimulationInput,
 )
 from syndicate.features.football.sim_engine.smartsim2.game_simulator import simulate_game
+from syndicate.features.shared.team_aliases import canonical_team
 
 LIVE_RESIM_LENS_SOURCE = "live_resim"
 PREGAME_LENS_SOURCE = "pregame"
@@ -633,6 +634,32 @@ def build_game_lens(
         "ok": True,
         "as_of": as_of,
         **result,
+        # THE JOIN'S OWN FIELD NAMES, beside the snake-case ones above. Until
+        # 2026-09-28 this lane carried ONLY `model_home_win_prob` / `sims_run`,
+        # and `live_gameline_join.live_gameline_from_lens` reads only
+        # `modelHomeWinProb` / `simsRun` / `projection` (NCAAF writes them at
+        # `ncaaf/live_resim.py:772`, NHL at `nhl/live_resim.py:421`). So every
+        # PRICED NFL lane was skipped as `skipped_no_accepted_lane` -- measured on
+        # refresh-worker 2026-09-27 22:53Z: `sources_seen {live_resim: 4,
+        # pregame: 12}`, `indexed 0`, and 82-92 full-game rows per build withheld
+        # `no_live_gameline_projection`, none of them written to the ledger.
+        "modelHomeWinProb": result.get("model_home_win_prob"),
+        "simsRun": result.get("sims_run"),
+        "liveStateAsOf": as_of,
+        # THE MEANS, which is what `live_gameline_score` grades spreads/totals
+        # on (`model_margin_mean` / `model_total_mean`), and FINAL-GAME values
+        # because the sim resumes from the live score.
+        #
+        # NO `totalRunsDist` / `marginDist`, DELIBERATELY. Those open spread and
+        # total PRICING, and `nfl-live-distribution-grade` graded NFL live
+        # margins a measured FAIL (worst powered bucket 0.4290 vs `#499`'s 0.150)
+        # with totals unmeasurable. Without a distribution the join withholds
+        # those rows by name and still records the means, so they are SCORED
+        # without being priced.
+        "projection": {
+            "total": result.get("total_mean"),
+            "homeMargin": result.get("margin_mean"),
+        },
     }
     if state is not None:
         lane["live_state"] = {
@@ -1016,9 +1043,20 @@ def build_live_lens_snapshot(
                 away_offense=float(away_off), away_defense=float(away_def),
                 sims=n_sims, env=env,
             )
+        # FULL CLUB NAMES, because that is what the board's join keys on. The
+        # games come from the smartsim2 projection CSV, which carries TRI-CODES
+        # ("phi" / "chi"), while every grid row carries "Philadelphia Eagles" /
+        # "Chicago Bears" and `live_gameline_join._norm_team` compares them
+        # EXACTLY -- measured 2026-09-28 against the week-3 artifact and the
+        # 09-27 grid: 0 of 16 pairs matched. The codes stay beside the names
+        # (and stay the key into `ratings` / `live_index` above, which are
+        # themselves code-keyed). An unresolvable code keeps the code, so it
+        # misses by name in the join's own counters rather than vanishing here.
         out_games.append({
-            "away_name": names["away_team"],
-            "home_name": names["home_team"],
+            "away_name": canonical_team("nfl", names["away_team"]) or names["away_team"],
+            "home_name": canonical_team("nfl", names["home_team"]) or names["home_team"],
+            "away_code": names["away_team"],
+            "home_code": names["home_team"],
             "gameLens": build_game_lens(state, result, live_state_as_of=generated_at),
         })
 

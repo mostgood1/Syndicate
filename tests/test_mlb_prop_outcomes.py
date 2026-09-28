@@ -60,6 +60,47 @@ def test_a_nickname_matches_through_the_pages_own_name_variants():
     assert po.player_actual("batter_hits", "Michael Trout", FEED) == (0.0, None)
 
 
+def _feed_with(*players):
+    return {"liveData": {"boxscore": {"teams": {
+        "away": {"players": {f"ID{i}": p for i, p in enumerate(players)}},
+        "home": {"players": {}},
+    }}}}
+
+
+# The two production misses, 2026-09-28: 150 of 2,882 `player_not_in_boxscore` rows over four
+# dates were these two players, who DID play (the other 94.8% genuinely did not).
+@pytest.mark.parametrize("odds_name, box_name", [
+    ("rafael flores", "Rafael Flores Jr."),
+    ("leonardo bernal", "Leo Bernal"),
+    ("J.P. Crawford", "JP Crawford"),
+])
+def test_the_measured_name_misses_now_find_the_player(odds_name, box_name):
+    feed = _feed_with(_player(box_name, batting={"hits": 2, "atBats": 4}))
+    assert po.player_actual("batter_hits", odds_name, feed) == (2.0, None)
+
+
+def test_a_folded_name_that_matches_two_players_stays_unmatched():
+    feed = _feed_with(_player("Luis Garcia Jr.", batting={"hits": 1}), _player("Luis Garcia", batting={"hits": 3}))
+    # The page's exact match still wins where it exists ...
+    assert po.player_actual("batter_hits", "luis garcia", feed) == (3.0, None)
+    # ... and a name only the fold can reach, reaching two players, is a void, not a guess.
+    feed = _feed_with(_player("Leo Bernal", batting={"hits": 1}), _player("Leon Bernal", batting={"hits": 3}))
+    assert po.player_actual("batter_hits", "leonardo bernal", feed) == (None, "player_not_in_boxscore")
+
+
+def test_an_initial_or_another_surname_never_matches():
+    feed = _feed_with(_player("Leo Bernal", batting={"hits": 1}))
+    assert po.player_actual("batter_hits", "L. Bernal", feed) == (None, "player_not_in_boxscore")
+    assert po.player_actual("batter_hits", "Le Bernal", feed) == (None, "player_not_in_boxscore")
+    assert po.player_actual("batter_hits", "leonardo bernardo", feed) == (None, "player_not_in_boxscore")
+
+
+def test_a_bench_player_is_still_a_void_after_the_fold():
+    feed = _feed_with(_player("Rafael Flores Jr."), _player("Leo Bernal", pitching={"strikeOuts": 1}))
+    assert po.player_actual("batter_hits", "rafael flores", feed) == (None, "player_not_in_boxscore")
+    assert po.player_actual("batter_hits", "leonardo bernal", feed) == (None, "player_not_in_boxscore")
+
+
 def test_a_player_who_did_not_play_settles_nothing():
     assert po.player_actual("batter_hits", "Bench Guy", FEED) == (None, "player_not_in_boxscore")
     assert po.player_actual("strikeouts", "aaron judge", FEED) == (None, "player_not_in_boxscore")
@@ -194,3 +235,33 @@ def test_a_final_games_score_comes_from_the_schedule():
 ])
 def test_no_final_score_is_invented(payload, reason):
     assert po.MlbPropGrader(fetch=FakeFetch({"date=2026-09-01": payload})).final_score(_record()) == (None, reason)
+
+
+def test_the_scorecards_mlb_grader_version_covers_the_name_match(monkeypatch):
+    """A name-match change must RESET MLB scorecard history, never pool two grader versions.
+
+    Until 2026-09-28 the digest hashed only `settle` and `final_score`, so this change itself
+    would have been pooled.
+    """
+    import importlib.util
+    import pathlib
+
+    from syndicate.features.shared import model_scorecard as msc
+
+    src = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "publish_model_scorecard.py"
+    spec = importlib.util.spec_from_file_location("publish_model_scorecard_for_digest", src)
+    pms = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(pms)
+
+    class _Settler:
+        sport_versions, versions, unavailable = {}, {}, set()
+
+    bs = msc.load_bucket_search()
+    before = pms.grader_signature(bs, _Settler())[1]["mlb"]
+
+    def other_match(player_name, contexts):  # a different name match
+        return None
+
+    monkeypatch.setattr(po, "_folded_match", other_match)
+    after = pms.grader_signature(bs, _Settler())[1]["mlb"]
+    assert before != after
