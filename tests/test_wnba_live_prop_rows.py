@@ -214,3 +214,67 @@ class SnapshotAdapterTests(unittest.TestCase):
         rows = [{"market": "double_double", "player": "X", "line": 0.5,
                  "liveProjectedStat": 1.0, "liveModelProbOver": 0.6}]
         self.assertEqual(to_snapshot_live_props(rows), [])
+
+
+# --------------------------------------------------------------------------
+# THE ACTUAL-SO-FAR, end to end through the REAL chain.
+# --------------------------------------------------------------------------
+
+def test_actual_so_far_SURVIVES_to_the_board_index_not_just_the_internal_row():
+    """The value was computed and dropped at the snapshot boundary.
+
+    `project_live_player_stat` is called with `current_stat=player[live_key]`
+    and returns it as `current`, which the internal row carries. The snapshot
+    row did not translate it, so `build_live_prop_index` -- which reads
+    `actualSoFar`, then `actual` -- got None, and
+    `layer2_board._live_projection_columns` rendered a blank `actual` cell for
+    every live WNBA prop.
+
+    Driven through the REAL producer and the REAL consumer rather than a
+    hand-written snapshot fixture, because a fixture I write is a fixture that
+    agrees with me: the `#412` join bug survived every hand-written test in its
+    file for exactly that reason.
+    """
+    from syndicate.features.shared.wnba_live_prop_rows import to_snapshot_live_props
+    from syndicate.features.shared.live_projection_join import build_live_prop_index
+
+    internal = [{
+        "player": "Napheesa Collier",
+        "market": "points",
+        "line": 21.5,
+        "current": 14.0,            # banked so far -- the field under test
+        "liveProjectedStat": 23.4,
+        "liveModelProbOver": 0.61,
+    }]
+    snapshot_rows = to_snapshot_live_props(internal)
+    assert snapshot_rows, "the producer dropped the row before the boundary"
+    assert snapshot_rows[0].get("actualSoFar") == 14.0, (
+        "the actual was computed and then dropped at the snapshot boundary")
+
+    indexed = build_live_prop_index({
+        "games": [{"status": {"detailedState": "In Progress"},
+                   "liveProps": snapshot_rows}]
+    })
+    assert indexed["rows_indexed"] == 1, indexed
+    entry = next(iter(indexed["index"].values()))
+    assert entry["actual_so_far"] == 14.0, (
+        f"the consumer still reads no actual: {entry}")
+
+
+def test_a_GENUINE_ZERO_actual_is_carried_not_collapsed_into_absent():
+    """A player with 0 points so far has an actual of 0.0, not a missing one.
+
+    `layer2_board` parses this column with `_as_float` specifically so a real
+    zero does not render as the same blank as "no live data". An `or`-style
+    carry-through here would have re-introduced exactly that collapse one layer
+    earlier, where nothing downstream could tell the difference.
+    """
+    from syndicate.features.shared.wnba_live_prop_rows import to_snapshot_live_props
+
+    rows = to_snapshot_live_props([{
+        "player": "A Player", "market": "points", "line": 8.5,
+        "current": 0.0, "liveProjectedStat": 7.1, "liveModelProbOver": 0.44,
+    }])
+    assert rows, "row dropped"
+    assert rows[0]["actualSoFar"] == 0.0, "a real zero was collapsed into absent"
+    assert rows[0]["actualSoFar"] is not None

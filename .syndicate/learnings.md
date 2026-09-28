@@ -4916,6 +4916,46 @@ One event gives an interval, not a rate. It cannot tell "rare" apart from
 
 ---
 
+## 2026-09-28 — AN ALLOWLIST IS AN ELIGIBILITY CHECK, NOT A TRANSPORT. And a check that answers about the wrong object is worse than one that fails.
+
+Lane `nfl-ncaaf-live-props`. Three beliefs overturned, all the same shape: **a
+check answered, and it was answering about something other than what I asked.**
+
+- **FORBIDDEN: reporting a path "retrievable" because it is in
+  `HOT_ARTIFACT_PATTERNS`.** The allowlist is read on THREE sides — the worker
+  before it sends, web on ingest, web on stream/export — and **none of them moves
+  a file.** An artifact written on refresh-worker (which serves no HTTP) is not
+  reachable from web (which serves the stream route off WEB's disk) until
+  something explicitly PUBLISHES it. Allowlisting alone turns the retrieval from
+  **403 into 404**, which is the worse failure: 403 says "not permitted", 404
+  says "the capture never happened". Measured: a capture family was allowlisted,
+  deployed, and one verification away from being reported as done. **Before
+  calling an artifact retrievable, name the line of code that SENDS it.**
+
+- **FORBIDDEN: treating a preflight `CLEAR` as validating its own baseline.**
+  `deploy_preflight.py` checks a baseline's **AGE**, never its **truth**. A
+  watcher whose API call 400'd left `LIVE` empty, so `git show ":<path>"` read
+  the **WORKTREE INDEX** — which contained the change — and fed back a baseline
+  identical to the expected post-state. It returned CLEAR. **An empty git rev is
+  not an error, it is the index**, and any `"$REV:path"` built from a variable
+  must hard-stop on an empty `$REV`. Every baseline must be read from a NAMED live
+  SHA, with an assertion that it reads as expected before the deploy proceeds.
+
+- **FORBIDDEN: `echo "$X" | grep -qv PATTERN` as a "not that state" test.**
+  `echo ""` emits one EMPTY line, which does not contain the pattern, so grep -v
+  matches and exits 0. A monitor built this way reported **"SPACING OPEN"** off a
+  preflight that had printed nothing at all — an absent verdict read as a green
+  light. Parse the verdict token explicitly (`grep -oE '^(CLEAR|HOLD|...)'` into a
+  `case`) and give **unparseable its own branch that is NOT permissive**. This is
+  the standing "unknown must not default permissive" rule reappearing in shell.
+
+**Cost:** none shipped — all three were caught before they authorised anything,
+the second because the numbers looked too convenient and the baseline was re-read
+by hand. **What caught them was the same habit each time: asking what would make
+this instrument read healthy while the thing it measures is broken.**
+
+---
+
 ## 2026-09-28 — an "unreproducible CI flake" was a production bug: never `print` inside a signal handler (session 2aff0397)
 
 BELIEF OVERTURNED: `test_worker_shutdown` end-to-end failing once on CI with empty output was treated as unexplained noise. It was the shutdown handler losing its record: a signal that lands while `sys.stdout`'s BufferedWriter lock is held runs the handler inside that flush, every `print` there raises "reentrant call", and the `finally: os._exit(0)` exits silently -- the RECORD_FAILED fallback line too, because it also used `print`. Fixed with `os.write` (#113). RULE: in a signal handler write with `os.write` to a raw fd, never `print`/logging. And when a test fails with no diagnosis, the first push is DIAGNOSTICS in the assertion message (here: the child's returncode), not a re-run -- the next CI failure then named the mechanism.

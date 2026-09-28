@@ -245,6 +245,27 @@ def to_snapshot_live_props(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, 
             "line": row.get("line"),
             "liveProjection": row.get("liveProjectedStat"),
             "liveModelProbOver": row.get("liveModelProbOver"),
+            # THE ACTUAL-SO-FAR, AND IT WAS COMPUTED ALL ALONG. `current` is the
+            # player's banked production for this market -- `project_live_player_stat`
+            # is called with `current_stat=player[live_key]` and returns it as
+            # `current`, which the internal row carries. It was simply not
+            # translated here, so it died at the snapshot boundary while
+            # `build_live_prop_index` read `actualSoFar` (then `actual`) two
+            # files away and got None, and `layer2_board._live_projection_columns`
+            # rendered a blank `actual` cell for every live WNBA prop.
+            #
+            # EMITTED UNDER THE SNAPSHOT VOCABULARY, not the internal one. This
+            # function exists precisely because the two vocabularies are separate
+            # (`player`/`market`/`liveProjectedStat` inside,
+            # `playerName`/`prop`/`liveProjection` on the wire); adding `current`
+            # verbatim would have been a third spelling nothing reads.
+            #
+            # A GENUINE ZERO MUST SURVIVE. A player who has scored 0 so far has
+            # an actual of 0.0, not a missing one, and the consumer distinguishes
+            # them (`layer2_board.py` parses this with `_as_float` for exactly
+            # that reason). So this is a plain carry-through with no `or`
+            # fallback, which would have collapsed 0.0 into null.
+            "actualSoFar": row.get("current"),
             # Carried through so a refused row is still attributable on the
             # snapshot rather than only inside this process.
             "residualSigma": row.get("residual_sigma"),
