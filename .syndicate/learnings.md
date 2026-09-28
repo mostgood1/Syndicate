@@ -4915,3 +4915,7 @@ One event gives an interval, not a rate. It cannot tell "rare" apart from
   ledger rows that had to be corrected by a fourth.
 
 ---
+
+## 2026-09-28 — an "unreproducible CI flake" was a production bug: never `print` inside a signal handler (session 2aff0397)
+
+BELIEF OVERTURNED: `test_worker_shutdown` end-to-end failing once on CI with empty output was treated as unexplained noise. It was the shutdown handler losing its record: a signal that lands while `sys.stdout`'s BufferedWriter lock is held runs the handler inside that flush, every `print` there raises "reentrant call", and the `finally: os._exit(0)` exits silently -- the RECORD_FAILED fallback line too, because it also used `print`. Fixed with `os.write` (#113). RULE: in a signal handler write with `os.write` to a raw fd, never `print`/logging. And when a test fails with no diagnosis, the first push is DIAGNOSTICS in the assertion message (here: the child's returncode), not a re-run -- the next CI failure then named the mechanism.
