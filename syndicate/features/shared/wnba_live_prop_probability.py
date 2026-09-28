@@ -148,21 +148,35 @@ REASON_NO_CURRENT = "count_market_needs_the_banked_stat_to_price_the_remainder"
 # assists 11.1 -> 6.1, threes 26.5 -> 5.9 (normal -> this). Brier skill up on all three.
 # THESE ARE FITTED VALUES: change them only by re-running that fit.
 #
-# (low, high, c, r) per minutes-remaining bucket.
+# REBOUNDS AND ASSISTS PRICE ON A REMAINING-MINUTES MODEL `[2026-09-28, user: "improve the
+# minutes projection for assists and threes"]`. Their mean is c_b x rate x E[remaining
+# minutes], with E[remaining minutes] from `expected_remaining_minutes` below rather than
+# the projection's `min(pregame - played, clock left)`. Remaining-minutes error (MAE),
+# held-out September: rule 4.89 -> model 3.44 min (rotation 4.60 -> 3.55); August 4.55 ->
+# 3.09. The fitted c_b fell to ~0.9-1.3 in EVERY bucket (the last-5-minutes c had been 2.7-2.8):
+# the minutes rule was most of what c_b was patching. Buckets key on the MODEL's minutes.
+# September line-level calibration, rotation, worst gap: assists 6.3 -> 3.5 pp (skill
+# +0.365 -> +0.387); rebounds 3.0 -> 3.1 (all players 3.0 -> 2.2; skill +0.425 -> +0.448).
+# THREES STAYS on the projection's remainder: with the model's minutes, hot-starting bench
+# shooters (~15 pregame minutes, <1 expected three) were over-priced by up to 22 pp -- the
+# live RATE after a few minutes is the problem there, and the old minutes cap had hidden it.
+#
+# (low, high, c, r) per remaining-minutes bucket.
+MINUTES_MODEL_MARKETS = frozenset({"rebounds", "assists"})
 _NEGBIN_REMAINDER: dict[str, tuple[tuple[float, float, float, float], ...]] = {
     "rebounds": (
-        (30.0, float("inf"), 0.74, 7.0),
-        (20.0, 30.0, 0.80, 5.0),
-        (10.0, 20.0, 0.82, 3.0),
-        (5.0, 10.0, 1.00, 1.5),
-        (0.0, 5.0, 2.66, 0.5),
+        (30.0, float("inf"), 0.78, 7.0),
+        (20.0, 30.0, 0.82, 7.0),
+        (10.0, 20.0, 0.88, 4.0),
+        (5.0, 10.0, 0.88, 2.0),
+        (0.0, 5.0, 0.90, 1.0),
     ),
     "assists": (
-        (30.0, float("inf"), 1.20, 25.0),
-        (20.0, 30.0, 1.14, 5.0),
-        (10.0, 20.0, 1.04, 2.0),
-        (5.0, 10.0, 1.16, 1.0),
-        (0.0, 5.0, 2.84, 0.5),
+        (30.0, float("inf"), 1.32, 3.0),
+        (20.0, 30.0, 1.16, 3.0),
+        (10.0, 20.0, 1.08, 3.0),
+        (5.0, 10.0, 0.96, 3.0),
+        (0.0, 5.0, 0.86, 3.0),
     ),
     "threes": (
         (30.0, float("inf"), 0.96, 1.5),
@@ -174,6 +188,42 @@ _NEGBIN_REMAINDER: dict[str, tuple[tuple[float, float, float, float], ...]] = {
 }
 COUNT_MARKETS = frozenset(_NEGBIN_REMAINDER)
 
+# E[remaining minutes] = clock_left x clip(x . beta, 0, 1), weighted least squares on the share
+# of the remaining regulation clock a player actually played. Features, in order:
+#   1, pregame share (pregame_minutes/40), live share (played/elapsed), lateness x each share,
+#   the rule's own share (max(pregame - played, 0)/clock_left), blowout x pregame share, blowout
+#   where blowout = clip(|own margin| - 8, 0, 20)/20 x lateness.
+# Fit 2026-07-17..08-31 clock-sampled replays (`scripts/fit_wnba_live_count_remainder.py`).
+# Fouls and an on-court flag were tested and added ~1% -- not worth a capture change.
+_MINUTES_BETA: tuple[float, ...] = (0.0938, 0.6498, 0.1814, -0.4042, 0.5824, -0.0475, -1.6356, 0.6119)
+_REGULATION_MINUTES = 40.0
+
+
+def expected_remaining_minutes(
+    pregame_minutes: Any, minutes_played: Any, game_minutes_remaining: Any, team_margin: Any = None
+) -> float | None:
+    """E[minutes this player still plays], or None when the state is unknown.
+
+    `team_margin` is the player's OWN team's lead (negative when trailing). Unknown
+    margin reads as 0 -- no blowout adjustment -- which is the state most samples had.
+    """
+    pre, played, clock = _as_number(pregame_minutes), _as_number(minutes_played), _as_number(game_minutes_remaining)
+    if pre is None or pre <= 0.0 or played is None or played < 0.0 or clock is None or clock < 0.0:
+        return None
+    clock = min(clock, _REGULATION_MINUTES)
+    if clock <= 0.0:
+        return 0.0
+    elapsed = _REGULATION_MINUTES - clock
+    s_pre = min(1.0, pre / _REGULATION_MINUTES)
+    s_live = min(1.0, played / elapsed) if elapsed > 0.0 else s_pre
+    late = min(1.0, elapsed / _REGULATION_MINUTES)
+    margin = abs(_as_number(team_margin) or 0.0)
+    blowout = min(max(margin - 8.0, 0.0), 20.0) / 20.0 * late
+    s_rule = min(1.0, max(pre - played, 0.0) / clock)
+    x = (1.0, s_pre, s_live, late * s_pre, late * s_live, s_rule, blowout * s_pre, blowout)
+    share = sum(b * v for b, v in zip(_MINUTES_BETA, x))
+    return clock * max(0.0, min(1.0, share))
+
 
 def _as_number(value: Any) -> float | None:
     try:
@@ -183,19 +233,33 @@ def _as_number(value: Any) -> float | None:
     return None if out != out else out
 
 
-def negbin_remainder(projected: Any, current: Any, minutes_remaining: Any, market: str) -> dict[str, float] | None:
+def negbin_remainder(projected: Any, current: Any, minutes_remaining: Any, market: str,
+                     *, rate: Any = None, expected_minutes: Any = None) -> dict[str, float] | None:
     """`{mean, dispersion, sd, center}` of the remaining-production NegBin, or None.
 
     None for a non-count market, an unknown state, or minutes outside the fitted range.
-    `center` is banked + mean: where the priced distribution actually sits.
+    `center` is banked + mean: where the priced distribution actually sits. A
+    `MINUTES_MODEL_MARKETS` market needs `rate` and `expected_minutes` and refuses
+    without them -- falling back to the projection's minutes would price it on the
+    table fitted for the OTHER minutes estimate.
     """
     table = _NEGBIN_REMAINDER.get(str(market or ""))
-    proj, cur, rem = _as_number(projected), _as_number(current), _as_number(minutes_remaining)
-    if table is None or proj is None or cur is None or rem is None or rem < 0.0:
+    proj, cur = _as_number(projected), _as_number(current)
+    if table is None or cur is None:
         return None
+    if str(market) in MINUTES_MODEL_MARKETS:
+        per_min, rem = _as_number(rate), _as_number(expected_minutes)
+        if per_min is None or rem is None or rem < 0.0:
+            return None
+        base = max(per_min, 0.0) * rem
+    else:
+        rem = _as_number(minutes_remaining)
+        if proj is None or rem is None or rem < 0.0:
+            return None
+        base = max(proj - cur, 0.0)
     for low, high, c, r in table:
         if low <= rem < high:
-            mean = c * max(proj - cur, 0.0)
+            mean = c * base
             sd = math.sqrt(mean + mean * mean / r) if mean > 0.0 else 0.0
             return {"mean": mean, "dispersion": r, "sd": sd, "center": cur + mean}
     return None
@@ -216,10 +280,12 @@ def _negbin_sf(k: int, mean: float, r: float) -> float:
     return max(0.0, min(1.0, 1.0 - cdf))
 
 
-def grid_center_and_sd(projected: Any, current: Any, minutes_remaining: Any, market: str) -> tuple[float, float] | None:
+def grid_center_and_sd(projected: Any, current: Any, minutes_remaining: Any, market: str,
+                       *, rate: Any = None, expected_minutes: Any = None) -> tuple[float, float] | None:
     """Where the priced distribution sits and how wide, for sizing a line grid."""
     if str(market or "") in COUNT_MARKETS:
-        nb = negbin_remainder(projected, current, minutes_remaining, market)
+        nb = negbin_remainder(projected, current, minutes_remaining, market,
+                              rate=rate, expected_minutes=expected_minutes)
         return None if nb is None else (nb["center"], nb["sd"])
     proj = _as_number(projected)
     sigma = residual_sigma(minutes_remaining, market)
@@ -261,6 +327,8 @@ def live_prop_prob_over(
     minutes_remaining: Any,
     market: str = "points",
     current: Any = None,
+    rate: Any = None,
+    expected_minutes: Any = None,
 ) -> dict[str, Any]:
     """`P(final >= line)` from the projection and its measured residual.
 
@@ -295,7 +363,8 @@ def live_prop_prob_over(
         if _as_number(current) is None:
             out["unavailable_reason"] = REASON_NO_CURRENT
             return out
-        nb = negbin_remainder(projection, current, minutes_remaining, market)
+        nb = negbin_remainder(projection, current, minutes_remaining, market,
+                              rate=rate, expected_minutes=expected_minutes)
         if nb is None:
             out["unavailable_reason"] = REASON_NO_MINUTES_REMAINING
             return out

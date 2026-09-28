@@ -44,7 +44,11 @@ import re
 import unicodedata
 from typing import Any, Iterable, Mapping
 
-from syndicate.features.shared.wnba_live_prop_probability import grid_center_and_sd, live_prop_prob_over
+from syndicate.features.shared.wnba_live_prop_probability import (
+    expected_remaining_minutes,
+    grid_center_and_sd,
+    live_prop_prob_over,
+)
 from syndicate.features.shared.wnba_live_prop_projection import project_live_player_stat
 
 # (live-capture key, sim mean key, market label). Declared rather than derived:
@@ -128,6 +132,7 @@ def build_live_prop_rows(
     game_minutes_remaining: Any = None,
     lines: Mapping[tuple[str, str], Any] | None = None,
     grid_markets: Iterable[str] = (),
+    team_margins: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """One row per (player, stat, line), plus the counters that make a zero readable.
 
@@ -186,6 +191,13 @@ def build_live_prop_rows(
                 "pregame_mean": anchor.get(mean_key),
                 "pregame_minutes": anchor.get("min_mean"),
                 "liveProjectedStat": verdict.get("projected"),
+                "rate": verdict.get("rate"),
+                # The COUNT pricer's remaining minutes (a game-state model), which can
+                # differ from `minutes_remaining` (the projection's rule) on purpose.
+                "expected_remaining_minutes": expected_remaining_minutes(
+                    anchor.get("min_mean"), player.get("mp"), game_minutes_remaining,
+                    (team_margins or {}).get(str(player.get("team_tri") or "").strip().upper()),
+                ),
                 "basis": verdict.get("basis"),
                 "unavailable_reason": verdict.get("unavailable_reason"),
             }
@@ -205,6 +217,8 @@ def build_live_prop_rows(
                     current=row["current"],
                     minutes_remaining=verdict.get("minutes_remaining"),
                     market=market,
+                    rate=row.get("rate"),
+                    expected_minutes=row.get("expected_remaining_minutes"),
                 )
                 # Lines ADDED beyond the supplied one. A market that cannot be
                 # gridded falls back to `[supplied]`, which may be `[None]` -- not a line.
@@ -249,7 +263,7 @@ GRID_MAX_LINES = 40
 
 
 def _grid_lines(supplied: Any, *, projected: Any, current: Any, minutes_remaining: Any,
-                market: str = "points") -> list[Any]:
+                market: str = "points", rate: Any = None, expected_minutes: Any = None) -> list[Any]:
     """The supplied line plus every half-point line near the projection, sorted.
 
     Lines at or below what is already banked are skipped: the over is decided and
@@ -262,7 +276,8 @@ def _grid_lines(supplied: Any, *, projected: Any, current: Any, minutes_remainin
     # THIS market's priced distribution -- its centre and spread -- so the grid's reach
     # matches what prices it. For count markets that is the player-scaled NegBin
     # remainder (centred on banked + fitted mean), not the raw projection.
-    placed = grid_center_and_sd(projected, current, minutes_remaining, market)
+    placed = grid_center_and_sd(projected, current, minutes_remaining, market,
+                                rate=rate, expected_minutes=expected_minutes)
     if placed is None or placed[1] <= 0.0:
         return sorted(out) if out else [supplied]
     center, sigma = placed
@@ -293,6 +308,8 @@ def _price_row(row: dict[str, Any], line: Any, verdict: Mapping[str, Any]) -> No
         minutes_remaining=verdict.get("minutes_remaining"),
         market=row.get("market") or "points",
         current=row.get("current"),
+        rate=row.get("rate"),
+        expected_minutes=row.get("expected_remaining_minutes"),
     )
     row["line"] = line
     row["residual_sigma"] = priced.get("residual_sigma")
