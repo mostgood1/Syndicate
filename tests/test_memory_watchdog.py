@@ -492,16 +492,36 @@ def test_pymalloc_stats_measure_real_retention():
     arena count against low live bytes in production meaningful rather than
     normal.
     """
-    import gc
+    # IN A FRESH INTERPRETER. pymalloc returns an arena only when EVERY block in
+    # it is free, so in a process already holding hundreds of arenas from other
+    # tests -- with other threads allocating concurrently -- the junk shares
+    # arenas with long-lived objects and none empties. Measured on CI
+    # 2026-09-28: 390 arenas held, 390 after the free. The calibration claim is
+    # about pymalloc, not about the runner's heap.
+    script = textwrap.dedent(
+        """
+        import gc, json, os, sys
+        sys.path.insert(0, os.getcwd())
+        from syndicate.features.shared import memory_observability as mo
 
-    mo._PYMALLOC_STATS_STATE["count"] = 0
-    junk = [str(i) + "x" * 70 for i in range(400_000)]
-    held = mo.log_pymalloc_arena_stats("unit-held")
-    del junk
-    gc.collect()
-    mo._PYMALLOC_STATS_STATE["count"] = 0
-    freed = mo.log_pymalloc_arena_stats("unit-freed")
-    assert held["arena_mb"] > freed["arena_mb"], (held, freed)
+        def main():
+            junk = [str(i) + "x" * 70 for i in range(400_000)]
+            held = mo.log_pymalloc_arena_stats("unit-held")
+            del junk
+            gc.collect()
+            mo._PYMALLOC_STATS_STATE["count"] = 0
+            freed = mo.log_pymalloc_arena_stats("unit-freed")
+            print("RETENTION_RESULT " + json.dumps([held["arena_mb"], freed["arena_mb"]]), flush=True)
+
+        main()
+        """
+    )
+    proc = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True,
+                          timeout=120, cwd=str(Path(__file__).resolve().parents[1]))
+    line = next((l for l in proc.stdout.splitlines() if l.startswith("RETENTION_RESULT ")), None)
+    assert line is not None, (proc.returncode, proc.stdout[-800:], proc.stderr[-800:])
+    held_mb, freed_mb = json.loads(line[len("RETENTION_RESULT "):])
+    assert held_mb > freed_mb, (held_mb, freed_mb)
 
 
 def test_pymalloc_stats_capped_per_process():

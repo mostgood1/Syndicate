@@ -37,7 +37,14 @@ class DailyUpdateSmokeTests(unittest.TestCase):
         # Nav/IA change 2026-07-24: "/" now renders the intelligence Betting
         # Board (see home.py::home). The per-sport dashboard with the live-lens
         # rail is still intentionally served through /api/home's html payload.
-        payload = self.client.get("/api/home").get_json()
+        #
+        # PINNED DATE. Unpinned, this asked for the real Central "today", which
+        # on CI loads that day's LIVE slate: it passed on 2026-09-27 and went
+        # red at 05:00Z 2026-09-28 because MLB's regular season had ended and
+        # no sport had games, so the dashboard rendered empty. The claim here is
+        # "the dashboard exposes a live-lens link", not "today has a slate";
+        # 2026-07-10 is served from the git-tracked mirror, with no network.
+        payload = self.client.get("/api/home?date=2026-07-10").get_json()
 
         self.assertTrue(payload.get("ok"))
         html = payload.get("html") or ""

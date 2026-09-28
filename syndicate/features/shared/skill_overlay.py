@@ -48,11 +48,11 @@ SOURCE_PREFIX = "model_scorecard/"
 _OFF_VALUES = frozenset({"off", "0", "false", "no"})
 _LOCK = threading.Lock()
 _STATE: dict[str, Any] = {
-    "checked_at": 0.0,
+    "checked_at": None,  # None = never checked; NOT 0.0 (see active_table)
     "mtime": None,
     "table": None,
     "meta": {"source": "static", "reason": "not_checked"},
-    "last_pull_at": 0.0,
+    "last_pull_at": None,  # None = never pulled; see active_table on monotonic-from-boot
     "pull_running": False,
     "logged": None,
 }
@@ -132,7 +132,8 @@ def _log(meta: Mapping[str, Any]) -> None:
 def _pull_in_background() -> None:
     """Fetch web's copy onto this disk. Never blocks the caller; at most once per PULL_INTERVAL."""
     now = time.monotonic()
-    if _STATE["pull_running"] or now - float(_STATE["last_pull_at"] or 0.0) < PULL_INTERVAL_SECONDS:
+    last = _STATE["last_pull_at"]
+    if _STATE["pull_running"] or (last is not None and now - float(last) < PULL_INTERVAL_SECONDS):
         return
     token = str(os.environ.get("ADMIN_TOKEN") or "").strip()
     if not token:
@@ -156,7 +157,7 @@ def _pull_in_background() -> None:
             print(f"[skill_overlay] PULL_FAILED {type(exc).__name__}: {exc}", flush=True)
         finally:
             _STATE["pull_running"] = False
-            _STATE["checked_at"] = 0.0
+            _STATE["checked_at"] = None
 
     threading.Thread(target=_run, name="skill-overlay-pull", daemon=True).start()
 
@@ -172,7 +173,14 @@ def active_table(static: Mapping[str, Mapping[str, Any]], *, now: datetime | Non
             return static
         clock = time.monotonic()
         with _LOCK:
-            fresh = clock - float(_STATE["checked_at"] or 0.0) < CHECK_INTERVAL_SECONDS
+            # `time.monotonic()` counts from BOOT, so "never checked" cannot be
+            # 0.0: on a host up for less than CHECK_INTERVAL_SECONDS, `clock - 0.0`
+            # read as FRESH and the overlay was skipped for the static table
+            # until the interval had elapsed since boot -- every fresh CI runner
+            # and every freshly booted worker (CI 2026-09-28,
+            # `test_reachability_the_overlay_moves_bucket_factor...`, uptime 351s).
+            checked_at = _STATE["checked_at"]
+            fresh = checked_at is not None and clock - float(checked_at) < CHECK_INTERVAL_SECONDS
             if fresh and path is None and now is None:
                 table = _STATE["table"]
                 return table if table is not None else static
@@ -212,5 +220,5 @@ def status() -> dict[str, Any]:
 
 def reset_cache() -> None:
     """Tests only."""
-    _STATE.update({"checked_at": 0.0, "mtime": None, "table": None, "last_pull_at": 0.0,
+    _STATE.update({"checked_at": None, "mtime": None, "table": None, "last_pull_at": None,
                    "pull_running": False, "logged": None, "meta": {"source": "static", "reason": "not_checked"}})

@@ -35,12 +35,22 @@ def _pre_change_module():
     written by hand here -- a hand-written expectation only proves this file
     agrees with itself.
     """
-    src = subprocess.run(
-        ["git", "show", f"origin/main:{MODULE_PATH}"],
-        capture_output=True,
-        cwd=str(Path(__file__).resolve().parents[1]),
-    ).stdout
-    assert src, "could not read origin/main's contracts.py"
+    # `origin/main` FIRST, then `HEAD`. CI's PR runs are a shallow checkout of
+    # the merge ref with NO `origin/main`, so these five tests failed on every
+    # PR and passed on every push to main -- no baseline could hold both
+    # (lane `pytest-baseline-dirfd`, todo `#691`, 2026-09-28). The cache change
+    # merged long ago, so on main the golden has already been the current file;
+    # HEAD gives PR runs that same comparison.
+    src = b""
+    for ref in ("origin/main", "HEAD"):
+        src = subprocess.run(
+            ["git", "show", f"{ref}:{MODULE_PATH}"],
+            capture_output=True,
+            cwd=str(Path(__file__).resolve().parents[1]),
+        ).stdout
+        if src:
+            break
+    assert src, "could not read contracts.py from origin/main or HEAD"
     path = Path(tempfile.mkdtemp()) / "contracts_pre_change.py"
     path.write_bytes(src)
     spec = importlib.util.spec_from_file_location("contracts_pre_change", path)
