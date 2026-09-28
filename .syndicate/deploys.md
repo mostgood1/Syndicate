@@ -43157,3 +43157,26 @@ execution.
 
 It writes to `deploys.md`, `log/<date>.md` and the `layer2-triad-alignment` block
 rather than messaging, because an unattended run has nobody to message.
+
+## 2026-09-28 3:24 PM CT — live-odds-worker `b8ea31bc` (lane `live-props-model-probability`) — WNBA count props priced on a player-scaled NegBin remainder; rebounds rejoins the grid. **Reading owed: 09-29.**
+
+    deploy dep-datcpvs9v7es7387hrm0   live-odds-worker dd77591b -> b8ea31bc
+    fired 20:24:31Z   live 20:27:25.703931Z   trigger=api   status=live
+    preflight CLEAR 20:24:2xZ; no collateral (b8ea31bc the only pending code commit)
+    baseline read 20:24:2xZ from live dd77591b's code: grid_markets=("points",);
+        rebounds/assists/threes basis measured_residual_normal
+
+**What shipped.** Rebounds/assists/threes: R = final - banked ~ NegBin(m = c_b x (projected -
+banked), dispersion r); Var = m + m^2/r scales with the player. Fit Jul(-Aug), variant chosen on
+Aug, ONE test on Sep (held out). Worst line-level gap, rotation players, Sep, normal -> NegBin:
+rebounds 16.7 -> 3.0 pp, assists 11.1 -> 6.1, threes 26.5 -> 5.9; Brier skill up on all three. The
+shipped function reproduces those numbers exactly. Grid: points + rebounds (rebounds under ~5 pp
+on both holdouts); assists/threes priced on the new model at one line each. A count market with no
+banked value refuses. `scripts/fit_wnba_live_count_remainder.py` reproduces the table.
+
+**Measured after.** First TICK_COMPLETE on the new instance 20:29:17Z, all sports True; `Traceback`
+since 20:27:25Z: 0 (read 20:29:22Z). Not yet exercised on a live game.
+
+**verify:** 09-29 -- rebounds rows carry many lines per player (grid), assists/threes one; rows of
+all three show `residual_sigma` varying by player (the NegBin sd), and `me` non-null counts per
+market in the population part. Task `wnba-live-prop-grid-reading-0929`.
