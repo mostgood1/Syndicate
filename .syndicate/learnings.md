@@ -5124,3 +5124,13 @@ own prior verdicts, not by anything failing.
 **Rule:** when a change increases a model's reliance on the pregame anchor, check the anchor's own bias in the evaluation regime (actual vs expected by period) before shipping, and keep the held-out period out of selection even when it would "rescue" a variant. Better Brier with worse line calibration is not a pass.
 
 ---
+
+## 2026-09-28 FORBIDDEN: telling the user a market is "not scored" off a PRINTED LABEL without reading the served payload's keys `[lane gameline-spread-total-scoring, session 3b474634]`
+- **What happened.** The nightly snapshot printed `spreads=399(refused) totals=372(refused)`, and I reported to the user that totals and spreads were not scored. They had been scored on every build since scorer contract 3 (2026-09-08), under `live_gameline_score.point_forecast`, and retained in history since 09-24. The label predated contract 3: it meant "not in the Brier", and nothing updated it when a second scoring rule shipped.
+- **The field that settled it was already served.** `point_forecast`, `point_forecast_markets` and `scorer_contract: 3` sat in the same payload the label summarised.
+- **Rule.** Before stating that something is not measured, read the payload's own keys for it. A printout is an observer with its own vintage, and a label that describes one scoring rule goes silently wrong when a second one ships. Fixed in `a8b61e7e`: markets are now labelled by HOW they are scored (`brier` / `point-forecast` / `unscored`).
+
+## 2026-09-28 FORBIDDEN: flagging a delegated lane's work as DRIFT without reading the consent and user-request lines first `[lane gameline-spread-total-scoring, session 3b474634]`
+- **What happened.** Polling lane `live-props-model-probability`, I reported to the user that it had drifted into four hours of WNBA model tuning. Every step was USER-REQUESTED in that session ("widen WNBA rebounds and assists too", "build the player-scaled spread model", ... "Ship it now"), and each cross-lane write was recorded with consent in `layer2-triad-alignment`'s block. I judged from the commit subjects against the lane's written Goal.
+- **Why it matters.** A monitor that cries drift at the user's own direction trains the user to ignore it -- the same failure as a guard that cries wolf. The lane Goal is what the opener wrote; the user can redirect a session in its own chat, and the ledger records it where the WRITE lands, not where the goal is.
+- **Rule.** Before calling work outside a lane's goal "drift", grep the lane's block AND the blocks of every lane whose files it touched for `USER-REQUESTED` / `user decision` / consent lines. Drift is work nobody asked for; redirected work is not drift, it is a goal the ledger has not caught up with.
