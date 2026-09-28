@@ -43035,3 +43035,30 @@ board has two rows above 0.98, which is the failing reading, not a passing one.
 
 Nothing is broken by this deploy: the code is strictly better where it runs, and
 where it does not run yet the board is exactly what it was this morning.
+
+## 2026-09-28 1:36 PM CT — live-odds-worker `33da9fc0` (lane `live-props-model-probability`) — WNBA live props: per-market MEASURED residuals; grid widened to rebounds + assists. **MEASUREMENT OWED: WNBA 2026-09-29.**
+
+    deploy dep-datb7eegekts73a52lb0   live-odds-worker bffcd1b4 -> 33da9fc0
+    fired 18:36:41Z   live 18:42:16.034914Z   trigger=api   status=live (deploys API poll)
+    preflight CLEAR 18:36:3xZ (infrastructure processes only)
+    baseline read 18:36:31Z from the LIVE commit's code (bffcd1b4 live_lens.py):
+        grid_markets=("points",); rebounds/assists/threes priced on the POINTS table (n=796)
+    collateral: db5b748b (test fixes), c3874b91 (NFL passing_tds/INT as Poisson counts) --
+        c3874b91 was ALREADY live on refresh-worker (its owner's deploy, 18:28:24Z), so this
+        aligns live-odds-worker with it; web 4b5ebc0a still lacks it (owner's decision)
+
+**What shipped.** Per-market residual tables (points, rebounds, assists, threes), measured by the
+extended grader over 48 dates / 140 games (2026-07-17..09-27; samples 11,910 / 8,286 / 5,138 /
+2,194), each gated on an exact box reconcile. Out of sample (fit Jul-Aug, test Sep) coverage of
+the 90% band: 91.5-91.8%, all four. The points table used for rebounds/assists covered 99%+ of
+their finals (2-3x too wide) -- those probabilities were squashed toward 0.5. Points refreshed
+too (old table 86.8% coverage). Unmeasured markets now refuse. Lens grids points + rebounds +
+assists; threes priced on its own table, not widened.
+
+**Measured after.** First lens tick 18:43:48Z (`BASKETBALL_MOMENTUM sport=wnba games=0`, no game
+today -- expected); `Traceback` since 18:42:16Z: 0 (read 18:44:20Z). NOT yet exercised live.
+
+**verify:** 09-29 WNBA games -- refresh-worker `LIVE_PROJECTION_JOIN sport=wnba` lens_indexed and
+projected vs the 3..5 baseline; population part `gs=live kind=prop` with `me` non-null for
+player_points, player_rebounds, player_assists separately; lens snapshot size (test: ~10.4 KB
+JSON per live player for three markets). Task `wnba-live-prop-grid-reading-0929`.
