@@ -43258,3 +43258,45 @@ since 21:08:47Z: 0 (read 21:11:14Z). Not yet exercised on a live game.
 
 **verify:** 09-29 -- rebound/assist rows carry `expected_remaining_minutes` and `rate`; assists now
 gridded; population part `me` counts per market. Task `wnba-live-prop-grid-reading-0929`.
+
+### FLEET MOVED PAST `41f14c3e` within ~30 min — the entry above is HISTORICAL, not current `[noted 2026-09-28 21:2xZ]`
+
+The section above says "ALL THREE SERVICES `41f14c3e`". That was true at
+20:42-20:43Z and is **no longer true**. Read as of 21:2xZ:
+
+    web               01092639   20:52:12Z   (not this lane's deploy)
+    refresh-worker    01092639   20:51:50Z   (not this lane's deploy)
+    live-odds-worker  6f7be98d   21:08:47Z   (lane live-props-model-probability)
+
+**THE MEASUREMENT STILL STANDS, because it was verified by CONTENT.** Both
+current SHAs carry the model work intact -- `discrete=5 override=2
+refit_weight=1`, the same three counts checked at deploy time. `41f14c3e` is an
+ancestor of both, so the fleet moved FORWARD and carried the change rather than
+dropping it. What expired is the SHA-identity sentence, not the result.
+
+**This is the fourth time today the fleet moved under a measurement without the
+measurer being told**, and twice within ninety minutes it happened to this lane.
+The general shape, recorded because it will recur: on a shared `origin/main`, a
+deploy receipt naming a SHA describes a MOMENT, not a state. A receipt that also
+records what it verified BY CONTENT survives the fleet moving; one that records
+only "service X is on SHA Y" is stale as soon as anyone else deploys.
+
+**A CORRECTION OWED TO A PEER, recorded so the ledger does not carry it wrong.**
+Session `f9c8d1b9` reported that this lane's `41f14c3e` deploy carried their
+`01092639` as collateral. It did not, and could not: `01092639` landed
+15:47:07 -0500 against `41f14c3e`'s 15:29:14, so the injuries commit is a
+DESCENDANT of the deploy target. `git merge-base --is-ancestor 01092639
+41f14c3e` is false; the reverse is true. `01092639` reached web and
+refresh-worker in a SEPARATE 20:51-20:52Z deploy that was not this lane's.
+
+Stated without high ground: this lane's own `cf2cdbae` rode out three times as
+collateral in other lanes' deploys before it was measured, and this lane has
+very likely carried other lanes' commits in its own `origin/main` deploys
+tonight without naming them. Deploying main is correct and collateral is its
+documented cost. The direction is the thing to check --
+`git merge-base --is-ancestor <carried> <target>` answers "did my deploy contain
+it", and it is easy to run backwards when two commits are eighteen minutes apart.
+
+**No action needed.** Tomorrow's scheduled reading gates on
+`projection.generated_at`, not on a SHA, so the fleet moving does not invalidate
+it.
