@@ -274,6 +274,44 @@ run(r, pre=True)
 touch(r, "syndicate/features/theirs.py", "no git here\n")
 check("a non-git tree is unaffected by HEAD tracking", run(r)[0], 2)
 
+print()
+print("THE MARKER IS READ WHERE LANE-GUARD READS IT (the primary tree) FIRST:")
+
+# A worktree session: the command runs in `wt`, the guards read `primary`.
+# Measured 2026-09-28: the marker lived only in the primary tree and a write to
+# the session's OWN claimed file warned `Your lane: 'none'`.
+primary = tree(TWO_LANES, "mine", {})
+wt = tree(TWO_LANES, None, SEED)
+PRIMARY_ENV = {"CLAUDE_PROJECT_DIR": primary}
+run(wt, pre=True, env_extra=PRIMARY_ENV)
+touch(wt, "syndicate/features/mine.py", "mine, from a worktree\n")
+check("primary-only marker: writing YOUR OWN file is silent",
+      run(wt, env_extra=PRIMARY_ENV)[0], 0)
+
+wt = tree(TWO_LANES, None, SEED)
+run(wt, pre=True, env_extra=PRIMARY_ENV)
+touch(wt, "syndicate/features/theirs.py", "theirs, from a worktree\n")
+rc, err = run(wt, env_extra=PRIMARY_ENV)
+check("primary-only marker: another lane's file is still REPORTED", rc, 2)
+check("  ^ names YOUR lane from the primary marker", "'mine'" in err, True)
+
+# The two copies disagree: the worktree names a lane the session LEFT. The
+# primary tree is what lane-guard grants ownership from, so it wins.
+wt = tree(TWO_LANES, "theirs", SEED)
+run(wt, pre=True, env_extra=PRIMARY_ENV)
+touch(wt, "syndicate/features/theirs.py", "stale worktree marker\n")
+rc, err = run(wt, env_extra=PRIMARY_ENV)
+check("stale worktree marker does NOT grant the other lane's file", rc, 2)
+check("  ^ names the PRIMARY marker's lane", "'mine'" in err, True)
+
+# No primary marker at all: the worktree copy is still honoured.
+empty_primary = tree(TWO_LANES, None, {})
+wt = tree(TWO_LANES, "mine", SEED)
+run(wt, pre=True, env_extra={"CLAUDE_PROJECT_DIR": empty_primary})
+touch(wt, "syndicate/features/mine.py", "local marker only\n")
+check("worktree-only marker still owns its file",
+      run(wt, env_extra={"CLAUDE_PROJECT_DIR": empty_primary})[0], 0)
+
 for t in TREES:
     shutil.rmtree(t, ignore_errors=True)
 

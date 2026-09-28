@@ -102,6 +102,32 @@ except Exception as exc:  # pragma: no cover - only when a shared module is gone
 OFF_ENV = "SYNDICATE_LANE_POSTCHECK"
 
 
+def _my_lane(root, session_id):
+    """This session's lane: the PRIMARY tree's marker first, then `root`'s.
+
+    `lane-guard` and `deploy-guard` read the marker under `CLAUDE_PROJECT_DIR`,
+    the primary tree. This hook used to read it only under `root`, the tree the
+    command ran in, which for a worktree session is the worktree. The two copies
+    are written by different steps and drift, so the guards disagreed about
+    who you are:
+      - 2026-09-2x (`lanes.md`, lane `nfl-live-resim-activation`): the worktree
+        copy named a lane the session had left hours earlier, so this warning
+        named the wrong lane.
+      - 2026-09-28: the marker existed only in the primary tree, so a write to
+        the session's OWN claimed file warned `Your lane: 'none'`.
+    Reading the primary first makes this hook agree with `lane-guard`, which is
+    the one that actually grants ownership. The `root` copy remains a fallback
+    for a session whose only marker is local.
+    """
+    primary = os.environ.get("CLAUDE_PROJECT_DIR") or ""
+    if primary:
+        lane, _used = current_lane(primary, session_id)
+        if lane:
+            return lane
+    lane, _used = current_lane(root, session_id)
+    return lane
+
+
 def _snap_path(root, session_id):
     """Per (tree, session). Two sessions must not share one snapshot slot.
 
@@ -146,7 +172,7 @@ def _candidates(root, session_id):
     except Exception:
         return {}
 
-    mine, _used = current_lane(root, session_id)
+    mine = _my_lane(root, session_id)
 
     out = {}
     try:
@@ -261,7 +287,7 @@ def _post(payload, session_id):
     if not changed:
         return 0
 
-    lane, _used = current_lane(payload.get("cwd") or ".", session_id)
+    lane = _my_lane(payload.get("cwd") or ".", session_id)
     sys.stderr.write(
         "OUT-OF-LANE WRITE: a file claimed by another OPEN lane CHANGED while "
         "your shell" + chr(10) +

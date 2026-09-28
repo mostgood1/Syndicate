@@ -923,6 +923,15 @@ death, never life — do not invert it.
 - Blocked by: none
 - Result: **GOAL MET.** `_land_target()` resolves the worktree to land. `<root>/<slug>` wins if it exists. Otherwise it picks the session worktree whose `lanes.md` carries `### <slug> `, preferring the one containing cwd. Several candidates with none containing cwd REFUSE, and none at all is still FATAL. `tests/test_session_worktree_land.py` has 5 tests on a real origin + worktrees. The reproduction fails on the old script with the exact 09-28 FATAL; 24/24 pass across land/close/lane_open. **Also fixed a regression from `02338706`:** `lane-postwrite-check` reads the marker from the command's cwd (the worktree) while deploy-guard/lane-guard read the primary tree, so a primary-only marker read as `Your lane: 'none'`. `lane_open.py` now writes both. Landed with the new `land --lane land-any-lane-in-worktree` from worktree `ops-snapshot-index-join-path`. Files released.
 
+### postwrite-reads-primary-marker — CLOSED 2026-09-28 — opened 2026-09-28 — session acb76ba7-70eb-4b26-b7b8-3cb425e6a6a0
+- Goal: lane-postwrite-check resolves this session's lane from the PRIMARY tree's marker (CLAUDE_PROJECT_DIR, what lane-guard reads) before the worktree copy
+- Files: .claude/hooks/lane-postwrite-check.py, .claude/hooks/test_lane_postwrite_check.py
+- Hypothesis: current_lane(root) reads the worktree marker; lane-guard reads CLAUDE_PROJECT_DIR. Observed 2026-09-28 (Your lane: 'none' with the primary marker set) and 09-2x lanes.md:573 (the two copies named different lanes).
+- Falsification test: n/a
+- Verification: test_lane_postwrite_check.py: primary-only marker silences own-file write; primary beats a stale worktree marker; all prior cases still pass
+- Blocked by: none
+- Result: **GOAL MET in the repo; LIVE only once the primary tree's `.claude/hooks/` catches up** (hooks run from `$CLAUDE_PROJECT_DIR`). `_my_lane()` reads `current_lane(CLAUDE_PROJECT_DIR)` first and falls back to `root`'s marker. It is used at both call sites: the ownership filter in `_candidates` and the `Your lane:` line. `test_lane_postwrite_check.py` 34/34; 4 of the 6 new cases fail on the old hook. **One of the 4 is a silent false grant, not just a false alarm:** a stale worktree marker naming the other lane let a write to that lane's file pass unreported. `lane_open.py` still writes both markers, harmless and still the fallback. Files released.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
