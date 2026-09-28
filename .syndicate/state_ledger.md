@@ -754,6 +754,17 @@ unbounded.
   names the claiming lane. **With the marker empty it blocks your OWN lane's
   files**, reporting `Current lane: 'none'` — so a session that hand-edits
   `lanes.md` instead of running `/lane` locks itself out.
+- **WHICH TREE'S MARKER EACH GUARD READS** `[verified 2026-09-28, session
+  acb76ba7; live in the primary tree from f72b42fd]`. `lane-guard` and
+  `deploy-guard` read `.current-lane.<session>` under `CLAUDE_PROJECT_DIR`, the
+  PRIMARY tree. `lane-postwrite-check` reads the primary first and falls back to
+  the tree the command ran in (`ad291679`). Before that it read only the
+  worktree's copy, so a stale copy could silently GRANT another lane's file.
+  `scripts/lane_open.py` writes the marker in BOTH trees (`99c27f45`). Before
+  `02338706` it wrote only beside the worktree's `lanes.md`, and deploy-guard
+  then refused a lane holding its claim and a CLEAR preflight (`your lane:
+  <none>`). `session_worktree.py land --lane X` lands X from any session
+  worktree whose `lanes.md` carries it, preferring the cwd's (`99c27f45`).
 - **`Bash` is not BLOCKED, but is no longer UNSEEN** `[updated 2026-09-04,
   verified, session f97ad5ab]`. `lane-guard`'s matcher is still
   `Edit|Write|MultiEdit|NotebookEdit`, so a shell write cannot be REFUSED —

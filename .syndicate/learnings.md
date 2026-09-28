@@ -4983,3 +4983,11 @@ BELIEF OVERTURNED: `test_worker_shutdown` end-to-end failing once on CI with emp
 **Rule:** a join verification must include at least one ACCEPTED record (`indexed >= 1`) on production-shaped input; an all-refusal reading verifies the refusal branch only and must say so. Fixtures feeding a join must use the identifiers the production producer actually emits (here: the projection CSV's tri-codes).
 
 ---
+
+## 2026-09-28 (session acb76ba7) - Two readers of one fact must read the SAME copy; fixing one reader's location can blind the other
+
+The lane marker `.current-lane.<session>` had two copies once sessions moved into worktrees (primary tree, worktree), and three guards read them: `lane-guard` and `deploy-guard` read the primary, `lane-postwrite-check` read the worktree. `lane_open.py` wrote only the worktree copy, so deploy-guard refused a lane that held its claim. Moving the write to the primary tree (`02338706`) fixed that and, within minutes, made `lane-postwrite-check` report `Your lane: 'none'` on the session's own file. Worse, the pre-existing split had let a STALE worktree copy silently GRANT another lane's file (4 of 6 new tests fail on the old hook). The same week, `snapshot-index` read `nfl_live_lens.json` while the join it diagnoses read `nfl_live_resim.json`: the same shape, a diagnostic and its subject resolving one name to two files.
+
+**Rule:** before moving where a fact is WRITTEN, enumerate every READER and the root each one resolves (grep the marker name in `.claude/hooks/`). Make readers resolve through ONE shared lookup, or import the writer's map (`_LIVE_GAMELINE_SNAPSHOT_PATHS`), never a parallel copy. A test must cover the case where the copies DISAGREE, not only where one is missing.
+
+---

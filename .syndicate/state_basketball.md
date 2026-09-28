@@ -864,7 +864,14 @@ is individually cleared and the end-to-end reading is STILL OWED:
 the same keyvalue-aware reader the join uses and reports the join's verdict per
 game. Nothing else can: `/api/ops/artifacts/export` is a DISK read and the
 snapshot is keyvalue-routed (returns empty), and `/wnba/api/live-lens` may
-rebuild from a published artifact rather than return stored bytes. Four
+rebuild from a published artifact rather than return stored bytes. **The
+file is per sport** `[verified 2026-09-28, web 4b5ebc0a]`: `path` is the
+GAME-LINE join's file, resolved through
+`board_enrichment._LIVE_GAMELINE_SNAPSHOT_PATHS` (`nfl` ->
+`nfl_live_resim.json`). `prop_path` is the PROP join's file
+(`<sport>_live_lens.json`), and `prop_index` is built from it. The two paths
+are equal for every sport but NFL. Before this it read the lens for both, so
+for NFL it measured a file the game-line join never reads. Four
 hypotheses about that pipeline were eliminated by measuring adjacent things and
 ALL FOUR WERE WRONG. `PULL_LIVE_LENS_SNAPSHOT ok=True written=0` is EXPECTED
 output for a keyvalue path, not a failure.

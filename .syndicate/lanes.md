@@ -897,6 +897,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### ops-snapshot-index-join-path — CLOSED 2026-09-28 — opened 2026-09-28 — session acb76ba7-70eb-4b26-b7b8-3cb425e6a6a0
+- Verdict: Goal: Make /api/ops/live-lens/snapshot-index read the same file the board live game-line join reads (_LIVE_GAMELINE_SNAPSHOT_PATHS; nfl -> nfl_live_resim.json), report the path, test it, deploy web -- GOAL: MET -- reading 17:19:14Z, prod `?sport=nfl` `path=.../nfl_live_resim.json` (baseline 17:09:43Z `.../nfl_live_lens.json`), `sources_seen {}` -> `{pregame: 16}`; web `4b5ebc0a` (deploys.md 2026-09-28 12:18 PM CT).
 - Goal: Make /api/ops/live-lens/snapshot-index read the same file the board live game-line join reads (_LIVE_GAMELINE_SNAPSHOT_PATHS; nfl -> nfl_live_resim.json), report the path, test it, deploy web
 - Files: syndicate/blueprints/ops.py (api_ops_live_lens_snapshot_index ONLY), tests/test_ops_live_lens_snapshot_index_path.py (NEW)
 - Hypothesis: The endpoint hardcodes {sport}_live_lens.json; for nfl the join reads nfl_live_resim.json, so the diagnostic reads a different file from the join (same class as 3887fdd6). board_enrichment.py is READ ONLY (lane nfl-live-resim-activation).
@@ -906,6 +907,7 @@ death, never life — do not invert it.
 - Result: **GOAL MET.** `4b5ebc0a` web live 17:18:24Z (`dep-dat9vm0jo6nc73erilig`). `?sport=nfl` path `.../nfl_live_lens.json` (17:09:43Z) -> `.../nfl_live_resim.json` (17:19:14Z); `sources_seen` `{}` -> `{pregame: 16}`, so different bytes, not a relabel. The prop half keeps the lens (`prop_path`), because `attach_live_projections_for_sport` (board_enrichment.py:1877) still reads it. Measurement: `deploys.md` 2026-09-28 12:18 PM CT. Files released.
 
 ### lane-open-marker-primary-tree — CLOSED 2026-09-28 — opened 2026-09-28 — session acb76ba7-70eb-4b26-b7b8-3cb425e6a6a0
+- Verdict: Goal: lane_open.py run from a worktree writes .current-lane.<session> into the PRIMARY tree's .syndicate/, where deploy-guard.py and lane-guard read it -- GOAL: MET -- the worktree case in tests/test_lane_open.py fails on the old tool and passes on the new; in real use the next lane_open wrote the marker into the PRIMARY tree's .syndicate/. It regressed lane-postwrite-check (a worktree-only reader); that was fixed by `99c27f45` + `ad291679`.
 - Goal: lane_open.py run from a worktree writes .current-lane.<session> into the PRIMARY tree's .syndicate/, where deploy-guard.py and lane-guard read it
 - Files: scripts/lane_open.py, tests/test_lane_open.py
 - Hypothesis: marker = lanes_path.parent, which is the worktree's .syndicate/ when run from a worktree; the guards read CLAUDE_PROJECT_DIR (primary). Observed 2026-09-28 lane ops-snapshot-index-join-path: deploy-guard said 'your lane: <none>'.
@@ -915,6 +917,7 @@ death, never life — do not invert it.
 - Result: **GOAL MET.** `marker_dir()` resolves the primary tree from `git rev-parse --git-common-dir`, run from the directory holding `--lanes`. Outside git, the marker still goes beside `lanes.md`. `tests/test_lane_open.py`: a real repo + worktree in `tmp_path` puts the marker in main's `.syndicate/` and not the worktree's. It fails on the old tool and passes on the new; all 12 pass. Local tooling, no deploy. Files released.
 
 ### land-any-lane-in-worktree — CLOSED 2026-09-28 — opened 2026-09-28 — session acb76ba7-70eb-4b26-b7b8-3cb425e6a6a0
+- Verdict: Goal: session_worktree.py land --lane X lands from the session worktree whose lanes.md carries lane X, not only from <root>/X -- GOAL: MET -- 5 tests on a real origin + worktrees; the reproduction fails on the old script with the 09-28 FATAL. Used for real: `land --lane land-any-lane-in-worktree` pushed `99c27f45` from worktree `ops-snapshot-index-join-path`.
 - Goal: session_worktree.py land --lane X lands from the session worktree whose lanes.md carries lane X, not only from <root>/X
 - Files: scripts/session_worktree.py (cmd_land + a resolver ONLY), tests/test_session_worktree_land.py (NEW), scripts/lane_open.py (marker placement ONLY), tests/test_lane_open.py
 - Hypothesis: cmd_land derives path = <root>/<slug>, so a second lane opened inside an existing worktree cannot be landed under its own name (observed 2026-09-28: FATAL no worktree at .../lane-open-marker-primary-tree).
@@ -924,6 +927,7 @@ death, never life — do not invert it.
 - Result: **GOAL MET.** `_land_target()` resolves the worktree to land. `<root>/<slug>` wins if it exists. Otherwise it picks the session worktree whose `lanes.md` carries `### <slug> `, preferring the one containing cwd. Several candidates with none containing cwd REFUSE, and none at all is still FATAL. `tests/test_session_worktree_land.py` has 5 tests on a real origin + worktrees. The reproduction fails on the old script with the exact 09-28 FATAL; 24/24 pass across land/close/lane_open. **Also fixed a regression from `02338706`:** `lane-postwrite-check` reads the marker from the command's cwd (the worktree) while deploy-guard/lane-guard read the primary tree, so a primary-only marker read as `Your lane: 'none'`. `lane_open.py` now writes both. Landed with the new `land --lane land-any-lane-in-worktree` from worktree `ops-snapshot-index-join-path`. Files released.
 
 ### postwrite-reads-primary-marker — CLOSED 2026-09-28 — opened 2026-09-28 — session acb76ba7-70eb-4b26-b7b8-3cb425e6a6a0
+- Verdict: Goal: lane-postwrite-check resolves this session's lane from the PRIMARY tree's marker (CLAUDE_PROJECT_DIR, what lane-guard reads) before the worktree copy -- GOAL: MET -- test_lane_postwrite_check.py 34/34 (4 new cases fail on the old hook). LIVE since the primary tree was fast-forwarded to `f72b42fd` (`def _my_lane` present there, suite 34/34 run from it).
 - Goal: lane-postwrite-check resolves this session's lane from the PRIMARY tree's marker (CLAUDE_PROJECT_DIR, what lane-guard reads) before the worktree copy
 - Files: .claude/hooks/lane-postwrite-check.py, .claude/hooks/test_lane_postwrite_check.py
 - Hypothesis: current_lane(root) reads the worktree marker; lane-guard reads CLAUDE_PROJECT_DIR. Observed 2026-09-28 (Your lane: 'none' with the primary marker set) and 09-2x lanes.md:573 (the two copies named different lanes).
