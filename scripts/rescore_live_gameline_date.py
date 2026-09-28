@@ -71,6 +71,11 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
+from syndicate.features.mlb.live_gameline_segment_actuals import (  # noqa: E402
+    MlbSegmentActuals,
+    segment_score_blocks,
+)
+from syndicate.features.shared.live_gameline_accuracy import RETAINED_SCORE_KEYS  # noqa: E402
 from syndicate.features.shared.live_gameline_score import (  # noqa: E402
     finals_from_scores,
     score_ledger_records,
@@ -133,6 +138,47 @@ def _final_scores(date: str) -> dict[str, tuple[float, float]]:
     return scores
 
 
+def _event_to_game_from_ledger(records: list[dict]) -> dict[str, str]:
+    """odds `event_id` -> gamePk, from the ledger's own FULL-GAME rows.
+
+    A first5 row carries `game_pk=None` and the event only; a full-game row
+    of the same event carries both (09-27: 14 of 14 first5 observation events
+    mapped, none to two games). The board build maps through the grid instead
+    (`event_to_game_pk_from_grid`); a re-score has no grid, and the ledger is
+    the one record of what the board joined at the time.
+    """
+    out: dict[str, str] = {}
+    for rec in records:
+        pk, ev = str(rec.get("game_pk") or "").strip(), str(rec.get("event_id") or "").strip()
+        if pk.isdigit() and ev:
+            out.setdefault(ev, pk)
+    return out
+
+
+def _retained_expectation(history: Path, date: str) -> dict | None:
+    """The BOARD's retained `all_records` for `date` -- the fullest ordinary
+    capture (never a re-score, which would make the gate check itself)."""
+    best = None
+    if not history.exists():
+        return None
+    for line in history.open(encoding="utf-8"):
+        line = line.strip()
+        if not line:
+            continue
+        row = json.loads(line)
+        if row.get("date") != date or row.get("sport", "mlb") != "mlb" or row.get("rescored_from_ledger"):
+            continue
+        allr = row.get("all_records") or {}
+        model, market = allr.get("model") or {}, allr.get("market") or {}
+        if model.get("brier") is None or market.get("brier") is None:
+            continue
+        if best is None or (row.get("games_with_outcome") or 0) > (best["games"] or 0):
+            best = {"games": row.get("games_with_outcome"), "model": model["brier"],
+                    "market": market["brier"], "n": f"{model.get('n')}/{market.get('n')}",
+                    "captured_at": row.get("captured_at")}
+    return best
+
+
 def _scorer_provenance() -> dict[str, str | None]:
     """The exact scorer that produced these numbers, so the row is re-derivable."""
     rel = "syndicate/features/shared/live_gameline_score.py"
@@ -170,11 +216,30 @@ def main(argv: list[str] | None = None) -> int:
                          "board capture. 'statsapi' means they could not be and the row is "
                          "scored on the sport's own record -- a DIFFERENT population, which "
                          "must never be pooled with 'board' rows unmarked.")
+    ap.add_argument("--expect-from-history", action="store_true",
+                    help="take --expect-model/--expect-market/--expect-n from the fullest BOARD "
+                         "capture of this date already in the history (never a re-score)")
+    ap.add_argument("--search-exclusions", action="store_true",
+                    help="if the StatsAPI finals do not reproduce the retained figures, try "
+                         "leaving out each final in turn; accept ONLY a unique exact match "
+                         "(the 08-31 precedent: one late game the board never saw)")
+    ap.add_argument("--history", default=str(HISTORY),
+                    help="history.jsonl to read expectations from and append to")
     ap.add_argument("--append", action="store_true", help="append the verified row to history.jsonl")
     ap.add_argument("--json-out", help="also write the full score object here")
     args = ap.parse_args(argv)
 
     date = args.date
+    history = Path(args.history)
+    if args.expect_from_history:
+        exp = _retained_expectation(history, date)
+        if exp is None:
+            print(f"NO RETAINED BOARD CAPTURE of {date} with all_records in {history}",
+                  file=sys.stderr)
+            return 3
+        args.expect_model, args.expect_market, args.expect_n = exp["model"], exp["market"], exp["n"]
+        print(f"  expectation from history: board capture {exp['captured_at']} games={exp['games']}"
+              f" model={exp['model']} market={exp['market']} n={exp['n']}")
     scratch = Path(os.environ.get("TEMP", ".")) / "live_gameline_rescore"
     scratch.mkdir(parents=True, exist_ok=True)
 
@@ -200,6 +265,33 @@ def main(argv: list[str] | None = None) -> int:
     missing = [g for g in excluded if g not in scores]
 
     score = score_ledger_records(records, finals_from_scores(kept), final_scores=kept)
+
+    def _reproduces(candidate: dict) -> bool:
+        if args.expect_model is None or args.expect_market is None or not args.expect_n:
+            return False
+        got = candidate["all_records"]
+        want_model_n, _, want_market_n = args.expect_n.partition("/")
+        return (got["model"]["brier"] is not None and got["market"]["brier"] is not None
+                and abs(got["model"]["brier"] - args.expect_model) <= 1e-5
+                and abs(got["market"]["brier"] - args.expect_market) <= 1e-5
+                and got["model"]["n"] == int(want_model_n)
+                and got["market"]["n"] == int(want_market_n))
+
+    if args.search_exclusions and not excluded and not _reproduces(score):
+        # THE BOARD'S POPULATION, FOUND RATHER THAN GUESSED. Only a UNIQUE
+        # exact match is accepted: two candidates that both reproduce would
+        # mean the gate cannot tell them apart, and picking one is a guess.
+        hits = []
+        for pk in sorted(scores):
+            trial = {k: v for k, v in scores.items() if k != pk}
+            if _reproduces(score_ledger_records(records, finals_from_scores(trial),
+                                                final_scores=trial)):
+                hits.append(pk)
+        print(f"  exclusion search over {len(scores)} finals: {len(hits)} exact match(es) {hits}")
+        if len(hits) == 1:
+            excluded = hits
+            kept = {k: v for k, v in scores.items() if k not in excluded}
+            score = score_ledger_records(records, finals_from_scores(kept), final_scores=kept)
 
     print(f"=== {date} re-scored by the CURRENT scorer ===")
     print(f"  ledger bytes={len(raw)} records={len(records)} statsapi_finals={len(scores)}"
@@ -295,6 +387,24 @@ def main(argv: list[str] | None = None) -> int:
             return 4
         print("    => EXACT: the current scorer reproduces the retained measurement.")
 
+    # --- the SEGMENT blocks, scored exactly as the board build now does ---
+    # (`segment_score_blocks`), against StatsAPI linescores of the SAME kept
+    # finals the gate just verified -- so a segment row can only be graded on a
+    # game the board also had as final.
+    event_to_game = _event_to_game_from_ledger(records)
+    seg_lookup = MlbSegmentActuals(event_to_game=event_to_game, final_game_pks=set(kept))
+    segments = segment_score_blocks(records, finals_from_scores(kept), kept,
+                                    sport=args.sport, segment_actuals=seg_lookup)
+    if segments:
+        for seg, block in sorted((segments.get("by_segment") or {}).items()):
+            allr = block.get("all_records") or {}
+            print(f"  segment {seg:7s} h2h games={block.get('games_with_outcome')}"
+                  f" paired={((allr.get('model_paired') or {}).get('brier'))}"
+                  f" market={((allr.get('market') or {}).get('brier'))}"
+                  f" diff={allr.get('model_minus_market_brier')}"
+                  f" n={((allr.get('market') or {}).get('n'))}")
+        print(f"  segment lookup: {segments.get('lookup')}")
+
     # --- the row --------------------------------------------------------
     row = {
         "sport": args.sport,
@@ -312,6 +422,7 @@ def main(argv: list[str] | None = None) -> int:
         "by_quote_age": score.get("by_quote_age"),
         "quote_age_absent": score.get("quote_age_absent"),
         "unscored": score.get("unscored"),
+        "segments": segments,
         # --- PROVENANCE. THIS ROW IS NOT A BOARD CAPTURE. ---------------
         # `backfill` already means "re-captured a past date FROM THE BOARD".
         # This row never touched the board's scorer output, so it needs its
@@ -328,7 +439,8 @@ def main(argv: list[str] | None = None) -> int:
         # buried in `rescore`, because it decides whether a row may be pooled.
         "finals_population": args.finals_population,
         "rescore": {
-            "reason": "retained summary predates fresh_quotes_only (4d20ea00, 2026-09-01)",
+            "reason": ("recover cuts/blocks the retained summary lacks: fresh_quotes_only "
+                       "(4d20ea00), point_forecast (contract 3), segments (2026-09-28)"),
             "finals_population": args.finals_population,
             "anchor": ("records_considered" if args.expect_records_considered is not None
                        else "retained_all_records_exact"),
@@ -344,6 +456,12 @@ def main(argv: list[str] | None = None) -> int:
         },
     }
 
+    # Every other scoring field the board's own captures keep, from the ONE
+    # shared list -- `point_forecast` and `scorer_contract` above all. This row
+    # used to drop both, so a re-score could never carry totals/spreads.
+    for key in RETAINED_SCORE_KEYS:
+        row.setdefault(key, score.get(key))
+
     if args.json_out:
         Path(args.json_out).write_text(json.dumps(score, indent=2), encoding="utf-8")
 
@@ -353,11 +471,11 @@ def main(argv: list[str] | None = None) -> int:
 
     # history.jsonl is SHARED and append-only -- other sessions and the
     # snapshot cron write it too. Open in append mode and never rewrite it.
-    before = sum(1 for _ in HISTORY.open(encoding="utf-8")) if HISTORY.exists() else 0
-    with HISTORY.open("a", encoding="utf-8") as fh:
+    before = sum(1 for _ in history.open(encoding="utf-8")) if history.exists() else 0
+    with history.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(row) + "\n")
-    after = sum(1 for _ in HISTORY.open(encoding="utf-8"))
-    print(f"\n  appended -> {HISTORY}  ({before} -> {after} rows)")
+    after = sum(1 for _ in history.open(encoding="utf-8"))
+    print(f"\n  appended -> {history}  ({before} -> {after} rows)")
     return 0
 
 
