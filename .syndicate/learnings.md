@@ -5006,3 +5006,60 @@ The lane marker `.current-lane.<session>` had two copies once sessions moved int
 **Rule:** before pricing a new market or widening a grid, gate on LINE-LEVEL calibration (reliability by predicted-probability bucket over the lines actually published), not on interval coverage. Measure with the sampling design production uses (a clock), not one triggered by the outcome being predicted.
 
 ---
+
+## 2026-09-28 — A POPULATION IS PART OF A CONSTANT. Four findings reversed when the population changed, and three retractions came from measuring the wrong pair.
+
+Lane `layer2-triad-alignment`. Every item below was measured, believed, and then
+overturned by a SECOND measurement in the same session.
+
+- **FORBIDDEN: selecting a constant on one population and shipping it to
+  another.** A spread-shrinkage `k=3` was selected on 132,136 rows with a genuine
+  convex minimum and a -0.003479 held-out Brier gain. On the 16,967 rows the BOARD
+  ACTUALLY QUOTES it was monotonically HARMFUL, and it made starters NARROWER --
+  the opposite of the defect. The league prior it shrank toward had a median
+  `rushing_yards` sd of 10.2 computed across 564 "rushers" who are mostly
+  marginal, against a workhorse's ~25. **State the population next to every
+  fitted constant, and re-run the selection on the population that will consume
+  it.**
+
+- **FORBIDDEN: comparing arms scored on different row sets.** The first pilot
+  showed shrinkage winning by -0.0516. It was entirely composition: shrinkage
+  gives a positive sd to players whose games were all identical, rows production
+  drops outright, so one arm scored 11,038 cells and the other 15,659. Pinned to
+  a common population the effect VANISHED and the real one was 15x smaller. A
+  `cells` count that differs between arms is the tell.
+
+- **FORBIDDEN: reading a DERIVED anomaly as evidence about its INPUT.** I reported
+  a "placeholder 0.500 market fair" on 24% of NFL rows and the user approved
+  fixing it. Recomputing the de-vig from prices in the same payload gave
+  0.4964-0.5002: NFL props are quoted near-symmetrically, so 0.500 is CORRECT.
+  The spread of the EDGE was evidence about the MODEL and I attributed it to the
+  MARKET. `edge = model_prob - fair`, so a 0.500 fair is simply where a
+  confident-but-wrong model shows its widest arithmetic gap.
+
+- **FORBIDDEN: calling an estimator biased by comparing a MEAN to a SINGLE
+  OUTCOME.** I reported the NFL prop mean as "often far from the line". Comparing
+  two EXPECTATIONS -- the rolling mean against the player's OWN future realised
+  mean -- gives 0.983 / 1.019 / 1.000 / 0.978 and is flat in n. The estimator is
+  unbiased. What looked like bias was selection on a noisy estimate plus a ~20%
+  mean-vs-median gap that is arithmetic on right-skewed markets (`passing_yards`
+  at 0.987 is the control: QBs always play, the skew vanishes).
+
+- **FORBIDDEN: accepting a constant at the edge of its grid.** An interceptions
+  sweep picked `k=24`, the largest candidate. Extending the grid showed the fit
+  Brier still falling at k=128 -- `#471`'s "more shrinkage is free" artifact --
+  and k=24's HELD-OUT gap was 0.1474, the WORST of every k tried. Where there is
+  no interior minimum, say what the monotone decline MEANS (here: a QB's own
+  interception rate carries no measurable signal) rather than picking a number
+  off the slope.
+
+**AND THE ONE THAT WAS NOT A CONSTANT.** `calibrate_nfl_cover_probability_blend`
+reads the model through `backtest_nfl_props._rate_from_log`, a LOCAL COPY of
+`player_rate` whose docstring said "identical math" and still called `pstdev`.
+Two blend re-fits run specifically to re-calibrate ON the new spread never saw it,
+and returned numbers identical to SIX DECIMAL PLACES across eight markets. **Two
+independent runs agreeing that exactly is impossible** -- that, not the code, is
+what exposed it. A second copy of an estimator does not announce its drift; the
+docstring asserting it is identical is the thing that makes the drift invisible.
+
+---

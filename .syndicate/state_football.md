@@ -120,7 +120,7 @@ population removed the entire effect and the real one is 15x smaller.
 current too-narrow sd, so `k=3` is best GIVEN that blend; widening the sd requires
 re-fitting it in the same pass.
 
-**SHIPPED 2026-09-28** (`cf2cdbae`, main, NOT deployed): `stdev` + usage-scaled CV
+**SHIPPED AND DEPLOYED 2026-09-28** (`cf2cdbae` + `c3874b91`, live on web / refresh-worker / live-odds-worker, verified BY CONTENT `discrete=5 spread=2`; **IN EFFECT NOWHERE** until the prop projection artifact rebuilds -- `props.py` skips recomputation when the artifact answers and it predates every deploy): `stdev` + usage-scaled CV
 shrinkage at a GLOBAL k=6, with the blend RE-FITTED (6 of 8 weights adopted, 2
 rejected for losing out of sample). Held out 2024-25, high-usage p70, same 8,629
 rows: **Brier 0.219600 -> 0.211765, worst bucket 0.2231 -> 0.0878 -- the first NFL
