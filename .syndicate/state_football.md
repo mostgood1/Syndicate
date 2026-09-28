@@ -50,6 +50,87 @@ the slate held ONE game whose first boundary was **9.5 h away**.
 **NOT YET MEASURED IN PRODUCTION:** the push on a FRESH snapshot. Only the sweep
 over an existing file has run live.
 
+## [nfl-prop-distribution-too-narrow] THE NFL PROP MODEL'S SPREAD IS 0.21x-0.65x OF PLAUSIBLE, AND THE SPREAD NEVER GOT THE SMALL-SAMPLE TREATMENT THE MEAN DID `[measured 2026-09-28, served payload + source, lane layer2-triad-alignment]`
+
+Implied sd back-derived from the model's own rows, `(projected - line) / z(model_prob_over)`:
+
+    Rushing Attempts 0.97 (0.21x)   Receptions 0.70 (0.35x)   Passing Yards 23.86 (0.37x)
+    Passing TDs 0.50 (0.50x)  Receiving Yards 18.06 (0.64x)  Rushing Yards 19.63 (0.65x)
+    Passing Attempts 5.78 (0.96x)   Interceptions 1.00 (1.25x)
+
+An implied sd of **0.97 on rushing ATTEMPTS** says a back's carry count is known
+to within one carry. `player_stats.py:541` returns `statistics.pstdev(values)`
+over as few as 2 games:
+
+1. **`pstdev` is the POPULATION sd (/n)** where a SAMPLE sd (/n-1) is wanted --
+   understating 29.3% at n=2 and 18.4% at n=3, and `player_rate` filters
+   `week < week` so n is 3 at week 4.
+2. **NOTHING SHRINKS THE SPREAD, and this dominates.** A player with consistent
+   usage (17/16/18 carries) yields `pstdev ~= 0.82` and the model asserts near
+   certainty -- reproducing the measured 0.97 exactly. **`#471` established this
+   defect for the MEAN of `anytime_td` and fixed it with swept Gamma-Poisson
+   shrinkage (`ANYTIME_TD_SHRINKAGE_K = 12.0`, Brier 0.1973 -> 0.1680 on 8,464
+   held-out rows). The identical argument for the SPREAD of every other market
+   was never made.**
+
+**A SEPARATE DEFECT, NOT DIAGNOSED:** the MEAN is often far from the line --
+Boston 77.0 vs 35.5, Raymond 62.0 vs 23.5, Judkins 27.0 vs 55.5. Widening the
+distribution makes those rows less confidently wrong, not right.
+
+**THE CONSTRAINT ON ANY FIX:** `_COVER_PROBABILITY_BLEND_WEIGHT` (`props.py:205`)
+is a FITTED table calibrated on top of the current too-narrow sd, so widening
+requires RE-FITTING it in the same pass (`model_engine_standard.md`: two
+mechanisms shipped together produced a NEGATIVE interaction in 4 of 4 markets).
+
+**NOT VERIFIED:** the raw game logs. `resolve_player_id` returns nothing in a
+session worktree (`data/` is excluded), so the implied sds are back-derived from
+production and the estimator is read from source, but no individual player's log
+was inspected.
+
+Full working: `.syndicate/findings_2026-09-28_nfl_prop_model_diagnosis.md`.
+
+## [nfl-model-edge-suppressed] NFL'S MODEL EDGE REACHES 3% OF THE SERVED BOARD, AND THE 15-POINT GUARD IS RIGHT TO REJECT IT `[measured 2026-09-28 on the served payload, lane layer2-triad-alignment]`
+
+`model_edge` is the model's ONLY route into the score: `sim_component != 0`
+tracks it exactly in every sport (nfl 6/6, ncaaf 127/127, soccer 1/1). Where it
+is absent the row ranks on market EV alone and the model contributes zero --
+while `score`/`score_v2` are present on 200/200 rows, so a field-list check
+reads as "scoring applied" either way.
+
+    sport   rows_with_model_edge/scored     served w/ model_edge
+    nfl            91/682  = 13.3%               6/200  =  3.0%
+    ncaaf         505/1000 = 50.5%             110/200  = 55.0%
+
+Same engine, opposite outcome: NCAAF game rows 127/200 (64%) carry an edge; NFL
+game rows **0 of 83**.
+
+**THE CAUSE IS THE MODEL, NOT THE BOARD.** `_MODEL_EDGE_MAX_POINTS = 15.0`:
+
+    sport   |edge| median   above cap   signed median   real-fair-only median
+    nfl        31.41          86%         +21.21              21.92
+    ncaaf      11.04          36%          -3.54              10.90
+
+Served examples: `model=0.0002 fair=0.5101` (Judkins rush 55.5),
+`model=0.9844 fair=0.5` (Watson pass 187.5). **Do not raise the cap** -- these
+are the failure it exists for. 39 of 44 NFL rows also carry
+`model_skill.sample_games = 0`.
+
+**A SECOND DEFECT WAS CLAIMED HERE AND IS RETRACTED** `[same day, before any code
+changed]`: that 12 of 50 NFL rows price against a "placeholder" 0.500 fair.
+Recomputing the de-vig from the served book prices gives 0.4964-0.5002 on exactly
+those rows -- NFL props are quoted near-symmetrically (Watson DK -112/-112, FD
+-114/-114), so 0.500 is CORRECT market data. Their larger |edge| median (48.44 vs
+21.92) is evidence about the MODEL, not the market: `edge = model_prob - fair`, so
+a 0.500 fair is where a confident-but-wrong model shows its widest arithmetic gap.
+
+**NOT A REGRESSION, and nearly filed as one:** NFL game `projection` coverage
+reads 6% only because the board mixes three slate dates. Tonight's game is 5/5 =
+100%; future weeks are 0% and correctly so. `[nfl-board-projection-coverage]`'s
+2026-09-04 metric (`unmatched_game_rows`) no longer exists in the book-grid
+payload and was NOT reproduced like-for-like.
+
+Full working: `.syndicate/findings_2026-09-28_model_edge_coverage.md`.
+
 ## [nfl-board-projection-coverage] NFL BOARD PROJECTION COVERAGE IS 100% `[measured 2026-09-04T23:19:34Z on the served payload, lanes nfl-projection-et-datekey + nfl-la-rams-alias]`
 
 `/api/board/book-grid?sport=nfl` reads **`unmatched_game_rows` 0** of 1,251 game rows;
