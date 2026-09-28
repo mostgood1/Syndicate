@@ -838,6 +838,21 @@ def _maybe_capture_prop_snapshot(row: Any, resolved: Any, *, date_str: str) -> s
     Never raises: a capture must not cost the tick its snapshot.
     """
     try:
+        # BEFORE EVERY EARLY RETURN BELOW, and that placement is the whole
+        # point. The sweep recovers captures written before the push existed,
+        # and gating it on a SUCCESSFUL capture would make the recovery depend
+        # on the very thing it exists to recover from. MEASURED 2026-09-28: this
+        # tick runs every ~5 min returning `no_period_or_clock=16`, while the
+        # next capturable boundary was ~9.5 h away (one game, kickoff 00:15Z) --
+        # so from `record_quarter_snapshot` the sweep would have waited 9.5 h to
+        # publish a file that was already sitting on disk.
+        #
+        # It is once-per-process and self-guarding, so this costs one directory
+        # listing per boot, not one per tick (`#241`).
+        from syndicate.features.nfl.live_prop_capture import publish_pending_captures
+
+        publish_pending_captures()
+
         if not isinstance(row, Mapping):
             return "no_row"
         period_raw = row.get("period")

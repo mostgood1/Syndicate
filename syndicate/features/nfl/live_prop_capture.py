@@ -301,17 +301,17 @@ def record_quarter_snapshot(
     """
     if not capture_enabled():
         return 0
-    # BEFORE the `.done` check, so a stranded earlier capture is recovered even
-    # on a boundary this tick has already written. It is once-per-process.
-    #
-    # THIS HOOK IS WEAKER THAN IT SHOULD BE, and that is a lane boundary rather
-    # than a design choice: the right place is the top of
+    # A BACKSTOP, not the primary trigger. The primary one is at the top of
     # `live_resim._maybe_capture_prop_snapshot`, before ITS early returns, so
-    # the sweep runs on any tick. That file is claimed by the OPEN lane
-    # `nfl-live-resim-activation`. Here the sweep fires on the first genuine
-    # boundary ATTEMPT instead -- period in 1..3, inside the clock window, not
-    # final, with box rows -- so on a slate that produces no capturable
-    # boundary at all, a stranded capture waits another day.
+    # the sweep runs on any tick rather than only on a boundary -- measured
+    # 2026-09-28 that tick fires every ~5 min while the next boundary was 9.5 h
+    # away, so from here alone a stranded file would have waited 9.5 h.
+    #
+    # Kept anyway, and cheap to keep: it is once-per-process, so the second
+    # caller costs a boolean. It means a future refactor that drops the tick
+    # hook degrades the recovery to slow rather than to never -- and the tick
+    # hook lives in another lane's file, which is exactly the kind of call site
+    # that goes away without this module hearing about it.
     publish_pending_captures(data_root)
     try:
         rows = snapshot_rows(event_id=event_id, period=period, date_str=date_str,
