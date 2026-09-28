@@ -42949,6 +42949,11 @@ full-slate reading.
         score-clock / prop capture, NHL Layer 1, slate-phase flags, worker memory
         heartbeat, soccer live-prop fix 1d64a4b2). Their owners' own receipts stand; this
         deploy only made them live here.
+    NFL PROP MODEL NOW SPLIT ACROSS SERVICES (verified 18:2xZ by ancestry, flagged by session
+        4ab694ed): cf2cdbae (NFL prop spread estimator + blend re-fit, graded but
+        production-UNMEASURED, deliberately held by its owner) is on web 4b5ebc0a and
+        live-odds-worker bffcd1b4 but NOT refresh-worker f9506b26, which builds the NFL prop
+        artifacts. The owner session holds the decision to complete or record the split.
 
 **What shipped (this lane).** `f72b42fd`: `build_live_prop_rows(grid_markets=)` and the lens
 passing `("points",)` -- every half-point line within 3 measured sigmas of the live projection
