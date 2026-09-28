@@ -50,6 +50,45 @@ the slate held ONE game whose first boundary was **9.5 h away**.
 **NOT YET MEASURED IN PRODUCTION:** the push on a FRESH snapshot. Only the sweep
 over an existing file has run live.
 
+## [nfl-prop-distribution-too-narrow] THE NFL PROP MODEL'S SPREAD IS 0.21x-0.65x OF PLAUSIBLE, AND THE SPREAD NEVER GOT THE SMALL-SAMPLE TREATMENT THE MEAN DID `[measured 2026-09-28, served payload + source, lane layer2-triad-alignment]`
+
+Implied sd back-derived from the model's own rows, `(projected - line) / z(model_prob_over)`:
+
+    Rushing Attempts 0.97 (0.21x)   Receptions 0.70 (0.35x)   Passing Yards 23.86 (0.37x)
+    Passing TDs 0.50 (0.50x)  Receiving Yards 18.06 (0.64x)  Rushing Yards 19.63 (0.65x)
+    Passing Attempts 5.78 (0.96x)   Interceptions 1.00 (1.25x)
+
+An implied sd of **0.97 on rushing ATTEMPTS** says a back's carry count is known
+to within one carry. `player_stats.py:541` returns `statistics.pstdev(values)`
+over as few as 2 games:
+
+1. **`pstdev` is the POPULATION sd (/n)** where a SAMPLE sd (/n-1) is wanted --
+   understating 29.3% at n=2 and 18.4% at n=3, and `player_rate` filters
+   `week < week` so n is 3 at week 4.
+2. **NOTHING SHRINKS THE SPREAD, and this dominates.** A player with consistent
+   usage (17/16/18 carries) yields `pstdev ~= 0.82` and the model asserts near
+   certainty -- reproducing the measured 0.97 exactly. **`#471` established this
+   defect for the MEAN of `anytime_td` and fixed it with swept Gamma-Poisson
+   shrinkage (`ANYTIME_TD_SHRINKAGE_K = 12.0`, Brier 0.1973 -> 0.1680 on 8,464
+   held-out rows). The identical argument for the SPREAD of every other market
+   was never made.**
+
+**A SEPARATE DEFECT, NOT DIAGNOSED:** the MEAN is often far from the line --
+Boston 77.0 vs 35.5, Raymond 62.0 vs 23.5, Judkins 27.0 vs 55.5. Widening the
+distribution makes those rows less confidently wrong, not right.
+
+**THE CONSTRAINT ON ANY FIX:** `_COVER_PROBABILITY_BLEND_WEIGHT` (`props.py:205`)
+is a FITTED table calibrated on top of the current too-narrow sd, so widening
+requires RE-FITTING it in the same pass (`model_engine_standard.md`: two
+mechanisms shipped together produced a NEGATIVE interaction in 4 of 4 markets).
+
+**NOT VERIFIED:** the raw game logs. `resolve_player_id` returns nothing in a
+session worktree (`data/` is excluded), so the implied sds are back-derived from
+production and the estimator is read from source, but no individual player's log
+was inspected.
+
+Full working: `.syndicate/findings_2026-09-28_nfl_prop_model_diagnosis.md`.
+
 ## [nfl-model-edge-suppressed] NFL'S MODEL EDGE REACHES 3% OF THE SERVED BOARD, AND THE 15-POINT GUARD IS RIGHT TO REJECT IT `[measured 2026-09-28 on the served payload, lane layer2-triad-alignment]`
 
 `model_edge` is the model's ONLY route into the score: `sim_component != 0`

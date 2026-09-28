@@ -486,6 +486,7 @@ once this index exists: re-splitting would orphan the parts.
 | [inplay-overlay-board-cadence] | THE BOARD'S IN-PLAY ROWS COME FROM THE BOOK GRID EVERY TICK, NOT THE SHORTLIST — LIVE ON ALL THREE SERVICES `[ | `state_board.md` |
 | [ncaaf-sim-view-coverage] | NCAAF GAME LINES CARRY A SIM VIEW ON EVERY MARKET; EDGES ARE BOUNDED BY THE 15-POINT CAP; STAKES STAY ON PRICE | `state_football.md` |
 | [nfl-live-prop-capture] | NFL PER-QUARTER PLAYER PRODUCTION IS CAPTURED AND RETRIEVABLE — the allowlist alone moved ZERO bytes `[2026-09-28]` | `state_football.md` |
+| [nfl-prop-distribution-too-narrow] | THE NFL PROP MODEL'S SPREAD IS 0.21x-0.65x OF PLAUSIBLE; pstdev over n>=2 games with NO shrinkage `[2026-09-28]` | `state_football.md` |
 | [nfl-model-edge-suppressed] | NFL'S MODEL EDGE REACHES 3% OF THE SERVED BOARD, AND THE 15-POINT GUARD IS RIGHT TO REJECT IT `[2026-09-28]` | `state_football.md` |
 | [nfl-board-projection-coverage] | NFL BOARD PROJECTION COVERAGE IS 100% `[measured 2026-09-04T23:19:34Z on the served payload, lanes nfl-project | `state_football.md` |
 | [ncaaf-zero-orders-is-two-gates] | NCAAF ZERO ORDERS — SUPERSEDED 2026-09-11: the paper portfolio HOLDS NCAAF orders and they GRADE end-to-end; t | `state_football.md` |
