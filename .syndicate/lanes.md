@@ -849,6 +849,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - **RESULT (verification RAN):** S rebuild took the SP+ path on 115/115 rows (`inseason_blend_enabled()` False in-process; the same driver on the blend snapshot reproduced production's CSV exactly on 113/115, 2 within 0.03). Pooled n=113 (2 post-kickoff Thursday rows dropped): margin MAE B 12.01 / S 11.38 / C 10.06, B-C +1.95 [+0.88, +3.04]; total MAE 13.80 / 15.04 / 12.38, B-C +1.42 [+0.01, +2.79]. Falsification test NOT met on either market. `findings_2026-09-28_ncaaf_inseason_blend_forward.md`; inputs and outputs in `C:/tmp/ncaaf_677_snapshots/grade/`. Uncommitted work: none.
 
+### layer2-triad-alignment — OPEN — opened 2026-09-28 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: Every Layer 2 board prop row across all sports carries pregame projection, live projection and the CORRECT actual-so-far under the keys the join reads, verified on a live slate as non-zero actual coverage per sport
+- Files: syndicate/features/shared/wnba_live_prop_rows.py, syndicate/features/shared/layer2_board.py, syndicate/features/nfl/live_prop_projection.py, tests/test_wnba_live_prop_rows.py, tests/test_layer2_triad_alignment.py
+- Hypothesis: The actual-so-far value is COMPUTED and then dropped at a serialisation boundary rather than never produced: WNBA's to_snapshot_live_props builds the snapshot row from an internal row carrying 'current' and does not emit it, while the join reads 'actualSoFar'/'actual' two lines away
+- Falsification test: If WNBA's live snapshot rows on a live slate already carry a non-null actualSoFar, or if the board's 'actual' column populates for WNBA without this change, the hypothesis is wrong and the gap is upstream in the producer
+- Verification: On a live slate, layer2 rows for each gated sport show non-zero count of non-null 'actual', and the same reading is zero on the pre-change tree
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
