@@ -51,6 +51,7 @@ __all__ = [
     "snapshot_rows",
     "record_quarter_snapshot",
     "publish_snapshot",
+    "publish_pending_captures",
 ]
 
 CAPTURE_SCHEMA_VERSION = 1
@@ -227,6 +228,52 @@ def publish_snapshot(path: Path) -> bool:
         return False
 
 
+_SWEEP_DONE = False
+
+
+def publish_pending_captures(data_root: Any = None) -> int:
+    """ONCE PER PROCESS: push every capture file already on disk. Returns count.
+
+    WITHOUT THIS, THE DEPLOY THAT MADE THE PATH RETRIEVABLE LEAVES THE ONLY
+    EXISTING CAPTURE UNRETRIEVABLE. `record_quarter_snapshot` publishes what it
+    has just written, and nothing else in the repo pushes this family -- so a
+    file captured BEFORE the push existed (2026-09-27, event 401872962, period
+    3, 62 rows) is stranded permanently: its `.done` marker is set, so that
+    boundary is never re-captured, so the push is never reached for it. The
+    rows sit on the mounted disk, allowlisted, and no code path can ever send
+    them.
+
+    That is the same class of mistake as the allowlist itself -- fixing the
+    mechanism for the next case while the case that motivated it stays broken.
+
+    It also self-heals a publish that failed transiently: web returning 503 for
+    one snapshot would otherwise strand that file until its date rolled over.
+
+    ONCE PER PROCESS, and that is `#241`'s bill. Periodic worker work restarted
+    production in a loop, so this runs on the first capturable tick after a boot
+    and never again -- a directory listing of a handful of small files, not a
+    per-tick scan. Re-publishing an already-published file is harmless: the
+    worker's copy is authoritative and the transfer is whole-file.
+    """
+    global _SWEEP_DONE
+    if _SWEEP_DONE or not capture_enabled():
+        return 0
+    _SWEEP_DONE = True
+    try:
+        directory = Path(data_root) / "live_prop_capture" if data_root is not None             else default_capture_dir()
+        if not directory.is_dir():
+            print(f"[nfl_prop_capture] SWEEP_NONE dir={directory} (absent)", flush=True)
+            return 0
+        found = sorted(directory.glob("*.jsonl"))
+        published = sum(1 for f in found if publish_snapshot(f))
+        print(f"[nfl_prop_capture] SWEEP dir={directory} found={len(found)} "
+              f"published={published}", flush=True)
+        return published
+    except Exception as exc:  # noqa: BLE001
+        print(f"[nfl_prop_capture] SWEEP_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return 0
+
+
 def record_quarter_snapshot(
     data_root: Any,
     *,
@@ -254,6 +301,18 @@ def record_quarter_snapshot(
     """
     if not capture_enabled():
         return 0
+    # BEFORE the `.done` check, so a stranded earlier capture is recovered even
+    # on a boundary this tick has already written. It is once-per-process.
+    #
+    # THIS HOOK IS WEAKER THAN IT SHOULD BE, and that is a lane boundary rather
+    # than a design choice: the right place is the top of
+    # `live_resim._maybe_capture_prop_snapshot`, before ITS early returns, so
+    # the sweep runs on any tick. That file is claimed by the OPEN lane
+    # `nfl-live-resim-activation`. Here the sweep fires on the first genuine
+    # boundary ATTEMPT instead -- period in 1..3, inside the clock window, not
+    # final, with box rows -- so on a slate that produces no capturable
+    # boundary at all, a stranded capture waits another day.
+    publish_pending_captures(data_root)
     try:
         rows = snapshot_rows(event_id=event_id, period=period, date_str=date_str,
                              player_rows=player_rows,
