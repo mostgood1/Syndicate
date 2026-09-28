@@ -11,6 +11,9 @@ justified it. Two steps, so the slow network pass runs once:
     # 2. fit on one set, report LINE-LEVEL calibration on another (and the live normal beside it)
     py -3 scripts/fit_wnba_live_count_remainder.py fit --train jul_aug.json --test sep.json
 
+    # 3. the REMAINING-MINUTES model behind rebounds/assists (`_MINUTES_BETA`), vs the rule
+    py -3 scripts/fit_wnba_live_count_remainder.py fit-minutes --train jul_aug.json --test sep.json
+
 THE GATE IS LINE-LEVEL CALIBRATION, not interval coverage: predicted vs observed P(final >= line)
 over the ladder the lens publishes (half-points above the banked value, out to 3 sd), reported
 for all players and for rotation players (pregame minutes >= 20). Interval coverage of 91.5-91.8%
@@ -91,14 +94,80 @@ def _nb_logpmf(k: int, m: float, r: float) -> float:
     return math.lgamma(k + r) - math.lgamma(r) - math.lgamma(k + 1) + r * math.log(p) + k * math.log1p(-p)
 
 
-def _prep(rows: list[dict]) -> list[tuple]:
+def _minutes_features(r: dict) -> tuple[float, list[float]]:
+    """Same features, same order, as `expected_remaining_minutes` in production."""
+    el = r["elapsed"]; played = r["minutes_played"] or 0.0; clock = max(0.0, 40.0 - el)
+    pre = r.get("pregame_minutes") or 0.0
+    s_pre = min(1.0, pre / 40.0); s_live = min(1.0, played / el) if el > 0 else s_pre
+    late = min(1.0, el / 40.0)
+    blow = min(max(abs(r.get("margin") or 0.0) - 8.0, 0.0), 20.0) / 20.0 * late
+    s_rule = min(1.0, max(pre - played, 0.0) / clock) if clock > 0 else 0.0
+    return clock, [1.0, s_pre, s_live, late * s_pre, late * s_live, s_rule, blow * s_pre, blow]
+
+
+def fit_minutes(train_path: Path, test_path: Path) -> None:
+    import numpy as np
+    from syndicate.features.shared import wnba_live_prop_probability as P
+
+    def usable(rows):
+        return [r for r in rows if r.get("final_minutes") is not None and r.get("elapsed") is not None
+                and r.get("minutes_played") is not None and r.get("pregame_minutes")]
+    train = usable(json.loads(train_path.read_text(encoding="utf-8"))["rows"]["points"])
+    test = usable(json.loads(test_path.read_text(encoding="utf-8"))["rows"]["points"])
+    X, y, w = [], [], []
+    for r in train:
+        clock, x = _minutes_features(r)
+        if clock >= 1.0:
+            X.append(x); y.append(min(1.5, max(0.0, r["final_minutes"] - r["minutes_played"]) / clock)); w.append(clock)
+    X, y, sw = np.array(X), np.array(y), np.sqrt(np.array(w))
+    beta, *_ = np.linalg.lstsq(X * sw[:, None], y * sw, rcond=None)
+    print("beta (fitted)  ", [round(float(b), 4) for b in beta])
+    print("beta (shipped) ", list(P._MINUTES_BETA))
+    for label, rot in (("all", False), ("rotation", True)):
+        e_rule, e_ship = [], []
+        for r in test:
+            clock = max(0.0, 40.0 - r["elapsed"])
+            if clock < 1.0 or (rot and r["pregame_minutes"] < 20):
+                continue
+            actual = max(0.0, r["final_minutes"] - r["minutes_played"])
+            e_rule.append(min(max(r["pregame_minutes"] - r["minutes_played"], 0.0), clock) - actual)
+            e_ship.append(P.expected_remaining_minutes(r["pregame_minutes"], r["minutes_played"], clock, r.get("margin")) - actual)
+        mae = lambda e: sum(abs(v) for v in e) / len(e)
+        print(f"  {label:8} n={len(e_rule)}  remaining-minutes MAE: rule {mae(e_rule):.3f}  shipped model {mae(e_ship):.3f}")
+
+
+def _blended_rate(r: dict) -> float | None:
+    from syndicate.features.shared.wnba_live_prop_projection import project_live_player_stat
+
+    v = project_live_player_stat(current_stat=r["current"], minutes_played=r.get("minutes_played"),
+                                 pregame_stat=r.get("pregame_stat"), pregame_minutes=r.get("pregame_minutes"),
+                                 game_minutes_remaining=max(0.0, 40.0 - r["elapsed"]))
+    return v.get("rate")
+
+
+def _prep(rows: list[dict], market: str = "") -> list[tuple]:
+    """Bucket + expected remainder, on the SAME minutes estimate production uses for `market`."""
+    from syndicate.features.shared import wnba_live_prop_probability as P
+
     out = []
     for r in rows:
-        b = _bucket(r["minutes_remaining"])
         remainder = int(round(r["actual"] - r["current"]))
-        if b is None or remainder < 0:
+        if remainder < 0:
             continue
-        out.append((b, max(r["projected"] - r["current"], 0.0), remainder, r))
+        if market in P.MINUTES_MODEL_MARKETS:
+            if r.get("elapsed") is None:
+                continue
+            rate = _blended_rate(r)
+            em = P.expected_remaining_minutes(r.get("pregame_minutes"), r.get("minutes_played"),
+                                              max(0.0, 40.0 - r["elapsed"]), r.get("margin"))
+            if rate is None or em is None:
+                continue
+            b, base = _bucket(em), rate * em
+        else:
+            b, base = _bucket(r["minutes_remaining"]), max(r["projected"] - r["current"], 0.0)
+        if b is None:
+            continue
+        out.append((b, base, remainder, r))
     return out
 
 
@@ -129,7 +198,8 @@ def line_calibration(rows: list[dict], price, rotation_only: bool) -> dict:
     for r in rows:
         if rotation_only and (r.get("pregame_minutes") or 0) < 20:
             continue
-        placed = grid_center_and_sd(r["projected"], r["current"], r["minutes_remaining"], r["_market"])
+        placed = grid_center_and_sd(r["projected"], r["current"], r["minutes_remaining"], r["_market"],
+                                    rate=r.get("_rate"), expected_minutes=r.get("_em"))
         if not placed:
             continue
         center, sd = placed
@@ -161,16 +231,20 @@ def fit(train_path: Path, test_path: Path) -> None:
     for stat in COUNT_STATS:
         for r in test[stat]:
             r["_market"] = stat
+            if stat in P.MINUTES_MODEL_MARKETS and r.get("elapsed") is not None:
+                r["_rate"] = _blended_rate(r)
+                r["_em"] = P.expected_remaining_minutes(r.get("pregame_minutes"), r.get("minutes_played"),
+                                                        max(0.0, 40.0 - r["elapsed"]), r.get("margin"))
         print(f"\n==== {stat.upper()}  train n={len(train[stat])}  test n={len(test[stat])}")
         for per_b in (True, False):
-            cs, rs = fit_negbin(_prep(train[stat]), per_b)
+            cs, rs = fit_negbin(_prep(train[stat], stat), per_b)
+            test_prepped = {id(t[3]): t for t in _prep(test[stat], stat)}
 
-            def nb_price(r, line, cs=cs, rs=rs):
-                b = _bucket(r["minutes_remaining"])
-                if b is None:
+            def nb_price(r, line, cs=cs, rs=rs, test_prepped=test_prepped):
+                t = test_prepped.get(id(r))
+                if t is None:
                     return None
-                m = cs[b] * max(r["projected"] - r["current"], 0.0)
-                return P._negbin_sf(math.ceil(line - r["current"]), m, rs[b])
+                return P._negbin_sf(math.ceil(line - r["current"]), cs[t[0]] * t[1], rs[t[0]])
 
             for rot in (False, True):
                 c = line_calibration(test[stat], nb_price, rot)
@@ -179,7 +253,8 @@ def fit(train_path: Path, test_path: Path) -> None:
 
         def shipped(r, line, stat=stat):
             return P.live_prop_prob_over(projected=r["projected"], line=line, minutes_remaining=r["minutes_remaining"],
-                                         market=stat, current=r["current"])["prob_over"]
+                                         market=stat, current=r["current"], rate=r.get("_rate"),
+                                         expected_minutes=r.get("_em"))["prob_over"]
 
         c = line_calibration(test[stat], shipped, True)
         print(f"  SHIPPED function rotation: skill {c.get('brier_skill')} worst {c.get('worst_gap')}")
@@ -191,9 +266,13 @@ def main(argv: list[str] | None = None) -> int:
     g = sub.add_parser("grade"); g.add_argument("--start", required=True); g.add_argument("--end", required=True)
     g.add_argument("--out", required=True, type=Path)
     f = sub.add_parser("fit"); f.add_argument("--train", required=True, type=Path); f.add_argument("--test", required=True, type=Path)
+    fm = sub.add_parser("fit-minutes"); fm.add_argument("--train", required=True, type=Path)
+    fm.add_argument("--test", required=True, type=Path)
     args = ap.parse_args(argv)
     if args.cmd == "grade":
         grade(args.start, args.end, args.out)
+    elif args.cmd == "fit-minutes":
+        fit_minutes(args.train, args.test)
     else:
         fit(args.train, args.test)
     return 0

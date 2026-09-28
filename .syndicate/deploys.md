@@ -43233,3 +43233,82 @@ deployed live-odds-worker to `b8ea31bc` at 20:27Z, and refresh-worker took a
 `trigger=service_updated` redeploy at 20:08Z on the same SHA). Every ancestry
 check here was re-run against the CURRENT live SHA immediately before deploying,
 not the one read minutes earlier.
+
+## 2026-09-28 4:05 PM CT — live-odds-worker `6f7be98d` (lane `live-props-model-probability`) — WNBA rebounds/assists priced on a game-state remaining-minutes model; assists joins the grid. **Reading owed: 09-29.**
+
+    deploy dep-datddcc9v7es7389jo8g   live-odds-worker 41f14c3e -> 6f7be98d
+    fired 21:05:53Z   live 21:08:47.79859Z   trigger=api   status=live
+    preflight CLEAR 21:05:4xZ (infrastructure processes only)
+    baseline read 21:05:4xZ from live 41f14c3e's code: grid_markets=("points", "rebounds");
+        rebounds/assists NegBin mean on the projection's min(pregame - played, clock) minutes
+    NOTE: live-odds-worker had been redeployed at 41f14c3e (lane layer2-triad-alignment, 20:35Z),
+        which CONTAINS b8ea31bc and dd77591b -- verified by ancestry before building on it
+    collateral: 01092639 (NFL game-day injuries publish path, on main, low risk)
+
+**What shipped.** `expected_remaining_minutes` (clock_left x fitted share: pregame share, live share,
+lateness, the rule's share, late blowout). Remaining-minutes MAE, held-out Sep: 4.89 -> 3.44 min
+(rotation 4.60 -> 3.55). Rebounds/assists NegBin mean = c_b x rate x E[remaining minutes];
+refit c_b ~0.9-1.3 everywhere (last-5-min c was 2.7-2.8). Sep rotation worst line-level gap:
+assists 6.3 -> 3.5 pp, rebounds 3.0 -> 3.1 (all players 3.0 -> 2.2); skill up on both. Threes
+unchanged (bench-shooter RATE problem). Grid: points + rebounds + assists. The lens derives
+each team's margin from the game score (`_team_margins`); unknown margin = no blowout adjustment.
+
+**Measured after.** First TICK_COMPLETE on the new instance 21:10:50Z, all sports True; `Traceback`
+since 21:08:47Z: 0 (read 21:11:14Z). Not yet exercised on a live game.
+
+**verify:** 09-29 -- rebound/assist rows carry `expected_remaining_minutes` and `rate`; assists now
+gridded; population part `me` counts per market. Task `wnba-live-prop-grid-reading-0929`.
+
+### FLEET MOVED PAST `41f14c3e` within ~30 min — the entry above is HISTORICAL, not current `[noted 2026-09-28 21:2xZ]`
+
+The section above says "ALL THREE SERVICES `41f14c3e`". That was true at
+20:42-20:43Z and is **no longer true**. Read as of 21:2xZ:
+
+    web               01092639   20:52:12Z   (not this lane's deploy)
+    refresh-worker    01092639   20:51:50Z   (not this lane's deploy)
+    live-odds-worker  6f7be98d   21:08:47Z   (lane live-props-model-probability)
+
+**THE MEASUREMENT STILL STANDS, because it was verified by CONTENT.** Both
+current SHAs carry the model work intact -- `discrete=5 override=2
+refit_weight=1`, the same three counts checked at deploy time. `41f14c3e` is an
+ancestor of both, so the fleet moved FORWARD and carried the change rather than
+dropping it. What expired is the SHA-identity sentence, not the result.
+
+**This is the fourth time today the fleet moved under a measurement without the
+measurer being told**, and twice within ninety minutes it happened to this lane.
+The general shape, recorded because it will recur: on a shared `origin/main`, a
+deploy receipt naming a SHA describes a MOMENT, not a state. A receipt that also
+records what it verified BY CONTENT survives the fleet moving; one that records
+only "service X is on SHA Y" is stale as soon as anyone else deploys.
+
+**A CORRECTION OWED TO A PEER, recorded so the ledger does not carry it wrong.**
+Session `f9c8d1b9` reported that this lane's `41f14c3e` deploy carried their
+`01092639` as collateral. It did not, and could not: `01092639` landed
+15:47:07 -0500 against `41f14c3e`'s 15:29:14, so the injuries commit is a
+DESCENDANT of the deploy target. `git merge-base --is-ancestor 01092639
+41f14c3e` is false; the reverse is true. `01092639` reached web and
+refresh-worker in a SEPARATE 20:51-20:52Z deploy that was not this lane's.
+
+Stated without high ground: this lane's own `cf2cdbae` rode out three times as
+collateral in other lanes' deploys before it was measured, and this lane has
+very likely carried other lanes' commits in its own `origin/main` deploys
+tonight without naming them. Deploying main is correct and collateral is its
+documented cost. The direction is the thing to check --
+`git merge-base --is-ancestor <carried> <target>` answers "did my deploy contain
+it", and it is easy to run backwards when two commits are eighteen minutes apart.
+
+**No action needed.** Tomorrow's scheduled reading gates on
+`projection.generated_at`, not on a SHA, so the fleet moving does not invalidate
+it.
+
+### CLARIFICATION to the `01092639` correction above `[2026-09-28 ~21:5xZ, session f9c8d1b9, lane live-props-model-probability]`
+
+The correction is right that `41f14c3e` did NOT carry `01092639` (verified: `git merge-base
+--is-ancestor 01092639 41f14c3e` false, the reverse true). Two details, so it is not carried wrong
+the other way: (1) `01092639` is NOT this lane's commit -- it is the NFL game-day injuries
+publish-path fix from another lane. (2) What this lane recorded is that ITS OWN live-odds-worker
+deploy `41f14c3e -> 6f7be98d` (21:08:47Z) carried `01092639` as collateral -- the `6f7be98d`
+receipt above says exactly that, and `git merge-base --is-ancestor 01092639 6f7be98d` is TRUE.
+The misreading came from an ambiguous cross-session message ("It carried 01092639"), not from
+the ledger. So `01092639` is live on all three services: web and refresh-worker via the
+20:51-20:52Z deploy, live-odds-worker via `6f7be98d`.

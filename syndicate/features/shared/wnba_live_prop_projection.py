@@ -103,6 +103,7 @@ def project_live_player_stat(
         "minutes_played": None,
         "minutes_remaining": None,
         "blend_weight": None,
+        "rate": None,
         "basis": None,
         "unavailable_reason": None,
     }
@@ -142,6 +143,10 @@ def project_live_player_stat(
 
     out["minutes_remaining"] = round(remaining, 3)
     out["blend_weight"] = round(weight, 4)
+    # The per-minute rate the projection extrapolates. Exposed so a consumer that
+    # estimates remaining MINUTES differently (the count-market pricer) prices the
+    # SAME rate rather than re-deriving it -- two copies of one formula drift.
+    out["rate"] = round(blended_rate, 6)
     out["basis"] = "live_rate_blended_toward_pregame"
     out["projected"] = round(current + (remaining * blended_rate), 3)
     return out

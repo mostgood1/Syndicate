@@ -5071,3 +5071,56 @@ docstring asserting it is identical is the thing that makes the drift invisible.
 - How we found out: the user set the flag, redeployed, and saw no `SLATE_PHASE` line. Tracing the reader showed the service.
 - The rule going forward: before telling anyone where to set a flag, grep for the function that reads it and name the SERVICE whose entrypoint reaches that function. Before calling an input "disk-backed", name the service that WRITES it and the service that READS it; if they differ, the file must be allowlisted in `HOT_ARTIFACT_PATTERNS` AND published by its producer, with a test that fnmatches the reader's pull pattern.
 - Cost: one wasted deploy cycle for the flag, and a trigger that was inert since it merged (#111).
+
+## 2026-09-28 — A LANE BLOCK AND THE DEPLOY LEDGER DISAGREED FOR A DAY, AND THE LEDGER WAS RIGHT. Plus: a verdict is a claim and ages like one.
+
+Lane hygiene pass, session 4ab694ed. Both items below were found by AUDITING my
+own prior verdicts, not by anything failing.
+
+- **FORBIDDEN: trusting a lane block's status over `deploys.md` when they
+  disagree.** `worker-memory-heartbeat` read "GOAL: NOT MET -- the code is LANDED
+  and DELIBERATELY NOT DEPLOYED" for a full day while `deploys.md` recorded
+  `87ce81d7` deployed and VERIFIED, with both halves of that lane's own
+  Verification satisfied (181 samples, 0 of 180 over the preflight limit,
+  CLEAR x3). **A lane saying "not deployed" about something deployed and
+  verified is worse than a stale OPEN lane: it is a FALSE NEGATIVE sitting
+  exactly where the next session looks first.** The deploy ledger is written at
+  the moment of measurement; a lane block is written from memory afterwards. When
+  they conflict, the ledger wins and the block gets corrected.
+
+- **FORBIDDEN: an all-refusal reading reported as a join verification.** Restated
+  here from session `273dc243`'s entry because it landed on MY lane and I am the
+  one who has to not repeat it: `nfl-live-resim-activation` closed `GOAL: MET` on
+  `sources_seen {pregame: 16}` -- sixteen REFUSALS and no accept. The accept path
+  was broken the entire window (snake_case fields the join never reads,
+  tri-codes against a full-name grid); the re-sim priced 1-4 games per tick for
+  TEN HOURS and the join indexed ZERO. **A verification that only ever exercises
+  the reject branch verifies the reject branch.** It must say so, and it must not
+  close a goal about the accept branch.
+
+  This is the same shape as three entries already in this file -- "absence in a
+  window isn't absence", "null needs a live population", "presence is not
+  reachability" -- and it still got through, because it arrived wearing the word
+  VERIFIED and a production timestamp.
+
+- **A VERDICT AGES, SO AUDIT OLD ONES, NOT JUST NEW WORK.** Both findings came
+  from re-reading verdicts I had already written and banked. Nothing failed to
+  prompt the audit; a survey of open lanes did. **When correcting a verdict, keep
+  the superseded text beneath the correction** rather than overwriting it -- a
+  silently rewritten verdict teaches the next reader nothing about why the first
+  one was believed.
+
+- **AND THE MECHANICAL ONE:** a whole-file replace in `lanes.md` matched TWICE --
+  a peer had written the same verdict phrase -- and would have rewritten their
+  verdict. An assertion on match count caught it. **Edits to one lane's block
+  must be bounded to that block's line range**, because nothing in this file's
+  prose is unique.
+
+---
+## 2026-09-28 (session f9c8d1b9, lane live-props-model-probability) - A variant chosen in-season can fail the playoff holdout for a reason outside the variant
+
+**What happened.** Threes rate shrinkage toward pregame, selected on August, cut the worst line-level gap to 3.4 pp there and went to 13.3 pp on held-out September (playoffs) -- worse than the live model -- while Brier skill improved. The shrinkage was fine; the thing it shrank TOWARD, the pregame threes expectation, overshoots by 18% in the playoffs against 8% in-season. Every earlier count-model change today passed the same holdout; this one leaned harder on the pregame anchor and was the only one to fail.
+
+**Rule:** when a change increases a model's reliance on the pregame anchor, check the anchor's own bias in the evaluation regime (actual vs expected by period) before shipping, and keep the held-out period out of selection even when it would "rescue" a variant. Better Brier with worse line calibration is not a pass.
+
+---

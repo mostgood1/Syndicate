@@ -409,6 +409,7 @@ def _attach_live_props(games: list[dict[str, Any]], date_str: str) -> None:
             sim_game,
             game_minutes_remaining=_game_minutes_remaining(game),
             lines=lines,
+            team_margins=_team_margins(game),
             # Live board lines move off the pregame line this lens is given; the
             # grid prices them. Was POINTS ONLY, and that was a MEASURED choice
             # `[2026-09-28, lane live-props-model-probability, user decision "Roll back
@@ -419,11 +420,11 @@ def _attach_live_props(games: list[dict[str, Any]], date_str: str) -> None:
             # which hurts low counts most. Rebounds/assists/threes keep their single
             # pregame line (priced on their own tables, which beat the old points
             # table); widening them waits on a player-scaled spread.
-            # REBOUNDS JOINS `[2026-09-28, player-scaled NegBin remainder]`: its worst
-            # line-level gap is 3.0 pp on the held-out September (3.7 on August),
-            # under the ~5 pp bar. Assists (6.1) and threes (5.9) are priced on the
-            # same model but stay at one line each -- close to the bar, not under it.
-            grid_markets=("points", "rebounds"),
+            # REBOUNDS JOINED on the player-scaled NegBin remainder (Sep 3.0 pp); ASSISTS
+            # joins once priced on the remaining-minutes model (Sep 3.5 pp, Aug 5.1).
+            # Threes (5.9 on the old minutes) stays at one line: its bench-shooter rate,
+            # not its minutes, is the open problem. `[2026-09-28]`
+            grid_markets=("points", "rebounds", "assists"),
         )
         game["liveProps"] = to_snapshot_live_props(built["rows"])
         game["livePropsCoverage"] = {
@@ -472,6 +473,28 @@ def _attach_live_props(games: list[dict[str, Any]], date_str: str) -> None:
             "players_unmatched_sample": list(built.get("players_unmatched") or [])[:12],
             "withheld_by_reason": built.get("withheld_by_reason"),
         })
+
+
+def _team_margins(game: dict[str, Any]) -> dict[str, float]:
+    """`{team tri: own lead}` for both teams, or {} when the score or codes are unknown.
+
+    Feeds the count pricer's remaining-minutes model (a blowout benches starters). An
+    empty map reads as margin 0 there -- no blowout adjustment -- never as a guess.
+    """
+    away = game.get("away") if isinstance(game.get("away"), dict) else {}
+    home = game.get("home") if isinstance(game.get("home"), dict) else {}
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    away_tri = str(game.get("away_tri") or away.get("tri") or away.get("abbr") or "").strip().upper()
+    home_tri = str(game.get("home_tri") or home.get("tri") or home.get("abbr") or "").strip().upper()
+    away_score = _safe_number(away.get("score"))
+    home_score = _safe_number(home.get("score"))
+    if away_score is None:
+        away_score = _safe_number(live_state.get("away_pts"))
+    if home_score is None:
+        home_score = _safe_number(live_state.get("home_pts"))
+    if not away_tri or not home_tri or away_score is None or home_score is None:
+        return {}
+    return {home_tri: home_score - away_score, away_tri: away_score - home_score}
 
 
 def _game_minutes_remaining(game: dict[str, Any]) -> float | None:

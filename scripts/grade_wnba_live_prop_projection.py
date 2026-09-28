@@ -131,6 +131,7 @@ def official_box(summary: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """athlete id -> {name, starter, minutes, points, rebounds, assists} from the OFFICIAL box."""
     out: dict[str, dict[str, Any]] = {}
     for team_block in (summary.get("boxscore") or {}).get("players") or []:
+        team_id = str(((team_block.get("team") or {}).get("id")) or "")
         for stat_block in team_block.get("statistics") or []:
             keys = [str(k) for k in (stat_block.get("keys") or [])]
             try:
@@ -162,6 +163,7 @@ def official_box(summary: dict[str, Any]) -> dict[str, dict[str, Any]]:
                     "rebounds": _stat_at(stats, rebounds_at),
                     "assists": _stat_at(stats, assists_at),
                     "threes": _made_at(stats, threes_at),
+                    "team_id": team_id,
                 }
     return out
 
@@ -191,6 +193,12 @@ def replay(summary: dict[str, Any]) -> dict[str, Any]:
     # prices on a clock tick, not after an event, so this is the design that matches it.
     clock_samples: list[dict[str, Any]] = []
     next_minute = 1.0
+    # GAME STATE for a remaining-minutes model `[2026-09-28]`: the running score (a
+    # blowout benches starters) and personal fouls (six and out).
+    competitors = (((summary.get("header") or {}).get("competitions") or [{}])[0].get("competitors") or [])
+    home_id = next((str(c.get("id")) for c in competitors if c.get("homeAway") == "home"), "")
+    score = {"home": 0.0, "away": 0.0}
+    fouls: dict[str, float] = {aid: 0.0 for aid in box}
     last_clock = 0.0
 
     plays = summary.get("plays") or []
@@ -206,10 +214,14 @@ def replay(summary: dict[str, Any]) -> dict[str, Any]:
                     max(0.0, next_minute - last_clock) if aid in on_court else 0.0)
                 if played <= 0.0:
                     continue
+                own_home = box[aid].get("team_id") == home_id
+                margin = (score["home"] - score["away"]) * (1.0 if own_home else -1.0)
                 clock_samples.append({
                     "elapsed": next_minute, "athlete_id": aid, "minutes": round(played, 3),
                     "points": points[aid], "rebounds": rebounds[aid],
                     "assists": assists[aid], "threes": threes[aid],
+                    "margin": margin, "fouls": fouls.get(aid, 0.0),
+                    "on_court": aid in on_court,
                 })
             next_minute += 1.0
         delta = max(0.0, now - last_clock)
@@ -222,6 +234,14 @@ def replay(summary: dict[str, Any]) -> dict[str, Any]:
         participants = [str(((p or {}).get("athlete") or {}).get("id") or "")
                         for p in (play.get("participants") or [])]
         type_text = str((play.get("type") or {}).get("text") or "").lower()
+        for side, key in (("home", "homeScore"), ("away", "awayScore")):
+            try:
+                if play.get(key) is not None:
+                    score[side] = float(play.get(key))
+            except (TypeError, ValueError):
+                pass
+        if "personal foul" in type_text and participants and participants[0] in fouls:
+            fouls[participants[0]] += 1.0
 
         if "substitution" in type_text and len(participants) >= 2:
             entering, leaving = participants[0], participants[1]
@@ -445,6 +465,15 @@ def grade_event(summary: dict[str, Any], anchors: dict[str, dict[str, Any]],
             "minutes_remaining": verdict.get("minutes_remaining"),
             "projected": verdict["projected"],
             "current": sample["value"],
+            "minutes_played": sample.get("minutes"),
+            "elapsed": sample.get("elapsed"),
+            "game_clock_left": round(max(0.0, end - sample["elapsed"]), 3),
+            "final_minutes": row.get("minutes"),
+            "pregame_minutes": anchor.get("min_mean"),
+            "pregame_stat": anchor.get(mean_key),
+            "margin": sample.get("margin"),
+            "fouls": sample.get("fouls"),
+            "on_court": sample.get("on_court"),
             "actual": row[stat],
             "residual": verdict["projected"] - row[stat],
         })

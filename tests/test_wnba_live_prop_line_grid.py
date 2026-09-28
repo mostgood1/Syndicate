@@ -89,13 +89,13 @@ def test_no_measured_sigma_falls_back_to_the_supplied_line():
     assert rows_mod._grid_lines(17.5, projected=None, current=6.0, minutes_remaining=20.0) == [17.5]
 
 
-def test_lens_grids_points_and_rebounds_only():
-    """Rebounds passed the ~5 pp line-calibration bar on the player-scaled model
-    (Sep 3.0, Aug 3.7); assists (6.1) and threes (5.9) did not, so stay ungridded."""
+def test_lens_grids_points_rebounds_and_assists_not_threes():
+    """Assists joined once priced on the remaining-minutes model (Sep 3.5 pp);
+    threes (5.9 on the old minutes, bench-shooter rate unsolved) stays ungridded."""
     import inspect
     from syndicate.features.wnba import live_lens
     src = inspect.getsource(live_lens)
-    assert 'grid_markets=("points", "rebounds")' in src
+    assert 'grid_markets=("points", "rebounds", "assists")' in src
 
 
 def test_every_grid_row_carries_the_actual_so_far():
@@ -157,7 +157,9 @@ def test_each_grid_reaches_three_of_its_OWN_sigmas():
     for market in ("points", "rebounds"):
         rows = [r for r in built["rows"] if r["market"] == market and r["line"] is not None]
         proj, sigma = grid_center_and_sd(rows[0]["liveProjectedStat"], rows[0]["current"],
-                                         rows[0]["minutes_remaining"], market)
+                                         rows[0]["minutes_remaining"], market,
+                                         rate=rows[0]["rate"],
+                                         expected_minutes=rows[0]["expected_remaining_minutes"])
         supplied = _LINES[("paige bueckers", market)]
         grid = [r["line"] for r in rows if r["line"] != supplied]
         assert grid, market
@@ -194,42 +196,101 @@ def test_count_markets_are_REACHED_by_the_negbin_and_points_is_not():
     built, _ = _snapshot(grid_markets=("points", "rebounds"))
     bases = {r["market"]: r.get("liveModelProbOver") is not None and prob.live_prop_prob_over(
         projected=r["liveProjectedStat"], line=r["line"], minutes_remaining=r["minutes_remaining"],
-        market=r["market"], current=r["current"])["basis"] for r in built["rows"] if r["line"] is not None}
+        market=r["market"], current=r["current"], rate=r["rate"],
+        expected_minutes=r["expected_remaining_minutes"])["basis"] for r in built["rows"] if r["line"] is not None}
     assert bases["rebounds"] == "measured_negbin_remainder"
     assert bases["points"] == "measured_residual_normal"
 
 
 def test_the_spread_scales_with_the_players_own_remainder():
     """THE POINT OF THE MODEL: same game state, bigger expected remainder, wider spread."""
-    small = prob.negbin_remainder(3.0, 1.0, 15.0, "rebounds")
-    big = prob.negbin_remainder(11.0, 1.0, 15.0, "rebounds")
+    small = prob.negbin_remainder(None, 1.0, None, "rebounds", rate=0.1, expected_minutes=15.0)
+    big = prob.negbin_remainder(None, 1.0, None, "rebounds", rate=0.5, expected_minutes=15.0)
     assert big["sd"] > 2 * small["sd"]
 
 
 def test_a_count_market_without_the_banked_stat_refuses():
-    out = prob.live_prop_prob_over(projected=6.0, line=5.5, minutes_remaining=15.0, market="rebounds")
+    out = prob.live_prop_prob_over(projected=6.0, line=5.5, minutes_remaining=15.0, market="rebounds",
+                                   rate=0.2, expected_minutes=15.0)
     assert out["prob_over"] is None and out["unavailable_reason"] == prob.REASON_NO_CURRENT
 
 
+def test_a_minutes_model_market_refuses_without_rate_or_minutes():
+    """Falling back to the projection's minutes would price rebounds/assists on a table
+    fitted for the OTHER minutes estimate."""
+    out = prob.live_prop_prob_over(projected=6.0, line=5.5, minutes_remaining=15.0, market="assists", current=3.0)
+    assert out["prob_over"] is None
+
+
+def test_threes_still_prices_on_the_projection_remainder():
+    out = prob.live_prop_prob_over(projected=3.0, line=2.5, minutes_remaining=15.0, market="threes", current=1.0)
+    assert out["prob_over"] is not None and out["basis"] == "measured_negbin_remainder"
+
+
 def test_a_line_already_reached_prices_at_one():
-    out = prob.live_prop_prob_over(projected=8.0, line=5.5, minutes_remaining=15.0, market="rebounds", current=6.0)
+    out = prob.live_prop_prob_over(projected=8.0, line=5.5, minutes_remaining=15.0, market="rebounds", current=6.0,
+                                   rate=0.2, expected_minutes=15.0)
     assert out["prob_over"] == 1.0
 
 
 def test_matches_a_hand_computed_negbin_tail():
-    """rebounds, 15 min left: c=0.82, r=3. projected 7, banked 4 -> m = 0.82*3 = 2.46.
-    Line 6.5 needs R >= 3."""
-    m, r = 0.82 * 3.0, 3.0
+    """rebounds, 15 expected minutes left (bucket 10-20: c=0.88, r=4), rate 0.2/min,
+    banked 4 -> m = 0.88 * 0.2 * 15 = 2.64. Line 6.5 needs R >= 3."""
+    m, r = 0.88 * 0.2 * 15.0, 4.0
     p = r / (r + m)
     pmf = [math.gamma(k + r) / (math.gamma(r) * math.factorial(k)) * p ** r * (1 - p) ** k for k in range(3)]
     expect = 1.0 - sum(pmf)
-    out = prob.live_prop_prob_over(projected=7.0, line=6.5, minutes_remaining=15.0, market="rebounds", current=4.0)
+    out = prob.live_prop_prob_over(projected=7.0, line=6.5, minutes_remaining=15.0, market="rebounds", current=4.0,
+                                   rate=0.2, expected_minutes=15.0)
     assert out["prob_over"] == pytest.approx(expect, abs=1e-6)
 
 
 def test_the_rebound_grid_sits_on_the_priced_distribution():
     """Centred on banked + fitted mean, not on the raw projection."""
-    center, sd = prob.grid_center_and_sd(9.0, 4.0, 25.0, "rebounds")
-    assert center == pytest.approx(4.0 + 0.80 * 5.0)
-    lines = rows_mod._grid_lines(None, projected=9.0, current=4.0, minutes_remaining=25.0, market="rebounds")
+    center, sd = prob.grid_center_and_sd(9.0, 4.0, 25.0, "rebounds", rate=0.2, expected_minutes=25.0)
+    assert center == pytest.approx(4.0 + 0.82 * 0.2 * 25.0)
+    lines = rows_mod._grid_lines(None, projected=9.0, current=4.0, minutes_remaining=25.0, market="rebounds",
+                                 rate=0.2, expected_minutes=25.0)
     assert min(lines) > 4.0 and max(lines) <= center + 3 * sd + 1.0
+
+
+
+# ---- remaining-minutes model for rebounds/assists `[2026-09-28]` ----
+
+def test_a_blowout_late_cuts_a_starters_expected_minutes():
+    close = prob.expected_remaining_minutes(32.0, 24.0, 8.0, 2.0)
+    blowout = prob.expected_remaining_minutes(32.0, 24.0, 8.0, 25.0)
+    assert blowout < close * 0.8
+
+
+def test_unknown_margin_is_no_adjustment_not_a_guess():
+    assert prob.expected_remaining_minutes(32.0, 24.0, 8.0, None) == prob.expected_remaining_minutes(32.0, 24.0, 8.0, 0.0)
+
+
+def test_no_clock_left_means_no_minutes_and_bad_inputs_refuse():
+    assert prob.expected_remaining_minutes(32.0, 30.0, 0.0, 0.0) == 0.0
+    assert prob.expected_remaining_minutes(None, 10.0, 20.0, 0.0) is None
+    assert prob.expected_remaining_minutes(32.0, None, 20.0, 0.0) is None
+
+
+def test_expected_minutes_never_exceed_the_clock():
+    for played in (0.0, 5.0, 15.0):
+        assert 0.0 <= prob.expected_remaining_minutes(38.0, played, 20.0, 0.0) <= 20.0
+
+
+def test_rows_carry_rate_and_expected_minutes_from_the_team_margin():
+    built = rows_mod.build_live_prop_rows(_LIVE, _SIM, game_minutes_remaining=10.0, lines=_LINES,
+                                          grid_markets=("rebounds",), team_margins={"DAL": 25.0})
+    calm = rows_mod.build_live_prop_rows(_LIVE, _SIM, game_minutes_remaining=10.0, lines=_LINES,
+                                         grid_markets=("rebounds",), team_margins={"DAL": 0.0})
+    reb = next(r for r in built["rows"] if r["market"] == "rebounds")
+    reb_calm = next(r for r in calm["rows"] if r["market"] == "rebounds")
+    assert reb["rate"] is not None
+    assert reb["expected_remaining_minutes"] < reb_calm["expected_remaining_minutes"]
+
+
+def test_lens_team_margins_from_the_game_score():
+    from syndicate.features.wnba.live_lens import _team_margins
+    game = {"away": {"abbr": "LVA", "score": 70}, "home": {"abbr": "IND", "score": 82}}
+    assert _team_margins(game) == {"IND": 12.0, "LVA": -12.0}
+    assert _team_margins({"away": {"abbr": "LVA"}, "home": {"abbr": "IND"}}) == {}
