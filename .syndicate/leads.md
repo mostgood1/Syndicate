@@ -963,3 +963,32 @@ capturable boundary leaves a stranded capture unpublished for another day.
 One call, before `if not isinstance(row, Mapping)`. Whoever holds that lane can
 move it in a two-line edit; the comment in `record_quarter_snapshot` says the
 same thing at the call site.
+
+## 2026-09-28 — the two lane guards read DIFFERENT per-session markers, so one of them enforces against the wrong lane
+
+Found while taking an authorised cross-lane override (lane `nfl-ncaaf-live-props`).
+
+`lane-guard.py` (PreToolUse) resolves the marker under `CLAUDE_PROJECT_DIR` — the
+PRIMARY tree. `lane-postwrite-check.py` read the copy inside the WORKTREE. Both
+files existed for session `4ab694ed` and held DIFFERENT slugs:
+
+    primary  .syndicate/.current-lane.4ab694ed...  = nfl-ncaaf-live-props
+    worktree .syndicate/.current-lane.4ab694ed...  = nfl-score-clock-model   <- stale
+
+So the post-write warning named a lane this session had left hours earlier, while
+the pre-write guard was enforcing the current one. **Every session working from a
+worktree — which the protocol requires — can carry two markers that drift apart,
+and nothing reports the drift.**
+
+Why it matters beyond a confusing message: the post-write check is the ONLY guard
+that sees shell writes (`lane-guard` hooks Edit/Write/MultiEdit/NotebookEdit
+only). A stale worktree marker makes its "Your lane:" line wrong, which is
+exactly the field a reader uses to decide whether a flagged write was theirs.
+`project_lane_guard_reads_primary_tree` records the pre-write half of this; the
+post-write half is a second, independent source.
+
+**Fix belongs in `lane_marker.current_lane()`, not in either hook** — one
+resolution order, applied by both, with the divergence reported rather than
+silently resolved (this repo's own standing rule: a guard that maps an unknown
+onto a permissive branch is worse than one that refuses). Synced by hand today;
+that is not a fix.
