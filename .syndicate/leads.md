@@ -945,3 +945,21 @@ already refused to touch it for this reason.
 larger sample (worst powered bucket 0.3185, MAE 10.146 losing to frozen 8.213).
 
 ---
+
+## 2026-09-28 — the NFL prop-capture SWEEP is hooked one level too low (lane `nfl-live-resim-activation` owns the right spot)
+
+From lane `nfl-ncaaf-live-props`. `live_prop_capture.publish_pending_captures()`
+(`2d22031f`) recovers captures written before the push existed. It belongs at the
+TOP of `live_resim._maybe_capture_prop_snapshot`, before its early returns
+(`no_row`, `no_period_or_clock`, `period_not_capturable`, `outside_window`,
+`final`, `no_event_id`, `no_player_rows`), so it runs on ANY tick after a boot.
+
+`lane-guard` blocked that edit: `syndicate/features/nfl/live_resim.py` is claimed
+by OPEN lane `nfl-live-resim-activation` (claim source `origin/main@43c73fbc`).
+So it is hooked at the top of `record_quarter_snapshot` instead, which fires only
+on a genuine boundary ATTEMPT. **Consequence:** a slate that produces no
+capturable boundary leaves a stranded capture unpublished for another day.
+
+One call, before `if not isinstance(row, Mapping)`. Whoever holds that lane can
+move it in a two-line edit; the comment in `record_quarter_snapshot` says the
+same thing at the call site.
