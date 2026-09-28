@@ -42,10 +42,15 @@ class LensConsumesTheCaptureTests(unittest.TestCase):
         props = games[0].get("liveProps")
         self.assertTrue(props, "the lens must carry liveProps for the prop join")
         points = [p for p in props if p["prop"] == "player_points"]
-        self.assertEqual(len(points), 1)
-        self.assertIsNotNone(points[0]["liveProjection"])
-        self.assertIsNotNone(points[0]["liveModelProbOver"], "a line was supplied")
-        self.assertEqual(points[0]["line"], 17.5)
+        # POINTS carries a line GRID around the live projection (lane
+        # live-props-model-probability, 2026-09-28): live board lines move off the
+        # pregame one. The supplied line is always among them.
+        self.assertGreater(len(points), 1)
+        by_line = {p["line"]: p for p in points}
+        self.assertIn(17.5, by_line)
+        self.assertIsNotNone(by_line[17.5]["liveProjection"])
+        self.assertIsNotNone(by_line[17.5]["liveModelProbOver"], "a line was supplied")
+        self.assertTrue(all(p["liveModelProbOver"] is not None for p in points))
 
     def test_a_combination_market_is_not_priced_from_a_single_mean(self) -> None:
         from syndicate.features.wnba.live_lens import _attach_live_props
@@ -75,7 +80,10 @@ class LensConsumesTheCaptureTests(unittest.TestCase):
             _attach_live_props(games, "2026-08-20")
         coverage = games[0]["livePropsCoverage"]
         self.assertEqual(coverage["players_matched"], 1)
-        self.assertEqual(coverage["priced"], 1, "only the market with a line")
+        # Only POINTS is priced -- the one market with a line in this fixture, and
+        # the one market gridded -- so `priced` is its supplied line plus the grid.
+        self.assertEqual(coverage["priced"], 1 + coverage["grid_rows"])
+        self.assertGreater(coverage["grid_rows"], 0)
 
 
 class CardLineVocabularyTests(unittest.TestCase):

@@ -39,11 +39,12 @@ has already cost this project a full investigation.
 
 from __future__ import annotations
 
+import math
 import re
 import unicodedata
 from typing import Any, Iterable, Mapping
 
-from syndicate.features.shared.wnba_live_prop_probability import live_prop_prob_over
+from syndicate.features.shared.wnba_live_prop_probability import live_prop_prob_over, residual_sigma
 from syndicate.features.shared.wnba_live_prop_projection import project_live_player_stat
 
 # (live-capture key, sim mean key, market label). Declared rather than derived:
@@ -126,8 +127,24 @@ def build_live_prop_rows(
     *,
     game_minutes_remaining: Any = None,
     lines: Mapping[tuple[str, str], Any] | None = None,
+    grid_markets: Iterable[str] = (),
 ) -> dict[str, Any]:
-    """One row per (player, stat), plus the counters that make a zero readable."""
+    """One row per (player, stat, line), plus the counters that make a zero readable.
+
+    `grid_markets` `[2026-09-28, lane live-props-model-probability]`: for a listed
+    market, price every half-point line within `GRID_SIGMAS` measured residual
+    sigmas of the live projection, in ADDITION to the supplied line. The supplied
+    line is the PREGAME consensus and live board lines move off it -- measured
+    2026-09-27: the lens indexed 3-5 keys per build against 147-196 live board
+    props, e.g. jackie young assists board 6.5 vs lens 8.5. The probability is the
+    unchanged `live_prop_prob_over`, so a grid line is priced by exactly the rule
+    a supplied line is. Default `()` is today's behaviour.
+
+    ONLY list a market whose residual was MEASURED. The n=796 table in
+    `wnba_live_prop_probability` is POINTS (the grader's own SCOPE); widening an
+    unmeasured market multiplies an assumption, not coverage.
+    """
+    grid = frozenset(str(m) for m in grid_markets or ())
     sim_index = index_sim_players(sim_game)
     rows: list[dict[str, Any]] = []
     players_seen = 0
@@ -137,6 +154,7 @@ def build_live_prop_rows(
     priced_rows = 0
     withheld_by_reason: dict[str, int] = {}
     unpriced_by_reason: dict[str, int] = {}
+    grid_rows = 0
 
     for player in live_players or ():
         if not isinstance(player, Mapping):
@@ -179,30 +197,30 @@ def build_live_prop_rows(
             line = None
             if lines:
                 line = lines.get((normalize_name(name), market))
-            priced = live_prop_prob_over(
-                projected=row["liveProjectedStat"],
-                line=line,
-                minutes_remaining=verdict.get("minutes_remaining"),
-            )
-            row["line"] = line
-            row["residual_sigma"] = priced.get("residual_sigma")
-            if priced.get("prob_over") is None:
-                row["liveModelProbOver"] = None
-                row["not_priced_reason"] = priced.get("unavailable_reason")
-            else:
-                row["liveModelProbOver"] = priced["prob_over"]
-                row["not_priced_reason"] = None
+            line_set = [line]
+            if market in grid:
+                line_set = _grid_lines(
+                    line,
+                    projected=row["liveProjectedStat"],
+                    current=row["current"],
+                    minutes_remaining=verdict.get("minutes_remaining"),
+                )
+                grid_rows += max(0, len(line_set) - (1 if line is not None else 0))
             if row["liveProjectedStat"] is None:
                 reason = str(verdict.get("unavailable_reason") or "unknown")
                 withheld_by_reason[reason] = withheld_by_reason.get(reason, 0) + 1
             else:
                 projected += 1
-            if row.get("liveModelProbOver") is not None:
-                priced_rows += 1
-            elif row["liveProjectedStat"] is not None:
-                reason = str(row.get("not_priced_reason") or "unknown")
-                unpriced_by_reason[reason] = unpriced_by_reason.get(reason, 0) + 1
-            rows.append(row)
+            base = row
+            for line in line_set:
+                row = dict(base)
+                _price_row(row, line, verdict)
+                if row.get("liveModelProbOver") is not None:
+                    priced_rows += 1
+                elif row["liveProjectedStat"] is not None:
+                    reason = str(row.get("not_priced_reason") or "unknown")
+                    unpriced_by_reason[reason] = unpriced_by_reason.get(reason, 0) + 1
+                rows.append(row)
 
     return {
         "rows": rows,
@@ -213,7 +231,71 @@ def build_live_prop_rows(
         "withheld_by_reason": withheld_by_reason,
         "priced": priced_rows,
         "unpriced_by_reason": unpriced_by_reason,
+        # Rows ADDED by `grid_markets` beyond the supplied line. Reported beside
+        # `priced` so a jump in priced rows is attributable to the grid.
+        "grid_rows": grid_rows,
     }
+
+
+# The grid's reach, in measured residual sigmas either side of the projection, and a
+# hard cap per (player, market) so the published snapshot stays bounded: ~40 rows x
+# ~20 players per game. 3 sigma covers >99% of where the final lands under the
+# measured (tail-widened) normal; a line beyond it prices at ~0 or ~1 anyway.
+GRID_SIGMAS = 3.0
+GRID_MAX_LINES = 40
+
+
+def _grid_lines(supplied: Any, *, projected: Any, current: Any, minutes_remaining: Any) -> list[Any]:
+    """The supplied line plus every half-point line near the projection, sorted.
+
+    Lines at or below what is already banked are skipped: the over is decided and
+    the join withholds it (`over_already_decided`) whatever is published. No
+    projection or no measured sigma -> the supplied line alone, unchanged.
+    """
+    out: set[float] = set()
+    if supplied is not None:
+        out.add(supplied)
+    try:
+        center = float(projected)
+    except (TypeError, ValueError):
+        return sorted(out) if out else [supplied]
+    sigma = residual_sigma(minutes_remaining)
+    if sigma is None or sigma <= 0.0:
+        return sorted(out) if out else [supplied]
+    try:
+        banked = float(current) if current is not None else 0.0
+    except (TypeError, ValueError):
+        banked = 0.0
+    low = max(center - GRID_SIGMAS * sigma, banked)
+    high = center + GRID_SIGMAS * sigma
+    candidate = math.floor(low) + 0.5
+    grid: list[float] = []
+    while candidate <= high:
+        if candidate > banked:
+            grid.append(candidate)
+        candidate += 1.0
+    if len(grid) > GRID_MAX_LINES:
+        # Keep the lines NEAREST the projection -- where a live board quotes.
+        grid = sorted(sorted(grid, key=lambda x: (abs(x - center), x))[:GRID_MAX_LINES])
+    out.update(grid)
+    return sorted(out)
+
+
+def _price_row(row: dict[str, Any], line: Any, verdict: Mapping[str, Any]) -> None:
+    """Stamp `line` and its measured-residual probability onto `row`."""
+    priced = live_prop_prob_over(
+        projected=row["liveProjectedStat"],
+        line=line,
+        minutes_remaining=verdict.get("minutes_remaining"),
+    )
+    row["line"] = line
+    row["residual_sigma"] = priced.get("residual_sigma")
+    if priced.get("prob_over") is None:
+        row["liveModelProbOver"] = None
+        row["not_priced_reason"] = priced.get("unavailable_reason")
+    else:
+        row["liveModelProbOver"] = priced["prob_over"]
+        row["not_priced_reason"] = None
 
 
 def to_snapshot_live_props(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:

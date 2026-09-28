@@ -409,11 +409,15 @@ def _attach_live_props(games: list[dict[str, Any]], date_str: str) -> None:
             sim_game,
             game_minutes_remaining=_game_minutes_remaining(game),
             lines=lines,
+            # POINTS ONLY: the one market whose live residual was MEASURED (n=796).
+            # Live board lines move off the pregame line this lens is given; the
+            # grid prices them. `[2026-09-28, lane live-props-model-probability]`
+            grid_markets=("points",),
         )
         game["liveProps"] = to_snapshot_live_props(built["rows"])
         game["livePropsCoverage"] = {
-            k: built[k] for k in ("players_seen", "players_matched", "rows_projected",
-                                  "priced", "unpriced_by_reason")
+            k: built.get(k) for k in ("players_seen", "players_matched", "rows_projected",
+                                      "priced", "unpriced_by_reason", "grid_rows")
         }
         # THE FUNNEL, END TO END, so a thin row count is attributable without a
         # deploy. `players_unmatched` is the one that names a NAME-JOIN failure
