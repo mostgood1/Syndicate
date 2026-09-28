@@ -5117,3 +5117,10 @@ own prior verdicts, not by anything failing.
   prose is unique.
 
 ---
+## 2026-09-28 (session f9c8d1b9, lane live-props-model-probability) - A variant chosen in-season can fail the playoff holdout for a reason outside the variant
+
+**What happened.** Threes rate shrinkage toward pregame, selected on August, cut the worst line-level gap to 3.4 pp there and went to 13.3 pp on held-out September (playoffs) -- worse than the live model -- while Brier skill improved. The shrinkage was fine; the thing it shrank TOWARD, the pregame threes expectation, overshoots by 18% in the playoffs against 8% in-season. Every earlier count-model change today passed the same holdout; this one leaned harder on the pregame anchor and was the only one to fail.
+
+**Rule:** when a change increases a model's reliance on the pregame anchor, check the anchor's own bias in the evaluation regime (actual vs expected by period) before shipping, and keep the held-out period out of selection even when it would "rescue" a variant. Better Brier with worse line calibration is not a pass.
+
+---
