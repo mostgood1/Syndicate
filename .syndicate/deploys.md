@@ -43454,3 +43454,26 @@ because `manifest_only` waits on refresh-worker's loop while NHL generation
 belongs to live-odds-worker. The task is told to poll for the ARTIFACT rather
 than a job-status endpoint (which returned `state=None`), and not to report a fix
 unless the artifact appears. It must not deploy.
+
+## 2026-09-28 4:53 PM CT — live-odds-worker `8acfd9a1` (lane `live-props-model-probability`) — WNBA points priced on the NegBin over game-state minutes; displayed live projection = priced centre. **Reading owed: 09-29.**
+
+    deploy dep-date3ovavr4c73d67mcg   live-odds-worker 6f7be98d -> 8acfd9a1
+    fired 21:53:39Z   live 21:56:30.738344Z   trigger=api   status=live
+    preflight CLEAR 21:53:3xZ (infrastructure processes only); no collateral
+    baseline read 21:53:3xZ from live 6f7be98d's code: MINUTES_MODEL_MARKETS = {rebounds, assists};
+        points priced on the normal (basis measured_residual_normal); liveProjection = rule projection
+
+**What shipped (user decision "Ship it now", with the caveat stated to them).** Points: NegBin over
+game-state minutes, r per bucket, c ~1.12 flat. September all / rotation vs the normal: worst gap
+6.5 / 9.4 -> 4.8 / 7.1 pp, Brier skill +0.372 / +0.429 -> +0.410 / +0.471 -- BUT September also picked
+this variant, so it is NOT a clean holdout; the first clean read is live 09-29 data. Normal pricing
+branch removed (no caller left). Displayed liveProjection is now the priced centre for every count
+market, so projection and P(over) cannot disagree about a line's side; `projection_rule` keeps the
+projection's own number (what threes prices off). Unknown game clock -> points refuses by name.
+
+**Measured after.** First TICK_COMPLETE on the new instance 21:58:29Z, all sports True; `Traceback`
+since 21:56:30Z: 0 (read 21:58:49Z). Not yet exercised on a live game.
+
+**verify:** 09-29 -- points rows basis `measured_negbin_remainder`; no row where liveProjection and
+P(over) sit on opposite sides of the line by >= 2; population `me` counts per market. The 09-29
+reading is the first CLEAN test of the points model. Task `wnba-live-prop-grid-reading-0929`.
