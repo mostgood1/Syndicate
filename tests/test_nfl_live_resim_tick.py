@@ -190,3 +190,35 @@ def test_the_adapter_carries_EVENT_ID_for_the_prop_capture():
     assert row["state"] == "in"
     assert row["period"] == 2
     assert row["home_score"] == 17
+
+
+def test_the_live_index_joins_RAMS_and_COMMANDERS_across_the_abbr_mismatch():
+    """It did not, and it cost a whole slate on 2026-09-27.
+
+    `nfl_game_state_index` keys on ESPN abbreviations (`LAR@DEN`); `live_key`
+    comes from the projections, which are nflverse-style (`LA@DEN`). 30 of 32
+    teams agree, so the join looked fine -- it fails only for the Rams and the
+    Commanders. The prop capture reported `no_row=2` with one live game on the
+    board, `LA_DEN`, and the single capturable game of the night was the one
+    team that does not join.
+    """
+    from scripts._nfl_live_resim_tick import build_live_index
+
+    espn_state = {
+        "LAR@DEN": {"event_id": "1", "in_progress": True, "final": False,
+                    "period": 1, "clock": "7:30", "home_pts": 3, "away_pts": 0},
+        "WSH@DAL": {"event_id": "2", "in_progress": True, "final": False,
+                    "period": 2, "clock": "0:12", "home_pts": 10, "away_pts": 7},
+        "KC@BUF": {"event_id": "3", "in_progress": True, "final": False,
+                   "period": 3, "clock": "1:00", "home_pts": 21, "away_pts": 14},
+    }
+    games = [{"live_key": "LA@DEN"}, {"live_key": "WAS@DAL"}, {"live_key": "KC@BUF"}]
+    index = build_live_index(espn_state, games)
+
+    # Keyed by the caller's OWN live_key, so the producer still looks it up the
+    # way it always did -- only the lookup into ESPN's index is mapped.
+    assert set(index) == {"LA@DEN", "WAS@DAL", "KC@BUF"}
+    assert index["LA@DEN"]["event_id"] == "1"
+    assert index["LA@DEN"]["period"] == 1
+    assert index["WAS@DAL"]["event_id"] == "2"
+    assert index["KC@BUF"]["event_id"] == "3", "an unmapped team must still join directly"

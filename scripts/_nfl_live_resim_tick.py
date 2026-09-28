@@ -93,6 +93,37 @@ def normalise_live_row(row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+# nflverse -> ESPN team abbreviations, for the ONE join where the two meet.
+#
+# MEASURED 2026-09-28T00:38Z. `nfl_game_state_index` keys its index
+# `f"{away_abbr}@{home_abbr}"` using ESPN's abbreviations, while `live_key` is
+# built from the PROJECTIONS, which are nflverse-style. For 30 of 32 teams the
+# two agree and the join works, which is exactly why this went unnoticed: it
+# fails only for the Rams and the Commanders.
+#
+# The cost was a whole slate. The per-quarter prop capture reported
+# `PROP_CAPTURE_TICK no_period_or_clock=14 no_row=2` while the board showed one
+# live game -- `LA_DEN`, Sunday night, a RAMS game. The single remaining
+# capturable game of the night was the one team whose abbreviation does not
+# join, so the capture could not fire and the slate's data is unrecoverable.
+#
+# The same mismatch was already found on a DIFFERENT join
+# (`backtest_nfl_live_totals.ESPN_TO_RATINGS_ABBR`, ratings lookup) and fixed
+# there in isolation. It is the same defect in two places, which is the argument
+# for a named map rather than a fuzzy match: a fuzzy match would have silently
+# joined something.
+NFLVERSE_TO_ESPN_ABBR = {"LA": "LAR", "WAS": "WSH"}
+
+
+def _espn_key(live_key: str) -> str:
+    """`LA@DEN` -> `LAR@DEN`. Unchanged when neither side needs mapping."""
+    away, sep, home = str(live_key or "").partition("@")
+    if not sep:
+        return live_key
+    return (f"{NFLVERSE_TO_ESPN_ABBR.get(away, away)}@"
+            f"{NFLVERSE_TO_ESPN_ABBR.get(home, home)}")
+
+
 def build_live_index(
     state_index: Mapping[str, Mapping[str, Any]],
     games: Any,
@@ -112,6 +143,8 @@ def build_live_index(
         if not key:
             continue
         raw = state_index.get(key)
+        if raw is None:
+            raw = state_index.get(_espn_key(key))
         if raw is None:
             continue
         out[key] = normalise_live_row(raw)
