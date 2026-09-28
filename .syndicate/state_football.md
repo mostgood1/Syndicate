@@ -107,8 +107,36 @@ population removed the entire effect and the real one is 15x smaller.
 current too-narrow sd, so `k=3` is best GIVEN that blend; widening the sd requires
 re-fitting it in the same pass.
 
-Full working: `.syndicate/findings_2026-09-28_nfl_prop_model_diagnosis.md` and
-`.syndicate/findings_2026-09-28_nfl_spread_shrinkage_sweep.md`.
+**SHIPPED 2026-09-28** (`cf2cdbae`, main, NOT deployed): `stdev` + usage-scaled CV
+shrinkage at a GLOBAL k=6, with the blend RE-FITTED (6 of 8 weights adopted, 2
+rejected for losing out of sample). Held out 2024-25, high-usage p70, same 8,629
+rows: **Brier 0.219600 -> 0.211765, worst bucket 0.2231 -> 0.0878 -- the first NFL
+prop configuration to PASS the `#499` bar.** cov80 OVERSHOOTS to 0.8906 against
+0.80: too narrow became somewhat too wide.
+
+**A FALSE VERIFICATION WAS CAUGHT AND CORRECTED IN THE SAME PASS.** Two blend
+re-fits measured the OLD spread, because
+`backtest_nfl_props._rate_from_log` is a LOCAL COPY of `player_rate` whose
+docstring said "identical math" and still called `pstdev`. They returned numbers
+identical to SIX DECIMAL PLACES across eight markets -- impossible over a 3-5x
+wider sd, which is what exposed it. `_rate_from_log` now calls the production
+function.
+
+**PER-MARKET `k` IS REFUTED** on its own out-of-sample grade: pooled Brier gain
+-0.000077 (1% of the shrinkage's own -0.0078), 5 markets better and 3 worse, and
+bucket gaps moving BACKWARDS on the two best-calibrated markets. `k` is done as a
+lever.
+
+**THE 3 MARKETS STILL FAILING SPLIT IN TWO.** `interceptions` (5 distinct
+outcomes, P(0)=0.52) and `passing_tds` (6 distinct, P(0)=0.18) are DISCRETE -- a
+continuous CDF cannot be calibrated against that support at any sd, which is why
+per-market k moved them the wrong way. They want the `anytime_td` treatment (a
+rate/count model, already precedented in `_nfl_prop_model_probability`).
+`passing_attempts` (57 distinct) is the one genuine k case: fails at k=6 (0.1619),
+crosses at k=2 (0.1463), NOT shipped.
+
+Full working: `.syndicate/findings_2026-09-28_nfl_prop_model_diagnosis.md`,
+`..._nfl_spread_shrinkage_sweep.md` and `..._nfl_per_market_k.md`.
 
 ## [nfl-model-edge-suppressed] NFL'S MODEL EDGE REACHES 3% OF THE SERVED BOARD, AND THE 15-POINT GUARD IS RIGHT TO REJECT IT `[measured 2026-09-28 on the served payload, lane layer2-triad-alignment]`
 
