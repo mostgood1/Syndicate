@@ -43180,3 +43180,56 @@ since 20:27:25Z: 0 (read 20:29:22Z). Not yet exercised on a live game.
 **verify:** 09-29 -- rebounds rows carry many lines per player (grid), assists/threes one; rows of
 all three show `residual_sigma` varying by player (the NegBin sd), and `me` non-null counts per
 market in the population part. Task `wnba-live-prop-grid-reading-0929`.
+
+## 2026-09-28 20:35Z — ALL THREE SERVICES `41f14c3e` (lane `layer2-triad-alignment`)
+
+    refresh-worker  dep-datcv89srm7s7387mnt0  c3874b91 -> 41f14c3e  live 20:42:22Z
+    live-odds-worker dep-datcvke7bikc73d34apg b8ea31bc -> 41f14c3e  live 20:42:28Z
+    web             dep-datcveek1f9s73fpr9lg  c3874b91 -> 41f14c3e  live 20:43:16Z
+
+Each behind its own claim, a baseline read from that service's OWN live SHA
+(`SPREAD_SHRINKAGE_K_BY_MARKET` = 0 on all three) and a CLEAR preflight.
+
+**EXPECTATION MET.** `nfl_passing_attempts_k2_override_live: false -> true`.
+Verified BY CONTENT on the deployed SHA: `discrete=5 spread_k=3 override_table=2
+refit_weight=1`. web served HTTP 200 (159 rows).
+
+### What is now live
+
+`passing_attempts` takes a k=2 spread override (global k stays 6), with the blend
+re-fitted for it alone (0.9480 -> 0.9449, OOS +0.004144; every other market
+unchanged to four decimals, which is the check that the re-fit isolated the one
+market whose spread moved).
+
+**ALL EIGHT NFL PROP MARKETS PASS THE `#499` BAR**, held out 2024-25 through the
+shipped function and the production spread:
+
+    passing_yards    0.1324    passing_attempts  0.1463
+    passing_tds      0.0318    rushing_yards     0.0359
+    rushing_attempts 0.0404    receiving_yards   0.0740
+    receptions       0.1167    interceptions     0.0690
+
+    AGGREGATE worst powered bucket 0.0811, Brier 0.210901.
+
+This morning: 0.2231 and five of eight failing.
+
+### Two honesty notes carried from the selection
+
+- `passing_attempts` k=1 had a BETTER held-out bucket (0.1198 vs 0.1463) and was
+  NOT taken, because k=2 is what the FIT seasons chose on both metrics. Selecting
+  on the test set is the one thing the split exists to prevent.
+- 0.1463 against a 0.150 bar is a THIN pass, not a comfortable one.
+
+### STILL OWED, unchanged by any of this
+
+**In effect nowhere.** `props.py` skips recomputation when the projection
+artifact answers, and the artifact still predates every deploy. Task
+`nfl-prop-poisson-artifact-reading` fires 2026-09-29 12:30 CT, gates on
+`projection.generated_at`, and now reads the FINAL configuration rather than the
+intermediate one — which is why this was deployed tonight rather than tomorrow.
+
+Service SHAs moved twice under this session while it worked (another lane
+deployed live-odds-worker to `b8ea31bc` at 20:27Z, and refresh-worker took a
+`trigger=service_updated` redeploy at 20:08Z on the same SHA). Every ancestry
+check here was re-run against the CURRENT live SHA immediately before deploying,
+not the one read minutes earlier.
