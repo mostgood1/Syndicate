@@ -905,6 +905,15 @@ death, never life — do not invert it.
 - Blocked by: none
 - Result: **GOAL MET.** `4b5ebc0a` web live 17:18:24Z (`dep-dat9vm0jo6nc73erilig`). `?sport=nfl` path `.../nfl_live_lens.json` (17:09:43Z) -> `.../nfl_live_resim.json` (17:19:14Z); `sources_seen` `{}` -> `{pregame: 16}`, so different bytes, not a relabel. The prop half keeps the lens (`prop_path`), because `attach_live_projections_for_sport` (board_enrichment.py:1877) still reads it. Measurement: `deploys.md` 2026-09-28 12:18 PM CT. Files released.
 
+### lane-open-marker-primary-tree — CLOSED 2026-09-28 — opened 2026-09-28 — session acb76ba7-70eb-4b26-b7b8-3cb425e6a6a0
+- Goal: lane_open.py run from a worktree writes .current-lane.<session> into the PRIMARY tree's .syndicate/, where deploy-guard.py and lane-guard read it
+- Files: scripts/lane_open.py, tests/test_lane_open.py
+- Hypothesis: marker = lanes_path.parent, which is the worktree's .syndicate/ when run from a worktree; the guards read CLAUDE_PROJECT_DIR (primary). Observed 2026-09-28 lane ops-snapshot-index-join-path: deploy-guard said 'your lane: <none>'.
+- Falsification test: n/a
+- Verification: test: lanes.md in a git worktree -> marker lands in the main worktree's .syndicate/
+- Blocked by: none
+- Result: **GOAL MET.** `marker_dir()` resolves the primary tree from `git rev-parse --git-common-dir`, run from the directory holding `--lanes`. Outside git, the marker still goes beside `lanes.md`. `tests/test_lane_open.py`: a real repo + worktree in `tmp_path` puts the marker in main's `.syndicate/` and not the worktree's. It fails on the old tool and passes on the new; all 12 pass. Local tooling, no deploy. Files released.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

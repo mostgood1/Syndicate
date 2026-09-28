@@ -99,6 +99,44 @@ def build_block(slug: str, session: str, date: str, goal: str, files: str,
     ])
 
 
+def marker_dir(lanes_path: pathlib.Path) -> pathlib.Path:
+    """The `.syndicate/` the GUARDS read, which is not always `lanes_path.parent`.
+
+    `deploy-guard.py` and `lane-guard.py` read `CLAUDE_PROJECT_DIR`, the PRIMARY
+    tree. Run from a session worktree -- which the protocol requires -- this tool
+    used to write the marker beside the worktree's `lanes.md`, where nothing
+    reads it. Measured 2026-09-28, lane `ops-snapshot-index-join-path`: claim
+    held and preflight CLEAR, and deploy-guard still blocked with `your lane:
+    <none>`. The same class `deploy_claim._main_worktree_root` fixed for claims.
+
+    `--git-common-dir` is shared by every worktree and points at the primary
+    tree's `.git`; its parent is the tree the guards read. Resolved from the
+    directory holding `lanes_path`, so a `--lanes` outside any repo (the tests)
+    keeps the old placement, as does anything git cannot answer.
+    """
+    import subprocess
+
+    here = lanes_path.resolve().parent
+    for args in (
+        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],  # git >= 2.31
+        ["git", "rev-parse", "--git-common-dir"],
+    ):
+        try:
+            done = subprocess.run(args, cwd=str(here), capture_output=True,
+                                  text=True, timeout=15)
+        except Exception:
+            continue
+        raw = (done.stdout or "").strip()
+        if done.returncode != 0 or not raw:
+            continue
+        common = pathlib.Path(raw)
+        if not common.is_absolute():
+            common = (here / common).resolve()
+        if common.name == ".git" and common.parent.is_dir():
+            return common.parent / ".syndicate"
+    return here
+
+
 def insert_into_open_section(text: str, block: str) -> str:
     """Put `block` at the END of the `## OPEN` section, never at EOF."""
     m = OPEN_HEADING.search(text)
@@ -175,9 +213,10 @@ def main() -> int:
         # Per-session marker ONLY. The bare `.syndicate/.current-lane` is a single
         # shared slot and writing it makes every other session with no marker of
         # its own read as owning YOUR lane (`lane.md` step 6).
-        marker = lanes_path.parent / f".current-lane.{a.session}"
+        marker = marker_dir(lanes_path) / f".current-lane.{a.session}"
+        marker.parent.mkdir(parents=True, exist_ok=True)
         marker.write_text(a.slug, encoding="utf-8")
-        print(f"marker written: {marker.name}")
+        print(f"marker written: {marker}")
     return 0
 
 

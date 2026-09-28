@@ -150,3 +150,42 @@ def test_dry_run_writes_nothing(tmp_path):
     assert r.returncode == 0
     assert lanes.read_bytes() == before
     assert EM in r.stdout
+
+
+def _run_with_marker(lanes: pathlib.Path) -> subprocess.CompletedProcess:
+    cmd = [sys.executable, str(TOOL), "--lanes", str(lanes), "--slug", "new-lane",
+           "--goal", "a testable outcome", "--files", "scripts/x.py",
+           "--session", "sess-1", "--date", "2026-09-23"]
+    return subprocess.run(cmd, capture_output=True, text=True)
+
+
+def _git(cwd: pathlib.Path, *args: str) -> None:
+    subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", *args],
+                   cwd=str(cwd), check=True, capture_output=True)
+
+
+def test_marker_from_a_worktree_lands_in_the_PRIMARY_tree(tmp_path):
+    """The guards read the primary tree's `.syndicate/`. Measured 2026-09-28: a
+    marker written beside the worktree's lanes.md left deploy-guard reporting
+    `your lane: <none>` for a lane that held its claim and a CLEAR preflight."""
+    main = tmp_path / "main"
+    (main / ".syndicate").mkdir(parents=True)
+    _lanes(main / ".syndicate")
+    _git(main, "init", "-q")
+    _git(main, "add", "-A")
+    _git(main, "commit", "-q", "-m", "init")
+    wt = tmp_path / "wt"
+    _git(main, "worktree", "add", "-q", str(wt))
+
+    r = _run_with_marker(wt / ".syndicate" / "lanes.md")
+    assert r.returncode == 0, r.stderr
+    primary = main / ".syndicate" / ".current-lane.sess-1"
+    assert primary.read_text(encoding="utf-8") == "new-lane"
+    assert not (wt / ".syndicate" / ".current-lane.sess-1").exists()
+
+
+def test_marker_outside_git_stays_beside_lanes(tmp_path):
+    lanes = _lanes(tmp_path)
+    r = _run_with_marker(lanes)
+    assert r.returncode == 0, r.stderr
+    assert (tmp_path / ".current-lane.sess-1").read_text(encoding="utf-8") == "new-lane"
