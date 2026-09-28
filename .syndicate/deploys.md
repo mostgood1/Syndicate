@@ -42615,3 +42615,52 @@ The capture fires only within 120 s of the end of Q1/Q2/Q3. At deploy time the 1
 ### NOT claimed
 
 That any prop is priced, projected or published. This writes observations to disk and nothing else. The parked `live_prop_projection` keeps its posture of emitting `liveProjection` and never `liveModelProbOver`, and remains unwired.
+
+---
+
+## 2026-09-27 evening — refresh-worker, SEVEN deploys for one collector, ending `6cfd4f4a`. **THE CAPTURE IS VERIFIED. The heartbeat is VERIFIED. The NFL floor's live reading is still OWED.**
+
+### 1. NFL per-quarter prop capture — VERIFIED, by the writer's own line
+
+    2026-09-28T02:53:56Z [nfl_prop_capture] CAPTURED
+      event=401872962  period=3  rows=62
+      path=/opt/render/project/data/nfl_source/live_prop_capture/2026-09-28.jsonl
+
+62 player rows at the end of Q3, on `/opt/render/project/data` -- the MOUNTED DISK, not `src/data` -- so it survives the next deploy. The per-tick tally agreed (`captured=1`), but only the writer's line is treated as evidence here, because **the tally's `captured=` counter produced a FALSE POSITIVE at 01:44:39Z**: the hook returned "captured" because the writer had been CALLED, while every row had been dropped and nothing reached disk.
+
+### SEVEN BUGS, in the order found, none caught by a test
+
+1. **Wrong hook.** `nfl_player_box_index` is called only from the WEB blueprint in a request path -- it would write to a disk the worker cannot read, and only when somebody loaded the cards page. A collector that depends on browsing is not a collector.
+2. **Write path.** `default_nfl_source_root()` picks a root by PROBING for `upcoming_recs_*.csv`, an unrelated family the repo mirror ships and the mounted disk does not, so it resolved to the ephemeral checkout (`#389`/`#441` measured the same selector doing this for days). My code comment claimed the opposite, which is worse than no comment.
+3. **Missing `event_id`.** `normalise_live_row` does not carry it, because `live_state_from_row` has no use for it. The capture's lookup returned empty on every game of every tick.
+4. **Liveness gate.** The hook required `isinstance(resolved, NflLiveGameState)` -- i.e. the game being SIMULATABLE -- but a game AT a boundary is in a BREAK. Measured 22:07Z: LV@NO at `Q2 0:00` while the tick reported `live_resimmed 3` against 4 live games. Halftime, the longest and most observable boundary, was missed every time.
+5. **`LA` vs `LAR`.** `nfl_game_state_index` keys on ESPN abbreviations; `live_key` comes from the nflverse-style projections. 30 of 32 teams agree, so it failed only for the Rams and Commanders -- and Sunday night's ONE capturable game was a Rams game. The same mismatch had already been found on the RATINGS join and fixed there in isolation: one defect, two places.
+6. **`player_name` vs `player`, plus invented stat names.** `_merged_player_rows` emits `{player_name, team_abbr, **_ROW_FIELDS}`; the capture looked for `player`/`name` and for `pass_completions`/`interceptions`/`total_yards`/`td_scored`, none of which the producer emits. Every row dropped, empty file written.
+7. **A success signal that was not one.** The hook reported `captured` without checking the writer's return value.
+
+### THE LESSON, and it is one thing
+
+**The per-tick tally should have been change ONE.** Before it, "no game was at a boundary" and "the capture is broken" were the SAME observation -- five deploys were spent unable to tell them apart. After it, bug 5 was diagnosed in seven minutes and bug 6 in two.
+
+**And the fixtures were never evidence.** Every test in `test_nfl_live_prop_capture.py` used `{"player": ...}` and passed through all six bugs: they tested an assumption back to itself. The only one worth having is now built FROM `live_player_box._ROW_FIELDS`, with `CAPTURED_FIELDS` asserted to be a subset of it, so a rename on either side fails.
+
+### 2. Standalone memory heartbeat (`87ce81d7`) — VERIFIED
+
+Measured in the genuinely quiet window after the slate ended (`check_deploy_safety` CLEAR, nothing in flight):
+
+    181 samples 04:06:57Z .. 04:56:22Z
+    max gap 60s (the configured interval)   median 10s
+    gaps over the 180s preflight limit: 0 of 180
+    deploy_preflight returned CLEAR on three consecutive polls in the same window
+
+Both halves of the lane's Verification. Before this, the emitter ran only INSIDE a `refresh_odds_sources` run, and 80 consecutive preflight polls over 37 minutes gave 41 HOLD, 39 UNKNOWN and ZERO CLEAR -- the service was structurally undeployable by its own gate.
+
+### 3. NFL separation floor (`ebe7785e`) — live reading OWED
+
+Offline it is verified: the guard refused 53.3% of all 1,488 pairings and now refuses 2.2%, and the cutoff-replay harness went 45 `degenerate_ratings` refusals to 0, 18 to 32 scored games, 3 to 10 powered buckets. **The LIVE reading is not obtainable tonight:** every game is final, so `NFL_LIVE_RESIM` reports `live_resimmed 0` and there are no refusals to count. Next live NFL slate.
+
+### Still owed, recorded so it is not mistaken for done
+
+- **The captured data is NOT RETRIEVABLE.** `nfl_source/live_prop_capture/*.jsonl` is not in `HOT_ARTIFACT_PATTERNS`, so it sits on the worker's disk where nothing can read it. It PERSISTS (mounted disk), so this can ride any later deploy -- but no fit can run until it does.
+- The week-3 re-grade of folded-vs-unfolded score-and-clock, now that the slate is complete.
+- NCAAF has no live player box at all; its capture needs the data layer built first.
