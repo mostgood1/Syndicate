@@ -121,6 +121,111 @@ REASON_NO_PROJECTION = "no_live_projection_to_price"
 REASON_NO_MINUTES_REMAINING = "minutes_remaining_unknown_so_no_measured_interval"
 REASON_NO_LINE = "no_line_to_price_against"
 REASON_NO_MEASURED_MARKET = "no_measured_residual_for_this_market"
+REASON_NO_CURRENT = "count_market_needs_the_banked_stat_to_price_the_remainder"
+
+# PLAYER-SCALED REMAINDER FOR THE COUNT MARKETS `[2026-09-28, lane
+# live-props-model-probability, user: "build the player-scaled spread model"]`.
+#
+# WHY. One sigma per time bucket gives a 2-rebound bench player and a 10-rebound
+# center the same spread. Interval coverage hid it (91.5-91.8% out of sample); LINE-LEVEL
+# calibration -- predicted vs observed P(final >= line) over the ladder the lens
+# publishes, CLOCK-sampled replays -- did not: overs overstated by up to 18.5 pp
+# (rebounds), 10 (assists), 18.7 (threes) in-season. Empirical CDFs and a plain
+# Poisson remainder fixed neither.
+#
+# THE MODEL. What is still to come, R = final - banked, is a count:
+#     R ~ NegBin(mean m, dispersion r),  m = c_b * (projected - banked),  Var = m + m^2/r
+# so the spread scales with the player's own expected remainder, the distribution is
+# skewed like counts are, and nothing is priced below what is already banked. `c_b`
+# (per minutes-remaining bucket) re-scales the SHIPPED projection's remainder -- it is
+# how the measured bias enters PRICING without changing the projection itself; `r` is
+# the dispersion (per bucket for rebounds/assists, one value for threes).
+#
+# PROVENANCE. Maximum likelihood over clock-sampled replays (`scripts/
+# grade_wnba_live_prop_projection.py --sampling clock`), 2026-07-17..08-31; variant
+# chosen on August with a July fit; then ONE test on September (playoffs, held out of
+# everything). Worst line-level gap, rotation players, September: rebounds 16.7 -> 3.0 pp,
+# assists 11.1 -> 6.1, threes 26.5 -> 5.9 (normal -> this). Brier skill up on all three.
+# THESE ARE FITTED VALUES: change them only by re-running that fit.
+#
+# (low, high, c, r) per minutes-remaining bucket.
+_NEGBIN_REMAINDER: dict[str, tuple[tuple[float, float, float, float], ...]] = {
+    "rebounds": (
+        (30.0, float("inf"), 0.74, 7.0),
+        (20.0, 30.0, 0.80, 5.0),
+        (10.0, 20.0, 0.82, 3.0),
+        (5.0, 10.0, 1.00, 1.5),
+        (0.0, 5.0, 2.66, 0.5),
+    ),
+    "assists": (
+        (30.0, float("inf"), 1.20, 25.0),
+        (20.0, 30.0, 1.14, 5.0),
+        (10.0, 20.0, 1.04, 2.0),
+        (5.0, 10.0, 1.16, 1.0),
+        (0.0, 5.0, 2.84, 0.5),
+    ),
+    "threes": (
+        (30.0, float("inf"), 0.96, 1.5),
+        (20.0, 30.0, 0.96, 1.5),
+        (10.0, 20.0, 0.94, 1.5),
+        (5.0, 10.0, 1.22, 1.5),
+        (0.0, 5.0, 2.22, 1.5),
+    ),
+}
+COUNT_MARKETS = frozenset(_NEGBIN_REMAINDER)
+
+
+def _as_number(value: Any) -> float | None:
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if out != out else out
+
+
+def negbin_remainder(projected: Any, current: Any, minutes_remaining: Any, market: str) -> dict[str, float] | None:
+    """`{mean, dispersion, sd, center}` of the remaining-production NegBin, or None.
+
+    None for a non-count market, an unknown state, or minutes outside the fitted range.
+    `center` is banked + mean: where the priced distribution actually sits.
+    """
+    table = _NEGBIN_REMAINDER.get(str(market or ""))
+    proj, cur, rem = _as_number(projected), _as_number(current), _as_number(minutes_remaining)
+    if table is None or proj is None or cur is None or rem is None or rem < 0.0:
+        return None
+    for low, high, c, r in table:
+        if low <= rem < high:
+            mean = c * max(proj - cur, 0.0)
+            sd = math.sqrt(mean + mean * mean / r) if mean > 0.0 else 0.0
+            return {"mean": mean, "dispersion": r, "sd": sd, "center": cur + mean}
+    return None
+
+
+def _negbin_sf(k: int, mean: float, r: float) -> float:
+    """P(R >= k) for R ~ NegBin(mean, dispersion r)."""
+    if k <= 0:
+        return 1.0
+    if mean <= 0.0:
+        return 0.0
+    p = r / (r + mean)
+    pmf = p ** r
+    cdf = pmf
+    for i in range(1, k):
+        pmf *= (i - 1 + r) / i * (1.0 - p)
+        cdf += pmf
+    return max(0.0, min(1.0, 1.0 - cdf))
+
+
+def grid_center_and_sd(projected: Any, current: Any, minutes_remaining: Any, market: str) -> tuple[float, float] | None:
+    """Where the priced distribution sits and how wide, for sizing a line grid."""
+    if str(market or "") in COUNT_MARKETS:
+        nb = negbin_remainder(projected, current, minutes_remaining, market)
+        return None if nb is None else (nb["center"], nb["sd"])
+    proj = _as_number(projected)
+    sigma = residual_sigma(minutes_remaining, market)
+    if proj is None or sigma is None or sigma <= 0.0:
+        return None
+    return proj, sigma
 
 
 def residual_sigma(minutes_remaining: Any, market: str = "points") -> float | None:
@@ -155,6 +260,7 @@ def live_prop_prob_over(
     line: Any,
     minutes_remaining: Any,
     market: str = "points",
+    current: Any = None,
 ) -> dict[str, Any]:
     """`P(final >= line)` from the projection and its measured residual.
 
@@ -181,6 +287,22 @@ def live_prop_prob_over(
 
     if str(market or "") not in MEASURED_MARKETS:
         out["unavailable_reason"] = REASON_NO_MEASURED_MARKET
+        return out
+    if str(market) in COUNT_MARKETS:
+        # A COUNT market is priced on the player-scaled remainder, never the normal.
+        # Without the banked stat there is no remainder to price, so it refuses --
+        # falling back to the normal would restore the miscalibration this replaced.
+        if _as_number(current) is None:
+            out["unavailable_reason"] = REASON_NO_CURRENT
+            return out
+        nb = negbin_remainder(projection, current, minutes_remaining, market)
+        if nb is None:
+            out["unavailable_reason"] = REASON_NO_MINUTES_REMAINING
+            return out
+        out["residual_sigma"] = round(nb["sd"], 4)
+        out["basis"] = "measured_negbin_remainder"
+        needed = math.ceil(target - float(current))
+        out["prob_over"] = round(_negbin_sf(needed, nb["mean"], nb["dispersion"]), 6)
         return out
     sigma = residual_sigma(minutes_remaining, market)
     if sigma is None or sigma <= 0.0:

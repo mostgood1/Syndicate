@@ -410,7 +410,7 @@ def _attach_live_props(games: list[dict[str, Any]], date_str: str) -> None:
             game_minutes_remaining=_game_minutes_remaining(game),
             lines=lines,
             # Live board lines move off the pregame line this lens is given; the
-            # grid prices them. POINTS ONLY, and that is a MEASURED choice
+            # grid prices them. Was POINTS ONLY, and that was a MEASURED choice
             # `[2026-09-28, lane live-props-model-probability, user decision "Roll back
             # reb/ast grid"]`: line-level calibration on CLOCK-sampled replays of
             # rotation players (fit Jul, test Aug) -- worst gap between predicted and
@@ -419,7 +419,11 @@ def _attach_live_props(games: list[dict[str, Any]], date_str: str) -> None:
             # which hurts low counts most. Rebounds/assists/threes keep their single
             # pregame line (priced on their own tables, which beat the old points
             # table); widening them waits on a player-scaled spread.
-            grid_markets=("points",),
+            # REBOUNDS JOINS `[2026-09-28, player-scaled NegBin remainder]`: its worst
+            # line-level gap is 3.0 pp on the held-out September (3.7 on August),
+            # under the ~5 pp bar. Assists (6.1) and threes (5.9) are priced on the
+            # same model but stay at one line each -- close to the bar, not under it.
+            grid_markets=("points", "rebounds"),
         )
         game["liveProps"] = to_snapshot_live_props(built["rows"])
         game["livePropsCoverage"] = {

@@ -44,7 +44,7 @@ import re
 import unicodedata
 from typing import Any, Iterable, Mapping
 
-from syndicate.features.shared.wnba_live_prop_probability import live_prop_prob_over, residual_sigma
+from syndicate.features.shared.wnba_live_prop_probability import grid_center_and_sd, live_prop_prob_over
 from syndicate.features.shared.wnba_live_prop_projection import project_live_player_stat
 
 # (live-capture key, sim mean key, market label). Declared rather than derived:
@@ -259,15 +259,13 @@ def _grid_lines(supplied: Any, *, projected: Any, current: Any, minutes_remainin
     out: set[float] = set()
     if supplied is not None:
         out.add(supplied)
-    try:
-        center = float(projected)
-    except (TypeError, ValueError):
+    # THIS market's priced distribution -- its centre and spread -- so the grid's reach
+    # matches what prices it. For count markets that is the player-scaled NegBin
+    # remainder (centred on banked + fitted mean), not the raw projection.
+    placed = grid_center_and_sd(projected, current, minutes_remaining, market)
+    if placed is None or placed[1] <= 0.0:
         return sorted(out) if out else [supplied]
-    # THIS market's measured sigma, so the grid's reach matches the interval that
-    # prices it -- a points-wide grid on rebounds would publish lines priced ~0/1.
-    sigma = residual_sigma(minutes_remaining, market)
-    if sigma is None or sigma <= 0.0:
-        return sorted(out) if out else [supplied]
+    center, sigma = placed
     try:
         banked = float(current) if current is not None else 0.0
     except (TypeError, ValueError):
@@ -294,6 +292,7 @@ def _price_row(row: dict[str, Any], line: Any, verdict: Mapping[str, Any]) -> No
         line=line,
         minutes_remaining=verdict.get("minutes_remaining"),
         market=row.get("market") or "points",
+        current=row.get("current"),
     )
     row["line"] = line
     row["residual_sigma"] = priced.get("residual_sigma")
