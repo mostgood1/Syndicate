@@ -43233,3 +43233,28 @@ deployed live-odds-worker to `b8ea31bc` at 20:27Z, and refresh-worker took a
 `trigger=service_updated` redeploy at 20:08Z on the same SHA). Every ancestry
 check here was re-run against the CURRENT live SHA immediately before deploying,
 not the one read minutes earlier.
+
+## 2026-09-28 4:05 PM CT — live-odds-worker `6f7be98d` (lane `live-props-model-probability`) — WNBA rebounds/assists priced on a game-state remaining-minutes model; assists joins the grid. **Reading owed: 09-29.**
+
+    deploy dep-datddcc9v7es7389jo8g   live-odds-worker 41f14c3e -> 6f7be98d
+    fired 21:05:53Z   live 21:08:47.79859Z   trigger=api   status=live
+    preflight CLEAR 21:05:4xZ (infrastructure processes only)
+    baseline read 21:05:4xZ from live 41f14c3e's code: grid_markets=("points", "rebounds");
+        rebounds/assists NegBin mean on the projection's min(pregame - played, clock) minutes
+    NOTE: live-odds-worker had been redeployed at 41f14c3e (lane layer2-triad-alignment, 20:35Z),
+        which CONTAINS b8ea31bc and dd77591b -- verified by ancestry before building on it
+    collateral: 01092639 (NFL game-day injuries publish path, on main, low risk)
+
+**What shipped.** `expected_remaining_minutes` (clock_left x fitted share: pregame share, live share,
+lateness, the rule's share, late blowout). Remaining-minutes MAE, held-out Sep: 4.89 -> 3.44 min
+(rotation 4.60 -> 3.55). Rebounds/assists NegBin mean = c_b x rate x E[remaining minutes];
+refit c_b ~0.9-1.3 everywhere (last-5-min c was 2.7-2.8). Sep rotation worst line-level gap:
+assists 6.3 -> 3.5 pp, rebounds 3.0 -> 3.1 (all players 3.0 -> 2.2); skill up on both. Threes
+unchanged (bench-shooter RATE problem). Grid: points + rebounds + assists. The lens derives
+each team's margin from the game score (`_team_margins`); unknown margin = no blowout adjustment.
+
+**Measured after.** First TICK_COMPLETE on the new instance 21:10:50Z, all sports True; `Traceback`
+since 21:08:47Z: 0 (read 21:11:14Z). Not yet exercised on a live game.
+
+**verify:** 09-29 -- rebound/assist rows carry `expected_remaining_minutes` and `rate`; assists now
+gridded; population part `me` counts per market. Task `wnba-live-prop-grid-reading-0929`.
