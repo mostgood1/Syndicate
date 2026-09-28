@@ -42810,3 +42810,33 @@ live SHA with a hard stop if it did not read as expected.
   sweep is measured in production.
 - NCAAF live props still have no `live_player_box` at all; the data layer comes
   before any capture.
+
+## 2026-09-28 11:03 AM CT — refresh-worker `15ddf78e` (lane `gameline-spread-total-scoring`) — MLB segment rows scored on the board build. **MEASUREMENT OWED: first MLB final (Wild Card, 2026-09-29).**
+
+    deploy dep-dat8vd17lnhs73c4jbt0   refresh-worker 02948aa0 -> 15ddf78e
+    fired 16:03:00Z   live 16:09:11Z   trigger=api   status=live (deploys API, 16:1xZ)
+    preflight CLEAR 16:02:50Z (two HOLDs on in-flight board builds first; no sim running)
+    baseline read 16:02:50Z: /api/board/book-grid?sport=mlb&date=2026-09-27
+        live_gameline_score.segments           ABSENT
+        unmeasured.segment_actual_unavailable  2061
+
+**What shipped.** `score_block_for_grid` attaches `live_gameline_score.segments` from
+`live_gameline_segment_actuals.segment_score_blocks`: each MLB segment (first1/3/5) scored
+ALONE, after the unchanged headline call, against StatsAPI `/linescore` read once per FINAL
+game (in-process cache). User-approved cross-lane write into `live-inplay-board-cadence`'s
+file, recorded in that block.
+
+**Expectation (stated before the deploy).** On the first build of a date with an MLB final:
+`segments.by_segment.first5.all_records.market.n > 0`, `segments.lookup.games_answered` equal
+to the final games, and the HEADLINE keys unchanged in meaning (`segment_actuals_supplied`
+stays false; `unmeasured.segment_actual_unavailable` still counts segment rows there, by
+design -- they are scored in `segments`, not in the headline). Offline on the real 09-27
+ledger + grid: 14/14 finals answered, first5 h2h 12 games n=176, 1.8 s cold / 0.02 s cached.
+
+**Why no reading today.** 2026-09-28 is an MLB off-day (regular season ended 09-27, Wild Card
+starts 09-29); the served MLB board has 0 rows, so the block cannot appear until a game ends.
+
+**verify:** `GET /api/board/book-grid?sport=mlb` after the first 09-29 final ->
+`live_gameline_score.segments.lookup` (`fetched`, `games_answered`, `refused_by_reason`) and
+`segments.by_segment.first5.all_records.market.n`. The nightly task
+`live-gameline-accuracy-snapshot` prints the `segment first5 h2h` line from the same block.
