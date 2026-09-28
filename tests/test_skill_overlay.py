@@ -107,3 +107,28 @@ class _FrozenDatetime(datetime):
     @classmethod
     def now(cls, tz=None):
         return NOW if tz else NOW.replace(tzinfo=None)
+
+
+def test_a_freshly_booted_host_reads_the_overlay_and_may_pull(tmp_path, monkeypatch):
+    """`time.monotonic()` counts from BOOT. "Never checked" / "never pulled" used to be
+    0.0, so on a host up for less than CHECK_INTERVAL_SECONDS (600s) the first read
+    looked FRESH and returned the static table, and for PULL_INTERVAL_SECONDS (1800s)
+    no pull could start -- the reachability test above failed on every CI runner
+    booted under 10 minutes before it ran (2026-09-28)."""
+    path = tmp_path / "overlay.json"
+    path.write_text(json.dumps(_payload()), encoding="utf-8")
+    monkeypatch.setattr(so, "_overlay_file", lambda: path)
+    monkeypatch.setattr(so, "datetime", _FrozenDatetime)
+    monkeypatch.setattr(so.time, "monotonic", lambda: 5.0)  # five seconds after boot
+    assert set(so.active_table({})) == {LOSS_ID}
+    assert so.status()["source"] == "overlay"
+
+    started = []
+    monkeypatch.setenv("ADMIN_TOKEN", "t")
+    from syndicate.features.shared import artifact_publisher as ap
+
+    monkeypatch.setattr(ap, "_export_url", lambda **_: "https://web.example/export")
+    monkeypatch.setattr(so.threading, "Thread", lambda *a, **k: type("T", (), {"start": lambda self: started.append(1)})())
+    so.reset_cache()
+    so.active_table({}, path=tmp_path / "missing.json")
+    assert started == [1], "a missing overlay on a fresh host must be allowed to start its pull"
