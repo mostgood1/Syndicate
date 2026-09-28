@@ -43477,3 +43477,36 @@ since 21:56:30Z: 0 (read 21:58:49Z). Not yet exercised on a live game.
 **verify:** 09-29 -- points rows basis `measured_negbin_remainder`; no row where liveProjection and
 P(over) sit on opposite sides of the line by >= 2; population `me` counts per market. The 09-29
 reading is the first CLEAN test of the points model. Task `wnba-live-prop-grid-reading-0929`.
+
+## 2026-09-28 6:09 PM CT — live-odds-worker `03837ae7` (lane `layer2-triad-alignment`) — NHL odds generation now builds TOMORROW as well as today. **Behavioural reading owed: 09-29 06:00 CT.**
+
+    deploy dep-datf4hs9v7es738feui0   live-odds-worker 8acfd9a1 -> 03837ae7
+    fired 23:03:35Z (6:03 PM CT)   live 23:09:22.501622Z (6:09 PM CT)   trigger=api   status=live
+    preflight CLEAR 23:03:2xZ (infrastructure processes only: run_live_odds_refresh_worker.py rss 508.773); no sim in flight
+    baseline read 23:03:24Z from live 8acfd9a1's OWN code:
+        scripts/refresh_odds_sources.py  --days-ahead occurrences = 0   (target: 2)
+    expectation: nhl_generation_builds_tomorrow  false -> true
+
+**What shipped.** `_build_nhl_steps` never passed `--days-ahead`, so the NHL generator's
+default of today-only was the only window the nightly run ever asked for — which is why
+09-29 regular-season odds were absent on 09-28 with nothing failing. Added
+`_nhl_days_ahead()` (env `SYNDICATE_NHL_DAYS_AHEAD`; **absent = 1**, junk -> 1, clamped >= 0)
+and threaded it into the step as `--days-ahead <n>`. Scoped to live-odds-worker alone
+because that service owns NHL generation; the change is inert on web and refresh-worker.
+5 new tests (`tests/test_nhl_days_ahead.py`) cover absent / explicit / junk / negative / zero.
+
+**Measured after (23:11-23:12Z).** Deployed content on `03837ae7`: `--days-ahead` occurrences
+= 2, `_nhl_days_ahead` = 2 — i.e. the definition AND the call site are both present in the
+code the service is running. Worker healthy across the restart: `[live_lens_loop]
+TICK_COMPLETE results={'mlb': True, 'wnba': True, 'soccer': True, 'nfl': True, 'nhl': True}`
+at 23:11:52Z, 2m30s after going live; container_memory 1113 MB / 2048 MB.
+
+**What this measurement does NOT establish.** Everything above is deployed-content and
+service-health identity. It does not show the flag changing an OUTPUT, because NHL
+generation is nightly and has not run since the deploy. Calling this verified on the
+content read alone would be exactly the presence-is-not-reachability error.
+
+**verify:** the next nightly NHL generation builds **two** dates, not one — `predictions_2026-09-30.csv`
+present alongside `predictions_2026-09-29.csv` under the NHL source tree. The 06:00 CT check
+(task `nhl-opening-night-predictions-check`) sees 09-29 either way, so the discriminating
+reading is the presence of the **09-30** file. Absent it, the flag is deployed and inert.
