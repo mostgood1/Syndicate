@@ -4999,3 +4999,10 @@ The lane marker `.current-lane.<session>` had two copies once sessions moved int
 **Rule:** before `close`, move EVERY shell that ever `cd`'d into the worktree back out: Bash, PowerShell, and the harness directory. Only a checked `--force` may clean up a half-removed tree: the folder is empty, `git worktree list` no longer shows it, and the branch has 0 commits beyond `origin/main`.
 
 ---
+## 2026-09-28 (session f9c8d1b9, lane live-props-model-probability) - Interval coverage is not calibration; and sample on the clock the product prices on
+
+**What happened.** I shipped per-market WNBA residual tables and widened rebounds/assists to a line grid on the strength of 90%-band coverage of 91.5-91.8% OUT OF SAMPLE. An hour later, line-level calibration -- predicted vs observed P(final >= line) over the exact ladder the lens publishes -- showed rebounds overstating overs by 18.5 pp and threes by 18.7 pp even in-season. Coverage was true and irrelevant: a band can hold 90% of finals while every over near the centre is mispriced, because the distribution is skewed and one sigma per bucket ignores player scale. Separately, the grader sampled each player right AFTER their own event, which inflates the pace the projection extrapolates; production prices on a clock tick.
+
+**Rule:** before pricing a new market or widening a grid, gate on LINE-LEVEL calibration (reliability by predicted-probability bucket over the lines actually published), not on interval coverage. Measure with the sampling design production uses (a clock), not one triggered by the outcome being predicted.
+
+---

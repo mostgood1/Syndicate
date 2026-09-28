@@ -43119,3 +43119,25 @@ better artifact with a worse one aimed at the wrong week.
 The falsifiable signature stands, written before any board was read: Poisson
 `interceptions` P(over 0.5) in **[0.419, 0.712]**, and NO discrete-market row near
 0 or 1.
+
+## 2026-09-28 2:01 PM CT — live-odds-worker `dd77591b` (lane `live-props-model-probability`) — ROLLBACK: WNBA live grid back to POINTS ONLY (user decision). **Reading owed: 09-29.**
+
+    deploy dep-datbj7egekts73a6di40   live-odds-worker 33da9fc0 -> dd77591b
+    fired 19:01:49Z   live 19:07:42.04184Z   trigger=api   status=live
+    preflight CLEAR 19:01:3xZ; no collateral (dd77591b was the only pending code commit)
+    baseline read 19:01:3xZ from live 33da9fc0's code: grid_markets=("points", "rebounds", "assists")
+
+**Why.** Asked to widen threes; measured first. Interval coverage was right (91.5-91.8% out of
+sample) but LINE-LEVEL calibration is not: clock-sampled replays of rotation players, fit July /
+test August, worst gap between predicted and observed P(final >= line): points 3.6 pp, assists 10,
+rebounds 18.5, threes 18.7, all overstating overs (September playoffs worse: points 9). Empirical
+CDF and Poisson-remainder shapes tested; neither fixes it. So the 33da9fc0 rebounds/assists grid
+was multiplying overstated overs onto the board. Per-market tables KEPT -- on the same lines they
+beat the old points table (Brier skill: threes -0.334 -> +0.175, assists +0.186 -> +0.367,
+rebounds +0.295 -> +0.387).
+
+**Measured after.** First TICK_COMPLETE on the NEW instance 19:09:36Z, all sports True; `Traceback`
+since 19:07:42Z: 0 (read 19:10:07Z). A tick at 19:04:59Z was the OLD instance -- not evidence.
+
+**verify:** 09-29: points gridded; rebounds/assists/threes at one pregame line each. Task
+`wnba-live-prop-grid-reading-0929`.
