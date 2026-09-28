@@ -7,7 +7,7 @@
     "--dist=loadscope"
   ],
   "total_testcases": 21008,
-  "failing_count": 38,
+  "failing_count": 37,
   "failing": [
     "tests.test_daily_update_secret_redaction::test_off_is_not_on",
     "tests.test_daily_update_secret_redaction::test_ordinary_values_survive",
@@ -45,7 +45,6 @@
     "tests.test_soccer_live_corners_book_grade::test_the_registered_180s_rule_is_kept_as_a_reported_subset[2026-09-19T14:37:00+00:00-1]",
     "tests.test_soccer_live_corners_forward_grade::test_a_harvest_with_finals_is_graded_through_every_stage",
     "tests.test_soccer_live_corners_forward_grade::test_h32_be_scores_the_fixed_feed_and_cannot_move_h32",
-    "tests.test_soccer_live_gates_wiring::test_gate3_unwired_sport_still_fails_closed",
-    "tests.test_team_nickname_aliases::test_a_sport_with_no_alias_map_is_unaffected"
+    "tests.test_soccer_live_gates_wiring::test_gate3_unwired_sport_still_fails_closed"
   ]
 }

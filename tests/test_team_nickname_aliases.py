@@ -72,10 +72,16 @@ def test_wnba_gains_nothing_because_its_supplement_already_covers_it():
 
 
 def test_a_sport_with_no_alias_map_is_unaffected():
-    """nhl and ncaab are the exemplars now. NCAAF used to be one and gained a
-    map on 2026-09-09; it is asserted separately below, because the derivation
-    this file tests is DECLINED for that sport rather than merely empty."""
-    assert canonical_team("nhl", "Bruins") is None
+    """ncaab is the exemplar now. NCAAF used to be one and gained a map on
+    2026-09-09; it is asserted separately below, because the derivation this
+    file tests is DECLINED for that sport rather than merely empty.
+
+    NHL WAS AN EXEMPLAR AND IS NOT ANY MORE: `_nhl_alias_to_name` gave it a map
+    (pinned by `test_nhl_ncaab_club_maps.py`), so `Bruins` resolves to "boston
+    bruins". The stale line kept this test in the pytest baseline, and it
+    FLIPPED to passing on CI (2026-09-28) whenever an earlier test in the same
+    xdist worker had made `local_nhl_odds` unimportable -- the loader is
+    `lru_cache`d and caches that failure as `{}`."""
     assert canonical_team("ncaab", "Blue Devils") is None
     assert canonical_team("", "Bears") is None
 
