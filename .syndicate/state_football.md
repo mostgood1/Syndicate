@@ -15,6 +15,41 @@ Same rules as state.md: when a fact changes, EDIT THE LINE.
 - **Ratings:** from 2026 week 3 the pregame generator prices on `inseason_blend_ppa` (prior-season SP+ blended with season-to-date per-game PPA, weight n/(n+2)) -- first applied 2026-09-18 23:16:15Z, web's wk3 CSV 57/57. The current-season SP+ copy is re-fetched when > 6 days old (refreshed 23:16:11Z; CFBD's 2026 SP+ had moved on every name-matched team since the 09-05 snapshot). Backtest (held-out 2025 wk3-15, 644 games): margin MAE 16.33 -> 12.83, still +0.93 behind the close; totals NOT measured (`findings_2026-09-18_ncaaf_inseason_blend.md`). The live re-sim prices on the same blend since refresh-worker `c03351aa` (first tick 2026-09-19 00:57:50Z, `sp_ratings_source inseason_blend_wk3`); `SYNDICATE_NCAAF_INSEASON_BLEND=off` reverts both. **Forward grade, 2026 wk3-4 pregame snapshots, n=113 (measured 2026-09-28, `findings_2026-09-28_ncaaf_inseason_blend_forward.md`):** margin MAE blend 12.01 vs refreshed-2026-SP+ 11.38 vs DK close 10.06 (blend-SP+ +0.63 [-0.85, +2.07], unresolved); total MAE 13.80 vs 15.04 vs 12.38 (blend-SP+ -1.24 [-2.44, -0.04]). The backtest's -3.50 margin gain was vs PRIOR-season SP+ and does not transfer.
 - **Player data:** Ask answers a typed NCAAF player question with last-N games, a 2026 season-to-date row and the published prop projection (web `b7faeb34`). `NCAAF_PLAYER_STATS_ENABLE_REFRESH_WORKER_AUTORUN` is `true`; the refresh runs daily ~22:48Z and chains the prop-projection build (`ncaaf_prop_projections_<S>_wk<W>.json`, allowlisted): first produced 2026-09-18 22:57:37Z (2,475 players, 5,911 projections), 197/209 NCAAF prop rows `projected` on the next board. Production's snapshot held 8,115 rows (2026 weeks 1-2, no 2025) that day, so last-season priors fall back to the role prior. Prop skill against prices is unmeasured.
 
+## [nfl-live-prop-capture] NFL PER-QUARTER PLAYER PRODUCTION IS CAPTURED AND RETRIEVABLE — the allowlist alone moved ZERO bytes `[verified end-to-end 2026-09-28T15:36Z, refresh-worker 02948aa0 + web 451f9fa6, lane nfl-ncaaf-live-props]`
+
+`live_player_box` fetches the right rows during a live game and caches them
+IN-MEMORY ONLY, so every live slate generated the dataset and threw it away.
+`nfl_source/live_prop_capture/<date>.jsonl` now persists one snapshot per
+(event, period) for periods 1-3, idempotent on a sibling `.done` marker.
+
+**RETRIEVAL TOOK THREE DEPLOYS BECAUSE `HOT_ARTIFACT_PATTERNS` IS READ ON THREE
+SIDES AND NONE OF THEM MOVES A FILE.** Allowlisting makes a path ELIGIBLE. The
+capture is written on refresh-worker, which serves no HTTP; the stream/export
+routes are served by **web off WEB's disk**. Retrieval after the allowlist alone
+returns **404, not 403** — the worse failure, because it reads as "the capture
+never happened".
+
+    e0755d0f  refresh-worker  allowlist        (eligible; moves nothing)
+    451f9fa6  web             allowlist + push
+    02948aa0  refresh-worker  sweep, above every early return
+
+**VERIFIED:** worker swept 3m33s after boot (`15:36:31Z SWEEP found=1
+published=1`); `fetch_prod_artifacts_paced.py --pattern
+nfl_source/live_prop_capture/*.jsonl` returned **62 rows off web** — event
+401872962, period 3, **`clock_seconds_at 0`**, score 16-16, all 12
+`CAPTURED_FIELDS` on all 62 rows. `clock_seconds_at` is the field that
+distinguishes a genuine quarter boundary from a tick that merely landed inside
+the window; a cutoff fit that ignores it is assuming its own premise.
+
+**THE SWEEP'S HOOK PLACEMENT IS LOAD-BEARING, measured:** at the top of
+`_maybe_capture_prop_snapshot` (above every early return) it ran 3m33s after
+boot. Inside `record_quarter_snapshot` it fires only on a boundary ATTEMPT — and
+on 2026-09-28 the tick ran every ~5 min emitting `no_period_or_clock=16` while
+the slate held ONE game whose first boundary was **9.5 h away**.
+
+**NOT YET MEASURED IN PRODUCTION:** the push on a FRESH snapshot. Only the sweep
+over an existing file has run live.
+
 ## [nfl-board-projection-coverage] NFL BOARD PROJECTION COVERAGE IS 100% `[measured 2026-09-04T23:19:34Z on the served payload, lanes nfl-projection-et-datekey + nfl-la-rams-alias]`
 
 `/api/board/book-grid?sport=nfl` reads **`unmatched_game_rows` 0** of 1,251 game rows;
