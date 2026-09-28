@@ -277,6 +277,24 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # computed on the one without the data. Scoped to `nfl_source/` for the
     # same reason as the line above.
     "nfl_source/nfl_prop_projections_*.json",
+    # `nfl-ncaaf-live-props`: the per-quarter player box capture, written on
+    # refresh-worker by `nfl/live_resim._maybe_capture_prop_snapshot` at quarter
+    # boundaries. UNREADABLE BY ANYTHING until allowlisted -- three services,
+    # three disks, so an artifact nobody publishes cannot be fitted, audited, or
+    # even confirmed to exist from outside the worker. The first real capture
+    # (2026-09-28T02:53:56Z, event 401872962, period 3, 62 rows) sat exactly
+    # there.
+    #
+    # The data CANNOT BE REGENERATED -- a slate not captured is gone -- so the
+    # cost of not publishing is permanent, while the cost of publishing is a
+    # small append-only file: ~16 games x 3 boundaries x ~40 players, a few
+    # hundred KB per slate, well inside the 8 MB `export` cap.
+    #
+    # DELIBERATELY NOT ADDED to `_NON_EMPTY_REQUIRED_PATTERNS`: this file is
+    # legitimately ABSENT on any day with no NFL slate, and legitimately empty
+    # until the first quarter boundary. Requiring it non-empty would raise a
+    # false alarm every Tuesday.
+    "nfl_source/live_prop_capture/*.jsonl",
     # `nfl-injuries-fetcher` / `nfl-roster-depth-autorun`: the three real
     # NFL data-ingestion artifacts wired into refresh-worker autoruns
     # 2026-08-20, none of which were allowlisted at the time -- production

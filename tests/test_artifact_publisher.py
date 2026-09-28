@@ -2466,3 +2466,40 @@ class IsAppendOnlyTest(unittest.TestCase):
         ):
             with self.subTest(path=path):
                 self.assertFalse(_is_append_only(path))
+
+
+def test_the_nfl_prop_capture_is_allowlisted_but_NOT_required_non_empty():
+    """Publishing it is what makes the capture readable at all.
+
+    Three services, three disks: an artifact nobody publishes cannot be fitted,
+    audited, or even confirmed to exist from outside refresh-worker. The first
+    real capture (2026-09-28T02:53:56Z, event 401872962, period 3, 62 rows) sat
+    on the worker's disk unreachable, and the data cannot be regenerated -- a
+    slate not captured is gone.
+
+    It must NOT be in `_NON_EMPTY_REQUIRED_PATTERNS`: the file is legitimately
+    absent on any day with no NFL slate and legitimately empty until the first
+    quarter boundary, so requiring it non-empty would raise a false alarm every
+    Tuesday. That is the distinction this test exists to hold.
+    """
+    import fnmatch
+
+    from syndicate.features.shared.artifact_publisher import (
+        HOT_ARTIFACT_PATTERNS,
+        _NON_EMPTY_REQUIRED_PATTERNS,
+    )
+
+    pattern = "nfl_source/live_prop_capture/*.jsonl"
+    assert pattern in HOT_ARTIFACT_PATTERNS
+    assert pattern not in _NON_EMPTY_REQUIRED_PATTERNS, (
+        "an absent capture on a no-games day would alarm"
+    )
+
+    real = "nfl_source/live_prop_capture/2026-09-28.jsonl"
+    assert any(fnmatch.fnmatch(real, p) for p in HOT_ARTIFACT_PATTERNS)
+
+    # SCOPED TO nfl_source, not a `*_source/` wildcard: NCAAF has no capture
+    # yet, and a broad pattern would silently start publishing one the day
+    # somebody creates the directory.
+    other = "ncaaf_source/live_prop_capture/2026-09-28.jsonl"
+    assert not any(fnmatch.fnmatch(other, p) for p in HOT_ARTIFACT_PATTERNS)
