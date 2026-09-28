@@ -4956,6 +4956,14 @@ this instrument read healthy while the thing it measures is broken.**
 
 ---
 
+## 2026-09-28 (session 249f998b, lane mlb-prop-grading-player-match) - a VOID count's size is not evidence of a join failure
+
+- **What was believed:** 9,728 MLB `prop_player_not_in_boxscore` rows against ~156k graded were "too large to be DNPs alone", so they had to be player-name match misses.
+- **What was measured:** 94.8% are true DNPs (2,882 rows over 4 dates, checked against StatsAPI box scores under any spelling); the name misses are exactly two players. Books post props before lineups and the recorder keeps every priced side, so bench players' props are a large, legitimate void class (~9% of prop rows).
+- **Rule:** before calling a skip reason a join bug, classify a sample of it against the source of truth. Volume alone says nothing about which class dominates.
+
+---
+
 ## 2026-09-28 — an "unreproducible CI flake" was a production bug: never `print` inside a signal handler (session 2aff0397)
 
 BELIEF OVERTURNED: `test_worker_shutdown` end-to-end failing once on CI with empty output was treated as unexplained noise. It was the shutdown handler losing its record: a signal that lands while `sys.stdout`'s BufferedWriter lock is held runs the handler inside that flush, every `print` there raises "reentrant call", and the `finally: os._exit(0)` exits silently -- the RECORD_FAILED fallback line too, because it also used `print`. Fixed with `os.write` (#113). RULE: in a signal handler write with `os.write` to a raw fd, never `print`/logging. And when a test fails with no diagnosis, the first push is DIAGNOSTICS in the assertion message (here: the child's returncode), not a re-run -- the next CI failure then named the mechanism.

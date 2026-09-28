@@ -193,3 +193,28 @@ def test_the_market_mix_labels_how_each_market_was_scored(tmp_path, capsys):
     assert "segment first5 h2h" in out
     # RETAINED, not just printed: the shared allowlist carries `segments`.
     assert rows[-1]["segments"]["by_segment"]["first5"]["games_with_outcome"] == 12
+
+
+def test_the_pool_is_ONE_sport_and_absent_sport_reads_as_mlb(tmp_path, capsys):
+    """history.jsonl holds several sports (soccer/wnba since 2026-08-29, ncaaf
+    from 2026-09-28) and every pool is per DATE, so a bigger soccer capture
+    could otherwise stand in for an MLB date."""
+    def with_cut(r, model):
+        r["fresh_quotes_only"] = {"model": {"brier": model, "n": 5}, "market": {"brier": 0.2, "n": 5},
+                                  "model_paired": {"brier": model, "n": 5},
+                                  "model_minus_market_brier": model - 0.2}
+        return r
+    mlb_legacy = with_cut(_row("2026-09-10", 10), 0.10)                 # no `sport` key
+    soccer = with_cut(dict(_row("2026-09-10", 40), sport="soccer"), 0.90)
+    hist = tmp_path / "history.jsonl"
+    hist.write_text("".join(json.dumps(r) + "\n" for r in (mlb_legacy, soccer)), encoding="utf-8")
+    pool.main(["--history", str(hist), "--cut", "fresh_quotes_only", "--era", "post-fix",
+               "--allow-stale-cut", "--json-out", str(tmp_path / "mlb.json")])
+    mlb = json.loads((tmp_path / "mlb.json").read_text(encoding="utf-8"))
+    assert mlb["post-fix"]["games"] == 10 and mlb["post-fix"]["model"] == pytest.approx(0.10)
+    pool.main(["--history", str(hist), "--sport", "soccer", "--cut", "fresh_quotes_only",
+               "--era", "post-fix", "--allow-stale-cut", "--json-out", str(tmp_path / "s.json")])
+    soc = json.loads((tmp_path / "s.json").read_text(encoding="utf-8"))
+    assert soc["post-fix"]["games"] == 40
+    assert "segments" not in soc["point_forecast"]        # innings segments are MLB-only
+    capsys.readouterr()

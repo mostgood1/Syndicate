@@ -436,7 +436,7 @@ def pool_segment_h2h(rows, segment):
             "diff": (model - market) / games, "per_date": per_date}
 
 
-def print_point_forecast(rows, cut):
+def print_point_forecast(rows, cut, sport="mlb"):
     """The totals/spreads and segment section. Returns (json block, stale)."""
     post = [r for r in rows if row_era(r) == POST]
     out = {}
@@ -476,6 +476,10 @@ def print_point_forecast(rows, cut):
                 stale = True
                 print("  ** STALE: the most recent date with outcomes (%s) carries no "
                       "%s point-forecast data. **" % (newest, family))
+    if str(sport).lower() != "mlb":
+        # first1/3/5 are innings; no other sport has them, and an empty
+        # "first5" block under ncaaf would read as a gap rather than N/A.
+        return out, stale
     seg = pool_segment_h2h(post, "first5")
     out["segments"] = {"first5_h2h": seg}
     print("\n=== segment first5 h2h (observation rows, all_records, PAIRED) | "
@@ -512,6 +516,12 @@ def main(argv=None):
     )
     ap.add_argument("--history", default=DEFAULT_HISTORY)
     ap.add_argument(
+        "--sport", default="mlb",
+        help="Pool ONE sport. The history holds several (soccer and wnba rows since "
+             "2026-08-29, ncaaf from 2026-09-28) and every pool below is per date, so "
+             "without this a 4-game soccer date could stand in for an MLB date.",
+    )
+    ap.add_argument(
         "--cut", default="priceable_only",
         choices=["priceable_only", "fresh_quotes_only", "all_records"],
     )
@@ -532,6 +542,14 @@ def main(argv=None):
         return 2
     if not rows:
         print("history is empty", file=sys.stderr)
+        return 2
+    # ONE SPORT PER POOL. Absent `sport` reads as mlb, and that is true BY
+    # CONSTRUCTION rather than a convenience: every capture that predates the
+    # field came from `snapshot_live_gameline_score.py --sport mlb`.
+    rows = [r for r in rows if str(r.get("sport") or "mlb").lower() == args.sport.lower()]
+    print("sport=%s  (%d rows)" % (args.sport, len(rows)))
+    if not rows:
+        print("no rows for sport=%s" % args.sport, file=sys.stderr)
         return 2
 
     by_era = defaultdict(list)
@@ -605,7 +623,7 @@ def main(argv=None):
 
     pf_stale = False
     if POST in wanted:
-        out["point_forecast"], pf_stale = print_point_forecast(rows, args.cut)
+        out["point_forecast"], pf_stale = print_point_forecast(rows, args.cut, args.sport)
 
     # Scope the gap to the eras being REPORTED, and WITHIN those, to eras that
     # actually carry the cut. A post-fix query listing pre-fix dates -- which

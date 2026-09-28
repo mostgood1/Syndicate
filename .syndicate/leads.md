@@ -993,3 +993,7 @@ resolution order, applied by both, with the divergence reported rather than
 silently resolved (this repo's own standing rule: a guard that maps an unknown
 onto a permissive branch is worse than one that refuses). Synced by hand today;
 that is not a fix.
+
+## 2026-09-28 -- MLB prop grader: two player-name misses are 5.2% of `prop_player_not_in_boxscore`, and the grader signature cannot see a fix to them `[lane mlb-prop-grading-player-match, session 249f998b, CLOSED EXONERATED]`
+- `leonardo bernal` (odds feed) vs StatsAPI `Leo Bernal`, `rafael flores` vs `Rafael Flores Jr.`: 150 of 2,882 rows over 4 dates. Fix = suffix/punctuation fold + a unique surname+initial fallback in `prop_outcomes.player_actual` (claimed by OPEN lane `accuracy-assessment-0914`).
+- `publish_model_scorecard.grader_signature` hashes only `MlbPropGrader.settle` + `final_score`; `player_actual`, `_final_game`, `match_game` and the `cards` name helpers are unhashed, so ANY change there silently pools grader versions. The fix above must add them to the digest, which resets MLB scorecard history (~0.3% of graded MLB rows recovered). User decision. Detail: `.syndicate/findings_2026-09-28_mlb_prop_not_in_boxscore.md`.
