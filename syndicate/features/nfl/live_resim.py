@@ -809,7 +809,7 @@ def live_state_from_row(
 PROP_CAPTURE_CLOCK_SECONDS = 120
 
 
-def _maybe_capture_prop_snapshot(row: Any, resolved: Any, *, date_str: str) -> None:
+def _maybe_capture_prop_snapshot(row: Any, resolved: Any, *, date_str: str) -> str:
     """Persist one per-quarter player box, if this game is at a boundary.
 
     READS THE RAW ROW, NOT THE PARSED SIM STATE, and that distinction cost a
@@ -839,26 +839,26 @@ def _maybe_capture_prop_snapshot(row: Any, resolved: Any, *, date_str: str) -> N
     """
     try:
         if not isinstance(row, Mapping):
-            return
+            return "no_row"
         period_raw = row.get("period")
         clock_raw = row.get("clock_seconds")
         if period_raw is None or clock_raw is None:
-            return
+            return "no_period_or_clock"
         period, clock = int(period_raw), int(clock_raw)
         if period not in (1, 2, 3):
-            return
+            return "period_not_capturable"
         if clock > PROP_CAPTURE_CLOCK_SECONDS:
-            return
+            return "outside_window"
         # A FINAL game is not at a boundary worth capturing: Q4's end is the
         # final box, which is not lossy and is already fetched elsewhere.
         if str(row.get("state") or "").strip().lower() == "final":
-            return
+            return "final"
 
         event_id = str(row.get("event_id") or "").strip()
         if not event_id:
             print("[nfl_live_resim] PROP_CAPTURE_SKIPPED reason=no_event_id "
                   f"period={period} clock={clock}", flush=True)
-            return
+            return "no_event_id"
 
         from syndicate.features.nfl.live_prop_capture import (
             capture_enabled,
@@ -867,14 +867,14 @@ def _maybe_capture_prop_snapshot(row: Any, resolved: Any, *, date_str: str) -> N
         )
 
         if not capture_enabled():
-            return
+            return "disabled"
         from syndicate.features.nfl.live_player_box import fetch_player_stat_rows
 
         rows = fetch_player_stat_rows(event_id)
         if not rows:
             print("[nfl_live_resim] PROP_CAPTURE_SKIPPED reason=no_player_rows "
                   f"event={event_id} period={period}", flush=True)
-            return
+            return "no_player_rows"
         record_quarter_snapshot(
             default_capture_dir().parent,
             event_id=event_id,
@@ -885,8 +885,10 @@ def _maybe_capture_prop_snapshot(row: Any, resolved: Any, *, date_str: str) -> N
             away_score=row.get("away_score"),
             clock_seconds=clock,
         )
+        return "captured"
     except Exception as exc:  # noqa: BLE001
         print(f"[nfl_live_resim] PROP_CAPTURE_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return "failed"
 
 
 def build_live_lens_snapshot(
@@ -931,6 +933,13 @@ def build_live_lens_snapshot(
     budget = float(budget_seconds if budget_seconds is not None else default_budget_seconds())
     generated_at = str(now or datetime.now(timezone.utc).isoformat())
 
+    # ONE LINE PER TICK, NOT ONE PER GAME. Every early return in the capture was
+    # silent, so "no game was at a boundary" and "the capture is broken" were the
+    # SAME observation. Measured 2026-09-27: the tick ran 8 times through a Q3
+    # window with zero lines of any kind, and nothing could distinguish a missed
+    # 120 s window from a third bug. A tally names every branch, once per tick.
+    _capture_tally: dict[str, int] = {}
+
     prepared: list[tuple[float, dict[str, str], Any]] = []
     for game in games or ():
         if not isinstance(game, Mapping):
@@ -947,7 +956,8 @@ def build_live_lens_snapshot(
         # refused (degenerate ratings, budget exhausted) still produced real
         # player production, and that observation is worth exactly as much to a
         # prop fit as one from a game that simulated cleanly.
-        _maybe_capture_prop_snapshot(live_row, resolved, date_str=str(date_str))
+        _cap = _maybe_capture_prop_snapshot(live_row, resolved, date_str=str(date_str))
+        _capture_tally[_cap] = _capture_tally.get(_cap, 0) + 1
         remaining = (
             (4 - resolved.period) * 900 + resolved.clock_seconds
             if isinstance(resolved, NflLiveGameState) else -1.0
@@ -955,6 +965,10 @@ def build_live_lens_snapshot(
         prepared.append((float(remaining),
                          {"away_team": away_team, "home_team": home_team}, resolved))
     prepared.sort(key=lambda item: item[0])
+
+    if _capture_tally:
+        print("[nfl_live_resim] PROP_CAPTURE_TICK "
+              + " ".join(f"{k}={v}" for k, v in sorted(_capture_tally.items())), flush=True)
 
     started = time.monotonic()
     out_games: list[dict[str, Any]] = []
