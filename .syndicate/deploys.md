@@ -43510,3 +43510,73 @@ content read alone would be exactly the presence-is-not-reachability error.
 present alongside `predictions_2026-09-29.csv` under the NHL source tree. The 06:00 CT check
 (task `nhl-opening-night-predictions-check`) sees 09-29 either way, so the discriminating
 reading is the presence of the **09-30** file. Absent it, the flag is deployed and inert.
+
+## 2026-09-28 6:48 PM CT — refresh-worker `fae9aab8` (lane `nhl-board-row-date-mismatch`) — the Layer 2 compact rail stopped serving the 09-19 preseason slate as today's NHL games. **GOAL MET, measured.**
+
+    deploy dep-datfo1mgekts73al5h5g   refresh-worker 01092639 -> fae9aab8
+    fired 23:45:10Z (6:45 PM CT)   live 23:48:27.268573Z (6:48 PM CT)   trigger=api   status=live
+    preflight CLEAR 23:44:33Z (infrastructure only: run_refresh_worker.py rss 1293.281 + 1 defunct child); no sim in flight
+    baseline read 23:44:23Z off refresh-worker's OWN live 01092639:
+        nhl_chips_on_a_no_games_date = 7      (/api/board/game-chips, artifact 81s old)
+        nhl_row_date_guard_present   = false  (_prediction_rows_for_date occurrences = 0 in 01092639's nhl/cards.py)
+    expectation: nhl_chips_on_a_no_games_date 7 -> 0 ; nhl_row_date_guard_present false -> true
+
+**The defect.** The rail carried 7 NHL chips on a date the NHL's own API says has ZERO
+games (preseason ended 09-26, opening night 09-29). They were `predictions_2026-09-19.csv`
+row-for-row AND IN ORDER -- DAL@STL, MTL@TOR, TOR@MTL, WPG@EDM, CHI@MIN, VGK@LAK, VAN@SEA,
+the first seven preseason games of the season, `gamePk` 1..7 -- off a `worker_artifact`
+46 SECONDS old with `GAME_CHIPS_PUBLISHED ... ok=True` every ~3 min. Fresh artifact,
+nine-day-old content; `artifact_age_seconds=46.2` against a 180s ceiling read healthy
+throughout. Web and refresh-worker disagreed about the same date on separate disks:
+`/nhl/api/cards?date=2026-09-28` on web looked ahead correctly to 09-29's five real games,
+while refresh-worker -- which BUILDS the chips -- had rows for 09-28 so its lookahead never
+fired. `start_time_utc` and `status_token` were null on all 7, so no scoreboard join could
+ever attach a score: the games had ended nine days earlier.
+
+**What shipped.** `_prediction_rows_for_date()` drops a row whose own `date` column names a
+different date than the one requested, at the FIVE sites that read these files: both
+predictions loaders, the sim-row index, the schedule join, and `_date_has_rows` -- the last
+one mandatory, because it is the gate lookahead consults and a guard that disagreed with it
+would have left a BLANK board instead of letting lookahead find the real slate. A blank
+`date` is KEPT: absence is not disagreement, and the permissive branch must be the one that
+cannot silently empty a slate. 11 tests; the last patches the guard back out and reproduces
+the production symptom exactly (7 games, gamePk 1..7), so `off != on` is proven in-process.
+
+**MEASURED AFTER, 23:49:25Z — off the FIRST chips artifact the new code built** (58s after
+live; gated on the deploy's `finishedAt`, not on a clock, because the 23:46:30Z artifact was
+the old instance's and reads as a FAILED fix rather than a stale one):
+
+    nhl_chips = 0   (was 7)      total_chips 171 -> 164, exactly -7
+    by_sport  = {'nfl': 16, 'soccer': 148}   -- both unchanged, so nothing else moved
+
+**Confirmed by the BRANCH, not only the outcome** (the guard's own lines, 23:50:40Z):
+
+    [nhl_cards] ROW_DATE_MISMATCH path=predictions_sim_2026-09-28.csv requested=2026-09-28 dropped=7 kept=0 row_dates=['2026-09-19']
+    [nhl_cards] RESOLVED requested=2026-09-28 served=2026-09-29 lookahead=True games=5 source=predictions_2026-09-29.csv
+
+So the guard fired on the rows' own date, and lookahead then found 09-29's five real games --
+which also confirms `03837ae7`'s days-ahead fix delivered 09-29 to this service's disk.
+
+**TWO CORRECTIONS TO MY OWN DIAGNOSIS, from the same lines.** (1) The stale file is
+`predictions_sim_2026-09-28.csv`, the SIM FALLBACK -- not `predictions_2026-09-28.csv` as I
+said. Guarding only the primary loader would have fixed nothing. (2) It is NOT one date:
+`predictions_sim_2026-09-27.csv` carries the same seven 09-19 rows. Something writes the
+09-19 slate under multiple dated sim filenames, and **that writer is untouched** -- the guard
+neutralises the board symptom, not the cause. Lead recorded.
+
+**This deploy carried 4 code commits, not 1** (only `origin/main` commits are deployable and
+the tip held all four): `fae9aab8` (this), `03837ae7` (NHL days-ahead, inert here), and
+`8acfd9a1`/`6f7be98d` (WNBA NegBin points, deliberately shipped to live-odds-worker earlier
+today and now also executing here). Accepted over leaving the fleet split across SHAs.
+
+**Pre-existing reds, checked not assumed:** `test_nhl_chip_start_time` fails on a date-label
+drift and the ledger already records it failing on unmodified HEAD (other lane's file);
+`test_nhl_ncaab_club_maps[ncaaf|soccer]` fails because `_sport_has_club_map` returns False for
+those two -- `nhl/cards.py` is never imported by that module, verified by import trace.
+
+**verify:** the other half of the lane's goal is the POSITIVE case, and today could not test
+it -- there are no NHL games today, so 0 chips is correct and proves only the refusal. The
+discriminating reading is **09-29: five NHL chips whose matchups equal the NHL API's own slate
+(FLA@CAR, MTL@TOR, NYR@BOS, VAN@EDM, CHI@VGK), each with a real `start_time_utc` and a
+`status_token`.** Covered by task `nhl-opening-night-predictions-check` (06:00 CT). Web is
+still on `01092639` and its own behaviour for 09-28 was already correct, so it is not urgent.
