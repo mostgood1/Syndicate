@@ -42664,3 +42664,68 @@ Offline it is verified: the guard refused 53.3% of all 1,488 pairings and now re
 - **The captured data is NOT RETRIEVABLE.** `nfl_source/live_prop_capture/*.jsonl` is not in `HOT_ARTIFACT_PATTERNS`, so it sits on the worker's disk where nothing can read it. It PERSISTS (mounted disk), so this can ride any later deploy -- but no fit can run until it does.
 - The week-3 re-grade of folded-vs-unfolded score-and-clock, now that the slate is complete.
 - NCAAF has no live player box at all; its capture needs the data layer built first.
+
+## 2026-09-28 — NFL prop capture: made retrievable, and the re-grade that failed its bar
+
+Lane `nfl-ncaaf-live-props`. Two of the three items "Still owed" above are now
+discharged; one is discharged as a NEGATIVE result, which is the point of having
+graded it.
+
+### 1. Capture retrieval — `e0755d0f` refresh-worker LIVE, and it was NOT enough
+
+    deploy dep-dat7tf49v7es73asdt5g   refresh-worker <- e0755d0f
+    fired 14:50:37Z   live 14:56:56Z   trigger=api
+    baseline read 14:49:48Z from the LIVE sha 6cfd4f4a:
+        artifact_publisher.py "live_prop_capture" occurrences = 0
+    target e0755d0f: occurrences = 1        expectation met, by deployed-sha identity
+
+**The allowlist made the path ELIGIBLE and moved zero bytes, and this was one
+verification away from being reported as "the captures are retrievable".** The
+file is written on refresh-worker, which runs `run_refresh_worker.py` and serves
+no HTTP at all; `/api/ops/artifacts/stream` is served by **web**, off **web's**
+disk. `HOT_ARTIFACT_PATTERNS` is read on three sides — `publish_hot_artifact`
+(worker, before it sends), `ops.py:2345/2544` (web, on ingest) and
+`ops.py:2719/3007` (web, on stream/export) — and NOTHING calls publish for this
+family. Retrieval after e0755d0f alone returns **404 rather than 403**, which is
+the worse failure: it reads as "the capture never happened".
+
+`451f9fa6` adds the push. It is on `origin/main` and **not yet deployed** —
+refresh-worker is inside its 25-min spacing window until ~15:15Z.
+
+Proved non-inert rather than asserted: with `publish_snapshot(path)` replaced by
+`pass`, both new tests fail; restored, they pass, file byte-identical.
+
+**STILL OWED: the END-TO-END reading.** `e0755d0f` is verified only by deployed-sha
+identity. The reading that settles it is a `[nfl_prop_capture] PUBLISH OK` line
+on refresh-worker followed by a 200 from
+`/api/ops/artifacts/stream?path=nfl_source/live_prop_capture/<date>.jsonl` on
+web — and that needs `451f9fa6` on BOTH services. Until then the 62 rows
+captured on 2026-09-27 (event 401872962, period 3) remain on the worker's disk.
+
+### 2. Score-and-clock re-grade, 2026 weeks 1–3 — the model LOSES its bar
+
+Out of sample: fit on 2018–2019, 2021–2025; graded on 2026 only.
+
+    47 games   141 cutoff rows   987 scored cells   0 refusals
+    distribution_source_counts = {cell: 141}      <- 141/141, ZERO pooled
+    MAE  projection 8.139   frozen 7.929      beats_frozen = FALSE
+    bias +1.759   CI over GAMES [-0.834, +4.285]
+    worst POWERED bucket 0.6-0.7   gap 0.1639   vs the `#499` bar of 0.150
+    10 of 10 buckets powered;  buckets_realised_above_predicted = 0 of 10
+
+**It does not qualify to publish, on two independent counts** — it loses to the
+hostile frozen baseline, and its worst powered bucket misses the calibration bar.
+Every one of ten buckets over-predicts, monotonically worsening from 0.006 at
+0.0–0.1 to 0.164 at 0.6–0.7; that is systematic over-confidence, not noise.
+
+**What the unfold DID fix, and what it did not settle.** The producer/consumer
+sign mismatch is gone: `141/141` answers came from a signed CELL, against the
+folded fit's `86 of 99` from the POOL. But the folded/unfolded comparison stays
+**UNADJUDICATED** and must not be reported as a win — the bias CI
+`[-0.834, +4.285]` contains both 0 and the +1.0 the adjudication was defined on,
+and the two arms are not comparable anyway (141 rows vs 99, 7 fit seasons vs 3).
+Whichever arm looks better, neither reading carries.
+
+The lane's own conclusion holds and is now measured rather than argued: an NFL
+live margin model built on ratings that carry as much noise as signal loses to
+frozen, and so does one built on score and clock alone. Neither publishes.
