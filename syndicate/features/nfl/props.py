@@ -244,7 +244,11 @@ def _safe_float(value: Any) -> float | None:
 # and `interceptions` want more.
 _COVER_PROBABILITY_BLEND_WEIGHT: dict[str, float] = {
     "passing_yards": 0.689,      # re-fit 0.4994 REJECTED, worse out of sample
-    "passing_attempts": 0.948,
+    # RE-FITTED AGAIN 2026-09-28 after `passing_attempts` took a k=2 spread
+    # override: 0.9480 -> 0.9449, OOS +0.004144. Every OTHER market came back
+    # unchanged to four decimals, which is the check that the re-fit isolated
+    # the one market whose spread moved rather than drifting the whole table.
+    "passing_attempts": 0.9449,
     # DEAD AS OF THE DISCRETE BRANCH. `passing_tds` and `interceptions` now
     # return from `_DISCRETE_COUNT_STATS` before any blend is consulted, so these
     # two weights are unreachable. Kept rather than deleted so the re-fit history

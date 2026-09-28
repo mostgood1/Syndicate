@@ -329,3 +329,42 @@ class NflPlayerStatsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NflPerMarketShrinkageTests(unittest.TestCase):
+    """`passing_attempts` overrides the global spread shrinkage at k=2.
+
+    It was the LAST market failing the `#499` bar. A full per-market table was
+    swept and refused (pooled Brier -0.000077, three markets worse, gaps moving
+    backwards on the two best-calibrated), so the override list is deliberately
+    one entry and the global k stands everywhere it is not beaten decisively.
+    """
+
+    def test_the_override_is_REACHED_and_differs_from_the_global_k(self) -> None:
+        """off != on for the override itself: a table nothing consults is inert,
+        and a per-market constant that silently equals the global one is the
+        same defect wearing a different name."""
+        same_inputs = (5.0, 3, 35.0)
+        overridden = player_stats.shrink_spread(*same_inputs, "passing_attempts")
+        globaldflt = player_stats.shrink_spread(*same_inputs, "receiving_yards")
+        self.assertNotAlmostEqual(overridden, globaldflt, places=6)
+        self.assertEqual(player_stats.SPREAD_SHRINKAGE_K_BY_MARKET["passing_attempts"], 2.0)
+
+    def test_the_override_uses_k2_not_the_global_6(self) -> None:
+        raw, n, mean = 5.0, 3.0, 35.0
+        cv = player_stats.LEAGUE_SPREAD_CV["passing_attempts"]
+        expected = (n * raw + 2.0 * cv * mean) / (n + 2.0)
+        self.assertAlmostEqual(
+            player_stats.shrink_spread(raw, int(n), mean, "passing_attempts"),
+            expected, places=9)
+
+    def test_an_UNLISTED_market_still_gets_the_GLOBAL_k(self) -> None:
+        """The override must not leak. Only `passing_attempts` earned one."""
+        raw, n, mean = 5.0, 3.0, 35.0
+        cv = player_stats.LEAGUE_SPREAD_CV["receiving_yards"]
+        expected = (n * raw + player_stats.SPREAD_SHRINKAGE_K * cv * mean) / (
+            n + player_stats.SPREAD_SHRINKAGE_K)
+        self.assertAlmostEqual(
+            player_stats.shrink_spread(raw, int(n), mean, "receiving_yards"),
+            expected, places=9)
+        self.assertEqual(list(player_stats.SPREAD_SHRINKAGE_K_BY_MARKET), ["passing_attempts"])

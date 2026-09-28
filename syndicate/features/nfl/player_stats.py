@@ -622,6 +622,44 @@ LEAGUE_SPREAD_CV: dict[str, float] = {
 #: false edges, but it is not calibrated and should not be described as such.
 SPREAD_SHRINKAGE_K = 6.0
 
+#: PER-MARKET OVERRIDES, and the list is short on purpose.
+#:
+#: A FULL per-market table was swept and REFUSED. Selected on the fit seasons and
+#: graded out of sample it moved the pooled Brier by **-0.000077** -- one percent
+#: of what the shrinkage itself delivered -- with five markets better, three
+#: worse, and the calibration gap moving BACKWARDS on the two best-calibrated
+#: markets (`rushing_yards` 0.0359 -> 0.0560, `rushing_attempts` 0.0404 ->
+#: 0.0504). Eight maintained constants for a gain indistinguishable from noise is
+#: a worse artifact than one, so the global k stands everywhere it is not beaten
+#: decisively.
+#:
+#: `passing_attempts` IS beaten decisively, and it was the last market failing the
+#: `#499` bar. Selected on the fit seasons, where BOTH metrics agree on k=2:
+#:
+#:     k      fit Brier   fit bucket  |  held Brier   held bucket
+#:     0       0.184303     0.1621    |   0.181048      0.1493
+#:     1       0.177927     0.1120    |   0.175128      0.1198
+#:     2       0.176890     0.1068    |   0.173932      0.1463   <- selected
+#:     3       0.176993     0.1232    |   0.173891      0.1482
+#:     6       0.178508     0.1417    |   0.175056      0.1619   <- global k
+#:
+#: **k=1 HAS A BETTER HELD-OUT BUCKET (0.1198) AND WAS NOT TAKEN.** Choosing it
+#: would be selecting on the test set, which is the one thing the fit/held-out
+#: split exists to prevent -- and this file already carries a constant (`#471`'s
+#: k=12) that was accepted only because its minimum was interior and in-sample.
+#:
+#: **THE PASS IS THIN AND SAYS SO: 0.1463 against a 0.150 bar.** It is a pass on
+#: the measurement that was declared in advance, not a comfortable one, and a
+#: re-fit on more seasons could move it either way.
+#:
+#: Why this market and not the count markets: `passing_attempts` has 57 distinct
+#: outcomes, so a continuous model is the right family and only the width was
+#: wrong. `interceptions` and `passing_tds` have 5 and 6, and no k fixes those --
+#: they moved to a Poisson (`props._DISCRETE_COUNT_STATS`).
+SPREAD_SHRINKAGE_K_BY_MARKET: dict[str, float] = {
+    "passing_attempts": 2.0,
+}
+
 
 def spread_shrinkage_enabled() -> bool:
     """DEFAULT ON, stated because the code's default is what decides.
@@ -648,7 +686,7 @@ def shrink_spread(raw_sd: float, n: int, mean: float, stat: str) -> float:
     cv = LEAGUE_SPREAD_CV.get(stat)
     if cv is None or mean is None or mean <= 0 or n <= 0:
         return raw_sd
-    k = SPREAD_SHRINKAGE_K
+    k = SPREAD_SHRINKAGE_K_BY_MARKET.get(stat, SPREAD_SHRINKAGE_K)
     return (n * raw_sd + k * cv * float(mean)) / (n + k)
 
 
