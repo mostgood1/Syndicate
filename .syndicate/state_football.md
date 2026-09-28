@@ -100,6 +100,8 @@ session worktree (`data/` is excluded), so the implied sds are back-derived from
 production and the estimator is read from source, but no individual player's log
 was inspected.
 
+**COMPLETE AND DEPLOYED 2026-09-28: ALL EIGHT NFL PROP MARKETS PASS THE `#499` BAR.** Aggregate worst powered bucket **0.0811** (was 0.2231, five of eight failing), Brier 0.210901, held out 2024-25 through the shipped function. `41f14c3e` live on all three services 20:42-20:43Z, verified by content. Per-market: passing_yards 0.1324, passing_attempts 0.1463, passing_tds 0.0318, rushing_yards 0.0359, rushing_attempts 0.0404, receiving_yards 0.0740, receptions 0.1167, interceptions 0.0690. **IN EFFECT NOWHERE until the projection artifact rebuilds** -- reading scheduled 09-29 12:30 CT.
+
 **SWEPT OUT OF SAMPLE 2026-09-28** (`scripts/calibrate_nfl_spread_shrinkage.py`,
 fit 2022-23, reported 2024-25, graded through the PRODUCTION probability function
 against real settled outcomes). SELECTED `estimator=stdev, k=3.0` on a genuine
