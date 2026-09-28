@@ -73,9 +73,22 @@ over as few as 2 games:
    held-out rows). The identical argument for the SPREAD of every other market
    was never made.**
 
-**A SEPARATE DEFECT, NOT DIAGNOSED:** the MEAN is often far from the line --
-Boston 77.0 vs 35.5, Raymond 62.0 vs 23.5, Judkins 27.0 vs 55.5. Widening the
-distribution makes those rows less confidently wrong, not right.
+**THE "SEPARATE DEFECT" IN THE MEAN IS RETRACTED** `[diagnosed 2026-09-28]`. I
+wrote that the mean is often far from the line (Boston 77.0 vs 35.5) and called
+those rows wrong. **The estimator is UNBIASED:** the rolling mean against the
+player's OWN future realised mean (both expectations, so single-game variance
+cancels) is 0.983 / 1.019 / 1.000 / 0.978 for receiving_yards, rushing_yards,
+receptions and passing_yards, and flat across n. The apparent bias was two
+artifacts: (a) SELECTION -- on all rows the estimator UNDER-predicts (0.955-0.972)
+and only over-predicts once conditioned on a high rolling mean (1.07-1.16),
+decaying with n, which is regression to the mean; and (b) a ~20% MEAN-vs-MEDIAN
+gap that is arithmetic, not disagreement -- a line sits near the median and these
+markets are right-skewed (receiving_yards mean/median 1.206, rushing_yards 1.203),
+with `passing_yards` at 0.987 as the control, symmetric because QBs always play.
+The real residual is that the Normal is CENTRED ON THE MEAN against a line at the
+median, overstating P(over) on skewed markets -- which is what the log-normal
+blend exists to correct and was re-fitted for. Full working:
+`.syndicate/findings_2026-09-28_nfl_mean_bias.md`.
 
 **THE CONSTRAINT ON ANY FIX:** `_COVER_PROBABILITY_BLEND_WEIGHT` (`props.py:205`)
 is a FITTED table calibrated on top of the current too-narrow sd, so widening
