@@ -43435,3 +43435,22 @@ and reach for it as a cause.
 
 `predictions_2026-09-29.csv` absent after ~06:00Z on 09-29. That is the single
 artifact between a working odds pipeline and an empty NHL cards board.
+
+### Opening-night check SCHEDULED `[2026-09-28 ~22:0xZ]`
+
+`nhl-opening-night-predictions-check`, one-shot, fires **2026-09-29 06:00 CT
+(11:00Z)** -- about ten hours before first puck (21:00Z, FLA @ CAR), deliberately
+early so there is time to act.
+
+**It gates on the artifact, and on its SIZE.** `predictions_2026-09-29.csv` must
+exist AND `/nhl/api/cards?date=2026-09-29` must serve 5 games. A header-only file
+(~508-677 bytes, the correct shape for an EMPTY slate) on a five-game day is
+recorded as a FAILURE, not a pass -- 09-26's 14-game file was 4,460 bytes.
+
+It carries last night's audit verdict so the runner does not re-derive it, and it
+carries the remediation HONESTLY: the scoped `odds-refresh/run` call returned
+`ok/started` last night and **was never picked up** (no `SPAWN` line in 20 min),
+because `manifest_only` waits on refresh-worker's loop while NHL generation
+belongs to live-odds-worker. The task is told to poll for the ARTIFACT rather
+than a job-status endpoint (which returned `state=None`), and not to report a fix
+unless the artifact appears. It must not deploy.
