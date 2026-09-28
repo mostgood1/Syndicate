@@ -140,9 +140,9 @@ def build_live_prop_rows(
     unchanged `live_prop_prob_over`, so a grid line is priced by exactly the rule
     a supplied line is. Default `()` is today's behaviour.
 
-    ONLY list a market whose residual was MEASURED. The n=796 table in
-    `wnba_live_prop_probability` is POINTS (the grader's own SCOPE); widening an
-    unmeasured market multiplies an assumption, not coverage.
+    ONLY list a market whose residual was MEASURED (`MEASURED_MARKETS` in
+    `wnba_live_prop_probability`); widening an unmeasured market multiplies an
+    assumption, not coverage. Each market's grid reaches 3 of ITS OWN sigmas.
     """
     grid = frozenset(str(m) for m in grid_markets or ())
     sim_index = index_sim_players(sim_game)
@@ -204,8 +204,11 @@ def build_live_prop_rows(
                     projected=row["liveProjectedStat"],
                     current=row["current"],
                     minutes_remaining=verdict.get("minutes_remaining"),
+                    market=market,
                 )
-                grid_rows += max(0, len(line_set) - (1 if line is not None else 0))
+                # Lines ADDED beyond the supplied one. A market that cannot be
+                # gridded falls back to `[supplied]`, which may be `[None]` -- not a line.
+                grid_rows += sum(1 for extra in line_set if extra is not None and extra != line)
             if row["liveProjectedStat"] is None:
                 reason = str(verdict.get("unavailable_reason") or "unknown")
                 withheld_by_reason[reason] = withheld_by_reason.get(reason, 0) + 1
@@ -245,7 +248,8 @@ GRID_SIGMAS = 3.0
 GRID_MAX_LINES = 40
 
 
-def _grid_lines(supplied: Any, *, projected: Any, current: Any, minutes_remaining: Any) -> list[Any]:
+def _grid_lines(supplied: Any, *, projected: Any, current: Any, minutes_remaining: Any,
+                market: str = "points") -> list[Any]:
     """The supplied line plus every half-point line near the projection, sorted.
 
     Lines at or below what is already banked are skipped: the over is decided and
@@ -259,7 +263,9 @@ def _grid_lines(supplied: Any, *, projected: Any, current: Any, minutes_remainin
         center = float(projected)
     except (TypeError, ValueError):
         return sorted(out) if out else [supplied]
-    sigma = residual_sigma(minutes_remaining)
+    # THIS market's measured sigma, so the grid's reach matches the interval that
+    # prices it -- a points-wide grid on rebounds would publish lines priced ~0/1.
+    sigma = residual_sigma(minutes_remaining, market)
     if sigma is None or sigma <= 0.0:
         return sorted(out) if out else [supplied]
     try:
@@ -287,6 +293,7 @@ def _price_row(row: dict[str, Any], line: Any, verdict: Mapping[str, Any]) -> No
         projected=row["liveProjectedStat"],
         line=line,
         minutes_remaining=verdict.get("minutes_remaining"),
+        market=row.get("market") or "points",
     )
     row["line"] = line
     row["residual_sigma"] = priced.get("residual_sigma")

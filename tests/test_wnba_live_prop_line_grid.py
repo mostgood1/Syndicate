@@ -87,11 +87,11 @@ def test_no_measured_sigma_falls_back_to_the_supplied_line():
     assert rows_mod._grid_lines(17.5, projected=None, current=6.0, minutes_remaining=20.0) == [17.5]
 
 
-def test_lens_passes_points_only():
+def test_lens_grids_the_three_measured_markets_the_user_asked_for():
     import inspect
     from syndicate.features.wnba import live_lens
     src = inspect.getsource(live_lens)
-    assert 'grid_markets=("points",)' in src
+    assert 'grid_markets=("points", "rebounds", "assists")' in src
 
 
 def test_every_grid_row_carries_the_actual_so_far():
@@ -114,3 +114,63 @@ def test_snapshot_size_per_player_is_bounded():
     added = len(json.dumps(grid)) - len(json.dumps(base))
     print(f"GRID_SNAPSHOT_BYTES_PER_PLAYER added={added}")
     assert added < 12_000
+
+
+# ---- per-market residuals `[2026-09-28]`: rebounds/assists/threes stop borrowing points' ----
+
+from syndicate.features.shared.wnba_live_prop_probability import (  # noqa: E402
+    MEASURED_MARKETS,
+    REASON_NO_MEASURED_MARKET,
+    residual_sigma,
+)
+
+
+def test_each_market_prices_on_ITS_OWN_measured_sigma():
+    """REACHABILITY (off != on). Before, every market read the points table, so a
+    rebounds row at 15 min left carried sigma 5.3; its own measurement is ~2.5."""
+    built, _ = _snapshot(grid_markets=("points", "rebounds"))
+    by_market = {}
+    for r in built["rows"]:
+        if r.get("residual_sigma") is not None:
+            by_market.setdefault(r["market"], set()).add(r["residual_sigma"])
+    assert by_market["rebounds"] and by_market["points"]
+    minutes = next(r["minutes_remaining"] for r in built["rows"] if r["market"] == "rebounds")
+    assert by_market["rebounds"] == {round(residual_sigma(minutes, "rebounds"), 4)}
+    assert residual_sigma(minutes, "rebounds") < residual_sigma(minutes, "points") / 1.8
+
+
+def test_an_unmeasured_market_refuses_rather_than_borrowing():
+    assert "blocks" not in MEASURED_MARKETS
+    assert residual_sigma(15.0, "blocks") is None
+    out = live_prop_prob_over(projected=2.0, line=1.5, minutes_remaining=15.0, market="blocks")
+    assert out["prob_over"] is None and out["unavailable_reason"] == REASON_NO_MEASURED_MARKET
+
+
+def test_each_grid_reaches_three_of_its_OWN_sigmas():
+    built, _ = _snapshot(grid_markets=("points", "rebounds"))
+    for market in ("points", "rebounds"):
+        rows = [r for r in built["rows"] if r["market"] == market and r["line"] is not None]
+        proj, sigma = rows[0]["liveProjectedStat"], rows[0]["residual_sigma"]
+        supplied = _LINES[("paige bueckers", market)]
+        grid = [r["line"] for r in rows if r["line"] != supplied]
+        assert grid, market
+        assert all(abs(line - proj) <= 3 * sigma + 1.0 for line in grid), market
+
+
+def test_a_market_with_no_line_and_no_grid_adds_no_grid_rows():
+    """`_grid_lines` falls back to `[supplied]`, which is `[None]` for a market with
+    no pregame line -- that is not an added line and must not be counted as one."""
+    assert rows_mod._grid_lines(None, projected=None, current=0.0, minutes_remaining=20.0) == [None]
+    built = rows_mod.build_live_prop_rows(_LIVE, _SIM, game_minutes_remaining=25.0, lines={},
+                                          grid_markets=("threes",))
+    added = [r for r in built["rows"] if r["market"] == "threes" and r["line"] is not None]
+    assert built["grid_rows"] == len(added)
+
+
+def test_snapshot_size_per_player_three_markets_is_bounded():
+    import json
+    _, base = _snapshot()
+    _, grid = _snapshot(grid_markets=("points", "rebounds", "assists"))
+    added = len(json.dumps(grid)) - len(json.dumps(base))
+    print(f"GRID_SNAPSHOT_BYTES_PER_PLAYER_3_MARKETS added={added}")
+    assert added < 20_000

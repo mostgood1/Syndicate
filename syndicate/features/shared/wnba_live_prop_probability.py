@@ -60,33 +60,85 @@ from typing import Any
 # would drift from the first.
 _Z90 = 1.6449
 
-# (low, high) minutes remaining -> measured residual sd and observed p90 |error|.
-# Provenance: grade_wnba_live_prop_projection.py, n=796 over 2026-08-14/15/16/
-# 17/19, replay reconciling 100% on every slate. THESE ARE MEASUREMENTS. Changing
-# one without re-running that grader makes the interval a guess wearing a
-# measurement's clothes.
-_RESIDUAL_BUCKETS: tuple[tuple[float, float, float, float], ...] = (
-    (30.0, float("inf"), 6.03, 10.29),
-    (20.0, 30.0, 5.38, 8.53),
-    (10.0, 20.0, 5.30, 8.52),
-    (5.0, 10.0, 3.88, 6.05),
-    (0.0, 5.0, 2.70, 5.14),
-)
+# (low, high) minutes remaining -> measured residual sd and observed p90 |error|,
+# ONE TABLE PER MARKET. THESE ARE MEASUREMENTS. Changing one without re-running the
+# grader makes the interval a guess wearing a measurement's clothes.
+#
+# PROVENANCE `[2026-09-28, lane live-props-model-probability]`:
+# `scripts/grade_wnba_live_prop_projection.py --stat <market>` driven over every
+# WNBA game 2026-07-17..09-27 that had a sim anchor -- 48 dates, 140 games
+# (rebounds 139, assists 137: a game is graded for a stat only if its replay
+# reproduces the official box EXACTLY for points AND that stat). Samples: points
+# 11,910, rebounds 8,286, assists 5,138, threes 2,194. OUT OF SAMPLE: tables fit on
+# 07-17..08-31 cover 91.5-91.8% of September finals inside their 90% band, all four.
+#
+# WHY PER MARKET: until this change rebounds/assists/threes were priced on the
+# POINTS table (the only one measured, n=796 over 5 slates), which is 2-3x too wide
+# for them -- its 90% band covered 99.1% / 99.9% / 100% of their finals, squashing
+# every probability toward 0.5 and inventing edges on far lines. The same regrade
+# showed the old points table itself too NARROW at this sample (86.8% coverage), so
+# points is refreshed from the same run.
+#
+# NO BIAS CORRECTION, as before (choice 2 in the docstring), though rebounds
+# measured a consistent early OVER-projection (+1.2 to +1.9 above 20 min left).
+# Recorded, not applied: a bias term is a change to the PROJECTION, not to its
+# interval, and it would need its own out-of-sample test.
+_RESIDUAL_BUCKETS_BY_MARKET: dict[str, tuple[tuple[float, float, float, float], ...]] = {
+    "points": (
+        (30.0, float("inf"), 7.41, 12.39),
+        (20.0, 30.0, 6.64, 10.82),
+        (10.0, 20.0, 5.54, 8.90),
+        (5.0, 10.0, 4.44, 6.78),
+        (0.0, 5.0, 3.28, 6.00),
+    ),
+    "rebounds": (
+        (30.0, float("inf"), 3.02, 5.23),
+        (20.0, 30.0, 2.90, 4.73),
+        (10.0, 20.0, 2.46, 4.04),
+        (5.0, 10.0, 2.04, 3.21),
+        (0.0, 5.0, 1.45, 2.91),
+    ),
+    "assists": (
+        (30.0, float("inf"), 2.28, 3.67),
+        (20.0, 30.0, 2.30, 3.63),
+        (10.0, 20.0, 1.87, 2.96),
+        (5.0, 10.0, 1.41, 2.15),
+        (0.0, 5.0, 1.03, 2.00),
+    ),
+    "threes": (
+        (30.0, float("inf"), 1.58, 2.81),
+        (20.0, 30.0, 1.37, 2.33),
+        (10.0, 20.0, 1.14, 1.96),
+        (5.0, 10.0, 0.84, 1.37),
+        (0.0, 5.0, 0.66, 1.00),
+    ),
+}
+# Kept for readers of the old name: the points table.
+_RESIDUAL_BUCKETS = _RESIDUAL_BUCKETS_BY_MARKET["points"]
+MEASURED_MARKETS = frozenset(_RESIDUAL_BUCKETS_BY_MARKET)
 
 REASON_NO_PROJECTION = "no_live_projection_to_price"
 REASON_NO_MINUTES_REMAINING = "minutes_remaining_unknown_so_no_measured_interval"
 REASON_NO_LINE = "no_line_to_price_against"
+REASON_NO_MEASURED_MARKET = "no_measured_residual_for_this_market"
 
 
-def residual_sigma(minutes_remaining: Any) -> float | None:
-    """The measured interval at this point of the game, or None outside it."""
+def residual_sigma(minutes_remaining: Any, market: str = "points") -> float | None:
+    """The measured interval for `market` at this point of the game, or None.
+
+    None outside the measured minutes range AND for a market with no measured
+    table -- an unmeasured market must refuse, never borrow another's interval.
+    """
+    table = _RESIDUAL_BUCKETS_BY_MARKET.get(str(market or ""))
+    if table is None:
+        return None
     try:
         remaining = float(minutes_remaining)
     except (TypeError, ValueError):
         return None
     if remaining < 0.0 or remaining != remaining:  # negative or NaN
         return None
-    for low, high, sd, p90 in _RESIDUAL_BUCKETS:
+    for low, high, sd, p90 in table:
         if low <= remaining < high:
             # Widened only where the observed tail is fatter than normal.
             return max(sd, p90 / _Z90)
@@ -102,6 +154,7 @@ def live_prop_prob_over(
     projected: Any,
     line: Any,
     minutes_remaining: Any,
+    market: str = "points",
 ) -> dict[str, Any]:
     """`P(final >= line)` from the projection and its measured residual.
 
@@ -126,7 +179,10 @@ def live_prop_prob_over(
         out["unavailable_reason"] = REASON_NO_LINE
         return out
 
-    sigma = residual_sigma(minutes_remaining)
+    if str(market or "") not in MEASURED_MARKETS:
+        out["unavailable_reason"] = REASON_NO_MEASURED_MARKET
+        return out
+    sigma = residual_sigma(minutes_remaining, market)
     if sigma is None or sigma <= 0.0:
         # No measured interval for this state. A 0.0 here would read as perfect
         # precision and make every edge priceable -- the substitution this

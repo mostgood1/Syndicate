@@ -409,10 +409,12 @@ def _attach_live_props(games: list[dict[str, Any]], date_str: str) -> None:
             sim_game,
             game_minutes_remaining=_game_minutes_remaining(game),
             lines=lines,
-            # POINTS ONLY: the one market whose live residual was MEASURED (n=796).
             # Live board lines move off the pregame line this lens is given; the
-            # grid prices them. `[2026-09-28, lane live-props-model-probability]`
-            grid_markets=("points",),
+            # grid prices them, each market on ITS OWN measured residual (48 dates /
+            # 140 games, out-of-sample coverage 91.5-91.8%). Threes is measured too
+            # but NOT widened -- the user asked for points, rebounds and assists.
+            # `[2026-09-28, lane live-props-model-probability]`
+            grid_markets=("points", "rebounds", "assists"),
         )
         game["liveProps"] = to_snapshot_live_props(built["rows"])
         game["livePropsCoverage"] = {

@@ -31,10 +31,12 @@ class SigmaTableTests(unittest.TestCase):
         `0-5` measured p90/sd = 1.90 against 1.6449 for a normal, so it widens
         2.70 -> ~3.12. The others measured BELOW 1.6449 and keep their sd.
         """
-        self.assertAlmostEqual(residual_sigma(2.0), 5.14 / 1.6449, places=3)
-        self.assertGreater(residual_sigma(2.0), 2.70, "heavy tail must widen")
-        self.assertAlmostEqual(residual_sigma(25.0), 5.38, places=3)
-        self.assertAlmostEqual(residual_sigma(7.0), 3.88, places=3)
+        # Table refreshed 2026-09-28 (48 dates / 140 games): `0-5` p90/sd = 1.83 and
+        # `30+` 1.67 widen; the middle buckets measured below 1.6449 and keep sd.
+        self.assertAlmostEqual(residual_sigma(2.0), 6.00 / 1.6449, places=3)
+        self.assertGreater(residual_sigma(2.0), 3.28, "heavy tail must widen")
+        self.assertAlmostEqual(residual_sigma(25.0), 6.64, places=3)
+        self.assertAlmostEqual(residual_sigma(7.0), 4.44, places=3)
 
     def test_outside_the_measured_range_it_refuses(self) -> None:
         for bad in (None, -1.0, "n/a", float("nan")):
@@ -72,7 +74,7 @@ class ProbabilityTests(unittest.TestCase):
 
     def test_it_carries_the_sigma_that_produced_it(self) -> None:
         out = live_prop_prob_over(projected=20.0, line=17.5, minutes_remaining=15.0)
-        self.assertAlmostEqual(out["residual_sigma"], 5.30, places=2)
+        self.assertAlmostEqual(out["residual_sigma"], 5.54, places=2)
         self.assertEqual(out["basis"], "measured_residual_normal")
 
 

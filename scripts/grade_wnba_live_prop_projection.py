@@ -21,11 +21,21 @@ exactly -- same points, same minutes, per player. `--reconcile-only` runs that
 and nothing else. A residual computed from a replay that does not reconcile is
 a number about a bug, and this project has published enough of those.
 
-SCOPE, stated rather than discovered later: POINTS and MINUTES only. Points is
+SCOPE, stated rather than discovered later: POINTS and MINUTES first. Points is
 the highest-volume prop and both reconstruct unambiguously from `scoreValue` and
-substitution events. Rebounds and assists need text parsing whose failure mode
-is silent under-counting, so they are left out until they can be reconciled the
-same way.
+substitution events.
+
+REBOUNDS AND ASSISTS `[2026-09-28, lane live-props-model-probability]` turned out
+NOT to need text parsing: ESPN's plays carry them STRUCTURALLY. A rebound is a
+play whose `type.text` contains "Rebound" with the rebounder as `participants[0]`
+(team rebounds carry NO participant, and the box credits no player with them); an
+assist is `participants[1]` on a made field goal (`scoringPlay` with two
+participants -- a block is two participants on a MISS, so it never counts). Each
+is admitted under the same gate as points: the replay must reproduce the official
+box's `rebounds` / `assists` EXACTLY, per player, or the game is not graded for
+that stat. THREES likewise: a made three is a scoring play worth 3, reconciled
+against the made half of the box's made-attempted pair. `--stat` picks which
+residual to measure.
 
     py -3 scripts/grade_wnba_live_prop_projection.py --events 401857158 --reconcile-only
     py -3 scripts/grade_wnba_live_prop_projection.py --date 2026-08-19
@@ -98,8 +108,27 @@ def elapsed_minutes(period: Any, clock_text: Any) -> float | None:
     return prior + (length - remaining)
 
 
+def _stat_at(stats: list[Any], index: int | None) -> float | None:
+    if index is None or len(stats) <= index:
+        return None
+    try:
+        return float(stats[index])
+    except (TypeError, ValueError):
+        return None
+
+
+def _made_at(stats: list[Any], index: int | None) -> float | None:
+    """`"3-7"` -> 3.0: the MADE half of a made-attempted pair."""
+    if index is None or len(stats) <= index:
+        return None
+    try:
+        return float(str(stats[index]).split("-", 1)[0])
+    except (TypeError, ValueError):
+        return None
+
+
 def official_box(summary: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """athlete id -> {name, starter, minutes, points} from the OFFICIAL box."""
+    """athlete id -> {name, starter, minutes, points, rebounds, assists} from the OFFICIAL box."""
     out: dict[str, dict[str, Any]] = {}
     for team_block in (summary.get("boxscore") or {}).get("players") or []:
         for stat_block in team_block.get("statistics") or []:
@@ -108,6 +137,10 @@ def official_box(summary: dict[str, Any]) -> dict[str, dict[str, Any]]:
                 minutes_at, points_at = keys.index("minutes"), keys.index("points")
             except ValueError:
                 continue
+            rebounds_at = keys.index("rebounds") if "rebounds" in keys else None
+            assists_at = keys.index("assists") if "assists" in keys else None
+            threes_key = "threePointFieldGoalsMade-threePointFieldGoalsAttempted"
+            threes_at = keys.index(threes_key) if threes_key in keys else None
             for athlete in stat_block.get("athletes") or []:
                 stats = athlete.get("stats") or []
                 if len(stats) <= max(minutes_at, points_at):
@@ -126,6 +159,9 @@ def official_box(summary: dict[str, Any]) -> dict[str, dict[str, Any]]:
                     "starter": bool(athlete.get("starter")),
                     "minutes": minutes,
                     "points": points,
+                    "rebounds": _stat_at(stats, rebounds_at),
+                    "assists": _stat_at(stats, assists_at),
+                    "threes": _made_at(stats, threes_at),
                 }
     return out
 
@@ -139,8 +175,15 @@ def replay(summary: dict[str, Any]) -> dict[str, Any]:
     box = official_box(summary)
     on_court = {aid for aid, row in box.items() if row.get("starter")}
     points: dict[str, float] = {aid: 0.0 for aid in box}
+    rebounds: dict[str, float] = {aid: 0.0 for aid in box}
+    assists: dict[str, float] = {aid: 0.0 for aid in box}
+    threes: dict[str, float] = {aid: 0.0 for aid in box}
     minutes: dict[str, float] = {aid: 0.0 for aid in box}
     samples: list[dict[str, Any]] = []
+    # Per-stat samples, taken at THAT stat's events for the credited player --
+    # the same sampling design as points (a sample at the scorer's scoring play),
+    # so the three residual tables are comparable.
+    stat_samples: dict[str, list[dict[str, Any]]] = {"rebounds": [], "assists": [], "threes": []}
     last_clock = 0.0
 
     plays = summary.get("plays") or []
@@ -168,6 +211,22 @@ def replay(summary: dict[str, Any]) -> dict[str, Any]:
                 on_court.add(entering)
             continue
 
+        if "rebound" in type_text and participants and participants[0] in rebounds:
+            rebounder = participants[0]
+            rebounds[rebounder] += 1.0
+            stat_samples["rebounds"].append({
+                "elapsed": round(now, 3), "athlete_id": rebounder,
+                "value": rebounds[rebounder], "minutes": round(minutes.get(rebounder, 0.0), 3),
+            })
+
+        if play.get("scoringPlay") and len(participants) >= 2 and participants[1] in assists:
+            assister = participants[1]
+            assists[assister] += 1.0
+            stat_samples["assists"].append({
+                "elapsed": round(now, 3), "athlete_id": assister,
+                "value": assists[assister], "minutes": round(minutes.get(assister, 0.0), 3),
+            })
+
         if play.get("scoringPlay") and participants:
             scorer = participants[0]
             try:
@@ -176,6 +235,14 @@ def replay(summary: dict[str, Any]) -> dict[str, Any]:
                 value = 0.0
             if scorer in points and value:
                 points[scorer] += value
+                if value == 3.0:
+                    # A made three is a scoring play worth 3. Free throws are worth 1,
+                    # so no other scoring play can carry that value.
+                    threes[scorer] += 1.0
+                    stat_samples["threes"].append({
+                        "elapsed": round(now, 3), "athlete_id": scorer,
+                        "value": threes[scorer], "minutes": round(minutes.get(scorer, 0.0), 3),
+                    })
                 samples.append({
                     "elapsed": round(now, 3),
                     "athlete_id": scorer,
@@ -190,6 +257,7 @@ def replay(summary: dict[str, Any]) -> dict[str, Any]:
             minutes[aid] += max(0.0, end - last_clock)
 
     return {"box": box, "points": points, "minutes": minutes,
+            "rebounds": rebounds, "assists": assists, "threes": threes, "stat_samples": stat_samples,
             "samples": samples, "end_elapsed": round(end, 3)}
 
 
@@ -209,8 +277,28 @@ def reconcile(state: dict[str, Any], *, minutes_tolerance: float = 2.0) -> dict[
             minutes_within += 1
         else:
             minutes_off.append(f'{row["name"]}: replay {state["minutes"].get(aid, 0.0):.1f} vs box {row["minutes"]:.1f}')
+    stat_exact: dict[str, int] = {}
+    stat_off: dict[str, list[str]] = {}
+    for stat in ("rebounds", "assists", "threes"):
+        exact = 0
+        off: list[str] = []
+        for aid, row in box.items():
+            official = row.get(stat)
+            replayed = state.get(stat, {}).get(aid, 0.0)
+            if official is not None and abs(replayed - official) < 1e-6:
+                exact += 1
+            else:
+                off.append(f'{row["name"]}: replay {replayed:.0f} vs box {official}')
+        stat_exact[stat] = exact
+        stat_off[stat] = off
     return {
         "players": len(box),
+        "rebounds_exact": stat_exact["rebounds"],
+        "rebounds_off": stat_off["rebounds"],
+        "assists_exact": stat_exact["assists"],
+        "assists_off": stat_off["assists"],
+        "threes_exact": stat_exact["threes"],
+        "threes_off": stat_off["threes"],
         "points_exact": points_exact,
         "points_off": points_off,
         "minutes_within_tolerance": minutes_within,
@@ -260,13 +348,13 @@ def sim_anchor_index(date_str: str) -> dict[str, dict[str, Any]]:
                 print("[grade] NO ADMIN_TOKEN -- cannot fetch the sim anchor; "
                       "set ADMIN_TOKEN or run from a tree with .env", flush=True)
                 return {}
-            url = ("https://syndicate-an21.onrender.com/api/ops/artifacts/export?"
+            # `/stream`, NOT `/export`: export reads on web have 502'd the board
+            # under load (state_model.md, model-scorecard); stream sends the file.
+            url = ("https://syndicate-an21.onrender.com/api/ops/artifacts/stream?"
                    + urllib.parse.urlencode({"path": relative}))
-            request = urllib.request.Request(url, headers={"X-Admin-Token": token})
+            request = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
             with urllib.request.urlopen(request, timeout=120) as response:
-                envelope = json.loads(response.read().decode("utf-8"))
-            body = (envelope.get("artifacts") or {}).get(relative)
-            payload = json.loads(body) if body else None
+                payload = json.loads(response.read().decode("utf-8"))
         except Exception:
             payload = None
     if not isinstance(payload, dict):
@@ -284,11 +372,19 @@ def sim_anchor_index(date_str: str) -> dict[str, dict[str, Any]]:
                 key = normalize_name(row.get("player_name"))
                 if key and key not in out:
                     out[key] = {"pts_mean": row.get("pts_mean"),
+                                "reb_mean": row.get("reb_mean"),
+                                "ast_mean": row.get("ast_mean"),
+                                "threes_mean": row.get("threes_mean"),
                                 "min_mean": row.get("min_mean")}
     return out
 
 
-def grade_event(summary: dict[str, Any], anchors: dict[str, dict[str, Any]]) -> dict[str, Any]:
+_STAT_MEAN_KEY = {"points": "pts_mean", "rebounds": "reb_mean", "assists": "ast_mean",
+                  "threes": "threes_mean"}
+
+
+def grade_event(summary: dict[str, Any], anchors: dict[str, dict[str, Any]],
+                stat: str = "points") -> dict[str, Any]:
     """Residuals of the SHIPPED projection against the actual final, per sample."""
     from syndicate.features.shared.wnba_live_prop_projection import project_live_player_stat
     from syndicate.features.shared.wnba_live_prop_rows import normalize_name
@@ -298,7 +394,12 @@ def grade_event(summary: dict[str, Any], anchors: dict[str, dict[str, Any]]) -> 
     end = state["end_elapsed"] or 40.0
     rows: list[dict[str, Any]] = []
     no_anchor: set[str] = set()
-    for sample in state["samples"]:
+    if stat == "points":
+        samples = [dict(s, value=s["points"]) for s in state["samples"]]
+    else:
+        samples = state["stat_samples"][stat]
+    mean_key = _STAT_MEAN_KEY[stat]
+    for sample in samples:
         row = box.get(sample["athlete_id"])
         if row is None:
             continue
@@ -307,9 +408,9 @@ def grade_event(summary: dict[str, Any], anchors: dict[str, dict[str, Any]]) -> 
             no_anchor.add(str(row.get("name")))
             continue
         verdict = project_live_player_stat(
-            current_stat=sample["points"],
+            current_stat=sample["value"],
             minutes_played=sample["minutes"],
-            pregame_stat=anchor.get("pts_mean"),
+            pregame_stat=anchor.get(mean_key),
             pregame_minutes=anchor.get("min_mean"),
             game_minutes_remaining=max(0.0, end - sample["elapsed"]),
         )
@@ -320,8 +421,8 @@ def grade_event(summary: dict[str, Any], anchors: dict[str, dict[str, Any]]) -> 
             "elapsed": sample["elapsed"],
             "minutes_remaining": verdict.get("minutes_remaining"),
             "projected": verdict["projected"],
-            "actual": row["points"],
-            "residual": verdict["projected"] - row["points"],
+            "actual": row[stat],
+            "residual": verdict["projected"] - row[stat],
         })
     return {"rows": rows, "no_anchor": sorted(no_anchor)}
 
@@ -416,6 +517,8 @@ def main(argv: list[str] | None = None) -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--events", nargs="*", default=None, help="ESPN event ids")
     parser.add_argument("--date", default=None, help="YYYY-MM-DD; grades every game that day")
+    parser.add_argument("--stat", choices=("points", "rebounds", "assists", "threes"), default="points",
+                        help="which residual to grade; each is gated on ITS OWN exact reconcile")
     parser.add_argument("--reconcile-only", action="store_true",
                         help="replay and check against the official box; grade nothing")
     args = parser.parse_args(argv)
@@ -427,7 +530,8 @@ def main(argv: list[str] | None = None) -> int:
         print("no events given (--events or --date)", flush=True)
         return 1
 
-    totals = {"games": 0, "players": 0, "points_exact": 0, "minutes_within": 0}
+    totals = {"games": 0, "players": 0, "points_exact": 0, "minutes_within": 0,
+              "rebounds_exact": 0, "assists_exact": 0, "games_graded": 0}
     graded: list[dict[str, Any]] = []
     no_anchor_all: set[str] = set()
     anchor_cache: dict[str, dict[str, Any]] = {}
@@ -439,7 +543,8 @@ def main(argv: list[str] | None = None) -> int:
             continue
         state = replay(summary)
         check = reconcile(state)
-        if not args.reconcile_only and check["points_exact"] == check["players"]:
+        stat_ok = check[f"{args.stat}_exact"] == check["players"]
+        if not args.reconcile_only and check["points_exact"] == check["players"] and stat_ok:
             # GRADE ONLY A GAME WHOSE REPLAY RECONCILED. A residual from a
             # replay that disagrees with the official box measures the bug.
             date_for_anchor = args.date or str(((summary.get("header") or {}).get("competitions") or [{}])[0].get("date") or "")[:10]
@@ -447,18 +552,25 @@ def main(argv: list[str] | None = None) -> int:
             if anchors is None:
                 anchors = sim_anchor_index(date_for_anchor)
                 anchor_cache[date_for_anchor] = anchors
-            result = grade_event(summary, anchors)
+            result = grade_event(summary, anchors, args.stat)
+            totals["games_graded"] += 1
             graded.extend(result["rows"])
             no_anchor_all.update(result["no_anchor"])
         totals["games"] += 1
         totals["players"] += check["players"]
         totals["points_exact"] += check["points_exact"]
         totals["minutes_within"] += check["minutes_within_tolerance"]
+        totals["rebounds_exact"] += check["rebounds_exact"]
+        totals["assists_exact"] += check["assists_exact"]
         print(f"event={event_id} players={check['players']} "
               f"points_exact={check['points_exact']}/{check['players']} "
               f"minutes_within_{check['minutes_tolerance']}min="
               f"{check['minutes_within_tolerance']}/{check['players']} "
+              f"rebounds_exact={check['rebounds_exact']}/{check['players']} "
+              f"assists_exact={check['assists_exact']}/{check['players']} "
               f"samples={len(state['samples'])}", flush=True)
+        for line in check[f"{args.stat}_off"][:5] if args.stat != "points" else ():
+            print(f"    {args.stat.upper()}_OFF {line}", flush=True)
         for line in check["points_off"][:5]:
             print(f"    POINTS_OFF {line}", flush=True)
         for line in check["minutes_off"][:5]:
@@ -469,7 +581,7 @@ def main(argv: list[str] | None = None) -> int:
         # interval SHRINKS as the game runs down -- a single sd over all samples
         # would describe neither end and would price both wrongly.
         print()
-        print("RESIDUALS (projected - actual final points), by minutes remaining:")
+        print(f"RESIDUALS (projected - actual final {args.stat}), by minutes remaining:")
         print(f"  {'bucket':>12}  {'n':>5}  {'mean':>7}  {'sd':>6}  {'p90|err|':>8}")
         buckets = ((30.0, 99.0), (20.0, 30.0), (10.0, 20.0), (5.0, 10.0), (0.0, 5.0))
         for low, high in buckets:
@@ -488,8 +600,9 @@ def main(argv: list[str] | None = None) -> int:
                   f"e.g. {sorted(no_anchor_all)[:4]}")
 
     print()
-    print(f"TOTALS games={totals['games']} players={totals['players']} "
-          f"points_exact={totals['points_exact']} minutes_within={totals['minutes_within']}",
+    print(f"TOTALS games={totals['games']} graded={totals['games_graded']} players={totals['players']} "
+          f"points_exact={totals['points_exact']} rebounds_exact={totals['rebounds_exact']} "
+          f"assists_exact={totals['assists_exact']} minutes_within={totals['minutes_within']}",
           flush=True)
     if totals["players"]:
         pct = 100.0 * totals["points_exact"] / totals["players"]
