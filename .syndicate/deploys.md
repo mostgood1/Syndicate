@@ -42935,3 +42935,32 @@ full-slate reading.
 - **The fix reached production, per date:** `prop_player_not_in_boxscore` 09-14 169 -> 142 (-27) and 09-20 787 -> 744 (-43) -- EXACTLY the offline replay's moved-row counts for those dates (27, 43; all Leo Bernal / Rafael Flores Jr.). Other re-graded dates also fell: 09-15 391->350, 09-16 414->371, 09-17 725->697, 09-18 844->775, 09-19 323->273, 09-27 1484->1398; 09-21 204->204. Total on the 9 re-graded dates 5,341 -> 4,954 (-387, 7.2%).
 - **After the reset MLB covers 9 dates / 112 games, not 14 / 188 -- BY DESIGN, not a loss:** `board_dates_to_fetch` takes today, yesterday and the oldest incomplete dates up to `--max-board-dates 10`, so 09-22..09-26 re-grade on the 2026-09-29 11:30Z scheduled run. Check that run shows 14 MLB dates again.
 - `prop_no_commence_time` 1,277 in 28d, all on 09-14..09-21 (producer fixed `0b5518ab`); ages out by 10-20.
+
+## 2026-09-28 1:01 PM CT — live-odds-worker `bffcd1b4` (lane `live-props-model-probability`) — WNBA live POINTS props priced on a line grid. **MEASUREMENT OWED: WNBA 2026-09-29 (LVA @ IND, MIN @ NYL).**
+
+    deploy dep-datamqm0tbcc73ai83h0   live-odds-worker ec10612a -> bffcd1b4
+    fired 18:01:14Z   live 18:04:52.78466Z   trigger=api   status=live (deploys API poll)
+    preflight CLEAR 18:00:5xZ (infrastructure processes only)
+    baseline read 18:00:39Z: refresh-worker LIVE_PROJECTION_JOIN sport=wnba, 09-27 20:50-21:26Z
+        lens_indexed 3..5 per build, projected 1..5, edged == projected, considered 147..196
+    COLLATERAL, USER-APPROVED in chat ("Deploy main before 09-29"): the service was 3 days
+        behind -- ec10612a..bffcd1b4 is 145 commits, 58 touching code, 47 by
+        pending_deploys.py (NCAAF live calibration + segment publishing, NFL live re-sim /
+        score-clock / prop capture, NHL Layer 1, slate-phase flags, worker memory
+        heartbeat, soccer live-prop fix 1d64a4b2). Their owners' own receipts stand; this
+        deploy only made them live here.
+
+**What shipped (this lane).** `f72b42fd`: `build_live_prop_rows(grid_markets=)` and the lens
+passing `("points",)` -- every half-point line within 3 measured sigmas of the live projection
+(cap 40, above the banked stat) plus the pregame line. Points only: the n=796 residual table is
+points. Consented cross-lane write into `layer2-triad-alignment`'s file.
+
+**Measured after.** First lens tick 18:06:21Z on the new code: `WNBA_LIVE_BOX_EMPTY date=2026-09-28
+games=0` (no WNBA game today -- expected), `NFL_PROJECTION_PULL ok=True`; `Traceback` since
+18:04:52Z: 0 (read 18:06:33Z). The grid path is NOT yet exercised.
+
+**verify:** during the 09-29 games, refresh-worker `LIVE_PROJECTION_JOIN sport=wnba`:
+`lens_indexed` well above 5 and `projected` well above 1..5 on `considered` ~150-200; then the
+09-29 population part: `gs=live kind=prop market=player_points` rows with `me` non-null.
+Also read the lens snapshot SIZE on the first live build (test measured +5.5 KB JSON per live
+player) -- a size regression is a memory question on this service.
