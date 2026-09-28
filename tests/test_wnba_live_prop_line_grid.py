@@ -87,11 +87,13 @@ def test_no_measured_sigma_falls_back_to_the_supplied_line():
     assert rows_mod._grid_lines(17.5, projected=None, current=6.0, minutes_remaining=20.0) == [17.5]
 
 
-def test_lens_grids_the_three_measured_markets_the_user_asked_for():
+def test_lens_grids_points_only_until_count_stats_are_calibrated():
+    """Rebounds/assists/threes overstate overs by 10-19 pp at the line level
+    (clock-sampled calibration, 2026-09-28); only points is gridded."""
     import inspect
     from syndicate.features.wnba import live_lens
     src = inspect.getsource(live_lens)
-    assert 'grid_markets=("points", "rebounds", "assists")' in src
+    assert 'grid_markets=("points",)' in src
 
 
 def test_every_grid_row_carries_the_actual_so_far():

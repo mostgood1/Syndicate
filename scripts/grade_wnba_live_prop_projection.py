@@ -184,6 +184,13 @@ def replay(summary: dict[str, Any]) -> dict[str, Any]:
     # the same sampling design as points (a sample at the scorer's scoring play),
     # so the three residual tables are comparable.
     stat_samples: dict[str, list[dict[str, Any]]] = {"rebounds": [], "assists": [], "threes": []}
+    # CLOCK SAMPLES `[2026-09-28]`: every player who has played, at every whole game
+    # minute, with counts AS OF that moment. The event samples above are taken right
+    # after the player's own event -- when count/minutes (the pace the projection
+    # extrapolates) is at its most inflated, worst for low-count stats. Production
+    # prices on a clock tick, not after an event, so this is the design that matches it.
+    clock_samples: list[dict[str, Any]] = []
+    next_minute = 1.0
     last_clock = 0.0
 
     plays = summary.get("plays") or []
@@ -192,6 +199,19 @@ def replay(summary: dict[str, Any]) -> dict[str, Any]:
         if now is None:
             continue
         # Credit every on-court player for the interval since the last event.
+        while now >= next_minute:
+            # Snapshot BEFORE this play's events: the state at the minute boundary.
+            for aid in box:
+                played = minutes.get(aid, 0.0) + (
+                    max(0.0, next_minute - last_clock) if aid in on_court else 0.0)
+                if played <= 0.0:
+                    continue
+                clock_samples.append({
+                    "elapsed": next_minute, "athlete_id": aid, "minutes": round(played, 3),
+                    "points": points[aid], "rebounds": rebounds[aid],
+                    "assists": assists[aid], "threes": threes[aid],
+                })
+            next_minute += 1.0
         delta = max(0.0, now - last_clock)
         if delta:
             for aid in on_court:
@@ -258,6 +278,7 @@ def replay(summary: dict[str, Any]) -> dict[str, Any]:
 
     return {"box": box, "points": points, "minutes": minutes,
             "rebounds": rebounds, "assists": assists, "threes": threes, "stat_samples": stat_samples,
+            "clock_samples": clock_samples,
             "samples": samples, "end_elapsed": round(end, 3)}
 
 
@@ -384,7 +405,7 @@ _STAT_MEAN_KEY = {"points": "pts_mean", "rebounds": "reb_mean", "assists": "ast_
 
 
 def grade_event(summary: dict[str, Any], anchors: dict[str, dict[str, Any]],
-                stat: str = "points") -> dict[str, Any]:
+                stat: str = "points", sampling: str = "event") -> dict[str, Any]:
     """Residuals of the SHIPPED projection against the actual final, per sample."""
     from syndicate.features.shared.wnba_live_prop_projection import project_live_player_stat
     from syndicate.features.shared.wnba_live_prop_rows import normalize_name
@@ -394,7 +415,9 @@ def grade_event(summary: dict[str, Any], anchors: dict[str, dict[str, Any]],
     end = state["end_elapsed"] or 40.0
     rows: list[dict[str, Any]] = []
     no_anchor: set[str] = set()
-    if stat == "points":
+    if sampling == "clock":
+        samples = [dict(s, value=s[stat]) for s in state["clock_samples"]]
+    elif stat == "points":
         samples = [dict(s, value=s["points"]) for s in state["samples"]]
     else:
         samples = state["stat_samples"][stat]
@@ -421,6 +444,7 @@ def grade_event(summary: dict[str, Any], anchors: dict[str, dict[str, Any]],
             "elapsed": sample["elapsed"],
             "minutes_remaining": verdict.get("minutes_remaining"),
             "projected": verdict["projected"],
+            "current": sample["value"],
             "actual": row[stat],
             "residual": verdict["projected"] - row[stat],
         })
@@ -519,6 +543,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--date", default=None, help="YYYY-MM-DD; grades every game that day")
     parser.add_argument("--stat", choices=("points", "rebounds", "assists", "threes"), default="points",
                         help="which residual to grade; each is gated on ITS OWN exact reconcile")
+    parser.add_argument("--sampling", choices=("event", "clock"), default="event",
+                        help="event: at the player's own events (the original design); "
+                             "clock: every player at every game minute (matches production)")
     parser.add_argument("--reconcile-only", action="store_true",
                         help="replay and check against the official box; grade nothing")
     args = parser.parse_args(argv)
@@ -552,7 +579,7 @@ def main(argv: list[str] | None = None) -> int:
             if anchors is None:
                 anchors = sim_anchor_index(date_for_anchor)
                 anchor_cache[date_for_anchor] = anchors
-            result = grade_event(summary, anchors, args.stat)
+            result = grade_event(summary, anchors, args.stat, args.sampling)
             totals["games_graded"] += 1
             graded.extend(result["rows"])
             no_anchor_all.update(result["no_anchor"])

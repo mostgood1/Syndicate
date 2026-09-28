@@ -410,11 +410,16 @@ def _attach_live_props(games: list[dict[str, Any]], date_str: str) -> None:
             game_minutes_remaining=_game_minutes_remaining(game),
             lines=lines,
             # Live board lines move off the pregame line this lens is given; the
-            # grid prices them, each market on ITS OWN measured residual (48 dates /
-            # 140 games, out-of-sample coverage 91.5-91.8%). Threes is measured too
-            # but NOT widened -- the user asked for points, rebounds and assists.
-            # `[2026-09-28, lane live-props-model-probability]`
-            grid_markets=("points", "rebounds", "assists"),
+            # grid prices them. POINTS ONLY, and that is a MEASURED choice
+            # `[2026-09-28, lane live-props-model-probability, user decision "Roll back
+            # reb/ast grid"]`: line-level calibration on CLOCK-sampled replays of
+            # rotation players (fit Jul, test Aug) -- worst gap between predicted and
+            # observed P(over): points 3.6 pp, assists 10, rebounds 18.5, threes 18.7,
+            # all overstating overs. One sigma per time bucket ignores player scale,
+            # which hurts low counts most. Rebounds/assists/threes keep their single
+            # pregame line (priced on their own tables, which beat the old points
+            # table); widening them waits on a player-scaled spread.
+            grid_markets=("points",),
         )
         game["liveProps"] = to_snapshot_live_props(built["rows"])
         game["livePropsCoverage"] = {

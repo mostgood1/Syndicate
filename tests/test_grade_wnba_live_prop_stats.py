@@ -67,3 +67,17 @@ def test_made_half_of_a_made_attempted_pair():
     assert g._made_at(["3-7"], 0) == 3.0
     assert g._made_at(["x"], 0) is None
     assert g._made_at([], 0) is None
+
+
+def test_clock_samples_snapshot_every_player_at_each_minute_before_the_play():
+    """Production prices on a clock tick, not right after the player's own event.
+    Clock samples take every player who has played, at each whole minute, with the
+    counts AS OF that minute -- i.e. before the play that crosses it."""
+    s = _summary({"1": ["40", "3", "1-4", "0", "0"], "2": ["40", "2", "0-1", "1", "1"]})
+    samples = g.replay(s)["clock_samples"]
+    at_1 = {x["athlete_id"]: x for x in samples if x["elapsed"] == 1.0}
+    assert set(at_1) == {"1", "2"}
+    # The made three at 9:00 of Q1 (elapsed 1.0) is AFTER the minute-1 snapshot.
+    assert at_1["1"]["threes"] == 0.0 and at_1["1"]["points"] == 0.0
+    later = [x for x in samples if x["athlete_id"] == "1" and x["elapsed"] == 2.0]
+    assert later and later[0]["threes"] == 1.0
