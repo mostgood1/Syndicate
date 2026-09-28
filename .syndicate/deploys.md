@@ -42729,3 +42729,84 @@ Whichever arm looks better, neither reading carries.
 The lane's own conclusion holds and is now measured rather than argued: an NFL
 live margin model built on ratings that carry as much noise as signal loses to
 frozen, and so does one built on score and clock alone. Neither publishes.
+
+### 1b. Capture retrieval — END TO END, VERIFIED
+
+The reading owed above is discharged. Three deploys, because the first two were
+each necessary and neither was sufficient.
+
+    e0755d0f  refresh-worker  live 14:56:56Z   allowlist  (eligible, moves nothing)
+    451f9fa6  web             live 15:08:06Z   allowlist + the push
+    02948aa0  refresh-worker  live 15:32:58Z   the sweep, hooked above every early return
+      dep-dat8fu942hec73fu66eg   fired 15:30:01Z
+      baseline read 15:29:51Z from live e0755d0f: tick-hook occurrences = 0
+
+**The worker swept 3 min 33 s after boot:**
+
+    15:36:31Z  [nfl_prop_capture] PUBLISH OK path=/opt/render/project/data/nfl_source/live_prop_capture/2026-09-28.jsonl
+    15:36:31Z  [nfl_prop_capture] SWEEP dir=.../live_prop_capture found=1 published=1
+
+**And the rows came back off WEB**, which is the claim that matters --
+`fetch_prod_artifacts_paced.py --pattern nfl_source/live_prop_capture/*.jsonl`:
+
+    62 rows   event 401872962 (LAR @ DEN)   period 3   clock_seconds_at 0
+    score at cutoff 16-16
+    all 12 CAPTURED_FIELDS present on all 62 rows
+    16 rows carry non-zero yardage; the rest are real zero-production players
+    spot check: Matthew Stafford 22/39, 199 yds, 1 TD at the end of Q3
+
+`clock_seconds_at 0` is the field worth reading twice: it says this is a genuine
+quarter boundary and not a mid-quarter tick that merely landed inside the window,
+which is the assumption a cutoff fit would otherwise be making silently.
+
+**THE INSTRUMENT WAS CALIBRATED BEFORE IT WAS TRUSTED.** The same fetch was run
+against `reports/intelligence/clv_price_trail/*.jsonl` first and returned 2 files,
+so `could not read the inventory; nothing fetched` on the capture pattern was a
+known-good tool reporting a real absence. Without that, a 404 after three deploys
+would have been unreadable.
+
+### 1c. The hook move — an AUTHORISED cross-lane override, and what it was worth
+
+`publish_pending_captures` shipped in `2d22031f` hooked inside
+`record_quarter_snapshot`, where it fires only on a genuine boundary ATTEMPT.
+Measured before deploying it: the NFL tick runs every ~5 min emitting
+`PROP_CAPTURE_TICK no_period_or_clock=16`, while the slate held **one** game
+(PHI @ CHI, kickoff 00:15Z) whose first capturable boundary was **9.5 h away**.
+So the file already on disk would have published tonight, not today, and the
+verification with it.
+
+The right hook is the top of `live_resim._maybe_capture_prop_snapshot`, in lane
+`nfl-live-resim-activation`. The conflict was surfaced, NOT self-approved; the
+user overrode in chat ("move the hook, I'll take the cross-lane override") and the
+override is logged in that lane's block. Measured result: **3 min 33 s instead of
+9.5 h.** `2d22031f` was never deployed on its own -- `02948aa0` superseded it
+before the window opened, which also saved a deploy.
+
+### Found doing it, and worth more than the edit
+
+**`lane-guard` and `lane-postwrite-check` read DIFFERENT per-session markers.**
+PreToolUse resolves the marker under `CLAUDE_PROJECT_DIR` (the PRIMARY tree); the
+post-write check read the copy inside the WORKTREE. Both existed for session
+`4ab694ed` and disagreed -- `nfl-ncaaf-live-props` against a stale
+`nfl-score-clock-model` -- so the post-write warning named a lane this session had
+left hours earlier. The post-write check is the ONLY guard that sees shell writes,
+and "Your lane:" is the field a reader uses to decide whether a flagged write was
+theirs. Synced by hand, which is not a fix; filed as a lead (`16b791e1`), and it
+belongs in `lane_marker.current_lane()`.
+
+**A preflight CLEAR I threw away.** The first watcher's Render API call 400'd,
+`LIVE` came back empty, and `git show ":<path>"` with an empty rev silently read
+the WORKTREE INDEX -- which does contain the allowlist -- so it fed preflight a
+baseline identical to the expected post-state and got CLEAR. Preflight validates a
+baseline's AGE, never its truth. Every baseline after that was read from the named
+live SHA with a hard stop if it did not read as expected.
+
+### Still owed
+
+- The NFL separation floor's LIVE reading (`ebe7785e`) -- needs a live slate;
+  tonight's PHI @ CHI at 00:15Z is the first chance.
+- Tonight's capture will exercise the push on a FRESH snapshot (today only
+  exercised the sweep over an existing file). Both paths are tested; only the
+  sweep is measured in production.
+- NCAAF live props still have no `live_player_box` at all; the data layer comes
+  before any capture.
