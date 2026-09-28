@@ -40,6 +40,72 @@ def _load_csv_rows(path: Path) -> list[dict[str, str]]:
         return []
 
 
+def _prediction_rows_for_date(path: Path, selected_date: str) -> list[dict[str, str]]:
+    """Predictions rows from `path`, minus any row that says it belongs to a
+    DIFFERENT date than the one being asked for.
+
+    THE FILENAME IS NOT THE SLATE. Every NHL surface resolves its games by
+    building `predictions_<date>.csv` and trusting the name, so a file written
+    under today's date with another date's rows is served as today's slate with
+    nothing reporting it.
+
+    Measured 2026-09-28 18:2xZ: the Layer 2 compact rail carried 7 NHL chips on
+    a date the NHL's own API says has ZERO games (preseason ended 09-26, opening
+    night is 09-29). They were `predictions_2026-09-19.csv` row-for-row and
+    IN ORDER -- DAL@STL, MTL@TOR, TOR@MTL, WPG@EDM, CHI@MIN, VGK@LAK, VAN@SEA,
+    the first seven preseason games of the season, `gamePk` 1..7 -- served under
+    `date=2026-09-28` off a `worker_artifact` 46 SECONDS OLD. Fresh artifact,
+    nine-day-old content, and `GAME_CHIPS_PUBLISHED ... ok=True` every ~3 min.
+
+    WEB AND REFRESH-WORKER DISAGREED, which is what made it invisible:
+    `/nhl/api/cards?date=2026-09-28` on web looked ahead correctly and served
+    09-29's five real games, while refresh-worker -- which BUILDS the chips --
+    had a 09-28 artifact with rows in it, so its lookahead never fired.
+
+    THE DISCRIMINATING FIELD WAS ALREADY IN THE ROW. `predictions_*.csv` carries
+    a populated `date` column (read from production: `2026-09-19` on every one of
+    those seven rows). Nothing compared it to the requested date.
+
+    Why the scoreboard join cannot cover this, and why the fix belongs HERE:
+    lane `nhl-compact-card-start-time` MET its goal on 2026-09-22 by copying
+    `gamePk`/`gameDate` off `NhlWebClient.scoreboard_day` onto the card game. On
+    a date with no games that join correctly returns nothing, so the rows fall
+    back to a row-counter `gamePk` and a null start -- no identity, therefore no
+    score can ever attach. The overlay was not wrong; the rows should not have
+    been there.
+
+    A BLANK `date` IS KEPT, NOT DROPPED. Absence is not disagreement, and the
+    permissive branch has to be the one that cannot silently empty a board: a
+    row that says nothing about its date is the old behaviour, a row that names
+    a different date is the bug.
+    """
+    rows = _load_csv_rows(path)
+    if not rows:
+        return rows
+    wanted = str(selected_date or "").strip()
+    if not wanted:
+        return rows
+    kept: list[dict[str, str]] = []
+    dropped = 0
+    dropped_dates: set[str] = set()
+    for row in rows:
+        row_date = str(row.get("date") or "").strip()[:10]
+        if row_date and row_date != wanted:
+            dropped += 1
+            dropped_dates.add(row_date)
+            continue
+        kept.append(row)
+    if dropped:
+        # Named out loud: a slate that silently shrinks to zero is the failure
+        # this guard replaces, not an improvement on it.
+        print(
+            f"[nhl_cards] ROW_DATE_MISMATCH path={path.name} requested={wanted} "
+            f"dropped={dropped} kept={len(kept)} row_dates={sorted(dropped_dates)}",
+            flush=True,
+        )
+    return kept
+
+
 def _safe_float(value: Any) -> float | None:
     try:
         return float(value)
@@ -350,10 +416,10 @@ def _game_from_row(row: dict[str, str], *, idx: int, selected_date: str) -> dict
 def _games_from_artifact(selected_date: str) -> tuple[list[dict[str, Any]], str]:
     primary_path = processed_path(f"predictions_{selected_date}.csv")
     sim_path = processed_path(f"predictions_sim_{selected_date}.csv")
-    rows = _load_csv_rows(primary_path)
+    rows = _prediction_rows_for_date(primary_path, selected_date)
     source_path = primary_path
     if not rows:
-        rows = _load_csv_rows(sim_path)
+        rows = _prediction_rows_for_date(sim_path, selected_date)
         if rows:
             source_path = sim_path
     games = [_game_from_row(row, idx=idx, selected_date=selected_date) for idx, row in enumerate(rows, start=1)]
@@ -369,10 +435,10 @@ def _recommendation_rows(selected_date: str) -> tuple[list[dict[str, str]], str]
 def _prediction_bundle_rows(selected_date: str) -> tuple[list[dict[str, Any]], str]:
     primary_path = processed_path(f"predictions_{selected_date}.csv")
     sim_path = processed_path(f"predictions_sim_{selected_date}.csv")
-    rows = _load_csv_rows(primary_path)
+    rows = _prediction_rows_for_date(primary_path, selected_date)
     source_path = primary_path
     if not rows:
-        rows = _load_csv_rows(sim_path)
+        rows = _prediction_rows_for_date(sim_path, selected_date)
         if rows:
             source_path = sim_path
     sim_rows_by_game = _prediction_sim_rows_by_game(selected_date)
@@ -459,7 +525,7 @@ def _prediction_bundle_rows(selected_date: str) -> tuple[list[dict[str, Any]], s
 
 def _prediction_sim_rows_by_game(selected_date: str) -> dict[tuple[str, str], dict[str, str]]:
     path = processed_path(f"predictions_sim_{selected_date}.csv")
-    rows = _load_csv_rows(path) if path.exists() else []
+    rows = _prediction_rows_for_date(path, selected_date) if path.exists() else []
     out: dict[tuple[str, str], dict[str, str]] = {}
     for row in rows:
         away_name = str(row.get("away") or "").strip()
@@ -520,7 +586,7 @@ def _sim_boxscore_rows(selected_date: str) -> tuple[list[dict[str, str]], str]:
 
 def _schedule_rows_by_game(selected_date: str) -> dict[tuple[str, str], dict[str, str]]:
     path = scoreboard_snapshot_path(selected_date)
-    rows = _load_csv_rows(path) if path.exists() else []
+    rows = _prediction_rows_for_date(path, selected_date) if path.exists() else []
     out: dict[tuple[str, str], dict[str, str]] = {}
     for row in rows:
         away_name = str(row.get("away") or row.get("away_team") or "").strip()
@@ -858,9 +924,9 @@ def _prediction_dates() -> list[str]:
 
 def _date_has_rows(date_str: str) -> bool:
     return bool(
-        _load_csv_rows(processed_path(f"predictions_{date_str}.csv"))
-        or _load_csv_rows(processed_path(f"predictions_sim_{date_str}.csv"))
-        or _load_csv_rows(scoreboard_snapshot_path(date_str))
+        _prediction_rows_for_date(processed_path(f"predictions_{date_str}.csv"), date_str)
+        or _prediction_rows_for_date(processed_path(f"predictions_sim_{date_str}.csv"), date_str)
+        or _prediction_rows_for_date(scoreboard_snapshot_path(date_str), date_str)
     )
 
 
@@ -883,7 +949,7 @@ def _next_scheduled_game_date_after_empty_slate(selected_date: str) -> str | Non
 
 def _games_from_scoreboard_snapshot(selected_date: str) -> tuple[list[dict[str, Any]], str]:
     path = scoreboard_snapshot_path(selected_date)
-    rows = _load_csv_rows(path) if path.exists() else []
+    rows = _prediction_rows_for_date(path, selected_date) if path.exists() else []
     games: list[dict[str, Any]] = []
     for idx, row in enumerate(rows, start=1):
         home_name = str(row.get("home") or row.get("home_team") or "Home").strip() or "Home"
@@ -995,6 +1061,22 @@ def build_cards_page_context(selected_date: str | None) -> dict[str, Any]:
             source_path = scoreboard_path
             source_title = "NHL archived scoreboard"
     using_sample_data = False
+
+    # WHICH FILE, AND WHETHER LOOKAHEAD FIRED. Refresh-worker and web read
+    # SEPARATE DISKS, and on 2026-09-28 they disagreed about the NHL slate for
+    # the same date with nothing reporting it: web looked ahead to 09-29's five
+    # real games while refresh-worker -- the service that BUILDS the chips --
+    # served 09-19's seven under today's date. The only visible symptom was on
+    # the board, which is the wrong place to find out.
+    #
+    # Unconditional on purpose: one line per build, on files the build has just
+    # read anyway, and it is what makes the disk split legible without having to
+    # deploy an instrument to go looking for it.
+    print(
+        f"[nhl_cards] RESOLVED requested={requested_date} served={resolved_date} "
+        f"lookahead={lookahead_applied} games={len(games)} source={Path(source_path).name}",
+        flush=True,
+    )
 
     scoreboard_items = [
         {

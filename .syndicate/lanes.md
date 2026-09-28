@@ -957,6 +957,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - Result: **GOAL MET in the repo; LIVE only once the primary tree's `.claude/hooks/` catches up** (hooks run from `$CLAUDE_PROJECT_DIR`). `_my_lane()` reads `current_lane(CLAUDE_PROJECT_DIR)` first and falls back to `root`'s marker. It is used at both call sites: the ownership filter in `_candidates` and the `Your lane:` line. `test_lane_postwrite_check.py` 34/34; 4 of the 6 new cases fail on the old hook. **One of the 4 is a silent false grant, not just a false alarm:** a stale worktree marker naming the other lane let a write to that lane's file pass unreported. `lane_open.py` still writes both markers, harmless and still the fallback. Files released.
 
+### nhl-board-row-date-mismatch — OPEN — opened 2026-09-28 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: An NHL predictions row whose own `date` column disagrees with the date being requested is never served as that date's game, so the Layer 2 compact rail shows NHL chips only for dates that actually have NHL games. Measured on production as zero NHL chips on /api/board/game-chips for 2026-09-28 (a date with zero real NHL games) and five correctly-identified chips for 2026-09-29.
+- Files: syndicate/features/nhl/cards.py (the predictions-row loaders _games_from_artifact/_prediction_bundle_rows/_date_has_rows ONLY), tests/test_nhl_cards_row_date_guard.py (NEW)
+- Hypothesis: refresh-worker's predictions artifact for 2026-09-28 holds 2026-09-19's seven rows; the cards builder keys entirely on the FILENAME's date and never reads the row's own populated `date` column, so _date_has_rows(2026-09-28) is true, lookahead never fires, and the 09-19 slate is served under today's date with row-counter gamePks that no scoreboard join can match.
+- Falsification test: If the chip matchups for 2026-09-28 do NOT match /nhl/api/cards?date=2026-09-19 row-for-row, the rows come from somewhere other than a mis-dated predictions file and the row-date guard is the wrong fix. If filtering by row date leaves _date_has_rows(2026-09-28) true, the guard is not at the choke point.
+- Verification: Offline: a predictions row carrying date=2026-09-19 loaded for selected_date=2026-09-28 yields zero games AND _date_has_rows returns False (so lookahead fires); a row whose date matches, or whose date column is blank, is still served. Production after a user-approved deploy of refresh-worker: /api/board/game-chips carries zero nhl chips for a no-games date, and on 2026-09-29 carries five chips whose matchups equal the NHL API's own slate.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
