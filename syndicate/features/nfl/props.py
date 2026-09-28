@@ -245,12 +245,18 @@ def _safe_float(value: Any) -> float | None:
 _COVER_PROBABILITY_BLEND_WEIGHT: dict[str, float] = {
     "passing_yards": 0.689,      # re-fit 0.4994 REJECTED, worse out of sample
     "passing_attempts": 0.948,
-    "passing_tds": 0.0,          # re-fit 0.2667 REJECTED, worse out of sample
+    # DEAD AS OF THE DISCRETE BRANCH. `passing_tds` and `interceptions` now
+    # return from `_DISCRETE_COUNT_STATS` before any blend is consulted, so these
+    # two weights are unreachable. Kept rather than deleted so the re-fit history
+    # above stays readable against a complete table, and so re-enabling the
+    # continuous path (by removing a market from `_DISCRETE_COUNT_STATS`) does
+    # not silently fall back to a weight nobody re-derived.
+    "passing_tds": 0.0,          # UNUSED: discrete. re-fit 0.2667 was REJECTED.
+    "interceptions": 0.2707,     # UNUSED: discrete.
     "rushing_yards": 0.5212,
     "rushing_attempts": 0.4971,
     "receptions": 0.154,
     "receiving_yards": 0.2872,
-    "interceptions": 0.2707,
 }
 
 
@@ -282,6 +288,126 @@ def _lognormal_cover_probability(mean: float, stdev: float, line: float) -> floa
     return 1.0 - statistics.NormalDist(0.0, 1.0).cdf(z)
 
 
+#: Markets modelled as a DISCRETE COUNT rather than a continuous cover
+#: probability, because their outcome space is a handful of integers and a
+#: continuous CDF cannot be calibrated against that at any spread.
+#:
+#: MEASURED on the graded population (high-usage, 2024-25): `interceptions` has
+#: FIVE distinct outcomes with P(0)=0.52, `passing_tds` has SIX with P(0)=0.18 --
+#: against 57 for `passing_attempts` and 198 for `receiving_yards`. They were the
+#: two markets still failing the `#499` bar after the spread was fixed (0.2577
+#: and 0.1570 against 0.150), and per-market shrinkage moved BOTH the wrong way
+#: (0.2613, 0.1672), which is what identified the family as the problem rather
+#: than the tuning.
+#:
+#: POISSON, AND THE DATA CHOSE IT. Over 1,976 real QB games 2022-2025
+#: (>= 8 games and >= 100 attempts, so genuine starters):
+#:
+#:     passing_tds     pooled mean 1.414  var 1.308  var/mean 0.925
+#:     interceptions   pooled mean 0.655  var 0.691  var/mean 1.054
+#:
+#: with per-QB-season medians of 0.872 and 1.000. A variance-to-mean ratio of 1
+#: IS the Poisson assumption, so a negative binomial would be fitting an
+#: overdispersion that is not there -- `passing_tds` is if anything slightly
+#: UNDER-dispersed, which makes Poisson mildly conservative rather than wrong.
+#:
+#: `anytime_td` is the precedent in this same function: a market whose outcome
+#: space made a distribution the wrong tool, handled as a rate instead.
+_DISCRETE_COUNT_STATS = frozenset({"passing_tds", "interceptions"})
+
+#: League per-game rate, from the FIT SEASONS ONLY (2022-2023), over real
+#: starters (>= 100 attempts in the season). 2024-2025 stayed held out.
+_DISCRETE_COUNT_PRIOR_RATE: dict[str, float] = {
+    "passing_tds": 1.3013,
+    "interceptions": 0.6932,
+}
+
+#: Gamma-Poisson shrinkage of the RATE, `(n*raw + k*prior)/(n+k)` -- `#471`'s own
+#: formula, and conjugate for a Poisson rather than merely analogous.
+#:
+#: IT IS NEEDED because the raw rolling rate over-predicts badly on the
+#: population the board quotes. Measured held out, unshrunk: every calibration
+#: bucket above 0.1 realised BELOW its prediction (0.350 -> 0.136, 0.650 ->
+#: 0.432), with lambda spanning 0.8-2.5 against a league rate of 0.655 -- the
+#: usage filter selects quarterbacks whose recent rate was high, and it regresses.
+#:
+#: THE TWO MARKETS ARE NOT THE SAME KIND OF NUMBER, and that distinction is the
+#: point of this comment.
+#:
+#: `passing_tds` k=8 is a GENUINE INTERIOR MINIMUM on the fit seasons -- 0.150778
+#: at k=8, rising monotonically to 0.156263 at k=128 -- which is the standard
+#: `#471` set for accepting a constant at all. Held out: Brier 0.172346 ->
+#: 0.165922, worst powered bucket 0.1286 -> 0.0318.
+#:
+#: `interceptions` k=32 IS NOT A FITTED OPTIMUM AND MUST NOT BE READ AS ONE. Its
+#: fit Brier declines MONOTONICALLY out to k=128 (0.136599 -> 0.133599) and is
+#: still falling -- exactly the "more shrinkage is free" artifact `#471` refused.
+#: k -> infinity means lambda -> the league rate, so what the sweep is really
+#: reporting is that **a quarterback's own interception rate carries no
+#: measurable predictive signal beyond the league average**. 32 is chosen as the
+#: point where the held-out bucket gap reaches its floor and STAYS there (0.0690
+#: at k=32, 48, 64, 96, 128), not as a minimum. k=24 was rejected despite being
+#: the grid-edge pick of an earlier sweep: its held-out gap was 0.1474, the WORST
+#: of every k tried, i.e. a noisy point on a flat slope.
+#:
+#: CONSEQUENCE, recorded because it bears on whether this market should be
+#: priced at all: at k=32 every quarterback gets nearly the same probability for
+#: a given line, so any "edge" this market produces is the MARKET's deviation
+#: from the league rate, not a model insight about the player.
+_DISCRETE_COUNT_SHRINKAGE_K: dict[str, float] = {
+    "passing_tds": 8.0,
+    "interceptions": 32.0,
+}
+
+
+def _discrete_count_rate(stat: str, mean: float, n: int) -> float:
+    """The Poisson rate to price with: the player's own, pulled toward the league.
+
+    Applied HERE rather than in `player_rate` so the displayed `projected` stays
+    the player's own observed rate while the PROBABILITY uses the shrunk
+    posterior. They answer different questions -- "what has he been doing" and
+    "what should I bet" -- and collapsing them would hide the shrinkage from a
+    reader looking at the card.
+    """
+    prior = _DISCRETE_COUNT_PRIOR_RATE.get(stat)
+    k = _DISCRETE_COUNT_SHRINKAGE_K.get(stat)
+    if prior is None or k is None or n <= 0:
+        return mean
+    return (n * float(mean) + k * prior) / (n + k)
+
+
+def _poisson_cover_probability(mean: float, line: float) -> float | None:
+    """`P(X > line)` for an integer-valued count with rate `mean`.
+
+    THE LINE IS A THRESHOLD ON AN INTEGER, which is the whole reason this exists.
+    A quoted `1.5` means "two or more", so the probability is
+    `1 - P(X <= 1)` -- summed exactly over the integers rather than integrated
+    over a continuum that the outcome cannot occupy. `floor` handles a whole
+    number line correctly too: at `line = 1`, "over" is still `X >= 2`.
+    """
+    if mean is None or mean < 0 or line is None or line < 0:
+        return None
+    try:
+        lam = float(mean)
+        upto = math.floor(float(line))
+    except (TypeError, ValueError):
+        return None
+    if lam == 0.0:
+        # A rate of exactly zero puts all mass on 0, so anything above 0 is
+        # impossible. Returned rather than refused: it is a real answer, and the
+        # caller's own `refuse_published_certainty` decides what to publish.
+        return 0.0
+    # Cumulative sum, not a closed form: the support here is 0..6 in practice and
+    # an explicit sum cannot silently lose the tail to floating point the way a
+    # survival-function identity can near lam -> 0.
+    term = math.exp(-lam)
+    cdf = term
+    for k in range(1, upto + 1):
+        term *= lam / k
+        cdf += term
+    return max(0.0, min(1.0, 1.0 - cdf))
+
+
 def _nfl_prop_model_probability(*, stat: str, mean: float | None, stdev: float | None, n: int, line: float | None) -> float | None:
     """Real season-to-date rate, converted to a probability -- a blended
     Normal/log-normal cover probability for count/yardage stats with a
@@ -300,6 +426,15 @@ def _nfl_prop_model_probability(*, stat: str, mean: float | None, stdev: float |
         return None
     if stat == "anytime_td":
         return max(0.0, min(1.0, mean))
+    if stat in _DISCRETE_COUNT_STATS:
+        # BEFORE the `stdev` guard on purpose. A Poisson has ONE parameter: the
+        # rate fixes the variance, so there is no spread to require and a market
+        # with a valid rate must not be refused for want of one. It also means
+        # the spread shrinkage and the log-normal blend are both inapplicable
+        # here rather than merely unused -- see `_DISCRETE_COUNT_STATS`.
+        if line is None:
+            return None
+        return _poisson_cover_probability(_discrete_count_rate(stat, mean, n), line)
     if line is None or stdev is None or stdev <= 0:
         return None
     normal_prob = 1.0 - statistics.NormalDist(mean, stdev).cdf(line)

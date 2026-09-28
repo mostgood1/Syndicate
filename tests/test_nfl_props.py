@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import os
 import tempfile
+import statistics
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -267,22 +268,27 @@ class NflPropsTests(unittest.TestCase):
         self.assertIsNone(props._lognormal_cover_probability(10.0, 5.0, -1.0))
 
     def test_model_probability_weight_zero_market_is_pure_normal(self) -> None:
-        # A weight of 0.0 must short-circuit before any log-normal call and match
-        # the plain Normal-CDF probability EXACTLY, not approximately.
-        #
-        # RE-POINTED FROM `interceptions` TO `passing_tds`, 2026-09-28. This test
-        # asserts a MECHANISM (the zero-weight path) and merely used whichever
-        # market happened to ship at 0.0. After `player_rate` widened the spread,
-        # the blend was re-fitted and `interceptions` moved 0.0 -> 0.2707 on a
-        # genuine out-of-sample improvement, while `passing_tds` stayed at 0.0
-        # (its re-fit lost out of sample and was rejected). Pinning the market
-        # rather than the mechanism would have made a legitimate re-calibration
-        # look like a regression.
-        import statistics as stdlib_statistics
-        mean, stdev, line = 1.2, 0.8, 1.5
-        normal_only = 1.0 - stdlib_statistics.NormalDist(mean, stdev).cdf(line)
-        self.assertEqual(props._COVER_PROBABILITY_BLEND_WEIGHT["passing_tds"], 0.0)
-        blended = props._nfl_prop_model_probability(stat="passing_tds", mean=mean, stdev=stdev, n=5, line=line)
+        """A weight of 0.0 must short-circuit before any log-normal call and match
+        the plain Normal-CDF probability EXACTLY.
+
+        DRIVEN BY PATCHING THE WEIGHT, not by naming whichever market happens to
+        ship at 0.0 -- twice now this test has broken for a reason that was not a
+        regression. It first pinned `interceptions`, which moved off 0.0 on a
+        genuine out-of-sample re-fit; re-pointed to `passing_tds`, which then
+        became a DISCRETE count market and stopped using the blend at all. The
+        assertion is about the zero-weight PATH, so the fixture now creates that
+        condition instead of hunting for it.
+        """
+        mean, stdev, line = 40.0, 18.0, 45.5
+        normal_only = 1.0 - statistics.NormalDist(mean, stdev).cdf(line)
+        original = dict(props._COVER_PROBABILITY_BLEND_WEIGHT)
+        try:
+            props._COVER_PROBABILITY_BLEND_WEIGHT["receiving_yards"] = 0.0
+            blended = props._nfl_prop_model_probability(
+                stat="receiving_yards", mean=mean, stdev=stdev, n=5, line=line)
+        finally:
+            props._COVER_PROBABILITY_BLEND_WEIGHT.clear()
+            props._COVER_PROBABILITY_BLEND_WEIGHT.update(original)
         self.assertEqual(blended, normal_only)
 
     def test_model_probability_weighted_market_differs_from_pure_normal(self) -> None:
@@ -357,3 +363,68 @@ class NflPropsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NflDiscreteCountPropsTests(unittest.TestCase):
+    """`passing_tds` and `interceptions` are priced as COUNTS, not with a CDF.
+
+    They have five and six distinct outcomes on the graded population, and a
+    continuous cover probability cannot be calibrated against that support at any
+    spread -- they were the two markets still failing the `#499` bar after the
+    spread was fixed, and per-market shrinkage moved both the WRONG way, which is
+    what identified the family rather than the tuning as the problem.
+    """
+
+    def test_a_half_point_line_is_a_threshold_on_an_INTEGER(self) -> None:
+        """Over 1.5 means two or more -- summed over integers, not integrated."""
+        import math
+        lam = 1.3013
+        expected = 1.0 - (math.exp(-lam) + lam * math.exp(-lam))
+        self.assertAlmostEqual(
+            props._poisson_cover_probability(lam, 1.5), expected, places=12)
+
+    def test_a_WHOLE_number_line_still_means_strictly_greater(self) -> None:
+        """At line=1, "over" is X >= 2, the same as line=1.5. `floor` must not
+        quietly turn that into X >= 1."""
+        self.assertAlmostEqual(props._poisson_cover_probability(1.3, 1.0),
+                               props._poisson_cover_probability(1.3, 1.5), places=12)
+
+    def test_the_discrete_branch_is_REACHED_and_differs_from_the_continuous_one(self) -> None:
+        """off != on for a family switch: the discrete markets must not merely
+        agree with the Normal they replaced."""
+        got = props._nfl_prop_model_probability(
+            stat="interceptions", mean=1.2, stdev=0.9, n=5, line=1.5)
+        normal = 1.0 - statistics.NormalDist(1.2, 0.9).cdf(1.5)
+        self.assertIsNotNone(got)
+        self.assertNotAlmostEqual(got, normal, places=3)
+
+    def test_the_rate_is_SHRUNK_toward_the_league_and_pulls_a_hot_QB_down(self) -> None:
+        """The raw rolling rate over-predicts on the selected population: held
+        out and unshrunk, every calibration bucket above 0.1 realised BELOW its
+        prediction (0.350 -> 0.136). A QB running hot must be pulled toward the
+        league rate."""
+        hot, n = 2.5, 4
+        raw = props._poisson_cover_probability(hot, 1.5)
+        shipped = props._nfl_prop_model_probability(
+            stat="interceptions", mean=hot, stdev=1.0, n=n, line=1.5)
+        self.assertLess(shipped, raw, "the hot rate was not shrunk at all")
+        self.assertAlmostEqual(
+            props._discrete_count_rate("interceptions", hot, n),
+            (n * hot + 32.0 * 0.6932) / (n + 32.0), places=9)
+
+    def test_a_discrete_market_is_priced_WITHOUT_a_spread(self) -> None:
+        """A Poisson has one parameter: the rate fixes the variance. A market
+        with a valid rate must not be refused for want of a spread the family
+        does not use."""
+        self.assertIsNotNone(props._nfl_prop_model_probability(
+            stat="passing_tds", mean=1.4, stdev=None, n=6, line=1.5))
+        self.assertIsNotNone(props._nfl_prop_model_probability(
+            stat="passing_tds", mean=1.4, stdev=0.0, n=6, line=1.5))
+
+    def test_a_ZERO_rate_puts_all_mass_on_zero(self) -> None:
+        self.assertEqual(props._poisson_cover_probability(0.0, 0.5), 0.0)
+
+    def test_the_blend_weights_for_discrete_markets_are_UNREACHABLE(self) -> None:
+        """They are kept in the table for history; nothing may consult them."""
+        for stat in ("passing_tds", "interceptions"):
+            self.assertIn(stat, props._DISCRETE_COUNT_STATS)
