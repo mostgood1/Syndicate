@@ -1043,16 +1043,30 @@ def api_ops_live_lens_snapshot_index() -> Any:
         lens_sources_for_sport,
         live_gameline_from_lens,
     )
+    # IMPORTED, not copied: the file the game-line join reads is decided by
+    # this map, and a copy is how the diagnostic drifts from the join again.
+    from syndicate.features.shared.board_enrichment import _LIVE_GAMELINE_SNAPSHOT_PATHS
     from syndicate.features.shared.refresh_state_store import data_root, read_json_file
 
     sport = str(request.args.get("sport") or "wnba").strip().lower()
-    path = data_root() / "live" / f"{sport}_live_lens.json"
+    # TWO FILES FOR NFL, ONE FOR EVERY OTHER SPORT. The game-line join
+    # (`attach_live_gamelines_for_sport`) resolves its snapshot through
+    # `_LIVE_GAMELINE_SNAPSHOT_PATHS` -- `nfl` reads the live RE-SIM,
+    # `nfl_live_resim.json` -- while the prop join
+    # (`attach_live_projections_for_sport`) still reads `<sport>_live_lens.json`.
+    # This endpoint hard-coded the lens for both until 2026-09-28, so for NFL
+    # the one diagnostic that exists to show what the game-line join sees was
+    # reading the pregame-carried lens instead: the wrong-call-site class of
+    # `3887fdd6`, in the instrument rather than the join.
+    lens_path = data_root() / "live" / f"{sport}_live_lens.json"
+    path = data_root() / "live" / _LIVE_GAMELINE_SNAPSHOT_PATHS.get(sport, f"{sport}_live_lens.json")
     snapshot = read_json_file(path)
     if not isinstance(snapshot, dict):
         # Absent is a REAL answer and must not read as "no games": it means the
         # join is reading nothing at all, which is a different defect.
         return jsonify({
             "ok": True, "sport": sport, "path": str(path),
+            "prop_path": str(lens_path),
             "snapshot_present": False, "reason": "no_snapshot_at_path",
         })
 
@@ -1151,10 +1165,14 @@ def api_ops_live_lens_snapshot_index() -> Any:
     # THE PROP INDEX, through the SAME function the board's join calls. The
     # gameline index above cannot stand in for it: they read different keys and,
     # on 2026-08-21, disagreed.
+    # Read from the PROP join's file, which differs from `path` for nfl.
+    prop_snapshot = snapshot if lens_path == path else read_json_file(lens_path)
     try:
         from syndicate.features.shared.live_projection_join import build_live_prop_index
 
-        prop_indexed = build_live_prop_index(snapshot)
+        if not isinstance(prop_snapshot, dict):
+            raise LookupError(f"no snapshot at {lens_path}")
+        prop_indexed = build_live_prop_index(prop_snapshot)
         prop_summary = {
             key: prop_indexed.get(key)
             for key in (
@@ -1175,6 +1193,9 @@ def api_ops_live_lens_snapshot_index() -> Any:
 
     return jsonify({
         "ok": True, "sport": sport, "path": str(path), "snapshot_present": True,
+        # The file `prop_index` below was built from -- the prop join's, which
+        # is not `path` when the sport has a separate game-line re-sim.
+        "prop_path": str(lens_path),
         "accepted_lens_sources": list(sources),
         "snapshot_date": snapshot.get("date"),
         "snapshot_generated_at": snapshot.get("generated_at") or snapshot.get("generatedAt"),

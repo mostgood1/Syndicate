@@ -893,6 +893,14 @@ death, never life — do not invert it.
 - Verification: the next model-scorecard run reports prop_player_not_in_boxscore reduced by the measured name-miss fraction, with graded MLB prop games up correspondingly; grader version change stamped (history resets by design)
 - Blocked by: none
 
+### ops-snapshot-index-join-path — OPEN — opened 2026-09-28 — session acb76ba7-70eb-4b26-b7b8-3cb425e6a6a0
+- Goal: Make /api/ops/live-lens/snapshot-index read the same file the board live game-line join reads (_LIVE_GAMELINE_SNAPSHOT_PATHS; nfl -> nfl_live_resim.json), report the path, test it, deploy web
+- Files: syndicate/blueprints/ops.py (api_ops_live_lens_snapshot_index ONLY), tests/test_ops_live_lens_snapshot_index_path.py (NEW)
+- Hypothesis: The endpoint hardcodes {sport}_live_lens.json; for nfl the join reads nfl_live_resim.json, so the diagnostic reads a different file from the join (same class as 3887fdd6). board_enrichment.py is READ ONLY (lane nfl-live-resim-activation).
+- Falsification test: n/a
+- Verification: prod GET /api/ops/live-lens/snapshot-index?sport=nfl reports path live/nfl_live_resim.json after web deploy
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
