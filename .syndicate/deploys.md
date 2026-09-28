@@ -43338,3 +43338,100 @@ commit is IN a tree; it cannot tell you which deploy someone meant. When a
 cross-session message says "it carried X", establish the subject before reaching
 for git -- and name the deploy explicitly when writing one, which is the habit
 `f9c8d1b9` adopted off the back of this.
+
+## 2026-09-28 ~21:5xZ — NHL END-TO-END AUDIT ahead of opening night (2026-09-29)
+
+`[user-directed, urgent. Lane layer2-triad-alignment / nhl-board-rows-missing.
+READ-ONLY except one scoped ops job; nothing deployed.]`
+
+**VERDICT: the NHL pipeline is INTACT for opening night. Neither reported symptom
+is a fault.**
+
+### The two reported symptoms, both resolved
+
+**"NHL preseason odds missing for today (09-28)" — NOT A FAULT.** NHL preseason
+ENDED 2026-09-26 (14 games). ESPN returns **zero events for 09-27 and 09-28 under
+BOTH season types** (`seasontype=1` preseason and `=2` regular). No games, no
+odds. `predictions_2026-09-27.csv` and `..._09-28.csv` exist at 508 and 677 bytes
+-- header-only, which is the correct artifact for an empty slate.
+
+**"NHL regular-season odds missing for tomorrow (09-29)" — ALSO NOT A FAULT. The
+odds are present and healthy:**
+
+    /api/board/book-grid?sport=nhl&date=2026-09-29
+        260 rows across ALL FIVE games (49-56 each)
+        markets h2h 5, totals 10, spreads 6, GOALS 201, SOG 38
+    layer2 per_sport_ingest nhl
+        scheduled_games 5, candidates 235, opportunities 235, scored 235
+        by_lane {"opportunity": 235}   <- ZERO dead
+        quote_rows 543, no_bettable_book 0, sweep_state "swept"
+
+Team markets AND player props on every opening-night game.
+
+### THE ONE REAL GAP, and it is self-healing
+
+`/nhl/api/cards?date=2026-09-29` serves **`games: 0`**. Its own empty-state says
+why: the cards board renders saved prediction rows, and
+`predictions_2026-09-29.csv` does not exist yet. `refresh_nhl_oddsapi.py` only
+COPIES that file; the generator is `build_nhl_artifacts` via
+`_run_owned_generation`.
+
+**It is written nightly by LIVE-ODDS-WORKER, not refresh-worker** -- confirmed:
+
+    13:30:58Z  [artifact_publisher] PUBLISH_OK
+               path=nhl_source/data/processed/predictions_2026-09-28.csv bytes=677
+
+Write times for the last eight slates: 02:41, 04:37, 04:58, 04:46, 03:01, 04:40,
+01:23, 13:30 UTC. **Opening night's first puck is 21:00Z on 09-29**, so on eight
+days of observed cadence the file lands hours before the first game.
+
+### Chain verified, stage by stage
+
+    1  upstream schedule      5 games on 09-29 (FLA@CAR, MTL@TOR, NYR@BOS,
+                              VAN@EDM, CHI@VGK)                          OK
+    2  odds fetch             260 book-grid rows, 5/5 games, props too   OK
+    3  season inputs          all 5 of `_NHL_SEASON_INPUT_FILES` present
+                              on production (team_elo/xg/special_teams/
+                              rates/player_rates _latest.csv)            OK
+    4  producer               runs on live-odds-worker, published 13:30Z OK
+    5  worker tick            live_lens_loop TICK_COMPLETE nhl: True     OK
+    6  layer 2                nhl in active_sports, 235 opportunities    OK
+    7  venues                 Polymarket carries opening-night NHL
+                              (`aec-nhl-nyr-bos-2026-09-29`)             OK
+    8  NHL cards page         0 games for 09-29 -- awaiting (4) for that
+                              date only                                  PENDING
+
+### A finding worth keeping: `SYNDICATE_ACTIVE_SPORTS` excludes nhl on refresh-worker
+
+Read per service by the SINGLE-KEY endpoint (never the list API, which dumps
+every value):
+
+    web                key ABSENT  -> no filtering
+    live-odds-worker   key ABSENT  -> no filtering
+    refresh-worker     'mlb,wnba,soccer,ncaaf,nfl'  -> nhl EXCLUDED
+
+This looked like the smoking gun and **is not one**: NHL odds and generation are
+OWNED BY live-odds-worker, which has no filter, and refresh-worker still builds
+NHL onto the Layer 2 board (235 candidates) because the exclusion applies to the
+SWEEP, not the board build. Recorded because a future reader will find this key
+and reach for it as a cause.
+
+### What was NOT verified
+
+- **The regular-season path has never run.** Everything observed working is
+  PRESEASON. 09-29 is the first regular-season generation, and that is the one
+  untested transition.
+- A scoped ops job (`sports=nhl date=2026-09-29 launch_mode=manifest_only`, id
+  `caef2f18e05d46beb0acbf5449f7982a`) was started at 21:26Z to force that test
+  tonight. **It had not been picked up 20 minutes later** -- no `SPAWN` line on
+  refresh-worker -- and `manifest_only` waits on that worker's autorun loop.
+  Since NHL generation belongs to live-odds-worker, routing it to refresh-worker
+  may be the wrong lever entirely; not pursued further tonight.
+- Whether `icehockey_nhl_preseason` returns priced books -- still never measured
+  against the live API (flagged unverified since 09-19). Tonight's 260 rows come
+  from the REGULAR key, so this matters only for the next preseason.
+
+### If opening night does go wrong, look here first
+
+`predictions_2026-09-29.csv` absent after ~06:00Z on 09-29. That is the single
+artifact between a working odds pipeline and an empty NHL cards board.
