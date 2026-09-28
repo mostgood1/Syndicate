@@ -42926,3 +42926,5 @@ priceable. After the final: `/api/board/book-grid?sport=nfl&date=2026-09-28`
 Caveat: the band refuses coin-flip states, so a close MNF may price few ticks -- read
 `live_resimmed` beside `indexed` before calling a zero a failure. Sunday 10-04 is the
 full-slate reading.
+
+**Partial reading 2026-09-28 12:58 PM CT (lane nfl-live-gameline-full-rows, refresh-worker f9506b26):** `/api/ops/live-lens/snapshot-index?sport=nfl` (web 4b5ebc0a, now reading `nfl_live_resim.json`) shows the snapshot generated 12:50:59 CDT naming games by FULL club name (`atlanta falcons` / `green bay packers`, 16 of 16, `skipped_no_team_names 0`) -- the tri-code half of the fix is live. `indexed 0` / `sources_seen {pregame: 16}` is expected: 15 final + MNF not started, so no priced lane exists yet. The camelCase half is still unexercised until MNF.
