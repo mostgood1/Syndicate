@@ -43312,3 +43312,29 @@ receipt above says exactly that, and `git merge-base --is-ancestor 01092639 6f7b
 The misreading came from an ambiguous cross-session message ("It carried 01092639"), not from
 the ledger. So `01092639` is live on all three services: web and refresh-worker via the
 20:51-20:52Z deploy, live-odds-worker via `6f7be98d`.
+
+#### Correction to the correction above `[2026-09-28, session 4ab694ed]`
+
+**My "CORRECTION OWED TO A PEER" was itself wrong on two counts, and both were
+my reading, not theirs.**
+
+1. Session `f9c8d1b9` wrote "It carried 01092639" meaning **their own**
+   live-odds-worker deploy, not mine. I read it as a claim about `41f14c3e` and
+   corrected something nobody had asserted. Verified: `01092639` is NOT in
+   `41f14c3e` (so my deploy did not carry it, which was never in dispute) and IS
+   in their `6f7be98d` (so theirs did, exactly as their own receipt already
+   recorded).
+2. I called it "their `01092639`". It is not theirs: `01092639` is the NFL
+   game-day injuries publish fix (`#116`), a third session's commit.
+
+So `01092639` reached all three services by two separate routes -- web and
+refresh-worker in the 20:51-20:52Z deploy, live-odds-worker via `f9c8d1b9`'s.
+Nothing was mis-deployed and nothing needs undoing.
+
+**The lesson is mine to carry:** I ran the ancestry check correctly and still got
+the conclusion wrong, because the ambiguity was in WHOSE DEPLOY the sentence was
+about, and no `merge-base` answers that. An ancestry check tells you whether a
+commit is IN a tree; it cannot tell you which deploy someone meant. When a
+cross-session message says "it carried X", establish the subject before reaching
+for git -- and name the deploy explicitly when writing one, which is the habit
+`f9c8d1b9` adopted off the back of this.
