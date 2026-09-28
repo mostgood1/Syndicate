@@ -913,6 +913,42 @@ def _build_wnba_steps(args: argparse.Namespace) -> list[RefreshStep]:
     ]
 
 
+def _nhl_days_ahead() -> int:
+    """How many days PAST the slate date NHL generation also builds. Absent = 1.
+
+    WHY ONE AND NOT ZERO, measured 2026-09-28 the evening before the NHL opener.
+    `refresh_nhl_oddsapi.py`'s `_date_window(date, days_ahead)` builds only the
+    dates it is handed and `--days-ahead` defaults to 0, so this step built
+    exactly one date: the slate that had ALREADY happened. The NHL cards board
+    renders saved prediction rows (`nhl/cards.py:351`), so with nothing built for
+    tomorrow it served `games: 0` for the opener while the odds were entirely
+    healthy -- 260 book-grid rows across all five games, 235 layer-2 candidates,
+    every one in the `opportunity` lane.
+
+    **That is indistinguishable from breakage to anyone looking at the board**,
+    and it was reported as "NHL odds are missing" when no odds were missing. A
+    board that structurally cannot show tomorrow's slate will be read as broken
+    every evening of the season.
+
+    ONE, not more: each extra day re-runs the whole per-date loop in
+    `_run_owned_generation` -- slate inputs, predictions, recommendations AND a
+    props sim -- so the cost is roughly linear in this number on a 2 GB service.
+    `#241` is this repo's standing reminder that periodic worker work is never
+    free.
+
+    ENV-TUNABLE ON PURPOSE. If the doubled generation proves too expensive on a
+    real slate, `SYNDICATE_NHL_DAYS_AHEAD=0` restores the old behaviour with no
+    deploy. Absent means 1, and that is the code's decision, not the env's.
+    """
+    raw = str(os.environ.get("SYNDICATE_NHL_DAYS_AHEAD") or "").strip()
+    if not raw:
+        return 1
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return 1
+
+
 def _build_nhl_steps(args: argparse.Namespace) -> list[RefreshStep]:
     python_exe = _venv_python(REPO_ROOT)
     artifact_root = _local_source_artifact_root("nhl")
@@ -926,10 +962,16 @@ def _build_nhl_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 "scripts/refresh_nhl_oddsapi.py",
                 "--date",
                 args.date,
+                "--days-ahead",
+                str(_nhl_days_ahead()),
                 "--artifact-root",
                 str(artifact_root),
             ),
-            description="Refresh NHL team odds and player props lines into a Syndicate-owned artifact bundle.",
+            description=(
+                "Refresh NHL team odds and player props lines into a Syndicate-owned artifact "
+                "bundle, and build predictions for the slate date PLUS the next day so the cards "
+                "board is not empty the evening before a slate."
+            ),
         ),
     ]
 
