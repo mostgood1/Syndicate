@@ -42884,3 +42884,45 @@ run: soccer live-prop cells in `windows.28d` with games > 0.
 - Preflight CLEAR 17:11Z (infra processes only). Claim held by this lane.
 - Baseline 17:09:43Z: `?sport=nfl` -> `path=/opt/render/project/data/live/nfl_live_lens.json`, no `prop_path`, 16 games, `index_size 0`, `sources_seen {}`.
 - verify: 17:19:14Z, 50 s after live. `?sport=nfl` -> `path=/opt/render/project/data/live/nfl_live_resim.json`, `prop_path=.../nfl_live_lens.json`, 16 games, `index_size 0`, `sources_seen {pregame: 16}`. `sources_seen` moved `{}` -> `{pregame: 16}`, so the endpoint reads different bytes, not the same file under a new label. `?sport=wnba`: `path == prop_path == .../wnba_live_lens.json`, unchanged. `index_size 0` is expected: the re-sim stamps `pregame` on every game with no NFL game in progress (Monday afternoon).
+
+## 2026-09-28 12:32 PM CT — refresh-worker `f9506b26` + env `SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS=nfl` (lane `nfl-live-gameline-full-rows`, session 273dc243) — NFL live full-game rows reach the live-gameline ledger, recorded and scored but NOT published. **MEASUREMENT OWED: MNF 2026-09-28 (kickoff 00:15Z).**
+
+    deploy dep-data6c0473hc73fc94og   refresh-worker 1d64a4b2 -> f9506b26
+    fired 17:26:08Z   live 17:32:31.158218Z   trigger=api   status=live (deploys API poll)
+    env   SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS absent -> 'nfl' (single-key PUT 17:08Z,
+          read back: refresh-worker 179 -> 180 keys, exactly this one added; web untouched)
+    locks deploy_claim acquired 17:06:59Z; first preflight TOO_SOON (1d64a4b2 went live 16:59Z,
+          25-min spacing); re-preflight CLEAR 17:25Z, infrastructure processes only
+    expect   live_commit 1d64a4b2 -> f9506b26 ; env.PUBLISH_DISABLED_SPORTS -> nfl
+    collateral (on main, other lane): 5a3c6af2 MLB prop grader name fold (`prop_outcomes.py`,
+          lane mlb-prop-grading-player-match) -- imported by `pipeline/execute_portfolio.py`
+
+**Why (measured on refresh-worker 09-27, not the web mirror).** The NFL re-sim ran enabled
+and priced 1-4 games on nearly every tick 17:04Z-03:55Z, yet `LIVE_GAMELINE_BUILD sport=nfl
+date=2026-09-27` 22:53Z read `index_why {sources_seen: {live_resim: 4, pregame: 12}, indexed:
+0, skipped_no_accepted_lane: 16}` with 92 full-game rows withheld `no_live_gameline_projection`
+-- no `live_gameline` block, so never written; the 3,000 ledger records were all segment
+refusals. Two producer defects: (a) the lane carried snake-case `model_home_win_prob` /
+`sims_run`, the join reads `modelHomeWinProb` / `simsRun`; (b) games were named by smartsim2
+tri-codes (`phi`), grid rows by full name -- 0 of 16 week-3 pairs matched.
+
+**What shipped.** `build_game_lens` adds `modelHomeWinProb`, `simsRun`, `liveStateAsOf`,
+`projection {total, homeMargin}`; NO `marginDist`/`totalRunsDist` (distribution grade FAILED
+margins), so spreads/totals are withheld `live_resim_published_no_distribution_for_this_market`
+but carry the means the scorer grades. Snapshot names are `canonical_team('nfl', code)`, codes
+kept. h2h would otherwise price (`priceable True` measured in-process), so the env key holds
+it at `model_edge_publishing_disabled_for_sport` -- user decision: record + score only.
+
+**Measured after.** First tick on the new code 17:35:28Z: `enabled true, games 16, written
+true, refusals {game_final 15, game_not_in_progress 1}` (MNF is the 1); `Traceback` since
+17:32:31Z: 0 (read 17:40Z). Join NOT yet exercised -- nothing in play.
+
+**verify:** during MNF (from ~00:20Z), refresh-worker `LIVE_GAMELINE_BUILD sport=nfl` shows
+`index_why.indexed >= 1` whenever `NFL_LIVE_RESIM live_resimmed >= 1`, `full_games > 0`,
+`written > 0`, and `withheld_by_reason` carries `model_edge_publishing_disabled_for_sport`
+(h2h) + `live_resim_published_no_distribution_for_this_market` (spreads/totals) and ZERO
+priceable. After the final: `/api/board/book-grid?sport=nfl&date=2026-09-28`
+`live_gameline_score.games_with_outcome >= 1` with `records_by_market` h2h/spreads/totals.
+Caveat: the band refuses coin-flip states, so a close MNF may price few ticks -- read
+`live_resimmed` beside `indexed` before calling a zero a failure. Sunday 10-04 is the
+full-slate reading.
