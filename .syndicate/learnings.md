@@ -4991,3 +4991,11 @@ The lane marker `.current-lane.<session>` had two copies once sessions moved int
 **Rule:** before moving where a fact is WRITTEN, enumerate every READER and the root each one resolves (grep the marker name in `.claude/hooks/`). Make readers resolve through ONE shared lookup, or import the writer's map (`_LIVE_GAMELINE_SNAPSHOT_PATHS`), never a parallel copy. A test must cover the case where the copies DISAGREE, not only where one is missing.
 
 ---
+
+## 2026-09-28 (session acb76ba7) - A half-removed session worktree is held open by the Bash tool's own cwd, not by a leftover process
+
+`session_worktree.py close` half-removed a worktree three times in one session: the admin dir and every file were gone, the empty directory and branch remained, and the retry refused with "state is unknown". Each time, the `close` ran from PowerShell with the primary tree as its cwd, and the harness's working directory had already moved out. The holder was the Bash tool: its cwd persists between calls, and the last Bash call had been `cd <worktree> && ... land`. Moving Bash out (`cd /c/tmp`) before the close removed the cause. The three-condition check (0 files, unregistered, 0 commits on `origin/main..session/<lane>`) then made `close --force` safe every time.
+
+**Rule:** before `close`, move EVERY shell that ever `cd`'d into the worktree back out: Bash, PowerShell, and the harness directory. Only a checked `--force` may clean up a half-removed tree: the folder is empty, `git worktree list` no longer shows it, and the branch has 0 commits beyond `origin/main`.
+
+---
