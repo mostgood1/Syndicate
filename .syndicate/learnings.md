@@ -4955,3 +4955,11 @@ by hand. **What caught them was the same habit each time: asking what would make
 this instrument read healthy while the thing it measures is broken.**
 
 ---
+
+## 2026-09-28 (session 249f998b, lane mlb-prop-grading-player-match) - a VOID count's size is not evidence of a join failure
+
+- **What was believed:** 9,728 MLB `prop_player_not_in_boxscore` rows against ~156k graded were "too large to be DNPs alone", so they had to be player-name match misses.
+- **What was measured:** 94.8% are true DNPs (2,882 rows over 4 dates, checked against StatsAPI box scores under any spelling); the name misses are exactly two players. Books post props before lineups and the recorder keeps every priced side, so bench players' props are a large, legitimate void class (~9% of prop rows).
+- **Rule:** before calling a skip reason a join bug, classify a sample of it against the source of truth. Volume alone says nothing about which class dominates.
+
+---
