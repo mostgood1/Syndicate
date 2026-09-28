@@ -2974,3 +2974,11 @@ works — that is proved by test only. Owed: one real sighting.
 - Now: lanes carry camelCase fields + `projection {total, homeMargin}`; NO `marginDist`/`totalRunsDist` (spreads/totals withheld by name, scored on means); names canonical full, codes kept.
 - `SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS=nfl` on refresh-worker (set 2026-09-28 17:08Z, user decision): NFL live h2h is recorded and scored, never priceable. Remove only on a graded h2h skill result.
 - NOT YET MEASURED LIVE: first reading is MNF 2026-09-28; receipt + verify criteria in `deploys.md` 12:32 PM CT.
+
+## [nfl-game-day-injuries] NFL GAME-DAY INJURY CAPTURE IS ENABLED ON REFRESH-WORKER; ITS STATUSES FILE NOW CROSSES TO LIVE-ODDS-WORKER — CAPTURE READING OWED `[2026-09-28, lane nfl-game-day-injuries]`
+
+- VERIFIED (user-pasted production log, refresh-worker, 2026-09-28): `NFL_GAME_INJURIES_FETCH_ENABLE_REFRESH_WORKER_AUTORUN` is on and gated by the T-3h window -- `NFL_GAME_INJURIES_FETCH_SKIPPED reason=outside_window next_game_in_14619s`.
+- VERIFIED (code + tests, `01092639`, #116): `statuses_<date>.json` is written on refresh-worker and read on LIVE-ODDS-WORKER by `_starting_soon_injury_change_sports`. Before #116 it was unallowlisted and never published, so that trigger was inert. Now in `HOT_ARTIFACT_PATTERNS` and published on every rewrite; live-odds-worker's `pull_hot_artifacts(*<date>*)` fnmatches it. Per-game snapshots and `changes.jsonl` stay local.
+- WHERE FLAGS GO: `SYNDICATE_SLATE_PHASE_OBSERVE` and `SYNDICATE_SLATE_STARTING_SOON_ENABLED` are read only on live-odds-worker (`live_refresh_loop`); refresh-worker ignores them.
+- NOT YET MEASURED: refresh-worker + web on `01092639` reported live by the user (no SHA reading taken); no `fetched=1` capture, no pulled statuses file, no `SLATE_PHASE` line on live-odds-worker observed yet. First chance: MNF 2026-09-28 window.
+
