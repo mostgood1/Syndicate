@@ -43141,3 +43141,19 @@ since 19:07:42Z: 0 (read 19:10:07Z). A tick at 19:04:59Z was the OLD instance --
 
 **verify:** 09-29: points gridded; rebounds/assists/threes at one pregame line each. Task
 `wnba-live-prop-grid-reading-0929`.
+
+### Reading SCHEDULED, 2026-09-28 20:1xZ
+
+`nfl-prop-poisson-artifact-reading`, one-shot, fires 2026-09-29 12:30 CT
+(17:30Z) -- about an hour after the daily autorun that rebuilt the artifact at
+11:27 CT on 09-28. The task is self-contained and carries the signature
+verbatim, so it cannot be fitted after the fact.
+
+**IT GATES ON THE ARTIFACT, NOT THE CLOCK.** The reading is only valid if
+`projection.generated_at` is later than 2026-09-28T18:59:38Z; if the artifact has
+not rebuilt the task records THAT and reports no signature either way. A task
+firing is not evidence the artifact rebuilt -- `lastRunAt` is dispatch, not
+execution.
+
+It writes to `deploys.md`, `log/<date>.md` and the `layer2-triad-alignment` block
+rather than messaging, because an unattended run has nobody to message.
