@@ -112,11 +112,18 @@ def test_script_run_counts_windows_shapes_and_errors(out_root):
             return {"boxscore": {}}
         raise OSError("boom")
 
-    result = script.run("2026-09-27", now_epoch=NOW, fetch=fetch)
+    published = []
+    result = script.run("2026-09-27", now_epoch=NOW, fetch=fetch, publish=lambda path: published.append(path) or True)
     assert (result["events_total"], result["events_in_window"]) == (4, 3)
     assert (result["fetched"], result["shape_unknown"], result["errors"], result["rows"]) == (1, 1, 1, 1)
     assert result["statuses_rewritten"] is True
+    assert result["statuses_published"] is True and published == [gi.statuses_path("2026-09-27")]
     assert "error" not in result
+
+    # An unchanged re-capture rewrites nothing, so it must publish nothing.
+    again = script.run("2026-09-27", now_epoch=NOW, fetch=fetch, publish=lambda path: published.append(path) or True)
+    assert again["statuses_rewritten"] is False and again["statuses_published"] is False
+    assert len(published) == 1
 
     def dead(url, *, timeout):
         raise OSError("dns")
@@ -206,3 +213,45 @@ def test_default_nfl_resolvers_include_the_game_day_file(out_root):
     resolvers = loop._STARTING_SOON_INJURY_FILES["nfl"]
     assert isinstance(resolvers, tuple) and len(resolvers) == 2
     assert resolvers[1]("2026-09-27") == gi.statuses_path("2026-09-27")
+
+
+# --- the statuses file must CROSS SERVICES (found 2026-09-28) -----------------
+# Written on refresh-worker, read on live-odds-worker by the starting-soon
+# trigger in `live_refresh_loop`. Render disks are per-service, so it reaches
+# the reader only if it is allowlisted AND its name matches live-odds-worker's
+# date-scoped pull. Both assertions fail on the pre-fix allowlist.
+
+
+def test_the_statuses_file_is_allowlisted_and_the_rest_is_not(tmp_path, monkeypatch):
+    from syndicate.features.shared import artifact_publisher as ap
+
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    monkeypatch.delenv("SYNDICATE_NFL_SOURCE_ROOT", raising=False)
+    relative = ap.relative_to_data_root(gi.statuses_path("2026-09-28"))
+    assert relative == "nfl_source/tracking/espn/game_injuries/2026-09-28/statuses_2026-09-28.json"
+    assert ap.is_hot_artifact_relative_path(relative)
+    # The per-game snapshots and the change log stay on refresh-worker.
+    assert not ap.is_hot_artifact_relative_path("nfl_source/tracking/espn/game_injuries/2026-09-28/401872963.json")
+    assert not ap.is_hot_artifact_relative_path("nfl_source/tracking/espn/game_injuries/2026-09-28/changes.jsonl")
+
+
+def test_live_odds_workers_date_pull_reaches_the_statuses_file():
+    """`live_lens_loop` pulls `pattern=*<central_today_iso()>*` every tick."""
+    import fnmatch
+
+    from syndicate.features.shared.timezone import central_today_iso
+
+    today = central_today_iso()
+    path = f"nfl_source/tracking/espn/game_injuries/{today}/statuses_{today}.json"
+    assert fnmatch.fnmatch(path, f"*{today}*")
+
+
+def test_a_failed_publish_never_fails_the_capture(out_root, monkeypatch):
+    from scripts import fetch_nfl_game_injuries as script
+    from syndicate.features.shared import artifact_publisher as ap
+
+    def boom(path, **_):
+        raise RuntimeError("web down")
+
+    monkeypatch.setattr(ap, "publish_hot_artifact", boom)
+    assert script._publish_statuses(gi.statuses_path("2026-09-27")) is False

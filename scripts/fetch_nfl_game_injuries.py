@@ -36,10 +36,12 @@ def _get_json(url: str, *, timeout: float) -> object:
         return json.loads(response.read().decode("utf-8"))
 
 
-def run(date_str: str, *, now_epoch: float, timeout: float = 8.0, fetch=_get_json) -> dict:
+def run(date_str: str, *, now_epoch: float, timeout: float = 8.0, fetch=_get_json, publish=None) -> dict:
+    publish = publish or _publish_statuses
     compact = date_str.replace("-", "")
     result = {"date": date_str, "events_total": 0, "events_in_window": 0, "fetched": 0, "rows": 0,
-              "changes": 0, "shape_unknown": 0, "errors": 0, "statuses_rewritten": False}
+              "changes": 0, "shape_unknown": 0, "errors": 0, "statuses_rewritten": False,
+              "statuses_published": False}
     try:
         scoreboard = fetch(gi.SCOREBOARD_URL.format(compact_date=compact), timeout=timeout)
     except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
@@ -74,7 +76,32 @@ def run(date_str: str, *, now_epoch: float, timeout: float = 8.0, fetch=_get_jso
             )
     if result["fetched"]:
         result["statuses_rewritten"] = gi.rebuild_statuses(date_str)
+        if result["statuses_rewritten"]:
+            result["statuses_published"] = publish(gi.statuses_path(date_str))
     return result
+
+
+def _publish_statuses(path: Path) -> bool:
+    """Push `statuses_<date>.json` to web, which live-odds-worker pulls from.
+
+    THE READER IS ON ANOTHER SERVICE. The starting-soon injury trigger runs in
+    `live_refresh_loop` on live-odds-worker; this script runs on refresh-worker,
+    and Render disks are per-service. Written here and never published, the
+    file was invisible to the trigger (found 2026-09-28). Only on a REWRITE --
+    `rebuild_statuses` returns False when no status changed, so an unchanged
+    tick costs no request. Never raises: a failed publish must not fail the
+    capture, which is still recorded locally.
+    """
+    try:
+        from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+        published = bool(publish_hot_artifact(path))
+    except Exception as exc:  # noqa: BLE001 -- best effort, see docstring
+        print(f"[nfl_game_injuries] STATUSES_PUBLISH_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return False
+    if not published:
+        print(f"[nfl_game_injuries] STATUSES_NOT_PUBLISHED path={path}", flush=True)
+    return published
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -183,8 +183,12 @@ def diff_rows(previous: Iterable[Mapping[str, Any]], current: Iterable[InjuryRow
 
 # ---------------------------------------------------------------------------
 # Storage. Under `nfl_artifact_output_root()` -- the MOUNTED disk on Render, not
-# the ephemeral checkout (`#389`) -- because the refresh-worker tick that reads
-# `statuses_<date>.json` runs on the same service that writes it.
+# the ephemeral checkout (`#389`). `statuses_<date>.json` is WRITTEN on
+# refresh-worker but READ on live-odds-worker (the starting-soon trigger lives in
+# `live_refresh_loop`), and Render disks are per-service -- so the capture
+# publishes it (`HOT_ARTIFACT_PATTERNS`) and live-odds-worker's date-scoped
+# `pull_hot_artifacts` brings it across. This comment used to say both ran on
+# refresh-worker; that was wrong, and left the trigger inert (2026-09-28).
 # ---------------------------------------------------------------------------
 
 
