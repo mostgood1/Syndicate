@@ -176,6 +176,33 @@ def _write_record(record: dict[str, Any]) -> None:
         pass
 
 
+def _emit(line: str) -> None:
+    """Write one line straight to fd 1 (fd 2 if that fails), NOT via `print`.
+
+    MEASURED on CI 2026-09-28: the end-to-end test's child exited `rc=0` with
+    NO output -- neither the record nor the RECORD_FAILED line. That is this
+    handler running while `sys.stdout`'s BufferedWriter lock is held: a signal
+    that lands mid-print runs the handler inside the flush, and every `print`
+    in it raises `RuntimeError: reentrant call inside <_io.BufferedWriter>`
+    -- including the failure line -- so the `finally` exits silently.
+    Reproduced deterministically by delivering SIGTERM from inside a raw
+    stdout write. A worker prints constantly, so on Render this loses the
+    record exactly when a deploy lands mid-log-line.
+
+    `os.write` takes no Python I/O lock. Anything still sitting in the
+    buffered `sys.stdout` is lost at `os._exit` either way, as before.
+    """
+    data = (line.rstrip("\n") + "\n").encode("utf-8", "replace")
+    for fd in (1, 2):
+        try:
+            view = memoryview(data)
+            while view:
+                view = view[os.write(fd, view):]
+            return
+        except BaseException:  # noqa: BLE001 -- try the next fd; the caller exits regardless
+            continue
+
+
 def install_shutdown_recorder(worker: str) -> None:
     """Install SIGTERM/SIGINT handlers that record and then exit immediately.
 
@@ -210,18 +237,18 @@ def install_shutdown_recorder(worker: str) -> None:
             record = build_shutdown_record(worker, name)
             # PRINT FIRST. This is the line that survives; everything after it is
             # a bonus racing SIGKILL.
-            print(f"[worker_shutdown] WORKER_SHUTDOWN {json.dumps(record, sort_keys=True, default=str)}", flush=True)
+            # Via `_emit`, not `print` -- see its docstring.
+            _emit(f"[worker_shutdown] WORKER_SHUTDOWN {json.dumps(record, sort_keys=True, default=str)}")
             if record.get("board_build", {}).get("in_flight"):
-                print(
+                _emit(
                     "[worker_shutdown] WORKER_SHUTDOWN_KILLED_BOARD_BUILD "
                     f"frame={record['board_build'].get('frame')} uptime_s={record.get('uptime_seconds')} "
-                    "-- this build's work is lost and will restart from zero on the next boot",
-                    flush=True,
+                    "-- this build's work is lost and will restart from zero on the next boot"
                 )
             _write_record(record)
         except BaseException as exc:  # noqa: BLE001 - deliberate, see above
             try:
-                print(f"[worker_shutdown] WORKER_SHUTDOWN_RECORD_FAILED {type(exc).__name__}: {exc}", flush=True)
+                _emit(f"[worker_shutdown] WORKER_SHUTDOWN_RECORD_FAILED {type(exc).__name__}: {exc}")
             except BaseException:
                 pass
         finally:

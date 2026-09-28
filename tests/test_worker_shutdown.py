@@ -178,15 +178,48 @@ def test_the_handler_exits_even_if_the_failure_print_also_fails(monkeypatch):
     exits = []
     monkeypatch.setattr(ws.os, "_exit", lambda code: exits.append(code))
     monkeypatch.setattr(ws, "build_shutdown_record", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
-    import builtins
-
-    real_print = builtins.print
-    monkeypatch.setattr(builtins, "print", lambda *a, **k: (_ for _ in ()).throw(OSError("stdout gone")))
+    # The handler writes through `_emit`, not `print` (see the next test).
+    monkeypatch.setattr(ws, "_emit", lambda line: (_ for _ in ()).throw(OSError("stdout gone")))
     installed = {}
     monkeypatch.setattr(ws.signal, "signal", lambda sig, fn: installed.setdefault(sig, fn))
-    try:
-        ws.install_shutdown_recorder("test-worker")
-        installed[signal.SIGTERM](int(signal.SIGTERM), None)
-    finally:
-        monkeypatch.setattr(builtins, "print", real_print)
+    ws.install_shutdown_recorder("test-worker")
+    installed[signal.SIGTERM](int(signal.SIGTERM), None)
     assert exits == [0]
+
+
+def test_the_record_survives_a_signal_that_lands_MID_PRINT():
+    """THE CI FAILURE, made deterministic (2026-09-28: `rc=0 output=''`).
+
+    A signal that arrives while `sys.stdout`'s buffer lock is held runs the
+    handler inside that flush; a `print` there raises "reentrant call" --
+    both the record and the RECORD_FAILED line -- and the `finally` exits 0
+    having said nothing. Here the raw stream under `sys.stdout` delivers
+    SIGTERM from inside its own write, which is exactly that state. On the
+    `print`-based handler this test fails with the same empty output.
+    """
+    script = textwrap.dedent(
+        """
+        import io, os, signal, sys, time
+        sys.path.insert(0, os.getcwd())
+        from syndicate.features.shared.worker_shutdown import install_shutdown_recorder
+        install_shutdown_recorder("test-worker")
+
+        class SignalsMidWrite(io.RawIOBase):
+            def writable(self):
+                return True
+            def write(self, b):
+                n = os.write(1, bytes(b))
+                os.kill(os.getpid(), signal.SIGTERM)
+                time.sleep(0.5)  # bytecode boundary: the handler runs HERE, lock held
+                return n
+
+        sys.stdout = io.TextIOWrapper(io.BufferedWriter(SignalsMidWrite()))
+        print("before-signal", flush=True)
+        time.sleep(30)
+        """
+    )
+    proc = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, timeout=60)
+    assert "WORKER_SHUTDOWN " in proc.stdout, (
+        f"returncode={proc.returncode} stdout={proc.stdout[-300:]!r} stderr={proc.stderr[-300:]!r}"
+    )
+    assert proc.returncode == 0

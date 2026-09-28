@@ -3922,6 +3922,15 @@ def _shadow_score_v2(**kwargs: Any) -> dict[str, Any] | None:
 
 
 @lru_cache(maxsize=8)
+def _function_accepts(function: Any, parameter: str) -> bool:
+    try:
+        import inspect
+
+        return parameter in inspect.signature(function).parameters
+    except (TypeError, ValueError):
+        return False
+
+
 def _blended_score_accepts(parameter: str) -> bool:
     """Does the DEPLOYED `blended_score` take this keyword?
 
@@ -3930,17 +3939,24 @@ def _blended_score_accepts(parameter: str) -> bool:
     have raises `TypeError` out of `build_layer2_rows` and loses the entire
     shortlist -- rows and cards both.
 
-    Cached because the caller is a per-side loop over thousands of rows and the
-    answer cannot change inside a process. `False` on any introspection failure:
-    the fallback drops one scoring term, which is a board that ranks the way it
-    did for months, while the alternative is no board.
-    """
-    try:
-        import inspect
+    Cached because the caller is a per-side loop over thousands of rows.
+    `False` on any introspection failure: the fallback drops one scoring term,
+    which is a board that ranks the way it did for months, while the
+    alternative is no board.
 
-        return parameter in inspect.signature(blended_score).parameters
-    except (TypeError, ValueError):
-        return False
+    CACHED PER FUNCTION OBJECT, not per parameter name. The answer is about
+    whatever `blended_score` is bound to NOW; keyed on the name alone, one
+    rebinding (a test's `lambda **_` stub) cached `False` for the rest of the
+    process and silently dropped the movement term from every later score --
+    two `test_layer2_movement_live_segment` tests went red on CI 2026-09-28 only
+    when they shared an xdist worker with `test_bucket_search`. In production
+    the binding never changes, so this is the same single probe it was.
+    """
+    return _function_accepts(blended_score, parameter)
+
+
+_blended_score_accepts.cache_clear = _function_accepts.cache_clear  # type: ignore[attr-defined]
+_blended_score_accepts.cache_info = _function_accepts.cache_info  # type: ignore[attr-defined]
 
 
 def _opening_line_key(line: Any) -> float | None:
