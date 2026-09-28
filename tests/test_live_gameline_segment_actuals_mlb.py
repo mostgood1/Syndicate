@@ -247,3 +247,36 @@ def test_it_never_raises_into_the_board_build():
     out = segment_score_blocks([_f5_obs("ev1", 0.5, 0.5)], {}, {}, sport="mlb",
                                segment_actuals=boom)
     assert out == {"error": "RuntimeError: reader exploded"}
+
+
+def test_REACHABILITY_the_board_block_carries_segments_and_the_headline_is_unchanged(monkeypatch):
+    """Through `book_grid_artifact.score_block_for_grid` -- the function the
+    board build calls. `off != on`: the headline keys are identical to a build
+    that never computed segments, and `segments` is present and scored."""
+    import syndicate.features.shared.live_gameline_ledger as ledger
+    from syndicate.features.shared.book_grid_artifact import score_block_for_grid
+
+    records = [_full_h2h("ev1", 0.70, 0.60), _f5_obs("ev1", 0.55, 0.52)]
+    monkeypatch.setattr(ledger, "read_records", lambda _path: records)
+    monkeypatch.setattr(mod, "fetch_linescore",
+                        lambda pk: _linescore([(0, 1), (1, 0), (0, 2), (0, 0), (0, 0)]))
+    grid = [_grid("ev1", "822679", home=6, away=4)]
+    block = score_block_for_grid(grid, sport="mlb", date_str="2026-09-27")
+
+    seg = block["segments"]
+    assert seg["lookup"]["games_answered"] == 1
+    assert seg["by_segment"]["first5"]["all_records"]["market"]["n"] == 1
+    # The headline is the full-game series, untouched.
+    assert block["all_records"]["model"]["n"] == 1
+    assert block["segment_actuals_supplied"] is False
+    assert block["unmeasured"] == {"segment_actual_unavailable": 1}
+
+
+def test_the_board_block_for_another_sport_carries_no_segments(monkeypatch):
+    import syndicate.features.shared.live_gameline_ledger as ledger
+    from syndicate.features.shared.book_grid_artifact import score_block_for_grid
+
+    monkeypatch.setattr(ledger, "read_records", lambda _path: [_f5_obs("ev1", 0.5, 0.5)])
+    block = score_block_for_grid([_grid("ev1", "1", home=2, away=1)], sport="nfl",
+                                 date_str="2026-09-27")
+    assert "segments" not in block

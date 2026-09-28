@@ -203,6 +203,19 @@ def score_block_for_grid(
                                        segment_actuals=segment_actuals,
                                    ),
                                    "finals_index": finals_diag}
+            # SEGMENT ROWS, SCORED ALONE (lane gameline-spread-total-scoring,
+            # 2026-09-28). The call above stays byte-identical so first5 h2h can
+            # never pour into the full-game series history.jsonl pools; see
+            # `live_gameline_segment_actuals.segment_score_blocks`. MLB only; it
+            # never raises, and reads StatsAPI `/linescore` once per FINAL game.
+            from syndicate.features.mlb.live_gameline_segment_actuals import (
+                segment_score_blocks,
+            )
+
+            segments = segment_score_blocks(records, finals, final_scores, grid=grid,
+                                            sport=sport, segment_actuals=segment_actuals)
+            if segments is not None:
+                live_gameline_score["segments"] = segments
     except Exception as exc:  # pragma: no cover - instrumentation must not break the board
         live_gameline_score = {"enabled": True, "error": f"{type(exc).__name__}: {exc}"[:200],
                                **caps}
