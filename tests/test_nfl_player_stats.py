@@ -138,7 +138,19 @@ class NflPlayerStatsTests(unittest.TestCase):
             _play(game_id="2025_02_KC_LV", week="2", passer_player_id="QB1",
                   passer_player_name="P.One", passing_yards="220", pass_attempt="1"),
         ])
-        mean, stdev, n = player_stats.player_rate(2025, 3, "QB1", "passing_yards")
+        import os
+        prior = os.environ.get("SYNDICATE_NFL_SPREAD_SHRINKAGE")
+        try:
+            # ISOLATED from the shrinkage, which is a separate mechanism with its
+            # own test. Pinning the composed value here would mean a revert of the
+            # ESTIMATOR could be masked by a compensating change to the shrinkage.
+            os.environ["SYNDICATE_NFL_SPREAD_SHRINKAGE"] = "off"
+            mean, stdev, n = player_stats.player_rate(2025, 3, "QB1", "passing_yards")
+        finally:
+            if prior is None:
+                os.environ.pop("SYNDICATE_NFL_SPREAD_SHRINKAGE", None)
+            else:
+                os.environ["SYNDICATE_NFL_SPREAD_SHRINKAGE"] = prior
         self.assertEqual(n, 2)
         self.assertAlmostEqual(mean, 210.0)
         self.assertAlmostEqual(stdev, 14.142135623730951, places=6)
@@ -164,6 +176,65 @@ class NflPlayerStatsTests(unittest.TestCase):
         self.assertGreater(narrow, 0.97, "the narrow sd should read as near-certain")
         self.assertLess(wider, narrow, "a wider sd must pull the probability back")
         self.assertLess(wider, 0.90, "a realistic sd should not read as near-certain")
+
+    def test_the_spread_is_SHRUNK_toward_a_usage_scaled_league_prior(self) -> None:
+        """`(n*sd + k*cv*mean)/(n+k)`, k=6, cv per market.
+
+        Pinned by value so a silent revert fails here. Two games of 200/220
+        passing yards: sample sd 14.142, mean 210, cv 0.4256 -> prior 89.376,
+        so (2*14.142 + 6*89.376)/8 = 70.568.
+        """
+        self._write_pbp(2025, [
+            _play(game_id="2025_01_KC_DEN", week="1", passer_player_id="QB1",
+                  passer_player_name="P.One", passing_yards="200", pass_attempt="1"),
+            _play(game_id="2025_02_KC_LV", week="2", passer_player_id="QB1",
+                  passer_player_name="P.One", passing_yards="220", pass_attempt="1"),
+        ])
+        _mean, stdev, _n = player_stats.player_rate(2025, 3, "QB1", "passing_yards")
+        self.assertAlmostEqual(stdev, 70.568, places=2)
+        self.assertGreater(stdev, 14.142, "the spread was not widened at all")
+
+    def test_shrinkage_is_REACHABLE_off_differs_from_on(self) -> None:
+        """A mechanism behind a flag needs `off != on` before correctness tests.
+
+        Four inert features shipped in this repo were caught by this check and
+        nothing else (`model_engine_standard.md`).
+        """
+        import os
+        self._write_pbp(2025, [
+            _play(game_id="2025_01_KC_DEN", week="1", passer_player_id="QB1",
+                  passer_player_name="P.One", passing_yards="200", pass_attempt="1"),
+            _play(game_id="2025_02_KC_LV", week="2", passer_player_id="QB1",
+                  passer_player_name="P.One", passing_yards="220", pass_attempt="1"),
+        ])
+        prior = os.environ.get("SYNDICATE_NFL_SPREAD_SHRINKAGE")
+        try:
+            os.environ["SYNDICATE_NFL_SPREAD_SHRINKAGE"] = "off"
+            _m, off, _n = player_stats.player_rate(2025, 3, "QB1", "passing_yards")
+            os.environ["SYNDICATE_NFL_SPREAD_SHRINKAGE"] = "on"
+            _m, on, _n = player_stats.player_rate(2025, 3, "QB1", "passing_yards")
+        finally:
+            if prior is None:
+                os.environ.pop("SYNDICATE_NFL_SPREAD_SHRINKAGE", None)
+            else:
+                os.environ["SYNDICATE_NFL_SPREAD_SHRINKAGE"] = prior
+        self.assertAlmostEqual(off, 14.142135623730951, places=6)
+        self.assertNotAlmostEqual(off, on, places=3)
+
+    def test_a_NON_POSITIVE_mean_is_NOT_shrunk_toward_zero(self) -> None:
+        """The prior is `cv * mean`, so a mean of 0 makes it 0 -- and blending
+        toward zero would make an already narrow distribution NARROWER, turning
+        the fix into the defect for exactly the players with least evidence."""
+        self.assertEqual(
+            player_stats.shrink_spread(5.0, 3, 0.0, "rushing_yards"), 5.0)
+        self.assertEqual(
+            player_stats.shrink_spread(5.0, 3, -1.0, "rushing_yards"), 5.0)
+
+    def test_an_UNKNOWN_market_is_not_shrunk_by_a_guessed_cv(self) -> None:
+        """A market with no fitted CV keeps its raw sample sd rather than being
+        shrunk toward a number nobody measured."""
+        self.assertEqual(
+            player_stats.shrink_spread(5.0, 3, 20.0, "not_a_real_market"), 5.0)
 
     def test_player_rate_excludes_current_and_later_weeks(self) -> None:
         self._write_pbp(2025, [

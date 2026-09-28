@@ -267,15 +267,22 @@ class NflPropsTests(unittest.TestCase):
         self.assertIsNone(props._lognormal_cover_probability(10.0, 5.0, -1.0))
 
     def test_model_probability_weight_zero_market_is_pure_normal(self) -> None:
-        # interceptions and passing_tds are shipped at weight 0.0 -- the
-        # OOS tune found no real benefit there. Must match the plain
-        # Normal-CDF probability exactly, not just approximately (a
-        # weight of 0.0 should short-circuit before any log-normal call).
+        # A weight of 0.0 must short-circuit before any log-normal call and match
+        # the plain Normal-CDF probability EXACTLY, not approximately.
+        #
+        # RE-POINTED FROM `interceptions` TO `passing_tds`, 2026-09-28. This test
+        # asserts a MECHANISM (the zero-weight path) and merely used whichever
+        # market happened to ship at 0.0. After `player_rate` widened the spread,
+        # the blend was re-fitted and `interceptions` moved 0.0 -> 0.2707 on a
+        # genuine out-of-sample improvement, while `passing_tds` stayed at 0.0
+        # (its re-fit lost out of sample and was rejected). Pinning the market
+        # rather than the mechanism would have made a legitimate re-calibration
+        # look like a regression.
         import statistics as stdlib_statistics
         mean, stdev, line = 1.2, 0.8, 1.5
         normal_only = 1.0 - stdlib_statistics.NormalDist(mean, stdev).cdf(line)
-        self.assertEqual(props._COVER_PROBABILITY_BLEND_WEIGHT["interceptions"], 0.0)
-        blended = props._nfl_prop_model_probability(stat="interceptions", mean=mean, stdev=stdev, n=5, line=line)
+        self.assertEqual(props._COVER_PROBABILITY_BLEND_WEIGHT["passing_tds"], 0.0)
+        blended = props._nfl_prop_model_probability(stat="passing_tds", mean=mean, stdev=stdev, n=5, line=line)
         self.assertEqual(blended, normal_only)
 
     def test_model_probability_weighted_market_differs_from_pure_normal(self) -> None:

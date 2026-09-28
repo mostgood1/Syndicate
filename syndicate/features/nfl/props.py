@@ -202,45 +202,55 @@ def _safe_float(value: Any) -> float | None:
 # Normal-only behavior) rather than shipping a fitted correction that
 # didn't generalize. Full sweep: reports/nfl_cover_probability_blend_
 # calibration.json.
-# RE-FITTED 2026-09-28 AFTER `player_rate` SWITCHED `pstdev` -> `stdev`, AND
-# DELIBERATELY UNCHANGED BY THAT RE-FIT.
+# RE-FITTED 2026-09-28 ON THE NEW SPREAD -- AND THE FIRST TWO RE-FITS WERE INERT.
 #
 # `docs/ai_context/model_engine_standard.md` requires that adding a mechanism to
-# a calibrated engine re-fits the rates that were absorbing it, so widening the
-# spread meant this table had to be re-derived rather than assumed still valid.
-# `scripts/calibrate_nfl_cover_probability_blend.py` was re-run on the new sd
-# (fit 2022-23, scored 2024-25). Result:
+# a calibrated engine re-fits the rates that were absorbing it. `player_rate`
+# moved `pstdev` -> `stdev` and gained a usage-scaled shrinkage, so this table
+# had to be re-derived.
 #
-#     market             old w    refit w     delta    OOS improvement
-#     passing_yards      0.689    0.6890    +0.0000       +0.000203
-#     passing_attempts   1.000    1.0000    +0.0000       +0.006381
-#     rushing_yards      0.573    0.5731    +0.0001       +0.004600
-#     rushing_attempts   0.550    0.5504    +0.0004       +0.002123
-#     receptions         0.137    0.1367    -0.0003       +0.000016
-#     receiving_yards    0.216    0.2158    -0.0002       +0.000065
-#     passing_tds        0.000    0.3155    +0.3155       -0.000862   REJECTED
-#     interceptions      0.000    0.1329    +0.1329       -0.000164   REJECTED
+# **A FIRST VERSION OF THIS COMMENT CLAIMED THE RE-FIT HAD RUN AND CHANGED
+# NOTHING. THAT WAS FALSE AND IS CORRECTED HERE.**
+# `calibrate_nfl_cover_probability_blend.py` reads the model through
+# `backtest_nfl_props.collect_raw` -> `_rate_from_log`, a LOCAL COPY of
+# `player_rate` whose docstring said "identical math" and which still called
+# `pstdev`. Two re-fits therefore measured the OLD spread and returned numbers
+# identical to SIX DECIMAL PLACES across all eight markets -- which is what
+# exposed it, because two runs over a 3-5x wider sd cannot agree that exactly.
+# `_rate_from_log` now calls `player_stats.shrink_spread` instead of
+# re-implementing it.
 #
-# SIX OF EIGHT ARE UNCHANGED TO FOUR DECIMALS -- the blend weight is insensitive
-# to this sd change, which is the finding, not a formality. The two that moved
-# are the markets clipped at zero, and both are WORSE on the held-out seasons, so
-# the calibrator's own select-on-fit / score-on-held-out discipline rejects them.
-# Adopting a weight that loses out of sample because it won in sample is the
-# exact failure that discipline exists to prevent.
+# THE REAL RE-FIT (fit 2022-23, scored 2024-25, harness verified to see the new
+# spread first):
 #
-# THIS TABLE IS STILL FITTED ON THE CURRENT SPREAD. A future change to the sd --
-# the usage-scaled prior under evaluation in
-# `scripts/calibrate_nfl_spread_shrinkage.py` (`stdev_cv`) -- requires re-running
-# this calibrator again before shipping.
+#     market             shipped   refit    OOS improvement
+#     passing_yards       0.689    0.4994      -0.000403   REJECTED
+#     passing_attempts    1.000    0.9480      +0.003151   adopted
+#     passing_tds         0.000    0.2667      -0.000758   REJECTED
+#     rushing_yards       0.573    0.5212      +0.004816   adopted
+#     rushing_attempts    0.550    0.4971      +0.002270   adopted
+#     receptions          0.137    0.1540      +0.000050   adopted
+#     receiving_yards     0.216    0.2872      +0.000355   adopted
+#     interceptions       0.000    0.2707      +0.000523   adopted
+#
+# Six adopted, two REJECTED because they lose on the held-out seasons -- taking a
+# weight that won in fit and lost out of sample is the exact failure the
+# select-on-fit / score-on-held-out split exists to prevent.
+#
+# THE DIRECTION IS COHERENT, which is the reassuring part: the three
+# highest-dispersion markets (`passing_attempts`, `rushing_yards`,
+# `rushing_attempts`) all want ~0.05 LESS log-normal now, because a wider Normal
+# already supplies some of the right-skew the blend was buying. `receiving_yards`
+# and `interceptions` want more.
 _COVER_PROBABILITY_BLEND_WEIGHT: dict[str, float] = {
-    "passing_yards": 0.689,
-    "passing_attempts": 1.0,
-    "passing_tds": 0.0,
-    "rushing_yards": 0.573,
-    "rushing_attempts": 0.550,
-    "receptions": 0.137,
-    "receiving_yards": 0.216,
-    "interceptions": 0.0,
+    "passing_yards": 0.689,      # re-fit 0.4994 REJECTED, worse out of sample
+    "passing_attempts": 0.948,
+    "passing_tds": 0.0,          # re-fit 0.2667 REJECTED, worse out of sample
+    "rushing_yards": 0.5212,
+    "rushing_attempts": 0.4971,
+    "receptions": 0.154,
+    "receiving_yards": 0.2872,
+    "interceptions": 0.2707,
 }
 
 

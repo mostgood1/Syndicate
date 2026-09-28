@@ -88,6 +88,22 @@ LADDER_STEPS = 7
 
 MIN_PRIOR_GAMES_FOR_POOL = 4
 
+# The STATIC league CV table a production build would actually carry, derived
+# from the FIT seasons only (2022-2023). The sweep's own `stdev_cv` arm uses a
+# prior recomputed per (season, week) from the no-lookahead pool; production
+# cannot do that, so this arm exists to prove the constant survives the switch to
+# a frozen table rather than assuming it does.
+STATIC_LEAGUE_CV: dict[str, float] = {
+    "passing_yards": 0.4256,
+    "passing_attempts": 0.5444,
+    "passing_tds": 0.9354,
+    "rushing_yards": 1.2271,
+    "rushing_attempts": 0.9129,
+    "receiving_yards": 0.9424,
+    "receptions": 0.7092,
+    "interceptions": 1.2766,
+}
+
 # z for a two-sided 80% interval. Named rather than inlined because the whole
 # point of reporting coverage is that the number means something exact.
 Z80 = 1.2815515655446004
@@ -234,6 +250,8 @@ def _prior_for(o: dict[str, Any], estimator: str) -> float:
     """
     if estimator == "stdev_cv":
         return o["prior_cv"] * o["mean"]
+    if estimator == "stdev_cv_static":
+        return STATIC_LEAGUE_CV.get(o["stat"], 0.0) * o["mean"]
     return o["prior_sd"]
 
 
@@ -392,7 +410,7 @@ def main() -> int:
     # separately as `rows_rescued`.
     def common(pop: list[dict[str, Any]]) -> set[int]:
         idx = {i for i in range(len(pop))}
-        for estimator in ("pstdev", "stdev", "stdev_cv"):
+        for estimator in ("pstdev", "stdev", "stdev_cv", "stdev_cv_static"):
             for k in cands + [0.0]:
                 idx &= {i for i in idx if scorable(pop[i], k=k, estimator=estimator)}
         return idx
@@ -403,7 +421,7 @@ def main() -> int:
           f"held-out {len(held_common)}/{len(held_obs)}", flush=True)
 
     rows = []
-    for estimator in ("pstdev", "stdev", "stdev_cv"):
+    for estimator in ("pstdev", "stdev", "stdev_cv", "stdev_cv_static"):
         for k in cands:
             r = score(fit_obs, k=k, estimator=estimator, only=fit_common)
             r["arm"] = "fit"
