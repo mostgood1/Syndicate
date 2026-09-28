@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from unittest.mock import patch
 
 from syndicate.features.mlb import live_lens
@@ -80,7 +80,10 @@ class LiveLensSnapshotNeedsRefreshTests(unittest.TestCase):
         self.assertTrue(live_lens._live_lens_snapshot_needs_refresh(self._today_iso(), None))
 
     def test_non_today_date_never_needs_refresh(self) -> None:
-        yesterday = (datetime.now().astimezone().date() - timedelta(days=1)).isoformat()
+        # From the CENTRAL date the code uses (#128). Built from the runner's
+        # UTC clock this was Central TODAY from 00:00 to 05:00Z -- red on main
+        # at 01:49Z 2026-09-28.
+        yesterday = (date.fromisoformat(self._today_iso()) - timedelta(days=1)).isoformat()
         self.assertFalse(live_lens._live_lens_snapshot_needs_refresh(yesterday, None))
         self.assertFalse(live_lens._live_lens_snapshot_needs_refresh(yesterday, {"games": []}))
 

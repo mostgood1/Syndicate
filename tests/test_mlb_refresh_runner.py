@@ -12,6 +12,8 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
+from syndicate.features.shared.timezone import central_today_iso
+
 
 class MlbRefreshRunnerTests(unittest.TestCase):
     def _load_module(self):
@@ -413,7 +415,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
     def test_live_lens_api_rebuilds_empty_today_snapshot(self) -> None:
         from syndicate.features.mlb import live_lens as live_lens_module
 
-        today = datetime.now().astimezone().date().isoformat()
+        today = central_today_iso()  # the code's own operating date (#128), not the runner's UTC date
         rebuilt_snapshot = {
             "games": [{"gamePk": 123, "status": {"abstract": "Live", "detailed": "In Progress"}, "props": [1]}],
             "counts": {"games": 1, "live": 1, "final": 0, "pregame": 0, "props": 1, "archivedLiveProps": 0},
@@ -937,7 +939,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 runtime_root = Path(tmp_dir) / "source" / "data"
                 runtime_live_lens_dir = runtime_root / "live_lens"
                 runtime_live_lens_dir.mkdir(parents=True, exist_ok=True)
-                today = datetime.now().astimezone().date().isoformat()
+                today = central_today_iso()  # the code's own operating date (#128), not the runner's UTC date
                 report_path = runtime_live_lens_dir / f"live_lens_report_{today.replace('-', '_')}.json"
                 report_path.write_text(
                     json.dumps(
