@@ -2924,3 +2924,10 @@ user-reported card, rendering. `deploys.md 5703578e` (web) / `a6740a82` (live-od
 **`WEEK_SUBSTITUTED` HAS STILL NEVER BEEN OBSERVED IN PRODUCTION.** By construction it
 should now stay silent on all three services, so its silence is NOT evidence the emitter
 works — that is proved by test only. Owed: one real sighting.
+
+## [nfl-live-gameline-join] NFL LIVE RE-SIM LANES WERE UNREADABLE BY THE BOARD JOIN — FIXED AND DEPLOYED, LIVE READING OWED `[deployed 2026-09-28T17:32:31Z, refresh-worker f9506b26, lane nfl-live-gameline-full-rows]`
+
+- Through 2026-09-27 the NFL re-sim priced games (1-4 per tick) but the join indexed none: snake-case lane fields (`model_home_win_prob`/`sims_run` vs the join's `modelHomeWinProb`/`simsRun`) and tri-code game names vs full-name grid rows (0/16 pairs). No NFL full-game live row ever reached the live-gameline ledger.
+- Now: lanes carry camelCase fields + `projection {total, homeMargin}`; NO `marginDist`/`totalRunsDist` (spreads/totals withheld by name, scored on means); names canonical full, codes kept.
+- `SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS=nfl` on refresh-worker (set 2026-09-28 17:08Z, user decision): NFL live h2h is recorded and scored, never priceable. Remove only on a graded h2h skill result.
+- NOT YET MEASURED LIVE: first reading is MNF 2026-09-28; receipt + verify criteria in `deploys.md` 12:32 PM CT.

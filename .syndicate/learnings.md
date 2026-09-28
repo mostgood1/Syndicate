@@ -4970,3 +4970,11 @@ this instrument read healthy while the thing it measures is broken.**
 **Rule:** when a producer writes a field another module consumes, at least one test must drive the real producer into the real consumer and assert the CONSUMER's output. And a lane hypothesis naming one end of a pipeline ("recording drops it" / "grading drops it") must be tested at every hop between the two, not only the two named ends -- here the defect sat in neither.
 
 ---
+
+## 2026-09-28 (session 273dc243, lane nfl-live-gameline-full-rows) - "VERIFIED" on a slate where nothing priced verified only the refusal path
+
+**What happened.** `nfl-live-resim-activation` closed its goal on `sources_seen {pregame: 16}` -- every lane a refusal. That reading proves refusals are rejected; it cannot see the PRICED lane, which carried snake-case fields the join never reads, and named games by tri-code where the grid uses full names. On 09-27 the re-sim priced 1-4 games per tick for ten hours and the join indexed zero. The unit fixtures named games "Dallas Cowboys" -- the cheaper path production never takes. Same class as the entry above, second instance the same day.
+
+**Rule:** a join verification must include at least one ACCEPTED record (`indexed >= 1`) on production-shaped input; an all-refusal reading verifies the refusal branch only and must say so. Fixtures feeding a join must use the identifiers the production producer actually emits (here: the projection CSV's tri-codes).
+
+---
