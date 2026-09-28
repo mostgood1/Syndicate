@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1106 rules `[generated]`
+## Index — 1202 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5063,3 +5063,11 @@ what exposed it. A second copy of an estimator does not announce its drift; the
 docstring asserting it is identical is the thing that makes the drift invisible.
 
 ---
+
+## 2026-09-28 (session 2aff0397, lane nfl-game-day-injuries) - A flag is set on the service whose LOOP reads it; a file is read on the service whose DISK holds it
+
+- What we believed: `SYNDICATE_SLATE_PHASE_OBSERVE` belonged on refresh-worker, next to the capture flag; and the ESPN game-day `statuses_<date>.json`, written under `SYNDICATE_DATA_ROOT`, was "disk-backed" and so reachable by the starting-soon trigger.
+- What was actually true: observe mode runs only in `live_refresh_loop._run_live_refresh_tick`, which runs on live-odds-worker; refresh-worker ignores the flag. The trigger also runs on live-odds-worker, and the statuses file was written on refresh-worker's disk, never published (not in `HOT_ARTIFACT_PATTERNS`), so the trigger's input did not exist where it ran.
+- How we found out: the user set the flag, redeployed, and saw no `SLATE_PHASE` line. Tracing the reader showed the service.
+- The rule going forward: before telling anyone where to set a flag, grep for the function that reads it and name the SERVICE whose entrypoint reaches that function. Before calling an input "disk-backed", name the service that WRITES it and the service that READS it; if they differ, the file must be allowlisted in `HOT_ARTIFACT_PATTERNS` AND published by its producer, with a test that fnmatches the reader's pull pattern.
+- Cost: one wasted deploy cycle for the flag, and a trigger that was inert since it merged (#111).

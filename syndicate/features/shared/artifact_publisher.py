@@ -328,6 +328,16 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "nfl_source/schedule_*.csv",
     "nfl_source/tracking/nflverse/schedules_games.csv",
     "nfl_source/tracking/nflverse/injuries/injuries_*.csv",
+    # ESPN GAME-DAY injury statuses (lane `nfl-game-day-injuries`). WRITTEN on
+    # refresh-worker by `scripts/fetch_nfl_game_injuries.py`, READ on
+    # live-odds-worker by the starting-soon injury trigger in
+    # `live_refresh_loop` -- two services, two disks. Unallowlisted, the file
+    # never left refresh-worker and the trigger was inert (found 2026-09-28).
+    # The date is in the NAME, so live-odds-worker's `pull_hot_artifacts
+    # (*<date>*)` in `live_lens_loop` brings it across every tick. The
+    # per-game snapshots and `changes.jsonl` stay local: nothing off
+    # refresh-worker reads them.
+    "nfl_source/tracking/espn/game_injuries/*/statuses_*.json",
     "nfl_source/source_artifacts/data/processed/rosters/roster_*_snapshot.csv",
     "nfl_source/source_artifacts/data/processed/depth/depth_*_snapshot.csv",
     # NFL fantasy-football projection engine (`lane nfl-fantasy-projections`).
