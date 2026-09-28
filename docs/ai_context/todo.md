@@ -1,9 +1,5 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#691` — **`pytest-baseline` on main is still not stable after #112/#113: a flip on one run, 2 NEW on the next** — FOUND 2026-09-28, lane `pytest-baseline-dirfd`, session 2aff0397 — **FIXED on PR #114, pending its CI: skill_overlay boot-relative 0.0 sentinel (production code), home smoke date pinned, NFL budget test budget 0.0 (user-approved cross-lane), soccersim golden falls back to HEAD (user-approved cross-lane); baseline 43 -> 38**
-
-CI on `982a02d0` (#113 merge): 0 NEW, but 5 baselined `tests/test_soccersim_serialize_cache.py` tests PASSED (the gate fails on flips, by design). CI on `b88d25ad` (next commit, another session's): 2 NEW -- `tests/test_daily_update_smoke.py::DailyUpdateSmokeTests::test_home_dashboard_payload_exposes_live_lens_link` and `tests/test_skill_overlay.py::test_reachability_the_overlay_moves_bucket_factor_and_the_switch_takes_it_away` -- and the soccersim flip absent. A test that changes state between consecutive runs is order- or clock-dependent: every one of the 18 fixed in #112/#113 was (xdist worker sharing, leaked daemon threads, per-process caches/caps, UTC-vs-Central date). Root-cause each (run the file after its xdist neighbours; run at 00:00-05:00Z), never re-baseline a flip-flopping test. Close the lane only when `main` is green on two consecutive runs.
-
 ### `#690` — **NFL game-day injury statuses: capture BUILT dark; whether ESPN carries the INACTIVES list is UNVERIFIED** — PR mostgood1/Syndicate#111, lane `nfl-game-day-injuries`, session 2aff0397 — **OFF: not deployed, never run against a live NFL game**
 
 **Why.** The only NFL injury input was nflverse's season CSV (`fetch_nfl_injuries.py`), which follows the
