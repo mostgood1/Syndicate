@@ -147,3 +147,22 @@ def test_absent_live_join_costs_only_the_live_tier(monkeypatch):
     assert "reason" in enrichment["live_projections"], (
         "'not on this deploy' and 'ran and matched nothing' need different fixes"
     )
+
+
+def test_blended_score_probe_is_not_poisoned_by_an_earlier_rebinding(monkeypatch):
+    """The probe answers about the CURRENT binding, not the first one it saw.
+
+    Keyed on the parameter name alone, a test that stubbed `blended_score` with
+    `lambda **_` cached `False` for the whole process, and every later board
+    build silently dropped the movement term (CI 2026-09-28: two
+    `test_layer2_movement_live_segment` tests failed only when they shared an
+    xdist worker with `test_bucket_search`)."""
+    import syndicate.features.shared.layer2_board as l2b
+
+    real = l2b.blended_score
+    monkeypatch.setattr(l2b, "blended_score", lambda **_: {"score": 0.0})
+    assert l2b._blended_score_accepts("movement_price_delta") is False
+    monkeypatch.setattr(l2b, "blended_score", real)
+    assert l2b._blended_score_accepts("movement_price_delta") is True, (
+        "a stale answer from the stub outlived the stub"
+    )
