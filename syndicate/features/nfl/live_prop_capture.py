@@ -24,9 +24,16 @@ round. It is also the shape the fit wants, because it matches the cutoff-replay
 methodology the game-line models are graded with -- the score is exact and the
 clock is 0:00, so nothing has to be interpolated.
 
-WHAT IT DOES NOT DO. It does not project, price, or publish anything. It writes
-observations to disk. The model that reads them is a separate, gradeable piece of
-work, and building this first is what makes that work possible at all.
+WHAT IT DOES NOT DO. It does not project or price anything. It writes
+observations to disk and pushes the file to the web service so it can be
+retrieved. The model that reads them is a separate, gradeable piece of work, and
+building this first is what makes that work possible at all.
+
+IT DID NOT ALWAYS PUSH, and the gap is worth recording because it was one
+verification away from being reported as done. Allowlisting the path in
+`HOT_ARTIFACT_PATTERNS` makes it ELIGIBLE to cross services and moves no bytes:
+the capture is written on refresh-worker, which serves no HTTP, while
+`/api/ops/artifacts/stream` reads WEB's disk. See `publish_snapshot`.
 """
 
 from __future__ import annotations
@@ -43,6 +50,7 @@ __all__ = [
     "default_capture_dir",
     "snapshot_rows",
     "record_quarter_snapshot",
+    "publish_snapshot",
 ]
 
 CAPTURE_SCHEMA_VERSION = 1
@@ -178,6 +186,47 @@ def snapshot_rows(
     return out
 
 
+def publish_snapshot(path: Path) -> bool:
+    """Push the capture file to the web service. Best effort, never raises.
+
+    WHY THIS EXISTS AS A SEPARATE STEP, and why allowlisting alone was not
+    enough. Adding `nfl_source/live_prop_capture/*.jsonl` to
+    `HOT_ARTIFACT_PATTERNS` makes the path ELIGIBLE to cross services. It does
+    not move a byte. The three services hold three separate disks: this file is
+    written on refresh-worker, which runs `scripts/run_refresh_worker.py` and
+    serves no HTTP at all, while `/api/ops/artifacts/stream` is served by web
+    off WEB's disk. Without an explicit push the capture is as unreachable
+    allowlisted as it was unallowlisted -- the only difference being that the
+    retrieval attempt would now return 404 instead of 403, which is a WORSE
+    failure because it reads as "the capture did not happen".
+
+    That distinction is the whole reason this is written out rather than
+    assumed: presence is not reachability, and the allowlist commit was one
+    verification away from being reported as "the captures are retrievable".
+
+    WHOLE FILE, NOT A TAIL. The file only ever grows, but `_is_append_only` is a
+    deliberately tiny explicit list gated on `/book_quotes/` and it is not
+    extended here. An append-only assumption applied to the wrong family
+    concatenates two versions into corruption; a whole-file publish of a ~40-row
+    snapshot is cheap and cannot. The cost is re-sending the day's accumulated
+    rows at each of ~48 boundaries per slate, which the publish budget bounds on
+    its own.
+    """
+    try:
+        from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+        ok = bool(publish_hot_artifact(Path(path)))
+        print(f"[nfl_prop_capture] PUBLISH {'OK' if ok else 'REFUSED'} path={path}",
+              flush=True)
+        return ok
+    except Exception as exc:  # noqa: BLE001
+        # A failed publish costs a retrieval, not an observation -- the rows are
+        # already on the mounted disk. Losing the tick would cost a board.
+        print(f"[nfl_prop_capture] PUBLISH_FAILED path={path} "
+              f"{type(exc).__name__}: {exc}", flush=True)
+        return False
+
+
 def record_quarter_snapshot(
     data_root: Any,
     *,
@@ -226,6 +275,7 @@ def record_quarter_snapshot(
         marker.write_text("", encoding="utf-8")
         print(f"[nfl_prop_capture] CAPTURED event={event_id} period={int(period)} "
               f"rows={len(rows)} path={path}", flush=True)
+        publish_snapshot(path)
         return len(rows)
     except Exception as exc:  # noqa: BLE001
         print(f"[nfl_prop_capture] CAPTURE_FAILED event={event_id} "

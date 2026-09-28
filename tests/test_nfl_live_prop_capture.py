@@ -296,3 +296,70 @@ def test_a_write_that_stores_NOTHING_is_not_reported_as_captured():
     assert "wrote_nothing" in src_consts, (
         "the hook does not distinguish a real write from a call that stored nothing"
     )
+
+
+# --------------------------------------------------------------------------
+# REACHABILITY. The allowlist made the path eligible; it moved no bytes.
+# --------------------------------------------------------------------------
+
+def test_a_successful_capture_PUSHES_the_file_to_the_web_service(tmp_path, monkeypatch):
+    """Writing to disk is not retrieval, and the allowlist alone did not fix it.
+
+    The capture lands on refresh-worker's mounted disk. refresh-worker runs
+    `scripts/run_refresh_worker.py` and serves no HTTP; `/api/ops/artifacts/
+    stream` is served by web, off WEB's disk. So without an explicit push the
+    file is exactly as unreachable allowlisted as unallowlisted -- the retrieval
+    would just return 404 rather than 403, which reads as "the capture never
+    happened".
+    """
+    import syndicate.features.shared.artifact_publisher as ap
+    from syndicate.features.nfl import live_prop_capture as cap
+
+    pushed: list = []
+    monkeypatch.setattr(ap, "publish_hot_artifact",
+                        lambda path, **kw: pushed.append(Path(path)) or True)
+
+    n = cap.record_quarter_snapshot(
+        tmp_path, event_id="401872962", period=3, date_str="2026-09-28",
+        player_rows=[{"player_name": "A Player", "team_abbr": "KC", "rush_yards": 40}])
+
+    assert n == 1
+    assert pushed == [cap.capture_path(tmp_path, "2026-09-28")], (
+        "the capture was written but never pushed -- allowlisted and still unreachable")
+
+
+def test_a_REFUSED_or_RAISING_publish_never_costs_the_capture(tmp_path, monkeypatch):
+    """The rows are already on disk. A failed push costs a retrieval, not an
+    observation -- and must never propagate into the tick that carries it."""
+    import syndicate.features.shared.artifact_publisher as ap
+    from syndicate.features.nfl import live_prop_capture as cap
+
+    def boom(path, **kw):
+        raise RuntimeError("web is down")
+
+    monkeypatch.setattr(ap, "publish_hot_artifact", boom)
+    n = cap.record_quarter_snapshot(
+        tmp_path, event_id="e1", period=1, date_str="2026-09-28",
+        player_rows=[{"player_name": "B Player", "rec_yards": 12}])
+
+    assert n == 1, "a publish failure swallowed the capture's own return"
+    written = cap.capture_path(tmp_path, "2026-09-28").read_text(encoding="utf-8")
+    assert "B Player" in written, "the rows did not survive a failed publish"
+
+
+def test_the_IDEMPOTENT_second_call_does_not_push_again(tmp_path, monkeypatch):
+    """The loop revisits a boundary for as long as halftime lasts. The `.done`
+    marker stops the rows being rewritten; it must stop the re-push too, or the
+    file is re-sent on every tick for the rest of the quarter."""
+    import syndicate.features.shared.artifact_publisher as ap
+    from syndicate.features.nfl import live_prop_capture as cap
+
+    pushed: list = []
+    monkeypatch.setattr(ap, "publish_hot_artifact",
+                        lambda path, **kw: pushed.append(Path(path)) or True)
+
+    rows = [{"player_name": "C Player", "pass_yards": 200}]
+    for _ in range(4):
+        cap.record_quarter_snapshot(tmp_path, event_id="e2", period=2,
+                                    date_str="2026-09-28", player_rows=rows)
+    assert len(pushed) == 1, f"re-pushed on every tick: {len(pushed)} publishes"
