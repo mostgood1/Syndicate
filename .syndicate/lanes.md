@@ -1074,6 +1074,14 @@ death, never life — do not invert it.
 - Tests: 8 new, including the integration that is the point — `coverage_contract` now resolves `nhl.pregame_props` as **attributed_zero (0/459 with a reason)** instead of `not_reported`, so it stops failing the e2e gate. 20 existing `test_nhl_game_projections.py` tests still pass.
 - Blocked by: none
 
+### layer2-window-merge-counters — OPEN — opened 2026-09-29 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: Every projection counter that has a summed denominator also has a summed numerator across the board's window, so no served rate divides two different dates' populations: game_rows_with_projection, prop_rows_considered, prop_rows_with_projection, games_indexed, games_unratable_opponent and rows_unsupported_game_market all sum, the nested game_coverage/prop_coverage halves merge with a rule that does not corrupt supported or carry a single date's reason as the window's, and NCAAF's served game rate is re-derived from one population.
+- Files: pipeline/layer2_shortlist.py (the summable tuple, summable_dicts and the coverage-half merge branch of _attach_projections_over_window ONLY), tests/test_layer2_window_merge_counters.py (NEW). **CLAIM TAKEN 2026-09-29, not free:** the file is claimed by OPEN lane `mlb-live-gameline-venue-freshness`, which is THIS SAME SESSION (4ab694ed) and holds it for `venue_quote_fanin`/`venue_quote_adapters` freshness work — a different function entirely. Scopes do not overlap: that lane keeps the venue-quote path, this one takes ONLY the window-merge counters in `_attach_projections_over_window`. Recorded rather than worked around, because `lane-guard` blocked the first edit and that is the guard doing its job.
+- Hypothesis: game_rows_considered is in summable while game_rows_with_projection is not, so NCAAF's 41/644 is a frozen first-date numerator over a summed denominator; and the nested coverage halves fall to first-non-falsy-wins, which is why game_coverage carries 2026-09-29's 'no NCAAF SmartSim2 projections for this date' as if it described the whole 7-day window.
+- Falsification test: If game_rows_with_projection is already summed, the 41/644 mismatch has another cause and this lane is wrong.
+- Verification: A windowed merge over synthetic per-date coverage sums every numerator whose denominator sums; supported:False survives the nested merge as False and not 0; and a half's reason is dropped once that half has a non-zero summed projection.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
