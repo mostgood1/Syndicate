@@ -43965,3 +43965,88 @@ still live at Q3 when this landed, so tonight may yet provide it — but refresh
 ~21 min to its first board publish, so if the game is final by then `supported=True` with
 `rows_corrected=0` and a named reason is the CORRECT reading and NOT a failure. The
 unambiguous live reading is Thursday 2026-10-02.
+
+
+## 2026-09-28 9:24 PM CT (2026-09-29T02:24Z) — refresh-worker `9c77608d` (lane `nfl-live-resim-activation`) — the NFL live-status READER is live and ACCEPTING the capture, and NFL's ~74% prop-projection miss is attributed for the first time. **BOTH readings MET.**
+
+    deploy dep-dathvvmk1f9s738bhnq0   refresh-worker fae9aab8 -> 9c77608d
+    fired 02:18:38.110986Z (9:18 PM CT)   live 02:24:28.329023Z (9:24 PM CT)   trigger=api   status=live
+    preflight CLEAR 02:18:17Z, infrastructure only (run_refresh_worker.py rss 1359.641)
+    `--allow-mid-build` PASSED AND AUTHORISED BY THE USER ("use allow-mid-build"), BUT NOT
+        EXERCISED: the verdict came back plain CLEAR because no board build was in flight at
+        that instant, so NO board build was discarded. Recorded this way rather than claiming
+        a cost that was not paid.
+    baseline read 02:17:48Z off refresh-worker's OWN live fae9aab8:
+        _read_nfl_capture = 0 ; _summarise_projection_half = 0 ; _row_slate_date = 0
+        LIVE_GAME_STATE_JOIN sport=nfl supported=False corrected=0
+            reason=no live status source wired for nfl   (captured twice: 02:14:02Z, 02:17:06Z)
+    expectation: supported false -> true ; projection-half attribution absent -> present
+
+**READING 1 — the live-status source is wired AND the cross-service hand-off works
+(02:29:02.428Z, 4m34s after live):**
+
+    [layer2_shortlist] LIVE_GAME_STATE_JOIN sport=nfl supported=True corrected=0
+        transitions={} snapshot_age_s=33.4 reason=None error=None
+
+`supported=False -> True` is the flip. **`snapshot_age_s=33.4` is the load-bearing number**: the
+capture the reader consumed was THIRTY-THREE SECONDS OLD, written by the tick on
+**live-odds-worker** and read by the board cycle on **refresh-worker** through the shared
+keyvalue store. That is the writer/reader hand-off working across two services, which is the
+half no offline test could reach. `reason=None` (not a refusal string) means the capture was
+ACCEPTED on freshness and content — it simply had nothing to correct, because the chip already
+agreed with it. `corrected=0` with `reason=None` is therefore a PASS, not a miss.
+
+**NOT PROVEN by this: a live CORRECTION.** `corrected=0` means no row needed moving on this
+build. The reading that proves the correction path end to end is a frozen chip against an
+in-play capture, i.e. `corrected > 0`. PHI @ CHI was live at Q3 when this deployed, so it may
+still arrive tonight; the unambiguous one is Thursday 2026-10-02.
+
+**READING 2 — NFL's prop-projection miss, ATTRIBUTED FOR THE FIRST TIME (02:29Z):**
+
+    PREGAME_PROJECTION_JOIN sport=nfl considered=7175 projected=1687
+      prop_coverage={rows_considered=818, rows_with_projection=215,
+                     unmatched_key_rows=603, no_probability_rows=0, no_line_rows=0,
+                     unsupported_market_rows=0,
+                     artifact_season=2026, artifact_week=3, artifact_rows=276}
+      game_coverage={rows_considered=207, rows_with_projection=26}
+
+Before this deploy that line read `considered=7049 projected=1694` with **every reason field
+`None`**. The counters were always being computed; `_merge_nfl_coverage` nests both halves and
+the emitter read the top level.
+
+**THE ANSWER IS UNAMBIGUOUS AND IT IS NOT WHAT A JOIN BUG LOOKS LIKE.** Of 818 prop rows
+considered, 215 projected and **603 missed — and ALL 603 are `unmatched_key_rows`**, the
+`(stat, player, line)` triple having no sim row. `no_probability_rows=0`, `no_line_rows=0`,
+`unsupported_market_rows=0`: **not one miss is a probability gap, a missing line, or an
+unsupported market.** Those three were the plausible suspects and all three are now excluded
+by measurement.
+
+**AND THE DECISIVE RATIO IS IN THE SAME TOKEN: `artifact_rows=276` against
+`rows_considered=818`.** The prop projection artifact carries 276 rows for a board asking about
+818. So the model hits **215 of 276 artifact rows (78%)** while covering only **34% of the
+board**. This is an ARTIFACT COVERAGE problem, not a matcher problem — the join is doing well
+on what it is given. Chasing player-name aliasing here would have been the wrong fix, and
+before this token there was no way to know that.
+
+**A number to re-derive before acting on it:** `artifact_week=3` while the slate just played is
+week 3 and week 4 opens Thursday. Whether 276 rows is the artifact's true size for week 3 or a
+partial write is NOT established by this reading.
+
+**Content verified on the deployed SHA:** `_read_nfl_capture` 0 -> 2, `_summarise_projection_half`
+0 -> 2, `_row_slate_date` 0 -> 2, and `_LIVE_GAME_STATE_SPORTS` now contains `nfl`. Health:
+`Traceback` since `finishedAt` **0**, `GAME_CHIPS_PUBLISHED` resumed, board build ran.
+
+**Also now live on this service** (it lacked them before): the board-timezone row-date comparison
+(`cfba2895`) and the backfill deletion (inert here — refresh-worker does not run
+`refresh_nhl_oddsapi.py`).
+
+**A PROCESS NOTE WORTH MORE THAN THIS DEPLOY.** My first watcher gated on `02:22:00Z`, BEFORE
+the 02:24:28Z `finishedAt`, and picked up the OLD instance's `PREGAME_PROJECTION_JOIN` line —
+then reported `TOKEN ABSENT` on it. A pre-deploy line read as a post-deploy result would have
+been recorded as a failed fix. Same shape as the 23:46 chips artifact earlier tonight. Gate
+every post-deploy read on the deploy's own `finishedAt`, not on a round number near it.
+
+**verify:** BOTH MET above. Owed next: (1) `corrected > 0` on a live NFL game — Thursday
+2026-10-02, or tonight if PHI @ CHI is still in play on a later build; (2) re-derive whether
+`artifact_rows=276` is the artifact's true week-3 size before treating coverage as the fix.
+Fleet now: web `cfba2895`, live-odds-worker `9c77608d`, refresh-worker `9c77608d`.
