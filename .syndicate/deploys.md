@@ -44111,3 +44111,18 @@ implied(open) - fee per contract)`.
 - **Per-date `prop_player_not_in_boxscore`, 09-22..09-26 (pre-fix -> now): PASS.** 09-22 940 -> 854 (-86), 09-23 944 -> 878 (-66), 09-24 577 -> 502 (-75), **09-25 1099 -> 1045 (-54, = replay exactly)**, **09-26 827 -> 801 (-26, = replay exactly)**. All five lower; no late-record explanation needed.
 - 28d `ungraded_by_sport.mlb`: `prop_player_not_in_boxscore` 9,034, `prop_no_commence_time` 1,278, `push` 2,254, `extra_ambiguous_game` 532 (all 09-25), `prop_game_not_played` 525 + `extra_game_not_played` 132 + `game_not_final` 34 (all 09-22), `extra_player_not_in_boxscore` 6.
 - The OWED verify on the 17:07:22Z deploy is discharged by this reading plus the 18:02Z one. Read-only: no run triggered, no deploy.
+
+## 2026-09-29 READING -- live-odds-worker c612db03 (lane soccer-live-serialize-fields-race): INSUFFICIENT
+
+**MEASURED 2026-09-29 ~11:05 AM CDT (16:05Z)** by scheduled task `soccer-serialize-systemerror-read-0929`, read-only.
+
+- **Service / commit:** live-odds-worker, live deploy `9c77608d` (finished 2026-09-29T02:20:51Z); `git merge-base --is-ancestor c612db03 9c77608d` passes.
+- **Go-live:** 2026-09-21T13:58:34Z = `finishedAt` of deploy `9c28e63d`, the OLDEST live-odds-worker deploy containing `c612db03` (the one before it, `76a6f4a2` 2026-09-20T16:06Z, fails the ancestry test).
+- **Failures since go-live: 0** `LEAGUE_POLL_FAILED ... error=SystemError`. Same query saw 136 post-fix `LEAGUE_POLL_FAILED` of other types (ESPN `403` x130, `ReadTimeout` x6), and returns the pre-fix SystemErrors still in retention (09-19 14:45Z epl; 09-20 14:04Z epl, 15:59Z ligue_1 -- the baseline's 09-19 x1 / 09-20 x2 -- plus 09-20 18:23Z primeira_liga and 19:34Z serie_a after the baseline cut). The reader is not blind.
+- **Baseline failures:** 8 (registered 2026-09-20); only **3** of them are still retrievable -- Render log retention for this service begins **2026-09-15T15:29Z**; an unfiltered query at 2026-09-13 12:00Z returns 0 lines.
+- **Exposure, post-fix** (09-21 13:58Z .. 09-29 15:25Z): 72,084 `live_state` write lines, 192 with n>0, **572 match-ticks** (09-24 34, 09-26 24, 09-27 477, 09-28 37; 0 on the rest).
+- **Exposure, baseline, retained part** (09-15 15:29Z .. 09-20 16:30Z): 35,655 write lines, 1,740 with n>0, **2,551 match-ticks** (09-19 865, 09-20 974). The full 09-13..09-20 window was larger; 2,551 is a floor.
+- **Verdict: INSUFFICIENT.** Post-fix exposure is 22% of the retained baseline alone. At the baseline rate (3 per 2,551 match-ticks) the expected post-fix count is ~0.67; 0 has P~0.51 under no change. Not stretched.
+- **Instruments:** the failure count is from `render_logs.py` (step 3 printed `nothing matched (1 page(s) fetched)` since go-live) and proven live: the same command over 09-19..09-21 returns all 5 pre-fix hits. Cross-checked with an API-cursor pager over `LEAGUE_POLL_FAILED` (645 lines, 0 SystemError post-fix). **Defect found in `render_logs.py` for the exposure count:** `fetch_window` breaks on the first page with no fresh match (`fresh == 0`); with the loose `live games` text the server over-matches and a 6 h window covered 40 s (10 lines). Exposure was paged by the API's `hasMore`/`nextEndTime` instead.
+
+**verify:** 0 SystemError `LEAGUE_POLL_FAILED` on live-odds-worker once post-fix match-ticks since 2026-09-21T13:58:34Z reach >= 2,551 (count `(<n> live games` over `live games` lines, paged by `nextEndTime`). Re-armed.
