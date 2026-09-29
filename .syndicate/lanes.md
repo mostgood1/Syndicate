@@ -984,6 +984,14 @@ death, never life — do not invert it.
 - Verification: Offline: a run for a date with no generated artifacts, beside a populated older date, leaves no new dated file and reports the artifacts missing; the removed helpers have no remaining callers. Production after a user-approved deploy of live-odds-worker: the next nightly NHL run emits no 'backfilled compatibility artifacts' warning, and no predictions_sim_<date>.csv appears whose rows name a different date -- read via the [nhl_cards] ROW_DATE_MISMATCH line staying silent for the new dates.
 - Blocked by: none
 
+### live-prop-grader-cross-sport — OPEN — opened 2026-09-29 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: A sport-agnostic live-prop grading harness measures a shipped projection's OWN residual against replay-reconciled official box scores, reproducing WNBA's published bucketed residual EXACTLY from the shared core, and emitting NBA's first measured residual to replace the hand-set sigma table its own source comment flags as not backtested.
+- Files: syndicate/features/shared/live_prop_grading.py (NEW), scripts/grade_live_prop_projection.py (NEW), tests/test_live_prop_grading.py (NEW)
+- Hypothesis: The WNBA grader's sport-specific surface is only four seams (ESPN league path, period/OT minutes, pbp stat semantics, sim-artifact field names); the reconcile gate and residual bucketing are sport-agnostic and reusable for NBA unchanged.
+- Falsification test: The shared core, run over the same WNBA events, does NOT reproduce grade_wnba_live_prop_projection.py's residual numbers -- in which case the extraction changed behaviour and is wrong.
+- Verification: Shared core reproduces WNBA's per-bucket residual spread on the same event ids, AND an NBA event replays and reconciles against its official box per player.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
