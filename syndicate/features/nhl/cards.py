@@ -40,6 +40,61 @@ def _load_csv_rows(path: Path) -> list[dict[str, str]]:
         return []
 
 
+def _row_slate_date(value: Any) -> str | None:
+    """The BOARD date a prediction row belongs to, from its own `date` field.
+
+    TWO FORMATS ARE IN USE AND THEY MEAN DIFFERENT THINGS. Current-season files
+    carry a BARE date (`2026-09-29`) which is already the board's date. Files from
+    last season carry a UTC TIMESTAMP (`2026-01-26T01:00:00Z`) while the FILENAME
+    is the BOARD-LOCAL date -- so a late game is one UTC day ahead of the slate it
+    belongs to.
+
+    MEASURED 2026-09-29T00:22Z, and this is a REGRESSION THIS FUNCTION FIXES.
+    `_prediction_rows_for_date` compared `str(...)[:10]`, which threw away real
+    games:
+
+        predictions_2026-01-25.csv
+          2026-01-25T18:30:00Z  COL @ TOR   kept
+          2026-01-26T00:00:00Z  FLA @ CHI   DROPPED -- 6:00 PM Central ON THE 25th
+          2026-01-26T01:00:00Z  ANA @ CGY   DROPPED -- 7:00 PM Central ON THE 25th
+
+    Seven files were hit; on the single-game playoff dates (05-21, 05-22, 05-24,
+    05-26, 06-02) the truncation took the board to ZERO games. Every case was off
+    by exactly +1 day and some were partial WITHIN a file -- which is how it is
+    distinguishable from the fabrication the guard exists for, where the whole file
+    was NINE days off.
+
+    CENTRAL, because the filename is a Central date BY CONSTRUCTION: this module's
+    own `default_date()` is `central_today_iso()` (`nhl/sources.py:153`), and
+    `candidate_slate_filter._SLATE_TZ` is already `America/Chicago` for the same
+    reason. Note what the data could NOT settle: across the 16 timestamped rows
+    measured, Central and Eastern NEVER disagreed (none started later than 01:00Z,
+    so there was no late West-Coast game to separate them). The zone is chosen from
+    the board's own clock, not from that sample.
+
+    FALLS BACK TO THE TRUNCATION, never to None: an unparseable stamp must not
+    become "no date", because that is the permissive branch and it would let a
+    genuinely mis-dated row through unnoticed.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if "T" not in text:
+        return text[:10]
+    try:
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return text[:10]
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    try:
+        from zoneinfo import ZoneInfo
+
+        return moment.astimezone(ZoneInfo("America/Chicago")).date().isoformat()
+    except Exception:
+        return moment.astimezone(timezone.utc).date().isoformat()
+
+
 def _prediction_rows_for_date(path: Path, selected_date: str) -> list[dict[str, str]]:
     """Predictions rows from `path`, minus any row that says it belongs to a
     DIFFERENT date than the one being asked for.
@@ -89,7 +144,7 @@ def _prediction_rows_for_date(path: Path, selected_date: str) -> list[dict[str, 
     dropped = 0
     dropped_dates: set[str] = set()
     for row in rows:
-        row_date = str(row.get("date") or "").strip()[:10]
+        row_date = _row_slate_date(row.get("date"))
         if row_date and row_date != wanted:
             dropped += 1
             dropped_dates.add(row_date)

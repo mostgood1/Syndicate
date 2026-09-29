@@ -91,14 +91,68 @@ def test_a_mixed_file_keeps_only_the_rows_for_the_requested_date(tmp_path: Path)
     assert [row["away"] for row in kept] == ["Florida Panthers", "New York Rangers"]
 
 
-def test_a_timestamp_shaped_date_compares_on_its_date_part(tmp_path: Path) -> None:
-    path = _write(tmp_path, "predictions_2026-09-29.csv", [
-        ("Carolina Hurricanes", "Florida Panthers", "2026-09-29T21:00:00Z"),
-        ("Minnesota Wild", "Chicago Blackhawks", "2026-09-19T23:00:00Z"),
+def test_a_timestamp_is_compared_in_the_BOARD_timezone_not_by_truncation(tmp_path: Path) -> None:
+    """THIS TEST REPLACES ONE THAT ASSERTED THE BUG.
+
+    The version here before 2026-09-29 pinned `str(...)[:10]` as correct, using a
+    fixture I invented (a 21:00Z row under a 09-29 filename -- a time of day where
+    UTC and Central agree, so it could not fail). It passed while production dropped
+    real games. A test written from the same wrong model as the code confirms the
+    model, not the behaviour.
+
+    Every row below is READ FROM PRODUCTION: `predictions_2026-01-25.csv`, whose two
+    late games are 6:00 PM and 7:00 PM Central ON THE 25th and were being thrown
+    away. `str(...)[:10]` on those gives 2026-01-26, so this test fails on the old
+    code -- which is the property the old one lacked.
+    """
+    path = _write(tmp_path, "predictions_2026-01-25.csv", [
+        ("Toronto Maple Leafs", "Colorado Avalanche", "2026-01-25T18:30:00Z"),
+        ("Seattle Kraken", "New Jersey Devils", "2026-01-25T20:00:00Z"),
+        ("Ottawa Senators", "Vegas Golden Knights", "2026-01-25T22:00:00Z"),
+        ("Vancouver Canucks", "Pittsburgh Penguins", "2026-01-25T23:00:00Z"),
+        ("Chicago Blackhawks", "Florida Panthers", "2026-01-26T00:00:00Z"),
+        ("Calgary Flames", "Anaheim Ducks", "2026-01-26T01:00:00Z"),
     ])
 
-    kept = cards._prediction_rows_for_date(path, "2026-09-29")
+    kept = cards._prediction_rows_for_date(path, "2026-01-25")
+
+    assert len(kept) == 6, "the two late games belong to the 25th in the board's timezone"
+    assert [row["away"] for row in kept][-2:] == ["Florida Panthers", "Anaheim Ducks"]
+    # ...and the truncation the old test enshrined would have dropped exactly those.
+    assert [r[2][:10] for r in (("", "", "2026-01-26T00:00:00Z"), ("", "", "2026-01-26T01:00:00Z"))] ==         ["2026-01-26", "2026-01-26"], "if this ever equals 2026-01-25 the test stops discriminating"
+
+
+def test_a_single_late_game_is_not_a_zero_game_slate(tmp_path: Path) -> None:
+    """The worst measured case: on the playoff dates the file holds ONE game, it
+    starts after midnight UTC, and truncation took the board to zero.
+    `predictions_2026-05-24.csv` -- COL @ VGK at 7:00 PM Central on the 24th."""
+    path = _write(tmp_path, "predictions_2026-05-24.csv", [
+        ("Vegas Golden Knights", "Colorado Avalanche", "2026-05-25T00:00:00Z"),
+    ])
+
+    assert len(cards._prediction_rows_for_date(path, "2026-05-24")) == 1
+
+
+def test_a_timestamp_naming_a_genuinely_different_slate_is_still_dropped(tmp_path: Path) -> None:
+    """The guard must not be softened into uselessness: a timestamp that resolves to
+    another date in the BOARD timezone is still refused."""
+    path = _write(tmp_path, "predictions_2026-01-25.csv", [
+        ("Chicago Blackhawks", "Florida Panthers", "2026-01-26T00:00:00Z"),
+        ("Toronto Maple Leafs", "Colorado Avalanche", "2026-01-27T18:30:00Z"),
+    ])
+
+    kept = cards._prediction_rows_for_date(path, "2026-01-25")
     assert [row["away"] for row in kept] == ["Florida Panthers"]
+
+
+def test_an_unparseable_stamp_falls_back_to_truncation_not_to_no_date(tmp_path: Path) -> None:
+    """Never map "cannot parse" onto the permissive branch: that would let a
+    genuinely mis-dated row through with nothing emitted."""
+    path = _write(tmp_path, "predictions_2026-09-29.csv", [
+        ("Carolina Hurricanes", "Florida Panthers", "2026-09-19Tnot-a-time"),
+    ])
+
+    assert cards._prediction_rows_for_date(path, "2026-09-29") == []
 
 
 def test_date_has_rows_is_false_for_a_file_of_only_mis_dated_rows(tmp_path: Path) -> None:
@@ -169,3 +223,37 @@ def test_without_the_guard_the_same_fixture_reproduces_the_production_bug(tmp_pa
         assert len(games) == 7
         assert [g["away_tri"] for g in games] == ["DAL", "MTL", "TOR", "WPG", "CHI", "VGK", "VAN"]
         assert [str(g["gamePk"]) for g in games] == ["1", "2", "3", "4", "5", "6", "7"]
+
+
+def test_without_the_timezone_resolver_the_regression_comes_back(tmp_path: Path) -> None:
+    """`off != on` for the timezone fix.
+
+    Patching `_row_slate_date` back to the truncation is exactly the code that was
+    live on web and refresh-worker between `fae9aab8` (2026-09-28T23:48Z) and this
+    change. If this ever stops dropping rows, the resolver has stopped mattering and
+    the tests above are passing for some other reason.
+    """
+    rows = [
+        ("Toronto Maple Leafs", "Colorado Avalanche", "2026-01-25T18:30:00Z"),
+        ("Seattle Kraken", "New Jersey Devils", "2026-01-25T20:00:00Z"),
+        ("Ottawa Senators", "Vegas Golden Knights", "2026-01-25T22:00:00Z"),
+        ("Vancouver Canucks", "Pittsburgh Penguins", "2026-01-25T23:00:00Z"),
+        ("Chicago Blackhawks", "Florida Panthers", "2026-01-26T00:00:00Z"),
+        ("Calgary Flames", "Anaheim Ducks", "2026-01-26T01:00:00Z"),
+    ]
+    path = _write(tmp_path, "predictions_2026-01-25.csv", rows)
+    truncating = patch.object(cards, "_row_slate_date",
+                              side_effect=lambda v: str(v or "").strip()[:10] or None)
+
+    with truncating:
+        kept = cards._prediction_rows_for_date(path, "2026-01-25")
+
+    assert len(kept) == 4, "the pre-fix truncation must lose the two late games"
+    assert [row["away"] for row in kept] == [
+        "Colorado Avalanche", "New Jersey Devils", "Vegas Golden Knights", "Pittsburgh Penguins",
+    ]
+    # and the single-game playoff case went to ZERO, which is the worst of it
+    lone = _write(tmp_path, "predictions_2026-05-24.csv",
+                  [("Vegas Golden Knights", "Colorado Avalanche", "2026-05-25T00:00:00Z")])
+    with truncating:
+        assert cards._prediction_rows_for_date(lone, "2026-05-24") == []
