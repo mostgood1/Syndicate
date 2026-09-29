@@ -44102,3 +44102,12 @@ All have `ev_pct` <= 5.263 (max 5.250), and all are positive after the fee actua
 **Caveat:** the in-sample section 6 paired script was never committed. This run rebuilds it from the
 lane's scratch plus the production `venue_fees`. The metric is `100 x (implied(close) -
 implied(open) - fee per contract)`.
+
+## 2026-09-29 15:45Z (10:45 AM CDT) -- READING, no deploy -- cron model-scorecard -- lane mlb-prop-grading-player-match -- **PASS**
+- **Run: PASS.** Scheduled run `crn-dam0ao942hec73cge0rg-29844690`: `cron_job_run_started` 11:30:39Z (6:30 AM CDT), `cron_job_run_ended` **successful** 11:38:17Z. Artifact `generated_at` 2026-09-29T11:32:27Z.
+- **Live commit: PASS.** `GET .../deploys?limit=1` -> `dep-dat9snk9v7es73b3ongg` live, commit `5a3c6af212c5` itself (contains `5a3c6af2` trivially); no deploy since 17:07:22Z 09-28.
+- **Version / no new reset: PASS.** `grader.sport_versions.mlb` = `mlb/1+props:2620e9f68486`; `run.reset` = null.
+- **MLB dates restored: PASS.** `windows.28d.coverage.by_sport.mlb` = 14 dates / 188 games / 157,049 graded rows (was 9 / 112 after the 09-28 manual run; = the 14 / 188 pre-reset baseline). State `ungraded` MLB covers 09-14..09-27; 09-28 has no MLB entry (no MLB board that date).
+- **Per-date `prop_player_not_in_boxscore`, 09-22..09-26 (pre-fix -> now): PASS.** 09-22 940 -> 854 (-86), 09-23 944 -> 878 (-66), 09-24 577 -> 502 (-75), **09-25 1099 -> 1045 (-54, = replay exactly)**, **09-26 827 -> 801 (-26, = replay exactly)**. All five lower; no late-record explanation needed.
+- 28d `ungraded_by_sport.mlb`: `prop_player_not_in_boxscore` 9,034, `prop_no_commence_time` 1,278, `push` 2,254, `extra_ambiguous_game` 532 (all 09-25), `prop_game_not_played` 525 + `extra_game_not_played` 132 + `game_not_final` 34 (all 09-22), `extra_player_not_in_boxscore` 6.
+- The OWED verify on the 17:07:22Z deploy is discharged by this reading plus the 18:02Z one. Read-only: no run triggered, no deploy.
