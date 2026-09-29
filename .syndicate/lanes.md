@@ -999,6 +999,20 @@ death, never life — do not invert it.
 - Next: the re-fit is NOT applied — no change to `nba/cards.py` in this lane, and NBA is out of season until late October so nothing is served off it today. Applying it needs the two defects separated and a decision on the shape.
 - Blocked by: none
 
+### mlb-live-prop-grader — OPEN — opened 2026-09-29 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: MLB's live prop re-sim becomes gradeable: a feed_live replay reconciles EXACTLY against the official boxscore, per player, for the stats that are actual prop markets (hits, total bases, home runs, RBIs, runs, batter strikeouts, pitcher strikeouts and outs), over a stated corpus with its date coverage reported.
+- Files: syndicate/features/shared/mlb_live_prop_grading.py (NEW), scripts/grade_mlb_live_prop_projection.py (NEW), tests/test_mlb_live_prop_grading.py (NEW)
+- Hypothesis: feed_live allPlays carries enough structure to reconstruct every prop-market stat exactly -- result.eventType for the batting line, result.rbi for RBIs, runners[].movement.end=='score' for runs, and matchup.pitcher for pitcher strikeouts -- with no text parsing of play descriptions.
+- Falsification test: The replay does NOT reproduce the official boxscore per player for a stat, in which case that stat is not gradeable from allPlays alone and the adapter must say so rather than grade it anyway.
+- Verification: Reconcile rate per stat over a sample of feed_live games, reported as a RATE with its denominator and the date window it rests on.
+- **GOAL: MET for the replay half.** Corpus **618 games / 47 dates (2026-05-28..07-14)**. Reconcile vs the official box: hits, totalBases, homeRuns, rbi, runs **1.0000** (n=12,970 batters); pitcher strikeOuts and outs **1.0000** (n=5,124); batter strikeOuts **0.9997**. **616/618 games clean on all 8 stats.** Zero unknown eventTypes, zero unreadable files.
+- **THE GATE IS SHOWN TO DISCRIMINATE, so 1.0000 is evidence rather than a vacuous comparison.** Three deliberate breaks move it: dropping `double` → hits 0.8485 (+69 unknown events); mis-scoring `home_run` as 1 base → totalBases 0.8718; mis-crediting `walk` as a hit → hits 0.7599. An unknown event also flips `stat_reconciles` False for BATTING while leaving PITCHING True.
+- **THE 4 STRIKEOUT MISSES ARE A SOURCE-DATA DEFECT, NOT A GAP IN THE EVENT TABLE.** In both games `matchup.batter.id` disagrees with the play DESCRIPTION — desc "Brandon Lowe strikes out swinging" carries batter id 691373 (Jhostynxon Garcia); desc "Sebastián Rivero called out on strikes" carries 681351 (Logan O'Hoppe). Parsing the description would "fix" these two and make the adapter depend on prose, which the module refuses by design. DECISION: keep the structural read and let the gate refuse those 2 games.
+- **COVERAGE INTERSECTION MEASURED BEFORE BUILDING ON IT (CLAUDE.md rule).** feed_live **47** dates, roster_objs **28** (06-15..07-12), daily_summary **0** on disk. `estimate_live` needs a TeamRoster, so the projection half can run on **28 dates, not 47** — and the triple intersection is **0**. Any MC residual rests on the 28, and that is a ceiling, not a starting point.
+- **CORPUS PROVENANCE, stated:** the primary tree's on-disk mirror (618 games). Git-tracked is **146 over 11 dates**, and production `/api/ops/artifacts/export` returns the SAME 146 — so this measurement rests on untracked mirror data that production does not currently hold.
+- Next: wire `estimate_live` at sample points for the residual, and build the rescale baseline to compare against on the same replayed games. NOT started.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
