@@ -3294,6 +3294,10 @@ def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = _B
             f"ok={live_lens_succeeded} written={live_lens_written}",
             flush=True,
         )
+    # Week-keyed families ride along, throttled to 30 min -- see
+    # `_pull_season_artifacts_if_due`. Nothing else on refresh-worker calls it,
+    # and this sweep is the only thing that ticks reliably.
+    _pull_season_artifacts_if_due(timeout_seconds=timeout_seconds)
     return written
 
 
@@ -4102,12 +4106,56 @@ def _resync_append_only_whole(
 # Render's log API cannot serve (control: `[artifact_publisher]` lines reach the
 # collector, `[mlb_sim_job]` lines return zero hits).
 _SEASON_ARTIFACT_PATTERNS: tuple[str, ...] = (
+    # WEEK-KEYED PROP PROJECTIONS, ALL SPORTS. `pull_hot_artifacts` scopes its
+    # request to `?pattern=*<date>*`, so a file keyed by SEASON+WEEK rather than
+    # by date can never match it -- that function's own docstring says non-dated
+    # files are out of scope. Measured 2026-09-29: the wk4 NFL prop artifact was
+    # published to web at 16:53Z and refresh-worker was still serving the wk3
+    # file hours later, because NOTHING on the worker ever asked for it. The
+    # board's fallback to wk3 was correct given a disk that could not have wk4;
+    # the daily autorun's `SEASON_PROJECTION_ARTIFACT_MISSING` was truthful and
+    # permanent; and the autorun that would "fix" it cannot succeed either,
+    # because the pbp it needs is not allowlisted. Three mechanisms each doing
+    # their job, combining into a file with no route.
+    "*_prop_projections_*.json",
     "*arsenal_*.json",
     "*quality_*.json",
     "*batted_ball_*.json",
     "*pitch_splits_*.json",
     "*conditional_mix_*.json",
 )
+
+
+_LAST_SEASON_PULL_EPOCH: list[float] = []
+_SEASON_PULL_MIN_INTERVAL_SECONDS = 1800.0
+
+
+def _pull_season_artifacts_if_due(*, timeout_seconds: int = 60) -> int:
+    """`pull_season_artifacts` at most every 30 min, for the hot sweep to call.
+
+    WHY THROTTLED AND NOT JUST CALLED. `pull_hot_artifacts` ticks every ~30s, and
+    `pull_season_artifacts`'s own docstring says to call it "BEFORE a roster
+    build, not on a per-cycle schedule" -- the reason the hot pull is date-scoped
+    at all is that unfiltered pulls hit Render's proxy timeout. This keeps the
+    week-keyed families arriving without paying that cost 120 times an hour:
+    each pattern is one narrow request, and an unchanged file writes nothing.
+
+    WHY FROM THE HOT SWEEP AT ALL. Because no other caller exists on
+    refresh-worker -- `pull_season_artifacts` is reached only from
+    `publish_mlb_season_artifacts` and `run_mlb_daily_sim_job`, both MLB-only. A
+    week-keyed artifact for any other sport therefore had no route onto the
+    machine that BUILDS the board.
+    """
+    now = time.time()
+    if _LAST_SEASON_PULL_EPOCH and (now - _LAST_SEASON_PULL_EPOCH[-1]) < _SEASON_PULL_MIN_INTERVAL_SECONDS:
+        return 0
+    _LAST_SEASON_PULL_EPOCH.append(now)
+    del _LAST_SEASON_PULL_EPOCH[:-1]
+    try:
+        return pull_season_artifacts(timeout_seconds=timeout_seconds)
+    except Exception as exc:  # a pull must never break the sweep that carries it
+        print(f"[artifact_publisher] SEASON_PULL_FROM_SWEEP_FAILED error={exc}", flush=True)
+        return 0
 
 
 def pull_season_artifacts(*, timeout_seconds: int = 60) -> int:
