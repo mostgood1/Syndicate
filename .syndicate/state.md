@@ -544,7 +544,7 @@ once this index exists: re-splitting would orphan the parts.
 | [layer1-layer2-boards] | LAYER 1 / LAYER 2 BOARDS — session briefs exist; three facts worth not re-deriving `[code read 08-16 11:2x CDT | `state_layer2.md` |
 | [layer1-board-date-scoping] | THE BOARD WAS DROPPING GAMES TWO WAYS — both FIXED AND VERIFIED; a THIRD (soccer projections, late kickoffs) f | `state_layer2.md` |
 | [board-chip-coverage] | Layer 2 compact game cards — FULL chip coverage, verified 2026-08-26 | `state_layer2.md` |
-| [chip-artifact-content-age] | A chip artifact's TIMESTAMP and its CONTENT age are different numbers — verified 2026-08-27 (lane `mlb-chip-li | `state_layer2.md` |
+| [chip-artifact-content-age] | A chip artifact's TIMESTAMP and its CONTENT age are different numbers -- worst measured case is NINE DAYS (NHL 09-28, another date's slate entirely), cause FOUND and FIXED | `state_layer2.md` |
 | [chip-refresh-worker-pull-hop] | REFRESH-WORKER'S HOT-ARTIFACT PULL FLOOR WAS SET BY LIVE-ODDS-WORKER — one shared keyvalue watermark; fix `082 | `state_layer2.md` |
 | [layer2-rail-group-join-keys] | THE GAMES RAIL BUILT EACH GAME FROM ITS FIRST ROW, AND A SHORT CLUB NAME MINTED A FAKE ABBR — both FIXED and V | `state_layer2.md` |
 | [layer2-market-gone-league-cadence] | `_drop_market_gone_rows` DELETED LIVE MARKETS whenever a partial pass was the newest stamp (soccer per league, | `state_layer2.md` |

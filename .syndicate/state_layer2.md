@@ -624,7 +624,7 @@ must mint a globally unique KEY, where the same rule mints collisions.
 one at 27,070 rows — the aggregator uses no spelling the exact match misses.
 Reproduced independently by lane `board-staleness-visibility`.
 
-## [chip-artifact-content-age] A chip artifact's TIMESTAMP and its CONTENT age are different numbers — verified 2026-08-27 (lane `mlb-chip-live-state`)
+## [chip-artifact-content-age] A chip artifact's TIMESTAMP and its CONTENT age are different numbers — verified 2026-08-27 (lane `mlb-chip-live-state`); **WORST MEASURED CASE IS NINE DAYS, NHL 2026-09-28, cause FOUND and FIXED** (lanes `nhl-board-row-date-mismatch`, `nhl-sim-artifact-backfill-fabricates`)
 
 **`/api/board/game-chips` `published_at` bounds when the artifact was WRITTEN,
 not how old the live state inside it is.** Measured 00:09:03Z, refresh-worker on
@@ -636,6 +636,42 @@ minutes — behind StatsAPI. `BOS` read `TOP 3` against `Bottom 5`; `MIL` read
 `published_at`, so BOTH read healthy through this.** Same shape as
 `[board-quote-staleness]`. A board build that takes ~750s cold stamps its
 artifact at the END.
+
+**NINE DAYS, NOT FIFTEEN MINUTES, AND THE CONTENT WAS ANOTHER DATE'S SLATE
+ENTIRELY `[verified 2026-09-28 18:2x-18:5x CT, refresh-worker `fae9aab8`]`.** The
+Layer 2 rail carried **7 NHL chips on a date the NHL's own API says has ZERO
+games** (preseason ended 09-26). They were `predictions_2026-09-19.csv`
+row-for-row AND IN ORDER — `gamePk` 1..7, the row counter — off an artifact
+**46 seconds old** with `GAME_CHIPS_PUBLISHED ... ok=True` every ~3 min. Chips
+carried `start_time_utc: null` and `status_token: null`, so no scoreboard join
+could ever attach a score to a game that ended nine days earlier.
+
+**TWO CAUSES, one per lane, both fixed and measured.** (1) `refresh_nhl_oddsapi.py`
+copied the newest OTHER-dated CSV onto today's filename for six REQUIRED_ARTIFACTS
+families, firing ONLY when generation produced nothing real — so it could only ever
+fabricate — and its sole effect was to empty a WARNING that never gated. DELETED.
+(2) `nhl/cards.py` resolved its slate from the FILENAME and never read the row's own
+populated `date` column; `_prediction_rows_for_date` now refuses a row naming another
+date. **Reading: nhl chips 7 -> 0, total 171 -> 164 (exactly -7), nfl 16 and soccer
+148 unchanged**, off the first artifact the new code built.
+
+**WEB AND REFRESH-WORKER DISAGREED ABOUT THE SAME DATE AND NOTHING REPORTED IT.**
+`/nhl/api/cards?date=2026-09-28` on web looked ahead correctly to 09-29's five real
+games while refresh-worker — which BUILDS the chips — had rows for 09-28 so its
+lookahead never fired. Separate disks, one board; the only symptom was on the board
+itself. `[nhl_cards] RESOLVED requested=... served=... lookahead=... source=...` now
+prints every build so the split is legible without a deploy to go looking.
+
+**THE COMPARISON MUST BE IN THE BOARD TIMEZONE, and getting that wrong cost a
+regression the same evening `[verified 2026-09-28 19:3xZ, web `cfba2895`]`.** Two date
+formats are in use: current-season files carry a BARE date, last season's carry a UTC
+TIMESTAMP against a board-LOCAL filename, so a late game sits one UTC day ahead of its
+slate. A 10-character truncation dropped those: **13 of 16 games served across six
+affected dates, and 2026-05-24 served 05-25's slate with `lookahead=true`** — the guard
+against serving another date's games caused exactly that. `_row_slate_date` converts to
+`America/Chicago` (the board's own clock: `default_date()` is `central_today_iso()`) and
+restored **16 of 16**. NOT settled by the data: across all 16 timestamped rows Central
+and Eastern never disagreed, because none started later than 01:00Z.
 
 **THE DISCRIMINATOR BETWEEN A STALE CHIP AND A BLANKED ONE IS THE TOKEN, NOT
 THE SCORE.** A blanked game (`#581`) carries `0-0` AND a bare `LIVE`/`FINAL`
