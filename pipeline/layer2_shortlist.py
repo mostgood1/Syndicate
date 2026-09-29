@@ -1479,6 +1479,36 @@ def build_layer2_shortlist(
             try:
                 proj_stats = enrichment.get("projections")
                 if isinstance(proj_stats, Mapping) and proj_stats.get("supported") is not False:
+                    # THE HALVES' OWN ATTRIBUTION, or the line is blind for any
+                    # sport that splits its join.
+                    #
+                    # Measured 2026-09-29T00:53Z: NFL props served 23 of 98 rows
+                    # with a projection and `PREGAME_PROJECTION_JOIN sport=nfl`
+                    # read `considered=7049 projected=1694` with EVERY reason
+                    # field `None` -- so a 76% miss had no attributable cause,
+                    # while soccer's same line reported `unmatched_match=361
+                    # unmatched_player=24 player_name_miss=24`.
+                    #
+                    # NOTHING WAS MISSING. `attach_nfl_prop_projections` already
+                    # counts `unmatched_key_rows` / `no_probability_rows` /
+                    # `no_line_rows` / `unsupported_market_rows`, and
+                    # `_merge_nfl_coverage` DELIBERATELY nests both halves under
+                    # `prop_coverage` / `game_coverage` so a prop rate is never
+                    # diluted by game rows -- its docstring says the prop
+                    # fraction "remains answerable". It was answerable and
+                    # nothing asked: this emitter read those keys at the TOP
+                    # level, where only the game half's keys live. Three
+                    # correct-in-isolation pieces, one blind log line.
+                    #
+                    # Generic over the halves rather than `if sport == "nfl"`,
+                    # so the next producer that nests cannot be dropped the same
+                    # way -- and it prints NOTHING when a sport does not nest,
+                    # which is every other sport today.
+                    _halves = " ".join(
+                        f"{_half}={_summarise_projection_half(proj_stats.get(_half))}"
+                        for _half in ("prop_coverage", "game_coverage")
+                        if isinstance(proj_stats.get(_half), Mapping)
+                    )
                     print(
                         f"[layer2_shortlist] PREGAME_PROJECTION_JOIN sport={sport} "
                         f"considered={proj_stats.get('rows_considered')} "
@@ -1516,7 +1546,8 @@ def build_layer2_shortlist(
                         f"unmatched_by_league={proj_stats.get('unmatched_by_league')} "
                         f"unmatched_fixtures={proj_stats.get('unmatched_fixtures_count')} "
                         f"board_names={proj_stats.get('unmatched_fixture_sample')} "
-                        f"sim_names={proj_stats.get('indexed_fixture_sample')}",
+                        f"sim_names={proj_stats.get('indexed_fixture_sample')}"
+                        + (f" {_halves}" if _halves else ""),
                         flush=True,
                     )
             except Exception:
@@ -2332,6 +2363,44 @@ def build_layer2_shortlist(
 # internally, so looping it per date re-scans the same grid against
 # near-identical indexes. See `_attach_projections_over_window`.
 _SELF_WINDOWING_PROJECTION_SPORTS = frozenset({"soccer"})
+
+
+def _summarise_projection_half(half: Any) -> str:
+    """The attribution a nested coverage half already carries, as one token.
+
+    Only the keys that are PRESENT, so a producer that does not count a bucket
+    reads as silent rather than as zero -- "absent" and "measured zero" are
+    different claims and a log that conflates them is how a 76% miss went
+    unattributed. Values are ints and short strings from the join's own
+    counters; nothing is computed here.
+
+    Returns `""` when there is nothing to say, and the caller omits the token
+    entirely rather than printing an empty one.
+    """
+    if not isinstance(half, Mapping):
+        return ""
+    keys = (
+        "rows_considered",
+        "rows_with_projection",
+        "unmatched_key_rows",
+        "no_probability_rows",
+        "no_line_rows",
+        "unsupported_market_rows",
+        "artifact_season",
+        "artifact_week",
+        "artifact_rows",
+        "reason",
+        "error",
+    )
+    parts = []
+    for key in keys:
+        if key not in half:
+            continue
+        value = half.get(key)
+        if value is None:
+            continue
+        parts.append(f"{key}={value}")
+    return "{" + ",".join(parts) + "}" if parts else ""
 
 
 def _attach_projections_over_window(
