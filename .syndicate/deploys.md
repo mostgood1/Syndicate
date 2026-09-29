@@ -43659,3 +43659,95 @@ NO "backfilled compatibility artifacts" warning, and no `predictions_sim_<date>.
 appear whose rows name a different date -- observable as `[nhl_cards] ROW_DATE_MISMATCH`
 staying SILENT for 2026-09-29 and 2026-09-30 while the board serves the opener's five real
 games. Task `nhl-opening-night-predictions-check` (06:00 CT) is positioned to read it.
+
+## 2026-09-28 7:21 PM CT (2026-09-29T00:21Z) — web `7d65beb4` (lane `nhl-sim-artifact-backfill-fabricates`) — web joins live-odds-worker on the tip. **Deploy verified by EXECUTION. And it exposed a REGRESSION I shipped in `fae9aab8` — see below.**
+
+    deploy dep-datg617lot8c73feeipg   web 01092639 -> 7d65beb4
+    fired 00:15:00.519757Z (7:15 PM CT)   live 00:21:26.157727Z (7:21 PM CT)   trigger=api   status=live
+    preflight CLEAR 00:14:48Z (4 gunicorn workers + 2 defunct children awaiting reap; no other process)
+    baseline read 00:14:16Z off web's OWN live 01092639:
+        nhl _prediction_rows_for_date occurrences = 0        (target 11)
+        wnba MINUTES_MODEL_MARKETS                = ABSENT   (target {points, rebounds, assists})
+        web [nhl_cards] RESOLVED lines in 12h     = 0        (log reader proven working at the same instant
+                                                              by a control string returning 2 hits)
+    expectation: all three -> present
+
+**VERIFIED BY EXECUTION, not by content identity.** After the deploy,
+`/nhl/api/cards?date=2026-09-28` was exercised and web emitted its OWN new log line
+**13 times** against a 12-hour baseline of 0:
+
+    [nhl_cards] RESOLVED requested=2026-09-28 served=2026-09-29 lookahead=True  games=5 source=predictions_2026-09-29.csv
+    [nhl_cards] RESOLVED requested=2026-09-29 served=2026-09-29 lookahead=False games=5 source=predictions_2026-09-29.csv
+    [nhl_cards] RESOLVED requested=2026-09-30 served=2026-09-30 lookahead=False games=0 source=predictions_2026-09-30.csv
+
+So the new code RAN on web, and 09-28 correctly looks ahead to the opener's five real
+games. Health: `/api/health` returned **502 then 200** `{"ok":true,"service":"syndicate"}` --
+the watcher probed the route rather than trusting the `live` status, which is why the
+~15 s cold-start window is visible here instead of being papered over (web takes 20-25 s
+to warm against a 5 s health check; that is the 2026-08-21 restart-loop hazard).
+
+**A THIRD OBSERVATION, incidental but useful:** `requested=2026-09-30 games=0
+source=predictions_2026-09-30.csv` -- web has NO rows for 09-30 although the NHL has three
+real games that day. That is the days-ahead gap `03837ae7` addresses, and it is the second
+thing tonight's run should fix.
+
+**FLEET, and a deliberate split.** web `7d65beb4`, live-odds-worker `7d65beb4`,
+**refresh-worker LEFT on `fae9aab8` -- USER DECISION 2026-09-28, asked and answered
+("leave refresh-worker").** Reason: the only commit it lacks changes
+`scripts/refresh_nhl_oddsapi.py`, which refresh-worker DOES NOT RUN (live-odds-worker does;
+confirmed from its process list), so the change is inert there -- while restarting it costs
+~21 min of frozen board (preflight's own figure) during Sunday Night Football. This is a
+recorded choice, not drift; it picks up the commit on the next deploy that touches code it
+executes.
+
+---
+
+## REGRESSION IN `fae9aab8`, found by its own instrument (2026-09-29T00:22:32Z)
+
+`ROW_DATE_MISMATCH` fired **5 times on web where I predicted 0**, and reading it rather than
+assuming showed the guard is DROPPING LEGITIMATE GAMES:
+
+    ROW_DATE_MISMATCH path=predictions_2026-01-25.csv requested=2026-01-25 dropped=2 kept=4 row_dates=['2026-01-26']
+    ROW_DATE_MISMATCH path=predictions_2026-03-01.csv requested=2026-03-01 dropped=1 kept=5 row_dates=['2026-03-02']
+    ROW_DATE_MISMATCH path=predictions_2026-05-24.csv requested=2026-05-24 dropped=1 kept=0 row_dates=['2026-05-25']
+    (also 05-21, 05-22, 05-26, 06-02 -- every one dropped=1 kept=0)
+
+**EVERY ONE IS OFF BY EXACTLY +1 DAY, never -1, and some are PARTIAL within a file.** That is
+not a copied slate (the 09-19 case was NINE days off, whole-file). Read the file and the
+cause is plain -- HISTORICAL predictions carry a UTC TIMESTAMP while the FILENAME is the
+BOARD-LOCAL date:
+
+    predictions_2026-01-25.csv
+      2026-01-25T18:30:00Z  COL @ TOR   kept
+      2026-01-25T22:00:00Z  VGK @ OTT   kept
+      2026-01-26T00:00:00Z  FLA @ CHI   DROPPED -- 6:00 PM Central ON THE 25th
+      2026-01-26T01:00:00Z  ANA @ CGY   DROPPED -- 7:00 PM Central ON THE 25th
+
+`_prediction_rows_for_date` truncates to 10 characters and string-compares, so a late game
+filed by UTC date is refused as another date's row. Those are real 01-25 games.
+
+**IMPACT, SCOPED AND MEASURED.** Current-season files use a BARE date, so today and the
+opener are unaffected -- verified directly: `predictions_2026-09-29.csv` carries
+`2026-09-29` on all five rows and the board serves `games=5`. **Opening night is NOT at
+risk.** The damage is on ARCHIVE dates from last season, and on the single-game playoff
+dates (05-21, 05-22, 05-24, 05-26, 06-02) it takes the board to ZERO games.
+
+**WHY MY OWN TEST DID NOT CATCH IT, recorded because that is the reusable part.** The test
+`test_a_timestamp_shaped_date_compares_on_its_date_part` DOES cover timestamps -- and asserts
+the WRONG THING: it pins the 10-character truncation as correct behaviour, using a fixture I
+invented (`2026-09-29T21:00:00Z` under a 09-29 filename) instead of a row read from
+production. A test written from the same wrong mental model as the code confirms the model,
+not the behaviour. Every fixture in that file used bare dates because that is what I had
+looked at.
+
+**THE FIX** is to compare in the BOARD TIMEZONE rather than by truncating UTC: convert a
+timestamped row to Central and compare that date; compare a bare date as-is. Checked against
+all four measured cases -- `2026-01-26T01:00:00Z` -> 01-25 19:00 CT -> matches; 
+`2026-05-25T00:00:00Z` -> 05-24 19:00 CT -> matches; bare `2026-09-19` under 09-28 stays
+DROPPED, so the original fix is preserved. NOT a +/-1-day tolerance, which would be a hack
+that also blinds the guard to a genuine one-day-off fabrication.
+
+**verify (this regression):** the four measured files re-served with their full row counts
+(01-25 -> 6, 03-01 -> 6, 05-24 -> 1, 06-02 -> 1) and `ROW_DATE_MISMATCH` silent for them,
+while a bare-dated row naming another date is still dropped. Fix lands next; claim released
+because the DEPLOY is complete and its own expectation was met.
