@@ -43751,3 +43751,88 @@ that also blinds the guard to a genuine one-day-off fabrication.
 (01-25 -> 6, 03-01 -> 6, 05-24 -> 1, 06-02 -> 1) and `ROW_DATE_MISMATCH` silent for them,
 while a bare-dated row naming another date is still dropped. Fix lands next; claim released
 because the DEPLOY is complete and its own expectation was met.
+
+## 2026-09-28 7:37 PM CT (2026-09-29T00:37Z) — web `cfba2895` (lane `nhl-board-row-date-mismatch`) — the `fae9aab8` regression is fixed: 13 of 16 games on the affected dates back to 16 of 16. **GOAL MET, measured behaviourally.**
+
+    deploy dep-datgeonavr4c73del0lg   web 7d65beb4 -> cfba2895
+    fired 00:33:38.567771Z (7:33 PM CT)   live 00:37:04.708183Z (7:37 PM CT)   trigger=api   status=live
+    preflight CLEAR 00:33:28Z (3 gunicorn + portdetector + 2 defunct awaiting reap; no other process)
+    baseline read 00:33:05Z off web's OWN live 7d65beb4 -- BEHAVIOURAL, not content:
+        games served across the 6 affected dates = 13   (files hold 16)
+          2026-01-25 -> 4 of 6      2026-03-01 -> 5 of 6
+          2026-05-24 -> served 2026-05-25 with lookahead_applied=TRUE
+        _row_slate_date occurrences in nhl/cards.py = 0
+    expectation: 13 -> 16 ; 05-24 lookahead true -> false ; _row_slate_date absent -> present
+
+**The regression being fixed (mine, shipped in `fae9aab8` 23:48Z, ~49 min live).**
+`_prediction_rows_for_date` compared `str(row["date"])[:10]` against the requested date.
+TWO FORMATS ARE IN USE AND THEY MEAN DIFFERENT THINGS: current-season files carry a BARE
+date, already the board's; last season's carry a UTC TIMESTAMP against a BOARD-LOCAL
+filename, so a late game sits one UTC day ahead of the slate it belongs to.
+
+    predictions_2026-01-25.csv
+      2026-01-25T18:30:00Z  COL @ TOR   kept
+      2026-01-26T00:00:00Z  FLA @ CHI   DROPPED -- 6:00 PM Central ON THE 25th
+      2026-01-26T01:00:00Z  ANA @ CGY   DROPPED -- 7:00 PM Central ON THE 25th
+
+**AND IT REPRODUCED THE VERY BUG THE GUARD EXISTS FOR.** Emptying 2026-05-24 made lookahead
+jump forward, so a request for 05-24 served **05-25's slate** with `lookahead_applied=true`.
+A guard against serving another date's games caused web to serve another date's games --
+narrower than the original (one day, one date, an archive view) but the same failure.
+
+**MEASURED AFTER, 00:37:27Z (23 s after live), same probe as the baseline:**
+
+    date         served       games  lookahead
+    2026-01-25   2026-01-25   6      False      (was 4)
+    2026-03-01   2026-03-01   6      False      (was 5)
+    2026-05-21   2026-05-21   1      False
+    2026-05-24   2026-05-24   1      False      (was: served 2026-05-25, lookahead TRUE)
+    2026-05-26   2026-05-26   1      False
+    2026-06-02   2026-06-02   1      False
+    TOTAL 16 of 16
+
+`ROW_DATE_MISMATCH` on web since live: **0** (was 5 per page load). No collateral: the opener
+still reads `requested=2026-09-29 date=2026-09-29 games=5`. Health `/api/health` 200
+`{"ok":true,"service":"syndicate"}` on the first probe.
+
+**The fix.** `_row_slate_date()` resolves a row's slate date instead of truncating: a bare
+date compares as-is, a UTC timestamp converts to **America/Chicago** and compares that date,
+and an unparseable stamp falls back to the TRUNCATION -- never to `None`, because "no date"
+is the permissive branch and would let a genuinely mis-dated row through silently.
+
+**Central is chosen from the BOARD'S CLOCK, not from the sample, and the docstring says so.**
+`nhl/sources.py:153` `default_date()` is `central_today_iso()` and
+`candidate_slate_filter._SLATE_TZ` is already `America/Chicago`, so the filename is a Central
+date by construction. What the DATA could not settle: across all 16 timestamped rows measured,
+Central and Eastern NEVER disagreed -- none started later than 01:00Z, so no late West-Coast
+game existed to separate them. A future file with a 10:30 PM Pacific start is the first row
+that would discriminate.
+
+**WHY MY OWN TEST PASSED THROUGH THE REGRESSION -- the reusable lesson.**
+`test_a_timestamp_shaped_date_compares_on_its_date_part` DID cover timestamps and ASSERTED THE
+BUG: it pinned `[:10]` as correct behaviour using a fixture I invented, `2026-09-29T21:00:00Z`
+under a 09-29 filename -- a time of day where UTC and Central agree, so it COULD NOT FAIL. A
+test written from the same wrong mental model as the code confirms the model, not the
+behaviour. Every fixture in that file used bare dates because bare dates were all I had looked
+at. Replaced with the six PRODUCTION rows, plus the single-game zero case, a still-dropped
+genuinely-different slate, the unparseable fallback, and an `off != on` test that patches the
+resolver back to truncation and reproduces the regression exactly (6 -> 4, and 1 -> 0).
+14 tests in the file, 45 in the scoped sweep; the one red is the pre-existing
+`test_nhl_chip_start_time` date-label drift that the ledger already records as failing on
+unmodified HEAD, and it belongs to another lane.
+
+**FLEET AND REMAINING EXPOSURE.** web `cfba2895`; live-odds-worker `7d65beb4`;
+**refresh-worker still `fae9aab8`, so it STILL CARRIES THE TRUNCATION.** Bounded, not benign:
+chips are built for TODAY, which uses bare dates, so the compact rail is unaffected -- but any
+past-date board built on that service keeps the flaw. It picks this up on the next deploy that
+touches code it runs; no deploy tonight, by the standing decision not to restart it during SNF.
+
+**A correction to my own arithmetic, for the record.** I read "13 of 16" as "3 games lost". It
+is not that simple: TWO dates lose games (01-25, 03-01), ONE serves the wrong date (05-24), and
+THREE (05-21, 05-26, 06-02) were being rescued by the archived-scoreboard fallback rather than
+by predictions -- which is why they read 1 of 1 while their predictions rows were being dropped.
+
+**verify:** MET above -- 16 of 16 with `lookahead_applied=false` on every affected date,
+`ROW_DATE_MISMATCH` silent, opener unchanged at 5 games. Still owed from the earlier receipts
+and unaffected by this one: tonight's NHL run (~12:15 AM CT) is the first on the
+backfill-deleted code, read by task `nhl-opening-night-predictions-check` at 06:00 CT.
