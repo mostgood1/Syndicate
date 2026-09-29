@@ -965,6 +965,14 @@ death, never life — do not invert it.
 - Verification: Offline: a predictions row carrying date=2026-09-19 loaded for selected_date=2026-09-28 yields zero games AND _date_has_rows returns False (so lookahead fires); a row whose date matches, or whose date column is blank, is still served. Production after a user-approved deploy of refresh-worker: /api/board/game-chips carries zero nhl chips for a no-games date, and on 2026-09-29 carries five chips whose matchups equal the NHL API's own slate.
 - Blocked by: none
 
+### nhl-sim-artifact-backfill-fabricates — OPEN — opened 2026-09-28 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: NHL generation never writes another date's rows under this date's filename. Measured as: no `predictions_sim_<date>.csv` (or any REQUIRED_ARTIFACTS member) on disk whose `date` column disagrees with its own filename, and a run with genuinely missing artifacts reporting them as MISSING rather than satisfying the presence check with a copy.
+- Files: scripts/refresh_nhl_oddsapi.py (_backfill_latest_dated_csv / _backfill_required_compatibility_artifacts and their single call site ONLY), tests/test_nhl_oddsapi_no_cross_date_backfill.py (NEW)
+- Hypothesis: _backfill_latest_dated_csv globs the newest OTHER-dated CSV and copies it verbatim onto today's filename purely to empty _missing_required_artifacts -- which is only a warning -- so it can only ever fire when generation produced nothing real, and therefore can only ever produce fabricated data. It also crosses FAMILIES (source_prefixes lets a predictions_*.csv become a predictions_sim_*.csv).
+- Falsification test: If some downstream step HARD fails (non-zero exit / refused board) on a missing REQUIRED_ARTIFACTS member rather than warning, removing the backfill trades wrong data for a broken pipeline and the fix must instead write a LABELLED placeholder. Checked at scripts/refresh_nhl_oddsapi.py:736 -- missing_required only appends to warnings.
+- Verification: Offline: a run for a date with no generated artifacts, beside a populated older date, leaves no new dated file and reports the artifacts missing; the removed helpers have no remaining callers. Production after a user-approved deploy of live-odds-worker: the next nightly NHL run emits no 'backfilled compatibility artifacts' warning, and no predictions_sim_<date>.csv appears whose rows name a different date -- read via the [nhl_cards] ROW_DATE_MISMATCH line staying silent for the new dates.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

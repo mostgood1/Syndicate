@@ -447,71 +447,49 @@ def _missing_required_artifacts(*, artifact_root: Path, date_str: str) -> list[s
     return missing
 
 
-def _backfill_latest_dated_csv(*, artifact_root: Path, date_str: str, destination_name: str, source_prefixes: tuple[str, ...]) -> bool:
-    destination = artifact_root / "data" / "processed" / destination_name
-    if destination.exists():
-        return True
-
-    search_roots = [artifact_root]
-    processed_roots = [root / "data" / "processed" for root in search_roots]
-    for processed_root in processed_roots:
-        for prefix in source_prefixes:
-            candidates = sorted(processed_root.glob(f"{prefix}_*.csv"), reverse=True)
-            for source in candidates:
-                if source.name == destination_name:
-                    continue
-                if source.stem.endswith(date_str):
-                    continue
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                _copy_if_exists(source=source, destination=destination)
-                return destination.exists()
-
-    return False
-
-
-def _backfill_required_compatibility_artifacts(*, artifact_root: Path, date_str: str) -> dict[str, bool]:
-    created: dict[str, bool] = {}
-    created["predictions"] = _backfill_latest_dated_csv(
-        artifact_root=artifact_root,
-        date_str=date_str,
-        destination_name=f"predictions_{date_str}.csv",
-        source_prefixes=("predictions_sim", "predictions"),
-    )
-    if created["predictions"]:
-        created["predictions_sim"] = _backfill_latest_dated_csv(
-            artifact_root=artifact_root,
-            date_str=date_str,
-            destination_name=f"predictions_sim_{date_str}.csv",
-            source_prefixes=("predictions_sim", "predictions"),
-        )
-    else:
-        created["predictions_sim"] = False
-
-    created["recommendations_sim"] = _backfill_latest_dated_csv(
-        artifact_root=artifact_root,
-        date_str=date_str,
-        destination_name=f"recommendations_sim_{date_str}.csv",
-        source_prefixes=("recommendations_sim", "recommendations"),
-    )
-    created["props_boxscores_sim"] = _backfill_latest_dated_csv(
-        artifact_root=artifact_root,
-        date_str=date_str,
-        destination_name=f"props_boxscores_sim_{date_str}.csv",
-        source_prefixes=("props_boxscores_sim", "props_boxscores_sim_samples"),
-    )
-    created["props_boxscores_sim_hist"] = _backfill_latest_dated_csv(
-        artifact_root=artifact_root,
-        date_str=date_str,
-        destination_name=f"props_boxscores_sim_hist_{date_str}.csv",
-        source_prefixes=("props_boxscores_sim_hist", "props_boxscores_sim_samples"),
-    )
-    created["props_boxscores_sim_samples"] = _backfill_latest_dated_csv(
-        artifact_root=artifact_root,
-        date_str=date_str,
-        destination_name=f"props_boxscores_sim_samples_{date_str}.csv",
-        source_prefixes=("props_boxscores_sim_samples", "props_boxscores_sim", "props_boxscores_sim_hist"),
-    )
-    return created
+# `_backfill_latest_dated_csv` / `_backfill_required_compatibility_artifacts` WERE
+# HERE AND ARE DELETED. They globbed the newest OTHER-dated CSV in
+# `data/processed/` and copied it verbatim onto TODAY's filename, for six
+# REQUIRED_ARTIFACTS families: predictions, predictions_sim, recommendations_sim,
+# props_boxscores_sim, props_boxscores_sim_hist, props_boxscores_sim_samples.
+#
+# WHAT THEY WERE FOR, AND WHY THAT WAS NEVER WORTH IT. Their only effect was to
+# empty `_missing_required_artifacts` below -- and that is a WARNING, never a
+# gate (see its call site: it appends to `warnings` and continues). So the trade
+# was a correct warning for silently wrong data, and the check it satisfied was
+# PRESENCE, which a copy satisfies without being true.
+#
+# A BACKFILL HERE CAN ONLY EVER FABRICATE. It ran only when the destination did
+# not exist, i.e. only when generation had produced nothing real for that date --
+# so there was never a case where it supplied something correct. It also crossed
+# FAMILIES, not just dates: `source_prefixes=("predictions_sim", "predictions")`
+# let a `predictions_*.csv` be served as a `predictions_sim_*.csv`.
+#
+# MEASURED 2026-09-28. The Layer 2 compact rail carried 7 NHL chips on a date the
+# NHL's own API says has ZERO games. Refresh-worker's own guard named the file:
+#
+#   [nhl_cards] ROW_DATE_MISMATCH path=predictions_sim_2026-09-28.csv #       requested=2026-09-28 dropped=7 kept=0 row_dates=['2026-09-19']
+#   [nhl_cards] ROW_DATE_MISMATCH path=predictions_sim_2026-09-27.csv #       requested=2026-09-27 dropped=7 kept=0 row_dates=['2026-09-19']
+#
+# The 2026-09-19 preseason slate -- the first seven preseason games of the season
+# -- copied under two later dates and served as those dates' games, off an
+# artifact 46 SECONDS old with `ok=True` every ~3 minutes.
+#
+# THE NEAR MISS THAT SETTLED IT: `predictions_sim_2026-09-29.csv` was absent the
+# evening before the season opener while `predictions_2026-09-29.csv` held the
+# five real games. The next run would have copied the 09-19 rows onto the
+# opener's sim filename -- and MTL @ TOR is on BOTH slates, so a real opening
+# night game would have been enriched from preseason sim numbers.
+#
+# The repo already refuses placeholders of this kind one screen down:
+# `_lineup_quality_issues` exits non-zero with `error=placeholder_lineup_artifacts`
+# rather than accept a stand-in lineup. This is the same class, handled the
+# opposite way, and `CLAUDE.md` is explicit about which is right: "If data is
+# missing at request time, the correct behavior is a degraded/empty UI state, not
+# an on-request backfill."
+#
+# If a downstream consumer ever genuinely needs a stand-in, it must be LABELLED
+# as one and carry its own date -- never an unmarked byte copy of another date.
 
 
 def _required_artifacts_by_date(*, artifact_root: Path, date_values: list[str]) -> dict[str, list[str]]:
@@ -722,13 +700,6 @@ def main() -> int:
         print(json.dumps({"ok": False, "date": args.date, "error": str(exc)}))
         return 1
 
-    backfilled = _backfill_required_compatibility_artifacts(artifact_root=artifact_root, date_str=args.date)
-    if any(backfilled.values()):
-        warnings.append(
-            "backfilled compatibility artifacts: "
-            + ", ".join(name for name, created in backfilled.items() if created)
-        )
-
     copied = _materialize_collected_only_artifact_bundle(artifact_root=artifact_root, date_str=args.date) if mode == "fast" else _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=args.date)
     if mode == "full":
         smart_sim_bundle_path = _write_smart_sim_bundle(artifact_root=artifact_root, date_str=args.date, copied=copied)
@@ -736,7 +707,11 @@ def main() -> int:
     missing_required = _missing_required_artifacts(artifact_root=artifact_root, date_str=args.date)
     if missing_required:
         warnings.append(
-            "missing required NHL artifacts: " + ", ".join(missing_required) + "; continuing with a warning"
+            "missing required NHL artifacts: "
+            + ", ".join(missing_required)
+            + "; continuing with a warning and NO placeholder written (a copy of another "
+            "date's rows would satisfy this presence check without being true -- see the "
+            "deleted backfill helpers above)"
         )
     lineup_quality_issues = _lineup_quality_issues(artifact_root=artifact_root, date_str=args.date)
     if lineup_quality_issues:
