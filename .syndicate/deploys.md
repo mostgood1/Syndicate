@@ -44066,3 +44066,39 @@ Fleet now: web `cfba2895`, live-odds-worker `9c77608d`, refresh-worker `9c77608d
 - **(b) PASS, under the 09-29 key.** Full rows were written: `full_games 1`, `written.full` up to 17 per build, in the `date=2026-09-29` build only. The 09-28 build wrote none.
 - **(c) PASS.** `priceable 0` in every NFL build. h2h was withheld as `model_edge_publishing_disabled_for_sport` (1 per build), or, in 2 builds, as `prob_interval_swamps_edge`. That gate fires earlier, and it is still a withhold. Spreads and totals were withheld as `live_resim_published_no_distribution_for_this_market`. The market-to-reason mapping is INFERRED from the counts (1 game, so 1 h2h row per build; board h2h 10 = 10 full-row builds). It was not read row by row, because the 09-29 ledger 404s on web.
 - **(d) PASS for the game, FAIL for the key as written.** `games_with_outcome 1` with h2h/spreads/totals all scored, but under `date=2026-09-29`. The criterion "for 2026-09-28" reads 0. This is a date-keying fact, not a regression: the re-sim keys games by UTC date. **Consequence for the goal reading:** Sunday Night Football (kickoff ~00:20Z) will score under the NEXT UTC date. The 10-04 slate must be read as `date=2026-10-04` plus `date=2026-10-05`.
+
+## 2026-09-29 10:15-10:40 CDT — READING owed by the 2026-09-21 21:43:55Z (`dd43fd49`, `SYNDICATE_SCORE_FEE_NET=1`) and 23:0xZ (`03d3f801`) entries — scheduled task `layer2-fee-net-7-slate-reading-0929`, read-only — **VERDICT: MET**
+
+Nothing was deployed. The scripts were read from `origin/main` `a5b06c7b`, pinned. Working:
+`findings_2026-09-29_layer2_fee_net_out_of_sample.md`.
+
+    fee-net CLV (pp), top-K per date x sport, <=3/game, paired     diff new-old     95% (games bootstrap)   rests on
+    top 25  (PRIMARY, pre-registered)                             +0.65            [+0.45, +0.86]          231 games, 40 slates, 8 dates 09-21..09-28
+    top 25  slate-paired (in-sample presentation)                 +0.70            [+0.44, +0.97]          40 slates   (in sample: +0.71 [+0.40, +1.04])
+    top 10  (secondary)                                           +0.54            [+0.20, +0.89]          177 games   (in sample: +0.79 [+0.27, +1.29])
+    top 25  excluding 09-21                                       +0.65            [+0.45, +0.86]          219 games, 34 slates, 7 dates
+    top 25  GROSS CLV (no fee charged to either arm)              +0.29            [+0.10, +0.47]
+
+**The contrast was measurable:** 211 of 853 top-25 picks differ (25%), 33 of 40 slates changed,
+and the fee-venue share of the top 25 went from 29.5% to 4.9%. MLB is the weak sport, +0.40
+[-0.17, +0.94]. NHL has no fee rows in its top K, so nothing moved there.
+
+**Recorder route (outcomes, 7 dates, 24 slates):** top 25 -25.7 ROI pts [-81.7, +6.6], driven by one
+Kalshi +9900 soccer totals row. Ex-soccer: -0.6 [-11.7, +9.7]. Every interval spans zero, so this
+route is uninformative, as the in-sample study predicted for one week of outcomes.
+
+**Paper ROI by venue, 09-22..09-28:** sportsbook -1.96% ($3,983 staked, 1,501 settled); exchange
+-0.53% ($3,887, 1,440). Order level: -2.51% [-8.7, +3.7] and -1.20% [-7.9, +5.8]. **The stated EV
+> 5.27% bucket is EMPTY:** 0 of 3,600 paper orders, while the 2-3 / 3-4 / 4-5.27 buckets hold
+1,122 / 708 / 926 settled orders. The highest stated EV is 5.262.
+
+**Kalshi half of the venue ceiling: DISCHARGED.** 26 live Kalshi orders since 2026-09-26 15:04 CDT.
+All have `ev_pct` <= 5.263 (max 5.250), and all are positive after the fee actually charged (min
++0.91%). Zero violations.
+
+**`score_v2`:** a running tally only (`s2` - `sc` top 25 +12.6 [+3.8, +22.0]; NCAAF top 10 -15.8
+[-83.5, +39.5]). It is decided by `#679` step 5 around 10-06, not here.
+
+**Caveat:** the in-sample section 6 paired script was never committed. This run rebuilds it from the
+lane's scratch plus the production `venue_fees`. The metric is `100 x (implied(close) -
+implied(open) - fee per contract)`.
