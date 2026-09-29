@@ -43580,3 +43580,82 @@ discriminating reading is **09-29: five NHL chips whose matchups equal the NHL A
 (FLA@CAR, MTL@TOR, NYR@BOS, VAN@EDM, CHI@VGK), each with a real `start_time_utc` and a
 `status_token`.** Covered by task `nhl-opening-night-predictions-check` (06:00 CT). Web is
 still on `01092639` and its own behaviour for 09-28 was already correct, so it is not urgent.
+
+## 2026-09-28 7:08 PM CT (2026-09-29T00:08Z) — live-odds-worker `7d65beb4` (lane `nhl-sim-artifact-backfill-fabricates`) — the writer that stamped another date's rows under today's filename is deleted. **Behavioural reading owed: tonight's NHL run (~12:15 AM CT), read by the 06:00 CT check.**
+
+    deploy dep-datg1ktg1s2s73987sg0   live-odds-worker 03837ae7 -> 7d65beb4
+    fired 00:05:39.937979Z (7:05 PM CT)   live 00:08:39.68298Z (7:08 PM CT)   trigger=api   status=live
+    preflight CLEAR 00:05:2xZ -- only infrastructure (run_live_odds_refresh_worker.py rss 527.504);
+        NO refresh_nhl_oddsapi.py subprocess in flight, so nothing was killed mid-write
+    baseline read 00:05:17Z off live-odds-worker's OWN live 03837ae7:
+        _backfill_latest_dated_csv( calls = 7 ; "NO placeholder written" = 0
+    expectation: nhl_cross_date_backfill_calls 7 -> 0 ; missing_warning_says_no_placeholder false -> true
+
+**The defect (this is the CAUSE behind `fae9aab8`, which only neutralised the symptom).**
+`_backfill_latest_dated_csv` globbed the newest OTHER-dated CSV in `data/processed/` and
+copied it VERBATIM onto today's filename, across six REQUIRED_ARTIFACTS families:
+predictions, predictions_sim, recommendations_sim, props_boxscores_sim,
+props_boxscores_sim_hist, props_boxscores_sim_samples.
+
+Its only effect was to empty `_missing_required_artifacts` -- and that is a WARNING, never
+a gate: its call site appends to `warnings` and falls through, and the only `return 1` after
+it is the lineup-quality gate, which the backfill never fed (`main()` still reaches
+`return 0` at :754, verified before deleting). So the trade was a correct warning for
+silently wrong data, and the check it satisfied was PRESENCE, which a copy satisfies
+without being true.
+
+**IT COULD ONLY EVER FABRICATE.** It ran only when the destination did not exist, i.e. only
+when generation had produced nothing real for that date -- there was never a case where it
+supplied something correct. It also crossed FAMILIES, not just dates:
+`source_prefixes=("predictions_sim", "predictions")` let a `predictions_*.csv` be served as
+a `predictions_sim_*.csv`.
+
+Measured, from refresh-worker's own guard after `fae9aab8` went live:
+
+    ROW_DATE_MISMATCH path=predictions_sim_2026-09-28.csv dropped=7 kept=0 row_dates=['2026-09-19']
+    ROW_DATE_MISMATCH path=predictions_sim_2026-09-27.csv dropped=7 kept=0 row_dates=['2026-09-19']
+
+**THE NEAR MISS that settled the scope.** `predictions_sim_2026-09-29.csv` was ABSENT the
+evening before the season opener (200 with empty artifacts, not a 403) while
+`predictions_2026-09-29.csv` held the five real games. The next run would have copied
+09-19's rows onto the opener's sim filename -- and **MTL @ TOR is on BOTH slates**, so a
+real opening-night game would have been enriched from preseason sim numbers.
+
+**MEASURED AFTER.** Deployed content on `7d65beb4`: `_backfill_latest_dated_csv(` calls
+**7 -> 0**, `_backfill_required_compatibility_artifacts(` **1 -> 0**, the
+`"backfilled compatibility artifacts"` warning string **1 -> 0**, `"NO placeholder written"`
+**0 -> 1**. Worker healthy across the restart: first `ALL_PROCESS_MEMORY` on the new
+instance 00:09:56.282Z (77 s after live), `argv=["scripts/run_live_odds_refresh_worker.py"]`,
+container_memory 866 MB / 2048 MB; `Traceback` since 00:08:39Z: **0**. The 52-second silence
+before that line is a booting worker, not a lost signal -- the same query returns lines in
+the pre-deploy window.
+
+**WHAT THIS MEASUREMENT DOES NOT ESTABLISH.** All of the above is deployed-content and
+service-health identity. NHL generation is nightly (today's two invocations were 05:15Z and
+21:45Z, both `--date 2026-09-28` with no `--days-ahead`), so no run has executed this code
+yet. Calling it verified on the content read alone would be the presence-is-not-reachability
+error.
+
+**Distinction recorded so nobody "fixes" it next.** `_materialize_artifact_bundle`
+(:315-322) has a second cross-FAMILY fallback -- `predictions_sim_{date}.csv` may fill
+`predictions_{date}.csv` -- but it is SAME-DATE on both sides and copies between SOURCE
+ROOTS, not between dates. Row dates stay correct and `_prediction_rows_for_date` correctly
+leaves it alone. It is not a fabrication and was deliberately not touched.
+
+**STILL OUTSTANDING, not fixed by this.** The already-fabricated
+`predictions_sim_2026-09-27.csv` and `predictions_sim_2026-09-28.csv` remain on
+**refresh-worker's disk** (web's copies were genuinely absent). Nothing creates new ones
+now, and `fae9aab8` makes these inert at every read site in `nhl/cards.py` -- but the bytes
+are there, and a future reader that bypasses `_prediction_rows_for_date` would be fooled.
+
+**LEAD, pre-existing and NOT caused by this change.** `_lineup_quality_issues` exits
+non-zero with `error=placeholder_lineup_artifacts` when `lineups_<date>.csv` is missing or
+EMPTY, and `lineups_2026-09-28.csv` has **0 rows** -- so on a date with no NHL games the NHL
+generation step already reports failure. A plausible reason NHL generation has looked
+unhealthy in run manifests. Not this lane's.
+
+**verify:** tonight's NHL run (~05:15Z / 12:15 AM CT) is the FIRST on this code. It must emit
+NO "backfilled compatibility artifacts" warning, and no `predictions_sim_<date>.csv` may
+appear whose rows name a different date -- observable as `[nhl_cards] ROW_DATE_MISMATCH`
+staying SILENT for 2026-09-29 and 2026-09-30 while the board serves the opener's five real
+games. Task `nhl-opening-night-predictions-check` (06:00 CT) is positioned to read it.
