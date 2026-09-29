@@ -1046,6 +1046,20 @@ death, never life — do not invert it.
 - **STILL NOT a market comparison.** Two-sidedness remains 0%, so no de-vig exists — "beats a constant" is the claim, NOT "beats the market", and no `measured_market_skill` entry is warranted.
 - Blocked by: none
 
+### e2e-coverage-contract — OPEN — opened 2026-09-29 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: One uniform per-sport coverage contract makes end-to-end state CHECKABLE: every cell in (sport x {pregame,live} x {games,props}) resolves to either a number with its denominator or a zero carrying a stated reason, an ABSENT key reads as not_reported rather than zero, and a gate exits non-zero on any unattributed zero or schema drift.
+- Files: syndicate/features/shared/coverage_contract.py (NEW), scripts/check_e2e_coverage.py (NEW), tests/test_coverage_contract.py (NEW)
+- Hypothesis: The per-sport diagnostic schema is non-uniform (MLB/NHL/soccer use rows_considered/rows_with_projection; NFL/NCAAF/WNBA use game_rows_*/prop_rows_*), and that inconsistency -- not any single sport's data gap -- is why no reliable cross-sport end-to-end view exists.
+- Falsification test: If a single key set already resolves every active sport's coverage, the contract is unnecessary and the non-uniformity claim is wrong.
+- Verification: The contract resolves all six active sports from one production payload, records WHICH key it used per cell, and the gate names every unattributed zero -- demonstrated against the live shortlist.
+- **GOAL: MET.** The contract resolves all **6** active sports from one production payload, records the key each cell came from, and the gate exits non-zero naming **7** cells that make end-to-end state unverifiable.
+- **HYPOTHESIS CONFIRMED, and it had already cost a real misread.** Three DIFFERENT resolution paths are needed: split (`game_rows_*`/`prop_rows_*` — NFL/NCAAF/WNBA), derived (`considered - no_projection` — MLB), and combined (`rows_*` — NHL/soccer). Reading MLB under the split keys it does not emit gave None, and I was one step from reporting MLB's healthy **773/882 = 87.6%** as **0%**. Falsification did NOT trigger: no single key set resolves every sport.
+- **MLB, THE REFERENCE MODULE, WAS THE LEAST LEGIBLE ROW UNTIL THE DERIVATION.** Before: games fell through to a COMBINED games+props 763/871 and props read `not_reported`. After: **games 241/245 (98.4%), props 587/626 (93.8%)** from MLB's own `game_no_projection` / `player_no_projection`.
+- **THE 7 REMAINING DEFECTS ARE FINDINGS, not gate noise.** 4 x `unattributed_zero` on `live_games` (ncaaf, nfl, nhl, wnba) — `rows_live_gameline_projected: 0` with **no reason**, so a code gap and a Monday slate are indistinguishable. 3 x `not_reported`: `nhl.pregame_props`, `soccer.pregame_props`, `soccer.live_games` — those sports emit no such metric at all.
+- **WHAT THE GATE DELIBERATELY DOES NOT FAIL ON**, so it stays adoptable rather than red-forever: an `attributed_zero` ("no live re-sim wired for nhl", "no soccer match in play") is a KNOWN gap tracked in a lane, not an instrument defect; and `degraded` partial coverage passes, because a per-sport healthy floor has never been measured and inventing one here would encode a guess as a threshold.
+- Verification RAN against the live shortlist (written_at 22:38:38Z). 16 offline tests, every absence case covered: absent key → `not_reported` never zero, blank reason → unattributed, bool never coerced to a count, active sport with no ingest block still appears as a row.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
