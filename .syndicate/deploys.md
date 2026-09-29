@@ -44145,3 +44145,47 @@ Scheduled task `nfl-prop-poisson-artifact-reading`, read-only. Signature was wri
 - **Why wk3 and not wk4 -- NOT determined, two live hypotheses:** (a) `load_nfl_prop_projections` -> `_resolve_season_week` -> `default_week` -> `nfl_target_week` still answers 3 on the service that builds the shortlist (e.g. MNF not final in that disk's schedule); (b) it answers 4, the building service's disk has no wk4 file (the stream read above went through WEB), and the `artifact_scan` fallback walked down to wk3. `prop_coverage` does not carry `index.resolution`, so the served payload cannot tell these apart. Discriminating read: which service writes `layer2_shortlist_artifact`, and whether `nfl_prop_projections_2026_wk4.json` exists on ITS disk.
 
 **verify:** `/api/board/layer2-shortlist?sport=nfl` -> `prop_coverage.artifact_week` = **4** and served `Passing TDs` Watson o0.5 ~= 0.738 (not 0.9911). Until then the fix is live in code and in the wk4 artifact, and IN EFFECT on no served board row. Re-read owed before Thursday 2026-10-01 kickoff.
+
+### 2026-09-29 18:23:26Z — refresh-worker — `3f28cdb7` — week-keyed prop artifacts get a pull route `[lane live-prop-grader-cross-sport / nfl-live-resim-activation, session 4ab694ed]`
+
+**THIS DISCHARGES THE `verify:` OWED BY THE ENTRY ABOVE, AND SETTLES ITS OPEN QUESTION.** That
+entry left two live hypotheses for why the board served wk3 while wk4 existed: (a)
+`nfl_target_week` still answering 3 on the building service, or (b) it answers 4 but the
+BUILDING service's disk had no wk4 file, so `artifact_scan` walked down to wk3. **(b) is
+correct.** Nothing about week resolution changed in this deploy — the only change is that the
+week-keyed artifact can now reach refresh-worker's disk — and `artifact_week` moved 3 -> 4. Had
+(a) been the cause this deploy would have changed nothing.
+
+**Root cause.** `pull_hot_artifacts` is DATE-scoped (`?pattern=*<date>*`), so a file keyed by
+WEEK (`nfl_prop_projections_2026_wk4.json`) could never match it at any date. The separate
+`pull_season_artifacts` path had patterns that were all MLB, with MLB-only callers. Publishing
+to web therefore never reached the worker that builds the board — the artifact was correct, on
+production, and unreachable by the only service that needed it.
+
+**Change.** `*_prop_projections_*.json` added to `_SEASON_ARTIFACT_PATTERNS`; a throttled
+(1800s) `_pull_season_artifacts_if_due()` called from `pull_hot_artifacts` before `return
+written`. All-sports by pattern, not NFL-special-cased.
+
+- **claim** refresh-worker held by `nfl-live-resim-activation`, token `83e58eb9ccee8108`.
+- **preflight** CLEAR at 18:19:4xZ — only infrastructure processes (no in-flight sim to kill).
+- **expect** `nfl.prop_coverage.artifact_week` 3 -> 4. **baseline** read 18:19:17Z.
+- Web and live-odds-worker NOT deployed: the pull runs on the worker that builds the board.
+
+**verify:** `/api/board/layer2-shortlist` -> `per_sport_ingest.nfl.enrichment.projections.prop_coverage`,
+read at 18:27:44Z from a shortlist whose own `written_at` is **18:27:26Z — AFTER the deploy's
+`finishedAt` 18:23:26Z**, which is the reading that matters. The three reads between 18:23:40Z
+and 18:26:43Z all still showed `written_at=18:18:01Z` and wk3: a verification taken in that
+four-minute window would have recorded this correct fix as a failure.
+
+    field                  baseline 18:19:17Z    measured 18:27:26Z
+    artifact_week                       3                 4     <- the expectation
+    artifact_rows                     276               495
+    rows_with_projection              179               494
+    unmatched_key_rows                527               212
+    pct_projected                    25.4%             70.0%
+    rows_considered                   706               706     (unchanged -- same denominator)
+
+`rows_considered` is identical on both sides, so `pct_projected` 25.4 -> 70.0 is a real coverage
+gain over a fixed population and not a denominator artefact. 212 keys still unmatched — not
+claimed as fixed here; `WSH`/`WAS` and `LA`/`LAR` abbreviation mismatches are the known open
+lead and are NOT measured by this entry.
