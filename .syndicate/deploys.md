@@ -43900,3 +43900,68 @@ change alters no reading on that service today.
 **LEAD (operator guidance defect, not this lane's):** `deploy_preflight.py`'s HOLD text should
 quote the MEASURED idle window, or better, report the current one -- "~4 min" against a measured
 66 s mean / 71 s max is the kind of number that sends an operator to an escape hatch.
+
+
+## 2026-09-28 9:20 PM CT (2026-09-29T02:20Z) — live-odds-worker `9c77608d` (lane `nfl-live-resim-activation`) — the NFL live-state WRITER now exists. **GOAL MET on this leg, verified behaviourally.**
+
+    deploy dep-dathubqd0e5s73c682ug   live-odds-worker 7d65beb4 -> 9c77608d
+    fired 02:15:11.960974Z (9:15 PM CT)   live 02:20:51.959448Z (9:20 PM CT)   trigger=api   status=live
+    preflight HOLD then CLEAR: first attempt refused on `1 job(s) in flight` (a
+        `fetch_espn_live_status_for_date.py` child, 12 s timeout -- TRANSIENT, unlike
+        refresh-worker's structural window); CLEAR on the retry, infrastructure only
+        (run_live_odds_refresh_worker.py rss 504.078)
+    baseline read 02:13:15Z off live-odds-worker's OWN live 7d65beb4:
+        _persist_nfl_live_state occurrences = 0   (target 2)
+        fetched_at occurrences              = 0   (target 3)
+        NFL_LIVE_STATE_CAPTURE lines in 2h  = 0   -- with a SAME-INSTANT CONTROL:
+            TICK_COMPLETE returned 3 lines, so the zero is a real absence and not a
+            dead reader. That control is here because on 2026-09-28 a poller log probe
+            returned 0 for BOTH the target and a known-working sibling.
+    expectation: all three -> present / nonzero
+
+**What this fixes.** `LIVE_GAME_STATE_JOIN sport=nfl supported=False reason="no live status
+source wired for nfl"` with PHI @ CHI in Q2 — so every NFL board row stayed `pregame` and no
+live projection or actual-so-far could attach. **The source was never missing:**
+`poll_nfl_live_state` parsed that game correctly on demand. What was missing was a WRITER.
+Its only caller was settlement's lazy capture, which fetches ONLY when the record is absent
+or has no games (`if not isinstance(record, Mapping) or not record.get("games")`), NEVER when
+it is merely stale — so a capture written before kickoff sat unrefreshed for the whole game,
+while `board_enrichment._read_nfl_capture` must not fetch (board cycle, OOM history `#241`).
+A reader that cannot fetch plus a writer that cannot refresh is no source at all.
+
+**MEASURED AFTER — 97 seconds post-live, and this is a BEHAVIOURAL reading, not content
+identity:**
+
+    [live_lens_loop] NFL_LIVE_STATE_CAPTURE status=ok date=2026-09-28 games=1 finals=0
+        reason=None persist_error=None          (02:22:28.774742491Z)
+
+`status=ok` with `persist_error=None` is the proof the writer works: the capture is being
+fetched AND persisted to the shared keyvalue store on every NFL tick. `games=1` is PHI @ CHI
+(still live, hence `finals=0`). Baseline for this line was **0 over two hours**.
+
+**`fetched_at` IS THE REASON THIS LEG MATTERS AT ALL.** `poll_nfl_live_state` never stamped
+it; `poll_ncaaf_live_state` always has. The football arm skips any capture whose age it cannot
+establish, so an unstamped record fails the staleness test IDENTICALLY to an ancient one —
+admitting `nfl` to `_LIVE_GAME_STATE_SPORTS` without this stamp would have changed nothing
+while looking fully wired. Third inert-fix shape caught this session.
+
+**COST, as stated in the code rather than waved at** (`worker_periodic_work_never_free`): one
+unbilled ESPN scoreboard GET per NFL tick; on a date with no NFL games it returns `count=0`
+and writes a few bytes. Ungated on liveness deliberately — every cheap gate available here is
+itself a fetch or a subprocess. Soft-fails always; a capture must never take down the tick
+carrying it.
+
+**WHICH SERVICE, READ NOT ASSUMED.** live-odds-worker emitted 3 `TICK_COMPLETE` lines in 25
+minutes and refresh-worker 0, so live-odds-worker owns the live-lens loop and is the writer;
+refresh-worker runs the board cycle and is the reader. Loop ownership here is an env flag that
+moves with no diff, so it was measured.
+
+**verify:** MET for the writer — `NFL_LIVE_STATE_CAPTURE status=ok ... persist_error=None`
+above. NOT verified by this leg: that the board CONSUMES it. That is the refresh-worker leg
+(`dep-dathvvmk1f9s738bhnq0`, fired 02:18:38Z), whose reading is
+`LIVE_GAME_STATE_JOIN sport=nfl` flipping `supported=False` -> `True`. And a genuine LIVE
+CORRECTION (`rows_corrected` > 0) needs a game in play when the board builds; PHI @ CHI was
+still live at Q3 when this landed, so tonight may yet provide it — but refresh-worker takes
+~21 min to its first board publish, so if the game is final by then `supported=True` with
+`rows_corrected=0` and a named reason is the CORRECT reading and NOT a failure. The
+unambiguous live reading is Thursday 2026-10-02.
