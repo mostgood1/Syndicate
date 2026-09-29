@@ -224,6 +224,53 @@ def test_a_sample_is_emitted_per_plate_appearance_and_carries_outs_recorded():
     assert [s["outs_recorded"] for s in state["samples"]] == [0.0, 1.0, 1.0, 2.0]
 
 
+def test_corpus_definition_is_pinned_and_self_describing():
+    """The corpus is NOT on production (feed_live is not a hot artifact), so the
+    pinned definition plus a rebuild command is what makes the measurement
+    reproducible. If any of this drifts, a later run reports different numbers
+    under the same claim."""
+    assert mlb.CORPUS_SEASON == 2026
+    assert mlb.CORPUS_START == "2026-05-28"
+    assert mlb.CORPUS_END == "2026-07-14"
+    assert "backfill_statsapi_feed_live.py" in mlb.CORPUS_REBUILD_COMMAND
+    assert mlb.CORPUS_START in mlb.CORPUS_REBUILD_COMMAND
+    assert mlb.CORPUS_END in mlb.CORPUS_REBUILD_COMMAND
+
+
+def test_corpus_as_measured_keeps_the_two_denominators_apart():
+    """The replay half rests on 618 games and the projection half on 313 -- the
+    roster_objs family is narrower. Conflating them would overstate the MC
+    residual's sample by roughly 2x."""
+    m = mlb.CORPUS_AS_MEASURED
+    assert m["games"] == 618
+    assert m["games_with_roster_obj"] == 313
+    assert m["games_with_roster_obj"] < m["games"]
+    assert m["roster_obj_dates"] < m["dates"]
+
+
+def test_corpus_status_reports_a_missing_corpus_instead_of_raising(tmp_path):
+    """A thin or absent corpus must be VISIBLE, not fatal: a run on partial data
+    should report the denominator it really had."""
+    status = mlb.corpus_status(tmp_path / "nope")
+    assert status["exists"] is False
+    assert status["games"] == 0
+    assert status["matches_as_measured"] is False
+    assert "backfill_statsapi_feed_live.py" in status["rebuild_command"]
+
+
+def test_corpus_status_counts_what_is_actually_on_disk(tmp_path):
+    for date in ("2026-05-28", "2026-05-29"):
+        d = tmp_path / date
+        d.mkdir(parents=True)
+        (d / "1.json.gz").write_bytes(b"")
+    status = mlb.corpus_status(tmp_path)
+    assert status["games"] == 2
+    assert status["dates"] == 2
+    assert status["window"] == ("2026-05-28", "2026-05-29")
+    # Two files is not the pinned corpus, and must not claim to be.
+    assert status["matches_as_measured"] is False
+
+
 def test_samples_snapshot_counts_as_of_that_moment_not_the_final_line():
     state = mlb.replay(_feed())
     first = state["samples"][0]

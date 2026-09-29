@@ -283,6 +283,80 @@ def reconcile(state: dict[str, Any]) -> dict[str, Any]:
     return report
 
 
+# ---------------------------------------------------------------------------
+# THE CORPUS, PINNED `[2026-09-29, user: "pin the corpus definition"]`
+# ---------------------------------------------------------------------------
+#
+# Publishing these captures to production is BLOCKED and deliberately not
+# pursued: feed_live matches none of the 200 `HOT_ARTIFACT_PATTERNS`, so
+# `/api/ops/artifacts/publish` returns 403 -- and `is_hot()` is False for the 146
+# files ALREADY on production, which are there because they are git-tracked and
+# ship in the deploy checkout, not because a publisher put them there. Widening
+# the allowlist would also widen what every worker PULLS (78 MB, recurring, on
+# services whose scarce resource is memory) to serve a one-off backtest.
+#
+# Pinning the DEFINITION is what reproducibility actually needs, and it was
+# verified rather than asserted: rebuilding 2026-05-28 from the public StatsAPI
+# gave 6/6 MEASUREMENT-identical games (same reconcile counts per stat) and 0/6
+# byte-identical ones. Byte-identity is the WRONG test here -- gzip stores a
+# timestamp, so two honest captures of the same immutable game differ in bytes.
+
+CORPUS_SEASON = 2026
+CORPUS_START = "2026-05-28"
+CORPUS_END = "2026-07-14"
+
+#: Rebuilds the replay corpus from `statsapi.mlb.com/api/v1.1/game/<pk>/feed/live`
+#: -- public, unauthenticated, and immutable once a game is final.
+CORPUS_REBUILD_COMMAND = (
+    "py -3 vendor/mlb_bettingv2/tools/datasets/backfill_statsapi_feed_live.py "
+    f"--start-date {CORPUS_START} --end-date {CORPUS_END} --season {CORPUS_SEASON}"
+)
+
+#: What the corpus held when the reconcile result below was measured. A later
+#: rebuild that returns different counts has not reproduced this measurement,
+#: and should say so rather than quietly report new numbers under the old claim.
+CORPUS_AS_MEASURED = {
+    "games": 618,
+    "dates": 47,
+    "batters": 12970,
+    "pitchers": 5124,
+    "games_clean_all_stats": 616,
+    # The projection half needs a TeamRoster as well, and roster_objs is a
+    # NARROWER family: 26 dates, 313 games. Stated here because the two halves
+    # of this lane rest on DIFFERENT denominators and conflating them would
+    # overstate the MC residual's sample by ~2x.
+    "games_with_roster_obj": 313,
+    "roster_obj_dates": 26,
+    "roster_obj_window": ("2026-06-15", "2026-07-12"),
+}
+
+
+def corpus_status(feed_live_root: str | Path) -> dict[str, Any]:
+    """What is actually on disk, against `CORPUS_AS_MEASURED`.
+
+    Returns counts and a `matches_as_measured` flag rather than raising: a thin
+    corpus must be VISIBLE to the caller, not fatal, so a run on partial data
+    reports the denominator it really had.
+    """
+    root = Path(feed_live_root)
+    files = sorted(root.glob("*/*.json.gz")) if root.exists() else []
+    dates = sorted({f.parent.name for f in files})
+    return {
+        "root": str(root),
+        "exists": root.exists(),
+        "games": len(files),
+        "dates": len(dates),
+        "window": (dates[0], dates[-1]) if dates else None,
+        "expected_games": CORPUS_AS_MEASURED["games"],
+        "expected_dates": CORPUS_AS_MEASURED["dates"],
+        "matches_as_measured": (
+            len(files) == CORPUS_AS_MEASURED["games"]
+            and len(dates) == CORPUS_AS_MEASURED["dates"]
+        ),
+        "rebuild_command": CORPUS_REBUILD_COMMAND,
+    }
+
+
 def stat_reconciles(report: dict[str, Any], stat: str) -> bool:
     """Did EVERY relevant player reconcile for this stat?
 
