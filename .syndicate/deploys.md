@@ -43836,3 +43836,67 @@ by predictions -- which is why they read 1 of 1 while their predictions rows wer
 `ROW_DATE_MISMATCH` silent, opener unchanged at 5 games. Still owed from the earlier receipts
 and unaffected by this one: tonight's NHL run (~12:15 AM CT) is the first on the
 backfill-deleted code, read by task `nhl-opening-night-predictions-check` at 06:00 CT.
+
+## 2026-09-28 7:55 PM CT (2026-09-29T00:55Z) — refresh-worker `cfba2895` NOT DEPLOYED (lane `nhl-board-row-date-mismatch`) — **blocked by HOLD, deferred by choice. Claim released.** And the HOLD message's own window figure is WRONG: measured 66 s, not "~4 min".
+
+    intended: refresh-worker fae9aab8 -> cfba2895 (the exact SHA web runs), on user instruction
+              "deploy refresh-worker too". NOT DEPLOYED. No deploy was fired.
+    claim     acquired 00:47:21Z, RELEASED 00:55Z unused -- holding a claim while not deploying
+              strands the service for every other session, and the natural window is hours away.
+    preflight HOLD twice: board build in flight at 00:47:44Z, and again at 00:49:06Z -- the second
+              started ONE SECOND after the read.
+
+**WHY IT WAS NOT FORCED.** `--allow-mid-build` is documented "For a revert or an already-broken
+board; recorded on the receipt." This is neither. It is a UNIFORMITY deploy whose measured
+behavioural benefit on THIS service tonight is **ZERO** -- see the baseline below -- so spending
+a discarded board build plus ~21 min of frozen board during Sunday Night Football buys nothing
+readable. `--drain` (the sanctioned alternative) REFUSED correctly: it needs
+`SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` + `SYNDICATE_REFRESH_STATE_URL`, and neither key is in
+this shell's `.env` -- it said so rather than writing a flag to a local file the worker never
+reads. Good tool.
+
+**THE HOLD MESSAGE UNDERSTATES THE PROBLEM BY 3x. MEASURED, 13 consecutive builds 00:11-00:48Z:**
+
+    builds finish every          180.6 s (mean)
+    each build takes             101.6-134.2 s wall
+    IDLE BETWEEN BUILDS           65.9 s mean, 70.8 s MAX   <-- the actual deploy window
+    HOLD message claims          "the ~4 min after a BOARD_BUILD_TIMING line"
+
+**66 seconds, not 4 minutes.** And the guard forces preflight and deploy to be SEPARATE tool
+calls -- a chained `preflight && render_deploy` is refused whole, because `deploy-guard.py`
+evaluates the STORED verdict at PreToolUse, before the chained preflight can refresh it (hit at
+00:49Z; nothing ran). Two sequential calls at ~30-50 s each do not reliably fit in 66 s. So under
+a live-game cadence the documented window does not exist, and an operator following that sentence
+will either fail repeatedly or reach for `--allow-mid-build` believing they were unlucky.
+
+**A NOTE ON GAMING IT, recorded so nobody does it by accident.** The guard reads the STORED
+verdict, so a CLEAR captured at the start of an idle window would still authorise a deploy fired
+30 s later once a new build had begun. That would satisfy the check and defeat its purpose. Not
+done.
+
+**BASELINE READ ANYWAY, and it CORRECTS AN EARLIER CLAIM OF MINE.** I wrote in the `cfba2895`
+receipt that refresh-worker "STILL CARRIES THE TRUNCATION ... any past-date board built on that
+service keeps the flaw", calling it "bounded, not benign". Measured over 00:00-00:55Z, its guard
+emitted ONLY:
+
+    27x  predictions_sim_2026-09-28.csv  dropped=7 kept=0  row_dates=['2026-09-19']
+    13x  predictions_sim_2026-09-27.csv  dropped=7 kept=0  row_dates=['2026-09-19']
+
+**Zero +1-day timestamp cases.** refresh-worker never reads the historical timestamped files --
+chips are built for TODAY and today uses bare dates. The exposure is **LATENT, NOT ACTIVE**:
+a past-date board request would trigger it, nothing is triggering it. "Bounded, not benign"
+overstated it.
+
+**FLEET, and it is deliberately uneven:** web `cfba2895`, live-odds-worker `7d65beb4`,
+refresh-worker `fae9aab8`. live-odds-worker lacks the timezone fix and refresh-worker lacks both
+it and the backfill deletion -- all inert on those services by the measurements above and by
+`refresh_nhl_oddsapi.py` not being run by refresh-worker at all.
+
+**verify / next:** the board-build cadence is driven by LIVE GAMES, so the idle window should
+widen once tonight's NFL game finishes (~10:30-11:00 PM CT). Deploy `cfba2895` to refresh-worker
+then, on a fresh baseline and a CLEAR preflight, with no escape hatch. Nothing is urgent: the
+change alters no reading on that service today.
+
+**LEAD (operator guidance defect, not this lane's):** `deploy_preflight.py`'s HOLD text should
+quote the MEASURED idle window, or better, report the current one -- "~4 min" against a measured
+66 s mean / 71 s max is the kind of number that sends an operator to an escape hatch.
