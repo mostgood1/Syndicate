@@ -76,6 +76,14 @@ _MLB_PROPS_SOURCE = (
     "(re-simulated after the games, so parity is an upper bound) vs de-vigged book "
     "prices vs StatsAPI box scores, bootstrap over games"
 )
+_NFL_PROPS_PRICE_SOURCE = (
+    "scripts/backtest_nfl_props.py rate model vs the DE-VIGGED book price, scored on "
+    "2024 (the only complete recent season -- 2025 wk10-21 props were never captured, "
+    "on production either), with 2025 wk1-9 + 2026 as a second holdout. Both sides are "
+    "priced on ~100% of rows in these eight markets, so this is a real de-vig and not "
+    "an assumed hold. 2026-09-29."
+)
+
 _FOOTBALL_SOURCE = (
     "lane accuracy-assessment-0914: production NCAAF/NFL projection CSVs (inputs "
     "verified pregame) vs OddsAPI closes vs ESPN finals, bootstrap over games"
@@ -88,6 +96,114 @@ _SOCCER_SOURCE = (
 
 # (sport, market, segment, phase) -> entry.
 MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
+
+    # ---- NFL PLAYER PROPS vs the PRICE `[2026-09-29]` ----------------------------
+    #
+    # THE COMPARISON THE BACKTEST WAS NAMED FOR AND NEVER MADE. Its
+    # `section_3_real_market_hit_rate` never reads `over_price`/`under_price`; it
+    # scores the model's side CALL against the line, so its headline
+    # `anytime_td hit_rate 0.774` is the MAJORITY-CLASS NULL (base rate 0.2209 ->
+    # always-say-no = 0.7791). Nothing in it established that any of these models
+    # beats a price, so every one of these markets read "never measured" while the
+    # 2026-09-11 "Withhold, all sports" decision withheld their one-sided rows.
+    #
+    # ALL EIGHT LOSE, on every arm, with every CI clear of zero. De-biasing the
+    # model (bias fitted on 2023, applied to 2024) narrows the gap -- passing_yards
+    # +0.0395 -> +0.0302 -- and closes none of them. The 2025/2026 holdout is WORSE
+    # across the board, so this is not a one-season artefact.
+    #
+    # ANYTIME TD IS ABSENT AND THAT IS STRUCTURAL, not an omission: 0 of 8,946 2024
+    # rows carry an under price, so the market's fair probability cannot be recovered
+    # at any sample size and a Brier comparison is impossible for it. It needs a
+    # realised-ROI arm instead.
+    ("nfl", "interceptions", "full", PHASE_PREGAME): {
+        "sample_games": 374,
+        "seasons": "scored 2024, 374 quoted rows; holdout under-powered",
+        "brier_model": 0.24966,
+        "brier_market": 0.24204,
+        "diff": 0.00763,
+        "ci95": (0.00232, 0.01293),
+        "verdict": "loses to the de-vigged market, Brier +0.0076 [+0.0023, +0.0129] over 374 quoted rows",
+        "verdict_class": VERDICT_LOSES,
+        "source": _NFL_PROPS_PRICE_SOURCE,
+    },
+    ("nfl", "passing_attempts", "full", PHASE_PREGAME): {
+        "sample_games": 640,
+        "seasons": "scored 2024, 640 quoted rows; holdout 2025wk1-9+2026 n=343 diff +0.0408",
+        "brier_model": 0.28733,
+        "brier_market": 0.25006,
+        "diff": 0.03727,
+        "ci95": (0.02344, 0.0511),
+        "verdict": "loses to the de-vigged market, Brier +0.0373 [+0.0234, +0.0511] over 640 quoted rows",
+        "verdict_class": VERDICT_LOSES,
+        "source": _NFL_PROPS_PRICE_SOURCE,
+    },
+    ("nfl", "passing_tds", "full", PHASE_PREGAME): {
+        "sample_games": 835,
+        "seasons": "scored 2024, 835 quoted rows; holdout under-powered",
+        "brier_model": 0.21705,
+        "brier_market": 0.21004,
+        "diff": 0.00701,
+        "ci95": (0.00188, 0.01214),
+        "verdict": "loses to the de-vigged market, Brier +0.0070 [+0.0019, +0.0121] over 835 quoted rows",
+        "verdict_class": VERDICT_LOSES,
+        "source": _NFL_PROPS_PRICE_SOURCE,
+    },
+    ("nfl", "passing_yards", "full", PHASE_PREGAME): {
+        "sample_games": 4346,
+        "seasons": "scored 2024, 4346 quoted rows; holdout 2025wk1-9+2026 n=834 diff +0.0568",
+        "brier_model": 0.27704,
+        "brier_market": 0.23753,
+        "diff": 0.03951,
+        "ci95": (0.03416, 0.04487),
+        "verdict": "loses to the de-vigged market, Brier +0.0395 [+0.0342, +0.0449] over 4346 quoted rows",
+        "verdict_class": VERDICT_LOSES,
+        "source": _NFL_PROPS_PRICE_SOURCE,
+    },
+    ("nfl", "receiving_yards", "full", PHASE_PREGAME): {
+        "sample_games": 13887,
+        "seasons": "scored 2024, 13887 quoted rows; holdout 2025wk1-9+2026 n=3116 diff +0.0396",
+        "brier_model": 0.25651,
+        "brier_market": 0.23395,
+        "diff": 0.02257,
+        "ci95": (0.02028, 0.02485),
+        "verdict": "loses to the de-vigged market, Brier +0.0226 [+0.0203, +0.0249] over 13887 quoted rows",
+        "verdict_class": VERDICT_LOSES,
+        "source": _NFL_PROPS_PRICE_SOURCE,
+    },
+    ("nfl", "receptions", "full", PHASE_PREGAME): {
+        "sample_games": 4401,
+        "seasons": "scored 2024, 4401 quoted rows; holdout 2025wk1-9+2026 n=1179 diff +0.0234",
+        "brier_model": 0.24578,
+        "brier_market": 0.22429,
+        "diff": 0.02149,
+        "ci95": (0.01745, 0.02553),
+        "verdict": "loses to the de-vigged market, Brier +0.0215 [+0.0175, +0.0255] over 4401 quoted rows",
+        "verdict_class": VERDICT_LOSES,
+        "source": _NFL_PROPS_PRICE_SOURCE,
+    },
+    ("nfl", "rushing_attempts", "full", PHASE_PREGAME): {
+        "sample_games": 1066,
+        "seasons": "scored 2024, 1066 quoted rows; holdout 2025wk1-9+2026 n=562 diff +0.0255",
+        "brier_model": 0.26709,
+        "brier_market": 0.24604,
+        "diff": 0.02104,
+        "ci95": (0.01138, 0.03071),
+        "verdict": "loses to the de-vigged market, Brier +0.0210 [+0.0114, +0.0307] over 1066 quoted rows",
+        "verdict_class": VERDICT_LOSES,
+        "source": _NFL_PROPS_PRICE_SOURCE,
+    },
+    ("nfl", "rushing_yards", "full", PHASE_PREGAME): {
+        "sample_games": 5879,
+        "seasons": "scored 2024, 5879 quoted rows; holdout 2025wk1-9+2026 n=1463 diff +0.0299",
+        "brier_model": 0.25749,
+        "brier_market": 0.23563,
+        "diff": 0.02186,
+        "ci95": (0.01809, 0.02564),
+        "verdict": "loses to the de-vigged market, Brier +0.0219 [+0.0181, +0.0256] over 5879 quoted rows",
+        "verdict_class": VERDICT_LOSES,
+        "source": _NFL_PROPS_PRICE_SOURCE,
+    },
     # ---- MLB, LIVE ------------------------------------------------------------
     # Full-game h2h is the market MLB live publication was switched off for
     # (lane `mlb-stop-publishing-edges`). This window re-confirms the loss.
