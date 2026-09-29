@@ -357,17 +357,36 @@ def attach_nhl_game_projections(
     non_full_segment = 0
     priced = 0
     refusals: dict[str, int] = {}
+    # PROP AND OTHER-MARKET ROWS ARE COUNTED, NOT JUST SKIPPED `[2026-09-29,
+    # lane nhl-prop-counter-honesty]`. They used to be `continue`d BEFORE
+    # `considered += 1`, so they were invisible to the denominator rather than
+    # refused-and-counted -- the payload could not even say "0 of 459". That
+    # made a HEALTHY game join (10/10) read as 10 of 834 candidates, i.e. as a
+    # near-total collapse, and sent a diagnosis at the join and the artifact read
+    # when neither was at fault. The two skips are counted SEPARATELY because a
+    # player prop (no NHL prop model exists) and an unsupported game market (a
+    # segment or an exotic) are different gaps with different owners.
+    prop_rows = 0
+    other_market_rows = 0
 
     for row in grid:
-        if str(row.get("kind") or "") == "prop":
-            continue
-        market = str(row.get("market") or "").strip().lower()
-        if market not in {"h2h", "spreads", "totals"}:
-            continue
+        # DATE SCOPING MOVED AHEAD OF THE MARKET CHECKS so the prop denominator
+        # is scoped the same way the game denominator is. Behaviour-preserving
+        # for `considered`: a row failing the date check was skipped in either
+        # order. Without this, `prop_rows` would span the whole multi-date grid
+        # while `considered` covered one date -- two populations in one payload,
+        # which is the exact defect this lane exists to remove.
         if selected_date:
             row_date = str(row.get("commence_time") or "")[:10]
             if row_date and row_date != str(selected_date)[:10]:
                 continue
+        if str(row.get("kind") or "") == "prop":
+            prop_rows += 1
+            continue
+        market = str(row.get("market") or "").strip().lower()
+        if market not in {"h2h", "spreads", "totals"}:
+            other_market_rows += 1
+            continue
         considered += 1
         if str(row.get("segment") or "full").strip().lower() not in {"", "full"}:
             # Every number here is full-game; a period market is a different bet.
@@ -392,8 +411,34 @@ def attach_nhl_game_projections(
 
     return {
         "supported": True,
+        # `rows_considered` / `rows_with_projection` KEEP THEIR MEANING (game
+        # rows only) so existing readers are unaffected; the split keys below are
+        # additive and are what the cross-sport coverage contract reads.
         "rows_considered": considered,
         "rows_with_projection": attached,
+        # THE SPLIT, matching the convention NFL/NCAAF/WNBA already emit, so
+        # `coverage_contract` resolves NHL at the same grain as every other sport
+        # instead of falling back to a combined count or reading `not_reported`.
+        "game_rows_considered": considered,
+        "game_rows_with_projection": attached,
+        "prop_rows_considered": prop_rows,
+        "prop_rows_with_projection": 0,
+        # A ZERO WITH A STATED REASON, which is the whole point: NHL player props
+        # have no projection source at ANY stage -- hockeysim's artifact is
+        # full-game only and there is no NHL branch in `prop_projections`. That
+        # is a MODEL gap, not a join failure, and it must not read as one.
+        "prop_coverage": {
+            "supported": False,
+            "rows_considered": prop_rows,
+            "rows_with_projection": 0,
+            "reason": (
+                "no NHL player-prop projection source: hockeysim publishes "
+                "full-game outputs only and prop_projections has no NHL branch"
+            ),
+        },
+        # Unsupported GAME markets (segments, exotics) -- a different gap from
+        # props, so it gets its own counter rather than being folded in.
+        "rows_unsupported_game_market": other_market_rows,
         # Attached but UNPRICED is the population this join deliberately
         # creates: a projection shown on the board with no probability behind
         # it. Counting it separately is what keeps that visible.
