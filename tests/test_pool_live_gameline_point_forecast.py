@@ -218,3 +218,15 @@ def test_the_pool_is_ONE_sport_and_absent_sport_reads_as_mlb(tmp_path, capsys):
     assert soc["post-fix"]["games"] == 40
     assert "segments" not in soc["point_forecast"]        # innings segments are MLB-only
     capsys.readouterr()
+
+
+@pytest.mark.parametrize("sport, unit", [("mlb", "in runs;"), ("ncaaf", "in points;"),
+                                         ("soccer", "in goals;"),
+                                         ("cricket", "in the sport's scoring units;")])
+def test_the_model_line_label_names_the_SPORTS_unit_not_always_runs(sport, unit, capsys):
+    rows = [_row("2026-09-10", 4, totals=_pf(4, 127, 2.3, 2.7), spreads=_pf(4, 135, 2.4, 2.7))]
+    pool.print_point_forecast(rows, "fresh_quotes_only", sport)
+    out = capsys.readouterr().out
+    assert out.count("model mean's error MINUS the line's, %s" % unit) == 2
+    if sport != "mlb":
+        assert "in runs" not in out

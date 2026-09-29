@@ -309,6 +309,16 @@ def pool(rows, cut):
 # ---------------------------------------------------------------------------
 PF_FAMILIES = ("totals", "spreads")
 
+# The point-forecast error is in the sport's scoring unit, so model-line is
+# only comparable within a sport. A sport not listed here prints a generic
+# label rather than borrowing MLB's "runs".
+PF_UNITS = {"mlb": "runs", "ncaaf": "points", "nfl": "points", "nba": "points",
+            "wnba": "points", "ncaab": "points", "nhl": "goals", "soccer": "goals"}
+
+
+def pf_unit(sport):
+    return PF_UNITS.get(str(sport or "").lower(), "the sport's scoring units")
+
 
 def pf_cut(row, family, cut):
     """The per-date point-forecast figures for one family, or None."""
@@ -462,9 +472,9 @@ def print_point_forecast(rows, cut, sport="mlb"):
         print("%-12s%6d%7s%11.3f%10.3f%+13.3f%9.3f"
               % ("POOLED", res["games"], "", res["model_mae"], res["line_mae"],
                  res["model_minus_line_mae"], res["hit_rate"]))
-        print("  model-line = model mean's error MINUS the line's, in runs; NEGATIVE = "
+        print("  model-line = model mean's error MINUS the line's, in %s; NEGATIVE = "
               "the model was closer to the actual than the market's line. GAMES are "
-              "the unit (%d)." % res["games"])
+              "the unit (%d)." % (pf_unit(sport), res["games"]))
         print("  hit = share of rows where the actual landed on the model's side of "
               "the line (se ~%.1fpp on games). NOT a market comparison: 'always over' "
               "and 'side with the current score' also beat 0.50 "
