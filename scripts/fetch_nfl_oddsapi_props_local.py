@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -676,6 +677,30 @@ def main(argv: list[str] | None = None) -> int:
         print("ERROR: Missing ODDS_API_KEY; set in environment or .env")
         return 2
     masked = f"***{api_key[-6:]}" if len(api_key) >= 6 else "(set)"
+    def _safe(exc: object) -> str:
+        """An exception's text with the API key removed.
+
+        THE KEY WAS BEING PRINTED IN CLEAR TEXT ON EVERY FAILURE. `requests`
+        puts the FULL REQUEST URL in its error string, and this script's URLs
+        carry `?apiKey=<32 hex>` -- so the masking two lines above was cosmetic:
+        the very next `print(f"...{exc}")` published the credential. Observed
+        2026-09-29 on a 401:
+
+            ERROR fetching OddsAPI player props: HTTP 401 401 Client Error:
+            Unauthorized for url: https://api.the-odds-api.com/v4/.../events?apiKey=<the whole key>
+
+        On a worker that goes straight to Render's log collector. The key that
+        leaked was a deactivated one, which is luck, not design -- the next
+        failure would have leaked the live one.
+
+        Redacts the VALUE rather than matching a URL shape, so it holds however
+        the key is embedded (query string, JSON body, retry text).
+        """
+        text = str(exc)
+        if api_key:
+            text = text.replace(api_key, "<REDACTED>")
+        return re.sub(r"(apiKey=)[^&\s\"']+", r"<REDACTED>", text)
+
     print(f"Using OddsAPI key: {masked}")
 
     out_path = Path(args.out)
@@ -693,20 +718,20 @@ def main(argv: list[str] | None = None) -> int:
         # same zero rows as a quiet market, and writing the file anyway is
         # exactly how this stayed invisible: 13 header-only weekly stubs on
         # production and not one line of evidence that anything was wrong.
-        print(f"ERROR: OddsAPI rejected every requested market: {exc}")
+        print(f"ERROR: OddsAPI rejected every requested market: {_safe(exc)}")
         return 2
     except HTTPError as exc:
         if getattr(getattr(exc, "response", None), "status_code", None) == 422:
             try:
                 events = fetch_player_props_chunked(api_key, region=region)
             except InvalidMarketError as retry_exc:
-                print(f"ERROR: OddsAPI rejected every requested market: {retry_exc}")
+                print(f"ERROR: OddsAPI rejected every requested market: {_safe(retry_exc)}")
                 return 2
             except Exception as retry_exc:
-                print(f"ERROR fetching OddsAPI player props (chunked) after 422: {retry_exc}")
+                print(f"ERROR fetching OddsAPI player props (chunked) after 422: {_safe(retry_exc)}")
                 return 2
         else:
-            print(f"ERROR fetching OddsAPI player props: HTTP {getattr(getattr(exc, 'response', None), 'status_code', None)} {exc}")
+            print(f"ERROR fetching OddsAPI player props: HTTP {getattr(getattr(exc, 'response', None), 'status_code', None)} {_safe(exc)}")
             return 2
     except Exception as exc:
         print(f"ERROR fetching OddsAPI player props: {exc}")
