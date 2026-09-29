@@ -68,6 +68,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 import urllib.request
 from pathlib import Path
 from typing import Any, Mapping
@@ -236,6 +237,17 @@ def poll_nfl_live_state(iso_date: str, *, persist: bool = True) -> dict[str, Any
         "games": games,
         "count": len(games),
         "finals": sum(1 for game in games if game.get("final")),
+        # WITHOUT THIS THE CAPTURE IS UNUSABLE TO THE BOARD, and unusable
+        # SILENTLY. `board_enrichment._read_nfl_capture` returns `fetched_at`
+        # and the football arm skips any capture whose age it cannot establish
+        # (`if fetched_at is None or now - fetched_at > _LENS_STATE_MAX_AGE_SECONDS`)
+        # -- a mid-game record never refreshed must not be allowed to set a
+        # state. An UNSTAMPED record fails that test identically to an ancient
+        # one, so every capture would have been discarded as stale and
+        # `_LIVE_GAME_STATE_SPORTS` admitting nfl would have changed nothing
+        # while looking wired. `poll_ncaaf_live_state` has stamped this from the
+        # start; NFL's omission only became load-bearing when a reader appeared.
+        "fetched_at": time.time(),
     }
     if persist:
         try:

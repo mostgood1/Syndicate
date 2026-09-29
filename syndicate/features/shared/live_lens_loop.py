@@ -123,6 +123,63 @@ def _pull_nfl_projection(season: int, week: int) -> None:
 	print(f"[live_lens_loop] NFL_PROJECTION_PULL path={relative} ok={ok} written={written}", flush=True)
 
 
+def _persist_nfl_live_state(date_str: str) -> None:
+	"""Keep the NFL live-state capture fresh, because NOTHING ELSE DOES.
+
+	THE GAP THIS FILLS, measured 2026-09-28 with PHI @ CHI in Q2:
+	`LIVE_GAME_STATE_JOIN sport=nfl supported=False reason="no live status source
+	wired for nfl"`, so every NFL board row stayed `pregame` and no live
+	projection or actual-so-far could attach to any of them.
+
+	The source was never missing. `poll_nfl_live_state` parsed that game correctly
+	on demand (`period=2`, `status="2:24 - 2nd"`, both scores). What was missing was
+	a WRITER: the only caller was settlement's lazy capture, and it fetches ONLY
+	when the record is absent or has no games --
+
+	    if not isinstance(record, Mapping) or not record.get("games"):
+
+	-- never when the record is merely STALE. So a capture written before kickoff
+	sat unrefreshed for the entire game, and `board_enrichment._read_nfl_capture`
+	must not fetch (it runs in the board cycle on a worker with an OOM history,
+	`#241`). A reader that cannot fetch plus a writer that cannot refresh is no
+	source at all.
+
+	WHY HERE. This loop already ticks NFL every cycle, and the capture goes to the
+	keyvalue store, which is shared across services -- so this tick on
+	live-odds-worker feeds the board cycle on refresh-worker, which is the whole
+	reason that backend exists.
+
+	COST, stated rather than waved at (`worker_periodic_work_never_free` is a
+	standing rule): ONE unbilled ESPN scoreboard GET per NFL tick. On a date with
+	no NFL games it returns `count=0` and writes a few bytes. It is not gated on
+	liveness on purpose -- every cheap liveness gate available here is itself a
+	fetch or a subprocess, so gating would cost more than it saves.
+
+	SOFT-FAILS ALWAYS. A capture is an enrichment; it must never be able to take
+	down the live-lens tick that carries it.
+	"""
+	try:
+		from scripts.poll_nfl_live_state import poll_nfl_live_state
+	except Exception:  # pragma: no cover - deploy-skew guard
+		return
+	try:
+		result = poll_nfl_live_state(date_str)
+	except Exception as exc:
+		print(f"[live_lens_loop] NFL_LIVE_STATE_CAPTURE status=error date={date_str} error={exc}", flush=True)
+		return
+	if not isinstance(result, dict):
+		return
+	# One line per tick, and it names the numbers the board join will read -- a
+	# capture that wrote zero games and one that failed to write must not look
+	# the same from the logs.
+	print(
+		f"[live_lens_loop] NFL_LIVE_STATE_CAPTURE status={result.get('status')} "
+		f"date={result.get('date')} games={result.get('count')} finals={result.get('finals')} "
+		f"reason={result.get('reason')} persist_error={result.get('persist_error')}",
+		flush=True,
+	)
+
+
 def _nfl_build_wrapper(date_str: str) -> dict[str, Any]:
 	# NFL's live-lens snapshot is week-scoped, not date-scoped like every
 	# other sport this loop drives -- date_str (central_today_iso(), passed
@@ -148,6 +205,7 @@ def _nfl_build_wrapper(date_str: str) -> dict[str, Any]:
 	week = preseason_week if preseason_week is not None else _nfl_default_week(season)
 	if preseason_week is None:
 		_pull_nfl_projection(season, week)
+	_persist_nfl_live_state(date_str)
 	return _nfl_build(week, season)
 
 

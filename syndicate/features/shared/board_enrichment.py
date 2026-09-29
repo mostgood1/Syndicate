@@ -74,6 +74,40 @@ def _read_ncaaf_capture(iso_date: str) -> tuple[list, float | None]:
     return games, fetched_at
 
 
+def _read_nfl_capture(iso_date: str) -> tuple[list, float | None]:
+    """`(games, fetched_at)` from the persisted NFL scoreboard capture, READ ONLY.
+
+    The exact sibling of `_read_ncaaf_capture`, and deliberately so: the two
+    pollers parse the same ESPN scoreboard into the same record shape
+    (`home_team`/`away_team`, `home_abbr`/`away_abbr`, `status`, `home_score`/
+    `away_score`, `in_progress`, `final`), verified against a live capture on
+    2026-09-28 (PHI @ CHI, `period=2`, `status="2:24 - 2nd"`, `in_progress=True`).
+
+    NEVER FETCHES, for the same reason ncaaf's does not: this runs inside the
+    board cycle on a worker with an OOM history (`#241`), so a missing capture is
+    a miss, not a network call. The freshness of the record is somebody else's
+    job -- see `live_lens_loop`'s NFL live-state tick, which exists BECAUSE
+    settlement's lazy capture cannot keep one fresh: `bet_status_nfl` fetches
+    only when the record is ABSENT or has no games, never when it is merely
+    stale, so a capture written pregame would sit unrefreshed for the whole game.
+    """
+    try:
+        from scripts.poll_nfl_live_state import live_state_path
+        from syndicate.features.shared.refresh_state_store import read_json_file
+
+        record = read_json_file(live_state_path(iso_date))
+    except Exception:
+        return [], None
+    if not isinstance(record, dict):
+        return [], None
+    games = [g for g in (record.get("games") or []) if isinstance(g, dict)]
+    try:
+        fetched_at = float(record.get("fetched_at"))
+    except (TypeError, ValueError):
+        fetched_at = None
+    return games, fetched_at
+
+
 def _game_block_from_capture(game: dict, *, fetched_at: float | None, now: float) -> dict | None:
     """The same `row["game"]` shape a chip produces, from one captured game.
 
@@ -422,7 +456,18 @@ _LENS_ABSTRACT_TO_STATE = {"live": "live", "final": "final", "preview": "pregame
 # so all its board rows stayed pregame and no live game line could attach even
 # though the live re-sim had indexed the game. NCAAF's source is the poller's
 # persisted ESPN capture, read with the same staleness bound as the others.
-_LIVE_GAME_STATE_SPORTS = frozenset({"mlb", "soccer", "ncaaf"})
+# `nfl` JOINED 2026-09-28, and ONLY together with the tick that keeps its capture
+# fresh -- the warning above is precisely the trap here. Measured that evening:
+# `LIVE_GAME_STATE_JOIN sport=nfl supported=False reason="no live status source
+# wired for nfl"` while PHI @ CHI was in Q2, so every NFL board row stayed
+# pregame and no live projection or actual could attach. The source itself was
+# never the problem: `poll_nfl_live_state` parsed that game correctly on demand.
+# What was missing was a WRITER -- settlement's lazy capture fetches only when the
+# record is absent or empty (`bet_status_nfl`), never when it is stale, so nothing
+# refreshed a capture during play. The arm below degrades to a NAMED reason when
+# the capture is missing or stale, exactly as ncaaf's does, so this cannot become
+# the silent "supported, corrected 0" the warning describes.
+_LIVE_GAME_STATE_SPORTS = frozenset({"mlb", "soccer", "ncaaf", "nfl"})
 
 
 def _lens_generated_age_seconds(snapshot: dict) -> float | None:
@@ -761,7 +806,13 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
                     "snapshot_age_seconds": round(age_seconds, 1),
                     "rows_corrected": 0,
                 }
-        elif sport == "ncaaf":
+        elif sport in ("ncaaf", "nfl"):
+            # ONE ARM FOR BOTH FOOTBALL CODES. They were never different: the two
+            # pollers parse the SAME ESPN scoreboard into the same record shape and
+            # both key their capture by kickoff date, so duplicating this block for
+            # `nfl` would have been fifty lines that can drift apart. The only
+            # sport-specific part is which reader to call, below.
+            #
             # THE POLLER'S ESPN CAPTURE, per ESPN date, for the dates this grid's
             # kickoffs fall on (the same Eastern-date helper settlement uses).
             # Only in-play and finished games are offered: a pregame capture
@@ -784,7 +835,8 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
             ages: list[float] = []
             stale_dates = 0
             for capture_date in sorted(capture_dates):
-                captured, fetched_at = _read_ncaaf_capture(capture_date)
+                _read_capture = _read_ncaaf_capture if sport == "ncaaf" else _read_nfl_capture
+                captured, fetched_at = _read_capture(capture_date)
                 if not captured:
                     continue
                 if fetched_at is None or now_epoch - fetched_at > _LENS_STATE_MAX_AGE_SECONDS:
@@ -812,8 +864,12 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
             if not lens_games:
                 return {
                     "supported": True,
-                    "reason": ("ncaaf capture is staler than the chip it would correct" if stale_dates and not ages
-                               else "ncaaf capture carries no in-play or finished games"),
+                    # NAMES THE SPORT IT DESCRIBES. Hardcoding "ncaaf" here once the
+                    # arm serves both would report an nfl miss as an ncaaf one --
+                    # a reason string that misattributes is worse than none.
+                    "reason": (f"{sport} capture is staler than the chip it would correct"
+                               if stale_dates and not ages
+                               else f"{sport} capture carries no in-play or finished games"),
                     "capture_dates": sorted(capture_dates),
                     "rows_corrected": 0,
                 }
