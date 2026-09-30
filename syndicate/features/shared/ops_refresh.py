@@ -27,6 +27,8 @@ from pathlib import Path
 from typing import Any
 
 from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.shared.process_liveness import pid_is_running
+from syndicate.features.shared.process_liveness import process_cmdline
 from syndicate.features.shared.refresh_state_store import list_refresh_status_manifest_paths
 from syndicate.features.shared.refresh_state_store import known_refresh_lanes
 from syndicate.features.shared.refresh_state_store import record_known_refresh_lane
@@ -82,36 +84,10 @@ def _load_mirror_manifest_summaries_from_current_data_root() -> list[dict[str, A
 
 
 def _pid_is_running(pid: int | None) -> bool:
-    if pid is None or pid <= 0:
-        return False
-    if os.name == "nt":
-        try:
-            os.kill(int(pid), 0)
-        except ProcessLookupError:
-            return False
-        except PermissionError:
-            return True
-        except OSError:
-            return False
-        return True
-    else:
-        stat_path = Path("/proc") / str(pid) / "stat"
-        if stat_path.exists():
-            try:
-                parts = stat_path.read_text(encoding="utf-8", errors="ignore").split()
-                if len(parts) >= 3 and str(parts[2]).strip().upper() == "Z":
-                    return False
-            except OSError:
-                pass
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
-            return False
-        except PermissionError:
-            return True
-        except OSError:
-            return False
-        return True
+    # Delegates to the shared probe: the Windows branch here used to call
+    # `os.kill(pid, 0)`, which is CTRL_C_EVENT on Windows, so a live run read as
+    # dead and the refresh-run lock let a second run launch (`#692`).
+    return pid_is_running(pid, unknown_is_alive=False)
 
 
 def _parse_utc_timestamp(value: Any) -> datetime | None:
@@ -627,14 +603,9 @@ def _refresh_run_max_runtime_seconds() -> int:
 
 
 def _process_cmdline(pid: int) -> list[str] | None:
-    if os.name == "nt":
-        return None
-    try:
-        raw = Path(f"/proc/{pid}/cmdline").read_bytes()
-    except Exception:
-        return None
-    parts = [part.decode("utf-8", errors="ignore") for part in raw.split(b"\x00") if part]
-    return parts or None
+    # /proc on Linux, psutil elsewhere -- it used to be None on Windows, which
+    # made the PID-reuse check below fail open there.
+    return process_cmdline(pid)
 
 
 def _process_matches_expected_command(pid: int, expected_command: Any) -> bool:

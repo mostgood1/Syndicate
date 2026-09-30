@@ -48,6 +48,7 @@ import json
 import os
 import re
 import tempfile
+import time
 import uuid
 from contextlib import contextmanager
 from datetime import date, datetime, timezone
@@ -178,20 +179,45 @@ def _write_file(path: Path, payload: Mapping[str, Any]) -> None:
         raise
 
 
+_WINDOWS_LOCK_TIMEOUT_SECONDS = 60.0
+
+
 @contextmanager
 def _exclusive(path: Path) -> Iterator[None]:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path.with_name(path.name + ".lock"), "a+") as handle:
         try:
             import fcntl
-        except ImportError:  # a Windows dev box: one process, nothing to serialise against
-            yield
+        except ImportError:
+            fcntl = None  # type: ignore[assignment]
+        if fcntl is not None:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
             return
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        # Windows. This used to yield UNLOCKED on the belief that a Windows box
+        # is "one process" -- false once scripts/local_production.py runs web
+        # and both workers on one disk (`#692`), where two writers would each
+        # read-modify-write the store and one would lose the other's change.
+        import msvcrt
+
+        deadline = time.monotonic() + _WINDOWS_LOCK_TIMEOUT_SECONDS
+        while True:
+            handle.seek(0)
+            try:
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                break
+            except OSError:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.05)
         try:
             yield
         finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
 
 
 def _mutate(apply: Callable[[dict[str, Any]], Any]) -> Any:

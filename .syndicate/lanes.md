@@ -209,6 +209,7 @@ death, never life — do not invert it.
   - It stays PERMISSIVE on every unknown, exactly like the account-level gate. The account-level `insufficient_venue_balance` check is unchanged.
 - Files: `syndicate/features/shared/execution_guard.py`, `tests/test_kalshi_shard_balance.py` (NEW), `docs/ai_context/todo.md` (`#573`). RELEASED 2026-09-23 to lane `polymarket-balance-detail` (session 236bd219, user-approved; this lane 11 days idle): `syndicate/features/shared/venue_balances.py` -- the POLYMARKET row builder and `_history_entry` only. The kalshi shard-cash logic in that file is still this lane's subject and needs re-claiming here if this lane resumes.
 - **CROSS-LANE WRITE 2026-09-30 ~17:00Z, lane `local-production-host` (session 157058fe):** prepended NEW item `#692` to `docs/ai_context/todo.md`. Item `#573` (this lane's claim) was not touched.
+- **CROSS-LANE WRITE 2026-09-30 ~18:3xZ, lane `windows-process-liveness` (session 157058fe):** edited owed item 3 of `#692` only in `docs/ai_context/todo.md`. `#573` not touched.
   - Never claimed by this lane: `pipeline/execute_portfolio.py`. The gate lives in `check_order`, which the executor already calls before any ledger row. (Reworded 2026-09-18 by session a1e40980 with the meaning unchanged. The old wording, "NOT `pipeline/execute_portfolio.py`, which `polymarket-e2e-review` holds", had the path before any disclaimer marker, so `lane_claims.py` parsed this prohibition as a CLAIM and the lane guard blocked edits to the file. `polymarket-e2e-review` has been CLOSED since 2026-09-11.)
   - NOT `pipeline/kalshi_odds_refresh.py`, which `kalshi-precap-board-lines` holds: each ticker's shard is read with `kalshi_client.fetch_market`, not from the stored markets.
 - Hypothesis, measured 2026-09-11 and read-only:
@@ -1120,6 +1121,14 @@ death, never life — do not invert it.
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: local_production.py up boots all three roles; /healthz 200 and board routes render; both workers log a completed tick; doctor reports READY
+- Blocked by: none
+
+### windows-process-liveness — OPEN — opened 2026-09-30 — session 157058fe-f912-55ec-9316-dbc932a8c804
+- Goal: Every unclaimed PID-liveness and cmdline-identity check answers correctly on native Windows, via one shared helper
+- Files: syndicate/features/shared/process_liveness.py, tests/test_process_liveness.py, syndicate/features/shared/ops_refresh.py, syndicate/app.py, syndicate/features/shared/live_refresh_loop.py, syndicate/features/shared/portfolio_books.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit tests exercise the Windows branch via monkeypatched os.name/ctypes on Linux; existing liveness/bootstrap/lock suites still pass
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

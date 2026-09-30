@@ -89,20 +89,13 @@ def _pid_is_running(pid: int) -> bool:
     all. Same call, sound here, unsound there -- the difference is entirely
     where the lock lives.
     """
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True  # exists, owned by another user
-    except OSError:
-        # Unknown. Treat as ALIVE: refusing to take a lock costs one skipped
-        # sync, while stealing a live one runs two syncs at once. The age
-        # backstop still breaks a lock that reads "alive" forever.
-        return True
-    return True
+    # Unknown reads as ALIVE: refusing to take a lock costs one skipped sync,
+    # while stealing a live one runs two syncs at once. The age backstop still
+    # breaks a lock that reads "alive" forever. The shared probe is also right
+    # on Windows, where `os.kill(pid, 0)` is CTRL_C_EVENT (`#692`).
+    from syndicate.features.shared.process_liveness import pid_is_running
+
+    return pid_is_running(pid, unknown_is_alive=True)
 
 
 def _process_start_marker(pid: int) -> str | None:

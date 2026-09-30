@@ -26,9 +26,17 @@ restarts over the soak; scorecard job ran against loopback; `down` clean.
    rebuilds from the lossy git mirror.
 2. First run on the user's machine: after ~15 min of `up`, today's odds snapshot on disk and a fresh board
    `generated_at` -> record in `.syndicate/deploys.md`.
-3. Native Windows only: `os.kill(pid, 0)` liveness (`ops_refresh.py`, `app.py`, `run_refresh_worker.py`) and
-   fcntl-only locks (`odds_book_quotes.py`, `portfolio_books.py`) are wrong on Windows. WSL2 sidesteps them;
-   fixing them is a separate lane (refresh-worker entrypoint is held by `live-inplay-board-cadence`).
+3. Native Windows only: `os.kill(pid, 0)` liveness and fcntl-only locks were wrong on Windows.
+   **PARTLY FIXED `[2026-09-30, lane windows-process-liveness]`:** new `syndicate/features/shared/process_liveness.py`
+   (OpenProcess/WaitForSingleObject on Windows, psutil cmdline off-Linux) now backs `ops_refresh._pid_is_running`
+   / `_process_cmdline`, `app._pid_is_running`, `live_refresh_loop._process_exists` / `_process_cmdline`;
+   `portfolio_books._exclusive` takes a real `msvcrt` lock instead of yielding unlocked. Tests:
+   `tests/test_process_liveness.py` (Windows branches driven through fake kernel32/msvcrt; negative control:
+   the caller tests FAIL on the pre-fix `ops_refresh.py`).
+   **STILL OWED, blocked by lane claims:** `scripts/run_refresh_worker.py:_pid_is_running` (lane
+   `live-inplay-board-cadence`) and the fcntl-only book_quotes append lock in `odds_book_quotes.py` (lane
+   `book-quotes-splice-repair`). Each is a one-line delegate to `process_liveness` / the msvcrt pattern once
+   its lane releases. Until then native Windows is still not the supported host; WSL2 is.
 
 ### `#690` — **NFL game-day injury statuses: capture BUILT dark; whether ESPN carries the INACTIVES list is UNVERIFIED** — PR mostgood1/Syndicate#111, lane `nfl-game-day-injuries`, session 2aff0397 — **OFF: not deployed, never run against a live NFL game**
 

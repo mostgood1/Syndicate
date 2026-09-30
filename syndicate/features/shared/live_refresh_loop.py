@@ -2300,63 +2300,18 @@ def _process_exists(pid: Any) -> bool:
 	# only visible to the gunicorn worker that launched it -- other workers
 	# (and any worker after a container restart) have no in-memory signal at
 	# all and must verify against the actual OS process table instead.
-	try:
-		pid_i = int(pid or 0)
-	except Exception:
-		return False
-	if pid_i <= 0:
-		return False
-	if sys.platform.startswith("win") or os.name == "nt":
-		try:
-			import ctypes
+	# The Windows OpenProcess/WaitForSingleObject probe that lived here is now
+	# the shared one (process_liveness.py), so every caller gets it (`#692`).
+	from syndicate.features.shared.process_liveness import pid_is_running
 
-			PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-			SYNCHRONIZE = 0x00100000
-			WAIT_TIMEOUT = 0x00000102
-			WAIT_OBJECT_0 = 0x00000000
-
-			kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-			handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, False, pid_i)
-			if not handle:
-				err = ctypes.get_last_error()
-				if err == 5:
-					return True
-				return False
-			try:
-				wait_code = kernel32.WaitForSingleObject(handle, 0)
-				if wait_code == WAIT_TIMEOUT:
-					return True
-				if wait_code == WAIT_OBJECT_0:
-					return False
-				return True
-			finally:
-				kernel32.CloseHandle(handle)
-		except Exception:
-			return False
-	try:
-		os.kill(pid_i, 0)
-	except PermissionError:
-		return True
-	except (OSError, SystemError, ValueError):
-		return False
-	return True
+	return pid_is_running(pid, unknown_is_alive=False)
 
 
 def _process_cmdline(pid: Any) -> list[str] | None:
-	try:
-		pid_i = int(pid or 0)
-	except Exception:
-		return None
-	if pid_i <= 0:
-		return None
-	if sys.platform.startswith("win") or os.name == "nt":
-		return None
-	try:
-		raw = Path(f"/proc/{pid_i}/cmdline").read_bytes()
-	except Exception:
-		return None
-	parts = [part.decode("utf-8", errors="ignore") for part in raw.split(b"\x00") if part]
-	return parts or None
+	# /proc on Linux, psutil elsewhere (was None on Windows: fail-open).
+	from syndicate.features.shared.process_liveness import process_cmdline
+
+	return process_cmdline(pid)
 
 
 def _process_matches_lock(pid: Any, expected_command: Any) -> bool:
