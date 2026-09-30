@@ -272,3 +272,11 @@ def test_checkout_depth_matches_repo_root_from():
         except IndexError:
             resolved = False
         assert resolved is expected
+
+
+def test_each_role_gets_its_render_plan_as_a_memory_ceiling(blueprint, settings):
+    # Without a ceiling every headroom gate reads None and fails closed.
+    for role, megabytes in lp.PLAN_MEMORY_MB.items():
+        assert _env(role, blueprint, settings)[0]["SYNDICATE_LOCAL_MEMORY_LIMIT_MB"] == str(megabytes)
+    override = {"SYNDICATE_LOCAL_MEMORY_LIMIT_MB": "8192"}
+    assert _env("refresh-worker", blueprint, settings, local=override)[0]["SYNDICATE_LOCAL_MEMORY_LIMIT_MB"] == "8192"

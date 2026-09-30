@@ -44,7 +44,8 @@ So the local tool does not hand-write any run-mode. It reads `render.yaml` at st
 2. **The Render keyvalue contents** (run manifests, watermarks, lane state). A fresh Redis starts empty. Everything in it is rebuildable state, not records.
 3. **Memory ceilings.**
    - Render's 2/4/2 GB cgroup limits were what the memory guards read.
-   - On Linux or WSL2 with no cgroup limit, those guards read nothing and let everything through.
+   - **CORRECTED 2026-09-30 (first native-Windows run):** with no cgroup limit, those guards did NOT "let everything through". Every headroom gate treats unmeasurable as insufficient and failed CLOSED: game-chip publishing skipped 34/34, MLB overview isolation was refused, and the MLB daily sim starved on `intelligence_pipeline_busy_and_no_headroom`.
+   - `up` now gives each role `SYNDICATE_LOCAL_MEMORY_LIMIT_MB` = its old Render plan (2048/4096/2048). Where no cgroup limit is readable, `memory_observability` measures the role's process-tree RSS (psutil) against that ceiling, so each gate trips where it did on Render. Render never sets the key. Override it in `local_production.env`.
    - `status` shows each role's RSS next to its old plan size so you can watch the ratchet.
    - Web's gunicorn `--max-requests` and anon-memory recycle still apply under gunicorn.
 4. **Native Windows** (use WSL2 instead, section 2):

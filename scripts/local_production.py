@@ -343,6 +343,14 @@ def derive_role_env(
         if key not in audit["local"]:
             audit["local"].append(key)
 
+    # No cgroup here, so every memory-headroom gate read None and failed CLOSED
+    # (chip publish, MLB overview isolation, MLB daily sim -- first native-
+    # Windows run, 2026-09-30). Give each role its old Render plan as a ceiling;
+    # memory_observability then measures the role's process-tree RSS against
+    # it. A default, so local_production.env can still override it.
+    if role in PLAN_MEMORY_MB and not str(env.get("SYNDICATE_LOCAL_MEMORY_LIMIT_MB") or "").strip():
+        env["SYNDICATE_LOCAL_MEMORY_LIMIT_MB"] = str(PLAN_MEMORY_MB[role])
+
     forced: dict[str, str] = {
         "SYNDICATE_BOOTSTRAP_ON_START": "0",
         "PYTHONUNBUFFERED": "1",

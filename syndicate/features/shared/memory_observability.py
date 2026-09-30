@@ -82,7 +82,79 @@ def _current_process_rss_bytes() -> int | None:
     return None
 
 
+LOCAL_MEMORY_LIMIT_ENV = "SYNDICATE_LOCAL_MEMORY_LIMIT_MB"
+LOCAL_MEMORY_ROOT_PID_ENV = "SYNDICATE_LOCAL_MEMORY_ROOT_PID"
+
+
+def _local_memory_limit_bytes() -> int | None:
+    """A declared ceiling for a host with no cgroup limit. OFF unless set.
+
+    `scripts/local_production.py` runs the three Render services as plain
+    processes on one machine (native Windows, or Linux/WSL2 with no container
+    limit). There is no cgroup to read, so every `memory_headroom_snapshot`
+    returned None, and every gate built on it failed CLOSED by design --
+    measured on the first native-Windows run, 2026-09-30: game-chip publishing
+    skipped 24/24, MLB overview isolation refused, and the MLB daily sim
+    starved on `intelligence_pipeline_busy_and_no_headroom`. Render never sets
+    this key, so production reads cgroups exactly as before.
+
+    It stays a MEASUREMENT, not a permissive default: the ceiling is the
+    service's old Render plan, and current usage is the role's real process-tree
+    RSS (`_local_process_tree_rss_bytes`). No psutil -> still None -> closed.
+    """
+    raw = str(os.environ.get(LOCAL_MEMORY_LIMIT_ENV) or "").strip()
+    if not raw:
+        return None
+    try:
+        megabytes = int(float(raw))
+    except ValueError:
+        return None
+    return megabytes * 1024 * 1024 if megabytes > 0 else None
+
+
+def _local_process_tree_rss_bytes() -> int | None:
+    """RSS of this ROLE's process tree -- what a cgroup would have counted.
+
+    The root is the first process in the role to ask (normally the worker
+    itself, at its memory heartbeat), recorded in the env so the sim and odds
+    subprocesses it spawns afterwards measure the whole role, not their own
+    subtree.
+    """
+    try:
+        import psutil
+    except Exception:
+        return None
+    try:
+        root_pid = int(os.environ.get(LOCAL_MEMORY_ROOT_PID_ENV) or 0)
+    except ValueError:
+        root_pid = 0
+    try:
+        root = psutil.Process(root_pid) if root_pid > 0 else None
+    except Exception:
+        root = None
+    if root is None:
+        root = psutil.Process(os.getpid())
+        os.environ[LOCAL_MEMORY_ROOT_PID_ENV] = str(root.pid)
+    total = 0
+    try:
+        processes = [root] + root.children(recursive=True)
+    except Exception:
+        processes = [root]
+    for process in processes:
+        try:
+            total += int(process.memory_info().rss)
+        except Exception:
+            continue
+    return total or None
+
+
+def _local_memory_limit_active() -> bool:
+    return _local_memory_limit_bytes() is not None and _read_cgroup_memory_max_bytes() is None
+
+
 def _read_container_memory_current_bytes() -> int | None:
+    if _local_memory_limit_active():
+        return _local_process_tree_rss_bytes()
     candidates = (
         Path("/sys/fs/cgroup/memory.current"),
         Path("/sys/fs/cgroup/memory/memory.usage_in_bytes"),
@@ -118,6 +190,13 @@ def container_memory_current_mb() -> float | None:
 
 
 def _read_container_memory_max_bytes() -> int | None:
+    cgroup_max = _read_cgroup_memory_max_bytes()
+    if cgroup_max is not None:
+        return cgroup_max
+    return _local_memory_limit_bytes()
+
+
+def _read_cgroup_memory_max_bytes() -> int | None:
     # memory.current alone can't say how close a container is to being
     # OOM-killed -- it includes reclaimable page cache and looks alarming
     # even when nothing is actually at risk. This reads the cgroup's own
