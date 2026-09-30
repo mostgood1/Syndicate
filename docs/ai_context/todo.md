@@ -24,7 +24,7 @@ restarts over the soak; scorecard job ran against loopback; `down` clean.
 1. **User decision: recover Render-disk-only data?** (book_quotes, evaluation/execution ledgers, opportunity
    population, gameline history). Only path is pay + unsuspend + `/api/ops/artifacts/export`. Everything else
    rebuilds from the lossy git mirror.
-2. First run on the user's machine: after ~15 min of `up`, today's odds snapshot on disk and a fresh board
+2. **MEASURED 2026-09-30 23:15Z, lane `local-production-first-run` (`deploys.md`): fresh data end-to-end on native Windows -- board 22:54:32Z 463 rows -> 23:10:02Z 821 rows; MLB sim running, MLB board rows still owed.** Was: First run on the user's machine: after ~15 min of `up`, today's odds snapshot on disk and a fresh board
    `generated_at` -> record in `.syndicate/deploys.md`.
 3. ~~Native Windows liveness + locks~~ **FIXED in code 2026-09-30, commit `67b5f471`, lane
    `windows-process-liveness`.** One helper, `syndicate/features/shared/process_liveness.py`
