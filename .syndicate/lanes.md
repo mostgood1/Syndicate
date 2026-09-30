@@ -1153,6 +1153,12 @@ death, never life — do not invert it.
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: subprocess test runs scripts/local_production.py down from outside the repo: fails pre-fix, passes post-fix
+### local-production-first-run — OPEN — opened 2026-09-30 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- Goal: local_production.py up on native Windows (--state file) produces FRESH data end-to-end: today's odds snapshot on the local data root and a fresh board generated_at, recorded in deploys.md (#692 item 2)
+- Files: scripts/local_production.py, tests/test_local_production.py, docs/ai_context/local_production_runbook.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: after ~15 min of up: odds snapshot files dated 2026-09-30/10-01 under the local data root with mtime after up started; /api board payload generated_at after up started; reading written to .syndicate/deploys.md
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

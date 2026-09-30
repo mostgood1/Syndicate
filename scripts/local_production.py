@@ -98,6 +98,8 @@ from typing import Any, Iterable, Sequence
 REPO_ROOT = Path(__file__).resolve().parents[1]
 # `python scripts/local_production.py` puts scripts/ on sys.path, not the repo
 # root, and `down` imports syndicate.features.shared.process_liveness.
+# It also broke `import-render-env` (`from scripts.snapshot_render_env`) on the
+# first native-Windows run, 2026-09-30.
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 RENDER_YAML = REPO_ROOT / "render.yaml"
@@ -132,8 +134,8 @@ DASHBOARD_ONLY_KEYS: dict[str, str] = {
     "SYNDICATE_EXECUTION_MODE": "paper (default) | live -- live ALSO needs `up --allow-live-execution`",
     "SYNDICATE_EXECUTION_LIVE_ARMED": "0 | 1",
     "SYNDICATE_EXECUTION_ENABLED": "0 | 1",
-    "PORTFOLIO_AUTH_USERNAME": "portfolio page login (required once RENDER=true)",
-    "PORTFOLIO_AUTH_PASSWORD_HASH": "werkzeug hash: python -c \"from werkzeug.security import generate_password_hash as g; print(g('pw'))\"",
+    "SYNDICATE_PORTFOLIO_USERNAME": "portfolio page login (required once RENDER=true)",
+    "SYNDICATE_PORTFOLIO_PASSWORD_HASH": "werkzeug hash: python -c \"from werkzeug.security import generate_password_hash as g; print(g('pw'))\"",
 }
 
 # Deliberately NOT carried over even when present in the env file: they point at
@@ -637,6 +639,11 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def checkout_depth_ok(repo_root: Path) -> bool:
+    """True when `repo_root_from` (parents[3]) exists for pipeline/*.py (#313)."""
+    return len((Path(repo_root) / "pipeline" / "x.py").parents) > 3
+
+
 def _check(ok: bool, label: str, detail: str = "", *, warn: bool = False) -> bool:
     tag = "OK  " if ok else ("WARN" if warn else "FAIL")
     print(f"  [{tag}] {label}" + (f" -- {detail}" if detail else ""))
@@ -649,6 +656,15 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     ok = True
     ok &= _check(sys.version_info[:2] == (3, 11), "python 3.11 (render.yaml PYTHON_VERSION=3.11.9)",
                  platform.python_version(), warn=sys.version_info[:2] >= (3, 11))
+    # `#313`: pipeline/intelligence_state.py does `repo_root_from(__file__)`,
+    # which is `parents[3]` -- two levels ABOVE the repo. A checkout at
+    # C:\Syndicate raises IndexError on import and web never starts (first
+    # native-Windows run, 2026-09-30). On Render it resolves to /opt/render.
+    depth_ok = checkout_depth_ok(REPO_ROOT)
+    ok &= _check(depth_ok, "checkout depth",
+                 str(REPO_ROOT) if depth_ok else
+                 f"{REPO_ROOT} is too shallow: web crashes on import (#313). "
+                 "Clone at least two directories below the drive root, e.g. C:\\SyndicateProd\\repo\\Syndicate")
     missing = []
     for module in ("flask", "redis", "pandas", "numpy", "onnxruntime", "yaml", "psutil"):
         try:
@@ -682,7 +698,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     ):
         present = bool(local.get(key) or imported["web"].get(key) or any(i.key == key and i.value for i in blueprint["web"]))
         ok &= _check(present, f"{key}", why if present else f"ABSENT -- {why} will not work")
-    for key in ("ANTHROPIC_API_KEY", "KALSHI_API_KEY_ID", "POLYMARKET_US_API_KEY_ID", "CFBD_API_KEY", "PORTFOLIO_AUTH_USERNAME"):
+    for key in ("ANTHROPIC_API_KEY", "KALSHI_API_KEY_ID", "POLYMARKET_US_API_KEY_ID", "CFBD_API_KEY", "SYNDICATE_PORTFOLIO_USERNAME"):
         have = bool(local.get(key) or any(imported[r].get(key) for r in ROLE_ORDER))
         _check(have, key, "set" if have else "absent (feature degrades, not fatal)", warn=True)
 

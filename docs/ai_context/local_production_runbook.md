@@ -78,6 +78,10 @@ Native Windows fallback (no WSL):
 - `py -3.11 -m pip install -r requirements.txt psutil waitress pyyaml`
 - Install **Memurai Developer**, which is Redis-compatible and runs as a Windows service. Alternatively, run `up --state file`, which clears `RENDER`; section 1 lists what that turns off.
 - Keep `SYNDICATE_LOCAL_HOME` **out of OneDrive**. The default is `%LOCALAPPDATA%\SyndicateProd`.
+- **Found on the first native-Windows run (2026-09-30, lane `local-production-first-run`):**
+  - **Clone at least two directories below the drive root**, e.g. `C:\SyndicateProd\repo\Syndicate`. At `C:\Syndicate`, web crashes on import with `IndexError: 3`, because `pipeline/intelligence_state.py` calls `repo_root_from(__file__)` = `parents[3]` (`#313`). On Render that resolves to `/opt/render`, so the clone depth reproduces Render and the code is left alone. `doctor` now checks it.
+  - **Do not use the `%LOCALAPPDATA%` default when running from the Claude desktop app** (or any MSIX-packaged shell). Writes there are redirected into `...\AppData\Local\Packages\<app>\LocalCache\Local\`, so the data root is invisible to your own shells and is deleted with the app. Set `SYNDICATE_LOCAL_HOME=C:\SyndicateProd\home` for every command.
+  - `--state` is a **global** flag and goes before the subcommand: `local_production.py --state file doctor`.
 
 ## 3. Configure
 
@@ -111,7 +115,7 @@ Without an import, you must set these yourself in `local_production.env`. `docto
 | `SYNDICATE_ENABLE_SOCCER_PREGAME_REFRESH_AUTORUN` | live-odds-worker | The ledger records `true`. |
 | `ANTHROPIC_API_KEY` | web | Ask the Syndicate. Absent means snapshot-only answers. |
 | `KALSHI_*`, `POLYMARKET_US_*` | workers | Venue quotes. Orders happen only when live-armed. |
-| `PORTFOLIO_AUTH_USERNAME`, `PORTFOLIO_AUTH_PASSWORD_HASH` | web | Required: with `RENDER=true`, `/portfolio` returns 503 until they are set. |
+| `SYNDICATE_PORTFOLIO_USERNAME`, `SYNDICATE_PORTFOLIO_PASSWORD_HASH` | web | Required: with `RENDER=true`, `/portfolio` returns 503 until they are set. |
 
 ## 4. Run
 

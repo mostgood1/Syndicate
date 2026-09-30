@@ -256,3 +256,19 @@ def test_down_runs_as_a_script_from_outside_the_repo(tmp_path):
     )
     assert result.returncode == 0, result.stderr
     assert "stale pidfile" in result.stdout
+
+
+def test_checkout_depth_matches_repo_root_from():
+    # `#313`: pipeline/intelligence_state.py resolves parents[3] at import.
+    # A checkout at a drive root's first level crashed web with IndexError.
+    from syndicate.features.shared.source_roots import clear_source_root_caches, repo_root_from
+
+    for root, expected in ((Path("/Syndicate"), False), (Path("/a/b/Syndicate"), True)):
+        assert lp.checkout_depth_ok(root) is expected
+        clear_source_root_caches()
+        try:
+            repo_root_from(root / "pipeline" / "intelligence_state.py")
+            resolved = True
+        except IndexError:
+            resolved = False
+        assert resolved is expected
