@@ -1117,7 +1117,7 @@ death, never life — do not invert it.
 - 17 tests in this file; **569** board_enrichment/live_gameline/coverage_contract tests pass.
 - Blocked by: none
 
-### local-production-host — OPEN — opened 2026-09-30 — session 157058fe-f912-55ec-9316-dbc932a8c804
+### local-production-host — CLOSED — opened 2026-09-30, closed 2026-09-30 — session 157058fe-f912-55ec-9316-dbc932a8c804
 - **CROSS-LANE WRITE into this lane's `docs/ai_context/local_production_runbook.md` and `scripts/local_production.py` claims, 2026-09-30, USER-APPROVED ("fix the runbook and doctor wording too")** (session a340182e, lane `windows-process-liveness`): runbook section 1 item 4, the two bullets on `os.kill` liveness and fcntl-only locks ONLY, now say FIXED (`67b5f471`) and add a psutil note. `doctor`'s native-Windows warning text ONLY, which now names the gaps that remain (os.replace, waitress, memory guards). No logic touched. Written by script, which lane-guard cannot see. Nothing for this lane to do.
 - Goal: Full Syndicate production (web + refresh-worker + live-odds-worker + state store) boots and serves on one local machine from render.yaml's own run-modes while Render is billing-suspended
 - Files: scripts/local_production.py, docs/ai_context/local_production_runbook.md, tests/test_local_production.py, deploy/local/
@@ -1125,6 +1125,7 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: local_production.py up boots all three roles; /healthz 200 and board routes render; both workers log a completed tick; doctor reports READY
 - Blocked by: none
+- **CLOSED 2026-09-30 ~19:0xZ.** Verification MET (Linux container; `.syndicate/deploys.md` 2026-09-30 ~17:01Z entry): doctor READY; web gunicorn `/healthz` + 8 board routes 200; both workers keyvalue; live-odds-worker `[live_lens_loop] TICK_COMPLETE` x3 (all six sports True); refresh-worker `[intelligence_state] BUILD_SPAN_EXIT` x4 + `MLB_SIM_TICK`; kill -9 recovered in 10 s; clean `down`. Shipped: PR #118 (`f565a435`). NOT verified and OWED under `#692` item 2: fresh odds data end to end (container egress blocked the odds/ESPN/statsapi/Kalshi hosts) -- needs a reading from the user's machine. Claims RELEASED.
 
 ### windows-process-liveness — CLOSED 2026-09-30 — helper at all 6 liveness sites + both locks, on main e305af6c — session a340182e-e5b0-4eb1-93e7-7943a9d905e7
 - **GOAL VERDICT.** Goal (verbatim): "One shared process-liveness/identity helper (OpenProcess on Windows, psutil cmdline) + msvcrt lock fallback, used at every os.kill(pid,0) and fcntl-only site; tests exercise the Windows branch on Linux; todo #692 owed item 3 updated" — **GOAL: MET.** The Verification ran: `tests/test_process_liveness.py` passed 32/32, and its AST guard finds zero `os.kill(<pid>, 0)` calls outside the helper. The related suites pass except 16 failures that are pre-existing on clean origin/main. #692 item 3 is updated. ONE CLAUSE IS UNMEASURED: "on Linux". The Windows branch is faked so that it runs on any host, but the suite ran only on Windows (no WSL/Docker here), and CI runs only `tests.test_archives`. Also still owed (in #692 item 3): a real native-Windows `up`. Commits `67b5f471` `e5aab91f` `e305af6c`; log `.syndicate/log/2026-09-30.md`.
