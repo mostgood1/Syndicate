@@ -2506,9 +2506,44 @@ def _attach_projections_over_window(
         "player_no_projection",
         "game_rows_considered",
         "game_no_projection",
+        # THE NUMERATOR WHOSE DENOMINATOR WAS ALREADY HERE `[2026-09-29, lane
+        # layer2-window-merge-counters]`. `game_rows_considered` summed while
+        # `game_rows_with_projection` fell to "first non-falsy wins", so NCAAF
+        # served **41 / 644** -- 41 frozen at 2026-10-02 (where it was 41/41,
+        # 100%) against a denominator summed over seven dates whose 10-03 slice
+        # alone holds 536 game rows. Numerator and denominator from two different
+        # populations: the exact defect the comments above this tuple were written
+        # about, reappearing one key later.
+        "game_rows_with_projection",
+        # The prop half of the same split. Measured the same day: NCAAF's "props
+        # are healthy, 44/49" was 44 and 49 frozen on DIFFERENT dates and divided
+        # by each other -- not a rate at all.
+        "prop_rows_considered",
+        "prop_rows_with_projection",
+        # NHL's prop population (lane `nhl-prop-counter-honesty`, same day) rides
+        # this list too, or its 0-of-N freezes at the first date and reports one
+        # slate as the window.
+        "rows_unsupported_game_market",
+        # Slate-shape counters. Frozen at the first date, these described a single
+        # Tuesday (4 indexed, 3 unratable) while sitting beside a 644-row window.
+        "games_indexed",
+        "games_unratable_opponent",
     )
     # Per-key SUM, because a dict cannot go through `summable` above.
     summable_dicts = ("unprojected_by_market",)
+    # The nested coverage halves need their OWN rule, not `summable_dicts`, for
+    # two reasons that each corrupt the payload silently:
+    #
+    # 1. `isinstance(False, int)` is True in Python, so a numeric sum turns
+    #    `supported: False` into `supported: 0` and `supported: True` into a TALLY
+    #    OF DATES. A capability is not a count.
+    # 2. `reason` is a string, so `summable_dicts` would DROP it, while the
+    #    current "first non-falsy wins" keeps ONE date's reason and serves it as
+    #    the window's -- which is how `game_coverage.reason` came to read "no
+    #    NCAAF SmartSim2 projections for this date" across a seven-date window
+    #    that projects hundreds of rows. Same defect `#633` fixed at the TOP
+    #    level; the nested halves were never covered by it.
+    coverage_halves = ("game_coverage", "prop_coverage")
     # RATES ARE NOT COUNTS AND MUST NOT BE MERGED AT ALL -- they have to be
     # RE-DERIVED from the merged counts after the loop.
     #
@@ -2550,6 +2585,29 @@ def _attach_projections_over_window(
                 for sub_key, sub_value in value.items():
                     if isinstance(sub_value, (int, float)):
                         bucket[sub_key] = bucket.get(sub_key, 0) + sub_value
+            elif key in coverage_halves and isinstance(value, Mapping):
+                bucket = merged.setdefault(key, {})
+                for sub_key, sub_value in value.items():
+                    if sub_key == "reason":
+                        # COLLECTED NOW, PRUNED AFTER THE LOOP. Whether a reason
+                        # is true of the WINDOW depends on the window's summed
+                        # projection, which is not known until every date has run.
+                        if isinstance(sub_value, str) and sub_value.strip():
+                            reasons = bucket.setdefault("reasons", [])
+                            if sub_value not in reasons:
+                                reasons.append(sub_value)
+                    elif isinstance(sub_value, bool):
+                        # A CAPABILITY, NOT A COUNT, and this branch has to come
+                        # before the numeric one: `isinstance(False, int)` is True
+                        # in Python, so summing would turn `supported: False` into
+                        # `0` and `supported: True` into a tally of dates. First
+                        # value wins -- whether the join CAN do this does not vary
+                        # by date.
+                        bucket.setdefault(sub_key, sub_value)
+                    elif isinstance(sub_value, (int, float)):
+                        bucket[sub_key] = bucket.get(sub_key, 0) + sub_value
+                    else:
+                        bucket.setdefault(sub_key, sub_value)
             elif key not in merged or merged.get(key) in (None, 0, False, ""):
                 merged[key] = value
 
@@ -2567,6 +2625,28 @@ def _attach_projections_over_window(
             merged[rate_key] = round(100.0 * num / den, 1) if den else 0.0
         else:
             merged.pop(rate_key, None)
+
+    # A HALF'S REASON IS THE WINDOW'S REASON ONLY IF THE WINDOW PROJECTED NOTHING
+    # FOR THAT HALF. `#633` established this at the top level and the nested halves
+    # were never covered by it, which is how `game_coverage.reason` came to serve
+    # one Tuesday's "no NCAAF SmartSim2 projections for this date" beside hundreds
+    # of projected rows across the rest of the window.
+    for half, window_count_key in (("game_coverage", "game_rows_with_projection"),
+                                   ("prop_coverage", "prop_rows_with_projection")):
+        bucket = merged.get(half)
+        if not isinstance(bucket, dict):
+            continue
+        reasons = bucket.pop("reasons", None)
+        projected = bucket.get("rows_with_projection")
+        if projected is None:
+            projected = merged.get(window_count_key)
+        if not projected and reasons:
+            # SEVERAL DISTINCT REFUSALS STAY SEVERAL. Collapsing seven dates'
+            # different reasons into one would be a different lie than the one
+            # being fixed here.
+            bucket["reason"] = reasons[0] if len(reasons) == 1 else "; ".join(reasons)
+        else:
+            bucket.pop("reason", None)
 
     if len(dates) > 1:
         merged["window_dates"] = list(dates)
