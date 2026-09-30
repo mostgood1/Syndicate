@@ -2258,6 +2258,87 @@ _LIVE_GAMELINE_SNAPSHOT_PATHS: dict[str, str] = {
 }
 
 
+def _attribute_live_gameline_zero(
+    coverage: dict[str, Any],
+    index_diag: dict[str, Any] | None,
+    *,
+    sport: str,
+) -> None:
+    """Give a live-gameline zero a STATED REASON, or leave a real number alone.
+
+    WHY `[2026-09-29, lane live-gameline-zero-attribution]`. The reasoned early
+    returns above cover "not wired", "no soccer match in play" and "no published
+    snapshot". A sport whose snapshot EXISTS and whose index comes back empty fell
+    through all three and returned all-zero counters with NO reason -- so
+    `check_e2e_coverage` reported `ncaaf`/`nfl`/`nhl` `live_games` as
+    `unattributed_zero`, where a code gap and a Tuesday with no game in play are
+    the same number.
+
+    `index_diagnostics` already carried everything needed to tell them apart; it
+    was simply never turned into a reason, and the contract reads `reason`.
+
+    THREE DISTINGUISHABLE STATES, because they have three different owners:
+      * no game in the snapshot at all -> nothing is in play, nobody is at fault;
+      * games in the snapshot, none INDEXED -> the producer or the accepted-source
+        list is the gap, and `skipped_*` says which;
+      * an index with games but no board row CONSIDERED -> the row/game join is
+        the gap, not the producer.
+
+    DOES NOTHING WHEN ROWS WERE CONSIDERED. A join that looked at rows and priced
+    none of them already explains itself through `withheld_by_reason`, and
+    overwriting that with a coarse summary would lose the detail.
+    """
+    try:
+        considered = int(coverage.get("rows_live_gameline_considered") or 0)
+        projected = int(coverage.get("rows_live_gameline_projected") or 0)
+    except (TypeError, ValueError):
+        return
+    if considered > 0 or projected > 0:
+        return
+    if str(coverage.get("reason") or "").strip():
+        return
+
+    diag = index_diag if isinstance(index_diag, dict) else {}
+
+    def _count(key: str) -> int:
+        try:
+            return int(diag.get(key) or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    games = _count("games_in_snapshot")
+    indexed = _count("indexed")
+    index_size = coverage.get("index_size")
+    if not isinstance(index_size, int):
+        index_size = indexed
+
+    if games <= 0:
+        coverage["reason"] = (
+            f"no {sport} game in play in the published live snapshot"
+        )
+        return
+    if index_size <= 0:
+        # The skip buckets name WHICH gap. Carried into the reason rather than
+        # left in a sibling dict, because the reader that decides whether a zero
+        # is actionable reads the reason.
+        skips = {
+            key: _count(key) for key in
+            ("skipped_no_accepted_lane", "skipped_no_team_names",
+             "skipped_no_probability", "skipped_stale")
+            if _count(key) > 0
+        }
+        detail = ", ".join(f"{k}={v}" for k, v in sorted(skips.items()))
+        coverage["reason"] = (
+            f"{games} {sport} game(s) in the live snapshot but none indexed"
+            + (f" ({detail})" if detail else "")
+        )
+        return
+    coverage["reason"] = (
+        f"{index_size} {sport} game(s) indexed from {games} in the snapshot, "
+        "but no board row matched them"
+    )
+
+
 def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: str) -> dict:
     """Overlay the live re-sim's GAME-LINE projection on live moneyline rows.
 
@@ -2292,7 +2373,8 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
     """
     if sport not in _LIVE_GAMELINE_SPORTS:
         return {"supported": False, "reason": f"no live re-sim wired for {sport}",
-                "rows_live_gameline_edged": 0}
+                "rows_live_gameline_edged": 0,
+                "rows_live_gameline_projected": 0}
     try:
         from syndicate.features.shared.live_gameline_join import (
             FIRST5_LENS_SOURCE,
@@ -2323,6 +2405,7 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                     "supported": True,
                     "reason": "no soccer match in play in any league's live-state artifact",
                     "rows_live_gameline_edged": 0,
+                    "rows_live_gameline_projected": 0,
                 }
             coverage = attach_live_gamelines(grid, index, sport=sport)
         else:
@@ -2341,6 +2424,7 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                     "supported": True,
                     "reason": "no published live-lens snapshot",
                     "rows_live_gameline_edged": 0,
+                    "rows_live_gameline_projected": 0,
                 }
             # Filled by the index builder; folded into coverage so the shortlist
             # can PRINT why an empty index is empty. `index=0` alone reads as
@@ -2404,8 +2488,10 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
         coverage["supported"] = True
         if sport != "soccer":
             coverage["index_diagnostics"] = index_diag
+        _attribute_live_gameline_zero(coverage, index_diag, sport=sport)
         return coverage
     except Exception:
         _LOGGER.exception("BOOK_GRID_LIVE_GAMELINE_FAILURE sport=%s date=%s", sport, selected_date)
         return {"supported": True, "error": "live gameline join failed",
-                "rows_live_gameline_edged": 0}
+                "rows_live_gameline_edged": 0,
+                "rows_live_gameline_projected": 0}
