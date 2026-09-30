@@ -44189,3 +44189,14 @@ four-minute window would have recorded this correct fix as a failure.
 gain over a fixed population and not a denominator artefact. 212 keys still unmatched — not
 claimed as fixed here; `WSH`/`WAS` and `LA`/`LAR` abbreviation mismatches are the known open
 lead and are NOT measured by this entry.
+
+## 2026-09-30 01:07Z (2026-09-29 8:07 PM CT) -- READING -- refresh-worker 15ddf78e (lane gameline-spread-total-scoring) -- PASS
+- who: scheduled task `mlb-first5-segments-reading-0929`, on behalf of session 3b474634 (archived). No deploy, no code edit.
+- live refresh-worker: `3f28cdb7` (live 2026-09-29T18:23:26Z); `git merge-base --is-ancestor 15ddf78e 3f28cdb7` -> 0 (contains the fix).
+- source: GET `/api/board/book-grid?sport=mlb` (board date 2026-09-29, `generated_at` 2026-09-30T01:06:43.76Z). StatsAPI schedule at read time: 2 Final (849845 PHI@ATL 3-5, 849849 CWS@HOU 6-3), 1 live (BOS@NYY), 1 pre-game (CHC@SD).
+- headline (unchanged by design): `games_with_outcome` 2, `segment_actuals_supplied` false.
+- `segments` PRESENT. `segments.lookup`: source `statsapi_linescore_final_games_only`, final_games 2, games_answered 2, fetched 0, fetch_failed 0, fetch_budget_exhausted 0, fetch_deferred_retry_window 0, refused_by_reason {game_not_final: 106}. `fetched` is a per-build counter (the lookup caches answered games), so 0 here with games_answered 2 means an earlier build fetched them -- not a failure; fetch_failed 0 means /linescore is reachable from refresh-worker.
+- first5 all_records: market n 33 brier 0.08039 mae 0.22212; model_paired n 33 brier 0.02300 mae 0.10788; model_minus_market_brier -0.05739; populations_matched true; rows_without_market_prob 0. first5 `games_with_outcome` **1** (CWS@HOU, F5 5-2). The other final, PHI@ATL, was level 1-1 after five -> h2h push, which is `segment_actual_level_for_h2h` 34.
+- first5 unmeasured: record_carries_no_model_point_forecast 178 (known producer gap: first5 totals/spreads carry no model mean), segment_actual_level_for_h2h 34, segment_actual_unavailable 77 (rows on non-final games).
+- first1 / first3: market n 0 / 0; unmeasured no_model_point_forecast 26 / 57, segment_actual_unavailable 11 / 18. Expected: no model forecast exists for these segments.
+- verdict: PASS against the lane's reading (segments present, games_answered == final_games, first5 market.n > 0). The first5 Brier diff rests on **ONE game** (33 rows from a single game); that is a smoke reading of the wiring, not a verdict on model vs market.
