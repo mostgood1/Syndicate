@@ -1162,6 +1162,15 @@ death, never life — do not invert it.
 - Verification: after ~15 min of up: odds snapshot files dated 2026-09-30/10-01 under the local data root with mtime after up started; /api board payload generated_at after up started; reading written to .syndicate/deploys.md
 - Blocked by: none
 
+### local-production-boot-task — CLOSED — opened 2026-09-30, closed 2026-09-30 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: MET.** Task `SyndicateLocalProduction` (logon trigger, restart every 1 min) registered with -LocalHome/-GlobalArgs/-Python; session fleet stopped, task started it: `/healthz` 200 in 85 s, supervisor.log written, same home reused (seed rc 0). Installer's native mode had booted an empty %LOCALAPPDATA% fleet, put --state after `up`, and used `py -3` on a two-Python machine. Claims RELEASED.
+- Goal: Windows scheduled task starts local production at logon from C:\SyndicateProd with the right home, --state file and Python 3.11 x64, and restarts it on failure
+- Files: deploy/local/install_windows_task.ps1, docs/ai_context/local_production_runbook.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: task registered; fleet stopped and restarted BY THE TASK; /healthz 200 with supervisor pid owned by the task; supervisor.log written under home
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

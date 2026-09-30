@@ -148,6 +148,7 @@ tail -f ~/syndicate-prod/logs/refresh-worker.log
 
 Start at boot and restart on failure:
 
+- **Windows, native** (measured 2026-09-30, lane `local-production-boot-task`: the task started the fleet, `/healthz` 200 in 85 s, same home reused): `powershell -ExecutionPolicy Bypass -File deploy\local\install_windows_task.ps1 -Mode Native -LocalHome C:\SyndicateProd\home -GlobalArgs '--state file' -Python <path to python311-x64\python.exe>`. All three flags are needed, and the script header says why. The trigger is **at logon**. Starting at boot with nobody signed in requires "Run whether user is logged on or not", which asks for your Windows password, so set it yourself in Task Scheduler.
 - **Windows, running WSL2:** `powershell -ExecutionPolicy Bypass -File deploy\local\install_windows_task.ps1 -Mode Wsl -WslRepo ~/Syndicate`
   - This registers a logon task that runs `up` in WSL and restarts it every minute on failure.
   - Also run `powercfg /change standby-timeout-ac 0`. Modern Standby suspends scheduled-task children, so the workers silently stop.

@@ -6,7 +6,18 @@ Lane `local-production-host` [2026-09-30]. Runbook: docs/ai_context/local_produc
   powershell -ExecutionPolicy Bypass -File deploy\local\install_windows_task.ps1 -Mode Wsl -WslRepo ~/Syndicate
 
   # Fallback: native Windows (waitress web server; see the runbook's caveats)
-  powershell -ExecutionPolicy Bypass -File deploy\local\install_windows_task.ps1 -Mode Native
+  powershell -ExecutionPolicy Bypass -File deploy\local\install_windows_task.ps1 -Mode Native `
+      -LocalHome C:\SyndicateProd\home -GlobalArgs '--state file' `
+      -Python C:\Users\<you>\AppData\Local\Programs\Python\Python311-x64\python.exe
+
+  Native needs all three on a real machine (first native-Windows setup, 2026-09-30):
+  -LocalHome   without it `up` resolves %LOCALAPPDATA%\SyndicateProd and boots a
+               NEW, EMPTY fleet beside the one you seeded.
+  -GlobalArgs  --state/--port/--home are GLOBAL flags and must precede `up`;
+               -UpArgs goes after it.
+  -Python      `py -3` picks whichever 3.x the launcher prefers; that machine had
+               both Python311-x64 and Python311-arm64.
+  The supervisor's own stdout goes to <LocalHome>\logs\supervisor.log.
 
   # Remove
   powershell -ExecutionPolicy Bypass -File deploy\local\install_windows_task.ps1 -Uninstall
@@ -17,6 +28,9 @@ param(
     [string] $WslRepo = '~/Syndicate',
     [string] $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
     [string] $UpArgs = '',
+    [string] $GlobalArgs = '',
+    [string] $LocalHome = '',
+    [string] $Python = '',
     [string] $TaskName = 'SyndicateLocalProduction',
     [switch] $Uninstall
 )
@@ -35,9 +49,24 @@ if ($Mode -eq 'Wsl') {
     $command = "cd $WslRepo && exec python3 scripts/local_production.py up $UpArgs"
     $action = New-ScheduledTaskAction -Execute 'wsl.exe' -Argument "-d $WslDistro -- bash -lc `"$command`""
 } else {
-    $py = (Get-Command py -ErrorAction SilentlyContinue).Source
-    if (-not $py) { $py = (Get-Command python -ErrorAction Stop).Source; $pyArgs = '' } else { $pyArgs = '-3 ' }
-    $action = New-ScheduledTaskAction -Execute $py -Argument "${pyArgs}scripts\local_production.py up $UpArgs" -WorkingDirectory $RepoRoot
+    if ($Python) {
+        if (-not (Test-Path $Python)) { throw "-Python not found: $Python" }
+        $py = $Python; $pyArgs = ''
+    } else {
+        $py = (Get-Command py -ErrorAction SilentlyContinue).Source
+        if (-not $py) { $py = (Get-Command python -ErrorAction Stop).Source; $pyArgs = '' } else { $pyArgs = '-3 ' }
+    }
+    $homeArg = ''
+    if ($LocalHome) { $homeArg = "--home `"$LocalHome`" " }
+    $inner = "`"$py`" ${pyArgs}scripts\local_production.py $homeArg$GlobalArgs up $UpArgs"
+    if ($LocalHome) {
+        New-Item -ItemType Directory -Force (Join-Path $LocalHome 'logs') | Out-Null
+        # cmd /c so the supervisor's own stdout lands somewhere; a task has no console.
+        $log = Join-Path $LocalHome 'logs\supervisor.log'
+        $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c `"$inner >> `"$log`" 2>&1`"" -WorkingDirectory $RepoRoot
+    } else {
+        $action = New-ScheduledTaskAction -Execute $py -Argument "${pyArgs}scripts\local_production.py $GlobalArgs up $UpArgs" -WorkingDirectory $RepoRoot
+    }
 }
 
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
