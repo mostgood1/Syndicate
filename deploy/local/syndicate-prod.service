@@ -1,0 +1,30 @@
+# systemd USER unit for Syndicate local production (Linux or WSL2 with systemd=true).
+# Lane `local-production-host` [2026-09-30]. Runbook: docs/ai_context/local_production_runbook.md
+#
+#   mkdir -p ~/.config/systemd/user
+#   cp deploy/local/syndicate-prod.service ~/.config/systemd/user/
+#   # edit WorkingDirectory if the checkout is not ~/Syndicate
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now syndicate-prod
+#   loginctl enable-linger "$USER"      # keep it running with no login session
+#   journalctl --user -u syndicate-prod -f
+[Unit]
+Description=Syndicate local production (web + refresh-worker + live-odds-worker)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Syndicate
+ExecStart=/usr/bin/env python3 scripts/local_production.py up
+ExecStop=/usr/bin/env python3 scripts/local_production.py down
+# The supervisor restarts individual roles itself; this restarts the supervisor.
+Restart=always
+RestartSec=10
+# SIGTERM -> the supervisor stops roles cleanly (an in-flight MLB sim is lost,
+# exactly as a Render deploy lost it).
+KillSignal=SIGTERM
+TimeoutStopSec=120
+
+[Install]
+WantedBy=default.target

@@ -1,5 +1,35 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#692` — **LOCAL PRODUCTION: run all three services on one machine while Render is billing-suspended** — lane `local-production-host`, session 157058fe, branch `claude/dreamy-babbage-dm6ubz`
+
+**Why.** 2026-09-30 06:37:51Z: web, refresh-worker and live-odds-worker all `suspended`, `suspenders=['billing']`
+(`.syndicate/log/2026-09-30.md`). `scripts/fleet_local.py` exists but is a REHEARSAL harness (replay network,
+no keys, paper, bounded) and cannot serve production.
+
+**Built.** `scripts/local_production.py` (`init` / `import-render-env` / `doctor` / `up` / `status` / `down` /
+`env`): per-role env parsed from `render.yaml` at start, then the live dashboard env (Render API, read-only),
+then `<home>/local_production.env`, then a short forced list (one shared data root; publish URL REMOVED --
+self-publish onto a shared disk races the appender; worker->web URLs to loopback; RENDER + service markers so
+web does not start the intelligence loop unflagged; local Redis; bootstrap once; money paper unless
+`--allow-live-execution`). Supervises with restart/backoff, runs the dashboard-only `model-scorecard` cron.
+`deploy/local/` has the Windows logon task (WSL2 or native) and a systemd unit. Runbook:
+`docs/ai_context/local_production_runbook.md`. Tests: `tests/test_local_production.py`.
+
+**Verified (Linux container):** doctor READY; bootstrap 1.9 GB rc 0; web gunicorn 2x4 with the memory guard
+armed, `/healthz` + 8 board pages 200; both workers `REFRESH_STATE_BACKEND = keyvalue` on local Redis, zero
+restarts over the soak; scorecard job ran against loopback; `down` clean.
+**NOT verified:** any fresh data -- that container's egress denied The Odds API / ESPN / statsapi / Kalshi.
+
+**OPEN / owed:**
+1. **User decision: recover Render-disk-only data?** (book_quotes, evaluation/execution ledgers, opportunity
+   population, gameline history). Only path is pay + unsuspend + `/api/ops/artifacts/export`. Everything else
+   rebuilds from the lossy git mirror.
+2. First run on the user's machine: after ~15 min of `up`, today's odds snapshot on disk and a fresh board
+   `generated_at` -> record in `.syndicate/deploys.md`.
+3. Native Windows only: `os.kill(pid, 0)` liveness (`ops_refresh.py`, `app.py`, `run_refresh_worker.py`) and
+   fcntl-only locks (`odds_book_quotes.py`, `portfolio_books.py`) are wrong on Windows. WSL2 sidesteps them;
+   fixing them is a separate lane (refresh-worker entrypoint is held by `live-inplay-board-cadence`).
+
 ### `#690` — **NFL game-day injury statuses: capture BUILT dark; whether ESPN carries the INACTIVES list is UNVERIFIED** — PR mostgood1/Syndicate#111, lane `nfl-game-day-injuries`, session 2aff0397 — **OFF: not deployed, never run against a live NFL game**
 
 **Why.** The only NFL injury input was nflverse's season CSV (`fetch_nfl_injuries.py`), which follows the
