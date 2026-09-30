@@ -237,3 +237,22 @@ def test_down_with_a_live_supervisor_signals_it_and_waits(settings):
 
 def test_down_with_no_pidfile_is_a_noop(settings):
     assert lp.cmd_down(_down_args(settings.home)) == 0
+
+
+def test_down_runs_as_a_script_from_outside_the_repo(tmp_path):
+    # 2026-09-30: `down` imported syndicate.* and died with ModuleNotFoundError
+    # when run the way the runbook says -- as a script -- because only
+    # scripts/ is on sys.path then. The in-process tests could not see it.
+    import subprocess
+    import sys
+
+    script = lp.REPO_ROOT / "scripts" / "local_production.py"
+    settings = lp.Settings(home=tmp_path / "home")
+    _write_pidfile(settings, _dead_pid())
+    result = subprocess.run(
+        [sys.executable, str(script), "--home", str(settings.home), "down", "--timeout", "5"],
+        cwd=str(tmp_path), capture_output=True, text=True, timeout=60,
+        env={k: v for k, v in __import__("os").environ.items() if k != "PYTHONPATH"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert "stale pidfile" in result.stdout

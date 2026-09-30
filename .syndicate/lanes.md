@@ -1146,6 +1146,15 @@ death, never life — do not invert it.
 - Verification: tests: dead supervisor -> down returns without waiting and kills recorded live orphans; live supervisor path unchanged
 - Blocked by: none
 
+### local-production-down-import — CLOSED — opened 2026-09-30, closed 2026-09-30 — session 157058fe-f912-55ec-9316-dbc932a8c804
+- **Goal: local_production.py down works when run as a script (repo root on sys.path) — GOAL: MET.** Reading: `test_down_runs_as_a_script_from_outside_the_repo` FAILS on e8ff5030's script (ModuleNotFoundError: syndicate) and passes with the fix; 20/20 `tests/test_local_production.py`; the real `down` then stopped the running fleet (0 processes, :10000 refused). Claims RELEASED.
+- Goal: local_production.py down works when run as a script (repo root on sys.path)
+- Files: scripts/local_production.py, tests/test_local_production.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: subprocess test runs scripts/local_production.py down from outside the repo: fails pre-fix, passes post-fix
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
