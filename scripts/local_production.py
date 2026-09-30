@@ -96,6 +96,10 @@ from pathlib import Path
 from typing import Any, Iterable, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+# `python scripts/local_production.py` puts scripts/ on sys.path, not the repo
+# root, and `down` imports syndicate.features.shared.process_liveness.
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 RENDER_YAML = REPO_ROOT / "render.yaml"
 IS_WINDOWS = os.name == "nt"
 
