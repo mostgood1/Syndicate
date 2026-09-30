@@ -1063,30 +1063,65 @@ def cmd_up(args: argparse.Namespace) -> int:
     return 0
 
 
+def _kill_pid_tree(pid: int) -> bool:
+    """Kill `pid` and its descendants. True if anything was alive to kill."""
+    try:
+        import psutil
+
+        proc = psutil.Process(pid)
+        for child in proc.children(recursive=True):
+            try:
+                child.kill()
+            except Exception:
+                pass
+        proc.kill()
+        return True
+    except Exception:
+        return False
+
+
 def cmd_down(args: argparse.Namespace) -> int:
+    from syndicate.features.shared.process_liveness import pid_is_alive
+
     settings = settings_from_args(args)
     pidfile = settings.run_dir / PIDFILE_NAME
+    stop_file = settings.run_dir / "stop"
     if not pidfile.is_file():
         print("not running (no pidfile).")
         return 0
-    (settings.run_dir / "stop").write_text("stop", encoding="utf-8")
     info = json.loads(pidfile.read_text(encoding="utf-8"))
+    pid = int(info.get("supervisor_pid") or 0)
+
+    # A supervisor that is already gone cannot read the stop file, so waiting
+    # for it only burns the timeout (measured 2026-09-30: 90 s against a
+    # supervisor the cloud session had already killed). Reap whatever it
+    # recorded instead -- its roles and redis can outlive it as orphans.
+    if not pid_is_alive(pid, zombie_is_dead=True):
+        print(f"supervisor {pid} is not running (stale pidfile).")
+        recorded = dict(info.get("roles") or {})
+        if info.get("redis_pid"):
+            recorded["redis"] = info["redis_pid"]
+        for name, child_pid in recorded.items():
+            if child_pid and pid_is_alive(int(child_pid), zombie_is_dead=True):
+                killed = _kill_pid_tree(int(child_pid))
+                print(f"  [{name}] orphan pid={child_pid} {'killed' if killed else 'could not be killed'}")
+        pidfile.unlink(missing_ok=True)
+        stop_file.unlink(missing_ok=True)
+        print("down.")
+        return 0
+
+    stop_file.write_text("stop", encoding="utf-8")
     deadline = time.time() + float(args.timeout)
     while time.time() < deadline and pidfile.is_file():
+        if not pid_is_alive(pid, zombie_is_dead=True):
+            break
         time.sleep(1)
     if pidfile.is_file():
-        pid = int(info.get("supervisor_pid") or 0)
-        print(f"supervisor {pid} did not stop in {args.timeout}s -- killing its process tree")
-        try:
-            import psutil
-
-            proc = psutil.Process(pid)
-            for child in proc.children(recursive=True):
-                child.kill()
-            proc.kill()
-        except Exception as exc:  # noqa: BLE001
-            print(f"  {type(exc).__name__}: {exc}")
+        if pid_is_alive(pid, zombie_is_dead=True):
+            print(f"supervisor {pid} did not stop in {args.timeout}s -- killing its process tree")
+            _kill_pid_tree(pid)
         pidfile.unlink(missing_ok=True)
+    stop_file.unlink(missing_ok=True)
     print("down.")
     return 0
 
