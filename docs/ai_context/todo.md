@@ -26,9 +26,18 @@ restarts over the soak; scorecard job ran against loopback; `down` clean.
    rebuilds from the lossy git mirror.
 2. First run on the user's machine: after ~15 min of `up`, today's odds snapshot on disk and a fresh board
    `generated_at` -> record in `.syndicate/deploys.md`.
-3. Native Windows only: `os.kill(pid, 0)` liveness (`ops_refresh.py`, `app.py`, `run_refresh_worker.py`) and
-   fcntl-only locks (`odds_book_quotes.py`, `portfolio_books.py`) are wrong on Windows. WSL2 sidesteps them;
-   fixing them is a separate lane (refresh-worker entrypoint is held by `live-inplay-board-cadence`).
+3. ~~Native Windows liveness + locks~~ **FIXED in code 2026-09-30, commit `67b5f471`, lane
+   `windows-process-liveness`.** One helper, `syndicate/features/shared/process_liveness.py`
+   (OpenProcess/WaitForSingleObject on Windows; the PID-reuse cmdline check uses psutil where there is no
+   procfs; a polled `msvcrt` lock where there is no `fcntl`). It is used at all SIX `os.kill(pid, 0)` sites:
+   the listed three, plus `live_refresh_loop._process_exists` and `scripts/run_queued_refresh_job.py`. It
+   also covers both fcntl-only locks. `tests/test_process_liveness.py` (32) drives the Windows branches on
+   any host, and an AST guard fails on a new `os.kill(<pid>, 0)`. Still owed: (a) **not yet exercised by a
+   real native-Windows `up`**; the refresh-run lock should hold across an in-flight run there. (b) psutil is
+   dev-only (`requirements-dev.txt`), so without it the Windows identity check still fails OPEN, as it
+   always did. (c) The runbook section 1.4 bullets and the `local_production.py doctor` native-Windows
+   warning still describe these as broken. Both files are claimed by `local-production-host`, so they were
+   left for that lane. `os.replace`, waitress and the memory guards remain real Windows gaps.
 
 ### `#690` — **NFL game-day injury statuses: capture BUILT dark; whether ESPN carries the INACTIVES list is UNVERIFIED** — PR mostgood1/Syndicate#111, lane `nfl-game-day-injuries`, session 2aff0397 — **OFF: not deployed, never run against a live NFL game**
 
