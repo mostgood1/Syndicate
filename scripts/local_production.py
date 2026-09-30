@@ -721,8 +721,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         _check(False, "home is under OneDrive", "move it (SYNDICATE_LOCAL_HOME) -- OneDrive syncing a live data root is unsafe", warn=True)
     if IS_WINDOWS:
         _check(False, "native Windows",
-               "WSL2 (Ubuntu) is the supported host: on native Windows os.kill(pid, 0) misreports "
-               "liveness (refresh-run lock can overlap runs), fcntl-only locks are skipped, and "
+               "WSL2 (Ubuntu) is the supported host: on native Windows os.replace onto an open "
+               "file fails intermittently, gunicorn does not run (waitress serves web), and "
                "memory guards read nothing. See the runbook.", warn=True)
         _check(True, "Windows sleep", "disable sleep/Modern Standby on AC power or the workers stall (see runbook)", warn=True)
 

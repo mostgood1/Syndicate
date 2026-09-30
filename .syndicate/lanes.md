@@ -1118,6 +1118,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### local-production-host — OPEN — opened 2026-09-30 — session 157058fe-f912-55ec-9316-dbc932a8c804
+- **CROSS-LANE WRITE into this lane's `docs/ai_context/local_production_runbook.md` and `scripts/local_production.py` claims, 2026-09-30, USER-APPROVED ("fix the runbook and doctor wording too")** (session a340182e, lane `windows-process-liveness`): runbook section 1 item 4, the two bullets on `os.kill` liveness and fcntl-only locks ONLY, now say FIXED (`67b5f471`) and add a psutil note. `doctor`'s native-Windows warning text ONLY, which now names the gaps that remain (os.replace, waitress, memory guards). No logic touched. Written by script, which lane-guard cannot see. Nothing for this lane to do.
 - Goal: Full Syndicate production (web + refresh-worker + live-odds-worker + state store) boots and serves on one local machine from render.yaml's own run-modes while Render is billing-suspended
 - Files: scripts/local_production.py, docs/ai_context/local_production_runbook.md, tests/test_local_production.py, deploy/local/
 - Hypothesis: n/a

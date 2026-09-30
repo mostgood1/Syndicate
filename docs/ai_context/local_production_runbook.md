@@ -48,8 +48,8 @@ So the local tool does not hand-write any run-mode. It reads `render.yaml` at st
    - `status` shows each role's RSS next to its old plan size so you can watch the ratchet.
    - Web's gunicorn `--max-requests` and anon-memory recycle still apply under gunicorn.
 4. **Native Windows** (use WSL2 instead, section 2):
-   - `os.kill(pid, 0)` misreports liveness (`ops_refresh.py`, `app.py`, `run_refresh_worker.py`), so the refresh-run lock can allow overlapping runs.
-   - The `fcntl`-only locks (`odds_book_quotes.py`, `portfolio_books.py`) are skipped.
+   - Process liveness and the file locks are no longer a Windows gap (fixed `67b5f471`, lane `windows-process-liveness`). Every liveness check goes through `syndicate/features/shared/process_liveness.py`, which uses OpenProcess on Windows instead of `os.kill(pid, 0)` (that is CTRL_C_EVENT there). The book-quote and portfolio-books locks take an `msvcrt` lock instead of being skipped.
+   - Install psutil (`requirements-dev.txt`) on a native Windows host. Without it the PID-reuse check cannot read a process's command line, and it assumes a match (fails open).
    - `os.replace` onto an open file fails intermittently.
    - Gunicorn does not run, so web is served by waitress.
 

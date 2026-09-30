@@ -35,9 +35,8 @@ restarts over the soak; scorecard job ran against loopback; `down` clean.
    any host, and an AST guard fails on a new `os.kill(<pid>, 0)`. Still owed: (a) **not yet exercised by a
    real native-Windows `up`**; the refresh-run lock should hold across an in-flight run there. (b) psutil is
    dev-only (`requirements-dev.txt`), so without it the Windows identity check still fails OPEN, as it
-   always did. (c) The runbook section 1.4 bullets and the `local_production.py doctor` native-Windows
-   warning still describe these as broken. Both files are claimed by `local-production-host`, so they were
-   left for that lane. `os.replace`, waitress and the memory guards remain real Windows gaps.
+   always did. (c) ~~runbook section 1.4 + `doctor` wording~~ corrected 2026-09-30 (user-approved cross-lane write
+   into `local-production-host`). `os.replace`, waitress and the memory guards remain real Windows gaps.
 
 ### `#690` — **NFL game-day injury statuses: capture BUILT dark; whether ESPN carries the INACTIVES list is UNVERIFIED** — PR mostgood1/Syndicate#111, lane `nfl-game-day-injuries`, session 2aff0397 — **OFF: not deployed, never run against a live NFL game**
 
