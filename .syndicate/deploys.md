@@ -43478,6 +43478,78 @@ since 21:56:30Z: 0 (read 21:58:49Z). Not yet exercised on a live game.
 P(over) sit on opposite sides of the line by >= 2; population `me` counts per market. The 09-29
 reading is the first CLEAN test of the points model. Task `wnba-live-prop-grid-reading-0929`.
 
+## 2026-09-29 slate — WNBA grid reading of `8acfd9a1` (read 2026-09-30 10:25 AM CT, scheduled task `wnba-live-prop-grid-reading-0929`, unattended) — JOIN EXERCISED AND UP ~20x; POPULATION + POINTS GRADE UNREADABLE: ALL THREE SERVICES BILLING-SUSPENDED
+
+**This was meant to be the FIRST CLEAN TEST of the points model** (September calibration also picked the
+variant, so 09-29 is its first holdout). **That test did NOT happen — not failed, not run.** It is still owed.
+
+    live commits (Render deploys API, read ~15:0xZ 09-30)
+      live-odds-worker 9c77608d (live 09-29 02:20:51Z)   refresh-worker c2049524 (live 09-30 02:34:11Z)
+      web (syndicate)  cfba2895 (live 09-29 00:37:04Z)   all three on origin/main
+      8acfd9a1 ancestor of all three live SHAs -> YES (and of refresh-worker's two earlier 09-29/30 SHAs)
+    SERVICE STATE: suspended=suspended, suspenders=['billing'] on ALL THREE; web events:
+      service_suspended + suspender_added {actor: Billing} 2026-09-30 06:37:51Z (1:37 AM CT)
+
+**Step 2 — `LIVE_PROJECTION_JOIN sport=wnba`, refresh-worker, requested 09-29 20:00Z..09-30 06:00Z,
+COVERED 20:04:54Z..05:56:55Z (115 lines, 3 pages).** 17 builds with a live game and considered>0,
+23:06:02Z..02:28:20Z; `lens_live_games` was 1 on every one (never 2 — the two games did not overlap
+in these builds; 00:51-00:57Z reads as the handover: lens_indexed ~90-100, miss_not_live 292/311).
+
+    field            09-29 min / median / max     09-27 baseline (5 builds) min / median / max
+    considered       180 / 221 / 409              147 / 184 / 196
+    projected         33 /  80 / 101                1 /   4 /   7
+    edged             23 /  74 /  91                1 /   4 /   5
+    edge_withheld      3 /   7 /  13                0 /   0 /   2
+    lens_indexed      90 / 513 / 664                3 /   5 /   7
+    miss_line_match    0 /   7 /  28                0 /   5 /  15
+    edged_modelled     0 /   0 /   0                0 /   0 /   0
+    prob_withheld      0 /   0 /   0                0 /   0 /   0
+
+- **The grid landed: lens_indexed ~100x, projected ~20x** (median 513 vs 5, 80 vs 4). `edged` is no
+  longer == `projected`: 3..13 per build now `edge_withheld` (baseline 0 except one build at 2). NOT
+  diagnosed which reason withholds them — the reason split is not in this line.
+- `edged_modelled=0` on every build in BOTH windows: pre-existing, not a regression of this deploy.
+- **78 of 115 lines are `reason=live-lens snapshot for wnba carries no liveProps (producer not
+  wired)`, interleaved with the live builds.** The 09-27 baseline shows the same alternation (3 of 8),
+  so it is PRE-EXISTING. Hypothesis, NOT tested: two builders (or two snapshot readers) on
+  refresh-worker, one of which never sees liveProps. Worth one look by the owner.
+- **refresh-worker was deployed TWICE MID-SLATE** (01:24-01:27Z `6bb116df`, 02:31-02:34Z `c2049524`,
+  both trigger=api by the user account), while lens_live_games=1. Not attributed to anything; noted
+  because a deploy restarts the board build that feeds this reading.
+
+**Tracebacks / memory.** live-odds-worker `Traceback` over the same window: **nothing matched**. Its
+two `server_failed` events (20:13:03Z, 02:21:32Z, `earlyExit`, not evicted, no oomKilled) are the
+PLANNED uptime recycle — `LIVE ODDS REFRESH WORKER RECYCLING after 20233s / 22036s uptime`, anon
+764 / 901 MB of 2048. refresh-worker: no server_failed in the window. **WEB WAS OOM-KILLED 5 TIMES**
+(`oomKilled memoryLimit 2Gi`): 23:27:38Z, 01:41:57Z, 03:57:22Z, 04:42:19Z, 06:15:09Z — then billing
+suspension at 06:37:51Z. Not attributed to this deploy (web runs cfba2895, and 8acfd9a1 is a
+live-odds-worker change); recorded because it is the service every read below depends on.
+
+**Step 3 — population ledger: NOT READ.** `.../api/ops/artifacts/stream?path=reports/intelligence/
+opportunity_population/2026-09-29__wnba__part000.jsonl` -> **HTTP 503 "This service has been
+suspended."** (the 09-27 part000 returns the same, so it is the host, not the file). Per-market
+rows / la / me counts: **not measured**. The 09-27 baseline (5 live props with a model edge) has no
+09-29 comparand yet.
+
+**Step 4 — points grade: NOT RUN TO A RESULT.** `fit_wnba_live_count_remainder.py grade --start
+2026-09-29 --end 2026-09-29` found the date's events on ESPN, then printed `2026-09-29 no sim anchor --
+skipped`: the anchors come from the same suspended host (`grade_wnba_live_prop_projection.py:394`).
+n=0. Re-run it once the web service is resumed; the boxscores are ESPN's and will still be there.
+
+**Step 5 — lens snapshot size: NOT FOUND in the lines read.** live-odds-worker PUBLISH_OK lines carry
+bytes only for `live_momentum_2026-09-29.jsonl` (367,374) and `momentum_events_2026-09-29.json`
+(38,325) — those are NOT the lens snapshot. Not guessed.
+
+**The receipt's other two verify clauses** (points rows carry basis `measured_negbin_remainder`; no
+row with liveProjection and P(over) on opposite sides by >= 2) need the served payload: **not read**.
+
+**NFL (NOT this lane — session 4ab694ed's, lane `layer2-triad-alignment`):** `cf2cdbae` and `c3874b91`
+are both ancestors of all three live SHAs (9c77608d, c2049524, cfba2895). No NFL prop probabilities
+were read (host suspended), so nothing odd is claimed and nothing is attributed.
+
+**Still owed, when web is resumed:** population per-market counts for 09-29 (UNVERIFIED whether the ledger
+survives a suspension), then the points grade. Both are READS; neither needs a deploy.
+
 ## 2026-09-28 6:09 PM CT — live-odds-worker `03837ae7` (lane `layer2-triad-alignment`) — NHL odds generation now builds TOMORROW as well as today. **Behavioural reading owed: 09-29 06:00 CT.**
 
     deploy dep-datf4hs9v7es738feui0   live-odds-worker 8acfd9a1 -> 03837ae7
