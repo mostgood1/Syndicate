@@ -44200,3 +44200,74 @@ lead and are NOT measured by this entry.
 - first5 unmeasured: record_carries_no_model_point_forecast 178 (known producer gap: first5 totals/spreads carry no model mean), segment_actual_level_for_h2h 34, segment_actual_unavailable 77 (rows on non-final games).
 - first1 / first3: market n 0 / 0; unmeasured no_model_point_forecast 26 / 57, segment_actual_unavailable 11 / 18. Expected: no model forecast exists for these segments.
 - verdict: PASS against the lane's reading (segments present, games_answered == final_games, first5 market.n > 0). The first5 Brier diff rests on **ONE game** (33 rows from a single game); that is a smoke reading of the wiring, not a verdict on model vs market.
+
+### 2026-09-30 01:27:10Z (2026-09-29 8:27 PM CT) — refresh-worker — `6bb116df` — honest projection counters, and the boards were far healthier than they read `[lane layer2-window-merge-counters + nhl-prop-counter-honesty + e2e-coverage-contract, session 4ab694ed]`
+
+Three landed commits in one deploy (`6bb116df` is the tip, so all three ride it):
+`de0d8b88` the cross-sport coverage contract + gate, `91e493e0` NHL prop counters,
+`6bb116df` the layer-2 window merge. Deployed together deliberately — the NHL
+counters ADD `prop_rows_*`, which the merge fix has to sum, and shipping the first
+without the second would have frozen NHL's new prop count at the first date.
+
+- **claim** refresh-worker held by `layer2-window-merge-counters`, token `1c1ea9e49b9eaf8f`.
+- **preflight** HOLD **four times** before it cleared, every one legitimate: the nightly
+  MLB daily sim in flight at 01:15Z, then board builds starting 01:20:43Z, 01:21:42Z and
+  01:23:10Z. No `--allow-mid-build`. `--drain` was tried and correctly REFUSED (it needs
+  the keyvalue backend in the shell, and without it the flag lands in a local file the
+  worker never reads).
+- **The fix for the race was to make the verdict and the action atomic.** The window kept
+  closing in the gap between a CLEAR and the deploy call — measured: CLEAR at 01:20:26Z,
+  a new build at 01:20:43Z, preflight sampling it at 01:20:56Z. Re-reading the baseline
+  and preflighting and deploying in ONE cycle fired at 01:24:13Z on that cycle's own CLEAR.
+- **expect** `nhl.prop_rows_considered` absent -> >0. **baseline** read 01:24:08Z.
+
+**verify:** `/api/board/layer2-shortlist` on a shortlist whose own `written_at` is
+**01:31:34Z, AFTER the deploy's `finishedAt` 01:27:10.743539Z**. The **six** reads between
+01:27:13Z and 01:31:02Z ALL still showed the pre-deploy payload (`written_at` 01:22:21Z):
+a verification taken in that four-minute window would have recorded this fix as a total
+failure. Second time today the same gate earned its place.
+
+    field                              baseline 01:24:08Z     measured 01:31:34Z
+    nhl.prop_rows_considered                     ABSENT                    196   <- the expectation
+    nhl.prop_rows_with_projection                ABSENT                      0
+    nhl.prop_coverage.supported                    null                  false   <- NOT 0; see below
+    nhl.game_rows_with_projection / considered    ABSENT                    9/9  (100%)
+    ncaaf.prop_rows_with_projection / considered   71/49                276/1000 (27.6%)
+    ncaaf.game_rows_with_projection / considered  53/752                 743/752 (98.8%)
+
+**THE BASELINE CARRIED ITS OWN PROOF: `ncaaf` served `prop_rows_with_projection: 71`
+against `prop_rows_considered: 49`.** A numerator exceeding its denominator is
+arithmetically impossible for a real rate, so the two were demonstrably frozen on
+different dates. Post-fix it is 276/1000 — a rate over one population.
+
+**THE BOARDS WERE HEALTHY AND THE COUNTERS WERE LYING, by more than an order of
+magnitude.** NCAAF pregame games read **7.0%** and is actually **98.8%**. NFL read 6.3%
+(94/1484) at the 22:31Z survey and now reads **42.6%** (623/1463) — that comparison spans
+different slates, so treat the SHAPE as the finding and not the delta. Every diagnosis
+this session that started from "NCAAF's game projections are missing" was chasing a
+counter.
+
+**The two nested-merge traps both hold in production.** `prop_coverage.supported` is
+`false`, NOT `0` — `isinstance(False, int)` is True in Python and a naive sum would have
+silently turned the capability into a count. And the stale
+`"no NCAAF SmartSim2 projections for this date"` reason is **GONE** (0 occurrences in the
+payload) while the `reasons` scratch bucket never leaked (0 occurrences), so a half's
+reason now survives only when that half's summed projection is actually zero.
+
+**Coverage gate: 7 defects -> 5.** `nhl.pregame_props` moved from `not_reported` to an
+attributed `0/196` carrying "no NHL player-prop projection source"; `wnba.live_games`
+moved to `116/212`. Still failing: `ncaaf`/`nfl`/`nhl` `live_games` unattributed zeros and
+soccer's two `not_reported` cells.
+
+**UNEXPECTED, AND IT CORRECTS ME: WNBA LIVE PROPS ARE PRODUCING — `89/258` (34.5%).**
+At 22:45:59Z, with LVA @ IND genuinely in progress (period 1, 4:37), the same field read
+`0` with "live-lens snapshot for wnba carries no liveProps (producer not wired)", and I
+reported the producer as not writing them. It is writing them now. **I have NOT
+established why** — candidates are the worker restart this deploy caused, a second game
+(MIN @ NYL, 00:30Z) being further along, or first-period state being too early for the
+producer. Not claimed as fixed by this deploy; recorded as a reading that contradicts my
+earlier conclusion, which stands withdrawn pending a cause.
+
+**NOT deployed:** web (`cfba2895`) and live-odds-worker (`9c77608d`) remain behind. The
+changed code is board-build only, so this is functionally right, but the three services
+are now on three different commits.
