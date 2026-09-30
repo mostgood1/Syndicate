@@ -1153,7 +1153,8 @@ death, never life — do not invert it.
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: subprocess test runs scripts/local_production.py down from outside the repo: fails pre-fix, passes post-fix
-### local-production-first-run — OPEN — opened 2026-09-30 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+### local-production-first-run — CLOSED — opened 2026-09-30, closed 2026-09-30 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: MET.** Native-Windows `up --state file`: board 22:54:32Z 463 rows -> 23:18Z 1159 rows incl. mlb 72 (`deploys.md` 23:15Z + 23:18Z). Fixed: checkout-depth crash (#313, doctor check), import-render-env sys.path, SYNDICATE_PORTFOLIO_* names, headroom gates failing closed with no cgroup (SYNDICATE_LOCAL_MEMORY_LIMIT_MB). Claims RELEASED.
 - Goal: local_production.py up on native Windows (--state file) produces FRESH data end-to-end: today's odds snapshot on the local data root and a fresh board generated_at, recorded in deploys.md (#692 item 2)
 - Files: scripts/local_production.py, tests/test_local_production.py, docs/ai_context/local_production_runbook.md, syndicate/features/shared/memory_observability.py, tests/test_memory_observability_local_limit.py
 - Hypothesis: n/a
