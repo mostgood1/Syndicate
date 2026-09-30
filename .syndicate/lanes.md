@@ -208,6 +208,7 @@ death, never life — do not invert it.
   - (2) `check_order` refuses a live Kalshi order by name (`insufficient_shard_balance`) when the shard its market routes to cannot cover the stake.
   - It stays PERMISSIVE on every unknown, exactly like the account-level gate. The account-level `insufficient_venue_balance` check is unchanged.
 - Files: `syndicate/features/shared/execution_guard.py`, `tests/test_kalshi_shard_balance.py` (NEW), `docs/ai_context/todo.md` (`#573`). RELEASED 2026-09-23 to lane `polymarket-balance-detail` (session 236bd219, user-approved; this lane 11 days idle): `syndicate/features/shared/venue_balances.py` -- the POLYMARKET row builder and `_history_entry` only. The kalshi shard-cash logic in that file is still this lane's subject and needs re-claiming here if this lane resumes.
+- **CROSS-LANE WRITE 2026-09-30 ~17:00Z, lane `local-production-host` (session 157058fe):** prepended NEW item `#692` to `docs/ai_context/todo.md`. Item `#573` (this lane's claim) was not touched.
   - Never claimed by this lane: `pipeline/execute_portfolio.py`. The gate lives in `check_order`, which the executor already calls before any ledger row. (Reworded 2026-09-18 by session a1e40980 with the meaning unchanged. The old wording, "NOT `pipeline/execute_portfolio.py`, which `polymarket-e2e-review` holds", had the path before any disclaimer marker, so `lane_claims.py` parsed this prohibition as a CLAIM and the lane guard blocked edits to the file. `polymarket-e2e-review` has been CLOSED since 2026-09-11.)
   - NOT `pipeline/kalshi_odds_refresh.py`, which `kalshi-precap-board-lines` holds: each ticker's shard is read with `kalshi_client.fetch_market`, not from the stored markets.
 - Hypothesis, measured 2026-09-11 and read-only:
@@ -1111,6 +1112,14 @@ death, never life — do not invert it.
 - **THE TEST SUITE HAD THE SAME BLIND SPOT AS THE CODE, which is the more useful lesson.** Both "left alone" tests used a NON-ZERO `projected`, so they passed on the early-return branch and NOTHING exercised `projected == 0` with `considered > 0`. 11 tests passed and the defect still reached production. 6 new tests close it, and I verified by simulation that the NHL-shape test FAILS against the old logic — a test that cannot fail against the bug it is written for proves nothing.
 - Ranked and truncated: reasons are ordered by count with a `+N more` tail so a long breakdown is summarised rather than silently cut. Rows withheld with NO breakdown recorded is itself NAMED, because that is a gap in the join's own accounting and must not read as a plain zero.
 - 17 tests in this file; **569** board_enrichment/live_gameline/coverage_contract tests pass.
+- Blocked by: none
+
+### local-production-host — OPEN — opened 2026-09-30 — session 157058fe-f912-55ec-9316-dbc932a8c804
+- Goal: Full Syndicate production (web + refresh-worker + live-odds-worker + state store) boots and serves on one local machine from render.yaml's own run-modes while Render is billing-suspended
+- Files: scripts/local_production.py, docs/ai_context/local_production_runbook.md, tests/test_local_production.py, deploy/local/
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: local_production.py up boots all three roles; /healthz 200 and board routes render; both workers log a completed tick; doctor reports READY
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

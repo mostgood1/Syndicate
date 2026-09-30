@@ -44391,3 +44391,26 @@ outside, and it is the real gap behind NHL's live zero.
 **NOT deployed:** web (`cfba2895`) and live-odds-worker (`9c77608d`). The change is
 board-build only, so this is functionally right, but the three services now sit on three
 commits.
+
+---
+
+### 2026-09-30 ~17:01Z — LOCAL PRODUCTION rehearsal (NOT a Render deploy) — lane `local-production-host`, `#692`
+
+**Context.** All three Render services billing-suspended since 06:37:51Z. This is the first measurement of
+`scripts/local_production.py` running the production run-modes on one host (Linux cloud container, commit on
+branch `claude/dreamy-babbage-dm6ubz`, base `bfb00966`). Money: paper. No venue keys. No live env import (no
+`RENDER_API_KEY` in that container) -- blueprint-only env.
+
+- expect: all three roles up from render.yaml's per-service env; web gunicorn 2x4; both workers on keyvalue.
+- verify (readings, 16:58:04Z -> 17:01:06Z):
+  - bootstrap seed 1.9 GB, rc 0, 136 s (earlier run 16:53Z).
+  - web: `MALLOC_ARENA_INIT applied`, `WEB_MEMORY_GUARD_ARMED`, `/healthz` 200; `/ /mlb /nba /nfl /nhl /wnba
+    /ncaaf /intelligence` 200; `/portfolio` 503 (`PORTFOLIO_AUTH_MODE mode=required on_render=True`, no creds -- correct).
+  - `REFRESH_STATE_BACKEND = keyvalue` on both workers; local redis dbsize 40 -> 80.
+  - `model-scorecard` job: `base=http://127.0.0.1:10000`, local data root, rc 0.
+  - RSS: web 292 MB, refresh-worker 235 MB, live-odds-worker 552 MB (incl. children).
+  - `kill -9` refresh-worker at 156 s -> supervisor restarted it in 10 s, keyvalue reconnected. Zero other restarts.
+  - `down`: 0 role/redis processes left.
+- NOT measured: fresh data. The container's egress denied api.the-odds-api.com, site.api.espn.com,
+  statsapi.mlb.com and Kalshi, so no odds fetch or sim completed. The end-to-end reading is owed from the
+  user's machine (`#692` owed item 2).

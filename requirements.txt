@@ -40,3 +40,7 @@ anthropic>=0.116.0
 # order placement. It was previously present only transitively, which is a
 # dependency that can disappear without anything in this file changing.
 cryptography>=42.0,<46.0
+
+# scripts/local_production.py parses render.yaml to derive each role's env
+# (lane local-production-host, todo #692). Nothing on the request path imports it.
+PyYAML>=6.0,<7.0
