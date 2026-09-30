@@ -2284,18 +2284,55 @@ def _attribute_live_gameline_zero(
       * an index with games but no board row CONSIDERED -> the row/game join is
         the gap, not the producer.
 
-    DOES NOTHING WHEN ROWS WERE CONSIDERED. A join that looked at rows and priced
-    none of them already explains itself through `withheld_by_reason`, and
-    overwriting that with a coarse summary would lose the detail.
+    A JOIN THAT CONSIDERED ROWS AND PRICED NONE ALSO NEEDS A REASON, and the first
+    version of this function got that wrong `[corrected 2026-09-30]`. It returned
+    early whenever `considered > 0`, reasoning that such a join "already explains
+    itself through `withheld_by_reason`". That was right about the DATA and wrong
+    about the READER: the coverage contract reads `reason` and cannot see
+    `withheld_by_reason`, so NHL shipped `considered: 9, withheld_by_reason:
+    {"no_live_gameline_projection": 9}` and still measured as an `unattributed_zero`
+    on production. A `reason` set ALONGSIDE `withheld_by_reason` loses no detail, so
+    the early return was over-cautious in the wrong direction.
+
+    ONLY A NON-ZERO `projected` returns early now: that is real coverage, and a rate
+    with a denominator explains itself.
     """
     try:
         considered = int(coverage.get("rows_live_gameline_considered") or 0)
         projected = int(coverage.get("rows_live_gameline_projected") or 0)
     except (TypeError, ValueError):
         return
-    if considered > 0 or projected > 0:
+    if projected > 0:
         return
     if str(coverage.get("reason") or "").strip():
+        return
+
+    if considered > 0:
+        # The join LOOKED at rows and priced none. `withheld_by_reason` holds the
+        # per-reason breakdown and stays untouched; this only surfaces the top of
+        # it into the field the contract reads.
+        withheld = coverage.get("withheld_by_reason")
+        if isinstance(withheld, dict) and withheld:
+            def _n(item):
+                try:
+                    return int(item[1] or 0)
+                except (TypeError, ValueError):
+                    return 0
+            top = sorted(withheld.items(), key=lambda kv: (-_n(kv), str(kv[0])))
+            detail = ", ".join(f"{k}={v}" for k, v in top[:3])
+            more = "" if len(top) <= 3 else f", +{len(top) - 3} more"
+            coverage["reason"] = (
+                f"{considered} {sport} row(s) considered, none priced "
+                f"({detail}{more})"
+            )
+        else:
+            # NO BREAKDOWN EITHER IS ITSELF THE FINDING: rows were withheld and
+            # nothing recorded why, which is a gap in the join's own accounting
+            # and must not read as a plain zero.
+            coverage["reason"] = (
+                f"{considered} {sport} row(s) considered, none priced, and no "
+                "withheld_by_reason was recorded"
+            )
         return
 
     diag = index_diag if isinstance(index_diag, dict) else {}
