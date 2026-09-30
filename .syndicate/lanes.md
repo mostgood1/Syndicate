@@ -1137,6 +1137,15 @@ death, never life — do not invert it.
 - Verification: tests/test_process_liveness.py + existing ops_refresh/live_refresh_loop tests pass; AST guard shows no os.kill(pid, 0) outside the helper
 - Blocked by: none
 
+### local-production-down-liveness — CLOSED — opened 2026-09-30, closed 2026-09-30 — session 157058fe-f912-55ec-9316-dbc932a8c804
+- **Goal: local_production.py down returns at once when the supervisor is already dead, and reaps any orphaned roles/redis from the pidfile — GOAL: MET.** Reading: `test_down_with_a_dead_supervisor_returns_at_once_and_reaps_orphans` 0.06 s and orphan killed; the same test against the pre-fix `cmd_down` FAILED after 31.9 s; live-supervisor path still waits and does not kill a cooperative supervisor. 19/19 `tests/test_local_production.py`. Claims RELEASED.
+- Goal: local_production.py down returns at once when the supervisor is already dead, and reaps any orphaned roles/redis from the pidfile
+- Files: scripts/local_production.py, tests/test_local_production.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: tests: dead supervisor -> down returns without waiting and kills recorded live orphans; live supervisor path unchanged
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

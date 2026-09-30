@@ -163,3 +163,77 @@ def test_web_counts_as_render_web_dyno_in_both_state_modes(blueprint, tmp_path):
         env, _ = _env("web", blueprint, lp.Settings(home=tmp_path, state=state))
         assert env["RENDER_SERVICE_ID"] == "local-web"
         assert env["SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP"] == "false"
+
+
+def _down_args(home, timeout=30.0):
+    return lp.parse_args(["--home", str(home), "down", "--timeout", str(timeout)])
+
+
+def _write_pidfile(settings, supervisor_pid, roles=None, redis_pid=None):
+    import json
+
+    settings.run_dir.mkdir(parents=True, exist_ok=True)
+    (settings.run_dir / lp.PIDFILE_NAME).write_text(
+        json.dumps({"supervisor_pid": supervisor_pid, "roles": roles or {}, "redis_pid": redis_pid}), encoding="utf-8"
+    )
+
+
+def _dead_pid():
+    import subprocess
+    import sys
+
+    child = subprocess.Popen([sys.executable, "-c", "pass"])
+    child.wait()
+    return child.pid
+
+
+def test_down_with_a_dead_supervisor_returns_at_once_and_reaps_orphans(settings):
+    # 2026-09-30: `down` waited its full 90 s timeout on a supervisor that was
+    # already gone, because only a live supervisor ever reads the stop file.
+    import subprocess
+    import sys
+    import time
+
+    orphan = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    try:
+        _write_pidfile(settings, _dead_pid(), roles={"web": orphan.pid, "refresh-worker": _dead_pid()})
+        started = time.monotonic()
+        assert lp.cmd_down(_down_args(settings.home, timeout=30.0)) == 0
+        assert time.monotonic() - started < 10
+        assert orphan.wait(timeout=10) is not None  # the orphaned role was killed
+        assert not (settings.run_dir / lp.PIDFILE_NAME).exists()
+        assert not (settings.run_dir / "stop").exists()
+    finally:
+        if orphan.poll() is None:
+            orphan.kill()
+
+
+def test_down_with_a_live_supervisor_signals_it_and_waits(settings):
+    import subprocess
+    import sys
+    import threading
+
+    supervisor = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    try:
+        _write_pidfile(settings, supervisor.pid)
+
+        def _behave_like_a_supervisor():
+            # a real supervisor sees the stop file and removes its own pidfile
+            stop = settings.run_dir / "stop"
+            for _ in range(100):
+                if stop.exists():
+                    (settings.run_dir / lp.PIDFILE_NAME).unlink(missing_ok=True)
+                    return
+                threading.Event().wait(0.05)
+
+        watcher = threading.Thread(target=_behave_like_a_supervisor)
+        watcher.start()
+        assert lp.cmd_down(_down_args(settings.home, timeout=30.0)) == 0
+        watcher.join(timeout=10)
+        assert supervisor.poll() is None  # a cooperative supervisor is NOT killed
+    finally:
+        supervisor.kill()
+
+
+def test_down_with_no_pidfile_is_a_noop(settings):
+    assert lp.cmd_down(_down_args(settings.home)) == 0
