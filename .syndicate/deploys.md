@@ -44271,3 +44271,51 @@ earlier conclusion, which stands withdrawn pending a cause.
 **NOT deployed:** web (`cfba2895`) and live-odds-worker (`9c77608d`) remain behind. The
 changed code is board-build only, so this is functionally right, but the three services
 are now on three different commits.
+
+### 2026-09-30 02:34:11Z (2026-09-29 9:34 PM CT) — refresh-worker — `c2049524` — live-gameline zeros attributed; gate 5 -> 2, and ONE of my three fixes missed `[lane live-gameline-zero-attribution, session 4ab694ed]`
+
+- **claim** refresh-worker held by `live-gameline-zero-attribution`, token `c18cca512989a8c1`.
+- **preflight** HOLD on cycles 1 and 2 (board builds starting 02:29:25Z and 02:30:18Z, under a
+  minute apart), CLEAR on cycle 3. Deployed 02:31:05Z, same second as the verdict. No
+  `--allow-mid-build`.
+- **expect** `nhl.live_gamelines.reason` absent -> present. **baseline** read 02:30:59Z.
+
+**verify:** shortlist `written_at` **02:38:20Z**, AFTER `finishedAt` **02:34:11.259734Z**. The
+**six** reads from 02:34:13Z to 02:38:02Z all still served the pre-deploy payload
+(`written_at` 02:28:48Z). Third time today that gate prevented a correct fix being logged as
+a failure.
+
+    sport   projected  considered  reason after the deploy
+    mlb            10         125  (none)  <- real coverage, correctly no reason
+    nfl             0           0  16 nfl game(s) in the live snapshot but none indexed (skipped...)
+    ncaaf           0           0  56 ncaaf game(s) in the live snapshot but none indexed (skipped...)
+    wnba            0           0  1 wnba game(s) in the live snapshot but none indexed (skipped...)
+    soccer          0        None  no soccer match in play in any league's live-state artifact
+    nhl             0           9  (none)  <- STILL UNATTRIBUTED, see below
+
+**`check_e2e_coverage.py`: 5 defects -> 2** (and 7 -> 2 across both deploys tonight).
+Fixed: `nfl`/`ncaaf`/`wnba` `live_games` now attributed; `soccer.live_games` moved off
+`not_reported` once the early returns carried `rows_live_gameline_projected` as well as
+`rows_live_gameline_edged`. Remaining: `nhl.live_games` and `soccer.pregame_props`.
+
+**THE MISS IS MINE AND IT IS A DESIGN ERROR, not an incomplete rollout.** I made the
+function return early when `rows_live_gameline_considered > 0`, on the reasoning that "a
+join that CONSIDERED rows already explains itself through `withheld_by_reason`, and writing
+a coarse summary over that would lose the detail". NHL is exactly that case — `considered:
+9`, `withheld: 9`, `withheld_by_reason: {"no_live_gameline_projection": 9}`. **The reasoning
+was right about the DATA and wrong about the READER:** the coverage contract reads `reason`
+and cannot see `withheld_by_reason`, so the explanation exists in the payload and is
+invisible to the only consumer that matters. Adding a `reason` ALONGSIDE
+`withheld_by_reason` loses nothing, so the early return was over-cautious in the wrong
+direction. Not fixed here; owed as a follow-up.
+
+**WHAT NHL'S DIAGNOSTICS NOW SHOW, which is a separate and real finding:**
+`games_in_snapshot: 5, indexed: 0, skipped_no_accepted_lane: 5, sources_seen:
+{"pregame_only": 5}` against `accepted_sources: ["live_resim"]`. All five NHL games are in
+the snapshot carrying ONLY a pregame source — the NHL live re-sim is not emitting
+`live_resim` at all. That corroborates lane `nhl-live-resim`'s own GOAL: NOT MET from the
+outside, and it is the real gap behind NHL's live zero.
+
+**NOT deployed:** web (`cfba2895`) and live-odds-worker (`9c77608d`). The change is
+board-build only, so this is functionally right, but the three services now sit on three
+commits.
