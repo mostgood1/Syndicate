@@ -443,6 +443,7 @@ rehearsal harness. Runbook: `docs/ai_context/local_production_runbook.md`.
   `publish_model_scorecard.base_url`). Set `SYNDICATE_INTERNAL_WEB_BASE_URL` / `SYNDICATE_WNBA_LIVE_BOX_BASE_URL` / `SYNDICATE_BASE_URL`.
 - **Money is paper unless `up --allow-live-execution`**, even when the imported live env says live+armed.
 - Redis keys embed the ABSOLUTE data-root path: pick `SYNDICATE_LOCAL_HOME` once.
+- `down` on a dead supervisor returns at once and reaps the roles/redis recorded in its pidfile as orphans `[verified 2026-09-30, PR #122 e8ff5030; negative control: pre-fix waited out the timeout]`.
 
 ## [artifact-allowlist-split] THE ARTIFACT ALLOWLIST IS TWO LISTS NOW: READ WIDE, WRITE NARROW — and an allowlist-filtered inventory is NOT a census of the disk `[verified 2026-09-02 in production, web `e6fa165b`, lane m625-export-only-patterns]`
 **CORRECTED 2026-09-03 — `reconciliation/*` MOVED TO THE WRITE LIST.** `#625`(2)
