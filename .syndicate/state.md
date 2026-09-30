@@ -677,6 +677,7 @@ once this index exists: re-splitting would orphan the parts.
 | [refresh-worker-headroom-2026-09-02] | THE ~1.4GB HEADROOM FIGURE IS STALE, AND THE METRIC EVERYONE READS IS THE WRONG ONE `[2026-09-02, lane m625-en | `state_worker.md` |
 | [accuracy-autorun-OOM-2026-09-02] | THE ACCURACY AUTORUN OOM-KILLED refresh-worker. **RESOLVED — DISARMED AND VERIFIED 19:32Z.** `[2026-09-02, lan | `state_worker.md` |
 | [local-fleet-runner] | THE THREE SERVICES RUN LOCALLY NOW — and doing it naively would have placed REAL ORDERS `[verified 2026-09-02, | `state_worker.md` |
+| [local-production-host] | PRODUCTION RUNS ON ONE MACHINE NOW — `scripts/local_production.py`, and self-publish MUST be off on a shared disk `[verified 2026-09-30, | `state_worker.md` |
 | [artifact-allowlist-split] | THE ARTIFACT ALLOWLIST IS TWO LISTS NOW: READ WIDE, WRITE NARROW — and an allowlist-filtered inventory is NOT  | `state_worker.md` |
 | [service-memory-saturation] | BOTH PRODUCTION SERVICES WERE MEMORY-SATURATED 2026-09-02/03 — MEASURED, and it BLOCKS analysis work `[lane so | `state_worker.md` |
 | [live-odds-worker-deploy-window] | `deploy_preflight` ALMOST NEVER CLEARS ON live-odds-worker DURING A LIVE SLATE, and the reason is a LONG-RUNNI | `state_worker.md` |
