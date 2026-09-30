@@ -44417,7 +44417,7 @@ branch `claude/dreamy-babbage-dm6ubz`, base `bfb00966`). Money: paper. No venue 
 
 ## 2026-09-30 23:15Z (6:15 PM CT) -- READING, no deploy -- LOCAL PRODUCTION first real run, native Windows (lane `local-production-first-run`) -- **FRESH DATA END-TO-END: MET (NCAAF/NFL/WNBA on the board; MLB sim running, MLB rows NOT yet on the board)**
 
-**Context.** Render still billing-suspended (all three services `suspenders=['billing']`, read via API 22:3xZ). This is `#692` owed item 2. Host: the user's Windows 11 machine, 32 GB, native Windows (no WSL/Redis/Memurai), `up --state file` (user decision), paper money (user decision), seeded from the git mirror only (user decision: no Render-disk export). Checkout `C:\SyndicateProdepo\Syndicate` at `6570d4dc` + this lane's fixes; home `C:\SyndicateProd\home`; live env imported read-only (web 88 / refresh-worker 182 / live-odds-worker 147 keys).
+**Context.** Render still billing-suspended (all three services `suspenders=['billing']`, read via API 22:3xZ). This is `#692` owed item 2. Host: the user's Windows 11 machine, 32 GB, native Windows (no WSL/Redis/Memurai), `up --state file` (user decision), paper money (user decision), seeded from the git mirror only (user decision: no Render-disk export). Checkout `C:\SyndicateProd\repo\Syndicate` at `6570d4dc` + this lane's fixes; home `C:\SyndicateProd\home`; live env imported read-only (web 88 / refresh-worker 182 / live-odds-worker 147 keys).
 
 - expect: within ~15 min of `up`, fresh odds on the local data root and a board `generated_at` after start.
 - verify (readings):
