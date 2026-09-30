@@ -55,6 +55,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterator, Mapping
 
 from syndicate.features.shared.ledger_bridge import _american_profit as american_profit
+from syndicate.features.shared.process_liveness import exclusive_file_lock
 from syndicate.features.shared.refresh_state_store import data_root
 
 SCHEMA_VERSION = 1
@@ -181,17 +182,11 @@ def _write_file(path: Path, payload: Mapping[str, Any]) -> None:
 @contextmanager
 def _exclusive(path: Path) -> Iterator[None]:
     path.parent.mkdir(parents=True, exist_ok=True)
+    # `flock` on POSIX, `msvcrt.locking` on Windows -- a native-Windows local
+    # production host runs web with more than one process too (#692).
     with open(path.with_name(path.name + ".lock"), "a+") as handle:
-        try:
-            import fcntl
-        except ImportError:  # a Windows dev box: one process, nothing to serialise against
+        with exclusive_file_lock(handle):
             yield
-            return
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def _mutate(apply: Callable[[dict[str, Any]], Any]) -> Any:

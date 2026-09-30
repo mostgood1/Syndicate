@@ -41,6 +41,7 @@ from syndicate.blueprints.soccer import soccer_bp
 from syndicate.blueprints.sports import sports_bp
 from syndicate.blueprints.wnba import wnba_bp
 from syndicate.features.shared.json_safety import json_safe_value
+from syndicate.features.shared.process_liveness import pid_is_alive
 from syndicate.features.shared.portfolio_auth import install_portfolio_auth
 from syndicate.features.shared.response_compression import install_response_compression
 from syndicate.features.shared.live_refresh_loop import start_live_refresh_background_loop
@@ -89,20 +90,11 @@ def _pid_is_running(pid: int) -> bool:
     all. Same call, sound here, unsound there -- the difference is entirely
     where the lock lives.
     """
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True  # exists, owned by another user
-    except OSError:
-        # Unknown. Treat as ALIVE: refusing to take a lock costs one skipped
-        # sync, while stealing a live one runs two syncs at once. The age
-        # backstop still breaks a lock that reads "alive" forever.
-        return True
-    return True
+    # Unknown reads as ALIVE: refusing to take a lock costs one skipped sync,
+    # while stealing a live one runs two syncs at once. The age backstop still
+    # breaks a lock that reads "alive" forever. (Not `os.kill(pid, 0)`: on
+    # Windows that sends CTRL_C_EVENT, #692.)
+    return pid_is_alive(pid, unknown=True)
 
 
 def _process_start_marker(pid: int) -> str | None:

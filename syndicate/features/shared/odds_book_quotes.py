@@ -61,6 +61,8 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator, Mapping
 
 from syndicate.features.shared.opportunity_signals import consensus_vigged_price
+from syndicate.features.shared.process_liveness import lock_file_exclusive
+from syndicate.features.shared.process_liveness import unlock_file
 from syndicate.features.shared.refresh_state_store import data_root
 
 # Kept deliberately flat and uniform across sports. A consumer that can read
@@ -642,9 +644,10 @@ def shard_append_lock(path: Path):
     (`artifact_publisher._pull_append_only_synced`), which rewrites the part of
     the file after the last synced offset. Without a shared lock an append
     landing between that read and its truncate would be lost. `flock` on a
-    dotfile beside the shard: released by the kernel if the holder dies, and a
-    no-op where `fcntl` does not exist (a Windows dev box). A lock that cannot
-    be taken never stops the write -- losing the capture is worse.
+    dotfile beside the shard: released by the kernel if the holder dies.
+    `msvcrt.locking` stands in on Windows, where a local production host runs
+    the same writers (#692). A lock that cannot be taken never stops the
+    write -- losing the capture is worse.
     """
     target = Path(path)
     handle = None
@@ -652,13 +655,8 @@ def shard_append_lock(path: Path):
         lock_path = target.with_name(f".{target.name}.lock")
         lock_path.parent.mkdir(parents=True, exist_ok=True)
         handle = open(lock_path, "a+b")
-        try:
-            import fcntl
-
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        except ImportError:
-            pass
-    except OSError:
+        lock_file_exclusive(handle)
+    except (OSError, ImportError):
         if handle is not None:
             handle.close()
         handle = None
@@ -667,9 +665,7 @@ def shard_append_lock(path: Path):
     finally:
         if handle is not None:
             try:
-                import fcntl
-
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                unlock_file(handle)
             except Exception:
                 pass
             handle.close()

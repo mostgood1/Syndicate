@@ -33,6 +33,8 @@ from syndicate.features.shared.source_roots import repo_root_from
 from syndicate.features.shared.timezone import central_datetime_from_epoch
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared import slate_phase as _slate_phase
+from syndicate.features.shared.process_liveness import pid_is_alive
+from syndicate.features.shared.process_liveness import process_cmdline
 
 try:
 	import fcntl  # type: ignore
@@ -2300,63 +2302,13 @@ def _process_exists(pid: Any) -> bool:
 	# only visible to the gunicorn worker that launched it -- other workers
 	# (and any worker after a container restart) have no in-memory signal at
 	# all and must verify against the actual OS process table instead.
-	try:
-		pid_i = int(pid or 0)
-	except Exception:
-		return False
-	if pid_i <= 0:
-		return False
-	if sys.platform.startswith("win") or os.name == "nt":
-		try:
-			import ctypes
-
-			PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-			SYNCHRONIZE = 0x00100000
-			WAIT_TIMEOUT = 0x00000102
-			WAIT_OBJECT_0 = 0x00000000
-
-			kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-			handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, False, pid_i)
-			if not handle:
-				err = ctypes.get_last_error()
-				if err == 5:
-					return True
-				return False
-			try:
-				wait_code = kernel32.WaitForSingleObject(handle, 0)
-				if wait_code == WAIT_TIMEOUT:
-					return True
-				if wait_code == WAIT_OBJECT_0:
-					return False
-				return True
-			finally:
-				kernel32.CloseHandle(handle)
-		except Exception:
-			return False
-	try:
-		os.kill(pid_i, 0)
-	except PermissionError:
-		return True
-	except (OSError, SystemError, ValueError):
-		return False
-	return True
+	# The OpenProcess/WaitForSingleObject probe that used to live here is now
+	# the shared `process_liveness` helper every liveness site calls (#692).
+	return pid_is_alive(pid, unknown=False)
 
 
 def _process_cmdline(pid: Any) -> list[str] | None:
-	try:
-		pid_i = int(pid or 0)
-	except Exception:
-		return None
-	if pid_i <= 0:
-		return None
-	if sys.platform.startswith("win") or os.name == "nt":
-		return None
-	try:
-		raw = Path(f"/proc/{pid_i}/cmdline").read_bytes()
-	except Exception:
-		return None
-	parts = [part.decode("utf-8", errors="ignore") for part in raw.split(b"\x00") if part]
-	return parts or None
+	return process_cmdline(pid)
 
 
 def _process_matches_lock(pid: Any, expected_command: Any) -> bool:
@@ -2367,7 +2319,7 @@ def _process_matches_lock(pid: Any, expected_command: Any) -> bool:
 	"""
 	current = _process_cmdline(pid)
 	if current is None:
-		# Can't verify (Windows, /proc unavailable, process just exited) --
+		# Can't verify (no procfs and no psutil, process just exited) --
 		# fall back to trusting the existing PID-liveness check alone.
 		return True
 	expected = expected_command if isinstance(expected_command, list) else []

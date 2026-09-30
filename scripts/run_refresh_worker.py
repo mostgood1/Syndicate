@@ -22,6 +22,7 @@ from syndicate.features.shared.ops_refresh import _active_sports_for_date
 from syndicate.features.shared.ops_refresh import _REFRESH_WORKER_LANE_KEY
 from syndicate.features.shared.ops_refresh import _refresh_lane_key
 from syndicate.features.shared.ops_refresh import _refresh_manifest_filename
+from syndicate.features.shared.process_liveness import pid_is_alive
 from pipeline.intelligence_state import start_intelligence_state_background_loop
 from syndicate.features.shared.timezone import central_datetime_from_epoch
 from syndicate.features.shared.timezone import central_today_iso
@@ -4098,13 +4099,10 @@ def _launch_autorun_evaluation_settlement(
 
 
 def _pid_is_running(pid: int | None) -> bool:
-    if not isinstance(pid, int) or pid <= 0:
+    if not isinstance(pid, int):
         return False
-    try:
-        os.kill(int(pid), 0)
-        return True
-    except Exception:
-        return False
+    # Not `os.kill(pid, 0)`: on Windows signal 0 is CTRL_C_EVENT (#692).
+    return pid_is_alive(pid, unknown=False)
 
 
 def _parse_utc_timestamp(value: str | None) -> datetime | None:

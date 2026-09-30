@@ -27,6 +27,8 @@ from pathlib import Path
 from typing import Any
 
 from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.shared.process_liveness import pid_is_alive
+from syndicate.features.shared.process_liveness import process_cmdline
 from syndicate.features.shared.refresh_state_store import list_refresh_status_manifest_paths
 from syndicate.features.shared.refresh_state_store import known_refresh_lanes
 from syndicate.features.shared.refresh_state_store import record_known_refresh_lane
@@ -82,36 +84,8 @@ def _load_mirror_manifest_summaries_from_current_data_root() -> list[dict[str, A
 
 
 def _pid_is_running(pid: int | None) -> bool:
-    if pid is None or pid <= 0:
-        return False
-    if os.name == "nt":
-        try:
-            os.kill(int(pid), 0)
-        except ProcessLookupError:
-            return False
-        except PermissionError:
-            return True
-        except OSError:
-            return False
-        return True
-    else:
-        stat_path = Path("/proc") / str(pid) / "stat"
-        if stat_path.exists():
-            try:
-                parts = stat_path.read_text(encoding="utf-8", errors="ignore").split()
-                if len(parts) >= 3 and str(parts[2]).strip().upper() == "Z":
-                    return False
-            except OSError:
-                pass
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
-            return False
-        except PermissionError:
-            return True
-        except OSError:
-            return False
-        return True
+    # Never `os.kill(pid, 0)` here: on Windows signal 0 is CTRL_C_EVENT (#692).
+    return pid_is_alive(pid, unknown=False, zombie_is_dead=True)
 
 
 def _parse_utc_timestamp(value: Any) -> datetime | None:
@@ -627,14 +601,7 @@ def _refresh_run_max_runtime_seconds() -> int:
 
 
 def _process_cmdline(pid: int) -> list[str] | None:
-    if os.name == "nt":
-        return None
-    try:
-        raw = Path(f"/proc/{pid}/cmdline").read_bytes()
-    except Exception:
-        return None
-    parts = [part.decode("utf-8", errors="ignore") for part in raw.split(b"\x00") if part]
-    return parts or None
+    return process_cmdline(pid)
 
 
 def _process_matches_expected_command(pid: int, expected_command: Any) -> bool:
@@ -643,7 +610,7 @@ def _process_matches_expected_command(pid: int, expected_command: Any) -> bool:
     # a stale pointer look perpetually held via liveness alone.
     current = _process_cmdline(pid)
     if current is None:
-        # Can't verify (Windows, /proc unavailable, process just exited) --
+        # Can't verify (no procfs and no psutil, process just exited) --
         # fall back to trusting the liveness check alone.
         return True
     expected = expected_command if isinstance(expected_command, list) else []

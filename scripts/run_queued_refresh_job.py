@@ -16,6 +16,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from syndicate.features.shared.artifact_publisher import publish_changed_hot_artifacts
+from syndicate.features.shared.process_liveness import pid_is_alive
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import assert_refresh_state_backend_ready
 from syndicate.features.shared.refresh_state_store import reports_root
@@ -32,13 +33,10 @@ def _default_latest_manifest_path() -> Path:
 
 
 def _pid_is_running(pid: int | None) -> bool:
-    if not isinstance(pid, int) or pid <= 0:
+    if not isinstance(pid, int):
         return False
-    try:
-        os.kill(int(pid), 0)
-        return True
-    except Exception:
-        return False
+    # Not `os.kill(pid, 0)`: on Windows signal 0 is CTRL_C_EVENT (#692).
+    return pid_is_alive(pid, unknown=False)
 
 def _is_stale_running_external_contract(latest_manifest: dict[str, Any]) -> bool:
     if str(latest_manifest.get("state") or "").strip().lower() != "running":
