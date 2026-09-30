@@ -426,6 +426,24 @@ live-odds-worker **exit 0, 620.2 MB** of 2048. Production run-modes preserved �
   can exceed the cap between samples and a sudden allocation outruns the
   sampler. Useful for the slow ratchet, NOT evidence about Render's ceiling.
 
+## [local-production-host] PRODUCTION RUNS ON ONE MACHINE NOW — `scripts/local_production.py`, and self-publish MUST be off on a shared disk `[verified 2026-09-30, lane local-production-host, PR #118 f565a435, NO DEPLOY]`
+
+All three Render services are billing-suspended (2026-09-30 06:37:51Z). `py -3 scripts/local_production.py init | import-render-env | doctor | up`
+runs web + refresh-worker + live-odds-worker + a local Redis, deriving each role's env from `render.yaml` PER SERVICE (then the
+live dashboard env, then `<home>/local_production.env`). This is the PRODUCTION counterpart of `[local-fleet-runner]`, which stays the
+rehearsal harness. Runbook: `docs/ai_context/local_production_runbook.md`.
+
+- **VERIFIED (Linux container):** all three roles up, web gunicorn 2x4 with the memory guard, both workers on keyvalue, ticks
+  complete, `kill -9` recovered in 10 s. **Fresh upstream data NOT measured** (container egress): owed, `#692` item 2.
+- **`SYNDICATE_WEB_PUBLISH_URL` MUST BE UNSET when roles share a disk.** The publish receiver `os.replace`s/merges the very file
+  the worker is appending to (rows appended mid-merge are lost). Pulls `os.replace` over the live file. Unset -> `*_SKIP_NOT_CONFIGURED`.
+- **Web needs a Render marker (`RENDER_SERVICE_ID`) or `syndicate/app.py` starts the intelligence + live-refresh loops on first
+  request WITHOUT reading their flags** -- a second board builder on the same disk.
+- **Unset worker->web URLs fall back to the PUBLIC onrender host** (`live_lens_loop._wnba_live_box_base_url`,
+  `publish_model_scorecard.base_url`). Set `SYNDICATE_INTERNAL_WEB_BASE_URL` / `SYNDICATE_WNBA_LIVE_BOX_BASE_URL` / `SYNDICATE_BASE_URL`.
+- **Money is paper unless `up --allow-live-execution`**, even when the imported live env says live+armed.
+- Redis keys embed the ABSOLUTE data-root path: pick `SYNDICATE_LOCAL_HOME` once.
+
 ## [artifact-allowlist-split] THE ARTIFACT ALLOWLIST IS TWO LISTS NOW: READ WIDE, WRITE NARROW — and an allowlist-filtered inventory is NOT a census of the disk `[verified 2026-09-02 in production, web `e6fa165b`, lane m625-export-only-patterns]`
 **CORRECTED 2026-09-03 — `reconciliation/*` MOVED TO THE WRITE LIST.** `#625`(2)
 put it on the READ-only list arguing "nothing on web serves these". True, and
