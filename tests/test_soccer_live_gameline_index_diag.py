@@ -82,10 +82,23 @@ def test_an_empty_soccer_index_keeps_its_named_early_return(monkeypatch):
     assert cov["reason"] == "no soccer match in play in any league's live-state artifact"
 
 
-@pytest.mark.parametrize("diag", [None, {}, [], {"games_in_snapshot": "many"}])
+@pytest.mark.parametrize("diag", [
+    None, {}, [], {"games_in_snapshot": "many"},
+    # PRESENT BUT NULL is still unknown. The first version of the guard read
+    # `int(raw or 0)`, which turned all three into a real 0 before int() could
+    # raise -- found by the owning lane against bc8a8340, 2026-09-30.
+    {"games_in_snapshot": None}, {"games_in_snapshot": ""}, {"games_in_snapshot": []},
+])
 def test_absent_or_unreadable_diagnostics_never_read_as_nothing_in_play(diag):
     """Unknown must not default permissive: counters nobody filled are not a zero."""
     cov = {"rows_live_gameline_considered": 0, "rows_live_gameline_projected": 0}
     _attribute_live_gameline_zero(cov, diag, sport="soccer")
     assert "no soccer game in play" not in cov["reason"]
     assert "index diagnostics unavailable" in cov["reason"]
+
+
+def test_a_real_zero_still_reads_as_nothing_in_play():
+    """The guard must not swallow the honest state: a counted 0 IS nothing in play."""
+    cov = {"rows_live_gameline_considered": 0, "rows_live_gameline_projected": 0}
+    _attribute_live_gameline_zero(cov, {"games_in_snapshot": 0, "indexed": 0}, sport="soccer")
+    assert cov["reason"] == "no soccer game in play in the published live snapshot"

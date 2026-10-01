@@ -2348,9 +2348,14 @@ def _attribute_live_gameline_zero(
     # would then say "no game in play" -- the permissive answer for a state that
     # is actually unknown. Soccer's live branch never filled them at all, and its
     # zero would have claimed nothing was in play while two matches were indexed.
+    # PRESENT-BUT-NULL is the same unknown: no `or 0` here, which would turn
+    # None / "" / [] into a counted zero before int() could object.
+    raw_games = diag.get("games_in_snapshot")
     try:
-        int(diag["games_in_snapshot"] or 0)
-    except (KeyError, TypeError, ValueError):
+        if raw_games is None or (isinstance(raw_games, str) and not raw_games.strip()):
+            raise ValueError("games_in_snapshot unset")
+        int(raw_games)
+    except (TypeError, ValueError):
         coverage["reason"] = (
             f"no {sport} row priced, and index diagnostics unavailable -- "
             "cannot tell 'nothing in play' from a producer or join gap"
