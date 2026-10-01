@@ -1333,6 +1333,15 @@ death, never life — do not invert it.
 - **Hypothesis (recorded before testing):** vendor `events.simulate_pbp_game_boxscore` draws `foul = rng.random() < foul_per_fga` (TEAM rate) BEFORE picking the shooter, so free throws follow shot share and a player's own foul-drawing (`fta_pm/fga_pm`) is ignored. Fix: pick the shooter first, then foul with p = foul_per_fga x the shooter's FT-rate multiplier, normalised so the team's expected foul rate is unchanged. Vendor change (inline loop) -- upstream PR owed.
 - Blocked by: none
 
+### nba-recon-props-no-header-only — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- Goal: scripts/refresh_nba_oddsapi_props.py never writes or accepts a header-only recon_props file: the builder writes nothing when boxscores are missing or yield no rows, and the export rebuilds instead of reusing an existing recon_props file that has no data rows (WNBA twin's guards)
+- Files: scripts/refresh_nba_oddsapi_props.py (_build_local_recon_props_artifact and _export_recon_props_artifact ONLY), tests/test_nba_recon_props_no_header_only.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit tests: missing boxscores -> no file + (0, None); empty boxscores -> no file; existing header-only recon + real boxscores -> rebuilt with rows; existing real recon reused untouched. Run the export against a scratch copy of the fleet's 06-13 inputs.
+- Blocked by: none
+- **CLOSED 2026-10-01 19:2xZ: GOAL MET.** `_build_local_recon_props_artifact` returns (0, None) and writes nothing when boxscores are missing or yield no rows. `_export_recon_props_artifact` reuses or copies an existing recon_props only if `_path_has_meaningful_content` (has data rows), and accepts a local build only with rows > 0 (WNBA twin's guards). The other three builders (NBA recon_games, WNBA recon_games/props) already had these guards. `_copy_existing_processed_artifact` was deliberately NOT changed: it serves 13 NBA artifacts, including JSON where an empty value may be legitimate. Verified: 7 new tests (5 fail on the old code); test_nba_refresh_runner + test_nba_props_integrity 52 passed; on the fleet's real 06-13 inputs in a scratch dir, header-only + no boxscores -> None (was "built"), + real boxscores -> rebuilt, 30 rows. Existing header-only files are left on disk (fleet: the source_artifacts 06-13 copy; checkout: two 06-13 copies); the export now ignores them.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

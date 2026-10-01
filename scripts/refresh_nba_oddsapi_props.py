@@ -4596,6 +4596,13 @@ def _export_recon_quarters_artifact(*, source_root: Path, date_str: str, process
 
 def _build_local_recon_props_artifact(*, processed_root: Path, date_str: str) -> tuple[int, Path | None]:
     boxscores_path = processed_root / f"boxscores_{date_str}.csv"
+    # No box scores -> no recon. This wrote a HEADER-ONLY recon_props file and
+    # returned it as built, so the export reported success with zero actuals and
+    # the reuse check below then kept that empty file forever. Found 2026-10-01:
+    # recon_props_2026-06-13.csv (NBA Finals) sat header-only while the live-prop
+    # audit graded nothing. Same guards as the WNBA twin.
+    if not boxscores_path.exists():
+        return 0, None
 
     game_cards_path = processed_root / f"game_cards_{date_str}.csv"
     team_to_game_id: dict[str, str] = {}
@@ -4689,6 +4696,8 @@ def _build_local_recon_props_artifact(*, processed_root: Path, date_str: str) ->
                     }
                 )
 
+    if not rows:
+        return 0, None
     out_path = processed_root / f"recon_props_{date_str}.csv"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = ["game_id", "player_id", "player_name", "team_abbr", "pts", "reb", "ast", "threes", "stl", "blk", "tov", "pr", "pa", "ra", "pra"]
@@ -4701,18 +4710,22 @@ def _build_local_recon_props_artifact(*, processed_root: Path, date_str: str) ->
 
 
 def _export_recon_props_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
-    existing = _copy_existing_processed_artifact(
-        source_root=source_root,
-        processed_root=processed_root,
-        file_name=f"recon_props_{date_str}.csv",
-    )
-    if existing:
-        return existing
-    local_rows, local_path = _build_local_recon_props_artifact(processed_root=processed_root, date_str=date_str)
-    if local_path is not None:
-        return str(local_path)
     source = source_root / "data" / "processed" / f"recon_props_{date_str}.csv"
-    if not source.exists() or not source.is_file():
+    # An existing recon_props counts only if it has data rows. A header-only
+    # file (see the builder's comment) used to be returned here as "already
+    # built" on every run, so it was never rebuilt once box scores arrived.
+    if _path_has_meaningful_content(source):
+        existing = _copy_existing_processed_artifact(
+            source_root=source_root,
+            processed_root=processed_root,
+            file_name=f"recon_props_{date_str}.csv",
+        )
+        if existing:
+            return existing
+    local_rows, local_path = _build_local_recon_props_artifact(processed_root=processed_root, date_str=date_str)
+    if local_rows > 0 and local_path is not None:
+        return str(local_path)
+    if not _path_has_meaningful_content(source):
         return None
     destination = processed_root / source.name
     destination.parent.mkdir(parents=True, exist_ok=True)
