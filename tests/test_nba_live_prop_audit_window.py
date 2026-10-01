@@ -27,7 +27,7 @@ class NbaLivePropAuditWindowTests(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
-        patcher = patch("syndicate.features.nba.live_prop_audit._artifact_root", return_value=self.root)
+        patcher = patch("syndicate.features.nba.live_prop_audit._processed_roots", return_value=[self.root])
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -67,6 +67,95 @@ class NbaLivePropAuditWindowTests(unittest.TestCase):
     def test_no_data_anywhere_says_so_rather_than_inventing_a_date(self) -> None:
         payload = self._get().get_json()
         self.assertIsNone(payload["latest_available_date"])
+
+
+class NbaLivePropAuditRootTests(unittest.TestCase):
+    """The audit resolves files across every NBA processed root, like the rest
+    of NBA. Measured 2026-10-01 on the local fleet: the data disk's root held no
+    live-lens projections, the second root held 2026-06-05..06-13, and the audit
+    -- which read only the first root -- answered empty for all of them."""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.first = Path(tmp.name) / "disk" / "data" / "processed"
+        self.second = Path(tmp.name) / "checkout" / "data" / "processed"
+        self.first.mkdir(parents=True)
+        self.second.mkdir(parents=True)
+        roots = [self.first.parent.parent, self.second.parent.parent]
+        patcher = patch("syndicate.features.nba.live_prop_audit._nba_artifact_roots", return_value=roots)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        primary = patch("syndicate.features.nba.live_prop_audit.artifact_processed_root", return_value=self.first)
+        primary.start()
+        self.addCleanup(primary.stop)
+
+    def test_a_file_only_in_the_second_root_is_found(self) -> None:
+        from syndicate.features.nba import live_prop_audit as audit
+
+        (self.second / "live_lens_projections_2026-06-13.jsonl").write_text("", encoding="utf-8")
+        self.assertEqual(audit._artifact_path("live_lens_projections_2026-06-13.jsonl"), self.second / "live_lens_projections_2026-06-13.jsonl")
+
+    def test_the_first_root_wins_when_both_have_the_file(self) -> None:
+        from syndicate.features.nba import live_prop_audit as audit
+
+        for root in (self.first, self.second):
+            (root / "recon_props_2026-06-13.csv").write_text("x", encoding="utf-8")
+        self.assertEqual(audit._artifact_path("recon_props_2026-06-13.csv"), self.first / "recon_props_2026-06-13.csv")
+
+    def test_projections_without_actuals_say_so_instead_of_a_bare_empty(self) -> None:
+        """The fleet's real shape: Finals projection rows present, recon_props
+        header-only, so nothing can be graded. The payload must name the gap."""
+        from syndicate.features.nba import live_prop_audit as audit
+
+        row = '{"game_id": "1", "player": "Jordan Clarkson", "name_key": "Jordan Clarkson", "stat": "pts", "proj": 5.49, "sim_mu": 5.49, "market": "player_prop"}'
+        (self.second / "live_lens_projections_2026-06-13.jsonl").write_text(row + "\n", encoding="utf-8")
+        (self.second / "recon_props_2026-06-13.csv").write_text("game_id,player_name,pts\n", encoding="utf-8")
+        payload = audit.build_live_prop_audit_payload("date=2026-06-13")
+        self.assertEqual(payload["status"], "empty")
+        self.assertEqual(payload["projection_rows"], 1)
+        self.assertEqual(payload["debug"]["days"][0]["unsettled_reason"], "no_actuals")
+        self.assertIn("no actual box-score results", payload["message"])
+        self.assertEqual(payload["latest_available_date"], "2026-06-13")
+
+    def test_a_new_source_file_refreshes_the_cached_payload(self) -> None:
+        """The cache was keyed on the query string alone, so a day's answer was
+        frozen for the life of the web process. A landed file must show up."""
+        from syndicate.features.nba import live_prop_audit as audit
+
+        before = audit.build_live_prop_audit_payload("date=2026-06-13")
+        self.assertEqual(before["projection_rows"] if "projection_rows" in before else 0, 0)
+        (self.second / "live_lens_projections_2026-06-13.jsonl").write_text(
+            '{"game_id": "1", "player": "J", "name_key": "J", "stat": "pts", "proj": 5.0, "market": "player_prop"}\n',
+            encoding="utf-8",
+        )
+        after = audit.build_live_prop_audit_payload("date=2026-06-13")
+        self.assertEqual(after["projection_rows"], 1)
+
+    def test_the_default_window_moves_with_the_date(self) -> None:
+        from syndicate.features.nba import live_prop_audit as audit
+
+        class _Clock:
+            now_value = datetime(2026, 10, 1, 12, tzinfo=timezone.utc)
+
+            @classmethod
+            def now(cls, tz=None):
+                return cls.now_value
+
+        with patch.object(audit, "datetime", _Clock), patch(
+            "syndicate.features.shared.live_lens_local.datetime", _Clock
+        ):
+            first = audit.build_live_prop_audit_payload("")["meta"]["end"]
+            _Clock.now_value = datetime(2026, 10, 2, 12, tzinfo=timezone.utc)
+            second = audit.build_live_prop_audit_payload("")["meta"]["end"]
+        self.assertEqual((first, second), ("2026-09-30", "2026-10-01"))
+
+    def test_latest_available_date_spans_every_root(self) -> None:
+        from syndicate.features.nba import live_prop_audit as audit
+
+        (self.first / "live_lens_projections_2026-06-05.jsonl").write_text("", encoding="utf-8")
+        (self.second / "live_lens_projections_2026-06-13.jsonl").write_text("", encoding="utf-8")
+        self.assertEqual(audit._latest_available_date(), "2026-06-13")
 
 
 if __name__ == "__main__":

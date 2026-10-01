@@ -11,14 +11,40 @@ from urllib.parse import parse_qs
 from syndicate.features.nba.sources import parse_iso_date
 from syndicate.features.shared.live_lens_local import _parse_window
 from syndicate.features.nba.sources import artifact_processed_root
+from syndicate.features.nba.sources import _artifact_roots as _nba_artifact_roots
 
 
-def _artifact_root() -> Path:
-    return artifact_processed_root()
+def _processed_roots() -> list[Path]:
+    """Every NBA `data/processed` directory, in `_resolve_processed_candidates`
+    order. This module used to read ONLY `artifact_processed_root()` -- the
+    first root -- while every other NBA reader resolves across all of them.
+    Measured 2026-10-01 on the local fleet: the data disk's `nba_source` holds
+    no live-lens projections while the second root holds 2026-06-05..06-13 and
+    their recon_props, so the audit answered empty for dates the rest of NBA
+    serves."""
+    # artifact_processed_root() stays FIRST: it is what this module always read,
+    # and the other roots only add places to look.
+    roots: list[Path] = []
+    seen: set[str] = set()
+    for root in [artifact_processed_root(), *(r / "data" / "processed" for r in _nba_artifact_roots())]:
+        key = str(root).lower()
+        if key not in seen:
+            seen.add(key)
+            roots.append(root)
+    return roots
 
 
 def _artifact_path(filename: str) -> Path:
-    return _artifact_root() / filename
+    """The first root that HAS the file; else where the first root would put it."""
+    roots = _processed_roots()
+    for root in roots:
+        candidate = root / filename
+        try:
+            if candidate.is_file():
+                return candidate
+        except OSError:
+            continue
+    return roots[0] / filename
 
 
 def _date_window(params: dict[str, list[str]]) -> list[str]:
@@ -39,8 +65,11 @@ def _latest_available_date() -> str | None:
     """Newest date with an NBA live-lens projection file, so an empty window
     (the offseason, or a quiet fortnight) says where the data actually is."""
     dates = sorted(
-        path.name[len("live_lens_projections_"):-len(".jsonl")]
-        for path in _artifact_root().glob("live_lens_projections_*.jsonl")
+        {
+            path.name[len("live_lens_projections_"):-len(".jsonl")]
+            for root in _processed_roots()
+            for path in root.glob("live_lens_projections_*.jsonl")
+        }
     )
     return dates[-1] if dates else None
 
@@ -356,6 +385,8 @@ def _local_live_prop_audit_payload(query_string: str) -> dict[str, Any] | None:
                 "replay_mode": replay_mode,
                 "audit_source": "projections",
                 "settled_rows": len(audit_rows),
+                "recon_rows": len(recon_lookup),
+                "unsettled_reason": _unsettled_reason(len(latest_rows), len(recon_lookup), len(audit_rows)),
             }
         )
 
@@ -392,9 +423,31 @@ def _local_live_prop_audit_payload(query_string: str) -> dict[str, Any] | None:
         "debug": {"days": debug_days},
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     }
+    payload["projection_rows"] = sum(int(day["latest_rows"]) for day in debug_days)
+    payload["latest_available_date"] = _latest_available_date()
     if not all_rows:
-        payload["message"] = "No settled live player-prop projection rows were available for the requested window."
+        reasons = sorted({str(day["unsettled_reason"]) for day in debug_days if day.get("unsettled_reason")})
+        if payload["projection_rows"] and "no_actuals" in reasons:
+            payload["message"] = (
+                f"{payload['projection_rows']} live player-prop projection rows exist for this window, but no actual "
+                "box-score results (recon_props) were captured to grade them against."
+            )
+        else:
+            payload["message"] = "No settled live player-prop projection rows were available for the requested window."
     return payload
+
+
+def _unsettled_reason(projection_rows: int, recon_rows: int, settled_rows: int) -> str | None:
+    """Why a day graded nothing, so an empty audit says which input is missing.
+    2026-10-01: the fleet's NBA Finals days carry 208 projection rows each and
+    zero recon_props rows (06-13's file is header-only; the others have none)."""
+    if settled_rows:
+        return None
+    if not projection_rows:
+        return "no_projections"
+    if not recon_rows:
+        return "no_actuals"
+    return "no_matching_actuals"
 
 
 def _empty_live_prop_audit_payload(query_string: str) -> dict[str, Any] | None:
@@ -448,9 +501,40 @@ def _empty_live_prop_audit_payload(query_string: str) -> dict[str, Any] | None:
     return payload
 
 
-@lru_cache(maxsize=256)
+def _source_signature() -> tuple[tuple[str, int, int], ...]:
+    """(path, mtime_ns, size) of every file this audit reads, across all roots."""
+    signature: list[tuple[str, int, int]] = []
+    for root in _processed_roots():
+        for pattern in ("live_lens_projections_*.jsonl", "recon_props_*.csv"):
+            for path in root.glob(pattern):
+                try:
+                    stat = path.stat()
+                except OSError:
+                    continue
+                signature.append((str(path), stat.st_mtime_ns, stat.st_size))
+    return tuple(sorted(signature))
+
+
 def build_live_prop_audit_payload(query_string: str) -> dict[str, Any] | None:
+    # The cache used to be keyed on the query string ALONE, for the life of the
+    # process. Found 2026-10-01 when a test got another test's cached empty
+    # payload: on web that froze a bare request's "trailing 14 days" at the
+    # first call's date, and froze any day's result even after its projection
+    # or recon file landed. The key now carries today's UTC date (the default
+    # window moves at midnight) and the source files' signature.
+    today = datetime.now(timezone.utc).date().isoformat()
+    return _cached_live_prop_audit_payload(query_string, today, _source_signature())
+
+
+@lru_cache(maxsize=256)
+def _cached_live_prop_audit_payload(
+    query_string: str, _today: str, _signature: tuple[tuple[str, int, int], ...]
+) -> dict[str, Any] | None:
     local_payload = _local_live_prop_audit_payload(query_string)
     if isinstance(local_payload, dict):
         return local_payload
     return _empty_live_prop_audit_payload(query_string)
+
+
+# Callers (and tests) that reset this cache keep working.
+build_live_prop_audit_payload.cache_clear = _cached_live_prop_audit_payload.cache_clear  # type: ignore[attr-defined]
