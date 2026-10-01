@@ -1227,13 +1227,14 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: regression test fails before / passes after; live /wnba/cards?client=board HTML contains no '{&#39;status&#39;' or '&quot;status&quot;' text in the status badge; other sports' string statuses unchanged
 - Blocked by: none
-### candidate-trace-unscoped-refusal — OPEN — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+### candidate-trace-unscoped-refusal — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
 - Goal: GET /api/ops/intelligence/candidate-trace without sport AND date answers a fast 400 naming the missing scope, with no build_intelligence_overview / _build_candidate_pool call in-request (finding 2026-10-01: unscoped call ran 87.98s on the local fleet, gunicorn killed the worker, next request got ConnectionResetError)
 - Files: syndicate/blueprints/ops.py (api_ops_intelligence_candidate_trace ONLY; user OK 2026-10-01 over book-quotes-splice-repair's UNOWNED claim), tests/test_candidate_trace_scope_refusal.py (NEW). One test in the artifact-publisher test module was replaced once with the user's OK; that file stays with nhl-live-resim and the write is recorded in its block
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: test asserts the refusal branch with build_intelligence_overview and _build_candidate_pool patched to raise; plus a live hit on the local fleet (127.0.0.1:10000) returning 400 in <1s
 - Blocked by: none
+- **CLOSED 2026-10-01 15:50Z: GOAL MET.** `da7f85b5` is live on the local fleet (web HUP 15:44:45Z). Bare call 400 in 0.015 s (was 87.98 s plus a killed worker), date-only and sport-only also 400 with the right `missing_scope`, read_only 200 in 0.96 s, no worker killed. Measurement in `deploys.md` 2026-10-01 15:44Z. Still open, NOT this lane: a scoped call rebuilds every sport in-request.
 - **PROGRESS 2026-10-01, code + tests DONE, live reading OWED.** Refusal sits after the `?read_only=1` path and before the heavy imports; `missing_scope` names whichever of sport/date is absent or blank. New `tests/test_candidate_trace_scope_refusal.py`: 6 pass; against the unfixed ops.py the 4 refusal tests FAIL and the reachability (scoped call reaches the patched overview) and read_only tests pass, so the patches are aimed right. Targeted run of the new tests and the 3 candidate-trace classes: 18 passed. **OWED:** the local fleet runs a separate WSL clone (`~/Syndicate`), so the live 400 needs that clone updated and web restarted, and that needs the user's OK. **NOT FIXED, stated so nobody reads the refusal as a bound:** a SCOPED call still rebuilds the overview for EVERY sport (`build_intelligence_overview` takes no sport) and `_build_candidate_pool` twice for the whole board, so `?sport=&date=` can still pass gunicorn's 60 s timeout. The scope params gate intent; they do not bound cost. On a hosted-flagged web (`RENDER=true` is set on the local fleet per the runbook), `_build_candidate_pool` refuses itself via the request-path guard, which leaves the overview rebuild as the remaining cost.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
