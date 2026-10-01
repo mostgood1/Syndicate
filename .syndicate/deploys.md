@@ -44464,3 +44464,14 @@ branch `claude/dreamy-babbage-dm6ubz`, base `bfb00966`). Money: paper. No venue 
 - action: ran the autorun's own command once under the refresh-worker env (`generate_smartsim2_nfl_projections.py --season 2026 --week 4`), rc 0, 02:37:57Z.
 - verify: `available_weeks [1, 4]`; `/nfl` defaults to week 4 (PIT@CLE Thu Oct 1 7:15 PM CDT, IND@WSH, TEN@BAL, NE@BUF).
 - NOT fixed: the autorun predicate (in `scripts/run_refresh_worker.py`, claimed by 3 OPEN lanes); weeks 5+ remain backfill until their mtime ages past 24h or the predicate is fixed.
+
+## 2026-10-01 14:28Z (9:28 AM CT) -- LOCAL PRODUCTION RESTART onto `cf63c82f` (lane `soccer-live-gameline-index-diag`) -- **fleet UP; soccer empty-state reading MET; in-play reading still OWED**
+
+**Context.** User instruction: "restart the fleet on cf63c82f". `9ab88382..cf63c82f` is a fast-forward; the only runtime change is the soccer producer-gap fix (`soccer_live_gameline_source.py`, `board_enrichment.py`). The other two commits are ledger entries, one of them another session's NFL week-4 reading (its job finished 02:37:57Z).
+
+- before: WSL tree clean at `9ab88382`; no sim or one-off job running (one unreaped `<defunct>` child of refresh-worker); last `mlbDailySim` `launched: false, intelligence_pipeline_busy`.
+- restart: ff-only to `cf63c82f` from GitHub; `local_production.py down` (supervisor exited in 2 s, no fleet process left); `Start-ScheduledTask SyndicateLocalProduction`.
+- verify (readings): HEAD `cf63c82f`; supervisor pid 100494 since **14:28:02Z**; web 100509, refresh-worker 100575, live-odds-worker 100576, all `up`, `restarts=0`; `/healthz` 200.
+- **the `9ab88382` run (02:28:46Z-14:28Z), read from refresh-worker.log after line 10856:** 112 `LIVE_GAMELINE_BUILD sport=soccer` lines, 0 with `error!=none`, **0 `BOOK_GRID_LIVE_GAMELINE_FAILURE sport=soccer`** (6 in the whole log, all before the first restart). NOT a proof of the UnboundLocalError fix: `written=0` on all 112, so there is no sign a match was in play in that window. The crash path needs matches in play, so the null has no population behind it yet.
+- **producer diagnostic on the real Redis store** (new code, refresh-worker env, 2026-10-01): `aggregate=empty, artifact=aggregate, games_in_snapshot=0, indexed=0`, all skips 0. This is state (a), the readable "nothing in play", so its reason is the true one.
+- **STILL OWED:** a soccer build line after 14:28:02Z with matches in play (`games_in_snapshot>0` in the coverage `index_diagnostics`), `error=none`, and no `BOOK_GRID_LIVE_GAMELINE_FAILURE sport=soccer` since.
