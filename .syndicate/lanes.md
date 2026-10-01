@@ -1407,6 +1407,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - **PROGRESS 2026-10-01: hypothesis CONFIRMED, code + tests DONE, live A/B next.** gunicorn 21.2.0 `gthread.run()` exits its loop and `poller.close()`s connections accepted (`accept` -> `poller.register`) but not yet read; process exit resets them. Isolated repro (toy app, 2x4 gthread, recycle every 25, 16 clients, 4,000 req), 3 rounds each: stock 101 / 106 / 104 failed; `DrainingThreadWorker` 0 / 0 / 0, 109 drains all `abandoned: 0`, typically `accepted_unread_at_stop: 1`, ~0.1 s each. `gunicorn.conf.py` sets `worker_class` (switch `SYNDICATE_WEB_WORKER_DRAIN`). Tests: 21 pass in WSL incl. a real-gunicorn recycle-under-load test, which FAILS with stock gthread (verified); on Windows the POSIX tests skip.
 
+### wnba-sim-tov-priors — OPEN — opened 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- Goal: WNBA smart sim turnovers match actual (component backtest: sim TOV 0.77x actual on fully matched team-games, uniform across players), which also leaves FGA 1.08x
+- Files: syndicate/features/shared/basketball_props_smart_sim.py,tests/test_basketball_sim_tov_priors.py
+- Hypothesis: The shortfall is introduced AFTER the logs: player_logs TOV/min matches box scores (0.0689 vs 0.0684), and the engine realizes ~1.1x its per-iteration p_tov, so the per-minute _prior_tov_pm the engine receives must be ~0.7x the players' real rate. Candidate stages, to be measured in order: (a) compute_player_priors_local rates (plain means), (b) _apply_player_priors_local's prior/pred fallback and its bounded split/opponent/position/roll adjustments (tov bounds 0.82-1.20), (c) the engine's p_tov (clip 0.05-0.22, garbage-time 0.94).
+- Falsification test: Falsified if raw compute_player_priors_local TOV x actual minutes is itself ~0.75x actual TOV (then the loss is in the logs/windowing, not the blend). A fix ships only if the component backtest's TOV ratio moves to within 0.95-1.05 and player PTS/FGA error does not worsen (CI).
+- Verification: deploys.md READING: per-stage TOV ratio table + backtest
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
