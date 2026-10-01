@@ -308,6 +308,41 @@ def _player_pct(players: pd.DataFrame, made_pm: str, att_pm: str, default: float
     return np.clip(pct, lo, hi)
 
 
+# Free throws follow the SHOOTER's own foul-drawing, not a flat team rate.
+# The PBP loop used to draw `foul = rng.random() < foul_per_fga` before the
+# shooter was chosen, so a team's free throws were shared out by shot volume
+# and every player got the same FTA per FGA. Measured 2026-10-01 (Syndicate
+# component backtest, 36 games): top-2 scorers drew 0.220 FTA/FGA in sim vs
+# 0.376 real (bench 0.232 vs 0.241) -- stars got 40% too few free throws.
+# With this on, the shooter is picked first and fouled with probability
+# foul_per_fga x their FT-rate multiplier, normalised so the team's expected
+# shooting-foul rate is unchanged. False restores the old draw exactly.
+SHOOTER_FT_RATE = True
+
+
+def _ft_rate_multipliers(players: pd.DataFrame, minutes: np.ndarray) -> np.ndarray:
+    """Per-player (FTA/FGA) / team shot-weighted mean, clipped to [0.3, 3]; 1.0 when unknown."""
+    fta = _safe_series(players, "_prior_fta_pm").to_numpy(dtype=float)
+    fga = _safe_series(players, "_prior_fga_pm").to_numpy(dtype=float)
+    mins = np.where(np.isfinite(minutes), np.maximum(minutes, 0.0), 0.0)
+    ok = np.isfinite(fta) & np.isfinite(fga) & (fga > 0) & (fta >= 0)
+    ratio = np.where(ok, fta / np.where(fga > 0, fga, 1.0), np.nan)
+    shots = np.where(ok, fga * mins, 0.0)
+    if float(shots.sum()) <= 0:
+        return np.ones(len(fta), dtype=float)
+    team = float(np.nansum(ratio * shots) / shots.sum())
+    if not np.isfinite(team) or team <= 0:
+        return np.ones(len(fta), dtype=float)
+    mult = np.where(ok, np.clip(ratio / team, 0.3, 3.0), 1.0)
+    # Re-normalise after clipping so the shot-weighted mean multiplier stays 1.
+    w = np.where(ok, fga * mins, 0.0)
+    if float(w.sum()) > 0:
+        mean = float((mult * w).sum() / w.sum())
+        if mean > 0:
+            mult = np.where(ok, mult / mean, 1.0)
+    return mult
+
+
 def _player_usage_weights(players: pd.DataFrame, col_pm: str, lineup_idx: List[int]) -> np.ndarray:
     """Return selection weights for the current on-court lineup.
 
@@ -1111,6 +1146,8 @@ def simulate_pbp_game_boxscore(
     a_3p_pct = _player_pct(away_players, "_prior_threes_pm", "_prior_threes_att_pm", default=0.35, lo=0.20, hi=0.50)
     h_ft_pct = _player_pct(home_players, "_prior_ftm_pm", "_prior_fta_pm", default=0.76, lo=0.45, hi=0.95)
     a_ft_pct = _player_pct(away_players, "_prior_ftm_pm", "_prior_fta_pm", default=0.76, lo=0.45, hi=0.95)
+    h_ft_mult = _ft_rate_multipliers(home_players, h_mins)
+    a_ft_mult = _ft_rate_multipliers(away_players, a_mins)
     h_starter_scores = _starter_like_scores(home_players, h_mins)
     a_starter_scores = _starter_like_scores(away_players, a_mins)
     h_scorer_scores = _scoring_like_scores(home_players)
@@ -1510,7 +1547,7 @@ def simulate_pbp_game_boxscore(
                     except Exception:
                         return
 
-                foul = bool(rng.random() < foul_per_fga)
+                foul = bool(rng.random() < foul_per_fga) if not SHOOTER_FT_RATE else False
 
                 if offense_home:
                     if shot_is_3:
@@ -1518,6 +1555,8 @@ def simulate_pbp_game_boxscore(
                     else:
                         w = _player_usage_weights(home_players, "_prior_fga_pm", h_line)
                     sh = int(_pick_weighted(rng, list(range(len(home_players))), w) or 0)
+                    if SHOOTER_FT_RATE:
+                        foul = bool(rng.random() < float(np.clip(foul_per_fga * float(h_ft_mult[sh]), 0.0, 0.95)))
 
                     h["fga"][sh] += 1
                     if shot_is_3:
@@ -1636,6 +1675,8 @@ def simulate_pbp_game_boxscore(
                     else:
                         w = _player_usage_weights(away_players, "_prior_fga_pm", a_line)
                     sh = int(_pick_weighted(rng, list(range(len(away_players))), w) or 0)
+                    if SHOOTER_FT_RATE:
+                        foul = bool(rng.random() < float(np.clip(foul_per_fga * float(a_ft_mult[sh]), 0.0, 0.95)))
 
                     a["fga"][sh] += 1
                     if shot_is_3:
