@@ -55,6 +55,18 @@ CHECK_EVERY_REQUESTS = 5
 # and no format, so this setting applies; a command-line format would override it.
 access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(M)sms'
 
+# A RECYCLING WORKER SERVES WHAT IT ALREADY ACCEPTED -- lane `web-worker-drain-on-recycle`
+# `[2026-10-01]`. Stock gthread exits by closing its poller with accepted-but-unread
+# connections still in it, so every recycle (the memory guard below, `--max-requests`,
+# SIGTERM) could reset a request: the local-fleet audit sweep got ConnectionResetError
+# after 0.0s the second worker 181021 recycled, and an isolated repro failed 101-106 of
+# 4,000 requests per round with stock gthread vs 0 with this worker. See
+# `syndicate/web_worker.py`. Applies only when no `--worker-class`/`-k` is given on the
+# command line. Switch: `SYNDICATE_WEB_WORKER_DRAIN` (default on; 0/false/off restores
+# stock gthread, which gunicorn picks itself because `--threads` > 1).
+if str(os.environ.get("SYNDICATE_WEB_WORKER_DRAIN") or "").strip().lower() not in {"0", "false", "no", "off"}:
+    worker_class = "syndicate.web_worker.DrainingThreadWorker"
+
 
 def _env_int(name: str, default: int) -> int:
     raw = str(os.environ.get(name) or "").strip()

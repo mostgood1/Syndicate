@@ -1398,6 +1398,15 @@ death, never life — do not invert it.
 - Blocked by: none
 - **CLOSED 2026-10-01 ~22:5xZ: GOAL MET (Verification's "290 hit" was the OLD list: 302 param-free; the regenerated list is 296, so 285).** `scripts/local_audit_sweep.py` keeps the original's rules (SKIP regex, ERR markers, empty-JSON flag, X-Admin-Token from local_production.env, supervisor pid before/after), adds `audit_sweep.prev.json` plus a comparison, and exits 1 on any failure or mid-sweep restart. Live fleet run ~22:43Z (worktree code): supervisor stable, 285 hit / 11 skipped, p99 3.78 s, max 5.45 s; status 200 x269, 400 x13, 429 x2 (the shared-throttle alias pairs, members swapped by route order), None x1. That one is `/wnba/market-board` ConnectionResetError after 0.0 s, because web's memory guard recycled worker 181021 at 17:46:26 CDT mid-request; recorded as a lead, not fixed here. 5 unit tests (injected fetcher) + the 6 route-generator tests pass. The out-of-repo `C:\SyndicateProdudit_sweep.py` is left in place.
 
+### web-worker-drain-on-recycle — OPEN — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- Goal: A recycling web gunicorn worker (memory guard or --max-requests) serves every connection it already accepted instead of resetting it: a draining ThreadWorker subclass stops listening, drains accepted connections (bounded), then exits; measured by the isolated gthread repro (stock: 108/4000 failed, 2.7%) going to 0 failures, and live on the fleet's web
+- Files: syndicate/web_worker.py (NEW), gunicorn.conf.py (worker_class setting ONLY; the memory-guard hooks untouched), tests/test_web_draining_worker.py (NEW)
+- Hypothesis: gthread's run() exits its loop and closes the poller with connections that were accepted but not yet read still registered; process exit then resets them
+- Falsification test: the draining worker still shows resets in the same repro
+- Verification: repro A/B with the real worker class (stock vs draining, same load); unit test of the drain loop; live: web reload, then a load run across recycles with 0 resets
+- Blocked by: none
+- **PROGRESS 2026-10-01: hypothesis CONFIRMED, code + tests DONE, live A/B next.** gunicorn 21.2.0 `gthread.run()` exits its loop and `poller.close()`s connections accepted (`accept` -> `poller.register`) but not yet read; process exit resets them. Isolated repro (toy app, 2x4 gthread, recycle every 25, 16 clients, 4,000 req), 3 rounds each: stock 101 / 106 / 104 failed; `DrainingThreadWorker` 0 / 0 / 0, 109 drains all `abandoned: 0`, typically `accepted_unread_at_stop: 1`, ~0.1 s each. `gunicorn.conf.py` sets `worker_class` (switch `SYNDICATE_WEB_WORKER_DRAIN`). Tests: 21 pass in WSL incl. a real-gunicorn recycle-under-load test, which FAILS with stock gthread (verified); on Windows the POSIX tests skip.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
