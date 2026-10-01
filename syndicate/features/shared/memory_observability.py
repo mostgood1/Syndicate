@@ -256,6 +256,13 @@ def _read_container_memory_stat() -> dict[str, int]:
     anonymous rather than file cache then the guard is correct as written and
     relaxing it walks back into the 4GiB OOM (#75).
     """
+    # Under SYNDICATE_LOCAL_MEMORY_LIMIT_MB the ceiling is ONE role's and
+    # "current" is that role's RSS, but on WSL2 /sys/fs/cgroup/memory.stat is
+    # the whole VM's (every role + redis: anon 2006MB, inactive_file 10.6GB on
+    # the first WSL run, 2026-10-01). Mixing the two charged every role for
+    # all of them. No breakdown -> headroom is ceiling - role RSS.
+    if _local_memory_limit_active():
+        return {}
     candidates = (
         Path("/sys/fs/cgroup/memory.stat"),
         Path("/sys/fs/cgroup/memory/memory.stat"),

@@ -55,3 +55,15 @@ def test_unusable_values_stay_unmeasurable(monkeypatch, raw):
     monkeypatch.setattr(mo, "_read_cgroup_memory_max_bytes", lambda: None)
     monkeypatch.setenv(mo.LOCAL_MEMORY_LIMIT_ENV, raw)
     assert mo._read_container_memory_max_bytes() is None
+
+
+def test_a_vm_wide_memory_stat_is_ignored_under_the_local_ceiling(monkeypatch):
+    # WSL2: memory.stat is the whole VM's. Charging one role for every role's
+    # anon understated headroom; the role's own RSS is the only usage basis.
+    monkeypatch.setattr(mo, "_read_cgroup_memory_max_bytes", lambda: None)
+    monkeypatch.setenv(mo.LOCAL_MEMORY_LIMIT_ENV, "4096")
+    monkeypatch.setattr(mo, "_local_process_tree_rss_bytes", lambda: 700 * MB)
+    assert mo._read_container_memory_stat() == {}
+    snapshot = mo.memory_headroom_snapshot(900 * MB)
+    assert snapshot["headroom_mb"] == 4096 - 700
+    assert snapshot["sufficient"] is True
