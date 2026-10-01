@@ -2343,6 +2343,20 @@ def _attribute_live_gameline_zero(
         except (TypeError, ValueError):
             return 0
 
+    # ABSENT IS NOT ZERO `[2026-09-30, lane soccer-live-gameline-index-diag]`.
+    # Diagnostics nobody filled read 0 through `_count`, and `games <= 0` below
+    # would then say "no game in play" -- the permissive answer for a state that
+    # is actually unknown. Soccer's live branch never filled them at all, and its
+    # zero would have claimed nothing was in play while two matches were indexed.
+    try:
+        int(diag["games_in_snapshot"] or 0)
+    except (KeyError, TypeError, ValueError):
+        coverage["reason"] = (
+            f"no {sport} row priced, and index diagnostics unavailable -- "
+            "cannot tell 'nothing in play' from a producer or join gap"
+        )
+        return
+
     games = _count("games_in_snapshot")
     indexed = _count("indexed")
     index_size = coverage.get("index_size")
@@ -2444,6 +2458,19 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                     "rows_live_gameline_edged": 0,
                     "rows_live_gameline_projected": 0,
                 }
+            # THIS BRANCH HAD NO `index_diag`, and the attribution below reads it
+            # for every sport: an UnboundLocalError on every tick with a match in
+            # play (76 `BOOK_GRID_LIVE_GAMELINE_FAILURE sport=soccer` in one
+            # local-production refresh-worker.log, 2026-09-30). The producer's
+            # contract makes every indexed entry an in-play match, so the
+            # snapshot count IS the index size; ambiguous canonical pairs are
+            # carried so an unpriced pair is not read as a join miss.
+            index_diag = {
+                "source": "soccer_live_state",
+                "games_in_snapshot": len(index),
+                "indexed": len(index),
+                "skipped_ambiguous": len(getattr(index, "ambiguous", ()) or ()),
+            }
             coverage = attach_live_gamelines(grid, index, sport=sport)
         else:
             # THE GAME-LINE JOIN reads the RE-SIM's snapshot where a sport has
@@ -2523,8 +2550,7 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
             if segment_index is not None:
                 coverage["segment_index_size"] = len(segment_index)
         coverage["supported"] = True
-        if sport != "soccer":
-            coverage["index_diagnostics"] = index_diag
+        coverage["index_diagnostics"] = index_diag
         _attribute_live_gameline_zero(coverage, index_diag, sport=sport)
         return coverage
     except Exception:
