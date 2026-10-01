@@ -4321,6 +4321,29 @@ def api_ops_intelligence_candidate_trace() -> Any:
             "read_only_trace": read_only_trace,
         })
 
+    # 2026-10-01: the full path below rebuilds the whole board in-request --
+    # build_intelligence_overview(force_refresh=True) over every sport, then
+    # _build_candidate_pool twice. Called bare it ran 87.98s on the local
+    # production fleet; gunicorn's 60s timeout killed the worker and the next
+    # request routed to it got ConnectionResetError. Refuse before any of that
+    # is imported or run unless the caller names both scopes, and point at the
+    # read_only path, which answers from persisted state. Raising
+    # GUNICORN_TIMEOUT is not the fix: the web service does no heavy compute.
+    missing_scope = [name for name, value in (("sport", sport_filter), ("date", date)) if not value]
+    if missing_scope:
+        return jsonify({
+            "ok": False,
+            "error": "scope_required",
+            "missing_scope": missing_scope,
+            "detail": (
+                "The full candidate trace rebuilds the intelligence overview and candidate "
+                "pool in-request and is refused without both ?sport= and ?date=. "
+                "Use ?read_only=1 for the persisted-state trace."
+            ),
+            "date": date,
+            "requested_sport": sport_filter,
+        }), 400
+
     try:
         from syndicate.features.intelligence import build_intelligence_overview
         from syndicate.features.intelligence import _query_preferences

@@ -1990,13 +1990,18 @@ class CandidateTraceSportScopingTests(unittest.TestCase):
         self.assertEqual(payload["preferences"]["requested_sports"], ["mlb"])
         self.assertEqual(payload["_seen"].get("collect_slugs"), ["mlb"])
 
-    def test_unscoped_request_still_covers_every_sport(self) -> None:
-        payload = self._trace("?date=2026-08-04")
-        self.assertIsNone(payload["requested_sport"])
-        self.assertIsNone(payload["requested_sport_present"])
-        self.assertEqual(payload["preferences"]["requested_sports"], [])
-        self.assertEqual(sorted(row["slug"] for row in payload["sports"]), ["mlb", "wnba"])
-        self.assertEqual(payload["fallback_merge_trace"].get("0_scope"), "all_sports")
+    def test_request_without_sport_is_refused_not_traced_across_every_sport(self) -> None:
+        # 2026-10-01: this used to assert ?date= alone traced every sport. The
+        # full path rebuilds the whole board in-request (87.98s bare on the
+        # local fleet, past gunicorn's 60s), so it now needs both scopes. See
+        # tests/test_candidate_trace_scope_refusal.py.
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
+            response = self.client.get(
+                "/api/ops/intelligence/candidate-trace?date=2026-08-04",
+                headers={"Authorization": "Bearer secret-token"},
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["missing_scope"], ["sport"])
 
     def test_a_sport_not_in_the_overview_is_stated_not_implied_by_an_empty_list(self) -> None:
         payload = self._trace("?sport=nfl&date=2026-08-04")
