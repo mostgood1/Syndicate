@@ -643,9 +643,7 @@ only true one; (b) matches in play that the producer dropped (no projection, bad
 probability, no team names, ambiguous canonical pair); (c) no artifact readable at
 all (aggregate absent / stale date / malformed, and no per-league file). Now (b)
 names its `skipped_*` buckets and (c) reads "no soccer live-state artifact readable
-for <date>". The producer's buckets always sum to `games_in_snapshot`. Look-ahead
-board dates the aggregate does not cover read (c) with `aggregate=stale_date`;
-that is honest, not a regression.
+for <date>". The producer's buckets always sum to `games_in_snapshot` (tested).
 **Measured on the fleet 2026-10-01 (`deploys.md` 14:28Z, 18:10Z):** (a) is what
 production reads off-window (Redis store: `aggregate=empty, artifact=aggregate`).
 0 soccer failures across 50 builds and 104 watcher cycles 14:42Z-18:07Z, **but no
