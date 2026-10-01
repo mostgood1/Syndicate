@@ -44705,3 +44705,11 @@ Not evidence against the fix. The check needs to re-run after 2026-10-05 22:00 C
 5. Local box-score history held 116 of ~290 2026 games; backfilled a SCRATCH copy from ESPN (336 games), not the live root.
 6. NBA's vendored engine has the identical clip / stacking / helper code -- not ported (needs its own backtest).
 7. Not upstream: `8fd37ff3` + `c0d406d3` are only in `vendor/` -- a re-pull of `mostgood1/WNBA-Betting` reverts both.
+
+## 2026-10-01 21:41Z (4:41 PM CT) -- LOCAL FLEET `~/Syndicate` ff onto `62e71011`, no restart (lane `basketball-game-cards-real-game-id`, user: "fix the NBA projection game_id \"1\" producer") -- **SHIPPED; verified off-line on real inputs + ESPN**
+
+- what: both refresh scripts' `_build_local_game_cards_artifact` game_odds fallback no longer uses the row index as game_id. In order: the row's own id, else the ESPN event id from `espn_event_ids_by_matchup` (cached ESPN scoreboard; the id box scores and recon carry), else `AWY@HOME`. `_build_local_live_lens_projections_artifact` copies game_cards' id, so NBA projections inherit it. Render untouched.
+- how: ff `996b5aa4 -> 62e71011` from the mirror's `refs/remotes/origin/main`. Only code in range: the two scripts + `basketball_boxscores_history.py` (the other commits are ledger). Both scripts run as fresh child processes; 0 NBA / 0 WNBA props refreshes were running at 21:41:40Z. The clone's dirty `vendor/wnba_betting_repo/.../boxscores_history.csv` is untouched.
+- verify (off-line, real inputs): NBA 2026-06-13 game_odds (rebuilt from the surviving game_cards row; the original was never kept) -> game_cards `game_id 401859967` against ESPN's live scoreboard -> 208 live-lens projections all `401859967` (were "1"). The old builders on the same fixture: '1' for NBA and WNBA. Tests: 7 new; 81 + 80 passed (incl. test_wnba_game_cards_census, test_wnba_refresh_runner).
+- live behaviour change: WNBA (in season) gets ESPN ids instead of index ids on days its game_cards come from the game_odds fallback (most WNBA days use the raw-odds branch's `0`+OddsAPI id, which is unchanged). Not yet observed live: the first such WNBA build.
+- not regenerated: existing June NBA game_cards/projections (the audit's team fallback already grades them, n=640).
