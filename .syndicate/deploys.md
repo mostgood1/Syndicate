@@ -44536,3 +44536,30 @@ branch `claude/dreamy-babbage-dm6ubz`, base `bfb00966`). Money: paper. No venue 
 - before: pid 107933 had no child process; it had loaded `6fd48b7f`; HEAD `0417e1c9`, so this restart ALSO loaded `fe9d15af` + `0417e1c9` (basketball props p_win / unfed features, both already verified live by their lanes via script rebuilds) and `23ae0ab1` (candidate-trace; ops.py/intelligence.py).
 - action: SIGTERM 107933 at 16:25:09Z; supervisor restarted it as pid 116223 at 16:25:17Z (`restarts=1`); web and live-odds-worker untouched.
 - verify: first BOOK_GRID_TICK of the new pid 16:26:47Z `rebuilt_previous 2026-09-30`, `nfl:166@2026-09-30`; grid mtime 16:26:18Z; served `/api/board/book-grid?sport=nfl&date=2026-09-30` 684,769 B: **0 wk5 games, 0 early-wk5 `generated_at` stamps** (was 15 / 79). 0 Tracebacks since boot; `/healthz` 200.
+
+## 2026-10-01 16:43Z (11:43 CT) -- READING, no deploy -- LOCAL PRODUCTION: NFL wk5 rebuild after MNF (lane nfl-backfill-autorun-gate)
+
+Scheduled task `nfl-wk5-rebuild-check` fired EARLY (2026-10-01, Thursday of week 4,
+before TNF PIT@CLE). Read-only; nothing launched, restarted or edited on the fleet.
+
+1. Week-4 completeness: **16 of 16** week-4 rows in `schedule_2026.csv` have blank
+   scores (first: `2026_04_PIT_CLE` 2026-10-01 20:15; last: `2026_04_ATL_NO`
+   2026-10-05 20:15). Lowest week with an unscored game = **4**. Rollover has NOT
+   happened -> per task, stop at step 6. NOT a failure of e04f6738.
+2. `smartsim2_projections_2026_wk5.csv`: **absent** (as left by the 10-01 removal).
+   Present: wk1-4, wk6-18; wk4 mtime 2026-09-30T21:37:57-0500, rest 17:40:49-0500.
+3. skipped (no file).
+4. `grep SEASON_PROJECTION refresh-worker.log | grep sport=nfl`: **0 lines**; 0
+   `artifact_is_preseason_backfill` lines; 0 SEASON_PROJECTION lines of ANY sport in the
+   current log (refresh-worker restarts=1 this supervisor run -- log may have been
+   reset; the check after MNF must not read an empty grep as "never launched").
+5. `/nfl/api/weeks` available_weeks = **[1, 4]** (5 absent, expected pre-rollover);
+   `/nfl/cards?week=5` -> **200**; web.log WEEK_SUBSTITUTED last at line 18444 of 18447
+   (`requested=5 resolved=4 available=[1, 4]`) -- recent, consistent with someone
+   requesting wk5 while it has no file.
+6. `local_production.py status`: supervisor pid=107855 since 2026-10-01T16:25:16Z
+   state=redis; web up 1078MB restarts=0; refresh-worker up 755MB **restarts=1**;
+   live-odds-worker up 556MB restarts=0; /healthz 200; /api/ops/version 401 (no token).
+
+VERDICT: **NOT MET -- reading 1 (week 4 incomplete: 16/16 unscored; run fired before MNF).**
+Not evidence against the fix. The check needs to re-run after 2026-10-05 22:00 CDT.
