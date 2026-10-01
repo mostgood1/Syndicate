@@ -44563,3 +44563,10 @@ before TNF PIT@CLE). Read-only; nothing launched, restarted or edited on the fle
 
 VERDICT: **NOT MET -- reading 1 (week 4 incomplete: 16/16 unscored; run fired before MNF).**
 Not evidence against the fix. The check needs to re-run after 2026-10-05 22:00 CDT.
+
+## 2026-10-01 ~17:10Z (12:10 PM CT) -- CORRECTION to the 16:43Z entry (scheduled task `nfl-wk5-rebuild-check`, trial "Run now") -- lane `nfl-backfill-autorun-gate`
+
+- Its verdict (NOT MET at reading 1: week 4 unplayed) stands. Two of its interpretations do not:
+  - "no `SEASON_PROJECTION` lines ... the log may have been reset" -- WRONG. A target week whose file is fresh decides `artifact_fresh`, which `_log_season_projection_skip` deliberately never prints; only LAUNCHING / ARTIFACT_MISSING / RELAUNCH_HELD are emitted. Silence was the healthy reading. The log was not reset: `refresh-worker.log` was 53.5 MB, starting 01:31:10Z, with all four of today's boots in it.
+  - the fresh `WEEK_SUBSTITUTED requested=5 resolved=4 available=[1, 4]` was CAUSED BY THE RUN'S OWN `curl /nfl/cards?week=5` against a week with no file -- not by a reader.
+- Also found: `local_production.py` rotates a role's log ONLY at `_spawn` (role (re)start) when it is over 200 MB (`rotate_log`, line ~912); a running worker never rotates, so a launch line can move to `refresh-worker.log.1` only across a restart. The task prompt now greps `refresh-worker.log*`, treats a quiet fresh week as normal, and reads WEEK_SUBSTITUTED before its own probe.
