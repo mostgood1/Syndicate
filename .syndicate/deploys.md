@@ -44656,3 +44656,15 @@ Not evidence against the fix. The check needs to re-run after 2026-10-05 22:00 C
 - baseline (`deploys.md` 18:22Z): June window `projection_rows 832`, graded 0, every day `no_actuals`.
 - verify (READ 18:51Z): `?since=2026-06-01&until=2026-06-15` -> **200, status ok, graded n=640** (06-03 160, 06-05 152, 06-10 168, 06-13 160 = played-and-projected players x 8 stats), `mae_proj 2.95`; by stat MAE ast 1.82, blk 0.63, pra 9.19, pts 6.69, reb 2.27, stl 0.76, threes 1.02, tov 1.18 (n=80 each). `?date=2026-06-13` -> n=160, mae 3.46. Bare -> 200 empty (offseason), `latest_available_date 2026-06-13`. Web workers unchanged after the calls.
 - not graded, by design: 2 projected players per day have no box-score row (Kevin McCullar Jr. inactive), plus 3-5 DNP per game.
+
+## 2026-10-01 (~5:00 PM CT) -- READING, local WSL fleet restarted onto `8fd37ff3` -- WNBA ENGINE: free throws follow the shooter's own foul-drawing rate; star shortfall PARTIALLY closed (lane `wnba-sim-star-shortfall`)
+
+**Decomposition (36 games, 2026-09-17..29, real PBP engine, actual minutes + team points held fixed, as-of-date features):** stars' (top-2 by expected points) FGA was 1.02x actual -- shot volume was NOT the gap. FTA was **0.60x**: sim FTA/FGA 0.220 top-2 vs 0.232 rest, actual **0.376 vs 0.241**. The engine drew fouls at a flat team rate per FGA, independent of who shot.
+
+**Fix (`vendor/wnba_betting_repo/src/wnba_betting/sim/events.py`, `SHOOTER_FT_RATE = True`):** `_ft_rate_multipliers` = player (FTA/FGA) / team shot-weighted mean, clipped [0.3, 3], renormalised so team FT volume is unchanged, 1.0 when unknown; the foul draw moves to after the shooter pick and scales `foul_per_fga` by that multiplier. Tests: `tests/test_basketball_sim_star_shortfall.py` (3, incl. reachability off != on); 111 sim tests pass.
+
+**Backtest, paired seeds, 726 player-games:** PTS MAE 3.330 -> 3.274, **-0.056 [CI -0.114, -0.000], 61% of games better**; top-2 bias -2.51 -> -2.38, rest bias +0.96 -> +0.89; top-2 FTA ratio 0.59 -> 0.63.
+
+**Reading:** WSL `~/Syndicate` at `8fd37ff3`, `events.SHOOTER_FT_RATE True` in the fleet venv, `/wnba/picks` HTTP 200 after restart; the in-flight `run_refresh_odds_job` survived (detached). **Owed:** the next WNBA pregame autorun regenerating /wnba/picks on this code.
+
+**NOT FIXED (most of the shortfall remains):** team FT volume is low (sim FTA/FGA 0.228 vs actual 0.293), sim FGA 1.15x actual with FG% 0.410 vs 0.450 (team-level calibration, not star-specific); team advanced stats stale (as_of 2026-07-08; checklist flags `games` unfed); per-minute rate inflation for tiny-minute players. **Upstream:** the vendor change is NOT yet in `mostgood1/WNBA-Betting` -- a re-pull reverts it.
