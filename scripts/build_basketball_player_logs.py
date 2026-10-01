@@ -144,6 +144,17 @@ def build_player_logs(*, league_code: str, season: int, min_rows: int = 200) -> 
     )
     for src, dst in (("PTS", "PTS"), ("REB", "REB"), ("AST", "AST"), ("FG3M", "FG3M"), ("STL", "STL"), ("BLK", "BLK"), ("TOV", "TOV")):
         out[dst] = merged[src] if src in merged.columns else 0.0
+    # The props FEATURE builder (basketball_props_features.load_player_logs_local)
+    # PREFERS this file over boxscores_history.csv, so every column it reads must
+    # be here too. Writing only the split-mechanism columns above left 64 of the
+    # props ONNX model's 140 features empty from 2026-08-19 on, and the predictor
+    # zero-filled them: WNBA pred_pts ~0.35x the 10-game average (measured
+    # 2026-10-01 vs 0.94-1.06 in Render-built July files). Carried only when the
+    # source has them -- an absent column stays absent; 0 would be a real, wrong
+    # value to a model.
+    for column in ("FGM", "FGA", "FG3A", "FTM", "FTA", "OREB", "DREB", "PF", "PLUS_MINUS"):
+        if column in merged.columns:
+            out[column] = merged[column]
 
     out = out[out["GAME_DATE"].notna()].copy()
     # Minutes drive every per-minute rate; a zero/NaN-minute row contributes

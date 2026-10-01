@@ -570,4 +570,29 @@ def predict_props_pure_onnx_local(*, features_df, models_dir: Path, processed_ro
     except Exception as exc:
         print(f"[WARN] Props ONNX models unavailable ({type(exc).__name__}: {exc}); using priors + rolling-stat fallback predictions")
         return _predict_props_without_models_local(features_df=features_df, processed_root=processed_root)
+    # UNFED FEATURES ARE REFUSED, NOT ZERO-FILLED. `predict` fills a missing or
+    # NaN feature with 0.0, which is indistinguishable from a real zero to a
+    # ridge model: from 2026-08-19 a slim player_logs.csv left 64 of 140
+    # features empty and every WNBA prop projection fell to ~0.35x the player's
+    # 10-game average with no log line at all (measured 2026-10-01). Above the
+    # threshold the rolling-stat fallback is the honest answer, and it says why.
+    if not features_df.empty:
+        feature_columns = list(getattr(predictor, "feature_columns", []) or [])
+        unfed = [
+            column for column in feature_columns
+            if column not in features_df.columns or features_df[column].isna().all()
+        ]
+        if feature_columns and len(unfed) / len(feature_columns) > _MAX_UNFED_FEATURE_SHARE:
+            print(
+                f"[props_onnx] PROPS_FEATURES_UNFED unfed={len(unfed)}/{len(feature_columns)} "
+                f"threshold={_MAX_UNFED_FEATURE_SHARE:.0%} examples={unfed[:8]} -> rolling-stat fallback",
+                flush=True,
+            )
+            return _predict_props_without_models_local(features_df=features_df, processed_root=processed_root)
     return predictor.predict(features_df)
+
+
+# Share of the model's feature columns that may be entirely empty before the
+# ONNX path is refused. A healthy build feeds all of them; the 2026-08-19 defect
+# left 46% empty.
+_MAX_UNFED_FEATURE_SHARE = 0.10

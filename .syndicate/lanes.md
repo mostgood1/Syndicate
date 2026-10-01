@@ -1253,6 +1253,13 @@ death, never life — do not invert it.
 - Verification: unit: filter test proves only the named sport reaches _build_sport_overview; route test proves sports=[X] is passed and _build_candidate_pool is not called without pool=1. live: timed scoped calls on 127.0.0.1:10000, worker pids unchanged
 - Blocked by: none
 - **PROGRESS 2026-10-01, code + tests DONE, live reading next.** `build_intelligence_overview(sports=...)` (default None = every sport, unchanged for all board callers) filters the configured list before the loop. The route passes `sports=[sport]` and runs the two whole-board `_build_candidate_pool` sections only with `?pool=1`, labelling them `skipped` otherwise. New fields: `pool_sections_ran`, `requested_sport_configured`. Tests: 9 new; 8 FAIL on the old code (the 9th is the default-all case); 43 pass in the targeted set incl. `test_request_path_guard.py`.
+### basketball-player-logs-shot-columns — OPEN — opened 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- Goal: Basketball prop features are fed again: player_logs.csv carries every box-score stat the props feature builder reads (FGM/FGA/FG3A/FTM/FTA/OREB/DREB/PF/PLUS_MINUS), and the ONNX predictor refuses to publish when its features are unfed instead of zero-filling them
+- Files: scripts/build_basketball_player_logs.py, syndicate/features/shared/basketball_props_onnx.py, tests/test_basketball_player_logs_shot_columns.py
+- Hypothesis: #477 (2026-08-19) writes a slim player_logs.csv; the feature loader prefers it over boxscores_history, so 64/140 model features are empty and zero-filled -> pred_pts ~0.35x roll10
+- Falsification test: after rebuilding player_logs with the shot columns, if today's props_predictions still shows pred_pts/roll10 far from ~1.0 (or the 64 columns stay empty), the hypothesis is wrong
+- Verification: rebuilt 2026-10-01 props_predictions: the 52 columns filled, median pred_pts/roll10 back near 1.0 (Render July: 0.94-1.06); regression tests fail before / pass after
+- Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
