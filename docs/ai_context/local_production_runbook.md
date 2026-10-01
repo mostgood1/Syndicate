@@ -67,7 +67,9 @@ wsl --install -d Ubuntu
 
 ```bash
 # Inside Ubuntu (WSL2)
-sudo apt update && sudo apt install -y python3.11 python3.11-venv python3-pip redis-server git
+# Ubuntu 24.04 ships Python 3.12 and has no python3.11 package: add deadsnakes first.
+# Run this INSIDE Ubuntu; Windows PowerShell 5.1 rejects `&&` (the 2026-10-01 setup hit that).
+sudo add-apt-repository -y ppa:deadsnakes/ppa && sudo apt update && sudo apt install -y python3.11 python3.11-venv python3.11-dev build-essential redis-server
 # Clone INSIDE the Linux filesystem, not /mnt/c (10x faster I/O, and not OneDrive):
 git clone https://github.com/mostgood1/Syndicate.git ~/Syndicate && cd ~/Syndicate
 python3.11 -m venv ~/.venvs/syndicate && . ~/.venvs/syndicate/bin/activate
@@ -149,7 +151,10 @@ tail -f ~/syndicate-prod/logs/refresh-worker.log
 Start at boot and restart on failure:
 
 - **Windows, native** (measured 2026-09-30, lane `local-production-boot-task`: the task started the fleet, `/healthz` 200 in 85 s, same home reused): `powershell -ExecutionPolicy Bypass -File deploy\local\install_windows_task.ps1 -Mode Native -LocalHome C:\SyndicateProd\home -GlobalArgs '--state file' -Python <path to python311-x64\python.exe>`. All three flags are needed, and the script header says why. The trigger is **at logon**. Starting at boot with nobody signed in requires "Run whether user is logged on or not", which asks for your Windows password, so set it yourself in Task Scheduler.
-- **Windows, running WSL2:** `powershell -ExecutionPolicy Bypass -File deploy\local\install_windows_task.ps1 -Mode Wsl -WslRepo ~/Syndicate`
+- **Windows, running WSL2** (the production host since 2026-10-01, lane `local-production-wsl`): `powershell -ExecutionPolicy Bypass -File deploy\local\install_windows_task.ps1 -Mode Wsl -WslDistro Ubuntu-24.04 -WslRepo '~/Syndicate' -LocalHome '~/syndicate-prod'`. This uses the venv python (`-WslPython`, default `~/.venvs/syndicate/bin/python`); Ubuntu's own `python3` has none of the requirements. Measured: gunicorn 2x4 with `WEB_MEMORY_GUARD_ARMED`, `REFRESH_STATE_BACKEND = keyvalue` on both workers against apt's redis-server 7.0.15 (a systemd unit, so `up` finds it already answering), and `/healthz` reachable from Windows on `127.0.0.1:10000` through WSL localhost forwarding.
+  - **WSL distros are per Windows account.** Install Ubuntu as the account the task runs as, or the task sees no distro.
+  - **Cloning from a Windows checkout under `/mnt/c`** trips git's ownership check (`dubious ownership`), and `-c safe.directory` is NOT inherited by the clone's upload-pack. A throwaway `GIT_CONFIG_GLOBAL` file holding the exception works and leaves `~/.gitconfig` alone. Expect about 90 MB/min across `/mnt/c`.
+  - **Migrating a native data home:** rsync it over and exclude `*.lock` and `*.pid`. A Windows PID in a lock would be checked against Linux processes. Seed-only bootstrap then fills in only what is missing, so the migrated files win.
   - This registers a logon task that runs `up` in WSL and restarts it every minute on failure.
   - Also run `powercfg /change standby-timeout-ac 0`. Modern Standby suspends scheduled-task children, so the workers silently stop.
 - **Linux, or WSL with systemd:** use `deploy/local/syndicate-prod.service`. Install steps are in its header.

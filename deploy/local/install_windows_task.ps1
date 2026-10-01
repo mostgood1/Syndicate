@@ -3,7 +3,9 @@ Register Syndicate local production to start at logon and restart if it dies.
 Lane `local-production-host` [2026-09-30]. Runbook: docs/ai_context/local_production_runbook.md
 
   # Recommended: run inside WSL2 (gunicorn, redis, fcntl locks, /proc memory all work)
-  powershell -ExecutionPolicy Bypass -File deploy\local\install_windows_task.ps1 -Mode Wsl -WslRepo ~/Syndicate
+  powershell -ExecutionPolicy Bypass -File deploy\local\install_windows_task.ps1 -Mode Wsl -WslDistro Ubuntu-24.04 `
+      -WslRepo ~/Syndicate -LocalHome ~/syndicate-prod
+  (-WslPython defaults to the runbook's venv, ~/.venvs/syndicate/bin/python.)
 
   # Fallback: native Windows (waitress web server; see the runbook's caveats)
   powershell -ExecutionPolicy Bypass -File deploy\local\install_windows_task.ps1 -Mode Native `
@@ -26,6 +28,7 @@ param(
     [ValidateSet('Wsl', 'Native')] [string] $Mode = 'Wsl',
     [string] $WslDistro = 'Ubuntu',
     [string] $WslRepo = '~/Syndicate',
+    [string] $WslPython = '~/.venvs/syndicate/bin/python',
     [string] $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
     [string] $UpArgs = '',
     [string] $GlobalArgs = '',
@@ -46,7 +49,18 @@ if ($Uninstall) {
 if ($Mode -eq 'Wsl') {
     # `exec` so the supervisor is the process WSL keeps alive; `bash -lc` so the
     # user's profile (PATH, venv activation) applies.
-    $command = "cd $WslRepo && exec python3 scripts/local_production.py up $UpArgs"
+    # -WslPython: Ubuntu 24.04's `python3` is 3.12 with none of the requirements
+    # installed (PEP 668); the runbook's venv is the interpreter that has them.
+    # -GlobalArgs (--state/--port/--home) must precede `up`. -LocalHome is a
+    # LINUX path here; the supervisor's stdout goes to <home>/logs/supervisor.log.
+    $homeArg = ''
+    $redirect = ''
+    if ($LocalHome) {
+        $homeArg = "--home $LocalHome "
+        $redirect = " >> $LocalHome/logs/supervisor.log 2>&1"
+    }
+    $mkLogs = if ($LocalHome) { "mkdir -p $LocalHome/logs && " } else { '' }
+    $command = "${mkLogs}cd $WslRepo && exec $WslPython scripts/local_production.py $homeArg$GlobalArgs up $UpArgs$redirect"
     $action = New-ScheduledTaskAction -Execute 'wsl.exe' -Argument "-d $WslDistro -- bash -lc `"$command`""
 } else {
     if ($Python) {

@@ -44431,3 +44431,18 @@ branch `claude/dreamy-babbage-dm6ubz`, base `bfb00966`). Money: paper. No venue 
 ## 2026-09-30 23:18Z (6:18 PM CT) -- READING, no deploy -- LOCAL PRODUCTION: MLB reaches the board (lane `local-production-first-run`) -- **MET; closes the MLB item owed in the 23:15Z entry**
 
 - verify: MLB daily sim (launched 23:05:57Z) wrote `daily_summary_2026_09_30.json` + hr/rfi/locked_policy/profile_bundle; `/api/intelligence/query` top-edges 2026-09-30 at 23:18:27Z served **1159 rows: wnba 619, ncaaf 384, nfl 84, mlb 72**. 0 role exits since the 23:04Z restart. `#692` item 2 is MET.
+
+## 2026-10-01 01:50Z (2026-09-30 8:50 PM CT) -- READING, no deploy -- LOCAL PRODUCTION MOVED TO WSL2 + REDIS (lane `local-production-wsl`) -- **MET: RENDER=true, keyvalue on Redis, gunicorn, fresh 6-sport board**
+
+**Context.** Render still billing-suspended. User decision: real Redis via WSL2 (Memurai Developer's EULA prohibits production use and it auto-stops after 10 days). Host: Ubuntu-24.04 on WSL2, native aarch64 (the native-Windows fleet ran x64 Python under emulation on this Snapdragon X). Repo `~/Syndicate`, venv `~/.venvs/syndicate` (Python 3.11.16, deadsnakes), home `~/syndicate-prod`, apt `redis-server` 7.0.15 (systemd). Paper money.
+
+- expect: same env as Render (`RENDER=true`, keyvalue state, gunicorn 2x4, loop ownership per render.yaml); board rebuilt by the WSL fleet with every in-season sport.
+- verify (readings):
+  - doctor READY `state=redis` (`redis 7.0.15`); env per role: `RENDER=true`, `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`, `SYNDICATE_REFRESH_STATE_URL=redis://127.0.0.1:6379/0`, intelligence loop on refresh-worker only, live-odds loop on live-odds-worker only.
+  - processes: gunicorn `--workers 2 --threads 4` + `WEB_MEMORY_GUARD_ARMED`; `REFRESH_STATE_BACKEND = keyvalue` on both workers; redis dbsize 21 -> 156 -> 238.
+  - Windows reaches it at `127.0.0.1:10000` (WSL localhost forwarding), `/healthz` 200; started by the logon task `SyndicateLocalProduction` (now `-Mode Wsl`), 0 supervisor exits.
+  - data: native home migrated by rsync (36,360 files / 4.26 GB, then a 553-file / 318 MB final delta after native `down`), `*.lock`/`*.pid` excluded and 29 book-quote locks deleted.
+  - **board built by the WSL fleet: `snapshot_generated_at` 2026-10-01T01:45:40Z, 1890 rows -- nfl 976, ncaaf 463, wnba 182, mlb 173, nhl 78, soccer 18** (served board before it: the migrated 00:21:12Z snapshot, 92 rows).
+- defects found and fixed: (1) `gunicorn_usable()` required `gunicorn` on PATH; the task runs the venv python unactivated, so web silently fell back to waitress on Linux (`3d667d9d`). (2) on WSL2 `memory.stat` is VM-wide (anon 2006 MB, inactive_file 10.6 GB vs a 698 MB role) and was charged against ONE role's ceiling (`68600132`); after: per-role readings only (refresh-worker 338-438 / 4096 MB, live-odds-worker 227-260 / 2048 MB), 0 headroom refusals. (3) `install_windows_task.ps1 -Mode Wsl` ran Ubuntu's bare `python3` (3.12, no deps) and could not pass global flags; now `-WslPython` (venv default), `-LocalHome`, `-GlobalArgs`, supervisor log.
+- also observed, NOT fixed: `board_enrichment.py:2528` `UnboundLocalError: index_diag` aborts soccer live game-lines (76x on native too -- a main bug, not a host one); `BOOK_GRID_PUBLISH_FAILED` is the publish skip on one disk (expected); 2 tests in `tests/test_memory_observability.py` fail on any host exposing `/sys/fs/cgroup` without a limit (fail at `533d2da3` too, before either memory commit).
+- native-Windows home `C:\SyndicateProd\home` kept as a fallback (task no longer points at it).

@@ -1171,6 +1171,15 @@ death, never life — do not invert it.
 - Verification: task registered; fleet stopped and restarted BY THE TASK; /healthz 200 with supervisor pid owned by the task; supervisor.log written under home
 - Blocked by: none
 
+### local-production-wsl — CLOSED — opened 2026-09-30, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: MET.** WSL2 Ubuntu-24.04 + redis 7.0.15: RENDER=true, keyvalue on both workers, gunicorn 2x4, logon task `-Mode Wsl`, board 01:45:40Z 1890 rows over 6 sports (`deploys.md` 2026-10-01 01:50Z). Fixed `3d667d9d` (gunicorn on PATH), `68600132` (VM-wide memory.stat), installer WSL mode. Claims RELEASED.
+- Goal: Local production runs in WSL2 Ubuntu with Redis (RENDER=true, keyvalue state, gunicorn) started by the logon task, data migrated from the native home, native task retired
+- Files: deploy/local/install_windows_task.ps1, docs/ai_context/local_production_runbook.md, scripts/local_production.py, tests/test_local_production.py, syndicate/features/shared/memory_observability.py, tests/test_memory_observability_local_limit.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: WSL fleet: doctor READY state=redis; REFRESH_STATE_BACKEND=keyvalue on both workers; gunicorn web /healthz 200 on 10000 from Windows; fresh board generated_at after start with mlb/wnba/ncaaf/nfl rows; started by the scheduled task
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
