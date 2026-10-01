@@ -5822,6 +5822,25 @@ def _season_projection_should_launch(sport: str, artifact_path: Path, *, season:
     """
     interval = float(_season_projection_refresh_interval_seconds())
     age_seconds = _file_age_seconds(artifact_path)
+    # A PRESEASON BACKFILL IS NOT A FRESH ARTIFACT. Measured 2026-10-01 on the
+    # local production fleet: `smartsim2_projections_2026_wk4.csv` was the
+    # 2026-08-01 backfill with a recent mtime, so this read `artifact_fresh
+    # age_seconds=14071` and never built week 4 -- while the NFL readers, which
+    # EXCLUDE that file via `is_preseason_backfill_projection`, logged
+    # `WEEK_SUBSTITUTED requested=4 resolved=1` and served week 1 (weeks 2-5
+    # alike). Any copy, seed or rsync that refreshes the mtime produces it. The
+    # file is invisible to every reader, so treat it as MISSING: that branch
+    # keeps `#389`'s launch backstop, so it neither stays stuck nor busy-loops.
+    # NFL only -- NCAAF has no such predicate and its readers exclude nothing.
+    preseason_backfill = False
+    if sport == "nfl" and age_seconds is not None:
+        try:
+            from syndicate.features.nfl.sources import is_preseason_backfill_projection
+            preseason_backfill = is_preseason_backfill_projection(artifact_path)
+        except Exception:
+            preseason_backfill = False
+        if preseason_backfill:
+            age_seconds = None
     if age_seconds is not None:
         if age_seconds < interval:
             return False, f"artifact_fresh age_seconds={int(age_seconds)} interval_seconds={int(interval)}"
@@ -5853,16 +5872,19 @@ def _season_projection_should_launch(sport: str, artifact_path: Path, *, season:
         return True, f"artifact_stale age_seconds={int(age_seconds)} interval_seconds={int(interval)}"
 
     since_launch = _seconds_since_season_projection_launch(sport, season=season, week=week)
+    backfill_tag = " preseason_backfill=1" if preseason_backfill else ""
     if since_launch is None:
+        if preseason_backfill:
+            return True, f"artifact_is_preseason_backfill path={artifact_path}"
         return True, f"artifact_missing_no_prior_launch path={artifact_path}"
     if since_launch < interval:
         return False, (
             f"artifact_missing_after_launch since_launch_seconds={int(since_launch)} "
-            f"interval_seconds={int(interval)} path={artifact_path}"
+            f"interval_seconds={int(interval)} path={artifact_path}{backfill_tag}"
         )
     return True, (
         f"artifact_missing_retry since_launch_seconds={int(since_launch)} "
-        f"interval_seconds={int(interval)} path={artifact_path}"
+        f"interval_seconds={int(interval)} path={artifact_path}{backfill_tag}"
     )
 
 

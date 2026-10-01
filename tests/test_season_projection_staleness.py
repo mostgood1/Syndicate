@@ -281,6 +281,21 @@ class SeasonProjectionAutorunWiringTests(unittest.TestCase):
 
         mocked_popen.assert_called_once()
 
+    def test_autorun_spawns_over_a_fresh_mtime_preseason_backfill(self) -> None:
+        """2026-10-01 at the call site: a wk4 backfill with a fresh mtime used
+        to read `artifact_fresh` and spawn nothing, leaving the pages on wk1."""
+        backfill = self.root / f"smartsim2_projections_{SEASON}_wk4.csv"
+        backfill.write_text(
+            "game_id,season,week,home_team,away_team,rating_source\n"
+            f"g1,{SEASON},4,KC,BUF,prior_season_fallback\n",
+            encoding="utf-8",
+        )
+        with patch.object(worker, "_season_projection_artifact_path", return_value=backfill), \
+                patch.object(worker, "_season_projection_target_week", return_value=4):
+            mocked_popen = self._run()
+
+        mocked_popen.assert_called_once()
+
 
 class StaleArtifactRelaunchCooldownTests(SeasonProjectionStalenessTests):
     """`#389`'s BACKSTOP WAS ONLY EVER WIRED TO THE MISSING-ARTIFACT BRANCH.
@@ -383,6 +398,94 @@ class StaleArtifactRelaunchCooldownTests(SeasonProjectionStalenessTests):
         self._marker["started_at_epoch"] = time.time() - 60
 
         should_launch, reason = self._decide()
+
+        self.assertFalse(should_launch)
+        self.assertTrue(reason.startswith("artifact_fresh"), reason)
+
+
+class PreseasonBackfillArtifactIsMissingTests(SeasonProjectionStalenessTests):
+    """A PRESEASON BACKFILL IS NOT A FRESH ARTIFACT -- gate on content, not mtime.
+
+    MEASURED 2026-10-01 on the local production fleet: the on-disk
+    `smartsim2_projections_2026_wk4.csv` was the 2026-08-01 preseason backfill
+    (`prior_season_fallback` on every row) with a recent mtime, so the autorun
+    read `artifact_fresh age_seconds=14071` and never built week 4 -- while the
+    NFL readers (`is_preseason_backfill_projection`) EXCLUDE that file, and the
+    pages logged `WEEK_SUBSTITUTED requested=4 resolved=1` and served week 1.
+    Weeks 2-5 were all in that state. Any copy, seed, rsync or migration that
+    refreshes a backfill's mtime produces it.
+
+    The fix routes such a file through the MISSING branch, so `#389`'s launch
+    backstop still applies: it must neither stay stuck nor busy-loop.
+    """
+
+    BACKFILL_WEEK = 4
+
+    def _write_projection(self, rating_source: str, *, age_seconds: float = 60) -> None:
+        self.artifact = self.root / f"smartsim2_projections_{SEASON}_wk{self.BACKFILL_WEEK}.csv"
+        self.artifact.write_text(
+            "game_id,season,week,home_team,away_team,rating_source\n"
+            f"g1,{SEASON},{self.BACKFILL_WEEK},KC,BUF,{rating_source}\n"
+            f"g2,{SEASON},{self.BACKFILL_WEEK},DAL,PHI,{rating_source}\n",
+            encoding="utf-8",
+        )
+        import os
+
+        stamp = time.time() - age_seconds
+        os.utime(self.artifact, (stamp, stamp))
+
+    def _decide_backfill_week(self) -> tuple[bool, str]:
+        return self._decide(week=self.BACKFILL_WEEK)
+
+    def test_a_fresh_mtime_backfill_launches_as_missing(self) -> None:
+        """THE bug. Old code returned `artifact_fresh` here."""
+        self._write_projection("prior_season_fallback", age_seconds=14071)
+
+        should_launch, reason = self._decide_backfill_week()
+
+        self.assertTrue(should_launch, reason)
+        self.assertTrue(reason.startswith("artifact_is_preseason_backfill"), reason)
+
+    def test_a_backfill_after_a_recent_launch_is_held_not_busy_looped(self) -> None:
+        """The `#389` backstop still applies: a generator that keeps failing
+        must not be relaunched every 30s tick."""
+        self._write_projection("prior_season_fallback")
+        worker._record_season_projection_launch(SPORT, 4242, season=SEASON, week=self.BACKFILL_WEEK)
+        self._marker["started_at_epoch"] = time.time() - 300
+
+        should_launch, reason = self._decide_backfill_week()
+
+        self.assertFalse(should_launch)
+        self.assertTrue(reason.startswith("artifact_missing_after_launch"), reason)
+        self.assertIn("preseason_backfill", reason)
+
+    def test_a_backfill_retries_after_the_interval(self) -> None:
+        self._write_projection("prior_season_fallback")
+        worker._record_season_projection_launch(SPORT, 4242, season=SEASON, week=self.BACKFILL_WEEK)
+        self._marker["started_at_epoch"] = time.time() - (INTERVAL + 60)
+
+        should_launch, reason = self._decide_backfill_week()
+
+        self.assertTrue(should_launch)
+        self.assertTrue(reason.startswith("artifact_missing_retry"), reason)
+
+    def test_a_real_fresh_week_4_is_still_fresh(self) -> None:
+        """The healthy path: a live build carries current-season ratings."""
+        self._write_projection("current_season_blend")
+
+        should_launch, reason = self._decide_backfill_week()
+
+        self.assertFalse(should_launch)
+        self.assertTrue(reason.startswith("artifact_fresh"), reason)
+
+    def test_the_rule_is_scoped_to_nfl(self) -> None:
+        """NCAAF's readers exclude nothing, so the same file shape there is a
+        real artifact and reinterpreting it would only build a relaunch."""
+        self._write_projection("prior_season_fallback")
+
+        should_launch, reason = worker._season_projection_should_launch(
+            "ncaaf", self.artifact, season=SEASON, week=self.BACKFILL_WEEK,
+        )
 
         self.assertFalse(should_launch)
         self.assertTrue(reason.startswith("artifact_fresh"), reason)
