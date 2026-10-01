@@ -1342,6 +1342,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - **CLOSED 2026-10-01 19:2xZ: GOAL MET.** `_build_local_recon_props_artifact` returns (0, None) and writes nothing when boxscores are missing or yield no rows. `_export_recon_props_artifact` reuses or copies an existing recon_props only if `_path_has_meaningful_content` (has data rows), and accepts a local build only with rows > 0 (WNBA twin's guards). The other three builders (NBA recon_games, WNBA recon_games/props) already had these guards. `_copy_existing_processed_artifact` was deliberately NOT changed: it serves 13 NBA artifacts, including JSON where an empty value may be legitimate. Verified: 7 new tests (5 fail on the old code); test_nba_refresh_runner + test_nba_props_integrity 52 passed; on the fleet's real 06-13 inputs in a scratch dir, header-only + no boxscores -> None (was "built"), + real boxscores -> rebuilt, 30 rows. Existing header-only files are left on disk (fleet: the source_artifacts 06-13 copy; checkout: two 06-13 copies); the export now ignores them.
 
+### wnba-sim-team-calibration — OPEN — opened 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- Goal: WNBA PBP engine: sim team FTA/FGA, FGA and FG% match actual box scores (sim FTA/FGA 0.228 vs 0.293, FGA 1.15x, FG% 0.410 vs 0.450 in the 2026-09-17..29 component backtest)
+- Files: vendor/wnba_betting_repo/src/wnba_betting/sim/events.py,vendor/wnba_betting_repo/src/wnba_betting/sim/smart_sim.py,tests/test_basketball_sim_team_calibration.py
+- Hypothesis: Three engine mechanisms, each testable alone: (M1) _team_rates_from_priors clips foul_per_fga to <=0.20 while league FTA/FGA is 0.317 (production team_advanced_priors 09-30), capping FT volume; (M2) a shooting foul on a MISSED shot is still counted as an FGA, inflating FGA and deflating FG% (real box scores do not count it); (M3) smart_sim multiplies the pregame matchup pace (already team pace) by pace_mult=team/league pace again (LVA-IND 10-01: 84.65 -> 86.87), overstating possessions.
+- Falsification test: M1+M2: paired-seed component backtest (actual minutes+team points, 36 games) -- falsified if team FTA/FGA, FGA ratio and FG% do not each move toward actual, or player PTS MAE does not improve (CI excluding 0 on the harmful side = revert). M3: falsified if predicted possessions WITH pace_mult are no farther from actual box-score possessions than WITHOUT, over 2026 games with as-of team stats.
+- Verification: deploys.md READING: backtest table + engine flags live in WSL fleet venv
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
