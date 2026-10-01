@@ -147,5 +147,82 @@ class CandidateTraceScopedBoundTests(unittest.TestCase):
         self.assertFalse(payload["requested_sport_configured"])
 
 
+class CandidateTraceSkippedSportFallbackTests(unittest.TestCase):
+    """A configured sport the in-request overview could not build is answered
+    from the worker-written board snapshot, never with an empty `sports` list.
+
+    Measured 2026-10-01 on the local fleet: `?sport=mlb` answered 200 in 1.25s
+    with `sports: []` because `OVERVIEW_STOPPED_FOR_MEMORY` refuses MLB on web
+    (3000MB floor, 2048MB budget) -- while the board snapshot carried MLB rows.
+    """
+
+    _SNAPSHOT = {
+        "updated_at": "2026-10-01T12:14:27-05:00",
+        "response": {
+            "by_sport": {
+                "mlb": [
+                    {"candidate_id": "mlb-1", "market": "moneyline", "selection": "NYY", "edge": 0.04, "noise": "x"},
+                    {"candidate_id": "mlb-2", "market": "total", "selection": "over", "line": 8.5},
+                ],
+                "nfl": [{"candidate_id": "nfl-1"}],
+            }
+        },
+    }
+
+    def setUp(self) -> None:
+        app = create_app()
+        app.testing = True
+        self.client = app.test_client()
+
+    def _get(self, query: str, *, overview_rows: list, headroom: dict | None):
+        from pipeline.intelligence_state import _INTELLIGENCE_STATE_SERVICE as service
+
+        with patch.dict(os.environ, {"ADMIN_TOKEN": _TOKEN}, clear=False), patch(
+            "syndicate.features.intelligence.build_intelligence_overview", return_value=overview_rows
+        ), patch("syndicate.features.intelligence.collect_candidates", return_value=[]), patch(
+            "syndicate.features.intelligence._collect_candidates", return_value=[]
+        ), patch.object(service, "_build_candidate_pool", side_effect=_explode), patch(
+            "syndicate.features.shared.refresh_state_store.read_json_file", return_value=self._SNAPSHOT
+        ), patch(
+            "pipeline.intelligence_state.expand_persisted_state", side_effect=lambda value: value
+        ), patch(
+            "syndicate.features.shared.memory_observability.memory_headroom_snapshot", return_value=headroom
+        ):
+            response = self.client.get(f"/api/ops/intelligence/candidate-trace{query}", headers=_HEADERS)
+        self.assertEqual(response.status_code, 200, response.get_data(as_text=True)[:400])
+        return response.get_json()
+
+    def test_skipped_sport_is_answered_from_the_board_snapshot(self) -> None:
+        payload = self._get(
+            "?sport=mlb&date=2026-10-01",
+            overview_rows=[],
+            headroom={"sufficient": False, "headroom_mb": 1815.3, "max_mb": 2048.0},
+        )
+        self.assertFalse(payload["requested_sport_present"])
+        self.assertEqual(len(payload["sports"]), 1)
+        row = payload["sports"][0]
+        self.assertEqual(row["slug"], "mlb")
+        self.assertEqual(row["source"], "board_snapshot")
+        self.assertEqual(row["candidate_count"], 2)
+        self.assertEqual([c["candidate_id"] for c in row["candidates"]], ["mlb-1", "mlb-2"])
+        self.assertNotIn("noise", row["candidates"][0])
+        self.assertEqual(row["snapshot_updated_at"], "2026-10-01T12:14:27-05:00")
+        self.assertEqual(row["overview_skip"]["reason"], "memory_floor")
+        self.assertEqual(row["overview_skip"]["max_mb"], 2048.0)
+
+    def test_a_built_sport_keeps_the_in_request_row_and_gets_no_fallback(self) -> None:
+        payload = self._get(
+            "?sport=mlb&date=2026-10-01",
+            overview_rows=[{"slug": "mlb", "dashboard_games": []}],
+            headroom={"sufficient": True},
+        )
+        self.assertEqual([row["source"] for row in payload["sports"]], ["in_request_overview"])
+
+    def test_an_unconfigured_sport_gets_no_fallback(self) -> None:
+        payload = self._get("?sport=cricket&date=2026-10-01", overview_rows=[], headroom=None)
+        self.assertFalse(payload["requested_sport_configured"])
+        self.assertEqual(payload["sports"], [])
+
+
 if __name__ == "__main__":
     unittest.main()

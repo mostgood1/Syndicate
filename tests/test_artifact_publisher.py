@@ -2004,9 +2004,12 @@ class CandidateTraceSportScopingTests(unittest.TestCase):
         self.assertEqual(response.get_json()["missing_scope"], ["sport"])
 
     def test_a_sport_not_in_the_overview_is_stated_not_implied_by_an_empty_list(self) -> None:
+        # 2026-10-01: a configured sport the overview did not build is answered
+        # from the board snapshot rather than an empty list (user: "we cant have
+        # things be empty"). See tests/test_candidate_trace_scope_refusal.py.
         payload = self._trace("?sport=nfl&date=2026-08-04")
         self.assertFalse(payload["requested_sport_present"])
-        self.assertEqual(payload["sports"], [])
+        self.assertEqual([(row["slug"], row["source"]) for row in payload["sports"]], [("nfl", "board_snapshot")])
         self.assertEqual(sorted(payload["sports_in_overview"]), ["mlb", "wnba"])
 
     def test_pool_wide_sections_are_labelled_as_pool_wide(self) -> None:

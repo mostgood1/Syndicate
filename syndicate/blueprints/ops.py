@@ -4254,6 +4254,71 @@ def _board_snapshot_read_summary(snapshot: Any) -> dict[str, Any]:
     return summary
 
 
+_SNAPSHOT_ROW_FIELDS = (
+    "candidate_id", "candidate_type", "type", "market", "market_type", "selection", "player_name",
+    "entity", "team", "line", "odds", "price", "edge", "adjusted_edge", "expected_value", "score",
+    "model_probability", "implied_probability", "game_id", "event_id", "matchup", "start_time", "game_state",
+)
+
+
+def _persisted_sport_rows(sport: str) -> dict[str, Any]:
+    """One sport's rows from the worker-written board snapshot, for a scoped
+    trace whose in-request overview could not build that sport.
+
+    2026-10-01: `?sport=mlb` on web answered 200 in 1.25s with `sports: []`.
+    `OVERVIEW_STOPPED_FOR_MEMORY` refuses MLB there by construction (3000MB
+    floor against a 2048MB web budget), while refresh-worker builds MLB into the
+    board every cycle. An empty answer for a sport that IS on the board is wrong,
+    so this reads what the worker computed -- a read, not a rebuild -- and labels
+    it as the snapshot, never as in-request output.
+    """
+    out: dict[str, Any] = {"source": "board_snapshot"}
+    try:
+        from syndicate.features.shared.refresh_state_store import read_json_file as _read_json_file
+        from pipeline.intelligence_state import BOARD_SNAPSHOT_PATH as _BOARD_SNAPSHOT_PATH
+        from pipeline.intelligence_state import expand_persisted_state as _expand
+
+        snapshot = _expand(_read_json_file(_BOARD_SNAPSHOT_PATH))
+    except Exception as exc:
+        out["error"] = f"{type(exc).__name__}: {exc}"
+        return out
+    if not isinstance(snapshot, dict):
+        out["error"] = "board snapshot unreadable or absent"
+        return out
+    response = snapshot.get("response") if isinstance(snapshot.get("response"), dict) else {}
+    by_sport = response.get("by_sport") or snapshot.get("by_sport") or {}
+    rows = by_sport.get(sport) if isinstance(by_sport, dict) else None
+    out["snapshot_updated_at"] = snapshot.get("updated_at") or snapshot.get("generated_at")
+    out["snapshot_sports"] = sorted(by_sport) if isinstance(by_sport, dict) else []
+    rows = [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+    out["candidate_count"] = len(rows)
+    out["candidates"] = [{key: row[key] for key in _SNAPSHOT_ROW_FIELDS if row.get(key) is not None} for row in rows]
+    return out
+
+
+def _overview_skip_reason(sport: str) -> dict[str, Any]:
+    """Why the in-request overview left `sport` out: the same floor and memory
+    snapshot `_overview_headroom_exhausted` decides on, recomputed here so the
+    reason is in the response and not only in web.log."""
+    try:
+        from syndicate.features.intelligence import _overview_headroom_floor_bytes
+        from syndicate.features.shared.memory_observability import memory_headroom_snapshot
+
+        floor_bytes, floor_label = _overview_headroom_floor_bytes(sport)
+        snapshot = memory_headroom_snapshot(floor_bytes)
+    except Exception as exc:
+        return {"reason": "unknown", "error": f"{type(exc).__name__}: {exc}"}
+    if isinstance(snapshot, dict) and not snapshot.get("sufficient", True):
+        return {
+            "reason": "memory_floor",
+            "floor": floor_label,
+            "floor_mb": round(floor_bytes / (1024 * 1024)),
+            "headroom_mb": snapshot.get("headroom_mb"),
+            "max_mb": snapshot.get("max_mb"),
+        }
+    return {"reason": "not_built_in_request", "floor": floor_label}
+
+
 @ops_bp.get("/api/ops/intelligence/candidate-trace")
 def api_ops_intelligence_candidate_trace() -> Any:
     # Protected endpoint: requires admin token. Diagnostic-only: exercises the
@@ -4594,6 +4659,7 @@ def api_ops_intelligence_candidate_trace() -> Any:
         result["sports"].append(
             {
                 "slug": slug,
+                "source": "in_request_overview",
                 "dashboard_games_count": len(dashboard_games),
                 "sample_game": sample_game_summary,
                 "candidate_count": len(sport_candidates) if isinstance(sport_candidates, list) else None,
@@ -4603,6 +4669,14 @@ def api_ops_intelligence_candidate_trace() -> Any:
                 "full_pipeline_error": full_pipeline_error,
             }
         )
+    # A configured sport the overview could not build here (MLB on web: its
+    # memory floor exceeds web's whole budget) gets the worker's rows from the
+    # board snapshot and the reason, instead of an empty `sports` list.
+    if sport_filter and sport_filter in configured_slugs and sport_filter not in overview_slugs:
+        fallback = _persisted_sport_rows(sport_filter)
+        fallback["slug"] = sport_filter
+        fallback["overview_skip"] = _overview_skip_reason(sport_filter)
+        result["sports"].append(fallback)
     return jsonify(result)
 
 
