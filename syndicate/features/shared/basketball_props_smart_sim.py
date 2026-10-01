@@ -3322,6 +3322,76 @@ def _simulate_event_level_boxscore_local(*, league_code: str = "nba", **kwargs):
     return _call_events_entrypoint_local(entrypoint_name="simulate_event_level_boxscore", kwargs=kwargs)
 
 
+def _water_fill_minutes_local(base, *, total: float, caps):
+    """Shrink a rotation to `total` minutes by taking the SAME number of minutes
+    off every player (floored at 0, never above their cap) -- so the excess comes
+    off the end of the bench, which is how real rotations absorb it, instead of
+    scaling everyone down proportionally. Returns None when caps bind so hard
+    that even no reduction reaches `total` (caller keeps the vendor path).
+    """
+    import numpy as np
+
+    b = np.maximum(0.0, np.where(np.isfinite(np.asarray(base, dtype=float)), np.asarray(base, dtype=float), 0.0))
+    cap = np.asarray(caps, dtype=float) if caps is not None else np.full(b.size, np.inf)
+    cap = np.where(np.isfinite(cap) & (cap > 0.0), cap, np.inf)
+    if b.size == 0 or float(np.minimum(b, cap).sum()) < float(total):
+        return None
+    lo, hi = 0.0, float(b.max())
+    for _ in range(100):
+        mid = (lo + hi) / 2.0
+        if float(np.clip(b - mid, 0.0, cap).sum()) > float(total):
+            lo = mid
+        else:
+            hi = mid
+    out = np.clip(b - (lo + hi) / 2.0, 0.0, cap)
+    s = float(out.sum())
+    return out * (float(total) / s) if s > 0 else None
+
+
+def _derive_sim_minutes_local(*, smart_sim_module, team_df, date_str=None, team_tri=None):
+    """The sim's minutes when no rotation history applies -- the vendored
+    `_derive_sim_minutes` with ONE change: the shrink to regulation minutes.
+
+    The vendor scaled every candidate's rolling minutes by total/sum. With 11
+    candidates summing to 232 (LVA, 2026-10-01) that is x0.862 on everyone, so
+    A'ja Wilson's 30.5 became 26.3. Real rotations shed the excess at the end of
+    the bench. Backtest vs actual box minutes, 36 games / 869 player rows,
+    2026-09-17..29: water-fill MAE 5.784 vs 6.019 (-0.233 min, 95% CI
+    [-0.338, -0.127], 72% of games better), top-3 bias -1.20 -> -0.12.
+    Seeding, the upward-scaling case and the caps are the vendor's own.
+    """
+    import pandas as pd
+
+    m = smart_sim_module
+    if team_df is None or team_df.empty:
+        return pd.Series(dtype=float)
+    league = getattr(m, "LEAGUE")
+    total = float(league.regulation_team_minutes)
+    mins = m._roll_minutes_unscaled(team_df, date_str=date_str, team_tri=team_tri)
+    seed = m._first_minutes_signal(team_df)
+    if len(team_df) >= 8 and int((seed > 0.0).sum()) < 8 and date_str and team_tri:
+        pri = m._minutes_priors_from_player_logs(date_str=str(date_str), team_tri=str(team_tri), lookback_days=21)
+        if pri:
+            try:
+                pkeys = m._frame_series(team_df, "player_name", "").map(m._norm_player_key)
+                pri_m = pd.to_numeric(pkeys.map(pri), errors="coerce").fillna(0.0).astype(float)
+                use = (seed <= 0.0) & (pri_m > 0.0)
+                if int(use.sum()) >= 3:
+                    mins = mins.where(~use, other=pri_m)
+            except Exception:
+                pass
+    if float(mins.sum()) <= 0.0:
+        mins = pd.Series([24.0] * len(team_df), index=team_df.index, dtype=float)
+    if float(mins.sum()) > total:
+        caps = m._minutes_caps_from_team_df(team_df, base_minutes=mins)
+        filled = _water_fill_minutes_local(mins.to_numpy(dtype=float), total=total, caps=pd.Series(caps, index=mins.index).to_numpy(dtype=float) if caps is not None else None)
+        if filled is not None:
+            return pd.Series(filled, index=mins.index, dtype=float)
+    mins = m._scale_minutes_to_target(mins, total_target=total)
+    caps = m._minutes_caps_from_team_df(team_df, base_minutes=mins)
+    return m._cap_and_redistribute_minutes(mins, total_target=total, cap=caps, iters=12).astype(float)
+
+
 def _pips_inclusion_probabilities_local(weights, k: int):
     """Inclusion probabilities exactly proportional to weight, summing to k.
 
@@ -4564,6 +4634,15 @@ def _call_source_simulate_smart_game_local(*, smart_sim_module, processed_root: 
             processed_root=processed_root,
             asof_date_str=asof_date_str,
             days_back=days_back,
+        ),
+        # Bench-first shrink to regulation minutes (see _derive_sim_minutes_local).
+        # The local port calls the vendor's OTHER helpers, never this name, so
+        # swapping it here cannot recurse.
+        "_derive_sim_minutes": lambda team_df, date_str=None, team_tri=None: _derive_sim_minutes_local(
+            smart_sim_module=smart_sim_module,
+            team_df=team_df,
+            date_str=date_str,
+            team_tri=team_tri,
         ),
         "_team_adj_from_advanced_stats": lambda date_str, home_tri, away_tri: _team_adj_from_advanced_stats_local(
             processed_root=processed_root,

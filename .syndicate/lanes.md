@@ -1306,6 +1306,13 @@ death, never life — do not invert it.
 - Verification: unit: bare call -> 200 window of 14 days ending yesterday; date= still single day; since/until and start/end/days honoured; garbage window -> 400; empty payload carries latest_available_date. live: bare call 200 on 127.0.0.1:10000 and ?date=2026-06-13 returns settled rows
 - Blocked by: none
 - **PROGRESS 2026-10-01, code + tests DONE, live reading next.** Cause: both NBA audit builders returned None without `date` or `since`/`until`, and the route mapped None to 502. They now use the shared `_parse_window(default_days=14, allow_date_single=True)` (WNBA's parser): a bare call is the trailing 14 days ending yesterday, and `start`/`end`/`days` now work too. An unparsable window is a 400. The empty payload carries `latest_available_date` (fleet: 2026-06-13, NBA offseason). 6 new tests, 5 fail on the old code; test_archives + test_live_lens_local show the same 34 failures/errors with and without the change (worktree has no data/).
+### wnba-sim-minutes-model — OPEN — opened 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- Goal: WNBA smart-sim minutes match real rotations: the no-rotation-history fallback stops shrinking stars proportionally, and the rotation history lost in the Render migration is rebuilt
+- Files: syndicate/features/shared/basketball_props_smart_sim.py, tests/test_basketball_sim_minutes_model.py
+- Hypothesis: vendor _derive_sim_minutes scales every candidate's rolling minutes by 200/sum (LVA 10-01: 232 -> x0.862, Wilson 30.5 -> 26.3); real excess minutes come off the bench, so stars are under- and bench over-allotted. Separately rotation_stints_history holds only 09-30 locally (Render's accumulated CSV was disk-only), so every team falls to this fallback
+- Falsification test: minutes backtest 2026-09-17..29 vs actual box minutes: if no bench-first allocation (constant-subtraction water-fill or power-gamma) beats proportional scaling on MAE with a game-bootstrap CI excluding 0 AND reduces top-3 under-allocation, the fallback change does not ship
+- Verification: backtest table + CI in deploys.md; regression tests fail before/pass after; live 10-01 sim minutes for LVA/IND starters within ~2 min of their recent averages; rotation history covers LVA/IND
+- Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
