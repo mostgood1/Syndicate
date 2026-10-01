@@ -178,10 +178,107 @@ def test_a_full_catalogue_fits_under_the_keyvalue_store_size_ceiling(monkeypatch
     # Persisted at all -- the size-ceiling failure, like the Decimal one
     # above, presented as a silent drop (WRITE_FAILED logged, no raise).
     assert state is not None
-    assert len(state["snapshot"]["markets"]) == 29469
+    assert len(mod.snapshot_from_state(state)["markets"]) == 29469
 
-    serialized = json.dumps(mod._json_safe(state), separators=(",", ":"))
+    serialized = json.dumps(state, separators=(",", ":"))
     assert len(serialized.encode("utf-8")) < 8 * 1024 * 1024
+
+
+def _realistic_catalogue(rows: int) -> list[dict]:
+    """Rows that vary the way the real tape does -- distinct uuid market ids,
+    spread probabilities and volumes, a COMBO-heavy ticker mix -- so the size
+    assertion is not flattered by identical rows deflating to nothing."""
+    import random
+    import uuid
+
+    rng = random.Random(20261001)
+    tickers = ["COMBO"] * 59 + ["NCAAF-SPREAD"] * 6 + ["NCAAF-TOTAL"] * 5 + ["NFL-RECEIVING_YARDS"] * 4 + [
+        "NFL-RUSHING_YARDS", "NFL-RECEPTIONS", "NFL-SPREAD", "NFL-TOTAL", "MLB-MONEY", "NHL-MONEY",
+    ] * 4
+    out = []
+    for _ in range(rows):
+        p = round(rng.uniform(0.02, 0.98), 4)
+        out.append(
+            {
+                "market_id": str(uuid.UUID(int=rng.getrandbits(128))),
+                "report_ticker": rng.choice(tickers),
+                "open_interest": f"{rng.uniform(0, 5000):.2f}",
+                "daily_volume": f"{rng.uniform(0, 20000):.2f}",
+                "close_probability": p,
+                "close_american": int(-100 * p / (1 - p)) if p >= 0.5 else int(100 * (1 - p) / p),
+                "status": "active",
+                "traded_today": rng.random() < 0.4,
+            }
+        )
+    return out
+
+
+def test_the_2026_09_30_catalogue_size_persists_losslessly_under_the_ceiling(monkeypatch):
+    """Measured 2026-10-01 on the local production fleet: 49,094 rows, 10,601,014
+    bytes after the trim, refused by the keyvalue ceiling on every write -- so
+    `previous_date` read None on every REFRESHED and the CSV was refetched every
+    hour. The stored state must now fit AND hand back every row unchanged."""
+    import json
+
+    markets = _realistic_catalogue(49094)
+    snapshot = _snapshot(date="2026-09-30", count=1)
+    snapshot["markets"] = markets
+    snapshot["count"] = len(markets)
+    _stub(monkeypatch, snapshot)
+
+    assert mod.run_novig_odds_refresh()["status"] == "ok"
+
+    from syndicate.features.shared.refresh_state_store import read_json_file
+
+    state = read_json_file(mod.markets_artifact_path())
+    wire = len(json.dumps(state, separators=(",", ":")).encode("utf-8"))
+    raw = len(json.dumps(markets, separators=(",", ":")).encode("utf-8"))
+    assert raw > 8 * 1024 * 1024  # the uncompressed rows alone are over the ceiling
+    assert wire < 4 * 1024 * 1024  # and the stored state leaves room to grow
+    # The compressed branch actually ran: the raw artifact holds the envelope.
+    assert "__compressed__" in state["snapshot"]["markets"]
+    assert state["snapshot"]["date"] == "2026-09-30"  # small fields stay plain
+    assert mod.snapshot_from_state(state)["markets"] == markets  # lossless
+
+
+def test_the_next_check_sees_the_stored_date_and_does_not_refetch_the_csv(monkeypatch):
+    """The production symptom of the refused write: every hourly check logged
+    REFRESHED with previous_date=None. With the state persisted, a later check
+    on the same published day is UNCHANGED, not a fresh fetch."""
+    markets = _realistic_catalogue(49094)
+    snapshot = _snapshot(date="2026-09-30", count=1)
+    snapshot["markets"] = markets
+    snapshot["count"] = len(markets)
+    _stub(monkeypatch, snapshot)
+    mod.run_novig_odds_refresh()
+
+    from syndicate.features.shared.refresh_state_store import read_json_file, write_json_file
+
+    path = mod.markets_artifact_path()
+    state = read_json_file(path)
+    state["checked_at"] = "2020-01-01T00:00:00Z"
+    write_json_file(path, state)
+
+    result = mod.run_novig_odds_refresh()
+    assert result["status"] == "cached"
+    assert result["snapshot"]["markets"] == markets
+
+
+def test_an_undecodable_stored_snapshot_is_refetched_not_served(monkeypatch):
+    from syndicate.features.shared.refresh_state_store import write_json_file
+
+    write_json_file(
+        mod.markets_artifact_path(),
+        {
+            "checked_at": mod._now_stamp(),
+            "snapshot": {"date": "2026-09-30", "markets": {"__compressed__": "zstd-v9", "data": "x"}},
+        },
+    )
+    calls = _stub(monkeypatch, _snapshot(date="2026-09-30"))
+    result = mod.run_novig_odds_refresh()
+    assert len(calls) == 1  # refetched despite a fresh checked_at
+    assert result["status"] == "ok"
+    assert isinstance(result["snapshot"]["markets"], list)
 
 
 def test_a_second_call_within_the_interval_is_cached_and_does_not_call_the_client(monkeypatch):

@@ -141,6 +141,48 @@ def _json_safe(value: Any) -> Any:
     return value
 
 
+def _persistable(state: dict[str, Any]) -> dict[str, Any]:
+    """What actually gets written: JSON-safe, with the snapshot's large values
+    (in practice `markets`) deflated by the board's own lossless codec.
+
+    Measured 2026-10-01 on the local production fleet: Novig's 2026-09-30 tape
+    is 49,094 rows (28,792 of them COMBO), and even trimmed to
+    `_MARKET_ROW_KEYS_TO_PERSIST` the payload was 10,601,014 bytes against the
+    8,388,608 keyvalue ceiling. Every write was refused (`KEYVALUE_WRITE_REJECTED`,
+    21x), so the state never persisted, every hourly check re-fetched the whole
+    CSV (`previous_date=None` on every REFRESHED), and nothing downstream could
+    ever have read a closing line. The trim was sized for 29,469 rows in August;
+    another field cut would only buy time against a catalogue that keeps
+    growing. Compression is lossless -- every row is kept, COMBO included -- and
+    homogeneous records like these are what deflate best (`_compress_oversized_values`
+    measured 14x on board snapshots).
+
+    `date`, `checked_at` and the other small fields stay plain, so the cadence
+    check and a `KEYVALUE_PAYLOAD_COMPOSITION` line still read them directly.
+    """
+    from pipeline.intelligence_state import _compress_oversized_values
+
+    out = _json_safe(state)
+    snapshot = out.get("snapshot")
+    if isinstance(snapshot, dict):
+        out["snapshot"] = _compress_oversized_values(snapshot)
+    return out
+
+
+def snapshot_from_state(state: Any) -> dict[str, Any] | None:
+    """The stored snapshot with its rows expanded. THE way to read this
+    artifact: a reader that takes `state["snapshot"]["markets"]` directly gets
+    the compressed envelope, not rows. None when there is no snapshot, or when
+    it cannot be decoded (an unknown codec or corrupt data refuses rather than
+    returning a half-decoded dict -- see `_decompress_oversized_values`)."""
+    from pipeline.intelligence_state import _decompress_oversized_values
+
+    snapshot = state.get("snapshot") if isinstance(state, dict) else None
+    if not isinstance(snapshot, dict):
+        return None
+    return _decompress_oversized_values(snapshot)
+
+
 def _now_stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -191,6 +233,15 @@ def run_novig_odds_refresh(*, force: bool = False) -> dict[str, Any]:
         state = read_json_file(path) or {}
     except Exception:
         state = {}
+    if state.get("snapshot") is not None:
+        expanded = snapshot_from_state(state)
+        if expanded is None:
+            # Undecodable: drop it and refetch rather than serve an envelope.
+            print("[novig_odds] STORED_SNAPSHOT_UNREADABLE effect=refetch", flush=True)
+            state.pop("snapshot", None)
+            state.pop("checked_at", None)
+        else:
+            state["snapshot"] = expanded
 
     interval = check_interval_seconds()
     if not force and not _due_to_check(state, interval):
@@ -212,7 +263,7 @@ def run_novig_odds_refresh(*, force: bool = False) -> dict[str, Any]:
         state["last_check_reason"] = result.get("reason")
         print(f"[novig_odds] CHECK_FAILED reason={result.get('reason')}", flush=True)
         try:
-            write_json_file(path, _json_safe(state))
+            write_json_file(path, _persistable(state))
         except Exception as exc:
             print(f"[novig_odds] WRITE_FAILED error={exc}", flush=True)
         # The LAST GOOD snapshot, if there is one -- a manifest hiccup must
@@ -231,7 +282,7 @@ def run_novig_odds_refresh(*, force: bool = False) -> dict[str, Any]:
             flush=True,
         )
         try:
-            write_json_file(path, _json_safe(state))
+            write_json_file(path, _persistable(state))
         except Exception as exc:
             print(f"[novig_odds] WRITE_FAILED error={exc}", flush=True)
         return {"status": "cached", "snapshot": state.get("snapshot")}
@@ -243,7 +294,7 @@ def run_novig_odds_refresh(*, force: bool = False) -> dict[str, Any]:
     result["markets"] = [_trimmed_for_storage(m) for m in (result.get("markets") or [])]
     state["snapshot"] = result
     try:
-        write_json_file(path, _json_safe(state))
+        write_json_file(path, _persistable(state))
     except Exception as exc:
         print(f"[novig_odds] WRITE_FAILED error={exc}", flush=True)
 

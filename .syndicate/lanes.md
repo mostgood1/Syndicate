@@ -1276,6 +1276,15 @@ death, never life — do not invert it.
 - **CLOSED 2026-10-01 17:25Z: GOAL MET.** Live on web (`f5555814`, HUP 17:23:23Z): `?sport=mlb` -> 200 in 1.96 s with a `board_snapshot` row (2 MLB candidates, snapshot 12:22:02 CDT) and `overview_skip.reason memory_floor`. NHL control unchanged (in-request, 32). `deploys.md` 2026-10-01 17:23Z.
 - **PROGRESS 2026-10-01, code + tests DONE, live reading next.** The route appends a `source: board_snapshot` row (that sport's rows from the worker-written board snapshot, fields allowlisted, plus `snapshot_updated_at`) and `overview_skip` (the same floor and memory snapshot `_overview_headroom_exhausted` decides on) when a CONFIGURED sport is absent from the in-request overview. In-request rows now carry `source: in_request_overview`; an unconfigured sport still answers `sports: []`. 3 new tests (2 fail on the old route); 41 pass in the targeted set. `intelligence.py` NOT touched (the reason is recomputed in the route).
 
+### novig-artifact-oversize — OPEN — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- Goal: reports/intelligence/novig_markets.json persists on the keyvalue store: refresh-worker logs no [novig_odds] WRITE_FAILED / KEYVALUE_WRITE_REJECTED for it, and the next check after a REFRESHED reads previous_date=<that date> (state survived), with all rows retained (lossless)
+- Files: pipeline/novig_odds_refresh.py, tests/test_novig_odds_cadence.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: round-trip test (write->read returns identical markets, payload under the keyvalue ceiling for a 49k-row snapshot); live: refresh-worker restart, then log shows REFRESHED with no WRITE_FAILED and a later UNCHANGED/CACHED with the stored date
+- Blocked by: none
+- **PROGRESS 2026-10-01, code + tests DONE, live reading next.** Promoted from the leads.md line of the same day. Cause measured on the fleet: the 2026-09-30 tape is 49,094 rows (28,792 COMBO), 10,601,014 bytes after the August trim (sized for 29,469 rows), refused on every write, so `previous_date=None` on every REFRESHED and an hourly full-CSV refetch. Fix: the snapshot's large values (`markets`) are stored with intelligence_state's lossless `zlib-b64-v1` codec; small fields stay plain; `snapshot_from_state()` is the reader. No rows dropped. A realistic 49,094-row catalogue goes from 10.7 MB raw to 2.84 MB stored. 3 new tests (all fail on the old code); 15 pass.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
