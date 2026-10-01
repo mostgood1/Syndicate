@@ -2964,9 +2964,7 @@ COMPLETE rather than the fallback — `2026_03_ATL_GB`, `ATL @ GB`, kickoff
 `2026-09-25T00:15:00+00:00`, `state=pregame`, `status_token=7:15P CT`. That is the
 user-reported card, rendering. `deploys.md 5703578e` (web) / `a6740a82` (live-odds-worker).
 
-**`WEEK_SUBSTITUTED` HAS STILL NEVER BEEN OBSERVED IN PRODUCTION.** By construction it
-should now stay silent on all three services, so its silence is NOT evidence the emitter
-works — that is proved by test only. Owed: one real sighting.
+**`WEEK_SUBSTITUTED` HAS NOW BEEN OBSERVED IN PRODUCTION** `[verified 2026-10-01, local fleet web.log, lane nfl-backfill-autorun-gate]`: `[nfl_cards] WEEK_SUBSTITUTED season=2026 requested=4 resolved=1 available=[1]` (55 lines, last at web.log line 4264) while the local disk held only the preseason BACKFILL for wk2-18 (`is_preseason_backfill_projection` True, so every reader excluded it) and the season-projection autorun called that file `artifact_fresh` by mtime. The emitter works. The autorun half is FIXED in `e04f6738` (`_season_projection_should_launch`: an NFL backfill-shaped artifact takes the MISSING branch, reason `artifact_is_preseason_backfill`, `#389` backstop kept), live on the local refresh-worker since 2026-10-01 15:03:39Z; its own live firing is still owed (first chance: wk5->wk6 rollover).
 
 ## [nfl-live-gameline-join] NFL LIVE RE-SIM LANES WERE UNREADABLE BY THE BOARD JOIN — FIXED AND DEPLOYED, LIVE READING OWED `[deployed 2026-09-28T17:32:31Z, refresh-worker f9506b26, lane nfl-live-gameline-full-rows]`
 
