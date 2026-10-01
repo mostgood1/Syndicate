@@ -1003,6 +1003,38 @@ def _plausible_ev_pct(value: float | None) -> float | None:
         return None
     return numeric
 
+def _model_p_win(top_play: dict) -> float | None:
+    """The play's MODEL win probability -- its own `p_win`, else the exact
+    inversion of the EV it carries. Never the bare price-implied probability.
+
+    `top_play` rows reach the slate with `ev`/`ev_pct`/`edge` but no `p_win`,
+    and every site here used to fall back to `_american_price_to_prob(price)`
+    and publish THAT as the model's probability. /wnba/picks 2026-10-01:
+    "Jackie Young UNDER 20.5 @ +103 -- Win prob 49.3%, EV 30.8%": 49.3% is
+    100/203, at which the EV would be ~0. EV per unit is q/p - 1, so the
+    model's q = p * (1 + ev) -> 0.6445, which reproduces the published EV and
+    equals implied + edge. (Not `p + ev` -- that additive form is the defect
+    `test_additive_inversion_is_gone_from_both_refresh_scripts` pins at zero.)
+    Absence propagates: no EV, an implausible EV or no price -> None.
+    """
+    raw = top_play.get("p_win")
+    # Not `_float_or_none`: it reads `value or ""`, so a genuine 0.0 came back
+    # None and fell through to a fallback -- the "a real 0.0 survives" promise
+    # at the call sites was never true.
+    explicit = float(raw) if isinstance(raw, (int, float)) and not isinstance(raw, bool) else _float_or_none(raw)
+    if explicit is not None:
+        return explicit
+    implied = _american_price_to_prob(top_play.get("price"))
+    if implied is None:
+        return None
+    ev_pct = _plausible_ev_pct(_float_or_none(top_play.get("ev_pct")))
+    if ev_pct is None:
+        ev = _float_or_none(top_play.get("ev"))
+        ev_pct = _plausible_ev_pct(ev * 100.0) if ev is not None else None
+    if ev_pct is None:
+        return None
+    return implied * (1.0 + ev_pct / 100.0)
+
 
 def _nba_totals_recommendations_enabled() -> bool:
     """True unless explicitly disabled. See the TOTAL branch for why the
@@ -1352,11 +1384,10 @@ def _build_local_top_by_game_snapshot(*, processed_root: Path, date_str: str) ->
         ev_pct = _plausible_ev_pct(_float_or_none(top_play.get("ev_pct")))
         # Prefer the play's own model probability; explicit None tests, not an
         # `or` chain -- `or` also fires on a genuine 0.0, and a missing price
-        # then fabricates 0.5. Fallback is the price-implied probability, never
-        # `implied + ev` (a return fraction added to a probability; ported fix).
-        p_win_value = _float_or_none(top_play.get("p_win"))
-        if p_win_value is None:
-            p_win_value = _american_price_to_prob(top_play.get("price"))
+        # then fabricates 0.5. Fallback is the exact EV inversion q = implied *
+        # (1 + ev) via `_model_p_win` -- never the bare price (published as the
+        # model's on WNBA 2026-10-01), never `implied + ev` (ported fix).
+        p_win_value = _model_p_win(top_play)
         win_prob = _clamp_probability(p_win_value)
         enriched_top_play = dict(top_play)
         enriched_top_play.update(_basketball_recent_form_fields(row, line_value=_float_or_none(top_play.get("line"))))
@@ -1418,11 +1449,10 @@ def _build_local_cards_props_snapshot_artifact(*, processed_root: Path, date_str
         ev_pct = _plausible_ev_pct(_float_or_none(top_play.get("ev_pct")))
         # Prefer the play's own model probability; explicit None tests, not an
         # `or` chain -- `or` also fires on a genuine 0.0, and a missing price
-        # then fabricates 0.5. Fallback is the price-implied probability, never
-        # `implied + ev` (a return fraction added to a probability; ported fix).
-        p_win_value = _float_or_none(top_play.get("p_win"))
-        if p_win_value is None:
-            p_win_value = _american_price_to_prob(top_play.get("price"))
+        # then fabricates 0.5. Fallback is the exact EV inversion q = implied *
+        # (1 + ev) via `_model_p_win` -- never the bare price (published as the
+        # model's on WNBA 2026-10-01), never `implied + ev` (ported fix).
+        p_win_value = _model_p_win(top_play)
         win_prob = _clamp_probability(p_win_value)
         base_pick = dict(top_play)
         base_pick.update(_basketball_recent_form_fields(row, line_value=_float_or_none(top_play.get("line"))))

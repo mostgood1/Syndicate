@@ -1237,6 +1237,14 @@ death, never life — do not invert it.
 - **CLOSED 2026-10-01 15:50Z: GOAL MET.** `da7f85b5` is live on the local fleet (web HUP 15:44:45Z). Bare call 400 in 0.015 s (was 87.98 s plus a killed worker), date-only and sport-only also 400 with the right `missing_scope`, read_only 200 in 0.96 s, no worker killed. Measurement in `deploys.md` 2026-10-01 15:44Z. Still open, NOT this lane: a scoped call rebuilds every sport in-request.
 - **PROGRESS 2026-10-01, code + tests DONE, live reading OWED.** Refusal sits after the `?read_only=1` path and before the heavy imports; `missing_scope` names whichever of sport/date is absent or blank. New `tests/test_candidate_trace_scope_refusal.py`: 6 pass; against the unfixed ops.py the 4 refusal tests FAIL and the reachability (scoped call reaches the patched overview) and read_only tests pass, so the patches are aimed right. Targeted run of the new tests and the 3 candidate-trace classes: 18 passed. **OWED:** the local fleet runs a separate WSL clone (`~/Syndicate`), so the live 400 needs that clone updated and web restarted, and that needs the user's OK. **NOT FIXED, stated so nobody reads the refusal as a bound:** a SCOPED call still rebuilds the overview for EVERY sport (`build_intelligence_overview` takes no sport) and `_build_candidate_pool` twice for the whole board, so `?sport=&date=` can still pass gunicorn's 60 s timeout. The scope params gate intent; they do not bound cost. On a hosted-flagged web (`RENDER=true` is set on the local fleet per the runbook), `_build_candidate_pool` refuses itself via the request-path guard, which leaves the overview rebuild as the remaining cost.
 
+### basketball-prop-model-pwin — OPEN — opened 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- Goal: Basketball prop picks publish the MODEL win probability (own p_win, else the exact EV inversion q = implied*(1+ev)), never the bare price-implied probability; WNBA slate summary names the projection the row carries
+- Files: scripts/refresh_wnba_oddsapi_props.py, scripts/refresh_nba_oddsapi_props.py, tests/test_basketball_prop_model_pwin.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: regression tests fail before / pass after; rebuilt WNBA slate for 2026-10-01: Jackie Young win_prob ~0.6445 (consistent with EV 30.8% at +103), summary 'Pts projection 14.48'; /wnba/picks shows it
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
