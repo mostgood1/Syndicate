@@ -106,7 +106,16 @@ def api_game_detail(game_pk: str):
 
 @ncaaf_bp.get("/api/weeks")
 def api_weeks():
-    weeks = week_summaries()
+    # The same union hub() builds. week_summaries() alone reads only the legacy
+    # recommendations_summary index, which no longer exists, so this returned []
+    # while the hub listed the real 2026 weeks (local-production audit, 2026-10-01).
+    weeks = [dict(week) for week in week_summaries()]
+    active_season, active_real_weeks = _resolve_ncaaf_active_season_and_weeks()
+    covered = {(week.get("week"), week.get("season")) for week in weeks if week.get("has_data")}
+    for week in active_real_weeks:
+        if (week, active_season) not in covered:
+            weeks.append({"week": week, "season": active_season, "has_data": True})
+    weeks.sort(key=lambda item: (int(item.get("season") or 0), int(item.get("week") or 0)))
     return jsonify(
         {
             "weeks": weeks,

@@ -612,9 +612,13 @@
             <span class="cards-chip">Source</span>
           </div>
           <div class="cards-callout-copy">{{ panel.body }}</div>
-          {% if panel['items'] is defined and panel['items'] %}
+          {# `panel['items']` on a dict without an "items" key falls back to the dict's
+             .items METHOD (defined, truthy, not iterable) -- /wnba/cards?client=board
+             500'd on it, 2026-10-01. Read the key, never the attribute. #}
+          {% set panel_items = panel.get('items') if panel is mapping else none %}
+          {% if panel_items and panel_items is iterable and panel_items is not string %}
             <div class="cards-callout-list">
-              {% for item in panel['items'] %}
+              {% for item in panel_items %}
                 <div class="cards-callout"><strong>{{ item.split(':', 1)[0] if ':' in item else 'Detail' }}</strong><span class="cards-callout-copy">{{ item.split(':', 1)[1].strip() if ':' in item else item }}</span></div>
               {% endfor %}
             </div>

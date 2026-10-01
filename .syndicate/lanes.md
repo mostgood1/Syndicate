@@ -1198,6 +1198,14 @@ death, never life — do not invert it.
 - **(superseded by the entry above) Adjacent, NOT fixed (outside this lane's files):** `soccer_live_gameline_index` drops games with no usable projection before the caller sees them, so an index that is empty because every in-play match lacked a projection still takes the "no soccer match in play" early return. Same unknown-as-permissive class; fixing it needs a `diagnostics=` out-param in `soccer_live_gameline_source.py`.
 - Blocked by: none
 
+### local-production-audit-fixes — OPEN — opened 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- Goal: Fix defects found by the 2026-10-01 local-production route audit that are in unclaimed files: WNBA board 500 (_game_card_generic.html panel items), /ncaaf/api/weeks missing real SmartSim2 weeks, dead MLB betting-card stub routes
+- Files: syndicate/templates/shared/_game_card_generic.html, syndicate/blueprints/ncaaf.py, syndicate/blueprints/mlb.py, tests/test_local_audit_fixes.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: /wnba/cards?client=board 200 on the local fleet; /ncaaf/api/weeks lists 2026 weeks 1,4,5; the six stub URLs 404; regression tests fail before and pass after
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
