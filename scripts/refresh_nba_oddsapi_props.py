@@ -1625,6 +1625,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
             _append_log(log_file, f"Local game_cards build skipped for {date_str}: no raw team odds snapshot found")
             return _build_from_source_cards_api()
 
+        espn_game_ids: dict[tuple[str, str], str] | None = None
         rows_out: list[dict[str, object]] = []
         with game_odds_path.open("r", encoding="utf-8", newline="") as handle:
             reader = csv.DictReader(handle)
@@ -1637,10 +1638,21 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                     continue
                 home_tri = _to_tricode_local(home_name)
                 away_tri = _to_tricode_local(away_name)
+                # Never the row index: it made every one-game day read game_id "1"
+                # (2026 NBA Finals), which joins to nothing and repeats across dates.
+                # The row's own id, else the ESPN event id the box scores carry, else
+                # "AWY@HOME" (unique within a day, and not mistakable for a real id).
+                resolved_game_id = str(row.get("game_id") or "").strip()
+                if not resolved_game_id:
+                    if espn_game_ids is None:
+                        from syndicate.features.shared.basketball_boxscores_history import espn_event_ids_by_matchup
+
+                        espn_game_ids = espn_event_ids_by_matchup(processed_root=processed_root, date_str=date_str, league_code="nba")
+                    resolved_game_id = espn_game_ids.get((home_tri, away_tri)) or f"{away_tri}@{home_tri}"
                 rows_out.append(
                     {
                         "date": date_str,
-                        "game_id": str(row.get("game_id") or idx),
+                        "game_id": resolved_game_id,
                         "home_team": home_name,
                         "visitor_team": away_name,
                         "commence_time": str(row.get("commence_time") or "").strip(),

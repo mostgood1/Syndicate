@@ -1370,6 +1370,15 @@ death, never life — do not invert it.
 - Verification: deploys.md READING: live LVA-IND model_total_raw after a forced resim, plus the walk-forward table
 - Blocked by: none
 
+### basketball-game-cards-real-game-id — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- Goal: NBA and WNBA game_cards built from processed game_odds never use the row index as game_id: they carry the row's own game_id, else the ESPN event id for (date, home, away) from the cached ESPN scoreboard, else 'AWY@HOME'; ids stay unique within a day; NBA live-lens projections built from game_cards therefore carry the ESPN id
+- Files: syndicate/features/shared/basketball_boxscores_history.py (espn_event_ids_by_matchup helper ONLY), scripts/refresh_nba_oddsapi_props.py (_build_local_game_cards_artifact game_odds branch ONLY), scripts/refresh_wnba_oddsapi_props.py (_build_local_game_cards_artifact idx fallback ONLY), tests/test_basketball_game_cards_game_id.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: no row id + ESPN match -> ESPN id; no match -> AWY@HOME; two games same day -> distinct ids; row id kept. real data: rebuild NBA 2026-06-13 game_cards in scratch from the fleet's cached ESPN scoreboard -> game_id 401859967
+- Blocked by: none
+- **CLOSED 2026-10-01 ~21:5xZ: GOAL MET.** Root: both refresh scripts' `_build_local_game_cards_artifact` game_odds fallback set `game_id = str(row.get("game_id") or idx)` (`enumerate(start=1)`), so a one-game day read "1"; `_build_local_live_lens_projections_artifact` copies game_cards' game_id. On the fleet no NBA game_cards file had ever carried a real id (3 empty, 4 index), and 1,364 WNBA rows were index ids. Now: the row's own id, else `espn_event_ids_by_matchup` (cached ESPN scoreboard, the id box scores and recon carry), else `AWY@HOME` (this builder's source-app convention; unique per day). The ESPN lookup is lazy (only when a row lacks an id) and never raises. Real inputs: the Finals 06-13 game_cards rebuild to 401859967, and all 208 projections inherit it (were "1"). The old builders on the same fixture give '1' for both sports. Tests: 7 new; 81 + 80 passed across the scoped NBA/WNBA suites. Existing June files are not regenerated (the audit's team fallback already grades them).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

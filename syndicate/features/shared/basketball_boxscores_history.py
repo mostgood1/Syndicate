@@ -40,6 +40,38 @@ def _to_minutes(value: Any) -> float:
         return 0.0
 
 
+def espn_event_ids_by_matchup(*, processed_root: Path, date_str: str, league_code: str) -> dict[tuple[str, str], str]:
+    """{(home_tri, away_tri): ESPN event id} for one date, from the same cached
+    ESPN scoreboard `bootstrap_boxscores_history_local` reads -- so a game_cards
+    row gets the id its box scores and recon_props carry.
+
+    Exists because the game_cards builders fell back to the ROW INDEX when a
+    processed game_odds row had no game_id: every 2026 NBA Finals game_cards row
+    read `game_id "1"` (and live-lens projections copied it), which joins to
+    nothing. Never raises; an empty dict means "no ESPN id known".
+    """
+    try:
+        smart_sim_module = importlib.import_module("syndicate.features.shared.basketball_props_smart_sim")
+        espn_scoreboard = getattr(smart_sim_module, "_espn_scoreboard_local")
+        espn_to_tri = getattr(smart_sim_module, "_espn_to_tri_local")
+        scoreboard = espn_scoreboard(processed_root=processed_root, date_str=date_str, league_code=league_code, force=False)
+    except Exception:
+        return {}
+    out: dict[tuple[str, str], str] = {}
+    for event in (scoreboard or {}).get("events") or [] if isinstance(scoreboard, dict) else []:
+        try:
+            event_id = str((event or {}).get("id") or "").strip()
+            competitors = (((event or {}).get("competitions") or [{}])[0] or {}).get("competitors") or []
+            sides = {str((c or {}).get("homeAway") or ""): str((((c or {}).get("team") or {}).get("abbreviation")) or "").strip().upper() for c in competitors}
+            home = espn_to_tri(sides.get("home", ""), league_code=league_code) if sides.get("home") else ""
+            away = espn_to_tri(sides.get("away", ""), league_code=league_code) if sides.get("away") else ""
+            if event_id and home and away:
+                out[(home, away)] = event_id
+        except Exception:
+            continue
+    return out
+
+
 def did_not_play(row: dict[str, Any]) -> bool:
     """True when a box-score row is a player who did not take the floor.
 
