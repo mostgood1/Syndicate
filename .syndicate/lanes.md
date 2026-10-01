@@ -1266,13 +1266,14 @@ death, never life — do not invert it.
 - Verification: rebuilt 2026-10-01 props_predictions: the 52 columns filled, median pred_pts/roll10 back near 1.0 (Render July: 0.94-1.06); regression tests fail before / pass after
 - Blocked by: none
 
-### candidate-trace-no-empty-sport — OPEN — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+### candidate-trace-no-empty-sport — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
 - Goal: A scoped candidate-trace for a configured sport the in-request overview cannot build (MLB on web: OVERVIEW_STOPPED_FOR_MEMORY) answers with that sport's rows from the worker-written board snapshot plus the skip reason, never an empty sports list; measured live for sport=mlb
 - Files: syndicate/blueprints/ops.py (api_ops_intelligence_candidate_trace ONLY), syndicate/features/intelligence.py (_overview_headroom_exhausted reason exposure ONLY, if needed), tests/test_candidate_trace_scope_refusal.py
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: route test: overview returns no mlb row -> response carries persisted rows + reason; live sport=mlb shows non-empty rows with snapshot updated_at
 - Blocked by: none
+- **CLOSED 2026-10-01 17:25Z: GOAL MET.** Live on web (`f5555814`, HUP 17:23:23Z): `?sport=mlb` -> 200 in 1.96 s with a `board_snapshot` row (2 MLB candidates, snapshot 12:22:02 CDT) and `overview_skip.reason memory_floor`. NHL control unchanged (in-request, 32). `deploys.md` 2026-10-01 17:23Z.
 - **PROGRESS 2026-10-01, code + tests DONE, live reading next.** The route appends a `source: board_snapshot` row (that sport's rows from the worker-written board snapshot, fields allowlisted, plus `snapshot_updated_at`) and `overview_skip` (the same floor and memory snapshot `_overview_headroom_exhausted` decides on) when a CONFIGURED sport is absent from the in-request overview. In-request rows now carry `source: in_request_overview`; an unconfigured sport still answers `sports: []`. 3 new tests (2 fail on the old route); 41 pass in the targeted set. `intelligence.py` NOT touched (the reason is recomputed in the route).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
