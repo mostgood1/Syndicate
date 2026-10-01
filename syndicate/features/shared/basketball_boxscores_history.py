@@ -40,6 +40,63 @@ def _to_minutes(value: Any) -> float:
         return 0.0
 
 
+def did_not_play(row: dict[str, Any]) -> bool:
+    """True when a box-score row is a player who did not take the floor.
+
+    `_event_rows_from_summary` used to write a DNP as MIN 0 with every counting
+    stat 0 (`_to_int(None) -> 0`). Kept in recon, that is a real-looking
+    0-point line, and `betting_recap._recon_prop_index` coerces even a BLANK
+    stat to 0.0, so the only safe recon for a DNP is no row at all. Measured
+    2026-10-01: the 2026 NBA Finals box scores carry 9-11 such rows of 30.
+
+    1. `DID_NOT_PLAY` -- ESPN's own `didNotPlay` flag, written by
+       `_event_rows_from_summary` from 2026-10-01 -- decides when present.
+    2. Older files without it: minutes 0 is NOT enough. ESPN reports whole
+       minutes, so a few seconds on the floor reads MIN 0 (measured: Rayah
+       Marshall, WNBA 2026-09-24, MIN 0 and PLUS_MINUS -2, kept by
+       `build_wnba_recon`, which uses the flag). Only MIN 0 with plus-minus 0
+       and every counting stat 0 or blank is treated as a DNP.
+    Blank or unparseable minutes are never a DNP: an unknown must not be read
+    as "did not play". Keys are matched case-insensitively.
+    """
+    upper = {str(key or "").strip().upper(): value for key, value in (row or {}).items()}
+    flag = upper.get("DID_NOT_PLAY")
+    flag_text = str(flag if flag is not None else "").strip().lower()
+    if flag_text in {"true", "1", "yes"}:
+        return True
+    if flag_text in {"false", "0", "no"}:
+        return False
+    if _minutes_text_is_zero(upper.get("MIN", upper.get("MINUTES"))) is not True:
+        return False
+    for key in ("PLUS_MINUS", "PTS", "REB", "AST", "STL", "BLK", "TOV", "FGA", "FTA", "FG3A", "PF", "OREB", "DREB"):
+        text = str(upper.get(key) if upper.get(key) is not None else "").strip()
+        if not text or text.lower() in {"nan", "none", "null"}:
+            continue
+        try:
+            if float(text) != 0.0:
+                return False
+        except ValueError:
+            return False
+    return True
+
+
+def _minutes_text_is_zero(value: Any) -> bool | None:
+    """True/False when the minutes parse; None when blank or unparseable."""
+    text = str(value if value is not None else "").strip().upper()
+    if not text or text in {"NAN", "NONE", "NULL"}:
+        return None
+    try:
+        if text.startswith("PT"):  # ISO-8601 duration, e.g. PT00M00.00S
+            parts = [part for part in text[2:].replace("M", " ").replace("S", " ").split() if part]
+            return bool(parts) and all(float(part) == 0.0 for part in parts)
+        if ":" in text:
+            minutes_text, _, seconds_text = text.partition(":")
+            return float(minutes_text) == 0.0 and float(seconds_text or 0) == 0.0
+        return float(text) == 0.0
+    except ValueError:
+        return None
+
+
 def _parse_made_attempted(value: Any) -> tuple[int, int]:
     text = str(value or "").strip()
     if not text:
@@ -151,6 +208,9 @@ def _event_rows_from_summary(*, summary: dict[str, Any], event_id: str, date_str
                     "FTA": free_throws_attempted,
                     "PLUS_MINUS": _to_int(stat_map.get("+/-")),
                     "STARTER": bool(athlete_payload.get("starter")),
+                    # ESPN's own flag. Additive: MIN and the stats are unchanged
+                    # for every consumer; recon builders use it to omit DNPs.
+                    "DID_NOT_PLAY": bool(athlete_payload.get("didNotPlay")),
                     "START_POSITION": str(((athlete.get("position") or {}).get("abbreviation")) or ""),
                     "source": "espn",
                     "date": str(date_str),

@@ -4595,6 +4595,8 @@ def _export_recon_quarters_artifact(*, source_root: Path, date_str: str, process
 
 
 def _build_local_recon_props_artifact(*, processed_root: Path, date_str: str) -> tuple[int, Path | None]:
+    from syndicate.features.shared.basketball_boxscores_history import did_not_play
+
     boxscores_path = processed_root / f"boxscores_{date_str}.csv"
     # No box scores -> no recon. This wrote a HEADER-ONLY recon_props file and
     # returned it as built, so the export reported success with zero actuals and
@@ -4632,6 +4634,10 @@ def _build_local_recon_props_artifact(*, processed_root: Path, date_str: str) ->
                 player_name = str(normalized.get("PLAYER_NAME") or normalized.get("PLAYER") or "").strip()
                 player_id = str(normalized.get("PLAYER_ID") or "").strip()
                 if not game_id or not player_name:
+                    continue
+                # A DNP (minutes parse to 0) gets no recon row: ESPN box scores write it
+                # as a 0-stat line, and readers would grade or settle it as a real zero.
+                if did_not_play(row):
                     continue
 
                 dedupe_key = (game_id, team_abbr, player_name.casefold())
