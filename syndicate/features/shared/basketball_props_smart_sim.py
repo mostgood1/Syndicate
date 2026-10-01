@@ -3509,6 +3509,16 @@ def _prior_rates_for_player_local(*, priors, team_tri, pkey, player_name) -> dic
     return hit or {}
 
 
+# `_weighted_positive_mean` returns 0.0 when every input is missing, and the anchor
+# below then counted that 0.0 as a REAL recent rate with weight 0.35 -- so for any stat
+# with no rolling features (stl, blk, tov always; others when a player lacks them) the
+# anchor was 0.5 x prior + 0.15 x pred, ~65% of the blend. Measured 2026-10-01 (lane
+# `wnba-sim-tov-priors`, 126 WNBA team-games): the TOV the engine received was 0.726x
+# actual while the players' real as-of rates summed to 1.027x. False restores the old
+# behaviour exactly.
+PRIOR_BLEND_MISSING_RECENT_IS_ABSENT = True
+
+
 def _apply_player_priors_local(*, smart_sim_module, team_df, priors, team_tri: str, sim_minutes=None, date_str: str | None = None):
     import numpy as np
     import pandas as pd
@@ -3693,6 +3703,9 @@ def _apply_player_priors_local(*, smart_sim_module, team_df, priors, team_tri: s
             base_rate = float(prior_pm.loc[idx]) if np.isfinite(prior_pm.loc[idx]) else 0.0
             pred_rate = float(pred_pm.loc[idx]) if np.isfinite(pred_pm.loc[idx]) else 0.0
             recent_rate = weighted_positive_mean([(roll10_pm.loc[idx], 0.65), (roll5_pm.loc[idx], 0.35)])
+            if PRIOR_BLEND_MISSING_RECENT_IS_ABSENT and not (np.isfinite(roll10_pm.loc[idx]) or np.isfinite(roll5_pm.loc[idx])):
+                # No rolling input at all (always so for stl/blk/tov): ABSENT, not a measured 0.
+                recent_rate = float("nan")
             anchor = weighted_positive_mean([(base_rate, 0.50), (recent_rate, 0.35), (pred_rate, 0.15)])
             if anchor <= 0.0:
                 anchor = weighted_positive_mean([(recent_rate, 0.75), (pred_rate, 0.25)])
