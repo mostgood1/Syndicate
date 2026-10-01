@@ -3278,7 +3278,23 @@ def _call_real_events_entrypoint_local(*, entrypoint_name: str, league_code: str
     params = inspect.signature(fn).parameters
     if not any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
         kwargs = {k: v for k, v in kwargs.items() if k in params}
-    return fn(**kwargs)
+    # The REAL engine resolves `_sample_lineup` from its own module globals, so
+    # the exact-inclusion sampler only takes effect if installed there for the
+    # call (see `_sample_lineup_local`). Restored afterwards so the vendored
+    # module is never left modified.
+    sentinel = object()
+    original = getattr(real_module, "_sample_lineup", sentinel)
+    real_module._sample_lineup = _sample_lineup_local
+    try:
+        return fn(**kwargs)
+    finally:
+        if original is sentinel:
+            try:
+                delattr(real_module, "_sample_lineup")
+            except AttributeError:
+                pass
+        else:
+            real_module._sample_lineup = original
 
 
 def _simulate_pbp_game_boxscore_local(*, league_code: str = "nba", **kwargs):
@@ -3304,6 +3320,111 @@ def _simulate_event_level_boxscore_local(*, league_code: str = "nba", **kwargs):
     if result is not None:
         return result
     return _call_events_entrypoint_local(entrypoint_name="simulate_event_level_boxscore", kwargs=kwargs)
+
+
+def _pips_inclusion_probabilities_local(weights, k: int):
+    """Inclusion probabilities exactly proportional to weight, summing to k.
+
+    pi_i = k * w_i / sum(w), with any pi_i > 1 capped at 1 and the excess
+    re-spread over the rest (iterated) -- a starter cannot be on the floor more
+    than every possession.
+    """
+    import numpy as np
+
+    w = np.asarray(weights, dtype=float)
+    w = np.where(np.isfinite(w) & (w > 0.0), w, 0.0)
+    n = int(w.size)
+    k = int(min(max(k, 0), n))
+    pi = np.zeros(n, dtype=float)
+    if k <= 0:
+        return pi
+    if float(w.sum()) <= 0.0:
+        return np.full(n, k / n)
+    fixed = np.zeros(n, dtype=bool)
+    for _ in range(n):
+        free = ~fixed
+        remaining = k - int(fixed.sum())
+        free_sum = float(w[free].sum())
+        if remaining <= 0 or free_sum <= 0.0:
+            break
+        pi[free] = remaining * w[free] / free_sum
+        over = free & (pi >= 1.0)
+        if not over.any():
+            break
+        pi[over] = 1.0
+        fixed |= over
+    # Players with zero weight can only fill seats nobody else can (k > positive count).
+    short = k - float(pi.sum())
+    if short > 1e-9:
+        zero = pi <= 0.0
+        if zero.any():
+            pi[zero] = min(1.0, short / int(zero.sum()))
+    return pi
+
+
+def _sample_lineup_local(rng, players, minutes_weights, k: int = 5, blowout_boost_bench: bool = False, bench_boost: float = 1.35):
+    """A 5-player unit whose inclusion probabilities EQUAL the minutes weights.
+
+    Replaces vendored `events._sample_lineup` (injected into the real engine at
+    call time). That one drew with numpy `choice(size=5, replace=False, p=w)`:
+    sequential draws without replacement do NOT give inclusion proportional to
+    w -- they compress it toward uniform. Measured 2026-10-01 in the real PBP
+    engine with actual minutes as input: on-court share / minutes share 0.88 for
+    28+ minute players, 1.23 for under-18 (a 34-minute star played like 28).
+    Systematic pi-ps sampling over a random order gives the exact pi_i and
+    exactly k players. The blowout bench boost is kept as the vendor had it.
+    """
+    import numpy as np
+
+    n = int(len(players))
+    if n <= 0:
+        return []
+    w = np.asarray(minutes_weights, dtype=float)
+    if w.size != n:
+        w = np.ones(n, dtype=float)
+    w = np.maximum(0.0, np.where(np.isfinite(w), w, 0.0))
+    if blowout_boost_bench and n >= 8:
+        order = np.argsort(-w)
+        w[order[:5]] = w[order[:5]] / max(1.0, bench_boost)
+        w[order[5:]] = w[order[5:]] * bench_boost
+    k_eff = int(min(k, n))
+    pi = _pips_inclusion_probabilities_local(w, k_eff)
+    perm = rng.permutation(n)
+    cum = np.cumsum(pi[perm])
+    u = float(rng.random())
+    picks: list[int] = []
+    for point in (u + j for j in range(k_eff)):
+        pos = int(np.searchsorted(cum, point, side="right"))
+        if pos < n:
+            picks.append(int(perm[pos]))
+    picks = list(dict.fromkeys(picks))
+    if len(picks) < k_eff:  # float edge: fill from the highest remaining pi
+        for i in np.argsort(-pi):
+            if int(i) not in picks:
+                picks.append(int(i))
+            if len(picks) >= k_eff:
+                break
+    return picks[:k_eff]
+
+
+def _prior_rates_for_player_local(*, priors, team_tri, pkey, player_name) -> dict[str, float]:
+    """The player's per-minute priors, joined on the PRIORS' own name key.
+
+    `priors.rates` is keyed by `basketball_props_onnx.normalize_player_name_key`,
+    which strips apostrophes and periods; the sim's `_norm_name_key` keeps them.
+    So "A'ja Wilson" (`A'JA WILSON` vs `AJA WILSON`) never found her prior and
+    was simulated off generic fallbacks -- measured 2026-10-01: the one prior
+    miss on a 22-player LVA/IND slate, and the league's top scorer. The sim's
+    own key is tried first so nothing that already joined changes.
+    """
+    from . import basketball_props_onnx
+
+    rates = getattr(priors, "rates", {}) or {}
+    team_u = str(team_tri or "").strip().upper()
+    hit = rates.get((team_u, str(pkey or "").strip().upper()))
+    if hit is None:
+        hit = rates.get((team_u, basketball_props_onnx.normalize_player_name_key(player_name)))
+    return hit or {}
 
 
 def _apply_player_priors_local(*, smart_sim_module, team_df, priors, team_tri: str, sim_minutes=None, date_str: str | None = None):
@@ -3372,9 +3493,12 @@ def _apply_player_priors_local(*, smart_sim_module, team_df, priors, team_tri: s
 
     def _rate_row(row: pd.Series) -> dict[str, float]:
         try:
-            team_u = str(team_tri or "").strip().upper()
-            key = str(row.get("_pkey") or "").strip().upper()
-            return priors.rates.get((team_u, key), {})
+            return _prior_rates_for_player_local(
+                priors=priors,
+                team_tri=team_tri,
+                pkey=row.get("_pkey"),
+                player_name=row.get("player_name"),
+            )
         except Exception:
             return {}
 
