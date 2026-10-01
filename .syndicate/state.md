@@ -648,7 +648,7 @@ once this index exists: re-splitting would orphan the parts.
 | [soccer-live-momentum] | FotMob momentum is production's signal now; the ESPN proxy carries none (2026-08-22) | `state_soccer.md` |
 | [soccer-compact-cards] | Pregame + final compact cards redesigned and DEPLOYED, verified on production HTML (2026-08-22) | `state_soccer.md` |
 | [soccer] | SOCCER | `state_soccer.md` |
-| [soccer-live-tier] | SOCCER'S LIVE TIER — VERIFIED, AND WHAT IS NOT | `state_soccer.md` |
+| [soccer-live-tier] | SOCCER'S LIVE TIER — VERIFIED, AND WHAT IS NOT. Live game-lines crashed in every live window until 2026-09-30 (fixed `bc8a8340`/`9ab88382`; empty states named `cf63c82f`); IN-PLAY READING OWED `#693` `[2026-10-01]` | `state_soccer.md` |
 | [soccer-shots-prop-skill] | SOCCER SHOTS PROPS â€” THE POISSON SHAPE IS RIGHT AND THE MEAN IS INFLATED `[measured 2026-08-31, lane layer1- | `state_soccer.md` |
 | [soccer-moneyline-precision] | SOCCER'S MONEYLINE EDGE IS NOW GATED ON ITS OWN SIM NOISE, AND 61% OF IT WAS INSIDE THAT NOISE `[measured 2026 | `state_soccer.md` |
 | [soccer-shot-woodwork-undercount] | EVERY SHOT OFF THE WOODWORK WAS MISSING FROM SHOT TOTALS — FIXED, LIVE ON live-odds-worker `20d589ed` 2026-09- | `state_soccer.md` |

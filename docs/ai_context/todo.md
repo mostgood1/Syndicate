@@ -1,5 +1,29 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#693` — **SOCCER LIVE GAME-LINES: the in-play reading is OWED -- both fixes are live on the local fleet and have never run with a match in play** — lane `soccer-live-gameline-index-diag` (CLOSED 2026-10-01 on user instruction with this open), session a83ad238
+
+**Why.** `attach_live_gamelines_for_sport` raised `UnboundLocalError: index_diag` on every soccer tick with a
+match IN PLAY (76x `BOOK_GRID_LIVE_GAMELINE_FAILURE sport=soccer` on the native fleet), fixed in `bc8a8340` /
+`9ab88382`. An empty soccer index also read "no soccer match in play" for three different causes, fixed in
+`cf63c82f`. Both are tested (each new test fails on the pre-change code), and both run on the local fleet: it was
+restarted onto `cf63c82f` 2026-10-01 14:28:02Z, and later restarts by other sessions (`d5aeeca4`, `f1926649`)
+still contain it.
+
+**What is NOT measured.** The crash path needs matches in play, and none were in play on either run: 0 of 104
+watcher cycles 14:42Z-18:07Z on 2026-10-01 saw `games_in_snapshot>0`, and every soccer build line wrote 0 rows.
+"0 failures since the restart" (50 builds, all `error=none`) is a null with no population behind it.
+
+**Done when** (read on the local fleet's `~/syndicate-prod/logs/refresh-worker.log`, WSL Ubuntu-24.04):
+1. a `LIVE_GAMELINE_BUILD sport=soccer` line, logged while the producer diagnostic reads `games_in_snapshot>0`,
+   with `error=none`; and
+2. no `BOOK_GRID_LIVE_GAMELINE_FAILURE sport=soccer` after log line 148010; and
+3. the coverage `reason` for that build is NOT "no soccer match in play", and is either real coverage
+   (`projected>0`) or names the join / skip bucket.
+Read the producer diagnostic directly (refresh-worker env): `soccer_live_gameline_index(<date>, diagnostics=d)`.
+**Caveat:** the build line's `index=` field read `na` on every soccer line, before and after the fix, so do not
+read `index=na` as "no index". Weekends are the reliable window: the watcher saw nothing on a Thursday.
+Record the reading in `.syndicate/deploys.md` (the 2026-10-01 14:28Z and 18:10Z entries say what is owed).
+
 ### `#692` — **LOCAL PRODUCTION: run all three services on one machine while Render is billing-suspended** — lane `local-production-host`, session 157058fe, branch `claude/dreamy-babbage-dm6ubz`
 
 **Why.** 2026-09-30 06:37:51Z: web, refresh-worker and live-odds-worker all `suspended`, `suspenders=['billing']`
