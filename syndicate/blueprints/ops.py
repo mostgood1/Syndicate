@@ -4356,49 +4356,61 @@ def api_ops_intelligence_candidate_trace() -> Any:
         return jsonify({"ok": False, "error": f"ImportError: {type(exc).__name__}: {exc}"}), 500
 
     try:
-        overview = build_intelligence_overview(selected_date=date, force_refresh=True)
+        # sports=: hydrate only the requested sport. Every configured sport was
+        # built here before, so ?sport=mlb still paid for all eight.
+        overview = build_intelligence_overview(selected_date=date, force_refresh=True, sports=[sport_filter])
     except Exception as exc:
         return jsonify({"ok": False, "error": f"build_intelligence_overview: {type(exc).__name__}: {exc}"}), 500
 
     manifest_check: dict[str, Any] = {}
     full_pool_check: dict[str, Any] = {}
     app_context_pool_check: dict[str, Any] = {}
-    try:
-        from pipeline.intelligence_state import _INTELLIGENCE_STATE_SERVICE
-
-        manifests = _INTELLIGENCE_STATE_SERVICE._available_sport_manifests(date)
-        manifest_check = {"available_sport_slugs": list(manifests.keys())}
-        source_fingerprint = _INTELLIGENCE_STATE_SERVICE._source_state_fingerprint(date)
-        pool = _INTELLIGENCE_STATE_SERVICE._build_candidate_pool(date, source_fingerprint)
-        full_pool_check = {
-            "source_fingerprint": source_fingerprint,
-            "candidate_count": pool.get("candidate_count"),
-            "candidate_pool_keys": list(pool.keys()) if isinstance(pool, dict) else None,
-            "self_app_was": repr(_INTELLIGENCE_STATE_SERVICE._app),
-        }
-
-        # refresh-worker's background loop sets self._app (via .start(app))
-        # and calls build_intelligence_overview inside
-        # `with self._app.app_context():` from a background thread -- this
-        # web-service diagnostic call runs inside a real Flask request
-        # context instead, with self._app left None (web never starts the
-        # background loop), so it never exercises that branch. Force it on,
-        # bust this exact cache entry, and rebuild to see if the
-        # manually-pushed background-thread app context changes the result.
-        cache_key = _INTELLIGENCE_STATE_SERVICE._candidate_pool_key(date, source_fingerprint)
-        with _INTELLIGENCE_STATE_SERVICE._condition:
-            _INTELLIGENCE_STATE_SERVICE._candidate_pools.pop(cache_key, None)
-        original_app = _INTELLIGENCE_STATE_SERVICE._app
+    # ?pool=1 only. _build_candidate_pool takes no sport and rebuilds the
+    # WHOLE board -- twice here -- so running it by default would leave a
+    # ?sport=-scoped trace exactly as unbounded as the unscoped call refused
+    # above. On a hosted web it is refused by the request-path guard anyway
+    # (#98); off-host it is the slowest thing this route can do.
+    run_pool_sections = _coerce_bool(request.args.get("pool"))
+    if not run_pool_sections:
+        skipped = {"skipped": "whole-board candidate pool rebuild; pass ?pool=1 to run it"}
+        manifest_check, full_pool_check, app_context_pool_check = dict(skipped), dict(skipped), dict(skipped)
+    else:
         try:
-            _INTELLIGENCE_STATE_SERVICE._app = current_app._get_current_object()
-            pool_with_app_context = _INTELLIGENCE_STATE_SERVICE._build_candidate_pool(date, source_fingerprint)
-            app_context_pool_check = {"candidate_count": pool_with_app_context.get("candidate_count")}
-        finally:
-            _INTELLIGENCE_STATE_SERVICE._app = original_app
+            from pipeline.intelligence_state import _INTELLIGENCE_STATE_SERVICE
+
+            manifests = _INTELLIGENCE_STATE_SERVICE._available_sport_manifests(date)
+            manifest_check = {"available_sport_slugs": list(manifests.keys())}
+            source_fingerprint = _INTELLIGENCE_STATE_SERVICE._source_state_fingerprint(date)
+            pool = _INTELLIGENCE_STATE_SERVICE._build_candidate_pool(date, source_fingerprint)
+            full_pool_check = {
+                "source_fingerprint": source_fingerprint,
+                "candidate_count": pool.get("candidate_count"),
+                "candidate_pool_keys": list(pool.keys()) if isinstance(pool, dict) else None,
+                "self_app_was": repr(_INTELLIGENCE_STATE_SERVICE._app),
+            }
+
+            # refresh-worker's background loop sets self._app (via .start(app))
+            # and calls build_intelligence_overview inside
+            # `with self._app.app_context():` from a background thread -- this
+            # web-service diagnostic call runs inside a real Flask request
+            # context instead, with self._app left None (web never starts the
+            # background loop), so it never exercises that branch. Force it on,
+            # bust this exact cache entry, and rebuild to see if the
+            # manually-pushed background-thread app context changes the result.
+            cache_key = _INTELLIGENCE_STATE_SERVICE._candidate_pool_key(date, source_fingerprint)
             with _INTELLIGENCE_STATE_SERVICE._condition:
                 _INTELLIGENCE_STATE_SERVICE._candidate_pools.pop(cache_key, None)
-    except Exception as exc:
-        manifest_check["error"] = f"{type(exc).__name__}: {exc}"
+            original_app = _INTELLIGENCE_STATE_SERVICE._app
+            try:
+                _INTELLIGENCE_STATE_SERVICE._app = current_app._get_current_object()
+                pool_with_app_context = _INTELLIGENCE_STATE_SERVICE._build_candidate_pool(date, source_fingerprint)
+                app_context_pool_check = {"candidate_count": pool_with_app_context.get("candidate_count")}
+            finally:
+                _INTELLIGENCE_STATE_SERVICE._app = original_app
+                with _INTELLIGENCE_STATE_SERVICE._condition:
+                    _INTELLIGENCE_STATE_SERVICE._candidate_pools.pop(cache_key, None)
+        except Exception as exc:
+            manifest_check["error"] = f"{type(exc).__name__}: {exc}"
 
     # 2026-08-04: ?sport= used to reach ONLY the per-sport loop at the bottom.
     # Everything above it -- these preferences (hardcoded sport="all") and the
@@ -4503,6 +4515,14 @@ def api_ops_intelligence_candidate_trace() -> Any:
     overview_slugs = [
         str(sport_row.get("slug") or "").strip().lower() for sport_row in overview if isinstance(sport_row, dict)
     ]
+    try:
+        from syndicate.features.intelligence import _configured_syndicate_sports
+
+        configured_slugs = [
+            str(sport.get("slug") or "").strip().lower() for sport in _configured_syndicate_sports()
+        ]
+    except Exception:
+        configured_slugs = []
     result: dict[str, Any] = {
         "ok": True,
         "date": date,
@@ -4517,6 +4537,12 @@ def api_ops_intelligence_candidate_trace() -> Any:
         # returns a bare empty list that reads like "this sport produced no
         # candidates" rather than "this sport was never in the overview".
         "requested_sport_present": (sport_filter in overview_slugs) if sport_filter else None,
+        # The overview is now built for the requested sport alone, so an absent
+        # sport is either not configured (misspelled / not a Syndicate sport)
+        # or configured but skipped by the overview's headroom guard. This
+        # tells the two apart.
+        "requested_sport_configured": sport_filter in configured_slugs,
+        "pool_sections_ran": run_pool_sections,
         "preferences": preferences,
         "manifest_check": manifest_check,
         "full_pool_check": full_pool_check,

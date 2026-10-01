@@ -1245,6 +1245,15 @@ death, never life — do not invert it.
 - Verification: regression tests fail before / pass after; rebuilt WNBA slate for 2026-10-01: Jackie Young win_prob ~0.6445 (consistent with EV 30.8% at +103), summary 'Pts projection 14.48'; /wnba/picks shows it
 - Blocked by: none
 
+### candidate-trace-scoped-bound — OPEN — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- Goal: A scoped GET /api/ops/intelligence/candidate-trace?sport=X&date=Y hydrates ONLY sport X (build_intelligence_overview gains a sports= filter) and skips the two whole-board _build_candidate_pool sections unless ?pool=1; measured live on the local fleet per sport incl. MLB, under gunicorn's 60s with no worker killed
+- Files: syndicate/features/intelligence.py (build_intelligence_overview signature + sport filter ONLY), syndicate/blueprints/ops.py (api_ops_intelligence_candidate_trace ONLY), tests/test_candidate_trace_scope_refusal.py, tests/test_intelligence_overview_sport_filter.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: filter test proves only the named sport reaches _build_sport_overview; route test proves sports=[X] is passed and _build_candidate_pool is not called without pool=1. live: timed scoped calls on 127.0.0.1:10000, worker pids unchanged
+- Blocked by: none
+- **PROGRESS 2026-10-01, code + tests DONE, live reading next.** `build_intelligence_overview(sports=...)` (default None = every sport, unchanged for all board callers) filters the configured list before the loop. The route passes `sports=[sport]` and runs the two whole-board `_build_candidate_pool` sections only with `?pool=1`, labelling them `skipped` otherwise. New fields: `pool_sections_ran`, `requested_sport_configured`. Tests: 9 new; 8 FAIL on the old code (the 9th is the default-all case); 43 pass in the targeted set incl. `test_request_path_guard.py`.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

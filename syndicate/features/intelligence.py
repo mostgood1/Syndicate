@@ -2762,7 +2762,14 @@ def build_intelligence_overview(
     force_refresh: bool = False,
     skip_game_hydration: bool = False,
     consumer: Any = None,
+    sports: Iterable[str] | None = None,
 ) -> list[dict[str, Any]]:
+    # `sports`: hydrate ONLY these slugs. None (the default, and every board
+    # caller) means every configured sport, exactly as before. Exists so the
+    # admin candidate-trace route can scope a diagnostic to one sport instead
+    # of rebuilding all eight in a web request (2026-10-01: 87.98s unscoped,
+    # past gunicorn's 60s). An unknown slug yields an empty list, not an error.
+    #
     # `consumer`: PEAK = MAX INSTEAD OF SUM.
     #
     # The comment below states the cost's shape -- "every sport's fully hydrated
@@ -2791,7 +2798,14 @@ def build_intelligence_overview(
     # data_health), e.g. _source_state_fingerprint's change-detection hash.
     # See _build_sport_overview's own comment for the full story.
     effective_date = _effective_date(selected_date)
+    requested_slugs = None if sports is None else {str(slug).strip().lower() for slug in sports}
     sports = _configured_syndicate_sports()
+    if requested_slugs is not None:
+        sports = [
+            sport
+            for sport in sports
+            if isinstance(sport, dict) and _safe_text(sport.get("slug"), "sport").lower() in requested_slugs
+        ]
     # Built as an explicit loop rather than a list comprehension so that a
     # crash inside one sport names that sport. This function OOM-killed
     # refresh-worker every ~5 minutes for 16+ hours on 2026-07-26 and the logs
