@@ -1099,7 +1099,8 @@ death, never life — do not invert it.
 
 ### live-gameline-zero-attribution — OPEN — opened 2026-09-29 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - Goal: Every live-gameline zero on the served board carries a stated reason, so check_e2e_coverage reports no unattributed_zero for any sport: when a snapshot exists but nothing is priced, the coverage says whether no game was in play, whether games were in the snapshot but none indexed, or whether the index held games that no board row matched.
-- Files: syndicate/features/shared/board_enrichment.py (the coverage return of attach_live_gamelines_for_sport ONLY), tests/test_live_gameline_zero_attribution.py (NEW)
+- Files: tests/test_live_gameline_zero_attribution.py (NEW)
+- **`board_enrichment.py` TAKEN 2026-09-30 by lane `soccer-live-gameline-index-diag` (session a83ad238), USER DECISION ("take the claim and fix it").** The soccer branch of `attach_live_gamelines_for_sport` never assigned `index_diag`, and this lane's `_attribute_live_gameline_zero(coverage, index_diag, ...)` call raised `UnboundLocalError` on every tick with a soccer match IN PLAY (76 `BOOK_GRID_LIVE_GAMELINE_FAILURE sport=soccer` in one local-production refresh-worker.log). The owner session (d26c7fa7, last active 15:19Z) was not asked first. Revert by re-adding the path here once that lane closes.
 - Hypothesis: The reasoned early returns cover 'not wired', 'soccer no match in play' and 'no published snapshot', but a sport whose snapshot EXISTS and whose index comes back empty returns all-zero counters with no reason -- which is why ncaaf/nfl/nhl live_games read as unattributed zeros while index_diagnostics already holds the information needed to explain them.
 - Falsification test: If a reason is already set on that path, the unattributed zeros come from somewhere else and this lane is wrong.
 - Verification: scripts/check_e2e_coverage.py against production reports zero unattributed_zero cells for live_games, with each zero naming which of the three states it is.
@@ -1178,6 +1179,14 @@ death, never life — do not invert it.
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: WSL fleet: doctor READY state=redis; REFRESH_STATE_BACKEND=keyvalue on both workers; gunicorn web /healthz 200 on 10000 from Windows; fresh board generated_at after start with mlb/wnba/ncaaf/nfl rows; started by the scheduled task
+- Blocked by: none
+
+### soccer-live-gameline-index-diag — OPEN — opened 2026-09-30 — session a83ad238-a05c-4205-bf35-b67b9ed693c5
+- Goal: attach_live_gamelines_for_sport no longer raises UnboundLocalError for soccer with matches in play; a soccer zero names why nothing was priced, and absent index diagnostics never read as 'no game in play'
+- Files: syndicate/features/shared/board_enrichment.py (attach_live_gamelines_for_sport + _attribute_live_gameline_zero ONLY; TAKEN from live-gameline-zero-attribution on user decision 2026-09-30), tests/test_soccer_live_gameline_index_diag.py (NEW)
+- Hypothesis: index_diag is assigned only in the non-soccer else branch; the soccer branch with a NON-EMPTY index reaches _attribute_live_gameline_zero unassigned. Empty soccer index returns early and is NOT the crash path.
+- Falsification test: If a test driving a non-empty soccer index through attach_live_gamelines_for_sport does not raise on origin/main, the crash comes from elsewhere.
+- Verification: New test fails on origin/main with UnboundLocalError and passes after; local-production refresh-worker.log shows LIVE_GAMELINE_BUILD sport=soccer without BOOK_GRID_LIVE_GAMELINE_FAILURE during a live soccer window.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
