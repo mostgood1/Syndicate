@@ -1226,6 +1226,7 @@ death, never life — do not invert it.
 - Verification: regression test fails before / passes after; live /wnba/cards?client=board HTML contains no '{&#39;status&#39;' or '&quot;status&quot;' text in the status badge; other sports' string statuses unchanged
 - Blocked by: none
 ### candidate-trace-unscoped-refusal — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- GOAL VERDICT [checkpoint 2026-10-01]: "GET /api/ops/intelligence/candidate-trace without sport AND date answers a fast 400 naming the missing scope, with no build_intelligence_overview / _build_candidate_pool call in-request (finding 2026-10-01: unscoped call ran 87.98s on the local fleet, gunicorn killed the worker, next request got ConnectionResetError)" — **GOAL: MET** — bare call 400 in 0.015 s on the fleet (was 87.98 s + killed worker); deploys.md 15:44Z
 - Goal: GET /api/ops/intelligence/candidate-trace without sport AND date answers a fast 400 naming the missing scope, with no build_intelligence_overview / _build_candidate_pool call in-request (finding 2026-10-01: unscoped call ran 87.98s on the local fleet, gunicorn killed the worker, next request got ConnectionResetError)
 - Files: syndicate/blueprints/ops.py (api_ops_intelligence_candidate_trace ONLY; user OK 2026-10-01 over book-quotes-splice-repair's UNOWNED claim), tests/test_candidate_trace_scope_refusal.py (NEW). One test in the artifact-publisher test module was replaced once with the user's OK; that file stays with nhl-live-resim and the write is recorded in its block
 - Hypothesis: n/a
@@ -1245,6 +1246,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### candidate-trace-scoped-bound — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- GOAL VERDICT [checkpoint 2026-10-01]: "A scoped GET /api/ops/intelligence/candidate-trace?sport=X&date=Y hydrates ONLY sport X (build_intelligence_overview gains a sports= filter) and skips the two whole-board _build_candidate_pool sections unless ?pool=1; measured live on the local fleet per sport incl. MLB, under gunicorn's 60s with no worker killed" — **GOAL: MET** — ncaaf 30.3 s / nfl 6.4 s / nhl 6.2 s / mlb 1.25 s on web, no worker death; deploys.md 17:06Z+17:12Z
 - Goal: A scoped GET /api/ops/intelligence/candidate-trace?sport=X&date=Y hydrates ONLY sport X (build_intelligence_overview gains a sports= filter) and skips the two whole-board _build_candidate_pool sections unless ?pool=1; measured live on the local fleet per sport incl. MLB, under gunicorn's 60s with no worker killed
 - Files: syndicate/features/intelligence.py (build_intelligence_overview signature + sport filter ONLY), syndicate/blueprints/ops.py (api_ops_intelligence_candidate_trace ONLY), tests/test_candidate_trace_scope_refusal.py, tests/test_intelligence_overview_sport_filter.py (NEW), syndicate/features/shared/week_calendar.py (added 2026-10-01 11:5x CDT: windows cache), tests/test_week_calendar.py
 - Hypothesis: n/a
@@ -1264,6 +1266,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### candidate-trace-no-empty-sport — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- GOAL VERDICT [checkpoint 2026-10-01]: "A scoped candidate-trace for a configured sport the in-request overview cannot build (MLB on web: OVERVIEW_STOPPED_FOR_MEMORY) answers with that sport's rows from the worker-written board snapshot plus the skip reason, never an empty sports list; measured live for sport=mlb" — **GOAL: MET** — ?sport=mlb -> 200, board_snapshot row with 2 candidates + overview_skip memory_floor; deploys.md 17:23Z
 - Goal: A scoped candidate-trace for a configured sport the in-request overview cannot build (MLB on web: OVERVIEW_STOPPED_FOR_MEMORY) answers with that sport's rows from the worker-written board snapshot plus the skip reason, never an empty sports list; measured live for sport=mlb
 - Files: syndicate/blueprints/ops.py (api_ops_intelligence_candidate_trace ONLY), syndicate/features/intelligence.py (_overview_headroom_exhausted reason exposure ONLY, if needed), tests/test_candidate_trace_scope_refusal.py
 - Hypothesis: n/a
@@ -1274,6 +1277,7 @@ death, never life — do not invert it.
 - **PROGRESS 2026-10-01, code + tests DONE, live reading next.** The route appends a `source: board_snapshot` row (that sport's rows from the worker-written board snapshot, fields allowlisted, plus `snapshot_updated_at`) and `overview_skip` (the same floor and memory snapshot `_overview_headroom_exhausted` decides on) when a CONFIGURED sport is absent from the in-request overview. In-request rows now carry `source: in_request_overview`; an unconfigured sport still answers `sports: []`. 3 new tests (2 fail on the old route); 41 pass in the targeted set. `intelligence.py` NOT touched (the reason is recomputed in the route).
 
 ### novig-artifact-oversize — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- GOAL VERDICT [checkpoint 2026-10-01]: "reports/intelligence/novig_markets.json persists on the keyvalue store: refresh-worker logs no [novig_odds] WRITE_FAILED / KEYVALUE_WRITE_REJECTED for it, and the next check after a REFRESHED reads previous_date=<that date> (state survived), with all rows retained (lossless)" — **GOAL: MET** — 0 WRITE_FAILED, 1.65 MB stored, 49,094 rows; CACHED across a fleet restart; deploys.md 17:30Z+17:46Z
 - Goal: reports/intelligence/novig_markets.json persists on the keyvalue store: refresh-worker logs no [novig_odds] WRITE_FAILED / KEYVALUE_WRITE_REJECTED for it, and the next check after a REFRESHED reads previous_date=<that date> (state survived), with all rows retained (lossless)
 - Files: pipeline/novig_odds_refresh.py, tests/test_novig_odds_cadence.py
 - Hypothesis: n/a
@@ -1296,6 +1300,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### nba-live-prop-audit-default-window — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- GOAL VERDICT [checkpoint 2026-10-01]: "GET /nba/api/live-player-props-audit with no date answers 200 (not 502) using the same trailing 14-day window WNBA uses (shared _parse_window), the empty payload names the latest date that has NBA projection files, and an unparsable window answers 400 instead of 502; measured live on the local fleet" — **GOAL: MET** — bare 502 -> 200, bad window 400, latest_available_date 2026-06-13; graded-rows clause met only after the backfill lane; deploys.md 18:22Z
 - Goal: GET /nba/api/live-player-props-audit with no date answers 200 (not 502) using the same trailing 14-day window WNBA uses (shared _parse_window), the empty payload names the latest date that has NBA projection files, and an unparsable window answers 400 instead of 502; measured live on the local fleet
 - Files: syndicate/features/nba/live_prop_audit.py, syndicate/blueprints/nba.py (_live_prop_audit_payload_response ONLY), tests/test_nba_live_prop_audit_window.py (NEW)
 - Hypothesis: n/a
@@ -1314,6 +1319,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### nba-june-finals-boxscore-backfill — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- GOAL VERDICT [checkpoint 2026-10-01]: "NBA live-prop audit grades the 2026 Finals: boxscores_<d>.csv + recon_props_<d>.csv for 2026-06-03/05/10/13 exist on the local fleet's NBA data disk (new files only, nothing overwritten, from the existing ESPN box-score path), and /nba/api/live-player-props-audit?since=2026-06-01&until=2026-06-15 reports graded rows (overall.n > 0) instead of no_actuals" — **GOAL: MET** — June window graded n=640 (was 0, no_actuals); deploys.md 18:51Z
 - Goal: NBA live-prop audit grades the 2026 Finals: boxscores_<d>.csv + recon_props_<d>.csv for 2026-06-03/05/10/13 exist on the local fleet's NBA data disk (new files only, nothing overwritten, from the existing ESPN box-score path), and /nba/api/live-player-props-audit?since=2026-06-01&until=2026-06-15 reports graded rows (overall.n > 0) instead of no_actuals
 - Files: syndicate/features/nba/live_prop_audit.py (recon join fallback ONLY), tests/test_nba_live_prop_audit_window.py
 - Hypothesis: n/a
@@ -1334,6 +1340,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### nba-recon-props-no-header-only — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- GOAL VERDICT [checkpoint 2026-10-01]: "scripts/refresh_nba_oddsapi_props.py never writes or accepts a header-only recon_props file: the builder writes nothing when boxscores are missing or yield no rows, and the export rebuilds instead of reusing an existing recon_props file that has no data rows (WNBA twin's guards)" — **GOAL: MET** — real 06-13 inputs: header-only + no boxscores -> None, + boxscores -> 30 rows; 7 tests (5 fail-before); deploys.md 19:25Z (shipped, offseason)
 - Goal: scripts/refresh_nba_oddsapi_props.py never writes or accepts a header-only recon_props file: the builder writes nothing when boxscores are missing or yield no rows, and the export rebuilds instead of reusing an existing recon_props file that has no data rows (WNBA twin's guards)
 - Files: scripts/refresh_nba_oddsapi_props.py (_build_local_recon_props_artifact and _export_recon_props_artifact ONLY), tests/test_nba_recon_props_no_header_only.py (NEW)
 - Hypothesis: n/a
@@ -1354,6 +1361,7 @@ death, never life — do not invert it.
 - **New hypotheses, recorded BEFORE testing:** (M4) `_expected_points_per_possession` is not the loop's own scoring model (no and-ones, fouls replace made shots, FG% used as 2P%), so eff_mult misses the target: smoke baseline overshoots actual team points by +4.5/team even with actual points as the target. Fix: a PPP that mirrors the loop, solved for eff_mult. Falsified if |team PTS bias| does not fall below 1 or player PTS MAE does not improve. (M6) 2PA make probability is the player's OVERALL FG% (threes included); fix: 2P% = (FGM-3PM)/(FGA-3PA). Falsified if sim FG% does not move toward actual or PTS MAE worsens. (M5, production) team_adj eff_mult multiplies ON TOP of a market-anchored target: live LVA-IND 10-01 target total 180.8 (anchored), sim mean 198.0 (104.9-93.2), p_total_over 0.84. Fix: with a target present, the team prior does not stack on it. Falsified if production-path sim means do not land within +/-1 pt of their targets.
 
 ### basketball-recon-dnp-exclusion — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- GOAL VERDICT [checkpoint 2026-10-01]: "NBA and WNBA recon_props builders omit box-score rows whose minutes parse to exactly 0 (ESPN DNPs written as 0-stat lines), so no reader grades or settles a DNP as a zero actual; rows with blank/unparseable minutes are kept unchanged" — **GOAL: MET** — NBA 06-13 rebuild 21 rows (old 30), fleet WNBA recon 0 DNP rows; 74 tests; deploys.md 20:32Z
 - Goal: NBA and WNBA recon_props builders omit box-score rows whose minutes parse to exactly 0 (ESPN DNPs written as 0-stat lines), so no reader grades or settles a DNP as a zero actual; rows with blank/unparseable minutes are kept unchanged
 - Files: syndicate/features/shared/basketball_boxscores_history.py (did_not_play helper + a DID_NOT_PLAY column in _event_rows_from_summary ONLY), scripts/refresh_nba_oddsapi_props.py (_build_local_recon_props_artifact ONLY), scripts/refresh_wnba_oddsapi_props.py (_build_local_recon_props_artifact ONLY), tests/test_basketball_recon_dnp_exclusion.py (NEW)
 - Hypothesis: n/a
@@ -1372,6 +1380,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### basketball-game-cards-real-game-id — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- GOAL VERDICT [checkpoint 2026-10-01]: "NBA and WNBA game_cards built from processed game_odds never use the row index as game_id: they carry the row's own game_id, else the ESPN event id for (date, home, away) from the cached ESPN scoreboard, else 'AWY@HOME'; ids stay unique within a day; NBA live-lens projections built from game_cards therefore carry the ESPN id" — **GOAL: MET** — Finals 06-13 cards -> 401859967 against ESPN, 208 projections inherit it; old code '1'; deploys.md 21:41Z
 - Goal: NBA and WNBA game_cards built from processed game_odds never use the row index as game_id: they carry the row's own game_id, else the ESPN event id for (date, home, away) from the cached ESPN scoreboard, else 'AWY@HOME'; ids stay unique within a day; NBA live-lens projections built from game_cards therefore carry the ESPN id
 - Files: syndicate/features/shared/basketball_boxscores_history.py (espn_event_ids_by_matchup helper ONLY), scripts/refresh_nba_oddsapi_props.py (_build_local_game_cards_artifact game_odds branch ONLY), scripts/refresh_wnba_oddsapi_props.py (_build_local_game_cards_artifact idx fallback ONLY), tests/test_basketball_game_cards_game_id.py (NEW)
 - Hypothesis: n/a
@@ -1381,6 +1390,7 @@ death, never life — do not invert it.
 - **CLOSED 2026-10-01 ~21:5xZ: GOAL MET.** Root: both refresh scripts' `_build_local_game_cards_artifact` game_odds fallback set `game_id = str(row.get("game_id") or idx)` (`enumerate(start=1)`), so a one-game day read "1"; `_build_local_live_lens_projections_artifact` copies game_cards' game_id. On the fleet no NBA game_cards file had ever carried a real id (3 empty, 4 index), and 1,364 WNBA rows were index ids. Now: the row's own id, else `espn_event_ids_by_matchup` (cached ESPN scoreboard, the id box scores and recon carry), else `AWY@HOME` (this builder's source-app convention; unique per day). The ESPN lookup is lazy (only when a row lacks an id) and never raises. Real inputs: the Finals 06-13 game_cards rebuild to 401859967, and all 208 projections inherit it (were "1"). The old builders on the same fixture give '1' for both sports. Tests: 7 new; 81 + 80 passed across the scoped NBA/WNBA suites. Existing June files are not regenerated (the audit's team fallback already grades them).
 
 ### local-audit-routes-generator — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- GOAL VERDICT [checkpoint 2026-10-01]: "scripts/local_audit_routes.py regenerates the local-production audit sweep's route list (<home>/audit_routes.json: GET rules as {rule, endpoint, args}) from the app's url_map; dry-run diff by default, --write with a timestamped backup; verified by a dry run on the fleet that reports 0 added / 0 removed against today's regenerated file" — **GOAL: MET** — fleet dry run 373/373, 0 added/removed, file untouched; 6 tests
 - Goal: scripts/local_audit_routes.py regenerates the local-production audit sweep's route list (<home>/audit_routes.json: GET rules as {rule, endpoint, args}) from the app's url_map; dry-run diff by default, --write with a timestamped backup; verified by a dry run on the fleet that reports 0 added / 0 removed against today's regenerated file
 - Files: scripts/local_audit_routes.py (NEW), tests/test_local_audit_routes.py (NEW)
 - Hypothesis: n/a
@@ -1390,6 +1400,7 @@ death, never life — do not invert it.
 - **CLOSED 2026-10-01 ~22:2xZ: GOAL MET.** `scripts/local_audit_routes.py` builds GET rules from `create_app().url_map` as {rule, endpoint, args}; dry-run diff by default, `--write` keeps a timestamped `.bak`, and `--env-from-gunicorn` builds under web's env. Default home is `local_production.default_home()`. Fleet dry run (worktree code, web env) against the 373-route file regenerated at 17:22 CDT: 373/373, 296/296 param-free, removed [], added [], file untouched. 6 unit tests incl. two against the real app. The sweep script itself (`C:\SyndicateProdudit_sweep.py`) stays outside the repo.
 
 ### local-audit-sweep-in-repo — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- GOAL VERDICT [checkpoint 2026-10-01]: "scripts/local_audit_sweep.py reproduces C:\SyndicateProd\audit_sweep.py (GET every param-free route in <home>/audit_routes.json with the admin token, same skip/error rules, supervisor-restart check, results to <home>/audit_sweep.json) and adds a previous-run comparison; verified by a live run on the fleet whose counts match the out-of-repo sweep's last run" — **GOAL: MET** — live fleet run 285 hit, supervisor stable, parity with the out-of-repo sweep; later run exit 0, 0 failures
 - Goal: scripts/local_audit_sweep.py reproduces C:\SyndicateProd\audit_sweep.py (GET every param-free route in <home>/audit_routes.json with the admin token, same skip/error rules, supervisor-restart check, results to <home>/audit_sweep.json) and adds a previous-run comparison; verified by a live run on the fleet whose counts match the out-of-repo sweep's last run
 - Files: scripts/local_audit_sweep.py (NEW), tests/test_local_audit_sweep.py (NEW)
 - Hypothesis: n/a
@@ -1399,6 +1410,7 @@ death, never life — do not invert it.
 - **CLOSED 2026-10-01 ~22:5xZ: GOAL MET (Verification's "290 hit" was the OLD list: 302 param-free; the regenerated list is 296, so 285).** `scripts/local_audit_sweep.py` keeps the original's rules (SKIP regex, ERR markers, empty-JSON flag, X-Admin-Token from local_production.env, supervisor pid before/after), adds `audit_sweep.prev.json` plus a comparison, and exits 1 on any failure or mid-sweep restart. Live fleet run ~22:43Z (worktree code): supervisor stable, 285 hit / 11 skipped, p99 3.78 s, max 5.45 s; status 200 x269, 400 x13, 429 x2 (the shared-throttle alias pairs, members swapped by route order), None x1. That one is `/wnba/market-board` ConnectionResetError after 0.0 s, because web's memory guard recycled worker 181021 at 17:46:26 CDT mid-request; recorded as a lead, not fixed here. 5 unit tests (injected fetcher) + the 6 route-generator tests pass. The out-of-repo `C:\SyndicateProdudit_sweep.py` is left in place.
 
 ### web-worker-drain-on-recycle — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- GOAL VERDICT [checkpoint 2026-10-01]: "A recycling web gunicorn worker (memory guard or --max-requests) serves every connection it already accepted instead of resetting it: a draining ThreadWorker subclass stops listening, drains accepted connections (bounded), then exits; measured by the isolated gthread repro (stock: 108/4000 failed, 2.7%) going to 0 failures, and live on the fleet's web" — **GOAL: MET** — live A/B 2 resets -> 0 across 2 recycles; memory-guard recycle mid-sweep drained (abandoned 0); deploys.md 23:04Z+23:07Z
 - Goal: A recycling web gunicorn worker (memory guard or --max-requests) serves every connection it already accepted instead of resetting it: a draining ThreadWorker subclass stops listening, drains accepted connections (bounded), then exits; measured by the isolated gthread repro (stock: 108/4000 failed, 2.7%) going to 0 failures, and live on the fleet's web
 - Files: syndicate/web_worker.py (NEW), gunicorn.conf.py (worker_class setting ONLY; the memory-guard hooks untouched), tests/test_web_draining_worker.py (NEW)
 - Hypothesis: gthread's run() exits its loop and closes the poller with connections that were accepted but not yet read still registered; process exit then resets them

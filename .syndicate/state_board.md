@@ -208,6 +208,8 @@ populated slate and reads as a false negative on most routes out of season.
 
 ## [board-compute-attribution] — VERIFIED 2026-08-28, refresh-worker `4805abe5`
 
+**UPDATE `[2026-10-01, lane candidate-trace-scoped-bound, session 0bafeeeb]`, local production fleet: `candidate_scoring` was 440-673 s of every build, ~100% of it NCAAF `week_calendar._ncaaf_week_windows` re-parsing ~300k schedule rows per scored candidate (11-15 s each). It is cached on the schedule files' signature (`d2d38f81`). First build after: `candidate_scoring` 10.5 s for the same 620 candidates, `BOARD_BUILD_TIMING wall_s=214.0` (was 1100-1300). `deploys.md` 2026-10-01 17:06Z.**
+
 **THE BOARD BUILD'S COST IS NAMED. 84% attributed, and every venue/IO
 hypothesis is DEAD.** One complete build, `BOARD_BUILD_TIMING wall_s=678.8
 cpu_s=664.1 off_cpu_pct=2.2`:
