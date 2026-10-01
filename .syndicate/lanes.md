@@ -1313,13 +1313,14 @@ death, never life — do not invert it.
 - Verification: backtest table + CI in deploys.md; regression tests fail before/pass after; live 10-01 sim minutes for LVA/IND starters within ~2 min of their recent averages; rotation history covers LVA/IND
 - Blocked by: none
 
-### nba-june-finals-boxscore-backfill — OPEN — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+### nba-june-finals-boxscore-backfill — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
 - Goal: NBA live-prop audit grades the 2026 Finals: boxscores_<d>.csv + recon_props_<d>.csv for 2026-06-03/05/10/13 exist on the local fleet's NBA data disk (new files only, nothing overwritten, from the existing ESPN box-score path), and /nba/api/live-player-props-audit?since=2026-06-01&until=2026-06-15 reports graded rows (overall.n > 0) instead of no_actuals
 - Files: syndicate/features/nba/live_prop_audit.py (recon join fallback ONLY), tests/test_nba_live_prop_audit_window.py
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: scratch fetch inspected first (teams SAS/NYK, players overlap the projections, DNP handling measured); then files written to ~/syndicate-prod/data/nba_source/data/processed; live audit call shows overall.n > 0 per day
 - Blocked by: none
+- **CLOSED 2026-10-01 18:53Z: GOAL MET.** Live (`9666185a`, web HUP 18:51:12Z): the June window grades **n=640** (was 0, `no_actuals`), 152-168 per game, mae_proj 2.95. `deploys.md` 2026-10-01 18:51Z. Two producer defects recorded as leads, not fixed here.
 - **PROGRESS 2026-10-01: data WRITTEN, code + tests DONE, live reading next.** Fetched via the existing ESPN path (`bootstrap_boxscores_history_local`) into a scratch dir first: 4 Finals games (ESPN 401859963/964/966/967), 30 rows each. Wrote to the fleet's NBA disk root (new files only): `boxscores_<d>.csv` as fetched, and `recon_props_<d>.csv` from the existing `_build_local_recon_props_artifact` over a copy filtered to MIN>0 (19-21 players each; 9-11 DNP excluded, because the NBA-stats source leaves DNP stats blank, so the audit skips them, while the ESPN path writes 0). Join fixes in the audit: accent folding (`Pacome` vs `Pacôme`), and a (team, player) fallback when the projection game_id is unusable (all Finals projections carry "1"); a team under two game ids on a date gets no fallback. Found: that builder writes a HEADER-ONLY recon when boxscores are missing, which is how 06-13 looked built. 3 new tests (2 fail on the old code); related suites match the 34 baseline.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
