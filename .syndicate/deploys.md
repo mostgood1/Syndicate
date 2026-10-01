@@ -44683,3 +44683,25 @@ Not evidence against the fix. The check needs to re-run after 2026-10-05 22:00 C
 - data: `~/syndicate-prod/data/nba_source/data/processed/recon_props_2026-06-13.csv` replaced, 20 -> 21 rows. This morning's Finals backfill used a MIN>0 filter and had dropped Jeremy Sochan (MIN 0.0, plus-minus +1: on the floor for seconds). 06-03/05/10 are unchanged under the final rule.
 - verify (off-line, real fleet inputs): NBA 2026-06-13 rebuild 21 rows (old builder 30). Fleet WNBA recon: 0 DNP rows among 264 under the final rule. The first, minutes-only rule wrongly flagged Rayah Marshall (WNBA 09-24, MIN 0, +/- -2), and that is why the rule changed. Tests: 74 passed across the new file, the header-only file, test_nba_refresh_runner, test_nba_props_integrity and test_basketball_boxscores_history.
 - not observable live yet: the next NBA props refresh (offseason) is the first real run of the NBA builder.
+
+## 2026-10-01 (~4:00 PM CT) -- READING, local WSL fleet restarted onto `c0d406d3` + LVA-IND force-resimmed -- WNBA ENGINE TEAM CALIBRATION: the sim now lands on its points target (lane `wnba-sim-team-calibration`)
+
+**Production defect found.** The live LVA-IND smart sim scored **198.0 against an anchored target of 180.8** (market 181.4): margin 11.7 vs 4.6, `p_total_over` 0.84, `p_home_cover` 0.69 -- and the WNBA game board consumes those two probabilities as model edges. Two stacked causes: the engine's own efficiency calibration overshot its target (~+5%), and the team-quality prior (LVA eff 1.076) was multiplied ON TOP of a market-anchored target that already prices team quality.
+
+**Shipped (`c0d406d3`, vendor `sim/events.py`, 3 switches):**
+- `FOULED_MISS_NOT_FGA` -- a fouled miss is FTs, not a missed FGA. Player FGA error **-0.295 [CI -0.326, -0.265]**, points unchanged.
+- `EXACT_TARGET_CALIBRATION` -- eff solved against a PPP model that mirrors the loop (and-ones, fouled misses, loop shot shares, FT-rate multipliers, and the quarter clock: OREB continuation is **1 + c per possession, not 1/(1-c)** -- measured 1.1016 vs 1.1041 vs 1.1162). Component backtest, 192 games / 3,513 player-games, actual minutes + possessions + points held fixed: team points bias **+2.94 -> -0.17** (fully-matched team-games), player PTS error **-0.074 [CI -0.105, -0.041]**, FTA error +0.018 [+0.005, +0.031] (small cost).
+- `TEAM_PRIOR_STACKS_ON_TARGET = False` -- no team prior on top of a target (still applied without one).
+
+**Refuted, not shipped (pre-registered):** M1 solve foul rate from FTA/FGA (FTA error **+0.32**; the "low FT volume" was the inflated-FGA denominator -- FTA volume was 0.92-1.00x); M6 2P% for twos (player PTS worse than without); M3 pace double count (72 local games said worse, the full 302-game season says **-0.06 [CI -0.18, +0.06]**, slope 1.57 -- keep).
+
+**Reading (live data root, after force-resim):** sim **88.4-84.9, total 173.3 vs anchored 174.1, margin 3.5 vs 4.3**, `p_total_over` **0.308**, `p_home_cover` **0.478**; served `/wnba/api/source/cards` `betting.p_total_over` = 0.308 (was 0.84). Scratch-copy 1000-draw check: 87.8-85.8 vs target 89.2-84.9 (home -1.5 -- the solver assumes minutes-proportional lineups, production uses rotation pools).
+
+**Found, NOT fixed:**
+1. **Raw game model total is 157.0 on the data root vs market 181.5** (`market_anchor.model_total_raw`; vendor-root runs gave 179.6). With the engine now honest, tonight's board leans UNDER at 69% on that input. The old overshoot was masking it in the other direction. Separate lane.
+2. **A same-day code deploy never re-sims.** The WNBA bundle `input_hash` excludes code, so the props refresh reuses the day's artifact (`DECISION=reused_artifact_bundle`); `--force-refresh --only-matchups` is the documented lever.
+3. The **bootstrap-on-start** WNBA refresh passes `SYNDICATE_SOURCE_ROOT_WNBA` = vendor tree, so its game cards land in a keyvalue key the web does not read. I first resimmed with that command (copied from the log) and the board stayed at 0.84 -- regular worker runs use the data root.
+4. Sim turnovers 0.77x actual (TOV priors 0.84x; uniform across players) -- the main remaining FGA excess (1.08x).
+5. Local box-score history held 116 of ~290 2026 games; backfilled a SCRATCH copy from ESPN (336 games), not the live root.
+6. NBA's vendored engine has the identical clip / stacking / helper code -- not ported (needs its own backtest).
+7. Not upstream: `8fd37ff3` + `c0d406d3` are only in `vendor/` -- a re-pull of `mostgood1/WNBA-Betting` reverts both.
