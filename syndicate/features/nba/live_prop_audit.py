@@ -9,6 +9,7 @@ from typing import Any
 from urllib.parse import parse_qs
 
 from syndicate.features.nba.sources import parse_iso_date
+from syndicate.features.shared.live_lens_local import _parse_window
 from syndicate.features.nba.sources import artifact_processed_root
 
 
@@ -18,6 +19,30 @@ def _artifact_root() -> Path:
 
 def _artifact_path(filename: str) -> Path:
     return _artifact_root() / filename
+
+
+def _date_window(params: dict[str, list[str]]) -> list[str]:
+    """The audit window, parsed the way WNBA's audit parses it.
+
+    `?date=` is one day; `since`/`until`, `start`/`end` or `days` make a window;
+    NO window is the trailing 14 days ending yesterday (settled days only).
+    This used to return None for a bare request, and the route turned that None
+    into a 502 -- measured 2026-10-01: `/nba/api/live-player-props-audit` was
+    the one 502 in a 290-route sweep of the local fleet, while WNBA's twin
+    answered the same bare call with 200. An empty list now means only an
+    unparsable window.
+    """
+    return _parse_window(params, default_days=14, allow_date_single=True)
+
+
+def _latest_available_date() -> str | None:
+    """Newest date with an NBA live-lens projection file, so an empty window
+    (the offseason, or a quiet fortnight) says where the data actually is."""
+    dates = sorted(
+        path.name[len("live_lens_projections_"):-len(".jsonl")]
+        for path in _artifact_root().glob("live_lens_projections_*.jsonl")
+    )
+    return dates[-1] if dates else None
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -221,22 +246,9 @@ def _rows_by_key(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
 
 def _local_live_prop_audit_payload(query_string: str) -> dict[str, Any] | None:
     params = parse_qs(query_string or "", keep_blank_values=True)
-    date_values = [str(value).strip() for value in params.get("date", []) if str(value).strip()]
-    if date_values:
-        date_list = [date_values[0]]
-    else:
-        until = str((params.get("until") or [""])[0]).strip()
-        since = str((params.get("since") or [""])[0]).strip()
-        if until and since:
-            start = parse_iso_date(since)
-            end = parse_iso_date(until)
-            date_list = []
-            current = start
-            while current <= end:
-                date_list.append(current.isoformat())
-                current = current.fromordinal(current.toordinal() + 1)
-        else:
-            return None
+    date_list = _date_window(params)
+    if not date_list:
+        return None
 
     include_rows = str((params.get("include_rows") or [""])[0]).strip().lower() in {"1", "true", "yes"}
     try:
@@ -387,22 +399,9 @@ def _local_live_prop_audit_payload(query_string: str) -> dict[str, Any] | None:
 
 def _empty_live_prop_audit_payload(query_string: str) -> dict[str, Any] | None:
     params = parse_qs(query_string or "", keep_blank_values=True)
-    date_values = [str(value).strip() for value in params.get("date", []) if str(value).strip()]
-    if date_values:
-        date_list = [date_values[0]]
-    else:
-        until = str((params.get("until") or [""])[0]).strip()
-        since = str((params.get("since") or [""])[0]).strip()
-        if until and since:
-            start = parse_iso_date(since)
-            end = parse_iso_date(until)
-            date_list = []
-            current = start
-            while current <= end:
-                date_list.append(current.isoformat())
-                current = current.fromordinal(current.toordinal() + 1)
-        else:
-            return None
+    date_list = _date_window(params)
+    if not date_list:
+        return None
 
     include_rows = str((params.get("include_rows") or [""])[0]).strip().lower() in {"1", "true", "yes"}
     try:
@@ -444,6 +443,7 @@ def _empty_live_prop_audit_payload(query_string: str) -> dict[str, Any] | None:
         "debug": {"days": debug_days},
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "message": "No settled live player-prop projection rows were available for the requested window.",
+        "latest_available_date": _latest_available_date(),
     }
     return payload
 

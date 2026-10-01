@@ -1298,6 +1298,15 @@ death, never life — do not invert it.
 - **Falsification 2:** same backtest; if lineup fix arm L does not cut MAE vs A with a game-bootstrap CI excluding 0, or does not move top2 bias toward 0 without pushing rest bias past it, it does not ship.
 - Blocked by: none
 
+### nba-live-prop-audit-default-window — OPEN — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- Goal: GET /nba/api/live-player-props-audit with no date answers 200 (not 502) using the same trailing 14-day window WNBA uses (shared _parse_window), the empty payload names the latest date that has NBA projection files, and an unparsable window answers 400 instead of 502; measured live on the local fleet
+- Files: syndicate/features/nba/live_prop_audit.py, syndicate/blueprints/nba.py (_live_prop_audit_payload_response ONLY), tests/test_nba_live_prop_audit_window.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: bare call -> 200 window of 14 days ending yesterday; date= still single day; since/until and start/end/days honoured; garbage window -> 400; empty payload carries latest_available_date. live: bare call 200 on 127.0.0.1:10000 and ?date=2026-06-13 returns settled rows
+- Blocked by: none
+- **PROGRESS 2026-10-01, code + tests DONE, live reading next.** Cause: both NBA audit builders returned None without `date` or `since`/`until`, and the route mapped None to 502. They now use the shared `_parse_window(default_days=14, allow_date_single=True)` (WNBA's parser): a bare call is the trailing 14 days ending yesterday, and `start`/`end`/`days` now work too. An unparsable window is a 400. The empty payload carries `latest_available_date` (fleet: 2026-06-13, NBA offseason). 6 new tests, 5 fail on the old code; test_archives + test_live_lens_local show the same 34 failures/errors with and without the change (worktree has no data/).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

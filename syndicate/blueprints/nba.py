@@ -553,7 +553,11 @@ def _live_prop_audit_payload_response(season: int | None = None):
     query_string = _live_lens_query_string(season)
     payload = build_live_prop_audit_payload(query_string)
     if not isinstance(payload, dict):
-        return jsonify({"ok": False, "error": "failed to load live player props audit"}), 502
+        # The builder defaults a missing window (trailing 14 days), so None now
+        # means only an unparsable since/until/start/end -- the caller's input,
+        # not an upstream failure. It answered 502 for every bare request
+        # until 2026-10-01.
+        return jsonify({"ok": False, "error": "invalid date window", "hint": "use date=YYYY-MM-DD, since/until, start/end or days"}), 400
     return jsonify(payload)
 
 
