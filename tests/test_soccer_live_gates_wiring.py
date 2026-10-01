@@ -106,10 +106,12 @@ def _live_prop_row():
 # ---------------------------------------------------------------- reachability
 
 def test_gate3_unwired_sport_still_fails_closed():
+    # `nba`, not `nhl`: nhl joined `_LIVE_GAMELINE_SPORTS` on 2026-09-24 (lane
+    # `nhl-live-resim`) and this test went red that day without anyone noticing.
     out = board_enrichment.attach_live_gamelines_for_sport(
-        [], sport="nhl", selected_date="2026-08-21")
+        [], sport="nba", selected_date="2026-08-21")
     assert out["supported"] is False
-    assert "nhl" in out["reason"]
+    assert "nba" in out["reason"]
 
 
 def test_gate2_unwired_sport_still_fails_closed():
@@ -119,12 +121,17 @@ def test_gate2_unwired_sport_still_fails_closed():
 
 
 def test_gate3_soccer_off_vs_on(root):
-    """OFF (no artifact) names its zero; ON prices the row."""
+    """OFF (no artifact) names its zero; ON prices the row.
+
+    No artifact at all is NOT "no soccer match in play" `[2026-09-30, lane
+    soccer-live-gameline-index-diag]`: nothing could be read, so nothing is
+    known. This asserted the permissive reading until then."""
     off = board_enrichment.attach_live_gamelines_for_sport(
         [_live_h2h_row()], sport="soccer", selected_date="2026-08-21")
     assert off["supported"] is True
     assert off["rows_live_gameline_edged"] == 0
-    assert "no soccer match in play" in off["reason"]
+    assert "no soccer live-state artifact readable" in off["reason"]
+    assert "no soccer match in play" not in off["reason"]
 
     _write_live(root)
     rows = [_live_h2h_row()]

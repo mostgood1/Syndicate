@@ -55,7 +55,9 @@ def _f(value: Any) -> float | None:
     return out
 
 
-def soccer_live_games(selected_date: str, *, data_root: Any = None) -> list[dict[str, Any]]:
+def soccer_live_games(
+    selected_date: str, *, data_root: Any = None, diagnostics: dict | None = None
+) -> list[dict[str, Any]]:
     """Every soccer match IN PLAY, from whichever store this service can reach.
 
     Returns the per-match dicts the poller builds (`projection`,
@@ -69,35 +71,65 @@ def soccer_live_games(selected_date: str, *, data_root: Any = None) -> list[dict
 
     The fallback is not dead code: on live-odds-worker and on a dev box the
     per-league files ARE local, and the tests exercise that path.
+
+    `diagnostics`, when given, is filled with WHICH store answered `[2026-09-30,
+    lane soccer-live-gameline-index-diag]`. An empty return used to mean both "a
+    readable artifact says nothing is in play" and "no artifact could be read at
+    all", and the board labelled both "no soccer match in play". Only the first
+    is that. `artifact` is `aggregate` / `per_league` when something readable
+    answered and `none` when nothing did; `aggregate` says why the aggregate did
+    or did not answer (`ok`, `empty`, `stale_date`, `malformed`, `absent`).
     """
     from syndicate.features.shared.refresh_state_store import (
         data_root as default_root,
         read_json_file,
     )
 
+    diag = diagnostics if isinstance(diagnostics, dict) else {}
     root = data_root or default_root()
 
     snapshot = read_json_file(root / "live" / "soccer_live_lens.json")
-    if isinstance(snapshot, Mapping):
-        # Only this date's snapshot may answer for this date. A stale one would
-        # price today's board off yesterday's match state.
-        if str(snapshot.get("date") or "") == str(selected_date):
-            games = snapshot.get("games")
-            if isinstance(games, list):
-                out = [g for g in games if isinstance(g, Mapping)]
-                if out:
-                    return [dict(g) for g in out]
+    if not isinstance(snapshot, Mapping):
+        diag["aggregate"] = "absent"
+    # Only this date's snapshot may answer for this date. A stale one would
+    # price today's board off yesterday's match state.
+    elif str(snapshot.get("date") or "") != str(selected_date):
+        diag["aggregate"] = "stale_date"
+    else:
+        games = snapshot.get("games")
+        if not isinstance(games, list):
+            diag["aggregate"] = "malformed"
+        else:
+            out = [g for g in games if isinstance(g, Mapping)]
+            if out:
+                diag["aggregate"] = "ok"
+                diag["artifact"] = "aggregate"
+                return [dict(g) for g in out]
+            # Readable, this date, and in play: nothing. That is a real answer,
+            # but it must not shadow a per-league tree that has games.
+            diag["aggregate"] = "empty"
+
+    def _finish(out: list[dict[str, Any]], files_read: int) -> list[dict[str, Any]]:
+        diag["per_league_files"] = files_read
+        if files_read > 0:
+            diag["artifact"] = "per_league"
+        elif diag.get("aggregate") == "empty":
+            diag["artifact"] = "aggregate"
+        else:
+            diag["artifact"] = "none"
+        return out
 
     # Per-league fallback.
     source = root / "soccer_source"
     try:
         if not source.exists():
-            return []
+            return _finish([], 0)
         league_dirs = sorted(source.iterdir())
     except OSError:
-        return []
+        return _finish([], 0)
 
     out: list[dict[str, Any]] = []
+    files_read = 0
     for league_dir in league_dirs:
         if not league_dir.is_dir():
             continue
@@ -109,10 +141,11 @@ def soccer_live_games(selected_date: str, *, data_root: Any = None) -> list[dict
         games = payload.get("games")
         if not isinstance(games, Mapping):
             continue
+        files_read += 1
         for event_id, game in games.items():
             if isinstance(game, Mapping):
                 out.append({"league": payload.get("league"), "event_id": event_id, **dict(game)})
-    return out
+    return _finish(out, files_read)
 
 
 def _histograms_from_scorelines(scorelines: Any) -> tuple[dict[float, float], dict[float, float]]:
@@ -261,7 +294,7 @@ class _CanonicalMatchIndex(dict):
 
 
 def soccer_live_gameline_index(
-    selected_date: str, *, data_root: Any = None
+    selected_date: str, *, data_root: Any = None, diagnostics: dict | None = None
 ) -> dict[tuple[str, str], dict[str, Any]]:
     """(away_team, home_team) -> live moneyline projection, for in-play matches.
 
@@ -283,20 +316,33 @@ def soccer_live_gameline_index(
 
     In-play only, by the producer's contract: a finished match leaves `games`
     and lives in `match_box`, so a settled market can never be priced from here.
+
+    `diagnostics`, when given, counts every in-play match into exactly one of
+    `indexed` or a `skipped_*` bucket, so they always sum to `games_in_snapshot`.
+    A match dropped here used to vanish: when every match in play was dropped,
+    the empty index read downstream as "no soccer match in play".
     """
+    diag = diagnostics if isinstance(diagnostics, dict) else {}
+    games = soccer_live_games(selected_date, data_root=data_root, diagnostics=diag)
+    skips = {"skipped_no_projection": 0, "skipped_no_probability": 0,
+             "skipped_no_team_names": 0, "skipped_ambiguous": 0}
     index = _CanonicalMatchIndex()
-    for game in soccer_live_games(selected_date, data_root=data_root):
+    for game in games:
         projection = game.get("projection")
         if not isinstance(projection, Mapping):
+            skips["skipped_no_projection"] += 1
             continue
         home_p = _f(projection.get("home_win_probability"))
         if home_p is None or not (0.0 <= home_p <= 1.0):
+            skips["skipped_no_probability"] += 1
             continue
         key = _canonical_pair(game.get("away_team"), game.get("home_team"))
         if not key[0] or not key[1]:
+            skips["skipped_no_team_names"] += 1
             continue
         if dict.__contains__(index, key):
             index.ambiguous.add(key)
+            skips["skipped_ambiguous"] += 1
             print(
                 f"[soccer_live_gameline] AMBIGUOUS_CANONICAL_KEY away={key[0]!r} home={key[1]!r} "
                 f"league={game.get('league')} event={game.get('event_id')} -- neither match is priced",
@@ -356,6 +402,12 @@ def soccer_live_gameline_index(
                 "away": bool(projection.get("away_red_card_applied")),
             },
         }
+    # An ambiguous pair's FIRST match stays in the dict but answers nothing
+    # (`_answer_key`), so it is a skip too, not an indexed game.
+    skips["skipped_ambiguous"] += len(index.ambiguous)
+    diag["games_in_snapshot"] = len(games)
+    diag["indexed"] = len(index) - len(index.ambiguous)
+    diag.update(skips)
     return index
 
 

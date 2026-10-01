@@ -2380,7 +2380,9 @@ def _attribute_live_gameline_zero(
         skips = {
             key: _count(key) for key in
             ("skipped_no_accepted_lane", "skipped_no_team_names",
-             "skipped_no_probability", "skipped_stale")
+             "skipped_no_probability", "skipped_stale",
+             # Soccer's producer buckets (`soccer_live_gameline_index`).
+             "skipped_no_projection", "skipped_ambiguous")
             if _count(key) > 0
         }
         detail = ", ".join(f"{k}={v}" for k, v in sorted(skips.items()))
@@ -2452,30 +2454,44 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                 soccer_live_gameline_index,
             )
 
-            index = soccer_live_gameline_index(selected_date)
-            if not index:
-                # NAMED, not a silent zero. Outside a live window this is the
-                # normal state, and it must stay distinguishable from "the join
-                # ran over live matches and priced none of them".
-                return {
-                    "supported": True,
-                    "reason": "no soccer match in play in any league's live-state artifact",
-                    "rows_live_gameline_edged": 0,
-                    "rows_live_gameline_projected": 0,
-                }
             # THIS BRANCH HAD NO `index_diag`, and the attribution below reads it
             # for every sport: an UnboundLocalError on every tick with a match in
             # play (76 `BOOK_GRID_LIVE_GAMELINE_FAILURE sport=soccer` in one
-            # local-production refresh-worker.log, 2026-09-30). The producer's
-            # contract makes every indexed entry an in-play match, so the
-            # snapshot count IS the index size; ambiguous canonical pairs are
-            # carried so an unpriced pair is not read as a join miss.
-            index_diag = {
-                "source": "soccer_live_state",
-                "games_in_snapshot": len(index),
-                "indexed": len(index),
-                "skipped_ambiguous": len(getattr(index, "ambiguous", ()) or ()),
-            }
+            # local-production refresh-worker.log, 2026-09-30). The producer now
+            # fills it: which store answered, and where every in-play match went.
+            index_diag = {"source": "soccer_live_state"}
+            index = soccer_live_gameline_index(selected_date, diagnostics=index_diag)
+            if not index_diag.get("indexed"):
+                # THREE EMPTY STATES, and only one is "nothing in play"
+                # `[2026-09-30]`. This used to return that reason for every empty
+                # index -- including matches in play that the producer dropped
+                # (no projection, no probability, ambiguous pair) and a store
+                # nobody could read.
+                empty = {
+                    "supported": True,
+                    "rows_live_gameline_edged": 0,
+                    "rows_live_gameline_projected": 0,
+                    "rows_live_gameline_considered": 0,
+                    "index_size": 0,
+                    "index_diagnostics": index_diag,
+                }
+                games = index_diag.get("games_in_snapshot")
+                if games == 0 and index_diag.get("artifact") in ("aggregate", "per_league"):
+                    # A readable artifact for this date says nothing is in play.
+                    # Outside a live window this is the normal state.
+                    empty["reason"] = (
+                        "no soccer match in play in any league's live-state artifact")
+                elif games == 0:
+                    empty["reason"] = (
+                        f"no soccer live-state artifact readable for {selected_date} "
+                        f"(aggregate={index_diag.get('aggregate', 'unknown')}, "
+                        f"per_league_files={index_diag.get('per_league_files', 'unknown')})"
+                        " -- cannot tell 'nothing in play' from a missing producer")
+                else:
+                    # Matches in play, none indexed: the skip buckets name why.
+                    # A missing count goes the same way, as "unavailable".
+                    _attribute_live_gameline_zero(empty, index_diag, sport=sport)
+                return empty
             coverage = attach_live_gamelines(grid, index, sport=sport)
         else:
             # THE GAME-LINE JOIN reads the RE-SIM's snapshot where a sport has
