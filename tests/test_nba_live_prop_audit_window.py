@@ -150,6 +150,43 @@ class NbaLivePropAuditRootTests(unittest.TestCase):
             second = audit.build_live_prop_audit_payload("")["meta"]["end"]
         self.assertEqual((first, second), ("2026-09-30", "2026-10-01"))
 
+    def _write_finals_day(self, recon_rows: list[str]) -> dict:
+        """One projection row shaped like the real 2026 Finals file (game_id "1")
+        and a recon_props file built from ESPN box scores (event-id game_id)."""
+        from syndicate.features.nba import live_prop_audit as audit
+
+        proj = [
+            '{"game_id": "1", "player": "Pac\\u00f4me Dadiet", "name_key": "Pac\\u00f4me Dadiet", "team_tri": "NYK", "stat": "pts", "proj": 4.0, "sim_mu": 4.0, "market": "player_prop"}',
+            '{"game_id": "1", "player": "Victor Wembanyama", "name_key": "Victor Wembanyama", "team_tri": "SAS", "stat": "pts", "proj": 27.0, "sim_mu": 27.0, "market": "player_prop"}',
+        ]
+        (self.second / "live_lens_projections_2026-06-13.jsonl").write_text("\n".join(proj) + "\n", encoding="utf-8")
+        header = "game_id,player_id,player_name,team_abbr,pts,reb,ast,threes,stl,blk,tov,pr,pa,ra,pra"
+        (self.second / "recon_props_2026-06-13.csv").write_text("\n".join([header, *recon_rows]) + "\n", encoding="utf-8")
+        audit.build_live_prop_audit_payload.cache_clear()
+        return audit.build_live_prop_audit_payload("date=2026-06-13")
+
+    def test_an_unusable_projection_game_id_falls_back_to_team_and_player(self) -> None:
+        payload = self._write_finals_day([
+            "401859967,1,Victor Wembanyama,SAS,31,12,4,2,1,5,3,43,35,16,47",
+        ])
+        self.assertEqual(payload["overall"]["n"], 1)
+        self.assertEqual(payload["history"], None)  # include_rows not requested
+
+    def test_accented_names_join_to_unaccented_box_scores(self) -> None:
+        payload = self._write_finals_day([
+            "401859967,1,Victor Wembanyama,SAS,31,12,4,2,1,5,3,43,35,16,47",
+            "401859967,2,Pacome Dadiet,NYK,6,1,0,2,0,0,0,7,6,1,7",
+        ])
+        self.assertEqual(payload["overall"]["n"], 2)
+
+    def test_a_team_under_two_game_ids_on_one_date_gets_no_fallback(self) -> None:
+        payload = self._write_finals_day([
+            "401859967,1,Victor Wembanyama,SAS,31,12,4,2,1,5,3,43,35,16,47",
+            "401859999,1,Victor Wembanyama,SAS,10,1,1,0,0,0,0,11,11,2,12",
+        ])
+        self.assertEqual(payload["overall"]["n"], 0)
+        self.assertEqual(payload["debug"]["days"][0]["unsettled_reason"], "no_matching_actuals")
+
     def test_latest_available_date_spans_every_root(self) -> None:
         from syndicate.features.nba import live_prop_audit as audit
 

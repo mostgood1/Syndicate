@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import unicodedata
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -120,7 +121,12 @@ def _number(value: Any) -> float | None:
 
 
 def _norm_player_name(value: str) -> str:
-    return " ".join(str(value or "").strip().upper().split())
+    # Accents folded: ESPN box scores write "Pacome Dadiet" where projections
+    # carry "Pacôme Dadiet" (measured 2026-10-01 on the 2026 Finals backfill),
+    # and the same split would drop Jokić, Dončić, Valančiūnas from the join.
+    decomposed = unicodedata.normalize("NFKD", str(value or ""))
+    folded = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    return " ".join(folded.strip().upper().split())
 
 
 def _canon_gid10(game_id: Any) -> str:
@@ -192,6 +198,7 @@ def _latest_player_prop_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]
 def _load_recon_props_lookup(date_str: str) -> dict[tuple[str, str], dict[str, Any]]:
     rows = _read_csv_rows(_artifact_path(f"recon_props_{date_str}.csv"))
     lookup: dict[tuple[str, str], dict[str, Any]] = {}
+    team_games: dict[str, set[str]] = {}
     for row in rows:
         gid = _canon_gid10(row.get("game_id"))
         name_key = _norm_player_name(str(row.get("player_name") or row.get("player") or ""))
@@ -209,6 +216,20 @@ def _load_recon_props_lookup(date_str: str) -> dict[tuple[str, str], dict[str, A
         if numeric_row.get("pra") is None and numeric_row.get("pts") is not None and numeric_row.get("reb") is not None and numeric_row.get("ast") is not None:
             numeric_row["pra"] = float(numeric_row["pts"]) + float(numeric_row["reb"]) + float(numeric_row["ast"])
         lookup[(gid, name_key)] = numeric_row
+        # Secondary key: (team, player) for the date. A projection's game_id
+        # can be unusable -- the 2026 Finals projections all carry "1" while
+        # the box scores carry ESPN event ids -- and an NBA team plays at most
+        # one game a day, so team + player identifies the row. A team seen
+        # under two game ids on one date is ambiguous and gets no team key.
+        team = str(row.get("team_abbr") or "").strip().upper()
+        if team:
+            team_key = (f"team:{team}", name_key)
+            team_games.setdefault(team, set()).add(gid)
+            lookup[team_key] = numeric_row
+    for team, games in team_games.items():
+        if len(games) > 1:
+            for key in [key for key in lookup if key[0] == f"team:{team}"]:
+                del lookup[key]
     return lookup
 
 
@@ -301,7 +322,9 @@ def _local_live_prop_audit_payload(query_string: str) -> dict[str, Any] | None:
             gid = _canon_gid10(row.get("game_id_canon") or row.get("game_id"))
             name_key = _norm_player_name(str(row.get("name_key") or row.get("player") or ""))
             stat_key = _stat_key(row.get("stat"))
-            recon_row = recon_lookup.get((gid, name_key))
+            recon_row = recon_lookup.get((gid, name_key)) or recon_lookup.get(
+                (f"team:{str(row.get('team_tri') or '').strip().upper()}", name_key)
+            )
             actual = recon_row.get(stat_key) if recon_row else None
             if actual is None:
                 continue
