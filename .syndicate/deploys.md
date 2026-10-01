@@ -44713,3 +44713,29 @@ Not evidence against the fix. The check needs to re-run after 2026-10-05 22:00 C
 - verify (off-line, real inputs): NBA 2026-06-13 game_odds (rebuilt from the surviving game_cards row; the original was never kept) -> game_cards `game_id 401859967` against ESPN's live scoreboard -> 208 live-lens projections all `401859967` (were "1"). The old builders on the same fixture: '1' for NBA and WNBA. Tests: 7 new; 81 + 80 passed (incl. test_wnba_game_cards_census, test_wnba_refresh_runner).
 - live behaviour change: WNBA (in season) gets ESPN ids instead of index ids on days its game_cards come from the game_odds fallback (most WNBA days use the raw-odds branch's `0`+OddsAPI id, which is unchanged). Not yet observed live: the first such WNBA build.
 - not regenerated: existing June NBA game_cards/projections (the audit's team fallback already grades them, n=640).
+
+## 2026-10-01 (~5:00 PM CT) -- READING, local WSL fleet on `a6d45144` (pulled; refresh subprocesses load it per run) + LVA-IND force-resimmed -- WNBA RAW GAME TOTAL: the totals calibration is now fed and defense is no longer counted twice (lane `wnba-game-total-level`)
+
+**Defect.** Live LVA-IND raw game total (`market_anchor.model_total_raw`) **157.0 vs market 181.5**. (The earlier "179.6" came from vendor-root runs whose `predictions_<date>.csv` had been *repaired from game odds* -- the "model" there was the market.)
+
+**Causes, walk-forward 2026** (299 games; each prediction built from games strictly before its date, with a true as-of team-stats file per date -- the vendor's feature builder otherwise falls back to the newest as-of file, leaking late-season ratings into May):
+1. The vendored game model predicts **~162 every season** -- bias 2024 -0.4, 2025 -1.3, **2026 -11.6** (2026 scoring ~174). The level correction the smart sim already READS (`calibration_totals_<date>.json`, `_apply_totals_calibration_local`) was **never written by anything in Syndicate** (the vendor's `calibrate-totals` was never wired).
+2. `_simulate_quarters_local` subtracted (opponent def - 101.5) from an off "rating" DERIVED from predicted points (2026 league def 104.2): ~-2.3 pts/team, and margin noise.
+
+| variant | total MAE | bias | margin MAE |
+|---|---|---|---|
+| V0 production | 19.81 | -13.66 | 11.71 |
+| + 14d rolling bias | 16.37 | -2.17 | 11.71 |
+| + no def double count | 15.83 | -0.87 | 10.64 |
+| + team terms (shipped, daily cheap build) | **15.39** | **+0.09** | **10.64** |
+
+Shipped vs V0: **-3.87 per game [CI -5.40, -2.26]**. Cheap daily build (one feature build, today's team stats) vs clean per-date walk-forward: -0.06 [CI -0.39, +0.30]. Team terms were added POST HOC (not pre-registered): -0.41 [CI -0.69, -0.11].
+
+**Reading (live data root):** the WNBA refresh ran the builder itself -- `WNBA_TOTALS_CALIBRATION rc=0 ... game_total_bias 11.293, n_window 38, n_season 344` -> `calibration_totals_2026-09-30.json`. LVA-IND raw **157.0 -> 175.6**, anchored 174.1 -> **179.7** (market 181.5), sim total 173.3 -> **178.8**, served `betting.p_total_over` 0.308 -> **0.416**, `p_home_cover` 0.412.
+
+**Not fixed / owed:**
+1. **`HOT_ARTIFACT_PATTERNS` entry for `wnba_source/data/processed/calibration_totals_*.json` is OWED** -- `artifact_publisher.py` is claimed by OPEN lane `nhl-live-resim` (opened 09-24); not edited across lanes. Locally harmless (written and read on the worker's disk); required by the engine standard.
+2. The remaining ~-6 on LVA-IND is the quarters step's injury drag: 0.3 pace AND 0.5 pts per out (LVA 4, IND 2). Unmeasurable -- no history of excluded players.
+3. The model's season counters (`season_game_number` 395, `season_progress` 8.9) accumulate across seasons; resetting them per season recovered only 3 of the 11.6 pts and moves inputs off the training distribution. Left; the calibration absorbs the level.
+4. NBA uses the same quarters path and job builder; it keeps the old behaviour (`off_rtg_from_points` is WNBA-only) until backtested.
+5. Pre-existing, unrelated: `tests/test_wnba_live_snapshots_local.py` (2 tests) errors in a checkout that has `data/` -- the conftest guard catches a write into the git-tracked mirror.
