@@ -44761,3 +44761,28 @@ Supersedes the "until it merges, a re-pull reverts both fixes" warning above. Up
 - action: `scripts/local_audit_sweep.py` from the fleet's own checkout (`cd507a9b`), against the regenerated 373-route list.
 - result: exit 0, supervisor stable, 285 hit / 11 skipped, **0 failures**, 0 empty JSON; status 200 x272, 400 x13 (the parameter-requiring ops routes); p99 4.51 s, max 6.56 s (`/intelligence/api/opportunity-board`). Changed vs 22:43Z: `/wnba/market-board` ConnectionResetError -> 200; the two WNBA rate-limited alias pairs 429 -> 200 (timing).
 - the reading that matters: mid-sweep, `WEB_WORKER_MEMORY_RECYCLE {pid 198427, anon_mb 625.9, limit_mb 620.2, hard false}` was followed by `WEB_WORKER_DRAINED {pid 198427, accepted_unread_at_stop 1, abandoned 0, drain_s 0.101}`, then `Worker exiting` at 18:07:08 CDT. The exact case that reset `/wnba/market-board` at 22:43Z (a non-hard memory-guard recycle with a request in flight) now serves that request.
+
+## 2026-10-01 (~7:00 PM CT) -- READING, local WSL fleet on `9f561ca3` (refresh subprocesses load it per run) + LVA-IND force-resimmed pregame -- WNBA SIM TURNOVERS (lane `wnba-sim-tov-priors`)
+
+**Stage measurement (126 team-games):** raw priors x minutes 0.801x actual TOV; what the engine received **0.726x**; the players' real as-of box rates **1.027x**. Cause 1: `_weighted_positive_mean` returns 0.0 when every input is missing and the prior blend counted that 0.0 as a real recent rate (weight 0.35) -- every stat with no rolling features (**stl, blk, tov**) got 0.5 x prior + 0.15 x pred (quintile 0 predicted 0.0237, measured 0.0238). Cause 2: the engine derived p_tov per possession but checks it per shot iteration (~1.10 per possession).
+
+**Backtest, 192 games / 3,508 player-games, paired seeds.** Team ratios are on the 191 fully matched team-games; the deviance change is per player-game, TT vs production:
+
+| | production | blend fix only | **shipped (blend + per-attempt)** | deviance change, shipped vs production |
+|---|---|---|---|---|
+| team TOV | 0.776 | 1.170 | **1.072** | **-0.060 [-0.089, -0.028]** |
+| team STL | 0.704 | 1.051 | 0.963 | **-0.064 [-0.090, -0.038]** |
+| team REB | 1.324 | 1.174 | 1.211 | **-0.233 [-0.253, -0.214]** |
+| FGA | 1.084 | 1.011 | 1.028 | abs error -0.121 [-0.143, -0.099] |
+| PTS / AST / BLK | -- | -- | ~unchanged | n.s. |
+
+Pre-registered bound (team TOV within 0.95-1.05): **MISSED by ~2 pts** -- the residual is prior level, not either mechanism. Player TOV/STL **MAE rose** (+0.024 / +0.014): MAE rewards the median, which sits below the mean for these low counts; tier bias went -0.48 / -0.20 -> +0.14 / +0.13.
+
+**Live reading (pregame resim, LVA-IND):** team TOV LVA 8.6 -> **12.2** (2026 actual 12.2/game), IND 11.3 -> **15.5** (actual 13.5); Clark 3.11 -> 4.21 (actual 4.52), Gray 2.01 -> 2.78 (2.87), Mitchell 1.12 -> 1.53 (1.63), Wilson 1.29 -> 1.93 (2.47). Points stable (90.6 -> 91.7, 88.9 -> 87.7).
+
+**Found, NOT fixed:**
+1. **Rebounds still ~1.25x actual** -- live LVA-IND projects 41-43 per team vs ~33 actual; backtest 1.21x. Next-biggest miss.
+2. IND's +2 TOV overshoot is probably the production-only `team_adj.tov_mult` stacking on player priors that already carry the team's turnover habit (the harness has no team_adj and overshoots 1.07). Unmeasured.
+3. Blocks 0.64x: the engine's constant `base_block_rate_on_2pa` 0.05; priors only allocate. Steals are a fixed 0.55 share of TOV.
+4. The target solver lands ~2 pts under for targets far below a team's natural level (synthetic 78); real-game team points stay within 0.6%.
+5. **Not upstream:** `TOV_PER_ATTEMPT` lives in `vendor/wnba_betting_repo/src/wnba_betting/sim/events.py`; a re-pull of `mostgood1/WNBA-Betting` reverts it.

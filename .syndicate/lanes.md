@@ -1002,7 +1002,8 @@ death, never life — do not invert it.
 - Verification: deploys.md READING: live LVA-IND model_total_raw after a forced resim, plus the walk-forward table
 - Blocked by: none
 
-### wnba-sim-tov-priors — OPEN — opened 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+### wnba-sim-tov-priors — CLOSED — opened 2026-10-01, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: PARTIALLY MET.** `9f561ca3`: hypothesis (b) CONFIRMED (missing recent rate counted as 0 in the prior blend, hits stl/blk/tov); H2 CONFIRMED in direction (per-iteration p_tov, 1.17 -> 1.07) but the pre-registered 0.95-1.05 bound is MISSED by ~2 pts. Poisson deviance TOV -0.060, STL -0.064, REB -0.233 (all CI < 0); FGA -0.121. Player TOV/STL MAE rose (median artifact, documented). Live LVA TOV 8.6 -> 12.2 (actual 12.2), IND 11.3 -> 15.5 (actual 13.5). Next: rebounds 1.21-1.25x. Vendor change not upstream. (`deploys.md` 2026-10-01 ~7:00 PM CT). Claims RELEASED.
 - Goal: WNBA smart sim turnovers match actual (component backtest: sim TOV 0.77x actual on fully matched team-games, uniform across players), which also leaves FGA 1.08x
 - Files: syndicate/features/shared/basketball_props_smart_sim.py,tests/test_basketball_sim_tov_priors.py, vendor/wnba_betting_repo/src/wnba_betting/sim/events.py
 - Hypothesis: The shortfall is introduced AFTER the logs: player_logs TOV/min matches box scores (0.0689 vs 0.0684), and the engine realizes ~1.1x its per-iteration p_tov, so the per-minute _prior_tov_pm the engine receives must be ~0.7x the players' real rate. Candidate stages, to be measured in order: (a) compute_player_priors_local rates (plain means), (b) _apply_player_priors_local's prior/pred fallback and its bounded split/opponent/position/roll adjustments (tov bounds 0.82-1.20), (c) the engine's p_tov (clip 0.05-0.22, garbage-time 0.94).
