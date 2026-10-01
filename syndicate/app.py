@@ -475,6 +475,9 @@ def create_app() -> Flask:
 
     app.jinja_env.filters["central"] = central_clock
     app.jinja_env.filters["central_epoch"] = central_clock_from_epoch
+    from syndicate.features.shared.status_label import status_label
+
+    app.jinja_env.filters["status_label"] = status_label
 
     app.register_blueprint(home_bp)
     app.register_blueprint(intelligence_bp)

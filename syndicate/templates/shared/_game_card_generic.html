@@ -124,7 +124,7 @@
         <span class="cards-game-time-label">{{ game.detail_label or 'Slate context' }}</span>
         <span class="cards-game-time-value">{{ game.detail }}</span>
       </div>
-      <span class="cards-status-badge">{{ game.status }}</span>
+      <span class="cards-status-badge">{{ game.status | status_label }}</span>
       {% if game.href %}
         <a class="cards-game-link" href="{{ game.href }}">{{ game.href_label or 'Open game detail' }}</a>
       {% endif %}

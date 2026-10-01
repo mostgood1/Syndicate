@@ -1217,6 +1217,14 @@ death, never life — do not invert it.
 - Verification: new regression test fails on origin/main, passes after; fresh real (current_season rating_source) wk4 still returns artifact_fresh; full tests/test_season_projection_staleness.py green
 - Blocked by: none
 
+### card-status-dict-label — OPEN — opened 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- Goal: Card status badges render a label, never a raw status dict: /wnba/cards?client=board shows SCHEDULED/LIVE/FINAL instead of {'status': ..., 'detail': ...}
+- Files: syndicate/features/shared/status_label.py, syndicate/app.py, syndicate/templates/shared/_game_card_generic.html, syndicate/templates/shared/_scoreboard_strip_generic.html, tests/test_status_label.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: regression test fails before / passes after; live /wnba/cards?client=board HTML contains no '{&#39;status&#39;' or '&quot;status&quot;' text in the status badge; other sports' string statuses unchanged
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
