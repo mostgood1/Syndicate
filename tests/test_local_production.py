@@ -280,3 +280,16 @@ def test_each_role_gets_its_render_plan_as_a_memory_ceiling(blueprint, settings)
         assert _env(role, blueprint, settings)[0]["SYNDICATE_LOCAL_MEMORY_LIMIT_MB"] == str(megabytes)
     override = {"SYNDICATE_LOCAL_MEMORY_LIMIT_MB": "8192"}
     assert _env("refresh-worker", blueprint, settings, local=override)[0]["SYNDICATE_LOCAL_MEMORY_LIMIT_MB"] == "8192"
+
+
+def test_gunicorn_usable_does_not_require_gunicorn_on_path(monkeypatch):
+    # The WSL boot task runs the venv python without activating the venv, so
+    # its bin/ is not on PATH; web runs `python -m gunicorn` and never needs it.
+    import types
+
+    monkeypatch.setattr(lp, "IS_WINDOWS", False)
+    monkeypatch.setattr(lp.shutil, "which", lambda name: None)
+    monkeypatch.setattr(lp.subprocess, "run", lambda *a, **k: types.SimpleNamespace(returncode=0))
+    assert lp.gunicorn_usable() is True
+    monkeypatch.setattr(lp.subprocess, "run", lambda *a, **k: types.SimpleNamespace(returncode=1))
+    assert lp.gunicorn_usable() is False

@@ -437,7 +437,11 @@ def mask(key: str, value: str) -> str:
 
 
 def gunicorn_usable() -> bool:
-    if IS_WINDOWS or shutil.which("gunicorn") is None:
+    # No `shutil.which("gunicorn")`: web is launched as `sys.executable -m
+    # gunicorn`, which never needs PATH, and a venv python run without
+    # activation (the WSL boot task) has no venv bin/ on PATH -- that check
+    # silently fell back to waitress on Linux (first WSL2 run, 2026-10-01).
+    if IS_WINDOWS:
         return False
     probe = subprocess.run([sys.executable, "-c", "import gunicorn.util, fcntl"], capture_output=True, timeout=60)
     return probe.returncode == 0
