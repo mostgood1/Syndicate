@@ -593,6 +593,9 @@ class TeamContextLocal:
     games_last_3d: int | None = None
     form_7: float | None = None
     form_30: float | None = None
+    # True when off_rating is DERIVED from the game model's predicted points
+    # (`_rating_from_mu` in the job builder), which already price the opponent.
+    off_rating_from_points: bool = False
 
 
 @dataclass
@@ -1221,8 +1224,17 @@ def _simulate_quarters_local(*, processed_root: Path, inp: GameInputsLocal, leag
     away_off = _safe_float_local(away.off_rating, league_avg_rating)
     home_def = _safe_float_local(home.def_rating, league_avg_rating)
     away_def = _safe_float_local(away.def_rating, league_avg_rating)
-    home_eff = _clip_rating(home_off - (away_def - league_avg_rating))
-    away_eff = _clip_rating(away_off - (home_def - league_avg_rating))
+    # Lane `wnba-game-total-level` (G2): an off_rating derived from the game model's
+    # predicted points already prices the opponent's defense, so subtracting
+    # (opponent def - baseline) counted it twice -- against a constant 101.5 when the
+    # 2026 WNBA league def is 104.2, i.e. ~-2.3 pts/team. Walk-forward 2026, 299 games:
+    # total MAE -0.46 [CI -0.89, -0.01], margin MAE 11.71 -> 10.64. Real ratings keep it.
+    if bool(getattr(home, "off_rating_from_points", False)) and bool(getattr(away, "off_rating_from_points", False)):
+        home_eff = _clip_rating(home_off)
+        away_eff = _clip_rating(away_off)
+    else:
+        home_eff = _clip_rating(home_off - (away_def - league_avg_rating))
+        away_eff = _clip_rating(away_off - (home_def - league_avg_rating))
     home_mu = max(getattr(league, "min_team_points"), (home_eff / 100.0) * pace) + _adjustments_local(home)
     away_mu = max(getattr(league, "min_team_points"), (away_eff / 100.0) * pace) + _adjustments_local(away)
     try:
@@ -5141,8 +5153,9 @@ def _smart_sim_worker_run_local(job: dict) -> dict:
         home_rest_days = job.get("home_rest_days")
         away_rest_days = job.get("away_rest_days")
 
-        home_ctx = TeamContextLocal(team=home_tri, pace=home_pace, off_rating=home_off_rtg, def_rating=home_def_rtg, injuries_out=home_outs, back_to_back=home_b2b, rest_days=(int(home_rest_days) if home_rest_days is not None else None))
-        away_ctx = TeamContextLocal(team=away_tri, pace=away_pace, off_rating=away_off_rtg, def_rating=away_def_rtg, injuries_out=away_outs, back_to_back=away_b2b, rest_days=(int(away_rest_days) if away_rest_days is not None else None))
+        from_points = bool(job.get("off_rtg_from_points") or False)
+        home_ctx = TeamContextLocal(team=home_tri, pace=home_pace, off_rating=home_off_rtg, def_rating=home_def_rtg, injuries_out=home_outs, back_to_back=home_b2b, rest_days=(int(home_rest_days) if home_rest_days is not None else None), off_rating_from_points=from_points)
+        away_ctx = TeamContextLocal(team=away_tri, pace=away_pace, off_rating=away_off_rtg, def_rating=away_def_rtg, injuries_out=away_outs, back_to_back=away_b2b, rest_days=(int(away_rest_days) if away_rest_days is not None else None), off_rating_from_points=from_points)
         qsum = _simulate_quarters_local(processed_root=out_path.parent, inp=GameInputsLocal(date=date_s, home=home_ctx, away=away_ctx, market_total=market_total_for_quarters, market_home_spread=home_spread), league=LEAGUE, n_samples=3000)
         cfg = _build_smart_sim_config_local(n_sims=int(state.get("n_sims") or job.get("n_sims") or 0), seed=state.get("seed"), use_pbp=bool(state.get("pbp")), roster_mode=str(state.get("roster_mode") or job.get("roster_mode") or "historical"))
         pre_ctx = {
@@ -5671,6 +5684,8 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
             "away_def_rtg": float(away_def_rtg),
             "home_off_rtg": float(home_off_rtg),
             "away_off_rtg": float(away_off_rtg),
+            # WNBA only: measured there (lane wnba-game-total-level); NBA has not been backtested.
+            "off_rtg_from_points": bool(home_mu is not None and away_mu is not None and str(league_code or "").strip().lower() == "wnba"),
             "home_outs": int(home_outs),
             "away_outs": int(away_outs),
             "home_b2b": bool(home_b2b),

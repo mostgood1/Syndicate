@@ -125,6 +125,31 @@ def _copy_if_exists(source_path: str | None, destination_path: Path) -> bool:
     return True
 
 
+
+def _ensure_wnba_totals_calibration(*, source_root: Path, date_str: str, log_file: Path | None) -> None:
+    """Write today's `calibration_totals_<yesterday>.json` before the smart sim reads it.
+
+    Lane `wnba-game-total-level`: the smart sim's quarters step consumes this file
+    (`_apply_totals_calibration_local`) and nothing produced it, so the raw game total
+    carried the game model's 2026 level error (-11.6 pts). A subprocess so the game
+    models it loads (~175MB peak) are released with it; once a day (it exits early when
+    the file exists). Non-fatal: the reader falls back to the newest earlier file.
+    """
+    if not _env_bool("WNBA_TOTALS_CALIBRATION_BUILD", True):
+        return
+    env = dict(os.environ)
+    env["WNBA_BETTING_DATA_ROOT"] = str(Path(source_root) / "data")
+    cmd = [sys.executable, str(REPO_ROOT / "scripts" / "build_wnba_totals_calibration.py"), "--date", str(date_str)]
+    try:
+        r = subprocess.run(cmd, cwd=str(REPO_ROOT), env=env, capture_output=True, text=True, timeout=900)
+        tail = [line for line in (r.stdout or "").splitlines() if line.startswith("{")][-1:]
+        msg = f"WNBA_TOTALS_CALIBRATION rc={r.returncode} {tail[0] if tail else (r.stderr or '')[-300:]}"
+    except Exception as exc:  # noqa: BLE001
+        msg = f"WNBA_TOTALS_CALIBRATION failed (non-fatal): {exc!r}"
+    print(msg, file=sys.stderr, flush=True)
+    if log_file is not None:
+        _append_log(log_file, msg)
+
 def _copy_matching_files(*, source_directory: Path, pattern: str, destination_directory: Path) -> list[str]:
     if not source_directory.exists() or not source_directory.is_dir():
         return []
@@ -4932,6 +4957,7 @@ def _run_refresh_via_cli(
             if not game_predictions_ok:
                 state["error"] = game_predictions_error or f"predictions missing before predict-props for {date_str}"
             else:
+                _ensure_wnba_totals_calibration(source_root=source_root, date_str=date_str, log_file=log_file)
                 try:
                     smart_sim_workers = max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS", 1))
                     smart_sim_executor = "ProcessPoolExecutor" if smart_sim_workers > 1 else "sequential"
