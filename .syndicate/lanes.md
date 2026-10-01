@@ -1380,6 +1380,15 @@ death, never life — do not invert it.
 - Blocked by: none
 - **CLOSED 2026-10-01 ~21:5xZ: GOAL MET.** Root: both refresh scripts' `_build_local_game_cards_artifact` game_odds fallback set `game_id = str(row.get("game_id") or idx)` (`enumerate(start=1)`), so a one-game day read "1"; `_build_local_live_lens_projections_artifact` copies game_cards' game_id. On the fleet no NBA game_cards file had ever carried a real id (3 empty, 4 index), and 1,364 WNBA rows were index ids. Now: the row's own id, else `espn_event_ids_by_matchup` (cached ESPN scoreboard, the id box scores and recon carry), else `AWY@HOME` (this builder's source-app convention; unique per day). The ESPN lookup is lazy (only when a row lacks an id) and never raises. Real inputs: the Finals 06-13 game_cards rebuild to 401859967, and all 208 projections inherit it (were "1"). The old builders on the same fixture give '1' for both sports. Tests: 7 new; 81 + 80 passed across the scoped NBA/WNBA suites. Existing June files are not regenerated (the audit's team fallback already grades them).
 
+### local-audit-routes-generator — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- Goal: scripts/local_audit_routes.py regenerates the local-production audit sweep's route list (<home>/audit_routes.json: GET rules as {rule, endpoint, args}) from the app's url_map; dry-run diff by default, --write with a timestamped backup; verified by a dry run on the fleet that reports 0 added / 0 removed against today's regenerated file
+- Files: scripts/local_audit_routes.py (NEW), tests/test_local_audit_routes.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit tests on build/diff/write; fleet dry run against the 373-route file -> no differences
+- Blocked by: none
+- **CLOSED 2026-10-01 ~22:2xZ: GOAL MET.** `scripts/local_audit_routes.py` builds GET rules from `create_app().url_map` as {rule, endpoint, args}; dry-run diff by default, `--write` keeps a timestamped `.bak`, and `--env-from-gunicorn` builds under web's env. Default home is `local_production.default_home()`. Fleet dry run (worktree code, web env) against the 373-route file regenerated at 17:22 CDT: 373/373, 296/296 param-free, removed [], added [], file untouched. 6 unit tests incl. two against the real app. The sweep script itself (`C:\SyndicateProdudit_sweep.py`) stays outside the repo.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
