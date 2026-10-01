@@ -44503,3 +44503,10 @@ branch `claude/dreamy-babbage-dm6ubz`, base `bfb00966`). Money: paper. No venue 
 - symptom: `/wnba/cards?client=board` badge showed the source status CONTRACT dict (`{'status': 'Scheduled', 'detail': '8:00 PM CT', 'startTime': ..., 'in_progress': False, ...}`).
 - fix `6fd48b7f`: `status_label` Jinja filter (render time; the dict is the WNBA source client's API shape) applied in `_game_card_generic.html` and `_scoreboard_strip_generic.html`; strings pass through unchanged.
 - verify: 11 regression tests fail-before (dict in badge HTML) / pass-after, 36 incl. card/board suites; local fleet restarted onto `6fd48b7f`; live page HTTP 200, badges `Scheduled` x2, 0 occurrences of `startTime`/`in_progress`.
+
+## 2026-10-01 ~15:50Z (10:50 AM CT) -- READING, no deploy -- LOCAL PRODUCTION: early NFL week-5 projection REMOVED (lane `nfl-backfill-autorun-gate`, user: "delete the week 5 file") -- supersedes the 15:29Z entry
+
+- why: the 15:29Z run built wk5 while wk4 is the target week (`nfl_target_week` = lowest schedule week with an unplayed game; wk4 opens PIT@CLE tonight), so it carried ratings through wk3 only. The loop is week-to-week; the user asked to undo it. My error was running it without raising that.
+- action: MOVED (recoverable, not rm) to `~/syndicate-prod/removed/2026-10-01/`: `smartsim2_projections_2026_wk5.csv`, `smartsim2_ratings_2026_wk5.json`, `smartsim2_segment_distributions_2026_wk5.json` -- all three written by the 15:29Z run (mtimes 10:29:15-16 CDT); the two JSONs did not exist before it (wk6 has neither). No NFL generator running at the time.
+- verify: `ls nfl_source | grep _2026_wk5` -> 0; `/nfl/api/weeks` `available_weeks [1, 4]` (back to the pre-run state); `GET /nfl` 200.
+- consequence: the original wk5 BACKFILL csv no longer exists either (the 15:29Z run overwrote it), so at the wk4->wk5 rollover the autorun reads wk5 as `artifact_missing_no_prior_launch` and builds it with wk4 results -- NOT the new `artifact_is_preseason_backfill` reason. That reason's first live firing stays owed at wk6.
