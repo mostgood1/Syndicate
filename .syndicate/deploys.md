@@ -44581,3 +44581,10 @@ Not evidence against the fix. The check needs to re-run after 2026-10-05 22:00 C
 - side effect, accepted: the web HUP ended my own diagnostic ncaaf trace from 16:23Z (one thread at ~98% CPU in worker 115747 for ~40 min). Nobody was waiting on it.
 - not mine, seen at boot: `[novig_odds] WRITE_FAILED ... 10601014 bytes exceeds` the keyvalue cap, 20 occurrences before this boot. Recorded as a lead.
 - still owed: an MLB-scoped trace on web was NOT run. MLB's overview is the one measured at +2.9 GB, so it is the case that could still exceed 60 s or the 2 GB web budget.
+
+## 2026-10-01 17:12Z (12:12 PM CT) -- READING, no deploy -- LOCAL PRODUCTION: MLB-scoped candidate-trace on web, memory watched (lane `candidate-trace-scoped-bound`, user: "run the MLB trace and watch memory") -- **MET (bounded by the overview memory guard; MLB cannot be traced on web)**
+
+- action: `GET /api/ops/intelligence/candidate-trace?sport=mlb&date=2026-10-01` against web at `d2d38f81`, with both web workers' RSS and host MemAvailable sampled every 1 s. No overview isolation is set in web's env (`SYNDICATE_OVERVIEW_ISOLATION_*` absent, default off).
+- result: **200 in 1.25 s**. Workers 121885/121886 were unchanged after the call. Peak RSS: 121885 389 -> 389 MB, 121886 233 -> 433 MB (+200). Host min available 12,285 MB. No `WORKER TIMEOUT` and no worker reboot.
+- why it is fast: `[intelligence] OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb floor=expensive floor_mb=3000 ... headroom_mb 1815.3, max_mb 2048.0, sufficient False`. MLB's 3000 MB floor exceeds web's whole 2048 MB budget, so the guard skips MLB on web BY CONSTRUCTION. The response reads `requested_sport_configured: True`, `requested_sport_present: False`, `sports: []`. The skip REASON is only in web.log, not in the response.
+- consequence: an MLB candidate trace is only possible where the overview can afford MLB (refresh-worker, or with overview isolation on). On web the route answers fast and empty for MLB.
