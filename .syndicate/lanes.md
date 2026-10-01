@@ -1283,6 +1283,7 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: unit: round-trip test (write->read returns identical markets, payload under the keyvalue ceiling for a 49k-row snapshot); live: refresh-worker restart, then log shows REFRESHED with no WRITE_FAILED and a later UNCHANGED/CACHED with the stored date
 - Blocked by: none
+- **PROGRESS 2026-10-01 17:31Z: LIVE, persistence MET.** refresh-worker 126722 on `42cb22fa`: 0 WRITE_FAILED / 0 novig REJECTED; stored 1,652,967 bytes, 49,094 rows decoded via `snapshot_from_state`. `deploys.md` 2026-10-01 17:30Z. **OWED before close:** the ~18:30Z hourly check logging `UNCHANGED snapshot_date=2026-09-30` (not a REFRESHED refetch).
 - **PROGRESS 2026-10-01, code + tests DONE, live reading next.** Promoted from the leads.md line of the same day. Cause measured on the fleet: the 2026-09-30 tape is 49,094 rows (28,792 COMBO), 10,601,014 bytes after the August trim (sized for 29,469 rows), refused on every write, so `previous_date=None` on every REFRESHED and an hourly full-CSV refetch. Fix: the snapshot's large values (`markets`) are stored with intelligence_state's lossless `zlib-b64-v1` codec; small fields stay plain; `snapshot_from_state()` is the reader. No rows dropped. A realistic 49,094-row catalogue goes from 10.7 MB raw to 2.84 MB stored. 3 new tests (all fail on the old code); 15 pass.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
