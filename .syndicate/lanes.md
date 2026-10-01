@@ -1389,6 +1389,15 @@ death, never life — do not invert it.
 - Blocked by: none
 - **CLOSED 2026-10-01 ~22:2xZ: GOAL MET.** `scripts/local_audit_routes.py` builds GET rules from `create_app().url_map` as {rule, endpoint, args}; dry-run diff by default, `--write` keeps a timestamped `.bak`, and `--env-from-gunicorn` builds under web's env. Default home is `local_production.default_home()`. Fleet dry run (worktree code, web env) against the 373-route file regenerated at 17:22 CDT: 373/373, 296/296 param-free, removed [], added [], file untouched. 6 unit tests incl. two against the real app. The sweep script itself (`C:\SyndicateProdudit_sweep.py`) stays outside the repo.
 
+### local-audit-sweep-in-repo — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
+- Goal: scripts/local_audit_sweep.py reproduces C:\SyndicateProd\audit_sweep.py (GET every param-free route in <home>/audit_routes.json with the admin token, same skip/error rules, supervisor-restart check, results to <home>/audit_sweep.json) and adds a previous-run comparison; verified by a live run on the fleet whose counts match the out-of-repo sweep's last run
+- Files: scripts/local_audit_sweep.py (NEW), tests/test_local_audit_sweep.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit tests with an injected fetcher (skip, error markers, empty JSON, timeouts, comparison); live fleet run: 290 hit, 0 failures, status counts equal to the 21:5xZ out-of-repo run minus the six deleted 404 routes
+- Blocked by: none
+- **CLOSED 2026-10-01 ~22:5xZ: GOAL MET (Verification's "290 hit" was the OLD list: 302 param-free; the regenerated list is 296, so 285).** `scripts/local_audit_sweep.py` keeps the original's rules (SKIP regex, ERR markers, empty-JSON flag, X-Admin-Token from local_production.env, supervisor pid before/after), adds `audit_sweep.prev.json` plus a comparison, and exits 1 on any failure or mid-sweep restart. Live fleet run ~22:43Z (worktree code): supervisor stable, 285 hit / 11 skipped, p99 3.78 s, max 5.45 s; status 200 x269, 400 x13, 429 x2 (the shared-throttle alias pairs, members swapped by route order), None x1. That one is `/wnba/market-board` ConnectionResetError after 0.0 s, because web's memory guard recycled worker 181021 at 17:46:26 CDT mid-request; recorded as a lead, not fixed here. 5 unit tests (injected fetcher) + the 6 route-generator tests pass. The out-of-repo `C:\SyndicateProdudit_sweep.py` is left in place.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
