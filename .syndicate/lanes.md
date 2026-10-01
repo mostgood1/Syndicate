@@ -1362,6 +1362,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - **CLOSED 2026-10-01 ~20:0xZ: GOAL MET, with the rule corrected mid-lane.** First cut: MIN parses to 0 -> DNP. Refuted on real data: Rayah Marshall (WNBA 09-24, MIN 0, PLUS_MINUS -2) played seconds and is correctly kept by `build_wnba_recon`, which uses ESPN's `didNotPlay` flag. Final: `_event_rows_from_summary` writes an additive `DID_NOT_PLAY` column from that flag, and `did_not_play()` trusts it when present; for older files only MIN 0 with plus-minus 0 and every counting stat 0/blank counts, and blank minutes never do. Both refresh-script recon builders skip DNP rows; `build_wnba_recon` (the worker's live WNBA producer) already did. Measured on fleet data: NBA 06-13 rebuild 21 rows (old 30), WNBA fleet recon 0 DNP rows of 264. The rule also showed that my own 06-13 Finals backfill had dropped Jeremy Sochan (MIN 0.0, +1), so that file was replaced (20 -> 21 rows). Tests: 22 in the new file + header-only; 74 passed across the scoped suites.
 
+### wnba-game-total-level — OPEN — opened 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- Goal: WNBA raw game-model total (market_anchor.model_total_raw) unbiased vs actual 2026 totals; live LVA-IND 10-01 raw 157.0 vs market 181.5
+- Files: syndicate/features/shared/basketball_props_smart_sim.py,scripts/build_wnba_totals_calibration.py,tests/test_wnba_totals_calibration.py
+- Hypothesis: (G1) The vendored game model predicts ~162 every season (2024 bias -0.4, 2025 -1.3, 2026 -11.4 over 344 games): fitted to 2024-25 scoring, it cannot track the 2026 level. The designed level correction, calibration_totals_<date>.json (read by _apply_totals_calibration_local), is consumed but NOTHING in Syndicate writes it. Fix: a Syndicate-owned builder of that file (rolling winsorized actual-minus-model bias, team terms shrunk) run before the smart sim. (G2) _simulate_quarters_local subtracts (opponent def_rtg - 101.5) from an off 'rating' that is DERIVED from the model's predicted points, which already price the opponent; with the 2026 league def at 104.2 that is ~-2.3 pts/team systematically. Fix: no def term on a points-derived rating (or center on the as-of league mean).
+- Falsification test: Walk-forward over 2026 games (calibration from games strictly before each date): G1 falsified if raw-total MAE does not fall with |bias| < 2; G2 falsified if removing/centering the def term does not lower raw-total MAE given G1.
+- Verification: deploys.md READING: live LVA-IND model_total_raw after a forced resim, plus the walk-forward table
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
