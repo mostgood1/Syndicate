@@ -1248,7 +1248,7 @@ death, never life — do not invert it.
 
 ### candidate-trace-scoped-bound — OPEN — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
 - Goal: A scoped GET /api/ops/intelligence/candidate-trace?sport=X&date=Y hydrates ONLY sport X (build_intelligence_overview gains a sports= filter) and skips the two whole-board _build_candidate_pool sections unless ?pool=1; measured live on the local fleet per sport incl. MLB, under gunicorn's 60s with no worker killed
-- Files: syndicate/features/intelligence.py (build_intelligence_overview signature + sport filter ONLY), syndicate/blueprints/ops.py (api_ops_intelligence_candidate_trace ONLY), tests/test_candidate_trace_scope_refusal.py, tests/test_intelligence_overview_sport_filter.py (NEW)
+- Files: syndicate/features/intelligence.py (build_intelligence_overview signature + sport filter ONLY), syndicate/blueprints/ops.py (api_ops_intelligence_candidate_trace ONLY), tests/test_candidate_trace_scope_refusal.py, tests/test_intelligence_overview_sport_filter.py (NEW), syndicate/features/shared/week_calendar.py (added 2026-10-01 11:5x CDT: windows cache), tests/test_week_calendar.py
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: unit: filter test proves only the named sport reaches _build_sport_overview; route test proves sports=[X] is passed and _build_candidate_pool is not called without pool=1. live: timed scoped calls on 127.0.0.1:10000, worker pids unchanged

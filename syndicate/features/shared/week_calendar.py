@@ -106,13 +106,53 @@ def _ncaaf_week_windows(source_root: Path) -> list[dict[str, Any]]:
     return _windows_from_grouped_dates(grouped)
 
 
+_SOURCE_GLOBS: dict[str, tuple[tuple[str, ...], str]] = {
+    # slug -> (sub-roots searched, glob); same roots and globs the readers use.
+    "nfl": (("", "source_artifacts"), "upcoming_recs_*.csv"),
+    "ncaaf": (("source_artifacts", ""), "college_football_schedule_*_predicted_totals_enhanced*.csv"),
+}
+_WINDOW_CACHE_MAX_ROOTS = 32
+_window_cache: dict[tuple[str, str], tuple[tuple[tuple[str, int, int], ...], list[dict[str, Any]]]] = {}
+
+
+def _source_signature(slug: str, source_root: Path) -> tuple[tuple[str, int, int], ...]:
+    subdirs, pattern = _SOURCE_GLOBS[slug]
+    signature: list[tuple[str, int, int]] = []
+    for sub in subdirs:
+        root = source_root / sub if sub else source_root
+        if not root.exists():
+            continue
+        for path in root.glob(pattern):
+            try:
+                stat = path.stat()
+            except OSError:
+                continue
+            signature.append((str(path), stat.st_mtime_ns, stat.st_size))
+    return tuple(sorted(signature))
+
+
 def week_windows_for_sport(sport_slug: str, *, source_root: Path) -> list[dict[str, Any]]:
+    # Cached on the source files' (path, mtime, size). Measured 2026-10-01 on
+    # the local production fleet: _ncaaf_week_windows re-parsed ~300k schedule
+    # CSV rows on EVERY call, and score_candidate reaches it once per candidate
+    # (build_market_history_view -> resolve_current_shard_key -> week_for_date),
+    # so it was ~100% of NCAAF scoring: 11-15s per candidate, 632s for 273, and
+    # 440-590s of every refresh-worker board build. A changed, added or removed
+    # file changes the signature, so a stale window is never served; the cost
+    # left per call is one glob + stat over the schedule files.
     slug = str(sport_slug or "").strip().lower()
-    if slug == "nfl":
-        return _nfl_week_windows(source_root)
-    if slug == "ncaaf":
-        return _ncaaf_week_windows(source_root)
-    return []
+    if slug not in _SOURCE_GLOBS:
+        return []
+    key = (slug, str(source_root))
+    signature = _source_signature(slug, source_root)
+    cached = _window_cache.get(key)
+    if cached is None or cached[0] != signature:
+        windows = _nfl_week_windows(source_root) if slug == "nfl" else _ncaaf_week_windows(source_root)
+        if key not in _window_cache and len(_window_cache) >= _WINDOW_CACHE_MAX_ROOTS:
+            _window_cache.clear()
+        _window_cache[key] = cached = (signature, windows)
+    # Copies, so a caller mutating a window cannot corrupt the cache.
+    return [dict(window) for window in cached[1]]
 
 
 def week_for_date(sport_slug: str, target_date: date, *, source_root: Path) -> tuple[int, int] | None:
