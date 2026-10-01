@@ -44497,3 +44497,9 @@ branch `claude/dreamy-babbage-dm6ubz`, base `bfb00966`). Money: paper. No venue 
 - verify (READ 15:30Z): `smartsim2_projections_2026_wk5.csv` `is_preseason_backfill_projection` **False**; 15/15 rows `rating_source=nflverse_pbp_epa_rolling[current_season_blend/current_season_blend]+level_shrink_0.3` (identical to wk4's 16/16). `/nfl/api/weeks` `available_weeks [1, 4, 5]` (was `[1, 4]`). `GET /nfl/cards?week=5` 200 and NO new `WEEK_SUBSTITUTED` (last is still web.log line 4264 of 16,973).
 - consequence for the owed reading in the 15:03Z entry: wk5 is no longer a backfill, so the `artifact_is_preseason_backfill` branch will NOT fire at the wk4->5 rollover; its first live firing is now owed at the first target week still on the backfill (wk6, today).
 - NOT done: wk2/wk3 (past weeks) and wk6-18 remain the backfill on this disk.
+
+## 2026-10-01 (~10:25 AM CT) -- READING, no deploy -- LOCAL PRODUCTION: WNBA board status badge printed a raw dict (lane `card-status-dict-label`) -- **MET**
+
+- symptom: `/wnba/cards?client=board` badge showed the source status CONTRACT dict (`{'status': 'Scheduled', 'detail': '8:00 PM CT', 'startTime': ..., 'in_progress': False, ...}`).
+- fix `6fd48b7f`: `status_label` Jinja filter (render time; the dict is the WNBA source client's API shape) applied in `_game_card_generic.html` and `_scoreboard_strip_generic.html`; strings pass through unchanged.
+- verify: 11 regression tests fail-before (dict in badge HTML) / pass-after, 36 incl. card/board suites; local fleet restarted onto `6fd48b7f`; live page HTTP 200, badges `Scheduled` x2, 0 occurrences of `startTime`/`in_progress`.

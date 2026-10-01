@@ -1217,7 +1217,8 @@ death, never life — do not invert it.
 - Verification: new regression test fails on origin/main, passes after; fresh real (current_season rating_source) wk4 still returns artifact_fresh; full tests/test_season_projection_staleness.py green
 - Blocked by: none
 
-### card-status-dict-label — OPEN — opened 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+### card-status-dict-label — CLOSED — opened 2026-10-01, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: MET.** Live `/wnba/cards?client=board` badges read `Scheduled`, 0 contract keys in the HTML after `6fd48b7f` (`deploys.md`). Claims RELEASED.
 - Goal: Card status badges render a label, never a raw status dict: /wnba/cards?client=board shows SCHEDULED/LIVE/FINAL instead of {'status': ..., 'detail': ...}
 - Files: syndicate/features/shared/status_label.py, syndicate/app.py, syndicate/templates/shared/_game_card_generic.html, syndicate/templates/shared/_scoreboard_strip_generic.html, tests/test_status_label.py
 - Hypothesis: n/a
