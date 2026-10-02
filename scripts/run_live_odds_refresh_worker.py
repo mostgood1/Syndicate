@@ -1060,7 +1060,25 @@ def _log_worker_memory(stage: str, **extra: object) -> None:
     print(f"LIVE_ODDS_WORKER_MEMORY {json.dumps(payload, default=str, sort_keys=True)}", flush=True)
 
 
-def _handle_stop(_signum: int, _frame: object) -> None:
+def _handle_stop(signum: int, _frame: object) -> None:
+    # SAY WHICH SIGNAL STOPPED THE WORKER `[2026-10-02, lane layer2-freshness-1h]`.
+    # On the fleet that day live-odds-worker exited cleanly mid-sleep at 17:52,
+    # 17:58 and 18:03Z -- `loop_finally`, exit code 0, nothing else in the log --
+    # and only this handler sets the stop event, so every one was a signal nobody
+    # could attribute. Each costs ~6 min of odds capture (startup + supervisor
+    # backoff). Never raises: a logging failure must not stop the stop.
+    try:
+        try:
+            name = signal.Signals(signum).name
+        except Exception:
+            name = str(signum)
+        print(
+            f"[live_odds_worker] STOP_SIGNAL signal={name} pid={os.getpid()} ppid={os.getppid()} "
+            f"utc={time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}",
+            flush=True,
+        )
+    except Exception:
+        pass
     _LIVE_REFRESH_LOOP_STOP.set()
 
 
