@@ -3866,6 +3866,37 @@ def _label_stale_live_rows(
     return labelled_rows, relabelled
 
 
+def _row_rank_score(row: Mapping[str, Any]) -> float:
+    score = row.get("score")
+    if isinstance(score, Mapping):
+        score = score.get("score")
+    try:
+        value = float(score)
+    except (TypeError, ValueError):
+        return float("-inf")
+    return value if value == value else float("-inf")
+
+
+def _rows_within_limit_by_score(rows: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    """WHICH rows fit under `limit` is decided by score; their ORDER is the artifact's.
+
+    `[2026-10-02, lane layer2-freshness-1h, user: "fix the combined board cap to
+    rank by score"]`. The cap used to keep the first `limit` rows in artifact
+    order, which puts the nearest dates first. When 988 NCAAF props joined the
+    board (BetOnline/Bovada became bettable), the all-sports view filled its
+    2,000 rows with today's and tomorrow's NCAAF and dropped every NFL row and
+    most NHL props -- while the top 100 by score held none of those NCAAF props.
+    Survivors keep the artifact's order, so a consumer reading that order (the
+    imminence seating) sees no change except which rows made the cut. No-op when
+    everything fits.
+    """
+    if limit <= 0 or len(rows) <= limit:
+        return rows
+    ranked = sorted(range(len(rows)), key=lambda i: _row_rank_score(rows[i]), reverse=True)
+    keep = set(ranked[:limit])
+    return [row for i, row in enumerate(rows) if i in keep]
+
+
 @intelligence_bp.get("/api/board/layer2-shortlist")
 def board_layer2_shortlist_api():
     """L2-A: the ranked shortlist, READ from the artifact the worker built.
@@ -4126,7 +4157,7 @@ def board_layer2_shortlist_api():
                 # Returns {"rows": ...} alone unless ?clv=1 asked for the join,
                 # so the default payload is byte-identical to what this endpoint
                 # served before.
-                **_clv_block(rows[:limit], selected_date, sport),
+                **_clv_block(_rows_within_limit_by_score(rows, limit), selected_date, sport),
                 "server_time": _server_timestamp(),
             }
         )

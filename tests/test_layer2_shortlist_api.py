@@ -391,3 +391,25 @@ def test_the_per_sport_freshness_gate_is_served(client, monkeypatch):
     served = client.get("/api/board/layer2-shortlist?date=2026-08-08").get_json()
     assert served["max_quote_age_seconds_by_sport"] == {"nhl": 3600.0, "wnba": 3600.0}
     assert served["rows_beyond_quote_age_by_sport"] == {"wnba": 7}
+
+
+def test_the_cap_keeps_the_highest_scores_in_the_artifacts_order(client, monkeypatch):
+    """2026-10-02 (lane `layer2-freshness-1h`, user: "fix the combined board cap to
+    rank by score"). The cap kept the first `limit` rows in artifact order -- the
+    nearest dates -- so 988 low-scoring NCAAF props filled the all-sports view and
+    every NFL row fell off it. Which rows fit is now decided by score; the order
+    they are served in stays the artifact's."""
+    near_low = [dict(_row("ncaaf", "home", 1.0), score={"score": -2.0}) for _ in range(3)]
+    far_high = [dict(_row("nfl", "home", 1.0), score={"score": 3.0}),
+                dict(_row("nfl", "away", 1.0), score={"score": 2.0})]
+    payload = dict(_shortlist_payload())
+    payload["rows"] = near_low + far_high
+    monkeypatch.setattr("pipeline.intelligence_state.read_layer2_shortlist", lambda date: payload)
+
+    served = client.get("/api/board/layer2-shortlist?date=2026-08-08&limit=2").get_json()
+    assert [r["sport"] for r in served["rows"]] == ["nfl", "nfl"]
+    assert [r["score"]["score"] for r in served["rows"]] == [3.0, 2.0]
+    assert served["total_rows"] == 5
+
+    everything = client.get("/api/board/layer2-shortlist?date=2026-08-08&limit=10").get_json()
+    assert [r["sport"] for r in everything["rows"]] == ["ncaaf"] * 3 + ["nfl"] * 2, "no-op when it all fits"
