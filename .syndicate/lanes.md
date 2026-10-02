@@ -1125,6 +1125,14 @@ death, never life — do not invert it.
 - Verification: unit: a child whose stdout is a FILE is stamped, one whose stdout is a PIPE is not and its JSON parses; off switch unchanged; fails on origin/main. Fleet: after ff, refresh-worker.log MLB_LIVE_PROBE lines stop carrying bad_json (79 before), counted over a window
 - Blocked by: none
 
+### ncaaf-lines-props-backtest — OPEN — opened 2026-10-02 — session 7e94d2ff-ea54-4a59-9c79-2ddb1bea2bad
+- Goal: Every NCAAF game-line market (spread/margin, total, moneyline, and 1H/quarter lines where priced and projected) and every NCAAF player-prop market priced in the captured odds is backtested AS-OF over completed games: per market n, MAE and bias vs actual, dMAE vs a naive baseline with a game-clustered bootstrap CI, and Brier/log-loss vs the de-vigged book; per-family date coverage and the intersection printed; findings file names which markets beat BOTH the baseline and the book (the only ones that may carry a board probability/edge). Measurement only -- no deploy, no board change without a user decision
+- Files: scripts/backtest_ncaaf_lines_props.py (NEW), tests/test_backtest_ncaaf_lines_props.py (NEW), .syndicate/findings_2026-10-02_ncaaf_lines_props_backtest.md (NEW)
+- Hypothesis: Following the NHL result and the 09-28 forward grade (margin and total both behind the DK close), no NCAAF game-line market beats the de-vigged book, and no continuous prop market beats the player's own as-of average; Anytime TD is the only prop market with a candidate model
+- Falsification test: Any market whose dMAE vs baseline CI lies wholly below 0 AND whose Brier vs the de-vigged book is lower with a paired CI excluding 0 refutes it for that market
+- Verification: The backtest script runs end-to-end on fleet (production) inputs plus as-of rebuilds, prints coverage + intersection, and writes per-market tables; numbers recorded in the findings file and lanes.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
