@@ -6949,10 +6949,17 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
                     # a failure here is not backstopped by anything and must not
                     # be silent. See `#333`.
                     if not publish_hot_artifact(path, timeout_seconds=120):
+                        size = path.stat().st_size
+                        # The sweep caveat is TRUE only above the sweep's cap; it
+                        # used to print on 0.02-2MB files and read as an alarm.
+                        caveat = (
+                            " (sweep will NOT repair this above 12MB -- see #333)"
+                            if size > 12 * 1024 * 1024
+                            else " (the hot-artifact sweep retries it)"
+                        )
                         print(
                             f"[refresh_worker] BOOK_GRID_PUBLISH_FAILED sport={sport} "
-                            f"date={build_date} bytes={path.stat().st_size} "
-                            f"(sweep will NOT repair this above 12MB -- see #333)",
+                            f"date={build_date} bytes={size}{caveat}",
                             flush=True,
                         )
                 except Exception as exc:

@@ -1788,6 +1788,24 @@ def _admin_token() -> str:
     return _env("ADMIN_TOKEN") or _env("SYNDICATE_ADMIN_TOKEN")
 
 
+def shared_disk_fleet() -> bool:
+    """True on the LOCAL fleet when it runs without a publish URL.
+
+    There every role reads and writes ONE data root, so the file a worker
+    wrote is already the file web serves: a publish is delivered by the write,
+    and a pull is already current. `local_production` drops
+    `SYNDICATE_WEB_PUBLISH_URL` for exactly that reason, and before this every
+    publish reported a FAILURE instead -- measured 2026-10-02: 2,838
+    `BOOK_GRID_PUBLISH_FAILED` and 2,202 `*SKIP_NOT_CONFIGURED` lines while
+    `/api/board/book-grid` served each worker file to the microsecond. Render
+    (and a fleet started with `--publish-loopback`) sets the URL, so this is
+    False there and nothing changes.
+    """
+    return _env("SYNDICATE_LOCAL_PRODUCTION").lower() in {"1", "true", "yes", "on"} and not _env(
+        "SYNDICATE_WEB_PUBLISH_URL"
+    )
+
+
 def _hot_artifact_pull_watermark_path(date_str: str | None = None) -> Path:
     """Where ONE puller's floor lives: per SERVICE and per DATE SCOPE.
 
@@ -2423,6 +2441,10 @@ def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
 
 def _publish_hot_artifact_once(path: Path, *, timeout_seconds: int = 10) -> bool:
     """One publish attempt; `publish_hot_artifact` owns the quote-state retry."""
+    if shared_disk_fleet():
+        # Delivered by the write itself -- see `shared_disk_fleet`. A MISSING
+        # file is still a failure: there is nothing on the disk to serve.
+        return Path(path).is_file()
     url = _publish_url()
     token = _admin_token()
     if not url or not token:
@@ -3203,6 +3225,8 @@ def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = _B
     for this call succeeds, so a partial failure re-fetches that same
     window next time instead of silently skipping it.
     """
+    if shared_disk_fleet():
+        return 0  # one disk: nothing to pull (see `shared_disk_fleet`)
     token = _admin_token()
     if not token or not _env("SYNDICATE_WEB_PUBLISH_URL"):
         print(f"[artifact_publisher] PULL_SKIP_NOT_CONFIGURED url_set={bool(_env('SYNDICATE_WEB_PUBLISH_URL'))} token_set={bool(token)}", flush=True)
@@ -3659,6 +3683,8 @@ def pull_streamed_artifact(relative_path: str, *, timeout_seconds: int = 120) ->
     normalized = str(relative_path or "").strip().replace("\\", "/")
     if not normalized or not is_hot_artifact_relative_path(normalized):
         return False, 0
+    if shared_disk_fleet():
+        return True, 0  # already current: the same disk (see `shared_disk_fleet`)
     token = _admin_token()
     if not token or not _env("SYNDICATE_WEB_PUBLISH_URL"):
         return False, 0
@@ -4180,6 +4206,8 @@ def pull_season_artifacts(*, timeout_seconds: int = 60) -> int:
     with "nothing matched"; the caller that needs certainty should check the
     file on disk, which is what `sim_input_checklist.py` does.
     """
+    if shared_disk_fleet():
+        return 0  # one disk: nothing to pull (see `shared_disk_fleet`)
     token = _admin_token()
     if not _publish_url() and not _env("SYNDICATE_WEB_PUBLISH_URL"):
         print("[artifact_publisher] SEASON_PULL_SKIP_NOT_CONFIGURED", flush=True)
