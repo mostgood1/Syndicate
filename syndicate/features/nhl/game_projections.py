@@ -81,6 +81,7 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.probability_refusal import refuse_published_certainty
+from syndicate.features.shared.timezone import central_date_from_iso
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -377,7 +378,14 @@ def attach_nhl_game_projections(
         # while `considered` covered one date -- two populations in one payload,
         # which is the exact defect this lane exists to remove.
         if selected_date:
-            row_date = str(row.get("commence_time") or "")[:10]
+            # CENTRAL date, not the UTC prefix `[2026-10-02, lane layer2-freshness-1h]`.
+            # `predictions_<date>.csv` is a Central slate, and a 7pm CT puck drop is
+            # already the next day in UTC -- so this skipped every evening game as
+            # "another date". Measured on the fleet board 2026-10-02 15:43Z: DET
+            # 5:40p and CAR 6:10p projected; WPG 7:10p, DAL 8:10p, VGK 9:10p not,
+            # with all five in that night's predictions file.
+            row_day = central_date_from_iso(row.get("commence_time"))
+            row_date = row_day.isoformat() if row_day is not None else ""
             if row_date and row_date != str(selected_date)[:10]:
                 continue
         if str(row.get("kind") or "") == "prop":

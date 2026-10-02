@@ -39,7 +39,9 @@ if str(REPO_ROOT) not in sys.path:
 
 from syndicate.features.nhl import game_projections as gp  # noqa: E402
 
-FUTURE = "2099-01-01T00:00:00Z"
+# Midday UTC so the CENTRAL date equals the UTC date: the join scopes rows by
+# Central slate date (2026-10-02), and midnight UTC is the previous Central evening.
+FUTURE = "2099-01-01T18:00:00Z"
 PAST = "2020-01-01T00:00:00Z"
 
 
@@ -279,10 +281,27 @@ def test_rows_from_another_date_are_not_counted_as_misses():
     """The NCAAF counting artefact: 9.3% reported vs a re-derived 47%."""
     index = gp.NhlGameProjectionIndex(date="2026-09-26")
     index.by_pair[("nashvillepredators", "carolinahurricanes")] = _entry()
-    grid = [_row("h2h", commence="2026-09-27T00:00:00Z")]
+    # Noon CT on 09-27: genuinely the next slate. (00:00Z on 09-27 would be 7pm CT
+    # on 09-26 -- THIS slate -- which is the case the next test pins.)
+    grid = [_row("h2h", commence="2026-09-27T17:00:00Z")]
     coverage = gp.attach_nhl_game_projections(grid, index, selected_date="2026-09-26")
     assert coverage["rows_considered"] == 0
     assert coverage["rows_unmatched"] == 0
+
+
+def test_an_evening_game_belongs_to_its_central_slate_not_the_utc_date():
+    """Fleet board 2026-10-02 15:43Z: WPG 7:10p, DAL 8:10p, VGK 9:10p CT carried
+    no projection while DET 5:40p and CAR 6:10p did -- all five were in
+    `predictions_2026-10-02.csv`. The join read the UTC prefix of commence_time,
+    and a 7pm CT puck drop is already the next UTC day."""
+    index = gp.NhlGameProjectionIndex(date="2026-10-02")
+    index.by_pair[("nashvillepredators", "carolinahurricanes")] = _entry()
+    evening = _row("totals", 6.5, commence="2026-10-03T00:10:00Z")   # 7:10pm CT 10-02
+    early = _row("totals", 6.5, commence="2026-10-02T22:40:00Z")     # 5:40pm CT 10-02
+    coverage = gp.attach_nhl_game_projections([evening, early], index, selected_date="2026-10-02")
+    assert coverage["rows_considered"] == 2
+    assert coverage["rows_with_projection"] == 2
+    assert evening.get("projection") is not None
 
 
 def test_an_unmatched_game_is_counted_not_silently_dropped():
