@@ -1401,6 +1401,14 @@ death, never life — do not invert it.
 - Verification: unit test: the loop returns promptly when the stop event is set mid-sleep; live: SIGTERM to live-odds-worker while it sleeps -> supervisor 'exited' within ~10s, new pid, first pass completes
 - Blocked by: none
 
+### quarantine-mia-tor-rows — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: The 22 pending evaluation-ledger rows and 24 odds_events rows that record the NBA game MIA@TOR as WNBA (2026-10-03) are moved out of the live files into the quarantine (full originals + removed rows backed up), with no concurrent append lost and no legitimate NBA row touched — **GOAL: MET** (reading: ledger 1661 -> 1637 and odds_events 96696 -> 96672, 24 removed each (ledger count was 24, not 22), 0 late appends lost, 0 bad rows left, originals + removed rows backed up; sweep: no WNBA-labelled MIA@TOR left on disk or keyvalue; deploys.md 2026-10-02 17:24Z)
+- Files: .syndicate/log/2026-10-02.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: after: 0 WNBA-labelled MIA@TOR rows in both files (disk and any keyvalue copy); row counts = before - removed (+ any appends that landed, preserved); backups present; non-WNBA MIA@TOR rows (if any) untouched
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
