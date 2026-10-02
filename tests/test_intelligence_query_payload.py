@@ -155,12 +155,33 @@ def test_it_drops_the_PROVEN_UNREFERENCED_quote_fields_and_keeps_the_rest():
     q = out["ranked_all"][0]["quote"]
 
     for gone in ("book_prices", "other_sides", "venue_basis", "best_any_book",
-                 "fair_method", "quote_seen_age_seconds"):
+                 "fair_method"):
         assert gone not in q, gone
     # the counter-example that made the proof necessary: greps 0 in the HTML,
     # used 34 times in the other consumer. It must survive.
     assert q["fair_probability"] == 0.5
     assert q["bookmaker"] == "dk"
+    # The page's poll clock (live "Price seen", pregame "Checked Xm ago") reads
+    # it. It used to be stripped here, and both clocks went blank/fell back.
+    assert q["quote_seen_age_seconds"] == 3.0
+
+
+def test_no_stripped_quote_field_is_read_by_the_page():
+    """The strip list is a proof about the CONSUMER, and the consumer changes.
+
+    `quote_seen_age_seconds` was proven unreferenced, then the template started
+    reading it, and the endpoint kept stripping it -- every "Checked" clock
+    rendered blank on the fleet 2026-10-02. Re-prove the list on every run.
+    """
+    from pathlib import Path
+
+    template = (
+        Path(__file__).resolve().parents[1] / "syndicate" / "templates" / "intelligence.html"
+    ).read_text(encoding="utf-8")
+    for name in intel._UNCONSUMED_QUOTE_FIELDS:
+        assert name not in template, (
+            f"{name} is stripped from the page payload but intelligence.html reads it"
+        )
 
 
 def test_it_drops_ONLY_the_null_movement_keys_and_keeps_a_real_value():

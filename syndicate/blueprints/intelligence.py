@@ -391,13 +391,22 @@ _UNCONSUMED_ROW_DIAGNOSTICS = ("trace", "score_breakdown")
 #: `fair_probability` is the counter-example that made this check necessary: it
 #: greps 0 in the HTML and is used 34 times in the other consumer. A single
 #: grep over one file would have "proved" it droppable. It is NOT in this list.
+#:
+#: **A PROOF OF "UNREFERENCED" EXPIRES WHEN THE CONSUMER CHANGES** `[2026-10-02,
+#: lane layer2-freshness-1h]`. `quote_seen_age_seconds` WAS on this list. The page
+#: then started reading it twice -- the live "Price seen" clock (09-12) and the
+#: pregame "Checked Xm ago" clock (10-02) -- and both silently fell back or went
+#: blank, because this endpoint is the page's data source and stripped the field
+#: before it arrived: 0 of 328 cards rendered "Checked" on the fleet 15:4xZ.
+#: `tests/test_intelligence_query_payload.py` now re-proves this list against the
+#: template on every run, so the next field the page starts reading fails a test
+#: instead of a card.
 _UNCONSUMED_QUOTE_FIELDS = (
     "book_prices",
     "other_sides",
     "venue_basis",
     "best_any_book",
     "fair_method",
-    "quote_seen_age_seconds",
 )
 
 #: `movement` sub-keys that are `null` on EVERY row -- 1,497 of 1,497, measured
