@@ -376,3 +376,18 @@ def test_an_unreadable_build_stamp_does_not_vouch_for_live_rows(client, monkeypa
     assert served["build_age_seconds"] is None
     assert served["rows"][0]["game_state"] == "unknown"
     assert served["rows_live_state_stale"] == 1
+
+
+def test_the_per_sport_freshness_gate_is_served(client, monkeypatch):
+    """2026-10-02 (lane `layer2-freshness-1h`): the per-sport 1h gate refused 88 rows
+    on its first fleet build, and the endpoint's explicit field list dropped both
+    new counters -- so WHICH sport lost rows was invisible. Same `#373` gap as the
+    counters above: a field must be added to the list in the same change."""
+    payload = dict(_shortlist_payload())
+    payload["max_quote_age_seconds_by_sport"] = {"nhl": 3600.0, "wnba": 3600.0}
+    payload["rows_beyond_quote_age_by_sport"] = {"wnba": 7}
+    monkeypatch.setattr("pipeline.intelligence_state.read_layer2_shortlist", lambda date: payload)
+
+    served = client.get("/api/board/layer2-shortlist?date=2026-08-08").get_json()
+    assert served["max_quote_age_seconds_by_sport"] == {"nhl": 3600.0, "wnba": 3600.0}
+    assert served["rows_beyond_quote_age_by_sport"] == {"wnba": 7}

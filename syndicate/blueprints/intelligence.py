@@ -4092,6 +4092,11 @@ def board_layer2_shortlist_api():
                 "unmeasured_model_only_by_market": shortlist.get("unmeasured_model_only_by_market"),
                 "unmeasured_model_only_mode": shortlist.get("unmeasured_model_only_mode"),
                 "max_quote_age_seconds": shortlist.get("max_quote_age_seconds"),
+                # The per-sport freshness gate (2026-10-02, lane layer2-freshness-1h):
+                # each sport's ceiling and how many rows it refused, so a stalled
+                # capture reads as a number here instead of rows quietly vanishing.
+                "max_quote_age_seconds_by_sport": shortlist.get("max_quote_age_seconds_by_sport"),
+                "rows_beyond_quote_age_by_sport": shortlist.get("rows_beyond_quote_age_by_sport"),
                 "rows_beyond_quote_age": shortlist.get("rows_beyond_quote_age"),
                 "stale_kickoff_seconds": shortlist.get("stale_kickoff_seconds"),
                 "rows_stale_kickoff": shortlist.get("rows_stale_kickoff"),
