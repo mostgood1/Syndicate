@@ -1117,6 +1117,14 @@ death, never life — do not invert it.
 - Verification: unit: stamped stdout (incl. a stamped multi-line indent=2 JSON) parses to the same dict as unstamped; unstamped unchanged; fails on origin/main. Fleet: after ff, the next odds run file has a result key (and failureSummary when rc!=0)
 - Blocked by: none
 
+### logstamp-skip-pipes — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: The local fleet's per-line UTC stamp stops corrupting data a parent reads from a child: scripts/local_logstamp stamps a stream only when it is NOT a pipe or socket, so role log files keep their stamps while captured child stdout (JSON for live_refresh_loop's MLB live/injury/ESPN probes, schedule_adapter, migration_gate) parses again; verified by MLB_LIVE_PROBE no longer reporting bad_json
+- Files: scripts/local_logstamp/sitecustomize.py,tests/test_local_logstamp.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: a child whose stdout is a FILE is stamped, one whose stdout is a PIPE is not and its JSON parses; off switch unchanged; fails on origin/main. Fleet: after ff, refresh-worker.log MLB_LIVE_PROBE lines stop carrying bad_json (79 before), counted over a window
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
