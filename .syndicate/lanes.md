@@ -1051,8 +1051,8 @@ death, never life — do not invert it.
 - Verification: unit tests (row build per venue, skips, idempotency, apply needs matching count, settle_from_venue + repairs leave rebuilt rows untouched); live: dry-run result artifact reviewed with the user, then apply; ledger live-row count and per-venue P&L read back; next VENUE_SETTLEMENT shows the rows as already, settled=0, no repairs
 - Blocked by: none
 
-### nba-hourly-odds-failures — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
-- Goal: NBA stops failing in the hourly odds runs: the props SmartSim no longer needs LEAGUE on the vendored NBA smart_sim module (falls back to Syndicate's NBA league config), and the game-cards export runs nba_betting.cli instead of a package named after the data-root folder; verified on the fleet by the next hourly run — **GOAL: NOT MET** (SmartSim fix VERIFIED on the fleet 19:04Z: 0 failures, 34 player rows; a third cause found and fixed -- game lines with no player props failed props-edges -- ca860dd5, fleet ff 19:18Z. Owed: the ~20:03Z all-sport run shows nba ok=true and runs game cards; watcher bxnvtofe4; deploys.md 19:18Z)
+### nba-hourly-odds-failures — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: NBA stops failing in the hourly odds runs: the props SmartSim no longer needs LEAGUE on the vendored NBA smart_sim module (falls back to Syndicate's NBA league config), and the game-cards export runs nba_betting.cli instead of a package named after the data-root folder; verified on the fleet by the next hourly run — **GOAL: MET** (reading: all-sport run 20261002_200434 reports nba ok=true, first since at least 10-01 05:00Z; SmartSim 34 rows, no-props skip logged, nba_betting.cli export-game-cards wrote game_cards 1 row; three causes fixed: 5c825580 x2, ca860dd5; deploys.md 20:20Z. The run's rc=1 is soccer, an unowned lead)
 - Files: syndicate/features/shared/basketball_props_smart_sim.py,scripts/refresh_nba_oddsapi_props.py,tests/test_nba_hourly_odds_failures.py
 - Hypothesis: n/a
 - Falsification test: n/a
