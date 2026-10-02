@@ -44981,3 +44981,18 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
   - live-odds-worker 15:15:10-13Z: `VENUE_BALANCES kalshi=ok polymarket=ok`, `VENUE_SETTLEMENT status=ok`, `ORDER_PATH venue=kalshi|polymarket status=no_positions`, `EXECUTION mode=paper venue=paper:kalshi|paper:polymarket placed=0`.
   - `venue_order_family_census.py --hours 1`: CLEAR (it was INCONCLUSIVE on every earlier run).
 - NOT verified / owed: settlement read `settled=0 unjoinable=593` (kalshi 432 rows, polymarket 161). Every live ledger row failed to join to the venue's record, so the Render-era live orders are still unsettled. This is a lead, not part of this lane.
+
+## 2026-10-02 ~15:40Z (~10:40 AM CT) -- LOCAL FLEET ff 927d1787 -> 5c1b1bf2 + web HUP + refresh-worker TERM (lane `layer2-freshness-1h`, user: "yes deploy it"; run BY THE USER -- auto mode refused the deploy) -- **PARTIAL: 1 of 3 met**
+- what: runtime files in range = `pipeline/layer2_shortlist.py`, `syndicate/templates/intelligence.html` only. Pre-check: `mlb_sim_runs/_active.json` = `{}`, refresh-worker 604202 had no children.
+- verify (READ, live page DOM 15:4xZ + fleet board build 15:43:23Z):
+  - MET -- movement arrow follows the no-vig consensus: 328/328 cells render the new labels ("Better price now · Odds -125 → +111 · market unchanged", "Market against pick"); 0 book clocks red.
+  - NOT MET -- "Checked Xm ago": **0 of 328** cards. Cause: `/api/intelligence/query` (the page's source) stripped `quote_seen_age_seconds` via `_UNCONSUMED_QUOTE_FIELDS`. Fixed in 669b90f0.
+  - NOT MET -- NHL projections unchanged (5 of 17 game rows). **The diagnosis was wrong**: it read UTC dates; there were no 10-03 NHL rows. Real cause: `attach_nhl_game_projections` scoped rows by the UTC prefix, dropping every game at 7pm CT or later. Fixed in 693de7a7.
+
+## 2026-10-02 ~15:58Z (~10:58 AM CT) -- LOCAL FLEET ff 5c1b1bf2 -> 693de7a7 + web HUP + refresh-worker TERM (609041 -> 610752) (lane `layer2-freshness-1h`, run BY THE USER) -- **MET**
+- what: runtime files `syndicate/blueprints/intelligence.py` (strip list), `syndicate/features/nhl/game_projections.py` (Central-date scoping), plus another lane's `coverage_contract.py` (062cea8b, rode along). Pre-check: `_active.json` `{}`, no refresh-worker children.
+- verify (READ):
+  - NHL, first post-restart build 15:59:27Z: **17 of 17** game rows projected (was 5 of 17), incl. WPG 7:10p, DAL 8:10p, VGK 9:10p CT. Log `PREGAME_PROJECTION_JOIN sport=nhl considered=20 projected=20` (was 8/8).
+  - `/api/intelligence/query` (page body `question="top edges today"`, `drop_row_diagnostics=true`), 16:0xZ: `quote_seen_age_seconds` present on **2,453 of 2,453** rows (was stripped from all); **354** of them >= 1h unpolled.
+  - Side reading: every NHL game in `predictions_2026-10-02.csv` projects `model_total` **5.9134** -- a degenerate total; not this lane, flagged.
+- OWED: web HUP for f60743fa (blotter Age column on the poll clock -- the blotter is the default view >900px and was missed by 5c1b1bf2), then a DOM read of the blotter.
