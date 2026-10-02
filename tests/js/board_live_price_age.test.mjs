@@ -32,6 +32,7 @@ const src = [
   extract(/ {2}function boardBuildEpochMs\(response\)[\s\S]*?\n {2}}\n/, 'boardBuildEpochMs'),
   extract(/ {2}function itemIsLiveForPriceAge\(item\)[\s\S]*?\n {2}}\n/, 'itemIsLiveForPriceAge'),
   extract(/ {2}function liveServedPriceAgeSeconds\(item, response, nowMs\)[\s\S]*?\n {2}}\n/, 'liveServedPriceAgeSeconds'),
+  extract(/ {2}function pregameCheckedAgeSeconds\(item\)[\s\S]*?\n {2}}\n/, 'pregameCheckedAgeSeconds'),
   extract(/ {2}function renderFreshness\(item\)[\s\S]*?\n {2}}\n/, 'renderFreshness'),
 ].join('\n');
 

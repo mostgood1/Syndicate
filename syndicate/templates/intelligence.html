@@ -2094,6 +2094,23 @@
     return seen + Math.max(0, (now - builtAt) / 1000);
   }
 
+  // How long since WE last checked a PREGAME price, as of now: the poll age the
+  // worker stamped at build, plus the time since the build. null for a live row
+  // (it has its own clock, `liveServedPriceAgeSeconds`) or when nothing is
+  // stamped -- unknown must read as unknown, never as fresh. ONE helper for the
+  // card clock and the blotter Age column, so the two views cannot disagree.
+  function pregameCheckedAgeSeconds(item) {
+    const quote = item && item.quote;
+    if (!quote || itemIsLiveForPriceAge(item)) return null;
+    const present = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value)) && Number(value) >= 0;
+    if (present(quote.quote_seen_age_seconds)) {
+      const builtAt = boardBuildEpochMs(lastResponseForActions);
+      return Number(quote.quote_seen_age_seconds) + (builtAt === null ? 0 : Math.max(0, (Date.now() - builtAt) / 1000));
+    }
+    if (present(quote.capture_age_seconds)) return Number(quote.capture_age_seconds);
+    return null;
+  }
+
   function renderFreshness(item) {
     const quote = item && item.quote;
     if (!quote) return "";
@@ -2119,16 +2136,7 @@
     // Red at one hour, the board's freshness rule; the book clock is plain info.
     const PREGAME_CHECK_STALE_AFTER_SECONDS = 3600;
     const bookAge = formatAge(quote.book_age_seconds);
-    let checkedSeconds = null;
-    if (!itemIsLiveForPriceAge(item)) {
-      const seen = Number(quote.quote_seen_age_seconds);
-      if (quote.quote_seen_age_seconds !== null && quote.quote_seen_age_seconds !== undefined && quote.quote_seen_age_seconds !== "" && Number.isFinite(seen) && seen >= 0) {
-        const builtAt = boardBuildEpochMs(lastResponseForActions);
-        checkedSeconds = seen + (builtAt === null ? 0 : Math.max(0, (Date.now() - builtAt) / 1000));
-      } else if (Number.isFinite(Number(quote.capture_age_seconds)) && quote.capture_age_seconds !== null && quote.capture_age_seconds !== undefined) {
-        checkedSeconds = Number(quote.capture_age_seconds);
-      }
-    }
+    const checkedSeconds = pregameCheckedAgeSeconds(item);
     const checkedAge = checkedSeconds === null ? "" : formatAge(checkedSeconds);
     if (!bookAge && !checkedAge && !parts.length) return "";
     if (checkedAge) {
@@ -3802,7 +3810,10 @@
     { key: "ev", label: "EV", type: "number", getValue: (item) => evVsFairValue(item) },
     // Ascending puts the FRESHEST first, which is why missing-sorts-last
     // matters here: a row with no book clock must not read as "brand new".
-    { key: "age", label: "Age", type: "number", getValue: (item) => bookAgeValue(item) },
+    // Pregame sorts on when we last CHECKED (user 2026-10-02, "Last polled
+    // <=1h"); live keeps the book clock, where an unmoved number means a
+    // suspended market.
+    { key: "age", label: "Age", type: "number", getValue: (item) => pregameCheckedAgeSeconds(item) ?? bookAgeValue(item) },
     { key: "projected", label: "Projected", type: "number", getValue: (item) => {
         const raw = Number(item.sim_projection ?? item.projected ?? item.projected_sim);
         return Number.isFinite(raw) ? raw : null;
@@ -3918,6 +3929,23 @@
   }
 
   function renderBlotterAge(item) {
+    // PREGAME: WHEN WE LAST CHECKED `[2026-10-02, lane layer2-freshness-1h, user
+    // decision "Last polled <=1h"]`. This column used to be judged "on the BOOK
+    // clock, never on our capture clock", which made every DraftKings NFL prop
+    // whose number simply had not moved read red although we had polled it
+    // minutes earlier (1,125 of 1,667 NFL rows >= 1h book age on 10-02, against
+    // 129 not polled for an hour). The book clock moves to the tooltip. LIVE rows
+    // keep the rule below unchanged: in play, a number the book has not moved IS
+    // the signal (a suspended market), and the `dead` state depends on it.
+    const checked = pregameCheckedAgeSeconds(item);
+    if (checked !== null) {
+      const checkedText = formatAge(checked) || "now";
+      const bookSeconds = bookAgeValue(item);
+      const bookText = Number.isFinite(bookSeconds) ? formatAge(bookSeconds) : "";
+      const checkStale = checked >= 3600;
+      const title = `Last checked at the book ${checkedText} ago${bookText ? ` · book last moved the number ${bookText} ago` : ""}${checkStale ? " · not re-checked for over an hour: check the book before betting" : ""}`;
+      return `<span class="board-blotter__age${checkStale ? " board-blotter__age--stale" : ""}" title="${escapeHtml(title)}">${escapeHtml(checkedText)}</span>`;
+    }
     const seconds = bookAgeValue(item);
     if (!Number.isFinite(seconds)) {
       return '<span class="board-blotter__muted" title="This source publishes no book timestamp">&mdash;</span>';
