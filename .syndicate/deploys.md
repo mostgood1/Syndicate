@@ -44929,3 +44929,9 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - what: `4f3edfa9` + `8c30fd68` -- `local_production.py status` calls a role STALE only when RUNTIME code differs between its loaded commit and HEAD (ledger/docs/tests/reports/data/*.md and the supervisor's own `scripts/local_production.py` + `deploy/local/` excluded; an undiffable gap still reads `STALE?`).
 - how: `~/Syndicate` ff `82bd182e -> 8c30fd68` from GitHub. Range: 4 commits, the only code `scripts/local_production.py` (no role imports it). Dirty `data/ncaaf_source/historical_truth/games_2026.json.gz` and `vendor/wnba_betting_repo/data/processed/boxscores_history.csv` untouched. No role or supervisor restart: `status` is a fresh process each call. The running supervisor (started by another session on `9856dd92`) keeps its loaded copy; that copy already has every scheduled job and the backup -- the two new commits only change `status`.
 - verify (READ): HEAD `8c30fd68`; `status` prints all three roles `code=9856dd92 (HEAD 8c30fd68: ledger/docs/tests only -- nothing to load)`, where `82bd182e` had printed `STALE`; `/healthz` 200.
+
+## 2026-10-02 ~15:0xZ (~10:0x AM CT) -- LOCAL FLEET ff onto `00d6c1a6`, no restart (lane `local-prod-stale-label`, user: "yes, fast-forward the fleet checkout") -- **MET**
+
+- what: `00d6c1a6` -- `status` labels a gap with no role code `no role code changed -- nothing to load` (was `ledger/docs/tests only`).
+- how: `~/Syndicate` ff `8c30fd68 -> 00d6c1a6` from GitHub; 2 commits, the only code `scripts/local_production.py` (no role imports it); dirty data files untouched; nothing restarted.
+- verify (READ): HEAD `00d6c1a6`; `status` prints all three roles `code=9856dd92 (HEAD 00d6c1a6: no role code changed -- nothing to load)`; `/healthz` 200.
