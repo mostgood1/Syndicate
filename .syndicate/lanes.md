@@ -1297,6 +1297,14 @@ death, never life — do not invert it.
 - Verification: Fleet board read: max quote_seen_age_seconds < 3600 in every sport across >=3 sweep cycles before the gate change; after it, rows_beyond_quote_age attributable and no sport emptied; NHL 10-03 totals/spreads projected; card DOM shows 'checked' badge and consensus-based arrow; OddsAPI calls/day measured before vs after.
 - Blocked by: none
 
+### fleet-paper-execution — OPEN — opened 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+- Goal: The local fleet runs paper execution (SYNDICATE_EXECUTION_ENABLED=1, MODE=paper, ARMED=0 unless up --allow-live-execution): live-odds-worker logs ORDER_PATH and VENUE_SETTLEMENT, refresh-worker logs PORTFOLIO_EXECUTED/PAPER2_EXECUTED, and no live order is possible
+- Files: scripts/local_production.py, tests/test_local_production.py, docs/ai_context/local_production_runbook.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit test on derive_role_env paper defaults; after restart the live pid env reads ENABLED=1 MODE=paper ARMED=0 and the logs carry ORDER_PATH, VENUE_SETTLEMENT and PORTFOLIO_EXECUTED/PAPER2_EXECUTED with mode=paper
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

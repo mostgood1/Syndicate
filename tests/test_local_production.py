@@ -97,6 +97,19 @@ def test_money_is_paper_unless_explicitly_allowed(blueprint, settings):
     assert lp.money_is_live(env)
 
 
+def test_paper_execution_runs_by_default_and_the_local_file_can_stop_it(blueprint, settings):
+    # ENABLED=0 silenced paper fills, venue settlement and ORDER_PATH on the
+    # whole fleet (2026-10-02). Paper must RUN; only mode+armed keep money off.
+    for role in ("live-odds-worker", "refresh-worker"):
+        env, _ = _env(role, blueprint, settings, live={"SYNDICATE_EXECUTION_ENABLED": "0"})
+        assert env["SYNDICATE_EXECUTION_ENABLED"] == "1"
+        assert env["SYNDICATE_EXECUTION_MODE"] == "paper"
+        assert env["SYNDICATE_EXECUTION_LIVE_ARMED"] == "0"
+        assert not lp.money_is_live(env)
+    env, _ = _env("live-odds-worker", blueprint, settings, local={"SYNDICATE_EXECUTION_ENABLED": "0"})
+    assert env["SYNDICATE_EXECUTION_ENABLED"] == "0"
+
+
 def test_layering_live_over_blueprint_and_local_over_live(blueprint, settings):
     live = {"SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS": "90", "SOME_DASHBOARD_KEY": "/opt/render/project/data/x"}
     env, audit = _env("live-odds-worker", blueprint, settings, live=live)

@@ -175,7 +175,7 @@ Start at boot and restart on failure:
 - the env (imported or local) says `SYNDICATE_EXECUTION_MODE=live` and `SYNDICATE_EXECUTION_LIVE_ARMED=1`;
 - `up --allow-live-execution`.
 
-`up` prints `money: LIVE` or `money: paper` on its first lines. The day stake caps are stored in the execution store, not in env, and start fresh on a new Redis.
+`up` prints `money: LIVE` or `money: paper` on its first lines. Paper still RUNS: `SYNDICATE_EXECUTION_ENABLED` is 1 by default, so the paper books fill, live-odds-worker settles the real venue accounts (it reads them; it never places anything) and logs `ORDER_PATH`. Until 2026-10-02 it was forced to 0, and the fleet booked no paper fill and no settlement. `SYNDICATE_EXECUTION_ENABLED=0` in `local_production.env` turns it off. The day stake caps are stored in the execution store, not in env, and start fresh on a new Redis.
 
 **Health watchdog** (`scripts/local_watchdog.py`, run every 5 minutes by `deploy/local/watchdog.ps1`). Render showed a dead service on its dashboard; here nothing did. It has two halves:
 - **Inside WSL**, it checks:

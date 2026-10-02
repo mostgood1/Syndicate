@@ -52,9 +52,11 @@ Everything not listed is passed through verbatim.
                                    compaction, per-service lanes. Without them
                                    the web process quietly behaves like a
                                    developer laptop instead of production.
-  SYNDICATE_EXECUTION_MODE / _LIVE_ARMED / _ENABLED -> paper, 0, 0
+  SYNDICATE_EXECUTION_MODE / _LIVE_ARMED -> paper, 0
                                    UNLESS `up --allow-live-execution`. Real
                                    money is never armed by a config file alone.
+  SYNDICATE_EXECUTION_ENABLED   -> 1 (paper fills, venue settlement, ORDER_PATH)
+                                   unless local_production.env says 0.
 
 ONE SHARED DISK
 ---------------
@@ -121,7 +123,17 @@ SERVICE_TO_ROLE = {"syndicate": "web", "refresh-worker": "refresh-worker", "live
 PLAN_MEMORY_MB = {"web": 2048, "refresh-worker": 4096, "live-odds-worker": 2048}
 
 EXECUTION_KEYS = ("SYNDICATE_EXECUTION_MODE", "SYNDICATE_EXECUTION_LIVE_ARMED", "SYNDICATE_EXECUTION_ENABLED")
-PAPER_EXECUTION = {"SYNDICATE_EXECUTION_MODE": "paper", "SYNDICATE_EXECUTION_LIVE_ARMED": "0", "SYNDICATE_EXECUTION_ENABLED": "0"}
+# PAPER, BUT RUNNING. Mode=paper and armed=0 are what keep money off: a live
+# order needs BOTH mode=live and armed=1, and in paper `place_order` never calls
+# a venue submitter. ENABLED was forced to 0 here too (copied from
+# fleet_local.py, a replay harness that also strips the venue keys), and that
+# silenced far more than orders: on 2026-10-02 the fleet's whole life showed
+# 431 PORTFOLIO_COMMIT, 0 PORTFOLIO_EXECUTED / PAPER2_EXECUTED, 0
+# VENUE_SETTLEMENT, 0 ORDER_PATH -- no paper evidence, no settlement of the
+# real venue accounts. So ENABLED defaults to 1; `SYNDICATE_EXECUTION_ENABLED=0`
+# in local_production.env still turns the whole tick off.
+PAPER_EXECUTION = {"SYNDICATE_EXECUTION_MODE": "paper", "SYNDICATE_EXECUTION_LIVE_ARMED": "0"}
+PAPER_EXECUTION_ENABLED_DEFAULT = "1"
 
 # Known dashboard-only keys: read by the code, set on the live services, and
 # declared NOWHERE in render.yaml (names from scripts/_fleet_guard.py and the
@@ -407,6 +419,11 @@ def derive_role_env(
 
     if not settings.allow_live_execution:
         forced.update(PAPER_EXECUTION)
+        # Only the operator's own file may turn paper execution off; the
+        # Render import's value is about LIVE money and does not apply here.
+        forced["SYNDICATE_EXECUTION_ENABLED"] = (
+            str(local.get("SYNDICATE_EXECUTION_ENABLED") or "").strip() or PAPER_EXECUTION_ENABLED_DEFAULT
+        )
 
     for key, value in forced.items():
         if env.get(key) != value:
