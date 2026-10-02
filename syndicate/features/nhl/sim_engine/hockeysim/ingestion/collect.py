@@ -15,7 +15,7 @@ from syndicate.local_nhl_odds import _alias_team_abbr, _team_abbr
 
 from ..features.loaders import _load_scoreboard_games, _processed_dir
 from .lineups import build_team_usage, infer_lines, project_lineup
-from .nhl_web import NhlWebIngestClient
+from .nhl_web import NhlWebIngestClient, season_code_for_date
 
 _LINEUP_COLUMNS = ["player_id", "full_name", "position", "line_slot", "pp_unit", "pk_unit", "proj_toi", "confidence", "team"]
 _ROSTER_COLUMNS = ["full_name", "player_id", "team", "position", "team_id"]
@@ -65,7 +65,11 @@ def collect_slate_inputs(
     goalie_rows: List[Dict] = []
 
     for abbr, team_name in teams:
-        usage = build_team_usage(client, _alias_team_abbr(abbr), date=date, n_games=n_games)
+        team_code = _alias_team_abbr(abbr)
+        # FULL names, not the boxscore's "A. Copp": the props producer joins book lines by name, and
+        # with abbreviated names it matched 0 of 339 lines on 2026-10-02 (every NHL prop unprojected).
+        name_map = client.roster_full_names(team_code, season_code_for_date(date))
+        usage = build_team_usage(client, team_code, date=date, n_games=n_games, name_map=name_map)
         if not usage:
             continue
         infer_lines(usage)

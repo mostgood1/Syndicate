@@ -27,6 +27,14 @@ def normalize_name(value: object) -> str:
     return " ".join("".join(c for c in s.lower() if c.isalnum() or c.isspace()).split())
 
 
+def initial_surname_key(value: object) -> str:
+    """"Andrew Copp" and "A. Copp" -> "a copp": the key a boxscore-abbreviated name can still match."""
+    parts = normalize_name(value).split()
+    if len(parts) < 2:
+        return ""
+    return f"{parts[0][0]} {' '.join(parts[1:])}"
+
+
 def _canonical_market(value: object) -> Optional[str]:
     token = str(value or "").strip().lower().replace(" ", "_")
     if token in _MARKET_ALIASES:
@@ -64,6 +72,8 @@ def load_props_lines(date: str, *, root: Optional[Path] = None) -> List[Dict[str
             "name_key": normalize_name(name),
             "player_name": name,
             "team": str(r.get("team") or "").strip(),
+            "home_team": str(r.get("home_team") or "").strip(),
+            "away_team": str(r.get("away_team") or "").strip(),
             "market": market,
             "line": line,
             "over_price": _f(r.get("over_price")),

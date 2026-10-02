@@ -1839,15 +1839,34 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
 
             index = load_nhl_game_projections(selected_date)
             if not index.games:
-                return {
+                game_coverage = {
                     "supported": True,
                     "rows_with_projection": 0,
                     "reason": "no NHL hockeysim predictions for this date",
                 }
-            return attach_nhl_game_projections(grid, index, selected_date=selected_date)
+            else:
+                game_coverage = attach_nhl_game_projections(grid, index, selected_date=selected_date)
         except Exception:
             _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=nhl date=%s", selected_date)
-            return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
+            game_coverage = {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
+        # PLAYER PROPS, independently of the game join `[2026-10-02, lane
+        # nhl-player-props-projection]`: two artifacts (predictions vs
+        # props_recommendations), either can exist without the other. Merged the
+        # NFL way, so numerator and denominator move together and the prop half's
+        # own coverage REPLACES the game join's "no NHL branch" placeholder.
+        try:
+            from syndicate.features.nhl.prop_projections import (
+                attach_nhl_prop_projections,
+                load_nhl_prop_projections,
+            )
+
+            prop_coverage = attach_nhl_prop_projections(
+                grid, load_nhl_prop_projections(selected_date), selected_date=selected_date
+            )
+        except Exception:
+            _LOGGER.exception("BOOK_GRID_PROP_PROJECTION_FAILURE sport=nhl date=%s", selected_date)
+            prop_coverage = {"supported": True, "error": "prop projection join failed", "rows_with_projection": 0}
+        return _merge_nfl_coverage(game_coverage, prop_coverage)
 
     if sport != "mlb":
         return {"supported": False, "reason": f"no projection source wired for {sport}"}

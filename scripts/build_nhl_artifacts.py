@@ -72,6 +72,7 @@ from syndicate.features.nhl.sim_engine.hockeysim.features.market_lines import ( 
     market_for_game,
 )
 from syndicate.features.nhl.sim_engine.hockeysim.features.props_lines import (  # noqa: E402
+    initial_surname_key,
     load_props_lines,
     normalize_name,
 )
@@ -164,56 +165,85 @@ def _poisson_p_over(line: float, lam: float) -> float:
     return max(0.0, min(1.0, 1.0 - cdf))
 
 
+def _match_lines_to_game(game, lines: List[Dict[str, object]]) -> Dict[int, int]:
+    """``{index into lines: player_id}`` for the book lines that belong to this game's players.
+
+    Exact normalized full name first. Then, because the lineup feed has carried the boxscore's
+    ABBREVIATED name ("A. Copp" for the book's "Andrew Copp") -- which matched 0 of 339 lines on
+    2026-10-02 -- an initial+surname key, accepted only when (a) the line names this game's two
+    teams and (b) exactly one player in the game carries that key. A line without team names gets
+    the exact match only, so an abbreviation can never capture a player from another game.
+    """
+    full: Dict[str, int] = {}
+    abbrev: Dict[str, List[int]] = defaultdict(list)
+    for p in list(game.home_players) + list(game.away_players):
+        full.setdefault(normalize_name(p.full_name), int(p.player_id))
+        key = initial_surname_key(p.full_name)
+        if key:
+            abbrev[key].append(int(p.player_id))
+    teams = {normalize_name(game.home.name), normalize_name(game.away.name)}
+    out: Dict[int, int] = {}
+    for idx, ln in enumerate(lines):
+        pid = full.get(str(ln["name_key"]))
+        if pid is None:
+            line_teams = {normalize_name(ln.get("home_team")), normalize_name(ln.get("away_team"))}
+            if line_teams != teams:
+                continue
+            cands = abbrev.get(initial_surname_key(ln.get("player_name")), [])
+            if len(set(cands)) != 1:
+                continue
+            pid = cands[0]
+        else:
+            line_teams = {normalize_name(ln.get("home_team")), normalize_name(ln.get("away_team"))}
+            if "" not in line_teams and line_teams != teams:
+                continue
+        out[idx] = pid
+    return out
+
+
 def build_props_for_date(
     date: str, *, root: Optional[Path] = None, n_sims: int = 400, out_dir: Optional[Path] = None,
 ) -> Tuple[Path, int]:
     """Produce props_recommendations_{date}.csv for a slate. Returns (path, row_count)."""
     games = build_slate_features(date, root=root)
     lines = load_props_lines(date, root=root)
-    by_name: Dict[str, List[Dict[str, object]]] = defaultdict(list)
-    for ln in lines:
-        by_name[str(ln["name_key"])].append(ln)
 
     rows_out: List[Dict[str, object]] = []
     for g in games:
-        namemap: Dict[str, int] = {}
-        for p in list(g.home_players) + list(g.away_players):
-            namemap[normalize_name(p.full_name)] = int(p.player_id)
-
-        pid_market_line: Dict[Tuple[int, str], float] = {}
-        for nk, rowlist in by_name.items():
-            pid = namemap.get(nk)
-            if pid is None:
-                continue
-            for r in rowlist:
-                pid_market_line.setdefault((pid, str(r["market"])), float(r["line"]))
-        if not pid_market_line:
+        line_pids = _match_lines_to_game(g, lines)
+        if not line_pids:
             continue
+        pid_market_line: Dict[Tuple[int, str], float] = {}
+        for idx, pid in line_pids.items():
+            r = lines[idx]
+            pid_market_line.setdefault((pid, str(r["market"])), float(r["line"]))
 
         projs = build_prop_projections(g, lines=pid_market_line, n_sims=n_sims)
         proj_by_key = {(p.player_id, p.market): p for p in projs}
 
-        for nk, rowlist in by_name.items():
-            pid = namemap.get(nk)
-            if pid is None:
+        for idx, pid in line_pids.items():
+            r = lines[idx]
+            pr = proj_by_key.get((pid, str(r["market"])))
+            if pr is None:
                 continue
-            for r in rowlist:
-                pr = proj_by_key.get((pid, str(r["market"])))
-                if pr is None:
-                    continue
-                line = float(r["line"])
-                p_over = _poisson_p_over(line, pr.proj_lambda)
-                proj_obj = replace(pr, line=line, p_over=round(p_over, 6), p_under=round(1.0 - p_over, 6))
-                op = r.get("over_price")
-                up = r.get("under_price")
-                row = prop_recommendation_row(
-                    proj_obj,
-                    over_price=int(round(float(op))) if op is not None else None,
-                    under_price=int(round(float(up))) if up is not None else None,
-                    book=str(r.get("book") or ""),
-                )
-                if row:
-                    rows_out.append(row)
+            line = float(r["line"])
+            p_over = _poisson_p_over(line, pr.proj_lambda)
+            # `player` is the BOOK's name: every downstream join (the board, prop evidence) keys on
+            # the sportsbook's full name, never on the lineup feed's spelling.
+            proj_obj = replace(
+                pr, player=str(r.get("player_name") or pr.player), line=line,
+                p_over=round(p_over, 6), p_under=round(1.0 - p_over, 6),
+            )
+            op = r.get("over_price")
+            up = r.get("under_price")
+            row = prop_recommendation_row(
+                proj_obj,
+                over_price=int(round(float(op))) if op is not None else None,
+                under_price=int(round(float(up))) if up is not None else None,
+                book=str(r.get("book") or ""),
+            )
+            if row:
+                rows_out.append(row)
 
     out_path = (out_dir or _processed_dir(root)) / f"props_recommendations_{date}.csv"
     n = write_props_recommendations_csv(out_path, rows_out)

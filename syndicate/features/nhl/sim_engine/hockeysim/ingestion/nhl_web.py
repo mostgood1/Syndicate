@@ -100,6 +100,29 @@ class NhlWebIngestClient:
                 pass
         return data
 
+    def roster_full_names(self, team_abbr: str, season: str) -> Dict[int, str]:
+        """``{player_id: "First Last"}`` from the club roster.
+
+        The boxscore's ``name.default`` is ABBREVIATED ("A. Copp") while every sportsbook prop line
+        carries the full name ("Andrew Copp"), so a lineup built from boxscores alone cannot be
+        joined to a book line by name. Not cached: a roster changes through the season, and it is
+        one call per team. An unreachable roster returns ``{}`` and the caller keeps the boxscore
+        name.
+        """
+        try:
+            data = self._get(f"{_NHLE_BASE}/roster/{team_abbr}/{season}")
+        except Exception:  # noqa: BLE001 - names are an enrichment; the lineup must still build
+            return {}
+        out: Dict[int, str] = {}
+        for group in ("forwards", "defensemen", "goalies"):
+            for p in (data or {}).get(group) or []:
+                first = (p.get("firstName") or {}).get("default") if isinstance(p.get("firstName"), dict) else p.get("firstName")
+                last = (p.get("lastName") or {}).get("default") if isinstance(p.get("lastName"), dict) else p.get("lastName")
+                name = " ".join(str(x).strip() for x in (first, last) if x and str(x).strip())
+                if p.get("id") is not None and name:
+                    out[int(p["id"])] = name
+        return out
+
     def recent_finished_game_ids(self, team_abbr: str, season: str, *, before_date: str, n: int = 8) -> List[str]:
         """The team's last ``n`` finished game ids strictly before ``before_date`` this season."""
         data = self._get(f"{_NHLE_BASE}/club-schedule-season/{team_abbr}/{season}")
