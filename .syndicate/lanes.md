@@ -1384,14 +1384,14 @@ death, never life — do not invert it.
 - Scope change 2026-10-02 (user decision "drop Bovada game-odds fallback"): `predict_date_cmd`'s Bovada fallback is REMOVED, not just repointed; NBA preseason via OddsAPI `basketball_nba_preseason` is a SEPARATE lane.
 - Status: done (deploys.md 2026-10-02 16:37Z, PR #8).
 
-### nba-preseason-oddsapi — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
-- Goal: NBA odds come from OddsAPI for preseason too: basketball_nba_preseason is listed and priced (per event under its own key) in both Syndicate's props fetcher and the vendored NBA game-odds fetch, and the vendored NBA repo's Bovada game-odds uses (predict-date fallback, odds-snapshots fill) are removed; upstream PR to mostgood1/NBA-Betting
+### nba-preseason-oddsapi — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: NBA odds come from OddsAPI for preseason too: basketball_nba_preseason is listed and priced (per event under its own key) in both Syndicate's props fetcher and the vendored NBA game-odds fetch, and the vendored NBA repo's Bovada game-odds uses (predict-date fallback, odds-snapshots fill) are removed; upstream PR to mostgood1/NBA-Betting — **GOAL: MET** (reading: 6 tests incl. per-key pricing and None-vs-inconclusive; live vendored fetch_game_odds_current(2026-10-03) -> Toronto Raptors vs Miami Heat from OddsAPI basketball_nba_preseason, 22 rows; no Bovada game-odds call left in the NBA cli; fleet ff 17:01Z; upstream PR https://github.com/mostgood1/NBA-Betting/pull/2)
 - Files: scripts/fetch_basketball_oddsapi_props_local.py,vendor/nba_betting_repo/src/nba_betting/odds_api.py,vendor/nba_betting_repo/src/nba_betting/cli.py,tests/test_nba_preseason_oddsapi.py
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: unit: events listed under both keys, each event priced under its own key, None only when both listings succeed with no game, inconclusive when either fails; predict_date/odds_snapshots have no Bovada game-odds call. Live (fleet, read-only): fetch_game_odds_current for 2026-10-03 returns MIA@TOR from OddsAPI basketball_nba_preseason. Upstream PR URL.
 - Blocked by: none
-- Status: code landed with this commit (6 tests, live OddsAPI preseason MIA@TOR); OWED: fleet ff, upstream PR to mostgood1/NBA-Betting (default branch main).
+- Status: done (deploys.md 2026-10-02 17:01Z, PR NBA-Betting#2). Owed only: the next fleet NBA run's game_odds_2026-10-03.csv sourced from OddsAPI.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
