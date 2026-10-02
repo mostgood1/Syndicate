@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1202 rules `[generated]`
+## Index — 1234 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 490**
+**FORBIDDEN — 500**
 
 - [2026-09-21 FORBIDDEN: diagnosing a failure from its most vivid example `[lane layer2-li…](#2026-09-21-forbidden-diagnosing-a-failure-from-its-most-vivid-example-lane-layer2-line-move-magnitude)
 - [2026-09-21 FORBIDDEN: verifying that a signal was COMPUTED as verifying that it is REAL…](#2026-09-21-forbidden-verifying-that-a-signal-was-computed-as-verifying-that-it-is-real-lane-layer2-line-move-magnitude)
@@ -165,6 +165,16 @@
 - [2026-09-26 — FORBIDDEN: keying a mechanism on a field without reading what that field a…](#2026-09-26-forbidden-keying-a-mechanism-on-a-field-without-reading-what-that-field-actually-holds-in-the-case-the-mechanism-handles----and-writing-the-fixture-from-the-same-assumption-which-makes-the-test-agree-with-you)
 - [2026-09-26 — FORBIDDEN: guarding one ARM of an if/else when you mean to EXCLUDE. The it…](#2026-09-26-forbidden-guarding-one-arm-of-an-ifelse-when-you-mean-to-exclude-the-item-does-not-drop-out----it-falls-into-the-other-branch-silently-reclassified)
 - [2026-09-27 — FORBIDDEN: fitting a correction without reading the PROVENANCE of the inpu…](#2026-09-27-forbidden-fitting-a-correction-without-reading-the-provenance-of-the-inputs-the-grade-ran-on-a-stale-input-produces-a-bias-that-looks-exactly-like-a-model-defect-and-the-correction-you-derive-from-it-is-a-new-defect-you-deployed-yourself)
+- [2026-09-28 FORBIDDEN: telling the user a market is "not scored" off a PRINTED LABEL wit…](#2026-09-28-forbidden-telling-the-user-a-market-is-not-scored-off-a-printed-label-without-reading-the-served-payloads-keys-lane-gameline-spread-total-scoring-session-3b474634)
+- [2026-09-28 FORBIDDEN: flagging a delegated lane's work as DRIFT without reading the con…](#2026-09-28-forbidden-flagging-a-delegated-lanes-work-as-drift-without-reading-the-consent-and-user-request-lines-first-lane-gameline-spread-total-scoring-session-3b474634)
+- [2026-09-28 FORBIDDEN: writing a test from the same mental model as the code, on a fixtu…](#2026-09-28-forbidden-writing-a-test-from-the-same-mental-model-as-the-code-on-a-fixture-you-invented-rather-than-one-read-from-production-lane-nhl-board-row-date-mismatch-session-4ab694ed)
+- [2026-09-28 FORBIDDEN: admitting a sport to a capability set without checking that its p…](#2026-09-28-forbidden-admitting-a-sport-to-a-capability-set-without-checking-that-its-producer-stamps-the-field-the-consumer-gates-on-lane-nfl-live-resim-activation-session-4ab694ed)
+- [2026-09-28 FORBIDDEN: using `deploy_preflight.py` as a status probe, and trusting its H…](#2026-09-28-forbidden-using-deploy_preflightpy-as-a-status-probe-and-trusting-its-hold-texts-window-figure-lane-nhl-board-row-date-mismatch-session-4ab694ed)
+- [2026-09-29 FORBIDDEN: attributing a CAUSE to a coverage pattern before reading the arti…](#2026-09-29-forbidden-attributing-a-cause-to-a-coverage-pattern-before-reading-the-artifacts-generated_at-against-the-state-of-the-world-it-describes-lane-layer2-triad-alignment-session-4ab694ed)
+- [2026-09-29 FORBIDDEN: trusting a metric's NAME for what it compares against — "real mar…](#2026-09-29-forbidden-trusting-a-metrics-name-for-what-it-compares-against-real-market-hit-rate-never-read-a-price-and-its-headline-was-the-majority-class-null-lane-nfl-live-resim-activation-session-4ab694ed)
+- [2026-09-29 FORBIDDEN: reading "production has this artifact" as "a publisher put it the…](#2026-09-29-forbidden-reading-production-has-this-artifact-as-a-publisher-put-it-there-feed_live-is-on-production-because-it-is-git-tracked-and-is_hot-is-false-for-the-very-files-that-are-already-there-lane-mlb-live-prop-grader-session-4ab694ed)
+- [2026-09-29 FORBIDDEN: checking production for ONE property and then diagnosing a DIFFER…](#2026-09-29-forbidden-checking-production-for-one-property-and-then-diagnosing-a-different-property-from-the-local-checkout-i-verified-the-file-count-against-production-and-still-reported-a-35-month-silent-regression-that-was-a-mirror-gap-lane-mlb-live-prop-grader-session-4ab694ed)
+- [2026-10-01 — FORBIDDEN: `x or 0` (or `or {}` / `or ""`) BEFORE the check in a guard tha…](#2026-10-01-forbidden-x-or-0-or-or-or-before-the-check-in-a-guard-that-exists-to-tell-unknown-from-zero-the-normalisation-is-the-unknown-as-zero-bug-applied-one-line-early-test-present-none-absent-and-unparseable-as-five-separate-cases-lane-soccer-live-gameline-index-diag)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -510,7 +520,7 @@
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 - [2026-09-03 — EXONERATED: `deploys.md` and `learnings.md` ARE guarded. Two sessions file…](learnings_archive.md#2026-09-03-exonerated-deploysmd-and-learningsmd-are-guarded-two-sessions-filed-the-same-false-gap-and-the-second-re-derived-it-with-the-same-blind-spot) `[evidence]`
 
-**Rules and corrections — 706**
+**Rules and corrections — 728**
 
 - [2026-09-08 A probe is production load, and an unbounded one is an outage. `[#632, sessi…](#2026-09-08-a-probe-is-production-load-and-an-unbounded-one-is-an-outage-632-session-b2b5b45b)
 - [2026-09-08 MAP: ~95 rules in this file are one question in 17 shapes — *"is the number…](#2026-09-08-map-95-rules-in-this-file-are-one-question-in-17-shapes-is-the-number-i-read-the-one-the-decision-depends-on-read-this-before-writing-another-lane-learnings-instrument-family-consolidation-session-e51345f0)
@@ -656,6 +666,28 @@
 - [2026-09-28 (session f9c8d1b9, lane live-props-model-probability) - Interval coverage is…](#2026-09-28-session-f9c8d1b9-lane-live-props-model-probability---interval-coverage-is-not-calibration-and-sample-on-the-clock-the-product-prices-on)
 - [2026-09-28 — A POPULATION IS PART OF A CONSTANT. Four findings reversed when the popula…](#2026-09-28-a-population-is-part-of-a-constant-four-findings-reversed-when-the-population-changed-and-three-retractions-came-from-measuring-the-wrong-pair)
 - [2026-09-28 (session 2aff0397, lane nfl-game-day-injuries) - A flag is set on the servic…](#2026-09-28-session-2aff0397-lane-nfl-game-day-injuries---a-flag-is-set-on-the-service-whose-loop-reads-it-a-file-is-read-on-the-service-whose-disk-holds-it)
+- [2026-09-28 — A LANE BLOCK AND THE DEPLOY LEDGER DISAGREED FOR A DAY, AND THE LEDGER WAS…](#2026-09-28-a-lane-block-and-the-deploy-ledger-disagreed-for-a-day-and-the-ledger-was-right-plus-a-verdict-is-a-claim-and-ages-like-one)
+- [2026-09-28 (session f9c8d1b9, lane live-props-model-probability) - A variant chosen in-…](#2026-09-28-session-f9c8d1b9-lane-live-props-model-probability---a-variant-chosen-in-season-can-fail-the-playoff-holdout-for-a-reason-outside-the-variant)
+- [2026-09-29 STANDING: claimed edge running ANTI-correlated with realised return is now m…](#2026-09-29-standing-claimed-edge-running-anti-correlated-with-realised-return-is-now-measured-in-two-sports-treat-roi-falls-as-the-ev-threshold-rises-as-the-primary-read-not-any-single-thresholds-ci-lane-mlb-live-prop-grader-session-4ab694ed)
+- [2026-09-30: a task QUEUED with spawn_task can be landed by ANOTHER session while you ar…](#2026-09-30-a-task-queued-with-spawn_task-can-be-landed-by-another-session-while-you-are-still-building-it-so-re-fetch-main-before-opening-the-pr)
+- [2026-09-30: an in-process test of a CLI function does not test the CLI, so run the entr…](#2026-09-30-an-in-process-test-of-a-cli-function-does-not-test-the-cli-so-run-the-entrypoint-once)
+- [2026-10-01: "minutes 0" is not "did not play" in ESPN box scores, so read ESPN's `didNo…](#2026-10-01-minutes-0-is-not-did-not-play-in-espn-box-scores-so-read-espns-didnotplay-flag)
+- [2026-10-01: a GRACEFUL gunicorn gthread exit still drops requests, so "graceful" is abo…](#2026-10-01-a-graceful-gunicorn-gthread-exit-still-drops-requests-so-graceful-is-about-the-process-not-the-connections)
+- [2026-10-01: repointing a script's base URL does not repoint its LOG reads, so a fleet r…](#2026-10-01-repointing-a-scripts-base-url-does-not-repoint-its-log-reads-so-a-fleet-run-can-stay-blind-to-render)
+- [2026-10-01: a drain that says CLEAR has not drained anything until the ACK is newer tha…](#2026-10-01-a-drain-that-says-clear-has-not-drained-anything-until-the-ack-is-newer-than-the-request)
+- [2026-10-02: a process listing is not a list of work -- zombies, and names that contain…](#2026-10-02-a-process-listing-is-not-a-list-of-work----zombies-and-names-that-contain-other-names)
+- [2026-10-02: a red suite with a recorded baseline is not "known red" until each entry fa…](#2026-10-02-a-red-suite-with-a-recorded-baseline-is-not-known-red-until-each-entry-fails-on-the-runner-you-trust-for-the-same-reason)
+- [2026-10-02: a determinism test inside ONE process cannot see per-process randomness](#2026-10-02-a-determinism-test-inside-one-process-cannot-see-per-process-randomness)
+- [2026-10-02: a clean reproduction of PART of a caught scope exonerates nothing -- reprod…](#2026-10-02-a-clean-reproduction-of-part-of-a-caught-scope-exonerates-nothing----reproduce-exactly-what-the-except-wraps)
+- [2026-10-02: a restart count and a `code=` stamp cannot tell a deliberate deploy from an…](#2026-10-02-a-restart-count-and-a-code-stamp-cannot-tell-a-deliberate-deploy-from-an-accident)
+- [2026-10-02: a test that passes against a swallowing parser can be vacuous -- prove the…](#2026-10-02-a-test-that-passes-against-a-swallowing-parser-can-be-vacuous----prove-the-fixture-reaches-the-code)
+- [2026-10-02 -- A log COUNT can match its own watcher; a status LABEL can lag the code](#2026-10-02----a-log-count-can-match-its-own-watcher-a-status-label-can-lag-the-code)
+- [2026-10-02: a scan of what a nested record MENTIONS is not what it is ABOUT -- read its…](#2026-10-02-a-scan-of-what-a-nested-record-mentions-is-not-what-it-is-about----read-its-subject-fields-before-acting-on-it)
+- [2026-10-02 -- A role restart on the shared fleet is an event in someone else's data](#2026-10-02----a-role-restart-on-the-shared-fleet-is-an-event-in-someone-elses-data)
+- [2026-10-02: a per-sport failure inside a big odds run is NOT in the run file -- read th…](#2026-10-02-a-per-sport-failure-inside-a-big-odds-run-is-not-in-the-run-file----read-the-sports-own-log)
+- [2026-10-02: a snapshot's row count is not its player-prop count, and a lane note naming…](#2026-10-02-a-snapshots-row-count-is-not-its-player-prop-count-and-a-lane-note-naming-a-file-is-a-claim)
+- [2026-10-02: a date read off `commence_time[:10]` is a UTC date -- an evening slate is "…](#2026-10-02-a-date-read-off-commence_time10-is-a-utc-date----an-evening-slate-is-tomorrow-in-it-and-so-was-my-diagnosis)
+- [2026-10-02 OVERTURNED: "pull from production (/api/ops/artifacts/export)" as the route…](#2026-10-02-overturned-pull-from-production-apiopsartifactsexport-as-the-route-to-mlb-history----since-2026-09-30-production-is-the-local-wsl-fleet-and-its-pre-09-30-history-is-the-git-mirror-lane-mlb-lines-props-backtest-session-b98d59a1)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

@@ -1500,3 +1500,40 @@ none had ever asserted `cards`. The new case is dated 09-22 and asserts ONE CARD
 
 **Still no-regression only** (13 MLB tiles, 0 duplicate matchups, 16:09:17Z). No
 doubleheader exists on 2026-09-26 to exercise it, and none remains this season.
+
+## [mlb-asof-backtest] NO MLB PREGAME MARKET EARNS A PROBABILITY: 0 of 23 beat both the player/team as-of baseline and the de-vigged book; 10 are WORSE than the book `[measured 2026-10-02, lane mlb-lines-props-backtest, NO DEPLOY]`
+
+The first leak-free MLB backtest. Its pieces:
+
+- **Model.** Per-game sims kept only if simulated while the game was Scheduled/Pre-Game/Warmup; `daily_summary` is NOT used, because it is post-game re-sims.
+- **Book.** The quote retrieved before first pitch.
+- **Baselines.** Built strictly before the date.
+- **Window.** 41 regular dates / 504 games (05-28..07-12); the postseason has 1 joinable game.
+- **Script.** `scripts/backtest_mlb_lines_props.py`.
+- **Full numbers.** `findings_2026-10-02_mlb_lines_props_backtest.md`.
+
+**WORSE than the book**, Brier diff with CI wholly above 0:
+
+| market | Brier diff |
+|---|---|
+| full total | +0.0123 |
+| F5 ML | +0.0097 |
+| F5 total | +0.0130 |
+| F1 total | +0.0095 |
+| hits | +0.0034 |
+| total bases | +0.0042 |
+| HR | +0.0108 |
+| pitcher strikeouts | +0.0317 |
+| outs | +0.1362 |
+| hits allowed | +0.0601 |
+
+Everything else is at parity, and nothing is better than the book.
+
+Other readings:
+
+- **Hitter H/TB/RBI/R beat the player's own as-of rate on Brier and still do not beat the price.**
+- **Starter length.** In this engine vintage, model starter outs average 20.5 against 15.8 actual.
+- **Scope.** This is the May–July engine. The 09-01/09-05/09-08 refits are unmeasured as-of, because their stored projections are post-game re-sims.
+- **Unreachable dates.** 07-13..09-29 sims live only on suspended Render.
+
+**The board still serves `model_prob_over`/edge on every MLB pregame market** (code: `prop_projections.py:687/726/768`, `project_game_market`). Stakes are already price-based (`[portfolio-sim-sizing-gate]`). Mean-only awaits a user decision.

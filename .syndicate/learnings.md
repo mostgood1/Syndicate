@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1202 rules `[generated]`
+## Index — 1234 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5280,3 +5280,9 @@ own prior verdicts, not by anything failing.
 ## 2026-10-02: a date read off `commence_time[:10]` is a UTC date -- an evening slate is "tomorrow" in it, and so was my diagnosis
 - Measured (lane `layer2-freshness-1h`): I bucketed NHL board rows by `commence_time[:10]`, saw "10-03", concluded tomorrow's games were unprojected, and shipped a date-set fix (5c1b1bf2) that moved nothing. All 17 rows were TONIGHT: 7:10-9:10pm CT is 00:10-02:10Z the next day. The real defect was the same mistake in code -- `attach_nhl_game_projections` scoped rows by the UTC prefix and dropped every evening game (fixed 693de7a7, 17/17 projected). Bucket by `central_date_from_iso` before reasoning about slates, and check the weekday too: I also ran half a day calling Friday 2026-10-02 a Thursday, which inverted an NCAAF savings estimate.
 - Related, same day: a sim input checklist (`scripts/nhl_sim_input_checklist.py`) audits the CHECKOUT's `data/` mirror unless pointed at production (`SYNDICATE_ARTIFACT_ROOT_<SPORT>` / `SYNDICATE_DATA_ROOT`). Its "21 unfed fields on the fleet" was a reading of the mirror; it prints the substrate path on one line -- read that line before quoting the result.
+
+## 2026-10-02 OVERTURNED: "pull from production (/api/ops/artifacts/export)" as the route to MLB history -- since 2026-09-30 production is the local WSL fleet, and its pre-09-30 history IS the git mirror `[lane mlb-lines-props-backtest, session b98d59a1]`
+
+- What we believed: the CLAUDE.md rule "Render is the source of truth; pull from `/api/ops/artifacts/export`" still names a reachable substrate richer than git.
+- What was true: Render suspended all three services 2026-09-30 (`docs/ai_context/local_production_runbook.md`). Production is now `/home/amyn/syndicate-prod` in WSL (web on 127.0.0.1:10000). Its MLB data root was SEEDED from the git mirror at bootstrap, so every artifact dated before 09-30 there is byte-for-byte the checkout's: all 44 MLB sim dates (05-28..07-12) are git-tracked. MLB sims for 07-13..09-29 existed only on Render's disk and are unreachable until someone pays to unsuspend web.
+- Rule: before scoping any backtest, locate production FIRST (`wsl -l -v`, `ps` for `local_production.py up`) and print per-family coverage from THAT data root; label any pre-09-30 artifact on the fleet as `checkout`-provenance, not `render`. A "full season" request is a billing decision when its middle months were Render-only.
