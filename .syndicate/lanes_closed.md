@@ -8890,3 +8890,374 @@ SAFE_SLUGS=ncaaf-board-sim-coverage,ncaaf-sim-inseason-ratings,ncaaf-player-data
 - Blocked by: none
 - **CLOSED 2026-10-01 23:06Z: GOAL MET.** Live A/B on web, same load (3,200 fresh connections to /healthz): stock 2 recycles -> 2 ConnectionResetError; draining (`cd507a9b`, HUP 23:04:42Z) 2 recycles -> 0 failures, both `WEB_WORKER_DRAINED accepted_unread_at_stop 1 abandoned 0`. `deploys.md` 2026-10-01 23:04Z.
 - **PROGRESS 2026-10-01: hypothesis CONFIRMED, code + tests DONE, live A/B next.** gunicorn 21.2.0 `gthread.run()` exits its loop and `poller.close()`s connections accepted (`accept` -> `poller.register`) but not yet read; process exit resets them. Isolated repro (toy app, 2x4 gthread, recycle every 25, 16 clients, 4,000 req), 3 rounds each: stock 101 / 106 / 104 failed; `DrainingThreadWorker` 0 / 0 / 0, 109 drains all `abandoned: 0`, typically `accepted_unread_at_stop: 1`, ~0.1 s each. `gunicorn.conf.py` sets `worker_class` (switch `SYNDICATE_WEB_WORKER_DRAIN`). Tests: 21 pass in WSL incl. a real-gunicorn recycle-under-load test, which FAILS with stock gthread (verified); on Windows the POSIX tests skip.
+
+### local-production-first-run — CLOSED — opened 2026-09-30, closed 2026-09-30 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: MET.** Native-Windows `up --state file`: board 22:54:32Z 463 rows -> 23:18Z 1159 rows incl. mlb 72 (`deploys.md` 23:15Z + 23:18Z). Fixed: checkout-depth crash (#313, doctor check), import-render-env sys.path, SYNDICATE_PORTFOLIO_* names, headroom gates failing closed with no cgroup (SYNDICATE_LOCAL_MEMORY_LIMIT_MB). Claims RELEASED.
+- Goal: local_production.py up on native Windows (--state file) produces FRESH data end-to-end: today's odds snapshot on the local data root and a fresh board generated_at, recorded in deploys.md (#692 item 2)
+- Files: scripts/local_production.py, tests/test_local_production.py, docs/ai_context/local_production_runbook.md, syndicate/features/shared/memory_observability.py, tests/test_memory_observability_local_limit.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: after ~15 min of up: odds snapshot files dated 2026-09-30/10-01 under the local data root with mtime after up started; /api board payload generated_at after up started; reading written to .syndicate/deploys.md
+- Blocked by: none
+
+### local-production-boot-task — CLOSED — opened 2026-09-30, closed 2026-09-30 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: MET.** Task `SyndicateLocalProduction` (logon trigger, restart every 1 min) registered with -LocalHome/-GlobalArgs/-Python; session fleet stopped, task started it: `/healthz` 200 in 85 s, supervisor.log written, same home reused (seed rc 0). Installer's native mode had booted an empty %LOCALAPPDATA% fleet, put --state after `up`, and used `py -3` on a two-Python machine. Claims RELEASED.
+- Goal: Windows scheduled task starts local production at logon from C:\SyndicateProd with the right home, --state file and Python 3.11 x64, and restarts it on failure
+- Files: deploy/local/install_windows_task.ps1, docs/ai_context/local_production_runbook.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: task registered; fleet stopped and restarted BY THE TASK; /healthz 200 with supervisor pid owned by the task; supervisor.log written under home
+- Blocked by: none
+
+### local-production-wsl — CLOSED — opened 2026-09-30, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: MET.** WSL2 Ubuntu-24.04 + redis 7.0.15: RENDER=true, keyvalue on both workers, gunicorn 2x4, logon task `-Mode Wsl`, board 01:45:40Z 1890 rows over 6 sports (`deploys.md` 2026-10-01 01:50Z). Fixed `3d667d9d` (gunicorn on PATH), `68600132` (VM-wide memory.stat), installer WSL mode. Claims RELEASED.
+- Goal: Local production runs in WSL2 Ubuntu with Redis (RENDER=true, keyvalue state, gunicorn) started by the logon task, data migrated from the native home, native task retired
+- Files: deploy/local/install_windows_task.ps1, docs/ai_context/local_production_runbook.md, scripts/local_production.py, tests/test_local_production.py, syndicate/features/shared/memory_observability.py, tests/test_memory_observability_local_limit.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: WSL fleet: doctor READY state=redis; REFRESH_STATE_BACKEND=keyvalue on both workers; gunicorn web /healthz 200 on 10000 from Windows; fresh board generated_at after start with mlb/wnba/ncaaf/nfl rows; started by the scheduled task
+- Blocked by: none
+
+### local-production-audit-fixes — CLOSED — opened 2026-10-01, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: MET.** Verified live after `d5aeeca4`: wnba board 200, ncaaf weeks [1,4,5], 6 stub URLs 404; 9 regression tests fail-before/pass-after; 77 neighbouring tests pass (`deploys.md` 2026-10-01 14:55Z). Claims RELEASED.
+- Goal: Fix defects found by the 2026-10-01 local-production route audit that are in unclaimed files: WNBA board 500 (_game_card_generic.html panel items), /ncaaf/api/weeks missing real SmartSim2 weeks, dead MLB betting-card stub routes
+- Files: syndicate/templates/shared/_game_card_generic.html, syndicate/blueprints/ncaaf.py, syndicate/blueprints/mlb.py, tests/test_local_audit_fixes.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: /wnba/cards?client=board 200 on the local fleet; /ncaaf/api/weeks lists 2026 weeks 1,4,5; the six stub URLs 404; regression tests fail before and pass after
+- Blocked by: none
+
+### card-status-dict-label — CLOSED — opened 2026-10-01, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: MET.** Live `/wnba/cards?client=board` badges read `Scheduled`, 0 contract keys in the HTML after `6fd48b7f` (`deploys.md`). Claims RELEASED.
+- Goal: Card status badges render a label, never a raw status dict: /wnba/cards?client=board shows SCHEDULED/LIVE/FINAL instead of {'status': ..., 'detail': ...}
+- Files: syndicate/features/shared/status_label.py, syndicate/app.py, syndicate/templates/shared/_game_card_generic.html, syndicate/templates/shared/_scoreboard_strip_generic.html, tests/test_status_label.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: regression test fails before / passes after; live /wnba/cards?client=board HTML contains no '{&#39;status&#39;' or '&quot;status&quot;' text in the status badge; other sports' string statuses unchanged
+- Blocked by: none
+
+### basketball-prop-model-pwin — CLOSED — opened 2026-10-01, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: MET.** Live /wnba/picks: Young 64.5% / Clark 64.1% / Gray 50.6% (were the price-implied 49.3/55.0/45.0), summaries name the projection; `fe9d15af`; 15 regression tests (`deploys.md` 2026-10-01 ~11:30 CT). Claims RELEASED.
+- Goal: Basketball prop picks publish the MODEL win probability (own p_win, else the exact EV inversion q = implied*(1+ev)), never the bare price-implied probability; WNBA slate summary names the projection the row carries
+- Files: scripts/refresh_wnba_oddsapi_props.py, scripts/refresh_nba_oddsapi_props.py, tests/test_basketball_prop_model_pwin.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: regression tests fail before / pass after; rebuilt WNBA slate for 2026-10-01: Jackie Young win_prob ~0.6445 (consistent with EV 30.8% at +103), summary 'Pts projection 14.48'; /wnba/picks shows it
+- Blocked by: none
+
+### basketball-player-logs-shot-columns — CLOSED — opened 2026-10-01, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: MET for the ML layer; hypothesis CONFIRMED.** Rebuilt player_logs carries all 9 shot columns; median pred_pts/roll10 0.338 -> 0.862. Published projections largely UNCHANGED because they come from the smart sim, which flattens player rates (not fixed here -- `deploys.md` 2026-10-01 ~11:30 CT). `0417e1c9`. Claims RELEASED.
+- Goal: Basketball prop features are fed again: player_logs.csv carries every box-score stat the props feature builder reads (FGM/FGA/FG3A/FTM/FTA/OREB/DREB/PF/PLUS_MINUS), and the ONNX predictor refuses to publish when its features are unfed instead of zero-filling them
+- Files: scripts/build_basketball_player_logs.py, syndicate/features/shared/basketball_props_onnx.py, tests/test_basketball_player_logs_shot_columns.py
+- Hypothesis: #477 (2026-08-19) writes a slim player_logs.csv; the feature loader prefers it over boxscores_history, so 64/140 model features are empty and zero-filled -> pred_pts ~0.35x roll10
+- Falsification test: after rebuilding player_logs with the shot columns, if today's props_predictions still shows pred_pts/roll10 far from ~1.0 (or the 64 columns stay empty), the hypothesis is wrong
+- Verification: rebuilt 2026-10-01 props_predictions: the 52 columns filled, median pred_pts/roll10 back near 1.0 (Render July: 0.94-1.06); regression tests fail before / pass after
+- Blocked by: none
+
+### wnba-sim-usage-flattening — CLOSED — opened 2026-10-01, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: PARTIALLY MET.** Shipped `b045fa09`: exact-inclusion lineup sampler (backtest MAE -0.212, CI [-0.320,-0.153]) + priors name-join fallback. Usage-weight change FALSIFIED and not shipped. Wilson live sim 14.3 -> 16.4 vs 26.8 recent -- the verification's 'within recent form' is NOT met: remaining causes are the sim MINUTES model (26.3 vs 30.5) and a ~-3.6 top2 residual not yet identified (`deploys.md` 2026-10-01 ~1:00 PM CT). Claims RELEASED.
+- Goal: WNBA smart-sim player points track reality: the A'ja-Wilson-style name-key miss is fixed and possession usage is allocated in proportion to per-minute rates, measured better against actual box scores
+- Files: syndicate/features/shared/basketball_props_smart_sim.py, tests/test_basketball_sim_usage_allocation.py
+- Hypothesis: vendor events._player_usage_weights (the one the REAL engine calls; the local override only reaches the stub) flattens usage via log1p(rate), a 25% near-uniform minutes term and a 20% log1p(pred_pts) term, so stars are under- and bench over-simulated; plus _norm_name_key keeps apostrophes so A'ja Wilson misses her prior
+- Falsification test: on the component backtest (actual minutes + actual team points fixed, real engine, 2026-09-17..29), if B3 (both fixes) does not reduce mean abs error vs A with a game-bootstrap CI excluding 0, or if top2 bias is not moved toward 0 without pushing rest bias past it, the hypothesis is wrong and nothing ships
+- Verification: backtest table + CI recorded in deploys.md; regression tests fail before/pass after; live 2026-10-01 sim: Wilson prior found and her sim pts within the recent-form range
+- **RESULT 1 (2026-10-01, recorded before any further change): usage-weight hypothesis FALSIFIED.** Component backtest (31 games 09-17..29, 641 player-games/arm, actual minutes + team points fixed, real PBP engine): proportional usage B2 +0.252 MAE [CI +0.155,+0.357], B3 +0.247 -- WORSE; top2 bias unmoved (A -3.69). Usage change NOT shipped. Name-join fix B1 neutral overall (-0.006, CI spans 0), affected names MAE 7.27 -> 7.05 -- kept. Priors are ACCURATE (top2 pts_pm 0.600 prior vs 0.587 actual); sim gives top2 15.7% of team pts vs 20.2% actual.
+- **Hypothesis 2 (recorded before testing):** vendor `events._sample_lineup` draws 5 with numpy `choice(replace=False, p=w)`, which compresses inclusion probabilities -- measured on-court/minutes share 0.88 for 28+ min, 1.23 for <18. Fix: exact pi-ps (systematic) sampling, inclusion = 5*w/sum(w) capped at 1, injected at call time.
+- **Falsification 2:** same backtest; if lineup fix arm L does not cut MAE vs A with a game-bootstrap CI excluding 0, or does not move top2 bias toward 0 without pushing rest bias past it, it does not ship.
+- Blocked by: none
+
+### wnba-sim-minutes-model — CLOSED — opened 2026-10-01, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: MET for minutes.** `b983a735` bench-first fallback (backtest -0.232 min/player, CI [-0.336,-0.130]); rotation + pbp histories backfilled from ESPN (migration gap) so LVA/IND use real rotations (`applied: True`). Starters now 29-33.5 sim min vs 26-29 before. Stars' POINTS still short (~-3.6 residual, cause unknown) and tiny-minute rate inflation found -- not fixed (`deploys.md` 2026-10-01 ~2:30 PM CT). Claims RELEASED.
+- Goal: WNBA smart-sim minutes match real rotations: the no-rotation-history fallback stops shrinking stars proportionally, and the rotation history lost in the Render migration is rebuilt
+- Files: syndicate/features/shared/basketball_props_smart_sim.py, tests/test_basketball_sim_minutes_model.py
+- Hypothesis: vendor _derive_sim_minutes scales every candidate's rolling minutes by 200/sum (LVA 10-01: 232 -> x0.862, Wilson 30.5 -> 26.3); real excess minutes come off the bench, so stars are under- and bench over-allotted. Separately rotation_stints_history holds only 09-30 locally (Render's accumulated CSV was disk-only), so every team falls to this fallback
+- Falsification test: minutes backtest 2026-09-17..29 vs actual box minutes: if no bench-first allocation (constant-subtraction water-fill or power-gamma) beats proportional scaling on MAE with a game-bootstrap CI excluding 0 AND reduces top-3 under-allocation, the fallback change does not ship
+- Verification: backtest table + CI in deploys.md; regression tests fail before/pass after; live 10-01 sim minutes for LVA/IND starters within ~2 min of their recent averages; rotation history covers LVA/IND
+- Blocked by: none
+
+### wnba-sim-star-shortfall — CLOSED — opened 2026-10-01, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: PARTIALLY MET.** Cause found: free throws were drawn at a flat team rate, not the shooter's (stars' FTA 0.60x actual). `8fd37ff3` shooter-weighted FT draw: PTS MAE -0.056 [CI -0.114, -0.000], top-2 bias -2.51 -> -2.38. Remaining gap is team-level (FT volume 0.228 vs 0.293 FTA/FGA, FG% 0.410 vs 0.450, stale team advanced stats) -- not in this lane. Upstream PR not yet opened. (`deploys.md` 2026-10-01 ~5:00 PM CT). Claims RELEASED.
+- Goal: Find and fix why the WNBA smart sim under-projects top scorers by ~3.6 pts even with actual minutes and team points fixed (component backtest, priors accurate)
+- Files: syndicate/features/shared/basketball_props_smart_sim.py, tests/test_basketball_sim_star_shortfall.py
+- Hypothesis: TBD -- step 1 is a measurement: decompose sim vs actual by FGA/FGM/FG3A/FG3M/FTA/FTM for top2 vs rest; the hypothesis is written here BEFORE any fix is tested
+- Falsification test: any candidate fix must cut player-points MAE vs current on the component backtest (2026-09-17..29) with a game-bootstrap CI excluding 0 AND move top2 bias toward 0 without pushing rest past it, or it does not ship
+- Verification: decomposition + backtest table + CI in deploys.md; regression tests fail before/pass after
+- **DECOMPOSITION (2026-10-01, 36 games / 726 player-games, actual minutes + team pts fixed, current code):** sim/actual top2: PTS 0.86, FGA 1.02 (volume RIGHT), FGM 0.92, **FTA 0.60**; rest FTA 1.19. FTA/FGA sim 0.220 (top2) vs 0.232 (rest) -- uniform -- vs actual 0.376 vs 0.241. Secondary: FG% low for all (0.410 vs 0.450).
+- **Hypothesis (recorded before testing):** vendor `events.simulate_pbp_game_boxscore` draws `foul = rng.random() < foul_per_fga` (TEAM rate) BEFORE picking the shooter, so free throws follow shot share and a player's own foul-drawing (`fta_pm/fga_pm`) is ignored. Fix: pick the shooter first, then foul with p = foul_per_fga x the shooter's FT-rate multiplier, normalised so the team's expected foul rate is unchanged. Vendor change (inline loop) -- upstream PR owed.
+- Blocked by: none
+
+### wnba-sim-team-calibration — CLOSED — opened 2026-10-01, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: PARTIALLY MET.** Shipped `c0d406d3`: M2 (fouled miss not an FGA) CONFIRMED, M4 (eff solved against the loop, incl. the quarter-clock OREB cap) CONFIRMED, M5 (no team prior on a target) CONFIRMED on the production path. REFUTED: M1 (FTA +0.32), M6 (PTS worse), M3 (full season -0.06 [CI -0.18, +0.06]). Team points now on target (bias +2.94 -> -0.17; live LVA-IND 198.0 -> 173.3 vs 174.1). FGA 1.18x -> 1.08x and FG% .409 -> .428 (actual .456) -- improved, not matched: the rest is TOV 0.77x (priors). Found: raw game-model total 157 on the data root vs market 181.5 (board now leans under on it). (`deploys.md` 2026-10-01 ~4:00 PM CT). Claims RELEASED.
+- Goal: WNBA PBP engine: sim team FTA/FGA, FGA and FG% match actual box scores (sim FTA/FGA 0.228 vs 0.293, FGA 1.15x, FG% 0.410 vs 0.450 in the 2026-09-17..29 component backtest)
+- Files: vendor/wnba_betting_repo/src/wnba_betting/sim/events.py,vendor/wnba_betting_repo/src/wnba_betting/sim/smart_sim.py,tests/test_basketball_sim_team_calibration.py
+- Hypothesis: Three engine mechanisms, each testable alone: (M1) _team_rates_from_priors clips foul_per_fga to <=0.20 while league FTA/FGA is 0.317 (production team_advanced_priors 09-30), capping FT volume; (M2) a shooting foul on a MISSED shot is still counted as an FGA, inflating FGA and deflating FG% (real box scores do not count it); (M3) smart_sim multiplies the pregame matchup pace (already team pace) by pace_mult=team/league pace again (LVA-IND 10-01: 84.65 -> 86.87), overstating possessions.
+- Falsification test: M1+M2: paired-seed component backtest (actual minutes+team points, 36 games) -- falsified if team FTA/FGA, FGA ratio and FG% do not each move toward actual, or player PTS MAE does not improve (CI excluding 0 on the harmful side = revert). M3: falsified if predicted possessions WITH pace_mult are no farther from actual box-score possessions than WITHOUT, over 2026 games with as-of team stats.
+- Verification: deploys.md READING: backtest table + engine flags live in WSL fleet venv
+- Blocked by: none
+- **Smoke 2026-10-01 (5 games, N=10, actual possessions + actual team points):** M2 direction CONFIRMED (FGA 1.25x -> 1.14x, FG% .394 -> .433, PTS identical -- accounting only). M1 looks REFUTED: at actual possessions the baseline's FTA VOLUME is already 0.97x; the low FTA/FGA was the inflated-FGA denominator. M1 overshoots FTA (1.34x) and worsens PTS (+0.39). M3 (pace double count, 72 local games): +0.30 poss MAE [CI -0.04, +0.64], slope 0.65 -- directional, not significant; local box history holds 116 of ~290 games, backfilling a SCRATCH copy from ESPN.
+- **New hypotheses, recorded BEFORE testing:** (M4) `_expected_points_per_possession` is not the loop's own scoring model (no and-ones, fouls replace made shots, FG% used as 2P%), so eff_mult misses the target: smoke baseline overshoots actual team points by +4.5/team even with actual points as the target. Fix: a PPP that mirrors the loop, solved for eff_mult. Falsified if |team PTS bias| does not fall below 1 or player PTS MAE does not improve. (M6) 2PA make probability is the player's OVERALL FG% (threes included); fix: 2P% = (FGM-3PM)/(FGA-3PA). Falsified if sim FG% does not move toward actual or PTS MAE worsens. (M5, production) team_adj eff_mult multiplies ON TOP of a market-anchored target: live LVA-IND 10-01 target total 180.8 (anchored), sim mean 198.0 (104.9-93.2), p_total_over 0.84. Fix: with a target present, the team prior does not stack on it. Falsified if production-path sim means do not land within +/-1 pt of their targets.
+
+### wnba-game-total-level — CLOSED — opened 2026-10-01, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: MET (walk-forward), one item owed.** G1 CONFIRMED (calibration file now written by `scripts/build_wnba_totals_calibration.py`, run from `scripts/refresh_wnba_oddsapi_props.py` -- that file is ADDED to this lane's claims; it was unclaimed). G2 CONFIRMED (-0.46 [CI -0.89, -0.01]). Team terms added post hoc (-0.41 [CI -0.69, -0.11]). Raw total MAE 19.81 -> 15.39, bias -13.66 -> +0.09; live LVA-IND raw 157.0 -> 175.6 (`a6d45144`). OWED: HOT_ARTIFACT_PATTERNS entry (file held by lane `nhl-live-resim`). Injury drag unmeasured. (`deploys.md` 2026-10-01 ~5:00 PM CT). Claims RELEASED.
+- Goal: WNBA raw game-model total (market_anchor.model_total_raw) unbiased vs actual 2026 totals; live LVA-IND 10-01 raw 157.0 vs market 181.5
+- Files: syndicate/features/shared/basketball_props_smart_sim.py,scripts/build_wnba_totals_calibration.py,tests/test_wnba_totals_calibration.py
+- Hypothesis: (G1) The vendored game model predicts ~162 every season (2024 bias -0.4, 2025 -1.3, 2026 -11.4 over 344 games): fitted to 2024-25 scoring, it cannot track the 2026 level. The designed level correction, calibration_totals_<date>.json (read by _apply_totals_calibration_local), is consumed but NOTHING in Syndicate writes it. Fix: a Syndicate-owned builder of that file (rolling winsorized actual-minus-model bias, team terms shrunk) run before the smart sim. (G2) _simulate_quarters_local subtracts (opponent def_rtg - 101.5) from an off 'rating' that is DERIVED from the model's predicted points, which already price the opponent; with the 2026 league def at 104.2 that is ~-2.3 pts/team systematically. Fix: no def term on a points-derived rating (or center on the as-of league mean).
+- Falsification test: Walk-forward over 2026 games (calibration from games strictly before each date): G1 falsified if raw-total MAE does not fall with |bias| < 2; G2 falsified if removing/centering the def term does not lower raw-total MAE given G1.
+- Verification: deploys.md READING: live LVA-IND model_total_raw after a forced resim, plus the walk-forward table
+- Blocked by: none
+
+### wnba-sim-tov-priors — CLOSED — opened 2026-10-01, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: PARTIALLY MET.** `9f561ca3`: hypothesis (b) CONFIRMED (missing recent rate counted as 0 in the prior blend, hits stl/blk/tov); H2 CONFIRMED in direction (per-iteration p_tov, 1.17 -> 1.07) but the pre-registered 0.95-1.05 bound is MISSED by ~2 pts. Poisson deviance TOV -0.060, STL -0.064, REB -0.233 (all CI < 0); FGA -0.121. Player TOV/STL MAE rose (median artifact, documented). Live LVA TOV 8.6 -> 12.2 (actual 12.2), IND 11.3 -> 15.5 (actual 13.5). Next: rebounds 1.21-1.25x. Vendor change not upstream. (`deploys.md` 2026-10-01 ~7:00 PM CT). Claims RELEASED.
+- Goal: WNBA smart sim turnovers match actual (component backtest: sim TOV 0.77x actual on fully matched team-games, uniform across players), which also leaves FGA 1.08x
+- Files: syndicate/features/shared/basketball_props_smart_sim.py,tests/test_basketball_sim_tov_priors.py, vendor/wnba_betting_repo/src/wnba_betting/sim/events.py
+- Hypothesis: The shortfall is introduced AFTER the logs: player_logs TOV/min matches box scores (0.0689 vs 0.0684), and the engine realizes ~1.1x its per-iteration p_tov, so the per-minute _prior_tov_pm the engine receives must be ~0.7x the players' real rate. Candidate stages, to be measured in order: (a) compute_player_priors_local rates (plain means), (b) _apply_player_priors_local's prior/pred fallback and its bounded split/opponent/position/roll adjustments (tov bounds 0.82-1.20), (c) the engine's p_tov (clip 0.05-0.22, garbage-time 0.94).
+- Falsification test: Falsified if raw compute_player_priors_local TOV x actual minutes is itself ~0.75x actual TOV (then the loss is in the logs/windowing, not the blend). A fix ships only if the component backtest's TOV ratio moves to within 0.95-1.05 and player PTS/FGA error does not worsen (CI).
+- Verification: deploys.md READING: per-stage TOV ratio table + backtest
+- Blocked by: none
+- **Stage measurement 2026-10-01 (126 team-games, scratch backfill):** raw `compute_player_priors_local` TOV x minutes 0.801x actual; what the engine receives 0.726x; the players' real as-of box rates 1.027x. Hypothesis (b) CONFIRMED, cause found: `_weighted_positive_mean` returns 0.0 when every input is missing, and the anchor then counted that 0.0 as a real recent rate (weight 0.35) -- every stat without rolling features (stl, blk, tov) got anchor = 0.5 x prior + 0.15 x pred (quintile 0 predicted 0.0237, measured 0.0238). Fix `PRIOR_BLEND_MISSING_RECENT_IS_ABSENT`. The context tables (split, career-opp, position) are clean.
+- **Smoke (5 games) exposes a second mechanism; hypothesis H2 recorded BEFORE testing:** with the blend fixed, sim TOV is 1.17x -- the engine turns per-game TOV into p_tov = tov / possessions but checks it on every shot ITERATION (~1.1 per possession, OREB continuation), so it realizes ~(1 + c) x its prior. Fix: divide p_tov by the expected iterations (1 + c, the same continuation the target solver uses). Falsified unless blend fix + H2 put the component-backtest TOV ratio within 0.95-1.05 without worsening player PTS/FGA error (CI). Also seen, NOT in scope: blocks 0.57x (constant `base_block_rate_on_2pa` 0.05; priors only allocate), steals a fixed 0.55 share of TOV.
+
+### wnba-sim-rebound-credit — CLOSED — opened 2026-10-01, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: PARTIALLY MET.** R1 CONFIRMED (`863e9e09`): credit per miss now 0.889 vs actual 0.896; REB deviance -0.214 [CI -0.244, -0.183] out of sample. Team REB 1.211x -> 1.073x -- the 0.95-1.05 bound is MISSED; the rest is extra misses, not credit. Live LVA 41.1 -> 36.6, IND 42.6 -> 38.3 (actual ~33). Vendor change not upstream. (`deploys.md` 2026-10-01 ~7:50 PM CT). Claims RELEASED.
+- Goal: WNBA sim player rebounds match actual (component backtest 1.21x; live LVA-IND 41-43 per team vs ~33.5)
+- Files: vendor/wnba_betting_repo/src/wnba_betting/sim/events.py,tests/test_basketball_sim_rebound_credit.py
+- Hypothesis: (R1) The PBP loop credits a PLAYER rebound on every missed FG; real box scores credit 0.893 player rebounds per missed FG (Jul-Sep 2026: OREB 0.226 per own miss, DREB 0.667 per opponent miss -- the rest are team rebounds / dead balls). Sim misses are now only +3.5% (FG% .454 vs .456), so the excess (~+20%) is the credit. Fix: keep possession flow (OREB continuation at the existing rate) but credit the player only with probability = real player-OREB / continuation and real player-DREB / defensive-rebound share, constants fitted on May-June 2026 only.
+- Falsification test: Component backtest Jul-Sep (out of sample for the fit), paired seeds: falsified unless team REB ratio lands within 0.95-1.05 AND player REB Poisson deviance improves (CI < 0) without PTS/FGA deviance worsening.
+- Verification: deploys.md READING: backtest table + live LVA-IND rebounds
+- Blocked by: none
+
+### scripts-base-url-resolver — CLOSED — opened 2026-10-01 — closed 2026-10-01 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: Every free scripts/*.py default base URL resolves via scripts/_base_url.py::default_base_url() (SYNDICATE_BASE_URL > SYNDICATE_OPS_BASE_URL > SYNDICATE_DIAG_BASE_URL > Render URL); unchanged when no env var set; a test fails on any new hard-coded default — **GOAL: MET** (reading: tests/test_base_url.py 6 passed; old-vs-new eval identical at all 56 sites with env unset; landed 06f5fa7f on origin/main)
+- Files: scripts/_base_url.py,tests/test_base_url.py,scripts/_pipeline_diag.py,scripts/ask_syndicate_regression.py,scripts/audit_layer1_completeness.py,scripts/audit_slate_coverage.py,scripts/backtest_mlb_props.py,scripts/backtest_wnba_projection.py,scripts/bucket_live_edges.py,scripts/bucket_realised_performance.py,scripts/build_basketball_interval_calibration.py,scripts/build_basketball_sim_calibration.py,scripts/capture_wnba_live_player_box.py,scripts/capture_wnba_pbp.py,scripts/census_board_row_duplicates.py,scripts/check_deploy_safety.py,scripts/check_venue_odds_hydration_census.py,scripts/decompose_movement_clv.py,scripts/decompose_sim_clv.py,scripts/fetch_mlb_edge_scan_rows.py,scripts/fetch_prod_artifacts_paced.py,scripts/fit_mlb_prop_calibration.py,scripts/grade_mlb_hitter_props_vs_market.py,scripts/grade_nhl_predictions_vs_market.py,scripts/grade_production_outs_betting.py,scripts/layer2_live_scorecard.py,scripts/malloc_trim_ab.py,scripts/measure_correlation_arm_value.py,scripts/measure_exchange_prop_option_value.py,scripts/measure_game_market_option_value.py,scripts/measure_line_probability_slope.py,scripts/measure_model_edge_coverage.py,scripts/measure_odds_posting_distribution.py,scripts/probe_polymarket_ncaaf_slug_role_join.py,scripts/publish_mlb_season_artifacts.py,scripts/publish_model_scorecard.py,scripts/read_venue_basis.py,scripts/read_win_prob_null.py,scripts/rescore_live_gameline_date.py,scripts/run_weekly_backtests.py,scripts/score_live_gameline_offline.py,scripts/score_projections.py,scripts/sim_output_checklist.py,scripts/snapshot_live_gameline_score.py,scripts/subset_edge_scan.py,scripts/verify_603_cross_game.py,scripts/verify_layer2_row_parity.py,scripts/verify_movement_line_gate.py,scripts/verify_nfl_autorun_obligations.py,scripts/verify_recent_shipped_work.py,scripts/verify_wnba_live_scale.py,scripts/verify_wnba_settlement_gate.py,scripts/verify_wnba_slate_hygiene.py,scripts/verify_wnba_totals_pricing.py,scripts/watch_479_artifacts.py,scripts/watch_488_convergence.py,scripts/watch_clamp_trigger.py,scripts/watch_ncaaf_slate_vs_espn.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: pytest tests/test_base_url.py green; py_compile every edited script; each edited script's module default equals the Render URL with env unset and the env value with SYNDICATE_BASE_URL set
+- Blocked by: none
+- Result: GOAL MET for 56 files. tests/test_base_url.py 6 passed (precedence, blank=unset, AST scan for new hard-coded defaults, stale-allowlist check, planted-default detector). Old-vs-new expression eval on all 56 sites: identical with no env var set; with one set, the only differences are generic vars now honoured where the old code fell back to Render. Script mode (`py -3 scripts/x.py --help`, 5 scripts rc=0) and package mode (`from scripts import x`) both import. 33 test files importing edited scripts: 803 passed, 4 failed -- all 4 in test_ask_sport_coverage NFL nickname lookup, which imports no script (data/ absent in worktree).
+- Skipped, CLAIMED by OPEN lanes (still hard-code Render; listed as `pending:` in tests/test_base_url.py ALLOWED -- convert and delete the entry when the lane closes): scripts/board_delivery_probe.py (nhl-board-rows-missing), scripts/bucket_search.py (accuracy-assessment-0914), scripts/build_wnba_boxscores.py (restore-measurement), scripts/check_e2e_coverage.py (e2e-coverage-contract), scripts/controlled_transfer_probe.py (bandwidth-controlled-transfer), scripts/grade_wnba_live_prop_projection.py (live-props-model-probability), scripts/publish_sim_input_reports.py (local-prod-gap-fixes), scripts/regrade_mlb_game_markets.py (dh-grading-ledger-joins).
+- Deliberately NOT converted: scripts/deploy_preflight.py (Render-deploy gate; generic SYNDICATE_BASE_URL must not repoint half its comparison -- keeps its own SYNDICATE_DIAG_BASE_URL), scripts/watch_unknown_submit.ps1 (PowerShell; resolver is Python -- pass -BaseUrl). Prose-only mentions (docstrings/comments/a 502 message) left as is.
+
+### deploy-safety-fleet-logs — CLOSED — opened 2026-10-01 — closed 2026-10-01 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: check_deploy_safety.py run against the local fleet reads the board-build state from the fleet's refresh-worker log instead of Render's logs API, so it can return CLEAR there; Render behaviour (and deploy_preflight's call) unchanged — **GOAL: MET** (reading: live run vs http://127.0.0.1:10000 returned CLEAR rc=0 with 'Board build idle (last completed 419 log lines ago), ~6.3min', then 45 s later 'Board build IN FLIGHT (stage=layer2_shortlist_build)' rc=1, matching the raw log tail; no-arg board_build_state() still takes the Render arm (test))
+- Files: scripts/check_deploy_safety.py,tests/test_check_deploy_safety_fleet_logs.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit tests over synthetic log tails (in-flight / complete / no-enter); live run against http://127.0.0.1:10000 shows a board-build verdict that is not 'UNKNOWN (no BUILD_SPAN_ENTER)'; deploy_preflight path still calls Render
+- Blocked by: none
+- Limits: fleet log has no timestamps, so no build age / time-remaining; a role killed mid-build reads IN FLIGHT until the next build completes (conservative). `--drain` still sizes its TTL from Render (`_expected_build_seconds`) -> floored at the module default on the fleet.
+
+### deploy-safety-drain-fleet-ttl — CLOSED — opened 2026-10-01 — closed 2026-10-01 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: check_deploy_safety.py --drain against the local fleet sizes its drain TTL from the fleet refresh-worker log (BOARD_BUILD_TIMING wall_s), not Render's logs API; Render path unchanged — **GOAL: MET** (reading: test_drain_ttl_reads_fleet_log_for_a_fleet_url -- fleet URL, wall_s above floor/3 -> TTL = 3 x wall_s, Render estimator called 0 times; no-URL path calls Render 1x, fleet tail 0x; live expected_build_seconds('http://127.0.0.1:10000') = 378.1 s from the real fleet log)
+- Files: scripts/check_deploy_safety.py,tests/test_check_deploy_safety_fleet_logs.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit test: fleet base URL -> TTL = max(default, 3 x fleet wall_s) and Render API not called; no-URL path still reads Render; live: expected_build_seconds('http://127.0.0.1:10000') returns the fleet wall_s
+- Blocked by: none
+- Effect today: 3 x 378 s = 1134 s < 9000 s floor (`_DEFAULT_TTL_SECONDS` 150 min), so the fleet TTL is still 9000 s; what changes is the printed measurement, and the TTL tracks any build > 50 min. No real `--drain` was run (it pauses the live worker).
+
+### wnba-sim-ft-trips — CLOSED — opened 2026-10-01, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: NOT MET -- F1 FALSIFIED.** Artifact half CONFIRMED (clean-game REB 1.033x, misses 1.042x). The solved foul rate fixes misses (1.019x) but overshoots FTA to 1.130x (bound 0.95-1.05); FTA deviance +0.212 [CI +0.138, +0.284]. Not shipped, code removed. Next idea, untested: solve net of the loop's late-game foul boosts. (`deploys.md` 2026-10-01 ~8:45 PM CT). Claims RELEASED.
+- Goal: WNBA sim missed FGs and FT trips match actual on clean games (both teams fully matched: misses 1.04x, FGA 1.037x, FTA 0.83x)
+- Files: vendor/wnba_betting_repo/src/wnba_betting/sim/events.py,tests/test_basketball_sim_ft_trips.py
+- Hypothesis: (F1) The +4% missed FGs are mostly a HARNESS ARTIFACT plus too few free-throw trips. Artifact: on games where both teams' rosters fully match the box score, rebounds are already 1.033x (vs 1.073x all-games) -- an opponent with unmatched players gets a lowered make rate (its points target is matched-only), manufacturing misses. Real residual: FTA 0.83x on clean games -- foul_per_fga = clip(FTA/FGA, 0.05, 0.20) while real FTA/FGA is ~0.29, so possessions end at the line too rarely and become FGAs. Fix: solve the per-attempt foul probability that reproduces the team's FTA/FGA (the refuted-2026-10-01 M1, which was judged on the all-games basis this artifact contaminates).
+- Falsification test: Component backtest Jul-Sep, paired seeds, judged on BOTH-teams-fully-matched games: falsified unless FTA lands within 0.95-1.05 and missed FGs within 0.98-1.02, with player PTS/FGA/FTA Poisson deviance (all games) not worse (CI).
+- Verification: deploys.md READING: clean-game table + deviance
+- Blocked by: none
+
+### fleet-drain-e2e — CLOSED — opened 2026-10-01 — closed 2026-10-01 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: A real check_deploy_safety.py --drain against the local fleet: the refresh-worker acks the drain, defers new builds, reports idle, and --undrain clears it; board builds resume afterwards — **GOAL: MET** (reading: run 1 01:11Z worker acked within ~60 s (`acked_drain_at` set, `DRAIN_HOLD stage=mlb_sim_tick` x many, `DEFERRED_BOARD_BUILD` x5, 0 BUILD_SPAN_ENTER in 7 min drained); --undrain 01:18:10Z cleared owner; next build ENTER ~01:22Z, completed 01:27Z. Hypothesis held, BUT run 1 exposed a deployer defect -- CLEAR in ~1 s on a pre-request heartbeat (`acked None`) -- fixed here)
+- Files: .syndicate/log/2026-10-01.md,scripts/check_deploy_safety.py,tests/test_check_deploy_safety_fleet_logs.py
+- Hypothesis: Run INSIDE WSL with the refresh-worker's state env (keyvalue redis://127.0.0.1:6379/0, SYNDICATE_REPORTS_ROOT=/home/amyn/syndicate-prod/data/reports), --drain writes the same Redis key the worker reads; the worker publishes acked_drain_at within one cycle, finishes any in-flight build, then reads idle -> rc=0. Run from Windows it would NOT (key embeds the resolved absolute path).
+- Falsification test: Falsified if read_worker_state stays 'unknown' (no drain_aware heartbeat) or acked_drain_at never appears within 3 cycles, or a new BUILD_SPAN_ENTER appears in the fleet log after the ack while the drain is in force.
+- Verification: rc=0 with CLEAR line; worker_drain_state acked_drain_at non-null; no BUILD_SPAN_ENTER after ack until --undrain; after --undrain, deploy_drain.json owner empty and a new BOARD_BUILD_TIMING appears
+- Blocked by: none
+- Fix: `_drain_clear` -- CLEAR needs ack >= requested_at AND worker idle AND board_build_state idle (UNKNOWN never clear). Live run 2 (fixed code, 01:22Z, started mid-build): worker idle+acked from 01:23:20Z (old code would have CLEARed) and the drain held through candidate_collection -> portfolio_commit; exited between 01:26:32Z and 01:27:13Z, with BOARD_BUILD_TIMING wall_s=294.1 present by 01:27:15Z and no new ENTER. Its CLEAR line/rc were NOT captured (monitor `rm -f` raced the output file) -- ordering is from an independent 10 s observer.
+
+### wnba-sim-blocks — CLOSED — opened 2026-10-01, closed 2026-10-02 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: PARTIALLY MET.** B0 confirmed; B2 (team prior on missed twos, `cbb14a73`) beat B1 and legacy -- team BLK 0.619x -> 1.064x (bound missed by ~1.4 pts), deviance -0.139 [CI -0.188, -0.096]; A1 (rate allocation, `4ec1fd72`) CONFIRMED -0.034 [-0.045, -0.024], top-quintile bias halved. Root data gap fixed: live box history 108 -> 336 games, player_logs rebuilt (block priors 1.207x -> 1.018x). Remaining: recency windows and pred-filled zero priors; playoff schedule rows. Not upstream. (`deploys.md` 2026-10-01/02 ~11:10 PM CT). Claims RELEASED.
+- Goal: WNBA sim blocks match actual (component backtest 0.65x team blocks; constant base_block_rate_on_2pa 0.05)
+- Files: vendor/wnba_betting_repo/src/wnba_betting/sim/events.py,tests/test_basketball_sim_blocks.py
+- Hypothesis: (B0) The PBP loop draws a block on 5% of ALL 2PAs, after and independent of the make -- so ~half of sim blocks are on made shots (impossible) and the level is ~half the real 0.094 blocks per opponent 2PA (May-Jun 2026; 0.192 per opponent MISSED 2PA). (B1) Fix: block only on missed 2PAs at the May-June league rate 0.192. (B2) Fix: block only on missed 2PAs at a team rate = defense's prior blocks per game / the opponent's expected missed 2PAs per game (team-specific rim protection).
+- Falsification test: Component backtest Jul-Sep (out of sample for B1's constant), paired seeds. Team BLK judged on BOTH-teams-fully-matched games: a variant is falsified unless team BLK lands within 0.95-1.05 AND player BLK Poisson deviance improves (CI < 0) with PTS/FGA/REB deviance not worse. If both pass, B2 ships only if its player BLK deviance beats B1's (CI < 0).
+- Verification: deploys.md READING: clean-game table + deviance + live LVA-IND or next slate
+- Blocked by: none
+- **Backtest 2026-10-01 (Jul-Sep, 192 games; team totals on the 55 both-rosters-matched games):** team BLK legacy 0.621x, league-rate-on-misses (L) **1.296x**, team-prior-on-misses (P) **1.168x** -- BOTH miss the pre-registered 0.95-1.05 bound. Player BLK deviance vs legacy: L +0.029 [CI -0.010, +0.067], **P -0.035 [-0.066, -0.005]**; P vs L -0.065 [-0.086, -0.045]; PTS/FGA/REB unchanged. B0 (blocks on made shots) confirmed in code.
+- **Why P overshoots -- a DATA finding:** P makes team blocks equal the blended priors by construction, and the priors are 1.21x actual (raw 0.80x with 47% of player-rows missing; real as-of season rates 0.99x; ONNX pred_blk 0.0199/min vs real 0.0195). Top-quintile raw rates 0.065/min vs real 0.050 -- small samples: the LOCAL `player_logs.csv` holds only 36 dates (~2,270 rows) while the backfilled box history has 336 games. Every per-minute prior is built from that thin log. Not shipped yet; decision pending: ship P now vs refresh player_logs first.
+- **Shipped team-prior mode `cbb14a73` (full-logs backtest: team BLK 1.064x on 146 both-matched games, player BLK deviance -0.139 [CI -0.188, -0.096], tier bias +0.04/+0.02; the 0.95-1.05 bound missed by ~1.4 pts). Live logs rebuilt from a full ESPN box backfill (108 -> 340 games; backup `~/syndicate-prod/backup_wnba_logs_20261002T0240Z`).** Live GSV-DAL 10-02 pregame: blocks GSV 2.26 -> 4.81 (actual 3.84/g), DAL 2.15 -> 6.82 (actual 4.04/g). Cause traced: DAL's APPLIED prior is 6.72 (engine faithful) -- Kuier's recent-window rate 0.140/min vs 0.090 season plus +4 projected minutes; a recency modelling choice, not a code defect.
+- **Hypothesis A1, recorded BEFORE testing:** within a team, `_player_usage_weights` hands out blocks with a 25% minutes floor and log1p-compressed rates -- right for points, wrong for a concentrated stat: Stokes applied 1.35 -> sim 1.03, Shepard 0.37 -> 0.60, Chen 0.03-rate player 0.30. Fix: allocate blocks among the five on court in proportion to their raw block rates. Falsified unless player BLK Poisson deviance improves vs the shipped team-prior mode (CI < 0) AND the bias of the top block-rate quintile (by actual season rate) shrinks.
+
+### fleet-drain-rerun — CLOSED — opened 2026-10-01 — closed 2026-10-01 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: Capture the fixed --drain's own CLEAR line and exit code on the live fleet (code at origin/main cc2fa010, run inside WSL, fleet checkout untouched), with ack-after-request and board-build idle at the CLEAR instant — **GOAL: MET** (reading: C:/tmp/drain_rerun_014429.out -- 01:44:36Z 'worker has not acked this drain yet' (worker idle, board_build idle: the old code's CLEAR instant), 01:45:06Z 'CLEAR: refresh-worker acked the drain, is idle, and no board build is in flight' drain rc=0; undrain rc=0, owner ''. Ack corroborated by exactly one DRAIN_HOLD after the last pre-drain BOARD_BUILD_TIMING (wall_s=86.1); the 5 s observer missed the ack instant (last active sample 01:45:03Z False))
+- Files: .syndicate/log/2026-10-01.md
+- Hypothesis: With c829b2df, --drain prints 'has not acked this drain yet' until the worker's next cycle, holds while any board build is in flight, then prints CLEAR rc=0 only when ack>=requested_at and the fleet log's last build marker is BOARD_BUILD_TIMING
+- Falsification test: Falsified if CLEAR prints while acked_after_req is False or while the fleet log's last marker is a BUILD_SPAN_ENTER, or if it never CLEARs within 15 min with the worker idle+acked and no build running
+- Verification: drain_rerun_<stamp>.out holds the CLEAR line and rc=0; observer rows at the same instant show acked_after_req True and last marker BOARD_BUILD_TIMING; undrain leaves owner ''
+- Blocked by: none
+- Fleet checkout `~/Syndicate` deliberately NOT updated (user decision): 14 behind github/main incl. 9 runtime files from other lanes; gunicorn has no --preload so web workers would pick them up on recycle. Its remote for GitHub is named `github`; `origin` there is a stale ref.
+
+### fleet-restart-onto-main — CLOSED — opened 2026-10-01 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: LOCAL FLEET ~/Syndicate fast-forwarded to github/main and all three roles restarted together (drain -> down -> scheduled task up), every role reporting code=<new HEAD>, /healthz 200, a board build completing after restart; recorded in deploys.md — **GOAL: MET** (reading: status 02:05:10Z all three roles `up restarts=0 code=5fa8076b`; /healthz 200 02:04:49Z; BOARD_BUILD_TIMING wall_s=332.4 ok=True 02:11:35Z after BOOTED; check_deploy_safety from ~/Syndicate rc 1 'Board build IN FLIGHT' -- a real verdict; deploys.md 2026-10-02 02:04Z)
+- Files: .syndicate/deploys.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: status: web/refresh-worker/live-odds-worker up restarts=0 code=<HEAD>; /healthz 200; BOARD_BUILD_TIMING after restart; check_deploy_safety from ~/Syndicate returns a verdict (not UNKNOWN) on the fleet
+- Blocked by: none
+
+### base-url-pending-conversions — CLOSED — opened 2026-10-01 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: Every pending: script in tests/test_base_url.py ALLOWED whose claiming lane has closed resolves its default via scripts/_base_url.default_base_url(), unchanged with no env var set, and leaves ALLOWED — **GOAL: MET** (reading: claim recheck 2026-10-02 via lane_claims_source.effective_claims -- 1 of 8 pending files free (`publish_sim_input_reports.py`, lane local-prod-gap-fixes CLOSED); converted; tests/test_base_url.py + tests/test_publish_sim_input_reports.py 21 passed incl. stale-allowlist; old-vs-new identical unset and for WEB_PUBLISH/SYNDICATE_BASE/BASE_URL)
+- Files: scripts/publish_sim_input_reports.py,tests/test_base_url.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: tests/test_base_url.py green incl. stale-allowlist check; old-vs-new default equal with env unset; tests/test_publish_sim_input_reports.py green
+- Blocked by: none
+- Still pending (claimed by OPEN lanes at 2026-10-02): board_delivery_probe (nhl-board-rows-missing), bucket_search (accuracy-assessment-0914), build_wnba_boxscores (restore-measurement), check_e2e_coverage (e2e-coverage-contract), controlled_transfer_probe (bandwidth-controlled-transfer), grade_wnba_live_prop_projection (live-props-model-probability), regrade_mlb_game_markets (dh-grading-ledger-joins).
+
+### fleet-restart-onto-main-2 — CLOSED — opened 2026-10-01 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: LOCAL FLEET ~/Syndicate fast-forwarded to github/main and all three roles restarted together (drain -> safety CLEAR -> down -> scheduled task up), every role code=<new HEAD>, /healthz 200, a board build completing after BOOTED; recorded in deploys.md — **GOAL: MET** (reading: status 02:31:24Z all roles `up restarts=0 code=d165980d`; /healthz 200 02:31:17Z; BOARD_BUILD_TIMING wall_s=212.0 ok=True 02:35:33Z after BOOTED line 420210, no DEFERRED/DRAIN_HOLD/Traceback; deploys.md 2026-10-02 02:31Z)
+- Files: .syndicate/deploys.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: status all roles up restarts=0 code=<HEAD>; /healthz 200; BOARD_BUILD_TIMING after the latest [refresh_worker] BOOTED with no DEFERRED/DRAIN_HOLD/Traceback; deploys.md entry
+- Blocked by: none
+
+### fleet-restart-onto-main-3 — CLOSED — opened 2026-10-01 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: LOCAL FLEET ~/Syndicate fast-forwarded to github/main and all three roles restarted together (drain -> safety CLEAR -> down -> scheduled task up), every role code=<new HEAD>, /healthz 200, a board build completing after BOOTED; recorded in deploys.md — **GOAL: DRIFTED** (by user decision: the range had 0 runtime files and an NFL projection child the safety tools cannot see was in flight, so ff-only to 582074b4, no restart -- deploys.md 2026-10-02 02:53Z. The coverage gap is recorded as a LEAD in log/2026-10-01.md; no lane opened for it)
+- Files: .syndicate/deploys.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: status all roles up restarts=0 code=<HEAD>; /healthz 200; BOARD_BUILD_TIMING after the latest [refresh_worker] BOOTED with no DEFERRED/DRAIN_HOLD/Traceback; deploys.md entry
+- Blocked by: none
+
+### deploy-safety-worker-children — CLOSED — opened 2026-10-01 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: check_deploy_safety.py (plain and --drain) against the local fleet blocks while refresh-worker has any live child process (NFL projections, sims, odds jobs -- however launched), naming each; an unreadable process table is UNKNOWN, never clear; Render path unchanged — **GOAL: MET** (reading: 125 passed incl. child present -> NOT CLEAR naming it, none -> note, scan failure/missing worker -> UNKNOWN, drain waits on a child, off-fleet never scans; live 03:05:15Z scan caught build_sport_overview_child.py pid 288742 matching an independent awk tree-walk; plain run 03:06Z printed 'refresh-worker child jobs: none (worker pid=268483)')
+- Files: scripts/check_deploy_safety.py,tests/test_check_deploy_safety_fleet_logs.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: child present -> NOT CLEAR naming it; none -> unchanged verdict; scan failure -> UNKNOWN; drain waits on children; Render/no-URL path never scans. Live: the scan lists refresh-worker's real children on the fleet (match against ps)
+- Blocked by: none
+
+### fleet-ff-safety-children — CLOSED — opened 2026-10-01 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: LOCAL FLEET ~/Syndicate fast-forwarded to github/main with no restart, so check_deploy_safety.py run from the fleet checkout carries the refresh-worker child scan; recorded in deploys.md — **GOAL: MET** (reading: HEAD 995c177f = github/main; only non-ledger file scripts/check_deploy_safety.py; run from ~/Syndicate it printed 'refresh-worker child jobs: none (worker pid=268483)'; /healthz 200; deploys.md 2026-10-02 03:17Z)
+- Files: .syndicate/deploys.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: HEAD = github/main; range has no runtime files besides deployer-side scripts; check_deploy_safety from ~/Syndicate prints the 'refresh-worker child jobs' line; /healthz 200
+- Blocked by: none
+
+### deploy-safety-odds-worker-children — CLOSED — opened 2026-10-01 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: check_deploy_safety.py (plain and --drain) against the local fleet also blocks while live-odds-worker has any live child process, naming each; unreadable or missing worker is UNKNOWN; Render path unchanged — **GOAL: MET** (reading: 131 passed incl. odds child blocks plain + drain, zombies dropped, exact-basename worker match, off-fleet never scans; live 12 samples: odds-worker scan = independent walk 11/12, zombies excluded; plain run 03:35Z named odds pids 298508/298509/298852 matching the state line)
+- Files: scripts/check_deploy_safety.py,tests/test_check_deploy_safety_fleet_logs.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: live-odds child present -> NOT CLEAR naming it (plain and drain); none -> note; scan failure/missing worker -> UNKNOWN; off-fleet never scans. Live: scan lists live-odds-worker's real children matching an independent tree-walk
+- Blocked by: none
+
+### fleet-ff-odds-children — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: LOCAL FLEET ~/Syndicate fast-forwarded to github/main with no restart, so check_deploy_safety.py run from the fleet checkout carries the live-odds-worker child scan and zombie filter; recorded in deploys.md — **GOAL: MET** (reading: HEAD 845fc011 = github/main, already containing 9fc24936 since another lane's 04:09Z reset; from ~/Syndicate the check printed 'live-odds-worker child jobs: none (worker pid=349107)' and named refresh-worker's odds-refresh children while the state line said idle; /healthz 200; deploys.md 2026-10-02 13:11Z)
+- Files: .syndicate/deploys.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: HEAD = github/main; range has no runtime files besides deployer-side scripts; check_deploy_safety from ~/Syndicate prints a 'live-odds-worker child jobs' line or live-odds blockers; /healthz 200
+- Blocked by: none
+
+### wnba-sim-ft-trips-2 — CLOSED — opened 2026-10-02, closed 2026-10-02 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: NOT MET -- reverted.** F1 retest falsified (FTA 1.160x). F2 (fixed-point solve) FTA 1.066x, FTA deviance -0.100, AST +0.013: pre-registration failed; the user overrode it on MY wrong framing (no FTA prop market exists), shipped `066ac9ea`, then reverted on the correction (`80bdd00c`). Next lever: sim FG% .441 vs .453 at FGA 1.045x. (`deploys.md` 2026-10-02 ~9:40 AM CT). Claims RELEASED.
+- Goal: WNBA sim free-throw trips match actual (146 both-rosters-matched games, full-season logs: FTA 0.889x, misses 1.068x, FGA 1.045x)
+- Files: vendor/wnba_betting_repo/src/wnba_betting/sim/events.py,tests/test_basketball_sim_ft_trips.py
+- Hypothesis: F1 RETEST on corrected inputs. Lane wnba-sim-ft-trips falsified F1 (solved per-attempt foul rate -> FTA 1.130x) on THIN-log priors that were never checked. With full-season logs the priors are right (prior FTA/FGA 0.305 vs actual 0.310; FTA volume 0.999x, 126 team-games), and a synthetic run already lands the box score on the target ratio. So the remaining FTA shortfall is the engine cap clip(FTA/FGA, 0.05, 0.20) against a real ~0.31, and solving the rate should bring FTA to ~1.0 and pull misses/FGA down with it.
+- Falsification test: Component backtest Jul-Sep, paired seeds, full logs. Judged on BOTH-teams-fully-matched games: falsified unless FTA lands within 0.95-1.05 AND missed FG moves toward 1.0, with player FTA/PTS/FGA Poisson deviance (all games) not worse (CI).
+- Verification: deploys.md READING: clean-game table + deviance + live GSV-DAL
+- **F1 retest (full-season logs) FALSIFIED AGAIN, cause identified.** 146 both-rosters-matched games: FTA 0.889 -> **1.160** (bound 0.95-1.05), FGA 1.045 -> 1.011, misses 1.068 -> 1.046, FG% .441 -> .434 (actual .453). Deviance FTA -0.035 [CI -0.094, +0.024] n.s., AST +0.024 [+0.010, +0.037], REB -0.025 [-0.038, -0.011]. The priors are right (FTA/FGA 0.305 vs 0.310). Mechanism: the rate is solved at the PRIOR FG%, but the loop shoots at prior x eff_mult, and eff_mult < 1 in real games too (sim FG% below actual) -- more misses -> more fouled-miss trips and fewer counted FGAs. Synthetic: realized 0.338 vs target 0.300.
+- **Hypothesis F2, recorded BEFORE testing:** solve the foul rate at the loop's REALIZED make rate (shot-share FG% x eff_mult), iterating foul rate and eff_mult to a fixed point. Falsified unless clean-game FTA lands within 0.95-1.05 with missed FG moving toward 1.0, and player FTA/PTS/FGA/AST deviance (all games) not worse (CI).
+
+### deploy-safety-stale-odds-pointer — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: On the local fleet, check_deploy_safety's 'Odds refresh RUNNING (pid=N)' blocker is reported as a STALE pointer (note, not blocker) when pid N is not a live process, while a live pid still blocks and an unreadable process table keeps blocking; Render path unchanged — **GOAL: MET** (reading: 136 passed incl. dead pid -> note, live pid -> blocker, unreadable -> blocker, off-fleet -> no scan; live fleet run printed 'Odds refresh: STALE pointer, ignoring (pid=376905 is not running ...)')
+- Files: scripts/check_deploy_safety.py,tests/test_check_deploy_safety_fleet_logs.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: dead pid -> note + no blocker; live pid -> blocker; table unreadable -> blocker kept; off-fleet -> blocker unchanged (never scans). Live: fleet run shows the STALE note when the latest_tick pid is dead
+- Blocked by: none
+
+### fleet-restart-onto-main-4 — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: LOCAL FLEET ~/Syndicate fast-forwarded to github/main and all three roles restarted together (drain incl. both workers' child jobs -> safety CLEAR -> down -> scheduled task up), every role code=<new HEAD>, /healthz 200, a board build completing after BOOTED; recorded in deploys.md — **GOAL: MET** (reading: status 13:37:30Z all roles `up restarts=0 code=9856dd92`; /healthz 200 13:37:25Z; BOARD_BUILD_TIMING wall_s=172.0 ok=True 13:40:38Z after BOOTED line 16042, no DEFERRED/DRAIN_HOLD/Traceback; deploys.md 2026-10-02 13:37Z. First attempt aborted safely on a stale odds pointer, fixed in lane deploy-safety-stale-odds-pointer)
+- Files: .syndicate/deploys.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: status all roles up restarts=0 code=<HEAD>; /healthz 200; BOARD_BUILD_TIMING after the latest [refresh_worker] BOOTED with no DEFERRED/DRAIN_HOLD/Traceback; deploys.md entry
+- Blocked by: none
+
+### live-odds-latest-tick-stale — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: /api/ops/live-refresh/state latest_tick.result no longer reports state=running for an odds-refresh run whose process has exited (measured on the fleet), without changing what a tick launches — **GOAL: MET** (reading: deploys.md 2026-10-02 14:44Z -- run 20261002_144402 served `running` while alive, then `state=finished launchState=running exitCode=0 stateSource=refresh_job_status` once its pid was dead, two consecutive reads)
+- Files: syndicate/features/shared/live_refresh_loop.py,syndicate/blueprints/ops.py,tests/test_live_refresh_latest_tick_status.py
+- Hypothesis: H1: latest_tick.result is the LAUNCH-TIME snapshot (state=running, pid) written once at tick end; nothing rewrites it when that run exits. H2: idle-time tick interval is long (minutes), so the snapshot outlives its process for most of each interval. Stale = H1 x H2, not a stuck writer.
+- Falsification test: H1 falsified if latest_tick.result.state ever reads a terminal state (completed/failed) for the same run_stamp without a new tick. H2 falsified if loop_status.intervalSeconds <= 90 while latest_tick.finishedAt lags > 3x interval (then the writer IS stuck).
+- Verification: Fleet: after the fix, a latest_tick whose result pid is dead reads a terminal/finished state (or carries the run's real status) within one read; unit test for the reconciliation; deploys.md READING
+- Blocked by: none
+- Status 2026-10-02 14:18Z: code landed `8e87c877` (read-side `reconcile_tick_result` + endpoint), 6 tests; H1 and H2 CONFIRMED on the fleet (log/2026-10-02.md); web HUP'd onto it 14:15Z (deploys.md). OWED: the READING -- a served tick whose launched run has exited must show its terminal state; no launching tick has occurred since the HUP (ticks at 14:11Z and 14:28Z were both skipped pregame ticks; watcher bh1t81li1 runs to ~14:56Z).
+
+### odds-run-135535-failure — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: Explain why live-odds-worker odds run 20261002_135535 ended failed exitCode=1 13 s after launch, and whether that failure mode is recurring (rate over today's runs) — **GOAL: MET** (reading: cause = C, `recommendation_engine.build_recommendation_output` indexes `[0]` of an empty ranking after FILTER_CANDIDATES rejects `no_model_probability` -- full traceback reproduced in a scratch copy; rate: WNBA in 65 of today's 498 odds runs, 0 ok -- 36 this IndexError, 29 fetch-step rc=1 whose cause was truncated out of `stderr_tail`. Fix proposed, not applied; see log/2026-10-02.md)
+- Files: .syndicate/log/2026-10-02.md
+- Hypothesis: Candidates, unranked: (A) the child refused/aborted on a lane mutex or 'nothing due' path that exits 1 (benign but mis-coded); (B) an upstream OddsAPI error (HTTP/quota/timeout); (C) a code/data error in refresh_odds_sources.py (Traceback); (D) the wrapper's own timeout/kill.
+- Falsification test: Each candidate is falsified by the run's own stderr/stdout + refresh_and_gate_run.json: A needs a refusal/skip message and no Traceback; B needs an HTTP/quota error; C needs a Traceback; D needs WRAPPER_WAIT_TIMEOUT. Recurrence is measured as failed/total over today's odds_refresh_* run dirs, not from one run.
+- Verification: Cause quoted from the run's own artifacts; failure rate across today's live-odds runs with denominator; log entry
+- Blocked by: none
+
+### base-url-orphaned-conversions — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: The five scripts released from orphaned lanes resolve their default base URL via scripts/_base_url.default_base_url(), unchanged with no env var set, and leave tests/test_base_url.py ALLOWED — **GOAL: MET** (reading: test_base_url green incl. stale-allowlist after removing 5 pending entries; old-vs-new identical with env unset at all 5 sites, 0 regressions; fleet roles set both WNBA-specific vars so build_wnba_boxscores is unchanged in prod; 500 passed over 24 test files)
+- Files: scripts/bucket_search.py,scripts/build_wnba_boxscores.py,scripts/controlled_transfer_probe.py,scripts/grade_wnba_live_prop_projection.py,scripts/regrade_mlb_game_markets.py,tests/test_base_url.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: test_base_url green incl. stale-allowlist; old-vs-new default identical with env unset per site; each script's own tests green
+- Blocked by: none
+
+### base-url-last-two — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: scripts/check_e2e_coverage.py and (on loan, one line only) scripts/board_delivery_probe.py resolve DEFAULT_BASE via scripts/_base_url.default_base_url(), unchanged with no env var set, and leave tests/test_base_url.py ALLOWED — **GOAL: MET** (reading: test_base_url green with ZERO pending entries left; 23 passed; probe diff = the DEFAULT_BASE line + import only; live: check_e2e_coverage via SYNDICATE_BASE_URL reached the fleet, BILLED_responses=0)
+- Files: scripts/check_e2e_coverage.py,scripts/board_delivery_probe.py,tests/test_base_url.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: test_base_url green incl. stale-allowlist; both scripts' own tests green; check_e2e_coverage --payload run exercises the env path without network; board_delivery_probe diff is the one DEFAULT_BASE line plus the import
+- Blocked by: none
+
+### fleet-restart-onto-main-5 — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: LOCAL FLEET ~/Syndicate fast-forwarded to github/main and all three roles restarted together (drain incl. both workers' child jobs -> safety CLEAR -> down -> scheduled task up), every role code=<new HEAD>, /healthz 200, a board build completing after BOOTED; recorded in deploys.md — **GOAL: DRIFTED** (user decision: hold. The only runtime change a restart would ship is open lane layer2-freshness-1h's 5c1b1bf2, mid-verification; owner local_12852f6a messaged; its reply CORRECTED my facts -- the 15:40Z refresh-worker exit and web HUP were the user's deliberate deploy of 5c1b1bf2, and the 15:10Z restart is in deploys.md (~10:10 AM CT). No open leads. See log/2026-10-02.md)
+- Files: .syndicate/deploys.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: status all roles up restarts=0 code=<HEAD>; /healthz 200; BOARD_BUILD_TIMING after the latest [refresh_worker] BOOTED with no DEFERRED/DRAIN_HOLD/Traceback; deploys.md entry
+- Blocked by: none
+
+### wnba-cards-nba-game — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: Explain how an NBA game (MIA@TOR, Toronto Raptors vs Miami Heat, 2026-10-03T23:00Z) got into the fleet's wnba_source game_cards_2026-10-03.csv, and whether it reaches anything served (WNBA board/cards) — **GOAL: MET** (reading: cause A via fallback -- WNBA predict_date_cmd falls back to Bovada when OddsAPI has no WNBA game, and the vendored WNBA odds_bovada.py queries NBA/NBA-preseason URLs; reach: served on /wnba/api/source/cards and /wnba/api/market-board for 10-03, absent from all four /api/board surfaces. Fix proposed, not applied; log/2026-10-02.md)
+- Files: .syndicate/log/2026-10-02.md
+- Hypothesis: Candidates: (A) a WNBA odds/props snapshot for 10-03 carries NBA events (wrong sport key, or a basketball feed not filtered by league); (B) the game_cards builder's raw-snapshot fallback read an NBA-tree file by date/path; (C) a shared cross-sport odds artifact without a sport filter.
+- Falsification test: A needs the NBA event inside a wnba_source raw/processed odds or props file for 10-03; B needs the builder's input path to point outside wnba_source or at an nba file; C needs the row's source to be a shared control-plane artifact. Reach: falsified as harmless only if no served WNBA payload (board/cards API) carries MIA@TOR.
+- Verification: Provenance quoted from the producing file/log line and the builder code path; served-payload check with the WNBA cards/board API; log entry
+- Blocked by: none
+
+### wnba-bovada-league — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: The vendored WNBA repo's Bovada fetchers query Bovada's WNBA category (not NBA) and WNBA predict-date keeps only games whose teams are WNBA teams by NAME; the 10-03 NBA artifacts are quarantined on the fleet; the same fix is opened upstream as a PR to mostgood1/WNBA-Betting — **GOAL: MET** (reading: fixed fetcher live vs Bovada: 10-02 -> DAL@GSV, 10-03 -> none; 5 tests incl. non-vacuous filter check; served /wnba/api/source/cards + market-board for 10-03: NBA-hits 5/8 -> 0 after the disk + keyvalue quarantine (deploys.md 16:37Z); upstream PR https://github.com/mostgood1/WNBA-Betting/pull/8 opened. Shared odds_events/evaluation-ledger rows left for a user decision)
+- Files: vendor/wnba_betting_repo/src/wnba_betting/odds_bovada.py,vendor/wnba_betting_repo/src/wnba_betting/cli.py,vendor/wnba_betting_repo/src/wnba_betting/teams.py,tests/test_wnba_bovada_league.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: ENDPOINTS contain no nba slug and include basketball/wnba; is_wnba_team rejects Toronto Raptors / Miami Heat but accepts Toronto Tempo; the predict-date filter drops a MIA@TOR row. Live: fetch_bovada_odds_current against Bovada returns only WNBA games. Fleet: served /wnba/api/source/cards for 10-03 no longer carries MIA@TOR. Upstream PR URL recorded.
+- Blocked by: none
+- Scope change 2026-10-02 (user decision "drop Bovada game-odds fallback"): `predict_date_cmd`'s Bovada fallback is REMOVED, not just repointed; NBA preseason via OddsAPI `basketball_nba_preseason` is a SEPARATE lane.
+- Status: done (deploys.md 2026-10-02 16:37Z, PR #8).
+
+### nba-preseason-oddsapi — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: NBA odds come from OddsAPI for preseason too: basketball_nba_preseason is listed and priced (per event under its own key) in both Syndicate's props fetcher and the vendored NBA game-odds fetch, and the vendored NBA repo's Bovada game-odds uses (predict-date fallback, odds-snapshots fill) are removed; upstream PR to mostgood1/NBA-Betting — **GOAL: MET** (reading: 6 tests incl. per-key pricing and None-vs-inconclusive; live vendored fetch_game_odds_current(2026-10-03) -> Toronto Raptors vs Miami Heat from OddsAPI basketball_nba_preseason, 22 rows; no Bovada game-odds call left in the NBA cli; fleet ff 17:01Z; upstream PR https://github.com/mostgood1/NBA-Betting/pull/2)
+- Files: scripts/fetch_basketball_oddsapi_props_local.py,vendor/nba_betting_repo/src/nba_betting/odds_api.py,vendor/nba_betting_repo/src/nba_betting/cli.py,tests/test_nba_preseason_oddsapi.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: events listed under both keys, each event priced under its own key, None only when both listings succeed with no game, inconclusive when either fails; predict_date/odds_snapshots have no Bovada game-odds call. Live (fleet, read-only): fetch_game_odds_current for 2026-10-03 returns MIA@TOR from OddsAPI basketball_nba_preseason. Upstream PR URL.
+- Blocked by: none
+- Status: done (deploys.md 2026-10-02 17:01Z; upstream NBA-Betting#2 MERGED 17:55Z as 73892a6d, main == reviewed head, deploys.md 17:55Z; WNBA-Betting#8 merged as b4632180 same time). Owed only: the next fleet NBA run's game_odds_2026-10-03.csv sourced from OddsAPI.
+
+### quarantine-mia-tor-rows — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: The 22 pending evaluation-ledger rows and 24 odds_events rows that record the NBA game MIA@TOR as WNBA (2026-10-03) are moved out of the live files into the quarantine (full originals + removed rows backed up), with no concurrent append lost and no legitimate NBA row touched — **GOAL: MET** (reading: ledger 1661 -> 1637 and odds_events 96696 -> 96672, 24 removed each (ledger count was 24, not 22), 0 late appends lost, 0 bad rows left, originals + removed rows backed up; sweep: no WNBA-labelled MIA@TOR left on disk or keyvalue; deploys.md 2026-10-02 17:24Z)
+- Files: .syndicate/log/2026-10-02.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: after: 0 WNBA-labelled MIA@TOR rows in both files (disk and any keyvalue copy); row counts = before - removed (+ any appends that landed, preserved); backups present; non-WNBA MIA@TOR rows (if any) untouched
+- Blocked by: none
