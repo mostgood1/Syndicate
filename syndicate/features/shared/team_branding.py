@@ -145,7 +145,13 @@ def read_team_branding_snapshot(path: Path) -> tuple[TeamBranding, ...]:
     if not path.exists():
         return ()
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
-        return tuple(TeamBranding.from_csv_row(row) for row in csv.DictReader(handle))
+        # A LIST first, then tuple(): `tuple(<generator>)` grows its result
+        # through `_PyTuple_Resize`, which raised `SystemError: Objects/
+        # tupleobject.c:927: bad argument to internal function` here once in the
+        # archive suite (local ci-suite, 2026-10-02) -- the same intermittent
+        # failure the soccer serializer hit (`c612db03`). A sized list has no
+        # resize step to fail.
+        return tuple([TeamBranding.from_csv_row(row) for row in csv.DictReader(handle)])
 
 
 def team_branding_index_by_id(rows: Sequence[TeamBranding]) -> dict[str, TeamBranding]:

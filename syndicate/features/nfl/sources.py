@@ -376,7 +376,21 @@ def data_path(*parts: str) -> Path:
     It can now only supply a file that exists nowhere better.
     """
     relative = Path(*parts)
-    candidates = list(_source_roots())
+    # Syndicate-owned DISCOVERED roots only -- the rule `_first_existing_root`
+    # and `week_summaries` already apply. `_source_roots()` can include a sibling
+    # repo's data dir (`NFL-Betting/nfl_compare/data`), and resolving per file
+    # (`#672`) let a file that exists ONLY there be read from it: the source-app
+    # fallback the migration gate's "data_path stays on local mirror" contract
+    # forbids (red on main, found 2026-10-02 by the local ci-suite run).
+    #
+    # The filter applies to the DISCOVERED list only, NOT to
+    # `default_nfl_source_root()` below: that is the explicit redirection hook
+    # (see the docstring), it already passes through `_first_existing_root`'s
+    # own nfl_source rule, and a caller or test that redirects it to any
+    # directory must be obeyed. Filtering it too broke
+    # `test_advanced_input_rows_use_source_artifact_fallback_for_nfl`
+    # (second local ci-suite run, 2026-10-02).
+    candidates = [root for root in _source_roots() if "nfl_source" in {part.lower() for part in root.parts}]
     try:
         probe_root = default_nfl_source_root()
         if probe_root not in candidates:
@@ -384,15 +398,6 @@ def data_path(*parts: str) -> Path:
     except Exception:  # noqa: BLE001 -- a root resolver must never break a read
         pass
     for root in candidates:
-        # Syndicate-owned roots only -- the rule `_first_existing_root` and
-        # `week_summaries` already apply. `_source_roots()` can include a sibling
-        # repo's data dir (`NFL-Betting/nfl_compare/data`), and resolving per file
-        # (`#672`) let a file that exists ONLY there be read from it: the
-        # source-app fallback the migration gate's "data_path stays on local
-        # mirror" contract forbids (red on main, found 2026-10-02 by the local
-        # ci-suite run). The sibling exists only on developer machines.
-        if "nfl_source" not in {part.lower() for part in root.parts}:
-            continue
         try:
             candidate = root / relative
             if candidate.exists():
