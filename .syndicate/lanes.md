@@ -1337,7 +1337,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### fleet-restart-onto-main-5 — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
-- Goal: LOCAL FLEET ~/Syndicate fast-forwarded to github/main and all three roles restarted together (drain incl. both workers' child jobs -> safety CLEAR -> down -> scheduled task up), every role code=<new HEAD>, /healthz 200, a board build completing after BOOTED; recorded in deploys.md — **GOAL: DRIFTED** (user decision: hold. The only runtime change a restart would ship is open lane layer2-freshness-1h's 5c1b1bf2, mid-verification; owner local_12852f6a messaged with the facts instead. Leads in log/2026-10-02.md; no lane opened for them)
+- Goal: LOCAL FLEET ~/Syndicate fast-forwarded to github/main and all three roles restarted together (drain incl. both workers' child jobs -> safety CLEAR -> down -> scheduled task up), every role code=<new HEAD>, /healthz 200, a board build completing after BOOTED; recorded in deploys.md — **GOAL: DRIFTED** (user decision: hold. The only runtime change a restart would ship is open lane layer2-freshness-1h's 5c1b1bf2, mid-verification; owner local_12852f6a messaged; its reply CORRECTED my facts -- the 15:40Z refresh-worker exit and web HUP were the user's deliberate deploy of 5c1b1bf2, and the 15:10Z restart is in deploys.md (~10:10 AM CT). No open leads. See log/2026-10-02.md)
 - Files: .syndicate/deploys.md
 - Hypothesis: n/a
 - Falsification test: n/a
