@@ -45207,3 +45207,10 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - fix: stamp a stream only when it is NOT a FIFO/socket. Roles' stdout is a file the supervisor opened (`stdout=handle`), so role logs keep their stamps; a captured child's lines reach the log through its parent, stamped on echo. No restart: each new child imports the module.
 - verify (READ 22:05:46Z, first probe after the ff): `MLB_LIVE_PROBE live=False report=no_payload schedule=pks=0` -- the schedule probe PARSES (0 live MLB games at that moment) instead of bad_json. Linux check before the ff: piped child output = raw JSON that parses; file output = stamped. Windows: 6 logstamp tests pass, the pipe test fails on the old module.
 - not separately read: the ESPN live-event, MLB injuries and MLB schedule helpers share the same exception path and child shape; they are fixed by the same change but no counter shows it. `report=no_payload` on the probe is a different input and predates the stamp.
+
+## 2026-10-02 22:47Z (5:47 PM CT) -- LOCAL FLEET FF e1c86392 -> 9a7f0d2f: NHL lineups dress by total ice time + positional PP/PK units (4247a6ea, lane `nhl-player-props-projection`, user: "yes, ff the fleet") -- **MET**
+
+- applied: ff via `github/main`, no restart (the NHL lineup collector runs inside the per-run `refresh_nhl_oddsapi.py` subprocess). Read back: HEAD contains 4247a6ea, `_dress_score` present in ingestion/lineups.py. No NHL run in flight at the ff.
+- expect: the first NHL odds run after 22:47Z rewrites lineups_<date>.csv with PP units of 3F+2D and PK units of 2F+2D for every team (before: top 5 / top 4 skaters by overall TOI, mostly D).
+- reading (23:26:56Z, lineups_2026-10-03.csv, first rewrite after the ff): 26 teams, shapes PP1 3F+2D 26/26, PP2 3F+2D 26/26, PK1 2F+2D 26/26, PK2 2F+2D 26/26.
+- offline measurement (backtest, paired on 34,284 regular-season player-games): SOG MAE -0.025 [-0.029, -0.022], POINTS -0.0085, ASSISTS -0.0023, GOALS flat, BLOCKS +0.010 worse; team-game totals unchanged. Board effect is display-only: NHL prop probability stays withheld (MEASURED_MARKETS empty).
