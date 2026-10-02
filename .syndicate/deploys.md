@@ -44872,3 +44872,24 @@ Supersedes "Not upstream" in the ~7:50 PM CT rebound entry. Upstream `main` `sim
 
 - what: `582074b4 -> 995c177f`, 2 commits (`8c8dfa24` ledger, `995c177f` refresh-worker child scan in `scripts/check_deploy_safety.py`). Only file outside `.syndicate/ docs/ tests/`: `scripts/check_deploy_safety.py` -- deployer-side, imported by no role (only `deploy_preflight`), so no restart is needed for it to take effect and none was done.
 - verify (READ 03:17Z): `before=582074b4 after=995c177f`; 2 local data mods kept; `check_deploy_safety.py --base-url http://127.0.0.1:10000` run FROM `~/Syndicate` printed `refresh-worker child jobs: none (worker pid=268483)` and rc 1 on a real in-flight board build (`layer2_shortlist_build`); `/healthz` 200; roles unchanged `restarts=0 code=d165980d` (STALE by stamp only -- no runtime file changed since d165980d).
+
+## 2026-10-01/02 (~11:10 PM CT) -- READING, local WSL fleet on `4ec1fd72` + LIVE DATA backfill + GSV-DAL 10-02 force-resimmed pregame -- WNBA BLOCKS (lane `wnba-sim-blocks`)
+
+**Engine (`cbb14a73`, `4ec1fd72`).** The loop drew a block on a flat 5% of ALL 2PAs, after and independent of the make (half the sim's blocks were on made shots; team blocks 0.62x). `BLOCK_MODE = "team_prior"` blocks only missed 2PAs at the defense's prior blocks / the missed 2PAs the loop will produce; `BLOCK_ALLOC_BY_RATE` allocates blocks among the five on court by raw block rate instead of the minutes-floored, log-compressed blend.
+
+**Backtest (Jul-Sep, paired seeds, priors from a full-season player_logs; team totals on 146 both-rosters-matched games):**
+
+| | legacy | flat league rate | team prior (shipped) | + rate allocation (shipped) |
+|---|---|---|---|---|
+| team BLK | 0.619x | 1.318x | **1.064x** | (same total) |
+| player BLK deviance vs legacy | -- | -0.078 | **-0.139 [CI -0.188, -0.096]** | further **-0.034 [-0.045, -0.024]** |
+| top block-rate quintile bias | -- | -- | -0.221 | **-0.107** |
+| bottom quintile bias | -- | -- | +0.139 | **+0.082** |
+
+Pre-registered team-level bound (0.95-1.05) missed by ~1.4 pts. PTS/FGA unchanged; a REB deviance shift (+0.018) in both new modes is random-stream noise (600 synthetic games: rebounds 35.30 vs 35.48, 0.887 vs 0.889 per miss).
+
+**LIVE DATA CHANGE -- the WNBA box history and player logs were rebuilt.** The live `boxscores_history.csv` held 108 of 2026's ~340 games (migration gap), so EVERY per-minute prior came from a thin `player_logs.csv` (2,440 rows): block priors 1.207x actual on the scratch copy, top block-quintile rates 0.065/min vs real 0.050. Backfilled from ESPN with the vendor's own `backfill_boxscores` (May-Sep; the first pass timed out in August, rerun Aug-Sep) -> 336 games; `player_logs.csv` rebuilt by `scripts/build_basketball_player_logs.py` -> 6,796 rows / 340 games. On scratch with full logs: block priors 1.207x -> **1.018x** (real 0.978x), TOV priors **0.980x** (real 1.009x). Backup with sha256: `~/syndicate-prod/backup_wnba_logs_20261002T0240Z`.
+
+**Live reading, GSV-DAL 10-02 pregame (tip 10-03 01:00Z):** TOV GSV 6.4 -> 9.7 (actual 10.2/g), DAL 7.9 -> 10.0 (11.2); REB GSV 44.3 -> 36.3 (33.1), DAL 41.6 -> 35.5 (34.3); blocks GSV 2.26 -> **4.88** (3.84), DAL 2.15 -> **6.75** (4.04). Allocation: Kuier 1.93 -> 2.35, Stokes 1.03 -> 1.18, Ogunbowale 0.49 -> 0.26, Shepard 0.60 -> 0.42.
+
+**Not fixed (prior construction, not engine):** DAL's applied block prior is 6.72 -- Kuier's recent-window rate 0.140/min vs 0.090 season plus +4 projected minutes; zero-prior players get the ONNX `pred_blk` (Shepard 0.42 vs 0.07 actual). The vendored `schedule_2026.csv` ends 2026-09-24, so playoff games (195 rows) cannot join into player_logs. **Not upstream:** `BLOCK_MODE` / `BLOCK_ALLOC_BY_RATE` live in `vendor/wnba_betting_repo/src/wnba_betting/sim/events.py`.
