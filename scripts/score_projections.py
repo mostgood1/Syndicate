@@ -65,7 +65,12 @@ from syndicate.features.shared.projection_score import (  # noqa: E402
 MLB_DATA = REPO_ROOT / "data/mlb_source/source_artifacts/data"
 DATE_RE = re.compile(r"(20\d{2})[-_](\d{2})[-_](\d{2})")
 
-BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BASE = default_base_url()
 ARTIFACT_PREFIX = "mlb_source/source_artifacts/data"
 # OUTSIDE THE REPO ON PURPOSE. These are whole production artifacts -- one
 # `--source production` run cached 58.6 MB across 31 files. Left under

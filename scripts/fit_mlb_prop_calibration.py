@@ -53,7 +53,12 @@ from vendor.mlb_bettingv2.tools.tune.fit_hitter_prob_calibration import (  # noq
     _iter_reports_from_batch,
 )
 
-DEFAULT_BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+DEFAULT_BASE = default_base_url()
 CONFIG_PATH = REPO_ROOT / "vendor" / "mlb_bettingv2" / "data" / "tuning" / "hitter_props_calibration" / "default.json"
 FITTER = REPO_ROOT / "vendor" / "mlb_bettingv2" / "tools" / "tune" / "fit_hitter_prob_calibration.py"
 

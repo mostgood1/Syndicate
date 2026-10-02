@@ -29,7 +29,12 @@ import collections
 import json
 import urllib.request
 
-DEFAULT_BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+DEFAULT_BASE = default_base_url()
 
 # Measured 2026-08-30 on production, BEFORE the `#601` fixes, from the same two
 # endpoints this script reads. Carried here so a later run is a comparison

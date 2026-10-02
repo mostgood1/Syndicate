@@ -53,7 +53,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-_BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+_BASE = default_base_url()
 _REG = 40.0
 _OLD_A, _OLD_B = 6.0, 0.35
 

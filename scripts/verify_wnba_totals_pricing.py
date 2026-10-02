@@ -60,7 +60,12 @@ import json
 import sys
 import urllib.request
 
-BOARD = "https://syndicate-an21.onrender.com/api/board/book-grid?sport=wnba"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BOARD = default_base_url() + "/api/board/book-grid?sport=wnba"
 ESPN = "https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard"
 
 REASON_INERT = "analytic_estimator_never_backtested_for_this_market"

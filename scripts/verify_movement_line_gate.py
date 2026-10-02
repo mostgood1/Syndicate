@@ -35,7 +35,12 @@ import json
 import urllib.request
 from datetime import datetime, timezone
 
-API = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+API = default_base_url()
 
 # Minimum denominators. Chosen from the population the DEFECT was found in
 # (19 moved-line rows of 23 tracked): 3 is enough that a pass is not one lucky

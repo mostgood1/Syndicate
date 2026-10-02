@@ -77,7 +77,12 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-BASE_URL = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BASE_URL = default_base_url()
 SHORTLIST_PATH = "/api/board/layer2-shortlist"
 QUERY_PATH = "/api/intelligence/query"
 

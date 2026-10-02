@@ -52,7 +52,12 @@ import urllib.request
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_BASE = os.environ.get("SYNDICATE_OPS_BASE_URL", "https://syndicate-an21.onrender.com")
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+DEFAULT_BASE = default_base_url("SYNDICATE_OPS_BASE_URL")
 RETRYABLE = (408, 429, 500, 502, 503, 504)
 
 

@@ -73,7 +73,12 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
-BASE = os.environ.get("SYNDICATE_BASE_URL") or "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BASE = default_base_url()
 STATSAPI = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={d}"
 ESPN_CFB = ("https://site.api.espn.com/apis/site/v2/sports/football/college-football/"
             "scoreboard?limit=400&dates={d}")

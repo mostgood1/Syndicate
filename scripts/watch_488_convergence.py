@@ -34,7 +34,12 @@ import urllib.request
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-_BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+_BASE = default_base_url()
 _STALE = "2026-06-30"
 _PATH = "wnba_source/data/processed/boxscores_history.csv"
 

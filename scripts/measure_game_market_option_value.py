@@ -112,7 +112,12 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BASE = default_base_url()
 
 # The venue set item 05 called "exchanges" (`measure_exchange_prop_option_value.py`).
 # Kept IDENTICAL so this is comparable to the +1.57pp it corrects. `betfair_ex_*`

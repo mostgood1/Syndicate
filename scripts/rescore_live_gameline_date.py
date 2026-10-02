@@ -83,7 +83,12 @@ from syndicate.features.shared.live_gameline_score import (  # noqa: E402
 
 HISTORY = REPO / "reports" / "live_gameline_accuracy" / "history.jsonl"
 LEDGER_PATH = "mlb_source/data/live_gameline_ledger/live_gameline_ledger_{date}.jsonl"
-DEFAULT_BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+DEFAULT_BASE = default_base_url()
 STATSAPI = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={date}"
 
 

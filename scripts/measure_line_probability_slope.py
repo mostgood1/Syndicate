@@ -63,7 +63,12 @@ import statistics as st
 import urllib.request
 from typing import Any
 
-BASE = os.environ.get("SYNDICATE_BASE_URL", "https://syndicate-an21.onrender.com")
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BASE = default_base_url()
 
 #: Below this, a cell's median is noise. Reported anyway, flagged `thin`.
 MIN_PAIRS_PER_CELL = 10

@@ -37,7 +37,12 @@ import urllib.request
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 
-DEFAULT_BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+DEFAULT_BASE = default_base_url()
 
 # Fetch failures must never look like "no games". An audit whose expected side
 # silently reads empty passes every sport -- which is how this script reported

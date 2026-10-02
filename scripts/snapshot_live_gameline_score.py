@@ -52,7 +52,12 @@ from syndicate.features.shared.live_gameline_accuracy import (  # noqa: E402
     RETAINED_SCORE_KEYS,
 )
 
-DEFAULT_BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+DEFAULT_BASE = default_base_url()
 HISTORY = REPO / "reports" / "live_gameline_accuracy" / "history.jsonl"
 
 

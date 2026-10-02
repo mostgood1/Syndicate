@@ -61,7 +61,12 @@ from pathlib import Path
 from statistics import fmean
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BASE = default_base_url()
 ESPN = "https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard"
 
 

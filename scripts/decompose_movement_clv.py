@@ -115,7 +115,12 @@ from datetime import date as _date, timedelta
 from pathlib import Path
 from typing import Any
 
-BASE = os.environ.get("SYNDICATE_BASE_URL", "https://syndicate-an21.onrender.com")
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BASE = default_base_url()
 
 # The production defaults, mirrored here so a CANDIDATE (weight, cap) can be
 # scored over the same data without a deploy -- the same property that made the

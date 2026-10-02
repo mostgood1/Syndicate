@@ -23,7 +23,12 @@ from datetime import datetime, timezone
 
 ESPN = ("https://site.api.espn.com/apis/site/v2/sports/football/college-football"
         "/scoreboard?dates=20260829&groups=80&limit=200")
-LENS = "https://syndicate-an21.onrender.com/ncaaf/api/live-lens"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+LENS = default_base_url() + "/ncaaf/api/live-lens"
 
 POLL_SECONDS = 120
 MISMATCH_POLLS = 4          # ~8 min sustained before it is a finding

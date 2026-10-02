@@ -50,7 +50,12 @@ import urllib.request
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVICES = ("live-odds-worker", "refresh-worker")
-BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BASE = default_base_url()
 
 # Local date, used only to tell a FINISHED game date from a future one.
 _TODAY = __import__("datetime").date.today().isoformat()

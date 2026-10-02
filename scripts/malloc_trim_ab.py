@@ -64,7 +64,12 @@ import time
 import urllib.request
 from pathlib import Path
 
-BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BASE = default_base_url()
 SETTLE_MIN = 12.0
 WINDOW_MIN = 30.0
 CADENCE_S = 20

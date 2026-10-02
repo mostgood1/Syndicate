@@ -63,7 +63,12 @@ if str(REPO_ROOT) not in sys.path:
 _SIM_NAME_RE = re.compile(r"smart_sim_(\d{4}-\d{2}-\d{2})_([A-Z0-9]+)_([A-Z0-9]+)\.json$")
 
 # Same base URL the other ops-reading scripts use.
-_DEFAULT_BASE_URL = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+_DEFAULT_BASE_URL = default_base_url()
 
 
 def _admin_token() -> str:

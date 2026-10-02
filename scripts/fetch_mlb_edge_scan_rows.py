@@ -23,7 +23,12 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BASE = default_base_url()
 OUT = Path(__file__).resolve().parents[1] / "reports" / "edge_scan" / "scan_rows.jsonl"
 PROP_KEYS = ("hitterProps", "extraHitterProps", "pitcherProps", "extraPitcherProps")
 GAME_KEYS = ("ml", "totals")

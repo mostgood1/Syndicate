@@ -127,7 +127,12 @@ from syndicate.features.shared.ncaaf_team_registry import (  # noqa: E402
 from syndicate.features.shared.polymarket_board_join import parse_slug  # noqa: E402
 from syndicate.features.shared.team_aliases import canonical_team  # noqa: E402
 
-DEFAULT_BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+DEFAULT_BASE = default_base_url()
 
 
 def _admin_token() -> str:

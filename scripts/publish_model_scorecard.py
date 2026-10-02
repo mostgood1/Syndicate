@@ -119,12 +119,14 @@ def data_root() -> Path:
     return Path(root).expanduser().resolve() if root else (REPO_ROOT / "data")
 
 
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+
 def base_url() -> str:
-    for key in ("SYNDICATE_WEB_PUBLISH_URL", "SYNDICATE_BASE_URL", "BASE_URL"):
-        value = str(os.environ.get(key) or "").strip()
-        if value:
-            return value.rstrip("/")
-    return "https://syndicate-an21.onrender.com"
+    return default_base_url("SYNDICATE_WEB_PUBLISH_URL", "SYNDICATE_BASE_URL", "BASE_URL")
 
 
 def admin_token() -> str:

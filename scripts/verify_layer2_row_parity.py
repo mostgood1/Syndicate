@@ -28,7 +28,12 @@ import sys
 import urllib.request
 from typing import Any
 
-DEFAULT_URL = "https://syndicate-an21.onrender.com/api/intelligence/query"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+DEFAULT_URL = default_base_url() + "/api/intelligence/query"
 QUERY = {
     "question": "top edges today",
     "mode": "recommendation",

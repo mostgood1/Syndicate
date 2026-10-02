@@ -57,7 +57,12 @@ from syndicate.features.shared.opportunity_signals import devig  # noqa: E402
 
 DATA = REPO_ROOT / "data/mlb_source/source_artifacts/data"
 SNAPSHOTS = DATA / "daily_pitcher_props/snapshots"
-BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BASE = default_base_url()
 
 # bucket prefix -> (odds market key, COLUMN IN mlb_batter_game_log.csv)
 #

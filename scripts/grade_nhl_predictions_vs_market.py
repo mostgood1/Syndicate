@@ -108,7 +108,12 @@ from syndicate.features.shared.model_scoring import brier_score  # noqa: E402
 from syndicate.features.shared.opportunity_signals import devig  # noqa: E402
 from syndicate.local_nhl_odds import _team_abbr  # noqa: E402
 
-_DEFAULT_BASE_URL = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+_DEFAULT_BASE_URL = default_base_url()
 
 
 def _nhl_source_root() -> Path:

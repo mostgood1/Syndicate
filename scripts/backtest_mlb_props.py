@@ -56,7 +56,12 @@ from statistics import fmean
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BASE = default_base_url()
 STATSAPI = "https://statsapi.mlb.com/api/v1"
 
 # artifact mean field -> box-score stat key. `hrr` is computed, not a stat.

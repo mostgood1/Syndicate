@@ -79,7 +79,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 RUNNER_VERSION = "weekly_backtests/1"
 TOKEN_ENV = "ADMIN_TOKEN"
 REDACTED = "***REDACTED***"
-DEFAULT_BASE_URL = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+DEFAULT_BASE_URL = default_base_url()
 TAIL_CHARS = 3000
 
 # Sports the opening ledger can carry. A sport with no records that date grades

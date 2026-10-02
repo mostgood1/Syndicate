@@ -115,7 +115,12 @@ import urllib.request
 from collections import defaultdict
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
-BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BASE = default_base_url()
 
 PROGRESS_BANDS = [
     (0.00, 0.25, "q1_early"),

@@ -70,7 +70,12 @@ from syndicate.features.shared.kalshi_board_join import (  # noqa: E402
     normalize_person,
 )
 
-DEFAULT_BASE_URL = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+DEFAULT_BASE_URL = default_base_url()
 
 
 def _books(row: dict) -> list[str]:

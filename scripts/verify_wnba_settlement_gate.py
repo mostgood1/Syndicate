@@ -43,7 +43,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-BASE = os.environ.get("SYNDICATE_BASE_URL", "https://syndicate-an21.onrender.com")
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BASE = default_base_url()
 # The commit that added the cross-disk publish. Without it the producer writes to
 # refresh-worker's disk and the web-facing endpoint reads web's -- so step 3 is
 # STRUCTURALLY unreachable and a zero there says nothing about settlement.

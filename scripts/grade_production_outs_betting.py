@@ -45,7 +45,12 @@ if str(REPO_ROOT) not in sys.path:
 
 from syndicate.features.shared.opportunity_signals import devig  # noqa: E402
 
-BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BASE = default_base_url()
 CACHE = Path(tempfile.gettempdir()) / "syndicate_phase7_cache"
 ODDS_ROOT = "mlb_source/data/daily/snapshots"
 SUMMARY_PREFIX = "mlb_source__source_artifacts__data"
