@@ -87,7 +87,7 @@ from syndicate.features.shared.opportunity_signals import (
     hold_pct,
     implied_probability,
 )
-from syndicate.features.shared.clv_price_trail import price_move_series
+from syndicate.features.shared.clv_price_trail import fair_move_series
 from syndicate.features.shared.probability_refusal import refuse_published_certainty
 from syndicate.features.shared.sharp_books import EXCHANGE_ANCHOR_PRIORITY, SHARP_ANCHOR_PRIORITY
 
@@ -3684,8 +3684,8 @@ def layer2_rows_to_board_cards(
                 "segment_label": _segment_label(row.get("segment"), sport),
                 **_layer2_board_columns(row, quote, score),
                 **(row.get("movement") if isinstance(row.get("movement"), Mapping) else _movement_from_opening(row, openings, openings_by_line)),
-                # The sparkline draws the SAME price pair the movement label states,
-                # so it reads the movement just spread above (recomputed only for a
+                # The sparkline draws the SAME consensus pair the movement verdict
+                # is computed from, so it reads the movement just spread above (recomputed only for a
                 # row that arrived without one; `_movement_from_opening` does no IO).
                 **_movement_series_columns(
                     row,
@@ -3702,6 +3702,10 @@ def layer2_rows_to_board_cards(
     return cards
 
 
+#: The market-consensus move (pp of no-vig probability) below which the board
+#: calls the market unchanged: de-vig rounding across books re-quoting. Same cut
+#: as the template's `_movementMarketVerdict` and the 2026-10-02 analysis.
+_MOVEMENT_MARKET_PP = 0.25
 _STEAM_PRICE_POINTS = 15.0    # American-odds move that counts as sharp
 _STEAM_WINDOW_SECONDS = 3 * 3600
 
@@ -3807,20 +3811,18 @@ def _movement_series_columns(
     price_trail: Mapping[str, Any] | None,
     movement: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
-    """The card's sparkline: the LABEL's own price pair, from our publish to now. No IO.
+    """The card's sparkline: the MARKET's no-vig consensus, from our publish to now. No IO.
 
-    User decision 2026-09-15 "Plot the label's price from our open". The first
-    version plotted the no-vig fair probability from the first trail point, and on
-    the served board 18:08:02Z 45 of 94 series sloped against their own arrow --
-    every one started after the row's opening, and in 31 of 35 fair-basis
-    disagreements the label's price would have matched. So the series now takes
-    its two ends from `movement_price_from` / `movement_price_to` and its time
-    from `movement_opened_at`, and only fills the middle from the trail. Arrow,
-    label, colour and line agree by construction, and a row with a price move
-    draws a line even before the trail has a second point.
+    User decision 2026-10-02: "the sparkline on the layer 2 board and the
+    information it delivers needs to be about the MARKET movement, not about a
+    single book. NOTHING should reference just a single book." Until then it drew
+    the label's price at ONE book (decision 09-15), so a book lengthening while
+    the market held drew a red line beside a market that had not moved.
 
-    Line-moved rows carry no price pair and get no series: their verdict comes
-    from the line, and a price line beside it would be a different claim.
+    Ends are `movement_fair_from` / `movement_fair_to` -- the two numbers
+    `movement_fair_delta_pp`, the arrow and `movement_vs_pick` are computed from
+    -- and the middle is the trail's consensus points. No consensus pair, no
+    series: a single book's price is never drawn in its place.
 
     Built here and NOT inside `_movement_from_opening`, deliberately: that
     function's output is stamped on the shortlist ROWS as well as the cards, and
@@ -3830,21 +3832,20 @@ def _movement_series_columns(
     """
     if not isinstance(movement, Mapping):
         return {}
-    price_from = movement.get("movement_price_from")
-    price_to = movement.get("movement_price_to")
+    fair_from = movement.get("movement_fair_from")
+    fair_to = movement.get("movement_fair_to")
     opened = _epoch_seconds(movement.get("movement_opened_at"))
-    if price_from is None or price_to is None or opened is None:
+    if fair_from is None or fair_to is None or opened is None:
         return {}
     key = movement_join_key(row)
     points = ((price_trail or {}).get(key) or ()) if key else ()
-    series = price_move_series(
+    series = fair_move_series(
         points,
         line=row.get("line"),
-        price_from=price_from,
-        price_to=price_to,
+        fair_from=fair_from,
+        fair_to=fair_to,
         opened_epoch=opened,
         now_epoch=int(datetime.now(timezone.utc).timestamp()),
-        book=movement.get("movement_book") if movement.get("movement_basis") == "same_book" else None,
     )
     return series or {}
 
@@ -4226,16 +4227,23 @@ def _movement_from_opening(
         if prob_from is not None and prob_to is not None:
             out["movement_prob_delta_pp"] = round((prob_to - prob_from) * 100.0, 2)
 
-    # THE MARKET CONSENSUS MOVE, for the tooltip only (user decision 2026-09-15
-    # "Plot the label's price from our open"). The sparkline draws the label's
-    # price; the no-vig fair's own move since publish is said beside it in words,
-    # because one book lengthening while the consensus shortens is real and worth
-    # knowing -- it just must not be the line the arrow sits next to. Same line
-    # only: a fair probability at a different handicap is a different bet.
+    # THE MARKET CONSENSUS MOVE IS THE MOVEMENT (user decision 2026-10-02: "the
+    # movement of the market absolutely needs to influence the ranking" and
+    # "NOTHING should reference just a single book"). The no-vig consensus at our
+    # publish and now: it signs `movement_vs_pick`, draws the sparkline, and is
+    # what the score's EV is priced against. Same line only: a fair probability
+    # at a different handicap is a different bet. The same-book price pair above
+    # is kept as DATA (CLV harness, the gated single-book score term) and is not
+    # displayed or used for any verdict.
     fair_open = _as_float(opened.get("fair_probability"))
     fair_now = _as_float(quote.get("fair_probability"))
-    if lines_comparable and fair_open is not None and fair_now is not None and 0 < fair_open < 1 and 0 < fair_now < 1:
+    fair_comparable = (
+        lines_comparable and fair_open is not None and fair_now is not None and 0 < fair_open < 1 and 0 < fair_now < 1
+    )
+    if fair_comparable:
         out["movement_fair_delta_pp"] = round((fair_now - fair_open) * 100.0, 2)
+        out["movement_fair_from"] = round(fair_open, 4)
+        out["movement_fair_to"] = round(fair_now, 4)
 
     if open_line is not None and now_line is not None:
         out["movement_line_delta"] = round(now_line - open_line, 2)
@@ -4245,7 +4253,7 @@ def _movement_from_opening(
 
     delta = out.get("movement_price_delta")
     line_delta = out.get("movement_line_delta")
-    if delta is None and line_delta is None:
+    if delta is None and line_delta is None and not fair_comparable:
         out["movement_state"] = "no_comparable_price"
         return out
 
@@ -4261,14 +4269,21 @@ def _movement_from_opening(
     # -- a moved line withholds the price delta above -- so one field suffices
     # and cannot contradict itself.
     side = str(row.get("side") or "").strip().lower()
-    if not delta and not line_delta:
-        out["movement_state"] = "flat"
-        out["movement_vs_pick"] = "flat"
-    elif not lines_comparable:
+    if not lines_comparable:
         out["movement_vs_pick"] = _line_move_vs_pick(side, line_delta)
+    elif fair_comparable:
+        # The MARKET's verdict, at the board's own cut: below 0.25 pp a consensus
+        # "move" is de-vig rounding across books re-quoting, not an opinion.
+        fair_delta = out["movement_fair_delta_pp"]
+        out["movement_vs_pick"] = (
+            "toward" if fair_delta >= _MOVEMENT_MARKET_PP else ("away" if fair_delta <= -_MOVEMENT_MARKET_PP else "flat")
+        )
+        if out["movement_vs_pick"] == "flat":
+            out["movement_state"] = "flat"
     else:
-        prob_delta = out.get("movement_prob_delta_pp") or 0.0
-        out["movement_vs_pick"] = "toward" if prob_delta > 0 else ("away" if prob_delta < 0 else "flat")
+        # No consensus at both ends: the market's move is UNKNOWN. Never fall
+        # back to one book's price -- that is the reading this replaced.
+        out["movement_vs_pick"] = "unknown"
 
     # THE LINE MOVE IS THE MOVEMENT, AND UNTIL 2026-09-20 IT SCORED 0.0
     # (lane `layer2-line-movement-scoring`).
@@ -4336,12 +4351,13 @@ def _movement_from_opening(
                     magnitude_pp if out["movement_vs_pick"] == "toward" else -magnitude_pp, 4
                 )
 
-    # STEAM: a sharp move in a short window, AT ONE BOOK. Both clock halves are
-    # required -- a 30 point drift over eight hours is not steam, and this is
-    # the distinction the old implementation never made because it had no
-    # clock. And the move must be SAME-BOOK: a best-of-N delta can be a change
-    # of hands rather than of price. The only Layer 2 steam flag on 2026-09-15
-    # was -102 at betmgm against +113 at kalshi.
+    # STEAM: a sharp MARKET move in a short window. Both clock halves are
+    # required -- a slow drift over eight hours is not steam. Until 2026-10-02
+    # the price half was a 15-cent move AT ONE BOOK; it is now the no-vig
+    # CONSENSUS moving by the same sharpness in probability points
+    # (`_STEAM_LINE_PROB_POINTS_PP`, 15 cents at the measured 6.192 cents/pp) --
+    # user decision that day, "NOTHING should reference just a single book".
+    # One book re-pricing alone is no longer steam.
     age = None
     opened_at = str(opened.get("captured_at") or "")
     if opened_at:
@@ -4353,16 +4369,17 @@ def _movement_from_opening(
             out["movement_age_seconds"] = round(age, 1)
         except Exception:
             age = None
+    fair_move = out.get("movement_fair_delta_pp")
     if (
-        delta is not None
-        and abs(delta) >= _STEAM_PRICE_POINTS
+        fair_move is not None
+        and abs(fair_move) >= _STEAM_LINE_PROB_POINTS_PP
         and age is not None
         and age <= _STEAM_WINDOW_SECONDS
-        and out.get("movement_basis") == "same_book"
     ):
         out["steam"] = True
+        out["steam_basis"] = "market"
         out["steam_reason"] = (
-            f"{_signed_american(price_from)} → {_signed_american(price_to)} at {book} "
+            f"market consensus {out['movement_fair_from'] * 100:.1f}% → {out['movement_fair_to'] * 100:.1f}% "
             f"in {age / 60:.0f} min since we published it"
         )
     elif (

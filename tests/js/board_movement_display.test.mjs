@@ -67,62 +67,62 @@ const polylineXs = (svg) => {
 const layer2 = (extra) => Object.assign({ source: 'layer2_shortlist', movement_state: 'tracked' }, extra);
 const minutesAgo = (m) => new Date(Date.now() - m * 60000).toISOString();
 
-console.log('--- 1. toward: a SHORTENING price is green, labelled as the two prices ---');
+console.log('--- 1. THE MARKET, NOT ONE BOOK (user 2026-10-02: "NOTHING should reference just a single book") ---');
 {
-  const out = api.renderMovement(layer2({
-    movement_vs_pick: 'toward', movement_price_from: -117, movement_price_to: -131, movement_price_delta: -14,
+  // The label is the no-vig consensus before and after; no book's price or name.
+  const toward = api.renderMovement(layer2({
+    movement_vs_pick: 'toward', movement_fair_delta_pp: 1.9, movement_fair_from: 0.52, movement_fair_to: 0.539,
+    movement_price_from: 100, movement_price_to: 106, movement_basis: 'same_book', movement_book: 'novig',
   }));
-  has('up arrow class', out, 'board-card__movement-arrow--up');
-  has('up arrow glyph', out, '▲');
-  has('label is the two prices', out, 'Odds -117 → -131');
-  lacks('the scoring delta is not typeset', text(out), '-14');
-}
+  has('consensus toward: up arrow', toward, 'board-card__movement-arrow--up');
+  has('up arrow glyph', toward, '▲');
+  has('labelled with the consensus before and after', text(toward), 'Market toward pick · 52.0% → 53.9%');
+  lacks('no book price in the label', text(toward), 'Odds');
+  lacks('no book name anywhere, tooltip included', toward, 'novig');
+  lacks('no "same book" wording', toward, 'Same book');
+  lacks('no per-book price story', toward, 'Better price');
+  has('tooltip carries the consensus move', toward, 'Market consensus (no-vig) +1.9 pts since publish');
 
-console.log('\n--- 2. away is red ---');
-{
-  const out = api.renderMovement(layer2({ movement_vs_pick: 'away', movement_price_from: -131, movement_price_to: -117 }));
-  has('down arrow class', out, 'board-card__movement-arrow--down');
-  has('down arrow glyph', out, '▼');
-  lacks('not the up class', out, 'movement-arrow--up');
-}
-
-console.log('\n--- 3. a crossing move shows the prices, never "+208" ---');
-{
-  const out = api.renderMovement(layer2({
-    movement_vs_pick: 'away', movement_price_from: -104, movement_price_to: 104, movement_price_delta: 208,
+  const against = api.renderMovement(layer2({
+    movement_vs_pick: 'away', movement_fair_delta_pp: -1.2, movement_fair_from: 0.5, movement_fair_to: 0.488,
+    movement_price_from: -117, movement_price_to: -131,
   }));
-  has('signed prices across the +/-100 boundary', out, 'Odds -104 → +104');
-  lacks('no "+208"', out, '+208');
-  lacks('no 208 anywhere, tooltip included', out, '208');
+  has('consensus against: down arrow', against, 'board-card__movement-arrow--down');
+  has('down arrow glyph', against, '▼');
+  has('says the market disagrees', text(against), 'Market against pick · 50.0% → 48.8%');
+  lacks('a book shortening does not leak in', text(against), '-131');
+
+  const held = api.renderMovement(layer2({
+    movement_state: 'flat', movement_vs_pick: 'flat', movement_fair_delta_pp: 0.1, movement_fair_from: 0.5, movement_fair_to: 0.501,
+    movement_price_from: 100, movement_price_to: 115,
+  }));
+  check('consensus held: exactly "→ Market unchanged"', text(held) === '→ Market unchanged', `got ${JSON.stringify(text(held))}`);
+  has('flat arrow', held, 'board-card__movement-arrow--flat');
+  const tiny = api.renderMovement(layer2({ movement_fair_delta_pp: -0.2 }));
+  has('a consensus move under 0.25 pp is unchanged', tiny, 'board-card__movement-arrow--flat');
+  const ago = api.renderMovement(layer2({ movement_fair_delta_pp: 0, movement_opened_at: minutesAgo(5) }));
+  has('the opened-at suffix survives', ago, 'Market unchanged · 5m ago');
 }
 
-console.log('\n--- 4. a line move is labelled in displayLine format ---');
+console.log('\n--- 2. no consensus: says so, never falls back to one book ---');
+{
+  const out = api.renderMovement(layer2({ movement_vs_pick: 'away', movement_price_from: 100, movement_price_to: 106 }));
+  has('Market move unavailable', out, 'Market move unavailable');
+  lacks('no arrow claims a direction', out, 'movement-arrow--down');
+  lacks('no book price', out, 'Odds');
+}
+
+console.log('\n--- 3. a line move is labelled in displayLine format, signed by the server ---');
 {
   const out = api.renderMovement(layer2({ movement_vs_pick: 'toward', movement_line_from: 8.5, movement_line_to: 9 }));
-  has('Line 8.5 → 9.0', out, 'Line 8.5 → 9.0');
+  has('Line 8.5 → 9.0', out, 'Market toward pick · Line 8.5 → 9.0');
+  has('up arrow', out, 'board-card__movement-arrow--up');
   const whole = api.renderMovement(layer2({ movement_vs_pick: 'away', movement_line_from: 8, movement_line_to: 8.5 }));
-  has('a whole-number opening keeps one decimal', whole, 'Line 8.0 → 8.5');
-  const both = api.renderMovement(layer2({
-    movement_vs_pick: 'toward', movement_price_from: 150, movement_price_to: 120, movement_line_from: 3.5, movement_line_to: 4,
-  }));
-  has('price and line together', both, 'Odds +150 → +120 · Line 3.5 → 4.0');
-}
-
-console.log('\n--- 5. no differing pair is "Flat", with a flat arrow ---');
-{
-  const out = api.renderMovement(layer2({ movement_state: 'flat', movement_vs_pick: 'flat', movement_price_from: -110, movement_price_to: -110 }));
-  check('label is exactly "→ Flat"', text(out) === '→ Flat', `got ${JSON.stringify(text(out))}`);
-  has('flat arrow class', out, 'board-card__movement-arrow--flat');
-  const noPairs = api.renderMovement(layer2({ movement_vs_pick: 'flat' }));
-  check('tracked with no pairs at all is Flat too', text(noPairs) === '→ Flat', `got ${JSON.stringify(text(noPairs))}`);
-  // A verdict with nothing on screen to point at must not paint the word Flat green.
-  const contradiction = api.renderMovement(layer2({ movement_vs_pick: 'toward', movement_price_from: -110, movement_price_to: -110 }));
-  has('a "toward" verdict beside Flat still draws the flat arrow', contradiction, 'board-card__movement-arrow--flat');
+  has('a whole-number opening keeps one decimal', whole, 'Market against pick · Line 8.0 → 8.5');
   const unknown = api.renderMovement(layer2({ movement_vs_pick: 'unknown', movement_line_from: 8.5, movement_line_to: 9 }));
   has('unknown direction is the flat arrow', unknown, 'board-card__movement-arrow--flat');
-  const ago = api.renderMovement(layer2({ movement_vs_pick: 'flat', movement_opened_at: minutesAgo(5) }));
-  has('the opened-at suffix survives', ago, 'Flat · 5m ago');
 }
+
 
 console.log('\n--- 6. the sparkline is movement_series: rising green, falling red, flat nothing ---');
 {
@@ -139,28 +139,21 @@ console.log('\n--- 6. the sparkline is movement_series: rising green, falling re
   const shuffled = api._movementSparkline(layer2({ movement_series: [[90, 4710], [0, 4390], [30, 4500]] }));
   has('out-of-order points are time-sorted before first/last decide the colour', shuffled, 'board-sparkline--up');
 
-  // Label and sparkline agree on one row: a shortening price, a rising series.
+
+  // The arrow and the line agree on one row: both read the consensus.
   const row = layer2({
-    movement_vs_pick: 'toward', movement_price_from: -117, movement_price_to: -131, movement_prob_delta_pp: 1.9,
-    movement_basis: 'same_book', movement_book: 'kalshi', movement_fair_delta_pp: 0.8,
-    // The series' ends ARE the label's pair (-117 -> 53.9%, -131 -> 56.7%): the
-    // backend now builds it that way (user decision "Plot the label's price from
-    // our open"), so a rising line beside a toward arrow is the only possible pair.
-    movement_series: [[0, 5392], [42, 5500], [120, 5671]],
-    movement_series_start: minutesAgo(120), movement_series_basis: 'same_book',
+    movement_vs_pick: 'toward', movement_fair_delta_pp: 2.8, movement_fair_from: 0.539, movement_fair_to: 0.567,
+    movement_price_from: -117, movement_price_to: -131,
+    movement_series: [[0, 5390], [42, 5500], [120, 5670]],
+    movement_series_start: minutesAgo(120), movement_series_basis: 'consensus',
   });
   const cell = api.renderMovement(row);
   has('toward arrow', cell, 'board-card__movement-arrow--up');
   has('and a green sparkline in the same cell', cell, 'board-sparkline--up');
-  has('tooltip carries the implied change', cell, '+1.9 pts implied');
-  has('tooltip names the book', cell, 'Same book: kalshi');
-  has('tooltip carries the no-vig consensus move in words', cell, 'Market consensus (no-vig) +0.8 pts since publish');
-  has('sparkline caption: the probability window', cell, '53.9% → 56.7%');
-  has('sparkline caption: whose price', cell, 'kalshi&#39;s price');
-  has('sparkline caption is an svg <title>', cell, '<title>Implied probability of this pick&#39;s price since ');
-  lacks('the implied change is not in the visible label', text(cell), 'pts implied');
-  const bestBasis = api._movementSparkline(layer2({ movement_series: [[0, 4390], [60, 4710]], movement_series_basis: 'best_price' }));
-  has('best-price basis is named', bestBasis, 'best price across books');
+  has('sparkline caption: the consensus window', cell, '53.9% → 56.7%');
+  has('sparkline caption is an svg <title> naming the market', cell, '<title>Market consensus (no-vig) for this side since ');
+  lacks('the caption names no book', cell, '&#39;s price');
+
 }
 
 console.log('\n--- 7. the x axis is TIME-scaled ---');
@@ -209,49 +202,15 @@ console.log('\n--- 9. legacy history: the colour means the same thing ---');
   has('a legacy LINE-only series makes no colour claim', lineOnly, 'board-sparkline--flat');
 }
 
-console.log('\n--- 10. the arrow follows the MARKET (no-vig consensus), not one book (user 2026-10-02) ---');
+console.log('\n--- 10. the sparkline is never redrawn neutral against its arrow: both are the market ---');
 {
-  // Measured 2026-10-02: 64 of the top 100 drew red "away", but the consensus
-  // had moved against the pick in only 20. The book's own drift is price info.
-  const series = { movement_series: [[0, 5000], [60, 4850]], movement_series_basis: 'same_book', movement_book: 'novig' };
-  const lengthenedHeld = api.renderMovement(layer2(Object.assign({
-    movement_vs_pick: 'away', movement_price_from: 100, movement_price_to: 106, movement_fair_delta_pp: 0.0,
-  }, series)));
-  has('book lengthened, market held: NEUTRAL arrow, not red', lengthenedHeld, 'board-card__movement-arrow--flat');
-  lacks('and no red arrow anywhere', lengthenedHeld, 'movement-arrow--down');
-  has('labelled as a better price with the market unchanged', text(lengthenedHeld), 'Better price now · Odds +100 → +106 · market unchanged');
-  has('its falling book sparkline is drawn neutral', lengthenedHeld, 'board-sparkline--flat');
-  has('tooltip says only the book moved', lengthenedHeld, 'only this book&#39;s price changed');
-
   const against = api.renderMovement(layer2({
-    movement_vs_pick: 'away', movement_price_from: 100, movement_price_to: 115, movement_fair_delta_pp: -1.2,
+    movement_vs_pick: 'away', movement_fair_delta_pp: -0.8, movement_fair_from: 0.5, movement_fair_to: 0.492,
+    movement_series: [[0, 5000], [60, 4950], [120, 4920]], movement_series_basis: 'consensus',
   }));
-  has('market against: the ONLY red case', against, 'board-card__movement-arrow--down');
-  has('says the market disagrees', text(against), 'Market against pick · Odds +100 → +115');
-
-  const toward = api.renderMovement(layer2({
-    movement_vs_pick: 'away', movement_price_from: 100, movement_price_to: 106, movement_fair_delta_pp: 0.9,
-  }));
-  has('market toward even though this book lengthened: green', toward, 'board-card__movement-arrow--up');
-  has('labelled market toward', text(toward), 'Market toward pick');
-
-  const shortenedAgainst = api.renderMovement(layer2({
-    movement_vs_pick: 'toward', movement_price_from: -117, movement_price_to: -131, movement_fair_delta_pp: -0.8,
-    movement_series: [[0, 5392], [120, 5671]],
-  }));
-  has('book shortened but market against: red arrow', shortenedAgainst, 'board-card__movement-arrow--down');
-  has('and the disagreeing green book line is drawn neutral', shortenedAgainst, 'board-sparkline--flat');
-  lacks('never a green line beside a red arrow', shortenedAgainst, 'board-sparkline--up');
-
-  const tiny = api.renderMovement(layer2({
-    movement_vs_pick: 'away', movement_price_from: 100, movement_price_to: 102, movement_fair_delta_pp: -0.2,
-  }));
-  has('a consensus move under 0.25 pp is "held"', tiny, 'board-card__movement-arrow--flat');
-
-  const noConsensus = api.renderMovement(layer2({ movement_vs_pick: 'away', movement_price_from: 100, movement_price_to: 106 }));
-  has('no consensus delta: the old per-book arrow is kept', noConsensus, 'board-card__movement-arrow--down');
-  const flatAll = api.renderMovement(layer2({ movement_state: 'flat', movement_vs_pick: 'flat', movement_fair_delta_pp: 0.0 }));
-  check('nothing moved at all is still exactly "→ Flat"', text(flatAll) === '→ Flat', `got ${JSON.stringify(text(flatAll))}`);
+  has('consensus fell: red arrow', against, 'board-card__movement-arrow--down');
+  has('and a red line', against, 'board-sparkline--down');
+  lacks('never a green line beside a red arrow', against, 'board-sparkline--up');
 }
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILED`);

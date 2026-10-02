@@ -103,13 +103,14 @@ def _row(**over):
             "price": -105,
             "bookmaker": "draftkings",
             "book_prices": {"draftkings": -105, "fanduel": -108},
+            "fair_probability": 0.5,
         },
     }
     row.update(over)
     return row
 
 
-def _openings(row, *, price=-105, line=8.5, minutes=20, books=None):
+def _openings(row, *, price=-105, line=8.5, minutes=20, books=None, fair=0.5):
     # `movement_join_key`, not `_opening_key` (`#446`). The production index is
     # built with the stable key -- one that excludes `line` and `bookmaker` --
     # because keying movement on those means only UNMOVED rows can match their
@@ -124,6 +125,7 @@ def _openings(row, *, price=-105, line=8.5, minutes=20, books=None):
             "line": line,
             "bookmaker": "draftkings",
             "book_prices": books if books is not None else {"draftkings": price},
+            "fair_probability": fair,
         }
     }
 
@@ -160,7 +162,7 @@ def test_props_are_measured_not_labelled_untracked():
     2,119 of 2,959 served rows (2026-09-15) whose openings the ledger already held."""
     row = _row(market="strikeouts", player_name="Sean Manaea", line=6.5)
     got = _movement_from_opening(row, _openings(row, price=-120, line=6.5, books={"draftkings": -120}))
-    assert got["movement_state"] == "tracked"
+    assert got["movement_state"] in {"tracked", "flat"}, "measured: a verdict, not a label"
     assert "movement_not_tracked" not in got
 
 
@@ -170,16 +172,39 @@ def test_props_are_measured_not_labelled_untracked():
 # --------------------------------------------------------------------------
 
 
-def test_a_shortening_price_is_toward_the_pick_whatever_its_sign():
-    row = _row(market="h2h", side="home", line=None)  # published now at -105
-    longer = _movement_from_opening(row, _openings(row, price=-125, line=None, books={"draftkings": -125}))
-    assert longer["movement_price_delta"] == 20.0
-    assert longer["movement_vs_pick"] == "away", "-125 -> -105: the market likes this side LESS"
-    assert longer["movement_prob_delta_pp"] < 0
-    assert (longer["movement_price_from"], longer["movement_price_to"]) == (-125.0, -105.0)
-    shorter = _movement_from_opening(row, _openings(row, price=105, line=None, books={"draftkings": 105}))
-    assert shorter["movement_vs_pick"] == "toward", "+105 -> -105 shortened across even money"
-    assert "movement_direction" not in longer and "movement_line_direction" not in longer
+def test_the_verdict_is_the_markets_not_one_books():
+    """User decision 2026-10-02: "NOTHING should reference just a single book".
+    One book's price moving says nothing about the verdict; the no-vig consensus
+    does. Here the book LENGTHENED (-125 -> -105) while the market came TOWARD
+    the pick -- the fleet board's 44-of-100 case that morning."""
+    row = _row(market="h2h", side="home", line=None)  # published now at -105, fair 0.53
+    row["quote"]["fair_probability"] = 0.53
+    got = _movement_from_opening(row, _openings(row, price=-125, line=None, books={"draftkings": -125}, fair=0.50))
+    assert got["movement_vs_pick"] == "toward"
+    assert got["movement_fair_delta_pp"] == 3.0
+    assert (got["movement_fair_from"], got["movement_fair_to"]) == (0.5, 0.53)
+    # The same-book pair is still DATA (CLV, the gated score term), never the verdict.
+    assert (got["movement_price_from"], got["movement_price_to"]) == (-125.0, -105.0)
+    row["quote"]["fair_probability"] = 0.47
+    against = _movement_from_opening(row, _openings(row, price=105, line=None, books={"draftkings": 105}, fair=0.50))
+    assert against["movement_vs_pick"] == "away", "the market fell even though the book shortened"
+    held = _movement_from_opening(_row(), _openings(_row(), price=-125, books={"draftkings": -125}))
+    assert held["movement_vs_pick"] == "flat" and held["movement_state"] == "flat", "a book moved; the market did not"
+    assert "movement_direction" not in got and "movement_line_direction" not in got
+
+
+def test_below_a_quarter_point_the_market_has_not_moved():
+    row = _row()
+    row["quote"]["fair_probability"] = 0.502
+    assert _movement_from_opening(row, _openings(row))["movement_vs_pick"] == "flat"
+
+
+def test_no_consensus_at_both_ends_is_unknown_never_a_book_fallback():
+    row = _row()
+    row["quote"].pop("fair_probability")
+    got = _movement_from_opening(row, _openings(row, price=-125, books={"draftkings": -125}))
+    assert got["movement_vs_pick"] == "unknown"
+    assert "movement_fair_delta_pp" not in got
 
 
 def test_a_line_move_is_judged_from_the_pick_side():
@@ -215,24 +240,35 @@ def test_price_delta_prefers_same_book_and_says_which():
 # --------------------------------------------------------------------------
 
 
-def test_steam_requires_a_sharp_move_in_a_short_window():
+def test_steam_requires_a_sharp_market_move_in_a_short_window():
+    """Steam is the CONSENSUS moving >= `_STEAM_LINE_PROB_POINTS_PP` (15 cents at
+    6.192 cents/pp) inside the window -- since 2026-10-02, never one book."""
     row = _row()
-    fast = _movement_from_opening(row, _openings(row, price=-125, minutes=25, books={"draftkings": -125}))
-    assert fast["steam"] is True and "25 min" in fast["steam_reason"]
-    slow = _movement_from_opening(row, _openings(row, price=-125, minutes=300, books={"draftkings": -125}))
-    assert "steam" not in slow, "a 20-point drift over five hours is not steam"
-    small = _movement_from_opening(row, _openings(row, price=-108, minutes=10, books={"draftkings": -108}))
-    assert "steam" not in small
+    row["quote"]["fair_probability"] = 0.53
+    fast = _movement_from_opening(row, _openings(row, minutes=25))
+    assert fast["steam"] is True and fast["steam_basis"] == "market" and "25 min" in fast["steam_reason"]
+    assert "50.0% → 53.0%" in fast["steam_reason"]
+    slow = _movement_from_opening(row, _openings(row, minutes=300))
+    assert "steam" not in slow, "a drift over five hours is not steam"
+    row["quote"]["fair_probability"] = 0.51
+    assert "steam" not in _movement_from_opening(row, _openings(row, minutes=10))
 
 
-def test_even_money_is_continuous_for_the_delta_and_for_steam():
+def test_one_book_moving_sharply_is_not_steam():
+    row = _row()
+    got = _movement_from_opening(row, _openings(row, price=-140, minutes=10, books={"draftkings": -140}))
+    assert abs(got["movement_price_delta"]) >= 15
+    assert "steam" not in got, "one book re-pricing while the market held"
+
+
+def test_even_money_is_continuous_for_the_delta():
     """-104 -> +104 is 8 cents. Raw subtraction called it +208: 59 of 651 priced
     Layer 2 rows on 2026-09-15, every one scored at the movement cap."""
-    row = _row(quote={"price": 104, "bookmaker": "draftkings", "book_prices": {"draftkings": 104}})
+    row = _row(quote={"price": 104, "bookmaker": "draftkings", "book_prices": {"draftkings": 104}, "fair_probability": 0.5})
     got = _movement_from_opening(row, _openings(row, price=-104, minutes=10, books={"draftkings": -104}))
     assert got["movement_price_delta"] == 8.0
-    assert got["movement_vs_pick"] == "away"
-    assert "steam" not in got, "an 8-cent move is not steam"
+    assert got["movement_vs_pick"] == "flat", "the market held"
+    assert "steam" not in got
     within_sign = _movement_from_opening(_row(), _openings(_row(), price=-125, books={"draftkings": -125}))
     assert within_sign["movement_price_delta"] == 20.0, "unchanged away from even money"
 
@@ -362,9 +398,9 @@ def test_a_move_toward_the_pick_scores_positive_and_away_negative():
     only the direction of the move differs."""
     away = _scored_over_with_opening(-125)   # -125 -> -105: price lengthened
     toward = _scored_over_with_opening(105)  # +105 -> -105: price shortened
-    assert away["movement"]["movement_vs_pick"] == "away"
+    # The GATED single-book term (on via this file's autouse fixture). The
+    # verdict no longer follows it -- see test_the_verdict_is_the_markets_not_one_books.
     assert away["score"]["movement_component"] < 0
-    assert toward["movement"]["movement_vs_pick"] == "toward"
     assert toward["score"]["movement_component"] > 0
 
 
@@ -548,28 +584,26 @@ def test_a_row_that_moved_line_AND_book_is_still_VISIBLE():
     assert out["movement_basis"] == "line_moved"
 
 
-def test_steam_needs_a_real_price_move_at_an_unchanged_line():
-    """**REWRITTEN.** This asserted that the -1.5 -> -2.5 row reached the steam
-    threshold on a -27 point "move". It did, in production, and it was a FALSE
-    POSITIVE -- the -27 was the gap between two different bets.
-
-    The honest version: steam fires on a real price move at an UNCHANGED line.
+def test_steam_needs_a_real_market_move_at_an_unchanged_line():
+    """**REWRITTEN twice.** First it asserted the -1.5 -> -2.5 row reached steam
+    on a -27 "move" that was the gap between two bets. Then steam fired on one
+    book's price at an unchanged line. Since 2026-10-02 it fires on the market
+    consensus moving at an unchanged line.
     """
     from syndicate.features.shared.layer2_board import (
-        _STEAM_PRICE_POINTS,
+        _STEAM_LINE_PROB_POINTS_PP,
         _movement_from_opening,
         movement_join_key,
     )
 
-    opening = _mv_opening(captured_at=_recent_iso())          # line -1.5
-    moved = _mv_row(                                          # line -1.5, price moved
+    opening = {**_mv_opening(captured_at=_recent_iso()), "fair_probability": 0.50}   # line -1.5
+    moved = _mv_row(                                          # line -1.5, market moved
         quote={"price": -140, "bookmaker": "draftkings",
-               "book_prices": {"draftkings": -140}},
+               "book_prices": {"draftkings": -140}, "fair_probability": 0.54},
     )
     out = _movement_from_opening(moved, {movement_join_key(opening): opening})
-    assert out["movement_price_delta"] == -30.0
-    assert abs(out["movement_price_delta"]) >= _STEAM_PRICE_POINTS
-    assert out.get("steam") is True
+    assert out["movement_fair_delta_pp"] >= _STEAM_LINE_PROB_POINTS_PP
+    assert out.get("steam") is True and out["steam_basis"] == "market"
 
 
 def test_the_old_full_key_would_have_missed_all_of_the_above():

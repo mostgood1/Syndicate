@@ -89,7 +89,8 @@ const stale = api.renderFreshness(liveCard({ quote_seen_age_seconds: 353, book_a
 check('a 427s live price renders its age', stale.includes('Price seen ≈7m ago'), true);
 check('a 427s live price is styled stale', stale.includes('board-card__clock--price board-card__clock--stale'), true);
 check('a stale live price tells the bettor what to do', stale.includes('check the book before betting'), true);
-check('book age is still shown beside it', stale.includes('Book last moved 4m ago'), true);
+// No single book's clock on the card (user 2026-10-02, "NOTHING should reference just a single book").
+check('no book clock beside it', stale.includes('Book last moved'), false);
 
 // WF @ PUR, Q4 10:32: built 1,013s old and served 267s after the build.
 api.__setResponse({ state_meta: { read_at: iso(0), newest_age_seconds: 267 } });
@@ -119,16 +120,15 @@ check('pregame renders no live price-age chip', pregame.includes('Price seen'), 
 check('pregame renders the poll clock from quote_seen_age_seconds', /Checked \d+[mh]/.test(pregame), true);
 check('a pregame price not checked for >1h is red', pregame.includes('board-card__clock--checked board-card__clock--stale'), true);
 check('and tells the bettor what to do', pregame.includes('check the book before betting'), true);
-check('the book clock is still shown', pregame.includes('Book last moved 67m ago'), true);
-check('but the book clock itself is never red', /board-card__clock--stale"[^>]*>Book/.test(pregame), false);
+check('no single-book clock is shown', pregame.includes('Book last moved'), false);
 
 const unmovedButChecked = api.renderFreshness({ market_state: 'pregame', __state: 'pregame', quote: { quote_seen_age_seconds: 60, book_age_seconds: 48000 } });
 check('a 13h-unmoved price checked recently is NOT red', unmovedButChecked.includes('board-card__clock--stale'), false);
-check('its book clock still says how long the number has sat', unmovedButChecked.includes('Book last moved 13h ago'), true);
+check('and no book clock is shown', unmovedButChecked.includes('Book last moved'), false);
 
 const bookOnly = api.renderFreshness({ market_state: 'pregame', __state: 'pregame', quote: { book_age_seconds: 600 } });
 check('no poll stamp: no Checked chip is invented', bookOnly.includes('board-card__clock--checked'), false);
-check('no poll stamp: the book clock alone, neutral', bookOnly.includes('Book last moved 10m ago') && !bookOnly.includes('--stale'), true);
+check('no poll stamp: renders nothing rather than a single-book clock', bookOnly, '');
 check('pregame with no clocks at all still renders nothing',
   api.renderFreshness({ market_state: 'pregame', quote: { price: 150 } }), '');
 

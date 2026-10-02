@@ -23,6 +23,11 @@ the label states would have matched (a different QUANTITY). So `price_move_serie
 now starts at our published price and ends at the price the label shows, with
 trail points between: arrow, label, colour and line agree by construction.
 
+SUPERSEDED 2026-10-02 (user: "NOTHING should reference just a single book"): the
+line now draws the no-vig MARKET CONSENSUS (`fair_move_series`), from the
+consensus at our publish to the consensus now, and the arrow follows the same
+consensus move -- so they still agree by construction, on the market's number.
+
 THE SAME IDENTITY AS MOVEMENT. Keyed by `layer2_board.movement_join_key`
 (event, market, player, segment, side -- no line, no book) and filtered by line
 when read, so a line move ends a series rather than being drawn as a price move.
@@ -181,13 +186,29 @@ def _line_key(value: Any) -> float | None:
     return None if number is None else round(number, 3)
 
 
+def _fair_key(value: Any) -> float | None:
+    number = _as_float(value)
+    return None if number is None or not 0 < number < 1 else round(number, 4)
+
+
 def row_trail_point(row: Mapping[str, Any], *, epoch: int) -> tuple | None:
-    """`(epoch, line, price, book)` for one published row, or None when unpriced."""
+    """`(epoch, line, price, book, fair)` for one published row, or None when unpriced.
+
+    `fair` is the row's no-vig MARKET CONSENSUS probability at this build -- what
+    the board's sparkline draws (user decision 2026-10-02: "NOTHING should
+    reference just a single book"). `price`/`book` stay for the CLV harness.
+    """
     quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
     price = _as_float(quote.get("price"))
     if price is None:
         return None
-    return (int(epoch), _line_key(row.get("line")), price, str(quote.get("bookmaker") or "").strip().lower())
+    return (
+        int(epoch),
+        _line_key(row.get("line")),
+        price,
+        str(quote.get("bookmaker") or "").strip().lower(),
+        _fair_key(quote.get("fair_probability")),
+    )
 
 
 def _trim(bucket: list) -> None:
@@ -198,10 +219,10 @@ def _trim(bucket: list) -> None:
 
 
 def load_price_trail(date: str, *, root: Path | str | None = None) -> dict[str, list[tuple]]:
-    """`key -> [(epoch, line, price, book), ...]` in time order. Empty on any miss.
+    """`key -> [(epoch, line, price, book, fair), ...]` in time order. Empty on any miss.
 
-    Files written before 2026-09-15 ~18:30Z also carry an `f` (fair) field; it is
-    ignored, so an old file still loads.
+    `fair` (the `f` field) is the no-vig consensus; it is None on points written
+    between 2026-09-15 ~18:30Z and 2026-10-02, which recorded price only.
     """
     trail: dict[str, list[tuple]] = {}
     # EVERY file for the date -- the legacy whole-day one AND every hourly
@@ -235,7 +256,7 @@ def load_price_trail(date: str, *, root: Path | str | None = None) -> dict[str, 
                     continue
                 bucket = trail.setdefault(key, [])
                 bucket.append(
-                    (int(stamp), _line_key(record.get("l")), price, str(record.get("b") or ""))
+                    (int(stamp), _line_key(record.get("l")), price, str(record.get("b") or ""), _fair_key(record.get("f")))
                 )
     # SORT THEN TRIM, ONCE, ACROSS ALL FILES. Within one file the points are
     # already in time order, but a legacy whole-day file and the chunks can
@@ -369,7 +390,10 @@ def record_price_trail(
             continue
         bucket.append(point)
         _trim(bucket)
-        pending.append({"k": key, "t": epoch, "l": point[1], "p": point[2], "b": point[3]})
+        record = {"k": key, "t": epoch, "l": point[1], "p": point[2], "b": point[3]}
+        if point[4] is not None:
+            record["f"] = point[4]
+        pending.append(record)
 
     # THE CURRENT HOUR'S CHUNK, never the whole-day file. See `_MAX_CHUNK_BYTES`.
     path = price_trail_chunk_path(date, stamp.hour, root=root)
@@ -460,47 +484,46 @@ def _downsample(values: list[tuple[int, float]], limit: int) -> list[tuple[int, 
     return picked
 
 
-def price_move_series(
+def fair_move_series(
     points: Iterable[tuple] | None,
     *,
     line: Any,
-    price_from: Any,
-    price_to: Any,
+    fair_from: Any,
+    fair_to: Any,
     opened_epoch: int | None,
     now_epoch: int,
-    book: Any = None,
 ) -> dict[str, Any] | None:
-    """The price the movement LABEL states, as implied probability, from our publish to now.
+    """The MARKET's no-vig consensus for this side, from our publish to now.
 
-    First point is `price_from` at `opened_epoch`; last point is `price_to` at
-    `now_epoch`; between them, trail points at the same line -- and, when `book`
-    is given (the label's pair is same-book), only points quoted at that book.
-    With `book=None` the label's pair is best-of-N, so every point's best price is
-    used. Because both ends ARE the label's pair, the line's direction always
-    matches `movement_vs_pick`: rising = the price shortened = toward the pick.
+    User decision 2026-10-02: the sparkline "needs to be about the MARKET
+    movement, not about a single book. NOTHING should reference just a single
+    book." It used to draw the label's own price at one book (`price_move_series`,
+    09-15), and on the fleet board that day one book lengthening while the
+    consensus held drew a red line under a market that had not moved.
 
-    Implied probability is the plotted unit because it is continuous across even
-    money and rises when a price shortens, whatever its sign. Returns None unless
-    the series holds 2+ distinct values: a flat line would draw movement that did
-    not happen.
+    First point is `fair_from` (the consensus when we published) at
+    `opened_epoch`, last is `fair_to` (the consensus now); between them, trail
+    points at the same line that recorded a consensus. Both ends are the numbers
+    `movement_fair_delta_pp` is computed from, so the line and the arrow agree by
+    construction -- the defect the 09-15 fair series had (45 of 94 sloped against
+    the arrow) came from starting at the first TRAIL point, not at our open.
+
+    Returns None unless the series holds 2+ distinct values.
     """
-    start = implied_probability(price_from)
-    end = implied_probability(price_to)
+    start = _fair_key(fair_from)
+    end = _fair_key(fair_to)
     if start is None or end is None or opened_epoch is None:
         return None
     opened = int(opened_epoch)
     finish = max(int(now_epoch), opened + 60)
     line_key = _line_key(line)
-    book_key = str(book).strip().lower() if book else None
     values: list[tuple[int, float]] = [(opened, start)]
     for point in sorted(points or (), key=lambda p: p[0]):
         if point[0] <= opened or point[0] >= finish or point[1] != line_key:
             continue
-        if book_key is not None and point[3] != book_key:
-            continue
-        prob = implied_probability(point[2])
-        if prob is not None:
-            values.append((point[0], prob))
+        fair = point[4] if len(point) > 4 else None
+        if fair is not None:
+            values.append((point[0], fair))
     values.append((finish, end))
     values = _downsample(values, _SERIES_MAX_POINTS)
     series = [[int(round((t - opened) / 60.0)), int(round(v * 10000))] for t, v in values]
@@ -509,5 +532,5 @@ def price_move_series(
     return {
         "movement_series": series,
         "movement_series_start": datetime.fromtimestamp(opened, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "movement_series_basis": "same_book" if book_key else "best_price",
+        "movement_series_basis": "consensus",
     }
