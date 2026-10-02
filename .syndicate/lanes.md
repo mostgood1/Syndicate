@@ -1427,7 +1427,8 @@ death, never life — do not invert it.
 - Verification: unit: _derive_sim_minutes_local and _apply_player_priors_local run against a module without LEAGUE (NBA 240 min) and still prefer the module's LEAGUE when present; the game-cards subprocess is invoked as nba_betting.cli with cwd vendor/nba_betting_repo for a data-root source_root. Fleet: after ff, the next hourly run shows nba ok=true, smart_sim_2026-10-03_TOR_MIA.json and game_cards_2026-10-03.csv written
 - Blocked by: none
 
-### status-loaded-commit — OPEN — opened 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+### status-loaded-commit — CLOSED — opened 2026-10-02, closed 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+- Goal (verbatim): local_production.py status reports the commit each role actually runs: the checkout HEAD (from git reflog) at the role process's start time (web: its oldest gunicorn worker), falling back to the env stamp only when the reflog cannot answer, and saying which source it used -- **GOAL: MET.** Reading: status on the fleet at 0b4b5859 named 538cea74 for web and refresh-worker and aee8827b for live-odds-worker, each equal to the reflog HEAD at its code-load time. The env stamp said a804550e for all three. 2 new tests (reflog at a moment, reflog over a stale env stamp). Shipped `0b4b5859`.
 - Goal: local_production.py status reports the commit each role actually runs: the checkout HEAD (from git reflog) at the role process's start time (web: its oldest gunicorn worker), falling back to the env stamp only when the reflog cannot answer, and saying which source it used
 - Files: scripts/local_production.py, tests/test_local_production.py
 - Hypothesis: n/a

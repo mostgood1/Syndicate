@@ -45115,3 +45115,11 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - applied: `git fetch github main && git merge --ff-only github/main` in /home/amyn/Syndicate (remote is `github`; `origin` there is the stale Windows clone C:/SyndicateProd/repo/Syndicate at 80bdd00c). No role restart. Read back: HEAD contains 5c825580, `_smart_sim_league_local` x3 in basketball_props_smart_sim.py, `package_name = "nba_betting"` at refresh_nba_oddsapi_props.py:3097. Tracked-dirty left untouched: data/ncaaf_source/historical_truth/games_2026.json.gz, vendor/wnba_betting_repo/data/processed/boxscores_history.csv.
 - expect: the first hourly all-sport run stamped after 18:45Z (~19:03Z start, ~19:18Z end) shows `{"sport": "nba", "ok": true}`, no `FileNotFoundError .../vendor/nba_source_repo` and no `no attribute 'LEAGUE'` in nba_source/logs/syndicate_refresh_oddsapi_props_2026-10-03.log, and smart_sim_2026-10-03_TOR_MIA.json + game_cards_2026-10-03.csv written. Baseline: nba ok=false in every hourly run 2026-10-01 05:00Z..10-02 18:03Z (~32 runs).
 - verify: watcher `C:/tmp/nba_hourly_watch.py` (background bodljw2uq) prints VERDICT nba_ok=... after that run. Not yet read.
+
+## 2026-10-02 (~1:50 PM CT) -- fleet checkout ff 1891b132 -> 0b4b5859 (status `code=` from the reflog), NO restart -- lane status-loaded-commit CLOSED
+- What: `git merge --ff-only github/main`. `status` is a fresh process, so the fix is live with no restart.
+- verify (READ, 18:50Z): `status` now matches HEAD at each role's code-load time from the checkout reflog, and the env stamp was wrong for all three:
+  - web: workers started 13:13:02, ff 538cea74 at 13:13:01 -> code=538cea74 (env a804550e);
+  - refresh-worker: 13:13:10 -> 538cea74 (env a804550e);
+  - live-odds-worker: 13:42:04, ff aee8827b at 13:41:54 -> aee8827b (env a804550e).
+- STALE flags are now real: 3-4 runtime files from other lanes' commits are unloaded. Not restarted; that is the owners' call.
