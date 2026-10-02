@@ -1352,6 +1352,14 @@ death, never life — do not invert it.
 - Verification: unit tests over fixture rows; after a live-odds-worker restart the VENUE_SETTLEMENT line carries unjoinable_split with before+after+undated == unjoinable
 - Blocked by: none
 
+### wnba-cards-nba-game — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: Explain how an NBA game (MIA@TOR, Toronto Raptors vs Miami Heat, 2026-10-03T23:00Z) got into the fleet's wnba_source game_cards_2026-10-03.csv, and whether it reaches anything served (WNBA board/cards) — **GOAL: MET** (reading: cause A via fallback -- WNBA predict_date_cmd falls back to Bovada when OddsAPI has no WNBA game, and the vendored WNBA odds_bovada.py queries NBA/NBA-preseason URLs; reach: served on /wnba/api/source/cards and /wnba/api/market-board for 10-03, absent from all four /api/board surfaces. Fix proposed, not applied; log/2026-10-02.md)
+- Files: .syndicate/log/2026-10-02.md
+- Hypothesis: Candidates: (A) a WNBA odds/props snapshot for 10-03 carries NBA events (wrong sport key, or a basketball feed not filtered by league); (B) the game_cards builder's raw-snapshot fallback read an NBA-tree file by date/path; (C) a shared cross-sport odds artifact without a sport filter.
+- Falsification test: A needs the NBA event inside a wnba_source raw/processed odds or props file for 10-03; B needs the builder's input path to point outside wnba_source or at an nba file; C needs the row's source to be a shared control-plane artifact. Reach: falsified as harmless only if no served WNBA payload (board/cards API) carries MIA@TOR.
+- Verification: Provenance quoted from the producing file/log line and the builder code path; served-payload check with the WNBA cards/board API; log entry
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
