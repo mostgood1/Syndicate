@@ -1151,6 +1151,14 @@ death, never life — do not invert it.
 - Verification: unit: child present -> NOT CLEAR naming it; none -> unchanged verdict; scan failure -> UNKNOWN; drain waits on children; Render/no-URL path never scans. Live: the scan lists refresh-worker's real children on the fleet (match against ps)
 - Blocked by: none
 
+### fleet-ff-safety-children — CLOSED — opened 2026-10-01 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: LOCAL FLEET ~/Syndicate fast-forwarded to github/main with no restart, so check_deploy_safety.py run from the fleet checkout carries the refresh-worker child scan; recorded in deploys.md — **GOAL: MET** (reading: HEAD 995c177f = github/main; only non-ledger file scripts/check_deploy_safety.py; run from ~/Syndicate it printed 'refresh-worker child jobs: none (worker pid=268483)'; /healthz 200; deploys.md 2026-10-02 03:17Z)
+- Files: .syndicate/deploys.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: HEAD = github/main; range has no runtime files besides deployer-side scripts; check_deploy_safety from ~/Syndicate prints the 'refresh-worker child jobs' line; /healthz 200
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
