@@ -127,3 +127,29 @@ def test_collect_live_smoke(tmp_path):
         pytest.skip("no mirrored scoreboard for 2026-06-14")
     assert summary["lineup_rows"] > 0
     assert summary["goalies"] >= 1
+
+
+def test_dress_selection_uses_total_ice_time_not_average():
+    # 13 forwards: F12 played ONE long game (22 min avg) while F0..F11 are every-night regulars
+    # (avg 10-20 over 8 games). Ranked by average, F12 dressed and a regular lost his slot --
+    # the 2026-10-02 backtest's 10% of skaters who played with no slot (projected ~0).
+    rows = [{"player_id": 100 + i, "position": "F", "games_played": 8, "toi_avg": 20.0 - i,
+             "toi_total": 8 * (20.0 - i)} for i in range(12)]
+    rows.append({"player_id": 112, "position": "F", "games_played": 1, "toi_avg": 22.0, "toi_total": 22.0})
+    by_id = {r["player_id"]: r for r in lu.infer_lines(rows)}
+    assert by_id[112]["line_slot"] is None
+    assert all(by_id[100 + i]["line_slot"] for i in range(12))
+    # lines are still ordered by AVERAGE usage within the dressed set
+    assert by_id[100]["line_slot"] == "L1" and by_id[111]["line_slot"] == "L4"
+
+
+def test_special_teams_units_have_positional_shape():
+    # D log the most minutes (24 > 20), which used to make PP1 / PK1 mostly defensemen.
+    usage = lu.infer_lines(_usage())
+    for unit, (nf, nd) in ((1, (3, 2)), (2, (3, 2))):
+        members = [r for r in usage if r.get("pp_unit") == unit]
+        assert (sum(r["position"] == "F" for r in members), sum(r["position"] == "D" for r in members)) == (nf, nd)
+    for unit in (1, 2):
+        members = [r for r in usage if r.get("pk_unit") == unit]
+        assert (sum(r["position"] == "F" for r in members), sum(r["position"] == "D" for r in members)) == (2, 2)
+    assert all(r.get("line_slot") for r in usage if r.get("pp_unit") or r.get("pk_unit"))

@@ -97,31 +97,58 @@ def build_team_usage(
     return usage
 
 
+def _dress_score(r: Dict) -> float:
+    """Total ice time over the window: how much a player actually PLAYED, not how long he played
+    the games he was in. ``toi_total`` when the usage row carries it, else ``toi_avg * games``."""
+    total = r.get("toi_total")
+    if total is None:
+        total = float(r.get("toi_avg") or 0.0) * float(r.get("games_played") or 0)
+    return float(total or 0.0)
+
+
 def infer_lines(usage: List[Dict]) -> List[Dict]:
-    """Assign line_slot (L1-L4 / D1-D3), pp_unit, pk_unit by TOI ranking (vendor algorithm)."""
+    """Assign line_slot (L1-L4 / D1-D3), pp_unit, pk_unit (vendor TOI model, two defects fixed).
+
+    WHO DRESSES is chosen by TOTAL ice time over the window, then the dressed 12 F / 6 D are
+    ordered into lines by AVERAGE ice time. Ranking everyone by the average let a player with one
+    long game outrank an every-night regular: measured 2026-10-02 (lane nhl-player-props-projection,
+    `scripts/backtest_nhl_props.py`), 10% of 2025-26 regular-season skaters who PLAYED had no slot
+    -- and an unslotted skater gets zero ice time in the engine (`_line_order`), so he projected
+    0.001 SOG against 0.86 actual; in preseason a prospect's single split-squad game pushed Adam
+    Fox off the D pairs.
+
+    SPECIAL-TEAMS UNITS HAVE A POSITIONAL SHAPE: PP = 3 F + 2 D, PK = 2 F + 2 D, from the dressed
+    players. They used to be the top 5 / top 4 skaters by overall ice time -- mostly defensemen,
+    since D log the most minutes -- and `engine.py` `_fill_unit` then topped each unit up from that
+    same list, so PP1 carried 2-3 D and PK1 3-4. That was the D-heavy minutes (D1 30.4 simulated vs
+    22.7 real) behind the D-over / F-under bias in every skater market. The api-web boxscore has no
+    per-strength ice time, so the PK forwards are the next four after the PP1 forwards, not a
+    measured penalty-kill role.
+    """
     forwards = [r for r in usage if r["position"] == "F"]
     defense = [r for r in usage if r["position"] == "D"]
-    forwards.sort(key=lambda r: r["toi_avg"], reverse=True)
-    defense.sort(key=lambda r: r["toi_avg"], reverse=True)
-
-    for idx, r in enumerate(forwards):
-        r["line_slot"] = ("L1", "L2", "L3", "L4")[idx // 3] if idx < 12 else None
-    for idx, r in enumerate(defense):
-        r["line_slot"] = ("D1", "D2", "D3")[idx // 2] if idx < 6 else None
     for r in usage:
-        if r["position"] == "G":
-            r["line_slot"] = None
+        r["line_slot"] = None
+        r["pp_unit"] = None
+        r["pk_unit"] = None
 
-    # PP/PK proxy from overall TOI among skaters (api-web lacks per-strength TOI).
-    skaters = sorted([r for r in usage if r["position"] != "G"], key=lambda r: r["toi_avg"], reverse=True)
-    pp1 = {r["player_id"] for r in skaters[:5]}
-    pp2 = {r["player_id"] for r in skaters[5:10]}
-    pk1 = {r["player_id"] for r in skaters[:4]}
-    pk2 = {r["player_id"] for r in skaters[4:8]}
-    for r in usage:
-        pid = r["player_id"]
-        r["pp_unit"] = 1 if pid in pp1 else (2 if pid in pp2 else None)
-        r["pk_unit"] = 1 if pid in pk1 else (2 if pid in pk2 else None)
+    def _dressed(rows: List[Dict], k: int) -> List[Dict]:
+        picked = sorted(rows, key=lambda r: (_dress_score(r), float(r.get("toi_avg") or 0.0)), reverse=True)[:k]
+        return sorted(picked, key=lambda r: float(r.get("toi_avg") or 0.0), reverse=True)
+
+    dressed_f = _dressed(forwards, 12)
+    dressed_d = _dressed(defense, 6)
+    for idx, r in enumerate(dressed_f):
+        r["line_slot"] = ("L1", "L2", "L3", "L4")[idx // 3]
+    for idx, r in enumerate(dressed_d):
+        r["line_slot"] = ("D1", "D2", "D3")[idx // 2]
+
+    for unit, (fs, ds) in enumerate(((dressed_f[0:3], dressed_d[0:2]), (dressed_f[3:6], dressed_d[2:4])), start=1):
+        for r in fs + ds:
+            r["pp_unit"] = unit
+    for unit, (fs, ds) in enumerate(((dressed_f[3:5], dressed_d[0:2]), (dressed_f[5:7], dressed_d[2:4])), start=1):
+        for r in fs + ds:
+            r["pk_unit"] = unit
     return usage
 
 
