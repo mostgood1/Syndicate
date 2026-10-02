@@ -529,45 +529,76 @@ def _as_dict(value: Any) -> dict[str, Any]:
 #
 # Fleet only: on Render the deployer cannot see the worker's process table, so
 # that path is unchanged ("not applicable", never a block).
+#
+# LIVE-ODDS-WORKER TOO (lane `deploy-safety-odds-worker-children`, 2026-10-02).
+# Eight 20 s samples (03:27-03:30Z) of its descendants: no permanent child,
+# idle gaps between runs -- and THREE `run_refresh_odds_job.py` runs at once
+# (all sports + separate ncaaf and nfl), where the state-based "Odds refresh"
+# check reads only the one run in `latest_tick`. Same scan, both roles.
+#
+# ZOMBIES ARE NOT WORK. A finished child lingers as `[python] <defunct>` until
+# its worker reaps it (seen in 3 of those 8 samples); a restart kills nothing
+# there, so state `Z` is dropped at parse time -- for both roles.
 _REFRESH_WORKER_SCRIPT = "run_refresh_worker.py"
+_LIVE_ODDS_WORKER_SCRIPT = "run_live_odds_refresh_worker.py"
+_FLEET_WORKER_SCRIPTS = {
+    "refresh-worker": _REFRESH_WORKER_SCRIPT,
+    "live-odds-worker": _LIVE_ODDS_WORKER_SCRIPT,
+}
 _SUPERVISOR_SCRIPT = "local_production.py"
 
 
+def _parse_ps(text: str) -> list[tuple[int, int, int, str]]:
+    """Rows of `ps -eo pid=,ppid=,etimes=,stat=,args=` -> (pid, ppid, age_s, args), zombies dropped."""
+    rows: list[tuple[int, int, int, str]] = []
+    for line in text.splitlines():
+        parts = line.split(None, 4)
+        if len(parts) < 4:
+            continue
+        if parts[3].startswith("Z"):
+            continue
+        try:
+            rows.append((int(parts[0]), int(parts[1]), int(parts[2]), parts[4] if len(parts) > 4 else ""))
+        except ValueError:
+            continue
+    return rows
+
+
 def _fleet_process_table() -> list[tuple[int, int, int, str]]:
-    """(pid, ppid, age_s, args) for every process on the fleet host."""
+    """(pid, ppid, age_s, args) for every live (non-zombie) process on the fleet host."""
     import subprocess
 
-    command = ["ps", "-eo", "pid=,ppid=,etimes=,args="]
+    command = ["ps", "-eo", "pid=,ppid=,etimes=,stat=,args="]
     if sys.platform.startswith("win"):
         command = ["wsl", "--"] + command
     done = subprocess.run(command, capture_output=True, timeout=60)
     if done.returncode != 0:
         raise RuntimeError(f"ps rc={done.returncode}: {done.stderr.decode('utf-8', 'replace').strip()[:200]}")
-    rows: list[tuple[int, int, int, str]] = []
-    for line in done.stdout.decode("utf-8", errors="replace").splitlines():
-        parts = line.split(None, 3)
-        if len(parts) < 3:
-            continue
-        try:
-            rows.append((int(parts[0]), int(parts[1]), int(parts[2]), parts[3] if len(parts) > 3 else ""))
-        except ValueError:
-            continue
+    rows = _parse_ps(done.stdout.decode("utf-8", errors="replace"))
     if not rows:
         raise RuntimeError("ps returned no processes")
     return rows
 
 
-def _worker_children(rows: list[tuple[int, int, int, str]]) -> tuple[int | None, list[dict[str, Any]]]:
-    """(refresh-worker pid, its live descendants) from one process snapshot.
+def _runs_script(args: str, script: str) -> bool:
+    """True when some argv token's basename IS `script` (not merely contains it)."""
+    return any(tok.rsplit("/", 1)[-1] == script for tok in args.split())
 
-    The worker is the `run_refresh_worker.py` process whose PARENT is the
-    supervisor (`local_production.py ... up`) -- a bare name match would also
-    catch an ad-hoc run or a test harness. No such process -> (None, []).
+
+def _worker_children(
+    rows: list[tuple[int, int, int, str]],
+    script: str = _REFRESH_WORKER_SCRIPT,
+) -> tuple[int | None, list[dict[str, Any]]]:
+    """(worker pid, its live descendants) from one process snapshot.
+
+    The worker is the process running `script` whose PARENT is the supervisor
+    (`local_production.py ... up`) -- a bare name match would also catch an
+    ad-hoc run or a test harness. No such process -> (None, []).
     """
     by_pid = {pid: (ppid, age, args) for pid, ppid, age, args in rows}
     root = None
     for pid, ppid, _age, args in rows:
-        if _REFRESH_WORKER_SCRIPT in args and _SUPERVISOR_SCRIPT in by_pid.get(ppid, (0, 0, ""))[2]:
+        if _runs_script(args, script) and _runs_script(by_pid.get(ppid, (0, 0, ""))[2], _SUPERVISOR_SCRIPT):
             root = pid
             break
     if root is None:
@@ -589,24 +620,50 @@ def _worker_children(rows: list[tuple[int, int, int, str]]) -> tuple[int | None,
     return root, children
 
 
-def refresh_worker_children(base_url: str | None = None) -> tuple[list[dict[str, Any]] | None, dict[str, Any]]:
-    """(children, facts). None = UNKNOWN (callers block); [] = none running.
+def fleet_worker_children(
+    base_url: str | None = None,
+) -> dict[str, tuple[list[dict[str, Any]] | None, dict[str, Any]]]:
+    """{role: (children, facts)} for both fleet workers from ONE `ps` snapshot.
 
-    Not applicable off the fleet: returns ([], {"applicable": False}).
+    children None = UNKNOWN (callers block); [] = none running. Off the fleet
+    returns {} -- nothing is scanned (Render, `deploy_preflight`'s call).
     """
     if not _is_fleet_base_url(base_url):
-        return [], {"applicable": False}
+        return {}
     try:
-        root, children = _worker_children(_fleet_process_table())
+        rows = _fleet_process_table()
     except Exception as exc:
-        return None, {"applicable": True, "reason": f"{type(exc).__name__}: {exc}"}
-    if root is None:
-        return None, {"applicable": True, "reason": "no refresh-worker process under the supervisor"}
-    return children, {"applicable": True, "worker_pid": root}
+        reason = f"{type(exc).__name__}: {exc}"
+        return {role: (None, {"applicable": True, "reason": reason}) for role in _FLEET_WORKER_SCRIPTS}
+    out: dict[str, tuple[list[dict[str, Any]] | None, dict[str, Any]]] = {}
+    for role, script in _FLEET_WORKER_SCRIPTS.items():
+        root, children = _worker_children(rows, script)
+        if root is None:
+            out[role] = (None, {"applicable": True, "reason": f"no {role} process under the supervisor"})
+        else:
+            out[role] = ([dict(c, role=role) for c in children], {"applicable": True, "worker_pid": root})
+    return out
+
+
+def refresh_worker_children(base_url: str | None = None) -> tuple[list[dict[str, Any]] | None, dict[str, Any]]:
+    """refresh-worker's entry of `fleet_worker_children`; ([], not applicable) off the fleet."""
+    return fleet_worker_children(base_url).get("refresh-worker", ([], {"applicable": False}))
+
+
+def _combined_children(scan: dict[str, tuple[list[dict[str, Any]] | None, dict[str, Any]]]) -> list[dict[str, Any]] | None:
+    """All roles' children in one list, or None if ANY role is UNKNOWN."""
+    combined: list[dict[str, Any]] = []
+    for children, _facts in scan.values():
+        if children is None:
+            return None
+        combined.extend(children)
+    return combined
 
 
 def _describe_children(children: list[dict[str, Any]], limit: int = 4) -> str:
-    shown = ", ".join(f"{c['script']} (pid={c['pid']}, age={c['age_s']}s)" for c in children[:limit])
+    shown = ", ".join(
+        f"{c.get('role', 'refresh-worker')}/{c['script']} (pid={c['pid']}, age={c['age_s']}s)" for c in children[:limit]
+    )
     more = len(children) - limit
     return shown + (f", +{more} more" if more > 0 else "")
 
@@ -635,8 +692,8 @@ def _drain_clear(
       2. WORKER IDLE (`read_worker_state`: fresh, drain-aware, nothing in flight).
       3. BOARD BUILD IDLE per `board_build_state` -- the build `in_flight` never
          reports. UNKNOWN is not idle.
-      4. NO REFRESH-WORKER CHILD PROCESS (fleet; `refresh_worker_children`) --
-         every other job the worker launched. UNKNOWN is not idle.
+      4. NO WORKER CHILD PROCESS (fleet; `fleet_worker_children`) -- every job
+         refresh-worker or live-odds-worker launched. UNKNOWN is not idle.
     """
     if verdict != "idle":
         return False, f"worker {verdict}"
@@ -651,9 +708,9 @@ def _drain_clear(
     if build_in_flight:
         return False, "board build in flight"
     if children is None:
-        return False, "refresh-worker child jobs UNKNOWN"
+        return False, "worker child jobs UNKNOWN"
     if children:
-        return False, f"refresh-worker child job running: {_describe_children(list(children))}"
+        return False, f"worker child job running: {_describe_children(list(children))}"
     return True, ""
 
 
@@ -718,12 +775,12 @@ def _run_drain(*, owner: str, wait_seconds: int, base_url: str | None = None) ->
     last = ""
     why_not = ""
     build_facts: dict[str, Any] = {}
-    child_facts: dict[str, Any] = {}
+    child_scan: dict[str, tuple[list[dict[str, Any]] | None, dict[str, Any]]] = {}
     while _time.time() < deadline:
         state, verdict = read_worker_state("refresh-worker")
         build_in_flight, build_facts = board_build_state(base_url)
-        children, child_facts = refresh_worker_children(base_url)
-        clear, why_not = _drain_clear(state, verdict, requested_at, build_in_flight, children)
+        child_scan = fleet_worker_children(base_url)
+        clear, why_not = _drain_clear(state, verdict, requested_at, build_in_flight, _combined_children(child_scan))
         busy = [k for k, v in ((state or {}).get("in_flight") or {}).items() if v]
         build = {None: "unknown", True: "in_flight", False: "idle"}[build_in_flight]
         line = (f"  {verdict:<8} in_flight={busy or '[]'} board_build={build} "
@@ -744,10 +801,11 @@ def _run_drain(*, owner: str, wait_seconds: int, base_url: str | None = None) ->
         print(f"[UNKNOWN] board build state unreadable: {build_facts.get('reason')}")
         print("  A worker that acked the drain can still be mid-build. Drain left in place; it expires on its own.")
         return 2
-    if why_not == "refresh-worker child jobs UNKNOWN":
+    if why_not == "worker child jobs UNKNOWN":
+        reasons = "; ".join(f"{role}: {facts.get('reason')}" for role, (kids, facts) in child_scan.items() if kids is None)
         print("")
-        print(f"[UNKNOWN] refresh-worker's child processes unreadable: {child_facts.get('reason')}")
-        print("  A restart kills every child of the worker. Drain left in place; it expires on its own.")
+        print(f"[UNKNOWN] worker child processes unreadable: {reasons}")
+        print("  A restart kills every child of a worker. Drain left in place; it expires on its own.")
         return 2
     if verdict == "unknown" or why_not == "worker has not acked this drain yet":
         print("")
@@ -871,20 +929,20 @@ def main() -> int:
     # unreadable log is not evidence of a quiet worker, and this script already
     # produced one bad window tonight by letting an unreadable state read as
     # benign.
-    children, child_facts = refresh_worker_children(args.base_url)
-    if children is None:
-        blockers.append(
-            f"refresh-worker child jobs UNKNOWN ({child_facts.get('reason')}) -- "
-            "a restart kills every child of the worker"
-        )
-    elif children:
-        for child in children:
+    for role, (children, child_facts) in fleet_worker_children(args.base_url).items():
+        if children is None:
             blockers.append(
-                f"refresh-worker child job RUNNING: {child['script']} (pid={child['pid']}, "
-                f"age={child['age_s']}s) -- {child['args']}"
+                f"{role} child jobs UNKNOWN ({child_facts.get('reason')}) -- "
+                "a restart kills every child of the worker"
             )
-    elif child_facts.get("applicable"):
-        notes.append(f"refresh-worker child jobs: none (worker pid={child_facts.get('worker_pid')})")
+        elif children:
+            for child in children:
+                blockers.append(
+                    f"{role} child job RUNNING: {child['script']} (pid={child['pid']}, "
+                    f"age={child['age_s']}s) -- {child['args']}"
+                )
+        else:
+            notes.append(f"{role} child jobs: none (worker pid={child_facts.get('worker_pid')})")
 
     build_in_flight, build_facts = board_build_state(args.base_url)
     if build_in_flight is None:

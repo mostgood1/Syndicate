@@ -105,7 +105,7 @@ def _drain_ttl(base_url, *, fleet_lines, capsys):
          mock.patch.object(deploy_drain, "request_drain") as request, \
          mock.patch.object(deploy_drain, "read_worker_state", return_value=({"in_flight": {}, "acked_drain_at": 9e12}, "idle")), \
          mock.patch.object(cds, "board_build_state", return_value=(False, {})), \
-         mock.patch.object(cds, "refresh_worker_children", return_value=([], {"applicable": True})), \
+         mock.patch.object(cds, "fleet_worker_children", return_value={}), \
          mock.patch.object(cds, "_fleet_log_tail", return_value=fleet_lines) as tail, \
          mock.patch.object(cds, "_expected_build_seconds", return_value=None) as render:
         assert cds._run_drain(owner="t", wait_seconds=30, base_url=base_url) == 0
@@ -174,8 +174,8 @@ def _patched_drain(read_states, build_states, wait_seconds, child_states=None):
          mock.patch.object(deploy_drain, "request_drain", return_value={"requested_at": REQ}), \
          mock.patch.object(deploy_drain, "read_worker_state", side_effect=read_states), \
          mock.patch.object(cds, "board_build_state", side_effect=build_states) as builds, \
-         mock.patch.object(cds, "refresh_worker_children",
-                           side_effect=child_states or (lambda *_: ([], {"applicable": True}))), \
+         mock.patch.object(cds, "fleet_worker_children",
+                           side_effect=lambda *a: {"refresh-worker": (child_states or (lambda *_: ([], {"applicable": True})))(*a)}), \
          mock.patch.object(cds, "expected_build_seconds", return_value=None), \
          mock.patch("time.time", side_effect=lambda: t[0]), \
          mock.patch("time.sleep", side_effect=lambda s: t.__setitem__(0, t[0] + s)):
@@ -258,7 +258,7 @@ def test_drain_clear_blocks_on_children_and_on_unknown_children():
     ok, why = cds._drain_clear(acked, "idle", REQ, False, kid)
     assert not ok and "generate_smartsim2_nfl_projections.py (pid=300" in why
     ok, why = cds._drain_clear(acked, "idle", REQ, False, None)
-    assert not ok and why == "refresh-worker child jobs UNKNOWN"
+    assert not ok and why == "worker child jobs UNKNOWN"
     assert cds._drain_clear(acked, "idle", REQ, False, []) == (True, "")
 
 
@@ -271,7 +271,7 @@ def test_run_drain_waits_for_the_child_job_to_exit(capsys):
                            child_states=lambda *_: next(children))
     out = capsys.readouterr().out
     assert rc == 0
-    assert "refresh-worker child job running: generate_smartsim2_nfl_projections.py" in out
+    assert "worker child job running: refresh-worker/generate_smartsim2_nfl_projections.py" in out
     assert "no board build or child job is in flight" in out
 
 
@@ -280,16 +280,17 @@ def test_run_drain_unknown_children_is_unknown_not_clear(capsys):
     rc, _ = _patched_drain(lambda *_: acked, lambda *_: (False, {}), wait_seconds=60,
                            child_states=lambda *_: (None, {"applicable": True, "reason": "wsl gone"}))
     assert rc == 2
-    assert "child processes unreadable: wsl gone" in capsys.readouterr().out
+    assert "worker child processes unreadable: refresh-worker: wsl gone" in capsys.readouterr().out
 
 
-def _run_main(children_result, capsys):
+def _run_main(children_result, capsys, odds_result=([], {"applicable": True, "worker_pid": 201})):
     payload = {"state": {"sim_run_status": {"state": "finished", "exit_code": 0},
                          "latest_tick": {"anyLive": False, "result": {"state": "idle"}}}}
     with mock.patch.object(cds, "_load_admin_token", return_value="t"), \
          mock.patch.object(cds, "_get_json", return_value=payload), \
          mock.patch.object(cds, "board_build_state", return_value=(False, {"newest_build_complete": "x"})), \
-         mock.patch.object(cds, "refresh_worker_children", return_value=children_result), \
+         mock.patch.object(cds, "fleet_worker_children",
+                           return_value={"refresh-worker": children_result, "live-odds-worker": odds_result}), \
          mock.patch("sys.argv", ["check_deploy_safety.py", "--base-url", "http://127.0.0.1:10000"]):
         rc = cds.main()
     return rc, capsys.readouterr().out
@@ -308,3 +309,84 @@ def test_main_clear_with_no_children_and_unknown_blocks(capsys):
     assert rc == 0 and "refresh-worker child jobs: none (worker pid=200)" in out
     rc, out = _run_main((None, {"applicable": True, "reason": "wsl gone"}), capsys)
     assert rc == 1 and "refresh-worker child jobs UNKNOWN (wsl gone)" in out
+
+
+# --- `deploy-safety-odds-worker-children`: live-odds-worker too, zombies out -
+
+ODDS = (201, 100, 9000, "/venv/bin/python scripts/run_live_odds_refresh_worker.py")
+ODDS_JOB = (600, 201, 160, "/venv/bin/python /home/u/Syndicate/scripts/run_refresh_odds_job.py --manifest-path /x")
+ODDS_SRC = (601, 600, 160, "/venv/bin/python /home/u/Syndicate/scripts/refresh_odds_sources.py --date 2026-10-01")
+
+
+def test_parse_ps_drops_zombies_and_keeps_args():
+    text = "\n".join([
+        "  100     1  9000 Ss   /venv/bin/python scripts/local_production.py --home /h up",
+        "  297607 201    10 Z    [python] <defunct>",
+        "  298055 201     2 R    [python]",
+        "garbage line",
+    ])
+    rows = cds._parse_ps(text)
+    assert [r[0] for r in rows] == [100, 298055]
+    assert rows[0][3] == "/venv/bin/python scripts/local_production.py --home /h up"
+
+
+def test_worker_scripts_match_by_exact_basename():
+    rows = [SUP, RW, ODDS, ODDS_JOB, ODDS_SRC, NFL]
+    assert cds._worker_children(rows, "run_refresh_worker.py") == (200, cds._worker_children(rows)[1])
+    root, kids = cds._worker_children(rows, "run_live_odds_refresh_worker.py")
+    assert root == 201 and sorted(k["pid"] for k in kids) == [600, 601]
+    # run_live_odds_refresh_worker.py must not be mistaken for run_refresh_worker.py
+    assert cds._worker_children([SUP, ODDS], "run_refresh_worker.py") == (None, [])
+
+
+def test_fleet_worker_children_one_snapshot_both_roles():
+    with mock.patch.object(cds, "_fleet_process_table", return_value=[SUP, RW, ODDS, ODDS_JOB, NFL]) as table:
+        scan = cds.fleet_worker_children("http://127.0.0.1:10000")
+    assert table.call_count == 1
+    assert [k["pid"] for k in scan["refresh-worker"][0]] == [300]
+    assert [k["pid"] for k in scan["live-odds-worker"][0]] == [600]
+    assert scan["live-odds-worker"][0][0]["role"] == "live-odds-worker"
+    assert cds.fleet_worker_children("https://syndicate-an21.onrender.com") == {}
+
+
+def test_fleet_worker_children_missing_odds_worker_is_unknown_for_that_role_only():
+    with mock.patch.object(cds, "_fleet_process_table", return_value=[SUP, RW]):
+        scan = cds.fleet_worker_children("http://127.0.0.1:10000")
+    assert scan["refresh-worker"] == ([], {"applicable": True, "worker_pid": 200})
+    assert scan["live-odds-worker"][0] is None
+    assert cds._combined_children(scan) is None
+
+
+def test_main_blocks_on_a_live_odds_child(capsys):
+    job = [{"pid": 600, "ppid": 201, "age_s": 160, "script": "run_refresh_odds_job.py", "args": ODDS_JOB[3],
+            "role": "live-odds-worker"}]
+    rc, out = _run_main(([], {"applicable": True, "worker_pid": 200}), capsys,
+                        odds_result=(job, {"applicable": True, "worker_pid": 201}))
+    assert rc == 1
+    assert "live-odds-worker child job RUNNING: run_refresh_odds_job.py (pid=600, age=160s)" in out
+    assert "refresh-worker child jobs: none (worker pid=200)" in out
+
+
+def test_run_drain_waits_for_a_live_odds_child(capsys):
+    import syndicate.features.shared.deploy_drain as deploy_drain
+    import syndicate.features.shared.refresh_state_store as store
+
+    t = [REQ]
+    acked = ({"in_flight": {}, "acked_drain_at": REQ + 30}, "idle")
+    job = [{"pid": 600, "age_s": 160, "script": "run_refresh_odds_job.py", "role": "live-odds-worker"}]
+    scans = iter([
+        {"refresh-worker": ([], {}), "live-odds-worker": (job, {})},
+        {"refresh-worker": ([], {}), "live-odds-worker": ([], {})},
+    ])
+    with mock.patch.object(store, "_state_backend_kind", return_value="keyvalue"), \
+         mock.patch.object(deploy_drain, "request_drain", return_value={"requested_at": REQ}), \
+         mock.patch.object(deploy_drain, "read_worker_state", return_value=acked), \
+         mock.patch.object(cds, "board_build_state", return_value=(False, {})), \
+         mock.patch.object(cds, "fleet_worker_children", side_effect=lambda *_: next(scans)), \
+         mock.patch.object(cds, "expected_build_seconds", return_value=None), \
+         mock.patch("time.time", side_effect=lambda: t[0]), \
+         mock.patch("time.sleep", side_effect=lambda sec: t.__setitem__(0, t[0] + sec)):
+        rc = cds._run_drain(owner="t", wait_seconds=600, base_url="http://127.0.0.1:10000")
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "worker child job running: live-odds-worker/run_refresh_odds_job.py (pid=600" in out

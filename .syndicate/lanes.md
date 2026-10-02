@@ -1159,6 +1159,14 @@ death, never life — do not invert it.
 - Verification: HEAD = github/main; range has no runtime files besides deployer-side scripts; check_deploy_safety from ~/Syndicate prints the 'refresh-worker child jobs' line; /healthz 200
 - Blocked by: none
 
+### deploy-safety-odds-worker-children — CLOSED — opened 2026-10-01 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: check_deploy_safety.py (plain and --drain) against the local fleet also blocks while live-odds-worker has any live child process, naming each; unreadable or missing worker is UNKNOWN; Render path unchanged — **GOAL: MET** (reading: 131 passed incl. odds child blocks plain + drain, zombies dropped, exact-basename worker match, off-fleet never scans; live 12 samples: odds-worker scan = independent walk 11/12, zombies excluded; plain run 03:35Z named odds pids 298508/298509/298852 matching the state line)
+- Files: scripts/check_deploy_safety.py,tests/test_check_deploy_safety_fleet_logs.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: live-odds child present -> NOT CLEAR naming it (plain and drain); none -> note; scan failure/missing worker -> UNKNOWN; off-fleet never scans. Live: scan lists live-odds-worker's real children matching an independent tree-walk
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
