@@ -1179,6 +1179,14 @@ death, never life — do not invert it.
 - Verification: HEAD = github/main; range has no runtime files besides deployer-side scripts; check_deploy_safety from ~/Syndicate prints a 'live-odds-worker child jobs' line or live-odds blockers; /healthz 200
 - Blocked by: none
 
+### wnba-sim-ft-trips-2 — OPEN — opened 2026-10-02 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- Goal: WNBA sim free-throw trips match actual (146 both-rosters-matched games, full-season logs: FTA 0.889x, misses 1.068x, FGA 1.045x)
+- Files: vendor/wnba_betting_repo/src/wnba_betting/sim/events.py,tests/test_basketball_sim_ft_trips.py
+- Hypothesis: F1 RETEST on corrected inputs. Lane wnba-sim-ft-trips falsified F1 (solved per-attempt foul rate -> FTA 1.130x) on THIN-log priors that were never checked. With full-season logs the priors are right (prior FTA/FGA 0.305 vs actual 0.310; FTA volume 0.999x, 126 team-games), and a synthetic run already lands the box score on the target ratio. So the remaining FTA shortfall is the engine cap clip(FTA/FGA, 0.05, 0.20) against a real ~0.31, and solving the rate should bring FTA to ~1.0 and pull misses/FGA down with it.
+- Falsification test: Component backtest Jul-Sep, paired seeds, full logs. Judged on BOTH-teams-fully-matched games: falsified unless FTA lands within 0.95-1.05 AND missed FG moves toward 1.0, with player FTA/PTS/FGA Poisson deviance (all games) not worse (CI).
+- Verification: deploys.md READING: clean-game table + deviance + live GSV-DAL
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
