@@ -1106,6 +1106,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - Fleet checkout `~/Syndicate` deliberately NOT updated (user decision): 14 behind github/main incl. 9 runtime files from other lanes; gunicorn has no --preload so web workers would pick them up on recycle. Its remote for GitHub is named `github`; `origin` there is a stale ref.
 
+### fleet-restart-onto-main — CLOSED — opened 2026-10-01 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: LOCAL FLEET ~/Syndicate fast-forwarded to github/main and all three roles restarted together (drain -> down -> scheduled task up), every role reporting code=<new HEAD>, /healthz 200, a board build completing after restart; recorded in deploys.md — **GOAL: MET** (reading: status 02:05:10Z all three roles `up restarts=0 code=5fa8076b`; /healthz 200 02:04:49Z; BOARD_BUILD_TIMING wall_s=332.4 ok=True 02:11:35Z after BOOTED; check_deploy_safety from ~/Syndicate rc 1 'Board build IN FLIGHT' -- a real verdict; deploys.md 2026-10-02 02:04Z)
+- Files: .syndicate/deploys.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: status: web/refresh-worker/live-odds-worker up restarts=0 code=<HEAD>; /healthz 200; BOARD_BUILD_TIMING after restart; check_deploy_safety from ~/Syndicate returns a verdict (not UNKNOWN) on the fleet
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
