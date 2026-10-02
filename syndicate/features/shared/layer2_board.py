@@ -3178,6 +3178,16 @@ def build_layer2_rows(
                     if _blended_score_accepts("movement_line_prob_delta_pp")
                     else {}
                 ),
+                # THE MARKET'S MOVE, for attribution (`market_move_component`):
+                # the no-vig consensus move since publish for THIS side, the same
+                # number the card's arrow reads. Only for a market-fair EV -- a
+                # modelled EV is not priced against the consensus, so the market's
+                # move is not inside it and must not be attributed to it.
+                **(
+                    {"market_move_pp": movement.get("movement_fair_delta_pp")}
+                    if _blended_score_accepts("market_move_pp") and ev_basis == EV_BASIS_MARKET
+                    else {}
+                ),
                 books_quoting=side_best.get("books_quoting") or row.get("books_quoting"),
                 book_age_seconds=side_best.get("age_seconds"),
                 quote_seen_age_seconds=side_best.get("seen_age_seconds"),

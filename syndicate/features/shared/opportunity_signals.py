@@ -603,6 +603,12 @@ _SCORE_MOVEMENT_SATURATING = _env_bool("SYNDICATE_SCORE_MOVEMENT_SATURATING", de
 # is byte-identical (pinned by a test).
 _SCORE_MOVEMENT_LINE_WEIGHT = _env_float("SYNDICATE_SCORE_MOVEMENT_LINE_WEIGHT", 0.3096)
 
+
+def _score_single_book_movement_enabled() -> bool:
+    """The single-book movement term, OFF by default since 2026-10-02 (see
+    `blended_score`). Read per call so the rollback needs no code change."""
+    return _env_bool("SYNDICATE_SCORE_SINGLE_BOOK_MOVEMENT", default=False)
+
 _SCORE_BOOK_CONFIDENCE = ((1, 0.5), (2, 0.7), (4, 0.85))   # books quoting -> factor
 # THE LADDER RAN OUT AT THREE HOURS AND THE BOARD DID NOT.
 #
@@ -792,6 +798,7 @@ def blended_score(
     fair_prob: Any = None,
     movement_price_delta: Any = None,
     movement_line_prob_delta_pp: Any = None,
+    market_move_pp: Any = None,
 ) -> dict[str, Any] | None:
     """Rank a board row by value discounted for how much we trust it (#243).
 
@@ -849,12 +856,35 @@ def blended_score(
     line_move = _as_float(movement_line_prob_delta_pp)
     value_move = 0.0
     movement_kind = None
-    if move:
+    # THE SINGLE-BOOK TERM IS OFF `[2026-10-02, lane layer2-freshness-1h, user
+    # decision "go ahead with 1-3"]`. It moved a row on ONE book's price change
+    # since publish, and that move REVERTS: same-book forward CLV, consensus held,
+    # MLB 07-07..08-09 (408 games, event-clustered): book drifted LONGER +0.39 pp
+    # [+0.29, +0.52], book SHORTENED -0.33 [-0.46, -0.21]; NFL/WNBA/MLB on Render
+    # 09-20..24 the same sign (`findings_2026-09-21_top_opps_adverse_movement.md`).
+    # The term rewarded the shortened rows and penalised -- and dropped 490 of --
+    # the drifted-long ones: the wrong sign for a bet-now ranking.
+    #
+    # THE MARKET'S MOVE STILL RANKS, through EV: `ev_pct` is priced against the
+    # CURRENT consensus fair, so a consensus move toward the pick raises a row's
+    # value and a move against lowers it. `market_move_component` below makes
+    # that share visible; it is NOT added again (that would count it twice).
+    # Rollback: SYNDICATE_SCORE_SINGLE_BOOK_MOVEMENT=1.
+    single_book_on = _score_single_book_movement_enabled()
+    if single_book_on and move:
         value_move = _movement_contribution(move)
         movement_kind = "price"
-    elif line_move:
+    elif single_book_on and line_move:
         value_move = _movement_contribution(line_move, weight=_SCORE_MOVEMENT_LINE_WEIGHT)
         movement_kind = "line"
+    # How much of `ev_component` the consensus moved since publish: with EV =
+    # 100 x (fair / implied - 1) at the row's own price, a consensus move of d pp
+    # moves EV by d / implied. Display and attribution only.
+    market_move_component = None
+    market_move = _as_float(market_move_pp)
+    price_implied = implied_probability(price) if price is not None else None
+    if market_move is not None and price_implied:
+        market_move_component = market_move / price_implied
     # The sim term is CAPPED, not merely weighted -- see `_SCORE_SIM_CAP_PCT`.
     # A bare weight scales with the edge, so a large enough model disagreement
     # always wins eventually; the cap is what makes domination structurally
@@ -943,6 +973,13 @@ def blended_score(
         # and it had not moved", which is the `#368` distinction this block
         # already makes for `movement_component` itself.
         "movement_kind": movement_kind,
+        # Whether the single-book term could fire at all on this build, so a 0.0
+        # `movement_component` reads as "off", not "the market did not move".
+        "movement_term_enabled": single_book_on,
+        # The share of `ev_component` produced by the no-vig CONSENSUS moving
+        # since publish (pp of EV). Already INSIDE `ev_component` and the score;
+        # published so the card can show how the market's move ranked the row.
+        "market_move_component": None if market_move_component is None else round(market_move_component, 4),
         # "AT THE BOUND", not "would the old clip have fired".
         #
         # This used to be `abs(weight * move) > cap`, which under the saturating

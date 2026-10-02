@@ -1657,6 +1657,12 @@
       // be the thing drawn beside the arrow.
       const fairDelta = numericValue(item.movement_fair_delta_pp);
       if (fairDelta !== null) tip.push(`Market consensus (no-vig) ${fairDelta > 0 ? "+" : ""}${fairDelta.toFixed(1)} pts since publish`);
+      // The SAME move, in the ranking's own unit: the score prices EV against
+      // the current consensus, so this is how far the market's move moved the
+      // row's value -- the arrow and the rank cannot disagree.
+      const scoreParts = (item && item.board_score_components) || {};
+      const marketMoveEv = numericValue(scoreParts.market_move_component);
+      if (marketMoveEv !== null) tip.push(`Moved this row's value ${marketMoveEv > 0 ? "+" : ""}${marketMoveEv.toFixed(2)} pts of EV`);
       const caption = _movementSeriesCaption(item, _movementSeries(item).points.map((point) => point.v));
       if (caption && sparkline) tip.push(caption);
       // The steam BADGE (renderCard's own badges row, "⚡ Steam") already
@@ -3892,6 +3898,11 @@
     const title = [
       `value ${numeric(parts.value_pct)?.toFixed(2) ?? "?"}%`,
       parts.ev_component !== null && parts.ev_component !== undefined ? `EV ${Number(parts.ev_component).toFixed(2)}` : null,
+      // The market's move since publish, ALREADY INSIDE EV (not added twice):
+      // how much of this row's rank the consensus moving produced.
+      parts.market_move_component !== null && parts.market_move_component !== undefined
+        ? `of which market move ${Number(parts.market_move_component) > 0 ? "+" : ""}${Number(parts.market_move_component).toFixed(2)}`
+        : null,
       parts.sim_component !== null && parts.sim_component !== undefined ? `sim ${Number(parts.sim_component).toFixed(2)}` : null,
       `books x${parts.book_confidence ?? "?"}`,
       `fresh x${parts.freshness_factor ?? "?"}`,

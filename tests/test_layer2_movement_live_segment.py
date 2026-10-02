@@ -23,6 +23,18 @@ from syndicate.features.shared.layer2_board import (
 )
 from syndicate.features.shared.opportunity_signals import blended_score
 
+
+# THE SINGLE-BOOK TERM IS OFF BY DEFAULT since 2026-10-02 (lane
+# `layer2-freshness-1h`; `opportunity_signals.blended_score`): one book's move
+# since publish reverts, so it no longer ranks rows. Its mechanics -- curve, cap,
+# sign, price/line selection -- still exist behind the rollback flag, and these
+# tests pin THAT mechanism, so they run with it switched on. The default-off
+# behaviour is pinned in tests/test_layer2_market_move_scoring.py.
+@pytest.fixture(autouse=True)
+def _single_book_movement_on(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_SCORE_SINGLE_BOOK_MOVEMENT", "1")
+
+
 NOW = datetime.now(timezone.utc)
 
 
