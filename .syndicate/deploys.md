@@ -44996,3 +44996,8 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
   - `/api/intelligence/query` (page body `question="top edges today"`, `drop_row_diagnostics=true`), 16:0xZ: `quote_seen_age_seconds` present on **2,453 of 2,453** rows (was stripped from all); **354** of them >= 1h unpolled.
   - Side reading: every NHL game in `predictions_2026-10-02.csv` projects `model_total` **5.9134** -- a degenerate total; not this lane, flagged.
 - OWED: web HUP for f60743fa (blotter Age column on the poll clock -- the blotter is the default view >900px and was missed by 5c1b1bf2), then a DOM read of the blotter.
+
+## 2026-10-02 ~16:10Z (~11:10 AM CT) -- LOCAL FLEET ff 693de7a7 -> bff3883a + web HUP (lane `layer2-freshness-1h`, run BY THE USER) -- **MET**
+- what: runtime file `syndicate/templates/intelligence.html` only (f60743fa: blotter Age column on the poll clock).
+- verify (READ, live page DOM 16:1xZ, blotter view, filters All sports / Today): **322 of 322** Age cells carry the new tooltip ("Last checked at the book Xm ago · book last moved ..."), 0 the old one; 0 `dead`.
+- **What the new clock shows, and it is accurate, not a display artefact:** 280 of 322 red -- NHL props **221** at `72m` (one capture: NHL props ride the 2h pregame fallback sweep) and WNBA **59** at `2h` (`SYNDICATE_WNBA_PREGAME_REFRESH_INTERVAL_SECONDS=7200`). Cross-check: `state_meta.newest_age_seconds` 14.7s, so the build offset adds nothing; server-side 575 of 2,512 rows >= 1h unpolled (wnba 228, nhl 227, nfl 84, ncaaf 36). This is the cadence half of the 1h rule, still OWED.
