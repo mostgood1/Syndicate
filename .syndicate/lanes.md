@@ -1084,6 +1084,14 @@ death, never life — do not invert it.
 - Verification: unit: DEFAULT_CACHE_DIR resolves under SYNDICATE_NCAAF_SOURCE_ROOT; a missing data-root games file is seeded from the repo copy without an API call; _cached_games reads the loader dir. Fleet: after ff, data-root games_2026 completed count >= 331, checkout git status clean, next generator run logs GAMES_CACHE_REFRESH against the data root and leaves the checkout clean
 - Blocked by: none
 
+### wnba-no-player-props — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: A WNBA odds run whose snapshot has game lines but zero player props skips props edges and props recommendations and exits 0 (game side still exports), as NBA does since ca860dd5; an unreadable snapshot still fails
+- Files: scripts/refresh_wnba_oddsapi_props.py,tests/test_wnba_no_player_props.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: game-lines-only snapshot -> edges/recs not called, game cards built, main exit 0; player props present -> edges called (off != on); fails on origin/main. Fleet: no live reading available until a game-lines-only WNBA slate occurs; record that as the caveat
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
