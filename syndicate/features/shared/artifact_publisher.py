@@ -1121,6 +1121,14 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/data/processed/intervals_time_profile.json",
     "*_source/source_artifacts/data/processed/player_stat_calibration.json",
     "*_source/data/processed/player_stat_calibration.json",
+    # WNBA smart-sim game-total level calibration (`a6d45144`,
+    # scripts/build_wnba_totals_calibration.py): written by the WNBA refresh as
+    # `calibration_totals_<date>.json` and read by `_apply_totals_calibration_local`.
+    # Owed under model_engine_standard.md Sec3 since 2026-10-01 (deploys.md
+    # "WNBA RAW GAME TOTAL"). Cross-lane write into lane `nhl-live-resim`'s claim,
+    # USER-APPROVED 2026-10-01 ("yes add the wnba allowlist line"), lane `local-prod-gap-fixes`.
+    "wnba_source/data/processed/calibration_totals_*.json",
+    "wnba_source/source_artifacts/data/processed/calibration_totals_*.json",
     # `docs/ai_context/hockeysim_engine_reference.md`: two hockeysim engine inputs
     # (`HockeyTeamFeatures.xgf_per_60`/`xga_per_60` and `.elo_rating`) had loaders
     # (`load_team_xg_map`, `load_team_elo_map`) but no allowlist entry -- per
