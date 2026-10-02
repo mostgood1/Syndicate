@@ -209,9 +209,19 @@ def _scoreboard_payloads(league: str, window: str, timeout: int) -> list[dict[st
     allowlisted. A builder or live poll asking for a bad date failed the same
     way.
 
-    ONLY a 400 on a parseable range falls back. Any other error, or a 400 on
-    something that is not a range, still raises: a 5xx is not this failure, and
-    splitting an unknown window would be guessing.
+    A 400 OR A 5xx on a parseable range falls back. Any other status, or any
+    error on something that is not a range (a bare date), still raises, and so
+    does an unparseable window: splitting it would be guessing.
+
+    WHY 5xx JOINED 400 (measured 2026-10-02, lane `soccer-espn-range-5xx`). This
+    docstring used to say "a 5xx is not this failure". It became exactly this
+    failure: from ~18:30Z ESPN answered ``bel.1`` ``20270410-20270430`` with a 502
+    in 0.17 s, every time -- not a timeout -- while the neighbouring ranges gave the
+    usual 400 and the single dates inside it (``20270410``, ``20270415``) gave 200.
+    The raise failed `build_soccer_schedule --league belgian_pro_league`, which
+    marked soccer ok=false in every pregame run (18:33Z, 19:04Z, 20:04Z). A 5xx on
+    a SINGLE date still raises, because that is the request the fallback itself
+    makes and there is nothing narrower to retry.
     """
     # A ONE-DAY RANGE IS SENT AS A BARE DATE, AT THE CHOKE POINT.
     #
@@ -232,11 +242,12 @@ def _scoreboard_payloads(league: str, window: str, timeout: int) -> list[dict[st
         return [fetch_espn_scoreboard(league, date_range=window, timeout=timeout)]
     except requests.HTTPError as error:
         status = getattr(getattr(error, "response", None), "status_code", None)
-        days = _window_days(window) if status == 400 else []
+        splittable = status == 400 or (isinstance(status, int) and 500 <= status < 600)
+        days = _window_days(window) if splittable else []
         if not days:
             raise
     print(
-        f"[espn_lineups] ESPN_RANGE_REFUSED league={league} window={window} status=400 "
+        f"[espn_lineups] ESPN_RANGE_REFUSED league={league} window={window} status={status} "
         f"-> retrying as {len(days)} single-date request(s)",
         flush=True,
     )

@@ -1094,7 +1094,7 @@ death, never life — do not invert it.
 
 ### soccer-espn-range-5xx — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
 - Goal: Soccer pregame runs stop failing on ESPN's 502 for one bel.1 range: espn_lineups._scoreboard_payloads splits a multi-day range into single dates on a 5xx as it does on a 400 (a 5xx on a single date, or any other status, still raises); verified by the next pregame soccer run reporting soccer ok and rewriting belgian_pro_league api/schedule
-- Files: syndicate/features/soccer/ingestion/espn_lineups.py (_scoreboard_payloads only),tests/test_espn_range_5xx_fallback.py
+- Files: syndicate/features/soccer/ingestion/espn_lineups.py (_scoreboard_payloads only),tests/test_espn_range_5xx_fallback.py,tests/test_soccer_espn_scoreboard_fallback.py (the non-400 test only)
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: unit: range 502 -> single-date payloads; single-date 502 raises; range 404 raises; unparseable window 502 raises; fails on origin/main. Fleet: after ff, the next soccer pregame run (single-sport or hourly) shows soccer ok=true and belgian_pro_league/api/schedule/schedule_2026.json rewritten

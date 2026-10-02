@@ -115,14 +115,30 @@ def test_REACHABILITY_an_accepted_range_is_NOT_split():
     assert calls == ["20260901-20260915"]
 
 
-def test_a_NON_400_error_still_raises_and_is_not_split():
-    """A 5xx is a different failure, and splitting it would multiply the load on
-    a struggling endpoint."""
+def test_an_outage_5xx_costs_one_extra_request_then_raises():
+    """A range 5xx now splits (2026-10-02: ESPN 502'd ONE bel.1 range while its
+    single dates answered 200 -- lane soccer-espn-range-5xx). The old worry, that
+    splitting multiplies load on a struggling endpoint, is bounded: in a real
+    outage the first single date fails too and raises, so the cost is ONE extra
+    request, not one per day of the window."""
     calls: list[str] = []
 
     def fake(league, *, date_range=None, timeout=20):
         calls.append(date_range)
         raise _http_error(503)
+
+    with patch.object(el, "fetch_espn_scoreboard", side_effect=fake):
+        with pytest.raises(requests.HTTPError):
+            el.fetch_events("epl", date_windows=["20260801-20260815"])
+    assert calls == ["20260801-20260815", "20260801"]
+
+
+def test_a_non_400_non_5xx_error_still_raises_and_is_not_split():
+    calls: list[str] = []
+
+    def fake(league, *, date_range=None, timeout=20):
+        calls.append(date_range)
+        raise _http_error(404)
 
     with patch.object(el, "fetch_espn_scoreboard", side_effect=fake):
         with pytest.raises(requests.HTTPError):
