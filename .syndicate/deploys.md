@@ -45123,3 +45123,11 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
   - refresh-worker: 13:13:10 -> 538cea74 (env a804550e);
   - live-odds-worker: 13:42:04, ff aee8827b at 13:41:54 -> aee8827b (env a804550e).
 - STALE flags are now real: 3-4 runtime files from other lanes' commits are unloaded. Not restarted; that is the owners' call.
+
+## 2026-10-02 19:14Z (2:14 PM CT) -- LOCAL FLEET ff -> ba3c8045 + FULL RESTART: per-sport 1h freshness gate (NHL, WNBA) + NHL sweep 35 -> 30 min (lane `layer2-freshness-1h`, run BY THE USER) -- **MET**
+- what: runtime file `layer2_board.py` (`SHORTLIST_MAX_QUOTE_AGE_BY_SPORT = {nhl: 3600, wnba: 3600}`, env override per sport, new `max_quote_age_seconds_by_sport` / `rows_beyond_quote_age_by_sport`); env `SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_NHL` 2100 -> 1800 (backup in WSL /tmp). Pre-check `_active.json` `{}`.
+- restart: task `Running`, LastRunTime 14:14:11 CT; supervisor 649736, roles web 649751 / refresh-worker 649814 / live-odds-worker 649815 on `ba3c8045`; live-odds-worker environ NHL=1800.
+- **first STOP_SIGNAL line (aee8827b discharged):** `2026-10-02T19:13:15.220Z [live_odds_worker] STOP_SIGNAL signal=SIGTERM pid=641512 ppid=631488` -- ppid is the old supervisor, i.e. the `down`.
+- verify (READ, first build on the new code ~19:24Z, all sports ~55s old): NHL 648 rows, oldest seen 5.7 min, **0 > 1h**; WNBA 339 rows, oldest 37.7 min, **0 > 1h** (the 5-8 dead lines gone); NFL 1,740 (140 > 1h, 14h ceiling unchanged); NCAAF 1,912 (80 > 1h, unchanged); soccer 18. `rows_beyond_quote_age` 88 board-wide.
+- gap found: the endpoint did not forward the two per-sport fields -> fixed in the next commit (web HUP owed).
+- cadence basis (watcher 17:47-19:00Z): NHL props fetched every ~37 min (one 56-min gap from two restarts), oldest live quote 55 min; WNBA every ~37 min. Measured per fetch post quota-fix: NHL ~97 credits, WNBA ~79; cadence change ~+5,100 credits/day (+~700 more for NHL at 30 min).
