@@ -2739,9 +2739,28 @@ class LiveRefreshLoopTests(unittest.TestCase):
         # with it, so a cold WNBA/MLB slate could never complete. The loop
         # must use the adaptive interval (900s idle/pregame) computed from
         # the tick's own result, not the fixed base interval.
+        #
+        # The worker sleeps ON THE STOP EVENT since 5c205087 (so SIGTERM ends it
+        # in seconds), not time.sleep: this test asserted on a time.sleep mock
+        # that was never called, and -- with the event's wait unpatched -- it
+        # really blocked for the full 900s. No sport is due here, so the idle
+        # wait is the plain idle interval (see the companion test below).
+        self._assert_worker_idle_wait(due_in={}, expected=900)
+
+    def test_run_live_odds_refresh_worker_wakes_when_a_sport_is_due(self) -> None:
+        # Lane `layer2-freshness-1h` 2026-10-02: the idle wait ends when the
+        # next sport's own pregame sweep is due (+5s), not a fixed 900s later.
+        self._assert_worker_idle_wait(due_in={"nfl": 300.0}, expected=305)
+
+    def _assert_worker_idle_wait(self, *, due_in: dict, expected: int) -> None:
         pregame_meta = {"phase": "pregame", "adaptive": True, "anyLive": False}
         mocked_sleep = Mock(return_value=None)
-        with patch.object(run_live_odds_refresh_worker, "_acquire_process_lock", return_value=True), _no_worker_background_threads(), patch.object(
+        mocked_wait = Mock(return_value=False)
+        with patch.object(run_live_odds_refresh_worker._LIVE_REFRESH_LOOP_STOP, "wait", mocked_wait), patch.object(
+            live_refresh_loop, "_pregame_sports_due_in_seconds", return_value=due_in
+        ), patch.object(live_refresh_loop, "_live_refresh_loop_idle_interval_seconds", return_value=900), patch.object(
+            run_live_odds_refresh_worker, "_acquire_process_lock", return_value=True
+        ), _no_worker_background_threads(), patch.object(
             run_live_odds_refresh_worker,
             "_start_live_lens_reports",
             return_value=None,
@@ -2761,7 +2780,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
             exit_code = run_live_odds_refresh_worker.main()
 
         self.assertEqual(exit_code, 0)
-        mocked_sleep.assert_called_once_with(900)
+        mocked_wait.assert_called_once_with(expected)
+        mocked_sleep.assert_not_called()
 
     def test_run_live_odds_refresh_worker_recycles_after_max_uptime(self) -> None:
         # A long-lived worker doing routine multi-sport file I/O every tick
