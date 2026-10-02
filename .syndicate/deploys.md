@@ -45001,3 +45001,8 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - what: runtime file `syndicate/templates/intelligence.html` only (f60743fa: blotter Age column on the poll clock).
 - verify (READ, live page DOM 16:1xZ, blotter view, filters All sports / Today): **322 of 322** Age cells carry the new tooltip ("Last checked at the book Xm ago · book last moved ..."), 0 the old one; 0 `dead`.
 - **What the new clock shows, and it is accurate, not a display artefact:** 280 of 322 red -- NHL props **221** at `72m` (one capture: NHL props ride the 2h pregame fallback sweep) and WNBA **59** at `2h` (`SYNDICATE_WNBA_PREGAME_REFRESH_INTERVAL_SECONDS=7200`). Cross-check: `state_meta.newest_age_seconds` 14.7s, so the build offset adds nothing; server-side 575 of 2,512 rows >= 1h unpolled (wnba 228, nhl 227, nfl 84, ncaaf 36). This is the cadence half of the 1h rule, still OWED.
+
+## 2026-10-02 (~11:20 AM CT) -- fleet checkout ff bff3883a -> c1067485 (VENUE_SETTLEMENT unjoinable_split), NO restart -- lane settlement-unjoinable-split
+- What: `git merge --ff-only github/main` in `~/Syndicate`. `split_unjoinable` is present in the checkout. No role restarted.
+- NOT live yet: live-odds-worker loaded its code at 15:10:56Z. It exits by design after 6 h (`SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS`), so it should load c1067485 at about 21:11Z (4:11 PM CT). Its last line before that (16:03:35Z) still reads `unjoinable=593` with no split.
+- verify (owed): the first VENUE_SETTLEMENT line after the next `==== start` in live-odds-worker.log carries `unjoinable_split={...}` with before + after + undated == unjoinable. Read the `after`, `after_outcomes` and `after_pnl_dollars` fields: they size the Render-era book nothing has graded.
