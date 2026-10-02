@@ -518,6 +518,32 @@ SHORTLIST_STALE_KICKOFF_SECONDS = 2 * 3600
 # blueprint_sync production event for a number that belongs in review.
 SHORTLIST_MAX_QUOTE_AGE_SECONDS = 14 * 3600
 
+# THE 1h FRESHNESS RULE, PER SPORT `[2026-10-02, lane layer2-freshness-1h, user
+# decisions "Last polled <=1h" and "build the per-sport gate"]`. A sport moves to
+# one hour only once its pregame sweep runs comfortably faster than that -- the
+# cap above records what a 1h gate does to a sport whose capture is slower: it
+# deletes it. NHL and WNBA sweep every 30/35 min since 2026-10-02 17:46Z; measured
+# over two cycles their oldest live quote peaked at 55 min, 0 NHL rows over the
+# hour, and the WNBA rows over it were lines the books had stopped posting.
+# Every other sport keeps the global ceiling until its cadence is done. Override
+# one sport by config: SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS_<SPORT>.
+SHORTLIST_MAX_QUOTE_AGE_BY_SPORT: dict[str, float] = {"nhl": 3600.0, "wnba": 3600.0}
+
+
+def _sport_quote_age_ceiling(sport: Any, default_ceiling: float) -> float:
+    """The quote-age ceiling for one sport: env override, then the table, then the global."""
+    key = str(sport or "").strip().lower()
+    if key:
+        raw = str(os.environ.get(f"SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS_{key.upper()}") or "").strip()
+        if raw:
+            try:
+                return float(raw)
+            except ValueError:
+                pass
+        if key in SHORTLIST_MAX_QUOTE_AGE_BY_SPORT:
+            return float(SHORTLIST_MAX_QUOTE_AGE_BY_SPORT[key])
+    return float(default_ceiling)
+
 
 # How many times a sport's OWN typical hold a row may be worse before it is
 # junk. Env: SYNDICATE_SHORTLIST_HOLD_MULTIPLE. Set to 0 to disable per-sport
@@ -4983,6 +5009,7 @@ def select_shortlist(
     admitted_by_movement = 0
     refused_by_movement = 0
     beyond_quote_age = 0
+    beyond_quote_age_by_sport: dict[str, int] = {}
     implausible_book = 0
     stale_kickoff = 0
     uninformative_ev = 0
@@ -5008,8 +5035,17 @@ def select_shortlist(
         # book clock would otherwise pass a bar they were never measured against.
         # It is not excluded either, because absence of a clock is not evidence
         # of staleness; the score already discounts it.
-        if age_seconds is not None and age_ceiling > 0 and age_seconds > age_ceiling:
+        # Per sport (see `SHORTLIST_MAX_QUOTE_AGE_BY_SPORT`). An explicit
+        # `max_quote_age_seconds` argument still applies to every sport, as before.
+        row_ceiling = (
+            age_ceiling
+            if max_quote_age_seconds is not None
+            else _sport_quote_age_ceiling(row.get("sport"), age_ceiling)
+        )
+        if age_seconds is not None and row_ceiling > 0 and age_seconds > row_ceiling:
             beyond_quote_age += 1
+            sport_key = str(row.get("sport") or "").strip().lower() or "unknown"
+            beyond_quote_age_by_sport[sport_key] = beyond_quote_age_by_sport.get(sport_key, 0) + 1
             continue
         # `#369`: an IMPOSSIBLE BOOK is a bad feed, not an opportunity.
         #
@@ -5294,6 +5330,15 @@ def select_shortlist(
         "hold_multiple": hold_multiple,
         "value_floor_by_sport": floor_report,
         "max_quote_age_seconds": age_ceiling,
+        "max_quote_age_seconds_by_sport": (
+            {}
+            if max_quote_age_seconds is not None
+            else {s: _sport_quote_age_ceiling(s, age_ceiling) for s in sorted(set(SHORTLIST_MAX_QUOTE_AGE_BY_SPORT) | {
+                k[len("SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS_"):].lower()
+                for k in os.environ if k.startswith("SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS_")
+            })}
+        ),
+        "rows_beyond_quote_age_by_sport": dict(sorted(beyond_quote_age_by_sport.items())),
         "stale_kickoff_seconds": stale_kickoff_ceiling,
         # Logged, not silently dropped: a sport vanishing from the shortlist
         # should be attributable to its schedule rather than look like an outage.

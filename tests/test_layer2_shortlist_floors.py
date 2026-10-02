@@ -121,20 +121,33 @@ class QuoteAgeCeilingTests(unittest.TestCase):
         took wnba and soccer to zero; 12h took wnba to zero, because wnba's range
         is 12.47h..13.00h and only its FRESHEST end is below 12h.
         """
+        # 2026-10-02 (lane `layer2-freshness-1h`): this invariant now covers the
+        # sports on the GLOBAL ceiling. NHL and WNBA moved to a per-sport 1h gate
+        # once their sweeps ran every 30/35 min (user: "Last polled <=1h"); for
+        # them a stalled capture SHOULD empty the sport -- and must say so in
+        # `rows_beyond_quote_age_by_sport` rather than vanish silently. The WNBA
+        # rows below (its 12.47h..13.00h August stall) moved to NFL, which keeps
+        # the global ceiling, so the invariant this test exists for is unchanged.
         rows = [
             _row(sport="mlb", age=11.46 * 3600),
-            _row(sport="wnba", age=12.47 * 3600),
-            _row(sport="wnba", age=13.00 * 3600),
+            _row(sport="nfl", age=12.47 * 3600),
+            _row(sport="nfl", age=13.00 * 3600),
             _row(sport="soccer", age=1.85 * 3600),
             _row(sport="soccer", age=22.2 * 3600),
         ]
         out = select_shortlist(rows, now=_NOW)
         seated = {r.get("sport") for r in out["rows"]}
         self.assertEqual(
-            seated, {"mlb", "wnba", "soccer"}, "default ceiling took a sport to zero rows"
+            seated, {"mlb", "nfl", "soccer"}, "default ceiling took a sport to zero rows"
         )
         # The dead 22.2h soccer quote is excluded -- the gate must still bite.
         self.assertEqual(out["rows_beyond_quote_age"], 1)
+
+    def test_a_one_hour_sport_whose_capture_stalls_is_reported_not_silent(self) -> None:
+        stalled = [_row(sport="wnba", age=12.47 * 3600), _row(sport="wnba", age=13.00 * 3600)]
+        out = select_shortlist(stalled + [_row(sport="mlb", age=600.0)], now=_NOW)
+        self.assertEqual({r.get("sport") for r in out["rows"]}, {"mlb"})
+        self.assertEqual(out["rows_beyond_quote_age_by_sport"], {"wnba": 2})
 
     def test_ceiling_is_env_tunable(self) -> None:
         with patch.dict(os.environ, {"SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS": "21600"}, clear=False):
