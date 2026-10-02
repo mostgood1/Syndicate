@@ -1068,6 +1068,14 @@ death, never life — do not invert it.
 - Verification: the 14 named tests pass on the landed origin/main tree; each touched module's own test file still passes
 - Blocked by: none
 
+### wnba-sim-ft-trips — OPEN — opened 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- Goal: WNBA sim missed FGs and FT trips match actual on clean games (both teams fully matched: misses 1.04x, FGA 1.037x, FTA 0.83x)
+- Files: vendor/wnba_betting_repo/src/wnba_betting/sim/events.py,tests/test_basketball_sim_ft_trips.py
+- Hypothesis: (F1) The +4% missed FGs are mostly a HARNESS ARTIFACT plus too few free-throw trips. Artifact: on games where both teams' rosters fully match the box score, rebounds are already 1.033x (vs 1.073x all-games) -- an opponent with unmatched players gets a lowered make rate (its points target is matched-only), manufacturing misses. Real residual: FTA 0.83x on clean games -- foul_per_fga = clip(FTA/FGA, 0.05, 0.20) while real FTA/FGA is ~0.29, so possessions end at the line too rarely and become FGAs. Fix: solve the per-attempt foul probability that reproduces the team's FTA/FGA (the refuted-2026-10-01 M1, which was judged on the all-games basis this artifact contaminates).
+- Falsification test: Component backtest Jul-Sep, paired seeds, judged on BOTH-teams-fully-matched games: falsified unless FTA lands within 0.95-1.05 and missed FGs within 0.98-1.02, with player PTS/FGA/FTA Poisson deviance (all games) not worse (CI).
+- Verification: deploys.md READING: clean-game table + deviance
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
