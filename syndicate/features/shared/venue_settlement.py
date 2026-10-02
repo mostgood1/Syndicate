@@ -403,6 +403,94 @@ def grade_polymarket_resolution(row: Mapping[str, Any]) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Unjoinable rows, split by WHEN they settled
+# ---------------------------------------------------------------------------
+
+# The moment Render was suspended (every service's `updatedAt`). The local fleet
+# started on a fresh Redis with NONE of Render's live orders (measured
+# 2026-10-02: 22 ledger rows, all paper), so every venue settlement row is
+# `unjoinable` -- and the bare count cannot say whether those are history
+# Render already graded or outcomes that landed after Render stopped and that
+# nothing has recorded. This split is that answer, read by the worker that
+# holds the credentials. Override with `SYNDICATE_SETTLEMENT_SPLIT_AT`.
+UNJOINABLE_SPLIT_DEFAULT = "2026-09-30T06:37:00Z"
+
+
+def _parse_venue_time(value: Any):
+    """A venue timestamp -> aware UTC datetime, or None. Polymarket sends
+    nanosecond fractions, which `fromisoformat` refuses; they are trimmed to
+    microseconds."""
+    import re
+    from datetime import datetime, timezone
+
+    text = str(value or "").strip()
+    if not text:
+        return None
+    text = text.replace("Z", "+00:00")
+    text = re.sub(r"(\.\d{6})\d+", r"\1", text)
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _row_settled_time(venue: str, row: Mapping[str, Any]):
+    return _parse_venue_time(row.get("settled_time") if venue == "kalshi" else row.get("updateTime"))
+
+
+def split_unjoinable(rows_by_venue: Mapping[str, list], split_at: str | None = None) -> dict[str, Any]:
+    """Unjoinable settlement rows counted BEFORE / AFTER `split_at`.
+
+    The after-rows are also GRADED here (pure; nothing is written), because
+    "how many" without "won or lost, for how much" cannot size the gap.
+    `before + after + undated == len(rows)` always; `undated` is never folded
+    into either side.
+    """
+    import os
+
+    raw = split_at or os.environ.get("SYNDICATE_SETTLEMENT_SPLIT_AT") or UNJOINABLE_SPLIT_DEFAULT
+    cutoff = _parse_venue_time(raw)
+    out: dict[str, Any] = {
+        "at": raw,
+        "before": 0,
+        "after": 0,
+        "undated": 0,
+        "after_by_venue": {},
+        "after_outcomes": {},
+        "after_refused": 0,
+        "after_pnl_dollars": 0.0,
+        "newest": None,
+    }
+    newest = None
+    for venue, rows in rows_by_venue.items():
+        grade = grade_kalshi_settlement if venue == "kalshi" else grade_polymarket_resolution
+        for row in rows or []:
+            when = _row_settled_time(venue, row)
+            if when is None or cutoff is None:
+                out["undated"] += 1
+                continue
+            newest = when if newest is None or when > newest else newest
+            if when < cutoff:
+                out["before"] += 1
+                continue
+            out["after"] += 1
+            out["after_by_venue"][venue] = out["after_by_venue"].get(venue, 0) + 1
+            verdict = grade(row)
+            if not verdict.get("graded"):
+                out["after_refused"] += 1
+                continue
+            outcome = str(verdict.get("outcome"))
+            out["after_outcomes"][outcome] = out["after_outcomes"].get(outcome, 0) + 1
+            out["after_pnl_dollars"] += float(verdict.get("pnl_dollars") or 0.0)
+    out["after_pnl_dollars"] = round(out["after_pnl_dollars"], 2)
+    out["newest"] = newest.strftime("%Y-%m-%dT%H:%M:%SZ") if newest else None
+    return out
+
+
+# ---------------------------------------------------------------------------
 # The join, and the write
 # ---------------------------------------------------------------------------
 
@@ -1218,6 +1306,7 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
 
     matched_keys: set[tuple[str, str]] = set()
     graded_any = False
+    unjoinable_rows: dict[str, list] = {}
 
     for venue, rows in fetched.items():
         grade = grade_kalshi_settlement if venue == "kalshi" else grade_polymarket_resolution
@@ -1232,6 +1321,7 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
                 # Expected constantly (already-graded rows, other accounts'
                 # history) -- counted, never treated as an error.
                 counters["unjoinable"] += 1
+                unjoinable_rows.setdefault(venue, []).append(row)
                 continue
 
             verdict = grade(row)
@@ -1337,6 +1427,10 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
     counters["awaiting"] = sum(
         len(v) for k, v in open_by_key.items() if k not in matched_keys
     )
+    try:
+        counters["unjoinable_split"] = split_unjoinable(unjoinable_rows)
+    except Exception as exc:  # a diagnostic must never cost a settlement
+        counters["errors"]["unjoinable_split"] = f"{type(exc).__name__}: {exc}"
 
     if graded_any and not dry_run:
         try:

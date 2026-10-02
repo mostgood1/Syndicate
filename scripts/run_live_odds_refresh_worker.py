@@ -2293,7 +2293,8 @@ def _run_execution_tick() -> None:
                 f"pnl_derived={_settled.get('pnl_derived')} "
                 f"pnl_exceeded_own_fill={_settled.get('pnl_exceeded_own_fill')} "
                 f"refused={_settled.get('refused')} errors={_settled.get('errors')} "
-                f"by_venue={_settled.get('by_venue')}",
+                f"by_venue={_settled.get('by_venue')} "
+                f"unjoinable_split={_settled.get('unjoinable_split')}",
                 flush=True,
             )
         except Exception as exc:
