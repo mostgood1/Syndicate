@@ -44951,3 +44951,12 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 **Lesson (recorded for learnings):** before arguing a stat's improvement, check that the stat is priced -- look at the refresh's `--markets` list and the artifact's per-player fields. A deviance win on an unpriced stat is not a product win.
 
 **Where FT trips stand:** FTA 0.889x, the cap still in place. The real lever is upstream of it: sim FG% .441 vs actual .453 with FGA 1.045x -- the loop meets its points target with too many, too-poor shots, which also starves assists (0.91x). Study that before touching the foul rate again.
+
+## 2026-10-02 14:44Z (9:44 AM CT) -- READING, `/api/ops/live-refresh/state` reconciliation (`8e87c877`, web HUP 14:15Z; lane `live-odds-latest-tick-stale`) -- **MET**
+
+- verify (READ, served endpoint vs `/proc`, 20 s cadence): tick finished 14:44:02Z launching odds run `20261002_144402` (pid 421023). 14:44:04Z served `result.state=running`, pid alive -> correct. 14:44:24Z, pid dead: served `state=finished launchState=running exitCode=0 stateSource=refresh_job_status` -> the exited run is no longer reported running. Confirmed again 14:44:44Z. Before the fix (13:58-14:06Z) the same endpoint served `running` for a dead pid for 11+ min.
+
+## 2026-10-02 14:49Z (9:49 AM CT) -- LOCAL FLEET `~/Syndicate` ff onto `589886d7`, NO restart (lane `wnba-odds-run-failures`, user: "fix both") -- **SHIPPED; READING OWED**
+
+- what: `80bdd00c -> 589886d7`; only runtime files `syndicate/features/shared/recommendation_engine.py` (`build_recommendation_output` returns the candidate unchanged when ranking filters it) and `syndicate/features/shared/refresh_log_tail.py` (`LIST_MEMORY`, `DATAFRAME_MEMORY` dropped from failed-step tails). Both run inside the per-run `refresh_odds_sources.py` subprocess, which imports from disk each run -> active from the next odds run, no role restart. 2 local data mods kept.
+- verify: owed -- watcher collects WNBA odds runs stamped after 20261002_144925 (ok vs failed, with denominator). Pre-fix baseline today: WNBA 0 ok of 65 (36 IndexError, 29 fetch rc=1 with the error truncated).

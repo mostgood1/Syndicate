@@ -1240,8 +1240,8 @@ death, never life — do not invert it.
 - Verification: tests/test_local_production.py passes and asserts the new label
 - Blocked by: none
 
-### live-odds-latest-tick-stale — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
-- Goal: /api/ops/live-refresh/state latest_tick.result no longer reports state=running for an odds-refresh run whose process has exited (measured on the fleet), without changing what a tick launches
+### live-odds-latest-tick-stale — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: /api/ops/live-refresh/state latest_tick.result no longer reports state=running for an odds-refresh run whose process has exited (measured on the fleet), without changing what a tick launches — **GOAL: MET** (reading: deploys.md 2026-10-02 14:44Z -- run 20261002_144402 served `running` while alive, then `state=finished launchState=running exitCode=0 stateSource=refresh_job_status` once its pid was dead, two consecutive reads)
 - Files: syndicate/features/shared/live_refresh_loop.py,syndicate/blueprints/ops.py,tests/test_live_refresh_latest_tick_status.py
 - Hypothesis: H1: latest_tick.result is the LAUNCH-TIME snapshot (state=running, pid) written once at tick end; nothing rewrites it when that run exits. H2: idle-time tick interval is long (minutes), so the snapshot outlives its process for most of each interval. Stale = H1 x H2, not a stuck writer.
 - Falsification test: H1 falsified if latest_tick.result.state ever reads a terminal state (completed/failed) for the same run_stamp without a new tick. H2 falsified if loop_status.intervalSeconds <= 90 while latest_tick.finishedAt lags > 3x interval (then the writer IS stuck).
