@@ -107,6 +107,7 @@ def test_team_prior_does_not_stack_on_a_target_but_still_applies_without_one():
     assert stacked > unstacked + 4.0           # off != on
     assert abs(unstacked - 85.0) < 2.5
     # No target: the prior is the only efficiency signal and must still apply.
-    plain = _run(n=60)["pts"]
-    boosted = _run(n=60, home_team_adj=adj, away_team_adj=adj)["pts"]
+    # 200 draws: at 60 the +4 bound sat ~2 SE from the true ~+7 lift and flaked.
+    plain = _run(n=200)["pts"]
+    boosted = _run(n=200, home_team_adj=adj, away_team_adj=adj)["pts"]
     assert boosted > plain + 4.0
