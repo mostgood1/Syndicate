@@ -1364,6 +1364,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### fleet-publish-not-needed — OPEN — opened 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+- Goal (verbatim): On the local shared-disk fleet (SYNDICATE_LOCAL_PRODUCTION=1, no SYNDICATE_WEB_PUBLISH_URL) artifact publish and pull are treated as NOT NEEDED, not failed: BOOK_GRID_PUBLISH_FAILED and SKIP_NOT_CONFIGURED/PULL_SKIP_NOT_CONFIGURED stop on the fleet, the >12MB clause prints only for files over 12MB, and Render behaviour is unchanged -- **GOAL: NOT MET (one half left).** refresh-worker half MET: pid 617011, first tick 16:35:13Z, 0 BOOK_GRID_PUBLISH_FAILED / 0 *SKIP_NOT_CONFIGURED, grids served equal to disk. Left: live-odds-worker (16 PULL_SKIP_NOT_CONFIGURED on pre-ff code) loads 08d7ec4d at its next start, a 6 h exit due ~22:18Z. Then read 0 PULL_SKIP_NOT_CONFIGURED since that start and close.
 - Goal: On the local shared-disk fleet (SYNDICATE_LOCAL_PRODUCTION=1, no SYNDICATE_WEB_PUBLISH_URL) artifact publish and pull are treated as NOT NEEDED, not failed: BOOK_GRID_PUBLISH_FAILED and SKIP_NOT_CONFIGURED/PULL_SKIP_NOT_CONFIGURED stop on the fleet, the >12MB clause prints only for files over 12MB, and Render behaviour is unchanged
 - Files: tests/test_artifact_publisher_local_fleet.py
 - Cross-lane writes (user-approved "Yes, edit both"): recorded in the blocks of lanes nhl-live-resim and live-inplay-board-cadence.
