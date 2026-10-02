@@ -3090,7 +3090,11 @@ def _run_refresh_via_cli(
     refresh_mode = str(mode or "full").strip().lower() or "full"
     raw_root = source_root / "data" / "raw"
     processed_root = source_root / "data" / "processed"
-    package_name = source_root.name
+    # The vendored package, never source_root.name: on the fleet source_root is the
+    # DATA bundle (.../data/nba_source), which ran `python -m nba_source.cli` from
+    # vendor/nba_source_repo -- FileNotFoundError on every hourly run 2026-10-01
+    # 05:00Z..10-02 15:03Z. WNBA pins "wnba_betting" the same way.
+    package_name = "nba_betting"
     raw_fp = raw_root / f"odds_nba_player_props_{date_str}.csv"
     pred_fp = processed_root / f"props_predictions_{date_str}.csv"
     edges_fp = processed_root / f"props_edges_{date_str}.csv"

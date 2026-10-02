@@ -3360,7 +3360,25 @@ def _water_fill_minutes_local(base, *, total: float, caps):
     return out * (float(total) / s) if s > 0 else None
 
 
-def _derive_sim_minutes_local(*, smart_sim_module, team_df, date_str=None, team_tri=None):
+def _smart_sim_league_local(smart_sim_module, league_code: str | None):
+    """The league config for a vendored smart_sim module.
+
+    Only the WNBA fork exports `LEAGUE` (`from ..league import LEAGUE`); the NBA
+    vendor has no league.py. Reading it unconditionally failed every NBA SmartSim
+    job -- measured 2026-10-02 on the fleet, preseason MIA@TOR:
+    `module 'nba_betting.sim.smart_sim' has no attribute 'LEAGUE'`, 0 player rows.
+    The module's own config wins when present; otherwise Syndicate's bridge for
+    the caller's league. No code and no LEAGUE raises rather than guessing one.
+    """
+    league = getattr(smart_sim_module, "LEAGUE", None)
+    if league is not None:
+        return league
+    if not str(league_code or "").strip():
+        raise AttributeError("smart_sim module has no LEAGUE and no league_code was given")
+    return _league_for_code_local(league_code)
+
+
+def _derive_sim_minutes_local(*, smart_sim_module, team_df, date_str=None, team_tri=None, league_code=None):
     """The sim's minutes when no rotation history applies -- the vendored
     `_derive_sim_minutes` with ONE change: the shrink to regulation minutes.
 
@@ -3377,7 +3395,7 @@ def _derive_sim_minutes_local(*, smart_sim_module, team_df, date_str=None, team_
     m = smart_sim_module
     if team_df is None or team_df.empty:
         return pd.Series(dtype=float)
-    league = getattr(m, "LEAGUE")
+    league = _smart_sim_league_local(m, league_code)
     total = float(league.regulation_team_minutes)
     mins = m._roll_minutes_unscaled(team_df, date_str=date_str, team_tri=team_tri)
     seed = m._first_minutes_signal(team_df)
@@ -3519,7 +3537,7 @@ def _prior_rates_for_player_local(*, priors, team_tri, pkey, player_name) -> dic
 PRIOR_BLEND_MISSING_RECENT_IS_ABSENT = True
 
 
-def _apply_player_priors_local(*, smart_sim_module, team_df, priors, team_tri: str, sim_minutes=None, date_str: str | None = None):
+def _apply_player_priors_local(*, smart_sim_module, team_df, priors, team_tri: str, sim_minutes=None, date_str: str | None = None, league_code: str | None = None):
     import numpy as np
     import pandas as pd
 
@@ -3533,7 +3551,7 @@ def _apply_player_priors_local(*, smart_sim_module, team_df, priors, team_tri: s
     safe_float = getattr(smart_sim_module, "_safe_float")
     minutes_caps_from_team_df = getattr(smart_sim_module, "_minutes_caps_from_team_df")
     cap_and_redistribute_minutes = getattr(smart_sim_module, "_cap_and_redistribute_minutes")
-    league = getattr(smart_sim_module, "LEAGUE")
+    league = _smart_sim_league_local(smart_sim_module, league_code)
 
     if team_df is None or getattr(team_df, "empty", True):
         return pd.DataFrame()
@@ -4654,6 +4672,7 @@ def _call_source_simulate_smart_game_local(*, smart_sim_module, processed_root: 
             team_tri=team_tri,
             sim_minutes=sim_minutes,
             date_str=date_str,
+            league_code=league_code,
         ),
         "_compute_player_priors_cached": lambda asof_date_str, days_back: _compute_player_priors_cached_local(
             processed_root=processed_root,
@@ -4668,6 +4687,7 @@ def _call_source_simulate_smart_game_local(*, smart_sim_module, processed_root: 
             team_df=team_df,
             date_str=date_str,
             team_tri=team_tri,
+            league_code=league_code,
         ),
         "_team_adj_from_advanced_stats": lambda date_str, home_tri, away_tri: _team_adj_from_advanced_stats_local(
             processed_root=processed_root,
