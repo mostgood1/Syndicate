@@ -1179,7 +1179,8 @@ death, never life — do not invert it.
 - Verification: HEAD = github/main; range has no runtime files besides deployer-side scripts; check_deploy_safety from ~/Syndicate prints a 'live-odds-worker child jobs' line or live-odds blockers; /healthz 200
 - Blocked by: none
 
-### wnba-sim-ft-trips-2 — OPEN — opened 2026-10-02 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+### wnba-sim-ft-trips-2 — CLOSED — opened 2026-10-02, closed 2026-10-02 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: NOT MET -- reverted.** F1 retest falsified (FTA 1.160x). F2 (fixed-point solve) FTA 1.066x, FTA deviance -0.100, AST +0.013: pre-registration failed; the user overrode it on MY wrong framing (no FTA prop market exists), shipped `066ac9ea`, then reverted on the correction (`80bdd00c`). Next lever: sim FG% .441 vs .453 at FGA 1.045x. (`deploys.md` 2026-10-02 ~9:40 AM CT). Claims RELEASED.
 - Goal: WNBA sim free-throw trips match actual (146 both-rosters-matched games, full-season logs: FTA 0.889x, misses 1.068x, FGA 1.045x)
 - Files: vendor/wnba_betting_repo/src/wnba_betting/sim/events.py,tests/test_basketball_sim_ft_trips.py
 - Hypothesis: F1 RETEST on corrected inputs. Lane wnba-sim-ft-trips falsified F1 (solved per-attempt foul rate -> FTA 1.130x) on THIN-log priors that were never checked. With full-season logs the priors are right (prior FTA/FGA 0.305 vs actual 0.310; FTA volume 0.999x, 126 team-games), and a synthetic run already lands the box score on the target ratio. So the remaining FTA shortfall is the engine cap clip(FTA/FGA, 0.05, 0.20) against a real ~0.31, and solving the rate should bring FTA to ~1.0 and pull misses/FGA down with it.
