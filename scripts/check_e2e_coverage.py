@@ -99,7 +99,11 @@ def main(argv: list[str] | None = None) -> int:
         for sport in sorted(matrix):
             cov = matrix[sport]
             row = " ".join(f"{cov.cell(n).describe()[:width]:>{width}}" for n in CELLS)
-            print(f"{sport:8} {str(cov.candidates):>6} {row}")
+            # An out-of-season sport is SHOWN and MARKED, never hidden: hiding it
+            # would lose that it is reported-but-idle, which is itself worth
+            # seeing. The marker is why its cells raise no defect below.
+            label = sport if cov.active is not False else f"{sport} (off)"
+            print(f"{label:8} {str(cov.candidates):>6} {row}")
         print("\nper-cell status and the key each was resolved from:")
         for sport in sorted(matrix):
             cov = matrix[sport]
@@ -109,6 +113,12 @@ def main(argv: list[str] | None = None) -> int:
                       f"src={c.source_key or '-'}")
 
     defects = all_defects(matrix)
+    inactive = sorted(s for s, c in matrix.items() if c.active is False)
+    if inactive:
+        # Stated explicitly: a reader must see WHAT was exempted, or the
+        # gate's clean verdict is unfalsifiable.
+        print("\nnot counted (absent from active_sports, out of season): "
+              + ", ".join(inactive))
     print("\n" + "=" * 78)
     if not defects:
         print("PASS: every cell is a number with its denominator, or a zero with a "

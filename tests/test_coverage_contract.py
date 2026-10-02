@@ -178,6 +178,95 @@ def test_derivation_is_preferred_over_the_combined_fallback():
 # Defect aggregation
 # --------------------------------------------------------------------------
 
+# --------------------------------------------------------------------------
+# Out-of-season sports: shown, not judged
+# --------------------------------------------------------------------------
+#
+# Measured on the live fleet 2026-10-02: 8 of the gate's 9 defects were mlb and nba
+# out of season. `read_shortlist` unions `per_sport_ingest` with `active_sports` so
+# an ACTIVE sport can never vanish; that guard was one-directional, so an INACTIVE
+# sport carrying a zero-activity ingest block got judged. 89% noise is how a gate
+# earns being switched off.
+
+
+def test_a_sport_absent_from_active_sports_raises_no_defect():
+    matrix = cc.read_shortlist({
+        "active_sports": ["nfl"],
+        "per_sport_ingest": {
+            "nfl": _ingest(projections={"game_rows_with_projection": 5,
+                                        "game_rows_considered": 5}),
+            # The real shape: present, but with nothing happening.
+            "mlb": {"grid_rows": 0, "opportunities": 0, "quote_rows": 0,
+                    "scheduled_games": 0},
+        },
+    })
+    assert matrix["mlb"].active is False
+    assert matrix["mlb"].defects == []
+    # Scoped to mlb: the nfl fixture supplies only `game_rows_*`, so nfl's other
+    # three cells are legitimately not_reported and DO raise defects. Asserting
+    # an empty global list here would be asserting the fixture, not the fix.
+    assert not any(d.startswith("mlb.") for d in cc.all_defects(matrix))
+    assert any(d.startswith("nfl.") for d in cc.all_defects(matrix))
+
+
+def test_an_inactive_sport_is_still_shown_in_the_matrix():
+    """Hiding it would lose that the sport is reported-but-idle, which is itself
+    worth seeing -- and would make the exemption invisible."""
+    matrix = cc.read_shortlist({
+        "active_sports": ["nfl"],
+        "per_sport_ingest": {"nfl": _ingest(), "mlb": {"grid_rows": 0}},
+    })
+    assert "mlb" in matrix
+    assert matrix["mlb"].cell(cc.PREGAME_GAMES).status == cc.NOT_REPORTED
+
+
+def test_an_ACTIVE_sport_with_no_ingest_block_still_fails():
+    """The original rationale for the union, preserved: an active sport missing
+    entirely must not read as 'nothing to report'."""
+    matrix = cc.read_shortlist({
+        "active_sports": ["nfl", "wnba"],
+        "per_sport_ingest": {"nfl": _ingest()},
+    })
+    assert matrix["wnba"].active is True
+    assert any("wnba" in d for d in cc.all_defects(matrix))
+
+
+def test_no_active_sports_key_leaves_every_sport_JUDGED():
+    """UNKNOWN MUST NOT DEFAULT PERMISSIVE. A payload with no `active_sports` does
+    not prove any sport is out of season, and exempting on that basis is the exact
+    failure this contract exists to refuse."""
+    matrix = cc.read_shortlist({"per_sport_ingest": {"mlb": {"grid_rows": 0}}})
+    assert matrix["mlb"].active is None
+    assert any("mlb" in d for d in cc.all_defects(matrix))
+
+
+def test_an_empty_active_sports_list_still_judges_nothing_as_inactive():
+    """An EMPTY list is a listing, so it does prove the sport is not in it."""
+    matrix = cc.read_shortlist({"active_sports": [],
+                                "per_sport_ingest": {"mlb": {"grid_rows": 0}}})
+    # No sport is active, so nothing is judged -- but the row is still present.
+    assert matrix["mlb"].active is None or matrix["mlb"].active is False
+    assert "mlb" in matrix
+
+
+def test_read_sport_defaults_to_judged():
+    """A direct `read_sport` caller with no season information must be judged, not
+    exempted -- same reason as the absent-key case above."""
+    cov = cc.read_sport("mlb", {"grid_rows": 0})
+    assert cov.active is None
+    assert cov.defects
+
+
+def test_an_inactive_sport_with_a_real_unattributed_zero_is_still_exempt():
+    """Deliberate: out of season, a zero is not evidence of anything. The row is
+    visible for a reader who wants it; the GATE does not fail on it."""
+    cov = cc.read_sport("mlb", _ingest(live_gamelines={
+        "rows_live_gameline_projected": 0,
+        "rows_live_gameline_considered": 0}), active=False)
+    assert cov.cell(cc.LIVE_GAMES).status == cc.UNATTRIBUTED_ZERO
+    assert cov.defects == []
+
+
 def test_defects_exclude_known_gaps_and_partial_coverage():
     matrix = cc.read_shortlist({"per_sport_ingest": {
         "nhl": _ingest(

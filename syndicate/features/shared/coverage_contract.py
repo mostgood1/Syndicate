@@ -194,6 +194,10 @@ class SportCoverage:
     sport: str
     candidates: int | None = None
     cells: dict[str, Cell] = field(default_factory=dict)
+    #: True when `active_sports` lists this sport, False when it lists others and
+    #: not this one, None when the payload carries no `active_sports` at all.
+    #: The three-way distinction is the point -- see `defects`.
+    active: bool | None = None
 
     def cell(self, name: str) -> Cell:
         return self.cells.get(name) or Cell(name=name)
@@ -205,7 +209,23 @@ class SportCoverage:
         Deliberately NOT a list of coverage gaps. A zero with a stated reason is a
         known, actionable gap and is not a defect of the instrument; an
         unattributed zero or a metric this sport stopped reporting is.
+
+        AN OUT-OF-SEASON SPORT CONTRIBUTES NOTHING `[2026-10-02, lane
+        coverage-gate-inactive-sports]`. `read_shortlist` unions `per_sport_ingest`
+        with `active_sports` so an ACTIVE sport can never vanish from the matrix --
+        but that guard was one-directional, so an INACTIVE sport carrying a
+        zero-activity ingest block got judged and produced four `not_reported`
+        defects. Measured on the live fleet 2026-10-02: **8 of the gate's 9 defects
+        were mlb and nba out of season**, i.e. 89% noise, which is how a gate earns
+        being switched off. The row is still SHOWN -- hiding it would lose the fact
+        that the sport is reported-but-idle.
+
+        `active is None` STILL GETS JUDGED. A payload with no `active_sports` does
+        not prove a sport is out of season, and mapping that unknown onto the
+        permissive branch is the exact failure this contract exists to refuse.
         """
+        if self.active is False:
+            return []
         out = []
         for name in CELLS:
             c = self.cell(name)
@@ -214,8 +234,13 @@ class SportCoverage:
         return out
 
 
-def read_sport(sport: str, ingest_block: Any) -> SportCoverage:
-    """Normalise one sport's `per_sport_ingest` entry into the contract."""
+def read_sport(sport: str, ingest_block: Any, *, active: bool | None = None) -> SportCoverage:
+    """Normalise one sport's `per_sport_ingest` entry into the contract.
+
+    `active` is three-way on purpose: True (listed in `active_sports`), False
+    (the payload lists sports and not this one), None (no `active_sports` to
+    read). Only an explicit False exempts a sport from `defects`.
+    """
     block = ingest_block if isinstance(ingest_block, dict) else {}
     enrichment = block.get("enrichment") if isinstance(block.get("enrichment"), dict) else {}
     cells: dict[str, Cell] = {}
@@ -268,7 +293,8 @@ def read_sport(sport: str, ingest_block: Any) -> SportCoverage:
                 break
         cells[name] = Cell(name=name, projected=projected, considered=considered,
                            reason=reason, supported=supported, source_key=source)
-    return SportCoverage(sport=sport, candidates=_as_int(block.get("candidates")), cells=cells)
+    return SportCoverage(sport=sport, candidates=_as_int(block.get("candidates")),
+                         cells=cells, active=active)
 
 
 def read_shortlist(payload: Any) -> dict[str, SportCoverage]:
@@ -282,9 +308,19 @@ def read_shortlist(payload: Any) -> dict[str, SportCoverage]:
     ingest = doc.get("per_sport_ingest") if isinstance(doc.get("per_sport_ingest"), dict) else {}
     active = doc.get("active_sports")
     names = set(ingest)
+    active_set: set[str] | None = None
     if isinstance(active, list):
-        names |= {str(s) for s in active if s}
-    return {s: read_sport(s, ingest.get(s)) for s in sorted(names)}
+        active_set = {str(s) for s in active if s}
+        names |= active_set
+    # `active_set is None` means the payload carried no `active_sports`, so
+    # nothing is known about any sport's season -- every row then passes
+    # `active=None` and stays judged. Only an explicit listing makes a sport
+    # provably inactive.
+    return {
+        s: read_sport(s, ingest.get(s),
+                      active=(s in active_set) if active_set is not None else None)
+        for s in sorted(names)
+    }
 
 
 def all_defects(matrix: dict[str, SportCoverage]) -> list[str]:
