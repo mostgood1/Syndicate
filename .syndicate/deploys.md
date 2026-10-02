@@ -44972,3 +44972,12 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - How: `local_production.py down` (task SyndicateLocalProduction went Ready), then `Start-ScheduledTask SyndicateLocalProduction`; /healthz 200 within 5 s.
 - verify (READ, ~15:01Z): `status` shows all three roles on new pids (web 602566, refresh-worker 602629, live-odds-worker 602630), `code=ca27e45a`, restarts=0, and no STALE flag. Lines since `==== start`: web 27/27, refresh-worker 183/183, live-odds-worker 334/334 stamped. `render_logs --service refresh-worker --text MEMORY` over the last 3 min: 114 exact, 0 approximate.
 - Side effect: this also loaded the 7 runtime files other lanes had shipped to the checkout since `9856dd92`.
+
+## 2026-10-02 (~10:10 AM CT) -- fleet ff ca27e45a -> 927d1787 + RESTART: paper execution RUNS on the fleet (ENABLED=1, mode paper, armed 0) -- lane fleet-paper-execution, user-approved "enable paper execution and restart if no sim is running"
+- Pre-check 15:10Z: `mlb_sim_runs/_active.json` = `{}`, no sim process, MLB_SIM_TICK launched nothing, no scheduled job running. `down`, `Start-ScheduledTask SyndicateLocalProduction`, /healthz 200 in 5 s.
+- verify (live pid env): live-odds-worker 604203 and refresh-worker 604202 both read ENABLED=1 MODE=paper ARMED=0; status `code=927d1787`; supervisor prints `money: paper`.
+- verify (first ticks; before this, the fleet's whole life since 10-01 01:31Z had 0 of each):
+  - refresh-worker 15:15:00Z: `PORTFOLIO_EXECUTED mode=paper placed=4`, `PAPER2_EXECUTED venue=paper:novig placed=1`, `venue=paper:prophetx placed=3`.
+  - live-odds-worker 15:15:10-13Z: `VENUE_BALANCES kalshi=ok polymarket=ok`, `VENUE_SETTLEMENT status=ok`, `ORDER_PATH venue=kalshi|polymarket status=no_positions`, `EXECUTION mode=paper venue=paper:kalshi|paper:polymarket placed=0`.
+  - `venue_order_family_census.py --hours 1`: CLEAR (it was INCONCLUSIVE on every earlier run).
+- NOT verified / owed: settlement read `settled=0 unjoinable=593` (kalshi 432 rows, polymarket 161). Every live ledger row failed to join to the venue's record, so the Render-era live orders are still unsettled. This is a lead, not part of this lane.
