@@ -98,6 +98,7 @@ from pathlib import Path
 from typing import Any, Iterable, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+LOGSTAMP_DIR = REPO_ROOT / "scripts" / "local_logstamp"
 # `python scripts/local_production.py` puts scripts/ on sys.path, not the repo
 # root, and `down` imports syndicate.features.shared.process_liveness.
 # It also broke `import-render-env` (`from scripts.snapshot_render_env`) on the
@@ -413,7 +414,12 @@ def derive_role_env(
         env[key] = value
 
     existing = env.get("PYTHONPATH") or ""
-    env["PYTHONPATH"] = os.pathsep.join([str(REPO_ROOT)] + ([existing] if existing else []))
+    front = [str(REPO_ROOT)]
+    # Every line a role prints gets its UTC emission time (scripts/local_logstamp):
+    # Render stamped lines, a log file does not, and render_logs --local reads these.
+    if str(env.get("SYNDICATE_LOCAL_LOG_TIMESTAMPS", "1")).strip() != "0":
+        front.insert(0, str(LOGSTAMP_DIR))
+    env["PYTHONPATH"] = os.pathsep.join(front + ([existing] if existing else []))
     return env, audit
 
 

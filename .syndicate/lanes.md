@@ -1274,6 +1274,13 @@ death, never life — do not invert it.
 - Verification: unit: empty ranking -> candidate returned unchanged; tracking refresh survives a filtered row; diagnostic_tail drops LIST_MEMORY/DATAFRAME_MEMORY and reaches the error line. Fleet: after restart, the next WNBA odds runs show post_refresh ok (or a different, non-IndexError cause), counted with a denominator
 - Blocked by: none
 - Status 2026-10-02: code landed (both fixes, 5 tests, scratch A/B IndexError -> ok); fleet ff + READING owed (next WNBA odds runs, with denominator).
+### local-logs-backend — OPEN — opened 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+- Goal: scripts/render_logs.py reads the local fleet's log files (rotated included) with the same service/text/time filters when Render is suspended or --local is given, so its callers work on the local fleet; the bandwidth-spike-tripwire task is paused while Render is suspended
+- Files: scripts/render_logs.py, tests/test_render_logs_local.py, scripts/local_production.py, scripts/local_logstamp/, tests/test_local_logstamp.py, docs/ai_context/local_production_runbook.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit tests over fixture log files (filters, rotation order, time window); live: render_logs --local on the fleet returns real lines; venue_order_family_census runs against the fleet and reads ORDER_PATH lines; tripwire task shows disabled
+- Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
