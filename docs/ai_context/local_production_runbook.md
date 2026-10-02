@@ -175,6 +175,19 @@ Start at boot and restart on failure:
 
 `up` prints `money: LIVE` or `money: paper` on its first lines. The day stake caps are stored in the execution store, not in env, and start fresh on a new Redis.
 
+**Health watchdog** (`scripts/local_watchdog.py`, run every 5 minutes by `deploy/local/watchdog.ps1`). Render showed a dead service on its dashboard; here nothing did. It has two halves:
+- **Inside WSL**, it checks:
+  - the supervisor and each role process;
+  - a crash loop (3 or more restarts since the last check);
+  - `/healthz`;
+  - each role's log written within 15 minutes, which catches a hung worker that hasn't exited;
+  - missed, overrunning or failed scheduled jobs;
+  - backup age under 30 hours;
+  - at least 10 GB free.
+- **On Windows**, `watchdog.ps1` shows a notification when the check says to, and alerts by itself when WSL doesn't answer.
+
+Alerts fire when a problem is new, again while it persists (failures every 6 hours, warnings every 24), and once when it clears. Install it with `deploy\local\install_watchdog_task.ps1`. That copies `watchdog.ps1` into `C:\SyndicateProd\watchdog` and registers `SyndicateFleetWatchdog`, which runs only while you're logged on, since a notification needs your desktop. Use `-TestToast` to prove notifications reach you. Logs: `C:\SyndicateProd\watchdog\watchdog.log` for Windows‑side runs, and `<home>/logs/watchdog.log` for transitions. **It can't alert while the laptop sleeps.** A missed run starts on wake, so an outage during sleep is reported late, not never.
+
 ## 5. Exposing the site (optional)
 
 Web binds `127.0.0.1` by default. Do not port-forward it. To serve the public:

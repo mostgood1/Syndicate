@@ -1248,6 +1248,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - Status 2026-10-02 14:18Z: code landed `8e87c877` (read-side `reconcile_tick_result` + endpoint), 6 tests; H1 and H2 CONFIRMED on the fleet (log/2026-10-02.md); web HUP'd onto it 14:15Z (deploys.md). OWED: the READING -- a served tick whose launched run has exited must show its terminal state; no launching tick has occurred since the HUP (last tick 14:11Z was skipped).
 
+### local-prod-watchdog — OPEN — opened 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+- Goal: A health watchdog checks the local production fleet every 5 minutes (supervisor, roles, healthz, log heartbeats, scheduled jobs, backup age, disk) and raises a Windows notification on a new problem, every 6 h while it persists, and on recovery; WSL itself unreachable also alerts
+- Files: scripts/local_watchdog.py, tests/test_local_watchdog.py, deploy/local/watchdog.ps1, deploy/local/install_watchdog_task.ps1, docs/ai_context/local_production_runbook.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit tests over the evaluator (healthy, each failure, re-alert window, recovery); live run on the fleet reports healthy; a negative control (stopped healthz / bad port) raises an alert and a real Windows notification
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
