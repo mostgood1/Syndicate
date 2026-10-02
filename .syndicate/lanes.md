@@ -1344,7 +1344,8 @@ death, never life — do not invert it.
 - Verification: status all roles up restarts=0 code=<HEAD>; /healthz 200; BOARD_BUILD_TIMING after the latest [refresh_worker] BOOTED with no DEFERRED/DRAIN_HOLD/Traceback; deploys.md entry
 - Blocked by: none
 
-### settlement-unjoinable-split — OPEN — opened 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+### settlement-unjoinable-split — CLOSED — opened 2026-10-02, closed 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+- Goal (verbatim): VENUE_SETTLEMENT reports unjoinable venue rows split before/after a cutoff (default the Render suspension, 2026-09-30T06:37Z; env SYNDICATE_SETTLEMENT_SPLIT_AT), with the after-rows' venue, outcome counts and P&L, so the size of the ungraded Render-era book is read by the worker with its own credentials -- **GOAL: MET.** Reading: VENUE_SETTLEMENT 16:22:42Z on live-odds-worker pid 613952 (c1067485): `unjoinable_split before=593 after=0 undated=0 newest=2026-09-28T03:16:56Z`, summing to unjoinable=593. So nothing has settled since the suspension. 3 new tests plus the 78 existing settlement tests pass. Shipped `c1067485`.
 - Goal: VENUE_SETTLEMENT reports unjoinable venue rows split before/after a cutoff (default the Render suspension, 2026-09-30T06:37Z; env SYNDICATE_SETTLEMENT_SPLIT_AT), with the after-rows' venue, outcome counts and P&L, so the size of the ungraded Render-era book is read by the worker with its own credentials
 - Files: syndicate/features/shared/venue_settlement.py, scripts/run_live_odds_refresh_worker.py, tests/test_venue_settlement_unjoinable_split.py
 - Hypothesis: n/a
