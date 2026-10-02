@@ -293,6 +293,78 @@ def events_in_scope(events: list[dict[str, Any]], *, window_days: float | None =
     return [event for when, event in dated if when <= cutoff]
 
 
+def _near_days() -> int:
+    """Central calendar days past today whose events are fetched EVERY run.
+
+    1 = today and tomorrow, the Layer 2 board's horizon. Lane
+    `layer2-freshness-1h`, 2026-10-02: this sweep fetched the whole week every
+    ~22 minutes -- 54 events x 9 markets, ~250 credits a run, ~20k a day, ~12% of
+    the monthly cap -- while the board, which only shows today and tomorrow,
+    served 2 NCAAF prop rows. Saturday's props bought on a Thursday were never
+    on it.
+    """
+    try:
+        return max(0, int(os.environ.get("NCAAF_PROPS_NEAR_DAYS", "1") or 1))
+    except Exception:
+        return 1
+
+
+def _far_refresh_seconds() -> float:
+    """Minimum age before an event BEYOND the near window is re-fetched (6h).
+
+    Not zero: the NCAAF page's props panel reads this week-keyed CSV and shows
+    Saturday's props from midweek, so far events keep a slow heartbeat and their
+    last capture is carried forward in between.
+    """
+    try:
+        return max(0.0, float(os.environ.get("NCAAF_PROPS_FAR_REFRESH_SECONDS", "21600") or 21600))
+    except Exception:
+        return 21600.0
+
+
+def plan_event_fetch(
+    scoped: list[dict[str, Any]],
+    prior_fetched_utc: dict[str, str] | None,
+    *,
+    now: datetime | None = None,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """(events to fetch now, ids to CARRY from the previous capture).
+
+    Near events -- kickoff on a Central date no later than today + `_near_days()`,
+    games in progress included -- are fetched every run, because those are the
+    rows the board can show and the 1h freshness rule judges. A far event is
+    fetched only when its own last fetch is at least `_far_refresh_seconds()`
+    old (or it was never fetched); otherwise it is carried.
+    """
+    from syndicate.features.shared.timezone import CENTRAL_TIMEZONE, central_date_from_iso
+
+    current = now or datetime.now(tz=timezone.utc)
+    today = current.astimezone(CENTRAL_TIMEZONE).date()
+    last_near_day = today + timedelta(days=_near_days())
+    far_age = _far_refresh_seconds()
+    prior = prior_fetched_utc or {}
+    to_fetch: list[dict[str, Any]] = []
+    carried: list[str] = []
+    for event in scoped:
+        event_id = str(event.get("id") or "").strip()
+        if not event_id:
+            continue
+        day = central_date_from_iso(event.get("commence_time") or event.get("commenceTime"))
+        if day is None or day <= last_near_day:
+            to_fetch.append(event)
+            continue
+        last = prior.get(event_id)
+        try:
+            age = (current - datetime.fromisoformat(str(last).replace("Z", "+00:00"))).total_seconds() if last else None
+        except Exception:
+            age = None
+        if age is None or age >= far_age:
+            to_fetch.append(event)
+        else:
+            carried.append(event_id)
+    return to_fetch, carried
+
+
 def fetch_event_odds(
     api_key: str,
     event_id: str,
@@ -337,6 +409,7 @@ def fetch_player_props(
     sport_key: str | None = None,
     region: str = "us",
     markets: list[str] | None = None,
+    scoped: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Every in-scope event's props, all markets in one request per event.
 
@@ -345,13 +418,14 @@ def fetch_player_props(
     """
     resolved_sport_key = sport_key or _get_sport_key()
     requested = list(markets or _player_markets())
-    events = fetch_events(api_key, sport_key=resolved_sport_key)
-    scoped = events_in_scope(events)
-    print(
-        f"OddsAPI events: {len(events)} listed, {len(scoped)} in the next slate "
-        f"(window {_event_window_days()}d); requesting {len(requested)} markets each.",
-        flush=True,
-    )
+    if scoped is None:
+        events = fetch_events(api_key, sport_key=resolved_sport_key)
+        scoped = events_in_scope(events)
+        print(
+            f"OddsAPI events: {len(events)} listed, {len(scoped)} in the next slate "
+            f"(window {_event_window_days()}d); requesting {len(requested)} markets each.",
+            flush=True,
+        )
     collected: list[dict[str, Any]] = []
     invalid_market_events = 0
     for event in scoped:
@@ -385,6 +459,7 @@ def fetch_player_props_chunked(
     sport_key: str | None = None,
     region: str = "us",
     markets: list[str] | None = None,
+    scoped: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """One request per market per event -- resilience fallback for a bad key
     poisoning a combined request. Same credits, 9x the HTTP calls.
@@ -394,8 +469,8 @@ def fetch_player_props_chunked(
     """
     resolved_sport_key = sport_key or _get_sport_key()
     requested = list(markets or _player_markets())
-    events = fetch_events(api_key, sport_key=resolved_sport_key)
-    scoped = events_in_scope(events)
+    if scoped is None:
+        scoped = events_in_scope(fetch_events(api_key, sport_key=resolved_sport_key))
     merged: dict[str, dict[str, Any]] = {}
     failed_markets: set[str] = set()
     for market in requested:
@@ -673,7 +748,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--season", type=int, required=True)
     parser.add_argument("--week", type=int, required=True)
     parser.add_argument("--out", type=str, required=True)
-    parser.add_argument("--mode", type=str, default=os.environ.get("ODDSAPI_PROPS_MODE", "per_market"), choices=["per_market", "combined"])
+    # COMBINED BY DEFAULT `[2026-10-02, lane layer2-freshness-1h]`: one request per
+    # event carrying every market, as the NFL fetcher already does. Same credits
+    # (OddsAPI bills per market returned) for 1/9th of the HTTP calls -- this
+    # sweep was ~500 calls a run and holds the shared odds lane while it runs.
+    # `per_market` was the unwired first draft's default, not a measured choice,
+    # and a 422 on the combined request still falls back to it below.
+    parser.add_argument("--mode", type=str, default=os.environ.get("ODDSAPI_PROPS_MODE", "combined"), choices=["per_market", "combined"])
     parser.add_argument("--keep-existing-on-empty", action="store_true", default=True)
     parser.add_argument("--no-keep-existing-on-empty", action="store_false", dest="keep_existing_on_empty")
     parser.add_argument("--save-raw", action="store_true", default=True)
@@ -694,15 +775,48 @@ def main(argv: list[str] | None = None) -> int:
     raw_path = out_path.with_name(out_path.stem + "_raw.json")
     region = os.environ.get("ODDS_API_REGION", "us")
 
+    # BOARD-HORIZON SCOPING (`plan_event_fetch`): near events every run, far ones
+    # on a slow heartbeat, the rest CARRIED from the previous capture. The prior
+    # capture is this same week-keyed raw sidecar.
+    prior_events_by_id: dict[str, dict[str, Any]] = {}
+    prior_fetched_utc: dict[str, str] = {}
+    try:
+        if raw_path.exists():
+            prior_raw = json.loads(raw_path.read_text(encoding="utf-8"))
+            prior_fetched_utc = dict(prior_raw.get("event_fetched_utc") or {})
+            for prior_event in prior_raw.get("events") or []:
+                if isinstance(prior_event, dict) and prior_event.get("id"):
+                    prior_events_by_id[str(prior_event["id"])] = prior_event
+    except Exception as exc:
+        print(f"WARNING: could not read prior raw capture {raw_path}: {exc}; fetching every in-scope event.")
+        prior_events_by_id, prior_fetched_utc = {}, {}
+
+    try:
+        listed = fetch_events(api_key, sport_key=sport_key)
+        in_scope = events_in_scope(listed)
+        to_fetch, carried_ids = plan_event_fetch(in_scope, prior_fetched_utc)
+        # A carried id with no stored payload had NO props when last fetched
+        # (only events with bookmakers are kept). Its recent fetch time already
+        # proves we looked, so it is neither carried nor re-fetched -- re-fetching
+        # every prop-less far game each run is the waste this exists to remove.
+        print(
+            f"[ncaaf_props] PLAN listed={len(listed)} in_scope={len(in_scope)} fetch={len(to_fetch)} "
+            f"carried={len(carried_ids)} near_days={_near_days()} far_refresh_s={int(_far_refresh_seconds())} mode={args.mode}",
+            flush=True,
+        )
+    except Exception as exc:
+        print(f"ERROR listing OddsAPI events: {exc}")
+        return 2
+
     try:
         if args.mode == "combined":
-            events = fetch_player_props(api_key, sport_key=sport_key, region=region)
+            events = fetch_player_props(api_key, sport_key=sport_key, region=region, scoped=to_fetch)
         else:
-            events = fetch_player_props_chunked(api_key, sport_key=sport_key, region=region)
+            events = fetch_player_props_chunked(api_key, sport_key=sport_key, region=region, scoped=to_fetch)
     except HTTPError as exc:
         if getattr(getattr(exc, "response", None), "status_code", None) == 422:
             try:
-                events = fetch_player_props_chunked(api_key, sport_key=sport_key, region=region)
+                events = fetch_player_props_chunked(api_key, sport_key=sport_key, region=region, scoped=to_fetch)
             except Exception as retry_exc:
                 print(f"ERROR fetching OddsAPI player props (chunked) after 422: {retry_exc}")
                 return 2
@@ -712,6 +826,19 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         print(f"ERROR fetching OddsAPI player props: {exc}")
         return 2
+
+    # Fetched this run vs carried: ONLY the fetched ones go to the quote log
+    # below. The log is what `quote_seen_age_seconds` is computed from, so
+    # re-appending a carried payload would stamp a price we did not look at as
+    # just checked -- the exact staleness the 1h rule exists to expose.
+    fetched_events = list(events or [])
+    fetched_at = datetime.now(tz=timezone.utc).isoformat()
+    event_fetched_utc = {i: prior_fetched_utc[i] for i in carried_ids if i in prior_fetched_utc}
+    for event in to_fetch:
+        if event.get("id"):
+            event_fetched_utc[str(event["id"])] = fetched_at
+    carried_events = [prior_events_by_id[i] for i in carried_ids if i in prior_events_by_id]
+    events = fetched_events + carried_events
 
     if args.save_raw:
         try:
@@ -724,6 +851,9 @@ def main(argv: list[str] | None = None) -> int:
                         "region": region,
                         "markets": _player_markets(),
                         "events_count": len(events) if isinstance(events, list) else None,
+                        "events_fetched": len(fetched_events),
+                        "events_carried": len(carried_events),
+                        "event_fetched_utc": event_fetched_utc,
                         "events": events,
                     },
                     ensure_ascii=False,
@@ -736,7 +866,7 @@ def main(argv: list[str] | None = None) -> int:
     # #209 Class A: parse_events_to_rows keeps ONE book per event and drops
     # the rest of an already-paid-for response. The CSV keeps its single-book
     # shape; the quote log keeps every book.
-    _append_ncaaf_book_quotes(events, season=int(args.season), week=int(args.week))
+    _append_ncaaf_book_quotes(fetched_events, season=int(args.season), week=int(args.week))
     if not rows:
         # Confirmed live 2026-08-05: OddsAPI returns zero real player-prop
         # markets for NCAAF games weeks out (and for NFL games days out --

@@ -83,7 +83,9 @@ class FetchNcaafOddsApiPropsLocalTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             out_path = Path(tmp_dir) / "oddsapi_player_props_2026_wk1.csv"
 
-            with patch.object(fetch_module, "fetch_player_props_chunked", return_value=[]), patch.dict(
+            with patch.object(fetch_module, "fetch_events", return_value=[]), patch.object(
+                fetch_module, "fetch_player_props", return_value=[]
+            ), patch.object(fetch_module, "fetch_player_props_chunked", return_value=[]), patch.dict(
                 "os.environ", {"ODDS_API_KEY": "test-key"}, clear=False
             ):
                 exit_code = fetch_module.main(
@@ -104,7 +106,9 @@ class FetchNcaafOddsApiPropsLocalTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.object(fetch_module, "fetch_player_props_chunked", return_value=[]), patch.dict(
+            with patch.object(fetch_module, "fetch_events", return_value=[]), patch.object(
+                fetch_module, "fetch_player_props", return_value=[]
+            ), patch.object(fetch_module, "fetch_player_props_chunked", return_value=[]), patch.dict(
                 "os.environ", {"ODDS_API_KEY": "test-key"}, clear=False
             ):
                 exit_code = fetch_module.main(["--season", "2026", "--week", "1", "--out", str(out_path), "--no-save-raw"])
