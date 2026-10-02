@@ -45131,3 +45131,20 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - verify (READ, first build on the new code ~19:24Z, all sports ~55s old): NHL 648 rows, oldest seen 5.7 min, **0 > 1h**; WNBA 339 rows, oldest 37.7 min, **0 > 1h** (the 5-8 dead lines gone); NFL 1,740 (140 > 1h, 14h ceiling unchanged); NCAAF 1,912 (80 > 1h, unchanged); soccer 18. `rows_beyond_quote_age` 88 board-wide.
 - gap found: the endpoint did not forward the two per-sport fields -> fixed in the next commit (web HUP owed).
 - cadence basis (watcher 17:47-19:00Z): NHL props fetched every ~37 min (one 56-min gap from two restarts), oldest live quote 55 min; WNBA every ~37 min. Measured per fetch post quota-fix: NHL ~97 credits, WNBA ~79; cadence change ~+5,100 credits/day (+~700 more for NHL at 30 min).
+
+## 2026-10-02 19:18Z (2:18 PM CT) -- LOCAL FLEET FF -> ca860dd5: NBA props skip edges/recs when the snapshot has game lines but no player props (lane `nba-hourly-odds-failures`, user-approved ff-only) -- **VERIFY OWED**
+
+- why: the 19:04Z all-sport run proved the 18:42Z SmartSim fix (5c825580) on the fleet -- `smart_sim_failures` 0, SMART_SIM_RESULT_LOAD_COMPLETE rows=34, smart_sim_2026-10-03_TOR_MIA.json + props_predictions_2026-10-03.csv written 19:05:21Z, the failures csv gone -- and exposed a THIRD cause: the MIA@TOR snapshot is 28 rows, all h2h/spreads/totals (0 with a player_name), so props-edges raised "No edges computed" and the run errored before game cards. That run survived the 19:13Z restart and still reports the pre-fix NBA failure; do not count it.
+- expect: the first all-sport run stamped after 19:20Z (~20:03Z) shows `{"sport": "nba", "ok": true}`, logs "no player-prop lines offered", and runs game cards via `nba_betting.cli export-game-cards` (first live test of the 5c825580 package pin). Watcher `C:/tmp/nba_hourly_watch.py` (bxnvtofe4).
+
+## 2026-10-02 19:30Z (2:30 PM CT) -- LOCAL FLEET: NCAAF games cache moved to the data root + ff -> 08361660 (lane `ncaaf-games-cache-data-root`, user: "Move it to the data root") -- **VERIFY OWED**
+
+- applied, in order: no NCAAF generator running; backups in `~/syndicate-prod/quarantine/2026-10-02_ncaaf_games_cache_move/` (data-root copy before, fresh checkout copy); fresh checkout copy -> data root (`cmp` equal); `git checkout --` the tracked checkout file; ff bb255e44 -> 08361660.
+- read back: data-root games_2026 completed **331**/888 (was 260); checkout copy = committed (260); checkout dirty tracked files **0** (was 2).
+- caveat: web's gunicorn workers imported the OLD DEFAULT_CACHE_DIR; until a HUP or recycle, a web request that falls past the published week_state reads the committed copy (260). Not done here (ff-only).
+- expect: next NCAAF projection run logs GAMES_CACHE_REFRESH against `/home/amyn/syndicate-prod/data/ncaaf_source/historical_truth` and the checkout stays clean.
+
+## 2026-10-02 19:1xZ (2:1x PM CT) -- LOCAL FLEET CONFIG: ~/Syndicate main upstream origin/main -> github/main; stray vendor WNBA boxscores_history.csv restored (lanes `fleet-checkout-upstream`, #5 of the user's list) -- **MET**
+
+- upstream: `git branch --set-upstream-to=github/main main`; read back `main@{upstream}` = github/main, `git status -sb` = `## main...github/main` (was "ahead 81" of the stale Windows clone at 80bdd00c). `origin` remote left in place.
+- vendor/wnba_betting_repo/data/processed/boxscores_history.csv: 1,248 stray rows (50 games) written 2026-10-01T18:13Z, ALL already in the data-root history (9,360 rows, 0 missing); backed up to `quarantine/2026-10-02_vendor_wnba_boxscores_history/`, then `git checkout --` (1,667 rows). Not recurring since 10-01.
