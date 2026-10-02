@@ -204,8 +204,17 @@ circular controls near 0. Away-moved rows revert and beat the close.
 minus away: nfl -2.81 (event bootstrap [-11.35, -1.55], 16 games), wnba -3.13 ([-3.94, -2.58], 18),
 mlb -7.37 ([-8.61, -6.10], 56). The effect is smaller than on 09-20 but still clear of zero. Circular controls are +1.6..+3.0,
 so the reversion is PARTIAL. NCAAF is UNRESOLVED: -2.53 but on ONE game (11/11 keys); re-run after the 09-26 slate.
-The term's sign looks backwards for a bet-now ranking. **NOT changed; a weight change is a user decision**
-(`findings_2026-09-21_top_opps_adverse_movement.md`).
+**THE SINGLE-BOOK TERM IS OFF `[verified 2026-10-02 17:42Z, a804550e, user decision, lane layer2-freshness-1h]`.**
+Same-book drift with the consensus HELD reverts (MLB mirror 07-07..08-09, 408 games: longer +0.39 pp
+[+0.29, +0.52], shorter -0.33 [-0.46, -0.21]), so `blended_score` no longer adds it
+(`SYNDICATE_SCORE_SINGLE_BOOK_MOVEMENT=1` restores). The MARKET's move still ranks, through EV priced
+against the current consensus, and is published as attribution-only `score.market_move_component`
+(consensus pp / implied price). Fleet board after: 0/3,381 rows carry a movement component,
+`rows_refused_by_movement` 490 -> 0, `market_move_component` sign = consensus arrow 1,792/1,792. The card's
+arrow follows `movement_fair_delta_pp` (+/-0.25 pp); single-book drift shows as neutral price info. Consensus
+moves themselves are small and sport-inconsistent (MLB -0.09/+0.11 pp toward/against; NHL +0.62/-0.56 on 8
+games) -- no fixed-sign extra term; per-sport measurement owed
+(`findings_2026-09-21_top_opps_adverse_movement.md`, `findings_2026-10-02_layer2_market_moves_away.md`).
 
 **Movement is the board's second-largest value term and was already wired end to
 end** — unusual here. `blended_score` = `ev_pct` + capped sim + capped movement,
