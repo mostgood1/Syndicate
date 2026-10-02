@@ -1093,8 +1093,8 @@ death, never life — do not invert it.
 - Verification: unit: game-lines-only snapshot -> edges/recs not called, game cards built, main exit 0; player props present -> edges called (off != on); fails on origin/main. Fleet: no live reading available until a game-lines-only WNBA slate occurs; record that as the caveat
 - Blocked by: none
 
-### soccer-espn-range-5xx — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
-- Goal: Soccer pregame runs stop failing on ESPN's 502 for one bel.1 range: espn_lineups._scoreboard_payloads splits a multi-day range into single dates on a 5xx as it does on a 400 (a 5xx on a single date, or any other status, still raises); verified by the next pregame soccer run reporting soccer ok and rewriting belgian_pro_league api/schedule — **GOAL: NOT MET** (5566d4ba on the fleet 20:56Z; live-ESPN pre-verify rc=0 with the 502 split; owed: the ~21:04Z pregame run shows soccer ok=true + Belgian schedule rewritten -- watcher boapf6pqe; deploys.md 20:56Z)
+### soccer-espn-range-5xx — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: Soccer pregame runs stop failing on ESPN's 502 for one bel.1 range: espn_lineups._scoreboard_payloads splits a multi-day range into single dates on a 5xx as it does on a 400 (a 5xx on a single date, or any other status, still raises); verified by the next pregame soccer run reporting soccer ok and rewriting belgian_pro_league api/schedule — **GOAL: MET** (run 20261002_210650: rc=0, soccer ok=true, Belgian schedule rewritten 21:30:48Z in-run; first rc=0 hourly all-sport run since at least 10-01; deploys.md 21:36Z)
 - Files: syndicate/features/soccer/ingestion/espn_lineups.py (_scoreboard_payloads only),tests/test_espn_range_5xx_fallback.py,tests/test_soccer_espn_scoreboard_fallback.py (the non-400 test only)
 - Hypothesis: n/a
 - Falsification test: n/a

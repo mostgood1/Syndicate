@@ -45185,3 +45185,9 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - reading (21:30:52Z, first run after the ff, ncaaf live): top-level keys include `results`, `phase`, `sports`, `odds_control_plane`, `coverage_audit`; no `stdout` key; parsed results `[('ncaaf', True)]`.
 - not yet seen live: the FAILURE shape (`result` + `failureSummary` + the log line) needs an rc!=0 run; covered by tests/test_refresh_failure_observability.py (22 pass with the new tests).
 - CONSUMERS OF THE OLD SHAPE: anything that read `stdout` or `command` from a run file written after 21:29Z now finds the result payload instead (success) or `result` (failure) -- the pre-stamp format. This session's watchers are updated; the soccer watcher's target run (20261002_210650) started before the ff and keeps the old shape.
+
+## 2026-10-02 21:36Z (4:36 PM CT) -- MEASUREMENT for the soccer ESPN range-5xx ff (5566d4ba, lane `soccer-espn-range-5xx`) -- **MET**
+
+- reading (all-sport pregame run 20261002_210650, 21:06:51Z -> 21:35:51Z, first after the ff): **rc=0**, per-sport ok nba/nhl/wnba/nfl/ncaaf/soccer all true (mlb's entry is in the truncated middle; rc=0 means no sport failed) -- the FIRST hourly all-sport run with rc=0 since at least 2026-10-01 05:00Z. belgian_pro_league/api/schedule/schedule_2026.json rewritten 21:30:48Z inside the run (last rewrite before: the 18:03Z run).
+- not visible: the `status=502 -> retrying` line (in the truncated middle of this pre-1d0cee45 run file); the live-ESPN pre-verify on the fleet's code showed it (deploys.md 20:56Z entry).
+- noted, not investigated: the run took 29 min against today's usual 15-17 min.
