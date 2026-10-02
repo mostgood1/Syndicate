@@ -105,22 +105,29 @@ def _slug_sport(slug: str) -> str | None:
 
 
 def _polymarket_cost(row: Mapping[str, Any]) -> tuple[float | None, float | None, float | None]:
-    """(cost $, shares, price per share) of the position BEFORE it resolved.
+    """(cost $, shares, venue avg price) of the position BEFORE it resolved.
 
-    `beforePosition` states its own cost basis (`cost`, `qtyBought`). A price is
-    kept only if it is a probability, strictly inside (0, 1), which is the unit
-    `profit_per_dollar` grades a contract in. Anything else is left None rather
-    than guessed.
+    `beforePosition` states its own cost basis. A SHORT (a bought NO) reports
+    `qtySold`/`netPosition<0` with `qtyBought=0`, so shares come from either.
+
+    THE AVERAGE PRICE IS NOT WRITTEN AS `fill_price`. Measured in the 2026-10-02
+    dry run: with a price derived as cost/shares (cost includes fees), 19 won
+    rows read as P&L larger than their stake could pay, by 2-6%, and
+    `repair_impossible_venue_pnl` would have REPLACED the venue's stated P&L
+    with an estimate on the next tick. The repair exists for an attribution
+    error that cannot occur here (each row IS the whole position), so the
+    venue's number is kept and the price is stored only as `venue_avg_price`.
     """
     before = row.get("beforePosition") if isinstance(row.get("beforePosition"), Mapping) else {}
     cost = vs._amount(before.get("cost"))
-    shares = vs._num(before.get("qtyBoughtDecimal")) or vs._num(before.get("qtyBought"))
+    shares = (vs._num(before.get("qtyBoughtDecimal")) or vs._num(before.get("qtyBought"))
+              or vs._num(before.get("qtySoldDecimal")) or vs._num(before.get("qtySold")))
+    avg = vs._amount(before.get("avgPx"))
+    if avg is not None and not (0.0 < avg < 1.0):
+        avg = None
     if cost is None or cost <= 0:
-        return None, shares, None
-    price = round(cost / shares, 4) if shares and shares > 0 else None
-    if price is not None and not (0.0 < price < 1.0):
-        price = None
-    return round(cost, 4), shares, price
+        return None, shares, avg
+    return round(cost, 4), shares, avg
 
 
 def _base_row(*, venue: str, ticker: str, side: str, slate: str | None, slate_source: str,
@@ -223,11 +230,11 @@ def polymarket_row(row: Mapping[str, Any], now: str) -> tuple[dict[str, Any] | N
     )
     out["venue_trade_id"] = row.get("tradeId")
     out["league"] = _slug_league(slug)
-    cost, shares, price = _polymarket_cost(row)
+    cost, shares, avg = _polymarket_cost(row)
+    out["venue_avg_price"] = avg
     if cost is not None:
         out["fill_stake_dollars"] = cost
         out["fill_contracts"] = shares
-        out["fill_price"] = price
     return out, None
 
 

@@ -35,7 +35,7 @@ def _p(slug="aec-mlb-tex-cws-2026-09-20", before=3.0, after=-6.6, side="POSITION
        cost="9.6000", qty="16"):
     position = {"realized": {"value": str(before)}}
     if cost is not None:
-        position.update(cost={"value": cost, "currency": "USD"}, qtyBought=qty)
+        position.update(cost={"value": cost, "currency": "USD"}, qtyBought=qty, avgPx={"value": "0.6000", "currency": "USD"})
     return {
         "marketSlug": slug, "side": side, "tradeId": trade, "updateTime": "2026-09-21T02:00:00Z",
         "beforePosition": position, "afterPosition": {"realized": {"value": str(after)}},
@@ -59,16 +59,41 @@ def test_a_polymarket_resolution_becomes_a_row_and_zero_delta_is_refused():
     assert reason is None
     assert (row["outcome"], row["pnl_dollars"]) == ("lost", pytest.approx(-9.6))
     assert (row["selected_date"], row["sport"], row["side"]) == ("2026-09-20", "mlb", "long")
-    # The position's own cost basis: $9.60 for 16 shares -> 0.60 a share.
-    assert (row["fill_stake_dollars"], row["fill_price"]) == (pytest.approx(9.6), pytest.approx(0.6))
+    # The position's own cost basis is the stake; its price is NOT a fill_price
+    # (see `_polymarket_cost`): only the venue's avgPx, kept for reference.
+    assert row["fill_stake_dollars"] == pytest.approx(9.6) and row["fill_price"] is None
+    assert row["venue_avg_price"] == pytest.approx(0.6)
     assert vr.polymarket_row(_p(before=3.0, after=3.0), NOW) == (None, "zero_realized_delta")
 
 
-def test_no_polymarket_cost_basis_is_invented_and_a_non_probability_price_is_dropped():
+def test_a_polymarket_short_takes_its_shares_from_qty_sold():
+    """Measured shape: a SHORT reports qtyBought=0, qtySold=2, netPosition=-2."""
+    row, _ = vr.polymarket_row(_p(side="POSITION_RESOLUTION_SIDE_SHORT", cost="1.0058", qty="0"), NOW)
+    assert row["fill_contracts"] is None  # qtySold absent in this fixture
+    raw = _p(side="POSITION_RESOLUTION_SIDE_SHORT", cost="1.0058", qty="0")
+    raw["beforePosition"]["qtySold"] = "2"
+    row, _ = vr.polymarket_row(raw, NOW)
+    assert (row["fill_contracts"], row["fill_stake_dollars"], row["side"]) == (2.0, pytest.approx(1.0058), "short")
+
+
+def test_a_win_slightly_above_a_fee_inflated_price_is_not_rewritten_by_the_repair():
+    """The 2026-10-02 dry-run case: won $2.014 on $1.8525 at an avg 0.4875. With
+    no fill_price the impossible-P&L check has nothing to bound against, so the
+    venue's own P&L stands."""
+    raw = _p(before=0.0, after=2.014, cost="1.8525", qty="3.8")
+    raw["beforePosition"]["avgPx"] = {"value": "0.4875"}
+    row, _ = vr.polymarket_row(raw, NOW)
+    assert row["outcome"] == "won"
+    assert vs._pnl_exceeds_own_fill(row, "won", row["pnl_dollars"]) is False
+
+
+def test_no_polymarket_cost_basis_is_invented_and_a_non_probability_avg_is_dropped():
     no_cost, _ = vr.polymarket_row(_p(cost=None), NOW)
     assert (no_cost["fill_stake_dollars"], no_cost["fill_price"]) == (None, None)
-    odd, _ = vr.polymarket_row(_p(cost="9.6", qty="4"), NOW)  # 2.40 a share is not a probability
-    assert (odd["fill_stake_dollars"], odd["fill_price"]) == (pytest.approx(9.6), None)
+    raw = _p()
+    raw["beforePosition"]["avgPx"] = {"value": "2.40"}
+    odd, _ = vr.polymarket_row(raw, NOW)
+    assert odd["venue_avg_price"] is None
 
 
 @pytest.mark.parametrize("slug,sport,league", [
