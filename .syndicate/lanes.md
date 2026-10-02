@@ -1322,6 +1322,13 @@ death, never life — do not invert it.
 - Verification: test_base_url green incl. stale-allowlist; both scripts' own tests green; check_e2e_coverage --payload run exercises the env path without network; board_delivery_probe diff is the one DEFAULT_BASE line plus the import
 - Blocked by: none
 
+### coverage-gate-inactive-sports — OPEN — opened 2026-10-02 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: check_e2e_coverage stops counting out-of-season sports as defects: a sport present in per_sport_ingest but ABSENT from active_sports is still SHOWN in the matrix and marked inactive, but contributes no defect, so the gate's failure list is only cells that are genuinely unverifiable -- demonstrated on the live fleet where 8 of 9 defects are mlb and nba out of season.
+- Files: syndicate/features/shared/coverage_contract.py, scripts/check_e2e_coverage.py, tests/test_coverage_contract.py
+- Hypothesis: read_shortlist takes the UNION of per_sport_ingest and active_sports so an active sport cannot vanish from the matrix; that guard is one-directional, so an INACTIVE sport carrying a zero-activity ingest block gets judged and yields 4 not_reported defects each.
+- Falsification test: If the fleet's mlb/nba defects come from something other than their absence from active_sports, this hypothesis is wrong and the union is not the cause.
+- Verification: SYNDICATE_BASE_URL=http://127.0.0.1:10000 scripts/check_e2e_coverage.py reports 1 defect (soccer.pregame_props) instead of 9, with mlb and nba still VISIBLE as inactive rows, and an ACTIVE sport missing its ingest block still fails.
+- Blocked by: none
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
