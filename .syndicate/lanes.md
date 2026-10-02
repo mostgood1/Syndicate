@@ -1051,6 +1051,15 @@ death, never life — do not invert it.
 - Blocked by: none
 - Limits: fleet log has no timestamps, so no build age / time-remaining; a role killed mid-build reads IN FLIGHT until the next build completes (conservative). `--drain` still sizes its TTL from Render (`_expected_build_seconds`) -> floored at the module default on the fleet.
 
+### deploy-safety-drain-fleet-ttl — CLOSED — opened 2026-10-01 — closed 2026-10-01 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: check_deploy_safety.py --drain against the local fleet sizes its drain TTL from the fleet refresh-worker log (BOARD_BUILD_TIMING wall_s), not Render's logs API; Render path unchanged — **GOAL: MET** (reading: test_drain_ttl_reads_fleet_log_for_a_fleet_url -- fleet URL, wall_s above floor/3 -> TTL = 3 x wall_s, Render estimator called 0 times; no-URL path calls Render 1x, fleet tail 0x; live expected_build_seconds('http://127.0.0.1:10000') = 378.1 s from the real fleet log)
+- Files: scripts/check_deploy_safety.py,tests/test_check_deploy_safety_fleet_logs.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit test: fleet base URL -> TTL = max(default, 3 x fleet wall_s) and Render API not called; no-URL path still reads Render; live: expected_build_seconds('http://127.0.0.1:10000') returns the fleet wall_s
+- Blocked by: none
+- Effect today: 3 x 378 s = 1134 s < 9000 s floor (`_DEFAULT_TTL_SECONDS` 150 min), so the fleet TTL is still 9000 s; what changes is the printed measurement, and the TTL tracks any build > 50 min. No real `--drain` was run (it pauses the live worker).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

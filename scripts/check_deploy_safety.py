@@ -358,6 +358,39 @@ def _fleet_log_tail(max_bytes: int = _FLEET_LOG_TAIL_BYTES) -> list[str]:
     return data.decode("utf-8", errors="replace").splitlines()
 
 
+def _fleet_expected_build_seconds(lines: list[str]) -> float | None:
+    """SLOWEST of the last 12 real `BOARD_BUILD_TIMING wall_s`, or None.
+
+    Same max-not-median rule as `_expected_build_seconds` (the cost is
+    asymmetric), same sub-second exclusion. None -- not a small number -- when
+    nothing qualifies, so callers fall back to their own conservative floor.
+    """
+    import re
+
+    walls: list[float] = []
+    for line in lines:
+        if "BOARD_BUILD_TIMING" in line:
+            match = re.search(r"wall_s=([0-9.]+)", line)
+            if match:
+                walls.append(float(match.group(1)))
+    real = [value for value in walls[-12:] if value >= _MIN_REAL_BUILD_SECONDS]
+    return max(real) if real else None
+
+
+def expected_build_seconds(base_url: str | None = None) -> float | None:
+    """The build-duration estimate from whichever log source `base_url` implies.
+
+    A local base URL reads the fleet log; anything else, including no
+    argument, reads Render's `COLLECT_SPAN_EXIT` exactly as before.
+    """
+    if _is_fleet_base_url(base_url):
+        try:
+            return _fleet_expected_build_seconds(_fleet_log_tail())
+        except Exception:
+            return None
+    return _expected_build_seconds(_load_render_key())
+
+
 def _fleet_board_build_state(lines: list[str]) -> tuple[bool | None, dict[str, Any]]:
     """`board_build_state` for the fleet: line order instead of timestamps."""
     import re
@@ -365,7 +398,6 @@ def _fleet_board_build_state(lines: list[str]) -> tuple[bool | None, dict[str, A
     facts: dict[str, Any] = {"log_source": "fleet refresh-worker.log"}
     last_enter = last_done = -1
     enter_stage = ""
-    walls: list[float] = []
     for index, line in enumerate(lines):
         if "BUILD_SPAN_ENTER" in line:
             last_enter = index
@@ -373,13 +405,10 @@ def _fleet_board_build_state(lines: list[str]) -> tuple[bool | None, dict[str, A
             enter_stage = match.group(1) if match else ""
         elif "BOARD_BUILD_TIMING" in line:
             last_done = index
-            match = re.search(r"wall_s=([0-9.]+)", line)
-            if match:
-                walls.append(float(match.group(1)))
-    real = [value for value in walls[-12:] if value >= _MIN_REAL_BUILD_SECONDS]
-    if real:
-        facts["typical_build_seconds"] = int(max(real))
-        facts["typical_build_minutes"] = round(max(real) / 60.0, 1)
+    expected = _fleet_expected_build_seconds(lines)
+    if expected is not None:
+        facts["typical_build_seconds"] = int(expected)
+        facts["typical_build_minutes"] = round(expected / 60.0, 1)
     if last_enter < 0:
         facts["reason"] = f"no BUILD_SPAN_ENTER in the last {_FLEET_LOG_TAIL_BYTES // (1024 * 1024)}MB of the fleet log"
         return None, facts
@@ -480,7 +509,7 @@ def _as_dict(value: Any) -> dict[str, Any]:
 
 
 
-def _run_drain(*, owner: str, wait_seconds: int) -> int:
+def _run_drain(*, owner: str, wait_seconds: int, base_url: str | None = None) -> int:
     """Request a drain, wait for the worker to go idle, report.
 
     NEVER deploys and never clears the drain on timeout. A drain that gives up
@@ -522,9 +551,12 @@ def _run_drain(*, owner: str, wait_seconds: int) -> int:
     # protected, and only on the slowest builds. Same COLLECT_SPAN_EXIT series
     # `#403` already reads, same max-not-median rule, x3 headroom, floored at
     # the module default so a missing measurement can never SHORTEN it.
+    # On the local fleet the series is `BOARD_BUILD_TIMING wall_s` from the
+    # fleet log -- Render's logs API sees nothing there, so reading it left the
+    # TTL silently floored (lane `deploy-safety-drain-fleet-ttl`, 2026-10-01).
     from syndicate.features.shared.deploy_drain import _DEFAULT_TTL_SECONDS
 
-    measured = _expected_build_seconds(_load_render_key())
+    measured = expected_build_seconds(base_url)
     ttl = max(int(_DEFAULT_TTL_SECONDS), int((measured or 0) * 3))
     if measured:
         print(f"  longest recent build {measured:.0f}s -> drain expiry {ttl}s ({ttl/60:.0f} min)")
@@ -594,7 +626,7 @@ def main() -> int:
     if args.undrain:
         return _run_undrain(owner=args.drain_owner)
     if args.drain:
-        return _run_drain(owner=args.drain_owner, wait_seconds=args.drain_wait_seconds)
+        return _run_drain(owner=args.drain_owner, wait_seconds=args.drain_wait_seconds, base_url=args.base_url)
 
     token = _load_admin_token()
     if not token:

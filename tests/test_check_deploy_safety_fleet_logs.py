@@ -94,3 +94,46 @@ def test_reads_tail_of_a_real_file(tmp_path, monkeypatch):
     monkeypatch.setenv("SYNDICATE_FLEET_REFRESH_LOG", str(log))
     lines = cds._fleet_log_tail(max_bytes=10_000)
     assert lines[-1] == COMPLETE_BUILD[-1]
+
+
+def _drain_ttl(base_url, *, fleet_lines, capsys):
+    """Run `_run_drain` to an immediate idle and return (ttl_seconds, stdout)."""
+    import syndicate.features.shared.deploy_drain as deploy_drain
+    import syndicate.features.shared.refresh_state_store as store
+
+    with mock.patch.object(store, "_state_backend_kind", return_value="keyvalue"), \
+         mock.patch.object(deploy_drain, "request_drain") as request, \
+         mock.patch.object(deploy_drain, "read_worker_state", return_value=({"in_flight": {}}, "idle")), \
+         mock.patch.object(cds, "_fleet_log_tail", return_value=fleet_lines) as tail, \
+         mock.patch.object(cds, "_expected_build_seconds", return_value=None) as render:
+        assert cds._run_drain(owner="t", wait_seconds=30, base_url=base_url) == 0
+    return request.call_args.kwargs["ttl_seconds"], tail.call_count, render.call_count, capsys.readouterr().out
+
+
+def test_drain_ttl_reads_fleet_log_for_a_fleet_url(capsys):
+    """Reachability: a build longer than the floor/3 moves the TTL only via the fleet arm."""
+    from syndicate.features.shared.deploy_drain import _DEFAULT_TTL_SECONDS
+
+    long_build = int(_DEFAULT_TTL_SECONDS) // 3 + 1000
+    lines = COMPLETE_BUILD[:-1] + [f"[intelligence_state] BOARD_BUILD_TIMING wall_s={long_build}.0 ok=True"]
+    ttl, tail_calls, render_calls, out = _drain_ttl("http://127.0.0.1:10000", fleet_lines=lines, capsys=capsys)
+    assert ttl == long_build * 3
+    assert (tail_calls, render_calls) == (1, 0)
+    assert f"longest recent build {long_build}s" in out
+
+
+def test_drain_ttl_render_path_unchanged(capsys):
+    from syndicate.features.shared.deploy_drain import _DEFAULT_TTL_SECONDS
+
+    ttl, tail_calls, render_calls, out = _drain_ttl(None, fleet_lines=COMPLETE_BUILD, capsys=capsys)
+    assert ttl == int(_DEFAULT_TTL_SECONDS)
+    assert (tail_calls, render_calls) == (0, 1)
+    assert "unmeasurable" in out
+
+
+def test_drain_ttl_floor_holds_for_a_typical_fleet_build(capsys):
+    from syndicate.features.shared.deploy_drain import _DEFAULT_TTL_SECONDS
+
+    ttl, _, _, out = _drain_ttl("http://127.0.0.1:10000", fleet_lines=COMPLETE_BUILD, capsys=capsys)
+    assert ttl == int(_DEFAULT_TTL_SECONDS)  # 3 x 177.8s is under the floor
+    assert "longest recent build 178s" in out
