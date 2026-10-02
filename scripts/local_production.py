@@ -1263,18 +1263,61 @@ BACKUP_EXCLUDES = ("*.lock", "*.pid")
 BACKUP_SNAPSHOT_FORMAT = "%Y%m%dT%H%M%SZ"
 
 
+def _setting(local: dict[str, str], key: str) -> str:
+    return (os.environ.get(key) or local.get(key) or "").strip()
+
+
 def default_backup_dir(settings: Settings, local: dict[str, str]) -> Path:
-    """`SYNDICATE_LOCAL_BACKUP_DIR` (env, then local_production.env), else a
-    directory OFF the data root's filesystem where one exists: on WSL the WSL
-    disk is one VHDX file, so `/mnt/c/SyndicateBackup` survives a lost or
-    unregistered distro. It is still the same physical disk -- a second drive
-    or off-machine copy is the only protection against disk failure."""
-    override = (os.environ.get("SYNDICATE_LOCAL_BACKUP_DIR") or local.get("SYNDICATE_LOCAL_BACKUP_DIR") or "").strip()
+    """Where the hard-linked snapshots live: `SYNDICATE_LOCAL_BACKUP_DIR`, else
+    `<home>-backup` beside the home -- the SAME filesystem as the data root, on
+    purpose. rsync must preserve mtimes for `--link-dest` to match anything,
+    and WSL's `/mnt/c` (9p, `uid=0`, no metadata) refuses every utime from the
+    WSL user: measured 2026-10-01, 2,946 `failed to set times` in 4 minutes
+    with 2,768 of ~41k files copied. The off-disk copy is a single archive
+    instead (`default_offdisk_dir`)."""
+    override = _setting(local, "SYNDICATE_LOCAL_BACKUP_DIR")
+    if override:
+        return Path(override).expanduser()
+    return settings.home.parent / f"{settings.home.name}-backup"
+
+
+def default_offdisk_dir(local: dict[str, str]) -> Path | None:
+    """Where the newest snapshot is archived OFF the data root's disk image:
+    `SYNDICATE_LOCAL_BACKUP_OFFDISK_DIR`, else `/mnt/c/SyndicateBackup` on WSL
+    (the WSL disk is one VHDX file, so this survives a lost or unregistered
+    distro), else none. Still the same physical disk -- copying it to a second
+    drive or off the machine is the only protection against disk failure."""
+    override = _setting(local, "SYNDICATE_LOCAL_BACKUP_OFFDISK_DIR")
     if override:
         return Path(override).expanduser()
     if not IS_WINDOWS and Path("/mnt/c").is_dir():
         return Path("/mnt/c/SyndicateBackup")
-    return settings.home.parent / f"{settings.home.name}-backup"
+    return None
+
+
+def archive_offdisk(snapshot: Path, offdisk: Path, keep: int) -> dict[str, Any]:
+    """`tar | gzip -1` the snapshot into ONE file on `offdisk` (a single
+    sequential write: no per-file metadata for 9p to refuse), `.partial` until
+    complete, keep the newest `keep`."""
+    offdisk.mkdir(parents=True, exist_ok=True)
+    for stale in offdisk.glob("*.tar.gz.partial"):
+        stale.unlink(missing_ok=True)
+    target = offdisk / f"{snapshot.name}.tar.gz"
+    partial = offdisk / f"{snapshot.name}.tar.gz.partial"
+    command = ["tar", "-C", str(snapshot.parent), "--use-compress-program=gzip -1", "-cf", str(partial), snapshot.name]
+    if shutil.which("nice") and not IS_WINDOWS:
+        command = ["nice", "-n", "15"] + command
+    proc = subprocess.run(command, capture_output=True, text=True)
+    # tar exits 1 for "file changed as we read it"; the snapshot is not being
+    # written, so anything non-zero here is a real failure.
+    if proc.returncode != 0 or not partial.is_file():
+        partial.unlink(missing_ok=True)
+        return {"ok": False, "rc": proc.returncode, "error": (proc.stderr or "")[-300:]}
+    partial.rename(target)
+    archives = sorted(p for p in offdisk.glob("*.tar.gz") if p.is_file())
+    for old in archives[: max(0, len(archives) - keep)]:
+        old.unlink(missing_ok=True)
+    return {"ok": True, "path": str(target), "bytes": target.stat().st_size}
 
 
 def _complete_snapshots(dest: Path) -> list[Path]:
@@ -1329,7 +1372,7 @@ def cmd_backup(args: argparse.Namespace) -> int:
     (partial / "data").mkdir(parents=True)
     previous = _complete_snapshots(dest)
     src_files, src_bytes = _count_tree(settings.data_root)
-    # -rt, not -a: drvfs (/mnt/c) cannot chown, so -a exits 23 on every file.
+    # -rt, not -a: a --dest on drvfs/9p cannot chown, so -a would exit 23 there.
     command = [rsync, "-rt", "--delete"] + [f"--exclude={p}" for p in BACKUP_EXCLUDES]
     if previous:
         command.append(f"--link-dest={previous[-1] / 'data'}")
@@ -1374,10 +1417,19 @@ def cmd_backup(args: argparse.Namespace) -> int:
     for old in kept[: max(0, len(kept) - int(args.keep))]:
         shutil.rmtree(old, ignore_errors=True)
     print(f"snapshot {dest / name}: {dst_files} files / {dst_bytes / 1e9:.2f} GB "
-          f"(source at start {src_files} / {src_bytes / 1e9:.2f} GB), redis {redis_note}, rsync rc={rc}")
-    if redis_note.startswith("FAILED"):
-        return 5
-    return 0
+          f"(source at start {src_files} / {src_bytes / 1e9:.2f} GB), redis {redis_note}, rsync rc={rc}", flush=True)
+    rc_out = 5 if redis_note.startswith("FAILED") else 0
+    offdisk = None if args.no_offdisk else (Path(args.offdisk).expanduser() if args.offdisk else default_offdisk_dir(local))
+    if offdisk is None:
+        print("off-disk archive: none configured (SYNDICATE_LOCAL_BACKUP_OFFDISK_DIR)")
+        return rc_out
+    started_archive = time.time()
+    result = archive_offdisk(dest / name, offdisk, int(args.offdisk_keep))
+    if not result["ok"]:
+        print(f"FAILED: off-disk archive into {offdisk}: rc={result['rc']} {result['error']}")
+        return 6
+    print(f"off-disk archive {result['path']}: {result['bytes'] / 1e9:.2f} GB in {time.time() - started_archive:.0f}s")
+    return rc_out
 
 
 # Keys that make a process act on the fleet's state or on a venue. The CI run
@@ -1546,8 +1598,11 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     p.set_defaults(func=cmd_down)
 
     p = sub.add_parser("backup", help="snapshot the data root + redis (hard-linked, keeps --keep); a scheduled job")
-    p.add_argument("--dest", help="backup directory (default SYNDICATE_LOCAL_BACKUP_DIR, else /mnt/c/SyndicateBackup on WSL)")
+    p.add_argument("--dest", help="snapshot directory (default SYNDICATE_LOCAL_BACKUP_DIR, else <home>-backup)")
     p.add_argument("--keep", type=int, default=7)
+    p.add_argument("--offdisk", help="archive directory (default SYNDICATE_LOCAL_BACKUP_OFFDISK_DIR, else /mnt/c/SyndicateBackup on WSL)")
+    p.add_argument("--offdisk-keep", type=int, default=2)
+    p.add_argument("--no-offdisk", action="store_true")
     p.set_defaults(func=cmd_backup)
 
     p = sub.add_parser("ci-run", help="the ci-suite cron: run_ci_suite.py in <home>/ci-checkout with a scrubbed env")

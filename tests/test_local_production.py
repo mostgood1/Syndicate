@@ -420,7 +420,9 @@ def test_backup_snapshots_hardlinks_unchanged_files_and_prunes(tmp_path):
     (data / "a.json").write_text("same", encoding="utf-8")
     (data / "x.lock").write_text("held", encoding="utf-8")
     dest = tmp_path / "backup"
-    args = lambda: lp.parse_args(["--home", str(home), "--state", "file", "backup", "--dest", str(dest), "--keep", "2"])  # noqa: E731
+    offdisk = tmp_path / "offdisk"
+    args = lambda: lp.parse_args(["--home", str(home), "--state", "file", "backup", "--dest", str(dest), "--keep", "2",  # noqa: E731
+                                  "--offdisk", str(offdisk), "--offdisk-keep", "1"])
 
     assert lp.cmd_backup(args()) == 0
     first = lp._complete_snapshots(dest)
@@ -440,3 +442,23 @@ def test_backup_snapshots_hardlinks_unchanged_files_and_prunes(tmp_path):
     a_old = os.stat(snaps[0] / "data" / "mlb_source" / "a.json")
     a_new = os.stat(snaps[1] / "data" / "mlb_source" / "a.json")
     assert a_old.st_ino == a_new.st_ino  # unchanged file is hard-linked, not copied
+
+    # the off-disk copy is ONE archive of the newest snapshot, pruned to --offdisk-keep
+    import tarfile
+
+    archives = sorted(offdisk.glob("*.tar.gz"))
+    assert [p.name for p in archives] == [f"{snaps[1].name}.tar.gz"]
+    assert not list(offdisk.glob("*.partial"))
+    with tarfile.open(archives[0]) as tar:
+        names = tar.getnames()
+    assert f"{snaps[1].name}/manifest.json" in names
+    assert f"{snaps[1].name}/data/mlb_source/a.json" in names
+
+
+def test_default_backup_dirs(settings, monkeypatch):
+    monkeypatch.delenv("SYNDICATE_LOCAL_BACKUP_DIR", raising=False)
+    monkeypatch.delenv("SYNDICATE_LOCAL_BACKUP_OFFDISK_DIR", raising=False)
+    # snapshots stay on the data root's filesystem (rsync needs mtimes; /mnt/c refuses utime)
+    assert lp.default_backup_dir(settings, {}) == settings.home.parent / f"{settings.home.name}-backup"
+    assert lp.default_backup_dir(settings, {"SYNDICATE_LOCAL_BACKUP_DIR": "/x"}) == Path("/x")
+    assert lp.default_offdisk_dir({"SYNDICATE_LOCAL_BACKUP_OFFDISK_DIR": "/y"}) == Path("/y")
