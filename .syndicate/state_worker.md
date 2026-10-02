@@ -51,7 +51,7 @@ the same 3h window) and the process-sample path would return `UNKNOWN` forever.
 Crons are deliberately NOT in the guard's `ALL_SERVICES`: they are absent from
 `render.yaml`, so `blueprint_sync` cannot reach them.
 
-## [ci-suite-pytest-step] THE FULL SUITE RUNS ON THE CRON ONLY WHEN CHUNKED, AND IT IS PERMANENTLY RED FOR A KNOWN REASON `[2026-09-08, lane render-cron-failures, verified on render]`
+## [ci-suite-pytest-step] THE FULL SUITE RUNS ONLY WHEN CHUNKED, AND IT IS GREEN WITH AN EMPTY BASELINE `[verified 2026-10-02, lane ci-red-on-main, local fleet]`
 
 **Worker count was never the lever.** OOM-killed at 2Gi at `-n auto`, at `-n 2`
 (1056 s in) and at `-n 0` (537 s in) — **fewer workers failed SOONER**, because
@@ -65,24 +65,19 @@ on any chunk that writes no junit or collects 0 cases — because this gate also
 fails on a SHRINKING failure set, so a dead chunk would otherwise report its
 tests as newly FIXED.
 
-**IT REPORTS `rc=1` EVERY DAY AND THAT RED IS CORRECT.** 19 failures, all
-cause-known (`#648`): **15 are a memory floor the runner cannot reach** —
-`OVERVIEW_STOPPED_FOR_MEMORY floor_mb=3000` against `max_mb=2048`, unsatisfiable
-by construction, already documented at `intelligence.py:2915-2930` — and **4 are
-stale tests** from two deliberate landings, owned by other lanes. **ZERO are
-regressions.**
+**GREEN, AND THE BASELINE IS EMPTY `[verified 2026-10-02, lane ci-red-on-main]`.** With Render suspended the suite
+runs as the local fleet's `ci-suite` job (08:00Z, `local_production.py ci-run`: its own `<home>/ci-checkout`,
+scrubbed env, niced). Full run on `d559535b`: **rc=0, 10/10 steps, pytest 21,615 collected / 0 failing,
+archive suite ok.** `tests/pytest_baseline.json` holds **0** failures, so ANY failure the job reports is new.
 
-**DO NOT REGENERATE THE BASELINE TO SILENCE IT.** 15 of the 19 fail only because
-the runner has 2 GB; recording them bakes a HOST property into a commit-level
-gate. `tests/pytest_baseline.json` (11,745 tests / 19 known, recorded
-2026-08-26 under `-n auto` on another machine) is stale against a suite that is
-now **16,418** tests, and a regenerated one must come from the cron, not a
-laptop.
+**THE OLD RED WAS MOSTLY HOST LEAKS, NOT KNOWN-CORRECT RED.** Run 1 (`869c4999`): 48 failing, 36 of them
+recorded. Every one passed on Windows; on Linux they read the host -- `os.environ["TEMP"]`, the cgroup's
+`memory.stat`, real refresh-job processes, Windows `powershell`, 0600 directories -- plus stale fixtures
+(hard-coded "future" dates, pre-rule EV) and two code defects (`soccer_season_audit/outcomes.py` TEMP;
+`nfl/sources.data_path` sibling-repo fallback). Per-test causes: commits `ef06babc`..`d559535b`.
 
-**OPEN:** should a suite whose intelligence tests need 3 GB of headroom run on a
-2 GB cron at all? The tests are not wrong and the guard is not wrong — the
-RUNNER is too small for that subset.
-
+**NOT RE-MEASURED:** the 2026-09-08 claim that 15 intelligence tests need 3 GB and fail on a 2 GB cron. The
+local runner is not memory-capped, so a green run here says nothing about a 2 GB Render cron.
 
 ## [odds-history-segment-keys] THE odds_history SHARD CARRIES `segment=` KEYS NOW — and three separate key builders were segment-blind, in two different ways `[verified in production 2026-09-10, lane odds-history-segment-term, live `26c8cfc6`]`
 
@@ -445,6 +440,7 @@ rehearsal harness. Runbook: `docs/ai_context/local_production_runbook.md`.
 - Redis keys embed the ABSOLUTE data-root path: pick `SYNDICATE_LOCAL_HOME` once.
 - **Operator scripts: `export SYNDICATE_BASE_URL=http://127.0.0.1:10000` repoints 56 `scripts/*.py` at the fleet** via `scripts/_base_url.py::default_base_url()` (precedence: script-specific vars > SYNDICATE_BASE_URL > SYNDICATE_OPS_BASE_URL > SYNDICATE_DIAG_BASE_URL > Render; unset = Render, unchanged). Fleet admin token is `ADMIN_TOKEN` in `~/syndicate-prod/local_production.env` (WSL), NOT repo `.env`. STILL Render-pinned: `deploy_preflight.py` (deliberate) + 8 lane-claimed files listed `pending:` in `tests/test_base_url.py` ALLOWED. `[verified 2026-10-01, 06f5fa7f, unit tests + per-site eval; NOT run against the live fleet, lane scripts-base-url-resolver]` **`check_deploy_safety.py` WORKS ON THE FLEET:** with a local base URL its board-build check reads `~/syndicate-prod/logs/refresh-worker.log` (via `wsl tail` on Windows; override `SYNDICATE_FLEET_REFRESH_LOG`) by LINE ORDER -- the log has no timestamps and no `COLLECT_SPAN_EXIT`; typical build from `BOARD_BUILD_TIMING wall_s` (~6.3 min). `deploy_preflight`'s no-arg call still reads Render. `[verified 2026-10-01 live: CLEAR rc=0 then IN FLIGHT rc=1, lane deploy-safety-fleet-logs]` `--drain` sizes its TTL from the same fleet `wall_s` (max(9000 s floor, 3 x build); fleet build 378 s -> floor holds) `[verified 2026-10-01 unit + live estimate, lane deploy-safety-drain-fleet-ttl]` **Drain WORKS end-to-end on the fleet** when run INSIDE WSL with the refresh-worker's state env (`SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`, `SYNDICATE_REFRESH_STATE_URL=redis://127.0.0.1:6379/0`, `SYNDICATE_REPORTS_ROOT=/home/amyn/syndicate-prod/data/reports`, venv `/home/amyn/.venvs/syndicate/bin/python`) -- run from Windows the key embeds a Windows-resolved path the worker never reads. Worker acks in ~60 s and defers both MLB sim and board builds. `--drain` CLEAR now requires ack-after-request + idle board build (it used to CLEAR in 1 s on a pre-request heartbeat). `[verified 2026-10-01 live, 2 runs, lane fleet-drain-e2e]` Own-output confirmation: fixed `--drain` printed 'not acked yet' then CLEAR rc=0 30 s later `[verified 2026-10-01 01:45Z, lane fleet-drain-rerun]`. **Fleet checkout `~/Syndicate`: GitHub remote is named `github`** (`origin` there is a stale ref) and gunicorn runs WITHOUT `--preload`, so an ff alone reaches web on the next worker recycle with no deploy -- update it as a deliberate all-roles restart (recipe: ff, `--drain` + `check_deploy_safety` CLEAR, `local_production.py down`, `Start-ScheduledTask SyndicateLocalProduction`). Last restart 2026-10-02 02:31Z onto `d165980d` (all roles `code=d165980d`); checkout then ff-only to `582074b4` at 02:53Z (no runtime files) -- `STALE` on the roles is stamp-only until the next runtime change `[verified, deploys.md]`. **`check_deploy_safety` (plain and `--drain`) now blocks on every live child of refresh-worker AND live-odds-worker** on the fleet (one `ps` snapshot, descendants of each supervised worker by exact script basename, zombies excluded; UNKNOWN if unreadable or a worker is missing -- live-odds children since lane deploy-safety-odds-worker-children 2026-10-02; during live play expect CLEAR to wait for an odds-job gap) **Its `Odds refresh:` STATE line reads only live-odds-worker's `latest_tick`** -- refresh-worker runs odds refreshes of its own (`run_refresh_odds_job.py`, 567 s old at 13:11Z) while that line said `idle`; trust the child-job lines, not that one `[verified 2026-10-02 13:11Z, deploys.md]`. -- `in_flight` itself still carries only `mlb_sim` `[verified 2026-10-02 live, lane deploy-safety-worker-children]`. `~/Syndicate` carries it since the 03:17Z ff to `995c177f` (no restart; roles still `code=d165980d`, STALE by stamp only). Before `down`, look for non-supervisor work too: `ps` for `run_ci_suite`/`pytest` -- other sessions run CI in `~/syndicate-prod/ci-checkout` outside the supervisor's tree (`down` does not touch it, and `check_deploy_safety` does not see it). refresh-worker's log is APPENDED across restarts (rotates only at 200 MB): slice it from the latest `[refresh_worker] BOOTED` line, never grep the whole file.
 - `down` on a dead supervisor returns at once and reaps the roles/redis recorded in its pidfile as orphans `[verified 2026-09-30, PR #122 e8ff5030; negative control: pre-fix waited out the timeout]`.
+- **Scheduled jobs, backup, AOF `[verified 2026-10-02, lane local-prod-gap-fixes, `869c4999`..`a01590bc`]`:** the supervisor runs `sim-input-reports` 07:00Z, `ci-suite` 08:00Z, `mlb-season-artifacts` Mon 09:00Z, `data-backup` 09:15Z, `model-scorecard` 11:30Z -- each ran once, rc 0 (ci-suite green on its third run). Backup = hard-linked snapshots in `<home>-backup` (keep 7) + one tar.gz in `/mnt/c/SyndicateBackup` (keep 2): 41,051 files / 5.19 GB -> 0.92 GB. Never rsync straight to `/mnt/c` (9p `uid=0` refuses utime). `up` turns AOF on a reused redis (`appendonly yes`). Same physical disk: not protection against disk failure.
 
 ## [artifact-allowlist-split] THE ARTIFACT ALLOWLIST IS TWO LISTS NOW: READ WIDE, WRITE NARROW — and an allowlist-filtered inventory is NOT a census of the disk `[verified 2026-09-02 in production, web `e6fa165b`, lane m625-export-only-patterns]`
 **CORRECTED 2026-09-03 — `reconciliation/*` MOVED TO THE WRITE LIST.** `#625`(2)
