@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import threading
 import subprocess
 import sys
@@ -491,6 +492,15 @@ def _result_payload_from_stdout(stdout_text: str) -> dict[str, Any]:
     text = str(stdout_text or "")
     if not text.strip():
         return {}
+    # THE LOCAL FLEET STAMPS EVERY LINE (`scripts/local_logstamp`, live since the
+    # 2026-10-02 supervisor restarts): `2026-10-02T20:04:34.877Z {`. The child
+    # inherits the stamping PYTHONPATH, so the brace never opened a line again and
+    # this parse failed on every run -- the same 264-char-preamble failure below,
+    # back in a new shape: no `result`, no `failureSummary`, no
+    # ODDS_REFRESH_FAILURE_SUMMARY, and the failing step only in the truncated
+    # middle of `stdout` (NBA and soccer were each diagnosed that way, slowly).
+    # The prefix is fixed-width and anchored, so stripping it cannot touch JSON.
+    text = _LOGSTAMP_PREFIX.sub("", text)
     decoder = json.JSONDecoder()
     for candidate in _json_object_start_offsets(text):
         try:
@@ -500,6 +510,10 @@ def _result_payload_from_stdout(stdout_text: str) -> dict[str, Any]:
         if isinstance(parsed, dict):
             return parsed
     return {}
+
+
+#: `scripts/local_logstamp.StampedStream._stamp`: `%Y-%m-%dT%H:%M:%S.mmmZ ` at line start.
+_LOGSTAMP_PREFIX = re.compile(r"(?m)^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z ")
 
 
 def _json_object_start_offsets(text: str) -> list[int]:
