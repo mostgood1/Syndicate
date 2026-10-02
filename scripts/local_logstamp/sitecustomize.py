@@ -66,12 +66,33 @@ class StampedStream:
         return getattr(self._stream, name)
 
 
+def _feeds_a_parent(stream) -> bool:
+    """True when the stream is a pipe or socket, i.e. a parent is reading it.
+
+    The stamp is for LOG FILES. Every Python child inherits this PYTHONPATH, so
+    without this check a child whose stdout a parent captures and parses as data
+    got stamped too: measured 2026-10-02, `live_refresh_loop`'s MLB live probe
+    logged `bad_json:'2026-10-02T21:32:52.433Z {"live_game_pks": []}'` 79 times and
+    reported MLB never live, and every odds run file lost its parsed result. Roles
+    write to a file the supervisor opened (`stdout=handle`), so they keep their
+    stamps; a captured child's lines reach the log through its parent, which
+    stamps them as it echoes them. Unknown (no fileno) counts as not a pipe.
+    """
+    import stat as _stat
+
+    try:
+        mode = _os.fstat(stream.fileno()).st_mode
+    except Exception:
+        return False
+    return _stat.S_ISFIFO(mode) or _stat.S_ISSOCK(mode)
+
+
 def install() -> bool:
     if _os.environ.get("SYNDICATE_LOCAL_LOG_TIMESTAMPS", "1").strip() == "0":
         return False
     for name in ("stdout", "stderr"):
         stream = getattr(_sys, name, None)
-        if stream is not None and not isinstance(stream, StampedStream):
+        if stream is not None and not isinstance(stream, StampedStream) and not _feeds_a_parent(stream):
             setattr(_sys, name, StampedStream(stream))
     return True
 

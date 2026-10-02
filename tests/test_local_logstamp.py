@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import io
+import json
 import os
 import subprocess
 import sys
@@ -45,25 +46,43 @@ def test_stamp_is_the_prefix_render_logs_reads_as_exact(tmp_path: Path) -> None:
     assert info["exact"] == 1
 
 
-def _run_child(env_extra: dict[str, str]) -> str:
+def _child_env(env_extra: dict[str, str]) -> dict[str, str]:
     env = dict(os.environ)
     env["PYTHONPATH"] = os.pathsep.join([str(STAMP_DIR), env.get("PYTHONPATH", "")])
     env.update(env_extra)
-    code = "import sys, logging; print('hello'); logging.basicConfig(); logging.warning('warned')"
-    proc = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=60)
-    return proc.stdout + proc.stderr
+    return env
 
 
-def test_child_python_is_stamped_via_pythonpath() -> None:
-    output = _run_child({})
-    assert render_logs._PREFIX.match(output.splitlines()[0])
-    assert all(render_logs._PREFIX.match(line) for line in output.splitlines())
+CHILD_CODE = "import sys, logging; print('hello'); logging.basicConfig(); logging.warning('warned')"
 
 
-def test_off_switch_leaves_output_raw() -> None:
-    output = _run_child({"SYNDICATE_LOCAL_LOG_TIMESTAMPS": "0"})
+def _run_child_to_file(env_extra: dict[str, str], tmp_path: Path) -> str:
+    """A role's shape: stdout/stderr go to a log FILE the parent opened."""
+    log = tmp_path / "role.log"
+    with log.open("w", encoding="utf-8") as handle:
+        subprocess.run([sys.executable, "-c", CHILD_CODE], env=_child_env(env_extra), stdout=handle,
+                       stderr=subprocess.STDOUT, timeout=60)
+    return log.read_text(encoding="utf-8")
+
+
+def test_child_python_writing_to_a_file_is_stamped_via_pythonpath(tmp_path: Path) -> None:
+    output = _run_child_to_file({}, tmp_path)
+    assert output.splitlines() and all(render_logs._PREFIX.match(line) for line in output.splitlines())
+
+
+def test_off_switch_leaves_output_raw(tmp_path: Path) -> None:
+    output = _run_child_to_file({"SYNDICATE_LOCAL_LOG_TIMESTAMPS": "0"}, tmp_path)
     assert "hello" in output.splitlines()
     assert not any(render_logs._PREFIX.match(line) for line in output.splitlines())
+
+
+def test_a_child_whose_stdout_a_parent_captures_is_not_stamped() -> None:
+    """2026-10-02: live_refresh_loop's MLB live probe logged
+    bad_json:'2026-10-02T21:32:52.433Z {"live_game_pks": []}' 79 times. A pipe is
+    DATA for the parent, so the stamp must not touch it."""
+    code = "import json; print(json.dumps({'live_game_pks': [1, 2]}))"
+    proc = subprocess.run([sys.executable, "-c", code], env=_child_env({}), capture_output=True, text=True, timeout=60)
+    assert json.loads(proc.stdout) == {"live_game_pks": [1, 2]}
 
 
 def test_supervisor_role_env_carries_the_stamp_dir_unless_disabled(tmp_path: Path) -> None:
