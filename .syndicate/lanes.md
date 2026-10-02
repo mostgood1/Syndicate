@@ -1203,6 +1203,13 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: unit: rows through the real attach_projections carry projected, model_prob_over None, edge_vs_market_pct None, modelled edge absent, reason stated; fails on origin/main. Fleet: served MLB pregame rows carry 0 probabilities and the same projection count as before
 - Blocked by: none
+- **PROPS READING 2026-10-02 ~23:20Z — HYPOTHESIS HOLDS FOR PROPS** (`.syndicate/findings_2026-10-02_nfl_lines_props_backtest.md`). The harness CALLS production: the props selfcheck has 0/8,976 mismatches vs `nfl_props_rows_for_week(use_artifact=False)`; the game-line harness reproduces the fleet's `smartsim2_projections_2026_wk4.csv` EXACTLY (16/16, all fields diff 0.0).
+  - 2023-25 pooled (593 games, 53 wks, OddsAPI kickoff-10min quotes): every continuous market is WORSE than the de-vigged book on Brier and LL with CIs excluding 0 (e.g. receiving_yards +0.0230 [+0.0190, +0.0266], 59,290 rows), except interceptions (+0.0030 [−0.0001, +0.0059], NO DIFFERENCE). The book line beats the model mean in 6/8 markets.
+  - Game-context term vs own average: significant only for passing_yards/passing_tds, and ~10x smaller than the gap to the book.
+  - Anytime TD: shrinkage beats the raw own rate (−0.0252 [−0.0284, −0.0219]) but loses even to the vig-INCLUSIVE yes price (+0.0088 [+0.0069, +0.0106]).
+  - 2026: only wk2 prices survive (16 games); weeks 1 and 3 were lost with Render's disk.
+  - **Eligible markets: NONE.** GAME LINES RUNNING (2022-2026, pbp_2021 fetched on user instruction).
+  - Owed to lane `layer2-triad-alignment`: `backtest_nfl_props._rate_from_log` omits production's zero-week imputation (not edited here).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
