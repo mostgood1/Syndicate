@@ -526,5 +526,16 @@ def test_an_undiffable_commit_reads_stale_not_current(git_repo):
     assert "STALE?" in note and "treat as stale" in note
 
 
+def test_a_supervisor_only_gap_does_not_mark_roles_stale(git_repo):
+    # No role imports the supervisor or the host install tooling.
+    repo, commit = git_repo
+    loaded = commit("syndicate/app.py", "v1\n")
+    commit("scripts/local_production.py", "supervisor v2\n")
+    head = commit("deploy/local/install_windows_task.ps1", "x\n")
+    assert lp.runtime_files_between(loaded, head, repo) == []
+    head2 = commit("scripts/run_refresh_worker.py", "worker v2\n")   # a role entrypoint IS runtime
+    assert lp.runtime_files_between(loaded, head2, repo) == ["scripts/run_refresh_worker.py"]
+
+
 def test_same_commit_has_no_note():
     assert lp.code_stamp_note("abc", "abc") == ""

@@ -1493,8 +1493,12 @@ def role_loaded_commit(pid: int | None) -> str | None:
 
 
 # Paths no role imports or reads at runtime: a gap made only of these leaves a
-# role's loaded code identical to HEAD's.
-NON_RUNTIME_PATHSPECS = (":!.syndicate", ":!docs", ":!tests", ":!reports", ":!data", ":!*.md")
+# role's loaded code identical to HEAD's. `scripts/local_production.py` and
+# `deploy/local/` are the SUPERVISOR and host install tooling -- no role imports
+# them (only a comment in memory_observability.py names the file) -- so a change
+# there needs `down`/`up` of the supervisor, not a role restart.
+NON_RUNTIME_PATHSPECS = (":!.syndicate", ":!docs", ":!tests", ":!reports", ":!data", ":!*.md",
+                         ":!scripts/local_production.py", ":!deploy/local")
 
 
 def runtime_files_between(old: str, new: str, repo: Path = REPO_ROOT) -> list[str] | None:

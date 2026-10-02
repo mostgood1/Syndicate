@@ -1221,6 +1221,14 @@ death, never life — do not invert it.
 - Verification: unit tests over a temp git repo (ledger-only gap -> not stale, code gap -> stale, unknown commit -> stale); on the fleet, status at 82bd182e vs roles at 9856dd92 no longer prints STALE
 - Blocked by: none
 
+### local-prod-stale-flag-supervisor — OPEN — opened 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+- Goal: status does not call roles STALE for changes only the supervisor/host tooling uses (scripts/local_production.py, deploy/local/), and the fleet checkout is fast-forwarded so status runs the new check
+- Files: scripts/local_production.py, tests/test_local_production.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: a test with a local_production.py-only gap reads nothing-to-load; after the ff, status on the fleet prints no STALE for a supervisor-only gap
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
