@@ -186,6 +186,7 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
         "verdict": "loses to the de-vigged market, Brier +0.0215 [+0.0175, +0.0255] over 4401 quoted rows",
         "verdict_class": VERDICT_LOSES,
         "source": _NFL_PROPS_PRICE_SOURCE,
+        "admission_checked": "2026-10-02 local-fleet served book grids 10-01..10-05: 202 of 204 receptions rows fair_method=consensus; the 2 book_margin_model rows (single-book Over-only) are withheld by layer2_board._row_rests_on_unmeasured_model under this loses_to_market verdict",
     },
     ("nfl", "rushing_attempts", "full", PHASE_PREGAME): {
         "sample_games": 1066,
