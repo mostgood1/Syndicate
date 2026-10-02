@@ -1313,6 +1313,14 @@ death, never life — do not invert it.
 - Verification: test_base_url green incl. stale-allowlist; old-vs-new default identical with env unset per site; each script's own tests green
 - Blocked by: none
 
+### base-url-last-two — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: scripts/check_e2e_coverage.py and (on loan, one line only) scripts/board_delivery_probe.py resolve DEFAULT_BASE via scripts/_base_url.default_base_url(), unchanged with no env var set, and leave tests/test_base_url.py ALLOWED — **GOAL: MET** (reading: test_base_url green with ZERO pending entries left; 23 passed; probe diff = the DEFAULT_BASE line + import only; live: check_e2e_coverage via SYNDICATE_BASE_URL reached the fleet, BILLED_responses=0)
+- Files: scripts/check_e2e_coverage.py,scripts/board_delivery_probe.py,tests/test_base_url.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: test_base_url green incl. stale-allowlist; both scripts' own tests green; check_e2e_coverage --payload run exercises the env path without network; board_delivery_probe diff is the one DEFAULT_BASE line plus the import
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

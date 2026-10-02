@@ -40,7 +40,12 @@ from syndicate.features.shared.coverage_contract import (  # noqa: E402
     CELLS, NOT_REPORTED, UNATTRIBUTED_ZERO, all_defects, read_shortlist,
 )
 
-DEFAULT_BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+DEFAULT_BASE = default_base_url()
 _LABEL = {"pregame_games": "PRE games", "pregame_props": "PRE props",
           "live_games": "LIVE games", "live_props": "LIVE props"}
 

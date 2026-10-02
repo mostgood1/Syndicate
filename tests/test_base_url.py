@@ -39,8 +39,6 @@ ALLOWED = {
     # PENDING: claimed by another OPEN lane on 2026-10-01 when the resolver
     # landed (lane `scripts-base-url-resolver`). Convert each when its lane
     # closes, and delete its line here -- the test then guards it too.
-    "scripts/board_delivery_probe.py": "pending: lane nhl-board-rows-missing",
-    "scripts/check_e2e_coverage.py": "pending: lane e2e-coverage-contract",
 }
 
 
