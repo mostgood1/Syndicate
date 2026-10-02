@@ -910,6 +910,13 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # Production ran `--publish --verify`; `--publish` is an HTTP self-publish
     # onto the disk `write()` already wrote to, so it is dropped here.
     ScheduledJob("model-scorecard", 11, 30, ("scripts/publish_model_scorecard.py", "--verify")),
+    # `movement-by-sport` (lane `layer2-freshness-1h`, 2026-10-02, user "go ahead
+    # with 1"): per sport, does the MARKET's move since a price was first seen
+    # predict the close beyond fair value? Read-only on the quote log; writes
+    # reports/intelligence/movement_by_sport/<date>.json. A sport gets its own
+    # movement weight only when this reads `momentum`/`reversion` on >= 20 games.
+    # 10:30Z: after the night's games are final and after the 09:15 backup.
+    ScheduledJob("movement-by-sport", 10, 30, ("scripts/consensus_movement_by_sport.py",)),
 )
 
 
