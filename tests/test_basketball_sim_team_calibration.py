@@ -17,7 +17,7 @@ from syndicate.features.shared import basketball_props_smart_sim as sim
 events = sim._import_real_events_module_local(package_name="wnba_betting")
 pytestmark = pytest.mark.skipif(events is None, reason="vendored wnba engine not importable")
 
-FLAGS = ("FOUL_RATE_SOLVED", "FOULED_MISS_NOT_FGA", "EXACT_TARGET_CALIBRATION", "TEAM_PRIOR_STACKS_ON_TARGET")
+FLAGS = ("FOULED_MISS_NOT_FGA", "EXACT_TARGET_CALIBRATION", "TEAM_PRIOR_STACKS_ON_TARGET")
 
 
 @pytest.fixture(autouse=True)
@@ -74,7 +74,6 @@ def test_solver_inverts_the_points_per_possession_model():
 
 
 def test_reachability_fouled_miss_is_not_an_fga_and_scores_identically():
-    events.FOUL_RATE_SOLVED = False  # the solved foul rate reads FOULED_MISS_NOT_FGA
     events.FOULED_MISS_NOT_FGA = False
     off = _run(target_home_points=85.0, target_away_points=85.0)
     events.FOULED_MISS_NOT_FGA = True
