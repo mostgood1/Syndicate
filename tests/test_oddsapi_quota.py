@@ -92,14 +92,14 @@ class RecordAndReadQuotaTests(unittest.TestCase):
         # Called from fetchers' HTTP seams inside detached subprocesses --
         # instrumentation must never be able to fail the refresh it measures.
         with patch(
-            "syndicate.features.shared.oddsapi_quota.write_json_file",
+            "syndicate.features.shared.oddsapi_quota.compare_and_swap_json_file",
             side_effect=OSError("disk gone"),
         ):
             self.assertIsNone(record_oddsapi_quota({"x-requests-used": "1"}, sport="mlb"))
 
     def test_never_raises_when_the_store_read_fails(self) -> None:
         with patch(
-            "syndicate.features.shared.oddsapi_quota.read_json_file",
+            "syndicate.features.shared.oddsapi_quota.read_json_file_result",
             side_effect=OSError("disk gone"),
         ):
             self.assertIsNone(record_oddsapi_quota({"x-requests-used": "1"}, sport="mlb"))
@@ -172,13 +172,13 @@ class RecordAndReadQuotaTests(unittest.TestCase):
 
 
 class ConcurrentWriteRaceProbeTests(unittest.TestCase):
-    """#106/#107. by_sport measured ~96% of the ground-truth burn counter
-    while by_market_family/by_hour_utc measured ~54% -- identical to each
-    other, since they update in the same block -- for 8+ hours straight,
-    with zero attribution exceptions recorded. The remaining candidate is a
-    read-modify-write race on the shared keyvalue store (three services can
-    call this concurrently, per test_burn_is_derived_from_absolute_counter_delta's
-    own comment). This probe makes that measurable instead of inferred.
+    """Concurrent writers must not lose increments (lane `layer2-freshness-1h`, 2026-10-02).
+
+    The recorder used to read -> add -> blind-write, so the last writer won and
+    every other writer's increment vanished: 73% of one fleet window's spend
+    never reached `by_sport`. It now writes through compare-and-swap. These
+    replace the old race PROBE tests -- the probe counted collisions; the swap
+    prevents them.
     """
 
     def setUp(self) -> None:
@@ -188,92 +188,89 @@ class ConcurrentWriteRaceProbeTests(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
         self.addCleanup(lambda: os.environ.pop("SYNDICATE_REPORTS_ROOT", None))
 
-    def test_no_race_when_calls_are_sequential(self) -> None:
-        record_oddsapi_quota({"x-requests-used": "1", "x-requests-last": "1"}, sport="mlb")
-        record_oddsapi_quota({"x-requests-used": "2", "x-requests-last": "1"}, sport="mlb")
+    @unittest.skipIf(os.name == "nt", "Windows cannot replace a file another thread holds open; the disk "
+                     "backend's writes fail there, which tests the OS, not the swap. Production is keyvalue.")
+    def test_concurrent_writers_lose_no_increment(self) -> None:
+        import threading
+
+        threads, per_thread = 8, 25
+        barrier = threading.Barrier(threads)
+
+        def _writer(n: int) -> None:
+            barrier.wait()
+            for i in range(per_thread):
+                record_oddsapi_quota(
+                    {"x-requests-used": str(n * 1000 + i), "x-requests-last": "1"},
+                    sport="nhl" if n % 2 else "ncaaf",
+                )
+
+        workers = [threading.Thread(target=_writer, args=(n,)) for n in range(threads)]
+        for w in workers:
+            w.start()
+        for w in workers:
+            w.join()
+
         state = read_oddsapi_quota()
-        self.assertEqual(state["race_detected_count"], 0)
-        self.assertIsNone(state["last_race_detail"])
+        total_calls = sum(b["calls"] for b in state["by_sport"].values())
+        total_credits = sum(b["credits"] for b in state["by_sport"].values())
+        self.assertEqual(total_calls, threads * per_thread)
+        self.assertEqual(total_credits, threads * per_thread)
+        self.assertEqual(state["by_sport"]["nhl"]["calls"], (threads // 2) * per_thread)
+        self.assertEqual(state["observation_count"], threads * per_thread)
 
-    def test_race_detected_when_store_advances_between_read_and_write(self) -> None:
+    def test_a_conflict_retries_and_is_counted_not_lost(self) -> None:
         from syndicate.features.shared import oddsapi_quota as module
+        from syndicate.features.shared.refresh_state_store import write_json_file
 
-        # Seed a real prior observation first (unpatched) so the probe read
-        # below has an actual stored dict to bump -- an empty store has no
-        # observation_count for a concurrent writer to have advanced.
         record_oddsapi_quota({"x-requests-used": "0", "x-requests-last": "0"}, sport="mlb")
+        real_read = module.read_json_file_result
+        state = {"interleaved": False}
 
-        real_read = module.read_json_file
-        call_count = {"n": 0}
+        def _read_then_another_writer_commits(path):
+            payload, ok = real_read(path)
+            if not state["interleaved"]:
+                # Another writer commits AFTER this call read the document and
+                # BEFORE it writes -- the interleaving that used to lose an
+                # increment. The swap must notice and rebuild from a fresh read.
+                state["interleaved"] = True
+                bumped = json.loads(json.dumps(payload))
+                bumped["by_sport"]["nhl"] = {"calls": 1, "credits": 2}
+                bumped["observation_count"] = int(bumped.get("observation_count") or 0) + 1
+                write_json_file(path, bumped)
+            return payload, ok
 
-        def _flaky_read(path):
-            call_count["n"] += 1
-            payload = real_read(path)
-            # Simulate a concurrent writer completing between this call's
-            # own top-of-function read and its pre-write probe read: bump
-            # observation_count on the SECOND read within this invocation
-            # (the probe read), exactly what another process's write would
-            # look like.
-            if call_count["n"] % 2 == 0 and isinstance(payload, dict):
-                payload = dict(payload)
-                payload["observation_count"] = int(payload.get("observation_count") or 0) + 1
-            return payload
+        with patch.object(module, "read_json_file_result", side_effect=_read_then_another_writer_commits):
+            record_oddsapi_quota({"x-requests-used": "2", "x-requests-last": "3"}, sport="mlb")
 
-        with patch("syndicate.features.shared.oddsapi_quota.read_json_file", side_effect=_flaky_read):
-            record_oddsapi_quota({"x-requests-used": "1", "x-requests-last": "1"}, sport="mlb")
+        quota = read_oddsapi_quota()
+        self.assertEqual(quota["by_sport"]["mlb"], {"calls": 2, "credits": 3})
+        self.assertEqual(quota["by_sport"]["nhl"], {"calls": 1, "credits": 2}, "the other writer's increment survived")
+        self.assertGreaterEqual(quota["cas_conflicts_count"], 1)
 
-        state = read_oddsapi_quota()
-        self.assertEqual(state["race_detected_count"], 1)
-        self.assertIsNotNone(state["last_race_detail"])
-        self.assertEqual(state["last_race_detail"]["sport"], "mlb")
-
-    def test_race_probe_never_changes_by_sport_computation(self) -> None:
-        # Diagnosis, not a fix: the probe reads the store an extra time to
-        # COUNT collisions, but the actual by_sport/by_family delta computed
-        # and written by this call must be based on this call's own
-        # top-of-function read, unaffected by whatever the probe read sees.
-        record_oddsapi_quota({"x-requests-used": "0", "x-requests-last": "0"}, sport="mlb")
-
+    def test_a_failed_read_never_zeroes_the_counters(self) -> None:
         from syndicate.features.shared import oddsapi_quota as module
 
-        real_read = module.read_json_file
-        call_count = {"n": 0}
+        for i in range(3):
+            record_oddsapi_quota({"x-requests-used": str(i), "x-requests-last": "5"}, sport="nhl")
+        with patch.object(module, "read_json_file_result", return_value=(None, False)):
+            self.assertIsNone(record_oddsapi_quota({"x-requests-used": "9", "x-requests-last": "5"}, sport="nhl"))
+        self.assertEqual(read_oddsapi_quota()["by_sport"]["nhl"], {"calls": 3, "credits": 15})
 
-        def _flaky_read(path):
-            call_count["n"] += 1
-            payload = real_read(path)
-            # Bump only the PROBE read (this invocation's 2nd read), not the
-            # top-of-function read its own computation is based on.
-            if call_count["n"] == 2 and isinstance(payload, dict):
-                payload = dict(payload)
-                payload["observation_count"] = int(payload.get("observation_count") or 0) + 41
-            return payload
-
-        with patch("syndicate.features.shared.oddsapi_quota.read_json_file", side_effect=_flaky_read):
-            record_oddsapi_quota({"x-requests-used": "1", "x-requests-last": "6"}, sport="mlb")
-
+    def test_an_older_observation_committed_late_does_not_replace_latest(self) -> None:
+        record_oddsapi_quota({"x-requests-used": "100", "x-requests-last": "1"}, sport="nhl")
+        record_oddsapi_quota({"x-requests-used": "150", "x-requests-last": "1"}, sport="nhl")
+        # A slower writer that read `used` 120 commits after the 150 reading.
+        record_oddsapi_quota({"x-requests-used": "120", "x-requests-last": "1"}, sport="nhl")
         state = read_oddsapi_quota()
-        # by_sport reflects this call's own real delta on top of the real
-        # prior state (1 call, 0 credits) -- untouched by the probe's bump.
-        self.assertEqual(state["by_sport"]["mlb"], {"calls": 2, "credits": 6})
-        self.assertEqual(state["race_detected_count"], 1)
+        self.assertEqual(state["latest"]["used"], 150)
+        self.assertEqual(state["by_sport"]["nhl"]["calls"], 3)
 
-    def test_probe_read_failure_does_not_break_recording(self) -> None:
+    def test_gives_up_quietly_when_every_attempt_conflicts(self) -> None:
         from syndicate.features.shared import oddsapi_quota as module
+        from syndicate.features.shared.refresh_state_store import WriteConflict
 
-        real_read = module.read_json_file
-        call_count = {"n": 0}
-
-        def _first_read_ok_second_raises(path):
-            call_count["n"] += 1
-            if call_count["n"] % 2 == 0:
-                raise OSError("transient")
-            return real_read(path)
-
-        with patch("syndicate.features.shared.oddsapi_quota.read_json_file", side_effect=_first_read_ok_second_raises):
-            result = record_oddsapi_quota({"x-requests-used": "1", "x-requests-last": "1"}, sport="mlb")
-        self.assertIsNotNone(result)
-        self.assertEqual(read_oddsapi_quota()["observation_count"], 1)
+        with patch.object(module, "compare_and_swap_json_file", side_effect=WriteConflict(Path("x"), 8)):
+            self.assertIsNone(record_oddsapi_quota({"x-requests-used": "1"}, sport="mlb"))
 
 
 class MarketFamilyAttributionTests(unittest.TestCase):

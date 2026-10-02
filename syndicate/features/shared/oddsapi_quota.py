@@ -28,10 +28,14 @@ with no lock.
 
 from __future__ import annotations
 
+import time
 from datetime import datetime, timezone
 from typing import Any
 
+from syndicate.features.shared.refresh_state_store import WriteConflict
+from syndicate.features.shared.refresh_state_store import compare_and_swap_json_file
 from syndicate.features.shared.refresh_state_store import read_json_file
+from syndicate.features.shared.refresh_state_store import read_json_file_result
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
 
@@ -206,6 +210,19 @@ def record_oddsapi_quota(headers: Any, *, sport: str | None = None, endpoint: st
     Called from fetchers' HTTP seams, including inside detached subprocesses,
     so a failure here must never be able to fail a refresh -- instrumentation
     that can break the thing it measures is worse than no instrumentation.
+
+    WRITTEN BY COMPARE-AND-SWAP `[2026-10-02, lane layer2-freshness-1h]`. This
+    was read -> add -> blind write, and with many writers (the hourly
+    seven-sport look-ahead, the live sweep, the NCAAF lines autorun every
+    150s, NHL's threaded client) the last write won and every other writer's
+    increment vanished. Measured on the fleet 16:15-17:30Z: +2,382 credits on
+    the account's own `used` counter against +643 attributed to sports -- 73%
+    of the window's spend lost from `by_sport`, including two minutes in which
+    +666 credits moved no sport at all. `used` itself was always right (it is
+    the server's absolute counter); only the per-sport/hour/family sums lost
+    increments. Now each attempt re-reads the document inside the swap
+    (`refresh_state_store.compare_and_swap_json_file`: WATCH/MULTI on keyvalue),
+    so a concurrent writer causes a retry, never a lost increment.
     """
     try:
         parsed = parse_quota_headers(headers)
@@ -217,118 +234,110 @@ def record_oddsapi_quota(headers: Any, *, sport: str | None = None, endpoint: st
             "endpoint": _sanitize_endpoint(endpoint) or None,
             "observedAt": _utc_now_iso(),
         }
-        payload = read_json_file(_quota_path())
-        if not isinstance(payload, dict):
-            payload = {}
-
-        baseline = payload.get("baseline") if isinstance(payload.get("baseline"), dict) else None
-        baseline = _next_baseline(baseline, observation)
-
-        by_sport = payload.get("by_sport") if isinstance(payload.get("by_sport"), dict) else {}
-        sport_key = observation.get("sport") or "unknown"
-        bucket = by_sport.get(sport_key) if isinstance(by_sport.get(sport_key), dict) else {"calls": 0, "credits": 0}
-        bucket["calls"] = int(bucket.get("calls") or 0) + 1
-        bucket["credits"] = int(bucket.get("credits") or 0) + int(observation.get("last_cost") or 0)
-        by_sport[sport_key] = bucket
-
-        # #15 attribution. Both aggregates stay O(1) like by_sport (#54's
-        # hard-won constraint): families are a fixed vocabulary of ~7 and
-        # hours are 24, so this key cannot grow back into the biggest thing
-        # in the store no matter how long it runs.
         last_cost = int(observation.get("last_cost") or 0)
-        by_family = payload.get("by_market_family") if isinstance(payload.get("by_market_family"), dict) else {}
-        by_hour = payload.get("by_hour_utc") if isinstance(payload.get("by_hour_utc"), dict) else {}
-        attribution_error_count = int(payload.get("attribution_error_count") or 0)
-        last_attribution_error = payload.get("last_attribution_error")
+        sport_key = observation.get("sport") or "unknown"
+        # Computed once, outside the swap: it depends only on this call.
+        family_error = None
         try:
-            for family, credits in _attribute_request_families(observation.get("endpoint") or "", last_cost).items():
-                family_bucket = by_family.get(family) if isinstance(by_family.get(family), dict) else {"calls": 0, "credits": 0.0}
-                family_bucket["calls"] = int(family_bucket.get("calls") or 0) + 1
-                family_bucket["credits"] = round(float(family_bucket.get("credits") or 0.0) + credits, 2)
-                by_family[family] = family_bucket
-
-            # Hour-of-day histogram (UTC), for the off-hours question: how
-            # much of the burn happens when nothing is live? 24 fixed buckets.
-            hour_key = str(observation.get("observedAt") or "")[11:13] or "??"
-            hour_bucket = by_hour.get(hour_key) if isinstance(by_hour.get(hour_key), dict) else {"calls": 0, "credits": 0}
-            hour_bucket["calls"] = int(hour_bucket.get("calls") or 0) + 1
-            hour_bucket["credits"] = int(hour_bucket.get("credits") or 0) + last_cost
-            by_hour[hour_key] = hour_bucket
+            families = _attribute_request_families(observation.get("endpoint") or "", last_cost)
         except Exception as exc:
-            # Attribution is a bonus on top of the load-bearing burn counter.
-            # If it breaks, the observation must still be recorded --
-            # un-attributed beats un-recorded, and the outer never-raises
-            # handler would otherwise throw away the whole reading. But a
-            # bare `except: pass` here previously made that failure
-            # completely invisible: by_market_family/by_hour_utc measured
-            # ~54% of by_sport's total for the entire tracked window with
-            # zero signal as to why (confirmed 2026-07-28, both stuck at the
-            # identical reduced figure, proving they fail together in this
-            # one block). Recording the exception (bounded: one message, one
-            # counter, not one entry per failure) turns the next occurrence
-            # into a one-read diagnosis instead of another blind
-            # investigation.
-            attribution_error_count += 1
-            last_attribution_error = {
+            families = {}
+            family_error = {
                 "error": f"{type(exc).__name__}: {exc}",
                 "endpoint": observation.get("endpoint"),
                 "sport": observation.get("sport"),
                 "observedAt": observation.get("observedAt"),
             }
+        hour_key = str(observation.get("observedAt") or "")[11:13] or "??"
 
-        # Concurrent-write race probe. #106/#107 flagged that by_sport (~96%
-        # complete vs the ground-truth burn counter) and
-        # by_market_family/by_hour_utc (~54%, identical to each other since
-        # they update in the same block above) are written together, in one
-        # function call, to one shared key -- yet diverge in completeness.
-        # That contradicts a plain lost-update race (which should lose all
-        # three equally per collision) if this write and the collision are
-        # simultaneous, so: re-read the store immediately before writing and
-        # compare observation_count against what this call read at the top.
-        # A mismatch proves another writer completed in between -- this call
-        # is about to overwrite it with a payload computed from the stale
-        # read, the exact mechanism under suspicion. Read-only probe: it
-        # does not change what gets written, only records how often this
-        # happens so the rate is measurable instead of inferred.
-        observation_count_at_read = int(payload.get("observation_count") or 0)
-        race_detected_count = int(payload.get("race_detected_count") or 0)
-        last_race_detail = payload.get("last_race_detail")
-        try:
-            fresh_payload = read_json_file(_quota_path())
-            fresh_count = int((fresh_payload or {}).get("observation_count") or 0) if isinstance(fresh_payload, dict) else observation_count_at_read
-            if fresh_count != observation_count_at_read:
-                race_detected_count += 1
-                last_race_detail = {
-                    "observation_count_at_read": observation_count_at_read,
-                    "observation_count_at_write": fresh_count,
-                    "sport": observation.get("sport"),
-                    "observedAt": observation.get("observedAt"),
-                }
-        except Exception:
-            pass
-
-        write_json_file(
-            _quota_path(),
-            {
+        def _build(attempt: int) -> dict[str, Any]:
+            # A FAILED READ MUST NEVER BECOME AN EMPTY DOCUMENT. `read_json_file`
+            # returns None both for "no document yet" and for "the read failed"
+            # (a store hiccup, or a file read mid-replace), and building from {}
+            # on the second would commit a fresh document and ZERO every
+            # counter -- which the pre-CAS code did as well. Retry the read
+            # briefly; if it still cannot be trusted, abort this attempt and
+            # drop only this one observation.
+            payload, ok = read_json_file_result(_quota_path())
+            for _ in range(4):
+                if ok:
+                    break
+                time.sleep(0.01)
+                payload, ok = read_json_file_result(_quota_path())
+            if not ok:
+                raise _UntrustedRead()
+            if not isinstance(payload, dict):
+                payload = {}
+            baseline = payload.get("baseline") if isinstance(payload.get("baseline"), dict) else None
+            baseline = _next_baseline(baseline, observation)
+            # LATEST IS THE HIGHEST `used`, not the last writer. Under
+            # concurrency a slower writer can commit an older observation
+            # after a newer one; `used` is monotonic within a billing period,
+            # so the larger one is the newer reading. A drop (period rollover)
+            # resets the baseline to this observation and takes it as latest.
+            prior_latest = payload.get("latest") if isinstance(payload.get("latest"), dict) else None
+            latest = observation
+            if prior_latest is not None and baseline is not observation:
+                try:
+                    if int(prior_latest.get("used") or 0) > int(observation.get("used") or 0):
+                        latest = prior_latest
+                except (TypeError, ValueError):
+                    pass
+            by_sport = dict(payload.get("by_sport") or {}) if isinstance(payload.get("by_sport"), dict) else {}
+            bucket = dict(by_sport.get(sport_key) or {"calls": 0, "credits": 0})
+            bucket["calls"] = int(bucket.get("calls") or 0) + 1
+            bucket["credits"] = int(bucket.get("credits") or 0) + last_cost
+            by_sport[sport_key] = bucket
+            by_family = dict(payload.get("by_market_family") or {}) if isinstance(payload.get("by_market_family"), dict) else {}
+            for family, credits in families.items():
+                family_bucket = dict(by_family.get(family) or {"calls": 0, "credits": 0.0})
+                family_bucket["calls"] = int(family_bucket.get("calls") or 0) + 1
+                family_bucket["credits"] = round(float(family_bucket.get("credits") or 0.0) + credits, 2)
+                by_family[family] = family_bucket
+            by_hour = dict(payload.get("by_hour_utc") or {}) if isinstance(payload.get("by_hour_utc"), dict) else {}
+            hour_bucket = dict(by_hour.get(hour_key) or {"calls": 0, "credits": 0})
+            hour_bucket["calls"] = int(hour_bucket.get("calls") or 0) + 1
+            hour_bucket["credits"] = int(hour_bucket.get("credits") or 0) + last_cost
+            by_hour[hour_key] = hour_bucket
+            return {
                 "baseline": baseline,
-                "latest": observation,
+                "latest": latest,
                 "by_sport": by_sport,
                 "by_market_family": by_family,
                 "by_hour_utc": by_hour,
-                "attribution_error_count": attribution_error_count,
-                "last_attribution_error": last_attribution_error,
-                "race_detected_count": race_detected_count,
-                "last_race_detail": last_race_detail,
-                # Stamped once, because none of the aggregates above ever
-                # reset -- a rate is only computable as total/(now - this).
+                "attribution_error_count": int(payload.get("attribution_error_count") or 0) + (1 if family_error else 0),
+                "last_attribution_error": family_error or payload.get("last_attribution_error"),
+                # Kept for continuity with the pre-CAS probe's history; no longer
+                # incremented -- a conflict now retries instead of racing.
+                "race_detected_count": int(payload.get("race_detected_count") or 0),
+                "last_race_detail": payload.get("last_race_detail"),
+                # Conflicts absorbed by a retry: the collisions that used to
+                # lose an increment, now counted instead of lost.
+                "cas_conflicts_count": int(payload.get("cas_conflicts_count") or 0) + (attempt - 1),
                 "aggregates_started_at": str(payload.get("aggregates_started_at") or _utc_now_iso()),
-                "observation_count": observation_count_at_read + 1,
+                "observation_count": int(payload.get("observation_count") or 0) + 1,
                 "updatedAt": _utc_now_iso(),
-            },
-        )
+            }
+
+        try:
+            compare_and_swap_json_file(_quota_path(), _build, max_attempts=_CAS_MAX_ATTEMPTS, backoff_seconds=0.02)
+        except (WriteConflict, _UntrustedRead):
+            # Every attempt collided. Dropping ONE observation is the bounded
+            # cost; `used` stays exact on the next recorded call regardless.
+            print(f"[oddsapi_quota] CAS_GAVE_UP sport={sport_key} attempts={_CAS_MAX_ATTEMPTS}", flush=True)
+            return None
         return observation
     except Exception:
         return None
+
+
+# Retries before one observation is dropped. Contention is bursty and short (a
+# few writers per second at peak), and each attempt is one small read + SET.
+_CAS_MAX_ATTEMPTS = 20
+
+
+class _UntrustedRead(RuntimeError):
+    """The quota document could not be read reliably; never build from empty."""
 
 
 def _next_baseline(baseline: dict[str, Any] | None, observation: dict[str, Any]) -> dict[str, Any]:
@@ -417,6 +426,9 @@ def read_oddsapi_quota() -> dict[str, Any]:
         "last_attribution_error": payload.get("last_attribution_error"),
         "race_detected_count": int(payload.get("race_detected_count") or 0),
         "last_race_detail": payload.get("last_race_detail"),
+        # Collisions absorbed by a compare-and-swap retry (2026-10-02): each one
+        # is an increment the pre-CAS recorder would have lost.
+        "cas_conflicts_count": int(payload.get("cas_conflicts_count") or 0),
     }
 
     if not isinstance(baseline, dict) or not isinstance(latest, dict):
