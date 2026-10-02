@@ -42,6 +42,17 @@ SPORT_KEYS = {
     "nba": "basketball_nba",
     "wnba": "basketball_wnba",
 }
+# OddsAPI lists the NBA PRESEASON under its own key (like
+# `icehockey_nhl_preseason`, which `syndicate/local_nhl_odds.py` already
+# fetches). Without it every NBA preseason day read as "no games".
+EXTRA_SPORT_KEYS = {
+    "nba": ("basketball_nba_preseason",),
+}
+
+
+def league_sport_keys(league: str) -> tuple[str, ...]:
+    slug = str(league).strip().lower()
+    return (SPORT_KEYS[slug], *EXTRA_SPORT_KEYS.get(slug, ()))
 BOOKMAKER_ALIASES = {
     "fanduel": "fanduel",
     "fd": "fanduel",
@@ -207,7 +218,7 @@ def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regi
     downstream could tell "no games" apart from "fetch failed, reuse
     whatever's newest" before this distinction existed.
     """
-    sport_key = SPORT_KEYS[str(league).strip().lower()]
+    sport_keys = league_sport_keys(league)
     target_date = pd.to_datetime(date_str).date()
     desired_markets = list(markets or DEFAULT_MARKETS)
     # `#343`: GAME AND INTERVAL MARKETS FROM THE CENTRAL VOCABULARY.
@@ -228,14 +239,26 @@ def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regi
     _segment_map = {**full_game_market_keys(), **segment_market_keys(league)}
     desired_markets.extend(key for key in _segment_map if key not in desired_markets)
 
-    try:
-        response = _get(f"{API_BASE}/sports/{sport_key}/events", {"apiKey": api_key})
-        events = response.json() or []
-    except Exception:
-        return pd.DataFrame()
-
-    if not isinstance(events, list):
-        return pd.DataFrame()
+    # Every sport key for the league (NBA: regular + preseason). Each event keeps
+    # the key that listed it -- its markets/odds must be requested under it.
+    # `None` (confirmed no games) needs EVERY listing to have succeeded: if one
+    # failed, a game could be hiding behind it, so the answer is inconclusive.
+    events: list[dict] = []
+    any_listing_failed = False
+    for sport_key in sport_keys:
+        try:
+            response = _get(f"{API_BASE}/sports/{sport_key}/events", {"apiKey": api_key})
+            listed = response.json() or []
+        except Exception:
+            any_listing_failed = True
+            continue
+        if not isinstance(listed, list):
+            any_listing_failed = True
+            continue
+        for event in listed:
+            if isinstance(event, dict):
+                event.setdefault("sport_key", sport_key)
+                events.append(event)
 
     day_events = []
     for event in events:
@@ -245,13 +268,13 @@ def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regi
         except Exception:
             continue
     if not day_events:
-        return None
+        return pd.DataFrame() if any_listing_failed else None
 
     rows: list[dict[str, object]] = []
     snapshot_ts = pd.Timestamp.utcnow().isoformat()
     normalized_bookmakers = _bookmakers_csv(bookmakers)
 
-    def _fetch_once(event_id: str, requested_markets: list[str]) -> bool:
+    def _fetch_once(event_id: str, sport_key: str, requested_markets: list[str]) -> bool:
         if not requested_markets:
             return False
         params: dict[str, object] = {
@@ -278,6 +301,7 @@ def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regi
         event_id = str(event.get("id") or "").strip()
         if not event_id:
             continue
+        sport_key = str(event.get("sport_key") or sport_keys[0])
         discovered = _discover_event_markets(
             api_key=api_key,
             sport_key=sport_key,
@@ -286,7 +310,7 @@ def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regi
             bookmakers=normalized_bookmakers,
         )
         requested = [market for market in discovered if market in set(desired_markets)] if discovered else []
-        if requested and _fetch_once(event_id, requested):
+        if requested and _fetch_once(event_id, sport_key, requested):
             continue
         core = [
             "player_points",
@@ -297,11 +321,11 @@ def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regi
         ]
         if desired_markets:
             core = [market for market in core if market in desired_markets]
-        if _fetch_once(event_id, core):
+        if _fetch_once(event_id, sport_key, core):
             continue
         probe_list = requested or desired_markets or core
         for market in probe_list:
-            _fetch_once(event_id, [market])
+            _fetch_once(event_id, sport_key, [market])
 
     return pd.DataFrame(rows)
 
