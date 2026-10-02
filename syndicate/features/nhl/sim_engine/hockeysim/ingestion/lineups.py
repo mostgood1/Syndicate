@@ -7,9 +7,13 @@ starter-goalie heuristic follow the vendor exactly.
 """
 from __future__ import annotations
 
+import datetime as _dt
 from typing import Dict, List, Optional
 
 from .nhl_web import NhlWebIngestClient, season_code_for_date
+
+
+_GOALIE_START_MIN = 30.0  # a goalie with 30+ minutes started (or played most of) the game
 
 
 def _toi_to_min(value: object) -> float:
@@ -59,10 +63,12 @@ def build_team_usage(
     season = season_code_for_date(date)
     game_ids = client.recent_finished_game_ids(team_abbr, season, before_date=date, n=n_games)
     acc: Dict[int, Dict] = {}
+    team_last_game = ""
     for gid in game_ids:
         box = client.boxscore(gid)
         if not box:
             continue
+        game_date = str(box.get("gameDate") or "")[:10]
         pbg = box.get("playerByGameStats") or {}
         side = None
         if _abbr_of((box.get("homeTeam") or {}).get("abbrev")) == team_abbr.upper():
@@ -71,6 +77,7 @@ def build_team_usage(
             side = "awayTeam"
         if side is None:
             continue
+        team_last_game = max(team_last_game, game_date)
         team_stats = pbg.get(side) or {}
         for group in ("forwards", "defense", "goalies"):
             for p in team_stats.get(group) or []:
@@ -86,12 +93,17 @@ def build_team_usage(
                     "games_played": 0,
                     "toi_total": 0.0,
                 })
+                toi = _toi_to_min(p.get("toi"))
                 row["games_played"] += 1
-                row["toi_total"] += _toi_to_min(p.get("toi"))
+                row["toi_total"] += toi
+                if pos == "G" and toi >= _GOALIE_START_MIN:
+                    row["starts"] = row.get("starts", 0) + 1
+                    row["last_start_date"] = max(str(row.get("last_start_date") or ""), game_date)
     usage = []
     for row in acc.values():
         gp = max(1, row["games_played"])
         row["toi_avg"] = round(row["toi_total"] / gp, 3)
+        row["team_last_game_date"] = team_last_game
         usage.append(row)
     usage.sort(key=lambda r: r["toi_avg"], reverse=True)
     return usage
@@ -152,10 +164,39 @@ def infer_lines(usage: List[Dict]) -> List[Dict]:
     return usage
 
 
-def project_lineup(usage: List[Dict]) -> List[Dict]:
-    """Add proj_toi (recent avg) and flag the starter goalie (highest recent goalie TOI)."""
-    goalies = sorted([r for r in usage if r["position"] == "G"], key=lambda r: r["toi_avg"], reverse=True)
-    starter_id = goalies[0]["player_id"] if goalies else None
+def _starter_goalie_id(usage: List[Dict], date: Optional[str]) -> Optional[int]:
+    """Most STARTS in the window (ties -> most recent start), swapped on the 2nd of a back-to-back.
+
+    The old rule was the highest AVERAGE goalie TOI, and a backup's one full start averages the same
+    ~60 minutes as the starter's every start -- measured over 2025-26 team-games (lane
+    nhl-player-props-projection, `C:/tmp/nhlprops/goalie_rules.py`): 49.0% right in the regular
+    season, 76.2% in the playoffs. Most starts alone: 54.6%; plus the back-to-back swap (the
+    goalie who started yesterday rarely starts today): 63.0% / 89.0%. Longer windows or recency
+    weights moved it by under 1.5 points, so the plain rule ships.
+    """
+    goalies = [r for r in usage if r["position"] == "G"]
+    if not goalies:
+        return None
+    ranked = sorted(
+        goalies,
+        key=lambda r: (int(r.get("starts") or 0), str(r.get("last_start_date") or ""), float(r.get("toi_avg") or 0.0)),
+        reverse=True,
+    )
+    pick = ranked[0]
+    if date and len(ranked) > 1:
+        try:
+            yesterday = (_dt.date.fromisoformat(str(date)[:10]) - _dt.timedelta(days=1)).isoformat()
+        except ValueError:
+            yesterday = ""
+        last_game = str(pick.get("team_last_game_date") or "")
+        if yesterday and last_game == yesterday and str(pick.get("last_start_date") or "") == yesterday:
+            pick = ranked[1]
+    return pick["player_id"]
+
+
+def project_lineup(usage: List[Dict], date: Optional[str] = None) -> List[Dict]:
+    """Add proj_toi (recent avg) and flag the starter goalie (see `_starter_goalie_id`)."""
+    starter_id = _starter_goalie_id(usage, date)
     for r in usage:
         r["proj_toi"] = round(float(r.get("toi_avg") or 0.0), 3)
         r["is_starter_goalie"] = (r["position"] == "G" and r["player_id"] == starter_id)

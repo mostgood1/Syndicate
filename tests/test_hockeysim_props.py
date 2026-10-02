@@ -218,3 +218,26 @@ class TeamRatesReachabilityTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_a_sim_without_the_player_counts_as_zero(monkeypatch):
+    """Defect 4: the mean used to divide by the sims the player APPEARED in."""
+    from syndicate.features.nhl.sim_engine.hockeysim import player_props as pp
+
+    calls = {"i": 0}
+
+    def fake_run(*args, **kwargs):
+        calls["i"] += 1
+        return object(), []
+
+    def fake_box(gs, events, starters):
+        # Player 1000 appears (with 2 shots) in every OTHER sim only.
+        appears = calls["i"] % 2 == 1
+        return {("HOME", 1000, 0): (2, 0, 0, 0, 0, 0)} if appears else {}
+
+    monkeypatch.setattr(pp, "run_hockeysim_game", fake_run)
+    monkeypatch.setattr(pp, "aggregate_events_to_boxscores_fast", fake_box)
+    projs = pp.build_prop_projections(_game(), lines={(1000, "SOG"): 1.5}, n_sims=10, base_seed=1)
+    sog = next(p for p in projs if p.player_id == 1000 and p.market == "SOG")
+    assert sog.proj_lambda == 1.0          # 5 sims x 2 shots / 10 sims (was 2.0)
+    assert sog.p_over == 0.5 and sog.p_under == 0.5

@@ -161,6 +161,10 @@ def build_prop_projections(
             vals = by_market.get(market) or []
             if not vals:
                 continue
+            # A sim the player never appeared in is a ZERO for him, not a missing draw `[2026-10-02,
+            # lane nhl-player-props-projection]`. Dividing by the sims he appeared in inflated
+            # every partly-used player (Adam Fox 0.217 SOG vs 0.170 over all 200 sims).
+            vals = list(vals) + [0] * max(0, int(n_sims) - len(vals))
             proj = sum(vals) / len(vals)
             line = lines.get((int(pid), market))
             p_over = p_under = None

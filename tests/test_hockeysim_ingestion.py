@@ -153,3 +153,28 @@ def test_special_teams_units_have_positional_shape():
         members = [r for r in usage if r.get("pk_unit") == unit]
         assert (sum(r["position"] == "F" for r in members), sum(r["position"] == "D" for r in members)) == (2, 2)
     assert all(r.get("line_slot") for r in usage if r.get("pp_unit") or r.get("pk_unit"))
+
+
+def _goalies(**rows):
+    out = []
+    for pid, (starts, last, avg, team_last) in rows.items():
+        out.append({"player_id": int(pid[1:]), "position": "G", "games_played": starts, "toi_avg": avg,
+                    "starts": starts, "last_start_date": last, "team_last_game_date": team_last})
+    return out
+
+
+def test_starter_is_most_starts_not_highest_average():
+    # The backup's one full start averages 60 min -- the same as the starter's. Old rule: a coin toss.
+    usage = _goalies(g1=(6, "2026-01-10", 59.0, "2026-01-12"), g2=(1, "2026-01-12", 60.0, "2026-01-12"))
+    usage = lu.project_lineup(usage, date="2026-01-15")
+    assert [r["player_id"] for r in usage if r["is_starter_goalie"]] == [1]
+
+
+def test_back_to_back_swaps_to_the_other_goalie():
+    usage = _goalies(g1=(6, "2026-01-14", 59.0, "2026-01-14"), g2=(2, "2026-01-08", 58.0, "2026-01-14"))
+    usage = lu.project_lineup(usage, date="2026-01-15")
+    assert [r["player_id"] for r in usage if r["is_starter_goalie"]] == [2]
+    # not a back-to-back: the regular starter
+    usage = lu.project_lineup(_goalies(g1=(6, "2026-01-12", 59.0, "2026-01-12"), g2=(2, "2026-01-08", 58.0, "2026-01-12")),
+                              date="2026-01-15")
+    assert [r["player_id"] for r in usage if r["is_starter_goalie"]] == [1]

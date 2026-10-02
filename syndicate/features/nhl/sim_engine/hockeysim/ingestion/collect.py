@@ -73,7 +73,7 @@ def collect_slate_inputs(
         if not usage:
             continue
         infer_lines(usage)
-        project_lineup(usage)
+        project_lineup(usage, date=date)
         for r in usage:
             lineup_rows.append({
                 "player_id": r["player_id"], "full_name": r["full_name"], "position": r["position"],
