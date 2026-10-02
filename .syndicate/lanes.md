@@ -1194,6 +1194,14 @@ death, never life — do not invert it.
 - Verification: probe over PYTHONHASHSEED 0..9 gives one identical rating_sd=0.75 result; a new cross-process test fails before and passes after; tests/test_nfl_live_resim.py passes
 - Blocked by: none
 
+### deploy-safety-stale-odds-pointer — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: On the local fleet, check_deploy_safety's 'Odds refresh RUNNING (pid=N)' blocker is reported as a STALE pointer (note, not blocker) when pid N is not a live process, while a live pid still blocks and an unreadable process table keeps blocking; Render path unchanged — **GOAL: MET** (reading: 136 passed incl. dead pid -> note, live pid -> blocker, unreadable -> blocker, off-fleet -> no scan; live fleet run printed 'Odds refresh: STALE pointer, ignoring (pid=376905 is not running ...)')
+- Files: scripts/check_deploy_safety.py,tests/test_check_deploy_safety_fleet_logs.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: dead pid -> note + no blocker; live pid -> blocker; table unreadable -> blocker kept; off-fleet -> blocker unchanged (never scans). Live: fleet run shows the STALE note when the latest_tick pid is dead
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

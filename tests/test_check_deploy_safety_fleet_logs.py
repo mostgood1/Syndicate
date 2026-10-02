@@ -390,3 +390,58 @@ def test_run_drain_waits_for_a_live_odds_child(capsys):
     out = capsys.readouterr().out
     assert rc == 0
     assert "worker child job running: live-odds-worker/run_refresh_odds_job.py (pid=600" in out
+
+
+# --- `deploy-safety-stale-odds-pointer`: a dead odds pid is a stale pointer ----
+
+def _run_main_odds(base_url, table, capsys):
+    payload = {"state": {"sim_run_status": {"state": "finished", "exit_code": 0},
+                         "latest_tick": {"anyLive": False, "result": {
+                             "state": "running", "pid": 376905, "lane": "live-odds-worker",
+                             "run_stamp": "20261002_131748"}}}}
+    table_mock = (mock.patch.object(cds, "_fleet_process_table", side_effect=table)
+                  if isinstance(table, Exception) else
+                  mock.patch.object(cds, "_fleet_process_table", return_value=table))
+    with mock.patch.object(cds, "_load_admin_token", return_value="t"), \
+         mock.patch.object(cds, "_get_json", return_value=payload), \
+         mock.patch.object(cds, "board_build_state", return_value=(False, {"newest_build_complete": "x"})), \
+         mock.patch.object(cds, "fleet_worker_children", return_value={}), \
+         table_mock as tm, \
+         mock.patch("sys.argv", ["check_deploy_safety.py", "--base-url", base_url]):
+        rc = cds.main()
+    return rc, capsys.readouterr().out, tm.call_count
+
+
+def test_dead_odds_pid_is_a_stale_note_not_a_blocker(capsys):
+    rc, out, _ = _run_main_odds("http://127.0.0.1:10000", [SUP, RW, ODDS], capsys)
+    assert rc == 0
+    assert "Odds refresh: STALE pointer, ignoring (pid=376905 is not running" in out
+    assert "Odds refresh RUNNING" not in out
+
+
+def test_live_odds_pid_still_blocks(capsys):
+    live = (376905, 201, 30, "/venv/bin/python scripts/run_refresh_odds_job.py")
+    rc, out, _ = _run_main_odds("http://127.0.0.1:10000", [SUP, RW, ODDS, live], capsys)
+    assert rc == 1
+    assert "Odds refresh RUNNING (pid=376905" in out
+
+
+def test_unreadable_table_keeps_the_odds_blocker(capsys):
+    rc, out, _ = _run_main_odds("http://127.0.0.1:10000", RuntimeError("wsl gone"), capsys)
+    assert rc == 1
+    assert "Odds refresh RUNNING (pid=376905" in out
+
+
+def test_off_fleet_never_scans_and_keeps_the_blocker(capsys):
+    rc, out, calls = _run_main_odds("https://syndicate-an21.onrender.com", [SUP], capsys)
+    assert rc == 1 and calls == 0
+    assert "Odds refresh RUNNING (pid=376905" in out
+
+
+def test_fleet_pid_alive_edges():
+    with mock.patch.object(cds, "_fleet_process_table", return_value=[SUP, RW]):
+        assert cds.fleet_pid_alive("http://127.0.0.1:10000", 200) is True
+        assert cds.fleet_pid_alive("http://127.0.0.1:10000", "200") is True
+        assert cds.fleet_pid_alive("http://127.0.0.1:10000", 999) is False
+        assert cds.fleet_pid_alive("http://127.0.0.1:10000", None) is None
+    assert cds.fleet_pid_alive(None, 200) is None

@@ -660,6 +660,25 @@ def _combined_children(scan: dict[str, tuple[list[dict[str, Any]] | None, dict[s
     return combined
 
 
+def fleet_pid_alive(base_url: str | None, pid: Any) -> bool | None:
+    """Is `pid` a live (non-zombie) process on the fleet host? None = cannot tell.
+
+    None off the fleet (Render: no process table to read), for an unparsable
+    pid, or when `ps` fails -- callers treat None as "keep the blocker".
+    """
+    if not _is_fleet_base_url(base_url):
+        return None
+    try:
+        wanted = int(pid)
+    except (TypeError, ValueError):
+        return None
+    try:
+        rows = _fleet_process_table()
+    except Exception:
+        return None
+    return any(row[0] == wanted for row in rows)
+
+
 def _describe_children(children: list[dict[str, Any]], limit: int = 4) -> str:
     shown = ", ".join(
         f"{c.get('role', 'refresh-worker')}/{c['script']} (pid={c['pid']}, age={c['age_s']}s)" for c in children[:limit]
@@ -902,8 +921,27 @@ def main() -> int:
 
     # The gap that motivated this script: an odds-refresh job in flight is
     # a separate process from the MLB sim and is invisible to sim_run_status.
+    #
+    # A STALE POINTER IS NOT A RUNNING JOB (lane `deploy-safety-stale-odds-pointer`).
+    # `latest_tick.result` keeps naming the run it launched after that process
+    # exits -- measured 2026-10-02 on the fleet: "Odds refresh RUNNING
+    # (pid=376905)" for 13+ minutes while pid 376905 was gone (verified
+    # 13:25Z and 13:31Z) and the child-process scan showed only newer short
+    # jobs. It blocked a careful restart for the full 10-minute wait. Same idea
+    # as the MLB sim's staleness ceiling above, but measured, not timed: on
+    # the fleet the pid is checked against the process table. A live pid
+    # still blocks; an unreadable table (None) keeps the blocker; any real odds
+    # job is ALSO caught by the per-worker child-job lines below.
     refresh_state = str(refresh_run.get("state") or "").strip().lower()
-    if refresh_state == "running":
+    refresh_pid_alive = (
+        fleet_pid_alive(args.base_url, refresh_run.get("pid")) if refresh_state == "running" else None
+    )
+    if refresh_state == "running" and refresh_pid_alive is False:
+        notes.append(
+            f"Odds refresh: STALE pointer, ignoring (pid={refresh_run.get('pid')} is not running; "
+            f"lane={refresh_run.get('lane')}, stamp={refresh_run.get('run_stamp')})"
+        )
+    elif refresh_state == "running":
         blockers.append(
             f"Odds refresh RUNNING (pid={refresh_run.get('pid')}, lane={refresh_run.get('lane')}, "
             f"stamp={refresh_run.get('run_stamp')})"
