@@ -44786,3 +44786,7 @@ Pre-registered bound (team TOV within 0.95-1.05): **MISSED by ~2 pts** -- the re
 3. Blocks 0.64x: the engine's constant `base_block_rate_on_2pa` 0.05; priors only allocate. Steals are a fixed 0.55 share of TOV.
 4. The target solver lands ~2 pts under for targets far below a team's natural level (synthetic 78); real-game team points stay within 0.6%.
 5. **Not upstream:** `TOV_PER_ATTEMPT` lives in `vendor/wnba_betting_repo/src/wnba_betting/sim/events.py`; a re-pull of `mostgood1/WNBA-Betting` reverts it.
+
+## 2026-10-01 (~7:30 PM CT) -- UPSTREAM MERGE, no deploy -- `mostgood1/WNBA-Betting#5` (TOV_PER_ATTEMPT) squash-merged as `a2faa096`
+
+Supersedes item 5 ("Not upstream") of the 2026-10-01 ~7:00 PM CT turnover entry. Upstream `main` `sim/events.py` vs `vendor/wnba_betting_repo`: 6 differing lines, all the reworded market-anchor comment (3 out, 3 in) -- a re-pull keeps every engine switch shipped today. Upstream suite on the merge base: 52 passed / 6 failed / 5 collection errors (the 6 + 5 pre-existing). Merged with `--match-head-commit 57a27e0f`, branch deleted.
