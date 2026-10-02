@@ -44923,3 +44923,9 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - verify (READ): HEAD `82bd182e`; `merge-base --is-ancestor 92565cd5 HEAD` yes; `live_resim.py:406` seeds `random.Random(f"nfl-rating-uncertainty|...")`; roles up `code=9856dd92`, `/healthz` 200.
 - note: `status` prints the roles `STALE` against `82bd182e`. That is a false positive -- the check compares commit stamps, not runtime diffs, and the only newer commit is a ledger entry.
 - owed: the 2026-10-03 08:00Z run's verdict, read by scheduled task `fleet-ci-suite-reading-1003` at 09:30Z.
+
+## 2026-10-02 ~14:4xZ (~9:4x AM CT) -- LOCAL FLEET ff onto `8c30fd68`, no restart (lane `local-prod-stale-flag-supervisor`, user: "exclude local_production.py from the role check and fast-forward") -- **MET**
+
+- what: `4f3edfa9` + `8c30fd68` -- `local_production.py status` calls a role STALE only when RUNTIME code differs between its loaded commit and HEAD (ledger/docs/tests/reports/data/*.md and the supervisor's own `scripts/local_production.py` + `deploy/local/` excluded; an undiffable gap still reads `STALE?`).
+- how: `~/Syndicate` ff `82bd182e -> 8c30fd68` from GitHub. Range: 4 commits, the only code `scripts/local_production.py` (no role imports it). Dirty `data/ncaaf_source/historical_truth/games_2026.json.gz` and `vendor/wnba_betting_repo/data/processed/boxscores_history.csv` untouched. No role or supervisor restart: `status` is a fresh process each call. The running supervisor (started by another session on `9856dd92`) keeps its loaded copy; that copy already has every scheduled job and the backup -- the two new commits only change `status`.
+- verify (READ): HEAD `8c30fd68`; `status` prints all three roles `code=9856dd92 (HEAD 8c30fd68: ledger/docs/tests only -- nothing to load)`, where `82bd182e` had printed `STALE`; `/healthz` 200.

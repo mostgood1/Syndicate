@@ -1221,7 +1221,8 @@ death, never life — do not invert it.
 - Verification: unit tests over a temp git repo (ledger-only gap -> not stale, code gap -> stale, unknown commit -> stale); on the fleet, status at 82bd182e vs roles at 9856dd92 no longer prints STALE
 - Blocked by: none
 
-### local-prod-stale-flag-supervisor — OPEN — opened 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+### local-prod-stale-flag-supervisor — CLOSED 2026-10-02 — opened 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+- Goal (verbatim): status does not call roles STALE for changes only the supervisor/host tooling uses (scripts/local_production.py, deploy/local/), and the fleet checkout is fast-forwarded so status runs the new check -- **GOAL: MET.** Reading: fleet ff onto 8c30fd68; status prints all three roles 'code=9856dd92 (HEAD 8c30fd68: ledger/docs/tests only -- nothing to load)' with scripts/local_production.py the only code in the gap; new test asserts a supervisor-only gap reads empty and a role entrypoint still counts; tests/test_local_production.py 35 passed / 1 skip. deploys.md 2026-10-02 ~14:4xZ.
 - Goal: status does not call roles STALE for changes only the supervisor/host tooling uses (scripts/local_production.py, deploy/local/), and the fleet checkout is fast-forwarded so status runs the new check
 - Files: scripts/local_production.py, tests/test_local_production.py
 - Hypothesis: n/a
