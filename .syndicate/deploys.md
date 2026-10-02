@@ -44824,3 +44824,7 @@ Supersedes item 5 ("Not upstream") of the 2026-10-01 ~7:00 PM CT turnover entry.
 **Also:** `test_team_prior_does_not_stack_on_a_target_but_still_applies_without_one` no-target leg moved to 200 draws -- at 60 the +4 bound sat ~2 SE from the true +6 to +8 lift (4 runs at 200 draws) and flaked once the credit draws shifted the random stream.
 
 **Not fixed / owed:** the residual is shot volume/make rate (sim misses above actual); blocks 0.65x (constant `base_block_rate_on_2pa`); IND +2 TOV (`team_adj.tov_mult` stacking, unmeasured). **Not upstream:** `PLAYER_REBOUND_CREDIT` lives in `vendor/wnba_betting_repo/src/wnba_betting/sim/events.py`; a re-pull of `mostgood1/WNBA-Betting` reverts it.
+
+## 2026-10-01 (~8:10 PM CT) -- UPSTREAM MERGE, no deploy -- `mostgood1/WNBA-Betting#6` (PLAYER_REBOUND_CREDIT) squash-merged as `cc37d68f`
+
+Supersedes "Not upstream" in the ~7:50 PM CT rebound entry. Upstream `main` `sim/events.py` vs `vendor/wnba_betting_repo`: 6 differing lines, all the reworded market-anchor comment -- a re-pull keeps every engine switch shipped today (SHOOTER_FT_RATE, FOULED_MISS_NOT_FGA, EXACT_TARGET_CALIBRATION, TEAM_PRIOR_STACKS_ON_TARGET, TOV_PER_ATTEMPT, PLAYER_REBOUND_CREDIT). Upstream suite on the branch: 54 passed / 6 failed / 5 collection errors (6 + 5 pre-existing). Merged with `--match-head-commit 434f8889`, branch deleted.
