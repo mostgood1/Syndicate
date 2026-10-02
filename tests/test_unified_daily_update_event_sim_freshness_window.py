@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -65,7 +66,15 @@ def _run_event_sim_decision(**kwargs: object) -> str:
         return completed.stdout.strip()
 
 
-@unittest.skipUnless(shutil.which("powershell.exe") or shutil.which("powershell"), "powershell.exe not available")
+@unittest.skipUnless(
+    # Native Windows only. The harness always invokes `powershell.exe` with a
+    # path from Python's temp dir. Under WSL that name still resolves (Windows
+    # interop), but the path is a LINUX one Windows PowerShell cannot see, so
+    # `Test-Path` reports the artifact missing and the "skip rerun" case reads
+    # True -- red on the local fleet's ci-suite (2026-10-02) while correct code.
+    os.name == "nt" and bool(shutil.which("powershell.exe")),
+    "needs native Windows PowerShell on the same filesystem as Python's temp dir",
+)
 class UnifiedDailyUpdateEventSimDecisionBehaviorTests(unittest.TestCase):
     def test_matching_fingerprint_with_existing_artifact_skips_rerun(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

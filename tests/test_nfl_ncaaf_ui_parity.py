@@ -61,7 +61,18 @@ FOOTBALL_VARIANTS = ("ncaaf_main", "nfl_main")
 
 
 def _env() -> Environment:
-    return Environment(loader=FileSystemLoader(str(TEMPLATE_ROOT)), autoescape=True)
+    # The same custom filters `syndicate/app.py` registers on `app.jinja_env`. A
+    # bare Environment broke here when `_game_card_generic.html` started using
+    # `status_label` (`6fd48b7f`, 2026-10-01): the template was right, the test's
+    # environment no longer matched production's (local ci-suite, 2026-10-02).
+    from syndicate.features.shared.status_label import status_label
+    from syndicate.features.shared.timezone import central_clock, central_clock_from_epoch
+
+    env = Environment(loader=FileSystemLoader(str(TEMPLATE_ROOT)), autoescape=True)
+    env.filters["central"] = central_clock
+    env.filters["central_epoch"] = central_clock_from_epoch
+    env.filters["status_label"] = status_label
+    return env
 
 
 class _Projection:
