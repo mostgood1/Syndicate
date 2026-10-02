@@ -1420,7 +1420,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### nba-hourly-odds-failures — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
-- Goal: NBA stops failing in the hourly odds runs: the props SmartSim no longer needs LEAGUE on the vendored NBA smart_sim module (falls back to Syndicate's NBA league config), and the game-cards export runs nba_betting.cli instead of a package named after the data-root folder; verified on the fleet by the next hourly run
+- Goal: NBA stops failing in the hourly odds runs: the props SmartSim no longer needs LEAGUE on the vendored NBA smart_sim module (falls back to Syndicate's NBA league config), and the game-cards export runs nba_betting.cli instead of a package named after the data-root folder; verified on the fleet by the next hourly run — **GOAL: NOT MET** (fix 5c825580 landed; fleet ff'd to 1891b132 at 18:42Z, no restart; 7 unit tests pass, 3 fail on old code. Fleet reading owed: first hourly run after 18:45Z (~19:03Z) -- watcher bodljw2uq; deploys.md 18:42Z)
 - Files: syndicate/features/shared/basketball_props_smart_sim.py,scripts/refresh_nba_oddsapi_props.py,tests/test_nba_hourly_odds_failures.py
 - Hypothesis: n/a
 - Falsification test: n/a
