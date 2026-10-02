@@ -1202,6 +1202,14 @@ death, never life — do not invert it.
 - Verification: unit: dead pid -> note + no blocker; live pid -> blocker; table unreadable -> blocker kept; off-fleet -> blocker unchanged (never scans). Live: fleet run shows the STALE note when the latest_tick pid is dead
 - Blocked by: none
 
+### fleet-restart-onto-main-4 — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: LOCAL FLEET ~/Syndicate fast-forwarded to github/main and all three roles restarted together (drain incl. both workers' child jobs -> safety CLEAR -> down -> scheduled task up), every role code=<new HEAD>, /healthz 200, a board build completing after BOOTED; recorded in deploys.md — **GOAL: MET** (reading: status 13:37:30Z all roles `up restarts=0 code=9856dd92`; /healthz 200 13:37:25Z; BOARD_BUILD_TIMING wall_s=172.0 ok=True 13:40:38Z after BOOTED line 16042, no DEFERRED/DRAIN_HOLD/Traceback; deploys.md 2026-10-02 13:37Z. First attempt aborted safely on a stale odds pointer, fixed in lane deploy-safety-stale-odds-pointer)
+- Files: .syndicate/deploys.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: status all roles up restarts=0 code=<HEAD>; /healthz 200; BOARD_BUILD_TIMING after the latest [refresh_worker] BOOTED with no DEFERRED/DRAIN_HOLD/Traceback; deploys.md entry
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
