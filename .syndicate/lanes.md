@@ -1246,7 +1246,7 @@ death, never life — do not invert it.
 - Falsification test: H1 falsified if latest_tick.result.state ever reads a terminal state (completed/failed) for the same run_stamp without a new tick. H2 falsified if loop_status.intervalSeconds <= 90 while latest_tick.finishedAt lags > 3x interval (then the writer IS stuck).
 - Verification: Fleet: after the fix, a latest_tick whose result pid is dead reads a terminal/finished state (or carries the run's real status) within one read; unit test for the reconciliation; deploys.md READING
 - Blocked by: none
-- Status 2026-10-02 14:18Z: code landed `8e87c877` (read-side `reconcile_tick_result` + endpoint), 6 tests; H1 and H2 CONFIRMED on the fleet (log/2026-10-02.md); web HUP'd onto it 14:15Z (deploys.md). OWED: the READING -- a served tick whose launched run has exited must show its terminal state; no launching tick has occurred since the HUP (last tick 14:11Z was skipped).
+- Status 2026-10-02 14:18Z: code landed `8e87c877` (read-side `reconcile_tick_result` + endpoint), 6 tests; H1 and H2 CONFIRMED on the fleet (log/2026-10-02.md); web HUP'd onto it 14:15Z (deploys.md). OWED: the READING -- a served tick whose launched run has exited must show its terminal state; no launching tick has occurred since the HUP (ticks at 14:11Z and 14:28Z were both skipped pregame ticks; watcher bh1t81li1 runs to ~14:56Z).
 
 ### local-prod-watchdog — OPEN — opened 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
 - Goal: A health watchdog checks the local production fleet every 5 minutes (supervisor, roles, healthz, log heartbeats, scheduled jobs, backup age, disk) and raises a Windows notification on a new problem, every 6 h while it persists, and on recovery; WSL itself unreachable also alerts
