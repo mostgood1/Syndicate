@@ -1139,6 +1139,12 @@ death, never life — do not invert it.
 - Hypothesis: Following NHL (no skater market beats its own average) and NFL's 09-28 findings (prop spread 0.21-0.65x plausible, distribution-family problem; per-market k refuted), no NFL continuous prop market beats BOTH the player's as-of average and the de-vigged book, and no NFL game-line market (margin, total, moneyline) beats the de-vigged close; Anytime TD is the only prop candidate
 - Falsification test: Any market whose dMAE vs baseline CI lies wholly below 0 AND whose Brier vs the de-vigged book is lower with a paired game-clustered CI excluding 0 refutes it for that market
 - Verification: The backtest runs end-to-end on fleet (production) inputs plus as-of rebuilds, prints per-family coverage + intersection, writes per-market tables for 2026 in-season and 2022-2025 separately; numbers recorded in the findings file and this lane
+### nba-lines-props-backtest — OPEN — opened 2026-10-02 — session e0a3e383-4fa1-4669-8740-c9a46b681c7a
+- Goal: Measured as-of backtest of NBA game lines (margin/total/ML + segment lines if priced) and every PRICED NBA player-prop market vs actuals, the player's own as-of average and the de-vigged book, with n/MAE/bias/dMAE bootstrap CI/Brier/log-loss per market, ending in a 2026-27 gate list (probability/edge vs mean-only)
+- Files: scripts/backtest_nba_lines_props.py (NEW), tests/test_backtest_nba_lines_props.py (NEW), .syndicate/findings_2026-10-02_nba_lines_props_backtest.md (NEW)
+- Hypothesis: As NHL: no NBA prop market beats the player's own as-of average AND the de-vigged book, so MEASURED markets stay empty; game lines unknown
+- Falsification test: A market whose dMAE CI vs the as-of average is entirely below 0 AND whose Brier/log-loss beats the de-vigged book on the same rows
+- Verification: Findings file with per-family date coverage + intersection, per-market n/MAE/bias/dMAE CI/Brier/log-loss, data substrate named (fleet vs checkout), and the gate list; no board change without user decision
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
