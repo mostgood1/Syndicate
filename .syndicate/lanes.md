@@ -1246,7 +1246,7 @@ death, never life — do not invert it.
 - Falsification test: H1 falsified if latest_tick.result.state ever reads a terminal state (completed/failed) for the same run_stamp without a new tick. H2 falsified if loop_status.intervalSeconds <= 90 while latest_tick.finishedAt lags > 3x interval (then the writer IS stuck).
 - Verification: Fleet: after the fix, a latest_tick whose result pid is dead reads a terminal/finished state (or carries the run's real status) within one read; unit test for the reconciliation; deploys.md READING
 - Blocked by: none
-- Status 2026-10-02: code landed (read-side `reconcile_tick_result` + endpoint), 6 tests; H1 and H2 CONFIRMED on the fleet (see log/2026-10-02.md). OWED: fleet READING once web loads it.
+- Status 2026-10-02 14:18Z: code landed `8e87c877` (read-side `reconcile_tick_result` + endpoint), 6 tests; H1 and H2 CONFIRMED on the fleet (log/2026-10-02.md); web HUP'd onto it 14:15Z (deploys.md). OWED: the READING -- a served tick whose launched run has exited must show its terminal state; no launching tick has occurred since the HUP (last tick 14:11Z was skipped).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
