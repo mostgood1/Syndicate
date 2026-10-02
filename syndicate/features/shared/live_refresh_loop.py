@@ -4052,6 +4052,25 @@ def _off_hours_gate_blocks_launch(*, now_epoch: float, any_live: bool | None, da
 	"""
 	if any_live is not False:
 		return False
+	# A sport whose OWN pregame interval has elapsed is not blocked by another
+	# sport's recent sweep. This ceiling is GLOBAL -- any launch resets it -- so
+	# with the tick following per-sport due times, an NHL sweep 10 min ago would
+	# otherwise hold a due NFL sweep for up to 15 min more. The storm bound is
+	# kept by the per-sport markers: a sport counts as due at most once per its
+	# own interval, and only under `_pregame_sports_due_in_seconds`' strict rules.
+	if _pregame_tick_follows_due_enabled():
+		try:
+			due_now = sorted(
+				sport for sport, due_in in _pregame_sports_due_in_seconds(now_epoch=now_epoch).items() if due_in <= 0
+			)
+		except Exception:
+			due_now = []
+		if due_now:
+			print(
+				f"[live_refresh_loop] OFF_HOURS_GATE_BYPASSED_SPORT_DUE sports={','.join(due_now)}",
+				flush=True,
+			)
+			return False
 	resolved_date = date_str or central_today_iso()
 	game_day = _any_tracked_sport_has_upcoming_game(resolved_date, now_epoch=now_epoch)
 	ceiling = _off_hours_game_day_max_staleness_seconds() if game_day else _off_hours_max_staleness_seconds()
@@ -5370,6 +5389,95 @@ def _apply_pregame_sport_cadence(
 	return kept, skipped
 
 
+def _pregame_tick_follows_due_enabled() -> bool:
+	"""On unless `SYNDICATE_PREGAME_TICK_FOLLOWS_DUE` is explicitly off. See below."""
+	return _env_bool("SYNDICATE_PREGAME_TICK_FOLLOWS_DUE", default=True)
+
+
+def _pregame_sports_due_in_seconds(*, now_epoch: float) -> dict[str, float]:
+	"""Seconds until each sport's own pregame sweep is due (<= 0: due now).
+
+	WHY THIS EXISTS (lane `layer2-freshness-1h`, 2026-10-02, user decision
+	"1h last-polled freshness across all sports"). With nothing live the loop
+	sleeps the IDLE interval (900s) after every tick, so a sport's per-sport
+	interval was only CHECKED every ~16 min: any interval between 16 and 32 min
+	fired at ~32. Measured on the fleet that evening: NFL/NCAAF set to 1800s
+	ticked at 19:34, 19:50, 20:06Z and the board's oldest NFL/NCAAF/WNBA rows
+	peaked at 59-60 min against a 60-min rule; a 1500s setting would have changed
+	nothing. The idle wait and the off-hours gate now consult this.
+
+	STRICT ON PURPOSE, unlike `_apply_pregame_sport_cadence`, which fails OPEN
+	(no checker, unreadable liveness, no marker -> sweep). Fail-open there means
+	"sweep anyway"; here it would mean "wake up and override the off-hours gate"
+	on every tick -- a storm. So only a sport with a liveness checker that says
+	NOT live, a stamped marker, and a positive interval is counted. League-scoped
+	sports (soccer) decide per league and are left to the normal idle tick.
+	"""
+	try:
+		configured = _live_refresh_loop_sports()
+		tracked = (
+			[item.strip().lower() for item in configured.split(",") if item.strip()]
+			if configured
+			else list(_LIVE_STATUS_CHECKERS.keys())
+		)
+	except Exception:
+		return {}
+	date_str = central_today_iso()
+	markers = _read_pregame_sport_sweep_epochs()
+	out: dict[str, float] = {}
+	for sport in tracked:
+		if sport in _LEAGUE_SCOPED_SPORTS:
+			continue
+		checker = _LIVE_STATUS_CHECKERS.get(sport)
+		last_epoch = markers.get(sport, 0.0)
+		if checker is None or last_epoch <= 0.0:
+			continue
+		try:
+			if bool(checker(date_str)):
+				continue
+			interval = _pregame_sweep_interval_for_tick(sport, now_epoch=now_epoch)
+		except Exception:
+			continue
+		if interval <= 0:
+			continue
+		out[sport] = (last_epoch + float(interval)) - float(now_epoch)
+	return out
+
+
+def _pregame_idle_wait_seconds(idle_seconds: int, *, now_epoch: float) -> int:
+	"""The idle wait, cut short to wake when the next sport is due (+5s slack).
+
+	Floored at 60s -- the live interval -- so a sport due "now" whose launch was
+	refused cannot spin the loop.
+	"""
+	if not _pregame_tick_follows_due_enabled():
+		return idle_seconds
+	try:
+		due = _pregame_sports_due_in_seconds(now_epoch=now_epoch)
+	except Exception:
+		return idle_seconds
+	if not due:
+		return idle_seconds
+	soonest = min(due.values())
+	return int(max(60, min(float(idle_seconds), soonest + 5.0)))
+
+
+def _explicit_pregame_sweep_interval_seconds(sport: str) -> int | None:
+	"""The operator's `SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_<SPORT>`, or None.
+
+	Only the PER-SPORT key: the global fallback and the fixture-aware tiers are
+	defaults, not a decision about this sport.
+	"""
+	raw = str(os.environ.get(f"SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_{str(sport).strip().upper()}") or "").strip()
+	if not raw:
+		return None
+	try:
+		value = int(raw)
+	except (TypeError, ValueError):
+		return None
+	return value if value > 0 else None
+
+
 def _pregame_relaunch_blocked(*, now_epoch: float, date_str: str, sports: Any = None) -> bool:
 	"""True only when EVERY candidate sport is still inside its own cooldown.
 
@@ -5431,6 +5539,14 @@ def _pregame_relaunch_blocked(*, now_epoch: float, date_str: str, sports: Any = 
 		if sport_epoch <= 0.0:
 			sport_epoch = legacy_epoch
 		sport_cooldown = cooldown
+		# An EXPLICIT per-sport sweep interval shorter than the cooldown wins for
+		# that sport (lane `layer2-freshness-1h`, 2026-10-02): NFL/NCAAF/WNBA set
+		# to 1500s for the 1h freshness rule were otherwise held to this 1800s.
+		# The operator chose that cadence for that sport; every sport left on
+		# defaults keeps the full storm guard.
+		explicit_interval = _explicit_pregame_sweep_interval_seconds(sport)
+		if explicit_interval is not None:
+			sport_cooldown = min(sport_cooldown, explicit_interval)
 		if starting_soon_on and _slate_phase.current_phase(sport, now_epoch=now_epoch, date_str=date_str, need_live=False).phase == _slate_phase.PHASE_STARTING_SOON:
 			sport_cooldown = min(cooldown, _slate_phase.starting_soon_relaunch_cooldown_seconds())
 		if sport_epoch <= 0.0 or (now_epoch - sport_epoch) >= sport_cooldown:
@@ -6418,7 +6534,11 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 
 def _live_refresh_loop_interval_for_meta(meta: dict[str, Any]) -> int:
 	if bool(meta.get("adaptive")) and meta.get("anyLive") is not None:
-		return _live_refresh_loop_interval_seconds() if meta.get("anyLive") else _live_refresh_loop_idle_interval_seconds()
+		if meta.get("anyLive"):
+			return _live_refresh_loop_interval_seconds()
+		# Idle: wake when the next sport's own pregame interval comes due rather
+		# than a fixed 900s later. See `_pregame_sports_due_in_seconds`.
+		return _pregame_idle_wait_seconds(_live_refresh_loop_idle_interval_seconds(), now_epoch=time.time())
 	return _live_refresh_loop_interval_seconds()
 
 
