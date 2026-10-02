@@ -1335,6 +1335,15 @@ death, never life — do not invert it.
 - 8 new tests, 23 in the file, 60 across the four consumer files. **Falsification checked: 6 of the new tests FAIL against the pre-fix contract** — a test that cannot fail against the bug it was written for proves nothing.
 - Note on my own process: my first version of the headline test asserted `all_defects(matrix) == []`, which was asserting the FIXTURE (the nfl stub supplies only `game_rows_*`, so nfl's other cells are legitimately not_reported). Narrowed to the mlb prefix. Same over-assertion I made in `layer2-window-merge-counters`.
 - Blocked by: none
+
+### fleet-restart-onto-main-5 — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: LOCAL FLEET ~/Syndicate fast-forwarded to github/main and all three roles restarted together (drain incl. both workers' child jobs -> safety CLEAR -> down -> scheduled task up), every role code=<new HEAD>, /healthz 200, a board build completing after BOOTED; recorded in deploys.md — **GOAL: DRIFTED** (user decision: hold. The only runtime change a restart would ship is open lane layer2-freshness-1h's 5c1b1bf2, mid-verification; owner local_12852f6a messaged with the facts instead. Leads in log/2026-10-02.md; no lane opened for them)
+- Files: .syndicate/deploys.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: status all roles up restarts=0 code=<HEAD>; /healthz 200; BOARD_BUILD_TIMING after the latest [refresh_worker] BOOTED with no DEFERRED/DRAIN_HOLD/Traceback; deploys.md entry
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
