@@ -462,3 +462,69 @@ def test_default_backup_dirs(settings, monkeypatch):
     assert lp.default_backup_dir(settings, {}) == settings.home.parent / f"{settings.home.name}-backup"
     assert lp.default_backup_dir(settings, {"SYNDICATE_LOCAL_BACKUP_DIR": "/x"}) == Path("/x")
     assert lp.default_offdisk_dir({"SYNDICATE_LOCAL_BACKUP_OFFDISK_DIR": "/y"}) == Path("/y")
+
+
+# --- `status` stale flag: runtime diff, not commit stamp (lane local-prod-stale-flag) --
+
+
+@pytest.fixture()
+def git_repo(tmp_path, monkeypatch):
+    import subprocess
+
+    base = tmp_path.resolve()
+    (base / "gitconfig").write_text("")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(base / "gitconfig"))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    for key in ("GIT_AUTHOR", "GIT_COMMITTER"):
+        monkeypatch.setenv(f"{key}_NAME", "test")
+        monkeypatch.setenv(f"{key}_EMAIL", "test@example.invalid")
+    repo = base / "repo"
+    repo.mkdir()
+
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, text=True).stdout.strip()
+
+    def commit(path: str, text: str) -> str:
+        target = repo / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+        git("add", path)
+        git("commit", "-q", "-m", path)
+        return git("rev-parse", "HEAD")
+
+    git("init", "-q")
+    return repo, commit
+
+
+def test_a_ledger_only_gap_is_not_stale(git_repo):
+    repo, commit = git_repo
+    loaded = commit("syndicate/app.py", "v1\n")
+    head = commit(".syndicate/deploys.md", "entry\n")
+    commit("docs/runbook.md", "x\n")
+    head = commit("tests/test_x.py", "x\n")
+    assert lp.runtime_files_between(loaded, head, repo) == []
+    note = lp.code_stamp_note(loaded, head, diff=lambda a, b: lp.runtime_files_between(a, b, repo))
+    assert "nothing to load" in note and "STALE" not in note
+
+
+def test_a_code_gap_is_stale_and_counted(git_repo):
+    repo, commit = git_repo
+    loaded = commit("syndicate/app.py", "v1\n")
+    commit(".syndicate/deploys.md", "entry\n")
+    head = commit("syndicate/app.py", "v2\n")
+    assert lp.runtime_files_between(loaded, head, repo) == ["syndicate/app.py"]
+    note = lp.code_stamp_note(loaded, head, diff=lambda a, b: lp.runtime_files_between(a, b, repo))
+    assert "STALE -- 1 runtime file(s) changed" in note
+
+
+def test_an_undiffable_commit_reads_stale_not_current(git_repo):
+    # Unknown must not take the permissive branch.
+    repo, commit = git_repo
+    head = commit("syndicate/app.py", "v1\n")
+    assert lp.runtime_files_between("0" * 40, head, repo) is None
+    note = lp.code_stamp_note("0" * 40, head, diff=lambda a, b: lp.runtime_files_between(a, b, repo))
+    assert "STALE?" in note and "treat as stale" in note
+
+
+def test_same_commit_has_no_note():
+    assert lp.code_stamp_note("abc", "abc") == ""

@@ -1210,6 +1210,15 @@ death, never life — do not invert it.
 - Verification: status all roles up restarts=0 code=<HEAD>; /healthz 200; BOARD_BUILD_TIMING after the latest [refresh_worker] BOOTED with no DEFERRED/DRAIN_HOLD/Traceback; deploys.md entry
 - Blocked by: none
 
+### local-prod-stale-flag — CLOSED 2026-10-02 — opened 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+- Goal (verbatim): local_production.py status flags a role STALE only when runtime code differs between its loaded commit and HEAD; a ledger/docs/tests-only gap reads as current, and an undeterminable diff still reads STALE -- **GOAL: MET.** Reading: on the fleet's `~/Syndicate` (roles `9856dd92`, HEAD `82bd182e`, one ledger commit between) the old rule printed `STALE`, the new one `ledger/docs/tests only -- nothing to load`; control `869c4999`->HEAD still `STALE -- 73 runtime file(s) changed`. 4 new tests over a temp git repo (ledger gap, code gap, undiffable commit -> STALE?, same commit); tests/test_local_production.py 34 passed / 1 skip (rsync, Windows).
+- Goal: local_production.py status flags a role STALE only when runtime code differs between its loaded commit and HEAD; a ledger/docs/tests-only gap reads as current, and an undeterminable diff still reads STALE
+- Files: scripts/local_production.py, tests/test_local_production.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit tests over a temp git repo (ledger-only gap -> not stale, code gap -> stale, unknown commit -> stale); on the fleet, status at 82bd182e vs roles at 9856dd92 no longer prints STALE
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

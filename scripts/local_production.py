@@ -1492,6 +1492,44 @@ def role_loaded_commit(pid: int | None) -> str | None:
         return None
 
 
+# Paths no role imports or reads at runtime: a gap made only of these leaves a
+# role's loaded code identical to HEAD's.
+NON_RUNTIME_PATHSPECS = (":!.syndicate", ":!docs", ":!tests", ":!reports", ":!data", ":!*.md")
+
+
+def runtime_files_between(old: str, new: str, repo: Path = REPO_ROOT) -> list[str] | None:
+    """Files that differ between two commits and could change what a role runs.
+
+    None when git cannot answer (unknown commit, shallow clone, no git): the
+    caller must treat that as STALE, never as current."""
+    try:
+        out = subprocess.run(
+            ["git", "diff", "--name-only", old, new, "--", ".", *NON_RUNTIME_PATHSPECS],
+            cwd=str(repo), capture_output=True, text=True, timeout=30,
+        )
+    except Exception:
+        return None
+    if out.returncode != 0:
+        return None
+    return [line for line in out.stdout.splitlines() if line.strip()]
+
+
+def code_stamp_note(loaded: str, head: str, *, diff=runtime_files_between) -> str:
+    """The `status` suffix for a role spawned on `loaded` while the checkout is at `head`.
+
+    A commit-stamp comparison alone called every role STALE after a ledger-only
+    fast-forward (2026-10-02: roles on `9856dd92`, HEAD `82bd182e`, one ledger
+    commit between). Only a RUNTIME difference needs a restart."""
+    if not loaded or not head or loaded == head:
+        return ""
+    files = diff(loaded, head)
+    if files is None:
+        return f" (HEAD {head[:8]}: STALE? cannot diff {loaded[:8]}..{head[:8]} -- treat as stale)"
+    if not files:
+        return f" (HEAD {head[:8]}: ledger/docs/tests only -- nothing to load)"
+    return f" (HEAD {head[:8]}: STALE -- {len(files)} runtime file(s) changed; restart the role to load HEAD)"
+
+
 def _tail(path: Path, lines: int) -> list[str]:
     if lines <= 0 or not path.is_file():
         return []
@@ -1530,7 +1568,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         loaded = role_loaded_commit(pid) or ""
         code = ""
         if loaded:
-            code = f"  code={loaded[:8]}" + ("" if loaded == head else f" (HEAD {head[:8]}: STALE -- restart the role to load HEAD)")
+            code = f"  code={loaded[:8]}" + code_stamp_note(loaded, head)
         print(f"  {name:17} pid={pid} {'up' if alive else 'DOWN'}  rss={rss}" + (f" (Render plan {cap} MB)" if cap else "")
               + f"  restarts={(info.get('restarts') or {}).get(name, 0)}" + code)
     port = int(info.get("port") or settings.port)
