@@ -1275,7 +1275,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### wnba-odds-run-failures — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
-- Goal: WNBA odds-refresh runs stop failing on the post-refresh IndexError (build_recommendation_output returns the row unchanged when ranking filters it out), and a failed step's stderr_tail no longer loses its error line to LIST_MEMORY/DATAFRAME_MEMORY dumps; verified on the fleet after a restart — **GOAL: NOT MET** (code shipped and on the fleet; the fleet reading is still owed: watcher b2l9545s6 verdict at 2026-10-03T03:45Z (10:45 PM CT) over WNBA runs after 20261002_144925, baseline 0/65 ok; as of 17:58Z no new WNBA run seen)
+- Goal: WNBA odds-refresh runs stop failing on the post-refresh IndexError (build_recommendation_output returns the row unchanged when ranking filters it out), and a failed step's stderr_tail no longer loses its error line to LIST_MEMORY/DATAFRAME_MEMORY dumps; verified on the fleet after a restart — **GOAL: NOT MET** (interim 18:15Z: WNBA ok in 8/8 runs since the fix vs 0/65 baseline, post_refresh ok, but all pregame; live phase owed -- watcher v2 b9s8e63mp, `C:/tmp/wnba_watch_evening2.py`, VERDICT 2026-10-03T03:45Z (10:45 PM CT); v1 watcher was blind, replaced; deploys.md 18:15Z)
 - Files: syndicate/features/shared/recommendation_engine.py,syndicate/features/shared/refresh_log_tail.py,tests/test_recommendation_engine_filtered_candidate.py,tests/test_refresh_log_tail_memory_tokens.py
 - Hypothesis: n/a
 - Falsification test: n/a
