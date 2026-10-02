@@ -1418,6 +1418,14 @@ death, never life — do not invert it.
 - Verification: unit tests (row build per venue, skips, idempotency, apply needs matching count, settle_from_venue + repairs leave rebuilt rows untouched); live: dry-run result artifact reviewed with the user, then apply; ledger live-row count and per-venue P&L read back; next VENUE_SETTLEMENT shows the rows as already, settled=0, no repairs
 - Blocked by: none
 
+### nba-hourly-odds-failures — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: NBA stops failing in the hourly odds runs: the props SmartSim no longer needs LEAGUE on the vendored NBA smart_sim module (falls back to Syndicate's NBA league config), and the game-cards export runs nba_betting.cli instead of a package named after the data-root folder; verified on the fleet by the next hourly run
+- Files: syndicate/features/shared/basketball_props_smart_sim.py,scripts/refresh_nba_oddsapi_props.py,tests/test_nba_hourly_odds_failures.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: _derive_sim_minutes_local and _apply_player_priors_local run against a module without LEAGUE (NBA 240 min) and still prefer the module's LEAGUE when present; the game-cards subprocess is invoked as nba_betting.cli with cwd vendor/nba_betting_repo for a data-root source_root. Fleet: after ff, the next hourly run shows nba ok=true, smart_sim_2026-10-03_TOR_MIA.json and game_cards_2026-10-03.csv written
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
