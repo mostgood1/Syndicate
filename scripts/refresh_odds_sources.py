@@ -1554,6 +1554,66 @@ _SOCCER_PLAYER_REFRESH_DAYS = 1.0
 _SOCCER_PLAYER_ESPN_MIN_SEASON_DAYS = 21
 
 
+def _soccer_schedule_full_rebuild_seconds() -> float:
+    """How old the last FULL-season schedule build may get before the next run
+    rebuilds it. `SYNDICATE_SOCCER_SCHEDULE_FULL_REBUILD_SECONDS`, default 6h;
+    0 restores a full build on every run.
+    """
+    raw = str(os.environ.get("SYNDICATE_SOCCER_SCHEDULE_FULL_REBUILD_SECONDS") or "").strip()
+    try:
+        value = float(raw) if raw else 21600.0
+    except ValueError:
+        value = 21600.0
+    return max(0.0, value)
+
+
+def _soccer_schedule_full_age_seconds(league: str, soccer_root: Path) -> float | None:
+    """Seconds since this league's last FULL schedule build; None when unknown."""
+    try:
+        season = int(soccer_default_season(league))
+        path = soccer_root / league / "api" / "schedule" / f"schedule_{season}.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        stamp = payload.get("full_generated_at") if isinstance(payload, dict) else None
+        if not stamp:
+            # Written before near mode existed: every build then was full.
+            stamp = payload.get("generated_at") if isinstance(payload, dict) else None
+        built = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+        if built.tzinfo is None:
+            built = built.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - built).total_seconds()
+    except Exception:
+        return None
+
+
+def _soccer_schedule_step(league: str, soccer_root: Path, python_exe: str) -> RefreshStep:
+    """FULL season while the last full build is stale or unknown, else `--near`.
+
+    Lane `layer2-freshness-1h`, 2026-10-02: schedule steps were 1,327 of a soccer
+    pregame run's 1,416 seconds (every league's full season, ~15 ESPN windows
+    each, on every run) against 11s of odds -- see `build_soccer_schedule.py`.
+    The near window refetches what a match day changes (status, scores) in one
+    window; a full rebuild still runs every `_soccer_schedule_full_rebuild_seconds`.
+    Unknown age (no file, unreadable, unparseable stamp) is a FULL build: never
+    let an unreadable file stretch the gap between full rebuilds.
+    """
+    command = [python_exe, "scripts/build_soccer_schedule.py", "--league", league, "--out-root", str(soccer_root)]
+    ceiling = _soccer_schedule_full_rebuild_seconds()
+    age = _soccer_schedule_full_age_seconds(league, soccer_root) if ceiling > 0 else None
+    near = age is not None and age < ceiling
+    if near:
+        command.append("--near")
+    return RefreshStep(
+        name=f"soccer_{league}_schedule",
+        phases=("pregame",),
+        cwd=REPO_ROOT,
+        command=tuple(command),
+        description=(
+            f"Refresh {league} ESPN schedule/fixture artifact "
+            + ("(near window, merged)." if near else "(full season).")
+        ),
+    )
+
+
 def _soccer_players_step(league: str, soccer_root: Path, python_exe: str) -> RefreshStep | None:
     """Refetch this league's CURRENT-season player rates once they go stale.
 
@@ -1841,22 +1901,7 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
         if players_step is not None:
             steps.append(players_step)
     for league in league_slugs:
-        steps.append(
-            RefreshStep(
-                name=f"soccer_{league}_schedule",
-                phases=("pregame",),
-                cwd=REPO_ROOT,
-                command=(
-                    python_exe,
-                    "scripts/build_soccer_schedule.py",
-                    "--league",
-                    league,
-                    "--out-root",
-                    str(soccer_root),
-                ),
-                description=f"Refresh {league} ESPN schedule/fixture artifact.",
-            )
-        )
+        steps.append(_soccer_schedule_step(league, soccer_root, python_exe))
     # CAPTURE BEFORE SIMULATE (`#433`). These two loops used to sit AFTER the
     # `artifacts` sim loop below, and that ordering was silently costing three
     # leagues their odds entirely.
