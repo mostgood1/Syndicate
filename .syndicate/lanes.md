@@ -1109,8 +1109,8 @@ death, never life — do not invert it.
 - Verification: On the fleet: props_recommendations_<date>.csv non-empty for the current slate, and /api/board/layer2-shortlist per_sport_ingest.nhl.enrichment.projections.prop_rows_with_projection > 0; backtest report with per-market n, MAE/bias vs actual and Brier/log-loss vs the de-vigged book
 - Blocked by: none
 
-### odds-run-result-parse-logstamp — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
-- Goal: Odds run files carry the child's parsed result and failureSummary again: run_refresh_odds_job._result_payload_from_stdout strips the local fleet's per-line UTC stamp (scripts/local_logstamp) before looking for the JSON result, so a failing step is named in odds_refresh.json and ODDS_REFRESH_FAILURE_SUMMARY is logged
+### odds-run-result-parse-logstamp — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: Odds run files carry the child's parsed result and failureSummary again: run_refresh_odds_job._result_payload_from_stdout strips the local fleet's per-line UTC stamp (scripts/local_logstamp) before looking for the JSON result, so a failing step is named in odds_refresh.json and ODDS_REFRESH_FAILURE_SUMMARY is logged — **GOAL: MET** (1d0cee45 on the fleet 21:29Z; first run after, 20261002_213052, wrote the parsed result -- `results`/`phase`/`sports`, no `stdout`. Failure shape awaits an rc!=0 run, covered by test_refresh_failure_observability; deploys.md 21:29Z)
 - Files: scripts/run_refresh_odds_job.py (_result_payload_from_stdout only),tests/test_run_refresh_odds_job_logstamp.py
 - Hypothesis: n/a
 - Falsification test: n/a
