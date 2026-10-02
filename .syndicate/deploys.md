@@ -44812,3 +44812,15 @@ Supersedes item 5 ("Not upstream") of the 2026-10-01 ~7:00 PM CT turnover entry.
 - what: `HOT_ARTIFACT_PATTERNS` gains `wnba_source/data/processed/calibration_totals_*.json` + `source_artifacts/` twin (user-approved cross-lane write into `nhl-live-resim`'s claim, recorded in its block). Render untouched (billing-suspended).
 - how: `~/Syndicate` ff `a01590bc -> 20381064` from GitHub; only runtime code in range is `artifact_publisher.py` (+8). `kill -HUP` web master 216306, workers 216318/216320 -> 226141/226142. Workers not restarted (they WRITE the file; the allowlist governs web's export/stream and cross-disk publish, which is off on one disk).
 - verify (READ, fleet token, not printed): `GET /api/ops/artifacts/stream?path=wnba_source/data/processed/calibration_totals_2026-09-30.json` **403 before the HUP -> 200 after**; `/healthz` 200. Unit: new test fails 2/3 before, passes after; `tests/test_artifact_publisher.py` 113 passed with it.
+
+## 2026-10-01 (~7:50 PM CT) -- READING, local WSL fleet on `863e9e09` (refresh subprocesses load it per run) + LVA-IND force-resimmed pregame (00:49Z, tip 01:00Z) -- WNBA PLAYER REBOUND CREDIT (lane `wnba-sim-rebound-credit`)
+
+**Cause.** The PBP loop credited a PLAYER rebound on every missed shot; real 2026 box scores credit **0.889-0.893 player rebounds per missed FG** (team rebounds and dead balls are in no player's line). Sim misses were only +3.5% on fully matched games, so the ~1.2x rebound excess was the credit. `PLAYER_REBOUND_CREDIT` keeps possession flow (OREB continuation at the team's rate) and thins only the player credit -- OREB 0.227/0.24, DREB 0.663/0.76, **fitted on May-June 2026 only** (142 games; Jul-Sep gives 0.226 / 0.667).
+
+**Out-of-sample backtest (Jul-Sep, 192 games / 3,508 player-games, paired seeds):** team REB **1.211x -> 1.073x**; REB Poisson deviance **-0.214 [CI -0.244, -0.183]**, abs error -0.200 [-0.227, -0.173] (85% of games better); BLK deviance -0.021 [-0.042, -0.001]; PTS, FGA, TOV, STL, AST unchanged. Pre-registered bound (0.95-1.05) **MISSED** -- but the credit itself now matches (sim 0.889 vs actual 0.896 player REB per miss); the remainder is extra MISSES (shot volume / make rate), not rebounding.
+
+**Live reading (LVA-IND pregame):** rebounds LVA 41.1 -> **36.6** (2026 actual 33.1/game), IND 42.6 -> **38.3** (actual 33.3); points 91.7 -> 90.7, 87.7 -> 86.3. Still ~+10-15% on this game.
+
+**Also:** `test_team_prior_does_not_stack_on_a_target_but_still_applies_without_one` no-target leg moved to 200 draws -- at 60 the +4 bound sat ~2 SE from the true +6 to +8 lift (4 runs at 200 draws) and flaked once the credit draws shifted the random stream.
+
+**Not fixed / owed:** the residual is shot volume/make rate (sim misses above actual); blocks 0.65x (constant `base_block_rate_on_2pa`); IND +2 TOV (`team_adj.tov_mult` stacking, unmeasured). **Not upstream:** `PLAYER_REBOUND_CREDIT` lives in `vendor/wnba_betting_repo/src/wnba_betting/sim/events.py`; a re-pull of `mostgood1/WNBA-Betting` reverts it.

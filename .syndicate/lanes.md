@@ -1022,7 +1022,8 @@ death, never life — do not invert it.
 - Verification: unit tests for job schedule/rotation/backup/AOF; on the fleet: redis CONFIG GET appendonly=yes, a backup snapshot present with file count matching the data root, status shows all roles on HEAD, each new job run once with rc recorded
 - Blocked by: none
 
-### wnba-sim-rebound-credit — OPEN — opened 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+### wnba-sim-rebound-credit — CLOSED — opened 2026-10-01, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- **GOAL: PARTIALLY MET.** R1 CONFIRMED (`863e9e09`): credit per miss now 0.889 vs actual 0.896; REB deviance -0.214 [CI -0.244, -0.183] out of sample. Team REB 1.211x -> 1.073x -- the 0.95-1.05 bound is MISSED; the rest is extra misses, not credit. Live LVA 41.1 -> 36.6, IND 42.6 -> 38.3 (actual ~33). Vendor change not upstream. (`deploys.md` 2026-10-01 ~7:50 PM CT). Claims RELEASED.
 - Goal: WNBA sim player rebounds match actual (component backtest 1.21x; live LVA-IND 41-43 per team vs ~33.5)
 - Files: vendor/wnba_betting_repo/src/wnba_betting/sim/events.py,tests/test_basketball_sim_rebound_credit.py
 - Hypothesis: (R1) The PBP loop credits a PLAYER rebound on every missed FG; real box scores credit 0.893 player rebounds per missed FG (Jul-Sep 2026: OREB 0.226 per own miss, DREB 0.667 per opponent miss -- the rest are team rebounds / dead balls). Sim misses are now only +3.5% (FG% .454 vs .456), so the excess (~+20%) is the credit. Fix: keep possession flow (OREB continuation at the existing rate) but credit the player only with probability = real player-OREB / continuation and real player-DREB / defensive-rebound share, constants fitted on May-June 2026 only.
