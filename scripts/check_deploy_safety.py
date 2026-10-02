@@ -292,9 +292,120 @@ def _expected_build_seconds(key: str) -> float | None:
     return _NO_REAL_BUILD_FALLBACK_SECONDS
 
 
-def board_build_state() -> tuple[bool | None, dict[str, Any]]:
+# --- local fleet board build -----------------------------------------------
+#
+# RENDER IS BILLING-SUSPENDED (2026-09-30) AND ITS LOGS API SEES NOTHING FROM THE
+# LOCAL WSL FLEET, so against http://127.0.0.1:10000 the Render path above read
+# "no BUILD_SPAN_ENTER in the lookback window" on EVERY run and this script could
+# never return CLEAR (measured 2026-10-01, lane `deploy-safety-fleet-logs`).
+# The fleet's refresh-worker writes the same markers to
+# `<home>/logs/refresh-worker.log` (`scripts/local_production.py`), with two
+# differences that change the predicate:
+#
+#   * NO LOG TIMESTAMPS. The supervisor appends raw stdout; the only ISO stamps
+#     in the file are game times. So "newest enter vs newest done" is decided by
+#     LINE ORDER in one append-only file instead of by time, and there is no
+#     build age / time-remaining estimate.
+#   * NO `COLLECT_SPAN_EXIT` (0 of ~100k lines, measured 2026-10-01). The build
+#     duration comes from `BOARD_BUILD_TIMING wall_s=`, which is the WHOLE build
+#     -- the quantity "how long might I wait" actually asks about.
+#
+# Measured order of one build: ENTER pull_hot_artifacts ... ENTER
+# portfolio_commit, EXIT portfolio_commit, then BOARD_BUILD_TIMING last. A role
+# killed mid-build leaves its ENTER as the last marker until the next build
+# completes, so that window reads IN FLIGHT -- conservative, and it clears on its
+# own within one build cycle.
+_FLEET_LOG_TAIL_BYTES = 16 * 1024 * 1024
+_FLEET_LOG_DEFAULT = "~/syndicate-prod/logs/refresh-worker.log"
+_FLEET_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+
+def _is_fleet_base_url(base_url: str | None) -> bool:
+    """True for a local-development host, i.e. the WSL fleet rather than Render."""
+    import urllib.parse
+
+    host = (urllib.parse.urlsplit(str(base_url or "")).hostname or "").lower()
+    return host in _FLEET_HOSTS or host.endswith(".localhost")
+
+
+def _fleet_log_tail(max_bytes: int = _FLEET_LOG_TAIL_BYTES) -> list[str]:
+    """The last `max_bytes` of the fleet refresh-worker log, as lines.
+
+    `SYNDICATE_FLEET_REFRESH_LOG` overrides the path. On Linux (run inside WSL)
+    the file is read directly; on Windows a POSIX path is read through `wsl`.
+    """
+    import subprocess
+
+    path = str(os.environ.get("SYNDICATE_FLEET_REFRESH_LOG") or "").strip()
+    if not path and sys.platform.startswith("linux"):
+        home = str(os.environ.get("SYNDICATE_LOCAL_HOME") or "").strip() or "~/syndicate-prod"
+        path = f"{home}/logs/refresh-worker.log"
+    path = path or _FLEET_LOG_DEFAULT
+    if sys.platform.startswith("win") and path.startswith(("/", "~")):
+        done = subprocess.run(
+            ["wsl", "--", "bash", "-c", f'tail -c {int(max_bytes)} {path}'],
+            capture_output=True, timeout=60,
+        )
+        if done.returncode != 0:
+            raise RuntimeError(f"wsl tail rc={done.returncode}: {done.stderr.decode('utf-8', 'replace').strip()[:200]}")
+        data = done.stdout
+    else:
+        file_path = Path(os.path.expanduser(path))
+        with file_path.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            handle.seek(max(0, handle.tell() - int(max_bytes)))
+            data = handle.read()
+    return data.decode("utf-8", errors="replace").splitlines()
+
+
+def _fleet_board_build_state(lines: list[str]) -> tuple[bool | None, dict[str, Any]]:
+    """`board_build_state` for the fleet: line order instead of timestamps."""
+    import re
+
+    facts: dict[str, Any] = {"log_source": "fleet refresh-worker.log"}
+    last_enter = last_done = -1
+    enter_stage = ""
+    walls: list[float] = []
+    for index, line in enumerate(lines):
+        if "BUILD_SPAN_ENTER" in line:
+            last_enter = index
+            match = re.search(r"stage=(\S+)", line)
+            enter_stage = match.group(1) if match else ""
+        elif "BOARD_BUILD_TIMING" in line:
+            last_done = index
+            match = re.search(r"wall_s=([0-9.]+)", line)
+            if match:
+                walls.append(float(match.group(1)))
+    real = [value for value in walls[-12:] if value >= _MIN_REAL_BUILD_SECONDS]
+    if real:
+        facts["typical_build_seconds"] = int(max(real))
+        facts["typical_build_minutes"] = round(max(real) / 60.0, 1)
+    if last_enter < 0:
+        facts["reason"] = f"no BUILD_SPAN_ENTER in the last {_FLEET_LOG_TAIL_BYTES // (1024 * 1024)}MB of the fleet log"
+        return None, facts
+    in_flight = last_enter > last_done
+    # No log clock, so the fields the Render path fills with times say where in
+    # the log instead -- and never pretend to be a time.
+    facts["newest_build_start"] = f"stage={enter_stage}, {len(lines) - 1 - last_enter} log lines ago"
+    facts["newest_build_complete"] = (
+        f"{len(lines) - 1 - last_done} log lines ago" if last_done >= 0 else "(none in tail)"
+    )
+    return in_flight, facts
+
+
+def board_build_state(base_url: str | None = None) -> tuple[bool | None, dict[str, Any]]:
     """(in_flight, facts). None means UNKNOWN, which callers must treat as a
-    BLOCK -- an unreadable log is not evidence of a quiet worker."""
+    BLOCK -- an unreadable log is not evidence of a quiet worker.
+
+    `base_url` on a local host reads the WSL fleet's log; anything else,
+    including no argument (`deploy_preflight`'s call), reads Render's logs API.
+    """
+    if _is_fleet_base_url(base_url):
+        try:
+            lines = _fleet_log_tail()
+        except Exception as exc:
+            return None, {"log_source": "fleet refresh-worker.log", "reason": f"{type(exc).__name__}: {exc}"}
+        return _fleet_board_build_state(lines)
     facts: dict[str, Any] = {}
     key = _load_render_key()
     if not key:
@@ -561,7 +672,7 @@ def main() -> int:
     # unreadable log is not evidence of a quiet worker, and this script already
     # produced one bad window tonight by letting an unreadable state read as
     # benign.
-    build_in_flight, build_facts = board_build_state()
+    build_in_flight, build_facts = board_build_state(args.base_url)
     if build_in_flight is None:
         blockers.append(
             f"Board build state UNKNOWN ({build_facts.get('reason')}) -- "

@@ -1042,6 +1042,15 @@ death, never life — do not invert it.
 - Skipped, CLAIMED by OPEN lanes (still hard-code Render; listed as `pending:` in tests/test_base_url.py ALLOWED -- convert and delete the entry when the lane closes): scripts/board_delivery_probe.py (nhl-board-rows-missing), scripts/bucket_search.py (accuracy-assessment-0914), scripts/build_wnba_boxscores.py (restore-measurement), scripts/check_e2e_coverage.py (e2e-coverage-contract), scripts/controlled_transfer_probe.py (bandwidth-controlled-transfer), scripts/grade_wnba_live_prop_projection.py (live-props-model-probability), scripts/publish_sim_input_reports.py (local-prod-gap-fixes), scripts/regrade_mlb_game_markets.py (dh-grading-ledger-joins).
 - Deliberately NOT converted: scripts/deploy_preflight.py (Render-deploy gate; generic SYNDICATE_BASE_URL must not repoint half its comparison -- keeps its own SYNDICATE_DIAG_BASE_URL), scripts/watch_unknown_submit.ps1 (PowerShell; resolver is Python -- pass -BaseUrl). Prose-only mentions (docstrings/comments/a 502 message) left as is.
 
+### deploy-safety-fleet-logs — CLOSED — opened 2026-10-01 — closed 2026-10-01 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: check_deploy_safety.py run against the local fleet reads the board-build state from the fleet's refresh-worker log instead of Render's logs API, so it can return CLEAR there; Render behaviour (and deploy_preflight's call) unchanged — **GOAL: MET** (reading: live run vs http://127.0.0.1:10000 returned CLEAR rc=0 with 'Board build idle (last completed 419 log lines ago), ~6.3min', then 45 s later 'Board build IN FLIGHT (stage=layer2_shortlist_build)' rc=1, matching the raw log tail; no-arg board_build_state() still takes the Render arm (test))
+- Files: scripts/check_deploy_safety.py,tests/test_check_deploy_safety_fleet_logs.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit tests over synthetic log tails (in-flight / complete / no-enter); live run against http://127.0.0.1:10000 shows a board-build verdict that is not 'UNKNOWN (no BUILD_SPAN_ENTER)'; deploy_preflight path still calls Render
+- Blocked by: none
+- Limits: fleet log has no timestamps, so no build age / time-remaining; a role killed mid-build reads IN FLIGHT until the next build completes (conservative). `--drain` still sizes its TTL from Render (`_expected_build_seconds`) -> floored at the module default on the fleet.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
