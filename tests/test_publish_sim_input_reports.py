@@ -144,6 +144,27 @@ def test_no_pull_with_no_inputs_still_refuses_and_needs_no_token(module, tmp_pat
     assert module.main() == 4
 
 
+def test_no_pull_still_has_each_checklist_write_its_report(module, tmp_path, monkeypatch):
+    """A checklist's `--publish` writes the report FILE; skipping it under
+    `--no-pull` left every report MISSING on the fleet (2026-10-02, rc=5)."""
+    import types
+
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    monkeypatch.setattr(module, "_token", lambda: "")
+    monkeypatch.setattr(module, "_count_local_inputs", lambda: 3)
+    seen = []
+
+    def fake_run(cmd, **kwargs):
+        seen.append(cmd)
+        return types.SimpleNamespace(returncode=1, stdout="", stderr="")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    monkeypatch.setattr(sys, "argv", ["publish_sim_input_reports.py", "--no-pull"])
+    module.main()
+    assert len(seen) == len(module.CHECKS)
+    assert all(cmd[-1] == "--publish" for cmd in seen)
+
+
 def test_pull_path_still_requires_a_token(module, monkeypatch):
     monkeypatch.setattr(module, "_token", lambda: "")
     monkeypatch.setattr(sys, "argv", ["publish_sim_input_reports.py"])

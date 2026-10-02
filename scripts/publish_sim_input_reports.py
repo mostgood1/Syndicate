@@ -314,10 +314,16 @@ def main() -> int:
 
     rc_overall = 0
     published: list[str] = []
+    # A checklist's own `--publish` only WRITES its report into the data root;
+    # the HTTP publish to web is `_publish` below. On the single shared disk
+    # (`--no-pull`) the data root IS what production reads, so the reports must
+    # still be written. Measured 2026-10-02: without this every report was
+    # MISSING (rc=5) while all five checklists had run.
+    write_reports = args.publish or args.no_pull
     for label, script, rels in CHECKS:
         print(f"=== {label} ===", flush=True)
         proc = subprocess.run(
-            [sys.executable, f"scripts/{script}"] + (["--publish"] if args.publish else []),
+            [sys.executable, f"scripts/{script}"] + (["--publish"] if write_reports else []),
             cwd=REPO_ROOT, capture_output=True, text=True)
         for line in (proc.stdout or "").strip().splitlines()[-6:]:
             print("   " + line[:220])
