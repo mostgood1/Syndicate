@@ -1239,6 +1239,15 @@ death, never life — do not invert it.
 - Verification: tests/test_local_production.py passes and asserts the new label
 - Blocked by: none
 
+### live-odds-latest-tick-stale — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: /api/ops/live-refresh/state latest_tick.result no longer reports state=running for an odds-refresh run whose process has exited (measured on the fleet), without changing what a tick launches
+- Files: syndicate/features/shared/live_refresh_loop.py,syndicate/blueprints/ops.py,tests/test_live_refresh_latest_tick_status.py
+- Hypothesis: H1: latest_tick.result is the LAUNCH-TIME snapshot (state=running, pid) written once at tick end; nothing rewrites it when that run exits. H2: idle-time tick interval is long (minutes), so the snapshot outlives its process for most of each interval. Stale = H1 x H2, not a stuck writer.
+- Falsification test: H1 falsified if latest_tick.result.state ever reads a terminal state (completed/failed) for the same run_stamp without a new tick. H2 falsified if loop_status.intervalSeconds <= 90 while latest_tick.finishedAt lags > 3x interval (then the writer IS stuck).
+- Verification: Fleet: after the fix, a latest_tick whose result pid is dead reads a terminal/finished state (or carries the run's real status) within one read; unit test for the reconciliation; deploys.md READING
+- Blocked by: none
+- Status 2026-10-02: code landed (read-side `reconcile_tick_result` + endpoint), 6 tests; H1 and H2 CONFIRMED on the fleet (see log/2026-10-02.md). OWED: fleet READING once web loads it.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

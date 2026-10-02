@@ -86,6 +86,60 @@ def _meta_dir() -> Path:
 	return path
 
 
+# A tick's `result` is the LAUNCH-TIME snapshot of the odds run it started
+# (`launch_refresh_run` returns state="running" + pid) and the tick file is
+# written once, at tick end. Nothing rewrites it when the run exits, so between
+# ticks it reads "running" for a process that is gone. MEASURED 2026-10-02 on
+# the local fleet (lane `live-odds-latest-tick-stale`): tick 13:54:57-13:55:35Z
+# launched run 20261002_135535, which ended `failed exitCode=1` at 13:55:48Z
+# per its own `refresh_job_status.json` -- while the served tick said
+# `running` for the next 11+ minutes (pregame ticks were that far apart). That
+# stale "running" blocked a careful fleet restart for its whole 10-minute wait.
+#
+# The run already records its outcome in the SHARED store the web reads, so the
+# fix is a read: overlay the run's terminal state onto the served snapshot. The
+# launch value is kept as `launchState`; nothing the tick launches changes.
+# Same terminal set as `ops_refresh._TERMINAL_REFRESH_STATES`.
+_TICK_RESULT_TERMINAL_STATES = frozenset({"finished", "failed", "canceled"})
+
+
+def reconcile_tick_result(tick: Any, read_json: Any) -> Any:
+	"""`tick` with a launch-time `result.state == "running"` replaced by the run's
+	TERMINAL state from `<artifacts_dir>/refresh_job_status.json`, when it has one.
+
+	Returns `tick` unchanged when there is nothing to reconcile, the status is
+	unreadable, or the run is still non-terminal -- an unknown never becomes
+	"finished". Never mutates its input.
+	"""
+	if not isinstance(tick, dict):
+		return tick
+	result = tick.get("result")
+	if not isinstance(result, dict) or str(result.get("state") or "").strip().lower() != "running":
+		return tick
+	artifacts_dir = str(result.get("artifacts_dir") or "").strip()
+	if not artifacts_dir:
+		return tick
+	try:
+		status = read_json(Path(artifacts_dir) / "refresh_job_status.json")
+	except Exception:
+		return tick
+	if not isinstance(status, dict):
+		return tick
+	run_state = str(status.get("state") or "").strip().lower()
+	if run_state not in _TICK_RESULT_TERMINAL_STATES:
+		return tick
+	reconciled = dict(result)
+	reconciled["launchState"] = result.get("state")
+	reconciled["state"] = run_state
+	for key in ("exitCode", "finishedAt"):
+		if status.get(key) is not None:
+			reconciled[key] = status[key]
+	reconciled["stateSource"] = "refresh_job_status"
+	out = dict(tick)
+	out["result"] = reconciled
+	return out
+
+
 def _process_lock_path() -> Path:
 	return _meta_dir() / "live_refresh_background_loop.lock"
 

@@ -3413,9 +3413,16 @@ def api_ops_live_refresh_state() -> Any:
     from syndicate.features.shared.refresh_state_store import read_text_file as _state_read_text
     from syndicate.features.shared.refresh_state_store import reports_root as _state_reports_root
 
+    from syndicate.features.shared.live_refresh_loop import reconcile_tick_result as _reconcile_tick_result
+
     base = _state_reports_root() / "live_refresh_loop"
     state = {
-        "latest_tick": _state_read_json(base / "latest_live_refresh_tick.json"),
+        # The tick's `result` is a launch-time snapshot; overlay the run's own
+        # terminal status so an exited run never reads "running" between ticks
+        # (lane `live-odds-latest-tick-stale`, 2026-10-02).
+        "latest_tick": _reconcile_tick_result(
+            _state_read_json(base / "latest_live_refresh_tick.json"), _state_read_json
+        ),
         "loop_status": _state_read_json(base / "live_refresh_loop_status.json"),
         "last_mlb_sim_check": _state_read_json(base / "last_mlb_sim_check.json"),
         "last_look_ahead_check": _state_read_json(base / "last_look_ahead_check.json"),
