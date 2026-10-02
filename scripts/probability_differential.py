@@ -203,6 +203,15 @@ AMERICAN_TO_PROBABILITY: list[Impl] = [
          "was nested in `_devig_home_prob`"),
     Impl("american_to_probability", "syndicate.features.soccer.cards", "_implied_prob_from_american",
          "was nested in `_game_event_market_data`; coerces via `_safe_float`"),
+    # ADDED 2026-10-02 (lane `local-prod-gap-fixes`): the tripwire had 26 unlisted
+    # names, red on main; each classified from its BODY. These three are genuine
+    # scalar american->probability converters.
+    Impl("american_to_probability", "scripts.decompose_movement_clv", "american_to_prob",
+         "float() coercion + zero guard"),
+    Impl("american_to_probability", "scripts.score_ranking_analysis", "implied",
+         "1/decimal_odds(american) via `break_even`; NO zero guard"),
+    Impl("american_to_probability", "syndicate.features.shared.polymarket_us_orders", "_implied_probability",
+         "DUAL SCALE: passes a value already in (0, 1) through as a probability; refuses |price| < 100"),
 ]
 
 AMERICAN_TO_DECIMAL: list[Impl] = [
@@ -220,6 +229,16 @@ AMERICAN_TO_DECIMAL: list[Impl] = [
     # refuses now and meets every requirement.
     Impl("american_to_decimal", "syndicate.features.nba.betting_recap", "_settlement_decimal_price",
          "settlement payout multiplier; `_coerce_float` + zero guard"),
+    # ADDED 2026-10-02 (lane `local-prod-gap-fixes`), same sweep: four copies of
+    # the one-line `1 + (a/100 if a > 0 else 100/-a)`, none guarded.
+    Impl("american_to_decimal", "scripts.layer2_live_scorecard", "decimal_odds",
+         "one-liner; NO coercion, NO zero guard"),
+    Impl("american_to_decimal", "scripts.score_ranking_analysis", "decimal_odds",
+         "one-liner; NO coercion, NO zero guard"),
+    Impl("american_to_decimal", "scripts.soccer_season_audit.common", "dec_from_american",
+         "float() then the one-liner; NO zero guard"),
+    Impl("american_to_decimal", "syndicate.features.shared.model_scorecard", "_decimal_odds",
+         "copy of `layer2_live_scorecard.decimal_odds`; prices the scorecard's pnl"),
 ]
 
 def _backfill_card_adapter(fn: Any, value: Any) -> Any:
@@ -368,6 +387,28 @@ NOT_A_SCALAR_CONVERTER: dict[str, str] = {
     "syndicate/features/shared/kalshi_client.py:dollars_to_american": "dollars scale; delegates to probability_to_american",
     "syndicate/features/shared/novig_client.py:cents_to_american": "cents scale; delegates to probability_to_american",
     "syndicate/features/shared/polymarket_client.py:outcome_price_to_american": "raw outcomePrices[i]; body is probability_to_american(_as_probability(value))",
+    # ADDED 2026-10-02 (lane `local-prod-gap-fixes`). The tripwire was red on main
+    # with 26 names; the 7 real converters are REGISTERED above, these 19 are not
+    # one of the three tested concepts. Classified from each BODY.
+    "scripts/decompose_movement_clv.py:american_cents": "price -> continuous cents scale (+/-100 -> 0) for movement; not a probability or a decimal price (twin of layer2_board._american_cents)",
+    "syndicate/features/shared/layer2_board.py:_american_cents": "price -> continuous cents scale for movement; not a probability or a decimal price",
+    "syndicate/features/shared/odds_refresh_tracking.py:american_cents": "price -> continuous cents scale for steam; twin of layer2_board._american_cents",
+    "syndicate/features/shared/layer2_board.py:_american_cents_delta": "difference of two prices on the cents scale; two args",
+    "syndicate/features/shared/odds_refresh_tracking.py:american_cents_delta": "difference of two prices on the cents scale; two args",
+    "syndicate/features/shared/layer2_board.py:_signed_american": "display formatting ('+150')",
+    "syndicate/features/shared/layer2_row_context.py:_fmt_american": "display formatting ('+150')",
+    "syndicate/features/shared/portfolio_books.py:parse_american_odds": "form-input parser/validator; returns the PRICE, raises InputError",
+    "scripts/score_ranking_analysis.py:fee_adjusted_decimal": "takes a ROW Mapping and applies venue fees; not scalar",
+    "scripts/soccer_season_audit/common.py:devig": "sequence in, sequence out",
+    "scripts/soccer_season_audit/corners_estimators.py:devig": "sequence in, sequence out",
+    "scripts/soccer_season_audit/live_corners_book_grade.py:devig_over": "two-sided devig of an over/under pair; two args",
+    "scripts/soccer_season_audit/common.py:implied_poisson_goals": "probabilities -> Poisson goal rates by grid search; a different concept",
+    "scripts/soccer_season_audit/corners_estimators.py:market_benchmark.implied_mean": "inverts a negative-binomial survival function for a line's mean; a different concept",
+    "scripts/soccer_season_audit/forward_grade.py:implied_mean": "inverts a negative-binomial survival function for a line's mean; a different concept",
+    "scripts/run_refresh_worker.py:_ncaaf_fcs_market_implied_games": "builds re-sim game rows from market-implied FCS ratings; returns a list of dicts",
+    "syndicate/features/ncaaf/live_resim.py:fcs_market_implied_enabled": "env flag; returns bool",
+    "syndicate/features/ncaaf/live_resim.py:market_implied_sp_components": "spread+total -> SP+ rating components; not a probability or a price",
+    "syndicate/features/shared/venue_scope.py:_min_implied_book_total_pct": "reads a threshold constant; returns a percent, not a conversion",
 }
 
 _NAME_HINT = ("implied", "american", "decimal", "devig", "no_vig", "novig",

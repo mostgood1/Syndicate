@@ -1016,7 +1016,7 @@ death, never life — do not invert it.
 
 ### local-prod-gap-fixes — OPEN — opened 2026-10-01 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
 - Goal: No-cost local-production gaps from the 2026-10-01 assessment are closed on the WSL fleet: nightly data-root backup, Redis AOF on, Render crons sim-input-reports/ci-suite/mlb-season-artifacts scheduled by the supervisor, long-running role logs rotate, status flags a stale code stamp, workers on HEAD, WSL clone can fetch, Render-bound scheduled tasks repointed
-- Files: scripts/local_production.py, tests/test_local_production.py, docs/ai_context/local_production_runbook.md, scripts/publish_sim_input_reports.py, tests/test_publish_sim_input_reports.py, tests/test_wnba_calibration_totals_allowlist.py
+- Files: scripts/local_production.py, tests/test_local_production.py, docs/ai_context/local_production_runbook.md, scripts/publish_sim_input_reports.py, tests/test_publish_sim_input_reports.py, tests/test_wnba_calibration_totals_allowlist.py, scripts/probability_differential.py, tests/test_probability_differential.py, tests/test_projection_degeneracy.py
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: unit tests for job schedule/rotation/backup/AOF; on the fleet: redis CONFIG GET appendonly=yes, a backup snapshot present with file count matching the data root, status shows all roles on HEAD, each new job run once with rc recorded

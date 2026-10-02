@@ -58,8 +58,25 @@ KNOWN_FAILING = {
         "syndicate.features.ncaab.mirror_export:_american_to_probability",
         "syndicate.features.nhl.sim_engine.hockeysim.adapters:american_to_implied",
         "syndicate.features.shared.odds_book_quotes:_implied_probability",
+        # ADDED 2026-10-02 (lane `local-prod-gap-fixes`), when the 26-name backlog
+        # was registered. RAISES on 0/None/""/"+150" -- it never returns a wrong
+        # number, and every row reaching it is pre-filtered by `usable()`
+        # (`px not in (None, 0)`). 1/5.
+        "scripts.score_ranking_analysis:implied",
     },
     "american_to_decimal": {
+        # ADDED 2026-10-02, same registration. Four copies of the unguarded
+        # one-liner `1 + (a/100 if a > 0 else 100/-a)`: all RAISE on bad input
+        # (ZeroDivisionError at 0, TypeError on None/text) rather than mis-price.
+        # `model_scorecard:_decimal_odds` is the production one; its ONLY call site
+        # returns early on `price is None or price == 0` first
+        # (`_accumulate_price`, model_scorecard.py:309).
+        # Returning None instead would only move the TypeError into the caller's
+        # arithmetic, so these are triaged here, not "fixed" into a new failure.
+        "scripts.layer2_live_scorecard:decimal_odds",
+        "scripts.score_ranking_analysis:decimal_odds",
+        "scripts.soccer_season_audit.common:dec_from_american",
+        "syndicate.features.shared.model_scorecard:_decimal_odds",
         "scripts.regrade_mlb_game_markets:_american_to_decimal",
         "syndicate.features.bankroll_manager:_american_to_decimal",
         "syndicate.features.intelligence:_american_to_decimal",
