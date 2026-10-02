@@ -384,6 +384,15 @@ def data_path(*parts: str) -> Path:
     except Exception:  # noqa: BLE001 -- a root resolver must never break a read
         pass
     for root in candidates:
+        # Syndicate-owned roots only -- the rule `_first_existing_root` and
+        # `week_summaries` already apply. `_source_roots()` can include a sibling
+        # repo's data dir (`NFL-Betting/nfl_compare/data`), and resolving per file
+        # (`#672`) let a file that exists ONLY there be read from it: the
+        # source-app fallback the migration gate's "data_path stays on local
+        # mirror" contract forbids (red on main, found 2026-10-02 by the local
+        # ci-suite run). The sibling exists only on developer machines.
+        if "nfl_source" not in {part.lower() for part in root.parts}:
+            continue
         try:
             candidate = root / relative
             if candidate.exists():

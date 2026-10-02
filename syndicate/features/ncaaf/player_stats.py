@@ -414,13 +414,13 @@ def _question_grams(question: str) -> list[tuple[int, int, str]]:
 
 def question_season(selected_date: str | None = None) -> int:
     """A football season is named for the year it starts; Jan/Feb belong to the previous one."""
-    from datetime import date
+    from syndicate.features.shared.timezone import central_today
 
-    text = str(selected_date or "").strip() or date.today().isoformat()
+    text = str(selected_date or "").strip() or central_today().isoformat()
     try:
         year, month = int(text[:4]), int(text[5:7])
     except (ValueError, IndexError):
-        today = date.today()
+        today = central_today()
         year, month = today.year, today.month
     return year - 1 if month <= 2 else year
 

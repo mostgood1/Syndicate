@@ -1060,6 +1060,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - Effect today: 3 x 378 s = 1134 s < 9000 s floor (`_DEFAULT_TTL_SECONDS` 150 min), so the fleet TTL is still 9000 s; what changes is the printed measurement, and the TTL tracks any build > 50 min. No real `--drain` was run (it pauses the live worker).
 
+### ci-red-on-main — OPEN — opened 2026-10-01 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+- Goal: The 14 ci-suite failures that also fail on origin/main (found by the local fleet's first ci-suite run 2026-10-02) pass on main, each fixed at its cause; claimed files only with user-approved cross-lane writes recorded in the owning lane
+- Files: tests/test_ops_live_lens_status.py, syndicate/features/nfl/sources.py, syndicate/features/ncaaf/player_stats.py, syndicate/features/nhl/boxscore_log.py, syndicate/features/prediction_reconciliation.py, syndicate/features/shared/disk_compaction.py, syndicate/blueprints/ops.py, tests/test_hot_artifact_pull_watermark_scope.py, tests/test_state_read_choke_point.py, tests/test_slate_date_timezone_discipline.py, tests/test_migration_gate.py, scripts/migration_gate.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: the 14 named tests pass on the landed origin/main tree; each touched module's own test file still passes
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

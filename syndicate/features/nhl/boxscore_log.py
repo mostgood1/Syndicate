@@ -294,7 +294,11 @@ def _eastern_today() -> date:
 
         return datetime.now(ZoneInfo("America/New_York")).date()
     except Exception:  # noqa: BLE001
-        return datetime.utcnow().date()
+        # Without tzdata: Central is one hour off Eastern; UTC was four or five,
+        # i.e. "tomorrow" every evening (slate-date tripwire, 2026-10-02).
+        from syndicate.features.shared.timezone import central_today
+
+        return central_today()
 
 
 def refresh_hosted_game_log(artifact_root: Path, *, today: date | None = None, fetch: FetchJson = fetch_json) -> dict[str, Any]:

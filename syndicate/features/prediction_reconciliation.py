@@ -462,7 +462,12 @@ def pending_prediction_dates(
     dates = sorted(per_date)
     if max_age_days is None:
         return dates
-    anchor = date.fromisoformat(str(today)[:10]) if today else date.today()
+    if today:
+        anchor = date.fromisoformat(str(today)[:10])
+    else:
+        from syndicate.features.shared.timezone import central_today
+
+        anchor = central_today()
     cutoff = (anchor - timedelta(days=int(max_age_days))).isoformat()
     kept = [value for value in dates if value >= cutoff]
     aged_out = [value for value in dates if value < cutoff]

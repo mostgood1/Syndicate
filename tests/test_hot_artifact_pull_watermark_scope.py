@@ -135,6 +135,13 @@ class HotArtifactPullWatermarkScopeTests(unittest.TestCase):
                 artifact_publisher, "_pull_hot_artifacts_request", return_value=(True, 0)
             ), patch.object(
                 artifact_publisher, "_missing_required_artifact_relative_paths", return_value=[]
+            ), patch.object(
+                # The season pull rides this call too (`_pull_season_artifacts_if_due`,
+                # throttled to once per 30 min per PROCESS) and its pattern requests
+                # carry no watermark by design. Left live, this test passed or failed
+                # on whether an earlier test in the same process had spent the
+                # throttle -- red in a chunked ci-suite run, 2026-10-02.
+                artifact_publisher, "_pull_season_artifacts_if_due", return_value=0
             ), patch.object(artifact_publisher.time, "time", return_value=self.NOW):
                 artifact_publisher.pull_hot_artifacts(date_str="2026-09-15")
             self.assertTrue(seen_since)

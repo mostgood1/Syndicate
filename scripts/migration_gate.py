@@ -986,11 +986,19 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
             sibling_file = sibling_root / "current_week.json"
             sibling_file.parent.mkdir(parents=True, exist_ok=True)
             sibling_file.write_text("{}", encoding="utf-8")
-            expected = local_root / "current_week.json"
             with patch("syndicate.features.nfl.sources._source_roots", return_value=[local_root, sibling_root]):
                 actual = nfl_data_path("current_week.json")
-            if not _same_path(expected, actual):
-                _append_violation("nfl", "data_path stays on local mirror", expected=str(expected), actual=str(actual))
+            # The contract is "never the sibling source app", not one exact path.
+            # `#672` (2026-09-17) deliberately makes a file that exists in no
+            # Syndicate root fall back to the WRITE root
+            # (`nfl_artifact_output_root()`), so new artifacts land on the mounted
+            # disk -- which this check's old `local_root / ...` expectation
+            # predates. What it must still catch is the source-app fallback
+            # `#672` re-admitted and `data_path` now refuses (2026-10-02).
+            actual_parts = {part.lower() for part in Path(actual).parts}
+            in_sibling = Path(actual).resolve().is_relative_to(sibling_root.resolve())
+            if in_sibling or "nfl_source" not in actual_parts:
+                _append_violation("nfl", "data_path stays on local mirror", expected="a Syndicate-owned nfl_source path, never the sibling", actual=str(actual))
 
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

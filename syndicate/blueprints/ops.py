@@ -4276,9 +4276,11 @@ def _persisted_sport_rows(sport: str) -> dict[str, Any]:
     try:
         from syndicate.features.shared.refresh_state_store import read_json_file as _read_json_file
         from pipeline.intelligence_state import BOARD_SNAPSHOT_PATH as _BOARD_SNAPSHOT_PATH
-        from pipeline.intelligence_state import expand_persisted_state as _expand
+        # Imported under its own name: `test_state_read_choke_point` recognises an
+        # expanded read by the expander's NAME, and an alias read as a raw one.
+        from pipeline.intelligence_state import expand_persisted_state
 
-        snapshot = _expand(_read_json_file(_BOARD_SNAPSHOT_PATH))
+        snapshot = expand_persisted_state(_read_json_file(_BOARD_SNAPSHOT_PATH))
     except Exception as exc:
         out["error"] = f"{type(exc).__name__}: {exc}"
         return out

@@ -138,6 +138,12 @@ class TestTheAllowlistFixWouldHaveBeenInert:
             # `#637`: 41 keys / 114.9MB of a 224.3MB store, no reader, and it had
             # grown past the 8MB write ceiling. Moved to disk.
             "/intelligence/venue_odds/",
+            # `#675` (`0465103e`, 2026-09-19): dated WNBA box scores are
+            # artifacts, and under keyvalue they went to Redis with a 10-day TTL
+            # and never to disk, so the publisher refused them. Added here
+            # 2026-10-02 (lane `local-prod-gap-fixes`) after checking the sibling
+            # invariant: `test_no_exclusion_marker_matches_the_tick_path` passes.
+            "wnba_source/data/processed/boxscores_20",
         }
 
     def test_stream_endpoint_still_refuses_the_tick_path(self, client):

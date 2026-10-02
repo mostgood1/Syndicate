@@ -372,7 +372,10 @@ def gzip_closed_history_csvs(
 
 def run_disk_compaction(root: str | os.PathLike[str], *, today: date | None = None, apply: bool | None = None, printer: Printer = print) -> dict[str, Any]:
     root_path = Path(root)
-    today = today or date.today()
+    if today is None:
+        from syndicate.features.shared.timezone import central_today
+
+        today = central_today()
     apply = (not _dry_run()) if apply is None else apply
     started = time.monotonic()
     summary: dict[str, Any] = {"root": str(root_path), "apply": apply, "today": today.isoformat(),
