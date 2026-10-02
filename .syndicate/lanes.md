@@ -1171,6 +1171,14 @@ death, never life — do not invert it.
 - Verification: unit: live-odds child present -> NOT CLEAR naming it (plain and drain); none -> note; scan failure/missing worker -> UNKNOWN; off-fleet never scans. Live: scan lists live-odds-worker's real children matching an independent tree-walk
 - Blocked by: none
 
+### fleet-ff-odds-children — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: LOCAL FLEET ~/Syndicate fast-forwarded to github/main with no restart, so check_deploy_safety.py run from the fleet checkout carries the live-odds-worker child scan and zombie filter; recorded in deploys.md — **GOAL: MET** (reading: HEAD 845fc011 = github/main, already containing 9fc24936 since another lane's 04:09Z reset; from ~/Syndicate the check printed 'live-odds-worker child jobs: none (worker pid=349107)' and named refresh-worker's odds-refresh children while the state line said idle; /healthz 200; deploys.md 2026-10-02 13:11Z)
+- Files: .syndicate/deploys.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: HEAD = github/main; range has no runtime files besides deployer-side scripts; check_deploy_safety from ~/Syndicate prints a 'live-odds-worker child jobs' line or live-odds blockers; /healthz 200
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
