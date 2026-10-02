@@ -1097,6 +1097,15 @@ death, never life — do not invert it.
 - Verification: deploys.md READING: clean-game table + deviance + live LVA-IND or next slate
 - Blocked by: none
 
+### fleet-drain-rerun — CLOSED — opened 2026-10-01 — closed 2026-10-01 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: Capture the fixed --drain's own CLEAR line and exit code on the live fleet (code at origin/main cc2fa010, run inside WSL, fleet checkout untouched), with ack-after-request and board-build idle at the CLEAR instant — **GOAL: MET** (reading: C:/tmp/drain_rerun_014429.out -- 01:44:36Z 'worker has not acked this drain yet' (worker idle, board_build idle: the old code's CLEAR instant), 01:45:06Z 'CLEAR: refresh-worker acked the drain, is idle, and no board build is in flight' drain rc=0; undrain rc=0, owner ''. Ack corroborated by exactly one DRAIN_HOLD after the last pre-drain BOARD_BUILD_TIMING (wall_s=86.1); the 5 s observer missed the ack instant (last active sample 01:45:03Z False))
+- Files: .syndicate/log/2026-10-01.md
+- Hypothesis: With c829b2df, --drain prints 'has not acked this drain yet' until the worker's next cycle, holds while any board build is in flight, then prints CLEAR rc=0 only when ack>=requested_at and the fleet log's last build marker is BOARD_BUILD_TIMING
+- Falsification test: Falsified if CLEAR prints while acked_after_req is False or while the fleet log's last marker is a BUILD_SPAN_ENTER, or if it never CLEARs within 15 min with the worker idle+acked and no build running
+- Verification: drain_rerun_<stamp>.out holds the CLEAR line and rc=0; observer rows at the same instant show acked_after_req True and last marker BOARD_BUILD_TIMING; undrain leaves owner ''
+- Blocked by: none
+- Fleet checkout `~/Syndicate` deliberately NOT updated (user decision): 14 behind github/main incl. 9 runtime files from other lanes; gunicorn has no --preload so web workers would pick them up on recycle. Its remote for GitHub is named `github`; `origin` there is a stale ref.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
