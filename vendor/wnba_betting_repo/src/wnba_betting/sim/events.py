@@ -286,6 +286,9 @@ def _team_rates_from_priors(players: pd.DataFrame, cfg: EventSimConfig) -> Dict[
     p_tov = float(np.clip(tov / poss, 0.05, 0.22)) if np.isfinite(tov) and tov > 0 else cfg.base_tov_per_poss
     p3 = float(np.clip(fg3a / max(1.0, fga), 0.18, 0.55)) if np.isfinite(fga) and fga > 0 else 0.36
     foul_per_fga = float(np.clip(fta / max(1.0, fga), 0.05, 0.20)) if np.isfinite(fga) and fga > 0 else cfg.base_shooting_foul_per_fga
+    if FOUL_RATE_SOLVED and np.isfinite(fga) and fga > 0 and np.isfinite(fta) and fta >= 0:
+        fgm = per_game_from_pm("_prior_fgm_pm")
+        foul_per_fga = _solved_foul_per_attempt(fta / fga, (fgm / fga) if (np.isfinite(fgm) and fgm > 0) else 0.45, p3)
 
     # PF per possession (includes non-shooting; rough)
     pf_per_poss = float(np.clip(pf / poss, 0.10, 0.30)) if np.isfinite(pf) and pf > 0 else 0.18
@@ -529,6 +532,34 @@ def _ft_rate_multipliers(players: pd.DataFrame, minutes: np.ndarray) -> np.ndarr
 # with no prior able to block. False restores the general blend for blocks.
 BLOCK_ALLOC_BY_RATE = True
 BLOCK_ALLOC_FLOOR_PM = 0.002
+
+# The team's shooting-foul probability per attempt is SOLVED so the box score shows the
+# team's prior FTA/FGA. It was clip(FTA/FGA, 0.05, 0.20): FTA/FGA is not a foul
+# probability (a foul yields 1 FTA on an and-one, 2-3 on a miss, and a fouled miss is no
+# FGA), and the 0.20 cap bound against a real ~0.31, so sim FTA ran 0.889x and the missing
+# trips became extra FGAs (lane `wnba-sim-ft-trips-2`). False restores the clip.
+FOUL_RATE_SOLVED = True
+
+
+def _team_fta_per_fga(players: pd.DataFrame, mins: np.ndarray) -> float:
+    m = np.maximum(0.0, np.where(np.isfinite(mins), mins, 0.0))
+    fta = float(np.sum(np.maximum(0.0, _safe_series(players, "_prior_fta_pm").to_numpy(dtype=float)) * m))
+    fga = float(np.sum(np.maximum(0.0, _safe_series(players, "_prior_fga_pm").to_numpy(dtype=float)) * m))
+    return fta / fga if fga > 0 else float("nan")
+
+
+def _solved_foul_per_attempt(fta_per_fga: float, fg_pct: float, p3: float) -> float:
+    """Per-attempt foul probability f with box-score FTA / FGA == fta_per_fga.
+
+    Per attempt: FTA = f * [m * 0.32 + (1 - m) * 0.70 * (2 + p3)];
+    counted FGA = 1 - f * (1 - m) * 0.70 when fouled misses are not FGAs.
+    """
+    r = float(np.clip(fta_per_fga, 0.05, 0.60))
+    m = float(np.clip(fg_pct, 0.30, 0.60))
+    s3 = float(np.clip(p3, 0.05, 0.75))
+    a = m * 0.32 + (1.0 - m) * 0.70 * (2.0 + s3)
+    b = (1.0 - m) * 0.70 if FOULED_MISS_NOT_FGA else 0.0
+    return float(np.clip(r / (a + r * b), 0.03, 0.45))
 
 
 def _player_usage_weights(players: pd.DataFrame, col_pm: str, lineup_idx: List[int]) -> np.ndarray:
@@ -1440,17 +1471,29 @@ def simulate_pbp_game_boxscore(
                 shot_share = _loop_shot_share(players, mins, "_prior_fga_pm")
                 ft_mult = (h_ft_mult if side == "h" else a_ft_mult) if SHOOTER_FT_RATE else np.ones(len(shot_share))
                 foul_share = shot_share * np.asarray(ft_mult, dtype=float)
-                solved = _solve_eff_mult(
-                    float(tpp),
-                    p_tov=float(rates["p_tov"]),
-                    p3=float(rates["p3"]),
-                    # 2PA shooters are picked by TOTAL FGA usage in the loop.
-                    fg2=_team_avg(fg2v, shot_share, 0.50),
-                    fg3=_vol_avg(fg3v, players, mins, ("_prior_threes_att_pm",), 0.34),
-                    foul=float(rates["foul_per_fga"]) * float(foul_share.sum()),
-                    ft=_team_avg(ftv, foul_share, 0.78),
-                    oreb=float(cfg.base_oreb_rate) * float(oreb_m),
-                )
+                fg2_avg = _team_avg(fg2v, shot_share, 0.50)
+                fg3_avg = _vol_avg(fg3v, players, mins, ("_prior_threes_att_pm",), 0.34)
+                fta_ratio = _team_fta_per_fga(players, mins)
+                foul_m = foul_mult_h if side == "h" else foul_mult_a
+                # The foul rate and eff_mult depend on each other: the rate must be solved
+                # at the make rate the loop will actually use (prior x eff_mult), and
+                # eff_mult at that rate's FT points. A few alternations reach the fixed point.
+                for _ in range(3 if (FOUL_RATE_SOLVED and np.isfinite(fta_ratio)) else 1):
+                    solved = _solve_eff_mult(
+                        float(tpp),
+                        p_tov=float(rates["p_tov"]),
+                        p3=float(rates["p3"]),
+                        # 2PA shooters are picked by TOTAL FGA usage in the loop.
+                        fg2=fg2_avg,
+                        fg3=fg3_avg,
+                        foul=float(rates["foul_per_fga"]) * float(foul_share.sum()),
+                        ft=_team_avg(ftv, foul_share, 0.78),
+                        oreb=float(cfg.base_oreb_rate) * float(oreb_m),
+                    )
+                    if FOUL_RATE_SOLVED and np.isfinite(fta_ratio):
+                        p3_ = float(rates["p3"])
+                        made = (1.0 - p3_) * float(np.clip(fg2_avg * solved, 0.05, 0.95)) + p3_ * float(np.clip(fg3_avg * solved, 0.05, 0.95))
+                        rates["foul_per_fga"] = float(np.clip(_solved_foul_per_attempt(fta_ratio, made, p3_) * float(foul_m), 0.03, 0.45))
                 if side == "h":
                     eff_mult_h = solved
                 else:
@@ -1466,6 +1509,26 @@ def simulate_pbp_game_boxscore(
             eff_mult_a = float(np.clip(float(eff_mult_a) * float(eff_prior_a), 0.75, 1.25))
     except Exception:
         pass
+
+    if FOUL_RATE_SOLVED:
+        # Sides without a target: solve the rate once at the final efficiency.
+        for tpp, players, mins, rates, fg_v, fg3_v, eff, foul_m in (
+            (tpp_h, home_players, h_mins, h_rates, h_fg_pct, h_3p_pct, eff_mult_h, foul_mult_h),
+            (tpp_a, away_players, a_mins, a_rates, a_fg_pct, a_3p_pct, eff_mult_a, foul_mult_a),
+        ):
+            if tpp is not None:
+                continue
+            try:
+                ratio = _team_fta_per_fga(players, mins)
+                if not np.isfinite(ratio):
+                    continue
+                share = _loop_shot_share(players, mins, "_prior_fga_pm")
+                share3 = _loop_shot_share(players, mins, "_prior_threes_att_pm")
+                p3_ = float(rates["p3"])
+                made = (1.0 - p3_) * float(np.clip(float(np.sum(np.asarray(fg_v, dtype=float) * share)) * eff, 0.05, 0.95))                     + p3_ * float(np.clip(float(np.sum(np.asarray(fg3_v, dtype=float) * share3)) * eff, 0.05, 0.95))
+                rates["foul_per_fga"] = float(np.clip(_solved_foul_per_attempt(ratio, made, p3_) * float(foul_m), 0.03, 0.45))
+            except Exception:
+                pass
 
     # Home DEFENSE blocks away shots, and vice versa (at the final efficiencies).
     h_blk_rate = _team_block_rate_on_missed_2pa(home_players, h_mins, away_players, a_mins, a_rates, a_fg_pct, eff_mult_a, poss,
