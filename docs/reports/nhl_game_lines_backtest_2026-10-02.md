@@ -78,6 +78,7 @@ and p1–p3, settling ML/PL/totals full game and 3-way on 60 minutes. What it **
 - **Leakage check (passed):** in all **187/187** roots, `team_rates_2025-2026.csv` games = 2 × the
   regular-season games strictly before the date. **0 degenerate dates** (no slate with a single constant
   total; the fleet's 5.9134 failure does not occur in the as-of roots).
+- **Roots named:** the run above used `C:/tmp/nhlprops/bt/roots` (lineups built BEFORE `4247a6ea`, the PP/PK-shape and dress-by-total-TOI fix). Re-run on `C:/tmp/nhlprops/bt_after/roots` (lineups ON the fix): **0 of 1,288 games differ** in period lambdas, raw or served probabilities (2026-10-02 ~23:40Z). Every number here holds for both lineup versions.
 - **Reachability:** removing lineups leaves the game lambdas byte-identical. Removing team xG changes
   them (positive control). Game lines depend only on the team season files, so the lineup-code version
   that wrote the roots does not matter here.
@@ -204,5 +205,4 @@ py -3 scripts/backtest_nhl_game_lines.py odds                          # dry run
 py -3 scripts/backtest_nhl_game_lines.py sim --quote-log C:/tmp/nhllines/captured/bq
 py -3 scripts/backtest_nhl_game_lines.py score --report <md>
 ```
-The roots come from `scripts/backtest_nhl_props.py` (lane `nhl-player-props-projection`). That script is
-untracked in that lane's worktree as of this report, and its landing was requested 2026-10-02.
+The roots come from `scripts/backtest_nhl_props.py` (lane `nhl-player-props-projection`), on origin/main as of `9a7f0d2f`.
