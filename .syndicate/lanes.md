@@ -1393,7 +1393,8 @@ death, never life — do not invert it.
 - Blocked by: none
 - Status: done (deploys.md 2026-10-02 17:01Z, PR NBA-Betting#2). Owed only: the next fleet NBA run's game_odds_2026-10-03.csv sourced from OddsAPI.
 
-### live-odds-stop-prompt — OPEN — opened 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+### live-odds-stop-prompt — CLOSED — opened 2026-10-02, closed 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+- Goal (verbatim): live-odds-worker's main loop sleeps on _LIVE_REFRESH_LOOP_STOP.wait() instead of time.sleep(), so a SIGTERM ends the worker within seconds instead of after up to a 900s idle sleep -- **GOAL: MET.** Reading: pid 627987 (5c205087), SIGTERM 7 s into a 900 s `loop_sleep` (17:31:22.610Z): gone in 0.61 s, against 895 s on the old code at 16:38-16:53Z. Supervisor restarted it as pid 629751, whose first pass completed at 17:34:55Z. Tests: AST guard (fails on the old code) plus a handler-wakes-wait behaviour test. Shipped `5c205087`.
 - Goal: live-odds-worker's main loop sleeps on _LIVE_REFRESH_LOOP_STOP.wait() instead of time.sleep(), so a SIGTERM ends the worker within seconds instead of after up to a 900s idle sleep
 - Files: scripts/run_live_odds_refresh_worker.py, tests/test_live_odds_worker_stop_prompt.py
 - Hypothesis: n/a
