@@ -222,3 +222,15 @@ def test_a_disagreeing_row_is_still_served():
     model whose `settled` count is 0."""
     result = build_layer2_rows([_row(projection={"edge_vs_market_pct": -4.0})])
     assert result["opportunities"], "the row is labelled, not removed"
+
+
+def test_betonline_and_bovada_are_bettable_so_an_ncaaf_prop_they_alone_quote_survives():
+    """2026-10-02 (lane `layer2-freshness-1h`, user: "Yes, add both"). On the fleet
+    1,442 of 2,756 priced NCAAF prop sides were quoted ONLY at betonlineag and/or
+    bovada; with neither on the list, `best_bettable` returned None at
+    `layer2_board.py`'s `no_bettable_book` gate and the board served 0 NCAAF props."""
+    assert book_shortlist.is_bettable("betonlineag")
+    assert book_shortlist.is_bettable("bovada")
+    assert book_shortlist.best_bettable({"betonlineag": 105, "bovada": -102}) == ("betonlineag", 105)
+    # A book still off the list never wins the bettable price, however good.
+    assert book_shortlist.best_bettable({"mybookieag": 130, "bovada": 110}) == ("bovada", 110)

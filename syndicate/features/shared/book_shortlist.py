@@ -45,6 +45,13 @@ DEFAULT_BOOKS: tuple[str, ...] = (
     "williamhill_us",
     "betrivers",
     "fanatics",
+    # Added 2026-10-02 (lane `layer2-freshness-1h`, user: "Yes, add both" -- the
+    # user bets at both). On the fleet that day they were the ONLY books quoting
+    # most NCAAF player props both ways: 1,442 of 2,756 priced NCAAF prop sides
+    # had no other book, so `no_bettable_book` dropped them and the board served
+    # 0 NCAAF props while paying ~250 OddsAPI credits a run to capture them.
+    "betonlineag",
+    "bovada",
     "pinnacle",
     "novig",
     "prophetx",
