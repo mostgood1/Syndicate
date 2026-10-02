@@ -1115,6 +1115,15 @@ death, never life — do not invert it.
 - Verification: status: web/refresh-worker/live-odds-worker up restarts=0 code=<HEAD>; /healthz 200; BOARD_BUILD_TIMING after restart; check_deploy_safety from ~/Syndicate returns a verdict (not UNKNOWN) on the fleet
 - Blocked by: none
 
+### base-url-pending-conversions — CLOSED — opened 2026-10-01 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: Every pending: script in tests/test_base_url.py ALLOWED whose claiming lane has closed resolves its default via scripts/_base_url.default_base_url(), unchanged with no env var set, and leaves ALLOWED — **GOAL: MET** (reading: claim recheck 2026-10-02 via lane_claims_source.effective_claims -- 1 of 8 pending files free (`publish_sim_input_reports.py`, lane local-prod-gap-fixes CLOSED); converted; tests/test_base_url.py + tests/test_publish_sim_input_reports.py 21 passed incl. stale-allowlist; old-vs-new identical unset and for WEB_PUBLISH/SYNDICATE_BASE/BASE_URL)
+- Files: scripts/publish_sim_input_reports.py,tests/test_base_url.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: tests/test_base_url.py green incl. stale-allowlist check; old-vs-new default equal with env unset; tests/test_publish_sim_input_reports.py green
+- Blocked by: none
+- Still pending (claimed by OPEN lanes at 2026-10-02): board_delivery_probe (nhl-board-rows-missing), bucket_search (accuracy-assessment-0914), build_wnba_boxscores (restore-measurement), check_e2e_coverage (e2e-coverage-contract), controlled_transfer_probe (bandwidth-controlled-transfer), grade_wnba_live_prop_projection (live-props-model-probability), regrade_mlb_game_markets (dh-grading-ledger-joins).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

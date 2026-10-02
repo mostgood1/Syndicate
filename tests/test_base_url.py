@@ -45,7 +45,6 @@ ALLOWED = {
     "scripts/check_e2e_coverage.py": "pending: lane e2e-coverage-contract",
     "scripts/controlled_transfer_probe.py": "pending: lane bandwidth-controlled-transfer",
     "scripts/grade_wnba_live_prop_projection.py": "pending: lane live-props-model-probability",
-    "scripts/publish_sim_input_reports.py": "pending: lane local-prod-gap-fixes",
     "scripts/regrade_mlb_game_markets.py": "pending: lane dh-grading-ledger-joins",
 }
 
