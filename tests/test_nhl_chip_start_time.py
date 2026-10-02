@@ -16,6 +16,7 @@ from __future__ import annotations
 import pytest
 
 from syndicate.blueprints import home
+from syndicate.features.shared import game_chip_scoreboard
 from syndicate.features.shared.game_chip_scoreboard import build_game_chip
 
 DATE = "2026-09-22"
@@ -61,6 +62,10 @@ def schedule(monkeypatch):
         from syndicate import local_nhl_odds
 
         monkeypatch.setattr(home, "central_today_iso", lambda: DATE)
+        # The chip builder reads its OWN `central_today_iso` to decide whether to
+        # prefix the day. Pinned here too: once 2026-09-22 passed, the chip correctly
+        # read 'Tue Sep 22 · 6:00P CT' and this test went red (ci-suite 2026-10-02).
+        monkeypatch.setattr(game_chip_scoreboard, "central_today_iso", lambda: DATE)
         monkeypatch.setattr(local_nhl_odds.NhlWebClient, "scoreboard_day", lambda self, date: list(rows))
 
     return _install

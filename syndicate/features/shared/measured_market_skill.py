@@ -126,6 +126,7 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
         "verdict": "loses to the de-vigged market, Brier +0.0076 [+0.0023, +0.0129] over 374 quoted rows",
         "verdict_class": VERDICT_LOSES,
         "source": _NFL_PROPS_PRICE_SOURCE,
+        "admission_checked": "2026-10-02 local-fleet served book grids 10-01..10-05: all 32 interceptions rows fair_method=consensus (layer2_board._resolve_fair, refresh-worker env)",
     },
     ("nfl", "passing_attempts", "full", PHASE_PREGAME): {
         "sample_games": 640,
@@ -137,6 +138,7 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
         "verdict": "loses to the de-vigged market, Brier +0.0373 [+0.0234, +0.0511] over 640 quoted rows",
         "verdict_class": VERDICT_LOSES,
         "source": _NFL_PROPS_PRICE_SOURCE,
+        "admission_checked": "2026-10-02 local-fleet served book grids 10-01..10-05: all 44 passing_attempts rows fair_method=consensus (layer2_board._resolve_fair, refresh-worker env)",
     },
     ("nfl", "passing_tds", "full", PHASE_PREGAME): {
         "sample_games": 835,
@@ -148,6 +150,7 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
         "verdict": "loses to the de-vigged market, Brier +0.0070 [+0.0019, +0.0121] over 835 quoted rows",
         "verdict_class": VERDICT_LOSES,
         "source": _NFL_PROPS_PRICE_SOURCE,
+        "admission_checked": "2026-10-02 local-fleet served book grids 10-01..10-05: all 33 passing_tds rows fair_method=consensus (layer2_board._resolve_fair, refresh-worker env)",
     },
     ("nfl", "passing_yards", "full", PHASE_PREGAME): {
         "sample_games": 4346,
@@ -159,6 +162,7 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
         "verdict": "loses to the de-vigged market, Brier +0.0395 [+0.0342, +0.0449] over 4346 quoted rows",
         "verdict_class": VERDICT_LOSES,
         "source": _NFL_PROPS_PRICE_SOURCE,
+        "admission_checked": "2026-10-02 local-fleet served book grids 10-01..10-05: all 142 passing_yards rows fair_method=consensus (layer2_board._resolve_fair, refresh-worker env)",
     },
     ("nfl", "receiving_yards", "full", PHASE_PREGAME): {
         "sample_games": 13887,
@@ -170,6 +174,7 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
         "verdict": "loses to the de-vigged market, Brier +0.0226 [+0.0203, +0.0249] over 13887 quoted rows",
         "verdict_class": VERDICT_LOSES,
         "source": _NFL_PROPS_PRICE_SOURCE,
+        "admission_checked": "2026-10-02 local-fleet served book grids 10-01..10-05: all 462 receiving_yards rows fair_method=consensus (layer2_board._resolve_fair, refresh-worker env)",
     },
     ("nfl", "receptions", "full", PHASE_PREGAME): {
         "sample_games": 4401,
@@ -192,6 +197,7 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
         "verdict": "loses to the de-vigged market, Brier +0.0210 [+0.0114, +0.0307] over 1066 quoted rows",
         "verdict_class": VERDICT_LOSES,
         "source": _NFL_PROPS_PRICE_SOURCE,
+        "admission_checked": "2026-10-02 local-fleet served book grids 10-01..10-05: all 70 rushing_attempts rows fair_method=consensus (layer2_board._resolve_fair, refresh-worker env)",
     },
     ("nfl", "rushing_yards", "full", PHASE_PREGAME): {
         "sample_games": 5879,
@@ -203,6 +209,7 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
         "verdict": "loses to the de-vigged market, Brier +0.0219 [+0.0181, +0.0256] over 5879 quoted rows",
         "verdict_class": VERDICT_LOSES,
         "source": _NFL_PROPS_PRICE_SOURCE,
+        "admission_checked": "2026-10-02 local-fleet served book grids 10-01..10-05: all 235 rushing_yards rows fair_method=consensus (layer2_board._resolve_fair, refresh-worker env)",
     },
     # ---- MLB, LIVE ------------------------------------------------------------
     # Full-game h2h is the market MLB live publication was switched off for
