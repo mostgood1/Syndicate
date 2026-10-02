@@ -9,6 +9,8 @@ billing-suspended.
     py -3 scripts/local_production.py status      # pids, /healthz, log tails
     py -3 scripts/local_production.py down        # stop a running `up`
     py -3 scripts/local_production.py env --role refresh-worker   # the derived env, secrets masked
+    py -3 scripts/local_production.py backup      # snapshot data root + redis (also a nightly job)
+    py -3 scripts/local_production.py ci-run      # the ci-suite cron, in its own checkout (also a job)
 
 Runbook: docs/ai_context/local_production_runbook.md.
 
@@ -850,38 +852,79 @@ class Supervised:
     backoff: float = 5.0
 
 
-# Render cron jobs that were created in the dashboard, not in render.yaml.
-# (name, UTC hour, UTC minute, argv). Render crons do not catch up; a laptop
-# can be asleep at the scheduled minute, so each job runs ONCE per UTC day at
-# the first supervisor tick at or after its time.
-SCHEDULED_JOBS: tuple[tuple[str, int, int, tuple[str, ...]], ...] = (
+@dataclass(frozen=True)
+class ScheduledJob:
+    name: str
+    hour: int  # UTC
+    minute: int  # UTC
+    argv: tuple[str, ...]  # after sys.executable; "{home}" is replaced with the local home
+    weekday: int | None = None  # None = daily; 0 = Monday (Render cron `* * 1`)
+
+
+# Render cron jobs that were created in the dashboard, not in render.yaml, plus
+# the local-only backup. Render crons do not catch up; a laptop can be asleep at
+# the scheduled minute, so each job runs ONCE on its UTC day at the first
+# supervisor tick at or after its time. Every job gets refresh-worker's env (one
+# shared disk, so the local data root IS the one each cron used to publish to).
+SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
+    # `sim-input-reports` crn-dafj4ie7bikc738q9ol0, `0 7 * * *` (state_worker.md).
+    # Production ran `--publish --verify` from a cron with an EMPTY disk, so it
+    # pulled basketball's inputs from web first. Here the inputs are already on
+    # the shared disk (`--no-pull`), and publishing onto that disk is a no-op.
+    ScheduledJob("sim-input-reports", 7, 0, ("scripts/publish_sim_input_reports.py", "--no-pull")),
+    # `ci-suite` crn-dafg4h0u01pc73aavs6g, `0 8 * * *`. Runs in its own checkout
+    # with a scrubbed env (`ci-run`) -- never against the fleet's Redis or data.
+    ScheduledJob("ci-suite", 8, 0, ("scripts/local_production.py", "--home", "{home}", "ci-run")),
+    # `data-backup`: local-only. Render kept the three disks; here the data root
+    # is the ONLY copy of everything written since 2026-09-30.
+    ScheduledJob("data-backup", 9, 15, ("scripts/local_production.py", "--home", "{home}", "backup")),
+    # `mlb-season-artifacts` crn-dafffnn40ujc73b349pg, `0 9 * * 1`. Without
+    # `--publish` it builds straight into the data root, which is the disk
+    # refresh-worker's `pull_season_artifacts` would have copied them to.
+    ScheduledJob("mlb-season-artifacts", 9, 0, ("scripts/publish_mlb_season_artifacts.py",), weekday=0),
     # `model-scorecard` crn-dam0ao942hec73cge0rg, `30 11 * * *` (state_model.md).
     # Production ran `--publish --verify`; `--publish` is an HTTP self-publish
     # onto the disk `write()` already wrote to, so it is dropped here.
-    ("model-scorecard", 11, 30, ("scripts/publish_model_scorecard.py", "--verify")),
+    ScheduledJob("model-scorecard", 11, 30, ("scripts/publish_model_scorecard.py", "--verify")),
 )
 
 
-def run_due_jobs(settings: "Settings", env: dict[str, str], running: dict[str, subprocess.Popen]) -> None:
+def job_is_due(job: ScheduledJob, now: dt.datetime, last_run_date: str | None) -> bool:
+    if last_run_date == now.date().isoformat():
+        return False
+    if job.weekday is not None and now.weekday() != job.weekday:
+        return False
+    return (now.hour, now.minute) >= (job.hour, job.minute)
+
+
+def run_due_jobs(
+    settings: "Settings",
+    env: dict[str, str],
+    running: dict[str, subprocess.Popen],
+    *,
+    now: dt.datetime | None = None,
+    jobs: Sequence[ScheduledJob] = SCHEDULED_JOBS,
+) -> None:
     state_path = settings.run_dir / "scheduled_jobs.json"
     try:
         state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.is_file() else {}
     except ValueError:
         state = {}
-    now = dt.datetime.now(dt.timezone.utc)
+    now = now or dt.datetime.now(dt.timezone.utc)
     today = now.date().isoformat()
-    for name, hour, minute, argv in SCHEDULED_JOBS:
+    for job in jobs:
+        name = job.name
         proc = running.get(name)
         if proc is not None:
             if proc.poll() is None:
                 continue
             print(f"  [job:{name}] finished rc={proc.returncode}", flush=True)
             state.setdefault(name, {})["last_rc"] = proc.returncode
+            state[name]["finished_at"] = now.isoformat()
             running.pop(name, None)
-        if state.get(name, {}).get("last_run_date") == today:
+        if not job_is_due(job, now, state.get(name, {}).get("last_run_date")):
             continue
-        if (now.hour, now.minute) < (hour, minute):
-            continue
+        argv = [part.replace("{home}", str(settings.home)) for part in job.argv]
         log_path = settings.logs_dir / f"job-{name}.log"
         rotate_log(log_path)
         handle = log_path.open("a", encoding="utf-8", errors="replace")
@@ -920,6 +963,56 @@ def rotate_log(path: Path, max_bytes: int = 200 * 1024 * 1024, keep: int = 5) ->
         path.replace(path.with_name(f"{path.name}.1"))
     except OSError:
         pass
+
+
+def rotate_running_log(path: Path, max_bytes: int = 200 * 1024 * 1024, keep: int = 5) -> bool:
+    """Rotate a log a LIVE role is still appending to (copy, then truncate).
+
+    `rotate_log` renames, which only works at spawn: a running role keeps its
+    handle on the renamed file. refresh-worker does not exit on its own, so its
+    log grew 108 MB in 3.5 h with nothing ever rotating it (2026-10-01). The
+    roles' handles are opened in append mode, so after the truncate their next
+    write lands at the new end of file. Lines written between the copy and the
+    truncate are lost -- a few lines once per 200 MB."""
+    try:
+        if not path.is_file() or path.stat().st_size < max_bytes:
+            return False
+        for index in range(keep - 1, 0, -1):
+            older = path.with_name(f"{path.name}.{index}")
+            if older.exists():
+                older.replace(path.with_name(f"{path.name}.{index + 1}"))
+        shutil.copyfile(path, path.with_name(f"{path.name}.1"))
+        with path.open("r+b") as handle:
+            handle.truncate(0)
+        return True
+    except OSError:
+        return False
+
+
+def ensure_redis_durable(url: str) -> str:
+    """Turn on AOF on an ALREADY-RUNNING redis that `up` did not start.
+
+    `start_local_redis` starts its own redis with `--appendonly yes`, but on the
+    WSL host apt's systemd redis-server answers first, so `up` reuses it with the
+    distro defaults: appendonly=no, RDB `save 3600 1 300 100 60 10000`
+    (measured 2026-10-01) -- a crash could drop up to an hour of state. Render
+    keyvalue is persistent. CONFIG REWRITE makes it survive a redis restart; if
+    the config file is not writable the change still holds until then."""
+    try:
+        import redis
+
+        client = redis.Redis.from_url(url, socket_timeout=5, socket_connect_timeout=5)
+        current = str(client.config_get("appendonly").get("appendonly", "")).lower()
+        if current == "yes":
+            return "aof=already-on"
+        client.config_set("appendonly", "yes")
+        try:
+            client.config_rewrite()
+            return "aof=enabled+persisted"
+        except Exception as exc:  # noqa: BLE001
+            return f"aof=enabled (runtime only; CONFIG REWRITE failed: {type(exc).__name__})"
+    except Exception as exc:  # noqa: BLE001
+        return f"aof=unknown ({type(exc).__name__}: {exc})"
 
 
 def _terminate(process: subprocess.Popen | None, timeout: float = 30.0) -> None:
@@ -989,6 +1082,8 @@ def cmd_up(args: argparse.Namespace) -> int:
     print(f"  money: {'LIVE -- real orders can be placed' if live_money else 'paper'}", flush=True)
 
     redis_proc = start_local_redis(settings) if settings.state == "redis" else None
+    if settings.state == "redis":
+        print(f"  [redis] {ensure_redis_durable(settings.redis_url)}", flush=True)
 
     if not args.skip_bootstrap:
         rc = run_bootstrap(settings, blueprint, local)
@@ -1052,10 +1147,16 @@ def cmd_up(args: argparse.Namespace) -> int:
         job_env = next((i.env for i in items if i.name == "refresh-worker"), None)
         stop_file = settings.run_dir / "stop"
         stop_file.unlink(missing_ok=True)
+        last_rotation_check = 0.0
         while not stopping["flag"]:
             if stop_file.exists():
                 stop_file.unlink(missing_ok=True)
                 break
+            if time.time() - last_rotation_check >= 60:
+                last_rotation_check = time.time()
+                for item in items:
+                    if rotate_running_log(item.log_path):
+                        print(f"  [{item.name}] log rotated (copy+truncate) at 200 MB", flush=True)
             if job_env is not None and not args.no_jobs:
                 try:
                     run_due_jobs(settings, job_env, jobs)
@@ -1158,6 +1259,187 @@ def cmd_down(args: argparse.Namespace) -> int:
     return 0
 
 
+BACKUP_EXCLUDES = ("*.lock", "*.pid")
+BACKUP_SNAPSHOT_FORMAT = "%Y%m%dT%H%M%SZ"
+
+
+def default_backup_dir(settings: Settings, local: dict[str, str]) -> Path:
+    """`SYNDICATE_LOCAL_BACKUP_DIR` (env, then local_production.env), else a
+    directory OFF the data root's filesystem where one exists: on WSL the WSL
+    disk is one VHDX file, so `/mnt/c/SyndicateBackup` survives a lost or
+    unregistered distro. It is still the same physical disk -- a second drive
+    or off-machine copy is the only protection against disk failure."""
+    override = (os.environ.get("SYNDICATE_LOCAL_BACKUP_DIR") or local.get("SYNDICATE_LOCAL_BACKUP_DIR") or "").strip()
+    if override:
+        return Path(override).expanduser()
+    if not IS_WINDOWS and Path("/mnt/c").is_dir():
+        return Path("/mnt/c/SyndicateBackup")
+    return settings.home.parent / f"{settings.home.name}-backup"
+
+
+def _complete_snapshots(dest: Path) -> list[Path]:
+    snaps = []
+    for path in dest.iterdir() if dest.is_dir() else []:
+        if not path.is_dir() or path.name.endswith(".partial"):
+            continue
+        try:
+            dt.datetime.strptime(path.name, BACKUP_SNAPSHOT_FORMAT)
+        except ValueError:
+            continue
+        if (path / "manifest.json").is_file():
+            snaps.append(path)
+    return sorted(snaps, key=lambda p: p.name)
+
+
+def _count_tree(root: Path) -> tuple[int, int]:
+    files = size = 0
+    for dirpath, _dirs, names in os.walk(root):
+        for name in names:
+            if any(Path(name).match(pattern) for pattern in BACKUP_EXCLUDES):
+                continue
+            try:
+                size += os.stat(os.path.join(dirpath, name)).st_size
+                files += 1
+            except OSError:
+                pass
+    return files, size
+
+
+def cmd_backup(args: argparse.Namespace) -> int:
+    """Snapshot the data root (rsync, hard-linked against the previous snapshot)
+    and the Redis state, keep the newest `--keep`. A snapshot is only renamed
+    from `<ts>.partial` to `<ts>` once its manifest is written, so a run that
+    dies half way never looks like a backup."""
+    settings = settings_from_args(args)
+    local = parse_env_file(settings.env_file)
+    dest = Path(args.dest).expanduser() if args.dest else default_backup_dir(settings, local)
+    if not settings.data_root.is_dir():
+        print(f"REFUSING: no data root at {settings.data_root}")
+        return 2
+    rsync = shutil.which("rsync")
+    if not rsync:
+        print("REFUSING: rsync not found (the backup is implemented for the Linux/WSL host).")
+        return 3
+    dest.mkdir(parents=True, exist_ok=True)
+    for stale in dest.glob("*.partial"):
+        shutil.rmtree(stale, ignore_errors=True)
+    started = dt.datetime.now(dt.timezone.utc)
+    name = started.strftime(BACKUP_SNAPSHOT_FORMAT)
+    partial = dest / f"{name}.partial"
+    (partial / "data").mkdir(parents=True)
+    previous = _complete_snapshots(dest)
+    src_files, src_bytes = _count_tree(settings.data_root)
+    # -rt, not -a: drvfs (/mnt/c) cannot chown, so -a exits 23 on every file.
+    command = [rsync, "-rt", "--delete"] + [f"--exclude={p}" for p in BACKUP_EXCLUDES]
+    if previous:
+        command.append(f"--link-dest={previous[-1] / 'data'}")
+    command += [f"{settings.data_root}/", f"{partial / 'data'}/"]
+    if shutil.which("nice") and not IS_WINDOWS:
+        command = ["nice", "-n", "15"] + command
+    print(f"backup {settings.data_root} -> {partial}  (link-dest {previous[-1].name if previous else 'none'})", flush=True)
+    rc = subprocess.run(command).returncode
+    # 24 = "some files vanished before they could be transferred": the roles keep
+    # writing during the copy. Anything else is a failed snapshot.
+    if rc not in (0, 24):
+        print(f"FAILED: rsync rc={rc}; {partial} left for inspection and removed by the next run")
+        return 4
+    redis_note = "skipped (state=file)"
+    if settings.state == "redis":
+        redis_cli = shutil.which("redis-cli")
+        if redis_cli:
+            host, port = _redis_host_port(settings.redis_url)
+            proc = subprocess.run([redis_cli, "-h", host, "-p", str(port), "--rdb", str(partial / "redis.rdb")],
+                                  capture_output=True, text=True)
+            redis_note = "ok" if proc.returncode == 0 and (partial / "redis.rdb").is_file() else f"FAILED rc={proc.returncode}"
+        else:
+            redis_note = "skipped (no redis-cli)"
+    dst_files, dst_bytes = _count_tree(partial / "data")
+    manifest = {
+        "snapshot": name,
+        "started_at": started.isoformat(),
+        "finished_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "source": str(settings.data_root),
+        "source_files_at_start": src_files,
+        "source_bytes_at_start": src_bytes,
+        "snapshot_files": dst_files,
+        "snapshot_bytes": dst_bytes,
+        "rsync_rc": rc,
+        "link_dest": previous[-1].name if previous else None,
+        "redis": redis_note,
+        "commit": git_commit(),
+    }
+    (partial / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    partial.rename(dest / name)
+    kept = _complete_snapshots(dest)
+    for old in kept[: max(0, len(kept) - int(args.keep))]:
+        shutil.rmtree(old, ignore_errors=True)
+    print(f"snapshot {dest / name}: {dst_files} files / {dst_bytes / 1e9:.2f} GB "
+          f"(source at start {src_files} / {src_bytes / 1e9:.2f} GB), redis {redis_note}, rsync rc={rc}")
+    if redis_note.startswith("FAILED"):
+        return 5
+    return 0
+
+
+# Keys that make a process act on the fleet's state or on a venue. The CI run
+# gets none of them: a test suite run with the fleet's env would read and write
+# the live Redis and data root.
+CI_ENV_PASSTHROUGH = ("PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "TMPDIR", "TERM", "SHELL")
+
+
+def ci_env(base: dict[str, str] | None = None) -> dict[str, str]:
+    base = dict(os.environ if base is None else base)
+    env = {key: base[key] for key in CI_ENV_PASSTHROUGH if key in base}
+    env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
+    return env
+
+
+def cmd_ci_run(args: argparse.Namespace) -> int:
+    """The `ci-suite` cron: run_ci_suite.py at this checkout's HEAD, in a
+    SEPARATE clone (<home>/ci-checkout) so test output never dirties the
+    checkout the fleet runs from, with a scrubbed env so no test can reach the
+    fleet's Redis, data root or venue keys. Render ran it on its own instance
+    with `--pytest-chunks 8 --pytest-workers 0`."""
+    settings = settings_from_args(args)
+    checkout = settings.home / "ci-checkout"
+    head = git_commit()
+    if not head:
+        print("REFUSING: cannot read this checkout's HEAD")
+        return 2
+    git = ["git", "-c", f"safe.directory={REPO_ROOT}"]
+    if not (checkout / ".git").is_dir():
+        shutil.rmtree(checkout, ignore_errors=True)
+        rc = subprocess.run(git + ["clone", "--quiet", "--no-checkout", str(REPO_ROOT), str(checkout)]).returncode
+        if rc != 0:
+            print(f"FAILED: clone rc={rc}")
+            return 3
+    for step in (["fetch", "--quiet", str(REPO_ROOT), head], ["checkout", "--quiet", "--force", "--detach", head],
+                 ["clean", "-fdq"]):
+        rc = subprocess.run(git + ["-C", str(checkout)] + step).returncode
+        if rc != 0:
+            print(f"FAILED: git {step[0]} rc={rc}")
+            return 3
+    summary = settings.run_dir / "ci-suite-latest.json"
+    command = [sys.executable, "scripts/run_ci_suite.py", "--pytest-chunks", "8", "--pytest-workers", "0", "--json", str(summary)]
+    if shutil.which("nice") and not IS_WINDOWS:
+        command = ["nice", "-n", "15"] + command
+    print(f"ci-suite at {head[:12]} in {checkout} (env scrubbed to {sorted(ci_env())})", flush=True)
+    return subprocess.run(command, cwd=str(checkout), env=ci_env()).returncode
+
+
+def role_loaded_commit(pid: int | None) -> str | None:
+    """RENDER_GIT_COMMIT from the role's own environment: the commit it was
+    SPAWNED on. A gunicorn HUP loads new code but keeps this stamp."""
+    if not pid:
+        return None
+    try:
+        import psutil
+
+        return psutil.Process(int(pid)).environ().get("RENDER_GIT_COMMIT")
+    except Exception:
+        return None
+
+
 def _tail(path: Path, lines: int) -> list[str]:
     if lines <= 0 or not path.is_file():
         return []
@@ -1180,6 +1462,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         import psutil
     except Exception:
         psutil = None  # type: ignore[assignment]
+    head = git_commit()
     for name, pid in (info.get("roles") or {}).items():
         rss = "?"
         alive = False
@@ -1192,8 +1475,12 @@ def cmd_status(args: argparse.Namespace) -> int:
             except Exception:
                 pass
         cap = PLAN_MEMORY_MB.get(name)
+        loaded = role_loaded_commit(pid) or ""
+        code = ""
+        if loaded:
+            code = f"  code={loaded[:8]}" + ("" if loaded == head else f" (HEAD {head[:8]}: STALE -- restart the role to load HEAD)")
         print(f"  {name:17} pid={pid} {'up' if alive else 'DOWN'}  rss={rss}" + (f" (Render plan {cap} MB)" if cap else "")
-              + f"  restarts={(info.get('restarts') or {}).get(name, 0)}")
+              + f"  restarts={(info.get('restarts') or {}).get(name, 0)}" + code)
     port = int(info.get("port") or settings.port)
     for path in ("/healthz", "/api/ops/version"):
         try:
@@ -1202,6 +1489,14 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"  GET {path} -> {response.status}  {body[:160]}")
         except Exception as exc:  # noqa: BLE001
             print(f"  GET {path} -> {type(exc).__name__}: {exc}")
+    try:
+        job_state = json.loads((settings.run_dir / "scheduled_jobs.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        job_state = {}
+    for job in SCHEDULED_JOBS:
+        row = job_state.get(job.name) or {}
+        when = f"{'Mon ' if job.weekday == 0 else ''}{job.hour:02d}:{job.minute:02d}Z"
+        print(f"  job {job.name:21} {when:10} last_run={row.get('last_run_date', 'never')}  rc={row.get('last_rc', '-')}")
     for name in (info.get("roles") or {}):
         print(f"\n--- {name} (last {args.lines} lines) ---")
         for line in _tail(settings.logs_dir / f"{name}.log", args.lines):
@@ -1242,13 +1537,21 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
                    help="let the env file's SYNDICATE_EXECUTION_* through. Without this, money is always paper.")
     p.add_argument("--publish-loopback", action="store_true", help="point SYNDICATE_WEB_PUBLISH_URL at the local web")
     p.add_argument("--no-tunnel", action="store_true")
-    p.add_argument("--no-jobs", action="store_true", help="do not run the scheduled jobs (model-scorecard)")
+    p.add_argument("--no-jobs", action="store_true", help="do not run the scheduled jobs (SCHEDULED_JOBS: the Render crons + data-backup)")
     p.add_argument("--web-start-timeout", type=float, default=180.0)
     p.set_defaults(func=cmd_up)
 
     p = sub.add_parser("down", help="stop a running `up`")
     p.add_argument("--timeout", type=float, default=90.0)
     p.set_defaults(func=cmd_down)
+
+    p = sub.add_parser("backup", help="snapshot the data root + redis (hard-linked, keeps --keep); a scheduled job")
+    p.add_argument("--dest", help="backup directory (default SYNDICATE_LOCAL_BACKUP_DIR, else /mnt/c/SyndicateBackup on WSL)")
+    p.add_argument("--keep", type=int, default=7)
+    p.set_defaults(func=cmd_backup)
+
+    p = sub.add_parser("ci-run", help="the ci-suite cron: run_ci_suite.py in <home>/ci-checkout with a scrubbed env")
+    p.set_defaults(func=cmd_ci_run)
 
     p = sub.add_parser("status", help="pids, memory, health, log tails")
     p.add_argument("--lines", type=int, default=8)

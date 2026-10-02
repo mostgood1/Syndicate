@@ -1013,6 +1013,14 @@ death, never life — do not invert it.
 - **Stage measurement 2026-10-01 (126 team-games, scratch backfill):** raw `compute_player_priors_local` TOV x minutes 0.801x actual; what the engine receives 0.726x; the players' real as-of box rates 1.027x. Hypothesis (b) CONFIRMED, cause found: `_weighted_positive_mean` returns 0.0 when every input is missing, and the anchor then counted that 0.0 as a real recent rate (weight 0.35) -- every stat without rolling features (stl, blk, tov) got anchor = 0.5 x prior + 0.15 x pred (quintile 0 predicted 0.0237, measured 0.0238). Fix `PRIOR_BLEND_MISSING_RECENT_IS_ABSENT`. The context tables (split, career-opp, position) are clean.
 - **Smoke (5 games) exposes a second mechanism; hypothesis H2 recorded BEFORE testing:** with the blend fixed, sim TOV is 1.17x -- the engine turns per-game TOV into p_tov = tov / possessions but checks it on every shot ITERATION (~1.1 per possession, OREB continuation), so it realizes ~(1 + c) x its prior. Fix: divide p_tov by the expected iterations (1 + c, the same continuation the target solver uses). Falsified unless blend fix + H2 put the component-backtest TOV ratio within 0.95-1.05 without worsening player PTS/FGA error (CI). Also seen, NOT in scope: blocks 0.57x (constant `base_block_rate_on_2pa` 0.05; priors only allocate), steals a fixed 0.55 share of TOV.
 
+### local-prod-gap-fixes — OPEN — opened 2026-10-01 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+- Goal: No-cost local-production gaps from the 2026-10-01 assessment are closed on the WSL fleet: nightly data-root backup, Redis AOF on, Render crons sim-input-reports/ci-suite/mlb-season-artifacts scheduled by the supervisor, long-running role logs rotate, status flags a stale code stamp, workers on HEAD, WSL clone can fetch, Render-bound scheduled tasks repointed
+- Files: scripts/local_production.py, tests/test_local_production.py, docs/ai_context/local_production_runbook.md, scripts/publish_sim_input_reports.py, tests/test_publish_sim_input_reports.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit tests for job schedule/rotation/backup/AOF; on the fleet: redis CONFIG GET appendonly=yes, a backup snapshot present with file count matching the data root, status shows all roles on HEAD, each new job run once with rc recorded
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

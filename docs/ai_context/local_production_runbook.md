@@ -15,6 +15,10 @@ Lane `local-production-host`, 2026-09-30. On 2026-09-30 at 06:37:51Z Render susp
 | `live-odds-worker` | standard, 2 GB | `scripts/run_live_odds_refresh_worker.py` | `live-odds-worker` |
 | `syndicate-refresh-state` | keyvalue | Redis | local `redis-server` (or Memurai), started by `up` |
 | `model-scorecard` cron (dashboard only) | `30 11 * * *` UTC | `publish_model_scorecard.py --publish --verify` | a scheduled job inside `up` |
+| `sim-input-reports` cron (dashboard only) | `0 7 * * *` UTC | `publish_sim_input_reports.py --publish --verify` | a scheduled job: `--no-pull` (inputs are already on the shared disk) |
+| `ci-suite` cron (dashboard only) | `0 8 * * *` UTC | `run_ci_suite.py --pytest-chunks 8 --pytest-workers 0` | a scheduled job: `local_production.py ci-run`, in `<home>/ci-checkout` with a scrubbed env |
+| `mlb-season-artifacts` cron (dashboard only) | `0 9 * * 1` UTC | `publish_mlb_season_artifacts.py --publish --verify` | a scheduled job (Mondays), builds straight into the data root; needs `pybaseball` in the venv |
+| Render's per-service disks | — | — | `data-backup` job, `09:15` UTC daily: `local_production.py backup` (section 4) |
 | three 50 GB disks, one per service | — | — | **one** shared data root |
 
 The three services run the **same code** with **different environments**. The environment decides which loops run where. For example, the intelligence loop runs only on refresh-worker, the live-odds loop and the MLB refresh tick only on live-odds-worker, and the MLB sim, weekly sports and look-ahead only on refresh-worker.
@@ -128,14 +132,16 @@ python3 scripts/local_production.py up       # foreground; Ctrl-C stops everythi
 ```
 
 `up` does the following:
-1. Starts Redis if nothing answers (persistent, AOF, loopback only).
+1. Starts Redis if nothing answers (persistent, AOF, loopback only). If a Redis already answers (the WSL host's apt/systemd `redis-server`, which ships `appendonly no`), `up` turns AOF on with `CONFIG SET` + `CONFIG REWRITE` and prints `[redis] aof=...`.
 2. Seeds the data root (first run: about 2 GB, a couple of minutes).
 3. Starts web and waits for `/healthz` 200.
 4. Starts both workers.
 5. From then on:
    - restarts any role that exits, with backoff from 5 s up to 5 min;
-   - rotates logs at 200 MB;
-   - runs `model-scorecard` once per UTC day at or after 11:30.
+   - rotates logs at 200 MB -- at spawn by rename, and every minute by copy+truncate for a role that never exits (refresh-worker);
+   - runs `SCHEDULED_JOBS` (the four Render dashboard crons plus `data-backup`), each once on its UTC day at the first tick at or after its time. `status` lists each job's last run and rc, and flags a role whose loaded commit is not HEAD (`STALE`). A gunicorn `HUP` loads new code but keeps the old `RENDER_GIT_COMMIT`, so `STALE` on web after a HUP means "stamp", not necessarily "code".
+
+**Backups** (`local_production.py backup`, also the nightly `data-backup` job). An rsync snapshot of the data root plus `redis-cli --rdb`, hard-linked against the previous snapshot so an unchanged file costs nothing, keeping the newest 7 (`--keep`). A snapshot is `<ts>.partial` until its `manifest.json` (file counts, bytes, rsync rc, commit) is written. Destination: `SYNDICATE_LOCAL_BACKUP_DIR`, else `/mnt/c/SyndicateBackup` on WSL. That survives a lost or unregistered distro, since the WSL disk is one VHDX file. It is still the same physical disk, so for disk failure copy `C:\SyndicateBackup` to a second drive or off the machine. Secrets (`render_env/`, `local_production.env`) are deliberately not in it: re-import them with `import-render-env`.
 
 live-odds-worker exits by design every 6 h (`SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS`), and the supervisor restarts it. That is expected, not a crash.
 

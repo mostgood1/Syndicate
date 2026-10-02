@@ -117,3 +117,34 @@ def test_unreadable_report_sets_a_distinct_exit_code(module):
     source = (REPO / "scripts" / "publish_sim_input_reports.py").read_text(encoding="utf-8")
     assert "rc_overall = 7" in source
     assert "UNREADABLE" in source
+
+
+# --- --no-pull (local single-disk fleet, lane local-prod-gap-fixes) ---------
+
+
+def test_no_pull_counts_inputs_already_on_disk(module, tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    assert module._count_local_inputs() == 0
+    target = tmp_path / "wnba_source" / "source_artifacts" / "data" / "processed"
+    target.mkdir(parents=True)
+    (target / "team_advanced_stats_2026.csv").write_text("x", encoding="utf-8")
+    (target / "home_court_advantage.json").write_text("{}", encoding="utf-8")
+    (target / "unrelated.csv").write_text("x", encoding="utf-8")
+    assert module._count_local_inputs() == 2
+
+
+def test_no_pull_with_no_inputs_still_refuses_and_needs_no_token(module, tmp_path, monkeypatch):
+    """The empty-directory refusal is the point of the pull guard; --no-pull
+    must keep it. And a run that neither pulls nor publishes has no use for a
+    token, so a missing one must not be what stops it."""
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    monkeypatch.delenv("ADMIN_TOKEN", raising=False)
+    monkeypatch.setattr(module, "_token", lambda: "")
+    monkeypatch.setattr(sys, "argv", ["publish_sim_input_reports.py", "--no-pull"])
+    assert module.main() == 4
+
+
+def test_pull_path_still_requires_a_token(module, monkeypatch):
+    monkeypatch.setattr(module, "_token", lambda: "")
+    monkeypatch.setattr(sys, "argv", ["publish_sim_input_reports.py"])
+    assert module.main() == 2

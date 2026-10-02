@@ -293,3 +293,150 @@ def test_gunicorn_usable_does_not_require_gunicorn_on_path(monkeypatch):
     assert lp.gunicorn_usable() is True
     monkeypatch.setattr(lp.subprocess, "run", lambda *a, **k: types.SimpleNamespace(returncode=1))
     assert lp.gunicorn_usable() is False
+
+
+# --- scheduled jobs, rotation, backup, CI env (lane local-prod-gap-fixes) ----
+
+import datetime as _dt  # noqa: E402
+import shutil as _shutil  # noqa: E402
+import sys as _sys  # noqa: E402
+
+
+def _utc(y, m, d, hh, mm):
+    return _dt.datetime(y, m, d, hh, mm, tzinfo=_dt.timezone.utc)
+
+
+def test_every_render_cron_is_a_scheduled_job_and_none_publishes():
+    # The three dashboard crons were missing locally (assessment 2026-10-01);
+    # `--publish` would only HTTP-write onto the disk the job already wrote.
+    jobs = {job.name: job for job in lp.SCHEDULED_JOBS}
+    assert {"model-scorecard", "sim-input-reports", "ci-suite", "mlb-season-artifacts", "data-backup"} <= set(jobs)
+    assert (jobs["sim-input-reports"].hour, jobs["sim-input-reports"].minute) == (7, 0)
+    assert (jobs["ci-suite"].hour, jobs["ci-suite"].minute) == (8, 0)
+    assert (jobs["mlb-season-artifacts"].hour, jobs["mlb-season-artifacts"].weekday) == (9, 0)
+    assert "--no-pull" in jobs["sim-input-reports"].argv
+    for job in lp.SCHEDULED_JOBS:
+        assert "--publish" not in job.argv, job.name
+
+
+def test_job_is_due_daily_weekly_and_once_per_day():
+    daily = lp.ScheduledJob("d", 7, 0, ("x",))
+    weekly = lp.ScheduledJob("w", 9, 0, ("x",), weekday=0)
+    monday, tuesday = _utc(2026, 10, 5, 9, 1), _utc(2026, 10, 6, 9, 1)
+    assert not lp.job_is_due(daily, _utc(2026, 10, 5, 6, 59), None)
+    assert lp.job_is_due(daily, monday, None)
+    assert lp.job_is_due(daily, monday, "2026-10-04")
+    assert not lp.job_is_due(daily, monday, "2026-10-05")
+    assert lp.job_is_due(weekly, monday, None)
+    assert not lp.job_is_due(weekly, tuesday, None)
+    assert not lp.job_is_due(weekly, _utc(2026, 10, 5, 8, 59), None)
+
+
+def test_run_due_jobs_substitutes_home_runs_once_and_records_rc(settings):
+    import json
+    import time
+
+    settings.run_dir.mkdir(parents=True, exist_ok=True)
+    settings.logs_dir.mkdir(parents=True, exist_ok=True)
+    job = lp.ScheduledJob("probe", 0, 0, ("-c", "import sys; print('HOME=' + sys.argv[1]); sys.exit(3)", "{home}"))
+    running: dict = {}
+    now = _utc(2026, 10, 5, 12, 0)
+    lp.run_due_jobs(settings, {}, running, now=now, jobs=(job,))
+    assert "probe" in running
+    running["probe"].wait(timeout=30)
+    time.sleep(0.2)
+    lp.run_due_jobs(settings, {}, running, now=now, jobs=(job,))  # reaps, does not relaunch
+    assert running == {}
+    state = json.loads((settings.run_dir / "scheduled_jobs.json").read_text(encoding="utf-8"))
+    assert state["probe"]["last_run_date"] == "2026-10-05"
+    assert state["probe"]["last_rc"] == 3
+    log = (settings.logs_dir / "job-probe.log").read_text(encoding="utf-8")
+    assert f"HOME={settings.home}" in log
+
+
+def test_rotate_running_log_keeps_the_writers_handle_working(tmp_path):
+    # A rename-rotation strands a live writer on the renamed file; copy+truncate
+    # must leave the role's append-mode handle writing into the CURRENT log.
+    log = tmp_path / "role.log"
+    handle = log.open("a", encoding="utf-8")
+    handle.write("old-line\n" * 50)
+    handle.flush()
+    assert lp.rotate_running_log(log, max_bytes=100) is True
+    handle.write("new-line\n")
+    handle.flush()
+    handle.close()
+    assert log.read_text(encoding="utf-8") == "new-line\n"
+    assert (tmp_path / "role.log.1").read_text(encoding="utf-8").count("old-line") == 50
+    assert lp.rotate_running_log(log, max_bytes=10_000) is False
+
+
+def test_ci_env_carries_nothing_that_reaches_the_fleet():
+    base = {
+        "PATH": "/usr/bin", "HOME": "/home/x", "RENDER": "true", "ADMIN_TOKEN": "t",
+        "SYNDICATE_REFRESH_STATE_URL": "redis://127.0.0.1:6379/0", "SYNDICATE_DATA_ROOT": "/d",
+        "KALSHI_PRIVATE_KEY": "k", "ODDS_API_KEY": "o", "PYTHONPATH": "/repo",
+    }
+    env = lp.ci_env(base)
+    assert env["PATH"] == "/usr/bin" and env["HOME"] == "/home/x"
+    for key in ("RENDER", "ADMIN_TOKEN", "SYNDICATE_REFRESH_STATE_URL", "SYNDICATE_DATA_ROOT",
+                "KALSHI_PRIVATE_KEY", "ODDS_API_KEY", "PYTHONPATH"):
+        assert key not in env
+
+
+def test_ensure_redis_durable_turns_aof_on(monkeypatch):
+    import types
+
+    calls = []
+
+    class Fake:
+        def __init__(self, value):
+            self.value = value
+
+        def config_get(self, key):
+            return {key: self.value}
+
+        def config_set(self, key, value):
+            calls.append((key, value))
+
+        def config_rewrite(self):
+            calls.append(("rewrite",))
+
+    fake_redis = types.SimpleNamespace(Redis=types.SimpleNamespace(from_url=lambda *a, **k: Fake("no")))
+    monkeypatch.setitem(_sys.modules, "redis", fake_redis)
+    assert lp.ensure_redis_durable("redis://x") == "aof=enabled+persisted"
+    assert calls == [("appendonly", "yes"), ("rewrite",)]
+    fake_redis.Redis.from_url = lambda *a, **k: Fake("yes")
+    assert lp.ensure_redis_durable("redis://x") == "aof=already-on"
+
+
+@pytest.mark.skipif(_shutil.which("rsync") is None, reason="backup uses rsync (Linux/WSL host)")
+def test_backup_snapshots_hardlinks_unchanged_files_and_prunes(tmp_path):
+    import json
+    import os
+
+    home = tmp_path / "home"
+    data = home / "data" / "mlb_source"
+    data.mkdir(parents=True)
+    (data / "a.json").write_text("same", encoding="utf-8")
+    (data / "x.lock").write_text("held", encoding="utf-8")
+    dest = tmp_path / "backup"
+    args = lambda: lp.parse_args(["--home", str(home), "--state", "file", "backup", "--dest", str(dest), "--keep", "2"])  # noqa: E731
+
+    assert lp.cmd_backup(args()) == 0
+    first = lp._complete_snapshots(dest)
+    assert len(first) == 1
+    manifest = json.loads((first[0] / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["snapshot_files"] == manifest["source_files_at_start"] == 1  # the lock is excluded
+    assert not (first[0] / "data" / "mlb_source" / "x.lock").exists()
+
+    import time
+    for _ in range(2):
+        time.sleep(1.1)  # snapshot names have one-second resolution
+        (data / "b.json").write_text(str(time.time()), encoding="utf-8")
+        assert lp.cmd_backup(args()) == 0
+    snaps = lp._complete_snapshots(dest)
+    assert len(snaps) == 2  # --keep 2 pruned the oldest
+    assert not list(dest.glob("*.partial"))
+    a_old = os.stat(snaps[0] / "data" / "mlb_source" / "a.json")
+    a_new = os.stat(snaps[1] / "data" / "mlb_source" / "a.json")
+    assert a_old.st_ino == a_new.st_ino  # unchanged file is hard-linked, not copied

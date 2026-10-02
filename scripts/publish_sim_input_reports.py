@@ -121,6 +121,28 @@ def _token() -> str:
     return ""
 
 
+def _count_local_inputs() -> int:
+    """Count basketball's inputs already on THIS disk (`--no-pull`).
+
+    On the single-disk local fleet (`scripts/local_production.py`, Render
+    billing-suspended since 2026-09-30) the checklists read the same data root
+    the workers write, so a pull would only re-export those files from the
+    local web and write them back over themselves while the workers append.
+    The empty-directory refusal still applies: zero inputs is a hard stop.
+    """
+    root = _data_root()
+    if not root.is_dir():
+        return 0
+    count = 0
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root).as_posix()
+        if any(fnmatch.fnmatch(rel, p) for p in BASKETBALL_INPUTS):
+            count += 1
+    return count
+
+
 def _pull_or_refuse(token: str) -> int:
     """Pull basketball's inputs onto this disk. REFUSES on an empty result.
 
@@ -249,6 +271,9 @@ def main() -> int:
     ap_ = argparse.ArgumentParser(description=__doc__)
     ap_.add_argument("--publish", action="store_true")
     ap_.add_argument("--verify", action="store_true")
+    ap_.add_argument("--no-pull", action="store_true",
+                     help="read basketball inputs already on this disk instead of "
+                          "pulling them from web (one shared disk: local_production.py)")
     args = ap_.parse_args()
 
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -260,22 +285,32 @@ def main() -> int:
           "allowlisted, so a cron would measure an absence and report it as a "
           "finding. They already publish from the worker.\n")
 
-    if not token:
+    if not token and (args.publish or not args.no_pull):
         print("REFUSING: no ADMIN_TOKEN. The pull would fetch nothing and the "
               "checklists would report 0.0% for everything -- a false finding "
               "that looks exactly like a real one.")
         return 2
 
-    print("=== pulling basketball inputs ===")
-    pulled = _pull_or_refuse(token)
-    if pulled < 0:
-        return 3
-    if pulled == 0:
-        print("\nREFUSING: pulled 0 files. Running the basketball checklist now "
-              "would audit an empty directory and report every field at 0.0%, "
-              "which is indistinguishable from the defect it detects.")
-        return 4
-    print(f"  total files pulled: {pulled}\n")
+    if args.no_pull:
+        print("=== basketball inputs on this disk (--no-pull) ===")
+        present = _count_local_inputs()
+        if present == 0:
+            print("\nREFUSING: 0 basketball input files on this disk. Running the "
+                  "checklist now would audit an empty directory and report every "
+                  "field at 0.0%, which is indistinguishable from the defect it detects.")
+            return 4
+        print(f"  input files present: {present}\n")
+    else:
+        print("=== pulling basketball inputs ===")
+        pulled = _pull_or_refuse(token)
+        if pulled < 0:
+            return 3
+        if pulled == 0:
+            print("\nREFUSING: pulled 0 files. Running the basketball checklist now "
+                  "would audit an empty directory and report every field at 0.0%, "
+                  "which is indistinguishable from the defect it detects.")
+            return 4
+        print(f"  total files pulled: {pulled}\n")
 
     rc_overall = 0
     published: list[str] = []
