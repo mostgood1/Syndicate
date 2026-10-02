@@ -138,6 +138,11 @@ def _final_scores_for_date(date_str: str) -> dict[Any, tuple[int, int]]:
     return out
 
 
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
 def _load_summary(date_str: str, *, admin_token: str | None) -> dict[str, Any] | None:
     token = date_str.replace("-", "_")
     local = Path("data/mlb_source/source_artifacts/data/daily") / f"daily_summary_{token}.json"
@@ -149,7 +154,7 @@ def _load_summary(date_str: str, *, admin_token: str | None) -> dict[str, Any] |
     if not admin_token:
         return None
     path = f"mlb_source/source_artifacts/data/daily/daily_summary_{token}.json"
-    url = "https://syndicate-an21.onrender.com/api/ops/artifacts/stream?path=" + urllib.parse.quote(path)
+    url = default_base_url() + "/api/ops/artifacts/stream?path=" + urllib.parse.quote(path)
     request = urllib.request.Request(url, headers={"X-Admin-Token": admin_token})
     try:
         with urllib.request.urlopen(request, timeout=300) as response:

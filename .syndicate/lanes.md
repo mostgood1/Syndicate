@@ -1305,6 +1305,14 @@ death, never life — do not invert it.
 - Verification: unit test on derive_role_env paper defaults; after restart the live pid env reads ENABLED=1 MODE=paper ARMED=0 and the logs carry ORDER_PATH, VENUE_SETTLEMENT and PORTFOLIO_EXECUTED/PAPER2_EXECUTED with mode=paper
 - Blocked by: none
 
+### base-url-orphaned-conversions — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: The five scripts released from orphaned lanes resolve their default base URL via scripts/_base_url.default_base_url(), unchanged with no env var set, and leave tests/test_base_url.py ALLOWED — **GOAL: MET** (reading: test_base_url green incl. stale-allowlist after removing 5 pending entries; old-vs-new identical with env unset at all 5 sites, 0 regressions; fleet roles set both WNBA-specific vars so build_wnba_boxscores is unchanged in prod; 500 passed over 24 test files)
+- Files: scripts/bucket_search.py,scripts/build_wnba_boxscores.py,scripts/controlled_transfer_probe.py,scripts/grade_wnba_live_prop_projection.py,scripts/regrade_mlb_game_markets.py,tests/test_base_url.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: test_base_url green incl. stale-allowlist; old-vs-new default identical with env unset per site; each script's own tests green
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

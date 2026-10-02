@@ -86,7 +86,12 @@ RESAMPLES = 2000
 SEED = 20260914
 FDR_Q = 0.10
 P_FLOOR, P_CEIL = 0.001, 0.999
-BASE_URL = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BASE_URL = default_base_url()
 SPORTS = ("mlb", "nfl", "ncaaf", "soccer", "wnba", "nba", "nhl", "ncaab")
 MAX_PARTS = 64
 

@@ -40,12 +40,7 @@ ALLOWED = {
     # landed (lane `scripts-base-url-resolver`). Convert each when its lane
     # closes, and delete its line here -- the test then guards it too.
     "scripts/board_delivery_probe.py": "pending: lane nhl-board-rows-missing",
-    "scripts/bucket_search.py": "pending: lane accuracy-assessment-0914",
-    "scripts/build_wnba_boxscores.py": "pending: lane restore-measurement",
     "scripts/check_e2e_coverage.py": "pending: lane e2e-coverage-contract",
-    "scripts/controlled_transfer_probe.py": "pending: lane bandwidth-controlled-transfer",
-    "scripts/grade_wnba_live_prop_projection.py": "pending: lane live-props-model-probability",
-    "scripts/regrade_mlb_game_markets.py": "pending: lane dh-grading-ledger-joins",
 }
 
 

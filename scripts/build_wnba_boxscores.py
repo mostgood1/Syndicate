@@ -321,6 +321,11 @@ def to_csv(rows: list[dict[str, Any]]) -> str:
 
 
 
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
 def web_base_url() -> str:
     """Where the final box is fetched from when we cannot reach ESPN ourselves.
 
@@ -330,11 +335,7 @@ def web_base_url() -> str:
     """
     import os
 
-    return str(
-        os.environ.get("SYNDICATE_WNBA_LIVE_BOX_BASE_URL")
-        or os.environ.get("SYNDICATE_INTERNAL_WEB_BASE_URL")
-        or "https://syndicate-an21.onrender.com"
-    ).strip().rstrip("/")
+    return default_base_url("SYNDICATE_WNBA_LIVE_BOX_BASE_URL", "SYNDICATE_INTERNAL_WEB_BASE_URL")
 
 
 def fetch_via_web(base_url: str, date_str: str, *, count_only: bool = False) -> dict[str, Any]:

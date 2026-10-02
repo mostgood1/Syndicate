@@ -76,7 +76,12 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = REPO_ROOT / "reports" / "bandwidth_spikes"
 
-BASE = "https://syndicate-an21.onrender.com"
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
+BASE = default_base_url()
 #: An INCOMPRESSIBLE static asset, and the choice is load-bearing. Measured
 #: 2026-09-08: a JS file's client-side size is 4.8x what Render counts, because
 #: the origin always sends gzip (Cloudflare normalises `Accept-Encoding` toward

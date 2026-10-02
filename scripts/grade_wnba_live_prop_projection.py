@@ -349,6 +349,11 @@ def reconcile(state: dict[str, Any], *, minutes_tolerance: float = 2.0) -> dict[
 
 
 
+try:
+    from scripts._base_url import default_base_url
+except ImportError:  # run as `python scripts/<name>.py`
+    from _base_url import default_base_url
+
 def sim_anchor_index(date_str: str) -> dict[str, dict[str, Any]]:
     """`normalized player name -> {pts_mean, min_mean}` from that date's sim.
 
@@ -391,7 +396,7 @@ def sim_anchor_index(date_str: str) -> dict[str, dict[str, Any]]:
                 return {}
             # `/stream`, NOT `/export`: export reads on web have 502'd the board
             # under load (state_model.md, model-scorecard); stream sends the file.
-            url = ("https://syndicate-an21.onrender.com/api/ops/artifacts/stream?"
+            url = (default_base_url() + "/api/ops/artifacts/stream?"
                    + urllib.parse.urlencode({"path": relative}))
             request = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
             with urllib.request.urlopen(request, timeout=120) as response:
