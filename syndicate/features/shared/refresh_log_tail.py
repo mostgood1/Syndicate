@@ -60,6 +60,12 @@ _NOISE_TOKENS: frozenset[str] = frozenset(
         "CONTAINER_MEMORY",
         "ALL_PROCESS_MEMORY",
         "LIVE_ODDS_WORKER_MEMORY",
+        # `memory_observability` emits these too. LIST_MEMORY alone filled the
+        # whole 1600-char tail of 29 failed WNBA props-fetch steps on
+        # 2026-10-01/02, so their real error was never recorded (lane
+        # `wnba-odds-run-failures`).
+        "LIST_MEMORY",
+        "DATAFRAME_MEMORY",
         "RUNTIME_SNAPSHOT",
         "MAIN_THREAD_STACK",
         "PROCESS_ENUM_DEBUG",

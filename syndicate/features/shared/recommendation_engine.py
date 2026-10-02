@@ -2016,7 +2016,18 @@ def build_recommendation_output(
     policy: str | None = None,
     experiment_key: str | None = None,
 ) -> dict[str, Any]:
-    return rank_recommendations(
+    """The candidate re-scored by `rank_recommendations` -- or, when ranking
+    FILTERS it out, the candidate unchanged.
+
+    `rank_recommendations` filters before it ranks, so it can return `[]` for a
+    single candidate. Indexing `[0]` on that raised `IndexError` and aborted the
+    whole WNBA post-refresh tracking step (`refresh_impacted_recommendations_for_tracking`
+    rebuilds every row a movement signal touches) -- measured 2026-10-02 on the
+    fleet: 36 WNBA odds runs failed this way, filter verdict
+    `rejected={"no_model_probability": 1}`. A filtered row has nothing to
+    re-score, so the caller keeps what it had (lane `wnba-odds-run-failures`).
+    """
+    ranked = rank_recommendations(
         [candidate],
         sport=sport,
         ledger_path=ledger_path,
@@ -2024,7 +2035,10 @@ def build_recommendation_output(
         policy=policy,
         experiment_key=experiment_key,
         limit=1,
-    )[0]
+    )
+    if not ranked:
+        return dict(candidate)
+    return ranked[0]
 
 
 __all__ = [

@@ -1266,6 +1266,15 @@ death, never life — do not invert it.
 - Verification: Cause quoted from the run's own artifacts; failure rate across today's live-odds runs with denominator; log entry
 - Blocked by: none
 
+### wnba-odds-run-failures — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: WNBA odds-refresh runs stop failing on the post-refresh IndexError (build_recommendation_output returns the row unchanged when ranking filters it out), and a failed step's stderr_tail no longer loses its error line to LIST_MEMORY/DATAFRAME_MEMORY dumps; verified on the fleet after a restart
+- Files: syndicate/features/shared/recommendation_engine.py,syndicate/features/shared/refresh_log_tail.py,tests/test_recommendation_engine_filtered_candidate.py,tests/test_refresh_log_tail_memory_tokens.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: empty ranking -> candidate returned unchanged; tracking refresh survives a filtered row; diagnostic_tail drops LIST_MEMORY/DATAFRAME_MEMORY and reaches the error line. Fleet: after restart, the next WNBA odds runs show post_refresh ok (or a different, non-IndexError cause), counted with a denominator
+- Blocked by: none
+- Status 2026-10-02: code landed (both fixes, 5 tests, scratch A/B IndexError -> ok); fleet ff + READING owed (next WNBA odds runs, with denominator).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
