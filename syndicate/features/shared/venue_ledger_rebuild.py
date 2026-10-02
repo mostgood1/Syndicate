@@ -317,16 +317,21 @@ def summarize(rows: list) -> dict[str, Any]:
         })
         v["rows"] += 1
         v[str(row.get("outcome"))] = v.get(str(row.get("outcome")), 0) + 1
-        v["pnl_dollars"] = round(v["pnl_dollars"] + float(row.get("pnl_dollars") or 0.0), 2)
+        # Summed exactly and rounded ONCE below: rounding the running total on
+        # every add drifted 8-13 cents from the ledger read-back (2026-10-02).
+        v["pnl_dollars"] += float(row.get("pnl_dollars") or 0.0)
         if row.get("fill_stake_dollars"):
             v["rows_with_stake"] += 1
-            v["staked_dollars"] = round(v["staked_dollars"] + float(row["fill_stake_dollars"]), 2)
+            v["staked_dollars"] += float(row["fill_stake_dollars"])
         d = row.get("selected_date")
         if d:
             v["first_date"] = min(filter(None, [v["first_date"], d]))
             v["last_date"] = max(filter(None, [v["last_date"], d]))
         sport = str(row.get("sport") or "unknown")
         v["by_sport"][sport] = v["by_sport"].get(sport, 0) + 1
+    for v in out["by_venue"].values():
+        v["pnl_dollars"] = round(v["pnl_dollars"], 2)
+        v["staked_dollars"] = round(v["staked_dollars"], 2)
     return out
 
 

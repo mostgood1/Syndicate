@@ -129,6 +129,14 @@ def test_build_skips_existing_markets_merges_same_side_and_refuses_two_sided():
     assert len({(r["venue"], r["venue_ticker"]) for r in rows}) == len(rows)
 
 
+def test_summary_totals_equal_an_exact_sum_rounded_once():
+    rows = [{"venue": "kalshi", "outcome": "won", "pnl_dollars": 0.004, "fill_stake_dollars": 0.004,
+             "selected_date": "2026-09-21", "sport": "nfl"} for _ in range(300)]
+    v = vr.summarize(rows)["by_venue"]["kalshi"]
+    # Per-add rounding would keep 0.00 forever; the exact sum is 1.20.
+    assert (v["pnl_dollars"], v["staked_dollars"]) == (1.2, 1.2)
+
+
 def test_a_rerun_over_its_own_output_adds_nothing():
     first = vr.build_rows([_k()], [_p()], [], now=NOW)["rows"]
     again = vr.build_rows([_k()], [_p()], first, now=NOW)
