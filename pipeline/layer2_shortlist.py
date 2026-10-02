@@ -332,6 +332,30 @@ def _sweep_reference_age(last_seen: Mapping[str, str], now: Any) -> tuple[float,
     return newest_age, recent[need - 1]
 
 
+_ROW_DATE_HORIZON_DAYS = 3
+
+
+def _row_kickoff_dates(grid: Iterable[Any], selected_date: str) -> list[str]:
+    """Distinct CENTRAL kickoff dates of `grid`'s rows within [selected, selected + horizon]."""
+    from datetime import date, timedelta
+
+    from syndicate.features.shared.timezone import central_date_from_iso
+
+    try:
+        start = date.fromisoformat(str(selected_date or "")[:10])
+    except ValueError:
+        return []
+    end = start + timedelta(days=_ROW_DATE_HORIZON_DAYS)
+    found: set[str] = set()
+    for row in grid or []:
+        if not isinstance(row, Mapping):
+            continue
+        day = central_date_from_iso(row.get("commence_time"))
+        if day is not None and start <= day <= end:
+            found.add(day.isoformat())
+    return sorted(found)
+
+
 def _row_commence_date(row: Mapping[str, Any]) -> str:
     """The row's UTC commence date (`YYYY-MM-DD`), or '' when it has none."""
     text = str(row.get("commence_time") or "").strip()[:10]
@@ -2428,6 +2452,20 @@ def _attach_projections_over_window(
         dates.insert(0, selected_date[:10])
     if not dates:
         dates = [selected_date]
+
+    # THE ROWS' OWN KICKOFF DATES, not only the slate window `[2026-10-02, lane
+    # layer2-freshness-1h]`. A single-date sport's window is `[selected_date]`,
+    # but its grid still carries tomorrow's games once the books post them.
+    # Measured on the fleet board 2026-10-02 14:47Z: every unprojected NHL game
+    # row was a 10-03 game, every 10-02 one was projected, and
+    # `predictions_2026-10-03.csv` was already on disk -- the index for 10-03 was
+    # simply never built. CENTRAL date, because slate files are named that way;
+    # a 7pm CT puck drop is the next UTC day (`central_date_from_iso`). Bounded
+    # to `_ROW_DATE_HORIZON_DAYS` past the slate so one malformed commence_time
+    # cannot fan this out into a scan of unrelated files. Soccer's own join
+    # already spans its window, so it is excluded for the reason given below.
+    if sport not in _SELF_WINDOWING_PROJECTION_SPORTS:
+        dates.extend(d for d in _row_kickoff_dates(grid, selected_date) if d not in dates)
 
     # A SPORT WHOSE OWN JOIN ALREADY SPANS THE WINDOW MUST BE JOINED ONCE.
     #

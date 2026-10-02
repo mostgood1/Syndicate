@@ -1492,7 +1492,8 @@
     return `Implied probability of this pick's price${since ? ` since ${since}` : ""}: ${first}% → ${last}%${basisText ? ` (${basisText})` : ""}`;
   }
 
-  function _movementSparkline(item) {
+  function _movementSparkline(item, options) {
+    const neutral = Boolean(options && options.neutral);
     const { points, oriented } = _movementSeries(item);
     const values = points.map((point) => point.v);
     // A flat or single-point series has nothing to show; drawing a
@@ -1523,15 +1524,48 @@
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     });
     const rising = values[values.length - 1] > values[0];
-    const klass = oriented ? (rising ? "up" : "down") : "flat";
+    const klass = oriented && !neutral ? (rising ? "up" : "down") : "flat";
     const last = coords[coords.length - 1].split(",");
     const caption = _movementSeriesCaption(item, values);
     const titleTag = caption ? `<title>${escapeHtml(caption)}</title>` : "";
     return `<svg class="board-sparkline board-sparkline--${klass}" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-hidden="true" focusable="false">${titleTag}<polyline points="${coords.join(" ")}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" /><circle cx="${last[0]}" cy="${last[1]}" r="1.9" fill="currentColor" /></svg>`;
   }
 
+  // THE ARROW FOLLOWS THE MARKET, NOT ONE BOOK `[2026-10-02, lane
+  // layer2-freshness-1h, user decision]`. The arrow used to be
+  // `movement_vs_pick`: ONE book's price, our publish -> now. On the fleet board
+  // 2026-10-02 14:47Z, 64 of the top 100 rows drew a red "Market moved away" --
+  // and the no-vig consensus had moved against the pick in only 20 of them. The
+  // other 44 were one book (mostly ProphetX/Novig) lengthening its price while
+  // the market held: a BETTER price, and usually the reason the row ranks at
+  // all. So the colour now answers "did the market move?" from
+  // `movement_fair_delta_pp`, and the single book's drift becomes neutral price
+  // information. Rows without a consensus delta keep the old per-book arrow.
+  //
+  function _movementMarketVerdict(item) {
+    // 0.25 pp: below that, a consensus "move" is de-vig rounding across books
+    // re-quoting, not a market opinion; it is the same cut the analysis used.
+    // Inside the function so the tests/js harnesses, which extract functions,
+    // carry it with them.
+    const MOVEMENT_MARKET_PP = 0.25;
+    const fairDelta = numericValue(item.movement_fair_delta_pp);
+    if (fairDelta === null) return null;
+    if (fairDelta >= MOVEMENT_MARKET_PP) return "toward";
+    if (fairDelta <= -MOVEMENT_MARKET_PP) return "against";
+    return "held";
+  }
+
   function renderMovement(item) {
-    const sparkline = _movementSparkline(item);
+    const marketVerdict = _movementMarketVerdict(item);
+    // The sparkline is ONE book's price. When the arrow follows the market and
+    // that book went the other way, a coloured line would contradict the arrow
+    // beside it -- so it is drawn neutral, and its caption still says whose price.
+    const bookDir = (() => {
+      const v = String(item.movement_vs_pick || "").trim().toLowerCase();
+      return v === "toward" ? "up" : v === "away" ? "down" : "flat";
+    })();
+    const marketDir = marketVerdict === "toward" ? "up" : marketVerdict === "against" ? "down" : "flat";
+    const sparkline = _movementSparkline(item, { neutral: marketVerdict !== null && bookDir !== marketDir });
 
     // THE CURRENT, AUTHORITATIVE SOURCE (`#372`, shipped 2026-08-16,
     // `_movement_from_opening` in layer2_board.py) -- top-level
@@ -1570,22 +1604,47 @@
       if (lineFrom !== null && lineTo !== null && lineFrom !== lineTo) {
         parts.push(`Line ${_movementLineText(lineFrom)} → ${_movementLineText(lineTo)}`);
       }
-      const label = parts.length ? parts.join(" · ") : "Flat";
-      // `movement_vs_pick` is resolved server-side against the pick's side and
-      // mapped straight onto the arrow classes. A "Flat" label always gets the
-      // flat arrow: a green ▲ beside the word Flat would be the cell
-      // contradicting itself, whatever the backend's verdict field says.
+      // `movement_vs_pick` is resolved server-side against the pick's side.
       const vsPick = String(item.movement_vs_pick || "").trim().toLowerCase();
-      const arrowDir = !parts.length ? "flat" : vsPick === "toward" ? "up" : vsPick === "away" ? "down" : "flat";
+      const tip = [];
+      let label;
+      let arrowDir;
+      if (marketVerdict !== null) {
+        // The market's verdict leads; this book's own move is price information.
+        // "away" for this book means its number got LONGER on our side -- a
+        // better price for the bettor -- and "toward" means it shortened.
+        const bookNote = !parts.length
+          ? ""
+          : vsPick === "away" ? "Better price now" : vsPick === "toward" ? "Price shortened" : "";
+        const prices = parts.join(" · ");
+        if (marketVerdict === "toward") {
+          arrowDir = "up";
+          label = ["Market toward pick", prices].filter(Boolean).join(" · ");
+          tip.push("The no-vig market consensus now prices this side as more likely than when we published it");
+        } else if (marketVerdict === "against") {
+          arrowDir = "down";
+          label = ["Market against pick", prices].filter(Boolean).join(" · ");
+          tip.push("The no-vig market consensus now prices this side as LESS likely than when we published it -- the market disagrees with this pick");
+        } else {
+          arrowDir = "flat";
+          label = parts.length ? [bookNote, prices, "market unchanged"].filter(Boolean).join(" · ") : "Flat";
+          tip.push("The market consensus has not moved; only this book's price changed");
+        }
+        if (vsPick === "away") tip.push("This book lengthened its price on this side since publish (pays more)");
+        else if (vsPick === "toward") tip.push("This book shortened its price on this side since publish (pays less)");
+      } else {
+        // No consensus delta on this row: the old per-book arrow. A "Flat" label
+        // always gets the flat arrow -- a green ▲ beside the word Flat would be
+        // the cell contradicting itself, whatever the verdict field says.
+        label = parts.length ? parts.join(" · ") : "Flat";
+        arrowDir = !parts.length ? "flat" : vsPick === "toward" ? "up" : vsPick === "away" ? "down" : "flat";
+        if (vsPick === "toward") tip.push("Market moved toward the pick (it now prices this side as more likely)");
+        else if (vsPick === "away") tip.push("Market moved away from the pick");
+        else if (vsPick === "flat") tip.push("No net move for the pick");
+        else tip.push("Direction versus the pick is unknown");
+      }
       const sinceAgo = formatRelativeTime(item.movement_opened_at);
       const agoText = sinceAgo ? ` · ${sinceAgo}` : "";
-      // Tooltip only: the backend's working, which the visible label keeps out
-      // of the way.
-      const tip = [];
-      if (vsPick === "toward") tip.push("Market moved toward the pick (it now prices this side as more likely)");
-      else if (vsPick === "away") tip.push("Market moved away from the pick");
-      else if (vsPick === "flat") tip.push("No net move for the pick");
-      else tip.push("Direction versus the pick is unknown");
       const probDelta = numericValue(item.movement_prob_delta_pp);
       if (probDelta !== null) tip.push(`${probDelta > 0 ? "+" : ""}${probDelta.toFixed(1)} pts implied`);
       const basis = String(item.movement_basis || "").trim().toLowerCase();
@@ -2049,18 +2108,40 @@
         parts.push(`<span class="board-card__clock board-card__clock--price${priceStale ? " board-card__clock--stale" : ""}" title="How old this live price is now: when it was last observed, plus the time since this board was built. Live prices move every play.">Price seen ≈${escapeHtml(formatAge(served))} ago${priceStale ? " &middot; check the book before betting" : ""}</span>`);
       }
     }
+    // FRESHNESS IS WHEN WE LAST CHECKED, NOT WHEN THE BOOK LAST MOVED `[2026-10-02,
+    // lane layer2-freshness-1h, user decision "Last polled <=1h"]`. The red used
+    // to sit on `book_age_seconds` -- how long since the book CHANGED its number
+    // -- so an unmoved price we had polled a minute ago read as stale. And the
+    // "checked" clock read `capture_age_seconds`, a field the Layer 2 payload
+    // never carries, so it never rendered at all: on the fleet board 2026-10-02,
+    // 0 of 2,984 rows. The poll clock is `quote_seen_age_seconds` (stamped at
+    // build) plus the time since the build, the same arithmetic as a live card.
+    // Red at one hour, the board's freshness rule; the book clock is plain info.
+    const PREGAME_CHECK_STALE_AFTER_SECONDS = 3600;
     const bookAge = formatAge(quote.book_age_seconds);
-    const captureAge = formatAge(quote.capture_age_seconds);
-    if (!bookAge && !captureAge && !parts.length) return "";
-    const stale = Number(quote.book_age_seconds) >= 3600;
+    let checkedSeconds = null;
+    if (!itemIsLiveForPriceAge(item)) {
+      const seen = Number(quote.quote_seen_age_seconds);
+      if (quote.quote_seen_age_seconds !== null && quote.quote_seen_age_seconds !== undefined && quote.quote_seen_age_seconds !== "" && Number.isFinite(seen) && seen >= 0) {
+        const builtAt = boardBuildEpochMs(lastResponseForActions);
+        checkedSeconds = seen + (builtAt === null ? 0 : Math.max(0, (Date.now() - builtAt) / 1000));
+      } else if (Number.isFinite(Number(quote.capture_age_seconds)) && quote.capture_age_seconds !== null && quote.capture_age_seconds !== undefined) {
+        checkedSeconds = Number(quote.capture_age_seconds);
+      }
+    }
+    const checkedAge = checkedSeconds === null ? "" : formatAge(checkedSeconds);
+    if (!bookAge && !checkedAge && !parts.length) return "";
+    if (checkedAge) {
+      const checkStale = checkedSeconds >= PREGAME_CHECK_STALE_AFTER_SECONDS;
+      parts.push(`<span class="board-card__clock board-card__clock--checked${checkStale ? " board-card__clock--stale" : ""}" title="When we last checked this price at the book">Checked ${escapeHtml(checkedAge)} ago${checkStale ? " &middot; check the book before betting" : ""}</span>`);
+    }
     if (bookAge) {
-      parts.push(`<span class="board-card__clock${stale ? " board-card__clock--stale" : ""}" title="When this book last moved the number">Book ${escapeHtml(bookAge)} ago</span>`);
+      parts.push(`<span class="board-card__clock" title="When this book last changed the number. An unchanged price is not a stale one: see Checked.">Book last moved ${escapeHtml(bookAge)} ago</span>`);
     } else if (!parts.length) {
       // Unknown must read as unknown. Falling back to capture time here would
       // rebuild exactly the conflation the separate field exists to remove.
       parts.push('<span class="board-card__clock board-card__clock--unknown" title="This source does not publish a book timestamp">Book age unknown</span>');
     }
-    if (captureAge) parts.push(`<span class="board-card__clock" title="When we last polled">checked ${escapeHtml(captureAge)} ago</span>`);
     return `<div class="board-card__freshness">${parts.join(" &middot; ")}</div>`;
   }
 
