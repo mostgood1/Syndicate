@@ -1258,6 +1258,14 @@ death, never life — do not invert it.
 - Verification: unit tests over the evaluator (healthy, each failure, re-alert window, recovery); live run on the fleet reports healthy; a negative control (stopped healthz / bad port) raises an alert and a real Windows notification
 - Blocked by: none
 
+### odds-run-135535-failure — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: Explain why live-odds-worker odds run 20261002_135535 ended failed exitCode=1 13 s after launch, and whether that failure mode is recurring (rate over today's runs) — **GOAL: MET** (reading: cause = C, `recommendation_engine.build_recommendation_output` indexes `[0]` of an empty ranking after FILTER_CANDIDATES rejects `no_model_probability` -- full traceback reproduced in a scratch copy; rate: WNBA in 65 of today's 498 odds runs, 0 ok -- 36 this IndexError, 29 fetch-step rc=1 whose cause was truncated out of `stderr_tail`. Fix proposed, not applied; see log/2026-10-02.md)
+- Files: .syndicate/log/2026-10-02.md
+- Hypothesis: Candidates, unranked: (A) the child refused/aborted on a lane mutex or 'nothing due' path that exits 1 (benign but mis-coded); (B) an upstream OddsAPI error (HTTP/quota/timeout); (C) a code/data error in refresh_odds_sources.py (Traceback); (D) the wrapper's own timeout/kill.
+- Falsification test: Each candidate is falsified by the run's own stderr/stdout + refresh_and_gate_run.json: A needs a refusal/skip message and no Traceback; B needs an HTTP/quota error; C needs a Traceback; D needs WRAPPER_WAIT_TIMEOUT. Recurrence is measured as failed/total over today's odds_refresh_* run dirs, not from one run.
+- Verification: Cause quoted from the run's own artifacts; failure rate across today's live-odds runs with denominator; log entry
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
