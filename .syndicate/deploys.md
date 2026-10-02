@@ -45191,3 +45191,12 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - reading (all-sport pregame run 20261002_210650, 21:06:51Z -> 21:35:51Z, first after the ff): **rc=0**, per-sport ok nba/nhl/wnba/nfl/ncaaf/soccer all true (mlb's entry is in the truncated middle; rc=0 means no sport failed) -- the FIRST hourly all-sport run with rc=0 since at least 2026-10-01 05:00Z. belgian_pro_league/api/schedule/schedule_2026.json rewritten 21:30:48Z inside the run (last rewrite before: the 18:03Z run).
 - not visible: the `status=502 -> retrying` line (in the truncated middle of this pre-1d0cee45 run file); the live-ESPN pre-verify on the fleet's code showed it (deploys.md 20:56Z entry).
 - noted, not investigated: the run took 29 min against today's usual 15-17 min.
+
+## 2026-10-02 21:38Z (4:38 PM CT) -- LOCAL FLEET: NHL player props reach the board (cc1465d8; fleet ff'd to it ~21:02Z, web HUP + refresh-worker TERM at 21:38:18Z on check_deploy_safety CLEAR, roles code=1d0cee45 which contains it) -- **MET** (lane `nhl-player-props-projection`)
+
+- baseline (21:02:02Z, served /api/board/layer2-shortlist): per_sport_ingest.nhl projections prop_rows_with_projection **0 / 339**, reason "no NHL player-prop projection source"; every props_recommendations_2026-10-0*.csv header-only.
+- expect: producer writes rows on its next per-run subprocess (no restart); after the role restart the board's NHL prop join stamps means, with probability WITHHELD per market (user decision "means now, edges after backtest").
+- reading 1 (producer, no restart): props_recommendations_2026-10-03.csv written 21:12:55Z with **196 rows** (first non-empty NHL props file since the July owned-generation cutover).
+- reading 2 (served, 21:42:00Z, build_age 30.8 s, first build after the restart): prop_rows_with_projection **297 / 341** (unmatched 44), rows_with_probability **0**, probability_withheld_unmeasured {SOG 65, ASSISTS 101, POINTS 101, GOALS 30}; game rows unchanged 19/19.
+- live-odds-worker NOT restarted (the producer is a per-run subprocess).
+- backtest (scripts/backtest_nhl_props.py, 1,132 regular-season games, as-of inputs): every skater market is significantly WORSE than the player's own as-of average (SOG dMAE +0.033 [0.028, 0.038], POINTS +0.029, ASSISTS +0.017, GOALS +0.009, BLOCKS +0.006); SAVES no difference. Keep MEASURED_MARKETS empty.
