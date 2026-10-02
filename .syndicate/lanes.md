@@ -1153,6 +1153,14 @@ death, never life — do not invert it.
 - Verification: Backtest script runs end-to-end on production-sourced inputs (export/stream) plus as-of baselines, prints per-family coverage + intersection, writes per-market tables; numbers recorded in the findings file and lanes.md
 - Blocked by: none
 
+### wnba-lines-props-backtest — OPEN — opened 2026-10-02 — session 39b666bb-e708-4edf-bfe5-3dda419e3589
+- Goal: Every WNBA game-line market (spread/margin, total, moneyline, and quarter/half lines where priced and projected) and every WNBA player-prop market priced in the captured odds is backtested AS-OF over completed 2026 games, regular season and playoffs reported separately: per market n, MAE and bias vs actual, dMAE vs a naive baseline (player's as-of average for props) with a game-clustered bootstrap CI, and Brier/log-loss vs the de-vigged book; per-family date coverage and the intersection printed; the 08-31 assessment re-measured on the full season; findings file names which markets beat BOTH the baseline and the book (the only ones that may carry a board probability/edge) and answers the ML vs spreads/totals recommendation-mix question. Measurement only -- no deploy, no board change without a user decision
+- Files: scripts/backtest_wnba_lines_props.py (NEW), tests/test_backtest_wnba_lines_props.py (NEW), .syndicate/findings_2026-10-02_wnba_lines_props_backtest.md (NEW)
+- Hypothesis: Following NHL (no skater market beats the player's own average) and the 09-19 market re-measure (WNBA prop ladder log-loss 0.858 vs market 0.682; totals/spreads worse than market; ML slightly better, 1.1 SE), no WNBA prop market beats BOTH the player's as-of average and the de-vigged book, and among game lines only the moneyline is a candidate
+- Falsification test: Any market whose dMAE vs baseline CI lies wholly below 0 AND whose Brier/log-loss vs the de-vigged book is lower with a paired game-clustered CI excluding 0 refutes it for that market
+- Verification: The backtest script runs end-to-end on fleet + recoverable production inputs, prints per-family coverage + intersection, writes per-market tables split regular season / playoffs; numbers recorded in the findings file, lanes.md and deploys.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
