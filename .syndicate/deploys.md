@@ -44849,3 +44849,15 @@ Supersedes "Not upstream" in the ~7:50 PM CT rebound entry. Upstream `main` `sim
   - `check_deploy_safety.py` run FROM `~/Syndicate` 02:06:37Z: real verdict (`Board build IN FLIGHT ... stage=build_intelligence_overview, typical=5.5min`, rc 1) -- no longer the Render-blind UNKNOWN.
   - web log, last 3,000 lines: 0 Traceback/ERROR; 90x 200, 2x 401. live-odds-worker: 3 Tracebacks in a window that straddles the restart (no boot marker in that log) = one external read timeout to `app.americansocceranalysis.com` + benign `PROCESS_ENUM_DEBUG` procfs races; no code error.
 - not done: nothing owed.
+
+## 2026-10-02 02:31Z (2026-10-01 9:31 PM CT) -- LOCAL FLEET all-roles restart onto `d165980d` (lane `fleet-restart-onto-main-2`, user: "update the fleet checkout with a deliberate all-roles restart") -- **MET**
+
+- what: `~/Syndicate` ff `5fa8076b -> d165980d` from `github` (4 commits; no requirements change; 2 local data mods kept). Runtime files: `scripts/publish_sim_input_reports.py` (default base URL via `scripts/_base_url`, `eae1de02`), `scripts/soccer_season_audit/outcomes.py`, `syndicate/features/shared/measured_market_skill.py`. Render untouched.
+- how: ff 02:25:54Z. `--drain` 02:25:55Z: "not acked yet" -> **"board build in flight"** (held) -> CLEAR rc=0 02:27:41Z -- the first live exercise of the build-gated path. Safety check then held 2m47s for odds refresh pid 267745 (stamp 20261002_022716) -> CLEAR 02:30:28Z. `down` 02:30:28-02:31:02Z rc 0; `Start-ScheduledTask SyndicateLocalProduction` 02:31:06Z; drain cleared after. Live games in progress (allowed).
+- verify (READ 02:31:17-02:35:33Z):
+  - `/healthz` 200 at 02:31:17Z.
+  - `status` 02:31:24Z: supervisor 268389, web 268404, refresh-worker 268483, live-odds-worker 268484, all `up restarts=0 code=d165980d`; `money: paper`; `[redis] aof=already-on`.
+  - first build after `[refresh_worker] BOOTED` (log line 420210): `BOARD_BUILD_TIMING wall_s=212.0 ok=True` 02:35:33Z; no DEFERRED / DRAIN_HOLD / Traceback since boot.
+  - `check_deploy_safety.py` from `~/Syndicate` 02:31:36Z: CLEAR rc 0 with real readings.
+  - web last 3,000 lines: 0 errors, 92x 200, 4x 401. live-odds-worker: 8 lines match a bare `ERROR` pattern, 0 Traceback / `_ERROR` / Exception.
+- side effect checked: another session's manual CI run (`c98bef63` `ci_main.sh`, pid 263049, NOT a supervisor job -- its own process tree in `~/syndicate-prod/ci-checkout`) ended in this window. Its script re-checked-out `ci-checkout` `bac37f64 -> bbff3f7a` at 02:33:10Z and relaunched (pid 271820, progressing). Attributed to that relaunch, not to `down` (which only signals the supervisor's own children); the old process's exact exit instant was not captured.

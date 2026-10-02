@@ -1127,6 +1127,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - Still pending (claimed by OPEN lanes at 2026-10-02): board_delivery_probe (nhl-board-rows-missing), bucket_search (accuracy-assessment-0914), build_wnba_boxscores (restore-measurement), check_e2e_coverage (e2e-coverage-contract), controlled_transfer_probe (bandwidth-controlled-transfer), grade_wnba_live_prop_projection (live-props-model-probability), regrade_mlb_game_markets (dh-grading-ledger-joins).
 
+### fleet-restart-onto-main-2 — CLOSED — opened 2026-10-01 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: LOCAL FLEET ~/Syndicate fast-forwarded to github/main and all three roles restarted together (drain -> safety CLEAR -> down -> scheduled task up), every role code=<new HEAD>, /healthz 200, a board build completing after BOOTED; recorded in deploys.md — **GOAL: MET** (reading: status 02:31:24Z all roles `up restarts=0 code=d165980d`; /healthz 200 02:31:17Z; BOARD_BUILD_TIMING wall_s=212.0 ok=True 02:35:33Z after BOOTED line 420210, no DEFERRED/DRAIN_HOLD/Traceback; deploys.md 2026-10-02 02:31Z)
+- Files: .syndicate/deploys.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: status all roles up restarts=0 code=<HEAD>; /healthz 200; BOARD_BUILD_TIMING after the latest [refresh_worker] BOOTED with no DEFERRED/DRAIN_HOLD/Traceback; deploys.md entry
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
