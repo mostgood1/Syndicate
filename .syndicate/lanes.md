@@ -1436,6 +1436,14 @@ death, never life — do not invert it.
 - Verification: unit tests over a temp repo reflog; live: status on the fleet names the right commit for live-odds-worker (last role-only restart) where the env stamp was wrong
 - Blocked by: none
 
+### fleet-checkout-upstream — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: Updating the fleet checkout cannot silently no-op: ~/Syndicate's main tracks github/main (not the stale Windows clone at origin), and the runbook says how to fast-forward it
+- Files: docs/ai_context/local_production_runbook.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: fleet: git rev-parse --abbrev-ref main@{upstream} prints github/main and git status -sb shows main...github/main level; runbook names the recipe and the trap
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
