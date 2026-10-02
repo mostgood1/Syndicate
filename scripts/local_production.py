@@ -88,6 +88,7 @@ import datetime as dt
 import json
 import os
 import platform
+import re
 import shutil
 import signal
 import socket
@@ -1503,8 +1504,9 @@ def cmd_ci_run(args: argparse.Namespace) -> int:
 
 
 def role_loaded_commit(pid: int | None) -> str | None:
-    """RENDER_GIT_COMMIT from the role's own environment: the commit it was
-    SPAWNED on. A gunicorn HUP loads new code but keeps this stamp."""
+    """RENDER_GIT_COMMIT from the role's own environment: the commit of the
+    supervisor's last `up`. NOT what a role runs after a role-only restart
+    (the supervisor reuses the env) or a gunicorn HUP -- see `role_code`."""
     if not pid:
         return None
     try:
@@ -1513,6 +1515,59 @@ def role_loaded_commit(pid: int | None) -> str | None:
         return psutil.Process(int(pid)).environ().get("RENDER_GIT_COMMIT")
     except Exception:
         return None
+
+
+def head_at(epoch: float, repo: Path = REPO_ROOT) -> str | None:
+    """The checkout's HEAD at `epoch`, from its reflog (newest first). None when
+    the reflog cannot answer: no git, no reflog, or `epoch` older than it."""
+    try:
+        out = subprocess.run(
+            ["git", "reflog", "show", "--date=unix", "--format=%H %gd", "HEAD"],
+            cwd=str(repo), capture_output=True, text=True, timeout=30,
+        )
+    except Exception:
+        return None
+    if out.returncode != 0:
+        return None
+    for line in out.stdout.splitlines():
+        match = re.match(r"^([0-9a-f]{40}) \S*@\{(\d+)\}$", line.strip())
+        if match and int(match.group(2)) <= epoch:
+            return match.group(1)
+    return None
+
+
+def role_start_epoch(pid: int | None, role: str = "") -> float | None:
+    """When the role's CODE was loaded. For web, gunicorn's OLDEST worker: a HUP
+    replaces the workers (which import the app) and keeps the master. For the
+    workers, the process itself; its children are sims, started later."""
+    if not pid:
+        return None
+    try:
+        import psutil
+
+        proc = psutil.Process(int(pid))
+        if role == "web":
+            kids = [c.create_time() for c in proc.children()]
+            if kids:
+                return min(kids)
+        return proc.create_time()
+    except Exception:
+        return None
+
+
+def role_code(pid: int | None, role: str = "", repo: Path = REPO_ROOT) -> tuple[str, str]:
+    """(commit, source) for what a role RUNS: HEAD at its start (`reflog`), else
+    the env stamp (`env`, exact only for a role started by `up`).
+
+    Measured 2026-10-02: live-odds-worker read `code=927d1787` from its env
+    while it ran c1067485, which it loaded at a role-only restart (its split log
+    line exists only in c1067485)."""
+    started = role_start_epoch(pid, role)
+    if started is not None:
+        commit = head_at(started, repo)
+        if commit:
+            return commit, "reflog"
+    return role_loaded_commit(pid) or "", "env"
 
 
 # Paths no role imports or reads at runtime: a gap made only of these leaves a
@@ -1592,10 +1647,10 @@ def cmd_status(args: argparse.Namespace) -> int:
             except Exception:
                 pass
         cap = PLAN_MEMORY_MB.get(name)
-        loaded = role_loaded_commit(pid) or ""
+        loaded, source = role_code(pid, name)
         code = ""
         if loaded:
-            code = f"  code={loaded[:8]}" + code_stamp_note(loaded, head)
+            code = f"  code={loaded[:8]}" + ("" if source == "reflog" else "(env stamp)") + code_stamp_note(loaded, head)
         print(f"  {name:17} pid={pid} {'up' if alive else 'DOWN'}  rss={rss}" + (f" (Render plan {cap} MB)" if cap else "")
               + f"  restarts={(info.get('restarts') or {}).get(name, 0)}" + code)
     port = int(info.get("port") or settings.port)

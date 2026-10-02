@@ -509,6 +509,32 @@ def git_repo(tmp_path, monkeypatch):
     return repo, commit
 
 
+def test_head_at_reads_the_reflog_at_a_moment(git_repo, monkeypatch):
+    repo, commit = git_repo
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "1700000000 +0000")
+    first = commit("syndicate/app.py", "v1\n")
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "1700000100 +0000")
+    second = commit("syndicate/app.py", "v2\n")
+    assert lp.head_at(1700000050, repo) == first
+    assert lp.head_at(1700000100, repo) == second
+    assert lp.head_at(1699999999, repo) is None  # older than the reflog: no answer, not a guess
+
+
+def test_role_code_prefers_the_reflog_over_a_stale_env_stamp(git_repo, monkeypatch):
+    """2026-10-02: live-odds-worker's env said 927d1787 while it ran c1067485,
+    loaded at a role-only restart. HEAD at its start time is the truth."""
+    repo, commit = git_repo
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "1700000000 +0000")
+    old = commit("syndicate/app.py", "v1\n")
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "1700000100 +0000")
+    new = commit("syndicate/app.py", "v2\n")
+    monkeypatch.setattr(lp, "role_loaded_commit", lambda pid: old)
+    monkeypatch.setattr(lp, "role_start_epoch", lambda pid, role="": 1700000200.0)
+    assert lp.role_code(123, "live-odds-worker", repo) == (new, "reflog")
+    monkeypatch.setattr(lp, "role_start_epoch", lambda pid, role="": 1600000000.0)
+    assert lp.role_code(123, "live-odds-worker", repo) == (old, "env")
+
+
 def test_a_ledger_only_gap_is_not_stale(git_repo):
     repo, commit = git_repo
     loaded = commit("syndicate/app.py", "v1\n")

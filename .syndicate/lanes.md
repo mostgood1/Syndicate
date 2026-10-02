@@ -1427,6 +1427,14 @@ death, never life — do not invert it.
 - Verification: unit: _derive_sim_minutes_local and _apply_player_priors_local run against a module without LEAGUE (NBA 240 min) and still prefer the module's LEAGUE when present; the game-cards subprocess is invoked as nba_betting.cli with cwd vendor/nba_betting_repo for a data-root source_root. Fleet: after ff, the next hourly run shows nba ok=true, smart_sim_2026-10-03_TOR_MIA.json and game_cards_2026-10-03.csv written
 - Blocked by: none
 
+### status-loaded-commit — OPEN — opened 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+- Goal: local_production.py status reports the commit each role actually runs: the checkout HEAD (from git reflog) at the role process's start time (web: its oldest gunicorn worker), falling back to the env stamp only when the reflog cannot answer, and saying which source it used
+- Files: scripts/local_production.py, tests/test_local_production.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit tests over a temp repo reflog; live: status on the fleet names the right commit for live-odds-worker (last role-only restart) where the env stamp was wrong
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
