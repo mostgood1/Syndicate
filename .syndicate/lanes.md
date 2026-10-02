@@ -1145,6 +1145,12 @@ death, never life — do not invert it.
 - Hypothesis: As NHL: no NBA prop market beats the player's own as-of average AND the de-vigged book, so MEASURED markets stay empty; game lines unknown
 - Falsification test: A market whose dMAE CI vs the as-of average is entirely below 0 AND whose Brier/log-loss beats the de-vigged book on the same rows
 - Verification: Findings file with per-family date coverage + intersection, per-market n/MAE/bias/dMAE CI/Brier/log-loss, data substrate named (fleet vs checkout), and the gate list; no board change without user decision
+### mlb-lines-props-backtest — OPEN — opened 2026-10-02 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- Goal: Every MLB pregame game-line market (ML, run line, total, F5 ML/RL/total) and every MLB player-prop market priced in the captured odds is backtested AS-OF over the 2026 regular season (postseason separately): per market n, MAE/bias vs actual, dMAE vs a naive baseline (player's own as-of rate for props) with a game-clustered bootstrap CI, and Brier/log-loss vs the de-vigged book; per-family date coverage + intersection printed from production; already-measured markets inventoried first; findings file gives the gate list (probability/edge vs mean-only) and every market whose CURRENT board treatment the backtest contradicts. Measurement only -- no deploy, no board change without a user decision
+- Files: scripts/backtest_mlb_lines_props.py (NEW), tests/test_backtest_mlb_lines_props.py (NEW), .syndicate/findings_2026-10-02_mlb_lines_props_backtest.md (NEW)
+- Hypothesis: Following the NHL result and the 08-31/09-01 MLB findings (sim edge anti-predictive; market wins every clean hitter family), no MLB game-line market beats the de-vigged book and no continuous MLB prop market beats BOTH the player's own as-of rate and the book
+- Falsification test: Any market whose dMAE vs baseline CI lies wholly below 0 AND whose Brier vs the de-vigged book is lower with a paired game-clustered CI excluding 0 refutes it for that market
+- Verification: Backtest script runs end-to-end on production-sourced inputs (export/stream) plus as-of baselines, prints per-family coverage + intersection, writes per-market tables; numbers recorded in the findings file and lanes.md
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
