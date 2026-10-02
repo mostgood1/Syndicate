@@ -192,7 +192,15 @@ class LiveLensLoopTests(unittest.TestCase):
                 "soccer": lambda payload: True,
                 "nfl": lambda payload: True,
             },
-        ), patch.object(live_lens_loop, "write_json_file") as mocked_write:
+        ), patch.object(live_lens_loop, "write_json_file") as mocked_write, patch(
+            # The tick also runs the MLB final pass, which REWRITES real
+            # `live_lens_report_*.json` files; unstubbed, it wrote into the
+            # git-tracked data/ mirror in any checkout that has one (CI, Render)
+            # and the conftest guard ERRORed the test (baseline red until
+            # 2026-10-02). Not what this test is about.
+            "syndicate.features.mlb.live_lens_final_pass.finalize_recent_mlb_live_lens_reports",
+            return_value={},
+        ):
             meta = live_lens_loop._run_live_lens_tick()
 
         self.assertFalse(meta["results"]["mlb"]["ok"])

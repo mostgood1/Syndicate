@@ -252,9 +252,19 @@ def _board_row(event_id: str, score: float):
         "quote": {
             "price": -110,
             "bookmaker": "draftkings",
-            "book_prices": {"draftkings": -110, "kalshi": -105},
+            "book_prices": {"draftkings": -110, "kalshi": -102},
         },
-        "ev_pct": 6.0,
+        # 0.75% at DK -110 and Kalshi at -102 (was 6.0% and -105). Since
+        # `4ee86561` (2026-09-21, user decision) venue scoping re-derives EV at
+        # the VENUE's price and refuses it past the shortlist's 5.26% ceiling
+        # (`venue_ev_implausible`), and the commit then deducts Kalshi's taker
+        # fee (~3.4% of stake near even money) and refuses anything below zero
+        # (`below_min_ev_pct_net_of_fee`). The old fixture re-derived to ~8% and
+        # was refused outright, so paper2 came out EMPTY. Now every row re-derives
+        # to ~4.5% gross / ~1.1% net -- inside both rules -- and the aggregator's
+        # Kalshi price equals the feed's, so the rows differ only in WHERE the
+        # price came from, which is what these tests are about.
+        "ev_pct": 0.75,
         "model_edge_pct": 4.0,
         "score": {"score": score, "price_reliability": 0.82},
     }

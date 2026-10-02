@@ -25,7 +25,9 @@ re-leaked the NEXT key regardless.
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -82,6 +84,12 @@ def _powershell(snippet: str) -> dict:
 def result() -> dict:
     if not SCRIPT.exists():
         pytest.skip("unified_daily_update.ps1 not present in this tree")
+    # Native Windows only: the harness runs Windows `powershell` on this tree's
+    # path. Linux has no `powershell` (FileNotFoundError at setup -- 4 tests
+    # ERRORed on Render/WSL, baseline red until 2026-10-02), and WSL's interop
+    # `powershell.exe` cannot read a Linux path.
+    if os.name != "nt" or shutil.which("powershell") is None:
+        pytest.skip("needs native Windows PowerShell")
     return _powershell(_HARNESS.format(script=str(SCRIPT), sentinel=SENTINEL))
 
 

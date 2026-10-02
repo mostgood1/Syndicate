@@ -22,6 +22,18 @@ from syndicate.features.shared import game_board_contract as contract
 from syndicate.features.soccer import cards
 
 
+def _kickoff_days_away(days: int = 5) -> str:
+    """A kickoff that is still `days` in the FUTURE whenever the suite runs.
+
+    These tests used the literal 2026-09-25 as "days away"; once that date
+    passed, `_effective_status_state` correctly stopped refusing a `post` for
+    it, and two refusal tests went red with correct code (local ci-suite,
+    2026-10-02). Same `%Y-%m-%dT%H:%MZ` shape as the artifact."""
+    from datetime import datetime, timedelta, timezone
+
+    return (datetime.now(timezone.utc) + timedelta(days=days)).strftime("%Y-%m-%dT%H:%MZ")
+
+
 # The real `betting` dict from `/soccer/epl/api/cards`, COV @ ARS, 2026-08-20.
 PROD_BETTING = {
     "away_ml": 1400.0,
@@ -595,7 +607,7 @@ class FabricatedScoreTests(unittest.TestCase):
         `away_score` above it unconditionally -- and the card head reads the
         latter. Asserted through `_match_to_game`, the real caller."""
         game = cards._match_to_game(
-            _live_match(status_state="pre", kickoff="2026-09-25T19:30Z"),
+            _live_match(status_state="pre", kickoff=_kickoff_days_away()),
             league="la_liga",
             week=1,
             season=2026,
@@ -609,7 +621,7 @@ class FabricatedScoreTests(unittest.TestCase):
         away. The score must be refused with it -- a card that has just
         decided a match has not started cannot also show its result."""
         game = cards._match_to_game(
-            _live_match(status_state="post", kickoff="2026-09-25T19:30Z"),
+            _live_match(status_state="post", kickoff=_kickoff_days_away()),
             league="la_liga",
             week=1,
             season=2026,
@@ -882,7 +894,7 @@ class StaleArtifactStateTests(unittest.TestCase):
         """An upgrade goes back through `_effective_status_state`, so a `post`
         whose kickoff is days away is refused whichever source claimed it."""
         self.assertEqual(
-            cards._effective_state_with_box("pre", "2026-09-25T19:00Z", self.FRESH_BOX),
+            cards._effective_state_with_box("pre", _kickoff_days_away(), self.FRESH_BOX),
             "pre",
         )
 

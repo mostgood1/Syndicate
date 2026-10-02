@@ -21,7 +21,15 @@ PRIMARY = os.environ.get("SYNDICATE_REPO_ROOT") or os.path.dirname(os.path.dirna
 sys.path.insert(0, PRIMARY)
 from syndicate.features.soccer.ingestion.espn_lineups import fetch_match_summary  # noqa: E402
 
-CACHE = os.path.join(os.environ["TEMP"], "espn_shots_cache")
+# `tempfile.gettempdir()`, not `os.environ["TEMP"]`: TEMP exists on Windows only,
+# so on Linux (Render, the WSL fleet, the ci-suite cron) this import raised
+# KeyError, and every grader that imports it inside a broad `except` silently
+# loaded ZERO outcomes -- 12 soccer grading tests read empty funnels there
+# (baseline red until 2026-10-02). gettempdir() honours TEMP/TMP/TMPDIR, so the
+# Windows path is unchanged.
+import tempfile  # noqa: E402
+
+CACHE = os.path.join(tempfile.gettempdir(), "espn_shots_cache")
 os.makedirs(CACHE, exist_ok=True)
 NOW = dt.datetime.now(dt.timezone.utc)
 

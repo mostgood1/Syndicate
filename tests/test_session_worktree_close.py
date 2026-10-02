@@ -99,7 +99,14 @@ def repo(tmp_path, monkeypatch):
     repo.sessions.mkdir()
     yield repo
     for dirpath, dirs, files in os.walk(base):     # pytest cannot delete a read-only dir either
-        for name in (*dirs, *files):
+        # Directories need S_IEXEC too. On Linux a dir without it cannot be
+        # traversed, so the walk's own chmod of a parent made every child's
+        # chmod raise PermissionError at teardown -- 6 tests ERROR on Linux
+        # (baseline red until 2026-10-02). On Windows mode bits only toggle
+        # READONLY, which is why it passed there.
+        for name in dirs:
+            os.chmod(os.path.join(dirpath, name), stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+        for name in files:
             os.chmod(os.path.join(dirpath, name), stat.S_IREAD | stat.S_IWRITE)
 
 

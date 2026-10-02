@@ -100,6 +100,11 @@ def test_memory_headroom_snapshot_reports_insufficient_and_sufficient(monkeypatc
     max_bytes = 2048 * BYTES_PER_MB
     min_required_bytes = 1800 * BYTES_PER_MB
 
+    # Headroom credits the cgroup's reclaimable page cache back; unstubbed, that
+    # read the HOST's `memory.stat` (~10 GB inactive_file on the WSL fleet) and
+    # the "tight" case read sufficient on any Linux host (baseline red until
+    # 2026-10-02, local ci-suite). Empty = no reclaimable credit.
+    monkeypatch.setattr(memory_observability, "_read_container_memory_stat", lambda: {})
     monkeypatch.setattr(memory_observability, "_read_container_memory_current_bytes", lambda: int(1900 * BYTES_PER_MB))
     monkeypatch.setattr(memory_observability, "_read_container_memory_max_bytes", lambda: max_bytes)
     tight = memory_observability.memory_headroom_snapshot(min_required_bytes)
@@ -497,12 +502,18 @@ def test_malloc_info_garbage_returns_None_not_a_confident_zero(bad):
     assert memory_observability.parse_malloc_info_xml(bad) is None
 
 
-def test_malloc_arena_snapshot_degrades_quietly_off_glibc(capsys):
-    # Every developer machine in this repo takes this branch. It must return
-    # None, must not raise, and MALLOC_INFO_INIT must still name the reason --
+def test_malloc_arena_snapshot_degrades_quietly_off_glibc(capsys, monkeypatch):
+    # Every Windows developer machine takes this branch. It must return None,
+    # must not raise, and MALLOC_INFO_INIT must still name the reason --
     # otherwise a failed bind and a successful no-op are both silence.
-    memory_observability._MALLOC_INFO_STATE.update(
-        {"resolved": False, "fn": None, "libc": None, "unavailable_reason": ""})
+    # The platform is FORCED so the branch is tested on every host: on Linux
+    # (Render, the WSL fleet) glibc is real and this test used to read a real
+    # arena snapshot and fail (baseline red until 2026-10-02).
+    monkeypatch.setattr(memory_observability.sys, "platform", "win32")
+    # setitem, not .update(): the forced "unavailable" resolution must not
+    # outlive this test, or every later reading in the process reads None.
+    for key, value in {"resolved": False, "fn": None, "libc": None, "unavailable_reason": ""}.items():
+        monkeypatch.setitem(memory_observability._MALLOC_INFO_STATE, key, value)
     assert memory_observability.malloc_arena_snapshot() is None
     assert "MALLOC_INFO_INIT" in capsys.readouterr().out
 

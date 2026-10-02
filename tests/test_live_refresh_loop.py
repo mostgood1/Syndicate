@@ -935,13 +935,21 @@ class LiveRefreshLoopTests(unittest.TestCase):
 
     def test_odds_refresh_memory_headroom_snapshot_reports_insufficient_and_sufficient(self) -> None:
         max_bytes = 2048 * 1024 * 1024
+        # `memory.stat` is stubbed EMPTY too: headroom credits the cgroup's
+        # reclaimable page cache back, and unstubbed it read the HOST's -- on the
+        # WSL fleet ~10 GB of inactive_file -- so the "tight" case came out
+        # sufficient on any Linux host (baseline red; local ci-suite 2026-10-02).
+        no_stat = patch(
+            "syndicate.features.shared.memory_observability._read_container_memory_stat",
+            return_value={},
+        )
         with patch.dict(os.environ, {"SYNDICATE_LIVE_ODDS_REFRESH_MIN_HEADROOM_MB": "1800"}, clear=False), patch(
             "syndicate.features.shared.memory_observability._read_container_memory_current_bytes",
             return_value=int(1900 * 1024 * 1024),
         ), patch(
             "syndicate.features.shared.memory_observability._read_container_memory_max_bytes",
             return_value=max_bytes,
-        ):
+        ), no_stat:
             tight = live_refresh_loop._odds_refresh_memory_headroom_snapshot()
         self.assertIsNotNone(tight)
         self.assertFalse(tight["sufficient"])
@@ -952,7 +960,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ), patch(
             "syndicate.features.shared.memory_observability._read_container_memory_max_bytes",
             return_value=max_bytes,
-        ):
+        ), no_stat:
             roomy = live_refresh_loop._odds_refresh_memory_headroom_snapshot()
         self.assertIsNotNone(roomy)
         self.assertTrue(roomy["sufficient"])
