@@ -74,3 +74,24 @@ def test_reachability_team_blocks_follow_the_prior():
     legacy, team = _blocks("legacy"), _blocks("team_prior")
     assert legacy < prior * 0.8
     assert abs(team - prior) / prior < 0.15
+
+
+@pytest.fixture
+def _alloc_flag():
+    saved = events.BLOCK_ALLOC_BY_RATE
+    yield
+    events.BLOCK_ALLOC_BY_RATE = saved
+
+
+def test_block_allocation_is_proportional_to_raw_block_rates(_alloc_flag):
+    t = _team()
+    t["_prior_blk_pm"] = [0.10, 0.0, 0.01, 0.02, 0.02, 0.0, 0.0, 0.0, 0.0, 0.0]
+    events.BLOCK_ALLOC_BY_RATE = True
+    w = events._player_usage_weights(t, "_prior_blk_pm", [0, 1, 2, 3, 4])
+    floor = events.BLOCK_ALLOC_FLOOR_PM
+    expected = np.array([0.10, floor, 0.01, 0.02, 0.02]) / (0.15 + floor)
+    assert w[:5] == pytest.approx(expected)
+    assert w[5:].sum() == 0
+    events.BLOCK_ALLOC_BY_RATE = False
+    flat = events._player_usage_weights(t, "_prior_blk_pm", [0, 1, 2, 3, 4])
+    assert flat[0] < w[0] and flat[1] > w[1]  # the general blend flattens toward minutes

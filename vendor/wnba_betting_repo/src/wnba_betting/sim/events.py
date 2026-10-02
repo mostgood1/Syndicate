@@ -522,6 +522,15 @@ def _ft_rate_multipliers(players: pd.DataFrame, minutes: np.ndarray) -> np.ndarr
     return mult
 
 
+# Blocks go to the five on court in proportion to their RAW block rates. The general blend
+# below (log1p-compressed rates, 25% minutes floor, 20% pred_pts) suits points but flattens
+# a concentrated stat: live GSV-DAL 2026-10-02, Stokes' block prior 1.35 became 1.03 in the
+# sim while a 0.03-rate guard got 0.30 (lane `wnba-sim-blocks`). The floor keeps a player
+# with no prior able to block. False restores the general blend for blocks.
+BLOCK_ALLOC_BY_RATE = True
+BLOCK_ALLOC_FLOOR_PM = 0.002
+
+
 def _player_usage_weights(players: pd.DataFrame, col_pm: str, lineup_idx: List[int]) -> np.ndarray:
     """Return selection weights for the current on-court lineup.
 
@@ -536,6 +545,16 @@ def _player_usage_weights(players: pd.DataFrame, col_pm: str, lineup_idx: List[i
 
     pm = _safe_series(players, col_pm).to_numpy(dtype=float)
     pm = np.maximum(0.0, np.where(np.isfinite(pm), pm, 0.0))
+    if BLOCK_ALLOC_BY_RATE and col_pm == "_prior_blk_pm":
+        w = np.zeros(n, dtype=float)
+        idx = [int(i) for i in (lineup_idx or []) if 0 <= int(i) < n]
+        if not idx:
+            return w
+        line = np.maximum(pm[idx], BLOCK_ALLOC_FLOOR_PM)
+        line = line / float(line.sum())
+        for j, i in enumerate(idx):
+            w[int(i)] = float(line[j])
+        return w
     # Compress outliers (robust even if a bad prior slips through).
     pm = np.log1p(pm)
 
