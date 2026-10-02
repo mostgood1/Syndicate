@@ -1084,8 +1084,8 @@ death, never life — do not invert it.
 - Verification: unit: DEFAULT_CACHE_DIR resolves under SYNDICATE_NCAAF_SOURCE_ROOT; a missing data-root games file is seeded from the repo copy without an API call; _cached_games reads the loader dir. Fleet: after ff, data-root games_2026 completed count >= 331, checkout git status clean, next generator run logs GAMES_CACHE_REFRESH against the data root and leaves the checkout clean
 - Blocked by: none
 
-### wnba-no-player-props — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
-- Goal: A WNBA odds run whose snapshot has game lines but zero player props skips props edges and props recommendations and exits 0 (game side still exports), as NBA does since ca860dd5; an unreadable snapshot still fails
+### wnba-no-player-props — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: A WNBA odds run whose snapshot has game lines but zero player props skips props edges and props recommendations and exits 0 (game side still exports), as NBA does since ca860dd5; an unreadable snapshot still fails — **GOAL: MET** (93b39fb6, fleet ff'd 19:5xZ; 6 unit tests, 4 fail on the old code; main() exits 0 only on a known zero. Caveat as written: no game-lines-only WNBA slate has run yet; deploys.md 19:5xZ)
 - Files: scripts/refresh_wnba_oddsapi_props.py,tests/test_wnba_no_player_props.py
 - Hypothesis: n/a
 - Falsification test: n/a

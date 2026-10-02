@@ -45148,3 +45148,9 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 
 - upstream: `git branch --set-upstream-to=github/main main`; read back `main@{upstream}` = github/main, `git status -sb` = `## main...github/main` (was "ahead 81" of the stale Windows clone at 80bdd00c). `origin` remote left in place.
 - vendor/wnba_betting_repo/data/processed/boxscores_history.csv: 1,248 stray rows (50 games) written 2026-10-01T18:13Z, ALL already in the data-root history (9,360 rows, 0 missing); backed up to `quarantine/2026-10-02_vendor_wnba_boxscores_history/`, then `git checkout --` (1,667 rows). Not recurring since 10-01.
+
+## 2026-10-02 19:5xZ (2:5x PM CT) -- LOCAL FLEET FF ae065230 -> 93b39fb6: WNBA props skip edges/recs and exit 0 when the snapshot has game lines but no player props (lane `wnba-no-player-props`) -- **MET (unit); no live case yet**
+
+- applied: ff via `github/main`, no restart (the WNBA runner is a per-run subprocess). Read back: HEAD contains 93b39fb6, `_count_player_prop_rows` present in scripts/refresh_wnba_oddsapi_props.py.
+- verify: 6 unit tests -- game-lines-only snapshot skips edges/recs and still builds game cards; props present still run edges/recs; main() exits 0 only on a KNOWN zero (None and 5 exit 1) -- 4 of the 6 fail on the old code, the 2 that pass are the exit-1 cases. The 10 failed + 11 errors across the 34 related test files are identical on the old code.
+- caveat (comes due on the first WNBA slate with game lines and no props): no such slate has run on the fleet since the fix; its first run should log "no player-prop lines offered" and report wnba ok.
