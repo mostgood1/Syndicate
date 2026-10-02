@@ -1410,6 +1410,14 @@ death, never life — do not invert it.
 - Verification: after: 0 WNBA-labelled MIA@TOR rows in both files (disk and any keyvalue copy); row counts = before - removed (+ any appends that landed, preserved); backups present; non-WNBA MIA@TOR rows (if any) untouched
 - Blocked by: none
 
+### live-ledger-venue-rebuild — OPEN — opened 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+- Goal: The fleet's execution ledger regains the Render-era LIVE record: one graded live row per venue-settled market position (Kalshi settlements, Polymarket resolutions), marked source=venue_rebuild, built and written by live-odds-worker (which holds the credentials) only on a request file, dry-run first and applied only with the dry run's exact row count
+- Files: syndicate/features/shared/venue_ledger_rebuild.py, scripts/run_live_odds_refresh_worker.py, tests/test_venue_ledger_rebuild.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit tests (row build per venue, skips, idempotency, apply needs matching count, settle_from_venue + repairs leave rebuilt rows untouched); live: dry-run result artifact reviewed with the user, then apply; ledger live-row count and per-venue P&L read back; next VENUE_SETTLEMENT shows the rows as already, settled=0, no repairs
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

@@ -2176,6 +2176,33 @@ def _execution_interval_seconds() -> int:
 _LAST_EXECUTION_AT: float | None = None
 
 
+def _ledger_rebuild_tick() -> None:
+    """Act on a venue-ledger rebuild REQUEST, if one is waiting. One file check.
+
+    HERE because this process holds the venue credentials, and the rebuild reads
+    both venues' settlement history (`venue_ledger_rebuild`'s docstring has
+    why). Never raises: a diagnostic/repair path must not stop the placer.
+    """
+    try:
+        from syndicate.features.shared.refresh_state_store import reports_root
+        from syndicate.features.shared.venue_ledger_rebuild import process_rebuild_request
+
+        result = process_rebuild_request(reports_root() / "intelligence")
+        if result is None:
+            return
+        summary = result.get("summary") or {}
+        print(
+            "[live_odds_worker] LEDGER_REBUILD"
+            f" mode={result.get('mode')} status={result.get('status')}"
+            f" fetched={result.get('fetched')} rows={summary.get('rows')}"
+            f" written={result.get('written')} skipped={result.get('skipped')}"
+            f" errors={result.get('errors')}",
+            flush=True,
+        )
+    except Exception as exc:
+        print(f"[live_odds_worker] LEDGER_REBUILD_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+
 def _run_execution_tick() -> None:
     """Place today's committed plan, on this worker, on its own clock.
 
@@ -2611,6 +2638,7 @@ def main() -> int:
             # priced from the freshest slate this pass can get.
             _polymarket_us_slate_refresh_tick()
             _run_execution_tick()
+            _ledger_rebuild_tick()
             # Use the adaptive interval (900s idle/pregame, 60s once a game is
             # actually live -- see _live_refresh_loop_interval_for_meta) rather
             # than the fixed base interval. Sleeping a fixed 60s regardless of
