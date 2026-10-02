@@ -86,9 +86,41 @@ def _kalshi_sport(ticker: str) -> str | None:
         return None
 
 
-def _slug_sport(slug: str) -> str | None:
+_SLUG_SPORTS = {"mlb": "mlb", "nfl": "nfl", "nba": "nba", "wnba": "wnba", "nhl": "nhl", "cfb": "ncaaf", "cbb": "ncaab"}
+
+
+def _slug_league(slug: str) -> str | None:
     parts = str(slug or "").split("-")
     return parts[1] if len(parts) > 2 and parts[1].isalpha() else None
+
+
+def _slug_sport(slug: str) -> str | None:
+    """Polymarket US slugs carry a LEAGUE code. Every code it lists outside the
+    US leagues and college codes is a soccer competition (dry run 2026-10-02:
+    lal, eflch, ere, sea, ligpor, epl, mls)."""
+    league = _slug_league(slug)
+    if league is None:
+        return None
+    return _SLUG_SPORTS.get(league, "soccer")
+
+
+def _polymarket_cost(row: Mapping[str, Any]) -> tuple[float | None, float | None, float | None]:
+    """(cost $, shares, price per share) of the position BEFORE it resolved.
+
+    `beforePosition` states its own cost basis (`cost`, `qtyBought`). A price is
+    kept only if it is a probability, strictly inside (0, 1), which is the unit
+    `profit_per_dollar` grades a contract in. Anything else is left None rather
+    than guessed.
+    """
+    before = row.get("beforePosition") if isinstance(row.get("beforePosition"), Mapping) else {}
+    cost = vs._amount(before.get("cost"))
+    shares = vs._num(before.get("qtyBoughtDecimal")) or vs._num(before.get("qtyBought"))
+    if cost is None or cost <= 0:
+        return None, shares, None
+    price = round(cost / shares, 4) if shares and shares > 0 else None
+    if price is not None and not (0.0 < price < 1.0):
+        price = None
+    return round(cost, 4), shares, price
 
 
 def _base_row(*, venue: str, ticker: str, side: str, slate: str | None, slate_source: str,
@@ -190,6 +222,12 @@ def polymarket_row(row: Mapping[str, Any], now: str) -> tuple[dict[str, Any] | N
         sport=_slug_sport(slug), verdict=verdict, settled_at=row.get("updateTime"), now=now,
     )
     out["venue_trade_id"] = row.get("tradeId")
+    out["league"] = _slug_league(slug)
+    cost, shares, price = _polymarket_cost(row)
+    if cost is not None:
+        out["fill_stake_dollars"] = cost
+        out["fill_contracts"] = shares
+        out["fill_price"] = price
     return out, None
 
 
@@ -307,6 +345,15 @@ def rebuild(*, dry_run: bool, expect_rows: int | None = None, fetch=None) -> dic
         "polymarket_position_keys": sorted({
             k for r in fetched.get("polymarket", [])[:50] for k in (r.get("beforePosition") or {})
         }),
+        # Cost-basis fields only (numbers, no identity), to check the units the
+        # stake is built from before anything is applied.
+        "polymarket_cost_sample": [
+            {"side": r.get("side"),
+             **{k: (r.get("beforePosition") or {}).get(k)
+                for k in ("cost", "avgPx", "costPerShare", "qtyBought", "qtyBoughtDecimal", "qtySold", "netPosition", "realized")},
+             "after_realized": (r.get("afterPosition") or {}).get("realized")}
+            for r in fetched.get("polymarket", [])[:4]
+        ],
     }
     if errors:
         # A partial fetch would rebuild a partial record that LOOKS whole.
@@ -314,6 +361,19 @@ def rebuild(*, dry_run: bool, expect_rows: int | None = None, fetch=None) -> dic
         return result
     state = _load()
     built = build_rows(fetched["kalshi"], fetched["polymarket"], state.get("orders") or [])
+    # Rows `repair_impossible_venue_pnl` would REWRITE on the next settlement
+    # tick: a P&L the row's own stake cannot produce. Reported before apply so
+    # the record written is the record that stays.
+    impossible = [
+        r for r in built["rows"]
+        if r.get("pnl_dollars") is not None and vs._pnl_exceeds_own_fill(r, str(r.get("outcome")), float(r["pnl_dollars"]))
+    ]
+    result["pnl_exceeds_own_stake"] = {
+        "rows": len(impossible),
+        "by_venue": {v: sum(1 for r in impossible if r["venue"] == v) for v in ("kalshi", "polymarket")},
+        "sample": [{k: r.get(k) for k in ("venue", "venue_ticker", "outcome", "pnl_dollars", "fill_stake_dollars", "fill_price")}
+                   for r in impossible[:4]],
+    }
     result.update(status="ok", skipped=built["skipped"], summary=built["summary"],
                   sample=[{k: r.get(k) for k in ("venue", "venue_ticker", "selected_date", "sport", "side",
                                                  "outcome", "pnl_dollars", "fill_stake_dollars", "fill_price")}

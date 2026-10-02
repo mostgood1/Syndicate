@@ -31,10 +31,14 @@ def _k(ticker="KXNFLGAME-26SEP21-NE", **over):
     return row
 
 
-def _p(slug="aec-mlb-tex-cws-2026-09-20", before=3.0, after=-6.6, side="POSITION_RESOLUTION_SIDE_LONG", trade="t1"):
+def _p(slug="aec-mlb-tex-cws-2026-09-20", before=3.0, after=-6.6, side="POSITION_RESOLUTION_SIDE_LONG", trade="t1",
+       cost="9.6000", qty="16"):
+    position = {"realized": {"value": str(before)}}
+    if cost is not None:
+        position.update(cost={"value": cost, "currency": "USD"}, qtyBought=qty)
     return {
         "marketSlug": slug, "side": side, "tradeId": trade, "updateTime": "2026-09-21T02:00:00Z",
-        "beforePosition": {"realized": {"value": str(before)}}, "afterPosition": {"realized": {"value": str(after)}},
+        "beforePosition": position, "afterPosition": {"realized": {"value": str(after)}},
     }
 
 
@@ -55,8 +59,26 @@ def test_a_polymarket_resolution_becomes_a_row_and_zero_delta_is_refused():
     assert reason is None
     assert (row["outcome"], row["pnl_dollars"]) == ("lost", pytest.approx(-9.6))
     assert (row["selected_date"], row["sport"], row["side"]) == ("2026-09-20", "mlb", "long")
-    assert row["fill_stake_dollars"] is None  # no cost basis invented
+    # The position's own cost basis: $9.60 for 16 shares -> 0.60 a share.
+    assert (row["fill_stake_dollars"], row["fill_price"]) == (pytest.approx(9.6), pytest.approx(0.6))
     assert vr.polymarket_row(_p(before=3.0, after=3.0), NOW) == (None, "zero_realized_delta")
+
+
+def test_no_polymarket_cost_basis_is_invented_and_a_non_probability_price_is_dropped():
+    no_cost, _ = vr.polymarket_row(_p(cost=None), NOW)
+    assert (no_cost["fill_stake_dollars"], no_cost["fill_price"]) == (None, None)
+    odd, _ = vr.polymarket_row(_p(cost="9.6", qty="4"), NOW)  # 2.40 a share is not a probability
+    assert (odd["fill_stake_dollars"], odd["fill_price"]) == (pytest.approx(9.6), None)
+
+
+@pytest.mark.parametrize("slug,sport,league", [
+    ("aec-epl-ars-che-2026-09-20", "soccer", "epl"),
+    ("asc-cfb-bama-lsu-2026-09-20", "ncaaf", "cfb"),
+    ("aec-wnba-lv-ny-2026-09-20", "wnba", "wnba"),
+])
+def test_polymarket_league_codes_map_to_sports(slug, sport, league):
+    row, _ = vr.polymarket_row(_p(slug=slug), NOW)
+    assert (row["sport"], row["league"]) == (sport, league)
 
 
 def test_build_skips_existing_markets_merges_same_side_and_refuses_two_sided():
