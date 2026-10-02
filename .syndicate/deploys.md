@@ -45048,3 +45048,8 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - verify (READ 17:01Z): `before=de914b30 after=bec56b80`; `basketball_nba_preseason` present in both fetchers on disk; `fetch_bovada_odds_current` count 0 in the NBA cli. Pre-ff live run of the SAME code (vendored `fetch_game_odds_current(2026-10-03)`, fleet key): Toronto Raptors vs Miami Heat, 22 rows, draftkings/fanduel/betonlineag/bovada. OWED: the next NBA pipeline run on the fleet producing `nba_source/data/processed/game_odds_2026-10-03.csv` from OddsAPI (bookmaker `oddsapi_consensus`, not `bovada`).
 - upstream: https://github.com/mostgood1/NBA-Betting/pull/2 (branch `feat/nba-preseason-oddsapi`, 274e6705; odds_api.py byte-identical pre-fix, cli.py re-derived by anchor). NOT merged.
 - cost: preseason events are now priced (game odds + props) -- new OddsAPI spend on preseason days.
+
+## 2026-10-02 (~12:10 PM CT) -- fleet checkout at 5c205087 (live-odds-worker sleeps on the stop event), NO restart -- lane live-odds-stop-prompt
+- What: `~/Syndicate` fast-forwarded to 5c205087; `_LIVE_REFRESH_LOOP_STOP.wait(sleep_seconds)` is present (1 hit). No role restarted.
+- NOT live: live-odds-worker pid 621242 started 16:53:30Z on pre-fix code, so its next stop still waits out the old `time.sleep`. It loads the fix at its next start: either a manual restart (up to ~15 min, the last one under the old sleep) or its 6 h exit at about 22:53Z (5:53 PM CT).
+- verify (owed): once a process that started AFTER this ff is running, SIGTERM it while it is in `loop_sleep`. The supervisor should log `[live-odds-worker] exited` within ~10 s of the signal (it was 895 s on 2026-10-02 16:38-16:53Z), followed by a new pid whose first pass completes.
