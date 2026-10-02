@@ -1092,6 +1092,14 @@ death, never life — do not invert it.
 - Verification: unit: game-lines-only snapshot -> edges/recs not called, game cards built, main exit 0; player props present -> edges called (off != on); fails on origin/main. Fleet: no live reading available until a game-lines-only WNBA slate occurs; record that as the caveat
 - Blocked by: none
 
+### soccer-espn-range-5xx — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: Soccer pregame runs stop failing on ESPN's 502 for one bel.1 range: espn_lineups._scoreboard_payloads splits a multi-day range into single dates on a 5xx as it does on a 400 (a 5xx on a single date, or any other status, still raises); verified by the next pregame soccer run reporting soccer ok and rewriting belgian_pro_league api/schedule
+- Files: syndicate/features/soccer/ingestion/espn_lineups.py (_scoreboard_payloads only),tests/test_espn_range_5xx_fallback.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: range 502 -> single-date payloads; single-date 502 raises; range 404 raises; unparseable window 502 raises; fails on origin/main. Fleet: after ff, the next soccer pregame run (single-sport or hourly) shows soccer ok=true and belgian_pro_league/api/schedule/schedule_2026.json rewritten
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
