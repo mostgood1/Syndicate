@@ -226,7 +226,15 @@ def _cached_games(season: int, week: int) -> list[dict] | None:
     the caller falls through to the API rather than treating "no cache" as
     "no games" -- an empty schedule would silently produce zero projections.
     """
-    path = Path(__file__).resolve().parents[1] / "data" / "ncaaf_source" / "historical_truth" / f"games_{season}.json.gz"
+    # The loader's own cache dir (the data root), so this reads the copy that
+    # `refresh_games_cache` keeps current rather than the git-tracked seed.
+    try:
+        from syndicate.features.football.sim_engine.smartsim2.historical_truth.ncaaf_historical_loader import (
+            DEFAULT_CACHE_DIR as _games_cache_dir,
+        )
+    except Exception:
+        _games_cache_dir = Path(__file__).resolve().parents[1] / "data" / "ncaaf_source" / "historical_truth"
+    path = Path(_games_cache_dir) / f"games_{season}.json.gz"
     if not path.exists():
         return None
     try:

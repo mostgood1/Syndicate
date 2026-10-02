@@ -1077,7 +1077,7 @@ death, never life — do not invert it.
 
 ### ncaaf-games-cache-data-root — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
 - Goal: NCAAF's games cache lives on the data root: ncaaf_historical_loader's default cache dir follows default_ncaaf_source_root() (as SP+ already does) and the generator's _cached_games reads the same dir, so refreshes stop rewriting the git-tracked checkout copy; fleet data-root copy seeded from the fresher checkout copy first, checkout file restored
-- Files: syndicate/features/football/sim_engine/smartsim2/historical_truth/ncaaf_historical_loader.py (DEFAULT_CACHE_DIR + ensure_games_cached seed only; games_payload_is_stale stays with ncaaf-kickoff-cache-staleness),scripts/generate_smartsim2_ncaaf_projections.py (_cached_games only),tests/test_ncaaf_games_cache_data_root.py
+- Files: syndicate/features/football/sim_engine/smartsim2/historical_truth/ncaaf_historical_loader.py (DEFAULT_CACHE_DIR + ensure_games_cached seed only; games_payload_is_stale stays with ncaaf-kickoff-cache-staleness),scripts/generate_smartsim2_ncaaf_projections.py (_cached_games only),tests/test_ncaaf_games_cache_data_root.py,tests/test_ncaaf_sp_ratings_cache.py (cache-dir fixture only)
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: unit: DEFAULT_CACHE_DIR resolves under SYNDICATE_NCAAF_SOURCE_ROOT; a missing data-root games file is seeded from the repo copy without an API call; _cached_games reads the loader dir. Fleet: after ff, data-root games_2026 completed count >= 331, checkout git status clean, next generator run logs GAMES_CACHE_REFRESH against the data root and leaves the checkout clean

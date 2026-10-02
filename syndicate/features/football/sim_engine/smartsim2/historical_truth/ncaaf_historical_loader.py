@@ -28,6 +28,7 @@ from __future__ import annotations
 import gzip
 import json
 import os
+import shutil
 import time
 import urllib.error
 import urllib.parse
@@ -41,7 +42,31 @@ from typing import Sequence
 
 import pandas as pd
 
-DEFAULT_CACHE_DIR = Path(__file__).resolve().parents[6] / "data" / "ncaaf_source" / "historical_truth"
+#: The git-tracked copy in the code checkout. A SEED only (see `ensure_games_cached`).
+REPO_CACHE_DIR = Path(__file__).resolve().parents[6] / "data" / "ncaaf_source" / "historical_truth"
+
+
+def _default_cache_dir() -> Path:
+    """The data root's `ncaaf_source/historical_truth`, as the SP+ cache already uses.
+
+    This used to be REPO_CACHE_DIR, i.e. resolved from `__file__`: on Render the
+    ephemeral checkout (every deploy dropped the refreshed cache), and on the local
+    fleet the git-tracked file itself -- `refresh_games_cache` rewrote
+    `data/ncaaf_source/historical_truth/games_2026.json.gz` in the checkout, so it
+    stayed modified, while the data root kept an orphaned copy 71 completed games
+    behind (measured 2026-10-02: 331 vs 260 of 888). With no data root configured
+    `default_ncaaf_source_root()` is the repo's `data/ncaaf_source`, so dev is
+    unchanged.
+    """
+    try:
+        from syndicate.features.ncaaf.sources import default_ncaaf_source_root
+
+        return Path(default_ncaaf_source_root()) / "historical_truth"
+    except Exception:
+        return REPO_CACHE_DIR
+
+
+DEFAULT_CACHE_DIR = _default_cache_dir()
 
 CFBD_API_BASE = "https://api.collegefootballdata.com"
 CFBD_ENV_VARS = (
@@ -231,6 +256,19 @@ def ensure_games_cached(season: int, *, cache_dir: Path = DEFAULT_CACHE_DIR, api
     path = _games_cache_path(season, cache_dir)
     if path.exists():
         return path
+    # A data root without this file (cold disk) takes the git-tracked copy rather
+    # than a CFBD call, which on web would be an on-request backfill. A stale seed
+    # is fine: `refresh_games_cache` judges staleness by CONTENT and refreshes it.
+    seed = _games_cache_path(season, REPO_CACHE_DIR)
+    if seed.exists() and seed.resolve() != path.resolve():
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = path.with_suffix(path.suffix + ".part")
+            shutil.copyfile(seed, temporary)
+            temporary.replace(path)
+            return path
+        except OSError:
+            pass
     payload = _cfbd_get(
         "/games",
         {"year": season, "seasonType": "regular", "classification": "fbs"},

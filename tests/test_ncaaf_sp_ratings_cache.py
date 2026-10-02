@@ -43,6 +43,16 @@ sys.modules["_gen"] = gen
 _spec.loader.exec_module(gen)
 
 
+@pytest.fixture(autouse=True)
+def _games_cache_in_tmp(tmp_path, monkeypatch):
+    """`_cached_games` reads the loader's cache dir (the data root since
+    2026-10-02), not a path under `gen.__file__`; point it where
+    `_write_games_cache` writes, so no test can read the real cache."""
+    from syndicate.features.football.sim_engine.smartsim2.historical_truth import ncaaf_historical_loader as loader
+
+    monkeypatch.setattr(loader, "DEFAULT_CACHE_DIR", tmp_path / "data" / "ncaaf_source" / "historical_truth")
+
+
 @pytest.fixture()
 def cache_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("SYNDICATE_SP_RATINGS_CACHE_DIR", str(tmp_path))
