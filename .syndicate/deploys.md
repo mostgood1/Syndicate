@@ -45078,3 +45078,10 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - baseline 17:47:18Z: NHL max seen-age 29 min, 0 of 571 rows >= 1h; WNBA 7 of 463 rows >= 1h (max 813 min) -- book/line quotes the books STOPPED posting (last sighting ages), which cadence cannot fix and the 1h gate removes.
 - cost basis: one NHL pregame sweep measured ~190 credits / 315 calls (17:05-17:14Z); projected +~7k credits/day for both sports (~+210k/30d vs 2.51M projected, 5M cap). 73% of a 75-min window's spend was unattributed by sport -- per-sport costs are lower bounds; separate trace owed.
 - OWED: two cycles (~70 min) showing NHL/WNBA live-quote seen-age < 60 min, and measured credits/cycle.
+
+## 2026-10-02 17:55Z (12:55 PM CT) -- UPSTREAM: mostgood1/WNBA-Betting#8 and mostgood1/NBA-Betting#2 MERGED (user: "merge both upstream PRs") -- **MET**
+
+- WNBA-Betting#8 (Bovada WNBA-only + drop predict-date Bovada fallback): squash-merged 17:55:12Z pinned `--match-head-commit 964f9e10`, merge commit `b4632180` on `main`.
+- NBA-Betting#2 (basketball_nba_preseason OddsAPI key + drop Bovada fallback): squash-merged 17:55:17Z pinned `--match-head-commit 274e6705`, merge commit `73892a6d` on `main`.
+- verify (READ 17:56Z): both PRs `state=MERGED`; `git diff --name-only <PR head> origin/main` = 0 files in each repo, so upstream main carries exactly the reviewed code. No CI configured on either repo.
+- consequence: the vendored copies in Syndicate already contain these changes, so a future re-pull of vendor/wnba_betting_repo or vendor/nba_betting_repo keeps them instead of reverting them. Nothing deployed; no fleet change.
