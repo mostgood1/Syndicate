@@ -397,7 +397,13 @@ def _perturbed_ratings(
     compare two variants on the SAME draws, which is how a calibration sweep
     turns into a comparison of random seeds.
     """
-    rng = random.Random(("nfl-rating-uncertainty", seed, sd).__hash__())
+    # Seeded from a STRING, not from a tuple's `__hash__()`: a tuple hashes its str
+    # member through Python's per-process randomised string hash (PYTHONHASHSEED),
+    # so every new interpreter drew different ratings -- deterministic within one
+    # process, irreproducible across them (2026-10-02: p 0.657..0.760 over hash
+    # seeds 0..9 at rating_sd 0.75; the widening test failed ~1 run in 5).
+    # `random.Random(str)` seeds from the string's SHA-512, identical everywhere.
+    rng = random.Random(f"nfl-rating-uncertainty|{int(seed)}|{float(sd)!r}")
     return (
         home_offense + rng.gauss(0.0, sd),
         home_defense + rng.gauss(0.0, sd),

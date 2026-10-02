@@ -426,6 +426,42 @@ def test_it_is_DETERMINISTIC_so_two_variants_compare_on_the_same_draws():
     assert a["margin_dist"] == b["margin_dist"]
 
 
+def test_it_is_DETERMINISTIC_ACROSS_PROCESSES_not_just_within_one():
+    """The perturbation must not depend on Python's per-process string hashing.
+
+    It used to seed `random.Random(("nfl-rating-uncertainty", seed, sd).__hash__())`;
+    a tuple's hash includes its str member's, which `PYTHONHASHSEED` randomises
+    per interpreter. The in-process test above could not see it -- both calls
+    share one process. Measured 2026-10-02: over PYTHONHASHSEED 0..9 the
+    rating_sd=0.75 probability ranged 0.657..0.760 (sd=0 was 0.754902 every
+    time), and the widening test above failed ~1 run in 5 when the draw landed
+    in the refusal band. Two fresh interpreters, two hash seeds, one answer.
+    """
+    import json
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parents[1]
+    probe = (
+        "import json, sys; sys.path.insert(0, %r)\n"
+        "from syndicate.features.nfl import live_resim as lr\n"
+        "st = lr.NflLiveGameState(away_team='B', home_team='A', period=2, clock_seconds=900, home_score=7, away_score=0)\n"
+        "r = lr.resim_live_game(st, home_offense=0.30, home_defense=0.10, away_offense=0.05, away_defense=0.05,\n"
+        "                       sims=60, env={'SYNDICATE_NFL_LIVE_RESIM': '1'}, rating_sd=0.75)\n"
+        "print(json.dumps(r['margin_dist'] if isinstance(r, dict) else r.reason, sort_keys=True))\n"
+    ) % str(repo)
+    outs = []
+    for hash_seed in ("1", "2"):
+        env = dict(os.environ, PYTHONHASHSEED=hash_seed)
+        proc = subprocess.run([sys.executable, "-c", probe], cwd=str(repo), env=env,
+                              capture_output=True, text=True, timeout=300)
+        assert proc.returncode == 0, proc.stderr[-2000:]
+        outs.append(json.loads(proc.stdout.strip().splitlines()[-1]))
+    assert outs[0] == outs[1], "the rating perturbation depends on PYTHONHASHSEED"
+
+
 def test_an_UNKNOWN_rating_source_is_never_MORE_CONFIDENT_than_a_known_one():
     """Unknown must not take the permissive branch.
 

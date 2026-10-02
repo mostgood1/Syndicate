@@ -1185,6 +1185,13 @@ death, never life — do not invert it.
 - Hypothesis: F1 RETEST on corrected inputs. Lane wnba-sim-ft-trips falsified F1 (solved per-attempt foul rate -> FTA 1.130x) on THIN-log priors that were never checked. With full-season logs the priors are right (prior FTA/FGA 0.305 vs actual 0.310; FTA volume 0.999x, 126 team-games), and a synthetic run already lands the box score on the target ratio. So the remaining FTA shortfall is the engine cap clip(FTA/FGA, 0.05, 0.20) against a real ~0.31, and solving the rate should bring FTA to ~1.0 and pull misses/FGA down with it.
 - Falsification test: Component backtest Jul-Sep, paired seeds, full logs. Judged on BOTH-teams-fully-matched games: falsified unless FTA lands within 0.95-1.05 AND missed FG moves toward 1.0, with player FTA/PTS/FGA Poisson deviance (all games) not worse (CI).
 - Verification: deploys.md READING: clean-game table + deviance + live GSV-DAL
+### nfl-resim-hashseed — CLOSED 2026-10-02 — opened 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+- Goal (verbatim): NFL live re-sim rating perturbation is reproducible across processes (no PYTHONHASHSEED dependence), so test_turning_it_ON_widens_the_distribution stops failing at random in the daily ci-suite -- **GOAL: MET.** Reading: `_perturbed_ratings` seeded `random.Random(tuple.__hash__())`, PYTHONHASHSEED-dependent (p 0.657..0.760 over hash seeds 0..9 at rating_sd 0.75); now seeded from a string -> p=0.691176 under all 10 seeds on Linux; new cross-process test failed before / passes after; test file 35/35 on Windows and 5/5 runs on Linux. No production effect: no caller passes rating_sd except scripts/backtest_nfl_live_totals.py, whose rating_sd calibration comments in live_resim.py were drawn under random hash seeds and are not exactly reproducible.
+- Goal: NFL live re-sim rating perturbation is reproducible across processes (no PYTHONHASHSEED dependence), so test_turning_it_ON_widens_the_distribution stops failing at random in the daily ci-suite
+- Files: syndicate/features/nfl/live_resim.py, tests/test_nfl_live_resim.py (the "held by OPEN lane nfl-live-resim-activation" note in `nfl-live-gameline-full-rows` is STALE: that lane CLOSED 2026-09-29, `lanes_closed.md`)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: probe over PYTHONHASHSEED 0..9 gives one identical rating_sd=0.75 result; a new cross-process test fails before and passes after; tests/test_nfl_live_resim.py passes
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
