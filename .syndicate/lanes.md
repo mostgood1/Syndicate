@@ -1373,6 +1373,16 @@ death, never life — do not invert it.
 - Verification: unit tests (local fleet no-op vs Render-configured vs unconfigured non-local); after fleet ff + refresh-worker restart, 0 BOOK_GRID_PUBLISH_FAILED and 0 SKIP_NOT_CONFIGURED lines since start while book_grid files keep refreshing
 - Blocked by: none
 
+### wnba-bovada-league — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: The vendored WNBA repo's Bovada fetchers query Bovada's WNBA category (not NBA) and WNBA predict-date keeps only games whose teams are WNBA teams by NAME; the 10-03 NBA artifacts are quarantined on the fleet; the same fix is opened upstream as a PR to mostgood1/WNBA-Betting
+- Files: vendor/wnba_betting_repo/src/wnba_betting/odds_bovada.py,vendor/wnba_betting_repo/src/wnba_betting/cli.py,vendor/wnba_betting_repo/src/wnba_betting/teams.py,tests/test_wnba_bovada_league.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: ENDPOINTS contain no nba slug and include basketball/wnba; is_wnba_team rejects Toronto Raptors / Miami Heat but accepts Toronto Tempo; the predict-date filter drops a MIA@TOR row. Live: fetch_bovada_odds_current against Bovada returns only WNBA games. Fleet: served /wnba/api/source/cards for 10-03 no longer carries MIA@TOR. Upstream PR URL recorded.
+- Blocked by: none
+- Scope change 2026-10-02 (user decision "drop Bovada game-odds fallback"): `predict_date_cmd`'s Bovada fallback is REMOVED, not just repointed; NBA preseason via OddsAPI `basketball_nba_preseason` is a SEPARATE lane.
+- Status: code landed with this commit; OWED: fleet ff + 10-03 quarantine + served check, upstream PR URL.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
