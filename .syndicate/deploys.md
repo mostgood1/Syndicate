@@ -44935,3 +44935,9 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - what: `00d6c1a6` -- `status` labels a gap with no role code `no role code changed -- nothing to load` (was `ledger/docs/tests only`).
 - how: `~/Syndicate` ff `8c30fd68 -> 00d6c1a6` from GitHub; 2 commits, the only code `scripts/local_production.py` (no role imports it); dirty data files untouched; nothing restarted.
 - verify (READ): HEAD `00d6c1a6`; `status` prints all three roles `code=9856dd92 (HEAD 00d6c1a6: no role code changed -- nothing to load)`; `/healthz` 200.
+
+## 2026-10-02 14:15Z (9:15 AM CT) -- LOCAL FLEET `~/Syndicate` ff onto `8e87c877` + web HUP (lane `live-odds-latest-tick-stale`, user: "fix the live-odds latest_tick so it stops going stale") -- **SHIPPED; READING OWED**
+
+- what: `00d6c1a6 -> 8e87c877`; only runtime change `8e87c877` (`/api/ops/live-refresh/state` overlays the odds run's terminal status from `refresh_job_status.json` onto the tick's launch-time `result`; helper `live_refresh_loop.reconcile_tick_result`). Runtime files the web loads since it booted on `9856dd92`: `syndicate/blueprints/ops.py`, `syndicate/features/shared/live_refresh_loop.py` (both this change); `scripts/local_production.py` also changed in that range but the web never imports it. Workers NOT restarted -- their only change is a new function nothing in them calls.
+- how: ff 14:15:42Z; `kill -HUP` web master 387572 14:15:42Z; workers 387584/387586 -> 399022/399023 by 14:15:44Z; `/healthz` 200.
+- verify: owed -- the served tick at 14:15:44Z was a skipped pregame tick (no `result`), so nothing to reconcile yet; a watcher is waiting for a tick that launches a run and for that run to exit.
