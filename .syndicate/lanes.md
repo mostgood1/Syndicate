@@ -1133,6 +1133,14 @@ death, never life — do not invert it.
 - Verification: The backtest script runs end-to-end on fleet (production) inputs plus as-of rebuilds, prints coverage + intersection, and writes per-market tables; numbers recorded in the findings file and lanes.md
 - Blocked by: none
 
+### nfl-lines-props-backtest — OPEN — opened 2026-10-02 — session 05b01a84-7abe-45fd-a8e9-c50ee819da1e
+- Goal: Every NFL game-line market (margin/spread, total, moneyline, and 1H/quarter lines where priced and projected) and every NFL player-prop market priced in the captured odds is backtested AS-OF over completed games, 2026 in-season and 2022-2025 historical reported separately: per market n, MAE and bias vs actual, dMAE vs a naive baseline (player's own as-of average for props) with a game-clustered bootstrap CI, and Brier/log-loss vs the de-vigged book with a paired CI; per-family date coverage and the intersection printed; findings file names which markets beat BOTH the baseline and the book (the only ones that may carry a board probability/edge). Measurement only -- no deploy, no board change without a user decision
+- Files: scripts/backtest_nfl_lines_props.py (NEW), tests/test_backtest_nfl_lines_props.py (NEW), .syndicate/findings_2026-10-02_nfl_lines_props_backtest.md (NEW). READ/IMPORT ONLY, NOT EDITED: scripts/backtest_nfl_props.py, scripts/calibrate_nfl_spread_shrinkage.py, syndicate/features/nfl/props.py, syndicate/features/nfl/player_stats.py (claimed by OPEN lane layer2-triad-alignment)
+- Hypothesis: Following NHL (no skater market beats its own average) and NFL's 09-28 findings (prop spread 0.21-0.65x plausible, distribution-family problem; per-market k refuted), no NFL continuous prop market beats BOTH the player's as-of average and the de-vigged book, and no NFL game-line market (margin, total, moneyline) beats the de-vigged close; Anytime TD is the only prop candidate
+- Falsification test: Any market whose dMAE vs baseline CI lies wholly below 0 AND whose Brier vs the de-vigged book is lower with a paired game-clustered CI excluding 0 refutes it for that market
+- Verification: The backtest runs end-to-end on fleet (production) inputs plus as-of rebuilds, prints per-family coverage + intersection, writes per-market tables for 2026 in-season and 2022-2025 separately; numbers recorded in the findings file and this lane
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
