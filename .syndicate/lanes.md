@@ -1410,7 +1410,8 @@ death, never life — do not invert it.
 - Verification: after: 0 WNBA-labelled MIA@TOR rows in both files (disk and any keyvalue copy); row counts = before - removed (+ any appends that landed, preserved); backups present; non-WNBA MIA@TOR rows (if any) untouched
 - Blocked by: none
 
-### live-ledger-venue-rebuild — OPEN — opened 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+### live-ledger-venue-rebuild — CLOSED — opened 2026-10-02, closed 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+- Goal (verbatim): The fleet's execution ledger regains the Render-era LIVE record: one graded live row per venue-settled market position (Kalshi settlements, Polymarket resolutions), marked source=venue_rebuild, built and written by live-odds-worker (which holds the credentials) only on a request file, dry-run first and applied only with the dry run's exact row count -- **GOAL: MET.** Reading: the third dry run (18:08Z) was clean, with 0 repair-touched rows. The user approved; apply wrote 552 (18:18:13Z). The ledger reads kalshi 420 / polymarket 132 live rows, all graded, -$525.70 on $2,834.45. The next VENUE_SETTLEMENT (18:33:54Z) read settled=0 already=552 with no repairs, and the read-back was unchanged. 18 tests. Shipped `331eaebe`/`68fa50f1`.
 - Goal: The fleet's execution ledger regains the Render-era LIVE record: one graded live row per venue-settled market position (Kalshi settlements, Polymarket resolutions), marked source=venue_rebuild, built and written by live-odds-worker (which holds the credentials) only on a request file, dry-run first and applied only with the dry run's exact row count
 - Files: syndicate/features/shared/venue_ledger_rebuild.py, scripts/run_live_odds_refresh_worker.py, tests/test_venue_ledger_rebuild.py. (Lent 2026-10-02 to `layer2-freshness-1h` for one `_handle_stop` edit, user decision; RETURNED in the same commit that landed it.)
 - Hypothesis: n/a

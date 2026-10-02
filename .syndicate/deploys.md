@@ -45092,3 +45092,15 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - not yet covered: the **live** phase. All 8 are `--phase pregame`; tonight's GSV-DAL (tip 2026-10-03T01:00Z) is the first live WNBA window. Watcher v2 (`C:/tmp/wnba_watch_evening2.py`, background b9s8e63mp) prints every new run and a VERDICT at 2026-10-03T03:45Z.
 - **the first watcher was blind**: v1 read `result.results`, a field these files do not have (keys are command/finishedAt/ok/returnCode/startedAt/stdout); the results live inside `stdout`, which is now per-line timestamp stamped and, for the all-sport runs, cut to the first+last 32 KB. It reported nothing for 3.5 h while 8 runs landed, and at 03:45Z would have printed "0 runs". v2 strips the stamp, decodes the top-level JSON, and falls back to the tail summary's per-sport `ok` when truncated.
 - NBA's failure in the hourly runs is pre-existing (15:03Z already) and is NOT this lane; recorded here as a lead, cause unread.
+
+## 2026-10-02 (~1:18 PM CT) -- LIVE LEDGER REBUILT FROM THE VENUES on the fleet: 552 graded live rows written (user-approved "Yes, apply 552 rows") -- lane live-ledger-venue-rebuild CLOSED
+- Code: `venue_ledger_rebuild` (`e3d18fad`, `93be8be9`, `331eaebe`, `68fa50f1`); a live-odds-worker request-file hook. Each step was a role-only restart of live-odds-worker (0.8-2.6 s exits, no sim involved).
+- Dry runs:
+  - 17:56Z: 552 rows. Polymarket had no stake, and its sports were league codes.
+  - 18:01Z: stake added, but 19 Polymarket wins would have been REWRITTEN by `repair_impossible_venue_pnl`, because a cost/shares price includes fees. Fixed by keeping no fill_price on Polymarket rows.
+  - 18:08Z: clean. 0 repair-touched, 0 fetch errors, 41 skipped (kalshi both_sides 8 and scalar 4; polymarket zero-delta 29).
+- Backup BEFORE apply: `/home/amyn/syndicate-prod-backup/ledger_before_venue_rebuild_20261002T181329Z.json` (100,764 bytes, sha256 3d52dad4413375d0...). Restore by SETting it back to the ledger key.
+- Apply 18:13:29Z -> result 18:18:13Z: `status=ok written=552`.
+- verify (READ, ledger): 637 rows = 552 `source=venue_rebuild` live (kalshi 420: 169W/251L, P&L -$361.40 on $2,258.34; polymarket 132: 45W/86L/1P, P&L -$164.30 on $576.11; all graded) + 85 paper.
+- verify (READ, the next settlement tick 18:33:54Z): `settled=0 already=552 awaiting=0`, no repair lines, and the read-back after it was identical (rebuilt-row digest 8c04637655c04779).
+- Not recoverable, by design: plan, model edge, sim view and line on these rows (None, marked `source=venue_rebuild`). 41 venue rows are not in the record (skips above).
