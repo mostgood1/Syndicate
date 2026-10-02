@@ -44861,3 +44861,9 @@ Supersedes "Not upstream" in the ~7:50 PM CT rebound entry. Upstream `main` `sim
   - `check_deploy_safety.py` from `~/Syndicate` 02:31:36Z: CLEAR rc 0 with real readings.
   - web last 3,000 lines: 0 errors, 92x 200, 4x 401. live-odds-worker: 8 lines match a bare `ERROR` pattern, 0 Traceback / `_ERROR` / Exception.
 - side effect checked: another session's manual CI run (`c98bef63` `ci_main.sh`, pid 263049, NOT a supervisor job -- its own process tree in `~/syndicate-prod/ci-checkout`) ended in this window. Its script re-checked-out `ci-checkout` `bac37f64 -> bbff3f7a` at 02:33:10Z and relaunched (pid 271820, progressing). Attributed to that relaunch, not to `down` (which only signals the supervisor's own children); the old process's exact exit instant was not captured.
+
+## 2026-10-02 02:53Z (2026-10-01 9:53 PM CT) -- LOCAL FLEET `~/Syndicate` ff onto `582074b4`, NO restart (lane `fleet-restart-onto-main-3`, user chose ff-only) -- **SHIPPED, nothing runtime**
+
+- what: `d165980d -> 582074b4`, 3 commits (`bbff3f7a` lane ledger, `d703ce30` deploys entry, `582074b4` tests/test_refresh_worker.py hermetic job count). `git diff --name-only` outside `.syndicate/ docs/ tests/`: **none** -- no runtime file, no requirements change.
+- why no restart (user decision after being shown it): a restart would ship no code, and refresh-worker was mid-way through an NFL projection child (`generate_smartsim2_nfl_projections.py --season 2026 --week 4`, pid 283300, ppid refresh-worker 268483) that NEITHER `--drain` (tracks mlb_sim + board build) NOR `check_deploy_safety` sees -- `down` would have killed it after a CLEAR.
+- verify (READ 02:53Z): `before=d165980d after=582074b4`; 2 local data mods kept; all roles `up restarts=0 code=d165980d (HEAD 582074b4: STALE)` -- stamp-only, the code they run is byte-identical outside tests/ledger; `/healthz` 200; NFL child still running.

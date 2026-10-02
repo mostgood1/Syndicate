@@ -1135,6 +1135,14 @@ death, never life — do not invert it.
 - Verification: status all roles up restarts=0 code=<HEAD>; /healthz 200; BOARD_BUILD_TIMING after the latest [refresh_worker] BOOTED with no DEFERRED/DRAIN_HOLD/Traceback; deploys.md entry
 - Blocked by: none
 
+### fleet-restart-onto-main-3 — CLOSED — opened 2026-10-01 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: LOCAL FLEET ~/Syndicate fast-forwarded to github/main and all three roles restarted together (drain -> safety CLEAR -> down -> scheduled task up), every role code=<new HEAD>, /healthz 200, a board build completing after BOOTED; recorded in deploys.md — **GOAL: DRIFTED** (by user decision: the range had 0 runtime files and an NFL projection child the safety tools cannot see was in flight, so ff-only to 582074b4, no restart -- deploys.md 2026-10-02 02:53Z. The coverage gap is recorded as a LEAD in log/2026-10-01.md; no lane opened for it)
+- Files: .syndicate/deploys.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: status all roles up restarts=0 code=<HEAD>; /healthz 200; BOARD_BUILD_TIMING after the latest [refresh_worker] BOOTED with no DEFERRED/DRAIN_HOLD/Traceback; deploys.md entry
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
