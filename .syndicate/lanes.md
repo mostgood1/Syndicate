@@ -1079,6 +1079,15 @@ death, never life — do not invert it.
 - Verification: deploys.md READING: clean-game table + deviance
 - Blocked by: none
 
+### fleet-drain-e2e — CLOSED — opened 2026-10-01 — closed 2026-10-01 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: A real check_deploy_safety.py --drain against the local fleet: the refresh-worker acks the drain, defers new builds, reports idle, and --undrain clears it; board builds resume afterwards — **GOAL: MET** (reading: run 1 01:11Z worker acked within ~60 s (`acked_drain_at` set, `DRAIN_HOLD stage=mlb_sim_tick` x many, `DEFERRED_BOARD_BUILD` x5, 0 BUILD_SPAN_ENTER in 7 min drained); --undrain 01:18:10Z cleared owner; next build ENTER ~01:22Z, completed 01:27Z. Hypothesis held, BUT run 1 exposed a deployer defect -- CLEAR in ~1 s on a pre-request heartbeat (`acked None`) -- fixed here)
+- Files: .syndicate/log/2026-10-01.md,scripts/check_deploy_safety.py,tests/test_check_deploy_safety_fleet_logs.py
+- Hypothesis: Run INSIDE WSL with the refresh-worker's state env (keyvalue redis://127.0.0.1:6379/0, SYNDICATE_REPORTS_ROOT=/home/amyn/syndicate-prod/data/reports), --drain writes the same Redis key the worker reads; the worker publishes acked_drain_at within one cycle, finishes any in-flight build, then reads idle -> rc=0. Run from Windows it would NOT (key embeds the resolved absolute path).
+- Falsification test: Falsified if read_worker_state stays 'unknown' (no drain_aware heartbeat) or acked_drain_at never appears within 3 cycles, or a new BUILD_SPAN_ENTER appears in the fleet log after the ack while the drain is in force.
+- Verification: rc=0 with CLEAR line; worker_drain_state acked_drain_at non-null; no BUILD_SPAN_ENTER after ack until --undrain; after --undrain, deploy_drain.json owner empty and a new BOARD_BUILD_TIMING appears
+- Blocked by: none
+- Fix: `_drain_clear` -- CLEAR needs ack >= requested_at AND worker idle AND board_build_state idle (UNKNOWN never clear). Live run 2 (fixed code, 01:22Z, started mid-build): worker idle+acked from 01:23:20Z (old code would have CLEARed) and the drain held through candidate_collection -> portfolio_commit; exited between 01:26:32Z and 01:27:13Z, with BOARD_BUILD_TIMING wall_s=294.1 present by 01:27:15Z and no new ENTER. Its CLEAR line/rc were NOT captured (monitor `rm -f` raced the output file) -- ordering is from an independent 10 s observer.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

@@ -509,6 +509,45 @@ def _as_dict(value: Any) -> dict[str, Any]:
 
 
 
+def _drain_clear(
+    state: dict[str, Any] | None,
+    verdict: str,
+    requested_at: float,
+    build_in_flight: bool | None,
+) -> tuple[bool, str]:
+    """(clear, why_not). CLEAR needs ALL THREE; anything unproven is not clear.
+
+    MEASURED 2026-10-01 on the local fleet (lane `fleet-drain-e2e`): the old
+    loop returned CLEAR **one second** after `request_drain`, on a worker state
+    published 43 s BEFORE the request (`acked_drain_at=None`). "idle" in that
+    payload described a worker that had never seen the drain. The ack landed
+    ~60 s later. And `in_flight` only ever carries `mlb_sim` -- the board build
+    runs in the intelligence-state loop and is never marked -- so the same
+    "idle" would have been returned in the middle of a board build. That run
+    was safe by luck: the last build had completed 17 log lines earlier.
+
+      1. ACK NEWER THAN THIS REQUEST. `acked_drain_at` is re-stamped every
+         cycle while a drain is in force, so `>= requested_at` proves the
+         worker has read THIS drain and holds new work.
+      2. WORKER IDLE (`read_worker_state`: fresh, drain-aware, nothing in flight).
+      3. BOARD BUILD IDLE per `board_build_state` -- the build `in_flight` never
+         reports. UNKNOWN is not idle.
+    """
+    if verdict != "idle":
+        return False, f"worker {verdict}"
+    try:
+        acked = float((state or {}).get("acked_drain_at") or 0.0)
+    except (TypeError, ValueError):
+        acked = 0.0
+    if acked < float(requested_at):
+        return False, "worker has not acked this drain yet"
+    if build_in_flight is None:
+        return False, "board build state UNKNOWN"
+    if build_in_flight:
+        return False, "board build in flight"
+    return True, ""
+
+
 def _run_drain(*, owner: str, wait_seconds: int, base_url: str | None = None) -> int:
     """Request a drain, wait for the worker to go idle, report.
 
@@ -562,27 +601,39 @@ def _run_drain(*, owner: str, wait_seconds: int, base_url: str | None = None) ->
         print(f"  longest recent build {measured:.0f}s -> drain expiry {ttl}s ({ttl/60:.0f} min)")
     else:
         print(f"  build duration unmeasurable -> drain expiry floored at {ttl}s ({ttl/60:.0f} min)")
-    request_drain(owner, ttl_seconds=ttl, reason="check_deploy_safety --drain")
+    requested = request_drain(owner, ttl_seconds=ttl, reason="check_deploy_safety --drain")
+    requested_at = float((requested or {}).get("requested_at") or _time.time())
     print(f"Drain requested by {owner}. Waiting up to {wait_seconds}s for refresh-worker to go idle.")
     print("  (a build already running is NOT interrupted -- drain waits for it to finish)")
     deadline = _time.time() + max(30, int(wait_seconds))
     last = ""
+    why_not = ""
+    build_facts: dict[str, Any] = {}
     while _time.time() < deadline:
         state, verdict = read_worker_state("refresh-worker")
+        build_in_flight, build_facts = board_build_state(base_url)
+        clear, why_not = _drain_clear(state, verdict, requested_at, build_in_flight)
         busy = [k for k, v in ((state or {}).get("in_flight") or {}).items() if v]
-        line = f"  {verdict:<8} in_flight={busy or '[]'} commit={(state or {}).get('commit')}"
+        build = {None: "unknown", True: "in_flight", False: "idle"}[build_in_flight]
+        line = (f"  {verdict:<8} in_flight={busy or '[]'} board_build={build} "
+                f"commit={(state or {}).get('commit')}" + (f"  -- {why_not}" if why_not else ""))
         if line != last:
             print(line, flush=True)
             last = line
-        if verdict == "idle":
+        if clear:
             print("")
-            print("CLEAR: refresh-worker is drained and idle. Deploy now, then:")
+            print("CLEAR: refresh-worker acked the drain, is idle, and no board build is in flight. Deploy now, then:")
             print(f"  python scripts/check_deploy_safety.py --undrain --drain-owner {owner}")
             return 0
         _time.sleep(15)
 
     state, verdict = read_worker_state("refresh-worker")
-    if verdict == "unknown":
+    if why_not == "board build state UNKNOWN":
+        print("")
+        print(f"[UNKNOWN] board build state unreadable: {build_facts.get('reason')}")
+        print("  A worker that acked the drain can still be mid-build. Drain left in place; it expires on its own.")
+        return 2
+    if verdict == "unknown" or why_not == "worker has not acked this drain yet":
         print("")
         print("[UNKNOWN] refresh-worker never acknowledged the drain.")
         print("  Either the running build predates drain support, or its heartbeat is stale")

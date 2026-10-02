@@ -103,7 +103,8 @@ def _drain_ttl(base_url, *, fleet_lines, capsys):
 
     with mock.patch.object(store, "_state_backend_kind", return_value="keyvalue"), \
          mock.patch.object(deploy_drain, "request_drain") as request, \
-         mock.patch.object(deploy_drain, "read_worker_state", return_value=({"in_flight": {}}, "idle")), \
+         mock.patch.object(deploy_drain, "read_worker_state", return_value=({"in_flight": {}, "acked_drain_at": 9e12}, "idle")), \
+         mock.patch.object(cds, "board_build_state", return_value=(False, {})), \
          mock.patch.object(cds, "_fleet_log_tail", return_value=fleet_lines) as tail, \
          mock.patch.object(cds, "_expected_build_seconds", return_value=None) as render:
         assert cds._run_drain(owner="t", wait_seconds=30, base_url=base_url) == 0
@@ -137,3 +138,72 @@ def test_drain_ttl_floor_holds_for_a_typical_fleet_build(capsys):
     ttl, _, _, out = _drain_ttl("http://127.0.0.1:10000", fleet_lines=COMPLETE_BUILD, capsys=capsys)
     assert ttl == int(_DEFAULT_TTL_SECONDS)  # 3 x 177.8s is under the floor
     assert "longest recent build 178s" in out
+
+
+# --- `fleet-drain-e2e`: CLEAR needs the ack AND an idle board build ---------
+
+REQ = 1_000.0
+
+
+@pytest.mark.parametrize(
+    "state,verdict,build,clear,why",
+    [
+        # The measured defect: idle, but published before the request (no ack).
+        ({"in_flight": {}, "acked_drain_at": None}, "idle", False, False, "not acked"),
+        ({"in_flight": {}, "acked_drain_at": REQ - 5}, "idle", False, False, "not acked"),
+        ({"in_flight": {}, "acked_drain_at": REQ + 5}, "idle", True, False, "board build in flight"),
+        ({"in_flight": {}, "acked_drain_at": REQ + 5}, "idle", None, False, "UNKNOWN"),
+        ({"in_flight": {"mlb_sim": True}, "acked_drain_at": REQ + 5}, "busy", False, False, "worker busy"),
+        (None, "unknown", False, False, "worker unknown"),
+        ({"in_flight": {}, "acked_drain_at": REQ + 5}, "idle", False, True, ""),
+    ],
+)
+def test_drain_clear_requires_ack_and_idle_build(state, verdict, build, clear, why):
+    ok, why_not = cds._drain_clear(state, verdict, REQ, build)
+    assert ok is clear
+    assert why in why_not
+
+
+def _patched_drain(read_states, build_states, wait_seconds):
+    import syndicate.features.shared.deploy_drain as deploy_drain
+    import syndicate.features.shared.refresh_state_store as store
+
+    t = [REQ]
+    with mock.patch.object(store, "_state_backend_kind", return_value="keyvalue"), \
+         mock.patch.object(deploy_drain, "request_drain", return_value={"requested_at": REQ}), \
+         mock.patch.object(deploy_drain, "read_worker_state", side_effect=read_states), \
+         mock.patch.object(cds, "board_build_state", side_effect=build_states) as builds, \
+         mock.patch.object(cds, "expected_build_seconds", return_value=None), \
+         mock.patch("time.time", side_effect=lambda: t[0]), \
+         mock.patch("time.sleep", side_effect=lambda s: t.__setitem__(0, t[0] + s)):
+        rc = cds._run_drain(owner="t", wait_seconds=wait_seconds, base_url="http://127.0.0.1:10000")
+    return rc, builds.call_count
+
+
+def test_run_drain_waits_through_unacked_then_building_then_clears(capsys):
+    """Reachability: the loop really polls past a stale idle and a running build."""
+    unacked = ({"in_flight": {}, "acked_drain_at": None}, "idle")
+    acked = ({"in_flight": {}, "acked_drain_at": REQ + 30}, "idle")
+    rc, build_calls = _patched_drain(
+        [unacked, acked, acked, acked], [(False, {}), (True, {}), (False, {})], wait_seconds=600
+    )
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert build_calls == 3
+    assert "has not acked this drain yet" in out
+    assert "board build in flight" in out
+    assert "CLEAR: refresh-worker acked the drain" in out
+
+
+def test_run_drain_never_acked_is_unknown_not_clear(capsys):
+    unacked = ({"in_flight": {}, "acked_drain_at": None}, "idle")
+    rc, _ = _patched_drain(lambda *_: unacked, lambda *_: (False, {}), wait_seconds=60)
+    assert rc == 2
+    assert "never acknowledged the drain" in capsys.readouterr().out
+
+
+def test_run_drain_unknown_build_state_is_unknown_not_clear(capsys):
+    acked = ({"in_flight": {}, "acked_drain_at": REQ + 30}, "idle")
+    rc, _ = _patched_drain(lambda *_: acked, lambda *_: (None, {"reason": "log gone"}), wait_seconds=60)
+    assert rc == 2
+    assert "board build state unreadable: log gone" in capsys.readouterr().out
