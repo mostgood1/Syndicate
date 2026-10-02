@@ -108,6 +108,16 @@ class RefreshWorkerTests(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         assert spec is not None and spec.loader is not None
         spec.loader.exec_module(module)
+        # HERMETIC JOB COUNT. `_resolve_active_job_count` takes the max of the
+        # manifest AND a real process enumeration -- by design, so a job the
+        # manifest missed still counts. In a test that enumeration sees whatever
+        # refresh jobs happen to be running on the HOST: on the local WSL fleet
+        # (production on this machine) the live jobs made `main --run-once`
+        # report `throttled` and 13 tests fail or pass depending on the minute
+        # the suite ran (local ci-suite, 2026-10-02). These tests control the
+        # manifest; they assume no foreign processes. The enumeration itself is
+        # tested by the `rrw` functions further down, which set it explicitly.
+        module._running_job_process_count = lambda: 0
         return module
 
     def test_bootstrap_soccer_player_seed_files_backfills_missing_leagues_only(self) -> None:
