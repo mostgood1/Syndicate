@@ -1275,7 +1275,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### wnba-odds-run-failures — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
-- Goal: WNBA odds-refresh runs stop failing on the post-refresh IndexError (build_recommendation_output returns the row unchanged when ranking filters it out), and a failed step's stderr_tail no longer loses its error line to LIST_MEMORY/DATAFRAME_MEMORY dumps; verified on the fleet after a restart
+- Goal: WNBA odds-refresh runs stop failing on the post-refresh IndexError (build_recommendation_output returns the row unchanged when ranking filters it out), and a failed step's stderr_tail no longer loses its error line to LIST_MEMORY/DATAFRAME_MEMORY dumps; verified on the fleet after a restart — **GOAL: NOT MET** (code shipped and on the fleet; the fleet reading is still owed: watcher b2l9545s6 verdict at 2026-10-03T03:45Z (10:45 PM CT) over WNBA runs after 20261002_144925, baseline 0/65 ok; as of 17:58Z no new WNBA run seen)
 - Files: syndicate/features/shared/recommendation_engine.py,syndicate/features/shared/refresh_log_tail.py,tests/test_recommendation_engine_filtered_candidate.py,tests/test_refresh_log_tail_memory_tokens.py
 - Hypothesis: n/a
 - Falsification test: n/a
@@ -1391,7 +1391,7 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: unit: events listed under both keys, each event priced under its own key, None only when both listings succeed with no game, inconclusive when either fails; predict_date/odds_snapshots have no Bovada game-odds call. Live (fleet, read-only): fetch_game_odds_current for 2026-10-03 returns MIA@TOR from OddsAPI basketball_nba_preseason. Upstream PR URL.
 - Blocked by: none
-- Status: done (deploys.md 2026-10-02 17:01Z, PR NBA-Betting#2). Owed only: the next fleet NBA run's game_odds_2026-10-03.csv sourced from OddsAPI.
+- Status: done (deploys.md 2026-10-02 17:01Z; upstream NBA-Betting#2 MERGED 17:55Z as 73892a6d, main == reviewed head, deploys.md 17:55Z; WNBA-Betting#8 merged as b4632180 same time). Owed only: the next fleet NBA run's game_odds_2026-10-03.csv sourced from OddsAPI.
 
 ### live-odds-stop-prompt — CLOSED — opened 2026-10-02, closed 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
 - Goal (verbatim): live-odds-worker's main loop sleeps on _LIVE_REFRESH_LOOP_STOP.wait() instead of time.sleep(), so a SIGTERM ends the worker within seconds instead of after up to a 900s idle sleep -- **GOAL: MET.** Reading: pid 627987 (5c205087), SIGTERM 7 s into a 900 s `loop_sleep` (17:31:22.610Z): gone in 0.61 s, against 895 s on the old code at 16:38-16:53Z. Supervisor restarted it as pid 629751, whose first pass completed at 17:34:55Z. Tests: AST guard (fails on the old code) plus a handler-wakes-wait behaviour test. Shipped `5c205087`.
