@@ -1143,6 +1143,14 @@ death, never life — do not invert it.
 - Verification: status all roles up restarts=0 code=<HEAD>; /healthz 200; BOARD_BUILD_TIMING after the latest [refresh_worker] BOOTED with no DEFERRED/DRAIN_HOLD/Traceback; deploys.md entry
 - Blocked by: none
 
+### deploy-safety-worker-children — CLOSED — opened 2026-10-01 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: check_deploy_safety.py (plain and --drain) against the local fleet blocks while refresh-worker has any live child process (NFL projections, sims, odds jobs -- however launched), naming each; an unreadable process table is UNKNOWN, never clear; Render path unchanged — **GOAL: MET** (reading: 125 passed incl. child present -> NOT CLEAR naming it, none -> note, scan failure/missing worker -> UNKNOWN, drain waits on a child, off-fleet never scans; live 03:05:15Z scan caught build_sport_overview_child.py pid 288742 matching an independent awk tree-walk; plain run 03:06Z printed 'refresh-worker child jobs: none (worker pid=268483)')
+- Files: scripts/check_deploy_safety.py,tests/test_check_deploy_safety_fleet_logs.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: child present -> NOT CLEAR naming it; none -> unchanged verdict; scan failure -> UNKNOWN; drain waits on children; Render/no-URL path never scans. Live: the scan lists refresh-worker's real children on the fleet (match against ps)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
