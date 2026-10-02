@@ -1021,6 +1021,14 @@ death, never life — do not invert it.
 - Verification: unit tests for job schedule/rotation/backup/AOF; on the fleet: redis CONFIG GET appendonly=yes, a backup snapshot present with file count matching the data root, status shows all roles on HEAD, each new job run once with rc recorded
 - Blocked by: none
 
+### wnba-sim-rebound-credit — OPEN — opened 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- Goal: WNBA sim player rebounds match actual (component backtest 1.21x; live LVA-IND 41-43 per team vs ~33.5)
+- Files: vendor/wnba_betting_repo/src/wnba_betting/sim/events.py,tests/test_basketball_sim_rebound_credit.py
+- Hypothesis: (R1) The PBP loop credits a PLAYER rebound on every missed FG; real box scores credit 0.893 player rebounds per missed FG (Jul-Sep 2026: OREB 0.226 per own miss, DREB 0.667 per opponent miss -- the rest are team rebounds / dead balls). Sim misses are now only +3.5% (FG% .454 vs .456), so the excess (~+20%) is the credit. Fix: keep possession flow (OREB continuation at the existing rate) but credit the player only with probability = real player-OREB / continuation and real player-DREB / defensive-rebound share, constants fitted on May-June 2026 only.
+- Falsification test: Component backtest Jul-Sep (out of sample for the fit), paired seeds: falsified unless team REB ratio lands within 0.95-1.05 AND player REB Poisson deviance improves (CI < 0) without PTS/FGA deviance worsening.
+- Verification: deploys.md READING: backtest table + live LVA-IND rebounds
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
