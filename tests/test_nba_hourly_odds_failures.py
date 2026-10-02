@@ -109,6 +109,92 @@ def _load_refresh_nba():
     return mod
 
 
+SNAPSHOT_HEADER = "snapshot_ts,event_id,commence_time,bookmaker,bookmaker_title,market,outcome_name,player_name,point,price,last_update,home_team,away_team\n"
+GAME_LINE = "t,e1,2026-10-03T23:00:00Z,draftkings,DraftKings,spreads,Miami Heat,,-1.5,-105,t,Toronto Raptors,Miami Heat\n"
+PROP_LINE = "t,e1,2026-10-03T23:00:00Z,draftkings,DraftKings,player_points,Over,Bam Adebayo,15.5,-110,t,Toronto Raptors,Miami Heat\n"
+
+
+def test_count_player_prop_rows(tmp_path):
+    mod = _load_refresh_nba()
+    games = tmp_path / "games.csv"
+    games.write_text(SNAPSHOT_HEADER + GAME_LINE * 3, encoding="utf-8")
+    both = tmp_path / "both.csv"
+    both.write_text(SNAPSHOT_HEADER + GAME_LINE + PROP_LINE, encoding="utf-8")
+    no_col = tmp_path / "nocol.csv"
+    no_col.write_text("a,b\n1,2\n", encoding="utf-8")
+    assert mod._count_player_prop_rows(games) == 0
+    assert mod._count_player_prop_rows(both) == 1
+    assert mod._count_player_prop_rows(tmp_path / "missing.csv") is None  # unknown is not zero
+    assert mod._count_player_prop_rows(no_col) is None
+
+
+def _run_with_snapshot(tmp_path, monkeypatch, body: str):
+    mod = _load_refresh_nba()
+    source_root = tmp_path / "data" / "nba_source"
+    processed = source_root / "data" / "processed"
+    processed.mkdir(parents=True)
+    (source_root / "data" / "raw").mkdir(parents=True)
+    calls = []
+
+    def fake_run_to_file(cmd, log_file, *, cwd=None, env=None, timeout_s=None, heartbeat_cb=None, heartbeat_every_s=None):
+        cmd = list(map(str, cmd))
+        if "--out" in cmd:  # the owned snapshot fetch
+            Path(cmd[cmd.index("--out") + 1]).write_text(body, encoding="utf-8")
+        return 0
+
+    def fake_preds(**kwargs):
+        Path(kwargs["out_path"]).write_text("player_name,team\nBam Adebayo,MIA\n", encoding="utf-8")
+        return 1, kwargs["out_path"]
+
+    def fake_edges(**kwargs):
+        calls.append("edges")
+        Path(kwargs["out_path"]).write_text("player_name,edge\nBam Adebayo,0.1\n", encoding="utf-8")
+        return 1, kwargs["out_path"]
+
+    def fake_recs(**kwargs):
+        calls.append("recs")
+        (processed / "props_recommendations_2026-10-03.csv").write_text("player_name\nBam Adebayo\n", encoding="utf-8")
+        return 1, None
+
+    def fake_cards(**kwargs):
+        calls.append("game_cards")
+        p = processed / "game_cards_2026-10-03.csv"
+        p.write_text("home_team,visitor_team\nTOR,MIA\n", encoding="utf-8")
+        return 1, p
+
+    monkeypatch.setattr(mod, "_run_to_file", fake_run_to_file)
+    monkeypatch.setattr(mod, "_ensure_player_logs_for_props_refresh", lambda **k: (True, None))
+    monkeypatch.setattr(mod, "_ensure_game_predictions_for_props_refresh", lambda **k: (True, None))
+    monkeypatch.setattr(mod, "export_props_predictions_local", fake_preds)
+    monkeypatch.setattr(mod, "export_props_edges_local", fake_edges)
+    monkeypatch.setattr(mod, "export_props_recommendations_local", fake_recs)
+    monkeypatch.setattr(mod, "_ensure_source_game_cards_export", fake_cards)
+    monkeypatch.setattr(mod, "_build_local_game_recommendations_artifact", lambda **k: (1, processed / "recs.json"))
+    monkeypatch.setattr(mod, "_export_cards_sim_detail_snapshot", lambda **k: None)
+    state = mod._run_refresh_via_cli(
+        source_root=source_root, date_str="2026-10-03", regions="us", bookmakers="", markets="",
+        do_edges=True, do_export=True, do_push=False, log_file=tmp_path / "run.log",
+    )
+    return state, calls
+
+
+def test_game_lines_only_skips_props_edges_instead_of_failing(tmp_path, monkeypatch):
+    state, calls = _run_with_snapshot(tmp_path, monkeypatch, SNAPSHOT_HEADER + GAME_LINE * 3)
+    assert state["player_prop_rows"] == 0
+    assert "edges" not in calls and "recs" not in calls
+    assert "game_cards" in calls  # the game side still exports
+    assert state.get("rc_edges") == 0
+    assert not str(state.get("error") or "").startswith(("props-edges", "export-props"))
+    assert "no player-prop lines" in str(state.get("warning") or "")
+
+
+def test_player_props_present_still_run_edges(tmp_path, monkeypatch):
+    """off != on: the skip is keyed on a zero, not on the snapshot shape."""
+    state, calls = _run_with_snapshot(tmp_path, monkeypatch, SNAPSHOT_HEADER + GAME_LINE + PROP_LINE)
+    assert state["player_prop_rows"] == 1
+    assert calls[:2] == ["edges", "recs"]
+
+
 class _StopAtGameCards(BaseException):
     """BaseException so the run function's `except Exception` cannot swallow it."""
 

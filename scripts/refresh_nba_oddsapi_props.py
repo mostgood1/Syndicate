@@ -420,6 +420,24 @@ def _export_team_advanced_stats_artifacts(*, source_root: Path, processed_root: 
     return copied
 
 
+def _count_player_prop_rows(path: Path | None) -> int | None:
+    """Snapshot rows that carry a player (game lines have an empty player_name).
+
+    None when the file cannot be read, so an unreadable snapshot never reads as
+    "zero props offered" and silently skips edges.
+    """
+    try:
+        if path is None or not path.exists() or not path.is_file():
+            return None
+        with path.open("r", encoding="utf-8", errors="replace", newline="") as handle:
+            reader = csv.DictReader(handle)
+            if "player_name" not in (reader.fieldnames or []):
+                return None
+            return sum(1 for row in reader if str(row.get("player_name") or "").strip())
+    except Exception:
+        return None
+
+
 def _count_csv_rows_quick(path: Path | None) -> int:
     try:
         if path is None or not path.exists() or not path.is_file():
@@ -3222,7 +3240,19 @@ def _run_refresh_via_cli(
         state["rc_edges"] = None if do_edges else state.get("rc_edges")
         state["rc_export"] = None if do_export else state.get("rc_export")
 
-    if refresh_mode == "full" and pred_ready and do_edges:
+    # Game lines without player props (books post preseason NBA game lines days
+    # before any props) are not a failed edges run: there is nothing to price.
+    # Measured 2026-10-02, MIA@TOR preseason: 28 snapshot rows, all h2h/spreads/
+    # totals, and "No edges computed" failed every hourly run. Only a KNOWN zero
+    # skips; an unreadable snapshot (None) still goes through edges and fails loudly.
+    state["player_prop_rows"] = _count_player_prop_rows(raw_fp)
+    no_player_props = state["player_prop_rows"] == 0 and int(state["snapshot_rows"] or 0) > 0
+    if refresh_mode == "full" and pred_ready and do_edges and no_player_props:
+        state["rc_edges"] = 0
+        state["edges_rows"] = 0
+        state["warning"] = f"no player-prop lines offered for {date_str} ({int(state['snapshot_rows'] or 0)} game-line rows); props edges skipped"
+        _append_log(log_file, state["warning"])
+    elif refresh_mode == "full" and pred_ready and do_edges:
         state["phase"] = "edges"
         state["phase_started_at"] = dt.datetime.utcnow().isoformat()
         state["rc_edges"] = -1
@@ -3257,7 +3287,9 @@ def _run_refresh_via_cli(
         try:
             _touch_progress()
             rc_local_props_export = 0
-            if pred_ready:
+            if pred_ready and no_player_props:
+                _append_log(log_file, f"Skipping local props recommendations export for {date_str}: no player-prop lines offered")
+            elif pred_ready:
                 _, _ = export_props_recommendations_local(processed_root=processed_root, date_str=date_str)
                 _touch_progress()
             else:
@@ -4881,10 +4913,13 @@ def main() -> int:
             return 1
     if snapshot_rows > 0 and alias_rows <= 0:
         return 1
-    if bool(args.do_edges) and snapshot_rows > 0 and edges_rows <= 0:
+    # A KNOWN zero player-prop rows (game lines only) has no props to edge or
+    # recommend; None (unreadable) keeps both checks.
+    props_offered = state.get("player_prop_rows") != 0
+    if bool(args.do_edges) and snapshot_rows > 0 and edges_rows <= 0 and props_offered:
         return 1
     predictions_rows = int(state.get("predictions_rows") or 0)
-    if bool(args.do_export) and snapshot_rows > 0 and game_cards_rows > 0 and predictions_rows > 0 and recs_rows <= 0:
+    if bool(args.do_export) and snapshot_rows > 0 and game_cards_rows > 0 and predictions_rows > 0 and recs_rows <= 0 and props_offered:
         return 1
     if bool(args.do_export) and snapshot_rows > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0 and smart_sim_files <= 0:
         return 1
