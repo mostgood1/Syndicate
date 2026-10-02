@@ -1089,6 +1089,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - Fix: `_drain_clear` -- CLEAR needs ack >= requested_at AND worker idle AND board_build_state idle (UNKNOWN never clear). Live run 2 (fixed code, 01:22Z, started mid-build): worker idle+acked from 01:23:20Z (old code would have CLEARed) and the drain held through candidate_collection -> portfolio_commit; exited between 01:26:32Z and 01:27:13Z, with BOARD_BUILD_TIMING wall_s=294.1 present by 01:27:15Z and no new ENTER. Its CLEAR line/rc were NOT captured (monitor `rm -f` raced the output file) -- ordering is from an independent 10 s observer.
 
+### wnba-sim-blocks — OPEN — opened 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
+- Goal: WNBA sim blocks match actual (component backtest 0.65x team blocks; constant base_block_rate_on_2pa 0.05)
+- Files: vendor/wnba_betting_repo/src/wnba_betting/sim/events.py,tests/test_basketball_sim_blocks.py
+- Hypothesis: (B0) The PBP loop draws a block on 5% of ALL 2PAs, after and independent of the make -- so ~half of sim blocks are on made shots (impossible) and the level is ~half the real 0.094 blocks per opponent 2PA (May-Jun 2026; 0.192 per opponent MISSED 2PA). (B1) Fix: block only on missed 2PAs at the May-June league rate 0.192. (B2) Fix: block only on missed 2PAs at a team rate = defense's prior blocks per game / the opponent's expected missed 2PAs per game (team-specific rim protection).
+- Falsification test: Component backtest Jul-Sep (out of sample for B1's constant), paired seeds. Team BLK judged on BOTH-teams-fully-matched games: a variant is falsified unless team BLK lands within 0.95-1.05 AND player BLK Poisson deviance improves (CI < 0) with PTS/FGA/REB deviance not worse. If both pass, B2 ships only if its player BLK deviance beats B1's (CI < 0).
+- Verification: deploys.md READING: clean-game table + deviance + live LVA-IND or next slate
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
