@@ -2630,7 +2630,12 @@ def main() -> int:
                 print(f"LIVE ODDS REFRESH WORKER RECYCLING after {uptime_seconds:.0f}s uptime to reset accumulated page cache", flush=True)
                 break
             _log_worker_memory("loop_sleep", interval_seconds=sleep_seconds)
-            time.sleep(sleep_seconds)
+            # ON THE STOP EVENT, not time.sleep: `_handle_stop` sets it, and a
+            # caught signal does not cut a time.sleep short (PEP 475). Measured
+            # 2026-10-02 on the local fleet: SIGTERM at ~16:38:30Z, exit at
+            # 16:53:25Z -- the rest of a 900s idle sleep. The same wait the
+            # live-refresh background loop already uses.
+            _LIVE_REFRESH_LOOP_STOP.wait(sleep_seconds)
     finally:
         _log_worker_memory("loop_finally", recycled_for_uptime=recycled_for_uptime)
         _release_process_lock()
