@@ -44914,3 +44914,12 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
   - first build after `[refresh_worker] BOOTED` (log line 16042, after a copy+truncate rotation): `BOARD_BUILD_TIMING wall_s=172.0 ok=True` 13:40:38Z; no DEFERRED / DRAIN_HOLD / Traceback since boot.
   - `check_deploy_safety.py` from `~/Syndicate` 13:40:38Z: CLEAR rc 0 -- `refresh-worker child jobs: none (worker pid=387637)`, `live-odds-worker child jobs: none (worker pid=387638)`.
   - web since restart: only 404s are 5x `/favicon.ico` (the 21 earlier 404s were pre-restart `/api/ops/artifacts/stream`); 0 Traceback/ERROR in the last 3,000 lines. live-odds-worker: 1 line matching the broad pattern, no Traceback.
+
+## 2026-10-02 ~14:0xZ (~9:0x AM CT) -- LOCAL FLEET ff onto `82bd182e`, no restart (lane `nfl-resim-hashseed`, user: "yes, fast-forward the fleet checkout") -- **MET**
+
+- why: the fleet's `ci-suite` job (08:00Z, `local_production.py ci-run`) tests the fleet checkout's HEAD. Tomorrow's run must include `92565cd5` (NFL live re-sim seeding fix -- the 2026-10-02 08:00Z run's only failure, `test_turning_it_ON_widens_the_distribution...`, flaked ~1 in 5 on PYTHONHASHSEED).
+- before: HEAD `9856dd92` -- another session had already restarted all roles onto it (`82bd182e` entry) and it already CONTAINS `92565cd5`. Range `9856dd92..82bd182e` = 1 commit, 0 runtime files (ledger only). Dirty `data/ncaaf_source/historical_truth/games_2026.json.gz` and `vendor/wnba_betting_repo/data/processed/boxscores_history.csv` untouched by the range.
+- how: `git merge --ff-only github/main` in `~/Syndicate`. No role restarted, no job started.
+- verify (READ): HEAD `82bd182e`; `merge-base --is-ancestor 92565cd5 HEAD` yes; `live_resim.py:406` seeds `random.Random(f"nfl-rating-uncertainty|...")`; roles up `code=9856dd92`, `/healthz` 200.
+- note: `status` prints the roles `STALE` against `82bd182e`. That is a false positive -- the check compares commit stamps, not runtime diffs, and the only newer commit is a ledger entry.
+- owed: the 2026-10-03 08:00Z run's verdict, read by scheduled task `fleet-ci-suite-reading-1003` at 09:30Z.
