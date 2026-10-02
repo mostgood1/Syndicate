@@ -1230,6 +1230,15 @@ death, never life — do not invert it.
 - Verification: a test with a local_production.py-only gap reads nothing-to-load; after the ff, status on the fleet prints no STALE for a supervisor-only gap
 - Blocked by: none
 
+### local-prod-stale-label — CLOSED 2026-10-02 — opened 2026-10-02 — session c98bef63-c505-46ce-a4a6-925e364a0cfb
+- Goal (verbatim): status labels a gap with no role code as 'no role code changed' instead of 'ledger/docs/tests only' -- **GOAL: MET.** Reading: status now prints 'no role code changed -- nothing to load'; tests/test_local_production.py 35 passed / 1 skip asserting the new label; runbook's status description updated to the runtime-diff rule.
+- Goal: status labels a gap with no role code as 'no role code changed' instead of 'ledger/docs/tests only'
+- Files: scripts/local_production.py, tests/test_local_production.py, docs/ai_context/local_production_runbook.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: tests/test_local_production.py passes and asserts the new label
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

@@ -504,7 +504,7 @@ def test_a_ledger_only_gap_is_not_stale(git_repo):
     head = commit("tests/test_x.py", "x\n")
     assert lp.runtime_files_between(loaded, head, repo) == []
     note = lp.code_stamp_note(loaded, head, diff=lambda a, b: lp.runtime_files_between(a, b, repo))
-    assert "nothing to load" in note and "STALE" not in note
+    assert "no role code changed -- nothing to load" in note and "STALE" not in note
 
 
 def test_a_code_gap_is_stale_and_counted(git_repo):

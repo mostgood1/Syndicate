@@ -1530,7 +1530,7 @@ def code_stamp_note(loaded: str, head: str, *, diff=runtime_files_between) -> st
     if files is None:
         return f" (HEAD {head[:8]}: STALE? cannot diff {loaded[:8]}..{head[:8]} -- treat as stale)"
     if not files:
-        return f" (HEAD {head[:8]}: ledger/docs/tests only -- nothing to load)"
+        return f" (HEAD {head[:8]}: no role code changed -- nothing to load)"
     return f" (HEAD {head[:8]}: STALE -- {len(files)} runtime file(s) changed; restart the role to load HEAD)"
 
 
