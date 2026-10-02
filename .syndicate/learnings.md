@@ -5255,3 +5255,8 @@ own prior verdicts, not by anything failing.
 ## 2026-10-02: a test that passes against a swallowing parser can be vacuous -- prove the fixture reaches the code
 - Belief overturned: my first `test_nba_event_served_on_the_wnba_url_is_dropped` PASSED ("the NBA event yields no WNBA game") while proving nothing: the fake response lacked `r.ok`, `fetch_bovada_odds_current` keeps a payload only `if r.ok`, the `AttributeError` was swallowed into `continue`, and the fetcher returned `[]` with or without my filter. The sibling test (real WNBA slate parses) failing was the only signal.
 - Rule: for any "X is filtered out" test, assert the PRECONDITION in the same test -- the same input WITH the filter bypassed must produce X (here: MIA@TOR appears when `is_wnba_team` is patched to always-true). Code that catches `Exception` around I/O turns a broken mock into a green negative test.
+
+## 2026-10-02 -- A log COUNT can match its own watcher; a status LABEL can lag the code
+- Unanchored grep counted `EXECUTION=3` before any EXECUTION line existed: `ALL_PROCESS_MEMORY` lines embed every process's cmdline, including the watcher's own grep pattern. **Anchor log counts on `^<stamp>Z [tag] NAME`.**
+- `local_production.py status` `code=` is `RENDER_GIT_COMMIT` from the env built at `up`. live-odds-worker read `927d1787` while running `c1067485` (its split line exists only there). **Judge a role's code by its `==== start` time against the checkout's ff.**
+- A role-only SIGTERM "took 108 s" once and was believed to be the cost. The next took 895 s: it was the remainder of an uninterruptible `time.sleep`. A single timing was luck of phase, not a property; fixed in `5c205087`.
