@@ -1159,6 +1159,12 @@ death, never life — do not invert it.
 - Hypothesis: Following NHL (no skater market beats the player's own average) and the 09-19 market re-measure (WNBA prop ladder log-loss 0.858 vs market 0.682; totals/spreads worse than market; ML slightly better, 1.1 SE), no WNBA prop market beats BOTH the player's as-of average and the de-vigged book, and among game lines only the moneyline is a candidate
 - Falsification test: Any market whose dMAE vs baseline CI lies wholly below 0 AND whose Brier/log-loss vs the de-vigged book is lower with a paired game-clustered CI excluding 0 refutes it for that market
 - Verification: The backtest script runs end-to-end on fleet + recoverable production inputs, prints per-family coverage + intersection, writes per-market tables split regular season / playoffs; numbers recorded in the findings file, lanes.md and deploys.md
+### nhl-lines-backtest — OPEN — opened 2026-10-02 — session 9ed26377-0ef3-4416-bc7b-54428f87ce5c
+- Goal: NHL GAME lines (moneyline incl. regulation 3-way, puck line +/-1.5, total O/U with separate over/under bias, period lines if priced AND projected) backtested AS-OF over the 2025-26 regular season, playoffs separately, any 2026-27 games in their own section: per market n / MAE / bias vs actual, dMAE vs a naive as-of baseline with game-bootstrap 95% CI, Brier/log-loss vs the de-vigged book; deliverable is the gate list (probability/edge vs mean-only) compared with what the board serves today, naming every market whose current treatment the evidence contradicts
+- Files: scripts/backtest_nhl_game_lines.py (NEW), docs/reports/nhl_game_lines_backtest_2026-10-02.md (NEW), .syndicate/findings_nhl_game_lines_backtest.md (NEW)
+- Hypothesis: n/a (measurement lane). Reuses the as-of harness of lane nhl-player-props-projection (scripts/backtest_nhl_props.py, NOT on origin/main at open -- untracked in that lane's worktree; import once landed, never fork)
+- Falsification test: n/a
+- Verification: report with per-market n, window and per-family date coverage + intersection (projections / odds snapshots / final scores), each claimed difference with a CI, substrate named per number; gate list written to this lane and the findings file. Read-only on production: no deploy and no board change without a user decision
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
