@@ -1272,6 +1272,14 @@ death, never life — do not invert it.
 - Verification: Fleet read after any fix: per-league recs files for the next 7 days; served layer2-shortlist?sport=soccer rows_with_projection > 0; recorded in deploys.md
 - Blocked by: none
 
+### soccer-projections-gap — OPEN — opened 2026-10-02 — session 6214bc11-3dad-4e37-af64-5a44a2cb498b
+- Goal: Soccer pregame projections serve on the fleet board: the soccer sim's unit dates and week_date_list key each fixture on its CENTRAL slate date (the date ESPN's scoreboard returns it under and the board reader loads), not the UTC timestamp prefix, so no US-evening kickoff is simulated under a day ESPN lists nothing on; verified on the fleet's served /api/board/layer2-shortlist?sport=soccer as per_sport_ingest.soccer.enrichment.projections.rows_with_projection > 0 (baseline 0, 2026-10-03 ~03:50Z) with per-league counts, recorded in deploys.md
+- Files: syndicate/features/soccer/sources.py (new fixture_slate_date + week_date_list ONLY), scripts/run_refresh_worker.py (_soccer_schedule_dates_in_horizon ONLY; live-inplay-board-cadence holds other functions), tests/test_soccer_slate_date_units.py (NEW)
+- Hypothesis: First zero is the PRODUCER's unit date, not the reader window: _soccer_schedule_dates_in_horizon and week_date_list take schedule date[:10] (UTC), while build_soccer_artifacts._fetch_fixtures asks ESPN for dates=<that day>, which ESPN buckets by US-local day. Every MLS kickoff after 00:00Z gets a unit for a day ESPN lists nothing on -> 'no ESPN fixtures' -> empty recommendations file -> board index.matches 0. EPL/Serie A zeros are NOT a defect: no fixture inside the 7-day horizon (schedule AND OddsAPI both first list them on 10-10). Supersedes fleet-soccer-recs-gap's hypothesis (b).
+- Falsification test: Refuted if ESPN dates=20261007 returns Chicago-Vancouver (kickoff 2026-10-07T00:30Z) or dates=20261006 does not. MEASURED BEFORE OPENING 2026-10-03 ~03:55Z on the fleet: 20261007 -> 0 events, 20261006 -> 1 (that match); 20261002 -> 0, 20261001 -> 1 (Seattle-SKC 10-02T01:30Z). NOT refuted.
+- Verification: Unit: a 00:30Z fixture resolves to the prior Central date in both paths, EU afternoon fixture unchanged; fails on origin/main. Fleet: after ff, SOCCER_UNIT_LAUNCHED mls unit_date=2026-10-06 and recommendations_2026-10-06.json with matches>0; then served rows_with_projection > 0, per league, in deploys.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
