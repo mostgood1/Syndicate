@@ -1484,6 +1484,13 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: python -m pytest tests/test_probability_differential.py on a worktree rebased to origin/main: all pass, incl. test_every_converter_is_registered_or_excused
 - Blocked by: none
+### ncaaf-total-level-shrink — OPEN — opened 2026-10-03 — session 7e94d2ff-ea54-4a59-9c79-2ddb1bea2bad
+- Goal: NCAAF pregame projections shrink the two teams' COMMON rating level by a lambda fitted on ACTUAL 2025 totals through the real engine (differences untouched), with SYNDICATE_NCAAF_TOTAL_LEVEL_SHRINK override, 1 = byte-exact kill switch, and rating_source stamped; validated on 2026 wk3-4 production games (total MAE vs actual and vs the close, margin unchanged within noise). No deploy without a separate decision
+- Files: scripts/generate_smartsim2_ncaaf_projections.py (build_projection + NCAAF_TOTAL_LEVEL_SHRINK/_total_level_shrink/shrink_rating_level only), tests/test_ncaaf_total_level_shrink.py (NEW), scripts/backtest_ncaaf_lines_props.py (--tag for the lambda fit only)
+- Hypothesis: Totals lose to the close because the engine over-applies team LEVEL (prediction SD 12.83 vs close 6.30, actual-on-model slope 0.30, n=626); a pre-engine level shrink, as NFL's 0.3, cuts total MAE below the close without moving margins
+- Falsification test: If no lambda in the fit grid improves 2025 total MAE vs actual by a CI excluding 0, or the 2026 validation total MAE does not improve, the level is not the carrier and the shrink is not shipped
+- Verification: fit table (lambda vs 2025 total MAE, paired CI vs lambda=1); 2026 wk3-4 validation; unit tests incl. kill switch reproduces the lambda=1 output exactly and off != on
+- Blocked by: HOST CAPACITY for the lambda fit (2026-10-03 ~13:3x CT). LANDED INERT: NCAAF_TOTAL_LEVEL_SHRINK=1.0 + shrink_rating_level after both rating paths in build_projection + rating_source stamp + env override; 9 new tests (difference preserved, kill switch exact, off != on) and the 30 existing generator tests pass. Reachability measured through the harness (lambda 0.3, 2 games of 2025): totals 50.51 -> 44.37 and 53.02 -> 54.99, margins -0.42 -> -0.59 and 24.53 -> 23.68. OWED: the fit (~160 sampled 2025 games x lambda {0.3, 0.5} through the engine, paired vs lambda=1 on common seeds) and the 2026 wk3-4 validation, then set the constant -- stopped because host memory was 95% from the fleet + peers. Live re-sim (live_resim.py:677) builds its own engine input and is NOT covered.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

@@ -626,13 +626,19 @@ def build_tasks(work: Path, arm: str) -> list[dict]:
 def cmd_sim(args) -> None:
     work = args.work
     configure_env(work)
-    out_path = work / f"sim_{args.arm}.jsonl"
+    if args.level_shrink is not None:
+        # Read by the generator's `_total_level_shrink`; spawned workers inherit it.
+        os.environ["SYNDICATE_NCAAF_TOTAL_LEVEL_SHRINK"] = repr(float(args.level_shrink))
+    out_path = work / (f"sim_{args.arm}_{args.tag}.jsonl" if args.tag else f"sim_{args.arm}.jsonl")
     done = set()
     if out_path.exists():
         for line in out_path.read_text(encoding="utf-8").splitlines():
             if line.strip():
                 done.add(json.loads(line)["game_id"])
     tasks = [t for t in build_tasks(work, args.arm) if t["game_id"] not in done]
+    if args.sample_every > 1:
+        # A deterministic stratified sample (every k-th game by id), for fits.
+        tasks = [t for t in sorted(tasks, key=lambda t: t["game_id"]) if t["game_id"] % args.sample_every == 0]
     if args.limit:
         tasks = tasks[: args.limit]
     print(f"{args.arm}: {len(tasks)} games to simulate ({len(done)} cached), {args.workers} workers, below-normal priority", flush=True)
@@ -1173,6 +1179,10 @@ def main() -> None:
             p.add_argument("--arm", choices=("L25", "L26", "L26C"), required=True)
             p.add_argument("--workers", type=int, default=4)
             p.add_argument("--limit", type=int, default=0)
+            p.add_argument("--tag", default="", help="Write sim_<arm>_<tag>.jsonl (e.g. a level-shrink arm).")
+            p.add_argument("--level-shrink", type=float, default=None,
+                           help="Set SYNDICATE_NCAAF_TOTAL_LEVEL_SHRINK for this run.")
+            p.add_argument("--sample-every", type=int, default=1, help="Keep games whose id %% k == 0.")
         if name == "score":
             p.add_argument("--lines-only", action="store_true")
             p.add_argument("--props-only", action="store_true")
