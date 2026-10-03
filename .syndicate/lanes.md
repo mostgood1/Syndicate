@@ -1579,6 +1579,14 @@ death, never life — do not invert it.
 - Verification: Report: per variant x league n, Brier/LL vs shipped, naive and close (CIs), favourite calibration (model vs actual vs book), rating spread; data coverage + intersection printed; leak check (no rating input dated >= kickoff); held-out = chronological split; 2025-26 reported separately where retained
 - Blocked by: none
 
+### nfl-off-market-edge — OPEN — opened 2026-10-03 — session 05b01a84-7abe-45fd-a8e9-c50ee819da1e
+- Goal: Measure, as-of on NFL closing quotes (props 2023-25 from tracking/book_quotes; game lines 2022-24 from historical_odds closing_lines with per-book last_update), whether a line whose best price beats the multi-book de-vigged consensus earns that edge: flat-stake ROI at the taken price vs claimed EV, by EV band, with game-clustered 95% CIs, for (a) the board's current definition (median including the quoting book) and (b) leave-one-out, and for game lines (c) stale-filtered. Output is per-line scoring evidence (which edge sizes are real, how much to discount) and a ranked list of the four known gaps to fix (LOO, stale-in-median, fee-net default, venue game lines fanned in after scoring). No market is gated; no deploy, no board change without a user decision
+- Files: scripts/measure_nfl_off_market_edge.py (NEW), tests/test_measure_nfl_off_market_edge.py (NEW), .syndicate/findings_2026-10-03_nfl_off_market_edge.md (NEW)
+- Hypothesis: At kickoff-10 closing snapshots, consensus-fair edges at sportsbooks mostly do not realize: realized ROI is a small fraction of claimed EV in the 0-3% bands and near zero overall; the large-EV bands are driven by stale quotes (measurable on game lines via last_update). Leave-one-out raises claimed EV but not realized ROI
+- Falsification test: If realized ROI tracks claimed EV (slope of realized on claimed with a CI covering 1) in any band with n>=300 bets, the off-market edge is real there and the hypothesis is wrong for that band
+- Verification: scripts/measure_nfl_off_market_edge.py prints per-family coverage and intersection, and per (props/game, definition, EV band): n bets, games, mean claimed EV, realized ROI [game-clustered CI], realized-on-claimed slope; findings file with the per-line discount recommendation and the ranked gap list
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
