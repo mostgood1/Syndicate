@@ -1522,6 +1522,13 @@ death, never life — do not invert it.
 - Hypothesis: Measured 2026-10-03 (lane wnba-prop-dispersion, stack re-fit): for rebounds/assists/threes the player's own average with the player's own spread prices the book line better than the sim ladder (rebounds 0.2494 vs 0.2524, assists 0.2511 vs 0.2556, threes 0.2466 vs 0.2524), and widening the ladder does nothing -- so the ladder's SHAPE is wrong for these low-count stats, not its width. A per-player negative binomial on the stack mean closes that gap
 - Falsification test: If the NB ladder does not beat the sim ladder on held-out book-line Brier with a CI < 0 for a market, or makes whole-ladder RPS worse, shape is not the fix for that market
 - Verification: Offline per-market train/test table: fitted shrink k, held-out Brier NB vs sim ladder vs own-avg normal vs book with paired CIs, RPS, reliability deciles; engine: off!=on reachability on a re-run date
+### consensus-movement-implied-guard — CLOSED 2026-10-03 — opened 2026-10-03 — session 8de04a09-d7cd-4e22-bab2-106540543671
+- Goal: scripts/consensus_movement_by_sport.py:_implied refuses invalid prices (0/None/''/unparseable -> None) by routing through a registered guarded converter, its caller skips unpriced rows, and it is removed from KNOWN_FAILING in tests/test_probability_differential.py
+- Files: scripts/consensus_movement_by_sport.py, tests/test_consensus_movement_by_sport.py, tests/test_probability_differential.py, scripts/probability_differential.py (REGISTRY row for the deleted copy ONLY)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: pytest tests/test_consensus_movement_by_sport.py tests/test_probability_differential.py pass; harness scorecard shows consensus_movement_by_sport:_implied 5/5
+- **CLOSED 2026-10-03:** the local `_implied` copy is DELETED; the script imports the owner `opportunity_signals.implied_probability` (5/5) and skips rows it refuses. Its REGISTRY row and KNOWN_FAILING entry are removed. New `test_a_zero_price_does_not_move_the_consensus` FAILS against the old converter (A/B by patching it back in) and passes now. The first version passed on the old code too: three identical clean books hide the outlier in the median. tests: consensus 5/5, differential 10/10. Files released.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

@@ -47,15 +47,15 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+# The recorded owner of american->probability (tests/test_probability_differential.py
+# OWNERS). The local copy it replaced priced 0 as 0.0, and one 0 in a two-sided pair
+# de-vigs to 0/100 and drags the consensus median.
+from syndicate.features.shared.opportunity_signals import implied_probability  # noqa: E402
+
 THRESHOLD_PP = 0.25
 MIN_EVENTS = 20
 BOOTSTRAP_DRAWS = 1000
 DEFAULT_SPORTS = ("nfl", "ncaaf", "wnba", "nhl", "mlb", "soccer")
-
-
-def _implied(price: Any) -> float:
-    p = float(price)
-    return 100.0 / (p + 100.0) if p > 0 else -p / (-p + 100.0)
 
 
 def _ts(text: Any) -> datetime:
@@ -70,10 +70,10 @@ def observations(rows: Iterable[dict], *, now: datetime) -> list[tuple[str, floa
         try:
             commence = _ts(r["commence_time"])
             captured = _ts(r["captured_at"])
-            price = _implied(r["price"])
+            price = implied_probability(r["price"])
         except Exception:
             continue
-        if commence > now or captured >= commence:
+        if price is None or commence > now or captured >= commence:
             continue
         market = str(r.get("market") or "")
         line = r.get("line")

@@ -62,3 +62,18 @@ def test_unstarted_games_are_excluded():
     for r in rows:
         r["commence_time"] = (NOW + timedelta(days=1)).isoformat()
     assert cm.observations(rows, now=NOW) == []
+
+
+def test_a_zero_price_does_not_move_the_consensus():
+    # A second book quotes "under" at 0 -- not a real American price. The old local
+    # converter priced it 0.0, so that book's pair de-vigged to over=1.0 and dragged
+    # the median; the owner refuses it and the one-sided book drops out of consensus.
+    # ONE clean book: with three identical ones the median of [x, x, x, 1.0] is
+    # still x, and this test passed against the old converter.
+    clean = _game("e0", [0.50, 0.52, 0.54, 0.56, 0.60], books=("dk",))
+    bad = _game("e0", [0.50, 0.52, 0.54, 0.56, 0.60], books=("bad",))
+    for r in bad:
+        if r["selection"] == "under":
+            r["price"] = 0
+    consensus = lambda rows: sorted(round(o[1], 9) for o in cm.observations(rows, now=NOW) if o[0] == "e0")
+    assert set(consensus(clean + bad)) == set(consensus(clean))

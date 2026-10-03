@@ -226,8 +226,9 @@ AMERICAN_TO_PROBABILITY: list[Impl] = [
          "one-liner; NO coercion, NO zero guard (0 -> 0.0)"),
     Impl("american_to_probability", "scripts.backtest_wnba_lines_props", "implied",
          "one-liner; NO coercion, NO zero guard (0 -> 0.0)"),
-    Impl("american_to_probability", "scripts.consensus_movement_by_sport", "_implied",
-         "float() coercion; NO zero guard (0 -> 0.0)"),
+    # `scripts.consensus_movement_by_sport:_implied` was registered here the same
+    # day and then DELETED (lane `consensus-movement-implied-guard`): it priced 0
+    # as 0.0, and the script now imports the owner, `opportunity_signals.implied_probability`.
 ]
 
 AMERICAN_TO_DECIMAL: list[Impl] = [

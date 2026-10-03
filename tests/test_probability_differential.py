@@ -73,7 +73,8 @@ KNOWN_FAILING = {
         "scripts.backtest_nfl_lines_props:implied",
         "scripts.backtest_nhl_props:_implied",
         "scripts.backtest_wnba_lines_props:implied",
-        "scripts.consensus_movement_by_sport:_implied",
+        # `scripts.consensus_movement_by_sport:_implied` left this set the same
+        # day: the copy was deleted and the script imports the owner instead.
     },
     "american_to_decimal": {
         # ADDED 2026-10-02, same registration. Four copies of the unguarded
