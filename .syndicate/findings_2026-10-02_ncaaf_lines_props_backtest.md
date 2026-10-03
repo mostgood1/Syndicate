@@ -32,9 +32,9 @@ posture for any market. The backtest is the DIAGNOSIS; per-line decisions stay w
 - **Ranked fixes, with measured or out-of-sample impact,** are in "What would make each market accurate".
   The two largest are operational and engine-level: restore the lost player weeks, and correct the
   total's over-applied team quality.
-- **The 2025 season arm (L25, 559 of 644 games, weeks 3-13) makes every full-game loss significant:**
-  margin +1.05 MAE [+0.64, +1.47], total +2.09 [+1.39, +2.77] (and worse than the naive baseline), h2h
-  Brier +0.011 [+0.001, +0.021], cover +0.023 [+0.011, +0.035], over +0.052 [+0.031, +0.072]. The same
+- **The 2025 season arm (L25, 626 of 644 games, weeks 3-14) makes every full-game loss significant:**
+  margin +0.90 MAE [+0.52, +1.30], total +2.16 [+1.49, +2.82] (and worse than the naive baseline), h2h
+  Brier +0.0096 [+0.0005, +0.0191], cover +0.021 [+0.009, +0.033], over +0.055 [+0.035, +0.073]. The same
   causes hold at that scale (diagnostics in the L25 section).
 
 ## Substrate — what each number rests on
@@ -65,42 +65,43 @@ history exists only where a session saved it. Families, and where each came from
   **+1.95 [+0.85, +3.02]** (09-28: +1.95 [+0.88, +3.04]); total 13.80 vs 12.38, **+1.42 [−0.05, +2.75]**
   (09-28: [+0.01, +2.79] — same point, bootstrap noise moves the lower end across 0).
 
-## L25 — 2025 season as-of rebuild (559 of 644 games, weeks 3-13)
+## L25 — 2025 season as-of rebuild (626 of 644 games, weeks 3-14)
 
 Of 663 FBS-vs-FBS finals in weeks 3-15, 644 have both teams in the 2024 SP+ prior (the other 19 would
-borrow current-season SP+, which has no as-of copy). **559 were simulated** (wk3 45, 4 49, 5 50, 6 49,
-7 55, 8 58, 9 51, 10 50, 11 49, 12 56, 13 47). The other 85 -- the tail of week 13 and weeks 14-15 -- were
-NOT run: a memory guard paused the run at 2026-10-03 04:17Z when host memory reached 94.6% (the fleet's WSL
-VM at 7.6 GB plus a peer session's pool). Each game is cached; `sim --arm L25` finishes them. Nothing below
-rests on weeks 14-15. Production generator, 300 seeds, as-of `blend_ppa` ratings (2024 FINAL SP+ prior +
-2025 `/ppa/games` weeks < N, points scale 44.66), promoted profile; book = CFBD close (DraftKings, else the
-median of providers); moneylines de-vigged.
+borrow current-season SP+, which has no as-of copy). **626 simulated** (wk3 45, 4 49, 5 50, 6 49, 7 55,
+8 58, 9 51, 10 50, 11 49, 12 56, 13 58, 14 56). **18 not run** (the rest of week 14 and week 15,
+conference-championship week): stopped 2026-10-03 ~12:40 CT with host memory at 94.7% from the fleet and
+peer sessions, above this lane's 93% guard. One game was simulated twice by overlapping runs and came out
+byte-identical (deterministic seeds); kept once. Production generator, 300 seeds, as-of `blend_ppa`
+ratings (2024 FINAL SP+ prior + 2025 `/ppa/games` weeks < N, points scale 44.66), promoted profile; book =
+CFBD close (DraftKings, else the median of providers); moneylines de-vigged.
 
 | market | n | model | comparator | model − comparator [95% CI] | verdict |
 |---|---|---|---|---|---|
-| margin MAE vs close | 559 | 12.821 | 11.773 | +1.049 [+0.640, +1.469] | **loses to book** |
-| margin MAE vs naive (team as-of averages) | 557 | 12.821 | 15.854 | −3.039 [−4.060, −1.982] | beats naive |
-| total MAE vs close | 559 | 14.261 | 12.171 | +2.090 [+1.394, +2.773] | **loses to book** |
-| total MAE vs naive | 557 | 14.261 | 12.329 | +1.896 [+1.181, +2.625] | **loses to naive** |
-| h2h Brier vs de-vigged ML | 545 | 0.1939 | 0.1829 | +0.0110 [+0.0010, +0.0211] | **loses to book** (log-loss +0.029 [+0.004, +0.055]) |
-| spread cover Brier @ close (book 0.5) | 551 | 0.2731 | 0.2500 | +0.0231 [+0.0105, +0.0353] | **loses to book** |
-| total over Brier @ close (book 0.5) | 559 | 0.3021 | 0.2500 | +0.0521 [+0.0313, +0.0720] | **loses to book** |
+| margin MAE vs close | 626 | 12.864 | 11.959 | +0.904 [+0.523, +1.298] | **loses to book** |
+| margin MAE vs naive (team as-of averages) | 624 | 12.864 | 16.054 | −3.196 [−4.083, −2.208] | beats naive |
+| total MAE vs close | 626 | 14.316 | 12.153 | +2.162 [+1.492, +2.820] | **loses to book** |
+| total MAE vs naive | 624 | 14.316 | 12.355 | +1.930 [+1.242, +2.627] | **loses to naive** |
+| h2h Brier vs de-vigged ML | 612 | 0.1907 | 0.1810 | +0.0096 [+0.0005, +0.0191] | **loses to book** (log-loss +0.026 [+0.003, +0.049]) |
+| spread cover Brier @ close (book 0.5) | 615 | 0.2710 | 0.2500 | +0.0210 [+0.0093, +0.0325] | **loses to book** |
+| total over Brier @ close (book 0.5) | 626 | 0.3045 | 0.2500 | +0.0545 [+0.0350, +0.0734] | **loses to book** |
 
-Segments vs the naive share baseline (n=559): margins BEAT naive in q1 (−0.63 [−0.90, −0.36]), q2, q3 and
-h1 (−1.77 [−2.36, −1.16]); q4/h2 unresolved. Segment TOTALS LOSE to naive in q1, q3, q4, h1 (+0.72
-[+0.33, +1.13]) and h2 (+0.93 [+0.52, +1.34]); q2 unresolved. Segment total bias: q1 −0.46, **q2 −1.96**,
-q3 +0.76, q4 +0.75, **h1 −2.42, h2 +1.64** -- the same scoring-clock shape as 2026, now on 559 games.
+Segments vs the naive share baseline (n=626): margins BEAT naive in q1 (−0.60 [−0.84, −0.36]), q2, q3, h1
+(−1.79 [−2.30, −1.23]) and h2 (−0.55 [−1.04, −0.05]); q4 unresolved. Segment TOTALS LOSE to naive in q1,
+q3, q4, h1 (+0.78 [+0.41, +1.18]) and h2 (+1.02 [+0.62, +1.43]); q2 unresolved. Segment total bias: q1
+−0.37, **q2 −1.94**, q3 +0.88, q4 +0.74, **h1 −2.31, h2 +1.75** -- the same scoring-clock shape as 2026.
 
-Diagnostics at season scale: margin bias −2.52 (book −1.22; non-neutral n=553 −2.52, neutral n=6
-−2.69); corr(model, actual) 0.587 vs book 0.644; model-minus-book vs actual-minus-book slope **+0.012, corr
-+0.005** -- across a season the model's disagreement with the close carries NO information; spread of
-means about right (actual-on-model 0.855). Totals: prediction SD 12.76 vs book 6.23, actual-on-model slope
-0.326, bias −1.38. Cover p<0.35 bin: predicted 0.266, observed 0.561 (n=123); over p<0.35: 0.196 vs 0.472
-(n=195); model SDs 14.47 / 13.22 against residual SDs 16.19 / 17.89.
+Diagnostics at season scale: margin bias −1.93 (close −0.67; non-neutral n=617 −1.96, neutral n=9
+−0.25); corr(model, actual) 0.604 vs close 0.654; model-minus-close vs actual-minus-close slope **+0.052,
+corr +0.019** -- across a season the model's disagreement with the close carries no information; spread
+of means about right (actual-on-model 0.903). Totals: prediction SD 12.83 vs close 6.30, actual-on-model
+slope 0.302, bias −1.16. Cover p<0.35 bin: predicted 0.269, observed 0.564 (n=133); over p<0.35: 0.199
+vs 0.472 (n=218); model SDs 14.47 / 13.23 against residual SDs 16.21 / 18.04.
 
-The early-season partial (94 games, weeks 3-5) agreed: margin +1.28 [+0.09, +2.49].
-Blend points scale 44.66 (2024 fit; production's 44.497 is fit on 2025 and would leak). The calibration
-profile was fit on 2023-2025 drives -- in-sample for this arm, a frozen constant.
+Earlier partial reads agreed: 94 games (wk3-5) margin +1.28 [+0.09, +2.49]; 559 games (wk3-13) margin
++1.05 [+0.64, +1.47], total +2.09, h2h +0.011. Blend points scale 44.66 (2024 fit; production's 44.497 is
+fit on 2025 and would leak). The calibration profile was fit on 2023-2025 drives -- in-sample here, a
+frozen constant.
 
 ## L26 — 2026 weeks 3-4, PRODUCTION's pregame projections (n = 113 games)
 
@@ -200,29 +201,29 @@ model if anything (an early line is softer than the close).
 2. **Correct the total's over-applied team quality** (engine, under `model_engine_standard.md`).
    `[smartsim2-total-carrier]` already fitted NCAAF keeps (offence 0.112 / defence 0.399) and named a
    PRE-ENGINE shrink as the right lever (as NFL's `[nfl-total-level-gain]`). Out-of-sample here: a level
-   shrink fitted on the 2025 season (k=0.326, n=559) takes 2026 total MAE 13.80 -> **12.14, below the
-   book's 12.38** (n=113); on 2025 itself the model's totals lose even to naive team averages (+1.90
-   [+1.18, +2.63]). The fitted slope (0.33) sits beside `[smartsim2-total-carrier]`'s keeps. Re-fit per
+   shrink fitted on the 2025 season (k=0.302, n=626) takes 2026 total MAE 13.80 -> **12.16, below the
+   book's 12.38** (n=113); on 2025 itself the model's totals lose even to naive team averages (+1.93
+   [+1.24, +2.63]). The fitted slope (0.30) sits beside `[smartsim2-total-carrier]`'s keeps. Re-fit per
    that section, never in isolation.
 3. **Price each line's probability from a calibrated distribution, not the raw model-vs-line gap**
    (pricing layer; every line keeps its own probability). Market line as prior, model as evidence, weights
-   and residual SD fitted on history. Fitted on the 2025 season (n=559) and tested on 2026 (n=113):
-   **margin w_model = 0.00** (SD 15.10) -- across a season the model adds nothing beyond the close on
+   and residual SD fitted on history. Fitted on the 2025 season (n=626) and tested on 2026 (n=113):
+   **margin w_model = 0.00** (SD 15.22) -- across a season the model adds nothing beyond the close on
    margins, so its cover probability at the close should be ~0.5 until item 4 lands (2026 cover Brier
-   +0.0316 -> +0.0000); **totals w_model = 0.10** (SD 15.23): 2026 over Brier +0.0223 -> **−0.0044
-   [−0.0091, +0.0001]**, point MAE 13.80 -> 12.20 (book 12.38). (The 94-game early fit gave w 0.15 / 0.25;
-   the season fit is the one to use.) It ends the 0.27-probabilities that come in at 0.56 (2025, n=123).
-   Props need the same treatment: their probabilities overstate weak information.
+   +0.0316 -> +0.0000); **totals w_model = 0.05** (SD 15.17): 2026 over Brier +0.0223 -> **−0.0024
+   [−0.0048, −0.0001] -- better than the book, CI excluding 0**, point MAE 13.80 -> 12.28 (book 12.38).
+   (Earlier fits: 94 games w 0.15/0.25, 559 games w 0.00/0.10.) It ends the 0.27-probabilities that come in
+   at 0.56 (2025, n=133). Props need the same treatment: their probabilities overstate weak information.
 4. **Better ratings for margin and moneyline** -- the only route to a margin/h2h edge. At season scale
-   the model under-projects the HOME margin by 2.52 points (n=553 non-neutral; the close's own bias is
-   −1.22, so ~1.3 points is the model's) -- check the home-field term first, it is the cheapest test. The forward grade's
+   the model under-projects the HOME margin by 1.96 points (n=617 non-neutral; the close's own bias is
+   −0.67, so ~1.3 points is the model's) -- check the home-field term first, it is the cheapest test. The forward grade's
    arm S (refreshed 2026 SP+) led the blend by 0.63 MAE (unresolved); the blend's k and PPA scale were
    tuned against prior-season SP+, a weaker baseline. Candidates to test as-of: weight toward in-season
    SP+, a market-spread prior in the rating, handling FCS-padded early schedules. No measurement here says
    which wins.
 5. **The engine's scoring clock for segments**: first half short (2026 h1 −2.68, Q2 −2.38, n=113; 2025
-   h1 −2.42, Q2 −1.96, n=559), second half high (+1.39 / +1.64); segment totals lose to the naive share
-   baseline on 5 of 6 segments in 2025 -- end-of-half / two-minute behaviour in the drive simulator, or a measured
+   h1 −2.42, Q2 −1.96, n=559), second half high (+1.39 / +1.75); segment totals lose to the naive share
+   baseline on 5 of 6 segments in 2025 (626 games: q1, q3, q4, h1, h2) -- end-of-half / two-minute behaviour in the drive simulator, or a measured
    per-segment share correction on the accumulator. Grading segments against a book needs captured
    segment closes for completed games (2 exist).
 6. **Receptions**: the shrink loses to own average mainly on `spot` rows; widen K / drop the role prior
