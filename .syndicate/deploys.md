@@ -45473,3 +45473,83 @@ or a normaliser change, which is global and needs its own reachability test (`of
 - **expect:** throttling only when refresh-worker itself has a job running; soccer units resume (15 due).
 - **reading (19:27:19-19:38:00Z, emitter-anchored `^<ts>Z [refresh_worker] TOKEN`):** `MLB_SIM_TICK` 6, **`JOB_CAP_THROTTLED` 0**, `JOB_COUNT_DISAGREEMENT` 0. `SOCCER_UNIT_LAUNCHED la_liga|2026-10-09` 19:32:12Z (`due=15`), `SOCCER_UNIT_CONFIRMED` 19:34:45Z (launched_at 1791055932 > restart 1791055639); `la_liga/recommendations_2026-10-09.json` rewritten, 1 match. Only later skip: `spacing_gate` (normal 300 s spacing).
 - **ALSO CLOSES `soccer-recs-empty-overwrite` (deploy 16:30:42Z):** the first REAL soccer build on the guard code (the la_liga unit above, a per-run subprocess started after the ff) rewrote its file non-empty, and the census was **18 non-empty before and after** (15:43:01Z vs 19:38:00Z). The refusal branch itself did not fire in production (ESPN returned the fixture); it is covered by unit tests and the 18/18 production predicate read (deploys.md 16:30:42Z).
+## 2026-10-03 19:27:18Z LOAD / 19:36:52Z READING (02:27 PM / 02:36 PM CT) -- LOCAL FLEET, refresh-worker: the measured-skill registry's display-cased market names now reach their entries, and a superseded entry yields no note (`7ee3d1b6`) -- **GOAL MET, measured on the served board** (lane `nfl-prop-skill-key-reachability`, user: "Fix _norm, exclude superseded")
+
+**NO CLAIM WAS TAKEN AND NO DEPLOY WAS RUN BY ME. This went live as a RIDE-ALONG.** Lane
+`refresh-worker-soccer-loop-silent` held the `refresh-worker` claim for its own `5602290f` and
+restarted at 19:27:11Z; someone had ff'd the fleet checkout to `ca3c85cd` (which contains
+`7ee3d1b6`) between their ride-along check ~19:20Z and the restart. Their script ff'd toward its own
+target, got "Already up to date", and fired **without asserting HEAD was the commit it expected**.
+They reported it unprompted. I had deliberately NOT forced their claim and NOT ff'd the tree, because
+a ff changes what their restart loads. Their stale-pin lesson is theirs to write up; recording it here
+because it is why this entry has no deploy of mine in it.
+
+**Verified independently with production's own `role_code` before accepting their report:**
+
+    role              pid      started     runs        source   contains 7ee3d1b6
+    refresh-worker    918203   19:27:18Z   ca3c85cd    reflog   YES
+    web               684622   19:01:15Z   eedfde5e    reflog   NO
+    live-odds-worker  897384   17:26:15Z   80f380f8    reflog   NO
+
+web and live-odds-worker do NOT have it and do NOT need it for this: the served shortlist reports
+`source: layer2_shortlist_artifact`, so refresh-worker builds the notes into the artifact and web only
+serves it. A request-path surface would still be on old code.
+
+**TWO-GATE MEASUREMENT.** Gate 1: the role loaded the commit (above). Gate 2: an artifact whose OWN
+`written_at` post-dates the load -- `19:36:52Z > 19:27:18Z`, from the `layer2_shortlist_build` that
+entered 19:34:54Z and exited 19:36:56Z (`elapsed_s=121.47`). Baseline is the immediately preceding
+artifact, `written_at 19:11:26Z`.
+
+**READING, production's own counters** (`per_sport_ingest.nfl.enrichment.projections`):
+
+    counter                                  19:11:26Z   19:36:52Z    delta
+    rows_with_measured_skill                       352         966     +614
+    rows_with_measured_skill_from_registry         352         966     +614
+    rows_with_unmeasured_skill                     992         364     -628
+    rows_considered                             12,922      12,936      +14
+    rows_with_projection                         9,408       9,310      -98
+
+**NOT A FROZEN A/B, and the deltas say so:** +614 against -628 does not offset, because the board moved
+between builds (`rows_with_projection` -98, `rows_considered` +14). Stamped population was 1,344
+before and 1,330 after. The direction and magnitude are unambiguous; do not read -628/+614 as one
+number.
+
+**ROW-LEVEL CONTENT, which is the part that proves BOTH halves** -- `(market, sample_games, status)`
+on served rows carrying a projection:
+
+    market              19:11:26Z              19:36:52Z
+    Receiving Yards     15x  0 unmeasured      11x  3116 measured    <- bridge
+    Rushing Yards        8x  0 unmeasured       8x  1463 measured    <- bridge
+    Rushing Attempts     9x  0 unmeasured       6x   562 measured    <- bridge
+    Passing Attempts    11x  0 unmeasured       9x   343 measured    <- bridge
+    Interceptions       18x  374 measured      19x     0 unmeasured  <- superseded gate
+    Passing TDs         19x  0 unmeasured      19x     0 unmeasured  (superseded AND was unreachable)
+    Receptions          61x  1179 measured     69x  1179 measured    (single word, already matched)
+    h2h / totals / spreads   15 measured            15 measured      (untouched)
+
+Every market moved exactly as predicted and nothing moved that should not have. `Passing Yards` is
+absent from the served shortlist on both sides, so its `834` cannot appear -- not a defect.
+
+**WHAT THIS CHANGES IN THE PRODUCT.** 614 more rows now carry an established-loss discount, so their
+Layer 2 score falls (`skill_reliability` = `max(0.5, 1 - 5 x established_loss_rel)`; Receiving Yards
+and Passing Yards sit at the 0.5 floor, weighted mean 0.5812 across the six). That moves ranking, caps
+and which rows get staked. It is the correct direction -- all six markets measurably lose to the
+de-vigged book (`findings_2026-10-03_nfl_props_vs_price_recheck.md`) -- and the user chose it
+explicitly over three alternatives including "write it up, don't change scoring yet". Separately, 19
+Interceptions rows LOST a discount they should never have had: that entry was superseded and its
+numbers came from an estimator production does not serve, pre-five-re-fits.
+
+**THREE WITHDRAWN NUMBERS, recorded because they were in this ledger.** My population figures of
+"1,910 of 2,622 rows (72.8%)" (`deploys.md` 18:10:08Z) and "797 of 1,177" (first correction) are BOTH
+WRONG and withdrawn. The first counted every node carrying a `market` string rather than the rows
+`attach_projection_skill` visits. The second had the right access pattern on the WRONG OBJECT: the
+on-disk `reports/intelligence/layer2_shortlist_*.json` files are three days stale
+(`2026_10_01__nfl` mtime 2026-09-30 19:29) and are NOT what the board serves. A peer's pushback on an
+unrelated soccer lead of mine is what exposed it. The correct population was a counter the producer
+publishes and I had already fetched. The MECHANISM, the six markets, the direction and the multipliers
+were never affected -- those were measured against the registry, not the artifact.
+
+**Owed: nothing for this lane.** Not owed but worth a lane: `Passing TDs` (19 served rows) and
+`Interceptions` (19) are now correctly unmeasured and need a real measurement -- both re-measured
+under the 200-row floor and both moved to a Poisson family in `c3874b91`, so they are unevaluated, not
+merely unmeasured.
