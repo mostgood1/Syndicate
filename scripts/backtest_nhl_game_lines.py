@@ -362,12 +362,12 @@ def _abbr_of(name: str) -> Optional[str]:
     return special.get(n)
 
 
-def _american_to_p(o: float) -> float:
-    return 100.0 / (o + 100.0) if o > 0 else -o / (-o + 100.0)
-
-
-def _devig2(pa: float, pb: float) -> float:
-    return pa / (pa + pb)
+def _pair_fair(first_odds: float, second_odds: float) -> float:
+    """Proportional fair probability of the FIRST side of a two-way market, using the production
+    (differential-registered) American->probability converter rather than a private copy."""
+    from syndicate.features.nhl.sim_engine.hockeysim.adapters import american_to_implied
+    a, b = american_to_implied(first_odds), american_to_implied(second_odds)
+    return a / (a + b)
 
 
 def book_consensus(act: Dict[str, Dict], out: Path) -> Dict[str, Dict]:
@@ -404,19 +404,19 @@ def book_consensus(act: Dict[str, Dict], out: Path) -> Dict[str, Dict]:
                     if m["key"] == "h2h":
                         ph, pa = oc.get((home_n, None)), oc.get((away_n, None))
                         if ph is not None and pa is not None:
-                            ml.append(_devig2(_american_to_p(ph), _american_to_p(pa)))
+                            ml.append(_pair_fair(ph, pa))
                     elif m["key"] == "totals":
                         pts = {p for (_, p) in oc}
                         for p in pts:
                             po, pu = oc.get(("over", p)), oc.get(("under", p))
                             if po is not None and pu is not None:
-                                tot[float(p)].append(_devig2(_american_to_p(po), _american_to_p(pu)))
+                                tot[float(p)].append(_pair_fair(po, pu))
                     elif m["key"] == "spreads":
                         for (nm, p), price in oc.items():
                             if nm == home_n and p is not None and abs(abs(p) - 1.5) < 1e-9:
                                 other = oc.get((away_n, -p))
                                 if other is not None:
-                                    pl[float(p)].append(_devig2(_american_to_p(price), _american_to_p(other)))
+                                    pl[float(p)].append(_pair_fair(price, other))
             row: Dict[str, Any] = {"snap_ts": snap_ts, "commence": ev["commence_time"]}
             if ml:
                 row.update(ml_home=statistics.fmean(ml), books_ml=len(ml))
@@ -483,14 +483,14 @@ def quote_log_close(act: Dict[str, Dict], qdir: Path) -> Tuple[Dict[str, Dict], 
         for b in books:
             ph, pa = q.get((b, "h2h", "home", None)), q.get((b, "h2h", "away", None))
             if ph is not None and pa is not None:
-                ml.append(_devig2(_american_to_p(ph), _american_to_p(pa)))
+                ml.append(_pair_fair(ph, pa))
             for (bb, mk, sel, ln), pr in q.items():
                 if bb != b or ln is None:
                     continue
                 if mk == "totals" and sel == "over" and (b, "totals", "under", ln) in q:
-                    tot[float(ln)].append(_devig2(_american_to_p(pr), _american_to_p(q[(b, "totals", "under", ln)])))
+                    tot[float(ln)].append(_pair_fair(pr, q[(b, "totals", "under", ln)]))
                 if mk == "spreads" and sel == "home" and abs(abs(ln) - 1.5) < 1e-9 and (b, "spreads", "away", -ln) in q:
-                    pl[float(ln)].append(_devig2(_american_to_p(pr), _american_to_p(q[(b, "spreads", "away", -ln)])))
+                    pl[float(ln)].append(_pair_fair(pr, q[(b, "spreads", "away", -ln)]))
         row: Dict[str, Any] = {"source": "fleet_book_quotes", "commence": c}
         if ml:
             row.update(ml_home=statistics.fmean(ml), books_ml=len(ml))
