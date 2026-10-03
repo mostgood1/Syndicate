@@ -1251,6 +1251,14 @@ death, never life — do not invert it.
   - Totals OOS: OVER 6.5 V7 vs B0 -0.0060 [-0.0110, -0.0012] MODEL BETTER (V5c was no difference).
   - OVER@close vs book: V4 +0.0028 -> V7 +0.0014 -> V7o (oracle) +0.0007 -- every CI includes 0.
   - Next for ML: a prior-season GSAx prior, recency-weighted xG, score-adjusted xG.
+- **H7 (written BEFORE the run, 2026-10-03 ~03:45Z, user: "test the prior-season GSAx prior next"):** in-season GSAx failed for ML because early-season samples are too small. A 2024-25 GSAx prior should stabilize it (2024-25 regular-season play-by-play, free NHL API; scored with the SAME frozen xG model; added at weight w; k, w tuned pre-2026-01-01). FALSIFIED if V8 leaves the OOS ML Brier vs B4 with a CI including 0 AND no better than V7.
+- **H7 RESULT 2026-10-03 ~05:00Z: FALSIFIED for ML; totals marginally better.**
+  - Prior: 2024-25 play-by-play, 1,312/1,312 games, 111,812 shots, 103 goalies, 0 pairing mismatches.
+  - Tuned (k, w) = (160 xG, 0.25), again the grid edge: the best goalie effect for ML is a small one.
+  - ML OOS, V8 vs B4: -0.0002 [-0.0042, +0.0038]; no better than V7.
+  - OVER 6.5 OOS vs B0: -0.0062 [-0.0115, -0.0012].
+  - OVER@close vs book: +0.0012 (V8) vs +0.0014 (V7) vs +0.0028 (V4), all CIs including 0.
+  - CONCLUSION: goalie quality (save%, GSAx, GSAx + prior, even the oracle starter) adds no ML information over team strength at this n; its value is the scoring level for totals.
 - Blocked by: production wiring needs (a) user decision, (b) lane nhl-player-props-projection for ingestion/collect.py (confirmed-starter feed); vs-book needs an active ODDS_API_KEY
 
 ### soccer-skill-registry-line-weighting — OPEN — opened 2026-10-02 — session 43e4d5fe-e05e-41bc-aae6-6d6986460b22

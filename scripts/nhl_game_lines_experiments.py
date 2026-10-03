@@ -237,6 +237,31 @@ class GoalieHistory:
         return by_key, by_pid, (1 - G / S) if S else 0.900
 
 
+PRIOR_SEASON_PREFIX = "2024020"   # 2024-25 regular season game ids 2024020001..2024021312
+
+
+def fetch_prior_pbp(out: Path, n_games: int = 1312, delay: float = 0.7) -> Dict[str, int]:
+    """Cache 2024-25 regular-season play-by-play from api-web.nhle.com (free, public; browser UA,
+    urllib's default UA is refused). Every game predates every 2025-26 date, so the whole season is
+    an as-of input. A failed fetch is counted, never written as an empty game."""
+    import time as _t
+    d = out / "pbp_2024"
+    d.mkdir(parents=True, exist_ok=True)
+    st = Counter()
+    for i in range(1, n_games + 1):
+        gid = f"{PRIOR_SEASON_PREFIX}{i:03d}" if i < 1000 else f"202402{i:04d}"
+        path = d / f"{gid}.json"
+        if path.exists() and path.stat().st_size > 0:
+            st["cached"] += 1
+            continue
+        got = BGL._http_json(f"{BGL.NHLE}/gamecenter/{gid}/play-by-play", path, True)
+        st["fetched" if got else "failed"] += 1
+        _t.sleep(delay)
+        if (st["fetched"] + st["failed"]) % 200 == 0:
+            print(f"  prior pbp: {dict(st)}", flush=True)
+    return dict(st)
+
+
 class GsaxHistory:
     """Goals saved above expected per goalie, AS-OF, from play-by-play shots scored by the PRODUCTION
     xG estimator (`shot_xg_model.featurize` + `LogisticRegression(max_iter=2000)`, as in
@@ -273,6 +298,7 @@ class GsaxHistory:
         Xfit = [x for x, m in zip(Xall, fit_mask) if m]
         yfit = [rw[3] for rw, m in zip(rows, fit_mask) if m]
         model = LogisticRegression(max_iter=2000).fit(Xfit, yfit)
+        self.model, self._X = model, X
         xg = model.predict_proba(Xall)[:, 1]
         self.rows = sorted((d, ab, gk, float(x), g) for (d, ab, gk, g), x in zip(rows, xg))
         self.dates = [rw[0] for rw in self.rows]
@@ -280,6 +306,35 @@ class GsaxHistory:
         stats["fit_shots_pre_eval"] = len(Xfit)
         self.stats = dict(stats)
         self._cache: Dict[Tuple[str, str], Any] = {}
+        self.prior: Dict[int, List[float]] = {}
+
+    def load_prior(self, pbp_dir: Path) -> Dict[str, int]:
+        """2024-25 GSAx inputs per goalie, scored by the SAME frozen xG model (never refit)."""
+        X = self._X
+        feats, rows = [], []
+        st = Counter()
+        for f in sorted(pbp_dir.glob("*.json")):
+            pbp = BGL._rj(f)
+            if not pbp or not (pbp.get("plays")):
+                st["empty"] += 1
+                continue
+            shots = X.parse_play_by_play_shots(pbp)
+            gids = self._goalies_in_order(pbp, X)
+            if len(gids) != len(shots):
+                st["goalie_order_mismatch"] += 1
+                continue
+            for s, gk in zip(shots, gids):
+                if s.is_empty_net or gk is None:
+                    continue
+                feats.append(s); rows.append((int(gk), int(s.is_goal)))
+            st["games"] += 1
+        if feats:
+            xg = self.model.predict_proba(X.featurize(feats))[:, 1]
+            for (gk, g), x in zip(rows, xg):
+                e = self.prior.setdefault(gk, [0.0, 0.0])
+                e[0] += float(x); e[1] += g
+        st["shots"] = len(feats); st["goalies"] = len(self.prior)
+        return dict(st)
 
     @staticmethod
     def _goalies_in_order(pbp, X) -> List[Optional[int]]:
@@ -320,10 +375,14 @@ class GsaxHistory:
 def gsax_factor(pid: Optional[int], hist: "GsaxHistory", date: str, arm: str, k: float) -> Optional[float]:
     """Shrunk goals-allowed / xG-faced ratio of the goalie, relative to the as-of league ratio.
     k is in xG units (a goalie with k xG faced is halfway to his own ratio). >1 = worse goalie."""
+    k, w = k if isinstance(k, tuple) else (k, 0.0)
     by_pid, lr = hist.asof(date, arm)
     if pid is None or pid not in by_pid:
         return None
     xg, ga = by_pid[pid]
+    if w and pid in hist.prior:
+        pxg, pga = hist.prior[pid]
+        xg += w * pxg; ga += w * pga
     r = (ga + k * lr) / (xg + k)
     return r / lr
 
@@ -482,10 +541,14 @@ def main() -> int:
     ap.add_argument("--report", default=None)
     ap.add_argument("--min-n", type=int, default=100)
     ap.add_argument("--goalie-prior", default="C:/tmp/nhllines/goalie_prior/20242025.json")
+    ap.add_argument("--fetch-prior-pbp", action="store_true", help="cache 2024-25 play-by-play into <out>/pbp_2024 and exit")
     ap.add_argument("--dfo", default=None, help="dir of fetch_nhl_confirmed_goalies.py outputs (default <out>/dfo)")
     a = ap.parse_args()
     out, roots = Path(a.out), Path(a.roots)
     src = Path(a.src) if a.src else BGL._main_worktree() / "data" / "nhl_source"
+    if a.fetch_prior_pbp:
+        print(f"prior pbp done: {fetch_prior_pbp(out)}")
+        return 0
     act = json.loads((out / "actuals.json").read_text(encoding="utf-8"))
     sim = json.loads((out / "sim" / "games.json").read_text(encoding="utf-8"))
     BOOK.update(json.loads((out / "book.json").read_text(encoding="utf-8")) if (out / "book.json").exists() else {})
@@ -646,6 +709,8 @@ def main() -> int:
     results = {}
     gsx = GsaxHistory(act, src)
     print(f"gsax history: {gsx.stats}")
+    prior_stats = gsx.load_prior(out / "pbp_2024")
+    print(f"gsax prior (2024-25): {prior_stats}")
     tune_g = {}
     for kg in (2.0, 5.0, 10.0, 20.0, 40.0, 80.0):
         rows_, _ = run(kg, None, "dfo", window=pre, metric="gsax")
@@ -653,7 +718,17 @@ def main() -> int:
     kg_best = min(tune_g, key=tune_g.get)
     print(f"tuned GSAx k (xG units, pre-{EVAL_START}): {kg_best}; ML log-loss by k: { {k: round(v, 5) for k, v in tune_g.items()} }")
 
-    for label, kw in (("V7", dict(k_goalie=kg_best, rest=None, source="dfo", metric="gsax")),
+    tune_p = {}
+    for kg in (20.0, 40.0, 80.0, 160.0):
+        for w in (0.25, 0.5, 1.0):
+            rows_, _ = run((kg, w), None, "dfo", window=pre, metric="gsax")
+            tune_p[(kg, w)] = ll_ml(rows_, "VX")
+    kp_best = min(tune_p, key=tune_p.get)
+    print(f"tuned GSAx+prior (k, w) pre-{EVAL_START}: {kp_best}; ML log-loss: { {str(k): round(v, 5) for k, v in tune_p.items()} }")
+
+    for label, kw in (("V8", dict(k_goalie=kp_best, rest=None, source="dfo", metric="gsax")),
+                      ("V8o", dict(k_goalie=kp_best, rest=None, source="oracle", metric="gsax")),
+                      ("V7", dict(k_goalie=kg_best, rest=None, source="dfo", metric="gsax")),
                       ("V7o", dict(k_goalie=kg_best, rest=None, source="oracle", metric="gsax")),
                       ("V5", dict(k_goalie=k_best, rest=None, source="proj")),
                       ("V5r", dict(k_goalie=k_best, rest=None, source="rotation")),
@@ -664,13 +739,14 @@ def main() -> int:
         results[label] = (rows, miss)
 
     rows_all = results["V6"][0]
-    others = {lab: {x["gid"]: x for x in results[lab][0]} for lab in ("V5", "V5r", "V5c", "V5o", "V7", "V7o")}
+    others = {lab: {x["gid"]: x for x in results[lab][0]} for lab in ("V5", "V5r", "V5c", "V5o", "V7", "V7o", "V8", "V8o")}
     for x in rows_all:
         for lab, idx in others.items():
             x[lab] = idx[x["gid"]]["VX"]
         x["V6"] = x.pop("VX")
 
-    report = {"k_goalie": k_best, "gsax_k": kg_best, "gsax_tune": tune_g, "gsax_stats": gsx.stats,
+    report = {"gsax_prior_kw": kp_best, "gsax_prior_tune": {str(k): v for k, v in tune_p.items()}, "gsax_prior_stats": prior_stats,
+              "k_goalie": k_best, "gsax_k": kg_best, "gsax_tune": tune_g, "gsax_stats": gsx.stats,
               "gsax_join": {k: dict(v[1]) for k, v in results.items() if k.startswith("V7")}, "tune": {str(k): v for k, v in tune.items()}, "rest": rest, "starter_sources": picks["stats"],
               "goalie_join": {k: dict(v[1]) for k, v in results.items()},
               "fits_sample": {d: fit_m.at(d, "regular") for d in ("2025-11-15", "2026-01-01", "2026-03-01")},
@@ -690,7 +766,7 @@ def main() -> int:
     return 0
 
 
-VARIANTS = ["V0", "V1", "V2", "V3", "V4", "V5", "V5r", "V5c", "V6", "V5o", "V7", "V7o"]
+VARIANTS = ["V0", "V1", "V2", "V3", "V4", "V5", "V5r", "V5c", "V6", "V5o", "V7", "V7o", "V8", "V8o"]
 
 
 def score(R: List[Dict], min_n: int) -> Dict:
