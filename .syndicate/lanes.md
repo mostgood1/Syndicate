@@ -1297,6 +1297,14 @@ death, never life — do not invert it.
 - Verification: Stage 1: per-match dumps for both arms from the same harness/sims settings, paired scorer printing n, xG-row share, Brier/log-loss vs results and vs true close with CIs; written to lane + findings. Stage 2 gated on stage 1
 - Blocked by: the running 2025-26 baseline run (arm A) finishing
 
+### nfl-prop-predictive-spread — OPEN — opened 2026-10-02 — session 05b01a84-7abe-45fd-a8e9-c50ee819da1e
+- Goal: NFL prop probabilities for the continuous markets (receptions, receiving_yards, rushing_yards, rushing_attempts, passing_yards, passing_attempts) are priced from a predictive spread that carries the uncertainty of the rate estimate, re-fitted per model_engine_standard.md (spread-shrinkage k and _COVER_PROBABILITY_BLEND_WEIGHT re-fit on top of it, fit 2023-24), and on held-out 2025 the served-path Brier gap to the de-vigged book closes by at least half for receptions and receiving_yards (lane nfl-lines-props-backtest measured 56-74% for a fitted scale), with no market getting worse; then deployed and read on the fleet's prop artifact. Every line stays shown (user decision: every line is its own decision)
+- Files: scripts/fit_nfl_prop_predictive_spread.py (NEW), tests/test_nfl_prop_predictive_spread.py (NEW), .syndicate/findings_2026-10-03_nfl_prop_predictive_spread.md (NEW).
+- Hypothesis: The prop loss is reliability (Murphy reliability 10-300x the book's, resolution at or above it): the probability at the line treats the season-to-date rate as known. A predictive sd = sqrt(sd_game^2 + var(rate)), with var(rate) fitted per market, removes most of it without touching the mean
+- Falsification test: If the explicitly-modelled predictive sd, re-fitted with the blend and shrinkage k on 2023-24, closes less than 30% of the 2025 receptions/receiving_yards gap, or makes any continuous market's 2025 Brier worse with a CI excluding 0, the mechanism is wrong and a flat k was fitting something else
+- Verification: Backtest via scripts/backtest_nfl_lines_props.py --selfcheck on the changed code (0 mismatches vs nfl_props_rows_for_week), per-market 2025 Brier gap closed with game-clustered CIs; reachability test (off != on); after an explicit user deploy decision, the fleet's nfl_prop_projections artifact rebuilt and a served-row reading of the new probabilities
+- Blocked by: layer2-triad-alignment -- release requested 2026-10-03 of the NFL prop model files it claims in prose (nfl player_stats + props modules, the spread-shrinkage and cover-blend calibration scripts, their tests). Until released this lane writes ONLY its own NEW files; the production modules are not edited.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
