@@ -1453,6 +1453,24 @@ def _polymarket_us_slate_refresh_tick() -> None:
         except ValueError:
             pass
 
+    # SINGLE-FLIGHT (lane `layer2-freshness-1h`, 2026-10-03). Two threads call
+    # this -- the venue poll and the main loop -- and the gate below was a
+    # check-then-set with no lock, so both could pass it and page the whole
+    # catalogue at once. Measured on the fleet 02:45-04:08Z: 29 sweeps, 3 of
+    # them under 90 s after the previous write -- a parallel duplicate of a
+    # ~4-minute, ~156-page sweep. A caller that finds a sweep in flight returns
+    # at once; the cadence is unchanged, so `execute_portfolio`'s 3x price-age
+    # ceiling is unaffected.
+    if not _POLYMARKET_SLATE_LOCK.acquire(blocking=False):
+        return
+    try:
+        _polymarket_us_slate_refresh_locked(interval)
+    finally:
+        _POLYMARKET_SLATE_LOCK.release()
+
+
+def _polymarket_us_slate_refresh_locked(interval: int) -> None:
+    """The interval gate, the sweep and the write. Caller holds `_POLYMARKET_SLATE_LOCK`."""
     global _POLYMARKET_SLATE_LAST_RUN
     now = time.time()
     if _POLYMARKET_SLATE_LAST_RUN and (now - _POLYMARKET_SLATE_LAST_RUN) < interval:
@@ -1505,6 +1523,7 @@ def _polymarket_us_slate_refresh_tick() -> None:
 
 
 _POLYMARKET_SLATE_LAST_RUN: float = 0.0
+_POLYMARKET_SLATE_LOCK = threading.Lock()
 
 
 def _polymarket_us_slate_probe_at_boot() -> None:
