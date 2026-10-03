@@ -1003,6 +1003,16 @@ def score(R: List[Dict], min_n: int) -> Dict:
             res["markets"].setdefault(mk, {})[v] = {"n": len(S), "d_brier": d, "d_ll": dl, "verdict": vd}
             lines.append(f"   {v:<4} dBrier vs book {d[0]:+.4f} [{d[1]:+.4f},{d[2]:+.4f}] dLL {dl[0]:+.4f} [{dl[1]:+.4f},{dl[2]:+.4f}] {vd}")
 
+    # paired head-to-heads the pre-written hypotheses name (H8: recency vs its control; H9: score
+    # adjustment vs the unadjusted control, with and without recency)
+    yml = lambda x: 1 if x["act"]["final_h"] > x["act"]["final_a"] else 0
+    for a_, b_ in (("V9", "V9c"), ("V10", "V9c"), ("V10r", "V9"), ("V10r", "V8")):
+        if a_ in R[0] and b_ in R[0]:
+            d = BGL._boot_diff([(x["date"], BGL._brier(x[a_]["p_home_ml"], yml(x)) - BGL._brier(x[b_]["p_home_ml"], yml(x))) for x in R])
+            vd = BGL._verdict(*d, len(R), min_n)
+            res["markets"].setdefault("PAIRED ML", {})[f"{a_}-{b_}"] = {"d_brier": d, "verdict": vd}
+            lines.append(f"PAIRED ML {a_} vs {b_}: dBrier {d[0]:+.4f} [{d[1]:+.4f},{d[2]:+.4f}] {vd}")
+
     # totals point accuracy (settled full game)
     tot = lambda x: x["act"]["final_h"] + x["act"]["final_a"]
     lines.append("TOTAL settled (MAE / bias)")

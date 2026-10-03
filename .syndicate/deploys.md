@@ -45368,3 +45368,23 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - **MY INSTRUMENT ERROR, stated:** the post-ff watcher's loose greps matched `ALL_PROCESS_MEMORY` lines, whose process listings contain my own grep's regex. Its "refusals" section was therefore noise, and its trigger is not trusted. Verified by a clean re-read (above).
 - **OWED:** the first real soccer build after 16:30:42Z. Read: census still 18+ non-empty, and any `SOCCER_RECS_EMPTY_OVERWRITE_REFUSED` line in that run's output (expected rare: it fires only when ESPN answers a scheduled date empty).
 - **separately (not this lane):** `mls|2026-10-06` WAS launched by refresh-worker's own resolver (14:00:33Z, 15:01:55Z, `wrote_since_launch=True`). This closes the minor item owed by `soccer-projections-gap`.
+
+## 2026-10-03 17:43:03Z (12:43 PM CT) -- LOCAL FLEET FF 80f380f8 -> a18cda3e: NHL totals line = the books' modal PREGAME line (was the median of every captured point) -- **SHIPPED; reading 1 MET; artifact reading 2 OWED** (lane `nhl-game-lines-model`, user: "ship the totals-line fix to production")
+
+- **What:** `syndicate/features/nhl/sim_engine/hockeysim/features/market_lines.py`, `load_market_lines` TOTALS consensus only (ML/PL untouched).
+  - Per book: its latest totals snapshot captured strictly before puck drop, from the quote log `nhl_source/tracking/book_quotes` (date +/-1 shards, streamed).
+  - Line = modal across books, tie -> closest to even money -> lower. Over/under priced only from books at that line.
+  - Fallback: single-line books in oddsapi.csv; a multi-point book does not vote; none -> None.
+- **How:** `git merge --ff-only a18cda3e` in ~/Syndicate (clean tree). Pinned to a18cda3e, NOT github/main's tip, so the other lanes' runtime commits that landed after it (3f07629e NCAAF props, the engine.py assist_weight write) did NOT ride.
+  - Ride-along (all already on main): 84407cc3/5c66f25e/375631d5 WNBA sim availability, flag default OFF and lane says "not enabled", so inert; my offline backtest script.
+  - No restart: NHL generation is a per-run `refresh_nhl_oddsapi.py --mode full` subprocess.
+  - Claim live-odds-worker held by nhl-game-lines-model (taken after soccer-shots-allocation-blend released at ~17:37Z without a ff).
+  - `check_deploy_safety.py` NOT run: it needs ADMIN_TOKEN, which was not fetched. The risk it guards, a restart killing an in-flight sim, does not apply to a no-restart ff.
+- **Baseline** (17:24:32Z, read-only grader over served predictions files vs the books' modal pregame line in the fleet quote log):
+  - `predictions_2026-10-03` (16:48Z): 5 match / **8 mismatch** / **6 off the half-goal grid**.
+  - `predictions_2026-10-04`: 3 / **2** / **2**.
+  - `predictions_2026-10-05`: 4 rows with no line.
+- **Expect:** the first `predictions_*` rewrite after 17:43:03Z shows 0 mismatch and 0 off-grid for every game the quote log covers.
+- **Reading 1 -- MET** (17:46:15Z): the DEPLOYED `load_market_lines` (fleet venv, ~/Syndicate at a18cda3e, content-verified) run read-only on production files. 10-03 **18/18 match**, 10-04 **18/18**, 10-05 **5/5**; **0 off-grid**. This is evidence about the code on production data, not the artifact.
+- **Reading 2 -- OWED:** a watcher polls predictions_2026-10-03/04/05 mtime > 17:43:03Z, then runs the same grader. Production rewrote 10-03 at 17:35Z (pre-ff), so a rewrite is expected within ~1 h.
+- Offline evidence before shipping: 60/60 games on fleet 09-30..10-04 copies match; tests on real fleet rows (4/6 fail on the old code).
