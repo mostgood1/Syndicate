@@ -238,9 +238,65 @@ def _load_fd_close(league: str, fd_close_dir: Path | None) -> dict[tuple[str, st
     return out
 
 
+def _fotmob_match_xg(league: str, fotmob_path: Path | None) -> dict[tuple[str, str, str], tuple[float, float]]:
+    """H37 arm: (iso date, canonical home, canonical away) -> (home shot xG, away shot xG) from a FotMob
+    harvest (`reports/soccer_backtest/fotmob_2y.json.gz` shape: matches[].shots[].{xg, home}). Lane
+    soccer-1x2-ratings-xg-source, pre-registered 2026-10-03 before computation."""
+    if fotmob_path is None:
+        return {}
+    import gzip
+
+    from syndicate.features.soccer.features.team_names import canonical_team_name
+
+    opener = gzip.open if str(fotmob_path).endswith(".gz") else open
+    with opener(fotmob_path, "rt", encoding="utf-8") as handle:
+        body = json.load(handle)
+    matches = body.get("matches") or []
+    if isinstance(matches, dict):
+        matches = list(matches.values())
+    out = {}
+    for m in matches:
+        if m.get("league") != league or not m.get("shots"):
+            continue
+        hx = sum(float(s.get("xg") or 0.0) for s in m["shots"] if s.get("home"))
+        ax = sum(float(s.get("xg") or 0.0) for s in m["shots"] if not s.get("home"))
+        out[(str(m.get("date"))[:10], canonical_team_name(m.get("home_team")), canonical_team_name(m.get("away_team")))] = (hx, ax)
+    return out
+
+
+def _apply_fotmob_xg(team_rows: list[dict[str, Any]], fotmob: dict) -> dict[str, int]:
+    """Replace goals-as-xG with FotMob shot xG on joined home/away row PAIRS (`team_rows_from_match_history`
+    appends home then away per match). Unjoined pairs keep goals. Returns the join tally."""
+    from syndicate.features.soccer.features.team_names import canonical_team_name
+
+    tally = {"pairs": 0, "joined": 0}
+    for i in range(0, len(team_rows) - 1, 2):
+        home, away = team_rows[i], team_rows[i + 1]
+        if home.get("date") != away.get("date"):
+            continue
+        tally["pairs"] += 1
+        day = _as_iso_day(home.get("date"))
+        if not day:
+            continue
+        hit = None
+        for delta in (0, -1, 1):
+            d = (dt_date.fromisoformat(day) + timedelta(days=delta)).isoformat()
+            hit = fotmob.get((d, canonical_team_name(home.get("team")), canonical_team_name(away.get("team"))))
+            if hit:
+                break
+        if not hit:
+            continue
+        home["xg_for"], home["xg_against"] = hit
+        away["xg_for"], away["xg_against"] = hit[1], hit[0]
+        home["xg_source"] = away["xg_source"] = "fotmob"
+        tally["joined"] += 1
+    return tally
+
+
 def backtest_league(
     league: str, *, simulations: int, min_prior_matches: int, limit: int | None,
     wire_market_confidence: bool = False, since: str | None = None, fd_close_dir: Path | None = None,
+    fotmob_xg_path: Path | None = None,
 ) -> dict[str, Any]:
     history = _load_history(league)
     if not history:
@@ -259,9 +315,13 @@ def backtest_league(
     # (confirmed 918-1145 rows each) -- that is a real, separate opportunity
     # in PRODUCTION, not something to silently fix inside a backtest whose
     # whole point is measuring what production actually does today.
+    xg_tally = None
     if league in _GOALS_BASED_RATING_LEAGUES:
         team_rows = team_rows_from_match_history(history, espn_stats=espn_stats)
         rating_window = 90
+        if fotmob_xg_path is not None:
+            xg_tally = _apply_fotmob_xg(team_rows, _fotmob_match_xg(league, fotmob_xg_path))
+            print(f"H37 {league}: FotMob xG joined on {xg_tally['joined']} of {xg_tally['pairs']} history matches", flush=True)
     else:
         team_rows = _load_team_history(league)
         rating_window = 45
@@ -323,6 +383,17 @@ def backtest_league(
         if limit is not None and scored >= limit:
             break
         ratings = compute_team_ratings(team_rows, as_of=day, window=rating_window)
+        # H37 diagnostic: share of each team's in-window rating rows that carry FotMob xG, as of this day.
+        if xg_tally is not None:
+            _prior = sorted((r for r in team_rows if (_as_iso_day(r.get("date")) or "9999") < day),
+                            key=lambda r: _as_iso_day(r.get("date")) or "")
+            _by_team: dict[str, list] = defaultdict(list)
+            for _r in _prior:
+                _by_team[str(_r.get("team"))].append(_r)
+            _xg_share = {t: sum(1 for x in rs[-rating_window:] if x.get("xg_source") == "fotmob") / max(1, len(rs[-rating_window:]))
+                         for t, rs in _by_team.items()}
+        else:
+            _xg_share = {}
         fixtures = by_day[day]
         # A team the as-of ratings have never seen gets a 0.0/0.0 default from
         # `_rating_for`, which is a prior, not a projection. Requiring prior
@@ -404,6 +475,9 @@ def backtest_league(
                 close_1x2 = _market_probabilities({"odds_home": close.get("AvgCH"), "odds_draw": close.get("AvgCD"),
                                                    "odds_away": close.get("AvgCA")})
             extra = {
+                "xg_source_arm": "fotmob" if xg_tally is not None else "production",
+                "rating_xg_share": None if not _xg_share else round(
+                    (_xg_share.get(str(row.get("home_team")), 0.0) + _xg_share.get(str(row.get("away_team")), 0.0)) / 2, 4),
                 "model_over25": td.get("over_2_5_probability"),
                 "model_btts": td.get("both_teams_scored_probability"),
                 "model_total_mean": td.get("mean") if td.get("mean") is not None else (
@@ -484,6 +558,9 @@ def main() -> int:
     parser.add_argument("--since", default=None, help="score only match days on/after this ISO date (ratings stay as-of)")
     parser.add_argument("--fd-close-dir", type=Path, default=None,
                         help="football-data season CSVs (<code>.csv) for the TRUE closing AvgC* join; history files hold pre-close Avg*")
+    parser.add_argument("--fotmob-xg", type=Path, default=None,
+                        help="H37 arm: rate the goals-based leagues from this FotMob harvest's shot xG instead of goals")
+    parser.add_argument("--leagues", default=None, help="comma list; overrides --all/--league")
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument(
         "--dump-matches",
@@ -494,9 +571,12 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if not args.league and not args.all:
-        parser.error("pass --league <name> or --all")
-    leagues = list(BACKTESTABLE_LEAGUES) if args.all else [args.league]
+    if not args.league and not args.all and not args.leagues:
+        parser.error("pass --league <name>, --leagues a,b or --all")
+    if args.leagues:
+        leagues = [x.strip() for x in args.leagues.split(",") if x.strip()]
+    else:
+        leagues = list(BACKTESTABLE_LEAGUES) if args.all else [args.league]
 
     results = [
         backtest_league(
@@ -507,6 +587,7 @@ def main() -> int:
             wire_market_confidence=args.wire_market_confidence,
             since=args.since,
             fd_close_dir=args.fd_close_dir,
+            fotmob_xg_path=args.fotmob_xg,
         )
         for league in leagues
     ]
