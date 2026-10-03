@@ -77,6 +77,15 @@ USAGE = {
 H_GRID = (1.5, 3.0, 6.0, 12.0)
 FIT, HOLDOUT, CURRENT = (2023, 2024), (2025,), (2026,)
 OUT_STATUSES = {"Out", "Doubtful"}
+# the game-log KEY each stat is stored under in `Usage.pg` (the first run read `g["rushing_attempts"]`,
+# a key that is never written, so the defaultdict returned 0 and the ewma mean was 0 for both attempts markets)
+GAME_KEY = {"receptions": "receptions", "receiving_yards": "receiving_yards", "rushing_yards": "rushing_yards",
+            "rushing_attempts": "rushes", "passing_yards": "passing_yards", "passing_attempts": "pass_att"}
+# an Out teammate only frees volume he was ACTUALLY taking: he must have played for this team in the
+# current season within this many team weeks, and the freed mass is capped. The first run let a backup
+# QB's prior-season share count, up to 0.9, which multiplied a starter's share by as much as 10.
+INJ_RECENT_WEEKS = 3
+INJ_MASS_CAP = 0.5
 
 
 # ---------------------------------------------------------------------------
@@ -177,7 +186,9 @@ class Features:
         _U, games, _w = self._window(season, week, pid)
         if len(games) < 2:
             return None
-        return ewma([g[stat] for g in games], h)
+        key = GAME_KEY[stat]
+        assert all(key in g for g in games), f"{stat}: game log has no {key!r}"
+        return ewma([g[key] for g in games], h)
 
     def _share(self, U, games, wk, unit: str, h: float, pid: str) -> Tuple[Optional[float], Optional[str]]:
         shares = []
@@ -203,19 +214,19 @@ class Features:
             out = self.inj.get((season, week, team), set())
             if pid in out:
                 return None
-            if out:
-                # as-of shares of the teammates listed Out, removed and redistributed
+            Ucur = self.U.get(season)
+            if out and Ucur is not None:
+                # as-of shares of the teammates listed Out, removed and redistributed -- only players
+                # active for THIS team in THIS season within the last INJ_RECENT_WEEKS team weeks
                 mass = 0.0
                 for oid in out:
                     if oid == pid:
                         continue
-                    og = U.player_games(oid, wk)
-                    og = [g for g in og if g["team"] == team]
-                    if len(og) >= 1:
-                        s_, _ = self._share(U, og, wk, unit, h, oid)
+                    og = [g for g in Ucur.player_games(oid, week) if g["team"] == team]
+                    if og and og[-1]["week"] >= week - INJ_RECENT_WEEKS:
+                        s_, _ = self._share(Ucur, og, week, unit, h, oid)
                         mass += s_ or 0.0
-                mass = min(mass, 0.9)
-                share = share / (1.0 - mass)
+                share = share / (1.0 - min(mass, INJ_MASS_CAP))
         mean = share * vol
         if num:
             units = sum(g[unit] for g in games)
