@@ -45298,3 +45298,17 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - **reading 3 (served, 05:2xZ, board date 10-03, build_age 228 s):** soccer **`rows_with_projection 519` of `rows_considered 612` (84.8%)**, `matches_in_source 9`, `unmatched_match_rows 0`. By league: mls 168, ligue_1 107, la_liga 101, bundesliga 120, eredivisie 99, primeira_liga 9, championship 5, belgian_pro_league 3. `rows_with_measured_skill 33` (registry), `rows_with_true_probability 465`. 51 soccer rows on the shortlist, 12 with `model_edge_pct`.
 - **EPL / Serie A:** no fixture before 10-10, which is outside board date 10-03's window (10-02..10-09). Units for 10-10 are resolved. **OWED:** the served per-league count for epl/serie_a on board date 10-04.
 - **left on disk:** mls `recommendations_2026-10-02/10-07.json` stay as 0-match files from the old code. Harmless (they add nothing to the index), and no unit will rewrite them now.
+
+## 2026-10-03 15:31Z (10:31 AM CT) -- LOCAL FLEET DATA RESTORE, NO CODE DEPLOY: NCAAF 2026 wk1-2 player logs back in the fleet snapshot; wk5 prop artifact rebuilt -- **MET** (lane `ncaaf-player-stats-wk12-restore`)
+
+- user: "go ahead and run it" (the first --apply was refused by the auto-mode classifier; nothing was written then).
+- cause (read-only, confirmed): never fetched, not deleted -- the fleet's first player-stats run was 2026-09-30 (`last_attempt_age_s=never`) and `player_stats_refresh` re-fetches only the target week + `DEFAULT_LOOKBACK_WEEKS=2`.
+- method: `C:/tmp/ncaaf_lpb/fleet/restore_wk12.py --apply` with the fleet interpreter from ~/Syndicate, environment inherited in-process from the live refresh-worker (no value printed); production `refresh_week` for 2026 wk1 and wk2 (2 CFBD calls; it asserts history preserved); then production `build_prop_projections(season=2026, week=5)`.
+- backup: `~/syndicate-prod/backups/ncaaf_player_stats_20261003T153050Z/ncaaf_player_game_stats_snapshot.csv`, sha256 b6cd12864ba7 = the pre-change file.
+- baseline (same run, 15:30Z): 2026 wk3 2,944 / wk4 2,819 / wk5 115 rows, total 41,707, sha b6cd12864ba7; wk5 artifact generated 04:08:23Z, weeks_used [3,4], players 2,221, projections 5,341.
+- expect: wk1 ~4,964 and wk2 ~3,178 rows (CFBD's 10-02 counts), every other season-week unchanged; wk5 artifact weeks_used [1,2,3,4] with more players.
+- reading 1 (file): 2026 wk1 4,964 rows / 204 games, wk2 3,178 / 131, wk3-5 unchanged, total 49,849, sha b5729955d445; "OTHER season-weeks changed: none".
+- reading 2 (artifact): written+published 15:31:34Z, weeks_used [1,2,3,4], players 2,221 -> 2,764, projections 5,341 -> 6,865.
+- reading 3 (served, /api/board/layer2-shortlist build 15:37:04Z): the NCAAF prop row on the shortlist carries projection `generated_at 2026-10-03T10:31:34-05:00` (the rebuilt artifact) and `sample_games 5`; no restart needed (index keyed by mtime). Only 1 NCAAF prop row is on the capped shortlist at this read.
+- expected effect (backtest, not a live measurement): receiving yds MAE -3.02 [-2.24, -3.80], rushing yds -1.80, receptions -0.25 (findings_2026-10-02_ncaaf_lines_props_backtest.md).
+- not fixed: a fleet reset would lose early weeks again (lookback 2); a first-run full-season backfill is a separate code change.
