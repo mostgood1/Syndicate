@@ -88,6 +88,8 @@ no league wins (EPL −0.0219 [−0.0667, +0.0237] is the best). Ten leagues at 
 | O/U 2.5, total goals, draw, true-close 1X2 | **NOT RE-RUN — owed.** The harness is extended and smoke-tested (10 EPL 2025-26 matches: all fields populated, 10/10 true-close joins), but the full run (~3,300 matches of real sim) could not progress on this host: 100% CPU, 1.3 GB free of 32 GB, the process paging at 0.3 CPU-s per 30 s while the production fleet shares the machine. Stopped deliberately after ~50 min rather than add memory pressure to production. | — | — | command below |
 | AH, BTTS, corners, props | untestable for 2025-26 from what is retained: no AH/BTTS/corners/prop prices captured last season; no as-of player substrate | — | — | — |
 
+- **STATUS 2026-10-03 ~21:30Z -- the 03:42Z re-run did NOT finish; it is SUPERSEDED, not complete.** First launch died in 3 s (`no committed history`: a `git rebase` of the sparse worktree deleted the materialised `data/` history files); the relaunch was stopped when the work moved into the H37 chain (lane `soccer-1x2-ratings-xg-source`). The 2025-26 O/U 2.5 / total-goals / true-close numbers for the four goals-rated leagues (championship, eredivisie, primeira_liga, belgian_pro_league) come from H37 **arm A** -- the same harness and production ratings, same per-match fields -- RUNNING (eredivisie 158 matches dumped at 21:2xZ), resumable. The five rest-of-leagues steps are DEFERRED by user decision (2026-10-03) until H37 is scored. No 2025-26 O/U Brier exists yet; nothing here is a result.
+
 The owed run cannot change the gate list: every 2026-27 market already fails the book clause. It would
 change only whether 2025-26 agrees.
 
