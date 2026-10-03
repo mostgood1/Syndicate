@@ -45229,3 +45229,9 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - verify: run 20261003_003217 (first on new code) 00:32:17-00:37:17Z = 5.0 min, ok=True, 51 steps, step-seconds 189 (schedule 52, props 74, picks 34, odds 18, artifacts 8) vs run 20261002_223521's 1,416 (schedule 1,327). All 10 schedule steps `--near`, 0 failed, each 3-12 s (full builds were 73-241 s). Files keep their match counts (epl 380, mls 511, championship 552), build_mode=near, full_generated_at carried.
 - cost of the old code tonight: the last old run 20261002_233838 ran 23:38:38-00:32Z (53 min, full rebuilds under live-phase contention) and refused ~22 sweeps lane_busy, incl. LIVE nhl/wnba/nfl/ncaaf sweeps.
 - expect: first 6-hourly FULL rebuild ~05:40-06:20Z (one ~20+ min run).
+
+
+## 2026-10-03 02:45Z (9:45 PM CT 10-02) -- MEASUREMENT: Polymarket boot work off the main thread (ba7e2d3a) -- first sweep 1m48s after start, was ~13 min -- lane `layer2-freshness-1h`
+- deploy: user-run ff to eccfe602 + live-odds-worker TERM (STOP_SIGNAL 02:32:24Z); new pid 747280 started 02:32:55Z.
+- verify: VENUE_BOOT_STARTED 02:33:03Z (8 s after start); first ODDS_SWEEP_LAUNCHED 02:34:43Z = 1m48s after start (refused lane_busy by the previous worker's still-running live sweep pid 746110 -- expected; relaunched 02:37:35Z). Before, restart 23:09:05Z: loop_start 23:18:17Z, first launch 23:22:16Z (~13 min). Boot thread: SLATE_WRITE ok 02:37:20Z (count 21,671), probe POLYMARKET_US_GAMES 02:41:31Z, VENUE_POLL_STARTED 02:42:12Z; the main loop's own per-pass write at 02:41:35Z is the normal cadence (180s gate), not a duplicate.
+- not addressed: the ~4-min silent section inside a first tick seen at 23:18-23:21Z (likely CPU/GIL contention with venue-poll Kalshi + live-lines payload builds; unmeasured). This restart's first tick reached its launch in ~1 min.
