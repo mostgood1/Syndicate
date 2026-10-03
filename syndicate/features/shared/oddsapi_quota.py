@@ -268,56 +268,11 @@ def record_oddsapi_quota(headers: Any, *, sport: str | None = None, endpoint: st
                 raise _UntrustedRead()
             if not isinstance(payload, dict):
                 payload = {}
-            baseline = payload.get("baseline") if isinstance(payload.get("baseline"), dict) else None
-            baseline = _next_baseline(baseline, observation)
-            # LATEST IS THE HIGHEST `used`, not the last writer. Under
-            # concurrency a slower writer can commit an older observation
-            # after a newer one; `used` is monotonic within a billing period,
-            # so the larger one is the newer reading. A drop (period rollover)
-            # resets the baseline to this observation and takes it as latest.
-            prior_latest = payload.get("latest") if isinstance(payload.get("latest"), dict) else None
-            latest = observation
-            if prior_latest is not None and baseline is not observation:
-                try:
-                    if int(prior_latest.get("used") or 0) > int(observation.get("used") or 0):
-                        latest = prior_latest
-                except (TypeError, ValueError):
-                    pass
-            by_sport = dict(payload.get("by_sport") or {}) if isinstance(payload.get("by_sport"), dict) else {}
-            bucket = dict(by_sport.get(sport_key) or {"calls": 0, "credits": 0})
-            bucket["calls"] = int(bucket.get("calls") or 0) + 1
-            bucket["credits"] = int(bucket.get("credits") or 0) + last_cost
-            by_sport[sport_key] = bucket
-            by_family = dict(payload.get("by_market_family") or {}) if isinstance(payload.get("by_market_family"), dict) else {}
-            for family, credits in families.items():
-                family_bucket = dict(by_family.get(family) or {"calls": 0, "credits": 0.0})
-                family_bucket["calls"] = int(family_bucket.get("calls") or 0) + 1
-                family_bucket["credits"] = round(float(family_bucket.get("credits") or 0.0) + credits, 2)
-                by_family[family] = family_bucket
-            by_hour = dict(payload.get("by_hour_utc") or {}) if isinstance(payload.get("by_hour_utc"), dict) else {}
-            hour_bucket = dict(by_hour.get(hour_key) or {"calls": 0, "credits": 0})
-            hour_bucket["calls"] = int(hour_bucket.get("calls") or 0) + 1
-            hour_bucket["credits"] = int(hour_bucket.get("credits") or 0) + last_cost
-            by_hour[hour_key] = hour_bucket
-            return {
-                "baseline": baseline,
-                "latest": latest,
-                "by_sport": by_sport,
-                "by_market_family": by_family,
-                "by_hour_utc": by_hour,
-                "attribution_error_count": int(payload.get("attribution_error_count") or 0) + (1 if family_error else 0),
-                "last_attribution_error": family_error or payload.get("last_attribution_error"),
-                # Kept for continuity with the pre-CAS probe's history; no longer
-                # incremented -- a conflict now retries instead of racing.
-                "race_detected_count": int(payload.get("race_detected_count") or 0),
-                "last_race_detail": payload.get("last_race_detail"),
-                # Conflicts absorbed by a retry: the collisions that used to
-                # lose an increment, now counted instead of lost.
-                "cas_conflicts_count": int(payload.get("cas_conflicts_count") or 0) + (attempt - 1),
-                "aggregates_started_at": str(payload.get("aggregates_started_at") or _utc_now_iso()),
-                "observation_count": int(payload.get("observation_count") or 0) + 1,
-                "updatedAt": _utc_now_iso(),
-            }
+            return _apply_observation(
+                payload, observation, attempt,
+                sport_key=sport_key, last_cost=last_cost, families=families,
+                family_error=family_error, hour_key=hour_key,
+            )
 
         try:
             compare_and_swap_json_file(_quota_path(), _build, max_attempts=_CAS_MAX_ATTEMPTS, backoff_seconds=0.02)
@@ -326,9 +281,221 @@ def record_oddsapi_quota(headers: Any, *, sport: str | None = None, endpoint: st
             # cost; `used` stays exact on the next recorded call regardless.
             print(f"[oddsapi_quota] CAS_GAVE_UP sport={sport_key} attempts={_CAS_MAX_ATTEMPTS}", flush=True)
             return None
+        _forward_to_fleet(
+            observation, sport_key=sport_key, last_cost=last_cost, families=families,
+            family_error=family_error, hour_key=hour_key,
+        )
         return observation
     except Exception:
         return None
+
+
+# ---------------------------------------------------------------------------
+# OFF-FLEET SPEND REACHES THE FLEET'S COUNTERS (lane `layer2-freshness-1h`,
+# 2026-10-03, user: "wire backtests into the quota recorder").
+#
+# MEASURED: overnight 10-02/03 the account's `used` rose 126,764 credits more
+# than the fleet's per-sport counters. 94,458 were a WNBA backtest's historical
+# pull and 26,220 an NHL backtest's (`scripts/backtest_nhl_game_lines.py`) --
+# and that NHL script ALREADY called `record_oddsapi_quota`. On a dev machine
+# the state backend is the local filesystem, so its 874 observations went into
+# a file in its working tree that nothing reads. Calling the recorder was
+# necessary and not sufficient: off the fleet it has to reach the fleet's store.
+#
+# So an off-fleet process (state backend NOT keyvalue) ALSO applies each
+# observation to the fleet's quota document, under `<sport>:offfleet` so
+# backtest spend is its own line and never inflates a production sport. The
+# fleet's key embeds the fleet's absolute data path, which a Windows process
+# cannot reproduce from env, so the key is DISCOVERED (exactly one match, or
+# nothing is written). Same compare-and-swap as the fleet's own writer; the
+# key's TTL is kept. Fleet processes are untouched (their backend IS keyvalue).
+#
+#   SYNDICATE_ODDSAPI_QUOTA_FORWARD=0       off  (also off under pytest unless =force)
+#   SYNDICATE_ODDSAPI_QUOTA_FORWARD_URL     default redis://127.0.0.1:6379/0
+#
+# One status line per process (`FLEET_FORWARD status=...`), so a backtest that
+# could NOT reach the fleet says so instead of recording into a file nobody reads.
+# ---------------------------------------------------------------------------
+_FLEET_FORWARD_STATE: dict[str, Any] = {"announced": False, "key": None, "client": None, "failed": None}
+_FLEET_QUOTA_KEY_PATTERN = "*:refresh-state:*odds_control_plane/oddsapi_quota.json"
+
+
+def _fleet_forward_enabled() -> bool:
+    import os
+
+    raw = str(os.environ.get("SYNDICATE_ODDSAPI_QUOTA_FORWARD") or "").strip().lower()
+    if raw in {"0", "off", "false", "no"}:
+        return False
+    # NEVER FROM A TEST RUN unless forced. Tests feed FAKE headers, and a test
+    # process is off-fleet by definition: on 2026-10-03 15:52-15:54Z the quota
+    # suite forwarded 556 fake observations into the fleet's document (fake
+    # `<sport>:offfleet` buckets, and a `used=0` observation reset its burn
+    # baseline). Real headers come only from real calls, which never run
+    # under pytest.
+    import sys
+
+    if raw != "force" and ("PYTEST_CURRENT_TEST" in os.environ or "pytest" in sys.modules):
+        return False
+    try:
+        from syndicate.features.shared.refresh_state_store import _keyvalue_backed
+
+        return not _keyvalue_backed(_quota_path())
+    except Exception:
+        return False
+
+
+def _fleet_forward_target() -> tuple[Any, str] | None:
+    """(client, key) for the fleet's quota document, discovered once per process."""
+    import os
+
+    state = _FLEET_FORWARD_STATE
+    if state["failed"] is not None:
+        return None
+    if state["client"] is not None and state["key"]:
+        return state["client"], state["key"]
+    try:
+        import redis
+
+        url = str(os.environ.get("SYNDICATE_ODDSAPI_QUOTA_FORWARD_URL") or "redis://127.0.0.1:6379/0").strip()
+        client = redis.Redis.from_url(url, socket_connect_timeout=1, socket_timeout=2)
+        keys = sorted({k.decode() if isinstance(k, bytes) else str(k) for k in client.scan_iter(match=_FLEET_QUOTA_KEY_PATTERN, count=1000)})
+    except Exception as exc:
+        state["failed"] = f"unreachable:{type(exc).__name__}"
+        return None
+    if len(keys) != 1:
+        state["failed"] = "no_quota_key" if not keys else f"ambiguous:{len(keys)}_keys"
+        return None
+    state["client"], state["key"] = client, keys[0]
+    return client, keys[0]
+
+
+def _forward_to_fleet(
+    observation: dict[str, Any],
+    *,
+    sport_key: str,
+    last_cost: int,
+    families: dict[str, float],
+    family_error: dict[str, Any] | None,
+    hour_key: str,
+) -> str:
+    """Apply this observation to the fleet's quota document. Never raises."""
+    status = "not_off_fleet"
+    try:
+        if not _fleet_forward_enabled():
+            return status
+        target = _fleet_forward_target()
+        if target is None:
+            status = f"skipped:{_FLEET_FORWARD_STATE['failed']}"
+            return status
+        client, key = target
+        import json as _json
+
+        import redis
+
+        from syndicate.features.shared.refresh_state_store import normalize_timestamped_payload
+
+        offfleet_key = f"{sport_key}:offfleet"
+        for attempt in range(1, _CAS_MAX_ATTEMPTS + 1):
+            with client.pipeline(transaction=True) as pipe:
+                pipe.watch(key)
+                raw_doc = client.get(key)
+                payload = _json.loads(raw_doc) if raw_doc else {}
+                if not isinstance(payload, dict) or not payload:
+                    # Never rebuild the fleet's document from empty -- the same
+                    # rule `_build` enforces for a failed local read.
+                    status = "skipped:fleet_document_unreadable"
+                    return status
+                new = _apply_observation(
+                    payload, observation, attempt,
+                    sport_key=offfleet_key, last_cost=last_cost, families=families,
+                    family_error=family_error, hour_key=hour_key,
+                )
+                pipe.multi()
+                pipe.set(key, _json.dumps(normalize_timestamped_payload(new), separators=(",", ":")), keepttl=True)
+                try:
+                    pipe.execute()
+                except redis.exceptions.WatchError:
+                    time.sleep(0.02 * attempt)
+                    continue
+            status = f"ok:{offfleet_key}"
+            return status
+        status = "gave_up:cas"
+        return status
+    except Exception as exc:  # noqa: BLE001 -- instrumentation never fails a fetch
+        status = f"error:{type(exc).__name__}"
+        return status
+    finally:
+        if status != "not_off_fleet" and not _FLEET_FORWARD_STATE["announced"]:
+            _FLEET_FORWARD_STATE["announced"] = True
+            print(f"[oddsapi_quota] FLEET_FORWARD status={status} key={_FLEET_FORWARD_STATE.get('key')}", flush=True)
+
+
+def _apply_observation(
+    payload: dict[str, Any],
+    observation: dict[str, Any],
+    attempt: int,
+    *,
+    sport_key: str,
+    last_cost: int,
+    families: dict[str, float],
+    family_error: dict[str, Any] | None,
+    hour_key: str,
+) -> dict[str, Any]:
+    """The quota document after one observation. Pure: no IO.
+
+    Shared by the local compare-and-swap and the off-fleet forward
+    (`_forward_to_fleet`), so the two can never count an observation differently.
+    """
+    baseline = payload.get("baseline") if isinstance(payload.get("baseline"), dict) else None
+    baseline = _next_baseline(baseline, observation)
+    # LATEST IS THE HIGHEST `used`, not the last writer. Under
+    # concurrency a slower writer can commit an older observation
+    # after a newer one; `used` is monotonic within a billing period,
+    # so the larger one is the newer reading. A drop (period rollover)
+    # resets the baseline to this observation and takes it as latest.
+    prior_latest = payload.get("latest") if isinstance(payload.get("latest"), dict) else None
+    latest = observation
+    if prior_latest is not None and baseline is not observation:
+        try:
+            if int(prior_latest.get("used") or 0) > int(observation.get("used") or 0):
+                latest = prior_latest
+        except (TypeError, ValueError):
+            pass
+    by_sport = dict(payload.get("by_sport") or {}) if isinstance(payload.get("by_sport"), dict) else {}
+    bucket = dict(by_sport.get(sport_key) or {"calls": 0, "credits": 0})
+    bucket["calls"] = int(bucket.get("calls") or 0) + 1
+    bucket["credits"] = int(bucket.get("credits") or 0) + last_cost
+    by_sport[sport_key] = bucket
+    by_family = dict(payload.get("by_market_family") or {}) if isinstance(payload.get("by_market_family"), dict) else {}
+    for family, credits in families.items():
+        family_bucket = dict(by_family.get(family) or {"calls": 0, "credits": 0.0})
+        family_bucket["calls"] = int(family_bucket.get("calls") or 0) + 1
+        family_bucket["credits"] = round(float(family_bucket.get("credits") or 0.0) + credits, 2)
+        by_family[family] = family_bucket
+    by_hour = dict(payload.get("by_hour_utc") or {}) if isinstance(payload.get("by_hour_utc"), dict) else {}
+    hour_bucket = dict(by_hour.get(hour_key) or {"calls": 0, "credits": 0})
+    hour_bucket["calls"] = int(hour_bucket.get("calls") or 0) + 1
+    hour_bucket["credits"] = int(hour_bucket.get("credits") or 0) + last_cost
+    by_hour[hour_key] = hour_bucket
+    return {
+        "baseline": baseline,
+        "latest": latest,
+        "by_sport": by_sport,
+        "by_market_family": by_family,
+        "by_hour_utc": by_hour,
+        "attribution_error_count": int(payload.get("attribution_error_count") or 0) + (1 if family_error else 0),
+        "last_attribution_error": family_error or payload.get("last_attribution_error"),
+        # Kept for continuity with the pre-CAS probe's history; no longer
+        # incremented -- a conflict now retries instead of racing.
+        "race_detected_count": int(payload.get("race_detected_count") or 0),
+        "last_race_detail": payload.get("last_race_detail"),
+        # Conflicts absorbed by a retry: the collisions that used to
+        # lose an increment, now counted instead of lost.
+        "cas_conflicts_count": int(payload.get("cas_conflicts_count") or 0) + (attempt - 1),
+        "aggregates_started_at": str(payload.get("aggregates_started_at") or _utc_now_iso()),
+        "observation_count": int(payload.get("observation_count") or 0) + 1,
+        "updatedAt": _utc_now_iso(),
+    }
 
 
 # Retries before one observation is dropped. Contention is bursty and short (a
