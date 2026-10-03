@@ -158,19 +158,40 @@ def _logloss(p: float, y: int) -> float:
     return -(math.log(p) if y else math.log(1 - p))
 
 
-def _implied(o: float) -> float:
-    return 100.0 / (o + 100.0) if o > 0 else -o / (-o + 100.0)
-
-
-def _american_to_dec(o: float) -> float:
-    return 1 + (o / 100.0 if o > 0 else 100.0 / -o)
-
-
-def _devig(pa: Optional[float], pb: Optional[float]) -> Optional[float]:
-    """Proportional de-vig of a two-sided American pair -> P(side a). None if either side missing."""
-    if pa is None or pb is None or pa == 0 or pb == 0:
+def _american(o) -> Optional[float]:
+    """A quotable American price, or None. Accepts numbers and wire strings ('+150', '-110.5');
+    refuses None, '', text, non-finite and |price| < 100 (0 included) -- none of which is a price.
+    Guard required by tests/test_probability_differential.py (lane nhl-props-converter-guard)."""
+    if o is None or isinstance(o, bool):
         return None
+    try:
+        x = float(str(o).strip()) if isinstance(o, str) else float(o)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(x) or abs(x) < 100:
+        return None
+    return x
+
+
+def _implied(o) -> Optional[float]:
+    x = _american(o)
+    if x is None:
+        return None
+    return 100.0 / (x + 100.0) if x > 0 else -x / (-x + 100.0)
+
+
+def _american_to_dec(o) -> Optional[float]:
+    x = _american(o)
+    if x is None:
+        return None
+    return 1 + (x / 100.0 if x > 0 else 100.0 / -x)
+
+
+def _devig(pa, pb) -> Optional[float]:
+    """Proportional de-vig of a two-sided American pair -> P(side a). None if either side is not a price."""
     ia, ib = _implied(pa), _implied(pb)
+    if ia is None or ib is None:
+        return None
     return ia / (ia + ib)
 
 
@@ -178,6 +199,7 @@ def _std_pair(a: Optional[float], b: Optional[float]) -> Optional[Tuple[float, f
     """A spread/total price pair only if it looks like a main line's juice: both sides in
     [-140, -100] U [100, 120] and total implied in [1.00, 1.10]. The upstream consensus pairs main
     points with alt-line prices (e.g. -245/+180 on a main spread) and leaves 39% of rows unpriced."""
+    a, b = _american(a), _american(b)
     if a is None or b is None:
         return None
     ok = lambda x: (-140 <= x <= -100) or (100 <= x <= 120)  # noqa: E731
@@ -653,12 +675,12 @@ def hist_game_book(args, d: str) -> Dict[Tuple[str, str], Dict]:
                 elif mk.get("key") == "spreads":
                     ho, ao = oc.get(ev["home_team"]) or {}, oc.get(ev["away_team"]) or {}
                     pt, hp, ap = _f(ho.get("point")), _f(ho.get("price")), _f(ao.get("price"))
-                    if pt is not None and hp and ap:
+                    if pt is not None and _devig(hp, ap) is not None:  # both sides quotable
                         sp[pt].append((_devig(hp, ap), hp, ap))
                 elif mk.get("key") == "totals":
                     o, u = oc.get("Over") or {}, oc.get("Under") or {}
                     pt, op, up = _f(o.get("point")), _f(o.get("price")), _f(u.get("price"))
-                    if pt is not None and op and up:
+                    if pt is not None and _devig(op, up) is not None:
                         tt[pt].append((_devig(op, up), op, up))
         rec: Dict = {"books_ml": len(ml)}
         if ml:
@@ -867,6 +889,9 @@ def score_props_book(args, manifest: Dict, hist: History, phase_of: Dict[str, st
             if base is None:
                 stats["no_prior_game_baseline"] += 1
                 continue
+            if _american(o["price"]) is None or _american(u["price"]) is None:
+                stats["unquotable_price_excluded"] += 1  # 0 / |price| < 100 / text: not a price
+                continue
             y = int(act[stat] > line)
             rows.append({"gid": act["gid"], "date": d, "phase": f"{phase_of.get(d, 'unknown')}:{eng}", "mk": stat, "pid": nba_pid,
                          "line": line, "book": book, "yb": y,
@@ -1074,8 +1099,8 @@ def score_games(args, manifest: Dict, scoreboards: Dict[str, List[Dict]], phase_
                         rows[f"{arm}|{ph}|{sk}|win_prob"].append({**base, "yb": int(am_ > 0), "p_model": mwp(m, scale=scale),
                                                                     "p_sim": a["_sim_p_home_win"][0] if sk == "game" else None,
                                                                     "p_book": p_book, "p_half": 0.5,
-                                                                    "dec_h": _american_to_dec(hml) if hml else None,
-                                                                    "dec_a": _american_to_dec(aml) if aml else None})
+                                                                    "dec_h": _american_to_dec(hml),
+                                                                    "dec_a": _american_to_dec(aml)})
                     # spread/total: the book price is used only when it is a plausible main-line pair
                     # (_std_pair); otherwise the book is the line itself at 50% and -110 both sides.
                     if sk == "game" and m is not None and hs is not None and (am_ + hs) != 0:

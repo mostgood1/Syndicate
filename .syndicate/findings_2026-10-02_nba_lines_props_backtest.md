@@ -304,6 +304,12 @@ distribution:
   against them is suspect.
 - **The repo `.env` `ODDS_API_KEY` is deactivated** (HTTP 401 `DEACTIVATED_KEY`, 2026-10-03).
 
+- **Price converters guarded (2026-10-03, at lane `nhl-props-converter-guard`'s request).** `_implied` and
+  `_american_to_dec` now refuse None/''/text/0 and |price| < 100, and score 5/5 in
+  `scripts/probability_differential.py`. Re-score impact: every served-path cell is identical. Only the
+  unserved `predictions_csv` win_prob arm lost 33 consensus rows (816 → 783), still MODEL_WORSE (+0.0835
+  [+0.0642, +0.1034]).
+
 ## Not done / owed
 
 - **OddsAPI historical backfill** (user-approved ~139k credits). Blocked: the repo key is deactivated, and

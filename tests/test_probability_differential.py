@@ -67,12 +67,9 @@ KNOWN_FAILING = {
         # consensus_movement) were ADDED here when registered -- each priced 0 as
         # 0.0 -- and all four were GUARDED and REMOVED the same day. Deliberately
         # not re-listed.
-        # ADDED 2026-10-03 (lane `nhl-props-converter-guard`): the NBA backtest
-        # (795d420b) copied the NHL one-liner before its guard. Every call site
-        # drops a 0 first (`_devig`, `if hml`, `hp and ap`) or raises on it via
-        # `_american_to_dec` in the same row; |price| < 100 is NOT filtered. The
-        # guard belongs to lane `nba-lines-props-backtest`.
-        "scripts.backtest_nba_lines_props:_implied",
+        # 2026-10-03: the NBA backtest's copy (795d420b) was ADDED here by lane
+        # `nhl-props-converter-guard` and GUARDED + REMOVED the same day by lane
+        # `nba-lines-props-backtest` (refuses 0/None/''/text/|price| < 100).
     },
     "american_to_decimal": {
         # ADDED 2026-10-02, same registration. Four copies of the unguarded
@@ -93,8 +90,7 @@ KNOWN_FAILING = {
         "syndicate.features.nhl.sim_engine.hockeysim.adapters:american_to_decimal",
         # 2026-10-03: the NFL and NHL-props backtest copies of the unguarded
         # one-liner were ADDED here and GUARDED + REMOVED the same day.
-        # ADDED 2026-10-03: the NBA backtest's copy; RAISES ZeroDivisionError at 0.
-        "scripts.backtest_nba_lines_props:_american_to_dec",
+        # The NBA backtest's copy was ADDED and GUARDED + REMOVED the same day too.
         # `nba.betting_recap:_settlement_decimal_price` was ADDED here on
         # 2026-09-09 and REMOVED the same day, which is the whole point of the
         # set. It had returned 2.0 on a missing or zero price -- an unpriced

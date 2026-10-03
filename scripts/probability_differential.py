@@ -225,7 +225,7 @@ AMERICAN_TO_PROBABILITY: list[Impl] = [
     Impl("american_to_probability", "scripts.backtest_nhl_props", "_implied",
          "float() coercion; refuses 0 AND |price| < 100 (guarded 2026-10-03)"),
     Impl("american_to_probability", "scripts.backtest_nba_lines_props", "_implied",
-         "copy of the NHL props one-liner as it was before its guard; NO coercion, NO zero guard"),
+         "via _american(): float() coercion; refuses None/''/text/0 AND |price| < 100 (guarded 2026-10-03)"),
     Impl("american_to_probability", "scripts.backtest_wnba_lines_props", "implied",
          "one-liner; NO coercion, NO zero guard (0 -> 0.0)"),
     # `scripts.consensus_movement_by_sport:_implied` was registered here the same
@@ -266,7 +266,7 @@ AMERICAN_TO_DECIMAL: list[Impl] = [
     Impl("american_to_decimal", "scripts.backtest_nhl_props", "_american_to_dec",
          "float() coercion; refuses 0 AND |price| < 100 (guarded 2026-10-03)"),
     Impl("american_to_decimal", "scripts.backtest_nba_lines_props", "_american_to_dec",
-         "one-liner; NO coercion, NO zero guard"),
+         "via _american(): float() coercion; refuses None/''/text/0 AND |price| < 100 (guarded 2026-10-03)"),
 ]
 
 def _backfill_card_adapter(fn: Any, value: Any) -> Any:
@@ -442,6 +442,7 @@ NOT_A_SCALAR_CONVERTER: dict[str, str] = {
     "scripts/backtest_mlb_lines_props.py:devig_two_way": "two-sided proportional devig; two PRICES in, fair P(side A) out. Its scalar half, `american_to_prob`, IS registered",
     "scripts/backtest_ncaaf_lines_props.py:devig_two_way": "two-sided proportional devig; two PRICES in, fair P(side A) out. Its scalar half, `american_to_prob`, IS registered",
     "scripts/backtest_nfl_lines_props.py:_american": "parses and VALIDATES an American price (float-or-None; refuses |price| < 100, None, ''); a parser/validator, not a conversion -- implied/american_to_dec convert after it",
+    "scripts/backtest_nba_lines_props.py:_american": "price VALIDATOR, not a converter: an American price in, the same price (float) or None out -- refuses None/''/text/non-finite/|price| < 100; `_implied` and `_american_to_dec` route through it and ARE registered",
     "scripts/backtest_nba_lines_props.py:_devig": "two-sided proportional devig; two PRICES in (refuses None/0 on either side), fair P(side a) out. Its scalar half, `_implied`, IS registered",
     "scripts/backtest_nfl_lines_props.py:devig":"normalizes two PROBABILITIES (p_side / (p_side + p_other)); two args, no price conversion at all",
 }
