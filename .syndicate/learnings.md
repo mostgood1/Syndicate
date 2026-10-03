@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1239 rules `[generated]`
+## Index — 1242 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5315,3 +5315,36 @@ own prior verdicts, not by anything failing.
 ## 2026-10-02 -- A task prompt's rule can contradict a standing user decision; check before building to it `[lane ncaaf-lines-props-backtest, session 7e94d2ff]`
 - The prompt said "a market earns a probability/edge only if it beats the baseline AND the book" and I delivered a gate list recommending withheld probabilities. The standing decision (memory `feedback_every_line_its_own_decision`; reaffirmed 2026-10-02 ~7:05 PM CT; `1ece602a`) forbids market-wide exclusions. A peer session caught it.
 - How to apply: before turning a prompt's decision RULE into a deliverable, grep memory/state/learnings for a decision on the same subject; when they conflict, say so up front and build the diagnosis (why it loses, what fixes it) rather than the exclusion.
+
+## 2026-10-03 — FORBIDDEN: reading a production-EQUIVALENCE check as proof the harness ran production's ENVIRONMENT. Both sides can share the same wrong input and agree perfectly `[lane nfl-lines-props-backtest, session 05b01a84]`
+
+- **What we believed:** the props harness was production. Its selfcheck fed one week's quotes through
+  `nfl_props_rows_for_week(use_artifact=False)` and matched every probability: **0 mismatches over
+  8,976 rows.**
+- **What was actually true:** the game-context multiplier was **exactly 1.0 on 100% of rows**, in both
+  the harness and the "production" call. The scratch data root had no `upcoming_recs_*.csv`, so
+  `default_nfl_source_root()` (the `#441` probe for an unrelated file) fell through to a non-existent
+  `source_artifacts/`, and `game_context()` read no schedule. On the fleet the multiplier is live
+  (non-1.0 on ~87% of rows). **An equivalence check proves the CODE matches; it is silent about any
+  input both sides read from the same place.**
+- **How we found out:** the report printed `ctx mean / share!=1` per market and every cell read
+  `1.0 / 0.0`, against non-zero coefficients in `_NFL_GAME_CONTEXT_PARAMS`. The summary column caught
+  it, not the check.
+- **The rule going forward:** next to any equivalence check, assert that every FED input is non-neutral
+  on the population (here: `game_context(season)` non-empty for each scored season; the harness now
+  refuses otherwise). A neutral default that both sides share cannot be found by comparing the sides.
+  Same family as `model_engine_standard.md` §4.2 (a neutral default makes an unfed field invisible).
+- **Cost:** one full props run discarded (~15 min).
+
+## 2026-10-03 — RULE: after `land`, read your lane's block for DETACHED lines, not only for duplicates. A rebase merge can re-home your additions under ANOTHER lane's header, and no header-level check sees it `[lane nfl-lines-props-backtest, session 05b01a84]`
+
+- **What happened:** I appended reading lines to my OPEN block across three lands. Meanwhile 5+ other
+  lanes were inserted at the end of `## OPEN`. After the merges, my header + Goal..Verification stayed
+  at line 1146, and my 19 reading lines (plus my `Blocked by`) sat at line 1217, under the CLOSED
+  `mlb-board-mean-only` block. My readings read as another lane's, and my block had no `Blocked by`.
+- **Why the existing checks missed it:** `check_lane_invariants` and `lane_identity_check` (the
+  2026-09-02 rule) count HEADERS. No header moved or duplicated; only body lines did.
+- **How to apply:** after every `land`, `grep -n` a distinctive string from your newest lane line and
+  confirm its nearest preceding `### ` header is YOURS. Keep lane-block additions few and short (the
+  narrative belongs in `log/<date>.md`), which also keeps the blast radius small.
+- **Cost:** fixed at checkpoint; no claim was mis-enforced (the lines carried no `Files:`).

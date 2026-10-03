@@ -5,6 +5,42 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [nfl-model-accuracy-backtest] NFL GAME LINES AND PROPS LOSE TO THE CLOSE IN EVERY MARKET; THE PROPS LOSS IS CALIBRATION (FIXABLE), THE MONEYLINE LOSS IS INFORMATION `[measured 2026-10-02/03, as-of, harness = production code, lane nfl-lines-props-backtest, NO DEPLOY]`
+
+- **Harness:** `scripts/backtest_nfl_lines_props.py`.
+  - It reproduces the fleet's `smartsim2_projections_2026_wk4.csv` EXACTLY (16/16 games, all fields).
+  - Its props selfcheck has 0/8,976 mismatches vs `nfl_props_rows_for_week(use_artifact=False)`.
+  - Detail: `findings_2026-10-02_nfl_lines_props_backtest.md`.
+- **Game lines, 2022-25 pooled (1,087 games), dBrier model − de-vigged close:**
+
+  | market | dBrier [CI] |
+  |---|---|
+  | ML | +0.0154 [+0.0093, +0.0206] |
+  | spread | +0.0114 [+0.0057, +0.0178] |
+  | total | +0.0192 [+0.0105, +0.0277] |
+
+  - The sim beats the as-of league baseline on margin MAE (9.99 vs 10.71) and on ML.
+  - Its spread/total cover probabilities are WORSE than the league-rate baseline. They are
+    overconfident at the line: Murphy reliability 0.035 vs the book's 0.007.
+  - ML is resolution-limited: corr(model margin, actual) 0.36 vs the close's 0.50.
+  - 2026 wks 1-3 (48 games, current code re-run): margin MAE 11.64 vs 10.41.
+- **Props, 2023-25 pooled (593 games, OddsAPI kickoff-10min):**
+  - 7/8 continuous markets are worse than the de-vigged book; interceptions is at parity.
+  - Anytime TD is worse even than the vig-inclusive yes price: +0.0088 [+0.0069, +0.0106].
+  - The loss is RELIABILITY, not resolution. On a 2025 holdout fitted on 2023-24:
+    - widening the spread ×2.5-3 closes 56-74% (receptions, receiving yards);
+    - a market-anchored mean closes 86-97% (rushing and passing volume).
+- **No market is gated or withheld** (user decision 2026-10-02, "every line is its own decision").
+  The findings rank model changes; per-line scoring decides.
+- **2026 data loss:** Render's disk was never exported after the 2026-09-30 suspension.
+  - 2026 wk1 and wk3 prop prices exist nowhere.
+  - The served 2026 wk1-3 game-line projections exist nowhere; the fleet copies are the 2026-08-01
+    preseason backfill.
+  - The only 2026 prop capture is the primary tree's untracked
+    `data/nfl_source/oddsapi_player_props_2026_wk1.csv`, which holds WEEK 2.
+- **Segments (1H/quarters):** 0 gradable games. Prices exist on the fleet only for 2026-10-02 commence,
+  and no consumer prices NFL segments.
+
 ## [ncaaf-sim-view-coverage] NCAAF GAME LINES CARRY A SIM VIEW ON EVERY MARKET; EDGES ARE BOUNDED BY THE 15-POINT CAP; STAKES STAY ON PRICE `[measured 2026-09-18 on the served board, web + refresh-worker `983c77e9`, lane ncaaf-board-sim-coverage]`
 
 - **Coverage, first build after the deploy (17:22:07Z):** FBS spreads with `projected` **186/186** (was 0 -- the margin had been blanked by design until the user reversed it: "they should be shown, period"); FBS game-line rows with a sim view **443/444**; games with any sim **56/74**, the 18 without all FCS opponents (SP+ is FBS-only -- no pregame model by construction).
