@@ -705,6 +705,11 @@ def build_soccer_player_features(
                 "season",
                 "appearances",
                 "starts",
+                # ESPN rows name their minutes `minutes_played` (Understat/ASA: `minutes`). Read ONLY by the
+                # H38 own-rate blend in `build_usage_profiles`, which is off unless
+                # SYNDICATE_SOCCER_PROP_OWN_RATE_BLEND is set (cross-lane write, user-approved 2026-10-03, lane
+                # soccer-shots-allocation-blend; claim held by soccer-corners-model-rebuild).
+                "minutes_played",
                 "is_goalkeeper",
                 "penalty_taker",
                 "set_piece_taker",

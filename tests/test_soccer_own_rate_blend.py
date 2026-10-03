@@ -96,5 +96,23 @@ class Arithmetic(unittest.TestCase):
         self.assertIsNone(profs[-1].own_shots_per_appearance)
 
 
+class EspnRowsReachTheBlend(unittest.TestCase):
+    """The loader's usage_metrics whitelist is the gate production rows pass through. ESPN rows carry
+    `minutes_played`, not `minutes`; without it the blend is inert for championship/eredivisie/primeira/belgian."""
+
+    def test_an_espn_row_through_the_real_loader_feeds_the_own_rate(self):
+        from syndicate.features.soccer.features.loaders import build_soccer_player_features
+
+        rows = [dict(r, team="Test FC") for r in _rows()]
+        feats = build_soccer_player_features(rows, league="championship", date="2026-10-03", fixture_teams=["Test FC"])
+        usage = [{"player_id": f.player_id, "player_name": f.player_name, "position": f.position, **dict(f.usage_metrics)} for f in feats]
+        self.assertTrue(all("minutes_played" in u for u in usage))
+        with mock.patch.dict("os.environ", {pp._OWN_RATE_BLEND_ENV: "1"}):
+            profs = pp.build_usage_profiles(usage, side="home", team="Test FC")
+        striker = next(p for p in profs if p.player_id == "s1")
+        self.assertIsNotNone(striker.own_shots_per_appearance)
+        self.assertIsNotNone(pp.project_player_props(_distribution(), striker).own_rate_blend)
+
+
 if __name__ == "__main__":
     unittest.main()
