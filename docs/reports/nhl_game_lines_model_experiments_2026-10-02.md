@@ -28,8 +28,9 @@ Diagnosis: `docs/reports/nhl_game_lines_backtest_2026-10-02.md`. Harnesses:
 
   Beating B0 means more accurate. Beating B4 means real *information* beyond team averages.
 - **Common random numbers** across variants, and a date-clustered bootstrap (2,000 reps) for every CI.
-- **No book leg.** The 2025-26 vs-book leg is still blocked on an active OddsAPI key; nothing here is a
-  vs-book claim.
+- **Book leg (added 2026-10-03).** OddsAPI historical closing snapshots ~3 minutes before each start (874
+  slots, 11 books typical, 26,220 credits, fleet key read with the user's direct approval). Per-book
+  proportional de-vig, consensus over books quoting both sides at the modal line.
 
 ## The ranked plan
 
@@ -43,8 +44,8 @@ Diagnosis: `docs/reports/nhl_game_lines_backtest_2026-10-02.md`. Harnesses:
 | **6** | **Playoff scoring is over-projected.** Settled total bias **+0.50 [+0.05, +0.91]** under every variant (n=82): regular-season rates in tighter playoff hockey. | An as-of playoff pace factor (prior playoff rounds; prior-season playoff/regular ratio for round 1). | Expected to remove a ~0.5-goal bias in playoff totals. Measurable next spring; n=82 now. | `projection.py` |
 | **7** | **Wrong starting goalie.** Production's `hockeysim_toi` projection named the actual starter in only **1,254/2,264 team-games (55.4%)**. | **Daily Faceoff confirmed starters** (`fetch_nhl_confirmed_goalies.py`): public per-date pages, robots `Allow`, with the post time per starter. Pregame-provable (posted < puck drop), Confirmed and as-of-verifiable: **1,624/1,625 correct (99.9%)**, 72% coverage. Blended with an as-of rotation rule (63.4% alone): **87.0%**. | **Goalie identity is now right.** Goalie *quality* by save% (2024-25 prior, shrink tuned pre-January) carries **no detectable signal**: ML Brier is unchanged for confirmed starters and for the oracle actual starter (V5c, V5o). Over 6.5 V5c vs B0 −0.0046 [−0.0092, −0.0002], borderline. The feed matters for the SAVES prop and for any better goalie metric (#8). | feed: `ingestion/collect.py` (**claimed by lane `nhl-player-props-projection`**, coordinate); the fetcher is this lane's |
 | **8** | **The moneyline has no information beyond team averages.** No tested change moves ML Brier: machinery, goalie, rest (B2B gf 0.960, n=144), oracle starter. ML ties B0 at every stage, −0.0031 [−0.0071, +0.0008] full window. This is the binding constraint. | Test in order: goalie **GSAx** (xG faced, from the production shot xG model) instead of save%; recency-weighted xG (last N); score- and venue-adjusted xG; travel and time zones. Then the vs-book reading (#9) to see how far the book sits from team averages. | Unknown until measured. Each needs its own walk-forward run against B4. | `projection.py` / new feature inputs |
-| **9** | **No vs-book reading for 2025-26.** The checkout's OddsAPI key is deactivated (401, 0 credits spent). | An active key as `ODDS_API_KEY` → `backtest_nhl_game_lines.py odds --execute --max-credits 30000` (~26k credits, user-approved), then the period/3-way probe. | Tells us where the model stands against the market, and whether the 0.35 anchoring helps or hurts per line. | — |
-| **10** | **No P1 or 3-way odds are captured.** Production fetches explicit `h2h,spreads,totals`. | Add the period and 3-way markets to the NHL fetch (per-event; cost to be estimated against the 5M/month cap first). | Lets P1 and 3-way lines be scored and decided per line. | `refresh_nhl_oddsapi.py` / `local_nhl_odds.py` |
+| **9** | **Where the model stands against the book: MEASURED (2026-10-03).** | — | Full window n=1,131 vs the close: ML raw +0.0005 [−0.0030, +0.0039], ML anchored −0.0004 [−0.0026, +0.0018], PL at the book line +0.0010 [−0.0032, +0.0050], OVER at the close +0.0029 [−0.0007, +0.0064] → **book parity on every market**. The plain team average is WORSE than the book on totals (+0.0050 [+0.0012, +0.0085]), so the model's totals carry real information the average lacks. Fixes #2–#5 plus confirmed starters move OVER from +0.0029 to +0.0019, within noise. OOS (n=680) reads the same. | — |
+| **10** | **No P1 or 3-way odds are captured.** Production fetches explicit `h2h,spreads,totals`. The historical probe (80 credits, 5 events) found `h2h_3_way` on 4/5 events (4–5 books each), while P1 markets appeared on opening night only. A 3-way backfill is ~14k credits: user decision owed. | Add the period and 3-way markets to the NHL fetch (per-event; cost to be estimated against the 5M/month cap first). | Lets P1 and 3-way lines be scored and decided per line. | `refresh_nhl_oddsapi.py` / `local_nhl_odds.py` |
 
 ### What ships together
 
@@ -56,14 +57,16 @@ first. #7's feed needs the props lane's collector.
 
 ### Not claimed
 
-- No market here is shown to beat the book. The vs-book leg is blocked (#9).
+- No market beats the book, and none loses to it: every model variant is at book parity (#9). The
+  binding work is #8, information beyond what the book already prices.
 - No change here moves the moneyline. The improvements are calibration (totals bias, tie rate, puck-line
   shape), not discrimination.
 - The Daily Faceoff archive names undressed goalies on some past dates, which looks like after-the-fact
   overwrites. 460 team-games were therefore treated as unverifiable. Live use reads the page pregame and is
   not exposed to that.
 
-## Raw tables
+## Raw tables (regenerated 2026-10-03 with the book leg)
+
 # NHL game-line model experiments (generated)
 
 goalie shrink k (tuned before 2026-01-01): (10000.0, 0.5); rest multipliers: {'gf': 0.9596973193680101, 'ga': 0.9967268773300196, 'n': 144}
@@ -150,6 +153,45 @@ OVER 6.5 (freq 0.479; B0 Brier 0.2543 meanP 0.415; B4 0.2510 meanP 0.453)
    V5c  Brier 0.2489 meanP 0.450 | vs B0 -0.0054 [-0.0115,+0.0003] NO DIFFERENCE  | vs B4 -0.0021 [-0.0079,+0.0031] NO DIFFERENCE
    V6   Brier 0.2495 meanP 0.443 | vs B0 -0.0048 [-0.0108,+0.0009] NO DIFFERENCE  | vs B4 -0.0015 [-0.0073,+0.0037] NO DIFFERENCE
    V5o  Brier 0.2490 meanP 0.451 | vs B0 -0.0053 [-0.0113,+0.0005] NO DIFFERENCE  | vs B4 -0.0020 [-0.0077,+0.0033] NO DIFFERENCE
+ML vs BOOK (n=680; book Brier 0.2430)
+   V0   dBrier vs book -0.0003 [-0.0053,+0.0044] dLL -0.0005 [-0.0112,+0.0093] NO DIFFERENCE
+   V1   dBrier vs book -0.0002 [-0.0053,+0.0046] dLL -0.0004 [-0.0112,+0.0095] NO DIFFERENCE
+   V2   dBrier vs book -0.0001 [-0.0054,+0.0047] dLL -0.0003 [-0.0111,+0.0098] NO DIFFERENCE
+   V3   dBrier vs book +0.0003 [-0.0051,+0.0055] dLL +0.0007 [-0.0107,+0.0115] NO DIFFERENCE
+   V4   dBrier vs book +0.0003 [-0.0051,+0.0055] dLL +0.0007 [-0.0107,+0.0115] NO DIFFERENCE
+   V5   dBrier vs book +0.0005 [-0.0049,+0.0056] dLL +0.0012 [-0.0103,+0.0118] NO DIFFERENCE
+   V5r  dBrier vs book +0.0005 [-0.0049,+0.0055] dLL +0.0011 [-0.0102,+0.0115] NO DIFFERENCE
+   V5c  dBrier vs book +0.0003 [-0.0050,+0.0054] dLL +0.0007 [-0.0104,+0.0112] NO DIFFERENCE
+   V6   dBrier vs book +0.0003 [-0.0047,+0.0049] dLL +0.0006 [-0.0099,+0.0103] NO DIFFERENCE
+   V5o  dBrier vs book +0.0003 [-0.0049,+0.0054] dLL +0.0007 [-0.0104,+0.0115] NO DIFFERENCE
+   B0   dBrier vs book +0.0005 [-0.0045,+0.0053] dLL +0.0016 [-0.0090,+0.0115] NO DIFFERENCE
+   B4   dBrier vs book +0.0007 [-0.0043,+0.0055] dLL +0.0018 [-0.0087,+0.0119] NO DIFFERENCE
+PL home @book line vs BOOK (n=680; book Brier 0.2229)
+   V0   dBrier vs book +0.0023 [-0.0033,+0.0078] dLL +0.0047 [-0.0078,+0.0165] NO DIFFERENCE
+   V1   dBrier vs book +0.0023 [-0.0033,+0.0078] dLL +0.0047 [-0.0078,+0.0165] NO DIFFERENCE
+   V2   dBrier vs book +0.0032 [-0.0030,+0.0093] dLL +0.0066 [-0.0070,+0.0198] NO DIFFERENCE
+   V3   dBrier vs book +0.0084 [-0.0005,+0.0173] dLL +0.0189 [-0.0013,+0.0391] NO DIFFERENCE
+   V4   dBrier vs book +0.0032 [-0.0028,+0.0090] dLL +0.0065 [-0.0067,+0.0192] NO DIFFERENCE
+   V5   dBrier vs book +0.0030 [-0.0030,+0.0088] dLL +0.0061 [-0.0069,+0.0190] NO DIFFERENCE
+   V5r  dBrier vs book +0.0033 [-0.0028,+0.0092] dLL +0.0068 [-0.0063,+0.0199] NO DIFFERENCE
+   V5c  dBrier vs book +0.0032 [-0.0029,+0.0091] dLL +0.0067 [-0.0065,+0.0196] NO DIFFERENCE
+   V6   dBrier vs book +0.0031 [-0.0026,+0.0089] dLL +0.0065 [-0.0061,+0.0190] NO DIFFERENCE
+   V5o  dBrier vs book +0.0032 [-0.0028,+0.0091] dLL +0.0066 [-0.0065,+0.0196] NO DIFFERENCE
+   B0   dBrier vs book +0.0019 [-0.0035,+0.0073] dLL +0.0043 [-0.0079,+0.0167] NO DIFFERENCE
+   B4   dBrier vs book +0.0020 [-0.0033,+0.0071] dLL +0.0044 [-0.0074,+0.0161] NO DIFFERENCE
+OVER @close vs BOOK (n=647; book Brier 0.2475)
+   V0   dBrier vs book +0.0025 [-0.0019,+0.0067] dLL +0.0051 [-0.0040,+0.0137] NO DIFFERENCE
+   V1   dBrier vs book +0.0031 [-0.0012,+0.0073] dLL +0.0062 [-0.0026,+0.0148] NO DIFFERENCE
+   V2   dBrier vs book +0.0037 [-0.0002,+0.0076] dLL +0.0075 [-0.0006,+0.0153] NO DIFFERENCE
+   V3   dBrier vs book +0.0033 [-0.0004,+0.0068] dLL +0.0066 [-0.0008,+0.0138] NO DIFFERENCE
+   V4   dBrier vs book +0.0028 [-0.0010,+0.0065] dLL +0.0057 [-0.0021,+0.0131] NO DIFFERENCE
+   V5   dBrier vs book +0.0029 [-0.0009,+0.0064] dLL +0.0057 [-0.0019,+0.0130] NO DIFFERENCE
+   V5r  dBrier vs book +0.0024 [-0.0015,+0.0060] dLL +0.0047 [-0.0031,+0.0121] NO DIFFERENCE
+   V5c  dBrier vs book +0.0025 [-0.0013,+0.0061] dLL +0.0051 [-0.0026,+0.0122] NO DIFFERENCE
+   V6   dBrier vs book +0.0029 [-0.0010,+0.0065] dLL +0.0057 [-0.0021,+0.0132] NO DIFFERENCE
+   V5o  dBrier vs book +0.0026 [-0.0011,+0.0061] dLL +0.0052 [-0.0022,+0.0122] NO DIFFERENCE
+   B0   dBrier vs book +0.0053 [+0.0012,+0.0092] dLL +0.0108 [+0.0023,+0.0186] MODEL WORSE
+   B4   dBrier vs book +0.0045 [+0.0011,+0.0077] dLL +0.0091 [+0.0021,+0.0156] MODEL WORSE
 TOTAL settled (MAE / bias)
    V0   MAE 1.847 bias +0.021 [-0.132,+0.184] | dMAE vs B4 -0.0099 [-0.0435,+0.0236]
    V1   MAE 1.855 bias +0.180 [+0.027,+0.344] | dMAE vs B4 -0.0021 [-0.0386,+0.0342]
@@ -245,6 +287,45 @@ OVER 6.5 (freq 0.463; B0 Brier 0.2521 meanP 0.412; B4 0.2500 meanP 0.444)
    V5c  Brier 0.2475 meanP 0.444 | vs B0 -0.0046 [-0.0092,-0.0002] MODEL BETTER   | vs B4 -0.0026 [-0.0068,+0.0019] NO DIFFERENCE
    V6   Brier 0.2477 meanP 0.437 | vs B0 -0.0044 [-0.0088,+0.0000] NO DIFFERENCE  | vs B4 -0.0024 [-0.0066,+0.0022] NO DIFFERENCE
    V5o  Brier 0.2475 meanP 0.445 | vs B0 -0.0045 [-0.0091,-0.0001] MODEL BETTER   | vs B4 -0.0025 [-0.0067,+0.0018] NO DIFFERENCE
+ML vs BOOK (n=1131; book Brier 0.2442)
+   V0   dBrier vs book +0.0005 [-0.0030,+0.0039] dLL +0.0012 [-0.0061,+0.0083] NO DIFFERENCE
+   V1   dBrier vs book +0.0006 [-0.0029,+0.0040] dLL +0.0014 [-0.0060,+0.0086] NO DIFFERENCE
+   V2   dBrier vs book +0.0006 [-0.0030,+0.0041] dLL +0.0013 [-0.0063,+0.0085] NO DIFFERENCE
+   V3   dBrier vs book +0.0008 [-0.0029,+0.0044] dLL +0.0018 [-0.0060,+0.0092] NO DIFFERENCE
+   V4   dBrier vs book +0.0008 [-0.0029,+0.0044] dLL +0.0018 [-0.0060,+0.0092] NO DIFFERENCE
+   V5   dBrier vs book +0.0009 [-0.0028,+0.0044] dLL +0.0020 [-0.0059,+0.0094] NO DIFFERENCE
+   V5r  dBrier vs book +0.0008 [-0.0028,+0.0044] dLL +0.0019 [-0.0058,+0.0093] NO DIFFERENCE
+   V5c  dBrier vs book +0.0008 [-0.0028,+0.0044] dLL +0.0019 [-0.0058,+0.0093] NO DIFFERENCE
+   V6   dBrier vs book +0.0005 [-0.0028,+0.0038] dLL +0.0012 [-0.0059,+0.0081] NO DIFFERENCE
+   V5o  dBrier vs book +0.0007 [-0.0030,+0.0042] dLL +0.0016 [-0.0061,+0.0090] NO DIFFERENCE
+   B0   dBrier vs book +0.0040 [-0.0003,+0.0082] dLL +0.0084 [-0.0004,+0.0169] NO DIFFERENCE
+   B4   dBrier vs book +0.0035 [-0.0006,+0.0077] dLL +0.0074 [-0.0011,+0.0159] NO DIFFERENCE
+PL home @book line vs BOOK (n=1131; book Brier 0.2168)
+   V0   dBrier vs book +0.0010 [-0.0032,+0.0050] dLL +0.0017 [-0.0074,+0.0107] NO DIFFERENCE
+   V1   dBrier vs book +0.0010 [-0.0032,+0.0050] dLL +0.0017 [-0.0074,+0.0107] NO DIFFERENCE
+   V2   dBrier vs book +0.0014 [-0.0032,+0.0058] dLL +0.0026 [-0.0075,+0.0124] NO DIFFERENCE
+   V3   dBrier vs book +0.0048 [-0.0018,+0.0112] dLL +0.0108 [-0.0042,+0.0260] NO DIFFERENCE
+   V4   dBrier vs book +0.0014 [-0.0032,+0.0059] dLL +0.0027 [-0.0075,+0.0129] NO DIFFERENCE
+   V5   dBrier vs book +0.0013 [-0.0032,+0.0059] dLL +0.0025 [-0.0075,+0.0126] NO DIFFERENCE
+   V5r  dBrier vs book +0.0015 [-0.0030,+0.0061] dLL +0.0030 [-0.0071,+0.0131] NO DIFFERENCE
+   V5c  dBrier vs book +0.0014 [-0.0031,+0.0060] dLL +0.0028 [-0.0072,+0.0130] NO DIFFERENCE
+   V6   dBrier vs book +0.0011 [-0.0033,+0.0055] dLL +0.0020 [-0.0076,+0.0119] NO DIFFERENCE
+   V5o  dBrier vs book +0.0014 [-0.0031,+0.0058] dLL +0.0026 [-0.0074,+0.0125] NO DIFFERENCE
+   B0   dBrier vs book +0.0017 [-0.0028,+0.0061] dLL +0.0046 [-0.0057,+0.0148] NO DIFFERENCE
+   B4   dBrier vs book +0.0016 [-0.0030,+0.0061] dLL +0.0042 [-0.0065,+0.0147] NO DIFFERENCE
+OVER @close vs BOOK (n=1083; book Brier 0.2481)
+   V0   dBrier vs book +0.0029 [-0.0007,+0.0064] dLL +0.0059 [-0.0014,+0.0132] NO DIFFERENCE
+   V1   dBrier vs book +0.0039 [+0.0000,+0.0078] dLL +0.0081 [+0.0001,+0.0160] MODEL WORSE
+   V2   dBrier vs book +0.0027 [-0.0006,+0.0060] dLL +0.0055 [-0.0014,+0.0121] NO DIFFERENCE
+   V3   dBrier vs book +0.0024 [-0.0008,+0.0055] dLL +0.0049 [-0.0017,+0.0111] NO DIFFERENCE
+   V4   dBrier vs book +0.0022 [-0.0010,+0.0051] dLL +0.0044 [-0.0021,+0.0103] NO DIFFERENCE
+   V5   dBrier vs book +0.0022 [-0.0010,+0.0051] dLL +0.0044 [-0.0020,+0.0103] NO DIFFERENCE
+   V5r  dBrier vs book +0.0019 [-0.0013,+0.0048] dLL +0.0037 [-0.0026,+0.0096] NO DIFFERENCE
+   V5c  dBrier vs book +0.0019 [-0.0013,+0.0048] dLL +0.0038 [-0.0026,+0.0096] NO DIFFERENCE
+   V6   dBrier vs book +0.0018 [-0.0014,+0.0047] dLL +0.0035 [-0.0028,+0.0095] NO DIFFERENCE
+   V5o  dBrier vs book +0.0018 [-0.0013,+0.0047] dLL +0.0037 [-0.0026,+0.0095] NO DIFFERENCE
+   B0   dBrier vs book +0.0050 [+0.0012,+0.0085] dLL +0.0102 [+0.0024,+0.0174] MODEL WORSE
+   B4   dBrier vs book +0.0048 [+0.0014,+0.0079] dLL +0.0096 [+0.0028,+0.0159] MODEL WORSE
 TOTAL settled (MAE / bias)
    V0   MAE 1.837 bias +0.112 [-0.028,+0.248] | dMAE vs B4 -0.0063 [-0.0325,+0.0210]
    V1   MAE 1.850 bias +0.272 [+0.131,+0.407] | dMAE vs B4 +0.0065 [-0.0236,+0.0366]
@@ -340,6 +421,45 @@ OVER 6.5 (freq 0.366; B0 Brier 0.2306 meanP 0.447; B4 0.2386 meanP 0.484)
    V5c  Brier 0.2394 meanP 0.478 | vs B0 +0.0088 [-0.0013,+0.0185] NO VERDICT (n=82 < 100) | vs B4 +0.0008 [-0.0069,+0.0091] NO VERDICT (n=82 < 100)
    V6   Brier 0.2394 meanP 0.478 | vs B0 +0.0088 [-0.0013,+0.0185] NO VERDICT (n=82 < 100) | vs B4 +0.0008 [-0.0069,+0.0091] NO VERDICT (n=82 < 100)
    V5o  Brier 0.2395 meanP 0.478 | vs B0 +0.0089 [-0.0012,+0.0186] NO VERDICT (n=82 < 100) | vs B4 +0.0009 [-0.0068,+0.0092] NO VERDICT (n=82 < 100)
+ML vs BOOK (n=82; book Brier 0.2367)
+   V0   dBrier vs book +0.0011 [-0.0079,+0.0100] dLL +0.0030 [-0.0154,+0.0214] NO VERDICT (n=82 < 100)
+   V1   dBrier vs book +0.0010 [-0.0079,+0.0100] dLL +0.0030 [-0.0155,+0.0215] NO VERDICT (n=82 < 100)
+   V2   dBrier vs book +0.0009 [-0.0082,+0.0101] dLL +0.0028 [-0.0158,+0.0216] NO VERDICT (n=82 < 100)
+   V3   dBrier vs book +0.0019 [-0.0071,+0.0113] dLL +0.0048 [-0.0141,+0.0240] NO VERDICT (n=82 < 100)
+   V4   dBrier vs book +0.0019 [-0.0071,+0.0113] dLL +0.0048 [-0.0141,+0.0240] NO VERDICT (n=82 < 100)
+   V5   dBrier vs book +0.0029 [-0.0065,+0.0126] dLL +0.0068 [-0.0127,+0.0267] NO VERDICT (n=82 < 100)
+   V5r  dBrier vs book +0.0034 [-0.0061,+0.0134] dLL +0.0079 [-0.0115,+0.0284] NO VERDICT (n=82 < 100)
+   V5c  dBrier vs book +0.0028 [-0.0067,+0.0129] dLL +0.0067 [-0.0130,+0.0274] NO VERDICT (n=82 < 100)
+   V6   dBrier vs book +0.0028 [-0.0067,+0.0129] dLL +0.0067 [-0.0130,+0.0274] NO VERDICT (n=82 < 100)
+   V5o  dBrier vs book +0.0029 [-0.0066,+0.0130] dLL +0.0068 [-0.0128,+0.0276] NO VERDICT (n=82 < 100)
+   B0   dBrier vs book +0.0055 [-0.0044,+0.0159] dLL +0.0115 [-0.0087,+0.0328] NO VERDICT (n=82 < 100)
+   B4   dBrier vs book +0.0051 [-0.0047,+0.0155] dLL +0.0108 [-0.0092,+0.0322] NO VERDICT (n=82 < 100)
+PL home @book line vs BOOK (n=82; book Brier 0.2182)
+   V0   dBrier vs book -0.0076 [-0.0173,+0.0023] dLL -0.0170 [-0.0377,+0.0045] NO VERDICT (n=82 < 100)
+   V1   dBrier vs book -0.0076 [-0.0173,+0.0023] dLL -0.0170 [-0.0377,+0.0045] NO VERDICT (n=82 < 100)
+   V2   dBrier vs book -0.0079 [-0.0187,+0.0034] dLL -0.0175 [-0.0411,+0.0072] NO VERDICT (n=82 < 100)
+   V3   dBrier vs book -0.0067 [-0.0228,+0.0101] dLL -0.0148 [-0.0501,+0.0234] NO VERDICT (n=82 < 100)
+   V4   dBrier vs book -0.0076 [-0.0173,+0.0026] dLL -0.0169 [-0.0382,+0.0050] NO VERDICT (n=82 < 100)
+   V5   dBrier vs book -0.0071 [-0.0175,+0.0038] dLL -0.0155 [-0.0378,+0.0080] NO VERDICT (n=82 < 100)
+   V5r  dBrier vs book -0.0062 [-0.0166,+0.0047] dLL -0.0135 [-0.0360,+0.0100] NO VERDICT (n=82 < 100)
+   V5c  dBrier vs book -0.0063 [-0.0166,+0.0046] dLL -0.0139 [-0.0361,+0.0097] NO VERDICT (n=82 < 100)
+   V6   dBrier vs book -0.0063 [-0.0166,+0.0046] dLL -0.0139 [-0.0361,+0.0097] NO VERDICT (n=82 < 100)
+   V5o  dBrier vs book -0.0064 [-0.0168,+0.0045] dLL -0.0141 [-0.0364,+0.0095] NO VERDICT (n=82 < 100)
+   B0   dBrier vs book -0.0061 [-0.0158,+0.0046] dLL -0.0135 [-0.0350,+0.0103] NO VERDICT (n=82 < 100)
+   B4   dBrier vs book -0.0057 [-0.0145,+0.0039] dLL -0.0125 [-0.0318,+0.0089] NO VERDICT (n=82 < 100)
+OVER @close vs BOOK (n=72; book Brier 0.2467)
+   V0   dBrier vs book +0.0261 [+0.0034,+0.0510] dLL +0.0553 [+0.0080,+0.1085] NO VERDICT (n=72 < 100)
+   V1   dBrier vs book +0.0285 [+0.0028,+0.0543] dLL +0.0611 [+0.0072,+0.1170] NO VERDICT (n=72 < 100)
+   V2   dBrier vs book +0.0169 [+0.0016,+0.0339] dLL +0.0354 [+0.0033,+0.0711] NO VERDICT (n=72 < 100)
+   V3   dBrier vs book +0.0170 [+0.0014,+0.0339] dLL +0.0358 [+0.0032,+0.0715] NO VERDICT (n=72 < 100)
+   V4   dBrier vs book +0.0207 [+0.0026,+0.0410] dLL +0.0437 [+0.0052,+0.0862] NO VERDICT (n=72 < 100)
+   V5   dBrier vs book +0.0213 [+0.0038,+0.0408] dLL +0.0447 [+0.0083,+0.0861] NO VERDICT (n=72 < 100)
+   V5r  dBrier vs book +0.0199 [+0.0028,+0.0384] dLL +0.0415 [+0.0060,+0.0811] NO VERDICT (n=72 < 100)
+   V5c  dBrier vs book +0.0199 [+0.0030,+0.0384] dLL +0.0416 [+0.0062,+0.0808] NO VERDICT (n=72 < 100)
+   V6   dBrier vs book +0.0199 [+0.0030,+0.0384] dLL +0.0416 [+0.0062,+0.0808] NO VERDICT (n=72 < 100)
+   V5o  dBrier vs book +0.0199 [+0.0030,+0.0384] dLL +0.0416 [+0.0062,+0.0810] NO VERDICT (n=72 < 100)
+   B0   dBrier vs book +0.0187 [+0.0037,+0.0354] dLL +0.0385 [+0.0077,+0.0724] NO VERDICT (n=72 < 100)
+   B4   dBrier vs book +0.0213 [+0.0039,+0.0389] dLL +0.0440 [+0.0081,+0.0804] NO VERDICT (n=72 < 100)
 TOTAL settled (MAE / bias)
    V0   MAE 1.748 bias +0.649 [+0.204,+1.068] | dMAE vs B4 +0.0123 [-0.0472,+0.0716]
    V1   MAE 1.799 bias +0.806 [+0.362,+1.225] | dMAE vs B4 +0.0634 [-0.0175,+0.1399]

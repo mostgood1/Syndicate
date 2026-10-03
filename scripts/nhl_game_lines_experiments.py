@@ -65,6 +65,7 @@ BGL = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(BGL)  # type: ignore[union-attr]
 
 EVAL_START = "2026-01-01"
+BOOK: Dict[str, Dict] = {}  # gid -> closing consensus from backtest_nhl_game_lines (book.json)
 REG_FULLGAME_BASE = 6.2538  # projection.py's calibration total (full game incl. OT + SO credit)
 
 
@@ -124,7 +125,8 @@ def draws(hp, ap, seed):
     return h, a
 
 
-def probs(h, a, *, q_ot=0.5, delta=0.0, e=0.0, seed=0, lines=(5.5, 6.5), full_settlement=True) -> Dict[str, float]:
+def probs(h, a, *, q_ot=0.5, delta=0.0, e=0.0, seed=0, lines=(5.5, 6.5), full_settlement=True,
+          close: Optional[float] = None) -> Dict[str, float]:
     """Market probabilities from regulation samples with the V1..V4 machinery applied."""
     hg, ag = h.sum(axis=1).astype(np.int64), a.sum(axis=1).astype(np.int64)
     if e > 0:
@@ -150,6 +152,9 @@ def probs(h, a, *, q_ot=0.5, delta=0.0, e=0.0, seed=0, lines=(5.5, 6.5), full_se
     out["margin"] = float((w * d).sum() / W) + (q_ot - 0.5) * p_tie * (2 if full_settlement else 0)
     for L in lines:
         out[f"over_{L}"] = m(settle > L)
+    if close is not None:
+        push = m(settle == close)
+        out["over_close"] = m(settle > close) / max(1e-9, 1 - push)  # push-free, like the de-vigged book
     return out
 
 
@@ -392,6 +397,8 @@ def main() -> int:
     src = Path(a.src) if a.src else BGL._main_worktree() / "data" / "nhl_source"
     act = json.loads((out / "actuals.json").read_text(encoding="utf-8"))
     sim = json.loads((out / "sim" / "games.json").read_text(encoding="utf-8"))
+    BOOK.update(json.loads((out / "book.json").read_text(encoding="utf-8")) if (out / "book.json").exists() else {})
+    print(f"book closes loaded: {len(BOOK)} games")
     from syndicate.features.nhl.sim_engine.hockeysim.adapters import game_seed
 
     games = [g for d in sim["dates"] for g in d["games"] if g["gid"] in act]
@@ -445,24 +452,25 @@ def main() -> int:
             seed = game_seed(g["date"], g["gid"])
             fm, fb = fit_m.at(g["date"], r["arm"]), fit_b.at(g["date"], r["arm"])
             hp, apl = list(g["hp"]), list(g["ap"])
-            rec = {"gid": g["gid"], "date": g["date"], "arm": r["arm"], "act": r}
+            rec = {"gid": g["gid"], "date": g["date"], "arm": r["arm"], "act": r, "book": BOOK.get(g["gid"], {})}
+            cl = rec["book"].get("total_line")
             s = fm["s"]
             if g["gid"] not in mach_cache:
                 m_ = {}
                 h0, a0 = draws(hp, apl, seed)
-                m_["V0"] = probs(h0, a0, full_settlement=False)
-                m_["V1"] = probs(h0, a0, q_ot=fm["q_ot"])
+                m_["V0"] = probs(h0, a0, full_settlement=False, close=cl)
+                m_["V1"] = probs(h0, a0, q_ot=fm["q_ot"], close=cl)
                 hs, as_ = draws([x * s for x in hp], [x * s for x in apl], seed)
-                m_["V2"] = probs(hs, as_, q_ot=fm["q_ot"])
-                m_["V3"] = probs(hs, as_, q_ot=fm["q_ot"], delta=fm["delta"])
-                m_["V4"] = probs(hs, as_, q_ot=fm["q_ot"], delta=fm["delta"], e=fm["e"], seed=seed)
+                m_["V2"] = probs(hs, as_, q_ot=fm["q_ot"], close=cl)
+                m_["V3"] = probs(hs, as_, q_ot=fm["q_ot"], delta=fm["delta"], close=cl)
+                m_["V4"] = probs(hs, as_, q_ot=fm["q_ot"], delta=fm["delta"], e=fm["e"], seed=seed, close=cl)
                 # baselines
                 bh, ba, p1s = base_lams[g["gid"]]
                 hb, abb = draws(BGL._periods(bh, p1s), BGL._periods(ba, p1s), seed)
-                m_["B0"] = probs(hb, abb, full_settlement=False)
+                m_["B0"] = probs(hb, abb, full_settlement=False, close=cl)
                 sb = fb["s"]
                 hb2, ab2 = draws(BGL._periods(bh * sb, p1s), BGL._periods(ba * sb, p1s), seed)
-                m_["B4"] = probs(hb2, ab2, q_ot=fb["q_ot"], delta=fb["delta"], e=fb["e"], seed=seed)
+                m_["B4"] = probs(hb2, ab2, q_ot=fb["q_ot"], delta=fb["delta"], e=fb["e"], seed=seed, close=cl)
                 mach_cache[g["gid"]] = m_
             rec.update(mach_cache[g["gid"]])
             # information layers
@@ -497,7 +505,7 @@ def main() -> int:
                     hp5 = [x * (rest["gf"] if bh2b else 1) * (rest["ga"] if ab2b else 1) for x in hp5]
                     ap5 = [x * (rest["gf"] if ab2b else 1) * (rest["ga"] if bh2b else 1) for x in ap5]
                 h5, a5 = draws(hp5, ap5, seed)
-                rec["VX"] = probs(h5, a5, q_ot=fm["q_ot"], delta=fm["delta"], e=fm["e"], seed=seed)
+                rec["VX"] = probs(h5, a5, q_ot=fm["q_ot"], delta=fm["delta"], e=fm["e"], seed=seed, close=cl)
             rows.append(rec)
         return rows, miss
 
@@ -612,6 +620,39 @@ def score(R: List[Dict], min_n: int) -> Dict:
             lines.append(f"   {v:<4} Brier {e['brier']:.4f} meanP {e['mean_p']:.3f} | vs B0 {e['d_B0'][0]:+.4f} "
                          f"[{e['d_B0'][1]:+.4f},{e['d_B0'][2]:+.4f}] {e['verdict_B0']:<14} | vs B4 {e['d_B4'][0]:+.4f} "
                          f"[{e['d_B4'][1]:+.4f},{e['d_B4'][2]:+.4f}] {e['verdict_B4']}")
+    def pl_at_book(x, v):
+        ln = x["book"].get("pl_line_home")
+        if ln is None:
+            return None
+        return x[v]["p_home_m15"] if ln < 0 else 1.0 - x[v]["p_away_m15"]
+
+    book_mk = {
+        "ML vs BOOK": (lambda x: x["book"].get("ml_home"), lambda x, v: x[v]["p_home_ml"],
+                       lambda x: 1 if x["act"]["final_h"] > x["act"]["final_a"] else 0),
+        "PL home @book line vs BOOK": (lambda x: x["book"].get("p_home_pl"), pl_at_book,
+                                       lambda x: None if x["book"].get("pl_line_home") is None else
+                                       (1 if (x["act"]["final_h"] - x["act"]["final_a"]) > -x["book"]["pl_line_home"] else 0)),
+        "OVER @close vs BOOK": (lambda x: x["book"].get("p_over"), lambda x, v: x[v].get("over_close"),
+                                lambda x: None if x["book"].get("total_line") is None or (
+                                    float(x["book"]["total_line"]).is_integer() and
+                                    x["act"]["final_h"] + x["act"]["final_a"] == x["book"]["total_line"])
+                                else int(x["act"]["final_h"] + x["act"]["final_a"] > x["book"]["total_line"])),
+    }
+    for mk, (pb, pm, yf) in book_mk.items():
+        S = [x for x in R if pb(x) is not None and yf(x) is not None and pm(x, "V0") is not None]
+        if not S:
+            continue
+        bb = statistics.fmean(BGL._brier(pb(x), yf(x)) for x in S)
+        lines.append(f"{mk} (n={len(S)}; book Brier {bb:.4f})")
+        for v in VARIANTS + ["B0", "B4"]:
+            if v not in S[0]:
+                continue
+            d = BGL._boot_diff([(x["date"], BGL._brier(pm(x, v), yf(x)) - BGL._brier(pb(x), yf(x))) for x in S])
+            dl = BGL._boot_diff([(x["date"], BGL._ll(pm(x, v), yf(x)) - BGL._ll(pb(x), yf(x))) for x in S])
+            vd = BGL._verdict(*d, len(S), 100)
+            res["markets"].setdefault(mk, {})[v] = {"n": len(S), "d_brier": d, "d_ll": dl, "verdict": vd}
+            lines.append(f"   {v:<4} dBrier vs book {d[0]:+.4f} [{d[1]:+.4f},{d[2]:+.4f}] dLL {dl[0]:+.4f} [{dl[1]:+.4f},{dl[2]:+.4f}] {vd}")
+
     # totals point accuracy (settled full game)
     tot = lambda x: x["act"]["final_h"] + x["act"]["final_a"]
     lines.append("TOTAL settled (MAE / bias)")
