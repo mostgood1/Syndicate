@@ -519,51 +519,14 @@ def load_ppa_ratings_with_fallback(season: int) -> tuple[dict[str, dict], str]:
 # the market (SD ~14.5).
 SP_RATING_SCALE = 10.0
 
-# HOW MUCH OF THE TWO TEAMS' COMMON LEVEL THE TOTAL KEEPS -- NCAAF's version of
-# NFL's `NFL_TOTAL_LEVEL_SHRINK` (`[nfl-total-level-gain]`). The margin reads the
-# DIFFERENCE between the two teams' ratings and the total reads their LEVEL;
-# one gain (`SP_RATING_SCALE`, calibrated on margins) served both.
-#
-# THE DEFECT, measured as-of over 626 of 2025's 644 graded FBS games
-# (`scripts/backtest_ncaaf_lines_props.py`, arm L25): total MAE 14.32 vs the
-# CFBD close 12.15 (+2.16 [+1.49, +2.82]) and WORSE than naive team scoring
-# averages (+1.93); model total SD 12.83 against the close's 6.30, and
-# actual-on-model slope 0.30 -- correlated, over-amplified: a gain defect.
-#
-# The value is set from the lambda fit in `findings_2026-10-02_ncaaf_lines_props_backtest.md`
-# (re-simulated through this engine on 2025, validated on 2026 wk3-4).
-# `SYNDICATE_NCAAF_TOTAL_LEVEL_SHRINK` overrides; ABSENT means this value; `1`
-# is the kill switch and reproduces the unshrunk output exactly.
-NCAAF_TOTAL_LEVEL_SHRINK = 1.0
-
-
-def _total_level_shrink() -> float:
-    """`SYNDICATE_NCAAF_TOTAL_LEVEL_SHRINK` overrides; absent means
-    `NCAAF_TOTAL_LEVEL_SHRINK`; unparseable falls back to it, never to off."""
-    raw = str(os.environ.get("SYNDICATE_NCAAF_TOTAL_LEVEL_SHRINK") or "").strip()
-    try:
-        value = float(raw) if raw else NCAAF_TOTAL_LEVEL_SHRINK
-    except ValueError:
-        value = NCAAF_TOTAL_LEVEL_SHRINK
-    return max(0.0, value)
-
-
-def shrink_rating_level(
-    home_off: float, home_def: float, away_off: float, away_def: float, shrink: float,
-) -> tuple[float, float, float, float]:
-    """Scale the two teams' COMMON level by `shrink`, leaving every DIFFERENCE
-    between them exactly intact (the same arithmetic as NFL's). Ratings are
-    centred on the league, so shrinking toward 0 shrinks toward the
-    league-average total. Exact in the ratings, statistical in the output: the
-    sim is non-linear, so `margin_mean` moves within seed noise."""
-    if shrink == 1.0:
-        return home_off, home_def, away_off, away_def
-    out = []
-    for home, away in ((home_off, away_off), (home_def, away_def)):
-        level, half = (home + away) / 2.0, (home - away) / 2.0
-        out.append((shrink * level + half, shrink * level - half))
-    (new_home_off, new_away_off), (new_home_def, new_away_def) = out
-    return new_home_off, new_home_def, new_away_off, new_away_def
+# THE TOTAL-LEVEL SHRINK lives in ONE place, `syndicate/features/ncaaf/total_level.py`,
+# because the live re-sim applies the same lambda and two copies of a constant
+# drift. The names are re-exported here for this module's callers and tests.
+from syndicate.features.ncaaf.total_level import (  # noqa: E402
+    NCAAF_TOTAL_LEVEL_SHRINK,
+    shrink_rating_level,
+    total_level_shrink as _total_level_shrink,
+)
 
 # Set from --refresh-sp-cache. Module-level because `load_sp_ratings` is called
 # from other scripts (the re-fit harnesses import it directly) that have no

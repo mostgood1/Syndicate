@@ -618,6 +618,7 @@ def resim_live_game(
     away_defense: float,
     sims: int | None = None,
     profile: Any = NCAAF_CALIBRATION_PROFILE,
+    level_shrink: float | None = None,
 ) -> dict[str, Any] | NcaafResimRefusal:
     """Rest-of-game Monte Carlo from `state`. Returns the lens lane's payload.
 
@@ -638,6 +639,20 @@ def resim_live_game(
     n = int(sims or default_sims())
     if n <= 0:
         return NcaafResimRefusal("no_sims_requested", f"sims={n}")
+
+    # THE PREGAME TOTAL-LEVEL SHRINK, from the one module both paths read
+    # (`ncaaf/total_level.py`). Applied HERE, inside the shipped function, so the
+    # cutoff-replay grade (`scripts/backtest_ncaaf_live_totals.py`) measures what
+    # production runs. None = the live lambda (= the pregame one unless
+    # `SYNDICATE_NCAAF_LIVE_TOTAL_LEVEL_SHRINK` says otherwise); the caller passes
+    # 1.0 for a market-implied FCS rating. Live totals were graded calibrated
+    # WITHOUT this (2026-09-27); see that module before shipping a lambda < 1.
+    from syndicate.features.ncaaf.total_level import live_total_level_shrink, shrink_rating_level
+
+    shrink = live_total_level_shrink() if level_shrink is None else max(0.0, float(level_shrink))
+    home_offense, home_defense, away_offense, away_defense = shrink_rating_level(
+        float(home_offense), float(home_defense), float(away_offense), float(away_defense), shrink
+    )
 
     base = dict(
         home_team=state.home_team or "HOME",
@@ -725,6 +740,7 @@ def resim_live_game(
         "total_mean_uncalibrated": round(sum(totals) / ran, 3),
         "possession_unknown": possession_unknown,
         "ties": ties,
+        "level_shrink": shrink,
         # Same shape as the pregame sidecar's `margin_dist` / `total_points_dist`
         # (home-positive margin), so a reader that already understands one
         # understands the other.
@@ -945,6 +961,9 @@ def build_live_lens_snapshot(
                     away_offense=away_off,
                     away_defense=away_def,
                     sims=sims,
+                    # A MARKET-IMPLIED side is solved so the engine reproduces the
+                    # market's own total; shrinking its level would undo that.
+                    level_shrink=1.0 if isinstance(names.get("provenance"), Mapping) else None,
                 )
         lanes = build_game_lens(
             state, result, live_state_as_of=state.as_of if state is not None else generated_at
@@ -958,6 +977,11 @@ def build_live_lens_snapshot(
             for lane in lanes:
                 lane["ratingSource"] = provenance.get("source")
                 lane["marketImplied"] = {k: v for k, v in provenance.items() if k != "source"}
+        # The lambda this lane was simulated at, ONLY when it is not the unshrunk
+        # engine -- so with the shrink off the payload is byte-identical.
+        if isinstance(result, Mapping) and float(result.get("level_shrink", 1.0)) != 1.0:
+            for lane in lanes:
+                lane["levelShrink"] = result["level_shrink"]
         out_games.append({
             "away_name": names["away_team"],
             "home_name": names["home_team"],
