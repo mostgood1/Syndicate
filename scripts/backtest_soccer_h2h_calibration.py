@@ -315,6 +315,7 @@ def backtest_league(
     league: str, *, simulations: int, min_prior_matches: int, limit: int | None,
     wire_market_confidence: bool = False, since: str | None = None, fd_close_dir: Path | None = None,
     fotmob_xg_path: Path | None = None,
+    dump_handle: Any = None, done_keys: set | None = None,
 ) -> dict[str, Any]:
     history = _load_history(league)
     if not history:
@@ -397,6 +398,7 @@ def backtest_league(
     scored = 0
     skipped_thin_ratings = 0
 
+    resumed_days = 0
     for day in sorted(by_day):
         if limit is not None and scored >= limit:
             break
@@ -426,6 +428,13 @@ def backtest_league(
                 continue
             eligible.append(row)
         if not eligible:
+            continue
+        # RESUME (`--append-dump`): a day whose every eligible fixture is already in the dump is not re-simulated.
+        # A partly-dumped day IS re-simulated; its already-dumped rows are not written twice (key check below).
+        if done_keys is not None and all(
+            (league, day, str(r.get("home_team")), str(r.get("away_team"))) in done_keys for r in eligible
+        ):
+            resumed_days += 1
             continue
 
         def _fixture(row: dict[str, Any]) -> dict[str, Any]:
@@ -509,8 +518,7 @@ def backtest_league(
                 "close_away": None if close_1x2 is None else round(close_1x2["away"], 6),
                 "asof_league_total_mean": (sum(prior_totals) / len(prior_totals)) if len(prior_totals) >= 50 else None,
             }
-            per_match.append(
-                {
+            _row = {
                     **extra,
                     "league": league,
                     "date": day,
@@ -524,11 +532,21 @@ def backtest_league(
                     "market_away": round(market["away"], 6),
                     "actual": actual,
                 }
-            )
+            per_match.append(_row)
+            # APPEND MODE: written and flushed the moment it is scored, so a stopped run loses at most the match
+            # in flight. Lane soccer-1x2-ratings-xg-source (H37), 2026-10-03.
+            if dump_handle is not None:
+                _k = (league, day, str(row.get("home_team")), str(row.get("away_team")))
+                if done_keys is None or _k not in done_keys:
+                    dump_handle.write(json.dumps(_row) + "\n")
+                    dump_handle.flush()
+                    if done_keys is not None:
+                        done_keys.add(_k)
             scored += 1
 
     if not scored:
-        return {"league": league, "coverage": coverage, "error": "no scoreable matches", "skipped_thin_ratings": skipped_thin_ratings}
+        return {"league": league, "coverage": coverage, "error": "no scoreable matches" if not resumed_days else None,
+                "skipped_thin_ratings": skipped_thin_ratings, "resumed_days": resumed_days, "matches_scored": 0}
 
     def _mean(values: list[float]) -> float:
         return round(sum(values) / len(values), 4)
@@ -541,6 +559,7 @@ def backtest_league(
         "league": league,
         "coverage": coverage,
         "matches_scored": scored,
+        "resumed_days": resumed_days,
         "skipped_thin_ratings": skipped_thin_ratings,
         "simulations_per_match": simulations,
         "model_brier": _mean(model_brier),
@@ -579,6 +598,9 @@ def main() -> int:
     parser.add_argument("--fotmob-xg", type=Path, default=None,
                         help="H37 arm: rate the goals-based leagues from this FotMob harvest's shot xG instead of goals")
     parser.add_argument("--leagues", default=None, help="comma list; overrides --all/--league")
+    parser.add_argument("--append-dump", action="store_true",
+                        help="write each scored match to --dump-matches immediately (flushed) and RESUME from the rows "
+                        "already there; the summary then covers only this run's newly scored matches")
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument(
         "--dump-matches",
@@ -588,6 +610,22 @@ def main() -> int:
         "calibration can be fitted and tested without re-running the simulation",
     )
     args = parser.parse_args()
+
+    dump_handle, done_keys = None, None
+    if args.append_dump:
+        if not args.dump_matches:
+            parser.error("--append-dump needs --dump-matches")
+        args.dump_matches.parent.mkdir(parents=True, exist_ok=True)
+        done_keys = set()
+        if args.dump_matches.exists():
+            for line in args.dump_matches.open(encoding="utf-8"):
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue          # a line cut mid-write by a kill; it is simply re-scored
+                done_keys.add((r.get("league"), r.get("date"), str(r.get("home_team")), str(r.get("away_team"))))
+        print(f"APPEND/RESUME: {len(done_keys)} matches already in {args.dump_matches}", flush=True)
+        dump_handle = args.dump_matches.open("a", encoding="utf-8", newline="\n")
 
     if not args.league and not args.all and not args.leagues:
         parser.error("pass --league <name>, --leagues a,b or --all")
@@ -606,13 +644,17 @@ def main() -> int:
             since=args.since,
             fd_close_dir=args.fd_close_dir,
             fotmob_xg_path=args.fotmob_xg,
+            dump_handle=dump_handle,
+            done_keys=done_keys,
         )
         for league in leagues
     ]
+    if dump_handle is not None:
+        dump_handle.close()
     # Per-match rows go to their own file. Folding thousands of them into the
     # summary would make the artifact everyone reads unreadable for the sake of
     # a consumer that wants a flat table anyway.
-    if args.dump_matches:
+    if args.dump_matches and not args.append_dump:
         args.dump_matches.parent.mkdir(parents=True, exist_ok=True)
         with args.dump_matches.open("w", encoding="utf-8", newline="\n") as handle:
             for result in results:
