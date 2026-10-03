@@ -5,6 +5,26 @@ board change. Template: NHL props lane (`nhl-player-props-projection`, deploys.m
 `0f25d513`): a market earns a board probability / edge only if it beats a naive as-of baseline AND the
 de-vigged book. Numbers: `reports/soccer_backtest/lines_props_backtest_2026-10-02.{json,md}`.
 
+> **CORRECTION 2026-10-03 -- USER DECISION: every line is judged on its own; NO market is removed.**
+> The "gate list" below was written as market-wide withholding (the NHL template's form). That is
+> withdrawn. The numbers stand as the ACCURACY DIAGNOSIS and as inputs to per-line weighting; nothing in
+> this file is a reason to switch a market off. What was done instead (lane
+> `soccer-skill-registry-line-weighting`):
+> - **Registry re-measured** (`02a76fb7`): soccer pregame totals PARITY (n 194) -> LOSES (n 492); h2h
+>   n 671 and spreads n 458 re-measured; `totals_alt` / `spreads_alt` / `h2h_3_way` aliased. This only
+>   moves each row's Layer 2 RANKING multiplier (totals 1.0 -> 0.93, h2h 0.877 -> 0.857, spreads 0.835).
+> - **Per-line edge weight FITTED** (`audit_games.py --extra`): edge = w x (model - de-vigged fair), w fitted
+>   on 2026-27 = **0.000** for 1X2 [0, 0.066], totals [0, 0.232], AH [0, 0.287]. Held until a model fix
+>   (user decision), so the model can earn weight back before the mechanism ships.
+> - **1X2 favourite calibration FALSIFIED** (post-hoc power sharpening, chronological): fitted T = 0.90
+>   (train) / 0.86 [0.68, 1.08] -- the model is slightly OVER-confident overall; held-out Brier -0.0011
+>   [-0.0039, +0.0018] vs raw, still +0.030 [+0.012, +0.048] vs the book, refit w still 0. Held-out
+>   favourites: raw 0.618, sharpened 0.592, book 0.722, actual 0.757. The favourite gap is TEAM-STRENGTH
+>   identity, not dispersion (matches 2025-26's temperature ~1.0). `C:/tmp/soccer-lpb/calib_1x2.py`.
+> - **Defect 4 below is CORRECTED**: after the 09-16 squad rebuild, unlisted players take **4.0%** of real
+>   shots (38.5% before, 119 vs 185 pre-kickoff matches); the remaining 29% unbound model rows are listed
+>   players not in the matchday squad, not stale squads.
+
 ## Bottom line
 
 **No soccer market — game line or player prop, pregame or live — earns a board probability or edge.**
@@ -160,7 +180,7 @@ None has been graded against an in-play price with a CI excluding zero → no li
 | all props | 2025-26 | never | no prop prices were captured last season; no as-of player substrate (players_*.csv are season aggregates, leaky) | **untestable** | — |
 | live totals / goals / corners / 1X2 | both | H29–H32, H36, euro_holdout | unchanged | settled where graded; H36 vs book WATCHING | state_soccer |
 
-## Gate list vs what the board serves TODAY
+## Gate list vs what the board serves TODAY (WITHDRAWN as a gate -- see the correction at the top; kept as the diagnosis)
 
 Rule (NHL template): probability/edge only if the market beats the naive as-of baseline (CI wholly < 0)
 AND the de-vigged book (CI wholly < 0). **Passing list: empty.** Board treatment is by code
@@ -204,7 +224,7 @@ two-sided rows. The NHL equivalent was `MEASURED_MARKETS` stays empty — soccer
 3. **The fleet serves no soccer projection today**: `per_sport_ingest.soccer.enrichment.projections` =
    0 rows, "no soccer recommendations for this date" (02:57Z read, 18 soccer rows, all
    `ev_basis=market_fair`). Not a gate — the fleet has written soccer recs for 09-30 (MLS) and 10-02 only.
-4. Prop squads are still stale: 4,724 of 12,897 pre-kickoff model rows (37%) bind to no box-score player.
+4. ~~Prop squads are still stale~~ CORRECTED 2026-10-03: 4,724 of 12,897 pre-kickoff model rows bind to no box-score player, but after the 09-16 rebuild only 4.0% of real shots come from unlisted players -- the unbound rows are listed players outside the matchday squad.
 
 ## Reproduce
 
