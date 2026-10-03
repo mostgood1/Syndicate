@@ -91,6 +91,16 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     block_rate_ev=0.4784,
     block_rate_pk=0.5847,
     block_rate_pp_def=0.3721,
+    # On-ice attribution UNFLATTENED `[2026-10-03, lane nhl-player-props-projection]`: power 1.0, no
+    # uniform mix, no share cap (engine defaults 0.85 / 0.12 / 0.35 stay as the old behaviour). The
+    # flattening compressed stars toward linemates: elite shooters (own >= 3.0 SOG/game) ran -0.505
+    # SOG under, low shooters +0.099 over. `scripts/backtest_nhl_props.py`, paired vs the previous
+    # production engine on 12,540 regular-season player-games (every 3rd date): MAE SOG -0.0030,
+    # GOALS -0.0007, POINTS -0.0030, BLOCKS -0.0039; Brier SOG@1.5 -0.0010, SOG@2.5 -0.0011,
+    # ASSISTS@0.5 -0.0010, POINTS@0.5 -0.0012 (all CIs exclude 0); team totals do not depend on it.
+    attribution_power=1.0,
+    attribution_uniform_mix=0.0,
+    attribution_share_cap=1.0,
     score_effects="dynamic",
     goal_model="from_shots",
     assist_model="onice",

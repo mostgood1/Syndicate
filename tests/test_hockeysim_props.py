@@ -241,3 +241,29 @@ def test_a_sim_without_the_player_counts_as_zero(monkeypatch):
     sog = next(p for p in projs if p.player_id == 1000 and p.market == "SOG")
     assert sog.proj_lambda == 1.0          # 5 sims x 2 shots / 10 sims (was 2.0)
     assert sog.p_over == 0.5 and sog.p_under == 0.5
+
+
+def test_attribution_unflattening_is_reachable_and_keeps_team_totals():
+    """off != on: the production profile's unflattened attribution must give the top shooter a larger
+    share than the old constants, while team totals stay where they were."""
+    from dataclasses import replace
+
+    from syndicate.features.nhl.sim_engine.hockeysim.calibration_profile import build_nhl_sim_config
+
+    prod = build_nhl_sim_config()
+    assert (prod.attribution_power, prod.attribution_uniform_mix, prod.attribution_share_cap) == (1.0, 0.0, 1.0)
+    old = replace(prod, attribution_power=0.85, attribution_uniform_mix=0.12, attribution_share_cap=0.35)
+    g = _game()
+    players = [replace(p, shot_weight=(4.0 if i == 0 else 1.0)) if p.position != "G" else p
+               for i, p in enumerate(g.home_players)]
+    game = replace(g, home_players=tuple(players))
+
+    def sog(profile):
+        projs = build_prop_projections(game, n_sims=60, profile=profile, base_seed=9)
+        home = [p for p in projs if p.market == "SOG" and p.player_id < 2000]
+        return next(p.proj_lambda for p in home if p.player_id == 1000), sum(p.proj_lambda for p in home)
+
+    star_old, team_old = sog(old)
+    star_new, team_new = sog(prod)
+    assert star_new > star_old * 1.15
+    assert abs(team_new - team_old) / team_old < 0.05

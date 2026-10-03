@@ -81,6 +81,14 @@ class SimConfig:
     block_rate_ev: float = 0.45
     block_rate_pk: float = 0.55
     block_rate_pp_def: float = 0.35
+    # On-ice ATTRIBUTION shaping in `_weighted_choice` (who gets the shot / goal / assist / block),
+    # hard-coded until 2026-10-03 and now fields so they can be measured (lane
+    # nhl-player-props-projection). Defaults ARE the old constants: weights are raised to
+    # `attribution_power`, mixed with `attribution_uniform_mix` uniform mass, and one player's share
+    # of an event is capped at `attribution_share_cap`. Team totals do not depend on them.
+    attribution_power: float = 0.85
+    attribution_uniform_mix: float = 0.12
+    attribution_share_cap: float = 0.35
     # Score-state effects mode for play-level simulation.
     # - dynamic: time-remaining + score-diff dependent multipliers (default)
     # - legacy: fixed +/-10% based on start-of-period score diff
@@ -810,13 +818,13 @@ class PeriodSimulator:
 
                 w = np.array([_wf(x) for x in weights], dtype=float)
                 # Flatten extremes (temperature-like) while preserving ordering
-                w = np.power(w, 0.85)
+                w = np.power(w, float(getattr(self.cfg, "attribution_power", 0.85)))
                 p = w / max(1e-12, float(w.sum()))
                 # Mix in uniform mass to keep distribution realistic across a line
-                alpha = 0.12
+                alpha = float(getattr(self.cfg, "attribution_uniform_mix", 0.12))
                 p = (1.0 - alpha) * p + alpha * (1.0 / max(1, len(p)))
                 # Cap the maximum share per event (line-level) then renormalize
-                cap = 0.35
+                cap = float(getattr(self.cfg, "attribution_share_cap", 0.35))
                 if cap > 0:
                     p = np.minimum(p, cap)
                     p = p / max(1e-12, float(p.sum()))
