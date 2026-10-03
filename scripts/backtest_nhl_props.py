@@ -526,7 +526,8 @@ def run_date(date: str, arm: str, n_sims: int) -> Dict:
                         vals = [c[(tname, int(p.player_id))][idx] for c in captured if (tname, int(p.player_id)) in c]
                         lam = proj_by.get((tname, int(p.player_id), mk))
                         if vals and lam is not None:
-                            mean = sum(vals) / len(vals)
+                            # production counts a sim without the player as a zero (player_props, defect 4)
+                            mean = sum(vals) / max(len(vals), nsim)
                             assert abs(round(mean, 4) - lam) < 1e-6, (date, g["gid"], p.player_id, mk, mean, lam)
                         rec["m"][mk] = {"lam": lam, "rows": len(vals),
                                         "hist": dict(Counter(int(v) for v in vals)) if vals else {}}
