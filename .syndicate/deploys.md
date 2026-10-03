@@ -45553,3 +45553,27 @@ were never affected -- those were measured against the registry, not the artifac
 `Interceptions` (19) are now correctly unmeasured and need a real measurement -- both re-measured
 under the 200-row floor and both moved to a Poisson family in `c3874b91`, so they are unevaluated, not
 merely unmeasured.
+
+### Addendum 19:41Z -- WEB DOES NOT NEED THIS, established by measurement rather than assumed
+
+The entry above asserted web's old code "does not matter for this artifact-backed payload". That was
+a claim about ONE date, and `learnings.md` already records that this endpoint has two code paths, so
+it needed checking across dates. All four served NFL dates, read at 19:41Z while web ran `eedfde5e`:
+
+    date         source                      written_at              measured / unmeasured
+    2026-10-03   layer2_shortlist_artifact    2026-10-03T19:36:52Z    966 / 364   <- post-fix
+    2026-10-04   layer2_shortlist_artifact    2026-10-03T16:59:24Z    197 / 1015  <- pre-fix artifact
+    2026-10-02   layer2_shortlist_artifact    2026-10-03T05:18:38Z    343 / 827   <- pre-fix artifact
+    2026-10-05   board_state                  (none)                  (none)
+
+**`board_state` is NOT a second building path.** Its whole body is
+`{"reason": "no_shortlist_artifact", "returned": 0, "rows": [], "shortlist_present": false}` -- the
+degraded empty state the architecture requires when no artifact exists, not an on-request build. So
+there is no path on which web stamps a `model_skill` note, and **web at `eedfde5e` cannot serve a
+stale note for this change.** No web deploy is needed or taken. live-odds-worker likewise.
+
+**What IS still pre-fix: the 10-04 and 10-02 artifacts**, written 16:59:24Z and 05:18:38Z, both before
+the 19:27:18Z load. Their counters (197/1015 and 343/827) will move when those dates next rebuild.
+That is ordinary artifact staleness on a per-date build schedule, not a deploy gap, and nothing is
+owed -- but a reader comparing dates today will see three different measured/unmeasured ratios for
+three different artifact vintages, which is worth knowing before anyone calls it an inconsistency.
