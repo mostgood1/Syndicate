@@ -533,14 +533,16 @@ def _sim_task(task: dict) -> dict:
 
 
 def _lower_priority() -> None:
-    """The production fleet shares this machine: run at IDLE priority so it
-    always preempts the backtest."""
+    """The production fleet shares this machine: run BELOW NORMAL so it always
+    preempts the backtest. Not IDLE: Windows 11 runs Idle-class processes in
+    efficiency mode, and measured 2026-10-02 that starved 7 workers to ~9 s of
+    CPU in 25 min with the host 34% busy."""
     try:
         import psutil
 
         proc = psutil.Process()
         if os.name == "nt":
-            proc.nice(psutil.IDLE_PRIORITY_CLASS)
+            proc.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
         else:
             proc.nice(19)
     except Exception:  # noqa: BLE001
@@ -632,7 +634,7 @@ def cmd_sim(args) -> None:
     tasks = [t for t in build_tasks(work, args.arm) if t["game_id"] not in done]
     if args.limit:
         tasks = tasks[: args.limit]
-    print(f"{args.arm}: {len(tasks)} games to simulate ({len(done)} cached), {args.workers} workers, idle priority", flush=True)
+    print(f"{args.arm}: {len(tasks)} games to simulate ({len(done)} cached), {args.workers} workers, below-normal priority", flush=True)
     t0 = time.time()
     with ProcessPoolExecutor(max_workers=args.workers, initializer=configure_env, initargs=(work,)) as pool, \
             out_path.open("a", encoding="utf-8") as handle:
