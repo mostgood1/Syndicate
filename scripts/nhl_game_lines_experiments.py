@@ -93,7 +93,7 @@ def goalie_lines(act: Dict[str, Dict], src: Path, roots: Path) -> Dict[str, Dict
             gl = []
             for g in ((box.get("playerByGameStats") or {}).get(side) or {}).get("goalies") or []:
                 nm = str((g.get("name") or {}).get("default") or "")
-                gl.append({"pid": int(g["playerId"]), "key": _norm(nm), "shots": int(g.get("shotsAgainst") or 0),
+                gl.append({"pid": int(g["playerId"]), "key": _key_from_full(nm) or _norm(nm), "shots": int(g.get("shotsAgainst") or 0),
                            "ga": int(g.get("goalsAgainst") or 0), "starter": bool(g.get("starter"))})
             per[ab] = gl
         out[gid] = per
@@ -108,12 +108,10 @@ def projected_starters(roots: Path, date: str) -> Dict[str, str]:
     if not p.exists():
         return res
     for row in csv.DictReader(p.open(encoding="utf-8")):
-        full = _norm(row.get("goalie") or "")
-        parts = full.split()
-        if len(parts) >= 2:
-            ab = BGL._abbr_of(row.get("team") or "")
-            if ab:
-                res[ab] = f"{parts[0][0]} {' '.join(parts[1:])}"
+        k = _key_from_full(row.get("goalie") or "")
+        ab = BGL._abbr_of(row.get("team") or "")
+        if k and ab:
+            res[ab] = k
     return res
 
 
@@ -223,20 +221,22 @@ class GoalieHistory:
 
     def asof(self, date, arm):
         i = bisect.bisect_left(self.dates, date) if not arm.startswith("current") else len(self.rows)
-        by_key = defaultdict(lambda: [0, 0])
-        by_pid = defaultdict(lambda: [0, 0])
+        by_key = defaultdict(lambda: [0, 0, None])
+        by_pid = defaultdict(lambda: [0, 0, None])
         S = G = 0
         for (_d, ab, key, pid, sh, ga, _st) in self.rows[:i]:
-            by_key[(ab, key)][0] += sh; by_key[(ab, key)][1] += ga
-            by_key[("*", key)][0] += sh; by_key[("*", key)][1] += ga
-            by_pid[pid][0] += sh; by_pid[pid][1] += ga
+            for k_ in ((ab, key), ("*", key)):
+                by_key[k_][0] += sh; by_key[k_][1] += ga; by_key[k_][2] = pid
+            by_pid[pid][0] += sh; by_pid[pid][1] += ga; by_pid[pid][2] = pid
             S += sh; G += ga
         return by_key, by_pid, (1 - G / S) if S else 0.900
 
 
 def _key_from_full(name: str) -> Optional[str]:
+    """first initial + LAST token; the boxscore's 'U. Luukkonen' and Daily Faceoff's
+    'Ukko-Pekka Luukkonen' must meet (hyphens normalize to spaces in `_norm`)."""
     parts = _norm(name).split()
-    return f"{parts[0][0]} {' '.join(parts[1:])}" if len(parts) >= 2 else None
+    return f"{parts[0][0]} {parts[-1]}" if len(parts) >= 2 else None
 
 
 def starter_picks(act, gl, lg_dates, dfo_dir: Path) -> Dict[str, Any]:
@@ -246,6 +246,7 @@ def starter_picks(act, gl, lg_dates, dfo_dir: Path) -> Dict[str, Any]:
       dfo      -- Daily Faceoff's starter IF its news was posted BEFORE puck drop and the status is
                   Confirmed or Likely; otherwise the rotation pick (counted as a fallback)."""
     hist = defaultdict(list)
+    keyhist = defaultdict(list)   # team -> [(date, goalie key)] of every goalie who PLAYED (as-of use only)
     for gid, r in sorted(act.items(), key=lambda kv: (kv[1]["date"], kv[0])):
         if r["season"] != BGL.SEASON_PREV:
             continue
@@ -253,6 +254,14 @@ def starter_picks(act, gl, lg_dates, dfo_dir: Path) -> Dict[str, Any]:
             st = [x["pid"] for x in gl.get(gid, {}).get(ab, []) if x["starter"]]
             if st:
                 hist[ab].append((r["date"], st[0]))
+            for x in gl.get(gid, {}).get(ab, []):
+                if x["shots"] > 0:
+                    keyhist[ab].append((r["date"], x["key"]))
+
+    def known_before(ab, key, date, season):
+        # a goalie this team used strictly before the date (any 2025-26 game for the 2026-27 arm)
+        return any(k == key and (d < date or season != BGL.SEASON_PREV) for d, k in keyhist[ab])
+
     rot: Dict[Tuple[str, str], Any] = {}
     dfo: Dict[Tuple[str, str], Any] = {}
     stats = Counter()
@@ -284,16 +293,32 @@ def starter_picks(act, gl, lg_dates, dfo_dir: Path) -> Dict[str, Any]:
             if page and page.get("games") is not None:
                 why = "fallback_game_not_listed"
                 for gm in page["games"]:
-                    if BGL._abbr_of(gm.get(f"{side}_team") or "") == ab and BGL._abbr_of(gm.get(f"{osd}_team") or "") == opp:
-                        status = str(gm.get(f"{side}_status") or "")
-                        at = str(gm.get(f"{side}_news_at") or "")
-                        if status not in ("Confirmed", "Likely"):
-                            why = f"fallback_status_{status or 'none'}"
-                        elif not at or at[:19] >= r["start"][:19]:
-                            why = "fallback_posted_after_start"
-                        else:
-                            chosen, why = _key_from_full(gm.get(f"{side}_goalie") or ""), f"dfo_{status.lower()}"
+                    teams = {BGL._abbr_of(gm.get("home_team") or ""), BGL._abbr_of(gm.get("away_team") or "")}
+                    if teams != {ab, opp}:
+                        continue
+                    # the page's goalie slot is NOT reliable per side (measured: 243 swaps); take the
+                    # named goalie this team has used before the date, else the slot the page gives
+                    cand = []
+                    for s_ in ("home", "away"):
+                        k = _key_from_full(gm.get(f"{s_}_goalie") or "")
+                        if k and known_before(ab, k, r["date"], r["season"]):
+                            cand.append(s_)
+                    if len(cand) != 1:
+                        # Measured: the ARCHIVED pages name goalies who dressed for neither team
+                        # (2025-11-01 WPG-PIT lists Skinner, then an EDM goalie). A name this team has
+                        # never used before the date cannot be verified as-of -> rotation fallback.
+                        why = "fallback_dfo_unverifiable_name"
                         break
+                    slot = cand[0]
+                    status = str(gm.get(f"{slot}_status") or "")
+                    at = str(gm.get(f"{slot}_news_at") or "")
+                    if status not in ("Confirmed", "Likely"):
+                        why = f"fallback_status_{status or 'none'}"
+                    elif not at or at[:19] >= r["start"][:19]:
+                        why = "fallback_posted_after_start"
+                    else:
+                        chosen, why = _key_from_full(gm.get(f"{slot}_goalie") or ""), f"dfo_{status.lower()}"
+                    break
             dfo[(gid, ab)] = chosen
             stats[why] += 1
             if r["arm"] == "regular" and r["date"] >= "2025-11-01":
@@ -308,8 +333,24 @@ def starter_picks(act, gl, lg_dates, dfo_dir: Path) -> Dict[str, Any]:
     return {"rotation": rot, "dfo": dfo, "stats": dict(stats)}
 
 
-def goalie_factor(stats: Tuple[int, int], sv_lg: float, k: float) -> float:
-    sh, ga = stats
+GOALIE_PRIOR: Dict[int, Tuple[float, float]] = {}  # pid -> (shots, ga), PRIOR season (2024-25), as-of for all of 2025-26
+
+
+def load_goalie_prior(path: Path) -> None:
+    d = BGL._rj(path) or {}
+    for x in d.get("data") or []:
+        GOALIE_PRIOR[int(x["playerId"])] = (float(x.get("shotsAgainst") or 0), float(x.get("goalsAgainst") or 0))
+
+
+def goalie_factor(stats, sv_lg: float, kw) -> float:
+    """kw = (k shrink shots, w prior-season weight). Current-season as-of shots/GA plus w x the
+    goalie's 2024-25 shots/GA (NHL stats API), shrunk toward the as-of league save% with k shots."""
+    k, w = kw if isinstance(kw, tuple) else (kw, 0.0)
+    sh, ga = float(stats[0]), float(stats[1])
+    pid = stats[2] if len(stats) > 2 else None
+    if w and pid in GOALIE_PRIOR:
+        psh, pga = GOALIE_PRIOR[pid]
+        sh += w * psh; ga += w * pga
     sv = ((sh - ga) + k * sv_lg) / (sh + k)
     return (1 - sv) / (1 - sv_lg)
 
@@ -344,6 +385,7 @@ def main() -> int:
     ap.add_argument("--src", default=None)
     ap.add_argument("--report", default=None)
     ap.add_argument("--min-n", type=int, default=100)
+    ap.add_argument("--goalie-prior", default="C:/tmp/nhllines/goalie_prior/20242025.json")
     ap.add_argument("--dfo", default=None, help="dir of fetch_nhl_confirmed_goalies.py outputs (default <out>/dfo)")
     a = ap.parse_args()
     out, roots = Path(a.out), Path(a.roots)
@@ -388,7 +430,9 @@ def main() -> int:
     picks = starter_picks(act, gl, lg_dates, Path(a.dfo) if a.dfo else out / "dfo")
     print(f"starter sources: {picks['stats']}")
 
-    def run(k_goalie: Optional[float], rest: Optional[Dict], source: str, window=None):
+    mach_cache: Dict[str, Dict] = {}
+
+    def run(k_goalie, rest: Optional[Dict], source: str, window=None):
         rows = []
         miss = Counter()
         for g in games:
@@ -402,21 +446,25 @@ def main() -> int:
             fm, fb = fit_m.at(g["date"], r["arm"]), fit_b.at(g["date"], r["arm"])
             hp, apl = list(g["hp"]), list(g["ap"])
             rec = {"gid": g["gid"], "date": g["date"], "arm": r["arm"], "act": r}
-            h0, a0 = draws(hp, apl, seed)
-            rec["V0"] = probs(h0, a0, full_settlement=False)
-            rec["V1"] = probs(h0, a0, q_ot=fm["q_ot"])
             s = fm["s"]
-            hs, as_ = draws([x * s for x in hp], [x * s for x in apl], seed)
-            rec["V2"] = probs(hs, as_, q_ot=fm["q_ot"])
-            rec["V3"] = probs(hs, as_, q_ot=fm["q_ot"], delta=fm["delta"])
-            rec["V4"] = probs(hs, as_, q_ot=fm["q_ot"], delta=fm["delta"], e=fm["e"], seed=seed)
-            # baselines
-            bh, ba, p1s = base_lams[g["gid"]]
-            hb, abb = draws(BGL._periods(bh, p1s), BGL._periods(ba, p1s), seed)
-            rec["B0"] = probs(hb, abb, full_settlement=False)
-            sb = fb["s"]
-            hb2, ab2 = draws(BGL._periods(bh * sb, p1s), BGL._periods(ba * sb, p1s), seed)
-            rec["B4"] = probs(hb2, ab2, q_ot=fb["q_ot"], delta=fb["delta"], e=fb["e"], seed=seed)
+            if g["gid"] not in mach_cache:
+                m_ = {}
+                h0, a0 = draws(hp, apl, seed)
+                m_["V0"] = probs(h0, a0, full_settlement=False)
+                m_["V1"] = probs(h0, a0, q_ot=fm["q_ot"])
+                hs, as_ = draws([x * s for x in hp], [x * s for x in apl], seed)
+                m_["V2"] = probs(hs, as_, q_ot=fm["q_ot"])
+                m_["V3"] = probs(hs, as_, q_ot=fm["q_ot"], delta=fm["delta"])
+                m_["V4"] = probs(hs, as_, q_ot=fm["q_ot"], delta=fm["delta"], e=fm["e"], seed=seed)
+                # baselines
+                bh, ba, p1s = base_lams[g["gid"]]
+                hb, abb = draws(BGL._periods(bh, p1s), BGL._periods(ba, p1s), seed)
+                m_["B0"] = probs(hb, abb, full_settlement=False)
+                sb = fb["s"]
+                hb2, ab2 = draws(BGL._periods(bh * sb, p1s), BGL._periods(ba * sb, p1s), seed)
+                m_["B4"] = probs(hb2, ab2, q_ot=fb["q_ot"], delta=fb["delta"], e=fb["e"], seed=seed)
+                mach_cache[g["gid"]] = m_
+            rec.update(mach_cache[g["gid"]])
             # information layers
             if k_goalie is not None:
                 ck = (g["date"], r["arm"])
@@ -459,9 +507,12 @@ def main() -> int:
     pre = lambda d: d < EVAL_START
     post = lambda d: d >= EVAL_START
     tune = {}
-    for k in (100.0, 300.0, 600.0, 1000.0, 2000.0, 5000.0):
-        rows, _ = run(k, None, "dfo", window=pre)
-        tune[k] = ll_ml(rows, "VX")
+    load_goalie_prior(Path(a.goalie_prior))
+    print(f"goalie prior: {len(GOALIE_PRIOR)} goalies from {a.goalie_prior}")
+    for k in (300.0, 1000.0, 3000.0, 10000.0):
+        for w in (0.0, 0.5, 1.0):
+            rows, _ = run((k, w), None, "dfo", window=pre)
+            tune[(k, w)] = ll_ml(rows, "VX")
     k_best = min(tune, key=tune.get)
     # rest multipliers: residual ratio of B2B teams vs V4 expected goals, games before EVAL_START
     rows_pre, _ = run(k_best, None, "dfo", window=pre)
@@ -499,7 +550,7 @@ def main() -> int:
             x[lab] = idx[x["gid"]]["VX"]
         x["V6"] = x.pop("VX")
 
-    report = {"k_goalie": k_best, "tune": tune, "rest": rest, "starter_sources": picks["stats"],
+    report = {"k_goalie": k_best, "tune": {str(k): v for k, v in tune.items()}, "rest": rest, "starter_sources": picks["stats"],
               "goalie_join": {k: dict(v[1]) for k, v in results.items()},
               "fits_sample": {d: fit_m.at(d, "regular") for d in ("2025-11-15", "2026-01-01", "2026-03-01")},
               "windows": {}}

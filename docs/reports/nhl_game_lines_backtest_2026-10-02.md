@@ -2,24 +2,30 @@
 
 Companion to the props backtest (lane `nhl-player-props-projection`, deploys 2026-10-02 21:38Z). Same template:
 as-of inputs, n / MAE / bias vs the actual, dMAE or dBrier vs a naive as-of baseline with a bootstrap CI,
-Brier/log-loss vs the de-vigged book, and a gate: **a game market earns a probability or an edge on the
-board only if it beats the baseline AND the book.**
+Brier/log-loss vs the de-vigged book.
+
+> **USER DECISION 2026-10-02 (~7:05 PM CT, relayed by the NCAAF backtesting session, and consistent with the user's own "we can't just ignore game lines" to this session): "every line is its own decision. we should have a model that is accurate that then helps inform each decision". A market-wide gate is forbidden. These numbers are the DIAGNOSIS for a model-accuracy plan (lane `nhl-game-lines-model`), NOT a recommendation to withhold any market. Per-line decisions stay with per-line scoring.**
+>
+> An earlier version of this report applied a gate ("a market earns a probability or an edge only if it
+> beats the baseline AND the book") and recommended withholding three markets. That rule was a
+> market-wide exclusion and is withdrawn. The ranked fixes are in
+> `docs/reports/nhl_game_lines_model_experiments_2026-10-02.md`.
 
 Harness: `scripts/backtest_nhl_game_lines.py` (`actuals` / `odds` / `probe-periods` / `sim` / `score`).
 Machine-readable result: `C:/tmp/nhllines/report.json` (scratch; regenerate with the commands at the end).
 
 ## TL;DR
 
-- **No NHL game market passes the gate.** Every market's model ties its naive as-of baseline over the
+- **Accuracy today: the model adds nothing over a team goal average.** Every market's model ties its naive as-of baseline over the
   2025-26 regular season (n=1,132). The one exception is the moneyline, which beats points%-log5 and a
   constant home rate but ties the GF/GA baseline. The leg against the book **could not be run for 2025-26**:
   the OddsAPI key in the checkout is deactivated (HTTP 401 `DEACTIVATED_KEY`, 0 credits spent).
-  Unmeasured counts as failing (unknown must not default permissive). On the 11 games that do have a
+  On the 11 games that do have a
   provable pregame close (2026-27 openers), the raw and the served model are both worse than the book.
   At 2 dates that is anecdote, not a verdict.
-- **Today the board serves a probability AND an edge on three NHL game markets the evidence does not
-  support:** moneyline (anchored `p_home_ml`), puck line home −1.5, and totals (when the book line equals
-  the line the sim priced). Each should be **mean-only** until a powered model-vs-book test passes.
+- **What the board serves today** (moneyline anchored `p_home_ml` + edge, puck line home −1.5 + edge,
+  totals at the priced line + edge) is recorded in §6 as context for the accuracy plan. Nothing is
+  proposed for removal: each line is its own decision, and the work is to make the model accurate.
 - **Three engine and pipeline defects, found and measured, none fixed here:**
   1. **Totals settle on regulation goals.** `game_market_sim` has no OT, so `p_over` counts regulation
      goals only. Books settle full game, with the shootout winner credited a goal. Two errors cancel: the
@@ -161,7 +167,7 @@ points% is real (CI excludes 0); the gain over a GF/GA team average is not.
   - The book was better in every comparison. This agrees with the prior n=15 reading and is not a
     verdict either.
 
-## 6. GATE LIST vs what the board serves TODAY
+## 6. What the board serves today (context, not a gate)
 
 Served treatment comes from `syndicate/features/nhl/game_projections.py:232-311`, read against the
 fleet's `/api/board/layer2-shortlist` at **2026-10-02 22:34:39Z**:
@@ -169,21 +175,15 @@ fleet's `/api/board/layer2-shortlist` at **2026-10-02 22:34:39Z**:
 - Refusals: 5 "no cover probability at 1.5", 6 totals "no over probability at <line>".
 - Every row carries `model_skill.state = "unmeasured"`.
 
-| market | gate (this evidence) | served today | contradicted? |
+| market | served today | what the accuracy evidence says | fix (ranked plan) |
 |---|---|---|---|
-| **Moneyline** | **MEAN-ONLY.** Ties the GF/GA baseline; vs book unmeasured for 2025-26 (key deactivated), worse on 11 games, worse on the prior n=15 | **probability + edge**: `model_prob_over = p_home_ml` (the ANCHORED blend), `edge_vs_market_pct` stamped pregame | **YES**: an edge is served with no evidence it beats the book |
-| **Puck line home −1.5** | **MEAN-ONLY.** Ties the baseline | **probability + edge** when the row is home −1.5 | **YES** |
-| Puck line home +1.5 / away side | MEAN-ONLY | projection only (refused: "prices only the home -1.5") | no |
-| **Totals at the sim's priced line** | **MEAN-ONLY.** Ties the baseline; served p uses regulation-only settlement; model over-biased | **probability + edge** when book line == `totals_line_used` | **YES** (and the line itself comes from the median-of-all-points defect) |
-| Totals at another line | MEAN-ONLY | projection only | no |
-| Projected total / margin (means) | **may stay as means**: MAE equals the baseline's, not worse | `projected` total and spread shown | no, but the `model_skill` note should say "measured: no skill vs a team-average baseline (n=1,132)", not "unmeasured" |
-| Regulation 3-way | **DO NOT ADD.** Tie probability miscalibrated by 8.6 pts, worse than baseline | not served | no |
-| P1 / period lines | MEAN-ONLY (ties baseline). No book for P1 is ever captured | period goal means only (cards); no probabilities | no |
-| First-10-min goal (`p_f10`) | untested here (no market captured); keep unpriced | column in artifact | — |
-
-**The rule applied, same as props:** an empty `MEASURED_MARKETS` for NHL game lines. The three
-contradicted rows should stamp the projection and withhold `model_prob_over` and `edge_vs_market_pct`.
-**This lane changes nothing served.** That is a board change, and it needs your decision.
+| Moneyline | anchored probability + edge | ties the GF/GA baseline; regulation ties split 50/50 on a tie rate that is 8.6 pts too low | OT/SO + tie mass + information (confirmed goalie) |
+| Puck line home −1.5 | probability + edge | ties the baseline; no empty-net effect on margins | empty net + tie mass |
+| Puck line +1.5 / away side | projection only (refused) | the away −1.5 side is the same draw | price both sides from the same distribution |
+| Totals at the priced line | probability + edge | regulation-only settlement; +0.36 regulation over-bias; the priced line is the median of every captured point | regulation rescale + full-game settlement + modal-line consensus |
+| Projected total / margin | means shown | MAE equals the baseline's | same fixes; `model_skill` should read "measured", not "unmeasured" |
+| Regulation 3-way | not served | tie mass miscalibrated | tie mass |
+| P1 / period lines | goal means only | ties the baseline; no P1 odds captured | capture P1 odds; same machinery |
 
 ## 7. What would change the verdict
 
@@ -192,9 +192,9 @@ contradicted rows should stamp the projection and withhold `model_prob_over` and
    slots, quota attributed `nhl`), and so is the period/3-way probe (`probe-periods --events 5`).
    It is **blocked**: the checkout's key is deactivated, and reading production's key was refused by
    the auto-mode classifier. It needs a key you supply as `ODDS_API_KEY` in the environment.
-2. Even with a powered vs-book test, ML must first beat the GF/GA baseline. On this evidence the engine
-   adds nothing over team goal averages. The fixes in §TL;DR (OT in the game-market sim, the over-bias,
-   tie mass, the totals-line consensus) come first. Each is a mechanism change to a calibrated engine,
+2. The model must become accurate before any vs-book reading means much: on this evidence it adds
+   nothing over team goal averages. The ranked fixes (OT in the game-market sim, the over-bias, tie mass,
+   the totals-line consensus, confirmed starting goalies) are measured in the experiments report. Each is a mechanism change to a calibrated engine,
    so under `model_engine_standard` §4.4 the rates absorbing it must be re-fit.
 
 ## Reproduce

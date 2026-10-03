@@ -54,12 +54,13 @@ Full report: `docs/reports/nhl_game_lines_backtest_2026-10-02.md`. Harness: `scr
 - The `oddsapi.csv` captures carry NO timestamp (`book_last_update` empty on 5,343/5,343 rows), so they
   can never prove a pregame close.
 
-## Gate (same rule as props: probability/edge only if it beats baseline AND book)
+## Framing (user decision; supersedes the earlier "Gate" section)
 
-- NHL game-line `MEASURED_MARKETS` = **empty**.
-- **CONTRADICTED by the evidence:** the board serves probability + `edge_vs_market_pct` on ML
-  (anchored), PL home -1.5, and totals at the priced line (`game_projections.py:232-311`; served read
-  2026-10-02 22:34:39Z, 8 of 19 game rows with a probability).
-- Recommended: withhold `model_prob_over` / edge on those three and keep the means. Do not add a
-  regulation 3-way or period probabilities.
-- **No board change was made; it needs a user decision.**
+- USER DECISION 2026-10-02 (~7:05 PM CT, relayed by the NCAAF backtesting session, and consistent with the user's own "we can't just ignore game lines" to this session): "every line is its own decision. we should have a model that is accurate that then helps inform each decision". A market-wide gate is forbidden. These numbers are the DIAGNOSIS for a model-accuracy plan (lane `nhl-game-lines-model`), NOT a recommendation to withhold any market. Per-line decisions stay with per-line scoring.
+- **WITHDRAWN:** "game-line MEASURED_MARKETS = empty" and "the board's ML/PL/totals probability + edge is
+  CONTRADICTED -> withhold". That was a market-wide exclusion.
+- **Served today, as context** (`game_projections.py:232-311`; read 2026-10-02 22:34:39Z, 8 of 19 game
+  rows with a probability): ML anchored probability + edge, PL home -1.5 probability + edge, totals at the
+  priced line probability + edge.
+- **Deliverable:** a ranked model-accuracy plan, each defect with evidence, fix and measured impact, in
+  `docs/reports/nhl_game_lines_model_experiments_2026-10-02.md` (lane `nhl-game-lines-model`).
