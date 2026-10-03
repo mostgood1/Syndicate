@@ -64,3 +64,11 @@ Full report: `docs/reports/nhl_game_lines_backtest_2026-10-02.md`. Harness: `scr
   priced line probability + edge.
 - **Deliverable:** a ranked model-accuracy plan, each defect with evidence, fix and measured impact, in
   `docs/reports/nhl_game_lines_model_experiments_2026-10-02.md` (lane `nhl-game-lines-model`).
+
+## Accuracy plan (lane nhl-game-lines-model, 2026-10-03)
+
+- Ranked fixes with measured impact: `docs/reports/nhl_game_lines_model_experiments_2026-10-02.md`.
+- #1, the totals line, is fixed by the modal pregame line from the quote log; 24/31 fleet games are mispriced today.
+- #2-#5 ship as one change: pace rescale + OT/SO + tie mass + empty net. Settled bias goes +0.272 -> -0.016; tie Brier improves.
+- #7: Daily Faceoff confirmed starters (99.9% when pregame-provable).
+- #8: ML has no information beyond team averages yet. GSAx goalie is next.

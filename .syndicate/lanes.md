@@ -1213,12 +1213,21 @@ death, never life — do not invert it.
   - Owed to lane `layer2-triad-alignment`: `backtest_nfl_props._rate_from_log` omits production's zero-week imputation (not edited here).
 
 ### nhl-game-lines-model — OPEN — opened 2026-10-02 — session 9ed26377-0ef3-4416-bc7b-54428f87ce5c
+- **Goal (verbatim): "An NHL game-line model that BEATS the as-of team GF/GA baseline with a date-clustered 95% CI excluding zero on the 2025-26 regular season (walk-forward, as-of fits only) for moneyline and at least one of totals/puck line, with full-game settlement (OT/SO) and a calibrated regulation tie rate -- each candidate fix measured singly and cumulatively, vs the naive baseline AND a baseline given the same machinery; production code changed only after the measured result and a user decision" -- GOAL: NOT MET** (2026-10-03 ~01:30Z). Calibration fixes MET their hypotheses; the ML-discrimination half did NOT (no tested change beats B0/B4 on ML). Ranked plan: docs/reports/nhl_game_lines_model_experiments_2026-10-02.md.
 - Goal: An NHL game-line model that BEATS the as-of team GF/GA baseline with a date-clustered 95% CI excluding zero on the 2025-26 regular season (walk-forward, as-of fits only) for moneyline and at least one of totals/puck line, with full-game settlement (OT/SO) and a calibrated regulation tie rate -- each candidate fix measured singly and cumulatively, vs the naive baseline AND a baseline given the same machinery; production code changed only after the measured result and a user decision
 - Files: scripts/nhl_game_lines_experiments.py (NEW), docs/reports/nhl_game_lines_model_experiments_2026-10-02.md (NEW), scripts/fetch_nhl_confirmed_goalies.py (NEW; Daily Faceoff confirmed starters, public per-date pages, robots Allow)
 - Hypothesis: H1 regulation lambdas are scaled to a FULL-GAME rate (projection.py league_baseline_goals_per_60=3.1269 from 6.2538 goals/game incl OT+SO credit) -> +0.36 reg over-bias; H2 no OT/SO in game_market_sim -> totals mis-settled, ML tie split naive; H3 independent Poisson under-produces regulation ties (0.160 vs 0.246); H4 no empty-net -> 1-goal margins over-predicted vs 2-goal (puck line); H5 the projection carries no information beyond team xG rates: starting goalie quality, rest/back-to-back and recency are absent, which is why it ties a GF/GA average
 - Falsification test: H1 false if an as-of regulation-rate rescale leaves reg bias outside +/-0.1; H3 false if as-of tie inflation does not bring the tie rate inside the actual CI; H5 false if goalie+rest+recency together fail to beat the SAME-MACHINERY baseline (CI includes 0)
 - Verification: experiment report: per variant n, dBrier/dMAE vs both baselines with CIs, tie rate and total bias, playoffs as a holdout; vs-book leg when an active OddsAPI key exists
-- Blocked by: none
+- **READINGS 2026-10-03 ~01:30Z** (walk-forward machinery fits; info params tuned pre-2026-01-01 then frozen; OOS 01-01..04-16 n=681, full n=1,132):
+  - H1 CONFIRMED: settled total bias +0.272 [+0.131, +0.407] (V1) -> -0.016 [-0.159, +0.121] with rescale + OT/SO + tie mass + empty net (V4).
+  - H3 CONFIRMED: tie 0.160 -> 0.272 vs actual 0.246; tie Brier vs B0 -0.0062 [-0.0112, -0.0012]. Slight overshoot; per-game rho is next.
+  - H4: empty net restores puck-line shape (home -1.5 mean p 0.288 vs freq 0.317 OOS).
+  - H5 NOT REFUTED for ML: confirmed goalie (save%), rest and even the oracle starter leave ML Brier unchanged (full window -0.0031 [-0.0071, +0.0008] vs B0).
+  - Daily Faceoff confirmed starters: 1,624/1,625 correct when pregame-provable and as-of-verifiable; production 55.4%.
+  - Fleet totals line != modal pregame book line on 24/31 games.
+  - FRAMING: user decision 2026-10-02 -- every line is its own decision; this is an accuracy plan, not a market exclusion. No deploy.
+- Blocked by: production wiring needs (a) user decision, (b) lane nhl-player-props-projection for ingestion/collect.py (confirmed-starter feed); vs-book needs an active ODDS_API_KEY
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
