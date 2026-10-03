@@ -45598,3 +45598,12 @@ three different artifact vintages, which is worth knowing before anyone calls it
   - 9: not in the sim lineup at all (Chinakhov, Eklund, Zellweger).
   - ~43 of the 'projected player, other market missing' bucket did not classify cleanly -- not explained.
 - the lineup-window fix (ebe7a634) is NOT the main source: only the 14 + 9 involve the lineup.
+
+## 2026-10-03 20:02:53Z (3:02 PM CT) -- MEASUREMENT: NHL totals line fix (a18cda3e, ff'd 17:43:03Z) -- artifact reading 2 **MET** (lane `nhl-game-lines-model`)
+
+- **Reading** (read-only grader on the fleet, served predictions files vs the books' modal pregame line in the fleet quote log):
+  - `predictions_2026-10-03` rewritten 19:50:58Z: **13/13 match, 0 off the half-goal grid** (baseline 16:48Z: 5 match / 8 mismatch / 6 off-grid).
+  - `predictions_2026-10-04` rewritten 19:53:14Z: **5/5 match, 0 off-grid** (baseline 3 / 2 / 2).
+- **Why reading 2 came late:** the first post-ff rewrite (10-04 at 17:52:54Z) still showed 2 mismatch / 2 off-grid. It was written by sweep 20261003_172532, started 17:25:32Z before the ff; that sweep's NHL child ran old code, and the new code cannot emit an off-grid line. The single refresh lane makes the next sweep necessarily post-ff.
+- **Not evidence either way:** `predictions_2026-10-05` (last written 15:52:38Z, pre-ff).
+- **Fleet HEAD now `ca3c85cd`** (another session's ff), which contains a18cda3e.
