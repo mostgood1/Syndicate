@@ -183,24 +183,71 @@ def test_a_superseded_entry_yields_no_note_at_all(monkeypatch):
     assert mms.skill_note(sport="nfl", market="Interceptions") is None
 
 
-def test_the_two_real_superseded_nfl_entries_reach_no_board_row():
-    """Against the REAL table: both must be unmeasured, by either spelling."""
-    for market, spelled in (("interceptions", "Interceptions"),
-                            ("passing_tds", "Passing TDs")):
-        entry = mms.MEASURED_MARKET_SKILL[("nfl", market, "full", mms.PHASE_PREGAME)]
-        assert entry.get("superseded"), f"{market} should still be annotated superseded"
-        assert mms.skill_note(sport="nfl", market=market) is None
-        assert mms.skill_note(sport="nfl", market=spelled) is None
+def test_no_nfl_pregame_prop_entry_is_superseded_any_more():
+    """All eight were measured 2026-10-03, so none may still claim to be superseded.
+
+    A `superseded` field on a measured entry makes `skill_note` return None (the gate
+    below), which would silently un-measure a market that now HAS a reading.
+    """
+    for key, entry in mms.MEASURED_MARKET_SKILL.items():
+        sport, market, segment, phase = key
+        if sport != "nfl" or phase != mms.PHASE_PREGAME:
+            continue
+        assert not entry.get("superseded"), f"{market} still carries superseded"
 
 
-def test_the_six_refreshed_nfl_markets_reach_their_entries_by_board_spelling():
-    """Against the REAL table, using the strings the board actually emits."""
+def test_all_eight_nfl_prop_markets_reach_their_entries_by_board_spelling():
+    """Against the REAL table, using the strings the board actually emits.
+
+    `interceptions` is PARITY, not a loss: measured 2026-10-03 at Brier +0.0015 with a
+    cluster-robust CI of [-0.0069, +0.0099], which straddles zero. It is pinned here
+    because a parity verdict and an unmeasured note are NOT interchangeable -- parity is
+    a reading, and `skill_reliability` must leave its rows undiscounted for the right
+    reason rather than by accident.
+    """
     expected = {
-        "Receiving Yards": 3116, "Receptions": 1179, "Rushing Yards": 1463,
-        "Passing Yards": 834, "Rushing Attempts": 562, "Passing Attempts": 343,
+        "Receiving Yards":  (3114, mms.VERDICT_LOSES),
+        "Rushing Yards":    (1455, mms.VERDICT_LOSES),
+        "Receptions":       (1179, mms.VERDICT_LOSES),
+        "Passing Yards":    ( 825, mms.VERDICT_LOSES),
+        "Rushing Attempts": ( 561, mms.VERDICT_LOSES),
+        "Passing Attempts": ( 334, mms.VERDICT_LOSES),
+        "Passing TDs":      ( 178, mms.VERDICT_LOSES),
+        "Interceptions":    ( 162, mms.VERDICT_PARITY),
     }
-    for spelled, n in expected.items():
+    for spelled, (n, cls) in expected.items():
         note = mms.skill_note(sport="nfl", market=spelled, segment="full")
         assert note is not None, f"the board's {spelled!r} must reach its entry"
         assert note["sample_games"] == n, spelled
-        assert note["verdict_class"] == mms.VERDICT_LOSES, spelled
+        assert note["verdict_class"] == cls, spelled
+
+
+def test_the_parity_market_earns_no_discount_and_the_losing_one_does():
+    """`established_loss_rel` clamps a negative lower bound to 0, so parity scores 1.0."""
+    from syndicate.features.shared.projection_skill import normalize_existing_note
+
+    parity = normalize_existing_note(
+        mms.skill_note(sport="nfl", market="Interceptions", segment="full"))
+    assert mms.skill_reliability(parity) == 1.0
+
+    losing = normalize_existing_note(
+        mms.skill_note(sport="nfl", market="Passing TDs", segment="full"))
+    assert 0.5 <= mms.skill_reliability(losing) < 1.0
+
+
+def test_every_nfl_prop_ci_lower_bound_agrees_with_its_verdict_class():
+    """A LOSES entry must have a CI clear of zero; a PARITY one must straddle it.
+
+    This is the check that would have caught the 2026-10-03 defect where the stored CIs
+    were computed over book-rows rather than player-games: too-narrow CIs cannot flip a
+    class, but a class asserted against a CI that contradicts it is unreadable.
+    """
+    for key, entry in mms.MEASURED_MARKET_SKILL.items():
+        sport, market, segment, phase = key
+        if sport != "nfl" or phase != mms.PHASE_PREGAME or "brier_market" not in entry:
+            continue
+        lo, hi = entry["ci95"]
+        if entry["verdict_class"] == mms.VERDICT_LOSES:
+            assert lo > 0, f"{market}: LOSES but CI lower bound {lo} is not above zero"
+        elif entry["verdict_class"] == mms.VERDICT_PARITY:
+            assert lo <= 0 <= hi, f"{market}: PARITY but CI [{lo}, {hi}] excludes zero"
