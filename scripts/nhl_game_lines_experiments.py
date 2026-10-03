@@ -372,6 +372,104 @@ class GsaxHistory:
         return res
 
 
+class TeamXg:
+    """Per-game team xGF / xGA for 2025-26 regular season, aggregated the way
+    `scripts/build_nhl_xg_artifact.py` does (every Fenwick shot incl. empty-net, summed per game,
+    rate = per game == "per 60"), scored by the SAME frozen xG model as `GsaxHistory`."""
+
+    def __init__(self, act: Dict[str, Dict], src: Path, gsx: "GsaxHistory"):
+        X = gsx._X
+        feats, meta, leads = [], [], []
+        self.score_walk = Counter()
+        for gid, r in act.items():
+            if r["season"] != BGL.SEASON_PREV or r["gtype"] != 2:
+                continue
+            pbp = BGL._rj(src / "data" / "ingestion_cache" / f"playbyplay_{gid}.json")
+            if not pbp:
+                continue
+            home_id = int((pbp.get("homeTeam") or {}).get("id"))
+            shots = X.parse_play_by_play_shots(pbp)
+            states = self._home_lead_before_kept(pbp, X)
+            ok = len(states) == len(shots)
+            self.score_walk["games_ok" if ok else "games_mismatch"] += 1
+            for k_, s in enumerate(shots):
+                feats.append(s)
+                meta.append((gid, r["home"] if s.team_id == home_id else r["away"],
+                             r["away"] if s.team_id == home_id else r["home"]))
+                hl = states[k_] if ok else None
+                leads.append(None if hl is None else (hl if s.team_id == home_id else -hl))
+        xg = gsx.model.predict_proba(X.featurize(feats))[:, 1]
+        # score-state coefficients, fit on pre-EVAL_START shots only: w_d = 0.5 / share_d, where
+        # share_d = xG by shooters leading by d / (that + xG by shooters trailing by d)
+        by_d = defaultdict(float)
+        for (gid, _sh, _df), x, ld in zip(meta, xg, leads):
+            if ld is not None and act[gid]["date"] < EVAL_START:
+                by_d[max(-3, min(3, ld))] += float(x)
+        self.w = {}
+        for d_ in range(-3, 4):
+            num, den = by_d.get(d_, 0.0), by_d.get(d_, 0.0) + by_d.get(-d_, 0.0)
+            self.w[d_] = (0.5 / (num / den)) if den > 0 and num > 0 else 1.0
+        per = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0, 0.0, 0.0]))  # gid -> team -> [xgf, xga, adj_xgf, adj_xga]
+        for (gid, sh, df), x, ld in zip(meta, xg, leads):
+            wx = float(x) * (self.w[max(-3, min(3, ld))] if ld is not None else 1.0)
+            e1, e2 = per[gid][sh], per[gid][df]
+            e1[0] += float(x); e2[1] += float(x); e1[2] += wx; e2[3] += wx
+        self.games = defaultdict(list)      # team -> [(date, xgf, xga)] sorted
+        self.games_adj = defaultdict(list)  # same, score-adjusted
+        for gid, teams in per.items():
+            d = act[gid]["date"]
+            for team in (act[gid]["home"], act[gid]["away"]):
+                f, a_, fa, aa = teams.get(team, [0.0, 0.0, 0.0, 0.0])
+                self.games[team].append((d, f, a_))
+                self.games_adj[team].append((d, fa, aa))
+        for k in self.games:
+            self.games[k].sort(); self.games_adj[k].sort()
+        self.n_shots = len(feats)
+        self._cache: Dict[Tuple, Any] = {}
+
+    @staticmethod
+    def _home_lead_before_kept(pbp, X) -> List[int]:
+        """Home lead BEFORE each Fenwick play the production parser keeps (same filters), walking
+        every play and updating on goal events (which carry the score AFTER the goal)."""
+        home_id = (pbp.get("homeTeam") or {}).get("id")
+        hs = as_ = 0
+        out = []
+        for pl in pbp.get("plays") or []:
+            d = pl.get("details") or {}
+            kept = False
+            if pl.get("typeDescKey") in X._FENWICK_TYPES and d.get("eventOwnerTeamId") is not None \
+                    and d.get("xCoord") is not None and d.get("yCoord") is not None:
+                try:
+                    float(d["xCoord"]); float(d["yCoord"]); tid = int(d["eventOwnerTeamId"])
+                    kept = X._situation_state(pl.get("situationCode"), shooter_is_home=(tid == home_id)) is not None
+                except (TypeError, ValueError):
+                    kept = False
+            if kept:
+                out.append(hs - as_)
+            if pl.get("typeDescKey") == "goal" and d.get("homeScore") is not None:
+                hs, as_ = int(d["homeScore"]), int(d["awayScore"])
+        return out
+
+    def rate(self, team: str, date: str, arm: str, half_life: Optional[float], adjusted: bool = False):
+        """(xgf60, xga60) from the team's games strictly before `date` (all 2025-26 for the 2026-27
+        arm), each weighted 0.5 ** (games_ago / half_life); half_life None = plain season average."""
+        key = (team, date, arm, half_life, adjusted)
+        if key in self._cache:
+            return self._cache[key]
+        g = (self.games_adj if adjusted else self.games).get(team, [])
+        if not arm.startswith("current"):
+            g = [x for x in g if x[0] < date]
+        if not g:
+            res = (None, None)
+        else:
+            n = len(g)
+            w = [1.0 if half_life is None else 0.5 ** ((n - 1 - i) / half_life) for i in range(n)]
+            W = sum(w)
+            res = (sum(wi * x[1] for wi, x in zip(w, g)) / W, sum(wi * x[2] for wi, x in zip(w, g)) / W)
+        self._cache[key] = res
+        return res
+
+
 def gsax_factor(pid: Optional[int], hist: "GsaxHistory", date: str, arm: str, k: float) -> Optional[float]:
     """Shrunk goals-allowed / xG-faced ratio of the goalie, relative to the as-of league ratio.
     k is in xG units (a goalie with k xG faced is halfway to his own ratio). >1 = worse goalie."""
@@ -662,6 +760,7 @@ def main() -> int:
                     else:
                         fac[side] = goalie_factor(stats, sv_lg, k_goalie)
                 # the HOME goalie scales the AWAY lambda and vice versa
+                rec["fac"] = dict(fac)
                 hp5 = [x * s * fac["away"] for x in hp]
                 ap5 = [x * s * fac["home"] for x in apl]
                 if rest:
@@ -738,14 +837,76 @@ def main() -> int:
         rows, miss = run(**kw)
         results[label] = (rows, miss)
 
+    # ---- recency-weighted xG (H8)
+    from syndicate.features.nhl.sim_engine.hockeysim.contracts import HockeyTeamFeatures as HTF
+    from syndicate.features.nhl.sim_engine.hockeysim.projection import project_game
+    txg = TeamXg(act, src, gsx)
+    print(f"team xG: {txg.n_shots} Fenwick shots (incl. empty-net), {len(txg.games)} teams")
+
+    print(f"score adjustment: walk {dict(txg.score_walk)}; w_d (lead d -> weight) { {d: round(v, 4) for d, v in txg.w.items()} }")
+
+    def lam_source(half_life, adjusted=False):
+        out_l = {}
+        for g in games:
+            r = act[g["gid"]]
+            hf, ha = txg.rate(r["home"], g["date"], r["arm"], half_life, adjusted)
+            af, aa = txg.rate(r["away"], g["date"], r["arm"], half_life, adjusted)
+            pr = project_game(HTF(name=r["home"], xgf_per_60=hf, xga_per_60=ha),
+                              HTF(name=r["away"], xgf_per_60=af, xga_per_60=aa))
+            out_l[g["gid"]] = (list(pr.period_home_lambdas), list(pr.period_away_lambdas))
+        return out_l
+
+    def v4_from(lams, fac_by_gid=None, window=None):
+        rt, ti, a1 = {}, {}, {}
+        for g in games:
+            hp_, ap_ = lams[g["gid"]]
+            p_ = probs(*draws(hp_, ap_, game_seed(g["date"], g["gid"])))
+            rt[g["gid"]], ti[g["gid"]], a1[g["gid"]] = p_["reg_total"], p_["p_reg_tie"], p_["abs1_nontie"]
+        fit = Fitter(act, rt, ti, a1)
+        res_ = {}
+        for g in games:
+            if window and not window(g["date"]):
+                continue
+            r = act[g["gid"]]
+            f = fit.at(g["date"], r["arm"])
+            hp_, ap_ = lams[g["gid"]]
+            fa = (fac_by_gid or {}).get(g["gid"], {"home": 1.0, "away": 1.0})
+            seed = game_seed(g["date"], g["gid"])
+            h_, a_ = draws([x * f["s"] * fa["away"] for x in hp_], [x * f["s"] * fa["home"] for x in ap_], seed)
+            res_[g["gid"]] = probs(h_, a_, q_ot=f["q_ot"], delta=f["delta"], e=f["e"], seed=seed,
+                                   close=BOOK.get(g["gid"], {}).get("total_line"))
+        return res_
+
+    def ll_of(pmap):
+        return statistics.fmean(BGL._ll(pmap[gid]["p_home_ml"], 1 if act[gid]["final_h"] > act[gid]["final_a"] else 0)
+                                for gid in pmap)
+
+    tune_h = {}
+    for hl in (5.0, 10.0, 20.0, 40.0, None):
+        tune_h[str(hl)] = ll_of(v4_from(lam_source(hl), window=pre))
+    h_best_s = min(tune_h, key=tune_h.get)
+    h_best = None if h_best_s == "None" else float(h_best_s)
+    print(f"tuned recency half-life (games, pre-{EVAL_START}): {h_best_s}; ML log-loss: { {k: round(v, 5) for k, v in tune_h.items()} }")
+    lam_ctrl = lam_source(None)
+    lam_rec = lam_source(h_best if h_best is not None else 20.0)  # if the control wins, still score a recency arm
+    v9c = v4_from(lam_ctrl)
+    v9 = v4_from(lam_rec)
+    fac8 = {x["gid"]: x.get("fac", {"home": 1.0, "away": 1.0}) for x in results["V8"][0]}
+    v9g = v4_from(lam_rec, fac_by_gid=fac8)
+    v10 = v4_from(lam_source(None, adjusted=True))
+    v10r = v4_from(lam_source(h_best if h_best is not None else 20.0, adjusted=True))
+
     rows_all = results["V6"][0]
     others = {lab: {x["gid"]: x for x in results[lab][0]} for lab in ("V5", "V5r", "V5c", "V5o", "V7", "V7o", "V8", "V8o")}
     for x in rows_all:
         for lab, idx in others.items():
             x[lab] = idx[x["gid"]]["VX"]
         x["V6"] = x.pop("VX")
+        x["V9c"], x["V9"], x["V9g"] = v9c[x["gid"]], v9[x["gid"]], v9g[x["gid"]]
+        x["V10"], x["V10r"] = v10[x["gid"]], v10r[x["gid"]]
 
-    report = {"gsax_prior_kw": kp_best, "gsax_prior_tune": {str(k): v for k, v in tune_p.items()}, "gsax_prior_stats": prior_stats,
+    report = {"score_adj_w": txg.w, "score_walk": dict(txg.score_walk), "recency_half_life": h_best_s, "recency_tune": tune_h,
+              "gsax_prior_kw": kp_best, "gsax_prior_tune": {str(k): v for k, v in tune_p.items()}, "gsax_prior_stats": prior_stats,
               "k_goalie": k_best, "gsax_k": kg_best, "gsax_tune": tune_g, "gsax_stats": gsx.stats,
               "gsax_join": {k: dict(v[1]) for k, v in results.items() if k.startswith("V7")}, "tune": {str(k): v for k, v in tune.items()}, "rest": rest, "starter_sources": picks["stats"],
               "goalie_join": {k: dict(v[1]) for k, v in results.items()},
@@ -766,7 +927,7 @@ def main() -> int:
     return 0
 
 
-VARIANTS = ["V0", "V1", "V2", "V3", "V4", "V5", "V5r", "V5c", "V6", "V5o", "V7", "V7o", "V8", "V8o"]
+VARIANTS = ["V0", "V1", "V2", "V3", "V4", "V5", "V5r", "V5c", "V6", "V5o", "V7", "V7o", "V8", "V8o", "V9c", "V9", "V9g", "V10", "V10r"]
 
 
 def score(R: List[Dict], min_n: int) -> Dict:
