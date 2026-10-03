@@ -45748,3 +45748,34 @@ decisive interval. Not costed.
   - Mean model_total **6.3265** (reading 1 predicted 6.327; baseline 6.4362).
   - The totals-line fix (a18cda3e) still holds in the same file: 13/13 at the books' modal pregame line, 0 off-grid.
 - **Not yet rewritten** (still legacy, pre-go-live): 10-04 (19:53:14Z), 10-05, 10-06. They convert on their next generation.
+### Addendum 20:54:39Z -- THE OWED INTERCEPTIONS READING LANDED. GOAL MET in full.
+
+The 10-04 slate's artifact rebuilt at `written_at 20:54:39Z`, post-dating the 20:32:44Z load, and it
+carries the population the 10-03 shortlist lacked:
+
+    market          rows   n    status    verdict_class     established_loss_rel  skill_reliability
+    Interceptions     20  162   measured  parity                            0.0               1.000
+    Passing TDs       21  178   measured  loses_to_market               0.05099               0.745
+
+    counter                       19:47:20Z (pre)   20:54:39Z (post)
+    rows_with_measured_skill                  809                855
+    rows_with_unmeasured_skill                364                308
+
+Both were `sample_games: 0, status: unmeasured` on the pre-load 19:47:20Z artifact (19 and 22 rows),
+so this is a true before/after on the same date rather than an inference from another one.
+
+**The "applies no discount" clause is verified on the served note itself, not inferred:**
+`Interceptions` carries `established_loss_rel: 0.0` and `skill_reliability` computes to **1.0**,
+because `established_loss_rel` clamps the CI's negative lower bound to zero. `Passing TDs` carries
+`0.05099` and **0.745**. The served verdict strings are the measured ones:
+*"indistinguishable from the de-vigged market, Brier +0.0015 [-0.0069, +0.0099] over 162
+player-game observations"* and *"loses to the de-vigged market, Brier +0.0266 [+0.0121, +0.0420]
+over 178 obs in 162 player-game clusters"*.
+
+So `interceptions` now reaches the board as a MEASURED PARITY rather than an absent measurement.
+Its rows score identically to before (1.0 either way) and the claim behind that score is no longer a
+blank. `passing_tds` applies a real discount for the first time.
+
+**Nothing is owed on this lane.** web (`f351eac5`) and live-odds-worker (`80f380f8`) remain without
+`9434b5cc` and do not need it: every served NFL date is `source: layer2_shortlist_artifact` except
+10-05, whose body is the degraded empty state, so no path has web stamping a `model_skill` note.
