@@ -88,10 +88,14 @@ def test_roster_full_names_unreachable_is_empty(monkeypatch):
 # --- board join -------------------------------------------------------------
 
 
-def _index(rows):
+_REG = {"line_slot": "L1", "proj_toi": "18.0", "sim_starter": "", "game_type": "regular"}
+
+
+def _index(rows, context=None):
     idx = npp.NhlPropProjectionIndex(date="2026-10-02")
     for player, code, team, opp, lam in rows:
         idx.by_key[(npp._norm(player), code)] = (npp._norm(team), npp._norm(opp), lam)
+        idx.context[(npp._norm(player), code)] = dict(_REG if context is None else context)
     return idx
 
 
@@ -103,31 +107,49 @@ def _row(player="Andrew Copp", market="player_shots_on_goal", line=1.5, **kw):
     return row
 
 
-def test_attach_stamps_mean_and_withholds_unmeasured_probability():
+def test_every_fit_line_gets_probability_and_edge():
+    # User decision 2026-10-02: no market-level withhold; every line is its own decision.
     grid = [_row(), _row(market="player_goals_alternate", line=0.5)]
     cov = npp.attach_nhl_prop_projections(
-        grid, _index([("Andrew Copp", "SOG", "Detroit Red Wings", "New York Rangers", 2.2),
+        grid, _index([("Andrew Copp", "SOG", "Detroit Red Wings", "New York Rangers", 2.0),
                       ("Andrew Copp", "GOALS", "Detroit Red Wings", "New York Rangers", 0.3)]),
         selected_date="2026-10-02",
     )
-    assert cov["rows_considered"] == 2 and cov["rows_with_projection"] == 2
+    assert cov["rows_with_projection"] == 2 and cov["rows_with_probability"] == 2
+    assert cov["probability_refused_by_line"] == {}
     p = grid[0]["projection"]
-    assert p["projected"] == 2.2 and p["edge_vs_line"] == pytest.approx(0.7) and p["side"] == "over"
-    # The user decision: no probability and no market edge until the market is measured.
-    assert p["model_prob_over"] is None and p["edge_vs_market_pct"] is None
-    assert "not yet backtested" in p["edge_unavailable_reason"]
-    assert cov["probability_withheld_unmeasured"] == {"SOG": 1, "GOALS": 1}
+    assert p["projected"] == 2.0 and p["edge_vs_line"] == pytest.approx(0.5)
+    # P(X > 1.5 | Poisson 2) = 1 - e^-2 (1 + 2)
+    assert p["model_prob_over"] == pytest.approx(0.594, abs=1e-3)
 
 
-def test_measured_market_gets_poisson_probability(monkeypatch):
-    monkeypatch.setattr(npp, "MEASURED_MARKETS", frozenset({"SOG"}))
-    grid = [_row()]
-    npp.attach_nhl_prop_projections(
-        grid, _index([("Andrew Copp", "SOG", "Detroit Red Wings", "New York Rangers", 2.0)]),
+@pytest.mark.parametrize("context,code,reason", [
+    ({"line_slot": "", "game_type": "regular"}, "SOG", npp.REFUSE_NO_SLOT),
+    ({"line_slot": "L2", "game_type": "preseason"}, "SOG", npp.REFUSE_PRESEASON),
+    ({}, "SOG", npp.REFUSE_NO_CONTEXT),
+    ({"sim_starter": "0", "game_type": "regular"}, "SAVES", npp.REFUSE_NOT_STARTER),
+])
+def test_unfit_line_is_refused_on_its_own_facts(context, code, reason):
+    market = {"SOG": "SOG", "SAVES": "SAVES"}[code]
+    grid = [_row(market=market, line=1.5 if code == "SOG" else 25.5)]
+    cov = npp.attach_nhl_prop_projections(
+        grid, _index([("Andrew Copp", code, "Detroit Red Wings", "New York Rangers", 2.0)], context=context),
         selected_date="2026-10-02",
     )
-    # P(X > 1.5 | Poisson 2) = 1 - e^-2 (1 + 2)
-    assert grid[0]["projection"]["model_prob_over"] == pytest.approx(0.594, abs=1e-3)
+    p = grid[0]["projection"]
+    assert p["projected"] == 2.0                    # the mean is still shown
+    assert p["model_prob_over"] is None and p["edge_vs_market_pct"] is None
+    assert p["edge_unavailable_reason"].endswith(reason)
+    assert cov["probability_refused_by_line"] == {reason: 1}
+
+
+def test_starting_goalie_saves_are_priced():
+    grid = [_row(market="SAVES", line=25.5)]
+    npp.attach_nhl_prop_projections(
+        grid, _index([("Andrew Copp", "SAVES", "Detroit Red Wings", "New York Rangers", 27.0)],
+                     context={"sim_starter": "1", "game_type": "regular"}),
+        selected_date="2026-10-02")
+    assert grid[0]["projection"]["model_prob_over"] is not None
 
 
 def test_same_name_in_another_game_does_not_price_the_row():

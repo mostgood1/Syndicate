@@ -61,7 +61,7 @@ from syndicate.features.nhl.sim_engine.hockeysim.market_anchoring import (  # no
     anchor_state_for,
     resolve_anchor_weight,
 )
-from syndicate.features.nhl.sim_engine.hockeysim.player_props import build_prop_projections  # noqa: E402
+from syndicate.features.nhl.sim_engine.hockeysim.player_props import _starter_goalie_id, build_prop_projections  # noqa: E402
 from syndicate.features.nhl.sim_engine.hockeysim.features.loaders import (  # noqa: E402
     _processed_dir,
     build_slate_features,
@@ -165,6 +165,24 @@ def _poisson_p_over(line: float, lam: float) -> float:
     return max(0.0, min(1.0, 1.0 - cdf))
 
 
+def _game_type(game_pk: object) -> str:
+    """NHL game id YYYYTTNNNN: TT 01 preseason, 02 regular season, 03 playoffs."""
+    code = str(game_pk or "")[4:6]
+    return {"01": "preseason", "02": "regular", "03": "playoff"}.get(code, "")
+
+
+def _line_context(pf, is_sim_starter: bool, game_type: str) -> Dict[str, object]:
+    """What the board's per-line gates need and the CSV did not carry."""
+    if pf is None:
+        return {"game_type": game_type}
+    return {
+        "line_slot": pf.line_slot or "",
+        "proj_toi": round(float(pf.proj_toi or 0.0), 3),
+        "sim_starter": ("1" if is_sim_starter else "0") if str(pf.position).upper() == "G" else "",
+        "game_type": game_type,
+    }
+
+
 def _match_lines_to_game(game, lines: List[Dict[str, object]]) -> Dict[int, int]:
     """``{index into lines: player_id}`` for the book lines that belong to this game's players.
 
@@ -220,6 +238,9 @@ def build_props_for_date(
 
         projs = build_prop_projections(g, lines=pid_market_line, n_sims=n_sims)
         proj_by_key = {(p.player_id, p.market): p for p in projs}
+        game_type = _game_type(g.game_pk)
+        starters = {_starter_goalie_id(tuple(g.home_players)), _starter_goalie_id(tuple(g.away_players))}
+        meta = {int(p.player_id): p for p in list(g.home_players) + list(g.away_players)}
 
         for idx, pid in line_pids.items():
             r = lines[idx]
@@ -241,6 +262,7 @@ def build_props_for_date(
                 over_price=int(round(float(op))) if op is not None else None,
                 under_price=int(round(float(up))) if up is not None else None,
                 book=str(r.get("book") or ""),
+                context=_line_context(meta.get(pid), pid in starters, game_type),
             )
             if row:
                 rows_out.append(row)

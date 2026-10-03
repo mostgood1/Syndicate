@@ -18,14 +18,20 @@ instead of being refused. Edge and fair go through the shared
 `_attach_sim_probability_edge`, which de-vigs two-sided rows and suppresses the
 edge on live rows, exactly as every other sport's prop joins do.
 
-PROBABILITY AND EDGE ARE WITHHELD PER MARKET UNTIL MEASURED `[2026-10-02, user
-decision: "means now, edges after backtest"]`. The mean and `edge_vs_line` are
-display-only (Layer 2 ranks on `edge_vs_market_pct` alone,
-`layer2_board.py` "Only `edge_vs_market_pct` qualifies"). A market joins
-`MEASURED_MARKETS` only once `scripts/backtest_nhl_props.py` has measured it;
-until then its rows carry the mean and a stated reason, and nothing ranks on an
-unvalidated claim -- the preseason lineup inference projected Adam Fox at 0.13
-shots a game on 2026-10-02, which would have priced a ~90% "edge" on the under.
+EVERY LINE IS ITS OWN DECISION `[2026-10-02, user decision "Restore, with per-line gates";
+supersedes "means now, edges after backtest"]`. Probability and edge are priced on every line,
+and a line is refused only on ITS OWN facts, each one measured by `scripts/backtest_nhl_props.py`
+(2025-26, as-of inputs):
+
+  * the player has no line slot (or is a goalie the sim does not start) -- the engine gives him
+    no ice time, so he projects ~0 (0.001 SOG against 0.86 actual over 4,146 player-games);
+  * the game is preseason -- split-squad lineups: 45% of skaters who played were absent from the
+    sim lineup and the starting goalie was right 0 of 116 times;
+  * the artifact carries no line context (written before the producer recorded it) -- unknown is
+    refused, never treated as passing.
+
+There is NO market-level withhold list. The model is still unmeasured-to-worse against a player's
+own average in most markets; `projection_skill` stamps that on every row.
 """
 
 from __future__ import annotations
@@ -44,9 +50,24 @@ _LOGGER = logging.getLogger(__name__)
 
 SOURCE = "nhl_hockeysim_props"
 
-# Market codes whose probability may be published. EMPTY until the backtest measures one.
-MEASURED_MARKETS: frozenset[str] = frozenset()
-_WITHHELD_REASON = "NHL prop model not yet backtested for this market; probability withheld"
+# Per-line refusal reasons (the board's `edge_unavailable_reason` vocabulary for NHL props).
+REFUSE_NO_SLOT = "player has no line slot in the sim lineup (projected ~0 ice time)"
+REFUSE_NOT_STARTER = "goalie is not the sim's projected starter"
+REFUSE_PRESEASON = "preseason game: sim lineups are unreliable for split-squad rosters"
+REFUSE_NO_CONTEXT = "artifact row carries no line context; refused rather than assumed fit"
+
+
+def line_refusal(context: Mapping[str, Any] | None, code: str) -> str | None:
+    """The per-line reason this row may not carry a probability, or None when it may."""
+    ctx = context or {}
+    game_type = str(ctx.get("game_type") or "").strip().lower()
+    if not game_type:
+        return REFUSE_NO_CONTEXT
+    if game_type == "preseason":
+        return REFUSE_PRESEASON
+    if code == "SAVES":
+        return None if str(ctx.get("sim_starter") or "") == "1" else REFUSE_NOT_STARTER
+    return None if str(ctx.get("line_slot") or "").strip() else REFUSE_NO_SLOT
 
 # Board market key (OddsAPI, `_alternate` stripped) -> props_recommendations market code.
 _MARKET_CODES = {
@@ -98,6 +119,8 @@ class NhlPropProjectionIndex:
     source_path: str = ""
     # (player, market code) -> (team, opp, lambda)
     by_key: dict[tuple[str, str], tuple[str, str, float]] = field(default_factory=dict)
+    # (player, market code) -> line context written by the producer (line_slot, sim_starter, game_type)
+    context: dict[tuple[str, str], dict[str, str]] = field(default_factory=dict)
 
     @property
     def players(self) -> int:
@@ -138,7 +161,11 @@ def load_nhl_prop_projections(selected_date: str) -> NhlPropProjectionIndex:
             continue
         if not player or not code or not math.isfinite(lam) or lam < 0:
             continue
-        index.by_key.setdefault((player, code), (_norm(raw.get("team")), _norm(raw.get("opp")), lam))
+        if (player, code) not in index.by_key:
+            index.by_key[(player, code)] = (_norm(raw.get("team")), _norm(raw.get("opp")), lam)
+            index.context[(player, code)] = {
+                k: str(raw.get(k) or "") for k in ("line_slot", "proj_toi", "sim_starter", "game_type")
+            }
     return index
 
 
@@ -161,7 +188,7 @@ def attach_nhl_prop_projections(
     unmatched = 0
     no_line = 0
     priced = 0
-    withheld: dict[str, int] = {}
+    refused: dict[str, int] = {}
     for row in grid:
         if str(row.get("kind") or "") != "prop":
             continue
@@ -197,13 +224,14 @@ def attach_nhl_prop_projections(
         else:
             projection["edge_vs_line"] = round(lam - line, 3)
             projection["side"] = "over" if lam > line else "under"
-            if code in MEASURED_MARKETS:
+            refusal = line_refusal(index.context.get((_norm(row.get("player_name")), code)), code)
+            if refusal is None:
                 _attach_sim_probability_edge(projection, row=row, model_prob=poisson_p_over(line, lam))
                 priced += 1
             else:
-                projection["probability_unavailable_reason"] = _WITHHELD_REASON
-                projection["edge_unavailable_reason"] = "no probability to price: " + _WITHHELD_REASON
-                withheld[code] = withheld.get(code, 0) + 1
+                projection["probability_unavailable_reason"] = refusal
+                projection["edge_unavailable_reason"] = "no probability to price: " + refusal
+                refused[refusal] = refused.get(refusal, 0) + 1
         row["projection"] = refuse_published_certainty(projection)  # type: ignore[index]
         attached += 1
 
@@ -216,7 +244,7 @@ def attach_nhl_prop_projections(
         "unmatched_player_rows": unmatched,
         "rows_without_line": no_line,
         "rows_with_probability": priced,
-        "probability_withheld_unmeasured": withheld,
+        "probability_refused_by_line": refused,
         "pct_projected": round(100.0 * attached / considered, 1) if considered else 0.0,
         "source_artifact": index.source_path,
     }

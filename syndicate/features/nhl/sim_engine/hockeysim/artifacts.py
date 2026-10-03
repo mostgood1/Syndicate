@@ -115,6 +115,8 @@ PROPS_RECOMMENDATIONS_COLUMNS: List[str] = [
     "date", "player", "team", "opp", "market", "line", "proj_lambda", "p_over",
     "over_price", "under_price", "book", "side", "price", "ev", "ev_over",
     "chosen_prob", "edge_score", "edge_drivers", "edge_reasons", "proj",
+    # Line context the board's per-line gates read (`syndicate/features/nhl/prop_projections.py`).
+    "line_slot", "proj_toi", "sim_starter", "game_type",
 ]
 
 
@@ -124,6 +126,7 @@ def prop_recommendation_row(
     over_price: Optional[int],
     under_price: Optional[int],
     book: str,
+    context: Optional[Dict[str, object]] = None,
 ) -> Optional[Dict[str, object]]:
     """Build one props_recommendations row from a projection + a book's over/under prices.
 
@@ -168,6 +171,10 @@ def prop_recommendation_row(
         "edge_drivers": driver,
         "edge_reasons": driver,
         "proj": _fmt(proj.proj),
+        "line_slot": (context or {}).get("line_slot"),
+        "proj_toi": (context or {}).get("proj_toi"),
+        "sim_starter": (context or {}).get("sim_starter"),
+        "game_type": (context or {}).get("game_type"),
     }
 
 
