@@ -45222,3 +45222,10 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - freshness, NOT a clean reading: 22:22-23:00Z oldest rows NFL 52.7 / NCAAF 58.9 / WNBA 57.2 / soccer 59.8 / NHL 47.7 min, 0 rows > 1h -- overlapped by the 24-min soccer run (22:35-22:59Z) that refused every other sweep lane_busy. After the 23:09Z restart the first sweep launched 23:22:16Z (14 min), NHL pregame rows aged out (5 served, 425 hidden at 23:33Z), and live phase began ~23:28Z. Saturday pregame watcher `~/satwatch/` 12:30-16:30Z owes the margin reading.
 - soccer: run 20261002_223521 = 24m10s, schedule steps 1,327 of 1,416 step-seconds (championship 241, primeira_liga 197, epl 164 ...), odds 11s. Near mode vs live ESPN on fleet-file copies: mls 14s vs 91s, identical to a fresh full build (511/511, weeks equal).
 - memory note: live-odds-worker headroom dipped to 120 MB of its 2048 MB plan at 23:36:07Z during a live 4-sport sweep.
+
+
+## 2026-10-03 00:40Z (7:40 PM CT 10-02) -- MEASUREMENT: soccer near-window schedules LIVE on the fleet (de28521c via ff to 921aa465) -- lane `layer2-freshness-1h`
+- deploy: the user's ff had not landed (checkout 10 behind github/main, clean tree, no reflog entry); I ran `git merge --ff-only github/main` on the fleet checkout 00:29Z at the user's request -> 921aa465. Other commits carried: new offline backtest scripts only. No restart (the soccer run spawns its scripts per run).
+- verify: run 20261003_003217 (first on new code) 00:32:17-00:37:17Z = 5.0 min, ok=True, 51 steps, step-seconds 189 (schedule 52, props 74, picks 34, odds 18, artifacts 8) vs run 20261002_223521's 1,416 (schedule 1,327). All 10 schedule steps `--near`, 0 failed, each 3-12 s (full builds were 73-241 s). Files keep their match counts (epl 380, mls 511, championship 552), build_mode=near, full_generated_at carried.
+- cost of the old code tonight: the last old run 20261002_233838 ran 23:38:38-00:32Z (53 min, full rebuilds under live-phase contention) and refused ~22 sweeps lane_busy, incl. LIVE nhl/wnba/nfl/ncaaf sweeps.
+- expect: first 6-hourly FULL rebuild ~05:40-06:20Z (one ~20+ min run).
