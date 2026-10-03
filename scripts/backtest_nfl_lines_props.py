@@ -873,7 +873,7 @@ def score_props(root: Path, sched: Dict[str, Dict[str, Any]], seasons: List[int]
                                 "p_base": p_base, "p_book": pb, "dec_yes": american_to_dec(sides["over"]),
                                 "dec_no": american_to_dec(sides["under"]), "book": book, "line": line,
                                 "player": player, "mean": r["mean_model"], "sd": r["sd"], "n": r["n"],
-                                "actual": r["actual"]})
+                                "actual": r["actual"], "pid": r["pid"], "week": r["week"], "ctx": r["ctx"]})
 
     # point rows: one per (game, player, stat); book point = median over books of each book's most-balanced line
     point_rows: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
