@@ -1245,6 +1245,12 @@ death, never life — do not invert it.
 - Hypothesis: A fitted shrink weight w in [0,1] per market improves held-out Brier of fair + w(model - fair) over both the raw model (w=1) and the book (w=0) wherever the model carries any information
 - Falsification test: If the held-out optimum is w=0 with a CI touching 0 for a market, the model adds nothing to the book there and its lines' edges go to ~0 (still judged per line, on EV)
 - Verification: Unit tests (weight applied, aliases resolve, admission unchanged); fleet board read after ff: soccer rows carry skill_edge_weight and edge_vs_market_pct = w x raw
+### mlb-pregame-sim-freeze — OPEN — opened 2026-10-02 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- Goal: Every MLB per-game sim written while its game was Scheduled/Pre-Game/Warmup is kept, frozen, in daily/sims_pregame/<date>/ (latest pregame copy per gamePk+game number wins; a post-first-pitch re-sim NEVER replaces it), captured by the MLB sim job wrapper before AND after every run, so the CURRENT engine can be backtested as-of. Verified on the fleet: after the 10-03 slate starts, sims_pregame/2026-10-03 holds one pregame-status file per game while daily/sims/2026-10-03 holds the post-start re-sims
+- Files: syndicate/features/mlb/pregame_freeze.py (NEW), tests/test_mlb_pregame_freeze.py (NEW), scripts/run_mlb_daily_sim_job.py (freeze calls before/after the vendor run ONLY)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: pregame file frozen; In Progress/Final re-sim leaves the frozen copy byte-identical; newer pregame replaces older; slate-index rename keyed by pk; fails on origin/main (module absent). Fleet: read sims_pregame/2026-10-03 vs daily/sims/2026-10-03 status fields after first pitch
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
