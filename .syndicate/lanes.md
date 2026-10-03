@@ -1563,6 +1563,14 @@ death, never life — do not invert it.
 - Verification: Tables in the findings file: disagreement buckets, minutes-vs-rate decomposition, teammate-absence effect, each with n and CI
 - Blocked by: none
 
+### soccer-team-strength — OPEN — opened 2026-10-03 — session 6214bc11-3dad-4e37-af64-5a44a2cb498b
+- Goal: Soccer 1X2 for the six xG-rated leagues (epl, la_liga, bundesliga, serie_a, ligue_1, mls) closes the FAVOURITE gap that is team-strength identity, not dispersion (held-out favourites: model 0.618, book 0.722, actual 0.757; 1X2 Brier vs de-vigged close +0.0285 [+0.0169,+0.0411], n 671, 2026-27): stage 1 measures, leak-free and as-of, rating variants (shrinkage strength, recency weighting, current-season blend, promoted-team prior) paired per match vs the shipped model, the as-of naive baseline AND the de-vigged close, with a match-clustered CI, singly and cumulatively; stage 2 (only if a variant beats the shipped model with CI excluding 0 and narrows the gap to the book) ships it through the model-engine standard after a user decision. Every line stays on the board; this improves the model, it gates nothing
+- Files: scripts/soccer_team_strength_experiments.py (NEW), docs/reports/soccer_team_strength_experiments_2026-10-03.md (NEW). Production rating code is NOT claimed; it sits with soccer-corners-model-rebuild and needs a user-approved cross-lane write at stage 2
+- Hypothesis: H39: the model's team ratings are UNDER-DISPERSED. Attack/defense ratings shrink too hard toward the league mean and lean on last season (current-season form under-weighted, promoted-team prior -0.18/-0.18 flat), so strong sides are rated too close to average. That is why sharpening (temperature 0.86-0.90) cannot fix it: the ORDER and SPREAD of team strengths are wrong, not the sim's noise.
+- Falsification test: H39 is false if no rating variant reduces held-out 2026-27 1X2 Brier vs the SHIPPED model with a match-clustered CI excluding 0, OR if the best variant's rating spread (sd of attack - defense across teams) is not wider than shipped. Then team-strength identity comes from inputs the ratings never see (squad/lineup strength, market information) and the lane says so.
+- Verification: Report: per variant x league n, Brier/LL vs shipped, naive and close (CIs), favourite calibration (model vs actual vs book), rating spread; data coverage + intersection printed; leak check (no rating input dated >= kickoff); held-out = chronological split; 2025-26 reported separately where retained
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
