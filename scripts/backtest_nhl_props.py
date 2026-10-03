@@ -703,12 +703,27 @@ def _reliability(ps: List[float], ys: List[int], bins: int = 10) -> List[Dict]:
     return out
 
 
-def _american_to_dec(o: float) -> float:
-    return 1 + (o / 100.0 if o > 0 else 100.0 / -o)
+def _american_to_dec(o) -> Optional[float]:
+    """None for a price that is not a quotable American price (0, |o| < 100, None,
+    text) -- 0 used to raise ZeroDivisionError here."""
+    try:
+        x = float(o)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(x) or abs(x) < 100:
+        return None
+    return 1 + (x / 100.0 if x > 0 else 100.0 / -x)
 
 
-def _implied(o: float) -> float:
-    return 100.0 / (o + 100.0) if o > 0 else -o / (-o + 100.0)
+def _implied(o) -> Optional[float]:
+    """None for a price that is not a quotable American price -- 0 used to price as 0.0."""
+    try:
+        x = float(o)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(x) or abs(x) < 100:
+        return None
+    return 100.0 / (x + 100.0) if x > 0 else -x / (-x + 100.0)
 
 
 def score(out: Path, arms: List[str], min_n: int, lines_by_date: Dict[str, List[Dict]], runtime: Dict) -> Dict:
@@ -936,6 +951,11 @@ def score_book(arm, sims, actuals, lines_by_date, roster_names, normalize_name, 
             if math.isnan(op) or math.isnan(up):
                 stats["one_sided_excluded"] += 1
                 continue
+            po, pu = _implied(op), _implied(up)
+            dec_o, dec_u = _american_to_dec(op), _american_to_dec(up)
+            if None in (po, pu, dec_o, dec_u):
+                stats["invalid_price_excluded"] += 1
+                continue
             mk = str(ln.get("market") or "").upper()
             nk = normalize_name(ln.get("player_name"))
             ik = initial_surname_key(ln.get("player_name"))
@@ -975,11 +995,10 @@ def score_book(arm, sims, actuals, lines_by_date, roster_names, normalize_name, 
             y = int(p[STAT_KEY[mk]] > line)
             h = {int(k): v for k, v in mm["hist"].items()}
             rws = sum(h.values())
-            po, pu = _implied(op), _implied(up)
             rows.append({"gid": g["gid"], "date": d, "mk": mk, "pid": p["pid"], "line": line, "book": ln.get("book"),
                          "fs": fs, "y": y, "p_book": po / (po + pu), "vig": po + pu - 1,
                          "p_model": _PO(line, mm["lam"]), "p_emp": (sum(v for k, v in h.items() if k > line) / rws) if rws else None,
-                         "dec_o": _american_to_dec(op), "dec_u": _american_to_dec(up)})
+                         "dec_o": dec_o, "dec_u": dec_u})
     # keep the LATEST pregame snapshot per (game, player, market, line, book)
     latest: Dict[Tuple, Dict] = {}
     for r in rows:

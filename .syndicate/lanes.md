@@ -1611,6 +1611,15 @@ death, never life — do not invert it.
 - Verification: scripts/measure_nfl_off_market_edge.py prints per-family coverage and intersection, and per (props/game, definition, EV band): n bets, games, mean claimed EV, realized ROI [game-clustered CI], realized-on-claimed slope; findings file with the per-line discount recommendation and the ranked gap list
 - Blocked by: none
 
+### nhl-props-converter-guard — CLOSED 2026-10-03 — opened 2026-10-03 — session 8de04a09-d7cd-4e22-bab2-106540543671
+- Goal: scripts/backtest_nhl_props.py _implied/_american_to_dec refuse invalid prices (0/None/''/unparseable/|p|<100 -> None), the call site skips+counts an unpriceable pair, and both leave KNOWN_FAILING in tests/test_probability_differential.py
+- Files: scripts/backtest_nhl_props.py (SCOPED: _implied, _american_to_dec and their call site ONLY; handed over by nhl-player-props-projection 0a54bb97, returned on land), tests/test_probability_differential.py, scripts/probability_differential.py, tests/test_backtest_nhl_props_price_guard.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: audit of captured NHL book prices for 0/(-100,100); harness scores both converters 5/5; pytest tests/test_probability_differential.py passes
+- **CLOSED 2026-10-03:** AUDIT: 0 of 19,924 captured NHL prop prices invalid (3,196 git-mirror, 19 dates 05-29..07-09; 16,728 fleet cache C:/tmp/nhlprops/*/lines, 09-30..10-01) -- lossy mirror + 2 fleet dates, so this is no OBSERVED impact, not a proof. `_implied`/`_american_to_dec` now refuse 0, |price| < 100, None, text; both 5/5 and OUT of KNOWN_FAILING. `score_book` drops a bad pair under `invalid_price_excluded` before matching (new test FAILS on the old module: the 0 line went on to `no_unique_player_match`). ALSO: `backtest_nba_lines_props` (795d420b, lane `nba-lines-props-backtest`) had turned the tripwire red with three copies of the pre-guard NHL one-liners; registered `_implied`/`_american_to_dec` (into KNOWN_FAILING, NBA file NOT edited) and excused `_devig`. The guard is owed by that lane. Tests: differential 10/10, NHL guard 10/10, nhl_props_name_join 18/18. `scripts/backtest_nhl_props.py` RETURNED to `nhl-player-props-projection`. Files released.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
