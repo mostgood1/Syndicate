@@ -358,9 +358,15 @@ Per season, vs the book (dBrier verdict):
 | receiving_yards | WORSE | WORSE | WORSE |
 | interceptions | no diff | WORSE | no diff |
 
-Consistency with the one prior measurement (`log/2026-09-29.md`, 2024, scratch scripts, model version
-unverified): receiving_yards +0.0226 there vs **+0.0240** here (2024, shipped model). It is the same
-answer, now on the shipped code.
+The one prior measurement (`log/2026-09-29.md`, 2024): receiving_yards +0.0226 there vs **+0.0240**
+here (2024). **CORRECTED 2026-10-03:** that run built its rates through
+`backtest_nfl_props._rate_from_log`, which omits production's zero-week imputation. It therefore graded
+an estimator production does not serve, and its author has SUPERSEDED it (lane
+`layer2-triad-alignment`, `133be4f4`). The two numbers agreeing is a coincidence of direction, not a
+replication. **This file's numbers are the served model** (selfcheck 0/8,976 vs
+`nfl_props_rows_for_week`). The NFL `VERDICT_LOSES` entries in `shared/measured_market_skill.py` come
+from the superseded run. Their direction holds here, but their figures should be re-derived from this
+harness. Owed to whichever lane holds that file; not edited here.
 
 ### 4b. Anytime TD (one-sided)
 
