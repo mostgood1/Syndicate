@@ -450,8 +450,17 @@ def empirical_rate_over(values: list[float], line: float) -> float:
 # ------------------------------------------------------------------- loaders
 def load_pregame_sims(daily_dir: Path, dates_filter, counters: Counter) -> dict[int, dict]:
     sims = {}
-    for f in sorted(glob.glob(str(daily_dir / "sims" / "*" / "sim_*.json"))):
+    # The first-pitch freeze (`syndicate/features/mlb/pregame_freeze.py`) FIRST:
+    # those copies are pregame by construction and survive the started-game
+    # re-sims that overwrite `sims/`. The live `sims/` tree fills in dates the
+    # freeze predates, under the same status filter.
+    frozen = sorted(glob.glob(str(daily_dir / "sims_pregame" / "*" / "sim_*.json")))
+    live = sorted(glob.glob(str(daily_dir / "sims" / "*" / "sim_*.json")))
+    frozen_set = set(frozen)
+    for f in frozen + live:
         date = Path(f).parent.name
+        if f in frozen_set:
+            counters["sim_files_frozen"] += 1
         if dates_filter and date not in dates_filter:
             continue
         try:

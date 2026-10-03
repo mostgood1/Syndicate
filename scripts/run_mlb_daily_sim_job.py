@@ -58,6 +58,19 @@ def _vendor_mlb_data_dir(vendor_cwd: Path) -> Path:
     return (vendor_cwd / "data").resolve()
 
 
+def _freeze_pregame(phase: str, date_str: str, vendor_cwd: Path) -> None:
+    # First-pitch freeze (lane mlb-pregame-sim-freeze). BEFORE the run it keeps the
+    # previous run's pregame sims safe from this run's started-game re-sims; AFTER,
+    # it keeps what this run wrote. Never blocks the sim.
+    try:
+        from syndicate.features.mlb.pregame_freeze import freeze_pregame_sims, log_line
+
+        counts = freeze_pregame_sims(_vendor_mlb_data_dir(vendor_cwd), date_str)
+        print(log_line(phase, date_str, counts), flush=True)
+    except Exception as exc:  # noqa: BLE001 -- a measurement aid must not fail the sim
+        print(f"MLB_PREGAME_FREEZE_FAILED phase={phase} date={date_str} error={type(exc).__name__}: {exc}", flush=True)
+
+
 def _hydrate_vendor_oddsapi_mirror(date_str: str, vendor_cwd: Path) -> None:
     """Copy this service's already-fetched odds snapshots into the tree
     tools/daily_update_multi_profile.py's K-ladder-targets builder actually
@@ -360,6 +373,7 @@ def main() -> int:
     started_epoch = time.time()
     capture_path: Path | None = None
     print(f"MLB_DAILY_SIM_START date={args.date} season={args.season} sims={args.sims} workers={args.workers} reason={args.reason}", flush=True)
+    _freeze_pregame("before", str(args.date), vendor_cwd)
 
     timeout_seconds = _timeout_seconds()
     poll_interval_seconds = _progress_poll_interval_seconds()
@@ -660,6 +674,8 @@ def main() -> int:
             })
         except Exception:
             pass
+
+    _freeze_pregame("after", str(args.date), vendor_cwd)
 
     published_count = 0
     try:

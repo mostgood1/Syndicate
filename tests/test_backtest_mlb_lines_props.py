@@ -173,3 +173,15 @@ def test_segment_runs_first5_and_incomplete():
     assert bt.segment_runs(g, "first1") == (1, 0)
     short = {**g, "innings": g["innings"][:4]}
     assert bt.segment_runs(short, "first5") is None
+
+
+def test_frozen_pregame_copy_wins_over_the_post_start_resim(tmp_path):
+    """The first-pitch freeze is read first; the live file (re-simmed post-start) is dropped."""
+    _write(tmp_path / "sims_pregame" / "2026-10-03" / "sim_pk55_g1.json",
+           {"game_pk": 55, "marker": "frozen", "schedule": {"status": {"detailed": "Pre-Game"}}})
+    _write(tmp_path / "sims" / "2026-10-03" / "sim_0_A_at_B_pk55_g1.json",
+           {"game_pk": 55, "marker": "resim", "schedule": {"status": {"detailed": "In Progress"}}})
+    c = Counter()
+    sims = bt.load_pregame_sims(tmp_path, None, c)
+    assert sims[55]["marker"] == "frozen" and sims[55]["_date"] == "2026-10-03"
+    assert c["sim_files_frozen"] == 1 and c["sim_dropped_not_pregame:In Progress"] == 1
