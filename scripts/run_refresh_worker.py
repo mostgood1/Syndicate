@@ -671,6 +671,7 @@ def _soccer_schedule_dates_in_horizon(
     """
     from datetime import date as _date
 
+    from syndicate.features.soccer.sources import fixture_slate_date
     from syndicate.features.soccer.sources import schedule_payload
 
     try:
@@ -688,7 +689,11 @@ def _soccer_schedule_dates_in_horizon(
     for match in matches:
         if not isinstance(match, Mapping):
             continue
-        text = str(match.get("date") or "")[:10]
+        # The CENTRAL slate date, not the UTC prefix: the unit date becomes the
+        # builder's ESPN `dates=` query, and ESPN files a 00:30Z kickoff under
+        # the previous day -- keyed on the prefix it simulated an empty day
+        # (lane `soccer-projections-gap`; see `fixture_slate_date`).
+        text = fixture_slate_date(match)
         try:
             when = _date.fromisoformat(text)
         except ValueError:

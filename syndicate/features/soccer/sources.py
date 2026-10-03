@@ -16,9 +16,11 @@ import threading
 import time
 from typing import Any
 from typing import Iterator
+from typing import Mapping
 
 from syndicate.features.soccer.features.schedule import default_season as _computed_default_season
 from syndicate.features.shared.source_roots import preferred_source_roots
+from syndicate.features.shared.timezone import central_date_from_iso
 from syndicate.features.shared.timezone import central_today_iso
 
 
@@ -1130,8 +1132,38 @@ def week_matches(league: str, season: int, week: int) -> list[dict[str, Any]]:
     return [row for row in matches if isinstance(row, dict) and row.get("week") == int(week)]
 
 
+def fixture_slate_date(match: Mapping[str, Any]) -> str:
+    """The CENTRAL slate date a schedule fixture belongs to, as `YYYY-MM-DD`.
+
+    THE SCHEDULE'S `date` IS A UTC TIMESTAMP, AND ITS PREFIX IS NOT THE MATCH'S
+    DAY (lane `soccer-projections-gap`, 2026-10-03). Every date this module hands
+    out is used to ask ESPN's scoreboard for `dates=YYYYMMDD` and to name
+    `recommendations_<date>.json`, and ESPN files a fixture under its US-local
+    day. Measured on the fleet, 2026-10-03 ~03:55Z, MLS:
+
+        Chicago Fire - Vancouver   2026-10-07T00:30Z   (10-06 7:30pm CT)
+        ESPN dates=20261007 -> 0 events     dates=20261006 -> this match
+        Seattle - Sporting KC      2026-10-02T01:30Z   (10-01 8:30pm CT)
+        ESPN dates=20261002 -> 0 events     dates=20261001 -> this match
+
+    Keyed on the prefix, both got sim units for a day ESPN lists nothing on, the
+    builder wrote `recommendations_2026-10-07.json` / `_10-02` with ZERO matches,
+    and the board reported "no soccer recommendations for this date" -- while the
+    fixture's real day never got a unit at all. Any US-evening kickoff (most of
+    MLS) is affected; a European afternoon kickoff is the same date either way,
+    which is why only MLS showed it. Same mistake as NHL's `693de7a7`.
+
+    A date-only value (no time) is returned unchanged.
+    """
+    raw = str(match.get("date") or "").strip()
+    if not raw:
+        return ""
+    local = central_date_from_iso(raw)
+    return local.isoformat() if local is not None else raw[:10]
+
+
 def week_date_list(league: str, season: int, week: int) -> list[str]:
-    dates = {str(row.get("date") or "")[:10] for row in week_matches(league, season, week)}
+    dates = {fixture_slate_date(row) for row in week_matches(league, season, week)}
     return sorted(date_str for date_str in dates if date_str)
 
 
