@@ -4727,6 +4727,16 @@ def _call_source_simulate_smart_game_local(*, smart_sim_module, processed_root: 
             recorded_draws,
             build_ladder=getattr(smart_sim_module, "build_exact_ladder_payload", None),
         )
+        # Widen the prop ladders to their measured width (lane wnba-prop-dispersion). WNBA-only and OFF unless
+        # SYNDICATE_WNBA_PROP_DISPERSION is set; runs AFTER the combo ladders above so pr/pa/ra are widened too.
+        from syndicate.features.shared.wnba_prop_dispersion import apply_prop_dispersion
+
+        apply_prop_dispersion(
+            out,
+            league_code=league_code,
+            processed_root=processed_root,
+            build_ladder=getattr(smart_sim_module, "build_exact_ladder_payload", None),
+        )
         return out
     finally:
         for name, value in original_values.items():

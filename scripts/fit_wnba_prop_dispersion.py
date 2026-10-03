@@ -228,6 +228,32 @@ def score_period(rows: List[Dict], k: float, recentre: bool = False) -> Dict:
     return out
 
 
+def write_artifact(path: Path, report: Dict) -> Dict:
+    """The engine's input (`syndicate/features/shared/wnba_prop_dispersion.py`). Only the `ladder` fit is written: a
+    book-line fit runs to the grid edge by flattening toward 0.5 and is NOT a width. A market whose ladder fit sat at
+    a grid edge is LEFT OUT (the engine then leaves that ladder untouched), never written at the edge value."""
+    from datetime import datetime, timezone
+    k, skipped, evidence = {}, {}, {}
+    for mk, ent in report["markets"].items():
+        lf = ent["ladder"]
+        key = B.LADDER_STAT[mk]
+        if lf["k_at_grid_edge"]:
+            skipped[key] = f"k={lf['k_fit']} at grid edge"
+            continue
+        k[key] = lf["k_fit"]
+        t = (lf["test_regular"].get("at_book_line") or {})
+        evidence[key] = {"test_n": t.get("n"), "dbrier_vs_k1": t.get("dbrier_kfit_minus_k1"),
+                         "rps_vs_k1": (lf["test_regular"].get("rps_whole_ladder") or {}).get("d_kfit_minus_k1")}
+    doc = {"version": 1, "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+           "fit": f"ranked probability score over the whole ladder, regular season before {report['split']}; "
+                  f"tested on/after it and on the playoffs", "k": k, "skipped": skipped, "evidence": evidence,
+           "producer": "scripts/fit_wnba_prop_dispersion.py", "lane": "wnba-prop-dispersion"}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(doc, indent=1), encoding="utf-8")
+    print(f"wrote {path}: k={k} skipped={skipped}", flush=True)
+    return doc
+
+
 def B_fmt(d: Optional[Dict]) -> str:
     if not d or d.get("point") is None:
         return ""
@@ -243,6 +269,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--split", default="2026-08-01")
     ap.add_argument("--out", required=True)
     ap.add_argument("--n-boot", type=int, default=2000)
+    ap.add_argument("--write-artifact", default="",
+                    help="write wnba_prop_dispersion.json (the engine's input) here, from the `ladder` fit")
     args = ap.parse_args(argv)
     _boot = B.boot_ci
     B.boot_ci = lambda rows, n_boot=args.n_boot, seed=7: _boot(rows, n_boot, seed)  # noqa: E731
@@ -276,6 +304,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                   f"rps k1/kfit={rp.get('k1')}/{rp.get('kfit')}", flush=True)
         report["markets"][mk] = ent
     (out / "dispersion_report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
+    if args.write_artifact:
+        write_artifact(Path(args.write_artifact), report)
     print(f"wrote {out / 'dispersion_report.json'}", flush=True)
     return 0
 
