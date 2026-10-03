@@ -1,6 +1,13 @@
 # MLB game lines + player props — AS-OF backtest `[2026-10-02, lane mlb-lines-props-backtest, NO DEPLOY]`
 
-Script: `scripts/backtest_mlb_lines_props.py` (tests: `tests/test_backtest_mlb_lines_props.py`, 12 pass).
+**USER DECISION (2026-10-02 ~8:15 PM CT), verbatim:** "MLB should still show everything - the prime
+directive of the app is that every line is its own decision. we should have a model that is accurate
+that then helps inform each decision". So this backtest does NOT gate the board. The board keeps
+showing every MLB line with the model's probability and edge. A mean-only gate (lane
+`mlb-board-mean-only`) was built and then discarded before anything was committed or deployed. The
+deliverable is the per-market WHY and the ranked accuracy plan below.
+
+Script: `scripts/backtest_mlb_lines_props.py` (tests: `tests/test_backtest_mlb_lines_props.py`, 14 pass).
 Method mirrors NHL (`nhl-player-props-projection`, deploys.md 2026-10-02 21:38Z): per market n, bias, MAE
 vs actual, dMAE vs a naive AS-OF baseline with a game-clustered bootstrap CI (1,000 draws, seed 7), and
 Brier / log-loss vs the de-vigged book on the SAME rows with a paired game-clustered CI. Verdict rule
@@ -8,8 +15,8 @@ copied from NHL (`INSUFFICIENT_N` < 200, `MODEL_BETTER` if CI upper < 0, `MODEL_
 
 ## Headline
 
-**No MLB pregame market earns a probability or edge: 0 of the 23 markets with two-sided book rows
-beat both the as-of baseline and the book.** Ten are significantly WORSE than the de-vigged book:
+**The May–July MLB engine beats the book in 0 of the 23 markets with two-sided book rows, and beats
+both the as-of baseline and the book in none.** Ten are significantly WORSE than the de-vigged book:
 
 - full-game total
 - F5 moneyline
@@ -23,8 +30,13 @@ beat both the as-of baseline and the book.** Ten are significantly WORSE than th
 - pitcher hits allowed
 
 None is better than the book. The other 13 are at parity: no difference, or too few rows to
-tell. This is the NHL result again — keep MLB **mean-only**, the
-equivalent of an empty `MEASURED_MARKETS`.
+tell.
+
+**Most of the loss is LEVEL, not missing information.** The calibration split (section "WHY") puts
+the model's resolution close to the book's in hits, total bases, RBI, runs, walks allowed and run
+lines. The gap there is reliability: probabilities that sit off the outcome rate. That part is
+fixable by correcting the mean. The pitcher markets are the exception: one defect, starter length,
+explains them.
 
 ## Substrate and coverage — read before the numbers
 
@@ -127,7 +139,7 @@ Point n for pitchers is 802 starts over 483 games.
    and as-of.
 2. **HR "MODEL_BETTER" on MAE is an artifact.** MAE is minimised by the median (0). The model's
    `hr_mean` is 0.055 per lineup batter, against roughly double that actual, so under-prediction
-   wins MAE. On Brier the model loses to both the baseline and the book. The gate therefore judges
+   wins MAE. On Brier the model loses to both the baseline and the book. The skill verdict therefore judges
    both legs on Brier only.
 3. **Pitcher length is the dominant defect in this engine vintage.** Model starter `outs_mean` was
    20.5 against **15.8 actual** (1,571 starts). Outs, hits allowed, strikeouts and ER all inherit
@@ -171,27 +183,21 @@ ledger and not re-derived:
 | SB, singles, doubles, walks, hitter K | — | — | not priced in the captured odds | not priceable |
 | team totals, alternate lines | — | — | no quotes captured | not priceable |
 
-## Gate list vs what the board serves TODAY
+## What the board shows today (unchanged, by user decision)
 
-**What is served today**, from code — the fleet board has no MLB slate on 10-02, `sweep_state no_slate`:
+Every MLB pregame market is shown with the sim's `model_prob_over` and edge:
 
-- MLB props carry `model_prob_over` and an edge:
-  - pitcher props via `_dist_prob_over`, `prop_projections.py:687`;
-  - HR via `:726`;
-  - hitter buckets, calibrated-or-raw, via `:768`.
-- Game lines carry the same, via `project_game_market` (`:980-1053`).
-- Money is protected: the `[portfolio-sim-sizing-gate]` sizes nothing that is not `beats_market`,
-  and no MLB market is. So the exposure is the displayed probability/edge and its ranking, not
-  stakes.
+- pitcher props via `_dist_prob_over`, `prop_projections.py:687`;
+- HR via `:726`;
+- hitter buckets via `:768`;
+- game lines via `project_game_market`.
 
-| market | backtest gate | served today | contradiction |
-|---|---|---|---|
-| every MLB game line (full, F5, F3, F1) | MEAN_ONLY | probability + edge | **yes: probability served** |
-| hitter hits, TB, HR, RBI, runs, HRR | MEAN_ONLY | probability + edge | **yes** |
-| pitcher K, outs, ER, H allowed, BB | MEAN_ONLY | probability + edge | **yes** |
+That stays. Each line is its own decision, and the job is to make the number behind it accurate.
+Stakes still follow price, not the sim, through `[portfolio-sim-sizing-gate]`: no MLB market is
+`beats_market`.
 
-**Verdict labels the as-of backtest contradicts** (`measured_market_skill.py`). Each is labelled
-`VERDICT_PARITY` today, but the as-of backtest has the model significantly WORSE than the book:
+**Labels this as-of reading contradicts** (`measured_market_skill.py`). Six entries are labelled
+`VERDICT_PARITY` where the May–July engine is significantly WORSE than the book:
 
 - full total (`:344`)
 - F5 h2h (`:352`)
@@ -200,9 +206,73 @@ ledger and not re-derived:
 - pitcher strikeouts (`:432`)
 - pitcher hits allowed (`:441`)
 
-The caveat: different engine vintage (May–July vs post-09-08). The 09-14 numbers are post-game
-upper bounds, so a "parity" there cannot rescue the market. Hitter hits/TB/HR carry NO market
-verdict in that table, and here they lose.
+They describe a different engine vintage, and theirs are post-game upper bounds. Annotate, don't
+overwrite.
+
+## WHY — per market (regular season, the priced rows)
+
+Brier = reliability - resolution + uncertainty. **Reliability** is how far the probabilities sit
+from the outcome rate; correcting the mean or recalibrating fixes it. **Resolution** is
+information; only better inputs or mechanisms raise it.
+
+| market | mean p model / book / outcome | reliability model / book | resolution model / book | sd of p model / book | other | diagnosis |
+|---|---|---|---|---|---|---|
+| full total | 0.431 / 0.501 / 0.535 | 0.0151 / 0.0013 | 0.0012 / 0.0000 | 0.087 / 0.015 | mean bias -0.93 runs; slope 0.31 | **LEVEL** (run environment low) plus probabilities spread 6x wider than the book with no information behind the spread |
+| F5 total | 0.445 / 0.501 / 0.539 | 0.0156 / 0.0019 | 0.0070 / 0.0026 | 0.078 / 0.035 | bias -0.64; slope 0.26 | same as full total: level, then overspread |
+| first-inning total | 0.436 / 0.496 / 0.548 | 0.0143 / 0.0054 | 0.0058 / 0.0057 | 0.047 / 0.047 | bias -0.22 | **LEVEL**: YRFI under-predicted; resolution equals the book |
+| F5 moneyline | 0.507 / 0.525 / 0.519 | 0.0073 / 0.0006 | 0.0028 / 0.0075 | 0.067 / 0.073 | slope **0.06** | **NO INFORMATION**: the F5 ranking barely separates winners. Starter-quality inputs for innings 1-5 are the suspect |
+| full moneyline | 0.499 / 0.530 / 0.522 | 0.0016 / 0.0013 | 0.0044 / 0.0066 | 0.065 / 0.072 | slope 0.75 | parity; less information than the book |
+| full run line | 0.483 / 0.494 / 0.464 | 0.0038 / 0.0016 | 0.0126 / 0.0094 | 0.131 / 0.099 | sim margin variance / realised MSE 0.82 | parity; resolution above the book, but a margin distribution ~10% too narrow |
+| hits | 0.606 / 0.569 / 0.573 | 0.0020 / 0.0002 | 0.0110 / 0.0118 | 0.128 / 0.101 | mean bias +0.105 | **LEVEL**: information nearly equal to the book; the over is too likely. The cheapest fix in the table |
+| total bases | 0.491 / 0.480 / 0.478 | 0.0029 / 0.0003 | 0.0076 / 0.0086 | 0.133 / 0.081 | slope 0.64; dispersion 0.76 | **OVERSPREAD**: probabilities 1.6x the book's spread; sim distribution too narrow |
+| HR | 0.090 / 0.176 / 0.185 | 0.0092 / 0.0002 | 0.0001 / 0.0014 | 0.023 / 0.041 | dispersion 0.56 | **LEVEL, HALVED**: the sim's HR rate is half the realised rate, and it carries almost no ranking |
+| RBI | 0.302 / 0.314 / 0.311 | 0.0003 / 0.0001 | 0.0013 / 0.0017 | 0.042 / 0.052 | — | near the book |
+| runs | 0.384 / 0.405 / 0.403 | 0.0007 / 0.0002 | 0.0039 / 0.0040 | 0.057 / 0.066 | — | near the book |
+| pitcher strikeouts | 0.553 / 0.498 / 0.479 | 0.0305 / 0.0008 | 0.0041 / 0.0056 | 0.183 / 0.062 | corr(sim mean, actual) 0.23 vs **0.36 for the pitcher's own as-of K average**; dispersion 0.67 | **LENGTH + OVERSPREAD**: inherits the starter-length bias, and the pitcher's history ranks better than the sim |
+| pitcher outs | 0.846 / 0.507 / 0.479 | **0.1346** / 0.0012 | 0.0032 / 0.0042 | 0.075 / 0.056 | bias **+4.75 outs** (20.5 vs 15.8 actual); dispersion 0.32 | **STARTER LENGTH**: the single largest defect in the engine |
+| pitcher hits allowed | 0.715 / 0.498 / 0.491 | 0.0578 / 0.0005 | 0.0006 / 0.0014 | 0.086 / 0.053 | bias +1.76; slope -0.05; corr 0.03 vs 0.20 for history | **LENGTH**: a longer start means more hits; no ranking left once length is wrong |
+| pitcher earned runs | 0.525 / 0.491 / 0.485 | 0.0040 / 0.0005 | 0.0025 / 0.0022 | 0.089 / 0.055 | bias +0.43; dispersion 1.41 (too wide) | length bias, mildly |
+| pitcher walks | 0.507 / 0.491 / 0.464 | 0.0057 / 0.0038 | 0.0113 / 0.0090 | 0.104 / 0.077 | — | parity; resolution above the book |
+
+How to read the "other" column:
+- **Dispersion** is the sim's own predictive variance divided by its realised squared error. Below
+  1 means the sim's distribution is too narrow for the misses it actually makes.
+- **Slope** is the OLS slope of outcome on p. Below 1 means overspread (overconfident); 1 is
+  calibrated.
+
+## Ranked accuracy plan
+
+Ordered by expected Brier gain against the book, cheapest-to-verify first within a tier. Every step
+must be re-measured with this script on a pregame-frozen run of the CURRENT engine, which is why
+step 1 is first.
+
+1. **Freeze the pregame sim at first pitch** (the 09-14 proposal, not on main). Today the current
+   engine (refits 09-01, 09-05, 09-08) cannot be measured as-of at all: its stored projections are
+   post-game re-sims. Every step below is unverifiable until this lands. Cost: an artifact write.
+   No model change.
+2. **Starter length.** Outs +4.75, with reliability 0.135 of a 0.136 Brier gap. It drives K,
+   hits allowed and ER. Re-fit the pitch-count/leash model to as-of starter outs. The 09-04 refit
+   targeted this, so measure it on frozen output before changing anything more. Expected to
+   recover most of the outs, hits-allowed and K gaps, which are the three largest in the table.
+3. **HR level.** The sim gives 0.090 against 0.185 realised: it halves the HR rate. Re-fit the HR
+   rate (park/weather multipliers and per-batter HR/PA) to the as-of league rate. Also widen the HR
+   distribution (dispersion 0.56).
+4. **Run environment for totals** (full, F5, first inning). This window ran 0.6–0.9 runs LOW; 09-14
+   measured the post-refit engine about 2 runs HIGH. The level swings with each refit. Anchor the
+   league run environment to the as-of league scoring rate instead of fitted constants. Then fix
+   the overspread (slope 0.26–0.31): the totals probabilities move 2–6x more than the book's with no
+   information behind it.
+5. **Hits level.** The over is +0.105 too high. Resolution equals the book's, so a level correction
+   alone should close roughly half of the +0.0034 Brier gap. This is the cheapest change in the
+   table to verify.
+6. **Prop spread for TB and K** (sd of p 1.6–3x the book's, slope 0.17–0.64). For strikeouts,
+   blend the sim mean with the pitcher's as-of K average, which predicts better (corr 0.36 vs 0.23).
+   That is an estimator change. Per standard section 4.4, re-fit rather than stack a mechanism.
+7. **F5 moneyline information** (slope 0.06). The first-five ranking has almost no signal. Audit
+   which starter inputs actually reach innings 1-5 (`sim_input_checklist.py`, standard section 1)
+   before adding anything.
+8. **H+R+RBI.** The distribution was dead in this vintage (`#429`, fixed 08-14). It becomes
+   gradeable once step 1 exists.
 
 ## What this does NOT establish
 
@@ -216,14 +286,10 @@ verdict in that table, and here they lose.
 - The book is a single bookmaker's snapshot, not a consensus close, and not best price.
 - 42 of ~180 regular-season dates.
 
-## Decisions for the user (nothing changed; no deploy)
+## Open decisions (nothing changed; no deploy)
 
-1. **Make MLB mean-only on the board, NHL-style.** Withhold `model_prob_over`/edge for every MLB
-   pregame market. Prop paths are in `prop_projections.py`, which lane `mlb-doubleheader-e2e`
-   holds (goal MET), so it needs a release or a loan.
-2. **Re-label the six `VERDICT_PARITY` entries above to `VERDICT_LOSES`**, or annotate them with
-   this as-of reading.
-3. **Freeze `daily_summary`/sims at first pitch** (09-14 proposal) so the current engine can ever be
-   measured as-of.
-4. **Recovering 07-13..09-29 needs Render unsuspended long enough to export.** That is a billing
+1. **Freeze the pregame sim at first pitch** (step 1 above). It is the precondition for measuring
+   any fix.
+2. **Annotate the six `measured_market_skill.py` PARITY labels** with this as-of reading.
+3. **Recovering 07-13..09-29 needs Render unsuspended long enough to export.** That is a billing
    call.

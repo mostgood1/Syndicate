@@ -54,12 +54,28 @@ def test_cluster_bootstrap_is_deterministic_and_resamples_games():
     assert a[1] <= a[0] <= a[2]
 
 
-def test_gate_needs_both_baseline_and_book():
+def test_skill_verdict_needs_both_baseline_and_book():
     better = {"verdict_vs_baseline": "MODEL_BETTER", "verdict_vs_book": "MODEL_BETTER"}
-    assert bt.gate(None, better) == "EARNS_PROBABILITY"
-    assert bt.gate(None, {**better, "verdict_vs_book": "NO_DIFFERENCE"}) == "MEAN_ONLY"
-    assert bt.gate(None, {**better, "verdict_vs_baseline": "NO_DIFFERENCE"}) == "MEAN_ONLY"
-    assert bt.gate(None, {"verdict_vs_baseline": "MODEL_BETTER"}).startswith("MEAN_ONLY")
+    assert bt.skill_verdict(None, better) == "BEATS_BASELINE_AND_BOOK"
+    assert bt.skill_verdict(None, {**better, "verdict_vs_book": "NO_DIFFERENCE"}) == "PARITY_WITH_BOOK"
+    assert bt.skill_verdict(None, {**better, "verdict_vs_book": "MODEL_WORSE"}) == "LOSES_TO_BOOK"
+    assert bt.skill_verdict(None, {**better, "verdict_vs_baseline": "NO_DIFFERENCE"}) == "BEATS_BOOK_ONLY"
+    assert bt.skill_verdict(None, {"verdict_vs_baseline": "MODEL_BETTER"}) == "NO_BOOK_ROWS"
+
+
+def test_calibration_splits_reliability_from_resolution():
+    ps = [0.2] * 50 + [0.8] * 50
+    ys = [0] * 40 + [1] * 10 + [1] * 40 + [0] * 10   # perfectly calibrated
+    c = bt.calibration(ps, ys)
+    assert c["reliability"] == pytest.approx(0.0)
+    assert c["resolution"] == pytest.approx(0.09)
+    assert c["slope"] == pytest.approx(1.0)
+    over = bt.calibration([0.05] * 50 + [0.95] * 50, ys)  # same ranking, over-confident
+    assert over["reliability"] > 0 and over["slope"] < 1
+
+
+def test_dist_var():
+    assert bt.dist_var({"0": 1, "2": 1}) == pytest.approx(1.0)
 
 
 def test_player_baseline_excludes_the_graded_date_and_dnps():

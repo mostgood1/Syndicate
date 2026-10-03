@@ -144,6 +144,61 @@ def dist_mean(dist: dict) -> float | None:
     return sum(float(k) * c for k, c in dist.items()) / n if n else None
 
 
+def dist_var(dist: dict | None) -> float | None:
+    n = sum(dist.values()) if dist else 0
+    if not n:
+        return None
+    m = sum(float(k) * c for k, c in dist.items()) / n
+    return sum((float(k) - m) ** 2 * c for k, c in dist.items()) / n
+
+
+def _corr(xs, ys):
+    n = len(xs)
+    if n < 3:
+        return None
+    mx, my = sum(xs) / n, sum(ys) / n
+    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    sxx = sum((x - mx) ** 2 for x in xs)
+    syy = sum((y - my) ** 2 for y in ys)
+    return sxy / (sxx * syy) ** 0.5 if sxx > 0 and syy > 0 else None
+
+
+def _sd(xs):
+    n = len(xs)
+    if n < 2:
+        return None
+    m = sum(xs) / n
+    return (sum((x - m) ** 2 for x in xs) / (n - 1)) ** 0.5
+
+
+def calibration(ps, ys, bins=10):
+    """Calibration-in-the-large, OLS slope of y on p, and the Murphy split.
+
+    Brier = reliability - resolution + uncertainty. Reliability is the part a
+    recalibration can fix; resolution is information (learnings 2026-09-08:
+    decompose before prescribing a recalibration).
+    """
+    n = len(ps)
+    if n < 10:
+        return None
+    base = sum(ys) / n
+    mp = sum(ps) / n
+    sxx = sum((p - mp) ** 2 for p in ps)
+    slope = sum((p - mp) * (y - base) for p, y in zip(ps, ys)) / sxx if sxx > 0 else None
+    groups = defaultdict(list)
+    for p, y in zip(ps, ys):
+        groups[min(int(p * bins), bins - 1)].append((p, y))
+    rel = res = 0.0
+    for g in groups.values():
+        k = len(g)
+        pbar = sum(p for p, _ in g) / k
+        ybar = sum(y for _, y in g) / k
+        rel += k * (pbar - ybar) ** 2
+        res += k * (ybar - base) ** 2
+    return {"mean_p": mp, "base_rate": base, "slope": slope, "sd_p": _sd(ps),
+            "reliability": rel / n, "resolution": res / n}
+
+
 def dist_degenerate(dist: dict | None) -> bool:
     return not dist or len([k for k, c in dist.items() if c]) <= 1
 
@@ -476,7 +531,8 @@ def build_game_rows(sims, sched, team_asof, gl_snaps, counters):
             mm = (ms.get("home_runs_mean") or 0) - (ms.get("away_runs_mean") or 0)
             pt = {"game_pk": pk, "date": date, "segment": seg, "gtype": g["game_type"],
                   "model_total": mt, "model_margin": mm, "act_total": h + a, "act_margin": h - a,
-                  "base_total": base["total"] if base else None, "base_margin": base["margin"] if base else None}
+                  "base_total": base["total"] if base else None, "base_margin": base["margin"] if base else None,
+                  "var_total": dist_var(ms.get("total_runs_dist")), "var_margin": dist_var(ms.get("run_margin_dist"))}
             points.append(pt)
             book = ((best[1]["markets"].get("segments") or {}).get(seg) if best else None) or {}
             if seg == "full" and best and not book:
@@ -608,7 +664,8 @@ def build_prop_rows(sims, sched, api, hp_snaps, pp_snaps, season, workers, count
                     continue
                 points.append({"game_pk": pk, "date": date, "gtype": (g or {}).get("game_type"),
                                "market": mkt, "pid": pid, "model": mean, "base": b["mean"],
-                               "base10": b["last10"], "act": val(act_stat)})
+                               "base10": b["last10"], "act": val(act_stat),
+                               "var": None if dist_degenerate(dist) else dist_var(dist)})
         # ---- probability rows: every two-sided priced line, quoted before first pitch
         for date, docs in snaps.items():
             key = "hitter_props" if role == "h" else "pitcher_props"
@@ -667,14 +724,23 @@ def build_prop_rows(sims, sched, api, hp_snaps, pp_snaps, season, workers, count
 
 
 # ---------------------------------------------------------------- summarising
-def summarise_points(points, model_key, base_key, act_key, min_n, draws):
+def summarise_points(points, model_key, base_key, act_key, min_n, draws, var_key=None):
     pts = [p for p in points if p[model_key] is not None and p[base_key] is not None]
     if not pts:
         return None
     n = len(pts)
     err = lambda p, k: abs(p[k] - p[act_key])  # noqa: E731
     d, lo, hi = cluster_boot_ci(pts, lambda p: err(p, model_key) - err(p, base_key), draws=draws)
-    return {"n": n, "games": len({p["game_pk"] for p in pts}), "dates": len({p["date"] for p in pts}),
+    act = [p[act_key] for p in pts]
+    diag = {"corr_model_actual": _corr([p[model_key] for p in pts], act),
+            "corr_base_actual": _corr([p[base_key] for p in pts], act),
+            "sd_model_mean": _sd([p[model_key] for p in pts]), "sd_actual": _sd(act)}
+    vs = [p for p in pts if var_key and p.get(var_key) is not None]
+    if vs:
+        # < 1: the sim's spread is narrower than its own realised error (over-confident)
+        mse = sum((p[act_key] - p[model_key]) ** 2 for p in vs) / len(vs)
+        diag["dispersion_ratio"] = (sum(p[var_key] for p in vs) / len(vs)) / mse if mse > 0 else None
+    return {**diag, "n": n, "games": len({p["game_pk"] for p in pts}), "dates": len({p["date"] for p in pts}),
             "mean_actual": sum(p[act_key] for p in pts) / n,
             "mean_model": sum(p[model_key] for p in pts) / n,
             "bias": sum(p[model_key] - p[act_key] for p in pts) / n,
@@ -706,6 +772,9 @@ def summarise_probs(rows, min_n, draws):
         out["logloss_book"] = sum(logloss(r["p_book"], r["y"]) for r in bk) / len(bk)
         d, lo, hi = cluster_boot_ci(bk, lambda r: brier(r["p_model"], r["y"]) - brier(r["p_book"], r["y"]), draws=draws)
         out["dbrier_vs_book"], out["dbrier_vs_book_ci"] = d, [lo, hi]
+        ys = [r["y"] for r in bk]
+        out["calibration_model"] = calibration([r["p_model"] for r in bk], ys)
+        out["calibration_book"] = calibration([r["p_book"] for r in bk], ys)
         out["verdict_vs_book"] = verdict(len(bk), lo, hi, min_n)
         # flat-stake EV>0 at the quoted price (side the model prefers)
         bets = []
@@ -724,20 +793,25 @@ def summarise_probs(rows, min_n, draws):
     return out
 
 
-def gate(point: dict | None, prob: dict) -> str:
-    """Probability/edge only if the model beats the baseline AND the book.
+def skill_verdict(point: dict | None, prob: dict) -> str:
+    """Does the model know more than the player/team history AND the price?
 
-    Both legs are judged on the PROPER score (Brier on the priced rows). The
-    point dMAE is reported but never gates: MAE is minimised by the median, so on
-    a skewed 0/1-heavy stat (HR: model mean 0.055 vs ~0.12 actual) a model that
-    under-predicts "beats" the baseline on MAE while losing on Brier.
+    This is a measurement for improving the model, NOT a publication gate: the
+    board shows every line as its own decision (user, 2026-10-02: "every line is
+    its own decision. we should have a model that is accurate that then helps
+    inform each decision"). Both legs use the PROPER score (Brier on the priced
+    rows); point dMAE is reported but not used, because MAE is minimised by the
+    median and rewards under-predicting a 0/1-heavy stat (HR).
     """
     if prob.get("verdict_vs_book") is None:
-        return "MEAN_ONLY (no two-sided book rows)"
-    base_ok = prob.get("verdict_vs_baseline") == "MODEL_BETTER"
-    if prob.get("verdict_vs_book") == "MODEL_BETTER" and base_ok:
-        return "EARNS_PROBABILITY"
-    return "MEAN_ONLY"
+        return "NO_BOOK_ROWS"
+    if prob.get("verdict_vs_book") == "MODEL_WORSE":
+        return "LOSES_TO_BOOK"
+    if prob.get("verdict_vs_book") == "MODEL_BETTER" and prob.get("verdict_vs_baseline") == "MODEL_BETTER":
+        return "BEATS_BASELINE_AND_BOOK"
+    if prob.get("verdict_vs_book") == "MODEL_BETTER":
+        return "BEATS_BOOK_ONLY"
+    return "PARITY_WITH_BOOK"
 
 
 def run(args) -> dict:
@@ -785,24 +859,24 @@ def run(args) -> dict:
         for seg in SEGMENTS:
             sp = [p for p in gp if p["segment"] == seg]
             res["game_lines"][f"{seg}:total_runs_mean"] = summarise_points(
-                sp, "model_total", "base_total", "act_total", args.min_n, args.draws)
+                sp, "model_total", "base_total", "act_total", args.min_n, args.draws, "var_total")
             res["game_lines"][f"{seg}:run_margin_mean"] = summarise_points(
-                sp, "model_margin", "base_margin", "act_margin", args.min_n, args.draws)
+                sp, "model_margin", "base_margin", "act_margin", args.min_n, args.draws, "var_margin")
         for mkt in sorted({r["market"] for r in gr}):
             prob = summarise_probs([r for r in gr if r["market"] == mkt], args.min_n, args.draws)
             seg, kind = mkt.split(":")
             pt_key = f"{seg}:total_runs_mean" if kind == "total" else f"{seg}:run_margin_mean"
-            prob["gate"] = gate(res["game_lines"].get(pt_key) if kind != "moneyline" else None, prob)
+            prob["skill"] = skill_verdict(res["game_lines"].get(pt_key) if kind != "moneyline" else None, prob)
             res["game_lines"][mkt] = prob
         pp_ = [p for p in p_points if p["gtype"] in gtypes]
         pr = [r for r in p_rows if r["gtype"] in gtypes]
         for mkt in list(HITTER_MARKETS) + list(PITCHER_MARKETS):
             point = summarise_points([p for p in pp_ if p["market"] == mkt], "model", "base", "act",
-                                     args.min_n, args.draws)
+                                     args.min_n, args.draws, "var")
             point10 = summarise_points([p for p in pp_ if p["market"] == mkt], "model", "base10", "act",
                                        args.min_n, args.draws)
             prob = summarise_probs([r for r in pr if r["market"] == mkt], args.min_n, args.draws)
-            prob["gate"] = gate(point, prob)
+            prob["skill"] = skill_verdict(point, prob)
             res["props"][mkt] = {"point_vs_season_avg": point, "point_vs_last10": point10, "prob": prob}
         report["arms"][arm] = res
     return report
@@ -830,7 +904,7 @@ def render_md(rep: dict) -> str:
                 L.append(f"| {k} | {v['n']} | {v['games']} | {fmt(v['bias'],3)} | {v['mae_model']:.3f} | "
                          f"{v['mae_base']:.3f} | {fmt(v['dmae'],4)} {ci(v['dmae_ci'])} | {v['verdict_vs_baseline']} |")
         L += ["", "### Game lines -- probability", "",
-              "| market | rows | dBrier vs base [CI] | book rows | Brier model / book | dBrier vs book [CI] | logloss model / book | EV>0 bets, ROI [CI] | gate |",
+              "| market | rows | dBrier vs base [CI] | book rows | Brier model / book | dBrier vs book [CI] | logloss model / book | EV>0 bets, ROI [CI] | skill |",
               "|---|---|---|---|---|---|---|---|---|"]
         for k, v in res["game_lines"].items():
             if v and "n_rows" in v:
@@ -847,23 +921,48 @@ def render_md(rep: dict) -> str:
             else:
                 L.append(f"| {k} | 0 | | | | | | INSUFFICIENT_N | |")
         L += ["", "### Props -- probability (baseline = player's own as-of rate of clearing the line)", "",
-              "| market | rows | dBrier vs base [CI] | book rows | Brier model / book | dBrier vs book [CI] | logloss model / book | EV>0 bets, ROI [CI] | gate |",
+              "| market | rows | dBrier vs base [CI] | book rows | Brier model / book | dBrier vs book [CI] | logloss model / book | EV>0 bets, ROI [CI] | skill |",
               "|---|---|---|---|---|---|---|---|---|"]
         for k, v in res["props"].items():
             L.append(_prob_line(k, v["prob"]))
+    f3 = lambda x: "-" if x is None else f"{x:.3f}"  # noqa: E731
+    f4 = lambda x: "-" if x is None else f"{x:.4f}"  # noqa: E731
+    for arm, res in rep["arms"].items():
+        L += ["", f"## {arm.upper()} -- WHY: bias, dispersion, calibration", "",
+              "| market | point bias | corr model / base | sd model mean / sd actual | dispersion (sim var / realised MSE) | "
+              "mean p model / book / outcome | slope model / book | sd p model / book | reliability model / book | "
+              "resolution model / book |",
+              "|---|---|---|---|---|---|---|---|---|---|"]
+        items = []
+        for k, v in res["game_lines"].items():
+            if v and "n_rows" in v:
+                seg, kind = k.split(":")
+                pkey = f"{seg}:total_runs_mean" if kind == "total" else f"{seg}:run_margin_mean"
+                items.append((k, None if kind.startswith("moneyline") else res["game_lines"].get(pkey), v))
+        for k, v in res["props"].items():
+            items.append((k, v["point_vs_season_avg"], v["prob"]))
+        for k, pt, pr in items:
+            pt = pt or {}
+            cm, cb = pr.get("calibration_model") or {}, pr.get("calibration_book") or {}
+            L.append(f"| {k} | {fmt(pt.get('bias'), 3)} | {f3(pt.get('corr_model_actual'))} / {f3(pt.get('corr_base_actual'))} | "
+                     f"{f3(pt.get('sd_model_mean'))} / {f3(pt.get('sd_actual'))} | {f3(pt.get('dispersion_ratio'))} | "
+                     f"{f3(cm.get('mean_p'))} / {f3(cb.get('mean_p'))} / {f3(cm.get('base_rate'))} | "
+                     f"{f3(cm.get('slope'))} / {f3(cb.get('slope'))} | {f3(cm.get('sd_p'))} / {f3(cb.get('sd_p'))} | "
+                     f"{f4(cm.get('reliability'))} / {f4(cb.get('reliability'))} | "
+                     f"{f4(cm.get('resolution'))} / {f4(cb.get('resolution'))} |")
     return "\n".join(L) + "\n"
 
 
 def _prob_line(k, v):
     if not v.get("n_rows"):
-        return f"| {k} | 0 | | | | | | | {v.get('gate', '-')} |"
+        return f"| {k} | 0 | | | | | | | {v.get('skill', '-')} |"
     bm = f"{v['brier_model_on_book_rows']:.4f} / {v['brier_book']:.4f}" if v.get("n_book_rows") else "-"
     ll = f"{v['logloss_model']:.4f} / {v['logloss_book']:.4f}" if v.get("n_book_rows") else "-"
     roi = f"{v['ev_bets']}, {fmt(v['ev_roi'],3)} {ci(v['ev_roi_ci'],3)}" if v.get("ev_bets") else "-"
     return (f"| {k} | {v['n_rows']} | {fmt(v['dbrier_vs_base'])} {ci(v['dbrier_vs_base_ci'])} "
             f"({v['verdict_vs_baseline']}) | {v.get('n_book_rows', 0)} | {bm} | "
             f"{fmt(v.get('dbrier_vs_book'))} {ci(v.get('dbrier_vs_book_ci'))} ({v.get('verdict_vs_book', '-')}) | "
-            f"{ll} | {roi} | {v['gate']} |")
+            f"{ll} | {roi} | {v['skill']} |")
 
 
 def main(argv=None) -> int:

@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1234 rules `[generated]`
+## Index — 1239 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5306,3 +5306,9 @@ own prior verdicts, not by anything failing.
 ## 2026-10-02 -- Belief overturned: a benchmark is what its COLUMN says, and a registry verdict is a reading with a window `[lane soccer-lines-props-backtest, session 43e4d5fe]`
 - Measured: the 2025-26 soccer 1X2 result "loses to the de-vigged CLOSE" (08-15, n 1,112) was graded against football-data `Avg*` -- the market average at collection, i.e. PRE-close (`match_history.py:109-113`); the closing columns are `AvgC*`. Name a benchmark from the source column you joined, not from the docstring that describes it.
 - Same lane: `measured_market_skill.py` registers soccer pregame totals as PARITY (n 194, 08-31..09-13, CI [-0.004, +0.024]) and Layer 2 still ranks those edges at x1.0; on n 492 (to 09-20) the same market LOSES +0.0095 [+0.0032, +0.0157]. A verdict_class is a frozen reading: carry its window next to it and re-grade before a consumer relies on "parity".
+
+## 2026-10-02 FORBIDDEN: proposing a MARKET-WIDE withhold of a model's probability as the answer to "the model loses to the book" `[lanes mlb-lines-props-backtest / mlb-board-mean-only, session b98d59a1]`
+
+- What I did: copied the NHL template's gate (empty `MEASURED_MARKETS`), recommended "MLB mean-only on the board", and built it on the user's "make it" -- while a standing rule already said otherwise (user: "every line is its own decision"; no market-wide pauses/exclusions).
+- What was true: the user's directive is "MLB should still show everything - the prime directive of the app is that every line is its own decision. we should have a model that is accurate that then helps inform each decision". A backtest that the model loses to the book is a MODEL-ACCURACY finding, not a publication switch. The reversal came before shipping. The cost was a lane, two loans on main, and a cross-session interrupt.
+- Rule: a backtest verdict feeds (a) WHY -- decompose reliability vs resolution, bias, dispersion -- and (b) a ranked fix plan. Never a sport- or market-wide withhold. Before recommending ANY change to what the board shows, grep the standing rules for the board's directive and quote it in the recommendation. A template from another sport's lane carries that lane's decision, not this one's.

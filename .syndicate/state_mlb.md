@@ -1501,7 +1501,7 @@ none had ever asserted `cards`. The new case is dated 09-22 and asserts ONE CARD
 **Still no-regression only** (13 MLB tiles, 0 duplicate matchups, 16:09:17Z). No
 doubleheader exists on 2026-09-26 to exercise it, and none remains this season.
 
-## [mlb-asof-backtest] NO MLB PREGAME MARKET EARNS A PROBABILITY: 0 of 23 beat both the player/team as-of baseline and the de-vigged book; 10 are WORSE than the book `[measured 2026-10-02, lane mlb-lines-props-backtest, NO DEPLOY]`
+## [mlb-asof-backtest] THE MAY–JULY MLB ENGINE BEATS THE DE-VIGGED BOOK IN 0 OF 23 MARKETS (10 WORSE); MOSTLY A LEVEL ERROR, LED BY STARTER LENGTH (outs +4.75) AND A HALVED HR RATE `[measured 2026-10-02, lane mlb-lines-props-backtest, NO DEPLOY]`
 
 The first leak-free MLB backtest. Its pieces:
 
@@ -1536,4 +1536,13 @@ Other readings:
 - **Scope.** This is the May–July engine. The 09-01/09-05/09-08 refits are unmeasured as-of, because their stored projections are post-game re-sims.
 - **Unreachable dates.** 07-13..09-29 sims live only on suspended Render.
 
-**The board still serves `model_prob_over`/edge on every MLB pregame market** (code: `prop_projections.py:687/726/768`, `project_game_market`). Stakes are already price-based (`[portfolio-sim-sizing-gate]`). Mean-only awaits a user decision.
+**The board keeps serving `model_prob_over`/edge on every MLB pregame market BY USER DECISION** -- USER DECISION 2026-10-02 ~8:15 PM CT, verbatim: "MLB should still show everything - the prime directive of the app is that every line is its own decision. we should have a model that is accurate that then helps inform each decision". Code: `prop_projections.py:687/726/768`, `project_game_market`. Stakes still follow price (`[portfolio-sim-sizing-gate]`). A mean-only gate was built and discarded unshipped (lane `mlb-board-mean-only`, CLOSED).
+
+**WHY (Murphy split on priced rows).** Most of the gap is RELIABILITY, not resolution. Hits/TB/RBI/runs/walks/run lines carry resolution near the book's; the loss is a level error a mean correction fixes. Exceptions:
+
+- **Outs:** reliability 0.135 of a 0.136 Brier gap; model 20.5 outs vs 15.8 actual.
+- **Hits allowed and K:** inherit the starter-length error; for K the pitcher's own as-of average ranks better (corr 0.36 vs 0.23).
+- **HR:** p 0.090 vs 0.185 realised.
+- **F5 moneyline:** slope 0.06, so almost no ranking information.
+
+The ranked fix plan is in the findings file. Its step 1 is a first-pitch freeze, because the current engine cannot be measured as-of without it.

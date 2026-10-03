@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1234 rules `[generated]`
+## Index — 1239 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 500**
+**FORBIDDEN — 501**
 
 - [2026-09-21 FORBIDDEN: diagnosing a failure from its most vivid example `[lane layer2-li…](#2026-09-21-forbidden-diagnosing-a-failure-from-its-most-vivid-example-lane-layer2-line-move-magnitude)
 - [2026-09-21 FORBIDDEN: verifying that a signal was COMPUTED as verifying that it is REAL…](#2026-09-21-forbidden-verifying-that-a-signal-was-computed-as-verifying-that-it-is-real-lane-layer2-line-move-magnitude)
@@ -175,6 +175,7 @@
 - [2026-09-29 FORBIDDEN: reading "production has this artifact" as "a publisher put it the…](#2026-09-29-forbidden-reading-production-has-this-artifact-as-a-publisher-put-it-there-feed_live-is-on-production-because-it-is-git-tracked-and-is_hot-is-false-for-the-very-files-that-are-already-there-lane-mlb-live-prop-grader-session-4ab694ed)
 - [2026-09-29 FORBIDDEN: checking production for ONE property and then diagnosing a DIFFER…](#2026-09-29-forbidden-checking-production-for-one-property-and-then-diagnosing-a-different-property-from-the-local-checkout-i-verified-the-file-count-against-production-and-still-reported-a-35-month-silent-regression-that-was-a-mirror-gap-lane-mlb-live-prop-grader-session-4ab694ed)
 - [2026-10-01 — FORBIDDEN: `x or 0` (or `or {}` / `or ""`) BEFORE the check in a guard tha…](#2026-10-01-forbidden-x-or-0-or-or-or-before-the-check-in-a-guard-that-exists-to-tell-unknown-from-zero-the-normalisation-is-the-unknown-as-zero-bug-applied-one-line-early-test-present-none-absent-and-unparseable-as-five-separate-cases-lane-soccer-live-gameline-index-diag)
+- [2026-10-02 FORBIDDEN: proposing a MARKET-WIDE withhold of a model's probability as the…](#2026-10-02-forbidden-proposing-a-market-wide-withhold-of-a-models-probability-as-the-answer-to-the-model-loses-to-the-book-lanes-mlb-lines-props-backtest-mlb-board-mean-only-session-b98d59a1)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -520,7 +521,7 @@
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 - [2026-09-03 — EXONERATED: `deploys.md` and `learnings.md` ARE guarded. Two sessions file…](learnings_archive.md#2026-09-03-exonerated-deploysmd-and-learningsmd-are-guarded-two-sessions-filed-the-same-false-gap-and-the-second-re-derived-it-with-the-same-blind-spot) `[evidence]`
 
-**Rules and corrections — 728**
+**Rules and corrections — 732**
 
 - [2026-09-08 A probe is production load, and an unbounded one is an outage. `[#632, sessi…](#2026-09-08-a-probe-is-production-load-and-an-unbounded-one-is-an-outage-632-session-b2b5b45b)
 - [2026-09-08 MAP: ~95 rules in this file are one question in 17 shapes — *"is the number…](#2026-09-08-map-95-rules-in-this-file-are-one-question-in-17-shapes-is-the-number-i-read-the-one-the-decision-depends-on-read-this-before-writing-another-lane-learnings-instrument-family-consolidation-session-e51345f0)
@@ -688,6 +689,10 @@
 - [2026-10-02: a snapshot's row count is not its player-prop count, and a lane note naming…](#2026-10-02-a-snapshots-row-count-is-not-its-player-prop-count-and-a-lane-note-naming-a-file-is-a-claim)
 - [2026-10-02: a date read off `commence_time[:10]` is a UTC date -- an evening slate is "…](#2026-10-02-a-date-read-off-commence_time10-is-a-utc-date----an-evening-slate-is-tomorrow-in-it-and-so-was-my-diagnosis)
 - [2026-10-02 OVERTURNED: "pull from production (/api/ops/artifacts/export)" as the route…](#2026-10-02-overturned-pull-from-production-apiopsartifactsexport-as-the-route-to-mlb-history----since-2026-09-30-production-is-the-local-wsl-fleet-and-its-pre-09-30-history-is-the-git-mirror-lane-mlb-lines-props-backtest-session-b98d59a1)
+- [2026-10-02 - RULE: a captured odds file with no capture timestamp is not a CLOSE; grade…](#2026-10-02---rule-a-captured-odds-file-with-no-capture-timestamp-is-not-a-close-grade-a-model-vs-the-book-only-on-quotes-that-prove-they-were-pregame-lane-nhl-lines-backtest-session-9ed26377)
+- [2026-10-02: a cadence setting is only as fine as the loop that CHECKS it -- and a "10-m…](#2026-10-02-a-cadence-setting-is-only-as-fine-as-the-loop-that-checks-it----and-a-10-minute-run-can-be-a-run-that-failed)
+- [2026-10-02 -- Belief overturned: IDLE priority is the safe way to run a backtest beside…](#2026-10-02----belief-overturned-idle-priority-is-the-safe-way-to-run-a-backtest-beside-the-local-fleet-lane-ncaaf-lines-props-backtest-session-7e94d2ff)
+- [2026-10-02 -- Belief overturned: a benchmark is what its COLUMN says, and a registry ve…](#2026-10-02----belief-overturned-a-benchmark-is-what-its-column-says-and-a-registry-verdict-is-a-reading-with-a-window-lane-soccer-lines-props-backtest-session-43e4d5fe)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
