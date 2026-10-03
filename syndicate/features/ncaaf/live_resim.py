@@ -643,10 +643,10 @@ def resim_live_game(
     # THE PREGAME TOTAL-LEVEL SHRINK, from the one module both paths read
     # (`ncaaf/total_level.py`). Applied HERE, inside the shipped function, so the
     # cutoff-replay grade (`scripts/backtest_ncaaf_live_totals.py`) measures what
-    # production runs. None = the live lambda (= the pregame one unless
-    # `SYNDICATE_NCAAF_LIVE_TOTAL_LEVEL_SHRINK` says otherwise); the caller passes
-    # 1.0 for a market-implied FCS rating. Live totals were graded calibrated
-    # WITHOUT this (2026-09-27); see that module before shipping a lambda < 1.
+    # production runs. None = the LIVE lambda, which is HELD at 1.0 until the live
+    # grade passes (user decision 2026-10-03) and does NOT follow the pregame value;
+    # `SYNDICATE_NCAAF_LIVE_TOTAL_LEVEL_SHRINK` is how that grade runs a candidate.
+    # The caller passes 1.0 for a market-implied FCS rating.
     from syndicate.features.ncaaf.total_level import live_total_level_shrink, shrink_rating_level
 
     shrink = live_total_level_shrink() if level_shrink is None else max(0.0, float(level_shrink))

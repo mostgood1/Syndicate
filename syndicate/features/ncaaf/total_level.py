@@ -30,20 +30,31 @@ WHERE IT APPLIES, AND ONE PLACE EACH:
 THE LIVE PATH WAS ALREADY CALIBRATED WITHOUT IT. Graded 2026-09-27 with fresh
 ratings (546 Saturday cutoff rows / 182 games): live total bias +0.171 [-1.176,
 +1.538], worst bucket 0.0556 against `#499`'s 0.150 bar, both live calibrators
-set to identity. A lambda < 1 on the live path is therefore UNMEASURED there:
-re-run that grade at the shipped lambda before a fleet update carries it, and
-`SYNDICATE_NCAAF_LIVE_TOTAL_LEVEL_SHRINK=1` turns it off for live alone.
+set to identity. A lambda < 1 on the live path is therefore UNMEASURED there.
 
-OVERRIDES. `SYNDICATE_NCAAF_TOTAL_LEVEL_SHRINK` sets both paths;
-`SYNDICATE_NCAAF_LIVE_TOTAL_LEVEL_SHRINK` overrides the live path only. Absent
-means the constant; unparseable falls back to it (never to "off"); negatives
-clamp to 0; `1` is the exact kill switch.
+SO LIVE IS HELD AT 1.0 UNTIL IT IS GRADED `[user decision 2026-10-03: "hold live
+at 1.0 until it's graded"]`. The live path reads its OWN constant,
+`NCAAF_LIVE_TOTAL_LEVEL_SHRINK`, and does NOT follow the pregame value or the
+pregame env var -- so fitting and shipping the pregame lambda can never reach the
+live re-sim, by any route. To release it: run
+`scripts/backtest_ncaaf_live_totals.py` with `SYNDICATE_NCAAF_LIVE_TOTAL_LEVEL_SHRINK`
+set to the candidate and unset (= 1.0) on the same dates, and change the live
+constant only if the candidate is no worse on the worst bucket and the bias.
+
+OVERRIDES. `SYNDICATE_NCAAF_TOTAL_LEVEL_SHRINK` sets the PREGAME path only;
+`SYNDICATE_NCAAF_LIVE_TOTAL_LEVEL_SHRINK` sets the LIVE path only (that is how
+the live grade runs a candidate). Absent means each path's constant;
+unparseable falls back to it (never to "off"); negatives clamp to 0; `1` is the
+exact kill switch.
 """
 from __future__ import annotations
 
 import os
 
 NCAAF_TOTAL_LEVEL_SHRINK = 1.0
+#: HELD at 1.0 until the live cutoff-replay grade passes at a candidate lambda
+#: (see the module docstring). Independent of `NCAAF_TOTAL_LEVEL_SHRINK`.
+NCAAF_LIVE_TOTAL_LEVEL_SHRINK = 1.0
 
 PREGAME_ENV = "SYNDICATE_NCAAF_TOTAL_LEVEL_SHRINK"
 LIVE_ENV = "SYNDICATE_NCAAF_LIVE_TOTAL_LEVEL_SHRINK"
@@ -58,14 +69,14 @@ def _parse(raw: str, default: float) -> float:
 
 
 def total_level_shrink() -> float:
-    """The pregame lambda (and the live one unless `LIVE_ENV` says otherwise)."""
+    """The PREGAME lambda. Never read by the live path."""
     return _parse(str(os.environ.get(PREGAME_ENV) or "").strip(), NCAAF_TOTAL_LEVEL_SHRINK)
 
 
 def live_total_level_shrink() -> float:
-    """The live lambda: `LIVE_ENV` if set, else exactly the pregame lambda."""
-    raw = str(os.environ.get(LIVE_ENV) or "").strip()
-    return _parse(raw, total_level_shrink()) if raw else total_level_shrink()
+    """The LIVE lambda: `LIVE_ENV` if set, else `NCAAF_LIVE_TOTAL_LEVEL_SHRINK`
+    (held at 1.0 until graded). Deliberately independent of the pregame value."""
+    return _parse(str(os.environ.get(LIVE_ENV) or "").strip(), NCAAF_LIVE_TOTAL_LEVEL_SHRINK)
 
 
 def shrink_rating_level(
