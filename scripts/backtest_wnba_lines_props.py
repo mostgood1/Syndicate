@@ -81,8 +81,17 @@ def norm_name(s: str) -> str:
     return " ".join(toks)
 
 
-def implied(o: float) -> float:
-    return 100.0 / (o + 100.0) if o > 0 else -o / (-o + 100.0)
+def implied(o: object) -> Optional[float]:
+    """American price -> implied probability, or None when there is no quotable price (0, None, "", unparseable).
+    Same contract as `backtest_mlb_lines_props.american_to_prob` (5/5 in `scripts/probability_differential.py`):
+    a price of 0 must never become a probability of 0.0."""
+    try:
+        v = float(str(o).replace("+", ""))
+    except (TypeError, ValueError):
+        return None
+    if v == 0 or not math.isfinite(v):
+        return None
+    return 100.0 / (v + 100.0) if v > 0 else -v / (-v + 100.0)
 
 
 def clip(p: float, lo: float = 1e-3) -> float:
@@ -362,6 +371,9 @@ def load_book(odds_dir: Path, games: Dict[str, Dict]) -> Tuple[Dict[str, Dict], 
                         cnt["h2h_not_two_way"] += 1
                         continue
                     ih, ia = implied(hp[0]["price"]), implied(ap[0]["price"])
+                    if ih is None or ia is None:
+                        cnt["unpriceable_quote"] += 1
+                        continue
                     fair.append((None, ih / (ih + ia)))
                 elif base == "spreads":
                     hp = [o for o in oc if o["name"] == g["home_name"]]
@@ -370,6 +382,9 @@ def load_book(odds_dir: Path, games: Dict[str, Dict]) -> Tuple[Dict[str, Dict], 
                         cnt["spread_unpaired"] += 1
                         continue
                     ih, ia = implied(hp[0]["price"]), implied(ap[0]["price"])
+                    if ih is None or ia is None:
+                        cnt["unpriceable_quote"] += 1
+                        continue
                     fair.append((hp[0]["point"], ih / (ih + ia)))
                 else:
                     ov = [o for o in oc if o["name"] == "Over"]
@@ -378,6 +393,9 @@ def load_book(odds_dir: Path, games: Dict[str, Dict]) -> Tuple[Dict[str, Dict], 
                         cnt["total_unpaired"] += 1
                         continue
                     io, iu = implied(ov[0]["price"]), implied(un[0]["price"])
+                    if io is None or iu is None:
+                        cnt["unpriceable_quote"] += 1
+                        continue
                     fair.append((ov[0]["point"], io / (io + iu)))
             if not fair:
                 continue
@@ -399,6 +417,9 @@ def load_book(odds_dir: Path, games: Dict[str, Dict]) -> Tuple[Dict[str, Dict], 
                     if mk in YESNO_MARKETS:
                         if "Yes" in sides and "No" in sides:
                             iy, iN = implied(sides["Yes"]["price"]), implied(sides["No"]["price"])
+                            if iy is None or iN is None:
+                                cnt[f"prop_unpriceable:{mk}"] += 1
+                                continue
                             per_prop[(pk, mk)].append((None, iy / (iy + iN)))
                         else:
                             cnt[f"prop_one_sided:{mk}"] += 1
@@ -408,6 +429,9 @@ def load_book(odds_dir: Path, games: Dict[str, Dict]) -> Tuple[Dict[str, Dict], 
                         cnt[f"prop_one_sided:{mk}"] += 1
                         continue
                     io, iu = implied(o["price"]), implied(u["price"])
+                    if io is None or iu is None:
+                        cnt[f"prop_unpriceable:{mk}"] += 1
+                        continue
                     per_prop[(pk, mk)].append((o["point"], io / (io + iu)))
         for (pk, mk), fair in per_prop.items():
             if mk in YESNO_MARKETS:
