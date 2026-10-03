@@ -138,3 +138,43 @@ def test_zero_restores_a_full_build_every_run(step_root, monkeypatch):
 def test_the_step_keeps_its_name_and_phase(step_root):
     step = ros._soccer_schedule_step(LEAGUE, step_root, "python")
     assert step.name == "soccer_epl_schedule" and step.phases == ("pregame",)
+
+
+# ---------------------------------------------------------------------------
+# Staggered full rebuilds: at most one league per run, the stalest due one.
+# ---------------------------------------------------------------------------
+
+
+def _league_file(root, league, hours_ago):
+    path = bss.schedule_file(root, league, SEASON)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"matches": [_row("1", "2026-10-03")], "full_generated_at": _stamp(hours_ago)}),
+                    encoding="utf-8")
+
+
+def test_reachability_only_the_stalest_due_league_rebuilds_in_full(step_root, monkeypatch):
+    monkeypatch.delenv("SYNDICATE_SOCCER_SCHEDULE_FULL_REBUILDS_PER_RUN", raising=False)
+    for league, hours in (("epl", 7), ("mls", 9), ("la_liga", 6.5), ("serie_a", 1)):
+        _league_file(step_root, league, hours)
+    leagues = ["epl", "mls", "la_liga", "serie_a"]
+    assert ros._soccer_schedule_full_rebuild_leagues(leagues, step_root) == {"mls"}
+    full = ros._soccer_schedule_full_rebuild_leagues(leagues, step_root)
+    near = {lg: _is_near(ros._soccer_schedule_step(lg, step_root, "python", allow_full=lg in full)) for lg in leagues}
+    assert near == {"epl": True, "mls": False, "la_liga": True, "serie_a": True}, "stale but not its turn -> near"
+
+
+def test_unknown_age_is_the_stalest(step_root):
+    _league_file(step_root, "mls", 9)
+    assert ros._soccer_schedule_full_rebuild_leagues(["mls", "epl"], step_root) == {"epl"}  # epl has no file
+
+
+def test_nothing_due_means_no_full_rebuild(step_root):
+    _league_file(step_root, "epl", 1)
+    assert ros._soccer_schedule_full_rebuild_leagues(["epl"], step_root) == set()
+
+
+def test_a_zero_limit_restores_every_due_league(step_root, monkeypatch):
+    for league, hours in (("epl", 7), ("mls", 9), ("serie_a", 1)):
+        _league_file(step_root, league, hours)
+    monkeypatch.setenv("SYNDICATE_SOCCER_SCHEDULE_FULL_REBUILDS_PER_RUN", "0")
+    assert ros._soccer_schedule_full_rebuild_leagues(["epl", "mls", "serie_a"], step_root) == {"epl", "mls"}

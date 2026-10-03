@@ -1585,7 +1585,48 @@ def _soccer_schedule_full_age_seconds(league: str, soccer_root: Path) -> float |
         return None
 
 
-def _soccer_schedule_step(league: str, soccer_root: Path, python_exe: str) -> RefreshStep:
+def _soccer_schedule_full_rebuilds_per_run() -> int:
+    """`SYNDICATE_SOCCER_SCHEDULE_FULL_REBUILDS_PER_RUN`, default 1 (0 = no limit)."""
+    raw = str(os.environ.get("SYNDICATE_SOCCER_SCHEDULE_FULL_REBUILDS_PER_RUN") or "").strip()
+    try:
+        value = int(raw) if raw else 1
+    except ValueError:
+        value = 1
+    return max(0, value)
+
+
+def _soccer_schedule_full_rebuild_leagues(leagues: list[str], soccer_root: Path) -> set[str]:
+    """The leagues allowed a FULL schedule rebuild this run: the stalest due ones, capped.
+
+    WHY A CAP (lane `layer2-freshness-1h`, 2026-10-03). The near window cut a soccer
+    run from ~24 min to 5.0, but every league's last full build landed within ~35 min
+    of the others (23:40-00:16Z), so all ten would come due together every 6h and
+    rebuild in ONE ~20-min run -- holding the refresh lane the live sweeps share
+    (the last such run, 2026-10-02 23:38-00:32Z, refused ~22 sweeps incl. LIVE
+    nhl/nfl/ncaaf). One full rebuild per run (1-4 min each) spreads them out; the
+    rest stay near until their turn. Cost: with ten leagues and a 45-min run cadence
+    a league's full rebuild can lag to ~10 runs (~7.5h) instead of 6h.
+
+    Unknown age counts as the stalest. 0 for the per-run limit, or a 0 rebuild
+    interval, allows every due league (the previous behaviour).
+    """
+    ceiling = _soccer_schedule_full_rebuild_seconds()
+    if ceiling <= 0:
+        return set(leagues)
+    due: list[tuple[float, str]] = []
+    for league in leagues:
+        age = _soccer_schedule_full_age_seconds(league, soccer_root)
+        if age is None or age >= ceiling:
+            due.append((float("inf") if age is None else age, league))
+    due.sort(reverse=True)
+    limit = _soccer_schedule_full_rebuilds_per_run()
+    chosen = due if limit <= 0 else due[:limit]
+    return {league for _, league in chosen}
+
+
+def _soccer_schedule_step(
+    league: str, soccer_root: Path, python_exe: str, *, allow_full: bool = True
+) -> RefreshStep:
     """FULL season while the last full build is stale or unknown, else `--near`.
 
     Lane `layer2-freshness-1h`, 2026-10-02: schedule steps were 1,327 of a soccer
@@ -1599,7 +1640,10 @@ def _soccer_schedule_step(league: str, soccer_root: Path, python_exe: str) -> Re
     command = [python_exe, "scripts/build_soccer_schedule.py", "--league", league, "--out-root", str(soccer_root)]
     ceiling = _soccer_schedule_full_rebuild_seconds()
     age = _soccer_schedule_full_age_seconds(league, soccer_root) if ceiling > 0 else None
-    near = age is not None and age < ceiling
+    # Not this league's turn for a full rebuild (`_soccer_schedule_full_rebuild_leagues`):
+    # near even when stale. A league with no usable file still gets a full build --
+    # `build_schedule_near` falls back to one by itself.
+    near = (age is not None and age < ceiling) or not allow_full
     if near:
         command.append("--near")
     return RefreshStep(
@@ -1900,8 +1944,11 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
         players_step = _soccer_players_step(league, soccer_root, python_exe)
         if players_step is not None:
             steps.append(players_step)
+    full_rebuild_leagues = _soccer_schedule_full_rebuild_leagues(league_slugs, soccer_root)
     for league in league_slugs:
-        steps.append(_soccer_schedule_step(league, soccer_root, python_exe))
+        steps.append(
+            _soccer_schedule_step(league, soccer_root, python_exe, allow_full=league in full_rebuild_leagues)
+        )
     # CAPTURE BEFORE SIMULATE (`#433`). These two loops used to sit AFTER the
     # `artifacts` sim loop below, and that ordering was silently costing three
     # leagues their odds entirely.
