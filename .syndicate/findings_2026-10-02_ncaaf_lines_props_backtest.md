@@ -6,22 +6,34 @@ tests `tests/test_backtest_ncaaf_lines_props.py` (10). **Measurement only: no de
 no board change.** Every difference below is model MINUS comparator (negative = model better), with a
 GAME-clustered bootstrap 95% CI (2,000 reps); no verdict is printed below 20 games.
 
+## USER DECISION governing this file (recorded 2026-10-02)
+
+**"Every line is its own decision. We should have a model that is accurate that then helps inform each
+decision"** (user, 2026-10-02 ~7:05 PM CT, said about MLB; the app's prime directive; relayed to this lane
+by the peer NCAAF session `local_379fd729` and corroborated on `origin/main` by `1ece602a`, which closed
+`mlb-board-mean-only` unshipped for the same reason). **The task prompt's rule -- "a market earns a
+probability/edge on the board only if it beats the baseline AND the book" -- is a MARKET-WIDE exclusion
+and is WITHDRAWN.** This file delivers NO gate list and recommends NO mean-only / withheld-probability
+posture for any market. The backtest is the DIAGNOSIS; per-line decisions stay with per-line scoring.
+
 ## Bottom line
 
-- **No NCAAF market earns a board probability or edge under the NHL rule** (beat the baseline AND the
-  book). Full-game margin and moneyline LOSE to the book with CIs excluding 0 (margin +1.95 MAE
-  [+0.85, +3.02], h2h Brier +0.039 [+0.013, +0.064], n=107-113 production pregame games); totals and
-  spread/total cover probabilities sit behind the book, unresolved. Segments cannot be graded against
-  a book at all (2 completed games carry segment quotes).
-- **Props are the one place the model has measured value, and only as a PROJECTION.** On 2025 (as-of,
-  n = 4k-16k player-games, ~1,480 games) the shipped shrunk mean beats the player's own as-of average
-  on passing yards, passing TDs, rushing yards and receiving yards, and LOSES on receptions. Against
-  real de-vigged prices (2026 wk4, 350 rows / 22 games) every market is unresolved, point estimates
-  mostly on the book's side. Anytime TD cannot be graded against the book: it is quoted one-sided.
-- **The board today publishes a model probability and an edge on all of these** (served reading below).
-  Withholding them is a board change; it is the user's decision and is NOT made here.
-- The 2025 full-season game-line arm (L25) is PARTIAL (94 of 644 games, paused for host memory); its
-  94 games agree with L26 (margin loses to the close, +1.28 [+0.09, +2.49]). Resume: `sim --arm L25`.
+- **Where NCAAF loses, and why (evidence below):** full-game MARGIN and MONEYLINE lose to the book because
+  the RATINGS are worse than the market's, not because the distribution is wrong -- the model's
+  disagreement with the close carries no information (slope -0.15, corr -0.09, n=113) and its win
+  probabilities are no more extreme than the book's (|p-0.5| 0.251 vs 0.244). TOTALS lose because the
+  engine spreads its means 2.6x wider than the market (prediction SD 12.67 vs 4.91; actual-on-model slope
+  0.28) -- team quality over-applied to the total, the known `[smartsim2-total-carrier]` defect. COVER/OVER
+  probabilities are mis-calibrated because they price the model-vs-line gap as signal with the model's
+  own SD (cover bin p<0.35: predicted 0.235, observed 0.548). SEGMENTS under-project the first half by
+  2.7 points (Q2 -2.38) and over-project the second (+1.39). PROPS lose information to stale/missing
+  inputs: losing 2026 wk1-2 (as the fleet has) costs receiving yards +3.02 MAE [+2.24, +3.80] and rushing
+  yards +1.80 [+0.64, +2.93].
+- **Ranked fixes, with measured or out-of-sample impact,** are in "What would make each market accurate".
+  The two largest are operational and engine-level: restore the lost player weeks, and correct the
+  total's over-applied team quality.
+- The 2025 full-season arm (L25) is PARTIAL (94 of 644 games, paused for host memory); its 94 games agree
+  with L26. Resume: `sim --arm L25`.
 
 ## Substrate — what each number rests on
 
@@ -151,28 +163,58 @@ resolve a 0.005-0.01 Brier difference needs on the order of 10-25× these games 
 two-sided captures. Prices are early-week (captured ≥ 2.5 days before kickoff), which flatters the
 model if anything (an early line is softer than the close).
 
-## The gating rule applied (the NHL rule: a market earns a probability/edge only if it beats the baseline AND the book)
+## Why each losing market loses (evidence; 2026 wk3-4 production pregame, n = 113 unless stated)
 
-| market | beats baseline | beats book | earns probability/edge? | what the board does TODAY (code read 2026-10-02) |
-|---|---|---|---|---|
-| spread / margin | yes | **no (loses)** | **NO** | `model_prob_over` + `edge_vs_market_pct` on every row; `model_edge_pct` on ~196/444 (15-pt cap), score demoted by `NCAAF_MEASURED_SKILL`, stakes sized on price |
-| total | no (L26) | no (behind) | **NO** | same as above |
-| moneyline (h2h) | — | **no (loses, CI excludes 0)** | **NO** | `home_win_rate` published as `model_prob_over` |
-| segments q1-q4/h1/h2 | partly (margins) | unmeasurable | **NO** | `segment_projection` publishes `model_prob_over` + edge |
-| Passing/Rushing/Receiving Yards, Passing TDs | **yes (2025, n≥4k)** | unresolved (n=22 games) | **NO — not yet** | `attach_ncaaf_prop_projections` publishes `model_prob_over` + `edge_vs_market_pct`; NO measured-market gate exists |
-| Receptions | **no (loses)** | unresolved | **NO** | same |
-| Anytime TD | yes (as-of rate) | not gradable (one-sided) | **NO** | legacy `props.py` publishes `prop_model.anytime_td_probability`, which reads the WHOLE season (its own sibling module calls this the lookahead it refuses) |
+| market | loses to | cause | evidence |
+|---|---|---|---|
+| margin / spread point | book (+1.95 MAE) | RATING quality (the means) | corr(model, actual) 0.665 vs corr(book, actual) 0.776; model-minus-book does NOT predict actual-minus-book (slope -0.149, corr -0.085); spread of means about right (actual-on-model slope 0.88; prediction SD 15.43 vs book 15.54); bias -0.79 (book +0.85) |
+| moneyline (h2h) | book (Brier +0.039) | the same rating error, carried through | not over-confident: mean abs(p-0.5) 0.251 vs book 0.244; tempering the logits makes it WORSE (k=0.8 -> 0.1738, k=0.5 -> 0.1835 vs 0.1722); Normal(margin, sd) at 0 gives the same Brier (0.1723), so the win-rate link is fine |
+| total point | book (+1.42, unresolved) | DISPERSION of means: team quality over-applied to the total | prediction SD 12.67 vs book 4.91 (2.6x); actual-on-model slope 0.28; corr(model, actual) 0.225 = book 0.229 -- the information is there, the scale is ~3.5x too big; bias -1.53 |
+| spread cover probability | book (+0.032, unresolved) | the model-vs-line gap priced as signal with the model's own SD | calibration: p<0.35 bin predicted 0.235 / observed 0.548 (n=31); 0.55-0.65 bin 0.590 / 0.417; model-side hit rate 0.505 |
+| total over probability | book (+0.022, unresolved) | same, plus a per-game SD that is too NARROW | model SD 13.22 vs residual SD 17.97; p<0.35 bin predicted 0.167 / observed 0.444 (n=36) |
+| segment totals q3, h2 | naive share (+0.51, +0.87) | the engine's SCORING CLOCK | model minus actual points: q1 -0.30, **q2 -2.38**, q3 +0.81, q4 +0.47; **h1 -2.68, h2 +1.39** -- too little end-of-half scoring, too much after the break |
+| props, all 5 (vs book, unresolved) | -- | STALE/MISSING inputs + over-stated probabilities | (a) the fleet snapshot lost 2026 wk1-2: rebuilding wk4 from wk3 only vs wk1-3 costs receiving yds +3.02 MAE [+2.24, +3.80], rushing yds +1.80 [+0.64, +2.93], receptions +0.25 [+0.19, +0.31] (683-862 player-games, 122 games) and drops ~25% of projected players (receivers 1,295 -> 966); passing unaffected (-2.09 [-6.97, +2.69]). (b) the median priced row rests on 3 prior games. (c) model probabilities sit 0.11-0.15 from 0.5 while its mean-minus-line carries only weak information (corr with actual-minus-line +0.08 receptions ... +0.29 rushing) |
+| receptions (vs own average, +0.009) | own as-of mean | role-prior shrink on the wrong rows; a shared regression-to-mean bias | by role: lead bias +0.674 (own avg +0.677), lead+rusher +1.886 -- shared by both; the model is worse than own avg mainly on `spot` rows (bias +0.407 vs +0.172, n=102) |
 
-**So, under the rule as the user stated it, NO NCAAF market currently earns a board probability or
-edge.** Today the board shows one on every NCAAF game market and every continuous prop market.
-Served reading (fleet `/api/board/layer2-shortlist`, 2026-10-03 ~00:1xZ): 114 NCAAF rows, **103
-full-game spread/total/h2h rows carry `model_prob_over` AND an edge**, plus segment rows (h1, q2, q3,
-q4) carrying a model probability. No NCAAF prop row was in the shortlist at that read, so the prop
-half of the claim rests on the code (`prop_projections.attach_ncaaf_prop_projections`), not a served row. The
-NHL-equivalent change is a `MEASURED_MARKETS = frozenset()` gate for NCAAF props (means kept,
-probability withheld) and the same for game/segment rows. **That is a board change and is NOT made
-here — it awaits the user's decision.** The yardage/TD prop means are the one place the model has
-measured value: as PROJECTIONS (beating the player's own average), not as prices.
+## What would make each market accurate (ranked by expected impact)
+
+1. **Restore the lost 2026 wk1-2 player logs on the fleet snapshot, and find why the refresh dropped
+   them** (operational). Measured above: +3.0 / +1.8 / +0.25 MAE on receiving yds / rushing yds /
+   receptions, and a quarter of the projected players. Every prop line tonight is priced on 2 of 4 weeks.
+   Cheapest fix with the largest measured effect.
+2. **Correct the total's over-applied team quality** (engine, under `model_engine_standard.md`).
+   `[smartsim2-total-carrier]` already fitted NCAAF keeps (offence 0.112 / defence 0.399) and named a
+   PRE-ENGINE shrink as the right lever (as NFL's `[nfl-total-level-gain]`). Out-of-sample here: a level
+   shrink fitted on 2025 (k=0.397, n=94) takes 2026 total MAE 13.80 -> **12.11, below the book's 12.38**
+   (n=113). Re-fit per that section, never in isolation.
+3. **Price each line's probability from a calibrated distribution, not the raw model-vs-line gap**
+   (pricing layer; every line keeps its own probability). Market line as prior, model as evidence, weights
+   and residual SD fitted on history. Out-of-sample (fit 2025 n=94, test 2026 n=113): spread cover Brier
+   +0.0316 -> **+0.0001 vs the book** (w_model 0.15, SD 15.89); total over +0.0223 -> **-0.0083
+   [-0.0198, +0.0029]** (w_model 0.25, SD 14.95); point MAE margin 12.02 -> 10.04 (book 10.06), total
+   13.80 -> 12.02 (book 12.38). It states honestly how much the model adds beyond the line (little on
+   margins, some on totals) and ends 0.235-probabilities that come in at 0.548. Props need the same
+   treatment: their probabilities overstate weak information. Training sample is 2025 weeks 3-5 only --
+   refit on the full L25 when it completes.
+4. **Better ratings for margin and moneyline** -- the only route to a margin/h2h edge. The forward grade's
+   arm S (refreshed 2026 SP+) led the blend by 0.63 MAE (unresolved); the blend's k and PPA scale were
+   tuned against prior-season SP+, a weaker baseline. Candidates to test as-of: weight toward in-season
+   SP+, a market-spread prior in the rating, handling FCS-padded early schedules. No measurement here says
+   which wins.
+5. **The engine's scoring clock for segments**: first half 2.7 points short (Q2 -2.38), second half +1.39
+   high on 113 games -- end-of-half / two-minute behaviour in the drive simulator, or a measured
+   per-segment share correction on the accumulator. Grading segments against a book needs captured
+   segment closes for completed games (2 exist).
+6. **Receptions**: the shrink loses to own average mainly on `spot` rows; widen K / drop the role prior
+   for them; keep the Poisson for this under-dispersed market (measured better than a normal in the
+   module).
+7. **Anytime TD**: not gradable against a book until a two-sided quote is captured; the as-of rate beats
+   the player's raw rate (Brier -0.0105 [-0.0115, -0.0094], n=20,157). The legacy `props.py` path still
+   calls `anytime_td_probability`, which reads the WHOLE season (lookahead) -- switch it to the as-of rate.
+
+Served context (fleet `/api/board/layer2-shortlist`, 2026-10-03 ~00:1xZ): 114 NCAAF rows, 103 full-game
+rows carry `model_prob_over` and an edge. Under the user decision that is the right SHAPE -- each line
+keeps its own probability; the work is to make that probability accurate (items 1-3), not to remove it.
 
 ## What the existing accuracy jobs cover, and what they miss
 

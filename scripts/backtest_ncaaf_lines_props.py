@@ -4,8 +4,9 @@ Lane `ncaaf-lines-props-backtest` (2026-10-02). The NHL template
 (`nhl-player-props-projection`, deploys.md 2026-10-02 21:38Z) applied to NCAAF:
 run THE PRODUCTION CODE PATH, unmodified, over completed games whose inputs are
 rebuilt AS-OF kickoff, score every market against (a) the actual result, (b) a
-naive baseline, (c) the de-vigged book, and let the result GATE the board. A
-market earns a probability/edge only if it beats the baseline AND the book.
+naive baseline, (c) the de-vigged book. The result is a DIAGNOSIS, not a gate:
+user decision 2026-10-02, "every line is its own decision" -- no market-wide
+exclusion; per-line decisions stay with per-line scoring.
 
 --------------------------------------------------------------------------
 ARMS (each says where its inputs come from and how many games it rests on)
