@@ -1380,6 +1380,18 @@ death, never life — do not invert it.
 - Falsification test: If no recency rule removes more non-player minutes than played-player minutes it wrongly removes (held-out), or played-player minutes MAE does not improve with a CI excluding 0, recency is not the fix and availability needs the injury feed
 - Verification: Offline table train/test: non-player minutes removed, real players wrongly dropped (count and their actual minutes), played-player minutes bias/MAE with CI, then props re-scored; engine: off!=on reachability test on a re-run date
 ### mlb-starter-length — OPEN — opened 2026-10-03 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **SELECTION RULE, PRE-REGISTERED 2026-10-03 ~16:30Z before any candidate result was read (user: "ship the best candidate when the sweeps finish").**
+  - Candidates: the 9 non-baseline configs of sweep1 (leash/short-start knobs) and sweep2 (shelled hook). 100 sims, same seeds, same 26 dates.
+  - (1) RANK on the TUNE split (dates < 2026-07-04) by starter-outs CRPS (lower is better).
+  - (2) The top-ranked candidate SHIPS only if every check below holds on the HOLDOUT split (dates >= 2026-07-04):
+    - CRPS is lower than the 100-sim baseline's;
+    - |outs bias| is not larger;
+    - the <=9-out share moves toward actual;
+    - each of |SO bias|, |H bias| and |ER bias| worsens by <= 0.10;
+    - the model's mean game total moves by <= 0.30 runs, and its |gap| to the box-score actual of the same games does not grow.
+  - (3) If it fails, try the next-ranked candidate. If none passes, ship NOTHING and record that.
+  - Ship = the override values in forward_start_2026_04_14_v1.json, plus the no-op hook code, on main; then a fleet ff. The sim job is a per-run subprocess, so no restart.
+  - Verified by the next MLB sim run's stored pitcher_props outs_mean moving as predicted.
 - Goal: The current MLB engine's starter-outs projection is unbiased and its distribution matches real starts (early-exit share and point mass at 15 outs), measured on an AS-OF replay of stored roster_objs against StatsAPI actual starter outs with a time-split holdout; any override change ships only if out-of-sample outs MAE/bias improve without worsening K/hits-allowed/ER or game totals, with the numbers recorded
 - Files: scripts/mlb_starter_length_replay.py (NEW), tests/test_mlb_starter_length_replay.py (NEW), vendor/mlb_bettingv2/data/tuning/manager_pitching_overrides/forward_start_2026_04_14_v1.json (override values + provenance ONLY), .syndicate/findings_2026-10-03_mlb_starter_length.md (NEW), vendor/mlb_bettingv2/sim_engine/simulate.py (_select_pitcher_v2 starter branch: shelled-hook knobs, default no-op ONLY), tests/test_mlb_starter_shell_hook.py (NEW)
 - Hypothesis: Per 09-14 (outs +7.1% on the post-refit engine; total pitches +2.4% but 4.4% too few pitches per out; 14% of real starts end <=9 outs vs 1.7% in the sim) and 08-17 (26.78% of sim mass at exactly 15 outs), the 5-inning leash (starter_min_innings=5, leash-break knobs at always-keep defaults) suppresses early exits; the bias is in the leash/short-start knobs, not the pitch-count hook
