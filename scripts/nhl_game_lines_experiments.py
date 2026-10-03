@@ -1,0 +1,594 @@
+"""NHL game-line model experiments (lane `nhl-game-lines-model`).
+
+`scripts/backtest_nhl_game_lines.py` showed every hockeysim game market TIES an as-of team GF/GA
+baseline (2025-26, n=1,132). This harness tests WHY and WHAT FIXES IT, layering candidate changes
+multiplicatively on the production lambdas that harness already produced (`<out>/sim/games.json`,
+production `predict_game`, asserted equal) -- exactly the shape a production change would take.
+
+VARIANTS (cumulative; each also reported singly where meaningful)
+  V0  production raw: regulation-only sim, ties split 50/50, p_over on regulation goals
+  V1  + full-game settlement: a regulation tie goes to OT/SO, home wins it w.p. q (as-of league
+        OT/SO home share), and the settled total gets +1 (the OT goal or the SO credit)
+  V2  + regulation scale: lambdas x s, s = as-of league REGULATION goals / as-of mean model total
+        (H1: projection.py's 3.1269/60 is a FULL-GAME rate used as a regulation rate)
+  V3  + tie mass: tie samples re-weighted 1+delta, delta fit as-of to the league tie rate (H3)
+  V4  + empty net: a 1-goal regulation lead becomes 2 w.p. e, e fit as-of on the non-tie
+        1-goal share (H4)
+  V5  + starting goalie: the opponent's lambda x (1 - sv_g)/(1 - sv_lg), sv_g the PROJECTED
+        starter's as-of save% shrunk with k shots (production collector's own projection,
+        `starting_goalies_<date>.csv`, source hockeysim_toi)
+  V6  + rest: back-to-back multipliers on a team's goals for/against, fit on games before the date
+  V5o ORACLE: V5 with the ACTUAL starter -- NOT pregame-honest (identity known after puck drop);
+        an upper bound on what confirmed-starter data would buy
+
+BASELINES
+  B0  the as-of GF/GA team baseline of backtest_nhl_game_lines (production machinery)
+  B4  the same GF/GA lambdas pushed through V1..V4 machinery, fit the same way on ITS OWN
+      predictions -- so "beats B4" means INFORMATION, not plumbing.
+
+HONESTY
+  * machinery parameters are walk-forward: fit on games strictly before the date;
+  * information hyper-parameters (goalie shrink k, rest shrink) are tuned on games BEFORE
+    2026-01-01 only and frozen; the headline window is 2026-01-01..2026-04-16 (out of sample);
+  * common random numbers: every variant of a game re-uses the game's production seed;
+  * CIs: date-clustered bootstrap, 2,000 reps.
+
+Usage:
+  py -3 scripts/nhl_game_lines_experiments.py --out C:/tmp/nhllines_after --roots C:/tmp/nhlprops/bt_after \
+      --report docs/reports/nhl_game_lines_model_experiments_2026-10-02.md
+"""
+from __future__ import annotations
+
+import argparse
+import bisect
+import csv
+import json
+import math
+import random
+import statistics
+import sys
+import unicodedata
+from collections import Counter, defaultdict
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
+
+REPO = Path(__file__).resolve().parents[1]
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+import importlib.util  # noqa: E402
+
+_spec = importlib.util.spec_from_file_location("_bgl", REPO / "scripts" / "backtest_nhl_game_lines.py")
+BGL = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(BGL)  # type: ignore[union-attr]
+
+EVAL_START = "2026-01-01"
+REG_FULLGAME_BASE = 6.2538  # projection.py's calibration total (full game incl. OT + SO credit)
+
+
+def _norm(s: str) -> str:
+    s = unicodedata.normalize("NFKD", str(s)).encode("ascii", "ignore").decode().lower()
+    return " ".join(s.replace(".", " ").replace("-", " ").split())
+
+
+# ---------------------------------------------------------------------------
+# data: goalie lines per game, projected starters, schedule
+# ---------------------------------------------------------------------------
+
+def goalie_lines(act: Dict[str, Dict], src: Path, roots: Path) -> Dict[str, Dict[str, List[Dict]]]:
+    """{gid: {abbr: [ {pid, key, shots, ga, starter, toi} ]}} from boxscores."""
+    out: Dict[str, Dict[str, List[Dict]]] = {}
+    for gid, r in act.items():
+        box = None
+        for p in (src / "data" / "ingestion_cache" / f"boxscore_{gid}.json", roots / "cache" / f"boxscore_{gid}.json"):
+            box = BGL._rj(p)
+            if box:
+                break
+        if not box:
+            continue
+        per = {}
+        for side, ab in (("homeTeam", r["home"]), ("awayTeam", r["away"])):
+            gl = []
+            for g in ((box.get("playerByGameStats") or {}).get(side) or {}).get("goalies") or []:
+                nm = str((g.get("name") or {}).get("default") or "")
+                gl.append({"pid": int(g["playerId"]), "key": _norm(nm), "shots": int(g.get("shotsAgainst") or 0),
+                           "ga": int(g.get("goalsAgainst") or 0), "starter": bool(g.get("starter"))})
+            per[ab] = gl
+        out[gid] = per
+    return out
+
+
+@__import__("functools").lru_cache(maxsize=None)
+def projected_starters(roots: Path, date: str) -> Dict[str, str]:
+    """{team abbr: 'j swayman'-style key} from the production collector's file."""
+    p = roots / "roots" / date / "data" / "processed" / f"starting_goalies_{date}.csv"
+    res = {}
+    if not p.exists():
+        return res
+    for row in csv.DictReader(p.open(encoding="utf-8")):
+        full = _norm(row.get("goalie") or "")
+        parts = full.split()
+        if len(parts) >= 2:
+            ab = BGL._abbr_of(row.get("team") or "")
+            if ab:
+                res[ab] = f"{parts[0][0]} {' '.join(parts[1:])}"
+    return res
+
+
+# ---------------------------------------------------------------------------
+# sample machinery
+# ---------------------------------------------------------------------------
+
+def draws(hp, ap, seed):
+    h, a = BGL.replica(hp, ap, seed)
+    return h, a
+
+
+def probs(h, a, *, q_ot=0.5, delta=0.0, e=0.0, seed=0, lines=(5.5, 6.5), full_settlement=True) -> Dict[str, float]:
+    """Market probabilities from regulation samples with the V1..V4 machinery applied."""
+    hg, ag = h.sum(axis=1).astype(np.int64), a.sum(axis=1).astype(np.int64)
+    if e > 0:
+        rng = np.random.default_rng(seed ^ 0x9E3779B9)
+        u = rng.random(len(hg))
+        lead_h = (hg - ag) == 1
+        lead_a = (ag - hg) == 1
+        hg = hg + (lead_h & (u < e))
+        ag = ag + (lead_a & (u < e))
+    d, t = hg - ag, hg + ag
+    tie = d == 0
+    w = np.where(tie, 1.0 + delta, 1.0)
+    W = w.sum()
+    m = lambda mask: float((w * mask).sum() / W)
+    p_tie = m(tie)
+    out = {"p_reg_home": m(d > 0), "p_reg_tie": p_tie, "p_reg_away": m(d < 0),
+           "p_home_ml": m(d > 0) + (q_ot if full_settlement else 0.5) * p_tie,
+           "p_home_m15": m(d > 1.5), "p_away_m15": m(d < -1.5),
+           "reg_total": float((w * t).sum() / W),
+           "abs1_nontie": m(np.abs(d) == 1) / max(1e-9, 1 - p_tie)}
+    settle = t + tie if full_settlement else t
+    out["full_total"] = float((w * settle).sum() / W)
+    out["margin"] = float((w * d).sum() / W) + (q_ot - 0.5) * p_tie * (2 if full_settlement else 0)
+    for L in lines:
+        out[f"over_{L}"] = m(settle > L)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# as-of parameter fits
+# ---------------------------------------------------------------------------
+
+class Fitter:
+    """Walk-forward machinery fits from games strictly before a date."""
+
+    def __init__(self, act: Dict[str, Dict], pred_reg_total: Dict[str, float], pred_tie: Dict[str, float],
+                 pred_abs1: Dict[str, float]):
+        self.g = sorted((r for r in act.values() if r["season"] == BGL.SEASON_PREV), key=lambda r: r["date"])
+        self.dates = [r["date"] for r in self.g]
+        self.prt, self.pt, self.pa1 = pred_reg_total, pred_tie, pred_abs1
+        self._cache: Dict[str, Dict] = {}
+
+    def at(self, date: str, arm: str) -> Dict[str, float]:
+        key = date if not arm.startswith("current") else "9999"
+        if key in self._cache:
+            return self._cache[key]
+        i = bisect.bisect_left(self.dates, date) if key != "9999" else len(self.g)
+        prior = self.g[:i]
+        n = len(prior)
+        if n < 100:
+            res = {"q_ot": 0.5, "s": 1.0 if not prior else 1.0, "delta": 0.0, "e": 0.0, "n": n}
+            self._cache[key] = res
+            return res
+        reg = statistics.fmean(r["reg_h"] + r["reg_a"] for r in prior)
+        ot = [r for r in prior if r["last"] in ("OT", "SO")]
+        q = statistics.fmean(1.0 if r["final_h"] > r["final_a"] else 0.0 for r in ot) if ot else 0.5
+        tie = len(ot) / n
+        nontie = [r for r in prior if r["last"] == "REG"]
+        o1 = statistics.fmean(1.0 if abs(r["reg_h"] - r["reg_a"]) == 1 else 0.0 for r in nontie)
+        # model-side means over prior games that HAVE a model prediction
+        mp = [r["gid"] for r in prior if r["gid"] in self.prt]
+        if len(mp) >= 100:
+            s = reg / statistics.fmean(self.prt[g] for g in mp)
+            pbar = statistics.fmean(self.pt[g] for g in mp)
+            m1 = statistics.fmean(self.pa1[g] for g in mp)
+        else:  # model-free as-of anchor: the profile's full-game base rescaled to regulation
+            s = reg / REG_FULLGAME_BASE
+            pbar, m1 = 0.16, 0.42
+        delta = max(0.0, tie * (1 - pbar) / (pbar * (1 - tie)) - 1.0)
+        e = max(0.0, min(0.6, 1.0 - o1 / m1)) if m1 > 0 else 0.0
+        res = {"q_ot": q, "s": s, "delta": delta, "e": e, "n": n, "tie": tie, "reg": reg}
+        self._cache[key] = res
+        return res
+
+
+# ---------------------------------------------------------------------------
+# information: goalie and rest
+# ---------------------------------------------------------------------------
+
+class GoalieHistory:
+    def __init__(self, act, gl):
+        rows = []
+        for gid, per in gl.items():
+            r = act[gid]
+            if r["season"] != BGL.SEASON_PREV:
+                continue
+            for ab, lst in per.items():
+                for g in lst:
+                    if g["shots"] > 0:
+                        rows.append((r["date"], ab, g["key"], g["pid"], g["shots"], g["ga"], g["starter"]))
+        rows.sort()
+        self.rows = rows
+        self.dates = [x[0] for x in rows]
+
+    def asof(self, date, arm):
+        i = bisect.bisect_left(self.dates, date) if not arm.startswith("current") else len(self.rows)
+        by_key = defaultdict(lambda: [0, 0])
+        by_pid = defaultdict(lambda: [0, 0])
+        S = G = 0
+        for (_d, ab, key, pid, sh, ga, _st) in self.rows[:i]:
+            by_key[(ab, key)][0] += sh; by_key[(ab, key)][1] += ga
+            by_key[("*", key)][0] += sh; by_key[("*", key)][1] += ga
+            by_pid[pid][0] += sh; by_pid[pid][1] += ga
+            S += sh; G += ga
+        return by_key, by_pid, (1 - G / S) if S else 0.900
+
+
+def _key_from_full(name: str) -> Optional[str]:
+    parts = _norm(name).split()
+    return f"{parts[0][0]} {' '.join(parts[1:])}" if len(parts) >= 2 else None
+
+
+def starter_picks(act, gl, lg_dates, dfo_dir: Path) -> Dict[str, Any]:
+    """Pregame starter per (gid, team abbr) from two honest sources, with accuracy vs the actual:
+      rotation -- most starts in the team's last 10 games, flipped to the next goalie on the second
+                  night of a back-to-back when the top goalie started the night before (as-of);
+      dfo      -- Daily Faceoff's starter IF its news was posted BEFORE puck drop and the status is
+                  Confirmed or Likely; otherwise the rotation pick (counted as a fallback)."""
+    hist = defaultdict(list)
+    for gid, r in sorted(act.items(), key=lambda kv: (kv[1]["date"], kv[0])):
+        if r["season"] != BGL.SEASON_PREV:
+            continue
+        for ab in (r["home"], r["away"]):
+            st = [x["pid"] for x in gl.get(gid, {}).get(ab, []) if x["starter"]]
+            if st:
+                hist[ab].append((r["date"], st[0]))
+    rot: Dict[Tuple[str, str], Any] = {}
+    dfo: Dict[Tuple[str, str], Any] = {}
+    stats = Counter()
+    dfo_cache: Dict[str, Optional[Dict]] = {}
+    for gid, r in act.items():
+        for side, ab in (("home", r["home"]), ("away", r["away"])):
+            opp = r["away"] if side == "home" else r["home"]
+            osd = "away" if side == "home" else "home"
+            h = hist[ab]
+            if r["season"] == BGL.SEASON_PREV:
+                i = bisect.bisect_left([d for d, _ in h], r["date"])
+                prior = h[:i]
+            else:
+                prior = h
+            pick = None
+            if prior:
+                last10 = Counter(p for _, p in prior[-10:])
+                top = last10.most_common(1)[0][0]
+                pick = top
+                if is_b2b(ab, r["date"], lg_dates) and prior[-1][1] == top:
+                    alts = [p for p, _ in last10.most_common() if p != top]
+                    if alts:
+                        pick = alts[0]
+            rot[(gid, ab)] = pick
+            if r["date"] not in dfo_cache:
+                dfo_cache[r["date"]] = BGL._rj(dfo_dir / f"{r['date']}.json")
+            page = dfo_cache[r["date"]]
+            chosen, why = pick, "fallback_no_page"
+            if page and page.get("games") is not None:
+                why = "fallback_game_not_listed"
+                for gm in page["games"]:
+                    if BGL._abbr_of(gm.get(f"{side}_team") or "") == ab and BGL._abbr_of(gm.get(f"{osd}_team") or "") == opp:
+                        status = str(gm.get(f"{side}_status") or "")
+                        at = str(gm.get(f"{side}_news_at") or "")
+                        if status not in ("Confirmed", "Likely"):
+                            why = f"fallback_status_{status or 'none'}"
+                        elif not at or at[:19] >= r["start"][:19]:
+                            why = "fallback_posted_after_start"
+                        else:
+                            chosen, why = _key_from_full(gm.get(f"{side}_goalie") or ""), f"dfo_{status.lower()}"
+                        break
+            dfo[(gid, ab)] = chosen
+            stats[why] += 1
+            if r["arm"] == "regular" and r["date"] >= "2025-11-01":
+                actual = [x for x in gl.get(gid, {}).get(ab, []) if x["starter"]]
+                if actual:
+                    a0 = actual[0]
+                    stats["acc_rotation_hit" if pick == a0["pid"] else "acc_rotation_miss"] += 1
+                    hit = (chosen == a0["key"]) if isinstance(chosen, str) else (chosen == a0["pid"])
+                    stats[f"acc_dfo_{'hit' if hit else 'miss'}"] += 1
+                    if why.startswith("dfo_"):
+                        stats[f"acc_{why}_{'hit' if hit else 'miss'}"] += 1
+    return {"rotation": rot, "dfo": dfo, "stats": dict(stats)}
+
+
+def goalie_factor(stats: Tuple[int, int], sv_lg: float, k: float) -> float:
+    sh, ga = stats
+    sv = ((sh - ga) + k * sv_lg) / (sh + k)
+    return (1 - sv) / (1 - sv_lg)
+
+
+def last_game_dates(act):
+    by = defaultdict(list)
+    for r in act.values():
+        by[r["home"]].append(r["date"]); by[r["away"]].append(r["date"])
+    for k in by:
+        by[k].sort()
+    return by
+
+
+def is_b2b(team, date, lg):
+    from datetime import date as D
+    lst = lg.get(team, [])
+    i = bisect.bisect_left(lst, date)
+    if i == 0:
+        return False
+    y, m, d = map(int, date.split("-")); y2, m2, d2 = map(int, lst[i - 1].split("-"))
+    return (D(y, m, d) - D(y2, m2, d2)).days == 1
+
+
+# ---------------------------------------------------------------------------
+# run
+# ---------------------------------------------------------------------------
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", default="C:/tmp/nhllines_after")
+    ap.add_argument("--roots", default="C:/tmp/nhlprops/bt_after")
+    ap.add_argument("--src", default=None)
+    ap.add_argument("--report", default=None)
+    ap.add_argument("--min-n", type=int, default=100)
+    ap.add_argument("--dfo", default=None, help="dir of fetch_nhl_confirmed_goalies.py outputs (default <out>/dfo)")
+    a = ap.parse_args()
+    out, roots = Path(a.out), Path(a.roots)
+    src = Path(a.src) if a.src else BGL._main_worktree() / "data" / "nhl_source"
+    act = json.loads((out / "actuals.json").read_text(encoding="utf-8"))
+    sim = json.loads((out / "sim" / "games.json").read_text(encoding="utf-8"))
+    from syndicate.features.nhl.sim_engine.hockeysim.adapters import game_seed
+
+    games = [g for d in sim["dates"] for g in d["games"] if g["gid"] in act]
+    games.sort(key=lambda g: (g["date"], g["gid"]))
+    asof = BGL.AsOf(act)
+
+    # pass 1: production-lambda summaries for the machinery fits (model and baseline separately)
+    m_rt, m_tie, m_a1, b_rt, b_tie, b_a1 = {}, {}, {}, {}, {}, {}
+    base_lams: Dict[str, Tuple[float, float, float]] = {}
+    stc = {}
+    for g in games:
+        r = act[g["gid"]]
+        seed = game_seed(g["date"], g["gid"])
+        h, aa = draws(g["hp"], g["ap"], seed)
+        p = probs(h, aa)
+        m_rt[g["gid"]], m_tie[g["gid"]], m_a1[g["gid"]] = p["reg_total"], p["p_reg_tie"], p["abs1_nontie"]
+        key = (g["date"], r["arm"])
+        if key not in stc:
+            stc[key] = asof.state(*key)
+        st = stc[key]
+        bl = BGL.baseline_lams(st, r["home"], r["away"])
+        if bl is not None:
+            base_lams[g["gid"]] = (bl[0], bl[1], st["p1_share"])
+            hb, ab_ = draws(BGL._periods(bl[0], st["p1_share"]), BGL._periods(bl[1], st["p1_share"]), seed)
+            pb = probs(hb, ab_)
+            b_rt[g["gid"]], b_tie[g["gid"]], b_a1[g["gid"]] = pb["reg_total"], pb["p_reg_tie"], pb["abs1_nontie"]
+    fit_m = Fitter(act, m_rt, m_tie, m_a1)
+    fit_b = Fitter(act, b_rt, b_tie, b_a1)
+
+    gl = goalie_lines(act, src, roots)
+    gh = GoalieHistory(act, gl)
+    lg_dates = last_game_dates(act)
+    gh_cache: Dict[Tuple[str, str], Any] = {}
+
+    # hyper-parameters tuned on games BEFORE EVAL_START only (grid; ML log-loss), then frozen
+    picks = starter_picks(act, gl, lg_dates, Path(a.dfo) if a.dfo else out / "dfo")
+    print(f"starter sources: {picks['stats']}")
+
+    def run(k_goalie: Optional[float], rest: Optional[Dict], source: str, window=None):
+        rows = []
+        miss = Counter()
+        for g in games:
+            if window and not window(g["date"]):
+                continue
+            r = act[g["gid"]]
+            if g["gid"] not in base_lams:
+                miss["no_baseline"] += 1
+                continue
+            seed = game_seed(g["date"], g["gid"])
+            fm, fb = fit_m.at(g["date"], r["arm"]), fit_b.at(g["date"], r["arm"])
+            hp, apl = list(g["hp"]), list(g["ap"])
+            rec = {"gid": g["gid"], "date": g["date"], "arm": r["arm"], "act": r}
+            h0, a0 = draws(hp, apl, seed)
+            rec["V0"] = probs(h0, a0, full_settlement=False)
+            rec["V1"] = probs(h0, a0, q_ot=fm["q_ot"])
+            s = fm["s"]
+            hs, as_ = draws([x * s for x in hp], [x * s for x in apl], seed)
+            rec["V2"] = probs(hs, as_, q_ot=fm["q_ot"])
+            rec["V3"] = probs(hs, as_, q_ot=fm["q_ot"], delta=fm["delta"])
+            rec["V4"] = probs(hs, as_, q_ot=fm["q_ot"], delta=fm["delta"], e=fm["e"], seed=seed)
+            # baselines
+            bh, ba, p1s = base_lams[g["gid"]]
+            hb, abb = draws(BGL._periods(bh, p1s), BGL._periods(ba, p1s), seed)
+            rec["B0"] = probs(hb, abb, full_settlement=False)
+            sb = fb["s"]
+            hb2, ab2 = draws(BGL._periods(bh * sb, p1s), BGL._periods(ba * sb, p1s), seed)
+            rec["B4"] = probs(hb2, ab2, q_ot=fb["q_ot"], delta=fb["delta"], e=fb["e"], seed=seed)
+            # information layers
+            if k_goalie is not None:
+                ck = (g["date"], r["arm"])
+                if ck not in gh_cache:
+                    gh_cache[ck] = gh.asof(*ck)
+                by_key, by_pid, sv_lg = gh_cache[ck]
+                fac = {}
+                for side, ab in (("home", r["home"]), ("away", r["away"])):
+                    if source == "oracle":
+                        st_ = [x for x in gl.get(g["gid"], {}).get(ab, []) if x["starter"]]
+                        stats = by_pid.get(st_[0]["pid"]) if st_ else None
+                    elif source == "proj":
+                        starters = projected_starters(roots, g["date"])
+                        key = starters.get(ab)
+                        stats = (by_key.get((ab, key)) or by_key.get(("*", key))) if key else None
+                    else:  # rotation | dfo (pregame-provable confirmed/likely, else rotation)
+                        pk = picks[source].get((g["gid"], ab))
+                        stats = by_pid.get(pk) if isinstance(pk, int) else (
+                            (by_key.get((ab, pk)) or by_key.get(("*", pk))) if pk else None)
+                    if stats is None:
+                        miss[f"goalie_unmatched_{source}"] += 1
+                        fac[side] = 1.0
+                    else:
+                        fac[side] = goalie_factor(stats, sv_lg, k_goalie)
+                # the HOME goalie scales the AWAY lambda and vice versa
+                hp5 = [x * s * fac["away"] for x in hp]
+                ap5 = [x * s * fac["home"] for x in apl]
+                if rest:
+                    bh2b, ab2b = is_b2b(r["home"], g["date"], lg_dates), is_b2b(r["away"], g["date"], lg_dates)
+                    hp5 = [x * (rest["gf"] if bh2b else 1) * (rest["ga"] if ab2b else 1) for x in hp5]
+                    ap5 = [x * (rest["gf"] if ab2b else 1) * (rest["ga"] if bh2b else 1) for x in ap5]
+                h5, a5 = draws(hp5, ap5, seed)
+                rec["VX"] = probs(h5, a5, q_ot=fm["q_ot"], delta=fm["delta"], e=fm["e"], seed=seed)
+            rows.append(rec)
+        return rows, miss
+
+    def ll_ml(rows, key):
+        return statistics.fmean(BGL._ll(x[key]["p_home_ml"], 1 if x["act"]["final_h"] > x["act"]["final_a"] else 0) for x in rows)
+
+    pre = lambda d: d < EVAL_START
+    post = lambda d: d >= EVAL_START
+    tune = {}
+    for k in (100.0, 300.0, 600.0, 1000.0, 2000.0, 5000.0):
+        rows, _ = run(k, None, "dfo", window=pre)
+        tune[k] = ll_ml(rows, "VX")
+    k_best = min(tune, key=tune.get)
+    # rest multipliers: residual ratio of B2B teams vs V4 expected goals, games before EVAL_START
+    rows_pre, _ = run(k_best, None, "dfo", window=pre)
+    gf_r, ga_r = [], []
+    for x in rows_pre:
+        r = x["act"]
+        for side, opp, mine, theirs in (("home", "away", "reg_h", "reg_a"), ("away", "home", "reg_a", "reg_h")):
+            team = r[side]
+            if is_b2b(team, x["date"], lg_dates):
+                gf_r.append((r[mine], None)); ga_r.append((r[theirs], None))
+    # expected regulation goals per side under V4 are not stored per side; use league-relative ratio
+    rest = None
+    if gf_r:
+        lg_side = statistics.fmean((x["act"]["reg_h"] + x["act"]["reg_a"]) / 2 for x in rows_pre)
+        kk = 200.0
+        n = len(gf_r)
+        gf = (sum(v for v, _ in gf_r) + kk * lg_side) / (n + kk) / lg_side
+        ga = (sum(v for v, _ in ga_r) + kk * lg_side) / (n + kk) / lg_side
+        rest = {"gf": gf, "ga": ga, "n": n}
+    print(f"tuned (pre-{EVAL_START}): goalie k={k_best} (ML log-loss by k: { {k: round(v, 5) for k, v in tune.items()} }); rest={rest}")
+
+    results = {}
+    for label, kw in (("V5", dict(k_goalie=k_best, rest=None, source="proj")),
+                      ("V5r", dict(k_goalie=k_best, rest=None, source="rotation")),
+                      ("V5c", dict(k_goalie=k_best, rest=None, source="dfo")),
+                      ("V6", dict(k_goalie=k_best, rest=rest, source="dfo")),
+                      ("V5o", dict(k_goalie=k_best, rest=None, source="oracle"))):
+        rows, miss = run(**kw)
+        results[label] = (rows, miss)
+
+    rows_all = results["V6"][0]
+    others = {lab: {x["gid"]: x for x in results[lab][0]} for lab in ("V5", "V5r", "V5c", "V5o")}
+    for x in rows_all:
+        for lab, idx in others.items():
+            x[lab] = idx[x["gid"]]["VX"]
+        x["V6"] = x.pop("VX")
+
+    report = {"k_goalie": k_best, "tune": tune, "rest": rest, "starter_sources": picks["stats"],
+              "goalie_join": {k: dict(v[1]) for k, v in results.items()},
+              "fits_sample": {d: fit_m.at(d, "regular") for d in ("2025-11-15", "2026-01-01", "2026-03-01")},
+              "windows": {}}
+    for wname, wf in (("EVAL 2026-01-01..04-16 (out of sample)", lambda x: x["arm"] == "regular" and x["date"] >= EVAL_START),
+                      ("FULL regular 11-01..04-16", lambda x: x["arm"] == "regular"),
+                      ("PLAYOFFS (holdout)", lambda x: x["arm"] == "playoff")):
+        R = [x for x in rows_all if wf(x)]
+        report["windows"][wname] = score(R, a.min_n)
+    (out / "experiments.json").write_text(json.dumps(report, indent=1, default=str), encoding="utf-8")
+    for w, rep in report["windows"].items():
+        print(f"\n=== {w}: n={rep['n']}")
+        for line in rep["lines"]:
+            print("  " + line)
+    if a.report:
+        write_md(report, Path(a.report))
+    return 0
+
+
+VARIANTS = ["V0", "V1", "V2", "V3", "V4", "V5", "V5r", "V5c", "V6", "V5o"]
+
+
+def score(R: List[Dict], min_n: int) -> Dict:
+    lines = []
+    res = {"n": len(R), "markets": {}}
+    if not R:
+        return {"n": 0, "lines": [], "markets": {}}
+    y = {
+        "ML home": (lambda x: 1 if x["act"]["final_h"] > x["act"]["final_a"] else 0, "p_home_ml"),
+        "REG tie": (lambda x: 1 if x["act"]["reg_h"] == x["act"]["reg_a"] else 0, "p_reg_tie"),
+        "REG home": (lambda x: 1 if x["act"]["reg_h"] > x["act"]["reg_a"] else 0, "p_reg_home"),
+        "PL home -1.5": (lambda x: 1 if x["act"]["final_h"] - x["act"]["final_a"] > 1.5 else 0, "p_home_m15"),
+        "PL away -1.5": (lambda x: 1 if x["act"]["final_a"] - x["act"]["final_h"] > 1.5 else 0, "p_away_m15"),
+        "OVER 5.5": (lambda x: 1 if x["act"]["final_h"] + x["act"]["final_a"] > 5.5 else 0, "over_5.5"),
+        "OVER 6.5": (lambda x: 1 if x["act"]["final_h"] + x["act"]["final_a"] > 6.5 else 0, "over_6.5"),
+    }
+    for mk, (yf, pk) in y.items():
+        ent = {}
+        freq = statistics.fmean(yf(x) for x in R)
+        for v in VARIANTS + ["B0", "B4"]:
+            if v not in R[0]:
+                continue
+            br = statistics.fmean(BGL._brier(x[v][pk], yf(x)) for x in R)
+            mp = statistics.fmean(x[v][pk] for x in R)
+            e = {"brier": br, "mean_p": mp}
+            for bn in ("B0", "B4"):
+                if v.startswith("B"):
+                    continue
+                d = BGL._boot_diff([(x["date"], BGL._brier(x[v][pk], yf(x)) - BGL._brier(x[bn][pk], yf(x))) for x in R])
+                e[f"d_{bn}"] = d
+                e[f"verdict_{bn}"] = BGL._verdict(*d, len(R), min_n)
+            ent[v] = e
+        res["markets"][mk] = ent
+        lines.append(f"{mk} (freq {freq:.3f}; B0 Brier {ent['B0']['brier']:.4f} meanP {ent['B0']['mean_p']:.3f}; "
+                     f"B4 {ent['B4']['brier']:.4f} meanP {ent['B4']['mean_p']:.3f})")
+        for v in VARIANTS:
+            if v not in ent:
+                continue
+            e = ent[v]
+            lines.append(f"   {v:<4} Brier {e['brier']:.4f} meanP {e['mean_p']:.3f} | vs B0 {e['d_B0'][0]:+.4f} "
+                         f"[{e['d_B0'][1]:+.4f},{e['d_B0'][2]:+.4f}] {e['verdict_B0']:<14} | vs B4 {e['d_B4'][0]:+.4f} "
+                         f"[{e['d_B4'][1]:+.4f},{e['d_B4'][2]:+.4f}] {e['verdict_B4']}")
+    # totals point accuracy (settled full game)
+    tot = lambda x: x["act"]["final_h"] + x["act"]["final_a"]
+    lines.append("TOTAL settled (MAE / bias)")
+    for v in VARIANTS + ["B0", "B4"]:
+        if v not in R[0]:
+            continue
+        err = [(x["date"], x[v]["full_total"] - tot(x)) for x in R]
+        mae = statistics.fmean(abs(e) for _, e in err)
+        bias = BGL._boot_diff(err)
+        extra = ""
+        if not v.startswith("B"):
+            d = BGL._boot_diff([(x["date"], abs(x[v]["full_total"] - tot(x)) - abs(x["B4"]["full_total"] - tot(x))) for x in R])
+            extra = f" | dMAE vs B4 {d[0]:+.4f} [{d[1]:+.4f},{d[2]:+.4f}]"
+        lines.append(f"   {v:<4} MAE {mae:.3f} bias {bias[0]:+.3f} [{bias[1]:+.3f},{bias[2]:+.3f}]{extra}")
+        res["markets"].setdefault("TOTAL", {})[v] = {"mae": mae, "bias": bias}
+    res["lines"] = lines
+    return res
+
+
+def write_md(rep: Dict, path: Path) -> None:
+    L = ["# NHL game-line model experiments (generated)", "",
+         f"goalie shrink k (tuned before {EVAL_START}): {rep['k_goalie']}; rest multipliers: {rep['rest']}",
+         f"goalie join misses: `{rep['goalie_join']}`", f"machinery fits (as-of samples): `{rep['fits_sample']}`", ""]
+    for w, r in rep["windows"].items():
+        L += [f"## {w} (n={r['n']})", "", "```"] + r["lines"] + ["```", ""]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(L) + "\n", encoding="utf-8")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
