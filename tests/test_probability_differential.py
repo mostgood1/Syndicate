@@ -71,7 +71,6 @@ KNOWN_FAILING = {
         # fix belongs to each owning lane (route through a guarded converter,
         # e.g. `backtest_mlb_lines_props.american_to_prob`, which passes 5/5).
         "scripts.backtest_nhl_props:_implied",
-        "scripts.backtest_wnba_lines_props:implied",
         # `scripts.consensus_movement_by_sport:_implied` left this set the same
         # day: the copy was deleted and the script imports the owner instead.
     },
