@@ -1408,6 +1408,14 @@ death, never life — do not invert it.
 - Verification: unit: snapshot holding 2026 wk3-4 + target 5 -> weeks (1,2,4,5); empty snapshot -> 1..5; other-season rows do not count; --weeks and --no-backfill unchanged; the new test fails on origin/main. Fleet: rides the next fleet fast-forward; its next run logs the backfill weeks (none needed today -- wk1-2 restored 2026-10-03)
 - Blocked by: none
 
+### nfl-prop-skill-refresh — OPEN — opened 2026-10-03 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: The eight NFL pregame prop entries in the measured-skill registry carry readings taken on PRODUCTION's estimator and PRODUCTION's probability function, scored on the 2025+2026 holdout, so no consumer reads a number measured through an estimator the board does not serve; and the two markets that re-measure UNDER-POWERED are marked superseded rather than left looking current.
+- Files: syndicate/features/shared/measured_market_skill.py (the eight nfl pregame entries ONLY), tests/test_measured_market_skill.py (NFL cases ONLY)
+- **No claim was taken in the end.** Lane `soccer-skill-registry-line-weighting` (session 43e4d5fe) RELEASED both registry paths on request and landed it on main, so the file was already unclaimed when I edited — I discarded my own prepared donor-side takeover rather than apply a redundant edit to a line a peer had just rewritten. Their caveat that the underlying holder was still the orphaned `accuracy-assessment-0914` does NOT hold on main: that block is absent from `lanes.md` altogether, so `lane_claims._claims` returns no holder and no cross-lane write is needed. Verified with the guard's own parser, not by eye.
+- Hypothesis: n/a — the measurement is already taken (`.syndicate/findings_2026-10-03_nfl_props_vs_price_recheck.md`); this lane only lands it.
+- Falsification test: n/a for the edit; the reading it lands was itself controlled (production's probability reproduced before any verdict was formed).
+- Verification: the registry's eight NFL pregame entries match the findings table, the two under-powered markets carry an explicit superseded note instead of a stale number, and `tests/test_measured_market_skill.py` passes.
+- Blocked by: none
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
