@@ -45625,3 +45625,118 @@ three different artifact vintages, which is worth knowing before anyone calls it
 - **Offline evidence on the shipped code** (2025-26 as-of lambdas, n=1,132): settled-total bias +0.111 -> **+0.008 [-0.133, +0.143]**; ML and OVER@close vs the close unchanged (paired, CIs include 0).
   - Known residual: mean P(over) at the close line 0.476 vs frequency 0.503 (dispersion; next item).
 - **Reading 2 -- OWED:** watcher `simfix_watch.sh` waits for the first predictions rewrite after 20:11:45Z and records the signature plus the writing sweep's start time.
+
+## 2026-10-03 20:32:44Z LOAD / 20:39:27Z READING (03:32 PM / 03:39 PM CT) -- LOCAL FLEET, refresh-worker: passing_tds and interceptions measured, all eight NFL prop CIs restated cluster-robust (`9434b5cc`) -- **PARTLY MET: the bridge, the six restated CIs and passing_tds are VERIFIED on the served board; the interceptions parity row is OWED on a population that exists** (lane `nfl-qb-prop-skill-measurement`, user: "take the passing_tds and interceptions measurement")
+
+Claim `refresh-worker` held by `nfl-qb-prop-skill-measurement`, token `24104425064e0136`, released after.
+
+**DEFERRED FIRST, THEN DEPLOYED -- the deferral is part of the record.** At 20:24Z refresh-worker
+had a live scoped resim (pid 928115, `MLB_SIM_FINGERPRINT_LAUNCH changed_games=3
+game_pks=849828,849829,849835`, launched 20:20:24Z). I acquired the claim, saw it, and RELEASED
+rather than hold a lock I was not using. By 20:32Z that sim had completed (pid 928115 `Zs
+<defunct>`, live sim count 0), so the deploy ran then. Nothing was killed.
+
+**NEW MECHANISM, read from the code rather than tested destructively -- a killed scoped resim is
+LOST, not retried.** `live_refresh_loop._record_mlb_sim_check(now_epoch, date_str,
+current_fingerprints, launched=True)` runs at DECISION time (`live_refresh_loop.py:2318`), before
+the subprocess finishes. The stored fingerprint therefore already equals the current one while the
+job runs, so a killed resim is never relaunched by a fingerprint change. `board_missing_games`
+recovers games ABSENT from the board, not games present-but-stale. With `MLB_SIM_TICK` reporting
+`sport_currently_live` every ~3 min, "wait for no sim running" may not terminate during a slate.
+Against this change's measured staking effect (0.6215 -> 0.6217 row-weighted `skill_reliability`)
+that cost was not worth paying, which is why the deploy waited rather than forced.
+
+**TWO GUARDS, both from failures observed earlier today, both fired clean:**
+
+- **HEAD asserted EQUAL to the target before signalling**, not merely a successful ff. A ff's
+  "Already up to date" answers a question about the MERGE, not about what is checked out -- that is
+  exactly how another lane loaded a commit it never chose at 19:27Z. `HEAD asserted == 9434b5cc
+  (9434b5ccaf54)`.
+- **Abort if a live MLB sim is present.** `live MLB sims under refresh-worker: 0`.
+
+**THIS DEPLOY CARRIED ANOTHER SESSION'S COMMIT AND COULD NOT AVOID IT.** History is linear, so the
+ff `f351eac5 -> 9434b5cc` necessarily brought `0461d22f` (*consensus_movement_by_sport: price
+through the owner converter; a 0 price no longer skews the consensus*) plus `63b3ed1a` (ledger
+only). So this is TWO runtime changes in one deploy, not the one-change ideal. Enumerated before
+firing rather than discovered after.
+
+**LOAD VERIFIED with production's own `role_code`** (HEAD at the role's start epoch, from the
+reflog -- not the env stamp, which lies after a role-only respawn):
+
+    role              pid      started     runs        has 9434b5cc  stale note
+    refresh-worker    930430   20:32:44Z   9434b5cc    YES           (current)
+    web               684622   20:18:32Z   f351eac5    NO            STALE -- 3 runtime files
+    live-odds-worker  897384   17:26:15Z   80f380f8    NO            STALE -- 28 runtime files
+
+In-process on the respawned worker: `skill_note("Passing TDs") -> n=178 loses_to_market`,
+`skill_note("Interceptions") -> n=162 parity`.
+
+**web and live-odds-worker do NOT need this.** Established by measurement on 2026-10-03 19:41Z
+across all four served NFL dates: every one is `source: layer2_shortlist_artifact` except 10-05,
+whose entire body is `{"reason": "no_shortlist_artifact", "returned": 0, "rows": [],
+"shortlist_present": false}` -- the degraded empty state, not a second building path. No path has
+web stamping a `model_skill` note.
+
+**READING -- gate 2 satisfied: artifact `written_at 20:39:27Z` post-dates the 20:32:44Z load.**
+Baseline is the immediately preceding artifact, `written_at 19:55:31Z`.
+
+    counter                         19:55:31Z   20:39:27Z    delta
+    rows_with_measured_skill              963        1010      +47
+    rows_with_unmeasured_skill            364         308      -56
+
+Not a frozen A/B: the board's composition moved between builds (the 10-03 shortlist went from 19
+Interceptions + 17 Passing TDs rows to 0 + 1). Read the direction, not the arithmetic.
+
+**ROW-LEVEL on the served 20:39:27Z artifact -- the six restated CIs are LIVE and carry their new
+sample sizes:**
+
+    49 x Receiving Yards   3114  measured  loses_to_market     (was 3116)
+    34 x Rushing Yards     1455  measured  loses_to_market     (was 1463)
+    19 x Receptions        1179  measured  loses_to_market     (unchanged)
+     6 x Rushing Attempts   561  measured  loses_to_market     (was 562)
+     6 x Passing Attempts   334  measured  loses_to_market     (was 343)
+     5 x Passing Yards      825  measured  loses_to_market     (was 834)
+     1 x Passing TDs        178  measured  loses_to_market     <- WAS UNMEASURED
+    33 x totals              15  measured  loses_to_market
+    21 x h2h                 15  measured  parity
+
+**OWED, and the population EXISTS -- this is a pending reading, not a null result.** The 10-03
+shortlist carried ZERO Interceptions rows at 20:39:27Z, so the parity note could not be observed
+there. The population is on the Sunday slate: the **10-04** artifact holds **20 Interceptions rows**
+(19 carrying a projection) and is still PRE-LOAD at `written_at 19:47:20Z` -- provably so, since it
+still shows the OLD values `Receiving Yards 3116`, `Rushing Yards 1463`, `Passing Attempts 343`,
+`Rushing Attempts 562`, and `Passing TDs`/`Interceptions` as `unmeasured`. A watcher is waiting for
+that date to rebuild. **Corroboration that the parity path renders at all:** 21 `h2h` rows on the
+10-03 artifact carry `verdict_class: parity` today, so the mechanism is exercised -- just not yet
+for interceptions.
+
+**Admission cannot change, re-verified on today's board rather than inherited.** Moving
+`interceptions` to PARITY is the one change here that could admit previously-withheld rows, since
+`layer2_board._row_rests_on_unmeasured_model` withholds a one-sided row whose note is unmeasured OR
+`loses_to_market` and PARITY is neither. But its first condition is
+`fair_method == "book_margin_model"`, and all 20 Interceptions and 22 Passing TDs rows on the
+served artifact carry `fair_method=consensus`. The gate cannot fire for either market.
+
+**What changed in the product.** `Passing TDs` 1.0 -> **0.7450** (measured loss now applied).
+`Interceptions` stays at **1.0000** but for the right reason -- a measured PARITY rather than an
+absent measurement; `established_loss_rel` clamps its negative lower bound to 0. The six keep their
+verdicts with corrected magnitudes; the row-weighted effect is 0.6215 -> 0.6217, i.e. the stored
+CIs had been over-discounting by a margin too small to matter on today's board.
+
+**A CORRECTION CARRIED FORWARD: the CIs I published at 18:10Z and 19:36Z were too narrow.**
+`recheck_eight_markets.gather()` counted one observation per CSV ROW, so N books quoting one line
+became N observations sharing one outcome. `passing_yards` had 825 observations over 161 player-game
+clusters. No verdict flipped, but `established_loss_rel` reads the CI's LOWER bound, so every stored
+magnitude was overstated. Corrected here for all eight on one basis. Detail:
+`.syndicate/findings_2026-10-03_nfl_qb_prop_measurement.md`.
+
+**And the corpus claim on all eight entries was wrong.** They said "2025+2026"; the only window with
+both odds and outcomes is **2025 wk3-wk9**. 2025 wk10-21 odds are 6-byte stubs in the git mirror AND
+on the fleet; 2026 wk1 has no prior-week history so production serves no rate; 2026 play data stops
+at week 2, so week 4's odds are unscoreable. **The fleet cannot run this measurement at all** --
+`load_player_plays(2025)` and `(2026)` both return 0 plays there, so the git mirror holds the
+outcomes while the fleet holds the fresher odds.
+
+**Owed beyond this lane:** capture 2025 wk10-18 player props. Outcomes already exist for those nine
+weeks, so it roughly doubles all eight samples and would likely move `interceptions` off parity to a
+decisive interval. Not costed.
