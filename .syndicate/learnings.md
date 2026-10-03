@@ -5437,3 +5437,14 @@ own prior verdicts, not by anything failing.
     exactly where `lane_open.py` inserts.
 - **Cost:** two repairs (`ac1717ee`), one other lane's line mis-edited for ~1 h; no claim was
   mis-enforced.
+
+## 2026-10-03 - RULE: landing a behaviour change on main DEPLOYS it the moment any session fast-forwards the fleet. Baseline BEFORE you land, and land only when ready to measure `[lane nhl-game-lines-model, session 9ed26377]`
+
+- I landed the NHL game-market sim fixes (7865b26e) ~20:05Z and was holding a 10-minute coordination window before my own ff. Another session fast-forwarded the fleet to github/main at 20:11:45Z (ad85d3e2) and again at 20:18:14Z (f351eac5). Both carried 7865b26e live while I held no claim. My `merge-base --is-ancestor HEAD <target>` guard caught it, so no redundant ff fired.
+- It worked out only because the baseline had been taken at 20:10:30Z, 75 s before go-live, and the change had a crisp artifact signature (legacy model_total == sum of periods; calibrated = +0.25..0.30).
+- **How to apply:**
+  - Take the baseline before landing.
+  - Read the go-live time from the fleet reflog (`git reflog --date=iso`), not from your own ff.
+  - Hold a change that must not ship unmeasured off main; moving the files aside and landing only the ledger works.
+  - When a ride-along owner needs notice, the notice must say "live as of <reflog time>", not "I will ff at X".
+- *(evidence: `.syndicate/deploys.md` 2026-10-03 20:11:45Z and 20:54:04Z entries)*

@@ -1271,6 +1271,12 @@ death, never life — do not invert it.
   - CONCLUSION: goalie quality (save%, GSAx, GSAx + prior, even the oracle starter) adds no ML information over team strength at this n; its value is the scoring level for totals.
 - **H8 (written BEFORE the run, 2026-10-03 ~05:20Z, user: "test recency-weighted xG next"):** season-to-date team xG lags form; exponentially decayed as-of xGF/60 and xGA/60 carry ML information. Built the way production does it: all Fenwick shots incl. empty-net, per game, through production `project_game`; the same frozen xG model. The half-life is tuned pre-2026-01-01. Compared with a control (infinite half-life) built identically, both on V4 machinery. FALSIFIED if V9 vs V9c AND V9 vs B4 on OOS ML Brier both have CIs including 0.
 - **H9 (written BEFORE the run, 2026-10-03 ~06:00Z, user: "test score-adjusted xG next"):** raw team xG mixes strength with game state (trailing teams shoot more), and score-adjusting it carries ML information. Each shot xG x w_d, w_d = 0.5 / league xG share of a shooter leading by d (clamped +/-3), coefficients fit on pre-2026-01-01 shots and frozen. Score state is the score BEFORE the shot, walked through play-by-play. Same aggregation and `project_game` as H8; V4 machinery. FALSIFIED if V10 vs V9c (unadjusted control) AND V10 vs B4 on OOS ML Brier both have CIs including 0.
+- **READINGS 2026-10-03 ~20:55Z:**
+  - **H8 recency FALSIFIED** (paired OOS V9 vs V9c -0.0003 [-0.0009, +0.0003]).
+  - **H9 score-adjusted xG NOT FALSIFIED:** paired OOS V10 vs V9c -0.0009 [-0.0016, -0.0001]; V10r vs V9 -0.0011 [-0.0019, -0.0002]. Small; vs B4/book CIs include 0; full window n.s. A candidate, not shipped.
+  - **SHIPPED:** totals line a18cda3e (reading 2 MET: 13/13 + 5/5 at the books' line, 0 off-grid).
+  - **SHIPPED:** four sim fixes 7865b26e (live 20:11:45Z via another session's ff; reading 2 MET: 13/13 calibrated, mean total 6.3265).
+  - **Next:** dispersion -- P(over) at the close 0.476 vs 0.503 frequency.
 - Blocked by: production wiring needs (a) user decision, (b) lane nhl-player-props-projection for ingestion/collect.py (confirmed-starter feed); vs-book needs an active ODDS_API_KEY
 
 ### soccer-skill-registry-line-weighting — OPEN — opened 2026-10-02 — session 43e4d5fe-e05e-41bc-aae6-6d6986460b22

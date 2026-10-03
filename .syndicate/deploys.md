@@ -45740,3 +45740,11 @@ outcomes while the fleet holds the fresher odds.
 **Owed beyond this lane:** capture 2025 wk10-18 player props. Outcomes already exist for those nine
 weeks, so it roughly doubles all eight samples and would likely move `interceptions` off parity to a
 decisive interval. Not costed.
+
+## 2026-10-03 20:54:04Z (3:54 PM CT) -- MEASUREMENT: NHL game-market sim fixes (7865b26e, live 20:11:45Z) -- artifact reading 2 **MET** (lane `nhl-game-lines-model`)
+
+- **Reading** (read-only signature + totals grader on the fleet): `predictions_2026-10-03` rewritten **20:52:10Z** by sweep started **20:50:48Z** (post go-live).
+  - **13/13 rows carry the CALIBRATED signature** (model_total - sum of periods, mean +0.2777 = the OT/SO goal).
+  - Mean model_total **6.3265** (reading 1 predicted 6.327; baseline 6.4362).
+  - The totals-line fix (a18cda3e) still holds in the same file: 13/13 at the books' modal pregame line, 0 off-grid.
+- **Not yet rewritten** (still legacy, pre-go-live): 10-04 (19:53:14Z), 10-05, 10-06. They convert on their next generation.
