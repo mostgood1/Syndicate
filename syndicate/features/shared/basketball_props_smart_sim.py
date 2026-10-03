@@ -5353,6 +5353,12 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
         return {"date": date_str, "wrote": 0, "skipped": 0, "failures": 0, "reason": f"missing_props:{props_path}"}
     props_df = pd.read_csv(props_path)
     excluded_map = _smart_sim_injuries_excluded_map_for_date_local(processed_root=processed_root, raw_root=raw_root, date_str=date_str, props_df=props_df)
+    # Players who missed their team's recent games stay out of the pool (lane wnba-sim-availability). WNBA-only and
+    # OFF unless SYNDICATE_WNBA_SIM_AVAILABILITY is set; only ADDS keys, never overrides a playing_today flag.
+    from syndicate.features.shared.wnba_sim_availability import add_recency_exclusions
+
+    add_recency_exclusions(excluded_map, processed_root=processed_root, date_str=date_str, league_code=league_code,
+                           props_df=props_df, name_key=_norm_name_key)
 
     odds_df = None
     odds_path = processed_root / f"game_odds_{date_str}.csv"
