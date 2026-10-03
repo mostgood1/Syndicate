@@ -13,7 +13,7 @@
         "baseline_holdout_pitch_bias": 9.76,
         "selected_holdout_pitch_bias": 1.35
       },
-      "baseline_holdout_pitch_bias_under_log5": 1.90,
+      "baseline_holdout_pitch_bias_under_log5": 1.9,
       "selected_holdout_pitch_bias_under_log5": 0.44,
       "holdout_games": 11,
       "tune_games": 35
@@ -54,13 +54,67 @@
       "matched_market_line_starts": 882,
       "holdout_games": 11,
       "tune_games": 35,
-      "betting_hit_rate_without_tto": {"strikeouts": 0.5578, "hits_allowed": 0.5463, "outs": 0.5954},
-      "betting_hit_rate_with_tto": {"strikeouts": 0.5465, "hits_allowed": 0.5643, "outs": 0.5915},
+      "betting_hit_rate_without_tto": {
+        "strikeouts": 0.5578,
+        "hits_allowed": 0.5463,
+        "outs": 0.5954
+      },
+      "betting_hit_rate_with_tto": {
+        "strikeouts": 0.5465,
+        "hits_allowed": 0.5643,
+        "outs": 0.5915
+      },
       "batch_artifacts": "vendor/mlb_bettingv2/data/eval/_prototype_test/full46_baseline_v2, full46_happyplace_test; betting_accuracy.py"
+    },
+    "starter_short_start_prob": {
+      "generated_at": "2026-10-03",
+      "lane": "mlb-starter-length (Syndicate); selection rule pre-registered in .syndicate/lanes.md before any candidate result was read",
+      "description": "Raises the rare large negative hook shift (\"short start\": quick hook for ineffectiveness/injury) from its code default 0.06 to 0.10. Measured on an AS-OF replay of the current engine over stored roster_objs (scripts/mlb_starter_length_replay.py, validated against production's stored 10-03 sims: +0.09 outs over 8 starters), 26 dates 2026-06-15..07-12, 565 starts, 100 sims/game, same seeds per config. Baseline defect: starter outs +0.72 [+0.36,+1.10], only 1.8% of starts <=9 outs vs 9.0% actual, 35% of mass at exactly 15 outs vs 20.5%.",
+      "selected_value": 0.1,
+      "holdout_2026_07_04_to_07_12": {
+        "outs_crps": [
+          2.344,
+          2.321
+        ],
+        "outs_bias": [
+          0.88,
+          0.73
+        ],
+        "share_le9_outs_model_vs_actual": [
+          [
+            0.016,
+            0.019
+          ],
+          0.082
+        ],
+        "so_bias": [
+          0.92,
+          0.86
+        ],
+        "hits_bias": [
+          0.19,
+          0.14
+        ],
+        "er_bias": [
+          0.03,
+          0.006
+        ],
+        "game_total_model_vs_actual": [
+          [
+            9.014,
+            9.027
+          ],
+          9.47
+        ],
+        "n_starts": 232
+      },
+      "why_not_the_shelled_hook": "starter_shell_runs_start/_weight (simulate.py, default no-op) ranked 1-5 on tune CRPS (2.352-2.380) and fit starter outs far better (holdout CRPS ~2.27, bias ~0, <=9-out share 7-10% vs 8.2%), but every variant failed a pre-registered side-effect guard: earned runs worsened by 0.11-0.19 or the game-total gap to actual grew. Left OFF; next lead.",
+      "previous_value": "0.06 (code default in simulate.py)"
     }
   },
   "starter_hook_add_pitches": -13,
   "starter_hook_stamina_excess_weight": 0.75,
   "starter_quality_hook_weight": 1.0,
-  "starter_tto_quality_scaling": 0.0
+  "starter_tto_quality_scaling": 0.0,
+  "starter_short_start_prob": 0.1
 }
