@@ -2366,8 +2366,5 @@ values):** sweep intervals NHL 1800, NFL/NCAAF/WNBA 1500, WNBA autorun 1500, soc
 key was absent from the file; render.yaml's 14400 applied); shortlist 1h gate NHL/WNBA by code,
 NFL/NCAAF/SOCCER by env.
 
-**NOT YET SHOWN:** the margin (oldest rows ~45 min). Friday night was confounded by a 24-min soccer run,
-a 7-min fleet outage 23:01-23:08Z (start raced `down`), a ~14-min first tick after restart, and live
-games from ~23:28Z. Saturday pregame watcher `~/satwatch/` (12:30-16:30Z) writes `summary.txt`. The
-gate's hidden-row count is mostly STRUCTURAL (NFL hid 272 rows with its oldest served row 10.5 min old):
-judge cadence on oldest age and launch gaps, not on hidden rows.
+**SHOWN `[verified 2026-10-03 12:30-16:30Z, Saturday pregame, 77 samples/sport, ~/satwatch/summary.txt]`:** 0 rows served > 1h in every sport and sample. Launch gaps NFL 25.2 / WNBA 25.2 / NHL 30.1 / MLB 60.1 min median (the configured intervals; were 32-38 before 963c2374). Served-row age p90 NFL 12.6, NCAAF 9.2, NHL 18.4, soccer 19.4 min. The OLDEST served row sits near 60 min (NFL 59.7, NCAAF 60.0, NHL 59.8 max) because the 1h gate CENSORS it -- that tail is lines a sweep does not re-quote (dead/withdrawn books), hidden at 60: NFL 301, NHL 193, NCAAF 110, soccer 153 median. That is a COVERAGE question, not cadence; 'oldest ~45 min' was the wrong metric. Soccer runs 2.3 min with 1 full + 9 near schedules (stagger 1433933d live). lane_busy refusals 15 in 4h (12 live-phase), against 129 overnight.
+**ALSO LIVE:** restart -> first sweep 1m48s (Polymarket boot work on a thread, ba7e2d3a; was ~13 min); slate sweep single-flight (fef0df47).
