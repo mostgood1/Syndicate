@@ -45320,3 +45320,11 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - **reading (board 10-04, dates_read 10-03..10-10, dates_with_rows 10-04/10-07/10-09/10-10):** rows_with_projection **3,930 / 4,475 (87.8%)**. By league: **epl 899, serie_a 302**, mls 839, bundesliga 837, ligue_1 613, la_liga 505, eredivisie 393, championship 48, primeira_liga 21, belgian_pro_league 3 -> 18. `leagues_indexed` holds all 10 leagues; `unmatched_by_league {}`.
 - **producer side (15:43:01Z census):** `epl/recommendations_2026-10-10.json` 6 matches, `serie_a/..._2026-10-10.json` 3. The resolver's 10-10 units (05:15Z+) ran.
 - **same read, board 10-03 (default):** 521 / 614, 8 leagues (no epl/serie_a, as expected by window).
+
+## 2026-10-03 15:56:55Z (10:56 AM CT) -- VERIFY READING for 02:57:32Z (soccer skill registry re-measure, 02a76fb7) -- **MET for h2h + totals; spreads/aliases not yet on the board** (lane `soccer-skill-registry-line-weighting`)
+
+- reading: served `/api/board/layer2-shortlist?sport=soccer`, board date 10-03, build_age 739.9 s, 37 soccer rows (projections back since lane soccer-projections-gap, deploys 05:17:19Z). Rows' `projection.model_skill`:
+  - `h2h` full (2 rows, e.g. HEE @ PSV away): status measured, basis measured_market_skill, verdict_class loses_to_market, sample_games **671**, established_loss_rel **0.02854** -> Layer 2 score x0.857 (was 121 / 0.0245 / x0.877).
+  - `totals` full (1 row, VAN @ CHI over 3.5): loses_to_market, sample_games **492**, rel **0.01396** -> x0.93 (was PARITY, n 194, x1.0).
+  - `alternate_totals_corners` 26 rows unmeasured (no registry entry, as expected); `btts` 8 rows carry no model note (unsupported market, as expected).
+- NOT READ: `spreads`, `totals_alt`, `spreads_alt`, `h2h_3_way` -- none on this shortlist. Owed when one is served.
