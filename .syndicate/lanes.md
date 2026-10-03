@@ -1281,6 +1281,14 @@ death, never life — do not invert it.
 - Verification: Unit: a 00:30Z fixture resolves to the prior Central date in both paths, EU afternoon fixture unchanged; fails on origin/main. Fleet: after ff, SOCCER_UNIT_LAUNCHED mls unit_date=2026-10-06 and recommendations_2026-10-06.json with matches>0; then served rows_with_projection > 0, per league, in deploys.md
 - Blocked by: none
 
+### wnba-live-fast-exit — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: Live WNBA runs in --mode fast stop exiting 1 when the snapshot has props: refresh_wnba_oddsapi_props main() applies its --do-edges 'no edge rows' exit check only in full mode (fast mode skips edges by design); verified by the next live WNBA window
+- Files: scripts/refresh_wnba_oddsapi_props.py (main() edges exit check only),tests/test_wnba_live_fast_exit.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: fast + props + 0 edges -> exit 0; full + props + 0 edges -> exit 1 (unchanged); fails on origin/main. Fleet: next live WNBA game -- fast-mode live runs report wnba ok (baseline 2026-10-02 evening: 31 of 42 live runs failed)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
