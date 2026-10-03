@@ -696,6 +696,75 @@ def extra(out_path):
     for arm in ("sim", "estimator"):
         sub = [i for i in cr if i["arm"] == arm]
         res[f"corners_total_mae_{arm}"] = _paired(sub, lambda i: abs(i["pc"] - i["y"]), lambda i: abs(i["naive"] - i["y"]))
+    # ---- per-market EDGE WEIGHT: how much of the model's disagreement with the book to keep, per line ----
+    # Lane `soccer-skill-registry-line-weighting`. Each line keeps its own judgement; this measures the shrink:
+    # p_w = fair + w * (model - fair). Brier(w) is quadratic in w, so the optimum is closed form, clipped to [0, 1].
+    def _vec_fit(its):
+        num = sum(sum((k - y) * (m - k) for m, k, y in zip(i["vm"], i["vk"], i["vy"])) for i in its)
+        den = sum(sum((m - k) ** 2 for m, k in zip(i["vm"], i["vk"])) for i in its)
+        return min(1.0, max(0.0, -num / den)) if den > 0 else 0.0
+
+    def _brier_w(its, w):
+        return mean(sum((k + w * (m - k) - y) ** 2 for m, k, y in zip(i["vm"], i["vk"], i["vy"])) for i in its)
+
+    def _fit_report(its, label):
+        import random as _r
+        if len(its) < 40:
+            return {"n": len(its), "verdict": "INSUFFICIENT_N"}
+        w = _vec_fit(its)
+        rng = _r.Random(11)
+        boots = sorted(_vec_fit([its[rng.randrange(len(its))] for _ in its]) for _ in range(2000))
+        dates = sorted({i["date"] for i in its})
+        cut = dates[len(dates) // 2]
+        tr, te = [i for i in its if i["date"] < cut], [i for i in its if i["date"] >= cut]
+        w_tr = _vec_fit(tr)
+        held = {"train_dates": f"{dates[0]}..{cut} (excl)", "test_n": len(te), "w_train": round(w_tr, 3),
+                "test_brier_w_train": _brier_w(te, w_tr), "test_brier_book": _brier_w(te, 0.0), "test_brier_model": _brier_w(te, 1.0)}
+        out = {"n": len(its), "w": round(w, 3), "w_ci95": (round(boots[50], 3), round(boots[1949], 3)),
+               "brier_book": _brier_w(its, 0.0), "brier_model": _brier_w(its, 1.0), "brier_w": _brier_w(its, w),
+               "held_out": held, "dates": f"{dates[0]}..{dates[-1]}"}
+        print(f"EDGE WEIGHT {label:10s} n={len(its):4d} w={w:.3f} [{boots[50]:.3f},{boots[1949]:.3f}] | held-out (n {len(te)}): "
+              f"w_train {w_tr:.3f} Brier {held['test_brier_w_train']:.4f} vs book {held['test_brier_book']:.4f} vs model {held['test_brier_model']:.4f}")
+        return out
+
+    onehot = lambda k: [1.0 if j == k else 0.0 for j in range(3)]
+    res["edge_weight"] = {
+        "h2h": _fit_report([{**i, "vm": i["model"], "vk": i["market"], "vy": onehot(i["res"])} for i in items], "h2h"),
+    }
+    tw = []
+    for r in rows:
+        f = r["fd"]
+        if f is None:
+            continue
+        o, u = fnum(f.get("AvgC>2.5")), fnum(f.get("AvgC<2.5"))
+        if None in (o, u):
+            continue
+        pm = r["m"]["p_over25"]
+        if pm is None:
+            sc = norm_scores(r["m"]["scores"])
+            pm = sum(p for (h, a), p in sc.items() if h + a > 2)
+        pk = devig([o, u])[0]
+        y = 1.0 if r["hg"] + r["ag"] > 2 else 0.0
+        tw.append({**r, "vm": [float(pm), 1 - float(pm)], "vk": [pk, 1 - pk], "vy": [y, 1 - y]})
+    res["edge_weight"]["totals"] = _fit_report(tw, "totals")
+    sw = []
+    for r in rows:
+        f = r["fd"]
+        if f is None:
+            continue
+        line = flt(f.get("AHCh"))
+        h, a = fnum(f.get("AvgCAHH")), fnum(f.get("AvgCAHA"))
+        sc = norm_scores(r["m"]["scores"])
+        if None in (line, h, a) or not sc:
+            continue
+        w_, _, _, _, l_ = ah_home_value(sc, line)
+        aw, _, _, _, al = ah_home_value({(r["hg"], r["ag"]): 1.0}, line)
+        if w_ + l_ <= 0 or aw + al <= 0:
+            continue
+        qm, qk, y = w_ / (w_ + l_), devig([h, a])[0], aw / (aw + al)
+        sw.append({**r, "vm": [qm, 1 - qm], "vk": [qk, 1 - qk], "vy": [y, 1 - y]})
+    res["edge_weight"]["spreads"] = _fit_report(sw, "spreads")
+
     json.dump(res, open(out_path, "w", encoding="utf-8"), default=str, indent=1)
     for k, v in res.items():
         if isinstance(v, dict) and "ALL" in v:
