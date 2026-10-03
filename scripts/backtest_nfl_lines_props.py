@@ -152,12 +152,28 @@ def _ci(rows: List[Tuple[str, float]], nd: int = 4) -> Dict[str, Any]:
     return {"point": round(p, nd), "ci95": [round(lo, nd), round(hi, nd)]}
 
 
-def american_to_dec(o: float) -> float:
-    return 1 + (o / 100.0 if o > 0 else 100.0 / -o)
+def _american(o: Any) -> Optional[float]:
+    """A quotable American price, or None. |price| < 100 (0 included) is not a price: the old one-liners
+    returned implied(0) = 0.0 -- a probability for a price that does not exist -- and raised
+    ZeroDivisionError in american_to_dec(0). Audited 2026-10-03: 0 of 532,127 prop prices and 0 of 6,984
+    game prices on this harness's inputs were in (-100, 100), so no published reading was affected."""
+    try:
+        v = float(str(o).replace("+", "")) if o is not None and str(o).strip() != "" else None
+    except (TypeError, ValueError):
+        return None
+    if v is None or math.isnan(v) or -100.0 < v < 100.0:
+        return None
+    return v
 
 
-def implied(o: float) -> float:
-    return 100.0 / (o + 100.0) if o > 0 else -o / (-o + 100.0)
+def american_to_dec(o: Any) -> Optional[float]:
+    v = _american(o)
+    return None if v is None else 1 + (v / 100.0 if v > 0 else 100.0 / -v)
+
+
+def implied(o: Any) -> Optional[float]:
+    v = _american(o)
+    return None if v is None else (100.0 / (v + 100.0) if v > 0 else -v / (-v + 100.0))
 
 
 def devig(p_side: float, p_other: float) -> float:
@@ -590,6 +606,8 @@ def score_lines(sched: Dict[str, Dict[str, Any]], sims: Dict[str, Dict[str, Any]
             drops["moneyline_tie_excluded"] += 1
         elif hml is None or aml is None:
             drops["moneyline_no_two_sided_price"] += 1
+        elif implied(hml) is None or implied(aml) is None:
+            drops["moneyline_invalid_price_excluded"] += 1
         else:
             rows["moneyline"].append({**common, "y": int(margin > 0), "p_model": s["home_win_rate"],
                                       "mean": s["margin_mean"], "sd": s["margin_stdev"], "line": 0.0,
@@ -600,6 +618,8 @@ def score_lines(sched: Dict[str, Dict[str, Any]], sims: Dict[str, Dict[str, Any]
         hso, aso = _f(g["home_spread_odds"]), _f(g["away_spread_odds"])
         if spread is None or hso is None or aso is None:
             drops["spread_no_two_sided_price"] += 1
+        elif implied(hso) is None or implied(aso) is None:
+            drops["spread_invalid_price_excluded"] += 1
         elif margin == spread:
             drops["spread_push_excluded"] += 1
         else:
@@ -612,6 +632,8 @@ def score_lines(sched: Dict[str, Dict[str, Any]], sims: Dict[str, Dict[str, Any]
         oo, uo = _f(g["over_odds"]), _f(g["under_odds"])
         if tot_line is None or oo is None or uo is None:
             drops["total_no_two_sided_price"] += 1
+        elif implied(oo) is None or implied(uo) is None:
+            drops["total_invalid_price_excluded"] += 1
         elif total == tot_line:
             drops["total_push_excluded"] += 1
         else:
@@ -846,6 +868,9 @@ def score_props(root: Path, sched: Dict[str, Dict[str, Any]], seasons: List[int]
             if p_model is None or p_base is None:
                 drops["td_no_probability"] += 1
                 continue
+            if implied(sides["yes"]) is None or ("no" in sides and implied(sides["no"]) is None):
+                drops["td_invalid_price_excluded"] += 1
+                continue
             row = {"gid": gid, "season": r["season"], "y": int(r["actual"] >= 1), "p_model": p_model, "p_base": p_base,
                    "n": r["n"],
                    "p_book_vig_inclusive": implied(sides["yes"]), "book": book}
@@ -861,6 +886,9 @@ def score_props(root: Path, sched: Dict[str, Dict[str, Any]], seasons: List[int]
             continue
         if r["actual"] == line:
             drops["push_excluded"] += 1
+            continue
+        if implied(sides["over"]) is None or implied(sides["under"]) is None:
+            drops["invalid_price_excluded"] += 1
             continue
         p_model = P._nfl_prop_model_probability(stat=stat, mean=r["mean_model"], stdev=r["sd"], n=r["n"], line=line)
         p_base = P._nfl_prop_model_probability(stat=stat, mean=r["mean_base"], stdev=r["sd"], n=r["n"], line=line)

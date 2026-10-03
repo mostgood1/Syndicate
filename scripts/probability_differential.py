@@ -437,6 +437,7 @@ NOT_A_SCALAR_CONVERTER: dict[str, str] = {
     # scalar halves are REGISTERED above.
     "scripts/backtest_mlb_lines_props.py:devig_two_way": "two-sided proportional devig; two PRICES in, fair P(side A) out. Its scalar half, `american_to_prob`, IS registered",
     "scripts/backtest_ncaaf_lines_props.py:devig_two_way": "two-sided proportional devig; two PRICES in, fair P(side A) out. Its scalar half, `american_to_prob`, IS registered",
+    "scripts/backtest_nfl_lines_props.py:_american": "parses and VALIDATES an American price (float-or-None; refuses |price| < 100, None, ''); a parser/validator, not a conversion -- implied/american_to_dec convert after it",
     "scripts/backtest_nfl_lines_props.py:devig": "normalizes two PROBABILITIES (p_side / (p_side + p_other)); two args, no price conversion at all",
 }
 
