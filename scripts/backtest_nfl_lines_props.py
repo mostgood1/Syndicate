@@ -253,6 +253,196 @@ def point_block(rows: List[Dict[str, Any]], preds: Tuple[str, ...], min_n: int) 
 
 
 # ---------------------------------------------------------------------------
+# DIAGNOSIS: why a market loses, and which model change would close the gap.
+#
+# User decision 2026-10-02 (~7:05 PM CT, the app's prime directive): "every line is its own
+# decision. we should have a model that is accurate that then helps inform each decision". A
+# backtest therefore does NOT produce a market-level gate; it diagnoses the model. Every candidate
+# change below is FITTED on the fit seasons and SCORED on held-out seasons, through production's
+# own probability function, so "would help" is a measurement, not an argument.
+# ---------------------------------------------------------------------------
+
+# Wide on purpose: the first grid (0.7..2.0) put the fitted k AT ITS EDGE in 5 markets, which
+# reads as "the optimum is outside", not as "k = 2.0".
+K_GRID = (0.4, 0.5, 0.7, 0.85, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0)
+W_GRID = tuple(i / 10 for i in range(11))
+
+
+def murphy(ps: List[float], ys: List[int], bins: int = 10) -> Dict[str, float]:
+    """Brier = reliability - resolution + uncertainty (equal-count bins). A recalibration can only
+    move `reliability`; a resolution deficit needs information the model does not have."""
+    n = len(ps)
+    if not n:
+        return {}
+    ybar = sum(ys) / n
+    order = sorted(range(n), key=lambda i: ps[i])
+    rel = res = 0.0
+    for b in range(bins):
+        idx = order[b * n // bins:(b + 1) * n // bins]
+        if not idx:
+            continue
+        pb = sum(ps[i] for i in idx) / len(idx)
+        ob = sum(ys[i] for i in idx) / len(idx)
+        rel += len(idx) * (pb - ob) ** 2
+        res += len(idx) * (ob - ybar) ** 2
+    return {"reliability": round(rel / n, 5), "resolution": round(res / n, 5), "uncertainty": round(ybar * (1 - ybar), 5)}
+
+
+def _sub(rows: List[Dict[str, Any]], cap: int = 20000, seed: int = 11) -> List[Dict[str, Any]]:
+    if len(rows) <= cap:
+        return rows
+    return random.Random(seed).sample(rows, cap)
+
+
+def _diag_market(F: List[Dict[str, Any]], T: List[Dict[str, Any]], prob, shift_fit: float,
+                 anchor_key: str = "line") -> Dict[str, Any]:
+    """`prob(row, shift, k, w)` -> probability. Fit shift (given), k, (shift,k), and the market-anchored
+    w on F; report each on T with the model's and the book's Brier on the same rows."""
+    def brier(rows, **kw):
+        tot = cnt = 0
+        for r in rows:
+            p = prob(r, **kw)
+            if p is None:
+                continue
+            tot += (_clip(p) - r["y"]) ** 2
+            cnt += 1
+        return tot / cnt if cnt else float("nan")
+
+    Fs = _sub(F)
+    k_best = min(K_GRID, key=lambda k: brier(Fs, shift=0.0, k=k, w=0.0))
+    ks_best = min(K_GRID, key=lambda k: brier(Fs, shift=shift_fit, k=k, w=0.0))
+    wk = min(((w, k) for w in W_GRID for k in K_GRID), key=lambda t: brier(Fs, shift=0.0, k=t[1], w=t[0]))
+    b_model = brier(T, shift=0.0, k=1.0, w=0.0)
+    b_book = sum((r["p_book"] - r["y"]) ** 2 for r in T) / len(T)
+    gap = b_model - b_book
+
+    def arm(name, **kw):
+        b = brier(T, **kw)
+        d = boot_ci([(r["gid"], (_clip(prob(r, **kw)) - r["y"]) ** 2 - (r["p_book"] - r["y"]) ** 2)
+                     for r in T if prob(r, **kw) is not None])
+        return {"arm": name, "params": kw, "brier": round(b, 5),
+                "gap_closed_pct": round(100 * (b_model - b) / gap, 1) if gap > 0 else None,
+                "dbrier_vs_book": {"point": round(d[0], 5), "ci95": [round(d[1], 5), round(d[2], 5)]}}
+
+    arms = [arm("shift_mean", shift=shift_fit, k=1.0, w=0.0), arm("scale_sd", shift=0.0, k=k_best, w=0.0),
+            arm("shift_and_scale", shift=shift_fit, k=ks_best, w=0.0),
+            arm("market_anchored_mean", shift=0.0, k=wk[1], w=wk[0])]
+    ps = [_clip(prob(r, shift=0.0, k=1.0, w=0.0)) for r in T]
+    return {"n_test": len(T), "games_test": len({r["gid"] for r in T}), "brier_model": round(b_model, 5),
+            "brier_book": round(b_book, 5), "gap": round(gap, 5),
+            "murphy_model": murphy(ps, [r["y"] for r in T]),
+            "murphy_book": murphy([r["p_book"] for r in T], [r["y"] for r in T]),
+            "arms": sorted(arms, key=lambda a: a["brier"])}
+
+
+def diagnose_props(prob_rows: Dict[str, List[Dict[str, Any]]], td_rows: List[Dict[str, Any]],
+                   fit: List[int], tests: Dict[str, List[int]]) -> Dict[str, Any]:
+    from syndicate.features.nfl import props as P
+    out: Dict[str, Any] = {"fit_seasons": fit, "tests": tests, "markets": {}}
+    for stat, rows in sorted(prob_rows.items()):
+        F = [r for r in rows if r["season"] in fit]
+        uniq: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        for r in F:
+            uniq[(r["gid"], r["player"])] = r
+        shift = statistics.fmean(u["actual"] - u["mean"] for u in uniq.values()) if uniq else 0.0
+
+        def prob(r, shift=0.0, k=1.0, w=0.0, _stat=stat):
+            mean = (1 - w) * (r["mean"] + shift) + w * r["line"]
+            sd = None if r["sd"] is None else r["sd"] * k
+            return P._nfl_prop_model_probability(stat=_stat, mean=mean, stdev=sd, n=r["n"], line=r["line"])
+
+        M: Dict[str, Any] = {"fitted_mean_shift": round(shift, 4),
+                             "discrete_poisson": stat in getattr(P, "_DISCRETE_COUNT_STATS", ())}
+        for label, ss in tests.items():
+            T = [r for r in rows if r["season"] in ss]
+            if len(T) < 50 or len(F) < 200:
+                M[label] = {"n_test": len(T), "status": "INSUFFICIENT_N"}
+                continue
+            tu: Dict[Tuple[str, str], Dict[str, Any]] = {}
+            for r in T:
+                tu[(r["gid"], r["player"])] = r
+            resid = [u["actual"] - u["mean"] for u in tu.values()]
+            sds = [u["sd"] for u in tu.values() if u["sd"]]
+            D = _diag_market(F, T, prob, shift)
+            D["test_bias_actual_minus_mean"] = round(statistics.fmean(resid), 4)
+            D["test_bias_pct_of_mean"] = round(100 * statistics.fmean(resid) / statistics.fmean(u["mean"] for u in tu.values()), 1)
+            if sds:
+                D["sd_ratio_model_over_empirical"] = round(statistics.fmean(sds) / math.sqrt(statistics.fmean(e * e for e in resid)), 3)
+            M[label] = D
+        out["markets"][stat] = M
+    # anytime TD: one-sided; recalibration slope fitted on F, compared with the vig-INCLUSIVE yes price
+    F = [r for r in td_rows if r["season"] in fit]
+    if F:
+        grid = tuple(x / 100 for x in range(60, 141, 5))
+        a = min(grid, key=lambda a: sum((_clip(a * r["p_model"]) - r["y"]) ** 2 for r in F))
+        T_out = {}
+        for label, ss in tests.items():
+            T = [r for r in td_rows if r["season"] in ss]
+            if not T:
+                continue
+            bm = sum((r["p_model"] - r["y"]) ** 2 for r in T) / len(T)
+            ba = sum((_clip(a * r["p_model"]) - r["y"]) ** 2 for r in T) / len(T)
+            bb = sum((r["p_book_vig_inclusive"] - r["y"]) ** 2 for r in T) / len(T)
+            d = boot_ci([(r["gid"], (_clip(a * r["p_model"]) - r["y"]) ** 2 - (r["p_book_vig_inclusive"] - r["y"]) ** 2) for r in T])
+            T_out[label] = {"n_test": len(T), "brier_model": round(bm, 5), "brier_recalibrated": round(ba, 5),
+                            "brier_book_vig_inclusive": round(bb, 5),
+                            "dbrier_recalibrated_vs_book": {"point": round(d[0], 5), "ci95": [round(d[1], 5), round(d[2], 5)]},
+                            "mean_p_model": round(statistics.fmean(r["p_model"] for r in T), 4),
+                            "observed_rate": round(statistics.fmean(r["y"] for r in T), 4),
+                            "murphy_model": murphy([r["p_model"] for r in T], [r["y"] for r in T]),
+                            "murphy_book": murphy([r["p_book_vig_inclusive"] for r in T], [r["y"] for r in T])}
+        out["markets"]["anytime_td"] = {"fitted_scale": a, **T_out}
+    return out
+
+
+def diagnose_lines(rows_by_market: Dict[str, List[Dict[str, Any]]], fit: List[int],
+                   tests: Dict[str, List[int]]) -> Dict[str, Any]:
+    """Margin/total: Normal(sim mean, sim sd), as the board prices. Moneyline is diagnosed through the
+    same Normal on the margin (line 0) next to the raw `home_win_rate` the board actually serves."""
+    from syndicate.features.shared.football_cards import cover_probability
+    out: Dict[str, Any] = {"fit_seasons": fit, "tests": tests, "markets": {}}
+    for m in ("spread", "total", "moneyline"):
+        rows = rows_by_market.get(m, [])
+        F = [r for r in rows if r["season"] in fit]
+        if len(F) < 100:
+            out["markets"][m] = {"status": "INSUFFICIENT_FIT_N", "n_fit": len(F)}
+            continue
+        shift = statistics.fmean(r["actual"] - r["mean"] for r in F)
+
+        def prob(r, shift=0.0, k=1.0, w=0.0):
+            mean = (1 - w) * (r["mean"] + shift) + w * r["anchor"]
+            return cover_probability(line=r["line"], mean=mean, stdev=r["sd"] * k)
+
+        M: Dict[str, Any] = {"fitted_mean_shift": round(shift, 4)}
+        for label, ss in tests.items():
+            T = [r for r in rows if r["season"] in ss]
+            if len(T) < 30:
+                M[label] = {"n_test": len(T), "status": "INSUFFICIENT_N"}
+                continue
+            resid = [r["actual"] - r["mean"] for r in T]
+            D = _diag_market(F, T, prob, shift)
+            D["test_bias_actual_minus_mean"] = round(statistics.fmean(resid), 3)
+            D["sd_ratio_model_over_empirical"] = round(statistics.fmean(r["sd"] for r in T) / math.sqrt(statistics.fmean(e * e for e in resid)), 3)
+            D["corr_model_mean_vs_actual"] = _corr([r["mean"] for r in T], [r["actual"] for r in T])
+            D["corr_market_line_vs_actual"] = _corr([r["anchor"] for r in T], [r["actual"] for r in T])
+            if m == "moneyline":
+                D["brier_served_home_win_rate"] = round(sum((r["p_model"] - r["y"]) ** 2 for r in T) / len(T), 5)
+            M[label] = D
+        out["markets"][m] = M
+    return out
+
+
+def _corr(xs: List[float], ys: List[float]) -> Optional[float]:
+    if len(xs) < 3:
+        return None
+    mx, my = statistics.fmean(xs), statistics.fmean(ys)
+    num = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    dx = math.sqrt(sum((x - mx) ** 2 for x in xs))
+    dy = math.sqrt(sum((y - my) ** 2 for y in ys))
+    return round(num / (dx * dy), 4) if dx and dy else None
+
+
+# ---------------------------------------------------------------------------
 # schedule / coverage
 # ---------------------------------------------------------------------------
 
@@ -402,6 +592,8 @@ def score_lines(sched: Dict[str, Dict[str, Any]], sims: Dict[str, Dict[str, Any]
             drops["moneyline_no_two_sided_price"] += 1
         else:
             rows["moneyline"].append({**common, "y": int(margin > 0), "p_model": s["home_win_rate"],
+                                      "mean": s["margin_mean"], "sd": s["margin_stdev"], "line": 0.0,
+                                      "anchor": spread if spread is not None else s["margin_mean"], "actual": margin,
                                       "p_book": devig(implied(hml), implied(aml)), "p_base": base["p_home_win"],
                                       "dec_yes": american_to_dec(hml), "dec_no": american_to_dec(aml)})
         # spread: P(home covers) = P(margin > spread_line), spread_line home-margin-positive
@@ -413,6 +605,8 @@ def score_lines(sched: Dict[str, Dict[str, Any]], sims: Dict[str, Dict[str, Any]
         else:
             p = cover_probability(line=spread, mean=s["margin_mean"], stdev=s["margin_stdev"])
             rows["spread"].append({**common, "y": int(margin > spread), "p_model": p,
+                                   "mean": s["margin_mean"], "sd": s["margin_stdev"], "line": spread, "anchor": spread,
+                                   "actual": margin,
                                    "p_book": devig(implied(hso), implied(aso)), "p_base": base["p_home_cover"],
                                    "dec_yes": american_to_dec(hso), "dec_no": american_to_dec(aso)})
         oo, uo = _f(g["over_odds"]), _f(g["under_odds"])
@@ -423,9 +617,12 @@ def score_lines(sched: Dict[str, Dict[str, Any]], sims: Dict[str, Dict[str, Any]
         else:
             p = cover_probability(line=tot_line, mean=s["total_mean"], stdev=s["total_stdev"])
             rows["total"].append({**common, "y": int(total > tot_line), "p_model": p,
+                                  "mean": s["total_mean"], "sd": s["total_stdev"], "line": tot_line, "anchor": tot_line,
+                                  "actual": total,
                                   "p_book": devig(implied(oo), implied(uo)), "p_base": base["p_over"],
                                   "dec_yes": american_to_dec(oo), "dec_no": american_to_dec(uo)})
     report: Dict[str, Any] = {"drops": dict(drops), "groups": {}}
+    _SELF["line_rows"] = rows
     for label, seasons in season_groups.items():
         G: Dict[str, Any] = {"seasons": seasons}
         sel = {m: [r for r in rr if r["season"] in seasons] for m, rr in rows.items()}
@@ -438,7 +635,7 @@ def score_lines(sched: Dict[str, Dict[str, Any]], sims: Dict[str, Dict[str, Any]
         G["n_weeks"] = len(G["weeks"])
         G["weeks"] = [f"{s}w{w}" for s, w in G["weeks"]]
         # the gate
-        G["eligible"] = {
+        G["beats_baseline_and_book"] = {
             "spread": G["margin_point"].get("verdict_vs_base") == "MODEL_BETTER" and G["spread"].get("verdict_vs_book") == "MODEL_BETTER",
             "total": G["total_point"].get("verdict_vs_base") == "MODEL_BETTER" and G["total"].get("verdict_vs_book") == "MODEL_BETTER",
             "moneyline": G["moneyline"].get("verdict_vs_base") == "MODEL_BETTER" and G["moneyline"].get("verdict_vs_book") == "MODEL_BETTER",
@@ -650,6 +847,7 @@ def score_props(root: Path, sched: Dict[str, Dict[str, Any]], seasons: List[int]
                 drops["td_no_probability"] += 1
                 continue
             row = {"gid": gid, "season": r["season"], "y": int(r["actual"] >= 1), "p_model": p_model, "p_base": p_base,
+                   "n": r["n"],
                    "p_book_vig_inclusive": implied(sides["yes"]), "book": book}
             if "no" in sides:
                 row["p_book"] = devig(implied(sides["yes"]), implied(sides["no"]))
@@ -674,7 +872,8 @@ def score_props(root: Path, sched: Dict[str, Dict[str, Any]], seasons: List[int]
         prob_rows[stat].append({"gid": gid, "season": r["season"], "y": int(r["actual"] > line), "p_model": p_model,
                                 "p_base": p_base, "p_book": pb, "dec_yes": american_to_dec(sides["over"]),
                                 "dec_no": american_to_dec(sides["under"]), "book": book, "line": line,
-                                "player": player})
+                                "player": player, "mean": r["mean_model"], "sd": r["sd"], "n": r["n"],
+                                "actual": r["actual"]})
 
     # point rows: one per (game, player, stat); book point = median over books of each book's most-balanced line
     point_rows: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
@@ -713,12 +912,12 @@ def score_props(root: Path, sched: Dict[str, Dict[str, Any]], seasons: List[int]
                 two = [r for r in tr if "p_book" in r]
                 M["prob_vs_book"] = prob_block(two, ("p_model", "p_book", "p_base"), min_n)
                 M["two_sided_rows"] = len(two)
-                M["eligible"] = (M["prob_vs_actual"].get("verdict_vs_base") == "MODEL_BETTER"
+                M["beats_baseline_and_book"] = (M["prob_vs_actual"].get("verdict_vs_base") == "MODEL_BETTER"
                                  and M["prob_vs_book"].get("verdict_vs_book") == "MODEL_BETTER")
             else:
                 rr = [r for r in prob_rows.get(stat, []) if r["season"] in ss]
                 M["prob_vs_book"] = prob_block(rr, ("p_model", "p_book", "p_base"), min_n, ev_odds=("dec_yes", "dec_no"))
-                M["eligible"] = (M["point_all"].get("verdict_vs_base") == "MODEL_BETTER"
+                M["beats_baseline_and_book"] = (M["point_all"].get("verdict_vs_base") == "MODEL_BETTER"
                                  and M["prob_vs_book"].get("verdict_vs_book") == "MODEL_BETTER")
             G["markets"][stat] = M
         G["weeks"] = sorted({f"{sched[r['gid']]['season_i']}w{sched[r['gid']]['week_i']}"
@@ -729,6 +928,7 @@ def score_props(root: Path, sched: Dict[str, Dict[str, Any]], seasons: List[int]
     report["player_market_games_resolved"] = sum(1 for v in resolved.values() if v is not None)
     report["player_market_games_attempted"] = len(resolved)
     _SELF["prob_rows"] = prob_rows
+    _SELF["td_rows"] = td_rows
     return report
 
 
@@ -850,7 +1050,7 @@ def write_md(rep: Dict[str, Any], path: Path) -> None:
                 L.append(f"| {m} | {v['n']} | {v['base_rate']} | {v['p_model']['brier']} | {v['p_book']['brier']} | {v['p_base']['brier']} | "
                          f"{_fmt_ci(v.get('dbrier_model_vs_book'))} | {_fmt_ci(v.get('dlogloss_model_vs_book'))} | {_fmt_ci(v.get('dbrier_model_vs_base'))} | "
                          f"{e.get('n')} / {e.get('roi', '')} {e.get('roi_ci95', '')} | {v.get('verdict_vs_book')} | {v.get('verdict_vs_base')} |")
-            L += ["", f"ELIGIBLE (beats baseline AND book): `{json.dumps(G['eligible'])}`", ""]
+            L += ["", f"beats baseline AND book (a description, not a gate -- every line is its own decision): `{json.dumps(G['beats_baseline_and_book'])}`", ""]
     props = rep.get("props")
     if props:
         L += ["## player props", "", f"quotes {props['n_quotes']}, events mapped {props['events_mapped']}; sources `{json.dumps(props['sources'])}`",
@@ -867,7 +1067,7 @@ def write_md(rep: Dict[str, Any], path: Path) -> None:
                 L.append(f"| {stat} | {a['n']} | {a['model']['mae']} | {a['base']['mae']} | {_fmt_ci(a.get('dmae_model_vs_base'))} | {a['model']['bias']} | "
                          f"{b.get('n', 0)} | {b.get('book', {}).get('mae', '')} | {_fmt_ci(b.get('dmae_model_vs_book'))} | {_fmt_ci(c.get('dmae_model_vs_last4'))} | "
                          f"{ctx.get('mean', '')} / {ctx.get('share_not_1', '')} |")
-            L += ["", "| market | n rows | games | over rate | Brier model | Brier book | Brier own-avg | dBrier vs book [CI] | dLL vs book [CI] | dBrier vs own-avg [CI] | EV bets n / ROI [CI] | vs book | ELIGIBLE |",
+            L += ["", "| market | n rows | games | over rate | Brier model | Brier book | Brier own-avg | dBrier vs book [CI] | dLL vs book [CI] | dBrier vs own-avg [CI] | EV bets n / ROI [CI] | vs book | beats both |",
                   "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
             for stat, M in G["markets"].items():
                 v = M["prob_vs_book"]
@@ -876,13 +1076,37 @@ def write_md(rep: Dict[str, Any], path: Path) -> None:
                         t = M["prob_vs_actual"]
                         if t.get("n"):
                             L.append(f"| anytime_td (one-sided: {M['two_sided_rows']} two-sided) | {t['n']} | {t['games']} | {t['base_rate']} | {t['p_model']['brier']} | "
-                                     f"vig-incl {t['p_book_vig_inclusive']['brier']} | {t['p_base']['brier']} | NOT DE-VIGGABLE | | {_fmt_ci(t.get('dbrier_model_vs_base'))} | | n/a | {M['eligible']} |")
+                                     f"vig-incl {t['p_book_vig_inclusive']['brier']} | {t['p_base']['brier']} | NOT DE-VIGGABLE | | {_fmt_ci(t.get('dbrier_model_vs_base'))} | | n/a | {M['beats_baseline_and_book']} |")
                     continue
                 e = v.get("ev_bets", {})
                 L.append(f"| {stat} | {v['n']} | {v['games']} | {v['base_rate']} | {v['p_model']['brier']} | {v['p_book']['brier']} | {v['p_base']['brier']} | "
                          f"{_fmt_ci(v.get('dbrier_model_vs_book'))} | {_fmt_ci(v.get('dlogloss_model_vs_book'))} | {_fmt_ci(v.get('dbrier_model_vs_base'))} | "
-                         f"{e.get('n')} / {e.get('roi', '')} {e.get('roi_ci95', '')} | {v.get('verdict_vs_book')} | {M['eligible']} |")
+                         f"{e.get('n')} / {e.get('roi', '')} {e.get('roi_ci95', '')} | {v.get('verdict_vs_book')} | {M['beats_baseline_and_book']} |")
             L.append("")
+    for key, title in (("lines_diagnosis", "game lines"), ("props_diagnosis", "player props")):
+        D = rep.get(key)
+        if not D:
+            continue
+        L += [f"## diagnosis: {title} (fit {D['fit_seasons']}, scored on held-out seasons)", "",
+              "Arms are model changes fitted on the fit seasons and scored on held-out rows through production's "
+              "probability function. gap closed = share of the model-minus-book Brier gap removed.", "",
+              "| market | test | n | Brier model / book | bias (actual-mean) | sd ratio model/empirical | Murphy rel/res model | Murphy rel/res book | best arm: params, Brier, gap closed %, dBrier vs book [CI] | other arms (gap closed %) |",
+              "|---|---|---|---|---|---|---|---|---|---|"]
+        for m, M in D["markets"].items():
+            for t, v in M.items():
+                if not isinstance(v, dict) or "arms" not in v:
+                    continue
+                b = v["arms"][0]
+                mm, mb = v["murphy_model"], v["murphy_book"]
+                others = "; ".join(f"{x['arm']} {x['gap_closed_pct']}" for x in v["arms"][1:])
+                L.append(f"| {m} | {t} | {v['n_test']} | {v['brier_model']} / {v['brier_book']} | {v.get('test_bias_actual_minus_mean')} | "
+                         f"{v.get('sd_ratio_model_over_empirical', '')} | {mm.get('reliability')} / {mm.get('resolution')} | "
+                         f"{mb.get('reliability')} / {mb.get('resolution')} | {b['arm']} `{json.dumps(b['params'])}` {b['brier']}, "
+                         f"{b['gap_closed_pct']}%, {_fmt_ci(b['dbrier_vs_book'])} | {others} |")
+        td = D["markets"].get("anytime_td") if key == "props_diagnosis" else None
+        if td:
+            L.append(f"anytime_td: `{json.dumps(td)}`")
+        L.append("")
     path.write_text("\n".join(L), encoding="utf-8")
 
 
@@ -932,6 +1156,12 @@ def main() -> int:
         else:
             sims = run_sims(root, a.out, tasks, a.workers)
         rep["lines"] = score_lines(sched, sims, groups, a.min_n)
+        fit_l = [x for x in hist if x < max(hist)] if hist else []
+        tests_l = {f"{max(hist)} holdout": [max(hist)]} if hist else {}
+        if a.current_season in seasons:
+            tests_l[f"{a.current_season} in-season"] = [a.current_season]
+        if fit_l:
+            rep["lines_diagnosis"] = diagnose_lines(_SELF["line_rows"], fit_l, tests_l)
     qgames: Dict[int, set] = defaultdict(set)
     if "props" in parts:
         rep["props"] = score_props(root, sched, seasons, groups, a.min_n)
@@ -939,6 +1169,12 @@ def main() -> int:
             for r in rr:
                 qgames[r["season"]].add(r["gid"])
         rep["selfcheck"] = [selfcheck(root, sched, *(int(x) for x in sw.split(":"))) for sw in a.selfcheck.split(",") if sw]
+        fit_p = [x for x in hist if x < max(hist)] if hist else []
+        tests_p = {f"{max(hist)} holdout": [max(hist)]} if hist else {}
+        if a.current_season in seasons:
+            tests_p[f"{a.current_season} in-season"] = [a.current_season]
+        if fit_p:
+            rep["props_diagnosis"] = diagnose_props(_SELF["prob_rows"], _SELF["td_rows"], fit_p, tests_p)
     rep["coverage"] = coverage(root, sched, seasons, sims, qgames)
     (a.out / "nfl_lines_props_backtest.json").write_text(json.dumps(rep, indent=1, default=str), encoding="utf-8")
     write_md(rep, a.out / "nfl_lines_props_backtest.md")

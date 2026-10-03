@@ -75,6 +75,15 @@ def test_spread_cover_uses_home_margin_positive_line():
     assert G["spread"]["p_model"]["mean_p"] > 0.5  # mean 10 vs line 3
 
 
+def test_murphy_decomposition_sums_to_brier_when_bins_are_pure():
+    # two forecast values, one per bin: Brier = reliability - resolution + uncertainty exactly
+    ps = [0.2] * 50 + [0.7] * 50
+    ys = [1] * 15 + [0] * 35 + [1] * 30 + [0] * 20
+    d = bt.murphy(ps, ys, bins=2)
+    brier = sum((p - y) ** 2 for p, y in zip(ps, ys)) / len(ps)
+    assert d["reliability"] - d["resolution"] + d["uncertainty"] == pytest.approx(brier, abs=1e-4)
+
+
 def test_configure_env_refuses_a_knob_production_does_not_set(monkeypatch, tmp_path):
     monkeypatch.setenv("SYNDICATE_NFL_TOTAL_LEVEL_SHRINK", "0.5")
     with pytest.raises(SystemExit):

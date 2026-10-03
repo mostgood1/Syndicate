@@ -8,13 +8,25 @@ NHL props backtest (lane `nhl-player-props-projection`) and the NCAAF twin (lane
 
 ## 0. Verdict up front
 
+> **USER DECISION 2026-10-02 (~7:05 PM CT, relayed by the NCAAF backtest session and checked against
+> the standing rule `feedback_every_line_its_own_decision`, first set 2026-09-22):** "every line is its
+> own decision. we should have a model that is accurate that then helps inform each decision". This
+> task prompt's rule ("a market earns a probability/edge on the board only if it beats the baseline AND
+> the book") was a MARKET-WIDE EXCLUSION and is WITHDRAWN. **This file delivers no gate list and
+> recommends no mean-only or probability-withheld market.** The backtest is the DIAGNOSIS: for each
+> market that loses, section 7 says WHY, with evidence, and which model change would make it accurate,
+> ranked by measured out-of-sample impact. Per-line decisions stay with per-line scoring. The first
+> push of this file (`29c7d0c4`) said "nothing earns a probability or edge on the board". That wording
+> was wrong by this rule, and this session should have caught it at the start: the rule was in
+> MEMORY.md.
+
 **No NFL player-prop market beats BOTH the player's own as-of average AND the de-vigged book. Not one,
 in any season.** Every continuous market except interceptions is significantly WORSE than the book on
 Brier and log-loss in the pooled 2023-2025 sample. Interceptions shows NO DIFFERENCE, which is not a win.
-The lane's hypothesis holds for props. MEASURED_MARKETS-style gating: **nothing earns a probability or
-edge on the board.** That matches what `measured_market_skill.py` already says (8 NFL prop entries,
-all `VERDICT_LOSES`). This run REPLICATES it on the SHIPPED model, with game-clustered CIs, adds
-log-loss, and covers 2023 + 2025 + 2026.
+The lane's hypothesis holds for props, as a statement about the MODEL's accuracy, not as a reason to
+hide a market. It matches `measured_market_skill.py` (8 NFL prop entries, all `VERDICT_LOSES`, which
+already lower ranking reliability per line and exclude nothing). This run REPLICATES that on the
+SHIPPED model, with game-clustered CIs, adds log-loss, and covers 2023 + 2025 + 2026.
 
 Anytime TD is **not** a candidate. Its shrinkage beats the player's raw average by a wide margin. It
 still loses to the book's YES price **before** that price is de-vigged, in every historical season.
@@ -258,10 +270,85 @@ It has no book price, no de-vig, no CI, no own-average baseline, no anytime-TD-v
 lines at all. It also grades a rate function that has drifted from production (section 1). **It cannot
 produce the verdict in this file.** This harness can, in ~15 min for props.
 
-## 6. Disposition (no board change made)
+## 7. Props diagnosis: WHY each market loses, and what would make it accurate
 
-- Props: every NFL prop market stays probability-WITHHELD / edge-free on the board on this evidence.
-  The model's mean is displayable; its probability is not a price.
+**Method.** Each candidate model change is FITTED on 2023-2024 and SCORED on held-out 2025 and on 2026
+wk2, through production's own `_nfl_prop_model_probability` on the same rows. "Gap closed" is the
+share of the model-minus-book Brier gap removed on the held-out rows. The arms:
+
+- `shift_mean`: add the fitted bias to the mean.
+- `scale_sd`: multiply the spread by a fitted k, grid 0.4..4.0. The first grid (0.7..2.0) put k at its
+  edge in 5 markets, so it was widened and re-run.
+- `shift_and_scale`: both of the above.
+- `market_anchored_mean`: mean' = (1−w)·mean + w·book line, w fitted. This is the CEILING on what
+  information the model's inputs lack, NOT a recommendation to copy the book.
+
+Plus a Murphy split of Brier (10 equal-count bins). The table below is the 2025 holdout. On 2026 wk2 (16
+games), the spread result replicates for receptions (62.6% closed at k=3.0) and receiving yards (57.7%
+at k=2.5). The other 2026 markets have n < 200 and wide CIs; all 2026 numbers are in the JSON.
+
+| market | n (2025) | Brier gap vs book | Murphy reliability: model / book | bias, actual−mean (% of mean) | gap closed: scale_sd (k) | shift_mean | shift+scale | market-anchored (w) |
+|---|---|---|---|---|---|---|---|---|
+| receiving_yards | 15,148 | 0.0302 | 0.0294 / 0.0001 | +1.96 (6.3%) | **55.8% (k=2.5)** | −1.2% | **71.9%** | 69.1% (w=0.8) |
+| receptions | 14,126 | 0.0254 | 0.0226 / 0.0009 | +0.15 (5.1%) | **73.7% (k=3.0)** | 0.5% | **74.9%** | 71.2% (w=0.8) |
+| rushing_yards | 7,376 | 0.0243 | 0.0257 / 0.0008 | +2.64 (8.3%) | 29.0% (k=2.0) | −4.9% | 39.4% | **89.0% (w=0.9)** |
+| rushing_attempts | 3,805 | 0.0192 | 0.0186 / 0.0016 | +0.70 (8.8%) | 27.1% (k=2.0) | 10.3% | 53.8% | **87.2% (w=1.0)** |
+| passing_yards | 3,195 | 0.0451 | 0.0498 / 0.0033 | +12.98 (6.1%) | 20.0% (k=1.75) | 12.2% | 35.8% | **97.0% (w=1.0)** |
+| passing_attempts | 2,739 | 0.0281 | 0.0384 / 0.0082 | +1.98 (6.1%) | 3.3% | 20.5% | 31.7% | **85.8% (w=1.0)** |
+| passing_tds (Poisson) | 3,189 | 0.0091 | 0.0086 / 0.0015 | +0.06 (4.4%) | n/a (no spread) | **17.6%** | 17.6% | 6.6% |
+| interceptions (Poisson) | 2,356 | 0.0015 (CI spans 0) | 0.0037 / 0.0033 | +0.09 | n/a | 0.8% | 0.8% | −30% |
+| anytime_td | 26,964 | 0.0115 vs vig-INCLUSIVE yes price | 0.0024 / 0.0008 | mean p 0.265 vs observed 0.223 | — | recalibration ×0.95 closes 9% | — | — |
+
+### What the evidence says, market by market
+
+1. **It is a RELIABILITY failure, not a resolution one, in every continuous market.** The model's
+   Murphy reliability term is 10-300x the book's. Its resolution is at or above the book's: receiving
+   yards 0.0012 vs 0.0003, rushing yards 0.0022 vs 0.0004. This is the OPPOSITE of the 2026-09-08
+   game-line finding (resolution deficit, recalibration hopeless). **Here a calibration-type change CAN
+   close most of the gap, and does out of sample.**
+2. **Receptions / receiving yards: the predictive spread at the line is 2.5-3x too narrow.** Widening
+   alone closes 56-74% on 2025 AND 57-63% on 2026 wk2, with k fitted on 2023-24. The mean barely
+   matters: shift_mean does ~0%. This is the 2026-09-28 `[nfl-prop-distribution-too-narrow]` finding
+   (spread 0.21-0.65x of plausible), now measured as Brier closed on a holdout. Note also
+   `sd_ratio_model/empirical` ≈ 0.9: the model's sd matches the spread of actual around its mean
+   OVERALL. What is too narrow is the uncertainty about the MEAN, at the price where the model
+   disagrees with the line. The predictive sd must carry estimation error in the rate (role/usage
+   drift), not only game-to-game noise.
+3. **Rushing / passing volume (rushing_yards, rushing_attempts, passing_yards, passing_attempts): the
+   MEAN is missing information.** Anchoring the mean on the line closes 86-97%, and at w = 0.9-1.0 the
+   residual vs the book is inside noise for passing_yards (+0.0014 [−0.0007, +0.0032]) and
+   rushing_yards (+0.0027 [−0.0011, +0.0064]). Widening closes only 20-29%.
+   - What the book has that a season-to-date rate does not: role and usage changes, depth chart,
+     injuries (own and teammates'), game script, opponent.
+   - QB volume is also biased LOW on the quoted population, by +13.0 yards and +2.0 attempts (6%).
+     shift_mean closes 12-21%.
+4. **passing_tds: a bias problem.** The Poisson rate is under-projected by 0.12 TDs on the quoted
+   population, and the shift closes 18%. The distribution family is right; 2026-09-28 already measured
+   Poisson dispersion at 0.925.
+5. **interceptions: at parity.** The gap is not significant in any season. No change needed.
+6. **anytime TD: a RESOLUTION deficit.** The model's resolution is 0.0096 vs the book's 0.0189 in
+   2025, so it discriminates scorers about half as well as the book. It is also mis-levelled (mean p
+   0.265 vs 0.223 observed), but recalibration closes only 9%.
+   - Needed: information, i.e. red-zone / goal-line role and the team's implied total.
+   - The game-context term ships at (0, 0) for this market because its alpha was fitted on the raw
+     rate, not the shrunk one (`props.py` comment). Re-fitting it against the shrunk estimator is
+     already owed and is the cheapest first step.
+
+### Ranked model changes (by measured out-of-sample Brier closed, weighted by market volume)
+
+| # | change | markets | measured on 2025 holdout | cost / caveat |
+|---|---|---|---|---|
+| 1 | **Widen the predictive spread to carry rate uncertainty:** sd' = k·sd, k≈2.5-3 for receptions/receiving yards, ≈2 for rushing, ≈1.75 for passing yards. Better: an explicit sd = sqrt(sd_game² + var(rate estimate)) | receptions, receiving_yards (102,381 of 174,504 = 59% of continuous-market rows, 2023-25); partial elsewhere | 56-74% of the gap closed (receptions, receiving); 20-29% (rushing, passing yards) | k is a fitted MECHANISM on a calibrated engine: `model_engine_standard.md` requires re-fitting `_COVER_PROBABILITY_BLEND_WEIGHT` and the spread-shrinkage k on top of it, then a re-measure. It interacts with 09-28's `SPREAD_SHRINKAGE_K=6`, which pulls the other way. |
+| 2 | **Give the mean the inputs the line carries:** snap/route/target share and carries trend; depth chart and injury status (the NFL injury and depth-chart ingestion autoruns already exist, `[nfl-data-ingestion-autoruns]`); teammate-out usage redistribution | rushing_*, passing_* most; all continuous | ceiling 86-97% (anchored arm) | Real modelling work. The anchored arm is the ceiling, not the result. Using the line itself as a prior is a legitimate pregame input and would close most of it, but it removes the model's independence by construction. That trade-off is a user decision. |
+| 3 | **De-bias the QB volume mean on the quoted population:** +2.0 attempts, +13 yards, +0.12 TDs on 2025 | passing_yards, passing_attempts, passing_tds | 12-21% | Find the cause before shifting: suspect the zero-week imputation's QB floor (`_QB_PASSING_ATTEMPTS_FLOOR`) and early-exit games pulling the season average down. A blind shift is the "fit the number, not the mechanism" trap. |
+| 4 | **Anytime TD: re-fit the game-context alpha against the shrunk estimator, then add red-zone role** | anytime_td | recalibration alone 9%; the rest is resolution | Owed already (props.py comment on `_NFL_GAME_CONTEXT_PARAMS`). |
+| — | interceptions | — | at parity | nothing |
+
+## 6. Disposition (no board change made, no deploy)
+
+- Per the user decision at the top: no market is withheld, made mean-only, or gated. The board keeps
+  showing every line. The fix is to make the model accurate (section 7). Each line's own scoring
+  (fee-net EV, price quality, the measured-skill reliability term) decides what it does.
 - The open question this does NOT answer: the 09-28 diagnosis says the residual is a
   distribution-family problem. This file says the MEAN already loses to the book line by 4-17% of MAE in 6
   markets (receptions 4%, receiving yards 7%, rushing yards 9%, rushing attempts 12%, passing
