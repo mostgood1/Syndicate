@@ -45388,3 +45388,78 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - **Reading 1 -- MET** (17:46:15Z): the DEPLOYED `load_market_lines` (fleet venv, ~/Syndicate at a18cda3e, content-verified) run read-only on production files. 10-03 **18/18 match**, 10-04 **18/18**, 10-05 **5/5**; **0 off-grid**. This is evidence about the code on production data, not the artifact.
 - **Reading 2 -- OWED:** a watcher polls predictions_2026-10-03/04/05 mtime > 17:43:03Z, then runs the same grader. Production rewrote 10-03 at 17:35Z (pre-ff), so a rewrite is expected within ~1 h.
 - Offline evidence before shipping: 60/60 games on fleet 09-30..10-04 copies match; tests on real fleet rows (4/6 fail on the old code).
+
+## 2026-10-03 18:10:08-18:10:30Z (01:10 PM CT) -- LOCAL FLEET ROLE RELOAD, refresh-worker only: six NFL pregame prop registry entries re-measured on production's estimator (8121a2f7) -- **CODE LOADED ON ALL THREE ROLES (measured); THE NUMBERS ARE INERT ON THE BOARD FOR 6 OF 8 MARKETS (measured)** (lane `nfl-prop-skill-refresh`, user: "deploy it to the fleet")
+
+Claim `refresh-worker` held by `nfl-prop-skill-refresh`, token `544049989fe13c7d`.
+
+**What shipped.** `8121a2f7` refreshes six `("nfl", <stat>, "full", PHASE_PREGAME)` entries in
+`measured_market_skill.MEASURED_MARKET_SKILL` from the 2026-10-03 re-check on production's own
+estimator and probability, and annotates `interceptions` / `passing_tds` `superseded` rather than
+restating under-powered numbers. Finding: `.syndicate/findings_2026-10-03_nfl_props_vs_price_recheck.md`.
+
+**Why only one role was restarted.** Derived with production's OWN `local_production.role_code`
+(HEAD at the role's start epoch, from the checkout reflog), not the env stamp:
+
+    role              pid      runs        source   contains 8121a2f7
+    web               684622   80f380f8    reflog   YES   (oldest gunicorn worker 12:20:51 CT)
+    live-odds-worker  897384   80f380f8    reflog   YES   (respawned 12:26:15 CT, restarts 3->4)
+    refresh-worker    836224   pre-commit  reflog   NO    (started 06:15:47 CT, 5h38m before the commit)
+
+web and live-odds-worker had already picked the commit up on their own -- web through the
+supervisor's periodic worker recycle (`run/web_worker_recycle.stamp` 12:47), live-odds-worker
+through a restart at 12:26 -- both after the tree fast-forwarded to `80f380f8` at 12:14:07 CT.
+Only refresh-worker was stale, so only refresh-worker was signalled.
+
+**Cost of the restart, checked first.** refresh-worker's only child was a ZOMBIE
+(`897217 Zs [python] <defunct>`, rss 0) and `game_count: 0` -- the six WNBA backtest sim workers
+seen earlier had finished. `role_start_epoch`'s docstring is explicit that a worker's children are
+its sims, so a restart during that batch would have killed them; it no longer would. SIGTERM, not
+SIGKILL; uptime > 600 s so the supervisor's backoff was 5 s (`local_production.py:1196-1215`).
+
+**MEASUREMENT (deploy).** SIGTERM 18:10:08Z -> respawned pid 903341 at 18:10:30Z (13:10:30 CT).
+`role_code(903341) = abdbee74 (reflog)`, equal to tree HEAD, `code_stamp_note` = "(none -- role is
+current)", and `git merge-base --is-ancestor 8121a2f7 abdbee74` = YES. Role healthy after: a
+`board_contract_end` build completed by 18:11:21Z, rss 2083 MB -> 534 MB (fresh process), 0 errors
+in `PROCESS_ENUM_DEBUG`.
+
+**The env stamp LIES here and was not used.** `RENDER_GIT_COMMIT` on the respawned role reads
+`9a7f0d2f` -- the supervisor reuses `item.env` on a role-only respawn, exactly as `role_code`'s
+docstring warns. Verified by reflog derivation and by content instead.
+
+**`status` CANNOT answer the staleness question on this host, silently.** `local_production.py
+status` printed `web/refresh-worker/live-odds-worker ... DOWN rss=?` for all three while
+`GET /healthz -> 200` and all three were demonstrably working, and it emitted NO `code=` segment at
+all. `code_stamp_note` only runs when `loaded` is truthy (line 1660), so a stale role is reported as
+neither stale NOR current -- the absent STALE line is not evidence of freshness. I had read it as
+such earlier in the session and was wrong. Separately: `/api/ops/version -> 401` from outside, so
+the documented loaded-commit read needs the fleet's own ADMIN_TOKEN.
+
+**MEASURED, AND IT BOUNDS THE WHOLE CHANGE: 6 of the 8 refreshed entries can never match a board
+row.** `measured_market_skill._norm` is `str(value or "").strip().lower()` -- it does NOT map spaces
+to underscores. The Layer 2 board names these markets in display case with spaces. Production's own
+`skill_note` against the board's own strings, segment `'full'`, phase pregame:
+
+    'Receiving Yards'  -> None (NO MATCH)      'receiving_yards' -> MATCH 3116
+    'Rushing Yards'    -> None (NO MATCH)      'passing_yards'   -> MATCH 834
+    'Passing Yards'    -> None (NO MATCH)
+    'Interceptions'    -> MATCH 374            'interceptions'   -> MATCH 374
+
+Single-word board names normalise onto the key and match; multi-word ones cannot. On
+`layer2_shortlist_2026_10_01__nfl.json` that is 777 Yards rows matching nothing, against a
+`sample_games` distribution of `{0: 850, 4401: 199, 15: 83, 374: 45}` -- 850 prop rows stamped
+`unmeasured` while a measurement for them exists. No artifact anywhere under the fleet data root
+contains either the old value `13887` or the new `3116`.
+
+That is why the mismatch survived: `Interceptions` and `Receptions` are single words and DO resolve,
+so two of eight markets look like the table is working.
+
+**So this deploy is correct and has no observable effect yet.** The code is loaded on all three
+roles; the refreshed numbers will not reach a board row until the key mismatch is fixed. Claimed as
+loaded, NOT as live-in-the-product. The alias table at `measured_market_skill.py:553` (soccer,
+2026-10-03) is the in-repo precedent for the fix shape.
+
+**Owed.** (1) Make the six multi-word NFL prop keys reachable -- aliases per the soccer precedent,
+or a normaliser change, which is global and needs its own reachability test (`off != on`).
+(2) Re-read a `layer2_shortlist_*__nfl.json` afterwards and confirm `sample_games: 3116` appears on
+`Receiving Yards` rows. Until (2) reads non-zero, no claim is made that Layer 2 scoring moved.
