@@ -1462,6 +1462,15 @@ death, never life — do not invert it.
 - Hypothesis: Measured 10-03: NCAAF credits 600-1,236/half-hour pregame and 2,647-5,332/half-hour after 15:10Z kickoff; the props step fetches ~51 events x 9 markets on EVERY sweep (pregame every 25 min, live every ~2.5 min); the 150s lines autorun is mode=fast at ~9 credits/run
 - Falsification test: If NCAAF credits/hour in the next live window stay above ~5k with in-play refresh at 15 min, the props step is not the driver
 - Verification: Fleet quota ncaaf credits/hour during the next NCAAF live window vs 10-03 16:00-16:30Z (5,332/half-hour); NCAAF prop rows served >1h = 0
+- **READINGS 2026-10-03 17:2x-17:53Z (fleet).**
+  - **H1 FALSIFIED:** the main loop never stopped (MLB_SIM_TICK, BOOK_GRID_TICK through 17:25Z). The soccer path's last line was `SOCCER_AUTORUN_SKIPPED reason=no_unit_due ... next_due_in_s=4119` at 15:06:58Z (skip lines print only on reason CHANGE), so the next unit fell due ~16:15:37Z.
+  - **H2 CONFIRMED as starvation by the job cap.** Ticks 16:15-17:26Z: 18. Of these, 17 were `JOB_CAP_THROTTLED` (the LEADING branch, so nothing below runs) and 1 was won by `NFL_NEWS_CAPTURE_LAUNCHING` (above soccer). Soccer got **0 of 18**.
+  - **CAUSE (cutover regression):** `_running_job_process_count` walks ALL of `/proc` and counts every `run_refresh_odds_job.py`. On Render that was one container; on the one-host fleet it counts **live-odds-worker's** odds jobs (166 started 13:00-17:45Z) against refresh-worker's `max=1`. Live ownership samples, 6 x 20 s at 17:48-17:51Z: every counted process was live-odds-worker's or an orphan, **0 refresh-worker's**.
+  - **Orphan:** pid 897298 (`20261003_172532`) was launched by the previous live-odds-worker seconds before its 6-hourly exit (code 0 after 21,253 s). It was reparented to `/init` and still running at 27+ min. It is counted until it exits.
+  - **Attribution is feasible:** every job's environ carries its role (`RENDER_SERVICE_NAME=local-live-odds-worker` on all 3, the orphan included); refresh-worker is `local-refresh-worker`.
+  - **Blast radius:** every refresh-worker autorun BELOW the throttle starves, not only soccer.
+  - Not the cause: refresh-worker restart (pid 774122 exited 0 at ~11:15Z; soccer ran 14:00-15:06Z under 836224); MLB sims (only 16:53-17:10Z and 17:25Z on).
+  - **Proposed fix (needs user approval + a cross-lane write; `live-inplay-board-cadence` holds the file):** count only job processes whose environ `RENDER_SERVICE_NAME` matches this worker's own; an unreadable environ is still counted (unknown must not read low). Render is unchanged: one container, one name.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
