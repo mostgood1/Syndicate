@@ -45312,3 +45312,11 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - reading 3 (served, /api/board/layer2-shortlist build 15:37:04Z): the NCAAF prop row on the shortlist carries projection `generated_at 2026-10-03T10:31:34-05:00` (the rebuilt artifact) and `sample_games 5`; no restart needed (index keyed by mtime). Only 1 NCAAF prop row is on the capped shortlist at this read.
 - expected effect (backtest, not a live measurement): receiving yds MAE -3.02 [-2.24, -3.80], rushing yds -1.80, receptions -0.25 (findings_2026-10-02_ncaaf_lines_props_backtest.md).
 - not fixed: a fleet reset would lose early weeks again (lookback 2); a first-run full-season backfill is a separate code change.
+
+## 2026-10-03 15:48:44Z (10:48 AM CT 10-03) -- READING, NO DEPLOY: EPL / Serie A served on the 10-04 board, the owed half of 05:17:19Z (lane `soccer-projections-gap`, user: "take the EPL/Serie A served reading on the 10-04 board") -- **MET**
+
+- **source:** served `/api/board/layer2-shortlist?sport=soccer&date=2026-10-04` on the fleet web (a built artifact, build_age 1147 s), `per_sport_ingest.soccer.enrichment.projections`.
+- **baseline:** EPL / Serie A 0 projected rows on every board up to and including 10-03. Their first fixture is 10-10, outside 10-03's window (dates_read 10-02..10-09).
+- **reading (board 10-04, dates_read 10-03..10-10, dates_with_rows 10-04/10-07/10-09/10-10):** rows_with_projection **3,930 / 4,475 (87.8%)**. By league: **epl 899, serie_a 302**, mls 839, bundesliga 837, ligue_1 613, la_liga 505, eredivisie 393, championship 48, primeira_liga 21, belgian_pro_league 3 -> 18. `leagues_indexed` holds all 10 leagues; `unmatched_by_league {}`.
+- **producer side (15:43:01Z census):** `epl/recommendations_2026-10-10.json` 6 matches, `serie_a/..._2026-10-10.json` 3. The resolver's 10-10 units (05:15Z+) ran.
+- **same read, board 10-03 (default):** 521 / 614, 8 leagues (no epl/serie_a, as expected by window).
