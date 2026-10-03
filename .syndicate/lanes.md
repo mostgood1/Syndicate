@@ -1287,6 +1287,27 @@ death, never life — do not invert it.
   - **SHIPPED:** totals line a18cda3e (reading 2 MET: 13/13 + 5/5 at the books' line, 0 off-grid).
   - **SHIPPED:** four sim fixes 7865b26e (live 20:11:45Z via another session's ff; reading 2 MET: 13/13 calibrated, mean total 6.3265).
   - **Next:** dispersion -- P(over) at the close 0.476 vs 0.503 frequency.
+- **H10 (written BEFORE testing, 2026-10-03 ~21:05Z, user: "fix the dispersion next"):** the shipped game-market sim (7865b26e) under-prices overs at the close (mean P 0.476 vs frequency 0.503, n=1,083) because independent per-period Poisson is too NARROW. The settled-total variance is under-stated; the mean is already unbiased (+0.008). Diagnosis first: actual vs predictive variance; mean P(over) vs frequency split by close line. A pure dispersion problem shows over-pricing at 5.5 and under-pricing at 6.5. Fix candidates: the existing SimConfig knobs shared_k (shared pace, widens totals) / overdispersion_k (Gamma-Poisson), fit pre-2026-01-01 with tie_weight/empty_net/scale RE-FIT jointly (standard 4.4). FALSIFIED if the variance ratio is ~1 (CI includes 1), or if the fitted knob leaves OOS OVER@close dBrier vs the shipped config with a CI including 0 AND the calibration gap unchanged.
+- **H10 RESULT 2026-10-03 ~21:15Z: FALSIFIED -- the spread is TOO WIDE, not too narrow.**
+  - Shipped config, settled total: E[(y-mu)^2/var] = 0.885 [0.818, 0.954] full (n=1,132); 0.892 [0.805, 0.983] OOS (n=681).
+  - Actual variance 5.24 vs predictive 6.01; real totals are UNDER-dispersed (var/mean ~0.84).
+  - Per close line the P(over) gap is n.s. everywhere: 5.5 -0.004 [-0.071, +0.061], 6.0 +0.018 [-0.030, +0.067], 6.5 -0.016 [-0.063, +0.032]. The aggregate 0.476 vs 0.503 was a line mixture.
+  - shared_k / overdispersion_k only widen, so they are the wrong direction.
+- **H11 (written BEFORE the run):** per-period Binomial thinning (goals ~ Binomial(m, lambda/m), var = lambda(1 - lambda/m)) corrects the spread. m is fit pre-2026-01-01 with tie_weight / empty_net / scale re-fit jointly. FALSIFIED if OOS E[(y-mu)^2/var] stays outside [0.95, 1.05], or OVER@close dBrier vs the shipped config is > 0 with CI excluding 0.
+- **H11 RESULT ~21:45Z: FALSIFIED (not shipped).**
+  - Binomial thinning m=8 fixes the pre-Jan spread (z2 1.007) but WORSENS pre-Jan OVER@close log-loss (0.69383 Poisson -> 0.69466 m=8, monotone).
+  - The selection therefore kept Poisson: OOS z2 0.918 (out of band); bias -0.214 (pre-Jan-only s); OVER vs shipped +0.0012 [-0.0003, +0.0026].
+  - **Decomposition:** the excess variance is WITHIN-game (5.92 of predictive 6.01; var(mu) 0.096).
+  - **Second defect:** the projected totals are OVER-CONFIDENT -- slope of actual on projected settled total 0.482 [0.021, 0.927] full, 0.488 OOS (CI incl. 1 OOS). Narrowing alone pushes P(over 6.5) further below the frequency.
+- **H12 (written BEFORE the run):** shrink each game's projected total toward the league level and narrow the spread, fit JOINTLY.
+  - Mechanism: mu' = L + k (mu - L) by rescaling both lambdas; Binomial m on top. L, k, m, s, delta, e all fit on pre-2026-01-01 games; selection by pre-Jan OVER@close log-loss.
+  - SHIP only if OOS (n=681): OVER@close dBrier vs shipped < 0 with CI excluding 0 -- OR not worse (CI incl. 0) AND z2 in [0.95, 1.05]; ML vs shipped not worse; settled bias CI incl. 0.
+  - Otherwise FALSIFIED, not shipped.
+- **H12 RESULT ~22:30Z: FALSIFIED -- NOT SHIPPED (user: "ship the dispersion fix if it holds up"; it did not).**
+  - Pre-Jan fit chose k=0.5, m=None. Every Binomial-narrowed variant (m 12/8, at every k) had WORSE pre-Jan OVER log-loss.
+  - OOS n=681: OVER@close vs shipped +0.0000 [-0.0020, +0.0020] (no gain); z2 0.890 [0.804, 0.982] (out of band); ML -0.0001 [-0.0003, +0.0001]; bias -0.087 [-0.241, +0.074].
+  - **DISPERSION TRACK CLOSED:** the over-wide settled-total spread is real (z2 ~0.89) but is not the lever for the priced lines. 21 variants, none improved OVER pricing; OVER is at book parity already.
+  - Production unchanged (7865b26e).
 - Blocked by: production wiring needs (a) user decision, (b) lane nhl-player-props-projection for ingestion/collect.py (confirmed-starter feed); vs-book needs an active ODDS_API_KEY
 
 ### soccer-skill-registry-line-weighting — OPEN — opened 2026-10-02 — session 43e4d5fe-e05e-41bc-aae6-6d6986460b22
