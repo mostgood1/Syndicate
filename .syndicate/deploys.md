@@ -45577,3 +45577,12 @@ the 19:27:18Z load. Their counters (197/1015 and 343/827) will move when those d
 That is ordinary artifact staleness on a per-date build schedule, not a deploy gap, and nothing is
 owed -- but a reader comparing dates today will see three different measured/unmeasured ratios for
 three different artifact vintages, which is worth knowing before anyone calls it an inconsistency.
+
+## 2026-10-03 19:20Z (2:20 PM CT) -- LOCAL FLEET FF -> ca3c85cd: NHL on-ice attribution unflattened (power 1.0, no uniform mix, no cap) -- **MET** (lane `nhl-player-props-projection`, user: "ship whichever combination measures better")
+
+- applied: ff via `github/main` 19:20:09Z, no restart (the props producer is a per-run subprocess; live_resim publishes moneylines, which attribution does not move). Read back: HEAD contains ca3c85cd; the fleet venv resolves attribution 1.0 / 0.0 / 1.0.
+- expect: the first producer run STARTED after the ff changes the 10-03 projections (seeded sims, so unchanged = old code), lifting stars toward their own averages.
+- reading 0 (19:23:22Z rewrite): 0 of 756 projections changed -- that run started before the ff, as expected.
+- reading 1 (19:53:06Z rewrite): 747 of 756 changed. Projection minus the player's own 2025-26 average, same players: SOG elite (>=3.0/game, n 18) -0.567 -> -0.304, all (n 196) -0.111 -> -0.053; POINTS elite -0.250 -> -0.175; ASSISTS elite -0.306 -> -0.281; GOALS all -0.022 -> -0.003.
+- offline evidence: paired backtest vs the previous engine, 12,540 regular-season player-games -- Brier SOG@1.5 -0.0010, SOG@2.5 -0.0011, ASSISTS@0.5 -0.0010, POINTS@0.5 -0.0012 (CIs exclude 0); playoffs GOALS@0.5 +0.0006 worse.
+- not shipped: assist_weight (ASSISTS@0.5 Brier +0.0010 worse); elite playmakers remain ~-0.28 assists/game under.
