@@ -1335,6 +1335,14 @@ death, never life — do not invert it.
 - Verification: Per-row dump from audit_props --asof --dump-rows on the 304-match pre-kickoff population, LODO scorer printing n, L, NLL and line Brier with CIs; result in lane + findings. Stage 2 gated on stage 1
 - Blocked by: none
 
+### ncaaf-player-stats-wk12-restore — OPEN — opened 2026-10-02 — session 7e94d2ff-ea54-4a59-9c79-2ddb1bea2bad
+- Goal: The fleet's NCAAF player-game-stats snapshot holds 2026 weeks 1-2 again (production code refresh_week, rows within 5% of the 4,964 / 3,178 CFBD returned on 10-02) with every other season/week row count unchanged, and the served week-5 prop artifact is rebuilt on input weeks [1,2,3,4]
+- Files: (data only, no repo file) fleet ~/syndicate-prod/data/ncaaf_source/source_artifacts/data/processed/player_game_stats/ncaaf_player_game_stats_snapshot.csv, fleet ncaaf_source/data/ncaaf_prop_projections_2026_wk5.json
+- Hypothesis: Never fetched, not deleted: the fleet started 2026-09-30 and player_stats_refresh re-fetches only the target week plus DEFAULT_LOOKBACK_WEEKS=2, so its first run reached wk3 and weeks 1-2 were never requested
+- Falsification test: If the fleet log shows a refresh that wrote 2026 wk1-2 and a later write that removed them, this is a deletion, not a gap
+- Verification: Before/after row counts per season-week on the fleet file (sha256 backup kept), wk5 artifact input.weeks_used and players count before/after, recorded in deploys.md
+- Blocked by: USER -- the --apply write to the fleet snapshot was refused by the auto-mode permission classifier (2026-10-03 ~05:0xZ); nothing written. Dry run (read-only) verified: worker env has CFBD_API_KEY, target = production snapshot, BASELINE 2026 wk3 2,944 / wk4 2,819 / wk5 115 rows, total 41,707, sha b6cd12864ba7; served wk5 prop artifact weeks_used [3,4], players 2,221, projections 5,341 (generated 04:08:23Z). Hypothesis CONFIRMED read-only: first fleet player-stats run 2026-09-30 (last_attempt_age_s=never), no log of any wk1-2 write. To apply (user): ~/.venvs/syndicate/bin/python /mnt/c/tmp/ncaaf_lpb/fleet/restore_wk12.py --apply from ~/Syndicate in WSL (backs up first, refresh_week wk1+wk2, asserts other weeks unchanged, rebuilds wk5).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
