@@ -107,6 +107,29 @@ def _mixture_over_probabilities(
     }
 
 
+# ---- OWN-RATE BLEND (H38) ---------------------------------------------------------------------------
+# Lane `soccer-shots-allocation-blend`. H38, pre-registered 2026-10-03 before computation: for appeared
+# players, m = L * model + (1 - L) * c, where c is the player's own current-season per-APPEARANCE average
+# shrunk with `_OWN_RATE_PSEUDO_APPS` pseudo-appearances, beat BOTH the model and c alone on held-out
+# Poisson NLL (post-fix pre-kickoff builds, 3,003 rows / 119 matches, leave-one-date-out):
+#   shots  L 0.48 (folds 0.47-0.54): blend-model -0.154 [-0.222, -0.097], blend-c -0.028 [-0.039, -0.017]
+#   SOT    L 0.66 (folds 0.64-0.68): blend-model -0.038 [-0.069, -0.014], blend-c -0.029 [-0.038, -0.020]
+# ONE DELIBERATE DEVIATION from the tested estimator, measured on the fleet before the flag is turned on:
+# `build_usage_profiles` sees ONE team's rows, so c shrinks toward the TEAM's per-appearance mean (the test
+# shrank toward the league's). OFF unless SYNDICATE_SOCCER_PROP_OWN_RATE_BLEND is set (absent = off).
+_OWN_RATE_BLEND_ENV = "SYNDICATE_SOCCER_PROP_OWN_RATE_BLEND"
+_OWN_RATE_L_SHOTS = 0.48
+_OWN_RATE_L_SOT = 0.66
+_OWN_RATE_PSEUDO_APPS = 3.0
+_OWN_RATE_MIN_APPS = 3.0
+
+
+def own_rate_blend_enabled() -> bool:
+    import os
+
+    return str(os.environ.get(_OWN_RATE_BLEND_ENV) or "").strip().lower() in {"1", "true", "on", "yes"}
+
+
 @dataclass(frozen=True)
 class PlayerUsageProfile:
     player_id: str
@@ -138,6 +161,12 @@ class PlayerUsageProfile:
     # And for ASSISTS (`#673`, H33): the assists ladder is priced on the same
     # mixture, over the same season-scoped on-pitch minutes.
     on_pitch_assist_share: float | None = None
+    # H38 own-rate blend inputs. Declared fields, not setattr, so `dataclasses.replace` keeps them and a
+    # reachability test can see the flag (model_engine_standard 4.3). None = not computable for this row.
+    own_shots_per_appearance: float | None = None
+    own_sot_per_appearance: float | None = None
+    own_appearances: float | None = None
+    own_rate_blend: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -159,6 +188,10 @@ class PlayerUsageProfile:
             "on_pitch_shot_share": self.on_pitch_shot_share,
             "on_pitch_goal_share": self.on_pitch_goal_share,
             "on_pitch_assist_share": self.on_pitch_assist_share,
+            "own_shots_per_appearance": self.own_shots_per_appearance,
+            "own_sot_per_appearance": self.own_sot_per_appearance,
+            "own_appearances": self.own_appearances,
+            "own_rate_blend": self.own_rate_blend,
             "metadata": dict(self.metadata),
         }
 
@@ -198,6 +231,9 @@ class PlayerPropProjection:
     # computed for THIS row. The two answer different questions, and the
     # artifact never said which it held.
     ladder_conditioning: dict[str, str] = field(default_factory=dict)
+    # H38: None when the blend did not run for this row; else the inputs and both means, so the artifact
+    # says which estimator produced the shot ladder.
+    own_rate_blend: dict[str, float] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -225,6 +261,7 @@ class PlayerPropProjection:
             "expected_assists_if_playing": self.expected_assists_if_playing,
             "anytime_scorer_probability_if_playing": self.anytime_scorer_probability_if_playing,
             "ladder_conditioning": dict(self.ladder_conditioning),
+            "own_rate_blend": dict(self.own_rate_blend) if self.own_rate_blend else None,
         }
 
 
@@ -382,12 +419,43 @@ def project_player_props(
             (1.0 - p_start, _SUB_SHOT_INTENSITY * full_match_shots * _MINUTES_PER_SUB_APPEARANCE / 90.0),
         )
         sot_components = tuple((weight, mean * on_target_rate) for weight, mean in shot_components)
+        blend_note = None
+        if (
+            usage_profile.own_rate_blend
+            and usage_profile.own_shots_per_appearance is not None
+            and (usage_profile.own_appearances or 0.0) >= _OWN_RATE_MIN_APPS
+        ):
+            # H38: scale every start/sub component by blend / model, so the mixture keeps its shape and
+            # every ladder line moves with the mean.
+            model_shots = sum(weight * mean for weight, mean in shot_components)
+            model_sot = sum(weight * mean for weight, mean in sot_components)
+            own_shots = max(0.0, float(usage_profile.own_shots_per_appearance))
+            own_sot = (
+                max(0.0, float(usage_profile.own_sot_per_appearance))
+                if usage_profile.own_sot_per_appearance is not None
+                else own_shots * on_target_rate
+            )
+            blend_shots = _OWN_RATE_L_SHOTS * model_shots + (1.0 - _OWN_RATE_L_SHOTS) * own_shots
+            blend_sot = _OWN_RATE_L_SOT * model_sot + (1.0 - _OWN_RATE_L_SOT) * own_sot
+            if model_shots > 0:
+                shot_components = tuple((weight, mean * blend_shots / model_shots) for weight, mean in shot_components)
+            if model_sot > 0:
+                sot_components = tuple((weight, mean * blend_sot / model_sot) for weight, mean in sot_components)
+            blend_note = {
+                "model_shots": round(model_shots, 4), "own_shots": round(own_shots, 4), "blend_shots": round(blend_shots, 4),
+                "model_sot": round(model_sot, 4), "own_sot": round(own_sot, 4), "blend_sot": round(blend_sot, 4),
+                "own_appearances": float(usage_profile.own_appearances or 0.0),
+                "L_shots": _OWN_RATE_L_SHOTS, "L_sot": _OWN_RATE_L_SOT,
+            }
         expected_shots_if_playing = sum(weight * mean for weight, mean in shot_components)
-        expected_shots_on_target_if_playing = expected_shots_if_playing * on_target_rate
+        expected_shots_on_target_if_playing = (
+            sum(weight * mean for weight, mean in sot_components) if blend_note else expected_shots_if_playing * on_target_rate
+        )
         shots_ladder = _mixture_over_probabilities(shot_components, _SHOT_LINES)
         shots_on_target_ladder = _mixture_over_probabilities(sot_components, _SOT_LINES)
         shots_conditioning = CONDITIONAL_ON_APPEARING
     else:
+        blend_note = None
         expected_shots_if_playing = expected_shots / conditioning
         expected_shots_on_target_if_playing = expected_shots_on_target / conditioning
         shots_ladder = _over_probabilities(expected_shots, _SHOT_LINES)
@@ -427,6 +495,7 @@ def project_player_props(
             "two_or_more_scorer_probability": UNCONDITIONAL,
             "goal_or_assist_probability": UNCONDITIONAL,
         },
+        own_rate_blend=blend_note,
     )
 
 
@@ -595,8 +664,39 @@ def build_usage_profiles(
             )
         return prior
 
+    # H38 OWN-RATE INPUTS: the player's own CURRENT-SEASON per-appearance shots (and SOT where the source
+    # carries a rate), shrunk with pseudo-appearances toward this team's current-season per-appearance mean.
+    # A side mixes current and prior-season rows; only the newest season counts here.
+    blend_on = own_rate_blend_enabled()
+    seasons = [str(row.get("season")) for row in players if row.get("season") not in (None, "")]
+    current_season = max(seasons) if seasons else None
+
+    def _own_totals(row: dict[str, Any]) -> tuple[float, float, float | None] | None:
+        if current_season is not None and str(row.get("season")) not in ("", "None", current_season):
+            return None
+        apps = _number(row.get("appearances")) or _number(row.get("games"))
+        played = _number(row.get("minutes_played")) or _number(row.get("minutes"))
+        rate = _number(row.get("shots_per90"))
+        if not apps or played is None or rate is None:
+            return None
+        shots = rate * played / 90.0
+        sot_rate = _number(row.get("shot_on_target_rate"))
+        return apps, shots, (shots * sot_rate if sot_rate is not None else None)
+
+    own = [_own_totals(row) for row in players]
+    team_apps = sum(o[0] for o in own if o)
+    team_mean = (sum(o[1] for o in own if o) / team_apps) if team_apps > 0 else None
+    sot_rows = [o for o in own if o and o[2] is not None]
+    team_sot_mean = (sum(o[2] for o in sot_rows) / sum(o[0] for o in sot_rows)) if sot_rows else None
+
+    def _shrunk(total: float, apps: float, target: float | None) -> float | None:
+        if target is None:
+            return None
+        return (total + _OWN_RATE_PSEUDO_APPS * target) / (apps + _OWN_RATE_PSEUDO_APPS)
+
     profiles: list[PlayerUsageProfile] = []
     for index, row in enumerate(players):
+        own_row = own[index]
         on_target = row.get("shot_on_target_rate")
         try:
             on_target_rate = float(on_target) if on_target is not None and str(on_target).strip() != "" else None
@@ -629,6 +729,12 @@ def build_usage_profiles(
                 on_pitch_assist_share=(
                     _rate(row, _ASSIST_RATE_KEYS) / on_pitch_assist_total if on_pitch_assist_total > 0 else 0.0
                 ),
+                own_shots_per_appearance=_shrunk(own_row[1], own_row[0], team_mean) if own_row else None,
+                own_sot_per_appearance=(
+                    _shrunk(own_row[2], own_row[0], team_sot_mean) if own_row and own_row[2] is not None else None
+                ),
+                own_appearances=own_row[0] if own_row else None,
+                own_rate_blend=blend_on,
                 metadata={key: value for key, value in row.items() if key not in {"player_id", "player_name"}},
             )
         )
