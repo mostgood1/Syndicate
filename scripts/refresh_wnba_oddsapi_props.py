@@ -7001,7 +7001,13 @@ def main() -> int:
         return 1
     # A KNOWN zero player-prop rows (game lines only) has no props to edge;
     # None (unreadable) keeps the check.
-    if bool(args.do_edges) and snapshot_rows > 0 and edges_rows <= 0 and state.get("player_prop_rows") != 0:
+    # FAST MODE NEVER COMPUTES EDGES (the run function gates predictions/edges on
+    # refresh_mode == "full"), so "no edge rows" is its normal outcome, not a
+    # failure. Measured 2026-10-02 evening: 31 of 42 live WNBA runs were
+    # `--phase live --mode fast`, each exiting 1 here 3-5 s after a snapshot of
+    # 324-569 prop rows, with nothing in the props log.
+    full_mode = str(getattr(args, "mode", "full") or "full").strip().lower() == "full"
+    if bool(args.do_edges) and full_mode and snapshot_rows > 0 and edges_rows <= 0 and state.get("player_prop_rows") != 0:
         return 1
     return 0
 
