@@ -45345,3 +45345,14 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 ## 2026-10-03 16:35Z (11:35 AM CT) -- MEASUREMENT: 1h freshness GOAL MET on the Saturday pregame window -- lane `layer2-freshness-1h` (CLOSED)
 - verify: ~/satwatch/summary.txt (12:30-16:30Z, 77 samples/sport, fleet 340eb0e3): rows served > 1h = 0 in NFL, NCAAF, NHL, soccer, WNBA (WNBA served no rows in the window). Launch gaps median/max: NFL 25.2/33.6, WNBA 25.2/33.6, NHL 30.1/37.3, MLB 60.1/61.1 min (configured 1500/1500/1800/3600 s); NCAAF 2.1 (in-play fast). Served-row age p90: NFL 12.6, NCAAF 9.2, NHL 18.4, soccer 19.4 min. Oldest served row max 59.7/60.0/59.8 (NFL/NCAAF/NHL) -- CENSORED by the 1h gate, which hides the lines a sweep does not re-quote (median hidden NFL 301, NHL 193, soccer 153, NCAAF 110). Soccer runs 2.3 min (12:43, 13:31, 15:15Z), each 1 full + 9 near schedules. lane_busy refusals 15 (12 live-phase).
 - credits/h in window: NCAAF 4,324, soccer 1,271, NFL 509, NHL 300, WNBA 125.
+
+## 2026-10-03 16:37Z (11:37 AM CT) -- LOCAL FLEET FF -> ebe7a634: NHL lineup window excludes preseason, tops up from last season, dresses only the club roster -- **MET** (lane `nhl-player-props-projection`, user: "Fix lineup window + backtest, then deploy")
+
+- why: the 10-03 pregame grid (05:03Z) priced 29 of 53 SOG lines at >10% edge, median -7.1%, all big ones unders; projections 0.305 below the player's own 2025-26 average because the 8-game usage window was all preseason games (Caufield L3 12.5 min, Batherson L4 12.2).
+- applied: ff via `github/main` 16:37:31Z, no restart (the collector runs inside the per-run NHL subprocess). Read back: HEAD contains ebe7a634, `_COMPETITIVE_GAME_TYPES` present.
+- baseline (16:37:31Z): lineups_2026-10-03.csv 1,104 rows, 42.5 per team.
+- reading 1 (16:48:08Z lineups rewrite): 572 rows, 22.0 per team, min 17 slotted per team.
+- reading 2 (16:55:15Z props rewrite): Caufield L2 17.9 min SOG 2.40 (was L3 12.5 / 1.51); Batherson L1 2.49 (was L4 / 1.17); Slafkovsky L1 2.39 (was L3 / 1.17); Cozens L2 2.04 (was L3 / 1.28).
+- reading 3 (book_grid_2026-10-03 generated 17:02:38Z): 635 projected / 635 priced / 635 edged, 0 refused. SOG median edge -7.1% -> -3.9%; |edge|>10% 55% -> 46% of lines; >25% 9% -> 2.6%; proj minus own average -0.305 -> -0.131.
+- backtest (window change alone; roster filter has no as-of history): Oct 2025 SOG +0.001 [-0.008, +0.010] neutral; 2026-27 opening regular-season games SOG -0.030 [-0.085, +0.022], ASSISTS -0.021 [-0.039, -0.005].
+- NOT fixed, still producing edges that are model error: D SOG over-projection (Josi 4.02 vs own 2.66, +30%), star assists under-projected (MacKinnon 0.50 vs 0.93, Kucherov 0.50 vs 1.13: `engine.py` `_weighted_choice` kind="assist" uses shot_weight as the playmaking proxy), forward SOG under.
