@@ -210,11 +210,19 @@ Same-book drift with the consensus HELD reverts (MLB mirror 07-07..08-09, 408 ga
 (`SYNDICATE_SCORE_SINGLE_BOOK_MOVEMENT=1` restores). The MARKET's move still ranks, through EV priced
 against the current consensus, and is published as attribution-only `score.market_move_component`
 (consensus pp / implied price). Fleet board after: 0/3,381 rows carry a movement component,
-`rows_refused_by_movement` 490 -> 0, `market_move_component` sign = consensus arrow 1,792/1,792. The card's
-arrow follows `movement_fair_delta_pp` (+/-0.25 pp); single-book drift shows as neutral price info. Consensus
+`rows_refused_by_movement` 490 -> 0, `market_move_component` sign = consensus arrow 1,792/1,792. Consensus
 moves themselves are small and sport-inconsistent (MLB -0.09/+0.11 pp toward/against; NHL +0.62/-0.56 on 8
-games) -- no fixed-sign extra term; per-sport measurement owed
+games) -- no fixed-sign extra term; measured NIGHTLY per sport by `scripts/consensus_movement_by_sport.py`
+(scheduled job `movement-by-sport` 10:30 local; reports/intelligence/movement_by_sport/<date>.json)
 (`findings_2026-09-21_top_opps_adverse_movement.md`, `findings_2026-10-02_layer2_market_moves_away.md`).
+**MOVEMENT ON THE BOARD IS THE MARKET'S, END TO END `[verified 2026-10-02 20:45Z on the fleet, 3121b0c4, user
+decision "NOTHING should reference just a single book", lane layer2-freshness-1h]`.** Same-line
+`movement_vs_pick` = the no-vig consensus move (`movement_fair_from` -> `movement_fair_to`, +/-0.25 pp; `unknown`
+when either end lacks a consensus -- never a book fallback); the sparkline plots that consensus
+(`clv_price_trail.fair_move_series`, basis `consensus`; trail points carry `f` again); steam fires on the
+consensus moving >= 2.42 pp in 3h (`steam_basis=market`); the card shows no book price, name or "book last moved"
+clock. Served board: verdict vs consensus sign 0/3,247 disagree, sparkline slope 0/2,262. Same-book
+`movement_price_*` stay as DATA (CLV harness, the gated-off term). Line-moved rows keep the line verdict.
 
 **Movement is the board's second-largest value term and was already wired end to
 end** — unusual here. `blended_score` = `ev_pct` + capped sim + capped movement,

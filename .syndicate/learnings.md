@@ -5292,3 +5292,9 @@ own prior verdicts, not by anything failing.
 - **How to apply:** for any vs-book grade, take the close from `<sport>_source/tracking/book_quotes` (every row has `captured_at`). Use the last quote per (book, market, selection, line) with `captured_at` <= commence, or an OddsAPI historical snapshot taken before the start. Count and report the rows dropped as post-start.
 - The same median-of-everything shape is a live production defect: `market_lines.load_market_lines` sets the NHL totals line to the median of every captured point, so hockeysim prices lines no book quotes.
 - *(evidence: `.syndicate/findings_nhl_game_lines_backtest.md`; `scripts/backtest_nhl_game_lines.py::quote_log_close`)*
+
+
+## 2026-10-02: a cadence setting is only as fine as the loop that CHECKS it -- and a "10-minute run" can be a run that failed
+- Measured (lane `layer2-freshness-1h`, local fleet): I moved NFL/NCAAF from 1800s to 1500s and predicted ~45-min peaks. Nothing changed (58-59 min) because the idle loop slept 900s between checks, so every interval in 16-32 min fired at ~32 -- it launched 38 min apart at 1500s. Read the loop's tick spacing (`PREGAME_CADENCE_DETAIL` timestamps) before tuning any interval it gates; fixed in 963c2374.
+- Same night: I sized soccer's 45-min cadence on "runs take ~10 min". Those were FAILED runs (rc 1 at a schedule step until 5566d4ba); the real run is 24 min, 94% full-season schedule rebuilds. Check a run's `ok`/returnCode before using its duration as a baseline.
+- Same night, ops: env in `local_production.env` is read at SUPERVISOR start only (a child TERM re-uses the old env), and `down` immediately followed by `Start-ScheduledTask` can race -- the new supervisor sees the old one and exits 0, leaving production down (23:01-23:08Z). Confirm the old supervisor is gone (`pgrep -f "local_production.py.*up"`) before starting, and confirm a new one after.

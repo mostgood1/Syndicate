@@ -2335,3 +2335,39 @@ pre-check must use an authoritative read WITH healing and must FAIL OPEN.
 
 **Production intervals are env-set, not the code defaults.** WNBA pregame runs at
 7200s, not the 14400s fallback in `_wnba_pregame_refresh_interval_seconds`.
+
+
+## [pregame-sweep-cadence] THE IDLE LOOP NOW WAKES WHEN A SPORT'S OWN PREGAME SWEEP IS DUE; soccer schedules refetch a near window between 6-hourly full rebuilds `[2026-10-02 22:10Z-23:40Z, fleet 963c2374 + de28521c, lane layer2-freshness-1h]`
+
+**Before (measured on the fleet 2026-10-02):** with nothing live, `live_refresh_loop` slept the 900s idle
+interval after every tick, so per-sport pregame intervals were only CHECKED every ~16 min -- any setting
+between 16 and 32 min fired at ~32 (NFL/NCAAF at 1500s launched 20:37:55Z then 21:15:56Z, 38 min apart).
+The GLOBAL off-hours gate (900s since any sport's sweep) and the flat 1800s per-sport relaunch cooldown
+also held shorter intervals back. Oldest NFL/NCAAF/WNBA board rows peaked 57-60 min against the 1h rule.
+
+**Now (963c2374, live on live-odds-worker from 22:10Z):** idle wait = min(idle, next sport due + 5s),
+floor 60s (`_pregame_idle_wait_seconds`); a due sport bypasses the off-hours gate
+(`OFF_HOURS_GATE_BYPASSED_SPORT_DUE`); an EXPLICIT `SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_<SPORT>`
+below the cooldown shortens that sport's cooldown. Due-ness is STRICT (checker says not live, marker
+stamped, not league-scoped). Off switch `SYNDICATE_PREGAME_TICK_FOLLOWS_DUE=0`. Seen live: sleep 733s
+timed to WNBA's due time; bypass fired for nfl,ncaaf 22:18:55Z and wnba 22:33:00Z. A refused (lane_busy)
+due sport keeps its rewound marker and retries every ~1.5-3 min -- refusals spend no credits.
+
+**Soccer (de28521c, fleet NOT yet fast-forwarded at 00:10Z 10-03 -- verify):** the soccer pregame run
+rebuilt ten leagues' FULL seasons every run -- 1,327 of 1,416 step-seconds (run 20261002_223521, 24 min;
+ESPN refuses every range here so a full build is ~one request per date) against 11 s of odds -- holding
+the refresh lane and refusing every other sport's sweep. Now `--near` (today-2..+7, merged by event_id)
+unless the last FULL build is > `SYNDICATE_SOCCER_SCHEDULE_FULL_REBUILD_SECONDS` (21600). Live-ESPN check:
+mls near 14s vs full 91s, result identical to a fresh full build (511/511). Soccer's earlier "~10 min"
+runs were FAILURES (rc 1 at the Belgian schedule step until 5566d4ba), not its normal duration.
+
+**Fleet env (local_production.env, read only at SUPERVISOR start -- a child restart re-uses the old
+values):** sweep intervals NHL 1800, NFL/NCAAF/WNBA 1500, WNBA autorun 1500, soccer autorun 2700 (the
+key was absent from the file; render.yaml's 14400 applied); shortlist 1h gate NHL/WNBA by code,
+NFL/NCAAF/SOCCER by env.
+
+**NOT YET SHOWN:** the margin (oldest rows ~45 min). Friday night was confounded by a 24-min soccer run,
+a 7-min fleet outage 23:01-23:08Z (start raced `down`), a ~14-min first tick after restart, and live
+games from ~23:28Z. Saturday pregame watcher `~/satwatch/` (12:30-16:30Z) writes `summary.txt`. The
+gate's hidden-row count is mostly STRUCTURAL (NFL hid 272 rows with its oldest served row 10.5 min old):
+judge cadence on oldest age and launch gaps, not on hidden rows.

@@ -705,6 +705,7 @@ once this index exists: re-splitting would orphan the parts.
 | [refresh-worker-disk-2026-09-13] | refresh-worker's 48.9 GB disk: FULL 09-12 23:39Z -> 09-13 14:15Z, COMPACTED to 16.3 GB free `[verified 2026-09 | `state_worker.md` |
 | [streamed-pull-append-only-tail] | `pull_streamed_artifact` sends NO `since=` on append-only tails — web's stream route 304'd before Range and fr | `state_worker.md` |
 | [refresh-worker-heavy-build-refusal] | refresh-worker's heavy build is refused for hours once the MAIN PROCESS settles above ~2.2 GB after its first  | `state_worker.md` |
+| [pregame-sweep-cadence] | THE IDLE LOOP NOW WAKES WHEN A SPORT'S OWN PREGAME SWEEP IS DUE; soccer schedules refetch a near window betwee | `state_worker.md` |
 | [mlb-live-gameline-venue-segment] | MLB LIVE GAME LINES SERVE NO SIM EDGE BECAUSE THE VENUES QUOTE FULL-GAME CONTRACTS AND THE LIVE BOARD IS MOSTLY SEGMENTS | `state_layer2.md` |
 | [nhl-live-resim] | NHL HAS A LIVE RE-SIM AND IT CAN NOW SEE ITS SLATE -- the 403 that emptied its slate is fixed and measured; no NHL game has yet reached the board with a probability | `state_model.md` |
 | [lane-claim-truncation] | A LANE CAN CLAIM FILES THE GUARD DOES NOT ENFORCE, AND NOTHING SAID SO -- 17 OPEN lanes affected, now REPORTED | `state_ledger.md` |
