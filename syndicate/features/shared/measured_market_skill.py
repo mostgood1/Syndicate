@@ -573,6 +573,40 @@ def _norm(value: Any) -> str:
     return str(value or "").strip().lower()
 
 
+# THE BOARD AND THIS TABLE SPELL THE SAME MARKET TWO WAYS, and `_norm` -- which is
+# only `strip().lower()` -- never bridged them. The Layer 2 board names player props
+# in display case (`'Receiving Yards'`); every key here is snake_case
+# (`receiving_yards`). Measured 2026-10-03 on the fleet, production's own `skill_note`
+# against the board's own strings at segment `'full'`, phase pregame:
+#
+#     'Receiving Yards' -> None      'receiving_yards' -> MATCH 3116
+#     'Rushing Yards'   -> None      'passing_yards'   -> MATCH 834
+#     'Passing Yards'   -> None
+#
+# That is 1,910 of 2,622 NFL rows on `layer2_shortlist_2026_10_01__nfl.json` matching
+# nothing -- 850 prop rows stamped `unmeasured` while a measurement for them existed,
+# and six entries no board row could reach. It survived because SINGLE-WORD board names
+# (`Interceptions`, `Receptions`) normalise straight onto the key and DO match, so two
+# of the eight NFL prop markets looked like the table was working.
+#
+# This is a key-SHAPE problem, not an alias problem, so it is fixed here at the one
+# place that builds the key rather than per market. The soccer block above is the other
+# kind: `totals_alt` -> `totals` maps DIFFERENT markets onto one measurement, which is a
+# judgement call needing its own admission check. Spaces to underscores is not a
+# judgement -- it is the same market, spelled for a human.
+#
+# ORDER MATTERS AND IS ADDITIVE: the exact normalised form is tried FIRST, so no lookup
+# that resolved before can resolve differently now, and the fallback can only ever turn
+# a MISS into a hit. A sport whose board already uses snake_case never reaches it.
+def _market_key_candidates(market: Any) -> tuple[str, ...]:
+    """The market spellings to try, exact form first. Never raises."""
+    exact = _norm(market)
+    bridged = exact.replace(" ", "_")
+    if bridged == exact:
+        return (exact,)
+    return (exact, bridged)
+
+
 # ---- SCORING: how far a measured loss moves a row's Layer 2 score ------------------
 #
 # `[2026-09-14, user decisions: "Category now, buckets next", "Scale by measured loss",
@@ -644,9 +678,25 @@ def skill_note(
     module inventing one. No `status` key -- `projection_skill` adds it, so
     there is one place that decides what `measured` means.
     """
-    key = (_norm(sport), _norm(market), _norm(segment) or "full", _norm(phase))
-    entry = MEASURED_MARKET_SKILL.get(key)
+    sport_k = _norm(sport)
+    segment_k = _norm(segment) or "full"
+    phase_k = _norm(phase)
+    entry = None
+    for market_k in _market_key_candidates(market):
+        entry = MEASURED_MARKET_SKILL.get((sport_k, market_k, segment_k, phase_k))
+        if entry:
+            break
     if not entry:
+        return None
+    # A SUPERSEDED entry is NOT a measurement, so it must not become a note. Its own
+    # text says to treat the numbers as unmeasured, and returning them would let
+    # `skill_reliability` discount a row by a figure the finding that wrote it calls
+    # stale. This is not hypothetical: measured 2026-10-03, `Interceptions` is a single
+    # word, so it already resolved under the old exact lookup and was discounting ~47
+    # NFL board rows by a reading taken through an estimator production does not serve
+    # and before five model re-fits. `None` here is the same honest answer the docstring
+    # above describes -- the caller stamps `unmeasured`.
+    if entry.get("superseded"):
         return None
     return {
         "correlation": entry.get("correlation"),

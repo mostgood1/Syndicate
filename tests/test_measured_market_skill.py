@@ -123,3 +123,84 @@ def test_soccer_alias_keys_read_their_base_market_verdict(alias, base):
 
 def test_soccer_alias_never_labels_a_live_row():
     assert mms.skill_note(sport="soccer", market="totals_alt", phase=mms.PHASE_LIVE) is None
+
+# ---- key SHAPE: the board's display case vs the table's snake_case -----------------
+#
+# REACHABILITY BEFORE CORRECTNESS. These assert `off != on`: that the board's own
+# spelling resolves NOW and provably did not before. Measured 2026-10-03 on the fleet,
+# 1,910 of 2,622 NFL Layer 2 rows matched nothing because `_norm` only lowercases, and
+# six entries were unreachable while their tests passed -- the tests all used the
+# snake_case spelling no board row ever carries.
+
+
+@pytest.fixture
+def spaced_table(monkeypatch):
+    fake = {("nfl", "receiving_yards", "full", mms.PHASE_PREGAME): dict(ENTRY)}
+    monkeypatch.setattr(mms, "MEASURED_MARKET_SKILL", fake)
+    return fake
+
+
+def test_the_boards_display_cased_market_reaches_the_snake_case_entry(spaced_table):
+    note = mms.skill_note(sport="nfl", market="Receiving Yards", segment="full")
+    assert note is not None, "the board names this market 'Receiving Yards'"
+    assert note["sample_games"] == 220
+
+
+def test_that_lookup_would_have_missed_under_a_lowercase_only_norm(spaced_table):
+    """off != on: the old behaviour, reproduced, so the fix cannot be a no-op."""
+    assert "receiving yards" not in {k[1] for k in spaced_table}
+    assert mms.MEASURED_MARKET_SKILL.get(
+        ("nfl", "receiving yards", "full", mms.PHASE_PREGAME)
+    ) is None
+
+
+def test_the_bridge_is_additive_and_never_reorders_an_exact_hit(monkeypatch):
+    """An exact spelling wins over the bridged one, so no resolved lookup moves."""
+    fake = {
+        ("nfl", "passing tds", "full", mms.PHASE_PREGAME): dict(ENTRY, sample_games=1),
+        ("nfl", "passing_tds", "full", mms.PHASE_PREGAME): dict(ENTRY, sample_games=2),
+    }
+    monkeypatch.setattr(mms, "MEASURED_MARKET_SKILL", fake)
+    assert mms.skill_note(sport="nfl", market="Passing TDs")["sample_games"] == 1
+
+
+def test_a_snake_case_market_tries_exactly_one_spelling():
+    assert mms._market_key_candidates("receiving_yards") == ("receiving_yards",)
+    assert mms._market_key_candidates("Receiving Yards") == (
+        "receiving yards", "receiving_yards")
+    assert mms._market_key_candidates(None) == ("",)
+
+
+# ---- a SUPERSEDED entry is not a measurement --------------------------------------
+
+
+def test_a_superseded_entry_yields_no_note_at_all(monkeypatch):
+    """Returning its numbers would discount a row by a reading already called stale."""
+    fake = {("nfl", "interceptions", "full", mms.PHASE_PREGAME): dict(
+        ENTRY, superseded="2026-10-03: under-powered on re-measurement; treat as unmeasured")}
+    monkeypatch.setattr(mms, "MEASURED_MARKET_SKILL", fake)
+    assert mms.skill_note(sport="nfl", market="interceptions") is None
+    assert mms.skill_note(sport="nfl", market="Interceptions") is None
+
+
+def test_the_two_real_superseded_nfl_entries_reach_no_board_row():
+    """Against the REAL table: both must be unmeasured, by either spelling."""
+    for market, spelled in (("interceptions", "Interceptions"),
+                            ("passing_tds", "Passing TDs")):
+        entry = mms.MEASURED_MARKET_SKILL[("nfl", market, "full", mms.PHASE_PREGAME)]
+        assert entry.get("superseded"), f"{market} should still be annotated superseded"
+        assert mms.skill_note(sport="nfl", market=market) is None
+        assert mms.skill_note(sport="nfl", market=spelled) is None
+
+
+def test_the_six_refreshed_nfl_markets_reach_their_entries_by_board_spelling():
+    """Against the REAL table, using the strings the board actually emits."""
+    expected = {
+        "Receiving Yards": 3116, "Receptions": 1179, "Rushing Yards": 1463,
+        "Passing Yards": 834, "Rushing Attempts": 562, "Passing Attempts": 343,
+    }
+    for spelled, n in expected.items():
+        note = mms.skill_note(sport="nfl", market=spelled, segment="full")
+        assert note is not None, f"the board's {spelled!r} must reach its entry"
+        assert note["sample_games"] == n, spelled
+        assert note["verdict_class"] == mms.VERDICT_LOSES, spelled
