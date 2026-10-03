@@ -1059,6 +1059,53 @@ def _top_props_for_match(player_outputs: list[dict[str, Any]], match_id: str, *,
     ]
 
 
+def _empty_overwrite_refusal(league: str, iso_date: str, rec_path: Path) -> str | None:
+    """Why an EMPTY payload must not replace `rec_path`, or None when it may.
+
+    ESPN answering a date with nothing is not proof the date is empty (lane
+    `soccer-recs-empty-overwrite`, 2026-10-03). A failed request already raises
+    before any write (`espn_lineups._scoreboard_payloads`), so what reaches this
+    branch is a 200 with no in-window pre/in/post event, and that has three causes:
+
+      * a postponement -- the date really is empty, and overwriting is RIGHT;
+      * a unit asking the wrong day -- measured: mls 10-02/10-07 were written empty
+        while ESPN filed those kickoffs under the previous local day (`e26ba342`);
+      * a stale or off-window 200, which `fetch_events` filters to nothing.
+
+    Only the schedule tells the first from the other two. So a file that holds
+    matches is kept while the schedule still lists a played-or-upcoming fixture
+    on this Central slate date. An unreadable schedule also keeps it: unknown
+    must not take the destructive branch. Nothing to protect (no file, an
+    unreadable one, or one already empty) is not a refusal.
+    """
+    try:
+        existing = json.loads(rec_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    held = len(existing.get("matches") or []) if isinstance(existing, dict) else 0
+    if held <= 0:
+        return None
+    from syndicate.features.soccer.ingestion.espn_lineups import record_is_unplayed
+    from syndicate.features.soccer.sources import fixture_slate_date
+    from syndicate.features.soccer.sources import schedule_payload
+
+    try:
+        schedule = schedule_payload(league, default_season(league)) or {}
+        matches = schedule.get("matches") if isinstance(schedule, dict) else None
+    except Exception as exc:
+        return f"reason=schedule_unreadable error={type(exc).__name__} existing_matches={held}"
+    if not isinstance(matches, list) or not matches:
+        return f"reason=schedule_unreadable error=no_matches existing_matches={held}"
+    live = [
+        match
+        for match in matches
+        if isinstance(match, dict) and fixture_slate_date(match) == iso_date and not record_is_unplayed(match)
+    ]
+    if live:
+        return f"reason=schedule_lists_fixtures scheduled={len(live)} existing_matches={held}"
+    return None
+
+
 def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: Path, simulations: int) -> dict[str, Any]:
     if league not in LEAGUE_ESPN_SLUGS:
         raise SystemExit(f"unknown league {league!r}; choices: {sorted(LEAGUE_ESPN_SLUGS)}")
@@ -1068,6 +1115,14 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
     rec_path = api_root / "recommendations" / f"recommendations_{iso_date}.json"
 
     if not fixtures_raw:
+        refusal = _empty_overwrite_refusal(league, iso_date, rec_path)
+        if refusal is not None:
+            print(
+                f"[soccer_artifacts] SOCCER_RECS_EMPTY_OVERWRITE_REFUSED league={league} date={iso_date} "
+                f"{refusal} path={rec_path}",
+                flush=True,
+            )
+            return json.loads(rec_path.read_text(encoding="utf-8"))
         # `anchor` is present on EVERY payload, including this one. A reader that
         # has to distinguish "key absent" from "state absent" has been handed the
         # same ambiguity the field exists to remove.
