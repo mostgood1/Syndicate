@@ -5448,3 +5448,8 @@ own prior verdicts, not by anything failing.
   - Hold a change that must not ship unmeasured off main; moving the files aside and landing only the ledger works.
   - When a ride-along owner needs notice, the notice must say "live as of <reflog time>", not "I will ff at X".
 - *(evidence: `.syndicate/deploys.md` 2026-10-03 20:11:45Z and 20:54:04Z entries)*
+
+
+## 2026-10-03 -- Belief overturned: files written into a sparse worktree's excluded `data/` survive git operations `[session 43e4d5fe, lane soccer-1x2-ratings-xg-source]`
+- Measured twice: `data/soccer_source/*/history/*.csv` materialised byte-exact into a `session_worktree.py` worktree (data/ excluded by sparse checkout) were DELETED by a later `git rebase origin/main` -- and a backtest reading them per league died with "no committed history" for every league after the first. Two runs (the 2025-26 totals run and the H37 arm A) were lost before the cause was seen.
+- How to apply: never run a long job off files you placed in a sparse worktree; run it from a static snapshot outside git (`git archive HEAD syndicate scripts` + the data files written byte-exact) so no checkout, rebase or land can touch its inputs. And a long job's output must be written incrementally (`--append-dump`), or a guard stop discards hours.
