@@ -1383,6 +1383,15 @@ death, never life — do not invert it.
 - Verification: Replay harness reproduces the STORED 10-03 sims' starter outs_mean (current code) within MC noise; then baseline vs candidate on a time-split holdout of the stored roster_objs dates (06-15..07-12), reported with n starts and CIs
 - Blocked by: none
 
+### ncaaf-player-stats-season-backfill — CLOSED — opened 2026-10-03 — closed 2026-10-03 — session 7e94d2ff-ea54-4a59-9c79-2ddb1bea2bad
+- **GOAL VERDICT 2026-10-03:** Goal (verbatim): "The NCAAF player-stats refresh fetches every earlier week of the season that has ZERO rows in the snapshot, in addition to its trailing lookback window, so a fresh fleet's first run (or any later loss of a week) backfills the season; explicit --weeks unchanged; tests fail on origin/main and pass on the fix" -- **GOAL: MET.** Reading: `missing_weeks` + `_resolve_weeks` union the trailing window with every earlier week of the season absent from the snapshot; 6 new tests (window+missing -> (1,2,4,5); fresh disk -> (1..5); other-season rows ignored; --weeks and --no-backfill unchanged; complete season adds nothing) pass, and the test file fails on origin/main (ImportError; old window for target 5 = (4,5)); 59 pass across the 3 player-stats test files. Read-only against the live fleet snapshot: missing () for targets 5 and 6, so today it adds zero CFBD calls. NOT ON THE FLEET YET: rides the next fleet fast-forward (no restart owed -- the job runs as a fresh subprocess each day).
+- Goal: The NCAAF player-stats refresh fetches every earlier week of the season that has ZERO rows in the snapshot, in addition to its trailing lookback window, so a fresh fleet's first run (or any later loss of a week) backfills the season; explicit --weeks unchanged; tests fail on origin/main and pass on the fix
+- Files: syndicate/features/ncaaf/player_stats_refresh.py, scripts/refresh_ncaaf_player_game_stats.py, tests/test_ncaaf_player_stats_backfill.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit: snapshot holding 2026 wk3-4 + target 5 -> weeks (1,2,4,5); empty snapshot -> 1..5; other-season rows do not count; --weeks and --no-backfill unchanged; the new test fails on origin/main. Fleet: rides the next fleet fast-forward; its next run logs the backfill weeks (none needed today -- wk1-2 restored 2026-10-03)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

@@ -217,6 +217,30 @@ def weeks_to_refresh(target_week: int | None, *, lookback_weeks: int = DEFAULT_L
     return tuple(range(start, end + 1))
 
 
+def missing_weeks(path: Path, *, season: int, target_week: int | None) -> tuple[int, ...]:
+    """Weeks `1 .. target_week - 1` of `season` with ZERO rows in the snapshot.
+
+    THE LOOKBACK WINDOW ALONE NEVER LOOKS BACK FAR ENOUGH ON A FRESH DISK. The
+    local fleet started 2026-09-30 with no 2026 rows; its first run fetched the
+    target week plus `DEFAULT_LOOKBACK_WEEKS`, so weeks 1-2 were never requested
+    and every prop projection after that was built on 2 of 4 weeks (measured
+    2026-10-03: receiving yards MAE +3.02, rushing +1.80 against weeks 1-3).
+    Unioning these weeks into the run makes the first run backfill the season
+    and puts back any week that later goes missing, for one CFBD call per
+    missing week, once. A week CFBD has no completed games for stays empty and
+    is re-asked each run -- `refresh_week` keeps that a no-op.
+    """
+    if target_week is None:
+        return ()
+    try:
+        end = int(target_week)
+    except (TypeError, ValueError):
+        return ()
+    have = {week for (row_season, week), count in _row_counts_by_season_week(path).items()
+            if row_season == str(int(season)) and count > 0}
+    return tuple(week for week in range(1, end) if str(week) not in have)
+
+
 def _row_counts_by_season_week(path: Path) -> Counter[tuple[str, str]]:
     counts: Counter[tuple[str, str]] = Counter()
     if not path.exists():

@@ -38,6 +38,7 @@ from syndicate.features.ncaaf.player_stats_refresh import (  # noqa: E402
     DEFAULT_LOOKBACK_WEEKS,
     NcaafPlayerStatsHistoryLoss,
     player_stats_autorun_enabled,
+    missing_weeks,
     player_stats_refresh_interval_seconds,
     refresh_player_game_stats,
     weeks_to_refresh,
@@ -71,7 +72,10 @@ def _resolve_season(explicit: int | None) -> int:
     return int(default_season())
 
 
-def _resolve_weeks(args: argparse.Namespace, season: int) -> tuple[int, ...]:
+def _resolve_weeks(args: argparse.Namespace, season: int, output_path: Path | None = None) -> tuple[int, ...]:
+    """The trailing window, plus every earlier week of the season with no rows
+    on THIS disk (`missing_weeks`) -- so a fresh disk's first run backfills the
+    season -- unless the operator named the weeks or passed `--no-backfill`."""
     if args.weeks:
         return _parse_weeks(args.weeks)
     target_week = args.target_week
@@ -79,7 +83,11 @@ def _resolve_weeks(args: argparse.Namespace, season: int) -> tuple[int, ...]:
         from syndicate.features.ncaaf.sources import ncaaf_target_week
 
         target_week = ncaaf_target_week(season)
-    return weeks_to_refresh(target_week, lookback_weeks=args.lookback_weeks)
+    window = weeks_to_refresh(target_week, lookback_weeks=args.lookback_weeks)
+    if args.no_backfill or output_path is None or not window:
+        return window
+    backfill = missing_weeks(output_path, season=season, target_week=target_week)
+    return tuple(sorted(set(window) | set(backfill)))
 
 
 def _emit(payload: dict[str, object], *, as_json: bool) -> None:
@@ -110,6 +118,11 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=DEFAULT_LOOKBACK_WEEKS,
         help=f"How many weeks back from the target week to re-fetch (default {DEFAULT_LOOKBACK_WEEKS}).",
+    )
+    parser.add_argument(
+        "--no-backfill",
+        action="store_true",
+        help="Fetch only the trailing window, not earlier weeks of the season missing from the snapshot.",
     )
     parser.add_argument(
         "--force",
@@ -146,7 +159,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     try:
-        weeks = _resolve_weeks(args, season)
+        weeks = _resolve_weeks(args, season, output_path)
+        # Said in the run report, so a backfill is visible in the log line.
+        weeks_absent_before_run = (
+            [w for w in weeks if w in set(missing_weeks(output_path, season=season, target_week=max(weeks) + 1))]
+            if weeks else []
+        )
     except Exception as exc:  # noqa: BLE001
         _emit({"status": "error", "reason": "weeks_unresolved", "error": f"{type(exc).__name__}: {exc}"}, as_json=args.json)
         return 2
@@ -191,6 +209,7 @@ def main(argv: list[str] | None = None) -> int:
     payload = report.as_dict()
     payload["status"] = "ok" if report.ok else "validation_issues"
     payload["requested_weeks"] = list(weeks)
+    payload["weeks_absent_before_run"] = weeks_absent_before_run
 
     # PUBLISH TO WEB, or none of this reaches a reader.
     #
