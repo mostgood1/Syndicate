@@ -111,7 +111,8 @@ def test_capture_is_on_when_configured_and_off_differs_from_on():
         events=[_event("e1", 60), _event("e2", -30)],
         session=session,
         now=NOW,
-        env={"SYNDICATE_NCAAF_SEGMENT_MARKETS": "h1"},
+        # Not a cadence test: the live tier's 600 s default (2026-10-03) is off here.
+        env={"SYNDICATE_NCAAF_SEGMENT_MARKETS": "h1", "SYNDICATE_NCAAF_SEGMENT_LIVE_INTERVAL_SECONDS": "0"},
     )
     assert stats["enabled"] is True
     assert len(session.calls) == 2, "capture is ON but no per-event call went out"

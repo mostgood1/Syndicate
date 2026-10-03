@@ -210,12 +210,14 @@ def events_in_window(
     now: datetime | None = None,
     env: Mapping[str, str] | None = None,
     include_pregame: bool = True,
+    include_live: bool = True,
 ) -> tuple[list[Mapping[str, Any]], dict[str, Any]]:
     """The events worth a per-event segment call right now, plus the counters.
 
     `include_pregame=False` drops the pregame tier and counts it as
     `pregame_deferred` (the tier's own cadence is not due -- see
-    `pregame_interval_seconds`); live events are never deferred.
+    `pregame_interval_seconds`); `include_live=False` does the same for the
+    live tier (`live_deferred`, `live_interval_seconds`).
 
     An event is in scope when it sits inside EITHER tier:
 
@@ -244,6 +246,7 @@ def events_in_window(
         "no_commence_time": 0,
         "capped": 0,
         "pregame_deferred": 0,
+        "live_deferred": 0,
         "pregame_window_seconds": pregame_window,
         "live_window_seconds": live_window,
         "max_events": max_events,
@@ -264,6 +267,9 @@ def events_in_window(
         stats[tier] += 1
         if tier == "pregame" and not include_pregame:
             stats["pregame_deferred"] += 1
+            continue
+        if tier == "live" and not include_live:
+            stats["live_deferred"] += 1
             continue
         # Sorted by |until| so that if the cap trips, the events kept are the
         # ones closest to kickoff -- the ones whose prices are moving.
@@ -289,6 +295,36 @@ def pregame_interval_seconds(sport: str, *, env: Mapping[str, str] | None = None
     is what lets the in-play tier run every ~150 s at about today's spend.
     """
     return _env_int(f"{env_prefix(sport)}_PREGAME_INTERVAL_SECONDS", 0, env)
+
+
+#: Per-sport default for `live_interval_seconds`. NCAAF only, by user decision
+#: 2026-10-03 (lane `ncaaf-props-credit-cut`): "set live segments to 10 minutes".
+#: A CODE default, not env, so it ships with a fast-forward rather than a fleet
+#: restart; `SYNDICATE_<SPORT>_SEGMENT_LIVE_INTERVAL_SECONDS` still overrides it.
+DEFAULT_LIVE_INTERVAL_SECONDS: dict[str, int] = {"ncaaf": 600}
+
+
+def live_interval_seconds(sport: str, *, env: Mapping[str, str] | None = None) -> int:
+    """How often the LIVE tier is fetched, in seconds. 0 = every run.
+
+    MEASURED 2026-10-03 on the fleet: with `SYNDICATE_NCAAF_SEGMENT_MARKETS=all`
+    (36 markets), a 3h45 live window and the NCAAF lines autorun every 150 s, the
+    live tier re-bought every quarter/half line of every game in progress every
+    2.5 minutes -- the `segment` family was 670 of NCAAF's 865 credits in a
+    10-minute window (~4,000/h). Full-game lines are NOT behind this gate: they
+    come from the bulk call and keep the autorun's cadence; only segment lines
+    are refreshed on this slower clock, so in-play quarter/half prices are up to
+    this old.
+    """
+    default = DEFAULT_LIVE_INTERVAL_SECONDS.get(str(sport or "").strip().lower(), 0)
+    return _env_int(f"{env_prefix(sport)}_LIVE_INTERVAL_SECONDS", default, env)
+
+
+def live_state_path(sport: str) -> Any:
+    """When this sport's live tier was last fetched (same reason as the pregame file)."""
+    from syndicate.features.shared.refresh_state_store import data_root
+
+    return data_root() / f"{str(sport or '').strip().lower()}_source" / "tracking" / "segment_live_fetch.json"
 
 
 def pregame_state_path(sport: str) -> Any:
@@ -345,6 +381,7 @@ def fetch_event_segments(
     timeout: int = 20,
     log_prefix: str | None = None,
     pregame_state: Any = None,
+    live_state: Any = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Per-event segment odds for the in-window events. Never raises.
 
@@ -383,10 +420,27 @@ def fetch_event_segments(
         state_path = pregame_state if pregame_state is not None else pregame_state_path(sport)
         last_pregame = _read_pregame_epoch(state_path)
         include_pregame = last_pregame <= 0.0 or (moment.timestamp() - last_pregame) >= pregame_every
-    scoped, window_stats = events_in_window(events, sport=sport, now=moment, env=env, include_pregame=include_pregame)
+    live_every = live_interval_seconds(sport, env=env)
+    live_path = None
+    include_live = True
+    if live_every > 0:
+        if live_state is not None:
+            live_path = live_state
+        elif pregame_state is not None:
+            # A caller that relocated the pregame stamp relocates this one with it.
+            live_path = os.path.join(os.path.dirname(str(pregame_state)), "segment_live_fetch.json")
+        else:
+            live_path = live_state_path(sport)
+        last_live = _read_pregame_epoch(live_path)
+        include_live = last_live <= 0.0 or (moment.timestamp() - last_live) >= live_every
+    scoped, window_stats = events_in_window(
+        events, sport=sport, now=moment, env=env, include_pregame=include_pregame, include_live=include_live
+    )
     stats.update(window_stats)
     stats["pregame_interval_seconds"] = pregame_every
     stats["pregame_included"] = include_pregame
+    stats["live_interval_seconds"] = live_every
+    stats["live_included"] = include_live
     regions = segment_regions(sport, env=env)
     markets_csv = ",".join(sorted(market_map.keys()))
     stats["requested_events"] = len(scoped)
@@ -399,7 +453,8 @@ def fetch_event_segments(
         f"pregame={window_stats['pregame']} live={window_stats['live']} "
         f"out_of_window={window_stats['out_of_window']} no_commence={window_stats['no_commence_time']} "
         f"capped={window_stats['capped']} pregame_every_s={pregame_every} "
-        f"pregame_deferred={window_stats['pregame_deferred']} events={len(scoped)} "
+        f"pregame_deferred={window_stats['pregame_deferred']} live_every_s={live_every} "
+        f"live_deferred={window_stats['live_deferred']} events={len(scoped)} "
         f"est_credits={stats['estimated_credits']}",
         flush=True,
     )
@@ -448,6 +503,10 @@ def fetch_event_segments(
 
     if state_path is not None and include_pregame and stats["ok_events"] > 0:
         _write_pregame_epoch(state_path, moment.timestamp())
+    # Stamped only when a live-tier event was actually fetched, so a run whose
+    # live tier was empty never pushes the next live fetch 10 minutes out.
+    if live_path is not None and include_live and window_stats.get("live", 0) > 0 and stats["ok_events"] > 0:
+        _write_pregame_epoch(live_path, moment.timestamp())
     print(
         f"{prefix} SEGMENT_FETCH ok={stats['ok_events']} failed={stats['failed_events']} "
         f"of={len(scoped)} est_credits={stats['estimated_credits']}"

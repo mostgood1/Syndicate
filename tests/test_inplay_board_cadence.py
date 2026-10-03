@@ -304,9 +304,11 @@ def _segments(session, now, env, state):
 NOW_SEG = datetime(2026, 9, 19, 18, 0, tzinfo=timezone.utc)
 
 
-def test_default_fetches_both_tiers_every_run(tmp_path):
+def test_with_both_intervals_zero_both_tiers_fetch_every_run(tmp_path):
+    # NCAAF's LIVE tier now defaults to 600 s (user decision 2026-10-03, lane
+    # `ncaaf-props-credit-cut`); 0 restores every-run, which is what this pins.
     session = _SegSession()
-    env = {"SYNDICATE_NCAAF_SEGMENT_MARKETS": "all"}
+    env = {"SYNDICATE_NCAAF_SEGMENT_MARKETS": "all", "SYNDICATE_NCAAF_SEGMENT_LIVE_INTERVAL_SECONDS": "0"}
     for minutes in (0, 3):
         _, stats = _segments(session, NOW_SEG + timedelta(minutes=minutes), env, tmp_path / "s.json")
         assert stats["pregame_included"] is True and stats["pregame_deferred"] == 0
@@ -314,9 +316,13 @@ def test_default_fetches_both_tiers_every_run(tmp_path):
     assert not (tmp_path / "s.json").exists()
 
 
-def test_pregame_tier_waits_for_its_interval_and_live_never_does(tmp_path):
+def test_pregame_tier_waits_for_its_interval_and_live_every_run_when_its_interval_is_zero(tmp_path):
     session = _SegSession()
-    env = {"SYNDICATE_NCAAF_SEGMENT_MARKETS": "all", "SYNDICATE_NCAAF_SEGMENT_PREGAME_INTERVAL_SECONDS": "1800"}
+    env = {
+        "SYNDICATE_NCAAF_SEGMENT_MARKETS": "all",
+        "SYNDICATE_NCAAF_SEGMENT_PREGAME_INTERVAL_SECONDS": "1800",
+        "SYNDICATE_NCAAF_SEGMENT_LIVE_INTERVAL_SECONDS": "0",
+    }
     state = tmp_path / "s.json"
     _, first = _segments(session, NOW_SEG, env, state)
     assert sorted(session.event_ids) == ["live", "pre"] and first["pregame_included"] is True
@@ -327,6 +333,32 @@ def test_pregame_tier_waits_for_its_interval_and_live_never_does(tmp_path):
     session.event_ids.clear()
     _segments(session, NOW_SEG + timedelta(minutes=31), env, state)
     assert sorted(session.event_ids) == ["live", "pre"]
+
+
+def test_reachability_ncaaf_live_tier_waits_10_minutes_by_default(tmp_path):
+    """User decision 2026-10-03: "set live segments to 10 minutes". Measured that
+    day: the live tier re-bought all 36 segment markets of every game in progress
+    every 150 s -- 670 of NCAAF's 865 credits in a 10-minute window."""
+    session = _SegSession()
+    env = {"SYNDICATE_NCAAF_SEGMENT_MARKETS": "all"}  # no interval keys: the code defaults
+    state = tmp_path / "s.json"
+    _, first = _segments(session, NOW_SEG, env, state)
+    assert "live" in session.event_ids and first["live_included"] is True and first["live_interval_seconds"] == 600
+    assert (tmp_path / "segment_live_fetch.json").exists(), "the live stamp sits beside the pregame stamp"
+    session.event_ids.clear()
+    _, second = _segments(session, NOW_SEG + timedelta(minutes=3), env, state)
+    assert "live" not in session.event_ids and second["live_deferred"] == 1
+    session.event_ids.clear()
+    _segments(session, NOW_SEG + timedelta(minutes=11), env, state)
+    assert "live" in session.event_ids
+
+
+def test_other_sports_keep_live_every_run():
+    from syndicate.features.shared import segment_odds_fetch as sof
+
+    assert sof.live_interval_seconds("nfl", env={}) == 0
+    assert sof.live_interval_seconds("ncaaf", env={}) == 600
+    assert sof.live_interval_seconds("ncaaf", env={"SYNDICATE_NCAAF_SEGMENT_LIVE_INTERVAL_SECONDS": "0"}) == 0
 
 
 def test_a_run_where_every_call_failed_does_not_stamp_the_pregame_tier(tmp_path):
