@@ -45779,3 +45779,10 @@ blank. `passing_tds` applies a real discount for the first time.
 **Nothing is owed on this lane.** web (`f351eac5`) and live-odds-worker (`80f380f8`) remain without
 `9434b5cc` and do not need it: every served NFL date is `source: layer2_shortlist_artifact` except
 10-05, whose body is the degraded empty state, so no path has web stamping a `model_skill` note.
+
+
+## 2026-10-03 21:00Z (4:00 PM CT) -- MEASUREMENT: NCAAF live-segment interval 10 min (8730cfb7) -- NCAAF credits 12,664/h -> 2,761/h (-78%); props per-event refresh (3f07629e) -- lane `ncaaf-props-credit-cut` (CLOSED)
+- deploy: no deploy of my own. 8730cfb7 reached the fleet in a fast-forward to ad85d3e2 at 20:11:22Z by fleet reflog (peer session nhl-game-lines-model reports 20:11:45Z; NOT that session's ff, and no deploys.md entry names it), then the user's ff to f351eac5 at 20:16:46Z, later 9434b5cc. No restart (per-run subprocesses). 3f07629e was live from abdbee74 at 17:50:06Z.
+- verify (fleet quota, ~/ncaafrate.csv, 5-min samples tagged with fleet HEAD): before 19:31:31-20:11:35Z 8,457 credits / 689 calls in 40.1 min = 12,664/h; after 20:16:35-20:56:38Z 1,843 credits / 193 calls in 40.0 min = 2,761/h. Both windows inside the live Saturday afternoon slate; live-game count per window not separately measured (subprocess logs not kept) -- the call drop matches the live segment tier going 150 s -> 600 s.
+- attribution that drove it (10-min quota diff ~18:3xZ): `segment` family 670 of NCAAF's 865 credits (SYNDICATE_NCAAF_SEGMENT_MARKETS=all = 36 markets, live window 3h45, every 150 s lines autorun). The props per-event refresh worked as built (51 -> 14 events/run, raw sidecar 18:20:21Z) but moved the total ~0 (5.3k/h -> 6.0k/h): hypothesis FALSIFIED, change kept.
+- freshness after (served board 20:57Z): NCAAF 1,224 rows, 0 > 1h, p90 12.5 min, oldest 56.9; segment rows still served (q1 74, q2 41, q3 35, q4 45, h1 89, h2 27), 169 live rows.
