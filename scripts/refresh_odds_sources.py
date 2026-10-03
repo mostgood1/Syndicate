@@ -949,28 +949,81 @@ def _nhl_days_ahead() -> int:
         return 1
 
 
+def _nhl_live_full_generation_seconds() -> float:
+    """`SYNDICATE_NHL_LIVE_FULL_GENERATION_SECONDS`, default 1800 (the NHL pregame
+    sweep cadence); 0 restores a full generation on every live sweep."""
+    raw = str(os.environ.get("SYNDICATE_NHL_LIVE_FULL_GENERATION_SECONDS") or "").strip()
+    try:
+        value = float(raw) if raw else 1800.0
+    except ValueError:
+        value = 1800.0
+    return max(0.0, value)
+
+
+def _nhl_live_generation_due(artifact_root: Path, date: str) -> bool:
+    """True when a LIVE sweep should still run NHL's full owned generation.
+
+    Due when the date's predictions are at least `_nhl_live_full_generation_seconds`
+    old, or their age is unknown (missing, unreadable): an unknown age must never
+    skip generation, or a slate could go a whole live window without predictions.
+    """
+    ceiling = _nhl_live_full_generation_seconds()
+    if ceiling <= 0:
+        return True
+    path = artifact_root / "data" / "processed" / f"predictions_{date}.csv"
+    try:
+        age = time.time() - path.stat().st_mtime
+    except Exception:
+        return True
+    return age >= ceiling
+
+
 def _build_nhl_steps(args: argparse.Namespace) -> list[RefreshStep]:
+    """NHL's refresh step -- FAST in a live sweep unless its generation is due.
+
+    LANE `nhl-live-sweep-fast` (2026-10-03). `refresh_nhl_oddsapi.py` defaults to
+    `--mode full`: odds collection PLUS the owned generation for the date and the
+    look-ahead day (lineups, predictions, recommendations, a 1,000-sim props run).
+    Nothing passed `--mode`, so EVERY live sweep paid for it. Measured on the fleet
+    10-02/03: across the 8 slowest full live sweeps (823-1,506 s), this one step was
+    6,291 of ~7,000 step-seconds (663-1,168 s each) while every other step took
+    seconds -- and the sweep holds the single refresh lane, so 129 of 304 launches
+    overnight were refused `lane_busy`.
+
+    In a LIVE sweep the step now passes `--mode fast` (odds only; the existing
+    predictions are left in place) unless the date's predictions are older than the
+    pregame cadence, so a staggered slate's later games still get lineup/goalie-driven
+    regeneration at most every ~30 min while an early game is live. Pregame and
+    combined ("all") sweeps are unchanged.
+    """
     python_exe = _venv_python(REPO_ROOT)
     artifact_root = _local_source_artifact_root("nhl")
+    command = [
+        python_exe,
+        "scripts/refresh_nhl_oddsapi.py",
+        "--date",
+        args.date,
+        "--days-ahead",
+        str(_nhl_days_ahead()),
+        "--artifact-root",
+        str(artifact_root),
+    ]
+    live_fast = str(getattr(args, "phase", "") or "").strip().lower() == "live" and not _nhl_live_generation_due(
+        artifact_root, str(args.date)
+    )
+    if live_fast:
+        command += ["--mode", "fast"]
     return [
         RefreshStep(
             name="nhl_oddsapi_refresh",
             phases=("pregame", "live"),
             cwd=REPO_ROOT,
-            command=(
-                python_exe,
-                "scripts/refresh_nhl_oddsapi.py",
-                "--date",
-                args.date,
-                "--days-ahead",
-                str(_nhl_days_ahead()),
-                "--artifact-root",
-                str(artifact_root),
-            ),
+            command=tuple(command),
             description=(
                 "Refresh NHL team odds and player props lines into a Syndicate-owned artifact "
                 "bundle, and build predictions for the slate date PLUS the next day so the cards "
                 "board is not empty the evening before a slate."
+                + (" LIVE FAST: odds only; generation not due." if live_fast else "")
             ),
         ),
     ]

@@ -1423,6 +1423,12 @@ death, never life — do not invert it.
 - Hypothesis: The prop probability is noise at the line (slope ~0, lane nfl-prop-predictive-spread) because the season-to-date per-game average misses role changes the line already prices; the market-anchored mean closed 86-97% of the gap. An as-of usage-share mean (recent share x team volume) recovers part of that information
 - Falsification test: If no usage-input mean, fitted on 2023-24, lifts the 2025 calibration slope at the line above 0 with a CI excluding 0 for receptions or receiving_yards, the binding information is not in pbp-derivable usage (it is news/injury timing the line sees and pbp does not), and the lane says so
 - Verification: scripts/fit_nfl_prop_mean_inputs.py reports per market and arm, on 2025 and 2026: calibration slope with a game-clustered CI, Brier vs production and vs the de-vigged book with paired CIs, MAE vs the book line; the selfcheck against nfl_props_rows_for_week passes for the production arm; a reachability test (off != on) for any flag; as-of inputs only (every input dated before the game)
+### nhl-live-sweep-fast — OPEN — opened 2026-10-03 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: A live-phase odds sweep that includes NHL no longer holds the refresh lane for 10-25 min: refresh_odds_sources runs refresh_nhl_oddsapi.py --mode fast in live phase unless the date's NHL predictions are older than the pregame cadence (default 1800s), so full generation still runs at most every ~30 min during a live slate
+- Files: scripts/refresh_odds_sources.py (_build_nhl_steps only), tests/test_nhl_live_sweep_mode.py (new)
+- Hypothesis: nhl_oddsapi_refresh ran full owned generation (two dates: lineups, predictions, recommendations, 1000-sim props) on EVERY live sweep because the step never passes --mode; measured 6,291 of ~7,000 step-seconds across the 8 slowest full live sweeps 10-02/03
+- Falsification test: If live sweeps with the NHL step in fast mode still take >5 min, the generation was not the cost
+- Verification: Fleet: live-phase sweeps including nhl finish in minutes (NHL step <2 min when fast), a full NHL generation still lands at most every ~30 min while NHL is live, lane_busy refusals in the live window drop vs 129/304 overnight
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
