@@ -5399,3 +5399,8 @@ own prior verdicts, not by anything failing.
     flattening grades the noise, not the mechanism.
 - **Cost:** one recommendation (#1 of `findings_2026-10-02_nfl_lines_props_backtest.md` §7) withdrawn, and one
   lane's premise falsified; nothing deployed.
+
+## 2026-10-03 — A log watcher on the fleet can be triggered by ITS OWN grep: `ALL_PROCESS_MEMORY` lines print every process's command line, including the watcher's regex `[lane soccer-recs-empty-overwrite, session 6214bc11]`
+
+- **What happened:** my post-ff watcher grepped `refresh-worker.log`/`live-odds-worker.log` for soccer build lines, and its "refusals" grep searched for `SOCCER_RECS_EMPTY_OVERWRITE_REFUSED`. Both outputs came back full of `ALL_PROCESS_MEMORY` lines. Those lines list the command line of every live process, my own `grep` included, so the token appeared in the log because I was searching for it. I nearly read "watcher fired + census unchanged" as verification. A clean re-read showed no soccer build had run at all.
+- **How to apply:** anchor a fleet log match to the EMITTER, `^<ts>Z \[<role>\] TOKEN`, and exclude `ALL_PROCESS_MEMORY`. Before trusting a watcher's trigger, confirm the artifact changed (`find -newermt <deploy time>`). Same family as "Log watchers: match timestamped lines" and "Gate verify on artifact mtime".
