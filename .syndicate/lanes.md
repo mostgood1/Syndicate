@@ -1238,6 +1238,13 @@ death, never life — do not invert it.
   - Daily Faceoff confirmed starters: 1,624/1,625 correct when pregame-provable and as-of-verifiable; production 55.4%.
   - Fleet totals line != modal pregame book line on 24/31 games.
   - FRAMING: user decision 2026-10-02 -- every line is its own decision; this is an accuracy plan, not a market exclusion. No deploy.
+- **H6 (written BEFORE the run, 2026-10-03 ~02:40Z):** goalie quality as GSAx carries the signal save% did not. GSAx is goals saved above xG: production xG estimator, fit on pre-2026-01-01 shots and frozen; as-of per goalie; k tuned pre-January. FALSIFIED if V7 (confirmed starter + GSAx) leaves the OOS ML Brier vs B4 with a CI including 0 AND no better than V5c. Smoke: 1,312/1,312 games paired, 111,896 shots, OOS xG 0.0701 vs goal rate 0.0711.
+- **H6 RESULT 2026-10-03 ~03:30Z: FALSIFIED for ML, directional for totals.**
+  - GSAx k tuned to the grid edge (80 xG).
+  - ML OOS, V7 vs B4: -0.0000 [-0.0040, +0.0040]; no better than V5c (save%). Full window vs book +0.0017 vs +0.0008 without the goalie: noise.
+  - Totals OOS: OVER 6.5 V7 vs B0 -0.0060 [-0.0110, -0.0012] MODEL BETTER (V5c was no difference).
+  - OVER@close vs book: V4 +0.0028 -> V7 +0.0014 -> V7o (oracle) +0.0007 -- every CI includes 0.
+  - Next for ML: a prior-season GSAx prior, recency-weighted xG, score-adjusted xG.
 - Blocked by: production wiring needs (a) user decision, (b) lane nhl-player-props-projection for ingestion/collect.py (confirmed-starter feed); vs-book needs an active ODDS_API_KEY
 
 ### soccer-skill-registry-line-weighting — OPEN — opened 2026-10-02 — session 43e4d5fe-e05e-41bc-aae6-6d6986460b22

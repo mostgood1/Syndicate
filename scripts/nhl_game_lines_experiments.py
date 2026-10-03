@@ -237,6 +237,97 @@ class GoalieHistory:
         return by_key, by_pid, (1 - G / S) if S else 0.900
 
 
+class GsaxHistory:
+    """Goals saved above expected per goalie, AS-OF, from play-by-play shots scored by the PRODUCTION
+    xG estimator (`shot_xg_model.featurize` + `LogisticRegression(max_iter=2000)`, as in
+    `scripts/build_nhl_xg_artifact.py`) fit ONLY on shots from games before EVAL_START and frozen.
+    Unblocked (Fenwick) shots with a goalie in net; empty-net shots excluded."""
+
+    def __init__(self, act: Dict[str, Dict], src: Path):
+        from syndicate.features.nhl.sim_engine.hockeysim.historical_truth import shot_xg_model as X
+        rows, feats, goals, fit_mask = [], [], [], []
+        stats = Counter()
+        for gid, r in act.items():
+            if r["season"] != BGL.SEASON_PREV or r["gtype"] != 2:
+                continue
+            pbp = BGL._rj(src / "data" / "ingestion_cache" / f"playbyplay_{gid}.json")
+            if not pbp:
+                stats["no_pbp"] += 1
+                continue
+            shots = X.parse_play_by_play_shots(pbp)
+            gids = self._goalies_in_order(pbp, X)
+            if len(gids) != len(shots):
+                stats["goalie_order_mismatch"] += 1
+                continue
+            home_id = int((pbp.get("homeTeam") or {}).get("id"))
+            for s, gk in zip(shots, gids):
+                if s.is_empty_net or gk is None:
+                    continue
+                defending = r["away"] if s.team_id == home_id else r["home"]
+                rows.append((r["date"], defending, int(gk), int(s.is_goal)))
+                feats.append(s)
+                fit_mask.append(r["date"] < EVAL_START)
+            stats["games"] += 1
+        from sklearn.linear_model import LogisticRegression
+        Xall = X.featurize(feats)
+        Xfit = [x for x, m in zip(Xall, fit_mask) if m]
+        yfit = [rw[3] for rw, m in zip(rows, fit_mask) if m]
+        model = LogisticRegression(max_iter=2000).fit(Xfit, yfit)
+        xg = model.predict_proba(Xall)[:, 1]
+        self.rows = sorted((d, ab, gk, float(x), g) for (d, ab, gk, g), x in zip(rows, xg))
+        self.dates = [rw[0] for rw in self.rows]
+        stats["shots"] = len(self.rows)
+        stats["fit_shots_pre_eval"] = len(Xfit)
+        self.stats = dict(stats)
+        self._cache: Dict[Tuple[str, str], Any] = {}
+
+    @staticmethod
+    def _goalies_in_order(pbp, X) -> List[Optional[int]]:
+        """goalieInNetId for exactly the plays `parse_play_by_play_shots` keeps, in the same order
+        (same filters, re-applied); the caller asserts the counts match per game."""
+        home_id = (pbp.get("homeTeam") or {}).get("id")
+        out = []
+        for pl in pbp.get("plays") or []:
+            if pl.get("typeDescKey") not in X._FENWICK_TYPES:
+                continue
+            d = pl.get("details") or {}
+            if d.get("eventOwnerTeamId") is None or d.get("xCoord") is None or d.get("yCoord") is None:
+                continue
+            try:
+                float(d["xCoord"]); float(d["yCoord"]); tid = int(d["eventOwnerTeamId"])
+            except (TypeError, ValueError):
+                continue
+            if X._situation_state(pl.get("situationCode"), shooter_is_home=(tid == home_id)) is None:
+                continue
+            out.append(d.get("goalieInNetId"))
+        return out
+
+    def asof(self, date: str, arm: str):
+        key = (date, "cur" if arm.startswith("current") else "prev")
+        if key in self._cache:
+            return self._cache[key]
+        i = bisect.bisect_left(self.dates, date) if not arm.startswith("current") else len(self.rows)
+        by_pid = defaultdict(lambda: [0.0, 0.0])  # [xG faced, goals allowed]
+        XG = G = 0.0
+        for (_d, _ab, gk, x, g) in self.rows[:i]:
+            by_pid[gk][0] += x; by_pid[gk][1] += g
+            XG += x; G += g
+        res = (by_pid, (G / XG) if XG else 1.0)
+        self._cache[key] = res
+        return res
+
+
+def gsax_factor(pid: Optional[int], hist: "GsaxHistory", date: str, arm: str, k: float) -> Optional[float]:
+    """Shrunk goals-allowed / xG-faced ratio of the goalie, relative to the as-of league ratio.
+    k is in xG units (a goalie with k xG faced is halfway to his own ratio). >1 = worse goalie."""
+    by_pid, lr = hist.asof(date, arm)
+    if pid is None or pid not in by_pid:
+        return None
+    xg, ga = by_pid[pid]
+    r = (ga + k * lr) / (xg + k)
+    return r / lr
+
+
 def _key_from_full(name: str) -> Optional[str]:
     """first initial + LAST token; the boxscore's 'U. Luukkonen' and Daily Faceoff's
     'Ukko-Pekka Luukkonen' must meet (hyphens normalize to spaces in `_norm`)."""
@@ -439,7 +530,7 @@ def main() -> int:
 
     mach_cache: Dict[str, Dict] = {}
 
-    def run(k_goalie, rest: Optional[Dict], source: str, window=None):
+    def run(k_goalie, rest: Optional[Dict], source: str, window=None, metric: str = "sv"):
         rows = []
         miss = Counter()
         for g in games:
@@ -492,7 +583,17 @@ def main() -> int:
                         pk = picks[source].get((g["gid"], ab))
                         stats = by_pid.get(pk) if isinstance(pk, int) else (
                             (by_key.get((ab, pk)) or by_key.get(("*", pk))) if pk else None)
-                    if stats is None:
+                    if metric == "gsax":
+                        pid = None
+                        if stats is not None and len(stats) > 2:
+                            pid = stats[2]
+                        f_ = gsax_factor(pid, gsx, g["date"], r["arm"], k_goalie) if gsx else None
+                        if f_ is None:
+                            miss[f"gsax_unmatched_{source}"] += 1
+                            fac[side] = 1.0
+                        else:
+                            fac[side] = f_
+                    elif stats is None:
                         miss[f"goalie_unmatched_{source}"] += 1
                         fac[side] = 1.0
                     else:
@@ -543,7 +644,18 @@ def main() -> int:
     print(f"tuned (pre-{EVAL_START}): goalie k={k_best} (ML log-loss by k: { {k: round(v, 5) for k, v in tune.items()} }); rest={rest}")
 
     results = {}
-    for label, kw in (("V5", dict(k_goalie=k_best, rest=None, source="proj")),
+    gsx = GsaxHistory(act, src)
+    print(f"gsax history: {gsx.stats}")
+    tune_g = {}
+    for kg in (2.0, 5.0, 10.0, 20.0, 40.0, 80.0):
+        rows_, _ = run(kg, None, "dfo", window=pre, metric="gsax")
+        tune_g[kg] = ll_ml(rows_, "VX")
+    kg_best = min(tune_g, key=tune_g.get)
+    print(f"tuned GSAx k (xG units, pre-{EVAL_START}): {kg_best}; ML log-loss by k: { {k: round(v, 5) for k, v in tune_g.items()} }")
+
+    for label, kw in (("V7", dict(k_goalie=kg_best, rest=None, source="dfo", metric="gsax")),
+                      ("V7o", dict(k_goalie=kg_best, rest=None, source="oracle", metric="gsax")),
+                      ("V5", dict(k_goalie=k_best, rest=None, source="proj")),
                       ("V5r", dict(k_goalie=k_best, rest=None, source="rotation")),
                       ("V5c", dict(k_goalie=k_best, rest=None, source="dfo")),
                       ("V6", dict(k_goalie=k_best, rest=rest, source="dfo")),
@@ -552,13 +664,14 @@ def main() -> int:
         results[label] = (rows, miss)
 
     rows_all = results["V6"][0]
-    others = {lab: {x["gid"]: x for x in results[lab][0]} for lab in ("V5", "V5r", "V5c", "V5o")}
+    others = {lab: {x["gid"]: x for x in results[lab][0]} for lab in ("V5", "V5r", "V5c", "V5o", "V7", "V7o")}
     for x in rows_all:
         for lab, idx in others.items():
             x[lab] = idx[x["gid"]]["VX"]
         x["V6"] = x.pop("VX")
 
-    report = {"k_goalie": k_best, "tune": {str(k): v for k, v in tune.items()}, "rest": rest, "starter_sources": picks["stats"],
+    report = {"k_goalie": k_best, "gsax_k": kg_best, "gsax_tune": tune_g, "gsax_stats": gsx.stats,
+              "gsax_join": {k: dict(v[1]) for k, v in results.items() if k.startswith("V7")}, "tune": {str(k): v for k, v in tune.items()}, "rest": rest, "starter_sources": picks["stats"],
               "goalie_join": {k: dict(v[1]) for k, v in results.items()},
               "fits_sample": {d: fit_m.at(d, "regular") for d in ("2025-11-15", "2026-01-01", "2026-03-01")},
               "windows": {}}
@@ -577,7 +690,7 @@ def main() -> int:
     return 0
 
 
-VARIANTS = ["V0", "V1", "V2", "V3", "V4", "V5", "V5r", "V5c", "V6", "V5o"]
+VARIANTS = ["V0", "V1", "V2", "V3", "V4", "V5", "V5r", "V5c", "V6", "V5o", "V7", "V7o"]
 
 
 def score(R: List[Dict], min_n: int) -> Dict:
