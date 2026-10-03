@@ -330,6 +330,16 @@ equivalent endpoint does carry finals.
 
 ## [wnba-model-vs-board-mismatch] THE WNBA SIM'S ONE EDGE IS THE MONEYLINE, AND THE BOARD BET IT TWICE ALL SEASON `[verified 2026-08-31, lane wnba-accuracy-assessment]`
 
+**SUPERSEDED IN PART 2026-10-03 (lane `wnba-lines-props-backtest`, measured; text below kept for why it was believed):**
+the "moneyline asset" was measured against CLIMATOLOGY. Against the de-vigged BOOK on the same rows it is no asset:
+served sim AUC **0.790 vs book 0.825**, dBrier +0.0118 [-0.0106, +0.0371] (n=119); today's code (as-of re-run, 331 games)
+dBrier **+0.0011 [-0.0043, +0.0061]**, because SmartSim anchors margin 0.95 to the market; the raw ridge alone is WORSE than
+the book (+0.0293 [+0.0134, +0.0441], AUC 0.676 vs 0.763). No WNBA pregame market beats the book; every prop market is worse
+than the player's own as-of average and the book. Board spreads/totals -9.68% has CI [-29.2%, +8.8%] (not significant).
+Detail and ranked model fixes: `findings_2026-10-02_wnba_lines_props_backtest.md`. Per user decision 2026-10-02 this is a
+model-accuracy diagnosis, never a market gate.
+
+
 **RE-MEASURED 2026-09-19 against the MARKET, not climatology** (lane
 `wnba-sim-distributions`; Render substrate, 25 dates 08-06..08-30,
 pregame `tracking/book_quotes` median-of-books no-vig, results from

@@ -45264,3 +45264,12 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - reading 1 (producer): props_recommendations_2026-10-03.csv rewritten 03:04:48Z with the new columns line_slot,proj_toi,sim_starter,game_type.
 - reading 2 (served, 03:17:35Z, build_age 579.8 s): prop_rows_with_projection 94/338, **rows_with_probability 94**, probability_refused_by_line {}, probability_withheld_unmeasured ABSENT.
 - caveat: every 10-02 row is in play, so edge_vs_market_pct is suppressed by the live-edge policy on all 56 priced grid rows ("game is live") and 0 NHL props are on the shortlist. The pregame edge distribution is first readable on the 10-03 pregame build -- check it for fabricated edges before trusting a ranking (the model is still worse than a player's own average in most markets).
+
+
+## 2026-10-03 03:30Z (10:30 PM CT 10-02) -- READING, NO DEPLOY: WNBA game lines + props backtested as-of vs own-average and the de-vigged book (lane `wnba-lines-props-backtest`)
+
+- substrate: ESPN finals (340 games 05-08..10-01), fleet box scores (331), OddsAPI historical tip-60min book (340/340, 94,458 credits, user-approved); served = Render pulls a1e40980/4a583d41 + git Syndicate root + fleet (121 games); as-of = fleet code `9a7f0d2f` re-run on a scratch copy, every input truncated to before D (340 games, 500 sims). Local re-run is evidence about the CODE.
+- game lines (as-of, 331): sim ML dBrier vs book +0.0011 [-0.0043, +0.0061], AUC 0.770 vs 0.763; spread -0.0003 [-0.0039, +0.0029]; total +0.0046 [-0.0020, +0.0110]; raw ridge ML +0.0293 [+0.0134, +0.0441]; raw ridge total bias -8.22. Sim = 0.95 market spread by construction; raw departures from the line slope 0.07 (margin) / -0.04 (total).
+- props (as-of, 4,618 player-games): every market worse than own as-of average (points dMAE +0.304 [+0.225, +0.380], PRA +0.516) and than the book (points dBrier +0.051, PRA +0.089, all CIs > 0). Causes: minutes bias -2.96/player; sd too narrow x1.39-1.58; rate departures slope 0.16-0.27.
+- 08-31 ML "asset" OVERTURNED vs the book (served AUC 0.790 vs 0.825). Board spreads/totals -9.68% CI [-29.2%, +8.8%] -- not significant.
+- verify: `findings_2026-10-02_wnba_lines_props_backtest.md`; reproduce with `scripts/backtest_wnba_lines_props.py`.

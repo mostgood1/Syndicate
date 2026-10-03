@@ -5348,3 +5348,11 @@ own prior verdicts, not by anything failing.
   confirm its nearest preceding `### ` header is YOURS. Keep lane-block additions few and short (the
   narrative belongs in `log/<date>.md`), which also keeps the blast radius small.
 - **Cost:** fixed at checkpoint; no claim was mis-enforced (the lines carried no `Files:`).
+
+
+## 2026-10-03 OVERTURNED: "the WNBA moneyline sim is the best pregame asset (AUC 0.7631, Brier skill +16.5%)" -- the comparator was climatology; against the BOOK on the same rows the discrimination was the market's `[lane wnba-lines-props-backtest, session 39b666bb]`
+
+- **What we believed:** 08-31 graded the sim ML against climatology and called it the platform's best asset; the board was faulted for not betting it.
+- **What was true:** on the same games the de-vigged book's own AUC was higher (0.825 vs 0.790, n=119); today's code ties the book only because it anchors 95% to the spread; the raw model alone is worse than the book (dBrier +0.029, CI excludes 0).
+- **How found:** an OddsAPI historical backfill (tip-60min) gave a book probability for every game, so every model probability could be scored against the market on identical rows.
+- **Rule:** an accuracy number is evidence of an edge only against the price it would trade into. Report the BOOK's AUC/Brier on the same rows beside the model's, every time; a skill score against climatology or a constant answers a different question. Also: a pre-sim market anchor makes "model ~= market" true by construction -- score the raw pre-anchor output separately before calling the model accurate.
