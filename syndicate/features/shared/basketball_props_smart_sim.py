@@ -4727,6 +4727,18 @@ def _call_source_simulate_smart_game_local(*, smart_sim_module, processed_root: 
             recorded_draws,
             build_ladder=getattr(smart_sim_module, "build_exact_ladder_payload", None),
         )
+        # Shrink per-minute prop rates toward each player's own as-of rate (lane wnba-sim-rate-shrink): moves the means
+        # and SHIFTS the ladders, width untouched; runs BEFORE the widening below. WNBA-only, OFF unless
+        # SYNDICATE_WNBA_SIM_RATE_SHRINK is set.
+        from syndicate.features.shared.wnba_sim_rate_shrink import apply_rate_shrink
+
+        apply_rate_shrink(
+            out,
+            league_code=league_code,
+            processed_root=processed_root,
+            build_ladder=getattr(smart_sim_module, "build_exact_ladder_payload", None),
+            name_key=_norm_name_key,
+        )
         # Widen the prop ladders to their measured width (lane wnba-prop-dispersion). WNBA-only and OFF unless
         # SYNDICATE_WNBA_PROP_DISPERSION is set; runs AFTER the combo ladders above so pr/pa/ra are widened too.
         from syndicate.features.shared.wnba_prop_dispersion import apply_prop_dispersion
