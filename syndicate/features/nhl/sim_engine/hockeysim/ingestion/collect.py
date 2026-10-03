@@ -70,6 +70,11 @@ def collect_slate_inputs(
         # with abbreviated names it matched 0 of 339 lines on 2026-10-02 (every NHL prop unprojected).
         name_map = client.roster_full_names(team_code, season_code_for_date(date))
         usage = build_team_usage(client, team_code, date=date, n_games=n_games, name_map=name_map)
+        # Early in a season the usage window reaches back into LAST season's games
+        # (`recent_finished_game_ids`), so a player who left in the summer would keep his old
+        # team's slot. When the club roster is known, only its players are dressed.
+        if name_map:
+            usage = [r for r in usage if int(r["player_id"]) in name_map]
         if not usage:
             continue
         infer_lines(usage)

@@ -178,3 +178,24 @@ def test_back_to_back_swaps_to_the_other_goalie():
     usage = lu.project_lineup(_goalies(g1=(6, "2026-01-12", 59.0, "2026-01-12"), g2=(2, "2026-01-08", 58.0, "2026-01-12")),
                               date="2026-01-15")
     assert [r["player_id"] for r in usage if r["is_starter_goalie"]] == [1]
+
+
+def test_window_skips_preseason_and_tops_up_from_last_season(monkeypatch):
+    from syndicate.features.nhl.sim_engine.hockeysim.ingestion.nhl_web import NhlWebIngestClient
+
+    sched = {
+        "20262027": {"games": [
+            {"id": 1, "gameType": 1, "gameState": "OFF", "gameDate": "2026-09-28"},
+            {"id": 2, "gameType": 1, "gameState": "OFF", "gameDate": "2026-09-30"},
+            {"id": 3, "gameType": 2, "gameState": "OFF", "gameDate": "2026-10-02"},
+            {"id": 4, "gameType": 2, "gameState": "FUT", "gameDate": "2026-10-05"},
+        ]},
+        "20252026": {"games": [
+            {"id": 90 + i, "gameType": 2, "gameState": "OFF", "gameDate": f"2026-04-{10 + i:02d}"} for i in range(5)
+        ] + [{"id": 99, "gameType": 3, "gameState": "OFF", "gameDate": "2026-04-20"}]},
+    }
+    client = NhlWebIngestClient(rate_limit_per_sec=0)
+    monkeypatch.setattr(client, "_get", lambda url: sched[url.rsplit("/", 1)[-1]])
+    ids = client.recent_finished_game_ids("MTL", "20262027", before_date="2026-10-03", n=4)
+    # preseason 1, 2 never; the one regular-season game, topped up with last season's latest three
+    assert ids == ["93", "94", "99", "3"]

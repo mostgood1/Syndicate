@@ -15,6 +15,7 @@ from typing import Dict, List, Optional
 
 _NHLE_BASE = (os.getenv("NHLE_BASE_URL", "https://api-web.nhle.com/v1") or "").rstrip("/")
 _FINISHED = {"OFF", "FINAL"}
+_COMPETITIVE_GAME_TYPES = {2, 3}  # regular season, playoffs -- never preseason (1)
 
 
 def season_code_for_date(date: str) -> str:
@@ -123,14 +124,13 @@ class NhlWebIngestClient:
                     out[int(p["id"])] = name
         return out
 
-    def recent_finished_game_ids(self, team_abbr: str, season: str, *, before_date: str, n: int = 8) -> List[str]:
-        """The team's last ``n`` finished game ids strictly before ``before_date`` this season."""
+    def _finished_competitive_ids(self, team_abbr: str, season: str, before_date: str) -> List[str]:
         data = self._get(f"{_NHLE_BASE}/club-schedule-season/{team_abbr}/{season}")
-        if not data:
-            return []
         out: List[str] = []
-        for g in data.get("games", []):
+        for g in (data or {}).get("games", []):
             if g.get("gameState") not in _FINISHED:
+                continue
+            if int(g.get("gameType") or 0) not in _COMPETITIVE_GAME_TYPES:
                 continue
             gdate = str(g.get("gameDate") or "")[:10]
             if before_date and gdate >= before_date:
@@ -138,4 +138,20 @@ class NhlWebIngestClient:
             gid = g.get("id")
             if gid is not None:
                 out.append(str(gid))
+        return out
+
+    def recent_finished_game_ids(self, team_abbr: str, season: str, *, before_date: str, n: int = 8) -> List[str]:
+        """The team's last ``n`` finished REGULAR-SEASON or PLAYOFF game ids strictly before ``before_date``.
+
+        PRESEASON GAMES ARE EXCLUDED, and an early-season window is topped up from the PREVIOUS
+        season's last games `[2026-10-03, lane nhl-player-props-projection]`. Two days into 2026-27
+        the window was all preseason split-squad games, so stars were slotted on the third and fourth
+        lines (Caufield L3 12.5 min, Batherson L4 12.2) and the 10-03 board priced 29 of 53 SOG lines
+        at >10% edge, every big one an under, projections 0.31 shots below the player's own average.
+        """
+        out = self._finished_competitive_ids(team_abbr, season, before_date)
+        if n and len(out) < n and len(str(season)) == 8 and str(season).isdigit():
+            start = int(str(season)[:4])
+            prev = self._finished_competitive_ids(team_abbr, f"{start - 1}{start}", before_date)
+            out = prev + out
         return out[-n:] if n and len(out) > n else out

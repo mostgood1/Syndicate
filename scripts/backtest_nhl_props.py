@@ -454,6 +454,16 @@ def _make_client(src: Path, out: Path, allow_net: bool):
         def _get(self, url: str):  # noqa: D401
             return http.get(url)
 
+        def roster_full_names(self, team_abbr, season):
+            # The roster endpoint has NO as-of history: fetched today, a PAST season's roster is the
+            # end-of-season one (~23 players). Since collect.py dresses only rostered players, using it
+            # for 2025-26 dates stripped real players (13-17 slotted skaters of 18 on 2025-10-15) and
+            # read as a +0.14 SOG MAE regression. Past seasons therefore get no roster (no filter, no
+            # full names -- this harness joins by player_id); the current season keeps production's.
+            if str(season) != str(SEASON_CUR):
+                return {}
+            return super().roster_full_names(team_abbr, season)
+
         def boxscore(self, game_id, *, use_cache: bool = True):
             p = _boxscore_path(str(game_id), src, out)
             if p is not None:
