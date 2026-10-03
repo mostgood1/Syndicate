@@ -1307,6 +1307,14 @@ death, never life — do not invert it.
 - Verification: Backtest via scripts/backtest_nfl_lines_props.py --selfcheck on the changed code (0 mismatches vs nfl_props_rows_for_week), per-market 2025 Brier gap closed with game-clustered CIs; reachability test (off != on); after an explicit user deploy decision, the fleet's nfl_prop_projections artifact rebuilt and a served-row reading of the new probabilities
 - Blocked by: layer2-triad-alignment -- release requested 2026-10-03 of the NFL prop model files it claims in prose (nfl player_stats + props modules, the spread-shrinkage and cover-blend calibration scripts, their tests). Until released this lane writes ONLY its own NEW files; the production modules are not edited.
 
+### wnba-prop-dispersion — OPEN — opened 2026-10-02 — session 39b666bb-e708-4edf-bfe5-3dda419e3589
+- Goal: WNBA SmartSim prop ladders are calibrated in width: a per-market dispersion estimator, fit on early-season as-of re-run ladders and tested out of sample (Aug-Sep regular season + playoffs), moves each priced market's ladder P(over) Brier at the book line toward the book with a paired game-clustered CI, keeps line-level reliability flat across the published ladder (not only interval coverage), and does not move the mean; then wired into the engine WNBA-only behind a flag with an off!=on reachability test. No deploy without a user decision
+- Files: scripts/fit_wnba_prop_dispersion.py (NEW), tests/test_fit_wnba_prop_dispersion.py (NEW), .syndicate/findings_2026-10-03_wnba_prop_dispersion.md (NEW)
+- Hypothesis: Measured 2026-10-02 (lane wnba-lines-props-backtest): sim residual sd / sim sd = 1.39 pts, 1.41 reb, 1.45 ast, 1.23 threes, 1.58 PRA; 80% coverage 58-73%; ladder Brier worse than book by +0.013..+0.089. Combos are built from joint draws, so their extra under-dispersion is a missing SHARED (game/minutes-level) variance, not independence. A per-market dilation around the sim mean, k ~ 1.2-1.6, closes most of the Brier gap toward own-average-normal; it will not pass the book
+- Falsification test: If the k fit on May-July does not improve held-out Aug-Sep/playoff Brier at the book line with a paired CI excluding 0, or the fitted k sits at a grid edge, or reliability across ladder thresholds gets worse, widening is not the fix and the mean (minutes) must come first
+- Verification: Offline: per-market table train/test n, fitted k, held-out Brier model vs book vs own-avg-normal with paired CI, reliability by predicted-probability decile over book lines AND over all ladder thresholds; engine: off!=on reachability test and a re-run date reproducing the offline ladder
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
