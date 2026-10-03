@@ -1477,6 +1477,14 @@ death, never life — do not invert it.
   - **Proposed fix (needs user approval + a cross-lane write; `live-inplay-board-cadence` holds the file):** count only job processes whose environ `RENDER_SERVICE_NAME` matches this worker's own; an unreadable environ is still counted (unknown must not read low). Render is unchanged: one container, one name.
 - Blocked by: none
 
+### probability-differential-backtest-converters — OPEN — opened 2026-10-03 — session 8de04a09-d7cd-4e22-bab2-106540543671
+- Goal: tests/test_probability_differential.py passes on origin/main: the 13 converter-shaped defs in the per-sport backtest scripts are registered in REGISTRY (scalar converters) or excused in NOT_A_SCALAR_CONVERTER with a body-based reason
+- Files: scripts/probability_differential.py, tests/test_probability_differential.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: python -m pytest tests/test_probability_differential.py on a worktree rebased to origin/main: all pass, incl. test_every_converter_is_registered_or_excused
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

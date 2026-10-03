@@ -212,6 +212,22 @@ AMERICAN_TO_PROBABILITY: list[Impl] = [
          "1/decimal_odds(american) via `break_even`; NO zero guard"),
     Impl("american_to_probability", "syndicate.features.shared.polymarket_us_orders", "_implied_probability",
          "DUAL SCALE: passes a value already in (0, 1) through as a probability; refuses |price| < 100"),
+    # ADDED 2026-10-03 (lane `probability-differential-backtest-converters`): the
+    # per-sport lines/props backtests landed 2026-10-02/03 with their own copies,
+    # red on main. Registered from the HARNESS side only -- the scripts belong to
+    # their backtest lanes. Classified from each BODY.
+    Impl("american_to_probability", "scripts.backtest_mlb_lines_props", "american_to_prob",
+         "str().replace('+') coercion + zero guard"),
+    Impl("american_to_probability", "scripts.backtest_ncaaf_lines_props", "american_to_prob",
+         "`_f` coercion; refuses 0 AND |price| < 100"),
+    Impl("american_to_probability", "scripts.backtest_nfl_lines_props", "implied",
+         "one-liner; NO coercion, NO zero guard (0 -> 0.0)"),
+    Impl("american_to_probability", "scripts.backtest_nhl_props", "_implied",
+         "one-liner; NO coercion, NO zero guard (0 -> 0.0)"),
+    Impl("american_to_probability", "scripts.backtest_wnba_lines_props", "implied",
+         "one-liner; NO coercion, NO zero guard (0 -> 0.0)"),
+    Impl("american_to_probability", "scripts.consensus_movement_by_sport", "_implied",
+         "float() coercion; NO zero guard (0 -> 0.0)"),
 ]
 
 AMERICAN_TO_DECIMAL: list[Impl] = [
@@ -239,6 +255,13 @@ AMERICAN_TO_DECIMAL: list[Impl] = [
          "float() then the one-liner; NO zero guard"),
     Impl("american_to_decimal", "syndicate.features.shared.model_scorecard", "_decimal_odds",
          "copy of `layer2_live_scorecard.decimal_odds`; prices the scorecard's pnl"),
+    # ADDED 2026-10-03, same sweep as the backtest american_to_probability rows.
+    Impl("american_to_decimal", "scripts.backtest_mlb_lines_props", "american_to_decimal",
+         "str().replace('+') coercion + zero guard"),
+    Impl("american_to_decimal", "scripts.backtest_nfl_lines_props", "american_to_dec",
+         "one-liner; NO coercion, NO zero guard"),
+    Impl("american_to_decimal", "scripts.backtest_nhl_props", "_american_to_dec",
+         "one-liner; NO coercion, NO zero guard"),
 ]
 
 def _backfill_card_adapter(fn: Any, value: Any) -> Any:
@@ -409,6 +432,11 @@ NOT_A_SCALAR_CONVERTER: dict[str, str] = {
     "syndicate/features/ncaaf/live_resim.py:fcs_market_implied_enabled": "env flag; returns bool",
     "syndicate/features/ncaaf/live_resim.py:market_implied_sp_components": "spread+total -> SP+ rating components; not a probability or a price",
     "syndicate/features/shared/venue_scope.py:_min_implied_book_total_pct": "reads a threshold constant; returns a percent, not a conversion",
+    # ADDED 2026-10-03 (lane `probability-differential-backtest-converters`). Their
+    # scalar halves are REGISTERED above.
+    "scripts/backtest_mlb_lines_props.py:devig_two_way": "two-sided proportional devig; two PRICES in, fair P(side A) out. Its scalar half, `american_to_prob`, IS registered",
+    "scripts/backtest_ncaaf_lines_props.py:devig_two_way": "two-sided proportional devig; two PRICES in, fair P(side A) out. Its scalar half, `american_to_prob`, IS registered",
+    "scripts/backtest_nfl_lines_props.py:devig": "normalizes two PROBABILITIES (p_side / (p_side + p_other)); two args, no price conversion at all",
 }
 
 _NAME_HINT = ("implied", "american", "decimal", "devig", "no_vig", "novig",

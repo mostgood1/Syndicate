@@ -63,6 +63,17 @@ KNOWN_FAILING = {
         # number, and every row reaching it is pre-filtered by `usable()`
         # (`px not in (None, 0)`). 1/5.
         "scripts.score_ranking_analysis:implied",
+        # ADDED 2026-10-03 (lane `probability-differential-backtest-converters`),
+        # when the per-sport backtest copies were registered. Offline backtest
+        # scripts, not a published price -- but UNLIKE the entries above these
+        # return a NUMBER at price 0 (0.0, or -0.0 for consensus_movement) rather
+        # than raising. Whether a 0 price can reach them was NOT audited; the
+        # fix belongs to each owning lane (route through a guarded converter,
+        # e.g. `backtest_mlb_lines_props.american_to_prob`, which passes 5/5).
+        "scripts.backtest_nfl_lines_props:implied",
+        "scripts.backtest_nhl_props:_implied",
+        "scripts.backtest_wnba_lines_props:implied",
+        "scripts.consensus_movement_by_sport:_implied",
     },
     "american_to_decimal": {
         # ADDED 2026-10-02, same registration. Four copies of the unguarded
@@ -81,6 +92,10 @@ KNOWN_FAILING = {
         "syndicate.features.bankroll_manager:_american_to_decimal",
         "syndicate.features.intelligence:_american_to_decimal",
         "syndicate.features.nhl.sim_engine.hockeysim.adapters:american_to_decimal",
+        # ADDED 2026-10-03, two more copies of the unguarded one-liner in the
+        # NFL/NHL backtests; they RAISE on bad input (ZeroDivisionError at 0).
+        "scripts.backtest_nfl_lines_props:american_to_dec",
+        "scripts.backtest_nhl_props:_american_to_dec",
         # `nba.betting_recap:_settlement_decimal_price` was ADDED here on
         # 2026-09-09 and REMOVED the same day, which is the whole point of the
         # set. It had returned 2.0 on a missing or zero price -- an unpriced
