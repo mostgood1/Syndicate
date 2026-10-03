@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1246 rules `[generated]`
+## Index — 1250 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5414,3 +5414,26 @@ own prior verdicts, not by anything failing.
 - **What happened:** I enumerated ride-alongs against fleet HEAD `eedfde5e` at ~19:19Z. Another session ff'd the checkout to `ca3c85cd` at 19:20:11Z. My gated script waited for CLEAR, ran `git merge --ff-only <my target>` (satisfied, "Already up to date") and restarted at 19:27. The restart loaded three other lanes' changes, one of them a peer's registry fix that peer meant to deploy and measure itself.
 - **How to apply:** a gated deploy script records the HEAD its ride-along read was taken against, and ABORTS if HEAD differs at fire time (`[ "$(git rev-parse HEAD)" = "$EXPECTED" ] || exit`). Re-enumerate, then re-arm. Afterwards derive loaded code from the role's start epoch against the reflog, never the env stamp (the supervisor reuses `item.env` on a respawn).
 - **Related, same session:** on the one-host fleet, any process scan over `/proc` sees ALL roles (`5602290f`). A guard that counted "its" jobs host-wide starved refresh-worker for hours. Scope by the job's inherited `RENDER_SERVICE_NAME`.
+
+## 2026-10-03 — RECURRENCE (mine, same day as the rule): an UNANCHORED one-shot replace in `lanes.md` edited ANOTHER lane, and my block's body lines were merged under a third lane's header `[lane nfl-prop-mean-inputs, session 05b01a84]`
+
+- **Two existing rules, both broken in one commit (`76cb25f7`):**
+  - 2026-09-25 FORBIDDEN, "a one-shot `replace(old, new, 1)` on a line that is not UNIQUE": I replaced
+    `- Blocked by: none` with `str.replace(..., 1)`. The first match in the FILE was lane
+    `accuracy-ledger-budget-raise`'s, not mine.
+  - This morning's RULE, "after `land`, read your block for DETACHED lines": my FIT RESULT / Blocked-by /
+    PREDICTION lines sat under `nhl-live-sweep-fast`.
+- **The mechanism of the detachment, now known.** Another session's `lane_open.py` and my edit both
+  INSERTED at the same anchor: the line after my block's last line, which was the end of `## OPEN`.
+  Git's rebase merged the two insertions in sequence with no conflict, the new lane's header first.
+  Everything I appended after that point now belongs, structurally, to the newer lane. No header-level
+  invariant check can see it.
+- **How to apply:**
+  - Every `lanes.md` edit is RANGE-ANCHORED: find my header, find the next `### `, and edit only inside
+    `[h, nxt)`, asserting exactly one match there.
+  - After every `land`, `git show origin/main:.syndicate/lanes.md` and check that the nearest `### `
+    above each line I added is mine.
+  - Prefer EDITING an existing line of my block over APPENDING after its last line. The last line is
+    exactly where `lane_open.py` inserts.
+- **Cost:** two repairs (`ac1717ee`), one other lane's line mis-edited for ~1 h; no claim was
+  mis-enforced.

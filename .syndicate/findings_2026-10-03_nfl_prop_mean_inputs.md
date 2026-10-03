@@ -68,3 +68,32 @@ mean is about as informative as a usage model, and both are near-uninformative a
 3. **Accept that the model ≈ the market at the line.** Use the per-line machinery for what is measured
    to pay: price shopping across books (+2.95 ROI pts, `reports/nfl_props_roi.json`). This needs no model
    edge.
+
+## Addendum: practice status (2026-10-03 ~20:30Z) -- also fails; lane CLOSED per its pre-registered rule
+
+Arm `practice` = production mean x a per-status factor, sum(actual)/sum(mean) over unique player-games,
+fitted on 2023-24. Statuses: Full / Limited / DNP from nflverse `practice_status`, or `none` when the
+player is not on the report. Scored on 2025; outputs in `C:\tmp\nflbt\practice\`.
+
+| market | fitted factors: none / full / limited / dnp (fit n) | 2025 slope: production -> practice | Brier vs production [CI] | Limited/DNP subgroup (player-games) |
+|---|---|---|---|---|
+| receptions | 1.118 / 1.063 / 1.049 / 0.952 (2,676 / 483 / 229 / 49) | 0.107 -> 0.109 | **+0.0035 [+0.0006, +0.0064] WORSE** | 168: no gain (+0.0034, CI spans 0) |
+| receiving_yards | 1.126 / 1.070 / 1.058 / 1.041 | −0.066 -> −0.060 | **+0.0038 [+0.0013, +0.0061] WORSE** | 169: no gain |
+| rushing_yards | 1.081 / 0.971 / 1.040 / 0.764 (dnp n = 8) | −0.010 -> −0.014 | +0.0008 n.s. | 47: no gain |
+| rushing_attempts | 1.101 / 1.062 / 1.052 / 0.904 (dnp n = 5) | 0.084 -> 0.081 | −0.0020 n.s. | 39 |
+| passing_yards / attempts | ~1.05 for all statuses | ≈ 0 | n.s. | < 50, not scored |
+
+- **Coverage bounded it, as pre-registered.** Only 21% of quoted player-games carry any status, and
+  6.6% are Limited/DNP.
+- **The fitted factors are mostly a LEVEL SHIFT.** Players NOT on the report are under-projected by
+  8-13% on the quoted population, the same selection bias found in the backtest. That shift did not
+  carry over to 2025.
+- **The "Limited/DNP factor < 1" prediction was WRONG.** Limited players are not over-projected relative
+  to the rest.
+- **"The book already prices it" held within noise.** In the subgroup, the practice arm's corr(mean −
+  line, actual − line) is 0.19 [−0.02, 0.37] for receptions, against production's 0.22 [0.01, 0.41],
+  on 168 player-games.
+
+**Conclusion for the lane.** Neither pbp usage (recency, share, injury redistribution) nor practice
+status gives the NFL prop probability information at a priced line. The line's information is not in
+any as-of public data this repo holds. Per the pre-registered rule, the lane closes: GOAL NOT MET.
