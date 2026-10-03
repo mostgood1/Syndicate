@@ -94,6 +94,12 @@ _SOCCER_SOURCE = (
     "draws counted, bootstrap over matches"
 )
 
+_SOCCER_SOURCE_2026_10 = (
+    "lane soccer-lines-props-backtest (2026-10-02): production soccer recommendation artifacts vs "
+    "football-data.co.uk 2026-27 CLOSING average (Pinnacle close for MLS 1X2), proportional de-vig, "
+    "vs ESPN finals, bootstrap over matches; scripts/soccer_season_audit/audit_games.py"
+)
+
 # (sport, market, segment, phase) -> entry.
 MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
 
@@ -262,41 +268,44 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
         "source": _MLB_LIVE_SOURCE,
     },
     # ---- SOCCER, PREGAME --------------------------------------------------------
-    # Every projection artifact in the window was REBUILT after its match, so the
-    # scored number is not the one published before kickoff. A leak can only
-    # flatter the model: "loses" is robust, "parity" is an upper bound on skill.
+    # RE-MEASURED 2026-10-03 (lane `soccer-skill-registry-line-weighting`, readings from lane
+    # `soccer-lines-props-backtest`, `.syndicate/findings_2026-10-02_soccer_lines_props_backtest.md`):
+    # 07-22..09-20 (MLS to 09-30), 4-6x the 09-13 samples. The totals entry FLIPPED: it read parity
+    # on 194 matches (+0.010 [-0.004, +0.024]) and loses on 492. Final artifacts were rebuilt after
+    # kickoff; on 165 matches with a genuine pre-kickoff build the 1X2 Brier moved 0.6243 -> 0.6230,
+    # so the verdicts are not a rebuild artefact. A leak can only flatter the model.
     ("soccer", "h2h", "full", PHASE_PREGAME): {
-        "sample_games": 121,
-        "seasons": "2026-09-07..09-13 pregame, current model version",
-        "brier_model": 0.6474,
-        "brier_market": 0.6028,
-        "diff": 0.0446,
-        "ci95": (0.0148, 0.0742),
-        "verdict": "loses to the de-vigged close: 1X2 Brier +0.045 [+0.015, +0.074] over 121 matches; under-prices favourites",
+        "sample_games": 671,
+        "seasons": "2026-07-22..09-20 pregame (MLS to 09-30), 10 leagues",
+        "brier_model": 0.6207,
+        "brier_market": 0.5921,
+        "diff": 0.0285,
+        "ci95": (0.0169, 0.0411),
+        "verdict": "loses to the de-vigged close: 1X2 Brier +0.029 [+0.017, +0.041] over 671 matches; under-prices favourites",
         "verdict_class": VERDICT_LOSES,
-        "source": _SOCCER_SOURCE,
+        "source": _SOCCER_SOURCE_2026_10,
     },
     ("soccer", "totals", "full", PHASE_PREGAME): {
-        "sample_games": 194,
-        "seasons": "2026-08-31..09-13 pregame, main line",
-        "brier_model": 0.2603,
-        "brier_market": 0.2505,
-        "diff": 0.0099,
-        "ci95": (-0.0037, 0.0237),
-        "verdict": "parity with the de-vigged close: main-line Brier +0.010 [-0.004, +0.024] over 194 matches",
-        "verdict_class": VERDICT_PARITY,
-        "source": _SOCCER_SOURCE,
+        "sample_games": 492,
+        "seasons": "2026-07-22..09-20 pregame, Europe (no MLS O/U close), O/U 2.5",
+        "brier_model": 0.2387,
+        "brier_market": 0.2293,
+        "diff": 0.0095,
+        "ci95": (0.0032, 0.0157),
+        "verdict": "loses to the de-vigged close: O/U 2.5 Brier +0.010 [+0.003, +0.016] over 492 matches; trails this season's scoring",
+        "verdict_class": VERDICT_LOSES,
+        "source": _SOCCER_SOURCE_2026_10,
     },
     ("soccer", "spreads", "full", PHASE_PREGAME): {
-        "sample_games": 100,
-        "seasons": "2026-09-07..09-13 pregame, main Asian handicap line",
-        "brier_model": 0.2698,
-        "brier_market": 0.2433,
-        "diff": 0.0265,
-        "ci95": (0.0001, 0.0542),
-        "verdict": "loses to the close, borderline: Asian handicap Brier +0.027 [+0.000, +0.054] over 100 matches",
+        "sample_games": 458,
+        "seasons": "2026-07-22..09-20 pregame, closing main Asian handicap line",
+        "brier_model": 0.2696,
+        "brier_market": 0.2487,
+        "diff": 0.0208,
+        "ci95": (0.0082, 0.0340),
+        "verdict": "loses to the close: Asian handicap Brier +0.021 [+0.008, +0.034] over 458 matches",
         "verdict_class": VERDICT_LOSES,
-        "source": _SOCCER_SOURCE,
+        "source": _SOCCER_SOURCE_2026_10,
     },
     # ---- SOCCER, LIVE -----------------------------------------------------------
     ("soccer", "h2h", "full", PHASE_LIVE): {
@@ -538,6 +547,24 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
         "source": _FOOTBALL_SOURCE,
     },
 }
+
+# ALIASES `[2026-10-03, user decision, lane soccer-skill-registry-line-weighting]`. The board names the
+# same soccer market three ways: the alternate-line keys (`totals_alt`, `spreads_alt`) and `h2h_3_way`
+# read "unmeasured" because the lookup is an exact key. They are the same model and the same
+# measurement (taken at the main line; an alternate line is the same distribution read at another
+# point). ADMISSION CANNOT CHANGE: `layer2_board._row_rests_on_unmeasured_model` withholds a one-sided
+# row whose note is unmeasured OR `loses_to_market` alike, so moving these keys from unmeasured to a
+# LOSES verdict re-admits nothing.
+_SOCCER_ALIAS_ADMISSION = (
+    "2026-10-03: aliased verdict is loses_to_market; layer2_board._row_rests_on_unmeasured_model treats "
+    "loses_to_market exactly as unmeasured for one-sided rows, so no row's admission can change"
+)
+for _alias, _base in (("totals_alt", "totals"), ("spreads_alt", "spreads"), ("h2h_3_way", "h2h")):
+    _entry = dict(MEASURED_MARKET_SKILL[("soccer", _base, "full", PHASE_PREGAME)])
+    _entry["seasons"] = _entry["seasons"] + f"; measured as '{_base}', applied to '{_alias}'"
+    _entry["admission_checked"] = _SOCCER_ALIAS_ADMISSION
+    MEASURED_MARKET_SKILL[("soccer", _alias, "full", PHASE_PREGAME)] = _entry
+del _alias, _base, _entry
 
 
 def _norm(value: Any) -> str:

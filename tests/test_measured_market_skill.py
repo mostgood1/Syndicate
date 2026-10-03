@@ -99,3 +99,27 @@ def test_relabelling_cannot_silently_readmit_one_sided_rows(key):
         f"{key} is not a two-sided game market and does not beat the market; "
         "name the served-board reading that shows its rows are two-sided"
     )
+
+
+# --------------------------------------------------------------------------
+# soccer, re-measured 2026-10-03 (lane soccer-skill-registry-line-weighting)
+# --------------------------------------------------------------------------
+
+
+def test_soccer_pregame_totals_now_reads_its_larger_sample_loss():
+    note = mms.skill_note(sport="soccer", market="totals")
+    assert note["verdict_class"] == mms.VERDICT_LOSES
+    assert note["sample_games"] >= 492
+    assert note["established_loss_rel"] > 0
+
+
+@pytest.mark.parametrize("alias,base", [("totals_alt", "totals"), ("spreads_alt", "spreads"), ("h2h_3_way", "h2h")])
+def test_soccer_alias_keys_read_their_base_market_verdict(alias, base):
+    a, b = mms.skill_note(sport="soccer", market=alias), mms.skill_note(sport="soccer", market=base)
+    assert a is not None and b is not None
+    assert (a["verdict_class"], a["established_loss_rel"], a["sample_games"]) == (b["verdict_class"], b["established_loss_rel"], b["sample_games"])
+    assert mms.MEASURED_MARKET_SKILL[("soccer", alias, "full", mms.PHASE_PREGAME)].get("admission_checked")
+
+
+def test_soccer_alias_never_labels_a_live_row():
+    assert mms.skill_note(sport="soccer", market="totals_alt", phase=mms.PHASE_LIVE) is None
