@@ -1450,6 +1450,14 @@ death, never life — do not invert it.
 - Verification: Offline: per stat train/test n, fitted w, held-out dMAE vs own average and vs availability-only sim with CIs, book-line Brier paired CI; engine: off!=on reachability test on a re-run date
 - Blocked by: none
 
+### refresh-worker-soccer-loop-silent — OPEN — opened 2026-10-03 — session 6214bc11-3dad-4e37-af64-5a44a2cb498b
+- Goal: Name, with log readings, why refresh-worker's soccer unit autorun logged nothing (no LAUNCHED/CONFIRMED/SKIPPED/OUTCOME) from 2026-10-03 15:44:34Z while the process was alive, and whether it has resumed; fix it at the cause if it is a defect (or record it as by-design with the gating reading), verified on the fleet by SOCCER_UNIT_* lines resuming and a recs file rebuilt
+- Files: none yet -- diagnostic first; files are claimed here before any edit
+- Hypothesis: H1: the soccer autorun is called from refresh-worker's single main loop, and the loop has been inside one long synchronous stage since ~15:44Z (the board build / kalshi stages seen IN FLIGHT 13 of 48 polls 15:48-16:23Z), so the soccer tick is never reached. H2 (alt): the soccer tick runs but returns before any log line, e.g. an exception swallowed above the SOCCER_ logs, or a gate (active sports / memory headroom) that skips silently.
+- Falsification test: H1 is false if refresh-worker's own main-loop tick lines (lines tagged [refresh_worker] for non-soccer autoruns: MLB tick, intelligence loop, etc.) KEEP appearing at normal cadence after 15:44Z. Then the loop is turning and the soccer path is skipping (H2). H2 is false if the loop's own tick lines also stop at ~15:44Z.
+- Verification: Per-tag timeline of [refresh_worker] lines 15:00Z-now with gaps; the soccer autorun's call site and gates read from code; the first stage that stops; a resumed SOCCER_UNIT_* line + recs mtime after any fix
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
