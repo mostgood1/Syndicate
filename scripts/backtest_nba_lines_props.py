@@ -1,0 +1,1345 @@
+"""Backtest: NBA game lines and player props, AS-OF, against actuals, naive baselines and the book.
+
+Mirrors `scripts/backtest_nhl_props.py` (lane nhl-player-props-projection) in method and report
+shape, so the NBA / NHL / NFL / NCAAF results read side by side.
+
+WHAT IS SCORED, AND WHY THESE QUANTITIES (traced 2026-10-02, lane nba-lines-props-backtest):
+
+  * The Layer-2 board has NO NBA projection source: `board_enrichment._attach_projections_by_sport`
+    falls through to `{"supported": False, "reason": "no projection source wired for nba"}`.
+    NBA model numbers reach a user only on the NBA cards page and its prop picks.
+  * GAME LINES (`syndicate/features/nba/cards.py::_game_from_row`): model margin/total =
+    smart-sim `score.margin_mean` / `score.total_mean` (fallback `game_cards.pred_margin/pred_total`,
+    which `refresh_nba_oddsapi_props._smart_sim_projection_index` derives from the SAME smart-sim
+    JSON). Probabilities are fixed-scale logistics of those means: win `_margin_win_prob(m, 6.5)`,
+    cover `(m + home_spread, 7.5)`, over `(total - line, 10.5)`; quarter win at the default 3.4.
+    This harness imports `_margin_win_prob` from cards.py, so the served transform is scored.
+  * PLAYER PROPS (`basketball_props_edges._compute_props_edges_file_only_local`): model mean =
+    `mean_<stat>` (smart-sim) when the column exists, else `pred_<stat>`; combos pr/pa/ra are sums;
+    P(over) = Normal(mean, sd_<stat> or a fixed sigma); with no `props_prob_calibration*.json`
+    (none exists on the fleet or the mirror) pts/pra are shrunk toward 0.5 and ast/reb/pr/pa/ra are
+    BLENDED toward the book's own vig-inclusive implied price. This harness CALLS that function on
+    the as-of inputs, so the probability scored is the one production computes.
+  * A second, NOT-SERVED game arm scores upstream `predictions_<date>.csv` (the vendor games
+    model), because it is the only game projection with full-season coverage. It is labelled.
+
+WHERE THE INPUTS COME FROM, AND WHAT MAKES THEM AS-OF:
+  * Historical artifacts are the files the producers COMMITTED: upstream `mostgood1/NBA-Betting`
+    (`data/processed/`, the source app Syndicate mirrored all 2025-26 season) and Syndicate's own
+    git mirror (`data/nba_source/data/processed/`, 2026 playoffs). Many files were re-committed
+    after their games (props_edges: 39 of ~200 dates last written after game day), so for every
+    (family, date) this harness takes the LAST version committed strictly before that date's FIRST
+    tip-off (ESPN scoreboard). A commit made before tip cannot contain the result. Files with no
+    pre-tip version are excluded and counted.
+  * Actuals: stats.nba.com `playergamelogs` (2025-26 Regular Season + Playoffs; joined by NBA
+    PLAYER_ID, never by name) and ESPN scoreboards (finals, linescores incl. OT, tip times).
+  * Baselines: (a) the player's own 2025-26 per-game average over games STRICTLY before the date
+    (regular season + any earlier playoff games), (b) his last-10 average; for game lines the
+    captured consensus book line. The book is the latest pre-tip COMMITTED capture, not a verified
+    close.
+
+HONESTY RULES BUILT IN (same as NHL): the intersection is reported, never the union; `n` travels
+with every statistic; no verdict below `--min-n`; the harness supplies no input production lacked;
+"no skill" is a result; the production probability is reproduced and parity-checked row by row
+(`model_prob_raw` vs this harness's Normal) before anything is scored.
+
+Usage:
+  py -3 scripts/backtest_nba_lines_props.py --out C:/tmp/nba_bt/out            # collect + score
+  py -3 scripts/backtest_nba_lines_props.py --out C:/tmp/nba_bt/out --analyze-only
+"""
+from __future__ import annotations
+
+import argparse
+import csv
+import io
+import json
+import math
+import os
+import pickle
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.request
+from collections import Counter, defaultdict
+from datetime import date as _date, datetime, timedelta, timezone
+from pathlib import Path
+from typing import Dict, Iterable, List, Optional, Tuple
+
+import numpy as np
+
+REPO = Path(__file__).resolve().parents[1]
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+UPSTREAM_URL = "https://github.com/mostgood1/NBA-Betting.git"
+SEASON = "2025-26"
+RS_START, RS_END = "2025-10-21", "2026-04-12"
+PO_START, PO_END = "2026-04-13", "2026-06-30"
+PROP_MARKETS = ("pts", "reb", "ast", "threes", "pra", "pr", "pa", "ra", "stl", "blk", "tov")
+LOG_COL = {"pts": "PTS", "reb": "REB", "ast": "AST", "threes": "FG3M", "stl": "STL", "blk": "BLK", "tov": "TOV"}
+COMBOS = {"pra": ("pts", "reb", "ast"), "pr": ("pts", "reb"), "pa": ("pts", "ast"), "ra": ("reb", "ast")}
+# per (repo-kind, family): path template; {d} = YYYY-MM-DD
+FAMILIES = {
+    "props_predictions": "props_predictions_{d}.csv",
+    "props_odds": "oddsapi_player_props_{d}.csv",
+    "game_odds": "game_odds_{d}.csv",
+    "period_lines": "period_lines_{d}.csv",
+    "predictions": "predictions_{d}.csv",
+}
+SOURCES = {  # name -> (repo path resolver, ref, data prefix); syndicate first: it is what Syndicate served
+    "syndicate": ("syndicate", "origin/main", "data/nba_source/data/processed/"),
+    "upstream": ("upstream", "HEAD", "data/processed/"),
+}
+TEAM_TRI = {
+    "Atlanta Hawks": "ATL", "Boston Celtics": "BOS", "Brooklyn Nets": "BKN", "Charlotte Hornets": "CHA",
+    "Chicago Bulls": "CHI", "Cleveland Cavaliers": "CLE", "Dallas Mavericks": "DAL", "Denver Nuggets": "DEN",
+    "Detroit Pistons": "DET", "Golden State Warriors": "GSW", "Houston Rockets": "HOU", "Indiana Pacers": "IND",
+    "Los Angeles Clippers": "LAC", "LA Clippers": "LAC", "Los Angeles Lakers": "LAL", "Memphis Grizzlies": "MEM",
+    "Miami Heat": "MIA", "Milwaukee Bucks": "MIL", "Minnesota Timberwolves": "MIN", "New Orleans Pelicans": "NOP",
+    "New York Knicks": "NYK", "Oklahoma City Thunder": "OKC", "Orlando Magic": "ORL", "Philadelphia 76ers": "PHI",
+    "Phoenix Suns": "PHX", "Portland Trail Blazers": "POR", "Sacramento Kings": "SAC", "San Antonio Spurs": "SAS",
+    "Toronto Raptors": "TOR", "Utah Jazz": "UTA", "Washington Wizards": "WAS",
+}
+ESPN_TRI = {"NY": "NYK", "GS": "GSW", "SA": "SAS", "NO": "NOP", "UTAH": "UTA", "WSH": "WAS"}
+NBA_HDR = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.nba.com/", "Origin": "https://www.nba.com",
+           "Accept": "application/json", "x-nba-stats-origin": "stats", "x-nba-stats-token": "true"}
+
+
+# ---------------------------------------------------------------------------
+# small utils
+# ---------------------------------------------------------------------------
+
+def _f(v) -> Optional[float]:
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return None
+    return x if math.isfinite(x) else None
+
+
+def _dates(a: str, b: str) -> List[str]:
+    d0, d1 = _date.fromisoformat(a), _date.fromisoformat(b)
+    return [(d0 + timedelta(days=i)).isoformat() for i in range((d1 - d0).days + 1)]
+
+
+def _git(repo: Path, *args: str, stdin: Optional[str] = None) -> str:
+    env = dict(os.environ, MSYS_NO_PATHCONV="1")
+    r = subprocess.run(["git", "-C", str(repo), *args], input=stdin, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", env=env)
+    if r.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args[:3])} failed: {r.stderr[:300]}")
+    return r.stdout
+
+
+def _get_json(url: str, cache: Path, headers: Dict[str, str]) -> Dict:
+    if cache.exists() and cache.stat().st_size > 0:
+        return json.loads(cache.read_text(encoding="utf-8"))
+    last = None
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60) as fh:
+                data = json.load(fh)
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            cache.write_text(json.dumps(data), encoding="utf-8")
+            return data
+        except Exception as exc:  # network: retry, then surface
+            last = exc
+            time.sleep(2 + 3 * attempt)
+    raise RuntimeError(f"fetch failed {url}: {last}")
+
+
+def _clip(p: float, lo: float = 1e-3) -> float:
+    return min(1 - lo, max(lo, p))
+
+
+def _logloss(p: float, y: int) -> float:
+    p = _clip(p)
+    return -(math.log(p) if y else math.log(1 - p))
+
+
+def _implied(o: float) -> float:
+    return 100.0 / (o + 100.0) if o > 0 else -o / (-o + 100.0)
+
+
+def _american_to_dec(o: float) -> float:
+    return 1 + (o / 100.0 if o > 0 else 100.0 / -o)
+
+
+def _devig(pa: Optional[float], pb: Optional[float]) -> Optional[float]:
+    """Proportional de-vig of a two-sided American pair -> P(side a). None if either side missing."""
+    if pa is None or pb is None or pa == 0 or pb == 0:
+        return None
+    ia, ib = _implied(pa), _implied(pb)
+    return ia / (ia + ib)
+
+
+def _std_pair(a: Optional[float], b: Optional[float]) -> Optional[Tuple[float, float]]:
+    """A spread/total price pair only if it looks like a main line's juice: both sides in
+    [-140, -100] U [100, 120] and total implied in [1.00, 1.10]. The upstream consensus pairs main
+    points with alt-line prices (e.g. -245/+180 on a main spread) and leaves 39% of rows unpriced."""
+    if a is None or b is None:
+        return None
+    ok = lambda x: (-140 <= x <= -100) or (100 <= x <= 120)  # noqa: E731
+    if not (ok(a) and ok(b)):
+        return None
+    s = _implied(a) + _implied(b)
+    return (a, b) if 1.0 <= s <= 1.10 else None
+
+
+def _ncdf(z: float) -> float:
+    return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
+
+
+def _boot_ci(rows: List[Tuple[str, float]], n_boot: int = 1000, seed: int = 7) -> Tuple[float, float, float]:
+    """Mean of per-row values with a GAME-clustered bootstrap 95% CI (same estimator as NHL)."""
+    if not rows:
+        return (float("nan"),) * 3  # type: ignore[return-value]
+    keys: Dict[str, int] = {}
+    idx = np.array([keys.setdefault(g, len(keys)) for g, _ in rows])
+    vals = np.array([v for _, v in rows], dtype=float)
+    sums = np.bincount(idx, weights=vals)
+    cnts = np.bincount(idx).astype(float)
+    point = float(sums.sum() / cnts.sum())
+    rng = np.random.default_rng(seed)
+    n = len(sums)
+    draws = rng.integers(0, n, size=(n_boot, n))
+    stats = np.sort(sums[draws].sum(axis=1) / cnts[draws].sum(axis=1))
+    return point, float(stats[int(0.025 * n_boot)]), float(stats[int(0.975 * n_boot) - 1])
+
+
+def _metrics(rows: List[Dict], pred_key: str) -> Dict:
+    q = [r for r in rows if r.get(pred_key) is not None]
+    n = len(q)
+    if n == 0:
+        return {"n": 0}
+    err = [r[pred_key] - r["y"] for r in q]
+    return {"n": n, "mean_pred": round(sum(r[pred_key] for r in q) / n, 4), "bias": round(sum(err) / n, 4),
+            "mae": round(sum(abs(e) for e in err) / n, 4), "rmse": round(math.sqrt(sum(e * e for e in err) / n), 4)}
+
+
+def _prob_block(rows: List[Dict], key: str) -> Dict:
+    q = [r for r in rows if r.get(key) is not None]
+    if not q:
+        return {"n": 0}
+    return {"n": len(q), "mean_p": round(sum(r[key] for r in q) / len(q), 4),
+            "brier": round(sum((r[key] - r["yb"]) ** 2 for r in q) / len(q), 5),
+            "logloss": round(sum(_logloss(r[key], r["yb"]) for r in q) / len(q), 5)}
+
+
+def _delta(rows: List[Dict], a: str, b: str, kind: str) -> Dict:
+    """Mean of (loss_a - loss_b) per row, game-clustered CI. kind: 'abs' (point) or 'brier'."""
+    q = [r for r in rows if r.get(a) is not None and r.get(b) is not None]
+    if not q:
+        return {"n": 0, "point": None, "ci95": [None, None]}
+    if kind == "abs":
+        vals = [(r["gid"], abs(r[a] - r["y"]) - abs(r[b] - r["y"])) for r in q]
+    else:
+        vals = [(r["gid"], (r[a] - r["yb"]) ** 2 - (r[b] - r["yb"]) ** 2) for r in q]
+    p, lo, hi = _boot_ci(vals)
+    return {"n": len(q), "games": len({r["gid"] for r in q}), "point": round(p, 5), "ci95": [round(lo, 5), round(hi, 5)]}
+
+
+def _verdict(d: Dict, n: int, min_n: int, better: str = "MODEL_BETTER", worse: str = "MODEL_WORSE") -> str:
+    if n < min_n or d.get("point") is None:
+        return "INSUFFICIENT_N"
+    return better if d["ci95"][1] < 0 else (worse if d["ci95"][0] > 0 else "NO_DIFFERENCE")
+
+
+# ---------------------------------------------------------------------------
+# 1. AS-OF artifact selection from git history
+# ---------------------------------------------------------------------------
+
+def _repo_paths(args) -> Dict[str, Path]:
+    up = args.upstream
+    if not (up / ".git").exists():
+        up.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["git", "clone", "-q", "--filter=blob:none", "--no-checkout", UPSTREAM_URL, str(up)], check=True)
+    else:
+        try:
+            _git(up, "fetch", "-q", "origin")
+        except RuntimeError as exc:
+            print(f"[warn] upstream fetch failed, using local history: {exc}", flush=True)
+    return {"upstream": up, "syndicate": args.syndicate_repo}
+
+
+def _commit_index(repo: Path, ref: str, prefix: str) -> Dict[str, List[Tuple[int, str]]]:
+    """path -> [(committer unix ts, commit sha)] for every commit that added/modified it on `ref`."""
+    out = _git(repo, "log", ref, "--format=@@%H %ct", "--name-only", "--diff-filter=AM", "--", prefix)
+    idx: Dict[str, List[Tuple[int, str]]] = defaultdict(list)
+    cur = None
+    for line in out.splitlines():
+        line = line.strip()
+        if line.startswith("@@"):
+            sha, ts = line[2:].split()
+            cur = (int(ts), sha)
+        elif line and cur:
+            idx[line].append(cur)
+    return idx
+
+
+def _pick(versions: List[Tuple[int, str]], cutoff_ts: int) -> Tuple[Optional[str], Dict]:
+    pre = [v for v in versions if v[0] < cutoff_ts]
+    info = {"versions": len(versions), "pre_tip": len(pre)}
+    if not pre:
+        return None, info
+    ts, sha = max(pre)
+    info["commit_ts"] = ts
+    info["lead_min"] = round((cutoff_ts - ts) / 60.0, 1)
+    return sha, info
+
+
+def _batch_read(repo: Path, specs: List[str]) -> Dict[str, bytes]:
+    """Read many `sha:path` blobs, prefetching missing ones from a partial clone in one round trip."""
+    if not specs:
+        return {}
+    # Resolve sha:path -> blob oid with ONE `ls-tree` per commit: trees are local in a blobless clone,
+    # whereas `cat-file --batch-check` on a missing blob lazily fetches it, one network round trip each.
+    by_commit: Dict[str, Dict[str, str]] = defaultdict(dict)
+    for s in specs:
+        sha, path = s.split(":", 1)
+        by_commit[sha][path] = s
+    oid_of: Dict[str, str] = {}
+    for sha, paths in by_commit.items():
+        dirs = sorted({p.rsplit("/", 1)[0] + "/" for p in paths})
+        listing = _git(repo, "ls-tree", sha, "--", *dirs)
+        for line in listing.splitlines():
+            meta, path = line.split("\t", 1)
+            if path in paths:
+                oid_of[paths[path]] = meta.split()[2]
+    oids = [oid_of.get(s, "") for s in specs]
+    unique = sorted({o for o in oids if o})
+    missing = []
+    chk = subprocess.run(["git", "-C", str(repo), "-c", "fetch.negotiationAlgorithm=noop", "cat-file",
+                          "--batch-check=%(objectname) %(objecttype)", "--buffer"],
+                         input=("\n".join(unique) + "\n").encode(), capture_output=True,
+                         env=dict(os.environ, GIT_NO_LAZY_FETCH="1"))
+    for line in chk.stdout.decode().splitlines():
+        if line.endswith(" missing"):
+            missing.append(line.split()[0])
+    for i in range(0, len(missing), 500):
+        # bytes, not text: Windows text-mode stdin writes \r\n and every oid becomes an invalid refspec
+        r = subprocess.run(["git", "-C", str(repo), "-c", "fetch.negotiationAlgorithm=noop", "fetch", "-q", "origin",
+                            "--no-tags", "--no-write-fetch-head", "--stdin"],
+                           input=("\n".join(missing[i:i + 500]) + "\n").encode(), capture_output=True)
+        if r.returncode != 0:
+            print(f"[warn] blob fetch batch {i // 500} rc={r.returncode}: {r.stderr.decode(errors='replace')[-300:]}", flush=True)
+    blobs: Dict[str, bytes] = {}
+    p = subprocess.run(["git", "-C", str(repo), "cat-file", "--batch"], input=("\n".join(unique) + "\n").encode(),
+                       capture_output=True, env=dict(os.environ, GIT_NO_LAZY_FETCH="1"))
+    buf = p.stdout
+    pos = 0
+    for oid in unique:
+        nl = buf.index(b"\n", pos)
+        header = buf[pos:nl].decode()
+        pos = nl + 1
+        if header.endswith("missing"):
+            continue
+        size = int(header.split()[2])
+        blobs[oid] = buf[pos:pos + size]
+        pos += size + 1
+    return {s: blobs[o] for s, o in zip(specs, oids) if o in blobs}
+
+
+def collect(args, cutoffs: Dict[str, int]) -> Dict:
+    repos = _repo_paths(args)
+    out_dir: Path = args.out / "asof"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    indexes = {name: _commit_index(repos[r], ref, prefix) for name, (r, ref, prefix) in SOURCES.items()}
+    manifest: Dict = {"families": {}, "smart_sim": {}}
+    wanted: Dict[str, List[Tuple[str, str, str]]] = defaultdict(list)  # repo -> [(spec, dest, key)]
+    for fam, tmpl in FAMILIES.items():
+        fam_m = manifest["families"].setdefault(fam, {})
+        for d, cut in sorted(cutoffs.items()):
+            for src, (r, _ref, prefix) in SOURCES.items():
+                path = prefix + tmpl.format(d=d)
+                vers = indexes[src].get(path)
+                if not vers:
+                    continue
+                sha, info = _pick(vers, cut)
+                info["source"] = src
+                if sha is None:
+                    fam_m.setdefault(d, info)  # remember a post-tip-only file, keep looking at other sources
+                    continue
+                dest = out_dir / fam / f"{d}.csv"
+                fam_m[d] = info
+                wanted[r].append((f"{sha}:{path}", str(dest), f"{fam}|{d}"))
+                break
+    # smart-sim per-game JSON (game lines' served quantity)
+    for src, (r, _ref, prefix) in SOURCES.items():
+        for path, vers in indexes[src].items():
+            name = path.rsplit("/", 1)[-1]
+            if not (name.startswith("smart_sim_") and name.endswith(".json")):
+                continue
+            parts = name[len("smart_sim_"):-5].split("_")
+            if len(parts) != 3 or parts[0] not in cutoffs:
+                continue
+            d = parts[0]
+            key = f"{d}_{parts[1]}_{parts[2]}"
+            if key in manifest["smart_sim"] and manifest["smart_sim"][key].get("commit_ts"):
+                continue
+            sha, info = _pick(vers, cutoffs[d])
+            info["source"] = src
+            manifest["smart_sim"][key] = info
+            if sha:
+                wanted[r].append((f"{sha}:{path}", str(out_dir / "smart_sim" / f"{key}.json"), f"smart_sim|{key}"))
+    for r, items in wanted.items():
+        blobs = _batch_read(repos[r], [s for s, _, _ in items])
+        for spec, dest, key in items:
+            if spec in blobs:
+                Path(dest).parent.mkdir(parents=True, exist_ok=True)
+                Path(dest).write_bytes(blobs[spec])
+            else:
+                fam, k = key.split("|", 1)
+                (manifest["smart_sim"] if fam == "smart_sim" else manifest["families"][fam])[k]["read_failed"] = True
+    (args.out / "asof_manifest.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+    return manifest
+
+
+# ---------------------------------------------------------------------------
+# 2. actuals: ESPN scoreboards (finals, linescores, tip times), stats.nba player logs
+# ---------------------------------------------------------------------------
+
+def fetch_scoreboards(args, dates: List[str]) -> Dict[str, List[Dict]]:
+    games: Dict[str, List[Dict]] = {}
+    for d in dates:
+        url = f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={d.replace('-', '')}&limit=40"
+        data = _get_json(url, args.out / "cache" / "espn" / f"{d}.json", {"User-Agent": "Mozilla/5.0"})
+        rows = []
+        for ev in data.get("events") or []:
+            comp = (ev.get("competitions") or [{}])[0]
+            st = ((comp.get("status") or {}).get("type") or {})
+            season_type = ((ev.get("season") or {}).get("type"))
+            teams = {}
+            for c in comp.get("competitors") or []:
+                ab = (c.get("team") or {}).get("abbreviation", "")
+                teams[c.get("homeAway")] = {"tri": ESPN_TRI.get(ab, ab), "pts": _f(c.get("score")),
+                                            "ls": [_f(x.get("value")) for x in c.get("linescores") or []]}
+            if "home" not in teams or "away" not in teams:
+                continue
+            rows.append({"date": d, "start": ev.get("date"), "completed": bool(st.get("completed")),
+                         "season_type": season_type, "home": teams["home"]["tri"], "away": teams["away"]["tri"],
+                         "home_pts": teams["home"]["pts"], "away_pts": teams["away"]["pts"],
+                         "home_ls": teams["home"]["ls"], "away_ls": teams["away"]["ls"]})
+        if rows:
+            games[d] = rows
+    return games
+
+
+def _ts(iso: str) -> int:
+    s = iso.replace("Z", "+00:00")
+    if len(s) == 22 and s[16] == "+":  # 2026-02-11T00:30+00:00
+        s = s[:16] + ":00" + s[16:]
+    return int(datetime.fromisoformat(s).timestamp())
+
+
+def fetch_player_logs(args) -> List[Dict]:
+    rows: List[Dict] = []
+    for stype in ("Regular Season", "Playoffs"):
+        url = (f"https://stats.nba.com/stats/playergamelogs?Season={SEASON}&SeasonType={stype.replace(' ', '%20')}"
+               "&LeagueID=00")
+        data = _get_json(url, args.out / "cache" / "statsnba" / f"playergamelogs_{SEASON}_{stype.replace(' ', '_')}.json", NBA_HDR)
+        rs = data["resultSets"][0]
+        hdr = rs["headers"]
+        for rr in rs["rowSet"]:
+            r = dict(zip(hdr, rr))
+            rows.append({"pid": int(r["PLAYER_ID"]), "name": r["PLAYER_NAME"], "team": r["TEAM_ABBREVIATION"],
+                         "gid": str(r["GAME_ID"]), "date": str(r["GAME_DATE"])[:10], "stype": stype,
+                         "min": _f(r.get("MIN")) or 0.0, **{k: (_f(r.get(c)) or 0.0) for k, c in LOG_COL.items()}})
+    for r in rows:
+        for c, parts in COMBOS.items():
+            r[c] = sum(r[p] for p in parts)
+    return rows
+
+
+class History:
+    """Per-player 2025-26 game history (played games only), for the as-of baselines."""
+
+    def __init__(self, logs: List[Dict]) -> None:
+        self.h: Dict[int, List[Dict]] = defaultdict(list)
+        self.by_pd: Dict[Tuple[int, str], Dict] = {}
+        for r in logs:
+            self.by_pd[(r["pid"], r["date"])] = r
+            if r["min"] > 0:
+                self.h[r["pid"]].append(r)
+        for v in self.h.values():
+            v.sort(key=lambda r: r["date"])
+
+    def resolve(self, pid: int, name: str, date: str, counter: Counter) -> Optional[int]:
+        """NBA PLAYER_ID for a projection row on `date`. By id first; the 2026 playoff files carry ESPN
+        ids, so fall back to a UNIQUE same-date normalized-name match among players with a log that day."""
+        if (pid, date) in self.by_pd:
+            counter["join_by_id"] += 1
+            return pid
+        if not hasattr(self, "_names"):
+            from syndicate.features.shared.basketball_props_edges import _norm_name
+            self._norm = _norm_name
+            self._names: Dict[Tuple[str, str], set] = defaultdict(set)
+            for (p, d), r in self.by_pd.items():
+                self._names[(d, _norm_name(r["name"]))].add(p)
+        cand = self._names.get((date, self._norm(name)), set())
+        if len(cand) == 1:
+            counter["join_by_name_same_date"] += 1
+            return next(iter(cand))
+        counter["join_name_ambiguous" if cand else "join_none"] += 1
+        return None
+
+    def asof(self, pid: int, date: str, last: int = 0) -> Tuple[Optional[Dict[str, float]], int]:
+        g = [r for r in self.h.get(pid, []) if r["date"] < date]
+        if last:
+            g = g[-last:]
+        if not g:
+            return None, 0
+        return {m: sum(r[m] for r in g) / len(g) for m in PROP_MARKETS}, len(g)
+
+
+# ---------------------------------------------------------------------------
+# 2b. OddsAPI HISTORICAL backfill (user-approved 2026-10-02, ~138k credits): one pre-tip snapshot
+#     per game for props, one pre-first-tip slate snapshot per date for main game lines.
+#     Writes ONLY under --out/cache (never data/ or the production quote log); dry run by default.
+# ---------------------------------------------------------------------------
+
+ODDSAPI = "https://api.the-odds-api.com/v4"
+HIST_PROP_MARKETS = ("player_points", "player_rebounds", "player_assists", "player_threes",
+                     "player_points_rebounds_assists", "player_points_rebounds", "player_points_assists",
+                     "player_rebounds_assists", "player_steals", "player_blocks")
+HIST_GAME_MARKETS = ("h2h", "spreads", "totals")
+
+
+class Budget:
+    def __init__(self, ceiling: int) -> None:
+        self.ceiling, self.spent, self.calls = ceiling, 0, 0
+        self.last_remaining: Optional[str] = None
+
+    def charge(self, headers) -> None:
+        self.calls += 1
+        try:
+            self.spent += int(headers.get("x-requests-last") or 0)
+        except ValueError:
+            pass
+        self.last_remaining = headers.get("x-requests-remaining")
+        if self.spent > self.ceiling:
+            raise RuntimeError(f"credit ceiling {self.ceiling} exceeded ({self.spent}); aborting -- cached work is kept")
+
+
+def _odds_get(path: str, params: Dict[str, str], cache: Path, budget: Budget, execute: bool) -> Optional[Dict]:
+    if cache.exists() and cache.stat().st_size > 0:
+        return json.loads(cache.read_text(encoding="utf-8"))
+    if not execute:
+        return None
+    key = (os.environ.get("ODDS_API_KEY") or os.environ.get("ODDSAPI_KEY") or "").strip()
+    if not key:
+        raise RuntimeError("ODDS_API_KEY not set")
+    from urllib.parse import urlencode
+    url = f"{ODDSAPI}{path}?{urlencode({**params, 'apiKey': key})}"
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Syndicate-backtest/1.0"}), timeout=60) as fh:
+                data = json.load(fh)
+                budget.charge(fh.headers)
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            cache.write_text(json.dumps(data), encoding="utf-8")
+            return data
+        except urllib.error.HTTPError as exc:  # type: ignore[attr-defined]
+            budget.charge(exc.headers or {})
+            if exc.code in (404, 422):
+                cache.parent.mkdir(parents=True, exist_ok=True)
+                cache.write_text(json.dumps({"_http": exc.code}), encoding="utf-8")
+                return {"_http": exc.code}
+            time.sleep(3 + 5 * attempt)
+        except Exception:  # network: retry; the URL carries the key, so never print it
+            time.sleep(3 + 5 * attempt)
+    raise RuntimeError(f"historical fetch failed for {path} (key redacted)")
+
+
+def _iso(ts: int) -> str:
+    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def fetch_hist_odds(args, scoreboards: Dict[str, List[Dict]], cutoffs: Dict[str, int]) -> Dict:
+    import urllib.error  # noqa: F401  (HTTPError above)
+    budget = Budget(args.max_credits)
+    root = args.out / "cache" / "oddsapi_hist"
+    n_dates = n_events = n_cached = 0
+    est = 0
+    for d in sorted(scoreboards):
+        games = [g for g in scoreboards[d] if g["completed"]]
+        if not games or d not in cutoffs:
+            continue
+        n_dates += 1
+        first = cutoffs[d]
+        snap_day = _iso(first - args.snap_min * 60)
+        _odds_get("/historical/sports/basketball_nba/odds",
+                  {"date": snap_day, "regions": "us", "markets": ",".join(HIST_GAME_MARKETS), "oddsFormat": "american"},
+                  root / "games" / f"{d}.json", budget, args.execute)
+        ev = _odds_get("/historical/sports/basketball_nba/events", {"date": snap_day},
+                       root / "events" / f"{d}.json", budget, args.execute)
+        est += 1 + 10 * len(HIST_GAME_MARKETS)
+        if ev is None:  # dry run: size props from the ESPN game count
+            est += 10 * len(HIST_PROP_MARKETS) * len(games)
+            continue
+        want = {(g["home"], g["away"]) for g in games}
+        for e in ((ev or {}).get("data") or []):
+            key = (TEAM_TRI.get(e.get("home_team", "")), TEAM_TRI.get(e.get("away_team", "")))
+            if key not in want:
+                continue
+            n_events += 1
+            est += 10 * len(HIST_PROP_MARKETS)
+            cpath = root / "props" / d / f"{e['id']}.json"
+            if cpath.exists():
+                n_cached += 1
+                continue
+            snap = _iso(_ts(e["commence_time"]) - args.snap_min * 60)
+            _odds_get(f"/historical/sports/basketball_nba/events/{e['id']}/odds",
+                      {"date": snap, "regions": "us", "markets": ",".join(HIST_PROP_MARKETS), "oddsFormat": "american"},
+                      cpath, budget, args.execute)
+        if args.execute and n_dates % 10 == 0:
+            print(f"[odds] {d}: credits spent {budget.spent} in {budget.calls} calls", flush=True)
+    out = {"dates": n_dates, "events_matched": n_events, "events_cached": n_cached, "estimate_credits_upper": est,
+           "spent": budget.spent, "calls": budget.calls, "remaining_header": budget.last_remaining, "executed": args.execute}
+    print(f"[odds] {json.dumps(out)}", flush=True)
+    return out
+
+
+def hist_props_csv(args, d: str) -> Optional[Path]:
+    """Flatten the cached historical event odds for date d into production's raw props schema."""
+    src = args.out / "cache" / "oddsapi_hist" / "props" / d
+    if not src.exists():
+        return None
+    rows = []
+    for f in sorted(src.glob("*.json")):
+        payload = json.loads(f.read_text(encoding="utf-8"))
+        snap = payload.get("timestamp") or ""
+        ev = payload.get("data") or {}
+        for bk in ev.get("bookmakers") or []:
+            for mk in bk.get("markets") or []:
+                for oc in mk.get("outcomes") or []:
+                    rows.append([snap, ev.get("id"), ev.get("commence_time"), bk.get("key"), bk.get("title"), mk.get("key"),
+                                 oc.get("name"), oc.get("description"), oc.get("point"), oc.get("price"),
+                                 mk.get("last_update") or bk.get("last_update"), ev.get("home_team"), ev.get("away_team")])
+    if not rows:
+        return None
+    dest = args.out / "asof" / "props_odds_hist" / f"{d}.csv"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with dest.open("w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        w.writerow(["snapshot_ts", "event_id", "commence_time", "bookmaker", "bookmaker_title", "market", "outcome_name",
+                    "player_name", "point", "price", "last_update", "home_team", "away_team"])
+        w.writerows(rows)
+    return dest
+
+
+def hist_game_book(args, d: str) -> Dict[Tuple[str, str], Dict]:
+    """Per game: the de-vigged MULTI-BOOK book from the pre-first-tip slate snapshot. ML = mean of
+    per-book de-vigged P(home); spread/total = the modal main line, mean per-book de-vig at that line,
+    median prices for ROI. Replaces the upstream consensus, whose prices are unreliable."""
+    p = args.out / "cache" / "oddsapi_hist" / "games" / f"{d}.json"
+    if not p.exists():
+        return {}
+    payload = json.loads(p.read_text(encoding="utf-8"))
+    out = {}
+    for ev in payload.get("data") or []:
+        h, a = TEAM_TRI.get(ev.get("home_team", "")), TEAM_TRI.get(ev.get("away_team", ""))
+        if not h or not a:
+            continue
+        ml, sp, tt = [], defaultdict(list), defaultdict(list)
+        for bk in ev.get("bookmakers") or []:
+            for mk in bk.get("markets") or []:
+                oc = {o.get("name"): o for o in mk.get("outcomes") or []}
+                if mk.get("key") == "h2h":
+                    ph = _devig(_f((oc.get(ev["home_team"]) or {}).get("price")), _f((oc.get(ev["away_team"]) or {}).get("price")))
+                    if ph is not None:
+                        ml.append(ph)
+                elif mk.get("key") == "spreads":
+                    ho, ao = oc.get(ev["home_team"]) or {}, oc.get(ev["away_team"]) or {}
+                    pt, hp, ap = _f(ho.get("point")), _f(ho.get("price")), _f(ao.get("price"))
+                    if pt is not None and hp and ap:
+                        sp[pt].append((_devig(hp, ap), hp, ap))
+                elif mk.get("key") == "totals":
+                    o, u = oc.get("Over") or {}, oc.get("Under") or {}
+                    pt, op, up = _f(o.get("point")), _f(o.get("price")), _f(u.get("price"))
+                    if pt is not None and op and up:
+                        tt[pt].append((_devig(op, up), op, up))
+        rec: Dict = {"books_ml": len(ml)}
+        if ml:
+            rec["p_home_ml"] = sum(ml) / len(ml)
+        for name, dd in (("spread", sp), ("total", tt)):
+            if dd:
+                line = max(dd, key=lambda k: len(dd[k]))
+                qs = dd[line]
+                rec[name] = {"line": line, "p": sum(q[0] for q in qs) / len(qs), "books": len(qs),
+                             "price_a": float(np.median([q[1] for q in qs])), "price_b": float(np.median([q[2] for q in qs]))}
+        out[(h, a)] = rec
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 3. scoring: player props, point accuracy (all as-of prediction dates)
+# ---------------------------------------------------------------------------
+
+def _read_csv(path: Path) -> List[Dict]:
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8", newline="", errors="replace") as fh:
+        return list(csv.DictReader(fh))
+
+
+def _pred_mean(row: Dict, cols: Iterable[str]) -> Dict[str, Optional[float]]:
+    """Production's mean selection: `mean_<stat>` if the COLUMN exists, else `pred_<stat>`; combos are sums."""
+    cols = set(cols)
+    m: Dict[str, Optional[float]] = {}
+    for s in ("pts", "reb", "ast", "threes", "pra", "stl", "blk", "tov"):
+        col = f"mean_{s}" if f"mean_{s}" in cols else f"pred_{s}"
+        m[s] = _f(row.get(col))
+    for c, parts in (("pr", ("pts", "reb")), ("pa", ("pts", "ast")), ("ra", ("reb", "ast"))):
+        m[c] = None if any(m[p] is None for p in parts) else sum(m[p] for p in parts)  # type: ignore[misc]
+    return m
+
+
+def score_props_point(args, manifest: Dict, hist: History, phase_of: Dict[str, str]) -> Dict:
+    rows: Dict[str, List[Dict]] = defaultdict(list)
+    drops = Counter()
+    engine = Counter()
+    for d, info in sorted(manifest["families"]["props_predictions"].items()):
+        if not info.get("commit_ts") or d < args.start:
+            drops["no_pre_tip_file_dates"] += 0 if info.get("commit_ts") else 1
+            continue
+        preds = _read_csv(args.out / "asof" / "props_predictions" / f"{d}.csv")
+        if not preds:
+            drops["empty_file_dates"] += 1
+            continue
+        cols = preds[0].keys()
+        engine["smart_sim_mean_cols" if "mean_pts" in cols else "pred_cols_only"] += 1
+        # engine: smartsim = the file carries mean_* (what production serves today); onnx = pred_* only
+        ph = f"{phase_of.get(d, 'unknown')}:{'smartsim' if 'mean_pts' in cols else 'onnx'}"
+        seen = set()
+        for p in preds:
+            raw_pid = int(_f(p.get("player_id")) or 0)
+            if str(p.get("playing_today", "True")).strip().lower() in ("false", "0"):
+                drops["flagged_not_playing"] += 1
+                continue
+            pid = hist.resolve(raw_pid, str(p.get("player_name") or ""), d, drops) if raw_pid else None
+            if not pid:
+                drops["no_game_log_that_date(not on slate, DNP or unmatched)"] += 1
+                continue
+            if (pid, d) in seen:
+                drops["duplicate_player_date"] += 1
+                continue
+            seen.add((pid, d))
+            act = hist.by_pd[(pid, d)]
+            if act["min"] <= 0:
+                drops["did_not_play"] += 1
+                continue
+            base_a, na = hist.asof(pid, d)
+            base_b, _ = hist.asof(pid, d, last=10)
+            if base_a is None:
+                drops["no_prior_game_baseline"] += 1
+                continue
+            mean = _pred_mean(p, cols)
+            for mk in PROP_MARKETS:
+                if mean.get(mk) is None:
+                    drops[f"no_model_mean_{mk}"] += 1
+                    continue
+                rows[f"{ph}|{mk}"].append({"gid": act["gid"], "date": d, "pid": pid, "y": act[mk], "model": mean[mk],
+                                          "base_a": base_a[mk], "base_b": base_b[mk] if base_b else None, "n_prior": na})
+    res: Dict = {"drops": dict(drops), "engine_by_date": dict(engine), "markets": {}}
+    for k, rr in sorted(rows.items()):
+        n = len(rr)
+        d = _delta(rr, "model", "base_a", "abs")
+        res["markets"][k] = {"n": n, "games": len({r["gid"] for r in rr}), "dates": len({r["date"] for r in rr}),
+                             "mean_actual": round(sum(r["y"] for r in rr) / n, 4), "model": _metrics(rr, "model"),
+                             "base_a": _metrics(rr, "base_a"), "base_b": _metrics(rr, "base_b"),
+                             "mae_delta_vs_a": d, "mae_delta_vs_b": _delta(rr, "model", "base_b", "abs"),
+                             "verdict": _verdict(d, n, args.min_n)}
+    return res
+
+
+# ---------------------------------------------------------------------------
+# 4. scoring: player props vs the de-vigged book, production probability
+# ---------------------------------------------------------------------------
+
+def _sigma_for(stat: str, row: Dict) -> float:
+    from syndicate.features.shared.basketball_props_edges import _SigmaConfig
+    sc = _SigmaConfig()
+
+    def sd(s: str) -> float:
+        v = _f(row.get(f"sd_{s}"))
+        return v if (v is not None and 0.05 < v < 50.0) else float(getattr(sc, s))
+
+    if stat in COMBOS and stat != "pra":
+        return math.sqrt(sum(sd(p) ** 2 for p in COMBOS[stat]))
+    return sd(stat)
+
+
+def score_props_book(args, manifest: Dict, hist: History, phase_of: Dict[str, str]) -> Dict:
+    import contextlib
+    from syndicate.features.shared.basketball_props_edges import _compute_props_edges_file_only_local
+
+    stats = Counter()
+    parity = Counter()
+    rows: List[Dict] = []
+    odds_m = manifest["families"]["props_odds"]
+    for d, info in sorted(manifest["families"]["props_predictions"].items()):
+        oinfo = odds_m.get(d) or {}
+        if not info.get("commit_ts") or not oinfo.get("commit_ts"):
+            continue
+        pred_path = args.out / "asof" / "props_predictions" / f"{d}.csv"
+        odds_path = args.out / "asof" / "props_odds" / f"{d}.csv"
+        pred_rows = _read_csv(pred_path)
+        preds = {int(_f(p.get("player_id")) or 0): p for p in pred_rows}
+        eng = "smartsim" if pred_rows and "mean_pts" in pred_rows[0] else "onnx"
+        with tempfile.TemporaryDirectory() as td:  # no calibration json here == the fleet's state
+            (Path(td) / "data" / "processed").mkdir(parents=True)
+            log = io.StringIO()
+            try:
+                with contextlib.redirect_stdout(log):
+                    edges = _compute_props_edges_file_only_local(source_root=Path(td), date_str=d, raw_path=odds_path,
+                                                                 predictions_path=pred_path, calibrate_prob=True)
+            except ValueError as exc:  # production's own refusal: nothing joinable on this date
+                stats["dates_production_refused"] += 1
+                stats.setdefault("refused_detail", [])  # type: ignore[arg-type]
+                stats["refused_detail"].append(f"{d}: {exc}; {log.getvalue().strip()[-200:]}")  # type: ignore[union-attr]
+                continue
+        join = [ln for ln in log.getvalue().splitlines() if "PROP_NAME_JOIN" in ln]
+        if join:
+            stats.setdefault("name_join", [])  # type: ignore[arg-type]
+            stats["name_join"].append(f"{d}: {join[-1].split('PROP_NAME_JOIN', 1)[1].strip()}")  # type: ignore[union-attr]
+        stats["dates"] += 1
+        cut = (manifest.get("cutoffs") or {}).get(d)
+        latest: Dict[Tuple, Dict] = {}
+        records = edges.to_dict("records")
+        # Production's short-key fallback is a many-to-many merge: one BOOK name can come back attached
+        # to several player_ids. Such lines are excluded and counted (NHL: "ambiguous_match").
+        owners: Dict[Tuple, set] = defaultdict(set)
+        for e in records:
+            owners[(str(e.get("player_name")), str(e.get("stat")), _f(e.get("line")), str(e.get("bookmaker")))].add(
+                int(_f(e.get("player_id")) or 0))
+        for e in records:
+            if len(owners[(str(e.get("player_name")), str(e.get("stat")), _f(e.get("line")), str(e.get("bookmaker")))]) > 1:
+                stats["ambiguous_player_match_excluded"] += 1
+                continue
+            stats["edge_rows"] += 1
+            stat = str(e.get("stat") or "")
+            side = str(e.get("side") or "")
+            if stat in ("dd", "td"):
+                stats["yes_no_market_excluded"] += 1
+                continue
+            pid = int(_f(e.get("player_id")) or 0)
+            line, price = _f(e.get("line")), _f(e.get("price"))
+            if not pid or line is None or price is None:
+                stats["unmatched_or_unparseable"] += 1
+                continue
+            snap = str(e.get("snapshot_ts") or "")
+            if cut and snap and _ts(snap) >= cut:
+                stats["snapshot_after_first_tip_excluded"] += 1
+                continue
+            k = (pid, stat, line, str(e.get("bookmaker")), side)
+            if k not in latest or snap > latest[k]["snap"]:
+                latest[k] = {"snap": snap, "price": price, "mp": _f(e.get("model_prob")), "mpr": _f(e.get("model_prob_raw")),
+                             "commence": str(e.get("commence_time") or "")}
+        pairs: Dict[Tuple, Dict] = defaultdict(dict)
+        for (pid, stat, line, book, side), v in latest.items():
+            pairs[(pid, stat, line, book)][side] = v
+        for (pid, stat, line, book), sides in pairs.items():
+            if "OVER" not in sides or "UNDER" not in sides:
+                stats["one_sided_excluded"] += 1
+                continue
+            if abs(line - round(line)) < 1e-9:
+                stats["integer_line_excluded"] += 1
+                continue
+            p = preds.get(pid) or {}
+            nba_pid = hist.resolve(pid, str(p.get("player_name") or ""), d, stats)
+            act = hist.by_pd.get((nba_pid, d)) if nba_pid else None
+            if act is None or act["min"] <= 0:
+                stats["player_did_not_play_void_or_unmatched"] += 1
+                continue
+            mean = _pred_mean(p, p.keys()).get(stat)
+            if mean is None:
+                stats["no_model_projection"] += 1
+                continue
+            sig = _sigma_for(stat, p)
+            p_raw_h = 1.0 - _ncdf((line - mean) / sig)
+            o, u = sides["OVER"], sides["UNDER"]
+            if o["mpr"] is not None:
+                parity["checked"] += 1
+                parity["mismatch"] += abs(o["mpr"] - p_raw_h) > 2e-3
+            base, _ = hist.asof(nba_pid, d)
+            if base is None:
+                stats["no_prior_game_baseline"] += 1
+                continue
+            y = int(act[stat] > line)
+            rows.append({"gid": act["gid"], "date": d, "phase": f"{phase_of.get(d, 'unknown')}:{eng}", "mk": stat, "pid": nba_pid,
+                         "line": line, "book": book, "yb": y,
+                         "p_book": _devig(o["price"], u["price"]), "vig": _implied(o["price"]) + _implied(u["price"]) - 1,
+                         "p_model": o["mp"], "p_model_under": u["mp"], "p_raw": o["mpr"],
+                         "p_base": 1.0 - _ncdf((line - base[stat]) / sig),
+                         "dec_o": _american_to_dec(o["price"]), "dec_u": _american_to_dec(u["price"])})
+    out: Dict = {"filter_counts": dict(stats), "parity_model_prob_raw": dict(parity), "n_rows": len(rows),
+                 "games": len({r["gid"] for r in rows}), "dates": sorted({r["date"] for r in rows}), "by_market": {}}
+    groups: Dict[str, List[Dict]] = defaultdict(list)
+    for r in rows:
+        groups[f"{r['phase']}|{r['mk']}"].append(r)
+        groups[f"{r['phase']}|ALL"].append(r)
+        groups[f"all|{r['mk']}"].append(r)
+        groups[f"all:{r['phase'].split(':')[1]}|{r['mk']}"].append(r)
+    for k, rr in sorted(groups.items()):
+        n = len(rr)
+        res = {"n": n, "games": len({r["gid"] for r in rr}), "dates": len({r["date"] for r in rr}),
+               "base_rate_over": round(sum(r["yb"] for r in rr) / n, 4),
+               "mean_vig": round(sum(r["vig"] for r in rr) / n, 4),
+               "under_plus_over_model": round(sum((r["p_model"] or 0) + (r["p_model_under"] or 0) for r in rr) / n, 4)}
+        for key in ("p_book", "p_model", "p_raw", "p_base"):
+            res[key] = _prob_block(rr, key)
+        res["brier_delta_model_vs_book"] = _delta(rr, "p_model", "p_book", "brier")
+        res["brier_delta_raw_vs_book"] = _delta(rr, "p_raw", "p_book", "brier")
+        res["brier_delta_base_vs_book"] = _delta(rr, "p_base", "p_book", "brier")
+        res["ev_bets"] = _ev_bets(rr)
+        res["verdict"] = _verdict(res["brier_delta_model_vs_book"], n, args.min_n)
+        out["by_market"][k] = res
+    return out
+
+
+def _ev_bets(rr: List[Dict]) -> Dict:
+    """Flat stake on the side production's own probabilities price at +EV (over: p_model, under: p_model_under)."""
+    bets = []
+    for r in rr:
+        po, pu = r["p_model"], r["p_model_under"] if r["p_model_under"] is not None else (1 - (r["p_model"] or 0))
+        if po is None:
+            continue
+        ev_o = po * r["dec_o"] - 1
+        ev_u = pu * r["dec_u"] - 1
+        if max(ev_o, ev_u) <= 0:
+            continue
+        if ev_o >= ev_u:
+            win = r["yb"] == 1
+            pnl = (r["dec_o"] - 1) if win else -1.0
+        else:
+            win = r["yb"] == 0
+            pnl = (r["dec_u"] - 1) if win else -1.0
+        bets.append((r["gid"], win, pnl))
+    if not bets:
+        return {"n": 0}
+    roi = _boot_ci([(g, p) for g, _, p in bets])
+    return {"n": len(bets), "hit_rate": round(sum(w for _, w, _ in bets) / len(bets), 4),
+            "roi": round(roi[0], 4), "roi_ci95": [round(roi[1], 4), round(roi[2], 4)]}
+
+
+# ---------------------------------------------------------------------------
+# 5. scoring: game lines (full game, halves, quarters)
+# ---------------------------------------------------------------------------
+
+def _game_odds_index(path: Path) -> Dict[Tuple[str, str], Dict]:
+    out = {}
+    for r in _read_csv(path):
+        h, a = TEAM_TRI.get(r.get("home_team", "")), TEAM_TRI.get(r.get("visitor_team", ""))
+        if h and a:
+            out[(h, a)] = r
+    return out
+
+
+def _period_index(path: Path) -> Dict[Tuple[str, str], Dict]:
+    out = {}
+    for r in _read_csv(path):
+        h, a = TEAM_TRI.get(r.get("home_team", "")), TEAM_TRI.get(r.get("visitor_team", ""))
+        if h and a:
+            out[(h, a)] = r
+    return out
+
+
+def _segments(g: Dict) -> Optional[Dict[str, Tuple[float, float]]]:
+    """Actual (home, away) points per segment from linescores; None unless 4+ quarters are present."""
+    hl, al = g["home_ls"], g["away_ls"]
+    if len(hl) < 4 or len(al) < 4 or any(x is None for x in hl[:4] + al[:4]):
+        return None
+    seg = {f"q{i + 1}": (hl[i], al[i]) for i in range(4)}
+    seg["h1"] = (hl[0] + hl[1], al[0] + al[1])
+    seg["game"] = (g["home_pts"], g["away_pts"])
+    return seg
+
+
+def _sim_quarters(sim: Dict) -> List[Tuple[Optional[float], Optional[float]]]:
+    """(home, away) mean points per quarter from either smart-sim shape (`periods.qN` or `quarters[]`)."""
+    per = sim.get("periods") if isinstance(sim.get("periods"), dict) else {}
+    out = []
+    if per:
+        for i in range(1, 5):
+            q = per.get(f"q{i}") or {}
+            out.append((_f(q.get("home_mean")), _f(q.get("away_mean"))))
+        return out
+    for q in (sim.get("quarters") or [])[:4]:
+        if isinstance(q, dict):
+            out.append((_f(q.get("home_pts_mu")), _f(q.get("away_pts_mu"))))
+    return out
+
+
+def score_games(args, manifest: Dict, scoreboards: Dict[str, List[Dict]], phase_of: Dict[str, str]) -> Dict:
+    from syndicate.features.nba.cards import _margin_win_prob as mwp
+
+    rows: Dict[str, List[Dict]] = defaultdict(list)
+    drops = Counter()
+    fam = manifest["families"]
+    for d, games in sorted(scoreboards.items()):
+        if d < args.start:
+            continue
+        odds = _game_odds_index(args.out / "asof" / "game_odds" / f"{d}.csv") if (fam["game_odds"].get(d) or {}).get("commit_ts") else {}
+        plines = _period_index(args.out / "asof" / "period_lines" / f"{d}.csv") if (fam["period_lines"].get(d) or {}).get("commit_ts") else {}
+        preds = {}
+        if (fam["predictions"].get(d) or {}).get("commit_ts"):
+            for r in _read_csv(args.out / "asof" / "predictions" / f"{d}.csv"):
+                h, a = r.get("home_tri") or TEAM_TRI.get(r.get("home_team", "")), r.get("away_tri") or TEAM_TRI.get(r.get("visitor_team", ""))
+                if h and a:
+                    preds[(h, a)] = r
+        ph = phase_of.get(d, "unknown")
+        for g in games:
+            if not g["completed"] or g["home_pts"] is None:
+                drops["not_completed"] += 1
+                continue
+            seg = _segments(g)
+            if seg is None:
+                drops["no_linescore"] += 1
+                continue
+            key = (g["home"], g["away"])
+            gid = f"{d}_{g['home']}_{g['away']}"
+            o = odds.get(key)
+            pl = plines.get(key) or {}
+            arms: Dict[str, Dict[str, Tuple[Optional[float], Optional[float]]]] = {}
+            ssp = args.out / "asof" / "smart_sim" / f"{gid}.json"
+            if ssp.exists():
+                sim = json.loads(ssp.read_text(encoding="utf-8"))
+                sc = sim.get("score") or {}
+                qs = _sim_quarters(sim)
+                a: Dict[str, Tuple[Optional[float], Optional[float]]] = {}
+                for i, (hm, am) in enumerate(qs, start=1):
+                    a[f"q{i}"] = (hm - am, hm + am) if hm is not None and am is not None else (None, None)
+                if len(qs) == 4 and all(h is not None and w is not None for h, w in qs):
+                    hh, aa = sum(h for h, _ in qs), sum(w for _, w in qs)  # type: ignore[misc]
+                    # SERVED: game_cards.pred_margin/pred_total = sum of q1-q4 means (regulation only),
+                    # refresh_nba_oddsapi_props._smart_sim_projection_index; cards_sim_detail drops `score`.
+                    a["game"] = (hh - aa, hh + aa)
+                    a["h1"] = (qs[0][0] + qs[1][0] - qs[0][1] - qs[1][1], qs[0][0] + qs[1][0] + qs[0][1] + qs[1][1])  # type: ignore[operator]
+                    a["_sim_p_home_win"] = (_f(sc.get("p_home_win")), None)
+                    arms["smart_sim"] = a
+                    if o and _f(o.get("home_spread")) is not None and _f(o.get("total")) is not None:
+                        # REPLAY of the market anchor Syndicate's port applies by default
+                        # (basketball_props_smart_sim._simulate_quarters_local: total 0.7 market + 0.3
+                        # model, margin 0.95 market + 0.05 model). The 2025-26 upstream sims carry no
+                        # `market_anchor` (raw model), so this arm is ARITHMETIC on the as-of line, not a re-sim.
+                        mk_m, mk_t = -_f(o.get("home_spread")), _f(o.get("total"))  # type: ignore[operator]
+                        arms["smart_sim_anchored_replay"] = {
+                            "game": (0.95 * mk_m + 0.05 * (hh - aa), 0.7 * mk_t + 0.3 * (hh + aa)),  # type: ignore[operator]
+                            "_sim_p_home_win": (None, None)}
+                    if sc.get("margin_mean") is not None:
+                        arms["smart_sim_score_full_game"] = {"game": (_f(sc.get("margin_mean")), _f(sc.get("total_mean"))),
+                                                             "_sim_p_home_win": (_f(sc.get("p_home_win")), None)}
+                else:
+                    drops["smart_sim_without_4_quarters"] += 1
+            else:
+                drops["no_pre_tip_smart_sim"] += 1
+            pr = preds.get(key)
+            if pr:
+                a = {"game": (_f(pr.get("spread_margin")), _f(pr.get("totals"))),
+                     "h1": (_f(pr.get("halves_h1_margin")), _f(pr.get("halves_h1_total")))}
+                for i in range(1, 5):
+                    a[f"q{i}"] = (_f(pr.get(f"quarters_q{i}_margin")), _f(pr.get(f"quarters_q{i}_total")))
+                a["_sim_p_home_win"] = (_f(pr.get("home_win_prob")), None)
+                arms["predictions_csv"] = a
+            for arm, a in arms.items():
+                for sk in ("game", "h1", "q1", "q2", "q3", "q4"):
+                    m, t = a.get(sk, (None, None))
+                    if m is None and t is None:
+                        continue
+                    hp, ap = seg[sk]
+                    am_, at_ = hp - ap, hp + ap
+                    # book lines for the segment
+                    if sk == "game" and o:
+                        hs, tot = _f(o.get("home_spread")), _f(o.get("total"))
+                        hsp, asp = _f(o.get("home_spread_price")), _f(o.get("away_spread_price"))
+                        top, tup = _f(o.get("total_over_price")), _f(o.get("total_under_price"))
+                        hml, aml = _f(o.get("home_ml")), _f(o.get("away_ml"))
+                    elif sk != "game" and pl:
+                        hs, tot = _f(pl.get(f"{sk}_spread")), _f(pl.get(f"{sk}_total"))
+                        hsp, asp = _f(pl.get(f"{sk}_home_spread_price")), _f(pl.get(f"{sk}_away_spread_price"))
+                        top = tup = hml = aml = None
+                    else:
+                        hs = tot = hsp = asp = top = tup = hml = aml = None
+                    base = {"gid": gid, "date": d}
+                    if m is not None:
+                        rows[f"{arm}|{ph}|{sk}|margin"].append({**base, "y": am_, "model": m, "book": (-hs if hs is not None else None)})
+                    if t is not None:
+                        rows[f"{arm}|{ph}|{sk}|total"].append({**base, "y": at_, "model": t, "book": tot})
+                    # probabilities (served transform: cards._margin_win_prob)
+                    if m is not None and am_ != 0:
+                        scale = 6.5 if sk == "game" else 3.4
+                        p_book = _devig(hml, aml) if sk == "game" else None
+                        rows[f"{arm}|{ph}|{sk}|win_prob"].append({**base, "yb": int(am_ > 0), "p_model": mwp(m, scale=scale),
+                                                                    "p_sim": a["_sim_p_home_win"][0] if sk == "game" else None,
+                                                                    "p_book": p_book, "p_half": 0.5,
+                                                                    "dec_h": _american_to_dec(hml) if hml else None,
+                                                                    "dec_a": _american_to_dec(aml) if aml else None})
+                    # spread/total: the book price is used only when it is a plausible main-line pair
+                    # (_std_pair); otherwise the book is the line itself at 50% and -110 both sides.
+                    if sk == "game" and m is not None and hs is not None and (am_ + hs) != 0:
+                        sp = _std_pair(hsp, asp)
+                        drops["cover_price_reset_to_-110" if sp is None else "cover_price_used"] += 1 if arm == "smart_sim" else 0
+                        sp = sp or (-110.0, -110.0)
+                        rows[f"{arm}|{ph}|{sk}|cover"].append({**base, "yb": int(am_ + hs > 0), "p_model": mwp(m + hs, scale=7.5),
+                                                                 "p_book": _devig(*sp), "p_half": 0.5,
+                                                                 "dec_h": _american_to_dec(sp[0]), "dec_a": _american_to_dec(sp[1])})
+                    if sk == "game" and t is not None and tot is not None and at_ != tot:
+                        tp = _std_pair(top, tup)
+                        drops["over_price_reset_to_-110" if tp is None else "over_price_used"] += 1 if arm == "smart_sim" else 0
+                        tp = tp or (-110.0, -110.0)
+                        rows[f"{arm}|{ph}|{sk}|over"].append({**base, "yb": int(at_ > tot), "p_model": mwp(t - tot, scale=10.5),
+                                                                "p_book": _devig(*tp), "p_half": 0.5,
+                                                                "dec_h": _american_to_dec(tp[0]), "dec_a": _american_to_dec(tp[1])})
+    res: Dict = {"drops": dict(drops), "point": {}, "prob": {}}
+    for k, rr in sorted(rows.items()):
+        n = len(rr)
+        if k.endswith("|margin") or k.endswith("|total"):
+            bk = [r for r in rr if r["book"] is not None]
+            d = _delta(bk, "model", "book", "abs")
+            res["point"][k] = {"n": n, "games": len({r["gid"] for r in rr}), "mean_actual": round(sum(r["y"] for r in rr) / n, 3),
+                               "model": _metrics(rr, "model"), "n_with_book": len(bk), "model_on_book_rows": _metrics(bk, "model"),
+                               "book": _metrics(bk, "book"), "mae_delta_vs_book": d,
+                               "verdict": _verdict(d, len(bk), args.min_n_games)}
+        else:
+            bk = [r for r in rr if r.get("p_book") is not None]
+            d = _delta(bk, "p_model", "p_book", "brier")
+            entry = {"n": n, "games": len({r["gid"] for r in rr}), "base_rate": round(sum(r["yb"] for r in rr) / n, 4),
+                     "p_model": _prob_block(rr, "p_model"), "p_half": _prob_block(rr, "p_half"),
+                     "n_with_book": len(bk), "p_model_on_book_rows": _prob_block(bk, "p_model"), "p_book": _prob_block(bk, "p_book"),
+                     "brier_delta_model_vs_book": d, "brier_delta_model_vs_half": _delta(rr, "p_model", "p_half", "brier"),
+                     "verdict": _verdict(d, len(bk), args.min_n_games)}
+            if any(r.get("p_sim") is not None for r in rr):
+                sim_rows = [r for r in bk if r.get("p_sim") is not None]
+                entry["p_sim_own"] = _prob_block(sim_rows, "p_sim")
+                entry["brier_delta_sim_own_vs_book"] = _delta(sim_rows, "p_sim", "p_book", "brier")
+            entry["ev_bets"] = _game_ev(bk)
+            res["prob"][k] = entry
+    return res
+
+
+def _game_ev(rr: List[Dict]) -> Dict:
+    bets = []
+    for r in rr:
+        if r.get("dec_h") is None or r.get("dec_a") is None:
+            continue
+        ev_h = r["p_model"] * r["dec_h"] - 1
+        ev_a = (1 - r["p_model"]) * r["dec_a"] - 1
+        if max(ev_h, ev_a) <= 0:
+            continue
+        win = (r["yb"] == 1) if ev_h >= ev_a else (r["yb"] == 0)
+        dec = r["dec_h"] if ev_h >= ev_a else r["dec_a"]
+        bets.append((r["gid"], win, (dec - 1) if win else -1.0))
+    if not bets:
+        return {"n": 0}
+    roi = _boot_ci([(g, p) for g, _, p in bets])
+    return {"n": len(bets), "hit_rate": round(sum(w for _, w, _ in bets) / len(bets), 4),
+            "roi": round(roi[0], 4), "roi_ci95": [round(roi[1], 4), round(roi[2], 4)]}
+
+
+# ---------------------------------------------------------------------------
+# 6. coverage and the gate list
+# ---------------------------------------------------------------------------
+
+def coverage(manifest: Dict, scoreboards: Dict[str, List[Dict]], logs: List[Dict], phase_of: Dict[str, str]) -> Dict:
+    game_dates = {d for d, g in scoreboards.items() if any(x["completed"] for x in g)}
+    log_dates = {r["date"] for r in logs}
+    fam_dates = {f: {d for d, i in m.items() if i.get("commit_ts")} for f, m in manifest["families"].items()}
+    fam_post = {f: {d for d, i in m.items() if not i.get("commit_ts")} for f, m in manifest["families"].items()}
+    ss_dates = {k[:10] for k, i in manifest["smart_sim"].items() if i.get("commit_ts")}
+    out: Dict = {}
+    for ph in ("regular", "playoff"):
+        gd = {d for d in game_dates if phase_of.get(d) == ph}
+        fam = {f: len(v & gd) for f, v in fam_dates.items()}
+        fam["smart_sim(dates)"] = len(ss_dates & gd)
+        fam["smart_sim(games)"] = sum(1 for k, i in manifest["smart_sim"].items() if i.get("commit_ts") and k[:10] in gd)
+        fam["player_logs"] = len(log_dates & gd)
+        post = {f: len(v & gd) for f, v in fam_post.items()}
+        out[ph] = {"game_dates": len(gd), "games": sum(sum(1 for x in scoreboards[d] if x["completed"]) for d in gd),
+                   "pre_tip_dates_per_family": fam, "post_tip_only_dates_excluded": post,
+                   "intersection_props_point(preds&logs)": len(fam_dates["props_predictions"] & log_dates & gd),
+                   "intersection_props_book(preds&odds&logs)": len(fam_dates["props_predictions"] & fam_dates["props_odds"] & log_dates & gd),
+                   "intersection_game_served(smart_sim&game_odds&finals)": len(ss_dates & fam_dates["game_odds"] & gd),
+                   "intersection_game_vendor(predictions&game_odds&finals)": len(fam_dates["predictions"] & fam_dates["game_odds"] & gd),
+                   "intersection_periods(smart_sim&period_lines&finals)": len(ss_dates & fam_dates["period_lines"] & gd),
+                   "props_odds_dates": sorted(fam_dates["props_odds"] & gd)}
+    return out
+
+
+def gate(report: Dict) -> Dict:
+    """A market earns a probability/edge only if it beats the player's own average (point, CI < 0)
+    AND the de-vigged book (Brier, CI < 0) on enough rows. Everything else is mean-only."""
+    out: Dict = {"props": {}, "games": {}}
+    pts = report["props_point"]["markets"]
+    book = report["props_book"]["by_market"]
+    for mk in PROP_MARKETS:
+        reasons = []
+        p_reg = pts.get(f"regular:smartsim|{mk}", {})
+        beats_avg = p_reg.get("verdict") == "MODEL_BETTER"
+        reasons.append(f"point vs own avg (regular, smart-sim engine): {p_reg.get('verdict')} dMAE {p_reg.get('mae_delta_vs_a', {}).get('point')} "
+                       f"{p_reg.get('mae_delta_vs_a', {}).get('ci95')} n={p_reg.get('n')}")
+        p_po = pts.get(f"playoff:smartsim|{mk}", {})
+        reasons.append(f"point vs own avg (playoff, smart-sim engine, informational): {p_po.get('verdict')} "
+                       f"dMAE {p_po.get('mae_delta_vs_a', {}).get('point')} {p_po.get('mae_delta_vs_a', {}).get('ci95')} n={p_po.get('n')}")
+        b = book.get(f"all:smartsim|{mk}", {})
+        # two served forms: picks (props_edges model_prob, shrunk/blended) and the market board
+        # (basketball_market_board: Normal(mean, sd), unblended == model_prob_raw)
+        forms = {}
+        for form, key in (("picks_blended", "brier_delta_model_vs_book"), ("market_board_raw", "brier_delta_raw_vs_book")):
+            d = b.get(key) or {}
+            v = _verdict(d, b.get("n", 0), report["min_n"]) if b else "NO_BOOK_ROWS"
+            forms[form] = v
+            reasons.append(f"{form} Brier vs book (smart-sim engine, all phases): {v} {d.get('point')} {d.get('ci95')} n={b.get('n', 0)}")
+        passing = [f for f, v in forms.items() if v == "MODEL_BETTER"]
+        out["props"][mk] = {"gate": ("PROBABILITY(" + ",".join(passing) + ")") if (beats_avg and passing) else "MEAN_ONLY",
+                            "why": reasons}
+    # Games: the 2026-27 serving config is the ANCHORED sim (anchor on by default), so it decides the
+    # full-game gate; the raw sim is shown beside it. Periods have no anchor and are judged on the raw sim.
+    for k, v in report["games"]["prob"].items():
+        arm, ph, sk, mk = k.split("|")
+        if ph != "regular" or arm not in ("smart_sim", "smart_sim_anchored_replay"):
+            continue
+        e = out["games"].setdefault(f"{sk}|{mk}", {"gate": "MEAN_ONLY", "why": []})
+        decides = (arm == "smart_sim_anchored_replay") or sk != "game"
+        beats_half = _verdict(v["brier_delta_model_vs_half"], v["n"], report["min_n_games"]) == "MODEL_BETTER"
+        if decides and v["verdict"] == "MODEL_BETTER" and beats_half:
+            e["gate"] = "PROBABILITY"
+        if decides and v["verdict"] == "MODEL_BETTER" and not beats_half:
+            e["why"].append(f"{arm}: beats the book but NOT a coin flip ({v['brier_delta_model_vs_half']}) -- the book price is noise here, not a bar")
+        e["why"].append(f"{arm} Brier vs book: {v['verdict']} {v['brier_delta_model_vs_book']} n_book={v['n_with_book']}"
+                        + ("" if decides else " (informational)"))
+    for k, v in report["games"]["point"].items():
+        arm, ph, sk, mk = k.split("|")
+        if ph != "regular" or arm not in ("smart_sim", "smart_sim_anchored_replay"):
+            continue
+        out["games"].setdefault(f"{sk}|{mk}", {"gate": "MEAN_ONLY", "why": []})["why"].append(
+            f"{arm} point vs book line: {v['verdict']} dMAE {v['mae_delta_vs_book']}")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 7. report
+# ---------------------------------------------------------------------------
+
+def _row_point(k: str, v: Dict, base: str = "a") -> str:
+    m = v["model"]
+    if base == "a":
+        a, b, d = v["base_a"], v["base_b"], v["mae_delta_vs_a"]
+        return (f"| {k} | {v['n']} | {v['games']} | {v['mean_actual']} | {m['mean_pred']} | {m['bias']} | {m['mae']} | {a['mae']} | "
+                f"{b.get('mae', '')} | {d['point']} [{d['ci95'][0]}, {d['ci95'][1]}] | {m['rmse']} | {a['rmse']} | {v['verdict']} |")
+    bk, d = v["book"], v["mae_delta_vs_book"]
+    mb = v["model_on_book_rows"]
+    return (f"| {k} | {v['n']} | {v['n_with_book']} | {v['mean_actual']} | {m.get('mean_pred')} | {m.get('bias')} | {m.get('mae')} | "
+            f"{mb.get('mae', '')} | {bk.get('mae', '')} | {d['point']} [{d['ci95'][0]}, {d['ci95'][1]}] | {v['verdict']} |")
+
+
+def write_md(report: Dict, path: Path) -> None:
+    L = ["# NBA game-line + player-prop backtest (as-of, 2025-26)", "",
+         f"generated {report['generated_at']}; min_n props = {report['min_n']}, min_n games = {report['min_n_games']}; "
+         f"regular-season scoring from {report['start']}", "",
+         "## coverage (per family, pre-tip versions only, and the intersections each result rests on)", "",
+         "```", json.dumps(report["coverage"], indent=1), "```", "",
+         "## player props: point accuracy (model = production mean; a = own as-of avg, b = last-10)", "",
+         f"drops: `{json.dumps(report['props_point']['drops'])}`; engine by date: `{json.dumps(report['props_point']['engine_by_date'])}`", "",
+         "| phase\\|market | n | games | mean act | mean proj | bias | MAE model | MAE a | MAE b | dMAE vs a [95% CI] | RMSE model | RMSE a | verdict |",
+         "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for k, v in report["props_point"]["markets"].items():
+        L.append(_row_point(k, v))
+    pb = report["props_book"]
+    L += ["", "## player props vs the de-vigged book (production probability, recomputed by the production function)", "",
+          f"filters: `{json.dumps(pb['filter_counts'])}`; parity model_prob_raw vs harness Normal: `{json.dumps(pb['parity_model_prob_raw'])}`; "
+          f"rows {pb['n_rows']}, games {pb['games']}, dates {len(pb['dates'])}", "",
+          "| phase\\|market | n | games | over rate | vig | Brier book | Brier model | Brier raw | Brier base | dBrier model-book [CI] | dBrier raw-book [CI] | LL book | LL model | EV bets n | hit | ROI [CI] | verdict |",
+          "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for k, v in pb["by_market"].items():
+        e, d, dr = v["ev_bets"], v["brier_delta_model_vs_book"], v["brier_delta_raw_vs_book"]
+        L.append(f"| {k} | {v['n']} | {v['games']} | {v['base_rate_over']} | {v['mean_vig']} | {v['p_book'].get('brier')} | {v['p_model'].get('brier')} | "
+                 f"{v['p_raw'].get('brier')} | {v['p_base'].get('brier')} | {d['point']} {d['ci95']} | {dr['point']} {dr['ci95']} | "
+                 f"{v['p_book'].get('logloss')} | {v['p_model'].get('logloss')} | {e['n']} | {e.get('hit_rate', '')} | {e.get('roi', '')} {e.get('roi_ci95', '')} | {v['verdict']} |")
+    g = report["games"]
+    L += ["", "## game lines: point accuracy vs the captured consensus line (smart_sim = SERVED; predictions_csv = vendor model, NOT served)", "",
+          f"drops: `{json.dumps(g['drops'])}`", "",
+          "| arm\\|phase\\|segment\\|stat | n | n w/ book | mean act | mean proj | bias | MAE model | MAE model (book rows) | MAE book | dMAE model-book [CI] | verdict |",
+          "|---|---|---|---|---|---|---|---|---|---|---|"]
+    for k, v in g["point"].items():
+        L.append(_row_point(k, v, base="book"))
+    L += ["", "## game lines: probability (served transform `cards._margin_win_prob`) vs the de-vigged consensus", "",
+          "| arm\\|phase\\|segment\\|market | n | n w/ book | base rate | Brier model | Brier book | dBrier model-book [CI] | Brier 0.5 | sim own p Brier | EV bets n | hit | ROI [CI] | verdict |",
+          "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for k, v in g["prob"].items():
+        d, e = v["brier_delta_model_vs_book"], v["ev_bets"]
+        L.append(f"| {k} | {v['n']} | {v['n_with_book']} | {v['base_rate']} | {v['p_model_on_book_rows'].get('brier')} | {v['p_book'].get('brier')} | "
+                 f"{d['point']} {d['ci95']} | {v['p_half'].get('brier')} | {(v.get('p_sim_own') or {}).get('brier', '')} | {e['n']} | "
+                 f"{e.get('hit_rate', '')} | {e.get('roi', '')} {e.get('roi_ci95', '')} | {v['verdict']} |")
+    L += ["", "## gate list for 2026-27 (PROBABILITY only if the market beats its baseline AND the book)", "", "```",
+          json.dumps(report["gate"], indent=1), "```", ""]
+    path.write_text("\n".join(L), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# main
+# ---------------------------------------------------------------------------
+
+def _primary_repo() -> Path:
+    try:
+        common = _git(REPO, "rev-parse", "--path-format=absolute", "--git-common-dir").strip()
+        return Path(common).parent
+    except Exception:
+        return REPO
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--out", type=Path, default=Path(r"C:\tmp\nba_bt\out"))
+    ap.add_argument("--upstream", type=Path, default=Path(r"C:\tmp\nba_bt\upstream"))
+    ap.add_argument("--syndicate-repo", type=Path, default=_primary_repo())
+    ap.add_argument("--start", default="2025-11-01", help="first scored date (as-of averages need prior games)")
+    ap.add_argument("--min-n", type=int, default=200, help="min rows for any prop verdict")
+    ap.add_argument("--min-n-games", type=int, default=100, help="min games for any game-line verdict")
+    ap.add_argument("--analyze-only", action="store_true")
+    ap.add_argument("--fetch-odds", action="store_true", help="OddsAPI historical backfill (dry run unless --execute)")
+    ap.add_argument("--execute", action="store_true", help="actually spend credits")
+    ap.add_argument("--max-credits", type=int, default=150000)
+    ap.add_argument("--snap-min", type=int, default=45, help="snapshot this many minutes before tip")
+    ap.add_argument("--odds-dates", default="", help="comma list: restrict the backfill to these dates (pilot)")
+    args = ap.parse_args()
+    args.out.mkdir(parents=True, exist_ok=True)
+    t0 = time.time()
+    dates = _dates(RS_START, PO_END)
+    scoreboards = fetch_scoreboards(args, dates)
+    cutoffs = {d: min(_ts(g["start"]) for g in gs) for d, gs in scoreboards.items() if gs}
+    phase_of = {}
+    for d, gs in scoreboards.items():
+        st = Counter(g["season_type"] for g in gs).most_common(1)[0][0]
+        phase_of[d] = "regular" if st == 2 and d <= RS_END else ("playoff" if st == 3 else f"type{st}")
+    if args.fetch_odds:
+        sel = {x for x in args.odds_dates.split(",") if x}
+        fetch_hist_odds(args, {d: g for d, g in scoreboards.items() if not sel or d in sel}, cutoffs)
+        return 0
+    man_path = args.out / "asof_manifest.json"
+    if args.analyze_only and man_path.exists():
+        manifest = json.loads(man_path.read_text(encoding="utf-8"))
+    else:
+        manifest = collect(args, cutoffs)
+    manifest["cutoffs"] = cutoffs
+    logs = fetch_player_logs(args)
+    hist = History(logs)
+    report = {"generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "min_n": args.min_n,
+              "min_n_games": args.min_n_games, "start": args.start,
+              "substrate": {"artifacts": "git history (upstream mostgood1/NBA-Betting HEAD + Syndicate origin/main), pre-tip versions",
+                            "actuals": "stats.nba.com playergamelogs + ESPN scoreboards, fetched live, cached under --out/cache"},
+              "coverage": coverage(manifest, scoreboards, logs, phase_of)}
+    report["props_point"] = score_props_point(args, manifest, hist, phase_of)
+    report["props_book"] = score_props_book(args, manifest, hist, phase_of)
+    report["games"] = score_games(args, manifest, scoreboards, phase_of)
+    report["gate"] = gate(report)
+    report["runtime_s"] = round(time.time() - t0, 1)
+    (args.out / "report.json").write_text(json.dumps(report, indent=1, default=str), encoding="utf-8")
+    write_md(report, args.out / "report.md")
+    print(f"wrote {args.out / 'report.md'} in {report['runtime_s']} s", flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
