@@ -36,6 +36,16 @@ class SimConfig:
     # Optional scaling to allow a smaller empty-net probability when leading by 2.
     # If set (>0), apply empty_net_p * empty_net_two_goal_scale when diff==2.
     empty_net_two_goal_scale: Optional[float] = None
+    # --- full-game settlement + tie mass (lane `nhl-game-lines-model`, 2026-10-03). Defaults reproduce
+    # the legacy behaviour exactly (asserted seed-for-seed in tests/test_nhl_game_market_calibration.py).
+    # Regulation ties re-weighted by (1 + tie_weight): independent per-period Poisson under-produces them
+    # (measured 2025-26: 0.160 modelled vs 0.2465 actual). 0 = no re-weighting.
+    tie_weight: float = 0.0
+    # True: a regulation tie goes to OT/SO -- home wins it w.p. ot_home_win_prob, and the SETTLED total
+    # gets +1 (the OT goal or the shootout credit), as books settle NHL totals. False: legacy -- ties split
+    # 50/50 for the moneyline and totals priced on regulation goals.
+    full_game_settlement: bool = False
+    ot_home_win_prob: float = 0.5
 
 
 def _rng(seed: Optional[int]) -> np.random.Generator:
@@ -152,35 +162,69 @@ def simulate_from_period_lambdas(
     diff = home_goals - away_goals
     total = home_goals + away_goals
 
-    # Moneyline: assign half of draws to each side (OT/SO resolution proxy)
-    wins_h = (diff > 0).sum()
-    wins_a = (diff < 0).sum()
-    draws = (diff == 0).sum()
-    p_home_ml = (wins_h + 0.5 * draws) / n
-    p_away_ml = (wins_a + 0.5 * draws) / n
+    calibrated = float(cfg.tie_weight or 0.0) > 0.0 or bool(cfg.full_game_settlement)
+    if not calibrated:
+        # LEGACY path, byte-for-byte: moneyline assigns half of draws to each side (OT/SO resolution
+        # proxy); totals on regulation goals.
+        wins_h = (diff > 0).sum()
+        wins_a = (diff < 0).sum()
+        draws = (diff == 0).sum()
+        p_home_ml = (wins_h + 0.5 * draws) / n
+        p_away_ml = (wins_a + 0.5 * draws) / n
+        if total_line is not None:
+            tl = float(total_line)
+            over = (total > tl).sum() / n
+            under = (total < tl).sum() / n
+        else:
+            over = np.nan
+            under = np.nan
+        # Puck line: home -1.5 cover probability. For a half-line, strict inequality is correct.
+        ph_pl = (diff > abs(puck_line)).sum() / n
+        pa_pl = 1.0 - ph_pl
+        return {
+            "home_ml": float(p_home_ml),
+            "away_ml": float(p_away_ml),
+            "over": float(over),
+            "under": float(under),
+            "home_puckline_-1.5": float(ph_pl),
+            "away_puckline_+1.5": float(pa_pl),
+        }
 
-    # Totals
+    # CALIBRATED path: tie re-weighting + full-game settlement. Every probability is a weighted mean.
+    tie = diff == 0
+    w = np.where(tie, 1.0 + float(cfg.tie_weight or 0.0), 1.0)
+    W = float(w.sum())
+
+    def _m(mask) -> float:
+        return float((w * mask).sum() / W)
+
+    q = float(cfg.ot_home_win_prob) if cfg.full_game_settlement else 0.5
+    p_tie = _m(tie)
+    p_home_ml = _m(diff > 0) + q * p_tie
+    p_away_ml = _m(diff < 0) + (1.0 - q) * p_tie
+    # settled total: an OT goal or the shootout credit adds exactly one goal to a regulation tie
+    settled = total + (tie.astype(np.int64) if cfg.full_game_settlement else 0)
+    out = {
+        "home_ml": p_home_ml,
+        "away_ml": p_away_ml,
+        # an OT/SO win is by exactly one goal, so the regulation margin settles the puck line
+        "home_puckline_-1.5": _m(diff > abs(puck_line)),
+        "away_puckline_+1.5": 1.0 - _m(diff > abs(puck_line)),
+        "p_reg_home": _m(diff > 0),
+        "p_reg_tie": p_tie,
+        "p_reg_away": _m(diff < 0),
+        "expected_home_goals": float((w * (home_goals + (tie * q if cfg.full_game_settlement else 0))).sum() / W),
+        "expected_away_goals": float((w * (away_goals + (tie * (1.0 - q) if cfg.full_game_settlement else 0))).sum() / W),
+    }
     if total_line is not None:
         tl = float(total_line)
-        over = (total > tl).sum() / n
-        under = (total < tl).sum() / n
+        out["over"] = _m(settled > tl)
+        out["under"] = _m(settled < tl)
+        out["push"] = _m(settled == tl)
     else:
-        over = np.nan
-        under = np.nan
-
-    # Puck line: home -1.5 cover probability
-    # For a half-line, strict inequality is correct
-    ph_pl = (diff > abs(puck_line)).sum() / n
-    pa_pl = 1.0 - ph_pl
-
-    return {
-        "home_ml": float(p_home_ml),
-        "away_ml": float(p_away_ml),
-        "over": float(over),
-        "under": float(under),
-        "home_puckline_-1.5": float(ph_pl),
-        "away_puckline_+1.5": float(pa_pl),
-    }
+        out["over"] = np.nan
+        out["under"] = np.nan
+    return out
 
 
 def simulate_from_totals_diff(
