@@ -4739,6 +4739,17 @@ def _call_source_simulate_smart_game_local(*, smart_sim_module, processed_root: 
             build_ladder=getattr(smart_sim_module, "build_exact_ladder_payload", None),
             name_key=_norm_name_key,
         )
+        # Negative-binomial shape for the reb/ast/threes ladders at the (shrunk) mean (lane wnba-prop-shape). WNBA-only,
+        # OFF unless SYNDICATE_WNBA_PROP_SHAPE is set; after the rate shrink, before any widening.
+        from syndicate.features.shared.wnba_prop_shape import apply_prop_shape
+
+        apply_prop_shape(
+            out,
+            league_code=league_code,
+            processed_root=processed_root,
+            build_ladder=getattr(smart_sim_module, "build_exact_ladder_payload", None),
+            name_key=_norm_name_key,
+        )
         # Widen the prop ladders to their measured width (lane wnba-prop-dispersion). WNBA-only and OFF unless
         # SYNDICATE_WNBA_PROP_DISPERSION is set; runs AFTER the combo ladders above so pr/pa/ra are widened too.
         from syndicate.features.shared.wnba_prop_dispersion import apply_prop_dispersion
