@@ -1264,6 +1264,14 @@ death, never life — do not invert it.
 - Verification: unit: pregame file frozen; In Progress/Final re-sim leaves the frozen copy byte-identical; newer pregame replaces older; slate-index rename keyed by pk; fails on origin/main (module absent). Fleet: read sims_pregame/2026-10-03 vs daily/sims/2026-10-03 status fields after first pitch
 - Blocked by: none
 
+### fleet-soccer-recs-gap — OPEN — opened 2026-10-02 — session 43e4d5fe-e05e-41bc-aae6-6d6986460b22
+- Goal: The local fleet writes soccer recommendations for every league's upcoming matches (EPL and Serie A included, not only the next fixture date) and the board serves them: measured on the fleet as recommendations_<date>.json present for each league's next 7 days of fixtures, and /api/board/layer2-shortlist?sport=soccer per_sport_ingest.soccer.enrichment.projections.rows_with_projection > 0 on a date with soccer fixtures (0 on 2026-10-03 03:42Z, reason 'no soccer recommendations for this date')
+- Files: none yet -- diagnostic first; files are claimed here before any edit
+- Hypothesis: Two separate zeros: (a) EPL/Serie A artifact builds fail or are skipped on the fleet since the 09-30 cutover (newest recs 08-21 / 08-28), and (b) the other leagues' builds only emit the next fixture date (10-09) so the board date (10-02/10-03) finds no file, while MLS's 10-02 file is not joined by the board's soccer loader
+- Falsification test: If the fleet's last soccer run logs show EPL/Serie A artifact steps succeeding and writing files elsewhere (another data root), (a) is wrong; if load_soccer_projections finds the MLS 10-02 file for date 10-02 when run on the fleet, (b)'s join half is wrong
+- Verification: Fleet read after any fix: per-league recs files for the next 7 days; served layer2-shortlist?sport=soccer rows_with_projection > 0; recorded in deploys.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
