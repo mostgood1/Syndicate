@@ -45607,3 +45607,21 @@ three different artifact vintages, which is worth knowing before anyone calls it
 - **Why reading 2 came late:** the first post-ff rewrite (10-04 at 17:52:54Z) still showed 2 mismatch / 2 off-grid. It was written by sweep 20261003_172532, started 17:25:32Z before the ff; that sweep's NHL child ran old code, and the new code cannot emit an off-grid line. The single refresh lane makes the next sweep necessarily post-ff.
 - **Not evidence either way:** `predictions_2026-10-05` (last written 15:52:38Z, pre-ff).
 - **Fleet HEAD now `ca3c85cd`** (another session's ff), which contains a18cda3e.
+
+## 2026-10-03 20:11:45Z (3:11 PM CT) -- LOCAL FLEET (via ANOTHER session's ff, ca3c85cd -> ad85d3e2): NHL game-market sim fixes 7865b26e LIVE -- **reading 1 MET; artifact reading 2 OWED** (lane `nhl-game-lines-model`, user: "ship the four sim fixes next")
+
+- **What (7865b26e):** `hockeysim/game_market_sim.py` + `adapters.py`. Full-game settlement (OT/SO: home wins w.p. 0.5, +1 goal to a tied total), regulation tie re-weighting 0.7539, empty net 0.3006, regulation pace scale 0.9398 on the game-market lambdas only (props engine untouched).
+  - Fit on all of 2025-26.
+  - Off switch: `SYNDICATE_NHL_GAME_MARKET_CALIBRATION=off`.
+- **HOW IT WENT LIVE -- not my ff.** I landed 7865b26e ~20:05Z and was holding a 10-min coordination window for the segment-odds owner (8730cfb7 rides along). Meanwhile the fleet reflog shows `merge github/main: Fast-forward` to **ad85d3e2 at 20:11:45Z**, then f351eac5 at 20:18:14Z. Both contain 7865b26e and 8730cfb7. No `deploys.md` entry names that ff at time of writing.
+  - My claims (taken 20:20Z for my own ff) were released unused; my `merge-base --is-ancestor HEAD 7865b26e` guard stopped the redundant ff.
+  - The segment-odds owner (session local_12852f6a) was told the real go-live time.
+- **Lesson:** landing a behaviour change on main IS deploying it once any session fast-forwards. Land only when ready to measure, and baseline before landing.
+- **Baseline** (20:10:30Z, read-only signature over served predictions files): every row carries the LEGACY signature, model_total == sum of period projections. 10-03 13/13 (mean total 6.4362), 10-04 5/5 (6.3144), 10-05 4/4, 10-06 9/9.
+- **Expect:** rows written by a post-go-live sweep carry the CALIBRATED signature (model_total ~+0.25..0.30 above the period sum = the OT/SO goal); mean total about -0.11.
+- **Reading 1 -- MET** (20:22:29Z): the fleet's own producer at the deployed commit, run on production inputs, writing ONLY to /tmp.
+  - Default: 10-03 **13/13 calibrated** (gap 0.257-0.303, mean total 6.327); 10-04 **5/5** (gap 0.246-0.304, 6.201).
+  - Off switch: 13/13 and 5/5 legacy, mean totals **6.4362 / 6.3144 -- identical to production's current files**.
+- **Offline evidence on the shipped code** (2025-26 as-of lambdas, n=1,132): settled-total bias +0.111 -> **+0.008 [-0.133, +0.143]**; ML and OVER@close vs the close unchanged (paired, CIs include 0).
+  - Known residual: mean P(over) at the close line 0.476 vs frequency 0.503 (dispersion; next item).
+- **Reading 2 -- OWED:** watcher `simfix_watch.sh` waits for the first predictions rewrite after 20:11:45Z and records the signature plus the writing sweep's start time.
