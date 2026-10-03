@@ -4202,7 +4202,26 @@ def _current_active_job_count(latest_manifest_path: Path) -> int:
 _JOB_PROCESS_MARKER = "run_refresh_odds_job.py"
 
 
-def _running_job_process_count() -> int | None:
+def _job_belongs_elsewhere(entry: Path, own_service: str) -> bool:
+    """True only when the job's environ positively names a DIFFERENT service.
+
+    Unreadable, or no `RENDER_SERVICE_NAME` on either side, is False: count it.
+    """
+    if not own_service:
+        return False
+    try:
+        environ = (entry / "environ").read_bytes().split(b"\x00")
+    except (OSError, PermissionError):
+        return False
+    prefix = b"RENDER_SERVICE_NAME="
+    for item in environ:
+        if item.startswith(prefix):
+            service = item[len(prefix):].decode("utf-8", "replace").strip()
+            return bool(service) and service != own_service
+    return False
+
+
+def _running_job_process_count(proc_root: Path | None = None) -> int | None:
     """Live refresh-job processes, or None when that cannot be determined.
 
     Counts `run_refresh_odds_job.py` -- see `_JOB_PROCESS_MARKER` for why that
@@ -4217,9 +4236,26 @@ def _running_job_process_count() -> int | None:
     bound is running. On 2026-08-08 that let the process count reach 79.
 
     None means "could not enumerate", and callers MUST NOT treat that as zero.
+
+    ONLY THIS WORKER'S JOBS (lane `refresh-worker-soccer-loop-silent`, 2026-10-03).
+    The walk covered all of `/proc`. On Render that was one container, so "every
+    job process" meant this service's. On the one-host local fleet it also counts
+    LIVE-ODDS-WORKER's odds jobs, and refresh-worker's cap is 1. Measured
+    16:15-17:26Z: 17 of 18 ticks were `JOB_CAP_THROTTLED`, and 6 ownership samples
+    found 0 refresh-worker jobs among the counted ones. Every autorun below the
+    throttle starved; soccer got 0 of 18 ticks. An orphan counted too: a job
+    launched seconds before live-odds-worker's 6-hourly exit was reparented to
+    `/init` and kept counting for 27+ min.
+
+    A job inherits its role's environment, and that survives reparenting. So a
+    job whose `RENDER_SERVICE_NAME` names ANOTHER service is not ours. A job
+    whose environ cannot be read, or that carries no name, still counts: unknown
+    must not read low, because low is the direction that spawns. With no name of
+    our own (a bare local run) nothing is filtered, which is the old behaviour.
     """
+    own_service = str(os.environ.get("RENDER_SERVICE_NAME") or "").strip()
     try:
-        proc_root = Path("/proc")
+        proc_root = Path("/proc") if proc_root is None else Path(proc_root)
         if proc_root.is_dir():
             count = 0
             enumerated = 0
@@ -4233,7 +4269,7 @@ def _running_job_process_count() -> int | None:
                     # enumerate; keep going.
                     continue
                 enumerated += 1
-                if _JOB_PROCESS_MARKER in cmdline:
+                if _JOB_PROCESS_MARKER in cmdline and not _job_belongs_elsewhere(entry, own_service):
                     count += 1
             if enumerated:
                 return count
@@ -4249,8 +4285,15 @@ def _running_job_process_count() -> int | None:
                 parts = process.info.get("cmdline") or []
             except Exception:
                 continue
-            if any(_JOB_PROCESS_MARKER in str(part) for part in parts):
-                count += 1
+            if not any(_JOB_PROCESS_MARKER in str(part) for part in parts):
+                continue
+            try:
+                service = str((process.environ() or {}).get("RENDER_SERVICE_NAME") or "").strip()
+            except Exception:
+                service = ""
+            if own_service and service and service != own_service:
+                continue
+            count += 1
         return count
     except Exception:
         return None
