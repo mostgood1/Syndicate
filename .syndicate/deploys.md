@@ -45586,3 +45586,15 @@ three different artifact vintages, which is worth knowing before anyone calls it
 - reading 1 (19:53:06Z rewrite): 747 of 756 changed. Projection minus the player's own 2025-26 average, same players: SOG elite (>=3.0/game, n 18) -0.567 -> -0.304, all (n 196) -0.111 -> -0.053; POINTS elite -0.250 -> -0.175; ASSISTS elite -0.306 -> -0.281; GOALS all -0.022 -> -0.003.
 - offline evidence: paired backtest vs the previous engine, 12,540 regular-season player-games -- Brier SOG@1.5 -0.0010, SOG@2.5 -0.0011, ASSISTS@0.5 -0.0010, POINTS@0.5 -0.0012 (CIs exclude 0); playoffs GOALS@0.5 +0.0006 worse.
 - not shipped: assist_weight (ASSISTS@0.5 Brier +0.0010 worse); elite playmakers remain ~-0.28 assists/game under.
+
+## 2026-10-03 19:54Z (2:54 PM CT) -- READING, NO DEPLOY: NHL prop projection coverage on the served board, and what the unprojected rows are (lane `nhl-player-props-projection`, asked by the backtest watcher session)
+
+- served /api/board/layer2-shortlist 19:54:19Z (build_age 238 s, slate 2026-10-03 pregame): prop rows_considered 1,034, rows_with_projection **791 (76.5%)**, unmatched 243, rows_with_probability 791, refused_by_line {}.
+- the 297/341 (10-02 21:42Z) -> 94/338 (10-03 03:17Z) drop was a SLATE change, not a regression: at 03:17Z the board still held the 10-02 slate with every game in play/finished, so the producer's lines file had few CURRENT lines to project.
+- 232 unprojected 10-03 rows classified with the production join code on the files the board read (props CSV 19:53:06Z, lines 19:49:59Z):
+  - 96: the player IS projected but has no CURRENT (player, market) line in the producer's lines file -- the producer only projects pairs it has a current line for, while the board can price any line from the mean (e.g. one-sided GOALS 0.5/1.5 quotes). STRUCTURAL; fix in the producer.
+  - 70: no current line for the player at all in the producer's file at its last run (same mechanism, whole player).
+  - 14: REAL REGULARS NOT DRESSED (no line slot): John Carlson 23.7 min, Darnell Nurse, Artyom Levshunov. Dress ranking by TOTAL ice time over the window penalises a player who missed late games of last season, which the early-season window is made of. DEFECT.
+  - 9: not in the sim lineup at all (Chinakhov, Eklund, Zellweger).
+  - ~43 of the 'projected player, other market missing' bucket did not classify cleanly -- not explained.
+- the lineup-window fix (ebe7a634) is NOT the main source: only the 14 + 9 involve the lineup.
