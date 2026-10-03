@@ -1550,6 +1550,14 @@ death, never life — do not invert it.
 - Verification: Entries match the measured table; 103+ registry tests pass; a layer2 NFL artifact rebuilt after the deploy shows Passing TDs measured and Interceptions parity with skill_reliability 1.0.
 - Blocked by: none
 
+### wnba-book-information — OPEN — opened 2026-10-03 — session 39b666bb-e708-4edf-bfe5-3dda419e3589
+- Goal: Measure what the WNBA prop book line knows that the model (fix #2+#3 stack) does not: who is right when they disagree, whether the book's disagreement predicts the player's MINUTES surprise or RATE surprise, and how much of it is late teammate absences (played the previous game, sits today); each with n and a game-clustered CI, ending in a ranked list of information sources the model could acquire. Measurement only, no engine change, no new odds spend without a user decision
+- Files: scripts/analyze_wnba_book_information.py (NEW), .syndicate/findings_2026-10-03_wnba_book_information.md (NEW)
+- Hypothesis: The book's remaining edge at its own line is mostly game-day MINUTES information (injury reports, rest, rotation changes) -- especially teammate absences announced after the previous game -- not a better per-minute rate
+- Falsification test: If the book-minus-model gap predicts the rate residual at least as well as the minutes residual, or teammate-absence games show no excess book move, the book's edge is not mostly minutes news
+- Verification: Tables in the findings file: disagreement buckets, minutes-vs-rate decomposition, teammate-absence effect, each with n and CI
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
