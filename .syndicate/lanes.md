@@ -966,8 +966,8 @@ death, never life — do not invert it.
 - Verification: unit tests over the evaluator (healthy, each failure, re-alert window, recovery); live run on the fleet reports healthy; a negative control (stopped healthz / bad port) raises an alert and a real Windows notification
 - Blocked by: none
 
-### wnba-odds-run-failures — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
-- Goal: WNBA odds-refresh runs stop failing on the post-refresh IndexError (build_recommendation_output returns the row unchanged when ranking filters it out), and a failed step's stderr_tail no longer loses its error line to LIST_MEMORY/DATAFRAME_MEMORY dumps; verified on the fleet after a restart — **GOAL: NOT MET** (interim 18:15Z: WNBA ok in 8/8 runs since the fix vs 0/65 baseline, post_refresh ok, but all pregame; live phase owed -- watcher v2 b9s8e63mp, `C:/tmp/wnba_watch_evening2.py`, VERDICT 2026-10-03T03:45Z (10:45 PM CT); v1 watcher was blind, replaced; deploys.md 18:15Z)
+### wnba-odds-run-failures — CLOSED — opened 2026-10-02 — closed 2026-10-03 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: WNBA odds-refresh runs stop failing on the post-refresh IndexError (build_recommendation_output returns the row unchanged when ranking filters it out), and a failed step's stderr_tail no longer loses its error line to LIST_MEMORY/DATAFRAME_MEMORY dumps; verified on the fleet after a restart — **GOAL: MET** (watcher over 79 WNBA runs to 03:45Z: no IndexError; pregame 37/37 ok vs baseline 0/65; the 31 live failures are a different, pre-existing cause -- `--mode fast` vs main()'s --do-edges exit check -- logged as a lead; deploys.md 2026-10-03 03:45Z)
 - Files: syndicate/features/shared/recommendation_engine.py,syndicate/features/shared/refresh_log_tail.py,tests/test_recommendation_engine_filtered_candidate.py,tests/test_refresh_log_tail_memory_tokens.py
 - Hypothesis: n/a
 - Falsification test: n/a
@@ -1078,8 +1078,8 @@ death, never life — do not invert it.
 - Verification: fleet: git rev-parse --abbrev-ref main@{upstream} prints github/main and git status -sb shows main...github/main level; runbook names the recipe and the trap
 - Blocked by: none
 
-### ncaaf-games-cache-data-root — OPEN — opened 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
-- Goal: NCAAF's games cache lives on the data root: ncaaf_historical_loader's default cache dir follows default_ncaaf_source_root() (as SP+ already does) and the generator's _cached_games reads the same dir, so refreshes stop rewriting the git-tracked checkout copy; fleet data-root copy seeded from the fresher checkout copy first, checkout file restored — **GOAL: NOT MET** (code 08361660 on the fleet; data root seeded 331/888, checkout clean, borrow returned. Owed: the next NCAAF projection run refreshes the DATA-ROOT copy and leaves the checkout clean -- DUE ~2026-10-03T00:50Z (7:50 PM CT): refresh-worker relaunches when smartsim2_projections_2026_wk5.csv (mtime 2026-10-02T00:49:12Z) passes SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS=86400; last run refreshed the cache ~6 min before writing the artifact. Reading = data-root games_2026.json.gz mtime after 00:50Z + `git status` clean in ~/Syndicate; deploys.md 19:30Z)
+### ncaaf-games-cache-data-root — CLOSED — opened 2026-10-02 — closed 2026-10-03 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
+- Goal: NCAAF's games cache lives on the data root: ncaaf_historical_loader's default cache dir follows default_ncaaf_source_root() (as SP+ already does) and the generator's _cached_games reads the same dir, so refreshes stop rewriting the git-tracked checkout copy; fleet data-root copy seeded from the fresher checkout copy first, checkout file restored — **GOAL: MET** (01:09:32Z: the NCAAF projection run refreshed the DATA-ROOT games_2026.json.gz, 333/888 completed; ~/Syndicate tracked-dirty 0; deploys.md 2026-10-03 03:45Z)
 - Files: scripts/generate_smartsim2_ncaaf_projections.py (_cached_games only),tests/test_ncaaf_games_cache_data_root.py,tests/test_ncaaf_sp_ratings_cache.py (cache-dir fixture only) (the NCAAF historical-truth loader was BORROWED from lane ncaaf-kickoff-cache-staleness for 08361660 and is RETURNED.)
 - Hypothesis: n/a
 - Falsification test: n/a
