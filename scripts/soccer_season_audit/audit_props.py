@@ -394,13 +394,17 @@ ASOF_BOOK = {"player_shots": "shots", "player_shots_on_target": "sot",
 def _asof_history(outc):
     """(league, folded name) -> [(kickoff, appeared-row)] sorted; league -> [(kickoff, row)] for the league mean."""
     hist, league_rows = collections.defaultdict(list), collections.defaultdict(list)
+    team_rows = collections.defaultdict(list)
     for (lg, mid), o in outc.items():
         k = ts(o.get("kickoff")) or ts(f"{o.get('date')}T12:00:00Z")
+        names = {s: fold((o.get("teams") or {}).get(s, {}).get("name") or "") for s in ("home", "away")}
         for p in o.get("players") or []:
             if not appeared(p):
                 continue
             hist[(lg, fold(p["name"]))].append((k, p))
             league_rows[lg].append((k, p))
+            team_rows[(lg, names.get(p.get("side"), ""))].append((k, p))
+    _asof_history.team_rows = team_rows
     for v in list(hist.values()) + list(league_rows.values()):
         v.sort(key=lambda x: x[0])
     return hist, league_rows
@@ -455,6 +459,15 @@ def grade_asof(out_path, dump_rows=None):
         kick = m["kickoff"]
         bound = bind_players(m["players"], o["players"])
         lg_prior = [p for k, p in league_rows[lg] if k < kick]
+        # PRODUCTION'S SHRINK TARGET (H38 stage 2): `build_usage_profiles` sees one team, so it shrinks toward the
+        # TEAM's per-appearance mean. Same pseudo-apps; the target is this match's side's prior appearances.
+        team_prior = {s: [p for k, p in _asof_history.team_rows.get((lg, fold((o.get("teams") or {}).get(s, {}).get("name") or "")), []) if k < kick]
+                      for s in ("home", "away")}
+        team_mean = {}
+        for s, tp in team_prior.items():
+            for stat, (_f, ostat, _l) in ASOF_STATS.items():
+                tv = [v for v in (_asof_val(q, ostat) for q in tp) if v is not None]
+                team_mean[(s, stat)] = mean(tv) if tv else None
         lg_mean = {}
         for stat, (_f, ostat, _l) in ASOF_STATS.items():
             lv = [v for v in (_asof_val(q, ostat) for q in lg_prior) if v is not None]
@@ -475,7 +488,9 @@ def grade_asof(out_path, dump_rows=None):
                 mv, y = p.get(field), _asof_val(hit, ostat)
                 vals = [v for v in (_asof_val(q, ostat) for q in prior) if v is not None]
                 lmean = lg_mean[stat]
+                tmean = team_mean.get((hit.get("side"), stat))
                 r[stat] = {"model": None if mv is None else float(mv), "y": y,
+                           "ct": ((sum(vals) + ASOF_SHRINK * tmean) / (len(vals) + ASOF_SHRINK)) if tmean is not None else None,
                            "a": mean(vals) if len(vals) >= ASOF_MIN_APPS else None,
                            "b": mean(vals[-5:]) if len(vals) >= ASOF_MIN_APPS else None,
                            "c": ((sum(vals) + ASOF_SHRINK * lmean) / (len(vals) + ASOF_SHRINK)) if lmean is not None else None,

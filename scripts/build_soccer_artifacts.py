@@ -1242,6 +1242,9 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
                 # needing a rebuild first.
                 "goal_or_assist_probability": row.get("goal_or_assist_probability"),
                 "two_or_more_scorer_probability": row.get("two_or_more_scorer_probability"),
+                # H38 provenance (lane soccer-shots-allocation-blend): present ONLY when the own-rate blend
+                # produced this row's shot/SOT ladder, so a flag-off artifact is byte-identical to before.
+                **({"own_rate_blend": row["own_rate_blend"]} if row.get("own_rate_blend") else {}),
             }
             for row in player_outputs
         ],
