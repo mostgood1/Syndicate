@@ -4,7 +4,16 @@ Lane `nfl-lines-props-backtest` (session 05b01a84). Measurement only: no deploy,
 Harness `scripts/backtest_nfl_lines_props.py` (commit `b2f0ab3b`), same method and table shape as the
 NHL props backtest (lane `nhl-player-props-projection`) and the NCAAF twin (lane `ncaaf-lines-props-backtest`).
 
-**Status: PROPS COMPLETE. GAME LINES RUNNING** (864 games simulated as-of; section 2 is filled in when it lands).
+**Status: COMPLETE** (props 2023-2026 wk2; game lines 2022-2025 + 2026 wks 1-3, 1,135 games simulated
+as-of). Full machine-readable outputs, not committed (scratch):
+- `C:\tmp\nflbt\final\nfl_lines_props_backtest.{json,md}` (game lines + diagnosis);
+- `C:\tmp\nflbt\props5\...` (props + diagnosis).
+
+Reproduce with the commands in the script docstring against a root built as in section 3.
+
+**Game lines in one line:** the sim beats a naive baseline on margin and moneyline but loses to the
+close in every market. Its spread/total cover probabilities are worse than a coin flip, because they
+are overconfident about disagreements with the line that carry no information (sections 2, 2d).
 
 ## 0. Verdict up front
 
@@ -82,7 +91,146 @@ from the corrected run. Context is now non-1.0 on ~87% of historical rows. The r
 - rushing_attempts and anytime_td sit at (0, 0) BY DESIGN.
 - The 2026 week-2 rows are 1.0 by design: a player needs 2 prior weeks.
 
-## 2. Game lines — PENDING (run in progress)
+## 2. Game lines: production's sim, as-of, 1,135 games (2022-2025 complete + 2026 wks 1-3)
+
+**Population:** every completed REG game with a projection and a two-sided nflverse close.
+
+- **Drops:** 3 ML ties, 32 spread pushes, 8 total pushes.
+- **Baseline (as-of league rates):**
+  - margin = league mean home margin;
+  - total = league mean total;
+  - P(home win) / P(home cover) / P(over) = league rates.
+
+  All of these use the prior season plus this season before the game's week.
+- **Book:** proportional de-vig of the nflverse closing ML, spread juice and total juice.
+
+### 2a. 2022-2025 pooled (1,087 games, 72 weeks)
+
+| market | n | model | baseline | book | model − baseline [CI] | model − book [CI] |
+|---|---|---|---|---|---|---|
+| margin, MAE | 1,087 | 9.99 | 10.71 | 9.49 | **−0.73 [−1.01, −0.45] better** | +0.49 [+0.31, +0.67] worse |
+| total, MAE | 1,087 | 10.66 | 10.74 | 10.19 | −0.08 [−0.29, +0.11] no diff | +0.47 [+0.25, +0.71] worse |
+| moneyline, Brier | 1,084 | 0.2258 | 0.2486 | 0.2105 | **−0.0228 [−0.0310, −0.0145] better** | +0.0154 [+0.0093, +0.0206] worse |
+| spread cover, Brier | 1,058 | 0.2613 | 0.2506 | 0.2498 | +0.0107 [+0.0049, +0.0170] **worse** | +0.0114 [+0.0057, +0.0178] worse |
+| total over, Brier | 1,079 | 0.2693 | 0.2500 | 0.2501 | +0.0193 [+0.0103, +0.0285] **worse** | +0.0192 [+0.0105, +0.0277] worse |
+
+**Log-loss vs the book: worse in all three markets.**
+
+| market | dLogLoss model − book [CI] |
+|---|---|
+| moneyline | +0.035 [+0.022, +0.047] |
+| spread | +0.025 [+0.012, +0.038] |
+| total | +0.044 [+0.025, +0.063] |
+
+**EV-bet ROI at the close.**
+
+| market | ROI [CI] | bets |
+|---|---|---|
+| moneyline | −10.8% [−19.5, −2.0] | 919 |
+| spread | −2.6% [−8.5, +4.0] | 869 |
+| total | −3.6% [−9.8, +2.7] | 960 |
+
+What the table says:
+
+- The sim carries real signal: it beats the naive baseline on margin MAE and on moneyline Brier.
+- It loses to the close in every market.
+- **Its spread-cover and total-over probabilities are worse than the league-rate baseline**, which is
+  a near coin flip. So the probability layer subtracts value that the margin mean has.
+
+Per season, model vs book (dBrier):
+
+| market | 2022 | 2023 | 2024 | 2025 |
+|---|---|---|---|---|
+| moneyline | worse | worse | worse | worse |
+| spread | no diff | worse | no diff | worse |
+| total | worse | worse | no diff | worse |
+
+Margin MAE vs book is worse in 2023, 2024 and 2025; in 2022 it is +0.30 [−0.04, +0.66].
+
+**Consistency with settled work:** the 2025 margin MAE here is 10.45 vs close 9.72. The refusal audit
+had 10.495 vs 9.722 on the same season. Same answer, now from the production sim at 300 seeds rather
+than the linear rating differential.
+
+### 2b. 2026 in-season (48 games, weeks 1-3)
+
+| market | model | book | model − book [CI] |
+|---|---|---|---|
+| margin MAE | 11.64 | 10.41 | +1.23 [+0.38, +2.12] |
+| total MAE | 12.22 | 11.10 | +1.12 [+0.07, +2.22] |
+| moneyline Brier | 0.2586 | 0.2327 | +0.026 [−0.007, +0.059] |
+| spread Brier | 0.2933 | 0.2482 | +0.045 [+0.017, +0.077] |
+| total Brier | 0.2895 | 0.2500 | +0.039 [−0.000, +0.078] |
+
+- EV-bet ROI on spreads: −36.0% [−65.4, −6.1], 39 bets.
+- **These numbers are the CURRENT code re-run as-of, not what the board served in weeks 1-3.** Those
+  served files were lost with Render's disk. The fleet copies are the 2026-08-01 preseason backfill.
+  Served wk1 was graded on 2026-09-14 (margin 12.59 vs 10.80).
+
+### 2c. Segment lines (1H / 2H / quarters)
+
+**Not gradable.**
+
+- **Prices:** NFL segment prices exist on the fleet (`tracking/book_quotes`, h1/h2/q1-q4 for
+  spreads/totals/h2h) only for games commencing 2026-10-02. That is the week-4 Thursday game, which is
+  in no as-of results input yet.
+- **Projections:** `smartsim2_segment_distributions_2026_wk4/5.json` exist, but no board consumer
+  prices NFL segments. Only NCAAF has a segment join.
+- **Result:** 0 completed games carry both a projection and a price, so the population is empty.
+- **When it becomes gradable:** after week 4 completes, if the capture continues and a consumer
+  exists.
+
+## 2d. Game-line diagnosis: WHY each market loses
+
+Every model change is fitted on 2022-2024 and scored on 2025, and again on 2026 wks 1-3, through
+`shared/football_cards.cover_probability` (the board's own function).
+
+| market (2025 holdout) | Brier gap | Murphy reliability / resolution, model | same, book | corr(mean, actual): model / close line | gap closed: scale_sd (k) | shift_mean | market-anchored (w) |
+|---|---|---|---|---|---|---|---|
+| spread cover | 0.0225 | **0.0348** / 0.0125 | 0.0069 / 0.0073 | 0.36 / 0.50 | 81.9% (k = 4.0, grid edge) | −1.8% | 93.3% (w = 0.9) |
+| total over | 0.0200 | **0.0319** / 0.0118 | 0.0138 / 0.0129 | 0.13 / 0.30 | 93.9% (k = 4.0, grid edge) | 6.0% | 101.8% (w = 0.9) |
+| moneyline | 0.0137 | 0.0061 / **0.0306** | 0.0033 / **0.0369** | 0.36 / 0.50 | −6.3% | −3.5% | 86.1% (w = 1.0) |
+
+2026 wks 1-3 agree, more sharply:
+- corr(model margin, actual) 0.08 vs the line's 0.31.
+- corr(model total, actual) 0.02 vs the line's 0.46.
+
+**Spread and total: the cover probability is OVERCONFIDENT about disagreements with the line that carry
+no information.**
+- The sim's own sd matches the spread of actual around its mean (sd ratio 1.00 margin, 0.84 total).
+- Its probability AT THE LINE is far too sure. Fitted k runs to the grid edge (4.0), which is a
+  probability of ≈ 0.5, i.e. the book's.
+- **The cover probability adds nothing the close does not already contain.** Any disagreement it
+  expresses is, on average, noise.
+
+**Moneyline: the reverse.**
+- Well calibrated (reliability 0.006), but RESOLUTION-deficient: 0.031 vs 0.037. It ranks teams less
+  well than the market.
+- Recalibration cannot close it; widening makes it worse (−6%). This is the same signature as
+  2026-09-08's live-gameline finding.
+
+**Bias: small.**
+- Margin: actual − mean = +1.1 in 2025, i.e. home teams under-projected by ~1 point.
+- Total: +2.1 in 2025, i.e. totals under-projected after the 0.3 level shrink.
+- Shifting closes ≤ 6%. Bias is not the problem.
+
+### Ranked model changes, game lines
+
+| # | change | measured on 2025 holdout | caveat |
+|---|---|---|---|
+| 1 | **Price the spread/total cover from a predictive distribution that includes the RATING's uncertainty, not only the sim's game-to-game spread.** sd_pred = sqrt(sd_sim² + var(mean error)). The fitted k ≥ 4 says var(mean error) dominates. | closes 82% (spread), 94% (total) of the gap; 2026: 76%, 82% | A probability near 0.5 is the honest answer while the ratings carry no information beyond the close. It removes false confidence, not the gap's cause. Calibrated-engine rule: re-measure after. |
+| 2 | **Better ratings: the information the close has.** Ceiling (market-anchored mean) is 86-100% in all three markets. Candidates: QB / key-player availability (injury ingestion exists, but the in-sim injury adjustment HURT, `36cd8a5c`); roster changes; early-season priors (K=4 already shipped). | ceiling only | The rating differential's corr with margin is 0.36 vs the close's 0.50 (2025), and 0.08 vs 0.31 in 2026. This is the binding constraint for the moneyline, where recalibration does nothing. |
+| 3 | Remove the residual level bias (+1.1 home margin, +2.1 total in 2025) | ≤ 6% | low value |
+
+## 2e. Coverage for game lines
+
+Every season's intersection is complete:
+- 2022: 271 games, 18 weeks.
+- 2023-2025: 272 games, 18 weeks each.
+- 2026: 48 games, weeks 1-3.
+
+Each needs final scores, pbp, a two-sided close and a projection. Sources:
+- **pbp 2026, schedules and closes:** fleet. The closes are nflverse `schedules_games.csv`.
+- **pbp 2021-2025:** checkout mirror, plus the nflverse fetch for 2021.
 
 ## 3. Coverage: per family, and the intersection each result rests on
 

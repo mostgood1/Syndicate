@@ -1220,6 +1220,17 @@ death, never life — do not invert it.
   - Anytime TD: shrinkage beats the raw own rate (−0.0252 [−0.0284, −0.0219]) but loses even to the vig-INCLUSIVE yes price (+0.0088 [+0.0069, +0.0106]).
   - 2026: only wk2 prices survive (16 games); weeks 1 and 3 were lost with Render's disk.
   - No market beats both baseline and book. GAME LINES RUNNING (2022-2026, pbp_2021 fetched on user instruction).
+  - **GAME LINES READING 2026-10-03 ~03:30Z** (1,135 games, production sim at 300 seeds, as-of; fit 2022-24 / test 2025 + 2026 wks 1-3). 2022-25 pooled, model vs de-vigged close, dBrier:
+    - ML +0.0154 [+0.0093, +0.0206]; spread +0.0114 [+0.0057, +0.0178]; total +0.0192 [+0.0105, +0.0277]. All worse.
+    - Margin MAE 9.99 vs close 9.49.
+    - The sim BEATS the as-of league baseline on margin MAE (−0.73 [−1.01, −0.45]) and ML Brier (−0.0228 [−0.0310, −0.0145]).
+    - Its spread and total cover probabilities are WORSE than the league-rate baseline (+0.0107, +0.0193).
+  - **Diagnosis:**
+    - spread/total = RELIABILITY (overconfident at the line); a predictive sd that carries rating uncertainty closes 82% / 94% on 2025.
+    - ML = RESOLUTION deficit (corr(model, margin) 0.36 vs the close's 0.50); only better ratings can close it.
+  - 2026 wks 1-3 are the CURRENT code re-run; the served files were lost with Render's disk.
+  - Segments: 0 gradable games (prices only for 10-02; no consumer).
+  - Verification MET: end-to-end on fleet + as-of inputs; coverage + intersection printed; per-market tables written for 2026 and 2022-2025 separately.
   - **USER DECISION 2026-10-02 ~7:05 PM CT** (relayed by the NCAAF backtest session; matches the standing rule `feedback_every_line_its_own_decision`): "every line is its own decision. we should have a model that is accurate that then helps inform each decision". The lane's "earns a probability/edge only if it beats baseline AND book" rule is WITHDRAWN; there is no gate list and no mean-only or withheld market. Deliverable reframed: per losing market, WHY plus the model change that would make it accurate, ranked by out-of-sample impact (fit 2023-24 / test 2025; lines fit 2022-24).
   - Owed to lane `layer2-triad-alignment`: `backtest_nfl_props._rate_from_log` omits production's zero-week imputation (not edited here).
 
