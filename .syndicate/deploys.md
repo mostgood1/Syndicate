@@ -45235,3 +45235,14 @@ Supersedes "Not upstream" in the 2026-10-01/02 blocks entry. Upstream `main` `si
 - deploy: user-run ff to eccfe602 + live-odds-worker TERM (STOP_SIGNAL 02:32:24Z); new pid 747280 started 02:32:55Z.
 - verify: VENUE_BOOT_STARTED 02:33:03Z (8 s after start); first ODDS_SWEEP_LAUNCHED 02:34:43Z = 1m48s after start (refused lane_busy by the previous worker's still-running live sweep pid 746110 -- expected; relaunched 02:37:35Z). Before, restart 23:09:05Z: loop_start 23:18:17Z, first launch 23:22:16Z (~13 min). Boot thread: SLATE_WRITE ok 02:37:20Z (count 21,671), probe POLYMARKET_US_GAMES 02:41:31Z, VENUE_POLL_STARTED 02:42:12Z; the main loop's own per-pass write at 02:41:35Z is the normal cadence (180s gate), not a duplicate.
 - not addressed: the ~4-min silent section inside a first tick seen at 23:18-23:21Z (likely CPU/GIL contention with venue-poll Kalshi + live-lines payload builds; unmeasured). This restart's first tick reached its launch in ~1 min.
+
+## 2026-10-03 02:47:31Z (9:47 PM CT 10-02) -- LOCAL FLEET FF 95ac02cf -> 20b3dbc4: MLB first-pitch sim freeze (lane `mlb-pregame-sim-freeze`, user: "build the first-pitch freeze") -- **PARTLY MET; post-first-pitch reading OWED**
+
+- **What.** `syndicate/features/mlb/pregame_freeze.py` (NEW), called by `scripts/run_mlb_daily_sim_job.py` BEFORE and AFTER every vendor sim run. It copies each `daily/sims/<date>/sim_*.json` whose own `schedule.status.detailed` at sim time is Scheduled/Pre-Game/Warmup into `daily/sims_pregame/<date>/sim_pk<pk>_g<n>.json`. The latest pregame copy wins; a post-start re-sim is never copied. The gap was this one commit only.
+- **No restart.** The sim job is a per-run subprocess, so the next run loads the new code from disk. No sim was running at the ff (ps empty). Nothing outside the MLB sim job changed.
+- **Reachability** (READ 02:5xZ): refresh-worker pid 684735 has `MLB_BETTING_DATA_ROOT=/home/amyn/syndicate-prod/data/mlb_source/source_artifacts/data`. Only that key was printed. It is the directory the 10-03 sims were written to.
+- **Reading 1** (manual one-shot freeze for 2026-10-03, fleet code, same data root): `seen=4 frozen_new=4 not_pregame=0 unreadable=0`. All 4 copies have `status_at_sim=Scheduled`, sources written 23:16-23:33Z by the `evening_next_day_sim` run (23:09:56Z, rc 0). Pairs (gamePk): CWS@CLE 849829, ATL@LAD 849828, NYY@TB 849835, SD@MIL 849830.
+- **OWED** (lane Verification):
+  - The next sim run's `MLB_PREGAME_FREEZE phase=before/after` lines in `refresh-worker.log`.
+  - After first pitch on 10-03: `sims_pregame/2026-10-03` still Scheduled/Pre-Game (byte-identical unless a later PREGAME sim replaced it), while `daily/sims/2026-10-03` shows post-start re-sims.
+- **Render** (suspended): `daily/sims_pregame/` is NOT in `HOT_ARTIFACT_PATTERNS` (`artifact_publisher.py`, held by lane `nhl-live-resim`). That is moot on the one-disk fleet, but it is needed if production returns to separate disks.
