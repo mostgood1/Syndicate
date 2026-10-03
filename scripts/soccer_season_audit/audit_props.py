@@ -359,5 +359,322 @@ def lodo_c(by_T, field, min_train=30):
     return held
 
 
+# ============================================================================ --asof: vs the player's own average
+# Lane `soccer-lines-props-backtest`, 2026-10-02. The NHL props template (lane `nhl-player-props-projection`,
+# deploys.md 2026-10-02 21:38Z): a prop market earns a board probability only if the model beats the
+# PLAYER'S OWN AS-OF AVERAGE and the book. Every earlier soccer prop grade used a constant or an engine
+# arm as its baseline, so this mode is the missing half. Additive: `main()` above is unchanged.
+#
+#   population  model players bound one-to-one to an ESPN box-score player who APPEARED (books void
+#               non-appearances), from the latest build generated BEFORE kickoff (`prekickoff_only`).
+#   model mean  the `*_if_playing` field (the conditional-on-appearing mean the board prices since
+#               fix #2); anytime = `anytime_scorer_probability_if_playing`.
+#   baseline a  the player's own mean per APPEARANCE over this season's box scores with kickoff
+#               strictly before this one, same league, folded name; >= ASOF_MIN_APPS prior apps.
+#   baseline b  his last 5 appearances (same prior-only rule).
+#   baseline c  a: shrunk toward the league's as-of per-appearance mean with ASOF_SHRINK pseudo-apps.
+#   CI          match-clustered percentile bootstrap (common.boot_ci), 95%.
+#   verdict     BEATS (CI wholly < 0), WORSE (wholly > 0), NO_DIFF, INSUFFICIENT_N (< ASOF_MIN_ROWS rows
+#               or < ASOF_MIN_MATCHES matches).
+#   book        one-sided OVER prices only, so NO de-vig exists: the comparison is model vs the raw
+#               implied probability (with vig) and flat-stake ROI at the best price, and it can never
+#               certify "beats the de-vigged book" -- which keeps the gate shut by construction.
+ASOF_MIN_APPS, ASOF_SHRINK = 3, 3.0
+ASOF_MIN_ROWS, ASOF_MIN_MATCHES = 200, 30
+ASOF_POST_FIX = {"shots": "2026-09-17T00:00:00+00:00", "sot": "2026-09-17T00:00:00+00:00",
+                 "goals": "2026-09-17T00:00:00+00:00", "assists": "2026-09-19T00:00:00+00:00"}
+ASOF_STATS = {"shots": ("expected_shots_if_playing", "shots", (0.5, 1.5, 2.5)),
+              "sot": ("expected_shots_on_target_if_playing", "sot", (0.5, 1.5)),
+              "goals": ("anytime_scorer_probability_if_playing", "goals", (0.5,)),
+              "assists": ("expected_assists_if_playing", "assists", (0.5,))}
+ASOF_BOOK = {"player_shots": "shots", "player_shots_on_target": "sot",
+             "player_goal_scorer_anytime": "goals", "player_assists": "assists"}
+
+
+def _asof_history(outc):
+    """(league, folded name) -> [(kickoff, appeared-row)] sorted; league -> [(kickoff, row)] for the league mean."""
+    hist, league_rows = collections.defaultdict(list), collections.defaultdict(list)
+    for (lg, mid), o in outc.items():
+        k = ts(o.get("kickoff")) or ts(f"{o.get('date')}T12:00:00Z")
+        for p in o.get("players") or []:
+            if not appeared(p):
+                continue
+            hist[(lg, fold(p["name"]))].append((k, p))
+            league_rows[lg].append((k, p))
+    for v in list(hist.values()) + list(league_rows.values()):
+        v.sort(key=lambda x: x[0])
+    return hist, league_rows
+
+
+def _asof_val(p, stat):
+    v = p.get(stat)
+    if stat == "goals":
+        return 1.0 if (v or 0) >= 1 else 0.0          # the anytime outcome, not the goal count
+    return None if v is None else float(v)
+
+
+def _verdict(n, matches, ci):
+    if n < ASOF_MIN_ROWS or matches < ASOF_MIN_MATCHES:
+        return "INSUFFICIENT_N"
+    if ci[1] < 0:
+        return "BEATS"
+    if ci[0] > 0:
+        return "WORSE"
+    return "NO_DIFF"
+
+
+def _clip(p):
+    return min(max(p, 1e-4), 1 - 1e-4)
+
+
+def _boot_rows(units, fn, reps=2000, seed=11):
+    """Match-clustered percentile CI of mean(fn(row)) -- the same estimator as common.boot_ci over
+    units, computed from per-match (sum, count) so a resample costs O(matches), not O(rows)."""
+    import numpy as np
+    if len(units) < 5:
+        return (float("nan"), float("nan"))
+    sums = np.array([sum(fn(r) for r in u) for u in units], dtype=float)
+    cnts = np.array([len(u) for u in units], dtype=float)
+    idx = np.random.default_rng(seed).integers(0, len(units), size=(reps, len(units)))
+    vals = np.sort(sums[idx].sum(axis=1) / cnts[idx].sum(axis=1))
+    return float(vals[int(0.025 * reps)]), float(vals[int(0.975 * reps) - 1])
+
+
+def grade_asof(out_path):
+    recs = load_recs(prekickoff_only=True)
+    outc = load_outcomes()
+    hist, league_rows = _asof_history(outc)
+    funnel = collections.Counter()
+    rows = []
+    for (lg, mid), m in recs.items():
+        o = outc.get((lg, mid))
+        if not o:
+            funnel["match_no_outcome"] += 1
+            continue
+        funnel["match_graded"] += 1
+        kick = m["kickoff"]
+        bound = bind_players(m["players"], o["players"])
+        lg_prior = [p for k, p in league_rows[lg] if k < kick]
+        lg_mean = {}
+        for stat, (_f, ostat, _l) in ASOF_STATS.items():
+            lv = [v for v in (_asof_val(q, ostat) for q in lg_prior) if v is not None]
+            lg_mean[stat] = mean(lv) if lv else None
+        for p in m["players"]:
+            funnel["model_player_rows"] += 1
+            hit = bound.get(id(p))
+            if hit is None:
+                funnel["unbound_to_box_score"] += 1
+                continue
+            if not appeared(hit):
+                funnel["did_not_appear(void)"] += 1
+                continue
+            prior = [q for k, q in hist.get((lg, fold(hit["name"])), []) if k < kick]
+            r = {"lg": lg, "key": f"{lg}|{mid}", "date": m["date"], "gen": m["generated_at"],
+                 "starter": bool(hit["starter"]), "n_prior": len(prior), "share": p.get("expected_minutes_share")}
+            for stat, (field, ostat, _lines) in ASOF_STATS.items():
+                mv, y = p.get(field), _asof_val(hit, ostat)
+                vals = [v for v in (_asof_val(q, ostat) for q in prior) if v is not None]
+                lmean = lg_mean[stat]
+                r[stat] = {"model": None if mv is None else float(mv), "y": y,
+                           "a": mean(vals) if len(vals) >= ASOF_MIN_APPS else None,
+                           "b": mean(vals[-5:]) if len(vals) >= ASOF_MIN_APPS else None,
+                           "c": ((sum(vals) + ASOF_SHRINK * lmean) / (len(vals) + ASOF_SHRINK)) if lmean is not None else None,
+                           "lmean": lmean}
+            rows.append(r)
+            funnel["appeared_rows"] += 1
+    print("=== AS-OF FUNNEL ===", dict(funnel))
+
+    def cell(rs, stat):
+        rs = [r for r in rs if r[stat]["model"] is not None and r[stat]["y"] is not None and r[stat]["a"] is not None]
+        if not rs:
+            return {"n": 0, "verdict": "INSUFFICIENT_N"}
+        by = collections.defaultdict(list)
+        for r in rs:
+            by[r["key"]].append(r)
+        units = list(by.values())
+        g = lambda r, k: r[stat][k]
+        out = {"n": len(rs), "matches": len(units), "dates": f"{min(r['date'] for r in rs)}..{max(r['date'] for r in rs)}",
+               "mean_actual": mean(g(r, "y") for r in rs), "mean_model": mean(g(r, "model") for r in rs),
+               "mean_base_a": mean(g(r, "a") for r in rs),
+               "bias_model": mean(g(r, "model") - g(r, "y") for r in rs)}
+        for k in ("model", "a", "b", "c"):
+            out[f"mae_{k}"] = mean(abs(g(r, k) - g(r, "y")) for r in rs)
+        if stat == "goals":   # binary: Brier is the MAE analogue; MAE of a probability is not a proper score
+            for k in ("model", "a", "b", "c"):
+                out[f"brier_{k}"] = mean((g(r, k) - g(r, "y")) ** 2 for r in rs)
+            loss = lambda r, k: (g(r, k) - g(r, "y")) ** 2
+        else:
+            loss = lambda r, k: abs(g(r, k) - g(r, "y"))
+        for k in ("a", "b", "c"):
+            d = mean(loss(r, "model") - loss(r, k) for r in rs)
+            ci = _boot_rows(units, lambda r, k=k: loss(r, "model") - loss(r, k))
+            out[f"d_vs_{k}"] = {"point": d, "ci95": ci, "verdict": _verdict(len(rs), len(units), ci)}
+        # probability at standard lines: model vs Poisson(baseline a), both conditional on appearing
+        lines = {}
+        for line in ASOF_STATS[stat][2]:
+            kk = int(math.floor(line)) + 1
+            def pm(r):
+                return g(r, "model") if stat == "goals" else poisson_sf(kk, g(r, "model"))
+            def pb(r):
+                return (1 - math.exp(-max(g(r, "a"), 0.0))) if stat == "goals" else poisson_sf(kk, max(g(r, "a"), 1e-9))
+            yy = lambda r: 1.0 if (g(r, "y") >= kk) else 0.0
+            bm = mean((pm(r) - yy(r)) ** 2 for r in rs)
+            bb = mean((pb(r) - yy(r)) ** 2 for r in rs)
+            lm = mean(-math.log(_clip(pm(r)) if yy(r) else 1 - _clip(pm(r))) for r in rs)
+            lb = mean(-math.log(_clip(pb(r)) if yy(r) else 1 - _clip(pb(r))) for r in rs)
+            ci = _boot_rows(units, lambda r: (pm(r) - yy(r)) ** 2 - (pb(r) - yy(r)) ** 2)
+            def pc(r):   # the shrunk baseline c: the fairer naive probability early in a season
+                return (1 - math.exp(-max(g(r, "c"), 0.0))) if stat == "goals" else poisson_sf(kk, max(g(r, "c"), 1e-9))
+            bc = mean((pc(r) - yy(r)) ** 2 for r in rs)
+            lc = mean(-math.log(_clip(pc(r)) if yy(r) else 1 - _clip(pc(r))) for r in rs)
+            ci_c = _boot_rows(units, lambda r: (pm(r) - yy(r)) ** 2 - (pc(r) - yy(r)) ** 2)
+            ci_lc = _boot_rows(units, lambda r: (-math.log(_clip(pm(r)) if yy(r) else 1 - _clip(pm(r))))
+                               - (-math.log(_clip(pc(r)) if yy(r) else 1 - _clip(pc(r)))))
+            lines[str(line)] = {"base_rate": mean(yy(r) for r in rs), "brier_model": bm, "brier_base_a": bb,
+                                "logloss_model": lm, "logloss_base_a": lb, "dbrier": bm - bb, "dbrier_ci95": ci,
+                                "verdict": _verdict(len(rs), len(units), ci),
+                                "brier_base_c": bc, "logloss_base_c": lc, "dbrier_vs_c": bm - bc, "dbrier_vs_c_ci95": ci_c,
+                                "verdict_vs_c": _verdict(len(rs), len(units), ci_c),
+                                "dlogloss_vs_c": lm - lc, "dlogloss_vs_c_ci95": ci_lc,
+                                "verdict_logloss_vs_c": _verdict(len(rs), len(units), ci_lc)}
+        out["lines"] = lines
+        return out
+
+    report = {"funnel": dict(funnel), "params": {"min_apps": ASOF_MIN_APPS, "shrink": ASOF_SHRINK, "min_rows": ASOF_MIN_ROWS,
+                                                  "min_matches": ASOF_MIN_MATCHES, "post_fix": ASOF_POST_FIX},
+              "coverage": {"recs_prekickoff_matches": len(recs), "outcome_matches": len(outc),
+                           "intersection_matches": funnel["match_graded"]},
+              "cells": {}}
+    for stat in ASOF_STATS:
+        post = ts(ASOF_POST_FIX[stat])
+        arms = {"all_versions": rows,
+                "pre_fix": [r for r in rows if r["gen"] and r["gen"] < ts("2026-09-15T21:38:00+00:00")],
+                "post_fix": [r for r in rows if r["gen"] and r["gen"] >= post]}
+        for arm, rs in arms.items():
+            report["cells"][f"{stat}|{arm}|ALL"] = cell(rs, stat)
+            for role, sel in (("starter", True), ("sub", False)):
+                report["cells"][f"{stat}|{arm}|role={role}"] = cell([r for r in rs if r["starter"] is sel], stat)
+            if arm == "all_versions":
+                small = []
+                for lg in LEAGUES:
+                    c = cell([r for r in rs if r["lg"] == lg], stat)
+                    if c.get("matches", 0) >= ASOF_MIN_MATCHES:
+                        report["cells"][f"{stat}|{arm}|{lg}"] = c
+                    else:
+                        small.append(lg)
+                if small:
+                    report["cells"][f"{stat}|{arm}|POOLED_SMALL({'+'.join(small)})"] = cell([r for r in rs if r["lg"] in small], stat)
+    report["book"] = _asof_book(recs, outc, hist)
+    json.dump(report, open(out_path, "w", encoding="utf-8"), default=str, indent=1)
+    for k, c in report["cells"].items():
+        if not c.get("n"):
+            print(f"  {k:55s} n=0")
+            continue
+        da = c["d_vs_a"]
+        print(f"  {k:55s} n={c['n']:6d} m={c['matches']:4d} act {c['mean_actual']:.3f} mod {c['mean_model']:.3f} base {c['mean_base_a']:.3f} "
+              f"MAE mod {c['mae_model']:.4f} a {c['mae_a']:.4f} | d(loss) vs a {da['point']:+.4f} [{da['ci95'][0]:+.4f},{da['ci95'][1]:+.4f}] {da['verdict']}")
+    print(f"wrote {out_path}")
+
+
+def _asof_book(recs, outc, hist):
+    """One-sided OVER prices: model vs raw implied (with vig) on the same rows, and flat ROI at the best price
+    when model p > implied, beside the same rule driven by baseline a. Rows: appeared + baseline a present."""
+    frames = []
+    for f in glob.glob(os.path.join(S, "prod", "props", "*.csv")):
+        b = os.path.basename(f)
+        if b.startswith("_") or os.path.getsize(f) < 50:
+            continue
+        mdate = re.search(r"(\d{4}-\d{2}-\d{2})\.csv$", b)
+        try:
+            fr = pd.read_csv(f)
+        except Exception:
+            continue
+        if fr.empty or "market_key" not in fr:
+            continue
+        fr = fr[fr["market_key"].isin(list(ASOF_BOOK))].copy()
+        fr["_fdate"] = mdate.group(1) if mdate else ""
+        frames.append(fr)
+    if not frames:
+        return {"n": 0, "reason": "no prop price rows"}
+    px = pd.concat(frames, ignore_index=True)
+    px["_gt"] = px["game_time"].map(ts)
+    px = px[px["_gt"].notna()]
+    px = px[px["_fdate"] <= px["_gt"].map(lambda t: t.date().isoformat())]
+    px = px.sort_values("_fdate").drop_duplicates(["event_id", "player", "market_key", "line", "book"], keep="last")
+    two_sided = int(px["under_price"].notna().sum()) if "under_price" in px else 0
+    by_league = collections.defaultdict(list)
+    for (lg, mid), m in recs.items():
+        by_league[lg].append(m)
+    offers = collections.defaultdict(list)
+    for ev, g in px.groupby("event_id"):
+        r0 = g.iloc[0]
+        m = find_fixture(r0["home_team"], r0["away_team"], [(x["home"], x["away"], x) for x in by_league.get(r0["league"], [])
+                                                            if x["kickoff"] and abs((x["kickoff"] - r0["_gt"]).total_seconds()) <= 3 * 3600])
+        if m is None:
+            continue
+        for r in g.itertuples():
+            line = float(r.line) if pd.notna(r.line) else 0.5
+            offers[(r0["league"], m["match_id"], fold(r.player), ASOF_BOOK[r.market_key], line)].append(dec_from_american(r.over_price))
+    bets, drop = [], collections.Counter()
+    bind = {}
+    for (lg, mid, pname, stat, line), decs in offers.items():
+        m, o = recs.get((lg, mid)), outc.get((lg, mid))
+        if not m or not o:
+            drop["no_outcome"] += 1
+            continue
+        sc = sorted(((name_score(pname, p.get("player_name")), k) for k, p in enumerate(m["players"])), reverse=True)
+        if not sc or sc[0][0] < 0.84 or (len(sc) > 1 and sc[1][0] >= sc[0][0]):
+            drop["no_model_player"] += 1
+            continue
+        pm = m["players"][sc[0][1]]
+        if (lg, mid) not in bind:
+            bind[(lg, mid)] = bind_players(m["players"], o["players"])
+        hit = bind[(lg, mid)].get(id(pm))
+        if hit is None or not appeared(hit):
+            drop["void_or_unbound"] += 1
+            continue
+        field, ostat, _ = ASOF_STATS[stat]
+        mv, y = pm.get(field), _asof_val(hit, ostat)
+        prior = [v for v in (_asof_val(q, ostat) for k, q in hist.get((lg, fold(hit["name"])), []) if k < m["kickoff"]) if v is not None]
+        if mv is None or y is None or len(prior) < ASOF_MIN_APPS:
+            drop["no_model_value_or_baseline"] += 1
+            continue
+        kk = int(math.floor(line)) + 1
+        a = mean(prior)
+        p_mod = float(mv) if stat == "goals" else poisson_sf(kk, float(mv))
+        p_base = (1 - math.exp(-a)) if stat == "goals" else poisson_sf(kk, max(a, 1e-9))
+        best = max(decs)
+        bets.append({"stat": stat, "line": line, "key": f"{lg}|{mid}", "date": m["date"], "gen": m["generated_at"],
+                     "won": (y >= kk), "p_mod": p_mod, "p_base": p_base, "imp": 1.0 / best, "best": best})
+    out = {"price_rows": int(len(px)), "two_sided_rows": two_sided, "graded_player_lines": len(bets), "dropped": dict(drop), "markets": {}}
+    for stat in ASOF_STATS:
+        kb = [b for b in bets if b["stat"] == stat]
+        if not kb:
+            out["markets"][stat] = {"n": 0}
+            continue
+        by = collections.defaultdict(list)
+        for b in kb:
+            by[b["key"]].append(b)
+        units = list(by.values())
+        yv = lambda b: 1.0 if b["won"] else 0.0
+        res = {"n": len(kb), "matches": len(units), "hit_rate": mean(yv(b) for b in kb),
+               "brier_model": mean((b["p_mod"] - yv(b)) ** 2 for b in kb), "brier_base_a": mean((b["p_base"] - yv(b)) ** 2 for b in kb),
+               "brier_implied_with_vig": mean((b["imp"] - yv(b)) ** 2 for b in kb),
+               "mean_p_model": mean(b["p_mod"] for b in kb), "mean_implied": mean(b["imp"] for b in kb)}
+        res["dbrier_model_minus_implied_ci95"] = _boot_rows(units, lambda b: (b["p_mod"] - yv(b)) ** 2 - (b["imp"] - yv(b)) ** 2)
+        for who, pk in (("model", "p_mod"), ("base_a", "p_base")):
+            bl = [{**b, "pl": (b["best"] - 1.0) if b["won"] else -1.0} for b in kb if b[pk] > b["imp"]]
+            if bl:
+                r, ci, nu = roi_c(bl, "pl")
+                res[f"roi_{who}_ev_pos"] = {"bets": len(bl), "matches": nu, "roi": r, "ci95": ci}
+        out["markets"][stat] = res
+    return out
+
+
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--asof" in sys.argv:
+        grade_asof(sys.argv[sys.argv.index("--asof") + 1] if len(sys.argv) > sys.argv.index("--asof") + 1
+                   else os.path.join(S, "asof_props.json"))
+    else:
+        main()

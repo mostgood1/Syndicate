@@ -53,6 +53,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+from datetime import date as dt_date, timedelta
 import json
 import math
 import sys
@@ -203,9 +204,43 @@ def _reliability(pairs: list[tuple[float, bool]], bins: int = 5) -> list[dict[st
     return out
 
 
+def _two_way(over: Any, under: Any) -> float | None:
+    """Proportionally de-vigged P(over) from a two-way price pair, or None."""
+    try:
+        o, u = float(over), float(under)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(o) or math.isnan(u) or o <= 1.0 or u <= 1.0:
+        return None
+    return (1.0 / o) / ((1.0 / o) + (1.0 / u))
+
+
+# football-data.co.uk division codes, for the optional TRUE-closing join (`--fd-close-dir`). The committed
+# history files carry `Avg*` -- the market average at collection time, i.e. PRE-close -- not `AvgC*`.
+# Lane soccer-lines-props-backtest, 2026-10-02.
+_FD_CODES = {"epl": "E0", "championship": "E1", "la_liga": "SP1", "bundesliga": "D1", "serie_a": "I1",
+             "ligue_1": "F1", "eredivisie": "N1", "primeira_liga": "P1", "belgian_pro_league": "B1"}
+
+
+def _load_fd_close(league: str, fd_close_dir: Path | None) -> dict[tuple[str, str, str], dict[str, Any]]:
+    if fd_close_dir is None:
+        return {}
+    path = Path(fd_close_dir) / f"{_FD_CODES.get(league, league)}.csv"
+    if not path.exists():
+        return {}
+    frame = pd.read_csv(path, encoding="latin-1")
+    frame.columns = [str(c).replace("﻿", "").replace("ï»¿", "") for c in frame.columns]
+    out = {}
+    for row in frame.to_dict("records"):
+        day = _as_iso_day(row.get("Date"))
+        if day:
+            out[(day, str(row.get("HomeTeam")), str(row.get("AwayTeam")))] = row
+    return out
+
+
 def backtest_league(
     league: str, *, simulations: int, min_prior_matches: int, limit: int | None,
-    wire_market_confidence: bool = False,
+    wire_market_confidence: bool = False, since: str | None = None, fd_close_dir: Path | None = None,
 ) -> dict[str, Any]:
     history = _load_history(league)
     if not history:
@@ -259,7 +294,14 @@ def backtest_league(
     # which is both correct and what makes this affordable.
     by_day: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in usable:
-        by_day[_as_iso_day(row.get("date"))].append(row)
+        day = _as_iso_day(row.get("date"))
+        if since and day < since:
+            continue                      # ratings still use every row dated before each day
+        by_day[day].append(row)
+    fd_close = _load_fd_close(league, fd_close_dir)
+    # As-of league scoring baseline for total goals: mean total over the 365 days before each match day.
+    dated_totals = sorted((d, float(r["home_goals"]) + float(r["away_goals"])) for r in with_result
+                          for d in [_as_iso_day(r.get("date"))] if d)
 
     adapter = build_soccer_simulation_adapter(league)
     model_brier: list[float] = []
@@ -351,8 +393,33 @@ def backtest_league(
             model_reliability.append((model["home"], actual == "home"))
             market_reliability.append((market["home"], actual == "home"))
             model_probs.append(model["home"])
+            td = output.get("total_distribution") or {}
+            tp = output.get("team_projection") or {}
+            hg, ag = float(row["home_goals"]), float(row["away_goals"])
+            lo = (dt_date.fromisoformat(day) - timedelta(days=365)).isoformat()
+            prior_totals = [t for d, t in dated_totals if lo <= d < day]
+            close = fd_close.get((day, str(row.get("home_team")), str(row.get("away_team"))))
+            close_1x2 = None
+            if close is not None:
+                close_1x2 = _market_probabilities({"odds_home": close.get("AvgCH"), "odds_draw": close.get("AvgCD"),
+                                                   "odds_away": close.get("AvgCA")})
+            extra = {
+                "model_over25": td.get("over_2_5_probability"),
+                "model_btts": td.get("both_teams_scored_probability"),
+                "model_total_mean": td.get("mean") if td.get("mean") is not None else (
+                    (tp.get("home_mean") or 0.0) + (tp.get("away_mean") or 0.0) if tp else None),
+                "model_home_mean": tp.get("home_mean"), "model_away_mean": tp.get("away_mean"),
+                "actual_home_goals": hg, "actual_away_goals": ag,
+                "preclose_over25": _two_way(row.get("odds_over_2_5"), row.get("odds_under_2_5")),
+                "close_over25": None if close is None else _two_way(close.get("AvgC>2.5"), close.get("AvgC<2.5")),
+                "close_home": None if close_1x2 is None else round(close_1x2["home"], 6),
+                "close_draw": None if close_1x2 is None else round(close_1x2["draw"], 6),
+                "close_away": None if close_1x2 is None else round(close_1x2["away"], 6),
+                "asof_league_total_mean": (sum(prior_totals) / len(prior_totals)) if len(prior_totals) >= 50 else None,
+            }
             per_match.append(
                 {
+                    **extra,
                     "league": league,
                     "date": day,
                     "home_team": row.get("home_team"),
@@ -414,6 +481,9 @@ def main() -> int:
         "_market_prior_index docstring and the soccer-model-dispersion lane's log for why that "
         "distinction matters here specifically.",
     )
+    parser.add_argument("--since", default=None, help="score only match days on/after this ISO date (ratings stay as-of)")
+    parser.add_argument("--fd-close-dir", type=Path, default=None,
+                        help="football-data season CSVs (<code>.csv) for the TRUE closing AvgC* join; history files hold pre-close Avg*")
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument(
         "--dump-matches",
@@ -435,6 +505,8 @@ def main() -> int:
             min_prior_matches=args.min_prior_matches,
             limit=args.limit,
             wire_market_confidence=args.wire_market_confidence,
+            since=args.since,
+            fd_close_dir=args.fd_close_dir,
         )
         for league in leagues
     ]

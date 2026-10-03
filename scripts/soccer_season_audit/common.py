@@ -49,7 +49,11 @@ def fold(name):
                    if not unicodedata.combining(c)).lower().replace(".", " ").replace("-", " ").strip()
 
 
-def load_recs(directory=os.path.join(S, "prod", "recs")):
+def load_recs(directory=os.path.join(S, "prod", "recs"), prekickoff_only=False):
+    """One record per (league, match_id): the LATEST build. With `prekickoff_only`, the latest
+    build generated strictly BEFORE that match's kickoff (a build with no `generated_at` or no
+    kickoff is dropped, never assumed early) -- the as-of view a player-level grade needs, since
+    H7 measured |delta player shots| 0.071 between the pre-kickoff and post-match builds."""
     matches = {}
     for f in glob.glob(os.path.join(directory, "*.json")):
         if os.path.basename(f).startswith("_"):
@@ -94,6 +98,8 @@ def load_recs(directory=os.path.join(S, "prod", "recs")):
                 "sot_h": vp.get("home_shots_on_target"), "sot_a": vp.get("away_shots_on_target"),
                 "players": props_by_match.get(mid, []),
             }
+            if prekickoff_only and (gen is None or rec["kickoff"] is None or gen >= rec["kickoff"]):
+                continue
             key = (rec["league"], mid)
             if key not in matches or (gen and matches[key]["generated_at"] and gen > matches[key]["generated_at"]):
                 matches[key] = rec

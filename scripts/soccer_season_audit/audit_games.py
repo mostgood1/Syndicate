@@ -581,5 +581,134 @@ def main():
     print("\nwrote games_results.json")
 
 
+# ============================================================================ --extra: template cells
+# Lane `soccer-lines-props-backtest`, 2026-10-02. Cells the NHL/cross-sport template asks for that `main()` does not
+# print: draw as its own two-way market, 1X2 and total goals against a NAIVE as-of baseline (last season's league
+# rates -- the no-model answer, known before the season), the book's own goal mean, and corners split at the
+# 2026-09-17 estimator change (`05b808cc`, corners_basis team_rates_pressure_v1). Additive: `main()` is unchanged.
+CORNERS_ESTIMATOR_LIVE = dt.datetime(2026, 9, 17, 12, 0, tzinfo=dt.timezone.utc)
+
+
+def _last_season_rates():
+    out = {}
+    for lg in LEAGUES:
+        p = os.path.join(PRIMARY, "data", "soccer_source", lg, "history", "matches_2025.csv")
+        if not os.path.exists(p):
+            continue
+        f = pd.read_csv(p).dropna(subset=["home_goals", "away_goals"])
+        if f.empty:
+            continue
+        n = len(f)
+        out[lg] = {"h": float((f.home_goals > f.away_goals).sum()) / n, "d": float((f.home_goals == f.away_goals).sum()) / n,
+                   "a": float((f.home_goals < f.away_goals).sum()) / n, "total": float((f.home_goals + f.away_goals).mean()), "n": n}
+    return out
+
+
+def _paired(items, loss_a, loss_b, min_n=8):
+    """{group: n, a, b, diff, ci} with a match-clustered (one row per match) bootstrap, ALL + per league."""
+    groups = collections.defaultdict(list)
+    for it in items:
+        groups["ALL"].append(it)
+        groups[it["lg"]].append(it)
+    out = {}
+    for g in [k for k in ORDER if k in groups]:
+        its = groups[g]
+        if len(its) < min_n:
+            continue
+        a, b = mean(loss_a(i) for i in its), mean(loss_b(i) for i in its)
+        ci = boot_ci(its, lambda s: mean(loss_a(i) - loss_b(i) for i in s))
+        out[g] = {"n": len(its), "a": a, "b": b, "diff": a - b, "ci": ci,
+                  "verdict": "A_BETTER" if ci[1] < 0 else ("A_WORSE" if ci[0] > 0 else "NO_DIFF")}
+    return out
+
+
+def extra(out_path):
+    recs = load_recs()
+    outc = load_outcomes()
+    fd = load_fd()
+    gm = load_game_markets()
+    rows, _cov, _m = build_rows(recs, outc, fd, gm)
+    ls = _last_season_rates()
+    pooled = {k: mean(v[k] for v in ls.values()) for k in ("h", "d", "a", "total")}
+    res = {"last_season_rates": ls, "pooled_fallback": pooled, "n_rows": len(rows),
+           "dates": f"{min(r['date'] for r in rows)}..{max(r['date'] for r in rows)}"}
+
+    def base(lg):
+        return ls.get(lg, pooled)
+
+    items = []
+    for r in rows:
+        f = r["fd"]
+        if f is None:
+            continue
+        avg = [fnum(f.get("AvgCH")), fnum(f.get("AvgCD")), fnum(f.get("AvgCA"))]
+        ps = [fnum(f.get("PSCH")), fnum(f.get("PSCD")), fnum(f.get("PSCA"))]
+        if None in avg:
+            continue
+        mk = devig(ps if None not in ps else avg)
+        m = r["m"]
+        s = m["p_home"] + m["p_draw"] + m["p_away"]
+        md = [m["p_home"] / s, m["p_draw"] / s, m["p_away"] / s]
+        b = base(r["lg"])
+        res_ = 0 if r["hg"] > r["ag"] else (1 if r["hg"] == r["ag"] else 2)
+        items.append({**r, "model": md, "market": mk, "naive": [b["h"], b["d"], b["a"]], "res": res_})
+    b3 = lambda p, k: sum((p[i] - (1.0 if i == k else 0.0)) ** 2 for i in range(3))
+    res["1x2_model_vs_naive"] = _paired(items, lambda i: b3(i["model"], i["res"]), lambda i: b3(i["naive"], i["res"]))
+    res["1x2_market_vs_naive"] = _paired(items, lambda i: b3(i["market"], i["res"]), lambda i: b3(i["naive"], i["res"]))
+    yd = lambda i: 1.0 if i["res"] == 1 else 0.0
+    res["draw_model_vs_book"] = _paired(items, lambda i: (i["model"][1] - yd(i)) ** 2, lambda i: (i["market"][1] - yd(i)) ** 2)
+    res["draw_model_vs_naive"] = _paired(items, lambda i: (i["model"][1] - yd(i)) ** 2, lambda i: (i["naive"][1] - yd(i)) ** 2)
+    res["draw_logloss_model_vs_book"] = _paired(
+        items, lambda i: -math.log(max(i["model"][1] if yd(i) else 1 - i["model"][1], 1e-6)),
+        lambda i: -math.log(max(i["market"][1] if yd(i) else 1 - i["market"][1], 1e-6)))
+    res["draw_rates"] = {"model": mean(i["model"][1] for i in items), "book": mean(i["market"][1] for i in items),
+                         "naive": mean(i["naive"][1] for i in items), "actual": mean(yd(i) for i in items), "n": len(items)}
+
+    tg = []
+    for r in rows:
+        tm = r["m"]["total_mean"]
+        if tm is None:
+            continue
+        f = r["fd"]
+        bk = None
+        if f is not None:
+            o, u = fnum(f.get("AvgC>2.5")), fnum(f.get("AvgC<2.5"))
+            if None not in (o, u):
+                bk = poisson_mean_from_over25(devig([o, u])[0])
+        tg.append({**r, "tm": float(tm), "naive": base(r["lg"])["total"], "book_mean": bk, "y": r["hg"] + r["ag"]})
+    res["total_goals_model_vs_naive_mae"] = _paired(tg, lambda i: abs(i["tm"] - i["y"]), lambda i: abs(i["naive"] - i["y"]))
+    tb = [i for i in tg if i["book_mean"] is not None]
+    res["total_goals_model_vs_book_mean_mae"] = _paired(tb, lambda i: abs(i["tm"] - i["y"]), lambda i: abs(i["book_mean"] - i["y"]))
+    res["total_goals_book_mean_vs_naive_mae"] = _paired(tb, lambda i: abs(i["book_mean"] - i["y"]), lambda i: abs(i["naive"] - i["y"]))
+    res["total_goals_bias"] = {"n": len(tg), "actual": mean(i["y"] for i in tg), "model": mean(i["tm"] for i in tg),
+                               "naive": mean(i["naive"] for i in tg)}
+
+    lsc = last_season_corners()
+    cr = []
+    for r in rows:
+        m = r["m"]
+        if m["corners_h"] is None or m["corners_a"] is None or r["lg"] not in lsc:
+            continue
+        t = r["o"]["teams"]
+        y = (t["home"].get("wonCorners") or 0) + (t["away"].get("wonCorners") or 0)
+        arm = "estimator" if (m["generated_at"] and m["generated_at"] >= CORNERS_ESTIMATOR_LIVE) else "sim"
+        cr.append({**r, "pc": m["corners_h"] + m["corners_a"], "naive": lsc[r["lg"]]["total_mean"], "y": y, "arm": arm})
+    for arm in ("sim", "estimator"):
+        sub = [i for i in cr if i["arm"] == arm]
+        res[f"corners_total_mae_{arm}"] = _paired(sub, lambda i: abs(i["pc"] - i["y"]), lambda i: abs(i["naive"] - i["y"]))
+    json.dump(res, open(out_path, "w", encoding="utf-8"), default=str, indent=1)
+    for k, v in res.items():
+        if isinstance(v, dict) and "ALL" in v:
+            a = v["ALL"]
+            print(f"{k:40s} n={a['n']:4d} A {a['a']:.4f} B {a['b']:.4f} diff {a['diff']:+.4f} [{a['ci'][0]:+.4f},{a['ci'][1]:+.4f}] {a['verdict']}")
+    print("draw rates", res["draw_rates"])
+    print(f"wrote {out_path}")
+
+
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--extra" in sys.argv:
+        i = sys.argv.index("--extra")
+        extra(sys.argv[i + 1] if len(sys.argv) > i + 1 else os.path.join(S, "games_extra.json"))
+    else:
+        main()
