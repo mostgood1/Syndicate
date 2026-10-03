@@ -268,6 +268,6 @@ class LiveOddsWorkerMallocArenaOrderTests(unittest.TestCase):
     def test_the_cap_runs_before_any_thread_starter(self) -> None:
         calls = self._main_calls()
         cap_line = min(line for line, name in calls if name == "configure_malloc_arenas")
-        starters = [line for line, name in calls if name in {"_start_live_lens_reports", "start_intelligence_state_background_loop", "start_venue_poll_loop"}]
+        starters = [line for line, name in calls if name in {"_start_live_lens_reports", "start_intelligence_state_background_loop", "start_venue_poll_loop", "start_venue_boot_then_poll", "start_inplay_capture_loop"}]
         self.assertTrue(starters, "the thread starters moved or were renamed -- this test no longer guards anything")
         self.assertLess(cap_line, min(starters))

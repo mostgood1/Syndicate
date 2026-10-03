@@ -2580,42 +2580,19 @@ def main() -> int:
         # three restarts without running.
         _live_ledger_at_boot()
         # `_polymarket_catalogue_at_boot()` WAS HERE and is retired -- see the
-        # note above its former definition. The two US probes below do the job
-        # it was written for, against the exchange our money is actually on.
+        # note above its former definition. The US probes do the job it was
+        # written for, against the exchange our money is actually on.
         _polymarket_us_auth_probe_at_boot()
-        _polymarket_us_slate_probe_at_boot()
-        # The WRITER, not the probe: the probe reports shape once at boot, this
-        # keeps the artifact fresh for the fan-in to read.
-        _polymarket_us_slate_refresh_tick()
-        # THE VENUE POLL, on its own thread and its own clock. From here the
-        # main loop's ~900s idle interval no longer bounds how fresh an
-        # exchange price can be -- see `start_venue_poll_loop`'s docstring for
-        # why that gate is right for per-sport work and wrong for these two.
-        # Started AFTER the boot writers above so its first tick finds their
-        # state rather than racing them.
-        if start_venue_poll_loop():
-            print(
-                f"[live_odds_worker] VENUE_POLL_STARTED interval_seconds={venue_poll_interval_seconds()}",
-                flush=True,
-            )
+        # THE SLATE PROBE, WRITER, SLATE AUDITS AND VENUE POLL RUN ON A
+        # BACKGROUND THREAD, IN THAT ORDER -- see `start_venue_boot_then_poll`.
+        # They used to run here, synchronously, before the main loop: on the
+        # fleet 2026-10-02 23:09Z restart the probe and the writer each paged
+        # the full ~78k-row catalogue (23:09:14-23:14:01 and 23:14:05-23:17:59),
+        # so the first odds sweep waited until 23:22:16Z and pregame rows aged
+        # out of the 1h gate after every restart.
+        start_venue_boot_then_poll()
         # In-play capture on its own clock too -- see `start_inplay_capture_loop`.
         start_inplay_capture_loop()
-        # AFTER the writer, deliberately: the audit reads the slate artifact,
-        # so running it before the refresh tick would measure the previous
-        # cycle's book. Inert unless SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT
-        # is set -- absent means off -- and it only reads, so a boot with the
-        # flag on costs one artifact read and one printed line. Unset the flag
-        # again once the reading is taken, same as the two probe hooks on the
-        # sibling worker. Full reasoning:
-        # `docs/ai_context/polymarket_oddsapi_coverage_audit.md` SS5.4.
-        _polymarket_spread_sign_audit_at_boot()
-        # Answers ONE question and then should be switched off again: is
-        # `find_first_game_offset`'s boundary landing above part of the game
-        # block? Inert unless SYNDICATE_POLYMARKET_OFFSET_PROBE_ON_BOOT is set.
-        # Unlike the audit above this one DOES read the venue (~10 signed GETs
-        # of 5 rows) -- deliberately, because no artifact can say what lives at
-        # a given offset, which is the whole question. Reads only.
-        _polymarket_offset_boundary_probe_at_boot()
         _game_line_grade_audit_at_boot()
         _log_worker_memory("loop_start", interval_seconds=interval_seconds, max_uptime_seconds=max_uptime_seconds)
         while not _LIVE_REFRESH_LOOP_STOP.is_set():
@@ -2786,6 +2763,49 @@ def _venue_poll_background_loop() -> None:
         interval = venue_poll_interval_seconds()
         elapsed = time.monotonic() - started
         _VENUE_POLL_STOP.wait(max(1.0, interval - elapsed))
+
+
+def _venue_boot_sequence() -> None:
+    """The Polymarket boot work, in order, then the venue poll. Runs off the main thread.
+
+    WRITER FIRST, then the shape probe. `_polymarket_us_slate_refresh_tick` stamps
+    `_POLYMARKET_SLATE_LAST_RUN` on entry, so once it has started the main loop's
+    own per-pass call returns at its interval gate instead of paging the whole
+    catalogue synchronously (~4 min). The probe only reports shape and reads the
+    venue, not the artifact, so its order does not matter to anything after it.
+
+    THE SLATE AUDITS FOLLOW THE WRITER, as they always did: they read the slate
+    artifact, so running them earlier would measure the previous cycle's book.
+    Both are inert unless their `*_ON_BOOT` flag is set (see each function).
+
+    THE VENUE POLL STARTS LAST so its first tick finds the boot writers' state
+    rather than racing them -- the reason it used to start after them in `main`.
+
+    Each step is isolated: one failing must not cost the poll that follows.
+    """
+    for step in (
+        _polymarket_us_slate_refresh_tick,
+        _polymarket_us_slate_probe_at_boot,
+        _polymarket_spread_sign_audit_at_boot,
+        _polymarket_offset_boundary_probe_at_boot,
+    ):
+        try:
+            step()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[live_odds_worker] VENUE_BOOT_STEP_FAILED step={step.__name__} {type(exc).__name__}: {exc}", flush=True)
+    if start_venue_poll_loop():
+        print(
+            f"[live_odds_worker] VENUE_POLL_STARTED interval_seconds={venue_poll_interval_seconds()}",
+            flush=True,
+        )
+
+
+def start_venue_boot_then_poll() -> bool:
+    """Start `_venue_boot_sequence` on a daemon thread. Returns whether it started."""
+    thread = threading.Thread(target=_venue_boot_sequence, name="venue-boot", daemon=True)
+    thread.start()
+    print("[live_odds_worker] VENUE_BOOT_STARTED (slate writer, probe, audits, then the venue poll)", flush=True)
+    return True
 
 
 def start_venue_poll_loop() -> bool:

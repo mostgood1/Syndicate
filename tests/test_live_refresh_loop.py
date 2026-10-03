@@ -105,6 +105,9 @@ def _no_worker_background_threads():
 
     stack = ExitStack()
     stack.enter_context(patch.object(run_live_odds_refresh_worker, "start_venue_poll_loop", return_value=False))
+    # The Polymarket boot work (slate writer, probe, audits) runs on its own thread
+    # since 2026-10-03 and pages the live venue catalogue; not what these tests measure.
+    stack.enter_context(patch.object(run_live_odds_refresh_worker, "start_venue_boot_then_poll", return_value=False))
     stack.enter_context(patch.object(run_live_odds_refresh_worker, "start_inplay_capture_loop", return_value=False))
     return stack
 
