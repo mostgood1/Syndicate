@@ -238,8 +238,8 @@ def _load_fd_close(league: str, fd_close_dir: Path | None) -> dict[tuple[str, st
     return out
 
 
-def _fotmob_match_xg(league: str, fotmob_path: Path | None) -> dict[tuple[str, str, str], tuple[float, float]]:
-    """H37 arm: (iso date, canonical home, canonical away) -> (home shot xG, away shot xG) from a FotMob
+def _fotmob_match_xg(league: str, fotmob_path: Path | None) -> dict[str, list[tuple[str, str, tuple[float, float]]]]:
+    """H37 arm: iso date -> [(home name, away name, (home shot xG, away shot xG))] from a FotMob
     harvest (`reports/soccer_backtest/fotmob_2y.json.gz` shape: matches[].shots[].{xg, home}). Lane
     soccer-1x2-ratings-xg-source, pre-registered 2026-10-03 before computation."""
     if fotmob_path is None:
@@ -260,14 +260,32 @@ def _fotmob_match_xg(league: str, fotmob_path: Path | None) -> dict[tuple[str, s
             continue
         hx = sum(float(s.get("xg") or 0.0) for s in m["shots"] if s.get("home"))
         ax = sum(float(s.get("xg") or 0.0) for s in m["shots"] if not s.get("home"))
-        out[(str(m.get("date"))[:10], canonical_team_name(m.get("home_team")), canonical_team_name(m.get("away_team")))] = (hx, ax)
+        out.setdefault(str(m.get("date"))[:10], []).append((str(m.get("home_team")), str(m.get("away_team")), (hx, ax)))
     return out
 
 
 def _apply_fotmob_xg(team_rows: list[dict[str, Any]], fotmob: dict) -> dict[str, int]:
     """Replace goals-as-xG with FotMob shot xG on joined home/away row PAIRS (`team_rows_from_match_history`
     appends home then away per match). Unjoined pairs keep goals. Returns the join tally."""
-    from syndicate.features.soccer.features.team_names import canonical_team_name
+    from syndicate.features.soccer.features.team_names import canonical_team_name, match_team_name
+
+    def _find(day: str, home: str, away: str):
+        # Exact canonical first; then BOTH sides bound by `match_team_name` to the SAME unique candidate.
+        # football-data writes short names ("Sheffield Weds", "Sp Lisbon") that canonical_team_name does
+        # not map onto FotMob's full ones (measured: 272 of 552 Championship 2025-26 matches joined exact).
+        cands = fotmob.get(day) or []
+        exact = [c for c in cands if canonical_team_name(c[0]) == canonical_team_name(home)
+                 and canonical_team_name(c[1]) == canonical_team_name(away)]
+        if len(exact) == 1:
+            return exact[0][2]
+        if not cands:
+            return None
+        mh = match_team_name(home, [c[0] for c in cands])
+        ma = match_team_name(away, [c[1] for c in cands])
+        if mh is None or ma is None:
+            return None
+        hits = [c for c in cands if c[0] == mh and c[1] == ma]
+        return hits[0][2] if len(hits) == 1 else None
 
     tally = {"pairs": 0, "joined": 0}
     for i in range(0, len(team_rows) - 1, 2):
@@ -281,7 +299,7 @@ def _apply_fotmob_xg(team_rows: list[dict[str, Any]], fotmob: dict) -> dict[str,
         hit = None
         for delta in (0, -1, 1):
             d = (dt_date.fromisoformat(day) + timedelta(days=delta)).isoformat()
-            hit = fotmob.get((d, canonical_team_name(home.get("team")), canonical_team_name(away.get("team"))))
+            hit = _find(d, str(home.get("team")), str(away.get("team")))
             if hit:
                 break
         if not hit:
