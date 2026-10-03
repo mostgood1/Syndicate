@@ -440,7 +440,7 @@ def _boot_rows(units, fn, reps=2000, seed=11):
     return float(vals[int(0.025 * reps)]), float(vals[int(0.975 * reps) - 1])
 
 
-def grade_asof(out_path):
+def grade_asof(out_path, dump_rows=None):
     recs = load_recs(prekickoff_only=True)
     outc = load_outcomes()
     hist, league_rows = _asof_history(outc)
@@ -483,6 +483,12 @@ def grade_asof(out_path):
             rows.append(r)
             funnel["appeared_rows"] += 1
     print("=== AS-OF FUNNEL ===", dict(funnel))
+    if dump_rows:
+        # H38 (lane soccer-shots-allocation-blend): one JSON line per appeared player-row, every stat's
+        # model / actual / baselines, so a fitted estimator can be scored without re-reading the cache.
+        with open(dump_rows, "w", encoding="utf-8") as handle:
+            for r in rows:
+                handle.write(json.dumps({**r, "gen": r["gen"].isoformat() if r["gen"] else None}, default=str) + "\n")
 
     def cell(rs, stat):
         rs = [r for r in rs if r[stat]["model"] is not None and r[stat]["y"] is not None and r[stat]["a"] is not None]
@@ -674,7 +680,8 @@ def _asof_book(recs, outc, hist):
 if __name__ == "__main__":
     import sys
     if "--asof" in sys.argv:
+        _dump = sys.argv[sys.argv.index("--dump-rows") + 1] if "--dump-rows" in sys.argv else None
         grade_asof(sys.argv[sys.argv.index("--asof") + 1] if len(sys.argv) > sys.argv.index("--asof") + 1
-                   else os.path.join(S, "asof_props.json"))
+                   else os.path.join(S, "asof_props.json"), dump_rows=_dump)
     else:
         main()
