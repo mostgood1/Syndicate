@@ -1355,6 +1355,14 @@ death, never life — do not invert it.
 - Verification: Before/after row counts per season-week on the fleet file (sha256 backup kept), wk5 artifact input.weeks_used and players count before/after, recorded in deploys.md
 - Blocked by: USER -- the --apply write to the fleet snapshot was refused by the auto-mode permission classifier (2026-10-03 ~05:0xZ); nothing written. Dry run (read-only) verified: worker env has CFBD_API_KEY, target = production snapshot, BASELINE 2026 wk3 2,944 / wk4 2,819 / wk5 115 rows, total 41,707, sha b6cd12864ba7; served wk5 prop artifact weeks_used [3,4], players 2,221, projections 5,341 (generated 04:08:23Z). Hypothesis CONFIRMED read-only: first fleet player-stats run 2026-09-30 (last_attempt_age_s=never), no log of any wk1-2 write. To apply (user): ~/.venvs/syndicate/bin/python /mnt/c/tmp/ncaaf_lpb/fleet/restore_wk12.py --apply from ~/Syndicate in WSL (backs up first, refresh_week wk1+wk2, asserts other weeks unchanged, rebuilds wk5).
 
+### soccer-recs-empty-overwrite — OPEN — opened 2026-10-03 — session 6214bc11-3dad-4e37-af64-5a44a2cb498b
+- Goal: build_soccer_artifacts never replaces a recommendations_<date>.json that holds matches with an empty payload while the league's schedule still lists a non-void fixture on that Central slate date (or the schedule is unreadable); it keeps the file and logs SOCCER_RECS_EMPTY_OVERWRITE_REFUSED with the reason; a genuinely empty day (no schedule fixture, or all void/postponed) still writes the empty artifact. Verified by unit tests through the real build_artifacts that fail on origin/main, and on the fleet by the next soccer run leaving every non-empty recs file non-empty (count before/after)
+- Files: tests/test_soccer_recs_empty_overwrite.py (NEW). The builder edit is pending a user-approved cross-lane write: soccer-corners-model-rebuild holds that file.
+- Hypothesis: ESPN request failures already raise before any write (_scoreboard_payloads re-raises a single-date error), so the empty overwrite happens only on a 200 that yields no in-window pre/in/post event: a stale/off-window payload, a wrong-day unit, or a real postponement. Only the schedule distinguishes the first two from the third.
+- Falsification test: If the guard refuses a write on a day the schedule shows no non-void fixture, it is wrong (would keep a postponed match's projection); test covers both sides
+- Verification: Unit: empty ESPN + existing non-empty file + schedule fixture -> file unchanged, refusal logged; + schedule void/absent -> empty written; + no existing file -> empty written; unreadable schedule -> kept. Fleet: non-empty recs count unchanged across the next soccer run
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
