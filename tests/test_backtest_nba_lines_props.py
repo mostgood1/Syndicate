@@ -123,3 +123,19 @@ def test_resolve_falls_back_to_unique_same_date_name_and_counts_it():
     assert h.resolve(3934672, "Jalen Brunson", "2026-05-02", c) == 201  # ESPN id -> NBA id by name
     assert h.resolve(3934672, "Jalen Brunson", "2026-05-03", c) is None  # never across dates
     assert c["join_by_id"] == 1 and c["join_by_name_same_date"] == 1 and c["join_none"] == 1
+
+
+def test_murphy_decomposition_adds_up_to_brier_for_binned_forecasts():
+    ps = [0.2] * 50 + [0.8] * 50
+    ys = [0] * 40 + [1] * 10 + [1] * 40 + [0] * 10
+    m = bt._murphy(ps, ys, bins=2)
+    assert m["brier"] == pytest.approx(m["rel"] - m["res"] + m["unc"], abs=1e-9)
+    assert m["rel"] == pytest.approx(0.0)  # 0.2 -> 20% observed, 0.8 -> 80% observed: perfectly reliable
+
+
+def test_nb_p_over_matches_poisson_at_unit_dispersion_and_widens_with_variance():
+    lam = 3.0
+    pois = 1 - sum(math.exp(-lam) * lam ** k / math.factorial(k) for k in range(0, 4))
+    assert bt._nb_p_over(3.5, lam, lam) == pytest.approx(pois, abs=1e-9)
+    # more variance at the same mean puts more mass in the far tail
+    assert bt._nb_p_over(8.5, lam, 3 * lam) > bt._nb_p_over(8.5, lam, lam)

@@ -1,24 +1,43 @@
-# NBA game lines + player props backtest, as-of, 2025-26 — lane `nba-lines-props-backtest`
+# NBA game lines + player props backtest and diagnosis, as-of, 2025-26 — lane `nba-lines-props-backtest`
 
 Generated 2026-10-03 by `scripts/backtest_nba_lines_props.py` (worktree branch `session/nba-lines-props-backtest`),
 same method and report shape as `scripts/backtest_nhl_props.py` (lane `nhl-player-props-projection`).
 Full tables: `C:\tmp\nba_bt\out\report.md` / `report.json` (scratch; reproducible with
 `py -3 scripts/backtest_nba_lines_props.py --out C:/tmp/nba_bt/out`).
 
-## Verdict (one paragraph)
+## Directive, and what changed in this file `[2026-10-03]`
 
-**No NBA market earns a probability or edge on the board for 2026-27.**
-- **Props.** The smart-sim engine that production serves is significantly worse than the player's own as-of
-  average in 9 of 11 markets (regular season, 8,434 player-games / 428 games). blk is no different and stl is
-  worse, so no prop clears the point half of the gate. The book half cannot rescue any market.
-- **Probabilities vs the book.** Neither served probability beats the de-vigged book anywhere. The market
-  board's unblended Normal is worse in every market with a reading (ONNX stl ties). The picks' book-blended probability is worse in 7 of 9
-  smart-sim markets with a verdict and no different in pa and reb.
-- **Game lines.** The raw smart-sim margin and total are significantly worse than the captured consensus line.
-  The market-anchored configuration that production runs by default ties the book, because it mostly IS the
-  book (95% / 70% market weight).
-- **Gate.** Apply the NHL rule: means only, probability and edge withheld on every NBA market. **No board
-  change was made**; that needs a user decision.
+**User decision (prime directive, 2026-10-02):** *"every line is its own decision. we should have a model that
+is accurate that then helps inform each decision."*
+- Source: on file in this user's memory (`feedback_every_line_its_own_decision`, recorded 2026-10-02); relayed
+  again on 2026-10-03 by the NCAAF backtest session.
+- The first version of this file (`795d420b`) carried a market-level "MEAN_ONLY on every NBA market" gate list.
+  That list was a market-wide exclusion and is **WITHDRAWN**.
+- No NBA market is withheld. The backtest's job is to make the model accurate. Per-market numbers below are
+  diagnosis and per-line scoring evidence, not a switch.
+
+## Summary
+
+- **The served model is less accurate than the player's own average, and the reasons are measurable:**
+  - minutes: sim minutes are biased −3.7 and worse than a last-5 average;
+  - per-minute rates: the sim's own rates are worse than the player's;
+  - distribution width: the served sd is 1.4-1.9x too narrow for pts/reb/ast/pra.
+- **Fixes that clear the player's own average out of sample** (test = 403 games / 79 dates, 2026-03-01
+  onward plus the playoffs; fit on 145 earlier smart-sim games):
+  - a mean shrunk toward the player's own per-minute rate and season average;
+  - an NBA-fit sd scale.
+  - Result at a book-like line: Brier better than the player's own-average distribution in **every** prop
+    market. For example, pts −0.0080 [−0.0098, −0.0062] and pra −0.0091 [−0.0113, −0.0069].
+- **Versus the de-vigged book these fixes are UNMEASURED.** Only 8 smart-sim games have two-sided prop prices.
+  The OddsAPI backfill that would supply ~600 is owed and blocked on a key.
+- **Game lines:**
+  - The raw sim adds nothing beyond the line out of sample: the fitted model weight is 0.00 for margin and
+    0.05 for total.
+  - The raw total's level drifts (−10.0 bias in train, +0.2 in test).
+  - The shipped market anchor (0.05 / 0.30) ties the line, which matches the WNBA lane's conclusion.
+  - The win probability's gap to the book is in **resolution** (0.074 vs 0.080), which a transform cannot fix.
+- No board or engine change was made. Each fix below is a model change for the user to decide, behind the
+  model-engine standard.
 
 ## What was scored, and why that path (traced, not assumed)
 
@@ -135,8 +154,8 @@ Filters (all 10 dates): 84,858 edge rows, 2,903 dd/td excluded (yes/no), 668 one
   ast +0.8% [−7.3%, +8.7%] on 1,933 bets). For the smart-sim engine, pts is −29.8% [−45.1%, −15.4%] on 1,179
   bets.
 - **This half is THIN for the served engine: 8 games.** The OddsAPI historical backfill (approved,
-  ~139k credits) would extend it to about 600 smart-sim games. It **cannot change the gate**, because the point
-  half already fails every regular-season smart-sim market.
+  ~139k credits) would extend it to about 600 smart-sim games. It is the measurement of whether the fixed
+  model (below) is better or worse than the book, line by line.
 
 ## Game lines (served = smart-sim quarter sum; regular season, 524 games with a pre-tip book)
 
@@ -155,27 +174,111 @@ Filters (all 10 dates): 84,858 edge rows, 2,903 dd/td excluded (yes/no), 668 one
   with +31% ROI. Cause: the upstream consensus `game_odds` pairs main points with alt-line prices (e.g.
   −245/+180), and 502 of 1,281 rows are unpriced. Spread/total prices are now used only inside a main-line
   band (431 cover / 538 over pairs kept; 172 / 68 reset to −110). After the fix: NO_DIFFERENCE, 86 bets,
-  ROI −4.8% [−27.2%, +16.0%]. **Spread/over book Brier here is a coin with noise;** the gate also requires
-  beating p = 0.5.
+  ROI −4.8% [−27.2%, +16.0%]. **Spread/over book Brier here is a coin with noise,** so beating it means little
+  unless the model also beats p = 0.5.
 
-## Gate list for 2026-27 (rule: PROBABILITY only if it beats its baseline AND the book, CI excluding 0)
+## Why each prop market loses, and what fixes it (`--diagnose`; fit < 2026-03-01, scored on 403 later games incl. playoffs)
 
-| market | gate | deciding reading |
-|---|---|---|
-| pts, reb, ast, threes, pra, pr, pa, ra, stl, tov | MEAN_ONLY | worse than own average (regular, smart-sim) |
-| blk | MEAN_ONLY | ties own average; worse than the book (+0.086 [+0.050, +0.129], 8 games) |
-| dd, td | MEAN_ONLY | one-sided yes/no; not measurable vs a de-vigged book |
-| game ML / cover / over | MEAN_ONLY | raw sim worse than the book; the anchored default ties it (no edge) |
-| game margin / total (point) | MEAN_ONLY | same |
-| h1 / q1-q4 margin, total, win prob | MEAN_ONLY | worse or no different vs period lines; no book for quarter ML |
+Data: 10,997 smart-sim player-games with sim minutes; train 2,635 rows / 145 games, test 8,362 rows / 403 games
+(1,726 playoff).
 
-**What the board does today that this contradicts (no change made; user decision owed):**
-- The NBA market board shows `model_prob_over` (raw Normal) for props, and the cards show win, cover and over
-  probabilities.
-- Props picks are made from `props_edges` edges.
-- The NHL precedent is `MEASURED_MARKETS = frozenset()` with probability withheld. The NBA equivalent would be
-  a gate in `basketball_market_board.py`, `nba/cards.py` and the picks export, before opening night (~late
-  October).
+### Cause 1, minutes (the largest single error)
+
+- Sim projected minutes vs actual: bias **−3.67 min**, MAE 6.64, against 5.27 for the player's last-5 average.
+  The sim is worse by +1.36 [+1.22, +1.52].
+- 1,942 sim players projected ≥ 10 min have no box line that day. That is DNP or unmatched; unmatched names
+  are included in the count, so it is an upper bound on availability misses.
+- **Diagnostic bound** (uses the result, not a fix): rescale the sim mean to the minutes actually played and
+  pts MAE falls 5.26 → 4.28 (own average 4.87), pra 7.13 → 5.17 (own average 6.52).
+- WNBA fix #2 (availability) targets exactly this. It changes minutes inside the sim, so measuring it on NBA
+  needs a re-sim; that is owed.
+
+### Cause 2, per-minute rates and mean shrink
+
+Replacing or shrinking the sim's per-minute rate toward the player's own as-of rate, then blending toward the
+own average, gives these test MAE deltas:
+
+| market | model − own avg | rate shrink (WNBA w, as-is) vs model | NBA-fit rate shrink vs own avg | blend toward own avg vs own avg (w_model) |
+|---|---|---|---|---|
+| pts | +0.390 [+0.293, +0.489] | −0.373 [−0.424, −0.319] | +0.017 (tie) | **−0.109 [−0.130, −0.088]** (0.20) |
+| reb | +0.114 [+0.079, +0.147] | −0.120 [−0.136, −0.104] | +0.002 (tie) | **−0.029 [−0.035, −0.023]** (0.15) |
+| ast | +0.079 [+0.051, +0.104] | −0.098 [−0.112, −0.083] | −0.013 (tie) | **−0.031 [−0.038, −0.024]** (0.25) |
+| threes | +0.047 [+0.033, +0.061] | −0.055 [−0.060, −0.049] | **−0.024 [−0.034, −0.015]** | 0 (w = 0) |
+| stl | +0.005 (tie) | n/a | **−0.028 [−0.034, −0.022]** | −0.003 |
+| blk | −0.017 [−0.024, −0.009] | n/a | **−0.025 [−0.030, −0.020]** | −0.011 |
+| tov | +0.066 [+0.049, +0.084] | n/a | **−0.019 [−0.028, −0.009]** | 0 (w = 0) |
+| pra | +0.605 [+0.451, +0.755] | −0.478 [−0.554, −0.400] | n/a | **−0.185 [−0.217, −0.155]** (0.20) |
+
+- **WNBA #3 (rate shrink) transfers to NBA as-is.** Its WNBA weights land within 0.003 of the NBA re-fit for
+  pts/reb/ast.
+- Fitted model weights in the blend are 0.15-0.30. The sim carries real information beyond the average, but
+  much less than it is given today.
+- **Bias-only shift and linear recalibration HURT out of sample** in most markets: the bias is not stable.
+  Don't ship them.
+
+### Cause 3, distribution width and shape (the probability the market board shows)
+
+The served sd is too narrow. On the test set, IQR(z)/1.349 is pts 1.52, reb 1.44, ast 1.39, pra 1.85,
+blk 1.14, threes 1.05. The ±0.674-sd band holds 36% of pts and 30% of pra outcomes, against 50% for a correct
+model.
+
+At a book-like line (the player's as-of average rounded to x.5), Brier vs the player's own-average
+distribution:
+
+| market | served Normal | NBA-fit wider sd | + blend mean | + rate-shrink mean | WNBA k (#1) vs served | WNBA NB D (#4) vs served |
+|---|---|---|---|---|---|---|
+| pts | +0.0261 [+0.0196, +0.0322] | +0.0081 | **−0.0080 [−0.0098, −0.0062]** | −0.0020 (tie) | −0.0106 | n/a |
+| reb | +0.0252 | +0.0064 | **−0.0055 [−0.0068, −0.0042]** | −0.0026 (tie) | −0.0120 | −0.0066 |
+| ast | +0.0162 | +0.0050 (tie) | **−0.0083 [−0.0103, −0.0064]** | −0.0056 | −0.0073 | −0.0045 |
+| threes | +0.0167 | +0.0157 | 0 | **−0.0074 [−0.0115, −0.0032]** | −0.0030 | **−0.0121** |
+| stl | 0.0000 (tie) | +0.0019 (tie) | −0.0026 | **−0.0131 [−0.0175, −0.0088]** | n/a | n/a |
+| blk | +0.0070 | +0.0036 (tie) | **−0.0065 [−0.0080, −0.0050]** | −0.0045 | n/a | n/a |
+| tov | +0.0153 | +0.0169 | 0 | **−0.0056 [−0.0096, −0.0011]** | n/a | n/a |
+| pra | +0.0349 [+0.0272, +0.0422] | +0.0053 (tie) | **−0.0091 [−0.0113, −0.0069]** | n/a | −0.0176 | n/a |
+
+- Murphy decomposition of the served Normal, pts: reliability 0.037 (very poorly calibrated) and resolution
+  0.008.
+- After blend + width: reliability 0.002, resolution 0.007. **The served probability's loss is almost all
+  reliability**, which is fixable.
+- The negative binomial with a variance fitted per market from the whole residual is **worse** than the scaled
+  Normal for pts/stl/blk/tov. The WNBA NB-D constants help reb/ast/threes, and threes most (−0.0121 vs served).
+
+### Ranked model fixes for NBA before opening night (by measured out-of-sample impact)
+
+1. **Mean: shrink sim per-minute rates toward the player's own, then blend toward the season average.** WNBA #3
+   transfers; NBA weights are in `diagnose.json`. It is the largest MAE gain on every market and the only fix
+   that beats the player's own average on point accuracy. Post-hoc evaluable, so it is ready to implement
+   behind a flag.
+2. **Width: an NBA-fit sd scale** (pts 1.5, reb 1.4, ast 1.4, pra 1.85; ~1.0 for threes/stl/tov). WNBA #1 k
+   values point the same way but are smaller. Combined with fix 1, the board's probability beats the player's
+   own-average distribution in all 8 markets.
+3. **Minutes / availability: re-sim with WNBA #2 enabled for NBA.** It is the largest error source by the
+   diagnostic bound, but needs a re-sim, so impact is UNMEASURED. It also requires editing the module's
+   hard-coded `!= "wnba"` check and an NBA re-fit.
+4. **threes shape: NB with D ≈ 1.13 (WNBA #4 transfers).** The best threes probability, −0.0121 vs served.
+5. **Not recommended on this evidence:** bias-only shift, linear recalibration, and a residual-fit NB for
+   pts/stl/blk/tov.
+6. **Vs the book: all of the above is UNMEASURED** (8 smart-sim games). The OddsAPI backfill is the
+   measurement.
+
+## Game lines: why the raw sim loses (`--diagnose`, 209 train / 394 test games)
+
+- **The sim's departures from the line carry no information out of sample.** For w·model + (1−w)·line, the
+  fitted w is **0.00 for margin and 0.05 for total**, before and after a bias shift.
+  - Raw sim vs line, MAE: margin +1.33 [+0.62, +2.00], total +2.95 [+2.00, +3.93].
+  - Shipped anchor (0.05 / 0.30) vs line: margin −0.024 [−0.064, +0.015], total +0.176 [−0.164, +0.509], both
+    ties.
+- **The raw total's level is unstable:** bias −10.0 in train (Jan-Feb) and +0.2 in test. A fitted level shift
+  does not carry forward.
+- **Win probability:**
+  - Served (logistic 6.5): Brier 0.185, reliability 0.017, resolution 0.074.
+  - Book: Brier 0.169, reliability 0.005, resolution 0.080.
+  - A re-fit scale does not help (0.189). The gap is resolution, so a transform cannot close it; only a
+    better margin model can.
+- **Raw-model fix candidates:** these are the same mechanisms the WNBA lane found (the raw ridge is worse than
+  the line; slope 0.07). The game-line model needs better inputs (minutes, availability, lineup), not
+  recalibration. Until it beats the line, **the shipped anchor is the honest serving config**; per line it
+  returns the line's own number.
 
 ## Daily accuracy / weekly backtests: what covers NBA
 
@@ -209,4 +312,5 @@ Filters (all 10 dates): 84,858 edge rows, 2,903 dd/td excluded (yes/no), 668 one
   `--fetch-odds` (dry run, 139,203-credit estimate) → `--fetch-odds --execute --max-credits 150000`, then
   `--analyze-only`. It writes only under `--out/cache`. The backfilled odds are not yet wired into scoring
   (`hist_props_csv` / `hist_game_book` exist; the book arm still reads the committed files).
+- **NBA re-sim** with WNBA #2 (availability) and #3 (rate shrink) enabled for NBA, to measure the minutes fix.
 - No board or engine change; nothing deployed.

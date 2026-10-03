@@ -1139,7 +1139,7 @@ def _game_ev(rr: List[Dict]) -> Dict:
 
 
 # ---------------------------------------------------------------------------
-# 6. coverage and the gate list
+# 6. coverage and per-market evidence (no market-level switch)
 # ---------------------------------------------------------------------------
 
 def coverage(manifest: Dict, scoreboards: Dict[str, List[Dict]], logs: List[Dict], phase_of: Dict[str, str]) -> Dict:
@@ -1167,54 +1167,328 @@ def coverage(manifest: Dict, scoreboards: Dict[str, List[Dict]], logs: List[Dict
     return out
 
 
-def gate(report: Dict) -> Dict:
-    """A market earns a probability/edge only if it beats the player's own average (point, CI < 0)
-    AND the de-vigged book (Brier, CI < 0) on enough rows. Everything else is mean-only."""
+def evidence(report: Dict) -> Dict:
+    """Per-market accuracy evidence: model vs the player's own average and vs the de-vigged book.
+    It is NOT a switch. User directive (2026-10-02): "every line is its own decision. we should have a
+    model that is accurate that then helps inform each decision" -- no market is withheld; these readings
+    feed model fixes (see --diagnose) and per-line scoring."""
     out: Dict = {"props": {}, "games": {}}
     pts = report["props_point"]["markets"]
     book = report["props_book"]["by_market"]
     for mk in PROP_MARKETS:
-        reasons = []
-        p_reg = pts.get(f"regular:smartsim|{mk}", {})
-        beats_avg = p_reg.get("verdict") == "MODEL_BETTER"
-        reasons.append(f"point vs own avg (regular, smart-sim engine): {p_reg.get('verdict')} dMAE {p_reg.get('mae_delta_vs_a', {}).get('point')} "
-                       f"{p_reg.get('mae_delta_vs_a', {}).get('ci95')} n={p_reg.get('n')}")
-        p_po = pts.get(f"playoff:smartsim|{mk}", {})
-        reasons.append(f"point vs own avg (playoff, smart-sim engine, informational): {p_po.get('verdict')} "
-                       f"dMAE {p_po.get('mae_delta_vs_a', {}).get('point')} {p_po.get('mae_delta_vs_a', {}).get('ci95')} n={p_po.get('n')}")
+        rows = []
+        for ph in ("regular:smartsim", "playoff:smartsim", "regular:onnx"):
+            p_ = pts.get(f"{ph}|{mk}", {})
+            d = p_.get("mae_delta_vs_a", {})
+            rows.append(f"point vs own avg ({ph}): {p_.get('verdict')} dMAE {d.get('point')} {d.get('ci95')} n={p_.get('n')}")
         b = book.get(f"all:smartsim|{mk}", {})
-        # two served forms: picks (props_edges model_prob, shrunk/blended) and the market board
-        # (basketball_market_board: Normal(mean, sd), unblended == model_prob_raw)
-        forms = {}
-        for form, key in (("picks_blended", "brier_delta_model_vs_book"), ("market_board_raw", "brier_delta_raw_vs_book")):
+        for form, key in (("picks (blended)", "brier_delta_model_vs_book"), ("market board (raw Normal)", "brier_delta_raw_vs_book")):
             d = b.get(key) or {}
             v = _verdict(d, b.get("n", 0), report["min_n"]) if b else "NO_BOOK_ROWS"
-            forms[form] = v
-            reasons.append(f"{form} Brier vs book (smart-sim engine, all phases): {v} {d.get('point')} {d.get('ci95')} n={b.get('n', 0)}")
-        passing = [f for f, v in forms.items() if v == "MODEL_BETTER"]
-        out["props"][mk] = {"gate": ("PROBABILITY(" + ",".join(passing) + ")") if (beats_avg and passing) else "MEAN_ONLY",
-                            "why": reasons}
-    # Games: the 2026-27 serving config is the ANCHORED sim (anchor on by default), so it decides the
-    # full-game gate; the raw sim is shown beside it. Periods have no anchor and are judged on the raw sim.
-    for k, v in report["games"]["prob"].items():
-        arm, ph, sk, mk = k.split("|")
-        if ph != "regular" or arm not in ("smart_sim", "smart_sim_anchored_replay"):
+            rows.append(f"{form} Brier vs book (smart-sim): {v} {d.get('point')} {d.get('ci95')} n={b.get('n', 0)} games={b.get('games', 0)}")
+        out["props"][mk] = rows
+    for part in ("prob", "point"):
+        for k, v in report["games"][part].items():
+            arm, ph, sk, mk = k.split("|")
+            if ph != "regular" or arm not in ("smart_sim", "smart_sim_anchored_replay"):
+                continue
+            d = v.get("brier_delta_model_vs_book") if part == "prob" else v.get("mae_delta_vs_book")
+            out["games"].setdefault(f"{sk}|{mk}", []).append(f"{arm} vs book: {v['verdict']} {d}")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 6b. DIAGNOSE: why each market loses, and which model fix helps OUT OF SAMPLE.
+#     User directive (2026-10-02): "every line is its own decision. we should have a model that is
+#     accurate that then helps inform each decision" -- so no market is withheld; the backtest's job
+#     is to make the model accurate. Every fix is FIT on smart-sim regular-season dates < --split and
+#     SCORED on dates >= --split plus the playoffs (game-clustered CI).
+# ---------------------------------------------------------------------------
+
+SIM_STATS = ("pts", "reb", "ast", "threes", "stl", "blk", "tov", "pra")
+# WNBA fixes (lanes wnba-prop-dispersion / wnba-sim-rate-shrink / wnba-prop-shape, all WNBA-only and on HOLD):
+# their FITTED WNBA constants, tested here for transfer to NBA as-is and against an NBA re-fit.
+WNBA_RATE_SHRINK_W = {"pts": 0.15, "reb": 0.15, "ast": 0.10, "threes": 0.35}           # wnba_sim_rate_shrink.json
+WNBA_DISPERSION_K = {"pts": 1.25, "reb": 1.30, "ast": 1.20, "threes": 1.15, "pra": 1.40}  # re-fit on the #2+#3 stack
+WNBA_SHAPE_D = {"reb": 1.189, "ast": 1.089, "threes": 1.131}                             # NB variance = D * mean
+
+
+def _murphy(ps: List[float], ys: List[int], bins: int = 10) -> Dict:
+    """Brier = REL - RES + UNC (equal-count bins). REL is fixable by a transform; RES is not."""
+    n = len(ps)
+    if not n:
+        return {"n": 0}
+    order = sorted(range(n), key=lambda i: ps[i])
+    ob = sum(ys) / n
+    rel = res = 0.0
+    for b in range(bins):
+        idx = order[b * n // bins:(b + 1) * n // bins]
+        if not idx:
             continue
-        e = out["games"].setdefault(f"{sk}|{mk}", {"gate": "MEAN_ONLY", "why": []})
-        decides = (arm == "smart_sim_anchored_replay") or sk != "game"
-        beats_half = _verdict(v["brier_delta_model_vs_half"], v["n"], report["min_n_games"]) == "MODEL_BETTER"
-        if decides and v["verdict"] == "MODEL_BETTER" and beats_half:
-            e["gate"] = "PROBABILITY"
-        if decides and v["verdict"] == "MODEL_BETTER" and not beats_half:
-            e["why"].append(f"{arm}: beats the book but NOT a coin flip ({v['brier_delta_model_vs_half']}) -- the book price is noise here, not a bar")
-        e["why"].append(f"{arm} Brier vs book: {v['verdict']} {v['brier_delta_model_vs_book']} n_book={v['n_with_book']}"
-                        + ("" if decides else " (informational)"))
-    for k, v in report["games"]["point"].items():
-        arm, ph, sk, mk = k.split("|")
-        if ph != "regular" or arm not in ("smart_sim", "smart_sim_anchored_replay"):
+        pk = sum(ps[i] for i in idx) / len(idx)
+        ok = sum(ys[i] for i in idx) / len(idx)
+        rel += len(idx) * (pk - ok) ** 2
+        res += len(idx) * (ok - ob) ** 2
+    brier = sum((ps[i] - ys[i]) ** 2 for i in range(n)) / n
+    return {"n": n, "brier": round(brier, 5), "rel": round(rel / n, 5), "res": round(res / n, 5), "unc": round(ob * (1 - ob), 5)}
+
+
+def _nb_p_over(line: float, mean: float, var: float) -> float:
+    """P(X > line) for a negative binomial with this mean/variance (Poisson if var <= mean)."""
+    mean = max(mean, 1e-6)
+    k = math.floor(line)
+    if var <= mean * 1.0001:
+        p, term = 0.0, math.exp(-mean)
+        for x in range(0, k + 1):
+            if x > 0:
+                term *= mean / x
+            p += term
+        return max(0.0, min(1.0, 1 - p))
+    r = mean * mean / (var - mean)
+    q = r / (r + mean)
+    term = q ** r
+    cdf = term
+    for x in range(1, k + 1):
+        term *= (x - 1 + r) / x * (1 - q)
+        cdf += term
+    return max(0.0, min(1.0, 1 - cdf))
+
+
+def _collect_sim_players(args, manifest: Dict, hist: History, phase_of: Dict[str, str]) -> Tuple[List[Dict], Counter]:
+    """One row per (smart-sim game, player who played): model mean/sd/minutes per stat (straight from the
+    pre-tip smart-sim JSON, the numbers production merges into props_predictions mean_/sd_), actuals,
+    and the as-of baselines including as-of minutes."""
+    rows, c = [], Counter()
+    for key, info in sorted(manifest["smart_sim"].items()):
+        if not info.get("commit_ts"):
             continue
-        out["games"].setdefault(f"{sk}|{mk}", {"gate": "MEAN_ONLY", "why": []})["why"].append(
-            f"{arm} point vs book line: {v['verdict']} dMAE {v['mae_delta_vs_book']}")
+        d = key[:10]
+        p = args.out / "asof" / "smart_sim" / f"{key}.json"
+        if not p.exists():
+            continue
+        sim = json.loads(p.read_text(encoding="utf-8"))
+        players = sim.get("players")
+        plist = (players.get("home", []) + players.get("away", [])) if isinstance(players, dict) else (players or [])
+        if not plist or "min_mean" not in (plist[0] if isinstance(plist[0], dict) else {}):
+            c["sim_without_player_minutes"] += 1
+            continue
+        for pl in plist:
+            raw = int(_f(pl.get("player_id")) or 0)
+            pid = hist.resolve(raw, str(pl.get("player_name") or ""), d, c) if raw else None
+            proj_min = _f(pl.get("min_mean")) or 0.0
+            if not pid:
+                c["projected_min>=10_no_log(DNP or unmatched)" if proj_min >= 10 else "projected_min<10_no_log"] += 1
+                continue
+            act = hist.by_pd[(pid, d)]
+            if act["min"] <= 0:
+                c["log_but_0_min"] += 1
+                continue
+            prior = [r for r in hist.h.get(pid, []) if r["date"] < d]
+            if not prior:
+                c["no_prior_game"] += 1
+                continue
+            asof_min = sum(r["min"] for r in prior) / len(prior)
+            l5 = prior[-5:]
+            asof_min5 = sum(r["min"] for r in l5) / len(l5)
+            base = {m: sum(r[m] for r in prior) / len(prior) for m in SIM_STATS}
+            per_min = {m: sum(r[m] for r in prior) / max(1e-6, sum(r["min"] for r in prior)) for m in SIM_STATS}
+            mean = {m: _f(pl.get(f"{m}_mean")) for m in SIM_STATS}
+            sd = {m: _f(pl.get(f"{m}_sd")) for m in SIM_STATS}
+            if any(v is None for v in mean.values()):
+                c["missing_stat_mean"] += 1
+                continue
+            rows.append({"gid": act["gid"], "date": d, "phase": phase_of.get(d, "unknown"), "pid": pid,
+                         "proj_min": proj_min, "act_min": act["min"], "asof_min": asof_min, "asof_min5": asof_min5,
+                         "mean": mean, "sd": sd, "act": {m: act[m] for m in SIM_STATS}, "base": base, "per_min": per_min,
+                         "n_prior": len(prior)})
+    c["rows"] = len(rows)
+    return rows, c
+
+
+def diagnose(args, manifest: Dict, hist: History, scoreboards: Dict[str, List[Dict]], phase_of: Dict[str, str]) -> Dict:
+    rows, counts = _collect_sim_players(args, manifest, hist, phase_of)
+    split = args.split
+    train = [r for r in rows if r["phase"] == "regular" and r["date"] < split]
+    test = [r for r in rows if (r["phase"] == "regular" and r["date"] >= split) or r["phase"] == "playoff"]
+    out: Dict = {"split": split, "counts": dict(counts),
+                 "train": {"rows": len(train), "games": len({r["gid"] for r in train}), "dates": len({r["date"] for r in train})},
+                 "test": {"rows": len(test), "games": len({r["gid"] for r in test}), "dates": len({r["date"] for r in test}),
+                          "playoff_rows": sum(r["phase"] == "playoff" for r in test)},
+                 "minutes": {}, "props": {}}
+
+    def mae_ci(rr: List[Dict], f_a, f_b) -> Dict:
+        p, lo, hi = _boot_ci([(r["gid"], abs(f_a(r) - r["y"]) - abs(f_b(r) - r["y"])) for r in rr])
+        return {"point": round(p, 4), "ci95": [round(lo, 4), round(hi, 4)]}
+
+    # minutes: the sim's projected minutes vs actual, against the as-of average
+    for name, rr in (("all", rows), ("test", test)):
+        if not rr:
+            continue
+        n = len(rr)
+        out["minutes"][name] = {
+            "n": n, "bias_sim": round(sum(r["proj_min"] - r["act_min"] for r in rr) / n, 3),
+            "mae_sim": round(sum(abs(r["proj_min"] - r["act_min"]) for r in rr) / n, 3),
+            "mae_asof_avg": round(sum(abs(r["asof_min"] - r["act_min"]) for r in rr) / n, 3),
+            "mae_asof_last5": round(sum(abs(r["asof_min5"] - r["act_min"]) for r in rr) / n, 3),
+            "dmae_sim_vs_last5": mae_ci([{**r, "y": r["act_min"]} for r in rr], lambda r: r["proj_min"], lambda r: r["asof_min5"])}
+
+    for m in SIM_STATS:
+        for r in rows:
+            r["y"] = r["act"][m]
+        tr = [r for r in train if r["sd"][m]]
+        te = [r for r in test if r["sd"][m]]
+        if len(tr) < 200 or len(te) < 200:
+            continue
+        model = lambda r: r["mean"][m]  # noqa: E731
+        base = lambda r: r["base"][m]  # noqa: E731
+        # --- fits on TRAIN only ---
+        res_tr = sorted(r["y"] - r["mean"][m] for r in tr)
+        shift = res_tr[len(res_tr) // 2]
+        xs = np.array([r["mean"][m] for r in tr]); ys = np.array([r["y"] for r in tr])
+        b1, b0 = (np.polyfit(xs, ys, 1) if xs.std() > 0 else (1.0, 0.0))
+        grid = [i / 20 for i in range(21)]
+        w_blend = min(grid, key=lambda w: sum(abs(w * r["mean"][m] + (1 - w) * r["base"][m] - r["y"]) for r in tr))
+        zs = [(r["y"] - r["mean"][m]) / r["sd"][m] for r in tr if r["sd"][m] > 0.05]
+        # ROBUST width: IQR(z)/1.349 (= 1 for a correct Normal). Plain std(z) is dominated by rows whose
+        # stored sd is near zero (deep-bench players) and over-widens everyone else.
+        sd_scale = float((np.percentile(zs, 75) - np.percentile(zs, 25)) / 1.349) if zs else 1.0
+        disp = sum((r["y"] - r["mean"][m]) ** 2 for r in tr) / max(1e-6, sum(r["mean"][m] for r in tr))  # var/mean
+        fixes = {
+            "bias_shift": lambda r: r["mean"][m] + shift,
+            "linear_recal": lambda r: b0 + b1 * r["mean"][m],
+            "blend_own_avg": lambda r: w_blend * r["mean"][m] + (1 - w_blend) * r["base"][m],
+            "asof_minutes": lambda r: r["mean"][m] * (r["asof_min5"] / r["proj_min"]) if r["proj_min"] > 1 else r["mean"][m],
+            "asof_rate_x_sim_min": lambda r: r["per_min"][m] * r["proj_min"],
+        }
+        # WNBA rate shrink: new_mean = min_mean * (r_own + w * (sim_rate - r_own)), pra moves by the summed delta
+        def _rs(r, wmap):
+            def one(s_):
+                w = wmap.get(s_)
+                if w is None or r["proj_min"] <= 1 or r["n_prior"] < 3:
+                    return r["mean"][s_]
+                return r["proj_min"] * (r["per_min"][s_] + w * (r["mean"][s_] / r["proj_min"] - r["per_min"][s_]))
+            if m == "pra":
+                return r["mean"]["pra"] + sum(one(s_) - r["mean"][s_] for s_ in ("pts", "reb", "ast"))
+            return one(m)
+        comps = ("pts", "reb", "ast") if m == "pra" else (m,)
+        if all(c_ in WNBA_RATE_SHRINK_W for c_ in comps):
+            fixes["rate_shrink_wnba_w"] = lambda r: _rs(r, WNBA_RATE_SHRINK_W)
+        if m != "pra":
+            w_rs = min(grid, key=lambda w: sum(abs(_rs(r, {m: w}) - r["y"]) for r in tr))
+            fixes["rate_shrink_nba_fit"] = lambda r, w_rs=w_rs: _rs(r, {m: w_rs})
+        n = len(te)
+        res = {"train_n": len(tr), "test_n": n, "test_games": len({r["gid"] for r in te}),
+               "fits": {"w_rate_shrink_nba": (w_rs if m != "pra" else None), "shift": round(shift, 3), "linear": [round(float(b0), 3), round(float(b1), 3)], "w_model_in_blend": w_blend,
+                        "sd_scale(iqr z)": round(sd_scale, 3), "var_over_mean": round(disp, 3)},
+               "test_bias_model": round(sum(model(r) - r["y"] for r in te) / n, 3),
+               "test_mae_model": round(sum(abs(model(r) - r["y"]) for r in te) / n, 4),
+               "test_mae_own_avg": round(sum(abs(base(r) - r["y"]) for r in te) / n, 4),
+               "test_dmae_model_vs_own_avg": mae_ci(te, model, base),
+               "oracle_actual_minutes": {  # diagnostic only (uses the result): error left if minutes were known
+                   "mae": round(sum(abs(r["mean"][m] * r["act_min"] / r["proj_min"] - r["y"]) for r in te if r["proj_min"] > 1) / n, 4)},
+               "fixes": {}}
+        for fname, f in fixes.items():
+            res["fixes"][fname] = {"test_mae": round(sum(abs(f(r) - r["y"]) for r in te) / n, 4),
+                                   "dmae_vs_model": mae_ci(te, f, model), "dmae_vs_own_avg": mae_ci(te, f, base)}
+        # --- width / shape at a book-like line: the player's as-of average rounded to x.5 ---
+        pr = []
+        for r in te:
+            sd = r["sd"][m]
+            if not sd or sd <= 0.05:
+                continue
+            L = math.floor(r["base"][m]) + 0.5
+            y = int(r["y"] > L)
+            mu = r["mean"][m]
+            pr.append({"gid": r["gid"], "yb": y,
+                       "p_normal": 1 - _ncdf((L - mu) / sd),
+                       "p_normal_scaled": 1 - _ncdf((L - mu) / (sd * sd_scale)),
+                       "p_nb": _nb_p_over(L, mu, max(mu * disp, (sd * sd_scale) ** 2)) if m != "pra" else None,
+                       "p_base_normal": 1 - _ncdf((L - r["base"][m]) / (sd * sd_scale)),
+                       "p_disp_wnba_k": (1 - _ncdf((L - mu) / (sd * WNBA_DISPERSION_K[m]))) if m in WNBA_DISPERSION_K else None,
+                       "p_nb_wnba_D": _nb_p_over(L, mu, WNBA_SHAPE_D[m] * mu) if m in WNBA_SHAPE_D else None,
+                       "p_blend_scaled": 1 - _ncdf((L - fixes["blend_own_avg"](r)) / (sd * sd_scale)),
+                       "p_rateshrink_scaled": (1 - _ncdf((L - fixes["rate_shrink_nba_fit"](r)) / (sd * sd_scale)))
+                       if "rate_shrink_nba_fit" in fixes else None})
+        zt = [(r["y"] - r["mean"][m]) / r["sd"][m] for r in te if r["sd"][m] and r["sd"][m] > 0.05]
+        sds = [r["sd"][m] for r in te if r["sd"][m]]
+        res["width_test"] = {"std_z": round(float(np.std(zt)), 3), "iqr_z/1.349": round(float((np.percentile(zt, 75) - np.percentile(zt, 25)) / 1.349), 3),
+                             "share_sd_below_0.5": round(sum(x < 0.5 for x in sds) / max(1, len(sds)), 3), "cover50": round(sum(abs(z) < 0.674 for z in zt) / len(zt), 3),
+                             "cover80": round(sum(abs(z) < 1.2816 for z in zt) / len(zt), 3), "n": len(zt)}
+        res["prob_at_asof_line"] = {k: {**_murphy([r[k] for r in pr if r[k] is not None], [r["yb"] for r in pr if r[k] is not None]),
+                                        "logloss": round(sum(_logloss(r[k], r["yb"]) for r in pr if r[k] is not None) / max(1, sum(r[k] is not None for r in pr)), 5)}
+                                    for k in ("p_normal", "p_normal_scaled", "p_nb", "p_disp_wnba_k", "p_nb_wnba_D", "p_base_normal", "p_blend_scaled", "p_rateshrink_scaled")}
+        for k in ("p_normal_scaled", "p_nb", "p_disp_wnba_k", "p_nb_wnba_D", "p_blend_scaled"):
+            q = [r for r in pr if r[k] is not None]
+            if not q:
+                continue
+            p_, lo, hi = _boot_ci([(r["gid"], (r[k] - r["yb"]) ** 2 - (r["p_normal"] - r["yb"]) ** 2) for r in q])
+            res["prob_at_asof_line"][k]["dbrier_vs_served_normal"] = {"point": round(p_, 5), "ci95": [round(lo, 5), round(hi, 5)]}
+        for k in ("p_normal", "p_normal_scaled", "p_blend_scaled", "p_rateshrink_scaled"):  # vs the player's-own-average distribution
+            q = [r for r in pr if r[k] is not None]
+            if q:
+                p_, lo, hi = _boot_ci([(r["gid"], (r[k] - r["yb"]) ** 2 - (r["p_base_normal"] - r["yb"]) ** 2) for r in q])
+                res["prob_at_asof_line"][k]["dbrier_vs_own_avg_dist"] = {"point": round(p_, 5), "ci95": [round(lo, 5), round(hi, 5)]}
+        out["props"][m] = res
+    out["games"] = _diagnose_games(args, manifest, scoreboards, phase_of)
+    return out
+
+
+def _diagnose_games(args, manifest: Dict, scoreboards: Dict[str, List[Dict]], phase_of: Dict[str, str]) -> Dict:
+    """Raw smart-sim (regulation quarter sums) vs the as-of consensus line: what model weight w in
+    w*model + (1-w)*line minimises error (fit on train, scored on test)? The shipped anchor is w=0.05
+    (margin) / 0.30 (total). Also a bias-corrected raw total and a refit win-probability scale."""
+    from syndicate.features.nba.cards import _margin_win_prob as mwp
+    g = []
+    fam = manifest["families"]
+    for d, games in sorted(scoreboards.items()):
+        if not (fam["game_odds"].get(d) or {}).get("commit_ts"):
+            continue
+        odds = _game_odds_index(args.out / "asof" / "game_odds" / f"{d}.csv")
+        for x in games:
+            if not x["completed"] or x["home_pts"] is None:
+                continue
+            o = odds.get((x["home"], x["away"]))
+            p = args.out / "asof" / "smart_sim" / f"{d}_{x['home']}_{x['away']}.json"
+            if not o or not p.exists():
+                continue
+            qs = _sim_quarters(json.loads(p.read_text(encoding="utf-8")))
+            if len(qs) != 4 or any(h is None or a is None for h, a in qs):
+                continue
+            hs, tot = _f(o.get("home_spread")), _f(o.get("total"))
+            if hs is None or tot is None:
+                continue
+            hh, aa = sum(h for h, _ in qs), sum(a for _, a in qs)  # type: ignore[misc]
+            g.append({"gid": f"{d}_{x['home']}_{x['away']}", "date": d, "phase": phase_of.get(d),
+                      "m": hh - aa, "t": hh + aa, "lm": -hs, "lt": tot, "am": x["home_pts"] - x["away_pts"],
+                      "at": x["home_pts"] + x["away_pts"], "p_book": _devig(_f(o.get("home_ml")), _f(o.get("away_ml")))})
+    tr = [r for r in g if r["phase"] == "regular" and r["date"] < args.split]
+    te = [r for r in g if (r["phase"] == "regular" and r["date"] >= args.split) or r["phase"] == "playoff"]
+    out: Dict = {"train_games": len(tr), "test_games": len(te)}
+    grid = [i / 20 for i in range(21)]
+    for k, lk, ak, shipped in (("margin", "lm", "am", 0.05), ("total", "lt", "at", 0.30)):
+        mk = "m" if k == "margin" else "t"
+        w = min(grid, key=lambda w: sum(abs(w * r[mk] + (1 - w) * r[lk] - r[ak]) for r in tr))
+        shift = float(np.median([r[ak] - r[mk] for r in tr])) if tr else 0.0
+        wb = min(grid, key=lambda w: sum(abs(w * (r[mk] + shift) + (1 - w) * r[lk] - r[ak]) for r in tr))
+
+        def ci(fa, fb):
+            p, lo, hi = _boot_ci([(r["gid"], abs(fa(r) - r[ak]) - abs(fb(r) - r[ak])) for r in te])
+            return {"point": round(p, 4), "ci95": [round(lo, 4), round(hi, 4)]}
+        out[k] = {"raw_bias_train": round(float(np.mean([r[mk] - r[ak] for r in tr])), 3) if tr else None,
+                  "raw_bias_test": round(float(np.mean([r[mk] - r[ak] for r in te])), 3) if te else None,
+                  "w_fit": w, "w_fit_after_bias_shift": wb, "shift": round(shift, 3), "w_shipped": shipped,
+                  "test_dmae_raw_vs_line": ci(lambda r: r[mk], lambda r: r[lk]),
+                  "test_dmae_shipped_anchor_vs_line": ci(lambda r: shipped * r[mk] + (1 - shipped) * r[lk], lambda r: r[lk]),
+                  "test_dmae_fit_w_vs_line": ci(lambda r: w * r[mk] + (1 - w) * r[lk], lambda r: r[lk]),
+                  "test_dmae_shift_fit_w_vs_line": ci(lambda r: wb * (r[mk] + shift) + (1 - wb) * r[lk], lambda r: r[lk])}
+    # win probability: refit the logistic scale on train (served 6.5) and decompose
+    ml = [r for r in te if r["am"] != 0 and r["p_book"] is not None]
+    scales = [s / 2 for s in range(6, 41)]
+    sc = min(scales, key=lambda s: sum((mwp(r["m"], scale=s) - int(r["am"] > 0)) ** 2 for r in tr if r["am"] != 0)) if tr else 6.5
+    out["win_prob"] = {"scale_served": 6.5, "scale_fit": sc,
+                       "served": _murphy([mwp(r["m"], scale=6.5) for r in ml], [int(r["am"] > 0) for r in ml]),
+                       "scale_refit": _murphy([mwp(r["m"], scale=sc) for r in ml], [int(r["am"] > 0) for r in ml]),
+                       "book": _murphy([r["p_book"] for r in ml], [int(r["am"] > 0) for r in ml])}
     return out
 
 
@@ -1272,8 +1546,8 @@ def write_md(report: Dict, path: Path) -> None:
         L.append(f"| {k} | {v['n']} | {v['n_with_book']} | {v['base_rate']} | {v['p_model_on_book_rows'].get('brier')} | {v['p_book'].get('brier')} | "
                  f"{d['point']} {d['ci95']} | {v['p_half'].get('brier')} | {(v.get('p_sim_own') or {}).get('brier', '')} | {e['n']} | "
                  f"{e.get('hit_rate', '')} | {e.get('roi', '')} {e.get('roi_ci95', '')} | {v['verdict']} |")
-    L += ["", "## gate list for 2026-27 (PROBABILITY only if the market beats its baseline AND the book)", "", "```",
-          json.dumps(report["gate"], indent=1), "```", ""]
+    L += ["", "## per-market evidence (diagnosis, NOT a switch: every line is its own decision)", "", "```",
+          json.dumps(report["evidence"], indent=1), "```", ""]
     path.write_text("\n".join(L), encoding="utf-8")
 
 
@@ -1302,6 +1576,8 @@ def main() -> int:
     ap.add_argument("--execute", action="store_true", help="actually spend credits")
     ap.add_argument("--max-credits", type=int, default=150000)
     ap.add_argument("--snap-min", type=int, default=45, help="snapshot this many minutes before tip")
+    ap.add_argument("--diagnose", action="store_true", help="why each market loses + OOS model fixes (needs a collected --out)")
+    ap.add_argument("--split", default="2026-03-01", help="diagnose: fit on smart-sim regular dates before this, test after + playoffs")
     ap.add_argument("--odds-dates", default="", help="comma list: restrict the backfill to these dates (pilot)")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
@@ -1325,6 +1601,11 @@ def main() -> int:
     manifest["cutoffs"] = cutoffs
     logs = fetch_player_logs(args)
     hist = History(logs)
+    if args.diagnose:
+        dg = diagnose(args, manifest, hist, scoreboards, phase_of)
+        (args.out / "diagnose.json").write_text(json.dumps(dg, indent=1, default=str), encoding="utf-8")
+        print(f"wrote {args.out / 'diagnose.json'}", flush=True)
+        return 0
     report = {"generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "min_n": args.min_n,
               "min_n_games": args.min_n_games, "start": args.start,
               "substrate": {"artifacts": "git history (upstream mostgood1/NBA-Betting HEAD + Syndicate origin/main), pre-tip versions",
@@ -1333,7 +1614,7 @@ def main() -> int:
     report["props_point"] = score_props_point(args, manifest, hist, phase_of)
     report["props_book"] = score_props_book(args, manifest, hist, phase_of)
     report["games"] = score_games(args, manifest, scoreboards, phase_of)
-    report["gate"] = gate(report)
+    report["evidence"] = evidence(report)
     report["runtime_s"] = round(time.time() - t0, 1)
     (args.out / "report.json").write_text(json.dumps(report, indent=1, default=str), encoding="utf-8")
     write_md(report, args.out / "report.md")

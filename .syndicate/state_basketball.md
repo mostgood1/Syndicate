@@ -916,30 +916,40 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 **The cost was never the point (~5.7s); the SILENCE was** — "no cards today" and
 "the stack blew" were the same observable, which is how it survived unnoticed.
 
-## [nba-model-skill-2025-26] NO NBA MARKET BEATS ITS BASELINE AND THE BOOK — as-of backtest of the 2025-26 season `[verified 2026-10-03, lane nba-lines-props-backtest, commit 795d420b, NO BOARD CHANGE]`
+## [nba-model-skill-2025-26] THE NBA MODEL IS LESS ACCURATE THAN THE PLAYER'S OWN AVERAGE, AND THE REASONS ARE MEASURED — as-of 2025-26 backtest + diagnosis `[verified 2026-10-03, lane nba-lines-props-backtest, NO BOARD/ENGINE CHANGE]`
 
-- **What the board serves (code, traced).** The Layer-2 board has no NBA projection source
-  (`board_enrichment._attach_projections_by_sport` falls through at :1871). NBA model numbers appear only on the
-  NBA cards page / market board:
-  - game margin/total = sum of the q1..q4 smart-sim means, through fixed logistics (`cards._margin_win_prob`
-    6.5 / 7.5 / 10.5);
-  - prop picks = `props_edges.model_prob`, uncalibrated (no `props_prob_calibration*.json` exists), so pts/pra
-    are shrunk and ast/reb/pr/pa/ra are blended 65-85% toward the vigged book;
-  - market board = raw Normal `model_prob_over`.
-- **Readings** (`scripts/backtest_nba_lines_props.py`; inputs are pre-tip COMMITTED artifacts from upstream
-  NBA-Betting + Syndicate origin/main; actuals from stats.nba/ESPN):
-  - Smart-sim props are WORSE than the player's own as-of average in 9/11 markets (regular season, 8,434
-    player-games / 428 games, e.g. pts dMAE +0.636 [+0.535, +0.739]); blk ties, stl is worse. The engine
-    under-projects (pts bias -1.11, pra -1.96).
-  - Both served probabilities are worse than the de-vigged book, or tie it where blended. That arm rests on
-    8 smart-sim games / 37 ONNX games.
-  - Raw game margin/total are worse than the line (+1.90 / +3.27 MAE, 524 games); the market-anchored default
-    ties it.
-  - Full tables: `.syndicate/findings_2026-10-02_nba_lines_props_backtest.md`.
-- **Gate for 2026-27 (NHL rule): MEAN_ONLY on every NBA market.** The board still shows NBA probabilities and
-  edges; withholding them is a user decision, not yet taken.
+**Directive:** every line is its own decision; no NBA market is withheld (user 2026-10-02). The earlier
+"MEAN_ONLY on every NBA market" gate in this section was WITHDRAWN on 2026-10-03.
+
+- **What is served (code, traced).**
+  - The Layer-2 board has no NBA projection source (`board_enrichment._attach_projections_by_sport` :1871).
+  - The NBA cards / market board show: game margin/total = the sum of q1..q4 smart-sim means through fixed
+    logistics (`cards._margin_win_prob` 6.5 / 7.5 / 10.5); prop picks = `props_edges.model_prob` (no
+    calibration file exists, so pts/pra are shrunk and ast/reb/pr/pa/ra are book-blended); market board =
+    raw Normal(`mean_*`, `sd_*`).
+- **Accuracy readings** (`scripts/backtest_nba_lines_props.py`; pre-tip COMMITTED artifacts from upstream
+  NBA-Betting + Syndicate origin/main; stats.nba/ESPN actuals):
+  - Smart-sim props are worse than the player's own as-of average in 9/11 markets (8,434 regular-season
+    player-games / 428 games, e.g. pts dMAE +0.636 [+0.535, +0.739]).
+  - Raw game margin/total are worse than the line (+1.90 / +3.27 MAE, 524 games). The shipped market anchor
+    ties the line.
+- **Why** (`--diagnose`; fit before 2026-03-01, scored on 403 later games incl. playoffs):
+  - **Minutes:** sim minutes bias −3.67, MAE 6.64 vs 5.27 for last-5.
+  - **Per-minute rates:** the sim's rates are worse than the player's own; WNBA rate-shrink weights transfer
+    as-is.
+  - **Distribution width:** the served sd is too narrow; IQR(z)/1.349 is pts 1.52, reb 1.44, ast 1.39,
+    pra 1.85.
+  - The served probability's loss is almost all reliability (pts REL 0.037), which is fixable.
+  - Game lines: the fitted model weight vs the line is 0.00 (margin) / 0.05 (total), so the raw sim carries
+    no out-of-sample information beyond the line.
+- **Out-of-sample fix:** mean rate-shrink / blend toward the player's own average, plus an NBA-fit sd scale.
+  - At a book-like line it beats the player's own-average distribution in every prop market (pts −0.0080
+    [−0.0098, −0.0062]).
+  - Versus the de-vigged book it is **UNMEASURED**: 8 smart-sim games have two-sided prop prices; the OddsAPI
+    backfill is owed.
 - **Data facts:**
-  - The upstream 2026 playoff `props_predictions` carry ESPN player ids, not NBA ids.
+  - The upstream 2026 playoff `props_predictions` carry ESPN player ids.
   - The upstream consensus `game_odds` spread/total prices are unreliable: 502 of 1,281 rows are unpriced, and
     some pair alt-line prices with a main point.
-  - The repo `.env` `ODDS_API_KEY` is DEACTIVATED (HTTP 401, 2026-10-03).
+  - The repo `.env` `ODDS_API_KEY` is DEACTIVATED (401, 2026-10-03).
+- Full tables: `.syndicate/findings_2026-10-02_nba_lines_props_backtest.md`.
