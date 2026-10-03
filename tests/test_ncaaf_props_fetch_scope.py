@@ -74,11 +74,45 @@ def test_a_far_event_never_fetched_is_fetched():
 
 
 def test_the_near_window_is_the_central_calendar_not_utc():
-    # 7:30pm CT Thursday is 10-03 in UTC; it is TONIGHT and must be near even
-    # though a recent fetch would otherwise let a far event be carried.
-    recent = (NOW - timedelta(minutes=5)).isoformat()
+    # 7:30pm CT Thursday is 10-03 in UTC; it is TONIGHT and must be near. A
+    # 25-minute-old fetch separates the two readings: due for a near pregame
+    # event (20 min), carried for a far one (6h heartbeat).
+    recent = (NOW - timedelta(minutes=25)).isoformat()
     to_fetch, carried = fetch_module.plan_event_fetch([_event("thu", THU_NIGHT)], {"thu": recent}, now=NOW)
     assert [e["id"] for e in to_fetch] == ["thu"] and carried == []
+
+
+# Lane `ncaaf-props-credit-cut` (2026-10-03): near events refresh by their OWN age.
+# Measured: NCAAF spent 5,332 credits in the half hour after 16:00Z, re-fetching
+# ~51 events x 9 markets on every ~2.5-minute live sweep.
+FRI_IN_PLAY = "2026-10-02T15:30:00Z"   # kicked off 30 min before NOW -> near, in progress
+
+
+def test_reachability_a_near_pregame_event_fetched_recently_is_carried():
+    five = (NOW - timedelta(minutes=5)).isoformat()
+    to_fetch, carried = fetch_module.plan_event_fetch([_event("fri", FRI_NIGHT)], {"fri": five}, now=NOW)
+    assert to_fetch == [] and carried == ["fri"], "a live sweep must not re-buy a game that has not started"
+    stale = (NOW - timedelta(minutes=21)).isoformat()
+    to_fetch, carried = fetch_module.plan_event_fetch([_event("fri", FRI_NIGHT)], {"fri": stale}, now=NOW)
+    assert [e["id"] for e in to_fetch] == ["fri"]
+
+
+def test_an_in_progress_event_refreshes_at_most_every_15_minutes():
+    ten = (NOW - timedelta(minutes=10)).isoformat()
+    sixteen = (NOW - timedelta(minutes=16)).isoformat()
+    assert fetch_module.plan_event_fetch([_event("live", FRI_IN_PLAY)], {"live": ten}, now=NOW) == ([], ["live"])
+    to_fetch, _ = fetch_module.plan_event_fetch([_event("live", FRI_IN_PLAY)], {"live": sixteen}, now=NOW)
+    assert [e["id"] for e in to_fetch] == ["live"]
+
+
+def test_never_fetched_or_zero_window_always_fetches(monkeypatch):
+    assert [e["id"] for e in fetch_module.plan_event_fetch([_event("fri", FRI_NIGHT)], {}, now=NOW)[0]] == ["fri"]
+    one = (NOW - timedelta(minutes=1)).isoformat()
+    monkeypatch.setenv("NCAAF_PROPS_PREGAME_REFRESH_SECONDS", "0")
+    monkeypatch.setenv("NCAAF_PROPS_INPLAY_REFRESH_SECONDS", "0")
+    events = [_event("fri", FRI_NIGHT), _event("live", FRI_IN_PLAY)]
+    to_fetch, carried = fetch_module.plan_event_fetch(events, {"fri": one, "live": one}, now=NOW)
+    assert [e["id"] for e in to_fetch] == ["fri", "live"] and carried == []
 
 
 @pytest.fixture
@@ -132,8 +166,9 @@ def test_end_to_end_one_request_per_event_and_carried_events_are_never_quoted(tm
     assert all("player_pass_yds" in c and "," in c.split("|")[1] for c in event_calls), "combined: all markets per request"
     assert quoted[-1] == ["thu", "sat"]
 
-    # Run 2, minutes later: the near game is re-fetched; Saturday's is carried,
-    # the prop-less FCS game is neither carried nor re-fetched.
+    # Run 2, 21 minutes later (the next pregame sweep): the near game is due again
+    # and re-fetched; Saturday's is carried, the prop-less FCS game is neither.
+    monkeypatch.setattr(fetch_module, "datetime", _clock(NOW + timedelta(minutes=21)))
     calls.clear()
     assert _run(tmp_path) == 0
     assert [c.split("/events/")[1].split("/")[0] for c in calls if "/events/" in c] == ["thu"]
@@ -145,8 +180,25 @@ def test_end_to_end_one_request_per_event_and_carried_events_are_never_quoted(tm
     csv_text = (tmp_path / "oddsapi_player_props_2026_wk5.csv").read_text(encoding="utf-8")
     assert "QB sat" in csv_text, "Saturday's props stay in the CSV for the NCAAF page"
 
+    # Run 3, five minutes after run 2 (a live sweep): nothing is due, nothing is bought.
+    monkeypatch.setattr(fetch_module, "datetime", _clock(NOW + timedelta(minutes=26)))
+    calls.clear()
+    assert _run(tmp_path) == 0
+    assert [c for c in calls if "/events/" in c] == [], "lane ncaaf-props-credit-cut: no re-buy within the window"
+    csv_text = (tmp_path / "oddsapi_player_props_2026_wk5.csv").read_text(encoding="utf-8")
+    assert "QB thu" in csv_text and "QB sat" in csv_text, "carried events keep their rows"
+
 
 class _FrozenDatetime(datetime):
     @classmethod
     def now(cls, tz=None):
         return NOW if tz is None else NOW.astimezone(tz)
+
+
+def _clock(instant):
+    class _At(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return instant if tz is None else instant.astimezone(tz)
+
+    return _At

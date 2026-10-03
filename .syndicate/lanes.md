@@ -1456,6 +1456,12 @@ death, never life — do not invert it.
 - Hypothesis: H1: the soccer autorun is called from refresh-worker's single main loop, and the loop has been inside one long synchronous stage since ~15:44Z (the board build / kalshi stages seen IN FLIGHT 13 of 48 polls 15:48-16:23Z), so the soccer tick is never reached. H2 (alt): the soccer tick runs but returns before any log line, e.g. an exception swallowed above the SOCCER_ logs, or a gate (active sports / memory headroom) that skips silently.
 - Falsification test: H1 is false if refresh-worker's own main-loop tick lines (lines tagged [refresh_worker] for non-soccer autoruns: MLB tick, intelligence loop, etc.) KEEP appearing at normal cadence after 15:44Z. Then the loop is turning and the soccer path is skipping (H2). H2 is false if the loop's own tick lines also stop at ~15:44Z.
 - Verification: Per-tag timeline of [refresh_worker] lines 15:00Z-now with gaps; the soccer autorun's call site and gates read from code; the first stage that stops; a resumed SOCCER_UNIT_* line + recs mtime after any fix
+### ncaaf-props-credit-cut — OPEN — opened 2026-10-03 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: NCAAF player-props credit burn on a Saturday drops from ~5-10k/h at peak by refreshing each event's props by its own age (not-started >=20 min, in-progress >=15 min) instead of every sweep, with 0 NCAAF prop rows served >1h
+- Files: scripts/fetch_ncaaf_oddsapi_props_local.py (plan_event_fetch + its two env readers only), tests/test_ncaaf_props_fetch_scope.py
+- Hypothesis: Measured 10-03: NCAAF credits 600-1,236/half-hour pregame and 2,647-5,332/half-hour after 15:10Z kickoff; the props step fetches ~51 events x 9 markets on EVERY sweep (pregame every 25 min, live every ~2.5 min); the 150s lines autorun is mode=fast at ~9 credits/run
+- Falsification test: If NCAAF credits/hour in the next live window stay above ~5k with in-play refresh at 15 min, the props step is not the driver
+- Verification: Fleet quota ncaaf credits/hour during the next NCAAF live window vs 10-03 16:00-16:30Z (5,332/half-hour); NCAAF prop rows served >1h = 0
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

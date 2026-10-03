@@ -322,6 +322,34 @@ def _far_refresh_seconds() -> float:
         return 21600.0
 
 
+def _env_seconds(name: str, default: float) -> float:
+    try:
+        return max(0.0, float(os.environ.get(name, str(default)) or default))
+    except Exception:
+        return float(default)
+
+
+def _pregame_refresh_seconds() -> float:
+    """Minimum age before a NEAR event that has NOT kicked off is re-fetched (20 min).
+
+    Lane `ncaaf-props-credit-cut`, 2026-10-03. Below the 25-minute NCAAF pregame
+    sweep cadence, so every PREGAME sweep still refreshes it; what it stops is
+    the LIVE sweep (every ~2.5 min once any NCAAF game kicks off) re-buying the
+    props of every game that has not started. 0 = every run (the old behaviour).
+    """
+    return _env_seconds("NCAAF_PROPS_PREGAME_REFRESH_SECONDS", 1200.0)
+
+
+def _inplay_refresh_seconds() -> float:
+    """Minimum age before an IN-PROGRESS event is re-fetched (15 min; user decision 2026-10-03).
+
+    Measured 10-03: NCAAF spent 5,332 credits in the half hour after 16:00Z,
+    ~51 events x 9 markets re-fetched on every ~2.5-minute live sweep. In-play
+    prop prices are therefore up to 15 min old instead of ~2.5. 0 = every run.
+    """
+    return _env_seconds("NCAAF_PROPS_INPLAY_REFRESH_SECONDS", 900.0)
+
+
 def plan_event_fetch(
     scoped: list[dict[str, Any]],
     prior_fetched_utc: dict[str, str] | None,
@@ -330,11 +358,15 @@ def plan_event_fetch(
 ) -> tuple[list[dict[str, Any]], list[str]]:
     """(events to fetch now, ids to CARRY from the previous capture).
 
-    Near events -- kickoff on a Central date no later than today + `_near_days()`,
-    games in progress included -- are fetched every run, because those are the
-    rows the board can show and the 1h freshness rule judges. A far event is
-    fetched only when its own last fetch is at least `_far_refresh_seconds()`
-    old (or it was never fetched); otherwise it is carried.
+    Each event is re-fetched only when ITS OWN last fetch is old enough, and
+    carried otherwise (its previous payload kept, never re-logged as a quote):
+
+        far event (kickoff after today + `_near_days()`)   `_far_refresh_seconds()` (6h)
+        near event, not yet kicked off                     `_pregame_refresh_seconds()` (20 min)
+        near event in progress (kickoff <= now)            `_inplay_refresh_seconds()` (15 min)
+
+    Never fetched, or an unreadable fetch time, always fetches. All three are
+    below the 1h freshness rule the board judges these rows by.
     """
     from syndicate.features.shared.timezone import CENTRAL_TIMEZONE, central_date_from_iso
 
@@ -342,6 +374,8 @@ def plan_event_fetch(
     today = current.astimezone(CENTRAL_TIMEZONE).date()
     last_near_day = today + timedelta(days=_near_days())
     far_age = _far_refresh_seconds()
+    pregame_age = _pregame_refresh_seconds()
+    inplay_age = _inplay_refresh_seconds()
     prior = prior_fetched_utc or {}
     to_fetch: list[dict[str, Any]] = []
     carried: list[str] = []
@@ -349,16 +383,26 @@ def plan_event_fetch(
         event_id = str(event.get("id") or "").strip()
         if not event_id:
             continue
-        day = central_date_from_iso(event.get("commence_time") or event.get("commenceTime"))
-        if day is None or day <= last_near_day:
+        commence_raw = event.get("commence_time") or event.get("commenceTime")
+        day = central_date_from_iso(commence_raw)
+        if day is None:
             to_fetch.append(event)
             continue
+        if day <= last_near_day:
+            try:
+                kickoff = datetime.fromisoformat(str(commence_raw).replace("Z", "+00:00"))
+                started = kickoff <= current
+            except Exception:
+                started = False
+            needed = inplay_age if started else pregame_age
+        else:
+            needed = far_age
         last = prior.get(event_id)
         try:
             age = (current - datetime.fromisoformat(str(last).replace("Z", "+00:00"))).total_seconds() if last else None
         except Exception:
             age = None
-        if age is None or age >= far_age:
+        if age is None or age >= needed:
             to_fetch.append(event)
         else:
             carried.append(event_id)
