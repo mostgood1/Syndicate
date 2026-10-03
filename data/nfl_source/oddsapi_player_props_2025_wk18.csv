@@ -1,1 +1,1239 @@
-team
+player,team,market,line,over_price,under_price,book,event,game_time,home_team,away_team,is_ladder
+AJ Barner,,Anytime TD,,180,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+AJ Dillon,,Anytime TD,,400,,betonlineag,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Aaron Rodgers,,Anytime TD,,2500,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Adam Prentice,,Anytime TD,,1150,,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Adam Thielen,,Anytime TD,,525,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Adam Trautman,,Anytime TD,,725,,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Adonai Mitchell,,Anytime TD,,325,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Alec Ingold,,Anytime TD,,3000,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Alec Pierce,,Anytime TD,,450,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Alex Bachman,,Anytime TD,,950,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Ameer Abdullah,,Anytime TD,,2000,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Amon-Ra St. Brown,,Anytime TD,,125,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Anthony Firkser,,Anytime TD,,1000,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Arizona Cardinals D/ST,,Anytime TD,,550,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Arizona Cardinals Defense,,Anytime TD,,1400,,fanduel,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Ashton Dulin,,Anytime TD,,2500,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Ashton Jeanty,,Anytime TD,,100,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Atlanta Falcons D/ST,,Anytime TD,,450,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Atlanta Falcons Defense,,Anytime TD,,850,,fanduel,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Audric Estime,,Anytime TD,,220,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Austin Hooper,,Anytime TD,,500,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Baker Mayfield,,Anytime TD,,750,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Baltimore Ravens D/ST,,Anytime TD,,500,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Baltimore Ravens Defense,,Anytime TD,,750,,fanduel,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Ben Sims,,Anytime TD,,950,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Ben Sinnott,,Anytime TD,,650,,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Ben Skowronek,,Anytime TD,,2400,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Bijan Robinson,,Anytime TD,,-165,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Blake Corum,,Anytime TD,,200,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Bo Melton,,Anytime TD,,1600,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Bo Nix,,Anytime TD,,310,,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Brady Cook,,Anytime TD,,350,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Brady Russell,,Anytime TD,,7000,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Brandin Cooks,,Anytime TD,,600,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Brashard Smith,,Anytime TD,,370,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Brevyn Spann-Ford,,Anytime TD,,650,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Brian Robinson Jr.,,Anytime TD,,750,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Britain Covey,,Anytime TD,,400,,betonlineag,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Brock Purdy,,Anytime TD,,600,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Bryce Young,,Anytime TD,,600,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Brycen Tremayne,,Anytime TD,,2200,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bucky Irving,,Anytime TD,,175,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+C.J. Ham,,Anytime TD,,1100,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+C.J. Stroud,,Anytime TD,,360,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+CJ Dippre,,Anytime TD,,2500,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Cade Otton,,Anytime TD,,460,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Cade Stover,,Anytime TD,,700,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Caleb Williams,,Anytime TD,,250,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Calvin Austin III,,Anytime TD,,510,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Cam Akers,,Anytime TD,,3500,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Carolina Panthers D/ST,,Anytime TD,,500,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Carolina Panthers Defense,,Anytime TD,,1000,,fanduel,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Carter Runyon,,Anytime TD,,1500,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Cedrick Wilson Jr.,,Anytime TD,,800,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+CeeDee Lamb,,Anytime TD,,121,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Charlie Kolar,,Anytime TD,,1200,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Charlie Woerner,,Anytime TD,,1700,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Chicago Bears D/ST,,Anytime TD,,500,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Chicago Bears Defense,,Anytime TD,,700,,fanduel,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Chris Blair,,Anytime TD,,4000,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Chris Brooks,,Anytime TD,,550,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Chris Godwin,,Anytime TD,,305,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Chris Manhertz,,Anytime TD,,650,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Chris Oladokun,,Anytime TD,,370,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Chris Rodriguez Jr.,,Anytime TD,,175,,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Christian Kirk,,Anytime TD,,280,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Christian McCaffrey,,Anytime TD,,-145,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Christian Watson,,Anytime TD,,390,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Chuba Hubbard,,Anytime TD,,350,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Colby Parkinson,,Anytime TD,,220,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Cole Kmet,,Anytime TD,,375,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Colston Loveland,,Anytime TD,,180,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Connor Heyward,,Anytime TD,,1200,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Cooper Kupp,,Anytime TD,,300,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Corey Kiner,,Anytime TD,,700,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Courtland Sutton,,Anytime TD,,180,,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+D'Andre Swift,,Anytime TD,,100,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+D'Ernest Johnson,,Anytime TD,,1000,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+DJ Giddens,,Anytime TD,,1300,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+DJ Moore,,Anytime TD,,190,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Dak Prescott,,Anytime TD,,550,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Dalen Cambre,,Anytime TD,,800,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Dallas Cowboys D/ST,,Anytime TD,,500,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Dalton Kincaid,,Anytime TD,,300,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Dalton Schultz,,Anytime TD,,195,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Dameon Pierce,,Anytime TD,,900,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Daniel Bellinger,,Anytime TD,,320,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Dante Pettis,,Anytime TD,,410,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Dare Ogunbowale,,Anytime TD,,1800,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Dareke Young,,Anytime TD,,3300,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Darius Cooper,,Anytime TD,,220,,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Darius Slayton,,Anytime TD,,195,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Darnell Mooney,,Anytime TD,,500,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+David Montgomery,,Anytime TD,,175,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+David Sills V,,Anytime TD,,750,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Davis Allen,,Anytime TD,,395,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Dawson Knox,,Anytime TD,,230,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+DeAndre Hopkins,,Anytime TD,,650,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+DeMario Douglas,,Anytime TD,,650,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Deebo Samuel Sr.,,Anytime TD,,360,,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Demarcus Robinson,,Anytime TD,,475,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Denver Broncos D/ST,,Anytime TD,,500,,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Denver Broncos Defense,,Anytime TD,,550,,fanduel,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Derius Davis,,Anytime TD,,1100,,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Derrick Henry,,Anytime TD,,-145,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Detroit Lions D/ST,,Anytime TD,,510,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Detroit Lions Defense,,Anytime TD,,800,,fanduel,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Deven Thompkins,,Anytime TD,,2500,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Devin Culp,,Anytime TD,,4000,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Devin Duvernay,,Anytime TD,,750,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Devin Singletary,,Anytime TD,,170,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Devontez Walker,,Anytime TD,,1600,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Dont'e Thornton Jr.,,Anytime TD,,800,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Drake Dabney,,Anytime TD,,2200,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Drake London,,Anytime TD,,160,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Drake Maye,,Anytime TD,,285,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Durham Smythe,,Anytime TD,,2800,,betrivers,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Dylan Drummond,,Anytime TD,,1900,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Dylan Laube,,Anytime TD,,850,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Efton Chism III,,Anytime TD,,600,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Elijah Higgins,,Anytime TD,,700,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Emanuel Wilson,,Anytime TD,,235,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Emari Demercado,,Anytime TD,,600,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Emeka Egbuka,,Anytime TD,,410,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Eric Gray,,Anytime TD,,1000,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Eric Saubert,,Anytime TD,,1300,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Evan Engram,,Anytime TD,,390,,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Evan Hull,,Anytime TD,,700,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Feleipe Franks,,Anytime TD,,4500,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Gabe Davis,,Anytime TD,,500,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+George Kittle,,Anytime TD,,165,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+George Pickens,,Anytime TD,,143,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Grant Calcaterra,,Anytime TD,,310,,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Green Bay Packers D/ST,,Anytime TD,,510,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Green Bay Packers Defense,,Anytime TD,,1300,,fanduel,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Greg Dulcich,,Anytime TD,,440,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Gunner Olszewski,,Anytime TD,,400,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Harrison Bryant,,Anytime TD,,2000,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Hassan Haskins,,Anytime TD,,400,,betonlineag,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Hollywood Brown,,Anytime TD,,275,,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Houston Texans D/ST,,Anytime TD,,475,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Houston Texans Defense,,Anytime TD,,700,,fanduel,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Hunter Henry,,Anytime TD,,133,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Hunter Luepke,,Anytime TD,,360,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Hunter Renfrow,,Anytime TD,,1700,,bovada,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Ian Thomas,,Anytime TD,,950,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Indianapolis Colts D/ST,,Anytime TD,,600,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Indianapolis Colts Defense,,Anytime TD,,1600,,fanduel,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Isaac TeSlaa,,Anytime TD,,333,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Isaiah Hodgins,,Anytime TD,,335,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Isaiah Likely,,Anytime TD,,410,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Isaiah Williams,,Anytime TD,,350,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+J.J. McCarthy,,Anytime TD,,235,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jack Bech,,Anytime TD,,550,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Jack Westover,,Anytime TD,,2000,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Jackson Hawes,,Anytime TD,,400,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Jacoby Brissett,,Anytime TD,,1100,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Jacory Croskey-Merritt,,Anytime TD,,143,,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Jahan Dotson,,Anytime TD,,200,,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Jahdae Walker,,Anytime TD,,1200,,betrivers,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jahmyr Gibbs,,Anytime TD,,-160,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jake Bobo,,Anytime TD,,2000,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Jake Ferguson,,Anytime TD,,255,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Jake Tonges,,Anytime TD,,1100,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Jaleel McLaughlin,,Anytime TD,,400,,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Jalen Brooks,,Anytime TD,,1100,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Jalen Coker,,Anytime TD,,320,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Jalen McMillan,,Anytime TD,,330,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Jalen Nailor,,Anytime TD,,350,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jalen Royals,,Anytime TD,,750,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Jalen Tolbert,,Anytime TD,,700,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+James Cook,,Anytime TD,,-125,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+James Jordan,,Anytime TD,,4000,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+James Mitchell,,Anytime TD,,1500,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Jameson Williams,,Anytime TD,,170,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jared Goff,,Anytime TD,,2500,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jared Wiley,,Anytime TD,,1600,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Jaret Patterson,,Anytime TD,,500,,betonlineag,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Jarquez Hunter,,Anytime TD,,1100,,betonlineag,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Jason Brownlee,,Anytime TD,,750,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Jauan Jennings,,Anytime TD,,200,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Jawhar Jordan,,Anytime TD,,290,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Jaxon Smith-Njigba,,Anytime TD,,100,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Jaxson Dart,,Anytime TD,,160,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Jayden Higgins,,Anytime TD,,200,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Jayden Reed,,Anytime TD,,425,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jaydon Blue,,Anytime TD,,-141,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Jaylen Warren,,Anytime TD,,195,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jaylen Wright,,Anytime TD,,185,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Jaylin Noel,,Anytime TD,,355,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Jeff Wilson Jr.,,Anytime TD,,1500,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Jeremy McNichols,,Anytime TD,,400,,betonlineag,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Jeremy Ruckert,,Anytime TD,,800,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Jimmy Horn Jr.,,Anytime TD,,900,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+John Bates,,Anytime TD,,1100,,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+John Metchie III,,Anytime TD,,400,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Jonathan Mingo,,Anytime TD,,675,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Jonathan Taylor,,Anytime TD,,119,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Jonnu Smith,,Anytime TD,,550,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jordan Addison,,Anytime TD,,215,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jordan Mason,,Anytime TD,,-150,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jordan Watkins,,Anytime TD,,1900,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Jordan Whittington,,Anytime TD,,700,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Josh Allen,,Anytime TD,,120,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Josh Downs,,Anytime TD,,550,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Josh Johnson,,Anytime TD,,725,,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Josh Oliver,,Anytime TD,,390,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Josh Whyle,,Anytime TD,,2500,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Joshua Palmer,,Anytime TD,,400,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Josiah Deguara,,Anytime TD,,1900,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+JuJu Smith-Schuster,,Anytime TD,,475,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Julian Hill,,Anytime TD,,1400,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Justin Jefferson,,Anytime TD,,145,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Justin Watson,,Anytime TD,,1500,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Juwan Johnson,,Anytime TD,,180,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+KaVontae Turpin,,Anytime TD,,550,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Kaleb Johnson,,Anytime TD,,900,,betonlineag,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Kalif Raymond,,Anytime TD,,1000,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Kameron Johnson,,Anytime TD,,3000,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Kansas City Chiefs D/ST,,Anytime TD,,450,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Kansas City Chiefs Defense,,Anytime TD,,750,,fanduel,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Kareem Hunt,,Anytime TD,,-130,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Kayshon Boutte,,Anytime TD,,280,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Keaton Mitchell,,Anytime TD,,500,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Keenan Allen,,Anytime TD,,500,,betonlineag,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Kendrick Bourne,,Anytime TD,,450,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kene Nwangwu,,Anytime TD,,300,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Kenneth Gainwell,,Anytime TD,,200,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Kenneth Walker III,,Anytime TD,,195,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kenny Pickett,,Anytime TD,,950,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Keon Coleman,,Anytime TD,,450,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Kevin Austin,,Anytime TD,,285,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Khalil Herbert,,Anytime TD,,350,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Khalil Shakir,,Anytime TD,,200,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Kimani Vidal,,Anytime TD,,350,,betonlineag,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Kirk Cousins,,Anytime TD,,1500,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Konata Mumpfield,,Anytime TD,,300,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Kyle Juszczyk,,Anytime TD,,1400,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kyle Monangai,,Anytime TD,,125,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Kyle Pitts,,Anytime TD,,185,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kyle Williams,,Anytime TD,,380,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Kyren Williams,,Anytime TD,,-177,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+LaJohntay Wester,,Anytime TD,,3000,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Ladd McConkey,,Anytime TD,,400,,betonlineag,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Lamar Jackson,,Anytime TD,,310,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Laquon Treadwell,,Anytime TD,,2200,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Las Vegas Raiders D/ST,,Anytime TD,,600,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Las Vegas Raiders Defense,,Anytime TD,,1300,,fanduel,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Lil'Jordan Humphrey,,Anytime TD,,700,,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Los Angeles Chargers D/ST,,Anytime TD,,510,,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Los Angeles Chargers Defense,,Anytime TD,,1700,,fanduel,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Los Angeles Rams D/ST,,Anytime TD,,500,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Los Angeles Rams Defense,,Anytime TD,,470,,fanduel,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Luke Farrell,,Anytime TD,,1600,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Luke Schoonmaker,,Anytime TD,,475,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Luther Burden III,,Anytime TD,,150,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Malik Washington,,Anytime TD,,400,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Marcedes Lewis,,Anytime TD,,1400,,betonlineag,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Mark Andrews,,Anytime TD,,220,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Marquez Valdes-Scantling,,Anytime TD,,400,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Marquise Brown,,Anytime TD,,280,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Marvin Mims Jr.,,Anytime TD,,650,,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Matthew Golden,,Anytime TD,,500,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Matthew Stafford,,Anytime TD,,1850,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Miami Dolphins D/ST,,Anytime TD,,650,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Miami Dolphins Defense,,Anytime TD,,1500,,fanduel,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Michael Carter,,Anytime TD,,340,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Michael Mayer,,Anytime TD,,333,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Michael Pittman Jr.,,Anytime TD,,425,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Michael Wilson,,Anytime TD,,180,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Mike Evans,,Anytime TD,,160,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Minnesota Vikings D/ST,,Anytime TD,,500,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Minnesota Vikings Defense,,Anytime TD,,550,,fanduel,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Mitchell Evans,,Anytime TD,,600,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Mo Alie-Cox,,Anytime TD,,1600,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Moliki Matavao,,Anytime TD,,1400,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Nate Adkins,,Anytime TD,,1600,,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Nathan Carter,,Anytime TD,,3500,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+New England Patriots D/ST,,Anytime TD,,475,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+New England Patriots Defense,,Anytime TD,,550,,fanduel,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+New Orleans Saints D/ST,,Anytime TD,,500,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+New Orleans Saints Defense,,Anytime TD,,1100,,fanduel,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+New York Giants D/ST,,Anytime TD,,480,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Nick Kallerup,,Anytime TD,,4000,,bovada,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Nick Vannett,,Anytime TD,,1600,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Nick Westbrook-Ikhine,,Anytime TD,,1900,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Noah Gray,,Anytime TD,,550,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Olamide Zaccheaus,,Anytime TD,,380,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Ollie Gordon II,,Anytime TD,,280,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Oronde Gadsden II,,Anytime TD,,600,,betonlineag,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Pat Bryant,,Anytime TD,,350,,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Pat Freiermuth,,Anytime TD,,390,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Patrick Ricard,,Anytime TD,,2500,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Payne Durham,,Anytime TD,,2200,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Pharaoh Brown,,Anytime TD,,2700,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Phil Mafah,,Anytime TD,,215,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Philadelphia Eagles D/ST,,Anytime TD,,500,,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Philadelphia Eagles Defense,,Anytime TD,,900,,fanduel,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Pittsburgh Steelers D/ST,,Anytime TD,,500,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Pittsburgh Steelers Defense,,Anytime TD,,1000,,fanduel,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Puka Nacua,,Anytime TD,,-129,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Quentin Johnston,,Anytime TD,,400,,betonlineag,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Quinn Ewers,,Anytime TD,,950,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+RJ Harvey,,Anytime TD,,-148,,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Rachaad White,,Anytime TD,,500,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Raheem Mostert,,Anytime TD,,700,,betonlineag,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Rasheen Ali,,Anytime TD,,1200,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Rashid Shaheed,,Anytime TD,,330,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Ray Davis,,Anytime TD,,300,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Rhamondre Stevenson,,Anytime TD,,155,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Rico Dowdle,,Anytime TD,,145,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Riley Leonard,,Anytime TD,,500,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Robbie Ouzts,,Anytime TD,,3500,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Robert Tonyan,,Anytime TD,,1700,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Roman Wilson,,Anytime TD,,1700,,betonlineag,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Romeo Doubs,,Anytime TD,,400,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Ronnie Bell,,Anytime TD,,750,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Ronnie Rivers,,Anytime TD,,550,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Ryan Flournoy,,Anytime TD,,305,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Sam Darnold,,Anytime TD,,1100,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+San Francisco 49ers D/ST,,Anytime TD,,500,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+San Francisco 49ers Defense,,Anytime TD,,1000,,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Scott Miller,,Anytime TD,,900,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Sean Tucker,,Anytime TD,,270,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Seattle Seahawks D/ST,,Anytime TD,,500,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Seattle Seahawks Defense,,Anytime TD,,700,,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Shane Zylstra,,Anytime TD,,650,,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Shedrick Jackson,,Anytime TD,,850,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Sione Vaki,,Anytime TD,,2200,,betrivers,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Skyy Moore,,Anytime TD,,1350,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Stefon Diggs,,Anytime TD,,145,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Sterling Shepard,,Anytime TD,,1500,,bovada,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Steven Sims,,Anytime TD,,1100,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Tahj Washington,,Anytime TD,,1500,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Tai Felton,,Anytime TD,,1100,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Tampa Bay Buccaneers D/ST,,Anytime TD,,500,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Tampa Bay Buccaneers Defense,,Anytime TD,,850,,fanduel,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Tank Bigsby,,Anytime TD,,165,,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Tanner Conner,,Anytime TD,,675,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Tanner McKee,,Anytime TD,,500,,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Taysom Hill,,Anytime TD,,255,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Teagan Quitoriano,,Anytime TD,,3000,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Tejhaun Palmer,,Anytime TD,,2500,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Terry McLaurin,,Anytime TD,,315,,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Tetairoa McMillan,,Anytime TD,,170,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Tez Johnson,,Anytime TD,,1750,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Theo Wease Jr.,,Anytime TD,,650,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Tom Kennedy,,Anytime TD,,1500,,betrivers,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Tommy Tremble,,Anytime TD,,600,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Travis Homer,,Anytime TD,,1900,,betrivers,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Travis Kelce,,Anytime TD,,260,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Tre Tucker,,Anytime TD,,400,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+TreVeyon Henderson,,Anytime TD,,125,,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Trent Sherfield Sr.,,Anytime TD,,800,,betrivers,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Trevor Etienne,,Anytime TD,,2500,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Trey Lance,,Anytime TD,,500,,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Trey McBride,,Anytime TD,,150,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Treylon Burks,,Anytime TD,,525,,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Treyton Welch,,Anytime TD,,2000,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Troy Franklin,,Anytime TD,,375,,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Tutu Atwell,,Anytime TD,,800,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Ty Chandler,,Anytime TD,,450,,betonlineag,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Ty Johnson,,Anytime TD,,350,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Tylan Wallace,,Anytime TD,,1900,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Tyler Allgeier,,Anytime TD,,180,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Tyler Badie,,Anytime TD,,1200,,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Tyler Goodson,,Anytime TD,,1900,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Tyler Higbee,,Anytime TD,,360,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Tyler Johnson,,Anytime TD,,1000,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Tyler Lockett,,Anytime TD,,700,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Tyler Shough,,Anytime TD,,350,,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Tyler Warren,,Anytime TD,,375,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Tyrell Shavers,,Anytime TD,,500,,betonlineag,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Tyrone Tracy Jr.,,Anytime TD,,120,,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Washington Commanders D/ST,,Anytime TD,,700,,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Washington Commanders Defense,,Anytime TD,,1300,,fanduel,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Will Shipley,,Anytime TD,,255,,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Woody Marks,,Anytime TD,,-115,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Xavier Hutchinson,,Anytime TD,,360,,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Xavier Legette,,Anytime TD,,480,,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Xavier Smith,,Anytime TD,,475,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Xavier Weaver,,Anytime TD,,700,,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Zach Charbonnet,,Anytime TD,,115,,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Zamir White,,Anytime TD,,700,,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Zavier Scott,,Anytime TD,,750,,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Zay Flowers,,Anytime TD,,210,,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Aaron Rodgers,,Interceptions,0.5,110,-137.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Baker Mayfield,,Interceptions,0.5,-141,113.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bo Nix,,Interceptions,0.5,106,-121.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Brady Cook,,Interceptions,0.5,-220,165.0,betmgm,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Brock Purdy,,Interceptions,0.5,-136,117.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Bryce Young,,Interceptions,0.5,102,-119.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+C.J. Stroud,,Interceptions,0.5,120,-130.0,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Caleb Williams,,Interceptions,0.5,150,-165.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Chris Oladokun,,Interceptions,0.5,115,-134.0,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Drake Maye,,Interceptions,0.5,170,-162.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+J.J. McCarthy,,Interceptions,0.5,-140,110.0,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jacoby Brissett,,Interceptions,0.5,-150,110.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Jared Goff,,Interceptions,0.5,104,-118.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jaxson Dart,,Interceptions,0.5,-135,100.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Josh Johnson,,Interceptions,0.5,-140,130.0,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Kirk Cousins,,Interceptions,0.5,100,-114.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Lamar Jackson,,Interceptions,0.5,130,-150.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Matthew Stafford,,Interceptions,0.5,105,-140.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Quinn Ewers,,Interceptions,0.5,-137,120.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Riley Leonard,,Interceptions,0.5,-162,147.0,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Sam Darnold,,Interceptions,0.5,-118,110.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Tanner McKee,,Interceptions,0.5,-102,-110.0,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Trey Lance,,Interceptions,0.5,-139,128.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Tyler Shough,,Interceptions,0.5,-106,-107.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Aaron Rodgers,,Passing Attempts,32.5,100,-110.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Baker Mayfield,,Passing Attempts,30.5,-110,-118.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Baker Mayfield,,Passing Attempts,31.5,-102,-112.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bo Nix,,Passing Attempts,32.5,-105,-125.0,betmgm,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Bo Nix,,Passing Attempts,33.5,-103,-115.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Brock Purdy,,Passing Attempts,33.5,-120,-102.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Brock Purdy,,Passing Attempts,34.5,100,-125.0,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Bryce Young,,Passing Attempts,29.5,-120,-110.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bryce Young,,Passing Attempts,30.5,-110,-110.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+C.J. Stroud,,Passing Attempts,29.5,-114,-114.0,betonlineag,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+C.J. Stroud,,Passing Attempts,30.5,100,-120.0,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Caleb Williams,,Passing Attempts,30.5,-117,-114.0,betrivers,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Caleb Williams,,Passing Attempts,31.5,-108,-115.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Caleb Williams,,Passing Attempts,33.5,150,-200.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Chris Oladokun,,Passing Attempts,26.5,-115,106.0,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Drake Maye,,Passing Attempts,27.5,-102,-105.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Drake Maye,,Passing Attempts,28.5,110,-145.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+J.J. McCarthy,,Passing Attempts,26.5,-104,-103.0,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+J.J. McCarthy,,Passing Attempts,27.5,100,-135.0,betmgm,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jacoby Brissett,,Passing Attempts,37.5,-109,-117.0,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Jacoby Brissett,,Passing Attempts,38.5,-102,-120.0,betonlineag,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Jared Goff,,Passing Attempts,32.5,-118,-101.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jared Goff,,Passing Attempts,33.5,-118,-110.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jaxson Dart,,Passing Attempts,30.5,-120,-110.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Josh Johnson,,Passing Attempts,27.5,-108,-110.0,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Kirk Cousins,,Passing Attempts,30.5,102,-120.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Lamar Jackson,,Passing Attempts,26.5,-118,-105.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Lamar Jackson,,Passing Attempts,27.5,100,-120.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Matthew Stafford,,Passing Attempts,30.5,-127,100.0,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Matthew Stafford,,Passing Attempts,31.5,-114,-108.0,betonlineag,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Matthew Stafford,,Passing Attempts,32.5,-110,-120.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Quinn Ewers,,Passing Attempts,27.5,-160,120.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Quinn Ewers,,Passing Attempts,28.5,-106,-108.0,fanduel,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Quinn Ewers,,Passing Attempts,29.5,100,-128.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Riley Leonard,,Passing Attempts,27.5,-104,-108.0,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Sam Darnold,,Passing Attempts,29.5,-118,-110.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Sam Darnold,,Passing Attempts,30.5,-102,-118.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Tanner McKee,,Passing Attempts,31.5,-103,-110.0,betonlineag,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Tanner McKee,,Passing Attempts,32.5,-113,-113.0,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Trey Lance,,Passing Attempts,27.5,-114,101.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Trey Lance,,Passing Attempts,28.5,100,-108.0,betrivers,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Tyler Shough,,Passing Attempts,31.5,-118,-110.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Tyler Shough,,Passing Attempts,32.5,-114,-103.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Aaron Rodgers,,Passing TDs,1.5,162,-185.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Baker Mayfield,,Passing TDs,1.5,112,-110.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bo Nix,,Passing TDs,1.5,104,-107.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Brady Cook,,Passing TDs,0.5,-120,-110.0,betmgm,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Brock Purdy,,Passing TDs,1.5,-120,115.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Bryce Young,,Passing TDs,1.5,130,-127.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+C.J. Stroud,,Passing TDs,1.5,125,-135.0,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Caleb Williams,,Passing TDs,1.5,-126,115.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Chris Oladokun,,Passing TDs,0.5,-188,170.0,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Drake Maye,,Passing TDs,1.5,-180,160.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+J.J. McCarthy,,Passing TDs,1.5,140,-157.0,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jacoby Brissett,,Passing TDs,1.5,135,-153.0,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Jared Goff,,Passing TDs,1.5,-110,109.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jaxson Dart,,Passing TDs,1.5,125,-165.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Josh Johnson,,Passing TDs,0.5,-157,136.0,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Kirk Cousins,,Passing TDs,1.5,125,-138.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Lamar Jackson,,Passing TDs,1.5,160,-173.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Matthew Stafford,,Passing TDs,2.5,155,-175.0,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Quinn Ewers,,Passing TDs,0.5,-157,170.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Riley Leonard,,Passing TDs,0.5,-118,105.0,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Sam Darnold,,Passing TDs,1.5,-121,120.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Tanner McKee,,Passing TDs,1.5,130,-139.0,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Trey Lance,,Passing TDs,0.5,-103,-105.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Tyler Shough,,Passing TDs,1.5,150,-170.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Aaron Rodgers,,Passing Yards,196.5,-117,-114.0,betrivers,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Aaron Rodgers,,Passing Yards,203.5,-125,-105.0,bovada,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Aaron Rodgers,,Passing Yards,208.5,-110,-111.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Aaron Rodgers,,Passing Yards,209.5,-112,-112.0,fanduel,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Aaron Rodgers,,Passing Yards,210.5,-115,-115.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Baker Mayfield,,Passing Yards,212.5,-112,-112.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Baker Mayfield,,Passing Yards,213.5,-110,-114.0,williamhill_us,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Baker Mayfield,,Passing Yards,217.5,-125,-105.0,bovada,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Baker Mayfield,,Passing Yards,221.5,135,-185.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bo Nix,,Passing Yards,215.5,-110,-120.0,fanatics,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Bo Nix,,Passing Yards,216.5,-112,-112.0,fanduel,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Bo Nix,,Passing Yards,217.5,-114,-110.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Bo Nix,,Passing Yards,218.5,-125,-108.0,williamhill_us,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Bo Nix,,Passing Yards,219.5,-114,-114.0,betonlineag,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Bo Nix,,Passing Yards,220.5,-110,-120.0,bovada,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Bo Nix,,Passing Yards,221.5,-115,-115.0,betmgm,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Bo Nix,,Passing Yards,224.5,-115,-115.0,betrivers,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Brady Cook,,Passing Yards,159.5,-114,-115.0,betmgm,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Brady Cook,,Passing Yards,160.5,-111,-113.0,draftkings,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Brock Purdy,,Passing Yards,238.5,-115,-115.0,betrivers,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Brock Purdy,,Passing Yards,240.5,-120,-110.0,fanatics,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Brock Purdy,,Passing Yards,245.5,-112,-112.0,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Brock Purdy,,Passing Yards,246.5,-114,-115.0,williamhill_us,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Brock Purdy,,Passing Yards,247.5,-112,-112.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Brock Purdy,,Passing Yards,249.5,-114,-114.0,betonlineag,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Brock Purdy,,Passing Yards,251.5,-115,-115.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Bryce Young,,Passing Yards,196.5,-115,-115.0,betrivers,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bryce Young,,Passing Yards,199.5,-115,-105.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bryce Young,,Passing Yards,200.5,-120,-110.0,fanatics,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bryce Young,,Passing Yards,201.5,-111,-110.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bryce Young,,Passing Yards,202.5,-114,-115.0,williamhill_us,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+C.J. Stroud,,Passing Yards,199.5,-114,-117.0,betrivers,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+C.J. Stroud,,Passing Yards,205.5,-111,-113.0,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+C.J. Stroud,,Passing Yards,206.5,-112,-112.0,fanduel,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+C.J. Stroud,,Passing Yards,209.5,-120,-105.0,betonlineag,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+C.J. Stroud,,Passing Yards,210.5,-115,-115.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Caleb Williams,,Passing Yards,232.5,-145,110.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Caleb Williams,,Passing Yards,238.5,-112,-112.0,fanduel,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Caleb Williams,,Passing Yards,239.5,-114,-117.0,betrivers,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Caleb Williams,,Passing Yards,241.5,-115,-114.0,williamhill_us,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Caleb Williams,,Passing Yards,242.5,-111,-113.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Caleb Williams,,Passing Yards,244.5,-114,-114.0,betonlineag,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Chris Oladokun,,Passing Yards,144.5,-114,-117.0,betrivers,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Chris Oladokun,,Passing Yards,149.5,-111,-112.0,draftkings,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Chris Oladokun,,Passing Yards,150.5,-135,100.0,williamhill_us,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Chris Oladokun,,Passing Yards,153.5,-115,-115.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Drake Maye,,Passing Yards,234.5,-114,-114.0,betonlineag,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Drake Maye,,Passing Yards,235.5,-112,-112.0,fanduel,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Drake Maye,,Passing Yards,236.5,-111,-113.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Drake Maye,,Passing Yards,239.5,-115,-115.0,betrivers,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Drake Maye,,Passing Yards,241.5,105,-140.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Drake Maye,,Passing Yards,246.5,-110,-120.0,bovada,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+J.J. McCarthy,,Passing Yards,187.5,-114,-117.0,betrivers,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+J.J. McCarthy,,Passing Yards,190.5,-112,-110.0,fanduel,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+J.J. McCarthy,,Passing Yards,192.5,-112,-112.0,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+J.J. McCarthy,,Passing Yards,194.5,-115,-115.0,betmgm,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jacoby Brissett,,Passing Yards,240.5,-112,-112.0,betonlineag,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Jacoby Brissett,,Passing Yards,241.5,-113,-111.0,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Jacoby Brissett,,Passing Yards,242.5,-115,-114.0,williamhill_us,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Jacoby Brissett,,Passing Yards,243.5,-115,-115.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Jacoby Brissett,,Passing Yards,245.5,-110,-120.0,bovada,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Jacoby Brissett,,Passing Yards,246.5,-115,-115.0,betrivers,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Jared Goff,,Passing Yards,251.5,-115,-115.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jared Goff,,Passing Yards,253.5,-114,-114.0,betonlineag,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jared Goff,,Passing Yards,254.5,-115,-115.0,betrivers,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jared Goff,,Passing Yards,255.5,-110,-111.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jared Goff,,Passing Yards,257.5,-112,-112.0,fanduel,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jaxson Dart,,Passing Yards,205.5,-120,-110.0,fanatics,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Jaxson Dart,,Passing Yards,211.5,-111,-113.0,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Jaxson Dart,,Passing Yards,212.5,-115,-115.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Josh Johnson,,Passing Yards,173.5,-115,-110.0,betmgm,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Josh Johnson,,Passing Yards,176.5,-114,-117.0,williamhill_us,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Josh Johnson,,Passing Yards,177.5,-114,-114.0,betonlineag,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Josh Johnson,,Passing Yards,178.5,-112,-111.0,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Josh Johnson,,Passing Yards,180.5,-114,-117.0,betrivers,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Kirk Cousins,,Passing Yards,200.5,-108,-120.0,betonlineag,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kirk Cousins,,Passing Yards,204.5,-111,-113.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kirk Cousins,,Passing Yards,205.5,-102,-112.0,fanduel,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kirk Cousins,,Passing Yards,209.5,-115,-115.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kirk Cousins,,Passing Yards,215.5,-120,-110.0,bovada,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Lamar Jackson,,Passing Yards,202.5,-115,-115.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Lamar Jackson,,Passing Yards,205.5,-110,-120.0,fanatics,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Lamar Jackson,,Passing Yards,206.5,-114,-114.0,betonlineag,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Lamar Jackson,,Passing Yards,207.5,-112,-112.0,fanduel,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Lamar Jackson,,Passing Yards,208.5,-111,-113.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Lamar Jackson,,Passing Yards,209.5,-110,-120.0,bovada,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Matthew Stafford,,Passing Yards,249.5,-115,-115.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Matthew Stafford,,Passing Yards,252.5,-114,-114.0,betonlineag,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Matthew Stafford,,Passing Yards,253.5,-110,-112.0,fanduel,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Matthew Stafford,,Passing Yards,254.5,-112,-112.0,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Matthew Stafford,,Passing Yards,259.5,-115,-115.0,betrivers,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Matthew Stafford,,Passing Yards,263.5,110,-145.0,bovada,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Quinn Ewers,,Passing Yards,184.5,-115,-115.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Quinn Ewers,,Passing Yards,186.5,-117,-114.0,betrivers,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Quinn Ewers,,Passing Yards,187.5,-113,-111.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Quinn Ewers,,Passing Yards,189.5,-107,-128.0,williamhill_us,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Quinn Ewers,,Passing Yards,190.5,-114,-114.0,betonlineag,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Quinn Ewers,,Passing Yards,191.5,-112,-112.0,fanduel,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Quinn Ewers,,Passing Yards,196.5,-115,-115.0,bovada,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Riley Leonard,,Passing Yards,155.5,-117,-114.0,betrivers,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Riley Leonard,,Passing Yards,160.5,-112,-112.0,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Riley Leonard,,Passing Yards,161.5,-111,-121.0,williamhill_us,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Riley Leonard,,Passing Yards,162.5,-114,-114.0,betonlineag,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Riley Leonard,,Passing Yards,163.5,-115,-115.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Sam Darnold,,Passing Yards,238.5,-117,-114.0,betrivers,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Sam Darnold,,Passing Yards,241.5,-115,-115.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Sam Darnold,,Passing Yards,245.5,-115,-115.0,williamhill_us,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Sam Darnold,,Passing Yards,246.5,-112,-105.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Sam Darnold,,Passing Yards,249.5,-114,-114.0,betonlineag,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Tanner McKee,,Passing Yards,213.5,-117,-114.0,betrivers,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Tanner McKee,,Passing Yards,218.5,-111,-113.0,draftkings,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Tanner McKee,,Passing Yards,219.5,-112,-112.0,williamhill_us,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Tanner McKee,,Passing Yards,220.5,-115,-115.0,fanatics,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Tanner McKee,,Passing Yards,224.5,-118,-115.0,betmgm,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Tanner McKee,,Passing Yards,226.5,110,-145.0,bovada,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Trey Lance,,Passing Yards,156.5,-114,-117.0,betrivers,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Trey Lance,,Passing Yards,160.5,-111,-113.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Trey Lance,,Passing Yards,162.5,100,-135.0,williamhill_us,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Trey Lance,,Passing Yards,163.5,-112,-110.0,fanduel,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Trey Lance,,Passing Yards,164.5,-115,-115.0,betmgm,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Tyler Shough,,Passing Yards,220.5,-120,-110.0,fanatics,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Tyler Shough,,Passing Yards,223.5,-117,-114.0,betrivers,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Tyler Shough,,Passing Yards,224.5,-115,-115.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Tyler Shough,,Passing Yards,225.5,-108,-112.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Tyler Shough,,Passing Yards,228.5,-115,-115.0,bovada,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+AJ Barner,,Receiving Yards,35.5,-118,-110.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+AJ Barner,,Receiving Yards,37.5,-112,-112.0,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+AJ Barner,,Receiving Yards,38.5,-110,-120.0,bovada,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+AJ Barner,,Receiving Yards,39.5,-109,-115.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+AJ Barner,,Receiving Yards,40.5,-114,-114.0,betonlineag,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Adam Thielen,,Receiving Yards,18.5,-121,-110.0,betrivers,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Adam Thielen,,Receiving Yards,19.5,-110,-108.0,williamhill_us,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Adam Thielen,,Receiving Yards,20.5,-114,-110.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Adam Thielen,,Receiving Yards,21.5,-110,-118.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Adonai Mitchell,,Receiving Yards,40.5,-110,-118.0,betmgm,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Amon-Ra St. Brown,,Receiving Yards,65.5,-112,-112.0,fanduel,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Amon-Ra St. Brown,,Receiving Yards,67.5,-118,-110.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Amon-Ra St. Brown,,Receiving Yards,68.5,-111,-113.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Amon-Ra St. Brown,,Receiving Yards,69.5,-114,-114.0,betonlineag,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Amon-Ra St. Brown,,Receiving Yards,70.5,-114,-117.0,betrivers,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Ashton Jeanty,,Receiving Yards,30.5,-110,-118.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Audric Estime,,Receiving Yards,14.5,-118,-110.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Austin Hooper,,Receiving Yards,10.5,-120,-110.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Bijan Robinson,,Receiving Yards,38.5,-112,-112.0,fanduel,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Bijan Robinson,,Receiving Yards,39.5,-110,-114.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Bijan Robinson,,Receiving Yards,40.5,-108,-113.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Bucky Irving,,Receiving Yards,15.5,-112,-112.0,fanduel,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bucky Irving,,Receiving Yards,16.5,-112,-109.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Cade Otton,,Receiving Yards,17.5,-113,-111.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Cade Otton,,Receiving Yards,18.5,-110,-112.0,fanduel,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Cade Stover,,Receiving Yards,8.5,-120,-110.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Calvin Austin III,,Receiving Yards,22.5,-130,-105.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Calvin Austin III,,Receiving Yards,23.5,-109,-107.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Calvin Austin III,,Receiving Yards,24.5,-117,-114.0,betrivers,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Cedrick Wilson Jr.,,Receiving Yards,20.5,-115,-118.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+CeeDee Lamb,,Receiving Yards,67.5,-115,-115.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Chris Godwin,,Receiving Yards,34.5,-112,100.0,fanduel,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Chris Godwin,,Receiving Yards,35.5,-113,-107.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Christian Kirk,,Receiving Yards,34.5,-110,-118.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Christian McCaffrey,,Receiving Yards,47.5,-113,-110.0,williamhill_us,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Christian McCaffrey,,Receiving Yards,48.5,-111,-112.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Christian McCaffrey,,Receiving Yards,50.5,-114,-114.0,betonlineag,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Chuba Hubbard,,Receiving Yards,8.5,-120,-110.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Chuba Hubbard,,Receiving Yards,9.5,-109,-102.0,betonlineag,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Chuba Hubbard,,Receiving Yards,10.5,-106,-112.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Cole Kmet,,Receiving Yards,16.5,-112,-112.0,fanduel,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Cole Kmet,,Receiving Yards,17.5,-112,-114.0,betonlineag,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Cole Kmet,,Receiving Yards,18.5,-109,-110.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Colston Loveland,,Receiving Yards,43.5,-112,-112.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Colston Loveland,,Receiving Yards,44.5,-110,-115.0,betonlineag,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Colston Loveland,,Receiving Yards,46.5,-115,-115.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Cooper Kupp,,Receiving Yards,31.5,-112,-112.0,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Cooper Kupp,,Receiving Yards,32.5,-114,-111.0,betonlineag,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Cooper Kupp,,Receiving Yards,33.5,-114,-110.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Cooper Kupp,,Receiving Yards,34.5,-109,-115.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Courtland Sutton,,Receiving Yards,53.5,-118,105.0,betmgm,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Courtland Sutton,,Receiving Yards,55.5,-112,-112.0,fanduel,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Courtland Sutton,,Receiving Yards,56.5,-112,-108.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Courtland Sutton,,Receiving Yards,57.5,-118,-113.0,betrivers,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+D'Andre Swift,,Receiving Yards,10.5,-118,-110.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+D'Andre Swift,,Receiving Yards,14.5,-112,-112.0,fanduel,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+D'Andre Swift,,Receiving Yards,15.5,-110,-115.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+DJ Moore,,Receiving Yards,34.5,-112,-105.0,fanduel,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+DJ Moore,,Receiving Yards,35.5,-110,-110.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+DJ Moore,,Receiving Yards,36.5,-114,-114.0,betonlineag,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+DJ Moore,,Receiving Yards,40.5,105,-140.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Dalton Schultz,,Receiving Yards,41.5,-130,100.0,bovada,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Dalton Schultz,,Receiving Yards,43.5,-115,-110.0,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Dalton Schultz,,Receiving Yards,44.5,-110,-112.0,fanduel,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Daniel Bellinger,,Receiving Yards,33.5,-110,-109.0,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Dante Pettis,,Receiving Yards,36.5,-115,-115.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Darius Slayton,,Receiving Yards,55.5,-120,-110.0,fanatics,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Darius Slayton,,Receiving Yards,56.5,-115,-113.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Darius Slayton,,Receiving Yards,57.5,-113,-111.0,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Darnell Mooney,,Receiving Yards,22.5,-118,-110.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+DeAndre Hopkins,,Receiving Yards,20.5,-112,-112.0,betonlineag,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+DeAndre Hopkins,,Receiving Yards,21.5,-115,-110.0,williamhill_us,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+DeAndre Hopkins,,Receiving Yards,22.5,-113,-111.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+DeAndre Hopkins,,Receiving Yards,23.5,-114,-117.0,betrivers,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+DeMario Douglas,,Receiving Yards,10.5,-110,-118.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Deebo Samuel Sr.,,Receiving Yards,46.5,-145,110.0,betmgm,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Demarcus Robinson,,Receiving Yards,16.5,-112,-112.0,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Demarcus Robinson,,Receiving Yards,17.5,-110,-110.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Demarcus Robinson,,Receiving Yards,18.5,-114,-114.0,betonlineag,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Derrick Henry,,Receiving Yards,3.5,-115,-108.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Derrick Henry,,Receiving Yards,4.5,-102,-107.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Devin Singletary,,Receiving Yards,7.5,-110,-118.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Drake London,,Receiving Yards,54.5,-105,-108.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Drake London,,Receiving Yards,55.5,-110,-113.0,betrivers,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Drake London,,Receiving Yards,56.5,-115,-115.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Drake London,,Receiving Yards,59.5,-120,-110.0,bovada,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Elijah Higgins,,Receiving Yards,14.5,-120,-110.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Emari Demercado,,Receiving Yards,9.5,-118,-110.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Emeka Egbuka,,Receiving Yards,24.5,-118,105.0,betrivers,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Emeka Egbuka,,Receiving Yards,25.5,-125,-105.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Emeka Egbuka,,Receiving Yards,26.5,-112,-107.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Emeka Egbuka,,Receiving Yards,28.5,-123,-105.0,betonlineag,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Evan Engram,,Receiving Yards,19.5,-112,-110.0,fanduel,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Evan Engram,,Receiving Yards,20.5,-108,-115.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+George Kittle,,Receiving Yards,60.5,-120,-110.0,fanatics,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+George Kittle,,Receiving Yards,63.5,-112,-112.0,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+George Kittle,,Receiving Yards,64.5,-110,-114.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+George Pickens,,Receiving Yards,67.5,-115,-115.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Greg Dulcich,,Receiving Yards,43.5,-110,-118.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Hunter Henry,,Receiving Yards,44.5,-108,-112.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Hunter Henry,,Receiving Yards,45.5,-115,-115.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Hunter Henry,,Receiving Yards,46.5,-105,-125.0,bovada,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Hunter Henry,,Receiving Yards,48.5,-115,-115.0,betrivers,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Isaac TeSlaa,,Receiving Yards,25.5,-112,-111.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Isaac TeSlaa,,Receiving Yards,26.5,-118,-110.0,williamhill_us,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Isaiah Likely,,Receiving Yards,22.5,-112,-111.0,betonlineag,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Isaiah Likely,,Receiving Yards,23.5,-110,-111.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Isaiah Williams,,Receiving Yards,24.5,-110,-118.0,betmgm,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Jack Bech,,Receiving Yards,21.5,-118,-115.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Jahmyr Gibbs,,Receiving Yards,28.5,-112,-111.0,fanduel,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jahmyr Gibbs,,Receiving Yards,29.5,-108,-116.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jake Ferguson,,Receiving Yards,30.5,-115,-115.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Jalen Coker,,Receiving Yards,33.5,-115,-115.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Jalen Coker,,Receiving Yards,34.5,-125,-105.0,bovada,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Jalen Coker,,Receiving Yards,35.5,-114,-117.0,betrivers,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Jalen Coker,,Receiving Yards,36.5,-110,-112.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Jalen Coker,,Receiving Yards,37.5,-112,-112.0,fanduel,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Jalen McMillan,,Receiving Yards,29.5,-111,-112.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Jalen McMillan,,Receiving Yards,30.5,-110,-115.0,betonlineag,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Jalen McMillan,,Receiving Yards,33.5,100,-130.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Jalen Nailor,,Receiving Yards,15.5,-120,-110.0,betmgm,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jameson Williams,,Receiving Yards,60.5,-115,-115.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jameson Williams,,Receiving Yards,61.5,-114,-110.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jameson Williams,,Receiving Yards,62.5,-112,-112.0,fanduel,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jauan Jennings,,Receiving Yards,43.5,-112,-112.0,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Jauan Jennings,,Receiving Yards,44.5,-113,100.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Jauan Jennings,,Receiving Yards,45.5,-114,-114.0,betonlineag,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Jauan Jennings,,Receiving Yards,48.5,-115,-115.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Jaxon Smith-Njigba,,Receiving Yards,97.5,-112,-110.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Jaxon Smith-Njigba,,Receiving Yards,98.5,-113,-105.0,williamhill_us,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Jaxon Smith-Njigba,,Receiving Yards,99.5,-115,-115.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Jaxon Smith-Njigba,,Receiving Yards,100.5,-120,-108.0,betonlineag,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Jayden Higgins,,Receiving Yards,45.5,-115,-115.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Jayden Higgins,,Receiving Yards,46.5,-112,-112.0,fanduel,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Jayden Higgins,,Receiving Yards,47.5,-121,-111.0,williamhill_us,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Jayden Higgins,,Receiving Yards,48.5,-113,-111.0,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Jayden Higgins,,Receiving Yards,49.5,-108,-113.0,betonlineag,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Jaydon Blue,,Receiving Yards,7.5,-115,-115.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Jaylen Warren,,Receiving Yards,10.5,-117,100.0,betrivers,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jaylen Warren,,Receiving Yards,11.5,100,-112.0,betonlineag,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jaylen Warren,,Receiving Yards,12.5,-110,-109.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jaylen Wright,,Receiving Yards,12.5,-115,-115.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Jaylin Noel,,Receiving Yards,18.5,-115,-115.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+John Metchie III,,Receiving Yards,24.5,-115,-115.0,betmgm,New York Jets @ Buffalo Bills,2026-01-04T21:25:00Z,Buffalo Bills,New York Jets,False
+Jonnu Smith,,Receiving Yards,14.5,-121,-110.0,betrivers,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jonnu Smith,,Receiving Yards,15.5,-111,100.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jonnu Smith,,Receiving Yards,16.5,-115,-115.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jordan Addison,,Receiving Yards,34.5,-117,-114.0,betrivers,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jordan Addison,,Receiving Yards,35.5,-115,-109.0,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jordan Addison,,Receiving Yards,36.5,-112,-112.0,fanduel,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jordan Mason,,Receiving Yards,7.5,-115,-115.0,betmgm,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+JuJu Smith-Schuster,,Receiving Yards,23.5,-115,-115.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Julian Hill,,Receiving Yards,9.5,-110,-120.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Justin Jefferson,,Receiving Yards,67.5,-135,100.0,betmgm,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Justin Jefferson,,Receiving Yards,70.5,-114,-117.0,betrivers,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Justin Jefferson,,Receiving Yards,71.5,-111,-103.0,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Juwan Johnson,,Receiving Yards,53.5,-115,-114.0,betrivers,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Juwan Johnson,,Receiving Yards,56.5,-112,-112.0,fanduel,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Juwan Johnson,,Receiving Yards,58.5,-115,-113.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Juwan Johnson,,Receiving Yards,59.5,-113,-111.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kareem Hunt,,Receiving Yards,7.5,-110,-118.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Kayshon Boutte,,Receiving Yards,27.5,-114,-110.0,betonlineag,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Kayshon Boutte,,Receiving Yards,29.5,-112,-112.0,fanduel,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Kayshon Boutte,,Receiving Yards,30.5,-114,-110.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Keaton Mitchell,,Receiving Yards,1.5,-110,-118.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Kendrick Bourne,,Receiving Yards,24.5,-112,-112.0,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kendrick Bourne,,Receiving Yards,25.5,-115,-110.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kendrick Bourne,,Receiving Yards,26.5,-110,-118.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kendrick Bourne,,Receiving Yards,27.5,-114,-114.0,betonlineag,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kenneth Gainwell,,Receiving Yards,29.5,-112,-105.0,fanduel,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Kenneth Gainwell,,Receiving Yards,30.5,-112,100.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Kenneth Gainwell,,Receiving Yards,31.5,-110,-118.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Kenneth Gainwell,,Receiving Yards,32.5,-105,-123.0,betonlineag,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Kenneth Walker III,,Receiving Yards,10.5,-115,-115.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kenneth Walker III,,Receiving Yards,11.5,-108,-124.0,betrivers,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kenneth Walker III,,Receiving Yards,12.5,-108,-110.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kenneth Walker III,,Receiving Yards,13.5,-120,-108.0,betonlineag,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kevin Austin,,Receiving Yards,40.5,-112,-112.0,fanduel,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kevin Austin,,Receiving Yards,41.5,-113,-111.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kevin Austin,,Receiving Yards,42.5,-114,-114.0,betonlineag,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kevin Austin,,Receiving Yards,44.5,-115,-115.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kyle Juszczyk,,Receiving Yards,7.5,-122,-109.0,betrivers,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kyle Juszczyk,,Receiving Yards,8.5,-110,-120.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kyle Juszczyk,,Receiving Yards,9.5,-112,-108.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kyle Monangai,,Receiving Yards,6.5,-110,-120.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Kyle Pitts,,Receiving Yards,41.5,-112,-109.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kyle Pitts,,Receiving Yards,42.5,-107,-127.0,williamhill_us,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kyle Pitts,,Receiving Yards,43.5,-110,-118.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kyle Pitts,,Receiving Yards,45.5,-115,-115.0,betrivers,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kyle Pitts,,Receiving Yards,47.5,-115,-115.0,bovada,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kyle Williams,,Receiving Yards,16.5,-112,-112.0,fanduel,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Kyle Williams,,Receiving Yards,18.5,-111,-121.0,williamhill_us,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Kyle Williams,,Receiving Yards,19.5,-115,-109.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Kyle Williams,,Receiving Yards,20.5,-110,-118.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Luther Burden III,,Receiving Yards,54.5,-115,-115.0,betrivers,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Luther Burden III,,Receiving Yards,55.5,-112,-110.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Luther Burden III,,Receiving Yards,56.5,-120,-112.0,williamhill_us,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Luther Burden III,,Receiving Yards,57.5,-114,-114.0,betonlineag,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Luther Burden III,,Receiving Yards,58.5,-110,-115.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Malik Washington,,Receiving Yards,32.5,-110,-118.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Mark Andrews,,Receiving Yards,28.5,-112,-112.0,williamhill_us,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Mark Andrews,,Receiving Yards,29.5,-110,-109.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Marquez Valdes-Scantling,,Receiving Yards,26.5,-112,-120.0,betrivers,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Marquez Valdes-Scantling,,Receiving Yards,27.5,-112,-110.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Marquez Valdes-Scantling,,Receiving Yards,29.5,-120,-108.0,betonlineag,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Marquise Brown,,Receiving Yards,26.5,-118,-110.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Matthew Golden,,Receiving Yards,29.5,-118,-110.0,betmgm,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Michael Carter,,Receiving Yards,13.5,-115,-115.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Michael Mayer,,Receiving Yards,39.5,-118,-110.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Michael Wilson,,Receiving Yards,71.5,-145,110.0,bovada,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Michael Wilson,,Receiving Yards,73.5,-115,-115.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Michael Wilson,,Receiving Yards,74.5,-112,-112.0,fanduel,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Michael Wilson,,Receiving Yards,76.5,-112,-108.0,betonlineag,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Michael Wilson,,Receiving Yards,79.5,-111,-113.0,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Mike Evans,,Receiving Yards,51.5,-117,-114.0,betrivers,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Mike Evans,,Receiving Yards,54.5,-112,-112.0,fanduel,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Mike Evans,,Receiving Yards,55.5,-110,-108.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Mike Evans,,Receiving Yards,57.5,-114,-114.0,betonlineag,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Mitchell Evans,,Receiving Yards,10.5,-117,-114.0,betrivers,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Mitchell Evans,,Receiving Yards,12.5,-110,-108.0,fanduel,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Mitchell Evans,,Receiving Yards,13.5,-110,-110.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Nico Collins,,Receiving Yards,61.5,-115,-115.0,bovada,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Noah Gray,,Receiving Yards,11.5,-115,-115.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Olamide Zaccheaus,,Receiving Yards,26.5,-115,-115.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Pat Bryant,,Receiving Yards,27.5,-118,-110.0,betmgm,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Pat Bryant,,Receiving Yards,28.5,-112,-112.0,fanduel,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Pat Bryant,,Receiving Yards,29.5,-115,-107.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Pat Bryant,,Receiving Yards,30.5,-105,-125.0,fanatics,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Pat Freiermuth,,Receiving Yards,31.5,-111,-111.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Pat Freiermuth,,Receiving Yards,32.5,-114,-114.0,betonlineag,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Pat Freiermuth,,Receiving Yards,34.5,-115,-115.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Puka Nacua,,Receiving Yards,85.5,-112,-112.0,betonlineag,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Puka Nacua,,Receiving Yards,86.5,-113,-111.0,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Puka Nacua,,Receiving Yards,89.5,-115,-115.0,betrivers,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Puka Nacua,,Receiving Yards,91.5,-118,-115.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Puka Nacua,,Receiving Yards,97.5,105,-135.0,bovada,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+RJ Harvey,,Receiving Yards,20.5,-120,-110.0,betmgm,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Rachaad White,,Receiving Yards,6.5,-109,-112.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Rasheen Ali,,Receiving Yards,7.5,-112,-112.0,fanduel,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Rasheen Ali,,Receiving Yards,8.5,-109,-110.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Rashid Shaheed,,Receiving Yards,27.5,-130,100.0,bovada,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Rashid Shaheed,,Receiving Yards,28.5,-110,-118.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Rashid Shaheed,,Receiving Yards,29.5,-112,-107.0,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Rashid Shaheed,,Receiving Yards,30.5,-110,-114.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Rashod Bateman,,Receiving Yards,15.5,-115,-115.0,bovada,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Rhamondre Stevenson,,Receiving Yards,12.5,-115,-115.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Rhamondre Stevenson,,Receiving Yards,13.5,-112,-112.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Rico Dowdle,,Receiving Yards,14.5,-109,-121.0,betrivers,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Rico Dowdle,,Receiving Yards,15.5,-112,-112.0,fanduel,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Rico Dowdle,,Receiving Yards,16.5,-105,-115.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Ronnie Bell,,Receiving Yards,12.5,-110,-120.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Ryan Flournoy,,Receiving Yards,25.5,-118,-110.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Scott Miller,,Receiving Yards,11.5,-112,-112.0,fanduel,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Scott Miller,,Receiving Yards,12.5,-114,-115.0,williamhill_us,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Scott Miller,,Receiving Yards,13.5,-115,-115.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Stefon Diggs,,Receiving Yards,52.5,-115,-115.0,bovada,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Stefon Diggs,,Receiving Yards,54.5,-111,-108.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Stefon Diggs,,Receiving Yards,55.5,-117,-113.0,betrivers,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Stefon Diggs,,Receiving Yards,57.5,-115,-115.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Tetairoa McMillan,,Receiving Yards,58.5,-118,-113.0,betrivers,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Tetairoa McMillan,,Receiving Yards,60.5,-115,-115.0,bovada,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Tetairoa McMillan,,Receiving Yards,61.5,-115,-105.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Tetairoa McMillan,,Receiving Yards,62.5,-110,-112.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Tetairoa McMillan,,Receiving Yards,64.5,-114,-114.0,betonlineag,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Theo Wease Jr.,,Receiving Yards,20.5,-115,-115.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Tommy Tremble,,Receiving Yards,15.5,-117,-114.0,betrivers,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Tommy Tremble,,Receiving Yards,16.5,-120,-110.0,bovada,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Tommy Tremble,,Receiving Yards,17.5,-110,-112.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Tommy Tremble,,Receiving Yards,18.5,-118,-110.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Travis Kelce,,Receiving Yards,43.5,-110,-118.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Tre Tucker,,Receiving Yards,34.5,-110,-118.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+TreVeyon Henderson,,Receiving Yards,12.5,-110,-120.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Trey McBride,,Receiving Yards,67.5,-115,-115.0,betrivers,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Trey McBride,,Receiving Yards,68.5,-112,-110.0,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Trey McBride,,Receiving Yards,69.5,-115,-110.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Troy Franklin,,Receiving Yards,20.5,-112,-112.0,fanduel,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Troy Franklin,,Receiving Yards,21.5,-115,-109.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Troy Franklin,,Receiving Yards,22.5,100,-114.0,betrivers,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Troy Franklin,,Receiving Yards,23.5,-118,-115.0,betmgm,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Tyler Lockett,,Receiving Yards,17.5,-110,-118.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Tyrone Tracy Jr.,,Receiving Yards,14.5,-109,-115.0,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Woody Marks,,Receiving Yards,9.5,-110,-120.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Xavier Hutchinson,,Receiving Yards,21.5,-110,-118.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Xavier Legette,,Receiving Yards,11.5,-120,-112.0,betrivers,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Xavier Legette,,Receiving Yards,14.5,-110,-110.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Xavier Legette,,Receiving Yards,15.5,-108,-125.0,williamhill_us,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Xavier Legette,,Receiving Yards,17.5,-115,-115.0,bovada,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Xavier Legette,,Receiving Yards,19.5,110,-145.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Xavier Weaver,,Receiving Yards,15.5,-115,-115.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Zach Charbonnet,,Receiving Yards,8.5,-115,-118.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Zach Charbonnet,,Receiving Yards,9.5,-108,-112.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Zay Flowers,,Receiving Yards,62.5,-112,-111.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Zay Flowers,,Receiving Yards,64.5,-114,-114.0,betonlineag,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Zay Flowers,,Receiving Yards,65.5,-111,-113.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+AJ Barner,,Receptions,3.5,-143,120.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+AJ Barner,,Receptions,4.5,120,-140.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Adam Thielen,,Receptions,2.5,115,-140.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Amon-Ra St. Brown,,Receptions,5.5,-132,115.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Ashton Jeanty,,Receptions,4.5,-130,-105.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Audric Estime,,Receptions,2.5,100,-135.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Austin Hooper,,Receptions,1.5,130,-175.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Bijan Robinson,,Receptions,4.5,105,-120.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Bucky Irving,,Receptions,2.5,115,-130.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Cade Otton,,Receptions,2.5,130,-145.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Calvin Austin III,,Receptions,2.5,150,-164.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Cedrick Wilson Jr.,,Receptions,1.5,-155,115.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Chris Godwin,,Receptions,3.5,-128,125.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Christian Kirk,,Receptions,3.5,105,-145.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Christian McCaffrey,,Receptions,5.5,-122,120.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Chuba Hubbard,,Receptions,1.5,-133,125.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Cole Kmet,,Receptions,1.5,-144,135.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Colston Loveland,,Receptions,3.5,-129,120.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Cooper Kupp,,Receptions,2.5,-167,135.0,williamhill_us,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Cooper Kupp,,Receptions,3.5,144,-160.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Courtland Sutton,,Receptions,4.5,104,-115.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+D'Andre Swift,,Receptions,1.5,-130,124.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+DJ Moore,,Receptions,2.5,-146,135.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+DJ Moore,,Receptions,3.5,165,-235.0,fanatics,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Dalton Schultz,,Receptions,4.5,-114,110.0,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Daniel Bellinger,,Receptions,3.5,105,-140.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Dante Pettis,,Receptions,3.5,100,-135.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Darius Slayton,,Receptions,4.5,115,-155.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Darnell Mooney,,Receptions,1.5,-185,135.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+DeAndre Hopkins,,Receptions,1.5,-132,115.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Deebo Samuel Sr.,,Receptions,4.5,-130,-105.0,betmgm,Washington Commanders @ Philadelphia Eagles,2026-01-04T21:25:00Z,Philadelphia Eagles,Washington Commanders,False
+Demarcus Robinson,,Receptions,1.5,-102,-105.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Derrick Henry,,Receptions,0.5,-150,120.0,betonlineag,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Devin Singletary,,Receptions,1.5,-118,-110.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Drake London,,Receptions,4.5,-120,118.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Drake London,,Receptions,5.5,120,-154.0,fanduel,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Elijah Higgins,,Receptions,1.5,-140,105.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Emari Demercado,,Receptions,1.5,-145,110.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Emeka Egbuka,,Receptions,2.5,140,-140.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Evan Engram,,Receptions,2.5,105,-128.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+George Kittle,,Receptions,5.5,102,105.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Greg Dulcich,,Receptions,3.5,-145,110.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Hunter Henry,,Receptions,4.5,108,-114.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Isaac TeSlaa,,Receptions,2.5,130,-145.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Isaiah Likely,,Receptions,2.5,140,-166.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jack Bech,,Receptions,2.5,110,-150.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Jahmyr Gibbs,,Receptions,4.5,120,-133.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jalen Coker,,Receptions,3.5,140,-145.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Jalen McMillan,,Receptions,2.5,-125,110.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Jalen Nailor,,Receptions,1.5,-125,-105.0,betmgm,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jameson Williams,,Receptions,3.5,-160,128.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jameson Williams,,Receptions,4.5,130,-166.0,fanduel,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jauan Jennings,,Receptions,3.5,-160,132.0,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Jauan Jennings,,Receptions,4.5,120,-152.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Jaxon Smith-Njigba,,Receptions,6.5,-155,115.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Jaxon Smith-Njigba,,Receptions,7.5,115,-129.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Jayden Higgins,,Receptions,3.5,-150,120.0,betrivers,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Jayden Higgins,,Receptions,4.5,138,-164.0,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Jaydon Blue,,Receptions,1.5,105,-140.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Jaylen Warren,,Receptions,1.5,-138,115.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jaylen Warren,,Receptions,2.5,170,-225.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jaylen Wright,,Receptions,2.5,140,-190.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Jaylin Noel,,Receptions,1.5,-175,130.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Jonnu Smith,,Receptions,2.5,108,-128.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jordan Addison,,Receptions,2.5,-160,133.0,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jordan Mason,,Receptions,1.5,100,-130.0,betmgm,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+JuJu Smith-Schuster,,Receptions,2.5,-140,105.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Julian Hill,,Receptions,1.5,140,-185.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Justin Jefferson,,Receptions,5.5,-110,104.0,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Juwan Johnson,,Receptions,5.5,-102,-113.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kareem Hunt,,Receptions,1.5,-135,100.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Kayshon Boutte,,Receptions,1.5,-195,,betrivers,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Kayshon Boutte,,Receptions,2.5,162,-175.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Keaton Mitchell,,Receptions,0.5,-150,115.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Kendrick Bourne,,Receptions,2.5,144,-170.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kenneth Gainwell,,Receptions,4.5,-134,120.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Kenneth Walker III,,Receptions,1.5,-145,135.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kevin Austin,,Receptions,3.5,-146,114.0,fanduel,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kevin Austin,,Receptions,4.5,130,-153.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kyle Juszczyk,,Receptions,1.5,135,-125.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kyle Monangai,,Receptions,1.5,135,-185.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Kyle Pitts,,Receptions,4.5,110,-115.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kyle Williams,,Receptions,1.5,-114,104.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Luther Burden III,,Receptions,4.5,110,-127.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Malik Washington,,Receptions,2.5,-150,110.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Mark Andrews,,Receptions,2.5,-160,120.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Mark Andrews,,Receptions,3.5,116,-137.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Marquez Valdes-Scantling,,Receptions,2.5,125,-145.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Matthew Golden,,Receptions,2.5,-165,125.0,betmgm,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Michael Carter,,Receptions,2.5,115,-150.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Michael Wilson,,Receptions,5.5,-150,125.0,betonlineag,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Michael Wilson,,Receptions,6.5,115,-137.0,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Mike Evans,,Receptions,4.5,110,-110.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Mitchell Evans,,Receptions,1.5,-103,-106.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Nico Collins,,Receptions,4.5,100,-130.0,bovada,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Noah Gray,,Receptions,1.5,-105,-125.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Olamide Zaccheaus,,Receptions,2.5,105,-145.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Pat Bryant,,Receptions,2.5,-110,-101.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Pat Freiermuth,,Receptions,3.5,116,-135.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Puka Nacua,,Receptions,6.5,-114,120.0,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Puka Nacua,,Receptions,7.5,110,-120.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+RJ Harvey,,Receptions,3.5,120,-160.0,betmgm,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Rachaad White,,Receptions,1.5,152,-180.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Rasheen Ali,,Receptions,1.5,118,-150.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Rashid Shaheed,,Receptions,2.5,128,-137.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Rashod Bateman,,Receptions,1.5,110,-145.0,bovada,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Rhamondre Stevenson,,Receptions,1.5,-190,140.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Rhamondre Stevenson,,Receptions,2.5,145,-180.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Rico Dowdle,,Receptions,2.5,102,-118.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Ronnie Bell,,Receptions,1.5,130,-175.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Scott Miller,,Receptions,1.5,120,-155.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Stefon Diggs,,Receptions,4.5,-145,140.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Tetairoa McMillan,,Receptions,4.5,-112,-102.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Tommy Tremble,,Receptions,2.5,135,-145.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Travis Kelce,,Receptions,4.5,-135,100.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+TreVeyon Henderson,,Receptions,1.5,-200,145.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Trey McBride,,Receptions,6.5,-132,115.0,betonlineag,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Trey McBride,,Receptions,7.5,109,-140.0,draftkings,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Troy Franklin,,Receptions,2.5,125,-141.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Tyler Lockett,,Receptions,2.5,145,-190.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Tyrone Tracy Jr.,,Receptions,2.5,-120,-110.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Woody Marks,,Receptions,1.5,-118,-110.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Xavier Hutchinson,,Receptions,1.5,-175,130.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Xavier Legette,,Receptions,1.5,-110,145.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Xavier Weaver,,Receptions,1.5,-105,-130.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Zach Charbonnet,,Receptions,1.5,-109,100.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Zay Flowers,,Receptions,4.5,-148,120.0,betonlineag,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Zay Flowers,,Receptions,5.5,125,-159.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Aaron Rodgers,,Rushing Attempts,1.5,135,-185.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Ashton Jeanty,,Rushing Attempts,19.5,-115,-115.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Audric Estime,,Rushing Attempts,12.5,-145,110.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Audric Estime,,Rushing Attempts,13.5,-102,-114.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Baker Mayfield,,Rushing Attempts,3.5,-125,-105.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bijan Robinson,,Rushing Attempts,18.5,106,-114.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Bo Nix,,Rushing Attempts,4.5,-130,-105.0,betmgm,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Brian Robinson Jr.,,Rushing Attempts,4.5,-108,-114.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Brock Purdy,,Rushing Attempts,3.5,-165,125.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Bryce Young,,Rushing Attempts,4.5,120,-155.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bucky Irving,,Rushing Attempts,15.5,-124,-101.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+C.J. Stroud,,Rushing Attempts,2.5,-160,120.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Caleb Williams,,Rushing Attempts,3.5,-160,125.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Christian McCaffrey,,Rushing Attempts,17.5,-112,-105.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Christian McCaffrey,,Rushing Attempts,18.5,102,-125.0,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Chuba Hubbard,,Rushing Attempts,7.5,-105,-114.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+D'Andre Swift,,Rushing Attempts,12.5,-110,-120.0,betrivers,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+D'Andre Swift,,Rushing Attempts,13.5,110,-128.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+David Montgomery,,Rushing Attempts,9.5,-120,-110.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Derrick Henry,,Rushing Attempts,19.5,-102,-105.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Derrick Henry,,Rushing Attempts,20.5,-114,-114.0,betonlineag,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Devin Singletary,,Rushing Attempts,7.5,-105,-125.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Drake Maye,,Rushing Attempts,4.5,-145,110.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Emari Demercado,,Rushing Attempts,4.5,-150,115.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Evan Hull,,Rushing Attempts,3.5,-110,-118.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+J.J. McCarthy,,Rushing Attempts,4.5,110,-145.0,betmgm,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jacoby Brissett,,Rushing Attempts,2.5,-110,-118.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Jahmyr Gibbs,,Rushing Attempts,12.5,-130,-102.0,fanduel,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jahmyr Gibbs,,Rushing Attempts,13.5,102,-120.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jahmyr Gibbs,,Rushing Attempts,14.5,105,-140.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jaleel McLaughlin,,Rushing Attempts,6.5,-135,100.0,betmgm,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Jaxson Dart,,Rushing Attempts,6.5,-130,100.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Jaylen Warren,,Rushing Attempts,11.5,-125,-102.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jaylen Warren,,Rushing Attempts,12.5,100,-122.0,betonlineag,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jaylen Wright,,Rushing Attempts,14.5,-109,-108.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Jaylen Wright,,Rushing Attempts,15.5,105,-135.0,betrivers,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Jordan Mason,,Rushing Attempts,15.5,-108,-105.0,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jordan Mason,,Rushing Attempts,16.5,-110,-120.0,betmgm,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Kareem Hunt,,Rushing Attempts,15.5,100,-135.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Keaton Mitchell,,Rushing Attempts,4.5,-125,-105.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Kenneth Gainwell,,Rushing Attempts,8.5,-105,-125.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Kenneth Walker III,,Rushing Attempts,11.5,-113,-106.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kenneth Walker III,,Rushing Attempts,12.5,-110,-120.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kirk Cousins,,Rushing Attempts,1.5,-105,-130.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kyle Monangai,,Rushing Attempts,8.5,-120,-110.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Lamar Jackson,,Rushing Attempts,5.5,-110,-103.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Michael Carter,,Rushing Attempts,10.5,-118,-110.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Quinn Ewers,,Rushing Attempts,2.5,145,-200.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+RJ Harvey,,Rushing Attempts,13.5,-120,102.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+RJ Harvey,,Rushing Attempts,14.5,-115,,betrivers,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+RJ Harvey,,Rushing Attempts,15.5,105,-140.0,betmgm,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Rachaad White,,Rushing Attempts,3.5,-118,-110.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Rhamondre Stevenson,,Rushing Attempts,10.5,105,-145.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Rico Dowdle,,Rushing Attempts,13.5,-101,-110.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Riley Leonard,,Rushing Attempts,4.5,-105,-125.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Sam Darnold,,Rushing Attempts,2.5,110,-150.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Sean Tucker,,Rushing Attempts,2.5,-140,105.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Taysom Hill,,Rushing Attempts,4.5,-140,105.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+TreVeyon Henderson,,Rushing Attempts,12.5,-114,-103.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+TreVeyon Henderson,,Rushing Attempts,13.5,110,-145.0,betrivers,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Trey Lance,,Rushing Attempts,8.5,-115,-115.0,betmgm,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Tyler Allgeier,,Rushing Attempts,8.5,-115,-115.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Tyler Shough,,Rushing Attempts,4.5,-130,100.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Tyrone Tracy Jr.,,Rushing Attempts,13.5,-130,100.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Woody Marks,,Rushing Attempts,14.5,-120,-108.0,fanduel,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Woody Marks,,Rushing Attempts,15.5,106,-130.0,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Zach Charbonnet,,Rushing Attempts,10.5,-108,103.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Zach Charbonnet,,Rushing Attempts,11.5,105,-140.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Aaron Rodgers,,Rushing Yards,0.5,-110,-108.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Ashton Jeanty,,Rushing Yards,72.5,-115,-115.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Audric Estime,,Rushing Yards,47.5,-114,-117.0,betrivers,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Audric Estime,,Rushing Yards,48.5,-115,-115.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Audric Estime,,Rushing Yards,49.5,-110,-110.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Baker Mayfield,,Rushing Yards,15.5,-120,105.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Baker Mayfield,,Rushing Yards,16.5,-112,-110.0,fanduel,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Baker Mayfield,,Rushing Yards,17.5,-110,-108.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Baker Mayfield,,Rushing Yards,19.5,-114,-114.0,betonlineag,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bijan Robinson,,Rushing Yards,80.5,-120,-110.0,fanatics,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Bijan Robinson,,Rushing Yards,82.5,-113,-111.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Bijan Robinson,,Rushing Yards,83.5,-112,-108.0,fanduel,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Bijan Robinson,,Rushing Yards,84.5,-115,-103.0,betrivers,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Bo Nix,,Rushing Yards,14.5,-114,-117.0,betrivers,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Bo Nix,,Rushing Yards,15.5,-112,-112.0,fanduel,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Bo Nix,,Rushing Yards,16.5,-102,-117.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Brian Robinson Jr.,,Rushing Yards,13.5,-112,-118.0,betrivers,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Brian Robinson Jr.,,Rushing Yards,14.5,-112,-110.0,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Brian Robinson Jr.,,Rushing Yards,15.5,-114,-106.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Brock Purdy,,Rushing Yards,14.5,-115,-115.0,betrivers,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Brock Purdy,,Rushing Yards,15.5,-110,-110.0,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Brock Purdy,,Rushing Yards,16.5,-112,-112.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Brock Purdy,,Rushing Yards,17.5,-114,-114.0,betonlineag,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Bryce Young,,Rushing Yards,18.5,-114,-117.0,betrivers,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bryce Young,,Rushing Yards,19.5,-110,-108.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bryce Young,,Rushing Yards,20.5,-112,-111.0,fanduel,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bucky Irving,,Rushing Yards,58.5,-120,-110.0,bovada,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bucky Irving,,Rushing Yards,60.5,-112,-108.0,fanduel,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bucky Irving,,Rushing Yards,61.5,-114,-109.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Bucky Irving,,Rushing Yards,62.5,-113,-118.0,betrivers,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+C.J. Stroud,,Rushing Yards,6.5,-140,105.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Caleb Williams,,Rushing Yards,17.5,-120,-110.0,bovada,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Caleb Williams,,Rushing Yards,18.5,-109,-112.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Caleb Williams,,Rushing Yards,19.5,-110,-110.0,betrivers,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Chris Oladokun,,Rushing Yards,17.5,-110,-118.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Christian McCaffrey,,Rushing Yards,64.5,-113,-111.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Christian McCaffrey,,Rushing Yards,65.5,-110,-112.0,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Christian McCaffrey,,Rushing Yards,66.5,-110,-115.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Christian McCaffrey,,Rushing Yards,67.5,-105,-120.0,williamhill_us,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Christian McCaffrey,,Rushing Yards,69.5,-123,-105.0,betonlineag,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Chuba Hubbard,,Rushing Yards,27.5,-116,100.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Chuba Hubbard,,Rushing Yards,28.5,-112,-112.0,fanduel,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Chuba Hubbard,,Rushing Yards,29.5,-118,-110.0,betonlineag,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+D'Andre Swift,,Rushing Yards,56.5,-114,-110.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+D'Andre Swift,,Rushing Yards,57.5,-112,-112.0,fanduel,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+D'Andre Swift,,Rushing Yards,58.5,-115,-110.0,williamhill_us,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+D'Andre Swift,,Rushing Yards,59.5,-112,-108.0,betonlineag,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+David Montgomery,,Rushing Yards,35.5,-112,-112.0,fanduel,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+David Montgomery,,Rushing Yards,36.5,-114,-111.0,betrivers,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+David Montgomery,,Rushing Yards,37.5,-115,-108.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+David Montgomery,,Rushing Yards,38.5,-115,-115.0,bovada,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Derrick Henry,,Rushing Yards,88.5,-130,100.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Derrick Henry,,Rushing Yards,89.5,-112,-112.0,betrivers,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Derrick Henry,,Rushing Yards,90.5,-110,-110.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Derrick Henry,,Rushing Yards,91.5,-116,-111.0,betonlineag,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Devin Singletary,,Rushing Yards,29.5,-110,-118.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Drake Maye,,Rushing Yards,17.5,-118,-110.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Drake Maye,,Rushing Yards,18.5,-111,-112.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Drake Maye,,Rushing Yards,19.5,-114,-114.0,betonlineag,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Emari Demercado,,Rushing Yards,18.5,-118,-110.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Evan Hull,,Rushing Yards,10.5,-110,-120.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+J.J. McCarthy,,Rushing Yards,13.5,-110,-112.0,betonlineag,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+J.J. McCarthy,,Rushing Yards,14.5,-113,-111.0,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jacoby Brissett,,Rushing Yards,8.5,-118,-110.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Jahmyr Gibbs,,Rushing Yards,59.5,-113,-118.0,betrivers,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jahmyr Gibbs,,Rushing Yards,60.5,-112,-105.0,fanduel,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jahmyr Gibbs,,Rushing Yards,61.5,-115,-115.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jahmyr Gibbs,,Rushing Yards,62.5,-114,-110.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Jaleel McLaughlin,,Rushing Yards,27.5,-118,-110.0,betmgm,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Jawhar Jordan,,Rushing Yards,29.5,-118,-110.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Jaxson Dart,,Rushing Yards,33.5,-114,-110.0,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Jaxson Dart,,Rushing Yards,34.5,-113,-117.0,williamhill_us,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Jaydon Blue,,Rushing Yards,56.5,-118,-115.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Jaylen Warren,,Rushing Yards,44.5,-120,-112.0,betrivers,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jaylen Warren,,Rushing Yards,45.5,-112,-120.0,betrivers,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jaylen Warren,,Rushing Yards,46.5,-112,-111.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jaylen Warren,,Rushing Yards,47.5,-115,-105.0,betonlineag,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jaylen Warren,,Rushing Yards,48.5,-111,-115.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Jaylen Wright,,Rushing Yards,51.5,-115,-109.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Jaylen Wright,,Rushing Yards,55.5,-112,-112.0,fanduel,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Jaylen Wright,,Rushing Yards,59.5,-115,-115.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Jordan Mason,,Rushing Yards,63.5,-112,-112.0,draftkings,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jordan Mason,,Rushing Yards,64.5,-112,-112.0,fanduel,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jordan Mason,,Rushing Yards,65.5,-112,-114.0,betonlineag,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Jordan Mason,,Rushing Yards,67.5,-115,-115.0,betmgm,Green Bay Packers @ Minnesota Vikings,2026-01-04T18:00:00Z,Minnesota Vikings,Green Bay Packers,False
+Kareem Hunt,,Rushing Yards,54.5,-110,-118.0,betmgm,Kansas City Chiefs @ Las Vegas Raiders,2026-01-04T21:25:00Z,Las Vegas Raiders,Kansas City Chiefs,False
+Keaton Mitchell,,Rushing Yards,18.5,-117,-113.0,betrivers,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Keaton Mitchell,,Rushing Yards,19.5,-109,-105.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Keaton Mitchell,,Rushing Yards,20.5,-121,-111.0,williamhill_us,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Kenneth Gainwell,,Rushing Yards,27.5,-120,-112.0,betrivers,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Kenneth Gainwell,,Rushing Yards,29.5,-112,-112.0,fanduel,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Kenneth Gainwell,,Rushing Yards,30.5,-113,-105.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Kenneth Walker III,,Rushing Yards,48.5,-118,-105.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kenneth Walker III,,Rushing Yards,50.5,-112,-112.0,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kenneth Walker III,,Rushing Yards,51.5,-109,-115.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Kirk Cousins,,Rushing Yards,0.5,105,-140.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Kyle Monangai,,Rushing Yards,41.5,-150,110.0,betmgm,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Kyle Monangai,,Rushing Yards,45.5,-112,-112.0,fanduel,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Kyle Monangai,,Rushing Yards,46.5,-111,-113.0,draftkings,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Kyle Monangai,,Rushing Yards,48.5,-120,-112.0,betrivers,Detroit Lions @ Chicago Bears,2026-01-04T21:25:00Z,Chicago Bears,Detroit Lions,False
+Lamar Jackson,,Rushing Yards,27.5,-150,115.0,bovada,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Lamar Jackson,,Rushing Yards,28.5,-135,100.0,betmgm,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Lamar Jackson,,Rushing Yards,29.5,-117,-114.0,betrivers,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Lamar Jackson,,Rushing Yards,31.5,-111,-113.0,draftkings,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Lamar Jackson,,Rushing Yards,32.5,-112,-105.0,betonlineag,Baltimore Ravens @ Pittsburgh Steelers,2026-01-05T01:20:00Z,Pittsburgh Steelers,Baltimore Ravens,False
+Michael Carter,,Rushing Yards,37.5,-110,-118.0,betmgm,Arizona Cardinals @ Los Angeles Rams,2026-01-04T21:25:00Z,Los Angeles Rams,Arizona Cardinals,False
+Ollie Gordon II,,Rushing Yards,21.5,-118,-110.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Quinn Ewers,,Rushing Yards,6.5,-105,-108.0,fanduel,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Quinn Ewers,,Rushing Yards,7.5,-104,-120.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+RJ Harvey,,Rushing Yards,53.5,-115,-118.0,betmgm,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+RJ Harvey,,Rushing Yards,55.5,-115,-115.0,fanatics,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+RJ Harvey,,Rushing Yards,56.5,-111,-112.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+RJ Harvey,,Rushing Yards,58.5,-114,-115.0,betrivers,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Rachaad White,,Rushing Yards,12.5,-120,100.0,betrivers,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Rachaad White,,Rushing Yards,13.5,-110,-108.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Rachaad White,,Rushing Yards,14.5,-114,-114.0,betonlineag,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Rashid Shaheed,,Rushing Yards,0.5,115,-115.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Rashid Shaheed,,Rushing Yards,1.5,120,-150.0,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Rhamondre Stevenson,,Rushing Yards,32.5,-112,-108.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Rhamondre Stevenson,,Rushing Yards,36.5,-118,-110.0,betmgm,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Rico Dowdle,,Rushing Yards,53.5,-112,-112.0,draftkings,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Rico Dowdle,,Rushing Yards,54.5,-102,-112.0,fanduel,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Rico Dowdle,,Rushing Yards,56.5,100,-135.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Riley Leonard,,Rushing Yards,19.5,-140,105.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Sam Darnold,,Rushing Yards,4.5,-117,100.0,betonlineag,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Sam Darnold,,Rushing Yards,5.5,108,-121.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Sean Tucker,,Rushing Yards,9.5,-118,-110.0,betmgm,Carolina Panthers @ Tampa Bay Buccaneers,2026-01-03T21:30:00Z,Tampa Bay Buccaneers,Carolina Panthers,False
+Taysom Hill,,Rushing Yards,14.5,-115,-115.0,betmgm,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+TreVeyon Henderson,,Rushing Yards,58.5,-112,-110.0,draftkings,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+TreVeyon Henderson,,Rushing Yards,59.5,-115,-114.0,betrivers,Miami Dolphins @ New England Patriots,2026-01-04T21:25:00Z,New England Patriots,Miami Dolphins,False
+Trey Lance,,Rushing Yards,29.5,-112,-112.0,fanduel,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Trey Lance,,Rushing Yards,30.5,-111,-108.0,draftkings,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Trey Lance,,Rushing Yards,32.5,100,-135.0,betmgm,Los Angeles Chargers @ Denver Broncos,2026-01-04T21:25:00Z,Denver Broncos,Los Angeles Chargers,False
+Tyler Allgeier,,Rushing Yards,32.5,-112,-108.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Tyler Shough,,Rushing Yards,15.5,-115,103.0,betonlineag,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Tyler Shough,,Rushing Yards,16.5,-109,-112.0,draftkings,New Orleans Saints @ Atlanta Falcons,2026-01-04T18:00:00Z,Atlanta Falcons,New Orleans Saints,False
+Tyrone Tracy Jr.,,Rushing Yards,60.5,-115,-113.0,betmgm,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Tyrone Tracy Jr.,,Rushing Yards,61.5,-113,-111.0,draftkings,Dallas Cowboys @ New York Giants,2026-01-04T18:00:00Z,New York Giants,Dallas Cowboys,False
+Woody Marks,,Rushing Yards,52.5,-115,-115.0,betmgm,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Woody Marks,,Rushing Yards,53.5,-110,100.0,draftkings,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Woody Marks,,Rushing Yards,54.5,-114,-103.0,betonlineag,Indianapolis Colts @ Houston Texans,2026-01-04T18:00:00Z,Houston Texans,Indianapolis Colts,False
+Zach Charbonnet,,Rushing Yards,39.5,-112,-112.0,fanduel,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Zach Charbonnet,,Rushing Yards,41.5,-122,-105.0,williamhill_us,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Zach Charbonnet,,Rushing Yards,42.5,-110,-114.0,draftkings,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Zach Charbonnet,,Rushing Yards,43.5,-114,-114.0,betonlineag,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False
+Zach Charbonnet,,Rushing Yards,44.5,-115,-115.0,betmgm,Seattle Seahawks @ San Francisco 49ers,2026-01-04T01:00:00Z,San Francisco 49ers,Seattle Seahawks,False

@@ -199,21 +199,23 @@ def test_no_nfl_pregame_prop_entry_is_superseded_any_more():
 def test_all_eight_nfl_prop_markets_reach_their_entries_by_board_spelling():
     """Against the REAL table, using the strings the board actually emits.
 
-    `interceptions` is PARITY, not a loss: measured 2026-10-03 at Brier +0.0015 with a
-    cluster-robust CI of [-0.0069, +0.0099], which straddles zero. It is pinned here
+    `interceptions` is PARITY, not a loss: measured 2026-10-03 at Brier +0.0018 with a
+    cluster-robust CI of [-0.0036, +0.0071] over 360 observations, which straddles zero
+    while clearing the pre-registered 200-observation floor -- so parity is the reading,
+    not a shortage of data. It is pinned here
     because a parity verdict and an unmeasured note are NOT interchangeable -- parity is
     a reading, and `skill_reliability` must leave its rows undiscounted for the right
     reason rather than by accident.
     """
     expected = {
-        "Receiving Yards":  (3114, mms.VERDICT_LOSES),
-        "Rushing Yards":    (1455, mms.VERDICT_LOSES),
-        "Receptions":       (1179, mms.VERDICT_LOSES),
-        "Passing Yards":    ( 825, mms.VERDICT_LOSES),
-        "Rushing Attempts": ( 561, mms.VERDICT_LOSES),
-        "Passing Attempts": ( 334, mms.VERDICT_LOSES),
-        "Passing TDs":      ( 178, mms.VERDICT_LOSES),
-        "Interceptions":    ( 162, mms.VERDICT_PARITY),
+        "Receiving Yards":  (6570, mms.VERDICT_LOSES),
+        "Rushing Yards":    (3102, mms.VERDICT_LOSES),
+        "Receptions":       (2542, mms.VERDICT_LOSES),
+        "Passing Yards":    (1833, mms.VERDICT_LOSES),
+        "Rushing Attempts": (1177, mms.VERDICT_LOSES),
+        "Passing Attempts": ( 720, mms.VERDICT_LOSES),
+        "Passing TDs":      ( 393, mms.VERDICT_LOSES),
+        "Interceptions":    ( 360, mms.VERDICT_PARITY),
     }
     for spelled, (n, cls) in expected.items():
         note = mms.skill_note(sport="nfl", market=spelled, segment="full")
@@ -251,3 +253,21 @@ def test_every_nfl_prop_ci_lower_bound_agrees_with_its_verdict_class():
             assert lo > 0, f"{market}: LOSES but CI lower bound {lo} is not above zero"
         elif entry["verdict_class"] == mms.VERDICT_PARITY:
             assert lo <= 0 <= hi, f"{market}: PARITY but CI [{lo}, {hi}] excludes zero"
+
+
+def test_every_nfl_prop_entry_clears_the_pre_registered_observation_floor():
+    """All eight were re-measured on the widened 2025 wk3-wk18 holdout.
+
+    The 200-observation floor was set before the data was seen. The 7-week corpus put
+    two markets under it; recovering 2025 wk10-18 from the already-purchased quote log
+    doubled every sample, so no NFL pregame prop entry rests below the floor any more.
+    If this fails, a reading was replaced by a narrower one and the verdict should be
+    re-examined rather than the floor lowered.
+    """
+    for key, entry in mms.MEASURED_MARKET_SKILL.items():
+        sport, market, segment, phase = key
+        if sport != "nfl" or phase != mms.PHASE_PREGAME or "brier_market" not in entry:
+            continue
+        if market in ("h2h", "totals", "spreads"):
+            continue
+        assert entry["sample_games"] >= 200, f"{market}: {entry['sample_games']} < 200"
