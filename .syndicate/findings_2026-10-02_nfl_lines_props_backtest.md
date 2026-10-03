@@ -426,6 +426,19 @@ produce the verdict in this file.** This harness can, in ~15 min for props.
 
 ## 7. Props diagnosis: WHY each market loses, and what would make it accurate
 
+> **OVERTURNED IN PART, 2026-10-03** (`findings_2026-10-03_nfl_prop_predictive_spread.md`). The reading
+> below that "the loss is RELIABILITY, not resolution, so a calibration change can close it", and
+> recommendation #1 ("widen the predictive spread"), are WRONG.
+>
+> The calibration slope of the PRODUCTION model's probability at the line is ≈ 0 in every continuous
+> market (receptions 0.11, receiving yards −0.07, rushing yards −0.01, passing yards −0.06; 2025). The
+> book's slope is ≈ 1. The model's probability carries no information at the line. Widening closes the
+> Brier gap only by flattening that noise toward 50%.
+>
+> The Murphy comparison misled: the book's resolution at a main line is near zero by construction, so
+> "model resolution ≥ book's" compared two near-zero numbers. What stands: the market-anchored-mean
+> result (the information is in the line), so the fix is the MEAN's inputs (recommendation #2).
+
 **Method.** Each candidate model change is FITTED on 2023-2024 and SCORED on held-out 2025 and on 2026
 wk2, through production's own `_nfl_prop_model_probability` on the same rows. "Gap closed" is the
 share of the model-minus-book Brier gap removed on the held-out rows. The arms:

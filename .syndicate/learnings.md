@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1242 rules `[generated]`
+## Index — 1246 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5368,3 +5368,34 @@ own prior verdicts, not by anything failing.
 ## 2026-10-03: a process that writes PRODUCTION by default must not run under the test runner -- my quota forwarder wrote 556 fake observations into the fleet
 - Measured (lane `layer2-freshness-1h`): the off-fleet quota forwarder enables itself whenever the state backend is not keyvalue -- which is TRUE of a pytest run on a dev machine, whose headers are fake. Running the quota suite once forwarded 556 fake observations into the live fleet document (fake buckets, inflated hour/family counters, and a used=0 observation that reset the burn baseline). Repaired by exact subtraction from a replay against a throwaway Redis; the old baseline was unrecoverable. Any default-on path to a production store needs a test-runner exclusion in the CODE (not only a conftest), and its first test run should point at a throwaway target -- check the production key after the first run, not after the commit.
 - Same day: a script that "already records" can still record nowhere -- `record_oddsapi_quota` off the fleet wrote to the dev machine's filesystem backend. Confirm WHERE an instrument writes from the process that calls it.
+
+## 2026-10-03 — OVERTURNED (mine): "the NFL prop loss is RELIABILITY, not resolution, so widening the spread fixes it". At a MAIN LINE a Murphy split compares two near-zero resolutions; the calibration SLOPE is the instrument that discriminates `[lanes nfl-lines-props-backtest -> nfl-prop-predictive-spread, session 05b01a84]`
+
+- **What I believed:**
+  - Murphy reliability was 10-300x the book's, and the model's resolution was "at or above" the book's.
+  - So I concluded the loss was calibration and fixable by reshaping (the 2026-09-08 rule: decompose
+    before prescribing).
+  - A widened spread then closed 56-74% of the Brier gap out of sample, and I ranked it fix #1.
+- **What was actually true:** the PRODUCTION model's calibration slope, logistic(y ~ a + b·logit(p)) at
+  the line, is ≈ 0 in all six continuous markets on 2025 (receptions 0.11, receiving yards −0.07,
+  rushing yards −0.01, passing yards −0.06). The book's slope is ≈ 1 (0.78-1.56), with its sd of
+  logit 10x smaller.
+  - **The model's probability at the line is noise.**
+  - The book's resolution is near zero BY CONSTRUCTION at a main line, which is priced near 50%. So
+    "model resolution ≥ book's" compared two near-zero numbers and discriminated nothing.
+  - Widening "worked" by flattening the noise toward 50%. The fitted parameters ran to the flattening
+    edge (shrinkage off, c = 3.0, log-normal weight 0).
+- **How it was caught:** I had PRE-REGISTERED a slope bar in the lane ("< 0.6 = shrinking toward the base
+  rate, NOT a repair"), on a peer's MLB caution. The Brier bar alone reported MET. The pre-registration
+  is the only reason "MET" was not shipped as a repair.
+- **The rule going forward:**
+  - Before calling a forecast's loss "reliability" (fixable by a transform), report the calibration
+    slope of the model AND of the comparator, plus each one's spread (sd of logit p).
+  - A slope near 0 with a large spread is noise, whatever the Murphy terms say. The fix then is
+    information, not shape.
+  - A Murphy split against a comparator that sits at 50% by construction (a main line) is not evidence
+    about resolution.
+  - Corollary of 2026-09-21 ("a filter on a model metric grades the model"): a Brier gain from
+    flattening grades the noise, not the mechanism.
+- **Cost:** one recommendation (#1 of `findings_2026-10-02_nfl_lines_props_backtest.md` §7) withdrawn, and one
+  lane's premise falsified; nothing deployed.

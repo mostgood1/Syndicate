@@ -5,7 +5,7 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
-## [nfl-model-accuracy-backtest] NFL GAME LINES AND PROPS LOSE TO THE CLOSE IN EVERY MARKET; THE PROPS LOSS IS CALIBRATION (FIXABLE), THE MONEYLINE LOSS IS INFORMATION `[measured 2026-10-02/03, as-of, harness = production code, lane nfl-lines-props-backtest, NO DEPLOY]`
+## [nfl-model-accuracy-backtest] NFL GAME LINES AND PROPS LOSE TO THE CLOSE IN EVERY MARKET; THE PROP PROBABILITY CARRIES NO INFORMATION AT THE LINE (slope ~0), THE MONEYLINE LOSS IS INFORMATION `[measured 2026-10-02/03, as-of, harness = production code, lane nfl-lines-props-backtest, NO DEPLOY]`
 
 - **Harness:** `scripts/backtest_nfl_lines_props.py`.
   - It reproduces the fleet's `smartsim2_projections_2026_wk4.csv` EXACTLY (16/16 games, all fields).
@@ -27,9 +27,14 @@ Same rules as state.md: when a fact changes, EDIT THE LINE.
 - **Props, 2023-25 pooled (593 games, OddsAPI kickoff-10min):**
   - 7/8 continuous markets are worse than the de-vigged book; interceptions is at parity.
   - Anytime TD is worse even than the vig-inclusive yes price: +0.0088 [+0.0069, +0.0106].
-  - The loss is RELIABILITY, not resolution. On a 2025 holdout fitted on 2023-24:
-    - widening the spread ×2.5-3 closes 56-74% (receptions, receiving yards);
-    - a market-anchored mean closes 86-97% (rushing and passing volume).
+  - **CORRECTED 2026-10-03 (lane nfl-prop-predictive-spread):** the PRODUCTION prop probability's
+    calibration slope at the line is ~0 in every continuous market on 2025 (receptions 0.11, receiving
+    yards −0.07, rushing yards −0.01, passing yards −0.06). The book's slope is ~1.
+    - Widening the spread "closes" 56-85% of the Brier gap only by flattening noise toward 50%. It is
+      NOT a repair; the earlier "reliability, not resolution, fixable" reading was wrong.
+    - A market-anchored mean closes 86-97%: the information is in the line, so the fix is the mean's
+      inputs (usage, depth chart, injuries).
+    - Detail: `findings_2026-10-03_nfl_prop_predictive_spread.md`.
 - **No market is gated or withheld** (user decision 2026-10-02, "every line is its own decision").
   The findings rank model changes; per-line scoring decides.
 - **2026 data loss:** Render's disk was never exported after the 2026-09-30 suspension.

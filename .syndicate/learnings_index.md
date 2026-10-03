@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1242 rules `[generated]`
+## Index — 1246 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -522,7 +522,7 @@
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 - [2026-09-03 — EXONERATED: `deploys.md` and `learnings.md` ARE guarded. Two sessions file…](learnings_archive.md#2026-09-03-exonerated-deploysmd-and-learningsmd-are-guarded-two-sessions-filed-the-same-false-gap-and-the-second-re-derived-it-with-the-same-blind-spot) `[evidence]`
 
-**Rules and corrections — 734**
+**Rules and corrections — 738**
 
 - [2026-09-08 A probe is production load, and an unbounded one is an outage. `[#632, sessi…](#2026-09-08-a-probe-is-production-load-and-an-unbounded-one-is-an-outage-632-session-b2b5b45b)
 - [2026-09-08 MAP: ~95 rules in this file are one question in 17 shapes — *"is the number…](#2026-09-08-map-95-rules-in-this-file-are-one-question-in-17-shapes-is-the-number-i-read-the-one-the-decision-depends-on-read-this-before-writing-another-lane-learnings-instrument-family-consolidation-session-e51345f0)
@@ -696,6 +696,10 @@
 - [2026-10-02 -- Belief overturned: a benchmark is what its COLUMN says, and a registry ve…](#2026-10-02----belief-overturned-a-benchmark-is-what-its-column-says-and-a-registry-verdict-is-a-reading-with-a-window-lane-soccer-lines-props-backtest-session-43e4d5fe)
 - [2026-10-02 -- A task prompt's rule can contradict a standing user decision; check befor…](#2026-10-02----a-task-prompts-rule-can-contradict-a-standing-user-decision-check-before-building-to-it-lane-ncaaf-lines-props-backtest-session-7e94d2ff)
 - [2026-10-03 — RULE: after `land`, read your lane's block for DETACHED lines, not only fo…](#2026-10-03-rule-after-land-read-your-lanes-block-for-detached-lines-not-only-for-duplicates-a-rebase-merge-can-re-home-your-additions-under-another-lanes-header-and-no-header-level-check-sees-it-lane-nfl-lines-props-backtest-session-05b01a84)
+- [2026-10-03 OVERTURNED: "the WNBA moneyline sim is the best pregame asset (AUC 0.7631, B…](#2026-10-03-overturned-the-wnba-moneyline-sim-is-the-best-pregame-asset-auc-07631-brier-skill-165----the-comparator-was-climatology-against-the-book-on-the-same-rows-the-discrimination-was-the-markets-lane-wnba-lines-props-backtest-session-39b666bb)
+- [2026-10-03 — "League X has had no recommendations since the cutover" is a claim about t…](#2026-10-03-league-x-has-had-no-recommendations-since-the-cutover-is-a-claim-about-the-producer-only-if-league-x-had-a-fixture-inside-the-sim-horizon-read-the-fixture-calendar-from-two-independent-sources-before-calling-it-a-gap-lane-soccer-projections-gap-session-6214bc11)
+- [2026-10-03: a process that writes PRODUCTION by default must not run under the test run…](#2026-10-03-a-process-that-writes-production-by-default-must-not-run-under-the-test-runner----my-quota-forwarder-wrote-556-fake-observations-into-the-fleet)
+- [2026-10-03 — OVERTURNED (mine): "the NFL prop loss is RELIABILITY, not resolution, so w…](#2026-10-03-overturned-mine-the-nfl-prop-loss-is-reliability-not-resolution-so-widening-the-spread-fixes-it-at-a-main-line-a-murphy-split-compares-two-near-zero-resolutions-the-calibration-slope-is-the-instrument-that-discriminates-lanes-nfl-lines-props-backtest---nfl-prop-predictive-spread-session-05b01a84)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

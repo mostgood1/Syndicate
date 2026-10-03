@@ -161,14 +161,34 @@ def _logit(p: float) -> float:
     return math.log(p / (1 - p))
 
 
-def calibration_slope(ps: List[float], ys: List[int]) -> Tuple[float, float]:
-    """logistic(y ~ a + b*logit(p)) by Newton; (a, b). b=1, a=0 is perfect calibration."""
+def _sigmoid(z: float) -> float:
+    if z >= 0:
+        return 1 / (1 + math.exp(-z))
+    e = math.exp(z)
+    return e / (1 + e)
+
+
+def _loglik(a: float, b: float, xs: List[float], ys: List[int]) -> float:
+    return sum(math.log(bt._clip(_sigmoid(a + b * x), 1e-12)) if y else math.log(bt._clip(1 - _sigmoid(a + b * x), 1e-12))
+               for x, y in zip(xs, ys))
+
+
+def calibration_slope(ps: List[float], ys: List[int]) -> Tuple[Optional[float], Optional[float]]:
+    """logistic(y ~ a + b*logit(p)) by DAMPED Newton; (a, b). b=1, a=0 is perfect calibration.
+
+    (None, None) when the slope is not estimable: a forecast with ~no spread in logit(p) (an arm that
+    pushed every probability to ~0.5) has no slope to report, and the first run of this script
+    diverged into an OverflowError on exactly that case instead of saying so.
+    """
     xs = [_logit(p) for p in ps]
+    if len(xs) < 30 or statistics.pstdev(xs) < 1e-3:
+        return None, None
     a, b = 0.0, 1.0
-    for _ in range(50):
+    ll = _loglik(a, b, xs, ys)
+    for _ in range(100):
         ga = gb = haa = hab = hbb = 0.0
         for x, y in zip(xs, ys):
-            q = 1 / (1 + math.exp(-(a + b * x)))
+            q = _sigmoid(a + b * x)
             ga += y - q
             gb += (y - q) * x
             w = q * (1 - q)
@@ -176,13 +196,22 @@ def calibration_slope(ps: List[float], ys: List[int]) -> Tuple[float, float]:
             hab += w * x
             hbb += w * x * x
         det = haa * hbb - hab * hab
-        if det <= 0:
-            break
+        if det <= 1e-12:
+            return None, None
         da = (hbb * ga - hab * gb) / det
         db = (haa * gb - hab * ga) / det
-        a, b = a + da, b + db
-        if abs(da) < 1e-8 and abs(db) < 1e-8:
+        step = 1.0
+        while step > 1e-6:  # halve until the likelihood does not fall
+            na, nb = a + step * da, b + step * db
+            nll = _loglik(na, nb, xs, ys)
+            if nll >= ll - 1e-12:
+                break
+            step /= 2
+        a, b, ll = na, nb, nll
+        if abs(step * da) < 1e-8 and abs(step * db) < 1e-8:
             break
+    if abs(b) > 50:
+        return None, None
     return round(a, 4), round(b, 4)
 
 

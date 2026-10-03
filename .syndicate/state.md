@@ -520,7 +520,7 @@ once this index exists: re-splitting would orphan the parts.
 | [nfl-player-props-model] | NFL PLAYER-PROP MODEL: `#471` FULLY CLOSED, ALL 6 TUNED CONSTANTS STABILITY-VERIFIED, ALLOWLIST GAP FIXED+LIVE | `state_football.md` |
 | [nfl-data-ingestion-autoruns] | NFL ROSTER/DEPTH-CHART/INJURIES INGESTION — ALL 3 AUTORUNS ARMED, DEPLOYED, CONFIRMED FIRING — ONE PUBLISH SUC | `state_football.md` |
 | [nfl-player-props] | NFL player props: capture fixed, model priced and BEATEN by the market | `state_football.md` |
-| [nfl-model-accuracy-backtest] | NFL GAME LINES AND PROPS LOSE TO THE CLOSE IN EVERY MARKET; PROPS LOSS IS CALIBRATION, ML LOSS IS INFORMATION `[2026-10-03]` | `state_football.md` |
+| [nfl-model-accuracy-backtest] | NFL GAME LINES AND PROPS LOSE TO THE CLOSE IN EVERY MARKET; PROP PROBABILITY HAS ~0 SLOPE AT THE LINE (no info), ML LOSS IS INFORMATION `[2026-10-03]` | `state_football.md` |
 | [nfl-game-context] | Game context is built and measured, and INERT in production | `state_football.md` |
 | [cfbd-monthly-quota-exhausted] | 2026-08-30 — LIVE: NCAAF projections are FAILING in production, on opener weekend | `state_football.md` |
 | [ncaaf-live-resim] | SMARTSIM2 CAN BE RESUMED FROM MID-GAME; ITS ENTRYPOINT COULD NOT `[measured 2026-09-05, lane ncaaf-live-resim] | `state_football.md` |
