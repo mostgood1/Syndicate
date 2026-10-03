@@ -237,6 +237,28 @@ class Features:
         return mean
 
 
+PRACTICE_CATEGORY = {"Full Participation in Practice": "full", "Limited Participation in Practice": "limited",
+                     "Did Not Participate In Practice": "dnp"}
+
+
+def load_practice(root: Path, seasons: List[int]) -> Dict[Tuple[int, int, str], str]:
+    """(season, week, gsis_id) -> full / limited / dnp, from the game week's official injury report.
+    A player absent from the report is `none` (not on it: healthy, or not reported)."""
+    out: Dict[Tuple[int, int, str], str] = {}
+    for s in seasons:
+        p = root / "tracking" / "nflverse" / "injuries" / f"injuries_{s}.csv"
+        if not p.exists():
+            continue
+        with p.open(encoding="utf-8", newline="") as fh:
+            for r in csv.DictReader(fh):
+                if (r.get("game_type") or "REG") != "REG" or not r.get("gsis_id"):
+                    continue
+                c = PRACTICE_CATEGORY.get((r.get("practice_status") or "").strip())
+                if c:
+                    out[(int(r["season"]), int(r["week"]), r["gsis_id"])] = c
+    return out
+
+
 def load_injuries(root: Path, seasons: List[int]) -> Dict[Tuple[int, int, str], set]:
     out: Dict[Tuple[int, int, str], set] = defaultdict(set)
     for s in seasons:
@@ -321,7 +343,7 @@ def fs_corr(xs: List[float], ys: List[float]) -> Optional[float]:
     return round(num / (dx * dy), 4) if dx and dy else None
 
 
-def run_market(stat: str, rows: List[Dict[str, Any]], F: Features) -> Dict[str, Any]:
+def run_market(stat: str, rows: List[Dict[str, Any]], F: Features, arm_names: Tuple[str, ...]) -> Dict[str, Any]:
     from syndicate.features.nfl import props as P
 
     def p_of(r, mean):
@@ -342,14 +364,39 @@ def run_market(stat: str, rows: List[Dict[str, Any]], F: Features) -> Dict[str, 
                 cache[k] = F.ewma_mean(stat, r["season"], r["week"], r["pid"], h)
             elif arm == "share":
                 cache[k] = F.share_mean(stat, r["season"], r["week"], r["pid"], h)
+            elif arm == "practice":
+                cache[k] = (r["mean"] / r["ctx"]) * practice_factor[practice_cat(r)]
             else:
                 cache[k] = F.share_mean(stat, r["season"], r["week"], r["pid"], h, injury=True)
         return cache[k]
 
+    def practice_cat(r):
+        return F.practice.get((r["season"], r["week"], r["pid"]), "none")
+
+    # per-status factor = sum(actual) / sum(production mean incl. context), unique player-games, FIT seasons
+    acc: Dict[str, List[float]] = defaultdict(lambda: [0.0, 0.0, 0])
+    seen = set()
+    for r in rows:
+        k = (r["gid"], r["pid"])
+        if r["season"] not in FIT or k in seen:
+            continue
+        seen.add(k)
+        a = acc[practice_cat(r)]
+        a[0] += r["actual"]
+        a[1] += r["mean"]
+        a[2] += 1
+    practice_factor = defaultdict(lambda: 1.0)
+    for c, (act, mn, _n) in acc.items():
+        practice_factor[c] = min(1.5, max(0.5, act / mn)) if mn > 0 else 1.0
+
     Fit = bt._sub([r for r in rows if r["season"] in FIT], cap=20000)
-    out: Dict[str, Any] = {"control_max_abs_diff": worst, "arms": {}}
+    out: Dict[str, Any] = {"control_max_abs_diff": worst, "arms": {},
+                           "practice_factor": {c: round(practice_factor[c], 4) for c in acc},
+                           "practice_fit_n": {c: v[2] for c, v in acc.items()}}
     arms = [("prod", None)]
-    for arm in ("ewma", "share", "share_inj"):
+    if "practice" in arm_names:
+        arms.append(("practice", None))
+    for arm in [x for x in ("ewma", "share", "share_inj") if x in arm_names]:
         def fb(h, arm=arm):
             tot = cnt = 0
             for r in Fit:
@@ -376,6 +423,15 @@ def run_market(stat: str, rows: List[Dict[str, Any]], F: Features) -> Dict[str, 
             ev["coverage_of_rows"] = round(len(TT) / len(T), 4)
             ev["slope_ci"] = slope_ci(ps, TT)
             ev["info_beyond_line"] = info_beyond_line(TT, [means[i] * T[i]["ctx"] for i in keep])
+            sub = [j for j, i in enumerate(keep) if practice_cat(T[i]) in ("limited", "dnp")]
+            if len(sub) >= 50:
+                S = [TT[j] for j in sub]
+                sev = fs.evaluate(S, [ps[j] for j in sub], [pp[j] for j in sub])
+                sev["slope_ci"] = slope_ci([ps[j] for j in sub], S)
+                sev["info_beyond_line"] = info_beyond_line(S, [means[keep[j]] * TT[j]["ctx"] for j in sub])
+                ev["subgroup_limited_dnp"] = sev
+            else:
+                ev["subgroup_limited_dnp"] = {"n": len(sub), "status": "INSUFFICIENT_N"}
             A[label] = ev
         out["arms"][arm] = A
     return out
@@ -422,6 +478,7 @@ def main() -> int:
     ap.add_argument("--rows", type=Path, required=True, help="prop_rows.pkl from fit_nfl_prop_predictive_spread.py")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--markets", default=",".join(CONTINUOUS))
+    ap.add_argument("--arms", default="ewma,share,share_inj,practice")
     a = ap.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
     env = bt.configure_env(a.root.resolve())
@@ -430,10 +487,11 @@ def main() -> int:
         rows = pickle.load(fh)
     seasons = [2022, 2023, 2024, 2025, 2026]
     F = Features(seasons, load_injuries(a.root.resolve(), seasons))
+    F.practice = load_practice(a.root.resolve(), seasons)
     rep: Dict[str, Any] = {"generated_at": datetime.now(timezone.utc).isoformat(), "env": env, "markets": {}}
     for m in [x for x in a.markets.split(",") if x]:
         print(f"[mean] {m}: {len(rows[m])} rows", flush=True)
-        rep["markets"][m] = run_market(m, rows[m], F)
+        rep["markets"][m] = run_market(m, rows[m], F, tuple(x for x in a.arms.split(",") if x))
         (a.out / "fit_nfl_prop_mean_inputs.json").write_text(json.dumps(rep, indent=1, default=str), encoding="utf-8")
     rep["verdict"] = verdict(rep["markets"])
     (a.out / "fit_nfl_prop_mean_inputs.json").write_text(json.dumps(rep, indent=1, default=str), encoding="utf-8")
