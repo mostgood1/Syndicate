@@ -20,7 +20,8 @@ GAME-clustered bootstrap 95% CI (2,000 reps); no verdict is printed below 20 gam
   mostly on the book's side. Anytime TD cannot be graded against the book: it is quoted one-sided.
 - **The board today publishes a model probability and an edge on all of these** (served reading below).
   Withholding them is a board change; it is the user's decision and is NOT made here.
-- The 2025 full-season game-line arm (L25, 644 games through the production generator) is below.
+- The 2025 full-season game-line arm (L25) is PARTIAL (94 of 644 games, paused for host memory); its
+  94 games agree with L26 (margin loses to the close, +1.28 [+0.09, +2.49]). Resume: `sim --arm L25`.
 
 ## Substrate — what each number rests on
 
@@ -50,11 +51,29 @@ history exists only where a session saved it. Families, and where each came from
   **+1.95 [+0.85, +3.02]** (09-28: +1.95 [+0.88, +3.04]); total 13.80 vs 12.38, **+1.42 [−0.05, +2.75]**
   (09-28: [+0.01, +2.79] — same point, bootstrap noise moves the lower end across 0).
 
-## L25 — 2025 season as-of rebuild (644 FBS-vs-FBS games, weeks 3-15)
+## L25 — 2025 season as-of rebuild (PARTIAL: 94 of 644 games, weeks 3-5)
 
-**RUNNING at the time of this commit** (started 2026-10-03 00:05Z, ~3.3 h at below-normal priority on
-a host shared with the fleet and two peer backtests). Results are appended here when it completes;
-until then nothing in this file rests on it.
+The full arm is 663 FBS-vs-FBS finals in weeks 3-15; 644 have both teams in the 2024 SP+ prior (the
+other 19 would borrow current-season SP+, which has no as-of copy). **It was PAUSED at 94 games**
+(2026-10-03 ~01:05Z): the host reached 96% memory with two peer backtests and the fleet running, and
+the workers were thrashing (~0.2 s CPU per 20 s, working sets trimmed to 35 MB) while also adding
+pressure to production. Each game is cached; `sim --arm L25` resumes at game 95.
+
+What the 94 games (weeks 3 = 45, 4 = 45, 5 = 4) say — consistent with L26, and NOT a season result:
+
+| market | n | model | comparator | model − comparator [95% CI] | verdict |
+|---|---|---|---|---|---|
+| margin MAE vs CFBD close | 94 | 13.475 | 12.197 | +1.279 [+0.093, +2.490] | **LOSES to book** |
+| margin MAE vs naive | 92 | 13.475 | 18.337 | −4.889 [−8.048, −1.909] | beats naive |
+| total MAE vs CFBD close | 94 | 13.188 | 12.628 | +0.561 [−0.957, +2.153] | unresolved |
+| total MAE vs naive | 92 | 13.188 | 11.616 | +1.334 [−0.233, +2.895] | unresolved |
+| h2h Brier vs de-vigged ML | 89 | 0.1876 | 0.1938 | −0.0061 [−0.0330, +0.0214] | unresolved |
+| spread cover Brier @ close (book 0.5) | 93 | 0.2740 | 0.2500 | +0.0240 [−0.0120, +0.0640] | unresolved (behind) |
+| total over Brier @ close (book 0.5) | 94 | 0.2676 | 0.2500 | +0.0176 [−0.0246, +0.0652] | unresolved (behind) |
+
+Bias: margin −4.55, total −3.34 (early-season 2025). Blend points scale 44.66 (2024 fit; production's
+44.497 is fit on 2025 and would leak). The calibration profile was fit on 2023-2025 drives, so it is
+in-sample for this arm — a frozen constant, as NHL's SimConfig was.
 
 ## L26 — 2026 weeks 3-4, PRODUCTION's pregame projections (n = 113 games)
 
