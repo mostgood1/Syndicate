@@ -87,3 +87,40 @@ width, and per-line edges stop being inflated by overconfident P(over) (at mean+
 does **not** make the prop board beat the book — that needs the mean (fix #2 minutes: bias −2.96 min/player; fix #3
 rates), and the sim currently has no discrimination at the book line. Re-fit k AFTER fixes #2/#3 (mechanism vs
 estimator, standard §4.4): a better mean leaves less residual for the width to absorb.
+
+---
+
+## 6. RE-FIT ON THE NEW STACK (fix #2 availability + fix #3 rate shrink), 2026-10-03 — supersedes the k values above
+
+User decision: "hold it, re-fit fix #1 on the new stack". The stack's ladders were built by applying fix #3's engine
+module (post-sim, deterministic; reproduced 316/316 by a real-engine re-run) to the availability-on re-run of all 116
+dates (339 of 340 games shifted; the season opener has no player with 3 prior games). Same split, grid and
+whole-ladder objective as section 1.
+
+| market | k (old → stack) | held-out d Brier vs k=1 [95% CI] | stack Brier: widened / book / own-avg normal | playoffs d vs k=1 |
+|---|---|---|---|---|
+| points | 1.35 → **1.25** | −0.0017 [−0.0029, −0.0004] | 0.2608 / 0.2489 / 0.2590 | −0.0034 [−0.0087, +0.0020] |
+| rebounds | 1.25 → **1.30** | −0.0004 [−0.0012, +0.0003] | 0.2524 / 0.2446 / 0.2494 | **+0.0029 [+0.0010, +0.0052]** |
+| assists | 1.25 → 1.20 | 0 (rounding-inert) | 0.2556 / 0.2478 / 0.2511 | — |
+| threes | 1.15 → 1.15 | 0 (rounding-inert) | 0.2524 / 0.2431 / 0.2466 | 0 |
+| PRA | 1.60 → **1.40** | −0.0080 [−0.0108, −0.0053] | 0.2634 / 0.2492 / 0.2608 | −0.0131 [−0.0225, −0.0043] |
+| PR | 1.50 → 1.35 | −0.0051 [−0.0074, −0.0027] | 0.2617 / 0.2498 / 0.2615 | |
+| PA | 1.40 → 1.30 | −0.0047 [−0.0068, −0.0026] | 0.2600 / 0.2495 / 0.2562 | |
+| RA | 1.30 → 1.40 | −0.0040 [−0.0070, −0.0013] | 0.2552 / 0.2493 / 0.2514 | |
+
+**What changed.** With the mean fixed, widening buys ~10x less (points −0.0017 vs −0.0181 before): most of what the
+first fit's widening was doing was compensating for a biased mean. The factors are smaller for points and combos and
+all interior. Widening is still worth having on points and the combos (held-out gains, CIs < 0); on rebounds,
+assists and threes it is ~nothing, and on rebounds it slightly HURTS in the playoffs.
+
+**What did not change, and is now the main finding.** At the book's line, points and PRA still have NO discrimination:
+observed over-rate 0.38–0.55 across every predicted decile (points P from 0.29 to 0.62). Rebounds and threes do show a
+slope (rebounds 0.43 → 0.63 across deciles). For rebounds/assists/threes the player's own average with the player's
+own spread (a normal) prices the book line better than the sim ladder (rebounds 0.2494 vs 0.2524) -- so for those
+markets the ladder's SHAPE, not its width, is the remaining defect. Every market is still behind the book
+(+0.006..+0.014).
+
+**Factor file for the stack:** `{"pts": 1.25, "reb": 1.3, "ast": 1.2, "threes": 1.15, "pra": 1.4, "pr": 1.35, "pa": 1.3, "ra": 1.4}`
+(`C:/tmp/wnba_bt/dispersion_stack/wnba_prop_dispersion.json`). Recommendation if enabled: ship points and the four
+combos; leave rebounds/assists/threes OUT of the file (the engine then leaves those ladders untouched) -- that choice
+reads the held-out/playoff numbers, so it is stated as a recommendation for the user, not as a fit.
