@@ -199,3 +199,30 @@ def test_window_skips_preseason_and_tops_up_from_last_season(monkeypatch):
     ids = client.recent_finished_game_ids("MTL", "20262027", before_date="2026-10-03", n=4)
     # preseason 1, 2 never; the one regular-season game, topped up with last season's latest three
     assert ids == ["93", "94", "99", "3"]
+
+
+def test_book_listed_player_is_dressed_first():
+    # 7 D: D6 ranks 7th by total ice time (missed late games last season) but has a book line.
+    rows = [{"player_id": 200 + i, "position": "D", "games_played": 8, "toi_avg": 24.0 - i,
+             "toi_total": 8 * (24.0 - i)} for i in range(6)]
+    rows.append({"player_id": 206, "position": "D", "games_played": 3, "toi_avg": 23.7, "toi_total": 71.1})
+    assert {r["player_id"]: r for r in lu.infer_lines([dict(r) for r in rows])}[206]["line_slot"] is None
+    by_id = {r["player_id"]: r for r in lu.infer_lines([dict(r) for r in rows], must_dress={206})}
+    assert by_id[206]["line_slot"] == "D1"            # dressed, and slotted by his AVERAGE usage
+    assert sum(1 for r in by_id.values() if r["line_slot"]) == 6
+
+
+def test_book_listed_ids_match_full_and_unique_abbreviated_names():
+    from syndicate.features.nhl.sim_engine.hockeysim.ingestion.collect import _book_listed_ids
+
+    usage = [{"player_id": 1, "full_name": "John Carlson", "position": "D"},
+             {"player_id": 2, "full_name": "A. Ovechkin", "position": "F"},
+             {"player_id": 3, "full_name": "L. Hughes", "position": "D"},
+             {"player_id": 4, "full_name": "L. Hughes", "position": "F"},
+             {"player_id": 5, "full_name": "Logan Thompson", "position": "G"}]
+    line = lambda n, h="Tampa Bay Lightning", a="Washington Capitals": {"player_name": n, "home_team": h, "away_team": a}
+    lines = [line("John Carlson"), line("Alex Ovechkin"), line("Luke Hughes"), line("Logan Thompson"),
+             line("Someone Else", h="Boston Bruins", a="Winnipeg Jets")]
+    # Carlson exact, Ovechkin by unique abbreviation; the two "L. Hughes" are ambiguous; goalies never
+    assert _book_listed_ids(usage, "Washington Capitals", lines) == {1, 2}
+    assert _book_listed_ids(usage, "Boston Bruins", [line("John Carlson", h="Winnipeg Jets", a="Calgary Flames")]) == set()

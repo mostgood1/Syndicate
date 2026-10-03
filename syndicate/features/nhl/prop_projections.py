@@ -121,6 +121,8 @@ class NhlPropProjectionIndex:
     by_key: dict[tuple[str, str], tuple[str, str, float]] = field(default_factory=dict)
     # (player, market code) -> line context written by the producer (line_slot, sim_starter, game_type)
     context: dict[tuple[str, str], dict[str, str]] = field(default_factory=dict)
+    # pairs filled from the all-markets file (absent from props_recommendations)
+    from_all_markets: int = 0
 
     @property
     def players(self) -> int:
@@ -137,35 +139,51 @@ class NhlPropProjectionIndex:
         return lam
 
 
+def _read_projection_rows(path: Any) -> list[dict[str, str]] | None:
+    try:
+        if not path.exists():
+            return None
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
+            return list(csv.DictReader(handle))
+    except OSError:
+        _LOGGER.exception("NHL_PROP_PROJECTIONS_READ_FAILED path=%s", path)
+        return None
+
+
 def load_nhl_prop_projections(selected_date: str) -> NhlPropProjectionIndex:
-    """Read `props_recommendations_<date>.csv`. Missing or header-only -> empty index."""
+    """Read `props_recommendations_<date>.csv`, then fill from `props_recommendations_all_markets_<date>.csv`.
+
+    The first file holds only the (player, market) pairs the producer had a current line for; the
+    second holds EVERY projected player x market (lane nhl-player-props-projection, 2026-10-03:
+    166 of 232 unprojected board rows were projected players missing just that pair). A pair in
+    both keeps the first file's row. Missing or header-only files -> an empty index.
+    """
     from syndicate.features.nhl.sources import processed_path
 
     index = NhlPropProjectionIndex(date=str(selected_date)[:10])
-    path = processed_path("props_recommendations_" + index.date + ".csv")
-    index.source_path = str(path)
-    try:
-        if not path.exists():
-            return index
-        with path.open("r", encoding="utf-8-sig", newline="") as handle:
-            rows = list(csv.DictReader(handle))
-    except OSError:
-        _LOGGER.exception("NHL_PROP_PROJECTIONS_READ_FAILED date=%s path=%s", index.date, path)
-        return index
-    for raw in rows:
-        player = _norm(raw.get("player"))
-        code = str(raw.get("market") or "").strip().upper()
-        try:
-            lam = float(raw.get("proj_lambda"))
-        except (TypeError, ValueError):
+    primary = processed_path("props_recommendations_" + index.date + ".csv")
+    fallback = processed_path("props_recommendations_all_markets_" + index.date + ".csv")
+    index.source_path = str(primary)
+    for path in (primary, fallback):
+        rows = _read_projection_rows(path)
+        if rows is None:
             continue
-        if not player or not code or not math.isfinite(lam) or lam < 0:
-            continue
-        if (player, code) not in index.by_key:
-            index.by_key[(player, code)] = (_norm(raw.get("team")), _norm(raw.get("opp")), lam)
-            index.context[(player, code)] = {
-                k: str(raw.get(k) or "") for k in ("line_slot", "proj_toi", "sim_starter", "game_type")
-            }
+        for raw in rows:
+            player = _norm(raw.get("player"))
+            code = str(raw.get("market") or "").strip().upper()
+            try:
+                lam = float(raw.get("proj_lambda"))
+            except (TypeError, ValueError):
+                continue
+            if not player or not code or not math.isfinite(lam) or lam < 0:
+                continue
+            if (player, code) not in index.by_key:
+                index.by_key[(player, code)] = (_norm(raw.get("team")), _norm(raw.get("opp")), lam)
+                index.context[(player, code)] = {
+                    k: str(raw.get(k) or "") for k in ("line_slot", "proj_toi", "sim_starter", "game_type")
+                }
+                if path is fallback:
+                    index.from_all_markets += 1
     return index
 
 
@@ -247,6 +265,7 @@ def attach_nhl_prop_projections(
         "probability_refused_by_line": refused,
         "pct_projected": round(100.0 * attached / considered, 1) if considered else 0.0,
         "source_artifact": index.source_path,
+        "pairs_from_all_markets_file": index.from_all_markets,
     }
     if not index.by_key:
         coverage["reason"] = "no NHL hockeysim prop projections for this date (props_recommendations empty or absent)"

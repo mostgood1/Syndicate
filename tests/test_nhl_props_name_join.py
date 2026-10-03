@@ -186,3 +186,23 @@ def test_grid_market_codes_are_supported():
     npp.attach_nhl_prop_projections(
         grid, _index([("Andrew Copp", "SOG", "Detroit Red Wings", "New York Rangers", 2.2)]), selected_date="2026-10-02")
     assert grid[0]["projection"]["projected"] == 2.2
+
+
+def test_loader_falls_back_to_the_all_markets_file(tmp_path, monkeypatch):
+    import syndicate.features.nhl.sources as src
+
+    proc = tmp_path
+    (proc / "props_recommendations_2026-10-03.csv").write_text(
+        "date,player,team,opp,market,line,proj_lambda,line_slot,proj_toi,sim_starter,game_type\n"
+        "2026-10-03,John Carlson,Washington Capitals,Tampa Bay Lightning,SOG,1.5,2.0,D1,23.7,,regular\n",
+        encoding="utf-8")
+    (proc / "props_recommendations_all_markets_2026-10-03.csv").write_text(
+        "date,player,team,opp,market,proj_lambda,line_slot,proj_toi,sim_starter,game_type\n"
+        "2026-10-03,John Carlson,Washington Capitals,Tampa Bay Lightning,SOG,9.9,D1,23.7,,regular\n"
+        "2026-10-03,John Carlson,Washington Capitals,Tampa Bay Lightning,ASSISTS,0.55,D1,23.7,,regular\n",
+        encoding="utf-8")
+    monkeypatch.setattr(src, "processed_path", lambda name: proc / name)
+    idx = npp.load_nhl_prop_projections("2026-10-03")
+    assert idx.by_key[(npp._norm("John Carlson"), "SOG")][2] == 2.0       # primary file wins
+    assert idx.by_key[(npp._norm("John Carlson"), "ASSISTS")][2] == 0.55  # filled from all-markets
+    assert idx.from_all_markets == 1

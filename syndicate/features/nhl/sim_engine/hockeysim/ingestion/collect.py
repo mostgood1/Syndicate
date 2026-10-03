@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Tuple
 from syndicate.local_nhl_odds import _alias_team_abbr, _team_abbr
 
 from ..features.loaders import _load_scoreboard_games, _processed_dir
+from ..features.props_lines import initial_surname_key, load_props_lines, normalize_name
 from .lineups import build_team_usage, infer_lines, project_lineup
 from .nhl_web import NhlWebIngestClient, season_code_for_date
 
@@ -43,6 +44,34 @@ def _slate_teams(date: str, root: Optional[Path]) -> List[Tuple[str, str]]:
     return list(seen.items())
 
 
+def _book_listed_ids(usage: List[Dict], team_name: str, lines: List[Dict]) -> set:
+    """Skaters in ``usage`` a current book line names, for a game this team plays.
+
+    Exact normalized name first, then a UNIQUE initial+surname within the team (the usage name can be
+    the boxscore's abbreviation). Lines without team names are ignored: an abbreviation must never
+    reach across games.
+    """
+    team = normalize_name(team_name)
+    names = {normalize_name(l.get("player_name")) for l in lines
+             if team and team in (normalize_name(l.get("home_team")), normalize_name(l.get("away_team")))}
+    if not names:
+        return set()
+    skaters = [r for r in usage if r.get("position") in ("F", "D")]
+    by_full = {normalize_name(r.get("full_name")): int(r["player_id"]) for r in skaters}
+    by_abbr: Dict[str, List[int]] = {}
+    for r in skaters:
+        by_abbr.setdefault(initial_surname_key(r.get("full_name")), []).append(int(r["player_id"]))
+    out = set()
+    for n in names:
+        if n in by_full:
+            out.add(by_full[n])
+            continue
+        cands = by_abbr.get(initial_surname_key(n), [])
+        if len(cands) == 1:
+            out.add(cands[0])
+    return out
+
+
 def collect_slate_inputs(
     date: str,
     *,
@@ -61,6 +90,10 @@ def collect_slate_inputs(
     out_dir = out_dir or _processed_dir(root)
 
     lineup_rows: List[Dict] = []
+    try:
+        book_lines = load_props_lines(date, root=root)
+    except Exception:  # noqa: BLE001 - the lines only steer who dresses; the lineup must still build
+        book_lines = []
     roster_rows: List[Dict] = []
     goalie_rows: List[Dict] = []
 
@@ -77,7 +110,7 @@ def collect_slate_inputs(
             usage = [r for r in usage if int(r["player_id"]) in name_map]
         if not usage:
             continue
-        infer_lines(usage)
+        infer_lines(usage, must_dress=_book_listed_ids(usage, team_name, book_lines))
         project_lineup(usage, date=date)
         for r in usage:
             lineup_rows.append({

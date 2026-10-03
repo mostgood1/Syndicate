@@ -250,3 +250,26 @@ def write_recommendations_sim_csv(
         for row in rows:
             writer.writerow({c: row.get(c) for c in RECOMMENDATIONS_SIM_COLUMNS})
     return len(rows)
+
+
+# ---------------------------------------------------------------------------
+# Every projected player x market (props_recommendations_all_markets_{date}.csv)
+# ---------------------------------------------------------------------------
+
+PROP_PROJECTIONS_COLUMNS: List[str] = [
+    "date", "player", "team", "opp", "market", "proj_lambda",
+    "line_slot", "proj_toi", "sim_starter", "game_type",
+]
+
+
+def write_prop_projections_csv(path: Path, rows: List[Dict[str, object]]) -> int:
+    """Write the all-markets projection file the board falls back to. Named under the already
+    allowlisted ``props_recommendations*.csv`` family; readers that want one date's file match
+    ``props_recommendations_YYYY-MM-DD.csv`` exactly, so this name never stands in for it."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=PROP_PROJECTIONS_COLUMNS)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({c: row.get(c) for c in PROP_PROJECTIONS_COLUMNS})
+    return len(rows)

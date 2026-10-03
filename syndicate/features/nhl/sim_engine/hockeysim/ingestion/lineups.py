@@ -118,7 +118,7 @@ def _dress_score(r: Dict) -> float:
     return float(total or 0.0)
 
 
-def infer_lines(usage: List[Dict]) -> List[Dict]:
+def infer_lines(usage: List[Dict], must_dress: Optional[set] = None) -> List[Dict]:
     """Assign line_slot (L1-L4 / D1-D3), pp_unit, pk_unit (vendor TOI model, two defects fixed).
 
     WHO DRESSES is chosen by TOTAL ice time over the window, then the dressed 12 F / 6 D are
@@ -144,8 +144,16 @@ def infer_lines(usage: List[Dict]) -> List[Dict]:
         r["pp_unit"] = None
         r["pk_unit"] = None
 
+    forced = {int(p) for p in (must_dress or ())}
+
     def _dressed(rows: List[Dict], k: int) -> List[Dict]:
-        picked = sorted(rows, key=lambda r: (_dress_score(r), float(r.get("toi_avg") or 0.0)), reverse=True)[:k]
+        # A player a sportsbook has posted a line on is dressed FIRST `[2026-10-03, lane
+        # nhl-player-props-projection]`: early in a season the window is mostly last season's final
+        # games, so a regular who missed some of them (Carlson 23.7 min avg) ranked out of the top 6 D
+        # by total ice time and projected nothing. A posted line is the market saying he plays.
+        ranked = sorted(rows, key=lambda r: (int(r["player_id"]) in forced, _dress_score(r),
+                                             float(r.get("toi_avg") or 0.0)), reverse=True)
+        picked = ranked[:k]
         return sorted(picked, key=lambda r: float(r.get("toi_avg") or 0.0), reverse=True)
 
     dressed_f = _dressed(forwards, 12)

@@ -47,6 +47,7 @@ from syndicate.features.nhl.sim_engine.hockeysim.adapters import build_game_pred
 from syndicate.features.nhl.sim_engine.hockeysim.artifacts import (  # noqa: E402
     prop_recommendation_row,
     write_predictions_csv,
+    write_prop_projections_csv,
     write_props_recommendations_csv,
     write_recommendations_sim_csv,
 )
@@ -227,6 +228,7 @@ def build_props_for_date(
     lines = load_props_lines(date, root=root)
 
     rows_out: List[Dict[str, object]] = []
+    all_markets: List[Dict[str, object]] = []
     for g in games:
         line_pids = _match_lines_to_game(g, lines)
         if not line_pids:
@@ -241,6 +243,19 @@ def build_props_for_date(
         game_type = _game_type(g.game_pk)
         starters = {_starter_goalie_id(tuple(g.home_players)), _starter_goalie_id(tuple(g.away_players))}
         meta = {int(p.player_id): p for p in list(g.home_players) + list(g.away_players)}
+        # EVERY projected player x market, not only the pairs this producer holds a current line for
+        # `[2026-10-03, lane nhl-player-props-projection]`: 166 of 232 unprojected 10-03 board rows were
+        # projected players whose (player, market) quote came from a book or a moment this lines file
+        # did not have. The board prices any line from the mean, so it needs the mean, not the line.
+        book_name = {pid: str(lines[i].get("player_name") or "") for i, pid in line_pids.items()}
+        for pr in projs:
+            all_markets.append({
+                "date": date,
+                "player": book_name.get(int(pr.player_id)) or pr.player,
+                "team": pr.team, "opp": pr.opp, "market": pr.market,
+                "proj_lambda": round(float(pr.proj_lambda), 4),
+                **_line_context(meta.get(int(pr.player_id)), int(pr.player_id) in starters, game_type),
+            })
 
         for idx, pid in line_pids.items():
             r = lines[idx]
@@ -269,6 +284,9 @@ def build_props_for_date(
 
     out_path = (out_dir or _processed_dir(root)) / f"props_recommendations_{date}.csv"
     n = write_props_recommendations_csv(out_path, rows_out)
+    write_prop_projections_csv(
+        (out_dir or _processed_dir(root)) / f"props_recommendations_all_markets_{date}.csv", all_markets,
+    )
     return out_path, n
 
 
