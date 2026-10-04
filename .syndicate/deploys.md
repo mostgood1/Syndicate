@@ -45913,3 +45913,10 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - applied: `git merge --ff-only github/main` in ~/Syndicate at 04:58:09Z (clean tree, 29 behind / 0 ahead; range also carries already-landed nba_prop_calibration, segment_odds_fetch, soccer_projections). check_deploy_safety: NOT CLEAR for a RESTART (live odds refresh in flight); no restart made -- the WNBA props SmartSim runs in a fresh per-refresh subprocess.
 - reading 1 (04:58Z, the fleet's own code on fleet data): exactly the expected map -- LVA + Dana Evans, NaLyssa Smith; ATL + Brionna Jones; NYL + Satou Sabally; Talbot absent. MET.
 - reading 2 OWED: the first production `smart_sim_2026-10-04_*.json` written after 04:58:09Z contains 0 players whose latest injury row is OUT/DOUBTFUL/SUSPENDED/INACTIVE. Watcher `C:/tmp/wnba_bt/watch_injury_fix.py` (WSL, 6h).
+
+
+## 2026-10-04 05:10Z (12:10 AM CT) -- MEASUREMENT: NHL live sweeps run --mode fast unless generation is due (bf35e498) -- NHL step median 624 s -> 51 s; NCAAF evening 1,677 credits/h -- lane `nhl-live-sweep-fast` (CLOSED)
+- deploy: user ff 2026-10-03 (fleet 80f380f8 at 17:14Z contained bf35e498); no restart (per-sweep subprocess).
+- verify (~/nhlwatch/summary.txt, 10-03 23:00Z -> 10-04 05:00Z, NHL games 23:10-02:10Z starts): 124 live sweeps including NHL -- 112 `--mode fast` (NHL step p50 51 s / max 218 s; sweep p50 71 s / max 329 s), 10 full (NHL step p50 218 s / max 317 s; sweep p50 241 s / max 389 s), 2 unread. Same window 10-02/03 (old code): 24 sweeps, ALL full, NHL step p50 624 s / max 1,168 s, sweep p50 699 s / max 1,506 s. Full generation still ~every 30-35 min: predictions_<date>.csv mtimes 23:27, 23:59, 00:31, 01:03, 01:34, 02:06, 02:38, 03:10, 03:45, 04:18Z.
+- lane_busy: 87 of 213 launches (41%) vs 129 of 304 (42%) -- the COUNT fell, the RATE did not; likely now a ~70 s sweep still running at the next 60 s live tick (retried a minute later), not a 10-25 min hold -- not broken down by cause.
+- NCAAF evening (~/ncaafrate.csv 21:01:38 -> 04:57:18Z, after 8730cfb7): 13,298 credits = 1,677/h (afternoon peak before the change 12,664/h).
