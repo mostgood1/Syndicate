@@ -5092,8 +5092,12 @@ def _smart_sim_injuries_excluded_map_for_date_local(*, processed_root: Path, raw
     except Exception:
         pass
 
+    # Re-admit an excluded player ONLY on a positive availability signal (`playing_today` truthy). Having a props row
+    # is not one: props_predictions are built for the whole roster and never carry `playing_today` in production, so
+    # the old rule re-admitted every injured player with a projection -- measured 2026-10-03, 83 exclusions -> 30, and
+    # production sims for 10-04 gave OUT-listed players 11-19 minutes (lane basketball-injury-exclusion-reinclusion).
     try:
-        if isinstance(props_df, pd.DataFrame) and (not props_df.empty):
+        if isinstance(props_df, pd.DataFrame) and (not props_df.empty) and "playing_today" in props_df.columns:
             if "team" in props_df.columns and "player_name" in props_df.columns:
                 tmp = props_df[["team", "player_name"] + (["playing_today"] if "playing_today" in props_df.columns else [])].copy()
                 tmp["team"] = tmp["team"].astype(str).str.strip().str.upper()
