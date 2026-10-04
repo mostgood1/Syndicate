@@ -38,8 +38,8 @@ def _load(name: str, rel: str):
 B = _load("bt_wnba", "backtest_wnba_lines_props.py")
 AV = _load("fit_avail", "fit_wnba_sim_availability.py")
 
-GRID_B0 = [round(-0.2 + 0.025 * i, 3) for i in range(25)]      # -0.2 .. 0.4
-GRID_B1 = [round(-0.2 + 0.05 * i, 3) for i in range(21)]       # -0.2 .. 0.8
+GRID_B0 = [round(-0.6 + 0.025 * i, 3) for i in range(41)]      # -0.6 .. 0.4 (b0 < 0 = a freed-minutes threshold)
+GRID_B1 = [round(-0.2 + 0.05 * i, 3) for i in range(29)]       # -0.2 .. 1.2
 GRID_LEAK = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
 FREED_BANDS = (("freed 0", 0.0, 0.001), ("freed < 15", 0.001, 15.0), ("freed >= 15", 15.0, 1e9))
 TIERS = (("rank 1-5", 1, 5), ("rank 6-8", 6, 8), ("rank 9+", 9, 99))
