@@ -472,7 +472,7 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         self.assertEqual(nfl_report["earliest_collected"], "2025 Week 1")
         self.assertEqual(nfl_report["latest_collected"], "2025 Week 2")
 
-    def test_wnba_uses_combined_game_and_player_prop_markets_while_other_basketball_sports_keep_interval_defaults(self) -> None:
+    def test_nba_and_wnba_use_combined_game_and_player_prop_markets_while_ncaab_keeps_interval_defaults(self) -> None:
         module = self._load_module()
         args = argparse.Namespace(
             date="2026-06-07",
@@ -490,8 +490,12 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         player_prop_markets = "player_points,player_rebounds,player_assists,player_points_rebounds_assists,player_threes,player_steals,player_blocks,player_turnovers,player_points_rebounds,player_points_assists,player_rebounds_assists,player_double_double,player_triple_double"
         wnba_markets = f"{game_markets},{player_prop_markets}"
 
+        # NBA asks for player props too (lane nba-layer2-projections, user
+        # decision 2026-10-03): with interval markets only, no NBA prop quote
+        # could ever reach the board.
         self.assertIn("--markets", nba_steps[0].command)
-        self.assertIn(interval_markets, nba_steps[0].command)
+        self.assertIn(wnba_markets, nba_steps[0].command)
+        self.assertNotIn(interval_markets, nba_steps[0].command)
         self.assertIn("--markets", ncaab_steps[0].command)
         self.assertIn(interval_markets, ncaab_steps[0].command)
 

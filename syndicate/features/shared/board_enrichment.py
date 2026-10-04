@@ -1868,6 +1868,51 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
             prop_coverage = {"supported": True, "error": "prop projection join failed", "rows_with_projection": 0}
         return _merge_nfl_coverage(game_coverage, prop_coverage)
 
+    if sport == "nba":
+        # `[2026-10-03, lane nba-layer2-projections, LOANED branch]`. NBA read
+        # "no projection source wired for nba" while the SmartSim published every
+        # input this needs. Game lines price off each game's smart_sim score
+        # histograms; props off cards_sim_detail's per-player ladders. Two
+        # independent joins, merged the NFL way, either able to fail alone.
+        game_index = None
+        try:
+            from syndicate.features.shared.nba_game_projections import (
+                attach_nba_game_projections,
+                load_nba_game_projections,
+            )
+
+            game_index = load_nba_game_projections(selected_date)
+            if not game_index.games:
+                game_coverage = {
+                    "supported": True,
+                    "rows_with_projection": 0,
+                    "reason": "no NBA game_cards rows for this date window",
+                }
+            else:
+                game_coverage = attach_nba_game_projections(grid, game_index)
+        except Exception:
+            _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=nba date=%s", selected_date)
+            game_coverage = {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
+        try:
+            from syndicate.features.shared.nba_projections import (
+                attach_nba_prop_projections,
+                load_nba_prop_projections,
+            )
+
+            prop_coverage = attach_nba_prop_projections(
+                grid, load_nba_prop_projections(selected_date, game_index)
+            )
+        except Exception:
+            _LOGGER.exception("BOOK_GRID_PROP_PROJECTION_FAILURE sport=nba date=%s", selected_date)
+            prop_coverage = {"supported": True, "error": "prop projection join failed", "rows_with_projection": 0}
+        merged = _merge_nfl_coverage(game_coverage, prop_coverage)
+        # Summed across both halves, like the projection counts, so the top
+        # level never reports one half's number as the whole sport's.
+        for key in ("rows_with_probability", "rows_with_edge"):
+            merged[key] = int(game_coverage.get(key) or 0) + int(prop_coverage.get(key) or 0)
+        merged.pop("unprojected_by_reason", None)
+        return merged
+
     if sport != "mlb":
         return {"supported": False, "reason": f"no projection source wired for {sport}"}
     try:

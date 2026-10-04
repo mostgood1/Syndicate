@@ -94,6 +94,16 @@ _WNBA_PLAYER_PROP_MARKETS = "player_points,player_rebounds,player_assists,player
 # these markets in the fetch request, moneyline/spread/total stay permanently
 # empty even though the parsing logic is already there.
 _WNBA_DEFAULT_MARKETS = f"{_WNBA_GAME_MARKETS},{_WNBA_PLAYER_PROP_MARKETS}"
+# NBA asks for the same player-prop markets `[2026-10-03, lane
+# nba-layer2-projections, user decision "Add all 13 prop markets"; a recorded
+# cross-lane write into lane nhl-live-sweep-fast's file, user-authorised]`. It
+# used to take `_effective_markets` -> game + half lines ONLY, so the fetcher's
+# own player-prop default never applied: the fleet's 2026-10-04 NBA quote log
+# held 234 game quotes and 0 props, the producer logged "no player-prop lines
+# offered" every hour, and no NBA prop could reach the board while the SmartSim
+# wrote a ladder for every player. A day whose books post no props still
+# returns game lines only.
+_NBA_DEFAULT_MARKETS = f"{_DEFAULT_INTERVAL_MARKETS},{_WNBA_PLAYER_PROP_MARKETS}"
 _DEFAULT_REFRESH_STEP_TIMEOUT_SECONDS = 1800
 _ALL_PROCESS_MEMORY_HEARTBEAT_SECONDS = 60
 _MEMORY_TRACE_LAST_RSS_BYTES: int | None = None
@@ -822,7 +832,7 @@ def _build_nba_steps(args: argparse.Namespace) -> list[RefreshStep]:
     payload = _build_nba_payload(args, env_key="NBA_BETTING_ODDSAPI_PROPS_JOB")["NBA_BETTING_ODDSAPI_PROPS_JOB"]
     payload_data = json.loads(payload)
     artifact_root = _local_source_artifact_root("nba")
-    markets = _effective_markets("nba", args.markets)
+    markets = str(args.markets or "").strip() or _NBA_DEFAULT_MARKETS
     command = [
         python_exe,
         "scripts/refresh_nba_oddsapi_props.py",
