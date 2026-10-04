@@ -953,3 +953,4 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
     some pair alt-line prices with a main point.
   - The repo `.env` `ODDS_API_KEY` is DEACTIVATED (401, 2026-10-03).
 - Full tables: `.syndicate/findings_2026-10-02_nba_lines_props_backtest.md`.
+- **Fix built, NOT wired, NOT enabled `[verified 2026-10-03, lane nba-prop-calibration, 600092b0]`:** `nba_prop_calibration.py` (rate shrink + sd/ladder scale; flag `SYNDICATE_NBA_PROP_CALIBRATION`, OFF). Out of sample it beats the served sim in all 11 prop markets. Nothing calls it until the call site lands in basketball_props_smart_sim.py (requested from the holding lane). Production constants: w (rate shrink): pts 0.10, reb 0.15, ast 0.15, threes 0.0, stl 0.0, blk 0.35, tov 0.0; sd_scale: pts 1.30, reb 1.30, ast 1.25, threes 1.00, stl 1.05, blk 1.25, tov 1.00, pra 1.55.
