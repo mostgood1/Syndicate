@@ -15,9 +15,10 @@ THE ESTIMATOR (fitted by `scripts/fit_wnba_minutes_redistribution.py`; parameter
     m''_i = m'_i * (TOTAL - leak) / sum(m')           leave `leak` minutes for players outside the pool
 `freed` = as-of mean minutes of the players who played the team's PREVIOUS game and are not in today's pool -- known
 before tip (the pool is the sim's own player list; history strictly before the slate date).
-Each player's counting-stat means scale by m''/s (the per-minute rate is held -- that is lane `wnba-sim-rate-shrink`'s
-job, and it runs AFTER this so it sees the new minutes), and every ladder is SHIFTED by its components' summed delta
-(v' = max(0, round_half_up(v + delta))), width untouched -- the same convention as the rate shrink.
+Each player's counting-stat means scale by k = m''/s (the per-minute rate is held -- that is lane `wnba-sim-rate-shrink`'s
+job, and it runs AFTER this so it sees the new minutes), and every ladder's draws scale by the same k (combos too: a
+sum of stats scales like its parts) with largest-remainder rounding, so the ladder mean is k x the old one to 1/n.
+NOT the rate shrink's shift-by-delta: a sub-half-unit shift of an integer ladder moves nothing (`scale_values`).
 
 WHAT IT DOES NOT TOUCH. `<stat>_sd`, `<stat>_q`, per-quarter and scenario blocks, team scores (player sums no longer
 equal the team total -- this is an estimator on the published prop distribution, not a re-simulation), and any team
@@ -103,6 +104,31 @@ def _history_cached(path_s: str, mtime: float) -> Tuple[Tuple[str, str, str, str
     return tuple(rows)
 
 
+@lru_cache(maxsize=16)
+def _asof_index(path_s: str, mtime: float, date_str: str, name_key: Callable[[object], str]
+                ) -> Tuple[Dict[str, frozenset], Dict[str, float]]:
+    """({team: players who played its last game before date_str}, {player: as-of mean minutes over games played})."""
+    rows = _history_cached(path_s, mtime)
+    keys: Dict[str, str] = {}
+    last_date: Dict[str, str] = {}
+    mins: Dict[str, List[float]] = defaultdict(list)
+    for d, _gid, team, name, m in rows:
+        if d >= date_str:
+            continue
+        if d > last_date.get(team, ""):
+            last_date[team] = d
+        if m > 0:
+            if name not in keys:
+                keys[name] = str(name_key(name) or "").strip().upper()
+            mins[keys[name]].append(m)
+    played_last: Dict[str, set] = defaultdict(set)
+    for d, _gid, team, name, m in rows:
+        if m > 0 and d == last_date.get(team) and name in keys:
+            played_last[team].add(keys[name])
+    return ({t: frozenset(v) for t, v in played_last.items()},
+            {k: sum(v) / len(v) for k, v in mins.items() if v})
+
+
 def freed_minutes(processed_root: Path, date_str: str, team: str, pool_keys: set,
                   name_key: Callable[[object], str]) -> Tuple[Optional[float], str]:
     """As-of mean minutes of players who played `team`'s previous game (before `date_str`) and are not in `pool_keys`."""
@@ -110,26 +136,13 @@ def freed_minutes(processed_root: Path, date_str: str, team: str, pool_keys: set
     if not path.is_file():
         return None, f"history absent: {path}"
     try:
-        rows = _history_cached(str(path), path.stat().st_mtime)
+        played_last, asof = _asof_index(str(path), path.stat().st_mtime, str(date_str)[:10], name_key)
     except Exception as exc:  # noqa: BLE001
         return None, f"history unreadable: {type(exc).__name__}"
-    ds = str(date_str)[:10]
     team = _team(team)
-    prior = [r for r in rows if r[0] < ds]
-    team_dates = sorted({r[0] for r in prior if r[2] == team})
-    if not team_dates:
+    if team not in played_last:
         return None, "team has no prior game"
-    last = team_dates[-1]
-    mins_by_player: Dict[str, List[float]] = defaultdict(list)
-    for d, _gid, _t, name, m in prior:
-        if m > 0:
-            mins_by_player[str(name_key(name) or "").strip().upper()].append(m)
-    played_last = {str(name_key(r[3]) or "").strip().upper() for r in prior if r[0] == last and r[2] == team and r[4] > 0}
-    freed = 0.0
-    for k in played_last - set(pool_keys):
-        if k and mins_by_player.get(k):
-            freed += sum(mins_by_player[k]) / len(mins_by_player[k])
-    return freed, "ok"
+    return sum(asof.get(k, 0.0) for k in played_last[team] - set(pool_keys) if k), "ok"
 
 
 def reshare(sim_minutes: List[float], freed: float, params: Mapping[str, float]) -> List[float]:
@@ -148,8 +161,20 @@ def reshare(sim_minutes: List[float], freed: float, params: Mapping[str, float])
     return [max(0.0, v * scale) for v in flat]
 
 
-def _round_half_up(x: float) -> int:
-    return int(math.floor(x + 0.5))
+def scale_values(vals: List[int], k: float) -> List[int]:
+    """Each draw times k, rounded so the draws' SUM is round(k * sum): floor every draw, then give +1 to the draws with
+    the largest remainders (ties in draw order). A plain half-up rounding of v*k (or of v + delta) moves nothing when
+    the change is under half a unit -- measured 2026-10-04: threes ladders came out byte-identical and the assists
+    Brier delta was [0.0, 0.0008] -- so a low-count stat would silently ignore the minutes change."""
+    if not vals:
+        return []
+    xs = [max(0.0, v * k) for v in vals]
+    base = [int(math.floor(x)) for x in xs]
+    extra = int(round(sum(xs))) - sum(base)
+    order = sorted(range(len(xs)), key=lambda i: (-(xs[i] - base[i]), i))
+    for i in order[:max(0, extra)]:
+        base[i] += 1
+    return base
 
 
 def _values(payload: Mapping[str, Any]) -> List[int]:
@@ -223,14 +248,13 @@ def apply_minutes_redistribution(out: Any, *, league_code: str, processed_root: 
                 r["min_mean"] = m
                 ladders = r.get("prop_ladders") if isinstance(r.get("prop_ladders"), dict) else {}
                 dists = r.get("prop_distributions") if isinstance(r.get("prop_distributions"), dict) else None
-                for key, parts in LADDER_PARTS.items():
-                    if key not in ladders or not all(p in delta for p in parts):
+                for key in LADDER_PARTS:
+                    if key not in ladders:
                         continue
                     vals = _values(ladders[key])
                     if not vals:
                         continue
-                    d = sum(delta[p] for p in parts)
-                    built = build_ladder([max(0, _round_half_up(v + d)) for v in vals])
+                    built = build_ladder(scale_values(vals, k))
                     if not built:
                         continue
                     ladders[key] = built

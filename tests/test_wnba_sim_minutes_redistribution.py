@@ -96,7 +96,18 @@ def test_freed_is_the_previous_games_absent_players_strictly_before_the_slate(tm
     assert freed == pytest.approx((30 + 26) / 2)   # Gone Guard's as-of mean; slate, exhibition and DNP rows excluded
 
 
-def test_means_scale_with_minutes_and_ladders_shift_not_widen(tmp_path):
+def test_a_sub_half_unit_change_still_moves_a_low_count_ladder():
+    """Discriminating: the shift-by-delta convention (round_half_up(v + d)) left a threes ladder byte-identical for a
+    -0.3 mean change (measured 2026-10-04, Brier delta exactly [0.0, 0.0]); scaling must move it."""
+    thr = [0] * 40 + [1] * 40 + [2] * 15 + [3] * 5                  # mean 0.85
+    k = 0.65                                                       # -0.30 threes
+    assert [int(v + (0.85 * (k - 1)) + 0.5) for v in thr] == thr   # the old rule: nothing moves
+    new = R.scale_values(thr, k)
+    assert sum(new) / len(new) == pytest.approx(0.85 * k, abs=0.01)
+    assert _hit_prob_over(BUILD(new)["ladder"], 0.5) < _hit_prob_over(BUILD(thr)["ladder"], 0.5)
+
+
+def test_means_and_ladders_scale_with_minutes(tmp_path):
     root = _root(tmp_path)
     out = _out()
     before = copy.deepcopy(out["players"]["home"][0])
@@ -109,8 +120,8 @@ def test_means_scale_with_minutes_and_ladders_shift_not_widen(tmp_path):
     assert after["pra_mean"] == pytest.approx(before["pra_mean"] + d + (after["reb_mean"] - before["reb_mean"])
                                               + (after["ast_mean"] - before["ast_mean"]))
     lb, la = before["prop_ladders"]["pts"], after["prop_ladders"]["pts"]
-    assert la["maxTotal"] - la["minTotal"] == lb["maxTotal"] - lb["minTotal"]     # shifted, width kept
-    assert la["mean"] == pytest.approx(lb["mean"] + d, abs=0.51)
+    assert la["mean"] == pytest.approx(lb["mean"] * k, abs=0.01)            # the ladder mean follows the minutes
+    assert la["maxTotal"] < lb["maxTotal"]
 
 
 def test_nba_and_missing_inputs_are_untouched_with_a_reason(tmp_path):
