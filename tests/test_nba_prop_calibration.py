@@ -126,3 +126,31 @@ def test_season_start_spans_preseason_through_june():
     assert cal.season_start("2026-01-10") == "2025-08-01"
     assert cal.season_start("2026-06-10") == "2025-08-01"
     assert cal.season_start("2026-10-21") == "2026-08-01"
+
+
+def test_blend_pulls_the_shrunk_mean_toward_the_season_per_game_average(tmp_path):
+    root = _write_root(tmp_path, factors={"w": {"pts": 0.2}, "blend": {"pts": 0.25}, "sd_scale": {"pts": 1.0}})
+    out = _sim()
+    s = cal.apply_nba_prop_calibration(out, league_code="nba", processed_root=root, build_ladder=_ladder, name_key=_key, env=ON)
+    a = out["players"]["home"][0]
+    own_rate, own_avg = 60 / 90, 60 / 3            # season-to-date: 60 pts in 3 games / 90 minutes
+    shrunk = cal.shrink_mean(30.0, 30.0, own_rate, 0.2)
+    assert a["pts_mean"] == pytest.approx(0.25 * shrunk + 0.75 * own_avg)
+    assert s["b"] == {"pts": 0.25}
+
+
+def test_blend_alone_is_a_valid_factor_file_and_reaches_the_mean(tmp_path):
+    root = _write_root(tmp_path, factors={"blend": {"reb": 0.0}})
+    off, on = _sim(), _sim()
+    cal.apply_nba_prop_calibration(off, league_code="nba", processed_root=root, build_ladder=_ladder, name_key=_key, env={})
+    cal.apply_nba_prop_calibration(on, league_code="nba", processed_root=root, build_ladder=_ladder, name_key=_key, env=ON)
+    assert off == _sim()
+    assert on["players"]["home"][0]["reb_mean"] == pytest.approx(30 / 3)   # b = 0 -> the season per-game average
+    assert on["players"]["away"][0]["reb_mean"] == 1.0                      # < MIN_GAMES: untouched
+
+
+def test_blend_weight_outside_bounds_is_refused(tmp_path):
+    root = _write_root(tmp_path, factors={"blend": {"pts": 1.5}})
+    out = _sim()
+    s = cal.apply_nba_prop_calibration(out, league_code="nba", processed_root=root, build_ladder=_ladder, name_key=_key, env=ON)
+    assert out == _sim() and "outside" in s["reason"]

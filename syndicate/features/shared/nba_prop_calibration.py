@@ -10,8 +10,12 @@ committed smart-sim output, stats.nba actuals; fit < 2026-03-01, scored on 403 l
 
 THE ESTIMATOR (constants from `nba_prop_calibration.json`, written by `scripts/fit_nba_prop_calibration.py`):
     r = r_own + w_s * (r_sim - r_own)    r_sim = sim mean / sim minutes, r_own = season-to-date total / minutes
-    new <stat>_mean = sim minutes * r              (pra_mean moves by the pts+reb+ast deltas)
-    new <stat>_sd   = k_s * <stat>_sd              (pts reb ast threes stl blk tov pra)
+    m1 = sim minutes * r                           (1. rate shrink)
+    new <stat>_mean = b_s * m1 + (1 - b_s) * avg_own   (2. season-average blend; avg_own = season-to-date per game)
+                                                   (pra_mean moves by the pts+reb+ast deltas)
+    new <stat>_sd   = k_s * <stat>_sd              (3. width; pts reb ast threes stl blk tov pra)
+Each step is optional per stat (absent from the file -> skipped). k is fit for the FINAL mean, so the three are
+one estimator, not three independent knobs.
 Ladders follow the same transforms so every consumer sees one distribution: SHIFTED by the summed component delta
 (as `wnba_sim_rate_shrink`), then DILATED around their mean by k (as `wnba_prop_dispersion`); pr/pa/ra ladders use
 k_combo = sqrt(sum (k_i sd_i)^2) / sqrt(sum sd_i^2), the same independence the edges' combo sigma assumes.
@@ -46,6 +50,7 @@ LADDER_PARTS = {"pts": ("pts",), "reb": ("reb",), "ast": ("ast",), "threes": ("t
                 "blk": ("blk",), "tov": ("tov",), "pra": ("pts", "reb", "ast"), "pr": ("pts", "reb"),
                 "pa": ("pts", "ast"), "ra": ("reb", "ast")}
 W_BOUNDS = (0.0, 1.2)
+B_BOUNDS = (0.0, 1.0)
 K_BOUNDS = (0.5, 3.0)
 MIN_GAMES = 3
 
@@ -64,6 +69,11 @@ def season_start(date_str: str) -> str:
 def shrink_mean(sim_mean: float, sim_minutes: float, own_rate: float, w: float) -> float:
     """The fitted estimator, exactly as the fit script scores it."""
     return sim_minutes * (own_rate + w * (sim_mean / sim_minutes - own_rate))
+
+
+def blend_mean(mean: float, own_avg: float, b: float) -> float:
+    """Season-average blend: b is the weight on the (rate-shrunk) sim mean."""
+    return b * mean + (1.0 - b) * own_avg
 
 
 def combo_scale(parts: Tuple[str, ...], sds: Mapping[str, float], k: Mapping[str, float]) -> Optional[float]:
@@ -87,8 +97,9 @@ def load_factors(processed_root: Path) -> Tuple[Optional[Dict[str, Dict[str, flo
         return None, f"factor file unreadable: {type(exc).__name__}"
     if not isinstance(doc, dict):
         return None, "factor file is not an object"
-    out: Dict[str, Dict[str, float]] = {"w": {}, "k": {}}
-    for block, allowed, bounds, dest in (("w", RATE_STATS, W_BOUNDS, "w"), ("sd_scale", SD_STATS, K_BOUNDS, "k")):
+    out: Dict[str, Dict[str, float]] = {"w": {}, "b": {}, "k": {}}
+    for block, allowed, bounds, dest in (("w", RATE_STATS, W_BOUNDS, "w"), ("blend", RATE_STATS, B_BOUNDS, "b"),
+                                         ("sd_scale", SD_STATS, K_BOUNDS, "k")):
         raw = doc.get(block)
         if raw is None:
             continue
@@ -104,7 +115,7 @@ def load_factors(processed_root: Path) -> Tuple[Optional[Dict[str, Dict[str, flo
             if not math.isfinite(v) or not (bounds[0] <= v <= bounds[1]):
                 return None, f"{block}[{key!r}] = {v} outside {bounds}"
             out[dest][key] = v
-    if not out["w"] and not out["k"]:
+    if not out["w"] and not out["b"] and not out["k"]:
         return None, "factor file names no known stat"
     return out, "ok"
 
@@ -149,7 +160,9 @@ def own_rates(processed_root: Path, date_str: str, name_key: Callable[[object], 
             continue
         key = str(name_key(name) or "").strip().upper()
         if key:
-            out[key] = {s: v[i] / v[-2] for i, s in enumerate(RATE_STATS)}
+            rec = {s: v[i] / v[-2] for i, s in enumerate(RATE_STATS)}                  # per minute
+            rec.update({f"{s}_avg": v[i] / v[-1] for i, s in enumerate(RATE_STATS)})  # per game
+            out[key] = rec
     return out, ("ok" if out else f"no player with >= {MIN_GAMES} season games before {date_str}")
 
 
@@ -206,8 +219,9 @@ def apply_nba_prop_calibration(out: Any, *, league_code: str, processed_root: Pa
             summary["reason"] = reason
             print(f"[nba_prop_calibration] NBA_PROP_CALIBRATION skipped reason={reason}", flush=True)
             return summary
-        w, k = factors["w"], factors["k"]
-        rates, rate_reason = own_rates(processed_root, str(out.get("date") or "")[:10], name_key) if w else ({}, "no w")
+        w, b, k = factors["w"], factors["b"], factors["k"]
+        rates, rate_reason = (own_rates(processed_root, str(out.get("date") or "")[:10], name_key)
+                              if (w or b) else ({}, "no w/blend"))
         summary["rate_reason"] = rate_reason
         for side in ("home", "away"):
             for row in out["players"].get(side) or []:
@@ -218,11 +232,13 @@ def apply_nba_prop_calibration(out: Any, *, league_code: str, processed_root: Pa
                 own = rates.get(str(name_key(row.get("player_name")) or "").strip().upper()) if rates else None
                 mins = _f(row.get("min_mean"))
                 if own and mins and mins > 0:
-                    for s, ws in w.items():
+                    for s in [x for x in RATE_STATS if x in w or x in b]:
                         m = _f(row.get(f"{s}_mean"))
                         if m is None:
                             continue
-                        target = shrink_mean(m, mins, own[s], ws)
+                        target = shrink_mean(m, mins, own[s], w[s]) if s in w else m        # 1. rate shrink
+                        if s in b:
+                            target = blend_mean(target, own[f"{s}_avg"], b[s])                # 2. season-average blend
                         delta[s] = target - m
                         row[f"{s}_mean"] = target
                     if all(s in delta for s in ("pts", "reb", "ast")) and _f(row.get("pra_mean")) is not None:
@@ -259,7 +275,7 @@ def apply_nba_prop_calibration(out: Any, *, league_code: str, processed_root: Pa
                     row["nba_prop_calibration"] = {"mean_delta": {s: round(v, 4) for s, v in delta.items()}, "sd_scale": scaled}
                     summary["players"] += 1
                     summary["players_rate_shrunk"] += bool(delta)
-        summary.update(applied=summary["players"] > 0, w=w, k=k, reason="ok")
+        summary.update(applied=summary["players"] > 0, w=w, b=b, k=k, reason="ok")
         out["nba_prop_calibration"] = summary
         print(f"[nba_prop_calibration] NBA_PROP_CALIBRATION applied players={summary['players']} "
               f"rate_shrunk={summary['players_rate_shrunk']} ladders={summary['ladders']} rates={rate_reason}", flush=True)

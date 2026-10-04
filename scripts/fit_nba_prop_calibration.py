@@ -9,8 +9,11 @@ Method (every transform goes through `syndicate.features.shared.nba_prop_calibra
   1. TRAIN = smart-sim regular-season dates < --split; TEST = later regular-season dates + playoffs.
   2. Fit w_s (rate shrink, grid over W_BOUNDS) by test-free MAE on TRAIN; players with < MIN_GAMES prior
      games keep the sim mean, exactly as the module does.
-  3. Fit k_s (sd scale, grid over K_BOUNDS) by log-loss on TRAIN at a book-like line (the player's as-of average
-     rounded to x.5), with the shrunk mean -- so k is fit for the mean it will be paired with.
+  2b. Fit b_s (season-average blend weight on the shrunk mean, grid over B_BOUNDS) by MAE on TRAIN, after w.
+  3. Fit k_s (sd scale, grid over K_BOUNDS) by CRPS on TRAIN over the whole predictive distribution, with the
+     FINAL mean -- so k is fit for the mean it will be paired with. (A log-loss fit at one book-like line runs to
+     the grid edge; see fit().)
+  The previous estimator (no blend) is fit and scored beside it, so the blend's increment is measured, not assumed.
   4. Score TEST with the TRAIN constants: MAE vs the served sim and vs the own average; Brier vs the served
      Normal and vs the own-average distribution; game-clustered 95% CIs. pr/pa/ra are scored through
      `combo_scale` (the edges' independence sigma).
@@ -65,15 +68,21 @@ def collect(bt, out: Path) -> List[Dict]:
     return rows
 
 
-def mean_after(r: Dict, s: str, w: Dict[str, float]) -> float:
-    """Shrunk mean via the module's own estimator; pra moves by the pts+reb+ast deltas; combos are sums."""
+def mean_after(r: Dict, s: str, w: Dict[str, float], b: Dict[str, float] = None) -> float:
+    """Final mean via the module's own estimator: rate shrink (w), then season-average blend (b); pra moves by
+    the pts+reb+ast deltas; pr/pa/ra are sums. Players with < MIN_GAMES prior games keep the sim mean."""
+    b = b or {}
     if s in COMBOS:
-        return sum(mean_after(r, p, w) for p in COMBOS[s]) if s != "pra" else (
-            r["mean"]["pra"] + sum(mean_after(r, p, w) - r["mean"][p] for p in COMBOS["pra"]) if all(p in w for p in COMBOS["pra"]) else r["mean"]["pra"])
+        if s != "pra":
+            return sum(mean_after(r, p, w, b) for p in COMBOS[s])
+        if all(p in w or p in b for p in COMBOS["pra"]):
+            return r["mean"]["pra"] + sum(mean_after(r, p, w, b) - r["mean"][p] for p in COMBOS["pra"])
+        return r["mean"]["pra"]
     m = r["mean"][s]
-    if s not in w or r["proj_min"] <= 0 or r["n_prior"] < cal.MIN_GAMES:
+    if (s not in w and s not in b) or r["proj_min"] <= 0 or r["n_prior"] < cal.MIN_GAMES:
         return m
-    return cal.shrink_mean(m, r["proj_min"], r["per_min"][s], w[s])
+    t = cal.shrink_mean(m, r["proj_min"], r["per_min"][s], w[s]) if s in w else m
+    return cal.blend_mean(t, r["base"][s], b[s]) if s in b else t
 
 
 def sd_after(r: Dict, s: str, k: Dict[str, float], scaled: bool = True) -> float:
@@ -110,21 +119,27 @@ def _usable(r: Dict, s: str) -> bool:
     return all((r["sd"].get(p) or 0) > 0.05 for p in parts)
 
 
-def fit(rows: List[Dict]) -> Dict[str, Dict[str, float]]:
+def fit(rows: List[Dict], use_blend: bool = True) -> Dict[str, Dict[str, float]]:
     wgrid = [round(i * 0.05, 2) for i in range(int(cal.W_BOUNDS[1] / 0.05) + 1)]
     kgrid = [round(cal.K_BOUNDS[0] + i * 0.05, 2) for i in range(int((cal.K_BOUNDS[1] - cal.K_BOUNDS[0]) / 0.05) + 1)]
     w: Dict[str, float] = {}
     for s in cal.RATE_STATS:
         w[s] = min(wgrid, key=lambda x: sum(abs(mean_after(r, s, {s: x}) - actual(r, s)) for r in rows))
+    # season-average blend, fit AFTER w on the shrunk mean (b = weight kept on the shrunk sim mean)
+    b: Dict[str, float] = {}
+    if use_blend:
+        bgrid = [round(i * 0.05, 2) for i in range(int(cal.B_BOUNDS[1] / 0.05) + 1)]
+        for s in cal.RATE_STATS:
+            b[s] = min(bgrid, key=lambda x: sum(abs(mean_after(r, s, w, {s: x}) - actual(r, s)) for r in rows))
     # k by CRPS over the WHOLE predictive distribution. A log-loss fit at one book-like line runs to the grid
     # edge (k = 3.0 measured): near that line the mean has little resolution, so flattening every probability
     # toward 0.5 wins there while ruining every alternate line -- the same trap lane wnba-prop-dispersion hit.
     k: Dict[str, float] = {}
     for s in cal.SD_STATS:
         q = [r for r in rows if _usable(r, s)]
-        pre = [(mean_after(r, s, w), sd_after(r, s, {}, scaled=False), actual(r, s)) for r in q]
+        pre = [(mean_after(r, s, w, b), sd_after(r, s, {}, scaled=False), actual(r, s)) for r in q]
         k[s] = min(kgrid, key=lambda x: sum(crps_normal(mu, sd * x, y) for mu, sd, y in pre))
-    return {"w": w, "k": k}
+    return {"w": w, "b": b, "k": k}
 
 
 def crps_normal(mu: float, sd: float, y: float) -> float:
@@ -136,7 +151,7 @@ def crps_normal(mu: float, sd: float, y: float) -> float:
 
 
 def evaluate(bt, rows: List[Dict], c: Dict[str, Dict[str, float]]) -> Dict:
-    w, k = c["w"], c["k"]
+    w, b, k = c["w"], c.get("b") or {}, c["k"]
     res = {}
 
     def ci(v):
@@ -146,19 +161,19 @@ def evaluate(bt, rows: List[Dict], c: Dict[str, Dict[str, float]]) -> Dict:
         q = [r for r in rows if _usable(r, s)]
         if not q:
             continue
-        e_cal = [(r["gid"], abs(mean_after(r, s, w) - actual(r, s)) - abs(mean_after(r, s, {}) - actual(r, s))) for r in q]
-        e_avg = [(r["gid"], abs(mean_after(r, s, w) - actual(r, s)) - abs(own_avg(r, s) - actual(r, s))) for r in q]
+        e_cal = [(r["gid"], abs(mean_after(r, s, w, b) - actual(r, s)) - abs(mean_after(r, s, {}) - actual(r, s))) for r in q]
+        e_avg = [(r["gid"], abs(mean_after(r, s, w, b) - actual(r, s)) - abs(own_avg(r, s) - actual(r, s))) for r in q]
         b_srv, b_avg = [], []
         for r in q:
             L = math.floor(own_avg(r, s)) + 0.5
             y = int(actual(r, s) > L)
-            p_cal = p_over(L, mean_after(r, s, w), sd_after(r, s, k))
+            p_cal = p_over(L, mean_after(r, s, w, b), sd_after(r, s, k))
             p_srv = p_over(L, mean_after(r, s, {}), sd_after(r, s, k, scaled=False))
             p_own = p_over(L, own_avg(r, s), sd_after(r, s, k))
             b_srv.append((r["gid"], (p_cal - y) ** 2 - (p_srv - y) ** 2))
             b_avg.append((r["gid"], (p_cal - y) ** 2 - (p_own - y) ** 2))
 
-        c_d = [(r["gid"], crps_normal(mean_after(r, s, w), sd_after(r, s, k), actual(r, s))
+        c_d = [(r["gid"], crps_normal(mean_after(r, s, w, b), sd_after(r, s, k), actual(r, s))
                 - crps_normal(mean_after(r, s, {}), sd_after(r, s, k, scaled=False), actual(r, s))) for r in q]
         res[s] = {"n": len(q), "games": len({r["gid"] for r in q}), "dCRPS_vs_served": ci(c_d),
                   "dMAE_vs_served": ci(e_cal), "dMAE_vs_own_avg": ci(e_avg),
@@ -180,15 +195,18 @@ def main() -> int:
           f"{len({r['gid'] for r in test})} games", flush=True)
     c_train = fit(train)
     oos = evaluate(bt, test, c_train)
+    c_train_nb = fit(train, use_blend=False)          # the previous (shrink + width only) estimator, for the increment
+    oos_nb = evaluate(bt, test, c_train_nb)
     c_all = fit(rows)
     report = {"generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "split": args.split,
               "train": {"rows": len(train), "games": len({r["gid"] for r in train})},
               "test": {"rows": len(test), "games": len({r["gid"] for r in test})},
-              "constants_train": c_train, "oos_with_train_constants": oos, "constants_all": c_all}
+              "constants_train": c_train, "oos_with_train_constants": oos,
+              "constants_train_no_blend": c_train_nb, "oos_no_blend": oos_nb, "constants_all": c_all}
     print(json.dumps(report, indent=1), flush=True)
     (args.bt_out / "fit_nba_prop_calibration.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
     if args.write:
-        doc = {"w": c_all["w"], "sd_scale": c_all["k"],
+        doc = {"w": c_all["w"], "blend": c_all["b"], "sd_scale": c_all["k"],
                "provenance": {"script": "scripts/fit_nba_prop_calibration.py", "generated_at": report["generated_at"],
                               "rows": len(rows), "games": len({r["gid"] for r in rows}),
                               "season": "2025-26 smart-sim (2026-01-21..2026-06-13), pre-tip committed output",
