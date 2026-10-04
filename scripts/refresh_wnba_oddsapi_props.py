@@ -6660,6 +6660,29 @@ def _parse_only_matchups_arg(raw: str) -> set[tuple[str, str]] | None:
     return pairs or None
 
 
+def _vendor_source_root_refusal(source_root: Path | None) -> str | None:
+    """A refusal message when `source_root` is inside this checkout's vendor/ on a
+    host with SYNDICATE_DATA_ROOT set, else None.
+
+    The last stop before SmartSims are built and `_copy_matching_files` copies
+    them into the artifact root. vendor/wnba_betting_repo/data is the ephemeral
+    checkout -- no injuries.csv, no league_status -- so sims built there carry
+    injuries_out = 0 and simulate OUT players. Every caller reaches here, so the
+    guard does not depend on each caller resolving its root correctly (the boot
+    bootstrap did not, 10-02..10-04). Local dev without a data root is unaffected.
+    """
+    if source_root is None or not str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip():
+        return None
+    vendor_dir = (REPO_ROOT / "vendor").resolve()
+    resolved = source_root.resolve()
+    if resolved != vendor_dir and vendor_dir not in resolved.parents:
+        return None
+    return (
+        f"[wnba-refresh] REFUSED --source-root {resolved}: a vendor/ tree is never an input root when "
+        f"SYNDICATE_DATA_ROOT is set (use <data root>/wnba_source)"
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the WNBA OddsAPI props refresh job through a Syndicate-owned entrypoint.")
     parser.add_argument("--date", required=True)
@@ -6729,6 +6752,10 @@ def main() -> int:
 
     source_root_arg = str(args.source_root or "").strip()
     source_root = Path(source_root_arg).resolve() if source_root_arg else None
+    vendor_refusal = _vendor_source_root_refusal(source_root)
+    if vendor_refusal:
+        print(vendor_refusal, flush=True)
+        return 2
     artifact_root = str(args.artifact_root or "").strip()
     fast_mode = str(args.mode or "full").strip().lower() == "fast"
     target_dates = _target_refresh_dates(date_str=args.date, days_ahead=int(args.days_ahead or 0))

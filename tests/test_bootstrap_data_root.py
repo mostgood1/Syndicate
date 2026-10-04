@@ -575,10 +575,11 @@ class BootstrapDataRootTests(unittest.TestCase):
             self.assertIn("source", called_command)
             self.assertNotIn("--source-root", called_command)
             called_env = popen_mock.call_args.kwargs.get("env") or {}
-            self.assertEqual(
-                called_env.get("SYNDICATE_SOURCE_ROOT_WNBA"),
-                str(Path(__file__).resolve().parents[1] / "vendor" / "wnba_betting_repo"),
-            )
+            # The data root's wnba_source -- never the checkout's vendor tree,
+            # which this test asserted until 2026-10-04 (it was the bug).
+            self.assertEqual(called_env.get("SYNDICATE_SOURCE_ROOT_WNBA"), str(data_root / "wnba_source"))
+            self.assertEqual(called_env.get("SYNDICATE_DATA_ROOT"), str(data_root))
+            self.assertNotIn("vendor", Path(called_env["SYNDICATE_SOURCE_ROOT_WNBA"]).parts)
 
     def test_bootstrap_wnba_today_artifacts_skips_when_present(self) -> None:
         module = _load_module()

@@ -1768,6 +1768,14 @@ death, never life — do not invert it.
 - Verification: check_lane_invariants.py INVARIANTS HOLD; claims 233 before and after; all 58 moved slugs present in lanes_closed.md AND pointed to from lanes.md; lanes.md byte count down.
 - Blocked by: none
 
+### wnba-boot-vendor-root — OPEN — opened 2026-10-04 — session 936c0a27-a98a-411b-8397-f769b7f2baf7
+- Goal: No boot-time or orchestrated WNBA refresh on a host with SYNDICATE_DATA_ROOT set can build SmartSims from vendor/wnba_betting_repo: bootstrap_data_root's boot refresh passes <data_root>/wnba_source, and refresh_odds_sources + refresh_wnba_oddsapi_props refuse a vendor source root when SYNDICATE_DATA_ROOT is set
+- Files: scripts/bootstrap_data_root.py (_wnba_refresh_source_root/_bootstrap_wnba_today_artifacts only), scripts/refresh_odds_sources.py (_basketball_source_root only), scripts/refresh_wnba_oddsapi_props.py (source-root validation in main only), tests/test_wnba_vendor_source_root_guard.py (NEW), tests/test_bootstrap_data_root.py (the WNBA boot-refresh vendor assertion only)
+- Hypothesis: Cause found 2026-10-04: bootstrap_data_root._bootstrap_wnba_today_artifacts sets SYNDICATE_SOURCE_ROOT_WNBA=<repo>/vendor/wnba_betting_repo, which _basketball_source_root honours first, while --artifact-root comes from SYNDICATE_DATA_ROOT; 5 boot refreshes (10-02 19:14/19:30/20:53/23:08Z, 10-04 13:53Z) each followed by vendor writes within seconds
+- Falsification test: A vendor-dir WNBA write with no preceding bootstrap 'refreshing today's WNBA bundle' line in ~/syndicate-prod/logs/bootstrap.log
+- Verification: Unit tests for all three hops; on the fleet after the next supervisor up, vendor/wnba_betting_repo/data/processed gains no new <today> files and bootstrap.log's boot refresh names the prod source root
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

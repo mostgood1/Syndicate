@@ -781,10 +781,30 @@ def _post_refresh_root(spec: SportSpec) -> Path:
     return _source_repo_root(spec.slug, spec.source_repo_name)
 
 
+def _is_vendor_tree(path: Path) -> bool:
+    vendor_dir = (REPO_ROOT / "vendor").resolve()
+    resolved = path.expanduser().resolve()
+    return resolved == vendor_dir or vendor_dir in resolved.parents
+
+
 def _basketball_source_root(slug: str, vendor_repo_name: str) -> Path:
     override = str(os.environ.get(_source_root_env_var(slug)) or "").strip()
     if override:
-        return Path(override).expanduser().resolve()
+        override_root = Path(override).expanduser().resolve()
+        # With a data root configured, a vendor/ override is never a valid input
+        # root: vendor/*/data is the ephemeral checkout (no injuries.csv, no
+        # league_status), and the artifact root still resolves to the data root,
+        # so the run copies vendor-built sims over production. That is what the
+        # boot bootstrap did on the fleet 10-02..10-04.
+        if _render_data_root_text() and _is_vendor_tree(override_root):
+            hosted_root = _hosted_data_source_root(slug).resolve()
+            print(
+                f"[refresh_odds_sources] REFUSED {_source_root_env_var(slug)}={override_root}: a vendor/ tree is "
+                f"never an input root when SYNDICATE_DATA_ROOT is set -- using {hosted_root}",
+                flush=True,
+            )
+            return hosted_root
+        return override_root
     hosted_root = _hosted_data_source_root(slug)
     if hosted_root.exists() or _render_data_root_text():
         return hosted_root.resolve()
