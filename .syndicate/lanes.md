@@ -1731,6 +1731,10 @@ death, never life — do not invert it.
     - vs the close: PRIOR +0.0037 [-0.0003, +0.0077] -> BLEND +0.0004 [-0.0028, +0.0035].
     - By phase BLEND - PRIOR: first 20 team games -0.0020, 20-40 -0.0032, 40+ -0.0041 [-0.0070, -0.0013].
   - Script: scripts/nhl_season_inputs_experiment.py; data: 2023-24/2024-25 play-by-play fetched (free API) into C:/tmp/nhllines/pbp_2023|2024.
+- **SCOPE EXTENDED 2026-10-04 ~17:10Z (user: "do the other season inputs too, coordinate with the props lane"):** team_rates, team_special_teams and player_rates in-season (producers' own aggregation over 2026-27 records, blended per field with 2025-26 _latest by games/opportunities); team_elo carried forward from the 2025-26 final ratings.
+  - These feed PROPS and the faceoff engine. Coordination message sent to lane nhl-player-props-projection (local_d89f75a7, queued 17:0xZ): ownership, the props-impact bar, blend weights.
+  - **NOTHING that changes props inputs ships before that lane answers or the user overrides.**
+  - Tuning plan: w per field family by forecasting each team's/player's next games from the as-of blend, tuned 2024-25 (prior 2023-24), checked 2025-26. Fetching 2023-24/2024-25 boxscores + landings (free API) into C:/tmp/nhllines/{boxscore,landing}_{2023,2024}.
 - Blocked by: none
 
 ### nfl-live-segment-interval — OPEN — opened 2026-10-03 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
