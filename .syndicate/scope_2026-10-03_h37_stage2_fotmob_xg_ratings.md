@@ -1,5 +1,7 @@
 # H37 stage 2 — FotMob shot-xG ratings for the goals-rated leagues (design, ready if H37 passes)
 
+> **SHELVED 2026-10-04: H37 NOT SUPPORTED** (B-A +0.00003 [-0.0040, +0.0040] on 1,333 paired matches; primeira, xG share 0.63, slightly worse). Kept as a record of the input path; do not implement on this evidence.
+
 **2026-10-03, lane `soccer-1x2-ratings-xg-source`, session 43e4d5fe.** Read-only design, written WHILE H37 stage 1 runs,
 so a SUPPORTED result can be implemented without a second survey. Researched by a read-only agent against origin/main;
 file:line references are its citations, NOT individually re-verified -- re-read each before editing. Nothing here is
