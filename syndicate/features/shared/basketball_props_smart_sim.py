@@ -5092,6 +5092,26 @@ def _smart_sim_injuries_excluded_map_for_date_local(*, processed_root: Path, raw
     except Exception:
         pass
 
+    # Re-key every exclusion to the team the SIM will put the player on. The pool is built from props_df, while the
+    # injury feed carries stale teams -- measured 2026-10-03: Fudd/A. Smith listed CON (sim DAL), Talbot IND (sim LVA),
+    # Sabally MIN (sim NYL), so team-keyed exclusions never landed and OUT players were simulated (lane
+    # basketball-injury-exclusion-reinclusion). Guard: re-key only a name that props_df places on exactly ONE team, so a
+    # healthy namesake elsewhere is never excluded.
+    try:
+        if isinstance(props_df, pd.DataFrame) and (not props_df.empty) and {"team", "player_name"} <= set(props_df.columns):
+            excluded_keys = {key for keys in out.values() for key in keys}
+            teams_by_key: dict[str, set[str]] = {}
+            for _, row in props_df[["team", "player_name"]].dropna().iterrows():
+                team = str(_to_tricode_local(row.get("team")) or row.get("team") or "").strip().upper()
+                player_key = _norm_player_key(row.get("player_name"))
+                if team and player_key:
+                    teams_by_key.setdefault(player_key, set()).add(team)
+            for player_key, teams in teams_by_key.items():
+                if player_key in excluded_keys and len(teams) == 1:
+                    out.setdefault(next(iter(teams)), set()).add(player_key)
+    except Exception:
+        pass
+
     # Re-admit an excluded player ONLY on a positive availability signal (`playing_today` truthy). Having a props row
     # is not one: props_predictions are built for the whole roster and never carry `playing_today` in production, so
     # the old rule re-admitted every injured player with a projection -- measured 2026-10-03, 83 exclusions -> 30, and

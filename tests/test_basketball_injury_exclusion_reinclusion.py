@@ -58,3 +58,39 @@ def test_no_props_frame_keeps_every_exclusion(tmp_path):
     processed, raw = _roots(tmp_path)
     m = excluded_map(processed_root=processed, raw_root=raw, date_str="2026-10-04", props_df=None)
     assert _norm_name_key("Stephanie Talbot").upper() in _keys(m, "LVA")
+
+
+def _injuries(raw: Path, rows):
+    with (raw / "injuries.csv").open("w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        w.writerow(["team", "player", "status", "injury", "date"])
+        w.writerows(rows)
+
+
+def test_a_mis_teamed_out_player_is_excluded_on_the_team_the_sim_uses(tmp_path):
+    # Production 2026-10-03: the injury feed listed Azzi Fudd under CON; the sim (props_df) has her on DAL.
+    processed, raw = _roots(tmp_path)
+    _injuries(raw, [["CON", "Azzi Fudd", "OUT", "Out", "2026-10-03"], ["MIN", "Satou Sabally", "OUT", "Out", "2026-10-03"]])
+    props = pd.DataFrame([{"team": "DAL", "player_name": "Azzi Fudd"}, {"team": "NYL", "player_name": "Satou Sabally"},
+                          {"team": "DAL", "player_name": "Paige Bueckers"}])
+    m = excluded_map(processed_root=processed, raw_root=raw, date_str="2026-10-04", props_df=props)
+    assert _norm_name_key("Azzi Fudd").upper() in _keys(m, "DAL")          # failed before the re-key
+    assert _norm_name_key("Satou Sabally").upper() in _keys(m, "NYL")
+    assert _norm_name_key("Paige Bueckers").upper() not in _keys(m, "DAL")
+
+
+def test_a_name_on_two_teams_is_not_re_keyed(tmp_path):
+    processed, raw = _roots(tmp_path)
+    _injuries(raw, [["CON", "Alanna Smith", "OUT", "Out", "2026-10-03"]])
+    props = pd.DataFrame([{"team": "DAL", "player_name": "Alanna Smith"}, {"team": "CHI", "player_name": "Alanna Smith"}])
+    m = excluded_map(processed_root=processed, raw_root=raw, date_str="2026-10-04", props_df=props)
+    assert _norm_name_key("Alanna Smith").upper() not in _keys(m, "DAL")
+    assert _norm_name_key("Alanna Smith").upper() not in _keys(m, "CHI")
+
+
+def test_playing_today_still_overrides_a_re_keyed_exclusion(tmp_path):
+    processed, raw = _roots(tmp_path)
+    _injuries(raw, [["CON", "Azzi Fudd", "OUT", "Out", "2026-10-03"]])
+    props = pd.DataFrame([{"team": "DAL", "player_name": "Azzi Fudd", "playing_today": True}])
+    m = excluded_map(processed_root=processed, raw_root=raw, date_str="2026-10-04", props_df=props)
+    assert _norm_name_key("Azzi Fudd").upper() not in _keys(m, "DAL")
