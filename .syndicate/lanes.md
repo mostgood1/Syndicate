@@ -1735,6 +1735,14 @@ death, never life — do not invert it.
 - Verification: Fleet quota NFL credits/hour Sunday 17:00-20:00Z; SEGMENT_PLAN live_every_s=600 for nfl; NFL rows served >1h = 0
 - Blocked by: none
 
+### oddsapi-quota-offfleet-clobber — OPEN — opened 2026-10-03 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: An OFF-FLEET process can no longer zero the OddsAPI control-plane document's per-sport and per-market-family counters: when the local quota document is ABSENT and the process is off-fleet, record_oddsapi_quota forwards to the fleet and does NOT create a local document, so a run whose reports_root resolves somewhere the ledger is not can never mint a fresh one; verified by a test that an off-fleet absent-document observation leaves no local file while an off-fleet PRESENT document still merges, and by replaying the 2026-10-03 conditions.
+- Files: syndicate/features/shared/oddsapi_quota.py, tests/test_oddsapi_quota.py
+- Hypothesis: read_json_file_result returns (None, ok=True) for 'no document yet', which is indistinguishable from 'absent in THIS process context but present elsewhere'. So an off-fleet run with a different reports_root builds from {} and writes a fresh document, dropping every other sport's counters.
+- Falsification test: If the 2026-10-03 clobber is reproducible with the document PRESENT, the cause is the merge rather than absence and this hypothesis is wrong.
+- Verification: A test asserting (a) off-fleet + absent writes no local document and returns the observation as forwarded-only, (b) off-fleet + present still merges and preserves other sports, (c) on-fleet + absent still creates the document; plus the existing quota suites green.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

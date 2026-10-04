@@ -495,3 +495,98 @@ class MarketFamilyAttributionTests(unittest.TestCase):
                 result = read_oddsapi_quota()
             self.assertEqual(result["attribution_error_count"], 0)
             self.assertIsNone(result["last_attribution_error"])
+
+
+class OffFleetAbsentDocumentTests(unittest.TestCase):
+    """An off-fleet run must never CREATE the quota document.
+
+    `read_json_file_result` returns `(None, ok=True)` both for "no document yet"
+    and for "absent in THIS process's `reports_root()` while the real ledger is
+    elsewhere". The retry guard already distinguishes a FAILED read, but not that
+    third state -- so an off-fleet run built from `{}` and committed a fresh
+    document, zeroing every other sport.
+
+    MEASURED 2026-10-03: a backfill run from a worktree whose sparse checkout
+    excludes `reports/` replaced a tracked document's
+    `by_sport={"nfl": ..., "ncaaf": ...}` with `{"nfl": ...}` alone, and its three
+    market families with one. Reproduced both ways before fixing: PRESENT merges
+    correctly, ABSENT loses everything. These tests pin both halves plus the
+    on-fleet case, so the fix cannot be mistaken for "never create a document".
+    """
+
+    HEADERS = {"x-requests-remaining": "4601831", "x-requests-used": "398169", "x-requests-last": "1"}
+    PRIOR = {
+        "baseline": {"remaining": 3094956, "used": 1905044, "last_cost": 0, "sport": "nfl",
+                     "endpoint": "x", "observedAt": "2026-09-29T16:52:54.522+00:00"},
+        "latest": {"remaining": 3094903, "used": 1905097, "last_cost": 1, "sport": "nfl",
+                   "endpoint": "y", "observedAt": "2026-09-29T16:52:56.996+00:00"},
+        "by_sport": {"nfl": {"calls": 18, "credits": 56}, "ncaaf": {"calls": 1, "credits": 3}},
+        "by_market_family": {"full_game": {"calls": 2, "credits": 6.0},
+                             "event_list": {"calls": 1, "credits": 0.0},
+                             "props": {"calls": 16, "credits": 53.0}},
+        "observation_count": 19,
+    }
+
+    def setUp(self) -> None:
+        self._tmp = TemporaryDirectory(ignore_cleanup_errors=True)
+        self.reports_root = Path(self._tmp.name)
+        os.environ["SYNDICATE_REPORTS_ROOT"] = str(self.reports_root)
+        self.addCleanup(self._tmp.cleanup)
+        self.addCleanup(lambda: os.environ.pop("SYNDICATE_REPORTS_ROOT", None))
+        self.addCleanup(lambda: os.environ.pop("SYNDICATE_ODDSAPI_QUOTA_ALLOW_LOCAL_CREATE", None))
+        self.quota_file = self.reports_root / "odds_control_plane" / "oddsapi_quota.json"
+        self.quota_file.parent.mkdir(parents=True, exist_ok=True)
+
+    def _write_prior(self) -> None:
+        self.quota_file.write_text(json.dumps(self.PRIOR), encoding="utf-8")
+
+    # `_fleet_forward_enabled` is deliberately False under pytest (fake headers
+    # must never reach the fleet), so off-fleet-ness is patched rather than
+    # enabled via the env -- which also keeps `_forward_to_fleet` a no-op here.
+    @staticmethod
+    def _off_fleet(enabled: bool):
+        return patch("syndicate.features.shared.oddsapi_quota._fleet_forward_enabled",
+                     return_value=enabled)
+
+    def test_off_fleet_with_no_document_creates_nothing(self) -> None:
+        with self._off_fleet(True):
+            returned = record_oddsapi_quota(self.HEADERS, sport="nfl", endpoint="historical/events")
+        self.assertFalse(
+            self.quota_file.exists(),
+            "an off-fleet run must not mint a local quota document it cannot see the ledger for",
+        )
+        # The observation is still returned: the caller's spend happened, and
+        # `_forward_to_fleet` is the path that accounts for it.
+        self.assertIsNotNone(returned)
+        self.assertEqual(returned["used"], 398169)
+
+    def test_off_fleet_with_an_existing_document_still_merges(self) -> None:
+        # The merge was never the bug. If this ever fails, the fix has gone too
+        # far and off-fleet runs have stopped counting at all.
+        self._write_prior()
+        with self._off_fleet(True):
+            record_oddsapi_quota(self.HEADERS, sport="nfl", endpoint="historical/events")
+        after = json.loads(self.quota_file.read_text(encoding="utf-8"))
+        self.assertIn("ncaaf", after["by_sport"], "another sport's counters were dropped")
+        self.assertEqual(after["by_sport"]["ncaaf"]["credits"], 3)
+        self.assertEqual(after["by_sport"]["nfl"]["credits"], 57)
+        for family in ("full_game", "event_list", "props"):
+            self.assertIn(family, after["by_market_family"], family)
+
+    def test_on_fleet_with_no_document_still_creates_it(self) -> None:
+        # A fresh fleet install has no document and must get one; the refusal is
+        # about being off-fleet, not about absence.
+        with self._off_fleet(False):
+            record_oddsapi_quota(self.HEADERS, sport="nfl", endpoint="historical/events")
+        self.assertTrue(self.quota_file.exists())
+        after = json.loads(self.quota_file.read_text(encoding="utf-8"))
+        self.assertEqual(after["by_sport"]["nfl"]["calls"], 1)
+
+    def test_the_escape_hatch_restores_local_creation(self) -> None:
+        os.environ["SYNDICATE_ODDSAPI_QUOTA_ALLOW_LOCAL_CREATE"] = "1"
+        with self._off_fleet(True):
+            record_oddsapi_quota(self.HEADERS, sport="nfl", endpoint="historical/events")
+        self.assertTrue(
+            self.quota_file.exists(),
+            "a dev measuring their own spend in isolation can opt back in",
+        )

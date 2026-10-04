@@ -267,6 +267,32 @@ def record_oddsapi_quota(headers: Any, *, sport: str | None = None, endpoint: st
             if not ok:
                 raise _UntrustedRead()
             if not isinstance(payload, dict):
+                # AND AN ABSENT DOCUMENT MUST NEVER BE *CREATED* FROM OFF-FLEET.
+                # The guard above distinguishes "read failed" from "no document
+                # yet", but there is a THIRD state it cannot see: absent in THIS
+                # process's `reports_root()` while the real ledger lives
+                # somewhere else. `read_json_file_result` returns (None, ok=True)
+                # for both, so an off-fleet run built from {} and committed a
+                # fresh document -- which ZEROES every other sport's counters in
+                # whatever file its path happens to resolve to.
+                #
+                # MEASURED 2026-10-03: a backfill run from a git worktree whose
+                # sparse checkout excludes `reports/` wrote
+                # `by_sport={"nfl": {...}}` over a tracked document holding
+                # `nfl` AND `ncaaf`, and `by_market_family={"historical": ...}`
+                # over `full_game`/`event_list`/`props`. Reproduced both ways:
+                # with the document PRESENT every prior sport survives (the
+                # merge in `_apply_observation` is correct), with it ABSENT they
+                # are all lost. Absence is the whole cause.
+                #
+                # Off-fleet spend is already accounted on the fleet by
+                # `_forward_to_fleet` below, which still runs. So the bounded
+                # cost of this refusal is ONE telemetry observation when the
+                # forward is also unreachable -- far cheaper than a document
+                # that can be committed over the authoritative ledger. Both
+                # lines print, so the pair says which happened.
+                if _fleet_forward_enabled() and not _local_create_allowed():
+                    raise _OffFleetAbsentDocument()
                 payload = {}
             return _apply_observation(
                 payload, observation, attempt,
@@ -281,6 +307,18 @@ def record_oddsapi_quota(headers: Any, *, sport: str | None = None, endpoint: st
             # cost; `used` stays exact on the next recorded call regardless.
             print(f"[oddsapi_quota] CAS_GAVE_UP sport={sport_key} attempts={_CAS_MAX_ATTEMPTS}", flush=True)
             return None
+        except _OffFleetAbsentDocument:
+            # NOT a failure, and NOT a `return`: the forward below is the whole
+            # point of this branch. Printed every time rather than once, because
+            # the count is how you notice a dev box whose spend is reaching
+            # nobody (this line with no `FLEET_FORWARD status=ok` beside it).
+            print(
+                f"[oddsapi_quota] LOCAL_DOC_ABSENT_OFFFLEET sport={sport_key} "
+                f"path={_quota_path()} -- not creating a local document; "
+                f"forwarding only (set SYNDICATE_ODDSAPI_QUOTA_ALLOW_LOCAL_CREATE=1 "
+                f"to create one anyway)",
+                flush=True,
+            )
         _forward_to_fleet(
             observation, sport_key=sport_key, last_cost=last_cost, families=families,
             family_error=family_error, hour_key=hour_key,
@@ -505,6 +543,30 @@ _CAS_MAX_ATTEMPTS = 20
 
 class _UntrustedRead(RuntimeError):
     """The quota document could not be read reliably; never build from empty."""
+
+
+class _OffFleetAbsentDocument(RuntimeError):
+    """No local quota document, and this process is off-fleet.
+
+    Distinct from `_UntrustedRead` because the handling differs: an untrusted
+    read drops the observation entirely, while this one still FORWARDS it to
+    the fleet and only declines the local write.
+    """
+
+
+def _local_create_allowed() -> bool:
+    """Opt-in escape hatch for a dev box that genuinely wants its own document.
+
+    Off by default: the common case is a run whose `reports_root()` simply is
+    not where the ledger lives, and in that case creating a document is the bug.
+    A developer measuring their own spend in isolation can set this and get the
+    old behaviour.
+    """
+    import os
+
+    return str(os.environ.get("SYNDICATE_ODDSAPI_QUOTA_ALLOW_LOCAL_CREATE") or "").strip().lower() in {
+        "1", "on", "true", "yes",
+    }
 
 
 def _next_baseline(baseline: dict[str, Any] | None, observation: dict[str, Any]) -> dict[str, Any]:
