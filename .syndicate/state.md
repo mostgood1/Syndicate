@@ -469,8 +469,9 @@ once this index exists: re-splitting would orphan the parts.
 | [wnba-fixture-identity] | WNBA fixture identity + the sweep ownership gap - VERIFIED 2026-08-17 — **ARCHIVED 2026-08-19 to `state_archiv | `state_basketball.md` |
 | [wnba-sweep-ownership-gate] | WNBA SWEEP OWNERSHIP GATE + PHASE 2 AUTORUN `[collapsed 2026-08-18 from three 2026-08-17/18 snapshots; newest  | `state_basketball.md` |
 | [basketball-smart-sim-engine] | NBA/WNBA smart-sim: allowlist, dead-gate fix, and an open staleness question — 2026-08-18 (lane `basketball-mo | `state_basketball.md` |
-| [nba-model-skill-2025-26] | THE NBA MODEL IS LESS ACCURATE THAN THE PLAYER'S OWN AVERAGE, AND THE REASONS ARE MEASURED — minutes, rates, sd width `[verified 2026-10-03 | `state_basketball.md` |
 | [wnba-cards-fallback-recursion] | `_artifact_bundle` RE-ENTERED ITSELF 247 FRAMES DEEP AND REPORTED NOTHING — FIXED `[2026-09-03, lane wnba-card | `state_basketball.md` |
+| [nba-model-skill-2025-26] | THE NBA MODEL IS LESS ACCURATE THAN THE PLAYER'S OWN AVERAGE, AND THE REASONS ARE MEASURED — as-of 2025-26 bac | `state_basketball.md` |
+| [nba-layer2-projections] | NBA LINES CARRY THE MODEL ON LAYER 2 -- game lines LIVE and VERIFIED; props wired but no NBA prop quote exists | `state_basketball.md` |
 | [board-freshness] | BOARD FRESHNESS AND STALENESS | `state_board.md` |
 | [board-intelligence-engine] | BOARD / INTELLIGENCE ENGINE — structural facts, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19. | `state_board.md` |
 | [locked-cards-retuned-no-autorun] | `locked_cards_retuned` HAS NO AUTOMATIC TRIGGER, ANYWHERE `[measured 2026-08-18]` | `state_board.md` |
@@ -485,17 +486,16 @@ once this index exists: re-splitting would orphan the parts.
 | [combined-board-state-rows-lost] | THE COMBINED BOARD DROPS EVERY PERSISTED STATE ROW; ITS AGE IS TOMORROW'S SHORTLIST — FIXED, LIVE ON WEB `b6a0 | `state_board.md` |
 | [board-per-date-freshness] | THE COMBINED BOARD DATES EACH WINDOW DATE ON ITS OWN; THE CHIP SHOWS TODAY APART FROM TOMORROW — LIVE ON WEB ` | `state_board.md` |
 | [inplay-overlay-board-cadence] | THE BOARD'S IN-PLAY ROWS COME FROM THE BOOK GRID EVERY TICK, NOT THE SHORTLIST — LIVE ON ALL THREE SERVICES `[ | `state_board.md` |
+| [nfl-model-accuracy-backtest] | NFL GAME LINES AND PROPS LOSE TO THE CLOSE IN EVERY MARKET; THE PROP PROBABILITY CARRIES NO INFORMATION AT THE | `state_football.md` |
 | [ncaaf-sim-view-coverage] | NCAAF GAME LINES CARRY A SIM VIEW ON EVERY MARKET; EDGES ARE BOUNDED BY THE 15-POINT CAP; STAKES STAY ON PRICE | `state_football.md` |
-| [nfl-live-gameline-join] | NFL LIVE RE-SIM LANES WERE UNREADABLE BY THE BOARD JOIN — FIXED AND DEPLOYED, LIVE READING OWED `[2026-09-28]` | `state_football.md` |
-| [nfl-live-prop-capture] | NFL PER-QUARTER PLAYER PRODUCTION IS CAPTURED AND RETRIEVABLE — the allowlist alone moved ZERO bytes `[2026-09-28]` | `state_football.md` |
-| [nfl-game-day-injuries] | NFL GAME-DAY INJURY CAPTURE IS ENABLED ON REFRESH-WORKER; ITS STATUSES FILE NOW CROSSES TO LIVE-ODDS-WORKER — CAPTURE READING OWED `[2026-09-28]` | `state_football.md` |
-| [nfl-prop-distribution-too-narrow] | THE NFL PROP MODEL'S SPREAD IS 0.21x-0.65x OF PLAUSIBLE; pstdev over n>=2 games with NO shrinkage `[2026-09-28]` | `state_football.md` |
-| [nfl-model-edge-suppressed] | NFL'S MODEL EDGE REACHES 3% OF THE SERVED BOARD, AND THE 15-POINT GUARD IS RIGHT TO REJECT IT `[2026-09-28]` | `state_football.md` |
+| [nfl-live-prop-capture] | NFL PER-QUARTER PLAYER PRODUCTION IS CAPTURED AND RETRIEVABLE — the allowlist alone moved ZERO bytes `[verifie | `state_football.md` |
+| [nfl-prop-distribution-too-narrow] | THE NFL PROP MODEL'S SPREAD IS 0.21x-0.65x OF PLAUSIBLE, AND THE SPREAD NEVER GOT THE SMALL-SAMPLE TREATMENT T | `state_football.md` |
+| [nfl-model-edge-suppressed] | NFL'S MODEL EDGE REACHES 3% OF THE SERVED BOARD, AND THE 15-POINT GUARD IS RIGHT TO REJECT IT `[measured 2026- | `state_football.md` |
 | [nfl-board-projection-coverage] | NFL BOARD PROJECTION COVERAGE IS 100% `[measured 2026-09-04T23:19:34Z on the served payload, lanes nfl-project | `state_football.md` |
 | [ncaaf-zero-orders-is-two-gates] | NCAAF ZERO ORDERS — SUPERSEDED 2026-09-11: the paper portfolio HOLDS NCAAF orders and they GRADE end-to-end; t | `state_football.md` |
 | [ncaaf-team-registry-two-files] | THE RESOLVER READS THE *SNAPSHOT*, AND THE FILE BESIDE IT IS OLDER AND DIFFERENT `[measured 2026-09-03]` | `state_football.md` |
-| [smartsim2-total-carrier] | THE ENGINE OVER-APPLIES TEAM QUALITY TO THE TOTAL IN BOTH FOOTBALL SPORTS, AND THE IN-ENGINE DIAL CANNOT REACH THE TARGET `[2026-09-23]` | `state_football.md` |
-| [nfl-total-level-gain] | THE TOTAL WAS PRICED FROM A GAIN NOBODY FITTED, AND IT IS NOW SHRUNK AND VERIFIED ON THE SERVED BOARD `[2026-09-23]` | `state_football.md` |
+| [smartsim2-total-carrier] | THE ENGINE OVER-APPLIES TEAM QUALITY TO THE TOTAL IN BOTH FOOTBALL SPORTS, AND THE IN-ENGINE DIAL CANNOT REACH | `state_football.md` |
+| [nfl-total-level-gain] | THE TOTAL WAS PRICED FROM A GAIN NOBODY FITTED, AND IT IS NOW SHRUNK AND VERIFIED ON THE SERVED BOARD `[measur | `state_football.md` |
 | [nfl-rating-units] | NFL'S SIM COULD NOT TELL TEAMS APART. THE CAUSE WAS THE SCALE CONSTANT, **NOT** A UNITS DEFECT — that diagnosi | `state_football.md` |
 | [football-smartsim2] | FOOTBALL (NFL + NCAAF) — smartsim2 runs on FOUR SCALARS `[measured 2026-08-18, lane football-model-owner]` | `state_football.md` |
 | [ncaaf-calibration-profile-live] | THE PROMOTED NCAAF PROFILE IS LIVE, AND PROMOTING ONE IS A **CODE DEPLOY** `[verified 2026-09-05, render]` | `state_football.md` |
@@ -521,7 +521,6 @@ once this index exists: re-splitting would orphan the parts.
 | [nfl-player-props-model] | NFL PLAYER-PROP MODEL: `#471` FULLY CLOSED, ALL 6 TUNED CONSTANTS STABILITY-VERIFIED, ALLOWLIST GAP FIXED+LIVE | `state_football.md` |
 | [nfl-data-ingestion-autoruns] | NFL ROSTER/DEPTH-CHART/INJURIES INGESTION — ALL 3 AUTORUNS ARMED, DEPLOYED, CONFIRMED FIRING — ONE PUBLISH SUC | `state_football.md` |
 | [nfl-player-props] | NFL player props: capture fixed, model priced and BEATEN by the market | `state_football.md` |
-| [nfl-model-accuracy-backtest] | NFL GAME LINES AND PROPS LOSE TO THE CLOSE IN EVERY MARKET; PROP PROBABILITY HAS ~0 SLOPE AT THE LINE (no info), ML LOSS IS INFORMATION `[2026-10-03]` | `state_football.md` |
 | [nfl-game-context] | Game context is built and measured, and INERT in production | `state_football.md` |
 | [cfbd-monthly-quota-exhausted] | 2026-08-30 — LIVE: NCAAF projections are FAILING in production, on opener weekend | `state_football.md` |
 | [ncaaf-live-resim] | SMARTSIM2 CAN BE RESUMED FROM MID-GAME; ITS ENTRYPOINT COULD NOT `[measured 2026-09-05, lane ncaaf-live-resim] | `state_football.md` |
@@ -530,6 +529,10 @@ once this index exists: re-splitting would orphan the parts.
 | [nfl-props-week1-dead] | NFL PLAYER PROPS WERE STRUCTURALLY DEAD EVERY WEEK 1, AND THE MODEL RAN ON THE SERVICE WITHOUT THE DATA `[FIXE | `state_football.md` |
 | [ncaaf-tbd-kickoff] | A TBD NCAAF KICKOFF IS A DATE, NOT A TIME — fixed, deployed to refresh-worker `889d4e12` and web `0022ecb1`, v | `state_football.md` |
 | [ncaaf-prop-quote-join-date] | NCAAF LEGACY PROP ROWS JOIN THE KICKOFF-DATE QUOTE SHARD — fixed `3157bb7b`, LIVE on refresh-worker `f833f7ec` | `state_football.md` |
+| [nhl-ncaab-club-maps] | NHL AND NCAAB HAVE CLUB MAPS; EVERY SPORT SYNDICATE COVERS NOW DOES `[verified in production 2026-09-24 02:07: | `state_football.md` |
+| [nfl-chip-week-enumeration] | NFL CHIPS WERE BUILT FOR WEEK 1 BECAUSE THE WEEK ENUMERATORS READ ONE ROOT - FIXED AND VERIFIED IN PRODUCTION  | `state_football.md` |
+| [nfl-live-gameline-join] | NFL LIVE RE-SIM LANES WERE UNREADABLE BY THE BOARD JOIN — FIXED AND DEPLOYED, LIVE READING OWED `[deployed 202 | `state_football.md` |
+| [nfl-game-day-injuries] | NFL GAME-DAY INJURY CAPTURE IS ENABLED ON REFRESH-WORKER; ITS STATUSES FILE NOW CROSSES TO LIVE-ODDS-WORKER —  | `state_football.md` |
 | [kalshi-in-play-and-real-fees] | KALSHI TRADES IN-PLAY AND PUBLISHES ITS OWN FEE PARAMETERS; THE ARB THRESHOLD WAS ABOVE BREAK-EVEN EVERYWHERE  | `state_kalshi.md` |
 | [kalshi-segment-on-full-game] | KALSHI PLACED SEGMENT BETS ON FULL-GAME CONTRACTS: the join key had no `segment` `[verified 2026-08-28, lane p | `state_kalshi.md` |
 | [kalshi-venue-execution] | KALSHI ORDERS: the blocker was SHARD COLLATERAL, and spreads were inverting the bet `[verified 2026-08-26, lan | `state_kalshi.md` |
@@ -546,19 +549,18 @@ once this index exists: re-splitting would orphan the parts.
 | [layer1-layer2-boards] | LAYER 1 / LAYER 2 BOARDS — session briefs exist; three facts worth not re-deriving `[code read 08-16 11:2x CDT | `state_layer2.md` |
 | [layer1-board-date-scoping] | THE BOARD WAS DROPPING GAMES TWO WAYS — both FIXED AND VERIFIED; a THIRD (soccer projections, late kickoffs) f | `state_layer2.md` |
 | [board-chip-coverage] | Layer 2 compact game cards — FULL chip coverage, verified 2026-08-26 | `state_layer2.md` |
-| [chip-artifact-content-age] | A chip artifact's TIMESTAMP and its CONTENT age are different numbers -- worst measured case is NINE DAYS (NHL 09-28, another date's slate entirely), cause FOUND and FIXED | `state_layer2.md` |
+| [chip-artifact-content-age] | A chip artifact's TIMESTAMP and its CONTENT age are different numbers — verified 2026-08-27 (lane `mlb-chip-li | `state_layer2.md` |
 | [chip-refresh-worker-pull-hop] | REFRESH-WORKER'S HOT-ARTIFACT PULL FLOOR WAS SET BY LIVE-ODDS-WORKER — one shared keyvalue watermark; fix `082 | `state_layer2.md` |
 | [layer2-rail-group-join-keys] | THE GAMES RAIL BUILT EACH GAME FROM ITS FIRST ROW, AND A SHORT CLUB NAME MINTED A FAKE ABBR — both FIXED and V | `state_layer2.md` |
 | [layer2-market-gone-league-cadence] | `_drop_market_gone_rows` DELETED LIVE MARKETS whenever a partial pass was the newest stamp (soccer per league, | `state_layer2.md` |
 | [kalshi-prop-quote-identity] | KALSHI PROP QUOTES WERE FILED UNDER THE CANONICAL KEY WITH NO GAME, AND REFRESH-WORKER'S NFL PROP ARTIFACT WAS | `state_layer2.md` |
 | [layer2-live-quote-age] | LIVE LAYER 2 ROWS WERE AGED ON THE MOVEMENT CLOCK — the observation gate and the in-play sizing refusal are LI | `state_layer2.md` |
 | [layer2-prior-date-carryover] | A GAME STILL LIVE AT MIDNIGHT CT LOST ITS LAYER 2 BOARD — the carryover and the stale-live label are LIVE; the | `state_layer2.md` |
-| [mlb-doubleheader-joins] | A TEAM PAIR WAS NOT A GAME: EVERY MLB DOUBLEHEADER JOIN COLLAPSED, AND SIX ARE NOW FIXED AND LIVE `[verified 2026-09-22 | `state_layer2.md` |
-| [nhl-chip-start-time] | NHL CHIPS CARRIED NO START TIME AND NO STATUS TOKEN UNTIL 2026-09-22 — FIXED AND LIVE (pregame half) `[verified 2026- | `state_layer2.md` |
-| [ncaaf-kickoff-cache] | AN UPCOMING NCAAF CARD READ "TBD" BECAUSE THE COMMITTED CFBD CACHE WAS THE JULY SNAPSHOT — FIXED BOTH HALVES `[verifi | `state_layer2.md` |
+| [mlb-doubleheader-joins] | A TEAM PAIR WAS NOT A GAME: EVERY MLB DOUBLEHEADER JOIN COLLAPSED, AND SIX ARE NOW FIXED AND LIVE `[verified 2 | `state_layer2.md` |
+| [nhl-chip-start-time] | NHL CHIPS CARRIED NO START TIME AND NO STATUS TOKEN UNTIL 2026-09-22 — FIXED AND LIVE -- BOTH HALVES MEASURED  | `state_layer2.md` |
+| [ncaaf-kickoff-cache] | AN UPCOMING NCAAF CARD READ "TBD" BECAUSE THE COMMITTED CFBD CACHE WAS THE JULY SNAPSHOT — FIXED BOTH HALVES,  | `state_layer2.md` |
+| [mlb-live-gameline-venue-segment] | MLB LIVE GAME LINES SERVE NO SIM EDGE BECAUSE THE VENUES QUOTE FULL-GAME CONTRACTS AND THE LIVE BOARD IS MOSTL | `state_layer2.md` |
 | [segment-misgrade-regrade] | 53 OF 173 SETTLED SEGMENT ORDERS WERE GRADED AGAINST THE WRONG ACTUAL — 30.6%, AND THE ERRORS NEARLY CANCEL `[ | `state_ledger.md` |
-| [live-gameline-ledger-key] | THE LIVE-GAMELINE LEDGER MERGED UP TO 14 GAMES INTO ONE RECORD - the key had no `event_id` and `game_pk` is  | `state_ledger.md` |
-| [live-gameline-clv-impact] | THE LEDGER'S PAIR-KEYED GAME IDENTITY COST NO PUBLISHED NUMBER AND REFUSED A WHOLE WINDOW - and its root  | `state_ledger.md` |
 | [stale-test-triage] | "THE TEST IS STALE" IS A HYPOTHESIS, AND IT WAS WRONG FOR 4 OF 18 `[2026-09-05, lane stale-test-repair, commit | `state_ledger.md` |
 | [full-suite-completes] | THE FULL SUITE RAN TO COMPLETION FOR THE FIRST TIME -- 15,307 tests, 61m06s, and the 27 "NEW" failures are 6 p | `state_ledger.md` |
 | [github-actions-dead] | GITHUB ACTIONS RUNS AGAIN FROM 2026-09-10 (billing fixed by the user); `ci.yml` GATED NOTHING 2026-08-22..2026 | `state_ledger.md` |
@@ -575,9 +577,12 @@ once this index exists: re-splitting would orphan the parts.
 | [todo-id-allocation] | A TODO ID IS RESERVED BY A PUSH TO `main` BEFORE ANY WORK — one claim-only `[skip ci]` commit per allocation ` | `state_ledger.md` |
 | [full-suite-run-method] | RUNNING THE FULL SUITE ON THIS MACHINE NEEDS BATCHING, AN ISOLATION RETRY AND A PINNED MANIFEST — and the fail | `state_ledger.md` |
 | [test-suite-writes-tracked-mirror] | THE TEST SUITE WROTE INTO THE TRACKED `data/` MIRROR, AND NOTHING SAID SO — **GUARDED SINCE 2026-09-09** `[lan | `state_ledger.md` |
+| [live-gameline-ledger-key] | THE LIVE-GAMELINE LEDGER MERGED UP TO 14 GAMES INTO ONE RECORD - the key had no `event_id` and `game_pk` is us | `state_ledger.md` |
+| [live-gameline-clv-impact] | THE LEDGER'S PAIR-KEYED GAME IDENTITY COST NO PUBLISHED NUMBER AND REFUSED A WHOLE WINDOW - and its root cause | `state_ledger.md` |
+| [lane-claim-parser-holes] | THREE CLAIM SHAPES GUARDED NOTHING AND NOTHING REPORTED IT -- ALL THREE FIXED `[2026-09-23, lane polymarket-co | `state_ledger.md` |
+| [lane-claim-truncation] | A LANE CAN CLAIM FILES THE GUARD DOES NOT ENFORCE, AND NOTHING SAID SO -- 17 OPEN lanes affected, now REPORTED | `state_ledger.md` |
 | [mlb-hitter-strikeouts-prop] | MLB HITTER `strikeouts` WAS A DEAD FIELD FOR MONTHS; FIXED, DEPLOYED AND VERIFIED — AND NO BET WAS EVER PRICED | `state_mlb.md` |
 | [mlb-sim-edge-is-anti-predictive] | THE MLB SIM'S CLAIMED EDGE IS ANTI-PREDICTIVE, AND THE PROP BOOK IS A REAL EDGE SPENT ON VIG `[verified 2026-0 | `state_mlb.md` |
-| [mlb-asof-backtest] | THE MAY–JULY MLB ENGINE BEATS THE BOOK IN 0 OF 23 MARKETS (10 WORSE); MOSTLY LEVEL -- STARTER LENGTH, HALVED HR RATE; board unchanged by user decision `[measured 2026-10-02]` | `state_mlb.md` |
 | [mlb-certainty-claims] | MLB PUBLISHES LIVE WIN PROBABILITIES OF EXACTLY 0.0 AND 1.0, PRICES THEM, AND TWO OF THEM LOST `[measured 2026 | `state_mlb.md` |
 | [mlb-live-edge-forbidden] | TWO STANDING CONSTRAINTS ON ANY MLB LIVE-EDGE WORK — lifted out of lane `live-prob-producer-reader-gap` when i | `state_mlb.md` |
 | [mlb-exchange-shopping-value] | EXCHANGE PRICE-SHOPPING IS WORTH `+0.74 ROI POINTS` ON GAME MARKETS AND `+2.43%` ON THE PROP GATE BOOK — both  | `state_mlb.md` |
@@ -592,6 +597,8 @@ once this index exists: re-splitting would orphan the parts.
 | [mlb-ladders-native-builder] | MLB LADDERS — NATIVE BUILDER SHIPPED TO THE TREE `[2026-08-19]` | `state_mlb.md` |
 | [mlb-live-lens-row-shape] | The live-lens report has TWO writers and TWO row shapes — verified 2026-08-26 (lane `mlb-chip-live-state`) | `state_mlb.md` |
 | [mlb-sim-retrigger-churn] | THE MLB DAILY SIM CROWDED THE BOARD OFF refresh-worker; A RE-SIM COSTS ~15 MIN WHATEVER ITS SCOPE — FINGERPRIN | `state_mlb.md` |
+| [mlb-traditional-doubleheader-join] | A TRADITIONAL DOUBLEHEADER COULD NEVER CLEAR THE 45-MINUTE SEPARATION RULE -- FIXED PREGAME; THE IN-PLAY FIX I | `state_mlb.md` |
+| [mlb-asof-backtest] | THE MAY–JULY MLB ENGINE BEATS THE DE-VIGGED BOOK IN 0 OF 23 MARKETS (10 WORSE); MOSTLY A LEVEL ERROR, LED BY S | `state_mlb.md` |
 | [scheduled-model-evaluation] | MODEL EVALUATION IS SCHEDULED NOW -- a daily Render cron grades the PRICED population per sport x market x seg | `state_model.md` |
 | [settlement-autorun-live-settles-zero] | THE EVALUATION-SETTLEMENT AUTORUN WAS LIVE ALL ALONG AND SETTLED ZERO — the switch was never the blocker, the  | `state_model.md` |
 | [ledger-and-primary-tree] | — MEASURED 2026-09-02, this machine | `state_model.md` |
@@ -607,14 +614,15 @@ once this index exists: re-splitting would orphan the parts.
 | [sim-scheduling-blocker] | 2026-08-17 02:1xZ — VERIFIED (sim-scheduling): the primary goal has ONE blocker — **ARCHIVED 2026-08-19 to `st | `state_model.md` |
 | [sim-edge-analysis-2026-09-01] | FULL-PLATFORM SIM-ENGINE EDGE ANALYSIS — strategy synthesis + new from-code facts `[2026-09-01, session syndic | `state_model.md` |
 | [accuracy-autorun-rearm-state] | `#626`(h) IS ARMED, RAN, AND PASSED. The budget, not memory, is now the constraint. `[2026-09-04, lane accurac | `state_model.md` |
+| [nhl-live-resim] | NHL HAS A LIVE RE-SIM AND IT CAN NOW SEE ITS SLATE -- but no NHL game has yet reached the board with a probabi | `state_model.md` |
 | [polymarket-live-totals-quote-names-no-game] | 26 OF 28 LIVE POLYMARKET TOTALS QUOTES ON THE BOARD ARE SHARED ACROSS GAMES — one price per LINE, no game iden | `state_polymarket.md` |
 | [polymarket-fill-price-is-reported] | THE VENUE REPORTS `avgPx`. "This path has no fill price" was FALSE and cost a 12h live halt `[verified 2026-08 | `state_polymarket.md` |
+| [polymarket-capital-is-margin-held] | POLYMARKET'S CASH IS NOT ITS BUYING POWER: `marginRequirement` HOLDS IT, and the venue tells us in a field we  | `state_polymarket.md` |
 | [polymarket-h2h-buys-the-wrong-side] | POLYMARKET MONEYLINES BUY THE WRONG TEAM: `outcomes[0]` is not reliably the YES leg `[verified 2026-08-28, lan | `state_polymarket.md` |
 | [polymarket-vs-kalshi-prop-prices] | — MEASURED 2026-09-01, MLB, production shard | `state_polymarket.md` |
 | [polymarket-low-activity] | — VERIFIED 2026-08-27, refresh-worker + live-odds-worker | `state_polymarket.md` |
 | [polymarket-venue-join] | VERIFIED 2026-08-29, all three services on `95c4fb12` | `state_polymarket.md` |
 | [polymarket-orders-are-cancelled] | 2026-08-30 — the venue cancels them, we re-place them, and nobody knows why | `state_polymarket.md` |
-| [polymarket-capital-is-margin-held] | POLYMARKET'S CASH IS NOT ITS BUYING POWER: `marginRequirement` HOLDS IT, and the venue tells us in a field we were discarding `[verified 2026-09-23]` | `state_polymarket.md` |
 | [polymarket-no-fill-size-is-gross-capped] | A POLYMARKET **NO** ORDER IS CHECKED AGAINST **$1.00 PER CONTRACT** AND CHARGED THE **NET** — **5 of 5 NO orde | `state_polymarket.md` |
 | [polymarket-resting-orders-do-not-encumber-cash] | 2026-08-31T15:45Z — CONFIRMED by a before/after pair, after I doubted it | `state_polymarket.md` |
 | [polymarket-price-gate-leaks-by-crossing] | 2026-08-31T16:05Z — FIXED AND DEPLOYED. The ceiling used to be checked against a price the venue never receive | `state_polymarket.md` |
@@ -641,18 +649,18 @@ once this index exists: re-splitting would orphan the parts.
 | [portfolio-settlement] | PORTFOLIO SETTLEMENT — the ledger crossed no service boundary, and the join keyed on a value that drifts `[ver | `state_portfolio.md` |
 | [portfolio-sim-sizing-gate] | ONLY A MODEL MEASURED TO BEAT THE MARKET SIZES MONEY; TODAY NONE IS, SO STAKES FOLLOW PRICE `[verified on prod | `state_portfolio.md` |
 | [order-model-attribution] | AN ORDER RECORDS THE SIM'S VERDICT — DEPLOYED AND VERIFIED ON PRODUCTION; THE COMMIT GATE MAKES FOUR OF THE NI | `state_portfolio.md` |
+| [soccer-projection-unit-dates] | SOCCER PREGAME PROJECTIONS: MLS UNITS WERE KEYED ON THE UTC DATE, SO EVENING KICKOFFS GOT EMPTY FILES; EPL/SER | `state_soccer.md` |
 | [soccer-season-market-audit] | SEASON TO DATE NO SOCCER MARKET BEATS THE CLOSE, AND THE PROP MODEL IS PRICING LAST SEASON'S SQUADS `[measured | `state_soccer.md` |
 | [soccer-prop-book-coverage] | WIDENING SOCCER PROP REGIONS BUYS ONE SOFT BOOK FOR ~1M CREDITS/MONTH — **KNOB SHIPPED, DELIBERATELY LEFT OFF* | `state_soccer.md` |
 | [soccer-input-gate] | THE SOCCER INPUT GATE NOW RUNS, AND 4 OF ITS 9 ALARMS WERE DECISIONS — MEASURED 2026-09-07 `[lane soccer-unfed | `state_soccer.md` |
 | [soccer-market-anchor] | MARKET-ANCHORING IS REACHABLE AND STILL OFF BY DECISION — MEASURED 2026-09-02 `[lane soccer-anchor-cost, main  | `state_soccer.md` |
-| [soccer-projection-unit-dates] | SOCCER PREGAME PROJECTIONS: MLS UNITS WERE KEYED ON THE UTC DATE, SO EVENING KICKOFFS GOT EMPTY FILES; EPL/SER | `state_soccer.md` |
 | [soccer-board-coverage] | — MEASURED 2026-09-02, production, NOT A DEFECT | `state_soccer.md` |
 | [soccer-live-match-state] | Soccer's live tier is WIRED AND VERIFIED ON LIVE MATCHES (2026-08-21) | `state_soccer.md` |
 | [soccer-live-espn-inputs] | SOCCER LIVE STATE: ESPN's RANGE scoreboard is stale (fixed, LIVE); the live score dropped penalties and own go | `state_soccer.md` |
 | [soccer-live-momentum] | FotMob momentum is production's signal now; the ESPN proxy carries none (2026-08-22) | `state_soccer.md` |
 | [soccer-compact-cards] | Pregame + final compact cards redesigned and DEPLOYED, verified on production HTML (2026-08-22) | `state_soccer.md` |
 | [soccer] | SOCCER | `state_soccer.md` |
-| [soccer-live-tier] | SOCCER'S LIVE TIER — VERIFIED, AND WHAT IS NOT. Live game-lines crashed in every live window until 2026-09-30 (fixed `bc8a8340`/`9ab88382`; empty states named `cf63c82f`); IN-PLAY READING OWED `#693` `[2026-10-01]` | `state_soccer.md` |
+| [soccer-live-tier] | SOCCER'S LIVE TIER — VERIFIED, AND WHAT IS NOT | `state_soccer.md` |
 | [soccer-shots-prop-skill] | SOCCER SHOTS PROPS â€” THE POISSON SHAPE IS RIGHT AND THE MEAN IS INFLATED `[measured 2026-08-31, lane layer1- | `state_soccer.md` |
 | [soccer-moneyline-precision] | SOCCER'S MONEYLINE EDGE IS NOW GATED ON ITS OWN SIM NOISE, AND 61% OF IT WAS INSIDE THAT NOISE `[measured 2026 | `state_soccer.md` |
 | [soccer-shot-woodwork-undercount] | EVERY SHOT OFF THE WOODWORK WAS MISSING FROM SHOT TOTALS — FIXED, LIVE ON live-odds-worker `20d589ed` 2026-09- | `state_soccer.md` |
@@ -676,12 +684,12 @@ once this index exists: re-splitting would orphan the parts.
 | [exchange-venues] | Crypto.com is NOT a third venue — VERIFIED 2026-08-28, local full-egress session | `state_venues.md` |
 | [venue-market-universe] | The venues list ~25,000 markets and the board acts on 277 — VERIFIED 2026-08-30 | `state_venues.md` |
 | [render-crons] | THE THREE CRON SERVICES: WHAT THEY ARE, AND FOUR FACTS THAT COST A SESSION TO LEARN `[2026-09-08, lane render- | `state_worker.md` |
-| [ci-suite-pytest-step] | THE FULL SUITE RUNS ONLY WHEN CHUNKED, AND IT IS GREEN WITH AN EMPTY BASELINE `[verified 2026-10-02, lane ci-red-on-main, local fleet]` | `state_worker.md` |
+| [ci-suite-pytest-step] | THE FULL SUITE RUNS ONLY WHEN CHUNKED, AND IT IS GREEN WITH AN EMPTY BASELINE `[verified 2026-10-02, lane ci-r | `state_worker.md` |
 | [odds-history-segment-keys] | THE odds_history SHARD CARRIES `segment=` KEYS NOW — and three separate key builders were segment-blind, in tw | `state_worker.md` |
 | [refresh-worker-headroom-2026-09-02] | THE ~1.4GB HEADROOM FIGURE IS STALE, AND THE METRIC EVERYONE READS IS THE WRONG ONE `[2026-09-02, lane m625-en | `state_worker.md` |
 | [accuracy-autorun-OOM-2026-09-02] | THE ACCURACY AUTORUN OOM-KILLED refresh-worker. **RESOLVED — DISARMED AND VERIFIED 19:32Z.** `[2026-09-02, lan | `state_worker.md` |
 | [local-fleet-runner] | THE THREE SERVICES RUN LOCALLY NOW — and doing it naively would have placed REAL ORDERS `[verified 2026-09-02, | `state_worker.md` |
-| [local-production-host] | PRODUCTION RUNS ON ONE MACHINE NOW — `scripts/local_production.py`, and self-publish MUST be off on a shared disk `[verified 2026-09-30, | `state_worker.md` |
+| [local-production-host] | PRODUCTION RUNS ON ONE MACHINE NOW — `scripts/local_production.py`, and self-publish MUST be off on a shared d | `state_worker.md` |
 | [artifact-allowlist-split] | THE ARTIFACT ALLOWLIST IS TWO LISTS NOW: READ WIDE, WRITE NARROW — and an allowlist-filtered inventory is NOT  | `state_worker.md` |
 | [service-memory-saturation] | BOTH PRODUCTION SERVICES WERE MEMORY-SATURATED 2026-09-02/03 — MEASURED, and it BLOCKS analysis work `[lane so | `state_worker.md` |
 | [live-odds-worker-deploy-window] | `deploy_preflight` ALMOST NEVER CLEARS ON live-odds-worker DURING A LIVE SLATE, and the reason is a LONG-RUNNI | `state_worker.md` |
@@ -708,10 +716,8 @@ once this index exists: re-splitting would orphan the parts.
 | [refresh-worker-disk-2026-09-13] | refresh-worker's 48.9 GB disk: FULL 09-12 23:39Z -> 09-13 14:15Z, COMPACTED to 16.3 GB free `[verified 2026-09 | `state_worker.md` |
 | [streamed-pull-append-only-tail] | `pull_streamed_artifact` sends NO `since=` on append-only tails — web's stream route 304'd before Range and fr | `state_worker.md` |
 | [refresh-worker-heavy-build-refusal] | refresh-worker's heavy build is refused for hours once the MAIN PROCESS settles above ~2.2 GB after its first  | `state_worker.md` |
+| [refresh-run-lanes] | Refresh-run lane topology, and refusals are now LOGGED [verified 2026-09-25/26] | `state_worker.md` |
 | [pregame-sweep-cadence] | THE IDLE LOOP NOW WAKES WHEN A SPORT'S OWN PREGAME SWEEP IS DUE; soccer schedules refetch a near window betwee | `state_worker.md` |
-| [mlb-live-gameline-venue-segment] | MLB LIVE GAME LINES SERVE NO SIM EDGE BECAUSE THE VENUES QUOTE FULL-GAME CONTRACTS AND THE LIVE BOARD IS MOSTLY SEGMENTS | `state_layer2.md` |
-| [nhl-live-resim] | NHL HAS A LIVE RE-SIM AND IT CAN NOW SEE ITS SLATE -- the 403 that emptied its slate is fixed and measured; no NHL game has yet reached the board with a probability | `state_model.md` |
-| [lane-claim-truncation] | A LANE CAN CLAIM FILES THE GUARD DOES NOT ENFORCE, AND NOTHING SAID SO -- 17 OPEN lanes affected, now REPORTED | `state_ledger.md` |
 
 ### `[web-oom-leak]` UPDATE — the instrument is fixed and the growth has a SUSPECT, 2026-09-04T00:4xZ `[session b2b5b45b]`
 

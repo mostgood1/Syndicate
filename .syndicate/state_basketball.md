@@ -954,3 +954,14 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - The repo `.env` `ODDS_API_KEY` is DEACTIVATED (401, 2026-10-03).
 - Full tables: `.syndicate/findings_2026-10-02_nba_lines_props_backtest.md`.
 - **Fix built and WIRED, NOT enabled `[verified 2026-10-04, lane nba-prop-calibration, module c7b22387, call site 7f920a60]`:** `nba_prop_calibration.py` (rate shrink -> season-average blend -> sd/ladder scale; flag `SYNDICATE_NBA_PROP_CALIBRATION`, OFF). Out of sample it beats the served sim AND the player's own average in all 11 prop markets (MAE and Brier, CIs < 0). Called from basketball_props_smart_sim.py's vendor-call wrapper (7f920a60); a no-op until the flag is set and `nba_prop_calibration.json` is in the NBA processed root. Production constants: w (rate shrink): pts 0.10, reb 0.15, ast 0.15, threes 0.0, stl 0.0, blk 0.35, tov 0.0; blend (weight on the shrunk mean): pts 0.45, reb 0.40, ast 0.50, threes 0.65, stl 1.0, blk 1.0, tov 0.55; sd_scale: pts 1.25, reb 1.25, ast 1.25, threes 1.00, stl 1.05, blk 1.25, tov 1.05, pra 1.50.
+
+## [nba-layer2-projections] NBA LINES CARRY THE MODEL ON LAYER 2 -- game lines LIVE and VERIFIED; props wired but no NBA prop quote exists yet `[2026-10-04, lane nba-layer2-projections, 92f86f64, fleet restart 05:38:39Z]`
+
+- **Game lines, served 05:45:56Z:** `per_sport_ingest.nba.enrichment.projections` supported:true, 13/13 game rows projected, 13 with probability, 13 with edge. Before (05:07:32Z): supported:false, "no projection source wired for nba".
+- **Sources (fleet, measured):**
+  - Game lines come from `smart_sim_<d>_<H>_<A>.json` `score.dist`: 500 draws, `margin_frame: home_minus_away`, segments full/regulation/h1/h2/q1-q4. NBA `cards_sim_detail` has NO `score_dist` and `game_cards` has no p_* columns.
+  - Props come from `cards_sim_detail` `prop_ladders`. `props_predictions.mean_*` == `<stat>_mean` == ladder mean (72/72, 10-04), so `props_recommendations` is only a copy of those means, and it is not written on a no-prop day.
+- **Policy:** every NBA line is priced, including the moneyline edge (WNBA withholds it). Refusals are per line only, and counted under `unprojected_by_reason`. `prop_coverage.edge_sign_by_side` is the one-sided-pile check.
+- **NBA player props are now REQUESTED** (`refresh_odds_sources._NBA_DEFAULT_MARKETS`; the 06:02:17Z run passed all 13 player_* markets). Before, `_effective_markets` sent game + half lines only, so no NBA prop quote could ever reach the board.
+- **Books posted 0 NBA props** for the 10-04/10-05 preseason dates, so served prop rows are 0. Owed: the first slate with NBA prop quotes.
+- **Edge shape to watch:** totals 5/5 favoured the OVER on 10-04 (2 games). The sim's prop means run low (minutes bias; Markkanen 9.8 pts on 10-04), which predicts an UNDER pile on props.

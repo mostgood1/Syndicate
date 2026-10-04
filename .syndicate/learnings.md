@@ -5481,3 +5481,9 @@ own prior verdicts, not by anything failing.
 - **Cost:** none in the end. The block was re-created verbatim (its prediction was still pre-data) and
   landed in `f11e7b7e`. It would have silently dropped the lane's pre-registration if the assertion had
   not existed.
+
+## 2026-10-04 — RULE: a callee's DEFAULT is dead code if every caller passes the argument; read the COMMAND LINE the producer actually ran, not the callee's default `[lane nba-layer2-projections, session ed75e56a]`
+
+- Belief: `fetch_basketball_oddsapi_props_local.py`'s `DEFAULT_MARKETS` lists the player props, so NBA props were "requested and simply not offered".
+- What was true: the orchestrator ALWAYS passed `--markets` for NBA (`_effective_markets` -> game + half lines). The default never applied, and no NBA prop was requested at all. The producer log's own `$ ... --markets h2h,spreads,...` line said so on every hourly run. Its "no player-prop lines offered" message read as a statement about the BOOKS when it was a statement about our REQUEST.
+- How to apply: when a producer reports "none offered", grep its logged command for the argument before believing it. Since the fix (06:02:17Z), the same message really is about the books (0 NBA preseason props), and only the logged `--markets` tells the two states apart.
