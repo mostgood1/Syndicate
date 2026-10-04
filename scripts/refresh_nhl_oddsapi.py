@@ -628,6 +628,20 @@ def _run_owned_generation(*, artifact_root: Path, target_dates: list[str], props
     if inputs["missing"]:
         warnings.append(f"nhl season inputs missing after pull: {inputs['missing']}")
 
+    # In-season team xG (lane nhl-season-inputs-in-season, user-approved cross-lane write 2026-10-04):
+    # rebuild team_xg_<season>.csv as a blend of last season and this season-to-date BEFORE generation,
+    # so today's predictions read current team strength (the loaders prefer the season file over
+    # _latest). Never raises; on any failure the previous file (or _latest) is what generation reads.
+    try:
+        from syndicate.features.nhl.inseason_team_xg import refresh_inseason_team_xg
+
+        inseason = refresh_inseason_team_xg(artifact_root)
+        # a root without a prior file (tests, local replays) is a printed skip, not a warning
+        if str(inseason.get("reason") or "").startswith("error="):
+            warnings.append(f"nhl in-season team xG failed: {inseason.get('reason')}")
+    except Exception as exc:
+        warnings.append(f"nhl in-season team xG failed: {exc}")
+
     for target_date in target_dates:
         try:
             collect_slate_inputs(target_date, root=artifact_root)
