@@ -1752,6 +1752,14 @@ death, never life — do not invert it.
 - Verification: Unit tests: down < 9 min no recover; >= 9 min recover; cap 3/hour; pause file blocks; recovered state clears. Fleet: a watchdog run on the live fleet reports recover=false with status ok; the ps1 acts only on recover=true
 - Blocked by: none
 
+### layer2-hidden-row-split — OPEN — opened 2026-10-04 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: The Layer 2 shortlist reports rows hidden by the 1h quote-age gate split into superseded lines (same game/market/segment/player/side quoted fresh at another line) and genuinely stale quotes, overall and per sport, forwarded by the layer2-shortlist endpoint, so stale quotes can serve as a freshness alarm
+- Files: syndicate/features/shared/layer2_board.py (quote-age gate counters only), syndicate/blueprints/intelligence.py (layer2-shortlist forwarded gate fields only), tests/test_layer2_hidden_row_split.py (new)
+- Hypothesis: Measured 2026-10-04 16:29Z: 90% of NFL's 8,641 stale keys and 90% of NHL's 84 are superseded lines; the single counter cannot separate them
+- Falsification test: n/a (instrumentation)
+- Verification: Served fleet board after deploy: rows_superseded_line + rows_stale_quote == rows_beyond_quote_age per sport, superseded the large majority for NFL
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

@@ -4128,7 +4128,11 @@ def board_layer2_shortlist_api():
                 # capture reads as a number here instead of rows quietly vanishing.
                 "max_quote_age_seconds_by_sport": shortlist.get("max_quote_age_seconds_by_sport"),
                 "rows_beyond_quote_age_by_sport": shortlist.get("rows_beyond_quote_age_by_sport"),
+                "rows_superseded_line_by_sport": shortlist.get("rows_superseded_line_by_sport"),
+                "rows_stale_quote_by_sport": shortlist.get("rows_stale_quote_by_sport"),
                 "rows_beyond_quote_age": shortlist.get("rows_beyond_quote_age"),
+                "rows_superseded_line": shortlist.get("rows_superseded_line"),
+                "rows_stale_quote": shortlist.get("rows_stale_quote"),
                 "stale_kickoff_seconds": shortlist.get("stale_kickoff_seconds"),
                 "rows_stale_kickoff": shortlist.get("rows_stale_kickoff"),
                 "opportunities_considered": shortlist.get("opportunities_considered"),

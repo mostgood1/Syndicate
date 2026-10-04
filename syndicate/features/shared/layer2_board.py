@@ -4947,6 +4947,41 @@ def _within_horizon(row: Mapping[str, Any], now: datetime, horizon_days: int | N
     return (start.astimezone(timezone.utc).date() - now.date()).days <= int(horizon_days)
 
 
+def _line_token(line: Any) -> str:
+    try:
+        return f"{float(line):g}"
+    except (TypeError, ValueError):
+        return str(line if line is not None else "")
+
+
+def _quote_age_group(row: Mapping[str, Any]) -> tuple:
+    """A row's identity across LINES: one bet family, any number."""
+    return (
+        str(row.get("sport") or "").strip().lower(),
+        str(row.get("event_id") or ""),
+        str(row.get("market") or ""),
+        str(row.get("segment") or "full"),
+        str(row.get("player_name") or "").strip().lower(),
+        str(row.get("side") or "").strip().lower(),
+    )
+
+
+def _fresh_lines_by_group(
+    opportunities: Iterable[Mapping[str, Any]], max_quote_age_seconds: Any, age_ceiling: float
+) -> dict[tuple, set[str]]:
+    """The lines each group is served FRESH at (age known and within its sport's ceiling)."""
+    out: dict[tuple, set[str]] = {}
+    for row in opportunities or ():
+        if not isinstance(row, Mapping):
+            continue
+        age = _row_quote_age_seconds(row)
+        ceiling = age_ceiling if max_quote_age_seconds is not None else _sport_quote_age_ceiling(row.get("sport"), age_ceiling)
+        if age is None or ceiling <= 0 or age > ceiling:
+            continue
+        out.setdefault(_quote_age_group(row), set()).add(_line_token(row.get("line")))
+    return out
+
+
 def select_shortlist(
     opportunities: Iterable[Mapping[str, Any]],
     *,
@@ -5027,6 +5062,19 @@ def select_shortlist(
     refused_by_movement = 0
     beyond_quote_age = 0
     beyond_quote_age_by_sport: dict[str, int] = {}
+    # THE HIDDEN ROWS, SPLIT (lane `layer2-hidden-row-split`, 2026-10-04). Measured
+    # that day on the fleet's quote keys: 90% of NFL's 8,641 keys last seen > 1h
+    # (and 90% of NHL's 84) were SUPERSEDED LINES -- the same book+side quoted fresh
+    # at another number, the old key simply no longer seen; median age 25.6 h. So
+    # `rows_beyond_quote_age` mostly counts dead lines and could not alarm on real
+    # staleness. A hidden row is `superseded_line` when its own
+    # (sport, event, market, segment, player, side) is still served fresh at
+    # ANOTHER line; otherwise it is `stale_quote` -- the freshness alarm.
+    superseded_line = 0
+    superseded_line_by_sport: dict[str, int] = {}
+    stale_quote = 0
+    stale_quote_by_sport: dict[str, int] = {}
+    fresh_lines_by_group = _fresh_lines_by_group(opportunities, max_quote_age_seconds, age_ceiling)
     implausible_book = 0
     stale_kickoff = 0
     uninformative_ev = 0
@@ -5063,6 +5111,13 @@ def select_shortlist(
             beyond_quote_age += 1
             sport_key = str(row.get("sport") or "").strip().lower() or "unknown"
             beyond_quote_age_by_sport[sport_key] = beyond_quote_age_by_sport.get(sport_key, 0) + 1
+            fresh_lines = fresh_lines_by_group.get(_quote_age_group(row)) or set()
+            if fresh_lines - {_line_token(row.get("line"))}:
+                superseded_line += 1
+                superseded_line_by_sport[sport_key] = superseded_line_by_sport.get(sport_key, 0) + 1
+            else:
+                stale_quote += 1
+                stale_quote_by_sport[sport_key] = stale_quote_by_sport.get(sport_key, 0) + 1
             continue
         # `#369`: an IMPOSSIBLE BOOK is a bad feed, not an opportunity.
         #
@@ -5356,6 +5411,10 @@ def select_shortlist(
             })}
         ),
         "rows_beyond_quote_age_by_sport": dict(sorted(beyond_quote_age_by_sport.items())),
+        # superseded + stale == beyond, per sport and in total. Read `stale` as the
+        # freshness alarm; `superseded` is a book having moved its number.
+        "rows_superseded_line_by_sport": dict(sorted(superseded_line_by_sport.items())),
+        "rows_stale_quote_by_sport": dict(sorted(stale_quote_by_sport.items())),
         "stale_kickoff_seconds": stale_kickoff_ceiling,
         # Logged, not silently dropped: a sport vanishing from the shortlist
         # should be attributable to its schedule rather than look like an outage.
@@ -5407,6 +5466,8 @@ def select_shortlist(
         "min_implied_book_total_pct": _MIN_IMPLIED_BOOK_TOTAL_PCT,
         "rows_implausible_book": implausible_book,
         "rows_beyond_quote_age": beyond_quote_age,
+        "rows_superseded_line": superseded_line,
+        "rows_stale_quote": stale_quote,
         "rows_stale_kickoff": stale_kickoff,
         # THE ROWS' CONTRIBUTION, not the artifact's size. Renamed from the
         # bare `persisted_bytes` it shipped as, because that name is what made a
