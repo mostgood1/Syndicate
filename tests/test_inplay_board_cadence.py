@@ -356,7 +356,9 @@ def test_reachability_ncaaf_live_tier_waits_10_minutes_by_default(tmp_path):
 def test_other_sports_keep_live_every_run():
     from syndicate.features.shared import segment_odds_fetch as sof
 
-    assert sof.live_interval_seconds("nfl", env={}) == 0
+    assert sof.live_interval_seconds("nfl", env={}) == 600, "NFL joined 2026-10-03 (lane nfl-live-segment-interval)"
+    assert sof.live_interval_seconds("soccer", env={}) == 0
+    assert sof.live_interval_seconds("nfl", env={"SYNDICATE_NFL_SEGMENT_LIVE_INTERVAL_SECONDS": "0"}) == 0
     assert sof.live_interval_seconds("ncaaf", env={}) == 600
     assert sof.live_interval_seconds("ncaaf", env={"SYNDICATE_NCAAF_SEGMENT_LIVE_INTERVAL_SECONDS": "0"}) == 0
 

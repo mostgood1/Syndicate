@@ -297,11 +297,14 @@ def pregame_interval_seconds(sport: str, *, env: Mapping[str, str] | None = None
     return _env_int(f"{env_prefix(sport)}_PREGAME_INTERVAL_SECONDS", 0, env)
 
 
-#: Per-sport default for `live_interval_seconds`. NCAAF only, by user decision
-#: 2026-10-03 (lane `ncaaf-props-credit-cut`): "set live segments to 10 minutes".
+#: Per-sport default for `live_interval_seconds`. NCAAF by user decision
+#: 2026-10-03 (lane `ncaaf-props-credit-cut`): "set live segments to 10 minutes";
+#: NFL the same day, before its Sunday window (lane `nfl-live-segment-interval`,
+#: "yes, do #1 for NFL") -- same fleet shape: MARKETS=all, 3h30 live window, lines
+#: autorun every 150 s. NCAAF measured 12,664 -> 2,761 credits/h on this change.
 #: A CODE default, not env, so it ships with a fast-forward rather than a fleet
 #: restart; `SYNDICATE_<SPORT>_SEGMENT_LIVE_INTERVAL_SECONDS` still overrides it.
-DEFAULT_LIVE_INTERVAL_SECONDS: dict[str, int] = {"ncaaf": 600}
+DEFAULT_LIVE_INTERVAL_SECONDS: dict[str, int] = {"ncaaf": 600, "nfl": 600}
 
 
 def live_interval_seconds(sport: str, *, env: Mapping[str, str] | None = None) -> int:
