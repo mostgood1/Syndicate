@@ -1775,6 +1775,7 @@ death, never life — do not invert it.
 - Falsification test: A vendor-dir WNBA write with no preceding bootstrap 'refreshing today's WNBA bundle' line in ~/syndicate-prod/logs/bootstrap.log
 - Verification: Unit tests for all three hops; on the fleet after the next supervisor up, vendor/wnba_betting_repo/data/processed gains no new <today> files and bootstrap.log's boot refresh names the prod source root
 - Blocked by: none
+- **LANDED 2026-10-04 d5f8acca (on origin/main; NOT on the fleet -- ~/Syndicate was at 00876a04).** Takes effect on the fleet with no restart: bootstrap_data_root.py runs fresh at each `local_production.py up`, and refresh_odds_sources/refresh_wnba_oddsapi_props are per-run subprocesses, so any fleet fast-forward carries it. VERIFY OWED after the next ff + `up`: bootstrap.log's boot refresh line, and no new <today> files under ~/Syndicate/vendor/wnba_betting_repo/data/processed. Known red in worktrees, not this lane: test_refresh_odds_sources::test_nba_and_wnba_use_combined_game_and_player_prop_markets... (writes data/nba_source/logs; fails identically on HEAD without this change).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
