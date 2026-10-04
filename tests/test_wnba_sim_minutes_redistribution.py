@@ -138,3 +138,24 @@ def test_out_of_range_parameters_are_refused(tmp_path):
     s = _apply(out, _root(tmp_path, params={"b0": 5.0, "b1": 0.0, "leak": 0.0}))
     assert s["applied"] is False and "outside" in s["reason"]
     assert out == _out()
+
+
+def test_bench_only_leaves_every_cut_player_exactly_as_simulated(tmp_path):
+    """The full re-share hurt the regulars' props (2026-10-04); bench-only must not touch anyone it would cut -- not
+    even min_mean, which the rate shrink divides by -- and must still scale the players it gives minutes to."""
+    root = _root(tmp_path, params={**P, "bench_only": True})
+    out = _out()
+    before = copy.deepcopy(out)
+    s = _apply(out, root)
+    star_b, star_a = before["players"]["home"][0], out["players"]["home"][0]
+    bench_b, bench_a = before["players"]["home"][2], out["players"]["home"][2]
+    assert star_a == star_b
+    assert bench_a["min_mean"] > bench_b["min_mean"]
+    assert bench_a["pts_mean"] == pytest.approx(bench_b["pts_mean"] * bench_a["min_mean"] / bench_b["min_mean"])
+    assert 0 < s["players"] < len(out["players"]["home"])
+
+
+def test_bench_only_must_be_a_boolean(tmp_path):
+    out = _out()
+    s = _apply(out, _root(tmp_path, params={**P, "bench_only": "yes"}))
+    assert s["applied"] is False and "bench_only" in s["reason"]

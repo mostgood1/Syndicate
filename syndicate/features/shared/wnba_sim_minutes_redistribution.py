@@ -20,6 +20,11 @@ job, and it runs AFTER this so it sees the new minutes), and every ladder's draw
 sum of stats scales like its parts) with largest-remainder rounding, so the ladder mean is k x the old one to 1/n.
 NOT the rate shrink's shift-by-delta: a sub-half-unit shift of an integer ladder moves nothing (`scale_values`).
 
+BENCH-ONLY (`"bench_only": true` in the parameter file). The full re-share is REFUTED for props (2026-10-04,
+`findings_2026-10-04_wnba_minutes_redistribution.md`): it takes minutes off the regulars at their full per-minute rate,
+but the minutes they lose are low-usage ones, so their props got worse. Bench-only applies the re-share only to players
+it would GIVE minutes to; everyone it would cut stays exactly as simulated (player minutes then sum to more than 200).
+
 WHAT IT DOES NOT TOUCH. `<stat>_sd`, `<stat>_q`, per-quarter and scenario blocks, team scores (player sums no longer
 equal the team total -- this is an estimator on the published prop distribution, not a re-simulation), and any team
 whose pool sums to less than half a game of minutes.
@@ -78,6 +83,10 @@ def load_params(processed_root: Path) -> Tuple[Optional[Dict[str, float]], str]:
         if not math.isfinite(v) or not (lo <= v <= hi):
             return None, f"parameter {key!r} = {v} outside [{lo}, {hi}]"
         out[key] = v
+    bench_only = raw.get("bench_only", False)
+    if not isinstance(bench_only, bool):
+        return None, f"parameter 'bench_only' = {bench_only!r} is not true/false"
+    out["bench_only"] = 1.0 if bench_only else 0.0
     return out, "ok"
 
 
@@ -229,6 +238,10 @@ def apply_minutes_redistribution(out: Any, *, league_code: str, processed_root: 
             summary["teams"][side] = {"team": team, "freed": round(freed, 2), "freed_reason": why}
             for r, s, m in zip(rows, sims, new):
                 if s <= 0:
+                    continue
+                if params.get("bench_only") and m <= s:
+                    # Bench-only: a player the re-share would cut is left EXACTLY as simulated, minutes included --
+                    # cutting min_mean alone would let the rate shrink (which reads mean / min_mean) re-take the loss.
                     continue
                 k = m / s
                 delta: Dict[str, float] = {}
