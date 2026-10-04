@@ -30,6 +30,11 @@ season start (Aug 1). Missing/invalid factor file or history -> untouched, a nam
 (`NBA_PROP_CALIBRATION skipped reason=...`). Never raises. NBA only; OFF unless `SYNDICATE_NBA_PROP_CALIBRATION`
 is truthy, or the factor file enables it (see SWITCH).
 
+PRIOR-SEASON FALLBACK (2026-10-04, user decision "build + measure it first"): a player with < MIN_GAMES current-
+season games uses his PREVIOUS regular season from `player_logs.csv` (same processed root), with the separate
+`prior_season: {w, blend}` constants -- measured on a year-stale proxy to beat the served sim (fit script
+`--prior-season-test`). No previous season either (rookies) -> mean untouched. Width is always scaled.
+
 SWITCH (2026-10-04, user decision "file switch, no restart"): ON when the env var is truthy, OR when the env var
 is unset AND the factor file carries `"enabled": true`. An explicit falsy env value (0/false/no/off) is a kill
 switch that wins over the file. A missing or unreadable file is OFF.
@@ -48,6 +53,7 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 FLAG = "SYNDICATE_NBA_PROP_CALIBRATION"
 FACTOR_FILE = "nba_prop_calibration.json"
 HISTORY_FILE = "boxscores_history.csv"
+PRIOR_FILE = "player_logs.csv"   # previous REGULAR season (stats.nba logs), the opening-night fallback
 RATE_STATS = {"pts": "PTS", "reb": "REB", "ast": "AST", "threes": "FG3M", "stl": "STL", "blk": "BLK", "tov": "TOV"}
 SD_STATS = ("pts", "reb", "ast", "threes", "stl", "blk", "tov", "pra")
 LADDER_PARTS = {"pts": ("pts",), "reb": ("reb",), "ast": ("ast",), "threes": ("threes",), "stl": ("stl",),
@@ -128,6 +134,25 @@ def load_factors(processed_root: Path) -> Tuple[Optional[Dict[str, Dict[str, flo
             if not math.isfinite(v) or not (bounds[0] <= v <= bounds[1]):
                 return None, f"{block}[{key!r}] = {v} outside {bounds}"
             out[dest][key] = v
+    out["pw"], out["pb"] = {}, {}
+    prior = doc.get("prior_season")
+    if prior is not None:
+        if not isinstance(prior, dict):
+            return None, "'prior_season' is not a map"
+        for block, bounds, dest in (("w", W_BOUNDS, "pw"), ("blend", B_BOUNDS, "pb")):
+            raw = prior.get(block) or {}
+            if not isinstance(raw, dict):
+                return None, f"prior_season.{block} is not a map"
+            for key, value in raw.items():
+                if key not in RATE_STATS:
+                    continue
+                try:
+                    v = float(value)
+                except (TypeError, ValueError):
+                    return None, f"prior_season.{block}[{key!r}] is not a number"
+                if not math.isfinite(v) or not (bounds[0] <= v <= bounds[1]):
+                    return None, f"prior_season.{block}[{key!r}] = {v} outside {bounds}"
+                out[dest][key] = v
     out["enabled"] = doc.get("enabled") is True  # type: ignore[assignment]
     if not out["w"] and not out["b"] and not out["k"]:
         return None, "factor file names no known stat"
@@ -135,13 +160,13 @@ def load_factors(processed_root: Path) -> Tuple[Optional[Dict[str, Dict[str, flo
 
 
 @lru_cache(maxsize=8)
-def _own_rates_cached(path_s: str, mtime: float, date_str: str) -> Tuple[Tuple[str, Tuple[float, ...]], ...]:
-    start = season_start(date_str)
+def _own_rates_cached(path_s: str, mtime: float, date_lo: str, date_hi: str) -> Tuple[Tuple[str, Tuple[float, ...]], ...]:
+    """Season totals per player over games with date_lo <= date < date_hi."""
     tot: Dict[str, List[float]] = defaultdict(lambda: [0.0] * (len(RATE_STATS) + 2))   # stats..., MIN, games
     with open(path_s, encoding="utf-8", errors="replace") as fh:
         for r in csv.DictReader(fh):
             d = str(r.get("date") or r.get("GAME_DATE") or "")[:10]
-            if not d or d >= date_str or d < start:
+            if not d or d >= date_hi or d < date_lo:
                 continue
             try:
                 mins = float(r.get("MIN") or 0)
@@ -161,11 +186,23 @@ def _own_rates_cached(path_s: str, mtime: float, date_str: str) -> Tuple[Tuple[s
 
 
 def own_rates(processed_root: Path, date_str: str, name_key: Callable[[object], str]) -> Tuple[Dict[str, Dict[str, float]], str]:
-    path = Path(processed_root) / HISTORY_FILE
+    """Season-to-date (this season, strictly before the slate) per-minute rates and per-game averages."""
+    d = str(date_str)[:10]
+    return _rates_from(Path(processed_root) / HISTORY_FILE, season_start(d), d, name_key, f"season games before {d}")
+
+
+def prior_rates(processed_root: Path, date_str: str, name_key: Callable[[object], str]) -> Tuple[Dict[str, Dict[str, float]], str]:
+    """The PREVIOUS season's per-minute rates / per-game averages (opening-night fallback)."""
+    cur = season_start(str(date_str)[:10])
+    prev = f"{int(cur[:4]) - 1}{cur[4:]}"
+    return _rates_from(Path(processed_root) / PRIOR_FILE, prev, cur, name_key, f"prior-season games {prev}..{cur}")
+
+
+def _rates_from(path: Path, date_lo: str, date_hi: str, name_key: Callable[[object], str], what: str) -> Tuple[Dict[str, Dict[str, float]], str]:
     if not path.is_file():
         return {}, f"history absent: {path}"
     try:
-        rows = _own_rates_cached(str(path), path.stat().st_mtime, str(date_str)[:10])
+        rows = _own_rates_cached(str(path), path.stat().st_mtime, date_lo, date_hi)
     except Exception as exc:  # noqa: BLE001
         return {}, f"history unreadable: {type(exc).__name__}"
     out: Dict[str, Dict[str, float]] = {}
@@ -177,7 +214,7 @@ def own_rates(processed_root: Path, date_str: str, name_key: Callable[[object], 
             rec = {s: v[i] / v[-2] for i, s in enumerate(RATE_STATS)}                  # per minute
             rec.update({f"{s}_avg": v[i] / v[-1] for i, s in enumerate(RATE_STATS)})  # per game
             out[key] = rec
-    return out, ("ok" if out else f"no player with >= {MIN_GAMES} season games before {date_str}")
+    return out, ("ok" if out else f"no player with >= {MIN_GAMES} {what}")
 
 
 def _round_half_up(x: float) -> int:
@@ -241,25 +278,32 @@ def apply_nba_prop_calibration(out: Any, *, league_code: str, processed_root: Pa
             return summary
         summary["switch"] = "env" if state == "on" else "factor_file"
         w, b, k = factors["w"], factors["b"], factors["k"]
-        rates, rate_reason = (own_rates(processed_root, str(out.get("date") or "")[:10], name_key)
-                              if (w or b) else ({}, "no w/blend"))
-        summary["rate_reason"] = rate_reason
+        pw, pb = factors.get("pw") or {}, factors.get("pb") or {}
+        slate = str(out.get("date") or "")[:10]
+        rates, rate_reason = own_rates(processed_root, slate, name_key) if (w or b) else ({}, "no w/blend")
+        prior, prior_reason = prior_rates(processed_root, slate, name_key) if (pw or pb) else ({}, "no prior_season block")
+        summary["rate_reason"], summary["prior_reason"], summary["players_prior_season"] = rate_reason, prior_reason, 0
         for side in ("home", "away"):
             for row in out["players"].get(side) or []:
                 if not isinstance(row, dict):
                     continue
                 orig_sd = {s: _f(row.get(f"{s}_sd")) for s in SD_STATS}
                 delta: Dict[str, float] = {}
-                own = rates.get(str(name_key(row.get("player_name")) or "").strip().upper()) if rates else None
+                pkey = str(name_key(row.get("player_name")) or "").strip().upper()
+                # in-season data once a player has MIN_GAMES current games; before that, his PREVIOUS season with
+                # its own (measured) constants -- the opening-night fallback; neither -> mean untouched
+                own, ww, bb, source = rates.get(pkey), w, b, "season"
+                if not own and prior.get(pkey):
+                    own, ww, bb, source = prior.get(pkey), pw, pb, "prior_season"
                 mins = _f(row.get("min_mean"))
                 if own and mins and mins > 0:
-                    for s in [x for x in RATE_STATS if x in w or x in b]:
+                    for s in [x for x in RATE_STATS if x in ww or x in bb]:
                         m = _f(row.get(f"{s}_mean"))
                         if m is None:
                             continue
-                        target = shrink_mean(m, mins, own[s], w[s]) if s in w else m        # 1. rate shrink
-                        if s in b:
-                            target = blend_mean(target, own[f"{s}_avg"], b[s])                # 2. season-average blend
+                        target = shrink_mean(m, mins, own[s], ww[s]) if s in ww else m      # 1. rate shrink
+                        if s in bb:
+                            target = blend_mean(target, own[f"{s}_avg"], bb[s])              # 2. own-average blend
                         delta[s] = target - m
                         row[f"{s}_mean"] = target
                     if all(s in delta for s in ("pts", "reb", "ast")) and _f(row.get("pra_mean")) is not None:
@@ -293,13 +337,16 @@ def apply_nba_prop_calibration(out: Any, *, league_code: str, processed_root: Pa
                             dists[key]["ladderShape"] = str(new.get("ladderShape") or "exact")
                         summary["ladders"] += 1
                 if delta or scaled:
-                    row["nba_prop_calibration"] = {"mean_delta": {s: round(v, 4) for s, v in delta.items()}, "sd_scale": scaled}
+                    row["nba_prop_calibration"] = {"mean_delta": {s: round(v, 4) for s, v in delta.items()}, "sd_scale": scaled,
+                                                   "source": source if delta else None}
+                    summary["players_prior_season"] += bool(delta) and source == "prior_season"
                     summary["players"] += 1
                     summary["players_rate_shrunk"] += bool(delta)
         summary.update(applied=summary["players"] > 0, w=w, b=b, k=k, reason="ok")
         out["nba_prop_calibration"] = summary
         print(f"[nba_prop_calibration] NBA_PROP_CALIBRATION applied players={summary['players']} "
-              f"rate_shrunk={summary['players_rate_shrunk']} ladders={summary['ladders']} rates={rate_reason}", flush=True)
+              f"rate_shrunk={summary['players_rate_shrunk']} prior_season={summary['players_prior_season']} "
+              f"ladders={summary['ladders']} rates={rate_reason} prior={prior_reason}", flush=True)
     except Exception as exc:  # noqa: BLE001 -- the sim's result must survive this
         summary["reason"] = f"failed: {type(exc).__name__}: {exc}"
         print(f"[nba_prop_calibration] NBA_PROP_CALIBRATION_FAILED {type(exc).__name__}: {exc}", flush=True)

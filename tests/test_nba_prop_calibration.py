@@ -187,3 +187,47 @@ def test_no_factor_file_with_env_unset_is_off(tmp_path):
     out = _sim()
     s = cal.apply_nba_prop_calibration(out, league_code="nba", processed_root=tmp_path, build_ladder=_ladder, name_key=_key, env={})
     assert out == _sim() and "not enabled" in s["reason"]
+
+
+def _write_prior(root, rows):
+    with (root / cal.PRIOR_FILE).open("w", encoding="utf-8") as fh:
+        fh.write("PLAYER_NAME,GAME_DATE,MIN,PTS,REB,AST,FG3M,STL,BLK,TOV\n")
+        for d, name, mins, pts in rows:
+            fh.write(f"{name},{d},{mins},{pts},4,2,1,1,0,1\n")
+    cal._own_rates_cached.cache_clear()
+
+
+PRIOR = {"enabled": True, "w": {"pts": 0.2}, "blend": {"pts": 0.5}, "sd_scale": {"pts": 1.0},
+         "prior_season": {"w": {"pts": 0.3}, "blend": {"pts": 0.7}}}
+
+
+def test_prior_season_fallback_applies_before_a_players_third_game(tmp_path):
+    root = _write_root(tmp_path, factors=PRIOR, history=[])          # no current-season games at all
+    # slate 2026-01-10 is in the 2025-26 season, so the PRIOR season is 2024-25
+    _write_prior(root, [("2024-11-01", "B. Bench", 20, 10), ("2024-11-03", "B. Bench", 20, 10),
+                        ("2024-11-05", "B. Bench", 20, 10),
+                        ("2023-11-05", "B. Bench", 40, 99),          # two seasons back: outside the window
+                        ("2025-11-05", "B. Bench", 40, 99)])         # current season: not "prior"
+    out = _sim()
+    s = cal.apply_nba_prop_calibration(out, league_code="nba", processed_root=root, build_ladder=_ladder, name_key=_key, env={})
+    b = out["players"]["away"][0]
+    shrunk = cal.shrink_mean(4.0, 10.0, 30 / 60, 0.3)                 # prior rate 30 pts / 60 min, PRIOR constants
+    assert b["pts_mean"] == pytest.approx(0.7 * shrunk + 0.3 * 10.0)  # prior per-game avg 10
+    assert b["nba_prop_calibration"]["source"] == "prior_season" and s["players_prior_season"] == 1
+    a = out["players"]["home"][0]
+    assert a["pts_mean"] == 30.0 and a["nba_prop_calibration"]["source"] is None   # no prior season (rookie): untouched
+
+
+def test_current_season_wins_once_a_player_has_three_games(tmp_path):
+    root = _write_root(tmp_path, factors=PRIOR)                       # A. Player has 3 current-season games
+    _write_prior(root, [("2024-11-01", "A. Player", 30, 99)] * 3)
+    out = _sim()
+    cal.apply_nba_prop_calibration(out, league_code="nba", processed_root=root, build_ladder=_ladder, name_key=_key, env={})
+    a = out["players"]["home"][0]
+    own_rate, own_avg = 60 / 90, 60 / 3
+    assert a["pts_mean"] == pytest.approx(0.5 * cal.shrink_mean(30.0, 30.0, own_rate, 0.2) + 0.5 * own_avg)
+    assert a["nba_prop_calibration"]["source"] == "season"
+
+
+def test_prior_season_window_is_the_previous_season_only():
+    assert cal.season_start("2026-10-21") == "2026-08-01"   # opening night 2026-27 -> prior window 2025-08-01..2026-08-01
