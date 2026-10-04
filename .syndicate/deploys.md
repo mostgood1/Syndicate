@@ -46092,3 +46092,11 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - reading: all **21** soccer artifacts written after the ff (all leagues, 10-09..10-11) have **0** rows whose served `expected_shots_if_playing` != `own_rate_blend.blend_shots`; **103** zero-model rows now served their blend (championship 10-10 34/34 -- Timothy Ouma 0.0 -> **0.195** == note; eredivisie 9 + 21, primeira 8 + 11, belgian 1 + 12, championship 10-11 7). Baseline before the ff: 128 mismatched rows in 11 artifacts.
 - not yet rebuilt (still pre-fix): belgian 10-10 (8), championship 10-09 (6), primeira 10-09 (11) -- self-correct on their next build.
 - still OPEN (separate): MLS never blended (ASA file has no games/appearances).
+
+## 2026-10-04 23:24Z (6:24 PM CT) -- LOCAL FLEET FF -> 4a565a47 (contains c29e1271): NHL PP/PK units from real PP/SH minutes -- **VERIFY OWED** (lane `nhl-pp-units-real-toi`, user: "ff now, takes effect at next pregame run")
+
+- applied: ff via `github/main`, no restart (the lineup collector runs inside the per-run NHL subprocess). Read back: fleet HEAD 4a565a47 contains c29e1271, `special_teams_toi` present in ingestion/nhl_web.py.
+- baseline (lineups_2026-10-05.csv written 23:18:36Z, before the ff): 8 teams, PP1 shapes {(3F,2D): 8}.
+- expect: the first full (pregame) NHL run after 23:25Z rewrites lineups with PP1 shapes from real minutes -- mostly 4F+1D (backtest 2025-11-01: 22 of 26 teams 4F+1D) -- and the props file follows. Live-phase runs are `--mode fast` (no generation), so this is likely the next pregame run, not tonight.
+- offline evidence (backtest, paired, 12,540 regular-season player-games): Brier BLOCKS@1.5 -0.0035 [-0.0048, -0.0021], POINTS@1.5 -0.0006; SOG/GOALS/ASSISTS/POINTS@0.5 within noise.
+- verify: watcher /mnt/c/tmp/nhlprops/pp_watch.py (cutoff 23:25:00Z via calendar.timegm; a first version used mktime and was off by an hour under CDT -- it fired on the pre-ff file and was killed) prints PP1 shapes and REAL_UNITS / STILL_3F2D_ONLY.
