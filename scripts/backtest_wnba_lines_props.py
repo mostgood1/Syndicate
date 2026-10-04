@@ -654,6 +654,7 @@ def run_sim_phase(args) -> int:
     import shutil
     import sys
     dates = [d for i, d in enumerate(_season_dates(args)) if i % args.workers == args.worker]
+    games_all = load_games(Path(args.espn_dir))
     archive, pristine, code = Path(args.archive), Path(args.pristine), Path(args.code)
     scratch = Path(args.scratch) / f"w{args.worker}"
     prepare_scratch(pristine, scratch, dates[0] if dates else "2026-01-01", None, False)
@@ -671,6 +672,9 @@ def run_sim_phase(args) -> int:
         t0 = datetime.now()
         info = prepare_scratch(pristine, scratch, d, archive, restore_upto_incl=True)
         src_root = scratch / "wnba_source"
+        if args.oracle_availability_box:
+            info["oracle_excluded"] = write_oracle_exclusions(Path(args.oracle_availability_box), games_all, d,
+                                                               src_root / "data" / "processed")
         pred_fp = src_root / "data" / "processed" / f"props_predictions_{d}.csv"
         try:
             rows, _ = export_props_predictions_local(
@@ -692,6 +696,39 @@ def run_sim_phase(args) -> int:
     return 0
 
 
+def write_oracle_exclusions(box_dir: Path, games: Dict[str, Dict], date: str, processed: Path) -> int:
+    """ORACLE, deliberately NOT as-of: mark OUT every player who did not play (absent from the box, or MIN 0) for each
+    team on D, through production's own injury path (`injuries_excluded_<D>.csv`, read by
+    `_smart_sim_injuries_excluded_map_for_date_local`). Candidates = every name the team's box scores list up to and
+    including D. Measures the CEILING of a perfect pregame inactive report; never a forecast."""
+    teams_today = {}
+    for g in games.values():
+        if g["date"] == date:
+            teams_today[g["home"]] = g["id"]
+            teams_today[g["away"]] = g["id"]
+    seen: Dict[str, set] = defaultdict(set)
+    played: Dict[str, set] = defaultdict(set)
+    for p in sorted(box_dir.glob("boxscores_2026-*.csv")):
+        d = _date_of(p.name)
+        if not d or d > date:
+            continue
+        with p.open(encoding="utf-8", errors="replace") as fh:
+            for r in csv.DictReader(fh):
+                team = SYND_ALIASES.get(str(r.get("TEAM_ABBREVIATION")).upper(), str(r.get("TEAM_ABBREVIATION")).upper())
+                if team not in teams_today:
+                    continue
+                name = str(r.get("PLAYER_NAME") or "")
+                seen[team].add(name)
+                if str(r.get("game_id") or r.get("gameId") or "") == teams_today[team] and _f(r.get("MIN")) > 0:
+                    played[team].add(name)
+    rows = [[date, team, name, "OUT"] for team in teams_today for name in sorted(seen[team] - played[team])]
+    with (processed / f"injuries_excluded_{date}.csv").open("w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        w.writerow(["date", "team_tri", "player", "status"])
+        w.writerows(rows)
+    return len(rows)
+
+
 def _rebuild_main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description="as-of re-run of the WNBA production prediction path")
     ap.add_argument("phase", choices=("game", "sim"))
@@ -706,6 +743,9 @@ def _rebuild_main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--n-sims", type=int, default=500)
     ap.add_argument("--no-sim", action="store_true")
+    ap.add_argument("--oracle-availability-box", default="",
+                    help="ORACLE (deliberately not as-of): box-score dir; every player who did not play on D is written "
+                         "OUT to injuries_excluded_<D>.csv -- the ceiling of a perfect pregame injury report")
     args = ap.parse_args(argv)
     return run_game_phase(args) if args.phase == "game" else run_sim_phase(args)
 
