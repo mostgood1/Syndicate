@@ -127,11 +127,25 @@ def main(argv=None):
     ap.add_argument("--apply", action="store_true", help="write; default is a dry run")
     ap.add_argument("--slug", action="append", default=[],
                     help="restrict to these slugs (repeatable). Default: every non-OPEN slug holding no claims.")
+    # DESTINATION IS A CHOICE NOW, because this tool's hardcoded one went stale.
+    # `lanes_history.md` is "superseded lane checkpoints" (its own header says
+    # so); CLOSED lanes go to `lanes_closed.md`, which is what the convention
+    # became after this script was written. Measured 2026-10-04: lanes_closed.md
+    # carried closures through 10-02 and was touched 10-03, while
+    # lanes_history.md stopped at 09-20 -- so the default was quietly filing
+    # closures into the wrong ledger. Default kept as-is so no existing caller
+    # changes behaviour; the session-start digest asks for `lanes_closed.md`.
+    ap.add_argument("--dest", default=str(HISTORY),
+                    help="archive file to append to (default: .syndicate/lanes_history.md; "
+                         "use .syndicate/lanes_closed.md for CLOSED lanes)")
+    ap.add_argument("--no-pointers", action="store_true",
+                    help="do not leave a one-line pointer in lanes.md for each moved slug")
     args = ap.parse_args(argv)
 
+    dest = pathlib.Path(args.dest)
     try:
         text = LANES.read_text(encoding="utf-8", errors="replace")
-        history = HISTORY.read_text(encoding="utf-8", errors="replace")
+        history = dest.read_text(encoding="utf-8", errors="replace")
     except OSError as exc:
         print(f"cannot read: {exc}")
         return 2
@@ -200,19 +214,58 @@ def main(argv=None):
           f"{'  *** OVER ***' if len(kept) > _cap else '  (under)'}")
     print(f"claims unchanged: {len(after_claims)}")
 
-    if not args.apply:
-        print("\nDRY RUN. Re-run with --apply to write.")
-        return 0
-
+    # EVERYTHING THE WRITE WILL DO IS COMPUTED BEFORE THE DRY-RUN RETURN, so the
+    # dry run exercises it. The pointer block used to be built after that return
+    # and carried a `len()` on an int -- a crash the dry run could not reach and
+    # that only surfaced on `--apply`, i.e. on the run that was about to rewrite
+    # a 693KB shared ledger. A preview that does not execute what it previews is
+    # not a preview.
     stamp = datetime.date.today().isoformat()
     banner = (f"\n\n## RELEASED LANE BLOCKS MOVED FROM `lanes.md` — {stamp}\n\n"
               f"Moved verbatim by `scripts/archive_released_lanes.py`; nothing summarised or\n"
               f"deleted. Every slug here held ZERO file claims at move time, verified against\n"
               f"`lane-guard.py`'s own `_claims()` — so `lane-guard` lost no protection.\n"
               f"Slugs: {', '.join(sorted(by_slug))}.\n\n")
-    HISTORY.write_text(history + banner + moved_text + "\n", encoding="utf-8")
+    if not args.no_pointers:
+        # A POINTER PER SLUG, because a moved block is otherwise unfindable from
+        # the file everyone reads. This matters most for ORPHANED lanes: their
+        # "to resume" notes are the only record of what a dead session was
+        # mid-way through, and an archive with no forward reference buries them.
+        # Deliberately ONE LINE each and naming NO file path -- `_paths_in`
+        # keeps every path-shaped token on a `Files:` line, and these pointers
+        # sit in `lanes.md` where that parser runs.
+        #
+        # The heading is 'Archive pointers', NOT 'Archived ...', because both
+        # `check_lane_invariants.py` and `hoist_open_lanes.py` anchor on the
+        # exact regex `(?m)^## Archived lanes`. A near-miss heading in a file
+        # those tools scan is the kind of thing that gets mistaken for the real
+        # section later. This section holds no `### ` blocks in any case.
+        pointers = "\n".join(
+            f"- `{slug}` — archived {stamp} to `{dest.name}` ({by_slug[slug]} block(s))"
+            for slug in sorted(by_slug)
+        )
+        kept = kept.rstrip("\n") + (
+            f"\n\n## Archive pointers — {stamp}\n\n"
+            f"Blocks moved verbatim to `{dest.name}` by `scripts/archive_released_lanes.py`;\n"
+            f"each held ZERO file claims at move time. Search that file for the slug to read\n"
+            f"the full block, including any ORPHANED 'to resume' note.\n\n"
+            f"{pointers}\n"
+        )
+        print(f"\npointers to add to lanes.md: {len(by_slug)} "
+              f"(heading '## Archive pointers — {stamp}'); first 3:")
+        for line in pointers.split("\n")[:3]:
+            print(f"  {line}")
+
+    if not args.apply:
+        print(f"\nDRY RUN. Nothing written. lanes.md would become {len(kept)} bytes "
+              f"and {dest.name} would gain {len(banner) + len(moved_text) + 1} bytes.")
+        print("Re-run with --apply to write.")
+        return 0
+
+    dest.write_text(history + banner + moved_text + "\n", encoding="utf-8")
     LANES.write_text(kept, encoding="utf-8")
-    print("\nWROTE lanes.md and lanes_history.md.")
+    print(f"\nWROTE lanes.md and {dest.name}"
+          f"{'' if args.no_pointers else f' (+{len(by_slug)} pointers in lanes.md)'}.")
     return 0
 
 
