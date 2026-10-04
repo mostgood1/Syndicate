@@ -1633,6 +1633,14 @@ death, never life — do not invert it.
 - Verification: Entries match the measured table; registry tests pass; a post-deploy layer2 NFL artifact carries the new sample_games with Interceptions parity / skill_reliability 1.0.
 - Blocked by: none
 
+### nba-prop-calibration — OPEN — opened 2026-10-03 — session e0a3e383-4fa1-4669-8740-c9a46b681c7a
+- Goal: NBA smart-sim prop means are rate-shrunk toward each player's season-to-date per-minute rate and <stat>_sd/ladders are scaled by NBA-fit factors, behind SYNDICATE_NBA_PROP_CALIBRATION (off by default), with constants fit by scripts/fit_nba_prop_calibration.py and an out-of-sample reading through the module's own functions
+- Files: syndicate/features/shared/nba_prop_calibration.py (NEW), scripts/fit_nba_prop_calibration.py (NEW), tests/test_nba_prop_calibration.py (NEW)
+- Hypothesis: Rate shrink + sd scale (measured in lane nba-lines-props-backtest --diagnose) improve NBA prop MAE vs the served sim and Brier vs the player's own-average distribution out of sample
+- Falsification test: If the module's own transform, with train-fit constants, does not improve test MAE vs the served sim AND test Brier vs the served Normal (CI excluding 0), the fix is not shipped
+- Verification: Fit script prints OOS MAE/Brier deltas with game-clustered CIs computed through apply_nba_prop_calibration's own functions; reachability test off != on; enabling in production needs ONE call-site line in basketball_props_smart_sim.py (held by OPEN WNBA lanes: loan or user override) + the factor file on the fleet + the flag -- user decision
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
