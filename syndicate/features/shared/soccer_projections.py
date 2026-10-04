@@ -721,6 +721,47 @@ def _mean_projection(mean: float, line: Any, *, basis: str) -> dict[str, Any]:
 _LIVE_OR_DONE = {"live", "in_progress", "final", "completed"}
 
 
+# ---- PER-LINE SKILL WEIGHT (lane `soccer-skill-registry-line-weighting`) ---------------------------------------
+# Every line is still judged on its own; this sets how much of the model's disagreement with the de-vigged book a
+# line's edge keeps: edge = w x (model - fair). w is FITTED per market on 2026-27 by the closed-form Brier optimum of
+# fair + w (model - fair) (`scripts/soccer_season_audit/audit_games.py --extra`, match bootstrap, chronological
+# held-out check). Measured 2026-10-03: w = 0.000 for all three -- the model's disagreement carries no information
+# beyond the close -- so turning this on today zeroes those edges. HELD BY USER DECISION until a model fix earns weight
+# back; OFF unless SYNDICATE_SOCCER_LINE_SKILL_WEIGHT is set (absent = off). Pregame two-sided rows only. NOT COVERED
+# HERE: the h2h DRAW / AWAY legs, which `layer2_board._three_way_leg_edge` re-prices from the probabilities -- that half
+# needs the same factor applied there (file held by another lane).
+_LINE_SKILL_WEIGHT_ENV = "SYNDICATE_SOCCER_LINE_SKILL_WEIGHT"
+_LINE_SKILL_WEIGHTS: dict[str, dict[str, Any]] = {
+    "h2h": {"w": 0.0, "ci95": (0.0, 0.066), "n": 671, "fitted": "2026-07-22..09-20 (MLS to 09-30)"},
+    "totals": {"w": 0.0, "ci95": (0.0, 0.232), "n": 492, "fitted": "2026-07-22..09-20, O/U 2.5"},
+    "spreads": {"w": 0.0, "ci95": (0.0, 0.287), "n": 458, "fitted": "2026-07-22..09-20, closing main AH line"},
+}
+_LINE_SKILL_MARKET_ALIASES = {"h2h_3_way": "h2h", "totals_alt": "totals", "spreads_alt": "spreads"}
+
+
+def line_skill_weight_enabled() -> bool:
+    import os
+
+    return str(os.environ.get(_LINE_SKILL_WEIGHT_ENV) or "").strip().lower() in {"1", "true", "on", "yes"}
+
+
+def _apply_line_skill_weight(row: Mapping[str, Any], projection: dict[str, Any]) -> None:
+    """Scale this line's two-sided `edge_vs_market_pct` by its market's fitted weight; keep the raw edge beside it."""
+    if not line_skill_weight_enabled():
+        return
+    edge = projection.get("edge_vs_market_pct")
+    if edge is None:
+        return
+    market = str(row.get("market") or "").strip().lower()
+    entry = _LINE_SKILL_WEIGHTS.get(_LINE_SKILL_MARKET_ALIASES.get(market, market))
+    if entry is None:
+        return
+    w = float(entry["w"])
+    projection["edge_vs_market_pct_raw"] = edge
+    projection["skill_edge_weight"] = w
+    projection["edge_vs_market_pct"] = round(w * float(edge), 2)
+
+
 def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any]) -> None:
     """Turn a model probability into an EDGE, or say why it cannot be one.
 
@@ -931,6 +972,7 @@ def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any]) ->
     # arithmetic and are named here so the omission is a decision, not a miss.
     if str(projection.get("basis") or "") != "win_probability":
         projection["edge_vs_market_pct"] = round((float(model_prob) - float(fair)) * 100.0, 2)
+        _apply_line_skill_weight(row, projection)
         return
 
     from syndicate.features.shared.live_gameline_join import price_moneyline
@@ -949,6 +991,7 @@ def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any]) ->
         )
         return
     projection["edge_vs_market_pct"] = round(float(verdict["edge_pp"]), 2)
+    _apply_line_skill_weight(row, projection)
 
 
 def _stamp_precision(projection: dict[str, Any], verdict: Mapping[str, Any]) -> None:
