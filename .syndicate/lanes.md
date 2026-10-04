@@ -1165,6 +1165,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - **LANDED 2026-10-04 d5f8acca (on origin/main; NOT on the fleet -- ~/Syndicate was at 00876a04).** Takes effect on the fleet with no restart: bootstrap_data_root.py runs fresh at each `local_production.py up`, and refresh_odds_sources/refresh_wnba_oddsapi_props are per-run subprocesses, so any fleet fast-forward carries it. VERIFY OWED after the next ff + `up`: bootstrap.log's boot refresh line, and no new <today> files under ~/Syndicate/vendor/wnba_betting_repo/data/processed. Known red in worktrees, not this lane: test_refresh_odds_sources::test_nba_and_wnba_use_combined_game_and_player_prop_markets... (writes data/nba_source/logs; fails identically on HEAD without this change).
 
+### nhl-pp-units-real-toi — OPEN — opened 2026-10-04 — session 5704bbd4-3c4f-4d88-9549-fa59e24ab70a
+- Goal: NHL power-play and penalty-kill units are built from each skater's real PP/SH ice time (NHL stats API, regular-season + playoff games in the usage window) instead of total-ice-time rank, and the backtest shows SOG/POINTS/ASSISTS Brier at the lines not worse vs the current engine
+- Files: syndicate/features/nhl/sim_engine/hockeysim/ingestion/nhl_web.py, syndicate/features/nhl/sim_engine/hockeysim/ingestion/lineups.py, syndicate/features/nhl/sim_engine/hockeysim/ingestion/collect.py, scripts/backtest_nhl_props.py, tests/test_hockeysim_ingestion.py
+- Hypothesis: On 10-04 the largest NHL SOG edges track the PP unit, not the player: L1/PP1 players projected 30-45% above their own SOG rate, stars slotted PP2 (Brady Tkachuk 2.43 vs 3.68) as far below. PP units come from total-TOI rank with a forced 3F+2D shape; real PP1 (MTL: Suzuki, Caufield, Hutson, Slafkovsky, Demidov = 4F+1D) differs
+- Falsification test: If real-PP-TOI units leave the paired SOG Brier unchanged or worse, unit composition is not what drives the per-player error
+- Verification: Paired backtest vs bt_flat_v2_noast (every 3rd regular-season date + playoffs): Brier SOG/POINTS/ASSISTS at the lines not worse with CIs; on the fleet, lineups_<date>.csv PP1 matches real PP usage and the 10-04-style |edge|>10% share for SOG falls
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
