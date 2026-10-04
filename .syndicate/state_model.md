@@ -911,3 +911,10 @@ lockout and busy by the time it lifts, which is exactly why waiting kept losing.
   **PRODUCTION READING OWED** and not obtainable before early October 2026.
 
 ---
+
+## [nhl-player-props] NHL PLAYER PROPS ARE PROJECTED AND PRICED ON THE BOARD, PER-LINE GATED -- and the engine still loses to a player's own average in most markets `[verified 2026-10-03 21:16Z on the fleet, lane nhl-player-props-projection]`
+
+- Served /api/board/layer2-shortlist: NHL prop_rows_with_projection 1,017/1,035, all with probability, refused_by_line {} (deploys.md fd4693cd). Producer: `scripts/build_nhl_artifacts.py::build_props_for_date` writes `props_recommendations_<date>.csv` (+ line_slot/proj_toi/sim_starter/game_type) and `props_recommendations_all_markets_<date>.csv`; board join `syndicate/features/nhl/prop_projections.py`, called from the NHL branch of `board_enrichment._attach_projections_by_sport`.
+- Per-line refusals only (user decision 2026-10-02): no line slot / goalie not the sim starter, preseason game, row without line context. No market-level withhold.
+- Engine accuracy (backtest `scripts/backtest_nhl_props.py`, 2025-26 as-of, paired): every market loses to the player's own average except SOG(F) and SAVES (ties). Elite playmaker forwards project ~0.66 of their real assists (shots 0.96, goals 1.03); four fixes for that were falsified.
+- NHL generation does NOT run in the live phase (live NHL odds runs use `refresh_nhl_oddsapi.py --mode fast`): a slate's projections freeze at its last pregame full run `[verified 2026-10-03, odds_refresh_20261003_202020]`.

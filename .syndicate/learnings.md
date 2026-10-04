@@ -5498,3 +5498,9 @@ own prior verdicts, not by anything failing.
 - Also EPISTEMIC: the restart path was never exercised before running unattended on production at night -- only the read-only verify script was dry-run. A path you cannot test should not be the one running alone at 3 AM.
 - Cost: 5 h 14 min with no board builds, odds sweeps, live tracking or scheduled jobs on the fleet (paper money only); a ci-suite run killed mid-flight at `down`.
 - **EXONERATED (with evidence): the change being shipped.** The 13:53Z start carried the SAME commit (`6d2e46c3`) and the SAME env (`SYNDICATE_SOCCER_PROP_OWN_RATE_BLEND=1`) and was healthy in 10 s, so neither the flag nor the fast-forwarded code caused the outage. The safety gate also worked as designed (19 NOT CLEAR aborts 08:00-08:36Z, claims released each time, then one clear window).
+
+## 2026-10-04 — RULE: fixing a BIAS is not fixing the PROJECTION; gate an estimator change on paired per-player Brier, never on the totals it was fit to `[lane nhl-player-props-projection]`
+
+- Belief overturned (twice in one lane): "the refit matches the real total, so the prop gets better." NHL blocks: a shared scale took team bias -0.738 -> -0.001, then a positional term took D/F bias to +0.005/+0.002 -- and paired player blocks MAE got WORSE both times (+0.0083, +0.0069). Assists: real assist rates, a primary/secondary split and two line-quality mechanisms each moved the target aggregate and none improved ASSISTS@0.5 Brier.
+- Why: an unbiased mean spread over the wrong individuals adds variance; the error lived in WHO gets the event, which a level/position fit cannot touch. MAE also rises when a skewed count's mean is lifted toward truth.
+- How to apply: before shipping any calibration/attribution change, run the paired per-player comparison at the betting lines (Brier) against the current production engine on the same player-games; a matched total is a precondition, not evidence.
