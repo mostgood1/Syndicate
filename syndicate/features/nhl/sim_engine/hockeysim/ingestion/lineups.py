@@ -8,7 +8,7 @@ starter-goalie heuristic follow the vendor exactly.
 from __future__ import annotations
 
 import datetime as _dt
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from .nhl_web import NhlWebIngestClient, season_code_for_date
 
@@ -46,6 +46,15 @@ def _name_of(value: object) -> str:
     if isinstance(value, dict):
         return str(value.get("default") or "").strip()
     return str(value or "").strip()
+
+
+def _season_of_game(game_id: object) -> str:
+    """NHL game id YYYYTTNNNN -> season code YYYY(YYYY+1)."""
+    s = str(game_id or "")
+    if len(s) < 4 or not s[:4].isdigit():
+        return ""
+    start = int(s[:4])
+    return f"{start}{start + 1}"
 
 
 def build_team_usage(
@@ -99,6 +108,19 @@ def build_team_usage(
                 if pos == "G" and toi >= _GOALIE_START_MIN:
                     row["starts"] = row.get("starts", 0) + 1
                     row["last_start_date"] = max(str(row.get("last_start_date") or ""), game_date)
+    # Real power-play / penalty-kill minutes for the SAME window games (seasons the window touches).
+    st_by_game: Dict[str, Dict[int, Tuple[float, float]]] = {}
+    for season_code in sorted({_season_of_game(gid) for gid in game_ids} - {""}):
+        try:
+            st_by_game.update(client.special_teams_toi(team_abbr.upper(), season_code))
+        except Exception:  # noqa: BLE001 - enrichment; infer_lines falls back to the positional shape
+            continue
+    for gid in game_ids:
+        for pid, (pp_sec, sh_sec) in (st_by_game.get(str(gid)) or {}).items():
+            row = acc.get(int(pid))
+            if row is not None:
+                row["pp_toi_total"] = row.get("pp_toi_total", 0.0) + pp_sec / 60.0
+                row["sh_toi_total"] = row.get("sh_toi_total", 0.0) + sh_sec / 60.0
     usage = []
     for row in acc.values():
         gp = max(1, row["games_played"])
@@ -163,12 +185,29 @@ def infer_lines(usage: List[Dict], must_dress: Optional[set] = None) -> List[Dic
     for idx, r in enumerate(dressed_d):
         r["line_slot"] = ("D1", "D2", "D3")[idx // 2]
 
-    for unit, (fs, ds) in enumerate(((dressed_f[0:3], dressed_d[0:2]), (dressed_f[3:6], dressed_d[2:4])), start=1):
-        for r in fs + ds:
-            r["pp_unit"] = unit
-    for unit, (fs, ds) in enumerate(((dressed_f[3:5], dressed_d[0:2]), (dressed_f[5:7], dressed_d[2:4])), start=1):
-        for r in fs + ds:
-            r["pk_unit"] = unit
+    dressed = dressed_f + dressed_d
+    # REAL special-teams units when the window carries PP/SH minutes `[2026-10-04, lane
+    # nhl-pp-units-real-toi]`: PP1 = the 5 dressed skaters with the most power-play minutes, in
+    # whatever F/D mix the team really uses; PK1 = top 4 by short-handed minutes. On 10-04 the largest
+    # NHL SOG edges tracked the unit, not the player -- Brady Tkachuk sat on PP2 by total-TOI rank.
+    if any(float(r.get("pp_toi_total") or 0.0) > 0 for r in dressed):
+        by_pp = sorted(dressed, key=lambda r: float(r.get("pp_toi_total") or 0.0), reverse=True)
+        for unit, members in ((1, by_pp[0:5]), (2, by_pp[5:10])):
+            for r in members:
+                r["pp_unit"] = unit
+    else:
+        for unit, (fs, ds) in enumerate(((dressed_f[0:3], dressed_d[0:2]), (dressed_f[3:6], dressed_d[2:4])), start=1):
+            for r in fs + ds:
+                r["pp_unit"] = unit
+    if any(float(r.get("sh_toi_total") or 0.0) > 0 for r in dressed):
+        by_sh = sorted(dressed, key=lambda r: float(r.get("sh_toi_total") or 0.0), reverse=True)
+        for unit, members in ((1, by_sh[0:4]), (2, by_sh[4:8])):
+            for r in members:
+                r["pk_unit"] = unit
+    else:
+        for unit, (fs, ds) in enumerate(((dressed_f[3:5], dressed_d[0:2]), (dressed_f[5:7], dressed_d[2:4])), start=1):
+            for r in fs + ds:
+                r["pk_unit"] = unit
     return usage
 
 

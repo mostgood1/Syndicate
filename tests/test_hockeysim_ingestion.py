@@ -226,3 +226,44 @@ def test_book_listed_ids_match_full_and_unique_abbreviated_names():
     # Carlson exact, Ovechkin by unique abbreviation; the two "L. Hughes" are ambiguous; goalies never
     assert _book_listed_ids(usage, "Washington Capitals", lines) == {1, 2}
     assert _book_listed_ids(usage, "Boston Bruins", [line("John Carlson", h="Winnipeg Jets", a="Calgary Flames")]) == set()
+
+
+def _usage_with_st():
+    rows = []
+    for i in range(12):   # forwards: F4 (index 4) is a PP1 specialist despite lower total TOI
+        rows.append({"player_id": 100 + i, "position": "F", "games_played": 8, "toi_avg": 20.0 - i,
+                     "toi_total": 8 * (20.0 - i), "pp_toi_total": {0: 25, 1: 24, 2: 2, 3: 23, 4: 22}.get(i, 1.0),
+                     "sh_toi_total": {5: 15, 6: 14}.get(i, 0.5)})
+    for i in range(6):    # defense: D0 quarterbacks PP1, D1/D2 kill penalties
+        rows.append({"player_id": 200 + i, "position": "D", "games_played": 8, "toi_avg": 24.0 - i,
+                     "toi_total": 8 * (24.0 - i), "pp_toi_total": 26 if i == 0 else 3.0,
+                     "sh_toi_total": {1: 18, 2: 17}.get(i, 1.0)})
+    return rows
+
+
+def test_real_special_teams_minutes_build_the_units():
+    by_id = {r["player_id"]: r for r in lu.infer_lines(_usage_with_st())}
+    pp1 = sorted(pid for pid, r in by_id.items() if r.get("pp_unit") == 1)
+    assert pp1 == [100, 101, 103, 104, 200]          # 4F + 1D, as the minutes say -- not 3F+2D
+    assert by_id[102]["pp_unit"] != 1                # big total TOI, little PP time -> not PP1
+    pk1 = sorted(pid for pid, r in by_id.items() if r.get("pk_unit") == 1)
+    assert pk1 == [105, 106, 201, 202]
+
+
+def test_special_teams_toi_parses_the_stats_report(monkeypatch):
+    from syndicate.features.nhl.sim_engine.hockeysim.ingestion.nhl_web import NhlWebIngestClient
+
+    client = NhlWebIngestClient(rate_limit_per_sec=0)
+    seen = []
+
+    def fake_get(url):
+        seen.append(url)
+        if "gameTypeId%3D2" in url:
+            return {"data": [{"gameId": 2025020500, "playerId": 8480018, "ppTimeOnIce": 212, "shTimeOnIce": 0},
+                             {"gameId": 2025020500, "playerId": 8478851, "ppTimeOnIce": 0, "shTimeOnIce": 73}]}
+        return {"data": []}
+
+    monkeypatch.setattr(client, "_get", fake_get)
+    st = client.special_teams_toi("MTL", "20252026")
+    assert st == {"2025020500": {8480018: (212.0, 0.0), 8478851: (0.0, 73.0)}}
+    assert len(seen) == 2 and all("seasonId%3D20252026" in u for u in seen)

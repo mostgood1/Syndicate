@@ -9,12 +9,14 @@ from __future__ import annotations
 import json
 import os
 import time
+import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 _NHLE_BASE = (os.getenv("NHLE_BASE_URL", "https://api-web.nhle.com/v1") or "").rstrip("/")
 _FINISHED = {"OFF", "FINAL"}
+_NHL_STATS_BASE = (os.getenv("NHL_STATS_BASE_URL", "https://api.nhle.com/stats/rest/en") or "").rstrip("/")
 _COMPETITIVE_GAME_TYPES = {2, 3}  # regular season, playoffs -- never preseason (1)
 
 
@@ -138,6 +140,36 @@ class NhlWebIngestClient:
             gid = g.get("id")
             if gid is not None:
                 out.append(str(gid))
+        return out
+
+    def special_teams_toi(self, team_abbr: str, season: str) -> Dict[str, Dict[int, Tuple[float, float]]]:
+        """``{game_id: {player_id: (pp_seconds, sh_seconds)}}`` for one team's regular-season and
+        playoff games of a season, from the NHL stats API's per-game time-on-ice report.
+
+        The api-web boxscore carries only TOTAL ice time, so power-play / penalty-kill units used
+        to be the top skaters by total TOI with a forced 3F+2D shape; real PP1s are often 4F+1D
+        (Montreal 2025-26: Suzuki, Caufield, Hutson, Slafkovsky, Demidov) `[2026-10-04, lane
+        nhl-pp-units-real-toi]`. One call per team per game type; an unreachable report returns
+        ``{}`` and the caller keeps its positional fallback. Needs the browser-style User-Agent
+        ``_get`` sends -- Python's default is refused with 403.
+        """
+        out: Dict[str, Dict[int, Tuple[float, float]]] = {}
+        for game_type in (2, 3):
+            exp = urllib.parse.quote(f'teamAbbrev="{team_abbr}" and seasonId={season} and gameTypeId={game_type}')
+            url = f"{_NHL_STATS_BASE}/skater/timeonice?isAggregate=false&isGame=true&limit=-1&cayenneExp={exp}"
+            try:
+                data = self._get(url)
+            except Exception:  # noqa: BLE001 - special-teams minutes are an enrichment
+                continue
+            for row in (data or {}).get("data") or []:
+                try:
+                    gid = str(int(row.get("gameId")))
+                    pid = int(row.get("playerId"))
+                    pp = float(row.get("ppTimeOnIce") or 0.0)
+                    sh = float(row.get("shTimeOnIce") or 0.0)
+                except (TypeError, ValueError):
+                    continue
+                out.setdefault(gid, {})[pid] = (pp, sh)
         return out
 
     def recent_finished_game_ids(self, team_abbr: str, season: str, *, before_date: str, n: int = 8) -> List[str]:
