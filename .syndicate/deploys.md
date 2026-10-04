@@ -45940,3 +45940,24 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - restore: 13:53:13Z `Start-ScheduledTask` again (no supervisor present first: `pgrep` empty) -> `/healthz` 200 at 13:53:23Z, supervisor pid 1049714 since 13:53:18Z, three roles up.
 - the change itself (verified 13:5xZ): `SYNDICATE_SOCCER_PROP_OWN_RATE_BLEND=1` present in live-odds-worker's /proc environ (single key read); fleet HEAD `6d2e46c3` (ride-alongs: everything on main between c573ea39 and 6d2e46c3 loaded with this restart -- not enumerated yet, OWED).
 - verify OWED: first soccer build after 13:53Z -> served soccer prop rows carrying `own_rate_blend` (expect ~65% of outfield rows, 7 leagues).
+
+## 2026-10-04 16:29:42Z (11:29 AM CT) -- LOCAL FLEET CONFIG (no restart): `SYNDICATE_SCORE_FEE_NET=1` pinned in `~/syndicate-prod/local_production.env` -- **MET** (session 05b01a84; user decision "yes, add it to local_production.env")
+
+- **why:** fee-net EV in the Layer 2 score was set on Render's refresh-worker 2026-09-21 (entry 21:43:55Z). It
+  reached the fleet only through the imported Render env snapshot (`render_env/refresh-worker.json`). It is in
+  NEITHER `render.yaml` NOR `local_production.env`, so a re-derive from `render.yaml` alone would silently
+  drop it.
+- **baseline (read 2026-10-03 ~23:40Z):**
+  - running refresh-worker `/proc/<pid>/environ` carried `SYNDICATE_SCORE_FEE_NET=1`; web and
+    live-odds-worker carried it ABSENT;
+  - served `/api/board/layer2-shortlist` (build age 122 s): fee-net EV is the score's value term
+    (`score.ev_component == score_v2.ev_net_pct`) on 212/212 fee-venue rows, 193/193 NFL Kalshi.
+- **change:** backup `local_production.env.bak_20261004T162942Z` (66 lines), then the key appended with a
+  comment (70 lines).
+- **expect:** the derived env carries `=1` for every role. No running process changes until the next `up`:
+  refresh-worker already has `=1`, and web / live-odds-worker gain it at the next `up`. Only the board build
+  (refresh-worker) scores rows; `portfolio_commit` and web read the scored board. So the served behaviour is
+  unchanged, and the change removes a silent-drop risk.
+- **verify (READ 16:29Z):** `scripts/local_production.py env --role <r>` in `~/Syndicate` prints
+  `SYNDICATE_SCORE_FEE_NET=1` for web, refresh-worker and live-odds-worker (only that key printed).
+- **not read:** a post-`up` process env (no restart was made).
