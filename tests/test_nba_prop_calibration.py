@@ -231,3 +231,54 @@ def test_current_season_wins_once_a_player_has_three_games(tmp_path):
 
 def test_prior_season_window_is_the_previous_season_only():
     assert cal.season_start("2026-10-21") == "2026-08-01"   # opening night 2026-27 -> prior window 2025-08-01..2026-08-01
+
+
+def _sim_file(tmp_path, stamp_block):
+    p = tmp_path / "smart_sim_2026-10-05_PHI_NYK.json"
+    payload = _sim()
+    if stamp_block is not None:
+        payload["nba_prop_calibration"] = stamp_block
+    p.write_text(json.dumps(payload), encoding="utf-8")
+    return p
+
+
+def test_pre_enable_sim_is_stale_once_calibration_is_on(tmp_path):
+    root = _write_root(tmp_path, factors={**FACTORS, "enabled": True})
+    old = _sim_file(tmp_path, None)                                   # written before the enable: no stamp
+    assert cal.sim_is_stale(old, league_code="nba", processed_root=root, env={}) is True
+
+
+def test_sim_stamped_by_the_active_factor_file_is_fresh_and_a_changed_file_makes_it_stale(tmp_path):
+    root = _write_root(tmp_path, factors={**FACTORS, "enabled": True})
+    out = _sim()
+    s = cal.apply_nba_prop_calibration(out, league_code="nba", processed_root=root, build_ladder=_ladder, name_key=_key, env={})
+    assert s["factor_sha"] == cal.factor_stamp(root)
+    p = tmp_path / "smart_sim_2026-10-05_X_Y.json"
+    p.write_text(json.dumps(out), encoding="utf-8")
+    assert cal.sim_is_stale(p, league_code="nba", processed_root=root, env={}) is False
+    _write_root(tmp_path, factors={**FACTORS, "enabled": True, "sd_scale": {"pts": 1.4}})   # constants changed
+    assert cal.sim_is_stale(p, league_code="nba", processed_root=root, env={}) is True
+
+
+def test_calibrated_sim_is_stale_when_calibration_is_switched_off_and_uncalibrated_is_not(tmp_path):
+    root = _write_root(tmp_path, factors={**FACTORS, "enabled": True})
+    stamped = _sim_file(tmp_path, {"applied": True, "factor_sha": cal.factor_stamp(root)})
+    assert cal.sim_is_stale(stamped, league_code="nba", processed_root=root, env={cal.FLAG: "0"}) is True
+    plain = _sim_file(tmp_path, None)
+    assert cal.sim_is_stale(plain, league_code="nba", processed_root=root, env={cal.FLAG: "0"}) is False
+
+
+def test_stamp_is_written_even_when_no_player_qualifies_so_it_cannot_loop(tmp_path):
+    root = _write_root(tmp_path, factors={"enabled": True, "w": {"pts": 0.2}}, history=[])
+    out = _sim()
+    s = cal.apply_nba_prop_calibration(out, league_code="nba", processed_root=root, build_ladder=_ladder, name_key=_key, env={})
+    assert s["players"] == 0 and out["nba_prop_calibration"]["factor_sha"] == cal.factor_stamp(root)
+    p = tmp_path / "smart_sim_2026-10-05_X_Y.json"
+    p.write_text(json.dumps(out), encoding="utf-8")
+    assert cal.sim_is_stale(p, league_code="nba", processed_root=root, env={}) is False
+
+
+def test_wnba_sims_are_never_judged_stale(tmp_path):
+    root = _write_root(tmp_path, factors={**FACTORS, "enabled": True})
+    assert cal.sim_is_stale(_sim_file(tmp_path, None), league_code="wnba", processed_root=root, env={}) is False
+    assert cal.sim_is_stale(tmp_path / "missing.json", league_code="nba", processed_root=root, env={}) is False

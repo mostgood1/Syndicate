@@ -106,6 +106,48 @@ def combo_scale(parts: Tuple[str, ...], sds: Mapping[str, float], k: Mapping[str
     return math.sqrt(num / den) if den > 0 else None
 
 
+def factor_stamp(processed_root: Path) -> Optional[str]:
+    """Content hash of the factor file (16 hex), or None when absent/unreadable."""
+    try:
+        import hashlib
+        return hashlib.sha256((Path(processed_root) / FACTOR_FILE).read_bytes()).hexdigest()[:16]
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def active_stamp(league_code: str, processed_root: Path, env: Optional[Mapping[str, str]] = None) -> Optional[str]:
+    """The stamp a sim written NOW would carry: the factor file's hash when the calibration would run, else None."""
+    if str(league_code or "").strip().lower() != "nba":
+        return None
+    state = flag_state(env)
+    if state == "off":
+        return None
+    factors, _ = load_factors(processed_root)
+    if factors is None or (state == "unset" and not factors.get("enabled")):
+        return None
+    return factor_stamp(processed_root)
+
+
+def sim_is_stale(path: Path, *, league_code: str, processed_root: Path, env: Optional[Mapping[str, str]] = None) -> bool:
+    """STALE-SIM CHECK (2026-10-04, user decision "borrow the file and add the stale-sim fix"). The smart-sim run
+    reuses any existing sim forever, so a sim written under a DIFFERENT calibration than the one now active (pre-enable,
+    old constants, or calibrated while it is now off) would be served indefinitely. True -> the caller re-simulates.
+    NBA only; never raises (an unreadable sim is not judged stale here -- the caller's own adequacy check owns that)."""
+    if str(league_code or "").strip().lower() != "nba":
+        return False
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return False
+    block = payload.get("nba_prop_calibration") if isinstance(payload, dict) else None
+    have = block.get("factor_sha") if isinstance(block, dict) else None
+    want = active_stamp(league_code, processed_root, env)
+    stale = have != want
+    if stale:
+        print(f"[nba_prop_calibration] NBA_SIM_STALE path={Path(path).name} have={have} want={want} -> re-simulate", flush=True)
+    return stale
+
+
 def load_factors(processed_root: Path) -> Tuple[Optional[Dict[str, Dict[str, float]]], str]:
     path = Path(processed_root) / FACTOR_FILE
     if not path.is_file():
@@ -277,6 +319,8 @@ def apply_nba_prop_calibration(out: Any, *, league_code: str, processed_root: Pa
             print(f"[nba_prop_calibration] NBA_PROP_CALIBRATION skipped reason={reason}", flush=True)
             return summary
         summary["switch"] = "env" if state == "on" else "factor_file"
+        # stamped whenever the calibration RUNS (even if no player qualifies) so sim_is_stale cannot loop
+        summary["factor_sha"] = factor_stamp(processed_root)
         w, b, k = factors["w"], factors["b"], factors["k"]
         pw, pb = factors.get("pw") or {}, factors.get("pb") or {}
         slate = str(out.get("date") or "")[:10]
@@ -343,6 +387,7 @@ def apply_nba_prop_calibration(out: Any, *, league_code: str, processed_root: Pa
                     summary["players"] += 1
                     summary["players_rate_shrunk"] += bool(delta)
         summary.update(applied=summary["players"] > 0, w=w, b=b, k=k, reason="ok")
+        summary.setdefault("factor_sha", factor_stamp(processed_root))
         out["nba_prop_calibration"] = summary
         print(f"[nba_prop_calibration] NBA_PROP_CALIBRATION applied players={summary['players']} "
               f"rate_shrunk={summary['players_rate_shrunk']} prior_season={summary['players_prior_season']} "

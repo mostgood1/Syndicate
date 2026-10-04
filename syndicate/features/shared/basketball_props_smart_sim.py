@@ -5701,7 +5701,14 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
             except Exception:
                 pass
         if out_path.exists() and (not force_this_game):
-            if _smart_sim_file_has_players_local(out_path):
+            # (lane nba-prop-calibration, LOANED) an NBA sim written under a different prop calibration than the one now
+            # active is STALE: without this, a sim from before an enable/constant change is reused (and served) forever.
+            # NBA-only; for WNBA sim_is_stale returns False without reading the file.
+            from syndicate.features.shared.nba_prop_calibration import sim_is_stale as _nba_calibration_stale
+
+            if _smart_sim_file_has_players_local(out_path) and not _nba_calibration_stale(
+                out_path, league_code=league_code, processed_root=processed_root
+            ):
                 skipped += 1
                 continue
             try:
