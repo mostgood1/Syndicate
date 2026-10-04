@@ -46007,3 +46007,12 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - **health after:** healthz 200; live-odds 1, refresh 1, gunicorn 3 processes. No restart was made.
 - **reading 2 OWED:** the next production NBA smart_sim after 16:40:07Z. Then the served reading via lane `nba-layer2-projections`, when books post NBA props: prop rows projected / total, rows_with_probability, and the over/under edge split.
 - **known limit:** on opening night, means are corrected only by width until each player's 3rd game. The prior-season fallback was measured (it beats the served sim) and ships separately; see the next entry.
+
+## 2026-10-04 16:49:07Z (11:49 AM CT) -- MEASUREMENT: NHL in-season team xG (5dcb8783, ff 16:33:28Z) -- **MET on production** (lane `nhl-season-inputs-in-season`)
+
+- **Reading 1** (watcher, fleet): `team_xg_2026-2027.csv` written by the first post-ff generation at **16:46:48Z**.
+  - 32 teams; games per team 4x1 / 20x2 / 8x3, identical to the 16:31Z dry run.
+  - `predictions_2026-10-05` rewritten 16:47:09Z, after the season file.
+- **Reading 2 (reachability)**: the fleet's own producer, re-run read-only into /tmp on production's root vs a /tmp copy WITHOUT the season file.
+  - Production's `p_home_ml_raw` (pure model, odds-independent) equals the WITH run on **4/4** games and the WITHOUT run on **0/4**.
+  - The blend already moves p_home_ml_raw by mean 0.0196, max 0.0474 at 1-3 games played.
