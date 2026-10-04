@@ -118,3 +118,55 @@ def test_main_runs_against_an_empty_home_and_reports_down(tmp_path, capsys):
     assert rc == 1 and out["status"] == "down" and out["alert"] is True
     assert (tmp_path / "run" / wd.STATE_NAME).is_file()
     assert "no supervisor pidfile" in (tmp_path / "logs" / wd.LOG_NAME).read_text(encoding="utf-8")
+
+# ---- auto-recovery (lane fleet-watchdog-auto-recovery; 2026-10-04 08:39-13:53Z outage) -----------------------
+
+T0 = dt.datetime(2026, 10, 4, 8, 40, tzinfo=dt.timezone.utc)
+DOWN = [wd.Finding("supervisor", wd.FAIL, "no supervisor pidfile")]
+
+
+def _at(minutes):
+    return T0 + dt.timedelta(minutes=minutes)
+
+
+def test_first_failing_check_waits_for_a_second_one():
+    d, s = wd.recovery(DOWN, {}, T0, paused=False)
+    assert d["recover"] is False and s["down_since"] == T0.isoformat()
+
+
+def test_a_second_failing_check_starts_the_fleet():
+    _, s = wd.recovery(DOWN, {}, T0, paused=False)
+    d, s2 = wd.recovery(DOWN, s, _at(10), paused=False)
+    assert d["recover"] is True and len(s2["recovery_attempts"]) == 1
+
+
+def test_attempts_are_capped_per_hour_then_alert_only():
+    state = {"down_since": T0.isoformat(), "recovery_attempts": []}
+    took = 0
+    for m in range(10, 60, 5):
+        d, state = wd.recovery(DOWN, state, _at(m), paused=False)
+        took += d["recover"]
+    assert took == wd.RECOVER_MAX_PER_HOUR
+    assert "alert only" in d["reason"]
+
+
+def test_the_pause_file_blocks_recovery():
+    d, _ = wd.recovery(DOWN, {"down_since": T0.isoformat()}, _at(30), paused=True)
+    assert d["recover"] is False and "paused" in d["reason"]
+
+
+def test_a_healthy_check_clears_down_since():
+    d, s = wd.recovery([], {"down_since": T0.isoformat()}, _at(30), paused=False)
+    assert d["recover"] is False and s["down_since"] is None
+
+
+def test_a_role_failure_under_a_live_supervisor_is_not_recovered_here():
+    role = [wd.Finding("healthz", wd.FAIL, "/healthz did not answer 200")]
+    d, _ = wd.recovery(role, {"down_since": T0.isoformat()}, _at(30), paused=False)
+    assert d["recover"] is False
+
+
+def test_old_attempts_age_out_of_the_hourly_cap():
+    state = {"down_since": T0.isoformat(), "recovery_attempts": [_at(0).isoformat()] * 3}
+    d, _ = wd.recovery(DOWN, state, _at(61), paused=False)
+    assert d["recover"] is True

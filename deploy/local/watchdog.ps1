@@ -18,6 +18,7 @@ param(
     [string] $LocalHome = '~/syndicate-prod',
     [string] $StateDir = 'C:\SyndicateProd\watchdog',
     [int] $TimeoutSeconds = 120,
+    [string] $FleetTaskName = 'SyndicateLocalProduction',
     [switch] $TestToast
 )
 
@@ -128,6 +129,17 @@ if ($state.unreachable_since) {
     Show-Toast 'Syndicate fleet: reachable again' "WSL answered again (was unreachable since $($state.unreachable_since): $($state.reason))" | Out-Null
     Write-Log "REACHABLE_AGAIN after $($state.unreachable_since)"
     @{ unreachable_since = $null; last_alert = $null; reason = $null } | ConvertTo-Json | Set-Content -Path $statePath -Encoding utf8
+}
+
+# AUTO-RECOVERY: the WSL-side decision (local_watchdog.recovery: supervisor down for two checks, capped 3/hour,
+# paused by <home>/watchdog_no_autostart) says start the fleet. Starting it is a Windows action, so it lives here.
+if ($result.recover) {
+    try {
+        Start-ScheduledTask -TaskName $FleetTaskName
+        Write-Log "RECOVERY_START task=$FleetTaskName $($result.recovery.reason)"
+    } catch {
+        Write-Log "RECOVERY_START_FAILED task=$FleetTaskName $($_.Exception.Message)"
+    }
 }
 
 if ($result.alert) {

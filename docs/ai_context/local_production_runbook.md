@@ -191,6 +191,8 @@ Start at boot and restart on failure:
 
 Alerts fire when a problem is new, again while it persists (failures every 6 hours, warnings every 24), and once when it clears. Install it with `deploy\local\install_watchdog_task.ps1`. That copies `watchdog.ps1` into `C:\SyndicateProd\watchdog` and registers `SyndicateFleetWatchdog`, which runs only while you're logged on, since a notification needs your desktop. Use `-TestToast` to prove notifications reach you. Logs: `C:\SyndicateProd\watchdog\watchdog.log` for Windows‑side runs, and `<home>/logs/watchdog.log` for transitions. **It can't alert while the laptop sleeps.** A missed run starts on wake, so an outage during sleep is reported late, not never.
 
+**Auto-recovery** `[2026-10-04, lane fleet-watchdog-auto-recovery, after a 5 h 14 min outage]`: when the supervisor itself is down (no pidfile, or a dead supervisor) on two consecutive checks (>= 9 min), the watchdog runs `Start-ScheduledTask SyndicateLocalProduction`, at most 3 times an hour, then alerts only. It logs `RECOVERY_START` in `C:\SyndicateProd\watchdog\watchdog.log`. **For deliberate maintenance, create `~/syndicate-prod/watchdog_no_autostart` before `down` and delete it after**, or the watchdog will start the fleet back up within about 10 minutes. It inherits the watchdog task's limit: it runs only while you are logged on.
+
 ## 5. Exposing the site (optional)
 
 Web binds `127.0.0.1` by default. Do not port-forward it. To serve the public:

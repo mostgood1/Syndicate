@@ -58,6 +58,15 @@ JOB_MAX_RUNTIME_SECONDS = 4 * 3600
 BACKUP_MAX_AGE_SECONDS = 30 * 3600
 MIN_FREE_BYTES = 10 * 1024 ** 3
 STATE_NAME = "watchdog_state.json"
+# AUTO-RECOVERY (lane fleet-watchdog-auto-recovery, user decision after the 2026-10-04 08:39-13:53Z outage).
+# A supervisor that is not running is restarted by the watchdog, not merely toasted about: a scheduled-task start
+# that never ran `up` exited 0, so Task Scheduler's restart-on-failure never fired and the fleet stayed down 5 h 14 min
+# while a toast reached nobody at 3 AM. Two consecutive failing checks (>= RECOVER_AFTER_SECONDS) so a deliberate
+# down->up does not trip it; RECOVER_MAX_PER_HOUR attempts, then alert-only. `<home>/watchdog_no_autostart` pauses it
+# for deliberate maintenance. The decision lives HERE (tested); watchdog.ps1 only acts on `recover`.
+RECOVER_AFTER_SECONDS = 9 * 60
+RECOVER_MAX_PER_HOUR = 3
+NO_AUTOSTART_NAME = "watchdog_no_autostart"
 LOG_NAME = "watchdog.log"
 
 
@@ -239,6 +248,33 @@ def decide(findings: list[Finding], state: dict[str, Any], now: dt.datetime) -> 
     return result, {"active": active, "last_check": now.isoformat()}
 
 
+def recovery(findings: list[Finding], state: dict[str, Any], now: dt.datetime, *, paused: bool) -> tuple[dict[str, Any], dict[str, Any]]:
+    """(decision, state updates). decision = {recover, reason, down_since, attempts_last_hour}.
+
+    Only a SUPERVISOR failure is recovered (no pidfile / dead supervisor): that is the one state the fleet cannot leave
+    by itself. A failing role under a live supervisor is the supervisor's job (it restarts roles that exit).
+    """
+    down = any(f.key == "supervisor" and f.severity == FAIL for f in findings)
+    attempts = [a for a in (state.get("recovery_attempts") or [])
+                if (now - dt.datetime.fromisoformat(a)).total_seconds() < 3600]
+    if not down:
+        return {"recover": False, "reason": "supervisor up", "down_since": None,
+                "attempts_last_hour": len(attempts)}, {"down_since": None, "recovery_attempts": attempts}
+    since = state.get("down_since") or now.isoformat()
+    down_for = (now - dt.datetime.fromisoformat(since)).total_seconds()
+    if paused:
+        reason, recover = f"paused by {NO_AUTOSTART_NAME}", False
+    elif down_for < RECOVER_AFTER_SECONDS:
+        reason, recover = f"down {int(down_for)} s < {RECOVER_AFTER_SECONDS} s; waiting one more check", False
+    elif len(attempts) >= RECOVER_MAX_PER_HOUR:
+        reason, recover = f"{len(attempts)} attempts in the last hour -- alert only, a human is needed", False
+    else:
+        reason, recover = f"supervisor down {int(down_for)} s -- starting the fleet (attempt {len(attempts) + 1})", True
+        attempts.append(now.isoformat())
+    return ({"recover": recover, "reason": reason, "down_since": since, "attempts_last_hour": len(attempts)},
+            {"down_since": since, "recovery_attempts": attempts})
+
+
 # --------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------
@@ -261,6 +297,13 @@ def main(argv: list[str] | None = None) -> int:
     findings = evaluate(readings, now, previous_restarts=state.get("restarts") or {})
     result, new_state = decide(findings, state, now)
     new_state["restarts"] = readings.get("restarts") or {}
+    decision, rec_state = recovery(findings, state, now, paused=(home / NO_AUTOSTART_NAME).exists())
+    new_state.update(rec_state)
+    result["recovery"] = decision
+    result["recover"] = decision["recover"]
+    if decision["recover"]:
+        result["alert"] = True
+        result["message"] = (result["message"] + "\nAUTO-RECOVERY: " + decision["reason"]).strip()
     result["checked_at"] = now.isoformat()
 
     if not args.dry_run:
