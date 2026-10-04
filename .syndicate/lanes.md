@@ -1049,7 +1049,7 @@ death, never life — do not invert it.
 - Verification: Report: per variant x league n, Brier/LL vs shipped, naive and close (CIs), favourite calibration (model vs actual vs book), rating spread; data coverage + intersection printed; leak check (no rating input dated >= kickoff); held-out = chronological split; 2025-26 reported separately where retained
 - Blocked by: none
 
-### nba-prop-calibration — OPEN — opened 2026-10-03 — session e0a3e383-4fa1-4669-8740-c9a46b681c7a — **GOAL: MET 2026-10-04 (module c7b22387 + call site 7f920a60 on main; flag OFF; production enable = user decision 'Not yet')**
+### nba-prop-calibration — OPEN — opened 2026-10-03 — session e0a3e383-4fa1-4669-8740-c9a46b681c7a — **GOAL: MET 2026-10-04; ENABLED IN PRODUCTION 2026-10-04 16:40Z/17:40Z by FILE SWITCH (user: 'enable before the first prop day'), with the prior-season fallback; READING 2 (next production NBA sim) OWED**
 - **NBA smart-sim prop means are rate-shrunk toward each player's season-to-date per-minute rate and <stat>_sd/ladders are scaled by NBA-fit factors, behind SYNDICATE_NBA_PROP_CALIBRATION (off by default), with constants fit by scripts/fit_nba_prop_calibration.py and an out-of-sample reading through the module's own functions — GOAL: MET.**
   - Done: the module (flag-gated, NBA-only), the fit script, 9 tests including flag-off != flag-on, and a real fleet payload run (smart_sim_2026-10-03_TOR_MIA: 297 ladders rebuilt, pts sd 6.79 -> 8.83, no rate shrink until 3 season games).
   - OOS (train-fit constants, 403 test games), WITH the season-average blend (c7b22387): beats the served sim AND the player's own average in all 11 markets on MAE and on Brier, every CI < 0 (e.g. pts MAE -0.134 vs own avg, pra -0.218).
@@ -1063,6 +1063,14 @@ death, never life — do not invert it.
 - Verification: Fit script prints OOS MAE/Brier deltas with game-clustered CIs computed through apply_nba_prop_calibration's own functions; reachability test off != on; enabling in production needs ONE call-site line in basketball_props_smart_sim.py (held by OPEN WNBA lanes: loan or user override) + the factor file on the fleet + the flag -- user decision
 - Blocked by: none
 
+- PRODUCTION 2026-10-04 (deploys.md 16:40:07Z + 17:40:28Z):
+  - File switch fbbaba76: on when the factor file says "enabled": true; env 0/off is the kill switch. No role restart was made.
+  - Prior-season fallback 00876a04: measured to beat the served sim on a year-stale proxy; reproduced exactly.
+  - Fleet factor file v2 at `nba_source/data/processed/nba_prop_calibration.json` (sha8 82ba04dd).
+  - Reading 1 MET: 35/35 players calibrated from the prior season, e.g. Embiid pts 21.1 -> 25.0.
+  - 38f029ca carried along and verified via the live quota ledger.
+  - OWED: reading 2 (watcher `C:\tmp\nba_bt\watch_calib.log`); then, when books post NBA props, the served reading via lane nba-layer2-projections (rows projected/total, rows_with_probability, over/under edge split).
+  - TO DISABLE: set `"enabled": false` in the factor file, or env `SYNDICATE_NBA_PROP_CALIBRATION=0`.
 ### basketball-injury-exclusion-reinclusion — OPEN — opened 2026-10-03 — session 39b666bb-e708-4edf-bfe5-3dda419e3589
 - **Goal (verbatim): "Players the injury feed lists OUT (raw/injuries.csv, injuries_excluded_<D>.csv, league_status) stay out of the WNBA/NBA SmartSim pool: _smart_sim_injuries_excluded_map_for_date_local stops re-admitting every player who merely appears in props_df when props_df has no playing_today column; verified by a regression test that fails on the old code and, after a user-approved fleet ff, by the next WNBA smart_sim carrying none of the injury file's OUT players" -- GOAL: MET (reading 2 16:51Z: 0/44 OUT-listed players in the 10-04 pools; injuries_out 5/4/1/5).** Shipped ff4ca730 + 500a5643 (second defect: stale injury-feed teams; re-key by name, user-approved), fleet ff 04:58:09Z no restart; reading 1 MET (fleet code produces the expected 10-04 map). Owed: next production smart_sim_2026-10-04 has 0 OUT-listed players (watcher armed). deploys.md 2026-10-04 04:58:09Z.
 - **OPEN DEFECT (unowned, found 10-04):** some process builds WNBA smart_sims with `--source-root` = `~/Syndicate/vendor/wnba_betting_repo` (no injuries.csv there -> injuries_out 0, OUT players simulated) and copies them into prod processed/ (10-02 and 10-04 13:57Z prod sims are md5-identical to the vendor-dir files). Not an orchestrator step (all used the prod root); writer unidentified. deploys.md 2026-10-04 16:51:50Z.
