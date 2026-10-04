@@ -45961,3 +45961,17 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - **verify (READ 16:29Z):** `scripts/local_production.py env --role <r>` in `~/Syndicate` prints
   `SYNDICATE_SCORE_FEE_NET=1` for web, refresh-worker and live-odds-worker (only that key printed).
 - **not read:** a post-`up` process env (no restart was made).
+
+## 2026-10-04 16:33:28Z (11:33 AM CT) -- LOCAL FLEET FF 41be27bd -> 5dcb8783, NO RESTART: NHL in-season team xG -- **SHIPPED; production reading OWED** (lane `nhl-season-inputs-in-season`, user: "we need to look at the team xG file and bringing in 2026-27 data")
+
+- **Why:** production projected every 2026-27 game from FROZEN 2025-26 season files (team_xg_latest.csv built 2026-08-18; `_ensure_season_inputs` only pulls missing `_latest`; fleet ingestion_cache empty). Team xG is the only team-strength input to the game lines.
+- **What:** `syndicate/features/nhl/inseason_team_xg.py`, called once per generation from `refresh_nhl_oddsapi._run_owned_generation` (user-approved cross-lane write, recorded in `nhl-sim-artifact-backfill-fabricates`).
+  - Writes `team_xg_2026-2027.csv` = (10 * prior + n * current) / (10 + n).
+  - Prior: production's `team_xg_latest.csv`. Current: 2026-27 regular-season play-by-play, frozen xG coefficients, put on the prior's scale.
+  - The loaders already prefer the season file over `_latest`. Never raises.
+- **Measured before shipping:** 2025-26 from opening night, n=1,312, production form, w chosen on 2024-25 and frozen. ML Brier blend - prior-only **-0.0033 [-0.0052, -0.0015]**; total MAE not worse; vs the close +0.0037 -> +0.0004.
+- **How:** `git merge --ff-only 5dcb8783` (clean tree); `rev-parse HEAD == target` checked after the ff. Gap from 41be27bd carried only ledger commits plus this lane's three runtime files. Claims live-odds-worker + refresh-worker held by nhl-season-inputs-in-season. No restart: the NHL runner is a per-run subprocess.
+- **Baseline** (16:30:33Z): `team_xg_2026-2027.csv` ABSENT; `team_xg_latest.csv` 2026-08-18 build; predictions_2026-10-04/05 last written ~16:00Z.
+- **Dry run** of the same code on a copy of production's prior (16:31Z, live feed): 34 finished 2026-27 regular games, 34/34 play-by-play fetched, 32 teams, 1-3 games each; mean combined xG shift 0.18 (largest PHI 0.55, 3 games).
+- **Expect:** the first post-ff full generation writes `team_xg_2026-2027.csv` (32 teams, games 1-3), then predictions are rewritten reading it.
+- **Reading OWED:** watcher `inseason_watch.sh` (season file mtime > ff, then a predictions rewrite >= it).
