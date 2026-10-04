@@ -56,7 +56,7 @@ def test_reachability_flag_off_differs_from_flag_on(tmp_path):
     off, on = _sim(), _sim()
     s_off = cal.apply_nba_prop_calibration(off, league_code="nba", processed_root=root, build_ladder=_ladder, name_key=_key, env={})
     s_on = cal.apply_nba_prop_calibration(on, league_code="nba", processed_root=root, build_ladder=_ladder, name_key=_key, env=ON)
-    assert off == _sim() and s_off["reason"] == f"{cal.FLAG} off"
+    assert off == _sim() and "unset and factor file not enabled" in s_off["reason"]
     assert on != off and s_on["applied"] and s_on["players_rate_shrunk"] == 1
 
 
@@ -154,3 +154,36 @@ def test_blend_weight_outside_bounds_is_refused(tmp_path):
     out = _sim()
     s = cal.apply_nba_prop_calibration(out, league_code="nba", processed_root=root, build_ladder=_ladder, name_key=_key, env=ON)
     assert out == _sim() and "outside" in s["reason"]
+
+
+def test_file_switch_turns_it_on_with_the_env_var_unset(tmp_path):
+    off, on = _sim(), _sim()
+    cal.apply_nba_prop_calibration(off, league_code="nba", processed_root=_write_root(tmp_path, factors=FACTORS),
+                                   build_ladder=_ladder, name_key=_key, env={})
+    root = _write_root(tmp_path, factors={**FACTORS, "enabled": True})
+    s = cal.apply_nba_prop_calibration(on, league_code="nba", processed_root=root, build_ladder=_ladder, name_key=_key, env={})
+    assert off == _sim()                       # file present but not enabled -> off
+    assert on != _sim() and s["applied"] and s["switch"] == "factor_file"
+
+
+def test_env_kill_switch_wins_over_an_enabled_file(tmp_path):
+    root = _write_root(tmp_path, factors={**FACTORS, "enabled": True})
+    for raw in ("0", "false", "off", "no"):
+        out = _sim()
+        s = cal.apply_nba_prop_calibration(out, league_code="nba", processed_root=root, build_ladder=_ladder, name_key=_key,
+                                           env={cal.FLAG: raw})
+        assert out == _sim() and s["reason"] == f"{cal.FLAG} off"
+
+
+def test_enabled_must_be_the_json_literal_true(tmp_path):
+    for val in ("true", 1, "yes", None):
+        root = _write_root(tmp_path, factors={**FACTORS, "enabled": val})
+        out = _sim()
+        s = cal.apply_nba_prop_calibration(out, league_code="nba", processed_root=root, build_ladder=_ladder, name_key=_key, env={})
+        assert out == _sim() and "not enabled" in s["reason"]
+
+
+def test_no_factor_file_with_env_unset_is_off(tmp_path):
+    out = _sim()
+    s = cal.apply_nba_prop_calibration(out, league_code="nba", processed_root=tmp_path, build_ladder=_ladder, name_key=_key, env={})
+    assert out == _sim() and "not enabled" in s["reason"]

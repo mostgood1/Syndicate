@@ -28,7 +28,11 @@ INPUT. `boxscores_history.csv` in the NBA processed root (rebuilt each run by
 `refresh_nba_oddsapi_props._refresh_boxscores_history_artifact`), games STRICTLY before the slate and on/after the
 season start (Aug 1). Missing/invalid factor file or history -> untouched, a named reason printed
 (`NBA_PROP_CALIBRATION skipped reason=...`). Never raises. NBA only; OFF unless `SYNDICATE_NBA_PROP_CALIBRATION`
-is truthy.
+is truthy, or the factor file enables it (see SWITCH).
+
+SWITCH (2026-10-04, user decision "file switch, no restart"): ON when the env var is truthy, OR when the env var
+is unset AND the factor file carries `"enabled": true`. An explicit falsy env value (0/false/no/off) is a kill
+switch that wins over the file. A missing or unreadable file is OFF.
 """
 from __future__ import annotations
 
@@ -55,9 +59,18 @@ K_BOUNDS = (0.5, 3.0)
 MIN_GAMES = 3
 
 
+def flag_state(env: Optional[Mapping[str, str]] = None) -> str:
+    """'on' / 'off' (explicit kill switch) / 'unset'. The env var always wins over the factor file."""
+    raw = str((env if env is not None else os.environ).get(FLAG) or "").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return "on"
+    if raw in {"0", "false", "no", "off"}:
+        return "off"
+    return "unset"
+
+
 def flag_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
-    raw = (env if env is not None else os.environ).get(FLAG)
-    return str(raw or "").strip().lower() in {"1", "true", "yes", "on"}
+    return flag_state(env) == "on"
 
 
 def season_start(date_str: str) -> str:
@@ -115,6 +128,7 @@ def load_factors(processed_root: Path) -> Tuple[Optional[Dict[str, Dict[str, flo
             if not math.isfinite(v) or not (bounds[0] <= v <= bounds[1]):
                 return None, f"{block}[{key!r}] = {v} outside {bounds}"
             out[dest][key] = v
+    out["enabled"] = doc.get("enabled") is True  # type: ignore[assignment]
     if not out["w"] and not out["b"] and not out["k"]:
         return None, "factor file names no known stat"
     return out, "ok"
@@ -208,17 +222,24 @@ def apply_nba_prop_calibration(out: Any, *, league_code: str, processed_root: Pa
         if str(league_code or "").strip().lower() != "nba":
             summary["reason"] = "not nba"
             return summary
-        if not flag_enabled(env):
+        state = flag_state(env)
+        if state == "off":
             summary["reason"] = f"{FLAG} off"
             return summary
         if not isinstance(out, dict) or not isinstance(out.get("players"), dict):
             summary["reason"] = "no players block"
             return summary
         factors, reason = load_factors(processed_root)
+        if state == "unset" and not (factors or {}).get("enabled"):
+            # FILE SWITCH (user decision 2026-10-04, "file switch, no restart"): with the env var unset, the
+            # calibration runs only when the factor file itself says "enabled": true. Unknown never means on.
+            summary["reason"] = f"{FLAG} unset and factor file not enabled ({reason})"
+            return summary
         if factors is None:
             summary["reason"] = reason
             print(f"[nba_prop_calibration] NBA_PROP_CALIBRATION skipped reason={reason}", flush=True)
             return summary
+        summary["switch"] = "env" if state == "on" else "factor_file"
         w, b, k = factors["w"], factors["b"], factors["k"]
         rates, rate_reason = (own_rates(processed_root, str(out.get("date") or "")[:10], name_key)
                               if (w or b) else ({}, "no w/blend"))
