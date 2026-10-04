@@ -46042,3 +46042,28 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - deploy: user ff to 965d43c2 + web HUP (pid 1049729) + refresh-worker TERM (new pid 1091464, ~17:45Z). First post-restart LAYER2_SHORTLIST 18:09:14Z (23 min after restart, during live NFL; the 17:13Z restart took 9 min).
 - verify (served /api/board/layer2-shortlist, build age 196 s): rows_beyond_quote_age 1,401 = rows_superseded_line 187 + rows_stale_quote 1,214; per sport sums hold: soccer 1,179 = 2 + 1,177; nfl 125 = 95 + 30; wnba 71 = 68 + 3; ncaaf 22 = 22 + 0; nhl 4 = 0 + 4. (A read at 18:09:21Z returned the previous build's 1,341 with the new fields empty -- caught between writes; the stored artifact and the next read agreed.)
 - finding: fewer superseded rows reach this gate than the raw-key reading (90%) because book_grid's SUPERSEDED_LINES_DROPPED removes most first; what reaches the gate is mostly REAL staleness. SOCCER: 1,177 stale quotes -- lead (unverified): league-scoped fixture cadence sweeps far-off fixtures rarely (MLS 24h tier) while the board's soccer window includes them.
+
+## 2026-10-04 17:40:28Z (12:40 PM CT) -- LOCAL FLEET FF fbbaba76 -> 00876a04 (no restart) + factor file v2: NBA prop calibration PRIOR-SEASON FALLBACK ON (means corrected from opening night); carries 38f029ca oddsapi_quota -- **READING 1 MET; 38f029ca carry-along MET; READING 2 OWED** (lane `nba-prop-calibration`; user: "Build + measure it first" for the fallback, then "ff it all, record both")
+
+- **why:** the in-season shrink/blend needs a player's 3rd current-season game, so on opening night only the width was corrected. The fallback uses the PREVIOUS regular season (`player_logs.csv`, same processed root) with its own `prior_season {w, blend}` constants.
+- **measured before shipping** (`fit_nba_prop_calibration.py --prior-season-test`, 880cde05; reproduced exactly on a 2nd run):
+  - Proxy: 2024-25 rates/averages replace the season-to-date ones, a year stale. Train-fit constants scored on 403 test games.
+  - Vs the served sim: MAE better in 9/11 markets (stl/blk tie), Brier and CRPS better in 10/11 (stl ties). E.g. pts MAE −0.245 [−0.306, −0.182], pra −0.389 [−0.479, −0.290].
+  - 85% of player-games had a prior season.
+- **carried along (user-approved):** 38f029ca `oddsapi_quota.py` (lane `oddsapi-quota-offfleet-clobber`, CLOSED, never on the fleet). It acts only when fleet-forwarding is enabled (off-fleet), so it is expected to be inert on the fleet.
+  - Range fbbaba76..00876a04 = 5 commits; runtime files changed: `nba_prop_calibration.py`, `oddsapi_quota.py`.
+- **locks:** refresh-worker + live-odds-worker held as `nba-prop-calibration` from 17:40Z. In flight at 17:40:13Z: no odds/NBA jobs. `check_deploy_safety` not run (needs the fleet ADMIN_TOKEN, not readable by this session); the in-flight `ps` check was used instead.
+- **applied:**
+  - `git merge --ff-only 00876a04` (exact target) at 17:40:25Z.
+  - v2 factor file written atomically at 17:40:28Z, sha8 82ba04dd. Same w/blend/sd_scale as 16:40:07Z, plus:
+    - `prior_season.w`: pts .30, reb .30, ast .30, threes 0, stl .20, blk .50, tov .10
+    - `prior_season.blend`: pts .70, reb .65, ast .75, threes .85, stl 1, blk 1, tov .75
+- **reading 1 (17:40:29Z, fleet venv, env unset, in-memory copy of smart_sim_2026-10-05_PHI_NYK.json):** MET.
+  - `applied=True switch=factor_file players=35 prior_season=35 ladders=385`; all 35 players matched a 2025-26 season by name.
+  - pts_mean sim -> calibrated: Embiid 21.08 -> 25.05, Maxey 20.51 -> 23.73, Edgecombe 16.77 -> 15.12, Drummond 4.72 -> 5.67.
+  - Widths as before (Embiid pts_sd 6.91 -> 8.64). Env `0`: unchanged.
+- **38f029ca reading (live quota ledger in fleet keyvalue, numbers only):** total credits 344,935 (18:13:55Z) -> 344,938 (18:15:44Z). NFL 49,048 (~17:58Z) -> 49,723; MLB/NHL/WNBA also advancing; `nfl:offfleet` flat at 72. No `oddsapi_quota` / Traceback / `LOCAL_DOC_ABSENT_OFFFLEET` lines in either worker log since 17:40Z. MET: odds subprocesses on the new module record quota normally.
+- **health after:** healthz 200 at 18:16:31Z; live-odds 1, refresh 1, gunicorn 3. No restart was made.
+- **note:** another session fast-forwarded the fleet to 965d43c2 while these claims were held (watchdog auto-recovery etc.). It contains 00876a04, and `nba_prop_calibration.py` / the call site are unchanged.
+- **reading 2 OWED:** the next production NBA smart_sim after 17:40:28Z shows `nba_prop_calibration.applied=true`, `players_prior_season>0`. Watcher `watch_calib.sh` (WSL, pid alive, started 16:44:56Z) logs to `C:\tmp\nba_bt\watch_calib.log`.
+  - Note: lane `nba-day-of-sweep-ownership` (ee306f29) changes which worker sweeps NBA. Check WHICH process writes the next sim before reading it.
