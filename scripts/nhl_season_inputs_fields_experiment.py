@@ -85,7 +85,7 @@ def load_season(box_dir: Path, land_dir: Path, pbp_dir: Path, *, box_pat: str, l
         for p in parse_boxscore_player_rates(box):
             players[int(p.player_id)] = {"pos": p.position, "shots": (float(p.shots), 1.0),
                                          "goals": (float(p.goals), 1.0), "blocks": (float(p.blocks), 1.0)}
-        games.append({"gid": gid, "date": str(box.get("gameDate") or "")[:10], "team": team, "player": players})
+        games.append({"gid": gid, "date": str(box.get("gameDate") or "")[:10], "team": team, "player": players, "rec": rec})
     games.sort(key=lambda g: (g["date"], g["gid"]))
     return games
 
@@ -151,6 +151,34 @@ def evaluate(target: List[dict], prior: List[dict], kind: str, fields: List[str]
     return {f: {w: (v[0] / v[1] if v[1] else float("nan"), v[2]) for w, v in d.items()} for f, d in res.items()}
 
 
+ELO_REGRESSION_GRID = (0.0, 0.25, 1.0 / 3.0, 0.5, 0.75, 1.0)
+
+
+def evaluate_elo(target: List[dict], prior: List[dict]) -> Dict[float, Tuple[float, int]]:
+    """Home-win Brier of the as-of Elo over `target` when each team starts at its `prior` FINAL rating
+    regressed toward 1500 by r (r=1 is a fresh 1500 start; production's frozen file is no updates at all,
+    scored as 'frozen')."""
+    from syndicate.features.nhl.sim_engine.hockeysim.historical_truth.elo_builder import (
+        DEFAULT_ELO_SCALE, DEFAULT_HOME_ADVANTAGE, DEFAULT_K, _expected_home_win_prob, compute_elo_ratings)
+
+    final = compute_elo_ratings([g["rec"] for g in prior])
+    out: Dict[object, Tuple[float, int]] = {}
+    for r in list(ELO_REGRESSION_GRID) + ["frozen"]:
+        ratings = {t: 1500.0 + (1.0 - (0.0 if r == "frozen" else r)) * (e - 1500.0) for t, e in final.items()}
+        se, n = 0.0, 0
+        for g in target:
+            rec = g["rec"]
+            ra, rb = ratings.get(rec.home_abbr, 1500.0), ratings.get(rec.away_abbr, 1500.0)
+            p = _expected_home_win_prob(ra, rb, scale=DEFAULT_ELO_SCALE, home_advantage=DEFAULT_HOME_ADVANTAGE)
+            y = 1.0 if rec.home_win else 0.0
+            se += (p - y) ** 2; n += 1
+            if r != "frozen":
+                d = DEFAULT_K * (y - p)
+                ratings[rec.home_abbr] = ra + d; ratings[rec.away_abbr] = rb - d
+        out[r] = (se / n if n else float("nan"), n)
+    return out
+
+
 TEAM_FIELDS = ["shots", "faceoff_pct", "pp_pct", "pk_ga_rate", "committed", "block_rate"]
 PLAYER_FIELDS = ["shots", "goals", "blocks"]
 
@@ -175,6 +203,12 @@ def main() -> int:
             pri, cur, bl = check[f][math.inf][0], check[f][0.0][0], check[f][w_star][0]
             print(f"{kind}.{f:<12} W*={w_star:>5} (tuned 2024-25) | 2025-26 MSE prior-only {pri:.5f} current-only {cur:.5f} "
                   f"blend {bl:.5f} -> vs prior {100 * (bl / pri - 1):+.2f}% vs current {100 * (bl / cur - 1):+.2f}% (n={check[f][w_star][1]})", flush=True)
+    et, ec = evaluate_elo(s24, s23), evaluate_elo(s25, s24)
+    r_star = min(ELO_REGRESSION_GRID, key=lambda r: et[r][0])
+    chosen["elo.regression"] = r_star
+    print("elo Brier tune 2024-25: " + ", ".join(f"{k if isinstance(k, str) else round(k, 3)}={v[0]:.5f}" for k, v in et.items()), flush=True)
+    print(f"elo r*={r_star:.3f} | 2025-26 Brier frozen {ec['frozen'][0]:.5f} fresh-1500 {ec[1.0][0]:.5f} carried {ec[r_star][0]:.5f} (n={ec[r_star][1]}) "
+          "-- INERT in production (elo_blend_weight=0)", flush=True)
     (tmp / "season_inputs_fields_w.json").write_text(json.dumps({k: (None if v == math.inf else v) for k, v in chosen.items()}, indent=1), encoding="utf-8")
     print("DONE", flush=True)
     return 0

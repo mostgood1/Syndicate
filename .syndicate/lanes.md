@@ -1114,6 +1114,13 @@ death, never life — do not invert it.
   - These feed PROPS and the faceoff engine. Coordination message sent to lane nhl-player-props-projection (local_d89f75a7, queued 17:0xZ): ownership, the props-impact bar, blend weights.
   - **NOTHING that changes props inputs ships before that lane answers or the user overrides.**
   - Tuning plan: w per field family by forecasting each team's/player's next games from the as-of blend, tuned 2024-25 (prior 2023-24), checked 2025-26. Fetching 2023-24/2024-25 boxscores + landings (free API) into C:/tmp/nhllines/{boxscore,landing}_{2023,2024}.
+- **COORDINATION 2026-10-04 ~18:00Z:** lane nhl-player-props-projection CLOSED (GOAL MET) without answering; its close lists "player_rates / team_rates / elo / special_teams for 2026-27 are frozen 2025-26 _latest files" as an **owed / unowned lead (2)**. Its session (local_d89f75a7) is idle; its last turn is on lineups. **This lane takes the lead.** The props-impact bar it never set is replaced by the end-to-end A/B below, pre-registered here.
+- **PRE-REGISTERED 2026-10-04 ~18:05Z (before any result is read):**
+  - H14 (inputs): per field, the count-level blend at W* (tuned on 2024-25, prior 2023-24) forecasts each team's/player's next-game value better than prior-only on 2025-26 (prior 2024-25). A field ships its blend only if 2025-26 blend MSE < prior-only MSE; otherwise its W is inf (stays last season's). W* = inf on 2024-25 also keeps it frozen.
+  - H15 (props end-to-end, `scripts/nhl_season_inputs_props_ab.py`): the props harness, unmodified, on 2025-26 regular-season dates 10-08..01-31 every 2nd date; arm prior = full 2024-25 files as `_latest` (production's state all season today), arm blend = the same plus the shipping module's `<stem>_2025-2026.csv`. Team xG identical in both arms. Paired per (game, player, market), players who played; MAE, game-clustered bootstrap 95% CI.
+  - SHIP iff: (a) no market's dMAE (blend - prior), all dates, has a CI entirely > 0; AND (b) at least one of SOG / BLOCKS / GOALS / POINTS has a CI entirely < 0. (a) alone with every CI spanning 0 -> NOT shipped (no measured gain), reported as such.
+  - Elo is INERT (elo_blend_weight == 0): its in-season file ships or not with the rest, measured only for honesty (home-win Brier), never as a gain.
+  - Module (unshipped): `syndicate/features/nhl/inseason_season_inputs.py` + tests (17 pass with the xG tests). Only rate columns change; metadata and the shot-strength / faceoff-zone/role indices are carried from `_latest`; players with no prior row are not added.
 - Blocked by: none
 
 ### nfl-live-segment-interval — OPEN — opened 2026-10-03 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
