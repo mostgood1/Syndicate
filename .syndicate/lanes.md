@@ -1758,6 +1758,14 @@ death, never life — do not invert it.
 - Verification: Read /proc environ of the new live-odds-worker for SYNDICATE_ACTIVE_SPORTS and SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_NBA; ODDS_SWEEP_LAUNCHED lines carry nba; nba producer log for 2026-10-04 has a fetch after the restart; NBA book_quotes 2026-10-04 grows; recorded in deploys.md
 - Blocked by: none
 
+### fleet-watchdog-auto-recovery — OPEN — opened 2026-10-04 — session 43e4d5fe-e05e-41bc-aae6-6d6986460b22
+- Goal: The local fleet recovers by itself from a supervisor that is not running: the 5-minute watchdog, on a supervisor FAIL for >= 9 min (two consecutive checks), starts SyndicateLocalProduction (capped 3 attempts/hour, then alert-only; paused by a no_autostart file for deliberate maintenance). Verified by unit tests of the decision and a fleet reading; would have ended the 2026-10-04 08:39-13:53Z outage in ~10 min (postmortem, user decision 'Watchdog auto-recovery')
+- Files: scripts/local_watchdog.py, tests/test_local_watchdog.py, deploy/local/watchdog.ps1, docs/ai_context/local_production_runbook.md (watchdog section only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: Unit tests: down < 9 min no recover; >= 9 min recover; cap 3/hour; pause file blocks; recovered state clears. Fleet: a watchdog run on the live fleet reports recover=false with status ok; the ps1 acts only on recover=true
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
