@@ -45975,3 +45975,35 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - **Dry run** of the same code on a copy of production's prior (16:31Z, live feed): 34 finished 2026-27 regular games, 34/34 play-by-play fetched, 32 teams, 1-3 games each; mean combined xG shift 0.18 (largest PHI 0.55, 3 games).
 - **Expect:** the first post-ff full generation writes `team_xg_2026-2027.csv` (32 teams, games 1-3), then predictions are rewritten reading it.
 - **Reading OWED:** watcher `inseason_watch.sh` (season file mtime > ff, then a predictions rewrite >= it).
+
+## 2026-10-04 16:40:07Z (11:40 AM CT) -- LOCAL FLEET FILE SWITCH (no restart): NBA prop calibration ON (rate shrink -> season-average blend -> width), fleet ff 5dcb8783 -> fbbaba76 (1 commit) -- **READING 1 MET; READING 2 OWED** (lane `nba-prop-calibration`, user: "enable NBA prop calibration before the first prop day", relayed by the NCAAF session and CONFIRMED in this session together with "File switch, no restart")
+
+- **why:** lane `nba-layer2-projections` (6d2e46c3) put NBA props on Layer 2. Uncalibrated sim means are biased low and the sds are 1.25-1.5x too narrow, so they would fabricate UNDER edges.
+- **out-of-sample evidence:** train-fit constants scored on 403 test games. The calibration beats the served sim AND the player's own average in all 11 prop markets, on MAE and on Brier (CIs < 0). See `findings_2026-10-02_nba_lines_props_backtest.md` and lane `nba-prop-calibration`.
+- **mechanism:**
+  - `nba_prop_calibration.py` turns ON when the env var is unset AND `nba_prop_calibration.json` carries `"enabled": true` (fbbaba76). An explicit env `0`/`off` is a kill switch that wins over the file.
+  - It is called in the per-run SmartSim subprocess (call site 7f920a60), so there was NO role restart. The env route would have needed live-odds-worker + refresh-worker restarts; cf. the 08:39Z outage entry.
+- **locks:** `deploy_claim` held refresh-worker + live-odds-worker as `nba-prop-calibration` (16:39Z; both had just been released by `nhl-season-inputs-in-season`).
+  - `check_deploy_safety` NOT run: it needs the fleet ADMIN_TOKEN, which auto mode refused to read.
+  - Substitute (read-only `ps`, 16:39:21Z): in flight were a soccer live odds job and an NFL live odds job; NO NBA job. The ff touched only `nba_prop_calibration.py` + its test, which neither imports.
+- **baseline (16:33:32Z):**
+  - fleet HEAD 5dcb8783, 1 behind github/main / 0 ahead, clean tree;
+  - no `nba_prop_calibration.json` in `nba_source/data/processed`; flag absent from both role envs;
+  - newest NBA sims `smart_sim_2026-10-05_{ATL_MEM,DET_PHX,PHI_NYK}.json` (05:04-05:07Z) carry no calibration block;
+  - healthz 200.
+- **expect:**
+  - Reading 1: with the env UNSET, the fleet's own code on the real processed root applies via `switch=factor_file`. The pts sd scales ×1.25 and means are unchanged, because no player has ≥3 2026-27 games. The kill switch leaves the sim untouched.
+  - Reading 2: the first production NBA smart_sim written after 16:40:07Z carries `"nba_prop_calibration": {"applied": true, "switch": "factor_file", ...}`, with widened ladders.
+- **applied:**
+  - `git merge --ff-only fbbaba76` in ~/Syndicate (exactly 1 commit, not github/main's tip).
+  - Factor file written atomically (temp + rename) at 16:40:07Z, sha8 238806ea. Constants (fit on all 548 smart-sim games):
+    - w: pts .10, reb .15, ast .15, threes 0, stl 0, blk .35, tov 0
+    - blend: pts .45, reb .40, ast .50, threes .65, stl 1, blk 1, tov .55
+    - sd_scale: pts 1.25, reb 1.25, ast 1.25, threes 1.00, stl 1.05, blk 1.25, tov 1.05, pra 1.50
+- **reading 1 (16:40:15Z, fleet venv, env unset, in-memory copy of smart_sim_2026-10-05_PHI_NYK.json):** MET.
+  - `applied=True switch=factor_file players=35 ladders=350 rate_shrunk=0` (rates: "no player with >= 3 season games before 2026-10-05").
+  - Joel Embiid pts_sd 6.911 -> 8.638, pts_mean unchanged.
+  - Env `0`: reason `SYNDICATE_NBA_PROP_CALIBRATION off`, sim unchanged.
+- **health after:** healthz 200; live-odds 1, refresh 1, gunicorn 3 processes. No restart was made.
+- **reading 2 OWED:** the next production NBA smart_sim after 16:40:07Z. Then the served reading via lane `nba-layer2-projections`, when books post NBA props: prop rows projected / total, rows_with_probability, and the over/under edge split.
+- **known limit:** on opening night, means are corrected only by width until each player's 3rd game. The prior-season fallback was measured (it beats the served sim) and ships separately; see the next entry.
