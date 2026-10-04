@@ -1557,6 +1557,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### probability-differential-backtest-converters — CLOSED 2026-10-03 — opened 2026-10-03 — session 8de04a09-d7cd-4e22-bab2-106540543671
+- **GOAL VERDICT:** tests/test_probability_differential.py passes on origin/main: the 13 converter-shaped defs in the per-sport backtest scripts are registered in REGISTRY (scalar converters) or excused in NOT_A_SCALAR_CONVERTER with a body-based reason -- **GOAL: MET** (test_every_converter_is_registered_or_excused passed on origin/main 80916f3f (file 10/10); still 10/10 on 5a22e960)
 - Goal: tests/test_probability_differential.py passes on origin/main: the 13 converter-shaped defs in the per-sport backtest scripts are registered in REGISTRY (scalar converters) or excused in NOT_A_SCALAR_CONVERTER with a body-based reason
 - Files: scripts/probability_differential.py, tests/test_probability_differential.py
 - Hypothesis: n/a
@@ -1592,6 +1593,7 @@ death, never life — do not invert it.
 - Falsification test: If the NB ladder does not beat the sim ladder on held-out book-line Brier with a CI < 0 for a market, or makes whole-ladder RPS worse, shape is not the fix for that market
 - Verification: Offline per-market train/test table: fitted shrink k, held-out Brier NB vs sim ladder vs own-avg normal vs book with paired CIs, RPS, reliability deciles; engine: off!=on reachability on a re-run date
 ### consensus-movement-implied-guard — CLOSED 2026-10-03 — opened 2026-10-03 — session 8de04a09-d7cd-4e22-bab2-106540543671
+- **GOAL VERDICT:** scripts/consensus_movement_by_sport.py:_implied refuses invalid prices (0/None/''/unparseable -> None) by routing through a registered guarded converter, its caller skips unpriced rows, and it is removed from KNOWN_FAILING in tests/test_probability_differential.py -- **GOAL: MET** (consensus tests 5/5 + differential 10/10 at 0461d22f; the copy was DELETED rather than scored 5/5 (it imports the 5/5 owner); new test fails on the old converter (A/B))
 - Goal: scripts/consensus_movement_by_sport.py:_implied refuses invalid prices (0/None/''/unparseable -> None) by routing through a registered guarded converter, its caller skips unpriced rows, and it is removed from KNOWN_FAILING in tests/test_probability_differential.py
 - Files: scripts/consensus_movement_by_sport.py, tests/test_consensus_movement_by_sport.py, tests/test_probability_differential.py, scripts/probability_differential.py (REGISTRY row for the deleted copy ONLY)
 - Hypothesis: n/a
@@ -1637,6 +1639,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### nhl-props-converter-guard — CLOSED 2026-10-03 — opened 2026-10-03 — session 8de04a09-d7cd-4e22-bab2-106540543671
+- **GOAL VERDICT:** scripts/backtest_nhl_props.py _implied/_american_to_dec refuse invalid prices (0/None/''/unparseable/|p|<100 -> None), the call site skips+counts an unpriceable pair, and both leave KNOWN_FAILING in tests/test_probability_differential.py -- **GOAL: MET** (harness 5/5 for both NHL converters, differential 10/10 + guard tests 10/10 on f296a56e; audit 0/19,924 invalid)
 - Goal: scripts/backtest_nhl_props.py _implied/_american_to_dec refuse invalid prices (0/None/''/unparseable/|p|<100 -> None), the call site skips+counts an unpriceable pair, and both leave KNOWN_FAILING in tests/test_probability_differential.py
 - Files: scripts/backtest_nhl_props.py (SCOPED: _implied, _american_to_dec and their call site ONLY; handed over by nhl-player-props-projection 0a54bb97, returned on land), tests/test_probability_differential.py, scripts/probability_differential.py, tests/test_backtest_nhl_props_price_guard.py (NEW)
 - Hypothesis: n/a

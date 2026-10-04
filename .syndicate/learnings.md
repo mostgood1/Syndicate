@@ -5458,3 +5458,9 @@ own prior verdicts, not by anything failing.
 
 - **What happened:** after a half-closed `session_worktree.py close` (dir empty, unregistered), I ran `git worktree prune` to tidy up. It tried to delete `.git/worktrees/lrl_ab`, which belongs to ANOTHER session, and failed only because Windows refused it (Permission denied). On a different permission state it would have removed a live peer's worktree record.
 - **How to apply:** finish a half-close by hand, scoped to your own path: `rmdir <your empty dir>`, `git branch -d session/<your slug>` (after confirming 0 unique commits). Never run `git worktree prune` / `git worktree remove` on paths you didn't create. Same family as "Never git stash in a worktree" (repo-global state reached from a local-looking command).
+
+## 2026-10-03 -- Belief overturned: "my new regression test catches the bug" -- it passed on the OLD code `[session 8de04a09, lane consensus-movement-implied-guard]`
+
+- **What I believed:** a test feeding a book that quotes 0 into `consensus_movement_by_sport.observations` and asserting the consensus is unchanged would fail on the old converter (which priced 0 as 0.0).
+- **What was actually true:** with three identical clean books the per-capture median of `[x, x, x, 1.0]` is still `x` -- the median absorbed the outlier, so the test passed on the buggy code. Found only by patching the old converter back in and re-running. Fixed by using ONE clean book (median of two = mean, which the bad pair moves).
+- **How to apply:** before landing a regression test, run it against the code it guards (patch the old function back in, or import the `origin/main` module from a temp copy) and see it FAIL. A robust statistic (median, trimmed mean, clip) in the path under test is the usual way a test goes inert.
