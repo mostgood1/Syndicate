@@ -45794,3 +45794,111 @@ blank. `passing_tds` applies a real discount for the first time.
 - reading 1 (lineups_2026-10-03.csv 21:05:13Z): John Carlson D1, Artyom Levshunov D2, Darnell Nurse D3 (all three were unslotted, projecting nothing).
 - reading 2 (served 21:16:14Z, build_age 324 s): rows_with_projection **1,017/1,035 (98.3%)**, unmatched 18, rows_with_probability 1,017, refused_by_line {}, pairs_from_all_markets_file 1,518.
 - caveat: during the live phase NHL generation does not run, so a slate's projections are frozen at its last pregame full run.
+
+## 2026-10-04 03:30:10Z LOAD / 04:19:34Z READING (10:30 PM / 11:19 PM CT 10-03) -- LOCAL FLEET, refresh-worker: 2025 wk10-18 recovered from the already-purchased quote log and all eight NFL prop markets re-measured on 16 weeks (`89e46ba3`) -- **GOAL MET: all eight serve the widened sample sizes on a post-load artifact** (lane `nfl-prop-skill-widened-corpus`, user: "go get the 2025 wk10-18 odds" then "deploy it to the fleet")
+
+Claim `refresh-worker` held by `nfl-prop-skill-widened-corpus`, token `731cbcd3a8283ebb`.
+
+**THE ODDS COST 63 CREDITS, NOT 12,393 -- they were already bought.** The dry run estimated ~12,393
+for 137 games; the run returned `events with props: 0   already done: 105   credits spent: 63`
+(phase-A window calls only). The backfill checkpoint records 105 done events in those windows with
+13,679 rows, all non-zero; `tracking/book_quotes/2025_wk1{0..8}.jsonl` held ~74,800 book rows from
+2026-08-21; and the CSVs were 6-byte `team\r\n` stubs that `write_week_csv` cannot produce (an empty
+run still writes all twelve headers). So the snapshots were paid for in August and only the derived
+CSVs were missing. Rebuilt from the log through the backfill's own writer:
+13,605 rows, 10,302 two-sided, **0 events with more than one snapshot**. Recipe committed as
+`scripts/rebuild_nfl_prop_csv_from_quotes.py` so nobody re-buys; its dry run reproduces 13,605/10,302.
+
+**A FALSE ABORT OF MY OWN MAKING, recorded because it is the second instance of this class today.**
+The first deploy attempt (03:2xZ) aborted on `live MLB sims anywhere on the box: 1`. **There was no
+sim.** The guard counted `ps -eo stat=,args=` with an UNBRACKETED pattern, so it matched its own grep
+process and could never read 0. Two independent instruments proved it: a bracketed `ps` = 0 and a
+`/proc` cmdline scan using neither `ps` nor grep-on-args = 0. The earlier preflight had read 0
+correctly only because it used `--ppid <refresh-worker>`, which excludes the grep. The same script
+applied the bracket trick to its DISPLAY line and not its COUNT line. It failed SAFE (blocked rather
+than killed), but a guard that cannot distinguish itself from its target is a defect. The fixed guard
+now requires TWO instruments to agree before proceeding. Also: rewriting that script with Python's
+`write_text` introduced CRLF and broke bash outright -- written as bytes thereafter.
+
+**THE FF HAD ALREADY COMPLETED WHEN THE FALSE ABORT FIRED**, which is why the re-run printed
+`Already up to date` and why the separate HEAD assertion matters: the merge's own output said nothing
+about what was checked out. `HEAD asserted == 89e46ba3 (89e46ba37162)`.
+
+**BLAST RADIUS, enumerated before firing: 12 commits / 14 runtime files, FOUR of them other lanes'
+production code** -- `syndicate/features/ncaaf/live_resim.py`, `syndicate/features/ncaaf/total_level.py`,
+`syndicate/features/shared/basketball_props_smart_sim.py`, `syndicate/features/shared/wnba_prop_shape.py`.
+The rest are offline backtest tools plus my two. Linear history means mine cannot ship without them and
+`origin/main` is the designated deploy target, but this is materially wider than the 3-file ff at
+20:32Z and is named here rather than discovered later.
+
+**LOAD VERIFIED with production's own `role_code`:**
+
+    role              pid      started     runs        has 89e46ba3
+    refresh-worker    997059   03:30:10Z   89e46ba3    YES
+    web               684622   22:57:35Z   9434b5cc    NO
+    live-odds-worker  959682   23:40:41Z   9434b5cc    NO
+
+web and live-odds-worker do not need it: the served shortlist is `source: layer2_shortlist_artifact`
+on every NFL date except 10-05, whose body is the degraded empty state, so no path has web stamping a
+`model_skill` note (measured 2026-10-03 19:41Z).
+
+**READING -- gate 2 satisfied: artifact `written_at 2026-10-04T04:19:34Z` post-dates the 03:30:10Z
+load** (from the `layer2_shortlist_build` that ran 04:17:47-04:19:35Z; five builds since the load,
+every one for date 2026-10-03). **All eight markets serve the widened sample size:**
+
+    market              rows   n served   was     verdict_class     reliability
+    Receiving Yards       10       6570   3114    loses_to_market        0.5000
+    Rushing Yards          7       3102   1455    loses_to_market        0.5000
+    Receptions            77       2542   1179    loses_to_market        0.6064
+    Passing Yards          2       1833    825    loses_to_market        0.5000
+    Rushing Attempts       9       1177    561    loses_to_market        0.7801
+    Passing Attempts      11        720    334    loses_to_market        0.6666
+    Passing TDs           15        393    178    loses_to_market        0.9333
+    Interceptions         15        360    162    parity                 1.0000
+
+`measured=965 unmeasured=308 from_registry=965`. Served verdict strings are the measured ones:
+*"parity with the de-vigged market, Brier +0.0018 [-0.0036, +0.0071] over 360 player-game
+observations"* and *"loses to the de-vigged market, Brier +0.0123 [+0.0033, +0.0223] over 393 obs in
+360 player-game clusters"*. `Interceptions` carries `established_loss_rel: 0.0` and
+`skill_reliability` **1.0** -- read off the served note, not inferred.
+
+**WHAT IS AND IS NOT A SAME-DATE BEFORE/AFTER.** The content comparison is decisive: every market
+moved from its documented old `n` to its new one, and the registry was the only thing that changed at
+03:30:10Z. The pre-load reading of the OLD values is from the **10-04** artifact at
+`written_at 02:01:36Z` (3114 / 1179 / 1455 / 334 / 561 / 825 / 178), not from 10-03, because I did not
+capture 10-03's counters between its 03:20:06Z build and the load. So the counter pair
+(965 / 308) is reported as a CURRENT reading without a same-date pre-load baseline; the row-level
+old->new is the verification.
+
+**The 10-04 artifact is still PRE-LOAD at 02:01:36Z and will not refresh tonight.** All five builds
+since the load were for 2026-10-03, and `MLB_SIM_TICK` reports the look-ahead gated
+`reason: sport_currently_live`. I had expected to need 10-04 for the QB-market population; it turned
+out 10-03 carries 15 rows of each, so nothing is owed. 10-04 will pick the new numbers up when the
+board's active date rolls.
+
+**THE FLEET'S RUNTIME DATA ROOT IS A SEPARATE TREE FROM THE CHECKOUT, and the ff only updated one.**
+After the deploy, `/home/amyn/Syndicate/data/nfl_source/*wk13.csv` was 309,028 bytes while
+`/home/amyn/syndicate-prod/data/nfl_source/*wk13.csv` was still a 6-byte stub. Copied across, guarded
+to overwrite only where the checkout copy is larger: the fleet data root now holds **13,605 rows**
+over the nine weeks instead of nine stubs. Nothing on the fleet reads those historical weeks today
+(`load_player_plays(2025)` returns 0 plays there, so the fleet cannot run this backtest at all), but
+leaving a known stub where recovered data exists is the gap this repo keeps getting bitten by.
+
+**What changed in the product.** `Passing TDs` 0.7450 -> **0.9333** (its loss was overstated by the
+7-week sample: +0.02664 -> +0.01227). `Interceptions` stays **1.0000**, now on 360 observations rather
+than 162 -- above the pre-registered floor, so the parity verdict no longer rests on a small sample.
+`Rushing Yards` 0.6765 -> **0.5000** and `Passing Yards` 0.5789 -> **0.5000** (both at the floor):
+tighter CIs raise most lower bounds, so most discounts DEEPEN. No verdict class changed for any market.
+
+**MY OWN HYPOTHESIS WAS REFUTED and that is the useful result.** I predicted recovering these weeks
+would move `interceptions` off parity to a decisive interval. At 360 observations the cluster-robust
+CI is `[-0.00355, +0.00708]` and still straddles zero, with the point estimate barely moving
+(+0.00149 -> +0.00177) while the CI tightened from +-0.0084 to +-0.0053. Parity is the reading, not a
+shortage of data. Detail: `.syndicate/findings_2026-10-03_nfl_qb_prop_measurement.md`.
+
+**Two leads, neither chased.** (1) The OddsAPI quota appears to have RESET: the committed control
+plane recorded `used 1,905,044 / remaining 3,094,956` at 2026-09-29, the API answered
+`used 398,098 / remaining 4,601,902` today. (2) `reports/odds_control_plane/oddsapi_quota.json` is
+CLOBBERED by a run rather than appended -- my 63-credit run erased the `ncaaf` entry and the
+`full_game`/`event_list`/`props` family breakdown, so I restored the committed version instead of
+committing a narrower one. A per-sport ledger one sport's run can erase is not a ledger.
