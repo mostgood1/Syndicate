@@ -641,6 +641,15 @@ def _run_owned_generation(*, artifact_root: Path, target_dates: list[str], props
             warnings.append(f"nhl in-season team xG failed: {inseason.get('reason')}")
     except Exception as exc:
         warnings.append(f"nhl in-season team xG failed: {exc}")
+    # Same for the props / faceoff season inputs (team_rates, team_special_teams, player_rates, team_elo).
+    try:
+        from syndicate.features.nhl.inseason_season_inputs import refresh_inseason_season_inputs
+
+        inseason_inputs = refresh_inseason_season_inputs(artifact_root)
+        if str(inseason_inputs.get("reason") or "").startswith("error="):
+            warnings.append(f"nhl in-season season inputs failed: {inseason_inputs.get('reason')}")
+    except Exception as exc:
+        warnings.append(f"nhl in-season season inputs failed: {exc}")
 
     for target_date in target_dates:
         try:
