@@ -853,6 +853,25 @@ death, never life — do not invert it.
 - Falsification test: blend vs prior-only ML CI includes 0 or > 0, or total MAE worse with CI excluding 0
 - Verification: experiment report with n, CIs, per-arm; then production: team_xg_2026-2027.csv present and current (mtime/games count), loaders select it (content check), next predictions rewrite reflects it
 - **PRE-REGISTERED 2026-10-04 ~18:05Z (before any result is read):**
+- **RESULT 2026-10-04 ~19:05Z: H14 and H15 both MET (pre-registered ~18:05Z).**
+  - H14 (inputs, `scripts/nhl_season_inputs_fields_experiment.py`; W tuned on 2024-25, prior 2023-24; checked 2025-26, prior 2024-25; next-game MSE blend vs prior-only):
+    - team: shots W5 -3.47%, faceoff W20 -3.82%, pp W40 -1.51%, pk_ga W80 -0.87%, committed W20 -1.72%, block_rate W20 -3.93% (n=2,575-2,624 team-games).
+    - player: shots W10 -4.38%, goals W20 -2.12%, blocks W10 -3.14% (n=47,231 player-games).
+    - The blend also beats current-only on every field (-3.1% to -4.6%).
+    - Elo (INERT): regression r=1/3 tuned on 2024-25; 2025-26 home-win Brier frozen 0.2649, fresh-1500 0.2506, carried 0.2519.
+  - H15 (props end-to-end, `scripts/nhl_season_inputs_props_ab.py`, harness unmodified; 2025-26 10-08..01-31, every 2nd date, 56 dates, 446 games, n_sims 200; dMAE blend - prior, game-clustered 95% CI):
+    - SOG **-0.0090 [-0.0133, -0.0047]** (n=14,514), POINTS **-0.0025 [-0.0038, -0.0011]**, BLOCKS **-0.0038 [-0.0066, -0.0013]**, ASSISTS -0.0012 [-0.0022, -0.0002].
+    - GOALS -0.0003 [-0.0012, +0.0006], SAVES -0.052 [-0.161, +0.054] (n=636): no market worse.
+    - **By month: October is neutral** (SOG +0.0048 [-0.0032, +0.0127], POINTS +0.0015 [-0.0009, +0.0039]); the gain is from November on (SOG Dec+ -0.0148 [-0.0207, -0.0087]). So the first weeks of 2026-27 should show ~no change.
+  - **LANDED b8845294 on main (19:08Z):** `syndicate/features/nhl/inseason_season_inputs.py` + 9 tests + real fixtures, and a second guarded call beside the team-xG hook in `refresh_nhl_oddsapi._run_owned_generation` (cross-lane write into lane nhl-sim-artifact-backfill-fabricates's file, OUTSIDE its claimed functions; same purpose as the user-approved xG hook; user: "do the other season inputs too").
+  - **NOT YET ON THE FLEET:** the fleet ff 9b106614 -> b8845294 was REFUSED by the auto-mode classifier (Production Deploy) at ~19:15Z; awaiting the user's explicit yes. Claims taken and released. **Main carries it: ANY session's fleet ff ships it** (gap also carries 809b07f3, WNBA minutes redistribution: imported by no runtime path, flag default off, inert).
+  - Production baseline (19:07:19Z): no `team_rates_ / team_special_teams_ / player_rates_ / team_elo_2026-2027.csv`; fleet HEAD 9b106614; props_recommendations_2026-10-05 last written 19:02Z.
+  - Verification owed after the ff: the four season files written by the first post-ff generation (status line NHL_INSEASON_SEASON_INPUTS); then props for a date re-run read-only with vs without them -> production's proj_lambda equals the WITH run.
+- **BRIER AT THE LINES 2026-10-04 ~19:40Z** (the props lane's bar, sent by its session after close: paired per-player Brier at the standard lines, production Poisson price, game-clustered CI; `score_brier` in the A/B script):
+  - Full sample (446 games): **no line worse**; better SOG@1.5 -0.00306 [-0.00420, -0.00189], SOG@2.5 -0.00154 [-0.00241, -0.00065], POINTS@0.5 -0.00097 [-0.00167, -0.00025]; all others span 0.
+  - **October alone (80 games): POINTS@0.5 WORSE +0.00144 [+0.00014, +0.00275]**, SAVES@28.5 +0.01150 [+0.00011, +0.02407]; every SOG/POINTS point estimate positive. 2 of 11 Oct cells significant (about 0.6 expected by chance), but every SOG/POINTS point estimate is positive, so it is not dismissed.
+  - **Action: 4fc8391e makes it OFF by default** (`SYNDICATE_NHL_INSEASON_SEASON_INPUTS`, hook skips unless on), so b8845294 riding any fleet ff changes nothing. Enabling now (October) vs from November vs a per-entity minimum-games floor (would need its own pre-registered test) is a **USER DECISION**, asked 2026-10-04.
+  - Peer guidance honoured: regular season only (gameType 2, no preseason); goal shrinkage heavier than shots (W20 vs W10); pp/pk heavy priors (W40/W80); faceoff_weight carried, not blended.
 - Blocked by: none
 ### nfl-live-segment-interval — OPEN — opened 2026-10-03 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
 - Goal: NFL in-play quarter/half segment lines refresh every 10 min (code default, like NCAAF 8730cfb7) instead of every 150 s lines-autorun run, before the Sunday 2026-10-04 17:00Z window; NFL full-game lines unchanged; 0 NFL rows served >1h
