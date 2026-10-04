@@ -181,14 +181,78 @@ def evaluate(bt, rows: List[Dict], c: Dict[str, Dict[str, float]]) -> Dict:
     return res
 
 
+def prior_season_test(bt, rows: List[Dict], split: str, out: Path) -> Dict:
+    """PRIOR-SEASON FALLBACK, measured before it ships (user decision 2026-10-04, "build + measure it first").
+
+    In production a player has no current-season games on opening night, so the in-season shrink/blend is idle
+    until his 3rd game; the module then uses his PREVIOUS regular season (player_logs.csv) with the
+    `prior_season` constants. Proxy: every row's season-to-date rate/average is REPLACED by his 2024-25
+    regular-season rate/average (a year stale by Jan-Jun -- harsher than opening night's ~4 months); w_p / b_p
+    are fit on TRAIN and TEST is scored vs the served sim and vs the in-season (current) own average. Players
+    without a 2024-25 season (rookies) keep the sim mean, as the module does.
+    """
+    data = json.loads((out / "cache" / "statsnba" / "playergamelogs_2024-25_Regular_Season.json").read_text(encoding="utf-8"))
+    rs = data["resultSets"][0]
+    hdr = rs["headers"]
+    tot: Dict[int, Dict[str, float]] = {}
+    cols = {"pts": "PTS", "reb": "REB", "ast": "AST", "threes": "FG3M", "stl": "STL", "blk": "BLK", "tov": "TOV"}
+    for rr in rs["rowSet"]:
+        r = dict(zip(hdr, rr))
+        mins = float(r.get("MIN") or 0)
+        if mins <= 0:
+            continue
+        t = tot.setdefault(int(r["PLAYER_ID"]), {"min": 0.0, "g": 0, **{k: 0.0 for k in cols}})
+        t["min"] += mins
+        t["g"] += 1
+        for k, c in cols.items():
+            t[k] += float(r.get(c) or 0)
+    prior_rows = []
+    for r in rows:
+        t = tot.get(r["pid"])
+        q = dict(r)
+        if t and t["g"] >= cal.MIN_GAMES and t["min"] > 0:
+            q["per_min"] = {**r["per_min"], **{k: t[k] / t["min"] for k in cols}}
+            q["base"] = {**r["base"], **{k: t[k] / t["g"] for k in cols}}
+            q["base"]["pra"] = q["base"]["pts"] + q["base"]["reb"] + q["base"]["ast"]
+            q["n_prior"] = cal.MIN_GAMES  # the fallback applies
+        else:
+            q["n_prior"] = 0  # rookie / no prior season: untouched
+        q["base_current"] = r["base"]
+        prior_rows.append(q)
+    cover = sum(1 for q in prior_rows if q["n_prior"]) / max(1, len(prior_rows))
+    tr = [r for r in prior_rows if r["phase"] == "regular" and r["date"] < split]
+    te = [r for r in prior_rows if (r["phase"] == "regular" and r["date"] >= split) or r["phase"] == "playoff"]
+    c_p = fit(tr)
+    res = evaluate(bt, te, c_p)
+
+    def ci(v):
+        p_, lo, hi = bt._boot_ci(v)
+        return {"point": round(p_, 5), "ci95": [round(lo, 5), round(hi, 5)]}
+    for s_ in list(cal.SD_STATS) + ["pr", "pa", "ra"]:
+        q = [r for r in te if _usable(r, s_)]
+        if not q or s_ not in res:
+            continue
+        cur = (lambda r: sum(r["base_current"][p] for p in COMBOS[s_]) if s_ in COMBOS and s_ != "pra" else r["base_current"][s_])
+        res[s_]["dMAE_vs_current_own_avg"] = ci([(r["gid"], abs(mean_after(r, s_, c_p["w"], c_p["b"]) - actual(r, s_))
+                                                  - abs(cur(r) - actual(r, s_))) for r in q])
+    return {"coverage_with_prior_season": round(cover, 4), "constants_train": c_p, "oos": res,
+            "constants_all": fit(prior_rows)}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--bt-out", type=Path, default=Path(r"C:\tmp\nba_bt\out"))
     ap.add_argument("--split", default="2026-03-01")
     ap.add_argument("--write", type=Path, default=None, help="write the production factor file (fit on ALL rows)")
+    ap.add_argument("--prior-season-test", action="store_true", help="measure the prior-season fallback (2024-25 rates)")
     args = ap.parse_args()
     bt = _load_bt()
     rows = collect(bt, args.bt_out)
+    if args.prior_season_test:
+        rep_p = prior_season_test(bt, rows, args.split, args.bt_out)
+        (args.bt_out / "fit_nba_prop_calibration_prior.json").write_text(json.dumps(rep_p, indent=1), encoding="utf-8")
+        print(json.dumps({k: v for k, v in rep_p.items() if k != "oos"}, indent=1), flush=True)
+        return 0
     train = [r for r in rows if r["phase"] == "regular" and r["date"] < args.split]
     test = [r for r in rows if (r["phase"] == "regular" and r["date"] >= args.split) or r["phase"] == "playoff"]
     print(f"train {len(train)} rows / {len({r['gid'] for r in train})} games; test {len(test)} rows / "
