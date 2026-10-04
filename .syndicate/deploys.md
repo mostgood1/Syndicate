@@ -46067,3 +46067,10 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - **note:** another session fast-forwarded the fleet to 965d43c2 while these claims were held (watchdog auto-recovery etc.). It contains 00876a04, and `nba_prop_calibration.py` / the call site are unchanged.
 - **reading 2 OWED:** the next production NBA smart_sim after 17:40:28Z shows `nba_prop_calibration.applied=true`, `players_prior_season>0`. Watcher `watch_calib.sh` (WSL, pid alive, started 16:44:56Z) logs to `C:\tmp\nba_bt\watch_calib.log`.
   - Note: lane `nba-day-of-sweep-ownership` (ee306f29) changes which worker sweeps NBA. Check WHICH process writes the next sim before reading it.
+
+## 2026-10-04 18:25:55Z (1:25 PM CT) -- LOCAL FLEET FF 965d43c2 -> 9b106614: H38 blend defect 1 fix (`f588daff`, zero model shot mean now serves the blend) -- **PARTIAL: fix confirmed on the one rebuilt affected row; bulk owed** (lane `soccer-shots-allocation-blend`)
+
+- applied: claims refresh-worker + live-odds-worker (after `nba-prop-calibration` released), `git merge --ff-only github/main`, claims released 18:26:19Z. NO role or supervisor restart: soccer artifacts are built by per-run child jobs that load code from disk.
+- baseline (artifacts written before the ff): 128 rows across 11 artifacts whose served `expected_shots_if_playing` != `own_rate_blend.blend_shots`, all zero-model rows (championship 10-10: 34 of 409; Timothy Ouma served 0.0 vs note 0.195).
+- reading 19:16Z: 3 artifacts rebuilt after the ff (all 10-09). belgian_pro_league 10-09: mismatched **1 -> 0**, its zero-model row now served > 0 -- the fix's branch, observed. bundesliga / la_liga 10-09: 0 (were 0; not evidence). 10-10 / 10-11 artifacts (holding 127 of the 128) not yet rebuilt; Ouma still 0.0 in championship 10-10 written 17:13Z.
+- verify OWED: the next championship 10-10 build -> 0 mismatched rows and Ouma ~0.195.
