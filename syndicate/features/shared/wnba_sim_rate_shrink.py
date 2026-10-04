@@ -8,7 +8,10 @@ THE ESTIMATOR, fitted on May-July and tested on Aug-Sep + playoffs (`scripts/fit
     r = r_own + w_s * (r_sim - r_own)      r_sim = sim mean / sim minutes, r_own = season total / season minutes
     new mean = sim minutes * r             (pts w 0.15, reb 0.15, ast 0.10, threes 0.35)
 Each player's `<stat>_mean` moves by delta_s, `pra_mean` by the sum, and every ladder is SHIFTED by its components'
-summed delta (v' = max(0, round_half_up(v + delta))) -- width untouched (that is lane `wnba-prop-dispersion`'s job).
+summed delta with `shift_values` (mean-preserving: every draw moves by floor(delta), and the fractional part is
+spread as +1 over draws evenly spaced through the sorted values) -- width untouched (that is lane
+`wnba-prop-dispersion`'s job). Until 2026-10-04 the shift was v' = round_half_up(v + delta), which moves NOTHING
+when |delta| < 0.5 -- most threes and assists deltas -- so the shrink never reached those ladders.
 Held out: points now tie the player's own average (-0.037 [-0.098, +0.026]); rebounds and RA beat it; book-line Brier
 improves on every market vs the availability-only ladders.
 
@@ -118,8 +121,22 @@ def own_rates(processed_root: Path, date_str: str, name_key: Callable[[object], 
     return out, "ok"
 
 
-def _round_half_up(x: float) -> int:
-    return int(math.floor(x + 0.5))
+def shift_values(vals: List[int], delta: float) -> List[int]:
+    """Shift integer draws by `delta` keeping the MEAN: every draw moves by floor(delta), then round(n * frac) draws --
+    evenly spaced through the value-sorted order, so the shape moves as a whole -- get one more. Floored at 0 (the only
+    place the mean can come up short). Deterministic. Replaces round_half_up(v + delta), which is a no-op for any
+    |delta| < 0.5 (measured 2026-10-04: threes ladders byte-identical after a -0.3 shift)."""
+    n = len(vals)
+    if n == 0:
+        return []
+    base = int(math.floor(delta))
+    extra = int(round((delta - base) * n))
+    out = [v + base for v in vals]
+    if extra > 0:
+        order = sorted(range(n), key=lambda i: (vals[i], i))
+        for j in range(extra):
+            out[order[int((j + 0.5) * n / extra)]] += 1
+    return [max(0, v) for v in out]
 
 
 def _values(payload: Mapping[str, Any]) -> List[int]:
@@ -192,7 +209,7 @@ def apply_rate_shrink(out: Any, *, league_code: str, processed_root: Path, build
                     vals = _values(ladders[key])
                     if not vals:
                         continue
-                    new = build_ladder([max(0, _round_half_up(v + d)) for v in vals])
+                    new = build_ladder(shift_values(vals, d))
                     if not new:
                         continue
                     ladders[key] = new

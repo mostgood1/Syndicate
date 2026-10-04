@@ -92,9 +92,8 @@ calibrated chain, and the rates it feeds were fitted on the old minutes.
 
 The fix #3 rate shrink (`wnba_sim_rate_shrink.py`) SHIFTS integer ladders by the mean delta with half-up rounding.
 The same convention here left threes ladders byte-identical and assists nearly so, so a change of less than half a unit
-never reaches the board. That may be why threes was the rate shrink's one failing market. This module now scales draws
-with largest-remainder rounding (`scale_values`, with a discriminating test). The rate shrink was not changed here;
-it belongs to its own lane (held, flag OFF).
+never reaches the board. (Correction 2026-10-04: threes' failing condition in the rate shrink was its MEAN error, which this rounding never touched, so the rounding does not explain it; it did cost ladder Brier — see the rate-shrink findings addendum.) This module now scales draws
+with largest-remainder rounding (`scale_values`, with a discriminating test). Fixed afterwards in the rate shrink's own lane (`shift_values`; re-measured in its findings addendum).
 
 ## 7. Bench-only variant (2026-10-04, user: "try the bench-only variant") — INERT
 

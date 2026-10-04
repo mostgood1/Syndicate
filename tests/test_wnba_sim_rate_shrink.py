@@ -120,3 +120,23 @@ def test_bad_factor_file_is_refused(tmp_path, bad, needle):
     out = _out()
     s = _apply(out, _root(tmp_path, factors=bad))
     assert s["applied"] is False and needle in s["reason"] and out == _out()
+
+
+def test_a_sub_half_unit_shift_reaches_the_ladder():
+    """Discriminating (2026-10-04): the old v' = round_half_up(v + delta) left a threes ladder byte-identical for a
+    +/-0.3 delta, so the shrink never reached most threes/assists ladders. shift_values must move it, by the full delta."""
+    thr = [0] * 40 + [1] * 40 + [2] * 15 + [3] * 5                     # mean 0.85
+    assert [max(0, int((v + 0.3) + 0.5)) for v in thr] == thr          # the old rule: nothing moves
+    new = R.shift_values(thr, 0.3)
+    assert sum(new) / len(new) == pytest.approx(0.85 + 0.3, abs=0.01)
+    assert _hit_prob_over(BUILD(new)["ladder"], 0.5) > _hit_prob_over(BUILD(thr)["ladder"], 0.5)
+
+
+@pytest.mark.parametrize("delta", [-2.6, -0.3, 0.0, 0.2, 0.5, 1.75])
+def test_shift_values_moves_the_mean_by_delta_and_keeps_the_width(delta):
+    vals = PTS
+    new = R.shift_values(vals, delta)
+    assert len(new) == len(vals)
+    assert sum(new) / len(new) == pytest.approx(sum(vals) / len(vals) + delta, abs=0.011)   # no draw floors at 0 here
+    assert (max(new) - min(new)) - (max(vals) - min(vals)) in (-1, 0, 1)                     # a shift, not a stretch
+    assert R.shift_values(vals, delta) == new                                                # deterministic

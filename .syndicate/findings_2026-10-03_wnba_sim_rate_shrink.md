@@ -71,3 +71,28 @@ Props are still behind the book at its own line on every market (points 0.262 vs
 player's own average, so the remaining gap is mostly information the book has and the model does not (game-day
 injuries/minutes news), plus width (fix #1, to re-fit). Threes is the one market where the shrink leaves the mean
 slightly worse than the own average; its weight (0.35) keeps too much of the sim's threes rate.
+
+## Addendum 2026-10-04 — ladder-shift rounding fixed (user: "fix the rate shrink rounding")
+
+**Defect.** The engine and this lane's fit script both shifted integer ladders by v' = round_half_up(v + delta). That is
+a **no-op for any |delta| < 0.5**, so most threes and assists deltas never reached the ladder the board reads; the
+means moved but the probabilities did not. Found while building `wnba_sim_minutes_redistribution` (a −0.3 threes shift
+left the ladder byte-identical).
+
+**Fix.** `shift_values` in `wnba_sim_rate_shrink.py`: every draw moves by floor(delta), then round(n·frac(delta)) draws,
+evenly spaced through the value-sorted order, get +1. The mean moves by exactly delta (floored at 0), the width stays
+within ±1, and it is deterministic. The fit script now scores with the same function, so the evaluation is what the
+engine publishes. Weights are unchanged (fitted on mean MAE, which this does not touch). Tests: a discriminating
+sub-half-unit case that the old rule fails, plus mean/width/determinism over six deltas.
+
+**Re-measured** (same availability-on archive, same rows, Aug–Sep regular season held out, n 2,041 per market).
+Ladder Brier old → new: assists **0.2557 → 0.2516** (−0.0041), threes 0.2489 → 0.2474 (−0.0014), PR −0.0011,
+points −0.0006, PA −0.0005, RA −0.0004, rebounds +0.0003, PRA +0.0001. These are point differences on identical rows;
+no CI is computed for the difference itself. Brier vs the unshrunk sim is still better on every market, with every
+CI below zero. Playoff threes: +0.0020 [0.0, +0.0049] (worse than no shrink) → −0.0008 [−0.0175, +0.0145].
+
+**Not explained by this:** threes' failing MEAN condition (MAE vs own average +0.018 [+0.008, +0.028]) is unchanged —
+it is a property of the mean, which the rounding never touched. (`findings_2026-10-04_wnba_minutes_redistribution.md`
+§6 suggested otherwise; corrected there.)
+
+Fix #3 stays HELD, flag OFF.

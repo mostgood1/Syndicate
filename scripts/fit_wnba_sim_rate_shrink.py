@@ -7,7 +7,7 @@ noise (departure-signal slope 0.16-0.27, backtest 2026-10-02 section 3c). What i
 THE ESTIMATOR, exactly as the engine would apply it. For each player and component stat s (pts, reb, ast, threes):
     r_sim = sim mean / sim minutes          r_own = season stat total / season minutes, games STRICTLY before tip (>= 3)
     r     = r_own + w_s * (r_sim - r_own)   new mean m' = sim minutes * r          delta_s = m' - sim mean
-and the ladder is SHIFTED by delta (v' = max(0, round_half_up(v + delta))), so its WIDTH is unchanged -- width is fix #1's
+and the ladder is SHIFTED by delta (the engine's mean-preserving `shift_values`), so its WIDTH is unchanged -- width is fix #1's
 job and is re-fit after this. Combos shift by the sum of their components' deltas (PRA = pts+reb+ast, etc.). A player
 without 3 prior games, or with no sim minutes, is left as the sim had it (w = 1).
 
@@ -31,6 +31,11 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from syndicate.features.shared import wnba_sim_rate_shrink as RS  # noqa: E402
+
 REPO = Path(__file__).resolve().parents[1]
 _spec = importlib.util.spec_from_file_location("bt_wnba", REPO / "scripts" / "backtest_wnba_lines_props.py")
 B = importlib.util.module_from_spec(_spec)
@@ -43,14 +48,13 @@ MARKET_OF = {v: k for k, v in B.LADDER_STAT.items()}            # ladder key -> 
 W_GRID = [round(0.05 * i, 2) for i in range(25)]                 # 0.00 .. 1.20
 
 
-def round_half_up(x: float) -> int:
-    return int(math.floor(x + 0.5))
-
-
 def shift(dist: Dict[int, float], delta: float) -> Dict[int, float]:
+    """The ENGINE's ladder shift (`wnba_sim_rate_shrink.shift_values`) on a {value: count} ladder, so this script scores
+    exactly what production publishes. Until 2026-10-04 both used round_half_up(v + delta), a no-op for |delta| < 0.5."""
+    vals = [v for v, m in sorted(dist.items()) for _ in range(int(round(m)))]
     out: Dict[int, float] = defaultdict(float)
-    for v, m in dist.items():
-        out[max(0, round_half_up(v + delta))] += m
+    for v in RS.shift_values(vals, delta):
+        out[v] += 1.0
     return dict(out)
 
 
