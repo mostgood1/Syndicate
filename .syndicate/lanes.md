@@ -764,6 +764,7 @@ death, never life — do not invert it.
 - Hypothesis: Totals lose to the close because the engine over-applies team LEVEL (prediction SD 12.83 vs close 6.30, actual-on-model slope 0.30, n=626); a pre-engine level shrink, as NFL's 0.3, cuts total MAE below the close without moving margins
 - Falsification test: If no lambda in the fit grid improves 2025 total MAE vs actual by a CI excluding 0, or the 2026 validation total MAE does not improve, the level is not the carrier and the shrink is not shipped
 - Verification: fit table (lambda vs 2025 total MAE, paired CI vs lambda=1); 2026 wk3-4 validation; unit tests incl. kill switch reproduces the lambda=1 output exactly and off != on
+- **LIVE GRADE 2026-10-04 (lambda 0.3 vs 1.0):** PASS -- totals worst bucket 0.0485 vs 0.0611, bias +0.547 vs +1.037, margin worst 0.0943 vs 0.0842 (< 0.150); 192 games / 576 rows, 120 sims, paired seeds; totals MAE 8.054 vs 8.013 (calibration gain, not accuracy); lambda-1.0 arm does NOT closely reproduce the 09-27 reference (margin worst 0.0842 vs 0.0411, bias +1.04 vs +0.17); live constant NOT changed (user decides).
 - Blocked by: live re-grade owed
 
 ### wnba-prop-shape — OPEN — opened 2026-10-03 — session 39b666bb-e708-4edf-bfe5-3dda419e3589

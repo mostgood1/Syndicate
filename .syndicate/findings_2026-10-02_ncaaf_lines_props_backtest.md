@@ -344,3 +344,53 @@ without incident. Host memory then sat at 93-98% for ~30 min (peer NHL backtests
 overran the 580 s call under contention and was moved to background; it was killed with `diag/kill_mine.py` (12
 games already cached, kept); the next two batches ran at --limit 15 / 30, then 45 again. Cache files verified after:
 lam03 165/165 unique, lam05 165/165, L26 lam05 115/115, 0 bad lines. No deploy.
+
+## Live totals grade at total-level shrink 0.3 (2026-10-04)
+
+**Verdict: PASS -- the user may release live at 0.3 by setting NCAAF_LIVE_TOTAL_LEVEL_SHRINK = 0.3.**
+The live constant was NOT changed (still 1.0); no code changed, nothing deployed, fleet untouched.
+
+**Population (VERIFIED).** Five Saturdays 2026-08-29, 09-05, 09-12, 09-19, 09-26: 292 completed games found,
+100 refused as unrated (FCS, as production refuses), **192 games rated, 576 cutoff rows**, 120 sims per cutoff
+(production's count). Paired: every game replayed at live lambda 1.0 and 0.3 with identical seeds, through the
+SHIPPED `syndicate/features/ncaaf/live_resim.resim_live_game` at origin/main `1f22f9d9` (confirmed
+`NCAAF_LIVE_TOTAL_LEVEL_SHRINK = 1.0`, `live_total_level_shrink()` reads `SYNDICATE_NCAAF_LIVE_TOTAL_LEVEL_SHRINK`).
+Ratings: production's reader over the fleet copy of `sp_ratings_2026.json`, fetched 2026-09-30T23:40Z. Driver
+`C:\tmp\ncaaf_lpb\diag\live_grade_driver.py`; scored with the harness's own scorer
+(`scripts/backtest_ncaaf_live_totals.py --score-only`). Calibration profile `ncaaf-goal-line-refit-1`.
+
+| market | arm | worst powered bucket (gap) | signed bias (pts) | MAE projection | MAE frozen | residual sd | possession_unknown_share |
+|---|---|---|---|---|---|---|---|
+| total | lambda 1.0 | 0.7-0.8 (**0.0611**) | **+1.037** | 8.013 | 26.97 | 10.193 | 1.0 |
+| total | lambda 0.3 | 0.8-0.9 (**0.0485**) | **+0.547** | 8.054 | 26.97 | 10.473 | 1.0 |
+| margin | lambda 1.0 | 0.2-0.3 (**0.0842**) | -0.221 | 8.091 | 10.873 | 10.274 | 1.0 |
+| margin | lambda 0.3 | 0.3-0.4 (**0.0943**) | -0.028 | 8.127 | 10.873 | 10.322 | 1.0 |
+
+All ten buckets powered (min n 30) in every arm; `beats_frozen` true in all four. The scorer printed no CI on bias.
+
+**Pre-registered criterion (unchanged after seeing results):**
+- totals worst-bucket gap 0.3 <= 1.0: 0.0485 <= 0.0611 -- **yes**
+- |bias 0.3| <= |bias 1.0| + 0.25: 0.547 <= 1.287 -- **yes**
+- totals gap under #499's 0.150: 0.0485 -- **yes**
+- margin worst-bucket gap under 0.150: 0.0943 -- **yes**
+
+**Read honestly (not part of the criterion):** at 0.3 the totals buckets tighten broadly (low tail 0.0225 -> 0.0002,
+0.4-0.5 0.0332 -> 0.0010) and bias halves, but totals MAE is very slightly WORSE (+0.041 pts) and residual sd wider
+(10.19 -> 10.47) -- a calibration gain, not an accuracy gain. Margin moves the other way: worst bucket 0.0842 -> 0.0943
+and MAE +0.036, still well inside the bar.
+
+**Reproduction of the 2026-09-27 reference (lambda 1.0: 546 rows / 182 games; totals worst 0.0556, bias +0.171
+[-1.176, +1.538]; margin worst 0.0411):** NOT a close reproduction. Population is larger (576 rows / 192 games vs
+546 / 182). Totals worst bucket is near (0.0611 vs 0.0556); totals bias +1.037 is inside the reference CI but six
+times its point; **margin worst bucket roughly doubled (0.0842 vs 0.0411)**. BELIEVED, not tested: the later ratings
+fetch (09-30 vs the reference's), the 10 extra games, and/or code that landed on main since 09-27 (calibration profile
+now `ncaaf-goal-line-refit-1`) -- the 1.0 arm is the shipped live path today, so this is a drift worth its own look,
+independent of the 0.3 decision.
+
+`possession_unknown_share` is 1.0 in all four scorings -- every cutoff replayed without a known possession; it was
+not checked whether the reference run had the same.
+
+Run notes: four batches (24/72/110/84 games, 138-334 s each, ~2-3 s per game per worker -- far faster than the
+~105 s/game estimate). Host memory 76-83% throughout; no peer `backtest_ncaaf_lines_props` runs (the count check
+self-matches its own py launcher + python, reading 2 with no peers). `kill_mine.py`: 0 left. Attended re-run of
+the scheduled task that stalled on a permission prompt (session local_f758c4fe).
