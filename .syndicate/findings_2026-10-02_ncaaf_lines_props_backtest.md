@@ -273,3 +273,74 @@ keeps its own probability; the work is to make that probability accurate (items 
     py -3 scripts/backtest_ncaaf_lines_props.py score --work C:/tmp/ncaaf_lpb
 
 Work dir `C:/tmp/ncaaf_lpb`: `fleet_inputs.sha256` (18 files, verified), `sim_*.jsonl`, `report*.json`.
+
+## L25 complete: 644 of 644 games (2026-10-04)
+
+The 18 unrun games (rest of week 14 + week 15) were simulated overnight 2026-10-04 (unattended run, same harness,
+lambda=1, 300 seeds). `diag/dedupe_l25.py`: unique 644, duplicates 0, bad lines 0; per week wk3 45, 4 49, 5 50,
+6 49, 7 55, 8 58, 9 51, 10 50, 11 49, 12 56, 13 58, 14 65, 15 9. Scored with `score --lines-only`
+(log `C:/tmp/ncaaf_lpb/score_L25_644.log`, report `C:/tmp/ncaaf_lpb/report_lines_L25_644.json`).
+
+| market | n | model | comparator | model - comparator [95% CI] | verdict |
+|---|---|---|---|---|---|
+| margin MAE vs close | 644 | 12.829 | 11.916 | +0.913 [+0.529, +1.290] | **loses to book** |
+| margin MAE vs naive | 642 | 12.829 | 15.933 | -3.110 [-4.002, -2.177] | beats naive |
+| total MAE vs close | 644 | 14.369 | 12.189 | +2.179 [+1.531, +2.823] | **loses to book** |
+| total MAE vs naive | 642 | 14.369 | 12.381 | +1.957 [+1.253, +2.647] | **loses to naive** |
+| h2h Brier vs de-vigged ML | 630 | 0.1914 | 0.1806 | +0.0108 [+0.0019, +0.0199] | **loses to book** (log-loss +0.0281 [+0.0063, +0.0508]) |
+| spread cover Brier @ close (book 0.5) | 632 | 0.2718 | 0.2500 | +0.0218 [+0.0103, +0.0330] | **loses to book** |
+| total over Brier @ close (book 0.5) | 644 | 0.3052 | 0.2500 | +0.0552 [+0.0357, +0.0747] | **loses to book** |
+
+Segments vs naive (n=644, g=642): margins BEAT naive in q1 (-0.620 [-0.851, -0.373]), q2 (-0.694 [-1.028, -0.347]),
+q3 (-0.396 [-0.658, -0.131]), h1 (-1.767 [-2.289, -1.205]); q4 unresolved (-0.162 [-0.415, +0.081]); **h2 now
+UNRESOLVED (-0.487 [-0.985, +0.003])**. Segment TOTALS LOSE to naive in q1 (+0.306 [+0.125, +0.489]), q3 (+0.377
+[+0.163, +0.589]), q4 (+0.375 [+0.182, +0.570]), h1 (+0.814 [+0.443, +1.210]), h2 (+1.070 [+0.669, +1.459]); q2
+unresolved (+0.206 [-0.019, +0.420]). Segment total bias q1 -0.30, q2 -1.93, q3 +1.03, q4 +0.75, h1 -2.22, h2 +1.91;
+margin bias -1.88.
+
+**Did any verdict change from the 626-game table?** Every full-game market: NO -- same verdict, point estimates
+within 0.02 MAE / 0.0012 Brier. One SEGMENT verdict changed: **h2 margin vs naive went from "beats naive"
+(-0.55 [-1.04, -0.05], n=626) to unresolved (-0.487 [-0.985, +0.003], n=644)** -- the CI upper bound now touches 0;
+it was marginal at 626 and should not be cited as a win. The comparator n's moved with coverage (h2h 612 -> 630, spread
+615 -> 632, naive 624 -> 642).
+
+## Total-level shrink fit (2026-10-04 overnight)
+
+Unattended scheduled run `ncaaf-total-level-shrink-fit`, lane `ncaaf-total-level-shrink`. Pre-registered rules (in
+the task prompt, written 2026-10-03 before any result): an arm QUALIFIES if its 2025 total-MAE d CI upper < 0 AND its
+margin-MAE d CI contains 0 (or |d| < 0.3); pick the qualifying arm with the lower total MAE; SHIP only if the 2026
+wk3-4 total-MAE d point estimate < 0 and margin d CI contains 0 or |d| < 0.3.
+
+**Fit, 2025 (as-of rebuild, `--sample-every 4` = game ids % 4 == 0, n=165, paired on common seeds against the
+lambda=1 L25 arm):**
+
+| arm | total MAE lambda=1 -> lambda | d [95% CI] | total SD (close 6.19) | mean total (actual 52.10) | margin MAE d [95% CI] | new - close total MAE (close 12.530) | qualifies? |
+|---|---|---|---|---|---|---|---|
+| lam03 (0.3) | 13.601 -> 12.653 | -0.948 [-2.008, +0.163] | 12.02 -> 5.91 | 51.51 -> 51.11 | +0.049 [-0.119, +0.231] | +0.123 [-0.902, +1.096] | NO (CI upper > 0) |
+| lam05 (0.5) | 13.601 -> 12.605 | -0.996 [-1.794, -0.213] | 12.02 -> 7.59 | 51.51 -> 51.05 | +0.084 [-0.080, +0.247] | +0.074 [-0.905, +1.055] | **YES** |
+
+Rule outcome: **lam05 chosen** (the only qualifying arm; it also has the lower total MAE).
+
+**Validation, 2026 wk3-4 (production pregame games, out of sample, n=113 graded of 115 simulated):** total MAE
+13.797 -> 12.583, **d -1.214 [-2.163, -0.236]**; total SD 12.67 -> 7.99 (close 4.91); mean total 51.60 -> 51.09
+(actual 53.13); margin MAE d +0.130 [-0.096, +0.359]; vs close (MAE 12.376) new - close +0.207 [-0.820, +1.195].
+SHIP RULE: **PASSES** (d < 0, CI also excludes 0; margin CI contains 0).
+
+**Constant SET:** `syndicate/features/ncaaf/total_level.py` `NCAAF_TOTAL_LEVEL_SHRINK = 0.5` (docstring updated with
+these numbers). `NCAAF_LIVE_TOTAL_LEVEL_SHRINK` untouched at 1.0. Tests at the new value: test_ncaaf_total_level_shrink
++ test_ncaaf_live_resim_level_shrink 14 passed; test_generate_smartsim2_ncaaf_projections 30 passed;
+test_ncaaf_live_resim 40 passed.
+
+What it does NOT do: shrunk totals are now level with the close, not better than it (both new - close CIs straddle 0,
+2025 and 2026). The defect that made totals LOSE to the close is fixed in expectation; no total edge is shown. The
+model total is still ~2 points low against actuals in 2026 (51.09 vs 53.13) -- a separate level-bias question.
+
+PRODUCTION EXPOSURE: the fleet is fast-forwarded to origin/main by several sessions; the next ff by ANY session ships lambda=0.5 to the PREGAME generator. The live re-sim stays at 1.0 (NCAAF_LIVE_TOTAL_LEVEL_SHRINK, held by user decision) until `scripts/backtest_ncaaf_live_totals.py` passes with SYNDICATE_NCAAF_LIVE_TOTAL_LEVEL_SHRINK=0.5 against unset on the same dates. Pregame off switch: SYNDICATE_NCAAF_TOTAL_LEVEL_SHRINK=1.
+
+Run notes (procedure, for the record): one lam03 batch STARTED with host memory at 91.7% because the memory check was
+chained into the same call as the batch (it printed, the batch ran anyway) -- a breach of the >= 90% rule; it completed
+without incident. Host memory then sat at 93-98% for ~30 min (peer NHL backtests, `backtest_nhl_props.py` +
+`nhl_season_inputs_props_ab.py`, ~20 workers, not this lane's) and the run waited. The first lam05 batch (limit 45)
+overran the 580 s call under contention and was moved to background; it was killed with `diag/kill_mine.py` (12
+games already cached, kept); the next two batches ran at --limit 15 / 30, then 45 again. Cache files verified after:
+lam03 165/165 unique, lam05 165/165, L26 lam05 115/115, 0 bad lines. No deploy.

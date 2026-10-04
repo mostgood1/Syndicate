@@ -12,10 +12,11 @@ the CFBD close 12.15 (+2.16 [+1.49, +2.82]) and worse than naive team scoring
 averages (+1.93); model total SD 12.83 against the close's 6.30;
 actual-on-model slope 0.30. Correlated, over-amplified: a gain defect.
 
-THE VALUE is set from the lambda fit recorded in
-`.syndicate/findings_2026-10-02_ncaaf_lines_props_backtest.md` (re-simulated
-through the engine on 2025, validated on 2026 wk3-4). 1.0 is the unshrunk
-engine, exactly.
+THE VALUE, 0.5, is from the lambda fit of 2026-10-04 (findings file, `## Total-level shrink fit`).
+Fit, 2025 n=165 paired seeds: total MAE 13.60 -> 12.61, d -0.996 [-1.794, -0.213];
+total SD 12.02 -> 7.59 (close 6.19); margin MAE d +0.084 [-0.080, +0.247]. 0.3 lost (CI crossed 0).
+Validated, 2026 wk3-4 production pregame n=113: 13.80 -> 12.58, d -1.214 [-2.163, -0.236];
+SD 12.67 -> 7.99 (close 4.91); margin d +0.130 [-0.096, +0.359]. 1.0 is the unshrunk engine, exactly.
 
 WHERE IT APPLIES, AND ONE PLACE EACH:
   * pregame -- `scripts/generate_smartsim2_ncaaf_projections.build_projection`,
@@ -51,7 +52,7 @@ from __future__ import annotations
 
 import os
 
-NCAAF_TOTAL_LEVEL_SHRINK = 1.0
+NCAAF_TOTAL_LEVEL_SHRINK = 0.5
 #: HELD at 1.0 until the live cutoff-replay grade passes at a candidate lambda
 #: (see the module docstring). Independent of `NCAAF_TOTAL_LEVEL_SHRINK`.
 NCAAF_LIVE_TOTAL_LEVEL_SHRINK = 1.0
