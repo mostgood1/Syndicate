@@ -46086,3 +46086,9 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - reading: first sweep 19:25:44Z `ODDS_SWEEP_LAUNCHED date=2026-10-04 sports=nba,nhl,wnba,nfl`; 0 `dropped=nba` lines since the restart. First NBA fetch for 2026-10-04 at 19:32:20Z, `--markets` including player_points: 428 rows from 8 books (betonlineag, betrivers, betus, bovada, draftkings, fanduel, mybookieag, williamhill_us); NBA book_quotes 2026-10-04 234 -> 658.
 - also measured: **0 player props on GAME DAY from 8 books** (producer: "no player-prop lines offered for 2026-10-04 (428 game-line rows)"). NBA books do not post props for these preseason games, so lane nba-layer2-projections' prop reading waits for the regular season.
 - cost to watch: NBA now sweeps day-of pregame (1800 s) and on the live cadence while its games are live (WNBA analog ~13 fetches/h live).
+
+## 2026-10-04 21:16Z (4:16 PM CT) -- VERIFY READING for 18:25:55Z (H38 blend defect-1 fix, `f588daff` on fleet `9b106614`) -- **MET** (lane `soccer-shots-allocation-blend`)
+
+- reading: all **21** soccer artifacts written after the ff (all leagues, 10-09..10-11) have **0** rows whose served `expected_shots_if_playing` != `own_rate_blend.blend_shots`; **103** zero-model rows now served their blend (championship 10-10 34/34 -- Timothy Ouma 0.0 -> **0.195** == note; eredivisie 9 + 21, primeira 8 + 11, belgian 1 + 12, championship 10-11 7). Baseline before the ff: 128 mismatched rows in 11 artifacts.
+- not yet rebuilt (still pre-fix): belgian 10-10 (8), championship 10-09 (6), primeira 10-09 (11) -- self-correct on their next build.
+- still OPEN (separate): MLS never blended (ASA file has no games/appearances).
