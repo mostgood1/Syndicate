@@ -46100,3 +46100,9 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - expect: the first full (pregame) NHL run after 23:25Z rewrites lineups with PP1 shapes from real minutes -- mostly 4F+1D (backtest 2025-11-01: 22 of 26 teams 4F+1D) -- and the props file follows. Live-phase runs are `--mode fast` (no generation), so this is likely the next pregame run, not tonight.
 - offline evidence (backtest, paired, 12,540 regular-season player-games): Brier BLOCKS@1.5 -0.0035 [-0.0048, -0.0021], POINTS@1.5 -0.0006; SOG/GOALS/ASSISTS/POINTS@0.5 within noise.
 - verify: watcher /mnt/c/tmp/nhlprops/pp_watch.py (cutoff 23:25:00Z via calendar.timegm; a first version used mktime and was off by an hour under CDT -- it fired on the pre-ff file and was killed) prints PP1 shapes and REAL_UNITS / STILL_3F2D_ONLY.
+
+## 2026-10-04 23:52Z (6:52 PM CT) -- READING for the 23:24Z ff (c29e1271, real PP/PK units) -- **MET** (lane `nhl-pp-units-real-toi`)
+
+- reading 1 (lineups_2026-10-05.csv rewritten 23:52:02Z, first rewrite after the ff; watcher cutoff 23:25:00Z): 8 teams, PP1 shapes {(4F,1D): 7, (5F,0D): 1}, verdict REAL_UNITS. Baseline at 23:18:36Z was {(3F,2D): 8}.
+- reading 2 (props_recommendations_2026-10-05.csv rewritten 23:53:00Z): 64 rows, generated on those lineups.
+- still owed (lane verification, second half): the 10-05 pregame NHL book grid's SOG |edge|>10% share against 10-04's 57% -- expected NOT to fall much, since the backtest found SOG Brier neutral (line order, not unit composition, is the remaining suspect).
