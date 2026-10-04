@@ -196,6 +196,63 @@ def score(outs: Dict[str, Path], actuals: Dict, n_boot: int = 2000) -> Dict:
     return report
 
 
+STANDARD_LINES = {"SOG": (1.5, 2.5, 3.5), "GOALS": (0.5,), "ASSISTS": (0.5,), "POINTS": (0.5, 1.5),
+                  "BLOCKS": (1.5,), "SAVES": (22.5, 25.5, 28.5)}
+
+
+def _p_over(line: float, lam: float) -> float:
+    """Production's price: P(X > line), X ~ Poisson(proj_lambda) (`build_nhl_artifacts._poisson_p_over`)."""
+    import math
+    lam = max(0.0, float(lam))
+    cdf = sum(math.exp(-lam) * lam ** i / math.factorial(i) for i in range(int(line) + 1))
+    return max(0.0, min(1.0, 1.0 - cdf))
+
+
+def score_brier(outs: Dict[str, Path], actuals: Dict, n_boot: int = 2000) -> Dict:
+    """Paired per-player Brier at the standard lines, production price, blend - prior, game-clustered CI
+    (the props lane's bar: MAE can improve while per-player Brier at the lines gets worse)."""
+    lam: Dict[str, Dict] = {arm: {} for arm in outs}
+    for arm, out in outs.items():
+        for f in (out / "sim").glob("regular_*.json"):
+            res = json.loads(f.read_text(encoding="utf-8"))
+            for g in res["games"]:
+                for p in g.get("players") or []:
+                    for mk, v in p["m"].items():
+                        if v.get("lam") is not None:
+                            lam[arm][(g["gid"], p["pid"], mk)] = (res["date"], v["lam"])
+    played = {(gid, p["pid"]): p for gid, a in actuals.items() for p in a["players"] if p["toi"] > 0}
+    keys = sorted(k for k in set(lam["prior"]) & set(lam["blend"]) if (k[0], k[1]) in played)
+    report = {}
+    for mk, lines in STANDARD_LINES.items():
+        for ln in lines:
+            for period, lo, hi in (("all", "", "9999"), ("Oct", "2025-10", "2025-11")):
+                rows = []
+                for k in keys:
+                    if k[2] != mk or not (lo <= lam["prior"][k][0] < hi):
+                        continue
+                    y = 1.0 if played[(k[0], k[1])][MARKET_STAT[mk]] > ln else 0.0
+                    bp, bb = (_p_over(ln, lam["prior"][k][1]) - y) ** 2, (_p_over(ln, lam["blend"][k][1]) - y) ** 2
+                    rows.append((k[0], bb - bp, bp))
+                if not rows:
+                    continue
+                by_game: Dict[str, List[float]] = defaultdict(list)
+                for gid, d, _ in rows:
+                    by_game[gid].append(d)
+                gids = sorted(by_game)
+                rng = random.Random(13)
+                boots = []
+                for _ in range(n_boot):
+                    s = n = 0
+                    for gid in (rng.choice(gids) for _ in gids):
+                        s += sum(by_game[gid]); n += len(by_game[gid])
+                    boots.append(s / n)
+                boots.sort()
+                report[f"{mk}@{ln}.{period}"] = {"n": len(rows), "games": len(gids), "brier_prior": sum(r[2] for r in rows) / len(rows),
+                                                 "dbrier_blend_minus_prior": sum(r[1] for r in rows) / len(rows),
+                                                 "ci95": [boots[int(0.025 * n_boot)], boots[int(0.975 * n_boot) - 1]]}
+    return report
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", type=Path, required=True, help="a props-harness out dir holding records.pkl + cache/")
@@ -244,6 +301,12 @@ def main() -> int:
                         print(f"  [{arm} {i}/{len(jobs)}] {r['date']} games={r['games']} {r['t']}s ({time.time() - t1:.0f}s)", flush=True)
                     except Exception as exc:  # noqa: BLE001
                         print(f"  [{arm} {i}/{len(jobs)}] FAILED {futs[f]}: {exc!r}", flush=True)
+    brier = score_brier(outs, actuals)
+    (args.out / "report_brier.json").write_text(json.dumps(brier, indent=1), encoding="utf-8")
+    for k, v in brier.items():
+        lo, hi = v["ci95"]
+        flag = "  WORSE" if lo > 0 else ("  better" if hi < 0 else "")
+        print(f"BRIER {k:<16} n={v['n']:>6} games={v['games']:>4} prior {v['brier_prior']:.5f}  blend-prior {v['dbrier_blend_minus_prior']:+.5f} [{lo:+.5f}, {hi:+.5f}]{flag}", flush=True)
     rep = score(outs, actuals)
     (args.out / "report.json").write_text(json.dumps(rep, indent=1), encoding="utf-8")
     for k, v in rep.items():

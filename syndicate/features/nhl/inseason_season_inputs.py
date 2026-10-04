@@ -264,6 +264,16 @@ def build_team_elo(prior: List[Dict[str, str]], records: list) -> List[Dict[str,
             for row in prior]
 
 
+# OFF by default. Props A/B on 2025-26 (446 games): better over the season (SOG@1.5 Brier -0.00306
+# [-0.00420, -0.00189], POINTS@0.5 -0.00097), but in OCTOBER alone POINTS@0.5 is WORSE (+0.00144
+# [+0.00014, +0.00275]). Enabling is a user decision; until then generation reads `_latest` as before.
+ENABLE_ENV = "SYNDICATE_NHL_INSEASON_SEASON_INPUTS"
+
+
+def enabled(env: Optional[Dict[str, str]] = None) -> bool:
+    return str((env if env is not None else os.environ).get(ENABLE_ENV) or "").strip().lower() in {"1", "true", "on", "yes"}
+
+
 STEMS = ("team_rates", "team_special_teams", "player_rates", "team_elo")
 # A short `_latest` is a broken pull, not a prior: write nothing and let the loaders keep `_latest`.
 MIN_PRIOR_ROWS = {"team_rates": 30, "team_special_teams": 30, "player_rates": 300, "team_elo": 30}

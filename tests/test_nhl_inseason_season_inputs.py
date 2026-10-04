@@ -182,3 +182,9 @@ def test_never_raises_and_writes_nothing_without_priors(tmp_path):
     status = M.refresh_inseason_season_inputs(_root(tmp_path / "b"), today=date(2026, 10, 4), fetch=boom,
                                               season_start=date(2026, 9, 30))
     assert status["reason"].startswith("error=")
+
+
+def test_off_by_default_and_env_switch():
+    assert M.enabled({}) is False
+    assert M.enabled({M.ENABLE_ENV: "on"}) is True
+    assert M.enabled({M.ENABLE_ENV: "0"}) is False
