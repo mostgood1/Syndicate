@@ -134,9 +134,10 @@ def _init(src: str, out: str, allow_net: bool, arm: str, side: str) -> None:
     def patched(proc: Path, _season_recs, cutoff: str, *, latest_only: bool):
         info = orig(proc, side_data["prior_recs"], "9999-12-31", latest_only=True)
         info["ab_arm"] = arm
-        if arm == "blend":
+        if arm == "blend" or arm.startswith("floor"):
             import csv as _csv
             from syndicate.features.nhl import inseason_season_inputs as M
+            M.MIN_CURRENT_GAMES = int(arm[len("floor"):]) if arm.startswith("floor") else 0
             cur = _merge([g["counts"] for g in side_data["current"] if g["date"] < cutoff])
             builders = {"team_rates": lambda r: M.build_team_rates(r, cur["team"]),
                         "team_special_teams": lambda r: M.build_special_teams(r, cur["team"]),
@@ -225,7 +226,7 @@ def score_brier(outs: Dict[str, Path], actuals: Dict, n_boot: int = 2000) -> Dic
     report = {}
     for mk, lines in STANDARD_LINES.items():
         for ln in lines:
-            for period, lo, hi in (("all", "", "9999"), ("Oct", "2025-10", "2025-11")):
+            for period, lo, hi in (("all", "", "9999"), ("Oct", "2025-10", "2025-11"), ("Nov+", "2025-11", "9999")):
                 rows = []
                 for k in keys:
                     if k[2] != mk or not (lo <= lam["prior"][k][0] < hi):
@@ -264,6 +265,8 @@ def main() -> int:
     ap.add_argument("--n-sims", type=int, default=200)
     ap.add_argument("--workers", type=int, default=10)
     ap.add_argument("--score-only", action="store_true")
+    ap.add_argument("--arms", default="prior,blend", help="arms to run: prior, blend, floorN (blend after N games)")
+    ap.add_argument("--variant", default="blend", help="arm scored against prior")
     args = ap.parse_args()
     import subprocess
     prim = Path(subprocess.run(["git", "-C", str(REPO), "worktree", "list", "--porcelain"], capture_output=True,
@@ -281,7 +284,7 @@ def main() -> int:
         actuals = pickle.load(fh)["actuals"]
     dates = sorted({a["date"] for a in actuals.values() if a["season"] == 20252026 and a["gtype"] == 2
                     and args.start <= a["date"] <= args.end})[::max(1, args.date_step)]
-    outs = {arm: args.out / arm for arm in ("prior", "blend")}
+    outs = {arm: args.out / arm for arm in [a.strip() for a in args.arms.split(",") if a.strip()]}
     if not args.score_only:
         for arm, out in outs.items():
             out.mkdir(parents=True, exist_ok=True)
@@ -301,14 +304,16 @@ def main() -> int:
                         print(f"  [{arm} {i}/{len(jobs)}] {r['date']} games={r['games']} {r['t']}s ({time.time() - t1:.0f}s)", flush=True)
                     except Exception as exc:  # noqa: BLE001
                         print(f"  [{arm} {i}/{len(jobs)}] FAILED {futs[f]}: {exc!r}", flush=True)
-    brier = score_brier(outs, actuals)
-    (args.out / "report_brier.json").write_text(json.dumps(brier, indent=1), encoding="utf-8")
+    pair = {"prior": args.out / "prior", "blend": args.out / args.variant}
+    print(f"SCORING prior vs {args.variant}", flush=True)
+    brier = score_brier(pair, actuals)
+    (args.out / f"report_brier_{args.variant}.json").write_text(json.dumps(brier, indent=1), encoding="utf-8")
     for k, v in brier.items():
         lo, hi = v["ci95"]
         flag = "  WORSE" if lo > 0 else ("  better" if hi < 0 else "")
         print(f"BRIER {k:<16} n={v['n']:>6} games={v['games']:>4} prior {v['brier_prior']:.5f}  blend-prior {v['dbrier_blend_minus_prior']:+.5f} [{lo:+.5f}, {hi:+.5f}]{flag}", flush=True)
-    rep = score(outs, actuals)
-    (args.out / "report.json").write_text(json.dumps(rep, indent=1), encoding="utf-8")
+    rep = score(pair, actuals)
+    (args.out / f"report_{args.variant}.json").write_text(json.dumps(rep, indent=1), encoding="utf-8")
     for k, v in rep.items():
         lo, hi = v["ci95"]
         print(f"{k:<14} n={v['n']:>6} games={v['games']:>4} MAE prior {v['mae_prior']:.4f}  blend-prior {v['dmae_blend_minus_prior']:+.4f} [{lo:+.4f}, {hi:+.4f}]", flush=True)

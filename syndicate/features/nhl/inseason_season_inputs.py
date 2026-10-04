@@ -51,6 +51,8 @@ BLEND_W: Dict[str, float] = {
 }
 # Last season's final Elo regressed 1/3 toward 1500 (tuned 2024-25; 2025-26 home-win Brier 0.2519 vs the
 # frozen file's 0.2649). INERT: production's elo_blend_weight is 0.
+# An entity's current season enters only once it has played this many games (0 = from game 1).
+MIN_CURRENT_GAMES = 0
 ELO_REGRESSION = 1.0 / 3.0
 
 FetchJson = Callable[[str], Any]
@@ -166,9 +168,21 @@ def current_counts(games: List[dict]) -> Dict[str, Any]:
     return {"team": team, "player": player, "records": records}
 
 
+def _games(fields: Dict) -> float:
+    """Current-season games of one entity: teams carry `_games`; a player's shots denominator is games."""
+    if "_games" in fields:
+        return fields["_games"][0]
+    return (fields.get("shots") or [0.0, 0.0])[1]
+
+
 def _cur(ent: Dict, key: Any, field: str) -> Tuple[float, float]:
-    v = (ent.get(key) or {}).get(field)
-    return (v[0], v[1]) if v else (0.0, 0.0)
+    """Current-season (num, den) of one field -- (0, 0), i.e. last season's value, until the entity has
+    played MIN_CURRENT_GAMES this season."""
+    fields = ent.get(key) or {}
+    v = fields.get(field)
+    if not v or _games(fields) < MIN_CURRENT_GAMES:
+        return 0.0, 0.0
+    return v[0], v[1]
 
 
 def build_team_rates(prior: List[Dict[str, str]], team: Dict) -> List[Dict[str, Any]]:

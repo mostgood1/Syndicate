@@ -188,3 +188,16 @@ def test_off_by_default_and_env_switch():
     assert M.enabled({}) is False
     assert M.enabled({M.ENABLE_ENV: "on"}) is True
     assert M.enabled({M.ENABLE_ENV: "0"}) is False
+
+
+def test_min_games_floor_holds_an_entity_at_its_prior(tmp_path, finite_w, monkeypatch):
+    monkeypatch.setattr(M, "MIN_CURRENT_GAMES", 2)   # every entity in the fixture has played 1 game
+    _root_, proc, _ = _refresh(tmp_path, [])
+    prior, out = _rows(proc / "team_rates_latest.csv"), _rows(proc / "team_rates_2026-2027.csv")
+    assert float(out["NJD"]["shots_per_60"]) == pytest.approx(float(prior["NJD"]["shots_per_60"]), abs=1e-4)
+    pp, op = _rows(proc / "player_rates_latest.csv", "player_id"), _rows(proc / "player_rates_2026-2027.csv", "player_id")
+    assert all(float(op[k]["shot_weight"]) == pytest.approx(float(pp[k]["shot_weight"]), abs=1e-4) for k in pp)
+    monkeypatch.setattr(M, "MIN_CURRENT_GAMES", 1)   # at the floor the game counts
+    _root2, proc2, _ = _refresh(tmp_path / "b", [])
+    assert float(_rows(proc2 / "team_rates_2026-2027.csv")["NJD"]["shots_per_60"]) != pytest.approx(
+        float(prior["NJD"]["shots_per_60"]), abs=1e-4)

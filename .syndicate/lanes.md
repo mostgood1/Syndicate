@@ -875,6 +875,14 @@ death, never life — do not invert it.
   - **October alone (80 games): POINTS@0.5 WORSE +0.00144 [+0.00014, +0.00275]**, SAVES@28.5 +0.01150 [+0.00011, +0.02407]; every SOG/POINTS point estimate positive. 2 of 11 Oct cells significant (about 0.6 expected by chance), but every SOG/POINTS point estimate is positive, so it is not dismissed.
   - **Action: 4fc8391e makes it OFF by default** (`SYNDICATE_NHL_INSEASON_SEASON_INPUTS`, hook skips unless on), so b8845294 riding any fleet ff changes nothing. Enabling now (October) vs from November vs a per-entity minimum-games floor (would need its own pre-registered test) is a **USER DECISION**, asked 2026-10-04.
   - Peer guidance honoured: regular season only (gameType 2, no preseason); goal shrinkage heavier than shots (W20 vs W10); pp/pk heavy priors (W40/W80); faceoff_weight carried, not blended.
+- **PRE-REGISTERED H16 2026-10-04 ~20:00Z (user: "test the minimum-games floor"; before the arm is run):**
+  - Mechanism: `MIN_CURRENT_GAMES` -- an entity's current season enters the blend only once IT has played N games this season; below that every field is last season's (`_cur` returns (0, 0)).
+  - **N = 10, fixed a priori, ONE arm (`floor10`)**: 2025-26 teams had played 10-13 games by 10-31 (median 11), so N=10 starts the blend at ~Nov 1. No other N is tested, so N is not chosen on the evaluation data.
+  - Same 56 dates / 446 games / n_sims 200 as H15; the prior and blend arms are reused unchanged.
+  - Bar (the props lane's): paired per-player Brier at the standard lines, production Poisson price, game-clustered 95% CI, floor10 - prior.
+  - **Recommend enabling iff:** (a) no line's CI is entirely > 0 in ANY of all / Oct / Nov+; AND (b) SOG@1.5 or POINTS@0.5 is better over all dates (CI entirely < 0).
+  - Stated caveat: October is the window where the regression was FOUND, and the floor makes October ~= prior by construction. So (a)-Oct is a sanity check, not evidence of skill; (b) -- does the full-season gain survive the floor -- is the real test.
+  - Secondary, reported but not gating: floor10 - blend on Nov+ (the gain the floor gives up).
 - Blocked by: none
 ### nfl-live-segment-interval — OPEN — opened 2026-10-03 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
 - Goal: NFL in-play quarter/half segment lines refresh every 10 min (code default, like NCAAF 8730cfb7) instead of every 150 s lines-autorun run, before the Sunday 2026-10-04 17:00Z window; NFL full-game lines unchanged; 0 NFL rows served >1h
