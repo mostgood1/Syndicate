@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1255 rules `[generated]`
+## Index — 1259 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -523,7 +523,7 @@
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 - [2026-09-03 — EXONERATED: `deploys.md` and `learnings.md` ARE guarded. Two sessions file…](learnings_archive.md#2026-09-03-exonerated-deploysmd-and-learningsmd-are-guarded-two-sessions-filed-the-same-false-gap-and-the-second-re-derived-it-with-the-same-blind-spot) `[evidence]`
 
-**Rules and corrections — 746**
+**Rules and corrections — 750**
 
 - [2026-09-08 A probe is production load, and an unbounded one is an outage. `[#632, sessi…](#2026-09-08-a-probe-is-production-load-and-an-unbounded-one-is-an-outage-632-session-b2b5b45b)
 - [2026-09-08 MAP: ~95 rules in this file are one question in 17 shapes — *"is the number…](#2026-09-08-map-95-rules-in-this-file-are-one-question-in-17-shapes-is-the-number-i-read-the-one-the-decision-depends-on-read-this-before-writing-another-lane-learnings-instrument-family-consolidation-session-e51345f0)
@@ -709,6 +709,10 @@
 - [2026-10-03 -- Belief overturned: files written into a sparse worktree's excluded `data/…](#2026-10-03----belief-overturned-files-written-into-a-sparse-worktrees-excluded-data-survive-git-operations-session-43e4d5fe-lane-soccer-1x2-ratings-xg-source)
 - [2026-10-03 — Clean up ONLY your own worktree. `git worktree prune` is repo-global and r…](#2026-10-03-clean-up-only-your-own-worktree-git-worktree-prune-is-repo-global-and-reaches-other-sessions-worktree-records-session-6214bc11-closing-soccer-projections-gap)
 - [2026-10-03 -- Belief overturned: "my new regression test catches the bug" -- it passed…](#2026-10-03----belief-overturned-my-new-regression-test-catches-the-bug----it-passed-on-the-old-code-session-8de04a09-lane-consensus-movement-implied-guard)
+- [2026-10-04 — RULE: a callee's DEFAULT is dead code if every caller passes the argument;…](#2026-10-04-rule-a-callees-default-is-dead-code-if-every-caller-passes-the-argument-read-the-command-line-the-producer-actually-ran-not-the-callees-default-lane-nba-layer2-projections-session-ed75e56a)
+- [2026-10-04 — An automated restart is not done until the NEW process answers; on a faile…](#2026-10-04-an-automated-restart-is-not-done-until-the-new-process-answers-on-a-failed-start-retry-and-keep-the-lock----never-log-and-exit)
+- [2026-10-04 — RULE: fixing a BIAS is not fixing the PROJECTION; gate an estimator change…](#2026-10-04-rule-fixing-a-bias-is-not-fixing-the-projection-gate-an-estimator-change-on-paired-per-player-brier-never-on-the-totals-it-was-fit-to-lane-nhl-player-props-projection)
+- [2026-10-03 — RECURRENCE (mine): I reported a production flag as "default OFF" from the…](#2026-10-03-recurrence-mine-i-reported-a-production-flag-as-default-off-from-the-code-default-without-reading-the-env-lane-nfl-off-market-edge-session-05b01a84)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

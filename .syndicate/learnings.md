@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1255 rules `[generated]`
+## Index — 1259 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5504,3 +5504,10 @@ own prior verdicts, not by anything failing.
 - Belief overturned (twice in one lane): "the refit matches the real total, so the prop gets better." NHL blocks: a shared scale took team bias -0.738 -> -0.001, then a positional term took D/F bias to +0.005/+0.002 -- and paired player blocks MAE got WORSE both times (+0.0083, +0.0069). Assists: real assist rates, a primary/secondary split and two line-quality mechanisms each moved the target aggregate and none improved ASSISTS@0.5 Brier.
 - Why: an unbiased mean spread over the wrong individuals adds variance; the error lived in WHO gets the event, which a level/position fit cannot touch. MAE also rises when a skewed count's mean is lifted toward truth.
 - How to apply: before shipping any calibration/attribution change, run the paired per-player comparison at the betting lines (Brier) against the current production engine on the same player-games; a matched total is a precondition, not evidence.
+## 2026-10-03 — RECURRENCE (mine): I reported a production flag as "default OFF" from the CODE default, without reading the env `[lane nfl-off-market-edge, session 05b01a84]`
+
+- The "absent != off" rule (CLAUDE.md, 2026-09-09 FORBIDDEN on reporting a stage OFF from an absent flag) cuts BOTH ways.
+  - I wrote "`SYNDICATE_SCORE_FEE_NET` default OFF" into a findings gap table from `opportunity_signals.py:1067`.
+  - The fleet refresh-worker had it `=1`, and the served board applied it on 212/212 venue rows.
+  - The user then asked me to "turn it on".
+- **How to apply:** a code default is a statement about the CODE. Before a findings line says a feature is on or off in production, read the running process env (only that key), and if possible the served payload's own evidence that the branch ran.
