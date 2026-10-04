@@ -4760,6 +4760,17 @@ def _call_source_simulate_smart_game_local(*, smart_sim_module, processed_root: 
             processed_root=processed_root,
             build_ladder=getattr(smart_sim_module, "build_exact_ladder_payload", None),
         )
+        # NBA prop calibration (lane nba-prop-calibration, LOANED call site): per-minute rate shrink of the means +
+        # NBA-fit sd/ladder scale. NBA-only and OFF unless SYNDICATE_NBA_PROP_CALIBRATION is set; a no-op for WNBA.
+        from syndicate.features.shared.nba_prop_calibration import apply_nba_prop_calibration
+
+        apply_nba_prop_calibration(
+            out,
+            league_code=league_code,
+            processed_root=processed_root,
+            build_ladder=getattr(smart_sim_module, "build_exact_ladder_payload", None),
+            name_key=_norm_name_key,
+        )
         return out
     finally:
         for name, value in original_values.items():
