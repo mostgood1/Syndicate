@@ -1181,6 +1181,14 @@ death, never life — do not invert it.
 - Verification: Paired backtest vs bt_flat_v2_noast (every 3rd regular-season date + playoffs): Brier SOG/POINTS/ASSISTS at the lines not worse with CIs; on the fleet, lineups_<date>.csv PP1 matches real PP usage and the 10-04-style |edge|>10% share for SOG falls
 - Blocked by: none
 
+### wnba-minutes-redistribution — OPEN — opened 2026-10-04 — session 39b666bb-e708-4edf-bfe5-3dda419e3589
+- Goal: When WNBA players are excluded from a SmartSim pool, the remaining players' simulated minutes match what they actually play: on the oracle-availability re-run, mean minutes surprise (actual - sim) for priced players in >=15-min late-out games moves from -0.57 to within +/-0.2 with a game-clustered CI covering 0, points/PRA bias in those games within +/-0.2, and held-out (Aug-Oct) paired Brier vs the current engine no worse on any market; flag-gated, default OFF, user decision before enabling
+- Files: syndicate/features/shared/wnba_sim_minutes_redistribution.py (NEW), scripts/fit_wnba_minutes_redistribution.py (NEW), scripts/diagnose_wnba_minutes_redistribution.py (NEW), tests/test_wnba_sim_minutes_redistribution.py (NEW), .syndicate/findings_2026-10-04_wnba_minutes_redistribution.md (NEW)
+- Hypothesis: Team minutes are fixed (200 + OT), so the sim's overshoot on priced players under perfect availability means the absent player's minutes go, in reality, to players the sim under-weights: the deep bench and/or players outside the sim pool (max_keep cut, no props row). The sim spreads freed minutes in proportion to existing minutes (scale + cap), which over-feeds the top of the rotation.
+- Falsification test: If in late-out games the sim's per-team pool minutes already match actual pool minutes (no minutes leak to out-of-pool players) AND the overshoot is uniform across rotation tiers rather than concentrated in the top, the defect is not in the sharing rule (look at OT/pace or the rotation model instead).
+- Verification: Diagnostic tables by rotation tier and in-pool vs out-of-pool, on the oracle archive, with n and CIs; then a fit on May-Jul and a held-out Aug-Oct paired comparison through the engine's own code; reachability test off != on.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
