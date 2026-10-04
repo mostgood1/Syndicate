@@ -45902,3 +45902,14 @@ plane recorded `used 1,905,044 / remaining 3,094,956` at 2026-09-29, the API ans
 CLOBBERED by a run rather than appended -- my 63-credit run erased the `ncaaf` entry and the
 `full_game`/`event_list`/`props` family breakdown, so I restored the committed version instead of
 committing a narrower one. A per-sport ledger one sport's run can erase is not a ledger.
+
+
+## 2026-10-04 04:58:09Z (11:58 PM CT 10-03) -- LOCAL FLEET FF 89e46ba3 -> 500a5643, NO RESTART: basketball SmartSim injury exclusions reach the pool (lane `basketball-injury-exclusion-reinclusion`, user: "Land + ff fleet now", then "Add name-match fix, then ff") -- **READING 1 MET; READING 2 (next 10-04 sim) OWED**
+
+- defect (found by the WNBA oracle-availability re-run, lane `wnba-book-information`): `_smart_sim_injuries_excluded_map_for_date_local` (1) re-admitted EVERY player present in props_df when props_df had no `playing_today` column -- production's props_predictions never carry it (0 of 4 fleet files) -- measured 83 exclusions -> 30 on 2026-08-12; and (2) keyed exclusions by the injury feed's team, which is stale (Fudd/A. Smith CON vs sim DAL, Talbot IND vs LVA, Sabally MIN vs NYL), so they never reached the pool. Shared WNBA/NBA.
+- fix: `ff4ca730` (re-admit only on a truthy playing_today) + `500a5643` (re-key each excluded name to the single team props_df places it on; names on 2+ teams left alone). Regression tests fail on the old code.
+- baseline (fleet code 89e46ba3 on fleet data, 04:29Z, date 2026-10-04): GSV [Tyasha Harris]; LVA [Aaliyah Nye, Cameron Brink, Ndjakalenga Mwenentanda, Shyanne Sellers]; ATL [Coulibaly, Stevens, Carrington, Villa, Cloud, Jackson, Diggins]; NYL [Nogic, Dunn, Plum]. Production smart_sim_2026-10-04 (pre-ff) simulates OUT-listed Sabally 13.7 min, B. Jones 10.9, NaLyssa Smith 2.4, Dana Evans 1.3.
+- expect: + Sabally (NYL), + Brionna Jones (ATL), + NaLyssa Smith, + Dana Evans (LVA); Talbot NOT excluded (latest row 10-03 Day-To-Day).
+- applied: `git merge --ff-only github/main` in ~/Syndicate at 04:58:09Z (clean tree, 29 behind / 0 ahead; range also carries already-landed nba_prop_calibration, segment_odds_fetch, soccer_projections). check_deploy_safety: NOT CLEAR for a RESTART (live odds refresh in flight); no restart made -- the WNBA props SmartSim runs in a fresh per-refresh subprocess.
+- reading 1 (04:58Z, the fleet's own code on fleet data): exactly the expected map -- LVA + Dana Evans, NaLyssa Smith; ATL + Brionna Jones; NYL + Satou Sabally; Talbot absent. MET.
+- reading 2 OWED: the first production `smart_sim_2026-10-04_*.json` written after 04:58:09Z contains 0 players whose latest injury row is OUT/DOUBTFUL/SUSPENDED/INACTIVE. Watcher `C:/tmp/wnba_bt/watch_injury_fix.py` (WSL, 6h).
