@@ -1750,6 +1750,14 @@ death, never life — do not invert it.
 - Verification: A test asserting (a) off-fleet + absent writes no local document and returns the observation as forwarded-only, (b) off-fleet + present still merges and preserves other sports, (c) on-fleet + absent still creates the document; plus the existing quota suites green.
 - Blocked by: none
 
+### nba-day-of-sweep-ownership — OPEN — opened 2026-10-04 — session ed75e56a-d3c4-4a0a-9fed-9550778f9ecc
+- Goal: NBA odds are refreshed for TODAY's slate: live-odds-worker's sweeps include nba (no SWEEP_OWNERSHIP_EXCLUDED nba line after the restart) and the NBA producer log shows a fetch for the current date launched after the restart, vs baseline: last fetch for 2026-10-04 at 2026-10-03 15:49Z while 10-04 sweeps ran every few minutes without nba
+- Files: none -- fleet configuration only (the live-odds-worker per-role env snapshot under the fleet home), no repository file
+- Hypothesis: live-odds-worker owns day-of sweeps and its SYNDICATE_ACTIVE_SPORTS (mlb,wnba,soccer,ncaaf,nfl,nhl) lacks nba, so _sweep_ownership_exclusion drops it every tick; NBA passes the season filter (it is a candidate before the drop), so this env key is the only gate
+- Falsification test: After nba is in the live-odds-worker env (read back from /proc environ), the sweeps still exclude nba or no NBA fetch for the current date follows within one pregame interval (1800 s)
+- Verification: Read /proc environ of the new live-odds-worker for SYNDICATE_ACTIVE_SPORTS and SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_NBA; ODDS_SWEEP_LAUNCHED lines carry nba; nba producer log for 2026-10-04 has a fetch after the restart; NBA book_quotes 2026-10-04 grows; recorded in deploys.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
