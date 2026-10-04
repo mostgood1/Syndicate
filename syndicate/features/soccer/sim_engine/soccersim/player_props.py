@@ -437,10 +437,25 @@ def project_player_props(
             )
             blend_shots = _OWN_RATE_L_SHOTS * model_shots + (1.0 - _OWN_RATE_L_SHOTS) * own_shots
             blend_sot = _OWN_RATE_L_SOT * model_sot + (1.0 - _OWN_RATE_L_SOT) * own_sot
+            # A ZERO model mean (no shot share) has no components to rescale. Rebuild them from the blended mean on
+            # the same start/sub structure, so the served mean IS the blend -- before this, the note said
+            # blend_shots > 0 while the ladder stayed 0 (deploys.md 2026-10-04 17:55Z: 34 of 409 championship rows).
+            start_unit = _MINUTES_PER_START / 90.0
+            sub_unit = _SUB_SHOT_INTENSITY * _MINUTES_PER_SUB_APPEARANCE / 90.0
+            per_full_match = p_start * start_unit + (1.0 - p_start) * sub_unit
+
+            def _rebuild(target: float) -> tuple[tuple[float, float], ...]:
+                full = target / per_full_match if per_full_match > 0 else 0.0
+                return ((p_start, full * start_unit), (1.0 - p_start, full * sub_unit))
+
             if model_shots > 0:
                 shot_components = tuple((weight, mean * blend_shots / model_shots) for weight, mean in shot_components)
+            elif blend_shots > 0:
+                shot_components = _rebuild(blend_shots)
             if model_sot > 0:
                 sot_components = tuple((weight, mean * blend_sot / model_sot) for weight, mean in sot_components)
+            elif blend_sot > 0:
+                sot_components = _rebuild(blend_sot)
             blend_note = {
                 "model_shots": round(model_shots, 4), "own_shots": round(own_shots, 4), "blend_shots": round(blend_shots, 4),
                 "model_sot": round(model_sot, 4), "own_sot": round(own_sot, 4), "blend_sot": round(blend_sot, 4),

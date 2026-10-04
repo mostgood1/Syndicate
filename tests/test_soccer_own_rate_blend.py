@@ -96,6 +96,27 @@ class Arithmetic(unittest.TestCase):
         self.assertIsNone(profs[-1].own_shots_per_appearance)
 
 
+class AZeroModelMeanIsBlendedToo(unittest.TestCase):
+    """Defect 1 (deploys.md 2026-10-04 17:55Z): a player with no shot share had a 0 model mean, the note recorded a
+    positive blend, and the served ladder stayed 0. The served mean must equal the note."""
+
+    def test_zero_model_mean_serves_the_blend(self):
+        prof = dataclasses.replace(_profiles(True)[1], on_pitch_shot_share=0.0)
+        proj = pp.project_player_props(_distribution(), prof)
+        note = proj.own_rate_blend
+        self.assertEqual(note["model_shots"], 0.0)
+        self.assertGreater(note["blend_shots"], 0.0)
+        self.assertAlmostEqual(proj.expected_shots_if_playing, note["blend_shots"], places=3)
+        self.assertAlmostEqual(proj.expected_shots_on_target_if_playing, note["blend_sot"], places=3)
+        self.assertGreater(proj.shots_over_probabilities["0.5"], 0.0)
+
+    def test_zero_model_mean_with_flag_off_stays_zero(self):
+        prof = dataclasses.replace(_profiles(False)[1], on_pitch_shot_share=0.0)
+        proj = pp.project_player_props(_distribution(), prof)
+        self.assertEqual(proj.expected_shots_if_playing, 0.0)
+        self.assertIsNone(proj.own_rate_blend)
+
+
 class EspnRowsReachTheBlend(unittest.TestCase):
     """The loader's usage_metrics whitelist is the gate production rows pass through. ESPN rows carry
     `minutes_played`, not `minutes`; without it the blend is inert for championship/eredivisie/primeira/belgian."""
