@@ -1313,6 +1313,22 @@ death, never life — do not invert it.
   - OOS n=681: OVER@close vs shipped +0.0000 [-0.0020, +0.0020] (no gain); z2 0.890 [0.804, 0.982] (out of band); ML -0.0001 [-0.0003, +0.0001]; bias -0.087 [-0.241, +0.074].
   - **DISPERSION TRACK CLOSED:** the over-wide settled-total spread is real (z2 ~0.89) but is not the lever for the priced lines. 21 variants, none improved OVER pricing; OVER is at book parity already.
   - Production unchanged (7865b26e).
+- **H13 (written BEFORE the run, 2026-10-03 ~22:40Z, user: "ship score-adjusted xG if it holds up"):** score-adjusted team xG improves the moneyline in PRODUCTION FORM.
+  - Production `project_game` -> `adapters.build_game_prediction` with the SHIPPED calibration; only the team xG rates differ (as-of season-to-date, all Fenwick incl. EN, xG model + score weights frozen pre-2026-01-01).
+  - SHIP only if ALL hold:
+    (a) OOS (n=681) paired ML dBrier adjusted - unadjusted < 0 with CI excluding 0;
+    (b) full regular season (n=1,132) paired ML not worse (CI upper <= 0.0005);
+    (c) OOS OVER@close and PL@book paired not worse (CI incl. 0 or < 0);
+    (d) the playoff holdout (n=82) is directionally not worse (point estimate <= 0);
+    (e) a production path that confines the change to game lines (props untouched) exists without editing another lane's claimed file.
+  - Otherwise NOT shipped.
+- **H13 RESULT ~23:10Z: NOT SHIPPED -- fails pre-registered criterion (d) by a hair; user override owed if wanted.**
+  - (a) OOS ML paired adj - unadj -0.0009 [-0.0016, -0.0002] PASS.
+  - (b) FULL ML -0.0002 [-0.0008, +0.0004] PASS.
+  - (c) OOS OVER@close +0.0002 [-0.0001, +0.0005] and PL -1.5 -0.0007 [-0.0015, +0.0002] PASS.
+  - **(d) playoffs n=82: point estimate +0.000026 > 0 -- FAIL** (noise-level, but the bar was set before the run and is not moved).
+  - (e) game-lines-only path exists (a separate score-adjusted team-xG artifact applied as a lambda tilt in adapters.py; props untouched; no claimed file edited) PASS.
+  - OOS ML vs book: adjusted +0.0000 [-0.0052, +0.0049], unadjusted +0.0009.
 - Blocked by: production wiring needs (a) user decision, (b) lane nhl-player-props-projection for ingestion/collect.py (confirmed-starter feed); vs-book needs an active ODDS_API_KEY
 
 ### soccer-skill-registry-line-weighting — OPEN — opened 2026-10-02 — session 43e4d5fe-e05e-41bc-aae6-6d6986460b22
