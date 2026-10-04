@@ -83,3 +83,13 @@ By claimed-EV band, props (board / loo):
 Fleet `book_quotes` has carried Kalshi NFL props since 2026-09-30. Measure each executable Kalshi price
 against the consensus at entry time and again at the CLOSE (fee-net CLV, per line). Gradable from week 4
 (games 2026-10-04/05) onward.
+
+## CORRECTION 2026-10-03 ~23:45Z: fee-net scoring is ALREADY ON in production; gap #1 above is withdrawn
+
+The gap table read `SYNDICATE_SCORE_FEE_NET` as "default OFF" from the CODE default (`opportunity_signals.py:1067`) without reading the ENV. Production has it on, which is the documented "absent != off" trap, made in the other direction:
+
+- the fleet refresh-worker process carries `SYNDICATE_SCORE_FEE_NET=1`, imported from Render's live env (`render_env/refresh-worker.json`), where it was set 2026-09-21 (`deploys.md` 21:43:55Z);
+- the served Layer 2 board (read 2026-10-03 ~23:40Z, build age 122 s) uses the FEE-NET EV as the score's value term on **212 of 212** fee-venue rows, including **193 of 193 NFL Kalshi rows** (`score.ev_component == score_v2.ev_net_pct`);
+- live-odds-worker and web do not carry the flag, but the board is built on refresh-worker, so every served row has it.
+
+**The gap ranking is therefore:** (1) Kalshi/Polymarket NFL game lines fan in after scoring (unmeasured); (2) stale-in-median (no effect at the close); (3) leave-one-out (do not build). **Residual risk:** the flag lives only in the imported Render env snapshot. It is in neither `render.yaml` nor `local_production.env`, so a re-derive from `render.yaml` alone would silently drop it.
