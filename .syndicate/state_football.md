@@ -43,6 +43,7 @@ Same rules as state.md: when a fact changes, EDIT THE LINE.
     preseason backfill.
   - The only 2026 prop capture is the primary tree's untracked
     `data/nfl_source/oddsapi_player_props_2026_wk1.csv`, which holds WEEK 2.
+- **Market-only (consensus-fair) edges are NOT earned at the close** `[measured 2026-10-03, lane nfl-off-market-edge, findings_2026-10-03_nfl_off_market_edge.md]`: props 2023-25, board-median edges 3,226 bets, claimed +1.88%, realized +0.30% [-3.05, +3.95]; claims >=10% realize -31%/-45%; game lines 2022-24 -6.4% [-17, +6] on +2.2% claimed. Leave-one-out adds no value. Kalshi NFL prop asks (venue_direct, since 2026-09-30) average -5.6% fee-net EV vs the consensus at first sighting; the forward fee-net CLV reading is lane `nfl-kalshi-forward-clv` (scheduled 2026-10-06).
 - **Segments (1H/quarters):** 0 gradable games. Prices exist on the fleet only for 2026-10-02 commence,
   and no consumer prices NFL segments.
 

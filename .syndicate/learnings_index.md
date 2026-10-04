@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1250 rules `[generated]`
+## Index — 1255 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 502**
+**FORBIDDEN — 503**
 
 - [2026-09-21 FORBIDDEN: diagnosing a failure from its most vivid example `[lane layer2-li…](#2026-09-21-forbidden-diagnosing-a-failure-from-its-most-vivid-example-lane-layer2-line-move-magnitude)
 - [2026-09-21 FORBIDDEN: verifying that a signal was COMPUTED as verifying that it is REAL…](#2026-09-21-forbidden-verifying-that-a-signal-was-computed-as-verifying-that-it-is-real-lane-layer2-line-move-magnitude)
@@ -177,6 +177,7 @@
 - [2026-10-01 — FORBIDDEN: `x or 0` (or `or {}` / `or ""`) BEFORE the check in a guard tha…](#2026-10-01-forbidden-x-or-0-or-or-or-before-the-check-in-a-guard-that-exists-to-tell-unknown-from-zero-the-normalisation-is-the-unknown-as-zero-bug-applied-one-line-early-test-present-none-absent-and-unparseable-as-five-separate-cases-lane-soccer-live-gameline-index-diag)
 - [2026-10-02 FORBIDDEN: proposing a MARKET-WIDE withhold of a model's probability as the…](#2026-10-02-forbidden-proposing-a-market-wide-withhold-of-a-models-probability-as-the-answer-to-the-model-loses-to-the-book-lanes-mlb-lines-props-backtest-mlb-board-mean-only-session-b98d59a1)
 - [2026-10-03 — FORBIDDEN: reading a production-EQUIVALENCE check as proof the harness ran…](#2026-10-03-forbidden-reading-a-production-equivalence-check-as-proof-the-harness-ran-productions-environment-both-sides-can-share-the-same-wrong-input-and-agree-perfectly-lane-nfl-lines-props-backtest-session-05b01a84)
+- [2026-10-03 — FORBIDDEN: `git checkout origin/main -- .syndicate/lanes.md` to "sync" the…](#2026-10-03-forbidden-git-checkout-originmain----syndicatelanesmd-to-sync-the-ledger-while-your-own-lane-block-is-uncommitted-it-erases-the-block-silently-lane-nfl-kalshi-forward-clv-session-05b01a84)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -522,7 +523,7 @@
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 - [2026-09-03 — EXONERATED: `deploys.md` and `learnings.md` ARE guarded. Two sessions file…](learnings_archive.md#2026-09-03-exonerated-deploysmd-and-learningsmd-are-guarded-two-sessions-filed-the-same-false-gap-and-the-second-re-derived-it-with-the-same-blind-spot) `[evidence]`
 
-**Rules and corrections — 742**
+**Rules and corrections — 746**
 
 - [2026-09-08 A probe is production load, and an unbounded one is an outage. `[#632, sessi…](#2026-09-08-a-probe-is-production-load-and-an-unbounded-one-is-an-outage-632-session-b2b5b45b)
 - [2026-09-08 MAP: ~95 rules in this file are one question in 17 shapes — *"is the number…](#2026-09-08-map-95-rules-in-this-file-are-one-question-in-17-shapes-is-the-number-i-read-the-one-the-decision-depends-on-read-this-before-writing-another-lane-learnings-instrument-family-consolidation-session-e51345f0)
@@ -704,6 +705,10 @@
 - [2026-10-03 -- Belief overturned: "the L25 workers thrashed on memory" -- they were FROZ…](#2026-10-03----belief-overturned-the-l25-workers-thrashed-on-memory----they-were-frozen-for-outliving-their-tool-call-lane-ncaaf-lines-props-backtest-session-7e94d2ff)
 - [2026-10-03 — "Already up to date" answers a question about the FF, not about what HEAD…](#2026-10-03-already-up-to-date-answers-a-question-about-the-ff-not-about-what-head-is-pin-the-deploy-to-the-head-you-enumerated-or-a-concurrent-ff-becomes-your-ride-along-lane-refresh-worker-soccer-loop-silent-session-6214bc11)
 - [2026-10-03 — RECURRENCE (mine, same day as the rule): an UNANCHORED one-shot replace in…](#2026-10-03-recurrence-mine-same-day-as-the-rule-an-unanchored-one-shot-replace-in-lanesmd-edited-another-lane-and-my-blocks-body-lines-were-merged-under-a-third-lanes-header-lane-nfl-prop-mean-inputs-session-05b01a84)
+- [2026-10-03 - RULE: landing a behaviour change on main DEPLOYS it the moment any session…](#2026-10-03---rule-landing-a-behaviour-change-on-main-deploys-it-the-moment-any-session-fast-forwards-the-fleet-baseline-before-you-land-and-land-only-when-ready-to-measure-lane-nhl-game-lines-model-session-9ed26377)
+- [2026-10-03 -- Belief overturned: files written into a sparse worktree's excluded `data/…](#2026-10-03----belief-overturned-files-written-into-a-sparse-worktrees-excluded-data-survive-git-operations-session-43e4d5fe-lane-soccer-1x2-ratings-xg-source)
+- [2026-10-03 — Clean up ONLY your own worktree. `git worktree prune` is repo-global and r…](#2026-10-03-clean-up-only-your-own-worktree-git-worktree-prune-is-repo-global-and-reaches-other-sessions-worktree-records-session-6214bc11-closing-soccer-projections-gap)
+- [2026-10-03 -- Belief overturned: "my new regression test catches the bug" -- it passed…](#2026-10-03----belief-overturned-my-new-regression-test-catches-the-bug----it-passed-on-the-old-code-session-8de04a09-lane-consensus-movement-implied-guard)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

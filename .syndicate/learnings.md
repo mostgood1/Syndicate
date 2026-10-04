@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1250 rules `[generated]`
+## Index — 1255 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5464,3 +5464,20 @@ own prior verdicts, not by anything failing.
 - **What I believed:** a test feeding a book that quotes 0 into `consensus_movement_by_sport.observations` and asserting the consensus is unchanged would fail on the old converter (which priced 0 as 0.0).
 - **What was actually true:** with three identical clean books the per-capture median of `[x, x, x, 1.0]` is still `x` -- the median absorbed the outlier, so the test passed on the buggy code. Found only by patching the old converter back in and re-running. Fixed by using ONE clean book (median of two = mean, which the bad pair moves).
 - **How to apply:** before landing a regression test, run it against the code it guards (patch the old function back in, or import the `origin/main` module from a temp copy) and see it FAIL. A robust statistic (median, trimmed mean, clip) in the path under test is the usual way a test goes inert.
+
+## 2026-10-03 — FORBIDDEN: `git checkout origin/main -- .syndicate/lanes.md` to "sync" the ledger while your own lane block is UNCOMMITTED. It erases the block silently `[lane nfl-kalshi-forward-clv, session 05b01a84]`
+
+- **What happened:** I opened `nfl-kalshi-forward-clv` with `lane_open.py`. That writes the block into the
+  worktree's `lanes.md` and does not commit it. I then built and dry-ran the script, and later ran the
+  sync recipe I had been using all day before each commit, `git checkout origin/main -- lanes.md
+  deploys.md`. The block was gone. Nothing reported it.
+- **How it was caught:** the next anchored edit asserted exactly one `### nfl-kalshi-forward-clv` header
+  and found none. The anchored-edit discipline from earlier the same day was what made the loss loud.
+- **The rule:**
+  - Land a `lane_open.py` block in the SAME step that writes it, before any other work.
+  - Sync ONLY `deploys.md` from upstream (the file the commit guard compares). Never `lanes.md` while it
+    holds anything of yours that is not on main.
+  - If a sync of lanes.md is needed, rebase the committed branch instead.
+- **Cost:** none in the end. The block was re-created verbatim (its prediction was still pre-data) and
+  landed in `f11e7b7e`. It would have silently dropped the lane's pre-registration if the assertion had
+  not existed.
