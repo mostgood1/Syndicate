@@ -4130,6 +4130,7 @@ def board_layer2_shortlist_api():
                 "rows_beyond_quote_age_by_sport": shortlist.get("rows_beyond_quote_age_by_sport"),
                 "rows_superseded_line_by_sport": shortlist.get("rows_superseded_line_by_sport"),
                 "rows_stale_quote_by_sport": shortlist.get("rows_stale_quote_by_sport"),
+                "rows_stale_quote_sample": shortlist.get("rows_stale_quote_sample"),
                 "rows_beyond_quote_age": shortlist.get("rows_beyond_quote_age"),
                 "rows_superseded_line": shortlist.get("rows_superseded_line"),
                 "rows_stale_quote": shortlist.get("rows_stale_quote"),

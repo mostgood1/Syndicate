@@ -1197,6 +1197,14 @@ death, never life — do not invert it.
 - Verification: Diagnostic tables by rotation tier and in-pool vs out-of-pool, on the oracle archive, with n and CIs; then a fit on May-Jul and a held-out Aug-Oct paired comparison through the engine's own code; reachability test off != on.
 - Blocked by: none
 
+### layer2-stale-quote-sample — OPEN — opened 2026-10-04 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: The Layer 2 shortlist publishes a bounded sample of the rows its 1h gate hides as stale quotes (market, league, book, both ages, kickoff, origin fields) so production names its own stale rows, and a row repriced to a bettable book carries THAT book's quote ages instead of the unrestricted best book's
+- Files: syndicate/features/shared/layer2_board.py (quote-age gate sample + bettable reprice quote ages), syndicate/blueprints/intelligence.py (forward the sample), tests/test_layer2_stale_quote_sample.py (new)
+- Hypothesis: Soccer: 1,177 rows hidden as stale quotes in production while the grid shows 65 stale sides and a same-grid reconstruction 22; production builds 1,783 soccer rows vs 581 reconstructed, so the stale rows come from enrichment not reproduced offline. Reprice stamping: 9 soccer sides stamped with a stale best book's age while their bettable quote is fresh
+- Falsification test: n/a (instrumentation + small fix)
+- Verification: Served board after deploy carries rows_stale_quote_sample naming soccer's stale rows; a repriced row's quote ages equal its bettable book's cell ages
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

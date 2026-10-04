@@ -2819,6 +2819,14 @@ def build_layer2_rows(
                 if fallback_book is not None:
                     side_prices = {str(fallback_book): price}
             bettable = book_shortlist.best_bettable(side_prices)
+            # THE QUOTE'S AGES BELONG TO THE BOOK WHOSE PRICE IT CARRIES (lane
+            # `layer2-stale-quote-sample`, 2026-10-04). A repriced row used to keep
+            # `side_best`'s ages -- the UNRESTRICTED best book's -- while showing the
+            # bettable book's price, and the best price is often a stale outlier
+            # (a book that stopped updating keeps a generous number). Measured on
+            # the soccer grid that day: 9 repriced sides stamped stale (> 1h) while
+            # their bettable quote was fresh, so the 1h gate hid them.
+            quote_age_cell = side_best
             if bettable is None:
                 # No book we can see is bettable. `side_prices` empty means we
                 # could see NO book at all -- absent evidence, not evidence of
@@ -2832,6 +2840,10 @@ def build_layer2_rows(
                 bettable_book, bettable_price = bettable
                 if bettable_price != price or str(side_best.get("bookmaker") or "") != bettable_book:
                     repriced_to_bettable += 1
+                    bettable_cell = ((row.get("cells") or {}).get(bettable_book) or {})
+                    bettable_cell = bettable_cell.get(side) if isinstance(bettable_cell, Mapping) else None
+                    if isinstance(bettable_cell, Mapping):
+                        quote_age_cell = bettable_cell
                 price = bettable_price
 
             quote = {
@@ -2844,12 +2856,12 @@ def build_layer2_rows(
                     "bookmaker": side_best.get("bookmaker"),
                     "price": side_best.get("price"),
                 },
-                "book_age_seconds": side_best.get("age_seconds"),
+                "book_age_seconds": quote_age_cell.get("age_seconds"),
                 # Time since we last LOOKED, as opposed to `book_age_seconds`'
                 # time since the price last MOVED. None when the date's quote
                 # state predates last-seen tracking -- unknown, and scoring must
                 # not read that as either fresh or stale.
-                "quote_seen_age_seconds": side_best.get("seen_age_seconds"),
+                "quote_seen_age_seconds": quote_age_cell.get("seen_age_seconds"),
                 "books_quoting": side_best.get("books_quoting"),
                 "fair_probability": fair,
                 "fair_method": fair_method if fair is not None else None,
@@ -4966,6 +4978,30 @@ def _quote_age_group(row: Mapping[str, Any]) -> tuple:
     )
 
 
+_STALE_SAMPLE_PER_SPORT = 10
+_STALE_SAMPLE_FIELDS = (
+    "sport", "kind", "market", "segment", "league", "event_id", "home_team", "away_team", "player_name",
+    "side", "line", "commence_time", "board_lane", "market_state", "ev_basis", "ev_pct", "source", "price_source",
+)
+
+
+def _stale_quote_sample_row(row: Mapping[str, Any], age_seconds: float | None) -> dict[str, Any]:
+    """One hidden stale-quote row, reduced to what names its origin. No IO."""
+    quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
+    best_any = quote.get("best_any_book") if isinstance(quote.get("best_any_book"), Mapping) else {}
+    out = {field: row.get(field) for field in _STALE_SAMPLE_FIELDS if row.get(field) is not None}
+    out.update({
+        "gate_age_seconds": round(age_seconds, 1) if age_seconds is not None else None,
+        "quote_bookmaker": quote.get("bookmaker"),
+        "quote_seen_age_seconds": quote.get("quote_seen_age_seconds"),
+        "quote_book_age_seconds": quote.get("book_age_seconds"),
+        "best_any_book": best_any.get("bookmaker"),
+        "books_quoting": quote.get("books_quoting"),
+        "row_keys": sorted(str(k) for k in row.keys())[:60],
+    })
+    return out
+
+
 def _fresh_lines_by_group(
     opportunities: Iterable[Mapping[str, Any]], max_quote_age_seconds: Any, age_ceiling: float
 ) -> dict[tuple, set[str]]:
@@ -5074,6 +5110,13 @@ def select_shortlist(
     superseded_line_by_sport: dict[str, int] = {}
     stale_quote = 0
     stale_quote_by_sport: dict[str, int] = {}
+    # WHICH rows, not just how many (lane `layer2-stale-quote-sample`). Soccer hid
+    # 1,177 stale quotes on 2026-10-04 while its grid showed 65 stale sides and a
+    # same-grid offline rebuild 22 -- production builds rows the rebuild cannot
+    # (projection/margin/live joins). Bounded per sport so one sport cannot crowd
+    # out the rest, and small: it rides the persisted shortlist.
+    stale_quote_sample: list[dict[str, Any]] = []
+    stale_sample_per_sport: dict[str, int] = {}
     fresh_lines_by_group = _fresh_lines_by_group(opportunities, max_quote_age_seconds, age_ceiling)
     implausible_book = 0
     stale_kickoff = 0
@@ -5118,6 +5161,9 @@ def select_shortlist(
             else:
                 stale_quote += 1
                 stale_quote_by_sport[sport_key] = stale_quote_by_sport.get(sport_key, 0) + 1
+                if stale_sample_per_sport.get(sport_key, 0) < _STALE_SAMPLE_PER_SPORT:
+                    stale_sample_per_sport[sport_key] = stale_sample_per_sport.get(sport_key, 0) + 1
+                    stale_quote_sample.append(_stale_quote_sample_row(row, age_seconds))
             continue
         # `#369`: an IMPOSSIBLE BOOK is a bad feed, not an opportunity.
         #
@@ -5415,6 +5461,7 @@ def select_shortlist(
         # freshness alarm; `superseded` is a book having moved its number.
         "rows_superseded_line_by_sport": dict(sorted(superseded_line_by_sport.items())),
         "rows_stale_quote_by_sport": dict(sorted(stale_quote_by_sport.items())),
+        "rows_stale_quote_sample": stale_quote_sample,
         "stale_kickoff_seconds": stale_kickoff_ceiling,
         # Logged, not silently dropped: a sport vanishing from the shortlist
         # should be attributable to its schedule rather than look like an outage.
