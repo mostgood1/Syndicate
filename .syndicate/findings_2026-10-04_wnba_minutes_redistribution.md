@@ -95,3 +95,26 @@ The same convention here left threes ladders byte-identical and assists nearly s
 never reaches the board. That may be why threes was the rate shrink's one failing market. This module now scales draws
 with largest-remainder rounding (`scale_values`, with a discriminating test). The rate shrink was not changed here;
 it belongs to its own lane (held, flag OFF).
+
+## 7. Bench-only variant (2026-10-04, user: "try the bench-only variant") — INERT
+
+Same May–Jul parameters (b0 −0.2, b1 0.45, leak 4.0) plus `bench_only: true` (`01f20fce`): the re-share applies only to
+players it would give minutes to, and anyone it would cut stays exactly as simulated, minutes included. No refit, so
+Aug–Oct stays held out.
+
+- **Oracle arm:** **14 players re-shared** in 124 games (of about 2,400 pool players). Regular-season Brier Δ: points
+  −0.0002 [−0.0005, +0.0001], PR −0.0001; every other market is exactly 0.0000. Late-out minutes surprise on priced
+  rows −0.57 → −0.60.
+- **Real-rule arm:** 292 players re-shared, but **not one paired priced row changed**: every Brier and MAE Δ is
+  0.0000.
+
+Why: the players the re-share would feed are the deep bench, and the book prices almost none of them. On the oracle
+arm the 4-minute leak (about 2%) also outweighs most bench gains, so very few players net any minutes. Whatever this
+estimator does to minutes, it can only reach the board through the regulars, and §3 shows that reaching them makes
+props worse.
+
+**Verdict.** The minutes-redistribution line is closed for props: the full re-share is harmful (§3) and the bench-only
+variant is a no-op on the board. The sim's top-heavy minutes are real but are not where the regulars' props error
+lives. Recommendation: **drop the lane; do not hook the module.** The module stays on main, flag OFF, as the record of
+the diagnosis and of `scale_values`. Engine time is better spent on the per-minute value of minutes (§4) or the
+book-information list's rotation/role item, measured on props directly.
