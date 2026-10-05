@@ -1022,6 +1022,101 @@ class NbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(int(state["rc_export"]), 0)
         self.assertEqual(int(state["recs_rows"]), 1)
 
+    def test_zero_positive_edges_is_a_warning_and_export_still_runs(self) -> None:
+        """Every prop line priced, none +EV (the NBA book blend's expected outcome): the export writes a
+        header-only file and returns 0. That must not set `error`, which skipped the whole export phase."""
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            raw_root = source_root / "data" / "raw"
+            processed_root = source_root / "data" / "processed"
+            raw_root.mkdir(parents=True, exist_ok=True)
+            processed_root.mkdir(parents=True, exist_ok=True)
+            (raw_root / "odds_nba_current_2026-05-22.csv").write_text(
+                "snapshot_ts,event_id,commence_time,bookmaker,bookmaker_title,market,outcome_name,player_name,point,price,last_update,home_team,away_team\n"
+                "2026-05-22T12:00:00Z,401,2026-05-22T23:00:00Z,fanduel,FanDuel,h2h,Boston Celtics,,,-140,2026-05-22T12:00:00Z,Boston Celtics,New York Knicks\n"
+                "2026-05-22T12:00:00Z,401,2026-05-22T23:00:00Z,fanduel,FanDuel,h2h,New York Knicks,,,120,2026-05-22T12:00:00Z,Boston Celtics,New York Knicks\n"
+                "2026-05-22T12:00:00Z,401,2026-05-22T23:00:00Z,fanduel,FanDuel,spreads,Boston Celtics,,-4.5,-110,2026-05-22T12:00:00Z,Boston Celtics,New York Knicks\n"
+                "2026-05-22T12:00:00Z,401,2026-05-22T23:00:00Z,fanduel,FanDuel,spreads,New York Knicks,,4.5,-110,2026-05-22T12:00:00Z,Boston Celtics,New York Knicks\n"
+                "2026-05-22T12:00:00Z,401,2026-05-22T23:00:00Z,fanduel,FanDuel,totals,Over,,218.5,-110,2026-05-22T12:00:00Z,Boston Celtics,New York Knicks\n"
+                "2026-05-22T12:00:00Z,401,2026-05-22T23:00:00Z,fanduel,FanDuel,totals,Under,,218.5,-110,2026-05-22T12:00:00Z,Boston Celtics,New York Knicks\n",
+                encoding="utf-8",
+            )
+            (processed_root / "smart_sim_2026-05-22_BOS_NYK.json").write_text(
+                json.dumps(
+                    {
+                        "date": "2026-05-22",
+                        "home": "BOS",
+                        "away": "NYK",
+                        "quarters": [
+                            {"home_pts_mu": 27.0, "away_pts_mu": 24.0},
+                            {"home_pts_mu": 27.0, "away_pts_mu": 25.0},
+                            {"home_pts_mu": 26.0, "away_pts_mu": 24.0},
+                            {"home_pts_mu": 26.0, "away_pts_mu": 23.0}
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            predict_calls = []
+            edges_calls = []
+            export_calls = []
+
+            def _fake_run(args, log_file, **kwargs):
+                if "--out" in args:
+                    out_idx = args.index("--out") + 1
+                    out_path = Path(args[out_idx])
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    out_path.write_text("snapshot_ts,event_id\n2026-05-22T12:00:00Z,evt-1\n", encoding="utf-8")
+                elif "props-edges" in args:
+                    (processed_root / "props_edges_2026-05-22.csv").write_text("market\nPTS\n", encoding="utf-8")
+                return 0
+
+            def _fake_predict_export(**kwargs):
+                predict_calls.append(dict(kwargs))
+                out_path = kwargs["out_path"]
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text("player\nA\n", encoding="utf-8")
+                return 1, out_path
+
+            def _fake_edges_export(**kwargs):
+                edges_calls.append(dict(kwargs))
+                out_path = kwargs["out_path"]
+                out_path.write_text("market\n", encoding="utf-8")
+                return 0, out_path
+
+            def _fake_export(*, processed_root, date_str, max_plus_odds=125.0):
+                export_calls.append({"processed_root": processed_root, "date_str": date_str, "max_plus_odds": max_plus_odds})
+                out_path = processed_root / f"props_recommendations_{date_str}.csv"
+                out_path.write_text("player\nA\n", encoding="utf-8")
+                return 1, out_path
+
+            with patch.object(module, "_run_to_file", side_effect=_fake_run), patch.object(module, "export_props_predictions_local", side_effect=_fake_predict_export), patch.object(module, "export_props_edges_local", side_effect=_fake_edges_export), patch.object(module, "export_props_recommendations_local", side_effect=_fake_export), patch.object(module, "_ensure_player_logs_for_props_refresh", return_value=(True, None)), patch.object(module, "_ensure_game_predictions_for_props_refresh", return_value=(True, None)):
+                state = module._run_refresh_via_cli(
+                    source_root=source_root,
+                    date_str="2026-05-22",
+                    regions="us",
+                    bookmakers="",
+                    markets="",
+                    do_edges=True,
+                    do_export=True,
+                    do_push=False,
+                    log_file=tmp_root / "refresh.log",
+                )
+
+        self.assertEqual(len(predict_calls), 1)
+        self.assertEqual(len(edges_calls), 1)
+        self.assertEqual(len(export_calls), 1)
+        self.assertEqual(int(state["rc_export"]), 0)
+        self.assertEqual(int(state["recs_rows"]), 1)
+        self.assertEqual(int(state["rc_edges"]), 0)
+        self.assertEqual(int(state["edges_rows"]), 0)
+        # the fixture trips a later, unrelated cards_sim_detail check; what matters is that no EDGES error
+        # was set and the export phase ran (export_calls == 1 above).
+        self.assertNotIn("props-edges", str(state.get("error") or ""))
+
     def test_cli_backed_exports_prefer_existing_processed_files(self) -> None:
         module = self._load_module()
 

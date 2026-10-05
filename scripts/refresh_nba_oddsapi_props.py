@@ -3279,7 +3279,12 @@ def _run_refresh_via_cli(
         if int(rc_edges) != 0:
             state["error"] = f"props-edges failed with exit code {int(rc_edges)}"
         elif int(state["snapshot_rows"] or 0) > 0 and int(state["edges_rows"] or 0) <= 0:
-            state["error"] = "props-edges produced zero rows after a non-empty snapshot"
+            # rc 0 with zero rows means every prop line was priced and none was +EV
+            # (export_props_edges_local writes a header-only file for that and raises on
+            # missing inputs). That is a result, so it must not set `error`, which would
+            # skip the export phase below (props recs, game cards, game recs).
+            state["warning"] = f"props-edges priced the {date_str} prop lines and none was +EV; 0 edge rows written"
+            _append_log(log_file, state["warning"])
 
     if refresh_mode == "full" and do_export and not state.get("error"):
         state["phase"] = "export"

@@ -704,9 +704,21 @@ def export_props_edges_local(
 
             edges = _filter_player_prop_bookmakers_df(edges, bookmakers)
             edges = _standardize_edge_columns(edges)
-            edges = edges[(edges["edge"] >= 0.0) & (edges["ev"] >= 0.0)].copy()
             if edges.empty:
                 raise ValueError(f"No edges computed for {date_str} (missing odds or predictions).")
+            priced_lines = int(len(edges.index))
+            edges = edges[(edges["edge"] >= 0.0) & (edges["ev"] >= 0.0)].copy()
+            if edges.empty:
+                # ZERO +EV LINES IS A RESULT, NOT A FAILURE. Every line was priced and none cleared the
+                # edge/EV floor -- the expected outcome when the served probability sits on the de-vigged
+                # book (the NBA book blend, 2026-10-05: survivors 834 -> 49 on 2026-05-26). Raising here made
+                # NBA's refresh set state.error and skip its whole export phase (props recs, game cards, game
+                # recs). Missing inputs still raise above and in the compute. A header-only file is written so
+                # readers see "priced, nothing +EV" rather than "never ran".
+                print(f"PROPS_EDGES_ZERO_POSITIVE date={date_str} priced_lines={priced_lines}", flush=True)
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                edges.to_csv(out_path, index=False)
+                return 0, out_path
 
             if "ev" in edges.columns:
                 edges.sort_values(["stat", "ev"], ascending=[True, False], inplace=True)

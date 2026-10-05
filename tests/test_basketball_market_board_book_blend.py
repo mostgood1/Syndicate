@@ -141,3 +141,40 @@ def test_layer2_prop_probability_is_the_book_blend_and_off_is_the_ladder(nba_roo
     assert p_on["model_prob_over"] == pytest.approx(0.5) and p_on["book_blend"] == "applied"
     assert p_on["p_model_raw"] == pytest.approx(0.4) and p_on["edge_vs_market_pct"] == pytest.approx(0.0)
     assert p_off["model_prob_over"] == pytest.approx(0.4) and "off" in p_off["book_blend"]
+
+
+def test_export_with_zero_positive_lines_writes_header_only_and_returns_zero(tmp_path, monkeypatch):
+    """The blend puts the served probability on the de-vigged book, so no line clears edge >= 0 & ev >= 0.
+    That is a RESULT: export returns 0 and writes a header-only file (it used to raise 'No edges computed',
+    which made NBA's refresh skip its whole export phase). Missing inputs still raise."""
+    _processed(tmp_path)
+    monkeypatch.delenv(cal.BOOK_BLEND_FLAG, raising=False)
+    raw = tmp_path / "odds.csv"
+    raw.write_text(
+        "snapshot_ts,event_id,commence_time,bookmaker,bookmaker_title,market,outcome_name,player_name,point,price,home_team,away_team\n"
+        + "".join(f"2026-09-17T18:00:00Z,evt1,2026-09-17T23:00:00Z,fanduel,FanDuel,player_points,{s},LeBron James,19.5,{p},Home Team,Away Team\n"
+                  for s, p in (("Over", -120), ("Under", 100))), encoding="utf-8")
+    preds = tmp_path / "preds.csv"
+    preds.write_text("player_id,player_name,team,mean_pts,mean_reb,mean_ast,mean_threes,mean_pra,mean_stl,mean_blk,mean_tov\n"
+                     "1,LeBron James,HOM,26.4,5.1,4.2,2.1,30.7,1.1,0.6,2.2\n", encoding="utf-8")
+    out = tmp_path / "props_edges.csv"
+    n, path = edges.export_props_edges_local(source_root=tmp_path, date_str="2026-09-17", raw_path=raw,
+                                             predictions_path=preds, out_path=out, league="nba")
+    assert n == 0 and path == out
+    text = out.read_text(encoding="utf-8").strip().splitlines()
+    assert len(text) == 1 and "model_prob" in text[0]
+    # the same inputs with the blend OFF do produce a +EV line, so the zero above is the blend's result
+    monkeypatch.setenv(cal.BOOK_BLEND_FLAG, "0")
+    n_off, _ = edges.export_props_edges_local(source_root=tmp_path, date_str="2026-09-17", raw_path=raw,
+                                              predictions_path=preds, out_path=out, league="nba")
+    assert n_off >= 1
+    # missing inputs are still a failure
+    with pytest.raises(ValueError):
+        edges.export_props_edges_local(source_root=tmp_path, date_str="2026-09-17", raw_path=raw,
+                                       predictions_path=_write_empty_preds(tmp_path), out_path=out, league="nba")
+
+
+def _write_empty_preds(tmp_path):
+    p = tmp_path / "empty_preds.csv"
+    p.write_text("player_id,player_name,team,mean_pts,mean_reb,mean_ast,mean_threes,mean_pra,mean_stl,mean_blk,mean_tov\n", encoding="utf-8")
+    return p
