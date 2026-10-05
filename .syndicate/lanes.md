@@ -1139,6 +1139,19 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### mlb-strikeout-bias — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **DECOMPOSITION + SELECTION RULE, PRE-REGISTERED 2026-10-05 ~22:30Z before any candidate result was read.**
+  - **Decomposition** (`mlb_strikeout_decomposition.py`, shipped config, 26 dates / 565 starts). The K excess of +0.81/start splits 0.59 from batters faced (BF 24.70 vs 22.07) and 0.19 from K/BF (+0.009, CI [+0.0002, +0.0173]). The BF excess is driven by:
+    - **HIT-BY-PITCH: 1.76/start vs 0.23 actual (7.6x).** `pitch_model.py` applies a per-PA rate PER PITCH: `p_hbp = base_hbp * (hbp_tgt / 0.008)`, base_hbp 0.01. Inputs are fine (roster hbp_rate mean ~0.010-0.012 vs a real 1.04%/BF). The 08-17 comment already flagged it ('roughly 4x', left unfixed while entangled with the pitch mix).
+    - Pitches/BF 3.44 vs 3.88 (-11%), with pitch count unbiased. Staff-level shows the same pattern (K/BF +0.009, BF +3.2/team-game), so the K excess is NOT a starter-vs-bullpen allocation problem.
+  - **Candidates:** `base_hbp` in {0.0015, 0.0020, 0.0025} via pitch_model_overrides, 200 sims, same seeds, same 26 dates.
+  - **(1) RANK** on the TUNE split (< 2026-07-04) by |starter SO bias|.
+  - **(2) SHIP the top candidate only if every check holds on the HOLDOUT** (>= 2026-07-04):
+    - |SO bias| is lower than the baseline's;
+    - HBP/start is within 0.15 of actual;
+    - |outs bias| worsens by <= 0.10;
+    - |H|, |BB| and |ER| bias each worsen by <= 0.10;
+    - the game-total |gap| to the box-score actual grows by <= 0.10 runs.
+  - **(3)** If the totals guard alone fails, do NOT ship. Fewer HBP removes baserunners, and per the standard section 4.4 that requires re-fitting the rates that were absorbing it (hr/inplay/bb mults); that becomes the next pre-registered step. If none passes, ship nothing.
 - Goal: The current MLB engine's starter strikeout projection is unbiased against real starts (today +0.87 K/start [+0.66,+1.07], 565 starts, with pitches unbiased), measured on the as-of roster_objs replay with a pre-registered tune/holdout pick and side-effect guards on walks, hits, outs and game totals; the cause is located (K/BF vs BF vs pitches/PA) and the commit that flipped K from 18% low (08-18) to 17% high is identified
 - Files: .syndicate/findings_2026-10-05_mlb_strikeout_bias.md (NEW), scripts/mlb_strikeout_decomposition.py (NEW)
 - Hypothesis: Pitches are unbiased while K is 17% high, so the excess is per-PA: either K/BF too high (pitch-level swing/whiff/called-strike mix after the 08-18..09-08 pitch-model and refit changes) or BF inflated by the PA-start counter flagged 09-14 (simulate.py:2657, BF exceeded outs+H+BB by 1.67/start)
