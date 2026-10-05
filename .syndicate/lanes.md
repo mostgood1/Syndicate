@@ -1148,6 +1148,19 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### mlb-strikeout-bias — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **JOINT RE-FIT, PRE-REGISTERED 2026-10-06 ~00:45Z before any stage result was read** (user: "yes, run the joint refit and ship if it passes"; this supersedes the HR-only rule in lane `mlb-hr-rate`).
+  - **Tool:** `mlb_strikeout_decomposition.py`. Same 26 dates, tune < 2026-07-04, holdout >= 2026-07-04. 100 sims for the stage grids, 200 for the final judgement.
+  - **Stage 0: HBP.** `base_hbp` = 0.0015, the swept value closest to actual HBP/start on TUNE (0.26 vs 0.22).
+  - **Stage 1: K.** With stage 0 fixed, grid { `early_count_foul_boost` 1.5, 1.75 ; `k_rate_mult` 0.85 }. Pick the config with the smallest |starter K/BF - actual| on TUNE. The current values (2.05, 0.9557) stay a candidate.
+  - **Stage 2: HR.** With stages 0-1 fixed, grid forward-file `hr_rate_mult` {1.5, 1.856, 2.2}, current 1.1 included. Pick the smallest |batting HR/PA - actual| on TUNE.
+  - **Stage 3: HOLDOUT judgement** of the combination against the production baseline (base). SHIP only if every check holds:
+    - |starter SO bias| is lower than the baseline's;
+    - HBP/start is within 0.15 of actual;
+    - |batting HR/PA bias| is no larger than the baseline's;
+    - starter |outs|, |H|, |BB| and |ER| bias each worsen by <= 0.10;
+    - game-total |gap| <= max(0.30 runs, the baseline's |gap|).
+  - **Otherwise ship nothing.** No stage-2 value is retried against the holdout; the holdout is read once.
+  - **Ship** = the pitch-model forward overrides file gains `base_hbp` + the stage-1 knob and changes `hr_rate_mult`, with provenance. Then a fleet ff; production's next sim is verified against a replay at both configurations.
 - **RESULT 2026-10-06 ~00:30Z, by the pre-registered rule: NOTHING SHIPS.** `base_hbp` 0.0015 / 0.0020 / 0.0025 fixes HBP (holdout 0.25-0.43 vs 0.26 actual, baseline 1.74), and every variant fails the primary check:
   - |SO bias| WORSENS (holdout +0.92 -> +1.21..+1.24), because K/BF rises 0.236 -> 0.255-0.257 (actual 0.224) once HBP stops ending PAs early;
   - outs bias +0.65 -> +1.06..+1.11;

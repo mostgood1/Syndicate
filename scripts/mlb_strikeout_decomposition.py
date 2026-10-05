@@ -39,6 +39,9 @@ def _sim_game(job: dict) -> dict:
     rec = rp._load_json(job["sim_path"]) if job.get("sim_path") else None
     weather, park, umpire = rp.context_from_sim(rec)
     starters = {"away": int(away.lineup.pitcher.player.mlbam_id), "home": int(home.lineup.pitcher.player.mlbam_id)}
+    bats = {side: {int(b.player.mlbam_id) for b in list(ro.lineup.batters or []) + list(ro.lineup.bench or [])}
+            for side, ro in (("away", away), ("home", home))}
+    bat = {"away": defaultdict(float), "home": defaultdict(float)}
     staff = {"away": {int(p.player.mlbam_id) for p in [away.lineup.pitcher] + list(away.lineup.bullpen or [])},
              "home": {int(p.player.mlbam_id) for p in [home.lineup.pitcher] + list(home.lineup.bullpen or [])}}
     st = {s: defaultdict(float) for s in starters}
@@ -50,6 +53,12 @@ def _sim_game(job: dict) -> dict:
                          manager_pitching="v2", manager_pitching_overrides=job["mp"], pitch_model_overrides=job["pm"])
         r = simulate_game(away, home, cfg)
         runs += float(r.away_score) + float(r.home_score)
+        for bid_raw, brow in (r.batter_stats or {}).items():
+            bid = int(bid_raw)
+            side = "away" if bid in bats["away"] else ("home" if bid in bats["home"] else None)
+            if side:
+                for k in ("HR", "H", "BB", "PA", "SO", "HBP"):
+                    bat[side][k] += float(brow.get(k) or 0.0)
         ps = r.pitcher_stats or {}
         for side, pid in starters.items():
             row = ps.get(pid) or ps.get(str(pid)) or {}
@@ -64,7 +73,8 @@ def _sim_game(job: dict) -> dict:
     return {"date": job["date"], "game_pk": job["game_pk"], "starters": starters,
             "starter": {s: {k: v / n for k, v in d.items()} for s, d in st.items()},
             "team": {s: {k: v / n for k, v in d.items()} for s, d in team.items()},
-            "total_runs": runs / n}
+            "total_runs": runs / n,
+            "batting": {s: {k: v / n for k, v in d.items()} for s, d in bat.items()}}
 
 
 def _actual(box: dict) -> dict:
@@ -79,6 +89,7 @@ def _actual(box: dict) -> dict:
         ip = str(s.get("inningsPitched") or "0.0")
         whole, _, frac = ip.partition(".")
         tp = ((t.get("teamStats") or {}).get("pitching") or {})
+        tb = ((t.get("teamStats") or {}).get("batting") or {})
         out[side] = {"pid": pid,
                      "starter": {"OUTS": int(s.get("outs", int(whole or 0) * 3 + int(frac or 0))),
                                  "P": int(s.get("numberOfPitches") or s.get("pitchesThrown") or 0),
@@ -87,6 +98,9 @@ def _actual(box: dict) -> dict:
                                  "BF": int(s.get("battersFaced") or 0), "ER": int(s.get("earnedRuns") or 0)},
                      "runs": int(((box.get("teams") or {}).get("away") or {}).get("teamStats", {}).get("batting", {}).get("runs") or 0)
                              + int(((box.get("teams") or {}).get("home") or {}).get("teamStats", {}).get("batting", {}).get("runs") or 0),
+                     "batting": {"HR": int(tb.get("homeRuns") or 0), "H": int(tb.get("hits") or 0),
+                                 "BB": int(tb.get("baseOnBalls") or 0), "PA": int(tb.get("plateAppearances") or 0),
+                                 "SO": int(tb.get("strikeOuts") or 0), "HBP": int(tb.get("hitByPitch") or 0)},
                      "team": {"SO": int(tp.get("strikeOuts") or 0), "BF": int(tp.get("battersFaced") or 0),
                               "P": int(tp.get("numberOfPitches") or tp.get("pitchesThrown") or 0)}}
     return out
@@ -126,6 +140,20 @@ def summarise(rows: list[dict], draws: int) -> dict:
     out["SO_mae"] = sum(abs(r["model_starter"]["SO"] - r["actual_starter"]["SO"]) for r in rows) / len(rows)
     b, lo, hi = rp.boot_ci(rows, lambda rs: sum(r["model_starter"]["SO"] - r["actual_starter"]["SO"] for r in rs) / len(rs), draws)
     out["SO_bias_ci"] = [b, lo, hi]
+    # Batting components per team-game. A starter row is keyed to the PITCHING side, so
+    # its batting row is that side's own offense: one team-game per starter row.
+    bat = {}
+    for k in ("HR", "H", "BB", "SO", "HBP", "PA"):
+        m = sum(r["model_bat"].get(k, 0.0) for r in rows) / len(rows)
+        a = sum(r["actual_bat"].get(k, 0) for r in rows) / len(rows)
+        bb_, lo_, hi_ = rp.boot_ci(rows, lambda rs, k=k: sum(r["model_bat"].get(k, 0.0) - r["actual_bat"].get(k, 0) for r in rs) / len(rs), draws)
+        bat[k] = {"model": m, "actual": a, "bias": bb_, "ci": [lo_, hi_]}
+    for k in ("HR", "H", "BB", "SO", "HBP"):
+        mp_ = sum(r["model_bat"].get("PA", 0.0) for r in rows)
+        ap_ = sum(r["actual_bat"].get("PA", 0) for r in rows)
+        bat[k + "_per_PA"] = {"model": sum(r["model_bat"].get(k, 0.0) for r in rows) / mp_ if mp_ else None,
+                              "actual": sum(r["actual_bat"].get(k, 0) for r in rows) / ap_ if ap_ else None}
+    out["batting"] = bat
     # K/start decomposition: model K = (model K/BF)(model BF); swap one term at a time
     kbf_m, kbf_a = s["K_per_BF"]["model"], s["K_per_BF"]["actual"]
     bf_m, bf_a = s["BF"]["model"], s["BF"]["actual"]
@@ -185,6 +213,7 @@ def main(argv=None) -> int:
                 continue
             rows.append({"date": res["date"], "game_pk": res["game_pk"], "pid": pid,
                          "model_runs": res["total_runs"], "actual_runs": a["runs"],
+                         "model_bat": res["batting"][side], "actual_bat": a["batting"],
                          "model_starter": res["starter"][side], "actual_starter": a["starter"],
                          "model_team": res["team"][side], "actual_team": a["team"]})
     dates = sorted(set(args.dates))
