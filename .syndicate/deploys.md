@@ -46480,3 +46480,9 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
   that run.
 - note: fcd348cd (portfolio staking, which a peer had described as held back) is also on the fleet as of this ff. It
   was not carried by me, and is recorded only because the peer asked that ffs not carry it.
+
+## 2026-10-05 21:32Z (4:32 PM CT) -- READING for the 21:16:36Z ff (cb1bb280, NHL last-game dressing rule) -- **MET** (lane `nhl-scratch-dilution`)
+
+- reading: lineups_2026-10-05.csv rebuilt 21:29:55Z (first after the ff): slotted skaters absent from their team's last game 12 of 144 -> 1 of 144 (`C:/tmp/nhlprops/lastgame_check.py`).
+- the one left, TBL Yanni Gourde (L2), is NOT book-listed (0 of 218 lines). TBL's last game (2026020024, 10-03) dressed 11 F + 7 D, so the 12-forward template has one slot no last-game forward can fill and it goes to the best absentee by total TOI -- the rule as designed. The prediction ("only book-listed remain") was worded too tightly; the right predicate is "absentees only where the last game left the slot unfillable or the player is book-listed".
+- lineups_2026-10-06.csv not yet rebuilt at read time (still 20:30:33Z, 26 of 324 under the old rule).
