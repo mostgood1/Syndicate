@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1261 rules `[generated]`
+## Index — 1266 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -2976,3 +2976,13 @@ own prior verdicts, not by anything failing.
 - What happened: I pre-registered "no line's 95% CI entirely > 0 in any of all / Oct / Nov+" over 33 cells (11 prop lines x 3 periods) for the NHL in-season props inputs. Two variants (H16, H17) each failed on ONE cell, at the boundary (+0.00012 [+0.00001, +0.00028]), in the same 6-game window (10-27..10-31) where the arms first differ. Under a TRUE null, P(at least one of 33 one-sided 2.5% exceedances) is ~0.57, so the bar fails a no-effect change about half the time. I wrote that down only after the second failure, and did not use it to pass anything.
 - Rule: for a multi-cell guard, compute 1 - (1 - alpha)^cells (or simulate it on a null arm) and print it next to the bar when you pre-register it. Then either budget the cells (e.g. pre-register a few primary cells; treat the rest as reported, not gating) or accept the stated false-fail rate.
 - Also confirmed the props lane's rule (2026-10-04): MAE improved in October while Brier at POINTS@0.5 got worse (+0.00144 [+0.00014, +0.00275]); gate props on Brier at the lines.
+
+## 2026-10-05 — RULE: an overnight ONE-TIME scheduled task is DEFERRED, not skipped. It fires hours late when the laptop wakes, or not at all, and it stays armed `[lane ncaaf-total-level-shrink, session 64f14d78]`
+
+- What happened (10-04/05): 3 overnight one-time tasks missed their slot. `ncaaf-total-level-shrink-fit` (fireAt 3:30 AM CT 10-04) started at 11:29 AM CT, **~8 h late**. `fleet-restart-fee-net-env-1004` (11:30 PM CT) and `ncaaf-live-shrink-03-post-restart-reading` (1:15 AM CT) both had **totalRuns 0** at 9:20 AM CT 10-05 and were still `enabled`, with nextRunAt in the past. The deploys.md entry said the shrink "loads at the 04:30Z guarded restart". It loaded through the supervisor's natural role restarts instead (06:19 / 09:06 / 09:18 CT).
+- Cause (BELIEVED, consistent with MEASURED precedent): Windows Modern Standby. state.md "Live-gameline collector (laptop cron)" measured one standby span covering a 23:34 CT fire, 6 of 10 nights. Wake timers do not help (AC=important-only, DC=disabled).
+- How to apply:
+  - Do not write "loads at the <overnight time> restart" as if it were a schedule. Name the READING that proves the load, and judge it by process start time vs checkout time.
+  - Judge a scheduled task by `list_task_runs` totalRuns plus its artifact, never by fireAt or lastRunAt.
+  - **A missed one-time task with side effects is a LIVE HAZARD.** Its late fire runs in daylight, outside the window the user approved. After a miss, disable it or re-scope it with the user. Never assume it expired. This is especially true of a restart task, which can kill an in-flight sim.
+  - Prefer a daytime or attended slot for anything with a production side effect. An overnight task should be read-only and idempotent.

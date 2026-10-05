@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1261 rules `[generated]`
+## Index — 1266 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 503**
+**FORBIDDEN — 504**
 
 - [2026-09-21 FORBIDDEN: diagnosing a failure from its most vivid example `[lane layer2-li…](#2026-09-21-forbidden-diagnosing-a-failure-from-its-most-vivid-example-lane-layer2-line-move-magnitude)
 - [2026-09-21 FORBIDDEN: verifying that a signal was COMPUTED as verifying that it is REAL…](#2026-09-21-forbidden-verifying-that-a-signal-was-computed-as-verifying-that-it-is-real-lane-layer2-line-move-magnitude)
@@ -112,6 +112,7 @@
 - [2026-10-02 FORBIDDEN: proposing a MARKET-WIDE withhold of a model's probability as the…](#2026-10-02-forbidden-proposing-a-market-wide-withhold-of-a-models-probability-as-the-answer-to-the-model-loses-to-the-book-lanes-mlb-lines-props-backtest-mlb-board-mean-only-session-b98d59a1)
 - [2026-10-03 — FORBIDDEN: reading a production-EQUIVALENCE check as proof the harness ran…](#2026-10-03-forbidden-reading-a-production-equivalence-check-as-proof-the-harness-ran-productions-environment-both-sides-can-share-the-same-wrong-input-and-agree-perfectly-lane-nfl-lines-props-backtest-session-05b01a84)
 - [2026-10-03 — FORBIDDEN: `git checkout origin/main -- .syndicate/lanes.md` to "sync" the…](#2026-10-03-forbidden-git-checkout-originmain----syndicatelanesmd-to-sync-the-ledger-while-your-own-lane-block-is-uncommitted-it-erases-the-block-silently-lane-nfl-kalshi-forward-clv-session-05b01a84)
+- [2026-10-04 — FORBIDDEN: a fleet restart gate whose DOWN and UP halves live in different…](#2026-10-04-forbidden-a-fleet-restart-gate-whose-down-and-up-halves-live-in-different-processes-when-the-session-ended-the-half-that-runs-down-survived-and-the-half-that-starts-the-fleet-did-not-lane-nba-day-of-sweep-ownership-session-ed75e56a)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -523,7 +524,7 @@
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 - [2026-09-03 — EXONERATED: `deploys.md` and `learnings.md` ARE guarded. Two sessions file…](learnings_archive.md#2026-09-03-exonerated-deploysmd-and-learningsmd-are-guarded-two-sessions-filed-the-same-false-gap-and-the-second-re-derived-it-with-the-same-blind-spot) `[evidence]`
 
-**Rules and corrections — 752**
+**Rules and corrections — 756**
 
 - [2026-09-16 — a detector that matches a FORMULA at published precision has a FALSE-POSIT…](#2026-09-16-a-detector-that-matches-a-formula-at-published-precision-has-a-false-positive-rate-and-mine-fired-at-about-1-row-per-1200-session-abacd435-lane-soccer-anytime-scorer)
 - [2026-09-16 — OVERTURNED: "the pre-registered criterion is the safe part, the risk is in…](#2026-09-16-overturned-the-pre-registered-criterion-is-the-safe-part-the-risk-is-in-the-mechanism-two-hypotheses-in-one-night-died-on-the-criterion-session-abacd435-fixes-4-and-5a-no-lane)
@@ -647,6 +648,10 @@
 - [2026-10-03 — RECURRENCE (mine): I reported a production flag as "default OFF" from the…](#2026-10-03-recurrence-mine-i-reported-a-production-flag-as-default-off-from-the-code-default-without-reading-the-env-lane-nfl-off-market-edge-session-05b01a84)
 - [2026-10-04 — RULE: an evaluation that calls the same helper as the engine cannot see th…](#2026-10-04-rule-an-evaluation-that-calls-the-same-helper-as-the-engine-cannot-see-that-helpers-defect-when-an-estimator-writes-integer-ladders-test-a-sub-half-unit-change-end-to-end-lanes-wnba-sim-rate-shrink-wnba-minutes-redistribution-session-39b666bb)
 - [2026-10-05 — RULE: "the module applied" is not "production serves it"; read the artifac…](#2026-10-05-rule-the-module-applied-is-not-production-serves-it-read-the-artifact-the-consumer-reads-at-the-field-it-reads-lane-nba-prop-calibration-session-e0a3e383)
+- [2026-10-05 — RULE: before fixing a measured bias, check whether it is COMPENSATING anot…](#2026-10-05-rule-before-fixing-a-measured-bias-check-whether-it-is-compensating-another-measure-both-terms-of-the-product-first-lane-nhl-ev-rotation)
+- [2026-10-05 — RULE: a verification is only as good as the population it ran on; if no me…](#2026-10-05-rule-a-verification-is-only-as-good-as-the-population-it-ran-on-if-no-member-of-the-reading-carries-the-failing-trait-met-is-untested-lane-basketball-injury-exclusion-reinclusion-session-39b666bb)
+- [2026-10-05 — RULE: a pre-registered "no cell worse" bar over many cells must state its…](#2026-10-05-rule-a-pre-registered-no-cell-worse-bar-over-many-cells-must-state-its-false-fail-rate-under-the-null-before-the-run-lane-nhl-season-inputs-in-season-session-9ed26377)
+- [2026-10-05 — RULE: an overnight ONE-TIME scheduled task is DEFERRED, not skipped. It fi…](#2026-10-05-rule-an-overnight-one-time-scheduled-task-is-deferred-not-skipped-it-fires-hours-late-when-the-laptop-wakes-or-not-at-all-and-it-stays-armed-lane-ncaaf-total-level-shrink-session-64f14d78)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

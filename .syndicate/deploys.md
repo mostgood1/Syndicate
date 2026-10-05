@@ -46241,3 +46241,19 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
   - OLD handoff drops **none**; NEW handoff drops **N'Faly Dante**.
   - The filter runs before the pool cut, so this is the step the fix changes.
 - **still owed:** an NBA game where an excluded player with a punctuated name would otherwise be simulated. It cannot be forced; the next NBA injury report will provide one.
+## 2026-10-05 14:18Z (9:18 AM CT) -- READING for the 01:25:28Z ff (ad231ea0, NCAAF live total-level shrink 0.3) -- **MET**; loaded by the supervisor's NATURAL role restarts, not by `fleet-restart-fee-net-env-1004`, which never fired (lane `ncaaf-total-level-shrink`, session 64f14d78)
+
+- baseline (the 01:25:28Z entry): fleet HEAD 4345ba0d -> ad231ea0 with no restart; running roles still held live lambda 1.0; pregame 0.5 in code since 68832abf.
+- expectation: refresh-worker started after the ad231ea0 checkout; neither override key in its environ; with both keys unset `total_level` reads NCAAF_LIVE_TOTAL_LEVEL_SHRINK 0.3, NCAAF_TOTAL_LEVEL_SHRINK 0.5, live_total_level_shrink() 0.3; healthz 200.
+- reading (14:18:09Z-14:20:55Z, read-only, WSL ~/Syndicate):
+  - fleet reflog: ad231ea0 checked out 2026-10-04 20:25:27 CT, d7955a3c 20:54:09 CT, 1111942f 2026-10-05 09:15:34 CT (another session's ff). `merge-base --is-ancestor` ad231ea0 and 68832abf -> HEAD: both YES.
+  - `git diff --stat` over total_level.py, live_resim.py and generate_smartsim2_ncaaf_projections.py: ad231ea0..d7955a3c EMPTY, d7955a3c..1111942f EMPTY. The shrink path is byte-identical in every code version a role has loaded since 20:25 CT.
+  - refresh-worker: pid 1282327 started 2026-10-05 06:19:40 CDT (the watcher session's reading); by 09:18:51 CDT it had restarted again, pid 1313093, `local_production.py status` code=1111942f, restarts=4. live-odds-worker: pid 1309726 started 09:06:52 CDT, code=d7955a3c (its 02:48 CT start was superseded by another natural restart). Every start is after 20:25:27 CT 10-04.
+  - /proc/<pid>/environ, KEYS ONLY, on both workers (both refresh-worker pids): SYNDICATE_NCAAF_LIVE_TOTAL_LEVEL_SHRINK absent, SYNDICATE_NCAAF_TOTAL_LEVEL_SHRINK absent.
+  - `~/.venvs/syndicate/bin/python`, both keys unset: NCAAF_LIVE_TOTAL_LEVEL_SHRINK 0.3, NCAAF_TOTAL_LEVEL_SHRINK 0.5, live_total_level_shrink() 0.3. Same as the watcher session's 7:10 AM CT read.
+  - healthz 127.0.0.1:10000 -> 200 (14:18Z and 14:20:55Z).
+  - web code=4a565a47 (STALE vs HEAD): irrelevant here, the web role builds no NCAAF projection or live re-sim.
+- verdict: **MET.** Pregame 0.5 and live 0.3 are in the code both workers run, with no env override.
+- how it loaded: `fleet-restart-fee-net-env-1004` (fireAt 04:30Z) totalRuns 0; `ncaaf-live-shrink-03-post-restart-reading` (fireAt 06:15Z) totalRuns 0. Both are still `enabled` with nextRunAt in the past. The supervisor's own role restarts loaded the checkout instead. See learnings 2026-10-05, "an overnight one-time scheduled task is DEFERRED, not skipped".
+- not yet seen (LEAD, not a blocker): a LIVE NCAAF re-sim at lambda 0.3. No NCAAF game has been live since the load. On the first live game of the next slate (by Sat 10-10), snapshot lanes should carry the level-shrink stamp 0.3, or 1.0 on market-implied FCS games.
+- HAZARD, RESOLVED ~14:40Z by user decision ("disable both tasks"): both tasks DISABLED by session 64f14d78. Before that, both stale tasks may still fire late. The fit task did, 8 h after its slot. The restart task's only gate is "no NFL game live", so a late fire runs a full down+up at an arbitrary hour. Its goal looks already met: SYNDICATE_SCORE_FEE_NET is PRESENT (key only) in web, refresh-worker and live-odds-worker environs at 14:19Z.
