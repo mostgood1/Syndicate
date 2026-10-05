@@ -347,6 +347,111 @@ def cmd_probe(a) -> int:
     return 0
 
 
+def _event_for(act: Dict[str, Dict], gid: str, out: Path) -> Optional[Tuple[str, str, Dict]]:
+    """(start, sport, event) of a game's closing featured snapshot, matched like `book_consensus`."""
+    r = act[gid]
+    start = r.get("start")
+    blob = _rj(out / "odds" / f"{start.replace(':', '')}.json") if start else None
+    if not blob:
+        return None
+    for ev in ((blob.get("snap") or {}).get("data")) or []:
+        if (_abbr_of(ev.get("home_team", "")), _abbr_of(ev.get("away_team", ""))) != (r["home"], r["away"]):
+            continue
+        if abs((datetime.strptime(ev["commence_time"], "%Y-%m-%dT%H:%M:%SZ")
+                - datetime.strptime(start, "%Y-%m-%dT%H:%M:%SZ")).total_seconds()) > 6 * 3600:
+            return None
+        return start, blob["sport"], ev
+    return None
+
+
+def reg3_consensus(ev: Dict, snap: Optional[Dict]) -> Optional[Dict[str, Any]]:
+    """Regulation 3-way close: per book, proportional de-vig over (home, draw, away) with the production
+    American->probability converter; the mean over books quoting all three."""
+    from syndicate.features.nhl.sim_engine.hockeysim.adapters import american_to_implied
+    home_n, away_n = _norm(ev["home_team"]), _norm(ev["away_team"])
+    rows = []
+    for b in ((snap or {}).get("data") or {}).get("bookmakers") or []:
+        for m in b.get("markets") or []:
+            if m.get("key") != "h2h_3_way":
+                continue
+            oc = {_norm(o["name"]): o["price"] for o in m.get("outcomes") or []}
+            ph, pd, pa = oc.get(home_n), oc.get("draw"), oc.get(away_n)
+            if ph is None or pd is None or pa is None:
+                continue
+            ih, idr, ia = american_to_implied(ph), american_to_implied(pd), american_to_implied(pa)
+            s = ih + idr + ia
+            if s > 0:
+                rows.append((ih / s, idr / s, ia / s))
+    if not rows:
+        return None
+    return {"reg_home": statistics.fmean(r[0] for r in rows), "reg_tie": statistics.fmean(r[1] for r in rows),
+            "reg_away": statistics.fmean(r[2] for r in rows), "books_3way": len(rows),
+            "snap_ts_3way": (snap or {}).get("timestamp")}
+
+
+def cmd_odds3way(a) -> int:
+    """Regulation 3-way (h2h_3_way) closes, per event (the market is not on the featured endpoint), at the
+    same snapshot time as the game's other closes; then merged into book.json as reg_home/reg_tie/reg_away.
+    10 credits per event. Spends nothing without --execute; re-runs skip cached events."""
+    out = Path(a.out)
+    act = json.loads((out / "actuals.json").read_text(encoding="utf-8"))
+    arms = {x.strip() for x in a.arms.split(",") if x.strip()}
+    cache = out / "odds3way"
+    todo, cached, unmatched = [], 0, 0
+    for gid in sorted(act):
+        if act[gid]["arm"] not in arms:
+            continue
+        if (cache / f"{gid}.json").exists():
+            cached += 1
+            continue
+        hit = _event_for(act, gid, out)
+        if hit is None:
+            unmatched += 1
+            continue
+        todo.append((gid, *hit))
+    print(f"odds3way: arms {sorted(arms)}: {len(todo)} to fetch, {cached} cached, {unmatched} with no matched close event; "
+          f"estimate {len(todo) * 10} credits (1 market x 1 region x 10)", flush=True)
+    if a.execute and todo:
+        key, budget = _api_key(), Budget(a.max_credits)
+        cache.mkdir(parents=True, exist_ok=True)
+        fails = 0
+        try:
+            for i, (gid, start, sport, ev) in enumerate(todo):
+                d = _odds_get(f"/historical/sports/{sport}/events/{ev['id']}/odds",
+                              {"regions": "us", "markets": "h2h_3_way", "oddsFormat": "american",
+                               "date": _snap_time(start)}, key, budget)
+                if d is None:  # failed call: never cache it, or a re-run would skip the game for good
+                    fails += 1
+                    if fails >= 5:
+                        raise SystemExit(f"odds3way: {fails} consecutive failed calls (dead key? see _api_key) -- stopped")
+                    continue
+                fails = 0
+                (cache / f"{gid}.json").write_text(json.dumps({"start": start, "sport": sport, "event": ev["id"], "snap": d}),
+                                                   encoding="utf-8")
+                if i % 100 == 0:
+                    print(f"  {i}/{len(todo)} spent={budget.spent} calls={budget.calls}", flush=True)
+        finally:
+            print(f"odds3way: spent {budget.spent} credits over {budget.calls} calls; header remaining={budget.remaining}", flush=True)
+    elif not a.execute:
+        print("dry run -- pass --execute to spend")
+    # merge whatever is cached into book.json
+    book = json.loads((out / "book.json").read_text(encoding="utf-8")) if (out / "book.json").exists() else {}
+    merged = Counter()
+    for f in sorted(cache.glob("*.json")) if cache.exists() else []:
+        blob = _rj(f) or {}
+        gid = f.stem
+        hit = _event_for(act, gid, out)
+        c = reg3_consensus(hit[2], blob.get("snap")) if hit else None
+        if c is None:
+            merged["no_3way_quote"] += 1
+            continue
+        book.setdefault(gid, {}).update(c)
+        merged["merged"] += 1
+    (out / "book.json").write_text(json.dumps(book), encoding="utf-8")
+    print(f"odds3way merge into book.json: {dict(merged)}", flush=True)
+    return 0
+
+
 def _norm(s: str) -> str:
     s = unicodedata.normalize("NFKD", str(s)).encode("ascii", "ignore").decode().lower()
     return " ".join(s.replace(".", " ").split())
@@ -984,7 +1089,8 @@ def write_md(rep: Dict, path: Path) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["actuals", "odds", "probe-periods", "sim", "score"])
+    ap.add_argument("cmd", choices=["actuals", "odds", "odds3way", "probe-periods", "sim", "score"])
+    ap.add_argument("--arms", default="regular,playoff,current_reg", help="odds3way: actuals arms to pull")
     ap.add_argument("--out", default="C:/tmp/nhllines")
     ap.add_argument("--roots", default="C:/tmp/nhlprops/bt", help="backtest_nhl_props.py --out dir (as-of roots + game_index)")
     ap.add_argument("--src", default=None, help="<primary>/data/nhl_source (raw boxscores/landings); default via git")
@@ -999,7 +1105,8 @@ def main() -> int:
     a = ap.parse_args()
     if a.src is None:
         a.src = str(_main_worktree() / "data" / "nhl_source")
-    return {"actuals": cmd_actuals, "odds": cmd_odds, "probe-periods": cmd_probe, "sim": cmd_sim, "score": cmd_score}[a.cmd](a)
+    return {"actuals": cmd_actuals, "odds": cmd_odds, "odds3way": cmd_odds3way, "probe-periods": cmd_probe, "sim": cmd_sim,
+            "score": cmd_score}[a.cmd](a)
 
 
 if __name__ == "__main__":
