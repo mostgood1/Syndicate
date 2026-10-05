@@ -124,7 +124,27 @@ _ALIASES: dict[str, str] = {
     "deportivo la coruna": "deportivo",
     "stade rennais": "rennes",
     "oud heverlee leuven": "oh leuven",
+    # football-data.co.uk short forms that the fuzzy step sent to a DIFFERENT
+    # club, measured 2026-10-05 (lane `soccer-xg-totals-bias`) against the
+    # Understat rating keys: "Ath Madrid" -> Real Madrid, "Paris SG" -> Paris FC.
+    "ath madrid": "atletico madrid",
+    "paris sg": "paris saint germain",
 }
+
+# Canonical pairs that are DIFFERENT clubs and must never be joined by the
+# fuzzy step. Same reasoning as `_ALIASES`: the same-club and different-club
+# score ranges overlap, so a wrong pair is fixed by naming it, not by moving
+# the threshold.
+#
+# "le mans" vs "lens" scores 0.727 (>= 0.72). Measured 2026-10-05 on the fleet
+# (lane `soccer-xg-totals-bias`): ESPN "Le Mans" -- promoted to Ligue 1 for
+# 2026-27, so absent from every Understat ratings file -- resolved to "Lens",
+# and every Le Mans match was priced with Lens's rating (attack +0.20, defense
+# +0.09) instead of `PROMOTED_TEAM_RATING` (-0.18 / -0.18). With the pair
+# refused, Le Mans resolves to None, which is the promoted-team path.
+_DISTINCT_CLUBS: frozenset[frozenset[str]] = frozenset({
+    frozenset({"le mans", "lens"}),
+})
 
 
 def _fold_accents(text: str) -> str:
@@ -186,6 +206,8 @@ def match_team_name(name: str, candidates: list[str] | tuple[str, ...], *, thres
         canonical = canonical_team_name(candidate)
         if canonical == target:
             return candidate
+        if frozenset({target, canonical}) in _DISTINCT_CLUBS:
+            continue
         score = SequenceMatcher(None, target, canonical).ratio()
         # Token containment (e.g. "arsenal" in "arsenal london") is strong.
         if target and (target in canonical or canonical in target):
