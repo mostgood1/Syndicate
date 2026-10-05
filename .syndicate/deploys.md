@@ -46454,3 +46454,11 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - **Reading it.** The replay runs slightly long against production: +0.09 on the pre-ship 10-03 validation, 8 starters. Net of that offset, production sits on the 0.10 replay; the 0.06 hypothesis is ~3 SE further away.
 - **Caveat.** The stored mean moved 0.013 between the two runs because a 10-05 game was re-simmed mid-check. That is small against the 0.13 that separates the hypotheses.
 - **Not yet measured:** accuracy against real starts for the new value on new games. Postseason n is tiny; the replay holdout (232 starts) is the accuracy evidence.
+
+## 2026-10-05 21:16:36Z (4:16 PM CT) -- LOCAL FLEET FF -> cb1bb280, NO RESTART: NHL lineups dress players from the team's most recent game first (lane `nhl-scratch-dilution`) -- VERIFY OWED
+
+- change: `infer_lines` ranks who dresses by (book-listed, played team's last game, total TOI). User decision "Ship it".
+- offline evidence: full 2025-26 paired vs production (`C:/tmp/nhlprops/bt_as_p15s2` vs `bt_scratch`): slotted-but-did-not-play 10.4% -> 6.0%; played-and-projected player-games 36,533 -> 38,287 (+4.8%); Brier on the 35,613 common player-games flat on every line (no change significant).
+- baseline (read 21:10Z, `C:/tmp/nhlprops/lastgame_check.py`, built under the old rule): lineups_2026-10-05 (20:27:37Z) 12 of 144 slotted skaters absent from their team's last game; lineups_2026-10-06 (20:30:33Z) 26 of 324.
+- prediction: the first rebuild after 21:16:36Z leaves only BOOK-LISTED skaters among those absent (they still dress first); every non-listed absentee is replaced.
+- verify: watcher `/mnt/c/tmp/nhlprops/scratch_watch.sh` reruns the check on that rebuild; remaining absentees are checked against the date's book lines.
