@@ -48,6 +48,32 @@ BGL = importlib.util.module_from_spec(_s)
 _s.loader.exec_module(BGL)
 
 
+def _leads(pbp: dict) -> List[int]:
+    from syndicate.features.nhl.inseason_team_xg import home_lead_before_shots
+    return home_lead_before_shots(pbp)
+
+
+def team_game_xg_adj(season: List[dict], model, weights: Dict[int, float]) -> None:
+    """Score-adjusted twin of `team_game_xg` (xg_h_adj / xg_a_adj), production weighting."""
+    from syndicate.features.nhl.sim_engine.hockeysim.historical_truth import shot_xg_model as X
+    from syndicate.features.nhl.inseason_team_xg import score_weight
+    for g in season:
+        g["xg_h_adj"] = g["xg_a_adj"] = 0.0
+        if not g["shots"]:
+            continue
+        p = model.predict_proba(X.featurize(g["shots"]))[:, 1]
+        ok = len(g["leads"]) == len(g["shots"])
+        for i, (s, x) in enumerate(zip(g["shots"], p)):
+            home = s.team_id == g["home_id"]
+            lead = (g["leads"][i] if home else -g["leads"][i]) if ok else 0
+            wx = float(x) * (score_weight(lead, weights) if ok else 1.0)
+            g["xg_h_adj" if home else "xg_a_adj"] += wx
+
+
+def adj_view(season: List[dict]) -> List[dict]:
+    return [{**g, "xg_h": g["xg_h_adj"], "xg_a": g["xg_a_adj"]} for g in season]
+
+
 def load_season(pbp_dir: Path, pattern: str) -> List[dict]:
     """Regular-season games from cached play-by-play: id, date, home/away abbr, shots, final score."""
     from syndicate.features.nhl.sim_engine.hockeysim.historical_truth import shot_xg_model as X
@@ -62,7 +88,7 @@ def load_season(pbp_dir: Path, pattern: str) -> List[dict]:
         games.append({"gid": str(d["id"]), "date": str(d.get("gameDate") or "")[:10],
                       "home": str(home.get("abbrev") or "").upper(), "away": str(away.get("abbrev") or "").upper(),
                       "home_id": int(home["id"]), "final_h": int(home["score"]), "final_a": int(away["score"]),
-                      "shots": X.parse_play_by_play_shots(d)})
+                      "shots": X.parse_play_by_play_shots(d), "leads": _leads(d)})
     games.sort(key=lambda g: (g["date"], g["gid"]))
     return games
 
@@ -144,11 +170,52 @@ def predict(game: dict, arm: str, w, prior, asof, total_line=None):
     return {"ml": p.p_home_ml, "tot": p.model_total, "ov": p.p_over}
 
 
+def scoreadj_eval(a, s23, s24, s25, out: Path) -> int:
+    weights = {int(k): float(v) for k, v in json.loads(Path(a.scoreadj_weights).read_text(encoding="utf-8"))["weights"].items()}
+    m_eval = fit_xg([s23, s24])
+    team_game_xg(s24, m_eval); team_game_xg(s25, m_eval)
+    team_game_xg_adj(s24, m_eval, weights); team_game_xg_adj(s25, m_eval, weights)
+    prior, asof = season_rates(s24), AsOf(s25)
+    prior_adj, asof_adj = season_rates(adj_view(s24)), AsOf(adj_view(s25))
+    act = json.loads((out / "actuals.json").read_text(encoding="utf-8"))
+    book = json.loads((out / "book.json").read_text(encoding="utf-8"))
+    yml = lambda x: 1 if x["r"]["final_h"] > x["r"]["final_a"] else 0
+    tot = lambda x: x["r"]["final_h"] + x["r"]["final_a"]
+    res = {}
+    for arm_name in ("regular", "playoff"):
+        rows = []
+        for g in s25:
+            r = act.get(g["gid"])
+            if not r or r["arm"] != arm_name:
+                continue
+            b = book.get(g["gid"], {})
+            rows.append({"date": g["date"], "r": r, "b": b,
+                         "BLEND": predict(g, "BLEND", 10.0, prior, asof, b.get("total_line")),
+                         "BLEND_ADJ": predict(g, "BLEND", 10.0, prior_adj, asof_adj, b.get("total_line"))})
+        if not rows:
+            print(f"== {arm_name}: no rows (play-by-play for this arm not loaded)")
+            continue
+        d = BGL._boot_diff([(x["date"], BGL._brier(x["BLEND_ADJ"]["ml"], yml(x)) - BGL._brier(x["BLEND"]["ml"], yml(x))) for x in rows])
+        dl = BGL._boot_diff([(x["date"], BGL._ll(x["BLEND_ADJ"]["ml"], yml(x)) - BGL._ll(x["BLEND"]["ml"], yml(x))) for x in rows])
+        dm = BGL._boot_diff([(x["date"], abs(x["BLEND_ADJ"]["tot"] - tot(x)) - abs(x["BLEND"]["tot"] - tot(x))) for x in rows])
+        mean_shift = statistics.fmean(abs(x["BLEND_ADJ"]["ml"] - x["BLEND"]["ml"]) for x in rows)
+        print(f"== {arm_name}: n={len(rows)} | mean |dp_home_ml| {mean_shift:.5f}")
+        print(f"   BLEND_ADJ - BLEND: ML dBrier {d[0]:+.5f} [{d[1]:+.5f},{d[2]:+.5f}] | ML dLL {dl[0]:+.5f} [{dl[1]:+.5f},{dl[2]:+.5f}] "
+              f"| total dMAE {dm[0]:+.4f} [{dm[1]:+.4f},{dm[2]:+.4f}]", flush=True)
+        res[arm_name] = {"n": len(rows), "d_brier": d, "d_ll": dl, "d_total_mae": dm, "mean_abs_dp": mean_shift}
+    (out / "scoreadj_production_form.json").write_text(json.dumps(res, indent=1), encoding="utf-8")
+    print("DONE", flush=True)
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--pbp-2023", required=True)
     ap.add_argument("--pbp-2024", required=True)
     ap.add_argument("--out", default="C:/tmp/nhllines")
+    ap.add_argument("--scoreadj-weights", default=None,
+                    help="JSON {lead: weight} fit on seasons BEFORE 2025-26: run ONLY the production-form score-adjusted "
+                         "comparison BLEND_ADJ vs BLEND at w=10 (the shipped weight) on 2025-26")
     a = ap.parse_args()
     out = Path(a.out)
     src = BGL._main_worktree() / "data" / "nhl_source" / "data" / "ingestion_cache"
@@ -156,6 +223,8 @@ def main() -> int:
     s24 = load_season(Path(a.pbp_2024), "*.json")
     s25 = load_season(src, "playbyplay_2025*.json")
     print(f"seasons: 2023-24 {len(s23)} games, 2024-25 {len(s24)}, 2025-26 {len(s25)}", flush=True)
+    if a.scoreadj_weights:
+        return scoreadj_eval(a, s23, s24, s25, Path(a.out))
 
     # --- tuning stage: target 2024-25, prior 2023-24, xG model fit on 2023-24 only
     m_tune = fit_xg([s23])

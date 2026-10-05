@@ -111,12 +111,38 @@ def predict_game(game, *, anchor_weight: float) -> HockeyGamePrediction:
     )
 
 
+def _apply_scoreadj_xg(games: list, date: str, root: Optional[Path]) -> list:
+    """Game lines only: re-project each game from SCORE-ADJUSTED team xG (`team_xg_scoreadj_<season>.csv`,
+    written beside `team_xg_<season>.csv` by `inseason_team_xg`) and give the game-market sim those period
+    lambdas. Props build their own features and never see this. A game where either team lacks an adjusted
+    rate keeps its unadjusted lambdas. Off switch: SYNDICATE_NHL_SCOREADJ_XG=off (user override 2026-10-05)."""
+    from datetime import date as _date
+
+    from syndicate.features.nhl.inseason_team_xg import load_scoreadj_map
+    from syndicate.features.nhl.sim_engine.hockeysim.projection import project_game
+
+    adj = load_scoreadj_map(_processed_dir(root), _date.fromisoformat(date))
+    if not adj:
+        return games
+    out = []
+    for g in games:
+        ha, aa = adj.get(str(g.home.abbrev or "").upper()), adj.get(str(g.away.abbrev or "").upper())
+        if ha is None or aa is None:
+            out.append(g)
+            continue
+        pr = project_game(replace(g.home, xgf_per_60=ha[0], xga_per_60=ha[1]),
+                          replace(g.away, xgf_per_60=aa[0], xga_per_60=aa[1]))
+        out.append(replace(g, home=replace(g.home, period_goal_lambdas=tuple(pr.period_home_lambdas)),
+                           away=replace(g.away, period_goal_lambdas=tuple(pr.period_away_lambdas))))
+    return out
+
+
 def _predictions_and_markets(
     date: str, *, root: Optional[Path], anchor: bool, anchor_weight: Optional[float],
 ) -> Tuple[List[HockeyGamePrediction], Dict[str, HockeyMarketLines]]:
     """Build every game's prediction for a slate (market-injected, anchored at the resolved weight)."""
     weight = _effective_anchor_weight(anchor, anchor_weight)
-    games = build_slate_features(date, root=root)
+    games = _apply_scoreadj_xg(build_slate_features(date, root=root), date, root)
     lines = load_market_lines(date, root=root)
     predictions: List[HockeyGamePrediction] = []
     markets: Dict[str, HockeyMarketLines] = {}

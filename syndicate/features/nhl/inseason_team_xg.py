@@ -48,6 +48,30 @@ FROZEN_XG = {
 REGULAR_SEASON = 2
 FINAL_STATES = frozenset({"FINAL", "OFF"})
 
+# --- score-adjusted team xG (game lines only; user override 2026-10-05: "ship score-adjusted xG anyway") ----
+# A shot's xG is weighted by the shooter's score state, w_d = 0.5 / share_d, share_d = xG by shooters leading
+# by d / (that + xG by shooters trailing by d), d clipped to [-3, 3]: trailing teams shoot more and leading teams
+# less, so raw xG overstates trailing teams. H13 (lane nhl-game-lines-model, 2026-10-03) passed 4 of its 5
+# pre-registered criteria and failed (d) by +0.000026 (playoff point estimate, n=82); shipped on the user's
+# override. Applied ONLY to game lines (`scripts/build_nhl_artifacts._predictions_and_markets`); props and the
+# season file `team_xg_<season>.csv` keep the unadjusted rates. Off switch: SYNDICATE_NHL_SCOREADJ_XG=off.
+SCOREADJ_ENV = "SYNDICATE_NHL_SCOREADJ_XG"
+# Frozen 2026-10-05 with FROZEN_XG on every 2023-24..2025-26 regular-season Fenwick shot (3936 games, all
+# aligned). Near 1 everywhere; the leading/trailing asymmetry includes empty-net shots, as in H13.
+SCORE_WEIGHTS: Dict[int, float] = {-3: 0.965, -2: 1.0354, -1: 1.0006, 0: 1.0, 1: 0.9994, 2: 0.9669, 3: 1.0376}
+# 2025-26 per team (the season `team_xg_latest.csv` holds): adjusted / unadjusted xGF and xGA under SCORE_WEIGHTS
+# (1312 games). The prior's adjusted rate = prior x ratio. Range 0.9969..1.0028.
+PRIOR_SCOREADJ_RATIO: Dict[str, Tuple[float, float]] = {
+    "ANA": (1.001, 1.0006), "BOS": (0.9996, 0.9999), "BUF": (1.0008, 0.9987), "CAR": (1.0001, 0.9997),
+    "CBJ": (0.9982, 1.0009), "CGY": (0.9985, 1.0017), "CHI": (0.9995, 1.0009), "COL": (1.0011, 0.9988),
+    "DAL": (1.0025, 0.9981), "DET": (1.0003, 1.0003), "EDM": (0.9993, 1.0023), "FLA": (1.0007, 0.9996),
+    "LAK": (0.9997, 1.0), "MIN": (1.0004, 0.9995), "MTL": (1.0001, 1.0003), "NJD": (0.9988, 1.0013),
+    "NSH": (1.0019, 0.9979), "NYI": (1.001, 0.9995), "NYR": (1.0024, 0.9969), "OTT": (1.0, 1.0012),
+    "PHI": (0.9997, 0.9987), "PIT": (0.9985, 1.001), "SEA": (0.9992, 1.0002), "SJS": (0.9973, 1.0018),
+    "STL": (0.9989, 1.0028), "TBL": (0.9998, 0.9994), "TOR": (1.0013, 0.9998), "UTA": (1.0002, 0.9985),
+    "VAN": (1.0004, 0.9996), "VGK": (1.0016, 0.9981), "WPG": (0.9986, 1.0018), "WSH": (0.9986, 1.0008),
+}
+
 FetchJson = Callable[[str], Any]
 
 
@@ -80,6 +104,80 @@ def game_xg(pbp: dict) -> Optional[Tuple[str, str, float, float]]:
     hx = sum(x for s, x in zip(shots, xs) if s.team_id == home_id)
     ax = sum(x for s, x in zip(shots, xs) if s.team_id != home_id)
     return str(home.get("abbrev") or "").upper(), str(away.get("abbrev") or "").upper(), hx, ax
+
+
+def home_lead_before_shots(pbp: dict) -> List[int]:
+    """Home lead BEFORE each Fenwick shot `shot_xg_model.parse_play_by_play_shots` keeps (same filters, same
+    order), walking every play and updating on goals (which carry the score AFTER the goal)."""
+    from syndicate.features.nhl.sim_engine.hockeysim.historical_truth import shot_xg_model as X
+
+    home_id = (pbp.get("homeTeam") or {}).get("id")
+    hs = as_ = 0
+    out: List[int] = []
+    for pl in pbp.get("plays") or []:
+        d = pl.get("details") or {}
+        kept = False
+        if pl.get("typeDescKey") in X._FENWICK_TYPES and d.get("eventOwnerTeamId") is not None                 and d.get("xCoord") is not None and d.get("yCoord") is not None:
+            try:
+                float(d["xCoord"]); float(d["yCoord"]); tid = int(d["eventOwnerTeamId"])
+                kept = X._situation_state(pl.get("situationCode"), shooter_is_home=(tid == home_id)) is not None
+            except (TypeError, ValueError):
+                kept = False
+        if kept:
+            out.append(hs - as_)
+        if pl.get("typeDescKey") == "goal" and d.get("homeScore") is not None:
+            hs, as_ = int(d["homeScore"]), int(d["awayScore"])
+    return out
+
+
+def score_weight(lead: int, weights: Optional[Dict[int, float]] = None) -> float:
+    w = SCORE_WEIGHTS if weights is None else weights
+    return float(w.get(max(-3, min(3, int(lead))), 1.0))
+
+
+def game_xg_scoreadj(pbp: dict, weights: Optional[Dict[int, float]] = None
+                     ) -> Optional[Tuple[str, str, float, float, float, float]]:
+    """(home, away, home xGF, away xGF, home adj xGF, away adj xGF) for one finished game; None when the
+    score walk cannot be aligned 1:1 with the parsed shots (then the game counts unadjusted)."""
+    from syndicate.features.nhl.sim_engine.hockeysim.historical_truth import shot_xg_model as X
+
+    home, away = pbp.get("homeTeam") or {}, pbp.get("awayTeam") or {}
+    if home.get("id") is None or not pbp.get("plays"):
+        return None
+    shots = X.parse_play_by_play_shots(pbp)
+    xs = _xg(shots)
+    leads = home_lead_before_shots(pbp)
+    home_id = int(home["id"])
+    hx = ax = hxa = axa = 0.0
+    aligned = len(leads) == len(shots)
+    for i, (s, x) in enumerate(zip(shots, xs)):
+        is_home = s.team_id == home_id
+        lead = (leads[i] if is_home else -leads[i]) if aligned else 0
+        wx = x * (score_weight(lead, weights) if aligned else 1.0)
+        if is_home:
+            hx += x; hxa += wx
+        else:
+            ax += x; axa += wx
+    return str(home.get("abbrev") or "").upper(), str(away.get("abbrev") or "").upper(), hx, ax, hxa, axa
+
+
+def scoreadj_enabled(env: Optional[Dict[str, str]] = None) -> bool:
+    raw = str((env if env is not None else os.environ).get(SCOREADJ_ENV) or "").strip().lower()
+    return raw not in {"0", "off", "false", "no"}
+
+
+def load_scoreadj_map(processed: Path, day: date) -> Dict[str, Tuple[float, float]]:
+    """{abbr: (adj xgf60, adj xga60)} from `team_xg_scoreadj_<season>.csv`; {} when absent or switched off."""
+    if not scoreadj_enabled():
+        return {}
+    path = Path(processed) / f"team_xg_scoreadj_{season_code(day)}.csv"
+    out: Dict[str, Tuple[float, float]] = {}
+    try:
+        for row in csv.DictReader(path.open(encoding="utf-8")):
+            out[str(row["abbr"]).upper()] = (float(row["xgf60"]), float(row["xga60"]))
+    except (OSError, KeyError, ValueError):
+        return {}
+    return out
 
 
 def _read_prior(path: Path) -> Dict[str, Tuple[float, float]]:
@@ -170,6 +268,7 @@ def refresh_inseason_team_xg(artifact_root: Path, *, today: Optional[date] = Non
         games, unreadable = finished_regular_games(fetch, start=season_start, end=today, base=base, cache_dir=cache)
         status.update(finished_regular_games=len(games), unreadable_days=len(unreadable))
         current: Dict[str, List[float]] = {}
+        current_adj: Dict[str, List[float]] = {}
         fetched = cached = failed = 0
         for g in games:
             gid = g["game_id"]
@@ -189,21 +288,32 @@ def refresh_inseason_team_xg(artifact_root: Path, *, today: Optional[date] = Non
                 cache.mkdir(parents=True, exist_ok=True)
                 path.write_text(json.dumps(pbp), encoding="utf-8")
                 fetched += 1
-            res = game_xg(pbp)
+            res = game_xg_scoreadj(pbp)
             if res is None:
                 failed += 1
                 continue
-            h, a, hx, ax = res
-            for team, xf, xa in ((h, hx, ax), (a, ax, hx)):
+            h, a, hx, ax, hxa, axa = res
+            for team, xf, xa, xfa, xaa in ((h, hx, ax, hxa, axa), (a, ax, hx, axa, hxa)):
                 e = current.setdefault(team, [0, 0.0, 0.0])
                 e[0] += 1
                 e[1] += xf * CURRENT_TO_PRIOR_SCALE
                 e[2] += xa * CURRENT_TO_PRIOR_SCALE
+                ea = current_adj.setdefault(team, [0, 0.0, 0.0])
+                ea[0] += 1
+                ea[1] += xfa * CURRENT_TO_PRIOR_SCALE
+                ea[2] += xaa * CURRENT_TO_PRIOR_SCALE
         status.update(pbp_cached=cached, pbp_fetched=fetched, pbp_failed=failed)
         rates = blend(prior, {t: (int(v[0]), v[1], v[2]) for t, v in current.items()})
         rows = sorted((t, f, a, n) for t, (f, a, n) in rates.items())
         out = processed / f"team_xg_{season}.csv"
         _write_atomic(out, rows)
+        # game-lines-only score-adjusted twin: prior x its 2025-26 ratio, blended the same way
+        prior_adj = {tm: (pf * PRIOR_SCOREADJ_RATIO.get(tm, (1.0, 1.0))[0], pa * PRIOR_SCOREADJ_RATIO.get(tm, (1.0, 1.0))[1])
+                     for tm, (pf, pa) in prior.items()}
+        rates_adj = blend(prior_adj, {tm: (int(v[0]), v[1], v[2]) for tm, v in current_adj.items()})
+        _write_atomic(processed / f"team_xg_scoreadj_{season}.csv",
+                      sorted((tm, f, a_, n) for tm, (f, a_, n) in rates_adj.items()))
+        status["scoreadj_written"] = True
         status.update(wrote=True, path=str(out), teams=len(rows), games_used=sum(int(v[0]) for v in current.values()) // 2,
                       max_team_games=max((int(v[0]) for v in current.values()), default=0))
     except Exception as exc:  # noqa: BLE001 -- generation must still run on the previous file
