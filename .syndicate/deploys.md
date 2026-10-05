@@ -46218,3 +46218,14 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - deploy: user ff 10-04 (41be27bd contained e90d74a5); every fleet HEAD sampled 15:30-21:00Z contained it (8 heads, ancestry checked).
 - verify (~/nflrate.csv, fleet quota by_sport.nfl every 5 min): pre-kickoff 15:30-16:55Z 6,225 credits = 4,384/h; early window 17:00-19:58Z 8,362 = 2,825/h; late window 20:03-20:58Z 2,537 = 2,767/h. No unthrottled NFL Sunday on exact counters exists, so the comparison is to the NCAAF-analog estimate (~8.6k/h for ~10 concurrent games at 36 segment markets every 150 s), not to a measured baseline.
 - note: the costliest NFL stretch was PRE-kickoff (4.4k/h) -- pregame props/lines -- not in-play segments; a lead if NFL spend matters next.
+
+## 2026-10-05 16:12Z (11:12 AM CT) -- READING 2 for the 14:23:15Z NBA prop calibration ladder fix (3493715f) -- **MET** (lane `nba-prop-calibration`)
+
+- **expectation (from the 14:23:15Z entry):** the first production NBA sims written after the ff carry stamp 10af559d9f370641, with ladder mean == field mean (|gap| <= 0.05) on every row.
+- **reading:** six production sims, re-simulated or new. Watcher `watch_ladder.sh` read 14:45:19Z; one-off check 16:12Z.
+  - Re-simulated (the old-code 10-05 sims, stale under TRANSFORM_VERSION 2): ATL_MEM 14:40:15Z, DET_PHX 14:40:39Z, PHI_NYK 14:41:01Z.
+  - New (10-06): CHA_BKN 15:04:53Z, OKC_NOP 15:05:39Z, UTA_DEN 15:06:23Z.
+  - All six carry stamp 10af559d9f370641 with applied=True (34-35 players each).
+  - Ladder-vs-field |gap| > 0.05: 0/252, 0/238, 0/245, 0/245, 0/245, 0/252, i.e. **0 of 1,477 rows**. Worst gap 0.005 (10-05) and 0.001 (10-06).
+- **before the fix (01:5xZ, same measure, >50%-of-shift lag):** threes 125/169, tov 122/169, stl 110/169 rows.
+- **not re-simulated:** the two 10-04 sims (DEN_UTA, LAC_GSW) still read stale. Their games are past, so no producer run targets 10-04 again; no served impact.
