@@ -2970,3 +2970,9 @@ own prior verdicts, not by anything failing.
 - Found the next day, only because a NEW exclusion source (availability) put two apostrophe names (Ny'Ceara Pryor, 22.9 min) into the set. Fixed 1111942f.
 - Also caught: my first watcher matched names without teams and reported 4 leaks, 2 of them traded players excluded only under their OLD team. A team-keyed rule needs a team-keyed check.
 - **How to apply:** when a check passes, ask what input would have made it fail and whether the population contained one. For anything that matches NAMES across two code bases, test with punctuated, accented and suffixed names explicitly, against the OTHER side's real normalizer -- never a copy of your own.
+
+## 2026-10-05 — RULE: a pre-registered "no cell worse" bar over many cells must state its false-fail rate under the null BEFORE the run `[lane nhl-season-inputs-in-season, session 9ed26377]`
+
+- What happened: I pre-registered "no line's 95% CI entirely > 0 in any of all / Oct / Nov+" over 33 cells (11 prop lines x 3 periods) for the NHL in-season props inputs. Two variants (H16, H17) each failed on ONE cell, at the boundary (+0.00012 [+0.00001, +0.00028]), in the same 6-game window (10-27..10-31) where the arms first differ. Under a TRUE null, P(at least one of 33 one-sided 2.5% exceedances) is ~0.57, so the bar fails a no-effect change about half the time. I wrote that down only after the second failure, and did not use it to pass anything.
+- Rule: for a multi-cell guard, compute 1 - (1 - alpha)^cells (or simulate it on a null arm) and print it next to the bar when you pre-register it. Then either budget the cells (e.g. pre-register a few primary cells; treat the rest as reported, not gating) or accept the stated false-fail rate.
+- Also confirmed the props lane's rule (2026-10-04): MAE improved in October while Brier at POINTS@0.5 got worse (+0.00144 [+0.00014, +0.00275]); gate props on Brier at the lines.

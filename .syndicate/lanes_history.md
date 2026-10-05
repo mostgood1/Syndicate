@@ -36628,3 +36628,72 @@ OUTSTANDING and every claim-bearing line. These are the 2 historical lines.
 - Hypothesis: Measured on 12 mid-season slates (2,945 player-games): projected TOI matches actual (L1 19.52 vs 19.39) but the engine gives L1 21.56 and L4 9.35 (actual 11.10), because EV rotation weights use TOTAL TOI (which includes PP) and PP units then add their own minutes. Weighting EV rotation by EV minutes removes the double count
 - Falsification test: If EV-weighted rotation leaves simulated per-slot TOI off projected TOI by > 0.5 min, or SOG Brier at the lines is not better, the double count is not the binding error
 - Verification: Paired backtest vs the current engine (every 3rd regular-season date + playoffs): per-slot sim TOI within 0.5 min of actual; Brier SOG@1.5/2.5 better with CI, no market worse; on the fleet, the next pregame NHL grid's SOG |edge|>10% share vs 10-04's 57%
+
+## nhl-season-inputs-in-season -- checkpoint 2026-10-05 (moved verbatim from lanes.md)
+
+- **PRE-REGISTERED 2026-10-04 ~18:05Z (before any result is read):**
+- **RESULT 2026-10-04 ~19:05Z: H14 and H15 both MET (pre-registered ~18:05Z).**
+  - H14 (inputs, `scripts/nhl_season_inputs_fields_experiment.py`; W tuned on 2024-25, prior 2023-24; checked 2025-26, prior 2024-25; next-game MSE blend vs prior-only):
+    - team: shots W5 -3.47%, faceoff W20 -3.82%, pp W40 -1.51%, pk_ga W80 -0.87%, committed W20 -1.72%, block_rate W20 -3.93% (n=2,575-2,624 team-games).
+    - player: shots W10 -4.38%, goals W20 -2.12%, blocks W10 -3.14% (n=47,231 player-games).
+    - The blend also beats current-only on every field (-3.1% to -4.6%).
+    - Elo (INERT): regression r=1/3 tuned on 2024-25; 2025-26 home-win Brier frozen 0.2649, fresh-1500 0.2506, carried 0.2519.
+  - H15 (props end-to-end, `scripts/nhl_season_inputs_props_ab.py`, harness unmodified; 2025-26 10-08..01-31, every 2nd date, 56 dates, 446 games, n_sims 200; dMAE blend - prior, game-clustered 95% CI):
+    - SOG **-0.0090 [-0.0133, -0.0047]** (n=14,514), POINTS **-0.0025 [-0.0038, -0.0011]**, BLOCKS **-0.0038 [-0.0066, -0.0013]**, ASSISTS -0.0012 [-0.0022, -0.0002].
+    - GOALS -0.0003 [-0.0012, +0.0006], SAVES -0.052 [-0.161, +0.054] (n=636): no market worse.
+    - **By month: October is neutral** (SOG +0.0048 [-0.0032, +0.0127], POINTS +0.0015 [-0.0009, +0.0039]); the gain is from November on (SOG Dec+ -0.0148 [-0.0207, -0.0087]). So the first weeks of 2026-27 should show ~no change.
+  - **LANDED b8845294 on main (19:08Z):** `syndicate/features/nhl/inseason_season_inputs.py` + 9 tests + real fixtures, and a second guarded call beside the team-xG hook in `refresh_nhl_oddsapi._run_owned_generation` (cross-lane write into lane nhl-sim-artifact-backfill-fabricates's file, OUTSIDE its claimed functions; same purpose as the user-approved xG hook; user: "do the other season inputs too").
+  - **NOT YET ON THE FLEET:** the fleet ff 9b106614 -> b8845294 was REFUSED by the auto-mode classifier (Production Deploy) at ~19:15Z; awaiting the user's explicit yes. Claims taken and released. **Main carries it: ANY session's fleet ff ships it** (gap also carries 809b07f3, WNBA minutes redistribution: imported by no runtime path, flag default off, inert).
+  - Production baseline (19:07:19Z): no `team_rates_ / team_special_teams_ / player_rates_ / team_elo_2026-2027.csv`; fleet HEAD 9b106614; props_recommendations_2026-10-05 last written 19:02Z.
+  - Verification owed after the ff: the four season files written by the first post-ff generation (status line NHL_INSEASON_SEASON_INPUTS); then props for a date re-run read-only with vs without them -> production's proj_lambda equals the WITH run.
+- **BRIER AT THE LINES 2026-10-04 ~19:40Z** (the props lane's bar, sent by its session after close: paired per-player Brier at the standard lines, production Poisson price, game-clustered CI; `score_brier` in the A/B script):
+  - Full sample (446 games): **no line worse**; better SOG@1.5 -0.00306 [-0.00420, -0.00189], SOG@2.5 -0.00154 [-0.00241, -0.00065], POINTS@0.5 -0.00097 [-0.00167, -0.00025]; all others span 0.
+  - **October alone (80 games): POINTS@0.5 WORSE +0.00144 [+0.00014, +0.00275]**, SAVES@28.5 +0.01150 [+0.00011, +0.02407]; every SOG/POINTS point estimate positive. 2 of 11 Oct cells significant (about 0.6 expected by chance), but every SOG/POINTS point estimate is positive, so it is not dismissed.
+  - **Action: 4fc8391e makes it OFF by default** (`SYNDICATE_NHL_INSEASON_SEASON_INPUTS`, hook skips unless on), so b8845294 riding any fleet ff changes nothing. Enabling now (October) vs from November vs a per-entity minimum-games floor (would need its own pre-registered test) is a **USER DECISION**, asked 2026-10-04.
+  - Peer guidance honoured: regular season only (gameType 2, no preseason); goal shrinkage heavier than shots (W20 vs W10); pp/pk heavy priors (W40/W80); faceoff_weight carried, not blended.
+- **PRE-REGISTERED H16 2026-10-04 ~20:00Z (user: "test the minimum-games floor"; before the arm is run):**
+  - Mechanism: `MIN_CURRENT_GAMES` -- an entity's current season enters the blend only once IT has played N games this season; below that every field is last season's (`_cur` returns (0, 0)).
+  - **N = 10, fixed a priori, ONE arm (`floor10`)**: 2025-26 teams had played 10-13 games by 10-31 (median 11), so N=10 starts the blend at ~Nov 1. No other N is tested, so N is not chosen on the evaluation data.
+  - Same 56 dates / 446 games / n_sims 200 as H15; the prior and blend arms are reused unchanged.
+  - Bar (the props lane's): paired per-player Brier at the standard lines, production Poisson price, game-clustered 95% CI, floor10 - prior.
+  - **Recommend enabling iff:** (a) no line's CI is entirely > 0 in ANY of all / Oct / Nov+; AND (b) SOG@1.5 or POINTS@0.5 is better over all dates (CI entirely < 0).
+  - Stated caveat: October is the window where the regression was FOUND, and the floor makes October ~= prior by construction. So (a)-Oct is a sanity check, not evidence of skill; (b) -- does the full-season gain survive the floor -- is the real test.
+  - Secondary, reported but not gating: floor10 - blend on Nov+ (the gain the floor gives up).
+- **H16 RESULT 2026-10-04 ~20:45Z: FAILS its pre-registered bar, on ONE cell. Not enabled; the gate is not moved.** (floor10 - prior, paired Brier at the lines, 446 games)
+  - (b) MET: SOG@1.5 all -0.00337 [-0.00448, -0.00226], SOG@2.5 -0.00159, POINTS@0.5 -0.00119 [-0.00184, -0.00051], SAVES@28.5 -0.00681 better. Nov+: no line worse.
+  - October: the POINTS@0.5 regression is gone (+0.00004 [-0.00028, +0.00043]).
+  - **(a) FAILS: BLOCKS@1.5 October +0.00047 [+0.00009, +0.00094].**
+  - Where that one cell comes from:
+    - The sim is deterministic across arms: floor10 lambdas equal prior on 9/9 dates 10-08..10-25 (0 differing of 92-2,964), and the season files are byte-identical to `_latest` there.
+    - The October difference is therefore ENTIRELY 10-27/10-29/10-31, as teams cross 10 games.
+    - BLOCKS@1.5 there: 195 player rows, 6 games; mean dBrier +0.00639, mean dlambda +0.0096.
+    - Real, not sim noise; also a thin sample. It matches the props lane's warning that blocks are where the per-player error lives.
+  - floor10 - blend: Nov+ identical within +/-0.0001 on every line (the floor costs nothing after November); all dates slightly better (the October part).
+  - Defaults unchanged: MIN_CURRENT_GAMES = 0, builder OFF (`SYNDICATE_NHL_INSEASON_SEASON_INPUTS`). Options for the user:
+    - (1) override the one cell and enable floor10;
+    - (2) a new pre-registered test of floor10 with blocks kept at the prior (W=inf for player.blocks / team.block_rate);
+    - (3) leave it off.
+- **PRE-REGISTERED H17 2026-10-04 (user: "test the floor with blocks kept at the prior"; before the arm is run):**
+  - Arm `floor10noblk`: MIN_CURRENT_GAMES = 10 (unchanged from H16); player.blocks and team.block_rate held at last season's value (W = inf). Every other field as H16.
+  - Same 56 dates / 446 games / n_sims 200; the prior arm reused.
+  - Bar UNCHANGED from H16 (paired Brier at the standard lines, floor10noblk - prior, game-clustered 95% CI). Recommend enabling iff (a) no line's CI is entirely > 0 in any of all / Oct / Nov+, AND (b) SOG@1.5 or POINTS@0.5 is better over all dates.
+  - Stated caveat: this variant was chosen AFTER seeing H16's failing cell, on the same data. A pass shows the blocks fields were the cause in this sample; it is not an independent confirmation. That is reported with the result.
+- **H17 RESULT 2026-10-04 ~21:30Z: FAILS its pre-registered bar, again on ONE marginal October cell. Not enabled; gate not moved.** (floor10noblk - prior, 446 games)
+  - (b) MET: SOG@1.5 -0.00343 [-0.00453, -0.00228], SOG@2.5 -0.00161, POINTS@0.5 -0.00103 [-0.00169, -0.00034], SAVES@28.5 -0.00724 better. Nov+: no line worse; SOG/POINTS/SAVES@28.5 better.
+  - Blocks fixed: BLOCKS@1.5 Oct +0.00014 [-0.00001, +0.00032], all +0.00006 (spans 0).
+  - **(a) FAILS: SOG@2.5 October +0.00012 [+0.00001, +0.00028]** (vs a full-season gain of -0.00161 on the same line). Like H16, every October difference comes from 10-27..10-31 (the floor is byte-identical to prior before), i.e. a handful of games.
+  - **On the bar itself (stated now, NOT used to pass anything):** (a) asks 33 cells (11 lines x 3 periods) for no one-sided 2.5% exceedance. Under a TRUE null of no effect, P(at least one) is ~ 1 - 0.975^33 ~ 0.57 (cells are correlated, so somewhat less). H16 and H17 each failed on one cell sitting at the boundary, in the same 3-date window. The bar is underpowered against noise in a 6-game window; that is a flaw in how I set it, and it is reported rather than fixed after the fact.
+  - What every variant agrees on: **from November on, no line is worse and SOG/POINTS are better** (blend, floor10, floor10noblk alike).
+  - Recommendation to the user: switch the builder on at ~Nov 1 (every team has >= 10 games), which removes the late-October crossing window entirely; or override; or leave off.
+- **USER DECISION 2026-10-04 ~22:00Z: "set the floor and blocks defaults now, enable on Nov 1".** Done in 2fe903ca (on main):
+  - MIN_CURRENT_GAMES = 10; player.blocks and team.block_rate at the prior (W = inf).
+  - `enabled()` is ON from Nov 1 of each season; env `SYNDICATE_NHL_INSEASON_SEASON_INPUTS` on/off overrides both ways. No deploy is needed on Nov 1; the code only has to be on the fleet.
+  - Fleet at check time (~21:50Z): d7955a3c, which carries b8845294/4fc8391e/a7f7c464 (another session's ff) but NOT yet 2fe903ca. Only `team_xg_2026-2027.csv` among season files (the builder is gated off).
+  - The next fleet ff by anyone carries 2fe903ca; it stays inert until Nov 1.
+  - **Reading OWED 2026-11-01:** scheduled task `nhl-inseason-inputs-nov1-verify` (fires 2026-11-01 16:00 CT). It is READ-ONLY on production and checks:
+    - fleet has 2fe903ca;
+    - the four `*_2026-2027.csv` files have mtime >= Nov 1 (any earlier = the date gate leaked);
+    - block_weight / block_rate_index identical to `_latest`, shot_weight / pp_pct changed;
+    - the NHL_INSEASON_SEASON_INPUTS line.
+    It records MET/NOT MET in deploys.md + here.
+  - Caveat: if no session ff's the fleet to >= 2fe903ca before Nov 1, the switch-on does not happen; the task reports that as NOT MET and asks for a fleet ff (a user decision; the auto-mode classifier refused my own fleet ff on 10-04).
