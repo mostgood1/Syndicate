@@ -97,7 +97,10 @@ def test_ladders_are_shifted_then_dilated(tmp_path):
     shift = a["pts_mean"] - 30.0  # w = 0 -> mean = minutes * own rate = 20
     assert shift == pytest.approx(-10.0)
     vals = sorted(int(k) for k, c in a["prop_ladders"]["pts"]["distribution"].items() for _ in range(c))
-    assert vals == cal.transform_values([10, 20, 30], -10.0, 2.0) == [0, 10, 30]
+    assert vals == sorted(cal.transform_values([10, 20, 30], -10.0, 2.0))
+    # mean-preserving (2026-10-05): the ladder mean is the calibrated mean (20 - 10), not the clip-inflated 13.3
+    # the old round_half_up rule produced ([0, 10, 30])
+    assert sum(vals) / len(vals) == pytest.approx(10.0)
 
 
 def test_missing_or_invalid_factor_file_leaves_result_untouched_with_a_reason(tmp_path):
@@ -282,3 +285,35 @@ def test_wnba_sims_are_never_judged_stale(tmp_path):
     root = _write_root(tmp_path, factors={**FACTORS, "enabled": True})
     assert cal.sim_is_stale(_sim_file(tmp_path, None), league_code="wnba", processed_root=root, env={}) is False
     assert cal.sim_is_stale(tmp_path / "missing.json", league_code="nba", processed_root=root, env={}) is False
+
+
+def test_sub_half_unit_shift_reaches_the_ladder_mean():
+    vals = [0, 1, 1, 2, 2, 2, 3, 3, 4, 5] * 10                 # n = 100, mean 2.3
+    old = [max(0, int(math.floor(v - 0.3 + 0.5))) for v in vals]   # the pre-2026-10-05 rule
+    assert old == vals                                         # it moved nothing
+    new = cal.shift_values(vals, -0.3)
+    assert sum(new) / len(new) == pytest.approx(2.3 - 0.3)
+    assert sum(cal.shift_values(vals, 0.37)) / len(vals) == pytest.approx(2.3 + 0.37)
+
+
+def test_scale_keeps_the_mean_and_widens_by_k():
+    import statistics
+    vals = [8, 10, 12, 14, 15, 17, 18, 20, 22, 25, 27, 30] * 25
+    for k in (1.25, 1.5, 0.9):
+        out = cal.scale_values(vals, k)
+        assert sum(out) / len(out) == pytest.approx(sum(vals) / len(vals), abs=1 / len(vals))
+        assert statistics.pstdev(out) == pytest.approx(k * statistics.pstdev(vals), rel=0.02)
+
+
+def test_transform_is_deterministic_and_carries_the_shift_exactly():
+    vals = list(range(0, 12)) * 40
+    a = cal.transform_values(vals, 0.42, 1.25)
+    assert a == cal.transform_values(vals, 0.42, 1.25)
+    assert sum(a) / len(a) == pytest.approx(sum(vals) / len(vals) + 0.42, abs=1.5 / len(vals))
+
+
+def test_stamp_includes_the_transform_version_so_old_code_sims_go_stale(tmp_path, monkeypatch):
+    root = _write_root(tmp_path, factors={**FACTORS, "enabled": True})
+    new = cal.factor_stamp(root)
+    monkeypatch.setattr(cal, "TRANSFORM_VERSION", "1")
+    assert cal.factor_stamp(root) != new

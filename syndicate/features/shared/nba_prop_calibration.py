@@ -106,11 +106,17 @@ def combo_scale(parts: Tuple[str, ...], sds: Mapping[str, float], k: Mapping[str
     return math.sqrt(num / den) if den > 0 else None
 
 
+# Bumped whenever the TRANSFORM changes (not just the constants), so sims written by the old code read as stale and are
+# re-simulated: "2" = mean-preserving ladder scale/shift (2026-10-05); "1" (implicit, unversioned) = round_half_up.
+TRANSFORM_VERSION = "2"
+
+
 def factor_stamp(processed_root: Path) -> Optional[str]:
-    """Content hash of the factor file (16 hex), or None when absent/unreadable."""
+    """Hash of the factor file's content + TRANSFORM_VERSION (16 hex), or None when the file is absent/unreadable."""
     try:
         import hashlib
-        return hashlib.sha256((Path(processed_root) / FACTOR_FILE).read_bytes()).hexdigest()[:16]
+        raw = (Path(processed_root) / FACTOR_FILE).read_bytes()
+        return hashlib.sha256(raw + b"|transform=" + TRANSFORM_VERSION.encode()).hexdigest()[:16]
     except Exception:  # noqa: BLE001
         return None
 
@@ -275,13 +281,58 @@ def _values(payload: Mapping[str, Any]) -> List[int]:
     return vals
 
 
+def _rebalance(out: List[int], target: int) -> List[int]:
+    """Move the integer total of `out` to `target` one unit at a time, on draws EVENLY SPACED through the value-sorted
+    order (so the shape moves as a whole), removing only from positive draws. Deterministic."""
+    out = list(out)
+    n = len(out)
+    for _ in range(64):                      # each pass moves up to n units; 64 passes covers any realistic gap
+        gap = target - sum(out)
+        if gap == 0 or n == 0:
+            break
+        elig = [i for i in sorted(range(n), key=lambda i: (out[i], i)) if gap > 0 or out[i] > 0]
+        if not elig:
+            break
+        m = min(abs(gap), len(elig))
+        step = len(elig) / m
+        for j in range(m):
+            out[elig[min(len(elig) - 1, int(j * step + step / 2))]] += 1 if gap > 0 else -1
+    return out
+
+
+def scale_values(vals: List[int], k: float) -> List[int]:
+    """Dilate integer draws around their mean by k KEEPING THE MEAN: y = mu + k(v - mu), rounded, floored at 0, then
+    the integer total is rebalanced to round(sum(vals)) -- without that, the floor at 0 raises the mean exactly where
+    low-count stats (threes/stl/blk) live."""
+    n = len(vals)
+    if n == 0 or k == 1.0:
+        return list(vals)
+    mu = sum(vals) / n
+    out = [max(0, int(math.floor(mu + k * (v - mu) + 0.5))) for v in vals]
+    return _rebalance(out, int(sum(vals)))
+
+
+def shift_values(vals: List[int], delta: float) -> List[int]:
+    """Shift integer draws by delta KEEPING THE MEAN: every draw moves by trunc(delta) (floored at 0), then the total is
+    rebalanced to round(sum(vals) + n*delta) (floored at 0) on evenly spaced draws. round_half_up(v + delta) -- this
+    module's rule until 2026-10-05 -- is a NO-OP for |delta| < 0.5 (measured live: threes ladders lagged the calibrated
+    mean on 125/169 rows); the WNBA shrink's fix (bfa92d5f) is the same idea for positive shifts."""
+    n = len(vals)
+    if n == 0 or delta == 0.0:
+        return list(vals)
+    base = int(delta)                         # toward 0, so the floor at 0 bites as little as possible
+    out = [max(0, v + base) for v in vals]
+    target = max(0, int(round(sum(vals) + n * delta)))
+    return _rebalance(out, target)
+
+
 def transform_values(values: List[int], shift: float, k: float) -> List[int]:
-    """Shift by the mean delta, then dilate around the shifted mean by k (the two ladder transforms, in order)."""
+    """The served ladder transform: widen by k around the mean, then shift by the calibrated mean delta. BOTH steps keep
+    the mean exactly (up to integer rounding and the floor at 0), so the ladder Layer 2 reads carries the calibrated
+    mean (`nba_projections.py` serves the ladder's hitProb and mean, not `<stat>_mean`/`<stat>_sd`)."""
     if not values:
         return []
-    shifted = [v + shift for v in values]
-    mu = sum(shifted) / len(shifted)
-    return [max(0, _round_half_up(mu + k * (v - mu))) for v in shifted]
+    return shift_values(scale_values(list(values), k), shift)
 
 
 def _f(x: Any) -> Optional[float]:
