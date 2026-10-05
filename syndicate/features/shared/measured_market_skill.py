@@ -101,6 +101,13 @@ _SOCCER_SOURCE_2026_10 = (
     "vs ESPN finals, bootstrap over matches; scripts/soccer_season_audit/audit_games.py"
 )
 
+_SOCCER_PROPS_PRICE_SOURCE = (
+    "lane soccer-lines-props-backtest (2026-10-02), .syndicate/findings_2026-10-02_soccer_lines_props_backtest.md "
+    "'Vs the book': production PRE-KICKOFF soccer recommendation builds vs captured OddsAPI prop prices "
+    "(props/<date>.csv, 8 US books) vs ESPN box scores; appeared players only; flat 1u at the best price "
+    "when model p > raw implied; match-bootstrap CI; scripts/soccer_season_audit/audit_props.py --asof"
+)
+
 # (sport, market, segment, phase) -> entry.
 MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
 
@@ -307,6 +314,44 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
         "verdict": "loses to the close: Asian handicap Brier +0.021 [+0.008, +0.034] over 458 matches",
         "verdict_class": VERDICT_LOSES,
         "source": _SOCCER_SOURCE_2026_10,
+    },
+    # ---- SOCCER PLAYER PROPS, PREGAME, vs the PRICE ---------------------------------
+    # `[2026-10-05, lane layer2-unmeasured-per-line; user: "take over all three"]`. Until
+    # 2026-10-05 these rows never reached the board (the removed unmeasured-model withhold
+    # dropped 3,111 soccer prop rows on one build), so they read "never backtested" while a
+    # reading existed. One-sided markets: 50 of 168,846 captured prices carry an UNDER, so
+    # there is NO de-vigged market and no Brier comparison. The reading is FLAT ROI, 1u at the
+    # best price, on the model's EV>0 side against the raw implied probability WITH vig, on
+    # pre-kickoff builds only -- the bet the board would actually be showing.
+    #
+    # BOTH READ PARITY UNDER THIS TABLE'S RULE, and that is deliberate, not lenient. Only an
+    # ESTABLISHED loss moves a score (`established_loss_rel`): for ROI that is the CI's
+    # UPPER bound below zero. Anytime's point estimate is -29.5% but its CI reaches +0.8%;
+    # SOT's reaches +31.1%. A weight taken from a point estimate would be the invented
+    # midpoint `skill_reliability` refuses. Shots (-22.4% [-40.6, -1.7]) and assists DO
+    # have readings but are NOT registered: no board row carries `player_shots` or
+    # `player_assists` (an entry no row can reach is the failure the key-shape block
+    # below describes). First/last scorer have no grade yet (lane
+    # `soccer-scorer-race-grade`) and keep the declared `unmeasured` note.
+    ("soccer", "player_goal_scorer_anytime", "full", PHASE_PREGAME): {
+        "sample_games": 144,
+        "seasons": "2026-27 pre-kickoff builds 07-22..09-30, all versions; 487 EV>0 bets over 144 matches; OVER-only prices, no de-vig possible",
+        "roi_model": -0.295,
+        "roi_ci95": (-0.537, 0.008),
+        "bets": 487,
+        "verdict": "at the price: no established loss, ROI on model EV>0 -29.5% [-53.7%, +0.8%] over 487 bets, 144 matches",
+        "verdict_class": VERDICT_PARITY,
+        "source": _SOCCER_PROPS_PRICE_SOURCE,
+    },
+    ("soccer", "player_shots_on_target", "full", PHASE_PREGAME): {
+        "sample_games": 143,
+        "seasons": "2026-27 pre-kickoff builds 07-22..09-30, all versions; 210 EV>0 bets over 143 matches; OVER-only prices, no de-vig possible",
+        "roi_model": -0.071,
+        "roi_ci95": (-0.413, 0.311),
+        "bets": 210,
+        "verdict": "at the price: no established loss, ROI on model EV>0 -7.1% [-41.3%, +31.1%] over 210 bets, 143 matches",
+        "verdict_class": VERDICT_PARITY,
+        "source": _SOCCER_PROPS_PRICE_SOURCE,
     },
     # ---- SOCCER, LIVE -----------------------------------------------------------
     ("soccer", "h2h", "full", PHASE_LIVE): {
@@ -625,7 +670,22 @@ SKILL_FLOOR = 0.5
 
 
 def established_loss_rel(entry: Mapping[str, Any]) -> float | None:
-    """The relative loss the CI's lower bound establishes, or None if unscoreable."""
+    """The relative loss the CI's lower bound establishes, or None if unscoreable.
+
+    An entry measured as REALISED ROI at the price (`roi_ci95`, one-sided markets with no
+    de-vig) is already a relative loss per unit staked, so the established loss is how far
+    the CI's UPPER bound sits below zero -- the same "only what the CI establishes" rule,
+    with the sign flipped because a better model has a higher ROI and a lower Brier.
+    """
+    roi_ci = entry.get("roi_ci95")
+    if roi_ci is not None and entry.get("brier_market") is None and entry.get("mae_market") is None:
+        try:
+            upper = float(roi_ci[1])  # type: ignore[index]
+        except (TypeError, ValueError, IndexError, KeyError):
+            return None
+        if not math.isfinite(upper):
+            return None
+        return round(max(0.0, -upper), 5)
     ci = entry.get("ci95")
     market = entry.get("brier_market")
     if market is None:
