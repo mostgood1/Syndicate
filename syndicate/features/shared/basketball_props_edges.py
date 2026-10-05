@@ -168,6 +168,7 @@ def _compute_props_edges_file_only_local(
     raw_path: Path,
     predictions_path: Path,
     calibrate_prob: bool,
+    league: str | None = None,
 ):
     import numpy as np
     import pandas as pd
@@ -491,6 +492,9 @@ def _compute_props_edges_file_only_local(
     except Exception:
         pass
 
+    if str(league or "").strip().lower() == "nba":
+        _apply_nba_book_blend(merged, source_root=source_root)
+
     merged["edge"] = merged["model_prob"] - merged["implied_prob"]
     ev = pd.Series(np.nan, index=merged.index, dtype="float64")
     if m_pos.any():
@@ -514,6 +518,8 @@ def _compute_props_edges_file_only_local(
         "implied_prob",
         "model_prob",
         "model_prob_raw",
+        "book_blend",
+        "book_blend_w",
         "edge",
         "ev",
         "bookmaker",
@@ -530,6 +536,55 @@ def _compute_props_edges_file_only_local(
     if dedup_keys:
         out = out.drop_duplicates(subset=dedup_keys, keep="first").reset_index(drop=True)
     return out
+
+
+def _apply_nba_book_blend(merged, *, source_root: Path) -> None:
+    """NBA only: serve model_prob = blend of the de-vigged two-sided book and the model, per stat
+    (`nba_prop_calibration.served_prop_probability`; user decision 2026-10-05). Measured: the calibrated
+    model carries no information beyond the de-vigged book (out-of-sample w ~0.05), so this REPLACES the
+    ad-hoc fixed-weight shrinks above for the rows it can price. The model side is `model_prob_raw` (the
+    distribution probability before any curve/shrink). A row with no two-sided price at the same
+    (player, stat, line, book), or a stat with no weight, keeps the existing chain; `book_blend` says which.
+    Mutates `merged` in place; never raises."""
+    import numpy as np
+    import pandas as pd
+
+    from syndicate.features.shared import nba_prop_calibration as npc
+
+    try:
+        merged["book_blend"] = ""
+        merged["book_blend_w"] = np.nan
+        weights, reason = npc.book_blend_weights(source_root / "data" / "processed")
+        if weights is None:
+            merged["book_blend"] = reason
+            return
+        side = merged["side"].astype(str).str.strip().str.upper() if "side" in merged.columns else pd.Series("", index=merged.index)
+        stat = merged["stat"].astype(str).str.strip().str.lower() if "stat" in merged.columns else pd.Series("", index=merged.index)
+        implied = pd.to_numeric(merged.get("implied_prob"), errors="coerce")
+        keys = [c for c in ("player_name", "stat", "line", "bookmaker") if c in merged.columns]
+        frame = pd.DataFrame({"side": side, "implied": implied})
+        for c in keys:
+            frame[c] = merged[c].astype(str)
+        both = frame[side.isin(["OVER", "UNDER"])].groupby(keys + ["side"], dropna=False)["implied"].first().unstack("side")
+        if not {"OVER", "UNDER"} <= set(both.columns):
+            merged["book_blend"] = "no two-sided book price for this line"
+            return
+        p_over_book = (both["OVER"] / (both["OVER"] + both["UNDER"])).rename("_p_book_over")
+        joined = frame[keys].join(p_over_book, on=keys)["_p_book_over"]
+        raw = pd.to_numeric(merged.get("model_prob_raw"), errors="coerce")
+        model_over = raw.where(side == "OVER", 1.0 - raw)
+        w = stat.map(lambda k: weights.get(k, np.nan)).astype(float)
+        ok = side.isin(["OVER", "UNDER"]) & joined.between(0.0, 1.0, inclusive="neither") & model_over.notna() & w.notna()
+        lb = np.log(joined[ok].clip(1e-4, 1 - 1e-4) / (1 - joined[ok].clip(1e-4, 1 - 1e-4)))
+        lm = np.log(model_over[ok].clip(1e-4, 1 - 1e-4) / (1 - model_over[ok].clip(1e-4, 1 - 1e-4)))
+        p_over = 1.0 / (1.0 + np.exp(-(lb + w[ok] * (lm - lb))))
+        merged.loc[ok, "model_prob"] = p_over.where(side[ok] == "OVER", 1.0 - p_over).clip(0.01, 0.99)
+        merged.loc[ok, "book_blend"] = "applied"
+        merged.loc[ok, "book_blend_w"] = w[ok]
+        merged.loc[~ok & w.isna(), "book_blend"] = "no weight for this stat"
+        merged.loc[~ok & w.notna(), "book_blend"] = "no two-sided book price for this line"
+    except Exception as exc:  # noqa: BLE001 -- the edges export must survive this
+        merged["book_blend"] = f"failed: {type(exc).__name__}"
 
 
 def _standardize_edge_columns(edges):
@@ -609,6 +664,7 @@ def export_props_edges_local(
     log_file: Path | None = None,
     heartbeat_cb: callable | None = None,
     heartbeat_every_s: float = 15.0,
+    league: str | None = None,
 ) -> tuple[int, Path]:
     src_root = source_root / "src"
     if str(src_root) not in sys.path:
@@ -643,6 +699,7 @@ def export_props_edges_local(
                 raw_path=raw_path,
                 predictions_path=predictions_path,
                 calibrate_prob=True,
+                league=league,
             )
 
             edges = _filter_player_prop_bookmakers_df(edges, bookmakers)

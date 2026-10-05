@@ -447,3 +447,106 @@ def apply_nba_prop_calibration(out: Any, *, league_code: str, processed_root: Pa
         summary["reason"] = f"failed: {type(exc).__name__}: {exc}"
         print(f"[nba_prop_calibration] NBA_PROP_CALIBRATION_FAILED {type(exc).__name__}: {exc}", flush=True)
     return summary
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# SERVED PROBABILITY: blend toward the de-vigged book (user decision 2026-10-05, "serve the book blend on the board").
+#
+# Measured (scripts/fit_nba_prop_calibration.py --vs-book / --book-blend, OddsAPI backfill): on 249,884 held-out book
+# lines / 400 games the calibrated probability LOSES to the de-vigged book in every market, and the out-of-sample blend
+# weight (~0.05) only TIES it -- the model carries no measurable information beyond the line. So the probability the
+# board serves for an NBA prop line is p = sigmoid(logit(p_book) + w_stat * (logit(p_model) - logit(p_book))), with w
+# from `nba_prop_book_blend.json` (refit on all 336,418 lines; mostly 0). Every line stays on the board with its model
+# mean; only the PROBABILITY (and so the edge) moves to what the evidence supports. NBA only.
+#
+# Kept in its OWN file, not the calibration factor file: the blend never touches the sims, and changing the factor
+# file's hash would re-simulate every NBA game for nothing.
+#
+# SWITCH: on when `nba_prop_book_blend.json` carries "enabled": true; env SYNDICATE_NBA_PROP_BOOK_BLEND=0/off is a kill
+# switch; a missing/invalid file, a stat with no weight, or a row with no two-sided book price -> the raw model
+# probability, with the reason stamped (never a silent fallback).
+# ---------------------------------------------------------------------------------------------------------------------
+BOOK_BLEND_FILE = "nba_prop_book_blend.json"
+BOOK_BLEND_FLAG = "SYNDICATE_NBA_PROP_BOOK_BLEND"
+
+
+def _logit(p: float) -> float:
+    p = min(1 - 1e-4, max(1e-4, float(p)))
+    return math.log(p / (1 - p))
+
+
+def blend_with_book(p_model: float, p_book: float, w: float) -> float:
+    """sigmoid(logit(book) + w (logit(model) - logit(book))): w = 0 is the book, w = 1 the model."""
+    z = _logit(p_book) + w * (_logit(p_model) - _logit(p_book))
+    return 1 / (1 + math.exp(-z))
+
+
+@lru_cache(maxsize=4)
+def _book_blend_cached(path_s: str, mtime_ns: int, size: int) -> Tuple[Optional[Dict[str, float]], str]:
+    try:
+        doc = json.loads(Path(path_s).read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        return None, f"book-blend file unreadable: {type(exc).__name__}"
+    if not isinstance(doc, dict) or doc.get("enabled") is not True:
+        return None, "book-blend file not enabled"
+    if str(doc.get("space") or "logit") != "logit":
+        return None, f"unsupported blend space {doc.get('space')!r}"
+    raw = doc.get("w")
+    if not isinstance(raw, dict) or not raw:
+        return None, "book-blend file has no 'w' map"
+    out: Dict[str, float] = {}
+    for key, value in raw.items():
+        try:
+            v = float(value)
+        except (TypeError, ValueError):
+            return None, f"w[{key!r}] is not a number"
+        if not math.isfinite(v) or not (0.0 <= v <= 1.0):
+            return None, f"w[{key!r}] = {v} outside [0, 1]"
+        out[str(key).strip().lower()] = v
+    return out, "ok"
+
+
+def book_blend_weights(processed_root: Optional[Path] = None, env: Optional[Mapping[str, str]] = None) -> Tuple[Optional[Dict[str, float]], str]:
+    """The active per-stat weights, or (None, reason). Resolves the NBA processed root when none is given."""
+    raw = str((env if env is not None else os.environ).get(BOOK_BLEND_FLAG) or "").strip().lower()
+    if raw in {"0", "false", "no", "off"}:
+        return None, f"{BOOK_BLEND_FLAG} off"
+    try:
+        if processed_root is None:
+            from syndicate.features.nba.sources import artifact_processed_root
+            processed_root = artifact_processed_root()
+        path = Path(processed_root) / BOOK_BLEND_FILE
+        if not path.is_file():
+            return None, "book-blend file absent"
+        st = path.stat()
+        return _book_blend_cached(str(path), st.st_mtime_ns, st.st_size)
+    except Exception as exc:  # noqa: BLE001
+        return None, f"book-blend unavailable: {type(exc).__name__}"
+
+
+def served_prop_probability(p_model: Optional[float], p_book: Optional[float], stat: str, *,
+                            processed_root: Optional[Path] = None, env: Optional[Mapping[str, str]] = None
+                            ) -> Tuple[Optional[float], Dict[str, Any]]:
+    """The probability to SERVE for one NBA prop line (P(over)), plus a stamp saying how it was made. Never raises."""
+    meta: Dict[str, Any] = {"p_model_raw": None if p_model is None else round(float(p_model), 4)}
+    try:
+        if p_model is None:
+            return None, meta
+        weights, reason = book_blend_weights(processed_root, env)
+        if weights is None:
+            meta["book_blend"] = reason
+            return p_model, meta
+        key = str(stat or "").strip().lower()
+        if key not in weights:
+            meta["book_blend"] = f"no weight for {key!r}"
+            return p_model, meta
+        if p_book is None or not (0.0 < float(p_book) < 1.0):
+            meta["book_blend"] = "no two-sided book price for this line"
+            return p_model, meta
+        w = weights[key]
+        p = blend_with_book(float(p_model), float(p_book), w)
+        meta.update(book_blend="applied", book_blend_w=w, p_book=round(float(p_book), 4))
+        return p, meta
+    except Exception as exc:  # noqa: BLE001 -- serving must survive this
+        meta["book_blend"] = f"failed: {type(exc).__name__}"
+        return p_model, meta

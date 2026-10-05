@@ -410,6 +410,15 @@ def book_blend(bt, train_rows: List[Dict], test_rows: List[Dict], c: Dict[str, D
                         "ev_bets": ({"n": len(bets), "hit": round(sum(x[2] for x in bets) / len(bets), 4),
                                      "roi": ci([(g, pnl) for g, pnl, _ in bets])} if bets else {"n": 0})}
         res["by_market"][mk] = e
+    # SERVING WEIGHTS: refit on ALL lines (train + test). The OOS run above is the evidence that the PROCEDURE ties the
+    # book; these are the constants it produces with every line. logit space (it was never worse than prob space).
+    allr = tr + te
+    g_all: Dict = defaultdict(list)
+    for r in allr:
+        g_all[r["mk"]].append(r)
+    w_all = {mk: min(grid, key=lambda x: brier(rr, x, "logit")) for mk, rr in sorted(g_all.items())}
+    res["serving"] = {"space": "logit", "w": w_all, "w_pooled": min(grid, key=lambda x: brier(allr, x, "logit")),
+                      "lines": len(allr), "games": len({r["gid"] for r in allr})}
     return res
 
 
@@ -429,6 +438,16 @@ def main() -> int:
         test = [r for r in rows if (r["phase"] == "regular" and r["date"] >= args.split) or r["phase"] == "playoff"]
         c_train = fit(train)
         rep_bb = {"constants_train": c_train, "blend": book_blend(bt, train, test, c_train, args.bt_out)}
+        if args.write:
+            sv = rep_bb["blend"]["serving"]
+            doc = {"space": sv["space"], "w": sv["w"],
+                   "provenance": {"script": "scripts/fit_nba_prop_calibration.py --book-blend",
+                                  "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                                  "lines": sv["lines"], "games": sv["games"],
+                                  "evidence": "OOS (train-fit w, 249,884 test lines / 400 games): ties the de-vigged book",
+                                  "meaning": "p_served = sigmoid(logit(p_book) + w * (logit(p_model) - logit(p_book)))"}}
+            args.write.write_text(json.dumps(doc, indent=1), encoding="utf-8")
+            print(f"wrote {args.write}", flush=True)
         (args.bt_out / "fit_nba_prop_calibration_book_blend.json").write_text(json.dumps(rep_bb, indent=1), encoding="utf-8")
         print(json.dumps({k: v for k, v in rep_bb["blend"].items() if k != "by_market"}), flush=True)
         return 0

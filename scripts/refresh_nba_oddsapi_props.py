@@ -3268,6 +3268,7 @@ def _run_refresh_via_cli(
                 log_file=log_file,
                 heartbeat_cb=_touch_progress,
                 heartbeat_every_s=5.0,
+                league="nba",
             )
             _touch_progress()
             rc_edges = 0

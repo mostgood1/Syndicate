@@ -199,6 +199,24 @@ def _prob_over(mean: float, sd: float, line: float) -> float | None:
     return max(0.0, min(1.0, 1.0 - 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))))
 
 
+def _devig_over(over_odds: Any, under_odds: Any) -> float | None:
+    """Proportionally de-vigged P(Over) from a two-sided American price pair, else None."""
+
+    def implied(price: Any) -> float | None:
+        try:
+            value = float(price)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(value) or abs(value) < 100:
+            return None
+        return 100.0 / (value + 100.0) if value > 0 else -value / (-value + 100.0)
+
+    p_over, p_under = implied(over_odds), implied(under_odds)
+    if p_over is None or p_under is None:
+        return None
+    return p_over / (p_over + p_under)
+
+
 def player_stat_distributions_from_sim(sim_players: dict[str, Any] | None) -> tuple[dict[str, dict[str, tuple[float, float]]], dict[str, str]]:
     """Reads the sim artifact's own per-player {stat}_mean/{stat}_sd fields
     (confirmed present for both NBA and WNBA's cards_sim_detail_<date>.json,
@@ -245,6 +263,7 @@ def basketball_market_board_rows_for_game(
     prop_recommendations: dict[str, Any] | None,
     raw_player_props: dict[str, dict[str, dict[str, Any]]] | None = None,
     sim_players: dict[str, Any] | None = None,
+    league: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     odds_rows: list[dict[str, Any]] = []
     sim_rows: list[dict[str, Any]] = []
@@ -425,6 +444,16 @@ def basketball_market_board_rows_for_game(
             model_prob_over = _prob_over(dist[0], dist[1], line)
             if model_prob_over is None:
                 continue
+            blend_meta: dict[str, Any] = {}
+            if str(league or "").strip().lower() == "nba":
+                # NBA only (user decision 2026-10-05): serve the blend of the de-vigged two-sided book and the
+                # model -- measured, the model carries no information beyond the book. The recommendation-engine
+                # rows above already carry it (their p_win comes from the blended props_edges CSV).
+                from syndicate.features.shared.nba_prop_calibration import served_prop_probability
+
+                model_prob_over, blend_meta = served_prop_probability(
+                    model_prob_over, _devig_over(over_odds, under_odds), stat_code
+                )
             sim_rows.append(
                 {
                     "game_id": game_pk,
@@ -433,6 +462,7 @@ def basketball_market_board_rows_for_game(
                     "entity": player,
                     "model_prob_over": model_prob_over,
                     "sim_source": "basketball_sim_distribution",
+                    **blend_meta,
                 }
             )
             entity_stats_with_sim_row.add((normalized_entity, stat_code))
@@ -674,6 +704,7 @@ def build_basketball_market_board(
             prop_recommendations=prop_recommendations,
             raw_player_props=raw_player_props,
             sim_players=sim_players,
+            league=sport_slug,
         )
         inventory = join_odds_to_sim(odds_rows, sim_rows)
         for row in inventory:

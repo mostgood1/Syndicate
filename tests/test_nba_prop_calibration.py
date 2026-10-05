@@ -329,3 +329,40 @@ def test_book_blend_endpoints_and_logit_symmetry():
         assert fitcal.blend_p(0.6, 0.3, 0.0, space) == pytest.approx(0.6, abs=1e-6)   # w = 0 is the book
         assert fitcal.blend_p(0.6, 0.3, 1.0, space) == pytest.approx(0.3, abs=1e-6)   # w = 1 is the model
     assert fitcal.blend_p(0.5, 0.8, 0.5) == pytest.approx(1 - fitcal.blend_p(0.5, 0.2, 0.5))
+
+
+# --- served probability: blend toward the de-vigged book -------------------------------------------------------------
+
+def _write_blend(tmp_path, doc):
+    (tmp_path / cal.BOOK_BLEND_FILE).write_text(json.dumps(doc), encoding="utf-8")
+    return tmp_path
+
+
+def test_book_blend_reachability_off_differs_from_on(tmp_path):
+    root = _write_blend(tmp_path, {"enabled": True, "space": "logit", "w": {"pts": 0.0, "reb": 0.1}})
+    on, meta_on = cal.served_prop_probability(0.70, 0.50, "pts", processed_root=root, env={})
+    off, meta_off = cal.served_prop_probability(0.70, 0.50, "pts", processed_root=root,
+                                                env={cal.BOOK_BLEND_FLAG: "0"})
+    assert on != off
+    assert on == pytest.approx(0.50) and meta_on["book_blend"] == "applied" and meta_on["p_model_raw"] == 0.7
+    assert off == 0.70 and "off" in meta_off["book_blend"]
+
+
+def test_book_blend_weight_interpolates_in_logit_space(tmp_path):
+    root = _write_blend(tmp_path, {"enabled": True, "w": {"reb": 0.1}})
+    p, meta = cal.served_prop_probability(0.70, 0.50, "REB", processed_root=root, env={})
+    assert p == pytest.approx(1 / (1 + math.exp(-0.1 * math.log(0.7 / 0.3))))
+    assert meta["book_blend_w"] == 0.1 and meta["p_book"] == 0.5
+
+
+def test_book_blend_falls_back_to_model_with_a_reason(tmp_path):
+    p, meta = cal.served_prop_probability(0.6, 0.5, "pts", processed_root=tmp_path, env={})
+    assert p == 0.6 and meta["book_blend"] == "book-blend file absent"
+    root = _write_blend(tmp_path, {"enabled": False, "w": {"pts": 0.0}})
+    assert cal.served_prop_probability(0.6, 0.5, "pts", processed_root=root, env={})[1]["book_blend"] == "book-blend file not enabled"
+    root = _write_blend(tmp_path, {"enabled": True, "w": {"pts": 1.5}})
+    assert "outside" in cal.served_prop_probability(0.6, 0.5, "pts", processed_root=root, env={})[1]["book_blend"]
+    root = _write_blend(tmp_path, {"enabled": True, "w": {"pts": 0.0}})
+    assert cal.served_prop_probability(0.6, None, "pts", processed_root=root, env={}) == (0.6, {"p_model_raw": 0.6, "book_blend": "no two-sided book price for this line"})
+    assert cal.served_prop_probability(0.6, 0.5, "stl", processed_root=root, env={})[1]["book_blend"] == "no weight for 'stl'"
+    assert cal.served_prop_probability(None, 0.5, "pts", processed_root=root, env={})[0] is None
