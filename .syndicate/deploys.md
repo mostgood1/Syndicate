@@ -46270,3 +46270,22 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 
 - reading 1: lineups_2026-10-05.csv rewritten 16:42:50Z (first after the ff): 144 slotted skaters, 144 with proj_ev_toi.
 - reading 2: `nhl_sim_input_checklist.py` on fleet data (fleet code) -- PASS; proj_ev_toi 16.0% "consumed, thinly populated" because the checklist pools every dated lineup file and only this one postdates the change (was FAIL 0% before the generation).
+
+## 2026-10-05 17:35:49Z (12:35 PM CT) -- LOCAL FLEET FF de074a80 -> 7d23f09d, NO RESTART: NHL score-adjusted team xG, game lines only -- **SHIPPED on a USER OVERRIDE; production reading OWED** (lane `nhl-game-lines-model`, user: "ship score-adjusted xG anyway")
+
+- **Override:** H13 (2026-10-03) failed pre-registered criterion (d), playoff point estimate +0.000026 (n=82); passed (a) OOS ML -0.0009 [-0.0016, -0.0002], (b), (c), (e).
+- **What:**
+  - `inseason_team_xg.py` also writes `team_xg_scoreadj_<season>.csv` = W=10 blend of (prior x frozen 2025-26 per-team ratio, 0.9969..1.0028) and this season's score-weighted xG (frozen weights 0.965..1.038).
+  - `build_nhl_artifacts._apply_scoreadj_xg` re-projects only the game-line period lambdas from it, before anchoring.
+  - Props and `team_xg_<season>.csv` are untouched. Off switch: SYNDICATE_NHL_SCOREADJ_XG=off.
+- **Measured before shipping, shipping form** (BLEND_ADJ - BLEND, 2025-26 regular, n=1,312; weights fit on 2023-24 + 2024-25 only): ML dBrier -0.00017 [-0.00036, +0.00002], total dMAE -0.0001; mean |dp_home_ml| 0.0028. The pre-written stop condition (CI entirely > 0) was not triggered.
+- **How:**
+  - Claims live-odds-worker + refresh-worker held by nhl-game-lines-model.
+  - `git merge --ff-only 7d23f09d` on a clean tree, HEAD == target. No NHL generation was running. No restart: NHL generation is a per-run subprocess.
+  - Gap runtime files: `build_nhl_artifacts.py`, `inseason_team_xg.py` (this change). The rest is offline scripts and `.claude/hooks/session-start.sh`.
+- **Baseline (17:34:15Z):** no `team_xg_scoreadj_2026-2027.csv`; `team_xg_2026-2027.csv` 17:12:28Z; predictions_2026-10-05/06/07 last written 17:10-17:14Z.
+- **Side reading (props season inputs, lane nhl-season-inputs-in-season):** that 17:12Z generation ran on de074a80, which contains 2fe903ca, and wrote NO props season file. The Oct gate held on a real generation.
+- **Expect:**
+  - The first post-ff generation writes `team_xg_scoreadj_2026-2027.csv` (32 teams), then rewrites predictions.
+  - Production's `p_home_ml_raw` equals a read-only re-run WITH the adjusted file, and differs from one WITHOUT it.
+- **Reading OWED:** watcher on the fleet (scoreadj mtime > ff, then a predictions rewrite >= it).
