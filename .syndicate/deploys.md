@@ -46402,3 +46402,11 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
   refresh correctly skips edges ("no player-prop lines offered"). NBA props_edges, and with them the picks arm of the
   book blend, start when books post NBA player props. The lead is closed. The expected outcome and the owed reading in
   the 20:03:24Z entry are unchanged.
+
+## 2026-10-05 20:29:49Z (3:29 PM CT) -- LOCAL FLEET FF 6b4fa17d -> 340b04cd (20:21:01Z) -> bce1cb2a, NO RESTART: daily optimizer (cron) + phase 2 rank/stake wiring -- **VERIFY OWED** (lane `daily-optimizer`, user: "yes fast-forward the fleet and wire phase 2")
+
+- change: `publish_model_scorecard.py` now runs `daily_optimizer` (model calibration shrink w* + PUBLISHED-recommendation grade by EV band, beside pooled) and writes `model_scorecard_optimizer{,_state,_overlay}.json`; `optimizer_overlay.factor_for_row` ([0.5, 1.0], validated cells only, 72 h expiry) multiplies Layer 2 SCORE and the stake's model edge. Never withholds (`value_pct`/admission untouched).
+- ride-along on the ff (peer code, already on main): `scripts/build_nhl_artifacts.py`, `syndicate/features/nhl/{confirmed_goalies,goalie_gsax}.py`, `scripts/nhl_gsax_production_form.py`, `syndicate/features/shared/measured_market_skill.py`, `scripts/grade_wnba_served_props.py`, `scripts/soccer_season_audit/grade_scorer_race.py` (first ff); `scripts/refresh_nba_oddsapi_props.py`, `syndicate/features/shared/basketball_props_edges.py` (second).
+- baseline (read 20:30Z on the fleet python): `_apply_skill_reliability({score:5}, nfl h2h)` -> unchanged; `_sizing_skill_factor` -> 0.5 from the existing market-skill registry; `optimizer_overlay` reason `overlay_absent`. No optimizer file on `~/syndicate-prod/data/reports/model_scorecard/`.
+- prediction: the 2026-10-06 11:30Z `model-scorecard` run logs `OPTIMIZER_STATE games=0`, then `OPTIMIZER committed={'committed': N>0, ...}` with `by_sport` non-empty for >=3 sports, and writes `model_scorecard_optimizer_overlay.json` with 0 entries (no cell can reach 60 games / 5 dates on day 1). Rank/stake therefore byte-identical until a cell validates.
+- verify: `py -3 .claude/skills/daily-optimizer/review.py` exit 0 after 11:3xZ 10-06 (scheduled task `daily-optimizer-review`, 07:30 CT), plus the job log's `OPTIMIZER` line.
