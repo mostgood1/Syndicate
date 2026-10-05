@@ -1031,6 +1031,12 @@ ba_bt\watch_ladder.log`).
 - Hypothesis: n/a (feature)
 - Falsification test: n/a
 - Verification: Unit tests (scoped key reaches only its role, beats the global local key and the live import for that role, never leaks as a literal key, NEVER_CARRY still refused, unknown role prefix ignored); on the fleet after ff + pin: env --role for all three roles read back, effective values identical to the running processes' (so no restart owed)
+### state-subject-archive-sweep — OPEN — opened 2026-10-05 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: Every state subject whose superseded history can be cut safely is archived: a committed tool performs the cut and REFUSES on a dangling reference (by UPDATE number AND by positional word, the class my 2026-10-04 hand-check missed), and it is run over the chain-shaped and closed-marked subjects; STATE_TOTAL falls by the measured ceiling (~120,000 of the ~363,000 the budget needs) with the shortfall stated and its cause named.
+- Files: scripts/archive_state_subject.py (NEW), .syndicate/state.md, .syndicate/state_board.md, .syndicate/state_football.md, .syndicate/state_mlb.md, .syndicate/state_soccer.md, .syndicate/state_worker.md, .syndicate/state_archive_2026-10-05.md (NEW)
+- Hypothesis: n/a -- the ceiling is already measured: 12 of 277 subjects have >=3 sub-blocks (148,775 chars) and 265 are flat (1,287,367), so archiving cannot reach 1,100,000 and the question is only how much it does reach.
+- Falsification test: If the tool's refusal fires on a subject, that subject is NOT cut -- a dangling reference means the boundary is wrong, not that the check is noisy.
+- Verification: Per subject: every moved non-blank line verbatim in the archive and absent from the part; zero dangling UPDATE-number AND positional references across the boundary; state_key_check.py coherent with the subject still counted. Overall: every part under 250,000, state.md under 120,000, and STATE_TOTAL reported before and after against 1,100,000.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
