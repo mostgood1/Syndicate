@@ -46257,3 +46257,11 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - how it loaded: `fleet-restart-fee-net-env-1004` (fireAt 04:30Z) totalRuns 0; `ncaaf-live-shrink-03-post-restart-reading` (fireAt 06:15Z) totalRuns 0. Both are still `enabled` with nextRunAt in the past. The supervisor's own role restarts loaded the checkout instead. See learnings 2026-10-05, "an overnight one-time scheduled task is DEFERRED, not skipped".
 - not yet seen (LEAD, not a blocker): a LIVE NCAAF re-sim at lambda 0.3. No NCAAF game has been live since the load. On the first live game of the next slate (by Sat 10-10), snapshot lanes should carry the level-shrink stamp 0.3, or 1.0 on market-implied FCS games.
 - HAZARD, RESOLVED ~14:40Z by user decision ("disable both tasks"): both tasks DISABLED by session 64f14d78. Before that, both stale tasks may still fire late. The fit task did, 8 h after its slot. The restart task's only gate is "no NFL game live", so a late fire runs a full down+up at an arbitrary hour. Its goal looks already met: SYNDICATE_SCORE_FEE_NET is PRESENT (key only) in web, refresh-worker and live-odds-worker environs at 14:19Z.
+
+## 2026-10-05 16:17Z (11:17 AM CT) -- LOCAL FLEET FF -> de074a80: NHL EV-minutes line rotation + line quality 0.5 -- **VERIFY OWED** (lane `nhl-ev-rotation-fullseason`, user: "Ship it")
+
+- applied: ff via `github/main` 16:17:18Z, no restart (props producer is a per-run subprocess; live_resim keeps the old engine until its next restart -- moneylines only, team totals unchanged in expectation). Read back: fleet HEAD de074a80; fleet venv resolves line_quality_strength 0.5.
+- baseline: lineups_2026-10-05..08 (latest 16:12Z) carry NO proj_ev_toi column; pre-deploy `nhl_sim_input_checklist.py` on fleet data FAILS proj_ev_toi 0% (consumed, never populated) -- expected, the files predate the producer change.
+- expect: the first generation after the ff writes lineups with proj_ev_toi on every slotted skater, and the checklist then PASSES.
+- offline evidence: full 2025-26 season, 36,533 regular-season player-games, Brier SOG@3.5 -0.00019 [-0.00038, -0.00001], all other markets better or flat (BLOCKS +0.00019 n.s.); playoffs SOG@1.5 -0.0017, POINTS@0.5 -0.0018.
+- verify: watcher /mnt/c/tmp/nhlprops/ev_watch.sh (cutoff 16:17:30Z UTC).
