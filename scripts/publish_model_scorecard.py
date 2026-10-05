@@ -423,7 +423,8 @@ def main(argv: list[str] | None = None) -> int:
             opt.prune(opt_state, today)
             report, opt_overlay = opt.build_report(opt_state, today=today, now=now,
                                                    run={"committed": committed}, resamples=args.resamples or opt.RESAMPLES)
-            optimizer_outputs = {opt.OPT_STATE_PATH: opt.dumps(opt_state), opt.OPTIMIZER_PATH: opt.dumps(report)}
+            optimizer_outputs = {opt.OPT_STATE_PATH: opt.dumps(opt_state), opt.OPTIMIZER_PATH: opt.dumps(report),
+                                 opt.OVERLAY_PATH: opt.dumps(opt_overlay)}
             scorecard["optimizer"] = {"path": opt.OPTIMIZER_PATH, "by_sport": report["by_sport"],
                                       "edge_shrink": len(opt_overlay["edge_shrink"]),
                                       "stake_scale": len(opt_overlay["stake_scale"]),

@@ -34,9 +34,9 @@ only MULTIPLIERS in [FACTOR_FLOOR, 1.0] that a consumer applies to a line's RANK
   - `stake_scale`: published bets in the cell realised significantly less than predicted EV
     (realised-minus-predicted CI upper < 0); factor = (predicted + CI upper) / predicted, floored.
 Never > 1 (the optimizer never amplifies), never 0, never a removal. 72 h expiry, capped entry
-count, and `validate_overlay` re-checks every rail on the consumer side. CONSUMER WIRING is phase 2
-(`layer2_board.py` / `portfolio_commit.py` are another lane's files); until then the overlay is
-published and READ, not applied.
+count, and `validate_overlay` re-checks every rail on the consumer side. CONSUMERS (phase 2,
+2026-10-05): `optimizer_overlay.factor_for_row`, multiplied into `layer2_board._apply_skill_reliability`
+(rank) and `portfolio_commit._sizing_skill_factor` (stake).
 
 STATE. Its own file (`OPT_STATE_PATH`), because `model_scorecard.load_state` copies back only the
 fields it knows. Per graded game: the calibration sums and the banded recommendation / pooled sums.
@@ -61,6 +61,9 @@ REPORT_DIR = "reports/model_scorecard"
 # so publishing needs no allowlist change on web; no ISO date in them, so date-scoped worker pulls skip them.
 OPTIMIZER_PATH = f"{REPORT_DIR}/model_scorecard_optimizer.json"
 OPT_STATE_PATH = f"{REPORT_DIR}/model_scorecard_optimizer_state.json"
+# The overlay ALONE, small, for the consumers (`optimizer_overlay`): they re-read it every 10 minutes
+# and must not parse the whole report to do so.
+OVERLAY_PATH = f"{REPORT_DIR}/model_scorecard_optimizer_overlay.json"
 OPENINGS_TEMPLATE = "reports/intelligence/clv_openings/{date}.jsonl"
 SOURCE = "model_scorecard/daily_optimizer"
 

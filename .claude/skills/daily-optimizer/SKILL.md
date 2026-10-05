@@ -56,10 +56,20 @@ rows are graded at their first recorded sighting, which can predate publication.
 
 Never > 1, never a removal, 72 h expiry, ≤200 entries, `validate_overlay` re-checks on read.
 
-**PHASE 2, NOT YET WIRED:** no consumer applies the overlay yet. The consumers are
-`layer2_board.py` (rank) and `portfolio_commit.py` (stake), held by lane `stop-market-withholding`
-on 2026-10-05. Until they are wired, the overlay is published and reviewed, not applied. Say so
-whenever you report it.
+**APPLIED (phase 2, 2026-10-05, user "wire phase 2").** The cron also writes
+`reports/model_scorecard/model_scorecard_optimizer_overlay.json` (overlay only), and
+`syndicate/features/shared/optimizer_overlay.factor_for_row` turns it into one multiplier per row:
+`max(0.5, edge_shrink x stake_scale)` for the row's cell, 1.0 when nothing validated applies. It is
+multiplied into:
+
+- RANK -- `layer2_board._apply_skill_reliability` (stamped `optimizer_factor` on the score when it bites;
+  `value_pct` and admission untouched);
+- STAKE -- `portfolio_commit._sizing_skill_factor` (the model edge the stake sizes from).
+
+Kill switch `SYNDICATE_OPTIMIZER_OVERLAY=off`. The consumers are ROLE code (web, refresh-worker):
+they load it at the next role restart after a fleet fast-forward. To see whether a live row is
+being moved, look for `optimizer_factor` on served Layer 2 scores and the
+`[optimizer_overlay] reason=...` log line.
 
 ## Expect "insufficient" for weeks
 

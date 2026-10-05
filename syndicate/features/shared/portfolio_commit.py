@@ -325,7 +325,12 @@ def _point_loss_rel(entry: Mapping[str, Any] | None) -> float:
 
 def _sizing_skill_factor(row: Mapping[str, Any]) -> float:
     """The stake multiplier: the larger of the established and the point-estimate loss,
-    through `measured_market_skill`'s gain and floor. 1.0 when neither shows a loss."""
+    through `measured_market_skill`'s gain and floor. 1.0 when neither shows a loss.
+
+    Times the daily optimizer's validated per-cell factor in [0.5, 1.0] `[2026-10-05, lane
+    daily-optimizer, user "wire phase 2"]` -- the same factor the row's rank carries
+    (`layer2_board._apply_skill_reliability`). Never above 1.0, never 0: it sizes down, it never refuses.
+    """
     from syndicate.features.shared.measured_market_skill import SKILL_FLOOR, SKILL_GAIN
 
     projection = row.get("projection")
@@ -334,9 +339,14 @@ def _sizing_skill_factor(row: Mapping[str, Any]) -> float:
     if isinstance(note, Mapping) and str(note.get("status") or "").strip().lower() == "measured":
         established = max(0.0, _as_float(note.get("established_loss_rel")) or 0.0)
     loss = max(established, _point_loss_rel(_registry_entry(row)))
-    if loss <= 0.0:
-        return 1.0
-    return max(SKILL_FLOOR, 1.0 - SKILL_GAIN * loss)
+    base = 1.0 if loss <= 0.0 else max(SKILL_FLOOR, 1.0 - SKILL_GAIN * loss)
+    try:
+        from syndicate.features.shared.optimizer_overlay import factor_for_row
+
+        optimizer = factor_for_row(row)
+    except Exception:
+        optimizer = 1.0
+    return base * optimizer
 
 
 def _sizing_model_edge(row: Mapping[str, Any]) -> float | None:

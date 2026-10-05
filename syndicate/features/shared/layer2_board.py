@@ -988,17 +988,29 @@ def _apply_skill_reliability(score: Any, projection: Any, row: Any = None) -> An
         if bucket is not None:
             factor = bucket
             source = "bucket"
-    if factor >= 1.0:
+    # THE DAILY OPTIMIZER `[2026-10-05, lane daily-optimizer, user "wire phase 2"]`: a validated
+    # per-cell multiplier in [0.5, 1.0] (`optimizer_overlay`), composed with the term above. Rank only
+    # -- `value_pct` is untouched, so it can lower a line's place but never withhold it.
+    try:
+        from syndicate.features.shared.optimizer_overlay import factor_for_row
+
+        optimizer = factor_for_row(row) if isinstance(row, Mapping) else 1.0
+    except Exception:
+        optimizer = 1.0
+    if factor >= 1.0 and optimizer >= 1.0:
         return score
     raw = _as_float(score.get("score"))
     if raw is None:
         return score
     adjusted = dict(score)
-    adjusted["score"] = round(min(raw, raw * factor), 4)
+    adjusted["score"] = round(min(raw, raw * factor * optimizer), 4)
     # Stamped only when it bit, beside the other reliability terms, so a reader can
     # see which term ranked the row down.
-    adjusted["skill_reliability"] = round(factor, 4)
-    adjusted["skill_source"] = source
+    if factor < 1.0:
+        adjusted["skill_reliability"] = round(factor, 4)
+        adjusted["skill_source"] = source
+    if optimizer < 1.0:
+        adjusted["optimizer_factor"] = round(optimizer, 4)
     return adjusted
 
 
