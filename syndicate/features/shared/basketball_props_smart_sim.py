@@ -4527,6 +4527,34 @@ def _team_players_from_props_local(*, props_df, team_tri: str, opp_tri: str, pro
     return out
 
 
+def _excluded_keys_for_source_filter(excluded_map: dict, teams, smart_sim_module) -> dict[str, set[str]]:
+    """The excluded-player map for one game, keyed so the vendored sim's pool filter can MATCH it.
+
+    Syndicate builds exclusion keys with `_norm_name_key`, which keeps apostrophes and periods ("NY'CEARA PRYOR",
+    "P.J. WASHINGTON"). The vendored `simulate_smart_game` drops excluded players by comparing against
+    `_norm_player_key(player_name)`, which strips them ("NYCEARA PRYOR"). Measured 2026-10-05 on the first production
+    10-07 WNBA sims: two players excluded by the availability rule (Ny'Ceara Pryor, Ta'Niya Latson) were simulated anyway,
+    and any injured player with punctuation in her name (A'ja Wilson) would have been too -- WNBA and NBA alike
+    (lane basketball-injury-exclusion-reinclusion). Every key is passed in BOTH forms: as built, and through the sim
+    module's own `_norm_player_key` (or a punctuation-stripped fallback when the module has none). A set membership
+    test, so an extra form can only match the same name."""
+    norm = getattr(smart_sim_module, "_norm_player_key", None)
+
+    def _alt(key: str) -> str:
+        if callable(norm):
+            try:
+                return str(norm(key) or "").strip().upper()
+            except Exception:
+                pass
+        return re.sub(r"\s+", " ", re.sub(r"[^A-Z0-9 ]", "", key.upper())).strip()
+
+    out: dict[str, set[str]] = {}
+    for team in teams:
+        keys = {str(k or "").strip().upper() for k in (excluded_map.get(team) or set()) if str(k or "").strip()}
+        out[str(team)] = keys | {a for a in (_alt(k) for k in keys) if a}
+    return out
+
+
 def _call_source_simulate_smart_game_local(*, smart_sim_module, processed_root: Path, league_code: str, kwargs: dict[str, Any]):
     original_values: dict[str, Any] = {}
     raw_root = processed_root.parent / "raw"
@@ -5268,7 +5296,7 @@ def _smart_sim_worker_run_local(job: dict) -> dict:
             "away_b2b": away_b2b,
         }
         excluded_map_local = state.get("excluded_map") or {}
-        excluded_game = {str(home_tri): set(excluded_map_local.get(home_tri) or set()), str(away_tri): set(excluded_map_local.get(away_tri) or set())}
+        excluded_game = _excluded_keys_for_source_filter(excluded_map_local, (home_tri, away_tri), smart_sim_module)
         out = _call_source_simulate_smart_game_local(
             smart_sim_module=smart_sim_module,
             processed_root=out_path.parent,

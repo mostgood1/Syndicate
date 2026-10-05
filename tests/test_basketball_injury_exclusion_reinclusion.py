@@ -94,3 +94,52 @@ def test_playing_today_still_overrides_a_re_keyed_exclusion(tmp_path):
     props = pd.DataFrame([{"team": "DAL", "player_name": "Azzi Fudd", "playing_today": True}])
     m = excluded_map(processed_root=processed, raw_root=raw, date_str="2026-10-04", props_df=props)
     assert _norm_name_key("Azzi Fudd").upper() not in _keys(m, "DAL")
+
+
+# ---- the handoff to the vendored pool filter (2026-10-05) --------------------------------------------------------
+import importlib  # noqa: E402
+import sys  # noqa: E402
+import types  # noqa: E402
+
+from syndicate.features.shared.basketball_props_smart_sim import _excluded_keys_for_source_filter  # noqa: E402
+
+_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _vendor_smart_sim(repo: str, pkg: str):
+    src = str(_ROOT / "vendor" / repo / "src")
+    if src not in sys.path:
+        sys.path.insert(0, src)
+    return importlib.import_module(f"{pkg}.sim.smart_sim")
+
+
+def _dropped_by_vendor_filter(module, excluded: dict, team: str, names: list) -> list:
+    """The vendored `_drop_excluded` predicate, verbatim: player kept unless _norm_player_key(name).upper() is in the
+    team's ban set."""
+    ban = {str(x).strip().upper() for x in excluded.get(team, set())}
+    return [n for n in names if str(module._norm_player_key(n)).upper() in ban]
+
+
+def test_punctuated_names_reach_the_vendor_pool_filter_wnba():
+    """Discriminating: production 10-07 sims kept Ny'Ceara Pryor and Ta'Niya Latson although both were excluded --
+    the map key keeps the apostrophe, the vendor filter strips it. The raw map (old handoff) drops neither."""
+    m = _vendor_smart_sim("wnba_betting_repo", "wnba_betting")
+    names = ["Ny'Ceara Pryor", "Ta'Niya Latson", "A'ja Wilson", "Jordin Canada"]
+    excluded = {"NYL": {_norm_name_key(n).upper() for n in names[:3]}}
+    assert _dropped_by_vendor_filter(m, excluded, "NYL", names) == []                       # the old handoff
+    fixed = _excluded_keys_for_source_filter(excluded, ("NYL", "ATL"), m)
+    assert _dropped_by_vendor_filter(m, fixed, "NYL", names) == names[:3]
+    assert fixed["ATL"] == set()
+
+
+def test_punctuated_names_reach_the_vendor_pool_filter_nba():
+    m = _vendor_smart_sim("nba_betting_repo", "nba_betting")
+    names = ["De'Aaron Fox", "P.J. Washington", "D'Angelo Russell", "LeBron James"]
+    excluded = {"DAL": {_norm_name_key(n).upper() for n in names[:3]}}
+    fixed = _excluded_keys_for_source_filter(excluded, ("DAL",), m)
+    assert _dropped_by_vendor_filter(m, fixed, "DAL", names) == names[:3]
+
+
+def test_fallback_strips_punctuation_when_the_module_has_no_normalizer():
+    fixed = _excluded_keys_for_source_filter({"NYL": {"NY'CEARA PRYOR"}}, ("NYL",), types.SimpleNamespace())
+    assert fixed["NYL"] == {"NY'CEARA PRYOR", "NYCEARA PRYOR"}
