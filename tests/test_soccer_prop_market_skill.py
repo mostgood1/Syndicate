@@ -20,8 +20,9 @@ from syndicate.features.shared.projection_skill import attach_projection_skill
 
 _NOW = datetime(2026, 10, 5, 16, 0, tzinfo=timezone.utc)
 
-_REGISTERED = ("player_goal_scorer_anytime", "player_shots_on_target")
-_UNGRADED = ("player_first_goal_scorer", "player_last_goal_scorer")
+_PARITY = ("player_goal_scorer_anytime", "player_shots_on_target", "player_first_goal_scorer")
+_LOSES = ("player_last_goal_scorer",)
+_REGISTERED = _PARITY + _LOSES
 
 
 def _grid_row(market: str) -> dict:
@@ -39,13 +40,6 @@ def test_the_boards_soccer_prop_spelling_reaches_its_measurement(market):
     assert coverage["rows_with_measured_skill_from_registry"] == 1
 
 
-@pytest.mark.parametrize("market", _UNGRADED)
-def test_ungraded_scorer_races_keep_the_declared_absence(market):
-    grid = [_grid_row(market)]
-    attach_projection_skill(grid, sport="soccer")
-    assert grid[0]["projection"]["model_skill"]["status"] == "unmeasured"
-
-
 def test_a_soccer_prop_measurement_never_labels_a_live_row():
     grid = [{"market": "player_shots_on_target", "segment": "full",
              "projection": {"mean": 0.4, "live_aware": True}}]
@@ -56,7 +50,7 @@ def test_a_soccer_prop_measurement_never_labels_a_live_row():
 # ------------------------------------------------------------- the ROI scale
 
 def test_an_roi_ci_reaching_above_zero_establishes_no_loss():
-    for market in _REGISTERED:
+    for market in _PARITY:
         entry = mms.MEASURED_MARKET_SKILL[("soccer", market, "full", mms.PHASE_PREGAME)]
         assert entry["roi_ci95"][1] > 0
         assert mms.established_loss_rel(entry) == 0.0
@@ -108,7 +102,7 @@ def _soccer_prop_row(market: str, *, price: int = 240, hold: float = 8.0) -> dic
     }
 
 
-@pytest.mark.parametrize("market", _REGISTERED + _UNGRADED)
+@pytest.mark.parametrize("market", _REGISTERED)
 def test_a_row_the_old_withhold_dropped_is_admitted_and_counted(market):
     row = _soccer_prop_row(market)
     result = select_shortlist([row], now=_NOW)
@@ -116,11 +110,23 @@ def test_a_row_the_old_withhold_dropped_is_admitted_and_counted(market):
     assert "rows_unmeasured_model_only" not in result
 
 
-@pytest.mark.parametrize("market", _REGISTERED + _UNGRADED)
+@pytest.mark.parametrize("market", _PARITY)
 def test_its_rank_and_its_sizing_factor_are_untouched(market):
     """No ESTABLISHED loss, so neither rank nor (since lane stop-market-withholding has
-    portfolio sizing read `skill_reliability` too) stake is discounted. A point estimate
-    is not an established loss."""
+    portfolio sizing read `skill_reliability` too) stake is discounted by the category."""
     row = _soccer_prop_row(market)
     assert _apply_skill_reliability(row["score"], row["projection"]) == row["score"]
     assert mms.skill_reliability(row["projection"]["model_skill"]) == 1.0
+
+
+def test_last_scorers_established_loss_ranks_its_line_down_but_keeps_it():
+    """-66.8% [-92.4%, -31.5%]: established loss 0.315, so 1 - 5 x 0.315 hits the 0.5 floor.
+    The line stays on the board (admitted above) -- accuracy moves rank, never presence."""
+    row = _soccer_prop_row("player_last_goal_scorer")
+    note = row["projection"]["model_skill"]
+    assert note["verdict_class"] == mms.VERDICT_LOSES
+    assert note["established_loss_rel"] == pytest.approx(0.315)
+    assert mms.skill_reliability(note) == mms.SKILL_FLOOR
+    scored = _apply_skill_reliability(row["score"], row["projection"])
+    assert scored["score"] == pytest.approx(row["score"]["score"] * mms.SKILL_FLOOR)
+    assert [r["market"] for r in select_shortlist([row], now=_NOW)["rows"]] == ["player_last_goal_scorer"]

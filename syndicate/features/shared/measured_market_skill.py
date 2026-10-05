@@ -107,6 +107,12 @@ _SOCCER_PROPS_PRICE_SOURCE = (
     "(props/<date>.csv, 8 US books) vs ESPN box scores; appeared players only; flat 1u at the best price "
     "when model p > raw implied; match-bootstrap CI; scripts/soccer_season_audit/audit_props.py --asof"
 )
+_SOCCER_SCORER_RACE_SOURCE = (
+    "lane soccer-scorer-race-grade (2026-10-05), .syndicate/findings_2026-10-05_soccer_scorer_race_grade.md: "
+    "production scorer_race on PRE-KICKOFF builds vs OddsAPI first/last scorer prices from run dates before "
+    "kickoff vs ESPN keyEvents goal order; flat 1u at the best price when model p > raw implied; match-bootstrap "
+    "CI; scripts/soccer_season_audit/grade_scorer_race.py"
+)
 
 # (sport, market, segment, phase) -> entry.
 MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
@@ -331,8 +337,14 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
     # midpoint `skill_reliability` refuses. Shots (-22.4% [-40.6, -1.7]) and assists DO
     # have readings but are NOT registered: no board row carries `player_shots` or
     # `player_assists` (an entry no row can reach is the failure the key-shape block
-    # below describes). First/last scorer have no grade yet (lane
-    # `soccer-scorer-race-grade`) and keep the declared `unmeasured` note.
+    # below describes).
+    #
+    # FIRST / LAST SCORER `[2026-10-05, graded by lane soccer-scorer-race-grade, bc51b24c]`:
+    # the board's `scorer_race` probability, same at-the-price method, outcome = ESPN goal
+    # order (own goals and shootouts excluded, DNP void), prices only from run dates BEFORE
+    # kickoff. LAST scorer is the first soccer prop with an ESTABLISHED loss (CI wholly below
+    # zero): it ranks at the floor. The finding attributes it to the race's time-reversal
+    # assumption (late goals favour substitutes), which a fix should target.
     ("soccer", "player_goal_scorer_anytime", "full", PHASE_PREGAME): {
         "sample_games": 144,
         "seasons": "2026-27 pre-kickoff builds 07-22..09-30, all versions; 487 EV>0 bets over 144 matches; OVER-only prices, no de-vig possible",
@@ -352,6 +364,26 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
         "verdict": "at the price: no established loss, ROI on model EV>0 -7.1% [-41.3%, +31.1%] over 210 bets, 143 matches",
         "verdict_class": VERDICT_PARITY,
         "source": _SOCCER_PROPS_PRICE_SOURCE,
+    },
+    ("soccer", "player_first_goal_scorer", "full", PHASE_PREGAME): {
+        "sample_games": 200,
+        "seasons": "2026-27 pre-kickoff builds, 22 dates 07-22..09-30; 305 EV>0 bets over 116 of 200 graded matches; yes-only prices, no de-vig possible",
+        "roi_model": -0.348,
+        "roi_ci95": (-0.699, 0.126),
+        "bets": 305,
+        "verdict": "at the price: no established loss, ROI on model EV>0 -34.8% [-69.9%, +12.6%] over 305 bets, 200 matches",
+        "verdict_class": VERDICT_PARITY,
+        "source": _SOCCER_SCORER_RACE_SOURCE,
+    },
+    ("soccer", "player_last_goal_scorer", "full", PHASE_PREGAME): {
+        "sample_games": 177,
+        "seasons": "2026-27 pre-kickoff builds, 22 dates 07-22..09-30; 264 EV>0 bets over 105 of 177 graded matches; yes-only prices, no de-vig possible",
+        "roi_model": -0.668,
+        "roi_ci95": (-0.924, -0.315),
+        "bets": 264,
+        "verdict": "at the price: LOSES, ROI on model EV>0 -66.8% [-92.4%, -31.5%] over 264 bets, 177 matches",
+        "verdict_class": VERDICT_LOSES,
+        "source": _SOCCER_SCORER_RACE_SOURCE,
     },
     # ---- SOCCER, LIVE -----------------------------------------------------------
     ("soccer", "h2h", "full", PHASE_LIVE): {
