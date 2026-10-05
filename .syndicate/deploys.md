@@ -46229,3 +46229,15 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
   - Ladder-vs-field |gap| > 0.05: 0/252, 0/238, 0/245, 0/245, 0/245, 0/252, i.e. **0 of 1,477 rows**. Worst gap 0.005 (10-05) and 0.001 (10-06).
 - **before the fix (01:5xZ, same measure, >50%-of-shift lag):** threes 125/169, tov 122/169, stl 110/169 rows.
 - **not re-simulated:** the two 10-04 sims (DEN_UTA, LAC_GSW) still read stale. Their games are past, so no producer run targets 10-04 again; no served impact.
+
+
+## 2026-10-05 ~15:30Z (10:30 AM CT) -- MEASUREMENT: the punctuated-name exclusion fix (1111942f) on NBA -- **filter stage MET on production data; end-to-end UNTESTED (no case yet)** (lane `basketball-injury-exclusion-reinclusion`)
+
+- **sims read:** all 9 NBA smart_sims on the fleet. Exclusion maps rebuilt per date with the fleet's own code (a2c15254), team-aware.
+  - **6 built after the 14:15:34Z ff** (10-05 ATL_MEM / DET_PHX / PHI_NYK, 10-06 CHA_BKN / OKC_NOP / UTA_DEN): 0 excluded players in any pool.
+  - **3 built before:** one, 10-03 TOR_MIA (built 10-02 19:05Z, before ff4ca730), holds 2 non-punctuated exclusions -- old-code era, not this fix.
+- **why the 0 is NOT evidence:** the only punctuated exclusion on those teams is N'Faly Dante (ATL 10-05; NOP 10-06, stale feed team, no props row). His last game was 2.0 min, so the 9-10 player pool cap would likely have cut him anyway. The population held no punctuated player who would otherwise have made a pool.
+- **what IS shown (filter stage, production data):** the vendored NBA `_drop_excluded` predicate over ATL's real 10-05 props roster (21 players), with the real `nba_betting` `_norm_player_key`.
+  - OLD handoff drops **none**; NEW handoff drops **N'Faly Dante**.
+  - The filter runs before the pool cut, so this is the step the fix changes.
+- **still owed:** an NBA game where an excluded player with a punctuated name would otherwise be simulated. It cannot be forced; the next NBA injury report will provide one.
