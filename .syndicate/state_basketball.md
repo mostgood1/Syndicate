@@ -971,7 +971,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Prop calibration reaches the sims.** The fleet has the stale-sim rule (468b8620, via ff 4345ba0d). The 10-05 sims were re-simulated with `nba_prop_calibration.factor_sha` 82ba04dd2dbd41f5 (prior-season fallback); Embiid pts 21.08 -> 24.87, sd 6.91 -> 8.86. Switch: env flag unset on both workers, the factor file decides.
 - **Edge shape to watch:** totals 5/5 favoured the OVER on 10-04 (2 games). The sim's prop means run low (minutes bias; Markkanen 9.8 pts on 10-04), which predicts an UNDER pile on props.
 
-## [wnba-props-model-skill] WNBA PROPS: NO MARKET BEATS THE BOOK; THE INJURY POOL IS FIXED IN PRODUCTION; FOUR MODEL FIXES ARE HELD, FLAGS OFF `[verified 2026-10-04, lanes wnba-lines-props-backtest / basketball-injury-exclusion-reinclusion / wnba-book-information / wnba-sim-rate-shrink / wnba-minutes-redistribution]`
+## [wnba-props-model-skill] WNBA PROPS: NO MARKET BEATS THE BOOK; INJURY + AVAILABILITY EXCLUSIONS AND THE RATE SHRINK ARE LIVE ON THE FLEET; SHAPE + DISPERSION HELD `[verified 2026-10-05, lanes wnba-lines-props-backtest / basketball-injury-exclusion-reinclusion / wnba-book-information / wnba-sim-availability / wnba-sim-rate-shrink / wnba-minutes-redistribution]`
 
 - **Production, verified:** SmartSim injury exclusions reach the pool. Fixes `ff4ca730` (re-admit only on a truthy
   `playing_today`) + `500a5643` (re-key each excluded name to the single team props_df places it on). Fleet reading 2,
@@ -984,6 +984,14 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   -0.0020 [-0.0059,+0.0020]; only threes significant). The book's minutes edge is rotation/role, not availability.
   The full minutes re-share fixes the sim's top-heavy minutes but makes props worse (PRA +0.0073/+0.0088); the
   bench-only variant is inert. Lane closed, module OFF and never hooked.
-- **Held estimators (all default OFF, user decision owed):** `SYNDICATE_WNBA_SIM_AVAILABILITY`,
-  `SYNDICATE_WNBA_SIM_RATE_SHRINK` (ladder rounding fixed `bfa92d5f`: half-up shift was a no-op for |delta| < 0.5),
-  `SYNDICATE_WNBA_PROP_SHAPE`, `SYNDICATE_WNBA_PROP_DISPERSION`, `SYNDICATE_WNBA_SIM_MINUTES_REDISTRIBUTION` (refuted).
+- **Live on the fleet since 2026-10-05 01:54:22Z (FILE SWITCH, no restart):** availability (`wnba_sim_availability.json`,
+  K=1) and rate shrink (`wnba_sim_rate_shrink.json`, fitted w; ladder shift fixed bfa92d5f). Env unset -> the JSON's
+  `"enabled": true` decides; env `0` is a kill switch. Verified on the 10-07 production sims (switch=file).
+- **Name-key leak fixed 2026-10-05 (1111942f, fleet ff 14:15:34Z):** excluded players whose names carry an apostrophe or
+  period were never removed from the pool (the vendored filter strips punctuation; the exclusion keys keep it) --
+  injury and availability exclusions, WNBA and NBA. After the fix + a scoped re-sim: 0 same-team excluded players in the
+  10-07 pools (was 2: Ny'Ceara Pryor 22.9 min, Ta'Niya Latson 6.7).
+- **Held (flags OFF, user decision owed):** `SYNDICATE_WNBA_PROP_SHAPE`, `SYNDICATE_WNBA_PROP_DISPERSION`.
+  `SYNDICATE_WNBA_SIM_MINUTES_REDISTRIBUTION` is refuted (lane closed), never hooked.
+- **Known risk:** the availability rule was measured before the injury feed worked; a player returning after one missed
+  game is left out for that game (~3.6% of player-games, held-out 10-03).

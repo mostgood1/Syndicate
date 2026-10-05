@@ -2963,3 +2963,10 @@ own prior verdicts, not by anything failing.
 
 - Belief overturned: "the NHL SOG edges come from wrong line order, so fix the line order / ice time." Measured: line order was mostly right, and the engine's excess top-line ice time (+2.2 min) was offsetting a too-flat per-minute shot rate (0.110 vs 0.133). Correcting the ice time alone made SOG@1.5 and POINTS@0.5 Brier WORSE.
 - How to apply: when a projection is a product (minutes x rate, opportunities x conversion), decompose sim vs actual for EACH factor on the same population before changing one; a fix to one factor needs the other in the same backtest arm.
+## 2026-10-05 — RULE: a verification is only as good as the population it ran on; if no member of the reading carries the failing trait, MET is untested `[lane basketball-injury-exclusion-reinclusion, session 39b666bb]`
+
+- 2026-10-04 reading 2 for the injury-exclusion fix: "0 of 44 OUT-listed players in the pools" -- MET, recorded, and true.
+- None of that day's OUT players had an apostrophe or period in her name. Every such excluded player had ALWAYS been simulated: the exclusion keys keep punctuation (`_norm_name_key`), while the vendored pool filter compares `_norm_player_key`, which strips it.
+- Found the next day, only because a NEW exclusion source (availability) put two apostrophe names (Ny'Ceara Pryor, 22.9 min) into the set. Fixed 1111942f.
+- Also caught: my first watcher matched names without teams and reported 4 leaks, 2 of them traded players excluded only under their OLD team. A team-keyed rule needs a team-keyed check.
+- **How to apply:** when a check passes, ask what input would have made it fail and whether the population contained one. For anything that matches NAMES across two code bases, test with punctuated, accented and suffixed names explicitly, against the OTHER side's real normalizer -- never a copy of your own.
