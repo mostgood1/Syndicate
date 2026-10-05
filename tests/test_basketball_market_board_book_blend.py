@@ -178,3 +178,44 @@ def _write_empty_preds(tmp_path):
     p = tmp_path / "empty_preds.csv"
     p.write_text("player_id,player_name,team,mean_pts,mean_reb,mean_ast,mean_threes,mean_pra,mean_stl,mean_blk,mean_tov\n", encoding="utf-8")
     return p
+
+
+# --- NBA game lines on Layer 2 (nba_game_projections.py, borrowed for this one call) ---------------------------------
+
+from tests.test_nba_layer2_projections import _game_row  # noqa: E402
+from syndicate.features.shared.nba_game_projections import attach_nba_game_projections, load_nba_game_projections  # noqa: E402
+
+GW = {"enabled": True, "space": "logit", "w": {"h2h:full": 0.0, "spreads:full": 0.0, "totals:full": 0.05, "default": 0.0}}
+
+
+def test_layer2_game_line_is_the_book_blend_and_off_is_the_sim(nba_root, monkeypatch):
+    """Real path: attach_nba_game_projections. The fixture's alt total 229.5 is P(over) 0.6 from the sim against a
+    -110/-110 fair 0.5; w(totals) 0.05 (alt -> its family) serves ~0.51, the kill switch serves 0.6."""
+    from syndicate.features.nba.sources import artifact_processed_root
+    from tests.test_nba_layer2_projections import D
+
+    (artifact_processed_root() / cal.GAME_BLEND_FILE).write_text(json.dumps(GW), encoding="utf-8")
+    monkeypatch.delenv(cal.GAME_BLEND_FLAG, raising=False)
+    on = _game_row("totals_alt", line=229.5)
+    attach_nba_game_projections([on], load_nba_game_projections(D))
+    monkeypatch.setenv(cal.GAME_BLEND_FLAG, "0")
+    off = _game_row("totals_alt", line=229.5)
+    attach_nba_game_projections([off], load_nba_game_projections(D))
+    p_on, p_off = on["projection"], off["projection"]
+    expect = 1 / (1 + math.exp(-0.05 * math.log(0.6 / 0.4)))
+    assert p_on["model_prob_over"] == pytest.approx(round(expect, 4), abs=1e-4) and p_on["book_blend"] == "applied"
+    assert p_on["book_blend_w"] == 0.05 and p_on["p_model_raw"] == pytest.approx(0.6)
+    assert abs(p_on["edge_vs_market_pct"]) < 1.5
+    assert p_off["model_prob_over"] == pytest.approx(0.6) and p_off["edge_vs_market_pct"] == pytest.approx(10.0)
+
+
+def test_game_blend_weight_lookup_and_fallbacks(tmp_path):
+    (tmp_path / cal.GAME_BLEND_FILE).write_text(json.dumps({"enabled": True, "w": {"spreads:full": 0.0}}), encoding="utf-8")
+    p, m = cal.served_game_probability(0.57, 0.415, "spreads", "full", processed_root=tmp_path, env={})
+    assert p == pytest.approx(0.415) and m["book_blend"] == "applied"
+    p, m = cal.served_game_probability(0.57, 0.415, "spreads_alt", "full", processed_root=tmp_path, env={})
+    assert p == pytest.approx(0.415)  # alt line -> its family's weight
+    p, m = cal.served_game_probability(0.57, 0.415, "spreads", "h1", processed_root=tmp_path, env={})
+    assert p == 0.57 and m["book_blend"] == "no weight for spreads:h1"
+    p, m = cal.served_game_probability(0.57, None, "spreads", "full", processed_root=tmp_path, env={})
+    assert p == 0.57 and m["book_blend"] == "no two-sided book price for this line"

@@ -506,16 +506,17 @@ def _book_blend_cached(path_s: str, mtime_ns: int, size: int) -> Tuple[Optional[
     return out, "ok"
 
 
-def book_blend_weights(processed_root: Optional[Path] = None, env: Optional[Mapping[str, str]] = None) -> Tuple[Optional[Dict[str, float]], str]:
-    """The active per-stat weights, or (None, reason). Resolves the NBA processed root when none is given."""
-    raw = str((env if env is not None else os.environ).get(BOOK_BLEND_FLAG) or "").strip().lower()
+def book_blend_weights(processed_root: Optional[Path] = None, env: Optional[Mapping[str, str]] = None, *,
+                       filename: str = BOOK_BLEND_FILE, flag: str = BOOK_BLEND_FLAG) -> Tuple[Optional[Dict[str, float]], str]:
+    """The active per-key weights, or (None, reason). Resolves the NBA processed root when none is given."""
+    raw = str((env if env is not None else os.environ).get(flag) or "").strip().lower()
     if raw in {"0", "false", "no", "off"}:
-        return None, f"{BOOK_BLEND_FLAG} off"
+        return None, f"{flag} off"
     try:
         if processed_root is None:
             from syndicate.features.nba.sources import artifact_processed_root
             processed_root = artifact_processed_root()
-        path = Path(processed_root) / BOOK_BLEND_FILE
+        path = Path(processed_root) / filename
         if not path.is_file():
             return None, "book-blend file absent"
         st = path.stat()
@@ -550,3 +551,46 @@ def served_prop_probability(p_model: Optional[float], p_book: Optional[float], s
     except Exception as exc:  # noqa: BLE001 -- serving must survive this
         meta["book_blend"] = f"failed: {type(exc).__name__}"
         return p_model, meta
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# NBA GAME LINES: the same blend, its own file (user decision 2026-10-05, "Blend to market, build it").
+#
+# Layer 2 priced NBA game lines from the raw smart-sim score histogram, which is not market-anchored. Measured on the
+# 2025-26 regular season the raw sim's OOS weight vs the line is 0.00 (margin) / 0.05 (total); in preseason the sim is
+# 4-6 pts more lopsided than the market and its totals run high (findings "NBA season phase"). Keys are
+# "<market>:<segment>" ("spreads:full"), then "<market>", then "default"; a missing key -> the model WITH a reason.
+# ---------------------------------------------------------------------------------------------------------------------
+GAME_BLEND_FILE = "nba_game_book_blend.json"
+GAME_BLEND_FLAG = "SYNDICATE_NBA_GAME_BOOK_BLEND"
+
+
+def served_game_probability(p_model: Optional[float], p_fair: Optional[float], market: str, segment: str = "full", *,
+                            processed_root: Optional[Path] = None, env: Optional[Mapping[str, str]] = None
+                            ) -> Tuple[Optional[float], Dict[str, Any]]:
+    """The probability to SERVE for one NBA game line (the same side `_attach_sim_probability_edge` prices), plus a
+    stamp. Never raises."""
+    meta: Dict[str, Any] = {"p_model_raw": None if p_model is None else round(float(p_model), 4)}
+    try:
+        if p_model is None:
+            return None, meta
+        weights, reason = book_blend_weights(processed_root, env, filename=GAME_BLEND_FILE, flag=GAME_BLEND_FLAG)
+        if weights is None:
+            meta["book_blend"] = reason
+            return p_model, meta
+        m, seg = str(market or "").strip().lower(), str(segment or "full").strip().lower()
+        fam = m[:-4] if m.endswith("_alt") else m
+        w = next((weights[k] for k in (f"{m}:{seg}", f"{fam}:{seg}", m, fam, "default") if k in weights), None)
+        if w is None:
+            meta["book_blend"] = f"no weight for {m}:{seg}"
+            return p_model, meta
+        if p_fair is None or not (0.0 < float(p_fair) < 1.0):
+            meta["book_blend"] = "no two-sided book price for this line"
+            return p_model, meta
+        p = blend_with_book(float(p_model), float(p_fair), w)
+        meta.update(book_blend="applied", book_blend_w=w, p_book=round(float(p_fair), 4))
+        return p, meta
+    except Exception as exc:  # noqa: BLE001 -- serving must survive this
+        meta["book_blend"] = f"failed: {type(exc).__name__}"
+        return p_model, meta
+

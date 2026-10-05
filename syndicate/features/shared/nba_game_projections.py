@@ -47,6 +47,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from syndicate.features.shared.nba_prop_calibration import served_game_probability
 from syndicate.features.shared.probability_refusal import refuse_published_certainty
 from syndicate.features.shared.prop_projections import _no_vig_over_probability
 from syndicate.features.shared.team_aliases import teams_match
@@ -288,6 +289,12 @@ def _project_row(row: Mapping[str, Any], market: str, segment: str, entry: NbaGa
             projection.pop("edge_unavailable_reason", None)
             projection.pop("market_fair_prob_over", None)
         if prob is not None:
+            # NBA game-line book blend (lane nba-prop-calibration, user decision 2026-10-05): the raw sim histogram
+            # carries no OOS information beyond the line (w 0.00 margin / 0.05 total, 2025-26) and runs far off the
+            # market in preseason, so the served probability is the per-line logit blend toward the SAME de-vigged
+            # fair the edge is computed against. Raw sim p + weight ride along; falls back to the sim WITH a reason.
+            prob, blend_meta = served_game_probability(prob, _no_vig_over_probability(row), market, segment)
+            projection.update(blend_meta)
             _attach_sim_probability_edge(projection, row=row, model_prob=prob)
         return projection, None
     if segment != "full":
