@@ -465,7 +465,7 @@ once this index exists: re-splitting would orphan the parts.
 | [wnba-game-lines-gradeable] | WNBA GAME LINES CAN BE GRADED — a player box gives the team score, and always could `[verified 2026-08-28, lan | `state_basketball.md` |
 | [espn-egress-and-wnba-boxscores] | ESPN SERVES RENDER FROM ONE OF TWO HOSTS, and the WNBA boxscore had no producer `[verified 2026-08-26, lane ka | `state_basketball.md` |
 | [wnba] | WNBA | `state_basketball.md` |
-| [wnba-props-model-skill] | WNBA PROPS: NO MARKET BEATS THE BOOK; EXCLUSIONS + RATE SHRINK LIVE ON THE FLEET; SHAPE | `state_basketball.md` |
+| [wnba-props-model-skill] | WNBA PROPS: NO MARKET BEATS THE BOOK; ALL FOUR ESTIMATORS + INJURY EXCLUSIONS LIVE ON | `state_basketball.md` |
 | [wnba-game-state] | WNBA GAME-STATE AND FIXTURE COVERAGE — 2026-08-17 (lane `wnba-live-tier`) — **ARCHIVED 2026-08-19 to `state_ar | `state_basketball.md` |
 | [wnba-fixture-identity] | WNBA fixture identity + the sweep ownership gap - VERIFIED 2026-08-17 — **ARCHIVED 2026-08-19 to `state_archiv | `state_basketball.md` |
 | [wnba-sweep-ownership-gate] | WNBA SWEEP OWNERSHIP GATE + PHASE 2 AUTORUN `[collapsed 2026-08-18 from three 2026-08-17/18 snapshots; newest  | `state_basketball.md` |

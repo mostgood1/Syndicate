@@ -972,7 +972,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Prop calibration reaches the sims.** The fleet has the stale-sim rule (468b8620, via ff 4345ba0d). The 10-05 sims were re-simulated with `nba_prop_calibration.factor_sha` 82ba04dd2dbd41f5 (prior-season fallback); Embiid pts 21.08 -> 24.87, sd 6.91 -> 8.86. Switch: env flag unset on both workers, the factor file decides.
 - **Edge shape to watch:** totals 5/5 favoured the OVER on 10-04 (2 games). The sim's prop means run low (minutes bias; Markkanen 9.8 pts on 10-04), which predicts an UNDER pile on props.
 
-## [wnba-props-model-skill] WNBA PROPS: NO MARKET BEATS THE BOOK; INJURY + AVAILABILITY EXCLUSIONS AND THE RATE SHRINK ARE LIVE ON THE FLEET; SHAPE + DISPERSION HELD `[verified 2026-10-05, lanes wnba-lines-props-backtest / basketball-injury-exclusion-reinclusion / wnba-book-information / wnba-sim-availability / wnba-sim-rate-shrink / wnba-minutes-redistribution]`
+## [wnba-props-model-skill] WNBA PROPS: NO MARKET BEATS THE BOOK; ALL FOUR ESTIMATORS (AVAILABILITY, RATE SHRINK, SHAPE, DISPERSION) + INJURY EXCLUSIONS ARE LIVE ON THE FLEET `[verified 2026-10-05, lanes wnba-lines-props-backtest / basketball-injury-exclusion-reinclusion / wnba-book-information / wnba-sim-availability / wnba-sim-rate-shrink / wnba-minutes-redistribution]`
 
 - **Production, verified:** SmartSim injury exclusions reach the pool. Fixes `ff4ca730` (re-admit only on a truthy
   `playing_today`) + `500a5643` (re-key each excluded name to the single team props_df places it on). Fleet reading 2,
@@ -994,7 +994,10 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   10-07 pools (was 2: Ny'Ceara Pryor 22.9 min, Ta'Niya Latson 6.7).
   NBA (read 2026-10-05): filter stage verified on production data (ATL 10-05 roster: old handoff drops none, new
   drops N'Faly Dante); no NBA sim yet has had a punctuated exclusion that would otherwise make the pool.
-- **Held (flags OFF, user decision owed):** `SYNDICATE_WNBA_PROP_SHAPE`, `SYNDICATE_WNBA_PROP_DISPERSION`.
+- **Live since 2026-10-05 19:08:40Z (FILE SWITCH):** prop shape (`wnba_prop_shape.json`, reb/ast/threes NB at league
+  dispersion) and dispersion (`wnba_prop_dispersion.json`, k on pts + 4 combos ONLY -- reb/ast/threes deliberately left
+  out so the NB is not widened twice). Verified on the rebuilt 10-07 sims: shape 3 ladders/player, dispersion 5.
   `SYNDICATE_WNBA_SIM_MINUTES_REDISTRIBUTION` is refuted (lane closed), never hooked.
+- **First real games with all four on:** 2026-10-07 (ATL-NYL 23:30Z, GSV-LVA 01:30Z 10-08). Not yet graded.
 - **Known risk:** the availability rule was measured before the injury feed worked; a player returning after one missed
   game is left out for that game (~3.6% of player-games, held-out 10-03).
