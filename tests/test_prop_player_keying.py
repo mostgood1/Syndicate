@@ -216,6 +216,30 @@ def test_only_the_newest_capture_per_league_is_read(capture, monkeypatch):
     assert out.quotes[0].american == 230, "read the stale capture instead of the fresh one"
 
 
+def test_a_future_named_file_written_earlier_loses_to_the_fresher_capture(capture, monkeypatch):
+    """Lane `layer2-stale-quote-sample`, 2026-10-04: soccer look-ahead runs write
+    FUTURE-dated files hours in advance. Measured on the fleet: EPL `2026-10-06.csv`
+    (18.5 h old) beat `2026-10-04.csv` (46 min) on stem order, and ~940 soccer prop
+    rows were priced from it and hidden as stale."""
+    import os
+    import time
+
+    root = capture([_row("Abdallah Sima", "player_goal_scorer_anytime", over="230")], stem="2026-08-27")
+    d = root / "ligue_1" / "props"
+    with (d / "2026-08-29.csv").open("w", encoding="utf-8", newline="") as h:
+        w = csv.writer(h)
+        w.writerow(HEADER)
+        w.writerow(_row("Abdallah Sima", "player_goal_scorer_anytime", over="100"))
+    now = time.time()
+    os.utime(d / "2026-08-29.csv", (now - 18 * 3600, now - 18 * 3600))   # look-ahead file, written long ago
+    os.utime(d / "2026-08-27.csv", (now - 600, now - 600))               # fresh capture
+
+    out = oddsapi_props_outcome("soccer", "2026-08-27")
+
+    assert len(out.quotes) == 1
+    assert out.quotes[0].american == 230, "read the 18 h look-ahead file instead of the fresh capture"
+
+
 def test_a_row_with_no_price_is_counted_not_published(capture):
     capture([_row("Abdallah Sima", "player_goal_scorer_anytime", over="")])
 

@@ -1705,14 +1705,20 @@ def _soccer_prop_files(selected_date: str) -> list[Path]:
 
     from syndicate.features.soccer.sources import _source_roots as _soccer_roots
 
-    # ORDERED BY THE FILE'S OWN CAPTURE DATE FIRST, mtime only as a tie-break.
-    # The stem IS the day the sweep ran, and it is the more trustworthy signal:
-    # `_fetched_at` in this module already documents that "an artifact
-    # republished unchanged gets a new mtime while its contents are hours old",
-    # and the artifact-pull sweep touches files exactly that way. Ordering on
-    # mtime alone also loses outright when two files land in the same
-    # filesystem tick -- which is how a test caught this picking the STALE
-    # capture over the fresh one.
+    # ORDERED BY WHEN THE FILE WAS WRITTEN, the stem only as a tie-break
+    # (cross-lane write, lane `layer2-stale-quote-sample`, 2026-10-04, user-
+    # approved). The stem is the date the RUN was for, not when it ran: soccer's
+    # look-ahead runs write FUTURE-dated files hours in advance. Measured on the
+    # fleet 2026-10-05 01:37Z: EPL `2026-10-06.csv` written 10-04 07:09Z (18.5 h
+    # old) beside `2026-10-04.csv` written 10-05 00:51Z (46 min) -- the same
+    # fixtures -- and stem-first read the 18.5 h file for every league, so all
+    # soccer props were priced from it and the 1h gate hid ~940 of them as stale
+    # (`rows_stale_quote_sample`: first/last goalscorer, seen age 66,425 s).
+    #
+    # The concern stem-first answered was an artifact-PULL sweep republishing an
+    # unchanged file with a new mtime; on the local fleet all three roles share
+    # one disk and nothing republishes these. A same-tick tie still falls to the
+    # later stem, which is what the test that caught the original defect needs.
     newest_by_league: dict[str, tuple[str, float, Path]] = {}
     for root in _soccer_roots():
         try:
@@ -1728,7 +1734,7 @@ def _soccer_prop_files(selected_date: str) -> list[Path]:
             except OSError:
                 continue
             held = newest_by_league.get(league)
-            if held is None or (path.stem, mtime) > (held[0], held[1]):
+            if held is None or (mtime, path.stem) > (held[1], held[0]):
                 newest_by_league[league] = (path.stem, mtime, path)
     return [entry[2] for entry in sorted(newest_by_league.values(), key=lambda e: e[2].as_posix())]
 
