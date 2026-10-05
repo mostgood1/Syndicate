@@ -46603,3 +46603,30 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - **The gap also carried** another session's `f16991cb` (NBA game-line blend phase keying: `nba_game_projections.py`, `nba_prop_calibration.py`) onto disk. It was not in deploys.md at the ff. It loads wherever those modules next load.
 - **OWED** (next MLB sim run): stored starter `outs_mean` ~+0.1 above a no-fix replay of the same rosters.
 - **Residual.** BF-balance gap 0.42 > 0.20, so step 2 (pickoffs) is warranted. It needs its own pre-registered rule before any run.
+
+## 2026-10-05 23:31:48Z (6:31 PM CT) -- LOCAL FLEET FILE SWITCH: NBA GAME-LINE book blend file placed; NOT SERVING until the refresh-worker restarts (lane `nba-prop-calibration`)
+
+- what: `~/syndicate-prod/data/nba_source/data/processed/nba_game_book_blend.json`, placed by the NCAAF/watcher
+  session on the user's instruction ("place the NBA game book blend switch file"). No ff and no restart came with it.
+  It turns on the per-line logit blend of NBA game lines toward the de-vigged fair in Layer 2
+  (`nba_game_projections._project_row`).
+  - Weights: h2h 0, spreads 0, totals 0.05, periods 0; preseason (ESPN season.type 1) all 0.
+  - Unknown phase takes the smallest weight.
+- why: user, "Blend to market, build it" (this session), and the relayed "approve the NBA market blend fix".
+  Findings "NBA season phase" (b0b35e3c).
+- measured at 23:33:55Z:
+  - file: 736 B, sha256 1ca55075520a5142, identical to C:\tmp\nba_bt\nba_game_book_blend.json.
+  - fleet checkout: b6fd6189, which contains 9d60ef66 and f16991cb. Fleet code reads the file as 'ok'
+    (`preseason|default` 0.0 present).
+  - the running refresh-worker started 21:47:00Z, BEFORE both commits, so it runs the old code. NOT SERVING.
+- baseline (served board, ~22:05Z / 23:0xZ):
+  - ATL spread 5.5: model 0.570 vs fair 0.415, +15.5 pts.
+  - DET ML: 0.670 vs 0.551, +11.9 pts.
+  - Sim ML vs fair on 10-05/06: ATL +9.1, DET +10.7, PHI +7.2, CHA -6.9, UTA -13.9 pts (OKC unmatched).
+- expect: after the next refresh-worker restart onto >= f16991cb, every NBA game row carries `book_blend`,
+  `season_phase` = "preseason" (10-05/06 are season.type 1) and w 0, with model_prob_over = market_fair_prob_over and
+  edge_vs_market_pct ~0. The 10-05/06 ML rows serve fair (the deltas above go to 0).
+- verify: OWED. Watcher scratchpad/watch_game_blend.py polls /api/board/layer2-shortlist every 5 min and exits on the
+  first stamped NBA game row. The per-game before/after, with the phase each game was treated as, goes in a reading
+  entry here.
+- rollout: per this session's user decision ("File now, code on next restart"), no restart by me and no claims taken.
