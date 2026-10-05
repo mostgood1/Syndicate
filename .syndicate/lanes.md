@@ -1061,6 +1061,13 @@ death, never life — do not invert it.
   - 18:54:39Z `starting_goalies_2026-10-05`: 7/8 rows dailyfaceoff, exactly Daily Faceoff's 7 confirmed teams.
   - The props sim's starters = those goalies (SAVES 20.73-24.19; listed backups 0.00).
   - deploys.md 18:56Z.
+- **Consumer checks after the props lane's reply (2026-10-05 ~19:10Z, session local_d89f75a7):**
+  - The loader's exact-name match is safe: the overlay writes the lineup row's own `full_name`.
+  - Production features (`build_slate_features`, read-only on the fleet) have exactly ONE `is_starting_goalie` per team-game: 8/8 (10-05), 18/18 (10-06).
+  - `sim_starter` follows the confirmed starter: confirmed goalies 1, listed backups (PIT Silovs, WPG Skinner) 0. So `prop_projections` REFUSE_NOT_STARTER flips with it.
+  - No SAVES book lines quoted for 10-05/10-06 yet: served-board SAVES coverage is unchanged today. The first slate with SAVES lines is a reading still owed.
+  - Known and accepted (props lane): in-sim goalie TOI still follows proj_toi (engine.py:1869-1875), and SAVES are credited via the starter map (props_boxscore.py:375-384). No per-goalie save% exists, so team goals against do not move.
+  - `nhl_sim_input_checklist.py` takes no date, and on the fleet audits 2026-06 mirror dates: not usable as this gate; the direct count above is.
 - Blocked by: none
 
 ### soccer-scorer-race-grade — OPEN — opened 2026-10-05 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
