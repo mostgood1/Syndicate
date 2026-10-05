@@ -46630,3 +46630,20 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
   first stamped NBA game row. The per-game before/after, with the phase each game was treated as, goes in a reading
   entry here.
 - rollout: per this session's user decision ("File now, code on next restart"), no restart by me and no claims taken.
+
+## 2026-10-05 23:06Z-23:47Z (6:06-6:47 PM CT) -- LOCAL FLEET: ff fe0dc508 -> d2ecd036, web HUP, gated refresh-worker restart (HEAD then b6fd6189): NHL SAVES registered in measured_market_skill -- **MET on production** (lane `nhl-saves-skill-registry`, user: "register NHL saves in the board's skill registry")
+
+- **What:** `("nhl", "saves", "full", pregame)` -> VERDICT_LOSES, Brier +0.0274 [+0.0162, +0.0388], 881 lines / 435 games. Measured vs OddsAPI historical player_total_saves closes (4,490 credits, user-approved). skill_reliability 0.68: ranks lower, never removed.
+- **How:**
+  - Claims web + refresh-worker as nhl-saves-skill-registry. ff `fe0dc508 -> d2ecd036` 23:06:35Z.
+  - Ride-along `9d60ef66` (NBA game-line book blend) is inert: no `nba_game_book_blend.json` on the fleet.
+  - Web master 1112818 HUP 23:06:43Z, /healthz 200 23:06:52Z (workers 1405494/1405495).
+  - The NHL book grid is a refresh-worker ARTIFACT (`enriched: from_artifact`), so the HUP changed nothing: the 23:07:53Z rebuild still read `unmeasured`, i.e. refresh-worker's long-lived process held the old module.
+  - Gated restart: `check_deploy_safety` NOT CLEAR polls 1-74 (live-odds-worker odds child jobs), CLEAR poll 75 -> TERM refresh-worker 1391497 23:46:37Z -> new pid 1413004 23:46:46Z, /healthz 200.
+- **Carried by that restart (other lanes' code, already on the fleet disk from their ffs 23:10:15Z / 23:23:48Z):**
+  - `f16991cb` NBA game-line blend season-phase keying (`nba_game_projections.py`, `nba_prop_calibration.py`; still gated by the blend file).
+  - `5fdd5139` MLB hitter-prop calibration re-fit (`tuning/hitter_props_calibration/default.json`).
+  - `b6fd6189` MLB sim caught-stealing outs (`vendor/mlb_bettingv2/sim_engine/simulate.py`).
+  - Their lanes own those readings; noted here because this restart is what loaded them into refresh-worker.
+- **Reading:** `book_grid_2026-10-05.json` rebuilt 23:47:15Z: **10/10 NHL SAVES rows** read model_skill `status: measured`, `verdict_class: loses_to_market`, `established_loss_rel 0.0647`, `sample_games 435`. Before: 11/11 `unmeasured` (23:05:47Z and 23:07:53Z builds).
+- Claims released after this entry.
