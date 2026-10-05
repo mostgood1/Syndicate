@@ -46265,3 +46265,8 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - expect: the first generation after the ff writes lineups with proj_ev_toi on every slotted skater, and the checklist then PASSES.
 - offline evidence: full 2025-26 season, 36,533 regular-season player-games, Brier SOG@3.5 -0.00019 [-0.00038, -0.00001], all other markets better or flat (BLOCKS +0.00019 n.s.); playoffs SOG@1.5 -0.0017, POINTS@0.5 -0.0018.
 - verify: watcher /mnt/c/tmp/nhlprops/ev_watch.sh (cutoff 16:17:30Z UTC).
+
+## 2026-10-05 16:44Z (11:44 AM CT) -- READING for the 16:17Z ff (de074a80, EV rotation + line quality 0.5) -- **MET** (lane `nhl-ev-rotation-fullseason`)
+
+- reading 1: lineups_2026-10-05.csv rewritten 16:42:50Z (first after the ff): 144 slotted skaters, 144 with proj_ev_toi.
+- reading 2: `nhl_sim_input_checklist.py` on fleet data (fleet code) -- PASS; proj_ev_toi 16.0% "consumed, thinly populated" because the checklist pools every dated lineup file and only this one postdates the change (was FAIL 0% before the generation).
