@@ -904,6 +904,12 @@ death, never life — do not invert it.
     - GUARD: Nov+, the only period production enables (date gate Nov 1). No line's CI entirely > 0 across 11 lines; P(>=1 false fail | true null) ~ 1 - 0.975^11 ~ 0.24.
     - October is reported, not gating: production keeps October at the prior by date.
   - Action if H18 fails: recommend the user switch off the Nov 1 enable (env `SYNDICATE_NHL_INSEASON_SEASON_INPUTS=off`, or flip the code default) before Nov 1.
+- **H18 RESULT 2026-10-05 ~19:30Z: MET -- the shipped config's gain HOLDS on the current engine.** (floor10noblk - prior, `C:/tmp/nhllines/props_ab_v2`, 56 dates / 449 games, 112/112 runs, 0 failures)
+  - Reachability: `proj_ev_toi` present on 100% of dressed skaters (e.g. 833/833 on 10-11); 97% of lambdas differ from the pre-c29e1271/de074a80 run on the same dates. The run exercised the new engine.
+  - PRIMARY: SOG@1.5 **-0.00309 [-0.00420, -0.00200]**, POINTS@0.5 **-0.00124 [-0.00192, -0.00050]**; neither worse.
+  - GUARD (Nov+, 11 lines): none worse; better SOG@1.5 -0.00373, SOG@2.5 -0.00148, POINTS@0.5 -0.00146, POINTS@1.5 -0.00052, SAVES@28.5 -0.01062.
+  - October, reported only (production keeps it at the prior by date): SOG@3.5 +0.00020 [+0.00001, +0.00051], the one boundary cell.
+  - No action: the Nov 1 enable stands.
 - Blocked by: none
 ### nfl-live-segment-interval — CLOSED 2026-10-05 — opened 2026-10-03 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
 - **VERDICT 2026-10-05 14:55Z:** Goal (verbatim): NFL in-play quarter/half segment lines refresh every 10 min (code default, like NCAAF 8730cfb7) instead of every 150 s lines-autorun run, before the Sunday 2026-10-04 17:00Z window; NFL full-game lines unchanged; 0 NFL rows served >1h -- **GOAL: MET.** Live on the fleet before kickoff (every sampled HEAD contained e90d74a5); NFL live-window spend 2,825/h (early) and 2,767/h (late) vs ~8.6k/h estimated unthrottled (no measured unthrottled baseline). NFL rows >1h: 0 in the hidden-row split readings that day (stale nfl 3-30, none served). deploys.md 2026-10-05 14:55Z.
