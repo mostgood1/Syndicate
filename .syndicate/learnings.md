@@ -2986,3 +2986,8 @@ own prior verdicts, not by anything failing.
   - Judge a scheduled task by `list_task_runs` totalRuns plus its artifact, never by fireAt or lastRunAt.
   - **A missed one-time task with side effects is a LIVE HAZARD.** Its late fire runs in daylight, outside the window the user approved. After a miss, disable it or re-scope it with the user. Never assume it expired. This is especially true of a restart task, which can kill an in-flight sim.
   - Prefer a daytime or attended slot for anything with a production side effect. An overnight task should be read-only and idempotent.
+
+## 2026-10-05 — RULE: a paid fetch loop must probe one call first and stop on consecutive failures; env precedence can silently pick a dead key `[lane nhl-lines-backtest, session 9ed26377]`
+
+- What happened: the NHL 3-way backfill's key resolver reads `os.environ` before `.env`. The session shell exports an `ODDS_API_KEY` that is DEACTIVATED (401 `DEACTIVATED_KEY`); the `.env` key works. The first run only worked because a failed key extraction left the override empty and it fell through to `.env`. The restart used the exported key: every call 401'd, the loop (which skipped failures) cached nothing and printed nothing, and it read as a stall for minutes.
+- Rule: before spending, probe ONE call and print status + `x-requests-last` only; make the loop raise after N consecutive failures (be62ddad does 5); name which key source won (env vs `.env`) without printing it.
