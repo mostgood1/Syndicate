@@ -3019,3 +3019,9 @@ own prior verdicts, not by anything failing.
 - **Belief overturned:** raising the elite tier from 0.66x to 0.91x of real assists would improve the ASSISTS@0.5 line. It made it WORSE (+0.00095, CI excludes 0) while every tier mean got closer. Amplifying a noisy per-player signal fixes the bucket averages and spreads noise across the bulk of players; the line Brier is what pays for it. The milder weighting (0.78x) was flat on assists and better on points, and shipped.
 - **Rule:** gate an attribution change on paired per-player Brier at the lines, never on tier calibration alone; report both.
 - **Also measured:** sequential primary/secondary sampling from four teammates compresses weight ratios -- real-share weights at power 1 barely moved the elite (0.63x -> 0.65x). Decompose a count into rate x share against real data (shift charts) before changing the attribution.
+
+## 2026-10-05 — RULE: `nhl_sim_input_checklist.py` audits the git mirror unless `SYNDICATE_ARTIFACT_ROOT_NHL` points at the prod disk; read its `dates` line before trusting PASS or FAIL `[lane nhl-confirmed-goalies, session 9ed26377]`
+
+- What happened: run on the fleet with `SYNDICATE_DATA_ROOT` set (which it does not read), it fell back to `nhl_source_root()` = the repo's June mirror. It printed `dates 8 (2026-06-02..2026-06-14)` and a wall of FAILs, and I wrote it off as "not usable as this gate".
+- With `SYNDICATE_ARTIFACT_ROOT_NHL=/home/amyn/syndicate-prod/data/nhl_source` it audits the live dates (09-30..10-08) and PASSes, incl. is_starting_goalie exactly one per team per game. Corrected by the props lane's session.
+- Rule: the `dates` line is the substrate. If it is not the slate you mean, the verdict is about a different system.
