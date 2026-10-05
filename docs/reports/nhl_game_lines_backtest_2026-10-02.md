@@ -206,3 +206,15 @@ py -3 scripts/backtest_nhl_game_lines.py sim --quote-log C:/tmp/nhllines/capture
 py -3 scripts/backtest_nhl_game_lines.py score --report <md>
 ```
 The roots come from `scripts/backtest_nhl_props.py` (lane `nhl-player-props-projection`), on origin/main as of `9a7f0d2f`.
+
+## Regulation 3-way vs book (2026-10-05; user: "pull the 3-way odds backfill")
+
+- **Pull:** `backtest_nhl_game_lines.py odds3way`, OddsAPI historical per-event `h2h_3_way` at the same snapshot as the other closes (3 min before start). 1,410/1,410 games (regular, playoffs, 2026-27 regular), 13,980 + ~130 credits; header remaining 4,403,965 afterwards. Proportional 3-way de-vig per book, mean over books quoting all three (5.4 books/game regular season).
+- **Model:** production form -- the stored as-of `predict_game` lambdas through production's own calibrated game-market sim (`NHL_GAME_MARKET_CALIBRATION`, `game_seed`, 20k sims). Script: `scripts/nhl_game_lines_3way_vs_book.py`.
+- **2025-26 regular, n=1,132 games / 143 dates** (the sim roots start 11-01; 180 October games have no model row):
+  - production - book: Brier3 **+0.0014 [-0.0043, +0.0069]**, LL3 +0.0017 [-0.0066, +0.0093] -- **parity**. Per outcome, home +0.0015, tie -0.0005, away +0.0004; every CI spans 0.
+  - the pre-2026-10-03 legacy sim - book: Brier3 **+0.0120 [+0.0050, +0.0182]** (worse), LL3 +0.0260 [+0.0137, +0.0372], driven by the tie (+0.0069 [+0.0040, +0.0098]). The shipped sim fixes (7865b26e) closed this gap.
+  - Tie rate: actual 0.246, book 0.223, production 0.257, legacy 0.160. The book prices the 60-minute tie below its realised rate, but no Brier difference on the tie (-0.0005 [-0.0023, +0.0012]): not an edge.
+- **Playoffs, n=82** (below min-n 100, no verdict): production - book Brier3 -0.0104 [-0.0274, +0.0061].
+- **2026-27 regular, n=16:** no verdict.
+- **Period lines:** P1 markets came back on 1 of 5 probed events (opening night only); not priced at scale in the historical archive, so not pulled.
