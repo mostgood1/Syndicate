@@ -1125,15 +1125,11 @@ death, never life — do not invert it.
 - Verification: unit tests incl. reachability (pub join off != on; overlay validates only under the bar); then the first cron run's published optimizer artifact read back via /api/ops/artifacts/stream with per-sport graded counts; consumer wiring (layer2_board.py / portfolio_commit.py, held by stop-market-withholding) is PHASE 2, coordinated, not in this lane's Files
 - Blocked by: none
 
-### nhl-scratch-dilution — OPEN — opened 2026-10-05 — session 5704bbd4-3c4f-4d88-9549-fa59e24ab70a
-- **GOAL: NOT MET (shipped, fleet verify owed).** Projected NHL lineups stop dressing skaters who will not play: slotted-but-did-not-play falls well below the 10.4% measured on 2025-26, without making any prop line's Brier worse. -- Reading (offline): slotted-DNP 10.4% -> 6.0% (bar ~6%: borderline), played-and-projected +4.8%, common-set Brier flat on every line. cb1bb280 ff 21:16:36Z; the first fleet rebuild must leave only book-listed skaters absent from their team's last game (baseline 12/144, 26/324).
+### nhl-scratch-dilution — CLOSED — opened 2026-10-05 — closed 2026-10-05 — session 5704bbd4-3c4f-4d88-9549-fa59e24ab70a
 - Goal: Projected NHL lineups stop dressing skaters who will not play: slotted-but-did-not-play falls well below the 10.4% measured on 2025-26, without making any prop line's Brier worse.
-- Files: syndicate/features/nhl/sim_engine/hockeysim/ingestion/lineups.py, tests/test_hockeysim_ingestion.py
-- Hypothesis: MEASURED 2026-10-05 (full 2025-26 backtest lineups, 40,752 slotted skater-games): 10.4% did not play. A slotted skater who missed the team's previous game sat 63.4% of the time (76-87% after 2-4 misses) and those are 60% of all non-players; one who played it sat 4.6%. infer_lines dresses by TOTAL TOI over 8 games, so an injured regular keeps his slot. Fix: dress players who played the team's most recent game first (book-listed still first of all).
-- Falsification test: Refuted if slotted-DNP does not fall below ~6%, or if paired full-season Brier is worse on any prop line vs production (bt_as_p15s2).
-- Verification: Paired full-season backtest vs production: DNP rate + every line's Brier; then the fleet lineups use the rule (a player absent from the last game is unslotted when a replacement played it).
+- **GOAL: MET.** Reading: full 2025-26 paired backtest slotted-but-did-not-play 10.4% -> 6.0%, played-and-projected player-games +4.8% (36,533 -> 38,287), Brier flat on every line (none worse). Fleet (cb1bb280, ff 21:16:36Z): slotted absentees from the team's last game 12/144 -> 1/144 (10-05) and 26/324 -> 3/324 (10-06), every survivor the unfillable 12th-F slot of an 11F+7D last game (deploys.md 21:32Z, 22:02Z). Full history in lanes_history.md.
+- Files: (none -- released at close)
 - Blocked by: none
-
 ### mlb-strikeout-bias — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
 - **JOINT RE-FIT STAGE PICKS, 2026-10-06 ~03:00Z, TUNE only, holdout not yet read.**
   - **Stage 1:** `early_count_foul_boost` 2.05 -> **1.5**. Starter K/BF 0.2295 vs 0.2280 actual (|d| 0.0015 vs 0.0257 at 2.05). `k_rate_mult` 0.85 barely moved K (0.2509), confirming the ledger.

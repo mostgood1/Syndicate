@@ -36737,3 +36737,15 @@ OUTSTANDING and every claim-bearing line. These are the 2 historical lines.
 - **LINEMATE-AWARE (FITTED PLACKETT-LUCE) STRENGTHS REFUTED (2026-10-05).** Data: every 2024-25 + 2025-26 game (2,792; NHL shift charts + play-by-play), 16,616 goals with on-ice skaters (100% kept, 1.707 assists/goal). Out-of-sample (train before 2026-01-01, test 2025-26 after; 7,792 assist choices, mean loglik/choice): uniform -1.2450, PRODUCTION share weights -1.2019, fit shrunk to position mean -1.2003 at best (ridge 8), fit shrunk to PRODUCTION weights -1.2022..-1.2077 (worse than production at every ridge, converging to it). 15-slate prototype with the position-prior fit: elite 0.73x -> 0.69x (WORSE). Read: per-player linemate corrections learned from goals do not generalise; production's share weights sit at about the frontier of what one-and-a-half seasons of goal data can teach about who assists. Reverted, never committed. Trap hit: Windows open() defaults to cp1252 -- 1,340 of 2,792 pbp files failed to parse silently until read as utf-8.
 - Blocked by: none
 
+
+## nhl-scratch-dilution -- full block as of close, 2026-10-05 (moved verbatim)
+
+### nhl-scratch-dilution — OPEN — opened 2026-10-05 — session 5704bbd4-3c4f-4d88-9549-fa59e24ab70a
+- **GOAL: NOT MET (shipped, fleet verify owed).** Projected NHL lineups stop dressing skaters who will not play: slotted-but-did-not-play falls well below the 10.4% measured on 2025-26, without making any prop line's Brier worse. -- Reading (offline): slotted-DNP 10.4% -> 6.0% (bar ~6%: borderline), played-and-projected +4.8%, common-set Brier flat on every line. cb1bb280 ff 21:16:36Z; the first fleet rebuild must leave only book-listed skaters absent from their team's last game (baseline 12/144, 26/324).
+- Goal: Projected NHL lineups stop dressing skaters who will not play: slotted-but-did-not-play falls well below the 10.4% measured on 2025-26, without making any prop line's Brier worse.
+- Files: syndicate/features/nhl/sim_engine/hockeysim/ingestion/lineups.py, tests/test_hockeysim_ingestion.py
+- Hypothesis: MEASURED 2026-10-05 (full 2025-26 backtest lineups, 40,752 slotted skater-games): 10.4% did not play. A slotted skater who missed the team's previous game sat 63.4% of the time (76-87% after 2-4 misses) and those are 60% of all non-players; one who played it sat 4.6%. infer_lines dresses by TOTAL TOI over 8 games, so an injured regular keeps his slot. Fix: dress players who played the team's most recent game first (book-listed still first of all).
+- Falsification test: Refuted if slotted-DNP does not fall below ~6%, or if paired full-season Brier is worse on any prop line vs production (bt_as_p15s2).
+- Verification: Paired full-season backtest vs production: DNP rate + every line's Brier; then the fleet lineups use the rule (a player absent from the last game is unslotted when a replacement played it).
+- Blocked by: none
+

@@ -46553,3 +46553,8 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - **Staking (part B) -- MET.** Baseline: `PORTFOLIO_COMMIT ... sim_share=0.0` on 39 of 39 builds today. First run on new code 21:58:08Z: `positions=20 staked=$111.2 sim_share=0.4285`. Execution `SYNDICATE_EXECUTION_MODE=paper`, `SYNDICATE_EXECUTION_LIVE_ARMED=0` on all three roles, so the `LIVE_PLAN_WRITTEN venue=polymarket positions=3 staked=$23.03` is a plan only; nothing places it.
 - **NFL props trigger -- the rebuild part is MET.** `21:53:57Z NFL_PROP_PROJECTION_LAUNCHING season=2026 week=4 reason=odds_newer odds_lead_seconds=57897 overriding[artifact_fresh ...]`. The artifact went from 125 rows / 2 games (05:30Z) to 469 rows / 14 games (21:54:04Z). The served-board half is OWED: the 21:54:52Z build started before the rebuild (77/398 NFL props projected, 2 games).
 - **NFL live h2h (part A, publish switch deleted) -- OWED** until MNF (~00:15Z).
+
+## 2026-10-05 22:02Z (5:02 PM CT) -- READING 2 for the 21:16:36Z ff (cb1bb280, NHL last-game dressing rule) -- **MET** (lane `nhl-scratch-dilution`)
+
+- reading: lineups_2026-10-06.csv rebuilt 21:32:54Z (first after the ff): slotted skaters absent from their team's last game 26 of 324 -> 3 of 324.
+- all three are the unfillable 12th-forward slot: DET Kasper (last game 2026020035, 11 F + 7 D, not book-listed), LAK Helenius (2026020034, 11 F + 7 D, not listed), NSH Schaefer (2026020030, 11 F + 7 D, also book-listed). With reading 1 (10-05: 12 -> 1, same cause): 38 -> 4 across both slates, every survivor explained by the rule.
