@@ -46289,3 +46289,15 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
   - The first post-ff generation writes `team_xg_scoreadj_2026-2027.csv` (32 teams), then rewrites predictions.
   - Production's `p_home_ml_raw` equals a read-only re-run WITH the adjusted file, and differs from one WITHOUT it.
 - **Reading OWED:** watcher on the fleet (scoreadj mtime > ff, then a predictions rewrite >= it).
+
+## 2026-10-05 17:46Z (12:46 PM CT) -- MEASUREMENT: NHL score-adjusted team xG, game lines (7d23f09d, ff 17:35:49Z) -- **MET on production** (lane `nhl-game-lines-model`)
+
+- **Reading 1 (watcher, fleet):**
+  - `team_xg_scoreadj_2026-2027.csv` written by the first post-ff generation at **17:42:35Z**: 32 teams, same set as `team_xg_2026-2027.csv`, max relative difference 0.55% (mean 0.18%).
+  - `predictions_2026-10-05` rewritten 17:42:51Z and `predictions_2026-10-06` 17:44:19Z, both after it.
+- **Reading 2 (reachability):** the fleet's own producer re-run read-only into /tmp, on production's root vs a /tmp copy WITHOUT the adjusted file.
+  - Production's `p_home_ml_raw` equals the WITH run on **4/4** (10-05) and **9/9** (10-06), and the WITHOUT run on 0/4 and 0/9.
+  - Shift: mean 0.0011 / 0.0027, max 0.0016 / 0.0062.
+  - The first 10-06 read matched WITHOUT 9/9 because that file was last written 17:13:59Z, pre-ff. It was re-read after the 17:44:19Z rewrite.
+- **Not measured on production:** the props path. By construction it never calls `_apply_scoreadj_xg` (`test_reachability_on_differs_from_off` asserts goals_per_60 unchanged).
+- Claims released after this entry.
