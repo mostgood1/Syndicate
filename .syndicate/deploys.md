@@ -46331,3 +46331,20 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
   - The other book-listed goalies on two of those teams (PIT Silovs, WPG Skinner) are 0.00.
 - **Not readable:** the module's NHL_CONFIRMED_GOALIES status line (changed_starter count). The NHL runner captures its child's stdout, so it never reaches the fleet logs. Whether Murashov / Stevenson were changes from the projection is not read.
 - Claims released after this entry.
+
+
+## 2026-10-05 19:08:40Z (2:08 PM CT) -- LOCAL FLEET FILE SWITCH (no restart): WNBA prop shape + dispersion ON, then scoped 10-07 re-sim -- **MET** (lanes `wnba-prop-shape`, `wnba-prop-dispersion`; user: "enable the prop shape and dispersion fixes", then "yes, go ahead")
+
+- **what:** prop shape (reb/ast/threes ladders rebuilt as a negative binomial at the stack mean, league dispersion) and dispersion (widens points and the four combos). Both fit on the availability + rate-shrink stack, now live. The dispersion k values predate the bfa92d5f rounding fix.
+- **mechanism:** file switch 26da2015 (env 1 on, env 0 kill, unset -> factor JSON `"enabled": true`).
+  - The fleet ALREADY contained 26da2015 at apply time (HEAD ba314b28, fast-forwarded by another session), so no ff by this lane. 26da2015's only runtime files are the two modules.
+- **locks:** deploy_claim refresh-worker + live-odds-worker were held by `nhl-confirmed-goalies` at 18:53Z. Not forced: waited until both were free (18:57:40Z), then acquired as wnba-prop-dispersion (18:57:50Z). A production WNBA refresh for 10-05 (no games) was in flight; started after it ended.
+- **baseline (18:57:50Z):** fleet ba314b28 (contains 26da2015), clean; no shape/dispersion JSON on disk; 10-07 sims from 14:16Z (availability + rate shrink only); healthz 200.
+- **dry run first (in memory, 26da2015 code on the production 10-07 sims):** shape 51/54 ladders, dispersion 85/90, reb/ast/threes left exactly as shape built them. Assists moved most (Jordin Canada over 8.5: 0.25 -> 0.35); points unchanged at the median line (widening moves tails).
+- **applied (19:08:40Z, atomic, refuse-to-overwrite):** `wnba_prop_shape.json` (fitted D_league reb 1.189 / ast 1.089 / threes 1.1315, enabled; sha8 1509e921) and `wnba_prop_dispersion.json` (k pts 1.25, pra 1.4, pr 1.35, pa 1.3, ra 1.4; reb/ast/threes REMOVED and recorded in the file; enabled; sha8 6be8d24b). Then production's orchestrator, scoped to ATL-NYL,GSV-LVA for 2026-10-07 under the live-odds-worker role env, rc 0.
+- **reading (19:13Z, the fleet's code):** smart_sim_2026-10-07_ATL_NYL 19:11:29Z and _GSV_LVA 19:12:15Z.
+  - `rate_shrink`, `prop_shape` and `prop_dispersion` all applied, switch=file.
+  - Shape ladders 51 / 54 (= 3 per player); dispersion ladders 85 / 90 (= 5 per player: points + 4 combos only).
+  - Same-team excluded players in the pools 0, injury-OUT 0.
+  - Matches the dry run. **MET.** healthz 200; no restart.
+- **all four WNBA estimators are now live** (availability, rate shrink, shape, dispersion). Rollback per fix: delete its JSON or set its env flag to 0.
