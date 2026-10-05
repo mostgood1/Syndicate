@@ -1063,6 +1063,14 @@ death, never life — do not invert it.
 - Verification: session-start.sh no longer reports 'state total' in LEDGER OVER BUDGET at the current size; a synthetic size above the new threshold DOES report it (off != on); no other cap's behaviour changes.
 - Blocked by: none
 
+### lanes-md-cap-raise — OPEN — opened 2026-10-05 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: The lanes.md cap in session-start.sh is raised from 240,000 to 550,000 -- current 477,436 + 15.2%, the same rule the state and learnings raises used -- with the justification written beside it, including that trimming and archiving were shown spent FIRST, that the digest's lane section is now a size-independent CENSUS so the cap no longer guards against truncation, and that the real lever is fewer open lanes; verified by the digest dropping lanes.md from the over-budget line, by a synthetic size above the new cap still reporting, and by ledger_caps.py (which parses this line) handing the new value to the trim tools.
+- Files: .claude/hooks/session-start.sh (the lanes.md cap in the caps line and its comment ONLY)
+- Hypothesis: n/a -- the measurement is taken: archivable 31KB against a 237KB overage, 326KB is 75 OPEN lane bodies, and the file sawtooths rather than accretes (357,536..681,655 over 15 days).
+- Falsification test: If the digest still lists lanes.md after the edit, or ledger_caps.py still reports 240000 to the trim tools, the caps line is not the only gate and the change is incomplete.
+- Verification: Digest no longer lists lanes.md; a synthetic size above 550,000 DOES report (off != on); ledger_caps.cap('lanes.md') returns 550000; learnings.md's cap unchanged at 460,000; and the running PRIMARY-TREE hook carries the change, not just the commit.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

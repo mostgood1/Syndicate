@@ -431,7 +431,51 @@ done
 # way before compacting again -- and note compaction is now nearly spent, since
 # 369 of 432 dated entries are ALREADY stubs and re-moving them reclaims zero.
 # The next lever is not a raise and not a compaction; it is fewer, better rules.
-for f in lanes.md:240000 learnings.md:460000; do
+# lanes.md 240000 -> 550000, 2026-10-05 [USER DECISION], AFTER archiving and
+# trimming. Same ORDER as the two raises documented above, and again the order
+# is the justification: both non-destructive levers ran FIRST and were then
+# measured as spent.
+#
+# What ran first, 2026-10-04/05:
+#   * `archive_released_lanes.py --dest lanes_closed.md`: 59 CLOSED/ORPHANED
+#     slugs out, 182,228 B reclaimed, one pointer left per slug so an ORPHANED
+#     lane's "to resume" note stays reachable.
+#   * `trim_lane_narrative.py` over all 74 OPEN lanes: 106,852 B of superseded
+#     narrative to lanes_history.md, contract keys / claim lines / OWED lines
+#     all kept, verified by `check_trimmed_contracts.py` (no contract key lost
+#     even ONE child) and a claim set identical as a SET.
+# The digest now reports `archivable 31KB` against a 237KB overage, and 35 of
+# the 74 blocks already carried a TRIMMED pointer from earlier runs. Spent.
+#
+# WHAT IS LEFT IS NOT SLACK: ~326 KB is 75 OPEN lanes' bodies -- the contracts
+# the protocol tells every session to read before touching a file. Cutting them
+# is not a non-destructive operation, which is exactly the case the 2026-09-01
+# block rules out: `a cap that cannot be met by any non-destructive operation is
+# not a budget, it is a permanent red light -- and a warning that is always on
+# is one nobody reads.` At 240,000 it had been always-on for weeks.
+#
+# THE CAP'S ORIGINAL RATIONALE IS GONE, and that matters more than the number.
+# 240,000 was set when this digest EMITTED lane bodies and cut them to
+# LANE_CAP=600 -- size caused real information loss, 1.9% of the state shown.
+# The 2026-09-08 change above replaced that with a CENSUS, which costs ~126
+# bytes and is SIZE-INDEPENDENT. So the digest is no longer degraded by this
+# file's size at all; what remains is the per-session cost of reading it, which
+# is real but is not truncation.
+#
+# 550,000 = 477,436 + 15.2%, the `current size + ~15% headroom` rule. The file
+# SAWTOOTHS rather than accretes -- 512,114 (09-20) down to 357,536 (09-26), up
+# to 681,655 (10-03), down to 466,094 (10-04) after the sweep -- so it is
+# managed by periodic trims against a gross append rate of ~46,300 B/day
+# (~1,930 B/h) measured 09-26..10-03. 72,564 B of headroom is ~1.5 days, which
+# is MORE than the 8-9 hours the learnings raise accepted as still firing on a
+# runaway.
+#
+# AND THE REAL LEVER IS NOT A RAISE. As the learnings block says of rules, say
+# it here of lanes: the next lever is FEWER OPEN LANES. 75 are open, 18 of them
+# untouched for over 7 days, and the census marks those `quiet Nd`. A raise buys
+# ~1.5 days; closing 18 stale lanes would reclaim far more and is the thing the
+# number is actually reporting. Read it that way before raising it again.
+for f in lanes.md:550000 learnings.md:460000; do
   n=${f%%:*}; cap=${f##*:}
   if [ -f ".syndicate/$n" ]; then
     SZ=$(wc -c < ".syndicate/$n" 2>/dev/null | tr -d ' ')
