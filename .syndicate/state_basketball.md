@@ -992,6 +992,8 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   period were never removed from the pool (the vendored filter strips punctuation; the exclusion keys keep it) --
   injury and availability exclusions, WNBA and NBA. After the fix + a scoped re-sim: 0 same-team excluded players in the
   10-07 pools (was 2: Ny'Ceara Pryor 22.9 min, Ta'Niya Latson 6.7).
+  NBA (read 2026-10-05): filter stage verified on production data (ATL 10-05 roster: old handoff drops none, new
+  drops N'Faly Dante); no NBA sim yet has had a punctuated exclusion that would otherwise make the pool.
 - **Held (flags OFF, user decision owed):** `SYNDICATE_WNBA_PROP_SHAPE`, `SYNDICATE_WNBA_PROP_DISPERSION`.
   `SYNDICATE_WNBA_SIM_MINUTES_REDISTRIBUTION` is refuted (lane closed), never hooked.
 - **Known risk:** the availability rule was measured before the injury feed worked; a player returning after one missed
