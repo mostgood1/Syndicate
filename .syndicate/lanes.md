@@ -1012,6 +1012,12 @@ death, never life — do not invert it.
 - Hypothesis: Measured on 12 mid-season slates (2,945 player-games): projected TOI matches actual (L1 19.52 vs 19.39) but the engine gives L1 21.56 and L4 9.35 (actual 11.10), because EV rotation weights use TOTAL TOI (which includes PP) and PP units then add their own minutes. Weighting EV rotation by EV minutes removes the double count
 - Falsification test: If EV-weighted rotation leaves simulated per-slot TOI off projected TOI by > 0.5 min, or SOG Brier at the lines is not better, the double count is not the binding error
 - Verification: Paired backtest vs the current engine (every 3rd regular-season date + playoffs): per-slot sim TOI within 0.5 min of actual; Brier SOG@1.5/2.5 better with CI, no market worse; on the fleet, the next pregame NHL grid's SOG |edge|>10% share vs 10-04's 57%
+### state-md-oom-subject-unindexed — OPEN — opened 2026-10-04 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: The [web-oom-leak] subject stops living unindexed inside state.md's subject-index section: its 46 UPDATE blocks (105,744 chars) move verbatim to a part file as ONE '## [web-oom-leak]' section, the subject index gains a row pointing at that file, and state.md's index drops under the 120,000 B the session-start digest trips on -- verified by state_key_check.py staying coherent with the subject COUNTED (275 -> 276), every moved line present verbatim in the part file and absent from state.md, and the index row resolving to the file that holds the body.
+- Files: .syndicate/state.md, .syndicate/state_worker.md
+- Hypothesis: state.md's index breach is one subject's body, not general growth: the subject-index section is 147,118 of 211,763 chars and 105,744 of that is 46 '### [web-oom-leak]' UPDATE blocks with no '##' section and no index row anywhere.
+- Falsification test: If the moved blocks total materially less than ~105,744 chars, or if [web-oom-leak] turns out to have a '##' section in some part file after all, the diagnosis is wrong and the bytes are general growth instead.
+- Verification: state_key_check.py coherent AND subject count +1; state.md index under 120,000 B; every moved non-blank line verbatim in state_worker.md and absent from state.md; an index row for the slug naming state_worker.md.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
