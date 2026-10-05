@@ -1339,6 +1339,14 @@ death, never life — do not invert it.
 - Verification: Findings file: re-derived 1.47x and the cause file:line; reachability test off != on; nhl_sim_input_checklist.py PASS; paired backtests per market regular season and playoffs separately; after a user decision to ship, the fleet's next NHL slate read: sim team PP min vs real, PP1 share (read, owned by nhl-elite-pp-onice), prop and total projection shifts, recorded in deploys.md.
 - Blocked by: none
 
+### mlb-asof-roster-rebuild — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- Goal: A leak-free as-of rebuild of MLB sim inputs (TeamRoster artifacts) for past dates, built by a Syndicate-owned script that bounds every stat input at D-1 (statsapi byDateRange endDate=D-1, game logs filtered < D, statcast layers off, BvP end_date=D-1, stored pregame lineups/probables, fresh cache) without touching the production builder; ADMITTED as the combined calibration's validation set only if its fidelity check passes: rebuilt vs stored roster_objs on 06-15..06-20 replay to the same starter/batting moments within MC noise
+- Files: scripts/mlb_asof_roster_build.py (NEW), tests/test_mlb_asof_roster_build.py (NEW), .syndicate/findings_2026-10-06_mlb_asof_roster_rebuild.md (NEW)
+- Hypothesis: With statcast layers off and season stats bounded at D-1, the rebuilt rosters replay to starter outs/K/BF and batting HR/H/BB per PA within MC noise of the stored production rosters
+- Falsification test: If any fitted moment differs beyond 2 SE between rebuilt and stored on 06-15..06-20, the rebuild is not admissible as validation (its levels differ) and the combined fit goes back to the user
+- Verification: Fidelity table on 06-15..06-20 (rebuilt vs stored, same seeds), then the rebuilt 05-30..06-14 set with per-date coverage
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
