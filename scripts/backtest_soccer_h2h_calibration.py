@@ -70,6 +70,7 @@ from syndicate.features.soccer.adapters import build_soccer_simulation_adapter  
 from syndicate.features.soccer.features.loaders import (  # noqa: E402
     _as_iso_day,
     _EspnStatsIndex,
+    _rating_for,
     build_soccer_simulation_input,
     compute_team_ratings,
     team_rows_from_match_history,
@@ -421,8 +422,16 @@ def backtest_league(
         # scored as if the model had an opinion.
         eligible = []
         for row in fixtures:
-            home_rating = ratings.get(str(row.get("home_team")), {})
-            away_rating = ratings.get(str(row.get("away_team")), {})
+            # SAME NAME RESOLUTION AS PRODUCTION (`loaders._rating_for` -> `match_team_name`). This was a raw
+            # `ratings.get(name)`: for the five Understat-rated leagues the ratings are keyed by Understat names
+            # ("Manchester United") while fixtures carry football-data names ("Man United"), so every fixture with a
+            # differently-named team read as zero prior matches and was SKIPPED -- 2025-26 EPL scored 170 of 380,
+            # La Liga 109, Bundesliga 42 (skipped_thin_ratings 210 / 271 / 264). The sim itself always resolved the
+            # names (it calls `_rating_for`), so scored rows were valid; the SAMPLE was biased to identically-named
+            # teams. Goals-rated leagues were unaffected (ratings built from the same history file). Lane
+            # soccer-lines-props-backtest, 2026-10-04.
+            home_rating, _ = _rating_for(ratings, str(row.get("home_team")))
+            away_rating, _ = _rating_for(ratings, str(row.get("away_team")))
             if min(home_rating.get("matches", 0.0), away_rating.get("matches", 0.0)) < min_prior_matches:
                 skipped_thin_ratings += 1
                 continue
