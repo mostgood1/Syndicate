@@ -5981,6 +5981,26 @@ def _nfl_prop_projection_script_args(season: int, week: int) -> list[str]:
 _NFL_PROP_ARTIFACT_SUSPECT_BYTES = 8192
 
 
+def _nfl_prop_odds_newer_than_artifact(season: int, week: int, artifact_path: Path) -> float | None:
+    """Seconds by which the week's prop-odds capture is newer than the projection
+    artifact, or None (not newer, or either file unreadable).
+
+    Reads the odds path through `nfl_props_path`, the resolver the props page and
+    the builder's own reader use, so a checkout stub can never stand in for the
+    disk copy. Two `stat()`s per tick; nothing is parsed.
+    """
+    try:
+        from syndicate.features.nfl.sources import nfl_props_path
+
+        odds_path = nfl_props_path(season, week)
+        if not odds_path.is_file() or not artifact_path.is_file():
+            return None
+        lead = odds_path.stat().st_mtime - artifact_path.stat().st_mtime
+    except Exception:  # noqa: BLE001 -- never fatal to the tick loop
+        return None
+    return lead if lead > 0 else None
+
+
 def _nfl_prop_artifact_is_empty(artifact_path: Path) -> bool:
     """True only when the artifact is present and carries ZERO rows.
 
@@ -6139,6 +6159,39 @@ def _launch_autorun_nfl_prop_projections(
             else:
                 should_launch = True
                 decision_reason = f"artifact_empty overriding[{decision_reason}]"
+
+    # NEW ODDS ARE A REASON TO REBUILD, NOT ONLY AGE `[2026-10-05, lane
+    # nfl-prop-projection-input-refresh, user "find the nightly builder and fix it"]`.
+    #
+    # The builder projects only the (player, stat, line) rows present in the
+    # week's odds capture WHEN IT RUNS, and the 86400 s age rule ran it once a
+    # night. Measured on the fleet 2026-10-05: the 05:30Z build held 125 rows for
+    # 2 games (MNF + TNF); the books posted the Sunday 10-11 props during the day
+    # (521 rows in the capture by 16:07 CDT), so all 11 Sunday games -- ~350 board
+    # props -- carried NO projection until the next night, and 74 more missed
+    # because their line had moved (median 3.0 off the nearest projected line).
+    # One build is ~6 s and ~100 MB RSS (memory snapshots 10-03/10-04).
+    #
+    # Same cooldown as the empty-artifact override above, for the same reason
+    # (`#389`): a build that cannot advance the artifact's mtime (the builder
+    # refuses a zero-row result) must not relaunch every tick.
+    if not should_launch and decision_reason.startswith("artifact_fresh"):
+        odds_lead = _nfl_prop_odds_newer_than_artifact(season, week, artifact_path)
+        if odds_lead is not None:
+            since_launch = _seconds_since_season_projection_launch(
+                "nfl_props", season=season, week=week,
+            )
+            cooldown = float(_season_projection_relaunch_cooldown_seconds())
+            if since_launch is not None and since_launch < cooldown:
+                decision_reason = (
+                    f"odds_newer_relaunched_recently odds_lead_seconds={int(odds_lead)} "
+                    f"since_launch_seconds={int(since_launch)} cooldown_seconds={int(cooldown)}"
+                )
+            else:
+                should_launch = True
+                decision_reason = (
+                    f"odds_newer odds_lead_seconds={int(odds_lead)} overriding[{decision_reason}]"
+                )
 
     if not should_launch:
         _log_season_projection_skip("nfl_props", decision_reason)
