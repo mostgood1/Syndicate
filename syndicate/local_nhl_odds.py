@@ -631,8 +631,12 @@ def collect_oddsapi_props(date: str) -> pd.DataFrame:
     bookmakers = os.getenv("PROPS_ODDSAPI_BOOKMAKERS", "fanduel,draftkings,pinnacle").strip() or None
     regions = os.getenv("PROPS_ODDSAPI_REGIONS", "us").strip() or "us"
     max_workers = max(1, int(os.getenv("PROPS_ODDSAPI_WORKERS", "6") or "6"))
-    markets = "player_points,player_assists,player_goals,player_shots_on_goal"
+    # player_total_saves: OddsAPI's NHL goalie-saves key (lane nhl-confirmed-goalies, user decision 2026-10-05:
+    # "Add saves only"). Without it no SAVES line was ever fetched, so the confirmed starter's SAVES projection
+    # had nothing to price against. +1 credit per event per fetch (4 -> 5 markets).
+    markets = "player_points,player_assists,player_goals,player_shots_on_goal,player_total_saves"
     market_map = {
+        "player_total_saves": "SAVES",
         "player_shots_on_goal": "SOG",
         "player_shots_on_goal_alternate": "SOG",
         "shots_on_goal": "SOG",
