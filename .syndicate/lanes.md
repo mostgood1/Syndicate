@@ -1057,6 +1057,14 @@ death, never life — do not invert it.
 - Verification: state_key_check.py coherent AND subject count +1; state.md index under 120,000 B; every moved non-blank line verbatim in state_worker.md and absent from state.md; an index row for the slug naming state_worker.md.
 - Blocked by: none
 
+### web-oom-chain-archive — OPEN — opened 2026-10-04 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: The superseded half of the [web-oom-leak] chain leaves the counted state files: the 37 blocks up to and including UPDATE 36 (79,826 chars) move VERBATIM to .syndicate/state_archive_2026-10-04.md, the 9 blocks from UPDATE 37 on stay with a pointer to the archive, state_worker.md drops under the 250,000 per-part cap and STATE_TOTAL under 1,100,000 -- verified by zero cross-boundary UPDATE references, every moved non-blank line present verbatim in the archive and absent from state_worker.md, and state_key_check.py still coherent with the subject COUNTED.
+- Files: .syndicate/state_worker.md, .syndicate/state_archive_2026-10-04.md (NEW)
+- Hypothesis: UPDATE 37 ('WEB IS NOT DYING OF MEMORY. It is dying of LATENCY') supersedes the whole 1-36 memory investigation, and every retraction in 1-36 names a referent inside 1-36, so the cut orphans nothing.
+- Falsification test: A kept block (37+) referencing an archived UPDATE number, or an archived block referencing a kept one, refutes the cut and the boundary must move. Measured before cutting: ZERO in both directions.
+- Verification: 0 cross-boundary UPDATE references; every moved non-blank line verbatim in the archive and gone from state_worker.md; a pointer naming the archive file in the kept section; state_key_check.py coherent and the subject still counted; state_worker.md < 250,000 and STATE_TOTAL < 1,100,000.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
