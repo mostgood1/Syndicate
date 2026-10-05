@@ -295,6 +295,37 @@ def git_commit() -> str:
         return ""
 
 
+def role_scope_prefix(role: str) -> str:
+    """`live-odds-worker` -> `LIVE_ODDS_WORKER__`: the prefix a role-scoped key carries in the local file."""
+    return role.upper().replace("-", "_") + "__"
+
+
+def role_local_view(local: dict[str, str], role: str) -> tuple[dict[str, str], list[str]]:
+    """The local file as ONE role sees it: global keys, then that role's `ROLE__KEY` overrides.
+
+    The local file applies every key to every role, so a value that legitimately
+    differs per role (live-odds-worker's `SYNDICATE_ACTIVE_SPORTS` carries nba/nhl,
+    web's does not) could only live in the imported Render snapshot, which a
+    re-import overwrites. `LIVE_ODDS_WORKER__SYNDICATE_ACTIVE_SPORTS=...` pins it
+    for that role alone `[2026-10-05, lane local-env-role-scoped-pin]`.
+
+    Another role's scoped key is dropped, never exported under its literal name.
+    A prefix that names no role is an ordinary key (so a real env key containing
+    `__` keeps working).
+    """
+    prefixes = {r: role_scope_prefix(r) for r in ROLE_ORDER}
+    view: dict[str, str] = {}
+    scoped: dict[str, str] = {}
+    for key, value in local.items():
+        owner = next((r for r, p in prefixes.items() if key.startswith(p) and len(key) > len(p)), None)
+        if owner is None:
+            view[key] = value
+        elif owner == role:
+            scoped[key[len(prefixes[owner]):]] = value
+    view.update(scoped)
+    return view, sorted(scoped)
+
+
 def derive_role_env(
     role: str,
     blueprint: dict[str, list[BlueprintKey]],
@@ -317,6 +348,9 @@ def derive_role_env(
             env.pop(name, None)
     audit: dict[str, Any] = {"rewritten": [], "local": [], "unset": [], "forced": {}, "live": 0}
     live = live or {}
+    # Role-scoped `ROLE__KEY` lines resolve to plain keys for this role only, and
+    # beat the same key's global line; every layer below sees the resolved view.
+    local, audit["role_scoped"] = role_local_view(local, role)
 
     for item in blueprint[role]:
         if item.source == "value":
