@@ -91,6 +91,27 @@ def nba_processed_candidates(filename: str) -> list[Path]:
     return deduped
 
 
+_ESPN_SEASON_PHASE = {1: "preseason", 2: "regular", 3: "postseason"}
+
+
+def season_phase_for_date(slate_date: str | None) -> str | None:
+    """The NBA season phase of a slate date from the ESPN scoreboard the sim caches
+    (`_espn_cache/nba/scoreboard_<ymd>.json`, `events[].season.type` 1/2/3). None when the cache is absent or the
+    date's events disagree -- the caller must treat None as UNKNOWN, never as regular season."""
+    if not slate_date:
+        return None
+    path = nba_processed_file(f"_espn_cache/nba/scoreboard_{str(slate_date)[:10].replace('-', '')}.json")
+    if path is None:
+        return None
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        types = {int((ev.get("season") or {}).get("type")) for ev in doc.get("events") or []
+                 if (ev.get("season") or {}).get("type") is not None}
+    except Exception:  # noqa: BLE001
+        return None
+    return _ESPN_SEASON_PHASE.get(types.pop()) if len(types) == 1 else None
+
+
 def nba_processed_file(filename: str) -> Path | None:
     for path in nba_processed_candidates(filename):
         try:
@@ -293,7 +314,9 @@ def _project_row(row: Mapping[str, Any], market: str, segment: str, entry: NbaGa
             # carries no OOS information beyond the line (w 0.00 margin / 0.05 total, 2025-26) and runs far off the
             # market in preseason, so the served probability is the per-line logit blend toward the SAME de-vigged
             # fair the edge is computed against. Raw sim p + weight ride along; falls back to the sim WITH a reason.
-            prob, blend_meta = served_game_probability(prob, _no_vig_over_probability(row), market, segment)
+            commence = row.get("commence_time")
+            phase = season_phase_for_date(central_date_from_iso(commence) if commence else None)
+            prob, blend_meta = served_game_probability(prob, _no_vig_over_probability(row), market, segment, phase=phase)
             projection.update(blend_meta)
             _attach_sim_probability_edge(projection, row=row, model_prob=prob)
         return projection, None

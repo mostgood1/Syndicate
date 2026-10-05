@@ -219,3 +219,35 @@ def test_game_blend_weight_lookup_and_fallbacks(tmp_path):
     assert p == 0.57 and m["book_blend"] == "no weight for spreads:h1"
     p, m = cal.served_game_probability(0.57, None, "spreads", "full", processed_root=tmp_path, env={})
     assert p == 0.57 and m["book_blend"] == "no two-sided book price for this line"
+
+
+def test_game_blend_phase_weights_and_unknown_is_not_permissive(tmp_path):
+    doc = {"enabled": True, "w": {"totals:full": 0.05, "spreads:full": 0.0, "default": 0.0},
+           "phase": {"preseason": {"default": 0.0}}}
+    (tmp_path / cal.GAME_BLEND_FILE).write_text(json.dumps(doc), encoding="utf-8")
+    kw = dict(processed_root=tmp_path, env={})
+    p_pre, m_pre = cal.served_game_probability(0.6, 0.5, "totals", "full", phase="preseason", **kw)
+    p_reg, m_reg = cal.served_game_probability(0.6, 0.5, "totals", "full", phase="regular", **kw)
+    p_unk, m_unk = cal.served_game_probability(0.6, 0.5, "totals", "full", phase=None, **kw)
+    assert p_pre == pytest.approx(0.5) and m_pre["book_blend_w"] == 0.0 and m_pre["season_phase"] == "preseason"
+    assert m_reg["book_blend_w"] == 0.05 and p_reg > 0.5
+    assert m_unk["book_blend_w"] == 0.0 and m_unk["season_phase"] == "unknown"  # smallest weight, not the base
+
+
+def test_layer2_game_line_reads_the_espn_season_type(nba_root, monkeypatch):
+    from syndicate.features.nba.sources import artifact_processed_root
+    from tests.test_nba_layer2_projections import D
+
+    root = artifact_processed_root()
+    doc = dict(GW, phase={"preseason": {"default": 0.0}})
+    (root / cal.GAME_BLEND_FILE).write_text(json.dumps(doc), encoding="utf-8")
+    cache = root / "_espn_cache" / "nba"
+    cache.mkdir(parents=True, exist_ok=True)
+    (cache / f"scoreboard_{D.replace('-', '')}.json").write_text(
+        json.dumps({"events": [{"season": {"type": 1, "slug": "preseason"}}]}), encoding="utf-8")
+    monkeypatch.delenv(cal.GAME_BLEND_FLAG, raising=False)
+    row = _game_row("totals_alt", line=229.5)
+    attach_nba_game_projections([row], load_nba_game_projections(D))
+    p = row["projection"]
+    assert p["season_phase"] == "preseason" and p["book_blend_w"] == 0.0
+    assert p["model_prob_over"] == pytest.approx(0.5) and p["edge_vs_market_pct"] == pytest.approx(0.0)

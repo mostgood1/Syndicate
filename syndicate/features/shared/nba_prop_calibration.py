@@ -503,6 +503,19 @@ def _book_blend_cached(path_s: str, mtime_ns: int, size: int) -> Tuple[Optional[
         if not math.isfinite(v) or not (0.0 <= v <= 1.0):
             return None, f"w[{key!r}] = {v} outside [0, 1]"
         out[str(key).strip().lower()] = v
+    phases = doc.get("phase")
+    if isinstance(phases, dict):
+        for ph, block in phases.items():
+            if not isinstance(block, dict):
+                return None, f"phase[{ph!r}] is not a map"
+            for key, value in block.items():
+                try:
+                    v = float(value)
+                except (TypeError, ValueError):
+                    return None, f"phase[{ph!r}][{key!r}] is not a number"
+                if not math.isfinite(v) or not (0.0 <= v <= 1.0):
+                    return None, f"phase[{ph!r}][{key!r}] = {v} outside [0, 1]"
+                out[f"{str(ph).strip().lower()}|{str(key).strip().lower()}"] = v
     return out, "ok"
 
 
@@ -566,11 +579,15 @@ GAME_BLEND_FLAG = "SYNDICATE_NBA_GAME_BOOK_BLEND"
 
 
 def served_game_probability(p_model: Optional[float], p_fair: Optional[float], market: str, segment: str = "full", *,
-                            processed_root: Optional[Path] = None, env: Optional[Mapping[str, str]] = None
-                            ) -> Tuple[Optional[float], Dict[str, Any]]:
+                            phase: Optional[str] = None, processed_root: Optional[Path] = None,
+                            env: Optional[Mapping[str, str]] = None) -> Tuple[Optional[float], Dict[str, Any]]:
     """The probability to SERVE for one NBA game line (the same side `_attach_sim_probability_edge` prices), plus a
-    stamp. Never raises."""
-    meta: Dict[str, Any] = {"p_model_raw": None if p_model is None else round(float(p_model), 4)}
+    stamp. `phase` is the game's season phase ("preseason" / "regular" / "postseason", ESPN season.type 1/2/3); a
+    phase block in the file overrides the base weights for that phase (user 2026-10-05: a harder preseason shrink).
+    UNKNOWN phase does not default permissive: it takes the SMALLEST weight any phase defines for the key. Never
+    raises."""
+    meta: Dict[str, Any] = {"p_model_raw": None if p_model is None else round(float(p_model), 4),
+                            "season_phase": phase or "unknown"}
     try:
         if p_model is None:
             return None, meta
@@ -580,7 +597,18 @@ def served_game_probability(p_model: Optional[float], p_fair: Optional[float], m
             return p_model, meta
         m, seg = str(market or "").strip().lower(), str(segment or "full").strip().lower()
         fam = m[:-4] if m.endswith("_alt") else m
-        w = next((weights[k] for k in (f"{m}:{seg}", f"{fam}:{seg}", m, fam, "default") if k in weights), None)
+        keys = (f"{m}:{seg}", f"{fam}:{seg}", m, fam, "default")
+        base = next((weights[k] for k in keys if k in weights), None)
+        phases = sorted({k.split("|", 1)[0] for k in weights if "|" in k})
+        per_phase = {ph: next((weights[f"{ph}|{k}"] for k in keys if f"{ph}|{k}" in weights), base) for ph in phases}
+        ph = str(phase or "").strip().lower()
+        if ph and ph in per_phase:
+            w = per_phase[ph]
+        elif ph:
+            w = base
+        else:
+            cands = [x for x in [base, *per_phase.values()] if x is not None]
+            w = min(cands) if cands else None
         if w is None:
             meta["book_blend"] = f"no weight for {m}:{seg}"
             return p_model, meta
