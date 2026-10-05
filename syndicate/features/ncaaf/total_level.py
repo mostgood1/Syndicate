@@ -42,6 +42,13 @@ live re-sim, by any route. To release it: run
 set to the candidate and unset (= 1.0) on the same dates, and change the live
 constant only if the candidate is no worse on the worst bucket and the bias.
 
+RELEASED AT 0.3 `[user decision 2026-10-04: "set live to 0.3 and deploy"]`. The
+paired grade (192 games / 576 cutoff rows, five Saturdays 08-29..09-26, 120 sims)
+passed its pre-registered criterion: totals worst bucket 0.0485 vs 0.0611 at 1.0,
+bias +0.547 vs +1.037, margin worst bucket 0.0943 (< 0.150). Totals MAE moved
+8.013 -> 8.054 -- a calibration gain, not an accuracy gain. Full table:
+`.syndicate/findings_2026-10-02_ncaaf_lines_props_backtest.md`.
+
 OVERRIDES. `SYNDICATE_NCAAF_TOTAL_LEVEL_SHRINK` sets the PREGAME path only;
 `SYNDICATE_NCAAF_LIVE_TOTAL_LEVEL_SHRINK` sets the LIVE path only (that is how
 the live grade runs a candidate). Absent means each path's constant;
@@ -53,9 +60,9 @@ from __future__ import annotations
 import os
 
 NCAAF_TOTAL_LEVEL_SHRINK = 0.5
-#: HELD at 1.0 until the live cutoff-replay grade passes at a candidate lambda
-#: (see the module docstring). Independent of `NCAAF_TOTAL_LEVEL_SHRINK`.
-NCAAF_LIVE_TOTAL_LEVEL_SHRINK = 1.0
+#: 0.3 since the live cutoff-replay grade passed there (2026-10-04, see the module
+#: docstring). Independent of `NCAAF_TOTAL_LEVEL_SHRINK`.
+NCAAF_LIVE_TOTAL_LEVEL_SHRINK = 0.3
 
 PREGAME_ENV = "SYNDICATE_NCAAF_TOTAL_LEVEL_SHRINK"
 LIVE_ENV = "SYNDICATE_NCAAF_LIVE_TOTAL_LEVEL_SHRINK"

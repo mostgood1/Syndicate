@@ -12,24 +12,24 @@ def _clear(monkeypatch):
     monkeypatch.delenv(total_level.LIVE_ENV, raising=False)
 
 
-def test_live_is_held_at_one_and_independent_of_pregame(monkeypatch):
-    """User decision 2026-10-03: live stays at 1.0 until its own grade passes."""
+def test_live_is_released_at_point_three_and_independent_of_pregame(monkeypatch):
+    """User decision 2026-10-04: live released at 0.3 after its own grade passed."""
     _clear(monkeypatch)
-    assert total_level.NCAAF_LIVE_TOTAL_LEVEL_SHRINK == 1.0
-    assert total_level.live_total_level_shrink() == 1.0
-    # tonight's fit sets the PREGAME constant; live must not move
-    monkeypatch.setattr(total_level, "NCAAF_TOTAL_LEVEL_SHRINK", 0.3)
-    assert total_level.total_level_shrink() == 0.3
-    assert total_level.live_total_level_shrink() == 1.0
+    assert total_level.NCAAF_LIVE_TOTAL_LEVEL_SHRINK == 0.3
+    assert total_level.live_total_level_shrink() == 0.3
+    # the PREGAME constant moving must not move live
+    monkeypatch.setattr(total_level, "NCAAF_TOTAL_LEVEL_SHRINK", 0.7)
+    assert total_level.total_level_shrink() == 0.7
+    assert total_level.live_total_level_shrink() == 0.3
     # nor does the pregame env var reach live
     monkeypatch.setenv(total_level.PREGAME_ENV, "0.4")
-    assert total_level.live_total_level_shrink() == 1.0
+    assert total_level.live_total_level_shrink() == 0.3
     # the live env var is how the live grade runs a candidate
     monkeypatch.setenv(total_level.LIVE_ENV, "0.5")
     assert total_level.live_total_level_shrink() == 0.5
     assert total_level.total_level_shrink() == 0.4               # pregame untouched by it
     monkeypatch.setenv(total_level.LIVE_ENV, "garbage")
-    assert total_level.live_total_level_shrink() == 1.0          # unparseable -> the live constant
+    assert total_level.live_total_level_shrink() == 0.3          # unparseable -> the live constant
 
 
 def _state():
@@ -64,10 +64,10 @@ def test_kill_switch_is_exact(monkeypatch):
 
 def test_default_reads_the_live_setting_only(monkeypatch):
     _clear(monkeypatch)
-    monkeypatch.setenv(total_level.PREGAME_ENV, "0.3")
-    assert _resim()["level_shrink"] == 1.0                   # pregame never reaches the re-sim
-    monkeypatch.setenv(total_level.LIVE_ENV, "0.3")
-    assert _resim()["level_shrink"] == 0.3
+    monkeypatch.setenv(total_level.PREGAME_ENV, "0.7")
+    assert _resim()["level_shrink"] == 0.3                   # pregame never reaches the re-sim
+    monkeypatch.setenv(total_level.LIVE_ENV, "0.5")
+    assert _resim()["level_shrink"] == 0.5
     assert _resim(level_shrink=1.0)["level_shrink"] == 1.0   # an explicit caller value wins
 
 
