@@ -311,3 +311,23 @@ def test_assist_share_is_as_of_and_shrunk_to_the_position_prior():
     assert by_id[9]["assist_share"] is None                             # goalies carry none
     empty = lu.attach_assist_share([{"player_id": 1, "position": "F"}], [({}, 1.0), ({}, 0.5)], "2025-12-05")
     assert empty[0]["assist_share"] is None                             # outage reads as missing, not as prior
+
+
+def test_dressing_prefers_players_from_the_teams_last_game():
+    """`[lane nhl-scratch-dilution]`: a regular who missed the team's previous game loses his slot to a
+    skater who played it, even with far more total ice time; a book-listed player still dresses first."""
+    fwd = [{"player_id": 100 + i, "position": "F", "games_played": 8, "toi_avg": 18.0 - i * 0.5,
+            "toi_total": (18.0 - i * 0.5) * 8, "played_last_game": True} for i in range(12)]
+    injured = {"player_id": 99, "position": "F", "games_played": 7, "toi_avg": 21.0, "toi_total": 147.0,
+               "played_last_game": False}
+    callup = {"player_id": 150, "position": "F", "games_played": 1, "toi_avg": 9.0, "toi_total": 9.0,
+              "played_last_game": True}
+    dmen = [{"player_id": 200 + i, "position": "D", "games_played": 8, "toi_avg": 20.0 - i, "toi_total": (20.0 - i) * 8,
+             "played_last_game": True} for i in range(6)]
+    fwd[11]["played_last_game"] = False          # the 12th forward also sat out last game
+    usage = fwd + [injured, callup] + dmen
+    slotted = {r["player_id"] for r in lu.infer_lines([dict(r) for r in usage]) if r.get("line_slot")}
+    assert 99 not in slotted and 150 in slotted   # the injured star sits; the call-up who played dresses
+    assert 111 not in slotted                     # 12th F missed last game too; the call-up outranks him
+    forced = {r["player_id"] for r in lu.infer_lines([dict(r) for r in usage], must_dress={99}) if r.get("line_slot")}
+    assert 99 in forced                           # a posted book line still wins

@@ -73,6 +73,7 @@ def build_team_usage(
     game_ids = client.recent_finished_game_ids(team_abbr, season, before_date=date, n=n_games)
     acc: Dict[int, Dict] = {}
     team_last_game = ""
+    played_on: Dict[str, set] = {}
     for gid in game_ids:
         box = client.boxscore(gid)
         if not box:
@@ -103,6 +104,8 @@ def build_team_usage(
                     "toi_total": 0.0,
                 })
                 toi = _toi_to_min(p.get("toi"))
+                if toi > 0:
+                    played_on.setdefault(game_date, set()).add(pid)
                 row["games_played"] += 1
                 row["toi_total"] += toi
                 if pos == "G" and toi >= _GOALIE_START_MIN:
@@ -122,10 +125,14 @@ def build_team_usage(
                 row["pp_toi_total"] = row.get("pp_toi_total", 0.0) + pp_sec / 60.0
                 row["sh_toi_total"] = row.get("sh_toi_total", 0.0) + sh_sec / 60.0
     usage = []
+    last_lineup = played_on.get(team_last_game, set())
     for row in acc.values():
         gp = max(1, row["games_played"])
         row["toi_avg"] = round(row["toi_total"] / gp, 3)
         row["team_last_game_date"] = team_last_game
+        # Dressed in the team's MOST RECENT game: the strongest single predictor of playing tonight
+        # (see `infer_lines`). Absent from a usage row -> treated as unknown (False for every row).
+        row["played_last_game"] = int(row["player_id"]) in last_lineup
         usage.append(row)
     usage.sort(key=lambda r: r["toi_avg"], reverse=True)
     return usage
@@ -173,8 +180,12 @@ def infer_lines(usage: List[Dict], must_dress: Optional[set] = None) -> List[Dic
         # nhl-player-props-projection]`: early in a season the window is mostly last season's final
         # games, so a regular who missed some of them (Carlson 23.7 min avg) ranked out of the top 6 D
         # by total ice time and projected nothing. A posted line is the market saying he plays.
-        ranked = sorted(rows, key=lambda r: (int(r["player_id"]) in forced, _dress_score(r),
-                                             float(r.get("toi_avg") or 0.0)), reverse=True)
+        # Then whoever played the team's MOST RECENT game `[2026-10-05, lane nhl-scratch-dilution]`:
+        # ranking by total ice time alone kept an injured regular slotted -- over the 2025-26 backtest
+        # 10.4% of slotted skaters did not play, and one who had missed the previous game sat 63% of the
+        # time (76-87% after 2-4 misses), 60% of all non-players; one who played it sat 4.6%.
+        ranked = sorted(rows, key=lambda r: (int(r["player_id"]) in forced, bool(r.get("played_last_game")),
+                                             _dress_score(r), float(r.get("toi_avg") or 0.0)), reverse=True)
         picked = ranked[:k]
         return sorted(picked, key=lambda r: float(r.get("toi_avg") or 0.0), reverse=True)
 
