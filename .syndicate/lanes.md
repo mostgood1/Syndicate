@@ -1384,6 +1384,11 @@ death, never life — do not invert it.
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: Unit tests incl. off!=on; fleet board after restart: player_surname_hits > 0, player_miss_name < 1,306, non_player_selection_rows ~138
+- **H25 RESULT 2026-10-06 ~00:20Z: FAILS its pre-registered bar (holdout CI spans 0). Nothing shipped; the gate is not moved.** (`scripts/nhl_saves_overdispersion.py`)
+  - Fit, 523 sim-starter goalie-games before 2026-01-01: k = 16.4 (var/mean 2.18; log-lik -1813.7 vs Poisson -1934.9). The overdispersion is real.
+  - HOLDOUT (01-01..01-31, 280 lines / 136 games): NB - Poisson **-0.00314 [-0.01068, +0.00395]**. Poisson was only +0.0064 vs the book there; NB +0.0032 vs book.
+  - ALL 56 dates (fit dates in-sample): NB - Poisson -0.01196 [-0.01640, -0.00757]; NB - book +0.0155 [+0.0076, +0.0231] (Poisson +0.0274).
+  - Next honest test, a user decision: two-fold cross-validation by date blocks, so all 881 lines are out-of-sample for a k fit on the other fold. Post-hoc, so it would be pre-registered as its own H26.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
