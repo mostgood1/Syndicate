@@ -1371,6 +1371,14 @@ death, never life — do not invert it.
 - Verification: Findings file reports, per season and pooled: n, dates, per-family coverage (dumps / served recs / outcomes / TRUE close) and intersection; Brier, reliability, resolution, uncertainty for model and close with match-bootstrap CIs; the recalibration's held-out gap vs close with paired CI; a stated verdict against each falsifier. Data: harness dumps C:/tmp/soccer-lpb/h2h_2526_all9.jsonl, h2h27_A.jsonl and the served 2026-27 pre-kickoff builds (audit cache)
 - Blocked by: none
 
+### nhl-saves-overdispersion — OPEN — opened 2026-10-05 — session 9ed26377-0ef3-4416-bc7b-54428f87ce5c
+- Goal: NHL SAVES priced by a negative binomial around the sim mean (dispersion k fit out-of-sample) instead of Poisson, in both the props file (build_nhl_artifacts) and the board projection (nhl prop_projections), measured to beat Poisson at the book's lines on a held-out window before shipping, then the registry entry re-measured for the shipped pricing and verified on the served grid
+- Files: syndicate/features/nhl/prop_projections.py, scripts/nhl_saves_overdispersion.py, tests/test_nhl_saves_overdispersion.py, syndicate/features/shared/measured_market_skill.py
+- Hypothesis: H25: saves are overdispersed relative to Poisson around the sim mean; NB(mean=lam, k fit on 2025-26 harness dates before 2026-01-01) lowers Brier at the book's SAVES lines on the held-out dates (2026-01-01..01-31)
+- Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
+- Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
