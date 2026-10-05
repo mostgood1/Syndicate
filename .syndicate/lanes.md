@@ -1262,6 +1262,25 @@ death, never life — do not invert it.
 - Verification: Replay per-batter P(HR>=1) and hitter buckets vs box outcomes, tune fit, holdout read once; production's next sim serves the re-fitted values
 - Blocked by: mlb-pa-length
 
+### mlb-non-pa-outs — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **SELECTION RULE, PRE-REGISTERED 2026-10-06 ~03:30Z before any change** (user: "then fix the caught stealing outs next"; promoted from the 10-06 lead).
+  - **Claim.** The engine edit to `simulate.py` (pre-PA steal block only) is taken from lane `mlb-starter-length` when this lane starts; recorded then.
+  - **Step 1, bookkeeping.** A caught-stealing out increments the current pitcher's `OUTS` (it already increments `half.outs`).
+    - Unit test first: it fails on main and passes after.
+    - Then replay the shipped config +/- the fix: 200 sims, 26 dates, tune < 2026-07-04, holdout >= 2026-07-04.
+  - **SHIP step 1 only if every check holds on HOLDOUT:**
+    - the starter BF balance (BF - OUTS - H - BB - HBP) moves toward actual;
+    - |starter outs bias| worsens by <= 0.10;
+    - |SO|, |H|, |BB| and |ER| bias each worsen by <= 0.10;
+    - game-total |gap| <= max(0.30, the baseline's).
+  - **Step 2, pickoffs.** Only if the residual BF-balance gap after step 1 is still > 0.20/start. That is a new mechanism, so per standard section 4.4 it needs its own pre-registered rule, written then, before running.
+- Goal: Outs that are not made by a batter are credited to the pitcher on the mound: caught-stealing outs (simulated, simulate.py ~2636, added to half.outs but never to the pitcher's OUTS) count in the pitcher's line, and pickoffs are modelled if the replay shows the residual needs them; measured as starter BF-(OUTS+H+BB+HBP) on the as-of replay moving from +0.05 toward actual -0.40 with starter outs bias not worsening, shipped only if a pre-registered holdout passes
+- Files: tests/test_mlb_non_pa_outs.py (NEW), .syndicate/findings_2026-10-06_mlb_non_pa_outs.md (NEW)
+- Hypothesis: The CS branch at simulate.py ~2636 increments half.outs but not the current pitcher's OUTS stat, so the pitcher box omits non-PA outs that real box scores (and outs props) count
+- Falsification test: If crediting CS outs moves the BF balance by <0.05/start, CS is too rare in the sim to explain the -0.40 and the residual is pickoffs / other non-PA outs
+- Verification: Unit test: a forced CS credits exactly one OUT to the pitcher of record; replay BF balance + outs bias on tune/holdout by the pre-registered rule; production's next sim verified
+- Blocked by: mlb-hr-prop-calibration
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
