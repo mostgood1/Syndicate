@@ -915,6 +915,13 @@ death, never life — do not invert it.
   - Same 56 dates / 446 games / n_sims 200; the prior arm reused.
   - Bar UNCHANGED from H16 (paired Brier at the standard lines, floor10noblk - prior, game-clustered 95% CI). Recommend enabling iff (a) no line's CI is entirely > 0 in any of all / Oct / Nov+, AND (b) SOG@1.5 or POINTS@0.5 is better over all dates.
   - Stated caveat: this variant was chosen AFTER seeing H16's failing cell, on the same data. A pass shows the blocks fields were the cause in this sample; it is not an independent confirmation. That is reported with the result.
+- **H17 RESULT 2026-10-04 ~21:30Z: FAILS its pre-registered bar, again on ONE marginal October cell. Not enabled; gate not moved.** (floor10noblk - prior, 446 games)
+  - (b) MET: SOG@1.5 -0.00343 [-0.00453, -0.00228], SOG@2.5 -0.00161, POINTS@0.5 -0.00103 [-0.00169, -0.00034], SAVES@28.5 -0.00724 better. Nov+: no line worse; SOG/POINTS/SAVES@28.5 better.
+  - Blocks fixed: BLOCKS@1.5 Oct +0.00014 [-0.00001, +0.00032], all +0.00006 (spans 0).
+  - **(a) FAILS: SOG@2.5 October +0.00012 [+0.00001, +0.00028]** (vs a full-season gain of -0.00161 on the same line). Like H16, every October difference comes from 10-27..10-31 (the floor is byte-identical to prior before), i.e. a handful of games.
+  - **On the bar itself (stated now, NOT used to pass anything):** (a) asks 33 cells (11 lines x 3 periods) for no one-sided 2.5% exceedance. Under a TRUE null of no effect, P(at least one) is ~ 1 - 0.975^33 ~ 0.57 (cells are correlated, so somewhat less). H16 and H17 each failed on one cell sitting at the boundary, in the same 3-date window. The bar is underpowered against noise in a 6-game window; that is a flaw in how I set it, and it is reported rather than fixed after the fact.
+  - What every variant agrees on: **from November on, no line is worse and SOG/POINTS are better** (blend, floor10, floor10noblk alike).
+  - Recommendation to the user: switch the builder on at ~Nov 1 (every team has >= 10 games), which removes the late-October crossing window entirely; or override; or leave off.
 - Blocked by: none
 ### nfl-live-segment-interval — OPEN — opened 2026-10-03 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
 - Goal: NFL in-play quarter/half segment lines refresh every 10 min (code default, like NCAAF 8730cfb7) instead of every 150 s lines-autorun run, before the Sunday 2026-10-04 17:00Z window; NFL full-game lines unchanged; 0 NFL rows served >1h
