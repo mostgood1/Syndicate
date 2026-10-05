@@ -57,7 +57,7 @@ def test_reachability_off_and_on_differ_through_the_boards_reader(tmp_path):
     off, on = _out(), _out()
     s_off = D.apply_prop_dispersion(off, league_code="wnba", processed_root=root, build_ladder=BUILD, env={})
     s_on = D.apply_prop_dispersion(on, league_code="wnba", processed_root=root, build_ladder=BUILD, env={D.FLAG: "1"})
-    assert s_off["applied"] is False and s_off["reason"] == f"{D.FLAG} off"
+    assert s_off["applied"] is False and s_off["reason"] == f"{D.FLAG} unset and factor file not enabled"
     assert s_on["applied"] is True and s_on["ladders"] == 3
     p_off = _hit_prob_over(off["players"]["home"][0]["prop_ladders"]["pts"]["ladder"], 22.5)
     p_on = _hit_prob_over(on["players"]["home"][0]["prop_ladders"]["pts"]["ladder"], 22.5)
@@ -115,3 +115,30 @@ def test_a_ladder_without_a_distribution_is_skipped_not_guessed(tmp_path):
     D.apply_prop_dispersion(out, league_code="wnba", processed_root=_root(tmp_path), build_ladder=BUILD, env={D.FLAG: "1"})
     assert out["players"]["home"][0]["prop_ladders"]["pts"] == before
     assert "pts" not in out["players"]["home"][0]["prop_dispersion"]
+
+
+def _disp(out, root, env):
+    return D.apply_prop_dispersion(out, league_code="wnba", processed_root=root, build_ladder=BUILD, env=env)
+
+
+def test_file_switch_turns_it_on_with_the_env_unset(tmp_path):
+    """FILE SWITCH (2026-10-05): production enables it by the factor file -- no role restart."""
+    out = _out()
+    s = _disp(out, _root(tmp_path, doc={**FACTORS, "enabled": True}), env={})
+    assert s["applied"] is True and s["switch"] == "file" and out != _out()
+
+
+def test_env_zero_is_a_kill_switch_over_an_enabled_file(tmp_path):
+    out = _out()
+    s = _disp(out, _root(tmp_path, doc={**FACTORS, "enabled": True}), env={D.FLAG: "0"})
+    assert s["reason"] == f"{D.FLAG} off" and out == _out()
+
+
+def test_a_stat_left_out_of_the_factor_file_is_untouched(tmp_path):
+    """The shipped file leaves reb/ast/threes OUT (prop shape owns those ladders): they must stay byte-identical."""
+    out = _out()
+    doc = {"version": 1, "k": {"pts": 1.25, "pr": 1.35}, "enabled": True}
+    _disp(out, _root(tmp_path, doc=doc), env={})
+    assert out["players"]["home"][0]["prop_ladders"]["reb"] == _out()["players"]["home"][0]["prop_ladders"]["reb"]
+    assert out["players"]["home"][0]["prop_ladders"]["pts"] != _out()["players"]["home"][0]["prop_ladders"]["pts"]
+

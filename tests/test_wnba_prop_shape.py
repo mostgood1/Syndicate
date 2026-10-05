@@ -52,7 +52,7 @@ def _apply(out, root, env=ON, league="wnba"):
 def test_reachability_off_and_on_differ_through_the_boards_reader(tmp_path):
     root = _root(tmp_path)
     off, on = _out(), _out()
-    assert _apply(off, root, env={})["reason"] == f"{S.FLAG} off" and off == _out()
+    assert _apply(off, root, env={})["reason"] == f"{S.FLAG} unset and factor file not enabled" and off == _out()
     s = _apply(on, root)
     assert s["applied"] is True and s["ladders"] == 1        # only reb has a ladder in this row
     p_off = _hit_prob_over(off["players"]["home"][0]["prop_ladders"]["reb"]["ladder"], 8.5)
@@ -95,3 +95,26 @@ def test_unusable_factor_file_is_refused(tmp_path, doc, needle):
     out = _out()
     s = _apply(out, root)
     assert s["applied"] is False and needle in s["reason"] and out == _out()
+
+
+def test_file_switch_turns_it_on_with_the_env_unset(tmp_path):
+    """FILE SWITCH (2026-10-05): production enables it by the factor file -- no role restart."""
+    out = _out()
+    s = _apply(out, _root(tmp_path, doc={**FACTORS, "enabled": True}), env={})
+    assert s["applied"] is True and s["switch"] == "file" and out != _out()
+
+
+def test_env_zero_is_a_kill_switch_over_an_enabled_file(tmp_path):
+    out = _out()
+    s = _apply(out, _root(tmp_path, doc={**FACTORS, "enabled": True}), env={S.FLAG: "0"})
+    assert s["reason"] == f"{S.FLAG} off" and out == _out()
+
+
+def test_only_the_json_true_enables(tmp_path):
+    for i, flag in enumerate(("true", 1)):
+        root = tmp_path / str(i)
+        root.mkdir()
+        out = _out()
+        s = _apply(out, _root(root, doc={**FACTORS, "enabled": flag}), env={})
+        assert s["applied"] is False and out == _out(), flag
+

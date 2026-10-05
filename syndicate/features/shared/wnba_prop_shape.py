@@ -18,6 +18,10 @@ NOT TOUCHED: the combo ladders (PR/PA/RA/PRA stay the sim's joint draws), `<stat
 INPUTS: `wnba_prop_shape.json` (k, D_league per stat) and `boxscores_history.csv` (games before the slate) in the WNBA
 processed root. Missing/broken -> untouched with a named reason. Never raises. WNBA only; OFF unless
 `SYNDICATE_WNBA_PROP_SHAPE` is set.
+
+GATING (FILE SWITCH, 2026-10-05, user "enable the prop shape and dispersion fixes"): env truthy -> on; env
+0/false/no/off -> off, a kill switch over everything; env UNSET -> on only if the factor file carries
+`"enabled": true`. The per-run SmartSim subprocess reads the file, so enabling needs no role restart.
 """
 from __future__ import annotations
 
@@ -39,9 +43,35 @@ MAX_T = 60
 D_BOUNDS = (0.5, 5.0)
 
 
-def flag_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
-    raw = (env if env is not None else os.environ).get(FLAG)
-    return str(raw or "").strip().lower() in {"1", "true", "yes", "on"}
+def flag_state(env: Optional[Mapping[str, str]] = None) -> str:
+    """'on' / 'off' (explicit kill switch) / 'unset'. The env var always wins over the factor file."""
+    raw = str((env if env is not None else os.environ).get(FLAG) or "").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return "on"
+    if raw in {"0", "false", "no", "off"}:
+        return "off"
+    return "unset"
+
+
+def file_enabled(processed_root: Path) -> Tuple[bool, str]:
+    """True only when the factor file parses and says `"enabled": true` (the JSON boolean, nothing truthy-ish)."""
+    path = Path(processed_root) / FACTOR_FILE
+    if not path.is_file():
+        return False, f"factor file absent: {path}"
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        return False, f"factor file unreadable: {type(exc).__name__}"
+    if isinstance(doc, dict) and doc.get("enabled") is True:
+        return True, "ok"
+    return False, "factor file not enabled"
+
+
+def flag_enabled(env: Optional[Mapping[str, str]] = None, processed_root: Optional[Path] = None) -> bool:
+    state = flag_state(env)
+    if state != "unset":
+        return state == "on"
+    return bool(processed_root is not None and file_enabled(processed_root)[0])
 
 
 def nb_pmf(m: float, d: float, upto: int = MAX_T) -> List[float]:
@@ -150,9 +180,16 @@ def apply_prop_shape(out: Any, *, league_code: str, processed_root: Path, build_
         if str(league_code or "").strip().lower() != "wnba":
             summary["reason"] = "not wnba"
             return summary
-        if not flag_enabled(env):
+        state = flag_state(env)
+        if state == "off":
             summary["reason"] = f"{FLAG} off"
             return summary
+        if state == "unset":
+            on, why = file_enabled(processed_root)
+            if not on:
+                summary["reason"] = f"{FLAG} unset and {why}"
+                return summary
+        summary["switch"] = "env" if state == "on" else "file"
         if not isinstance(out, dict) or not isinstance(out.get("players"), dict) or not callable(build_ladder):
             summary["reason"] = "no players block or no ladder builder"
             return summary

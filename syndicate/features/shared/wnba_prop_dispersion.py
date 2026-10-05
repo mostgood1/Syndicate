@@ -20,6 +20,10 @@ widening only removes overconfidence. The remaining gap to the book is the mean 
 GATING. WNBA only. OFF unless `SYNDICATE_WNBA_PROP_DISPERSION` is truthy (default OFF until a user decision). A
 missing or unreadable factor file leaves the ladders untouched and says why (`PROP_DISPERSION ... reason=...`) --
 never a silent neutral default (model_engine_standard §4.2). Never raises: the sim's result must survive this.
+
+GATING (FILE SWITCH, 2026-10-05, user "enable the prop shape and dispersion fixes"): env truthy -> on; env
+0/false/no/off -> off, a kill switch over everything; env UNSET -> on only if the factor file carries
+`"enabled": true`. The per-run SmartSim subprocess reads the file, so enabling needs no role restart.
 """
 from __future__ import annotations
 
@@ -35,9 +39,35 @@ LADDER_KEYS = ("pts", "reb", "ast", "threes", "pra", "pr", "pa", "ra")
 K_BOUNDS = (0.5, 3.0)   # a factor outside this is a broken fit, refused rather than applied
 
 
-def flag_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
-    raw = (env if env is not None else os.environ).get(FLAG)
-    return str(raw or "").strip().lower() in {"1", "true", "yes", "on"}
+def flag_state(env: Optional[Mapping[str, str]] = None) -> str:
+    """'on' / 'off' (explicit kill switch) / 'unset'. The env var always wins over the factor file."""
+    raw = str((env if env is not None else os.environ).get(FLAG) or "").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return "on"
+    if raw in {"0", "false", "no", "off"}:
+        return "off"
+    return "unset"
+
+
+def file_enabled(processed_root: Path) -> Tuple[bool, str]:
+    """True only when the factor file parses and says `"enabled": true` (the JSON boolean, nothing truthy-ish)."""
+    path = Path(processed_root) / FILE_NAME
+    if not path.is_file():
+        return False, f"factor file absent: {path}"
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        return False, f"factor file unreadable: {type(exc).__name__}"
+    if isinstance(doc, dict) and doc.get("enabled") is True:
+        return True, "ok"
+    return False, "factor file not enabled"
+
+
+def flag_enabled(env: Optional[Mapping[str, str]] = None, processed_root: Optional[Path] = None) -> bool:
+    state = flag_state(env)
+    if state != "unset":
+        return state == "on"
+    return bool(processed_root is not None and file_enabled(processed_root)[0])
 
 
 def load_factors(processed_root: Path) -> Tuple[Optional[Dict[str, float]], str]:
@@ -102,9 +132,16 @@ def apply_prop_dispersion(out: Any, *, league_code: str, processed_root: Path, b
         if str(league_code or "").strip().lower() != "wnba":
             summary["reason"] = "not wnba"
             return summary
-        if not flag_enabled(env):
+        state = flag_state(env)
+        if state == "off":
             summary["reason"] = f"{FLAG} off"
             return summary
+        if state == "unset":
+            on, why = file_enabled(processed_root)
+            if not on:
+                summary["reason"] = f"{FLAG} unset and {why}"
+                return summary
+        summary["switch"] = "env" if state == "on" else "file"
         if not isinstance(out, dict) or not isinstance(out.get("players"), dict) or not callable(build_ladder):
             summary["reason"] = "no players block or no ladder builder"
             return summary
