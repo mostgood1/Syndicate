@@ -272,6 +272,9 @@ def main() -> int:
     ap.add_argument("--score-only", action="store_true")
     ap.add_argument("--arms", default="prior,blend", help="arms to run: prior, blend, floorN (blend after N games), floorNnoblk (and blocks kept at the prior)")
     ap.add_argument("--variant", default="blend", help="arm scored against prior")
+    ap.add_argument("--allow-net", action="store_true",
+                    help="let the harness client fetch uncached URLs (needed when the engine reads a new endpoint, e.g. "
+                         "the stats-API PP/SH time-on-ice; offline, that enrichment silently falls back)")
     args = ap.parse_args()
     import subprocess
     prim = Path(subprocess.run(["git", "-C", str(REPO), "worktree", "list", "--porcelain"], capture_output=True,
@@ -301,7 +304,7 @@ def main() -> int:
             print(f"arm {arm}: {len(dates)} dates, {len(jobs)} to run", flush=True)
             t1 = time.time()
             with ProcessPoolExecutor(max_workers=args.workers, initializer=_init,
-                                     initargs=(str(src), str(out), False, arm, str(side))) as ex:
+                                     initargs=(str(src), str(out), bool(args.allow_net), arm, str(side))) as ex:
                 futs = {ex.submit(_run, d, args.n_sims): d for d in jobs}
                 for i, f in enumerate(as_completed(futs), 1):
                     try:

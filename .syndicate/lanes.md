@@ -895,6 +895,15 @@ death, never life — do not invert it.
   - Precondition MET 2026-10-05: another session fast-forwarded the fleet d7955a3c -> 1111942f at 14:15Z, which contains 2fe903ca (checked 14:19Z). Only `team_xg_2026-2027.csv` existed then; the last NHL generation (14:08Z) predates the ff, so the October gate is not yet exercised by a generation under 2fe903ca -- the Nov 1 task also checks no props season file has an mtime before Nov 1.
   - Cross-lane write: the hook is in `scripts/refresh_nhl_oddsapi.py::_run_owned_generation` (lane nhl-sim-artifact-backfill-fabricates owns other functions of that file; recorded in its block).
 - H14-H17 (field weights, props A/B, Brier at the lines, floor, floor without blocks) and their results: moved VERBATIM to `lanes_history.md` under `## nhl-season-inputs-in-season -- checkpoint 2026-10-05`. Narrative: log/2026-10-04.md, log/2026-10-05.md.
+- **PRE-REGISTERED H18 2026-10-05 (user: "re-run the props A/B on the current engine"; before any arm is run):**
+  - Why: H15-H17 ran on the props engine BEFORE c29e1271 (PP/PK units from real PP/SH minutes) and de074a80 (EV line rotation by even-strength minutes + line quality 0.5), both now live.
+  - Arms, rebuilt from scratch on current main in `C:/tmp/nhllines/props_ab_v2`: `prior` and `floor10noblk` (the shipped config). Same 56 dates / 446 games / n_sims 200 / records base; harness client ONLINE (`--allow-net`).
+  - **Reachability first, before scoring:** both arms' lineups must carry `proj_ev_toi` on most dressed skaters. Offline, the stats-API enrichment silently falls back to the old path; the probe confirmed BOS 2025-26 returns 88 games of PP/SH minutes. If proj_ev_toi is mostly empty, the run did not test the current engine and is reported as such, not scored.
+  - Bar, with the cell budget and false-fail rate stated up front (learnings 2026-10-05):
+    - PRIMARY: SOG@1.5 and POINTS@0.5 over all dates. Gain holds iff at least one CI is entirely < 0 AND neither is entirely > 0.
+    - GUARD: Nov+, the only period production enables (date gate Nov 1). No line's CI entirely > 0 across 11 lines; P(>=1 false fail | true null) ~ 1 - 0.975^11 ~ 0.24.
+    - October is reported, not gating: production keeps October at the prior by date.
+  - Action if H18 fails: recommend the user switch off the Nov 1 enable (env `SYNDICATE_NHL_INSEASON_SEASON_INPUTS=off`, or flip the code default) before Nov 1.
 - Blocked by: none
 ### nfl-live-segment-interval — CLOSED 2026-10-05 — opened 2026-10-03 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
 - **VERDICT 2026-10-05 14:55Z:** Goal (verbatim): NFL in-play quarter/half segment lines refresh every 10 min (code default, like NCAAF 8730cfb7) instead of every 150 s lines-autorun run, before the Sunday 2026-10-04 17:00Z window; NFL full-game lines unchanged; 0 NFL rows served >1h -- **GOAL: MET.** Live on the fleet before kickoff (every sampled HEAD contained e90d74a5); NFL live-window spend 2,825/h (early) and 2,767/h (late) vs ~8.6k/h estimated unthrottled (no measured unthrottled baseline). NFL rows >1h: 0 in the hidden-row split readings that day (stale nfl 3-30, none served). deploys.md 2026-10-05 14:55Z.
