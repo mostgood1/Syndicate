@@ -3013,3 +3013,9 @@ own prior verdicts, not by anything failing.
 - **FORBIDDEN:** any rule that removes a row, pick, edge or stake because of its MARKET, market family, or a (sport, market) model verdict. A gate must be a property of the LINE (its price/EV, quote age, an impossible book, game state, the per-game cap). A model's measured accuracy may only scale rank/stake (`skill_reliability`).
 - **Why it mattered, measured:** fleet build 2026-10-05 withheld 3,166 rows by the removed rule; 3,111 were soccer player props, while ~770 credits/h were still being spent fetching them.
 - **Still market-keyed after this lane (each needs its own change):** `football/pick_gate.py` (NCAAF model picks, default deny), `portfolio_commit.py` sim-sizing `measured_only` + `_PRICE_BASIS_SPORTS_DEFAULT={"ncaaf"}`, `live_gameline_join.publishing_disabled_for_sport` (env-driven).
+
+## 2026-10-05 -- A tier-mean bias fix is not a line-accuracy fix (lane nhl-elite-assists)
+
+- **Belief overturned:** raising the elite tier from 0.66x to 0.91x of real assists would improve the ASSISTS@0.5 line. It made it WORSE (+0.00095, CI excludes 0) while every tier mean got closer. Amplifying a noisy per-player signal fixes the bucket averages and spreads noise across the bulk of players; the line Brier is what pays for it. The milder weighting (0.78x) was flat on assists and better on points, and shipped.
+- **Rule:** gate an attribution change on paired per-player Brier at the lines, never on tier calibration alone; report both.
+- **Also measured:** sequential primary/secondary sampling from four teammates compresses weight ratios -- real-share weights at power 1 barely moved the elite (0.63x -> 0.65x). Decompose a count into rate x share against real data (shift charts) before changing the attribution.
