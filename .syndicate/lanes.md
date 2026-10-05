@@ -992,6 +992,14 @@ death, never life — do not invert it.
 - Verification: Served board after deploy carries rows_stale_quote_sample naming soccer's stale rows; a repriced row's quote ages equal its bettable book's cell ages
 - Blocked by: none
 
+### nba-1005-calibrated-resim — OPEN — opened 2026-10-04 — session ed75e56a-d3c4-4a0a-9fed-9550778f9ecc
+- Goal: The 2026-10-05 NBA games (ATL@MEM, DET@PHX, PHI@NYK) are re-simulated on production with the NBA prop calibration applied: new smart_sim_2026-10-05_*.json written after the trigger, each marked as produced under the active calibration (sim_is_stale False), and an NBA_PROP_CALIBRATION applied line in the 10-05 producer log, vs baseline: sims written 2026-10-04 ~05:05Z before the 16:40Z enable, stale under the fleet code
+- Files: none -- operational: fleet checkout fast-forward (no restart) + one ops-queued NBA refresh; no repository file (the stale-sim rule 468b8620 belongs to lane nba-prop-calibration)
+- Hypothesis: n/a (operational). Known: the fleet (4a565a47) lacks 468b8620, so even a scheduled 10-05 run would reuse the uncalibrated sims; ride-alongs to origin/main are inert on the fleet (no WNBA rate-shrink/minutes flags or parameter files; NHL floor env unset)
+- Falsification test: After the ff and a full 10-05 NBA run, the 10-05 sims are unchanged (same mtime) or sim_is_stale still reads True for them
+- Verification: Before/after: mtimes and sim_is_stale for each 10-05 sim (fleet code); producer log NBA_PROP_CALIBRATION line; a calibrated ladder differs from the old one (e.g. pts sd); recorded in deploys.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
