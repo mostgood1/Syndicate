@@ -105,3 +105,44 @@ def test_a_row_with_no_model_edge_still_has_none():
 
 def test_the_cut_orders_by_the_published_score():
     assert _cut_rank_score(_row(LOSES)) == pytest.approx(5.0)
+
+
+# ------------------------------------------------ the point estimate `[2026-10-05]`
+# User decision "ship B with the point-estimate scaling": money reads the registry's
+# POINT ESTIMATE too, so a negative record whose CI reaches zero still shrinks the stake.
+
+def _soccer(market):
+    return _row({"status": "measured", "verdict_class": "parity", "established_loss_rel": 0.0},
+                sport="soccer", market=market, model_edge_pct=10.0)
+
+
+def test_sot_sizes_on_its_point_estimate_loss():
+    """-7.1% ROI at the price, CI [-41.3%, +31.1%]: no ESTABLISHED loss, but the stake
+    shrinks to 1 - 5 x 0.071 = 0.645."""
+    assert _sizing_model_edge(_soccer("player_shots_on_target")) == pytest.approx(6.45)
+    assert _sim_sizing_basis(_soccer("player_shots_on_target")) == "skill_scaled"
+
+
+def test_anytime_scorer_point_estimate_hits_the_floor():
+    assert _sizing_model_edge(_soccer("player_goal_scorer_anytime")) == pytest.approx(10.0 * SKILL_FLOOR)
+
+
+def test_a_market_with_no_registry_entry_is_unchanged():
+    row = _row(sport="soccer", market="player_first_goal_scorer", model_edge_pct=10.0)
+    assert _sizing_model_edge(row) == pytest.approx(10.0)
+
+
+def test_a_non_negative_point_estimate_does_not_scale(monkeypatch):
+    from syndicate.features.shared import measured_market_skill as mms
+
+    key = ("soccer", "player_shots_on_target", "full", mms.PHASE_PREGAME)
+    patched = dict(mms.MEASURED_MARKET_SKILL)
+    patched[key] = {**patched[key], "roi_model": 0.04}
+    monkeypatch.setattr(mms, "MEASURED_MARKET_SKILL", patched)
+    assert _sizing_model_edge(_soccer("player_shots_on_target")) == pytest.approx(10.0)
+
+
+def test_the_larger_of_established_and_point_loss_wins():
+    row = _soccer("player_shots_on_target")
+    row["projection"]["model_skill"]["established_loss_rel"] = 0.09   # 1 - 0.45 = 0.55 < 0.645
+    assert _sizing_model_edge(row) == pytest.approx(5.5)

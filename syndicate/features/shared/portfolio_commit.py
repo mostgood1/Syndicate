@@ -270,17 +270,73 @@ def _net_profit_per_unit(american: float) -> float | None:
 # moves money in proportion; it never removes the line. Every other sizing guard is
 # a property of the line and is unchanged (Kelly <= 0 refuses, the in-play fair
 # guard, venue fee ceilings, the interval gate).
+#
+# THE STAKE READS THE POINT ESTIMATE, NOT ONLY THE ESTABLISHED LOSS
+# `[2026-10-05, user decision "ship B with the point-estimate scaling"]`. Ranking
+# (`skill_reliability`) moves only on a loss the CI ESTABLISHES, so a market whose
+# measured record is negative but whose interval reaches zero ranks -- and would size
+# -- at full weight. Measured that day on the served board: 73 soccer shots-on-target
+# overs carried edges up to +14.6 on a model whose at-the-price ROI is -7.1%
+# [-41.3%, +31.1%]. For MONEY the sizer uses the larger of the established loss and
+# the point estimate's loss (`_point_loss_rel`), through the same gain and floor:
+# SOT sizes at ~0.65x, anytime scorer (-29.5%) at the 0.5 floor. A market with no
+# registry entry, or a non-negative point estimate, is unchanged.
 SIM_SIZING_FULL = "full_model_edge"
 SIM_SIZING_SCALED = "skill_scaled"
 
 
+def _registry_entry(row: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    """The `measured_market_skill` entry this row's market resolves to, or None.
+
+    Same key shape `skill_note` uses (sport, market candidates, segment, phase), and
+    the same refusal of a SUPERSEDED entry.
+    """
+    from syndicate.features.shared import measured_market_skill as mms
+
+    projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
+    sport = str(row.get("sport") or "").strip().lower()
+    segment = str(row.get("segment") or "full").strip().lower() or "full"
+    phase = mms.projection_phase(projection)
+    for market_key in mms._market_key_candidates(row.get("market")):
+        entry = mms.MEASURED_MARKET_SKILL.get((sport, market_key, segment, phase))
+        if entry:
+            return None if entry.get("superseded") else entry
+    return None
+
+
+def _point_loss_rel(entry: Mapping[str, Any] | None) -> float:
+    """The relative loss the entry's POINT ESTIMATE shows, 0.0 when it shows none.
+
+    ROI entries (one-sided, at the price): `-roi_model`. Brier / MAE entries:
+    `(model - market) / market`, the unit-free scale `established_loss_rel` uses.
+    """
+    if not isinstance(entry, Mapping):
+        return 0.0
+    roi = _as_float(entry.get("roi_model"))
+    if roi is not None and entry.get("brier_market") is None and entry.get("mae_market") is None:
+        return max(0.0, -roi)
+    for model_key, market_key in (("brier_model", "brier_market"), ("mae_model", "mae_market")):
+        model = _as_float(entry.get(model_key))
+        market = _as_float(entry.get(market_key))
+        if model is not None and market is not None and market > 0:
+            return max(0.0, (model - market) / market)
+    return 0.0
+
+
 def _sizing_skill_factor(row: Mapping[str, Any]) -> float:
-    """`measured_market_skill.skill_reliability` of this row's own model note."""
-    from syndicate.features.shared.measured_market_skill import skill_reliability
+    """The stake multiplier: the larger of the established and the point-estimate loss,
+    through `measured_market_skill`'s gain and floor. 1.0 when neither shows a loss."""
+    from syndicate.features.shared.measured_market_skill import SKILL_FLOOR, SKILL_GAIN
 
     projection = row.get("projection")
     note = projection.get("model_skill") if isinstance(projection, Mapping) else None
-    return skill_reliability(note)
+    established = 0.0
+    if isinstance(note, Mapping) and str(note.get("status") or "").strip().lower() == "measured":
+        established = max(0.0, _as_float(note.get("established_loss_rel")) or 0.0)
+    loss = max(established, _point_loss_rel(_registry_entry(row)))
+    if loss <= 0.0:
+        return 1.0
+    return max(SKILL_FLOOR, 1.0 - SKILL_GAIN * loss)
 
 
 def _sizing_model_edge(row: Mapping[str, Any]) -> float | None:
