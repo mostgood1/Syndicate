@@ -46647,3 +46647,10 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
   - Their lanes own those readings; noted here because this restart is what loaded them into refresh-worker.
 - **Reading:** `book_grid_2026-10-05.json` rebuilt 23:47:15Z: **10/10 NHL SAVES rows** read model_skill `status: measured`, `verdict_class: loses_to_market`, `established_loss_rel 0.0647`, `sample_games 435`. Before: 11/11 `unmeasured` (23:05:47Z and 23:07:53Z builds).
 - Claims released after this entry.
+
+## 2026-10-05 23:55Z (6:55 PM CT) -- CORRECTION to the 23:06-23:47Z NHL SAVES entry: the restart LOADED THE NBA GAME-LINE BOOK BLEND ACTIVE (lane `nhl-saves-skill-registry`, at the watcher session's request)
+
+- That entry said ride-along `f16991cb` was "still gated by the blend file". **Wrong at restart time.**
+  - `nba_source/data/processed/nba_game_book_blend.json` was user-placed at **23:31:48Z** (6:31:48 PM CT). My "no file on the fleet" read was taken ~23:05Z, before that.
+  - The gated refresh-worker restart (TERM 1391497 at 23:46:37Z -> pid **1413004**, started 23:46:43Z, /healthz 200) therefore loaded the NBA blend code (f16991cb, season-phase keyed) WITH its switch file present.
+- **This restart is the one the user asked the watcher session for** (NBA blend load). No second restart is needed for that purpose. The NBA blend's own served reading belongs to its lane (nba-prop-calibration).
