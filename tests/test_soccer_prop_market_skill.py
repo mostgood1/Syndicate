@@ -16,7 +16,6 @@ import pytest
 from syndicate.features.shared import measured_market_skill as mms
 from syndicate.features.shared.layer2_board import _apply_skill_reliability, select_shortlist
 from syndicate.features.shared.opportunity_signals import expected_value_pct
-from syndicate.features.shared.portfolio_commit import _sim_sizing_gate_reason
 from syndicate.features.shared.projection_skill import attach_projection_skill
 
 _NOW = datetime(2026, 10, 5, 16, 0, tzinfo=timezone.utc)
@@ -118,9 +117,10 @@ def test_a_row_the_old_withhold_dropped_is_admitted_and_counted(market):
 
 
 @pytest.mark.parametrize("market", _REGISTERED + _UNGRADED)
-def test_its_rank_is_untouched_and_its_stake_stays_on_the_price_basis(market):
+def test_its_rank_and_its_sizing_factor_are_untouched(market):
+    """No ESTABLISHED loss, so neither rank nor (since lane stop-market-withholding has
+    portfolio sizing read `skill_reliability` too) stake is discounted. A point estimate
+    is not an established loss."""
     row = _soccer_prop_row(market)
     assert _apply_skill_reliability(row["score"], row["projection"]) == row["score"]
-    # Measured parity is not a licence to size: only beats_market is.
-    reason = _sim_sizing_gate_reason(row)
-    assert reason in {"parity", "unmeasured"}
+    assert mms.skill_reliability(row["projection"]["model_skill"]) == 1.0
