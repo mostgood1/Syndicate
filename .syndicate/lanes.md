@@ -1084,6 +1084,12 @@ death, never life — do not invert it.
 - Hypothesis: On every 3rd date the combined patch was within noise in the regular season (SOG@2.5 -0.0002) and better in the playoffs (SOG@1.5 -0.0017, POINTS@0.5 -0.0018); with ~3x the regular-season sample a real gain of that size would clear a CI
 - Falsification test: If the full-season regular-season SOG Brier CI still spans 0, or any market is significantly worse, the effect is noise and the patch stays shelved
 - Verification: Paired Brier at the standard lines, full season, patch vs production, game-clustered bootstrap
+### local-env-role-scoped-pin — OPEN — opened 2026-10-05 — session ed75e56a-d3c4-4a0a-9fed-9550778f9ecc
+- Goal: The fleet's NBA day-of sweep settings survive a re-import or re-derive: local_production.env supports ROLE__KEY overrides applied to that role only (WEB / REFRESH_WORKER / LIVE_ODDS_WORKER), and pins LIVE_ODDS_WORKER__SYNDICATE_ACTIVE_SPORTS (mlb,wnba,soccer,ncaaf,nfl,nhl,nba) and LIVE_ODDS_WORKER__SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_NBA=1800; local_production.py env --role shows them on live-odds-worker only, the other two roles' lists unchanged, and the prefixed keys never appear literally in any role env
+- Files: scripts/local_production.py (derive_role_env local-file layer ONLY), tests/test_local_production_role_scoped_env.py (NEW)
+- Hypothesis: n/a (feature)
+- Falsification test: n/a
+- Verification: Unit tests (scoped key reaches only its role, beats the global local key and the live import for that role, never leaks as a literal key, NEVER_CARRY still refused, unknown role prefix ignored); on the fleet after ff + pin: env --role for all three roles read back, effective values identical to the running processes' (so no restart owed)
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
