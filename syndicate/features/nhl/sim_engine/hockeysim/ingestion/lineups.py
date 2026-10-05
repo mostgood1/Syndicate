@@ -246,5 +246,15 @@ def project_lineup(usage: List[Dict], date: Optional[str] = None) -> List[Dict]:
     starter_id = _starter_goalie_id(usage, date)
     for r in usage:
         r["proj_toi"] = round(float(r.get("toi_avg") or 0.0), 3)
+        # EVEN-STRENGTH minutes per game: total minus the real PP/SH minutes, when the window has them.
+        # The engine weights EV line rotation by this; total TOI double-counted the PP minutes the PP
+        # units already receive (measured 2026-10-05: L1 simulated 21.56 min vs 19.39 real, L4 9.35
+        # vs 11.10) `[lane nhl-ev-rotation]`.
+        gp = max(1, int(r.get("games_played") or 0))
+        if "pp_toi_total" in r or "sh_toi_total" in r:
+            st_avg = (float(r.get("pp_toi_total") or 0.0) + float(r.get("sh_toi_total") or 0.0)) / gp
+            r["proj_ev_toi"] = round(max(0.0, r["proj_toi"] - st_avg), 3)
+        else:
+            r["proj_ev_toi"] = None
         r["is_starter_goalie"] = (r["position"] == "G" and r["player_id"] == starter_id)
     return usage

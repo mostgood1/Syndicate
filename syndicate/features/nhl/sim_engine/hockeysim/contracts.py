@@ -53,6 +53,8 @@ class HockeyPlayerFeatures:
     full_name: str
     position: str  # F / D / G
     proj_toi: float = 0.0
+    # even-strength minutes per game (total minus real PP/SH); weights EV line rotation when present
+    proj_ev_toi: Optional[float] = None
     shot_weight: Optional[float] = None
     goal_weight: Optional[float] = None
     block_weight: Optional[float] = None
@@ -76,6 +78,7 @@ class HockeyPlayerFeatures:
             "full_name": self.full_name,
             "position": self.position,
             "proj_toi": float(self.proj_toi or 0.0),
+            "proj_ev_toi": self.proj_ev_toi,
             "shot_weight": self.shot_weight,
             "goal_weight": self.goal_weight,
             "block_weight": self.block_weight,

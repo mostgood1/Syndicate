@@ -18,7 +18,8 @@ from ..features.props_lines import initial_surname_key, load_props_lines, normal
 from .lineups import build_team_usage, infer_lines, project_lineup
 from .nhl_web import NhlWebIngestClient, season_code_for_date
 
-_LINEUP_COLUMNS = ["player_id", "full_name", "position", "line_slot", "pp_unit", "pk_unit", "proj_toi", "confidence", "team"]
+_LINEUP_COLUMNS = ["player_id", "full_name", "position", "line_slot", "pp_unit", "pk_unit", "proj_toi", "confidence", "team",
+                   "proj_ev_toi"]
 _ROSTER_COLUMNS = ["full_name", "player_id", "team", "position", "team_id"]
 _GOALIE_COLUMNS = ["team", "goalie", "status", "confidence", "source"]
 
@@ -117,6 +118,7 @@ def collect_slate_inputs(
                 "player_id": r["player_id"], "full_name": r["full_name"], "position": r["position"],
                 "line_slot": r.get("line_slot"), "pp_unit": r.get("pp_unit"), "pk_unit": r.get("pk_unit"),
                 "proj_toi": r.get("proj_toi"), "confidence": 0.5, "team": team_name,
+                "proj_ev_toi": r.get("proj_ev_toi"),
             })
             roster_rows.append({
                 "full_name": r["full_name"], "player_id": r["player_id"], "team": team_name,

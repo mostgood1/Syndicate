@@ -18,6 +18,8 @@ class PlayerState:
     position: str  # F/D/G
     team: str
     toi_proj: float = 0.0
+    # projected EVEN-STRENGTH minutes; None = unknown (EV rotation then uses toi_proj)
+    ev_toi_proj: Optional[float] = None
     # Weights to bias event attribution while on ice
     shot_weight: float = 0.0
     goal_weight: float = 0.0

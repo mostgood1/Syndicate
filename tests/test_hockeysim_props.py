@@ -267,3 +267,51 @@ def test_attribution_unflattening_is_reachable_and_keeps_team_totals():
     star_new, team_new = sog(prod)
     assert star_new > star_old * 1.15
     assert abs(team_new - team_old) / team_old < 0.05
+
+
+def test_ev_minutes_rotation_is_reachable():
+    """off != on: when L1's minutes are mostly PP time, EV rotation by EV minutes gives L1 less ice."""
+    from dataclasses import replace
+
+    g = _game()
+
+    def l1_sog(with_ev: bool):
+        players = []
+        for i, p in enumerate(g.home_players):
+            if p.position != "G" and with_ev:
+                ev = (p.proj_toi - 6.0) if i < 3 else p.proj_toi    # L1 carries 6 PP minutes a game
+                p = replace(p, proj_ev_toi=ev)
+            players.append(p)
+        projs = build_prop_projections(replace(g, home_players=tuple(players)), n_sims=60, base_seed=17)
+        return sum(p.proj_lambda for p in projs if p.market == "SOG" and p.player_id in (1000, 1001, 1002))
+
+    assert l1_sog(True) < l1_sog(False) * 0.95
+
+
+def test_line_quality_is_reachable_and_keeps_team_totals():
+    """off != on: with line quality on, the strong first line out-shoots the weak fourth line by more,
+    while the team's shot total stays where it was (renormalised)."""
+    from dataclasses import replace
+
+    from syndicate.features.nhl.sim_engine.hockeysim.calibration_profile import build_nhl_sim_config
+
+    assert build_nhl_sim_config().line_quality_strength == 0.5      # production value
+    g = _game()
+
+    def sw(i):
+        return 3.0 if i < 3 else (0.5 if 9 <= i < 12 else 1.5)
+    players = [replace(p, shot_weight=sw(i)) if p.position != "G" else p for i, p in enumerate(g.home_players)]
+    game = replace(g, home_players=tuple(players))
+
+    def run(alpha):
+        prof = replace(build_nhl_sim_config(), line_quality_strength=alpha)
+        projs = build_prop_projections(game, n_sims=150, profile=prof, base_seed=21)
+        sog = {p.player_id: p.proj_lambda for p in projs if p.market == "SOG" and p.player_id < 2000}
+        return (sum(sog[pid] for pid in (1000, 1001, 1002)), sum(sog[pid] for pid in (1009, 1010, 1011)),
+                sum(sog.values()))
+
+    l1_off, l4_off, team_off = run(0.0)
+    l1_on, l4_on, team_on = run(1.0)
+    assert l1_on > l1_off * 1.10
+    assert l4_on < l4_off * 0.95
+    assert abs(team_on - team_off) / team_off < 0.04

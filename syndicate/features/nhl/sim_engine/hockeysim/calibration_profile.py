@@ -101,6 +101,14 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     attribution_power=1.0,
     attribution_uniform_mix=0.0,
     attribution_share_cap=1.0,
+    # LINE QUALITY 0.5 together with EV-minutes rotation `[2026-10-05, lane nhl-ev-rotation-fullseason]`.
+    # The engine gave the top line too much EV ice time (EV rotation weighted by TOTAL TOI incl. PP: L1
+    # 21.56 vs 19.39 real) and flat per-minute shooting across lines (0.110 vs 0.133 real) -- the two
+    # cancelled, so neither fix helps alone. Together, full 2025-26 season, paired vs the previous engine
+    # on 36,533 regular-season player-games: Brier SOG@3.5 -0.00019 [-0.00038, -0.00001], every other
+    # market better or flat (BLOCKS +0.00019, n.s.); MAE SOG/GOALS/ASSISTS/POINTS better; playoffs
+    # SOG@1.5 -0.0017, POINTS@0.5 -0.0018. Team totals unchanged (renormalised over the rotation).
+    line_quality_strength=0.5,
     score_effects="dynamic",
     goal_model="from_shots",
     assist_model="onice",

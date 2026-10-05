@@ -89,6 +89,12 @@ class SimConfig:
     attribution_power: float = 0.85
     attribution_uniform_mix: float = 0.12
     attribution_share_cap: float = 0.35
+    # LINE QUALITY (prototype, 2026-10-03, lane nhl-player-props-projection). 0.0 = off and the engine
+    # is byte-identical. At even strength the team's shot count for a segment becomes
+    # Poisson(lam * m), m = (on-ice skaters' summed per-minute shot rate / the team's rotation-weighted
+    # mean) ** line_quality_strength, renormalised so m averages exactly 1 over the EV rotation --
+    # team totals are unchanged in expectation, only WHICH line produces them moves.
+    line_quality_strength: float = 0.0
     # Score-state effects mode for play-level simulation.
     # - dynamic: time-remaining + score-diff dependent multipliers (default)
     # - legacy: fixed +/-10% based on start-of-period score diff
@@ -926,7 +932,13 @@ class PeriodSimulator:
             vals = []
             for grp in pid_groups:
                 if grp:
-                    avg_toi = sum([max(0.0, float(team.players.get(int(pid)).toi_proj or 0.0)) for pid in grp if team.players.get(int(pid))]) / max(1, len(grp))
+                    # EVEN-STRENGTH minutes when the roster carries them `[2026-10-05, lane nhl-ev-rotation]`:
+                    # total TOI includes PP time the PP units already receive, which gave L1 21.56 simulated
+                    # minutes against 19.39 real (L4 9.35 vs 11.10). A member without EV minutes uses total.
+                    def _rot_minutes(ps: PlayerState) -> float:
+                        ev = getattr(ps, "ev_toi_proj", None)
+                        return float(ev) if ev is not None else float(ps.toi_proj or 0.0)
+                    avg_toi = sum([max(0.0, _rot_minutes(team.players.get(int(pid)))) for pid in grp if team.players.get(int(pid))]) / max(1, len(grp))
                 else:
                     avg_toi = 15.0
                 vals.append(max(0.1, avg_toi))
@@ -1016,6 +1028,49 @@ class PeriodSimulator:
         rot_la = alloc_fn(w_la, segments) if l_away else []
         rot_da = alloc_fn(w_da, segments) if d_away else []
         idx_lh = 0; idx_da = 0; idx_la = 0; idx_dh = 0
+        # LINE QUALITY context (see SimConfig.line_quality_strength), computed once per period.
+        lq_alpha = float(getattr(self.cfg, "line_quality_strength", 0.0) or 0.0)
+
+        def _group_strength(group: List[int], team: TeamState) -> float:
+            s = 0.0
+            for pid in (group or []):
+                ps = team.players.get(int(pid))
+                if ps is None:
+                    continue
+                toi = float(ps.toi_proj or 0.0)
+                if toi > 1e-6:
+                    s += max(0.0, float(ps.shot_weight or 0.0)) / toi
+            return s
+
+        def _lq_context(lines: List[List[int]], pairs: List[List[int]], w_l: List[float], w_d: List[float],
+                        team: TeamState):
+            if lq_alpha <= 0.0 or not lines or not pairs:
+                return None
+            s_l = [_group_strength(g, team) for g in lines]
+            s_d = [_group_strength(g, team) for g in pairs]
+            mean = sum(w * s for w, s in zip(w_l, s_l)) + sum(w * s for w, s in zip(w_d, s_d))
+            if mean <= 1e-9:
+                return None
+            # exact expectation of the raw multiplier over the (independent) line x pair rotation
+            norm = sum(wl * wd * ((sl + sd) / mean) ** lq_alpha
+                       for wl, sl in zip(w_l, s_l) for wd, sd in zip(w_d, s_d))
+            if norm <= 1e-9:
+                return None
+            return mean, norm
+
+        lq_home = _lq_context(l_home, d_home, w_lh, w_dh, gs.home)
+        lq_away = _lq_context(l_away, d_away, w_la, w_da, gs.away)
+
+        def _lq_adjust(n_shots: int, lam: float, ice: List[int], team: TeamState, ctx) -> int:
+            """Turn an already-drawn Poisson(lam) count into an exact Poisson(lam * m) draw."""
+            if ctx is None:
+                return n_shots
+            mean, norm = ctx
+            m = ((_group_strength(ice, team) / mean) ** lq_alpha) / norm
+            m = max(0.5, min(2.0, m))
+            if m >= 1.0:
+                return n_shots + int(self.np_rng.poisson(max(0.0, lam * (m - 1.0))))
+            return int(self.np_rng.binomial(n_shots, m)) if n_shots > 0 else 0
         # Special teams units
         pp_home = _pp_units(lineup_home, gs.home)
         pk_home = _pk_units(lineup_home, gs.home)
@@ -1754,6 +1809,9 @@ class PeriodSimulator:
                     ice_h = (ice_h or [])[:5]
                     ice_a = (ice_a or [])[:5]
                     ev_ptr += 1
+                    if lq_alpha > 0.0 and goal_model != "independent":
+                        sh_h = _lq_adjust(sh_h, lam_h, ice_h, gs.home, lq_home)
+                        sh_a = _lq_adjust(sh_a, lam_a, ice_a, gs.away, lq_away)
                 else:
                     # OT 3v3: select 2F + 1D from top pools
                     def _pick_3v3(lines_f: List[List[int]], lines_d: List[List[int]], idx_f: int, idx_d: int) -> Tuple[List[int], int, int]:
@@ -1943,7 +2001,7 @@ class GameSimulator:
                 sw = float(sw if sw is not None else sw_h)
                 bw = float(bw if bw is not None else bw_h)
                 gw = float(gw if gw is not None else gw_h)
-            p = PlayerState(player_id=pid, full_name=row.get("full_name"), position=pos, team=home_name, toi_proj=toi, shot_weight=float(sw), goal_weight=float(gw), block_weight=float(bw))
+            p = PlayerState(player_id=pid, full_name=row.get("full_name"), position=pos, team=home_name, toi_proj=toi, shot_weight=float(sw), goal_weight=float(gw), block_weight=float(bw), ev_toi_proj=(float(row["proj_ev_toi"]) if row.get("proj_ev_toi") not in (None, "") else None))
             home.players[pid] = p
         for row in roster_away:
             pid = int(row.get("player_id"))
@@ -1959,7 +2017,7 @@ class GameSimulator:
                 sw = float(sw if sw is not None else sw_h)
                 bw = float(bw if bw is not None else bw_h)
                 gw = float(gw if gw is not None else gw_h)
-            p = PlayerState(player_id=pid, full_name=row.get("full_name"), position=pos, team=away_name, toi_proj=toi, shot_weight=float(sw), goal_weight=float(gw), block_weight=float(bw))
+            p = PlayerState(player_id=pid, full_name=row.get("full_name"), position=pos, team=away_name, toi_proj=toi, shot_weight=float(sw), goal_weight=float(gw), block_weight=float(bw), ev_toi_proj=(float(row["proj_ev_toi"]) if row.get("proj_ev_toi") not in (None, "") else None))
             away.players[pid] = p
         return GameState(home=home, away=away, period=0, clock=self.cfg.seconds_per_period)
 

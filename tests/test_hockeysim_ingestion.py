@@ -267,3 +267,11 @@ def test_special_teams_toi_parses_the_stats_report(monkeypatch):
     st = client.special_teams_toi("MTL", "20252026")
     assert st == {"2025020500": {8480018: (212.0, 0.0), 8478851: (0.0, 73.0)}}
     assert len(seen) == 2 and all("seasonId%3D20252026" in u for u in seen)
+
+
+def test_projected_ev_minutes_are_total_minus_special_teams():
+    rows = [{"player_id": 1, "position": "F", "games_played": 4, "toi_avg": 20.0, "pp_toi_total": 12.0, "sh_toi_total": 4.0},
+            {"player_id": 2, "position": "F", "games_played": 4, "toi_avg": 12.0}]
+    by_id = {r["player_id"]: r for r in lu.project_lineup(rows)}
+    assert by_id[1]["proj_ev_toi"] == 16.0          # 20 - (12 + 4) / 4
+    assert by_id[2]["proj_ev_toi"] is None          # no special-teams data: unknown, not total
