@@ -46348,3 +46348,9 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
   - Same-team excluded players in the pools 0, injury-OUT 0.
   - Matches the dry run. **MET.** healthz 200; no restart.
 - **all four WNBA estimators are now live** (availability, rate shrink, shape, dispersion). Rollback per fix: delete its JSON or set its env flag to 0.
+
+## 2026-10-05 19:12:39Z -- refresh-worker on d9aa0992+: Layer 2 no longer withholds by market (lane stop-market-withholding) -- MET
+- **What:** `d9aa0992` removed the 2026-09-11 unmeasured-model-only admission rule and the excluded-markets knob from `layer2_board.select_shortlist` (user directive 2026-10-05, "STOP WITHHOLDING MARKETS").
+- **Restart:** refresh-worker restarted 18:56Z (pid 1313093 -> 1358416). The first user restart command did not land: `pgrep -f` inside `bash -lc` matched its own shell. Use `pgrep -f "[r]un_refresh_worker.py"`. Web did NOT reload (gunicorn logged no HUP), so the counter rename (`rows_on_unmeasured_model`) is not in the served payload yet; rows are built by refresh-worker, so the rows are.
+- **Baseline:** served build 18:50:14Z: `rows_unmeasured_model_only` 3,168 (soccer first 944 / anytime 863 / SOT 671 / last 633 on the 2026-10-05 build read earlier), 0 soccer player_* rows served.
+- **verify (reading):** first build after the restart, `written_at` 2026-10-05T19:12:39Z, `/api/board/layer2-shortlist?limit=5000`: 2,000 rows (ncaaf 284, mlb 251, nfl 165, soccer 742, nba 430, nhl 128); soccer player_* rows 439 (SOT 345, anytime 45, first 43, last 6); `batter_home_runs` 43, `Anytime TD` 10; old key `rows_unmeasured_model_only` absent.
