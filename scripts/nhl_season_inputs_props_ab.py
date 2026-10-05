@@ -155,6 +155,24 @@ def _init(src: str, out: str, allow_net: bool, arm: str, side: str) -> None:
         return info
 
     bt.write_season_inputs = patched
+    if arm.endswith("_dfo"):
+        # lane nhl-confirmed-goalies: overlay Daily Faceoff confirmed starters (2025-26 archive, posted before the
+        # scheduled start) onto the collector's starting_goalies file, exactly as production will after collect
+        import syndicate.features.nhl.sim_engine.hockeysim.ingestion.collect as coll
+        from datetime import datetime as _dt, timezone as _tz
+        from syndicate.features.nhl import confirmed_goalies as CG
+        orig_collect = coll.collect_slate_inputs
+
+        def collect_then_overlay(date, *args, **kwargs):
+            res = orig_collect(date, *args, **kwargs)
+            arch = Path(_A.get("dfo_dir") or "C:/tmp/nhllines/dfo") / f"{date}.json"
+            games = (json.loads(arch.read_text(encoding="utf-8")).get("games") or []) if arch.exists() else []
+            root = kwargs.get("root")
+            if root is not None and games:
+                CG.overlay(Path(root) / "data" / "processed", date, games, now=_dt(2100, 1, 1, tzinfo=_tz.utc))
+            return res
+
+        coll.collect_slate_inputs = collect_then_overlay
     _A["bt"] = bt
 
 

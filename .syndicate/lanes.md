@@ -1041,6 +1041,18 @@ death, never life — do not invert it.
 - Hypothesis: H19: overlaying confirmed starters raises starter accuracy over the current rule on 2025-26; H20: it improves SAVES Brier at 22.5/25.5/28.5 (one CI < 0, none > 0) with no other line worse
 - Falsification test: accuracy not higher, or no SAVES line improves, or any SAVES line / any other line (8, all dates) has a CI entirely > 0
 - Verification: props A/B arm prior_dfo vs prior on the current engine (props_ab_v2), then fleet: starting_goalies_<date>.csv carries source=dailyfaceoff rows and the props sim's starter matches them
+- **H19 MET (2026-10-05):** starter accuracy on the current-engine harness roots (56 dates, 898 team-games, 2025-26), overlay with the Daily Faceoff archive (Confirmed, posted before the scheduled start, name maps to a dressed goalie):
+  - collector rule 560/898 = 62.4% -> overlay 769/898 = 85.6% (shipped name matcher).
+  - The overlay applied to 604 team-games, right on 604/604; the rule had 395 of those.
+  - 102 confirmed names map to no dressed goalie: the archive's after-the-fact overwrites, left to the rule.
+- **H20 MET (2026-10-05):** props A/B arm `prior_dfo` vs `prior`, current engine, `C:/tmp/nhllines/props_ab_v2`, 56 dates / 449 games, 0 failures. The arm ran the pre-fix matcher (594 overlaid vs 604 shipped: slightly understates).
+  - SAVES@22.5 **-0.0478 [-0.0634, -0.0317]**, @25.5 **-0.0155 [-0.0259, -0.0058]**, @28.5 **-0.0047 [-0.0093, -0.0003]**.
+  - Every skater line exactly 0.00000: the props sim does not model goalie quality for skaters.
+  - The SAVES gain is the rule's wrong-starter rows: the actual starter's SAVES projection was ~0.
+- **Wiring:** the overlay runs from `scripts/build_nhl_artifacts._ensure_confirmed_goalies`, once per date per process, before `build_slate_features` in the predictions and props producers (both run after the collector).
+  - It is NOT in `refresh_nhl_oddsapi.py`: lane-guard blocked that file (claimed by `nhl-sim-artifact-backfill-fabricates`).
+  - The fetch only happens when the collector's lineups + starting_goalies files exist. Off switch: SYNDICATE_NHL_CONFIRMED_GOALIES=off.
+- Coordination: lane `nhl-elite-assists` (session local_d89f75a7), which owns collect.py / lineups.py / loaders.py, was messaged 2026-10-05 ~18:0xZ. None of its files are edited.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

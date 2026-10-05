@@ -111,6 +111,22 @@ def predict_game(game, *, anchor_weight: float) -> HockeyGamePrediction:
     )
 
 
+_CONFIRMED_GOALIES_DONE: Dict[Tuple[str, str], Dict[str, object]] = {}
+
+
+def _ensure_confirmed_goalies(date: str, root: Optional[Path]) -> None:
+    """Overlay Daily Faceoff CONFIRMED starters onto `starting_goalies_<date>.csv` once per date per process,
+    before any producer reads the slate (lane `nhl-confirmed-goalies`). It runs after the collector, because
+    generation collects first and then calls these producers. Never raises; off: SYNDICATE_NHL_CONFIRMED_GOALIES=off."""
+    processed = _processed_dir(root)
+    key = (str(processed), date)
+    if key in _CONFIRMED_GOALIES_DONE:
+        return
+    from syndicate.features.nhl.confirmed_goalies import refresh_confirmed_goalies
+
+    _CONFIRMED_GOALIES_DONE[key] = refresh_confirmed_goalies(processed.parent.parent, date)
+
+
 def _apply_scoreadj_xg(games: list, date: str, root: Optional[Path]) -> list:
     """Game lines only: re-project each game from SCORE-ADJUSTED team xG (`team_xg_scoreadj_<season>.csv`,
     written beside `team_xg_<season>.csv` by `inseason_team_xg`) and give the game-market sim those period
@@ -142,6 +158,7 @@ def _predictions_and_markets(
 ) -> Tuple[List[HockeyGamePrediction], Dict[str, HockeyMarketLines]]:
     """Build every game's prediction for a slate (market-injected, anchored at the resolved weight)."""
     weight = _effective_anchor_weight(anchor, anchor_weight)
+    _ensure_confirmed_goalies(date, root)
     games = _apply_scoreadj_xg(build_slate_features(date, root=root), date, root)
     lines = load_market_lines(date, root=root)
     predictions: List[HockeyGamePrediction] = []
@@ -250,6 +267,7 @@ def build_props_for_date(
     date: str, *, root: Optional[Path] = None, n_sims: int = 400, out_dir: Optional[Path] = None,
 ) -> Tuple[Path, int]:
     """Produce props_recommendations_{date}.csv for a slate. Returns (path, row_count)."""
+    _ensure_confirmed_goalies(date, root)
     games = build_slate_features(date, root=root)
     lines = load_props_lines(date, root=root)
 
