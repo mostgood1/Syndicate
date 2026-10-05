@@ -339,10 +339,54 @@ BLOAT=""
 #                     reads first, and it grows one row per new subject.
 #   part:250000       one domain running away. Largest today is venues at
 #                     154,682, so this is ~1.6x the current worst.
-#   total:1100000     aggregate growth, the question the old 920,000 asked.
-#                     Today's total is 774,933 across ten files -- the split
-#                     ADDED ~28 KB in part headers and the index, which is the
-#                     price of the structure and is counted here honestly.
+#   total:1675000     aggregate growth, the question the old 920,000 asked.
+#                     Was 1,100,000 when the total stood at 774,933 across ten
+#                     files -- the split ADDED ~28 KB in part headers and the
+#                     index, which is the price of the structure and is counted
+#                     here honestly. RAISED 2026-10-05, see below.
+#
+# total 1100000 -> 1675000, 2026-10-05 [USER DECISION], AFTER archiving.
+# Same ORDER as the learnings raise below, and the order is again the whole
+# justification: archiving ran FIRST and was then shown SPENT, by measurement.
+#
+# What ran first: `[web-oom-leak]`'s UPDATE 1..36 (79,826 B) to
+# state_archive_2026-10-04.md, and `[mlb-ladders-native-builder]`'s two
+# `>>> (superseded) <<<` blocks (10,354 B) to state_archive_2026-10-05.md.
+# Both verbatim, both verified line-by-line against pre-cut copies, both with
+# the live section left pointing at the archive.
+#
+# WHY NO MORE IS AVAILABLE, censused over all 277 subjects in the 15 counted
+# files rather than estimated:
+#   * 12 subjects have >=3 `###` sub-blocks -- the only shape with a boundary
+#     to cut at -- holding 148,775 B between them.
+#   * 265 subjects are FLAT: 1,287,367 B with no superseded region at all.
+#   * exactly 8 sub-blocks carry a superseded/retracted marker in their own
+#     heading (19,638 B), and MOST ARE NOT ARCHIVABLE ON READING -- they are
+#     the CORRECTION ("THE SUPERSEDED CORRECTION'S TWO ACTIONABLE CLAIMS ARE
+#     VOID") or say so outright ("kept visible because it is actionable and
+#     WRONG", "superseded header, kept for the file/line map").
+# This reproduces `compact_state.py`'s own 2026-09-03 audit one level down --
+# it measured paragraphs and found 0.2% reclaimable; this measured sub-blocks
+# and found ~11 KB against a 353 KB overage. The corpus is not bloated, it is
+# LIVE CURRENT TRUTH, which is what that tool's docstring already says.
+#
+# 1,675,000 = 1,453,542 (post-archive) + 15.2%, the `current size + ~15%
+# headroom` rule the 2026-09-01 block states and the learnings raise followed.
+#
+# WHAT THAT HEADROOM BUYS, measured instead of hoped: the corpus grew
+# +151,515 B over the 13 days 2026-09-20..10-03 (1,362,521 -> 1,514,036), i.e.
+# ~11,655 B/day, so 218,031 B of headroom is ~19 days.
+#
+# AND THAT IS THE HONEST LIMIT OF THIS ALARM. At ~11.7 KB/day against a corpus
+# that cannot be compacted, the TOTAL will need raising roughly monthly, which
+# makes it a ratchet rather than a brake. **The per-file caps are the ones that
+# earn their keep**: `state.md:120000` is what caught the real defect on
+# 2026-10-04 -- `[web-oom-leak]` had put 105,318 B of body inside the INDEX
+# with no `##` section and no index row, so the largest subject in the file was
+# invisible to the index meant to find it. A total-bytes alarm would never have
+# said that. If this needs revisiting, the question is whether the total should
+# be a growth-RATE alarm rather than an absolute; that is a redesign and was
+# not taken here.
 STATE_TOTAL=0
 for sf in .syndicate/state.md .syndicate/state_*.md; do
   case "$sf" in *state_archive*) continue;; esac
@@ -354,7 +398,7 @@ for sf in .syndicate/state.md .syndicate/state_*.md; do
     *) [ "${SZ:-0}" -gt 250000 ] && BLOAT="${BLOAT}$(basename "$sf") $((SZ/1024))KB>244KB, ";;
   esac
 done
-[ "$STATE_TOTAL" -gt 1100000 ] && BLOAT="${BLOAT}state total $((STATE_TOTAL/1024))KB>1074KB, "
+[ "$STATE_TOTAL" -gt 1675000 ] && BLOAT="${BLOAT}state total $((STATE_TOTAL/1024))KB>1636KB, "
 
 # learnings.md 400000 -> 460000, 2026-09-05 [USER DECISION], AFTER compacting.
 # The raise is second, not first, and that ORDER is the whole justification:

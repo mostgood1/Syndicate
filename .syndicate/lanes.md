@@ -1046,6 +1046,14 @@ death, never life — do not invert it.
 - **2026-10-05 FULL-SEASON RESULT (verification ran):** paired vs production on 36,533 regular-season player-games (`C:/tmp/nhlprops/bt_full_prod` vs `bt_full_evlq`): Brier SOG@3.5 -0.00019 [-0.00038, -0.00001] (CI clears 0); SOG@1.5 -0.00027, SOG@2.5 -0.00011, GOALS/ASSISTS/POINTS@0.5 better but within noise; BLOCKS@1.5 +0.00019 n.s.; MAE SOG -0.0019, GOALS, ASSISTS, POINTS better (CIs clear 0); playoffs SOG@1.5 -0.0017, POINTS@0.5 -0.0018; team totals unchanged. Marginal pass; user decision "Ship it". Pre-deploy `nhl_sim_input_checklist.py` on fleet data FAILS proj_ev_toi 0% (fleet lineups predate the column) -- must PASS after the first post-deploy generation.
 - Blocked by: none
 
+### state-total-budget-raise — OPEN — opened 2026-10-05 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: The STATE_TOTAL budget in session-start.sh is raised from 1,100,000 to 1,675,000 -- current size + 15.2%, the rule the 2026-09-05 learnings raise states -- with the justification written beside it including that archiving was shown spent FIRST, and the digest verified to stop reporting state total as over budget while still reporting a genuine future breach.
+- Files: .claude/hooks/session-start.sh (the STATE_TOTAL threshold and its comment ONLY)
+- Hypothesis: n/a -- the raise is a decision; the measurement supporting it is already taken (archiving ceiling ~11KB of a 353KB overage; 265 of 277 subjects flat).
+- Falsification test: If the digest still reports 'state total' over budget after the edit, the threshold was not the only gate and the change is incomplete.
+- Verification: session-start.sh no longer reports 'state total' in LEDGER OVER BUDGET at the current size; a synthetic size above the new threshold DOES report it (off != on); no other cap's behaviour changes.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
