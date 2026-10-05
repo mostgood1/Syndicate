@@ -1146,6 +1146,10 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### mlb-strikeout-bias — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **JOINT RE-FIT STAGE PICKS, 2026-10-06 ~03:00Z, TUNE only, holdout not yet read.**
+  - **Stage 1:** `early_count_foul_boost` 2.05 -> **1.5**. Starter K/BF 0.2295 vs 0.2280 actual (|d| 0.0015 vs 0.0257 at 2.05). `k_rate_mult` 0.85 barely moved K (0.2509), confirming the ledger.
+  - **Stage 2:** `hr_rate_mult` **1.856**. Batting HR/PA 0.0367 vs 0.0345 actual (|d| 0.0021; 1.1 -> 0.0131, 1.5 -> 0.0050, 2.2 -> 0.0089). Tune game total 9.64 vs 9.79 actual (7.92 at 1.1).
+  - **Stage 3:** the 200-sim baseline and combination are running.
 - **AMENDMENT to the joint re-fit rule, 2026-10-06 ~01:45Z: stricter only, written BEFORE the holdout was read.**
   - Production applies `data/tuning/hitter_hr_calibration/default.json` (affine_logit a=0.805, b=0.032, fitted 07-17 on the HR-starved engine) to every hitter P(HR>=1) the board serves. It maps raw 0.09 -> 0.138, which is right only for the old level.
   - Therefore: IF the joint ship changes `hr_rate_mult`, the SAME ship sets that file `enabled: false` (identity).
