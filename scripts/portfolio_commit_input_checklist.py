@@ -66,11 +66,10 @@ CANONICAL_ROW = {
     "ev_pct": 4.5,
     "model_edge_pct": 3.2,
     "score": {"score": 5.1, "price_reliability": 0.82},
-    # A model the sizer is ALLOWED to size (lane `sim-sizing-skill-gate`). From
-    # 2026-09-19 only `measured` + `beats_market` sizes on the sim. Without this
-    # note the canonical row would size on price, the checklist would stop
-    # exercising the model-probability plumbing it exists to gate, and outside
-    # a market-fair allowlist it would refuse the row and halt every commit.
+    # A model note that does not scale the edge (`skill_reliability` 1.0), so the
+    # checklist exercises the model-probability plumbing at full strength. Since
+    # 2026-10-05 every model edge sizes, scaled by its measured record (lane
+    # `stop-market-withholding`).
     "projection": {"model_skill": {"status": "measured", "verdict_class": "beats_market"}},
 }
 

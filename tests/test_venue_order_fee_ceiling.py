@@ -15,11 +15,6 @@ from syndicate.features.shared.portfolio_settings import PortfolioSettings
 from syndicate.features.shared.venue_scope import REASON_VENUE_EV_IMPLAUSIBLE, scope_rows_to_venue
 
 
-@pytest.fixture(autouse=True)
-def _sim_sizing_legacy(monkeypatch):
-    monkeypatch.setenv("SYNDICATE_PORTFOLIO_SIM_SIZING", "legacy")
-
-
 def _p(american):
     return 100 / (american + 100) if american > 0 else -american / (-american + 100)
 

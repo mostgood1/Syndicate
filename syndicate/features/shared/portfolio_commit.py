@@ -248,189 +248,68 @@ def _net_profit_per_unit(american: float) -> float | None:
 
 
 
-# SPORTS WHOSE STAKES ARE SIZED ON PRICE EVEN WHEN THE ROW CARRIES A SIM EDGE.
-# `[2026-09-18, user decision "Show edges, size on price", lane ncaaf-board-sim-coverage]`
+# EVERY MODEL EDGE SIZES; ITS MEASURED RECORD SCALES IT.
+# `[2026-10-05, user directive, lane stop-market-withholding]`: "WE HAVE TO STOP
+# WITHHOLDING MARKETS! THIS IS A PRIME DIRECTIVE OF THE APP. All lines are judged
+# individually - models are tested for accuracy but each bet is at the line level".
 #
-# A SIZING BASIS, NOT AN EXCLUSION. Every NCAAF row is still judged and sized
-# (the 2026-09-16 no-family-exclusion rule below is untouched); what changes is
-# only WHICH probability the stake is bet on. Until 2026-09-18 NCAAF published
-# no `model_edge_pct` at all, so every NCAAF stake was already market-fair.
-# That day the user made NCAAF sim edges visible and rankable ("they should be
-# shown, period"), and asked separately that the money keep following price
-# until an in-season NCAAF model beats the close -- the current one loses to it
-# by +1.75 margin MAE this season (`ncaaf/game_projections.NCAAF_MEASURED_SKILL`).
+# This REPLACES two gates that zeroed the model's part of a stake by sport or by a
+# market-level verdict, and both are deleted rather than defaulted off:
+#   * `_PRICE_BASIS_SPORTS_DEFAULT = {"ncaaf"}` / `SYNDICATE_PORTFOLIO_PRICE_BASIS_SPORTS`
+#     `[2026-09-18, user decision "Show edges, size on price"]` -- NCAAF never sized
+#     on its model;
+#   * `SYNDICATE_PORTFOLIO_SIM_SIZING` = `measured_only`
+#     `[2026-09-19, user decision "All sports (Recommended)", lane sim-sizing-skill-gate]`
+#     -- a model not measured as `beats_market` sized nothing (a sim-only row sized
+#     to zero), unless the daily scorecard validated its bucket.
 #
-# Without this, publishing the edge would silently switch NCAAF paper AND live
-# stakes to `fair + model_edge_pct/100` Kelly. With it, NCAAF sizing is
-# byte-identical to the day before the edges appeared. The row's real
-# `model_edge_pct` is still RECORDED on the position, so the settled book can be
-# split by what the sim thought.
-#
-# `SYNDICATE_PORTFOLIO_PRICE_BASIS_SPORTS`: absent or blank keeps this default;
-# `none` clears it; otherwise a comma list.
-_PRICE_BASIS_SPORTS_DEFAULT = frozenset({"ncaaf"})
+# Now the stake's model edge is `model_edge_pct x skill_reliability(note)`: the same
+# multiplier `layer2_board._apply_skill_reliability` ranks the row by. It is 1.0 for
+# an unmeasured model and for one without an established loss, and shrinks a model
+# MEASURED as losing to the market toward `SKILL_FLOOR` (0.5). The accuracy test
+# moves money in proportion; it never removes the line. Every other sizing guard is
+# a property of the line and is unchanged (Kelly <= 0 refuses, the in-play fair
+# guard, venue fee ceilings, the interval gate).
+SIM_SIZING_FULL = "full_model_edge"
+SIM_SIZING_SCALED = "skill_scaled"
 
 
-def _price_basis_sports() -> frozenset[str]:
-    raw = str(os.environ.get("SYNDICATE_PORTFOLIO_PRICE_BASIS_SPORTS") or "").strip().lower()
-    if not raw:
-        return _PRICE_BASIS_SPORTS_DEFAULT
-    if raw == "none":
-        return frozenset()
-    return frozenset(part.strip() for part in raw.split(",") if part.strip())
-
-
-# ONLY A MODEL MEASURED TO BEAT THE MARKET MAY MOVE MONEY.
-# `[2026-09-19, user decision "All sports (Recommended)", after "We need
-# everything to be MEANINGFUL how do we get there"]`, lane `sim-sizing-skill-gate`.
-#
-# The NCAAF price-basis rule above, generalised from one sport to every row whose
-# model has not EARNED sizing. When measured, all 31 `measured_market_skill` entries were
-# `parity` (23) or `loses_to_market` (8). None beat the market. The WNBA
-# backtest over 25 dates (4,297 priced props) put the sim's log-loss at 0.858
-# against the market's 0.682, with the fitted weight on the model ~0. Yet
-# `stake_attribution` measured the sim OWNING 57.6% of a representative stake,
-# and it sized a live WNBA over at 89% on 2026-09-18. A number that loses to the
-# market was deciding how much money went in.
-#
-# A gated row takes the price-basis path: its sim edge is still shown, ranked
-# and RECORDED on the position, and its stake is the price-shopping stake that
-# `stake_attribution` already computes as `stake_fraction_ev_only`. So the sim
-# can no longer create a bet (a sim-only row sizes to zero), veto or shrink a
-# price bet, or run the interval gate and blend. An IN-PLAY row whose stake
-# rested on the sim now meets `in_play_market_fair`, refused by default for the
-# 2026-09-12 stale-quote measurement.
-#
-# `SYNDICATE_PORTFOLIO_SIM_SIZING`: only the exact word `legacy` restores sim
-# sizing; absent or anything else gates. An unrecognised value must not quietly
-# hand money back to an unmeasured model.
-SIM_SIZING_LEGACY = "legacy"
-SIM_SIZING_GATED = "measured_only"
-SIM_SIZING_PRICE_BASIS_SPORT = "price_basis_sport"
-
-
-def _sim_sizing_mode() -> str:
-    raw = str(os.environ.get("SYNDICATE_PORTFOLIO_SIM_SIZING") or "").strip().lower()
-    return SIM_SIZING_LEGACY if raw == SIM_SIZING_LEGACY else SIM_SIZING_GATED
-
-
-def _note_gate_reason(row: Mapping[str, Any]) -> str | None:
-    """The row's own `projection.model_skill` verdict: None only for measured + beats_market."""
-    from syndicate.features.shared.measured_market_skill import VERDICT_BEATS
-    from syndicate.features.shared.projection_skill import STATUS_MEASURED
+def _sizing_skill_factor(row: Mapping[str, Any]) -> float:
+    """`measured_market_skill.skill_reliability` of this row's own model note."""
+    from syndicate.features.shared.measured_market_skill import skill_reliability
 
     projection = row.get("projection")
-    skill = projection.get("model_skill") if isinstance(projection, Mapping) else None
-    if not isinstance(skill, Mapping):
-        return "no_skill_note"
-    status = str(skill.get("status") or "").strip().lower()
-    if status != STATUS_MEASURED:
-        return status or "no_skill_status"
-    verdict_class = str(skill.get("verdict_class") or "").strip().lower()
-    if verdict_class == VERDICT_BEATS:
-        return None
-    return verdict_class or "measured_no_verdict"
-
-
-def _in_validated_skill_pocket(row: Mapping[str, Any]) -> bool:
-    """True when the daily scorecard has VALIDATED this row's bucket as a skill pocket.
-
-    THE SELF-UPDATING HALF OF THE GATE. The `model-scorecard` cron grades the priced
-    population every day and publishes only buckets that pass `bucket_search`'s own
-    bar (>= 60 games over >= 5 dates, FDR, leave-one-date-out). The file expires in
-    72 h and has a kill switch (`skill_overlay`). A model that starts beating the
-    market in a bucket earns sizing there with no code change, and loses it when the
-    next run stops validating it.
-
-    `bucket_factor == 1.0` is exactly "a validated pocket and no conflicting loss"
-    (`measured_bucket_skill.bucket_factor`). Anything else, including a lookup that
-    raises, is not a pocket. Unknown must not default permissive.
-    """
-    try:
-        from syndicate.features.shared.measured_bucket_skill import bucket_factor, view_from_candidate
-
-        return bucket_factor(view_from_candidate(row)) == 1.0
-    except Exception:
-        return False
-
-
-def _sim_sizing_gate_reason(row: Mapping[str, Any]) -> str | None:
-    """Why this row's model may NOT size, or None when it may.
-
-    It may size when the gate is off (`legacy`), when the row's
-    `projection.model_skill` is `measured` with `verdict_class == beats_market`,
-    or when the daily scorecard validated the row's bucket as a skill pocket.
-    Anything else is gated and says which: `no_skill_note` (unknown must not
-    default permissive), `unmeasured`, `measured_no_verdict` (a producer note
-    that carries no class), `parity` or `loses_to_market`.
-    """
-    if _sim_sizing_mode() == SIM_SIZING_LEGACY:
-        return None
-    reason = _note_gate_reason(row)
-    if reason is not None and _in_validated_skill_pocket(row):
-        return None
-    return reason
+    note = projection.get("model_skill") if isinstance(projection, Mapping) else None
+    return skill_reliability(note)
 
 
 def _sizing_model_edge(row: Mapping[str, Any]) -> float | None:
-    """The model edge the STAKE may use.
+    """The model edge the STAKE uses: the row's edge scaled by its measured record.
 
-    None for a price-basis sport, and None for a model not measured to beat the
-    market (`_sim_sizing_gate_reason`). Both take the same price-basis path.
+    None only when the row carries no model edge at all.
     """
-    if str(row.get("sport") or "").strip().lower() in _price_basis_sports():
-        return None
     edge = _as_float(row.get("model_edge_pct"))
-    if edge is None or _sim_sizing_gate_reason(row) is not None:
+    if edge is None:
         return None
-    return edge
+    return edge * _sizing_skill_factor(row)
 
 
 def _sim_sizing_basis(row: Mapping[str, Any]) -> str | None:
-    """What decided whether this row's sim edge sized: None when it has no edge."""
+    """How this row's sim edge sized: None when it has no edge."""
     if _as_float(row.get("model_edge_pct")) is None:
         return None
-    if str(row.get("sport") or "").strip().lower() in _price_basis_sports():
-        return SIM_SIZING_PRICE_BASIS_SPORT
-    if _sim_sizing_mode() == SIM_SIZING_LEGACY:
-        return SIM_SIZING_LEGACY
-    reason = _note_gate_reason(row)
-    if reason is None:
-        return "admitted_beats_market"
-    if _in_validated_skill_pocket(row):
-        return "admitted_validated_pocket"
-    return f"gated_{reason}"
+    return SIM_SIZING_SCALED if _sizing_skill_factor(row) < 1.0 else SIM_SIZING_FULL
 
 
 def _cut_rank_score(row: Mapping[str, Any]) -> float | None:
-    """The score the `max_positions` cut orders by.
+    """The score the `max_positions` cut orders by: the row's published Layer 2 score.
 
-    A row whose sim edge may not size must not win a slot on it either, so its
-    Layer 2 score is re-derived with the capped `sim_component` removed. The
-    re-derivation uses the score's own terms, the same algebra as
-    `blended_score` and `layer2_board._apply_skill_reliability`: value is
-    `value_pct - sim_component`, and the reliability discount applies only when
-    it lowers the value. A score without those terms, or a row whose sim may
-    size, keeps its published score unchanged.
+    Until 2026-10-05 a row whose sim edge was gated from sizing had its score
+    re-derived without the sim term. Nothing is gated now (lane
+    `stop-market-withholding`), and the published score already carries the
+    model's measured record (`layer2_board._apply_skill_reliability`).
     """
-    base = _score_value(row)
-    score = row.get("score")
-    if base is None or not isinstance(score, Mapping):
-        return base
-    sim = _as_float(score.get("sim_component"))
-    if not sim or _as_float(row.get("model_edge_pct")) is None or _sizing_model_edge(row) is not None:
-        return base
-    value = _as_float(score.get("value_pct"))
-    terms = [_as_float(score.get(key)) for key in ("book_confidence", "freshness_factor", "price_reliability")]
-    if value is None or any(term is None for term in terms):
-        return base
-    reliability = terms[0] * terms[1] * terms[2]
-    price_only = value - sim
-    ranked = min(price_only, price_only * reliability)
-    skill_factor = _as_float(score.get("skill_reliability"))
-    if skill_factor is not None and skill_factor < 1.0:
-        ranked = min(ranked, ranked * skill_factor)
-    return round(ranked, 4)
+    return _score_value(row)
 
 
 def _market_fair_sports() -> frozenset[str]:
@@ -1424,10 +1303,10 @@ def commit_portfolio(
                 else None
             ),
         },
-        # Per sim-edge row: `admitted_beats_market`, `gated_<reason>`,
-        # `price_basis_sport` or `legacy`. Sums to `rows_with_sim_edge`.
+        # Per sim-edge row: `full_model_edge` or `skill_scaled` (lane
+        # `stop-market-withholding`, 2026-10-05). Sums to `rows_with_sim_edge`.
         "sim_sizing": {
-            "mode": _sim_sizing_mode(),
+            "mode": "skill_scaled_all",
             "by_basis": dict(sorted(sim_sizing.items())),
         },
         "rows_in": rows_in,
