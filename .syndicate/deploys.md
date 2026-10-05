@@ -46580,3 +46580,26 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
   - Shortlist NHL candidates rose 390 -> 556 (props 382 -> 446 selected). 0 SAVES rows are among the 200 returned rows.
 - **Not exercised:** REFUSE_NOT_STARTER on a SAVES line (no backup was quoted on this slate).
 - **Lead, not acted on:** the board marks NHL SAVES `model_skill: unmeasured, sample_games 0`. This lane's 2025-26 backtest (SAVES Brier better at 22.5 / 25.5 / 28.5) is not in the board's measured-skill registry.
+
+## 2026-10-05 23:10:15Z (6:10 PM CT) -- LOCAL FLEET FF d2ecd036 -> 5fdd5139, NO RESTART: 10 of 18 hitter-prop calibrations re-fit on the current engine (lane `mlb-hr-prop-calibration`) -- **SHIPPED; verification OWED**
+
+- **Rule, pre-registered** (lanes.md, before the replay): per key, keep the lowest holdout log-loss among {current, re-fit, identity}. Replace only if it wins by >= 0.001 nats/row AND calibration-in-the-large is no worse.
+- **Data.** `scripts/mlb_hitter_prop_replay.py`: production engine, 26 dates, 4,954 batter-games; holdout 07-04..07-12, n=1,930, read once.
+- **REPLACED (10):** hits_1plus, hits_2plus, rbi_1plus, runs_1plus, runs_2plus, total_bases_1plus..5plus.
+  - The 09-01 maps served BELOW realised. Example, hits_1plus: served mean 0.524 vs 0.589 actual; re-fit 0.620; holdout log-loss 0.6911 -> 0.6796.
+- **KEPT (9):** doubles, hits_3plus, rbi_2-4plus, runs_3plus, sb, triples, and `hr_1plus`.
+  - `hr_1plus` kept its 07-17 map: the re-fit log-loss was better (0.4007 -> 0.3931), but its level was further from actual (0.137 vs 0.127 current, 0.131 realised).
+- **Mechanics.** Gap = this one file as runtime. The calibration is read per sim run, so no restart was needed. No sim was running at the ff.
+- **OWED** (next MLB sim run after 23:10Z): served `p_*_cal` == sigmoid(a*logit(p_raw)+b) for the new (a, b), on >= 1 changed key.
+
+## 2026-10-05 23:23:48Z (6:23 PM CT) -- LOCAL FLEET FF 5fdd5139 -> b6fd6189, NO RESTART: caught-stealing outs credited to the pitcher (lane `mlb-non-pa-outs`, step 1) -- **SHIPPED; verification OWED**
+
+- **Fix.** `simulate.py` pre-PA steal block: `st.pitcher_row(pitcher_id)["OUTS"] += 1.0` on a caught steal. The out already counted for the inning, never for the pitcher.
+- **Test.** `tests/test_mlb_non_pa_outs.py`: pitcher OUTS == 3 x half-innings (non-walk-off) on a caught-stealing-heavy fixture. Fails before (51 vs 54), passes after.
+- **Replay, holdout 232 starts.** All 7 checks of the pre-registered rule PASS.
+  - BF balance +0.05 -> -0.05 (actual -0.47).
+  - Starter outs bias +0.65 -> +0.75 (worsens by 0.100; limit 0.10).
+  - SO/H/BB/ER/totals byte-identical: the fix is bookkeeping only.
+- **The gap also carried** another session's `f16991cb` (NBA game-line blend phase keying: `nba_game_projections.py`, `nba_prop_calibration.py`) onto disk. It was not in deploys.md at the ff. It loads wherever those modules next load.
+- **OWED** (next MLB sim run): stored starter `outs_mean` ~+0.1 above a no-fix replay of the same rosters.
+- **Residual.** BF-balance gap 0.42 > 0.20, so step 2 (pickoffs) is warranted. It needs its own pre-registered rule before any run.

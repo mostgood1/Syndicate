@@ -1269,6 +1269,7 @@ death, never life — do not invert it.
 - Blocked by: mlb-strikeout-bias
 
 ### mlb-hr-prop-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **SHIPPED 2026-10-05 23:10:15Z (fleet 5fdd5139):** 10 of 18 hitter-prop keys re-fit by the pre-registered rule; HR + 8 kept. Verification owed at the next MLB sim (deploys.md 23:10:15Z).
 - **SELECTION RULE, PRE-REGISTERED 2026-10-06 ~06:00Z before any replay** (user: "yes, do 2 and 3 and ship if they pass").
   - **Engine** = production as shipped: forward overrides incl. hr_rate_mult 1.1, starter_short_start_prob 0.10.
   - **Data.** `scripts/mlb_hitter_prop_replay.py`: per lineup batter who appeared (PA >= 1), the RAW sim P(X >= k) at 200 sims for every key in `hitter_props_calibration/default.json` (18 keys) plus `hr_1plus` (`hitter_hr_calibration`). Outcomes from the box score. Same 26 dates; TUNE < 2026-07-04, HOLDOUT >= 2026-07-04.
@@ -1286,6 +1287,7 @@ death, never life — do not invert it.
 - Blocked by: none (unblocked 2026-10-06, user: "do 2 and 3 and ship if they pass"; runs on the engine as shipped, since the joint re-fit did not ship)
 
 ### mlb-non-pa-outs — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **STEP 1 SHIPPED 2026-10-05 23:23:48Z (fleet b6fd6189):** all 7 holdout checks pass; BF balance +0.05 -> -0.05 (actual -0.47); game play byte-identical. Verification owed at the next MLB sim. Step 2 (pickoffs) is warranted (residual 0.42 > 0.20) and needs its own pre-registered rule.
 - **SELECTION RULE, PRE-REGISTERED 2026-10-06 ~03:30Z before any change** (user: "then fix the caught stealing outs next"; promoted from the 10-06 lead).
   - **Claim.** The engine edit to `simulate.py` (pre-PA steal block only) is taken from lane `mlb-starter-length` when this lane starts; recorded then.
   - **Step 1, bookkeeping.** A caught-stealing out increments the current pitcher's `OUTS` (it already increments `half.outs`).
