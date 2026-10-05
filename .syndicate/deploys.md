@@ -46375,3 +46375,21 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 ## 2026-10-05 19:56Z (2:56 PM CT) -- READING for the 19:50:48Z ff (82e26761, NHL assist_position_power 1.5) -- **MET** (lane `nhl-elite-assists`)
 
 - reading: props_recommendations_all_markets_2026-10-05.csv rebuilt 19:55:30Z (first after the ff): ASSISTS mean D 0.2343 -> 0.2627 (+12.1%, n 48), F 0.3219 -> 0.3078 (-4.4%, n 95). Predicted D +10-13%, F -4-5%: both inside.
+
+## 2026-10-05 20:03:24Z (3:03 PM CT) -- LOCAL FLEET FILE SWITCH (no restart): NBA prop BOOK BLEND ON -- placed by the USER; served reading OWED (lane `nba-prop-calibration`)
+
+- what: the user copied `C:\tmp\nba_bt\nba_prop_book_blend.enabled.json` to `~/syndicate-prod/data/nba_source/data/processed/nba_prop_book_blend.json` (auto mode had refused my copy). This turns on the NBA-only serving blend p = sigmoid(logit(book) + w (logit(model) - logit(book))) in Layer 2 (`nba_projections.py`), the NBA market board's sim-distribution rows, and NBA props edges (league="nba").
+- why: user decision 2026-10-05 ("serve the book blend on the board"). Measured (findings_2026-10-02_nba_lines_props_backtest.md, vs-book section): the calibrated model loses to the de-vigged book in all 10 markets on 249,884 held-out lines, and the OOS blend weight ~0.05 only ties it.
+- weights (refit on all 336,418 lines / 545 games): reb 0.10, pra 0.05, ra 0.05, stl 0.05, pts/ast/threes/blk/pr/pa 0. tov has no weight, so it keeps the model chain with reason `no weight`.
+- code: 8ba08f59 + 4c62f7e0. They are loaded by web (gunicorn workers started 19:17:50Z) and the refresh-worker (started 19:48:30Z). Both started after the 19:16:35Z ff to 22a68f03, which contains 4c62f7e0. The fleet HEAD is now 6b4fa17d (ff'd by others since). The loader is mtime-keyed per call, so no restart is needed.
+- measured at 20:03:43Z:
+  - file: present, 558 B, sha256 504350d881cc4c73 (identical to the source).
+  - fleet code (fleet venv, service roots SYNDICATE_NBA_SOURCE_ROOT=~/syndicate-prod/data/nba_source): `book_blend_weights()` -> 'ok', with the weights above.
+  - `served_prop_probability(0.62, 0.50, 'pts')` -> 0.5 (`applied`, w 0).
+  - the same call for 'reb' -> 0.5122 (`applied`, w 0.10).
+  - healthz 200.
+- baseline (19:05Z): the NBA market board served 0 NBA prop rows (moneylines only), and Layer 2 per_sport nba prop = 0. The fleet writes NO NBA props_edges file (lead a744832d). So NO served surface changes today.
+- expect: on the first NBA prop rows on Layer 2 or the market board, every row carries `book_blend` = 'applied' (or a per-row reason) plus `p_model_raw`. model_prob_over is approximately the consensus de-vigged over price (|served - fair| <= ~0.01 except reb/combos). |edge_vs_market_pct| collapses toward 0 versus today's model-only edges, so few or no NBA prop picks clear the EV floor.
+- verify: OWED, at the first served NBA prop rows (Layer 2 lane expects NBA prop quotes ~opening night 10-20). Read /api/board/layer2-shortlist per_sport.nba.prop > 0 and the projection's `book_blend` counter.
+- off switch: SYNDICATE_NBA_PROP_BOOK_BLEND=0 (needs a restart to reach the env), or delete the file / set "enabled": false (no restart).
+- locks: none taken for the copy (a user action, data file only). web and refresh-worker claims were free at 19:52Z.
