@@ -121,6 +121,14 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     # 2.0, full season: D 0.99x, F 1.01x, elite unchanged 0.78x; Brier ASSISTS@0.5 -0.00048 [-0.00063,
     # -0.00031], POINTS@0.5 -0.00031 [-0.00046, -0.00014], POINTS@1.5 -0.00007; playoffs ASSISTS@0.5
     # -0.00080. Position power 1.0 overshot D (1.11x).
+    # POWER-PLAY skaters drawn by projected PP minutes, not fixed PP1/PP2 units `[2026-10-05, lane
+    # nhl-elite-pp-onice]`. Fixed units gave PP1 members 0.903 of team PP time vs real 0.632 (PP2 0.097 vs
+    # 0.286); "minutes" lands at 0.664 / 0.291 (45 slates vs NHL stats timeonice). Full 2025-26 season,
+    # paired vs the previous engine on 38,287 regular-season player-games: Brier SOG@1.5 -0.00161
+    # [-0.00212, -0.00114], SOG@2.5 -0.00145, SOG@3.5 -0.00070, ASSISTS@0.5 -0.00046, POINTS@0.5 -0.00052
+    # (CIs exclude 0); GOALS, POINTS@1.5, BLOCKS flat; playoffs SOG@2.5 -0.00173. Elite assists 0.77x ->
+    # 0.74x (they no longer get an inflated PP share). Total PP time is NOT changed here (lane nhl-pp-time).
+    pp_usage="minutes",
     assist_attribution="onice_share",
     assist_position_power=1.5,
     assist_share_power=2.0,

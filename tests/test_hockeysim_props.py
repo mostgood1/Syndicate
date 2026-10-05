@@ -349,3 +349,39 @@ def test_assist_share_unknown_player_uses_the_position_prior():
     from syndicate.features.nhl.sim_engine.hockeysim.state import ASSIST_SHARE_PRIOR
 
     assert ASSIST_SHARE_PRIOR["F"] > ASSIST_SHARE_PRIOR["D"] > 0.2
+
+
+def test_pp_minutes_usage_is_reachable():
+    """off != on `[lane nhl-elite-pp-onice]`: under pp_usage="minutes" a PP2 forward who really plays
+    2.8 PP minutes a game gets far more PP shots than under the fixed units (PP2 ~10% of PP time), and
+    a PP1 forward with 2.0 minutes gets fewer; team shot totals do not move."""
+    from dataclasses import replace
+
+    from syndicate.features.nhl.sim_engine.hockeysim.calibration_profile import build_nhl_sim_config
+
+    assert build_nhl_sim_config().pp_usage == "minutes"      # production value
+
+    def unit_and_minutes(i, p):
+        if p.position == "G":
+            return p
+        f_idx, d_idx = (i, None) if p.position == "F" else (None, i - 12)
+        unit = 1 if (f_idx is not None and f_idx < 3) or (d_idx is not None and d_idx < 2) else (
+            2 if (f_idx is not None and f_idx < 6) or (d_idx is not None and d_idx < 4) else None)
+        mins = {0: 4.0, 1: 2.0, 2: 3.5, 3: 2.8}.get(f_idx, 3.0 if unit == 1 else (1.0 if unit == 2 else 0.0))
+        return replace(p, pp_unit=unit, proj_pp_toi=mins)
+
+    g = _game()
+    game = replace(g, home_players=tuple(unit_and_minutes(i, p) for i, p in enumerate(g.home_players)),
+                   away_players=tuple(unit_and_minutes(i, p) for i, p in enumerate(g.away_players)))
+
+    def run(mode):
+        prof = replace(build_nhl_sim_config(), pp_usage=mode)
+        projs = build_prop_projections(game, n_sims=200, profile=prof, base_seed=23)
+        sog = {p.player_id: p.proj_lambda for p in projs if p.market == "SOG" and p.player_id < 2000}
+        return sog[1003], sog[1001], sum(sog.values())
+
+    pp2_units, pp1_units, team_units = run("units")
+    pp2_min, pp1_min, team_min = run("minutes")
+    assert pp2_min > pp2_units * 1.05
+    assert pp1_min < pp1_units
+    assert abs(team_min - team_units) / team_units < 0.04

@@ -309,7 +309,12 @@ def project_lineup(usage: List[Dict], date: Optional[str] = None) -> List[Dict]:
         if "pp_toi_total" in r or "sh_toi_total" in r:
             st_avg = (float(r.get("pp_toi_total") or 0.0) + float(r.get("sh_toi_total") or 0.0)) / gp
             r["proj_ev_toi"] = round(max(0.0, r["proj_toi"] - st_avg), 3)
+            # POWER-PLAY minutes per game `[2026-10-05, lane nhl-elite-pp-onice]`: the engine draws its PP
+            # skaters by these when SimConfig.pp_usage == "minutes" (fixed PP1/PP2 units gave PP1 members
+            # 0.903 of PP time against a real 0.632).
+            r["proj_pp_toi"] = round(float(r.get("pp_toi_total") or 0.0) / gp, 3)
         else:
             r["proj_ev_toi"] = None
+            r["proj_pp_toi"] = None
         r["is_starter_goalie"] = (r["position"] == "G" and r["player_id"] == starter_id)
     return usage

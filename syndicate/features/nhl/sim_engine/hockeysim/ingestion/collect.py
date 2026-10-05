@@ -19,7 +19,7 @@ from .lineups import ASSIST_SHARE_PRIOR_SEASON_WEIGHT, attach_assist_share, buil
 from .nhl_web import NhlWebIngestClient, season_code_for_date
 
 _LINEUP_COLUMNS = ["player_id", "full_name", "position", "line_slot", "pp_unit", "pk_unit", "proj_toi", "confidence", "team",
-                   "proj_ev_toi", "assist_share"]
+                   "proj_ev_toi", "assist_share", "proj_pp_toi"]
 _ROSTER_COLUMNS = ["full_name", "player_id", "team", "position", "team_id"]
 _GOALIE_COLUMNS = ["team", "goalie", "status", "confidence", "source"]
 
@@ -125,6 +125,7 @@ def collect_slate_inputs(
                 "proj_toi": r.get("proj_toi"), "confidence": 0.5, "team": team_name,
                 "proj_ev_toi": r.get("proj_ev_toi"),
                 "assist_share": r.get("assist_share"),
+                "proj_pp_toi": r.get("proj_pp_toi"),
             })
             roster_rows.append({
                 "full_name": r["full_name"], "player_id": r["player_id"], "team": team_name,
