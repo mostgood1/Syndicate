@@ -64,3 +64,57 @@ and is the only per-league candidate for a level fix.
 - `league_profiles.py` is claimed by lane `soccer-corners-model-rebuild`.
 
 Reproduce: `py -3 C:/tmp/soccer-lpb/totals_bias_2627.py` (output `C:/tmp/soccer-lpb/totals_bias_2627.out`).
+
+## Step 2 — H-STALE: 2026-27 harness, production ratings (A) vs + current-season rows (B) (2026-10-05)
+
+**Data.** Both arms: `scripts/backtest_soccer_h2h_calibration.py` (post `bc438e3e`), leak-free per-day as-of,
+300 sims, `--since 2026-07-01`, TRUE close from football-data 2026-27 `AvgC*` (downloaded 10-05; 250/250 rows
+carry it). Fixtures: `fetch_soccer_history_local.py --kind matches --seasons 2026` (250 matches,
+2026-08-15..09-20; football-data and Understat both stop at 09-20). Arm A ratings: `teams_2024/2025.csv` (what
+the fleet has). Arm B: + `teams_2026.csv` (Understat, 500 team-rows to 09-20). Scratch snapshots
+`C:/tmp/soccer-lpb/rr27{A,B}` only; the fleet and repo `data/` untouched.
+
+**Result, paired n 183:** 1X2 Brier vs actual **B−A −0.0063 [−0.0156, +0.0024]** (B better in 4 of 5 leagues,
+Serie A −0.0180 [−0.0369, +0.0003] the largest; La Liga +0.0029). Mean total: A 2.93, B 2.94, actual 3.08 →
+**bias A −0.145, B −0.138 (B−A shift +0.007 goals)**. vs TRUE close: 1X2 A +0.0198 [−0.004, +0.044], B +0.0135
+[−0.009, +0.036]; O/U 2.5 Brier A +0.0098, B +0.0112.
+Without wrong-club rows (below), paired n 172: B−A −0.0056 [−0.0145, +0.0038]; bias A −0.131, B −0.125.
+
+**Verdict against the pre-registration: MIXED, by the letter** — the 1X2 CI includes 0 (not SUPPORTED), and
+|bias B| < |bias A| by 0.007 (so not FALSIFIED). **In substance, H-STALE does not explain the totals bias at
+all:** refreshing ratings moved the mean total by +0.007 against a bias of −0.145 (2026-27) / +0.18 (2025-26).
+The 1X2 direction favours fresh ratings but is underpowered at n 183.
+
+**Why ratings cannot move the total — the cause, file:line.** `compute_team_ratings`
+(`syndicate/features/soccer/features/loaders.py:390-414`) divides every team's xG by the window's league mean
+and never exports that mean: attack/defense ratings are RELATIVE. The league's scoring LEVEL reaches the sim
+only through the fixed per-league constants in
+`syndicate/features/soccer/sim_engine/soccersim/league_profiles.py` (conversion bases, shot frequency, etc.).
+So the model's mean total is a per-league constant that does not track a season (2.95 in 2025-26, 2.94 in
+2026-27, while actual moved 2.77 → 3.08), and stale vs fresh ratings is irrelevant to it. This also explains
+the goals-rated control group showing the same flat pattern. **Next test (not run): an as-of league scoring
+level fed into the sim (e.g. a goal-rate multiplier = as-of league goals per match / profile's implied mean),
+vs the static profile, on both seasons.** `league_profiles.py` is claimed by lane `soccer-corners-model-rebuild`.
+
+**Stale ratings remain a real input gap (separate from the totals bias):** `refresh_odds_sources._soccer_history_step`
+fetches team history only when files are MISSING and only for COMPLETED seasons, so 2026-27 production ratings
+contain no 2026-27 match (fleet `team_history/teams_2025.csv` ends 2026-05-24; no `matches_2026.csv`, read
+10-05). Effect on 1X2 so far: −0.0063 Brier, CI spans 0.
+
+## Defect found on the way — name resolution maps clubs onto the WRONG club
+
+`match_team_name` (`syndicate/features/soccer/features/team_names.py`) fuzzy-matches when no exact name exists.
+Measured 2026-10-05:
+- **PRODUCTION (fleet, ESPN names vs production ratings): ESPN "Le Mans" → Understat "Lens".** Le Mans is
+  promoted and absent from Understat history, so instead of `PROMOTED_TEAM_RATING` (−0.18/−0.18) it is priced
+  with Lens's rating (attack +0.1999, defense +0.0865, 45 matches): one of the stronger sides in place of a
+  promoted one, in every Le Mans match this season. Every other ESPN name in the five leagues resolves
+  correctly or to None (promoted, as intended).
+- **HARNESS ONLY (football-data names):** "Ath Madrid" → Real Madrid; "Paris SG" → Paris FC; "Le Mans" → Lens.
+  Affected rows: 48 of 1,391 (2025-26 xG five), 10+4 of 187 (2026-27). Excluding them changes no conclusion:
+  2025-26 xG five 1X2 vs close +0.0124 [+0.0052, +0.0192] (was +0.0130), O/U +0.0023 (was +0.0036, both no
+  diff); all nine 1X2 +0.0195, O/U +0.0039 [+0.0010, +0.0067] (both still lose).
+- No lane claims `team_names.py`. A fix changes served prices, so it is a user decision.
+
+Reproduce: `C:/tmp/soccer-lpb/score_stale.py` (`STALE_P=C:/tmp/soccer-lpb/x_h2h27_{}.jsonl` for the
+wrong-club-excluded set), `C:/tmp/soccer-lpb/le_mans.py`, `C:/tmp/soccer-lpb/espn_names.sh` (fleet).
