@@ -46354,3 +46354,12 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - **Restart:** refresh-worker restarted 18:56Z (pid 1313093 -> 1358416). The first user restart command did not land: `pgrep -f` inside `bash -lc` matched its own shell. Use `pgrep -f "[r]un_refresh_worker.py"`. Web did NOT reload (gunicorn logged no HUP), so the counter rename (`rows_on_unmeasured_model`) is not in the served payload yet; rows are built by refresh-worker, so the rows are.
 - **Baseline:** served build 18:50:14Z: `rows_unmeasured_model_only` 3,168 (soccer first 944 / anytime 863 / SOT 671 / last 633 on the 2026-10-05 build read earlier), 0 soccer player_* rows served.
 - **verify (reading):** first build after the restart, `written_at` 2026-10-05T19:12:39Z, `/api/board/layer2-shortlist?limit=5000`: 2,000 rows (ncaaf 284, mlb 251, nfl 165, soccer 742, nba 430, nhl 128); soccer player_* rows 439 (SOT 345, anytime 45, first 43, last 6); `batter_home_runs` 43, `Anytime TD` 10; old key `rows_unmeasured_model_only` absent.
+
+## 2026-10-05 19:16:35Z (2:16 PM CT) -- LOCAL FLEET: soccer 'Le Mans' -> 'Lens' wrong-club fix (`d58a6f8b`) live via another lane's ff -- **verify OWED** (lane `soccer-xg-totals-bias`, user: "fix the Le Mans name match")
+
+- change: `team_names._DISTINCT_CLUBS` refuses the fuzzy pair le mans / lens, so promoted Le Mans resolves to None -> `PROMOTED_TEAM_RATING` (-0.18/-0.18) instead of Lens's rating (attack +0.1999, defense +0.0865).
+- applied: NOT by this lane. The fleet ff ba314b28 -> 22a68f03 at 19:16:35Z (reflog), under another lane's claims, carried `d58a6f8b`. This lane's own attempt waited on claims held by `wnba-prop-dispersion` then `layer2-unmeasured-per-line`; it acquired live-odds-worker once and released it unused. No restart: soccer artifacts are built by per-run child jobs that load code from disk.
+- blast radius, measured before landing (fleet, production ratings, 175 served team names across 9 leagues): exactly 1 resolution changes -- ligue_1 'Le Mans': 'Lens' -> None.
+- expectation: the next ligue_1 `recommendations_2026-10-10.json` rebuild shows PSG v Le Mans with a LOWER Le Mans win probability and LOWER Le Mans goal mean.
+- baseline (artifact written 16:57Z, pre-fix): Paris Saint-Germain v Le Mans p home 0.57 / draw 0.21 / away 0.22; means 2.005 / 1.2425.
+- verify OWED: watcher on that file's mtime > 19:16:35Z (`C:/tmp/soccer-lpb/watch_lemans.sh`).
