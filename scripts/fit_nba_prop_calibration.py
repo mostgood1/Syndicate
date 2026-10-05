@@ -239,15 +239,207 @@ def prior_season_test(bt, rows: List[Dict], split: str, out: Path) -> Dict:
             "constants_all": fit(prior_rows)}
 
 
+HIST_MARKETS = {"player_points": "pts", "player_rebounds": "reb", "player_assists": "ast", "player_threes": "threes",
+                "player_points_rebounds_assists": "pra", "player_points_rebounds": "pr", "player_points_assists": "pa",
+                "player_rebounds_assists": "ra", "player_steals": "stl", "player_blocks": "blk"}
+
+
+def _book_recs(bt, rows: List[Dict], c: Dict[str, Dict[str, float]], out: Path):
+    """Join every two-sided, non-integer backfilled book line to a scored row; one record per (line, book)."""
+    from collections import Counter, defaultdict
+    from syndicate.features.shared.basketball_props_edges import _norm_name
+    w, b, k = c["w"], c.get("b") or {}, c["k"]
+    stats = Counter()
+    idx: Dict = {}
+    for r in rows:
+        key = (r["date"], _norm_name(r.get("name") or ""))
+        idx[key] = None if key in idx else r          # same name twice on a date -> ambiguous
+    recs = []
+    for d in sorted({r["date"] for r in rows}):
+        src = out / "cache" / "oddsapi_hist" / "props" / d
+        if not src.exists():
+            stats["dates_without_backfill"] += 1
+            continue
+        for f in sorted(src.glob("*.json")):
+            ev = (json.loads(f.read_text(encoding="utf-8")) or {}).get("data") or {}
+            commence = str(ev.get("commence_time") or "")
+            quotes: Dict = defaultdict(dict)
+            for bk in ev.get("bookmakers") or []:
+                for mk in bk.get("markets") or []:
+                    stat = HIST_MARKETS.get(mk.get("key"))
+                    if not stat:
+                        continue
+                    upd = str(mk.get("last_update") or bk.get("last_update") or "")
+                    if upd and commence and upd >= commence:
+                        stats["quote_after_tip_excluded"] += 1
+                        continue
+                    for oc in mk.get("outcomes") or []:
+                        side = str(oc.get("name") or "").upper()
+                        if side in ("OVER", "UNDER") and oc.get("point") is not None:
+                            quotes[(_norm_name(oc.get("description")), stat, float(oc["point"]), bk.get("key"))][side] = oc.get("price")
+            for (nk, stat, line, book), sides in quotes.items():
+                stats["lines"] += 1
+                if "OVER" not in sides or "UNDER" not in sides:
+                    stats["one_sided"] += 1
+                    continue
+                if abs(line - round(line)) < 1e-9:
+                    stats["integer_line"] += 1
+                    continue
+                p_book = bt._devig(sides["OVER"], sides["UNDER"])
+                if p_book is None:
+                    stats["unquotable_price"] += 1
+                    continue
+                key = (d, nk)
+                if key not in idx:
+                    stats["no_sim_player_that_date"] += 1
+                    continue
+                r = idx[key]
+                if r is None:
+                    stats["ambiguous_name"] += 1
+                    continue
+                if not _usable(r, stat):
+                    stats["no_sd"] += 1
+                    continue
+                y = int(actual(r, stat) > line)
+                recs.append({"gid": r["gid"], "phase": r["phase"], "mk": stat, "yb": y, "p_book": p_book,
+                             "p_cal": p_over(line, mean_after(r, stat, w, b), sd_after(r, stat, k)),
+                             "p_raw": p_over(line, mean_after(r, stat, {}), sd_after(r, stat, k, scaled=False)),
+                             "p_own": p_over(line, own_avg(r, stat), sd_after(r, stat, k)),
+                             "dec_o": bt._american_to_dec(sides["OVER"]), "dec_u": bt._american_to_dec(sides["UNDER"])})
+    return recs, stats
+
+
+def vs_book(bt, rows: List[Dict], c: Dict[str, Dict[str, float]], out: Path) -> Dict:
+    """THE CALIBRATED MODEL vs THE DE-VIGGED BOOK, line by line (OddsAPI historical backfill, one pre-tip snapshot per
+    game, every US book). For each two-sided, non-integer line on a scored row: Brier/log-loss of the calibrated
+    probability (the given constants), the raw served probability and the player's own-average probability, against
+    the proportionally de-vigged book; game-clustered CIs; flat-stake ROI of the calibrated model's +EV side."""
+    from collections import defaultdict
+    recs, stats = _book_recs(bt, rows, c, out)
+
+    def ci(v):
+        p_, lo, hi = bt._boot_ci(v)
+        return {"point": round(p_, 5), "ci95": [round(lo, 5), round(hi, 5)]}
+    groups: Dict[str, List[Dict]] = defaultdict(list)
+    for r in recs:
+        groups[r["mk"]].append(r)
+        groups["ALL"].append(r)
+    res: Dict = {"filters": dict(stats), "rows": len(recs), "games": len({r["gid"] for r in recs}), "by_market": {}}
+    for mk, rr in sorted(groups.items()):
+        n = len(rr)
+        e = {"n": n, "games": len({r["gid"] for r in rr}), "over_rate": round(sum(r["yb"] for r in rr) / n, 4)}
+        for key in ("p_book", "p_cal", "p_raw", "p_own"):
+            e[key] = {"brier": round(sum((r[key] - r["yb"]) ** 2 for r in rr) / n, 5),
+                      "logloss": round(sum(_ll(r[key], r["yb"]) for r in rr) / n, 5)}
+        for key in ("p_cal", "p_raw", "p_own"):
+            e[f"dBrier_{key}_vs_book"] = ci([(r["gid"], (r[key] - r["yb"]) ** 2 - (r["p_book"] - r["yb"]) ** 2) for r in rr])
+        bets = []
+        for r in rr:
+            if r["dec_o"] is None or r["dec_u"] is None:
+                continue
+            ev_o, ev_u = r["p_cal"] * r["dec_o"] - 1, (1 - r["p_cal"]) * r["dec_u"] - 1
+            if max(ev_o, ev_u) <= 0:
+                continue
+            win = (r["yb"] == 1) if ev_o >= ev_u else (r["yb"] == 0)
+            dec = r["dec_o"] if ev_o >= ev_u else r["dec_u"]
+            bets.append((r["gid"], (dec - 1) if win else -1.0, win))
+        if bets:
+            e["ev_bets_cal"] = {"n": len(bets), "hit": round(sum(x[2] for x in bets) / len(bets), 4),
+                                "roi": ci([(g, pnl) for g, pnl, _ in bets])}
+        res["by_market"][mk] = e
+    return res
+
+
+def _logit(p: float) -> float:
+    p = min(1 - 1e-4, max(1e-4, p))
+    return math.log(p / (1 - p))
+
+
+def blend_p(p_book: float, p_model: float, w: float, space: str = "logit") -> float:
+    """p = book + w (model - book), in logit (default) or probability space. w = 0 is the book; w = 1 the model."""
+    if space == "prob":
+        return p_book + w * (p_model - p_book)
+    z = _logit(p_book) + w * (_logit(p_model) - _logit(p_book))
+    return 1 / (1 + math.exp(-z))
+
+
+def book_blend(bt, train_rows: List[Dict], test_rows: List[Dict], c: Dict[str, Dict[str, float]], out: Path) -> Dict:
+    """OUT-OF-SAMPLE BOOK-BLEND WEIGHT. The calibrated model loses to the de-vigged book in every market (vs_book), so
+    the question is how much weight its departure from the book deserves. w is fit on TRAIN book lines (Brier, grid
+    0..1 step 0.05; per market and pooled; logit and probability space) and scored on TEST: Brier vs the book with a
+    game-clustered CI, and the flat-stake ROI of the blended +EV side. w = 0 means the model adds nothing to the line."""
+    from collections import defaultdict
+    tr, tr_stats = _book_recs(bt, train_rows, c, out)
+    te, te_stats = _book_recs(bt, test_rows, c, out)
+    grid = [round(i * 0.05, 2) for i in range(21)]
+
+    def brier(rr, w, space):
+        return sum((blend_p(r["p_book"], r["p_cal"], w, space) - r["yb"]) ** 2 for r in rr) / max(1, len(rr))
+
+    def ci(v):
+        p_, lo, hi = bt._boot_ci(v)
+        return {"point": round(p_, 5), "ci95": [round(lo, 5), round(hi, 5)]}
+
+    g_tr, g_te = defaultdict(list), defaultdict(list)
+    for r in tr:
+        g_tr[r["mk"]].append(r)
+        g_tr["ALL"].append(r)
+    for r in te:
+        g_te[r["mk"]].append(r)
+        g_te["ALL"].append(r)
+    res: Dict = {"train": {"rows": len(tr), "games": len({r["gid"] for r in tr}), "filters": dict(tr_stats)},
+                 "test": {"rows": len(te), "games": len({r["gid"] for r in te}), "filters": dict(te_stats)}, "by_market": {}}
+    for mk in sorted(g_te):
+        rr_tr, rr_te = g_tr.get(mk) or g_tr["ALL"], g_te[mk]
+        e: Dict = {"train_n": len(g_tr.get(mk) or []), "test_n": len(rr_te), "test_games": len({r["gid"] for r in rr_te})}
+        for space in ("logit", "prob"):
+            w = min(grid, key=lambda x: brier(rr_tr, x, space))
+            d = ci([(r["gid"], (blend_p(r["p_book"], r["p_cal"], w, space) - r["yb"]) ** 2 - (r["p_book"] - r["yb"]) ** 2)
+                    for r in rr_te])
+            bets = []
+            for r in rr_te:
+                if r["dec_o"] is None or r["dec_u"] is None:
+                    continue
+                pb = blend_p(r["p_book"], r["p_cal"], w, space)
+                ev_o, ev_u = pb * r["dec_o"] - 1, (1 - pb) * r["dec_u"] - 1
+                if max(ev_o, ev_u) <= 0:
+                    continue
+                win = (r["yb"] == 1) if ev_o >= ev_u else (r["yb"] == 0)
+                bets.append((r["gid"], ((r["dec_o"] if ev_o >= ev_u else r["dec_u"]) - 1) if win else -1.0, win))
+            e[space] = {"w_fit_on_train": w, "dBrier_blend_vs_book_test": d,
+                        "ev_bets": ({"n": len(bets), "hit": round(sum(x[2] for x in bets) / len(bets), 4),
+                                     "roi": ci([(g, pnl) for g, pnl, _ in bets])} if bets else {"n": 0})}
+        res["by_market"][mk] = e
+    return res
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--bt-out", type=Path, default=Path(r"C:\tmp\nba_bt\out"))
     ap.add_argument("--split", default="2026-03-01")
     ap.add_argument("--write", type=Path, default=None, help="write the production factor file (fit on ALL rows)")
     ap.add_argument("--prior-season-test", action="store_true", help="measure the prior-season fallback (2024-25 rates)")
+    ap.add_argument("--vs-book", action="store_true", help="calibrated model vs the de-vigged book (needs --fetch-odds cache)")
+    ap.add_argument("--book-blend", action="store_true", help="fit the book-blend weight on train book lines, score it on test")
     args = ap.parse_args()
     bt = _load_bt()
     rows = collect(bt, args.bt_out)
+    if args.book_blend:
+        train = [r for r in rows if r["phase"] == "regular" and r["date"] < args.split]
+        test = [r for r in rows if (r["phase"] == "regular" and r["date"] >= args.split) or r["phase"] == "playoff"]
+        c_train = fit(train)
+        rep_bb = {"constants_train": c_train, "blend": book_blend(bt, train, test, c_train, args.bt_out)}
+        (args.bt_out / "fit_nba_prop_calibration_book_blend.json").write_text(json.dumps(rep_bb, indent=1), encoding="utf-8")
+        print(json.dumps({k: v for k, v in rep_bb["blend"].items() if k != "by_market"}), flush=True)
+        return 0
+    if args.vs_book:
+        train = [r for r in rows if r["phase"] == "regular" and r["date"] < args.split]
+        test = [r for r in rows if (r["phase"] == "regular" and r["date"] >= args.split) or r["phase"] == "playoff"]
+        c_train = fit(train)
+        rep_b = {"constants_train": c_train, "test": vs_book(bt, test, c_train, args.bt_out)}
+        (args.bt_out / "fit_nba_prop_calibration_vs_book.json").write_text(json.dumps(rep_b, indent=1), encoding="utf-8")
+        print(json.dumps({"filters": rep_b["test"]["filters"], "rows": rep_b["test"]["rows"], "games": rep_b["test"]["games"]}), flush=True)
+        return 0
     if args.prior_season_test:
         rep_p = prior_season_test(bt, rows, args.split, args.bt_out)
         (args.bt_out / "fit_nba_prop_calibration_prior.json").write_text(json.dumps(rep_p, indent=1), encoding="utf-8")

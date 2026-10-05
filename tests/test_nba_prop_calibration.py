@@ -317,3 +317,15 @@ def test_stamp_includes_the_transform_version_so_old_code_sims_go_stale(tmp_path
     new = cal.factor_stamp(root)
     monkeypatch.setattr(cal, "TRANSFORM_VERSION", "1")
     assert cal.factor_stamp(root) != new
+
+
+def test_book_blend_endpoints_and_logit_symmetry():
+    import importlib.util
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location("fitcal", Path(__file__).resolve().parents[1] / "scripts" / "fit_nba_prop_calibration.py")
+    fitcal = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fitcal)
+    for space in ("logit", "prob"):
+        assert fitcal.blend_p(0.6, 0.3, 0.0, space) == pytest.approx(0.6, abs=1e-6)   # w = 0 is the book
+        assert fitcal.blend_p(0.6, 0.3, 1.0, space) == pytest.approx(0.3, abs=1e-6)   # w = 1 is the model
+    assert fitcal.blend_p(0.5, 0.8, 0.5) == pytest.approx(1 - fitcal.blend_p(0.5, 0.2, 0.5))

@@ -528,10 +528,35 @@ HIST_PROP_MARKETS = ("player_points", "player_rebounds", "player_assists", "play
 HIST_GAME_MARKETS = ("h2h", "spreads", "totals")
 
 
+def _api_key() -> str:
+    """Env first; an EMPTY env value falls through to the PRIMARY tree's .env (2026-10-05: the shell-exported key is a
+    different, deactivated key and wins by precedence -- run with `ODDS_API_KEY= ...`). The value is never printed."""
+    for name in ("ODDS_API_KEY", "ODDSAPI_KEY", "THE_ODDS_API_KEY"):
+        if (os.environ.get(name) or "").strip():
+            return os.environ[name].strip()
+    env = _primary_repo() / ".env"
+    if env.exists():
+        for line in env.read_text(encoding="utf-8-sig", errors="ignore").splitlines():
+            for name in ("ODDS_API_KEY", "ODDSAPI_KEY", "THE_ODDS_API_KEY"):
+                if line.strip().startswith(name + "="):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
+    raise RuntimeError("no OddsAPI key in env or the primary tree's .env")
+
+
 class Budget:
+    MAX_CONSECUTIVE_FAILURES = 5
+
     def __init__(self, ceiling: int) -> None:
         self.ceiling, self.spent, self.calls = ceiling, 0, 0
         self.last_remaining: Optional[str] = None
+        self.consecutive_failures = 0
+
+    def failed(self, what: str) -> None:
+        """A dead key returns 401 on every call; a loop that skips failures then spends nothing, caches nothing and looks
+        like a stall. Abort instead (memory: oddsapi-key-access)."""
+        self.consecutive_failures += 1
+        if self.consecutive_failures >= self.MAX_CONSECUTIVE_FAILURES:
+            raise RuntimeError(f"{self.consecutive_failures} consecutive OddsAPI failures (last: {what}); aborting")
 
     def charge(self, headers) -> None:
         self.calls += 1
@@ -549,9 +574,7 @@ def _odds_get(path: str, params: Dict[str, str], cache: Path, budget: Budget, ex
         return json.loads(cache.read_text(encoding="utf-8"))
     if not execute:
         return None
-    key = (os.environ.get("ODDS_API_KEY") or os.environ.get("ODDSAPI_KEY") or "").strip()
-    if not key:
-        raise RuntimeError("ODDS_API_KEY not set")
+    key = _api_key()
     from urllib.parse import urlencode
     url = f"{ODDSAPI}{path}?{urlencode({**params, 'apiKey': key})}"
     for attempt in range(4):
@@ -559,11 +582,15 @@ def _odds_get(path: str, params: Dict[str, str], cache: Path, budget: Budget, ex
             with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Syndicate-backtest/1.0"}), timeout=60) as fh:
                 data = json.load(fh)
                 budget.charge(fh.headers)
+                budget.consecutive_failures = 0
             cache.parent.mkdir(parents=True, exist_ok=True)
             cache.write_text(json.dumps(data), encoding="utf-8")
             return data
         except urllib.error.HTTPError as exc:  # type: ignore[attr-defined]
             budget.charge(exc.headers or {})
+            if exc.code in (401, 403):
+                budget.failed(f"HTTP {exc.code} on {path}")
+                raise RuntimeError(f"OddsAPI HTTP {exc.code} on {path} (key rejected; value not printed)")
             if exc.code in (404, 422):
                 cache.parent.mkdir(parents=True, exist_ok=True)
                 cache.write_text(json.dumps({"_http": exc.code}), encoding="utf-8")
@@ -571,6 +598,7 @@ def _odds_get(path: str, params: Dict[str, str], cache: Path, budget: Budget, ex
             time.sleep(3 + 5 * attempt)
         except Exception:  # network: retry; the URL carries the key, so never print it
             time.sleep(3 + 5 * attempt)
+    budget.failed(f"network on {path}")
     raise RuntimeError(f"historical fetch failed for {path} (key redacted)")
 
 
@@ -803,10 +831,20 @@ def score_props_book(args, manifest: Dict, hist: History, phase_of: Dict[str, st
     odds_m = manifest["families"]["props_odds"]
     for d, info in sorted(manifest["families"]["props_predictions"].items()):
         oinfo = odds_m.get(d) or {}
-        if not info.get("commit_ts") or not oinfo.get("commit_ts"):
+        if not info.get("commit_ts"):
             continue
         pred_path = args.out / "asof" / "props_predictions" / f"{d}.csv"
-        odds_path = args.out / "asof" / "props_odds" / f"{d}.csv"
+        # prefer the OddsAPI historical backfill (one pre-tip snapshot per game, every US book); fall back to the
+        # committed raw snapshot (10 dates) when a date was not backfilled
+        hist_path = hist_props_csv(args, d)
+        if hist_path is not None:
+            odds_path = hist_path
+            stats["dates_odds_oddsapi_hist"] += 1
+        elif oinfo.get("commit_ts"):
+            odds_path = args.out / "asof" / "props_odds" / f"{d}.csv"
+            stats["dates_odds_committed"] += 1
+        else:
+            continue
         pred_rows = _read_csv(pred_path)
         preds = {int(_f(p.get("player_id")) or 0): p for p in pred_rows}
         eng = "smartsim" if pred_rows and "mean_pts" in pred_rows[0] else "onnx"
@@ -852,8 +890,13 @@ def score_props_book(args, manifest: Dict, hist: History, phase_of: Dict[str, st
                 stats["unmatched_or_unparseable"] += 1
                 continue
             snap = str(e.get("snapshot_ts") or "")
-            if cut and snap and _ts(snap) >= cut:
-                stats["snapshot_after_first_tip_excluded"] += 1
+            # pre-tip test against THIS row's own game (the backfill snapshots each game 45 min before its tip, so a
+            # date-level first-tip cutoff would drop every later game); fall back to the date cutoff only when the
+            # row carries no commence_time
+            commence = str(e.get("commence_time") or "")
+            limit = _ts(commence) if commence else cut
+            if limit and snap and _ts(snap) >= limit:
+                stats["snapshot_at_or_after_tip_excluded"] += 1
                 continue
             k = (pid, stat, line, str(e.get("bookmaker")), side)
             if k not in latest or snap > latest[k]["snap"]:
@@ -1008,6 +1051,9 @@ def score_games(args, manifest: Dict, scoreboards: Dict[str, List[Dict]], phase_
             continue
         odds = _game_odds_index(args.out / "asof" / "game_odds" / f"{d}.csv") if (fam["game_odds"].get(d) or {}).get("commit_ts") else {}
         plines = _period_index(args.out / "asof" / "period_lines" / f"{d}.csv") if (fam["period_lines"].get(d) or {}).get("commit_ts") else {}
+        # multi-book pre-first-tip snapshot from the OddsAPI historical backfill (preferred over the upstream consensus,
+        # whose spread/total prices are unreliable); {} when the date was not backfilled
+        hist = hist_game_book(args, d)
         preds = {}
         if (fam["predictions"].get(d) or {}).get("commit_ts"):
             for r in _read_csv(args.out / "asof" / "predictions" / f"{d}.csv"):
@@ -1076,7 +1122,18 @@ def score_games(args, manifest: Dict, scoreboards: Dict[str, List[Dict]], phase_
                     hp, ap = seg[sk]
                     am_, at_ = hp - ap, hp + ap
                     # book lines for the segment
-                    if sk == "game" and o:
+                    hb = hist.get(key) if sk == "game" else None
+                    p_ml_hist = None
+                    if hb and (hb.get("spread") or hb.get("total") or hb.get("p_home_ml") is not None):
+                        hs = hb["spread"]["line"] if hb.get("spread") else None
+                        hsp, asp = (hb["spread"]["price_a"], hb["spread"]["price_b"]) if hb.get("spread") else (None, None)
+                        tot = hb["total"]["line"] if hb.get("total") else None
+                        top, tup = (hb["total"]["price_a"], hb["total"]["price_b"]) if hb.get("total") else (None, None)
+                        hml = aml = None
+                        p_ml_hist = hb.get("p_home_ml")
+                        drops["book_source_oddsapi_hist"] += 1 if arm == "smart_sim" else 0
+                    elif sk == "game" and o:
+                        drops["book_source_upstream_consensus"] += 1 if arm == "smart_sim" else 0
                         hs, tot = _f(o.get("home_spread")), _f(o.get("total"))
                         hsp, asp = _f(o.get("home_spread_price")), _f(o.get("away_spread_price"))
                         top, tup = _f(o.get("total_over_price")), _f(o.get("total_under_price"))
@@ -1095,12 +1152,15 @@ def score_games(args, manifest: Dict, scoreboards: Dict[str, List[Dict]], phase_
                     # probabilities (served transform: cards._margin_win_prob)
                     if m is not None and am_ != 0:
                         scale = 6.5 if sk == "game" else 3.4
-                        p_book = _devig(hml, aml) if sk == "game" else None
+                        p_book = (p_ml_hist if p_ml_hist is not None else _devig(hml, aml)) if sk == "game" else None
+                        # with the multi-book ML only the de-vigged probability is kept, so ROI is at the FAIR price
+                        # (1/p) -- optimistic by the vig; it is not used for any verdict
+                        dec_h = _american_to_dec(hml) if p_ml_hist is None else (1 / p_ml_hist if p_ml_hist else None)
+                        dec_a = _american_to_dec(aml) if p_ml_hist is None else (1 / (1 - p_ml_hist) if p_ml_hist and p_ml_hist < 1 else None)
                         rows[f"{arm}|{ph}|{sk}|win_prob"].append({**base, "yb": int(am_ > 0), "p_model": mwp(m, scale=scale),
                                                                     "p_sim": a["_sim_p_home_win"][0] if sk == "game" else None,
                                                                     "p_book": p_book, "p_half": 0.5,
-                                                                    "dec_h": _american_to_dec(hml),
-                                                                    "dec_a": _american_to_dec(aml)})
+                                                                    "dec_h": dec_h, "dec_a": dec_a})
                     # spread/total: the book price is used only when it is a plausible main-line pair
                     # (_std_pair); otherwise the book is the line itself at 50% and -110 both sides.
                     if sk == "game" and m is not None and hs is not None and (am_ + hs) != 0:
@@ -1323,6 +1383,7 @@ def _collect_sim_players(args, manifest: Dict, hist: History, phase_of: Dict[str
                 c["missing_stat_mean"] += 1
                 continue
             rows.append({"gid": act["gid"], "date": d, "phase": phase_of.get(d, "unknown"), "pid": pid,
+                         "name": str(pl.get("player_name") or ""),
                          "proj_min": proj_min, "act_min": act["min"], "asof_min": asof_min, "asof_min5": asof_min5,
                          "mean": mean, "sd": sd, "act": {m: act[m] for m in SIM_STATS}, "base": base, "per_min": per_min,
                          "n_prior": len(prior)})
