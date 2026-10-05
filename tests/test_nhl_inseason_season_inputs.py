@@ -76,6 +76,7 @@ def trimmed_player_prior(monkeypatch):
 @pytest.fixture
 def finite_w(monkeypatch):
     monkeypatch.setattr(M, "BLEND_W", {k: 10.0 for k in M.BLEND_W})
+    monkeypatch.setattr(M, "MIN_CURRENT_GAMES", 0)   # the fixture holds one game; test the blend itself
 
 
 def _refresh(tmp_path: Path, calls: list) -> tuple:
@@ -184,10 +185,21 @@ def test_never_raises_and_writes_nothing_without_priors(tmp_path):
     assert status["reason"].startswith("error=")
 
 
-def test_off_by_default_and_env_switch():
-    assert M.enabled({}) is False
-    assert M.enabled({M.ENABLE_ENV: "on"}) is True
-    assert M.enabled({M.ENABLE_ENV: "0"}) is False
+def test_on_from_november_first_and_env_overrides():
+    assert M.enabled({}, today=date(2026, 10, 31)) is False
+    assert M.enabled({}, today=date(2026, 11, 1)) is True
+    assert M.enabled({}, today=date(2027, 3, 15)) is True     # same season, after New Year
+    assert M.enabled({}, today=date(2027, 10, 4)) is False    # next season's October
+    assert M.enabled({M.ENABLE_ENV: "on"}, today=date(2026, 10, 4)) is True
+    assert M.enabled({M.ENABLE_ENV: "off"}, today=date(2026, 12, 1)) is False
+
+
+def test_shipped_defaults_keep_blocks_at_the_prior_under_the_floor(tmp_path):
+    assert M.MIN_CURRENT_GAMES == 10
+    assert M.BLEND_W["player.blocks"] == math.inf and M.BLEND_W["team.block_rate"] == math.inf
+    _root_, proc, _ = _refresh(tmp_path, [])
+    for stem, key in (("team_rates", "abbr"), ("player_rates", "player_id")):   # 1 game played < 10
+        assert _rows(proc / f"{stem}_2026-2027.csv", key) == _rows(proc / f"{stem}_latest.csv", key)
 
 
 def test_min_games_floor_holds_an_entity_at_its_prior(tmp_path, finite_w, monkeypatch):

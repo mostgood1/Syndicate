@@ -646,7 +646,7 @@ def _run_owned_generation(*, artifact_root: Path, target_dates: list[str], props
         from syndicate.features.nhl.inseason_season_inputs import enabled as _inseason_inputs_enabled
         from syndicate.features.nhl.inseason_season_inputs import refresh_inseason_season_inputs
 
-        # OFF unless SYNDICATE_NHL_INSEASON_SEASON_INPUTS is on (October props regression; user decision)
+        # on from Nov 1 of each season (user decision); SYNDICATE_NHL_INSEASON_SEASON_INPUTS on/off overrides
         inseason_inputs = refresh_inseason_season_inputs(artifact_root) if _inseason_inputs_enabled() else {}
         if str(inseason_inputs.get("reason") or "").startswith("error="):
             warnings.append(f"nhl in-season season inputs failed: {inseason_inputs.get('reason')}")

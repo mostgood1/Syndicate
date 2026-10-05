@@ -44,15 +44,19 @@ BLEND_W: Dict[str, float] = {
     "team.pp_pct": 40.0,        # -1.51% (-4.31%)  n=2,575
     "team.pk_ga_rate": 80.0,    # -0.87% (-3.92%)
     "team.committed": 20.0,     # -1.72% (-3.55%)
-    "team.block_rate": 20.0,    # -3.93% (-3.66%)
+    "team.block_rate": math.inf,  # tuned W20 (-3.93%); kept at the prior -- see H16/H17 below
     "player.shots": 10.0,       # -4.38% (-4.16%)  n=47,231 player-games
     "player.goals": 20.0,       # -2.12% (-4.55%)
-    "player.blocks": 10.0,      # -3.14% (-4.63%)
+    "player.blocks": math.inf,  # tuned W10 (-3.14%); kept at the prior -- see H16/H17 below
 }
 # Last season's final Elo regressed 1/3 toward 1500 (tuned 2024-25; 2025-26 home-win Brier 0.2519 vs the
 # frozen file's 0.2649). INERT: production's elo_blend_weight is 0.
 # An entity's current season enters only once it has played this many games (0 = from game 1).
-MIN_CURRENT_GAMES = 0
+# User decision 2026-10-04: floor 10 with blocks at the prior (H17). Props A/B on 2025-26, 446 games, Brier at
+# the lines vs prior: SOG@1.5 -0.00343 [-0.00453, -0.00228], POINTS@0.5 -0.00103 [-0.00169, -0.00034],
+# no line worse from November; blocks blended made BLOCKS@1.5 worse in late October (H16) and gained
+# nothing over the season, so they stay last season's.
+MIN_CURRENT_GAMES = 10
 ELO_REGRESSION = 1.0 / 3.0
 
 FetchJson = Callable[[str], Any]
@@ -278,14 +282,22 @@ def build_team_elo(prior: List[Dict[str, str]], records: list) -> List[Dict[str,
             for row in prior]
 
 
-# OFF by default. Props A/B on 2025-26 (446 games): better over the season (SOG@1.5 Brier -0.00306
-# [-0.00420, -0.00189], POINTS@0.5 -0.00097), but in OCTOBER alone POINTS@0.5 is WORSE (+0.00144
-# [+0.00014, +0.00275]). Enabling is a user decision; until then generation reads `_latest` as before.
+# ON from November 1 of each season (user decision 2026-10-04: "enable on Nov 1"). Every variant tested was
+# no worse on any line from November on, while late-October games (teams crossing the floor) carried the only
+# regressions. Before Nov 1 generation reads `_latest` as before. The env var overrides both ways:
+# on/1/true forces it on, off/0/false forces it off.
 ENABLE_ENV = "SYNDICATE_NHL_INSEASON_SEASON_INPUTS"
+ENABLE_FROM_MONTH_DAY = (11, 1)
 
 
-def enabled(env: Optional[Dict[str, str]] = None) -> bool:
-    return str((env if env is not None else os.environ).get(ENABLE_ENV) or "").strip().lower() in {"1", "true", "on", "yes"}
+def enabled(env: Optional[Dict[str, str]] = None, today: Optional[date] = None) -> bool:
+    raw = str((env if env is not None else os.environ).get(ENABLE_ENV) or "").strip().lower()
+    if raw in {"1", "true", "on", "yes"}:
+        return True
+    if raw in {"0", "false", "off", "no"}:
+        return False
+    today = today or date.today()
+    return today >= date(int(season_code(today)[:4]), *ENABLE_FROM_MONTH_DAY)
 
 
 STEMS = ("team_rates", "team_special_teams", "player_rates", "team_elo")
