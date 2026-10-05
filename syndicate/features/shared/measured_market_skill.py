@@ -114,8 +114,36 @@ _SOCCER_SCORER_RACE_SOURCE = (
     "CI; scripts/soccer_season_audit/grade_scorer_race.py"
 )
 
+_NHL_SAVES_PRICE_SOURCE = (
+    "lane nhl-saves-skill-registry (2026-10-05): scripts/nhl_saves_vs_book.py -- production-form SAVES proj_lambda "
+    "(props harness arm prior_dfo: current engine incl. c29e1271 + de074a80, Daily Faceoff confirmed-starter overlay, "
+    "as-of inputs) priced by production's Poisson at the line, vs OddsAPI HISTORICAL player_total_saves closes "
+    "(3 min pre-start, us books, proportional two-sided de-vig, mean over books) vs boxscore saves; population = what "
+    "production prices (the sim's starter, who played); game-clustered bootstrap"
+)
+
 # (sport, market, segment, phase) -> entry.
 MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
+
+    # ---- NHL GOALIE SAVES vs the PRICE `[2026-10-05]` ----------------------------
+    #
+    # LOSES, clearly. The mean probability matches the market (model 0.505, market 0.503,
+    # realised over rate 0.529) and the loss is in the SPREAD: Brier 0.277 is worse than a
+    # coin flip, i.e. the probabilities are overconfident. Production prices SAVES by Poisson
+    # from the sim mean, which is narrower than real saves. A pricing-shape defect, not a
+    # mean defect, so it is a lead for the props model, not something this table fixes.
+    # Board key: the grid writes the CODE "SAVES", which normalises to "saves".
+    ("nhl", "saves", "full", PHASE_PREGAME): {
+        "sample_games": 435,
+        "seasons": "2025-26 regular season, 56 harness dates (every 2nd date 10-08..01-31); 881 player-game-lines in 435 games; 139 lines on a goalie production would not price (not the sim's starter), 5 on goalies who did not play and 10 name-unmatched were excluded; CI is game-clustered",
+        "brier_model": 0.2772,
+        "brier_market": 0.24978,
+        "diff": 0.02742,
+        "ci95": (0.01616, 0.03883),
+        "verdict": "loses to the de-vigged market, Brier +0.0274 [+0.0162, +0.0388], 881 lines / 435 games; Poisson spread overconfident",
+        "verdict_class": VERDICT_LOSES,
+        "source": _NHL_SAVES_PRICE_SOURCE,
+    },
 
     # ---- NFL PLAYER PROPS vs the PRICE `[2026-09-29]` ----------------------------
     #

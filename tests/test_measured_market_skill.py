@@ -256,3 +256,11 @@ def test_every_nfl_prop_entry_clears_the_pre_registered_observation_floor():
         if market in ("h2h", "totals", "spreads"):
             continue
         assert entry["sample_games"] >= 200, f"{market}: {entry['sample_games']} < 200"
+
+
+def test_nhl_saves_board_code_reaches_its_measured_loss():
+    # the NHL grid writes the market CODE "SAVES" (lane nhl-saves-skill-registry, 2026-10-05)
+    note = mms.skill_note(sport="nhl", market="SAVES", segment="full")
+    assert note is not None and note["verdict_class"] == mms.VERDICT_LOSES and note["sample_games"] == 435
+    assert note["established_loss_rel"] > 0                      # an established loss: it moves the row's score
+    assert mms.skill_note(sport="nhl", market="SAVES", segment="full", phase=mms.PHASE_LIVE) is None

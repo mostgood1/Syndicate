@@ -1311,6 +1311,13 @@ death, never life — do not invert it.
 - Hypothesis: H24: none -- a measurement; the verdict class follows the CI (beats if CI < 0, loses if > 0, else parity)
 - Falsification test: n/a (registered whatever it is); refused only if fewer than 100 player-game-lines join
 - Verification: pull report (credits, coverage), scoring table, registry test, then served board read: NHL SAVES rows model_skill.status measured, verdict as registered
+- **RESULT 2026-10-05 ~22:50Z:**
+  - Pull: OddsAPI historical player_total_saves for all 449 harness games, 4,490 credits (header remaining 4,242,901), 0 failures. 3.38 books per line.
+  - Score (881 player-game-lines, 435 games, 56 dates; population = production-priced lines: the sim's starter, who played): model Brier 0.2772 vs market 0.2498, diff **+0.0274 [+0.0162, +0.0388] -> LOSES TO MARKET**.
+  - The mean is right (model 0.505, market 0.503, realised over 0.529); the Poisson spread is overconfident (Brier > 0.25).
+  - Excluded: 139 lines on a goalie production does not price (not the sim's starter), 5 did not play, 10 name-unmatched.
+  - Registered `("nhl", "saves", "full", pregame)` as VERDICT_LOSES. established_loss_rel 0.0647 gives skill_reliability 0.68 (the row ranks lower and is never removed).
+  - Lead (props model, not this lane): price SAVES with an overdispersed distribution instead of Poisson.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
