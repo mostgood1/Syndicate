@@ -1033,6 +1033,14 @@ death, never life — do not invert it.
 - Verification: Paired full-season backtest vs production: ASSISTS/POINTS Brier CI below 0, no market worse; then fleet lineups carry the column and the checklist passes.
 - Blocked by: none
 
+### nhl-confirmed-goalies — OPEN — opened 2026-10-05 — session 9ed26377-0ef3-4416-bc7b-54428f87ce5c
+- Goal: NHL props (and every consumer of starting_goalies_<date>.csv) use Daily Faceoff CONFIRMED starters when posted before puck drop and the name maps to a dressed goalie, else the existing projection; measured on the props harness (starter accuracy and SAVES Brier at the lines vs the current rule, no other line worse) before shipping, then verified on production (starting_goalies rows with source dailyfaceoff that the props sim reads)
+- Files: syndicate/features/nhl/confirmed_goalies.py, tests/test_nhl_confirmed_goalies.py
+- Hypothesis: H19: overlaying confirmed starters raises starter accuracy over the current rule on 2025-26; H20: it improves SAVES Brier at 22.5/25.5/28.5 (one CI < 0, none > 0) with no other line worse
+- Falsification test: accuracy not higher, or no SAVES line improves, or any SAVES line / any other line (8, all dates) has a CI entirely > 0
+- Verification: props A/B arm prior_dfo vs prior on the current engine (props_ab_v2), then fleet: starting_goalies_<date>.csv carries source=dailyfaceoff rows and the props sim's starter matches them
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
