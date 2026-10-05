@@ -46176,3 +46176,25 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
   - `rate_shrink.applied=true, switch=file` (players 17 / 18). Context outs 5/5 in both games. Pools 8-9 players per team, as before.
   - **MET.** healthz 200 after; no restart.
 - **NBA:** the same fix is live for NBA sims from their next build. 10-06 had 1 punctuated exclusion, which was not in a pool. Not separately read.
+
+## 2026-10-05 14:23:15Z (9:23 AM CT) -- LOCAL FLEET FF 1111942f -> 3493715f (no restart): NBA prop calibration LADDER FIX (mean-preserving scale + shift; TRANSFORM_VERSION 2 re-sims old sims) -- **READING 1 MET; READING 2 OWED** (lane `nba-prop-calibration`, user: "fix the ladder shift and roll it to the fleet")
+
+- **why:** Layer 2's NBA prop join (`nba_projections.py`) serves the sim LADDER (hitProb + ladder.mean). The calibration's ladder shift was round_half_up(v + delta), a no-op below half a unit. Measured on the 5 live calibrated sims (2026-10-05 ~01:5xZ): the ladder lagged >50% of the calibrated shift on threes 125/169 rows, tov 122, stl 110, ast 67, blk 58, reb 33, pts 17.
+- **fix (3493715f):**
+  - `scale_values` / `shift_values` move the integer total to the target and rebalance ±1 over evenly spaced draws, so the floor at 0 no longer lifts the mean.
+  - `factor_stamp` hashes `TRANSFORM_VERSION` "2", so sims written by the old code read stale and are re-simulated automatically.
+  - 28 tests, including a sub-half-unit case the old rule fails.
+- **pre-rollout real check (worktree code, in memory, the 3 pre-enable 10-05 sims, fleet factor file + history):**
+  - Ladder mean == calibrated mean within 0.001 on every row; 0 lagging rows in all 7 stats.
+  - Width ratio medians: pts 1.21, reb 1.21, ast 1.18, blk 1.16, stl 1.08, tov 1.06, threes 1.04 (targets 1.25 / 1.25 / 1.25 / 1.25 / 1.05 / 1.05 / 1.00).
+  - Limit: the OOS evidence scored Normal(mean, sd). Historical sims carry no ladders, so the ladder path was not re-scored.
+- **range:** 8 commits; the ONLY runtime file changed is `nba_prop_calibration.py`. No carry-alongs.
+- **locks:** refresh-worker + live-odds-worker held as `nba-prop-calibration` 14:22-14:24Z; released after health was confirmed.
+  - `check_deploy_safety` not run (it needs the fleet ADMIN_TOKEN, not readable here).
+  - In flight at 14:23:01Z: a multi-sport PREGAME odds job for 10-06 (mlb,nba,nhl,wnba,nfl,ncaaf,soccer), 19 min old. **The ff was made with it in flight** (deviation from my own no-in-flight rule). Each sport's refresh is its own subprocess, so its NBA step runs entirely on the old code or the new.
+- **baseline:** fleet HEAD 1111942f, clean tree, ancestor of 3493715f. The 5 calibrated NBA sims (10-04 DEN_UTA/LAC_GSW, 10-05 ATL_MEM/DET_PHX/PHI_NYK) are stamped 82ba04dd2dbd41f5.
+- **expect:**
+  - Reading 1: with fleet code, the active stamp changes, all 5 read stale, and WNBA reads not stale.
+  - Reading 2: the first production NBA sims written after 14:23:15Z carry the new stamp, with ladder mean == field mean (|gap| <= 0.05) on every row.
+- **reading 1 (14:23:22Z):** MET. TRANSFORM_VERSION 2, active stamp 10af559d9f370641; all 5 sims `NBA_SIM_STALE have=82ba04dd2dbd41f5 want=10af559d9f370641`; WNBA False; healthz 200; live-odds 1, refresh 1, gunicorn 3; no restart.
+- **reading 2 OWED:** watcher `watch_ladder.sh` (WSL, started 14:24:16Z, 30 h) logs to `C:\tmp\nba_bt\watch_ladder.log`.
