@@ -1086,6 +1086,15 @@ death, never life — do not invert it.
 - Verification: Fleet board build after ff+restart: rows_withheld_unmeasured gone, served shortlist carries soccer player_* rows (was 0) and MLB batter_home_runs / NFL Anytime TD one-sided rows
 - Blocked by: none
 
+### layer2-unmeasured-per-line — OPEN — opened 2026-10-05 — session f028352c-8cd6-4236-9dae-f51b4216c08c
+- Goal: The rows the removed 2026-09-11 unmeasured-model withhold dropped (soccer first/last/anytime scorer + SOT, MLB batter_home_runs, NFL Anytime TD) are served on the fleet's /api/board/layer2-shortlist with model_prob/edge, each carrying a per-line skill weight: soccer prop markets the board serves get measured_market_skill entries from the 2026-10-02 backtest (ROI at the price), the rest keep an explicit unmeasured note; reading: unmeasured_model_only_mode absent and 0 rows withheld by it (was 3,168 at 18:50:14Z), soccer prop rows served by market, edge sign split, recorded in deploys.md
+- Files: syndicate/features/shared/measured_market_skill.py, tests/test_measured_market_skill.py, tests/test_soccer_prop_market_skill.py
+- Hypothesis: H1: the shortlist still withholds because the board-building role has not reloaded d9aa0992 (fleet ff 7f56875e at 13:48 CT, served board 18:50:14Z reads mode=withhold, 3,168 rows); a restart of that role alone moves rows_unmeasured_model_only 3,168 -> absent. H2: admitted soccer prop rows carry model_edge_pct > 0 on the large majority of rows (one-sided pile), because the model loses to the price (2026-10-02 ROI EV>0 negative in all 4 markets)
+- Falsification test: H1: after the restart the served board still reports unmeasured_model_only_mode or omits soccer player_* rows. H2: soccer prop served rows split near 50/50 in edge sign
+- Verification: Served /api/board/layer2-shortlist after restart: rows_unmeasured_model_only absent, rows_on_unmeasured_model by market, soccer player_* row count by market, edge sign split, skill_reliability on soccer prop rows; healthz 200 and roles up before releasing claims; recorded in deploys.md
+- Blocked by: none
+- **LOAN 2026-10-05 ~2:05 PM CT, USER DECISION (verbatim): "take over all three, including the restart".** `measured_market_skill.py` + `tests/test_measured_market_skill.py` are borrowed from OPEN lane `stop-market-withholding` (session b9bb5f37 = CCD "Layer 2 board candidate concerns"; messaged twice). This lane does its three remaining steps: (a) fleet restart of the shortlist-building role + served reading, (b) soccer prop registry entries, (c) whether soccer prop credits now buy served rows. `layer2_board.py` / `intelligence.py` stay with the owner.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
