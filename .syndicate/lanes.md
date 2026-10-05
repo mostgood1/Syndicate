@@ -1145,6 +1145,10 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### mlb-strikeout-bias — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **AMENDMENT to the joint re-fit rule, 2026-10-06 ~01:45Z: stricter only, written BEFORE the holdout was read.**
+  - Production applies `data/tuning/hitter_hr_calibration/default.json` (affine_logit a=0.805, b=0.032, fitted 07-17 on the HR-starved engine) to every hitter P(HR>=1) the board serves. It maps raw 0.09 -> 0.138, which is right only for the old level.
+  - Therefore: IF the joint ship changes `hr_rate_mult`, the SAME ship sets that file `enabled: false` (identity).
+  - Lane `mlb-hr-prop-calibration` then re-fits it, and the 07-17 hitter_props calibration, on the replay.
 - **JOINT RE-FIT, PRE-REGISTERED 2026-10-06 ~00:45Z before any stage result was read** (user: "yes, run the joint refit and ship if it passes"; this supersedes the HR-only rule in lane `mlb-hr-rate`).
   - **Tool:** `mlb_strikeout_decomposition.py`. Same 26 dates, tune < 2026-07-04, holdout >= 2026-07-04. 100 sims for the stage grids, 200 for the final judgement.
   - **Stage 0: HBP.** `base_hbp` = 0.0015, the swept value closest to actual HBP/start on TUNE (0.26 vs 0.22).
