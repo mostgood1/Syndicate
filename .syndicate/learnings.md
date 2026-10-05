@@ -3067,3 +3067,8 @@ own prior verdicts, not by anything failing.
 
 - What happened: I logged "served-board SAVES coverage: owed on the first slate with SAVES book lines", and checkpointed it twice. `local_nhl_odds.collect_oddsapi_props` requested only points / assists / goals / SOG, so no SAVES line could ever arrive. The owed reading had no possible due date.
 - Rule: for any reading gated on a future event, check the event's precondition in the code or data path NOW (here: the market list, then a grep of `player_props_lines` and the quote log). A reading whose trigger cannot fire is not owed; it is a defect. Related: 2026-10-05 learning on a "no cell worse" bar's null rate; memory "Caveat = scheduled defect".
+
+## 2026-10-05 -- Windows open() without encoding silently halves a JSON dataset (lane nhl-elite-assists)
+
+- **Measured:** 1,340 of 2,792 NHL play-by-play files failed `json.load(open(f))` -- cp1252 default vs UTF-8 player names -- inside a `try/except: continue`, so the parse "succeeded" on 1,452 games and the first cross-validation ran on half the data with no error. Caught only because the game count (1,452) did not match the fetch count (2,792).
+- **Rule:** pass `encoding="utf-8"` on every `open()` of fetched data, and print the parsed count beside the expected count before using any result -- a swallowed exception in a loader is a denominator change, not a skip.
