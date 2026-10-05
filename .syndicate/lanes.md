@@ -1348,6 +1348,14 @@ death, never life — do not invert it.
 - Verification: Fidelity table on 06-15..06-20 (rebuilt vs stored, same seeds), then the rebuilt 05-30..06-14 set with per-date coverage
 - Blocked by: none
 
+### soccer-ou-loss-source — OPEN — opened 2026-10-05 — session 43e4d5fe-e05e-41bc-aae6-6d6986460b22
+- Goal: The source of soccer's O/U 2.5 loss to the de-vigged TRUE close (2025-26 all nine leagues n 2,724: Brier +0.0045 [+0.0018, +0.0072]; 2026-27 served +0.0095 n 492) is attributed with a measurement: the gap split into RELIABILITY (calibration) vs RESOLUTION (separation) per arm, and a recalibration of the model's P(over 2.5) fitted on 2025-26 tested on held-out 2026-27 vs the close (paired match-bootstrap CI). Measurement only -- no production change without a user decision
+- Files: .syndicate/findings_2026-10-05_soccer_ou_loss_source.md (NEW)
+- Hypothesis: PRE-REGISTERED 2026-10-05: the loss is RESOLUTION, not RELIABILITY -- the model's P(over 2.5) separates high- from low-scoring matches less than the close does (information the book has and the model lacks), so (1) in a Murphy decomposition (10 equal-count bins, match bootstrap) the model's resolution term is below the close's with a CI excluding 0, and its reliability penalty is the smaller part of the gap; (2) a monotone recalibration (logistic on logit p) fitted on 2025-26 leaves the held-out 2026-27 Brier gap to the close positive. Context: the goals-LEVEL bias is already ruled out (findings 2026-10-05 soccer_xg_totals_bias, H-LEVEL); lane soccer-team-strength (rating spread, 1X2) may share a cause
+- Falsification test: Any of: the model's resolution is not below the close's (CI includes 0) on 2025-26 n 2,724; reliability accounts for >= half the Brier gap; the 2025-26-fitted recalibration makes the held-out 2026-27 Brier gap to the close <= 0 or its CI include 0 while the uncalibrated gap's CI excludes 0
+- Verification: Findings file reports, per season and pooled: n, dates, per-family coverage (dumps / served recs / outcomes / TRUE close) and intersection; Brier, reliability, resolution, uncertainty for model and close with match-bootstrap CIs; the recalibration's held-out gap vs close with paired CI; a stated verdict against each falsifier. Data: harness dumps C:/tmp/soccer-lpb/h2h_2526_all9.jsonl, h2h27_A.jsonl and the served 2026-27 pre-kickoff builds (audit cache)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
