@@ -46558,3 +46558,9 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 
 - reading: lineups_2026-10-06.csv rebuilt 21:32:54Z (first after the ff): slotted skaters absent from their team's last game 26 of 324 -> 3 of 324.
 - all three are the unfillable 12th-forward slot: DET Kasper (last game 2026020035, 11 F + 7 D, not book-listed), LAK Helenius (2026020034, 11 F + 7 D, not listed), NSH Schaefer (2026020030, 11 F + 7 D, also book-listed). With reading 1 (10-05: 12 -> 1, same cause): 38 -> 4 across both slates, every survivor explained by the rule.
+
+## 2026-10-05 22:01:08Z (5:01 PM CT) -- VERIFY READING for 19:16:35Z (soccer Le Mans -> Lens fix, `d58a6f8b` on fleet `22a68f03`) -- **MET** (lane `soccer-xg-totals-bias`)
+
+- reading: ligue_1 `recommendations_2026-10-10.json` rebuilt 22:01:08Z (first rebuild after the fix; the soccer unit queue reached ligue_1|2026-10-10 at ~22:00Z). Paris Saint-Germain v Le Mans: p home **0.57 -> 0.818**, draw 0.21 -> 0.12, away **0.22 -> 0.062**; goal means 2.005 / 1.2425 -> **2.7075 / 0.7225**. Direction and size as predicted (lower Le Mans win probability and goal mean).
+- the fix's BRANCH, not just the outcome: the rebuilt artifact carries `promoted_prior_teams = ["Le Mans"]` -- `_fill_promoted`'s output, which Le Mans could not reach while `match_team_name` returned 'Lens'.
+- not separated: odds or other inputs that changed between 16:57Z and 22:01Z also feed this build; the promoted-team field is what ties the move to this change.
