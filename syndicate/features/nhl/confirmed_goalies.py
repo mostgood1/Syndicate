@@ -28,7 +28,7 @@ import re
 import tempfile
 import unicodedata
 import urllib.request
-from datetime import datetime, timezone
+from datetime import date as date_cls, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -197,8 +197,12 @@ def refresh_confirmed_goalies(artifact_root: Path, day: str, *, fetch_html: Opti
     status: Dict[str, Any] = {"day": day}
     try:
         processed = Path(artifact_root) / "data" / "processed"
+        today = (now or datetime.now(timezone.utc)).date()
         if not enabled():
             status["reason"] = f"{ENV}=off"
+        elif not (today - timedelta(days=1) <= date_cls.fromisoformat(day) <= today + timedelta(days=1)):
+            # a pregame feed: never applied to a rebuilt past slate (the archive is overwritten after the fact)
+            status["reason"] = "day outside today +/- 1; nothing fetched"
         elif not ((processed / f"lineups_{day}.csv").exists() and (processed / f"starting_goalies_{day}.csv").exists()):
             status["reason"] = "no collector lineups/starting_goalies for the day; nothing fetched"
         else:

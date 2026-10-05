@@ -32,6 +32,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import sys
 from collections import defaultdict
@@ -153,13 +154,75 @@ def _apply_scoreadj_xg(games: list, date: str, root: Optional[Path]) -> list:
     return out
 
 
+_GOALIE_GSAX_TABLES: Dict[Tuple[str, str], tuple] = {}
+
+
+def _starter_pids(processed: Path, date: str) -> Dict[str, int]:
+    """{team abbr: player id} of the slate's starting goalie (`starting_goalies_<date>.csv`, i.e. Daily Faceoff
+    confirmed or the collector's projection), mapped through `lineups_<date>.csv` by the lineup's own full name."""
+    from syndicate.features.nhl.confirmed_goalies import _abbr, _read
+
+    _h, lineup = _read(processed / f"lineups_{date}.csv")
+    _h2, starters = _read(processed / f"starting_goalies_{date}.csv")
+    pid = {}
+    for r in lineup:
+        if str(r.get("position") or "").upper() == "G":
+            try:
+                pid[(_abbr(r.get("team")), str(r.get("full_name") or "").strip().lower())] = int(r["player_id"])
+            except (TypeError, ValueError, KeyError):
+                continue
+    out = {}
+    for r in starters:
+        ab = _abbr(r.get("team"))
+        p = pid.get((ab, str(r.get("goalie") or "").strip().lower()))
+        if ab and p is not None:
+            out[ab] = p
+    return out
+
+
+def _apply_goalie_gsax(games: list, date: str, root: Optional[Path]) -> list:
+    """Game lines only: scale each team's period lambdas by the OPPOSING starter's GSAx factor
+    (`syndicate.features.nhl.goalie_gsax`; experiment V8). A starter with no shots faced this season, or no
+    mapped starter, leaves that side at 1.0. Off switch: SYNDICATE_NHL_GOALIE_GSAX=off."""
+    from datetime import date as _date
+
+    from syndicate.features.nhl import goalie_gsax as GG
+
+    if not GG.enabled():
+        return games
+    processed = _processed_dir(root)
+    key = (str(processed), date)
+    if key not in _GOALIE_GSAX_TABLES:
+        try:
+            _GOALIE_GSAX_TABLES[key] = GG.season_table(processed.parent.parent, _date.fromisoformat(date))
+        except Exception as exc:  # noqa: BLE001 -- game lines must still build without the factor
+            _GOALIE_GSAX_TABLES[key] = ({}, 0.0, {"reason": f"error={type(exc).__name__}: {exc}"})
+        print(f"[nhl_goalie_gsax] NHL_GOALIE_GSAX {json.dumps(_GOALIE_GSAX_TABLES[key][2], sort_keys=True)}", flush=True)
+    table, league, _status = _GOALIE_GSAX_TABLES[key]
+    if not table:
+        return games
+    starters = _starter_pids(processed, date)
+    out = []
+    for g in games:
+        h_ab, a_ab = str(g.home.abbrev or "").upper(), str(g.away.abbrev or "").upper()
+        f_home_goalie = GG.gsax_factor(starters.get(h_ab), table, league) or 1.0
+        f_away_goalie = GG.gsax_factor(starters.get(a_ab), table, league) or 1.0
+        if f_home_goalie == 1.0 and f_away_goalie == 1.0:
+            out.append(g)
+            continue
+        # the HOME goalie scales the AWAY lambdas and vice versa
+        out.append(replace(g, home=replace(g.home, period_goal_lambdas=tuple(x * f_away_goalie for x in g.home.period_goal_lambdas)),
+                           away=replace(g.away, period_goal_lambdas=tuple(x * f_home_goalie for x in g.away.period_goal_lambdas))))
+    return out
+
+
 def _predictions_and_markets(
     date: str, *, root: Optional[Path], anchor: bool, anchor_weight: Optional[float],
 ) -> Tuple[List[HockeyGamePrediction], Dict[str, HockeyMarketLines]]:
     """Build every game's prediction for a slate (market-injected, anchored at the resolved weight)."""
     weight = _effective_anchor_weight(anchor, anchor_weight)
     _ensure_confirmed_goalies(date, root)
-    games = _apply_scoreadj_xg(build_slate_features(date, root=root), date, root)
+    games = _apply_goalie_gsax(_apply_scoreadj_xg(build_slate_features(date, root=root), date, root), date, root)
     lines = load_market_lines(date, root=root)
     predictions: List[HockeyGamePrediction] = []
     markets: Dict[str, HockeyMarketLines] = {}

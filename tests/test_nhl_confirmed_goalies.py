@@ -104,3 +104,11 @@ def test_refresh_never_raises_and_has_an_off_switch(tmp_path, monkeypatch):
     calls = []
     st = C.refresh_confirmed_goalies(root, DAY, fetch_html=lambda u: calls.append(u))
     assert calls == [] and st["reason"] == f"{C.ENV}=off"
+
+
+def test_never_applied_to_a_rebuilt_past_slate(tmp_path):
+    root = _proc(tmp_path).parent.parent
+    calls = []
+    st = C.refresh_confirmed_goalies(root, DAY, fetch_html=lambda u: calls.append(u),
+                                     now=datetime(2026, 11, 20, tzinfo=timezone.utc))
+    assert calls == [] and "outside" in st["reason"]
