@@ -46150,3 +46150,14 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - post-game (01:35 -> 02:30Z): credits flat at 1,068; +4 zero-credit calls.
 - caveat: `live_sweeps_with_nba` in the csv counts every sport's live autorun, not NBA's -- ignore it.
 - projection (NOT measured), ~10-game regular-season night, ~5 h staggered live window: game lines ~10 credits/event/fetch -> ~9-10k credits/night. If books post the 13 prop markets live, up to ~2x -> ~20k/night ~ 600k/month (~12% of the 5M cap). Live re-fetching dominates; the lever, if needed, is NBA's live cadence, not the pregame interval. First real reading: opening night (~10-20) when props are posted.
+
+
+## 2026-10-05 13:08:05Z (8:08 AM CT) -- READING 2 for the 01:54:22Z WNBA availability + rate-shrink switch-on: **rate shrink MET; availability PARTIAL -- a pre-existing name-key defect let 2 excluded players into the pools** (lanes `wnba-sim-rate-shrink`, `wnba-sim-availability`, `basketball-injury-exclusion-reinclusion`)
+
+- **sims:** first production smart_sim_2026-10-07_ATL_NYL (13:07:35Z) and _GSV_LVA (13:08:05Z), built by the fleet's own refresh.
+- **rate shrink: MET.** `rate_shrink.applied=true, switch=file`, players 17 / 19.
+- **availability: applied, but leaky.** The refresh log reads `SIM_AVAILABILITY applied date=2026-10-07 k=1 added=236`. Injury-OUT players in the pools: 0.
+  - Players the rule excludes FOR THEIR OWN TEAM still in the pool: **2** -- Ny'Ceara Pryor (NYL, last game 04-25, simulated **22.9 min**) and Ta'Niya Latson (LVA, 6.7 min).
+  - The watcher's first count of 4 included 2 cross-team false positives (Bonner excluded under PHX, Pissott under IND); a team-aware recheck gives 2.
+- **cause (not the switch):** the exclusion keys keep apostrophes (`_norm_name_key`: NY'CEARA PRYOR), while the vendored pool filter compares `_norm_player_key(name)`, which strips them (NYCEARA PRYOR). Every excluded player with an apostrophe or period has always leaked, injury exclusions included, WNBA and NBA. 10-07 WNBA: 33 of 661 excluded keys carry punctuation; NBA 10-06: 1, not in a pool.
+- **fix:** 1111942f on main -- the worker passes every key in both forms (second via the sim module's own `_norm_player_key`). Tests reproduce the miss with the real vendored WNBA and NBA normalizers; 283 pass. **NOT on the fleet yet** -- needs the fleet ff plus a scoped re-sim of the two 10-07 games (sim files are write-once). User decision owed.
