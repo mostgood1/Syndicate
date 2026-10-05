@@ -424,3 +424,42 @@ far more often (rest and load management), so a one-game absence is weak evidenc
 measure the residual non-player minutes, minutes bias/MAE, prop MAE vs own average, and Brier vs book, then refit the
 blend weight on the result.
 
+## NBA season phase: where it is and is not handled `[2026-10-05, e0a3e383; audit, read-only]`
+
+Asked for by the user's preseason direction, relayed by the NCAAF session. **Nothing in the NBA lines or props path
+reads the season phase.** The label exists only in two places, and neither reaches an artifact row:
+- the vendor schedule's `game_label` (`vendor/.../schedule.py:172,199`; its fallback `:114` hardcodes
+  "Regular Season");
+- OddsAPI's `basketball_nba_preseason` sport key (`vendor/.../odds_api.py:26-27`). It is dropped from the rows at
+  `:133-145` and from `scripts/fetch_basketball_oddsapi_props_local.py:170-183,390-410`.
+
+ESPN scoreboards label it `season.type` (1 = pre), verified on the 10-03/04 games.
+
+| component | file:line | phase-aware? | preseason impact |
+|---|---|---|---|
+| boxscores_history writer | shared/basketball_boxscores_history.py:297-395; ESPN `scoreboard?dates=` (smart_sim.py:488) | no | preseason AND playoffs included |
+| player_logs writer | vendor/player_logs.py:234 (fallback :293-298) | yes (Regular Season) | pure, unless the fallback rewrites it from boxscores_history |
+| sim minutes priors | basketball_props_smart_sim.py:3381-3422 (:3403 -> player_logs, 21 days) | no | regular-season priors |
+| rotation-history minutes | basketball_props_smart_sim.py:2324,2380 (28-day lookback); vendor rotations_espn.py:512 | no | **at the opener the window is all preseason** |
+| pool prune | basketball_props_smart_sim.py:1799 (max_keep 13) | no | same depth every phase |
+| prop calibration own rates | nba_prop_calibration.py:82-85 (season from Aug 1), :236-239 | no | preseason becomes "season-to-date" after 3 games and stays mixed into early regular season |
+| prop calibration prior | nba_prop_calibration.py:242-246 (player_logs) | yes | last regular season |
+| prop calibration constants | backtest_nba_lines_props.py:460 (Regular Season + Playoffs) | fit without preseason | applied to preseason unchanged |
+| availability K rule | wnba_sim_availability.py:85-114 (NBA gated off at :144) | no | WNBA: a preseason game counts as a team game |
+| game Elo / rolling | vendor cli.py:12302-12372; features.py; scrape_nba_api.py:96,183 | regular-season source | preseason slates get end-of-last-season features |
+| market anchor | vendor sim/quarters.py:218-252 | no | same weights every phase |
+| team advanced stats | vendor advanced_stats_boxscores.py:150-162 | no | preseason included |
+| props bias calibration 7/30 days, totals calibration | refresh_nba_oddsapi_props.py:2998-2999; vendor props_calibration.py:50,187; cli.py:11017 | no | preseason inside the windows after the opener |
+| skill registry / optimizer | measured_market_skill.py:117; daily_optimizer.py:14 | phase = pregame/live only | NBA preseason and regular season would share a cell |
+
+**Live consequence (measured 2026-10-05 ~22:05Z).** Layer 2 prices NBA game lines from the raw smart-sim score
+histogram (`nba_game_projections.py:274-291`), which is not market-anchored.
+- On the 10-05/06 slates the sim's home margin is 4-6 pts more lopsided than the market in 5 of 6 games, and its
+  totals are 1-11 pts higher.
+- The served board's NBA rows showed +15.5 (spread, 0.57 vs fair 0.415) and +10.4 (ML, 0.67 vs 0.566) points of
+  edge.
+- Preseason games already graded (ESPN finals): MIA@TOR sim −0.7/233.8 vs −24/234; UTA@DEN +6.5/241.7 vs −12/206;
+  GSW@LAC −3.1/232.4 vs +3/205.
+- Even in the 2025-26 regular season, the raw sim's OOS weight vs the line was 0.00 (margin) / 0.05 (total).
+- The user chose "blend to market, build it" (pre-registered H-G1 in lanes.md).
+
