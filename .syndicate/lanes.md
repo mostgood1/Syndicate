@@ -1047,7 +1047,7 @@ death, never life — do not invert it.
 ### nhl-elite-assists — OPEN — opened 2026-10-05 — session 5704bbd4-3c4f-4d88-9549-fa59e24ab70a
 - **GOAL: NOT MET (partial, shipped 7f56875e on user decision "Ship p2s2 now").** Elite NHL playmakers' projected assists stop running at ~0.63x of real (asof A/G>=0.8 bucket), without making SOG/GOALS/POINTS/BLOCKS Brier worse at the lines. -- Reading: full-season paired backtest elite 0.66x -> 0.78x real assists, no line worse (ASSISTS@0.5 flat, POINTS@1.5 -0.00039 sig, playoffs POINTS better); falsification bar elite A/onGF >= 0.43 not re-measured on the full season. Left: elite still 0.78x, D now 0.88x; the stronger weighting (0.91x) made ASSISTS@0.5 worse and was refused. Fleet verification MET 18:56Z (deploys.md): lineups 144/144 assist_share, checklist PASS, Kucherov ASSISTS 0.54 -> 0.596.
 - Goal: Elite NHL playmakers' projected assists stop running at ~0.63x of real (asof A/G>=0.8 bucket), without making SOG/GOALS/POINTS/BLOCKS Brier worse at the lines.
-- Files: syndicate/features/nhl/sim_engine/hockeysim/state.py, syndicate/features/nhl/sim_engine/hockeysim/contracts.py, syndicate/features/nhl/sim_engine/hockeysim/features/loaders.py, syndicate/features/nhl/sim_engine/hockeysim/ingestion/nhl_web.py, syndicate/features/nhl/sim_engine/hockeysim/ingestion/lineups.py, syndicate/features/nhl/sim_engine/hockeysim/ingestion/collect.py, syndicate/features/nhl/sim_engine/hockeysim/calibration_profile.py, tests/test_hockeysim_props.py, tests/test_hockeysim_ingestion.py, scripts/sim_input_checklist_nhl.py
+- Files: syndicate/features/nhl/sim_engine/hockeysim/state.py, syndicate/features/nhl/sim_engine/hockeysim/contracts.py, syndicate/features/nhl/sim_engine/hockeysim/features/loaders.py, syndicate/features/nhl/sim_engine/hockeysim/ingestion/nhl_web.py, syndicate/features/nhl/sim_engine/hockeysim/ingestion/collect.py, syndicate/features/nhl/sim_engine/hockeysim/calibration_profile.py, tests/test_hockeysim_props.py, scripts/sim_input_checklist_nhl.py
 - Hypothesis: MEASURED 2026-10-05 (15 slates, 4,318 player-games, real on-ice GF from shift charts): on-ice goals-for is roughly right (elite sim/real 0.91) but the sim's assist share of on-ice GF is FLAT ~0.33 at every tier while real runs 0.27 (depth) -> 0.49 (elite), F and D alike (0.445/0.441). Cause: _weighted_choice credits assists by shot rate. Fix: attribute assists by each player's as-of A/(onGF-G) from the NHL stats goalsForAgainst report, shrunk to a position prior.
 - Falsification test: Refuted if the sim's A/onGF by tier does not spread toward real (elite >=0.43), or if paired full-season ASSISTS@0.5 / POINTS@0.5 Brier does not improve.
 - Verification: Paired full-season backtest vs production: ASSISTS/POINTS Brier CI below 0, no market worse; then fleet lineups carry the column and the checklist passes.
@@ -1126,6 +1126,14 @@ death, never life — do not invert it.
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: unit tests incl. reachability (pub join off != on; overlay validates only under the bar); then the first cron run's published optimizer artifact read back via /api/ops/artifacts/stream with per-sport graded counts; consumer wiring (layer2_board.py / portfolio_commit.py, held by stop-market-withholding) is PHASE 2, coordinated, not in this lane's Files
+- Blocked by: none
+
+### nhl-scratch-dilution — OPEN — opened 2026-10-05 — session 5704bbd4-3c4f-4d88-9549-fa59e24ab70a
+- Goal: Projected NHL lineups stop dressing skaters who will not play: slotted-but-did-not-play falls well below the 10.4% measured on 2025-26, without making any prop line's Brier worse.
+- Files: syndicate/features/nhl/sim_engine/hockeysim/ingestion/lineups.py, tests/test_hockeysim_ingestion.py
+- Hypothesis: MEASURED 2026-10-05 (full 2025-26 backtest lineups, 40,752 slotted skater-games): 10.4% did not play. A slotted skater who missed the team's previous game sat 63.4% of the time (76-87% after 2-4 misses) and those are 60% of all non-players; one who played it sat 4.6%. infer_lines dresses by TOTAL TOI over 8 games, so an injured regular keeps his slot. Fix: dress players who played the team's most recent game first (book-listed still first of all).
+- Falsification test: Refuted if slotted-DNP does not fall below ~6%, or if paired full-season Brier is worse on any prop line vs production (bt_as_p15s2).
+- Verification: Paired full-season backtest vs production: DNP rate + every line's Brier; then the fleet lineups use the rule (a player absent from the last game is unslotted when a replacement played it).
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
