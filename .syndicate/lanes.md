@@ -1111,6 +1111,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - **LOAN 2026-10-05 ~2:05 PM CT, USER DECISION (verbatim): "take over all three, including the restart".** `measured_market_skill.py` + `tests/test_measured_market_skill.py` are borrowed from OPEN lane `stop-market-withholding` (session b9bb5f37 = CCD "Layer 2 board candidate concerns"; messaged twice). This lane does its three remaining steps: (a) fleet restart of the shortlist-building role + served reading, (b) soccer prop registry entries, (c) whether soccer prop credits now buy served rows. `layer2_board.py` / `intelligence.py` stay with the owner.
 
+### daily-optimizer — OPEN — opened 2026-10-05 — session 5942cf5f-48c9-485b-99a8-e6e04c75bd83
+- Goal: [user 2026-10-05: 'something that check each sport daily for accuracy of model vs reality and optimizes, and something that checks for betting recommendation accuracy vs reality and optimizes ... runs daily without prompting'; chose auto-apply within rails + cron and daily Claude review] The 11:30Z model-scorecard cron publishes, per sport x market x segment x phase, (a) a model calibration fit (Brier-optimal shrink w of model edge toward market, bootstrap CI, LODO, BH-FDR) and (b) a graded PUBLISHED-recommendation block (bets, hit rate, ROI vs predicted EV by EV band, beside the pooled population); validated entries (games>=60, dates>=5, FDR, LODO; w only <1, factor floor 0.5, 72h expiry) go to an optimizer overlay that may ONLY scale rank/stake (2026-10-05 PRIME DIRECTIVE: never withhold); and a daily Claude scheduled task reads it and reports. Measured as: first production cron run after landing carries both blocks with nonzero graded rows for >=3 sports.
+- Files: syndicate/features/shared/daily_optimizer.py (NEW), tests/test_daily_optimizer.py (NEW), scripts/publish_model_scorecard.py, .claude/skills/daily-optimizer/SKILL.md (NEW), .claude/skills/daily-optimizer/review.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit tests incl. reachability (pub join off != on; overlay validates only under the bar); then the first cron run's published optimizer artifact read back via /api/ops/artifacts/stream with per-sport graded counts; consumer wiring (layer2_board.py / portfolio_commit.py, held by stop-market-withholding) is PHASE 2, coordinated, not in this lane's Files
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
