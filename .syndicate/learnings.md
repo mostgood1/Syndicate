@@ -2991,3 +2991,8 @@ own prior verdicts, not by anything failing.
 
 - What happened: the NHL 3-way backfill's key resolver reads `os.environ` before `.env`. The session shell exports an `ODDS_API_KEY` that is DEACTIVATED (401 `DEACTIVATED_KEY`); the `.env` key works. The first run only worked because a failed key extraction left the override empty and it fell through to `.env`. The restart used the exported key: every call 401'd, the loop (which skipped failures) cached nothing and printed nothing, and it read as a stall for minutes.
 - Rule: before spending, probe ONE call and print status + `x-requests-last` only; make the loop raise after N consecutive failures (be62ddad does 5); name which key source won (env vs `.env`) without printing it.
+
+## 2026-10-05 — RULE: an OFFLINE backtest replay silently runs the OLD engine once the engine reads a new endpoint; prove the new field is populated before scoring `[lane nhl-season-inputs-in-season, session 9ed26377]`
+
+- What happened: re-running the NHL props A/B "on the current engine" after c29e1271 / de074a80. Both read per-game PP/SH minutes from a NEW host (NHL stats API) through the harness's HTTP cache. Offline (`allow_net=False`), the cache misses, `special_teams_toi` swallows the miss as an "enrichment" and returns {}. Lineups then fall back to positional PP units with `proj_ev_toi = None`: the old engine path, with no error and plausible numbers.
+- Rule: before scoring a replay of a changed engine, count the new field in the replay's own artifacts (here proj_ev_toi on 833/833 skaters). Diff the projections against the previous run (here 97% of lambdas changed). Only then score. An engine change that adds an endpoint needs the harness online (or a pre-fetch) once.
