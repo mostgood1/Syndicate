@@ -46486,3 +46486,40 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - reading: lineups_2026-10-05.csv rebuilt 21:29:55Z (first after the ff): slotted skaters absent from their team's last game 12 of 144 -> 1 of 144 (`C:/tmp/nhlprops/lastgame_check.py`).
 - the one left, TBL Yanni Gourde (L2), is NOT book-listed (0 of 218 lines). TBL's last game (2026020024, 10-03) dressed 11 F + 7 D, so the 12-forward template has one slot no last-game forward can fill and it goes to the best absentee by total TOI -- the rule as designed. The prediction ("only book-listed remain") was worded too tightly; the right predicate is "absentees only where the last game left the slot unfillable or the player is book-listed".
 - lineups_2026-10-06.csv not yet rebuilt at read time (still 20:30:33Z, 26 of 324 under the old rule).
+
+## 2026-10-05 19:17Z-21:41:38Z (2:17-4:41 PM CT) -- LOCAL FLEET: unmeasured-model withhold removal READ on the served board; web HUP; refresh-worker restarts onto 22a68f03 then cb1bb280 (lane `layer2-unmeasured-per-line`, session f028352c)
+
+- **who/why:** user 2026-10-05 ~1:45 PM CT "yes, spin up a session to remove the withhold", then (to this session) "take over all three, including the restart", "go ahead and run the peer's step 1", and (asked directly) "ff to 6b4fa17d". The code removal itself is `d9aa0992` (lane `stop-market-withholding`, session b9bb5f37); its first refresh-worker load was the 18:56Z restart recorded by that lane (156067a1).
+- **locks:** claims web + refresh-worker as `layer2-unmeasured-per-line` (19:14-19:47Z, then 19:50Z-close). `deploy_preflight` does not apply (reads suspended Render); gate = `check_deploy_safety --base-url http://127.0.0.1:10000` run FROM `~/Syndicate` with the fleet token loaded from `local_production.env` (never printed). live-odds-worker never touched.
+- **step 1 -- ff + web HUP:** `~/Syndicate` ff `ba314b28 -> 22a68f03` 19:16:35Z (ride-alongs: NBA book-blend code 8ba08f59/4c62f7e0 -- switch file not placed until the user did at 20:03:24Z; soccer `team_names` d58a6f8b; my `83e1e73c`). Web master 1112818 HUP 19:17:44Z -> workers 1362370/1362371, `code=22a68f03`, /healthz 200 from 19:18:09Z (one 000 at 19:18:02 mid-reload).
+- **step 2 -- refresh-worker onto 22a68f03:** gate NOT CLEAR polls 1-36 (odds runs, a board build), CLEAR poll 37 19:46:39Z -> TERM 1358416 -> new pid 1366178 up 19:46:49Z `code=22a68f03`, /healthz 200, web + live-odds-worker up. Claims released 19:50Z.
+- **step 3 -- peer step 1 (user: run it), retargeted:** ff `22a68f03 -> 57d061dd` 19:50:26Z, gated restart pending. **Aborted before any TERM** when lane `stop-market-withholding` reported the fleet disk had moved to `82e26761` (another session's NHL ff, fb2cc854) which contains part B `fcd348cd` UNSCALED. Script killed; its log has no CLEAR/TERM line. Fleet read 19:5xZ: refresh-worker pid 1367304 `restarts=7 code=22a68f03` (cycled once after my 19:46Z restart, still pre-B), web `22a68f03`. The user then chose (asked directly) ff to `6b4fa17d` (A + B with point-estimate scaling): ff `82e26761 -> 6b4fa17d` 19:56:38Z, removing the unscaled-B-on-disk hazard (any role restart would have loaded it).
+- **step 4 -- refresh-worker + web onto 6b4fa17d:** the 6b4fa17d gate ran 60 polls 19:56-20:42Z, never CLEAR (odds runs, then an MLB sim started 20:38:23Z), and gave up with NO restart. Its relaunch REFUSED (fleet HEAD moved): lane `daily-optimizer` ff'd 6b4fa17d -> 340b04cd 20:21:01Z -> bce1cb2a 20:29:49Z, no restart (its own entry), and by 21:29Z the HEAD was cb1bb280. Read at 20:42Z: web `code=6b4fa17d` (reloaded by someone after my 19:56 ff), live-odds-worker `6b4fa17d` (restarts=4), refresh-worker still `22a68f03`. User (asked directly) chose restart onto bce1cb2a; bce1cb2a..cb1bb280 runtime = NHL `hockeysim/ingestion/lineups.py` (build subprocess, already live via the ff) + a 2-line `portfolio_commit.py` docstring + offline scripts, so restarted on cb1bb280 under that approval. Claims re-taken 21:30Z (the 20:32Z pair expired 21:17Z while waiting). CLEAR poll 16 21:41:18Z -> TERM refresh-worker 1367304 + HUP web master 1112818 -> refresh-worker pid 1390577 `restarts=8 code=cb1bb280`, web workers 1390519/1390520 `code=cb1bb280`, /healthz 200 21:41:38Z and 21:41:58Z, live-odds-worker untouched (1371970, 6b4fa17d). Claims released 21:42Z.
+- **carried by the final restart (cb1bb280):** part A `57d061dd` + part B scaled `6b4fa17d` (lane `stop-market-withholding`), my `1562ec43` first/last scorer entries, daily-optimizer phase 2 (`optimizer_overlay`, inert while its overlay file is absent -- that lane's prediction), NBA book blend (switch file user-placed 20:03:24Z). NHL GSAx `553cd7aa` went live via the daily-optimizer ff (build subprocess), not via this restart; its lane recorded MET (40a58030).
+
+### READING 1 -- the withhold removal (build 19:12:39Z, first build on d9aa0992; before = 18:50:14Z)
+- before (18:50:14Z): `unmeasured_model_only_mode = withhold`, `rows_unmeasured_model_only = 3,168` (soccer first 942 / anytime 859 / last 633 / SOT 675, MLB HR 43, NFL ATD 16); served 200-row default page held 0 soccer player_* rows.
+- after (19:12:39Z, `?limit=5000`, 2,000 served): old keys absent. Once-withheld markets SERVED, every row with model probability + edge (492 / 492):
+
+  | market | served | edge>0 | median edge | best rank |
+  |---|---|---|---|---|
+  | soccer player_shots_on_target | 345 | 73 (21%) | -4.72 | 701 |
+  | soccer player_goal_scorer_anytime | 45 | 1 | -8.43 | 709 |
+  | soccer player_first_goal_scorer | 43 | 2 | -4.38 | 754 |
+  | soccer player_last_goal_scorer | 6 | 0 | -5.27 | 762 |
+  | mlb batter_home_runs | 43 | 28 | +0.45 | 286 |
+  | nfl Anytime TD | 10 | 8 | +3.93 | 541 |
+
+- after web HUP (same build): `rows_on_unmeasured_model = 3,207` (first 964, anytime 875, last 633, SOT 675, MLB HR 43, NFL ATD 17) -- all ADMITTED to the per-line gates; 492 fit the 2,000-row budget, the rest fall to value floor / budget / per-game caps on their own facts.
+- **H2 FALSIFIED: no one-sided positive pile.** The soccer prop model sits UNDER the price (shots mean 0.81 model vs 0.98 actual in the 10-02 backtest): 76 of 439 soccer prop rows have edge > 0. All soccer prop rows are one-sided (`book_margin_model`, side over/yes only); there is no under side to split.
+
+### READING 2 -- per-line skill notes (build 19:54:53Z, refresh-worker 1366178 on 22a68f03 = `83e1e73c`)
+- anytime 44/44 and SOT 445/445 rows carry `model_skill.status = measured`, `basis = measured_market_skill`, `established_loss_rel = 0.0`, verdict "at the price: no established loss, ROI on model EV>0 ..." (was `unmeasured` "model never backtested" on 100%).
+- `rows_on_unmeasured_model` 3,207 -> **1,676** (first 985, last 635, MLB HR 40, NFL ATD 16): the two registered markets left the unmeasured count, exactly as predicted. First/last still `unmeasured` on this build (their entries are `1562ec43`, not deployed).
+- skill_reliability stays 1.0 (no established loss), so ranks moved only with the rest of the board: soccer props best rank 277 (SOT) / 285 (anytime).
+
+### Odds spend (lane goal item c)
+- Soccer prop OddsAPI spend (~770 credits/h, lane `stop-market-withholding` estimate, b271af18 -- NOT re-measured here) now BUYS served rows: 439 soccer prop rows on the 19:12:39Z build, 537 on 19:54:53Z (SOT 445, first 42, anytime 44, last 6), out of 3,000+ admitted. Before 2026-10-05 it bought 0. Fetch cadence unchanged.
+
+### OWED
+- served reading for `1562ec43` on the first shortlist build after 21:41:38Z: `player_first_goal_scorer` rows `status=measured` parity, `player_last_goal_scorer` rows `verdict_class=loses_to_market`, `score.skill_reliability = 0.5`, `skill_source=category`; `rows_on_unmeasured_model` drops by the first+last counts (~1,620 on the 19:54:53Z build) to ~MLB HR + NFL ATD only.
