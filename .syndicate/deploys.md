@@ -46530,3 +46530,20 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - `player_last_goal_scorer`: 6/6 rows `status=measured`, `verdict_class=loses_to_market`, `established_loss_rel=0.315`, `sample_games=177`, and `score.skill_reliability=0.5`, `skill_source=category` on 6/6 (= 1 - 5 x 0.315 floored at 0.5, as predicted). Still SERVED (ranks 517-627); edge>0 on 0/6.
 - `rows_on_unmeasured_model` 1,676 -> 675 (`mlb:batter_home_runs` 19, `nfl:Anytime TD` 21, `soccer:player_last_goal_scorer` 635). Last scorer stays in this COUNTER because it keeps the removed rule's predicate (unmeasured OR loses_to_market). That is a count, not a drop: the rows are served.
 - unchanged on the same build: anytime 45/45 and SOT 495/495 `measured`; soccer prop edge>0 77/588 (no positive pile).
+
+## 2026-10-05 22:00:02Z (5:00 PM CT) -- LOCAL FLEET FF 45b02482 -> fe0dc508, NO RESTART: NHL props odds request goalie saves -- **SHIPPED; production reading OWED** (lane `nhl-confirmed-goalies`, user: "Add saves only")
+
+- **Why:**
+  - `local_nhl_odds.collect_oddsapi_props` requested 4 markets (points, assists, goals, SOG) and never `player_total_saves`. Its map did not know that key either.
+  - Measured on the fleet: `player_props_lines` 10-03..10-08 had 0 SAVES rows, and the 10-06 book-quote log had none.
+  - So the confirmed-starter SAVES projection could never be priced or served.
+- **What:** `markets` gains `player_total_saves`; `market_map` maps it to SAVES. +1 credit per event per props fetch (4 -> 5 markets). Test `tests/test_nhl_oddsapi_props_markets.py` runs the real function on a fake client.
+- **How:**
+  - The file's claim was released by closing lane nhl-compact-card-start-time (GOAL: MET, owner session archived; user decision).
+  - Claims live-odds-worker + refresh-worker were held by nhl-confirmed-goalies. No NHL refresh was running.
+  - `git merge --ff-only fe0dc508`. The gap carried this file and an unimported MLB analysis script.
+  - Claims released at ~22:03Z, the ff being complete; the reading below needs no service action.
+- **Expect:**
+  - The next props odds fetch after books post saves writes SAVES rows into `player_props_lines/date=<d>/oddsapi.csv`.
+  - `props_recommendations_<d>.csv` then prices SAVES for the `sim_starter == 1` goalie (confirmed when Daily Faceoff confirms) and refuses the others (REFUSE_NOT_STARTER).
+- **Reading OWED:** fleet watcher on `player_props_lines` for SAVES rows written after 22:00:02Z, then the props file.
