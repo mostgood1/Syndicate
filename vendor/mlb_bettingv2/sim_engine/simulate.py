@@ -2637,6 +2637,11 @@ def simulate_game(
                             _set_half_bases_from_runners(half, 0, int(half.runner_on_2b), int(half.runner_on_3b))
                             _sync_runner_reach_sources(state.runner_reach_source_by_id, half)
                             half.outs += 1
+                            # A caught-stealing out is the pitcher's out: real box scores
+                            # count it in innings pitched, and outs props settle on it.
+                            # It was added to the inning but never to the pitcher's line
+                            # (lane mlb-non-pa-outs, 2026-10-06).
+                            st.pitcher_row(pitcher_id)["OUTS"] += 1.0
                             if pbp_mode in ("pa", "pitch"):
                                 _log(
                                     {
