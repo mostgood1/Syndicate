@@ -320,3 +320,52 @@ distribution:
   (`hist_props_csv` / `hist_game_book` exist; the book arm still reads the committed files).
 - **NBA re-sim** with WNBA #2 (availability) and #3 (rate shrink) enabled for NBA, to measure the minutes fix.
 - No board or engine change; nothing deployed.
+
+## The calibrated model vs the de-vigged book, and the out-of-sample book-blend weight `[2026-10-05, a032251a]`
+
+**Data.**
+- OddsAPI historical backfill (user-approved): 137,863 credits, 1,325 games over 212 dates, 0 errors.
+- One pre-tip snapshot per game, 45 min before its own tip, from every US book, in the 10 priced prop markets.
+- Lines are proportionally de-vigged per book, and only two-sided, non-integer lines are kept.
+- Scored rows are the calibration's held-out set: 400 games, 2026-03-01 onward plus the playoffs; constants were fit
+  on 145 earlier games.
+- 249,884 (line, book) rows on test and 86,534 on train. 22,705 test lines had no sim player that date.
+- Several books often price the same line, so every CI is game-clustered.
+
+**The calibrated model loses to the book in every market** (`fit_nba_prop_calibration.py --vs-book`):
+
+| market | lines | Brier book | calibrated | raw served | own avg | calibrated − book [95% CI] | +EV bets ROI [CI] |
+|---|---|---|---|---|---|---|---|
+| all | 249,884 | 0.2438 | 0.2672 | 0.3110 | 0.2709 | +0.0234 [+0.0204, +0.0268] | −6.5% [−8.4, −4.7] |
+| pts | 61,456 | 0.2420 | 0.2696 | 0.3079 | 0.2746 | +0.0276 [+0.0236, +0.0322] | −6.9% [−9.6, −4.4] |
+| reb | 34,367 | 0.2437 | 0.2539 | 0.2959 | 0.2564 | +0.0102 [+0.0065, +0.0140] | −2.4% [−5.4, +0.8] |
+| threes | 24,211 | 0.2406 | 0.2555 | 0.2667 | 0.2595 | +0.0149 [+0.0114, +0.0183] | −9.6% [−13.1, −6.2] |
+| ast | 22,896 | 0.2435 | 0.2668 | 0.3166 | 0.2685 | +0.0233 [+0.0189, +0.0282] | −9.0% [−12.3, −5.6] |
+
+pra, pr, pa, ra, blk and stl follow the same pattern; full table in `fit_nba_prop_calibration_vs_book.json`.
+The calibration closes about two-thirds of the raw model's gap to the book (+0.067 -> +0.023 pooled), but none of it.
+
+**How much should the model's departure from the book be trusted?** (`--book-blend`)
+- The blend is p = book + w (calibrated − book). w is fit on TRAIN lines by Brier, in logit and probability space, and
+  scored on TEST.
+- Fitted w: 0.05 pooled (logit), 0.05-0.15 per market, and 0 for blk and stl.
+- On test, the blend TIES the book: pooled +0.00010 [−0.00010, +0.00029]. No market is better; the best is reb,
+  −0.00028 [−0.00068, +0.00023]. ast is WORSE even at w = 0.10: +0.00099 [+0.00038, +0.00165].
+- The blended model's +EV bets have ROI CIs spanning 0 in every market.
+
+**Conclusion.**
+- On these lines, the calibrated NBA prop model carries no measurable information beyond the de-vigged book.
+- Per line, the honest probability is the book's own price (w ≈ 0.05). An edge shown against the book is model error.
+- This is consistent with the WNBA lane's book-information finding: the book is right ~94% of the way when the two
+  disagree, through minutes, late absences and lineups.
+- The largest error source measured here is minutes, and the fix aimed at it, availability (WNBA #2), is still
+  untested on NBA. That, not recalibration, is where any edge would have to come from.
+
+**Not done:**
+- The ladder path (what Layer 2 serves) was not scored separately. Its mean equals the evaluated mean, and its width
+  is approximately the evaluated width.
+- The harness's served-model-vs-book arm on the backfilled odds was STOPPED. The production edges function
+  short-key merge blew up to 3.36M rows / 4.8 GB per date (the many-to-many lead), and the host had 2.2 GB free with
+  the fleet on the same machine. Do not re-run it on backfilled odds without first filtering to one line per
+  (player, stat, book).
+
