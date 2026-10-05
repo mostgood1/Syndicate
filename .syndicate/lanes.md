@@ -1081,7 +1081,8 @@ death, never life — do not invert it.
 
 ### stop-market-withholding — OPEN — opened 2026-10-05 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
 - Goal: No Layer 2 row is withheld because of its MARKET or a market-level model verdict: the 2026-09-11 unmeasured-model-only admission rule is removed (user directive 2026-10-05 'STOP WITHHOLDING MARKETS ... each bet is at the line level'); every line is judged on its own EV/price/freshness and model skill only moves ranking; verified on the fleet as soccer prop rows present on the served board
-- Files: syndicate/features/shared/layer2_board.py, syndicate/blueprints/intelligence.py, pipeline/intelligence_state.py, tests/test_layer2_unmeasured_model_only.py, tests/test_layer2_uninformative_ev.py, tests/test_measured_market_skill.py, syndicate/features/shared/measured_market_skill.py, tests/test_layer2_excluded_markets.py
+- Files: syndicate/features/shared/layer2_board.py, syndicate/blueprints/intelligence.py, pipeline/intelligence_state.py, tests/test_layer2_unmeasured_model_only.py, tests/test_layer2_uninformative_ev.py, tests/test_layer2_excluded_markets.py
+- **RELEASED 2026-10-05 ~2:10 PM CT to lane `layer2-unmeasured-per-line` (session f028352c), USER DECISION verbatim "take over all three, including the restart": `syndicate/features/shared/measured_market_skill.py` and `tests/test_measured_market_skill.py` moved OFF the Files: line above. The owner session was messaged twice (queued, mid-turn).**
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: Fleet board build after ff+restart: rows_withheld_unmeasured gone, served shortlist carries soccer player_* rows (was 0) and MLB batter_home_runs / NFL Anytime TD one-sided rows
