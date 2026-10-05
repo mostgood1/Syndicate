@@ -1066,6 +1066,14 @@ death, never life — do not invert it.
 - Verification: 0 cross-boundary UPDATE references; every moved non-blank line verbatim in the archive and gone from state_worker.md; a pointer naming the archive file in the kept section; state_key_check.py coherent and the subject still counted; state_worker.md < 250,000 and STATE_TOTAL < 1,100,000.
 - Blocked by: none
 
+### soccer-xg-totals-bias — OPEN — opened 2026-10-05 — session 43e4d5fe-e05e-41bc-aae6-6d6986460b22
+- Goal: The source of the soccer goals-level over-projection in the five xG-rated leagues (2025-26: model mean total 2.95 vs actual 2.77, mean P(over 2.5) 0.590 vs 0.540, n 1,391) is identified file:line, and a correction fitted on 2025-26 is tested on held-out 2026-27 completed matches: model mean total within +/-0.05 goals of actual AND O/U 2.5 Brier vs the TRUE close not worse (paired match-bootstrap CI). Measurement only -- no production change without a user decision
+- Files: .syndicate/findings_2026-10-05_soccer_xg_totals_bias.md (NEW)
+- Hypothesis: PRE-REGISTERED 2026-10-05: the bias is a per-league LEVEL offset in the goal rate fed by the xG-based (Understat) team ratings, not a shape error -- so (1) it is present in 2026-27 too; (2) it is roughly constant across the season (not an early-season prior artefact); (3) a single per-league multiplicative goal-rate correction fitted on 2025-26 removes most of it on 2026-27. Not part of the hypothesis: Ligue 1 O/U loss being entirely this bias
+- Falsification test: Any of: 2026-27 xG-league completed matches show mean model total within +/-0.05 of actual (bias absent -> season-specific, stop); the 2025-26 bias reverses sign between first and second half of the season; the 2025-26-fitted correction leaves 2026-27 bias outside +/-0.05 or makes O/U 2.5 Brier vs close worse with a CI excluding 0
+- Verification: Findings file reports: per-league bias 2025-26 and 2026-27 with n and dates; season-half split; the cause traced file:line; held-out 2026-27 O/U 2.5 Brier vs TRUE close before/after the fitted correction with paired CI; per-family date coverage and intersection printed. league_profiles.py is claimed by lane soccer-corners-model-rebuild -- any fix there needs that lane's release or an approved cross-lane write
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
