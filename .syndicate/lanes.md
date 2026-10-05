@@ -1141,6 +1141,11 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### mlb-strikeout-bias — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **FOUND 2026-10-05 (HR lane next, user-queued): the 09-04 HR refit is INERT in production.**
+  - `PitchModelConfig.hr_rate_mult` defaults to 1.856 (`ead7c6c5`). But `simulate.py` builds `PitchModelConfig(**pitch_model_overrides)`, and production's forward file `data/tuning/pitch_model_overrides/forward_start_2026_04_14_v1.json` (every date >= 04-14) sets `hr_rate_mult: 1.1`.
+  - Production therefore runs HR at 1.1, not 1.856. The k/bb mults are not in the file, so they DO apply.
+  - This fits the as-of backtest: sim HR p 0.090 vs 0.185 realised (May–July).
+  - The replay harness loads the forward file, so its baseline = production.
 - **DECOMPOSITION + SELECTION RULE, PRE-REGISTERED 2026-10-05 ~22:30Z before any candidate result was read.**
   - **Decomposition** (`mlb_strikeout_decomposition.py`, shipped config, 26 dates / 565 starts). The K excess of +0.81/start splits 0.59 from batters faced (BF 24.70 vs 22.07) and 0.19 from K/BF (+0.009, CI [+0.0002, +0.0173]). The BF excess is driven by:
     - **HIT-BY-PITCH: 1.76/start vs 0.23 actual (7.6x).** `pitch_model.py` applies a per-PA rate PER PITCH: `p_hbp = base_hbp * (hbp_tgt / 0.008)`, base_hbp 0.01. Inputs are fine (roster hbp_rate mean ~0.010-0.012 vs a real 1.04%/BF). The 08-17 comment already flagged it ('roughly 4x', left unfixed while entangled with the pitch mix).
