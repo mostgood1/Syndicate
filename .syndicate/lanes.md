@@ -1056,6 +1056,10 @@ death, never life — do not invert it.
   - It is NOT in `refresh_nhl_oddsapi.py`: lane-guard blocked that file (claimed by `nhl-sim-artifact-backfill-fabricates`).
   - The fetch only happens when the collector's lineups + starting_goalies files exist. Off switch: SYNDICATE_NHL_CONFIRMED_GOALIES=off.
 - Coordination: lane `nhl-elite-assists` (session local_d89f75a7), which owns collect.py / lineups.py / loaders.py, was messaged 2026-10-05 ~18:0xZ. None of its files are edited.
+- **LIVE + MET on production 2026-10-05:** 475cd522 went live via another session's ff 18:47:33Z.
+  - 18:54:39Z `starting_goalies_2026-10-05`: 7/8 rows dailyfaceoff, exactly Daily Faceoff's 7 confirmed teams.
+  - The props sim's starters = those goalies (SAVES 20.73-24.19; listed backups 0.00).
+  - deploys.md 18:56Z.
 - Blocked by: none
 
 ### soccer-scorer-race-grade — OPEN — opened 2026-10-05 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f

@@ -46314,3 +46314,20 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - reading 1: lineups_2026-10-05.csv rewritten 18:54:39Z (first after the ff): 144 slotted skaters, 144 with assist_share (0.248..0.676; top Celebrini 0.676, Kucherov 0.662, Pastrnak 0.654).
 - reading 2: `nhl_sim_input_checklist.py` on fleet data -- PASS; assist_share 5.0% "consumed, thinly populated" only because older dated lineup files predate the column.
 - reading 3: props_recommendations_all_markets_2026-10-05.csv rewritten 18:55:32Z: Kucherov ASSISTS proj 0.596 (05:07Z build, shot-rate attribution: 0.54; his own avg 1.13).
+
+## 2026-10-05 18:56Z (1:56 PM CT) -- MEASUREMENT: NHL confirmed starting goalies (475cd522) -- **LIVE via ANOTHER SESSION'S ff 18:47:33Z, MET on production** (lane `nhl-confirmed-goalies`, user: "wire confirmed starting goalies into the lineups")
+
+- **How it went live:**
+  - Landed 475cd522 at ~18:23Z. Claims live-odds-worker + refresh-worker were acquired by nhl-confirmed-goalies at ~18:22Z.
+  - My own ff waited for a gap between NHL refresh runs (runs are back to back: a 20-min run 18:33-18:53Z).
+  - Before it fired, another session ff'd the fleet 7d23f09d -> 7f56875e at 18:47:33Z ("NHL assists by as-of assists per on-ice goal"), then -> ba314b28 at 18:52:45Z. Both contain 475cd522. That happened while this lane held both claims.
+  - Recorded, not contested; my loop was killed before it ran a merge.
+- **Baseline (18:21:13Z):** `starting_goalies_2026-10-05/06` had 0 dailyfaceoff rows (8 / 18 rows, all hockeysim_toi).
+- **Reading 1 (artifact):** the first generation on the new code (started 18:52:51Z) wrote `starting_goalies_2026-10-05.csv` at 18:54:39Z.
+  - 7 of 8 rows `source=dailyfaceoff, status=confirmed`, matching exactly the 7 teams Daily Faceoff listed Confirmed when read independently at 18:5xZ (PHI Vladar, PIT Murashov, WPG Stevenson, BOS Swayman, OTT Ullmark, DAL Oettinger, SJS Askarov).
+  - TBL (not confirmed) kept its projection. 2026-10-06: 0 confirmed yet, so 0 overlaid, as expected.
+- **Reading 2 (reachability, the consumer):** `props_recommendations_all_markets_2026-10-05.csv` rewritten 18:55:32Z.
+  - Every confirmed goalie is the props sim's starter: SAVES proj_lambda 20.73-24.19.
+  - The other book-listed goalies on two of those teams (PIT Silovs, WPG Skinner) are 0.00.
+- **Not readable:** the module's NHL_CONFIRMED_GOALIES status line (changed_starter count). The NHL runner captures its child's stdout, so it never reaches the fleet logs. Whether Murashov / Stevenson were changes from the projection is not read.
+- Claims released after this entry.
