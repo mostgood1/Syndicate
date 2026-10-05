@@ -1241,6 +1241,24 @@ death, never life — do not invert it.
 - Verification: Component table (HR, non-HR H, BB per team-game; batter P(HR>=1)) at 1.1, then candidates by the pre-registered rule; production's next sim matches the shipped value's replay
 - Blocked by: mlb-strikeout-bias
 
+### mlb-pa-length — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **SELECTION RULE, PRE-REGISTERED 2026-10-06 ~01:30Z before any PA-length run** (user: "yes, do PA length next and ship if it passes").
+  - **Baseline** = production after `mlb-strikeout-bias` resolves (its joint re-fit if shipped, else today's config).
+  - **Tool:** `mlb_strikeout_decomposition.py`. Same 26 dates, tune < 2026-07-04, holdout >= 2026-07-04, 100 sims for grids, 200 for the judgement.
+  - **Stage A.** Grid `base_in_play` in {0.20, 0.18} with `base_foul` raised to keep the mix summing as the engine expects (read from `PitchModelConfig` before running). Pick the smallest |P/BF - actual| on TUNE.
+  - **Stage B.** Re-fit the strikeout knob (`early_count_foul_boost` in a 3-value grid around the baseline's value) so starter K/BF matches actual on TUNE. The mix is NEVER changed alone.
+  - **Stage C: HOLDOUT read once.** SHIP only if every check holds:
+    - |P/BF gap| is lower than the baseline's;
+    - |starter SO|, |H|, |BB|, |ER| and |outs| bias, and batting |HR/PA|, |H/PA|, |BB/PA| bias, each worsen by <= 0.10 (per-PA terms by <= 0.003);
+    - game-total |gap| <= max(0.30 runs, the baseline's).
+  - **Otherwise ship nothing.** Ship = pitch-model forward overrides with provenance, fleet ff, verified on production's next sim.
+- Goal: MLB plate appearances are the right length: replay pitches per batter faced matches actual (today 3.44 vs 3.88, -11%) via a JOINT fit of the in-play/foul pitch mix with the strikeout knob (the mix-only fix is FORBIDDEN, learnings 08-18), holding K/BF, H/BF and BB/BF at actual, judged once on a pre-registered holdout against the configuration the joint re-fit ships; shipped only if it passes, then verified on production's next sim
+- Files: .syndicate/findings_2026-10-06_mlb_pa_length.md (NEW)
+- Hypothesis: base_in_play (0.23 vs ~0.17 real) ends PAs early; raising PA length cuts batters faced per start, removing the residual starter-outs and K/start bias
+- Falsification test: If no in-play/foul/K combination reaches P/BF within 3% of actual while keeping K/BF, H/BF and BB/BF within their holdout guards, nothing ships
+- Verification: Pre-registered grid on tune, holdout read once, production's next sim matches the shipped replay
+- Blocked by: mlb-strikeout-bias
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
