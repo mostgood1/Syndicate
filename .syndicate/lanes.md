@@ -930,6 +930,18 @@ death, never life — do not invert it.
   - **On the bar itself (stated now, NOT used to pass anything):** (a) asks 33 cells (11 lines x 3 periods) for no one-sided 2.5% exceedance. Under a TRUE null of no effect, P(at least one) is ~ 1 - 0.975^33 ~ 0.57 (cells are correlated, so somewhat less). H16 and H17 each failed on one cell sitting at the boundary, in the same 3-date window. The bar is underpowered against noise in a 6-game window; that is a flaw in how I set it, and it is reported rather than fixed after the fact.
   - What every variant agrees on: **from November on, no line is worse and SOG/POINTS are better** (blend, floor10, floor10noblk alike).
   - Recommendation to the user: switch the builder on at ~Nov 1 (every team has >= 10 games), which removes the late-October crossing window entirely; or override; or leave off.
+- **USER DECISION 2026-10-04 ~22:00Z: "set the floor and blocks defaults now, enable on Nov 1".** Done in 2fe903ca (on main):
+  - MIN_CURRENT_GAMES = 10; player.blocks and team.block_rate at the prior (W = inf).
+  - `enabled()` is ON from Nov 1 of each season; env `SYNDICATE_NHL_INSEASON_SEASON_INPUTS` on/off overrides both ways. No deploy is needed on Nov 1; the code only has to be on the fleet.
+  - Fleet at check time (~21:50Z): d7955a3c, which carries b8845294/4fc8391e/a7f7c464 (another session's ff) but NOT yet 2fe903ca. Only `team_xg_2026-2027.csv` among season files (the builder is gated off).
+  - The next fleet ff by anyone carries 2fe903ca; it stays inert until Nov 1.
+  - **Reading OWED 2026-11-01:** scheduled task `nhl-inseason-inputs-nov1-verify` (fires 2026-11-01 16:00 CT). It is READ-ONLY on production and checks:
+    - fleet has 2fe903ca;
+    - the four `*_2026-2027.csv` files have mtime >= Nov 1 (any earlier = the date gate leaked);
+    - block_weight / block_rate_index identical to `_latest`, shot_weight / pp_pct changed;
+    - the NHL_INSEASON_SEASON_INPUTS line.
+    It records MET/NOT MET in deploys.md + here.
+  - Caveat: if no session ff's the fleet to >= 2fe903ca before Nov 1, the switch-on does not happen; the task reports that as NOT MET and asks for a fleet ff (a user decision; the auto-mode classifier refused my own fleet ff on 10-04).
 - Blocked by: none
 ### nfl-live-segment-interval — OPEN — opened 2026-10-03 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
 - Goal: NFL in-play quarter/half segment lines refresh every 10 min (code default, like NCAAF 8730cfb7) instead of every 150 s lines-autorun run, before the Sunday 2026-10-04 17:00Z window; NFL full-game lines unchanged; 0 NFL rows served >1h
