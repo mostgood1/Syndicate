@@ -46371,3 +46371,7 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - baseline (read 19:52Z, built under 2.0): props_recommendations_all_markets_2026-10-05.csv (19:31:00Z) ASSISTS mean D 0.2343 (n 48) / F 0.3219 (n 95); 2026-10-06 (19:35:45Z) D 0.2458 / F 0.3276.
 - prediction: the first props build after 19:50:48Z raises the D mean by ~10-13% and lowers F by ~4-5% (backtest D 0.88x->0.99x, F 1.06x->1.01x); team totals unchanged.
 - verify: watcher `/mnt/c/tmp/nhlprops/dpow_watch.sh` prints the D/F means of that build.
+
+## 2026-10-05 19:56Z (2:56 PM CT) -- READING for the 19:50:48Z ff (82e26761, NHL assist_position_power 1.5) -- **MET** (lane `nhl-elite-assists`)
+
+- reading: props_recommendations_all_markets_2026-10-05.csv rebuilt 19:55:30Z (first after the ff): ASSISTS mean D 0.2343 -> 0.2627 (+12.1%, n 48), F 0.3219 -> 0.3078 (-4.4%, n 95). Predicted D +10-13%, F -4-5%: both inside.
