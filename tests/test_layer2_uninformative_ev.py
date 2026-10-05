@@ -26,9 +26,9 @@ from syndicate.features.shared.opportunity_signals import expected_value_pct
 
 _NOW = datetime(2026, 8, 14, 20, 0, tzinfo=timezone.utc)
 
-# A MEASURED model view. Since 2026-09-11 a one-sided row whose model is
-# unmeasured is withheld (`tests/test_layer2_unmeasured_model_only.py`);
-# the keepers here test the hold-restatement rule, so their model is measured.
+# A MEASURED model view. The keepers here test the hold-restatement rule, so
+# their model is measured (an unmeasured one is counted, not withheld, since
+# 2026-10-05 -- `tests/test_layer2_unmeasured_model_only.py`).
 _MEASURED = {"model_skill": {"status": "measured", "sample_games": 120}}
 
 

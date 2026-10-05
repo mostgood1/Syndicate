@@ -1,4 +1,9 @@
-"""`#400` -- one prop family took half the board.
+"""`#400` -- one prop family took half the board. NO LONGER A RULE.
+
+`[2026-10-05, user directive]`, lane `stop-market-withholding`: no market is
+kept off the board by name. The exclusion list and its env knob
+(`SYNDICATE_SHORTLIST_EXCLUDED_MARKETS`) are removed; these tests pin that a
+value set in the environment excludes nothing. History follows.
 
 Measured on the served board 2026-08-12: soccer contributed 100 of 200 sampled
 rows and EVERY one was `player_first_goal_scorer` (45) or
@@ -34,71 +39,27 @@ def _row(*, market, sport="soccer", ev=2.0, event_id="e1"):
     }
 
 
-class ExcludedMarketTests(unittest.TestCase):
-    """DEFAULT EMPTY since 2026-09-16 (user decision): no family is excluded by name.
-    The env knob still works when someone sets it explicitly, and is tested as such."""
-
-    def test_by_default_goalscorer_props_are_KEPT_and_nothing_is_excluded(self) -> None:
+class NoMarketIsExcludedTests(unittest.TestCase):
+    def test_goalscorer_props_are_kept(self) -> None:
         rows = [
             _row(market="player_first_goal_scorer"),
             _row(market="player_last_goal_scorer"),
+            _row(market="player_anytime_goal_scorer"),
             _row(market="h2h"),
         ]
         out = select_shortlist(rows, now=_NOW)
-        kept = sorted(r["market"] for r in out["rows"])
-        self.assertEqual(kept, ["h2h", "player_first_goal_scorer", "player_last_goal_scorer"])
-        self.assertEqual(out["rows_excluded_market"], 0)
-        self.assertEqual(out["excluded_markets"], [])
+        self.assertEqual(len(out["rows"]), 4)
+        self.assertNotIn("rows_excluded_market", out)
+        self.assertNotIn("excluded_markets", out)
 
-    def test_by_default_the_anytime_variant_is_kept_too(self) -> None:
-        out = select_shortlist([_row(market="player_anytime_goal_scorer")], now=_NOW)
-        self.assertEqual(len(out["rows"]), 1)
-        self.assertEqual(out["rows_excluded_market"], 0)
-
-    def test_an_explicit_env_exclusion_is_a_substring_rule_and_counted(self) -> None:
+    def test_the_old_env_knob_excludes_nothing(self) -> None:
         import os
         from unittest.mock import patch
 
+        rows = [_row(market="player_first_goal_scorer", event_id=f"g{i}") for i in range(4)]
         with patch.dict(os.environ, {"SYNDICATE_SHORTLIST_EXCLUDED_MARKETS": "goal_scorer"}, clear=False):
-            out = select_shortlist([_row(market="player_anytime_goal_scorer"), _row(market="h2h")], now=_NOW)
-        self.assertEqual([r["market"] for r in out["rows"]], ["h2h"])
-        self.assertEqual(out["rows_excluded_market"], 1)
-        self.assertEqual(out["excluded_markets"], ["goal_scorer"])
-
-    def test_an_explicit_exclusion_beats_the_kind_floor(self) -> None:
-        """kind_floor guarantees 30 prop slots. If exclusion ran after bucketing
-        the guarantee would drag these back -- the ordering still matters when
-        someone sets the knob."""
-        import os
-        from unittest.mock import patch
-
-        rows = [_row(market="player_first_goal_scorer", event_id=f"g{i}") for i in range(40)]
-        with patch.dict(os.environ, {"SYNDICATE_SHORTLIST_EXCLUDED_MARKETS": "goal_scorer"}, clear=False):
-            out = select_shortlist(rows, now=_NOW, kind_floor=30)
-        self.assertEqual(out["rows"], [])
-        self.assertEqual(out["rows_excluded_market"], 40)
-
-    def test_an_unrelated_prop_is_untouched(self) -> None:
-        out = select_shortlist([_row(market="player_shots_on_target")], now=_NOW)
-        self.assertEqual(len(out["rows"]), 1)
-        self.assertEqual(out["rows_excluded_market"], 0)
-
-    def test_env_can_disable_or_replace_the_list(self) -> None:
-        import os
-        from unittest.mock import patch
-
-        with patch.dict(os.environ, {"SYNDICATE_SHORTLIST_EXCLUDED_MARKETS": ""}, clear=False):
-            out = select_shortlist([_row(market="player_first_goal_scorer")], now=_NOW)
-        self.assertEqual(len(out["rows"]), 1)
-        self.assertEqual(out["excluded_markets"], [])
-
-        with patch.dict(os.environ, {"SYNDICATE_SHORTLIST_EXCLUDED_MARKETS": "shots_on_target"}, clear=False):
-            out = select_shortlist(
-                [_row(market="player_shots_on_target"), _row(market="player_first_goal_scorer")],
-                now=_NOW,
-            )
-        kept = [r["market"] for r in out["rows"]]
-        self.assertEqual(kept, ["player_first_goal_scorer"], "env must REPLACE the default list")
+            out = select_shortlist(rows + [_row(market="h2h", event_id="h")], now=_NOW)
+        self.assertEqual(len(out["rows"]), 5)
 
 
 if __name__ == "__main__":

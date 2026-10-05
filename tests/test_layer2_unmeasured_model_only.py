@@ -1,6 +1,10 @@
-"""A one-sided row whose ONLY value is an unmeasured model's edge is withheld.
+"""A one-sided row whose ONLY value is an unmeasured model's edge is COUNTED, never withheld.
 
-`[2026-09-11, user decision: "Withhold, all sports"]`, lane `pricing-plane-v1`.
+`[2026-10-05, user directive]`, lane `stop-market-withholding`: "STOP WITHHOLDING
+MARKETS ... All lines are judged individually - models are tested for accuracy
+but each bet is at the line level". Before that, `[2026-09-11, user decision:
+"Withhold, all sports"]` (lane `pricing-plane-v1`) dropped these rows; the
+evidence it rested on is kept below as history.
 
 Measured on the served board that morning: all 116 MLB `batter_home_runs` rows
 were one-sided (`book_margin_model`) with `model_skill.sample_games: 0`, 8 of
@@ -15,9 +19,9 @@ from datetime import datetime, timezone
 
 import pytest
 
+from syndicate.features.shared import layer2_board
 from syndicate.features.shared.layer2_board import (
     _row_rests_on_unmeasured_model,
-    _unmeasured_model_only_mode,
     select_shortlist,
 )
 from syndicate.features.shared.opportunity_signals import expected_value_pct
@@ -26,11 +30,6 @@ _NOW = datetime(2026, 9, 11, 16, 0, tzinfo=timezone.utc)
 
 _UNMEASURED = {"model_skill": {"status": "unmeasured", "sample_games": 0}}
 _MEASURED = {"model_skill": {"status": "measured", "sample_games": 180}}
-
-
-@pytest.fixture(autouse=True)
-def _default_mode(monkeypatch):
-    monkeypatch.delenv("SYNDICATE_LAYER2_UNMEASURED_MODEL_ONLY", raising=False)
 
 
 def _one_sided(*, price: int = 410, hold: float = 6.6, market: str = "batter_home_runs",
@@ -120,51 +119,47 @@ def test_a_measured_loss_on_a_TWO_SIDED_row_is_still_never_touched():
     assert _row_rests_on_unmeasured_model(_two_sided_total(projection=dict(_MEASURED_LOSS))) is False
 
 
-def test_the_shortlist_withholds_a_measured_loss_and_counts_it():
-    rows = [
-        _one_sided(price=410, market="outs", projection=dict(_MEASURED_LOSS)),
-        _one_sided(price=500, market="batter_home_runs", projection=dict(_MEASURED)),
-    ]
-    result = select_shortlist(rows, now=_NOW)
-    assert result["rows_unmeasured_model_only"] == 1
-    assert result["unmeasured_model_only_by_market"] == {"mlb:outs": 1}
-    assert [r["market"] for r in result["rows"]] == ["batter_home_runs"]
-
-
 def test_a_one_sided_row_with_NO_model_view_is_left_to_the_hold_restatement_rule():
     assert _row_rests_on_unmeasured_model(_one_sided(model_edge_pct=None)) is False
 
 
-# --------------------------------------------------------------------------- the switch
-
-def test_absent_means_withhold():
-    assert _unmeasured_model_only_mode() == "withhold"
-
-
-def test_only_the_exact_word_admit_reverts(monkeypatch):
-    monkeypatch.setenv("SYNDICATE_LAYER2_UNMEASURED_MODEL_ONLY", "admit")
-    assert _unmeasured_model_only_mode() == "admit"
-    monkeypatch.setenv("SYNDICATE_LAYER2_UNMEASURED_MODEL_ONLY", "yes please")
-    assert _unmeasured_model_only_mode() == "withhold"
-
-
 # --------------------------------------------------------------------------- the shortlist
 
-def test_the_shortlist_withholds_them_counts_them_and_names_the_market():
+def test_the_shortlist_KEEPS_them_and_counts_them_by_market():
     rows = [
         _one_sided(price=410 + i, market="batter_home_runs") for i in range(3)
     ] + [
         _one_sided(price=150, market="Anytime TD", sport="nfl"),
+        _one_sided(price=410, market="outs", projection=dict(_MEASURED_LOSS)),
         _two_sided_total(),
         _one_sided(price=500, market="batter_home_runs", projection=dict(_MEASURED)),
     ]
     result = select_shortlist(rows, now=_NOW)
 
-    assert result["rows_unmeasured_model_only"] == 4
-    assert result["unmeasured_model_only_by_market"] == {"mlb:batter_home_runs": 3, "nfl:Anytime TD": 1}
-    assert result["unmeasured_model_only_mode"] == "withhold"
-    kept = {(r["market"], r["projection"]["model_skill"]["status"]) for r in result["rows"]}
-    assert kept == {("totals", "unmeasured"), ("batter_home_runs", "measured")}
+    assert len(result["rows"]) == len(rows)
+    assert result["rows_on_unmeasured_model"] == 5
+    assert result["on_unmeasured_model_by_market"] == {
+        "mlb:batter_home_runs": 3, "mlb:outs": 1, "nfl:Anytime TD": 1,
+    }
+
+
+def test_no_env_value_brings_the_withhold_back(monkeypatch):
+    """The rule was REMOVED, not defaulted off: the old switch is inert."""
+    for value in ("withhold", "admit", ""):
+        monkeypatch.setenv("SYNDICATE_LAYER2_UNMEASURED_MODEL_ONLY", value)
+        result = select_shortlist([_one_sided(price=410)], now=_NOW)
+        assert [r["market"] for r in result["rows"]] == ["batter_home_runs"]
+    assert not hasattr(layer2_board, "_unmeasured_model_only_mode")
+    assert "rows_unmeasured_model_only" not in result
+
+
+def test_a_measured_LOSS_stays_on_the_board_instead_of_vanishing():
+    """Accuracy moves RANK: a known-losing model's line stays on the board, scored
+    down by `_apply_skill_reliability`, rather than being hidden."""
+    result = select_shortlist(
+        [_one_sided(price=410, market="outs", projection=dict(_MEASURED_LOSS))], now=_NOW
+    )
+    assert [r["market"] for r in result["rows"]] == ["outs"]
 
 
 def test_the_rules_never_double_count():
@@ -172,18 +167,11 @@ def test_the_rules_never_double_count():
     unmeasured = _one_sided(price=410)
     result = select_shortlist([no_view, unmeasured], now=_NOW)
     assert result["rows_uninformative_ev"] == 1
-    assert result["rows_unmeasured_model_only"] == 1
+    assert result["rows_on_unmeasured_model"] == 1
+    assert len(result["rows"]) == 1
 
 
-def test_the_counter_is_present_and_zero_when_nothing_is_withheld():
+def test_the_counter_is_present_and_zero_when_nothing_rests_on_an_unmeasured_model():
     result = select_shortlist([_two_sided_total()], now=_NOW)
-    assert result["rows_unmeasured_model_only"] == 0
-    assert result["unmeasured_model_only_by_market"] == {}
-
-
-def test_admit_restores_todays_behaviour(monkeypatch):
-    monkeypatch.setenv("SYNDICATE_LAYER2_UNMEASURED_MODEL_ONLY", "admit")
-    result = select_shortlist([_one_sided(price=410)], now=_NOW)
-    assert result["rows_unmeasured_model_only"] == 0
-    assert result["unmeasured_model_only_mode"] == "admit"
-    assert [r["market"] for r in result["rows"]] == ["batter_home_runs"]
+    assert result["rows_on_unmeasured_model"] == 0
+    assert result["on_unmeasured_model_by_market"] == {}

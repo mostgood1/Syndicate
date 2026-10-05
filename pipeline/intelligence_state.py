@@ -7093,7 +7093,7 @@ class IntelligenceStateService:
                 # `select_shortlist` ALREADY computes and returns all of these
                 # -- `rows_beyond_horizon`, `rows_stale_kickoff`,
                 # `rows_beyond_quote_age`, `rows_implausible_book`,
-                # `rows_excluded_market`, `rows_uninformative_ev`,
+                # `rows_uninformative_ev`,
                 # `rows_beyond_game_cap`. Nothing new is counted here; they were
                 # simply never printed, so eight rules trimmed silently.
                 #
@@ -7106,9 +7106,8 @@ class IntelligenceStateService:
                 f"stale_kickoff={layer2_shortlist.get('rows_stale_kickoff')} "
                 f"beyond_quote_age={layer2_shortlist.get('rows_beyond_quote_age')} "
                 f"implausible_book={layer2_shortlist.get('rows_implausible_book')} "
-                f"excluded_market={layer2_shortlist.get('rows_excluded_market')} "
                 f"uninformative_ev={layer2_shortlist.get('rows_uninformative_ev')} "
-                f"unmeasured_model_only={layer2_shortlist.get('rows_unmeasured_model_only')} "
+                f"on_unmeasured_model={layer2_shortlist.get('rows_on_unmeasured_model')} "
                 f"beyond_game_cap={layer2_shortlist.get('rows_beyond_game_cap')} "
                 f"sports={layer2_shortlist.get('active_sports')} "
                 # PER-SPORT SERVED COUNTS. `rows` above is the total, and every

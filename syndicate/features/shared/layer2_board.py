@@ -340,38 +340,28 @@ SHORTLIST_IMMINENCE_FLOOR = 25
 # makes a 26-row takeover impossible. 0 disables the cap.
 SHORTLIST_ROWS_PER_GAME = 6
 
-# Market substrings never seated on the shortlist. Env:
-# SYNDICATE_SHORTLIST_EXCLUDED_MARKETS (comma-separated), empty string disables.
+# NO MARKET IS EVER KEPT OFF THE BOARD BY NAME OR BY A MARKET-LEVEL VERDICT.
 #
-# **GOALSCORER PROPS, and this is a product decision rather than a defect fix.**
-# Measured on the served board 2026-08-12: soccer contributed 100 of 200 sampled
-# rows -- the largest single block -- and EVERY one was
-# `player_first_goal_scorer` (45) or `player_last_goal_scorer` (55). Nothing
-# else from the sport reached the board.
+# `[2026-10-05, user directive, verbatim]`: "WE HAVE TO STOP WITHHOLDING MARKETS!
+# THIS IS A PRIME DIRECTIVE OF THE APP. All lines are judged individually -
+# models are tested for accuracy but each bet is at the line level". Lane
+# `stop-market-withholding`.
 #
-# They are structurally unfit for an ACTIONABLE board, for three reasons that
-# compound:
-#   1. One-sided by construction. A book quotes "will X score first" at +7000
-#      and posts no opposing side, so there is no two-sided price to de-vig and
-#      `#384`'s consensus path cannot run. All 100 fell back to
-#      `book_margin_model` -- an ESTIMATE from a market-wide median hold.
-#   2. That hold is measured mostly on moneylines and totals. Applying it to a
-#      100:1 longshot is the least defensible use of the margin model;
-#      `book_margin_model`'s own docstring notes a 4.5% moneyline hold and 12%
-#      prop hold are both ordinary.
-#   3. Uniformly negative EV. The whole family sat at roughly -6.9 with a 1.6
-#      point spread, so it was never ranked ON merit -- it filled soccer's
-#      per-sport allocation because nothing else qualified.
+# Two rules here used to break that, and both are gone rather than defaulted
+# off, so no env value can bring them back:
+#   * `SHORTLIST_EXCLUDED_MARKETS` / `SYNDICATE_SHORTLIST_EXCLUDED_MARKETS` -- a
+#     substring list of market families never seated (`#400`; default emptied
+#     2026-09-16 by user decision, lane `board-category-gates`).
+#   * the 2026-09-11 "Withhold, all sports" admission rule -- a one-sided row
+#     whose model was unmeasured, or measured as losing to the market, was
+#     dropped. Measured on the fleet build 2026-10-05: 3,166 rows, 3,111 of them
+#     soccer player props (first/anytime/last scorer, shots on target).
 #
-# `#391` caps any one GAME at 6 rows. Nothing capped a market FAMILY, which is
-# how one prop type took half the board. Substring match, so `first`, `last` and
-# `anytime` variants are all covered by one rule.
-#
-# **DEFAULT EMPTY FROM 2026-09-16, BY USER DECISION** (`learnings.md`, lane
-# `board-category-gates`): no market family is kept off the board by name;
-# every row is judged on its own EV, sim edge, value floor and the per-game cap.
-# The reasons above are why `goal_scorer` WAS the default, kept as history.
-SHORTLIST_EXCLUDED_MARKETS = ""
+# What a model's measured accuracy does now is RANK: `_apply_skill_reliability`
+# scales a row's score by `measured_market_skill.skill_reliability`, so a model
+# known to lose to the market sinks without its lines being hidden. Every gate
+# left in `select_shortlist` is a property of the LINE (its age, an impossible
+# book total, its own EV against its family's floor, its game's cap).
 
 
 # Minimum value% a row must carry to be shown. Env:
@@ -897,41 +887,12 @@ def _row_ev_is_hold_restatement(row: Mapping[str, Any]) -> bool:
     return _as_float(row.get("model_edge_pct")) is None
 
 
-def _unmeasured_model_only_mode() -> str:
-    """`withhold` (default) or `admit`: may an UNMEASURED model alone seat a one-sided row?
-
-    `[2026-09-11, user decision: "Withhold, all sports"]`, taken on the served board,
-    reading the `written_at` 16:27:27Z build:
-
-        MLB   116 `batter_home_runs` rows, EVERY ONE one-sided (`book_margin_model`)
-              and EVERY ONE `model_skill.sample_games: 0`; 8 of the top 25, 33 of
-              the top 100. Acuna 1+ HR: model 0.321 vs implied 0.196 at +410;
-              2+ HR longshots at +2400..+6000 carrying model means of 0.38-0.59
-              HR a game, 2-3x what any hitter averages.
-        NFL    93 `Anytime TD` rows, same shape, 7 of the top 25.
-        soccer 221 shots / shots-on-target / assists rows, same shape.
-
-    A one-sided row's `ev_pct` is the book's own hold restated
-    (`_row_ev_is_hold_restatement`), so the market says nothing about it. What
-    seated these rows was the model's edge ALONE -- from a model that has never
-    been checked against a result. That is not an opportunity; it is an
-    unvalidated claim ranked beside measured ones. NCAAF already runs the same
-    principle the other way round (`football/pick_gate.py`: default deny, serving
-    needs a recorded win), and MLB's live edges were stopped for a MEASURED loss
-    to the market (lane `mlb-stop-publishing-edges`).
-
-    This is ADMISSION, not ranking. The 2026-08-31 decision ("rank on edge") is
-    untouched: a one-sided row whose model IS measured still ranks on its edge.
-
-    Absent means WITHHOLD. Only the exact word `admit` reverts, so an
-    unrecognised value cannot silently re-seat unvalidated rows.
-    """
-    raw = str(os.environ.get("SYNDICATE_LAYER2_UNMEASURED_MODEL_ONLY") or "").strip().lower()
-    return "admit" if raw == "admit" else "withhold"
-
-
 def _row_rests_on_unmeasured_model(row: Mapping[str, Any]) -> bool:
     """True for a one-sided row whose ONLY value signal is an unmeasured model.
+
+    INFORMATIONAL SINCE 2026-10-05 (lane `stop-market-withholding`): it COUNTS
+    such rows (`rows_on_unmeasured_model`) and no longer removes them -- see the
+    note above `SHORTLIST_MIN_VALUE_PCT`. The history below is why it was a gate.
 
     Three conditions, all required:
 
@@ -5077,18 +5038,9 @@ def select_shortlist(
         if rows_per_game is not None
         else int(_env_float("SYNDICATE_SHORTLIST_ROWS_PER_GAME", SHORTLIST_ROWS_PER_GAME))
     )
-    raw_excluded = os.environ.get("SYNDICATE_SHORTLIST_EXCLUDED_MARKETS")
-    excluded_markets = tuple(
-        token.strip().lower()
-        for token in (
-            SHORTLIST_EXCLUDED_MARKETS if raw_excluded is None else raw_excluded
-        ).split(",")
-        if token.strip()
-    )
     by_sport: dict[str, list[Mapping[str, Any]]] = {}
     beyond_horizon = 0
     beyond_game_cap = 0
-    excluded_market = 0
     below_value_floor = 0
     # Rows the BLEND put on the board that raw EV would have rejected. The
     # direct measure of the 2026-08-22 scoring change; zero here means the sim
@@ -5121,10 +5073,9 @@ def select_shortlist(
     implausible_book = 0
     stale_kickoff = 0
     uninformative_ev = 0
-    # `[2026-09-11, user decision]` -- see `_unmeasured_model_only_mode`.
-    unmeasured_model_mode = _unmeasured_model_only_mode()
-    unmeasured_model_only = 0
-    unmeasured_model_only_by_market: dict[str, int] = {}
+    # Counted, never removed (lane `stop-market-withholding`, 2026-10-05).
+    on_unmeasured_model = 0
+    on_unmeasured_model_by_market: dict[str, int] = {}
     for row in opportunities:
         if not _within_horizon(row, reference_now, horizon_days):
             beyond_horizon += 1
@@ -5188,14 +5139,6 @@ def select_shortlist(
         if implied_total is not None and implied_total < _MIN_IMPLIED_BOOK_TOTAL_PCT:
             implausible_book += 1
             continue
-        # `#400`: excluded market families. Applied HERE, before the per-sport
-        # bucket, so an excluded row cannot be re-seated by `kind_floor` or by
-        # `per_sport` running short -- the same ordering the value floor and the
-        # game cap already follow, and for the same reason.
-        market_text = str(row.get("market") or "").strip().lower()
-        if excluded_markets and any(token in market_text for token in excluded_markets):
-            excluded_market += 1
-            continue
         # A0/A3, model audit 2026-08-14: AN EV THAT IS A RESTATEMENT OF THE HOLD
         # IS NOT A MEASUREMENT, AND MUST NOT SEAT A ROW.
         #
@@ -5226,18 +5169,15 @@ def select_shortlist(
         if _row_ev_is_hold_restatement(row):
             uninformative_ev += 1
             continue
-        # The mirror of the rule above: THAT drops a one-sided row with no model
-        # view; THIS drops one whose only view is a model nobody has measured.
-        # Placed with the pre-bucket rules for the same reason -- so
-        # `kind_floor`/`per_sport` cannot re-seat what it withheld.
-        if unmeasured_model_mode == "withhold" and _row_rests_on_unmeasured_model(row):
-            unmeasured_model_only += 1
+        # Rows resting on an unmeasured (or losing) model are COUNTED here and
+        # stay in the pool: accuracy ranks them, it does not hide them.
+        if _row_rests_on_unmeasured_model(row):
+            on_unmeasured_model += 1
             key = "%s:%s" % (
                 str(row.get("sport") or "unknown").strip().lower() or "unknown",
                 str(row.get("market") or "unknown"),
             )
-            unmeasured_model_only_by_market[key] = unmeasured_model_only_by_market.get(key, 0) + 1
-            continue
+            on_unmeasured_model_by_market[key] = on_unmeasured_model_by_market.get(key, 0) + 1
         sport = str(row.get("sport") or "unknown").strip().lower() or "unknown"
         by_sport.setdefault(sport, []).append(row)
 
@@ -5487,8 +5427,6 @@ def select_shortlist(
         # nobody can tell apart from a thin slate.
         "rows_beyond_game_cap": beyond_game_cap,
         "rows_per_game": rows_per_game,
-        "rows_excluded_market": excluded_market,
-        "excluded_markets": list(excluded_markets),
         # A3. Rows whose `ev_pct` was a restatement of the book's own hold and
         # which carried no model view. Added in the SAME commit as the rule that
         # produces it -- `#397`'s discipline, after three rounds of shipping a
@@ -5500,9 +5438,8 @@ def select_shortlist(
         # `[2026-09-11, user decision]`: one-sided rows withheld because their
         # ONLY value was an unmeasured model's edge. Counter, per-market
         # breakdown and mode ship in the SAME commit as the rule (`#397`).
-        "rows_unmeasured_model_only": unmeasured_model_only,
-        "unmeasured_model_only_by_market": dict(sorted(unmeasured_model_only_by_market.items())),
-        "unmeasured_model_only_mode": unmeasured_model_mode,
+        "rows_on_unmeasured_model": on_unmeasured_model,
+        "on_unmeasured_model_by_market": dict(sorted(on_unmeasured_model_by_market.items())),
         # `#369`: named separately from the value floor, because "the book is
         # impossible" and "this row is priced below our floor" are different
         # rejections and collapsing them would hide a feed problem as taste.

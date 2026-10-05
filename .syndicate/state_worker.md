@@ -1841,7 +1841,9 @@ what would make the shed unreachable rather than merely rare.
   came from a construction I could not reproduce (this instrument reads the
   pre-divisor window at 0.925). Only before/after on ONE instrument is valid.
 
-**ADMISSION, NOT RANKING: a one-sided row whose ONLY value is an UNMEASURED model's edge is now WITHHELD from the shortlist** `[2026-09-11, user decision "Withhold, all sports"; 9d580145 live on refresh-worker 12:27 CT, lane pricing-plane-v1]`.
+**SUPERSEDED 2026-10-05 -- NOTHING IS WITHHELD BY MARKET OR BY A MARKET-LEVEL VERDICT** `[user directive, lane stop-market-withholding]`: "WE HAVE TO STOP WITHHOLDING MARKETS! THIS IS A PRIME DIRECTIVE OF THE APP. All lines are judged individually - models are tested for accuracy but each bet is at the line level". The rule below and `SHORTLIST_EXCLUDED_MARKETS` are REMOVED from `select_shortlist` (no env restores them); rows resting on an unmeasured/losing model are counted as `rows_on_unmeasured_model` / `on_unmeasured_model_by_market` and ranked by `_apply_skill_reliability`. Fleet build that day had 3,166 rows withheld by it (soccer props 3,111). History follows.
+
+~~ADMISSION, NOT RANKING: a one-sided row whose ONLY value is an UNMEASURED model's edge is now WITHHELD from the shortlist `[2026-09-11, user decision "Withhold, all sports"; 9d580145 live on refresh-worker 12:27 CT, lane pricing-plane-v1]`~~
 - **Why.** The 08-31 ranking change reduced the HR takeover but did not end it. On 2026-09-11 all 116 MLB `batter_home_runs` rows were `book_margin_model`
   with `model_skill.sample_games: 0`, 8 of them in the top 25:
   - Acuna 1+ HR: model 0.321 vs implied 0.196.

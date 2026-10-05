@@ -4100,8 +4100,6 @@ def board_layer2_shortlist_api():
                 # `#400`, added in the SAME commit as the rule that produces it
                 # -- that is the discipline `#397` exists to enforce after three
                 # rounds of shipping a working change with an unreadable counter.
-                "rows_excluded_market": shortlist.get("rows_excluded_market"),
-                "excluded_markets": shortlist.get("excluded_markets"),
                 # A3 (model audit 2026-08-14), added in the SAME commit as the
                 # rule that produces it -- the fourth time this key list has
                 # been the thing that made a working filter unreadable
@@ -4115,13 +4113,11 @@ def board_layer2_shortlist_api():
                 # from "soccer's whole slate was one-book longshots", and those
                 # need opposite responses.
                 "rows_uninformative_ev": shortlist.get("rows_uninformative_ev"),
-                # `[2026-09-11, user decision]`: one-sided rows withheld because
-                # their ONLY value was an unmeasured model's edge. Added to this
-                # explicit list in the same commit as the rule, or the counter
-                # would reach nobody (`#373`, `#381`, `#397`, `#400`).
-                "rows_unmeasured_model_only": shortlist.get("rows_unmeasured_model_only"),
-                "unmeasured_model_only_by_market": shortlist.get("unmeasured_model_only_by_market"),
-                "unmeasured_model_only_mode": shortlist.get("unmeasured_model_only_mode"),
+                # One-sided rows whose only value signal is an unmeasured (or
+                # losing) model. COUNTED, not withheld, since 2026-10-05 (lane
+                # `stop-market-withholding`): every line is judged on its own.
+                "rows_on_unmeasured_model": shortlist.get("rows_on_unmeasured_model"),
+                "on_unmeasured_model_by_market": shortlist.get("on_unmeasured_model_by_market"),
                 "max_quote_age_seconds": shortlist.get("max_quote_age_seconds"),
                 # The per-sport freshness gate (2026-10-02, lane layer2-freshness-1h):
                 # each sport's ceiling and how many rows it refused, so a stalled

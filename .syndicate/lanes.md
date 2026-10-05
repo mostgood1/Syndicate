@@ -1055,6 +1055,22 @@ death, never life — do not invert it.
 - Coordination: lane `nhl-elite-assists` (session local_d89f75a7), which owns collect.py / lineups.py / loaders.py, was messaged 2026-10-05 ~18:0xZ. None of its files are edited.
 - Blocked by: none
 
+### soccer-scorer-race-grade — OPEN — opened 2026-10-05 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: First/last goalscorer race probabilities (soccer_scorer_markets.scorer_race) graded against pre-kickoff book prices and match_box goal order: per-market ROI on model EV>0 and Brier/log-loss vs raw implied, with match-bootstrap CI and the date count the result rests on
+- Files: scripts/soccer_season_audit/grade_scorer_race.py, .syndicate/findings_2026-10-05_soccer_scorer_race_grade.md
+- Hypothesis: The race model beats the vig-included implied price on first/last scorer (the two markets the 2026-10-02 backtest left untested)
+- Falsification test: Model EV>0 ROI CI wholly below 0, or Brier/log-loss no better than raw implied
+- Verification: Findings file with per-market n, matches, dates, ROI CI, Brier/LL deltas; read-only on production data
+- Blocked by: none
+
+### stop-market-withholding — OPEN — opened 2026-10-05 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: No Layer 2 row is withheld because of its MARKET or a market-level model verdict: the 2026-09-11 unmeasured-model-only admission rule is removed (user directive 2026-10-05 'STOP WITHHOLDING MARKETS ... each bet is at the line level'); every line is judged on its own EV/price/freshness and model skill only moves ranking; verified on the fleet as soccer prop rows present on the served board
+- Files: syndicate/features/shared/layer2_board.py, syndicate/blueprints/intelligence.py, pipeline/intelligence_state.py, tests/test_layer2_unmeasured_model_only.py, tests/test_layer2_uninformative_ev.py, tests/test_measured_market_skill.py, syndicate/features/shared/measured_market_skill.py, tests/test_layer2_excluded_markets.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: Fleet board build after ff+restart: rows_withheld_unmeasured gone, served shortlist carries soccer player_* rows (was 0) and MLB batter_home_runs / NFL Anytime TD one-sided rows
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

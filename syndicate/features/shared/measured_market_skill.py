@@ -31,12 +31,13 @@ re-sim's number (`projection["live_aware"]`, set by `live_projection_join`).
 MLB's live model has its own, different record, and a pregame note on a live
 row would be the inherited-number failure `live_gameline_join` names.
 
-ADMISSION. `layer2_board._row_rests_on_unmeasured_model` withholds ONE-SIDED
-(`book_margin_model`) rows whose model is not `measured`, so relabelling a
-market can re-admit rows. On the 2026-09-14 shortlist every row in the markets
-this table covers was priced `consensus` (two-sided) and none changed admission.
-`TWO_SIDED_GAME_MARKETS` pins that: an entry outside it whose verdict is not
-`beats_market` needs `admission_checked` naming the reading that cleared it.
+ADMISSION IS NOT THIS TABLE'S BUSINESS ANY MORE `[2026-10-05, user directive, lane
+stop-market-withholding]`: "All lines are judged individually - models are tested
+for accuracy but each bet is at the line level". A verdict here RANKS a row
+(`skill_reliability` -> `layer2_board._apply_skill_reliability`); it never removes
+one. The `admission_checked` strings on some entries record readings taken while
+`layer2_board._row_rests_on_unmeasured_model` was still a gate (2026-09-11..10-05)
+and are history, not a requirement.
 
 PAYLOAD DISCIPLINE, same as `projection_skill`: the per-row note is six short
 keys. The numbers behind a verdict live in the entry, not on the row.
@@ -552,9 +553,8 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
 # same soccer market three ways: the alternate-line keys (`totals_alt`, `spreads_alt`) and `h2h_3_way`
 # read "unmeasured" because the lookup is an exact key. They are the same model and the same
 # measurement (taken at the main line; an alternate line is the same distribution read at another
-# point). ADMISSION CANNOT CHANGE: `layer2_board._row_rests_on_unmeasured_model` withholds a one-sided
-# row whose note is unmeasured OR `loses_to_market` alike, so moving these keys from unmeasured to a
-# LOSES verdict re-admits nothing.
+# point). (The admission note below dates from when unmeasured/losing one-sided rows were withheld;
+# since 2026-10-05 nothing is withheld by verdict -- see the module docstring.)
 _SOCCER_ALIAS_ADMISSION = (
     "2026-10-03: aliased verdict is loses_to_market; layer2_board._row_rests_on_unmeasured_model treats "
     "loses_to_market exactly as unmeasured for one-sided rows, so no row's admission can change"

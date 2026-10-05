@@ -86,21 +86,6 @@ def test_every_real_entry_cites_a_measurement(key):
     assert phase in {mms.PHASE_PREGAME, mms.PHASE_LIVE}
 
 
-@pytest.mark.parametrize("key", sorted(mms.MEASURED_MARKET_SKILL))
-def test_relabelling_cannot_silently_readmit_one_sided_rows(key):
-    """`layer2_board._row_rests_on_unmeasured_model` withholds one-sided rows
-    whose model is not `measured`. A losing model on a one-sided market must
-    not pass that gate just because it now has a number."""
-    entry = mms.MEASURED_MARKET_SKILL[key]
-    _, market, _, _ = key
-    if entry["verdict_class"] == mms.VERDICT_BEATS or market in mms.TWO_SIDED_GAME_MARKETS:
-        return
-    assert entry.get("admission_checked"), (
-        f"{key} is not a two-sided game market and does not beat the market; "
-        "name the served-board reading that shows its rows are two-sided"
-    )
-
-
 # --------------------------------------------------------------------------
 # soccer, re-measured 2026-10-03 (lane soccer-skill-registry-line-weighting)
 # --------------------------------------------------------------------------
