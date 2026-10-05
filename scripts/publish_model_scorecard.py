@@ -51,6 +51,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from syndicate.features.shared import daily_optimizer as opt  # noqa: E402
 from syndicate.features.shared import model_scorecard as msc  # noqa: E402
 
 # Sports with recorder parts to read.
@@ -312,6 +313,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-board-dates", type=int, default=10)
     parser.add_argument("--resamples", type=int, default=None)
     parser.add_argument("--weekly", choices=("auto", "on", "off"), default="auto")
+    parser.add_argument("--optimizer", choices=("on", "off"), default="on",
+                        help="the daily optimizer (lane daily-optimizer): calibration + recommendation grading "
+                             "and the rank/stake overlay. Fail-soft: it can never stop the scorecard publishing.")
     args = parser.parse_args(argv)
 
     now = datetime.now(timezone.utc)
@@ -351,6 +355,18 @@ def main(argv: list[str] | None = None) -> int:
     log(f"STATE loaded={'yes' if saved_state is not None else 'no (first run)'} reset={reset} "
         f"games={len(state['games'])} pending={len(state['pending'])}")
 
+    # The daily optimizer's own state. A FAILED read disables it for this run rather than starting it
+    # empty -- an empty state published over a real one would erase its history, the same reason the
+    # scorecard refuses above. It never refuses the scorecard itself.
+    opt_state = None
+    if args.optimizer == "on":
+        try:
+            opt_state, opt_reset = opt.load_state(reader.json(opt.OPT_STATE_PATH), signature,
+                                                  sport_versions=sport_versions, now=now)
+            log(f"OPTIMIZER_STATE games={len(opt_state['games'])} pub={len(opt_state['pub'])} reset={opt_reset}")
+        except Exception as exc:
+            log(f"OPTIMIZER_DISABLED state read failed: {type(exc).__name__}: {exc}")
+
     fetched_ok = 0
     merge_counts: dict[str, Any] = {}
     for day in msc.board_dates_to_fetch(state, today, limit=args.max_board_dates):
@@ -363,6 +379,18 @@ def main(argv: list[str] | None = None) -> int:
         merge_counts[day] = {"parts": parts, **msc.merge_board_date(
             state, day, records, today=today, central_date=bs.SCORECARD.central_date,
             fetched_at=now.strftime("%Y-%m-%dT%H:%M:%SZ"))}
+        if opt_state is not None:
+            try:
+                keys = opt.published_keys(reader.text(opt.OPENINGS_TEMPLATE.format(date=day)), bs)
+            except FetchError as exc:
+                log(f"OPENINGS_UNREADABLE {day} {exc} -- this date's games stay out of the published grade")
+                keys = None
+            try:
+                merge_counts[day]["published"] = opt.note_published(opt_state, day, records, keys,
+                                                                    game_key=msc.game_key,
+                                                                    pending=state["pending"])
+            except Exception as exc:
+                log(f"OPTIMIZER_NOTE_FAILED {day} {type(exc).__name__}: {exc}")
         log(f"BOARD_DATE {day} parts={parts} {merge_counts[day]}")
     if fetched_ok == 0:
         log("REFUSING: every board-date fetch failed; publishing would replace the overlay with an empty table.")
@@ -370,6 +398,8 @@ def main(argv: list[str] | None = None) -> int:
 
     grade = functools.partial(bs.grade_population, prop_settler=mlb.settle, score_source=mlb.final_score,
                               extra_settler=settler)
+    if opt_state is not None:
+        grade = opt.wrap_grade(grade, opt_state, game_key=msc.game_key)
     grading = msc.grade_pending(state, today=today, grade=grade,
                                 chips_for=functools.partial(fetch_chips_with_retry, bs),
                                 central_date=bs.SCORECARD.central_date)
@@ -386,6 +416,25 @@ def main(argv: list[str] | None = None) -> int:
         previous_overlay = None
     scorecard["overlay"]["diff"] = msc.overlay_diff(previous_overlay, overlay)
 
+    optimizer_outputs: dict[str, str] = {}
+    if opt_state is not None:
+        try:
+            committed = opt.commit(opt_state, state["games"])
+            opt.prune(opt_state, today)
+            report, opt_overlay = opt.build_report(opt_state, today=today, now=now,
+                                                   run={"committed": committed}, resamples=args.resamples or opt.RESAMPLES)
+            optimizer_outputs = {opt.OPT_STATE_PATH: opt.dumps(opt_state), opt.OPTIMIZER_PATH: opt.dumps(report)}
+            scorecard["optimizer"] = {"path": opt.OPTIMIZER_PATH, "by_sport": report["by_sport"],
+                                      "edge_shrink": len(opt_overlay["edge_shrink"]),
+                                      "stake_scale": len(opt_overlay["stake_scale"]),
+                                      "expires_at": opt_overlay["expires_at"]}
+            log(f"OPTIMIZER committed={committed} window_games={report['window']['games']} "
+                f"edge_shrink={len(opt_overlay['edge_shrink'])} stake_scale={len(opt_overlay['stake_scale'])} "
+                f"by_sport={json.dumps({k: v['games'] for k, v in report['by_sport'].items()})}")
+        except Exception as exc:
+            log(f"OPTIMIZER_FAILED {type(exc).__name__}: {exc} -- scorecard publishes without it")
+            scorecard["optimizer"] = {"error": f"{type(exc).__name__}: {exc}"}
+
     weekly = None
     if weekly_due(args.weekly, today):
         weekly = run_weekly(today, token, publish_outputs=args.publish)
@@ -401,6 +450,12 @@ def main(argv: list[str] | None = None) -> int:
     for relative, content in outputs.items():
         path = write(relative, content)
         log(f"WROTE {relative} bytes={path.stat().st_size}")
+    for relative, content in list(optimizer_outputs.items()):
+        try:
+            log(f"WROTE {relative} bytes={write(relative, content).stat().st_size}")
+        except Exception as exc:
+            log(f"OPTIMIZER_WRITE_FAILED {relative} {type(exc).__name__}: {exc}")
+            optimizer_outputs.pop(relative)
     for label, window in scorecard["windows"].items():
         log(f"WINDOW {label} {json.dumps(window['coverage']['by_sport'])} cells={len(window['cells'])} "
             f"changes={len(window['verdict_changes'])}")
@@ -415,6 +470,12 @@ def main(argv: list[str] | None = None) -> int:
         log(f"PUBLISH_FAILED {failed}")
         return 5
     log(f"PUBLISHED {len(outputs)} files")
+    for relative, content in optimizer_outputs.items():
+        # After the scorecard, and never fatal: the optimizer is additive.
+        try:
+            log(f"OPTIMIZER_PUBLISHED {relative} ok={publish(relative, token)}")
+        except Exception as exc:
+            log(f"OPTIMIZER_PUBLISH_FAILED {relative} {type(exc).__name__}: {exc}")
     if args.verify:
         try:
             echoed = reader.json(msc.LATEST_PATH)
