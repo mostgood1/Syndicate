@@ -1260,6 +1260,14 @@ death, never life — do not invert it.
 - Verification: Pre-registered grid on tune, holdout read once, production's next sim matches the shipped replay
 - Blocked by: mlb-strikeout-bias
 
+### mlb-hr-prop-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- Goal: Hitter prop probabilities the MLB board serves are calibrated on the CURRENT engine: batter P(HR>=1) and the hitter_props buckets (hits/TB/RBI/runs) re-fitted on the as-of replay (tune) against box-score outcomes and judged once on holdout, replacing the 07-17 calibrations fitted to the pre-refit engine; shipped only if holdout log-loss and calibration-in-the-large improve on the shipped engine's raw probabilities
+- Files: vendor/mlb_bettingv2/data/tuning/hitter_hr_calibration/default.json (values + provenance ONLY), vendor/mlb_bettingv2/data/tuning/hitter_props_calibration/default.json (values + provenance ONLY), scripts/mlb_hitter_prop_replay.py (NEW), .syndicate/findings_2026-10-06_mlb_hr_prop_calibration.md (NEW)
+- Hypothesis: The 07-17 affine-logit HR calibration (a=0.805,b=0.032) compensates the halved HR rate; once hr_rate_mult is fixed it over-inflates, and the raw corrected probabilities are closer to calibrated than calibrated ones
+- Falsification test: If on the shipped engine the raw P(HR>=1) is already calibrated (calibration-in-the-large within CI of 0), a re-fit ships nothing and identity stays
+- Verification: Replay per-batter P(HR>=1) and hitter buckets vs box outcomes, tune fit, holdout read once; production's next sim serves the re-fitted values
+- Blocked by: mlb-pa-length
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
