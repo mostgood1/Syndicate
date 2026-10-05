@@ -1296,6 +1296,14 @@ death, never life — do not invert it.
 - Verification: Unit test: a forced CS credits exactly one OUT to the pitcher of record; replay BF balance + outs bias on tune/holdout by the pre-registered rule; production's next sim verified
 - Blocked by: mlb-hr-prop-calibration
 
+### nhl-elite-pp-onice — OPEN — opened 2026-10-05 — session 5704bbd4-3c4f-4d88-9549-fa59e24ab70a
+- Goal: Elite NHL playmakers' simulated power-play on-ice goals-for stop running ~0.82x of real, and their projected assists/points rise accordingly, without making any prop line's Brier worse.
+- Files: syndicate/features/nhl/sim_engine/hockeysim/ingestion/lineups.py, tests/test_hockeysim_ingestion.py
+- Hypothesis: Directional (15 slates, elite n=77): elite PP on-ice GF sim 0.599 vs real 0.727 per game, while all-team PP goals run HIGH in the sim (0.646 vs 0.561) and PP1 gets ~82.5% of PP segments (engine deterministic usage 0.65 + alternation). First step is a decomposition at scale, before any change: elite PP GF = team PP goals x elite's PP time share x PP-unit scoring concentration; real side from the cached shift charts + pbp + NHL stats timeonice for every 2025-26 game.
+- Falsification test: If the decomposition at scale shows no elite PP on-ice deficit (>= 0.95x), the 77-row reading was noise and the lane closes with no change.
+- Verification: Decomposition at scale names the component; a fix to it raises elite PP on-ice GF toward real in a paired full-season backtest with no prop line's Brier worse; then fleet verification.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
