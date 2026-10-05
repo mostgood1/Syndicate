@@ -369,3 +369,58 @@ The calibration closes about two-thirds of the raw model's gap to the book (+0.0
   the fleet on the same machine. Do not re-run it on backfilled odds without first filtering to one line per
   (player, stat, book).
 
+## NBA sim availability: does the pre-tip sim simulate players who are not playing? `[2026-10-05, e0a3e383]`
+
+Pre-registered as H-A1/H-A2 in lanes.md (8b24e2b3) before measuring.
+
+**Substrate.**
+- Committed pre-tip smart-sim JSONs, C:\tmp\nba_bt\out\asof\smart_sim (640 files), joined to stats.nba 2025-26
+  regular-season logs.
+- 159 team-games were skipped because their sim minutes do not sum to 240. That covers all of January 2026
+  (`min_mean` = 0, an old format) and a few empty sims.
+- Measured: 930 team-games over 62 dates. Train is before 2026-03-01 (285 team-games, February only); test is on or
+  after it (645).
+- Players are joined by a season-wide unique normalized name. 6,999 of 13,742 sim ids are not NBA ids (ESPN ids)
+  and 11 names are unknown.
+- Script: scratchpad nba_avail_measure.py (not committed).
+
+**H-A1 HOLDS.** The sim gives **44.5 of every 240 team minutes (18.5%)** to players with no log that day. That is
+4.8 sim rows per team-game, 1,673 of them projected at 10 minutes or more. WNBA's figure was 42.6 of 200 (21%).
+Played players: minutes bias −2.75, MAE 6.91 (n 9,253).
+
+**H-A2 REFUTED as stated.** WNBA's K=1 rule (left out if absent from the team's last game) removes 55% of those
+minutes, but it drops **1.43 real players per team-game** (pre-registered bar: < 1). It removes 16.2 real-player
+minutes for every 24.4 non-player minutes, a 1.5 : 1 ratio against WNBA's 6.4 : 1. NBA players miss single games
+far more often (rest and load management), so a one-game absence is weak evidence there.
+
+**Exploration** (post-hoc; selected on train only by net non-player minutes, the WNBA criterion; confirmed on test):
+
+| rule | split | non-player min removed /tg (share) | real-player min wrongly removed /tg | real players dropped /tg | ratio |
+|---|---|---|---|---|---|
+| missed last 1 | train | 19.15 (52%) | 14.09 | 1.11 | 1.4 |
+| missed last 1 | test | 26.70 (56%) | 17.13 | 1.57 | 1.6 |
+| missed last 2 | train | 13.02 (36%) | 3.74 | 0.49 | 3.5 |
+| missed last 2 | test | 19.24 (40%) | 6.39 | 0.75 | 3.0 |
+| missed last 3 | train | 9.83 (27%) | 1.97 | 0.32 | 5.0 |
+| missed last 3 | test | 15.71 (33%) | 3.50 | 0.47 | 4.5 |
+| never played for team (≥3 team games) | train | 0.09 | 0.55 | 0.04 | 0.2 |
+| never played for team (≥3 team games) | test | 0.43 | 0.13 | 0.02 | 3.2 |
+
+- Net minutes per team-game: K=2 is +9.28 on train and +12.85 on test. K=3 is +7.86 / +12.21. K=1 is +5.06 / +9.57.
+  **K=2 is selected.**
+
+**What this does NOT establish.**
+1. **Confound.** These sims ran pre-2026-10-04 code. The injury-exclusion fixes (ff4ca730 re-admit only on a truthy
+   playing_today, 500a5643 team re-keying, 1111942f punctuated-name keys) apply to NBA too. Production's residual
+   non-player minutes under current code are unmeasured. WNBA measured its rule on as-of re-runs of current code.
+2. **No prop effect measured.** Minutes are an input; the WNBA lane needed an engine re-run (500 sims, paired) to show
+   the prop/Brier effect.
+3. **The book-blend ceiling.** With the NBA book blend serving ≈ the book (w ≈ 0), better minutes change served
+   probabilities only if they raise the out-of-sample blend weight. WNBA's oracle found that perfect injury
+   information barely moves props at the book line. The more likely payoff is the served means and projections, not
+   the edges.
+
+**Next, if wanted:** an as-of engine re-run on held-out NBA games with current code, base vs K=2 (paired). It would
+measure the residual non-player minutes, minutes bias/MAE, prop MAE vs own average, and Brier vs book, then refit the
+blend weight on the result.
+
