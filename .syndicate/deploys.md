@@ -46363,3 +46363,11 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - expectation: the next ligue_1 `recommendations_2026-10-10.json` rebuild shows PSG v Le Mans with a LOWER Le Mans win probability and LOWER Le Mans goal mean.
 - baseline (artifact written 16:57Z, pre-fix): Paris Saint-Germain v Le Mans p home 0.57 / draw 0.21 / away 0.22; means 2.005 / 1.2425.
 - verify OWED: watcher on that file's mtime > 19:16:35Z (`C:/tmp/soccer-lpb/watch_lemans.sh`).
+
+## 2026-10-05 19:50:48Z (2:50 PM CT) -- LOCAL FLEET FF -> 82e26761, NO RESTART: NHL assist_position_power 2.0 -> 1.5 (lane `nhl-elite-assists`) -- VERIFY OWED
+
+- change: profile-only; D assists were 0.88x real under 2.0. User decision "Ship it".
+- offline evidence: full 2025-26 paired vs the shipped 2.0 (`C:/tmp/nhlprops/bt_as_p2s2` vs `bt_as_p15s2`), 36,533 reg player-games: D 0.99x, F 1.01x, elite unchanged 0.78x; Brier ASSISTS@0.5 -0.00048 [-0.00063,-0.00031], POINTS@0.5 -0.00031 [-0.00046,-0.00014], POINTS@1.5 -0.00007; playoffs ASSISTS@0.5 -0.00080.
+- baseline (read 19:52Z, built under 2.0): props_recommendations_all_markets_2026-10-05.csv (19:31:00Z) ASSISTS mean D 0.2343 (n 48) / F 0.3219 (n 95); 2026-10-06 (19:35:45Z) D 0.2458 / F 0.3276.
+- prediction: the first props build after 19:50:48Z raises the D mean by ~10-13% and lowers F by ~4-5% (backtest D 0.88x->0.99x, F 1.06x->1.01x); team totals unchanged.
+- verify: watcher `/mnt/c/tmp/nhlprops/dpow_watch.sh` prints the D/F means of that build.
