@@ -1144,6 +1144,12 @@ death, never life — do not invert it.
 - Hypothesis: Pitches are unbiased while K is 17% high, so the excess is per-PA: either K/BF too high (pitch-level swing/whiff/called-strike mix after the 08-18..09-08 pitch-model and refit changes) or BF inflated by the PA-start counter flagged 09-14 (simulate.py:2657, BF exceeded outs+H+BB by 1.67/start)
 - Falsification test: If model K/BF matches actual K/BF and the excess is entirely BF, the fix is the counter, not the pitch model; if neither K/BF nor BF is biased, the K bias is a starter-vs-bullpen allocation artifact
 - Verification: Decomposition table on the 26-date replay (tune/holdout), then a candidate measured with the same harness and guards
+### soccer-last-scorer-pricing — OPEN — opened 2026-10-05 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: Last-goalscorer probability stops reusing the first-scorer number: measure how last scorers differ from first (subs, minute, game state) on the ESPN goal record, and if the difference is material, price last scorer from it; verified by re-running grade_scorer_race.py (last-scorer log-loss/ROI vs the 2026-10-05 baseline -66.8% [-92.4, -31.5])
+- Files: scripts/soccer_season_audit/last_scorer_study.py, .syndicate/findings_2026-10-05_soccer_last_scorer.md
+- Hypothesis: Last goals come disproportionately from substitutes and late-minute attackers, so the time-reversed first-scorer number overprices starters for last scorer
+- Falsification test: Sub share of last goals within ~2pp of sub share of first goals, and the model's last-scorer calibration by starter/sub no worse than first-scorer's
+- Verification: Findings with sub/starter shares for first vs last goals, model calibration split, and (if a fix ships) a re-grade
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
