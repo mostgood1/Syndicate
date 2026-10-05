@@ -95,11 +95,15 @@ def context_from_sim(rec: dict | None):
     return weather, park, umpire
 
 
-def games_for_date(data_dir: Path, date: str) -> list[dict]:
+def games_for_date(data_dir: Path, date: str, stored: str = "frozen") -> list[dict]:
+    """`stored` picks which sim record supplies context and the validation target:
+    "frozen" (sims_pregame first) for backtests, "live" when validating against the
+    sim built from the CURRENT roster_objs (a post-start re-sim rewrites both)."""
     snap = data_dir / "daily" / "snapshots" / date / "roster_objs"
     sims = {}
-    for f in glob.glob(str(data_dir / "daily" / "sims_pregame" / date / "sim_*.json")) + \
-            glob.glob(str(data_dir / "daily" / "sims" / date / "sim_*.json")):
+    frozen = glob.glob(str(data_dir / "daily" / "sims_pregame" / date / "sim_*.json"))
+    live = glob.glob(str(data_dir / "daily" / "sims" / date / "sim_*.json"))
+    for f in (frozen + live if stored == "frozen" else live + frozen):
         m = re.search(r"pk(\d+)", Path(f).name)
         if m and int(m.group(1)) not in sims:
             sims[int(m.group(1))] = f
@@ -261,7 +265,7 @@ def run(args) -> dict:
     dates = sorted(set(args.dates))
     jobs = []
     for d in dates:
-        for g in games_for_date(data_dir, d):
+        for g in games_for_date(data_dir, d, args.stored):
             g.update({"sims": args.sims, "seed": args.seed, "mp": mp, "pm": pm})
             jobs.append(g)
     counters = defaultdict(int)
@@ -344,6 +348,7 @@ def main(argv=None) -> int:
     ap.add_argument("--set", action="append", help="manager-pitching override key=value (JSON value)")
     ap.add_argument("--cache", default=os.path.join(os.environ.get("TMPDIR", "/tmp"), "mlb_starter_replay_cache"))
     ap.add_argument("--validate-only", action="store_true")
+    ap.add_argument("--stored", choices=["frozen", "live"], default="frozen")
     ap.add_argument("--dump-starts", action="store_true")
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)

@@ -46426,3 +46426,31 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - **Reading (reachability):** predictions rewritten 20:27:44Z (10-05) and 20:30:33Z (10-06). Re-run read-only of the fleet's producer, confirmed-goalie overlay OFF so it cannot write:
   - 10-06: production model_total and p_home_ml_raw == the GSAx-ON run 9/9 and == OFF 0/9. Mean |on - off| total 0.080, max 0.314; ML 0.0078.
   - 10-05: == ON 4/4, == OFF 1/4. The one equal game has both starters at factor 1.0: no shots faced this season, by design.
+
+## 2026-10-05 ~21:30Z (4:30 PM CT) -- MEASUREMENT: MLB first-pitch freeze post-first-pitch reading (lane `mlb-pregame-sim-freeze`) -- **MET**
+
+- **Why by hand.** The scheduled check (`mlb-freeze-post-first-pitch-check`, fireAt 10-03 21:30Z) never ran: `list_task_runs` = 0 runs. Done in-session against the fleet data root and StatsAPI.
+- **Per game: frozen copy vs live file vs real first pitch.**
+  - **10-03**
+    - 849829: frozen `Warmup` from 16:56Z, first pitch 17:00Z; live re-simmed `Final` at 03:31Z on 10-04. PASS.
+    - 849828: frozen `Pre-Game` from 19:46Z, first pitch 20:00Z; live `Final`. PASS.
+    - 849835: frozen `Pre-Game` from 22:03Z, first pitch 22:30Z; live `Final`. PASS.
+    - 849830: frozen `Pre-Game` from 00:05Z, first pitch 00:30Z; live `In Progress`. PASS.
+  - **10-04**
+    - 849825: frozen `Warmup` from 19:49Z, first pitch 20:00Z; live `Final` at 04:27Z on 10-05. PASS.
+    - 849823: frozen `Warmup` from 23:58Z, first pitch 00:00Z; live `Final`. PASS.
+  - **10-05:** 2 games not yet started at the read; both frozen `Pre-Game`.
+- **Result: 6/6 started games PASS, 0 FAIL.** Every frozen copy was simulated pregame, minutes before first pitch. Every live file was overwritten by a post-start re-sim, which is exactly the overwrite the freeze exists to survive.
+- **The automatic path runs.** The 10-04 and 10-05 copies were made only by scheduled sim runs; nothing was run by hand for those dates.
+- **The `MLB_PREGAME_FREEZE` lines are absent from `refresh-worker.log`.** The sim job is a detached process with its own log, so the frozen artifacts are the evidence. Not a defect.
+
+## 2026-10-05 ~21:45Z (4:45 PM CT) -- MEASUREMENT: `starter_short_start_prob` 0.06 -> 0.10 live on production (eedfde5e, fleet ff 2026-10-03 18:26:15Z) -- **MET** (lane `mlb-starter-length`)
+
+- **Baseline expectation** (pre-registered in the lane, 10-03). Replaying the same rosters, production's stored starter `outs_mean` should match the 0.10 config and sit ~0.14 outs below the 0.06 config.
+- **Reading.** `mlb_starter_length_replay.py --validate-only --stored live`, 1,000 sims, seed 4242, same code as the fleet (no `sim_engine`/tuning diff `eedfde5e..HEAD`). 16 starters, all live sims built after the ff: 10-03 re-sims 03:31Z on 10-04, 10-04 re-sims 04:27Z on 10-05, 10-05 pregame 20:39Z.
+  - Replay at 0.10: mean 16.038 vs stored 15.890 (+0.148).
+  - Replay at 0.06: mean 16.179 vs stored 15.903 (+0.276).
+  - Config gap 0.141, as predicted.
+- **Reading it.** The replay runs slightly long against production: +0.09 on the pre-ship 10-03 validation, 8 starters. Net of that offset, production sits on the 0.10 replay; the 0.06 hypothesis is ~3 SE further away.
+- **Caveat.** The stored mean moved 0.013 between the two runs because a 10-05 game was re-simmed mid-check. That is small against the 0.13 that separates the hypotheses.
+- **Not yet measured:** accuracy against real starts for the new value on new games. Postseason n is tiny; the replay holdout (232 starts) is the accuracy evidence.
