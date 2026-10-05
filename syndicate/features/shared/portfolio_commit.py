@@ -330,6 +330,8 @@ def _sizing_skill_factor(row: Mapping[str, Any]) -> float:
     Times the daily optimizer's validated per-cell factor in [0.5, 1.0] `[2026-10-05, lane
     daily-optimizer, user "wire phase 2"]` -- the same factor the row's rank carries
     (`layer2_board._apply_skill_reliability`). Never above 1.0, never 0: it sizes down, it never refuses.
+    The two are independent evidence (market-level registry, per-cell graded population) and
+    MULTIPLY: composite floor is SKILL_FLOOR x optimizer FACTOR_FLOOR = 0.25x; never 0.
     """
     from syndicate.features.shared.measured_market_skill import SKILL_FLOOR, SKILL_GAIN
 
