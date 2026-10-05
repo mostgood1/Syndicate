@@ -46564,3 +46564,8 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - reading: ligue_1 `recommendations_2026-10-10.json` rebuilt 22:01:08Z (first rebuild after the fix; the soccer unit queue reached ligue_1|2026-10-10 at ~22:00Z). Paris Saint-Germain v Le Mans: p home **0.57 -> 0.818**, draw 0.21 -> 0.12, away **0.22 -> 0.062**; goal means 2.005 / 1.2425 -> **2.7075 / 0.7225**. Direction and size as predicted (lower Le Mans win probability and goal mean).
 - the fix's BRANCH, not just the outcome: the rebuilt artifact carries `promoted_prior_teams = ["Le Mans"]` -- `_fill_promoted`'s output, which Le Mans could not reach while `match_team_name` returned 'Lens'.
 - not separated: odds or other inputs that changed between 16:57Z and 22:01Z also feed this build; the promoted-team field is what ties the move to this change.
+
+## 2026-10-05 22:12:11Z (5:12 PM CT) -- NFL props rebuild-on-new-odds: SERVED reading -- MET (lane `nfl-prop-projection-input-refresh`)
+- **Baseline (same day):** served NFL props with a projection 49/92 (20:56:49Z build); 77/398, 2 games (21:54:52Z build, started before the rebuild). Join `unmatched_key_rows` 3,703 of 4,382.
+- **verify (reading):** first build after the 21:54:04Z rebuild (469 rows / 14 games), `written_at` 22:12:11Z: **442 of 543 NFL props carry a projection (81%), 348 a numeric model_edge_pct, 13 games projected.** `prop_coverage` summed over the window dates: rows_considered 4,459, rows_with_projection 3,059, unmatched_key_rows 1,400.
+- Residual misses are players/lines absent from the capture at the 21:54Z build. The trigger rebuilds again on the next odds write, at most once per `SEASON_PROJECTION_RELAUNCH_COOLDOWN_SECONDS` (default 3600).

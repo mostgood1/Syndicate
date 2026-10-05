@@ -1211,7 +1211,8 @@ death, never life — do not invert it.
 - Verification: Findings with sub/starter shares for first vs last goals, model calibration split, and (if a fix ships) a re-grade
 - Blocked by: none
 
-### nfl-prop-projection-input-refresh — OPEN — opened 2026-10-05 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+### nfl-prop-projection-input-refresh — CLOSED 2026-10-05 (GOAL MET) — opened 2026-10-05 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- GOAL VERDICT: Goal: NFL player-prop projections rebuild within ~1h of new prop odds instead of once a day: the refresh-worker's nfl_props autorun also launches when the week's oddsapi_player_props file is newer than the projection artifact (existing 1h relaunch cooldown); verified on the fleet as the artifact's game coverage growing from 2 of 13 board events (125 rows, built 05:30Z) to the Sunday slate after a rebuild, and NFL prop_coverage.unmatched_key_rows falling -- **GOAL: MET**: odds_newer launch 21:53:57Z, artifact 125 -> 469 rows / 2 -> 14 games, served NFL props projected 442/543 on the 22:12:11Z build (was 49/92 and 77/398); deploys.md.
 - Goal: NFL player-prop projections rebuild within ~1h of new prop odds instead of once a day: the refresh-worker's nfl_props autorun also launches when the week's oddsapi_player_props file is newer than the projection artifact (existing 1h relaunch cooldown); verified on the fleet as the artifact's game coverage growing from 2 of 13 board events (125 rows, built 05:30Z) to the Sunday slate after a rebuild, and NFL prop_coverage.unmatched_key_rows falling
 - Files: tests/test_nfl_prop_projection_input_refresh.py
 - Code landed 45b02482 (run_refresh_worker.py loan RETURNED to live-inplay-board-cadence). Verification owed: an nfl_props launch on the fleet after refresh-worker loads 45b02482+.
