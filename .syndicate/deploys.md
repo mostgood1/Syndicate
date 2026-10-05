@@ -46161,3 +46161,18 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
   - The watcher's first count of 4 included 2 cross-team false positives (Bonner excluded under PHX, Pissott under IND); a team-aware recheck gives 2.
 - **cause (not the switch):** the exclusion keys keep apostrophes (`_norm_name_key`: NY'CEARA PRYOR), while the vendored pool filter compares `_norm_player_key(name)`, which strips them (NYCEARA PRYOR). Every excluded player with an apostrophe or period has always leaked, injury exclusions included, WNBA and NBA. 10-07 WNBA: 33 of 661 excluded keys carry punctuation; NBA 10-06: 1, not in a pool.
 - **fix:** 1111942f on main -- the worker passes every key in both forms (second via the sim module's own `_norm_player_key`). Tests reproduce the miss with the real vendored WNBA and NBA normalizers; 283 pass. **NOT on the fleet yet** -- needs the fleet ff plus a scoped re-sim of the two 10-07 games (sim files are write-once). User decision owed.
+
+
+## 2026-10-05 14:15:34Z (9:15 AM CT) -- LOCAL FLEET FF d7955a3c -> 1111942f (no restart) + scoped 10-07 WNBA re-sim: excluded players with punctuated names now leave the pool -- **MET** (lane `basketball-injury-exclusion-reinclusion`; user: "yes, go ahead")
+
+- **why:** reading 2 of the 01:54Z switch-on found 2 excluded players in the 10-07 pools (Ny'Ceara Pryor 22.9 min, Ta'Niya Latson 6.7). The exclusion keys keep apostrophes, and the vendored pool filter strips them. Fix 1111942f passes each key in both forms.
+- **locks:** deploy_claim live-odds-worker + refresh-worker held by basketball-injury-exclusion-reinclusion (14:15Z).
+- **ride-alongs (enumerated before the ff, 12 commits):** runtime files `basketball_props_smart_sim.py` (this fix), `scripts/refresh_nhl_oddsapi.py` + `nhl/inseason_season_inputs.py` (2fe903ca, user decision, date-gated ON from Nov 1), `venue_quote_adapters.py` (b341ce08, soccer props read the newest capture). Everything else is ledger/tests.
+- **baseline (14:15:26Z):** fleet d7955a3c, clean; no WNBA/NHL job in flight; 10-07 sims from 13:07:35Z / 13:08:05Z; healthz 200.
+- **applied:** `git merge --ff-only 1111942f` (14:15:34Z, HEAD verified, helper present). Then one scoped run of production's orchestrator under the live-odds-worker role env: `refresh_odds_sources.py --date 2026-10-07 --phase pregame --sports wnba --force-refresh --force-refresh-sports wnba --wnba-only-matchups ATL-NYL,GSV-LVA`, rc 0.
+- **reading (14:17Z, the fleet's code, team-aware):** smart_sim_2026-10-07_ATL_NYL 14:16:22Z and _GSV_LVA 14:16:45Z.
+  - Same-team excluded players in the pools (injury map + availability): **0** in all four teams (was 2).
+  - Injury-OUT players in the pools: 0. Pryor and Latson absent.
+  - `rate_shrink.applied=true, switch=file` (players 17 / 18). Context outs 5/5 in both games. Pools 8-9 players per team, as before.
+  - **MET.** healthz 200 after; no restart.
+- **NBA:** the same fix is live for NBA sims from their next build. 10-06 had 1 punctuated exclusion, which was not in a pool. Not separately read.
