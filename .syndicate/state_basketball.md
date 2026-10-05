@@ -1000,5 +1000,9 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   out so the NB is not widened twice). Verified on the rebuilt 10-07 sims: shape 3 ladders/player, dispersion 5.
   `SYNDICATE_WNBA_SIM_MINUTES_REDISTRIBUTION` is refuted (lane closed), never hooked.
 - **First real games with all four on:** 2026-10-07 (ATL-NYL 23:30Z, GSV-LVA 01:30Z 10-08). Not yet graded.
-- **Known risk:** the availability rule was measured before the injury feed worked; a player returning after one missed
-  game is left out for that game (~3.6% of player-games, held-out 10-03).
+- **Known cost:** the availability rule leaves out a player returning after one missed game (~3.6% of player-games,
+  held-out 10-03). Measured on production's 10-04 slate (rule applied after the fact): it would have excluded 2 players
+  who played -- Aminata Gueye (GSV, 13 min) and Marine Fauthoux (NYL, 12 min).
+- **Grading needs a pre-tip snapshot:** production overwrites `oddsapi_player_props_<D>.csv` after the slate (10-04's is
+  header-only by 10-05), so served-vs-book grading must copy the capture before tip. Done for 10-07 by
+  `C:/tmp/wnba_bt/watch_grade_1007.py`; grader `scripts/grade_wnba_served_props.py` (pre-registered b3f825a3).
