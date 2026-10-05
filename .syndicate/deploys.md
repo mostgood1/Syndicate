@@ -46308,3 +46308,9 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - offline evidence: full 2025-26, paired vs production (`C:/tmp/nhlprops/bt_full_evlq` vs `bt_as_p2s2`), 36,533 regular-season player-games, SOG/GOALS/BLOCKS byte-identical; Brier ASSISTS@0.5 -0.00004 (flat), POINTS@0.5 -0.00035 [-0.00069,+0.00003], POINTS@1.5 -0.00039 [-0.00054,-0.00023]; playoffs POINTS@0.5 -0.0019, @1.5 -0.0008. Elite (as-of >= 0.8 A/G) assists 0.66x -> 0.78x real; D 0.96x -> 0.88x.
 - why no restart: NHL generation (collect + props producer) runs as a per-run subprocess from the checkout.
 - verify: the first lineups_<date>.csv written after 18:47:33Z carries `assist_share` on every slotted skater, and `nhl_sim_input_checklist.py` on fleet data PASSES (assist_share may read thinly populated from older date files, as proj_ev_toi did).
+
+## 2026-10-05 18:56Z (1:56 PM CT) -- READING for the 18:47:33Z ff (7f56875e, NHL assists by on-ice share) -- **MET** (lane `nhl-elite-assists`)
+
+- reading 1: lineups_2026-10-05.csv rewritten 18:54:39Z (first after the ff): 144 slotted skaters, 144 with assist_share (0.248..0.676; top Celebrini 0.676, Kucherov 0.662, Pastrnak 0.654).
+- reading 2: `nhl_sim_input_checklist.py` on fleet data -- PASS; assist_share 5.0% "consumed, thinly populated" only because older dated lineup files predate the column.
+- reading 3: props_recommendations_all_markets_2026-10-05.csv rewritten 18:55:32Z: Kucherov ASSISTS proj 0.596 (05:07Z build, shot-rate attribution: 0.54; his own avg 1.13).
