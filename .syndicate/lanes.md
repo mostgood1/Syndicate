@@ -1192,6 +1192,25 @@ death, never life — do not invert it.
 - Verification: Fleet: after restart, an nfl_props launch within ~1h of the odds file changing; artifact rows cover the 10-11 games; served NFL props with projection rises from 49/92
 - Blocked by: none
 
+### mlb-hr-rate — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **SELECTION RULE, PRE-REGISTERED 2026-10-05 ~23:30Z before any HR replay number exists** (user: "ship the HR fix too if it passes").
+  - **Baseline** = production's configuration AFTER `mlb-strikeout-bias` resolves. If that lane's run-scoring refit picks `hr_rate_mult`, this lane VERIFIES that value against the checks below instead of re-fitting it.
+  - **Candidates:** forward-file `hr_rate_mult` in {1.1 (current), 1.4, 1.7, 1.856, 2.1}. 200 sims, same seeds, same 26 dates, replay harness.
+  - **(1) PICK on TUNE** (< 2026-07-04): the value with the smallest |team HR per game bias|.
+  - **(2) SHIP it only if every check holds on HOLDOUT** (>= 2026-07-04):
+    - |HR/game bias| is lower than the baseline's, with its CI covering 0 or narrower than the baseline's gap;
+    - batter P(HR>=1) calibration-in-the-large moves toward realised;
+    - the game-total |gap| to actual is no larger than the baseline's;
+    - starter |SO|, |H|, |BB|, |ER| and |outs| bias each worsen by <= 0.10.
+  - **(3)** If the pick fails, try the next-closest value. If none passes, ship nothing and record that.
+  - **Ship** = the forward-file value + provenance on main, then a fleet ff (the sim job is a per-run subprocess, no restart). Verified on production's next sim against a replay at the shipped and the previous value.
+- Goal: The current MLB engine's home-run rate matches real games on the as-of replay: team HR per game and batter P(HR>=1) unbiased, starting from production's ACTUAL hr_rate_mult (1.1, pinned by the forward pitch-model overrides file; the 09-04 refit's 1.856 never reached production), with a pre-registered tune/holdout pick, side-effect guards, and the shipped value verified on production's next sim
+- Files: vendor/mlb_bettingv2/data/tuning/pitch_model_overrides/forward_start_2026_04_14_v1.json (hr_rate_mult value + provenance ONLY), scripts/mlb_run_components.py (NEW), .syndicate/findings_2026-10-05_mlb_hr_rate.md (NEW)
+- Hypothesis: Production runs HR at hr_rate_mult 1.1 because the forward pitch-model overrides file overrides the 1.856 code default; the May-July as-of backtest saw the sim's P(HR>=1) at 0.090 vs 0.185 realised, so team HR/game is under-predicted on the current engine too
+- Falsification test: If team HR/game on the replay at 1.1 is already unbiased (CI includes 0), the HR deficit was the May-July engine, not this pin, and nothing ships
+- Verification: Component table (HR, non-HR H, BB per team-game; batter P(HR>=1)) at 1.1, then candidates by the pre-registered rule; production's next sim matches the shipped value's replay
+- Blocked by: mlb-strikeout-bias
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
