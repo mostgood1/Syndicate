@@ -1138,6 +1138,14 @@ death, never life — do not invert it.
 - Verification: Paired full-season backtest vs production: DNP rate + every line's Brier; then the fleet lineups use the rule (a player absent from the last game is unslotted when a replacement played it).
 - Blocked by: none
 
+### mlb-strikeout-bias — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- Goal: The current MLB engine's starter strikeout projection is unbiased against real starts (today +0.87 K/start [+0.66,+1.07], 565 starts, with pitches unbiased), measured on the as-of roster_objs replay with a pre-registered tune/holdout pick and side-effect guards on walks, hits, outs and game totals; the cause is located (K/BF vs BF vs pitches/PA) and the commit that flipped K from 18% low (08-18) to 17% high is identified
+- Files: .syndicate/findings_2026-10-05_mlb_strikeout_bias.md (NEW), scripts/mlb_strikeout_decomposition.py (NEW)
+- Hypothesis: Pitches are unbiased while K is 17% high, so the excess is per-PA: either K/BF too high (pitch-level swing/whiff/called-strike mix after the 08-18..09-08 pitch-model and refit changes) or BF inflated by the PA-start counter flagged 09-14 (simulate.py:2657, BF exceeded outs+H+BB by 1.67/start)
+- Falsification test: If model K/BF matches actual K/BF and the excess is entirely BF, the fix is the counter, not the pitch model; if neither K/BF nor BF is biased, the K bias is a starter-vs-bullpen allocation artifact
+- Verification: Decomposition table on the 26-date replay (tune/holdout), then a candidate measured with the same harness and guards
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
