@@ -275,3 +275,39 @@ def test_projected_ev_minutes_are_total_minus_special_teams():
     by_id = {r["player_id"]: r for r in lu.project_lineup(rows)}
     assert by_id[1]["proj_ev_toi"] == 16.0          # 20 - (12 + 4) / 4
     assert by_id[2]["proj_ev_toi"] is None          # no special-teams data: unknown, not total
+
+
+def test_onice_goals_parses_the_stats_report(monkeypatch):
+    from syndicate.features.nhl.sim_engine.hockeysim.ingestion.nhl_web import NhlWebIngestClient
+
+    client = NhlWebIngestClient(rate_limit_per_sec=0)
+
+    def fake_get(url):
+        assert "skater/goalsForAgainst" in url
+        if "gameTypeId%3D2" in url:
+            return {"data": [{"gameId": 2025020500, "gameDate": "2025-12-01", "playerId": 7, "goals": 1, "assists": 2,
+                              "evenStrengthGoalsFor": 3, "powerPlayGoalFor": 1, "shortHandedGoalsFor": None}]}
+        return {"data": []}
+
+    monkeypatch.setattr(client, "_get", fake_get)
+    assert client.onice_goals("TBL", "20252026") == {"2025020500": ("2025-12-01", {7: (3, 2)})}  # 4 on ice - 1 own
+
+
+def test_assist_share_is_as_of_and_shrunk_to_the_position_prior():
+    """Games ON or after the slate date never count; a share is pulled toward its position prior by
+    ASSIST_SHARE_K teammate goals; a previous season counts at its weight; no report at all -> None."""
+    from syndicate.features.nhl.sim_engine.hockeysim.state import ASSIST_SHARE_PRIOR
+
+    cur = {"g1": ("2025-12-01", {1: (30, 24), 2: (30, 6)}),
+           "g2": ("2025-12-05", {1: (100, 0)})}              # the slate date itself: must be ignored
+    prev = {"p1": ("2025-03-01", {1: (60, 30)})}
+    rows = [{"player_id": 1, "position": "F"}, {"player_id": 2, "position": "D"}, {"player_id": 3, "position": "F"},
+            {"player_id": 9, "position": "G"}]
+    by_id = {r["player_id"]: r for r in lu.attach_assist_share(rows, [(cur, 1.0), (prev, 0.5)], "2025-12-05")}
+    kf, kd = lu.ASSIST_SHARE_K["F"], lu.ASSIST_SHARE_K["D"]
+    assert by_id[1]["assist_share"] == round((24 + 15 + kf * ASSIST_SHARE_PRIOR["F"]) / (30 + 30 + kf), 4)
+    assert by_id[2]["assist_share"] == round((6 + kd * ASSIST_SHARE_PRIOR["D"]) / (30 + kd), 4)
+    assert by_id[3]["assist_share"] == ASSIST_SHARE_PRIOR["F"]          # no games: exactly the prior
+    assert by_id[9]["assist_share"] is None                             # goalies carry none
+    empty = lu.attach_assist_share([{"player_id": 1, "position": "F"}], [({}, 1.0), ({}, 0.5)], "2025-12-05")
+    assert empty[0]["assist_share"] is None                             # outage reads as missing, not as prior

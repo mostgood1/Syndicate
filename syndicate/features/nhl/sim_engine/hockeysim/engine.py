@@ -21,7 +21,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from .state import GameState, TeamState, PlayerState, Event
+from .state import ASSIST_SHARE_PRIOR, GameState, TeamState, PlayerState, Event
 from .models import RateModels, TeamRates, PlayerRates
 from .historical_truth.faceoff_decay_model import (
     draw_strength_zone,
@@ -95,6 +95,19 @@ class SimConfig:
     # mean) ** line_quality_strength, renormalised so m averages exactly 1 over the EV rotation --
     # team totals are unchanged in expectation, only WHICH line produces them moves.
     line_quality_strength: float = 0.0
+    # Who is credited with an ASSIST on a teammate's goal `[2026-10-05, lane nhl-elite-assists]`.
+    # "shot_proxy" (default, the old behaviour): each on-ice teammate's per-minute SHOT rate -- which
+    # left the sim's assists per on-ice goal FLAT at ~0.33 for every player while real runs 0.27 (depth)
+    # to 0.49 (elite), so elite playmakers projected 0.63x their real assists. "onice_share": each
+    # teammate's as-of A/(onGF-G) (`PlayerState.assist_share`, prior `state.ASSIST_SHARE_PRIOR` when
+    # unknown) raised to `assist_share_power`. No per-minute division: the share is already conditional
+    # on being on the ice.
+    assist_attribution: str = "shot_proxy"
+    # weight = prior_pos ** assist_position_power * (share / prior_pos) ** assist_share_power: the first
+    # sets the F-vs-D level, the second how far a player's own share moves him off it. Sequential
+    # primary/secondary sampling compresses weight differences, so both need to exceed 1.
+    assist_share_power: float = 1.0
+    assist_position_power: float = 1.0
     # Score-state effects mode for play-level simulation.
     # - dynamic: time-remaining + score-diff dependent multipliers (default)
     # - legacy: fixed +/-10% based on start-of-period score diff
@@ -720,7 +733,18 @@ class PeriodSimulator:
             out = [g for g in out if g]
             return out[:max_groups] if out else [[]]
         # Weighted selection helpers based on player on-ice stats/weights
+        assist_share_mode = str(getattr(self.cfg, "assist_attribution", "shot_proxy") or "shot_proxy").strip().lower() == "onice_share"
+        assist_share_power = float(getattr(self.cfg, "assist_share_power", 1.0) or 1.0)
+        assist_position_power = float(getattr(self.cfg, "assist_position_power", 1.0) or 1.0)
+
+        def _assist_share_weight(ps: PlayerState) -> float:
+            prior = ASSIST_SHARE_PRIOR["D" if str(ps.position) == "D" else "F"]
+            q = getattr(ps, "assist_share", None)
+            q = prior if q is None else max(1e-3, float(q))
+            return (prior ** assist_position_power) * ((q / prior) ** assist_share_power)
+
         def _weighted_choice(pid_group: List[int], team: TeamState, kind: str) -> Optional[int]:
+            share_mode = assist_share_mode and kind == "assist"
             if not pid_group:
                 pid_group = []
             cands = []
@@ -734,6 +758,9 @@ class PeriodSimulator:
                     w = max(0.01, float(ps.shot_weight or 0.0))
                 elif kind == "goal":
                     w = max(0.01, float(ps.goal_weight or (ps.shot_weight or 0.0) * 0.30))
+                elif kind == "assist" and share_mode:
+                    weights.append(_assist_share_weight(ps))
+                    continue
                 elif kind == "assist":
                     # Assist propensities are not modeled directly; approximate using a playmaking
                     # proxy from shot involvement, with a mild forward bias.
@@ -786,6 +813,9 @@ class PeriodSimulator:
                         w = max(0.01, float(ps.shot_weight or 0.0))
                     elif kind == "goal":
                         w = max(0.01, float(ps.goal_weight or (ps.shot_weight or 0.0) * 0.30))
+                    elif kind == "assist" and share_mode:
+                        weights.append(_assist_share_weight(ps))
+                        continue
                     elif kind == "assist":
                         w = max(0.01, float(ps.shot_weight or 0.0))
                         try:
@@ -2001,7 +2031,7 @@ class GameSimulator:
                 sw = float(sw if sw is not None else sw_h)
                 bw = float(bw if bw is not None else bw_h)
                 gw = float(gw if gw is not None else gw_h)
-            p = PlayerState(player_id=pid, full_name=row.get("full_name"), position=pos, team=home_name, toi_proj=toi, shot_weight=float(sw), goal_weight=float(gw), block_weight=float(bw), ev_toi_proj=(float(row["proj_ev_toi"]) if row.get("proj_ev_toi") not in (None, "") else None))
+            p = PlayerState(player_id=pid, full_name=row.get("full_name"), position=pos, team=home_name, toi_proj=toi, shot_weight=float(sw), goal_weight=float(gw), block_weight=float(bw), ev_toi_proj=(float(row["proj_ev_toi"]) if row.get("proj_ev_toi") not in (None, "") else None), assist_share=(float(row["assist_share"]) if row.get("assist_share") not in (None, "") else None))
             home.players[pid] = p
         for row in roster_away:
             pid = int(row.get("player_id"))
@@ -2017,7 +2047,7 @@ class GameSimulator:
                 sw = float(sw if sw is not None else sw_h)
                 bw = float(bw if bw is not None else bw_h)
                 gw = float(gw if gw is not None else gw_h)
-            p = PlayerState(player_id=pid, full_name=row.get("full_name"), position=pos, team=away_name, toi_proj=toi, shot_weight=float(sw), goal_weight=float(gw), block_weight=float(bw), ev_toi_proj=(float(row["proj_ev_toi"]) if row.get("proj_ev_toi") not in (None, "") else None))
+            p = PlayerState(player_id=pid, full_name=row.get("full_name"), position=pos, team=away_name, toi_proj=toi, shot_weight=float(sw), goal_weight=float(gw), block_weight=float(bw), ev_toi_proj=(float(row["proj_ev_toi"]) if row.get("proj_ev_toi") not in (None, "") else None), assist_share=(float(row["assist_share"]) if row.get("assist_share") not in (None, "") else None))
             away.players[pid] = p
         return GameState(home=home, away=away, period=0, clock=self.cfg.seconds_per_period)
 

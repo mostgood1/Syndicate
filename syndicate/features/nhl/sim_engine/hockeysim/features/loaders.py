@@ -475,6 +475,7 @@ def build_player_features(
                 position=position,
                 proj_toi=_to_float(row.get("proj_toi")) or 0.0,
                 proj_ev_toi=_to_float(row.get("proj_ev_toi")),
+                assist_share=_to_float(row.get("assist_share")),
                 shot_weight=(rates or {}).get("shot_weight"),
                 goal_weight=(rates or {}).get("goal_weight"),
                 block_weight=(rates or {}).get("block_weight"),

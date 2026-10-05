@@ -315,3 +315,37 @@ def test_line_quality_is_reachable_and_keeps_team_totals():
     assert l1_on > l1_off * 1.10
     assert l4_on < l4_off * 0.95
     assert abs(team_on - team_off) / team_off < 0.04
+
+
+def test_assist_share_attribution_is_reachable():
+    """off != on `[lane nhl-elite-assists]`: with every skater shooting alike, a high on-ice assist share
+    must pull assists toward that player only when `assist_attribution == "onice_share"`, and the team's
+    assist total must not move (the per-goal assist count does not depend on who gets them)."""
+    from dataclasses import replace
+
+    from syndicate.features.nhl.sim_engine.hockeysim.calibration_profile import build_nhl_sim_config
+
+    prod = build_nhl_sim_config()
+    assert (prod.assist_attribution, prod.assist_position_power, prod.assist_share_power) == ("onice_share", 2.0, 2.0)
+    g = _game()
+    players = [replace(p, shot_weight=1.5, assist_share=(0.75 if i == 0 else 0.40)) if p.position != "G" else p
+               for i, p in enumerate(g.home_players)]
+    game = replace(g, home_players=tuple(players))
+
+    def run(mode):
+        prof = replace(build_nhl_sim_config(), assist_attribution=mode, assist_position_power=2.0, assist_share_power=2.0)
+        projs = build_prop_projections(game, n_sims=150, profile=prof, base_seed=9)
+        ast = {p.player_id: p.proj_lambda for p in projs if p.market == "ASSISTS" and p.player_id < 2000}
+        return ast[1000], sum(ast.values())
+
+    star_off, team_off = run("shot_proxy")
+    star_on, team_on = run("onice_share")
+    assert star_on > star_off * 1.3
+    assert abs(team_on - team_off) / team_off < 0.05
+
+
+def test_assist_share_unknown_player_uses_the_position_prior():
+    """A player with no measured share is weighted at his position prior, never at zero or at a forward's."""
+    from syndicate.features.nhl.sim_engine.hockeysim.state import ASSIST_SHARE_PRIOR
+
+    assert ASSIST_SHARE_PRIOR["F"] > ASSIST_SHARE_PRIOR["D"] > 0.2

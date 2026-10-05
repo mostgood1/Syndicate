@@ -241,6 +241,50 @@ def _starter_goalie_id(usage: List[Dict], date: Optional[str]) -> Optional[int]:
     return pick["player_id"]
 
 
+# Shrinkage strength, in teammate goals, for `attach_assist_share`: noise variance p(1-p)/n against the
+# between-player variance of A/(onGF-G) among skaters with >= 40 teammate goals in 2024-25 (F sd 0.106,
+# D sd 0.091 observed; ~0.09 / ~0.07 after removing binomial noise) -> k = p(1-p)/var_true.
+ASSIST_SHARE_K = {"F": 30.0, "D": 40.0}
+# A previous season's games count at this weight: still informative early in a season, but a summer of
+# roster change means it should not outvote this season's.
+ASSIST_SHARE_PRIOR_SEASON_WEIGHT = 0.5
+
+
+def attach_assist_share(usage: List[Dict], seasons: List[Tuple[Dict, float]], date: Optional[str]) -> List[Dict]:
+    """Set ``assist_share`` = assists per teammate goal while on ice, AS OF ``date`` (games strictly
+    before it), shrunk to the position prior `state.ASSIST_SHARE_PRIOR`.
+
+    ``seasons`` is ``[(onice_goals_report, weight), ...]`` from `NhlWebIngestClient.onice_goals`. The
+    engine credits assists by this when `SimConfig.assist_attribution == "onice_share"`
+    `[2026-10-05, lane nhl-elite-assists]`. With no report at all the column is None, never the prior,
+    so an outage reads as missing in the input checklist rather than as a populated neutral value.
+    """
+    from ..state import ASSIST_SHARE_PRIOR
+
+    if not any(rep for rep, _w in seasons):
+        for r in usage:
+            r["assist_share"] = None
+        return usage
+    tot: Dict[int, List[float]] = {}
+    for rep, weight in seasons:
+        for _gid, (gdate, players) in (rep or {}).items():
+            if date and gdate and gdate >= str(date)[:10]:
+                continue
+            for pid, (tg, a) in players.items():
+                acc = tot.setdefault(int(pid), [0.0, 0.0])
+                acc[0] += weight * a
+                acc[1] += weight * tg
+    for r in usage:
+        if r.get("position") not in ("F", "D"):
+            r["assist_share"] = None
+            continue
+        pos = r["position"]
+        a, tg = tot.get(int(r["player_id"]), (0.0, 0.0))
+        k = ASSIST_SHARE_K[pos]
+        r["assist_share"] = round((a + k * ASSIST_SHARE_PRIOR[pos]) / (tg + k), 4)
+    return usage
+
+
 def project_lineup(usage: List[Dict], date: Optional[str] = None) -> List[Dict]:
     """Add proj_toi (recent avg) and flag the starter goalie (see `_starter_goalie_id`)."""
     starter_id = _starter_goalie_id(usage, date)

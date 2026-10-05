@@ -109,6 +109,17 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     # market better or flat (BLOCKS +0.00019, n.s.); MAE SOG/GOALS/ASSISTS/POINTS better; playoffs
     # SOG@1.5 -0.0017, POINTS@0.5 -0.0018. Team totals unchanged (renormalised over the rotation).
     line_quality_strength=0.5,
+    # ASSISTS credited by each on-ice teammate's as-of A/(onGF-G) `[2026-10-05, lane nhl-elite-assists]`.
+    # The shot-rate proxy left the sim's assists per on-ice goal flat at ~0.33 for every player (real
+    # 0.27 depth -> 0.49 elite; 15 slates vs NHL shift charts), so elite playmakers projected 0.66x their
+    # real assists. Full 2025-26 season, paired vs the previous engine on 36,533 regular-season
+    # player-games (SOG/GOALS/BLOCKS byte-identical): Brier ASSISTS@0.5 -0.00004 (flat), POINTS@0.5
+    # -0.00035 [-0.00069, +0.00003], POINTS@1.5 -0.00039 [-0.00054, -0.00023]; playoffs POINTS@0.5
+    # -0.0019, @1.5 -0.0008 (CIs exclude 0). Elite (as-of >= 0.8 A/G) 0.66x -> 0.78x, depth 1.31x ->
+    # 1.25x; D 0.96x -> 0.88x. Share power 4 reached elite 0.91x but ASSISTS@0.5 +0.00095 WORSE: refused.
+    assist_attribution="onice_share",
+    assist_position_power=2.0,
+    assist_share_power=2.0,
     score_effects="dynamic",
     goal_model="from_shots",
     assist_model="onice",

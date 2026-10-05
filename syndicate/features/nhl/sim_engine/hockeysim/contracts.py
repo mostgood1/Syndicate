@@ -55,6 +55,8 @@ class HockeyPlayerFeatures:
     proj_toi: float = 0.0
     # even-strength minutes per game (total minus real PP/SH); weights EV line rotation when present
     proj_ev_toi: Optional[float] = None
+    # assists per teammate goal while on ice, as of the slate date (lineups CSV); see state.ASSIST_SHARE_PRIOR
+    assist_share: Optional[float] = None
     shot_weight: Optional[float] = None
     goal_weight: Optional[float] = None
     block_weight: Optional[float] = None
@@ -79,6 +81,7 @@ class HockeyPlayerFeatures:
             "position": self.position,
             "proj_toi": float(self.proj_toi or 0.0),
             "proj_ev_toi": self.proj_ev_toi,
+            "assist_share": self.assist_share,
             "shot_weight": self.shot_weight,
             "goal_weight": self.goal_weight,
             "block_weight": self.block_weight,

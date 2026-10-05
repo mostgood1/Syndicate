@@ -15,11 +15,11 @@ from syndicate.local_nhl_odds import _alias_team_abbr, _team_abbr
 
 from ..features.loaders import _load_scoreboard_games, _processed_dir
 from ..features.props_lines import initial_surname_key, load_props_lines, normalize_name
-from .lineups import build_team_usage, infer_lines, project_lineup
+from .lineups import ASSIST_SHARE_PRIOR_SEASON_WEIGHT, attach_assist_share, build_team_usage, infer_lines, project_lineup
 from .nhl_web import NhlWebIngestClient, season_code_for_date
 
 _LINEUP_COLUMNS = ["player_id", "full_name", "position", "line_slot", "pp_unit", "pk_unit", "proj_toi", "confidence", "team",
-                   "proj_ev_toi"]
+                   "proj_ev_toi", "assist_share"]
 _ROSTER_COLUMNS = ["full_name", "player_id", "team", "position", "team_id"]
 _GOALIE_COLUMNS = ["team", "goalie", "status", "confidence", "source"]
 
@@ -113,12 +113,18 @@ def collect_slate_inputs(
             continue
         infer_lines(usage, must_dress=_book_listed_ids(usage, team_name, book_lines))
         project_lineup(usage, date=date)
+        season = season_code_for_date(date)
+        prev = f"{int(season[:4]) - 1}{season[:4]}" if len(season) == 8 else ""
+        attach_assist_share(usage, [(client.onice_goals(team_code, season), 1.0),
+                                    (client.onice_goals(team_code, prev) if prev else {}, ASSIST_SHARE_PRIOR_SEASON_WEIGHT)],
+                            date)
         for r in usage:
             lineup_rows.append({
                 "player_id": r["player_id"], "full_name": r["full_name"], "position": r["position"],
                 "line_slot": r.get("line_slot"), "pp_unit": r.get("pp_unit"), "pk_unit": r.get("pk_unit"),
                 "proj_toi": r.get("proj_toi"), "confidence": 0.5, "team": team_name,
                 "proj_ev_toi": r.get("proj_ev_toi"),
+                "assist_share": r.get("assist_share"),
             })
             roster_rows.append({
                 "full_name": r["full_name"], "player_id": r["player_id"], "team": team_name,

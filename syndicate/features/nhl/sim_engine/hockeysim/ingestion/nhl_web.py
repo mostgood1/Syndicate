@@ -172,6 +172,38 @@ class NhlWebIngestClient:
                 out.setdefault(gid, {})[pid] = (pp, sh)
         return out
 
+    def onice_goals(self, team_abbr: str, season: str) -> Dict[str, Tuple[str, Dict[int, Tuple[int, int]]]]:
+        """``{game_id: (game_date, {player_id: (teammate_goals_on_ice, assists)})}`` for one team's
+        regular-season and playoff games of a season, from the NHL stats API's per-game
+        ``skater/goalsForAgainst`` report. ``teammate_goals_on_ice`` = on-ice goals for (EV + PP + SH)
+        minus the player's own goals: the goals he could have assisted on.
+
+        Feeds `lineups.attach_assist_share` `[2026-10-05, lane nhl-elite-assists]`; the boxscore has
+        assists but no on-ice goals, so assists per game cannot tell a playmaker from a passenger on
+        a high-scoring line. Same transport and failure mode as `special_teams_toi`: an unreachable
+        report returns ``{}`` and the share falls back to its position prior.
+        """
+        out: Dict[str, Tuple[str, Dict[int, Tuple[int, int]]]] = {}
+        for game_type in (2, 3):
+            exp = urllib.parse.quote(f'teamAbbrev="{team_abbr}" and seasonId={season} and gameTypeId={game_type}')
+            url = f"{_NHL_STATS_BASE}/skater/goalsForAgainst?isAggregate=false&isGame=true&limit=-1&cayenneExp={exp}"
+            try:
+                data = self._get(url)
+            except Exception:  # noqa: BLE001 - an enrichment; the lineup must still build
+                continue
+            for row in (data or {}).get("data") or []:
+                try:
+                    gid = str(int(row.get("gameId")))
+                    pid = int(row.get("playerId"))
+                    gf = sum(int(row.get(k) or 0) for k in ("evenStrengthGoalsFor", "powerPlayGoalFor", "shortHandedGoalsFor"))
+                    goals = int(row.get("goals") or 0)
+                    assists = int(row.get("assists") or 0)
+                except (TypeError, ValueError):
+                    continue
+                entry = out.setdefault(gid, (str(row.get("gameDate") or "")[:10], {}))
+                entry[1][pid] = (max(0, gf - goals), assists)
+        return out
+
     def recent_finished_game_ids(self, team_abbr: str, season: str, *, before_date: str, n: int = 8) -> List[str]:
         """The team's last ``n`` finished REGULAR-SEASON or PLAYOFF game ids strictly before ``before_date``.
 

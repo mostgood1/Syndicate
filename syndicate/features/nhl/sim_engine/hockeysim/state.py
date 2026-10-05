@@ -11,6 +11,12 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 
+# League A/(onGF-G) by position, 2024-25 regular season, NHL stats `skater/goalsForAgainst` pooled
+# over every skater (F 0.5029, D 0.3191) `[2026-10-05, lane nhl-elite-assists]`. The shrinkage prior
+# for `PlayerState.assist_share`, and the engine's value for a player whose share is unknown.
+ASSIST_SHARE_PRIOR = {"F": 0.503, "D": 0.319}
+
+
 @dataclass
 class PlayerState:
     player_id: int
@@ -20,6 +26,8 @@ class PlayerState:
     toi_proj: float = 0.0
     # projected EVEN-STRENGTH minutes; None = unknown (EV rotation then uses toi_proj)
     ev_toi_proj: Optional[float] = None
+    # as-of ASSISTS PER TEAMMATE GOAL while on ice, A/(onGF-G), shrunk to ASSIST_SHARE_PRIOR; None = unknown
+    assist_share: Optional[float] = None
     # Weights to bias event attribution while on ice
     shot_weight: float = 0.0
     goal_weight: float = 0.0
