@@ -137,7 +137,12 @@ def _init(src: str, out: str, allow_net: bool, arm: str, side: str) -> None:
         if arm == "blend" or arm.startswith("floor"):
             import csv as _csv
             from syndicate.features.nhl import inseason_season_inputs as M
-            M.MIN_CURRENT_GAMES = int(arm[len("floor"):]) if arm.startswith("floor") else 0
+            import math as _math
+            import re as _re
+            m = _re.match(r"floor(\d+)", arm)
+            M.MIN_CURRENT_GAMES = int(m.group(1)) if m else 0
+            if arm.endswith("noblk"):  # blocks stay last season's
+                M.BLEND_W = {**M.BLEND_W, "player.blocks": _math.inf, "team.block_rate": _math.inf}
             cur = _merge([g["counts"] for g in side_data["current"] if g["date"] < cutoff])
             builders = {"team_rates": lambda r: M.build_team_rates(r, cur["team"]),
                         "team_special_teams": lambda r: M.build_special_teams(r, cur["team"]),
@@ -265,7 +270,7 @@ def main() -> int:
     ap.add_argument("--n-sims", type=int, default=200)
     ap.add_argument("--workers", type=int, default=10)
     ap.add_argument("--score-only", action="store_true")
-    ap.add_argument("--arms", default="prior,blend", help="arms to run: prior, blend, floorN (blend after N games)")
+    ap.add_argument("--arms", default="prior,blend", help="arms to run: prior, blend, floorN (blend after N games), floorNnoblk (and blocks kept at the prior)")
     ap.add_argument("--variant", default="blend", help="arm scored against prior")
     args = ap.parse_args()
     import subprocess

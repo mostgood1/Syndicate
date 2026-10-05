@@ -901,6 +901,11 @@ death, never life — do not invert it.
     - (1) override the one cell and enable floor10;
     - (2) a new pre-registered test of floor10 with blocks kept at the prior (W=inf for player.blocks / team.block_rate);
     - (3) leave it off.
+- **PRE-REGISTERED H17 2026-10-04 (user: "test the floor with blocks kept at the prior"; before the arm is run):**
+  - Arm `floor10noblk`: MIN_CURRENT_GAMES = 10 (unchanged from H16); player.blocks and team.block_rate held at last season's value (W = inf). Every other field as H16.
+  - Same 56 dates / 446 games / n_sims 200; the prior arm reused.
+  - Bar UNCHANGED from H16 (paired Brier at the standard lines, floor10noblk - prior, game-clustered 95% CI). Recommend enabling iff (a) no line's CI is entirely > 0 in any of all / Oct / Nov+, AND (b) SOG@1.5 or POINTS@0.5 is better over all dates.
+  - Stated caveat: this variant was chosen AFTER seeing H16's failing cell, on the same data. A pass shows the blocks fields were the cause in this sample; it is not an independent confirmation. That is reported with the result.
 - Blocked by: none
 ### nfl-live-segment-interval — OPEN — opened 2026-10-03 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
 - Goal: NFL in-play quarter/half segment lines refresh every 10 min (code default, like NCAAF 8730cfb7) instead of every 150 s lines-autorun run, before the Sunday 2026-10-04 17:00Z window; NFL full-game lines unchanged; 0 NFL rows served >1h
