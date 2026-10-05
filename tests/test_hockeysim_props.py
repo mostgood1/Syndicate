@@ -326,7 +326,7 @@ def test_assist_share_attribution_is_reachable():
     from syndicate.features.nhl.sim_engine.hockeysim.calibration_profile import build_nhl_sim_config
 
     prod = build_nhl_sim_config()
-    assert (prod.assist_attribution, prod.assist_position_power, prod.assist_share_power) == ("onice_share", 2.0, 2.0)
+    assert (prod.assist_attribution, prod.assist_position_power, prod.assist_share_power) == ("onice_share", 1.5, 2.0)
     g = _game()
     players = [replace(p, shot_weight=1.5, assist_share=(0.75 if i == 0 else 0.40)) if p.position != "G" else p
                for i, p in enumerate(g.home_players)]

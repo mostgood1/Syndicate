@@ -117,8 +117,12 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     # -0.00035 [-0.00069, +0.00003], POINTS@1.5 -0.00039 [-0.00054, -0.00023]; playoffs POINTS@0.5
     # -0.0019, @1.5 -0.0008 (CIs exclude 0). Elite (as-of >= 0.8 A/G) 0.66x -> 0.78x, depth 1.31x ->
     # 1.25x; D 0.96x -> 0.88x. Share power 4 reached elite 0.91x but ASSISTS@0.5 +0.00095 WORSE: refused.
+    # Position power 2.0 -> 1.5 (same day): 2.0 squared the F/D prior ratio and pushed D to 0.88x. Paired vs
+    # 2.0, full season: D 0.99x, F 1.01x, elite unchanged 0.78x; Brier ASSISTS@0.5 -0.00048 [-0.00063,
+    # -0.00031], POINTS@0.5 -0.00031 [-0.00046, -0.00014], POINTS@1.5 -0.00007; playoffs ASSISTS@0.5
+    # -0.00080. Position power 1.0 overshot D (1.11x).
     assist_attribution="onice_share",
-    assist_position_power=2.0,
+    assist_position_power=1.5,
     assist_share_power=2.0,
     score_effects="dynamic",
     goal_model="from_shots",
