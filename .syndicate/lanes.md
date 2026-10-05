@@ -1131,6 +1131,13 @@ death, never life — do not invert it.
 - Files: (none -- released at close)
 - Blocked by: none
 ### mlb-strikeout-bias — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **JOINT RE-FIT RESULT, 2026-10-06 ~05:30Z: holdout read ONCE (232 starts). FAILS the pre-registered rule; NOTHING SHIPS.** Combination: base_hbp 0.0015 + early_count_foul_boost 1.5 + hr_rate_mult 1.856.
+  - **PASS:** |SO bias| +0.92 -> +0.79; HBP/start 1.74 -> 0.26 (actual 0.26); HR/PA gap -0.0147 -> +0.0018.
+  - **FAIL:** starter outs +0.65 -> +0.95; H +0.16 -> +0.79; BB +0.01 -> +0.29; ER +0.05 -> +0.32; game total 9.01 -> 9.60 vs 9.06 actual (gap 0.54 > 0.30).
+  - **Reading.** Every per-PA rate moved to actual (K/BF 0.236 -> 0.233 vs 0.224; H/PA 0.199 -> 0.227 vs 0.218; BB/PA 0.077 -> 0.089 vs 0.087; HR/PA to actual). But without the free HBP baserunners, innings take fewer pitches, so starters go DEEPER and accumulate H/BB/ER per start.
+    - The holdout window also scored low: 9.06 actual vs 9.79 on tune, where the same combination read 9.64.
+    - The remaining coupling is starter length. The shelled hook, which cut outs but pushed ER low, is the opposing lever. A combination is a NEW experiment, and this holdout has now been read twice (starter sweep + this), so it needs FRESH validation data.
+  - The HR calibration is unchanged (the amendment applied only on a ship).
 - **JOINT RE-FIT STAGE PICKS, 2026-10-06 ~03:00Z, TUNE only, holdout not yet read.**
   - **Stage 1:** `early_count_foul_boost` 2.05 -> **1.5**. Starter K/BF 0.2295 vs 0.2280 actual (|d| 0.0015 vs 0.0257 at 2.05). `k_rate_mult` 0.85 barely moved K (0.2509), confirming the ledger.
   - **Stage 2:** `hr_rate_mult` **1.856**. Batting HR/PA 0.0367 vs 0.0345 actual (|d| 0.0021; 1.1 -> 0.0131, 1.5 -> 0.0050, 2.2 -> 0.0089). Tune game total 9.64 vs 9.79 actual (7.92 at 1.1).
