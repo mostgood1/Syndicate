@@ -18,8 +18,12 @@ INPUT. `boxscores_history.csv` in the WNBA processed root (production writes it 
 to games before the slate). Only games strictly before the slate date are read. A missing or unreadable history adds
 nothing and says why (`SIM_AVAILABILITY skipped reason=...`). Never raises.
 
-GATING. WNBA only. OFF unless `SYNDICATE_WNBA_SIM_AVAILABILITY` is truthy; K from
-`SYNDICATE_WNBA_SIM_AVAILABILITY_MISSED_GAMES` (default 1, bounded 1..5).
+GATING. WNBA only. `SYNDICATE_WNBA_SIM_AVAILABILITY` truthy -> on; explicitly falsy (0/false/no/off) -> off, a kill
+switch that wins over everything; UNSET -> on only if `wnba_sim_availability.json` in the processed root carries
+`"enabled": true` (FILE SWITCH, 2026-10-04, user "enable the availability and rate shrink fixes": the per-run
+SmartSim subprocess reads the file, so turning it on needs no role restart -- cf. the 2026-10-04 08:39Z outage, which
+was an env flip's restart). Unknown never means on. K from `SYNDICATE_WNBA_SIM_AVAILABILITY_MISSED_GAMES` (default 1,
+bounded 1..5).
 """
 from __future__ import annotations
 
@@ -34,9 +38,40 @@ K_ENV = "SYNDICATE_WNBA_SIM_AVAILABILITY_MISSED_GAMES"
 HISTORY_FILE = "boxscores_history.csv"
 
 
-def flag_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
-    raw = (env if env is not None else os.environ).get(FLAG)
-    return str(raw or "").strip().lower() in {"1", "true", "yes", "on"}
+SWITCH_FILE = "wnba_sim_availability.json"
+
+
+def flag_state(env: Optional[Mapping[str, str]] = None) -> str:
+    """'on' / 'off' (explicit kill switch) / 'unset'. The env var always wins over the switch file."""
+    raw = str((env if env is not None else os.environ).get(FLAG) or "").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return "on"
+    if raw in {"0", "false", "no", "off"}:
+        return "off"
+    return "unset"
+
+
+def file_enabled(processed_root: Path) -> Tuple[bool, str]:
+    """True only when the switch file parses and says `"enabled": true` (the JSON boolean, nothing truthy-ish)."""
+    path = Path(processed_root) / SWITCH_FILE
+    if not path.is_file():
+        return False, f"switch file absent: {path}"
+    try:
+        import json
+
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        return False, f"switch file unreadable: {type(exc).__name__}"
+    if isinstance(doc, dict) and doc.get("enabled") is True:
+        return True, "ok"
+    return False, "switch file not enabled"
+
+
+def flag_enabled(env: Optional[Mapping[str, str]] = None, processed_root: Optional[Path] = None) -> bool:
+    state = flag_state(env)
+    if state != "unset":
+        return state == "on"
+    return bool(processed_root is not None and file_enabled(processed_root)[0])
 
 
 def missed_games_k(env: Optional[Mapping[str, str]] = None) -> int:
@@ -109,9 +144,16 @@ def add_recency_exclusions(excluded_map: Dict[str, Set[str]], *, processed_root:
         if str(league_code or "").strip().lower() != "wnba":
             summary["reason"] = "not wnba"
             return summary
-        if not flag_enabled(env):
+        state = flag_state(env)
+        if state == "off":
             summary["reason"] = f"{FLAG} off"
             return summary
+        if state == "unset":
+            on, why = file_enabled(processed_root)
+            if not on:
+                summary["reason"] = f"{FLAG} unset and {why}"
+                return summary
+        summary["switch"] = "env" if state == "on" else "file"
         k = missed_games_k(env)
         add, reason = recency_exclusions(processed_root=processed_root, date_str=date_str, k=k, name_key=name_key)
         if not add:

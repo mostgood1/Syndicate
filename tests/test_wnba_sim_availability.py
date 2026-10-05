@@ -43,7 +43,7 @@ def test_reachability_off_and_on_differ(tmp_path):
                                      name_key=_norm_name_key, env={})
     s_on = A.add_recency_exclusions(on, processed_root=root, date_str="2026-07-07", league_code="wnba", props_df=None,
                                     name_key=_norm_name_key, env=ON)
-    assert off == {} and s_off["reason"] == f"{A.FLAG} off"
+    assert off == {} and s_off["reason"].startswith(f"{A.FLAG} unset and switch file absent")
     assert s_on["applied"] is True
     assert on["LVA"] == {_norm_name_key("Kierstan Bell").upper(), _norm_name_key("Dana Evans").upper()}
 
@@ -91,3 +91,36 @@ def test_missing_history_adds_nothing_and_names_why(tmp_path):
     s = A.add_recency_exclusions(m, processed_root=tmp_path, date_str="2026-07-07", league_code="wnba", props_df=None,
                                  name_key=_norm_name_key, env=ON)
     assert m == {} and s["applied"] is False and "history absent" in s["reason"]
+
+
+def _run(root, env):
+    m = {}
+    s = A.add_recency_exclusions(m, processed_root=root, date_str="2026-07-07", league_code="wnba", props_df=None,
+                                 name_key=_norm_name_key, env=env)
+    return m, s
+
+
+def _switch(root, body):
+    (root / A.SWITCH_FILE).write_text(body, encoding="utf-8")
+    return root
+
+
+def test_file_switch_turns_it_on_with_the_env_unset(tmp_path):
+    """FILE SWITCH (2026-10-04): the per-run SmartSim reads the file, so production turns this on with no restart."""
+    m, s = _run(_switch(_season(tmp_path), '{"enabled": true}'), env={})
+    assert s["applied"] is True and s["switch"] == "file"
+    assert _norm_name_key("Kierstan Bell").upper() in m["LVA"]
+
+
+def test_env_zero_is_a_kill_switch_over_an_enabled_file(tmp_path):
+    m, s = _run(_switch(_season(tmp_path), '{"enabled": true}'), env={A.FLAG: "0"})
+    assert m == {} and s["reason"] == f"{A.FLAG} off"
+
+
+def test_only_the_json_true_enables_and_unknown_is_off(tmp_path):
+    for body in ('{"enabled": "true"}', '{"enabled": 1}', '{}', 'not json'):
+        root = tmp_path / str(abs(hash(body)))
+        root.mkdir()
+        m, s = _run(_switch(_season(root), body), env={})
+        assert m == {} and s["applied"] is False and "unset and switch file" in s["reason"], body
+

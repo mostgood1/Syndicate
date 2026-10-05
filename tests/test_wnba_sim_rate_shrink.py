@@ -63,7 +63,7 @@ def _apply(out, root, env=ON, league="wnba"):
 def test_reachability_off_and_on_differ_through_the_boards_reader(tmp_path):
     root = _root(tmp_path)
     off, on = _out(), _out()
-    assert _apply(off, root, env={})["reason"] == f"{R.FLAG} off"
+    assert _apply(off, root, env={})["reason"] == f"{R.FLAG} unset and factor file not enabled"
     assert _apply(on, root)["applied"] is True
     assert off == _out()
     p_off = _hit_prob_over(off["players"]["home"][0]["prop_ladders"]["pts"]["ladder"], 14.5)
@@ -140,3 +140,30 @@ def test_shift_values_moves_the_mean_by_delta_and_keeps_the_width(delta):
     assert sum(new) / len(new) == pytest.approx(sum(vals) / len(vals) + delta, abs=0.011)   # no draw floors at 0 here
     assert (max(new) - min(new)) - (max(vals) - min(vals)) in (-1, 0, 1)                     # a shift, not a stretch
     assert R.shift_values(vals, delta) == new                                                # deterministic
+
+
+def test_file_switch_turns_it_on_with_the_env_unset(tmp_path):
+    """FILE SWITCH (2026-10-04): production enables it by the factor file -- no role restart."""
+    root = _root(tmp_path, factors={**W, "enabled": True})
+    out = _out()
+    s = _apply(out, root, env={})
+    assert s["applied"] is True and s["switch"] == "file"
+    assert out != _out()
+
+
+def test_env_zero_is_a_kill_switch_over_an_enabled_file(tmp_path):
+    root = _root(tmp_path, factors={**W, "enabled": True})
+    out = _out()
+    assert _apply(out, root, env={R.FLAG: "0"})["reason"] == f"{R.FLAG} off"
+    assert out == _out()
+
+
+def test_only_the_json_true_enables(tmp_path):
+    for i, flag in enumerate(("true", 1, None)):
+        root = tmp_path / str(i)
+        root.mkdir()
+        factors = dict(W) if flag is None else {**W, "enabled": flag}
+        out = _out()
+        s = _apply(out, _root(root, factors=factors), env={})
+        assert s["applied"] is False and out == _out(), flag
+

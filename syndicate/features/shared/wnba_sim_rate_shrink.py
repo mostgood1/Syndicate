@@ -21,8 +21,11 @@ without sim minutes (left exactly as the sim had them).
 
 INPUT. `boxscores_history.csv` in the WNBA processed root, games strictly before the slate; factors from
 `wnba_sim_rate_shrink.json` (written by the fit script's `--write-artifact`). Missing/unreadable file -> untouched, a
-named reason logged (`SIM_RATE_SHRINK skipped reason=...`). Never raises. WNBA only; OFF unless
-`SYNDICATE_WNBA_SIM_RATE_SHRINK` is truthy.
+named reason logged (`SIM_RATE_SHRINK skipped reason=...`). Never raises. WNBA only.
+GATING: `SYNDICATE_WNBA_SIM_RATE_SHRINK` truthy -> on; explicitly falsy (0/false/no/off) -> off, a kill switch that
+wins over everything; UNSET -> on only if the factor file carries `"enabled": true` (FILE SWITCH, 2026-10-04, user
+"enable the availability and rate shrink fixes": the per-run SmartSim subprocess reads the file, so turning it on
+needs no role restart). Unknown never means on.
 """
 from __future__ import annotations
 
@@ -45,9 +48,35 @@ W_BOUNDS = (0.0, 1.2)
 MIN_GAMES = 3
 
 
-def flag_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
-    raw = (env if env is not None else os.environ).get(FLAG)
-    return str(raw or "").strip().lower() in {"1", "true", "yes", "on"}
+def flag_state(env: Optional[Mapping[str, str]] = None) -> str:
+    """'on' / 'off' (explicit kill switch) / 'unset'. The env var always wins over the factor file."""
+    raw = str((env if env is not None else os.environ).get(FLAG) or "").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return "on"
+    if raw in {"0", "false", "no", "off"}:
+        return "off"
+    return "unset"
+
+
+def file_enabled(processed_root: Path) -> Tuple[bool, str]:
+    """True only when the factor file parses and says `"enabled": true` (the JSON boolean, nothing truthy-ish)."""
+    path = Path(processed_root) / FACTOR_FILE
+    if not path.is_file():
+        return False, f"factor file absent: {path}"
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        return False, f"factor file unreadable: {type(exc).__name__}"
+    if isinstance(doc, dict) and doc.get("enabled") is True:
+        return True, "ok"
+    return False, "factor file not enabled"
+
+
+def flag_enabled(env: Optional[Mapping[str, str]] = None, processed_root: Optional[Path] = None) -> bool:
+    state = flag_state(env)
+    if state != "unset":
+        return state == "on"
+    return bool(processed_root is not None and file_enabled(processed_root)[0])
 
 
 def load_weights(processed_root: Path) -> Tuple[Optional[Dict[str, float]], str]:
@@ -158,9 +187,16 @@ def apply_rate_shrink(out: Any, *, league_code: str, processed_root: Path, build
         if str(league_code or "").strip().lower() != "wnba":
             summary["reason"] = "not wnba"
             return summary
-        if not flag_enabled(env):
+        state = flag_state(env)
+        if state == "off":
             summary["reason"] = f"{FLAG} off"
             return summary
+        if state == "unset":
+            on, why = file_enabled(processed_root)
+            if not on:
+                summary["reason"] = f"{FLAG} unset and {why}"
+                return summary
+        summary["switch"] = "env" if state == "on" else "file"
         if not isinstance(out, dict) or not isinstance(out.get("players"), dict) or not callable(build_ladder):
             summary["reason"] = "no players block or no ladder builder"
             return summary
