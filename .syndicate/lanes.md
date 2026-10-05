@@ -1036,6 +1036,7 @@ death, never life — do not invert it.
 - Falsification test: Refuted if the sim's A/onGF by tier does not spread toward real (elite >=0.43), or if paired full-season ASSISTS@0.5 / POINTS@0.5 Brier does not improve.
 - Verification: Paired full-season backtest vs production: ASSISTS/POINTS Brier CI below 0, no market worse; then fleet lineups carry the column and the checklist passes.
 - Engine edit was a user-requested cross-lane write into nhl-live-resim's claim, recorded in that lane's block (9th); shipped and released.
+- **2026-10-05 D under-projection (user: "fix the defenseman assist under-projection next").** Hypothesis (before testing): D 0.96x -> 0.88x came from `assist_position_power=2.0` squaring the F/D prior ratio (0.503/0.319); position power 1.0-1.5 with share power 2.0 restores D without losing the elite gain. Falsified if D stays <= 0.92x, or ASSISTS@0.5 / POINTS Brier is worse than production (bt_as_p2s2), paired, full season. Profile-only change (calibration_profile.py).
 - Blocked by: none
 
 ### nhl-confirmed-goalies — OPEN — opened 2026-10-05 — session 9ed26377-0ef3-4416-bc7b-54428f87ce5c
