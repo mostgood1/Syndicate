@@ -2927,3 +2927,11 @@ own prior verdicts, not by anything failing.
   - The fleet refresh-worker had it `=1`, and the served board applied it on 212/212 venue rows.
   - The user then asked me to "turn it on".
 - **How to apply:** a code default is a statement about the CODE. Before a findings line says a feature is on or off in production, read the running process env (only that key), and if possible the served payload's own evidence that the branch ran.
+
+## 2026-10-04 — RULE: an evaluation that calls the same helper as the engine cannot see that helper's defect; when an estimator writes integer ladders, test a SUB-HALF-UNIT change end to end `[lanes wnba-sim-rate-shrink / wnba-minutes-redistribution, session 39b666bb]`
+
+- The WNBA rate shrink shifted integer prop ladders by v' = round_half_up(v + delta). That is a NO-OP for |delta| < 0.5 -- most threes and assists deltas -- so the means moved and the board's probabilities did not.
+- Its fit script scored Brier with the SAME rounding, so the measured gains already contained the loss, and the engine-equivalence check compared MEANS (316/316 equal), which the defect never touches. Every check passed.
+- Caught only when a second module used the convention and a dry run printed a Brier delta of exactly [0.0, 0.0] for threes. Fixed with a mean-preserving shift (bfa92d5f); held out, assists Brier -0.0041 and threes -0.0014 on the same rows.
+- Same session, recurrence of the 2026-10-04 "fixing a BIAS is not fixing the PROJECTION" rule: a minutes re-share took the top-five minutes bias from -1.61 to -0.21 and made PRA Brier WORSE (+0.0073 / +0.0088). Removed minutes are low-usage minutes; holding the per-minute rate overstates the loss.
+- **How to apply:** an exactly-zero delta on any market is a finding, not a null. Before trusting an estimator that edits discrete distributions, feed it a change smaller than one unit and assert the published probability moves; and never let the fit's scorer reuse the engine helper under test without a test of that helper of its own.

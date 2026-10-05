@@ -965,3 +965,20 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **NBA player props are now REQUESTED** (`refresh_odds_sources._NBA_DEFAULT_MARKETS`; the 06:02:17Z run passed all 13 player_* markets). Before, `_effective_markets` sent game + half lines only, so no NBA prop quote could ever reach the board.
 - **Books posted 0 NBA props** for the 10-04/10-05 preseason dates, so served prop rows are 0. Owed: the first slate with NBA prop quotes.
 - **Edge shape to watch:** totals 5/5 favoured the OVER on 10-04 (2 games). The sim's prop means run low (minutes bias; Markkanen 9.8 pts on 10-04), which predicts an UNDER pile on props.
+
+## [wnba-props-model-skill] WNBA PROPS: NO MARKET BEATS THE BOOK; THE INJURY POOL IS FIXED IN PRODUCTION; FOUR MODEL FIXES ARE HELD, FLAGS OFF `[verified 2026-10-04, lanes wnba-lines-props-backtest / basketball-injury-exclusion-reinclusion / wnba-book-information / wnba-sim-rate-shrink / wnba-minutes-redistribution]`
+
+- **Production, verified:** SmartSim injury exclusions reach the pool. Fixes `ff4ca730` (re-admit only on a truthy
+  `playing_today`) + `500a5643` (re-key each excluded name to the single team props_df places it on). Fleet reading 2,
+  2026-10-04 16:51Z: 0/44 OUT-listed players in the 10-04 pools (deploys.md). Per-game sim files are skip-if-exists,
+  so a fix to sim inputs reaches an already-simmed date only through a scoped re-sim (`--wnba-only-matchups`).
+- **Skill, measured as-of over 2026:** no WNBA pregame market beats the de-vigged book; the 08-31 ML "edge" is
+  overturned (`findings_2026-10-02_wnba_lines_props_backtest.md`). When book and model disagree on props the book is
+  right (points slope 0.94 full season).
+- **Ceilings measured 2026-10-04:** perfect injury information barely moves props at the book line (points Brier
+  -0.0020 [-0.0059,+0.0020]; only threes significant). The book's minutes edge is rotation/role, not availability.
+  The full minutes re-share fixes the sim's top-heavy minutes but makes props worse (PRA +0.0073/+0.0088); the
+  bench-only variant is inert. Lane closed, module OFF and never hooked.
+- **Held estimators (all default OFF, user decision owed):** `SYNDICATE_WNBA_SIM_AVAILABILITY`,
+  `SYNDICATE_WNBA_SIM_RATE_SHRINK` (ladder rounding fixed `bfa92d5f`: half-up shift was a no-op for |delta| < 0.5),
+  `SYNDICATE_WNBA_PROP_SHAPE`, `SYNDICATE_WNBA_PROP_DISPERSION`, `SYNDICATE_WNBA_SIM_MINUTES_REDISTRIBUTION` (refuted).
