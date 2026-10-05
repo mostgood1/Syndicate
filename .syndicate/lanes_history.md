@@ -36607,3 +36607,15 @@ OUTSTANDING and every claim-bearing line. These are the 2 historical lines.
 ## SUPERSEDED HEADER 2026-10-04 -- nba-prop-calibration (duplicate block merged; header line moved verbatim)
 
 ### nba-prop-calibration — OPEN — opened 2026-10-03 — session e0a3e383-4fa1-4669-8740-c9a46b681c7a — **GOAL: MET 2026-10-04 (module c7b22387 + call site 7f920a60 on main; flag OFF; production enable = user decision 'Not yet')**
+
+## nhl-pp-units-real-toi -- full block as of close, 2026-10-05 (moved verbatim)
+
+### nhl-pp-units-real-toi — OPEN — opened 2026-10-04 — session 5704bbd4-3c4f-4d88-9549-fa59e24ab70a
+- Goal: NHL power-play and penalty-kill units are built from each skater's real PP/SH ice time (NHL stats API, regular-season + playoff games in the usage window) instead of total-ice-time rank, and the backtest shows SOG/POINTS/ASSISTS Brier at the lines not worse vs the current engine
+- Files: syndicate/features/nhl/sim_engine/hockeysim/ingestion/nhl_web.py, syndicate/features/nhl/sim_engine/hockeysim/ingestion/lineups.py, syndicate/features/nhl/sim_engine/hockeysim/ingestion/collect.py, scripts/backtest_nhl_props.py, tests/test_hockeysim_ingestion.py
+- Hypothesis: On 10-04 the largest NHL SOG edges track the PP unit, not the player: L1/PP1 players projected 30-45% above their own SOG rate, stars slotted PP2 (Brady Tkachuk 2.43 vs 3.68) as far below. PP units come from total-TOI rank with a forced 3F+2D shape; real PP1 (MTL: Suzuki, Caufield, Hutson, Slafkovsky, Demidov = 4F+1D) differs
+- Falsification test: If real-PP-TOI units leave the paired SOG Brier unchanged or worse, unit composition is not what drives the per-player error
+- Verification: Paired backtest vs bt_flat_v2_noast (every 3rd regular-season date + playoffs): Brier SOG/POINTS/ASSISTS at the lines not worse with CIs; on the fleet, lineups_<date>.csv PP1 matches real PP usage and the 10-04-style |edge|>10% share for SOG falls
+- **2026-10-04 BACKTEST (verification half 1, MET):** `C:/tmp/nhlprops/bt_ppunits/` vs production-equivalent `bt_flat_v2_noast`, paired on 12,540 regular-season player-games (every 3rd date) + playoffs. Brier: BLOCKS@1.5 **-0.0035** [-0.0048, -0.0021] (playoffs -0.0038), POINTS@1.5 -0.0006 [-0.0010, -0.0003]; SOG 1.5/2.5/3.5, GOALS, ASSISTS, POINTS@0.5 all within noise (none worse). MAE BLOCKS -0.0138, POINTS -0.0024, GOALS -0.0013. Team totals unchanged. Real PK units put the real shot-blockers on the PK -- the per-player block error two refits could not reach. **SOG falsification triggered in part:** SOG Brier neutral, elite-shooter bias -0.204 -> -0.259, so unit composition is NOT what drives the 10-04 SOG edges; line ORDER from an early-season window remains the suspect. Live check on 10-04 inputs: FLA PP1 now M. Tkachuk + Verhaeghe; ANA PP1 Gauthier + Sennecke (Killorn off). Backtest PP1 shapes 2025-11-01: 22x 4F+1D, 2x 3F+2D, 2x 5F. Fleet reading (half 2) owed.
+- Blocked by: none
+
