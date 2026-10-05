@@ -1153,6 +1153,17 @@ death, never life — do not invert it.
     - |H|, |BB| and |ER| bias each worsen by <= 0.10;
     - the game-total |gap| to the box-score actual grows by <= 0.10 runs.
   - **(3)** If the totals guard alone fails, do NOT ship. Fewer HBP removes baserunners, and per the standard section 4.4 that requires re-fitting the rates that were absorbing it (hr/inplay/bb mults); that becomes the next pre-registered step. If none passes, ship nothing.
+- **RUN-SCORING REFIT, PRE-REGISTERED 2026-10-05 ~23:00Z before any HBP result was read** (user: "if totals fails, do the run-scoring refit too"). This applies only if the top HBP candidate fails the totals guard alone.
+  - **(a) Fix `base_hbp`** at that candidate's value.
+  - **(b) Measure the component biases** on the TUNE split. These are game-level batting: model vs box score per team-game, for HR, H (non-HR) and BB.
+  - **(c) Pick the ONE knob** whose component is the most significantly under-predicted (largest negative bias/SE): HR -> `hr_rate_mult`, non-HR H -> `inplay_hit_rate_mult`, BB -> `bb_rate_mult`.
+    - `inplay_hit_rate_mult` was rejected out of sample on 09-04 (`ead7c6c5`). If it is the pick, it must pass the same holdout or nothing ships.
+  - **(d) Fit that knob's value on TUNE** so the model game total matches the actual (bisection, 3 values).
+  - **(e) SHIP `base_hbp` + that value** only if, on HOLDOUT, every check passes:
+    - every guard of rule (2) holds;
+    - the game-total |gap| is no larger than the shipped baseline's;
+    - the refit component's |bias| shrinks.
+  - Otherwise ship nothing. This is a joint calibration, so ONE knob only; no stacking.
 - Goal: The current MLB engine's starter strikeout projection is unbiased against real starts (today +0.87 K/start [+0.66,+1.07], 565 starts, with pitches unbiased), measured on the as-of roster_objs replay with a pre-registered tune/holdout pick and side-effect guards on walks, hits, outs and game totals; the cause is located (K/BF vs BF vs pitches/PA) and the commit that flipped K from 18% low (08-18) to 17% high is identified
 - Files: .syndicate/findings_2026-10-05_mlb_strikeout_bias.md (NEW), scripts/mlb_strikeout_decomposition.py (NEW)
 - Hypothesis: Pitches are unbiased while K is 17% high, so the excess is per-PA: either K/BF too high (pitch-level swing/whiff/called-strike mix after the 08-18..09-08 pitch-model and refit changes) or BF inflated by the PA-start counter flagged 09-14 (simulate.py:2657, BF exceeded outs+H+BB by 1.67/start)
