@@ -1089,6 +1089,12 @@ death, never life — do not invert it.
   - No SAVES book lines quoted for 10-05/10-06 yet: served-board SAVES coverage is unchanged today. The first slate with SAVES lines is a reading still owed.
   - Known and accepted (props lane): in-sim goalie TOI still follows proj_toi (engine.py:1869-1875), and SAVES are credited via the starter map (props_boxscore.py:375-384). No per-goalie save% exists, so team goals against do not move.
   - CORRECTED: `nhl_sim_input_checklist.py` IS the gate when pointed at the prod disk with `SYNDICATE_ARTIFACT_ROOT_NHL=/home/amyn/syndicate-prod/data/nhl_source` (I had set SYNDICATE_DATA_ROOT, which it does not read, so it fell back to the June git mirror). Run 2026-10-05 ~19:20Z: dates 9 (2026-09-30..2026-10-08), PASS, exit 0 -- incl. is_starting_goalie exactly one per team per game.
+- **2026-10-05 ~21:55Z: the owed "first slate with SAVES lines" reading CANNOT come due as configured.**
+  - `syndicate/local_nhl_odds.py:634` (`collect_oddsapi_props`) requests only `player_points,player_assists,player_goals,player_shots_on_goal`. No saves (OddsAPI `player_total_saves`) and no blocks (`player_blocked_shots`).
+  - Its market map lists `player_saves` / `goalie_saves`, not `player_total_saves` (the key `prop_projections.py:78` and `bet_status_nhl.py:225` use).
+  - Measured on the fleet: `player_props_lines` 10-03..10-08 carry only GOALS / SOG / POINTS / ASSISTS. The book-quote log for 10-06 has h2h / totals / spreads / SOG / GOALS. Zero SAVES rows anywhere.
+  - The confirmed-goalie overlay therefore changes SAVES projections (all-markets file) but no served SAVES line, because none is ever fetched.
+  - The fix (request + map `player_total_saves`, optionally `player_blocked_shots`) is in a file another lane claims (nhl-compact-card-start-time). It costs +1 credit per market per event per props fetch (4 -> 5 or 6). A user decision.
 - Blocked by: none
 
 ### soccer-scorer-race-grade — CLOSED 2026-10-05 (GOAL MET) — opened 2026-10-05 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
