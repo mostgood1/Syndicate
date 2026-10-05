@@ -46410,3 +46410,19 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - baseline (read 20:30Z on the fleet python): `_apply_skill_reliability({score:5}, nfl h2h)` -> unchanged; `_sizing_skill_factor` -> 0.5 from the existing market-skill registry; `optimizer_overlay` reason `overlay_absent`. No optimizer file on `~/syndicate-prod/data/reports/model_scorecard/`.
 - prediction: the 2026-10-06 11:30Z `model-scorecard` run logs `OPTIMIZER_STATE games=0`, then `OPTIMIZER committed={'committed': N>0, ...}` with `by_sport` non-empty for >=3 sports, and writes `model_scorecard_optimizer_overlay.json` with 0 entries (no cell can reach 60 games / 5 dates on day 1). Rank/stake therefore byte-identical until a cell validates.
 - verify: `py -3 .claude/skills/daily-optimizer/review.py` exit 0 after 11:3xZ 10-06 (scheduled task `daily-optimizer-review`, 07:30 CT), plus the job log's `OPTIMIZER` line.
+
+## 2026-10-05 20:43Z (3:43 PM CT) -- MEASUREMENT: NHL goalie GSAx factor on game lines (553cd7aa) -- **LIVE via ANOTHER SESSION'S ff 20:21:01Z (-> 340b04cd), MET on production** (lane `nhl-game-lines-model`, user: "ship GSAx for totals with the confirmed starters")
+
+- **What:**
+  - `goalie_gsax.py` (factor = shrunk GA / xG-faced vs league, k=160, 2025-26 prior at w=0.25, frozen; table in memory from this season's cached play-by-play STRICTLY before the slate date).
+  - Applied in `build_nhl_artifacts._apply_goalie_gsax` after the score-adjusted re-projection and before anchoring. The starter comes from `starting_goalies` (Daily Faceoff confirmed, else projection) via lineups.
+  - Game lines only. Off switch SYNDICATE_NHL_GOALIE_GSAX=off.
+  - Same commit: the confirmed-goalie overlay now only applies within today +/- 1.
+- **Measured before shipping** (shipping form, 2025-26, H22): OOS OVER@close dBrier -0.00203 [-0.00443, +0.00069], ML +0.00056 [-0.00118, +0.00238], total dMAE -0.0145 [-0.0307, +0.0004]. Stop condition not triggered.
+- **How it went live:**
+  - My refresh-worker claim was refused (held by layer2-unmeasured-per-line); I released my live-odds-worker claim rather than hold half.
+  - A watcher saw another session's ff carry 553cd7aa (6b4fa17d -> 340b04cd at 20:21:01Z).
+- **Baseline (20:04:59Z):** predictions_2026-10-06 written 19:57:17Z (pre-GSAx).
+- **Reading (reachability):** predictions rewritten 20:27:44Z (10-05) and 20:30:33Z (10-06). Re-run read-only of the fleet's producer, confirmed-goalie overlay OFF so it cannot write:
+  - 10-06: production model_total and p_home_ml_raw == the GSAx-ON run 9/9 and == OFF 0/9. Mean |on - off| total 0.080, max 0.314; ML 0.0078.
+  - 10-05: == ON 4/4, == OFF 1/4. The one equal game has both starters at factor 1.0: no shots faced this season, by design.
