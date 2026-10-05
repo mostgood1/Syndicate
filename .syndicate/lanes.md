@@ -1067,7 +1067,7 @@ death, never life — do not invert it.
   - `sim_starter` follows the confirmed starter: confirmed goalies 1, listed backups (PIT Silovs, WPG Skinner) 0. So `prop_projections` REFUSE_NOT_STARTER flips with it.
   - No SAVES book lines quoted for 10-05/10-06 yet: served-board SAVES coverage is unchanged today. The first slate with SAVES lines is a reading still owed.
   - Known and accepted (props lane): in-sim goalie TOI still follows proj_toi (engine.py:1869-1875), and SAVES are credited via the starter map (props_boxscore.py:375-384). No per-goalie save% exists, so team goals against do not move.
-  - `nhl_sim_input_checklist.py` takes no date, and on the fleet audits 2026-06 mirror dates: not usable as this gate; the direct count above is.
+  - CORRECTED: `nhl_sim_input_checklist.py` IS the gate when pointed at the prod disk with `SYNDICATE_ARTIFACT_ROOT_NHL=/home/amyn/syndicate-prod/data/nhl_source` (I had set SYNDICATE_DATA_ROOT, which it does not read, so it fell back to the June git mirror). Run 2026-10-05 ~19:20Z: dates 9 (2026-09-30..2026-10-08), PASS, exit 0 -- incl. is_starting_goalie exactly one per team per game.
 - Blocked by: none
 
 ### soccer-scorer-race-grade — OPEN — opened 2026-10-05 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
