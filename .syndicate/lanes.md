@@ -1287,6 +1287,20 @@ death, never life — do not invert it.
 - Blocked by: none (unblocked 2026-10-06, user: "do 2 and 3 and ship if they pass"; runs on the engine as shipped, since the joint re-fit did not ship)
 
 ### mlb-non-pa-outs — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **STEP 2 (PICKOFFS): COMPOSITION FIRST, then a SELECTION RULE PRE-REGISTERED 2026-10-06 ~00:30Z before any pickoff code ran** (user: "do pickoffs too").
+  - **Composition, real.** Box scores, 626 team-games: balance BF-(OUTS+H+BB+HBP) = -0.71/team-game, made of GIDP 0.61 + CS 0.19 + PICKOFFS 0.07, minus ~0.16 of reach-without-H/BB/HBP.
+  - **Composition, model.** 90 games x 30 sims, pbp: DP 0.20, CS 0.15, PO 0 (not modelled), balance -0.01. That implies ~0.34 of reach-without-H/BB/HBP, about 2x real.
+  - **So pickoffs are ~10% of the residual.** The main pieces, DP at one-third of real and errors/FC at ~2x, go to the combined calibration as levers (`bip_dp_rate`, `bip_roe_rate`/`bip_fc_rate`). They are NOT fixed here.
+  - **Mechanism.** In the pre-PA steal block, BEFORE the steal draw, on the same opportunity (runner on 1B, 2B empty, < 2 outs): with probability `pickoff_rate` (read from `manager_pitching_overrides`, default 0.0) the runner is out.
+    - On a pickoff: half.outs += 1; pitcher OUTS += 1; pitcher row 'PO' += 1, written only when it happens, so there is no template change.
+    - At 0.0 there is NO extra rng draw, so the change is byte-identical (tested against HEAD as before).
+  - **Fit** `pickoff_rate` on TUNE in {0.01, 0.02, 0.03}: the value whose model PO/team-game is closest to the tune actual (box `pickoffs`). 100 sims.
+  - **SHIP only if every check holds on HOLDOUT (200 sims)** against the shipped config:
+    - |PO/team-game - actual| <= 0.02;
+    - the starter BF balance moves toward actual;
+    - starter |outs|, |SO|, |H|, |BB| and |ER| bias each worsen by <= 0.10;
+    - game-total |gap| <= max(0.30, the baseline's).
+  - **Ship** = the no-op code + the value in the forward manager-pitching overrides file. Then a fleet ff, verified on the next sim.
 - **STEP 1 SHIPPED 2026-10-05 23:23:48Z (fleet b6fd6189):** all 7 holdout checks pass; BF balance +0.05 -> -0.05 (actual -0.47); game play byte-identical. Verification owed at the next MLB sim. Step 2 (pickoffs) is warranted (residual 0.42 > 0.20) and needs its own pre-registered rule.
 - **SELECTION RULE, PRE-REGISTERED 2026-10-06 ~03:30Z before any change** (user: "then fix the caught stealing outs next"; promoted from the 10-06 lead).
   - **Claim.** The engine edit to `simulate.py` (pre-PA steal block only) is taken from lane `mlb-starter-length` when this lane starts; recorded then.
