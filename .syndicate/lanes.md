@@ -1142,6 +1142,16 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### mlb-strikeout-bias — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **RESULT 2026-10-06 ~00:30Z, by the pre-registered rule: NOTHING SHIPS.** `base_hbp` 0.0015 / 0.0020 / 0.0025 fixes HBP (holdout 0.25-0.43 vs 0.26 actual, baseline 1.74), and every variant fails the primary check:
+  - |SO bias| WORSENS (holdout +0.92 -> +1.21..+1.24), because K/BF rises 0.236 -> 0.255-0.257 (actual 0.224) once HBP stops ending PAs early;
+  - outs bias +0.65 -> +1.06..+1.11;
+  - ER +0.05 -> -0.34..-0.38;
+  - game total 9.01 -> 7.27-7.42 vs 9.06 actual.
+  - The registered run-scoring refit does NOT trigger: it was conditioned on totals failing ALONE.
+- **FINDING: OPPOSING ERRORS (learnings 08-18; standard section 4.4).** The 7.6x HBP excess was absorbing two other defects:
+  - a K/BF that is +12% high once HBP is right;
+  - a run environment ~1.8-2.4 runs/game too low without those free baserunners. That is consistent with `hr_rate_mult` pinned at 1.1 instead of the refit 1.856.
+  - No single knob is a fix. NEXT (needs a user decision): a JOINT re-fit with `base_hbp` correct and `k_rate_mult` + `hr_rate_mult` fitted per-rate on TUNE (K/BF, HR/BF to actual), judged on HOLDOUT with the totals/ER/outs guards.
 - **FOUND 2026-10-05 (HR lane next, user-queued): the 09-04 HR refit is INERT in production.**
   - `PitchModelConfig.hr_rate_mult` defaults to 1.856 (`ead7c6c5`). But `simulate.py` builds `PitchModelConfig(**pitch_model_overrides)`, and production's forward file `data/tuning/pitch_model_overrides/forward_start_2026_04_14_v1.json` (every date >= 04-14) sets `hr_rate_mult: 1.1`.
   - Production therefore runs HR at 1.1, not 1.856. The k/bb mults are not in the file, so they DO apply.
