@@ -46393,3 +46393,12 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - verify: OWED, at the first served NBA prop rows (Layer 2 lane expects NBA prop quotes ~opening night 10-20). Read /api/board/layer2-shortlist per_sport.nba.prop > 0 and the projection's `book_blend` counter.
 - off switch: SYNDICATE_NBA_PROP_BOOK_BLEND=0 (needs a restart to reach the env), or delete the file / set "enabled": false (no restart).
 - locks: none taken for the copy (a user action, data file only). web and refresh-worker claims were free at 19:52Z.
+
+## 2026-10-05 20:15Z (3:15 PM CT) -- CORRECTION to the 20:03:24Z NBA book-blend entry (lane `nba-prop-calibration`)
+
+- The baseline line "The fleet writes NO NBA props_edges file (lead a744832d)" stated a symptom with the wrong cause
+  implied. The 1,134-row `oddsapi_player_props_2026-10-05.csv` holds 0 player markets; every row is a game line. The
+  raw pulls have 0 `player_*` rows for 10-04..06 even though the fetch requests them all (per-event discovery). So the
+  refresh correctly skips edges ("no player-prop lines offered"). NBA props_edges, and with them the picks arm of the
+  book blend, start when books post NBA player props. The lead is closed. The expected outcome and the owed reading in
+  the 20:03:24Z entry are unchanged.
