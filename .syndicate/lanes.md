@@ -1261,12 +1261,21 @@ death, never life — do not invert it.
 - Blocked by: mlb-strikeout-bias
 
 ### mlb-hr-prop-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **SELECTION RULE, PRE-REGISTERED 2026-10-06 ~06:00Z before any replay** (user: "yes, do 2 and 3 and ship if they pass").
+  - **Engine** = production as shipped: forward overrides incl. hr_rate_mult 1.1, starter_short_start_prob 0.10.
+  - **Data.** `scripts/mlb_hitter_prop_replay.py`: per lineup batter who appeared (PA >= 1), the RAW sim P(X >= k) at 200 sims for every key in `hitter_props_calibration/default.json` (18 keys) plus `hr_1plus` (`hitter_hr_calibration`). Outcomes from the box score. Same 26 dates; TUNE < 2026-07-04, HOLDOUT >= 2026-07-04.
+  - **Disclosure.** The 09-01 hitter-props maps were fitted on a window containing these dates, so on holdout they are judged IN-SAMPLE. The test is biased toward keeping them; stated, not corrected.
+  - **Fit** on TUNE, per key: affine-logit (a, b), L2 toward (1, 0) with lambda = 10, Newton.
+  - **Decide** on HOLDOUT, read once, per key. Choose the lowest holdout log-loss among {CURRENT served map, RE-FIT map, IDENTITY}.
+    - It replaces the current map only if it beats it by >= 0.001 nats/row, and its calibration-in-the-large |mean p - rate| is no worse than the current map's.
+    - Otherwise keep the current map.
+  - **Ship** = the changed keys' values + provenance in the two JSON files, then a fleet ff (read per sim run, no restart). Verified on production's next sim: served p_*_cal == sigmoid(a*logit(raw)+b) for the new (a, b).
 - Goal: Hitter prop probabilities the MLB board serves are calibrated on the CURRENT engine: batter P(HR>=1) and the hitter_props buckets (hits/TB/RBI/runs) re-fitted on the as-of replay (tune) against box-score outcomes and judged once on holdout, replacing the 07-17 calibrations fitted to the pre-refit engine; shipped only if holdout log-loss and calibration-in-the-large improve on the shipped engine's raw probabilities
 - Files: vendor/mlb_bettingv2/data/tuning/hitter_hr_calibration/default.json (values + provenance ONLY), vendor/mlb_bettingv2/data/tuning/hitter_props_calibration/default.json (values + provenance ONLY), scripts/mlb_hitter_prop_replay.py (NEW), .syndicate/findings_2026-10-06_mlb_hr_prop_calibration.md (NEW)
 - Hypothesis: The 07-17 affine-logit HR calibration (a=0.805,b=0.032) compensates the halved HR rate; once hr_rate_mult is fixed it over-inflates, and the raw corrected probabilities are closer to calibrated than calibrated ones
 - Falsification test: If on the shipped engine the raw P(HR>=1) is already calibrated (calibration-in-the-large within CI of 0), a re-fit ships nothing and identity stays
 - Verification: Replay per-batter P(HR>=1) and hitter buckets vs box outcomes, tune fit, holdout read once; production's next sim serves the re-fitted values
-- Blocked by: mlb-pa-length
+- Blocked by: none (unblocked 2026-10-06, user: "do 2 and 3 and ship if they pass"; runs on the engine as shipped, since the joint re-fit did not ship)
 
 ### mlb-non-pa-outs — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
 - **SELECTION RULE, PRE-REGISTERED 2026-10-06 ~03:30Z before any change** (user: "then fix the caught stealing outs next"; promoted from the 10-06 lead).
