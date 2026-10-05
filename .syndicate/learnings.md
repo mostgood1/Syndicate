@@ -2958,3 +2958,8 @@ own prior verdicts, not by anything failing.
 - What happened: a CLEAR-gated restart ran as a PowerShell wrapper (start task + verify) around a WSL bash loop (wait CLEAR, then `local_production.py down`). The Claude session ended mid-wait. The wrapper died; the WSL loop (pid 1090598) kept polling. Had it read CLEAR, it would have stopped all three roles with nothing left to start them. Found by `pgrep` on the next turn and killed before it acted.
 - Rule: before resuming after any session break, `pgrep -fa` for your own gate/watch scripts on the fleet and kill orphans first. Better, put both halves in ONE process, or make the WSL side refuse `down` unless a live parent is present.
 - Related, same session: `tail -f` in WSL on a `/mnt/c` file never saw appends written from Windows (a 30-min monitor delivered 0 events while the file grew). Poll by line count instead.
+
+## 2026-10-05 — RULE: before fixing a measured bias, check whether it is COMPENSATING another; measure both terms of the product first `[lane nhl-ev-rotation]`
+
+- Belief overturned: "the NHL SOG edges come from wrong line order, so fix the line order / ice time." Measured: line order was mostly right, and the engine's excess top-line ice time (+2.2 min) was offsetting a too-flat per-minute shot rate (0.110 vs 0.133). Correcting the ice time alone made SOG@1.5 and POINTS@0.5 Brier WORSE.
+- How to apply: when a projection is a product (minutes x rate, opportunities x conversion), decompose sim vs actual for EACH factor on the same population before changing one; a fix to one factor needs the other in the same backtest arm.

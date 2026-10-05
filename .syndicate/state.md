@@ -611,7 +611,7 @@ once this index exists: re-splitting would orphan the parts.
 | [execution-ledger-cross-service-race] | THE MONEY LEDGER IS WRITTEN BY THREE SERVICES, AND SINCE 2026-09-11 EVERY WRITE IS ONE COMPARE-AND-SWAP (#656) | `state_model.md` |
 | [probability-statistic-ownership] | PROBABILITY-STATISTIC OWNERSHIP `[measured 08-15, shipped `2ac3c6bc`]` | `state_model.md` |
 | [nhl-sim-engine] | NHL SIM (hockeysim) — `nhl_sim_input_checklist.py` PASSES, exit 0 `[measured 2026-08-20, lane nhl-model-owner] | `state_model.md` |
-| [nhl-player-props] | NHL PLAYER PROPS PROJECTED AND PRICED ON THE BOARD, PER-LINE GATED (1,017/1,035 served 10-03); engine still loses to player average in most markets `[verified 2026-10-03, lane nhl-player-props-projection]` | `state_model.md` |
+| [nhl-player-props] | NHL PLAYER PROPS PROJECTED AND PRICED, PER-LINE GATED; PP/PK units from real PP/SH minutes; engine still loses to player average in most markets (ice-time and per-minute errors cancel) `[verified 2026-10-05, lanes nhl-player-props-projection / nhl-pp-units-real-toi]` | `state_model.md` |
 | [model-skill] | MODEL SKILL (`#428`) — measured vs not | `state_model.md` |
 | [sim-scheduling-blocker] | 2026-08-17 02:1xZ — VERIFIED (sim-scheduling): the primary goal has ONE blocker — **ARCHIVED 2026-08-19 to `st | `state_model.md` |
 | [sim-edge-analysis-2026-09-01] | FULL-PLATFORM SIM-ENGINE EDGE ANALYSIS — strategy synthesis + new from-code facts `[2026-09-01, session syndic | `state_model.md` |
