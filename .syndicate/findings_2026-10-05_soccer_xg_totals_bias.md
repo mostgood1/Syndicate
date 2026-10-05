@@ -118,3 +118,36 @@ Measured 2026-10-05:
 
 Reproduce: `C:/tmp/soccer-lpb/score_stale.py` (`STALE_P=C:/tmp/soccer-lpb/x_h2h27_{}.jsonl` for the
 wrong-club-excluded set), `C:/tmp/soccer-lpb/le_mans.py`, `C:/tmp/soccer-lpb/espn_names.sh` (fleet).
+
+## Step 3 — H-LEVEL: a season-tracking league goal level (2026-10-05) — FALSIFIED
+
+**Mechanism tested (pre-registered in the lane before computing):** per league, before each match day d,
+m(d) = actual mean total / model mean total over the league's last K = 80 completed matches, clipped
+[0.8, 1.25], m = 1 with < 40 prior matches; both team goal means x m. No re-simulation: arm A = independent
+Poisson from the dumped leak-free as-of means, arm B = the same with means x m, so B−A isolates m. The
+Poisson step itself costs almost nothing (Poisson-A minus the sim's own O/U 2.5 Brier: −0.0004 on 2026-27,
+−0.0006 on 2025-26). Data: harness dumps, 2025-26 all nine leagues (n 2,724) and 2026-27 xG five (H-STALE arm
+A, n 187; its trailing window continues from 2025-26). Scratch only; no engine file touched.
+
+| set | n | mean m | O/U 2.5 Brier B−A | mean-total bias A → B | 1X2 Brier B−A |
+|---|---|---|---|---|---|
+| **2026-27 xG five (PRIMARY, held out)** | 187 | 0.972 | **+0.0031 [−0.0028, +0.0094]** | −0.150 → **−0.230** | +0.0021 [−0.0001, +0.0043] |
+| 2025-26 all nine | 2,724 | 0.981 | +0.0004 [−0.0015, +0.0022] | +0.071 → +0.005 | +0.0001 |
+| 2025-26 xG five | 1,391 | 0.945 | +0.0022 [−0.0004, +0.0047] | +0.180 → +0.018 | +0.0002 |
+| 2025-26 goals four | 1,333 | 1.018 | −0.0014 [−0.0042, +0.0013] | −0.043 → −0.010 | −0.0001 |
+
+Sensitivity (reported, not selected): K = 40 primary +0.0006 [−0.0057, +0.0069]; K = 160 +0.0027 [−0.0034, +0.0089];
+K = 80 without wrong-club rows +0.0032 [−0.0026, +0.0091]. vs TRUE close on 2026-27: A +0.0089, B +0.0120.
+
+**Verdict: FALSIFIED** — the primary CI includes 0 and the point estimate is worse. Two readings matter more than
+the verdict:
+
+1. **The level correction made 2026-27 WORSE on bias (−0.150 → −0.230).** The trailing window entering 2026-27 is
+   last season's tail, where the model over-projected, so m < 1 just as this season's scoring went UP. A trailing
+   level lags exactly the season-to-season shift it was meant to catch.
+2. **Removing the level bias does not improve O/U 2.5.** On 2025-26 the correction takes the mean-total bias from
+   +0.071 to +0.005 (xG five: +0.180 to +0.018) and O/U 2.5 Brier does not move (+0.0004; xG five +0.0022). So the
+   goals-level bias is NOT what costs O/U 2.5 against the book. The lane's premise — that the totals loss is a level
+   problem — does not hold. Where the O/U loss does come from is unresolved.
+
+Reproduce: `py -3 C:/tmp/soccer-lpb/score_level.py <K> [excl]` (output `score_level_k80.out`).
