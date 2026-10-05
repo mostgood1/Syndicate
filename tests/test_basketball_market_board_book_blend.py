@@ -118,3 +118,26 @@ def test_edges_compute_reaches_the_blend_only_for_nba(tmp_path):
     assert on.loc["OVER", "book_blend"] == "applied"
     assert off.loc["OVER", "model_prob"] != pytest.approx(on.loc["OVER", "model_prob"])
     assert "book_blend" not in off.columns or off["book_blend"].isna().all()
+
+
+# --- Layer 2 (nba_projections.py, borrowed for this one call) -------------------------------------------------------
+
+from tests.test_nba_layer2_projections import _prop_row, _props, nba_root  # noqa: E402,F401  (fixture reuse)
+
+
+def test_layer2_prop_probability_is_the_book_blend_and_off_is_the_ladder(nba_root, monkeypatch):
+    """Reachability through the real served path: `attach_nba_prop_projections`. The fixture's ladder
+    says P(over 20.5) = 0.4 against a -110/-110 book; w(pts) = 0 serves 0.5, the kill switch serves 0.4."""
+    from syndicate.features.nba.sources import artifact_processed_root
+
+    (artifact_processed_root() / cal.BOOK_BLEND_FILE).write_text(json.dumps(W), encoding="utf-8")
+    monkeypatch.delenv(cal.BOOK_BLEND_FLAG, raising=False)
+    on = _prop_row("Lauri Markkanen", line=20.5)
+    _props([on])
+    monkeypatch.setenv(cal.BOOK_BLEND_FLAG, "0")
+    off = _prop_row("Lauri Markkanen", line=20.5)
+    _props([off])
+    p_on, p_off = on["projection"], off["projection"]
+    assert p_on["model_prob_over"] == pytest.approx(0.5) and p_on["book_blend"] == "applied"
+    assert p_on["p_model_raw"] == pytest.approx(0.4) and p_on["edge_vs_market_pct"] == pytest.approx(0.0)
+    assert p_off["model_prob_over"] == pytest.approx(0.4) and "off" in p_off["book_blend"]

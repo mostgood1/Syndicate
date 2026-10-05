@@ -44,7 +44,8 @@ from syndicate.features.shared.nba_game_projections import (
     window_dates,
 )
 from syndicate.features.shared.probability_refusal import refuse_published_certainty
-from syndicate.features.shared.prop_projections import _norm_name
+from syndicate.features.shared.nba_prop_calibration import served_prop_probability
+from syndicate.features.shared.prop_projections import _no_vig_over_probability, _norm_name
 from syndicate.features.shared.timezone import central_date_from_iso
 from syndicate.features.shared.wnba_game_projections import _attach_sim_probability_edge
 from syndicate.features.shared.wnba_projections import (
@@ -267,7 +268,13 @@ def attach_nba_prop_projections(
             if hit_prob is None:
                 projection["probability_unavailable_reason"] = "sim ladder could not be read at this line"
             else:
-                _attach_sim_probability_edge(projection, row=row, model_prob=hit_prob)
+                # NBA book blend (lane nba-prop-calibration, user decision 2026-10-05): measured, the model
+                # carries no information beyond the de-vigged book, so the served probability is the
+                # per-stat logit blend toward the consensus fair price; the raw ladder probability and the
+                # weight ride along on the projection. Falls back to the ladder WITH a reason.
+                served_prob, blend_meta = served_prop_probability(hit_prob, _no_vig_over_probability(row), stat)
+                projection.update(blend_meta)
+                _attach_sim_probability_edge(projection, row=row, model_prob=served_prob)
             edge = round(mean - line, 3)
             projection["side"] = "over" if edge > 0 else "under"
             live_reason = live_edge_unavailable_reason(row)
