@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1259 rules `[generated]`
+## Index — 1261 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -523,7 +523,7 @@
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 - [2026-09-03 — EXONERATED: `deploys.md` and `learnings.md` ARE guarded. Two sessions file…](learnings_archive.md#2026-09-03-exonerated-deploysmd-and-learningsmd-are-guarded-two-sessions-filed-the-same-false-gap-and-the-second-re-derived-it-with-the-same-blind-spot) `[evidence]`
 
-**Rules and corrections — 750**
+**Rules and corrections — 752**
 
 - [2026-09-16 — a detector that matches a FORMULA at published precision has a FALSE-POSIT…](#2026-09-16-a-detector-that-matches-a-formula-at-published-precision-has-a-false-positive-rate-and-mine-fired-at-about-1-row-per-1200-session-abacd435-lane-soccer-anytime-scorer)
 - [2026-09-16 — OVERTURNED: "the pre-registered criterion is the safe part, the risk is in…](#2026-09-16-overturned-the-pre-registered-criterion-is-the-safe-part-the-risk-is-in-the-mechanism-two-hypotheses-in-one-night-died-on-the-criterion-session-abacd435-fixes-4-and-5a-no-lane)
@@ -645,6 +645,8 @@
 - [2026-10-04 — An automated restart is not done until the NEW process answers; on a faile…](#2026-10-04-an-automated-restart-is-not-done-until-the-new-process-answers-on-a-failed-start-retry-and-keep-the-lock----never-log-and-exit)
 - [2026-10-04 — RULE: fixing a BIAS is not fixing the PROJECTION; gate an estimator change…](#2026-10-04-rule-fixing-a-bias-is-not-fixing-the-projection-gate-an-estimator-change-on-paired-per-player-brier-never-on-the-totals-it-was-fit-to-lane-nhl-player-props-projection)
 - [2026-10-03 — RECURRENCE (mine): I reported a production flag as "default OFF" from the…](#2026-10-03-recurrence-mine-i-reported-a-production-flag-as-default-off-from-the-code-default-without-reading-the-env-lane-nfl-off-market-edge-session-05b01a84)
+- [2026-10-04 — RULE: an evaluation that calls the same helper as the engine cannot see th…](#2026-10-04-rule-an-evaluation-that-calls-the-same-helper-as-the-engine-cannot-see-that-helpers-defect-when-an-estimator-writes-integer-ladders-test-a-sub-half-unit-change-end-to-end-lanes-wnba-sim-rate-shrink-wnba-minutes-redistribution-session-39b666bb)
+- [2026-10-05 — RULE: "the module applied" is not "production serves it"; read the artifac…](#2026-10-05-rule-the-module-applied-is-not-production-serves-it-read-the-artifact-the-consumer-reads-at-the-field-it-reads-lane-nba-prop-calibration-session-e0a3e383)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

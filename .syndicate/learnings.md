@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1259 rules `[generated]`
+## Index — 1261 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -2935,3 +2935,20 @@ own prior verdicts, not by anything failing.
 - Caught only when a second module used the convention and a dry run printed a Brier delta of exactly [0.0, 0.0] for threes. Fixed with a mean-preserving shift (bfa92d5f); held out, assists Brier -0.0041 and threes -0.0014 on the same rows.
 - Same session, recurrence of the 2026-10-04 "fixing a BIAS is not fixing the PROJECTION" rule: a minutes re-share took the top-five minutes bias from -1.61 to -0.21 and made PRA Brier WORSE (+0.0073 / +0.0088). Removed minutes are low-usage minutes; holding the per-minute rate overstates the loss.
 - **How to apply:** an exactly-zero delta on any market is a finding, not a null. Before trusting an estimator that edits discrete distributions, feed it a change smaller than one unit and assert the published probability moves; and never let the fit's scorer reuse the engine helper under test without a test of that helper of its own.
+
+## 2026-10-05 — RULE: "the module applied" is not "production serves it"; read the artifact the CONSUMER reads, at the field it reads `[lane nba-prop-calibration, session e0a3e383]`
+
+- I enabled the NBA prop calibration and recorded reading 1 MET: the module, applied to an in-memory copy of a sim,
+  moved Embiid's mean 21.1 -> 25.0. Production served none of it, twice over:
+  - (1) The smart-sim run REUSES any existing sim, so the props file rebuilt 3 minutes after the enable carried the
+    raw values (21.08 / 6.91) until a stale-sim rule existed (468b8620).
+  - (2) Layer 2's NBA prop join reads the sim LADDER, not `<stat>_mean` / `<stat>_sd`. The calibration's integer
+    ladder shift is a no-op below half a unit, so the ladder lags the calibrated mean on 125/169 threes rows and
+    122/169 tov rows.
+- The out-of-sample evidence scored Normal(mean, sd). That is a different quantity from what Layer 2 serves, so
+  "beats the served sim" was measured on a path the board does not read.
+- **How to apply:** before calling an estimator live, find the CONSUMER (grep the field it reads, not the field you
+  wrote) and read THAT field from a production artifact written AFTER the change. An enable on a producer that
+  reuses artifacts needs a stale/version rule or a rebuild. Evaluate the served transform, ladder and all, not a
+  convenient proxy. Recurrence of the 2026-10-04 integer-ladder rule (WNBA bfa92d5f) and of the engine standard's
+  "publishing is not sufficient -- a new input requires a REBUILD".
