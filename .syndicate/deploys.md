@@ -46654,3 +46654,25 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
   - `nba_source/data/processed/nba_game_book_blend.json` was user-placed at **23:31:48Z** (6:31:48 PM CT). My "no file on the fleet" read was taken ~23:05Z, before that.
   - The gated refresh-worker restart (TERM 1391497 at 23:46:37Z -> pid **1413004**, started 23:46:43Z, /healthz 200) therefore loaded the NBA blend code (f16991cb, season-phase keyed) WITH its switch file present.
 - **This restart is the one the user asked the watcher session for** (NBA blend load). No second restart is needed for that purpose. The NBA blend's own served reading belongs to its lane (nba-prop-calibration).
+
+## 2026-10-05 23:57:51Z (6:57 PM CT) -- READING: NBA GAME-LINE book blend is SERVING (preseason, w 0) -- **MET** for the priced rows (lane `nba-prop-calibration`)
+
+- carried by: another session restarted the refresh-worker at 23:46:45Z onto b6fd6189 (contains 9d60ef66 +
+  f16991cb). It was not my restart. The switch file had been placed at 23:31:48Z (see that entry).
+- watcher (scratchpad/watch_game_blend.py): the first stamped rows appeared at 23:56:52Z (board build age 105 s).
+- served /api/board/layer2-shortlist at 23:57:51Z, every NBA game row that has a sim probability:
+
+| game | market | raw sim p (`p_model_raw`) | served p | fair | season_phase | w |
+|---|---|---|---|---|---|---|
+| NYK @ PHI | h2h | 0.490 | 0.409 | 0.409 | preseason | 0.0 |
+| PHX @ DET | h2h | 0.670 | 0.5804 | 0.5804 | preseason | 0.0 |
+| MEM @ ATL | h2h | 0.690 | 0.5144 | 0.5144 | preseason | 0.0 |
+
+- The served probability equals the de-vigged fair on every priced row, as pre-registered in H-G1
+  (|served - fair| <= 0.01). Before, the board showed ATL spread +15.5 and DET ML +11.9 pts.
+- All three games tipped at ~23:10Z, so their edge is now suppressed by the live policy
+  (`edge_unavailable_reason`: game is live). The pregame edges were 0 by construction at w 0.
+- NOT covered: MIN @ MIL (00:00Z) rows carry NO projection at all. There is no smart_sim for that game (the 10-05 sims
+  are ATL_MEM, DET_PHX, PHI_NYK), which is a coverage gap that predates this change. The 10-06 slate's pregame rows
+  are to be read when they reach the board.
+- off switch: SYNDICATE_NBA_GAME_BOOK_BLEND=0 (restart), or delete the file / set "enabled": false (no restart).
