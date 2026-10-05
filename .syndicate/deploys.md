@@ -46462,3 +46462,21 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - baseline (read 21:10Z, `C:/tmp/nhlprops/lastgame_check.py`, built under the old rule): lineups_2026-10-05 (20:27:37Z) 12 of 144 slotted skaters absent from their team's last game; lineups_2026-10-06 (20:30:33Z) 26 of 324.
 - prediction: the first rebuild after 21:16:36Z leaves only BOOK-LISTED skaters among those absent (they still dress first); every non-listed absentee is replaced.
 - verify: watcher `/mnt/c/tmp/nhlprops/scratch_watch.sh` reruns the check on that rebuild; remaining absentees are checked against the date's book lines.
+
+## 2026-10-05 21:29Z -- READING: zero +EV edges fix (a4da7f8b) is ON THE FLEET, carried by another session's ff (lane `nba-prop-calibration`)
+
+- what: the user asked to ff the fleet to a4da7f8b. That was not needed, and no ff, restart or HUP was done by me.
+  The fleet ff'd github/main -> cb1bb280 at 2026-10-05T21:16:36Z (4:16 PM CT; reflog, not mine), and cb1bb280
+  contains a4da7f8b (`git merge-base --is-ancestor a4da7f8b HEAD`).
+- measured: on disk in ~/Syndicate, `PROPS_EDGES_ZERO_POSITIVE` is present in basketball_props_edges.py (1) and
+  "none was +EV" in refresh_nba_oddsapi_props.py (2).
+- takes effect: per-run refresh subprocesses import it fresh, so no restart is needed. NBA is inert until books post
+  NBA player props (every 10-05 run skipped edges with "no player-prop lines offered"). WNBA reaches the same warning
+  as before through the rc-0 branch.
+- expect: the first NBA prop slate where no line clears edge>=0 & ev>=0 logs `PROPS_EDGES_ZERO_POSITIVE date=...` and
+  "none was +EV". The refresh state carries a warning, not error, and props_recommendations / game_cards /
+  recommendations for that date are still written.
+- verify: OWED, at that slate. Read the NBA refresh log for the marker, then the three export artifacts' mtimes after
+  that run.
+- note: fcd348cd (portfolio staking, which a peer had described as held back) is also on the fleet as of this ff. It
+  was not carried by me, and is recorded only because the peer asked that ffs not carry it.
