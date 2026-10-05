@@ -2952,3 +2952,9 @@ own prior verdicts, not by anything failing.
   reuses artifacts needs a stale/version rule or a rebuild. Evaluate the served transform, ladder and all, not a
   convenient proxy. Recurrence of the 2026-10-04 integer-ladder rule (WNBA bfa92d5f) and of the engine standard's
   "publishing is not sufficient -- a new input requires a REBUILD".
+
+## 2026-10-04 — FORBIDDEN: a fleet restart gate whose DOWN and UP halves live in different processes. When the session ended, the half that runs `down` survived and the half that starts the fleet did not `[lane nba-day-of-sweep-ownership, session ed75e56a]`
+
+- What happened: a CLEAR-gated restart ran as a PowerShell wrapper (start task + verify) around a WSL bash loop (wait CLEAR, then `local_production.py down`). The Claude session ended mid-wait. The wrapper died; the WSL loop (pid 1090598) kept polling. Had it read CLEAR, it would have stopped all three roles with nothing left to start them. Found by `pgrep` on the next turn and killed before it acted.
+- Rule: before resuming after any session break, `pgrep -fa` for your own gate/watch scripts on the fleet and kill orphans first. Better, put both halves in ONE process, or make the WSL side refuse `down` unless a live parent is present.
+- Related, same session: `tail -f` in WSL on a `/mnt/c` file never saw appends written from Windows (a 30-min monitor delivered 0 events while the file grew). Poll by line count instead.

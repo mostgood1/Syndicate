@@ -46141,3 +46141,12 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - **reading 2 OWED:** watcher `C:/tmp/wnba_bt/watch_switch_1007.py` (WSL, 48 h): first smart_sim_2026-10-07_* after 01:54:22Z -> rate_shrink applied/switch, recency-excluded players in pool (expect 0), injury-OUT players in pool (expect 0).
 - **known risk:** the recency rule was measured BEFORE the injury feed worked. With both on, a player returning after one missed game is left out for that game (~3.6% of player-games, held-out 10-03).
 - **rollback:** delete either JSON (or set the env flag to 0); no restart needed for the file route.
+
+## 2026-10-05 02:31Z (9:31 PM CT 10-04) -- MEASUREMENT, NO DEPLOY: NBA OddsAPI cost of a live slate after NBA joined the day-of sweeps (follow-up to lane `nba-day-of-sweep-ownership`, user: "measure the NBA live sweep cost tonight")
+
+- substrate: fleet `/api/ops/oddsapi/quota` `by_sport.nba` (cumulative credits/calls), sampled every 5 min by `~/nbarate.sh` -> `~/nbarate.csv`, 23:25Z -> 02:30Z; NBA fetch counts from the producer logs. Slate: 2 preseason games, DEN@UTA + LAC@GSW, tips 23:10Z. The first sample is 15 min after tip; pregame comes from the 19:4xZ read (366 credits / 224 calls).
+- pregame (~19:45 -> 23:25Z, 1800 s cadence): +20 credits / +6 calls.
+- live (23:25 -> 01:35Z, 2 h 10 m): 386 -> 1,068 credits (+682), 230 -> 428 calls (+198); the 10-05 re-sim run (01:16-01:35Z, lane nba-1005-calibrated-resim) is ~37 of that, so live play alone was ~645 credits = **~300 credits/h for 2 games**. NBA 10-04 fetches 22 -> 53 (+31) = **~14 fetches/h** (WNBA analog 13/h) = ~21 credits per fetch for a 2-event date (~10 per event; no props returned, so none charged).
+- post-game (01:35 -> 02:30Z): credits flat at 1,068; +4 zero-credit calls.
+- caveat: `live_sweeps_with_nba` in the csv counts every sport's live autorun, not NBA's -- ignore it.
+- projection (NOT measured), ~10-game regular-season night, ~5 h staggered live window: game lines ~10 credits/event/fetch -> ~9-10k credits/night. If books post the 13 prop markets live, up to ~2x -> ~20k/night ~ 600k/month (~12% of the 5M cap). Live re-fetching dominates; the lever, if needed, is NBA's live cadence, not the pregame interval. First real reading: opening night (~10-20) when props are posted.
