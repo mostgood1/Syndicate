@@ -46523,3 +46523,10 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 
 ### OWED
 - served reading for `1562ec43` on the first shortlist build after 21:41:38Z: `player_first_goal_scorer` rows `status=measured` parity, `player_last_goal_scorer` rows `verdict_class=loses_to_market`, `score.skill_reliability = 0.5`, `skill_source=category`; `rows_on_unmeasured_model` drops by the first+last counts (~1,620 on the 19:54:53Z build) to ~MLB HR + NFL ATD only.
+
+## 2026-10-05 21:54:52Z (4:54 PM CT) -- READING: soccer first/last scorer skill notes served (`1562ec43`, refresh-worker 1390577 on cb1bb280 since 21:41:38Z) -- **MET** (lane `layer2-unmeasured-per-line`)
+- build: first shortlist after the 21:41:38Z restart, `written_at 2026-10-05T21:54:52Z`, `?limit=5000`, 2,000 served (soccer 791).
+- `player_first_goal_scorer`: 42/42 rows `model_skill.status=measured`, `verdict_class=parity`, `established_loss_rel=0.0`, `sample_games=200`; no `skill_reliability` stamp (factor 1.0, as predicted). Before (19:54:53Z): 42/42 `unmeasured`.
+- `player_last_goal_scorer`: 6/6 rows `status=measured`, `verdict_class=loses_to_market`, `established_loss_rel=0.315`, `sample_games=177`, and `score.skill_reliability=0.5`, `skill_source=category` on 6/6 (= 1 - 5 x 0.315 floored at 0.5, as predicted). Still SERVED (ranks 517-627); edge>0 on 0/6.
+- `rows_on_unmeasured_model` 1,676 -> 675 (`mlb:batter_home_runs` 19, `nfl:Anytime TD` 21, `soccer:player_last_goal_scorer` 635). Last scorer stays in this COUNTER because it keeps the removed rule's predicate (unmeasured OR loses_to_market). That is a count, not a drop: the rows are served.
+- unchanged on the same build: anytime 45/45 and SOT 495/495 `measured`; soccer prop edge>0 77/588 (no positive pile).
