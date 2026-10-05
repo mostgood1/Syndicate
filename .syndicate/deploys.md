@@ -46569,3 +46569,14 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - **Baseline (same day):** served NFL props with a projection 49/92 (20:56:49Z build); 77/398, 2 games (21:54:52Z build, started before the rebuild). Join `unmatched_key_rows` 3,703 of 4,382.
 - **verify (reading):** first build after the 21:54:04Z rebuild (469 rows / 14 games), `written_at` 22:12:11Z: **442 of 543 NFL props carry a projection (81%), 348 a numeric model_edge_pct, 13 games projected.** `prop_coverage` summed over the window dates: rows_considered 4,459, rows_with_projection 3,059, unmatched_key_rows 1,400.
 - Residual misses are players/lines absent from the capture at the 21:54Z build. The trigger rebuilds again on the next odds write, at most once per `SEASON_PROJECTION_RELAUNCH_COOLDOWN_SECONDS` (default 3600).
+
+## 2026-10-05 22:20Z (5:20 PM CT) -- MEASUREMENT: NHL goalie SAVES lines fetched, priced and on the served grid (fe0dc508, ff 22:00:02Z) -- **MET on production** (lane `nhl-confirmed-goalies`)
+
+- **Reading 1 (fetch):** `player_props_lines/date=2026-10-05/oddsapi.csv` rewritten 22:01:40Z with **10 SAVES rows** (0 before). They cover 7 goalies on pinnacle / fanduel, every one the slate's starter: 6 Daily Faceoff confirmed + TBL Vasilevskiy projected. No backup was quoted.
+- **Reading 2 (pricing):** `props_recommendations_2026-10-05.csv` rewritten 22:04:15Z: **10 SAVES rows, all `sim_starter = 1`**, priced (e.g. Swayman 24.5 p_over 0.484, Askarov 23.5 p_over 0.261).
+- **Reading 3 (served):**
+  - The quote log carries 42 SAVES rows after 22:00Z, and `book_grid_2026-10-05.json` (22:10:41Z) has 10 SAVES rows.
+  - `/api/board/book-grid?sport=nhl` serves all 10 with a projection, e.g. Murashov 22.5: projected 23.184, model P(over) 0.5429 vs market fair 0.4919, edge 5.1%.
+  - Shortlist NHL candidates rose 390 -> 556 (props 382 -> 446 selected). 0 SAVES rows are among the 200 returned rows.
+- **Not exercised:** REFUSE_NOT_STARTER on a SAVES line (no backup was quoted on this slate).
+- **Lead, not acted on:** the board marks NHL SAVES `model_skill: unmeasured, sample_games 0`. This lane's 2025-26 backtest (SAVES Brier better at 22.5 / 25.5 / 28.5) is not in the board's measured-skill registry.
