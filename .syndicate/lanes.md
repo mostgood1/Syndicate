@@ -896,7 +896,8 @@ ba_bt\watch_ladder.log`).
   - Cross-lane write: the hook is in `scripts/refresh_nhl_oddsapi.py::_run_owned_generation` (lane nhl-sim-artifact-backfill-fabricates owns other functions of that file; recorded in its block).
 - H14-H17 (field weights, props A/B, Brier at the lines, floor, floor without blocks) and their results: moved VERBATIM to `lanes_history.md` under `## nhl-season-inputs-in-season -- checkpoint 2026-10-05`. Narrative: log/2026-10-04.md, log/2026-10-05.md.
 - Blocked by: none
-### nfl-live-segment-interval — OPEN — opened 2026-10-03 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+### nfl-live-segment-interval — CLOSED 2026-10-05 — opened 2026-10-03 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- **VERDICT 2026-10-05 14:55Z:** Goal (verbatim): NFL in-play quarter/half segment lines refresh every 10 min (code default, like NCAAF 8730cfb7) instead of every 150 s lines-autorun run, before the Sunday 2026-10-04 17:00Z window; NFL full-game lines unchanged; 0 NFL rows served >1h -- **GOAL: MET.** Live on the fleet before kickoff (every sampled HEAD contained e90d74a5); NFL live-window spend 2,825/h (early) and 2,767/h (late) vs ~8.6k/h estimated unthrottled (no measured unthrottled baseline). NFL rows >1h: 0 in the hidden-row split readings that day (stale nfl 3-30, none served). deploys.md 2026-10-05 14:55Z.
 - Goal: NFL in-play quarter/half segment lines refresh every 10 min (code default, like NCAAF 8730cfb7) instead of every 150 s lines-autorun run, before the Sunday 2026-10-04 17:00Z window; NFL full-game lines unchanged; 0 NFL rows served >1h
 - Files: syndicate/features/shared/segment_odds_fetch.py (DEFAULT_LIVE_INTERVAL_SECONDS only)
 - Hypothesis: Fleet env: SYNDICATE_NFL_SEGMENT_MARKETS=all (36 markets), live window 12600 s, NFL lines autorun every 150 s, live interval 0 -> up to ~8.6k credits/h with ~10 concurrent games, the pattern NCAAF showed at 12,664/h
