@@ -46301,3 +46301,10 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
   - The first 10-06 read matched WITHOUT 9/9 because that file was last written 17:13:59Z, pre-ff. It was re-read after the 17:44:19Z rewrite.
 - **Not measured on production:** the props path. By construction it never calls `_apply_scoreadj_xg` (`test_reachability_on_differs_from_off` asserts goals_per_60 unchanged).
 - Claims released after this entry.
+
+## 2026-10-05 18:47:33Z (1:47 PM CT) -- LOCAL FLEET FF 7d23f09d -> 7f56875e, NO RESTART: NHL assists credited by as-of assists per on-ice goal (lane `nhl-elite-assists`) -- VERIFY OWED
+
+- change: `_weighted_choice` kind="assist" weights each on-ice teammate by prior**2 * (assist_share/prior)**2 (NHL profile `assist_attribution="onice_share"`); `assist_share` = as-of A/(onGF-G) from NHL stats `skater/goalsForAgainst`, shrunk to F 0.503 / D 0.319, new column in lineups_<date>.csv. User decision "Ship p2s2 now".
+- offline evidence: full 2025-26, paired vs production (`C:/tmp/nhlprops/bt_full_evlq` vs `bt_as_p2s2`), 36,533 regular-season player-games, SOG/GOALS/BLOCKS byte-identical; Brier ASSISTS@0.5 -0.00004 (flat), POINTS@0.5 -0.00035 [-0.00069,+0.00003], POINTS@1.5 -0.00039 [-0.00054,-0.00023]; playoffs POINTS@0.5 -0.0019, @1.5 -0.0008. Elite (as-of >= 0.8 A/G) assists 0.66x -> 0.78x real; D 0.96x -> 0.88x.
+- why no restart: NHL generation (collect + props producer) runs as a per-run subprocess from the checkout.
+- verify: the first lineups_<date>.csv written after 18:47:33Z carries `assist_share` on every slotted skater, and `nhl_sim_input_checklist.py` on fleet data PASSES (assist_share may read thinly populated from older date files, as proj_ev_toi did).
