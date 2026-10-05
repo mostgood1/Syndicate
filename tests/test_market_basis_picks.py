@@ -269,10 +269,13 @@ def test_rows_without_a_basis_are_read_as_model_not_as_any():
         {"market": "spread", "edge": 4.0},
         {"market": "spread", "edge": 4.0, "edge_basis": BASIS},
     ]
-    kept, suppressed = pick_gate.filter_pick_rows("ncaaf", rows)
-    assert len(kept) == 1
-    assert kept[0]["edge_basis"] == BASIS
-    assert suppressed == {"spread": 1}
+    kept, unproven = pick_gate.filter_pick_rows("ncaaf", rows)
+    # Nothing is dropped (2026-10-05, lane stop-market-withholding); the row with
+    # no basis is read as MODEL and labelled, the market-basis row is not.
+    assert len(kept) == 2
+    assert kept[0].get("model_verdict") and not kept[1].get("model_verdict")
+    assert kept[1]["edge_basis"] == BASIS
+    assert unproven == {"spread": 1}
 
 
 @pytest.mark.parametrize(

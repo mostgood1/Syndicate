@@ -1,4 +1,14 @@
-"""Which football markets have EARNED the right to be served as picks.
+"""The measured record of the football model, per market -- a LABEL, not a gate.
+
+**SUPERSEDED AS A GATE 2026-10-05** `[user directive, lane stop-market-withholding]`:
+"WE HAVE TO STOP WITHHOLDING MARKETS! THIS IS A PRIME DIRECTIVE OF THE APP. All
+lines are judged individually - models are tested for accuracy but each bet is at
+the line level". Nothing here removes a pick any more: `filter_pick_rows` keeps
+every row and labels the ones whose model has no recorded win, and the notices are
+caveats shown beside served picks. The registry, its measurements and
+`LIFT_CONDITION` stand as the accuracy record. The text below is why it was a gate.
+
+(Original title: which football markets have EARNED the right to be served as picks.)
 
 A projection is not a bet. A bet claims the model prices something better than
 the market does, and that claim is measurable: score the model against realised
@@ -289,61 +299,61 @@ def filter_pick_rows(
     market_key: str = "market",
     basis_key: str = "edge_basis",
 ) -> tuple[list[Mapping[str, Any]], dict[str, int]]:
-    """Split priced pick rows into (servable, suppressed-counts-by-market).
+    """Return EVERY pick row, labelled, plus counts of rows on an unproven model.
 
-    Returns the counts so callers can SAY what was withheld. A suppression
-    nobody can see is one somebody deletes.
+    `[2026-10-05, user directive, lane stop-market-withholding]`: "WE HAVE TO STOP
+    WITHHOLDING MARKETS! ... All lines are judged individually - models are
+    tested for accuracy but each bet is at the line level". This used to drop
+    every model-basis row in a market without a recorded win; it now keeps them
+    all. A row whose basis has no recorded win comes back as a COPY carrying
+    `model_verdict` (the one-line measurement) and `model_verdict_detail`, and is
+    counted by market so the page can say what the model's record is.
 
-    A row may declare its own `edge_basis`. **A row that does not declare one is
-    read as MODEL basis, not as "any basis"** -- these rows come from the
-    recommendation artifact, whose edge has always been the model's, so absent
-    means model here rather than unknown. The permissive reading would let a
-    model pick through by omitting a field, which is the failure mode
-    `learnings.md` calls "unknown must not default permissive"; the strict
-    reading costs a market-basis producer one explicit field.
+    A row that declares no `edge_basis` is still read as MODEL basis -- the
+    recommendation artifact's edge has always been the model's.
     """
     kept: list[Mapping[str, Any]] = []
-    suppressed: dict[str, int] = {}
+    unproven: dict[str, int] = {}
     for row in rows:
         if not isinstance(row, Mapping):
             continue
         market = _normalise_market(row.get(market_key), sport)
         basis = str(row.get(basis_key) or "").strip().lower() or MODEL_BASIS
-        if is_servable(sport, market, basis=basis):
+        verdict = market_verdict(sport, market, basis=basis)
+        if verdict.servable:
             kept.append(row)
-        else:
-            label = market or "unknown"
-            if basis != MODEL_BASIS:
-                label = f"{label} ({basis})"
-            suppressed[label] = suppressed.get(label, 0) + 1
-    return kept, suppressed
+            continue
+        label = market or "unknown"
+        if basis != MODEL_BASIS:
+            label = f"{label} ({basis})"
+        unproven[label] = unproven.get(label, 0) + 1
+        kept.append({**row, "model_verdict": verdict.summary(), "model_verdict_detail": verdict.detail})
+    return kept, unproven
 
 
-def notice_for(sport: str, suppressed: Mapping[str, int] | None = None) -> dict[str, Any] | None:
-    """A user-facing explanation of what is being withheld and why.
+def notice_for(sport: str, unproven: Mapping[str, int] | None = None) -> dict[str, Any] | None:
+    """What the model's record is on the picks being served. None when every
+    served pick rests on a model with a recorded win.
 
-    None when nothing was suppressed, so a healthy surface stays quiet.
+    A CAVEAT, NOT A SUPPRESSION (2026-10-05): the picks are on the page; this is
+    the measurement a reader should weigh them by.
     """
-    if not suppressed:
+    if not unproven:
         return None
-    markets = sorted(suppressed)
+    markets = sorted(unproven)
     verdicts = {m: market_verdict(sport, m) for m in markets}
-    total = sum(suppressed.values())
+    total = sum(unproven.values())
     plural = "" if total == 1 else "s"
     scope = "this market" if len(markets) == 1 else "these markets"
     return {
-        "kind": "picks_suppressed",
+        "kind": "picks_model_caveat",
         "sport": str(sport or "").lower(),
-        "suppressed_count": total,
+        "caveated_count": total,
         "markets": markets,
         "headline": (
-            f"{total} {str(sport or '').upper()} MODEL pick{plural} withheld: the "
-            f"model does not beat the closing line in {scope}."
+            f"{total} {str(sport or '').upper()} MODEL pick{plural} shown on a model "
+            f"that does not beat the closing line in {scope}."
         ),
-        # NAMED, because the page now serves a second kind of pick beside these.
-        # A headline that says "picks withheld" next to a list of picks reads as
-        # a contradiction, and the reader resolves it by distrusting whichever
-        # one they notice second.
         "basis": MODEL_BASIS,
         "other_bases_unaffected": [MARKET_BASIS],
         "reasons": [
@@ -388,32 +398,27 @@ LIFT_CONDITION = (
 
 
 def board_notice(sport: str, markets: Iterable[str]) -> dict[str, Any] | None:
-    """Explain a WHOLESALE suppression: no market this board can serve is open.
+    """The model's record when NO market this board serves has a recorded win.
 
-    Distinct from notice_for(), which reports how many actual rows were
-    withheld. Here the board is stopped before candidates are built, so there is
-    no row count -- and inventing one would put a fabricated number on a
-    user-facing surface. Returns None the moment ANY market opens, so the board
-    comes back on its own when a measurement lifts the gate, with no second edit.
+    A BANNER, never a stop (2026-10-05, lane `stop-market-withholding`): the
+    board serves its model picks under it. None the moment any market has a
+    recorded win.
     """
     wanted = [str(m).strip().lower() for m in markets if str(m).strip()]
     if not wanted:
         return None
-    blocked = [m for m in wanted if not is_servable(sport, m, basis=MODEL_BASIS)]
-    if len(blocked) < len(wanted):
+    unproven = [m for m in wanted if not is_servable(sport, m, basis=MODEL_BASIS)]
+    if len(unproven) < len(wanted):
         return None
-    verdicts = {m: market_verdict(sport, m) for m in blocked}
+    verdicts = {m: market_verdict(sport, m) for m in unproven}
     return {
-        "kind": "picks_board_suppressed",
+        "kind": "picks_board_model_caveat",
         "sport": str(sport or "").lower(),
-        "markets": blocked,
+        "markets": unproven,
         "headline": (
-            f"{str(sport or '').upper()} MODEL picks are suppressed: the model "
-            "does not beat the closing line in any market this board serves."
+            f"{str(sport or '').upper()} MODEL picks are shown, but the model does not "
+            "beat the closing line in any market this board serves."
         ),
-        # See notice_for(). This notice is now a BANNER on a board that may
-        # still have market-basis rows under it, not necessarily a blackout --
-        # the caller decides which, and says so.
         "basis": MODEL_BASIS,
         "other_bases_unaffected": [MARKET_BASIS],
         "reasons": [
@@ -422,11 +427,8 @@ def board_notice(sport: str, markets: Iterable[str]) -> dict[str, Any] | None:
                 "reason": verdicts[m].summary(),
                 "detail": verdicts[m].detail,
             }
-            for m in blocked
+            for m in unproven
         ],
-        # Same constant as notice_for(). This is the copy the SERVED board
-        # renders, so a divergence here would show users a criterion that is no
-        # longer the one in force -- two copies where only one gets updated.
         "lift_condition": LIFT_CONDITION,
     }
 

@@ -1,4 +1,10 @@
-"""The sport-scoped publish switch: publication stops, measurement does not.
+"""THE SPORT-SCOPED PUBLISH SWITCH IS GONE: no sport's live edges can be switched off.
+
+`[2026-10-05, user directive, lane stop-market-withholding]`: "WE HAVE TO STOP
+WITHHOLDING MARKETS! ... each bet is at the line level". These tests pin that
+`SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS` is inert, and keep the real
+caller-path regression (`f5c2468a`'s TypeError) that this file also guarded.
+History of why the switch existed:
 
 WHY THIS EXISTS. The MLB live game-line model loses to the market over 252
 games / 19 dates (pooled +0.00905, bootstrap-over-games CI [+0.00154,
@@ -28,13 +34,12 @@ import json
 import pytest
 
 from syndicate.features.shared import board_enrichment
+from syndicate.features.shared import live_gameline_join
 from syndicate.features.shared.live_gameline_join import (
     REASON_NOT_PRICEABLE,
-    REASON_PUBLISH_DISABLED,
     attach_live_gamelines,
     build_live_gameline_index,
     price_moneyline,
-    publishing_disabled_for_sport,
 )
 
 ENV = "SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS"
@@ -49,104 +54,23 @@ def _clean_env(monkeypatch):
     monkeypatch.delenv(ENV, raising=False)
 
 
-class TestOffIsNotOn:
-    """Reachability before correctness: prove the flag does something."""
-
-    def test_off_prices_mlb_exactly_as_before(self):
-        v = price_moneyline(**CLEARS_THE_BAR, sport="mlb")
-        assert v["priceable"] is True
-        assert v["withheld_reason"] is None
-
-    def test_on_refuses_mlb_by_its_own_name(self, monkeypatch):
-        monkeypatch.setenv(ENV, "mlb")
-        v = price_moneyline(**CLEARS_THE_BAR, sport="mlb")
-        assert v["priceable"] is False
-        assert v["withheld_reason"] == REASON_PUBLISH_DISABLED
-
-    def test_the_refusal_is_NOT_the_precision_refusal(self, monkeypatch):
-        """A 999pp `min_edge_pp` would produce the same silence under the WRONG
-        name. `not_priceable` means "too small to trust"; this means "we do not
-        believe this model". A reader must be able to tell them apart forever."""
-        monkeypatch.setenv(ENV, "mlb")
-        v = price_moneyline(**CLEARS_THE_BAR, sport="mlb")
-        assert v["withheld_reason"] != REASON_NOT_PRICEABLE
-
-
-class TestScopeIsPerSport:
-    """The whole reason this is not the existing global knob."""
-
-    def test_disabling_mlb_leaves_wnba_publishing(self, monkeypatch):
-        monkeypatch.setenv(ENV, "mlb")
-        assert price_moneyline(**CLEARS_THE_BAR, sport="wnba")["priceable"] is True
-
-    def test_disabling_mlb_leaves_soccer_and_ncaaf_publishing(self, monkeypatch):
-        monkeypatch.setenv(ENV, "mlb")
-        for sport in ("soccer", "ncaaf"):
-            assert price_moneyline(**CLEARS_THE_BAR, sport=sport)["priceable"] is True, sport
-
-    def test_several_sports_can_be_disabled_together(self, monkeypatch):
-        monkeypatch.setenv(ENV, "mlb, soccer")
-        assert price_moneyline(**CLEARS_THE_BAR, sport="mlb")["priceable"] is False
-        assert price_moneyline(**CLEARS_THE_BAR, sport="soccer")["priceable"] is False
-        assert price_moneyline(**CLEARS_THE_BAR, sport="wnba")["priceable"] is True
-
-    @pytest.mark.parametrize("raw", ["MLB", "  mlb  ", "wnba,mlb", "mlb,,"])
-    def test_the_list_is_parsed_forgivingly(self, monkeypatch, raw):
+class TestNoSportCanBeSwitchedOff:
+    @pytest.mark.parametrize("raw", ["mlb", "nfl", "mlb,nfl,soccer,wnba,ncaaf"])
+    def test_the_old_env_value_withholds_nothing(self, monkeypatch, raw):
         monkeypatch.setenv(ENV, raw)
-        assert publishing_disabled_for_sport("mlb") is True
+        for sport in ("mlb", "nfl", "soccer", "wnba", "ncaaf"):
+            v = price_moneyline(**CLEARS_THE_BAR, sport=sport)
+            assert v["priceable"] is True, sport
+            assert v["withheld_reason"] is None, sport
 
-    def test_an_absent_sport_is_never_silenced(self, monkeypatch):
-        """UNKNOWN MUST NOT TAKE THE PERMISSIVE BRANCH IN EITHER DIRECTION. A row
-        with no sport cannot be shown to be disabled -- and must not be disabled
-        by accident, which would suppress a sport nobody named."""
-        monkeypatch.setenv(ENV, "mlb")
-        for missing in (None, "", "   "):
-            assert publishing_disabled_for_sport(missing) is False
-            assert price_moneyline(**CLEARS_THE_BAR, sport=missing)["priceable"] is True
+    def test_the_switch_no_longer_exists(self):
+        assert not hasattr(live_gameline_join, "publishing_disabled_for_sport")
+        assert not hasattr(live_gameline_join, "REASON_PUBLISH_DISABLED")
 
-
-class TestMeasurementSurvives:
-    """Publication stops; the denominator does not."""
-
-    def test_disabling_changes_ONLY_the_publication_decision(self, monkeypatch):
-        """The invariant, stated directly rather than as magic numbers: every
-        field the ledger scores the model on is byte-identical with the switch
-        off and on. Only `priceable` and `withheld_reason` may differ.
-
-        (The raw 0.75 becomes 0.7419 via Agresti-Coull add-two smoothing at
-        n=120, so `edge_pp` is 24.19 and not 25.0 -- deliberate, and equally
-        true on both sides of this comparison, which is the point.)
-        """
-        off = price_moneyline(**CLEARS_THE_BAR, sport="mlb")
-        monkeypatch.setenv(ENV, "mlb")
-        on = price_moneyline(**CLEARS_THE_BAR, sport="mlb")
-
-        assert off["priceable"] is True and on["priceable"] is False
-        for field in set(off) | set(on):
-            if field in {"priceable", "withheld_reason"}:
-                continue
-            assert off.get(field) == on.get(field), f"{field} changed when publication was disabled"
-
-        # and the fields must actually be POPULATED -- an all-None row would
-        # satisfy the equality above while carrying no measurement at all.
-        assert on["edge_pp"] is not None
-        assert on["prob_std_err"] is not None
-        assert on["model_prob"] is not None
-        assert on["market_prob"] == pytest.approx(0.50)
-        assert on["model_prob_raw"] == pytest.approx(0.75)
-
-    def test_the_switch_is_applied_AFTER_the_precision_gate(self, monkeypatch):
-        """Ordering matters and is not cosmetic. A row that fails the precision
-        bar must still say so, otherwise disabling a sport would rewrite the
-        history of WHY rows were refused and make the two causes
-        indistinguishable in the ledger."""
-        monkeypatch.setenv(ENV, "mlb")
-        tiny = price_moneyline(model_prob=0.501, market_prob=0.500, sims=120, sport="mlb")
+    def test_a_line_that_fails_its_OWN_precision_bar_is_still_refused(self, monkeypatch):
+        """Line-level judgement stays: a tiny edge is refused for being tiny."""
+        tiny = price_moneyline(model_prob=0.501, market_prob=0.500, sims=120, sport="nfl")
         assert tiny["withheld_reason"] == REASON_NOT_PRICEABLE
-
-    def test_default_is_off_so_no_sport_changes_without_being_named(self):
-        for sport in ("mlb", "wnba", "soccer", "ncaaf", None):
-            assert publishing_disabled_for_sport(sport) is False
 
 
 # ------------------------------------------------------------- the real caller
@@ -222,23 +146,17 @@ class TestTheRealCallerPath:
         for row in grid:
             assert row["live_gameline"]["priceable"] is True, row["market"]
 
-    def test_mlb_disabled_refuses_EVERY_market_by_name(self, mlb_lens, monkeypatch):
+    def test_the_old_env_value_leaves_every_market_priced(self, mlb_lens, monkeypatch):
         monkeypatch.setenv(ENV, "mlb")
         grid = _grid()
         cov = board_enrichment.attach_live_gamelines_for_sport(
             grid, sport="mlb", selected_date="2026-09-10")
         assert "error" not in cov, cov
-        assert cov["rows_live_gameline_edged"] == 0
-        assert cov["withheld_by_reason"] == {REASON_PUBLISH_DISABLED: 3}, cov
+        assert cov["rows_live_gameline_edged"] == 3, cov
         for row in grid:
-            block = row["live_gameline"]
-            assert block["priceable"] is False, row["market"]
-            assert block["withheld_reason"] == REASON_PUBLISH_DISABLED, row["market"]
-            # measurement survives on the distribution path too
-            assert block["edge_pp"] is not None, row["market"]
-            assert block["prob_std_err"] is not None, row["market"]
+            assert row["live_gameline"]["priceable"] is True, row["market"]
 
-    def test_disabling_mlb_leaves_another_sports_distribution_pricing(self, monkeypatch):
+    def test_another_sports_distribution_pricing_is_unaffected(self, monkeypatch):
         monkeypatch.setenv(ENV, "mlb")
         snapshot = json.loads(json.dumps(_mlb_lens_snapshot()))
         grid = [_row("totals", line=7.5, sport="wnba")]

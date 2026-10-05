@@ -531,7 +531,6 @@ def test_the_capture_sweep_runs_on_a_NON_capturable_row(monkeypatch):
 # and ledger builder, so each one goes red if either defect comes back.
 # --------------------------------------------------------------------------
 from syndicate.features.shared.live_gameline_join import (  # noqa: E402
-    REASON_PUBLISH_DISABLED,
     attach_live_gamelines,
     build_live_gameline_index,
     lens_sources_for_sport,
@@ -608,20 +607,15 @@ def test_full_game_rows_reach_the_LEDGER_and_totals_are_withheld_by_name(monkeyp
             "live_resim_published_no_distribution_for_this_market"
 
 
-def test_publish_switch_keeps_NFL_h2h_RECORDED_but_never_priceable(monkeypatch):
-    """`[2026-09-28, user decision]`: NFL live rows are scored, not published."""
+def test_NFL_live_h2h_is_priceable_even_with_the_old_switch_set(monkeypatch):
+    """`[2026-10-05, user directive, lane stop-market-withholding]`: the 2026-09-28
+    NFL publish switch is removed; the env value it read is inert."""
     monkeypatch.setenv("SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS", "nfl")
     index = build_live_gameline_index(_prod_snapshot(), sources=lens_sources_for_sport("nfl"),
                                       sport="nfl")
     grid = [_grid_row("h2h", market_prob=0.60)]
     attach_live_gamelines(grid, index, sport="nfl")
-    (rec,) = build_records(grid, sport="nfl", date_str="2026-09-27")
-    assert rec["priceable"] is False
-    assert rec["withheld_reason"] == REASON_PUBLISH_DISABLED
-    assert rec["model_home_win_prob"] is not None
-    # off != on: the SAME row prices without the switch, so the env key is what
-    # keeps it off the board -- not some other gate that happens to refuse it.
-    monkeypatch.delenv("SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS")
-    grid = [_grid_row("h2h", market_prob=0.60)]
-    attach_live_gamelines(grid, index, sport="nfl")
     assert grid[0]["live_gameline"]["priceable"] is True
+    (rec,) = build_records(grid, sport="nfl", date_str="2026-09-27")
+    assert rec["priceable"] is True
+    assert rec["model_home_win_prob"] is not None

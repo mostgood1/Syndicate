@@ -58,24 +58,20 @@ def _collapse_results(
 ) -> list[dict[str, Any]]:
     """Collapse recommendation rows to the best card per (matchup, market, side).
 
-    Rows are gated FIRST, before dedup and ranking. Gating after ranking would
-    still withhold the card but would leave a suppressed row occupying a slot in
-    the top-`limit`, so a served market could lose cards to a market that is not
-    allowed to be served at all.
-
-    `gate_counts` follows the `counts=` out-param idiom cards.py already uses for
-    board truncation: a cap that bites must announce it.
+    Every row is served (2026-10-05, lane `stop-market-withholding`): a row whose
+    model has no recorded win in its market is LABELLED with that measurement,
+    not dropped. `gate_counts` receives how many served rows carry the label, by
+    market -- the `counts=` out-param idiom cards.py uses.
     """
     raw_results = summary.get("results") if isinstance(summary.get("results"), list) else []
-    results, suppressed = filter_pick_rows("ncaaf", raw_results)
+    results, unproven = filter_pick_rows("ncaaf", raw_results)
     if gate_counts is not None:
         gate_counts.clear()
-        gate_counts.update(suppressed)
-    if suppressed:
-        # Web's stdout IS collected by Render; logger.info is not.
+        gate_counts.update(unproven)
+    if unproven:
         print(
-            "NCAAF_PICKS_SUPPRESSED "
-            + " ".join(f"{market}={count}" for market, count in sorted(suppressed.items())),
+            "NCAAF_PICKS_MODEL_CAVEAT "
+            + " ".join(f"{market}={count}" for market, count in sorted(unproven.items())),
             flush=True,
         )
     best_rows: dict[tuple[str, str, str, str], dict[str, Any]] = {}
@@ -147,7 +143,8 @@ def _collapse_results(
                     f"Side: {side}",
                     f"Kelly fraction: {_kelly_text(row.get('kelly_f'))}",
                     f"Raw edge multiple: {format_num(row.get('edge'))}",
-                ],
+                ]
+                + ([f"Model record: {row.get('model_verdict')}"] if row.get("model_verdict") else []),
             }
         )
     return cards
@@ -573,38 +570,26 @@ def _line_for_side(line: Any, side: str, market: str = "") -> str:
     return f"{value:+g}"
 
 
-def _suppressed_picks_context(
+def _with_model_caveat(
+    context: dict[str, Any],
     *,
     season: int,
-    selected_week: int,
-    active_weeks: list[int],
     gate: dict[str, Any],
 ) -> dict[str, Any]:
-    """The picks board with no MODEL pick to serve, saying so and saying why.
+    """Serve the model's picks WITH its measured record, beside the market-basis cards.
 
-    Deliberately NOT an error or an empty board. A blank surface with no reason
-    reads as a data outage, and the repair somebody reaches for is deleting the
-    gate. The board keeps its navigation so projections stay reachable -- the
-    model's opinion is still published on /ncaaf/cards, it is only the BET that
-    is withheld.
-
-    **AND IT IS NO LONGER NECESSARILY EMPTY (2026-08-29).** The model gate now
-    speaks only for the model's basis, so this page serves MARKET-basis picks
-    beside the notice. When there are none the page is exactly what it was; when
-    there are some, the notice becomes a caveat on a board rather than the whole
-    board. The two are never blended: the cards say what they rest on and the
-    panel says what is withheld.
+    `[2026-10-05, user directive, lane stop-market-withholding]`: no market is
+    withheld; each pick is shown and the model's accuracy is the label it
+    carries. This replaced `_suppressed_picks_context`, which served only the
+    market-basis cards and withheld every model pick when no NCAAF market had a
+    recorded win. Market-basis cards (cross-book price dispersion, no model in
+    them) still come first, because they are priced lines.
     """
-    weeks = active_weeks or [1]
-    resolved_week = _clamp_week(selected_week or (weeks[-1] if weeks else 1))
-    prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
+    resolved_week = int(context.get("week") or 1)
     market_counts: dict[str, Any] = {}
     try:
         market_cards = _market_basis_pick_cards(season, resolved_week, counts=market_counts)
     except Exception:
-        # A market-basis failure must NOT take down the page that explains the
-        # model suppression. The notice below is the thing this surface has
-        # always owed the reader; the cards are the addition.
         market_cards, market_counts = [], {"error": "market-basis pick build failed"}
     if market_counts.get("withheld_by_cap"):
         print(
@@ -612,87 +597,39 @@ def _suppressed_picks_context(
             f"shown={market_counts.get('shown')} withheld={market_counts.get('withheld_by_cap')}",
             flush=True,
         )
-    return {
-        **build_rank_page_context(
-            selected_date=_selected_date_token(resolved_week, season=season),
-            route_path="/ncaaf/picks",
-            intro_title="NCAAF Picks",
-            intro_body=(
-                "NCAAF MODEL picks are suppressed -- the model is measured as losing "
-                "to the closing line, and the panel below says by how much. The cards "
-                "here are a different claim: books that are quoting a better price "
-                "than the rest of the market on the same bet. That is price shopping, "
-                "not a model opinion and not expected value."
-                if market_cards
-                else
-                "NCAAF model picks are currently suppressed, and no market-basis pick "
-                "clears its bar this week either. Projections remain available on the "
-                "cards board; what is withheld is the recommendation to bet them."
-            ),
-            aria_label="NCAAF picks board",
-            source_path="syndicate/features/football/pick_gate.py",
-            source_title="NCAAF pick serving gate",
-            source_date_display=f"Week {resolved_week}",
-            rank_cards=market_cards,
-            using_sample_data=False,
-            header_stats=[
-                {"label": "Cards", "value": str(len(market_cards))},
-                {"label": "Basis", "value": "market" if market_cards else "-"},
-                {"label": "Model picks withheld", "value": str(len(gate["markets"]))},
-                {"label": "Weeks", "value": str(len(weeks) or "-")},
-            ],
-            module_links=build_module_links(resolved_week, "Picks"),
-            control_label="Week",
-            control_type="number",
-            control_name="week",
-            control_value=str(resolved_week),
-            prev_href=f"/ncaaf/picks?week={prev_week}",
-            next_href=f"/ncaaf/picks?week={next_week}",
-            empty_state={
-                "eyebrow": "Picks suppressed",
-                "title": gate["headline"],
-                "body": (
-                    "A pick asserts the model prices a market better than the "
-                    "book does. For NCAAF that assertion has been measured "
-                    "against realised results and it is false, so the picks are "
-                    "withheld rather than served."
-                ),
-                "list_items": [reason["reason"] for reason in gate["reasons"]]
-                + [gate["lift_condition"]],
-            },
-            warning_panel={
-                "eyebrow": "Model vs market",
-                "title": "Measured: the NCAAF margin model loses to the close",
-                "body": (
-                    "Prior-season 2024 SP+ scoring realised 2025 margins, 220 "
-                    "games, closing spread on the same games as the benchmark: "
-                    "model MAE 13.763 against a market 11.586. Paired dMAE "
-                    "+2.176, SE 0.518, t=+4.20. Every rating scale from 6 to 24 "
-                    "loses, so this is a property of the model rather than of a "
-                    "tuning constant."
-                ),
-                "list_items": [reason["detail"] for reason in gate["reasons"]]
-                + (
-                    [
-                        "The cards above are NOT affected by this measurement. They "
-                        "rest on cross-book price dispersion and the model plays no "
-                        "part in them -- see each card's own summary for its anchor.",
-                    ]
-                    if market_cards
-                    else []
-                ),
-            },
+    record = "; ".join(reason["reason"] for reason in gate["reasons"])
+    model_cards = []
+    for card in context.get("rank_cards") or []:
+        labelled = dict(card)
+        labelled["list_items"] = list(card.get("list_items") or []) + [f"Model record: {record}"]
+        labelled["eyebrow"] = f"{card.get('eyebrow') or 'Model'} - model unproven vs close"
+        model_cards.append(labelled)
+    cards = list(market_cards) + model_cards
+    out = dict(context)
+    out["rank_cards"] = cards
+    out["header_stats"] = [
+        {"label": "Cards", "value": str(len(cards))},
+        {"label": "Market basis", "value": str(len(market_cards))},
+        {"label": "Model", "value": str(len(model_cards))},
+        {"label": "Weeks", "value": str(len(context.get("available_weeks") or []) or "-")},
+    ]
+    out["warning_panel"] = {
+        "eyebrow": "Model vs market",
+        "title": gate["headline"],
+        "body": (
+            "Every pick is shown and judged on its own line. The model's measured "
+            "record against the closing line is below; weigh its picks by it. "
+            "Market-basis cards rest on cross-book price dispersion and the model "
+            "plays no part in them."
         ),
-        "week": resolved_week,
-        "available_weeks": weeks,
-        "season": season,
-        "picks_gate": gate,
-        # The instrument for this surface. `servable` vs `sides_considered` is
-        # the rate that says whether an empty board is a working filter or a
-        # missing artifact, and `dates_absent` separates the two -- a count with
-        # no denominator cannot.
-        "market_basis": market_counts,
+        "list_items": [reason["detail"] or reason["reason"] for reason in gate["reasons"]]
+        + [gate["lift_condition"]],
     }
+    if cards:
+        out["empty_state"] = None
+    out["picks_gate"] = gate
+    out["market_basis"] = market_counts
+    return out
 
 
 def build_smartsim_picks_page_context(selected_week: int) -> dict[str, Any]:
@@ -703,14 +640,15 @@ def build_smartsim_picks_page_context(selected_week: int) -> dict[str, Any]:
     # inert, the same way the board cap lived in build_cards_page_context while
     # the route served build_smartsim_cards_page_context.
     season, active_weeks = _resolve_ncaaf_active_season_and_weeks()
+    context = _model_picks_context(selected_week, season=season, active_weeks=active_weeks)
+    # A CAVEAT, NEVER A STOP (2026-10-05, lane `stop-market-withholding`).
     gate = board_notice("ncaaf", _PICKS_BOARD_MARKETS)
     if gate is not None:
-        return _suppressed_picks_context(
-            season=season,
-            selected_week=selected_week,
-            active_weeks=active_weeks,
-            gate=gate,
-        )
+        return _with_model_caveat(context, season=season, gate=gate)
+    return context
+
+
+def _model_picks_context(selected_week: int, *, season: int, active_weeks: list[int]) -> dict[str, Any]:
     if not active_weeks:
         return build_picks_page_context(selected_week)
     default_active_week = _ncaaf_default_active_week(season, active_weeks)
@@ -803,24 +741,7 @@ def build_picks_page_context(selected_week: int) -> dict[str, Any]:
     prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
     total_results = len(summary.get("results") or []) if isinstance(summary.get("results"), list) else 0
     empty_state = None
-    if not cards and gate_notice:
-        # Rows EXIST and were withheld. Saying "none available" here would be
-        # false, would read as an outage, and is how a suppression gets
-        # "fixed" by deleting it. State the reason and the numbers.
-        empty_state = {
-            "eyebrow": "Picks suppressed",
-            "title": gate_notice["headline"],
-            "body": (
-                f"{total_results} stored NCAAF recommendation row"
-                f"{'' if total_results == 1 else 's'} for Week {resolved_week} "
-                "were withheld rather than served. A pick asserts the model "
-                "prices a market better than the book does; for these markets "
-                "that assertion has been measured and it is false."
-            ),
-            "list_items": [reason["reason"] for reason in gate_notice["reasons"]]
-            + [gate_notice["lift_condition"]],
-        }
-    elif not cards:
+    if not cards:
         empty_state = {
             "eyebrow": "Historical mode",
             "title": "No recommendations available.",
@@ -856,6 +777,11 @@ def build_picks_page_context(selected_week: int) -> dict[str, Any]:
             next_href=f"/ncaaf/picks?week={next_week}",
             empty_state=empty_state,
             warning_panel={
+                "eyebrow": "Model vs market",
+                "title": gate_notice["headline"],
+                "body": "Every stored pick is shown; the model's measured record against the closing line is below.",
+                "list_items": [reason["reason"] for reason in gate_notice["reasons"]] + [gate_notice["lift_condition"]],
+            } if gate_notice else {
                 "eyebrow": "Historical mode",
                 "title": "Current source artifacts are offseason snapshots",
                 "body": "The live recommendations file is empty right now, so the first NCAAF surface uses the populated historical weekly summaries already present in the source repo.",

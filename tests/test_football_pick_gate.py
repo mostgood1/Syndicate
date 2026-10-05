@@ -1,4 +1,12 @@
-"""The football pick-serving gate: suppression must be REACHABLE and REVERSIBLE.
+"""The football model's per-market record: a LABEL on every pick, never a filter.
+
+`[2026-10-05, user directive, lane stop-market-withholding]`: "WE HAVE TO STOP
+WITHHOLDING MARKETS! ... each bet is at the line level". These tests used to pin
+that the gate SUPPRESSED NCAAF model picks; they now pin that nothing is dropped
+and that every pick on an unproven model carries the measurement. The registry
+tests (unknown -> not servable, the measurement and criterion text) still hold:
+"servable" now means "has a recorded win", which is what the label reads.
+The original rationale follows.
 
 Measured 2026-08-19, and the reason this gate exists: the NCAAF margin model
 loses to the closing line by +3.563 MAE (SE 0.207, t=+17.20) over 2,233 graded
@@ -164,9 +172,10 @@ class FilterAndNoticeTests(unittest.TestCase):
             {"market": "moneyline_home"},
             {"market": "total"},
         ]
-        kept, suppressed = filter_pick_rows("ncaaf", rows)
-        self.assertEqual(kept, [])
-        self.assertEqual(suppressed, {"spread": 2, "moneyline": 1, "total": 1})
+        kept, unproven = filter_pick_rows("ncaaf", rows)
+        self.assertEqual(len(kept), 4, "no row may be dropped")
+        self.assertTrue(all(row.get("model_verdict") for row in kept))
+        self.assertEqual(unproven, {"spread": 2, "moneyline": 1, "total": 1})
 
     def test_notice_is_none_when_nothing_suppressed(self) -> None:
         self.assertIsNone(notice_for("ncaaf", {}))
@@ -189,46 +198,43 @@ class FilterAndNoticeTests(unittest.TestCase):
             self.assertIsNone(board_notice("ncaaf", markets))
 
 
-class NcaafPickServingGateTests(unittest.TestCase):
-    """The gate on the path production actually serves."""
+class NcaafPickServingTests(unittest.TestCase):
+    """The served path (/ncaaf/picks and /ncaaf/api/picks both enter
+    build_smartsim_picks_page_context): model picks are SHOWN with their record."""
 
-    def test_served_board_yields_no_cards_while_suppressed(self) -> None:
-        context = ncaaf_picks.build_smartsim_picks_page_context(1)
-        self.assertEqual(len(context.get("rank_cards") or []), 0)
-        self.assertIn("picks_gate", context)
+    def _context(self, cards):
+        base = {"rank_cards": cards, "week": 1, "available_weeks": [1], "empty_state": None}
+        with patch.object(ncaaf_picks, "_model_picks_context", return_value=base), patch.object(
+            ncaaf_picks, "_market_basis_pick_cards", return_value=[]
+        ):
+            return ncaaf_picks.build_smartsim_picks_page_context(1)
 
-    def test_suppressed_board_explains_itself(self) -> None:
-        """A blank board with no reason reads as an outage and gets 'fixed'."""
-        context = ncaaf_picks.build_smartsim_picks_page_context(1)
-        empty = context.get("empty_state") or {}
-        self.assertEqual(empty.get("eyebrow"), "Picks suppressed")
-        self.assertIn("closing line", empty.get("title", ""))
-        self.assertTrue(empty.get("list_items"))
+    def test_model_picks_are_served_with_their_record(self) -> None:
+        card = {"title": "UGA vs BAMA", "eyebrow": "SmartSim", "list_items": ["Projected spread: UGA by 3"]}
+        context = self._context([card])
+        self.assertEqual(len(context["rank_cards"]), 1)
+        served = context["rank_cards"][0]
+        self.assertTrue(any(item.startswith("Model record:") for item in served["list_items"]))
+        self.assertIn("closing line", context["warning_panel"]["title"])
+        self.assertIsNone(context.get("empty_state"))
 
-    def test_suppressed_board_keeps_navigation(self) -> None:
-        """Projections stay reachable; only the BET is withheld."""
-        context = ncaaf_picks.build_smartsim_picks_page_context(1)
+    def test_off_equals_on_for_what_is_served(self) -> None:
+        """THE test now. A market without a recorded win must serve the SAME
+        picks as one with a recorded win -- only the label differs."""
+        card = {"title": "UGA vs BAMA", "eyebrow": "SmartSim", "list_items": []}
+        closed = self._context([card])
+        with _open_ncaaf_markets():
+            opened = self._context([card])
+        self.assertEqual(len(closed["rank_cards"]), len(opened["rank_cards"]))
+        self.assertIn("picks_gate", closed)
+        self.assertNotIn("picks_gate", opened)
+
+    def test_the_board_keeps_navigation(self) -> None:
+        context = self._context([])
         self.assertTrue(context.get("available_weeks"))
         self.assertIsNotNone(context.get("week"))
 
-    def test_off_is_not_on(self) -> None:
-        """THE test. Gate open must serve cards the closed gate withholds.
-
-        Without this, 'zero cards' is equally consistent with a working gate and
-        with a board that had nothing to show -- and the second reads as success.
-        """
-        closed = ncaaf_picks.build_smartsim_picks_page_context(1)
-        self.assertEqual(len(closed.get("rank_cards") or []), 0)
-        with _open_ncaaf_markets():
-            opened = ncaaf_picks.build_smartsim_picks_page_context(1)
-        self.assertGreater(
-            len(opened.get("rank_cards") or []),
-            0,
-            "gate-open board served nothing, so the closed board proves nothing",
-        )
-        self.assertNotIn("picks_gate", opened)
-
-    def test_collapse_results_drops_suppressed_rows(self) -> None:
+    def test_collapse_results_keeps_and_labels_every_row(self) -> None:
         summary = {
             "results": [
                 {"home_team": "UGA", "away_team": "BAMA", "market": "spread", "side": "UGA -3.5", "provider": "b", "edge": 0.04},
@@ -237,7 +243,9 @@ class NcaafPickServingGateTests(unittest.TestCase):
         }
         counts: dict[str, int] = {}
         cards = ncaaf_picks._collapse_results(summary, gate_counts=counts)
-        self.assertEqual(cards, [])
+        self.assertEqual(len(cards), 2)
+        for card in cards:
+            self.assertTrue(any(item.startswith("Model record:") for item in card["list_items"]))
         self.assertEqual(counts, {"spread": 1, "total": 1})
 
 

@@ -3012,7 +3012,7 @@ own prior verdicts, not by anything failing.
 - **Overrides (logged as an explicit user override):** the 2026-09-11 "Withhold, all sports" admission rule (incl. its 2026-09-14 `loses_to_market` clause) and the `#400` excluded-markets knob. Both REMOVED from `layer2_board.select_shortlist`, not defaulted off.
 - **FORBIDDEN:** any rule that removes a row, pick, edge or stake because of its MARKET, market family, or a (sport, market) model verdict. A gate must be a property of the LINE (its price/EV, quote age, an impossible book, game state, the per-game cap). A model's measured accuracy may only scale rank/stake (`skill_reliability`).
 - **Why it mattered, measured:** fleet build 2026-10-05 withheld 3,166 rows by the removed rule; 3,111 were soccer player props, while ~770 credits/h were still being spent fetching them.
-- **Still market-keyed after this lane (each needs its own change):** `football/pick_gate.py` (NCAAF model picks, default deny), `portfolio_commit.py` sim-sizing `measured_only` + `_PRICE_BASIS_SPORTS_DEFAULT={"ncaaf"}`, `live_gameline_join.publishing_disabled_for_sport` (env-driven).
+- **Same lane, same day, also removed (user: "go ahead with all three"):** `football/pick_gate.py` is now a LABEL (NCAAF model picks served with their measured record, never dropped); `live_gameline_join.publishing_disabled_for_sport` deleted (fleet refresh-worker still carried `SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS=nfl` -- now inert); `portfolio_commit` sizes EVERY model edge x `skill_reliability` (floor 0.5) -- the 09-19 `measured_only` gate and the 09-18 NCAAF price-basis rule are deleted, their env keys inert.
 
 ## 2026-10-05 -- A tier-mean bias fix is not a line-accuracy fix (lane nhl-elite-assists)
 

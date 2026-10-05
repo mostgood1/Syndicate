@@ -72,12 +72,15 @@ class NcaafPicksLocalTests(unittest.TestCase):
             "syndicate.features.ncaaf.picks._engine_rows_for_season_week", return_value=runtime_rows
         ), patch(
             "syndicate.features.ncaaf.picks._runtime_prediction_rows", return_value=runtime_rows
-        ), patch("syndicate.features.ncaaf.picks._prediction_source_path", return_value=Path("/tmp/predicted_totals.csv")):
+        ), patch("syndicate.features.ncaaf.picks._prediction_source_path", return_value=Path("/tmp/predicted_totals.csv")), patch(
+            "syndicate.features.ncaaf.picks.record_trial_page_view"
+        ), patch("syndicate.features.ncaaf.picks._market_basis_pick_cards", return_value=[]):
             context = build_smartsim_picks_page_context(1)
 
         self.assertEqual(context["source_title"], "NCAAF Enhanced Totals Engine picks runtime")
         self.assertEqual(context["rank_cards"][0]["meta"], "UNLV at Sam Houston")
-        self.assertEqual(context["rank_cards"][0]["eyebrow"], "Enhanced Totals Engine")
+        # Model picks are served WITH the model's record (2026-10-05, lane stop-market-withholding).
+        self.assertTrue(context["rank_cards"][0]["eyebrow"].startswith("Enhanced Totals Engine"))
         self.assertIn("Enhanced Totals Engine projects Sam Houston", context["rank_cards"][0]["summary"])
 
     def test_smartsim_picks_runtime_falls_back_to_summaries(self) -> None:
