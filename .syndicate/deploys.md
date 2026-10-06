@@ -47015,3 +47015,19 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - **Applied:** `~/wnba_bt/resim_1007_r3.py` (production orchestrator, live-odds-worker role env, root /home/amyn/syndicate-prod/data/wnba_source, `--wnba-only-matchups ATL-NYL,GSV-LVA --force-refresh`), 21:19:44Z -> 21:36:17Z, rc 0, 16/16 steps ok, partial guard did not fire, 0 vendor/ files.
 - **Reading (MET):** ATL_NYL rebuilt 16:23:37 CDT (md5 9a91231c), GSV_LVA 16:24:38 (82ca6569). GSV_LVA players.away: Jewell Loyd min_mean 32.1 / pts 10.8, Stephanie Talbot 19.6 / 5.5; Gray absent; Howard present in ATL_NYL. Context injuries_out 5/5. Before the lender lane's tip-60 grading snapshot (22:30Z 10-07).
 - **Pre-check on prod inputs (old vs new function, temp copy):** only Loyd + Talbot left the LVA exclusions; every other exclusion on the four teams identical.
+
+## 2026-10-06 21:35:50Z (4:35 PM CT) -- LOCAL FLEET FF e3f2c3c0 -> d6eb1086, NO RESTART: SmartSim reuse check rebuilds a sim whose stamped exclusions differ -- **VERIFY OWED** (lane `smart-sim-reuse-stale-exclusions`, user: "land it and ff the fleet, then take the reading on the next WNBA build")
+
+- **change:** d6eb1086 adds `smart_sim_reuse.reuse_verdict` and puts it in the reuse branch of `_smart_sim_run_date_local` (on loan from basketball-injury-exclusion-reinclusion).
+  - A sim whose `context.excluded_players` differs per team from the set the current run would pass is rebuilt.
+  - Every decision prints a line: `SMART_SIM_REUSE_EXCLUSIONS stale=0`, or `SMART_SIM_REUSE_STALE_EXCLUSIONS` with the added/removed names.
+  - Kill switch: `SYNDICATE_SMART_SIM_REUSE_EXCLUSION_CHECK=0`.
+- **ride-alongs (e3f2c3c0..d6eb1086, runtime paths incl. vendor):** scripts/basketball_scenario_rates.py (NEW, offline) and scripts/football_scenario_refit.py (print fix, offline). Both are inert to every service.
+- **how:**
+  - Claim live-odds-worker (token f18ce446), released after. refresh-worker was held by layer2-coverage-identity-merge; no restart, so it was not needed.
+  - check_deploy_safety read NOT CLEAR on in-flight jobs: the live-odds-worker WNBA/NHL pregame refresh and the refresh-worker board build. An ff kills neither, and the new branch only calls a module that arrives in the same ff.
+  - Guarded `git merge --ff-only` (HEAD e3f2c3c0 and a clean tree asserted first).
+  - After: `reuse_verdict` is present in basketball_props_smart_sim.py, healthz 200.
+- **baseline (read 2026-10-06 ~3:50 PM CT on the fleet, real functions under the live-odds-worker role env):** both 10-07 WNBA sims (ATL_NYL, GSV_LVA) match their stamps on all 4 teams (24/18/16/13 keys), so 0 drift.
+- **prediction:** the next WNBA props build that reaches SmartSim prints `SMART_SIM_REUSE_EXCLUSIONS stale=0 reuse=True` for each unchanged 10-07 sim and rebuilds nothing. A sim prints `STALE ... reuse=False` and is rebuilt only if that day's exclusions moved (e.g. a new injury-feed snapshot).
+- **verify:** the `[smart_sim_reuse]` lines in wnba_source/logs/syndicate_refresh_oddsapi_props_<D>.log after 16:35:50 CDT, plus the sim file mtimes. Watcher: scratchpad/watch_reuse.sh (2-min poll, ~12 h).
