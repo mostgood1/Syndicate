@@ -370,7 +370,9 @@ def build_props_for_date(
             if pr is None:
                 continue
             line = float(r["line"])
-            p_over = _poisson_p_over(line, pr.proj_lambda)
+            # SAVES: negative binomial (lane nhl-saves-overdispersion); every other market Poisson, unchanged
+            from syndicate.features.nhl.prop_projections import price_p_over
+            p_over = price_p_over(str(r["market"]), line, pr.proj_lambda)
             # `player` is the BOOK's name: every downstream join (the board, prop evidence) keys on
             # the sportsbook's full name, never on the lineup feed's spelling.
             proj_obj = replace(

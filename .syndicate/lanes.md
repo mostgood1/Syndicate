@@ -1396,6 +1396,11 @@ death, never life — do not invert it.
   - Pooled paired Brier NB - Poisson, game-clustered 95% CI (4,000 reps).
   - **Ship iff that CI is entirely < 0.** Also reported: NB - book.
   - The k production would use is fixed now: the MLE on all 56 dates' goalie-games, whatever it comes out to.
+- **H26 RESULT 2026-10-06 ~00:40Z: PASS.**
+  - Fit: k = 18.82 (first half, 10-08..12-03, n=363) / 16.37 (second half, n=405); all-dates k = **16.367** (n=768, var/mean 2.19).
+  - Pooled out of fold, 881 lines: NB - Poisson **-0.01181 [-0.01609, -0.00763]**; NB - book +0.01561 [+0.00761, +0.02335] (Poisson was +0.0274).
+  - Built: `nhl prop_projections.price_p_over` (NB for SAVES, Poisson for the rest; basis `sim_mean_negbin`), used by the board projection AND `build_nhl_artifacts` (props file). Tests 3 new + 99 existing pass.
+  - Registry entry re-measured for the shipped pricing: loses, +0.0156 [+0.0076, +0.0234]; skill_reliability 0.68 -> 0.85.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

@@ -77,12 +77,13 @@ def main() -> int:
     out = Path("C:/tmp/nhllines")
     games = SVB.sim_games(Path("C:/tmp/nhllines/props_ab_v2/prior_dfo/sim"))
     acts = pickle.load(open("C:/tmp/nhlprops/bt_lqp_0.5/records.pkl", "rb"))["actuals"]
-    fit_pairs, lines = [], []
+    fit_pairs, lines, all_pairs = [], [], []
     for gid, g in games.items():
         played = {p["pid"]: p for p in (acts.get(gid) or {}).get("players", []) if p["pos"] == "G" and p["toi"] > 0}
         starters = [x for x in g["goalies"] if x["sim_starter"] and x["lam"] and x["pid"] in played]
         if g["date"] < CUT:
             fit_pairs += [(x["lam"], int(played[x["pid"]]["sv"])) for x in starters]
+        all_pairs += [(g["date"], x["lam"], int(played[x["pid"]]["sv"])) for x in starters]
         f = out / "odds_saves" / f"{gid}.json"
         if not f.exists():
             continue
@@ -110,6 +111,27 @@ def main() -> int:
               f"Poisson - book {d_pk[0]:+.5f} [{d_pk[1]:+.5f}, {d_pk[2]:+.5f}]", flush=True)
         report[name] = {"n": len(R), "games": len({r['gid'] for r in R}), "brier_nb": bm("pn"), "brier_poisson": bm("pp"),
                         "brier_book": bm("pk"), "nb_minus_poisson": d_np, "nb_minus_book": d_nk, "poisson_minus_book": d_pk}
+    if "--twofold" in sys.argv:
+        dates = sorted({d for d, _m, _y in all_pairs})
+        half_a = set(dates[: len(dates) // 2])
+        ka, ia = fit_k([(m, y) for d, m, y in all_pairs if d in half_a])
+        kb, ib = fit_k([(m, y) for d, m, y in all_pairs if d not in half_a])
+        k_all, i_all = fit_k([(m, y) for _d, m, y in all_pairs])
+        print(f"H26 two-fold: half A {min(half_a)}..{max(half_a)} k={ka} {ia} | half B k={kb} {ib} | ALL-dates k={k_all} {i_all}", flush=True)
+        b = lambda p, y: (p - y) ** 2
+        for r in lines:
+            kk = kb if r["date"] in half_a else ka          # price each line with the OTHER half's k
+            r["pn2"] = nb_p_over(r["line"], r["lam"], kk)
+            r["pp"] = SVB._p_over(r["line"], r["lam"])
+        d_np = boot([(r["gid"], b(r["pn2"], r["y"]) - b(r["pp"], r["y"])) for r in lines])
+        d_nk = boot([(r["gid"], b(r["pn2"], r["y"]) - b(r["pk"], r["y"])) for r in lines])
+        bm = lambda key: sum(b(r[key], r["y"]) for r in lines) / len(lines)
+        verdict = "PASS (ship)" if d_np[2] < 0 else "FAIL (do not ship)"
+        print(f"H26 pooled out-of-fold: n={len(lines)} lines | Brier NB {bm('pn2'):.5f} Poisson {bm('pp'):.5f} book {bm('pk'):.5f}")
+        print(f"   NB - Poisson {d_np[0]:+.5f} [{d_np[1]:+.5f}, {d_np[2]:+.5f}] -> {verdict} | NB - book {d_nk[0]:+.5f} [{d_nk[1]:+.5f}, {d_nk[2]:+.5f}]", flush=True)
+        report["H26"] = {"k_half_a": ka, "k_half_b": kb, "k_all": k_all, "fit_all": i_all, "n": len(lines),
+                         "brier_nb": bm("pn2"), "brier_poisson": bm("pp"), "brier_book": bm("pk"),
+                         "nb_minus_poisson": d_np, "nb_minus_book": d_nk, "verdict": verdict}
     (out / "saves_overdispersion.json").write_text(json.dumps(report, indent=1, default=str), encoding="utf-8")
     return 0
 

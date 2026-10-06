@@ -125,22 +125,23 @@ _NHL_SAVES_PRICE_SOURCE = (
 # (sport, market, segment, phase) -> entry.
 MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
 
-    # ---- NHL GOALIE SAVES vs the PRICE `[2026-10-05]` ----------------------------
+    # ---- NHL GOALIE SAVES vs the PRICE `[2026-10-05, re-measured 2026-10-06]` ------
     #
-    # LOSES, clearly. The mean probability matches the market (model 0.505, market 0.503,
-    # realised over rate 0.529) and the loss is in the SPREAD: Brier 0.277 is worse than a
-    # coin flip, i.e. the probabilities are overconfident. Production prices SAVES by Poisson
-    # from the sim mean, which is narrower than real saves. A pricing-shape defect, not a
-    # mean defect, so it is a lead for the props model, not something this table fixes.
+    # STILL LOSES, by about half as much. First reading (Poisson pricing): Brier +0.0274
+    # [+0.0162, +0.0388], with the mean right and the spread overconfident (saves variance
+    # ~2.2x the mean). Production now prices SAVES by a negative binomial (lane
+    # nhl-saves-overdispersion, k = 16.367). Out of fold (two date halves, each priced with
+    # the other half's k) NB beats Poisson by -0.0118 [-0.0161, -0.0076], and THIS entry is
+    # that NB pricing against the market on the same 881 lines.
     # Board key: the grid writes the CODE "SAVES", which normalises to "saves".
     ("nhl", "saves", "full", PHASE_PREGAME): {
         "sample_games": 435,
         "seasons": "2025-26 regular season, 56 harness dates (every 2nd date 10-08..01-31); 881 player-game-lines in 435 games; 139 lines on a goalie production would not price (not the sim's starter), 5 on goalies who did not play and 10 name-unmatched were excluded; CI is game-clustered",
-        "brier_model": 0.2772,
+        "brier_model": 0.26538,
         "brier_market": 0.24978,
-        "diff": 0.02742,
-        "ci95": (0.01616, 0.03883),
-        "verdict": "loses to the de-vigged market, Brier +0.0274 [+0.0162, +0.0388], 881 lines / 435 games; Poisson spread overconfident",
+        "diff": 0.01561,
+        "ci95": (0.00761, 0.02335),
+        "verdict": "loses to the de-vigged market, Brier +0.0156 [+0.0076, +0.0234], 881 lines / 435 games (NB pricing, out of fold)",
         "verdict_class": VERDICT_LOSES,
         "source": _NHL_SAVES_PRICE_SOURCE,
     },

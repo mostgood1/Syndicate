@@ -100,6 +100,40 @@ def market_code(market: Any) -> str | None:
     return _MARKET_CODES.get(key)
 
 
+# Goalie SAVES are OVERDISPERSED around the sim mean: variance ~2.2x the mean on 2025-26 (lane
+# nhl-saves-overdispersion). Priced by a negative binomial NB(mean = lam, size k), variance lam + lam^2 / k,
+# k fit by maximum likelihood on 768 production-form sim-starter goalie-games (props harness, 56 dates).
+# H26 (pre-registered, two-fold by date halves, all 881 book lines out of fold): NB - Poisson Brier
+# -0.0118 [-0.0161, -0.0076]. Every other market keeps Poisson.
+SAVES_NB_K = 16.367
+
+
+def nb_p_over(line: float, mean: float, k: float) -> float:
+    """P(X > line), X ~ NB(mean, size k). An integer line's push mass counts as not-over (as Poisson)."""
+    mu = max(1e-9, float(mean))
+    upto = math.floor(float(line))
+    log_p = k * math.log(k / (k + mu))       # pmf(0)
+    ratio = mu / (k + mu)
+    term = math.exp(log_p)
+    cdf = 0.0
+    for i in range(upto + 1):
+        if i:
+            term *= (i - 1 + k) / i * ratio
+        cdf += term
+    return max(0.0, min(1.0, 1.0 - cdf))
+
+
+def price_p_over(market_code: str, line: float, lam: float) -> float:
+    """Production's P(over) for one NHL prop line: NB for SAVES, Poisson for every other market."""
+    if str(market_code or "").upper() == "SAVES":
+        return nb_p_over(line, lam, SAVES_NB_K)
+    return poisson_p_over(line, lam)
+
+
+def pricing_basis(market_code: str) -> str:
+    return "sim_mean_negbin" if str(market_code or "").upper() == "SAVES" else "sim_mean_poisson"
+
+
 def poisson_p_over(line: float, lam: float) -> float:
     """P(X > line), X ~ Poisson(lam). An integer line's push mass counts as not-over."""
     lam = max(0.0, float(lam))
@@ -231,7 +265,7 @@ def attach_nhl_prop_projections(
         projection: dict[str, Any] = {
             "projected": round(lam, 3),
             "source": SOURCE,
-            "basis": "sim_mean_poisson",
+            "basis": pricing_basis(code),
             "model_prob_over": None,
             "edge_vs_market_pct": None,
             "probability_unavailable_reason": "row has no line to price",
@@ -244,7 +278,7 @@ def attach_nhl_prop_projections(
             projection["side"] = "over" if lam > line else "under"
             refusal = line_refusal(index.context.get((_norm(row.get("player_name")), code)), code)
             if refusal is None:
-                _attach_sim_probability_edge(projection, row=row, model_prob=poisson_p_over(line, lam))
+                _attach_sim_probability_edge(projection, row=row, model_prob=price_p_over(code, line, lam))
                 priced += 1
             else:
                 projection["probability_unavailable_reason"] = refusal
