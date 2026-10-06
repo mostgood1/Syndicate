@@ -668,6 +668,12 @@ class GameConfig:
     bip_roe_rate: float = 0.012
     bip_fc_rate: float = 0.04
     bip_fc_runner_on_3b_score_rate: float = 0.0
+    # On a double play with 0 outs before it, real runners do not hold: the runner on
+    # 2nd usually takes 3rd and the runner on 3rd usually scores (no RBI). Rates are
+    # MEASURED from StatsAPI play-by-play (scripts/mlb_dp_advancement_rates.py), not
+    # fitted. 0.0 = runners hold, the behaviour before 2026-10-06.
+    bip_dp_r2_to_3b_rate: float = 0.0
+    bip_dp_r3_scores_rate: float = 0.0
     # Optional: sample per-game pitcher rates (K/BB/HBP/HR/in-play hit).
     # This injects "today" uncertainty while keeping within-game consistency.
     pitcher_rate_sampling: bool = True

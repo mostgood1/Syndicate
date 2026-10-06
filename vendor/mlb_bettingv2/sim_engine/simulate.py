@@ -770,41 +770,6 @@ def _advance_bases_simple(bases: BaseState, hit: str) -> Tuple[BaseState, int]:
     return BaseState.LOADED, runs
 
 
-def _resolve_in_play_out(
-    rng: random.Random,
-    bases: BaseState,
-    outs: int,
-    batted_ball_type: Optional[BattedBallType],
-    dp_rate: float,
-    sf_rate_flypop: float,
-    sf_rate_line: float,
-) -> Tuple[BaseState, int, int, str]:
-    """Resolve an in-play out with crude DP/SF logic.
-
-    Returns (new_bases, runs_scored, outs_added, subtype).
-    subtype is one of: OUT, DP, SF.
-    """
-    on1, on2, on3 = _bases_to_tuple(bases)
-    bb = batted_ball_type
-
-    # Double play: ground ball with runner on 1st and <2 outs.
-    if bb == BattedBallType.GROUND and outs <= 1 and on1:
-        p_dp = _clamp01(float(dp_rate))
-        if rng.random() < p_dp:
-            on1 = False
-            # Keep other runners in place (conservative).
-            return _tuple_to_bases(on1, on2, on3), 0, 2, "DP"
-
-    # Sac fly: fly/pop/line with runner on 3rd and <2 outs.
-    if bb in (BattedBallType.FLY, BattedBallType.POP, BattedBallType.LINE) and outs <= 1 and on3:
-        p_sf = _clamp01(float(sf_rate_flypop)) if bb in (BattedBallType.FLY, BattedBallType.POP) else _clamp01(float(sf_rate_line))
-        if rng.random() < p_sf:
-            on3 = False
-            return _tuple_to_bases(on1, on2, on3), 1, 1, "SF"
-
-    return bases, 0, 1, "OUT"
-
-
 def _resolve_in_play_out_with_runners(
     rng: random.Random,
     bases: BaseState,
@@ -824,6 +789,8 @@ def _resolve_in_play_out_with_runners(
     fc_rate: float,
     fc_runner_on_3b_score_rate: float,
     p1_to_3b_on_1b_rate: float,
+    dp_r2_to_3b_rate: float = 0.0,
+    dp_r3_scores_rate: float = 0.0,
 ) -> Tuple[BaseState, int, int, int, int, List[int], int, str]:
     """Runner-id-aware resolution for non-hit in-play balls.
 
@@ -840,8 +807,20 @@ def _resolve_in_play_out_with_runners(
         p_dp = _clamp01(float(dp_rate))
         if rng.random() < p_dp:
             on1 = 0
+            runs = 0
+            # With 0 outs before, the DP leaves 1 out, so the other runners can move
+            # (with 1 out it ends the inning and nothing counts). A rate of 0 draws no
+            # random number, so the default keeps the RNG stream identical.
+            if outs == 0:
+                if on3 and dp_r3_scores_rate > 0.0 and rng.random() < dp_r3_scores_rate:
+                    scoring.append(int(on3))
+                    on3 = 0
+                    runs = 1
+                if on2 and not on3 and dp_r2_to_3b_rate > 0.0 and rng.random() < dp_r2_to_3b_rate:
+                    on3 = int(on2)
+                    on2 = 0
             nb = _tuple_to_bases(bool(on1), bool(on2), bool(on3))
-            return nb, int(on1), int(on2), int(on3), 0, scoring, 2, "DP"
+            return nb, int(on1), int(on2), int(on3), runs, scoring, 2, "DP"
 
         if rng.random() < _clamp01(float(fc_rate or 0.0)):
             if on3 and rng.random() < _clamp01(float(fc_runner_on_3b_score_rate or 0.0)):
@@ -2263,6 +2242,8 @@ def simulate_game(
     bip_roe_rate = _clamp(float(getattr(cfg, "bip_roe_rate", 0.012) or 0.012), 0.0, 0.1)
     bip_fc_rate = _clamp(float(getattr(cfg, "bip_fc_rate", 0.04) or 0.04), 0.0, 0.2)
     bip_fc_runner_on_3b_score_rate = _clamp(float(getattr(cfg, "bip_fc_runner_on_3b_score_rate", 0.0) or 0.0), 0.0, 1.0)
+    bip_dp_r2_to_3b_rate = _clamp(float(getattr(cfg, "bip_dp_r2_to_3b_rate", 0.0)), 0.0, 1.0)
+    bip_dp_r3_scores_rate = _clamp(float(getattr(cfg, "bip_dp_r3_scores_rate", 0.0)), 0.0, 1.0)
 
     # Optional: sample per-game pitcher rates (starter + bullpen) once per game.
     # This injects uncertainty into K/BB/HR/in-play hit rates while keeping the
@@ -3156,6 +3137,8 @@ def simulate_game(
                             bip_fc_rate,
                             bip_fc_runner_on_3b_score_rate,
                             bip_1b_p1_to_3b_rate,
+                            dp_r2_to_3b_rate=bip_dp_r2_to_3b_rate,
+                            dp_r3_scores_rate=bip_dp_r3_scores_rate,
                         )
                         if subtype in ("ROE", "FC"):
                             state.runner_reach_source_by_id[int(batter_id)] = RUNNER_SRC_NON_HIT_REACH
@@ -3165,7 +3148,8 @@ def simulate_game(
                         half.outs += outs_added
                         if outs_added:
                             pr["OUTS"] += float(outs_added)
-                        if subtype == "ROE":
+                        if subtype in ("ROE", "DP"):
+                            # No RBI on an error or on a ground-into-double-play run.
                             charge_pitcher_runs(pitcher_id, runs)
                         else:
                             record_run(batter_id, pitcher_id, runs)
