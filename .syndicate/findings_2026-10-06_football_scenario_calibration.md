@@ -275,6 +275,22 @@ Coverage: sim 544, real 544, intersection 544. Flagged (outside real 95% CI AND 
 | H1 halftime | -1.12 [-1.22, -1.03] | -0.85 [-0.97, -0.72] | +0.11 [-0.09, +0.31] / +0.10 [-0.09, +0.28] | 0.000 | -0.06 [-0.26, +0.14] / **+0.23 [+0.05, +0.40]** |
 | H2 4th down | +0.67 [+0.53, +0.80] | +0.26 [+0.11, +0.40] | +0.08 [-0.08, +0.23] / -0.07 [-0.22, +0.07] | +0.001 | **+0.28 [+0.12, +0.43]** / +0.01 |
 
+H3 (same 136 games): mean total +1.63 [+1.51, +1.76] (prediction +1.5..+2.3 HELD), home margin
++0.41 [+0.23, +0.58] (prediction |delta| < 0.3 FAILED), sim total SD +0.47 [+0.37, +0.59] (toward the
+realised 13.4), MAE margin -0.15 [-0.34, +0.03], Brier -0.004 [-0.011, +0.002],
+abs(sim - close) total **+0.45 [+0.16, +0.72]**.
+
+### Joint re-fit descent, NFL (136 FIT games, 60 seeds; objective = sum z^2 over 13 moments)
+
+Production 56.98 -> switches ON at shipped levers 124.82 -> **fitted 40.22 (-29% vs production)**.
+Fitted: all four switches ON, `drive_yardage_multiplier` 0.875, `touchdown_weight_multiplier` 1.25,
+`drive_success_offense_sensitivity` 0.6, `drive_success_defense_sensitivity` 0.6, `home_field_bonus`
+0.12. DROPPED as unreachable with the 4th-down model ON: `field_goal_attempt_base_probability` (smoke)
+AND `field_goal_weight_multiplier` (full run) -- FG attempts now arise only from the measured 4th-down
+table, so no FG-frequency lever exists. Residual misses at the fit: P(FG)/drive z -4.9, plays/drive
+z +2.5. Home-field bonus HURT in pass 1 and was kept at 0.12 in pass 2, after yardage/TD weight
+moved -- the coupling a one-lever-at-a-time read would have missed. Edge steps tried, none kept.
+
 H1 prediction (|delta total| < 1.0) FAILED (-1.12). H2 prediction (total in [-0.5, +1.5]) held. Both
 fixes work mechanically (S12 after-half 25.0; S5 4th-down rows inside the real CI) and neither moves
 accuracy alone -- each moves the level or home edge away from the close, as the re-fit design expects.
