@@ -46904,3 +46904,38 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - how it actually loaded: NOT the planned all-roles restart. The drain cleared 18:09:15Z, but the full safety check then saw a real board build in flight for 20+ min, so `down` never ran. Meanwhile refresh-worker RESTARTED NATURALLY (supervisor restart #19) onto `2491d701`. Web: TERM to pid 1112818 at 18:48:23Z, `/healthz` 200 at 18:49:14Z; `status` then shows web `code=9b106614` (unresolvable stamp), so web was verified BY CONTENT. live-odds-worker untouched (still `0f30194f`; none of fixes 1-4 runs there). Drain lifted 18:5xZ (`DRAIN_CLEARED owner=published-negative-ev`); no leftover safety-check processes.
 - READ (VERIFIED): refresh-worker `code=2491d701` (`status`). Web `/api/board/book-grid?sport=nfl` serves the new field `seen_lag_behind_freshest_seconds` (TRUE). NFL grid sides with 1-2 books = 10 of 100, against the offline old-rule replay's 73% of 222 sides (different sample sizes; directionally as predicted).
 - NOT YET MEASURABLE: the newest paper plan (generated 12:47 CT = 17:47Z) predates the refresh-worker restart: refusals below_min_ev_pct 4,583, zero_kelly 221, `below_min_ev_pct_after_fair_noise` absent -- expected. OWED: (a) first paper plan after the in-flight board build -> refusal `below_min_ev_pct_after_fair_noise` > 0; (b) openings after ~18:10Z -> lower 1-2-book share on nfl/mlb/nhl/ncaaf lines; (c) new kalshi/polymarket paper fills `fees_dollars` > 0; (d) `closing_mark` on newly settled orders; (e) 10-07 11:30Z optimizer report `## Staked` graded > 0.
+
+## 2026-10-06 19:06:52Z (2:06 PM CT) -- LOCAL FLEET FF 2491d701 -> 2de13feb, NO RESTART: NBA recon producer + id-space-aware props bias join (lane `nba-season-phase`)
+
+- who: this session, on the user's instruction ("ff the fleet to include the recon code").
+  - Took the refresh-worker claim (holder nba-season-phase, token 5d2e2e03) AFTER the in-flight NBA props refresh
+    finished (19:01:36Z). That refresh would have loaded the changed files mid-run.
+  - `git fetch github` (the first attempt failed on a network error; the retry worked), then
+    `git merge --ff-only 2de13feb` on ~/Syndicate. Claim released. No role restarted: the NBA props refresh is a per-run
+    job.
+- target: 2de13feb, verified to contain 1213254f, a clean ff (23 commits). github/main moved to ceaef3e4 during the
+  merge; the fleet was deliberately taken only to the verified target.
+- measured at 19:09:36Z:
+  - HEAD 2de13feb (reflog 14:06:52-05:00, `merge 2de13feb: Fast-forward`);
+  - scripts/build_nba_recon.py and syndicate/features/shared/nba_history_refresh.py present;
+  - refresh_recon called twice in scripts/refresh_nba_oddsapi_props.py;
+  - healthz 200.
+- runtime files changed 2491d701..2de13feb (excluding .syndicate/docs/tests/reports/data): 14.
+  - Mine (1213254f): build_nba_recon.py (NEW), build_wnba_recon.py (league param, WNBA default unchanged),
+    build_wnba_boxscores.py (optional scoreboard_url), refresh_nba_oddsapi_props.py (recon call),
+    basketball_props_calibration.py (id-overlap-aware join), nba_history_refresh.py (refresh_recon).
+  - Ride-alongs, each VERIFIED INERT by me:
+    - MLB double steals (429c0847): `sb_double_steal_trail_prob` defaults 0.0, and `> 0.0` short-circuits before
+      any rng draw, so bases are unchanged.
+    - Football smartsim2 `halftime_kickoff` (d3b4d425) and `fourth_down_decision_model` (af46c25d): both default
+      False, and the code runs only behind `if profile.<flag>` (game_simulator.py:159, drive_simulator.py:332).
+      No setter in the tree outside the defaults.
+    - Offline scripts: football_scenario_rates.py, mlb_steal_rate_calibration.py.
+- effect: the next NBA props refresh writes NBA recon (recon_games/quarters/props) for D-1..D-3 (throttled 6 h).
+  The props bias calibration joins predictions to recon on name + team when the id spaces differ: fleet 10-04, 0 pairs
+  old reader vs 34 new. Preseason recon is written, but the phase guard keeps it out of regular-season windows.
+- verify: OWED.
+  - (1) The first `NBA_RECON_REFRESH` line in the NBA props log, plus recon files for 10-03..10-05 on the fleet
+    (watcher running).
+  - (2) After 2026-10-20, compute_biases finds pairs on a regular-season date.
+- off switches: SYNDICATE_NBA_RECON_REFRESH=0 (env, needs a restart to reach the env).
