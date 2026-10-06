@@ -1085,6 +1085,7 @@ death, never life — do not invert it.
   - WHY: SAVES is a two-sided consensus market (3 books), so the board scores it on EV vs the books' own consensus (`eb: market_fair`). The model enters only via the capped sim term (weight 0.125, cap 1.5 EV points; `opportunity_signals._SCORE_SIM_WEIGHT`). Example: Murashov 22.5 over, ev -6.07 + 0.125 x model edge 5.1 = score -5.43. The vig (~5-7 pts) dominates.
   - Not SAVES-specific: model-probability EV is used only for one-sided `book_margin_model` rows (on 10-05 the 51 NHL goals rows).
   - No change made; decision with the user.
+- **USER DECISION 2026-10-06 ~14:40Z: "Leave the board as is".** SAVES stay priced on the full grid and seat on the shortlist only on price merit, consistent with the model losing to the market on SAVES (+0.0156). No floor seat, no sim-weight change.
 - Blocked by: mlb-asof-roster-rebuild
 
 ### nba-season-phase — OPEN — opened 2026-10-05 — session e0a3e383-4fa1-4669-8740-c9a46b681c7a
