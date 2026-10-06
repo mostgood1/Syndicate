@@ -20,7 +20,10 @@ import json
 import os
 import pickle
 import random
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # records.pkl pickles syndicate types
 
 STAT = {"SOG": "sog", "GOALS": "g", "ASSISTS": "a", "POINTS": "pts", "BLOCKS": "blk", "SAVES": "sv"}
 LINES = {"SOG": (1.5, 2.5, 3.5), "GOALS": (0.5,), "ASSISTS": (0.5,), "POINTS": (0.5, 1.5), "BLOCKS": (1.5,),
