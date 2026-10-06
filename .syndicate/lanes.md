@@ -890,6 +890,14 @@ death, never life — do not invert it.
   - GUARD (Nov+, 11 lines): none worse; better SOG@1.5 -0.00373, SOG@2.5 -0.00148, POINTS@0.5 -0.00146, POINTS@1.5 -0.00052, SAVES@28.5 -0.01062.
   - October, reported only (production keeps it at the prior by date): SOG@3.5 +0.00020 [+0.00001, +0.00051], the one boundary cell.
   - No action: the Nov 1 enable stands.
+- **PRE-REGISTERED H27 2026-10-06 ~14:30Z (user: "test the early-season shot volume fix with the in-season inputs"; before any arm runs):**
+  - The interaction no one has measured: lane nhl-early-season-shot-volume's fix (WIP, `C:/tmp/nhlprops/kept_patches/roster-volume-WIP.diff`, a = 0.4) sums the dressed skaters' `player_rates` shot_weight. After 2026-11-01 this lane's in-season player_rates AND team_rates both move. Its tuning used prior-season player rates and the team-rate rule only.
+  - Two props-harness runs on current main + that patch, applied in a SCRATCH worktree (never committed by this lane):
+    - both on the shipped in-season config (arm `floor10noblk`), 56 dates, n_sims 200, online;
+    - A = `SYNDICATE_NHL_ROSTER_SHOT_WEIGHT=0` (fix off), B = weight 0.4 (fix on).
+  - Paired Brier at the standard lines, B - A, game-clustered 95% CI.
+  - Bar = the shot-volume lane's own: **no line's CI entirely > 0 over all dates**. SOG@1.5/2.5/3.5 is the directly affected market, so it is reported first. Oct / Nov+ are reported, not gating. P(>= 1 false fail of 11 | null) ~ 0.24.
+  - Started only after the shot-volume lane's own A/B finishes and host RAM is free (1.3 GB free at 14:2xZ; peer memory gate ~2 GB). 6 workers.
 - Blocked by: none
 ### fleet-watchdog-auto-recovery — OPEN — opened 2026-10-04 — session 43e4d5fe-e05e-41bc-aae6-6d6986460b22
 - **GOAL VERDICT (checkpoint 2026-10-04 ~21:30Z / 4:30 PM CT).** Goal, verbatim: "The local fleet recovers by itself from a supervisor that is not running: the 5-minute watchdog, on a supervisor FAIL for >= 9 min (two consecutive checks), starts SyndicateLocalProduction (capped 3 attempts/hour, then alert-only; paused by a no_autostart file for deliberate maintenance). Verified by unit tests of the decision and a fleet reading; would have ended the 2026-10-04 08:39-13:53Z outage in ~10 min (postmortem, user decision 'Watchdog auto-recovery')" **GOAL: NOT MET -- built, tested, installed; live recovery branch unexercised.** `local_watchdog.recovery` + 7 tests; installed copy carries RECOVERY_START; live healthy reading recover False (deploys.md 2026-10-04 17:4xZ). LEFT: the first real supervisor-down >= 9 min must log RECOVERY_START and a healthy fleet. No deliberate outage to test it.
