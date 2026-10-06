@@ -3166,3 +3166,15 @@ own prior verdicts, not by anything failing.
 
 - **Measured:** the deploys.md prediction for the roster shot-volume fix said STL -2.8% and league +0.6-1%; the fleet showed STL +1.6% and league +2.0%. The code was right -- recomputed its way, every team matched within ~1 point. The prediction had been derived from a diagnostic script that counted unrated skaters as 0, while the code (and its tuning) count them at a replacement level; STL dresses 3 unrated skaters.
 - **Rule:** derive the expected post-deploy reading by calling the shipped function (or the same formula with every fallback it applies) on the live inputs, not from the diagnostic that motivated the change. A prediction from a different computation turns a correct deploy into an apparent miss.
+
+## 2026-10-06 — RULE: on Windows, `subprocess.run(["git", ...], timeout=)` does not stop git; and never `git fetch` the OneDrive primary repo from a scheduled job `[session 5da10f7c]`
+- **Measured:** the harvest launcher's `git fetch` of the primary checkout (on OneDrive, hundreds of refs and
+  worktrees) sat minutes in `rev-list --objects --not --all --alternate-refs`. Its 120 s timeout killed only
+  `git.exe`'s shim; the real fetch, `git-remote-https` and a `git archive` lived on as orphans for ~27 min, the disk sat
+  at 101% busy, and later runs stalled even importing a .py file (faulthandler trace in `importlib get_data`), each
+  killed by the task's 10-minute limit. Killing the orphans: disk busy 101% -> 14%.
+- **How to apply:** a scheduled job that needs repo code keeps its OWN small clone (`--depth 1 --filter=blob:none
+  --sparse`, measured ~2 s to update) outside OneDrive. Run git with stdin/stdout/stderr = DEVNULL (a captured pipe
+  held by a git grandchild blocks `subprocess.run` past its timeout), `-c gc.auto=0 -c maintenance.auto=false`,
+  `GIT_TERMINAL_PROMPT=0`. After any timeout, look for surviving `git.exe`/`git-remote-https.exe` and kill them.
+  Arm `faulthandler.dump_traceback_later` below the task's time limit so a stall leaves its own stack.
