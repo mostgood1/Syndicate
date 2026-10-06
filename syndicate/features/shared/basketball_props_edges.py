@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from syndicate.features.shared.memory_observability import log_dataframe_memory
+from syndicate.features.shared.basketball_props_availability import refuse_out_player_lines
 
 
 _PLAYER_PROP_BOOKMAKER_ALIASES = {
@@ -706,6 +707,11 @@ def export_props_edges_local(
             edges = _standardize_edge_columns(edges)
             if edges.empty:
                 raise ValueError(f"No edges computed for {date_str} (missing odds or predictions).")
+            # Lines for a player the injury feed lists OUT are refused here, each on its own fact, so every
+            # reader of this file (recommendations, slate, top-by-game, cards snapshot, board) inherits it
+            # (lane wnba-props-out-player-leak, on loan from nba-prop-calibration; kill switch
+            # SYNDICATE_PROPS_OUT_PLAYER_REFUSAL=0).
+            edges = refuse_out_player_lines(edges, source_root=source_root, date_str=date_str, league=league, out_dir=out_path.parent)
             priced_lines = int(len(edges.index))
             edges = edges[(edges["edge"] >= 0.0) & (edges["ev"] >= 0.0)].copy()
             if edges.empty:
