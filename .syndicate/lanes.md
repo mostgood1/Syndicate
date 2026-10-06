@@ -1019,6 +1019,11 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **RULE v2 AMENDMENT 5 — POPUP SAC FLY SPLIT, PRE-REGISTERED 2026-10-06 ~17:20Z (user: "then fix the popup sac fly split next"); pipeline paused (builds 11/20, 0 descent runs):**
+  - ENGINE: new GameConfig field `bip_sf_rate_pop` (default None = popups use `bip_sf_rate_flypop`, today's behaviour; byte-identical to be proven on seeded games). When set, POP outs use it and FLY outs keep `bip_sf_rate_flypop`.
+  - RATES: already measured under amendment 4 with the true base state, never fitted: fly_ball 102/136 = 0.750, popup 1/54 = 0.019.
+  - Descent arms: `bip_sf_rate_flypop=0.750 --cfg-set bip_sf_rate_pop=0.019` REPLACE the pooled 0.542. Line stays 0.657.
+  - Gates before relaunch: a test (pop rate used for POP only; None falls back), a byte-identical proof, and reachability.
 - **AMENDMENT 4 READINGS 2026-10-06 ~17:00Z (before any descent run) — and a MEASUREMENT BUG found and fixed:**
   - BUG: the first sac-fly pass selected plays by a play's `runners` list, which holds only runners who MOVED. It read 110/116 with 2 popups in 316 games: a runner who held on 3rd was invisible, so the sample kept only plays where he scored.
   - FIX: the pre-play base state now comes from the previous play's `matchup.postOn*` in the same half-inning; a pre-play runner absent from `runners` held.
