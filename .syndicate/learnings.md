@@ -3182,3 +3182,9 @@ own prior verdicts, not by anything failing.
 
 - **Measured:** `/api/board/layer2-shortlist` -> `per_sport_ingest.nfl.enrichment.projections.prop_coverage` read `artifact_week=35`, `artifact_season=14182`, `pct_projected=482.3` on a 7-date window. The per-date `/api/board/book-grid` read week 5, season 2026, 63.7-73.6%. On 2026-09-29 the same field verified a deploy (`3f28cdb7`) as "3 -> 4", when the window effectively held one date.
 - **Rule:** before trusting a week, season, id or pct read off an aggregate payload, check the aggregation: an identity field that is exactly N x a plausible value is a sum. Read the per-unit endpoint for identity, and use the aggregate only for counts.
+
+## 2026-10-06 -- A peer worktree's modified lanes.md is NOT evidence its lane is unlanded; read origin/main `[session af3cc595]`
+
+- **Measured:** `check_lane_invariants.py` in the primary tree flagged `layer2-coverage-identity-merge` and `wnba-slate-and-out-props` as "marker with no block anywhere". I found each block in its owner's worktree with `lanes.md` showing `M`, reported "written but not pushed", and messaged both owners. Both blocks were already on origin/main (`a1d3b030`; `dfb193bb`/`96228fcf`). The PRIMARY tree had been fast-forwarded minutes BEFORE they landed, and the check reads the primary tree.
+- **Rule:** before calling a lane block unlanded, `git show origin/main:.syndicate/lanes.md | grep '^### <slug> '` after a fresh fetch. A dirty `lanes.md` in a worktree only means that worktree differs from its own HEAD. An orphan-marker flag written minutes ago is most often a lane in flight or a lagging primary tree, never grounds to write or delete a block.
+- **Also 2026-10-06:** zero freeze/recommendation files for European soccer 09-21..10-08 was the FIXTURE CALENDAR (ESPN: no match in any of the nine leagues), not a writer defect. Before diagnosing a missing per-date artifact, count the real events for those dates.
