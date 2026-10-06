@@ -191,6 +191,61 @@ and no snap can end in a safety. S11 real (parser check): NFL 1.90 pts/game, NCA
   |delta| < 0.3; total SD up. As for H1/H2: **not shipped ON** -- the scoring level was fitted
   without these points, so ON alone will over-project totals until the joint re-fit.
 
+## H4 possession-aware drive priors — PRE-REGISTERED 2026-10-06 (user: "Fix it as H4, include in re-fit")
+
+**Found while setting up the re-fit.** `drive_priors.build_drive_priors:339-340` seeds the drive
+priors (drive success, turnover, explosive, ...) from `0.5 + home_offense_rating` and
+`0.5 + home_defense_rating` for EVERY drive. Measured, not inferred: an away possession's
+drive_success is 0.327 neutral, 0.327 with away offense +0.3 (unchanged), and 0.369 with HOME
+offense +0.3. The away team's drives use the home offense, and the home team's drives face the
+home team's OWN defense. Only per-play yardage (`play_simulator.py:383`) picks the right team.
+Same sign convention on both sides (defense rating = -EPA allowed; higher = better).
+
+- **Mechanism:** `CalibrationProfile.possession_aware_priors: bool = False`. ON: the possessing
+  team's offense rating and the OPPONENT's defense rating seed the priors.
+- **Lever added for the re-fit:** `CalibrationProfile.home_field_bonus: float = 0.0`, added to the
+  possessing team's offense rating when the home team has the ball, in both the play and the
+  drive-prior paths. There is no home-field term in the engine today -- the sim's home edge came
+  from structure (home receives the opening kick; under the halftime bug it often kept the ball),
+  measured as +1.1 -> +0.26 pts when H1 is switched on.
+- Byte-identity OFF/0.0 on the same sha; reachability `off != on`; a test that the away drive
+  moves with the away offense when ON.
+
+## JOINT RE-FIT — PRE-REGISTERED 2026-10-06 (user: "set up the joint re-fit with all three switches on"; H4 added by user decision)
+
+**Arm under test:** production's profile with `halftime_kickoff`, `fourth_down_decision_model`,
+`non_offensive_scoring`, `possession_aware_priors` ALL ON, plus re-fitted levers. **Baseline:**
+production as shipped (all OFF). Per sport; NFL and NCAAF fitted separately.
+
+**FIT set:** every 4th FIT game (NFL 2023-24: 136 games; NCAAF 2024 wk3-15: ~164), through
+production's own `build_projection` and env, **60 seeds** per game in the descent (300 for the
+final reads). The SAME games and seeds in every arm.
+
+**Moments (targets from the REAL FIT games, same harness counters):** game level -- mean total,
+mean home margin, SD(actual total - sim mean) vs mean sim total SD, same for margin; drive level --
+P(TD), P(FG), P(punt), P(TO), plays/drive, drives/team-game, P(TD|RZ); rating sensitivity --
+pts/drive in the weak and strong rating-gap terciles. Standardised error z = (sim - real) / SE_real
+(game-clustered bootstrap). **Objective = sum of z^2.**
+
+**Levers (coordinate descent, 2 passes, a move is kept only if the objective drops):**
+`home_field_bonus` {0, 0.03, 0.06, 0.09, 0.12}; `drive_yardage_multiplier`,
+`touchdown_weight_multiplier`, `red_zone_touchdown_weight_bonus`,
+`field_goal_attempt_base_probability` (grids around the shipped value, +-~25%);
+`drive_success_offense_sensitivity`, `drive_success_defense_sensitivity` {0.6, 0.8, 1.0, 1.2}.
+Any lever not shown reachable (`off != on` on one game) is dropped and the drop recorded.
+Measured rates from H2/H3 are FIXED, never levers.
+
+**VALIDATION (2025, read ONCE, 300 seeds, re-fit arm vs production), all must pass:**
+- (a) the objective on 2025 is >= 20% lower than production's;
+- (b) no moment's |z| grows by more than 1.0;
+- (c) margin MAE vs actual: paired delta upper 95% CI < +0.15 pts;
+- (d) total MAE vs actual: paired delta upper 95% CI < +0.15 pts;
+- (e) home-win Brier vs actual: paired delta upper 95% CI < +0.003;
+- (f) |sim - close| for total and margin (NFL nflverse close; NCAAF CFBD close): upper CI < +0.15.
+If any fails, nothing ships and the failure is recorded. If all pass, the result is a CANDIDATE
+profile artifact (`save_versioned_profile`) and a recommendation -- promotion to the fleet is a
+separate user decision, and the lane's mid-drive LIVE replay gate is still owed before it.
+
 ## Results
 
 (none yet -- NFL 544-game run in progress, then NCAAF 654)
