@@ -1526,6 +1526,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Unit: a stub run with a stale stamp rebuilds (switch on) and reuses (switch off); a matching stamp reuses. Fleet: next WNBA props run prints SMART_SIM_REUSE_EXCLUSIONS with stale=0 for unchanged sims (reused), and a drifted sim is rebuilt; deploys.md.
 - Blocked by: none
 
+### basketball-scenario-calibration — OPEN — opened 2026-10-06 — session e0a3e383-4fa1-4669-8740-c9a46b681c7a
+- Goal: For the shared NBA/WNBA SmartSim (vendor sim/events.py via basketball_props_smart_sim), each pre-registered game scenario is measured real (ESPN pbp/box, FIT window) vs sim (production engine, same FIT games, unmodified, per-draw recorder), flagged scenarios get default-off byte-identical mechanisms, measured rates go in every arm with a joint re-fit, and a combined config ships only if it beats production on the held-out window for quarter/half margin+total Brier vs book, live-interval replay Brier, and player minutes/prop MAE, every gate clearing its own SE; NCAAB gets the real-rate scenario table only (no in-repo sim).
+- Files: scripts/basketball_scenario_rates.py (NEW), tests/test_basketball_scenario_rates.py (NEW), .syndicate/findings_2026-10-06_basketball_scenario_calibration.md (NEW)
+- Hypothesis: The raw engine loses to the book on periods (WNBA Q2/Q3 Brier +0.013 with CIs excluding 0; NBA q1 +0.97, h1 +1.81 MAE) and on props (minutes bias -3.67 NBA / -2.96 WNBA; prop sd 1.4-1.9x too narrow) partly because hardcoded scenario rates are wrong or missing: fixed quarter shares, blowout triggers 18/15 not rescaled for WNBA, minutes that do not respond to game script, no intentional-foul FTs/bonus/foul-outs, a fixed possession count; measuring them and re-fitting closes part of the gap.
+- Falsification test: No combined config beats production on the held-out window on every gate (each clearing its own SE) -> nothing ships; every scenario whose real rate contains the sim rate in its 95% CI is recorded EXONERATED.
+- Verification: Findings file: Phase 1 real-vs-sim table per league with CIs and the pre-registered decision rule; per mechanism a byte-identical proof + reachability test; final held-out reading read once. Fleet change only by user decision.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
