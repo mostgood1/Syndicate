@@ -68,6 +68,26 @@ ratings, closing lines) and the intersection, and the result states the game cou
 Source: LOCAL files only (Render suspended since 2026-09-30); `data/` untracked mirror, vintage
 printed per file (mtime + row count).
 
+### Amendment 1 — 2026-10-06, written before any SIM-vs-REAL comparison was read
+
+- **S11 non-offensive points/game** (defensive + return TDs, safeties). Read from the engine: a
+  sim TURNOVER scores 0 (`possession_outcomes.classify_outcome`), there is no safety and no return
+  TD, so the sim's value is 0 by construction. **Disclosure:** the REAL value was seen while
+  reconciling the parsers (NFL 2023-24: 1.90/game, n=544) before this amendment was written; the
+  sim side is structurally 0, so no choice here depends on that reading.
+- **S12 drive-start field position** by how the possession began (half / after a score / after a
+  punt / after a turnover). Read from the engine: every post-score possession starts at the 25
+  (`drive_simulator.py:161`).
+- **NCAAF points rule (parser, not a scenario):** CFBD per-drive start/end scores LAG (a TD drive
+  reads 14 -> 14; 16 of 873 games went negative on the residual), so NCAAF drive points are taken
+  from the result (TD = 7, FG = 3), and S11 is counted directly (7 per defensive/return TD, 2 per
+  safety). **S7 (PAT/2pt value) is NOT MEASURABLE for NCAAF from this source** and is NFL-only.
+- **NCAAF FIT narrowed to 2024 weeks 3-15** (prior SP+ 2023 + 2024 in-season PPA, 14 CFBD calls,
+  654 FBS-vs-FBS games). 2023 would need 2022 SP+, which no local copy holds. The blend beta
+  44.66 was fit on 2024, so the NCAAF FIT ratings are in-sample for beta -- irrelevant to a
+  scenario-rate comparison, stated anyway.
+- **Seeds:** 300 (production's), measured ~17 s/game warm on this machine.
+
 ## Results
 
 (none yet)
