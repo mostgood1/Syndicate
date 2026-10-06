@@ -1316,11 +1316,6 @@ death, never life — do not invert it.
 - LIVE 2026-10-06 19:06:52Z: fleet ff to 2de13feb (by me, user instruction; deploys.md 50c0a9c7) carries the NBA recon producer + join fix. Watcher scratchpad/watch_recon.sh waits for the first NBA_RECON_REFRESH line.
 - READING 2026-10-06 19:40:24Z (deploys.md): first NBA recon written on the fleet -- 10-03 (1 game/31 rows), 10-04 (2/69), 10-05 (5/163); content checked (real finals, NBA codes). Step 2 OWED: bias pairs on a regular-season date after 2026-10-20.
 
-### nhl-early-season-shot-volume — CLOSED — opened 2026-10-06 — closed 2026-10-06 — session 5704bbd4-3c4f-4d88-9549-fa59e24ab70a
-- Goal: Early in a season, each NHL team's projected shot volume reflects the roster it actually dresses, not only last season's team rate, so players on teams that added or lost shooters stop being squeezed or inflated -- without making any prop line's Brier worse.
-- **GOAL: MET.** Reading: offline, prior-season-rate props arm SOG@1.5 -0.00124, SOG@2.5 -0.00104, SOG@3.5 -0.00061, POINTS@0.5 -0.00096 (CIs exclude 0), none worse; current-season regime byte-identical (scoped to team_rates_latest.csv, user decision "Prior-file only"). Fleet (f88c9453, ff 14:44:17Z, rebuild 14:51:03Z): projected team SOG moved exactly as the code computes (NJD +7.1%, TOR +6.1%, UTA +4.5%, FLA +5.4%, STL +1.6%, OTT -2.1%, league +2.0%); my written prediction missed STL/league by counting unrated skaters as 0 (deploys.md 14:52Z). Auto-off when team_rates_2026-2027.csv appears (2026-11-01). Full history in lanes_history.md.
-- Files: (none -- released at close)
-- Blocked by: none
 ### closed-lane-archive-20261006-1700 — CLOSED 2026-10-06 (GOAL MET: 1 block archived) — opened 2026-10-06 — session 5da10f7c-2faf-4ee1-9c98-33ffbab3771b
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Verdict: GOAL MET (partial by design). owner_liveness.py --idle-min 240 read 3 CLOSED blocks on origin/main, SAFE 0: mlb-hr-prop-calibration (owner b98d59a1 idle 1m) and closed-lane-archive-20261006-0823 (owner d6c259c7 idle 82m) left in place; scripts-fleet-default archived with --owner-idle-verified because its owner is this session, finished with it. Archiver verified claims unchanged (252) and OPEN headers unchanged (71); numstat lanes.md 1+/9-, lanes_closed.md 9+/0-.
@@ -1535,6 +1530,10 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Falsification test: No combined config beats production on the held-out window on every gate (each clearing its own SE) -> nothing ships; every scenario whose real rate contains the sim rate in its 95% CI is recorded EXONERATED.
 - Verification: Findings file: Phase 1 real-vs-sim table per league with CIs and the pre-registered decision rule; per mechanism a byte-identical proof + reachability test; final held-out reading read once. Fleet change only by user decision.
 - Blocked by: none
+### closed-lane-archive-20261006-1550 — CLOSED 2026-10-06 (GOAL MET: 1 blocks archived) — opened 2026-10-06 — session cad2e2a3-1131-47d8-9c97-ea6c7b88817e
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 at ~20:52Z returned SAFE for 1 of 17 CLOSED blocks; moved `nhl-early-season-shot-volume` to lanes_closed.md. The other 16 WAIT (table in log/2026-10-06.md).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1778,6 +1777,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - `nhl-compact-card-start-time` — CLOSED — opened 2026-09-22 — closed 2026-10-05 — session 3692ff18-8c0a-4e3c-9144-62db455acf14
 - `nhl-confirmed-goalies` — CLOSED — opened 2026-10-05 — closed 2026-10-05 — session 9ed26377-0ef3-4416-bc7b-54428f87ce5c
 - `nhl-drop-started-game-belt` — CLOSED — opened 2026-09-26, closed 2026-09-26 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- `nhl-early-season-shot-volume` — CLOSED — opened 2026-10-06 — closed 2026-10-06 — session 5704bbd4-3c4f-4d88-9549-fa59e24ab70a
 - `nhl-elite-assists` — CLOSED — opened 2026-10-05 — closed 2026-10-05 — session 5704bbd4-3c4f-4d88-9549-fa59e24ab70a
 - `nhl-elite-pp-onice` — CLOSED — opened 2026-10-05 — closed 2026-10-06 — session 5704bbd4-3c4f-4d88-9549-fa59e24ab70a
 - `nhl-ev-rotation` — CLOSED — opened 2026-10-05 — closed 2026-10-05 — session 5704bbd4-3c4f-4d88-9549-fa59e24ab70a
