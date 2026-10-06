@@ -3161,3 +3161,8 @@ own prior verdicts, not by anything failing.
 - **How to apply:** before flipping a default, grep the tests for calls that pass no explicit target, and put the
   "never read the real secret under test" rail in the RESOLVER (`'pytest' in sys.modules`), not in a conftest you may
   not hold. Tests of the real path must name their fixture file explicitly.
+
+## 2026-10-06 -- Compute a deploy prediction with the shipped code's own arithmetic (lane nhl-early-season-shot-volume)
+
+- **Measured:** the deploys.md prediction for the roster shot-volume fix said STL -2.8% and league +0.6-1%; the fleet showed STL +1.6% and league +2.0%. The code was right -- recomputed its way, every team matched within ~1 point. The prediction had been derived from a diagnostic script that counted unrated skaters as 0, while the code (and its tuning) count them at a replacement level; STL dresses 3 unrated skaters.
+- **Rule:** derive the expected post-deploy reading by calling the shipped function (or the same formula with every fallback it applies) on the live inputs, not from the diagnostic that motivated the change. A prediction from a different computation turns a correct deploy into an apparent miss.
