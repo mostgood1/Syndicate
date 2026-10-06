@@ -251,30 +251,6 @@ def _top_play_consensus_and_reasons(row: dict[str, object], *, max_plus_odds: fl
     return reasons, consensus, line_adv
 
 
-def _excluded_players_for_date(
-    *, processed_root: Path, date_str: str, predictions_rows: list[dict[str, object]]
-) -> tuple[dict[str, set[str]], object]:
-    """{team: {sim name keys}} for players the SmartSim drops as unavailable, and the key function.
-
-    The SAME helper and inputs as the sim (`_smart_sim_injuries_excluded_map_for_date_local` over
-    props_predictions and <processed>/../raw), so "OUT" means one thing on both paths. Until
-    2026-10-06 this exporter had no availability check: Allisha Gray (OUT on the feed 10-04..10-06)
-    was recommended for 10-07 (threes OVER 1.5, EV 31.7%) while the sim had dropped her.
-    """
-    from syndicate.features.shared.basketball_props_smart_sim import (
-        _norm_name_key,
-        _smart_sim_injuries_excluded_map_for_date_local,
-    )
-
-    excluded = _smart_sim_injuries_excluded_map_for_date_local(
-        processed_root=processed_root,
-        raw_root=processed_root.parent / "raw",
-        date_str=date_str,
-        props_df=pd.DataFrame(predictions_rows),
-    )
-    return {str(team).strip().upper(): set(names) for team, names in (excluded or {}).items()}, _norm_name_key
-
-
 def export_props_recommendations_local(
     *,
     processed_root: Path,
@@ -290,23 +266,6 @@ def export_props_recommendations_local(
     out_path = processed_root / f"props_recommendations_{date_str}.csv"
     model_map = _build_model_map(predictions_rows)
 
-    try:
-        excluded, name_key = _excluded_players_for_date(
-            processed_root=processed_root, date_str=date_str, predictions_rows=predictions_rows
-        )
-    except Exception as exc:  # noqa: BLE001
-        # Publishing with no availability check is the pre-2026-10-06 behaviour; say so rather than
-        # let a failed lookup read as "nobody is out".
-        print(f"[props_recommendations] AVAILABILITY_CHECK_FAILED date={date_str} {type(exc).__name__}: {exc}", flush=True)
-        excluded, name_key = {}, _normalize_player_name
-    dropped: list[str] = []
-
-    def _unavailable(player: object, team: object) -> bool:
-        if name_key(player) in excluded.get(str(team or "").strip().upper(), ()):
-            dropped.append(f"{player} ({str(team or '').strip().upper()})")
-            return True
-        return False
-
     cards: list[dict[str, object]] = []
     if not edges_rows:
         seen: set[tuple[str, str]] = set()
@@ -315,8 +274,6 @@ def export_props_recommendations_local(
             if key in seen:
                 continue
             seen.add(key)
-            if _unavailable(*key):
-                continue
             model = model_map.get((_normalize_player_name(key[0]), str(key[1]).strip().upper()), {})
             cards.append(
                 {
@@ -334,8 +291,6 @@ def export_props_recommendations_local(
             groups.setdefault((str(row.get("player_name") or ""), str(row.get("team") or "")), []).append(row)
 
         for (player, team), group_rows in groups.items():
-            if _unavailable(player, team):
-                continue
             plays: list[dict[str, object]] = []
             for row in group_rows:
                 market = str(row.get("stat") or row.get("market") or "").strip().lower()
@@ -376,11 +331,6 @@ def export_props_recommendations_local(
                         "model": model,
                     }
                 )
-    print(
-        f"[props_recommendations] UNAVAILABLE_DROPPED date={date_str} count={len(dropped)} "
-        f"players={','.join(sorted(dropped)) or '<none>'}",
-        flush=True,
-    )
     log_list_memory("basketball_props_recommendations.cards_pre_rows", cards)
     log_list_memory("basketball_props_recommendations.cards_post_grouping", cards)
 
