@@ -382,6 +382,9 @@ def simulate_play(
     outcome = _weighted_choice(rng, weights)
     offense_rating = simulation_input.home_offense_rating if possession_state.possession_owner == "home" else simulation_input.away_offense_rating
     defense_rating = simulation_input.away_defense_rating if possession_state.possession_owner == "home" else simulation_input.home_defense_rating
+    # Home field as a rating (H4 re-fit lever); 0.0, the default, adds nothing.
+    if profile.home_field_bonus and possession_state.possession_owner == "home":
+        offense_rating = offense_rating + profile.home_field_bonus
 
     if outcome == PlayOutcome.TOUCHDOWN:
         yards_gained = max(1, 100 - play_state.yardline)

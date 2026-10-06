@@ -336,8 +336,22 @@ def build_drive_priors(
 ) -> DrivePriorProfile:
     if isinstance(source, SmartSim2SimulationInput):
         payload = _copy_mapping(source.feature_generation_payload)
-        fallback_offense = _clamp(0.5 + float(source.home_offense_rating or 0.0), _INDEX_FLOOR, _INDEX_CEILING)
-        fallback_defense = _clamp(0.5 + float(source.home_defense_rating or 0.0), _INDEX_FLOOR, _INDEX_CEILING)
+        offense_rating = float(source.home_offense_rating or 0.0)
+        defense_rating = float(source.home_defense_rating or 0.0)
+        # H4: OFF keeps the home team's offense AND the home team's own defense for
+        # every drive (the defect, kept byte-identical). ON reads the teams on the field.
+        if possession_state is not None and getattr(profile, "possession_aware_priors", False):
+            if possession_state.possession_owner == "home":
+                offense_rating = float(source.home_offense_rating or 0.0)
+                defense_rating = float(source.away_defense_rating or 0.0)
+            else:
+                offense_rating = float(source.away_offense_rating or 0.0)
+                defense_rating = float(source.home_defense_rating or 0.0)
+        home_field_bonus = float(getattr(profile, "home_field_bonus", 0.0) or 0.0)
+        if home_field_bonus and possession_state is not None and possession_state.possession_owner == "home":
+            offense_rating += home_field_bonus
+        fallback_offense = _clamp(0.5 + offense_rating, _INDEX_FLOOR, _INDEX_CEILING)
+        fallback_defense = _clamp(0.5 + defense_rating, _INDEX_FLOOR, _INDEX_CEILING)
     else:
         payload = _copy_mapping(source)
         fallback_offense = 0.5

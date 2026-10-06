@@ -348,6 +348,21 @@ class CalibrationProfile:
     # the scoring level was fitted without these points (see `halftime_kickoff`).
     non_offensive_scoring: bool = False
 
+    # DRIVE PRIORS FROM THE TEAMS ON THE FIELD. Lane `football-scenario-calibration`
+    # H4 (2026-10-06). OFF: `drive_priors.build_drive_priors` seeds every drive from
+    # the HOME team's offense and the HOME team's own defense -- measured: an away
+    # drive did not move with the away offense and did move with the home offense.
+    # ON: the possessing team's offense and its opponent's defense, as
+    # `play_simulator` already does per play. Default OFF (see `halftime_kickoff`).
+    possession_aware_priors: bool = False
+
+    # HOME FIELD, AS A RATING. Added to the possessing team's offense rating when
+    # the HOME team has the ball, in the play AND drive-prior paths. 0.0 = no
+    # term, which is the engine today: its home edge came from structure (the
+    # opening kick, and the halftime-kickoff bug). A re-fit lever (H4); 0.0 is an
+    # exact no-op.
+    home_field_bonus: float = 0.0
+
     def to_dict(self) -> dict[str, float | str]:
         return {
             "name": self.name,
@@ -382,6 +397,8 @@ class CalibrationProfile:
             "halftime_kickoff": self.halftime_kickoff,
             "fourth_down_decision_model": self.fourth_down_decision_model,
             "non_offensive_scoring": self.non_offensive_scoring,
+            "possession_aware_priors": self.possession_aware_priors,
+            "home_field_bonus": self.home_field_bonus,
         }
 
 
