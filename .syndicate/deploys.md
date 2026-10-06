@@ -46716,3 +46716,9 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
   - rbi_1plus: 36 rows, |served - new| 0.00000, |served - old| 0.05686.
 - **Verdict:** the board's hitter-prop probabilities are computed with the re-fit maps.
 - **Caught-stealing fix (b6fd6189).** Code path confirmed: the fleet was at b6fd6189 before the 23:41Z and 23:55Z runs. The effect (~+0.1 outs/start) gets a paired replay reading next; not yet measured.
+
+## 2026-10-06 00:38:12Z (7:38 PM CT 10-05) -- soccer prop name join (18425937) on refresh-worker: SERVED reading -- MET (lane `soccer-prop-name-join`)
+- **Baseline:** served build 23:27:05Z: soccer `projections` pct_projected 85.9, player_miss_name 1,306, unmatched_player_rows 1,321 (138 of them "No Scorer").
+- **Load:** fleet ff to 18425937 (the user's first ff did not land; HEAD stayed 793299cd until re-run), refresh-worker restarted ~00:30Z (pid 1422936, code=18425937).
+- **verify (reading):** first build on the fix, `written_at` 00:38:12Z: rows_considered 10,086, **pct_projected 88.9, player_miss_name 861, unmatched_player_rows 878, player_surname_hits 282, player_alias_ambiguous 8, non_player_selection_rows 138**. Same as the offline A/B on the fleet grid (8,652 -> 8,957 projected rows).
+- **Residual sample** (squad gap, not join): Gannon-Doak, Baleba, Yarmoliuk, Donnum, Zabarnyi, Hanche-Olsen, Vazquez, Ciervo. Causes are traced in this session's log: stats-file-only squads, ø-fold rescue miss, slate-wide comma binding.
