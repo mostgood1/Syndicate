@@ -367,7 +367,11 @@ def test_paper_spend_does_not_consume_the_live_budget_and_vice_versa(monkeypatch
     monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "paper")
     execution_ledger.place_order(_request(stake=12.0))
 
-    assert guard.spent_today("2026-08-24", mode="paper")["dollars"] == 12.0
+    # A paper fill at Kalshi pays Kalshi's fee (`paper_fill_fee_fields`), and
+    # fees come out of the same budget as stake -- exactly as a live fill's do.
+    fee = execution_ledger.paper_fill_fee_fields(_request(stake=12.0))["fees_dollars"]
+    assert fee > 0
+    assert guard.spent_today("2026-08-24", mode="paper")["dollars"] == round(12.0 + fee, 2)
     assert guard.spent_today("2026-08-24", mode="live")["dollars"] == 0.0
     # The default is the strictest reading, not a pooled one.
     assert guard.spent_today("2026-08-24")["dollars"] == 0.0
@@ -384,8 +388,12 @@ def test_the_two_paper_books_do_not_share_a_budget(monkeypatch):
 
     # They exist to be compared. A shared budget would make each one's size
     # depend on the other's.
-    assert guard.spent_today("2026-08-24", venue="paper", mode="paper")["dollars"] == 12.0
-    assert guard.spent_today("2026-08-24", venue="paper:kalshi", mode="paper")["dollars"] == 7.0
+    # Each book pays its own fill's fee and only its own: `paper:kalshi` pays
+    # Kalshi's, the unrestricted `paper` book (no `book` named here) pays none.
+    fee_12 = execution_ledger.paper_fill_fee_fields(replace(_request(stake=12.0), venue="paper"))["fees_dollars"]
+    fee_7 = execution_ledger.paper_fill_fee_fields(replace(_request(stake=7.0), venue="paper:kalshi"))["fees_dollars"]
+    assert guard.spent_today("2026-08-24", venue="paper", mode="paper")["dollars"] == round(12.0 + fee_12, 2)
+    assert guard.spent_today("2026-08-24", venue="paper:kalshi", mode="paper")["dollars"] == round(7.0 + fee_7, 2)
 
 
 def test_the_caps_are_the_ones_the_user_set():

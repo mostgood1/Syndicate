@@ -58,6 +58,7 @@ __all__ = [
     "settle_orders",
     "settled_decisions_by_sport",
     "settlement_summary",
+    "stamp_closing_marks",
     "OUTCOME_WON",
     "OUTCOME_LOST",
     "OUTCOME_PUSH",
@@ -240,20 +241,26 @@ def grade_order(order: Mapping[str, Any], status: Mapping[str, Any]) -> dict[str
 
     raw = str(status.get("status") or "")
     if raw == STATUS_WON:
-        outcome, pnl = OUTCOME_WON, stake * profit_multiple - fees
+        outcome, gross = OUTCOME_WON, stake * profit_multiple
     elif raw == STATUS_LOST:
-        outcome, pnl = OUTCOME_LOST, -stake - fees
+        outcome, gross = OUTCOME_LOST, -stake
     else:
         # A DECIDED tie is a push: the stake comes back and the bet is neither
         # won nor lost. `resolve_bet_status` calls it `live_tied`, which reads
         # oddly for a finished game -- folding it into the losses would
         # understate every figure this module produces.
-        outcome, pnl = OUTCOME_PUSH, -fees
+        outcome, gross = OUTCOME_PUSH, 0.0
+    pnl = gross - fees
 
     return {
         "graded": True,
         "outcome": outcome,
         "pnl_dollars": round(pnl, 4),
+        # THE PRE-FEE FIGURE, kept beside the net one [2026-10-06]. Paper fills
+        # began paying their venue's fee on this date; every order graded
+        # before it booked `pnl_dollars` with no fee. `pnl_gross_dollars` is
+        # the series that stays comparable across that boundary.
+        "pnl_gross_dollars": round(gross, 4),
         "settled_value": status.get("current_value"),
         "line": status.get("line"),
     }
@@ -399,6 +406,7 @@ def settle_orders(
     selected_date: str,
     *,
     resolver: Callable[[Mapping[str, Any]], dict[str, Any]] | None = None,
+    closer: Callable[[Sequence[Mapping[str, Any]], str], Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Grade every ungraded, decided order for `selected_date`. Persists.
 
@@ -521,6 +529,7 @@ def settle_orders(
 
         order["outcome"] = verdict["outcome"]
         order["pnl_dollars"] = verdict["pnl_dollars"]
+        order["pnl_gross_dollars"] = verdict["pnl_gross_dollars"]
         order["settled_value"] = verdict["settled_value"]
         # THE SCOREBOARD, where the resolver supplied one. `settled_value` is
         # the margin, and a margin is self-consistent under an inverted sign
@@ -539,6 +548,12 @@ def settle_orders(
 
     if graded:
         dirty = True
+
+    # THE CLOSE, ON THE ROW, ONCE THE BET IS DECIDED. See `stamp_closing_marks`.
+    marks = stamp_closing_marks(orders, normalized, closer=closer)
+    if marks.get("stamped"):
+        dirty = True
+
     if dirty:
         _persist(state)
 
@@ -664,7 +679,156 @@ def settle_orders(
         "verified": agreements,
         "conflicts": conflicts,
         "unverifiable": dict(unchecked),
+        "closing_marks": marks,
     }
+
+
+# ---------------------------------------------------------------------------
+# CLOSING MARK  [2026-10-06, lane published-negative-ev]
+# ---------------------------------------------------------------------------
+#
+# P&L converges on a strategy's quality in thousands of bets; CLV does it in
+# hundreds, because every bet carries a continuous reading instead of a coin
+# flip. The worker already computes each order's CLV (`order_clv.clv_for_orders`
+# in `portfolio_commit`) -- but only as a per-market AGGREGATE in the plan, for
+# the plan's own date, and the per-order rows are dropped. So a settled order
+# carried no close at all, and `/portfolio/paper` could only show a live mark
+# for today's slate.
+#
+# This stamps the close onto the order itself, here, because settlement is the
+# worker step that already visits every decided order and already persists the
+# ledger. No request route computes it (CLAUDE.md: web does no heavy work).
+#
+# HONEST ABSENCE. An order with no resolvable close gets `clv_pct: None` and the
+# REASON, never 0.0 -- a zero CLV is a real reading (filled at the close) and an
+# unresolved one is the absence of a reading.
+#
+# BOUNDED. `clv_for_orders` runs only when some decided order on this date has
+# no mark (or an unresolved one due a retry), so a fully-marked date costs
+# nothing per cycle (`#241`: worker periodic work is never free). An unresolved
+# `no_close_for_market` is retried at most `_CLOSE_MAX_ATTEMPTS` times, at least
+# `_CLOSE_RETRY_SECONDS` apart, because a transient odds-history read and "this
+# market has no close" both arrive under that name; every other reason
+# (`unkeyable`, `no_entry_price`, `clv_uncomputable`) is a property of the order
+# and is final on the first attempt.
+_CLOSE_MAX_ATTEMPTS = 4
+_CLOSE_RETRY_SECONDS = 3600.0
+_CLOSE_RETRYABLE_REASONS = frozenset({"no_close_for_market"})
+_CLOSE_FIELDS = (
+    "clv_pct",
+    "close_price",
+    "close_source",
+    "close_captured_at",
+    "close_book_scope",
+    "matched_bookmaker",
+    "no_close_reason",
+)
+
+
+def _needs_closing_mark(order: Mapping[str, Any], now: datetime) -> bool:
+    if not order.get("outcome") or str(order.get("status") or "") != "filled":
+        return False
+    mark = order.get("closing_mark")
+    if not isinstance(mark, Mapping):
+        return True
+    if mark.get("clv_pct") is not None:
+        return False
+    if str(mark.get("reason") or "") not in _CLOSE_RETRYABLE_REASONS:
+        return False
+    if int(mark.get("attempts") or 0) >= _CLOSE_MAX_ATTEMPTS:
+        return False
+    checked = _parse_utc(mark.get("checked_at"))
+    return checked is None or (now - checked).total_seconds() >= _CLOSE_RETRY_SECONDS
+
+
+def _parse_utc(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def stamp_closing_marks(
+    orders: Sequence[dict[str, Any]],
+    selected_date: str,
+    *,
+    closer: Callable[[Sequence[Mapping[str, Any]], str], Mapping[str, Any]] | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Write `closing_mark` onto each decided order that lacks one. Mutates `orders`.
+
+    `closer(orders, date)` returns `order_clv.clv_for_orders`' report; it is
+    injectable so a test (or a caller that already ran the join) supplies rows
+    without reading odds history. Never raises: a CLV failure must not undo a
+    grade, so on error nothing is stamped and the next cycle tries again.
+    """
+    current = now or datetime.now(timezone.utc)
+    needing = [order for order in orders if _needs_closing_mark(order, current)]
+    if not needing:
+        return {"stamped": 0, "resolved": 0}
+
+    if closer is None:
+        from syndicate.features.shared.order_clv import clv_for_orders
+
+        def closer(rows, date):  # noqa: E306 -- default bound lazily
+            return clv_for_orders(rows, date=date)
+
+    try:
+        report = closer(needing, selected_date) or {}
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[paper_settlement] CLOSING_MARK_FAILED date={selected_date}"
+            f" orders={len(needing)} {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return {"stamped": 0, "resolved": 0, "error": type(exc).__name__}
+
+    by_key = {
+        str(row.get("idempotency_key") or ""): row
+        for row in (report.get("rows") or [])
+        if row.get("idempotency_key")
+    }
+    stamped = resolved = 0
+    reasons: dict[str, int] = {}
+    stamp_time = current.strftime("%Y-%m-%dT%H:%M:%SZ")
+    for order in needing:
+        row = by_key.get(str(order.get("idempotency_key") or ""))
+        if row is None:
+            # The join returned nothing for this order -- not a reading, so not
+            # stamped. It stays eligible and is retried next cycle.
+            reasons["not_in_report"] = reasons.get("not_in_report", 0) + 1
+            continue
+        previous = order.get("closing_mark") if isinstance(order.get("closing_mark"), Mapping) else {}
+        mark: dict[str, Any] = {
+            "reason": row.get("reason"),
+            "checked_at": stamp_time,
+            "attempts": int(previous.get("attempts") or 0) + 1,
+        }
+        for field in _CLOSE_FIELDS:
+            value = row.get(field)
+            if value is not None:
+                mark[field] = value
+        # ALWAYS PRESENT, possibly None: "no reading" must not look like a
+        # missing key a reader could default to zero.
+        mark["clv_pct"] = row.get("clv_pct")
+        order["closing_mark"] = mark
+        stamped += 1
+        if mark["clv_pct"] is not None:
+            resolved += 1
+        name = str(row.get("reason") or "")
+        reasons[name] = reasons.get(name, 0) + 1
+
+    print(
+        f"[paper_settlement] CLOSING_MARKS date={selected_date}"
+        f" eligible={len(needing)} stamped={stamped} with_clv={resolved}"
+        f" reasons={dict(sorted(reasons.items()))}",
+        flush=True,
+    )
+    return {"stamped": stamped, "resolved": resolved, "reasons": reasons}
 
 
 # How far back the straggler sweep will look, and how many slates it will do in

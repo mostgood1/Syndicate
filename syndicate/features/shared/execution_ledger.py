@@ -218,6 +218,11 @@ _LEAN_FIELDS = (
     "fill_price",
     "fill_stake_dollars",
     "fees_dollars",
+    # WHERE A PAPER FEE CAME FROM -- `venue_fees.taker_fee_per_contract`'s basis
+    # and its upper-bound flag. None on a live row, whose fee is the venue's own
+    # charge. See `paper_fill_fee_fields`.
+    "fee_basis",
+    "fee_is_upper_bound",
     # WHEN THE SUBMIT RESOLVED -- the write-ahead record being closed with a
     # venue response. NOT when the bet was decided. Grading is `outcome` +
     # `graded_at`, and `paper_settlement` exists because that distinction was
@@ -1394,6 +1399,8 @@ def _record_into_state(
         # "no fee" -- the same reason `outcome` is None rather than absent.
         # Filled in by reconciliation from the venue's own charge.
         "fees_dollars": None,
+        "fee_basis": None,
+        "fee_is_upper_bound": None,
         "venue_resolved_at": None,
         "settled_at": None,
         "venue_order_id": None,
@@ -1414,6 +1421,7 @@ def complete_order(
     fill_stake_dollars: float | None = None,
     venue_order_id: str | None = None,
     error: str | None = None,
+    fee_fields: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Close out a write-ahead record with what actually happened."""
     state = _load()
@@ -1425,6 +1433,7 @@ def complete_order(
         fill_stake_dollars=fill_stake_dollars,
         venue_order_id=venue_order_id,
         error=error,
+        fee_fields=fee_fields,
     )
     if updated is not None:
         _persist(state)
@@ -1440,6 +1449,7 @@ def _complete_in_state(
     fill_stake_dollars: float | None = None,
     venue_order_id: str | None = None,
     error: str | None = None,
+    fee_fields: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """`complete_order` against a ledger ALREADY LOADED, writing nothing.
 
@@ -1460,6 +1470,11 @@ def _complete_in_state(
         resolved_at = _utc_now()
         order["venue_resolved_at"] = resolved_at
         order["settled_at"] = resolved_at
+        # PAPER ONLY: the fee a real fill at this venue would have paid. A live
+        # fill's fee comes from the venue's own charge via reconciliation, so
+        # live callers never pass this. See `paper_fill_fee_fields`.
+        for field, value in (fee_fields or {}).items():
+            order[field] = value
         updated = dict(order)
         break
     return updated
@@ -1485,6 +1500,7 @@ def _place_paper_into_state(
         fill_price=request.requested_price,
         fill_stake_dollars=request.requested_stake_dollars,
         venue_order_id=None,
+        fee_fields=paper_fill_fee_fields(request),
     )
     return (completed or record), True
 
@@ -1763,6 +1779,7 @@ def place_order(
             fill_price=request.requested_price,
             fill_stake_dollars=request.requested_stake_dollars,
             venue_order_id=None,
+            fee_fields=paper_fill_fee_fields(request),
         ) or record
 
     # LIVE. A duplicate is answered by its existing row BEFORE anything is
@@ -2030,6 +2047,92 @@ def _price_as_probability(value: Any) -> float | None:
 
         return american_to_probability(parsed)
     return None
+
+
+# THE FEE A PAPER FILL WOULD HAVE PAID  [2026-10-06, lane published-negative-ev]
+#
+# Before this, every paper order recorded `fees_dollars = None` and settled
+# with the fee charged as zero -- 623 settled orders on 2026-10-02..05, most of
+# them at exchanges. A paper book that pays no fees overstates the strategy by
+# exactly the venue's cut.
+#
+# ONE FEE SCHEDULE. The per-contract fee is `venue_fees.taker_fee_per_contract`,
+# the same call the board's `score_v2` and the venue plans make, so the fee a
+# paper fill pays is the fee the row was scored and sized against. A venue that
+# function does not charge (every sportsbook, and any exchange whose schedule
+# it has not measured) records 0.0 with basis "none" -- the module's own
+# answer, not a second table here. The fee is a property of the VENUE the line
+# fills at, never a reason to drop the line.
+#
+# GATED BY CONSTRUCTION ON FILLS FROM NOW ON: this runs only at a paper fill,
+# so no order filled before it is rewritten. Those keep `fees_dollars = None`
+# and no `fee_basis`, which `paper_settlement.grade_order` reads as "unknown,
+# charged as zero" exactly as before.
+FEE_BASIS_UNPRICEABLE = "unpriceable"
+
+
+def _fee_venue(venue: Any, book: Any) -> str:
+    """Where the fill happens: the book that quoted the price.
+
+    `paper` is the unrestricted book's ledger name, not a venue, and
+    `paper:<venue>` is a scoped shadow book whose venue is the suffix.
+    """
+    book_text = str(book or "").strip().lower()
+    if book_text:
+        return book_text
+    venue_text = str(venue or "").strip().lower()
+    if venue_text.startswith("paper:"):
+        return venue_text.split(":", 1)[1]
+    return venue_text
+
+
+def paper_fill_fee_fields(request: Any) -> dict[str, Any]:
+    """`{fees_dollars, fee_basis, fee_is_upper_bound}` for a paper fill.
+
+    Accepts an `OrderRequest` or an order row. Never raises: a fill must not be
+    lost to a fee we could not price. An unpriceable fill records
+    `fees_dollars = None` (unknown) -- never 0.0, which would claim the venue
+    charged nothing.
+    """
+    from syndicate.features.shared import venue_fees
+
+    def _get(name: str) -> Any:
+        if isinstance(request, Mapping):
+            return request.get(name)
+        return getattr(request, name, None)
+
+    fill_price = _get("fill_price")
+    if fill_price is None:
+        fill_price = _get("requested_price")
+    stake = _get("fill_stake_dollars")
+    if stake is None:
+        stake = _get("requested_stake_dollars")
+    prob = _price_as_probability(fill_price)
+    try:
+        stake_value = float(stake)
+    except (TypeError, ValueError):
+        stake_value = None
+    if prob is None or stake_value is None or not (stake_value > 0) or not (0.0 < prob < 1.0):
+        return {"fees_dollars": None, "fee_basis": FEE_BASIS_UNPRICEABLE, "fee_is_upper_bound": None}
+    try:
+        per_contract, basis, bound = venue_fees.taker_fee_per_contract(
+            _fee_venue(_get("venue"), _get("book")),
+            prob,
+            venue_ref=_get("venue_ticker"),
+            sport=_get("sport"),
+            market=_get("market"),
+            segment=_get("segment"),
+        )
+    except Exception as exc:  # noqa: BLE001 -- see docstring
+        return {
+            "fees_dollars": None,
+            "fee_basis": f"fee_error:{type(exc).__name__}",
+            "fee_is_upper_bound": None,
+        }
+    contracts = stake_value / prob
+    raw = contracts * float(per_contract)
+    fees = venue_fees.ceil_to_fee_precision(raw) if raw > 0 else 0.0
+    return {"fees_dollars": fees, "fee_basis": basis, "fee_is_upper_bound": bool(bound)}
 
 
 def _venue_reader(venue: str):
