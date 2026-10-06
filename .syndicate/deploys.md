@@ -46999,3 +46999,9 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - **Instrument trap:** the grid's DEFAULT response is capped at 300 of 721 rows (`total_rows` 721, `rows_truncated` 0)
   and held 0 SAVES rows. The scheduled task `nhl-saves-negbin-board-verify` curled without `limit` and would have
   read "0 SAVES rows"; it had not dispatched by 21:05Z and is now DISABLED (this reading supersedes it).
+
+## 2026-10-06 21:17:11Z (4:17 PM CT) -- refresh-worker restart ABANDONED for now; drain lifted (lane `published-negative-ev`, follows the 20:09:27Z ff entry)
+
+- what happened: drains held from ~20:10Z with gaps (drain #1 unacked behind a 2h odds child; #2 and #3 hit the 15-min cap as refresh-worker ran odds jobs back to back). While drained, refresh-worker logged `DRAIN_HOLD stage=mlb_sim_tick reason=deploy_drain_requested` every ~30-60 s (seen 21:08-21:12Z) -- the drain was HOLDING THE MLB SIM TICK on a playoff evening. That cost outweighs a paper-only fee change, so the restart loop was killed and the drain lifted (`DRAIN_CLEARED owner=published-negative-ev` 21:17:11Z).
+- verified after: `[refresh_worker] MALLOC_ARENA stage=post_mlb_sim_tick` at 21:17:21Z (the tick ran 10 s after the undrain); no DRAIN_HOLD since. refresh-worker still pid 2563384 `code=2491d701` -- the ProphetX/Novig fees (eb5a32d8) are NOT loaded yet.
+- next: restart refresh-worker in a quiet window (overnight, no live slate), or let a natural restart load HEAD; the 20:09:27Z prediction + verify stand unchanged.
