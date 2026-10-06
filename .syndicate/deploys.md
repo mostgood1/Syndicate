@@ -46781,3 +46781,36 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 
 - reading: props_recommendations_all_markets_2026-10-06.csv rebuilt 14:51:03Z (first after the ff): projected team SOG FLA 25.9 -> 27.3 (+5.4%), NJD 29.4 -> 31.5 (+7.1%), OTT 28.2 -> 27.6 (-2.1%), STL 24.5 -> 24.9 (+1.6%), TOR 26.3 -> 27.9 (+6.1%), UTA 26.9 -> 28.1 (+4.5%); league mean 26.71 -> 27.24 (+2.0%).
 - the deploys.md prediction was WRONG for STL (predicted -2.8%) and the league mean (+0.6-1%): my prediction counted unrated skaters as 0 while the code counts them at replacement (F 1.2 / D 0.9, the same values the tuning used). Recomputed the code's way from the fleet files: FLA +4.6%, NJD +7.1%, OTT -2.7%, STL +2.3% (3 unrated skaters), TOR +6.6%, UTA +5.0%, league +2.0% -- every team within ~1 point of the observed change (sim noise). The code does what it was built to do; the stated predicate missed.
+
+## 2026-10-06 16:45:28Z (11:45 AM CT) -- LOCAL FLEET FILE SWITCH: NBA sim availability (K=2 + prop-line re-admit) file placed; NOT LIVE until the fleet carries 2327738b (lane `nba-prop-calibration`)
+
+- what: `~/syndicate-prod/data/nba_source/data/processed/nba_sim_availability.json`
+  (`{"enabled": true, "k": 2, "readmit_with_prop_line": true}`), placed by the NCAAF/watcher session on the user's
+  instruction ("turn on NBA availability"). No ff and no restart came with it.
+  - It turns on `nba_sim_availability.add_nba_recency_exclusions`, called from
+    `basketball_props_smart_sim._smart_sim_run_date_local` (51d68f1a + 2327738b).
+  - NBA regular-season slates only: a player who appeared for the team this season but in neither of its last 2
+    regular-season games is left out of the sim pool, unless he has a posted pre-tip prop line, or the sim places him on
+    another team (a trade).
+  - Add-only: it never removes an injury exclusion.
+- why: findings "NBA availability (K=2), engine re-run" -- H-A3 MET (paired, 42 dates). Minutes MAE −1.92
+  [−2.08, −1.76]; book-line Brier better in 6 of 7 markets, none worse. The prop-line re-admit is a labelled post-hoc
+  user override of H-A4.
+- measured at 16:46:31Z:
+  - file: 322 B, sha256 e9e5a5952e6fc117, identical to C:\tmp\nba_bt\nba_sim_availability.json.
+  - fleet checkout: f88c9453. It does NOT contain 51d68f1a / 2327738b (objects not even fetched), so the code that
+    reads the file is not on the fleet. NOT LIVE.
+- takes effect: with the next fleet ff by any session. The rule runs inside the per-run NBA props refresh and reads
+  the file per call, so no restart is needed.
+- expect:
+  - Every NBA sim run logs `[nba_sim_availability] NBA_SIM_AVAILABILITY {...}` in
+    `nba_source/logs/syndicate_refresh_oddsapi_props_<D>.log`.
+  - Until 2026-10-20: `applied: false`, reason "slate phase preseason: rule measured on the regular season only"
+    (dry-run on a scratch copy of fleet data, 10-06/10-19). On 10-20: applied, 0 teams (no 2026-27 regular history).
+  - The first exclusions come at each team's 3rd regular-season game.
+- verify: OWED.
+  - (1) The first NBA_SIM_AVAILABILITY line after the ff (preseason, applied=false) -- a watcher is running.
+  - (2) Regular-season week 1: players dropped per team-game, readmitted_with_prop_line, skipped_traded, and the
+    minutes shift vs the K-off counterfactual.
+- off switch: SYNDICATE_NBA_SIM_AVAILABILITY=0 (env, needs a restart), or delete the file / set "enabled": false (no
+  restart).
