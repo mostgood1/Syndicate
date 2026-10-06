@@ -1104,6 +1104,14 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 32 of 32 CLOSED blocks SAFE (owners idle 586-13755m, blocks last modified 726-2592m ago); none named in an uncommitted worktree diff. Moved all 32 to lanes_closed.md with one pointer each; lanes.md 573,199 -> 469,455 B before this block. Table and Part B report in log/2026-10-06.md.
 - Moved: nhl-compact-card-start-time, nhl-lines-backtest, soccer-lines-props-backtest, mlb-pregame-sim-freeze, soccer-1x2-ratings-xg-source, mlb-starter-length, nfl-live-segment-interval, nba-day-of-sweep-ownership, layer2-hidden-row-split, nhl-pp-units-real-toi, wnba-minutes-redistribution, layer2-stale-quote-sample, nba-1005-calibrated-resim, nhl-ev-rotation, soccer-xg-totals-bias, nhl-ev-rotation-fullseason, local-env-role-scoped-pin, nhl-elite-assists, nhl-confirmed-goalies, soccer-scorer-race-grade, stop-market-withholding, layer2-unmeasured-per-line, nhl-scratch-dilution, mlb-strikeout-bias, nfl-prop-projection-input-refresh, mlb-hr-rate, mlb-pa-length, mlb-non-pa-outs, nhl-elite-pp-onice, nhl-saves-skill-registry, soccer-ou-loss-source, soccer-prop-name-join
 
+### nhl-early-season-shot-volume — OPEN — opened 2026-10-06 — session 5704bbd4-3c4f-4d88-9549-fa59e24ab70a
+- Goal: Early in a season, each NHL team's projected shot volume reflects the roster it actually dresses, not only last season's team rate, so players on teams that added or lost shooters stop being squeezed or inflated -- without making any prop line's Brier worse.
+- Files: syndicate/features/nhl/sim_engine/hockeysim/features/loaders.py (team-rate / feature assembly only; the team special-teams loader stays on loan to lane nhl-pp-time), tests/test_hockeysim_props.py, tests/test_hockeysim_loaders_roster_volume.py (NEW)
+- Hypothesis: MEASURED 2026-10-06 (fleet, 10-06 slate): team shots are pinned to the frozen 2025-26 team rate while rosters changed; dressed-roster sum of 2025-26 per-game shot rates / team rate = NJD 1.14, UTA 1.12, TOR 1.12, FLA 1.07, OTT 0.90, STL 0.93 (median 1.02). The in-season blend (inseason_season_inputs.py) keeps that prior and only admits this season after 10 games. Fix at feature assembly: shots_per_60 = (1-a)*team_rate + a*c*roster_sum, a = a0*K/(K+n_current_games), c = league ratio. a0, K tuned out-of-sample on October 2025 (2024-25 rates as prior) BEFORE touching code.
+- Falsification test: Refuted if the roster-implied blend does not beat the prior team rate at forecasting October-2025 team SOG (paired, CI excluding 0), or the paired props backtest makes any line's Brier worse.
+- Verification: Out-of-sample team-SOG forecast gain on Oct 2025; props A/B on early-season 2025-26 dates no line worse; then fleet: projected team SOG tracks the roster ratio (TOR/NJD/UTA up, OTT/STL down).
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
