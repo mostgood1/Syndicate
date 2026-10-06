@@ -46722,3 +46722,9 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - **Load:** fleet ff to 18425937 (the user's first ff did not land; HEAD stayed 793299cd until re-run), refresh-worker restarted ~00:30Z (pid 1422936, code=18425937).
 - **verify (reading):** first build on the fix, `written_at` 00:38:12Z: rows_considered 10,086, **pct_projected 88.9, player_miss_name 861, unmatched_player_rows 878, player_surname_hits 282, player_alias_ambiguous 8, non_player_selection_rows 138**. Same as the offline A/B on the fleet grid (8,652 -> 8,957 projected rows).
 - **Residual sample** (squad gap, not join): Gannon-Doak, Baleba, Yarmoliuk, Donnum, Zabarnyi, Hanche-Olsen, Vazquez, Ciervo. Causes are traced in this session's log: stats-file-only squads, ø-fold rescue miss, slate-wide comma binding.
+
+## 2026-10-06 01:19:11Z (8:19 PM CT 10-05) -- NFL live game lines priced with the per-sport publish switch deleted (57d061dd): SERVED reading -- MET (lane `stop-market-withholding`)
+- **Context:** the fleet refresh-worker env still carries `SYNDICATE_LIVE_GAMELINE_PUBLISH_DISABLED_SPORTS=nfl` (set 2026-09-28); 57d061dd made it inert.
+- **Join, 00:27:20Z build (ATL @ NO in progress):** `live_gamelines` considered 44, priceable 1, withheld 43 = segment_is_not_full_game 30, live_resim_published_no_distribution_for_this_market 10, quote_older_than_live_pricing_ceiling 3. **Zero `model_edge_publishing_disabled_for_sport`.**
+- **verify (reading):** served build 01:19:11Z: 3 live NFL game rows on the board, 1 `priceable: true` (h2h full home, model 0.2229 vs market 0.3492, edge_pp -12.63), 2 withheld `live_resim_published_no_distribution_for_this_market`.
+- Note: builds 23:27Z-00:27Z carried no live NFL game rows while 150 live props were served. That is gone by 01:19Z; the cause was not traced.
