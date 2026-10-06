@@ -1290,6 +1290,12 @@ death, never life — do not invert it.
 - Hypothesis: PRE-REGISTERED 2026-10-06 (user: 'Measure first'). Few-match handling, scratch harness, leak-free as-of, 300 sims, TRUE close, matches where either side has < 20 rated matches as of the day (fresh ratings incl. current-season rows), 2025-08-01..2026-09-20, all nine leagues. Arms: RAW (production behaviour once the refresh ships: rating from however many rows exist; absent teams get PROMOTED_TEAM_RATING as _fill_promoted does), DEFAULT (a team with < 10 rows keeps PROMOTED_TEAM_RATING -0.18/-0.18), BLEND (for every team with n < 20 rated rows: attack/defense = (n*raw + 10*(-0.18))/(n+10); n >= 20 raw; other rating fields left raw). PRIMARY: 1X2 Brier on those matches, paired per match. Decision rule fixed now: ship DEFAULT unless RAW or BLEND beats DEFAULT with a paired CI wholly below 0, in which case ship the better of those. Expectation: BLEND <= DEFAULT < RAW (few-match raw ratings are noise)
 - Falsification test: Expectation refuted if RAW beats DEFAULT with CI below 0 (few-match current rows carry signal the prior lacks). The refresh itself is NOT shipped if, on matches where both sides have >= 20 rows, current-season ratings are worse than stale ones with a CI excluding 0 (H-STALE read -0.0063 [-0.0156, +0.0024], n 183, xG five only)
 - Verification: Findings file: per-arm n, dates, per-family coverage, 1X2 + O/U 2.5 Brier paired CIs, decision per the rule. Then code + tests, fleet ff, and a reading: teams_<season>.csv / matches_<season>.csv present on the fleet with mtime < 24h, and a rebuilt artifact whose ratings include 2026-27 rows (e.g. a team's matches count or a promoted team's handling per the chosen arm), recorded in deploys.md
+### soccer-squad-name-fold — OPEN — opened 2026-10-06 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: Soccer squad and starter name matching folds non-decomposing letters (ø æ œ ł đ ß ...) like the board's name normaliser, so a player such as Aron Dønnum (stats file) is rescued by the roster check against 'Aron Donnum' instead of being dropped as departed; verified by unit tests and by Dønnum appearing in the next ligue_1 recommendations player_props after a soccer artifact rebuild
+- Files: syndicate/features/soccer/features/lineups.py, tests/test_soccer_squad_name_fold.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: Tests; fleet: next ligue_1 build lists Aron Donnum
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

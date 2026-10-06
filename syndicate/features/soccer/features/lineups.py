@@ -30,7 +30,18 @@ _DEFAULT_MIN_STARTERS = 7
 
 
 def _norm_player_name(name: str) -> str:
-    text = unicodedata.normalize("NFKD", str(name or ""))
+    """Accent-folded, lower-cased player name for squad, roster and starter matching.
+
+    LETTERS THAT DO NOT DECOMPOSE ARE FOLDED FIRST (lane `soccer-squad-name-fold`,
+    2026-10-05). NFKD strips combining accents but leaves `ø æ œ ł đ ß` intact, so
+    the stats file's `Aron Dønnum` never equalled the ESPN roster's `Aron Donnum`,
+    the departed-player roster rescue (`build_soccer_artifacts._drop_departed_players`)
+    missed him, and he was dropped from every ligue_1 squad. Uses the board's own
+    table (`prop_projections._LIGATURE_FOLD`) so the two normalisers cannot drift.
+    """
+    from syndicate.features.shared.prop_projections import _LIGATURE_FOLD
+
+    text = unicodedata.normalize("NFKD", str(name or "").translate(_LIGATURE_FOLD))
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
     return " ".join(text.lower().replace(".", " ").replace("-", " ").split())
 
