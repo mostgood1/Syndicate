@@ -1054,6 +1054,16 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **DESCENT DONE + PIPELINE BUG 2026-10-06 ~23:25Z (no validation outcome read):**
+  - Descent (24 FIT dates, 100 sims, 33 arms): objective **12564 -> 35.8**. Chosen:
+    - pitch model: base_hbp 0.0015, early_count_foul_boost 1.5, base_in_play 0.23 (unchanged), hr_rate_mult 1.856;
+    - bip_dp_rate 0.30;
+    - manager: starter_short_start_prob 0.14, shelled hook (4, 1.0), pickoff_rate 0.01;
+    - plus every measured input.
+  - BUG: `cfg_args.py` imports descent.py, which reads DATES at import. The pipeline did not set it, so it crashed silently and `CH` was EMPTY.
+    - So the prop collect, the map re-fit (19x KEEP_CURRENT) and the 'chosen' validation replays all ran at PRODUCTION config. val_chosen == val_prod byte for byte in size.
+    - Those files are renamed `INVALID_prodcfg_*` and never read. val_prod / props_val_prod are genuine production arms (unread).
+  - FIX: pipeline2.sh sets DATES and GATES ON THE OUTPUT: it refuses to run unless the args contain the chosen values. It re-runs only the chosen-config steps.
 - **AMENDMENT 11 RESULT 2026-10-06 ~18:20Z: FLOOR NOT MET -> no mechanism; the descent was never interrupted.**
   - 310 FIT-window games: **5 steal-of-home attempts**. <= 1 out: 1 (caught); 2 outs: 4 (3 safe, 1 caught). Far below the 10-attempt floor.
   - Too rare to set a rate from 24 dates, and worth ~0.016 runs per game at most. Recorded as a known unmodelled event.
