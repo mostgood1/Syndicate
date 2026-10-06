@@ -1372,6 +1372,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### mlb-asof-roster-rebuild — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **FIDELITY RESULT 2026-10-06:** per-PA economy reproduces; STARTER LENGTH does not (outs -0.66, 15-out share +0.07). Suspects: stamina from byDateRange totals (06-15 inputs: stamina -2.8 pitches), the quality hook with statcast off, empty bullpen availability. NEXT: diagnose and fix the builder, re-run the same gate.
 - Goal: A leak-free as-of rebuild of MLB sim inputs (TeamRoster artifacts) for past dates, built by a Syndicate-owned script that bounds every stat input at D-1 (statsapi byDateRange endDate=D-1, game logs filtered < D, statcast layers off, BvP end_date=D-1, stored pregame lineups/probables, fresh cache) without touching the production builder; ADMITTED as the combined calibration's validation set only if its fidelity check passes: rebuilt vs stored roster_objs on 06-15..06-20 replay to the same starter/batting moments within MC noise
 - Files: scripts/mlb_asof_roster_build.py (NEW), tests/test_mlb_asof_roster_build.py (NEW), .syndicate/findings_2026-10-06_mlb_asof_roster_rebuild.md (NEW)
 - Hypothesis: With statcast layers off and season stats bounded at D-1, the rebuilt rosters replay to starter outs/K/BF and batting HR/H/BB per PA within MC noise of the stored production rosters
@@ -1424,6 +1425,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **FIDELITY GATE (0) RESULT, 2026-10-06 ~01:30Z: FAIL, so the validation set is NOT admitted; per the rule, stop, ship nothing.** Rebuilt vs stored, 06-15..06-20, 73 games, same seeds, 200 sims. Every per-PA moment, DP/PO and runs/game agree within tolerance. FAIL on starter outs mean 16.16 -> 15.51 (-0.66 vs tol 0.30) and the ==15 share 0.38 -> 0.45 (+0.07 vs 0.03). The difference is systematic, not MC. Validation OUTCOMES were never read, so fixing the builder and re-running this same gate is admissible.
 - **COMBINED CALIBRATION RULE, PRE-REGISTERED 2026-10-06 ~02:30Z before any fidelity or descent run** (user: "ship the combined calibration if it passes").
   - **Data.**
     - FIT = the 26 replay dates 2026-06-15..07-12 (565 starts). The old tune/holdout split is retired: both halves are already read.
