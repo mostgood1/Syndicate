@@ -5773,8 +5773,23 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
             # NBA-only; for WNBA sim_is_stale returns False without reading the file.
             from syndicate.features.shared.nba_prop_calibration import sim_is_stale as _nba_calibration_stale
 
+            # (lane smart-sim-reuse-stale-exclusions, LOANED) a sim built with a different exclusion set than this run
+            # would pass is STALE: the scoped trigger misses D+1 dates, new-date baselines, unhashed exclusion inputs and
+            # launch-gate refusals, so without this a sim keeps an OUT player (or drops a returned one) until tip.
+            from syndicate.features.shared.smart_sim_reuse import reuse_verdict as _exclusions_current
+
             if _smart_sim_file_has_players_local(out_path) and not _nba_calibration_stale(
                 out_path, league_code=league_code, processed_root=processed_root
+            ) and _exclusions_current(
+                out_path,
+                expected=_excluded_keys_for_source_filter(
+                    excluded_map,
+                    (home_tri, away_tri),
+                    _build_local_smart_sim_module(processed_root=processed_root, league_code=league_code),
+                ),
+                teams=(home_tri, away_tri),
+                date_str=date_str,
+                league=league_code,
             ):
                 skipped += 1
                 continue
