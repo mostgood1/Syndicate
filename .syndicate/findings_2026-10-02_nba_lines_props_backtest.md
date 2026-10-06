@@ -463,3 +463,56 @@ histogram (`nba_game_projections.py:274-291`), which is not market-anchored.
 - Even in the 2025-26 regular season, the raw sim's OOS weight vs the line was 0.00 (margin) / 0.05 (total).
 - The user chose "blend to market, build it" (pre-registered H-G1 in lanes.md).
 
+## NBA availability (K=2), engine re-run, paired: H-A3 MET; still no information beyond the book `[2026-10-06, e0a3e383]`
+
+**Substrate.**
+- `scripts/resim_nba_availability.py` (9d60ef66): today's engine re-run as-of per date, twice, identical except
+  for the rule (scratch code copy; roster mode forced to pregame).
+- Base arm: availability off. Avail arm: K=2, i.e. left out if absent from the team's last 2 games, read from
+  regular-season player_logs.
+- **42 dates (2026-03-01..04-12), 334 games, 500 sims, 0 errors.**
+- Paired on (date, game, player) for players who played: **6,488 rows**. Book lines: the OddsAPI backfill, pre-tip,
+  two-sided, de-vigged; 149,677 lines scored.
+- **No pregame injury feed in either arm**: none exists before 2026-09-30. This measures the no-injury-feed case;
+  production has had injury exclusions working since 10-04/05.
+- Scored with `score` -> C:\tmp\nba_bt\availability_compare.json.
+
+**H-A3 (pre-registered b02481a4) -- MET on all three gates.**
+
+| measure | base | K=2 | paired diff [95% CI, game-clustered] |
+|---|---|---|---|
+| (a) played-player minutes MAE | 7.39 | 5.47 | **−1.92 [−2.08, −1.76]** |
+| minutes bias | −6.10 | −2.36 | +3.74 [+3.54, +3.93] |
+| (b) sim minutes to NON-players / team-game | 67.4 / 240 | 38.0 / 240 | — |
+
+**(c) Brier at the de-vigged book line** (no market worse):
+
+| market | lines | base | K=2 | diff [CI] | book | K=2 − book [CI] |
+|---|---|---|---|---|---|---|
+| pts | 49,527 | 0.3042 | 0.2784 | −0.0257 [−0.0304, −0.0214] | 0.2426 | +0.0358 [+0.0299, +0.0421] |
+| pra | 29,983 | 0.3275 | 0.2922 | −0.0352 [−0.0405, −0.0299] | 0.2474 | +0.0448 [+0.0370, +0.0529] |
+| reb | 27,396 | 0.2829 | 0.2695 | −0.0134 [−0.0173, −0.0095] | 0.2441 | +0.0254 [+0.0203, +0.0308] |
+| threes | 19,444 | 0.2621 | 0.2556 | −0.0065 [−0.0102, −0.0029] | 0.2417 | +0.0138 [+0.0098, +0.0178] |
+| ast | 18,040 | 0.3119 | 0.2907 | −0.0212 [−0.0251, −0.0176] | 0.2434 | +0.0473 [+0.0392, +0.0554] |
+| blk | 3,506 | 0.2451 | 0.2409 | −0.0042 [−0.0061, −0.0025] | 0.2176 | +0.0233 [+0.0148, +0.0325] |
+| stl | 1,781 | 0.2449 | 0.2440 | −0.0009 [−0.0050, +0.0032] | 0.2317 | +0.0122 [+0.0058, +0.0187] |
+
+**Prop mean MAE** (reported, not a gate): pts −0.36 [−0.43, −0.30], pra −0.81 [−0.91, −0.70], reb −0.10, ast −0.07;
+**threes +0.009 [+0.002, +0.016] (worse)**, as in WNBA (more minutes means more attempts).
+
+**Costs and limits, stated with the result.**
+- **Coverage.** The rule drops **539 player-games of players who DID play** (7,302 actual minutes, ~13.5 each). That is
+  7.7% of played player-games, and those players get no projection at all. It adds only 2. The paired rows exclude
+  those 539 by construction, so the gains above are on the players BOTH arms project.
+- **Still worse than the book in every market** (K=2 − book CI > 0 everywhere). Better minutes do not make the model
+  carry information beyond the line. With the served blend at w ≈ 0, the per-line served probability is unchanged; the
+  gain is in the projected means/minutes the board shows.
+- **No injury feed.** The base arm's non-player minutes (67.4) exceed the committed production sims' 44.5 because
+  production then had partial exclusions. With the 10-04/05 injury fixes the real gain will be smaller. Measure it on
+  production 2026-27 sims.
+- Regular season only (March–April). Not measured: preseason (where rest is the norm and the rule is not applied, per
+  the design) or the postseason.
+
+**Next, per the pre-registration:** refit the per-line book-blend weight on the K=2 arm (does w rise above ~0?), and
+decide on wiring K=2 for NBA (file switch, regular season only) with the coverage cost made visible.
+
