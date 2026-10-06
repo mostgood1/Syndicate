@@ -46814,3 +46814,29 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
     minutes shift vs the K-off counterfactual.
 - off switch: SYNDICATE_NBA_SIM_AVAILABILITY=0 (env, needs a restart), or delete the file / set "enabled": false (no
   restart).
+
+## 2026-10-06 16:49:45Z (11:49 AM CT) -- LOCAL FLEET FF f88c9453 -> e82ce67f, NO RESTART: NBA sim availability code now on the fleet (lane `nba-prop-calibration`)
+
+- who: the NCAAF/watcher session, on the user's instruction ("ff the fleet now", ~11:55 AM CT relayed).
+  - It took the refresh-worker claim with holder name `nba-prop-calibration` (token 440d07fb), which is THIS lane's
+    name, not that session's. Recorded so the claim history is not misread as this session's.
+  - Then `git fetch github` + `git merge --ff-only e82ce67f` on ~/Syndicate. Claim released; no role restarted.
+- measured by me at 16:50:23Z:
+  - ~/Syndicate HEAD e82ce67f; reflog `merge e82ce67f: Fast-forward` at 2026-10-06T11:49:45-05:00 (prior
+    f88c9453, 09:44:17).
+  - `git merge-base --is-ancestor 2327738b HEAD` true.
+  - healthz 200.
+- runtime files changed f88c9453..e82ce67f (excluding .syndicate/docs/tests/reports): exactly 5.
+  - `syndicate/features/shared/nba_sim_availability.py` (NEW) and `basketball_props_smart_sim.py` (+7: the one
+    loaned call) -- the NBA availability rule.
+  - `vendor/mlb_bettingv2/sim_engine/models.py` + `simulate.py` (1addb501, MLB popup sac-fly rate). **INERT, verified
+    by me:** the new `GameConfig.bip_sf_rate_pop` defaults to None. With None a POP takes the unchanged
+    `bip_sf_rate_flypop` branch with the same single rng draw. The only setter in the tree is an offline `--cfg-set`
+    experiment described in lanes.md; no production config sets it.
+  - `scripts/mlb_dp_advancement_rates.py`: an offline script, not on a serving path.
+- effect: the NBA availability rule is now LIVE in the per-run NBA props refresh (the switch file has been in place
+  since 16:45:28Z; the rule reads it per call).
+  - Until 2026-10-20 it is a no-op by construction: preseason slate -> applied=false.
+- verify: OWED. The first `[nba_sim_availability] NBA_SIM_AVAILABILITY` line after this ff (expect applied=false,
+  "slate phase preseason") -- watcher scratchpad/watch_avail.sh is running. Then regular-season week 1.
+- also carried: faa5f804 / 46daccca (nba-season-phase guards) were already on the fleet before this ff.
