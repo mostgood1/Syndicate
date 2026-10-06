@@ -1208,6 +1208,15 @@ death, never life — do not invert it.
 - Verification: owner_liveness.py SAFE set; archive_closed_lanes_before.py verifies claim set unchanged, OPEN headers unchanged, every moved line present in lanes_closed.md
 - Blocked by: none
 
+### published-negative-ev — OPEN — opened 2026-10-06 — session 5942cf5f-48c9-485b-99a8-e6e04c75bd83
+- **STATUS 2026-10-06 ~16:00Z (11:00 AM CDT): DIAGNOSED -- findings `findings_2026-10-06_published_negative_ev.md`.** H1 CONFIRMED (published = 40-86% of recorded keys; the staked set is the execution ledger). H2 FALSIFIED (board `ev` itself is -4..-7%: ordinary book prices). Staked paper portfolio: 623 settled over 4 dates, ROI -7.7% vs +3.6% predicted; market-only -13.6% (268), model -3.3% (355); market-only on 1-2-book lines -22.6% (181) = 88% of all losses, monotone by books quoting. Paper fees recorded 0. GOAL: MET for the explanation + ranked fix list; implementation is a USER decision (fix 1 changes staking).
+- Goal: [user 2026-10-06: 'look into why published lines show negative predicted EV - we really need Syndicate to be delivering profitability while maintaining our main goals'] Explain, with production numbers and their denominators, why the daily optimizer's PUBLISHED rows carry negative mean predicted EV (-3.6..-5.6% on 10-06), say whether that measures the system's real recommendations, and report the realised profitability of what Syndicate actually stakes (portfolio commits) per sport -- ending in a ranked, per-line (never market-withholding) fix list.
+- Files: .syndicate/findings_2026-10-06_published_negative_ev.md (NEW)
+- Hypothesis: H1: 'published' (clv_openings) is most of the board (shortlist admits value >= -2%), not the staked recommendation set (portfolio_commit, ev_pct >= 2). H2: daily_optimizer's predicted EV = fair_market x price - 1 at FIRST SIGHTING, i.e. ~ -vig for a typical single-book quote; the system's own EV is model-based (p_model) and/or best-price-based, so the negative mean is a definitional artifact, not proof the system recommends -EV bets.
+- Falsification test: H1 false if published keys are a small subset (<20% of recorded keys) or their EV distribution matches the staked set. H2 false if the published rows' recorded ev_pct (the board's own `ev` field) is ALSO negative on average.
+- Verification: Numbers from the fleet: published share of recorded keys per sport; mean recorded ev / model-based EV of published rows; portfolio staked positions count, realised ROI and CLV per sport over all available dates; written to the findings file.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
