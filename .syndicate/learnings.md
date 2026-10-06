@@ -3153,3 +3153,11 @@ own prior verdicts, not by anything failing.
 - The repair has a second trap. On this CRLF worktree, a file holding a lone CR is NOT converted by git (the conversion would not be reversible), so the whole-file diff showed 2,116+/2,115-; the fix was writing the exact BLOB bytes (all LF, lone CR kept).
 - Third instance, same session: writing THIS entry through a shell heredoc turned the backslash-r escapes I typed into real CR bytes, and learnings.md showed a whole-file diff (3,155+/3,148-). Caught by the numstat gate, rebuilt from the HEAD blob.
 - **How to apply:** edit ledger files as BYTES (read_bytes / split on the LF byte / write_bytes), and write entry text from a FILE made with the Write tool, never through a heredoc. Gate every ledger commit on numstat equal to the lines you meant to change, never just "deletions == 0". Verify on origin with `MSYS_NO_PATHCONV=1 git show origin/main:<path>` (Git Bash mangles rev:path).
+
+## 2026-10-06 — RULE: when a default moves from a DEAD endpoint to a LIVE one, every test that leaned on the default starts doing live I/O `[lane scripts-fleet-default, session 5da10f7c]`
+- **Belief overturned:** "token helpers are safe to call in tests". They were only safe because the default target
+  was Render, which the helper never contacted and whose token sat in a file the test redirected. Flipping the default
+  to the fleet made a no-argument call read the LIVE fleet token through `wsl.exe`, and a failing assertion printed it.
+- **How to apply:** before flipping a default, grep the tests for calls that pass no explicit target, and put the
+  "never read the real secret under test" rail in the RESOLVER (`'pytest' in sys.modules`), not in a conftest you may
+  not hold. Tests of the real path must name their fixture file explicitly.
