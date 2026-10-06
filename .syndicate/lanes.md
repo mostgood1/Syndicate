@@ -1016,6 +1016,12 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **AMENDMENT 3 READINGS 2026-10-06 ~16:10Z (before any descent run):**
+  - fc = **300/620 = 0.484** [0.445, 0.523] (force_out 295, fielders_choice_out 5 / + field_out 261, field_error 13, fielders_choice 46). The model's 0.04 is ~12x low.
+  - DP conversion (info only) 384/1004 = 0.382, inside the DP grid's 0.30-0.40.
+  - **INERT CEILING FOUND:** simulate.py clamped `bip_fc_rate` to <= 0.2, so 0.484 would have run as 0.2. Old engine FC count, 30 seeded games: 13 at 0.2 vs 13 at 0.6 (identical).
+  - Ceiling raised to 1.0. Defaults (0.04) are unaffected. New test `test_fc_rate_above_the_old_0_2_ceiling_is_not_clamped` passes on the new engine; on the old engine its counts are equal.
+  - Descent: 9 levers (FC removed), 17 trials/pass. Every arm carries `--cfg-set bip_fc_rate=0.484` + the DP-advancement rates.
 - **RULE v2 AMENDMENT 3 — DP-SITUATION FIELDER'S CHOICE RATE MEASURED, PRE-REGISTERED 2026-10-06 ~15:45Z (user: "then fix the DP fielder's choice rate next"), before measuring; pipeline paused at its wait loop again (builds 7/20, 0 descent runs):**
   - Model: on a ground-ball out with a runner on 1st and <2 outs, after no DP, an FC (a runner out, batter safe) happens with prob `bip_fc_rate` (0.04). It is checked BEFORE the ROE draw.
   - MEASURED (not fitted) from StatsAPI pbp of the same 316 FIT-date games. Plays: trajectory `ground_ball`, a runner starting on 1B, 0-1 outs before, eventType NOT `grounded_into_double_play`.

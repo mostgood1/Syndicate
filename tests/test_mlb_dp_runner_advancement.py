@@ -80,5 +80,20 @@ class GameTests(unittest.TestCase):
             self.assertLessEqual(rbi, runs)
 
 
+def _fc_count(fc_rate):
+    away, home = _roster(1, "AWY", 100000), _roster(2, "HOM", 200000)
+    cfg = replace(GameConfig(rng_seed=7, manager_pitching="v2", pbp="pa"), bip_fc_rate=fc_rate)
+    return sum(1 for i in range(30) for ev in (simulate_game(away, home, replace(cfg, rng_seed=7 + i)).pbp or [])
+               if ev.get("type") == "PA" and ev.get("result") == "FC")
+
+
+class FieldersChoiceCeilingTests(unittest.TestCase):
+    def test_fc_rate_above_the_old_0_2_ceiling_is_not_clamped(self) -> None:
+        # The measured real rate is ~0.48; a 0.2 ceiling made 0.2 and 0.6 identical in expectation.
+        lo, hi = _fc_count(0.2), _fc_count(0.6)
+        self.assertGreater(lo, 0, "the fixture must produce fielder's choices")
+        self.assertGreater(hi, 2 * lo)
+
+
 if __name__ == "__main__":
     unittest.main()

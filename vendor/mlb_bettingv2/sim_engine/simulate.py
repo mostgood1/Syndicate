@@ -2240,7 +2240,9 @@ def simulate_game(
     bip_out_1b_to_2b_rate = _clamp(float(getattr(cfg, "bip_out_1b_to_2b_rate", 0.14) or 0.14), 0.0, 0.8)
     bip_misc_advance_pitch_rate = _clamp(float(getattr(cfg, "bip_misc_advance_pitch_rate", 0.004) or 0.004), 0.0, 0.05)
     bip_roe_rate = _clamp(float(getattr(cfg, "bip_roe_rate", 0.012) or 0.012), 0.0, 0.1)
-    bip_fc_rate = _clamp(float(getattr(cfg, "bip_fc_rate", 0.04) or 0.04), 0.0, 0.2)
+    # Ceiling was 0.2, which silently capped the measured real rate (0.48 of non-DP
+    # ground balls with a runner on 1st and <2 outs, 2026 pbp) -- lane mlb-combined-calibration.
+    bip_fc_rate = _clamp(float(getattr(cfg, "bip_fc_rate", 0.04) or 0.04), 0.0, 1.0)
     bip_fc_runner_on_3b_score_rate = _clamp(float(getattr(cfg, "bip_fc_runner_on_3b_score_rate", 0.0) or 0.0), 0.0, 1.0)
     bip_dp_r2_to_3b_rate = _clamp(float(getattr(cfg, "bip_dp_r2_to_3b_rate", 0.0)), 0.0, 1.0)
     bip_dp_r3_scores_rate = _clamp(float(getattr(cfg, "bip_dp_r3_scores_rate", 0.0)), 0.0, 1.0)
