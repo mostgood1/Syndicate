@@ -99,7 +99,7 @@ STATSAPI = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={date}"
 # a day's slate is the whole population.
 ESPN_CFB = ("https://site.api.espn.com/apis/site/v2/sports/football/college-football/"
             "scoreboard?dates={compact}&groups=80&limit=400")
-WIRED_SPORTS = ("mlb", "ncaaf")
+WIRED_SPORTS = ("mlb", "ncaaf", "soccer")
 
 
 def _admin_token(base_url: str | None = None) -> str | None:
@@ -250,6 +250,97 @@ def _final_scores_ncaaf(date, records):
                     "scoreable_games": len(scoreable), "espn_unused": espn_unused}
 
 
+def _final_scores_soccer(date, records):
+    """`game_pk` -> `(away, home)` for soccer games FINAL on ESPN, plus a join report.
+
+    AN ID JOIN, NOT A NAME JOIN, and that is the whole point. The ledger's soccer
+    `game_pk` is ESPN's event id, so this keys on the scorer's first lookup field and
+    never compares a club name. Verified 2026-09-30: ledger `game_pk` 761833 is ESPN
+    `usa.1` event 761833. A name join would have failed on both recoverable dates --
+    ESPN says "St. Louis CITY SC" / "Red Bull New York" where the ledger says
+    "St. Louis City SC" / "New York Red Bulls" -- which is the documented soccer
+    name-join hazard (`tests/test_soccer_live_gameline_name_join.py`).
+
+    DRAWS ARE KEPT. `soccer` is in `DRAW_IS_A_REAL_OUTCOME` and `finals_from_scores`
+    maps a level final to False ("the home side did not win"), which is the unbiased
+    treatment; excluding draws is what once removed a third of soccer's population
+    while both probabilities were formed unconditionally.
+
+    Everything else is borrowed rather than re-derived: the league slugs, the window
+    retry, and the postponed/canceled rule all come from `espn_lineups`.
+    """
+    from syndicate.features.soccer.ingestion.espn_lineups import (  # noqa: PLC0415
+        LEAGUE_ESPN_SLUGS, fetch_events, record_is_unplayed)
+    compact = date.replace("-", "")
+    window = f"{compact}-{compact}"
+    try:
+        from syndicate.features.soccer.sources import active_leagues_for_date  # noqa: PLC0415
+        leagues = [lg for lg in active_leagues_for_date(date) if lg in LEAGUE_ESPN_SLUGS]
+        league_source = "active_leagues_for_date"
+    except Exception:  # noqa: BLE001
+        # Falling back to EVERY tracked league is more fetches, never fewer finals,
+        # and the report says which happened so a thin join is not misread as a
+        # league being out of season.
+        leagues = sorted(LEAGUE_ESPN_SLUGS)
+        league_source = "ALL tracked leagues (active_leagues_for_date unavailable)"
+    if not leagues:
+        leagues = sorted(LEAGUE_ESPN_SLUGS)
+        league_source = "ALL tracked leagues (none reported active for this date)"
+
+    scores = {}
+    finals_seen = 0
+    unplayed = 0
+    draws = 0
+    for league in leagues:
+        try:
+            events = fetch_events(league, date_windows=[window], statuses={"post"})
+        except Exception as exc:  # noqa: BLE001
+            print(f"    league {league}: fetch FAILED ({type(exc).__name__}), no finals from it")
+            continue
+        for ev in events:
+            if record_is_unplayed(ev):
+                unplayed += 1
+                continue
+            try:
+                home_pts, away_pts = float(ev.get("home_score")), float(ev.get("away_score"))
+            except (TypeError, ValueError):
+                continue
+            finals_seen += 1
+            if home_pts == away_pts:
+                draws += 1          # KEPT, see the docstring
+            scores[str(ev.get("event_id"))] = (away_pts, home_pts)
+
+    ledger_games = {}
+    scoreable = set()
+    for rec in records:
+        pk = str(rec.get("game_pk") or "").strip()
+        if not pk:
+            continue
+        ledger_games.setdefault(pk, (rec.get("home_team"), rec.get("away_team")))
+        if (rec.get("market") == "h2h" and rec.get("segment") == "full"
+                and rec.get("model_home_win_prob") is not None
+                and rec.get("market_fair_prob") is not None):
+            scoreable.add(pk)
+    matched = sorted(set(ledger_games) & set(scores))
+    unmatched = []
+    unmatched_scoreable = []
+    for pk in sorted(set(ledger_games) - set(scores)):
+        home, away = ledger_games[pk]
+        tag = " [SCOREABLE -- shrinks the measurement]" if pk in scoreable else " [no scoreable h2h row]"
+        unmatched.append(f"{away} @ {home} (game_pk {pk}){tag}")
+        if pk in scoreable:
+            unmatched_scoreable.append(f"{away} @ {home} (game_pk {pk})")
+    # Only the ledger's own games are kept: an ESPN final for a match this board never
+    # priced is not part of the population and must not enter the index.
+    kept = {pk: scores[pk] for pk in matched}
+    return kept, {"leagues": leagues, "league_source": league_source,
+                  "espn_finals": finals_seen, "espn_unplayed_skipped": unplayed,
+                  "draws_kept": draws, "ledger_games": len(ledger_games),
+                  "matched": len(kept), "unmatched": unmatched,
+                  "unmatched_scoreable": unmatched_scoreable,
+                  "scoreable_games": len(scoreable)}
+
+
 def _event_to_game_from_ledger(records: list[dict]) -> dict[str, str]:
     """odds `event_id` -> gamePk, from the ledger's own FULL-GAME rows.
 
@@ -310,8 +401,10 @@ def main(argv: list[str] | None = None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--date", required=True, help="slate date, zero-padded YYYY-MM-DD")
     ap.add_argument("--sport", default="mlb",
-                    help="mlb (StatsAPI finals, keyed by game_pk) or ncaaf (ESPN FBS "
-                         "scoreboard, keyed by event_id via a team-name join)")
+                    help="mlb (StatsAPI finals, keyed by game_pk), ncaaf (ESPN FBS "
+                         "scoreboard, keyed by event_id via a team-name join) or soccer "
+                         "(ESPN per-league scoreboards, keyed by game_pk, which IS the "
+                         "ESPN event id -- an id join, and draws are kept as not-a-home-win)")
     ap.add_argument("--ledger", help="local ledger .jsonl; fetched from production if absent")
     ap.add_argument("--base-url", default=DEFAULT_BASE)
     ap.add_argument("--exclude-game-pk", action="append", default=[],
@@ -386,7 +479,20 @@ def main(argv: list[str] | None = None) -> int:
 
     # --- finals, restricted to the board's population ------------------
     join = None
-    if sport == "ncaaf":
+    if sport == "soccer":
+        scores, join = _final_scores_soccer(date, records)
+        print(f"  soccer finals join: leagues={len(join['leagues'])} ({join['league_source']})"
+              f" espn_finals={join['espn_finals']} draws_kept={join['draws_kept']}"
+              f" unplayed_skipped={join['espn_unplayed_skipped']}"
+              f" ledger_games={join['ledger_games']} matched={join['matched']}")
+        for game in join["unmatched"]:
+            print(f"    UNMATCHED -- this game is NOT scored: {game}")
+        if join["unmatched_scoreable"]:
+            print(f"  WARNING: {len(join['unmatched_scoreable'])} unmatched game(s) DO carry a"
+                  " scoreable h2h row, so the scored population is SMALLER than the"
+                  " ledger's. Do not read the result as a reproduction unless the"
+                  " --expect-* gate passes anyway.")
+    elif sport == "ncaaf":
         scores, join = _final_scores_ncaaf(date, records)
         print(f"  ncaaf finals join: espn_finals={join['espn_finals']}"
               f" ledger_games={join['ledger_games']} matched={join['matched']}")
@@ -444,7 +550,8 @@ def main(argv: list[str] | None = None) -> int:
     # The dict means different things per sport: for mlb it is every StatsAPI final
     # for the date, for ncaaf only the ones that JOINED, so label it accordingly
     # rather than printing one number under two meanings.
-    finals_label = "espn_finals_matched" if sport == "ncaaf" else "statsapi_finals"
+    finals_label = ("espn_finals_matched" if sport in ("ncaaf", "soccer")
+                    else "statsapi_finals")
     print(f"  ledger bytes={len(raw)} records={len(records)} {finals_label}={len(scores)}"
           f" excluded={excluded or 'none'} scored_games={score['games_with_outcome']}")
     if missing:

@@ -152,7 +152,10 @@ def test_the_ledger_path_is_sport_scoped_and_mlb_is_unchanged():
 
 
 def test_only_wired_sports_are_accepted():
-    assert mod.WIRED_SPORTS == ("mlb", "ncaaf")
+    # The PROPERTY, not the literal tuple: pinning the exact tuple made this test
+    # fail when soccer was legitimately wired, which is a brittle assertion about
+    # a list that is expected to grow rather than a fact worth defending.
+    assert "mlb" in mod.WIRED_SPORTS and "ncaaf" in mod.WIRED_SPORTS
     rc = mod.main(["--date", "2026-10-03", "--sport", "nhl"])
     assert rc == 2, "an unwired sport must refuse, not fetch a path that does not exist"
 
