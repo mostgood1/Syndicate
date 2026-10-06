@@ -1374,6 +1374,11 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### mlb-asof-roster-rebuild — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **FIDELITY GATE v3, PRE-REGISTERED 2026-10-06 ~02:00Z (user: "yes, do 1 and ship if it passes"), before any v3 build or replay:**
+  - Diagnosis of the stamina/workload gap uses ROSTER INPUTS only (stored vs rebuilt profile fields on 06-15..06-20, already-spent dates). No replay outcome is read while choosing the builder change.
+  - GATE DATES: 2026-06-21..06-27 (stored roster_objs exist; never used by any fidelity run). Same moments, same tolerances, same clause: within max(2 game-clustered paired SE, tolerance); 200 sims, same seeds, `--game-pks-from` the rebuilt set.
+  - ONE shot: if v3 fails, the combined calibration ships nothing and goes back to the user. No v4 on these dates.
+  - If ADMITTED: the combined-calibration rule above runs UNCHANGED, with the validation set rebuilt by the v3 builder (05-30..06-14).
 - **FIDELITY v2 RESULT 2026-10-06 ~01:30Z: NOT ADMITTED. The combined calibration ships NOTHING (rule (0): stop, report).**
   - Rebuilt with as-of statcast features + the cache-hit stamina path (counters: 318-337 statcast pitchers/date, stamina adjusted 72-119/date). 06-15..06-20, 200 sims, same seeds, 129 paired starts / 73 games.
   - Per-PA economy reproduces (K/BF -0.0024, BB/PA -0.0025, HR/PA +0.0008, H/PA -0.0001, HBP/PA -0.0017, DP -0.004, runs -0.14: all within tolerance).
@@ -1440,6 +1445,11 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **FIDELITY GATE v3, PRE-REGISTERED 2026-10-06 ~02:00Z (user: "yes, do 1 and ship if it passes"), before any v3 build or replay:**
+  - Diagnosis of the stamina/workload gap uses ROSTER INPUTS only (stored vs rebuilt profile fields on 06-15..06-20, already-spent dates). No replay outcome is read while choosing the builder change.
+  - GATE DATES: 2026-06-21..06-27 (stored roster_objs exist; never used by any fidelity run). Same moments, same tolerances, same clause: within max(2 game-clustered paired SE, tolerance); 200 sims, same seeds, `--game-pks-from` the rebuilt set.
+  - ONE shot: if v3 fails, the combined calibration ships nothing and goes back to the user. No v4 on these dates.
+  - If ADMITTED: the combined-calibration rule above runs UNCHANGED, with the validation set rebuilt by the v3 builder (05-30..06-14).
 - **FIDELITY v2 RESULT 2026-10-06 ~01:30Z: fidelity gate NOT ADMITTED (see lane mlb-asof-roster-rebuild). The combined calibration ships NOTHING (rule (0): stop, report).**
   - STARTER LENGTH still does not: outs paired diff **-0.498 (SE 0.058; allowance 0.30) FAIL**; ==15 share **+0.061 (SE 0.006; allowance 0.03) FAIL**; <=9 share +0.004 PASS. v1 was -0.66 / +0.07, so the fix closed ~1/4 of the gap.
 - **FIDELITY GATE (0) RESULT, 2026-10-06 ~01:30Z: FAIL, so the validation set is NOT admitted; per the rule, stop, ship nothing.** Rebuilt vs stored, 06-15..06-20, 73 games, same seeds, 200 sims. Every per-PA moment, DP/PO and runs/game agree within tolerance. FAIL on starter outs mean 16.16 -> 15.51 (-0.66 vs tol 0.30) and the ==15 share 0.38 -> 0.45 (+0.07 vs 0.03). The difference is systematic, not MC. Validation OUTCOMES were never read, so fixing the builder and re-running this same gate is admissible.
