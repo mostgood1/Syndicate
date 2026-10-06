@@ -1,16 +1,22 @@
-"""Measure how runners move on a real ground-into-double-play (lane mlb-combined-calibration).
+"""Measure batted-ball baserunning rates from StatsAPI play-by-play (lane mlb-combined-calibration).
 
-The sim's DP branch (simulate.py `_resolve_in_play_out_with_runners`) used to hold every
-other runner in place. Its two advancement rates are MEASURED here from StatsAPI
-play-by-play, never fitted:
-  r2 = P(runner who started on 2B ends on 3B or scores | GIDP, 0 outs before, runner on 2B)
-  r3 = P(runner who started on 3B scores               | GIDP, 0 outs before, runner on 3B)
-With 1 out before, a DP ends the inning and nothing advances, so only 0-out plays count.
+The sim's non-hit in-play resolver (simulate.py `_resolve_in_play_out_with_runners`) has
+rates that are MEASURED here, never fitted:
 
-It also measures the DP-situation fielder's-choice rate the sim checks after a missed DP
-(`bip_fc_rate`): over ground balls with a runner on 1B and 0-1 outs, excluding GIDP,
-  fc = #(force_out + fielders_choice_out) / #(those + field_out + field_error + fielders_choice)
-and, for information only, the DP conversion GIDP / (GIDP + that denominator).
+  r2  P(runner on 2B ends on 3B or scores | GIDP, 0 outs before)      bip_dp_r2_to_3b_rate
+  r3  P(runner on 3B scores               | GIDP, 0 outs before)      bip_dp_r3_scores_rate
+  fc  P(force out / FC out | ground ball, runner on 1B, 0-1 outs,
+        not a GIDP)                                                    bip_fc_rate
+  sf  P(sac fly | fly+pop (or line) out-or-error, runner on 3B,
+        0-1 outs)                                                      bip_sf_rate_flypop / _line
+
+THE BASE STATE BEFORE A PLAY comes from the previous play's `matchup.postOn*` within the
+same half-inning. A play's `runners` list holds only runners who MOVED: a runner who held
+on 3rd during a popup is absent from it, so selecting plays by `runners` keeps only the
+plays where he moved and biases every advancement rate up (the first version of this
+script did exactly that: sac flies 110/116 with 2 popups in 316 games). A runner who is
+on base before the play and absent from `runners` held his base.
+Stolen bases during the at-bat are not replayed (the previous play's post-state is used).
 
   python scripts/mlb_dp_advancement_rates.py --data-root <fleet mlb data> --dates 2026-06-15 ... \\
       --cache ~/mlb_pbp_cache --out rates.json
@@ -29,6 +35,7 @@ import urllib.request
 from pathlib import Path
 
 FEED = "https://statsapi.mlb.com/api/v1.1/game/{pk}/feed/live"
+BASES = (("postOnFirst", "1B"), ("postOnSecond", "2B"), ("postOnThird", "3B"))
 
 
 def game_pks(data_dir: Path, date: str) -> list[int]:
@@ -53,64 +60,60 @@ def feed(pk: int, cache: Path) -> dict:
     return data
 
 
-def gidp_events(data: dict) -> list[dict]:
-    """One record per 0-out GIDP: where the runners who started on 2B / 3B ended."""
-    out = []
+def plays_with_state(data: dict):
+    """Yield (pre_bases {base: runner_id}, outs_before, play) for every play."""
+    prev = None
     for play in ((data.get("liveData") or {}).get("plays") or {}).get("allPlays") or []:
-        res = play.get("result") or {}
-        if res.get("eventType") != "grounded_into_double_play":
+        a = play.get("about") or {}
+        half = (a.get("inning"), a.get("halfInning"))
+        if prev is not None and prev[0] == half:
+            pre, outs_before = prev[1], prev[2]
+        else:
+            pre, outs_before = {}, 0
+        yield pre, outs_before, play
+        m = play.get("matchup") or {}
+        post = {base: (m.get(k) or {}).get("id") for k, base in BASES if (m.get(k) or {}).get("id")}
+        prev = (half, post, int((play.get("count") or {}).get("outs") or 0))
+
+
+def final_base(play: dict, runner_id: int, start: str) -> str:
+    """Where a runner on `start` ended the play: his last movement, else he held."""
+    end = start
+    for r in play.get("runners") or []:
+        if ((r.get("details") or {}).get("runner") or {}).get("id") != runner_id:
             continue
-        outs_after = int((play.get("count") or {}).get("outs") or 0)
-        runners = play.get("runners") or []
-        outs_on_play = sum(1 for r in runners if (r.get("movement") or {}).get("isOut"))
-        if outs_after - outs_on_play != 0:
-            continue
-        final = {}
-        for r in runners:
-            mv = r.get("movement") or {}
-            rid = ((r.get("details") or {}).get("runner") or {}).get("id")
-            start = mv.get("originBase") or mv.get("start")
-            if start not in ("2B", "3B") or rid is None:
-                continue
-            # A runner can appear in several movement segments; keep the last one.
-            end = "out" if mv.get("isOut") else (mv.get("end") or start)
-            final.setdefault(rid, {"start": start})["end"] = end
-        out.append({"game_pk": (data.get("gamePk")), "runners": list(final.values())})
-    return out
+        mv = r.get("movement") or {}
+        end = "out" if mv.get("isOut") else (mv.get("end") or end)
+    return end
+
+
+def trajectory(play: dict):
+    hit = [e.get("hitData") for e in play.get("playEvents") or [] if e.get("hitData")]
+    return hit[-1].get("trajectory") if hit else None
 
 
 _FC_YES = ("force_out", "fielders_choice_out")
 _FC_NO = ("field_out", "field_error", "fielders_choice")
+_SF_YES = ("sac_fly", "sac_fly_double_play")
+_SF_ALL = _SF_YES + ("field_out", "double_play", "field_error")
 
 
-def dp_situation_grounders(data: dict) -> list[str]:
-    """eventType of every ground ball hit with a runner on 1B and 0-1 outs before."""
-    out = []
-    for play in ((data.get("liveData") or {}).get("plays") or {}).get("allPlays") or []:
+def collect(data: dict, acc: dict) -> None:
+    for pre, outs_before, play in plays_with_state(data):
         ev = (play.get("result") or {}).get("eventType")
-        if ev not in _FC_YES + _FC_NO + ("grounded_into_double_play",):
-            continue
-        hit = [e.get("hitData") for e in play.get("playEvents") or [] if e.get("hitData")]
-        if not hit or hit[-1].get("trajectory") != "ground_ball":
-            continue
-        runners = play.get("runners") or []
-        if not any((r.get("movement") or {}).get("originBase") == "1B" for r in runners):
-            continue
-        outs_before = int((play.get("count") or {}).get("outs") or 0) - sum(
-            1 for r in runners if (r.get("movement") or {}).get("isOut"))
-        if outs_before > 1:
-            continue
-        out.append(ev)
-    return out
-
-
-def fc_rate(evs: list[str]) -> dict:
-    k = sum(1 for e in evs if e in _FC_YES)
-    n = sum(1 for e in evs if e in _FC_YES + _FC_NO)
-    g = sum(1 for e in evs if e == "grounded_into_double_play")
-    return {"fc": {"k": k, "n": n, "rate": k / n if n else None, "ci95": wilson(k, n)},
-            "dp_conversion_info_only": {"k": g, "n": g + n, "rate": g / (g + n) if g + n else None},
-            "counts": {e: evs.count(e) for e in sorted(set(evs))}}
+        traj = trajectory(play)
+        if ev == "grounded_into_double_play":
+            acc["gidp_all"] += 1
+            if outs_before == 0:
+                acc["gidp_zero_out"] += 1
+                if pre.get("2B"):
+                    acc["r2"].append(final_base(play, pre["2B"], "2B") in ("3B", "score"))
+                if pre.get("3B"):
+                    acc["r3"].append(final_base(play, pre["3B"], "3B") == "score")
+        if pre.get("1B") and outs_before <= 1 and traj == "ground_ball" and ev in _FC_YES + _FC_NO + ("grounded_into_double_play",):
+            acc["grounders"].append(ev)
+        if pre.get("3B") and outs_before <= 1 and traj in ("fly_ball", "popup", "line_drive") and ev in _SF_ALL:
+            acc["airballs"].append((traj, ev))
 
 
 def wilson(k: int, n: int) -> list[float]:
@@ -123,18 +126,26 @@ def wilson(k: int, n: int) -> list[float]:
     return [c - h, c + h]
 
 
-def rates(events: list[dict]) -> dict:
-    n2 = k2 = n3 = k3 = 0
-    for e in events:
-        for r in e["runners"]:
-            if r["start"] == "2B":
-                n2 += 1
-                k2 += r["end"] in ("3B", "score")
-            elif r["start"] == "3B":
-                n3 += 1
-                k3 += r["end"] == "score"
-    return {"r2": {"k": k2, "n": n2, "rate": k2 / n2 if n2 else None, "ci95": wilson(k2, n2)},
-            "r3": {"k": k3, "n": n3, "rate": k3 / n3 if n3 else None, "ci95": wilson(k3, n3)}}
+def share(k: int, n: int) -> dict:
+    return {"k": k, "n": n, "rate": k / n if n else None, "ci95": wilson(k, n)}
+
+
+def summarise(acc: dict) -> dict:
+    g = acc["grounders"]
+    k = sum(1 for e in g if e in _FC_YES)
+    n = sum(1 for e in g if e in _FC_YES + _FC_NO)
+    gd = sum(1 for e in g if e == "grounded_into_double_play")
+    air = acc["airballs"]
+
+    def sf(trajs):
+        return share(sum(1 for t, e in air if t in trajs and e in _SF_YES), sum(1 for t, _ in air if t in trajs))
+
+    return {"gidp_all_outs": acc["gidp_all"], "gidp_zero_out": acc["gidp_zero_out"],
+            "r2": share(sum(acc["r2"]), len(acc["r2"])), "r3": share(sum(acc["r3"]), len(acc["r3"])),
+            "fc": share(k, n), "dp_conversion_info_only": share(gd, gd + n),
+            "fc_counts": {e: g.count(e) for e in sorted(set(g))},
+            "sf_flypop": sf(("fly_ball", "popup")), "sf_line": sf(("line_drive",)),
+            "sf_info": {"fly_ball": sf(("fly_ball",)), "popup": sf(("popup",))}}
 
 
 def main(argv=None) -> int:
@@ -147,7 +158,8 @@ def main(argv=None) -> int:
     data_dir = Path(os.path.expanduser(args.data_root))
     cache = Path(os.path.expanduser(args.cache))
     cache.mkdir(parents=True, exist_ok=True)
-    events, games, failed, gidp_all, grounders = [], 0, 0, 0, []
+    acc = {"gidp_all": 0, "gidp_zero_out": 0, "r2": [], "r3": [], "grounders": [], "airballs": []}
+    games = failed = 0
     for d in sorted(set(args.dates)):
         for pk in game_pks(data_dir, d):
             try:
@@ -156,12 +168,8 @@ def main(argv=None) -> int:
                 failed += 1
                 continue
             games += 1
-            gidp_all += sum(1 for p in ((data.get("liveData") or {}).get("plays") or {}).get("allPlays") or []
-                            if (p.get("result") or {}).get("eventType") == "grounded_into_double_play")
-            events += gidp_events(data)
-            grounders += dp_situation_grounders(data)
-    rep = {"dates": sorted(set(args.dates)), "games": games, "feeds_failed": failed,
-           "gidp_all_outs": gidp_all, "gidp_zero_out": len(events), **rates(events), **fc_rate(grounders)}
+            collect(data, acc)
+    rep = {"dates": sorted(set(args.dates)), "games": games, "feeds_failed": failed, **summarise(acc)}
     Path(args.out).write_text(json.dumps(rep, indent=1), encoding="utf-8")
     print(json.dumps(rep, indent=1))
     return 0

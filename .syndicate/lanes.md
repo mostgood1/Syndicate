@@ -1018,6 +1018,16 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **AMENDMENT 4 READINGS 2026-10-06 ~17:00Z (before any descent run) — and a MEASUREMENT BUG found and fixed:**
+  - BUG: the first sac-fly pass selected plays by a play's `runners` list, which holds only runners who MOVED. It read 110/116 with 2 popups in 316 games: a runner who held on 3rd was invisible, so the sample kept only plays where he scored.
+  - FIX: the pre-play base state now comes from the previous play's `matchup.postOn*` in the same half-inning; a pre-play runner absent from `runners` held.
+  - ALL rates re-measured that way:
+    - r2 47/48 and r3 16/16: UNCHANGED, so the DP-advancement numbers stand.
+    - fc 300/621 = 0.483 (was 300/620).
+    - DP conversion (info) 392/1013 = 0.387.
+  - SAC FLY (true base state): flypop **103/190 = 0.542** [0.471, 0.611] (model 0.48); line **46/70 = 0.657** [0.540, 0.758] (model 0.36). Info: fly_ball 102/136 = 0.75, popup 1/54 = 0.02.
+    - Caveat, stated not fixed: the model has ONE fly+pop rate. 0.542 is right only if the sim's pop share among those outs matches real (54/190 = 28%).
+  - Every descent arm adds `--cfg-set bip_sf_rate_flypop=0.542 --cfg-set bip_sf_rate_line=0.657`. No engine change: both pass `_clamp01` only.
 - **RULE v2 AMENDMENT 4 — SAC FLY RATES MEASURED, PRE-REGISTERED 2026-10-06 ~16:30Z (user: "then fix the sac fly rate next"), before measuring; pipeline paused again (builds 10/20, 0 descent runs):**
   - Model: on a fly/pop/line OUT with a runner on 3rd and <2 outs, the runner scores (batter out, RBI) with prob `bip_sf_rate_flypop` (0.48) for fly+pop or `bip_sf_rate_line` (0.36) for liners. Drawn BEFORE the ROE draw.
   - MEASURED from StatsAPI pbp of the same 316 FIT-date games. Plays: a runner starting on 3B, 0-1 outs before, eventType in {sac_fly, sac_fly_double_play, field_out, double_play, field_error}.
