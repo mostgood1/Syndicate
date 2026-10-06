@@ -46984,3 +46984,18 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - baseline: settled paper orders at prophetx/novig all `fees_dollars` 0/None (333 of 623 on 10-02..05).
 - prediction: after the restart, a new prophetx paper fill records `fees_dollars 0.0` + `fee_basis prophetx_win_commission_at_settlement`, and its settlement on a WIN books pnl = gross - 2% of gross; a novig PREGAME fill records `novig_pregame_straight` 0.0; refresh-worker `status` shows code = HEAD.
 - verify: refresh-worker `status` code; the first prophetx/novig paper fills after the restart in the execution ledger (fee_basis); first prophetx win settled after it (pnl vs pnl_gross_dollars).
+
+## 2026-10-06 21:11:14Z (4:11 PM CT) -- MEASUREMENT: NHL SAVES negative-binomial pricing on the served board (793299cd) -- MET
+
+- Lane nhl-saves-overdispersion. READ-ONLY. Fleet HEAD contains 793299cd (now 467a2a92); refresh-worker pid 2563384
+  (restarted since 00:06:44Z's 1418176 -- not by this lane; code still contains 793299cd).
+- Books posted: 21 SAVES lines in `player_props_lines/date=2026-10-06/oddsapi.csv`.
+- Served grid `/api/board/book-grid?sport=nhl&date=2026-10-06&limit=5000` (generated_at 21:09:16Z, 721 rows):
+  18 SAVES rows; 17 projected, all `basis: sim_mean_negbin`; `model_prob_over` == `nb_p_over(line, projected, 16.367)`
+  17/17 (e.g. Varlamov 23.5, projected 21.994 -> 0.3853); model_skill measured / loses_to_market / 0.0305 17/17.
+  1 row unprojected (Colten Ellis 24.5, MIN@BUF) -- not the sim's starter, no price by design. Other NHL props:
+  664/664 `sim_mean_poisson`.
+- `props_recommendations_2026-10-06.csv`: SAVES p_over == NB at 6 dp, 17/17.
+- **Instrument trap:** the grid's DEFAULT response is capped at 300 of 721 rows (`total_rows` 721, `rows_truncated` 0)
+  and held 0 SAVES rows. The scheduled task `nhl-saves-negbin-board-verify` curled without `limit` and would have
+  read "0 SAVES rows"; it had not dispatched by 21:05Z and is now DISABLED (this reading supersedes it).
