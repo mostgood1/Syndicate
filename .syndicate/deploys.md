@@ -46768,3 +46768,11 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - prediction was: committed N>0, by_sport non-empty for >=3 sports, overlay with 0 entries -> all three HELD (12; 4 sports; 0/0). Rank/stake therefore unchanged today.
 - first numbers (12 games, ONE date -- not a finding): published vs pooled ROI per bet mlb -4.8% / -8.7% (1,515 / 1,856), nba -4.1% / -4.8% (2,028 / 2,766), nfl -5.2% / -5.0% (2,032 / 2,614), nhl -8.2% / -12.1% (1,154 / 1,288). Published rows' mean PREDICTED EV vs recorded fair is NEGATIVE in all four (-3.6% / -5.0% / -4.7% / -5.6%): "published" = served on the board at first-sighting price, not bets placed -- worth a look once the window has dates.
 - review automation: run FREEZE fixed (10-05 21:30:45Z); app TIMER still broken host-wide -> the 07:30 review did not fire today; needs the user's app restart.
+
+## 2026-10-06 14:44:17Z (9:44 AM CT) -- LOCAL FLEET FF -> f88c9453, NO RESTART: NHL team shot volume blended with the dressed roster while team rates are last season's (lane `nhl-early-season-shot-volume`) -- VERIFY OWED
+
+- change: `loaders.apply_roster_shot_volume` -- shots_per_60 = 0.6 * team rate + 0.4 * dressed skaters' per-game SOG sum, ONLY while `team_rates_are_prior_season` (fleet: no team_rates_2026-2027.csv; off once it appears, 2026-11-01). User decision "Prior-file only".
+- offline evidence: 2025-26 team-SOG forecast vs 2024-25 prior -3.1% MSE (first 10 games); props A/B on a prior-season rate (playoff arm) SOG@1.5 -0.00124, SOG@2.5 -0.00104, SOG@3.5 -0.00061, POINTS@0.5 -0.00096 (CIs exclude 0); with a season file present byte-identical (1,062/1,062).
+- baseline (props_recommendations_all_markets_2026-10-06.csv built 14:32:15Z, before the ff): projected team SOG FLA 25.9, NJD 29.4, OTT 28.2, STL 24.5, TOR 26.3, UTA 26.9; league mean 26.71.
+- prediction (from 0.6/0.4 and the 10-06 roster ratios): NJD ~+5.4%, UTA ~+5.1%, TOR ~+4.9%, FLA ~+2.9%, STL ~-2.8%, OTT ~-3.9%; league mean up ~+0.6-1%.
+- verify: watcher `/mnt/c/tmp/nhlprops/rvol_watch.sh` prints the same sums on the first rebuild after 14:44:17Z.
