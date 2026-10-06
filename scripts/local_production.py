@@ -1663,6 +1663,94 @@ def _tail(path: Path, lines: int) -> list[str]:
         return handle.read().decode("utf-8", errors="replace").splitlines()[-lines:]
 
 
+def reload_progress(old_workers: set[int], current_workers: set[int], expected: int) -> str:
+    """Where a HUP reload is: `booting` (fewer than `expected` new workers),
+    `draining` (new set up, an old worker still alive), or `done`."""
+    new = current_workers - old_workers
+    if len(new) < expected:
+        return "booting"
+    if current_workers & old_workers:
+        return "draining"
+    return "done"
+
+
+def _healthz_probe(port: int, timeout: float = 5.0) -> tuple[bool, float, str]:
+    started = time.monotonic()
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=timeout) as response:
+            ok = response.status == 200
+            via = response.headers.get("X-Syndicate-Health") or "flask"
+            response.read()
+        return ok, time.monotonic() - started, via
+    except Exception as exc:  # noqa: BLE001 - every failure is a reading here
+        return False, time.monotonic() - started, type(exc).__name__
+
+
+def cmd_reload_web(args: argparse.Namespace) -> int:
+    """Load new web code with a gunicorn HUP -- lane `web-restart-healthz` `[2026-10-06]`.
+
+    WHY NOT TERM. On 2026-10-06 a session loaded web code by sending TERM to the
+    gunicorn master (deploys.md 18:48:23Z). The master took ~2 min to drain and exit
+    under a saturated host, the supervisor then restarted it, and between the old
+    master closing its listener and the new one binding, `/healthz` was REFUSED
+    (watchdog: down, Connection refused, 18:52:27Z), followed by ~8 min of cold
+    workers. A HUP keeps the master and its listening socket: new workers boot (and
+    import the new code) while the old ones drain, so a client waits at worst for a
+    worker -- it is never refused. The supervisor sees no exit and keeps its pid.
+    Polls `/healthz` every `--interval` s throughout and prints max latency and
+    failures. Exit 0 only when every old worker is gone, the full new set is up, and
+    `/healthz` answers 200; 1 otherwise (the reload is not confirmed -- go look)."""
+    settings = settings_from_args(args)
+    pidfile = settings.run_dir / PIDFILE_NAME
+    if not pidfile.is_file():
+        print("not running (no pidfile).")
+        return 1
+    info = json.loads(pidfile.read_text(encoding="utf-8"))
+    master = (info.get("roles") or {}).get("web")
+    port = int(info.get("port") or settings.port)
+    try:
+        import psutil
+
+        proc = psutil.Process(int(master))
+        cmdline = " ".join(proc.cmdline())
+    except Exception as exc:  # noqa: BLE001
+        print(f"web master {master} not readable ({type(exc).__name__}); nothing sent.")
+        return 1
+    if "gunicorn" not in cmdline or os.name == "nt":
+        print("web is not a gunicorn master here (waitress/Windows); HUP does not apply -- use down/up.")
+        return 1
+    old = {c.pid for c in proc.children()}
+    expected = int(args.workers or len(old) or 2)
+    print(f"web master {master}: HUP; old workers {sorted(old)}; waiting for {expected} new", flush=True)
+    os.kill(int(master), signal.SIGHUP)
+    started = time.monotonic()
+    deadline = started + float(args.timeout)
+    probes = failures = 0
+    worst = 0.0
+    state = "booting"
+    last_ok = False
+    while time.monotonic() < deadline:
+        ok, latency, via = _healthz_probe(port)
+        probes += 1
+        failures += 0 if ok else 1
+        worst = max(worst, latency)
+        last_ok = ok
+        try:
+            current = {c.pid for c in proc.children()}
+        except Exception:  # noqa: BLE001 - the master itself died
+            print("web master vanished during the reload -- the supervisor restarts it; NOT confirmed.")
+            return 1
+        state = reload_progress(old, current, expected)
+        print(f"  +{time.monotonic() - started:5.1f}s healthz={'200' if ok else 'FAIL'} {latency:.2f}s via={via} "
+              f"workers={sorted(current)} {state}", flush=True)
+        if state == "done" and ok:
+            break
+        time.sleep(max(0.0, float(args.interval) - latency))
+    print(f"RELOAD_WEB {json.dumps({'state': state, 'healthz_ok_last': last_ok, 'probes': probes, 'failures': failures, 'max_latency_s': round(worst, 2), 'elapsed_s': round(time.monotonic() - started, 1)}, sort_keys=True)}",
+          flush=True)
+    return 0 if state == "done" and last_ok else 1
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     settings = settings_from_args(args)
     pidfile = settings.run_dir / PIDFILE_NAME
@@ -1768,6 +1856,12 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
 
     p = sub.add_parser("ci-run", help="the ci-suite cron: run_ci_suite.py in <home>/ci-checkout with a scrubbed env")
     p.set_defaults(func=cmd_ci_run)
+
+    p = sub.add_parser("reload-web", help="load new web code by gunicorn HUP (rolling; never refuses), then confirm")
+    p.add_argument("--timeout", type=float, default=300.0)
+    p.add_argument("--interval", type=float, default=2.0)
+    p.add_argument("--workers", type=int, default=0, help="new workers to wait for (default: as many as before)")
+    p.set_defaults(func=cmd_reload_web)
 
     p = sub.add_parser("status", help="pids, memory, health, log tails")
     p.add_argument("--lines", type=int, default=8)

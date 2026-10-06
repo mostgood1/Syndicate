@@ -39,9 +39,20 @@ _CACHE_TTL_SECONDS = 30.0
 # (cache hit) to 5,113 ms (real build), and 20% of organic requests to that
 # route exceeded the 5 s health-check budget.
 #
-# The lease is 120 s: longer than any observed build, short enough that a
-# builder which dies without releasing delays the key rather than wedging it.
-_CHIP_BUILD_FLIGHT = SingleFlight(lease_seconds=120.0)
+# The lease was 120 s, "longer than any observed build". It is not any more:
+# MEASURED on the local fleet 2026-10-06 18:53-19:00Z (host CPU at 100%), cold
+# `/api/board/game-chips` requests took 234-404 s EACH, ~7 concurrent -- every
+# one of web's 8 slots running its own copy of the same fan-out for ~6 minutes,
+# and `/healthz` queued behind them (lane `web-restart-healthz`). Two exits let a
+# second build start while the first was alive: the lease expiring under a slow
+# builder, and a cold waiter falling through after its 120 s wait. Each extra
+# build competes for the same CPU, so every build got slower -- a herd that feeds
+# itself. Builds release in `finally`, and the cache dies with the process, so the
+# lease only has to outlive a SLOW builder; a hung one delays the key, nothing more.
+_CHIP_BUILD_LEASE_SECONDS = 900.0
+_CHIP_BUILD_FLIGHT = SingleFlight(lease_seconds=_CHIP_BUILD_LEASE_SECONDS)
+# How often a waiter re-checks that the builder is still alive.
+_CHIP_WAITER_POLL_SECONDS = 30.0
 # How stale a chip list may be while a rebuild is IN FLIGHT. 10x the TTL = 300 s.
 # Generous on purpose: the path this replaces was serving a worker artifact
 # measured at 245-304 s old, so a 300 s bound is strictly fresher than the
@@ -729,15 +740,28 @@ def build_game_chips(selected_date: str, sports: list[str]) -> list[dict[str, An
     if not owns_build:
         if cached is not None and (now - cached[0]) <= _CACHE_TTL_SECONDS * _CHIP_STALE_TTL_MULTIPLE:
             return list(cached[1])
-        build_done.wait(timeout=max(30.0, _CACHE_TTL_SECONDS * 4))
+        # Wait for as long as the builder is ALIVE (its lease), not a fixed 120 s:
+        # a waiter that gives up and builds while the first build still runs is the
+        # herd (see `_CHIP_BUILD_LEASE_SECONDS`). A waiting thread costs no CPU; a
+        # duplicate build costs a full fan-out and slows the original.
+        while not build_done.wait(timeout=_CHIP_WAITER_POLL_SECONDS):
+            if not _CHIP_BUILD_FLIGHT.in_flight(cache_key):
+                break
         with _cache_lock:
             cached = _cache.get(cache_key)
         if cached is not None:
             return list(cached[1])
-        # The in-flight build failed or timed out. Fall through and build --
-        # returning an empty scoreboard to a caller that asked for one is worse
-        # than doing the work twice.
+        # The in-flight build FAILED (it released without caching). Fall through
+        # and build -- returning an empty scoreboard to a caller that asked for
+        # one is worse than doing the work twice. `begin` again so a concurrent
+        # waiter in the same position waits on THIS build instead of racing it.
         owns_build, build_done = _CHIP_BUILD_FLIGHT.begin(cache_key)
+        if not owns_build:
+            build_done.wait(timeout=_CHIP_BUILD_LEASE_SECONDS)
+            with _cache_lock:
+                cached = _cache.get(cache_key)
+            if cached is not None:
+                return list(cached[1])
 
     try:
         return _build_game_chips_uncached(date_value, normalized_sports, cache_key, now)

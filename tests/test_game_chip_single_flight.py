@@ -174,3 +174,32 @@ def test_a_failing_build_does_not_wedge_the_key(monkeypatch):
     assert hasattr(gcs, "_CHIP_BUILD_FLIGHT"), "the single flight is gone"
     assert not gcs._CHIP_BUILD_FLIGHT.in_flight(("2026-09-08", ("mlb",))), \
         "a failed build must release the key, or every later caller waits on a dead event"
+
+
+def test_a_SLOW_cold_build_is_never_duplicated_by_waiters_that_time_out(monkeypatch):
+    """Lane `web-restart-healthz`, MEASURED on the fleet 2026-10-06 18:53-19:00Z:
+    cold builds ran 234-404 s each, ~7 at once. A waiter used to give up after a
+    fixed wait and build itself, and the lease (120 s) expired under a slow builder.
+    Here a waiter's poll times out ~10 times while the one build is alive; it must
+    keep waiting, and every caller must still get chips."""
+    counter = {"n": 0}
+    _install(monkeypatch, counter, delay=1.0)
+    gcs._CHIP_BUILD_FLIGHT = __import__(
+        "syndicate.features.shared.single_flight", fromlist=["SingleFlight"]
+    ).SingleFlight(lease_seconds=gcs._CHIP_BUILD_LEASE_SECONDS)
+    monkeypatch.setattr(gcs, "_CHIP_WAITER_POLL_SECONDS", 0.1)
+
+    out = []
+    threads = [threading.Thread(target=lambda: out.append(
+        gcs.build_game_chips("2026-10-06", ["mlb"]))) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=20)
+    assert counter["n"] == 1, f"{counter['n']} fan-outs for one key: waiters built while the builder was alive"
+    assert len(out) == 8 and all(out), "every waiter must get chips"
+
+
+def test_the_lease_outlives_the_slowest_measured_build():
+    # 404 s was the slowest cold build measured on the fleet (2026-10-06).
+    assert gcs._CHIP_BUILD_LEASE_SECONDS > 404

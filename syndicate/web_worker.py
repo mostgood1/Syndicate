@@ -26,6 +26,20 @@ WHAT THIS CHANGES -- only the exit path:
 Requests are served the stock way throughout; keep-alive connections are
 closed after their response once the worker is stopping (the stock rule).
 Proof line: `WEB_WORKER_DRAINED`.
+
+`/healthz` IS ANSWERED BY THE WORKER'S OWN LOOP, NOT BY A REQUEST THREAD -- lane
+`web-restart-healthz` `[2026-10-06]`. MEASURED on the local fleet 18:53-19:00Z:
+every one of web's 8 slots (2 workers x 4 threads) was held 234-404 s by cold
+`/api/board/game-chips` builds, and `/healthz` -- 0-1 ms once a thread ran it --
+waited behind them, so the watchdog logged web DOWN for ~8 minutes while both
+worker processes were alive and serving. A FRESH connection whose request is a
+complete, body-less `GET`/`HEAD /healthz` is now answered here, in the event loop,
+instead of being queued for a thread: no slot needed. It still proves the worker
+PROCESS accepts and its loop turns (the same loop that heartbeats the master); it
+no longer proves a Flask thread is free -- `/api/health` still does that.
+Proof: the response carries `X-Syndicate-Health: worker-loop`, and each worker logs
+`WEB_FAST_HEALTHZ_ACTIVE` once, on its first fast answer. Switch:
+`SYNDICATE_WEB_FAST_HEALTHZ` (default on; 0/false/off restores the Flask route).
 """
 
 from __future__ import annotations
@@ -34,6 +48,7 @@ import concurrent.futures as futures
 import json
 import os
 import selectors
+import socket
 import time
 from functools import partial
 
@@ -47,6 +62,53 @@ def drain_seconds(graceful_timeout: float) -> float:
     except ValueError:
         value = 5.0
     return max(0.0, min(value, float(graceful_timeout or 0) or value))
+
+
+_HEALTHZ_BODY = b'{"ok":true,"service":"syndicate"}\n'
+_HEALTHZ_PEEK_BYTES = 4096
+_HEADER_END = b"\r\n\r\n"
+
+
+def fast_healthz_enabled() -> bool:
+    raw = str(os.environ.get("SYNDICATE_WEB_FAST_HEALTHZ") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def healthz_request(head: bytes) -> str | None:
+    """`"GET"`/`"HEAD"` when `head` is a COMPLETE, body-less `/healthz` request, else None.
+
+    Anything else -- another path, a body, headers not all arrived yet -- returns
+    None and goes to a thread exactly as before, so being wrong here can only ever
+    send a request down the normal path."""
+    end = head.find(_HEADER_END)
+    if end < 0:
+        return None
+    lines = head[:end].split(b"\r\n")
+    parts = lines[0].split(b" ")
+    if len(parts) != 3 or not parts[2].startswith(b"HTTP/1."):
+        return None
+    method, target = parts[0], parts[1]
+    if method not in (b"GET", b"HEAD"):
+        return None
+    if target != b"/healthz" and not target.startswith(b"/healthz?"):
+        return None
+    for line in lines[1:]:
+        name = line.split(b":", 1)[0].strip().lower()
+        if name in (b"content-length", b"transfer-encoding", b"expect", b"upgrade"):
+            return None
+    return method.decode("ascii")
+
+
+def healthz_response(method: str) -> bytes:
+    head = (
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: application/json\r\n"
+        f"Content-Length: {len(_HEALTHZ_BODY)}\r\n"
+        "Cache-Control: no-store\r\n"
+        "X-Syndicate-Health: worker-loop\r\n"
+        "Connection: close\r\n\r\n"
+    ).encode("ascii")
+    return head if method == "HEAD" else head + _HEALTHZ_BODY
 
 
 class DrainingThreadWorker(ThreadWorker):
@@ -78,6 +140,43 @@ class DrainingThreadWorker(ThreadWorker):
         self.tpool.shutdown(False)
         self.poller.close()
         futures.wait(self.futures, timeout=self.cfg.graceful_timeout)
+
+    def on_client_socket_readable(self, conn, client) -> None:
+        # Fresh connections only: a keep-alive conn has been `init()`ed (blocking,
+        # parser attached) and stays on the stock path.
+        if not conn.initialized and fast_healthz_enabled() and self._answer_healthz(conn, client):
+            return
+        super().on_client_socket_readable(conn, client)
+
+    def _answer_healthz(self, conn, client) -> bool:
+        try:
+            head = conn.sock.recv(_HEALTHZ_PEEK_BYTES, socket.MSG_PEEK)
+        except OSError:
+            return False  # not readable after all, or reset: the stock path handles it
+        method = healthz_request(head)
+        if method is None:
+            return False
+        with self._lock:
+            try:
+                self.poller.unregister(client)
+            except (KeyError, ValueError, OSError):
+                return False
+        try:
+            conn.sock.recv(head.find(_HEADER_END) + len(_HEADER_END))  # exactly the peeked request
+            conn.sock.settimeout(2.0)
+            conn.sock.sendall(healthz_response(method))
+        except OSError:
+            pass
+        finally:
+            self.nr_conns -= 1
+            try:
+                conn.sock.close()
+            except OSError:
+                pass
+        if not getattr(self, "_syndicate_fast_healthz_logged", False):
+            self._syndicate_fast_healthz_logged = True
+            print("WEB_FAST_HEALTHZ_ACTIVE " + json.dumps({"pid": os.getpid()}), flush=True)
+        return True
 
     def _stop_listening(self) -> None:
         for sock in self.sockets:

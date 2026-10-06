@@ -578,3 +578,30 @@ def test_a_supervisor_only_gap_does_not_mark_roles_stale(git_repo):
 
 def test_same_commit_has_no_note():
     assert lp.code_stamp_note("abc", "abc") == ""
+
+
+# --- reload-web (lane web-restart-healthz): HUP, not TERM -------------------
+
+def test_reload_progress_waits_for_the_full_new_set_then_for_the_old_to_drain():
+    old = {10, 11}
+    assert lp.reload_progress(old, {10, 11}, 2) == "booting"
+    assert lp.reload_progress(old, {10, 11, 20}, 2) == "booting"
+    assert lp.reload_progress(old, {10, 20, 21}, 2) == "draining"
+    assert lp.reload_progress(old, {20, 21}, 2) == "done"
+
+
+def test_reload_progress_is_not_done_while_a_new_worker_is_missing():
+    # an old worker exiting before its replacement booted is not a finished reload
+    assert lp.reload_progress({10, 11}, {20}, 2) == "booting"
+
+
+def test_reload_web_is_a_subcommand_with_bounded_defaults():
+    args = lp.parse_args(["reload-web"])
+    assert args.func is lp.cmd_reload_web
+    assert args.timeout == 300.0 and args.interval == 2.0
+
+
+def test_reload_web_without_a_pidfile_sends_nothing_and_fails(tmp_path, capsys):
+    args = lp.parse_args(["--home", str(tmp_path), "reload-web"])
+    assert lp.cmd_reload_web(args) == 1
+    assert "not running" in capsys.readouterr().out
