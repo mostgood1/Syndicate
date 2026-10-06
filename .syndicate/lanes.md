@@ -1389,6 +1389,12 @@ death, never life — do not invert it.
   - HOLDOUT (01-01..01-31, 280 lines / 136 games): NB - Poisson **-0.00314 [-0.01068, +0.00395]**. Poisson was only +0.0064 vs the book there; NB +0.0032 vs book.
   - ALL 56 dates (fit dates in-sample): NB - Poisson -0.01196 [-0.01640, -0.00757]; NB - book +0.0155 [+0.0076, +0.0231] (Poisson +0.0274).
   - Next honest test, a user decision: two-fold cross-validation by date blocks, so all 881 lines are out-of-sample for a k fit on the other fold. Post-hoc, so it would be pre-registered as its own H26.
+- **PRE-REGISTERED H26 2026-10-06 ~00:30Z (user: "Run a pre-registered 2-fold test"; before it runs):**
+  - The 56 harness dates are split into two CONTIGUOUS halves by date (first 28, last 28).
+  - Fit k by MLE on each half's sim-starter goalie-games (all who played, not only those with lines); price the OTHER half's book lines with that k. All 881 lines end up out of fold.
+  - Pooled paired Brier NB - Poisson, game-clustered 95% CI (4,000 reps).
+  - **Ship iff that CI is entirely < 0.** Also reported: NB - book.
+  - The k production would use is fixed now: the MLE on all 56 dates' goalie-games, whatever it comes out to.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
