@@ -84,30 +84,22 @@ from syndicate.features.shared.live_gameline_score import (  # noqa: E402
 HISTORY = REPO / "reports" / "live_gameline_accuracy" / "history.jsonl"
 LEDGER_PATH = "mlb_source/data/live_gameline_ledger/live_gameline_ledger_{date}.jsonl"
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 DEFAULT_BASE = default_base_url()
 STATSAPI = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={date}"
 
 
-def _admin_token() -> str | None:
-    token = os.environ.get("ADMIN_TOKEN")
-    if token:
-        return token.strip()
-    env = REPO / ".env"
-    if not env.exists():
-        return None
-    for line in env.read_text(encoding="utf-8", errors="replace").splitlines():
-        if line.strip().startswith("ADMIN_TOKEN"):
-            _, _, value = line.partition("=")
-            return value.strip().strip('"').strip("'")
-    return None
+def _admin_token(base_url: str | None = None) -> str | None:
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(base_url or DEFAULT_BASE)
+    return token or None
 
 
 def _fetch_ledger(date: str, base: str, dest: Path) -> bytes:
-    token = _admin_token()
+    token = _admin_token(base)
     if not token:
         raise RuntimeError("no ADMIN_TOKEN in env or .env")
     url = f"{base}/api/ops/artifacts/stream?path=" + LEDGER_PATH.format(date=date)

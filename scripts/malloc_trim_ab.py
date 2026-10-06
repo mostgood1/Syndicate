@@ -57,7 +57,6 @@ retraction this script exists to repair.
 from __future__ import annotations
 
 import json
-import os
 import statistics
 import sys
 import time
@@ -65,9 +64,9 @@ import urllib.request
 from pathlib import Path
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 BASE = default_base_url()
 SETTLE_MIN = 12.0
@@ -78,29 +77,9 @@ OUT_DIR = Path(__file__).resolve().parent.parent / "reports" / "malloc_trim_ab"
 
 
 def _token() -> str:
-    """ADMIN_TOKEN from the environment first, then a `.env` beside the repo.
-
-    THE ENVIRONMENT COMES FIRST BECAUSE A WORKTREE HAS NO `.env` -- it is
-    gitignored, so `session_worktree.py open` never copies it. Reading only the
-    file returned an empty token here, which meant no `X-Admin-Token` header,
-    which meant every poll of `/api/ops/memory` came back 401 and the arm
-    collected NOTHING for 30 minutes while printing only `HTTPError`. The
-    service was healthy throughout; the harness was not.
-    """
-    env_token = str(os.environ.get("ADMIN_TOKEN") or "").strip()
-    if env_token:
-        return env_token
-    for env in (Path(__file__).resolve().parent.parent / ".env",
-                Path(r"C:/Users/tempadmin/OneDrive/Coding/Syndicate/.env")):
-        try:
-            if not env.exists():
-                continue
-            for line in env.read_text(encoding="utf-8", errors="ignore").splitlines():
-                if line.startswith("ADMIN_TOKEN"):
-                    return line.split("=", 1)[1].strip().strip('"').strip("'")
-        except Exception:
-            continue
-    return ""
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(BASE)
+    return token
 
 
 def _get(path: str, token: str, timeout: int = 90):

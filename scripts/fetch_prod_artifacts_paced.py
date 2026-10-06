@@ -42,7 +42,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import sys
 import time
@@ -53,26 +52,23 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 DEFAULT_BASE = default_base_url("SYNDICATE_OPS_BASE_URL")
 RETRYABLE = (408, 429, 500, 502, 503, 504)
 
 
-def admin_token() -> str:
-    """Same convention as `fetch_mlb_edge_scan_rows.py` -- the gitignored `.env`
-    beside the repo, never argv, so the secret cannot reach a log or a prompt."""
-    token = str(os.environ.get("ADMIN_TOKEN") or "").strip()
-    if token:
-        return token
-    env = REPO_ROOT / ".env"
-    if env.is_file():
-        for line in env.read_text(encoding="utf-8").splitlines():
-            if line.startswith("ADMIN_TOKEN="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    raise SystemExit("no ADMIN_TOKEN in the environment or .env")
+def admin_token(base_url: str | None = None) -> str:
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    # `REPO_ROOT` stays the `.env` override: `soccer_season_audit/forward_grade.py` repoints it at
+    # the checkout that holds one (a worktree has none).
+    dotenv = REPO_ROOT / ".env"
+    token = resolve_admin_token(base_url or DEFAULT_BASE, env_file=dotenv if dotenv.is_file() else None)
+    if not token:
+        raise SystemExit("no ADMIN_TOKEN (fleet env file, environment, or .env)")
+    return token
 
 
 def export(base: str, token: str, params: dict, timeout: int) -> dict:
@@ -136,7 +132,7 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=None)
     args = parser.parse_args()
 
-    token = admin_token()
+    token = admin_token(args.base_url)
     out_dir = Path(args.out_dir)
     if not out_dir.is_absolute():
         out_dir = REPO_ROOT / out_dir

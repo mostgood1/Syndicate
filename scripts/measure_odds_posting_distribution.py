@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import collections
 import json
-import os
 import sys
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -39,19 +38,20 @@ PITCHER_MARKETS = {
 MIN_BULK = 50
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 BASE = default_base_url() + "/api/ops/artifacts/stream?path="
 PATH = "mlb_source/tracking/book_quotes/{date}.jsonl"
 
 
 def _token() -> str:
-    for line in open(os.path.join(os.getcwd(), ".env"), encoding="utf-8-sig"):
-        if line.startswith("ADMIN_TOKEN="):
-            return line.split("=", 1)[1].strip().strip('"').strip("'")
-    raise SystemExit("ADMIN_TOKEN not found in .env")
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token()
+    if not token:
+        raise SystemExit("no ADMIN_TOKEN (fleet env file, environment, or .env)")
+    return token
 
 
 def _parse(ts: str | None) -> datetime | None:

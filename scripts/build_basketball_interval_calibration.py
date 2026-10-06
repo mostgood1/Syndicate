@@ -74,24 +74,20 @@ if str(REPO_ROOT) not in sys.path:
 
 _SIM_NAME_RE = re.compile(r"smart_sim_(\d{4}-\d{2}-\d{2})_([A-Z0-9]+)_([A-Z0-9]+)\.json$")
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 _DEFAULT_BASE_URL = default_base_url()
 _TARGET_COVERAGE = 0.80  # p10..p90 by construction
 
 
-def _admin_token() -> str:
-    token = str(os.environ.get("ADMIN_TOKEN") or "").strip()
-    if token:
-        return token
-    env_path = REPO_ROOT / ".env"
-    if env_path.is_file():
-        for line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-            if line.startswith("ADMIN_TOKEN"):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    raise SystemExit("ADMIN_TOKEN not found (env or .env)")
+def _admin_token(base_url: str | None = None) -> str:
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(base_url or _DEFAULT_BASE_URL)
+    if not token:
+        raise SystemExit("no ADMIN_TOKEN (fleet env file, environment, or .env)")
+    return token
 
 
 def _ops_export(base_url: str, token: str, *, path: str | None = None, pattern: str | None = None, names_only: bool = False) -> dict:
@@ -510,7 +506,7 @@ def main() -> int:
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
-    token = _admin_token()
+    token = _admin_token(args.base_url)
     print(f"Pairing production sim per-segment quantiles with ESPN PBP actuals ({args.league.upper()})...")
     paired, diag = collect_paired(league_code=args.league, base_url=args.base_url, token=token, allow_fetch=not args.no_fetch)
     print(f"  sim files listed     : {diag.get('sim_files_listed', 0)}")

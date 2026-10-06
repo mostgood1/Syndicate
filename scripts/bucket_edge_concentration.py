@@ -50,12 +50,12 @@ from scripts.bucket_realised_performance import (  # noqa: E402
     finals_for,
     ledger_rows,
     resolve,
-    secret,
 )
+from scripts.bucket_realised_performance import BASE, resolve_admin_token  # noqa: E402
 
 
 def collect(sport: str, days: int, market: str, band: str, spread_sign: float):
-    token = secret("ADMIN_TOKEN")
+    token = resolve_admin_token(BASE)
     rows = ledger_rows(sport, days, token)
     dates = {str(r.get("date") or "")[:10] for r in rows if r.get("date")}
     finals = finals_for({d for d in dates if d})

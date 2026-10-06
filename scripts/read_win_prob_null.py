@@ -42,7 +42,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import urllib.error
 import urllib.request
@@ -50,34 +49,26 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 DEFAULT_BASE_URL = default_base_url()
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
-def _admin_token() -> str:
-    """Same resolution order as `check_deploy_safety`, so there is one answer."""
-    value = str(os.environ.get("ADMIN_TOKEN") or os.environ.get("SYNDICATE_ADMIN_TOKEN") or "").strip()
-    if value:
-        return value
-    env_path = REPO_ROOT / ".env"
-    if env_path.is_file():
-        for line in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
-            key, sep, raw = line.partition("=")
-            if sep and key.strip() in {"ADMIN_TOKEN", "SYNDICATE_ADMIN_TOKEN"}:
-                token = raw.strip().strip('"').strip("'")
-                if token:
-                    return token
-    raise SystemExit("ADMIN_TOKEN not found in env or .env")
+def _admin_token(base_url: str | None = None) -> str:
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(base_url or DEFAULT_BASE_URL)
+    if not token:
+        raise SystemExit("no ADMIN_TOKEN (fleet env file, environment, or .env)")
+    return token
 
 
 def fetch(base_url: str, timeout: float) -> dict[str, Any]:
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/api/ops/win-prob-null",
-        headers={"X-Admin-Token": _admin_token(), "Accept": "application/json"},
+        headers={"X-Admin-Token": _admin_token(base_url), "Accept": "application/json"},
     )
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return {"status": response.status, "payload": json.loads(response.read().decode("utf-8"))}

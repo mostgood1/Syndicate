@@ -63,7 +63,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import statistics
 import sys
 import urllib.parse
@@ -74,9 +73,9 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 BASE = default_base_url()
 STATSAPI = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={d}"
@@ -88,20 +87,9 @@ _SPREADS = {"spreads", "spreads_alt", "alternate_spreads"}
 
 
 def _admin_token() -> str | None:
-    for candidate in (Path(".env"),
-                      Path(__file__).resolve().parent.parent / ".env",
-                      Path.home() / "OneDrive" / "Coding" / "Syndicate" / ".env"):
-        try:
-            if not candidate.exists():
-                continue
-            for line in candidate.read_text(encoding="utf-8", errors="replace").splitlines():
-                if line.strip().startswith("ADMIN_TOKEN"):
-                    value = line.split("=", 1)[1].strip().strip('"').strip("'")
-                    if value:
-                        return value
-        except OSError:
-            continue
-    return os.environ.get("ADMIN_TOKEN")
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(BASE)
+    return token or None
 
 
 def ledger_records(sport: str, day: str, token: str | None) -> list[dict[str, Any]]:

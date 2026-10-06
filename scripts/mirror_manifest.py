@@ -81,7 +81,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scripts._pipeline_diag import WEB_BASE, _load_dotenv  # noqa: E402
+from scripts._base_url import admin_token as resolve_admin_token  # noqa: E402
+from scripts._pipeline_diag import WEB_BASE  # noqa: E402
 
 MANIFEST_DIRNAME = "_manifests"
 MANIFEST_VERSION = 1
@@ -245,9 +246,10 @@ def mirror_root(explicit: str | None = None) -> Path:
 
 
 def _token() -> str:
-    token = (os.environ.get("ADMIN_TOKEN") or _load_dotenv().get("ADMIN_TOKEN") or "").strip()
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(WEB_BASE)
     if not token:
-        raise SystemExit("ADMIN_TOKEN not set (env or .env). Cannot read production.")
+        raise SystemExit("ADMIN_TOKEN not set (fleet env file, environment or .env). Cannot read production.")
     return token
 
 

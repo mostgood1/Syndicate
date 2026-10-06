@@ -38,7 +38,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import os
 import re
 import statistics
 import sys
@@ -58,9 +57,9 @@ from syndicate.features.shared.opportunity_signals import devig  # noqa: E402
 DATA = REPO_ROOT / "data/mlb_source/source_artifacts/data"
 SNAPSHOTS = DATA / "daily_pitcher_props/snapshots"
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 BASE = default_base_url()
 
@@ -95,9 +94,6 @@ def _env() -> dict:
         if line and not line.startswith("#") and "=" in line:
             k, v = line.split("=", 1)
             out[k.strip()] = v.strip().strip('"').strip("'")
-    # A fresh clone (the `model-scorecard` cron) has no .env; the token arrives in the environment.
-    if not out.get("ADMIN_TOKEN") and os.environ.get("ADMIN_TOKEN"):
-        out["ADMIN_TOKEN"] = os.environ["ADMIN_TOKEN"].strip()
     return out
 
 
@@ -223,7 +219,7 @@ def main() -> int:
     dates = [(d0 + timedelta(days=i)).isoformat() for i in range((d1 - d0).days + 1)]
 
     env = _env()
-    token = env.get("ADMIN_TOKEN", "")
+    token = resolve_admin_token(BASE)
     cache = Path(env.get("TEMP", "/tmp")) / "mlb_prop_market_cache"
     actuals = load_actuals(args.batter_log)
 

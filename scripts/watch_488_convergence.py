@@ -35,9 +35,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 _BASE = default_base_url()
 _STALE = "2026-06-30"
@@ -45,10 +45,10 @@ _PATH = "wnba_source/data/processed/boxscores_history.csv"
 
 
 def _tok() -> str:
-    for line in (REPO / ".env").read_text(encoding="utf-8", errors="ignore").splitlines():
-        if line.startswith("ADMIN_TOKEN"):
-            return line.split("=", 1)[1].strip().strip('"').strip("'")
-    raise SystemExit("ADMIN_TOKEN not found")
+    token = resolve_admin_token(_BASE)
+    if not token:
+        raise SystemExit("ADMIN_TOKEN not found (fleet env file, environment or .env)")
+    return token
 
 
 def _export(tok: str, **kw):

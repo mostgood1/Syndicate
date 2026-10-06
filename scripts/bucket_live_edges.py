@@ -50,7 +50,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import statistics
 import sys
 import urllib.parse
@@ -75,9 +74,9 @@ PROGRESS_BANDS = (
 
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 
 def _base_url() -> str:
@@ -85,15 +84,9 @@ def _base_url() -> str:
 
 
 def _token() -> str:
-    v = str(os.environ.get("ADMIN_TOKEN") or "").strip()
-    if v:
-        return v
-    env = REPO_ROOT / ".env"
-    if env.exists():
-        for line in env.read_text(encoding="utf-8", errors="replace").splitlines():
-            if line.startswith("ADMIN_TOKEN"):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return ""
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(_base_url())
+    return token
 
 
 def fetch_rows(sport: str, day: str, token: str) -> list[dict]:

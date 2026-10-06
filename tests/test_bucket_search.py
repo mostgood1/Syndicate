@@ -360,19 +360,32 @@ def test_a_session_worktree_finds_the_token_in_the_main_worktree(tmp_path, monke
     monkeypatch.delenv("ADMIN_TOKEN", raising=False)
     monkeypatch.setattr(bs, "REPO_ROOT", session_tree)
     monkeypatch.setattr(bs, "_main_worktree", lambda: main_tree)
-    assert bs._admin_token() == "from-main"
+    render = "https://render.example"  # `.env` is Render's token; only a non-fleet target reads it
+    assert bs._admin_token(base_url=render) == "from-main"
     explicit = tmp_path / "explicit.env"
     explicit.write_text("ADMIN_TOKEN=from-flag\n", encoding="utf-8")
-    assert bs._admin_token(explicit) == "from-flag"
+    assert bs._admin_token(explicit, render) == "from-flag"
     monkeypatch.setenv("ADMIN_TOKEN", "from-env")
-    assert bs._admin_token(explicit) == "from-env"
+    assert bs._admin_token(explicit, render) == "from-env"
+
+
+def test_the_fleet_target_never_takes_the_dotenv_token(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text("ADMIN_TOKEN=render-token\n", encoding="utf-8")
+    monkeypatch.delenv("ADMIN_TOKEN", raising=False)
+    monkeypatch.setenv("SYNDICATE_FLEET_ADMIN_TOKEN", "fleet-token")
+    monkeypatch.setattr(bs, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(bs, "_main_worktree", lambda: None)
+    assert bs._admin_token(base_url="http://127.0.0.1:10000") == "fleet-token"
 
 
 def test_no_token_anywhere_is_empty_not_a_guess(tmp_path, monkeypatch):
     monkeypatch.delenv("ADMIN_TOKEN", raising=False)
     monkeypatch.setattr(bs, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(bs, "_main_worktree", lambda: None)
-    assert bs._admin_token() == ""
+    monkeypatch.delenv("SYNDICATE_FLEET_ADMIN_TOKEN", raising=False)
+    monkeypatch.delenv("SYNDICATE_FLEET_ENV_FILE", raising=False)
+    assert bs._admin_token(base_url="https://render.example") == ""
+    assert bs._admin_token(base_url="http://127.0.0.1:10000") == ""  # no live read under pytest
     assert bs.env_file_candidates() == [tmp_path / ".env"]
 
 

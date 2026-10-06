@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import urllib.parse
 import urllib.request
@@ -44,9 +43,9 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 BASE = default_base_url()
 # The commit that added the cross-disk publish. Without it the producer writes to
@@ -67,15 +66,9 @@ def _get(path: str, token: str | None = None, timeout: int = 120) -> dict:
 
 
 def _admin_token() -> str | None:
-    token = (os.environ.get("ADMIN_TOKEN") or "").strip()
-    if token:
-        return token
-    env_file = REPO_ROOT / ".env"
-    if env_file.is_file():
-        for line in env_file.read_text(encoding="utf-8").splitlines():
-            if line.startswith("ADMIN_TOKEN="):
-                return line.split("=", 1)[1].strip().strip('"')
-    return None
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(BASE)
+    return token or None
 
 
 def _say(verdict: str, reason: str, detail: dict) -> None:

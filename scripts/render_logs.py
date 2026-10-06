@@ -57,7 +57,8 @@ from deploy_preflight import OWNER_ID, SERVICE_IDS, _api_key, _get  # noqa: E402
 # `fetch_window` read NOTHING there -- the lines exist, just not on Render.
 #
 # THE SOURCE IS CHOSEN, AND SAID: `--local` / `--render`, else
-# `SYNDICATE_LOG_SOURCE=local|render`, else AUTO: local when there is no Render
+# `SYNDICATE_LOG_SOURCE=local|render|auto`, else LOCAL (since 2026-10-06; it was
+# AUTO, which called the Render API first). AUTO: local when there is no Render
 # key (a fleet checkout) or Render reports the web service suspended (cached 10
 # min). Every result names its source.
 #
@@ -142,10 +143,19 @@ def render_suspended(key: str) -> bool | None:
 
 
 def resolve_source(explicit: str | None = None) -> tuple[str, str]:
-    """(source, why). `local` or `render`."""
-    choice = (explicit or os.environ.get("SYNDICATE_LOG_SOURCE") or "auto").strip().lower()
+    """(source, why). `local` or `render`.
+
+    UNSET MEANS LOCAL, with no Render API call `[2026-10-06, lane scripts-fleet-default]`.
+    Until then unset meant AUTO, which asked the Render API whether Render was
+    suspended on every cold cache -- a network round trip to a billing-suspended
+    platform before reading a file on this machine. AUTO is still there, by name:
+    `SYNDICATE_LOG_SOURCE=auto` (or `explicit="auto"`).
+    """
+    choice = (explicit or os.environ.get("SYNDICATE_LOG_SOURCE") or "").strip().lower()
     if choice in ("local", "render"):
         return choice, "explicit" if explicit else "SYNDICATE_LOG_SOURCE"
+    if choice != "auto":
+        return "local", "default: production runs on the local fleet (--render for the Render API)"
     try:
         key = _api_key()
     except (Exception, SystemExit):  # noqa: BLE001 -- _api_key EXITS when absent
@@ -359,7 +369,7 @@ def main() -> int:
     parser.add_argument("--json", action="store_true")
     where = parser.add_mutually_exclusive_group()
     where.add_argument("--local", dest="source", action="store_const", const="local",
-                       help="read the local fleet's log files (default: AUTO, see resolve_source)")
+                       help="read the local fleet's log files (the default; see resolve_source)")
     where.add_argument("--render", dest="source", action="store_const", const="render",
                        help="read the Render logs API")
     parser.add_argument("--exact-only", action="store_true",

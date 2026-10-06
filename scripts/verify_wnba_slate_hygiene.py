@@ -46,8 +46,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import subprocess
 import sys
 import urllib.error
 import urllib.parse
@@ -57,9 +55,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 BASE = default_base_url()
 
@@ -213,32 +211,10 @@ def unwrap_export(doc, path):
     return text
 
 
-def _main_worktree_root():
-    # `REPO_ROOT` is the checkout this copy came from, which in a session
-    # worktree has no `.env` (learnings 2026-09-10). `git worktree list` names
-    # the main worktree first.
-    try:
-        out = subprocess.run(["git", "worktree", "list", "--porcelain"], cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=20)
-    except Exception:  # noqa: BLE001
-        return None
-    for line in out.stdout.splitlines():
-        if line.startswith("worktree "):
-            return Path(line[len("worktree "):].strip())
-    return None
-
-
 def _admin_token():
-    token = (os.environ.get("ADMIN_TOKEN") or os.environ.get("SYNDICATE_ADMIN_TOKEN") or "").strip()
-    if token:
-        return token
-    for root in (REPO_ROOT, _main_worktree_root()):
-        env_file = (root / ".env") if root else None
-        if env_file and env_file.is_file():
-            for line in env_file.read_text(encoding="utf-8-sig").splitlines():
-                name, _, value = line.partition("=")
-                if name.strip() in {"ADMIN_TOKEN", "SYNDICATE_ADMIN_TOKEN"} and value.strip():
-                    return value.strip().strip('"').strip("'")
-    return None
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(BASE)
+    return token or None
 
 
 def _get_json(path, token=None, timeout=180):

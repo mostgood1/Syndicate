@@ -288,27 +288,31 @@ def test_summary_nfl_real():
 
 
 @pytest.mark.parametrize("script", ["backtest_mlb_props", "backtest_wnba_projection"])
-def test_admin_token_falls_back_to_env_when_no_dotenv(script, tmp_path, monkeypatch):
+def test_admin_token_goes_through_the_shared_resolver(script, monkeypatch):
+    """The env/.env/fleet order lives in `scripts/_base_url.admin_token` (tests/test_base_url.py)."""
     module = _load(script)
-    monkeypatch.setattr(module, "REPO_ROOT", tmp_path)  # no .env here
-    monkeypatch.delenv("ADMIN_TOKEN", raising=False)
+    seen = []
+    answer = {"token": ""}
+
+    def resolver(base, **_kwargs):
+        seen.append(base)
+        return answer["token"]
+
+    monkeypatch.setattr(module, "resolve_admin_token", resolver)
     with pytest.raises(SystemExit):
         module._admin_token()
-    monkeypatch.setenv("ADMIN_TOKEN", "from-env")
-    assert module._admin_token() == "from-env"
-    (tmp_path / ".env").write_text("ADMIN_TOKEN='from-file'\n", encoding="utf-8")
-    assert module._admin_token() == "from-file"  # .env behaviour unchanged
+    answer["token"] = "resolved"
+    assert module._admin_token() == "resolved"
+    assert seen == [module.BASE, module.BASE]
 
 
 def test_grade_market_script_env_token_and_input_paths(tmp_path, monkeypatch):
     module = _load("grade_mlb_hitter_props_vs_market")
     monkeypatch.setattr(module, "REPO_ROOT", tmp_path)
-    monkeypatch.delenv("ADMIN_TOKEN", raising=False)
-    assert "ADMIN_TOKEN" not in module._env()
-    monkeypatch.setenv("ADMIN_TOKEN", "from-env")
-    assert module._env()["ADMIN_TOKEN"] == "from-env"
-    (tmp_path / ".env").write_text('ADMIN_TOKEN="from-file"\n', encoding="utf-8")
-    assert module._env()["ADMIN_TOKEN"] == "from-file"
+    # The token comes from the shared resolver now (tests/test_base_url.py), not `_env()`.
+    assert callable(module.resolve_admin_token)
+    (tmp_path / ".env").write_text('TEMP="from-file"\n', encoding="utf-8")
+    assert module._env()["TEMP"] == "from-file"
 
     day = "2099-01-01"
     snapshots = tmp_path / "snapshots"

@@ -54,9 +54,9 @@ from vendor.mlb_bettingv2.tools.tune.fit_hitter_prob_calibration import (  # noq
 )
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 DEFAULT_BASE = default_base_url()
 CONFIG_PATH = REPO_ROOT / "vendor" / "mlb_bettingv2" / "data" / "tuning" / "hitter_props_calibration" / "default.json"
@@ -164,15 +164,12 @@ def report_degenerate(batch_dir: Path, props: list[str]) -> dict[str, list[str]]
 
 
 # ----------------------------------------------------------------- production
-def _token(explicit: str) -> str:
-    if explicit:
-        return explicit
-    env = REPO_ROOT / ".env"
-    if env.exists():
-        for line in env.read_text(encoding="utf-8").splitlines():
-            if line.startswith("ADMIN_TOKEN="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    raise SystemExit("no ADMIN_TOKEN (pass --admin-token or put it in .env)")
+def _token(explicit: str, base_url: str | None = None) -> str:
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = explicit or resolve_admin_token(base_url or DEFAULT_BASE)
+    if not token:
+        raise SystemExit("no ADMIN_TOKEN (fleet env file, environment, or .env)")
+    return token
 
 
 def _export(base: str, token: str, params: dict) -> dict:
@@ -231,7 +228,7 @@ def main() -> int:
 
     work = Path(args.out_dir)
     work.mkdir(parents=True, exist_ok=True)
-    token = _token(args.admin_token)
+    token = _token(args.admin_token, args.base_url)
 
     print("Pulling production sim_vs_actual reports (substrate: Render, not data/**)", flush=True)
     windows = download_splits(args.base_url, token, work)

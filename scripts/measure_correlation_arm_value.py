@@ -114,7 +114,6 @@ import csv
 import io
 import json
 import math
-import os
 import random
 import re
 import sys
@@ -132,9 +131,9 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 DEFAULT_BASE = default_base_url()
 
@@ -188,17 +187,11 @@ ARMS = ("independence", "heuristic", "measured")
 
 
 def admin_token() -> str:
-    """The gitignored `.env` beside the repo, never argv, so the secret cannot
-    reach a log or a prompt."""
-    token = str(os.environ.get("ADMIN_TOKEN") or "").strip()
-    if token:
-        return token
-    env = REPO_ROOT / ".env"
-    if env.is_file():
-        for line in env.read_text(encoding="utf-8").splitlines():
-            if line.startswith("ADMIN_TOKEN="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    raise SystemExit("no ADMIN_TOKEN in the environment or .env")
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(DEFAULT_BASE)
+    if not token:
+        raise SystemExit("no ADMIN_TOKEN (fleet env file, environment, or .env)")
+    return token
 
 
 def export(base: str, params: dict, timeout: int = 300) -> dict:

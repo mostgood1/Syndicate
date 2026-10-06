@@ -34,7 +34,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import urllib.parse
 import urllib.request
@@ -47,26 +46,17 @@ if str(REPO_ROOT) not in sys.path:
 
 ALL_SPORTS = ("mlb", "nfl", "ncaaf", "nhl", "nba", "wnba", "soccer", "ncaab")
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 DEFAULT_BASE = default_base_url()
 
 
-def _admin_token() -> str:
-    token = str(os.environ.get("ADMIN_TOKEN") or "").strip()
-    if token:
-        return token
-    env_path = REPO_ROOT / ".env"
-    if env_path.exists():
-        for line in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
-            if line.strip().startswith("#") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            if key.strip() == "ADMIN_TOKEN":
-                return value.strip().strip('"').strip("'")
-    return ""
+def _admin_token(base_url: str | None = None) -> str:
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(base_url or DEFAULT_BASE)
+    return token
 
 
 def _get(base: str, path: str, params: dict[str, str], token: str, timeout: float) -> Any:
@@ -216,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
 
         date = central_today_iso()
 
-    token = _admin_token()
+    token = _admin_token(args.base_url)
     if not token:
         print("ADMIN_TOKEN not found in the environment or .env", flush=True)
         return 2

@@ -147,5 +147,5 @@ def test_reversed_price_orientation_is_detected(brp):
 
 
 def test_concentration_script_imports_still_resolve(brp):
-    for name in ("band_for", "finals_for", "ledger_rows", "resolve", "secret", "point_forecast_side"):
+    for name in ("band_for", "finals_for", "ledger_rows", "resolve", "resolve_admin_token", "point_forecast_side"):
         assert callable(getattr(brp, name))

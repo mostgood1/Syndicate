@@ -62,25 +62,20 @@ from statistics import fmean
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 BASE = default_base_url()
 ESPN = "https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard"
 
 
 def _admin_token() -> str:
-    env_file = REPO_ROOT / ".env"
-    if env_file.is_file():
-        for line in env_file.read_text(encoding="utf-8").splitlines():
-            if line.strip().startswith("ADMIN_TOKEN="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    # A fresh clone (the `model-scorecard` cron) has no .env; the token arrives in the environment.
-    token = str(os.environ.get("ADMIN_TOKEN") or "").strip()
-    if token:
-        return token
-    raise SystemExit("ADMIN_TOKEN not found in .env or the environment")
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(BASE)
+    if not token:
+        raise SystemExit("no ADMIN_TOKEN (fleet env file, environment, or .env)")
+    return token
 
 
 def _get(url: str, headers: dict | None = None, timeout: int = 90) -> bytes:

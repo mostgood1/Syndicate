@@ -44,7 +44,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import statistics
 import sys
 import urllib.parse
@@ -350,9 +349,9 @@ def reconcile(state: dict[str, Any], *, minutes_tolerance: float = 2.0) -> dict[
 
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 def sim_anchor_index(date_str: str) -> dict[str, dict[str, Any]]:
     """`normalized player name -> {pts_mean, min_mean}` from that date's sim.
@@ -374,29 +373,20 @@ def sim_anchor_index(date_str: str) -> dict[str, dict[str, Any]]:
         payload = None
     if not isinstance(payload, dict):
         try:
-            # ENV FIRST, then `.env`. On Render `ADMIN_TOKEN` is an environment
-            # variable; `.env` is gitignored, so a git WORKTREE has none and the
-            # token silently came back empty -- the export then failed and the
-            # anchor index returned {} with no error, which reads exactly like
-            # "that date has no sim". Measured here: 0 anchors for 2026-08-19
-            # while the export itself was fine.
-            token = os.environ.get("ADMIN_TOKEN", "").strip()
-            if not token:
-                for candidate in (REPO_ROOT / ".env", Path.cwd() / ".env"):
-                    if not candidate.exists():
-                        continue
-                    for line in candidate.read_text(encoding="utf-8").splitlines():
-                        if line.strip().startswith("ADMIN_TOKEN"):
-                            token = line.split("=", 1)[1].strip().strip('"').strip("'")
-                    if token:
-                        break
+            # `_base_url.admin_token`: the fleet's own token for the fleet, else
+            # env then `.env` (this checkout's, then the primary's -- a git
+            # WORKTREE has none). An empty token once returned {} with no error,
+            # which reads exactly like "that date has no sim" (0 anchors for
+            # 2026-08-19 while the export itself was fine).
+            base = default_base_url()
+            token = resolve_admin_token(base)
             if not token:
                 print("[grade] NO ADMIN_TOKEN -- cannot fetch the sim anchor; "
                       "set ADMIN_TOKEN or run from a tree with .env", flush=True)
                 return {}
             # `/stream`, NOT `/export`: export reads on web have 502'd the board
             # under load (state_model.md, model-scorecard); stream sends the file.
-            url = (default_base_url() + "/api/ops/artifacts/stream?"
+            url = (base + "/api/ops/artifacts/stream?"
                    + urllib.parse.urlencode({"path": relative}))
             request = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
             with urllib.request.urlopen(request, timeout=120) as response:

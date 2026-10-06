@@ -77,7 +77,6 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import os
 import statistics
 import sys
 import urllib.parse
@@ -88,9 +87,9 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 BASE = default_base_url()
 SPORTS = ("mlb", "ncaaf", "wnba", "soccer")
@@ -107,36 +106,9 @@ _DISCRIM_CEIL = 0.48
 
 
 def _admin_token() -> str | None:
-    """The admin token, or None.
-
-    SEARCHES THE PRIMARY TREE TOO, and that is not incidental. `.env` is
-    gitignored, so it does NOT exist inside a session worktree
-    (`scripts/session_worktree.py`) -- which is where this script will usually be
-    run from. The first version looked only beside the script, got None, 401'd
-    every fetch, and the run reported PASS. Caught immediately, but it is the
-    exact `unknown -> permissive` substitution this file exists to detect.
-    """
-    candidates = [
-        Path(".env"),
-        Path(__file__).resolve().parent.parent / ".env",
-        # The primary shared checkout, when running from a worktree.
-        Path.home() / "OneDrive" / "Coding" / "Syndicate" / ".env",
-    ]
-    extra = os.environ.get("SYNDICATE_PRIMARY_TREE")
-    if extra:
-        candidates.append(Path(extra) / ".env")
-    for candidate in candidates:
-        try:
-            if not candidate.exists():
-                continue
-            for line in candidate.read_text(encoding="utf-8", errors="replace").splitlines():
-                if line.strip().startswith("ADMIN_TOKEN"):
-                    value = line.split("=", 1)[1].strip().strip('"').strip("'")
-                    if value:
-                        return value
-        except OSError:
-            continue
-    return os.environ.get("ADMIN_TOKEN")
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(BASE)
+    return token or None
 
 
 def _export(path: str, token: str | None, timeout: int = 120) -> str:

@@ -40,7 +40,6 @@ from __future__ import annotations
 import argparse
 import io
 import json
-import os
 import sys
 import urllib.request
 from datetime import datetime, timezone
@@ -53,24 +52,18 @@ from syndicate.features.shared.live_gameline_accuracy import (  # noqa: E402
 )
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 DEFAULT_BASE = default_base_url()
 HISTORY = REPO / "reports" / "live_gameline_accuracy" / "history.jsonl"
 
 
-def _admin_token() -> str:
-    tok = os.environ.get("ADMIN_TOKEN", "").strip()
-    if tok:
-        return tok
-    env = REPO / ".env"
-    if env.exists():
-        for line in env.read_text(encoding="utf-8", errors="replace").splitlines():
-            if line.startswith("ADMIN_TOKEN="):
-                return line.split("=", 1)[1].strip().strip('"')
-    return ""
+def _admin_token(base_url: str | None = None) -> str:
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(base_url or DEFAULT_BASE)
+    return token
 
 
 def fetch(base: str, sport: str, date: str = "", timeout: int = 120) -> dict:
@@ -81,7 +74,7 @@ def fetch(base: str, sport: str, date: str = "", timeout: int = 120) -> dict:
     if date:
         url += f"&date={date}"
     req = urllib.request.Request(url)
-    tok = _admin_token()
+    tok = _admin_token(base)
     if tok:
         req.add_header("Authorization", f"Bearer {tok}")
     with urllib.request.urlopen(req, timeout=timeout) as fh:

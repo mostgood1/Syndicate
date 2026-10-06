@@ -34,24 +34,17 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 DEFAULT_BASE_URL = default_base_url()
 
 
-def _load_admin_token() -> str:
-    token = str(os.environ.get("ADMIN_TOKEN") or os.environ.get("SYNDICATE_ADMIN_TOKEN") or "").strip()
-    if token:
-        return token
-    env_path = REPO_ROOT / ".env"
-    if env_path.exists():
-        for line in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
-            key, _, value = line.partition("=")
-            if key.strip() in {"ADMIN_TOKEN", "SYNDICATE_ADMIN_TOKEN"}:
-                return value.strip().strip('"').strip("'")
-    return ""
+def _load_admin_token(base_url: str | None = None) -> str:
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(base_url or DEFAULT_BASE_URL)
+    return token
 
 
 def _get_json(base_url: str, path: str, token: str, timeout: int = 90) -> Any:
@@ -872,7 +865,7 @@ def main() -> int:
     if args.drain:
         return _run_drain(owner=args.drain_owner, wait_seconds=args.drain_wait_seconds, base_url=args.base_url)
 
-    token = _load_admin_token()
+    token = _load_admin_token(args.base_url)
     if not token:
         print("ADMIN_TOKEN not found in environment or .env", file=sys.stderr)
         return 2

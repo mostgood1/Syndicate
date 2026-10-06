@@ -45,7 +45,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts._pipeline_diag import REPO_ROOT, WEB_BASE, banner, secret  # noqa: E402
+from scripts._base_url import admin_token as resolve_admin_token  # noqa: E402
+from scripts._pipeline_diag import REPO_ROOT, WEB_BASE, banner  # noqa: E402
 
 # family -> relative-path template. `{date}` is the ISO date, `{slug}` the
 # underscore form. Kept explicit rather than derived: a wrong guess here is a
@@ -73,7 +74,7 @@ FAMILY_PATHS: dict[str, tuple[str, ...]] = {
 
 def stream_artifact(relative_path: str, *, timeout: int = 120) -> tuple[bytes | None, int | None, str]:
     """Fetch ONE artifact. Returns (body, status, error). Never raises."""
-    token = secret("ADMIN_TOKEN")
+    token = resolve_admin_token(WEB_BASE)
     if not token:
         return None, None, "ADMIN_TOKEN not set"
     url = f"{WEB_BASE}/api/ops/artifacts/stream?path={relative_path}"

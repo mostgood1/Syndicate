@@ -38,7 +38,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import sys
 import time
@@ -48,9 +47,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 DEFAULT_BASE = default_base_url()
 
@@ -244,7 +243,7 @@ def _post(base: str, question: str, context: dict | None, timeout: float) -> tup
 def _get(base: str, path: str, timeout: float = 90.0) -> dict | None:
     # `/api/portfolio/*` is behind the portfolio sign-in since 2026-09-10; the
     # ops token passes it without a browser session.
-    token = str(os.environ.get("ADMIN_TOKEN") or os.environ.get("SYNDICATE_ADMIN_TOKEN") or "").strip()
+    token = resolve_admin_token(base)
     request = urllib.request.Request(f"{base}{path}", headers={"X-Admin-Token": token} if token else {})
     try:
         with urllib.request.urlopen(request, timeout=timeout) as resp:

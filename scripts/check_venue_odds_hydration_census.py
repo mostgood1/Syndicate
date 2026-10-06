@@ -51,9 +51,9 @@ import urllib.request
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVICES = ("live-odds-worker", "refresh-worker")
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 BASE = default_base_url()
 
@@ -69,10 +69,11 @@ BOOK_RE = re.compile(r"\[(\w+)\] (?:(\w+)_)?DAILY_BOOK status=(\w+)")
 
 
 def _admin_token(env_file: str) -> str:
-    for line in open(env_file, encoding="utf-8-sig"):
-        if line.startswith("ADMIN_TOKEN="):
-            return line.split("=", 1)[1].strip().strip('"').strip("'")
-    raise SystemExit("ADMIN_TOKEN not found in %s" % env_file)
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(BASE, env_file=env_file)
+    if not token:
+        raise SystemExit("no ADMIN_TOKEN (fleet env file, environment, or .env)")
+    return token
 
 
 def _redis_venue_odds_keys(token: str, top: int) -> tuple[dict[tuple[str, str, str], int], bool]:

@@ -44,7 +44,6 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import os
 import random
 import sys
 import urllib.parse
@@ -57,24 +56,18 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 DEFAULT_BASE = default_base_url()
 STATSAPI = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={d}"
 
 
-def _admin_token() -> str:
-    tok = os.environ.get("ADMIN_TOKEN", "").strip()
-    if tok:
-        return tok
-    env = REPO / ".env"
-    if env.exists():
-        for line in env.read_text(encoding="utf-8", errors="replace").splitlines():
-            if line.startswith("ADMIN_TOKEN="):
-                return line.split("=", 1)[1].strip().strip('"')
-    return ""
+def _admin_token(base_url: str | None = None) -> str:
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(base_url or DEFAULT_BASE)
+    return token
 
 
 def fetch_ledger(base: str, sport: str, day: str, timeout: int = 300) -> list[dict]:
@@ -89,7 +82,7 @@ def fetch_ledger(base: str, sport: str, day: str, timeout: int = 300) -> list[di
                f"live_gameline_ledger_{day}.jsonl")
     url = f"{base.rstrip('/')}/api/ops/artifacts/export?pattern={urllib.parse.quote(pattern)}"
     req = urllib.request.Request(url)
-    tok = _admin_token()
+    tok = _admin_token(base)
     if tok:
         req.add_header("Authorization", f"Bearer {tok}")
     with urllib.request.urlopen(req, timeout=timeout) as fh:

@@ -66,9 +66,9 @@ MLB_DATA = REPO_ROOT / "data/mlb_source/source_artifacts/data"
 DATE_RE = re.compile(r"(20\d{2})[-_](\d{2})[-_](\d{2})")
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 BASE = default_base_url()
 ARTIFACT_PREFIX = "mlb_source/source_artifacts/data"
@@ -115,12 +115,11 @@ def _to_float(value: Any) -> float | None:
 
 
 def _admin_token() -> str:
-    env = REPO_ROOT / ".env"
-    if env.exists():
-        for line in env.read_text(encoding="utf-8").splitlines():
-            if line.strip().startswith("ADMIN_TOKEN="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    raise SystemExit("ADMIN_TOKEN not found in .env -- needed for --source production")
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(BASE)
+    if not token:
+        raise SystemExit("ADMIN_TOKEN not found (fleet env file, environment or .env) -- needed for --source production")
+    return token
 
 
 def _stream(path: str, token: str, timeout: int = 180) -> bytes:

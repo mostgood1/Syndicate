@@ -113,7 +113,6 @@ import argparse
 import collections
 import csv
 import json
-import os
 import sys
 import urllib.request
 from pathlib import Path
@@ -128,27 +127,21 @@ from syndicate.features.shared.polymarket_board_join import parse_slug  # noqa: 
 from syndicate.features.shared.team_aliases import canonical_team  # noqa: E402
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 DEFAULT_BASE = default_base_url()
 
 
-def _admin_token() -> str:
-    token = os.environ.get("ADMIN_TOKEN")
-    if token:
-        return token.strip()
-    env = Path(__file__).resolve().parents[1] / ".env"
-    if env.exists():
-        for line in env.read_text(encoding="utf-8", errors="replace").splitlines():
-            if line.startswith("ADMIN_TOKEN"):
-                return line.split("=", 1)[1].strip().strip("\"'")
-    return ""
+def _admin_token(base_url: str | None = None) -> str:
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(base_url or DEFAULT_BASE)
+    return token
 
 
 def _get(base: str, path: str) -> dict:
-    req = urllib.request.Request(base + path, headers={"X-Admin-Token": _admin_token()})
+    req = urllib.request.Request(base + path, headers={"X-Admin-Token": _admin_token(base)})
     with urllib.request.urlopen(req, timeout=120) as handle:  # noqa: S310
         return json.loads(handle.read().decode("utf-8"))
 

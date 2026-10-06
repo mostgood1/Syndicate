@@ -98,8 +98,21 @@ def test_fetch_window_dispatches_to_local_and_records_source(log_dir: Path, monk
     assert render_logs.LAST_FETCH["source"] == "local" and render_logs.LAST_FETCH["why"] == "explicit"
 
 
-def test_resolve_source_auto(monkeypatch) -> None:
+def test_resolve_source_unset_is_local_without_render_call(monkeypatch) -> None:
     monkeypatch.delenv("SYNDICATE_LOG_SOURCE", raising=False)
+
+    def forbidden(*_a, **_k):
+        raise AssertionError("the default must not touch the Render API")
+
+    monkeypatch.setattr(render_logs, "_api_key", forbidden)
+    monkeypatch.setattr(render_logs, "render_suspended", forbidden)
+    source, why = render_logs.resolve_source()
+    assert source == "local" and why.startswith("default:")
+    assert render_logs.resolve_source("render") == ("render", "explicit")
+
+
+def test_resolve_source_auto(monkeypatch) -> None:
+    monkeypatch.setenv("SYNDICATE_LOG_SOURCE", "auto")
 
     def no_key():
         raise SystemExit("RENDER_API_KEY not set")
@@ -112,5 +125,6 @@ def test_resolve_source_auto(monkeypatch) -> None:
     assert render_logs.resolve_source() == ("local", "auto: Render reports the web service suspended")
     monkeypatch.setattr(render_logs, "render_suspended", lambda key: False)
     assert render_logs.resolve_source()[0] == "render"
+    assert render_logs.resolve_source("auto")[0] == "render"
     monkeypatch.setenv("SYNDICATE_LOG_SOURCE", "local")
     assert render_logs.resolve_source() == ("local", "SYNDICATE_LOG_SOURCE")

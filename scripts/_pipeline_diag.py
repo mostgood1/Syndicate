@@ -35,9 +35,9 @@ from typing import Any, Iterable
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 WEB_BASE = default_base_url("SYNDICATE_DIAG_BASE_URL")
 RENDER_API = "https://api.render.com/v1"
@@ -118,7 +118,7 @@ def http_json(url: str, *, headers: dict[str, str] | None = None, timeout: int =
 def web_json(path: str, *, admin: bool = False, timeout: int = 60) -> tuple[Any, int | None, str]:
     headers = {}
     if admin:
-        token = secret("ADMIN_TOKEN")
+        token = resolve_admin_token(WEB_BASE)
         if not token:
             return None, None, "ADMIN_TOKEN not set"
         headers["X-Admin-Token"] = token

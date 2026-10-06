@@ -237,9 +237,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 BASE = default_base_url()
 EXCHANGES = {"kalshi", "polymarket", "novig", "prophetx"}
@@ -952,12 +952,7 @@ def main() -> int:
     if not dates:
         raise SystemExit("give --date (repeatable) or --since/--until")
 
-    token = args.admin_token
-    if not token:
-        env = REPO_ROOT / ".env"
-        for line in (env.read_text(encoding="utf-8").splitlines() if env.exists() else []):
-            if line.startswith("ADMIN_TOKEN="):
-                token = line.split("=", 1)[1].strip().strip('"').strip("'")
+    token = args.admin_token or resolve_admin_token(BASE)
     if not token:
         raise SystemExit("no ADMIN_TOKEN")
 

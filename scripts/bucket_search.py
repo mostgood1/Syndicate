@@ -41,7 +41,6 @@ import argparse
 import collections
 import importlib.util
 import json
-import os
 import random
 import sys
 import urllib.error
@@ -87,9 +86,9 @@ SEED = 20260914
 FDR_Q = 0.10
 P_FLOOR, P_CEIL = 0.001, 0.999
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 BASE_URL = default_base_url()
 SPORTS = ("mlb", "nfl", "ncaaf", "soccer", "wnba", "nba", "nhl", "ncaab")
@@ -254,21 +253,10 @@ def env_file_candidates(env_file: Path | str | None = None) -> list[Path]:
     return unique
 
 
-def _admin_token(env_file: Path | str | None = None) -> str:
-    """ADMIN_TOKEN from the environment, else the first candidate `.env` that holds one. Never printed."""
-    from_env = str(os.environ.get("ADMIN_TOKEN") or "").strip()
-    if from_env:
-        return from_env
-    for path in env_file_candidates(env_file):
-        if not path.is_file():
-            continue
-        for line in path.read_text(encoding="utf-8-sig").splitlines():
-            key, sep, value = line.strip().partition("=")
-            if sep and key.strip() == "ADMIN_TOKEN":
-                token = value.strip().strip('"').strip("'")
-                if token:
-                    return token
-    return ""
+def _admin_token(env_file: Path | str | None = None, base_url: str | None = None) -> str:
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(base_url or BASE_URL, env_file=env_file_candidates(env_file))
+    return token
 
 
 def _get_json(url: str, token: str | None = None, timeout: float = 180.0) -> Any:
@@ -889,7 +877,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         if not (args.start and args.end):
             parser.error("--start and --end are required unless --records-dir is given")
-        token = _admin_token(args.env_file)
+        token = _admin_token(args.env_file, args.base_url)
         if not token:
             searched = ", ".join(str(p) for p in env_file_candidates(args.env_file))
             parser.error(f"no ADMIN_TOKEN in the environment or in: {searched}")

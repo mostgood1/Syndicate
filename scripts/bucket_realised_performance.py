@@ -106,7 +106,6 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import os
 import pathlib
 import statistics
 import sys
@@ -116,9 +115,9 @@ from collections import defaultdict
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 BASE = default_base_url()
 
@@ -134,21 +133,6 @@ PROGRESS_BANDS = [
 # 0.517 on 74 games. A frame flip reads NEGATIVE, so this is a direction check
 # with some margin, not a quality bar.
 _LINE_TRACKS_OUTCOME_MIN_CORR = 0.2
-
-
-def secret(name: str) -> str:
-    # The environment first: a session worktree has no `.env`, and copying one in
-    # would put the secret inside a checkout.
-    env = os.environ.get(name)
-    if env:
-        return env.strip().strip('"').strip("'")
-    path = REPO / ".env"
-    if not path.exists():
-        return ""
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        if line.startswith(name):
-            return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return ""
 
 
 def band_for(progress) -> str:
@@ -461,7 +445,7 @@ def main(argv: list[str] | None = None) -> int:
         rows = _read_jsonl(args.rows_jsonl)
         print(f"REPLAY of {args.rows_jsonl}: {len(rows)} ledger rows (not a fresh pull)")
     else:
-        token = secret("ADMIN_TOKEN")
+        token = resolve_admin_token(BASE)
         print(f"pulling {args.sport} ledger, {args.days} days")
         rows = ledger_rows(args.sport, args.days, token)
         print(f"TOTAL ledger rows: {len(rows)}")

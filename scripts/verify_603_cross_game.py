@@ -42,15 +42,14 @@ from __future__ import annotations
 import argparse
 import collections
 import json
-import os
 import sys
 import urllib.request
 from datetime import datetime, timezone
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 BASE = default_base_url()
 TOTALS_MARKETS = {"totals", "totals_alt"}
@@ -58,19 +57,9 @@ EXIT_OK, EXIT_FAIL, EXIT_ERROR, EXIT_UNMEASURABLE = 0, 1, 2, 3
 
 
 def _admin_token() -> str:
-    token = (os.environ.get("ADMIN_TOKEN") or "").strip()
-    if token:
-        return token
-    # The gitignored .env is where this lives on a dev machine. Read rather
-    # than required-in-argv so the secret never reaches a log or a shell history.
-    try:
-        with open(".env", encoding="utf-8") as handle:
-            for line in handle:
-                if line.startswith("ADMIN_TOKEN"):
-                    return line.split("=", 1)[1].strip().strip('"').strip()
-    except OSError:
-        pass
-    return ""
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = resolve_admin_token(BASE)
+    return token
 
 
 def _board(date: str, token: str) -> dict:

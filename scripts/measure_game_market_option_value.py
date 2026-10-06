@@ -113,9 +113,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 BASE = default_base_url()
 
@@ -237,16 +237,11 @@ def dates_between(start: str, end: str) -> list[str]:
 
 
 def admin_token(explicit: str) -> str:
-    """Resolved LAZILY, at the first shard that is not already cached. A run off
-    a warm cache needs no credential, and demanding one up front would make a
-    read-only re-run fail in a worktree that has no `.env`."""
-    if explicit:
-        return explicit
-    for env in (REPO_ROOT / ".env", Path.cwd() / ".env"):
-        for line in (env.read_text(encoding="utf-8").splitlines() if env.exists() else []):
-            if line.startswith("ADMIN_TOKEN="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    raise SystemExit("no ADMIN_TOKEN, and a shard is missing from the cache")
+    """Via `_base_url.admin_token`: the fleet's own token for the fleet, else env / `.env`. Never printed."""
+    token = explicit or resolve_admin_token(BASE)
+    if not token:
+        raise SystemExit("no ADMIN_TOKEN, and a shard is missing from the cache")
+    return token
 
 
 # ------------------------------------------------------------------ fetching
