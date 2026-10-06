@@ -14,6 +14,14 @@ from syndicate.features.shared.portfolio_settings import PortfolioSettings
 
 
 @pytest.fixture(autouse=True)
+def _fair_noise_off(monkeypatch):
+    """These tests predate the fair-noise shrink (lane `published-negative-ev`, 2026-10-06) and test
+    other properties of market-only sizing, so the shrink is pinned OFF here. It has its own tests in
+    `tests/test_portfolio_fair_noise.py`."""
+    monkeypatch.setenv("SYNDICATE_PORTFOLIO_FAIR_NOISE_PP", "0")
+
+
+@pytest.fixture(autouse=True)
 def _env(monkeypatch):
     monkeypatch.setenv("SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS", "ncaaf")
     monkeypatch.delenv("SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR", raising=False)

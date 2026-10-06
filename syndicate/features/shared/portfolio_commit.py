@@ -110,6 +110,7 @@ FORBIDDEN).
 from __future__ import annotations
 
 import hashlib
+import math
 import os
 from dataclasses import dataclass, fields as dataclass_fields
 from datetime import datetime, timezone
@@ -349,6 +350,53 @@ def _sizing_skill_factor(row: Mapping[str, Any]) -> float:
     except Exception:
         optimizer = 1.0
     return base * optimizer
+
+
+# THE FAIR'S OWN NOISE `[2026-10-06, lane published-negative-ev, user "Size by book count"]`.
+# A price-shopping edge is `best price vs a consensus fair`, and that fair is built from the
+# books that quote the line. Measured on the paper portfolio's 623 settled orders
+# (2026-10-02..05, `findings_2026-10-06_published_negative_ev.md`): market-only orders lost
+# -22.6% on lines with 1-2 books (181 orders, 88% of the whole loss), -11.3% with 3-4, +6.5%
+# with 5-7, +42.6% with 8+ -- the winner's curse of selecting on a noisy estimate.
+#
+# PRE-REGISTERED, NOT FITTED: one book's price sits about one vig (~5 pp of EV) from fair, and
+# a consensus of n books carries roughly that noise / sqrt(n). So a MARKET-ONLY row's EV is
+# taken as `ev_pct - FAIR_NOISE_PP / sqrt(books_quoting)` for admission and for its Kelly
+# probability. A property of the LINE (how many books form its fair), never of its market
+# (2026-10-05 PRIME DIRECTIVE): a thin line still stakes when its edge clears its own noise.
+# Model-backed rows are unchanged -- their edge does not come from the noisy fair.
+# An unknown book count is treated as ONE book (unknown must not default permissive).
+# `SYNDICATE_PORTFOLIO_FAIR_NOISE_PP=0` switches it off.
+FAIR_NOISE_PP_DEFAULT = 5.0
+
+
+def _fair_noise_pp() -> float:
+    raw = str(os.environ.get("SYNDICATE_PORTFOLIO_FAIR_NOISE_PP") or "").strip()
+    if not raw:
+        return FAIR_NOISE_PP_DEFAULT
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return FAIR_NOISE_PP_DEFAULT
+
+
+def _fair_noise_penalty_pct(row: Mapping[str, Any]) -> float:
+    """EV points to take off a MARKET-ONLY row for the noise of its fair; 0.0 for a model-backed row."""
+    if _sizing_model_edge(row) is not None:
+        return 0.0
+    noise = _fair_noise_pp()
+    if noise <= 0.0:
+        return 0.0
+    quote = row.get("quote")
+    books = _as_float(quote.get("books_quoting")) if isinstance(quote, Mapping) else None
+    books = books if books is not None and books >= 1.0 else 1.0
+    return noise / math.sqrt(books)
+
+
+def _effective_ev_pct(row: Mapping[str, Any]) -> float | None:
+    """`ev_pct` less the fair-noise penalty (market-only rows only)."""
+    ev_pct = _as_float(row.get("ev_pct"))
+    return None if ev_pct is None else ev_pct - _fair_noise_penalty_pct(row)
 
 
 def _sizing_model_edge(row: Mapping[str, Any]) -> float | None:
@@ -657,7 +705,13 @@ def sizing_inputs_with_provenance(
         # globally would start sizing 40% of the board in one unreviewed step.
         if str(row.get("sport") or "").strip().lower() not in _market_fair_sports():
             return None, "no_model_edge_pct", provenance
-        model_edge_pct = 0.0
+        # The Kelly probability of a market-only row is its fair LESS the fair's own noise
+        # (`_fair_noise_penalty_pct`): a 1-2-book "edge" sizes to ~0 through Kelly <= 0.
+        penalty = _fair_noise_penalty_pct(row)
+        provenance["fair_noise_penalty_pct"] = round(penalty, 4)
+        # fair_adj = ((ev - penalty)/100 + 1)/(profit + 1) = fair - (penalty/100)/(profit + 1),
+        # so the edge in probability points is -penalty/(profit + 1).
+        model_edge_pct = -penalty / (profit + 1.0)
 
     raw_model = fair + (model_edge_pct / 100.0)
     if not (0.0 < raw_model < 1.0):
@@ -1002,6 +1056,11 @@ def commit_portfolio(
         ev_pct = _as_float(row.get("ev_pct"))
         if ev_pct is None or ev_pct < resolved.min_ev_pct:
             refuse("below_min_ev_pct", row)
+            continue
+        # Its own refusal name, so the counter says how many bets the fair's noise alone removed.
+        effective_ev = _effective_ev_pct(row)
+        if effective_ev is None or effective_ev < resolved.min_ev_pct:
+            refuse("below_min_ev_pct_after_fair_noise", row)
             continue
         # THE VENUE'S FEE COMES OFF BEFORE SUBMIT (user decision 2026-09-21: "we should
         # have the fee deduction prior to submit not at submit"). A venue-scoped row
