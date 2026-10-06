@@ -15,6 +15,7 @@ module home and this note changed.
 from __future__ import annotations
 
 import math
+import os
 import random
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
@@ -56,6 +57,16 @@ class SimConfig:
     # Additional goal conversion multipliers applied after PP/PK adjustments
     pp_goals_mult: float = 1.0
     pk_goals_mult: float = 1.0
+    # TEAM POWER-PLAY TIME `[lane nhl-pp-time, 2026-10-05]`. "minors_2min" (default, the legacy path,
+    # byte-identical): every committed minor gives the opponent 120 s of PP, and an OT period samples
+    # PP against the OT window itself, so it hits the 0.45 cap (~45% of OT on a PP). Real 2025-26
+    # regular season: 4.742 PP min per team-game (NHL stats `team/powerplaytime`) vs 3.236 opponent
+    # minors x 2 min = 6.471 -> 0.733 (2024-25: 0.741). The missing time is coincidental minors (no
+    # PP), PPs ended early by a goal, and overlapping penalties. "per_minor": each minor gives
+    # `pp_seconds_per_minor` of PP, and OT samples PP at the REGULATION per-second rate (real OT
+    # carries 1.0% of all PP time). Off switch: env SYNDICATE_NHL_PP_TIME_MODEL=minors_2min.
+    pp_time_model: str = "minors_2min"
+    pp_seconds_per_minor: float = 120.0
 
     # SECOND correction layer, multiplied on top of the four fields above (`pp_shots_mult` etc)
     # AND, for the goal-rate pair, on top of the per-team `pp_pct`/`pk_pct` adjustment
@@ -276,6 +287,10 @@ class SimConfig:
     # "narrow first" pattern) -- strength-state (PP/PK) segments' own assumed-single-draw mechanism
     # is untouched, a stated next step, not silently extended without its own verification.
     faceoff_multi_event_segment_model: bool = True
+
+
+class _PPTimeResolved(Exception):
+    """Control flow only: the `per_minor` PP-time path resolved `pp_frac_total` (lane nhl-pp-time)."""
 
 
 def _multi_event_segment_multipliers(
@@ -1248,7 +1263,15 @@ class PeriodSimulator:
         # Approximate total PP time as: minors_per_game * 120s, then convert to fraction of game time.
         h_comm = _f(st_home.get("committed_per_game", 3.0), 3.0)
         a_comm = _f(st_away.get("committed_per_game", 3.0), 3.0)
+        pp_time_model = str(os.environ.get("SYNDICATE_NHL_PP_TIME_MODEL") or getattr(self.cfg, "pp_time_model", "minors_2min")).strip().lower()
         try:
+            if pp_time_model == "per_minor":
+                # SimConfig.pp_time_model: PP seconds per committed minor are measured, not assumed 120,
+                # and OT uses the REGULATION per-second rate (the legacy OT denominator caps at 0.45).
+                reg_game_seconds = float(max(1.0, float(self.cfg.periods) * float(self.cfg.seconds_per_period)))
+                per_minor = max(0.0, _f(getattr(self.cfg, "pp_seconds_per_minor", 120.0), 120.0))
+                pp_frac_total = max(0.0, min(0.45, float(h_comm + a_comm) * per_minor / reg_game_seconds))
+                raise _PPTimeResolved()
             # Each committed minor yields ~2 minutes of PP time for the opponent.
             # `h_comm`/`a_comm` are per-game rates, so convert to a fraction of *game* time.
             # This function runs once per period; sampling PP segments using per-period seconds
@@ -1261,6 +1284,8 @@ class PeriodSimulator:
             if int(T) != int(self.cfg.seconds_per_period):
                 denom_seconds = float(max(1.0, float(T)))
             pp_frac_total = max(0.0, min(0.45, float(pp_seconds_total) / float(denom_seconds)))
+        except _PPTimeResolved:
+            pass
         except Exception:
             # Fallback: convert minutes of PP per game into a fraction of regulation time.
             try:
