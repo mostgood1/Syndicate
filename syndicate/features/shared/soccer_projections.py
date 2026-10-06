@@ -31,13 +31,41 @@ inferred from a mean are not the same claim.
 
 from __future__ import annotations
 
+import html
 import json
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from syndicate.features.shared.prop_projections import _norm_name
+from syndicate.features.shared.prop_projections import _norm_name as _base_norm_name
+
+
+def _norm_name(value: Any) -> str:
+    """`prop_projections._norm_name`, after decoding HTML entities.
+
+    The soccer producer writes some names entity-encoded -- measured on the fleet
+    2026-10-05: `Dara O&#039;Shea`, `Matt O&#039;Riley`, `Djylian N&#039;Guessan`
+    (8 of 5,152 `player_props` names) -- which normalise to `dara o 039shea`-style
+    keys that no book name can reach. Decoded here, for both the index keys and the
+    board names, so the two sides go through one function (lane
+    `soccer-prop-name-join`).
+
+    CURLY APOSTROPHES ARE STRAIGHTENED FIRST. The base drops a straight `'` but
+    splits on a curly one: `N'Dri` -> `ndri` while `N’Dri` -> `n dri`, so the two
+    spellings of one player never met (the sim writes `Konan N’Dri`).
+    """
+    text = html.unescape(str(value or ""))
+    return _base_norm_name(text.translate(_APOSTROPHES))
+
+
+_APOSTROPHES = str.maketrans({"’": "'", "‘": "'", "ʼ": "'", "`": "'", "´": "'"})
+
+
+# Selections priced in the scorer markets that are not a player. Counted apart
+# (`non_player_selection_rows`) so they stop reading as player-join misses: 138
+# of the 1,306 `player_miss_name` rows on the 2026-10-05 fleet grid.
+_NON_PLAYER_SELECTIONS = frozenset({"no scorer", "no goalscorer", "no goal scorer", "no goal"})
 from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
 from syndicate.features.shared.book_margin_model import (
     EDGE_FIELD as MODELLED_EDGE_FIELD,
@@ -1166,6 +1194,8 @@ def attach_soccer_projections(
     # attributable before anyone chooses what to fix next.
     player_alias_hits = 0
     player_alias_ambiguous = 0
+    player_surname_hits = 0
+    non_player_selection_rows = 0
     unprojected_no_field = 0
     unprojected_by_market: dict[str, int] = {}
     # `#673`: rows NOT priced because their ladder answers the other question
@@ -1223,6 +1253,27 @@ def attach_soccer_projections(
             return candidates[0], "alias"
         if len(candidates) > 1:
             return None, "ambiguous"
+        # UNIQUE SURNAME WITHIN THIS ONE MATCH, last resort (lane
+        # `soccer-prop-name-join`, 2026-10-05). The token-subset rule above cannot
+        # bridge a first-name VARIANT: measured on the fleet grid that day, 288
+        # rows were players on the match's own roster under another spelling --
+        # `Nicolas Paz` / `nico paz`, `Anastasios Douvikas` / `tasos douvikas`,
+        # `Yassine Titraoui` / `yacine titraoui`, `Brendan Aaronson` / `brenden
+        # aaronson`. The same three guards apply: the pool is ONE match's roster;
+        # a surname shared by two listed players refuses (`ambiguous`); a surname
+        # under three characters is never used (`da`, `de` and initials are two;
+        # `Paz`, the measured case, is three).
+        surname = key.split()[-1]
+        if len(surname) >= 3:
+            by_surname = [
+                pool_value
+                for pool_key, pool_value in pool.items()
+                if str(pool_key or "").split() and str(pool_key).split()[-1] == surname
+            ]
+            if len(by_surname) == 1:
+                return by_surname[0], "surname"
+            if len(by_surname) > 1:
+                return None, "ambiguous"
         return None, "miss"
 
     def _note_player_miss(match: Mapping[str, Any], row: Mapping[str, Any], roster: Mapping[str, Any]) -> None:
@@ -1372,6 +1423,9 @@ def attach_soccer_projections(
             if margin is not None:
                 projection = _mean_projection(margin, row.get("line"), basis="margin_mean")
         elif market in _DERIVED_SCORER_MARKETS:
+            if _norm_name(row.get("player_name")) in _NON_PLAYER_SELECTIONS:
+                non_player_selection_rows += 1
+                continue
             match_id = str(match.get("match_id") or "").strip()
             race = _scorer_race_for(index, match_id, match)
             prob, race_state = _lookup_player(
@@ -1379,6 +1433,8 @@ def attach_soccer_projections(
             )
             if race_state == "alias":
                 player_alias_hits += 1
+            elif race_state == "surname":
+                player_surname_hits += 1
             elif race_state == "ambiguous":
                 player_alias_ambiguous += 1
             if prob is None:
@@ -1412,10 +1468,15 @@ def attach_soccer_projections(
             # Built from the unconditional goal means, like the anytime field.
             projection["conditioning"] = _FAMILY_CONDITIONING.get(market)
         elif market in _PLAYER_FIELDS or market in _PLAYER_PROB_BY_LINE:
+            if _norm_name(row.get("player_name")) in _NON_PLAYER_SELECTIONS:
+                non_player_selection_rows += 1
+                continue
             players = index.players_by_match.get(str(match.get("match_id") or "").strip()) or {}
             entry, player_state = _lookup_player(players, row.get("player_name"))
             if player_state == "alias":
                 player_alias_hits += 1
+            elif player_state == "surname":
+                player_surname_hits += 1
             elif player_state == "ambiguous":
                 player_alias_ambiguous += 1
             if entry is None:
@@ -1555,6 +1616,8 @@ def attach_soccer_projections(
         "player_miss_no_rate": player_miss_no_rate,
         "player_alias_hits": player_alias_hits,
         "player_alias_ambiguous": player_alias_ambiguous,
+        "player_surname_hits": player_surname_hits,
+        "non_player_selection_rows": non_player_selection_rows,
         "unprojected_no_field": unprojected_no_field,
         # Top markets only: the whole dict on one log line is unreadable, and
         # the tail is never the thing anyone acts on.

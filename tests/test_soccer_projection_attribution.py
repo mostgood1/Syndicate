@@ -324,18 +324,21 @@ def test_a_match_with_no_roster_is_named_as_a_PRODUCER_gap(tmp_path: Path) -> No
 
 
 def test_a_name_absent_from_a_REAL_roster_is_named_as_a_name_miss(tmp_path: Path) -> None:
+    # `Gabriel Jesus`, not `Bukayo Saka`: since 2026-10-05 (lane `soccer-prop-name-join`)
+    # the same-match unique-surname rule JOINS `Bukayo Saka` to `B. Saka`, which is the
+    # same player -- see `test_soccer_prop_name_join.py`.
     _write_with_players(
         tmp_path, "epl", DATE, "Arsenal", "Chelsea", ["B. Saka", "Martin Ødegaard"]
     )
     index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
 
     coverage = attach_soccer_projections(
-        [_player_row("epl", "Arsenal", "Chelsea", "Bukayo Saka")], index
+        [_player_row("epl", "Arsenal", "Chelsea", "Gabriel Jesus")], index
     )
     assert coverage["player_miss_name"] == 1
     assert coverage["player_miss_no_roster"] == 0
     # BOTH SIDES, so an alias can actually be written from the log line.
-    assert coverage["unmatched_player_sample"] == ["epl|Bukayo Saka"]
+    assert coverage["unmatched_player_sample"] == ["epl|Gabriel Jesus"]
     assert "B. Saka" in coverage["sim_roster_sample"]
 
 
@@ -345,12 +348,12 @@ def test_one_player_contributes_one_sample_not_one_per_prop_row(tmp_path: Path) 
     index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
 
     grid = [
-        _player_row("epl", "Arsenal", "Chelsea", "Bukayo Saka", market=m)
+        _player_row("epl", "Arsenal", "Chelsea", "Gabriel Jesus", market=m)
         for m in ("player_shots", "player_shots_on_target", "player_shots", "player_shots_on_target")
     ]
     coverage = attach_soccer_projections(grid, index)
     assert coverage["unmatched_player_rows"] == 4
-    assert coverage["unmatched_player_sample"] == ["epl|Bukayo Saka"]
+    assert coverage["unmatched_player_sample"] == ["epl|Gabriel Jesus"]
 
 
 def test_the_player_split_reconciles_with_the_total(tmp_path: Path) -> None:
@@ -360,7 +363,7 @@ def test_the_player_split_reconciles_with_the_total(tmp_path: Path) -> None:
     index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
 
     grid = [
-        _player_row("epl", "Arsenal", "Chelsea", "Bukayo Saka"),
+        _player_row("epl", "Arsenal", "Chelsea", "Gabriel Jesus"),
         _player_row("mls", "LAFC", "Portland Timbers", "Denis Bouanga"),
     ]
     coverage = attach_soccer_projections(grid, index)
