@@ -50,6 +50,22 @@ def _read_recon_for_date(*, processed_root: Path, date_str: str):
         return None
 
 
+def _ids_overlap(left, right) -> bool:
+    """True when two player_id columns share at least one id (compared as integers where possible)."""
+    def ids(col) -> set[str]:
+        out: set[str] = set()
+        for v in col.dropna().tolist():
+            try:
+                out.add(str(int(float(v))))
+            except (TypeError, ValueError):
+                text = str(v).strip()
+                if text:
+                    out.add(text)
+        return out
+
+    return bool(ids(left) & ids(right))
+
+
 def _merge_pred_recon_for_date(*, processed_root: Path, date_str: str):
     pred = _read_predictions_for_date(processed_root=processed_root, date_str=date_str)
     recon = _read_recon_for_date(processed_root=processed_root, date_str=date_str)
@@ -57,12 +73,21 @@ def _merge_pred_recon_for_date(*, processed_root: Path, date_str: str):
         return None
 
     join_keys: list[tuple[str, str]] = []
-    if "player_id" in pred.columns and "player_id" in recon.columns:
+    if "player_id" in pred.columns and "player_id" in recon.columns and _ids_overlap(pred["player_id"], recon["player_id"]):
         join_keys = [("player_id", "player_id")]
     elif "player_name" in pred.columns and "player_name" in recon.columns:
-        join_keys = [("player_name", "player_name")]
+        # ID SPACES (lane nba-season-phase, 2026-10-06): NBA predictions carry stats.nba ids and NBA recon ESPN ids,
+        # so an id join matched NOTHING and NBA bias calibration never had a pair. Join on the id only when the two
+        # sets actually overlap; otherwise on the normalised name (+ team), which both files carry.
+        from syndicate.features.shared.basketball_props_edges import _norm_name
+
+        pred = pred.assign(_name_key=pred["player_name"].map(_norm_name))
+        recon = recon.assign(_name_key=recon["player_name"].map(_norm_name))
+        join_keys = [("_name_key", "_name_key")]
         if "team" in pred.columns and "team_abbr" in recon.columns:
-            join_keys.append(("team", "team_abbr"))
+            pred = pred.assign(_team_key=pred["team"].astype(str).str.strip().str.upper())
+            recon = recon.assign(_team_key=recon["team_abbr"].astype(str).str.strip().str.upper())
+            join_keys.append(("_team_key", "_team_key"))
     else:
         return None
 
@@ -94,28 +119,9 @@ def compute_biases(*, processed_root: Path, anchor_date: str, window_days: int =
     errs: dict[str, list[float]] = {key: [] for key in STAT_KEYS}
     total_pairs = 0
     for date_str in dates:
-        pred = _read_predictions_for_date(processed_root=processed_root, date_str=date_str)
-        recon = _read_recon_for_date(processed_root=processed_root, date_str=date_str)
-        if pred is None or recon is None or pred.empty or recon.empty:
-            continue
-
-        join_keys: list[tuple[str, str]] = []
-        if "player_id" in pred.columns and "player_id" in recon.columns:
-            join_keys = [("player_id", "player_id")]
-        elif "player_name" in pred.columns and "player_name" in recon.columns:
-            join_keys = [("player_name", "player_name")]
-            if "team" in pred.columns and "team_abbr" in recon.columns:
-                join_keys.append(("team", "team_abbr"))
-        else:
-            continue
-
-        left_on = [left for left, _ in join_keys]
-        right_on = [right for _, right in join_keys]
-        try:
-            merged = pred.merge(recon, left_on=left_on, right_on=right_on, how="inner", suffixes=("_pred", "_act"))
-        except Exception:
-            continue
-        if merged.empty:
+        # One join for both calibrations (it used to be duplicated here, with the same id-space defect).
+        merged = _merge_pred_recon_for_date(processed_root=processed_root, date_str=date_str)
+        if merged is None or merged.empty:
             continue
 
         for stat in STAT_KEYS:

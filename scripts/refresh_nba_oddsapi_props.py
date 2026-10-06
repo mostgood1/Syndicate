@@ -2855,6 +2855,17 @@ def _ensure_player_logs_for_props_refresh(*, source_root: Path, date_str: str, l
                 _append_log(log_file, "player_logs refresh: " + json.dumps(refreshed, default=str))
         except Exception as exc:  # noqa: BLE001
             _append_log(log_file, f"player_logs refresh failed: {exc}")
+    # NBA recon for the last 3 dates (lane nba-season-phase): nothing wrote NBA recon after 2026-06-13, so the props
+    # bias calibration had no outcomes. Throttled 6 h; completed games only. Off: SYNDICATE_NBA_RECON_REFRESH=0.
+    if (os.environ.get("SYNDICATE_NBA_RECON_REFRESH") or "1").strip().lower() not in {"0", "false", "no", "off"}:
+        try:
+            from syndicate.features.shared.nba_history_refresh import refresh_recon
+
+            recon = refresh_recon(source_root / "data" / "processed", date_str)
+            if not recon.get("skipped"):
+                _append_log(log_file, "nba recon refresh: " + json.dumps(recon, default=str))
+        except Exception as exc:  # noqa: BLE001
+            _append_log(log_file, f"nba recon refresh failed: {exc}")
     raw_max_age = (
         os.environ.get("REFRESH_PLAYER_LOGS_MAX_AGE_HOURS")
         or os.environ.get("DAILY_PLAYER_LOGS_MAX_AGE_HOURS")

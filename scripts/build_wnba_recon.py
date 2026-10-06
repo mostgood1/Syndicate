@@ -91,6 +91,38 @@ _SCALARS = {
 _THREES = "threePointFieldGoalsMade-threePointFieldGoalsAttempted"
 
 
+# League parameter (lane nba-season-phase, 2026-10-06): NBA had NO recon producer after 2026-06-13, so the NBA props
+# bias calibration had no outcomes to learn from. The same outcome-only rows, from NBA's ESPN endpoints, written under
+# nba_source/ with NBA team codes. "wnba" is the default and behaves exactly as before.
+_LEAGUES: dict[str, dict[str, Any]] = {
+    "wnba": {"scoreboard": None, "summary": _SUMMARY, "base": "wnba_source/data/processed", "tag": "wnba_recon"},
+    "nba": {
+        "scoreboard": str(__import__("os").environ.get("SYNDICATE_NBA_SCOREBOARD_URL")
+                          or "https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard").strip(),
+        "summary": "https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/summary",
+        "base": "nba_source/data/processed",
+        "tag": "nba_recon",
+    },
+}
+
+
+def _league(league: str) -> dict[str, Any]:
+    key = str(league or "wnba").strip().lower()
+    if key not in _LEAGUES:
+        raise ValueError(f"unknown league {league!r}")
+    return _LEAGUES[key]
+
+
+def _tri(abbr: str, league: str) -> str:
+    """ESPN team abbreviation -> the code the league's other artifacts use (NBA: GS -> GSW, NY -> NYK, ...)."""
+    value = str(abbr or "").upper()
+    if str(league or "wnba").strip().lower() != "nba":
+        return value
+    from syndicate.features.shared.basketball_props_smart_sim import _espn_to_tri_local
+
+    return _espn_to_tri_local(value, league_code="nba")
+
+
 def _int(value: Any) -> int | None:
     try:
         return int(str(value).strip())
@@ -98,8 +130,8 @@ def _int(value: Any) -> int | None:
         return None
 
 
-def _summary(event_id: str) -> dict[str, Any]:
-    return _get(f"{_SUMMARY}?event={event_id}")
+def _summary(event_id: str, league: str = "wnba") -> dict[str, Any]:
+    return _get(f"{_league(league)['summary']}?event={event_id}")
 
 
 def _linescore_totals(competitors: list[dict[str, Any]]) -> dict[str, Any]:
@@ -135,9 +167,9 @@ def _linescore_totals(competitors: list[dict[str, Any]]) -> dict[str, Any]:
     return {"quarters": quarters, "h1": h1, "h2": h2}
 
 
-def rows_for_event(event_id: str, date_str: str) -> dict[str, list[dict[str, Any]]]:
+def rows_for_event(event_id: str, date_str: str, league: str = "wnba") -> dict[str, list[dict[str, Any]]]:
     """One completed game -> its game, quarter and player rows."""
-    payload = _summary(event_id)
+    payload = _summary(event_id, league)
     header = payload.get("header") or {}
     competitions = header.get("competitions") or []
     if not competitions:
@@ -147,7 +179,7 @@ def rows_for_event(event_id: str, date_str: str) -> dict[str, list[dict[str, Any
     home = away = None
     for competitor in competitors:
         record = {
-            "tri": ((competitor.get("team") or {}).get("abbreviation") or "").upper(),
+            "tri": _tri((competitor.get("team") or {}).get("abbreviation") or "", league),
             "score": _int(competitor.get("score")),
         }
         if str(competitor.get("homeAway") or "").lower() == "home":
@@ -186,7 +218,7 @@ def rows_for_event(event_id: str, date_str: str) -> dict[str, list[dict[str, Any
 
     prop_rows: list[dict[str, Any]] = []
     for team in (payload.get("boxscore") or {}).get("players") or []:
-        team_tri = ((team.get("team") or {}).get("abbreviation") or "").upper()
+        team_tri = _tri((team.get("team") or {}).get("abbreviation") or "", league)
         stats_block = (team.get("statistics") or [{}])[0]
         index = {name: position for position, name in enumerate(stats_block.get("keys") or stats_block.get("names") or [])}
         for athlete in stats_block.get("athletes") or []:
@@ -240,8 +272,8 @@ def rows_for_event(event_id: str, date_str: str) -> dict[str, list[dict[str, Any
     return {"games": [game_row], "quarters": [quarter_row], "props": prop_rows}
 
 
-def artifact_relative_paths(date_str: str) -> dict[str, str]:
-    base = "wnba_source/data/processed"
+def artifact_relative_paths(date_str: str, league: str = "wnba") -> dict[str, str]:
+    base = _league(league)["base"]
     return {
         "games": f"{base}/recon_games_{date_str}.csv",
         "quarters": f"{base}/recon_quarters_{date_str}.csv",
@@ -259,10 +291,13 @@ def to_csv(rows: list[dict[str, Any]], columns: tuple[str, ...]) -> str:
     return buffer.getvalue()
 
 
-def build_date(date_str: str, *, dry_run: bool = False, data_root: Path | None = None) -> dict[str, Any]:
-    event_ids = completed_event_ids(date_str)
+def build_date(date_str: str, *, dry_run: bool = False, data_root: Path | None = None,
+               league: str = "wnba") -> dict[str, Any]:
+    cfg = _league(league)
+    tag = cfg["tag"]
+    event_ids = completed_event_ids(date_str, scoreboard_url=cfg["scoreboard"])
     if not event_ids:
-        print(f"[wnba_recon] {date_str} no completed games", flush=True)
+        print(f"[{tag}] {date_str} no completed games", flush=True)
         return {"status": "no_final", "date": date_str, "games": 0}
 
     games: list[dict[str, Any]] = []
@@ -270,16 +305,16 @@ def build_date(date_str: str, *, dry_run: bool = False, data_root: Path | None =
     props: list[dict[str, Any]] = []
     for event_id in event_ids:
         try:
-            built = rows_for_event(event_id, date_str)
+            built = rows_for_event(event_id, date_str, league)
         except Exception as exc:  # a single bad event must not lose the slate
-            print(f"[wnba_recon] {date_str} event {event_id} FAILED: {type(exc).__name__}: {exc}", flush=True)
+            print(f"[{tag}] {date_str} event {event_id} FAILED: {type(exc).__name__}: {exc}", flush=True)
             continue
         games.extend(built["games"])
         quarters.extend(built["quarters"])
         props.extend(built["props"])
 
     if not games:
-        print(f"[wnba_recon] {date_str} fetched {len(event_ids)} events, produced NO rows", flush=True)
+        print(f"[{tag}] {date_str} fetched {len(event_ids)} events, produced NO rows", flush=True)
         return {"status": "empty", "date": date_str, "games": 0}
 
     if data_root:
@@ -292,7 +327,7 @@ def build_date(date_str: str, *, dry_run: bool = False, data_root: Path | None =
         from syndicate.features.shared.refresh_state_store import data_root as _resolved_data_root
 
         root = Path(_resolved_data_root())
-    paths = artifact_relative_paths(date_str)
+    paths = artifact_relative_paths(date_str, league)
     payloads = {
         "games": (paths["games"], to_csv(games, GAME_COLUMNS)),
         "quarters": (paths["quarters"], to_csv(quarters, QUARTER_COLUMNS)),
@@ -307,7 +342,7 @@ def build_date(date_str: str, *, dry_run: bool = False, data_root: Path | None =
         written[kind] = str(target)
 
     print(
-        f"[wnba_recon] {date_str} {'DRY ' if dry_run else ''}wrote"
+        f"[{tag}] {date_str} {'DRY ' if dry_run else ''}wrote"
         f" games={len(games)} quarters={len(quarters)} props={len(props)}"
         f" -> {root / paths['games']}",
         flush=True,
@@ -343,6 +378,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end", help="backfill end, YYYY-MM-DD")
     parser.add_argument("--data-root", help="artifact root (defaults to SYNDICATE_DATA_ROOT, else ./data)")
     parser.add_argument("--dry-run", action="store_true", help="fetch and report, write nothing")
+    parser.add_argument("--league", default="wnba", choices=sorted(_LEAGUES), help="wnba (default) or nba")
     args = parser.parse_args(argv)
 
     if args.start and args.end:
@@ -359,13 +395,13 @@ def main(argv: list[str] | None = None) -> int:
     wrote = empty = 0
     for date_str in targets:
         result = build_date(date_str, dry_run=bool(args.dry_run),
-                            data_root=Path(root) if root else None)
+                            data_root=Path(root) if root else None, league=args.league)
         if result.get("status") in {"ok", "dry_run"}:
             wrote += 1
         elif result.get("status") == "empty":
             empty += 1
 
-    print(f"[wnba_recon] SUMMARY dates={len(targets)} wrote={wrote} empty={empty}", flush=True)
+    print(f"[{_league(args.league)['tag']}] SUMMARY dates={len(targets)} wrote={wrote} empty={empty}", flush=True)
     if wrote:
         return 0
     return 2 if empty else 1

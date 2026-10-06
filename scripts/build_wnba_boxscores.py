@@ -114,7 +114,7 @@ def _get(url: str, timeout: int = 30) -> dict[str, Any]:
         return json.loads(response.read().decode("utf-8"))
 
 
-def completed_event_ids(date_str: str) -> list[str]:
+def completed_event_ids(date_str: str, scoreboard_url: str | None = None) -> list[str]:
     """Event ids for games ESPN reports as FINISHED. Only these may be written.
 
     `status.type.completed` is the authority; `state == "post"` is accepted as
@@ -123,7 +123,8 @@ def completed_event_ids(date_str: str) -> list[str]:
     that grows is worse than one that is absent, because a consumer cannot tell
     a half-game from a low-scoring one.
     """
-    payload = _get(f"{_SCOREBOARD}?dates={str(date_str).replace('-', '')}")
+    # scoreboard_url: another league's ESPN scoreboard (build_wnba_recon(league="nba")); default WNBA, unchanged.
+    payload = _get(f"{scoreboard_url or _SCOREBOARD}?dates={str(date_str).replace('-', '')}")
     out: list[str] = []
     for event in payload.get("events") or []:
         event_id = str(event.get("id") or "").strip()

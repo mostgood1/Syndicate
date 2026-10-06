@@ -121,3 +121,48 @@ def refresh_player_logs(processed_root: Path, date_str: str, *, min_interval_hou
         return out
     finally:
         print("NBA_PLAYER_LOGS_REFRESH " + json.dumps(out, default=str), flush=True)
+
+
+RECON_MARKER = ".nba_recon_refresh.json"
+
+
+def refresh_recon(processed_root: Path, date_str: str, *, lookback_days: int = 3, min_interval_hours: float = 6.0,
+                  build: Optional[Callable[..., Dict[str, Any]]] = None, now: Optional[datetime] = None,
+                  force: bool = False) -> Dict[str, Any]:
+    """Write NBA recon (recon_games / recon_quarters / recon_props) for the `lookback_days` dates before the slate,
+    from ESPN, via scripts/build_wnba_recon.build_date(league="nba"): outcome-only, completed games only.
+
+    WHY. Nothing wrote NBA recon after 2026-06-13, so the props bias calibration had no outcomes. Called from the NBA
+    props refresh (no restart), throttled. Every phase is written (preseason recon is real data); the calibration
+    windows already keep same-phase dates only. Never raises."""
+    from datetime import date as _date, timedelta as _timedelta
+
+    processed_root = Path(processed_root)
+    now = now or datetime.now(timezone.utc)
+    out: Dict[str, Any] = {"date": str(date_str)[:10], "dates": {}}
+    marker = processed_root / RECON_MARKER
+    try:
+        if not force and not _due(marker, now, min_interval_hours):
+            out["skipped"] = f"attempted within {min_interval_hours} h"
+            return out
+        marker.write_text(json.dumps({"attempted_at": now.isoformat()}), encoding="utf-8")
+        if build is None:
+            repo = Path(__file__).resolve().parents[3]
+            if str(repo) not in sys.path:
+                sys.path.insert(0, str(repo))
+            from scripts.build_wnba_recon import build_date as build  # type: ignore
+        data_root = processed_root.parent.parent.parent      # <data_root>/nba_source/data/processed
+        anchor = _date.fromisoformat(str(date_str)[:10])
+        for back in range(1, int(lookback_days) + 1):
+            d = (anchor - _timedelta(days=back)).isoformat()
+            try:
+                res = build(d, data_root=data_root, league="nba")
+                out["dates"][d] = {k: res.get(k) for k in ("status", "games", "props")}
+            except Exception as exc:  # noqa: BLE001 -- one bad date must not stop the others
+                out["dates"][d] = {"status": f"failed: {type(exc).__name__}"}
+        return out
+    except Exception as exc:  # noqa: BLE001
+        out["reason"] = f"failed: {type(exc).__name__}: {str(exc)[:160]}"
+        return out
+    finally:
+        print("NBA_RECON_REFRESH " + json.dumps(out, default=str), flush=True)
