@@ -46676,3 +46676,10 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
   are ATL_MEM, DET_PHX, PHI_NYK), which is a coverage gap that predates this change. The 10-06 slate's pregame rows
   are to be read when they reach the board.
 - off switch: SYNDICATE_NBA_GAME_BOOK_BLEND=0 (restart), or delete the file / set "enabled": false (no restart).
+
+## 2026-10-06 00:00:21Z (7:00 PM CT 10-05) -- LOCAL FLEET FF -> 0092c975 (contains af737b31), NO RESTART: NHL power-play skaters drawn by projected PP minutes (lane `nhl-elite-pp-onice`) -- VERIFY OWED
+
+- change: profile `pp_usage="minutes"`; PP segments draw skaters by systematic sampling on `proj_pp_toi` (new lineups column) instead of fixed PP1/PP2 units. User decision "Ship it". Total PP time unchanged (lane nhl-pp-time).
+- offline evidence: 45-slate check PP1 share of team PP time 0.903 -> 0.664 (real 0.632), PP2 0.097 -> 0.291 (real 0.286). Full 2025-26 paired vs production (`C:/tmp/nhlprops/bt_scratch` vs `bt_ppmin`), 38,287 reg player-games: Brier SOG@1.5 -0.00161, SOG@2.5 -0.00145, SOG@3.5 -0.00070, ASSISTS@0.5 -0.00046, POINTS@0.5 -0.00052 (CIs exclude 0); GOALS/POINTS@1.5/BLOCKS flat; playoffs SOG@2.5 -0.00173.
+- baseline: fleet lineups before the ff carry no proj_pp_toi column (engine falls back to the units until they do).
+- verify: the first lineups_<date>.csv written after 00:00:21Z carries proj_pp_toi on every slotted skater, and `nhl_sim_input_checklist.py` on fleet data PASSES (watcher /mnt/c/tmp/nhlprops/pp_watch.sh).
