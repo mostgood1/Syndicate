@@ -1028,6 +1028,10 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **FIT COVERAGE AS BUILT 2026-10-06 ~18:10Z (before any descent run; no outcome read):** FIT = **24 dates, 311 games** (rebuilt).
+  - 06-23 and 06-24 built 0 games. The fleet mirror has no `lineups.json` / `probables.json` for them (only per-game roster files; 4 and 1 stored sims), so there is no pregame lineup to rebuild from. They were ~12 starts in the old stored set.
+  - VALIDATION = 15 dates, 205 games (05-30..06-14; 06-04 has 0 games, as in every earlier build).
+  - The date lists passed to the scripts still name all 26 / 16; dates with no roster_objs contribute nothing. The results rest on 24 + 15 dates.
 - **AMENDMENT 5 READINGS 2026-10-06 ~17:45Z (before any descent run):**
   - CODE: `bip_sf_rate_pop` (models.py, default None) -> the resolver uses it for POP outs only; None falls back to `bip_sf_rate_flypop`.
   - BYTE-IDENTICAL: 100 seeded games, HEAD vs new, sha256 B840A6C6... -- the same hash as the pre-DP engine, so every engine change today is a no-op at defaults.
