@@ -185,16 +185,6 @@ def load_team_rates_map(date: str, *, root: Optional[Path] = None) -> Dict[str, 
     return out
 
 
-def team_rates_are_prior_season(date: str, *, root: Optional[Path] = None) -> bool:
-    """True when `load_team_rates_map` for ``date`` falls back to ``team_rates_latest.csv`` -- last
-    season's frozen rates, because no ``team_rates_<season>.csv`` has been written yet. Keys
-    `apply_roster_shot_volume` (lane nhl-early-season-shot-volume)."""
-    proc = _processed_dir(root)
-    if _read_csv_rows(proc / f"team_rates_{_season_code_for_date(date)}.csv"):
-        return False
-    return bool(_read_csv_rows(proc / "team_rates_latest.csv"))
-
-
 def load_player_rates_map(date: str, *, root: Optional[Path] = None) -> Dict[int, Dict[str, float]]:
     """Load ``{player_id: {"shot_weight":.., "goal_weight":.., "block_weight":..,
     "faceoff_weight":..}}`` for a date.
@@ -646,9 +636,8 @@ def build_game_features(
         player_rates_map=player_rates_map,
     )
 
-    if team_rates_are_prior_season(date, root=root):
-        home = apply_roster_shot_volume(home, home_players)
-        away = apply_roster_shot_volume(away, away_players)
+    home = apply_roster_shot_volume(home, home_players)
+    away = apply_roster_shot_volume(away, away_players)
 
     game = HockeyGameFeatures(
         game_pk=str(game_pk),
@@ -666,11 +655,13 @@ def build_game_features(
     return game
 
 
-# Team shot volume blended with the DRESSED ROSTER's own shot rates `[2026-10-06, lane nhl-early-season-shot-volume]`,
-# ONLY while the team rate is last season's frozen file (`team_rates_latest.csv`; `team_rates_are_prior_season`). Props A/B, full 2025-26: on a prior-season rate (playoff arm) SOG@1.5 -0.00124, SOG@2.5
-# -0.00104, SOG@3.5 -0.00061, POINTS@0.5 -0.00096 (CIs exclude 0); on a current-season rate (regular arm) it
-# double counts the roster and ASSISTS@0.5 went +0.00023 worse -- so it switches itself off once the in-season
-# `team_rates_<season>.csv` exists (2026-11-01, lane nhl-season-inputs-in-season).
+# Team shot volume blended with the DRESSED ROSTER's own shot rates `[2026-10-06, lane nhl-early-season-shot-volume]`.
+# Props A/B, full 2025-26, on a prior-season team rate: SOG@1.5 -0.00124, SOG@2.5 -0.00104, SOG@3.5 -0.00061,
+# POINTS@0.5 -0.00096 (CIs exclude 0). It first shipped switched OFF once the in-season `team_rates_<season>.csv`
+# exists (f88c9453: ASSISTS@0.5 +0.00023 on a current-season "regular" arm). On the config production actually
+# runs from 2026-11-01 (in-season inputs, 10-game floor, blocks at the prior; lane nhl-season-inputs-in-season
+# H27, 56 dates / 449 games) no line's Brier CI is entirely > 0, SOG@2.5 is better (-0.00027) and ASSISTS@0.5 is
+# -0.00013 [-0.00045, +0.00019] -- so it stays on all season (user: "ship the roster shot-volume fix").
 # The team rate is last season's (frozen until the in-season blend admits 10 games) while rosters change: on
 # the 2026-10-06 slate the dressed roster's summed 2025-26 per-game shot rates ran 1.12-1.14x the team rate
 # for NJD/UTA/TOR (every skater squeezed) and 0.90x for OTT. Out-of-sample on 2025-26 (prior = 2024-25 team

@@ -46,11 +46,17 @@ def test_env_override_disables(monkeypatch):
     assert loaders.apply_roster_shot_volume(team, _roster(3.0)).shots_per_60 == 26.0
 
 
-def test_only_the_frozen_latest_file_counts_as_prior_season(tmp_path):
+
+
+def test_blend_still_runs_once_the_in_season_team_rates_file_exists(tmp_path, monkeypatch):
+    """Reachability (H28): f88c9453 skipped the blend once `team_rates_<season>.csv` existed (2026-11-01);
+    it now runs all season."""
     proc = loaders._processed_dir(tmp_path)
     proc.mkdir(parents=True, exist_ok=True)
     (proc / "team_rates_latest.csv").write_text("abbr,shots_per_60,faceoff_win_pct\nTOR,26.3,0.5\n", encoding="utf-8")
-    assert loaders.team_rates_are_prior_season("2026-10-06", root=tmp_path)        # no 2026-2027 file yet
-    (proc / "team_rates_2026-2027.csv").write_text("abbr,shots_per_60,faceoff_win_pct\nTOR,28.0,0.5\n", encoding="utf-8")
-    assert not loaders.team_rates_are_prior_season("2026-10-06", root=tmp_path)    # in-season file: blend stays off
-    assert loaders.load_team_rates_map("2026-10-06", root=tmp_path)["TOR"] == {"shots_per_60": 28.0, "faceoff_win_pct": 0.5}
+    (proc / "team_rates_2026-2027.csv").write_text("abbr,shots_per_60,faceoff_win_pct\nTOR,28.0,0.5\nBOS,30.0,0.5\n", encoding="utf-8")
+    seen = []
+    real = loaders.apply_roster_shot_volume
+    monkeypatch.setattr(loaders, "apply_roster_shot_volume", lambda team, players: seen.append(team.abbrev) or real(team, players))
+    loaders.build_game_features("1", "2026-11-05", "Toronto Maple Leafs", "Boston Bruins", root=tmp_path, project=False)
+    assert sorted(seen) == ["BOS", "TOR"]
