@@ -46840,3 +46840,22 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - verify: OWED. The first `[nba_sim_availability] NBA_SIM_AVAILABILITY` line after this ff (expect applied=false,
   "slate phase preseason") -- watcher scratchpad/watch_avail.sh is running. Then regular-season week 1.
 - also carried: faa5f804 / 46daccca (nba-season-phase guards) were already on the fleet before this ff.
+
+## 2026-10-06 17:04:16Z (12:04 PM CT) -- LOCAL FLEET FF e82ce67f -> 467a2a92, NO RESTART: NHL roster shot-volume blend kept on after Nov 1 (H28) -- MET (today's half)
+
+- Lane nhl-season-inputs-in-season; claims live-odds-worker + refresh-worker held by that lane. User: "ship the roster shot-volume fix".
+- Change: `loaders.py` drops `team_rates_are_prior_season` (f88c9453's gate that switched the blend off once
+  `team_rates_<season>.csv` exists, 2026-11-01). Evidence: H27 (lanes.md), no prop line worse on the Nov 1 config.
+- Ride-along (other lanes, read before the ff): 551e1b38 `scripts/mlb_dp_advancement_rates.py` (offline measurement
+  script, no production caller) and 19b3ccc9 MLB vendor `bip_roe_rate_{ground,line,air}` (default None = previous
+  behaviour; nothing sets them). Both inert.
+- Expectation (written before the ff): today's output unchanged -- the fleet still reads `team_rates_latest.csv`,
+  where the blend already ran. Baseline 17:03:15Z vs after 17:04:35Z, read-only probe (`build_slate_features`
+  on the fleet, C:/tmp/h28_probe.py): all 18 team shots_per_60 on the 2026-10-06 slate IDENTICAL; fleet HEAD 467a2a92,
+  gate function absent, no `team_rates_2026-2027.csv` yet. **MET for today.**
+- Procedure slip: my wait loop read only the last 3 lines of check_deploy_safety and missed its NOT CLEAR header, so the
+  ff ran while a 0-second-old `fetch_espn_live_status_for_date.py --sport nfl` child was running (it imports none of the
+  changed files; it had exited by 17:04:35Z). A ff restarts nothing. Fix for next time: grep the whole output.
+- verify (11-01): with `team_rates_2026-2027.csv` present, the default run's team shots_per_60 differ from a
+  `SYNDICATE_NHL_ROSTER_SHOT_WEIGHT=0` run (check 4b added to scheduled task nhl-inseason-inputs-nov1-verify).
+  Unit reachability: `test_blend_still_runs_once_the_in_season_team_rates_file_exists` fails on f88c9453, passes here.
