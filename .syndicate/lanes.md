@@ -1038,6 +1038,16 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **RULE v2 AMENDMENT 7 — WILD PITCH / PASSED BALL / BALK RATE MEASURED, PRE-REGISTERED 2026-10-06 ~16:45Z (user: "then fix the wild pitch rate next"); descent stopped again (its restart was minutes old; any arm it wrote is discarded by the key change):**
+  - Engine: per non-in-play pitch (ball / called / swinging / foul) with a runner on, P(advance event) = `bip_misc_advance_pitch_rate` (0.004) x {ball 1.0, strike 0.9, foul 0.8} x (1.2 if a runner is on 3B).
+    - The event type is then split WP/PB/BALK by fixed shares; all runners move up one base.
+  - MEASURED from StatsAPI pbp of the FIT-date games, base state tracked PITCH BY PITCH. Start from the previous play's post-state; apply each runner movement at its `playIndex`.
+    - events = distinct (play, playIndex) whose runner movements carry eventType wild_pitch / passed_ball / balk;
+    - eligible = pitches with call ball / called strike / swinging strike / foul and a runner on at that pitch.
+    - r = events / eligible.
+    - The base rate that reproduces r on the REAL pitch mix: b = r / mean(multiplier over the eligible pitches).
+    - Also reported, information only: the WP / PB / BK split vs the model's.
+  - Not a lever: every arm carries `--cfg-set bip_misc_advance_pitch_rate=<b>`. Engine unchanged (b goes through a <= 0.05 clamp). Production keeps 0.004; checks (a)-(e) unchanged.
 - **AMENDMENT 6 READINGS 2026-10-06 ~16:20Z (descent not yet restarted):**
   - ROE measured (316 FIT-date games), against the model's 0.012 x multiplier:
     - ground **117/4129 = 0.0283** [0.0237, 0.0339] vs 0.0168 (1.7x low);
