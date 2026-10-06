@@ -246,6 +246,35 @@ If any fails, nothing ships and the failure is recorded. If all pass, the result
 profile artifact (`save_versioned_profile`) and a recommendation -- promotion to the fleet is a
 separate user decision, and the lane's mid-drive LIVE replay gate is still owed before it.
 
+### Re-fit amendment 2 — 2026-10-06, after a 6-game/10-seed SMOKE run, BEFORE the full descent
+
+The smoke run (plumbing only; `refit_smoke/`, nothing from it is a result) showed:
+- `field_goal_attempt_base_probability` is UNREACHABLE with `fourth_down_decision_model` ON (the
+  measured table replaces the FG ladder) -- dropped by the reachability check, as designed. FG
+  frequency is the most-missed moment (Phase 1: 0.137 vs 0.155), so the FG lever becomes
+  `field_goal_weight_multiplier` (`play_simulator.py:137`), same grid rule.
+- two kept values sat on a grid edge -> a kept edge value gets ONE further step after pass 2
+  (x0.875 / x1.125, or one grid step for absolute levers), kept only if the objective drops.
+Nothing else changes.
+
 ## Results
 
-(none yet -- NFL 544-game run in progress, then NCAAF 654)
+### Phase 1, NFL (2023-24 REG, all 544 games, 300 seeds; real-vs-sim, flag rule as pre-registered)
+
+Coverage: sim 544, real 544, intersection 544. Flagged (outside real 95% CI AND >= 0.25 pts/team-game):
+- P(TD)/drive real 0.214 [0.206, 0.222] vs sim 0.231 (+1.32 pts/tg); P(FG)/drive 0.155 vs 0.137 (-0.57);
+  pts/drive 1.952 vs 2.030 (+0.85). Worst for the WEAK rating-gap tercile: pts/drive 1.631 vs 1.752 (+1.32).
+- Game level: real home margin +2.28 vs sim +1.08; total SD of residuals 13.37 vs the sim's own 11.80
+  (over-confident on totals); H1 points 22.57 vs 20.99; P(OT) 0.053 vs 0.036; non-offensive pts 1.90 vs 0.
+- 4th down inside the opp 30 on 1-2 to go: real P(go) 0.66 vs sim 0.02 (H2). Start after the half 26.4 vs 34.8 (H1).
+
+### H1 / H2 paired, NFL (136 FIT games = every 4th, 300 seeds, same seeds; ON - OFF, game-clustered 95% CI)
+
+| | mean total | home margin | MAE total / margin vs actual | Brier | abs(sim - close) total / margin |
+|---|---|---|---|---|---|
+| H1 halftime | -1.12 [-1.22, -1.03] | -0.85 [-0.97, -0.72] | +0.11 [-0.09, +0.31] / +0.10 [-0.09, +0.28] | 0.000 | -0.06 [-0.26, +0.14] / **+0.23 [+0.05, +0.40]** |
+| H2 4th down | +0.67 [+0.53, +0.80] | +0.26 [+0.11, +0.40] | +0.08 [-0.08, +0.23] / -0.07 [-0.22, +0.07] | +0.001 | **+0.28 [+0.12, +0.43]** / +0.01 |
+
+H1 prediction (|delta total| < 1.0) FAILED (-1.12). H2 prediction (total in [-0.5, +1.5]) held. Both
+fixes work mechanically (S12 after-half 25.0; S5 4th-down rows inside the real CI) and neither moves
+accuracy alone -- each moves the level or home edge away from the close, as the re-fit design expects.
