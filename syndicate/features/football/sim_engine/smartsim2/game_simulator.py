@@ -64,6 +64,19 @@ def _merge_quarter_carryover_drives(drive_log: list[dict[str, Any]]) -> list[dic
     return merged
 
 
+def _second_half_kickoff(state, *, opening_receiver: str | None, rng: Random):
+    """The second half opens with a kickoff to the team that did NOT receive the
+    first one, at the engine's kickoff spot (own 25 -- the post-score convention
+    in `drive_simulator`). Lane `football-scenario-calibration` H1; reached only
+    with `CalibrationProfile.halftime_kickoff` ON, so the rng below is never
+    consumed with it OFF and the default stream is unchanged."""
+    if opening_receiver in ("home", "away"):
+        receiver = "away" if opening_receiver == "home" else "home"
+    else:
+        receiver = "home" if rng.random() < 0.5 else "away"
+    return replace(state, possession_owner=receiver, field_position=25, down=1, distance=10)
+
+
 def simulate_game(
     simulation_input: SmartSim2SimulationInput,
     *,
@@ -91,6 +104,19 @@ def simulate_game(
         clock_remaining=start_clock,
         score_home=simulation_input.initial_score_home,
         score_away=simulation_input.initial_score_away,
+    )
+
+    # WHO RECEIVED THE OPENING KICKOFF -- known only when the sim starts at it.
+    # A resume inside the first half has `initial_possession_owner` = whoever
+    # holds the ball NOW, which says nothing about the opening kick; `None` makes
+    # `_second_half_kickoff` toss a coin instead of guessing a team.
+    opening_receiver = (
+        state.possession_owner
+        if start_quarter == 1
+        and int(start_clock) == int(simulation_input.quarter_seconds)
+        and state.score_home == 0
+        and state.score_away == 0
+        else None
     )
 
     possession_log: list[dict[str, Any]] = []
@@ -130,6 +156,8 @@ def simulate_game(
 
         if quarter < simulation_input.quarters:
             state = advance_quarter(state, quarter_seconds=simulation_input.quarter_seconds)
+            if profile.halftime_kickoff and quarter == simulation_input.quarters // 2:
+                state = _second_half_kickoff(state, opening_receiver=opening_receiver, rng=rng)
             quarter_start_clock = simulation_input.quarter_seconds
             continue
 

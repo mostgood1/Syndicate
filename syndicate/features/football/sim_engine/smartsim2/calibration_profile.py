@@ -318,6 +318,16 @@ class CalibrationProfile:
     # mechanism are one change and can never ship apart.
     goal_line_touchdown: bool = False
 
+    # THE SECOND HALF STARTS WITH A KICKOFF. Lane `football-scenario-calibration`
+    # H1 (2026-10-06). `advance_quarter` only bumps the quarter, so with this OFF
+    # the team holding the ball at the half KEEPS it, at the same spot -- measured
+    # as a sim second-half start at the 34.6 against a real 25.8 (NFL, interim).
+    # ON: possession goes to the team that did not receive the opening kickoff, at
+    # the engine's kickoff spot. Default OFF because both profiles were calibrated
+    # with the bug in place (`model_engine_standard.md` 4.4): the switch and any
+    # re-fit it needs are one change.
+    halftime_kickoff: bool = False
+
     def to_dict(self) -> dict[str, float | str]:
         return {
             "name": self.name,
@@ -349,6 +359,7 @@ class CalibrationProfile:
             # candidate that opts into the goal-line rule would load with it OFF
             # and the whole re-fit would be inert while appearing to apply.
             "goal_line_touchdown": self.goal_line_touchdown,
+            "halftime_kickoff": self.halftime_kickoff,
         }
 
 

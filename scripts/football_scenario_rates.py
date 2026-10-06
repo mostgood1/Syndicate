@@ -286,11 +286,40 @@ def _lower_priority() -> None:
         pass
 
 
-def _nfl_init(root: str) -> None:
+def _parse_profile_set(items: List[str]) -> Dict[str, Any]:
+    """`key=value` pairs -> CalibrationProfile overrides (bools, ints, floats)."""
+    out: Dict[str, Any] = {}
+    for item in items or []:
+        k, v = item.split("=", 1)
+        lv = v.strip().lower()
+        out[k.strip()] = True if lv in ("1", "true", "on") else False if lv in ("0", "false", "off") else float(v)
+    return out
+
+
+def _apply_profile_set(gen: Any, sport: str, overrides: Dict[str, Any]) -> None:
+    """ONE field changed against production's own resolved profile, nothing else.
+    NFL resolves its profile per game through `nfl_calibration_profile()`; NCAAF's
+    generator reads the module constant -- both are wrapped here, in the worker."""
+    if not overrides:
+        return
+    from dataclasses import fields as _fields, replace as _replace
+    current = gen.nfl_calibration_profile() if sport == "nfl" else gen.NCAAF_CALIBRATION_PROFILE
+    bad = set(overrides) - {f.name for f in _fields(current)}
+    if bad:
+        raise SystemExit(f"unknown profile fields {bad}")
+    if sport == "nfl":
+        base = gen.nfl_calibration_profile
+        gen.nfl_calibration_profile = lambda: _replace(base(), **overrides)
+    else:
+        gen.NCAAF_CALIBRATION_PROFILE = _replace(gen.NCAAF_CALIBRATION_PROFILE, **overrides)
+
+
+def _nfl_init(root: str, overrides: Dict[str, Any]) -> None:
     from scripts import backtest_nfl_lines_props as H
     H.configure_env(Path(root))          # production's measured NFL env, refuses stray knobs
     _lower_priority()
     from scripts import generate_smartsim2_nfl_projections as gen
+    _apply_profile_set(gen, "nfl", overrides)
     _W.update(gen=gen, plays={}, sport="nfl")
 
 
@@ -300,7 +329,7 @@ def _nfl_plays(season: int):
     return _W["plays"][season]
 
 
-def _ncaaf_init(work: str) -> None:
+def _ncaaf_init(work: str, overrides: Dict[str, Any]) -> None:
     _ncaaf_env(Path(work))
     _lower_priority()
     from syndicate.features.football.sim_engine.smartsim2 import ncaaf_calibration_profile as P
@@ -308,6 +337,7 @@ def _ncaaf_init(work: str) -> None:
     if version != NCAAF_PROFILE_VERSION:
         raise SystemExit(f"NCAAF profile resolved to {version!r}, production runs {NCAAF_PROFILE_VERSION!r}")
     from scripts import generate_smartsim2_ncaaf_projections as gen
+    _apply_profile_set(gen, "ncaaf", overrides)
     _W.update(gen=gen, sport="ncaaf")
 
 
@@ -446,8 +476,11 @@ def ncaaf_tasks(seasons: List[int], seeds: int) -> List[Dict[str, Any]]:
 def cmd_sim(args) -> None:
     out = OUT_ROOT / args.sport
     out.mkdir(parents=True, exist_ok=True)
-    cache = out / f"sim_{'-'.join(map(str, args.season_list))}_s{args.seeds}.jsonl"
+    overrides = _parse_profile_set(args.profile_set)
+    cache = out / f"sim_{'-'.join(map(str, args.season_list))}_s{args.seeds}{_variant(args)}.jsonl"
     tasks = (nfl_tasks if args.sport == "nfl" else ncaaf_tasks)(args.season_list, args.seeds)
+    if args.every:
+        tasks = tasks[:: args.every]      # an even spread over the season, not its first weeks
     if args.limit:
         tasks = tasks[: args.limit]
     done = set()
@@ -460,7 +493,7 @@ def cmd_sim(args) -> None:
         return
     init, initarg = (_nfl_init, str(nfl_root())) if args.sport == "nfl" else (_ncaaf_init, str(ncaaf_work()))
     t0 = time.time()
-    with ProcessPoolExecutor(max_workers=args.workers, initializer=init, initargs=(initarg,)) as ex, \
+    with ProcessPoolExecutor(max_workers=args.workers, initializer=init, initargs=(initarg, overrides)) as ex, \
             cache.open("a", encoding="utf-8") as fh:
         futs = [ex.submit(sim_task, t) for t in todo]
         for i, fut in enumerate(as_completed(futs), 1):
@@ -767,11 +800,15 @@ def _points_effect(row_id: str, label: str, gap: float, base: Dict[str, float]) 
     return None
 
 
+def _variant(args) -> str:
+    return "".join(f"_{x.replace('=', '-')}" for x in sorted(args.profile_set or []))
+
+
 def cmd_report(args) -> None:
     sport = args.sport
     out = OUT_ROOT / sport
     tag = "-".join(map(str, args.season_list))
-    sim = _load(out / f"sim_{tag}_s{args.seeds}.jsonl")
+    sim = _load(out / f"sim_{tag}_s{args.seeds}{_variant(args)}.jsonl")
     real = _load(out / f"real_{tag}.jsonl")
     common = sorted(set(sim) & set(real))
     print(f"COVERAGE {sport} {tag}: sim {len(sim)} games, real {len(real)} games, INTERSECTION {len(common)} "
@@ -848,7 +885,7 @@ def cmd_report(args) -> None:
     report = {"sport": sport, "seasons": args.season_list, "seeds": args.seeds, "games": len(common),
               "tercile_cuts": cuts, "rows": results,
               "game_rows": [{"id": a, "metric": b, "real": c, "sim": d} for a, b, c, d in game_rows]}
-    (out / f"report_{tag}.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
+    (out / f"report_{tag}{_variant(args)}.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
     _print(report)
 
 
@@ -886,6 +923,9 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--reps", type=int, default=1000)
+    ap.add_argument("--every", type=int, default=0, help="take every Nth game (an even spread)")
+    ap.add_argument("--profile-set", action="append", default=[],
+                    help="CalibrationProfile field=value against production's profile (repeatable)")
     args = ap.parse_args(argv)
     args.season_list = [int(s) for s in args.seasons.split(",")]
     if 2025 in args.season_list and not os.environ.get("FOOTBALL_SCENARIO_READ_VALIDATION"):

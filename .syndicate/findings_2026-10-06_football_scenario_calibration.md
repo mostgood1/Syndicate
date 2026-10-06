@@ -88,6 +88,42 @@ printed per file (mtime + row count).
   scenario-rate comparison, stated anyway.
 - **Seeds:** 300 (production's), measured ~17 s/game warm on this machine.
 
+## Engine structure read from CODE (not from the sample) — Phase 2 candidates
+
+- **No halftime kickoff.** `possession_state.advance_quarter` (`:59`) only increments the
+  quarter and resets the clock. At the half, the team holding the ball KEEPS it at the SAME field
+  position; in football the other team receives a kickoff. Surfaced by S12 "start fp after half"
+  (an interim 41-game read: sim 34.6 vs real 25.8), confirmed in code.
+- **Fourth-down go-for-it is reachable only in Q4, <= 300 s, trailing, outside FG range**
+  (`drive_simulator.py:~250`). Everywhere else 4th down is punt/FG by the ladder. Interim read:
+  4th-and-1-2 inside the opp 30, real P(go) 0.667 vs sim 0.018.
+- **Turnover probability does not move with team quality** -- interim S1 by rating-gap tercile:
+  sim 0.108/0.114/0.113 (weak/mid/strong offense) vs real 0.145/0.087/0.079. The turnover weight
+  (`play_simulator.py:130`) reads `priors.turnover_probability` and situation, not the
+  offense-vs-defense gap -- to be traced before any claim.
+- **No non-offensive scoring** (S11) and **no kickoff variance** (S12 after-score = 25 always).
+
+These are stated for ranking only; no number from the 41-game interim is a result.
+
+## H1 halftime kickoff — PRE-REGISTERED 2026-10-06 (user: "fix the halftime kickoff bug now")
+
+- **Mechanism:** `CalibrationProfile.halftime_kickoff: bool = False`. When ON, at the Q2 -> Q3
+  transition possession goes to the team that did NOT receive the opening kickoff, at the engine's
+  kickoff spot (own 25, the same convention as after a score), 1st and 10. Pregame: opening
+  receiver = `initial_possession_owner`, so the 2H receiver is the other team. A resume that
+  starts in Q1/Q2 does not know the opening receiver -> a fair coin from the game rng (consumed
+  ONLY when the switch is on). A resume at Q3+ never crosses the half and is unaffected.
+- **No new input field** (an unfed one would trip `football_sim_input_checklist.py`).
+- **Byte-identity (OFF):** sha256 over 2 default profiles x 40 seeds x 3 start states
+  (pregame, Q2 resume, Q3 resume) = `defba53b...f99238b` before the change; must be equal after.
+- **Reachability:** ON != OFF on the same seeds; S12 "start fp after half" sim == 25.0 with ON.
+- **Predictions (FIT, production ratings, same seeds):** S12 after-half 34.6 -> 25.0 (NFL);
+  no direction predicted for mean total or margin, |delta mean total| < 1.0 pt per game.
+- **Not shipped ON by this change.** Both production profiles were calibrated with the bug in
+  place (`model_engine_standard.md` §4.4), and pushing a default-ON engine change reaches the
+  local fleet on its next fast-forward. Turning it on is a separate decision, made on the on-vs-off
+  measurement over the FIT games.
+
 ## Results
 
-(none yet)
+(none yet -- NFL 544-game run in progress, then NCAAF 654)
