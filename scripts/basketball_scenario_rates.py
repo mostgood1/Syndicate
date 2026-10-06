@@ -240,16 +240,126 @@ def run_real(args) -> int:
     return 0
 
 
+def _compact_draw(h_box: Dict[str, Any], a_box: Dict[str, Any], hq: Any, aq: Any, foul_limit: int) -> Dict[str, Any]:
+    def team(b: Dict[str, Any]) -> List[int]:
+        return [int(b.get(k) or 0) for k in ("team_total_fga", "team_total_fta", "team_total_tov", "team_total_fg3a", "team_total_pf")]
+
+    fo = sum(1 for b in (h_box, a_box) for p in (b.get("players") or []) if int(p.get("pf") or 0) >= foul_limit)
+    return {"hq": [int(x or 0) for x in list(hq or [])[:4]], "aq": [int(x or 0) for x in list(aq or [])[:4]],
+            "hot": int(sum(int(x or 0) for x in (h_box.get("ot_pts") or []) if x is not None)),
+            "aot": int(sum(int(x or 0) for x in (a_box.get("ot_pts") or []) if x is not None)),
+            "h": team(h_box), "a": team(a_box), "fo": fo}
+
+
+def run_sim(args) -> int:
+    """SIM side: production's engine re-run as of each FIT date (scratch copy; roster mode forced pregame), with the
+    per-draw recorder wrapped IN THIS PROCESS ONLY to keep each draw's quarter scores, OT, team volume and foul-outs.
+    No engine file is modified. Run in WSL from a code copy (see resim_nba_availability.py for the scratch layout)."""
+    import os
+    import shutil
+    import sys
+
+    code, pristine, asof = Path(args.code), Path(args.pristine), Path(args.asof)
+    out = Path(args.out) / f"sim_{args.league}"
+    out.mkdir(parents=True, exist_ok=True)
+    scratch = Path(args.scratch) / f"sc_w{args.worker}"
+    sys.path[:0] = [str(code / "scripts"), str(code), str(code / "vendor" / "nba_betting_repo" / "src")]
+    import backtest_nba_lines_props as bt
+    import resim_nba_availability as rs
+
+    class BtArgs:
+        out = Path(args.bt_out)
+
+    env = {"SYNDICATE_DATA_ROOT": str(scratch), "SYNDICATE_NBA_SOURCE_ROOT": str(scratch / "nba_source"),
+           "NBA_BETTING_DATA_ROOT": str(scratch / "nba_source" / "data"), "OMP_NUM_THREADS": "1",
+           "OPENBLAS_NUM_THREADS": "1", "MKL_NUM_THREADS": "1", "PYTHONUNBUFFERED": "1"}
+    for k in ("ODDS_API_KEY", "ODDSAPI_KEY"):
+        os.environ.pop(k, None)
+    os.environ.update(env)
+    from syndicate.features.shared import basketball_props_smart_sim as bpss
+    from syndicate.features.shared.basketball_props_predictions import export_props_predictions_local
+
+    bpss._resolve_smart_sim_roster_mode_local = lambda **_k: "pregame"
+    games: List[Dict[str, Any]] = []
+    cur: Dict[str, Any] = {}
+    orig_call, orig_rec = bpss._call_source_simulate_smart_game_local, bpss._recording_sim_draws_local
+
+    def call(**kw):
+        k = kw.get("kwargs") or {}
+        cur.update(game={"date": str(k.get("date_str")), "home": str(k.get("home_tri")), "away": str(k.get("away_tri"))},
+                   draws=[], minutes=None)
+        result = orig_call(**kw)
+        games.append({**cur["game"], "draws": cur["draws"], "minutes": cur["minutes"]})
+        return result
+
+    def rec(simulate_draw, recorded_draws):
+        inner = orig_rec(simulate_draw, recorded_draws)
+
+        def wrapped(**kw):
+            res = inner(**kw)
+            try:
+                h_box, a_box, hq, aq = res
+                cur["draws"].append(_compact_draw(h_box, a_box, hq, aq, FOUL_LIMIT[args.league]))
+                if cur.get("minutes") is None:   # minutes are INPUTS (constant across draws): keep them once
+                    cur["minutes"] = {side: [[str(p.get("player_name") or ""), float(p.get("min") or 0.0)]
+                                             for p in (b.get("players") or [])] for side, b in (("home", h_box), ("away", a_box))}
+            except Exception:  # noqa: BLE001
+                pass
+            return res
+        return wrapped
+
+    bpss._call_source_simulate_smart_game_local = call
+    bpss._recording_sim_draws_local = rec
+
+    dates = [d for i, d in enumerate(rs._dates(f"{args.start}..{args.end}", asof)) if i % args.workers == args.worker]
+    for d in dates:
+        dest = out / f"{d}.jsonl"
+        if dest.exists():
+            continue
+        props_csv = bt.hist_props_csv(BtArgs, d)
+        if props_csv is None:
+            print(f"SIM_SKIP {d} no props snapshot", flush=True)
+            continue
+        rs.prepare_scratch(pristine, scratch, d, asof, props_csv)
+        for extra in args.copy_file or []:     # production switch files absent from the pristine copy
+            shutil.copy2(extra, scratch / "nba_source" / "data" / "processed" / Path(extra).name)
+        games.clear()
+        src_root = scratch / "nba_source"
+        try:
+            export_props_predictions_local(
+                source_root=src_root, date_str=d, out_path=src_root / "data" / "processed" / f"props_predictions_{d}.csv",
+                calib_window=7, calibrate_player=True, player_calib_window=30, player_min_pairs=6, player_shrink_k=8,
+                use_smart_sim=True, smart_sim_n_sims=args.n_sims, smart_sim_pbp=True, smart_sim_workers=1,
+                smart_sim_overwrite=True, log_file=Path(args.out) / f"sim_{args.league}_{d}.log")
+        except Exception as exc:  # noqa: BLE001
+            print(f"SIM_FAIL {d} {exc!r}"[:300], flush=True)
+        with dest.open("w", encoding="utf-8") as fh:
+            for g in games:
+                fh.write(json.dumps(g) + "\n")
+        print(f"SIM {d} games={len(games)} draws={sum(len(g['draws']) for g in games)}", flush=True)
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("phase", choices=("real",))
+    ap.add_argument("phase", choices=("real", "sim"))
     ap.add_argument("--league", choices=tuple(SPORT), required=True)
     ap.add_argument("--start", required=True)
     ap.add_argument("--end", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--sample", type=int, default=0, help="at most N games per date (NCAAB: deterministic sample)")
+    # sim phase (WSL)
+    ap.add_argument("--code", default="")
+    ap.add_argument("--pristine", default="")
+    ap.add_argument("--scratch", default="")
+    ap.add_argument("--asof", default="/mnt/c/tmp/nba_bt/out/asof")
+    ap.add_argument("--bt-out", default="/mnt/c/tmp/nba_bt/out")
+    ap.add_argument("--n-sims", type=int, default=200)
+    ap.add_argument("--worker", type=int, default=0)
+    ap.add_argument("--workers", type=int, default=1)
+    ap.add_argument("--copy-file", action="append", help="extra production switch file copied into each scratch")
     args = ap.parse_args(argv)
-    return run_real(args)
+    return run_sim(args) if args.phase == "sim" else run_real(args)
 
 
 if __name__ == "__main__":
