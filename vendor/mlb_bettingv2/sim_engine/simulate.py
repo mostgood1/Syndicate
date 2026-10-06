@@ -791,6 +791,7 @@ def _resolve_in_play_out_with_runners(
     p1_to_3b_on_1b_rate: float,
     dp_r2_to_3b_rate: float = 0.0,
     dp_r3_scores_rate: float = 0.0,
+    sf_rate_pop: Optional[float] = None,
 ) -> Tuple[BaseState, int, int, int, int, List[int], int, str]:
     """Runner-id-aware resolution for non-hit in-play balls.
 
@@ -843,7 +844,12 @@ def _resolve_in_play_out_with_runners(
             return nb, int(on1), int(on2), int(on3), 0, scoring, 1, "FC"
 
     if bb in (BattedBallType.FLY, BattedBallType.POP, BattedBallType.LINE) and outs <= 1 and on3:
-        p_sf = _clamp01(float(sf_rate_flypop)) if bb in (BattedBallType.FLY, BattedBallType.POP) else _clamp01(float(sf_rate_line))
+        if bb == BattedBallType.POP and sf_rate_pop is not None:
+            p_sf = _clamp01(float(sf_rate_pop))
+        elif bb in (BattedBallType.FLY, BattedBallType.POP):
+            p_sf = _clamp01(float(sf_rate_flypop))
+        else:
+            p_sf = _clamp01(float(sf_rate_line))
         if rng.random() < p_sf:
             scoring.append(int(on3))
             on3 = 0
@@ -3141,6 +3147,7 @@ def simulate_game(
                             bip_1b_p1_to_3b_rate,
                             dp_r2_to_3b_rate=bip_dp_r2_to_3b_rate,
                             dp_r3_scores_rate=bip_dp_r3_scores_rate,
+                            sf_rate_pop=getattr(cfg, "bip_sf_rate_pop", None),
                         )
                         if subtype in ("ROE", "FC"):
                             state.runner_reach_source_by_id[int(batter_id)] = RUNNER_SRC_NON_HIT_REACH

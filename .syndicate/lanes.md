@@ -1022,6 +1022,12 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **AMENDMENT 5 READINGS 2026-10-06 ~17:45Z (before any descent run):**
+  - CODE: `bip_sf_rate_pop` (models.py, default None) -> the resolver uses it for POP outs only; None falls back to `bip_sf_rate_flypop`.
+  - BYTE-IDENTICAL: 100 seeded games, HEAD vs new, sha256 B840A6C6... -- the same hash as the pre-DP engine, so every engine change today is a no-op at defaults.
+  - TESTS: tests/test_mlb_dp_runner_advancement.py 9 pass (pop uses its own rate; fly keeps flypop; None falls back).
+  - REACHABILITY (06-15 rebuilt, 40 sims, flypop 0.75): runs/game 9.050 with popups at 0.75 -> 8.970 with pop 0.019.
+  - Descent arms: flypop 0.750 + pop 0.019 replace the pooled 0.542; line 0.657.
 - **RULE v2 AMENDMENT 5 — POPUP SAC FLY SPLIT, PRE-REGISTERED 2026-10-06 ~17:20Z (user: "then fix the popup sac fly split next"); pipeline paused (builds 11/20, 0 descent runs):**
   - ENGINE: new GameConfig field `bip_sf_rate_pop` (default None = popups use `bip_sf_rate_flypop`, today's behaviour; byte-identical to be proven on seeded games). When set, POP outs use it and FLY outs keep `bip_sf_rate_flypop`.
   - RATES: already measured under amendment 4 with the true base state, never fitted: fly_ball 102/136 = 0.750, popup 1/54 = 0.019.

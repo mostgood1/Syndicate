@@ -655,6 +655,9 @@ class GameConfig:
     bip_dp_rate: float = 0.06
     bip_sf_rate_flypop: float = 0.48
     bip_sf_rate_line: float = 0.36
+    # Popups almost never score a runner from 3rd (2026 pbp: 1/54) while fly balls
+    # do (102/136). None = popups share bip_sf_rate_flypop, the behaviour before 2026-10-06.
+    bip_sf_rate_pop: Optional[float] = None
     # Tuning knobs for the batted-ball-informed HIT baserunning logic.
     # These scale the probabilities that runners score on singles/doubles.
     # 1.0 = baseline behavior.

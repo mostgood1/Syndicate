@@ -95,5 +95,26 @@ class FieldersChoiceCeilingTests(unittest.TestCase):
         self.assertGreater(hi, 2 * lo)
 
 
+def _sf(bb, flypop, pop):
+    from vendor.mlb_bettingv2.sim_engine.simulate import _tuple_to_bases
+
+    class _Draw(random.Random):
+        def random(self):  # 0.5: fires only for a rate above 0.5
+            return 0.5
+
+    out = _resolve_in_play_out_with_runners(_Draw(0), _tuple_to_bases(False, False, True), 0, 0, 0, 3, 9, bb,
+                                            0.0, flypop, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, sf_rate_pop=pop)
+    return out[-1]
+
+
+class PopupSacFlyTests(unittest.TestCase):
+    def test_popups_use_their_own_rate_when_set(self) -> None:
+        self.assertEqual(_sf(BattedBallType.POP, 0.9, 0.0), "OUT")
+        self.assertEqual(_sf(BattedBallType.FLY, 0.9, 0.0), "SF")
+
+    def test_unset_popup_rate_falls_back_to_the_pooled_rate(self) -> None:
+        self.assertEqual(_sf(BattedBallType.POP, 0.9, None), "SF")
+
+
 if __name__ == "__main__":
     unittest.main()
