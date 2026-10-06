@@ -1054,6 +1054,16 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **VALIDATION RESULT 2026-10-07 ~00:05Z (read ONCE, checks.py): DO NOT SHIP — check (c) fails. Nothing shipped; production unchanged.**
+  - Data: 15 validation dates, 203 games, 390 starts. Combined = descent choice + 9 re-fit prop maps (hits 1/2+, hr, runs 1+, TB 1-5+) + all measured inputs.
+  - (a) PASS objective 10060 -> 34.1 (ratio 0.003). (b) PASS: no moment's |z| grows (largest growth -0.20).
+  - **(c) FAIL** starter |bias| change: SO -0.494, H -0.182, **BB +0.121 (> 0.10)**, ER +0.026.
+  - (d) PASS runs |gap| 0.786 -> 0.496 (actual 9.675; prod 8.889; chosen 9.179). (e) PASS prop log-loss 0.38917 -> 0.38800 (66044 pairs).
+  - WHY (c) fails: OPPOSING ERRORS in production.
+    - Production starters faced +1.91 BF/start too many with batting BB/PA too low (0.0745 vs 0.0889), so starter BB was right by cancellation (+0.005).
+    - The combined config fixes both (BF bias +0.004; BB/PA 0.0871), which exposes a small residual walk excess: starter BB +0.126.
+    - Other starter readings, prod -> chosen: SO +0.881 -> +0.387, H -0.350 -> -0.167, outs +0.391 -> -0.140, ER -0.247 -> -0.273.
+  - The validation set is now SPENT. Any re-test needs a new pre-registered rule on data no fit has touched, or an explicit, logged user override. The decision is the user's.
 - **DESCENT DONE + PIPELINE BUG 2026-10-06 ~23:25Z (no validation outcome read):**
   - Descent (24 FIT dates, 100 sims, 33 arms): objective **12564 -> 35.8**. Chosen:
     - pitch model: base_hbp 0.0015, early_count_foul_boost 1.5, base_in_play 0.23 (unchanged), hr_rate_mult 1.856;
