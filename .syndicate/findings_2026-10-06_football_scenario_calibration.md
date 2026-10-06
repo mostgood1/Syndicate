@@ -124,6 +124,41 @@ These are stated for ranking only; no number from the 41-game interim is a resul
   local fleet on its next fast-forward. Turning it on is a separate decision, made on the on-vs-off
   measurement over the FIT games.
 
+## H2 fourth-down decision model — PRE-REGISTERED 2026-10-06 (user: "fix the 4th down go-for-it logic too")
+
+**What the code does today** (`drive_simulator.py`): at 4th down, (1) go only if Q4 <= 300 s,
+trailing, outside FG range; else (2) `_field_goal_decision` -- in range it kicks with p 0.58..0.97
+by field position ONLY, never reading yards-to-go; else (3) `_punt_decision` ladder; else (4) an
+implicit go at a guessed conversion `0.52 - 0.06*(d-2)` (the late branch: `0.62 - 0.05*(d-2)`),
+both times `fourth_down_conversion_multiplier` (NCAAF 0.55, fit to its turnover-on-downs rate).
+Go is the RESIDUAL of two kick ladders, so inside the 30 it is ~never chosen.
+
+- **Mechanism:** `CalibrationProfile.fourth_down_decision_model: bool = False`. When ON, steps (2)-(4)
+  are replaced by one draw of go / fg / punt from a MEASURED table P(decision | field-position
+  bucket, to-go bucket) for the profile's sport, and a go converts with a MEASURED P(convert |
+  to-go bucket) -- the multiplier is NOT applied on top (it was absorbing the guessed formula).
+  Steps (1) and the urgency-FG rule run first, unchanged. Gain on a conversion, FG make, and punt
+  result: unchanged code.
+- **Buckets:** field position (yards from own goal) <40, 40-49, 50-59, 60-69, 70-79, 80-89, 90+;
+  to-go 1, 2, 3-4, 5-7, 8-10, 11+.
+- **Population (FIT only):** NFL 2023-24 REG, `down == 4`, play_type pass/run/punt/field_goal,
+  `aborted_play` excluded; NCAAF 2024 FBS-vs-FBS REG, CFBD 4th-down scrimmage plays. EXCLUDED: the
+  states the engine already handles -- Q4 <= 300 s with the offense trailing (step 1), and Q2/Q4
+  <= 90 s, field position >= 65, score diff -9..+2 (urgency FG).
+- **Decision:** go = pass/run (fakes count as go), fg = field goal attempt, punt = punt.
+- **Conversion:** go attempts; NFL `fourth_down_converted == 1`; NCAAF yardsGained >= distance or an
+  offensive TD.
+- **Smoothing:** each cell's counts + 10 x its field-position bucket's pooled proportions; every
+  cell's n is written next to it in the code.
+- **Tables live in** `situation_model.py` (claimed), with n and provenance.
+- **Byte-identity OFF**, same 3-start-state sha as H1 (with H1 OFF). **Reachability:** ON != OFF,
+  and with ON the sim's S5 rates sit inside the real 95% CI on the FIT games (a construction
+  check, not evidence of skill).
+- **Predictions (FIT, paired seeds):** more go-for-its inside the 40 -> fewer FG attempts, more
+  TDs and more turnovers on downs. NFL mean total change in [-0.5, +1.5] points/game; S4
+  P(FGA|RZ) falls toward the real 0.34. No prediction on accuracy vs results or the close.
+- **Not shipped ON** for the same reason as H1.
+
 ## Results
 
 (none yet -- NFL 544-game run in progress, then NCAAF 654)
