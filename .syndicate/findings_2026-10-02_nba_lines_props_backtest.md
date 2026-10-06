@@ -516,3 +516,16 @@ histogram (`nba_game_projections.py:274-291`), which is not market-anchored.
 **Next, per the pre-registration:** refit the per-line book-blend weight on the K=2 arm (does w rise above ~0?), and
 decide on wiring K=2 for NBA (file switch, regular season only) with the coverage cost made visible.
 
+### Coverage cost: does a posted prop line identify the wrongly dropped? (H-A4, pre-registered 4c193acd) -- REFUTED as stated
+
+| K=2 dropped player-games | pre-tip prop line (any book) | no line |
+|---|---|---|
+| played (539) | 125 (23.2%) | 414 |
+| did not play (2,501) | 8 (0.3%) | 2,493 |
+
+- The line is a near-perfect PRECISION signal (0.3% of non-players carry one) but recovers only 23% of the wrongly
+  dropped. Those recovered are the high-minute ones: 3,104 of 7,302 lost minutes, ~25 min each.
+- The rest have no posted props: bench players returning from a 2-game absence.
+- The bar was >= 70% recovery, so the re-admit is not adopted under the pre-registration. Adopting it anyway would be
+  a labelled post-hoc user decision.
+
