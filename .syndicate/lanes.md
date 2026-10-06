@@ -1199,6 +1199,14 @@ death, never life — do not invert it.
 - Verification: targeted unit tests (test_base_url, new resolver tests, test_render_logs_local); live: fetch_prod_artifacts_paced with a clean env (ADMIN_TOKEN, SYNDICATE_* unset) reads one artifact from the fleet (HTTP 200), and render_logs prints source local without touching the Render API
 - Blocked by: none
 
+### closed-lane-archive-20261006-1700 — OPEN — opened 2026-10-06 — session 5da10f7c-2faf-4ee1-9c98-33ffbab3771b
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: owner_liveness.py SAFE set; archive_closed_lanes_before.py verifies claim set unchanged, OPEN headers unchanged, every moved line present in lanes_closed.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
