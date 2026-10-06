@@ -1458,6 +1458,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: py -3 scripts/rescore_live_gameline_date.py --sport ncaaf --date 2026-10-03 --expect-model 0.12358 --expect-market 0.11869 --expect-n 2472/2472 exits 0 with the gate PASSING, and reports 49 scored games; plus unit tests covering a final/non-final ESPN fixture, a matched join, an orientation flip, an unmatched game, and that --sport mlb still uses StatsAPI.
 - Blocked by: none
 
+### web-restart-healthz — OPEN — opened 2026-10-06 — session 46e09dbb-934d-4916-8c14-16fa66650844
+- Goal: Fleet web: /healthz answers in <1 s whenever a gunicorn worker process is up, even with every request slot busy (measured during a deliberate HUP reload: 2 s poll, max latency + failure count before vs after); game-chips cold builds stop herding (a waiter never falls through to a second build while one is in flight); a code reload is a HUP (local_production.py reload-web), not a TERM; watchdog labels refused vs slow (pending loan)
+- Files: syndicate/web_worker.py, tests/test_web_worker_fast_healthz.py (NEW), syndicate/features/shared/game_chip_scoreboard.py, tests/test_game_chip_single_flight.py, scripts/local_production.py (reload-web subcommand only), tests/test_local_production.py (reload-web tests only), docs/ai_context/local_production_runbook.md (web reload section only)
+- Hypothesis: (H1) The 13:52 CT web exit was a manual TERM to the gunicorn master by lane published-negative-ev (deploys.md 18:48:23Z), not a policy; (H2) /healthz waits because it needs a gthread slot and all 8 (2x4) were held 234-404 s by concurrent cold /api/board/game-chips builds -- build_game_chips waiters fall through after 120 s and the single-flight lease is 120 s, so a slow cold build becomes N builds; host CPU at 100% (Windows research jobs + WSL backtests) stretches each build; (H3) the 14:21-14:28 CT WORKER TIMEOUT loop is CPU starvation of worker main loops against --timeout 60
+- Falsification test: H1: no TERM sender in the ledger / master log shows no 'Handling signal: term'. H2: healthz latency during a reload with the fast path deployed still > 1 s while worker processes are up, or game-chips herd persists (>1 concurrent build per key in a worker) after the fix
+- Verification: deploys.md READING: healthz poll every 2 s across a deliberate HUP reload, before (current code, TERM-style history from 10-06) vs after: max latency, failures; response header X-Syndicate-Health=worker-loop proves the fast branch answered; watchdog line on the reload
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
