@@ -653,6 +653,12 @@ _W: Dict[str, Any] = {}
 
 
 def _winit(roots: str, out: str) -> None:
+    # The replica reproduces the LEGACY game-market machinery (regulation-only Poisson draws), which is the
+    # RAW layer `nhl_game_lines_experiments.py` and the 3-way scorer build the shipped calibration on top of.
+    # Since 7865b26e (2026-10-03) production's `build_game_prediction` defaults to the calibrated sim, so the
+    # replica == production assertion holds only against production's own legacy switch. Set here, in every
+    # worker, so `predict_game` takes that path; nothing in this harness serves anything.
+    os.environ["SYNDICATE_NHL_GAME_MARKET_CALIBRATION"] = "off"
     _W["roots"], _W["out"] = Path(roots), Path(out)
     _W["bna"] = _load_script("build_nhl_artifacts")
     _W["book"] = json.loads((Path(out) / "book.json").read_text(encoding="utf-8")) if (Path(out) / "book.json").exists() else {}
