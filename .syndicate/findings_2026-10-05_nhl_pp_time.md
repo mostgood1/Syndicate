@@ -73,16 +73,93 @@ per_minor 88.9 + `pp_shot_cal_mult` 1.2399 + `pk_shot_cal_mult` 0.4630; PP goal 
 Inert by construction: game-line lambdas come from `projection.py` -> `market_anchoring` ->
 `adapters` -> `game_market_sim`, none of which imports `engine.py`. Verified: production
 `predict_game` byte-identical flag on/off, 83 games (10 dates Jan-Mar 2026). The game-lines harness
-itself currently fails its replica assertion on main (flag OFF) — reported to lane nhl-game-lines-model.
+failed its replica assertion because production defaults to the calibrated game sim since 7865b26e (not GSAx/score-adj); fixed by lane nhl-game-lines-model.
 
-## 7. Props backtest
+## 7. Props backtest (paired, production af737b31+ engine = per-player PP minutes)
 
-(pending — base / C1 time-only / C2 time + shot re-fit; every 2nd regular-season date + all playoffs,
-200 sims, `scripts/nhl_props_paired.py`)
+Runs: `scripts/backtest_nhl_props.py` roots/inputs, driven in-process (memory), every 3rd 2025-26
+regular-season date from 11-01 (48 dates, 13,161 skater-games, 523 starter-goalie games) + all 44
+playoff dates (2,769 / 145), 200 sims, same seeds. Scored by `scripts/nhl_props_paired.py`
+(empirical sim P(over), game-clustered CIs). Arms (profiles via SYNDICATE_CALIBRATION_PROFILE_PATH_NHL):
+- C1 time-only: per_minor 88.9 s.
+- C2: C1 + pp_shot_cal_mult 1.2418 / pk_shot_cal_mult 0.4368 (re-fit on the current engine, Nov-Dec;
+  k_pp 1.363 holdout 1.297, k_pk 1.297 holdout 1.362).
+- C3 (pre-registered after C2's engine measure): C2 + ev_shot_scale 0.9267 / ev_goal_scale 1.003
+  (Nov-Dec fit so team SOG and goals equal production's; holdout 0.932 / 0.998).
+
+Engine measures (current engine, 386 games / 772 team-games), sim / real ratio:
+
+| | production | C1 | C2 | C3 |
+|---|---|---|---|---|
+| PP min | 1.494 | 1.087 | 1.088 | 1.086 |
+| PP goals | 1.046 | 0.757 | 1.040 | 1.036 |
+| PP SOG | 1.038 | 0.755 | 1.032 | 1.028 |
+| team SOG | 0.979 | 0.995 | 1.040 | 0.977 |
+| team goals | 1.078 | 1.085 | 1.145 | 1.079 |
+
+### regular (Brier d x1000 vs production, game-clustered 95% CI; W = worse, B = better)
+
+| market@line | segment | n | production Brier | C1 time-only | C2 +shot re-fit | C3 +EV level |
+|---|---|---|---|---|---|---|
+| SOG@1.5 | all | 13161 | 0.2151 | +0.60 [-0.16,+1.31] | +0.97 [+0.16,+1.80] W | +0.10 [-0.61,+0.79] |
+| SOG@2.5 | all | 13161 | 0.1516 | -0.35 [-0.95,+0.20] | +0.18 [-0.53,+0.85] | -0.32 [-0.84,+0.21] |
+| SOG@3.5 | all | 13161 | 0.0861 | -0.30 [-0.68,+0.08] | -0.07 [-0.50,+0.35] | -0.35 [-0.71,-0.01] B |
+| GOALS@0.5 | all | 13161 | 0.1265 | -0.03 [-0.46,+0.39] | +0.19 [-0.28,+0.71] | -0.32 [-0.76,+0.16] |
+| ASSISTS@0.5 | all | 13161 | 0.1775 | +1.30 [+0.72,+1.90] W | +1.44 [+0.74,+2.15] W | +0.96 [+0.35,+1.54] W |
+| POINTS@0.5 | all | 13161 | 0.2090 | +1.23 [+0.36,+1.97] W | +1.61 [+0.72,+2.56] W | +0.89 [+0.11,+1.66] W |
+| POINTS@1.5 | all | 13161 | 0.0770 | +0.26 [-0.07,+0.61] | +0.25 [-0.12,+0.61] | +0.17 [-0.20,+0.49] |
+| BLOCKS@1.5 | all | 13161 | 0.1368 | -1.44 [-1.97,-0.91] B | +1.04 [+0.48,+1.56] W | +0.46 [-0.06,+0.94] |
+| SOG@1.5 | elite | 1141 | 0.1907 | +0.71 [-1.42,+2.81] | -1.56 [-3.79,+0.79] | +0.07 [-1.81,+2.03] |
+| SOG@2.5 | elite | 1141 | 0.2437 | -0.81 [-3.47,+1.80] | -1.34 [-4.57,+2.01] | -2.39 [-5.23,+0.21] |
+| SOG@3.5 | elite | 1141 | 0.2020 | -0.04 [-2.38,+2.43] | -0.10 [-2.90,+2.51] | -0.11 [-2.30,+2.11] |
+| GOALS@0.5 | elite | 1141 | 0.2210 | -0.99 [-3.70,+1.44] | -1.08 [-3.73,+1.61] | -1.29 [-3.69,+1.13] |
+| ASSISTS@0.5 | elite | 1141 | 0.2516 | +2.09 [-0.71,+4.89] | -0.81 [-3.50,+1.85] | +0.62 [-2.02,+3.53] |
+| POINTS@0.5 | elite | 1141 | 0.2314 | +1.97 [-1.10,+5.05] | -0.81 [-3.81,+2.35] | +2.03 [-0.81,+5.03] |
+| POINTS@1.5 | elite | 1141 | 0.1954 | +2.48 [+0.03,+5.14] W | +0.29 [-2.04,+2.54] | +0.57 [-1.53,+2.88] |
+| BLOCKS@1.5 | elite | 1141 | 0.0952 | -0.06 [-1.32,+1.23] | +1.39 [+0.10,+2.75] W | +0.20 [-1.07,+1.43] |
+| SAVES@22.5 | goalie starter | 523 | 0.3037 | -1.44 [-5.72,+2.85] | +0.50 [-8.06,+9.03] | +2.67 [-1.04,+6.52] |
+| SAVES@25.5 | goalie starter | 523 | 0.2726 | +2.53 [-2.32,+7.16] | +5.70 [-2.63,+14.90] | +3.36 [-0.23,+6.93] |
+| SAVES@28.5 | goalie starter | 523 | 0.1986 | -2.41 [-5.25,+0.58] | +3.72 [-2.46,+10.01] | +0.63 [-1.97,+3.26] |
+
+### playoff (Brier d x1000 vs production, game-clustered 95% CI; W = worse, B = better)
+
+| market@line | segment | n | production Brier | C1 time-only | C2 +shot re-fit | C3 +EV level |
+|---|---|---|---|---|---|---|
+| SOG@1.5 | all | 2769 | 0.2139 | +0.80 [-0.68,+2.32] | -0.13 [-1.92,+1.76] | -0.87 [-2.42,+0.79] |
+| SOG@2.5 | all | 2769 | 0.1559 | -0.79 [-2.13,+0.35] | -0.14 [-1.60,+1.18] | -0.88 [-2.03,+0.22] |
+| SOG@3.5 | all | 2769 | 0.0923 | -1.24 [-2.10,-0.42] B | -0.79 [-1.87,+0.21] | -1.11 [-1.79,-0.39] B |
+| GOALS@0.5 | all | 2769 | 0.1238 | -0.16 [-1.11,+0.85] | -0.02 [-0.96,+0.96] | -0.17 [-1.15,+0.88] |
+| ASSISTS@0.5 | all | 2769 | 0.1717 | +1.24 [-0.21,+2.75] | +1.16 [-0.36,+2.66] | +0.55 [-0.87,+1.91] |
+| POINTS@0.5 | all | 2769 | 0.2097 | +1.40 [-0.31,+3.21] | +2.24 [+0.46,+4.11] W | +0.72 [-0.89,+2.38] |
+| POINTS@1.5 | all | 2769 | 0.0744 | +0.14 [-0.53,+0.79] | +0.77 [+0.10,+1.35] W | +0.47 [-0.19,+1.05] |
+| BLOCKS@1.5 | all | 2769 | 0.1448 | -1.83 [-2.90,-0.72] B | -0.95 [-2.11,+0.31] | +0.24 [-0.97,+1.41] |
+| SOG@1.5 | elite | 376 | 0.2031 | +3.38 [-0.29,+7.13] | +2.35 [-1.45,+6.15] | +0.89 [-2.57,+4.37] |
+| SOG@2.5 | elite | 376 | 0.2475 | +1.30 [-3.14,+5.84] | +1.10 [-4.18,+6.67] | -2.59 [-7.04,+1.79] |
+| SOG@3.5 | elite | 376 | 0.2089 | -1.70 [-5.64,+2.30] | -1.97 [-7.00,+3.12] | -4.50 [-8.49,-0.90] B |
+| GOALS@0.5 | elite | 376 | 0.1952 | +0.69 [-3.76,+4.78] | +0.53 [-3.27,+3.77] | +0.77 [-3.27,+4.40] |
+| ASSISTS@0.5 | elite | 376 | 0.2457 | +1.40 [-3.64,+6.77] | -1.92 [-6.45,+2.72] | +1.82 [-2.88,+6.57] |
+| POINTS@0.5 | elite | 376 | 0.2388 | +0.71 [-5.31,+6.56] | -0.07 [-4.88,+4.73] | +0.44 [-4.34,+5.06] |
+| POINTS@1.5 | elite | 376 | 0.1782 | -1.46 [-5.09,+2.52] | -0.34 [-3.90,+2.83] | +0.93 [-2.36,+4.12] |
+| BLOCKS@1.5 | elite | 376 | 0.1245 | -1.44 [-3.96,+0.89] | -0.49 [-2.98,+1.88] | +1.09 [-1.28,+3.35] |
+| SAVES@22.5 | goalie starter | 145 | 0.2310 | -4.83 [-12.94,+3.12] | -8.11 [-22.68,+6.74] | -5.06 [-12.56,+2.74] |
+| SAVES@25.5 | goalie starter | 145 | 0.2581 | -7.27 [-14.77,+0.62] | -4.49 [-20.60,+12.07] | -2.88 [-9.91,+4.56] |
+| SAVES@28.5 | goalie starter | 145 | 0.2122 | -5.90 [-13.55,+1.09] | -6.66 [-22.14,+7.28] | +0.51 [-4.36,+5.44] |
+
+Reading: C3 is the only arm that fixes PP time and keeps the team level; it is better on SOG@3.5
+(regular and playoffs) and WORSE on ASSISTS@0.5 (+0.00096 [+0.00035, +0.00154]) and POINTS@0.5
+(+0.00089 [+0.00011, +0.00166]) in the regular season. Null false-WORSE rate: 14 lines x 2 phases at
+~2.5% each -> ~0.7 expected by chance; ASSISTS@0.5 is consistent across C1/C2/C3, so it is not noise.
+Likely absorber: assist attribution (`assist_share`, position power 1.5) was fitted under the old PP
+time. Nothing enabled.
+
+## 8. PK units (found, not fixed)
+
+PK1 skaters ~88% of team PK time (6.0 sim vs 2.1-2.5 real PK min/game), PK2 0.15 vs 0.42 share, skaters
+outside the PK units 0 vs 0.06-0.14 -- the fixed-unit defect PP had before af737b31.
 
 ## Leads
 
 - Recency-weighted `committed_per_game` (the April residual).
 - SH goals 0.38x real at every PP time — not a time effect.
 - Engine goalie (`_starter_goalie` = max toi_proj) differs from the props starter (flagged) in ~1 of 5
-  team-games on this population — told lane nhl-player-props-projection's session.
+  team-games -- cosmetic: SAVES are credited to the flagged starter (props_boxscore), so no priced number moves.
