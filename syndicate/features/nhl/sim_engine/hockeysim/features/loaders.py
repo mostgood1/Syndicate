@@ -185,6 +185,16 @@ def load_team_rates_map(date: str, *, root: Optional[Path] = None) -> Dict[str, 
     return out
 
 
+def team_rates_are_prior_season(date: str, *, root: Optional[Path] = None) -> bool:
+    """True when `load_team_rates_map` for ``date`` falls back to ``team_rates_latest.csv`` -- last
+    season's frozen rates, because no ``team_rates_<season>.csv`` has been written yet. Keys
+    `apply_roster_shot_volume` (lane nhl-early-season-shot-volume)."""
+    proc = _processed_dir(root)
+    if _read_csv_rows(proc / f"team_rates_{_season_code_for_date(date)}.csv"):
+        return False
+    return bool(_read_csv_rows(proc / "team_rates_latest.csv"))
+
+
 def load_player_rates_map(date: str, *, root: Optional[Path] = None) -> Dict[int, Dict[str, float]]:
     """Load ``{player_id: {"shot_weight":.., "goal_weight":.., "block_weight":..,
     "faceoff_weight":..}}`` for a date.
@@ -636,6 +646,10 @@ def build_game_features(
         player_rates_map=player_rates_map,
     )
 
+    if team_rates_are_prior_season(date, root=root):
+        home = apply_roster_shot_volume(home, home_players)
+        away = apply_roster_shot_volume(away, away_players)
+
     game = HockeyGameFeatures(
         game_pk=str(game_pk),
         date=str(date),
@@ -650,6 +664,52 @@ def build_game_features(
         from ..market_anchoring import anchor_game_features
         game = anchor_game_features(game, weight=anchor_weight)
     return game
+
+
+# Team shot volume blended with the DRESSED ROSTER's own shot rates `[2026-10-06, lane nhl-early-season-shot-volume]`,
+# ONLY while the team rate is last season's frozen file (`team_rates_latest.csv`; `team_rates_are_prior_season`). Props A/B, full 2025-26: on a prior-season rate (playoff arm) SOG@1.5 -0.00124, SOG@2.5
+# -0.00104, SOG@3.5 -0.00061, POINTS@0.5 -0.00096 (CIs exclude 0); on a current-season rate (regular arm) it
+# double counts the roster and ASSISTS@0.5 went +0.00023 worse -- so it switches itself off once the in-season
+# `team_rates_<season>.csv` exists (2026-11-01, lane nhl-season-inputs-in-season).
+# The team rate is last season's (frozen until the in-season blend admits 10 games) while rosters change: on
+# the 2026-10-06 slate the dressed roster's summed 2025-26 per-game shot rates ran 1.12-1.14x the team rate
+# for NJD/UTA/TOR (every skater squeezed) and 0.90x for OTT. Out-of-sample on 2025-26 (prior = 2024-25 team
+# rates, real dressed rosters, 2,624 team-games), forecasting team SOG: weight 0.4 on the roster sum beats the
+# team rate by -3.1% MSE in a team's first 10 games and -1.6% over the season against production's own
+# in-season rule; the roster sum needs no league scaling (mean ratio 1.001). Env override for A/B:
+# SYNDICATE_NHL_ROSTER_SHOT_WEIGHT ("0" disables). Team GOALS do not move: the engine's per-shot goal
+# probability is goals_per_60 / shots_per_60.
+ROSTER_SHOT_VOLUME_WEIGHT = 0.4
+# A skater with no rate row is counted at a replacement level (per-game SOG) so a call-up is not a zero.
+_ROSTER_REPLACEMENT_SOG = {"F": 1.2, "D": 0.9}
+_ROSTER_MIN_SKATERS = 15
+
+
+def _roster_shot_weight() -> float:
+    raw = os.getenv("SYNDICATE_NHL_ROSTER_SHOT_WEIGHT")
+    if raw is None or str(raw).strip() == "":
+        return ROSTER_SHOT_VOLUME_WEIGHT
+    try:
+        return max(0.0, min(1.0, float(raw)))
+    except ValueError:
+        return ROSTER_SHOT_VOLUME_WEIGHT
+
+
+def apply_roster_shot_volume(team: HockeyTeamFeatures, players: Tuple[HockeyPlayerFeatures, ...]) -> HockeyTeamFeatures:
+    """``shots_per_60 = (1 - a) * team rate + a * sum of the dressed skaters' per-game shot rates``.
+
+    Only slotted F/D count (who actually dresses). Fewer than ``_ROSTER_MIN_SKATERS`` slotted skaters
+    (no lineup) leaves the team rate untouched.
+    """
+    a = _roster_shot_weight()
+    if a <= 0.0:
+        return team
+    dressed = [p for p in players if p.position in ("F", "D") and p.line_slot]
+    if len(dressed) < _ROSTER_MIN_SKATERS:
+        return team
+    roster = sum(float(p.shot_weight) if p.shot_weight is not None else _ROSTER_REPLACEMENT_SOG[p.position] for p in dressed)
+    blended = (1.0 - a) * float(team.shots_per_60) + a * roster
+    return dataclasses.replace(team, shots_per_60=round(blended, 4))
 
 
 def _load_scoreboard_games(date: str, root: Optional[Path] = None) -> List[Tuple[str, str, str]]:
