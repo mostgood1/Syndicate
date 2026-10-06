@@ -68,7 +68,7 @@ def _sim_game(job: dict) -> dict:
             pid = int(pid_raw)
             side = "away" if pid in staff["away"] else ("home" if pid in staff["home"] else None)
             if side:
-                for k in ("SO", "BF", "P"):
+                for k in ("SO", "BF", "P", "PO"):
                     team[side][k] += float(row.get(k) or 0.0)
     return {"date": job["date"], "game_pk": job["game_pk"], "starters": starters,
             "starter": {s: {k: v / n for k, v in d.items()} for s, d in st.items()},
@@ -102,6 +102,7 @@ def _actual(box: dict) -> dict:
                                  "BB": int(tb.get("baseOnBalls") or 0), "PA": int(tb.get("plateAppearances") or 0),
                                  "SO": int(tb.get("strikeOuts") or 0), "HBP": int(tb.get("hitByPitch") or 0)},
                      "team": {"SO": int(tp.get("strikeOuts") or 0), "BF": int(tp.get("battersFaced") or 0),
+                              "PO": int(tp.get("pickoffs") or 0),
                               "P": int(tp.get("numberOfPitches") or tp.get("pitchesThrown") or 0)}}
     return out
 
@@ -154,6 +155,8 @@ def summarise(rows: list[dict], draws: int) -> dict:
         bat[k + "_per_PA"] = {"model": sum(r["model_bat"].get(k, 0.0) for r in rows) / mp_ if mp_ else None,
                               "actual": sum(r["actual_bat"].get(k, 0) for r in rows) / ap_ if ap_ else None}
     out["batting"] = bat
+    out["team_PO_per_game"] = {"model": sum(r["model_team"].get("PO", 0.0) for r in rows) / len(rows),
+                               "actual": sum(r["actual_team"].get("PO", 0) for r in rows) / len(rows)}
     # K/start decomposition: model K = (model K/BF)(model BF); swap one term at a time
     kbf_m, kbf_a = s["K_per_BF"]["model"], s["K_per_BF"]["actual"]
     bf_m, bf_a = s["BF"]["model"], s["BF"]["actual"]
