@@ -340,9 +340,225 @@ def run_sim(args) -> int:
     return 0
 
 
+ESPN_TO_TRI = {"nba": {"GS": "GSW", "NO": "NOP", "NY": "NYK", "UTAH": "UTA", "WSH": "WAS", "SA": "SAS", "PHO": "PHX"},
+               "wnba": {"GS": "GSV", "LV": "LVA", "LA": "LAS", "NY": "NYL"}}
+
+
+def _tri(league: str, abbr: Any) -> str:
+    v = str(abbr or "").upper()
+    return ESPN_TO_TRI.get(league, {}).get(v, v)
+
+
+def _boot_mean(groups: List[List[float]], reps: int = 1000, seed: int = 7) -> tuple:
+    """Mean over all values, with a GAME-clustered bootstrap 95% CI (each inner list is one game)."""
+    groups = [g for g in groups if g]
+    if not groups:
+        return (float("nan"),) * 3
+    sums = [sum(g) for g in groups]
+    cnts = [len(g) for g in groups]
+    point = sum(sums) / sum(cnts)
+    rng = random.Random(seed)
+    n = len(groups)
+    stats = []
+    for _ in range(reps):
+        idx = [rng.randrange(n) for _ in range(n)]
+        c = sum(cnts[i] for i in idx)
+        stats.append(sum(sums[i] for i in idx) / c if c else point)
+    stats.sort()
+    return point, stats[int(0.025 * reps)], stats[int(0.975 * reps) - 1]
+
+
+def _sd(values: List[float]) -> float:
+    if len(values) < 2:
+        return float("nan")
+    m = sum(values) / len(values)
+    return math.sqrt(sum((v - m) ** 2 for v in values) / (len(values) - 1))
+
+
+def _boot_sd(groups: List[List[float]], reps: int = 500, seed: int = 11) -> tuple:
+    groups = [g for g in groups if g]
+    flat = [v for g in groups for v in g]
+    point = _sd(flat)
+    rng = random.Random(seed)
+    stats = []
+    for _ in range(reps):
+        pick = [groups[rng.randrange(len(groups))] for _ in range(len(groups))]
+        stats.append(_sd([v for g in pick for v in g]))
+    stats.sort()
+    return point, stats[int(0.025 * reps)], stats[int(0.975 * reps) - 1]
+
+
+def _lines(league: str, dates: List[str], bt_out: Path) -> Dict[tuple, Dict[str, float]]:
+    """(date, home, away) -> {'spread': home line, 'total': line} from the OddsAPI pre-tip backfill (NBA)."""
+    out: Dict[tuple, Dict[str, float]] = {}
+    if league != "nba":
+        return out
+    import sys
+    repo = Path(__file__).resolve().parents[1]
+    sys.path[:0] = [str(repo / "scripts"), str(repo)]
+    import backtest_nba_lines_props as bt
+
+    class A:
+        out = bt_out
+
+    for d in sorted(set(dates)):
+        for (h, a), rec in bt.hist_game_book(A, d).items():
+            row = {}
+            if "spread" in rec:
+                row["spread"] = rec["spread"]["line"]
+            if "total" in rec:
+                row["total"] = rec["total"]["line"]
+            out[(d, h, a)] = row
+    return out
+
+
+def run_table(args) -> int:
+    """Phase 1 real-vs-sim rows (pre-registered in the findings file). Pairs games present on BOTH sides."""
+    lg = args.league
+    out = Path(args.out)
+    reg = REG_PERIODS[lg]
+    thr = BLOWOUT[lg]
+    real = {}
+    for ln in (out / f"real_{lg}.jsonl").read_text(encoding="utf-8").splitlines():
+        r = json.loads(ln)
+        if args.start <= r["date"] <= args.end and r["season_type"] == 2:
+            real[(r["date"], _tri(lg, r["home"]), _tri(lg, r["away"]))] = r
+    sim = {}
+    for f in sorted((out / f"sim_{lg}").glob("*.jsonl")):
+        for ln in f.read_text(encoding="utf-8").splitlines():
+            g = json.loads(ln)
+            if g.get("draws"):
+                sim[(g["date"], g["home"], g["away"])] = g
+    keys = sorted(set(real) & set(sim))
+    lines = _lines(lg, [k[0] for k in keys], Path(args.bt_out))
+    print(f"TABLE league={lg} real={len(real)} sim={len(sim)} paired={len(keys)} with_line={sum(1 for k in keys if k in lines)}")
+
+    def spread_bucket(k):
+        ln = lines.get(k, {}).get("spread")
+        if ln is None:
+            return None
+        a = abs(ln)
+        return "0-4" if a <= 4 else ("4.5-8" if a <= 8 else "8.5+")
+
+    def state_bucket(m):
+        a = abs(m)
+        return "close<=8" if a <= 8 else (f"9-{thr - 1}" if a < thr else f">={thr}")
+
+    rows: List[Dict[str, Any]] = []
+
+    def add(sid, name, bucket, r_groups, s_groups, unit, sd=False, pts_per_unit=None):
+        f = _boot_sd if sd else _boot_mean
+        rp, rlo, rhi = f(r_groups)
+        sp, slo, shi = f(s_groups)
+        gap = sp - rp
+        outside = not (rlo <= sp <= rhi) if not math.isnan(rlo) else None
+        rows.append({"id": sid, "scenario": name, "bucket": bucket, "n_real_games": sum(1 for g in r_groups if g),
+                     "real": round(rp, 4), "real_ci": [round(rlo, 4), round(rhi, 4)], "sim": round(sp, 4),
+                     "sim_ci": [round(slo, 4), round(shi, 4)], "gap": round(gap, 4), "unit": unit,
+                     "sim_outside_real_ci": outside,
+                     "pts_effect": None if pts_per_unit is None else round(gap * pts_per_unit, 3)})
+
+    # per-game helpers
+    def real_q(r):
+        return r["period_totals"]
+
+    def sim_q(d):
+        return [d["hq"][i] + d["aq"][i] for i in range(reg)]
+
+    mean_total = sum(sum(real[k]["period_totals"]) for k in keys) / max(1, len(keys))
+    # S1 pace proxy per team-game: FGA + 0.44 FTA + TOV
+    r_g, s_g = [], []
+    for k in keys:
+        b = real[k]["box"]
+        r_g.append([b[s]["fga"] + 0.44 * b[s]["fta"] + b[s]["tov"] for s in ("home", "away")
+                    if b.get(s) and None not in (b[s]["fga"], b[s]["fta"], b[s]["tov"])])
+        s_g.append([d[s][0] + 0.44 * d[s][1] + d[s][2] for d in sim[k]["draws"] for s in ("h", "a")])
+    add("S1", "pace proxy FGA+0.44FTA+TOV per team-game", "overall", r_g, [[sum(g) / len(g)] for g in s_g], "plays",
+        pts_per_unit=mean_total / 100)
+    # S2 quarter shares, overall and by state entering the last period
+    for qi in range(reg):
+        r_g = [[real_q(real[k])[qi] / sum(real_q(real[k]))] for k in keys]
+        s_g = [[sum(sim_q(d)[qi] / max(1, sum(sim_q(d))) for d in sim[k]["draws"]) / len(sim[k]["draws"])] for k in keys]
+        add("S2", f"share of regulation total in P{qi + 1}", "overall", r_g, s_g, "share", pts_per_unit=mean_total)
+        for st in ("close<=8", f"9-{thr - 1}", f">={thr}"):
+            r_g = [[real_q(real[k])[qi] / sum(real_q(real[k]))] for k in keys if state_bucket(real[k]["margin_entering_last"]) == st]
+            s_g = []
+            for k in keys:
+                v = [sim_q(d)[qi] / max(1, sum(sim_q(d))) for d in sim[k]["draws"]
+                     if state_bucket(sum(d["hq"][:reg - 1]) - sum(d["aq"][:reg - 1])) == st]
+                if v:
+                    s_g.append([sum(v) / len(v)])
+            add("S2", f"share of regulation total in P{qi + 1}", f"entering last: {st}", r_g, s_g, "share", pts_per_unit=mean_total)
+    # S3 quarter-total SD (pooled; sim pooled over draws)
+    for qi in range(reg):
+        add("S3", f"SD of P{qi + 1} total", "overall", [[real_q(real[k])[qi]] for k in keys],
+            [[sim_q(d)[qi] for d in sim[k]["draws"]] for k in keys], "pts", sd=True, pts_per_unit=1.0)
+    # S4 first-half share
+    half = reg // 2
+    add("S4", "H1 share of regulation total", "overall",
+        [[sum(real_q(real[k])[:half]) / sum(real_q(real[k]))] for k in keys],
+        [[sum(sum(sim_q(d)[:half]) / max(1, sum(sim_q(d))) for d in sim[k]["draws"]) / len(sim[k]["draws"])] for k in keys],
+        "share", pts_per_unit=mean_total)
+    # S5 blowout incidence entering the last period, by |spread| bucket
+    for sb in ("0-4", "4.5-8", "8.5+", None):
+        ks = [k for k in keys if (sb is None or spread_bucket(k) == sb)]
+        add("S5", f"P(|margin| >= {thr} entering last period)", f"|spread| {sb or 'all'}",
+            [[1.0 if abs(real[k]["margin_entering_last"]) >= thr else 0.0] for k in ks],
+            [[sum(1 for d in sim[k]["draws"] if abs(sum(d["hq"][:reg - 1]) - sum(d["aq"][:reg - 1])) >= thr) / len(sim[k]["draws"])] for k in ks],
+            "prob")
+    # S6 FTA per team-game
+    add("S6", "FTA per team-game", "overall",
+        [[real[k]["box"][s]["fta"] for s in ("home", "away") if real[k]["box"].get(s) and real[k]["box"][s]["fta"] is not None] for k in keys],
+        [[sum(d[s][1] for d in sim[k]["draws"] for s in ("h", "a")) / (2 * len(sim[k]["draws"]))] for k in keys], "FTA",
+        pts_per_unit=0.78)
+    # S7 tied after regulation, by |spread| bucket
+    for sb in ("0-4", "4.5-8", "8.5+", None):
+        ks = [k for k in keys if (sb is None or spread_bucket(k) == sb)]
+        add("S7", "P(tied after regulation)", f"|spread| {sb or 'all'}",
+            [[1.0 if real[k]["tied_after_reg"] else 0.0] for k in ks],
+            [[sum(1 for d in sim[k]["draws"] if sum(d["hq"]) == sum(d["aq"])) / len(sim[k]["draws"])] for k in ks], "prob")
+    # S8 SD of final total and margin around the pregame line (games with a line)
+    kl = [k for k in keys if "total" in lines.get(k, {})]
+    add("S8", "SD of (final total - total line)", "overall", [[real[k]["total"] - lines[k]["total"]] for k in kl],
+        [[sum(d["hq"]) + sum(d["aq"]) + d["hot"] + d["aot"] - lines[k]["total"] for d in sim[k]["draws"]] for k in kl],
+        "pts", sd=True, pts_per_unit=1.0)
+    ks = [k for k in keys if "spread" in lines.get(k, {})]
+    add("S8", "SD of (final margin + home spread)", "overall", [[real[k]["margin"] + lines[k]["spread"]] for k in ks],
+        [[sum(d["hq"]) + d["hot"] - sum(d["aq"]) - d["aot"] + lines[k]["spread"] for d in sim[k]["draws"]] for k in ks],
+        "pts", sd=True, pts_per_unit=1.0)
+    # S9 3PA per team-game
+    add("S9", "3PA per team-game", "overall",
+        [[real[k]["box"][s]["fg3a"] for s in ("home", "away") if real[k]["box"].get(s) and real[k]["box"][s]["fg3a"] is not None] for k in keys],
+        [[sum(d[s][3] for d in sim[k]["draws"] for s in ("h", "a")) / (2 * len(sim[k]["draws"]))] for k in keys], "3PA")
+    # S10 top-5 minutes by final |margin| bucket (sim minutes are INPUTS: constant across draws)
+    for mb, lo, hi in (("<=6", 0, 6), ("7-19", 7, 19), (">=20", 20, 999)):
+        r_g, s_g = [], []
+        for k in keys:
+            if lo <= abs(real[k]["margin"]) <= hi:
+                r_g.append([sum(sorted(real[k]["starters_min"].get(s) or [], reverse=True)[:5]) / 5
+                            for s in ("home", "away") if len(real[k]["starters_min"].get(s) or []) >= 5])
+            share = sum(1 for d in sim[k]["draws"]
+                        if lo <= abs(sum(d["hq"]) + d["hot"] - sum(d["aq"]) - d["aot"]) <= hi) / len(sim[k]["draws"])
+            mins = sim[k].get("minutes") or {}
+            top = [sum(sorted((m for _, m in mins.get(s) or []), reverse=True)[:5]) / 5 for s in ("home", "away") if mins.get(s)]
+            if share > 0 and top:
+                s_g.append(top)
+        add("S10", "mean minutes of top-5 (real: ESPN starters; sim: top-5 input minutes)", f"final |margin| {mb}", r_g, s_g, "min")
+    # S11 foul-outs per game
+    add("S11", f"foul-outs (>= {FOUL_LIMIT[lg]} PF) per game", "overall", [[float(real[k]["foulouts"])] for k in keys],
+        [[sum(d["fo"] for d in sim[k]["draws"]) / len(sim[k]["draws"])] for k in keys], "players")
+    dest = out / f"table_{lg}_{args.start}_{args.end}.json"
+    dest.write_text(json.dumps({"league": lg, "paired_games": len(keys), "rows": rows}, indent=1), encoding="utf-8")
+    for r in rows:
+        print(f"{r['id']:4} {r['scenario'][:46]:46} {r['bucket'][:22]:22} n={r['n_real_games']:4} real={r['real']:.4g} "
+              f"[{r['real_ci'][0]:.4g},{r['real_ci'][1]:.4g}] sim={r['sim']:.4g} gap={r['gap']:+.4g} "
+              f"outside={r['sim_outside_real_ci']} pts={r['pts_effect']}")
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("phase", choices=("real", "sim"))
+    ap.add_argument("phase", choices=("real", "sim", "table"))
     ap.add_argument("--league", choices=tuple(SPORT), required=True)
     ap.add_argument("--start", required=True)
     ap.add_argument("--end", required=True)
@@ -353,12 +569,14 @@ def main(argv=None) -> int:
     ap.add_argument("--pristine", default="")
     ap.add_argument("--scratch", default="")
     ap.add_argument("--asof", default="/mnt/c/tmp/nba_bt/out/asof")
-    ap.add_argument("--bt-out", default="/mnt/c/tmp/nba_bt/out")
+    ap.add_argument("--bt-out", default=("C:/tmp/nba_bt/out" if __import__("os").name == "nt" else "/mnt/c/tmp/nba_bt/out"))
     ap.add_argument("--n-sims", type=int, default=200)
     ap.add_argument("--worker", type=int, default=0)
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--copy-file", action="append", help="extra production switch file copied into each scratch")
     args = ap.parse_args(argv)
+    if args.phase == "table":
+        return run_table(args)
     return run_sim(args) if args.phase == "sim" else run_real(args)
 
 
