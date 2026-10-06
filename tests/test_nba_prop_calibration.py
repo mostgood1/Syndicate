@@ -34,12 +34,37 @@ def _write_root(tmp_path, factors=FACTORS, history=None):
         ("2026-01-10", "A. Player", 40, 99, 99, 99),   # the slate date itself: must be ignored
         ("2026-01-05", "B. Bench", 10, 2, 1, 0),        # only 1 game: no shrink
     ]
-    with (tmp_path / cal.HISTORY_FILE).open("w", encoding="utf-8") as fh:
-        fh.write("PLAYER_NAME,date,MIN,PTS,REB,AST,FG3M,STL,BLK,TOV\n")
+    # season-to-date now reads player_logs.csv (regular season only) from this season's ESPN regular-season start
+    # (lane nba-season-phase); the ESPN season table is cached so the slate's phase resolves offline.
+    with (tmp_path / cal.PRIOR_FILE).open("w", encoding="utf-8") as fh:
+        fh.write("PLAYER_NAME,GAME_DATE,MIN,PTS,REB,AST,FG3M,STL,BLK,TOV\n")
         for d, name, mins, pts, reb, ast in rows:
             fh.write(f"{name},{d},{mins},{pts},{reb},{ast},1,1,0,1\n")
+    write_season_types(tmp_path)
     cal._own_rates_cached.cache_clear()
     return tmp_path
+
+
+ESPN_TYPES = {  # measured 2026-10-05 from ESPN seasons/<yr>/types
+    2026: [{"type": 1, "start": "2025-10-01T07:00Z", "end": "2025-10-21T06:59Z"},
+           {"type": 2, "start": "2025-10-21T07:00Z", "end": "2026-04-13T06:59Z"},
+           {"type": 5, "start": "2026-04-13T07:00Z", "end": "2026-04-18T06:59Z"},
+           {"type": 3, "start": "2026-04-18T07:00Z", "end": "2026-06-27T06:59Z"},
+           {"type": 4, "start": "2026-06-27T07:00Z", "end": "2026-09-30T06:59Z"}],
+    2027: [{"type": 1, "start": "2026-09-30T07:00Z", "end": "2026-10-20T06:59Z"},
+           {"type": 2, "start": "2026-10-20T07:00Z", "end": "2027-04-12T06:59Z"},
+           {"type": 5, "start": "2027-04-12T07:00Z", "end": "2027-04-17T06:59Z"},
+           {"type": 3, "start": "2027-04-17T07:00Z", "end": "2027-06-26T06:59Z"}],
+}
+
+
+def write_season_types(root):
+    from syndicate.features.shared import nba_season_phase as ph
+    cache = root / "_espn_cache" / "nba"
+    cache.mkdir(parents=True, exist_ok=True)
+    for yr, rows in ESPN_TYPES.items():
+        (cache / f"season_types_{yr}.json").write_text(json.dumps(rows), encoding="utf-8")
+    ph._types_cached.cache_clear()
 
 
 def _sim():
@@ -193,8 +218,8 @@ def test_no_factor_file_with_env_unset_is_off(tmp_path):
 
 
 def _write_prior(root, rows):
-    with (root / cal.PRIOR_FILE).open("w", encoding="utf-8") as fh:
-        fh.write("PLAYER_NAME,GAME_DATE,MIN,PTS,REB,AST,FG3M,STL,BLK,TOV\n")
+    # player_logs.csv holds every season (current and prior): APPEND to what _write_root wrote
+    with (root / cal.PRIOR_FILE).open("a", encoding="utf-8") as fh:
         for d, name, mins, pts in rows:
             fh.write(f"{name},{d},{mins},{pts},4,2,1,1,0,1\n")
     cal._own_rates_cached.cache_clear()
@@ -366,3 +391,21 @@ def test_book_blend_falls_back_to_model_with_a_reason(tmp_path):
     assert cal.served_prop_probability(0.6, None, "pts", processed_root=root, env={}) == (0.6, {"p_model_raw": 0.6, "book_blend": "no two-sided book price for this line"})
     assert cal.served_prop_probability(0.6, 0.5, "stl", processed_root=root, env={})[1]["book_blend"] == "no weight for 'stl'"
     assert cal.served_prop_probability(None, 0.5, "pts", processed_root=root, env={})[0] is None
+
+
+def test_preseason_or_unknown_slate_never_uses_season_to_date(tmp_path, monkeypatch):
+    """Phase guard: a preseason slate (2026-10-05) gets NO own rates even with preseason-dated rows on file, and an
+    unknown phase (no season table) is treated the same way -- never as regular season."""
+    root = _write_root(tmp_path, history=[("2026-10-02", "A. Player", 30, 20, 10, 5)] * 3)
+    rates, why = cal.own_rates(root, "2026-10-05", _key)
+    assert rates == {} and "preseason" in why
+    rates, why = cal.own_rates(root, "2026-10-25", _key)          # regular season, but those rows are preseason-dated
+    assert rates == {} and "regular-season games 2026-10-20" in why
+    import shutil
+    from syndicate.features.shared import nba_season_phase as ph
+    monkeypatch.setattr(ph, "_fetch_types", lambda year, timeout=10.0: None)   # offline: the table cannot be fetched
+    shutil.rmtree(root / "_espn_cache")
+    ph._types_cached.cache_clear()
+    rates, why = cal.own_rates(root, "2026-01-10", _key)
+    assert rates == {} and "unknown" in why
+

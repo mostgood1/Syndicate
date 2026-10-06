@@ -77,12 +77,20 @@ def _merge_pred_recon_for_date(*, processed_root: Path, date_str: str):
     return merged
 
 
-def compute_biases(*, processed_root: Path, anchor_date: str, window_days: int = 7, min_pairs: int = 50) -> dict[str, float]:
+def _window_dates(anchor_date: str, days: int, date_filter) -> list[str]:
+    """The window's calendar dates, minus any the caller's phase filter rejects (lane nba-season-phase: NBA keeps
+    same-phase dates only, so preseason recon never calibrates a regular-season slate)."""
+    dates = _list_recent_dates(anchor_date, days)
+    return dates if date_filter is None else [d for d in dates if date_filter(d)]
+
+
+def compute_biases(*, processed_root: Path, anchor_date: str, window_days: int = 7, min_pairs: int = 50,
+                   date_filter=None) -> dict[str, float]:
     warn_if_compute_in_request_path("compute_biases")
     import numpy as np
     import pandas as pd
 
-    dates = _list_recent_dates(anchor_date, window_days)
+    dates = _window_dates(anchor_date, window_days, date_filter)
     errs: dict[str, list[float]] = {key: [] for key in STAT_KEYS}
     total_pairs = 0
     for date_str in dates:
@@ -187,12 +195,13 @@ def compute_player_biases(
     shrink_k: float = 8.0,
     shrink_k_by_stat: dict[str, float] | None = None,
     min_pairs_by_stat: dict[str, int] | None = None,
+    date_filter=None,
 ):
     warn_if_compute_in_request_path("compute_player_biases")
     import numpy as np
     import pandas as pd
 
-    dates = _list_recent_dates(anchor_date, window_days)
+    dates = _window_dates(anchor_date, window_days, date_filter)
     rows: list[tuple[int | None, str | None, str, float]] = []
     for date_str in dates:
         merged = _merge_pred_recon_for_date(processed_root=processed_root, date_str=date_str)

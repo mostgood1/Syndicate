@@ -2841,6 +2841,20 @@ def _bootstrap_local_boxscores_history_for_props(*, source_root: Path, date_str:
 
 
 def _ensure_player_logs_for_props_refresh(*, source_root: Path, date_str: str, log_file: Path, heartbeat_cb: callable) -> tuple[bool, str | None]:
+    # Keep player_logs current with THIS season's regular-season games (lane nba-season-phase, 2026-10-06). The
+    # gates below return True once the file merely EXISTS, so on its own this refresh never updated it: measured
+    # 2026-10-06 the fleet's player_logs ended 2026-04-12 with nothing scheduled to fetch 2026-27. Throttled (6 h),
+    # merges without dropping prior seasons, writes nothing on an empty fetch. Off switch:
+    # SYNDICATE_NBA_PLAYER_LOGS_REFRESH=0.
+    if (os.environ.get("SYNDICATE_NBA_PLAYER_LOGS_REFRESH") or "1").strip().lower() not in {"0", "false", "no", "off"}:
+        try:
+            from syndicate.features.shared.nba_history_refresh import refresh_player_logs
+
+            refreshed = refresh_player_logs(source_root / "data" / "processed", date_str)
+            if not refreshed.get("skipped"):
+                _append_log(log_file, "player_logs refresh: " + json.dumps(refreshed, default=str))
+        except Exception as exc:  # noqa: BLE001
+            _append_log(log_file, f"player_logs refresh failed: {exc}")
     raw_max_age = (
         os.environ.get("REFRESH_PLAYER_LOGS_MAX_AGE_HOURS")
         or os.environ.get("DAILY_PLAYER_LOGS_MAX_AGE_HOURS")

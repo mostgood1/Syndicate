@@ -207,12 +207,23 @@ def finalize_props_predictions_local(
         processed_root = source_root / "data" / "processed"
         preds = pd.read_csv(out_path)
 
+        # NBA only (lane nba-season-phase): the bias windows keep SAME-PHASE dates, so preseason recon never
+        # calibrates a regular-season slate; a preseason or unknown-phase slate gets an empty window.
+        date_filter = None
+        from syndicate.features.shared.basketball_props_smart_sim import _league_code_from_source_root_local
+
+        if _league_code_from_source_root_local(source_root) == "nba":
+            from syndicate.features.shared.nba_season_phase import same_phase_date_filter
+
+            date_filter = same_phase_date_filter(date_str, processed_root=processed_root)
+
         if calibrate:
             try:
                 biases = basketball_props_calibration.compute_biases(
                     processed_root=processed_root,
                     anchor_date=date_str,
                     window_days=int(calib_window),
+                    date_filter=date_filter,
                 )
                 preds = basketball_props_calibration.apply_biases(preds=preds, biases=biases)
                 basketball_props_calibration.save_calibration(
@@ -234,6 +245,7 @@ def finalize_props_predictions_local(
                     shrink_k=float(player_shrink_k),
                     shrink_k_by_stat=None,
                     min_pairs_by_stat=None,
+                    date_filter=date_filter,
                 )
                 if player_biases is not None and not player_biases.empty:
                     preds = basketball_props_calibration.apply_player_biases(preds=preds, player_biases=player_biases)

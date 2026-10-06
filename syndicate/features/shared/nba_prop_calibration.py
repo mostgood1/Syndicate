@@ -234,9 +234,25 @@ def _own_rates_cached(path_s: str, mtime: float, date_lo: str, date_hi: str) -> 
 
 
 def own_rates(processed_root: Path, date_str: str, name_key: Callable[[object], str]) -> Tuple[Dict[str, Dict[str, float]], str]:
-    """Season-to-date (this season, strictly before the slate) per-minute rates and per-game averages."""
+    """Season-to-date per-minute rates and per-game averages: THIS season's REGULAR-season games strictly before the
+    slate, from player_logs.csv (stats.nba Regular Season only, kept current by nba_history_refresh).
+
+    PHASE GUARD (lane nba-season-phase, 2026-10-06). This used to read boxscores_history.csv from Aug 1, which is
+    ESPN all-phase: preseason games would have become "season-to-date" after 3 games and stayed mixed into the early
+    regular season. Nothing refreshes that file either, so on the fleet it held only 2026 playoff games. Now:
+      * preseason or UNKNOWN slate -> no own rates (the prior-season fallback applies; never a guess);
+      * regular / play-in / postseason slate -> regular-season rows from this season's ESPN regular-season start.
+        Postseason own rows are a design step-4 item (no current playoff history is refreshed)."""
     d = str(date_str)[:10]
-    return _rates_from(Path(processed_root) / HISTORY_FILE, season_start(d), d, name_key, f"season games before {d}")
+    from syndicate.features.shared.nba_season_phase import phase_for_date, phase_start
+
+    phase = phase_for_date(d, processed_root=processed_root)
+    if phase not in {"regular", "play_in", "postseason"}:
+        return {}, f"own rates not used: slate phase {phase or 'unknown'} (preseason never feeds season-to-date)"
+    lo = phase_start(d, "regular", processed_root=processed_root)
+    if not lo:
+        return {}, "own rates not used: this season's regular-season start is unknown"
+    return _rates_from(Path(processed_root) / PRIOR_FILE, lo, d, name_key, f"regular-season games {lo}..{d}")
 
 
 def prior_rates(processed_root: Path, date_str: str, name_key: Callable[[object], str]) -> Tuple[Dict[str, Dict[str, float]], str]:
