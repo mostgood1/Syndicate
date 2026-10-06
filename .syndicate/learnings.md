@@ -3178,3 +3178,7 @@ own prior verdicts, not by anything failing.
   held by a git grandchild blocks `subprocess.run` past its timeout), `-c gc.auto=0 -c maintenance.auto=false`,
   `GIT_TERMINAL_PROMPT=0`. After any timeout, look for surviving `git.exe`/`git-remote-https.exe` and kill them.
   Arm `faulthandler.dump_traceback_later` below the task's time limit so a stall leaves its own stack.
+## 2026-10-06 -- A window-aggregated coverage dict sums its IDENTITY fields (lane layer2-triad-alignment)
+
+- **Measured:** `/api/board/layer2-shortlist` -> `per_sport_ingest.nfl.enrichment.projections.prop_coverage` read `artifact_week=35`, `artifact_season=14182`, `pct_projected=482.3` on a 7-date window. The per-date `/api/board/book-grid` read week 5, season 2026, 63.7-73.6%. On 2026-09-29 the same field verified a deploy (`3f28cdb7`) as "3 -> 4", when the window effectively held one date.
+- **Rule:** before trusting a week, season, id or pct read off an aggregate payload, check the aggregation: an identity field that is exactly N x a plausible value is a sum. Read the per-unit endpoint for identity, and use the aggregate only for counts.
