@@ -46761,3 +46761,10 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 6. **Fleet:** supervisor pid 1112803 since 13:25:31Z, redis state; `/healthz` 200. web up (1231 MB), refresh-worker up (2300 MB, restarts=17), live-odds-worker up (1829 MB, restarts=6). All three run code=18425937 against HEAD 0f30194f (STALE, 12 runtime files changed, which matches the 14:03Z no-restart ff above; not this lane's concern).
 
 **Verdict: MET.** Week 4 is complete, the wk5 file exists with mtime after 22:00 CDT, all rows are `current_season`, backfill is False, and the web serves week 5. Follow-up worth a look, not a failure: what re-created a preseason-backfill wk5 file between 10-01 and 10-06 03:38Z.
+
+## 2026-10-06 14:5xZ (9:5x AM CDT) -- READING for the 2026-10-05 20:29:49Z ff (bce1cb2a, daily optimizer + phase 2) -- **MET** (lane `daily-optimizer`)
+
+- reading: fleet `job-model-scorecard.log` 2026-10-06 11:30:05Z `OPTIMIZER_STATE games=0 pub=0 reset=None`; 11:32:00Z `OPTIMIZER committed={'committed': 12, 'with_published': 12, 'not_committed': 1} window_games=12 edge_shrink=0 stake_scale=0 by_sport={"mlb": 2, "nba": 5, "nfl": 1, "nhl": 4}`. `review.py` exit 0, generated_at 11:30:01Z, overlay 0/0, expires 10-09 11:30:01Z.
+- prediction was: committed N>0, by_sport non-empty for >=3 sports, overlay with 0 entries -> all three HELD (12; 4 sports; 0/0). Rank/stake therefore unchanged today.
+- first numbers (12 games, ONE date -- not a finding): published vs pooled ROI per bet mlb -4.8% / -8.7% (1,515 / 1,856), nba -4.1% / -4.8% (2,028 / 2,766), nfl -5.2% / -5.0% (2,032 / 2,614), nhl -8.2% / -12.1% (1,154 / 1,288). Published rows' mean PREDICTED EV vs recorded fair is NEGATIVE in all four (-3.6% / -5.0% / -4.7% / -5.6%): "published" = served on the board at first-sighting price, not bets placed -- worth a look once the window has dates.
+- review automation: run FREEZE fixed (10-05 21:30:45Z); app TIMER still broken host-wide -> the 07:30 review did not fire today; needs the user's app restart.
