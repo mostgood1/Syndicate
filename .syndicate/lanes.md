@@ -1343,6 +1343,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Unit tests incl. off!=on; fleet board after restart: stale_book_skipped > 0, NHL/MLB rows_stale_quote lower than the pre-restart reading
 - Blocked by: none
 
+### mlb-segment-cold-refresh — OPEN — opened 2026-10-06 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: MLB first1/first3/first5 segment and alternate game lines for games still outside the 75-min scoping window are refreshed at least every ~50 min instead of only by the next-day lookahead, so they stop going 20+ h stale; verified by MLB rows_stale_quote falling on the fleet board (16:48Z reading 97) and segment quote seen-age < 1h for today's games
+- Files: scripts/fetch_mlb_oddsapi_local.py (fetch_live_game_lines_for_date cold-event branch + one interval helper ONLY), tests/test_mlb_segment_cold_refresh.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: Unit tests incl. off!=on; fleet: [mlb_fetch_event_scoping] cold_segment_refreshed > 0 and MLB rows_stale_quote down
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

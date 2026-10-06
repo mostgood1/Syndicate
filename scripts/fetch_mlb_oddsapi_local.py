@@ -1186,6 +1186,41 @@ def _props_cold_interval_seconds() -> int:
         return 15 * 60
 
 
+def _segment_cold_interval_seconds() -> int:
+    """How often a COLD event (outside its scoping window) still gets its segment set.
+
+    Lane `mlb-segment-cold-refresh` (2026-10-06). Event scoping (#16) skips the
+    per-event segment/alternate fetch for a confirmed-pregame game more than the
+    window (75 min) before first pitch, so today's first1/first3/first5 lines were
+    refreshed only by the refresh-worker's NEXT-DAY lookahead and then went dark:
+    measured 2026-10-06 16:48Z, every segment market/book key for the 10-06 slate
+    last seen 20.9 h earlier, 97 MLB `rows_stale_quote`. Default 3000 s keeps a
+    cold game's segments inside the 1h quote-age gate; 0 restores the old skip.
+    Cost: one per-event call (~18 markets x 1 region) per cold game per interval.
+    """
+    raw = str(os.environ.get("SYNDICATE_ODDS_SEGMENT_COLD_INTERVAL_SECONDS") or "").strip()
+    try:
+        return max(0, int(raw)) if raw else 3000
+    except ValueError:
+        return 3000
+
+
+def _segment_refresh_due(cache_entry: object, *, now: datetime, interval_seconds: int) -> bool:
+    """True when a cold event's segment set is older than the interval (or never fetched)."""
+    if interval_seconds <= 0:
+        return False
+    if not isinstance(cache_entry, dict):
+        return True
+    text = str(cache_entry.get("fetched_at") or "").strip()
+    try:
+        fetched_at = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if fetched_at.tzinfo is None:
+        fetched_at = fetched_at.replace(tzinfo=timezone.utc)
+    return (now - fetched_at).total_seconds() >= interval_seconds
+
+
 def _props_event_cache_path(date_str: str, kind: str) -> Path:
     # Raw per-event payload cache, one file per props kind per date --
     # deliberately NOT under data/market/oddsapi/ (the public artifact
@@ -1277,6 +1312,15 @@ def fetch_live_game_lines_for_date(api_key: str, date_str: str, *, regions: str 
     book_quotes: list[dict[str, Any]] = []
     events_scoped_full = 0
     events_scoped_reduced = 0
+    # Cold events still get their segment set every `_segment_cold_interval_seconds`
+    # (see that helper). Only reached when scoping is on and the slate call
+    # covered core, i.e. exactly the case that used to fetch nothing per event.
+    segment_cold_interval = _segment_cold_interval_seconds()
+    segment_cache: dict[str, dict[str, Any]] = (
+        _load_props_event_cache(date_str, "segments") if event_scoping_enabled and segment_cold_interval > 0 else {}
+    )
+    segment_cache_dirty = False
+    cold_segment_refreshed = 0
     for event in live_events:
         event_id = str(event.get("id") or "").strip()
         if not event_id:
@@ -1295,6 +1339,13 @@ def fetch_live_game_lines_for_date(api_key: str, date_str: str, *, regions: str 
             events_scoped_full += 1
         else:
             events_scoped_reduced += 1
+            if slate_covered and _segment_refresh_due(
+                segment_cache.get(event_id), now=scoping_now, interval_seconds=segment_cold_interval
+            ):
+                wants_full = True
+                cold_segment_refreshed += 1
+                segment_cache[event_id] = {"fetched_at": scoping_now.isoformat()}
+                segment_cache_dirty = True
         payload = None
         if wants_full or not slate_covered:
             event_market_keys = per_event_market_keys if wants_full else _CORE_GAME_MARKET_KEYS
@@ -1328,8 +1379,10 @@ def fetch_live_game_lines_for_date(api_key: str, date_str: str, *, regions: str 
         "totals_games": int(sum(1 for row in games if isinstance((row.get("markets") or {}).get("totals"), dict))),
         "spreads_games": int(sum(1 for row in games if isinstance((row.get("markets") or {}).get("spreads"), dict))),
     }
+    if segment_cache_dirty:
+        _write_props_event_cache(date_str, "segments", segment_cache)
     print(
-        f"[mlb_fetch_event_scoping] enabled={event_scoping_enabled} full_tier={events_scoped_full} reduced_tier={events_scoped_reduced} events_matched={len(live_events)}",
+        f"[mlb_fetch_event_scoping] enabled={event_scoping_enabled} full_tier={events_scoped_full} reduced_tier={events_scoped_reduced} cold_segment_refreshed={cold_segment_refreshed} events_matched={len(live_events)}",
         flush=True,
     )
     return {
@@ -1350,6 +1403,8 @@ def fetch_live_game_lines_for_date(api_key: str, date_str: str, *, regions: str 
                 "enabled": bool(event_scoping_enabled),
                 "full_tier_events": int(events_scoped_full),
                 "reduced_tier_events": int(events_scoped_reduced),
+                "cold_segment_refreshed": int(cold_segment_refreshed),
+                "segment_cold_interval_seconds": int(segment_cold_interval),
             },
         },
     }
