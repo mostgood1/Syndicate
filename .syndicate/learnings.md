@@ -3131,3 +3131,10 @@ own prior verdicts, not by anything failing.
 - **The fixed path took effect**, and the run reached it: fresh archive run (`b37f92ee`) did `Glob, Read, Read` then a `Write` to `C:\tmp\sched-task-scratch\archive-closed-lanes-0917\…` — 4 use / 3 result.
 - **A Write OUTSIDE the per-session scratchpad PROMPTS; inside it is auto-approved.** Measured both ways within an hour: three runs' Writes to their own scratchpad returned immediately, and the first Write to the fixed `C:\tmp` directory is pending. So the fixed-path design does not remove an approval, it makes the approval CONSTANT — which is the whole point, but say it accurately.
 - **The model did NOT honour the pinned filename:** the prompt says `run.py` and the run wrote `build_run.py`. A prompt can pin a DIRECTORY reliably and a FILENAME only by persuasion, so the durable form of the approval has to be directory-scoped, not command-string-scoped. If the stored approval turns out to be exact-string, the filename drift defeats it the same way the uuid did.
+
+
+## 2026-10-06 -- A free-memory guard must read AVAILABLE memory, and `--workers 1` is not one process `[lane nhl-pp-time, session dd07cae9]`
+
+- **Belief overturned:** "free memory 1.2 GB" (Win32_OperatingSystem.FreePhysicalMemory) was read as the host's headroom. It excludes the standby cache; `\Memory\Available MBytes` read 2.85 GB at the same moment. A guard on FreePhysicalMemory waits forever or kills for nothing. Use the Available counter.
+- **And:** `scripts/backtest_nhl_props.py --workers 1` still forks a ProcessPool worker, so records.pkl is held twice (~0.9 GB together); one in-process driver over `run_date` holds it once (~0.45 GB). Measured: 2 workers tripped a 1.8 GB floor in 34 s; the in-process driver runs under 1.2 GB with resumable per-date output.
+- **How to apply:** guard on Available, run memory-tight backtests in-process from a DETACHED process (a run tied to a tool call died silently at 19:47 CT with empty stderr), and make every run resumable per date so a guard kill costs one date.
