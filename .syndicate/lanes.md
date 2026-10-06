@@ -1000,6 +1000,12 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **COMBINED CALIBRATION RULE v2, PRE-REGISTERED 2026-10-06 ~02:40Z (user chose "Rebuild all with today's code"; supersedes the stored-roster rule and fidelity gate v3) -- written before any replay on the rebuilt fit set:**
+  - **Data.** FIT = 06-15..07-12 (26 dates) REBUILT with today's builder (`mlb_asof_roster_build.py --statcast-raw-root`: stats <= D-1, statcast features <= D-1, cache-hit stamina path) in ~/asof_out_v2_fit. VALIDATION = 05-30..06-14 built by the SAME builder in ~/asof_out_v2_val (built, never read). Read ONCE at the end.
+  - No stored-match gate: fit and validation come from one builder. Known residual differences from live production, stated not fixed: prior-season platoon/arsenal splits, empty bullpen availability, no injuries.
+  - **Unchanged from v1:** the 13 fitted moments, the objective and its scales, the 10 levers and their grids, coordinate descent (2 passes from production, 100 sims, accept only if the objective drops), the hitter-prop map re-fit on FIT, checks (a)-(e) on VALIDATION at 200 sims (combined config + re-fit maps vs production config + production maps), and the ship mechanics.
+  - Lever plumbing: base_hbp / early_count_foul_boost / base_in_play / hr_rate_mult via pitch_model_overrides; bip_dp/roe/fc_rate via GameConfig; starter_short_start_prob, starter_shell_runs_start/weight, pickoff_rate via manager_pitching_overrides. Production = the forward override files + code defaults.
+  - Any lever that cannot be shown reachable (off != on on 1 date) before the descent is DROPPED from the grid, and that is recorded.
 - **v3 DIAGNOSIS 2026-10-06 ~02:20Z (roster inputs only; gate dates 06-21..06-27 still UNSPENT):** the stored June rosters were built by PRE-07-20 builder code.
   - Stored starters carry NO statcast features (`statcast_quality_mult` absent 139/139, `bb_inplay_n` 0): the features file was first generated in 880a812e (2026-07-20).
   - The same commit fixed `_derive_stamina_pitches_from_season_stats` folding RELIEF pitches into pitches-per-start (start-purity gate >= 0.5). Stored-vs-rebuilt stamina diff: mean -2.47, tail -29/-25/-20 (relief-inflated starters).
