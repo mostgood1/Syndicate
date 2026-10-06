@@ -328,6 +328,18 @@ class CalibrationProfile:
     # re-fit it needs are one change.
     halftime_kickoff: bool = False
 
+    # FOURTH DOWN DECIDED FROM WHAT TEAMS ACTUALLY DO. Lane
+    # `football-scenario-calibration` H2 (2026-10-06). OFF: field goal ladder ->
+    # punt ladder -> go as the RESIDUAL; the FG ladder never reads yards-to-go,
+    # so in range 4th-and-1 kicks like 4th-and-12 (interim NFL read: inside the
+    # opp 30 on 4th-and-1-2, sim P(go) 0.018 vs real 0.667). ON: one draw of
+    # go / fg / punt from `situation_model.FOURTH_DOWN_TABLES` by field position x
+    # to-go, and a go converts at the measured rate for its to-go (NOT times
+    # `fourth_down_conversion_multiplier`, which was absorbing the guessed
+    # formula). The late-trailing go-for-it and the urgency FG still run first,
+    # unchanged. Default OFF for the same reason as `halftime_kickoff`.
+    fourth_down_decision_model: bool = False
+
     def to_dict(self) -> dict[str, float | str]:
         return {
             "name": self.name,
@@ -360,6 +372,7 @@ class CalibrationProfile:
             # and the whole re-fit would be inert while appearing to apply.
             "goal_line_touchdown": self.goal_line_touchdown,
             "halftime_kickoff": self.halftime_kickoff,
+            "fourth_down_decision_model": self.fourth_down_decision_model,
         }
 
 

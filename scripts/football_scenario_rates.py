@@ -914,9 +914,131 @@ def _print(rep: Dict[str, Any]) -> None:
         print(f"{g['id']:5} {g['metric']:40} real {_fmt(g['real'])}   sim {_fmt(g['sim'])}")
 
 
+# ---------------------------------------------------------------------------
+# H2: the measured 4th-down decision + conversion tables (pre-registered)
+# ---------------------------------------------------------------------------
+
+FD_FP_EDGES = (40, 50, 60, 70, 80, 90)            # yards from own goal -> 7 buckets
+FD_TOGO_EDGES = (2, 3, 5, 8, 11)                  # to-go 1 | 2 | 3-4 | 5-7 | 8-10 | 11+
+FD_SMOOTH = 10.0
+
+
+def fd_fp_bucket(fp: int) -> int:
+    return sum(1 for e in FD_FP_EDGES if fp >= e)
+
+
+def fd_togo_bucket(togo: int) -> int:
+    return sum(1 for e in FD_TOGO_EDGES if togo >= e)
+
+
+def _fd_excluded(q: int, clock: int, fp: int, diff: int) -> bool:
+    """States the engine already decides by its own rules (late-trailing go, urgency FG)."""
+    if q >= 4 and clock <= 300 and diff < 0:
+        return True
+    if q in (2, 4) and clock <= 90 and fp >= 65 and -9 <= diff <= 2:
+        return True
+    return False
+
+
+def fourth_down_rows(sport: str, seasons: List[int]) -> List[Tuple[int, int, str, Optional[bool]]]:
+    """(fp, to_go, decision, converted-or-None) for every in-population real 4th down."""
+    rows: List[Tuple[int, int, str, Optional[bool]]] = []
+    if sport == "nfl":
+        for season in seasons:
+            path = nfl_root() / "tracking" / "nflverse" / "pbp" / f"pbp_{season}.csv"
+            with path.open(encoding="utf-8", newline="") as fh:
+                for r in csv.DictReader(fh):
+                    if r.get("season_type") != "REG" or r.get("down") != "4" or r.get("aborted_play") == "1":
+                        continue
+                    pt = r.get("play_type")
+                    if pt not in ("pass", "run", "punt", "field_goal"):
+                        continue
+                    q = _i(r.get("qtr"))
+                    fp = 100 - _i(r.get("yardline_100"), 50)
+                    if _fd_excluded(q, _i(r.get("quarter_seconds_remaining")), fp, _i(r.get("score_differential"))):
+                        continue
+                    dec = "punt" if pt == "punt" else ("fg" if pt == "field_goal" else "go")
+                    conv = (r.get("fourth_down_converted") == "1") if dec == "go" else None
+                    rows.append((fp, _i(r.get("ydstogo"), 10), dec, conv))
+    else:
+        root = PRIMARY / "data" / "ncaaf_source" / "historical_truth"
+        for season in seasons:
+            meta = {int(g["id"]): g for g in _ncaaf_games(season)}
+            for wk in range(1, 17):
+                p = root / f"plays_{season}_wk{wk:02d}.json.gz"
+                if not p.exists():
+                    continue
+                for r in json.load(gzip.open(p, "rt", encoding="utf-8")):
+                    g = meta.get(int(r.get("gameId") or 0))
+                    if not g or g.get("seasonType") != "regular" or g.get("homeClassification") != "fbs" \
+                            or g.get("awayClassification") != "fbs":
+                        continue
+                    pt = r.get("playType", "")
+                    if _i(r.get("down")) != 4 or pt not in _CFBD_SCRIM:
+                        continue
+                    q = _i(r.get("period"))
+                    clock = _i((r.get("clock") or {}).get("minutes")) * 60 + _i((r.get("clock") or {}).get("seconds"))
+                    fp = 100 - _i(r.get("yardsToGoal"), 50)
+                    diff = _i(r.get("offenseScore")) - _i(r.get("defenseScore"))
+                    if q > 4 or _fd_excluded(q, clock, fp, diff):
+                        continue
+                    dec = "punt" if "Punt" in pt else ("fg" if "Field Goal" in pt else "go")
+                    conv = None
+                    if dec == "go":
+                        off_td = pt in ("Passing Touchdown", "Rushing Touchdown")
+                        conv = off_td or _i(r.get("yardsGained")) >= _i(r.get("distance"), 99)
+                    rows.append((fp, _i(r.get("distance"), 10), dec, conv))
+    return rows
+
+
+def fourth_down_tables(rows: List[Tuple[int, int, str, Optional[bool]]]) -> Dict[str, Any]:
+    cell: Dict[Tuple[int, int], Dict[str, int]] = defaultdict(lambda: {"go": 0, "fg": 0, "punt": 0})
+    marg: Dict[int, Dict[str, int]] = defaultdict(lambda: {"go": 0, "fg": 0, "punt": 0})
+    conv: Dict[int, List[int]] = defaultdict(lambda: [0, 0])
+    for fp, togo, dec, c in rows:
+        fb, tb = fd_fp_bucket(fp), fd_togo_bucket(togo)
+        cell[(fb, tb)][dec] += 1
+        marg[fb][dec] += 1
+        if dec == "go":
+            conv[tb][0] += int(bool(c))
+            conv[tb][1] += 1
+    decision: Dict[str, Any] = {}
+    for fb in range(len(FD_FP_EDGES) + 1):
+        m = marg[fb]
+        mt = sum(m.values()) or 1
+        for tb in range(len(FD_TOGO_EDGES) + 1):
+            c = cell[(fb, tb)]
+            n = sum(c.values())
+            sm = {k: c[k] + FD_SMOOTH * m[k] / mt for k in ("go", "fg", "punt")}
+            tot = sum(sm.values()) or 1.0
+            decision[f"{fb},{tb}"] = {"go": round(sm["go"] / tot, 4), "fg": round(sm["fg"] / tot, 4),
+                                      "punt": round(sm["punt"] / tot, 4), "n": n}
+    conversion = {str(tb): {"p": round(conv[tb][0] / conv[tb][1], 4) if conv[tb][1] else None, "n": conv[tb][1]}
+                  for tb in range(len(FD_TOGO_EDGES) + 1)}
+    return {"decision": decision, "conversion": conversion, "n_rows": len(rows)}
+
+
+def cmd_fourth(args) -> None:
+    rows = fourth_down_rows(args.sport, args.season_list)
+    t = fourth_down_tables(rows)
+    out = OUT_ROOT / args.sport / f"fourth_down_tables_{'-'.join(map(str, args.season_list))}.json"
+    out.write_text(json.dumps(t, indent=1), encoding="utf-8")
+    print(f"{args.sport} {args.season_list}: {t['n_rows']} in-population 4th downs -> {out}")
+    togo_lbl = ["1", "2", "3-4", "5-7", "8-10", "11+"]
+    fp_lbl = ["<40", "40-49", "50-59", "60-69", "70-79", "80-89", "90+"]
+    print("P(go) [n]      " + "".join(f"{x:>14}" for x in togo_lbl))
+    for fb, fl in enumerate(fp_lbl):
+        print(f"fp {fl:>6}     " + "".join(f"{t['decision'][f'{fb},{tb}']['go']:>8.3f} [{t['decision'][f'{fb},{tb}']['n']:>3}]"
+                                          for tb in range(6)))
+    print("P(fg)          " + "".join(f"{x:>14}" for x in togo_lbl))
+    for fb, fl in enumerate(fp_lbl):
+        print(f"fp {fl:>6}     " + "".join(f"{t['decision'][f'{fb},{tb}']['fg']:>14.3f}" for tb in range(6)))
+    print("conversion     " + "".join(f"{(t['conversion'][str(tb)]['p'] or 0):>8.3f} [{t['conversion'][str(tb)]['n']:>3}]" for tb in range(6)))
+
+
 def main(argv: Optional[List[str]] = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=("fetch", "sim", "real", "report"))
+    ap.add_argument("cmd", choices=("fetch", "sim", "real", "report", "fourth"))
     ap.add_argument("--sport", choices=("nfl", "ncaaf"), required=True)
     ap.add_argument("--seasons", required=True)
     ap.add_argument("--seeds", type=int, default=300)
@@ -930,7 +1052,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     args.season_list = [int(s) for s in args.seasons.split(",")]
     if 2025 in args.season_list and not os.environ.get("FOOTBALL_SCENARIO_READ_VALIDATION"):
         raise SystemExit("2025 is VALIDATION (read once, pre-registered); set FOOTBALL_SCENARIO_READ_VALIDATION=1 to read it")
-    {"fetch": cmd_fetch, "sim": cmd_sim, "real": cmd_real, "report": cmd_report}[args.cmd](args)
+    {"fetch": cmd_fetch, "sim": cmd_sim, "real": cmd_real, "report": cmd_report, "fourth": cmd_fourth}[args.cmd](args)
 
 
 if __name__ == "__main__":

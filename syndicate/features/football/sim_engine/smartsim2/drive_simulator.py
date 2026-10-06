@@ -20,6 +20,8 @@ from syndicate.features.football.sim_engine.smartsim2.situation_model import TRU
 from syndicate.features.football.sim_engine.smartsim2.situation_model import URGENCY_TRAILING
 from syndicate.features.football.sim_engine.smartsim2.situation_model import URGENCY_TWO_MINUTE
 from syndicate.features.football.sim_engine.smartsim2.situation_model import classify_urgency
+from syndicate.features.football.sim_engine.smartsim2.situation_model import fourth_down_buckets
+from syndicate.features.football.sim_engine.smartsim2.situation_model import fourth_down_table
 
 
 def _clamp(value: float, low: float, high: float) -> float:
@@ -85,6 +87,22 @@ def _punt_result(state: PossessionState, priors: Any, rng: Random) -> tuple[Poss
     )
     net_yards = max(0, gross_distance - return_yards)
     return end_state, gross_distance, net_yards, touchback
+
+
+def _fourth_down_draw(state: PossessionState, rng: Random, profile: CalibrationProfile) -> str:
+    """go / fg / punt from the measured table (H2). One rng draw; ON only."""
+    fp_bucket, togo_bucket = fourth_down_buckets(state.field_position, state.distance)
+    p_go, p_fg, _p_punt = fourth_down_table(profile.name)["decision"][(fp_bucket, togo_bucket)]
+    roll = rng.random()
+    if roll < p_go:
+        return "go"
+    return "fg" if roll < p_go + p_fg else "punt"
+
+
+def _fourth_down_conversion(state: PossessionState, profile: CalibrationProfile) -> float:
+    """Measured P(first down or TD | go, to-go bucket) (H2)."""
+    _fp_bucket, togo_bucket = fourth_down_buckets(state.field_position, state.distance)
+    return float(fourth_down_table(profile.name)["conversion"][togo_bucket])
 
 
 def _field_goal_decision(
@@ -308,7 +326,12 @@ def simulate_drive(
                 state = end_state
                 break
 
-            if _field_goal_decision(state, priors, rng, profile):
+            # H2: with `fourth_down_decision_model` ON the measured table decides
+            # in ONE draw; OFF, the two ladders below run exactly as before (the
+            # `if model_decision` guards keep their rng draws in the same order).
+            model_decision = _fourth_down_draw(state, rng, profile) if profile.fourth_down_decision_model else None
+            kick_field_goal = (model_decision == "fg") if model_decision else _field_goal_decision(state, priors, rng, profile)
+            if kick_field_goal:
                 play_step, end_state, terminal_outcome, points = _execute_field_goal(state, priors, rng, len(steps) + 1, profile=profile)
                 steps.append(play_step)
                 total_clock += play_step.clock_consumed
@@ -317,7 +340,8 @@ def simulate_drive(
                 state = end_state
                 break
 
-            if _punt_decision(state, priors, rng, profile):
+            punt_now = (model_decision == "punt") if model_decision else _punt_decision(state, priors, rng, profile)
+            if punt_now:
                 clock_consumed = min(state.clock_remaining, max(4, int(round(rng.normalvariate(priors.expected_clock_seconds * 0.20, 4.0)))))
                 end_state = advance_possession_clock(state, clock_consumed)
                 end_state, gross_distance, net_distance, touchback = _punt_result(end_state, priors, rng)
@@ -346,7 +370,11 @@ def simulate_drive(
             end_state = advance_possession_clock(state, clock_consumed)
             # Neutral go-for-it attempt: short distance converts realistically
             # instead of every declined kick/punt becoming a failed 4th down.
-            conversion_probability = _clamp((0.52 - max(0, state.distance - 2) * 0.06) * profile.fourth_down_conversion_multiplier, 0.15, 0.52)
+            conversion_probability = (
+                _fourth_down_conversion(state, profile)
+                if model_decision
+                else _clamp((0.52 - max(0, state.distance - 2) * 0.06) * profile.fourth_down_conversion_multiplier, 0.15, 0.52)
+            )
             if rng.random() < conversion_probability:
                 gained = max(state.distance, int(round(rng.normalvariate(state.distance + 2.0, 2.0))))
                 end_state = replace(
