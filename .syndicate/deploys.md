@@ -46700,3 +46700,9 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - **Not yet readable on the served board:** the 10-05 grid had 0 SAVES rows after puck drop, and 10-06 has no SAVES lines yet.
 - **Reading OWED:** scheduled task `nhl-saves-negbin-board-verify` (2026-10-06 16:00 CT, read-only) checks grid basis / probabilities / registry verdict and the 10-06 props file.
 - Claims released after this entry.
+
+## 2026-10-06 00:15Z (7:15 PM CT 10-05) -- READING for the 00:00:21Z ff (af737b31, NHL per-player PP time) -- **MET** (lane `nhl-elite-pp-onice`)
+
+- reading 1: lineups_2026-10-06.csv rewritten 00:13:01Z (first after the ff): 324 slotted skaters, 324 with proj_pp_toi (0.0..7.133; top Reinhart 7.13, Stutzle 6.31, B. Tkachuk 6.16, M. Tkachuk 6.14; 42 with 0.0 = never drawn on the PP).
+- reading 2: `nhl_sim_input_checklist.py` on fleet data -- PASS; proj_pp_toi 16.0% "consumed, thinly populated" only because older dated lineup files predate the column.
+- watch: early-season windows are small -- OTT Yakemchuk (PP2) carries 6.36 PP min/game; the per-player draw follows it.

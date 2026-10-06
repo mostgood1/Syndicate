@@ -36749,3 +36749,14 @@ OUTSTANDING and every claim-bearing line. These are the 2 historical lines.
 - Verification: Paired full-season backtest vs production: DNP rate + every line's Brier; then the fleet lineups use the rule (a player absent from the last game is unslotted when a replacement played it).
 - Blocked by: none
 
+
+## nhl-elite-pp-onice -- full block as of close, 2026-10-06 (moved verbatim)
+
+### nhl-elite-pp-onice — OPEN — opened 2026-10-05 — session 5704bbd4-3c4f-4d88-9549-fa59e24ab70a
+- **GOAL: DRIFTED (into PP time allocation, same lane).** Elite NHL playmakers' simulated power-play on-ice goals-for stop running ~0.82x of real, and their projected assists/points rise accordingly, without making any prop line's Brier worse. -- The premise was refuted at scale (definition artifact; elites get MORE PP time). The work went to PP1/PP2 time allocation (sim 0.903/0.097 vs real 0.632/0.286), which serves the mid-tier over-projection rather than the elite; total PP time went to lane nhl-pp-time. Per-player PP time built, UNCOMMITTED in this session's worktree (backup kept_patches/pp-minutes-WIP.diff), full-season backtest bt_ppmin running.
+- Goal: Elite NHL playmakers' simulated power-play on-ice goals-for stop running ~0.82x of real, and their projected assists/points rise accordingly, without making any prop line's Brier worse.
+- Files: syndicate/features/nhl/sim_engine/hockeysim/ingestion/lineups.py, syndicate/features/nhl/sim_engine/hockeysim/ingestion/collect.py, syndicate/features/nhl/sim_engine/hockeysim/contracts.py, syndicate/features/nhl/sim_engine/hockeysim/state.py, syndicate/features/nhl/sim_engine/hockeysim/features/loaders.py, syndicate/features/nhl/sim_engine/hockeysim/calibration_profile.py, tests/test_hockeysim_ingestion.py, tests/test_hockeysim_props.py
+- **LOAN 2026-10-05 to lane `nhl-pp-time` (session dd07cae9), USER-APPROVED ("Approve all three"):** `features/loaders.py`, the team special-teams loader ONLY (an as-of PP-minutes input for team PP TIME). This lane keeps the PP1/PP2 share work and every other part of the file.
+- Hypothesis: Directional (15 slates, elite n=77): elite PP on-ice GF sim 0.599 vs real 0.727 per game, while all-team PP goals run HIGH in the sim (0.646 vs 0.561) and PP1 gets ~82.5% of PP segments (engine deterministic usage 0.65 + alternation). First step is a decomposition at scale, before any change: elite PP GF = team PP goals x elite's PP time share x PP-unit scoring concentration; real side from the cached shift charts + pbp + NHL stats timeonice for every 2025-26 game.
+- Falsification test: If the decomposition at scale shows no elite PP on-ice deficit (>= 0.95x), the 77-row reading was noise and the lane closes with no change.
+- Verification: Decomposition at scale names the component; a fix to it raises elite PP on-ice GF toward real in a paired full-season backtest with no prop line's Brier worse; then fleet verification.
