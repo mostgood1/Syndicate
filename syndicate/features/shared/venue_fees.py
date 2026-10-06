@@ -468,6 +468,27 @@ POLYMARKET_ASSUMED_WORST_CASE_RATE = 0.02
 # Decimal places Kalshi rounds a fee to. FOUR -- a hundredth of a cent -- not
 # two. Measured 18/18 against real fills; see the module docstring for the
 # discriminating comparison against round-to-4dp (9/18).
+# PROPHETX AND NOVIG `[2026-10-06, lane published-negative-ev, user "add fee schedules for prophetx
+# and novig"]`. Until today both were charged 0.0 ("no fee model exists"), so every paper fill at them
+# -- 243 + 90 of 623 settled portfolio orders on 10-02..05 -- booked a fee-free P&L.
+#
+# PUBLISHED TERMS, NOT YET MEASURED FROM A FILL (contrast Polymarket above). Read 2026-10-06 from
+# independent reviews that agree (lines.com, predictionscout.com, gambling.com for ProphetX; the
+# dimers.com Novig fees page dated 2026-10-05, consistent with oddsassist.com / bettingusa.com):
+#
+# - ProphetX: 2% of NET WINNINGS per market on straight trades, charged only on a WIN (0% on losses,
+#   unmatched cancels and parlays; a VIP tier is 1.5% -- the 2% standard rate is used). So the fee is
+#   not known at fill: the pre-trade cost is its EXPECTATION at the price, p x 0.02 x (1 - p) per $1
+#   contract, and paper settlement charges the realised 2% of a win (`prophetx_settlement_fee_dollars`).
+# - Novig: takers pay coefficient x p x (1 - p) per contract; makers pay 0. Coefficient 0 for PREGAME
+#   straights, 0.03 live, 0.06 futures, 0.10 parlays. Only straights are traded here, so pregame is
+#   free and live pays 0.03 x p x (1 - p). A caller that cannot say pregame vs live is charged the live
+#   rate and FLAGGED as an upper bound (understating a fee invents edge -- this module's rule).
+PROPHETX_WIN_COMMISSION = 0.02
+PROPHETX_SETTLEMENT_BASIS = "prophetx_win_commission_at_settlement"
+NOVIG_TAKER_COEFFICIENT_PREGAME = 0.0
+NOVIG_TAKER_COEFFICIENT_LIVE = 0.03
+
 FEE_DECIMAL_PLACES = 4
 
 
@@ -713,6 +734,12 @@ def kalshi_series_for_market(sport: Any, market: Any, segment: Any = None) -> st
     return _KALSHI_SERIES_BY_MARKET.get((str(sport or "").strip().lower(), base, seg))
 
 
+def prophetx_settlement_fee_dollars(gross_win_dollars: float) -> float:
+    """ProphetX's commission on a WON straight trade: 2% of the net winnings, rounded up."""
+    win = max(0.0, float(gross_win_dollars or 0.0))
+    return ceil_to_fee_precision(PROPHETX_WIN_COMMISSION * win) if win > 0 else 0.0
+
+
 def taker_fee_per_contract(
     bookmaker: Any,
     price_prob: float,
@@ -721,6 +748,7 @@ def taker_fee_per_contract(
     sport: Any = None,
     market: Any = None,
     segment: Any = None,
+    in_play: bool | None = None,
 ) -> tuple[float, str, bool]:
     """(fee per $1 contract, basis, is_upper_bound) for taking at `price_prob`.
 
@@ -750,4 +778,12 @@ def taker_fee_per_contract(
         return KALSHI_BASE_TAKER_RATE * multiplier * p * (1.0 - p), basis, False
     if book == "polymarket":
         return POLYMARKET_MEASURED_NOTIONAL_RATE, "polymarket_measured_notional", False
+    if book == "prophetx":
+        # Charged only on a win: the expected cost per contract at the price's own probability.
+        return PROPHETX_WIN_COMMISSION * p * (1.0 - p), "prophetx_expected_win_commission", False
+    if book == "novig":
+        if in_play is False:
+            return NOVIG_TAKER_COEFFICIENT_PREGAME * p * (1.0 - p), "novig_pregame_straight", False
+        basis = "novig_live" if in_play else "novig_assumed_live_rate"
+        return NOVIG_TAKER_COEFFICIENT_LIVE * p * (1.0 - p), basis, in_play is None
     return 0.0, "none", False

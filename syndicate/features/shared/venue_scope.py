@@ -44,6 +44,7 @@ an answer to this.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from datetime import datetime, timezone
 from typing import Any
 
 __all__ = ["scope_rows_to_venue", "venue_scope_report_line"]
@@ -203,9 +204,16 @@ def scope_rows_to_venue(
         from syndicate.features.shared.venue_fees import taker_fee_per_contract
 
         venue_prob = 1.0 / (venue_profit + 1.0)
+        # Pregame vs live from the row's own state and kickoff (`measured_bucket_skill._phase`): Novig's
+        # fee depends on it; "unknown" is passed as None and charged as an upper bound.
+        from syndicate.features.shared.measured_bucket_skill import _phase
+
+        phase = _phase(row.get("game_state"), sighted_at=datetime.now(timezone.utc),
+                       commence_time=row.get("commence_time"))
         fee, fee_basis, fee_bound = taker_fee_per_contract(
             venue, venue_prob, venue_ref=venue_ticker, sport=row.get("sport"),
-            market=row.get("market"), segment=row.get("segment"))
+            market=row.get("market"), segment=row.get("segment"),
+            in_play=None if phase == "unknown" else phase == "live")
         ev_net_pct = (fair / (venue_prob + fee) - 1.0) * 100.0
 
         scoped_quote = dict(quote)

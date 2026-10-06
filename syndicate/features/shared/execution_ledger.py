@@ -2086,6 +2086,17 @@ def _fee_venue(venue: Any, book: Any) -> str:
     return venue_text
 
 
+def _fill_is_in_play(commence_time: Any) -> bool | None:
+    """Whether a fill happening NOW is in-play: None when the kickoff is unknown or unparseable."""
+    try:
+        start = datetime.fromisoformat(str(commence_time).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) >= start
+
+
 def paper_fill_fee_fields(request: Any) -> dict[str, Any]:
     """`{fees_dollars, fee_basis, fee_is_upper_bound}` for a paper fill.
 
@@ -2114,14 +2125,20 @@ def paper_fill_fee_fields(request: Any) -> dict[str, Any]:
         stake_value = None
     if prob is None or stake_value is None or not (stake_value > 0) or not (0.0 < prob < 1.0):
         return {"fees_dollars": None, "fee_basis": FEE_BASIS_UNPRICEABLE, "fee_is_upper_bound": None}
+    fee_venue = _fee_venue(_get("venue"), _get("book"))
+    if fee_venue == "prophetx":
+        # ProphetX charges 2% of net winnings ON A WIN, at settlement -- nothing is taken at the fill.
+        # `paper_settlement.grade_order` charges it from this basis (venue_fees, 2026-10-06).
+        return {"fees_dollars": 0.0, "fee_basis": venue_fees.PROPHETX_SETTLEMENT_BASIS, "fee_is_upper_bound": False}
     try:
         per_contract, basis, bound = venue_fees.taker_fee_per_contract(
-            _fee_venue(_get("venue"), _get("book")),
+            fee_venue,
             prob,
             venue_ref=_get("venue_ticker"),
             sport=_get("sport"),
             market=_get("market"),
             segment=_get("segment"),
+            in_play=_fill_is_in_play(_get("commence_time")),
         )
     except Exception as exc:  # noqa: BLE001 -- see docstring
         return {

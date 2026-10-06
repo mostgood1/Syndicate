@@ -103,7 +103,9 @@ def test_a_sportsbook_paper_fill_records_zero_not_none():
 # --- FEES: one schedule, venue_fees' own ------------------------------------
 
 
-@pytest.mark.parametrize("book", ["kalshi", "polymarket", "prophetx", "novig",
+# ProphetX is not here: its fee (2% of net winnings) is charged at SETTLEMENT on a win, so a fill
+# records 0.0 under `PROPHETX_SETTLEMENT_BASIS` -- see tests/test_venue_fees_prophetx_novig.py.
+@pytest.mark.parametrize("book", ["kalshi", "polymarket", "novig",
                                   "fanduel", "draftkings", "betmgm", "bovada", "betrivers"])
 def test_the_paper_fee_is_exactly_venue_fees_and_no_second_table(book):
     price, stake = -110.0, 10.0

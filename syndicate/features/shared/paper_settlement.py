@@ -250,6 +250,12 @@ def grade_order(order: Mapping[str, Any], status: Mapping[str, Any]) -> dict[str
         # oddly for a finished game -- folding it into the losses would
         # understate every figure this module produces.
         outcome, gross = OUTCOME_PUSH, 0.0
+    # ProphetX takes 2% of NET WINNINGS on a win and nothing otherwise, so its fee is charged here,
+    # from the outcome, not at the fill (`venue_fees.PROPHETX_SETTLEMENT_BASIS`, 2026-10-06).
+    if str(order.get("fee_basis") or "") == "prophetx_win_commission_at_settlement":
+        from syndicate.features.shared.venue_fees import prophetx_settlement_fee_dollars
+
+        fees = prophetx_settlement_fee_dollars(gross) if outcome == OUTCOME_WON else 0.0
     pnl = gross - fees
 
     return {
