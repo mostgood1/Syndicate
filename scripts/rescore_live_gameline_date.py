@@ -63,6 +63,8 @@ import datetime as _dt
 import hashlib
 import json
 import os
+import re
+import unicodedata
 import subprocess
 import sys
 import urllib.request
@@ -82,7 +84,7 @@ from syndicate.features.shared.live_gameline_score import (  # noqa: E402
 )
 
 HISTORY = REPO / "reports" / "live_gameline_accuracy" / "history.jsonl"
-LEDGER_PATH = "mlb_source/data/live_gameline_ledger/live_gameline_ledger_{date}.jsonl"
+LEDGER_PATH = "{sport}_source/data/live_gameline_ledger/live_gameline_ledger_{date}.jsonl"
 try:
     from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
@@ -90,6 +92,14 @@ except ImportError:  # run as `python scripts/<name>.py`
 
 DEFAULT_BASE = default_base_url()
 STATSAPI = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={date}"
+# NCAAF has no StatsAPI equivalent and its ledger rows carry `game_pk: None`, so its
+# finals are keyed by `event_id` instead -- which needs NO scorer change, because
+# `score_ledger_records` tries a record's `game_pk` and THEN its `event_id`
+# (`live_gameline_score.py:793`). `groups=80` is FBS; one page with `limit` far above
+# a day's slate is the whole population.
+ESPN_CFB = ("https://site.api.espn.com/apis/site/v2/sports/football/college-football/"
+            "scoreboard?dates={compact}&groups=80&limit=400")
+WIRED_SPORTS = ("mlb", "ncaaf")
 
 
 def _admin_token(base_url: str | None = None) -> str | None:
@@ -98,11 +108,11 @@ def _admin_token(base_url: str | None = None) -> str | None:
     return token or None
 
 
-def _fetch_ledger(date: str, base: str, dest: Path) -> bytes:
+def _fetch_ledger(date: str, sport: str, base: str, dest: Path) -> bytes:
     token = _admin_token(base)
     if not token:
         raise RuntimeError("no ADMIN_TOKEN in env or .env")
-    url = f"{base}/api/ops/artifacts/stream?path=" + LEDGER_PATH.format(date=date)
+    url = f"{base}/api/ops/artifacts/stream?path=" + LEDGER_PATH.format(sport=sport, date=date)
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
     with urllib.request.urlopen(req, timeout=300) as resp:
         raw = resp.read()
@@ -135,6 +145,111 @@ def _final_scores(date: str) -> dict[str, tuple[float, float]]:
     return scores
 
 
+def _norm_team(name):
+    """Fold diacritics, DROP apostrophes, then strip remaining punctuation to spaces.
+
+    Nothing fuzzier ON PURPOSE: an alias table or edit-distance match would hide a real
+    miss, and a miss has to be NAMED. The two steps here are pure canonicalisation --
+    the SAME name written two ways -- which is a different thing from guessing that two
+    different names mean one team. Measured 2026-10-06 against ESPN:
+
+        San José State  -> san jose state   (NFKD fold)
+        Hawai'i         -> hawaii           (apostrophe DROPPED, not spaced: spacing it
+                                             gives 'hawai i', which matches nothing)
+
+    Deliberately NOT handled, and reported as unmatched instead: `McNeese State` vs
+    `McNeese`, `UMass` vs `Massachusetts`. Those are different strings for one team and
+    resolving them needs a decision, not a regex.
+    """
+    folded = unicodedata.normalize("NFKD", name or "")
+    folded = "".join(ch for ch in folded if not unicodedata.combining(ch))
+    folded = folded.replace("'", "").replace("\u2019", "")
+    s = re.sub(r"[^a-z0-9 ]", " ", folded.lower())
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _final_scores_ncaaf(date, records):
+    """`event_id` -> `(away, home)` for NCAAF games FINAL on ESPN's FBS scoreboard,
+    plus a join report.
+
+    THE JOIN IS BY TEAM NAME BECAUSE THERE IS NO SHARED ID. The ledger's `event_id`
+    is an odds-feed hash and its `game_pk` is None for this sport, so the only field
+    both sides carry is the team display name. Both orientations are tried -- a feed
+    listing the sides the other way round would otherwise read as a miss -- and EVERY
+    unmatched game is returned for the caller to print. A silent drop would shrink the
+    scored population, which is the one thing this tool exists to pin down.
+    """
+    compact = date.replace("-", "")
+    with urllib.request.urlopen(ESPN_CFB.format(compact=compact), timeout=60) as resp:
+        board = json.load(resp)
+    by_pair = {}
+    finals_seen = 0
+    for event in board.get("events") or []:
+        comp = (event.get("competitions") or [{}])[0]
+        if (((comp.get("status") or {}).get("type") or {}).get("state")) != "post":
+            continue
+        sides = comp.get("competitors") or []
+        home = next((c for c in sides if c.get("homeAway") == "home"), None)
+        away = next((c for c in sides if c.get("homeAway") == "away"), None)
+        if not home or not away:
+            continue
+        try:
+            hs, as_ = float(home.get("score")), float(away.get("score"))
+        except (TypeError, ValueError):
+            continue
+        finals_seen += 1
+        hk = _norm_team((home.get("team") or {}).get("displayName"))
+        ak = _norm_team((away.get("team") or {}).get("displayName"))
+        by_pair[(hk, ak)] = (as_, hs)
+
+    games = {}
+    scoreable = set()
+    for rec in records:
+        ev = str(rec.get("event_id") or "").strip()
+        if not ev:
+            continue
+        if ev not in games and rec.get("home_team") and rec.get("away_team"):
+            games[ev] = (rec["home_team"], rec["away_team"])
+        # Only a game with a scoreable FULL-GAME h2h row can move the h2h measurement,
+        # so only such a game going unmatched shrinks the scored population. Measured
+        # 2026-10-03: 3 of 54 games went unmatched and NONE was scoreable, which is why
+        # the --expect-* gate still reproduced the retained figures exactly.
+        if (rec.get("market") == "h2h" and rec.get("segment") == "full"
+                and rec.get("model_home_win_prob") is not None
+                and rec.get("market_fair_prob") is not None):
+            scoreable.add(ev)
+
+    scores = {}
+    flipped = []
+    unmatched = []
+    unmatched_scoreable = []
+    for ev, (ht, at) in games.items():
+        h, a = _norm_team(ht), _norm_team(at)
+        if (h, a) in by_pair:
+            scores[ev] = by_pair[(h, a)]
+        elif (a, h) in by_pair:
+            feed_away, feed_home = by_pair[(a, h)]
+            # the feed had OUR home side as its away side, so swap back into
+            # (away, home) as THIS ledger row orients it
+            scores[ev] = (feed_home, feed_away)
+            flipped.append(at + " @ " + ht)
+        else:
+            tag = " [SCOREABLE -- shrinks the measurement]" if ev in scoreable else " [no scoreable h2h row]"
+            unmatched.append(at + " @ " + ht + tag)
+            if ev in scoreable:
+                unmatched_scoreable.append(at + " @ " + ht)
+    used = set()
+    for ev in scores:
+        ht, at = games[ev]
+        h, a = _norm_team(ht), _norm_team(at)
+        used.add((h, a) if (h, a) in by_pair else (a, h))
+    espn_unused = [f"{a} @ {h}" for (h, a) in by_pair if (h, a) not in used]
+    return scores, {"espn_finals": finals_seen, "ledger_games": len(games),
+                    "matched": len(scores), "orientation_flipped": flipped,
+                    "unmatched": unmatched, "unmatched_scoreable": unmatched_scoreable,
+                    "scoreable_games": len(scoreable), "espn_unused": espn_unused}
+
+
 def _event_to_game_from_ledger(records: list[dict]) -> dict[str, str]:
     """odds `event_id` -> gamePk, from the ledger's own FULL-GAME rows.
 
@@ -152,7 +267,7 @@ def _event_to_game_from_ledger(records: list[dict]) -> dict[str, str]:
     return out
 
 
-def _retained_expectation(history: Path, date: str) -> dict | None:
+def _retained_expectation(history: Path, date: str, sport: str = "mlb") -> dict | None:
     """The BOARD's retained `all_records` for `date` -- the fullest ordinary
     capture (never a re-score, which would make the gate check itself)."""
     best = None
@@ -163,7 +278,7 @@ def _retained_expectation(history: Path, date: str) -> dict | None:
         if not line:
             continue
         row = json.loads(line)
-        if row.get("date") != date or row.get("sport", "mlb") != "mlb" or row.get("rescored_from_ledger"):
+        if row.get("date") != date or row.get("sport", "mlb") != sport or row.get("rescored_from_ledger"):
             continue
         allr = row.get("all_records") or {}
         model, market = allr.get("model") or {}, allr.get("market") or {}
@@ -194,11 +309,15 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--date", required=True, help="slate date, zero-padded YYYY-MM-DD")
-    ap.add_argument("--sport", default="mlb", help="only mlb is wired (StatsAPI finals)")
+    ap.add_argument("--sport", default="mlb",
+                    help="mlb (StatsAPI finals, keyed by game_pk) or ncaaf (ESPN FBS "
+                         "scoreboard, keyed by event_id via a team-name join)")
     ap.add_argument("--ledger", help="local ledger .jsonl; fetched from production if absent")
     ap.add_argument("--base-url", default=DEFAULT_BASE)
     ap.add_argument("--exclude-game-pk", action="append", default=[],
-                    help="game_pk the board did NOT have a final for; repeatable")
+                    help="a finals KEY the board did NOT have a final for; repeatable. "
+                         "For mlb that is a game_pk, for ncaaf an event_id -- whatever "
+                         "this sport's finals index is keyed by.")
     ap.add_argument("--expect-model", type=float, help="retained all_records model brier")
     ap.add_argument("--expect-market", type=float, help="retained all_records market brier")
     ap.add_argument("--expect-n", help="retained all_records n, as MODEL/MARKET")
@@ -207,7 +326,7 @@ def main(argv: list[str] | None = None) -> int:
                          "PRE-FIX scorer and so cannot be reproduced by design. Proves the "
                          "same ledger reached the scorer; it does NOT prove the same finals "
                          "population, so it requires --finals-population statsapi.")
-    ap.add_argument("--finals-population", choices=("board", "statsapi"), default="board",
+    ap.add_argument("--finals-population", choices=("board", "statsapi", "espn"), default="board",
                     help="Which population this row is scored on. 'board' means the retained "
                          "figures were reproduced exactly, so the row is comparable with a "
                          "board capture. 'statsapi' means they could not be and the row is "
@@ -227,9 +346,16 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     date = args.date
+    sport = (args.sport or "").strip().lower()
+    if sport not in WIRED_SPORTS:
+        # An unwired sport would otherwise fetch a ledger that does not exist and
+        # report an empty one, which reads as 'no data' rather than 'not supported'.
+        print(f"sport {sport!r} is not wired for re-scoring; wired: "
+              f"{', '.join(WIRED_SPORTS)}", file=sys.stderr)
+        return 2
     history = Path(args.history)
     if args.expect_from_history:
-        exp = _retained_expectation(history, date)
+        exp = _retained_expectation(history, date, sport)
         if exp is None:
             print(f"NO RETAINED BOARD CAPTURE of {date} with all_records in {history}",
                   file=sys.stderr)
@@ -241,12 +367,15 @@ def main(argv: list[str] | None = None) -> int:
     scratch.mkdir(parents=True, exist_ok=True)
 
     # --- records -------------------------------------------------------
-    path = Path(args.ledger) if args.ledger else scratch / f"ledger_{date}.jsonl"
+    # SPORT-SCOPED, and not cosmetically: with a bare `ledger_{date}.jsonl` an
+    # earlier --sport ncaaf run left its 44 MB ledger where a later --sport mlb run
+    # read it, scoring 0 games off the wrong sport entirely (measured 2026-10-06).
+    path = Path(args.ledger) if args.ledger else scratch / f"ledger_{sport}_{date}.jsonl"
     try:
         if args.ledger or path.exists():
             raw = path.read_bytes()
         else:
-            raw = _fetch_ledger(date, args.base_url, path)
+            raw = _fetch_ledger(date, sport, args.base_url, path)
     except Exception as exc:  # noqa: BLE001
         print(f"FAILED to obtain ledger for {date}: {exc}", file=sys.stderr)
         return 2
@@ -256,7 +385,28 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     # --- finals, restricted to the board's population ------------------
-    scores = _final_scores(date)
+    join = None
+    if sport == "ncaaf":
+        scores, join = _final_scores_ncaaf(date, records)
+        print(f"  ncaaf finals join: espn_finals={join['espn_finals']}"
+              f" ledger_games={join['ledger_games']} matched={join['matched']}")
+        for game in join["orientation_flipped"]:
+            print(f"    ORIENTATION FLIPPED (feed listed the sides the other way): {game}")
+        for game in join["unmatched"]:
+            print(f"    UNMATCHED -- this game is NOT scored: {game}")
+        if join["unmatched_scoreable"]:
+            print(f"  WARNING: {len(join['unmatched_scoreable'])} unmatched game(s) DO carry a"
+                  " scoreable h2h row, so the scored population is SMALLER than the"
+                  " ledger's. Do not read the result as a reproduction unless the"
+                  " --expect-* gate passes anyway.")
+        elif join["unmatched"]:
+            print(f"  {len(join['unmatched'])} unmatched game(s), NONE of them scoreable, so the"
+                  f" h2h measurement is unaffected ({join['scoreable_games']} scoreable games"
+                  " in the ledger).")
+        for game in join.get("espn_unused") or []:
+            print(f"    ESPN final no ledger game matched: {game}")
+    else:
+        scores = _final_scores(date)
     excluded = [str(g) for g in args.exclude_game_pk]
     kept = {k: v for k, v in scores.items() if k not in excluded}
     missing = [g for g in excluded if g not in scores]
@@ -291,7 +441,11 @@ def main(argv: list[str] | None = None) -> int:
             score = score_ledger_records(records, finals_from_scores(kept), final_scores=kept)
 
     print(f"=== {date} re-scored by the CURRENT scorer ===")
-    print(f"  ledger bytes={len(raw)} records={len(records)} statsapi_finals={len(scores)}"
+    # The dict means different things per sport: for mlb it is every StatsAPI final
+    # for the date, for ncaaf only the ones that JOINED, so label it accordingly
+    # rather than printing one number under two meanings.
+    finals_label = "espn_finals_matched" if sport == "ncaaf" else "statsapi_finals"
+    print(f"  ledger bytes={len(raw)} records={len(records)} {finals_label}={len(scores)}"
           f" excluded={excluded or 'none'} scored_games={score['games_with_outcome']}")
     if missing:
         print(f"  WARNING: --exclude-game-pk {missing} not among StatsAPI finals (no effect)")
@@ -369,8 +523,18 @@ def main(argv: list[str] | None = None) -> int:
             "model_n": (got["model"]["n"], int(want_model_n)),
             "market_n": (got["market"]["n"], int(want_market_n)),
         }
-        failed = {k: v for k, v in checks.items()
-                  if (abs(v[0] - v[1]) > 1e-5 if isinstance(v[1], float) else v[0] != v[1])}
+        def _differs(got, want):
+            # A None `got` means the re-score produced NO measurement for that field.
+            # That is a FAILURE to report, not a crash: `abs(None - 0.1)` used to raise
+            # TypeError here and hide the one line the operator needed (measured
+            # 2026-10-06, a run that scored 0 games against an expectation of 4).
+            if got is None:
+                return True
+            if isinstance(want, float):
+                return abs(got - want) > 1e-5
+            return got != want
+
+        failed = {k: v for k, v in checks.items() if _differs(v[0], v[1])}
         print("\n  VERIFICATION against the retained summary (all_records):")
         for key, (got_v, want_v) in checks.items():
             print(f"    {key:13s} got={got_v} retained={want_v}"
@@ -441,7 +605,7 @@ def main(argv: list[str] | None = None) -> int:
             "finals_population": args.finals_population,
             "anchor": ("records_considered" if args.expect_records_considered is not None
                        else "retained_all_records_exact"),
-            "ledger_path": LEDGER_PATH.format(date=date),
+            "ledger_path": LEDGER_PATH.format(sport=sport, date=date),
             "ledger_bytes": len(raw),
             "ledger_sha256_16": hashlib.sha256(raw).hexdigest()[:16],
             "finals_source": "statsapi.mlb.com/api/v1/schedule",
