@@ -67,6 +67,12 @@ class SimConfig:
     # carries 1.0% of all PP time). Off switch: env SYNDICATE_NHL_PP_TIME_MODEL=minors_2min.
     pp_time_model: str = "minors_2min"
     pp_seconds_per_minor: float = 120.0
+    # EVEN-STRENGTH rate scales `[lane nhl-pp-time, 2026-10-06]` (default 1.0 = byte-identical). With PP time
+    # corrected, the minutes leave a 0.24x-shots PK state for EV, and team SOG/goals rise ~6% -- the inflated
+    # PK time had been offsetting the base rate. These rescale EV segments only (shot lambda / per-shot goal
+    # probability) so a PP-time fix can redistribute minutes without moving the team level.
+    ev_shot_scale: float = 1.0
+    ev_goal_scale: float = 1.0
 
     # SECOND correction layer, multiplied on top of the four fields above (`pp_shots_mult` etc)
     # AND, for the goal-rate pair, on top of the per-team `pp_pct`/`pk_pct` adjustment
@@ -1776,6 +1782,11 @@ class PeriodSimulator:
                     lam_a = max(1e-6, float(lam_a) * float(self.np_rng.lognormal(mean=0.0, sigma=sigma)))
                 except Exception:
                     pass
+            if not seg_is_home_pp and not seg_is_away_pp:
+                _evs = float(getattr(self.cfg, "ev_shot_scale", 1.0))
+                if _evs != 1.0:
+                    lam_h = float(lam_h) * _evs
+                    lam_a = float(lam_a) * _evs
             sh_h = int(self.np_rng.poisson(lam_h))
             sh_a = int(self.np_rng.poisson(lam_a))
             # Goals proportional to shots vs base conversion
@@ -1798,6 +1809,11 @@ class PeriodSimulator:
             elif seg_is_away_pp:
                 p_goal_away *= float(self.cfg.pp_goals_mult)
                 p_goal_home *= float(self.cfg.pk_goals_mult)
+            if not seg_is_home_pp and not seg_is_away_pp:
+                _evg = float(getattr(self.cfg, "ev_goal_scale", 1.0))
+                if _evg != 1.0:
+                    p_goal_home = min(0.45, p_goal_home * _evg)
+                    p_goal_away = min(0.45, p_goal_away * _evg)
             # Apply empty-net multiplier to the leading team's conversion, if any
             if period_idx == 2 and p_empty_mult != 1.0:
                 if diff < 0:  # away leading

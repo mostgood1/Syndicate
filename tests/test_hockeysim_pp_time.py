@@ -102,3 +102,43 @@ class PPTimeModelTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EVScaleTest(unittest.TestCase):
+    """`ev_shot_scale` / `ev_goal_scale` move EVEN-STRENGTH segments only; 1.0 is the shipped path."""
+
+    def setUp(self) -> None:
+        patcher = mock.patch.dict(os.environ, {"SYNDICATE_NHL_PP_TIME_MODEL": ""})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _shots(self, profile: SimConfig, seeds: range):
+        rh, ra = _roster("HOME", 1000), _roster("AWAY", 2000)
+        by = {"EV": 0, "PP": 0, "PK": 0}
+        goals = 0
+        for s in seeds:
+            _gs, ev = run_hockeysim_game("HOME", "AWAY", rh, ra, _rates(), st_home=dict(ST), st_away=dict(ST),
+                                         lineup_home=_lineup(1000), lineup_away=_lineup(2000), profile=profile, seed=s)
+            for e in ev:
+                if e.kind == "shot":
+                    by[str((e.meta or {}).get("strength", "EV"))] += 1
+                elif e.kind == "goal":
+                    goals += 1
+        return by, goals
+
+    def test_defaults_are_neutral(self) -> None:
+        self.assertEqual(SimConfig().ev_shot_scale, 1.0)
+        self.assertEqual(SimConfig().ev_goal_scale, 1.0)
+
+    def test_ev_shot_scale_moves_only_ev_shots(self) -> None:
+        seeds = range(30)
+        base, _ = self._shots(NHL_CALIBRATION_PROFILE, seeds)
+        up, _ = self._shots(replace(NHL_CALIBRATION_PROFILE, ev_shot_scale=1.3), seeds)
+        self.assertGreater(up["EV"], base["EV"] * 1.15)  # off != on, EV
+        self.assertAlmostEqual(up["PP"] / max(1, base["PP"]), 1.0, delta=0.15)
+
+    def test_ev_goal_scale_is_reachable(self) -> None:
+        seeds = range(30)
+        _, g0 = self._shots(NHL_CALIBRATION_PROFILE, seeds)
+        _, g1 = self._shots(replace(NHL_CALIBRATION_PROFILE, ev_goal_scale=1.5), seeds)
+        self.assertGreater(g1, g0)
