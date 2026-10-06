@@ -1377,6 +1377,12 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### mlb-asof-roster-rebuild — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **v3 DIAGNOSIS 2026-10-06 ~02:20Z (roster inputs only; gate dates 06-21..06-27 still UNSPENT):** the stored June rosters were built by PRE-07-20 builder code.
+  - Stored starters carry NO statcast features (`statcast_quality_mult` absent 139/139, `bb_inplay_n` 0): the features file was first generated in 880a812e (2026-07-20).
+  - The same commit fixed `_derive_stamina_pitches_from_season_stats` folding RELIEF pitches into pitches-per-start (start-purity gate >= 0.5). Stored-vs-rebuilt stamina diff: mean -2.47, tail -29/-25/-20 (relief-inflated starters).
+  - So matching the stored set means REPRODUCING a fixed bug. And every replay-harness fit (26 dates 06-15..07-12) is on pre-fix inputs that production has not used since 07-20.
+  - No post-fix regular-season stored rosters exist on the fleet: roster_objs cover 06-15..07-12, then 09-30+ (postseason). 07-13..09-29 lived on Render (suspended).
+  - Not resolved by this lane alone: the redesign (rebuild fit AND validation with today's builder) changes the pre-registered fit data. Taken to the user.
 - **FIDELITY GATE v3, PRE-REGISTERED 2026-10-06 ~02:00Z (user: "yes, do 1 and ship if it passes"), before any v3 build or replay:**
   - Diagnosis of the stamina/workload gap uses ROSTER INPUTS only (stored vs rebuilt profile fields on 06-15..06-20, already-spent dates). No replay outcome is read while choosing the builder change.
   - GATE DATES: 2026-06-21..06-27 (stored roster_objs exist; never used by any fidelity run). Same moments, same tolerances, same clause: within max(2 game-clustered paired SE, tolerance); 200 sims, same seeds, `--game-pks-from` the rebuilt set.
@@ -1448,6 +1454,12 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **v3 DIAGNOSIS 2026-10-06 ~02:20Z (roster inputs only; gate dates 06-21..06-27 still UNSPENT):** the stored June rosters were built by PRE-07-20 builder code.
+  - Stored starters carry NO statcast features (`statcast_quality_mult` absent 139/139, `bb_inplay_n` 0): the features file was first generated in 880a812e (2026-07-20).
+  - The same commit fixed `_derive_stamina_pitches_from_season_stats` folding RELIEF pitches into pitches-per-start (start-purity gate >= 0.5). Stored-vs-rebuilt stamina diff: mean -2.47, tail -29/-25/-20 (relief-inflated starters).
+  - So matching the stored set means REPRODUCING a fixed bug. And every replay-harness fit (26 dates 06-15..07-12) is on pre-fix inputs that production has not used since 07-20.
+  - No post-fix regular-season stored rosters exist on the fleet: roster_objs cover 06-15..07-12, then 09-30+ (postseason). 07-13..09-29 lived on Render (suspended).
+  - Not resolved by this lane alone: the redesign (rebuild fit AND validation with today's builder) changes the pre-registered fit data. Taken to the user.
 - **FIDELITY GATE v3, PRE-REGISTERED 2026-10-06 ~02:00Z (user: "yes, do 1 and ship if it passes"), before any v3 build or replay:**
   - Diagnosis of the stamina/workload gap uses ROSTER INPUTS only (stored vs rebuilt profile fields on 06-15..06-20, already-spent dates). No replay outcome is read while choosing the builder change.
   - GATE DATES: 2026-06-21..06-27 (stored roster_objs exist; never used by any fidelity run). Same moments, same tolerances, same clause: within max(2 game-clustered paired SE, tolerance); 200 sims, same seeds, `--game-pks-from` the rebuilt set.
