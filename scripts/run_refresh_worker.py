@@ -6001,6 +6001,31 @@ def _nfl_prop_odds_newer_than_artifact(season: int, week: int, artifact_path: Pa
     return lead if lead > 0 else None
 
 
+def _nfl_prop_odds_newer_than_launch(
+    season: int, week: int, since_launch_seconds: float | None
+) -> float | None:
+    """Seconds by which the week's prop-odds capture was written AFTER the last
+    launch of its build, or None (no launch on record, no capture, or older).
+
+    The missing-artifact twin of `_nfl_prop_odds_newer_than_artifact`: when a
+    launch was refused there is no artifact to compare against, so the launch
+    time stands in for it. Same resolver, one `stat()`, nothing parsed.
+    """
+    if since_launch_seconds is None:
+        return None
+    try:
+        from syndicate.features.nfl.sources import nfl_props_path
+
+        odds_path = nfl_props_path(season, week)
+        if not odds_path.is_file():
+            return None
+        odds_age = time.time() - odds_path.stat().st_mtime
+    except Exception:  # noqa: BLE001 -- never fatal to the tick loop
+        return None
+    lead = float(since_launch_seconds) - odds_age
+    return lead if lead > 0 else None
+
+
 def _nfl_prop_artifact_is_empty(artifact_path: Path) -> bool:
     """True only when the artifact is present and carries ZERO rows.
 
@@ -6192,6 +6217,35 @@ def _launch_autorun_nfl_prop_projections(
                 decision_reason = (
                     f"odds_newer odds_lead_seconds={int(odds_lead)} overriding[{decision_reason}]"
                 )
+
+    # A MISSING ARTIFACT IS REBUILT WHEN ITS ODDS ARRIVE, NOT A DAY LATER
+    # `[2026-10-06, lane nfl-prop-missing-odds-relaunch]`.
+    #
+    # The override above rewrites only `artifact_fresh`, and it compares odds to
+    # the ARTIFACT -- which a refused build never wrote. Measured on the fleet
+    # 2026-10-06: wk5's first build at 03:39:01Z REFUSED `zero_sim_rows
+    # odds_rows=0` (the week's capture did not exist yet); the capture held 777
+    # rows by 05:12:59Z; and `artifact_missing_after_launch interval_seconds=86400`
+    # held every tick until a manual publish at 15:09Z created the file -- ~10 h
+    # of a board with no wk5 projections, and 24 h without that publish.
+    #
+    # So compare the odds to the LAST LAUNCH instead: a capture written after the
+    # refused launch is exactly the input that launch lacked. Same cooldown as
+    # the two overrides above (`#389`). While the cooldown holds, the reason is
+    # left as `artifact_missing_after_launch` so its rate-limited log line keeps
+    # firing -- a held relaunch must not go quiet.
+    if not should_launch and decision_reason.startswith("artifact_missing_after_launch"):
+        since_launch = _seconds_since_season_projection_launch(
+            "nfl_props", season=season, week=week,
+        )
+        odds_lead = _nfl_prop_odds_newer_than_launch(season, week, since_launch)
+        cooldown = float(_season_projection_relaunch_cooldown_seconds())
+        if odds_lead is not None and since_launch is not None and since_launch >= cooldown:
+            should_launch = True
+            decision_reason = (
+                f"odds_newer_than_launch odds_lead_seconds={int(odds_lead)} "
+                f"overriding[{decision_reason}]"
+            )
 
     if not should_launch:
         _log_season_projection_skip("nfl_props", decision_reason)
