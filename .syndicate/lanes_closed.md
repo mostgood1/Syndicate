@@ -10439,3 +10439,9 @@ Slugs: accuracy-assessment-0914, bandwidth-controlled-transfer, ci-red-on-main, 
 - Falsification test: n/a
 - Verification: targeted unit tests (test_base_url, new resolver tests, test_render_logs_local); live: fetch_prod_artifacts_paced with a clean env (ADMIN_TOKEN, SYNDICATE_* unset) reads one artifact from the fleet (HTTP 200), and render_logs prints source local without touching the Render API
 - Blocked by: none
+
+### closed-lane-archive-20261006-0823 — CLOSED 2026-10-06 (GOAL MET: 32 blocks archived) — opened 2026-10-06 — session d6c259c7-956f-4709-be0a-eb26e9cf3cb0
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 32 of 32 CLOSED blocks SAFE (owners idle 586-13755m, blocks last modified 726-2592m ago); none named in an uncommitted worktree diff. Moved all 32 to lanes_closed.md with one pointer each; lanes.md 573,199 -> 469,455 B before this block. Table and Part B report in log/2026-10-06.md.
+- Moved: nhl-compact-card-start-time, nhl-lines-backtest, soccer-lines-props-backtest, mlb-pregame-sim-freeze, soccer-1x2-ratings-xg-source, mlb-starter-length, nfl-live-segment-interval, nba-day-of-sweep-ownership, layer2-hidden-row-split, nhl-pp-units-real-toi, wnba-minutes-redistribution, layer2-stale-quote-sample, nba-1005-calibrated-resim, nhl-ev-rotation, soccer-xg-totals-bias, nhl-ev-rotation-fullseason, local-env-role-scoped-pin, nhl-elite-assists, nhl-confirmed-goalies, soccer-scorer-race-grade, stop-market-withholding, layer2-unmeasured-per-line, nhl-scratch-dilution, mlb-strikeout-bias, nfl-prop-projection-input-refresh, mlb-hr-rate, mlb-pa-length, mlb-non-pa-outs, nhl-elite-pp-onice, nhl-saves-skill-registry, soccer-ou-loss-source, soccer-prop-name-join

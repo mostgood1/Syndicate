@@ -1298,12 +1298,6 @@ death, never life — do not invert it.
 - BUILT 2026-10-06 (faa5f804, on main): nba_season_phase (resolver), nba_history_refresh (2026-27 regular player_logs, called from the props-refresh gate), own_rates regular-only, same-phase props bias windows. H-S2 dry run on a scratch copy of fleet data: MET for every reader measurable today (opening-night 7-day window 7 preseason dates -> 0 kept; own_rates preseason not used; live 2026-27 fetch -> nothing written). ROLLOUT: code runs in the per-run NBA props refresh, so it goes live with the next fleet ff by ANY session, no restart. Until 10-20 it is behaviour-neutral: preseason own_rates were already empty (boxscores_history predates Aug 1), preseason windows had no recon, and the refresh writes nothing on the empty 2026-27 fetch (one stats.nba call per 6 h). VERIFY OWED after 2026-10-20: player_logs carries 2026-27 games within a day (NBA_PLAYER_LOGS_REFRESH wrote=true in the props log), own_rates use them once players have 3 games, and 0 preseason dates in any window.
 - ROTATION GUARD 2026-10-06 (46daccca): _rotation_sim_minutes_from_history_local keeps same-phase stints for NBA (loan from basketball-injury-exclusion-reinclusion 284a15c8, used and RETURNED; recorded in that block).
 
-### closed-lane-archive-20261006-0823 — CLOSED 2026-10-06 (GOAL MET: 32 blocks archived) — opened 2026-10-06 — session d6c259c7-956f-4709-be0a-eb26e9cf3cb0
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 32 of 32 CLOSED blocks SAFE (owners idle 586-13755m, blocks last modified 726-2592m ago); none named in an uncommitted worktree diff. Moved all 32 to lanes_closed.md with one pointer each; lanes.md 573,199 -> 469,455 B before this block. Table and Part B report in log/2026-10-06.md.
-- Moved: nhl-compact-card-start-time, nhl-lines-backtest, soccer-lines-props-backtest, mlb-pregame-sim-freeze, soccer-1x2-ratings-xg-source, mlb-starter-length, nfl-live-segment-interval, nba-day-of-sweep-ownership, layer2-hidden-row-split, nhl-pp-units-real-toi, wnba-minutes-redistribution, layer2-stale-quote-sample, nba-1005-calibrated-resim, nhl-ev-rotation, soccer-xg-totals-bias, nhl-ev-rotation-fullseason, local-env-role-scoped-pin, nhl-elite-assists, nhl-confirmed-goalies, soccer-scorer-race-grade, stop-market-withholding, layer2-unmeasured-per-line, nhl-scratch-dilution, mlb-strikeout-bias, nfl-prop-projection-input-refresh, mlb-hr-rate, mlb-pa-length, mlb-non-pa-outs, nhl-elite-pp-onice, nhl-saves-skill-registry, soccer-ou-loss-source, soccer-prop-name-join
-
 ### nhl-early-season-shot-volume — CLOSED — opened 2026-10-06 — closed 2026-10-06 — session 5704bbd4-3c4f-4d88-9549-fa59e24ab70a
 - Goal: Early in a season, each NHL team's projected shot volume reflects the roster it actually dresses, not only last season's team rate, so players on teams that added or lost shooters stop being squeezed or inflated -- without making any prop line's Brier worse.
 - **GOAL: MET.** Reading: offline, prior-season-rate props arm SOG@1.5 -0.00124, SOG@2.5 -0.00104, SOG@3.5 -0.00061, POINTS@0.5 -0.00096 (CIs exclude 0), none worse; current-season regime byte-identical (scoped to team_rates_latest.csv, user decision "Prior-file only"). Fleet (f88c9453, ff 14:44:17Z, rebuild 14:51:03Z): projected team SOG moved exactly as the code computes (NJD +7.1%, TOR +6.1%, UTA +4.5%, FLA +5.4%, STL +1.6%, OTT -2.1%, league +2.0%); my written prediction missed STL/league by counting unrated skaters as 0 (deploys.md 14:52Z). Auto-off when team_rates_2026-2027.csv appears (2026-11-01). Full history in lanes_history.md.
@@ -1381,6 +1375,12 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Tests (exactness at an artifact line, reprice at a moved line, off!=on); fleet A/B of attach_nfl_prop_projections on the live grid
 - Blocked by: none
 
+### closed-lane-archive-20261006-1235 — CLOSED 2026-10-06 (GOAL MET: 1 block archived) — opened 2026-10-06 — session 1584787c-47cd-46ee-a8cb-d972264218f5
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 at 17:36Z (12:36 CDT) returned SAFE for 1 of 9 CLOSED blocks; the other 8 WAIT (owners or last-modify < 240m). Table in log/2026-10-06.md.
+- Moved: closed-lane-archive-20261006-0823
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
@@ -1447,6 +1447,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - `closed-lane-archive-20260926-2234` — CLOSED 2026-09-26 (GOAL MET: 1 block archived) — opened 2026-09-26 — session 74f24894-f1fd-4067-870d-756a809e19ce
 - `closed-lane-archive-20260927-0955` — CLOSED 2026-09-27 (GOAL MET: 1 block archived) — opened 2026-09-27 — session f3c70fb1-645e-44a4-877b-5084400b6f5e
 - `closed-lane-archive-20260927-1045` — CLOSED 2026-09-27 (GOAL MET: 1 blocks archived) — opened 2026-09-27 — session 80147c5f-c74c-4efd-9b6a-7d05b4e52af7
+- `closed-lane-archive-20261006-0823` — CLOSED 2026-10-06 (GOAL MET: 32 blocks archived) — opened 2026-10-06 — session d6c259c7-956f-4709-be0a-eb26e9cf3cb0
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `combined-board-rows-unreadable-tripwire` — CLOSED 2026-09-15 — opened 2026-09-15 — session 3a65723e-e0d5-42da-bea1-0c61b0c94add — **GOAL MET: live on web `da268e07` (15:36:46Z); the field is served on every date, 0 `ROWS_UNREADABLE` lines; stored 113 vs rows 111 is the per-sport `by_sport` cap, not a defect.**
