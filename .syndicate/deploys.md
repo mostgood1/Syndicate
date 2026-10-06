@@ -46939,3 +46939,21 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
     (watcher running).
   - (2) After 2026-10-20, compute_biases finds pairs on a regular-season date.
 - off switches: SYNDICATE_NBA_RECON_REFRESH=0 (env, needs a restart to reach the env).
+
+## 2026-10-06 19:40:24Z (2:40 PM CT) -- READING: NBA recon is being WRITTEN on the fleet again -- **MET** (step 1 of 2) (lane `nba-season-phase`)
+
+- first production write, from the first NBA props refresh after the 19:06:52Z ff to 2de13feb
+  (`nba_source/logs/syndicate_refresh_oddsapi_props_2026-10-06.log`):
+  `nba recon refresh: {"date": "2026-10-06", "dates": {"2026-10-05": {"status": "ok", "games": 5, "props": 163},
+  "2026-10-04": {"status": "ok", "games": 2, "props": 69}, "2026-10-03": {"status": "ok", "games": 1, "props": 31}}}`
+- files on the fleet (nba_source/data/processed), written 14:40:20-24 CT: recon_games / recon_quarters / recon_props for
+  2026-10-03 (1 game, 31 player rows), 10-04 (2, 69), 10-05 (5, 163). These are the first NBA recon since 2026-06-13.
+- content checked by me at 19:52Z:
+  - real finals (10-05: MEM 132 at ATL 123; DET 109 PHX 107);
+  - NBA team codes;
+  - outcome-only columns (`source` espn).
+- caught by watcher scratchpad/watch_recon.sh at 19:42:50Z.
+- not yet exercised: these are PRESEASON dates. The phase guard keeps them out of the 7/30-day bias windows, so no
+  pairs are consumed until regular-season recon exists.
+- verify still OWED (step 2): after 2026-10-20, compute_biases / compute_player_biases find pairs on a regular-season
+  date (expected via the name + team fallback; current predictions use stats.nba ids, recon ESPN ids).
