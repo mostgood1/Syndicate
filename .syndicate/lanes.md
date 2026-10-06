@@ -1407,6 +1407,7 @@ death, never life — do not invert it.
   - Pooled out of fold, 881 lines: NB - Poisson **-0.01181 [-0.01609, -0.00763]**; NB - book +0.01561 [+0.00761, +0.02335] (Poisson was +0.0274).
   - Built: `nhl prop_projections.price_p_over` (NB for SAVES, Poisson for the rest; basis `sim_mean_negbin`), used by the board projection AND `build_nhl_artifacts` (props file). Tests 3 new + 99 existing pass.
   - Registry entry re-measured for the shipped pricing: loses, +0.0156 [+0.0076, +0.0234]; skill_reliability 0.68 -> 0.85.
+- **SHIPPED 2026-10-06 00:05Z (793299cd, refresh-worker restarted 00:06:44Z, pid 1418176):** props-path reading MET (read-only rerun: SAVES == NB 7/7, others Poisson 133/133). Served-board reading OWED -> scheduled task `nhl-saves-negbin-board-verify` (10-06 16:00 CT).
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

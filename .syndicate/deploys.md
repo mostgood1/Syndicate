@@ -46683,3 +46683,20 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - offline evidence: 45-slate check PP1 share of team PP time 0.903 -> 0.664 (real 0.632), PP2 0.097 -> 0.291 (real 0.286). Full 2025-26 paired vs production (`C:/tmp/nhlprops/bt_scratch` vs `bt_ppmin`), 38,287 reg player-games: Brier SOG@1.5 -0.00161, SOG@2.5 -0.00145, SOG@3.5 -0.00070, ASSISTS@0.5 -0.00046, POINTS@0.5 -0.00052 (CIs exclude 0); GOALS/POINTS@1.5/BLOCKS flat; playoffs SOG@2.5 -0.00173.
 - baseline: fleet lineups before the ff carry no proj_pp_toi column (engine falls back to the units until they do).
 - verify: the first lineups_<date>.csv written after 00:00:21Z carries proj_pp_toi on every slotted skater, and `nhl_sim_input_checklist.py` on fleet data PASSES (watcher /mnt/c/tmp/nhlprops/pp_watch.sh).
+
+## 2026-10-06 00:05-00:12Z (7:05-7:12 PM CT 10-05) -- LOCAL FLEET FF 0092c975 -> 793299cd + gated refresh-worker restart: NHL goalie SAVES priced by a NEGATIVE BINOMIAL -- **props path MET (read-only rerun); served-board reading OWED** (lane `nhl-saves-overdispersion`, user: "price NHL saves with an overdispersed distribution")
+
+- **What:**
+  - `nhl prop_projections.price_p_over`: NB(mean = sim lambda, k = 16.367) for SAVES, Poisson for every other market. Used by the board projection (basis `sim_mean_negbin`) and `build_nhl_artifacts` (props file).
+  - The registry entry was re-measured for the shipped pricing: still loses, Brier +0.0156 [+0.0076, +0.0234] (was +0.0274). skill_reliability 0.68 -> 0.85.
+- **Measured before shipping:**
+  - H25 (January holdout, n=280) FAILED its CI bar (-0.0031 [-0.0107, +0.0040]). The user chose a pre-registered two-fold test.
+  - H26: pooled out of fold over 881 lines, NB - Poisson **-0.0118 [-0.0161, -0.0076]**: PASS.
+- **How:**
+  - Claims web + refresh-worker held by nhl-saves-overdispersion. ff `0092c975 -> 793299cd` 00:05:07Z; the gap was only this lane's files.
+  - Gated restart: CLEAR on poll 4 -> TERM refresh-worker 1413004 at 00:06:44Z -> pid **1418176** 00:06:52Z, /healthz 200.
+- **Baseline:** `props_recommendations_2026-10-05` (23:37:19Z) SAVES p_over were Poisson (e.g. Swayman 24.5 0.484082 at lam 24.47).
+- **Reading 1 (props path, read-only rerun of the fleet's own producer for 10-05 into /tmp, overlay off):** SAVES p_over == NB **7/7**, == Poisson 0/7. Other markets == Poisson **133/133**. Example: Vladar 26.5 at lam 22.205: 0.2576 NB vs 0.1791 Poisson.
+- **Not yet readable on the served board:** the 10-05 grid had 0 SAVES rows after puck drop, and 10-06 has no SAVES lines yet.
+- **Reading OWED:** scheduled task `nhl-saves-negbin-board-verify` (2026-10-06 16:00 CT, read-only) checks grid basis / probabilities / registry verdict and the 10-06 props file.
+- Claims released after this entry.
