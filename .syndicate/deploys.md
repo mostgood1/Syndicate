@@ -46957,3 +46957,22 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
   pairs are consumed until regular-season recon exists.
 - verify still OWED (step 2): after 2026-10-20, compute_biases / compute_player_biases find pairs on a regular-season
   date (expected via the name + team fallback; current predictions use stats.nba ids, recon ESPN ids).
+
+## 2026-10-06 20:21:53Z (3:21 PM CT) -- LOCAL FLEET FF f8dfe437 -> a98c4557, NO RESTART: revert of ea5a8877 (peer OUT filter); 0de8a9d5 OUT-player refusal READ on the 10-07 WNBA props build -- **VERIFIED** (lane `wnba-props-out-player-leak`)
+
+- **Context:** the fleet was ALREADY at f8dfe437, which carries 0de8a9d5 (this lane) and ea5a8877 (peer lane wnba-slate-and-out-props). That ff was an UNRECORDED `merge github/main: Fast-forward` at 15:09:27 CDT, with no deploys.md entry; the author is unknown and it was not this lane.
+- **change:** 39412c42 reverts ea5a8877 (basketball_props_recommendations.py) by user decision, cross-lane, owner agreed. Runtime diff f8dfe437..a98c4557 is that one file (-50 lines); no other ride-alongs.
+- **how:**
+  - Claim live-odds-worker (holder wnba-props-out-player-leak, token 744ed461), released after. refresh-worker was held by layer2-coverage-identity-merge, so not taken: no restart, and my change runs only in per-run props subprocesses.
+  - check_deploy_safety read NOT CLEAR on two jobs: an in-process refresh-worker odds job and a bundesliga ESPN fetch. An ff kills neither, and the revert is a self-contained function.
+  - Guarded `git merge --ff-only a98c4557` (HEAD and clean tree asserted first).
+  - Checks after the ff: `_excluded_players_for_date` absent, `refuse_out_player_lines` present, healthz 200.
+- **baseline** (props_edges_2026-10-07.csv 13:24 CDT, latest-snapshot rule): 39 +EV lines for Allisha Gray (ATL, OUT on the 10-06 snapshot) and a top play for her (threes OVER 1.5 +118 FD, EV 31.7%).
+- **prediction:** the next 10-07 build refuses Gray's lines only, with a counted reason; Loyd and Talbot (off the 10-06 snapshot) stay priced.
+- **reading:** a per-run build `~/wnba_bt/props_1007_out_r1.py` = refresh_odds_sources --date 2026-10-07 --sports wnba --force-refresh, live-odds-worker role env, sims REUSED (no only-matchups), nice 15, MemAvailable 11.6 GB. rc 0, 15:23:28 -> 15:35:23 CDT.
+  - `PROPS_OUT_PLAYER_REFUSED league=wnba date=2026-10-07 enabled=True feed_status=read snapshot=2026-10-06 out_on_feed=49 lines_considered=1770 lines_refused=24 players=Allisha Gray(ATL):24`
+  - Sidecar props_out_player_refusals_2026-10-07.json (15:25:07) carries reason "player OUT on the injury feed".
+  - Allisha Gray occurrences = 0 in props_edges (581 rows), props_recommendations (21 rows), recommendations_slate, props_recommendations_top_by_game and cards_props_snapshot (all 15:29-15:35).
+  - Jewell Loyd (15 edge lines) and Stephanie Talbot (13) are priced and in the recommendations again.
+  - **OUT-player lines refused: 24 of 1,770 priced (pre-+EV), before: 0. Gray's +EV lines in the edges: 39 before, 0 now.**
+- **verify OWED (not this lane's goal):** the served board/Layer 2. Layer 1/2 prop rows are built from book quotes (board_enrichment.attach_projections / layer2_board), not from the edges file, so an OUT player's quote can appear there without a projection, per peer lane wnba-slate-and-out-props.
