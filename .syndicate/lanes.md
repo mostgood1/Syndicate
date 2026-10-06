@@ -1044,6 +1044,15 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **RULE v2 AMENDMENT 8 — STOLEN BASE CALIBRATION MEASURED, PRE-REGISTERED 2026-10-06 ~17:20Z (user: "then fix the stolen base rate next"); descent stopped again:**
+  - Engine: before each PA with a runner on 1B, 2B empty and <= 1 out, P(attempt of 2B) = the runner's `sb_attempt_rate`, then P(success) = `sb_success_rate`.
+    - build_roster derives the attempt rate as (SB+CS) / (1B+BB+HBP), a per-TIME-ON-BASE rate, but the engine applies it PER PA. Steals of 3B / home are not modelled.
+  - ENGINE: new GameConfig fields `sb_attempt_mult` / `sb_success_mult` (default 1.0 = byte-identical) multiply the two rates before their clamps.
+  - MEASURED, not fitted, on the FIT-date games (pbp + the REBUILT roster_objs). Opportunities = PAs whose pre-PA state (true base state) has a runner on 1B, 2B empty, <= 1 out, with that runner in the game's rebuilt lineup.
+    - attempt_mult = #attempts of 2B by that runner in that PA (stolen_base_2b, caught_stealing_2b, pickoff_caught_stealing_2b) / sum over opportunities of his profile `sb_attempt_rate` (clamped like the engine);
+    - success_mult = #stolen_base_2b / sum over attempts of his profile `sb_success_rate`.
+    - Runners not in the rebuilt lineup are excluded and counted. Poisson / Wilson-style CIs.
+  - Not levers: every arm carries `--cfg-set sb_attempt_mult=<m_a> --cfg-set sb_success_mult=<m_s>`. Production unchanged; checks (a)-(e) unchanged. Gates: tests, byte-identical proof, reachability.
 - **AMENDMENT 7 READINGS 2026-10-06 ~17:05Z (descent not restarted yet):**
   - 316 FIT-date games: 223 events (WP 178, PB 23, BK 22) over 31,635 eligible pitches = **0.00705/pitch** [0.00619, 0.00803].
     - Mean sim multiplier on the real pitch mix 0.962, so **b = 0.00733** vs the model's 0.004 (1.8x low).
