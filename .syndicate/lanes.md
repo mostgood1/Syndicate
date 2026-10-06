@@ -1506,6 +1506,15 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: web access-log durations for the harvest's export requests vs. wall time from the run (stall trace/harvest.log), plus one instrumented run
 - Blocked by: none
 
+### rescore-confirm-recovered-dates — CLOSED 2026-10-06 — opened 2026-10-06 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- **GOAL: MET.** Goal verbatim: "Every backfilled row from the 2026-09-30..10-04 collector outage that the rescore tool can reach is independently confirmed by reproducing its retained all_records briers and n exactly, and every row the tool CANNOT reach is named with the reason rather than left unexamined." **6 of 10 recovered rows CONFIRMED by the gate, every one EXACT on the first attempt with no exclusion needed:** mlb 09-30 (3 games, 0.08236/0.06292 n=58), 10-01 (1, 0.01559/0.04846 n=16), 10-03 (4, 0.11173/0.13178 n=72), 10-04 (2, 0.28133/0.37405 n=48); ncaaf 10-01 (2, 0.06954/0.14088 n=170), 10-03 (49, 0.12358/0.11869 n=2472). So the backfill captured the board's own measurement, not a lookalike. **The other 4 are soccer and are named, not skipped:** `--sport soccer` exits **2** (`not wired; wired: mlb, ncaaf`) — measured as a control — so 09-30 and 10-01 (1 game each) are UNREACHABLE, and 10-03/10-04 carry 0 games so there is nothing to confirm. Wiring soccer is a harder adapter than NCAAF's: it admits DRAWS, and its team-name join is the one with a documented history of failures (`test_soccer_live_gameline_name_join.py`), so a name-pair join would be the wrong instrument. **None of this makes a date a RESULT** — 10-01 rests on one game — the pooled series is where they belong. Detail: `.syndicate/findings_2026-10-06_recovered_dates_confirm.md`.
+- Goal: Every backfilled row from the 2026-09-30..10-04 collector outage that the rescore tool can reach is independently confirmed by reproducing its retained all_records briers and n exactly, and every row the tool CANNOT reach is named with the reason rather than left unexamined.
+- Files: .syndicate/findings_2026-10-06_recovered_dates_confirm.md
+- Hypothesis: The 8 rows with a non-zero game count were captured from a board summary the current scorer can rebuild from the same per-record ledger, so --expect-from-history should reproduce each one EXACTLY for mlb 09-30/10-01/10-04 and ncaaf 10-01; the 4 soccer rows are unreachable because soccer is not in WIRED_SPORTS, and 2 of those carry 0 games so there is nothing to confirm.
+- Falsification test: Any date whose re-score does not reproduce the retained briers at the retained n is NOT confirmed, and the row stays in history flagged rather than quietly trusted -- in particular a date whose ledger is absent (HTTP 404) or whose finals join is lossy must be reported as unconfirmed, not approximated.
+- Verification: Per date: the tool exits 0 with the gate EXACT, or the mismatch is recorded with both figures. Report a per-date table and the count confirmed / unconfirmed / unreachable.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
