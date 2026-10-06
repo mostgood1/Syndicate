@@ -1491,6 +1491,15 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Live on 2026-10-03: a run with --exclude-game-pk <event_id> drops scored_games 49 -> 48 and FAILS the 49-game gate; then a run with --search-exclusions and the 48-game figures as --expect-* finds exactly that event_id. Plus offline unit tests for both flags on the ncaaf path.
 - Blocked by: none
 
+### harvest-export-latency — CLOSED 2026-10-06 (GOAL MET: exports queue behind cold game-chips builds holding all 8 web slots; owned by web-restart-healthz) — opened 2026-10-06 — session 5da10f7c-2faf-4ee1-9c98-33ffbab3771b
+- **GOAL VERDICT (2026-10-06):** Goal: "Name why the soccer harvest task's two /api/ops/artifacts/export calls take minutes when the identical call from an interactive shell takes 0.1-0.2 s, with a fleet-side or client-side measurement that discriminates" -- **GOAL: MET.** Reading: fleet web.log shows the 18:52:28Z run's exports logged 19:00:34Z (10.8 s) right after 8 identical game-chips?date=2026-10-05 requests released all 8 gthread slots (234-404 s each, completed 19:00:11-23Z); the client's faulthandler dump (19:00:28Z) was in getresponse. H1 (fleet-side queueing) confirmed, H2 (client) falsified. Cause owned by lane web-restart-healthz (its H2). Narrative: log/2026-10-06.md.
+- Goal: Name why the soccer harvest task's two /api/ops/artifacts/export calls take minutes when the identical call from an interactive shell takes 0.1-0.2 s, with a fleet-side or client-side measurement that discriminates
+- Files: none (diagnostic; out-of-repo launcher C:\tmp\soccer-live-projection-harvest\bin\run_harvest.py)
+- Hypothesis: H1 fleet-side: the slow request waits on a busy/blocked web worker (server time high in the web access log for the task's requests); H2 client-side: the task's process is slow before/while sending (env/proxy/WSL token read), server time low
+- Falsification test: H1 falsified if the web log shows the task's export requests served in < 2 s; H2 falsified if the server-side duration accounts for the wall time
+- Verification: web access-log durations for the harvest's export requests vs. wall time from the run (stall trace/harvest.log), plus one instrumented run
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
