@@ -46737,3 +46737,14 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - **READING 1 (MET, 14:03Z, fleet venv):** `daily_optimizer.OPTIMIZER_VERSION == "daily_optimizer/2"`; `accumulate` on a -110 row at fair 0.5 / model 0.56 -> `[1, 1, 0.909, -0.0455, 1, 0.909, 0.0691]` (market EV -4.5%, model EV +6.9%). Checkout clean after the ff.
 - **prediction (READING 2, the 2026-10-07 11:30Z / 6:30 AM CT `model-scorecard` run):** the job logs a reset `state_version_changed`; the report's table carries `pub model EV` and `pub market EV` columns; `pub model EV` > 0 in every sport with published bets (the shortlist publishes on positive model edge), and `pub market EV` ~ -3% to -6%. Overlay still 0/0 (no cell can reach 60 games / 5 dates on 1 date).
 - **verify:** `py -3 C:/Users/tempadmin/.claude/scheduled-tasks/daily-optimizer-review/review.py` exit 0 after 11:3xZ 10-07, reading those two columns.
+
+## 2026-10-06 14:30Z (9:30 AM CT) -- MEASUREMENT of the caught-stealing outs fix b6fd6189 on production (no deploy; lane `mlb-combined-calibration`, user: "then measure the CS fix while it runs") -- **MET**
+- **What.** b6fd6189 credits a caught-stealing out to the pitcher on the mound. It went live on the fleet 2026-10-05 18:23:48 CDT (reflog, no restart; the MLB sim job is a per-run subprocess).
+- **How (pre-registered in lanes.md before running).** Production's own roster_objs for 10-03..10-06 (10 games, 20 starters), replayed `--validate-only --stored live` at 4000 sims.
+  - A = the fleet checkout 18425937 (contains the fix).
+  - B = a copy of the same tree with the one fix line deleted. md5 check: simulate.py is the only .py file that differs.
+  - Served LIVE sims are 1000 sims each. PRE-fix = 10-03 + 10-04 (12 starters); POST-fix = 10-05 23:26 + 10-06 01:21 CDT (8 starters).
+- **(1) Effect, paired A - B: +0.093 outs/start** (min +0.050, max +0.145, n 20; every starter > 0). Prediction +0.10, each >= 0: MET. Game play is byte-identical, so this is exact for these rosters.
+- **(2) Production runs it.** offset_pre = mean(served - B) on PRE = -0.133 (SE 0.046, n 12). On POST: served - A = -0.093 (SE 0.034), served - B = +0.005 (SE 0.036). |A - offset| 0.040 < |B - offset| 0.139: MET, production's post-fix sims match the fixed code.
+  - As pre-stated, (2) is the weaker reading (8 post starters); with the reflog it is consistent, and (1) is exact.
+- verify: the paired A-B reading (+0.093/start) and the post-fix served-vs-replay match. Evidence (scratchpad): cs_A.json, cs_B.json, cs_eval.py, cs_ab.sh.
