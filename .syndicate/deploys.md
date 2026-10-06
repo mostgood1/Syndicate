@@ -46776,3 +46776,8 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - baseline (props_recommendations_all_markets_2026-10-06.csv built 14:32:15Z, before the ff): projected team SOG FLA 25.9, NJD 29.4, OTT 28.2, STL 24.5, TOR 26.3, UTA 26.9; league mean 26.71.
 - prediction (from 0.6/0.4 and the 10-06 roster ratios): NJD ~+5.4%, UTA ~+5.1%, TOR ~+4.9%, FLA ~+2.9%, STL ~-2.8%, OTT ~-3.9%; league mean up ~+0.6-1%.
 - verify: watcher `/mnt/c/tmp/nhlprops/rvol_watch.sh` prints the same sums on the first rebuild after 14:44:17Z.
+
+## 2026-10-06 14:52Z (9:52 AM CT) -- READING for the 14:44:17Z ff (f88c9453, NHL roster shot volume) -- **MET, with the prediction corrected** (lane `nhl-early-season-shot-volume`)
+
+- reading: props_recommendations_all_markets_2026-10-06.csv rebuilt 14:51:03Z (first after the ff): projected team SOG FLA 25.9 -> 27.3 (+5.4%), NJD 29.4 -> 31.5 (+7.1%), OTT 28.2 -> 27.6 (-2.1%), STL 24.5 -> 24.9 (+1.6%), TOR 26.3 -> 27.9 (+6.1%), UTA 26.9 -> 28.1 (+4.5%); league mean 26.71 -> 27.24 (+2.0%).
+- the deploys.md prediction was WRONG for STL (predicted -2.8%) and the league mean (+0.6-1%): my prediction counted unrated skaters as 0 while the code counts them at replacement (F 1.2 / D 0.9, the same values the tuning used). Recomputed the code's way from the fleet files: FLA +4.6%, NJD +7.1%, OTT -2.7%, STL +2.3% (3 unrated skaters), TOR +6.6%, UTA +5.0%, league +2.0% -- every team within ~1 point of the observed change (sim noise). The code does what it was built to do; the stated predicate missed.
