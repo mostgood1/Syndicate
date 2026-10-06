@@ -2386,7 +2386,27 @@ def build_layer2_shortlist(
 # Sports whose per-date projection join ALREADY reads the whole slate window
 # internally, so looping it per date re-scans the same grid against
 # near-identical indexes. See `_attach_projections_over_window`.
-_SELF_WINDOWING_PROJECTION_SPORTS = frozenset({"soccer"})
+#
+# NFL JOINS ARE DATE-BLIND, so they belong here too `[2026-10-06, lane
+# layer2-coverage-identity-merge]`. `load_nfl_prop_projections` accepts
+# `selected_date` "for signature" only and resolves the CURRENT season/week, and
+# `load_nfl_game_projections` builds a season-wide index keyed by each row's own
+# commence_time. Seven passes were seven identical joins over the whole grid.
+# Measured on the fleet 2026-10-06 19:00Z: the shortlist's NFL `prop_coverage`
+# read rows_considered 5131 and games_in_index 2247 (= 321 x 7), against a
+# single-date book-grid's games_in_index 321.
+_SELF_WINDOWING_PROJECTION_SPORTS = frozenset({"soccer", "nfl"})
+
+# Coverage-half keys that name the ARTIFACT a join read rather than count rows
+# it joined. Summing them across window dates is meaningless (season 2026 x 7 =
+# 14182), so the window merge carries their distinct values instead.
+# `games_in_index` / `games_in_artifact` are the size of the index consulted,
+# which a date-blind join consults once per pass.
+_COVERAGE_IDENTITY_KEYS = frozenset({"games_in_index", "games_in_artifact"})
+
+
+def _is_coverage_identity_key(key: str) -> bool:
+    return key.startswith("artifact_") or key in _COVERAGE_IDENTITY_KEYS
 
 
 def _summarise_projection_half(half: Any) -> str:
@@ -2496,8 +2516,9 @@ def _attach_projections_over_window(
     #
     # EXPLICIT SET, NOT A HEURISTIC. Whether a join self-widens is a fact about
     # that join's code, not something to infer from the sport's window length --
-    # ncaaf and nfl also span days and their joins take `selected_date` alone,
-    # so they genuinely need this loop. Adding a sport here without widening its
+    # ncaaf also spans days and its joins filter by `selected_date`, so it
+    # genuinely needs this loop. (NFL was listed beside it until 2026-10-06; its
+    # joins turned out never to read the date -- see the constant.) Adding a sport here without widening its
     # join would silently narrow its coverage to one date, which is `#379`'s
     # defect running backwards.
     if sport in _SELF_WINDOWING_PROJECTION_SPORTS and len(dates) > 1:
@@ -2506,6 +2527,10 @@ def _attach_projections_over_window(
     merged: dict[str, Any] = {}
     per_date: dict[str, Any] = {}
     errors: dict[str, str] = {}
+    # Coverage-half identity values seen per (half, key), and the rate keys each
+    # half carried -- both resolved after the loop.
+    identities: dict[tuple[str, str], list[Any]] = {}
+    half_rates: dict[str, set[str]] = {}
     # EVERY per-date COUNT belongs here. A counter merged by the `elif` below is
     # merged by "first non-falsy wins", which reports ONE PASS rather than the
     # window -- and for a dict it is worse: `{}` equals none of
@@ -2642,8 +2667,34 @@ def _attach_projections_over_window(
                         # value wins -- whether the join CAN do this does not vary
                         # by date.
                         bucket.setdefault(sub_key, sub_value)
+                    elif _is_coverage_identity_key(sub_key) and not isinstance(sub_value, Mapping):
+                        # WHICH ARTIFACT ANSWERED, NOT HOW MANY ROWS IT ANSWERED.
+                        # Summed, a week-keyed artifact consulted on seven dates
+                        # served week 35 of season 14182 (fleet, 2026-10-06).
+                        # Collected as a distinct set, collapsed after the loop,
+                        # and kept per date so a window that straddles a week
+                        # boundary says which date read which artifact.
+                        seen = identities.setdefault((key, sub_key), [])
+                        if sub_value not in seen:
+                            seen.append(sub_value)
+                        per_date[date_key].setdefault(key, {})[sub_key] = sub_value
+                    elif sub_key.startswith("pct_"):
+                        # A RATE, re-derived from the half's own summed counts
+                        # after the loop. Summing it served pct_projected 490.7.
+                        half_rates.setdefault(key, set()).add(sub_key)
                     elif isinstance(sub_value, (int, float)):
                         bucket[sub_key] = bucket.get(sub_key, 0) + sub_value
+                    elif isinstance(sub_value, Mapping) and sub_value and all(
+                        isinstance(v, (int, float)) and not isinstance(v, bool)
+                        for v in sub_value.values()
+                    ):
+                        # A per-key tally (`artifact_weeks`, `unsupported_markets`)
+                        # sums per key. It used to fall to "first wins" below and
+                        # serve one date's tally as the window's.
+                        tally = bucket.setdefault(sub_key, {})
+                        if isinstance(tally, dict):
+                            for tally_key, tally_value in sub_value.items():
+                                tally[tally_key] = tally.get(tally_key, 0) + tally_value
                     else:
                         bucket.setdefault(sub_key, sub_value)
             elif key not in merged or merged.get(key) in (None, 0, False, ""):
@@ -2663,6 +2714,31 @@ def _attach_projections_over_window(
             merged[rate_key] = round(100.0 * num / den, 1) if den else 0.0
         else:
             merged.pop(rate_key, None)
+
+    # The halves' identity fields: one distinct value stays a scalar (the shape
+    # every single-date reader already parses); several become a sorted list.
+    for (half, sub_key), values in identities.items():
+        bucket = merged.get(half)
+        if not isinstance(bucket, dict):
+            continue
+        if len(values) == 1:
+            bucket[sub_key] = values[0]
+        else:
+            bucket[sub_key] = sorted(values, key=lambda v: (str(type(v)), str(v)))
+    # The halves' rates, by the same table and the same drop-if-underivable rule
+    # as the top level, over each half's OWN counts.
+    for half, rate_keys in half_rates.items():
+        bucket = merged.get(half)
+        if not isinstance(bucket, dict):
+            continue
+        for rate_key in rate_keys:
+            num_key, den_key = derived_rates.get(rate_key, (None, None))
+            num = bucket.get(num_key) if num_key else None
+            den = bucket.get(den_key) if den_key else None
+            if isinstance(num, (int, float)) and isinstance(den, (int, float)):
+                bucket[rate_key] = round(100.0 * num / den, 1) if den else 0.0
+            else:
+                bucket.pop(rate_key, None)
 
     # A HALF'S REASON IS THE WINDOW'S REASON ONLY IF THE WINDOW PROJECTED NOTHING
     # FOR THAT HALF. `#633` established this at the top level and the nested halves

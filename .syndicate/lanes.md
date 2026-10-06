@@ -1418,6 +1418,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Falsification test: If the recomputed briers land near 0.19 instead of near 0.124, then the last-captured-score proxy was NOT mislabelling outcomes and my diagnosis in findings_2026-10-06 is wrong -- the gap would then be in row selection or in the scorer's probability source, not the outcome. If the join covers materially fewer than 49 games, the comparison is on a smaller population and must be reported as such rather than as a reproduction.
 - Verification: Report matched/49 games, the unmatched names, and model+market briers per cut (all_records, fresh_quotes_only, priceable_only) against the retained values, stating which hypothesis the result supports.
 - Blocked by: none
+### layer2-coverage-identity-merge — OPEN — opened 2026-10-06 — session 5d9a4d65-467f-4895-aad0-fdadc305b279
+- Goal: The windowed merge of the nested game_coverage/prop_coverage halves never sums identity fields (artifact_season/artifact_week/artifact_rows/artifact_date) and re-derives each half's pct_* rate from its own summed counts, so a 7-date NFL window serves week 5 / season 2026, not 35 / 14182, and a pct_projected <= 100
+- Files: pipeline/layer2_shortlist.py (coverage-half merge branch of _attach_projections_over_window ONLY), tests/test_layer2_coverage_identity_merge.py (NEW)
+- Hypothesis: The coverage_halves branch sums every numeric sub-key, so identity fields from a week-keyed artifact loaded once per window date are multiplied by the date count (week 5 x 7 = 35) and the half's pct_projected is a sum of per-date percentages (482.3)
+- Falsification test: If a 2-date synthetic window through the real merge yields artifact_week 5 and pct_projected <= 100 before the fix, the defect is elsewhere
+- Verification: New test: 2-date window, week 5 on both dates -> prop_coverage.artifact_week == 5, artifact_season == 2026, pct_projected re-derived; distinct weeks -> sorted list; fleet reading of /api/board/layer2-shortlist after the next fleet ff
+- Blocked by: none
+
 
 ### soccer-roster-only-players — OPEN — opened 2026-10-06 — session fc6fc474-5cf8-4333-b451-4dcf68180c23
 - Goal: Soccer sim squads include ESPN-roster players who have no stats row, per the PRE-REGISTRATION .syndicate/findings_2026-10-06_soccer_roster_only_players_prereg.md (5c36cf37): positional-prior per-90 rate, small minutes share by starter flag, team totals unchanged. Tested exactly as registered (paired, SOT 0.5 + anytime-scorer log loss on APPEARED players, match bootstrap, 95% CI wholly < 0 on BOTH, listed-player calibration toward 1.0). Shipped behind a flag (off!=on, kill switch) with the share re-fit ONLY if it passes; on a fail it is not shipped and not re-tuned.
