@@ -11,6 +11,8 @@ pre-PA base state from scripts/mlb_dp_advancement_rates.py):
   success_mult = real steals of 2B   / sum of the runner's profile success rate over attempts
 using each runner's profile from the game's roster artifact (lineup + bench), clamped
 exactly as the sim clamps it. They become GameConfig `sb_attempt_mult` / `sb_success_mult`.
+Steals of THIRD are measured the same way over runner-on-2B / 3B-empty / <= 1-out PAs and
+become `sb3_attempt_mult` / `sb3_success_mult`.
 
   python scripts/mlb_steal_rate_calibration.py --data-root <fleet mlb data> --roster-root <rebuilt root> \\
       --dates 2026-06-15 ... --cache ~/mlb_pbp_cache --out steals.json
@@ -29,7 +31,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import mlb_dp_advancement_rates as pbp  # noqa: E402
 
-ATTEMPT = ("stolen_base_2b", "caught_stealing_2b", "pickoff_caught_stealing_2b")
+ATTEMPT = {"2B": ("stolen_base_2b", "caught_stealing_2b", "pickoff_caught_stealing_2b"),
+           "3B": ("stolen_base_3b", "caught_stealing_3b", "pickoff_caught_stealing_3b")}
 
 
 def profiles(roster_root: Path, date: str) -> dict[int, dict]:
@@ -53,10 +56,11 @@ def profiles(roster_root: Path, date: str) -> dict[int, dict]:
     return out
 
 
-def game_counts(data: dict, rates: dict, acc: dict) -> None:
+def game_counts(data: dict, rates: dict, acc: dict, target: str = "2B") -> None:
+    origin, nxt = ("1B", "2B") if target == "2B" else ("2B", "3B")
     for pre, outs_before, play in pbp.plays_with_state(data):
-        rid = pre.get("1B")
-        if not rid or pre.get("2B") or outs_before > 1:
+        rid = pre.get(origin)
+        if not rid or pre.get(nxt) or outs_before > 1:
             continue
         if rid not in rates:
             acc["runner_not_in_roster"] += 1
@@ -66,11 +70,11 @@ def game_counts(data: dict, rates: dict, acc: dict) -> None:
         acc["expected_attempts"] += ar
         kinds = {(r.get("details") or {}).get("eventType") for r in play.get("runners") or []
                  if ((r.get("details") or {}).get("runner") or {}).get("id") == rid}
-        att = kinds & set(ATTEMPT)
+        att = kinds & set(ATTEMPT[target])
         if att:
             acc["attempts"] += 1
             acc["expected_successes"] += sr
-            acc["steals"] += "stolen_base_2b" in att
+            acc["steals"] += ATTEMPT[target][0] in att
 
 
 def poisson_ratio_ci(k: int, expected: float) -> list[float]:
@@ -91,23 +95,30 @@ def main(argv=None) -> int:
     data_dir = Path(os.path.expanduser(args.data_root))
     roster_root = Path(os.path.expanduser(args.roster_root))
     cache = Path(os.path.expanduser(args.cache))
-    acc = {"opportunities": 0, "expected_attempts": 0.0, "attempts": 0, "expected_successes": 0.0, "steals": 0,
-           "runner_not_in_roster": 0, "games": 0, "games_without_roster": 0}
+    accs = {t: {"opportunities": 0, "expected_attempts": 0.0, "attempts": 0, "expected_successes": 0.0, "steals": 0,
+                "runner_not_in_roster": 0} for t in ("2B", "3B")}
+    games = without = 0
     for d in sorted(set(args.dates)):
         profs = profiles(roster_root, d)
         for pk in pbp.game_pks(data_dir, d):
             if pk not in profs:
-                acc["games_without_roster"] += 1
+                without += 1
                 continue
-            acc["games"] += 1
-            game_counts(pbp.feed(pk, cache), profs[pk], acc)
-    am = acc["attempts"] / acc["expected_attempts"] if acc["expected_attempts"] else None
-    sm = acc["steals"] / acc["expected_successes"] if acc["expected_successes"] else None
-    rep = {**acc, "sb_attempt_mult": am, "attempt_mult_ci95": poisson_ratio_ci(acc["attempts"], acc["expected_attempts"]),
-           "sb_success_mult": sm, "real_success_rate": acc["steals"] / acc["attempts"] if acc["attempts"] else None,
-           "profile_success_rate": acc["expected_successes"] / acc["attempts"] if acc["attempts"] else None,
-           "real_attempts_per_opportunity": acc["attempts"] / acc["opportunities"] if acc["opportunities"] else None,
-           "profile_attempts_per_opportunity": acc["expected_attempts"] / acc["opportunities"] if acc["opportunities"] else None}
+            games += 1
+            data = pbp.feed(pk, cache)
+            for t in ("2B", "3B"):
+                game_counts(data, profs[pk], accs[t], t)
+
+    def summary(acc):
+        return {**acc,
+                "attempt_mult": acc["attempts"] / acc["expected_attempts"] if acc["expected_attempts"] else None,
+                "attempt_mult_ci95": poisson_ratio_ci(acc["attempts"], acc["expected_attempts"]),
+                "success_mult": acc["steals"] / acc["expected_successes"] if acc["expected_successes"] else None,
+                "real_success_rate": acc["steals"] / acc["attempts"] if acc["attempts"] else None,
+                "profile_success_rate": acc["expected_successes"] / acc["attempts"] if acc["attempts"] else None,
+                "real_attempts_per_opportunity": acc["attempts"] / acc["opportunities"] if acc["opportunities"] else None}
+
+    rep = {"games": games, "games_without_roster": without, "steal_2b": summary(accs["2B"]), "steal_3b": summary(accs["3B"])}
     Path(args.out).write_text(json.dumps(rep, indent=1), encoding="utf-8")
     print(json.dumps(rep, indent=1))
     return 0

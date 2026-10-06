@@ -1046,6 +1046,15 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **AMENDMENT 9 READINGS 2026-10-06 ~18:25Z (descent not restarted yet):**
+  - 1763 opportunities (runner on 2B, 3B empty, <= 1 out; 17 runners not in the roster excluded): **25 attempts** (19 SB, 6 CS) vs 173.0 profile-expected.
+    - -> **sb3_attempt_mult 0.144** [0.088, 0.201]; success 19/25 = 0.76 vs profile 0.763 -> **sb3_success_mult 0.997**.
+    - Steals of 2B re-read in the same pass: unchanged (0.689 / 0.954).
+  - CODE: steal-of-third block before the 2B block (simulate.py), `sb3_attempt_mult` default 0.0 = off with no RNG draw. CS of 3rd credits the inning out AND the pitcher's OUTS.
+  - BYTE-IDENTICAL vs HEAD on 150 seeded games, including 50 on the high-steal fixture (223 SB+CS): sha256 5441F475... both.
+    - Earlier proofs never exercised the steal path; this one does. Outputs were checked to be real (543 KB, 150 games), not two empty files.
+  - TESTS: 20 pass (off by default; on produces SB and CS of 3rd; pitcher OUTS == 3 x half-innings with CS of 3rd).
+  - Every arm adds `sb3_attempt_mult=0.144 sb3_success_mult=0.997`.
 - **RULE v2 AMENDMENT 9 — STEALS OF THIRD, PRE-REGISTERED 2026-10-06 ~18:00Z (user: "then fix the caught stealing of third next"); descent stopped again:**
   - MECHANISM (new; the sim only steals 2B): before a PA with a runner on 2B, 3B empty and <= 1 out, that runner attempts 3B with P = his `sb_attempt_rate` x `sb3_attempt_mult`.
     - He succeeds with P = his `sb_success_rate` x `sb3_success_mult`, clamped like 2B.

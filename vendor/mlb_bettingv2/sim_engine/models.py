@@ -681,6 +681,11 @@ class GameConfig:
     # 1.0 = no change (the behaviour before 2026-10-06).
     sb_attempt_mult: float = 1.0
     sb_success_mult: float = 1.0
+    # Steals of THIRD (runner on 2B, 3B empty, <= 1 out), keyed off the same runner
+    # rates. 0.0 = no steals of third (the behaviour before 2026-10-06, no RNG draw).
+    # Measured 2026 pbp: 25 attempts in 1763 opportunities -> 0.144 x the profile rate.
+    sb3_attempt_mult: float = 0.0
+    sb3_success_mult: float = 1.0
     bip_fc_rate: float = 0.04
     bip_fc_runner_on_3b_score_rate: float = 0.0
     # On a double play with 0 outs before it, real runners do not hold: the runner on

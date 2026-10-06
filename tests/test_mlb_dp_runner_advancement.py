@@ -165,5 +165,30 @@ class StolenBaseMultiplierTests(unittest.TestCase):
         self.assertGreater(sb1 / (sb1 + cs1), sb0 / (sb0 + cs0) + 0.2)
 
 
+def _steal3_games(mult):
+    from tests.test_mlb_non_pa_outs import _stealing_roster
+    away, home = _stealing_roster(1, "AWY", 100000), _stealing_roster(2, "HOM", 200000)
+    cfg = replace(GameConfig(rng_seed=21, manager_pitching="v2", pbp="pa"), sb3_attempt_mult=mult)
+    return [simulate_game(away, home, replace(cfg, rng_seed=21 + i)) for i in range(40)]
+
+
+class StealOfThirdTests(unittest.TestCase):
+    def test_off_by_default_and_on_when_set(self) -> None:
+        to3 = lambda games: [ev for r in games for ev in (r.pbp or []) if ev.get("to") == "3B" or  # noqa: E731
+                             (ev.get("type") == "CS" and ev.get("to") == "3B")]
+        self.assertEqual(to3(_steal3_games(0.0)), [])
+        on = [ev for r in _steal3_games(1.0) for ev in (r.pbp or []) if ev.get("to") == "3B"]
+        self.assertGreater(sum(1 for ev in on if ev["type"] == "SB"), 0)
+        self.assertGreater(sum(1 for ev in on if ev["type"] == "CS"), 0, "the fixture must produce a CS of 3rd")
+
+    def test_caught_stealing_third_is_the_pitchers_out(self) -> None:
+        for r in _steal3_games(1.0):
+            if r.home_score > r.away_score and len(r.home_inning_runs) == len(r.away_inning_runs):
+                continue  # walk-off: the last half may end before 3 outs
+            halves = len(r.away_inning_runs) + len(r.home_inning_runs)
+            outs = sum(float(row.get("OUTS") or 0.0) for row in (r.pitcher_stats or {}).values())
+            self.assertEqual(outs, 3.0 * halves)
+
+
 if __name__ == "__main__":
     unittest.main()

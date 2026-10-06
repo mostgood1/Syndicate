@@ -2261,6 +2261,8 @@ def simulate_game(
     bip_roe_rates = {k: getattr(cfg, f"bip_roe_rate_{k}", None) for k in ("ground", "line", "air")}
     sb_attempt_mult = max(0.0, float(getattr(cfg, "sb_attempt_mult", 1.0)))
     sb_success_mult = max(0.0, float(getattr(cfg, "sb_success_mult", 1.0)))
+    sb3_attempt_mult = max(0.0, float(getattr(cfg, "sb3_attempt_mult", 0.0)))
+    sb3_success_mult = max(0.0, float(getattr(cfg, "sb3_success_mult", 1.0)))
 
     # Optional: sample per-game pitcher rates (starter + bullpen) once per game.
     # This injects uncertainty into K/BB/HR/in-play hit rates while keeping the
@@ -2619,6 +2621,46 @@ def simulate_game(
         # Simple stolen base attempt model (only 2B steals, no third/double steals).
         # Happens before the PA, so it should not count as a PA for the current batter.
         try:
+            # STEAL OF THIRD (lane mlb-combined-calibration): the runner on 2B, with 3B
+            # empty and <= 1 out. Off (no RNG draw) at the default sb3_attempt_mult 0.0.
+            # With <= 1 out a caught stealing cannot end the inning.
+            if (
+                sb3_attempt_mult > 0.0
+                and (not resume_seeded_pa)
+                and int(half.outs) <= 1
+                and int(half.runner_on_2b) > 0
+                and int(half.runner_on_3b) == 0
+            ):
+                rid3 = int(half.runner_on_2b)
+                rprof3 = _batter_profile_by_id(batting_roster, rid3)
+                if rprof3 is not None:
+                    ar3 = float(max(0.0, min(0.40, float(getattr(rprof3, "sb_attempt_rate", 0.0) or 0.0) * sb3_attempt_mult)))
+                    sr3 = float(max(0.40, min(0.95, float(getattr(rprof3, "sb_success_rate", 0.72) or 0.72) * sb3_success_mult)))
+                    if ar3 > 0.0 and rng.random() < ar3:
+                        stole3 = rng.random() < sr3
+                        if stole3:
+                            st.batter_row(rid3)["SB"] += 1
+                            _set_half_bases_from_runners(half, int(half.runner_on_1b), 0, rid3)
+                        else:
+                            st.batter_row(rid3)["CS"] += 1
+                            _set_half_bases_from_runners(half, int(half.runner_on_1b), 0, 0)
+                            half.outs += 1
+                            st.pitcher_row(pitcher_id)["OUTS"] += 1.0
+                        _sync_runner_reach_sources(state.runner_reach_source_by_id, half)
+                        if pbp_mode in ("pa", "pitch"):
+                            _log(
+                                {
+                                    "type": "SB" if stole3 else "CS",
+                                    "inning": int(state.inning),
+                                    "half": "top" if state.top else "bottom",
+                                    "batting_team_id": int(batting_roster.team.team_id),
+                                    "runner_id": int(rid3),
+                                    "to": "3B",
+                                    "outs": int(half.outs),
+                                    "bases": str(half.bases.value),
+                                    "score": {"away": int(state.away_score), "home": int(state.home_score)},
+                                }
+                            )
             if (not resume_seeded_pa) and int(half.outs) <= 1 and int(half.runner_on_1b) > 0 and int(half.runner_on_2b) == 0:
                 rid = int(half.runner_on_1b)
                 rprof = _batter_profile_by_id(batting_roster, rid)
