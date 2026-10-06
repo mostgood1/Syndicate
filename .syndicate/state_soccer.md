@@ -5,6 +5,14 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [soccer-roster-only-players] SOCCER SIM SQUADS: ADDING ROSTER-ONLY PLAYERS (TEAM TOTALS FIXED) FAILED ITS PRE-REGISTERED TEST, AND THE ESPN ROSTERS ARE A JULY SEED `[measured 2026-10-06, lane soccer-roster-only-players, NOT SHIPPED]`
+
+- **Squads are still stats-file-only.** A player is in `player_props` only if he has a `players_*.csv` row; the roster only rescues inside the departed filter (`build_soccer_artifacts.py`). Unchanged by this lane.
+- **H-ROSTER FAILED** (registration 5c36cf37, choices fixed in lanes.md 9c170ca4 before the run, run once): paired engine replay, 119 pre-kickoff matches 2026-09-17..09-30, 3,121 appeared listed outfield players. SOT 0.5 log loss +0.00162 [+0.00043, +0.00286] (worse); anytime +0.00021 [-0.00043, +0.00087]; listed calibration moved away from 1.0 (anytime 1.033 -> 1.074, starters' first scorer 1.70 -> 1.78). Substrate: session caches (`C:/tmp/soccer-lpb/cache`, 10-02 pull) + fleet roster copies -- NOT a verified mirror. Evidence: `findings_2026-10-06_soccer_roster_only_players_result.md`.
+- **Listed appeared players are UNDER-predicted, not over** (SOT realised 0.256 vs 0.233 on this window), so redistributing team mass away from them is the wrong direction.
+- **Coverage it would have bought** (fleet, priced props 10-04..10-11): 87 players / 1,987 of 19,816 lines with no exact-name sim row.
+- **Soccer ESPN rosters have no production producer.** The fleet's `rosters_2026.csv` files are dated 2026-09-30 17:40 (fleet bootstrap) with the July-20 git seed's row counts (bundesliga 142, ligue_1 223, la_liga 353); `scripts/build_soccer_rosters.py` is run by nothing scheduled (git grep, 2026-10-06).
+
 ## [soccer-projection-unit-dates] SOCCER PREGAME PROJECTIONS: MLS UNITS WERE KEYED ON THE UTC DATE, SO EVENING KICKOFFS GOT EMPTY FILES; EPL/SERIE A ABSENCE IS THE INTERNATIONAL BREAK, NOT A DEFECT `[measured 2026-10-03 ~04:00Z on the fleet, lane soccer-projections-gap, fix main e26ba342, LIVE on the fleet 05:17:19Z: served rows_with_projection 0 -> 519]`
 
 - **Served baseline** (04:14:31Z, board date 10-02): `per_sport_ingest.soccer.enrichment.projections.rows_with_projection 0`, "no soccer recommendations for this date". That reason means `index.matches == 0` over the window [prev day, slate 7 days] -- files may EXIST and be EMPTY.
