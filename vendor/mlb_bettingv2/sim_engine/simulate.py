@@ -2259,6 +2259,8 @@ def simulate_game(
     bip_dp_r2_to_3b_rate = _clamp(float(getattr(cfg, "bip_dp_r2_to_3b_rate", 0.0)), 0.0, 1.0)
     bip_dp_r3_scores_rate = _clamp(float(getattr(cfg, "bip_dp_r3_scores_rate", 0.0)), 0.0, 1.0)
     bip_roe_rates = {k: getattr(cfg, f"bip_roe_rate_{k}", None) for k in ("ground", "line", "air")}
+    sb_attempt_mult = max(0.0, float(getattr(cfg, "sb_attempt_mult", 1.0)))
+    sb_success_mult = max(0.0, float(getattr(cfg, "sb_success_mult", 1.0)))
 
     # Optional: sample per-game pitcher rates (starter + bullpen) once per game.
     # This injects uncertainty into K/BB/HR/in-play hit rates while keeping the
@@ -2621,8 +2623,8 @@ def simulate_game(
                 rid = int(half.runner_on_1b)
                 rprof = _batter_profile_by_id(batting_roster, rid)
                 if rprof is not None:
-                    ar = float(getattr(rprof, "sb_attempt_rate", 0.0) or 0.0)
-                    sr = float(getattr(rprof, "sb_success_rate", 0.72) or 0.72)
+                    ar = float(getattr(rprof, "sb_attempt_rate", 0.0) or 0.0) * sb_attempt_mult
+                    sr = float(getattr(rprof, "sb_success_rate", 0.72) or 0.72) * sb_success_mult
                     ar = float(max(0.0, min(0.40, ar)))
                     sr = float(max(0.40, min(0.95, sr)))
                     # PICKOFF (lane mlb-non-pa-outs step 2). Same opportunity as the

@@ -675,6 +675,12 @@ class GameConfig:
     bip_roe_rate_ground: Optional[float] = None
     bip_roe_rate_line: Optional[float] = None
     bip_roe_rate_air: Optional[float] = None
+    # Stolen-base calibration. The roster attempt rate is (SB+CS) per time on base, but
+    # the sim draws it before EVERY PA the runner sits on 1B, so it over-attempts.
+    # Measured on 2026 pbp against the profile rates (scripts/mlb_steal_rate_calibration.py).
+    # 1.0 = no change (the behaviour before 2026-10-06).
+    sb_attempt_mult: float = 1.0
+    sb_success_mult: float = 1.0
     bip_fc_rate: float = 0.04
     bip_fc_runner_on_3b_score_rate: float = 0.0
     # On a double play with 0 outs before it, real runners do not hold: the runner on

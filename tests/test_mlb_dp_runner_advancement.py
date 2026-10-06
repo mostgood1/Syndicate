@@ -141,5 +141,29 @@ class ReachedOnErrorTests(unittest.TestCase):
         self.assertEqual(_roe(BattedBallType.GROUND, None), "OUT")
 
 
+def _steal_totals(**cfg_fields):
+    from tests.test_mlb_non_pa_outs import _stealing_roster
+    away, home = _stealing_roster(1, "AWY", 100000), _stealing_roster(2, "HOM", 200000)
+    cfg = replace(GameConfig(rng_seed=3, manager_pitching="v2"), **cfg_fields)
+    sb = cs = 0
+    for i in range(40):
+        for row in (simulate_game(away, home, replace(cfg, rng_seed=3 + i)).batter_stats or {}).values():
+            sb += int(row.get("SB") or 0)
+            cs += int(row.get("CS") or 0)
+    return sb, cs
+
+
+class StolenBaseMultiplierTests(unittest.TestCase):
+    def test_attempt_multiplier_cuts_attempts(self) -> None:
+        sb0, cs0 = _steal_totals()
+        sb1, cs1 = _steal_totals(sb_attempt_mult=0.3)
+        self.assertLess(sb1 + cs1, 0.6 * (sb0 + cs0))
+
+    def test_success_multiplier_shifts_the_success_share(self) -> None:
+        sb0, cs0 = _steal_totals()
+        sb1, cs1 = _steal_totals(sb_success_mult=2.0)  # 0.40 x 2 = 0.80, inside the 0.95 clamp
+        self.assertGreater(sb1 / (sb1 + cs1), sb0 / (sb0 + cs0) + 0.2)
+
+
 if __name__ == "__main__":
     unittest.main()
