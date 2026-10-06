@@ -1013,6 +1013,11 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **RULE v2 AMENDMENT 2026-10-06 ~14:25Z (user: "fix the GIDP gap next"), BEFORE the descent has run (builds 3/20; no fit replay exists):** `bip_dp_rate` grid {0.06, 0.12, 0.18} -> **{0.06, 0.18, 0.30, 0.40}**. Nothing else changes.
+  - Why: real GIDP is 0.61/team-game (26 dates; MLB long-run ~0.7) vs model 0.20. The reachability runs (06-15, mechanics only) gave DP 0.19 at 0.06 and 0.275 at 0.12, so 0.18 tops out near 0.36 and the old grid CANNOT close the gap.
+  - The rate is the bug, not the mechanism: P(DP | ground-ball OUT, runner on 1st, <2 outs) is ~0.11 GIDP per DP-situation PA / ~0.32 ground-ball outs per PA ~= 0.34. The code default 0.06 is ~6x low.
+  - Second-order, NOT changed here: on a model DP the other runners hold (a real 6-4-3 usually moves a runner from 2nd to 3rd).
+  - Ships only through rule v2's checks (a)-(e); a higher DP rate cuts runs, which the other levers re-balance in the same descent.
 - **CS FIX (b6fd6189) PRODUCTION MEASUREMENT, PRE-REGISTERED 2026-10-06 ~14:05Z (user: "then measure the CS fix while it runs"), before any run:**
   - Fix live on the fleet 2026-10-05 18:23:48 CDT (reflog). Served LIVE sims: PRE-fix = 10-03 + 10-04 (6 games); POST-fix = 10-05 23:26 + 10-06 01:21 CDT (4 games).
   - Replays of production's own roster_objs, `--validate-only --stored live`, 4000 sims: A = fleet checkout 18425937 (fix), B = the same tree with the one fix line removed.
