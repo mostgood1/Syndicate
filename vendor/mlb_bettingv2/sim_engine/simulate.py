@@ -792,6 +792,7 @@ def _resolve_in_play_out_with_runners(
     dp_r2_to_3b_rate: float = 0.0,
     dp_r3_scores_rate: float = 0.0,
     sf_rate_pop: Optional[float] = None,
+    roe_rates: Optional[Dict[str, Optional[float]]] = None,
 ) -> Tuple[BaseState, int, int, int, int, List[int], int, str]:
     """Runner-id-aware resolution for non-hit in-play balls.
 
@@ -856,7 +857,12 @@ def _resolve_in_play_out_with_runners(
             nb = _tuple_to_bases(bool(on1), bool(on2), bool(on3))
             return nb, int(on1), int(on2), int(on3), 1, scoring, 1, "SF"
 
-    if rng.random() < _roe_reach_rate(bb, roe_rate):
+    p_roe = _roe_reach_rate(bb, roe_rate)
+    if roe_rates:
+        key = "ground" if bb == BattedBallType.GROUND else ("line" if bb == BattedBallType.LINE else "air")
+        if roe_rates.get(key) is not None:
+            p_roe = _clamp01(float(roe_rates[key]))
+    if rng.random() < p_roe:
         nb, on1, on2, on3, runs, scoring = _advance_bases_hit_with_runners(
             rng,
             bases,
@@ -2252,6 +2258,7 @@ def simulate_game(
     bip_fc_runner_on_3b_score_rate = _clamp(float(getattr(cfg, "bip_fc_runner_on_3b_score_rate", 0.0) or 0.0), 0.0, 1.0)
     bip_dp_r2_to_3b_rate = _clamp(float(getattr(cfg, "bip_dp_r2_to_3b_rate", 0.0)), 0.0, 1.0)
     bip_dp_r3_scores_rate = _clamp(float(getattr(cfg, "bip_dp_r3_scores_rate", 0.0)), 0.0, 1.0)
+    bip_roe_rates = {k: getattr(cfg, f"bip_roe_rate_{k}", None) for k in ("ground", "line", "air")}
 
     # Optional: sample per-game pitcher rates (starter + bullpen) once per game.
     # This injects uncertainty into K/BB/HR/in-play hit rates while keeping the
@@ -3148,6 +3155,7 @@ def simulate_game(
                             dp_r2_to_3b_rate=bip_dp_r2_to_3b_rate,
                             dp_r3_scores_rate=bip_dp_r3_scores_rate,
                             sf_rate_pop=getattr(cfg, "bip_sf_rate_pop", None),
+                            roe_rates=bip_roe_rates,
                         )
                         if subtype in ("ROE", "FC"):
                             state.runner_reach_source_by_id[int(batter_id)] = RUNNER_SRC_NON_HIT_REACH

@@ -9,6 +9,8 @@ rates that are MEASURED here, never fitted:
         not a GIDP)                                                    bip_fc_rate
   sf  P(sac fly | fly+pop (or line) out-or-error, runner on 3B,
         0-1 outs)                                                      bip_sf_rate_flypop / _line
+  roe P(batter reaches on error | field_out or field_error), per
+        trajectory: ground / line / fly+pop (bunts excluded)          bip_roe_rate_ground / _line / _air
 
 THE BASE STATE BEFORE A PLAY comes from the previous play's `matchup.postOn*` within the
 same half-inning. A play's `runners` list holds only runners who MOVED: a runner who held
@@ -114,6 +116,8 @@ def collect(data: dict, acc: dict) -> None:
             acc["grounders"].append(ev)
         if pre.get("3B") and outs_before <= 1 and traj in ("fly_ball", "popup", "line_drive") and ev in _SF_ALL:
             acc["airballs"].append((traj, ev))
+        if ev in ("field_out", "field_error") and traj in ("ground_ball", "line_drive", "fly_ball", "popup"):
+            acc["roe"].append((traj, ev == "field_error"))
 
 
 def wilson(k: int, n: int) -> list[float]:
@@ -145,7 +149,9 @@ def summarise(acc: dict) -> dict:
             "fc": share(k, n), "dp_conversion_info_only": share(gd, gd + n),
             "fc_counts": {e: g.count(e) for e in sorted(set(g))},
             "sf_flypop": sf(("fly_ball", "popup")), "sf_line": sf(("line_drive",)),
-            "sf_info": {"fly_ball": sf(("fly_ball",)), "popup": sf(("popup",))}}
+            "sf_info": {"fly_ball": sf(("fly_ball",)), "popup": sf(("popup",))},
+            **{f"roe_{name}": share(sum(1 for t, e in acc["roe"] if t in trajs and e), sum(1 for t, _ in acc["roe"] if t in trajs))
+               for name, trajs in (("ground", ("ground_ball",)), ("line", ("line_drive",)), ("air", ("fly_ball", "popup")))}}
 
 
 def main(argv=None) -> int:
@@ -158,7 +164,7 @@ def main(argv=None) -> int:
     data_dir = Path(os.path.expanduser(args.data_root))
     cache = Path(os.path.expanduser(args.cache))
     cache.mkdir(parents=True, exist_ok=True)
-    acc = {"gidp_all": 0, "gidp_zero_out": 0, "r2": [], "r3": [], "grounders": [], "airballs": []}
+    acc = {"gidp_all": 0, "gidp_zero_out": 0, "r2": [], "r3": [], "grounders": [], "airballs": [], "roe": []}
     games = failed = 0
     for d in sorted(set(args.dates)):
         for pk in game_pks(data_dir, d):

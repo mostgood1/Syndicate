@@ -669,6 +669,12 @@ class GameConfig:
     bip_out_1b_to_2b_rate: float = 0.14
     bip_misc_advance_pitch_rate: float = 0.004
     bip_roe_rate: float = 0.012
+    # Per-trajectory reached-on-error rates. None = bip_roe_rate x the fixed trajectory
+    # multipliers in simulate._roe_reach_rate (the behaviour before 2026-10-06). Measured
+    # 2026 pbp: ground 0.028, line 0.006, fly+pop 0.003 -- errors concentrate on grounders.
+    bip_roe_rate_ground: Optional[float] = None
+    bip_roe_rate_line: Optional[float] = None
+    bip_roe_rate_air: Optional[float] = None
     bip_fc_rate: float = 0.04
     bip_fc_runner_on_3b_score_rate: float = 0.0
     # On a double play with 0 outs before it, real runners do not hold: the runner on

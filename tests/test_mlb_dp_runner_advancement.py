@@ -116,5 +116,30 @@ class PopupSacFlyTests(unittest.TestCase):
         self.assertEqual(_sf(BattedBallType.POP, 0.9, None), "SF")
 
 
+def _roe(bb, roe_rates):
+    from vendor.mlb_bettingv2.sim_engine.simulate import _tuple_to_bases
+
+    class _Draw(random.Random):
+        def random(self):  # 0.02: fires only for a rate above 0.02
+            return 0.02
+
+    out = _resolve_in_play_out_with_runners(_Draw(0), _tuple_to_bases(False, False, False), 0, 0, 0, 0, 9, bb,
+                                            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.012, 0.0, 0.0, 0.0, roe_rates=roe_rates)
+    return out[-1]
+
+
+class ReachedOnErrorTests(unittest.TestCase):
+    def test_per_trajectory_rates_replace_base_times_multiplier(self) -> None:
+        rates = {"ground": 0.028, "line": 0.006, "air": 0.003}
+        self.assertEqual(_roe(BattedBallType.GROUND, rates), "ROE")   # 0.028 > 0.02
+        self.assertEqual(_roe(BattedBallType.LINE, rates), "OUT")     # 0.006
+        self.assertEqual(_roe(BattedBallType.FLY, rates), "OUT")      # 0.003
+
+    def test_unset_rates_keep_base_times_multiplier(self) -> None:
+        # 0.012 x 1.40 = 0.0168 < 0.02 -> no error; None everywhere is today's behaviour.
+        self.assertEqual(_roe(BattedBallType.GROUND, {"ground": None, "line": None, "air": None}), "OUT")
+        self.assertEqual(_roe(BattedBallType.GROUND, None), "OUT")
+
+
 if __name__ == "__main__":
     unittest.main()

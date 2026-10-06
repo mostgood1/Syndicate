@@ -1037,6 +1037,16 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **AMENDMENT 6 READINGS 2026-10-06 ~16:20Z (descent not yet restarted):**
+  - ROE measured (316 FIT-date games), against the model's 0.012 x multiplier:
+    - ground **117/4129 = 0.0283** [0.0237, 0.0339] vs 0.0168 (1.7x low);
+    - line **8/1393 = 0.0057** [0.0029, 0.0113] vs 0.0102;
+    - fly+pop **12/4168 = 0.0029** [0.0016, 0.0050] vs 0.0054.
+    - The level is close; the SHAPE is wrong: errors concentrate on grounders.
+  - CODE: `bip_roe_rate_ground/_line/_air` (models.py, default None); the resolver overrides base x multiplier per trajectory, with the same single RNG draw.
+  - BYTE-IDENTICAL vs HEAD: 100 seeded games, sha256 B840A6C6... (unchanged since the pre-DP engine).
+  - TESTS: 11 pass. REACHABILITY (06-15 rebuilt, 40 sims): runs/game 9.177 -> 9.245.
+  - Descent: 8 levers, 16 trials/pass; arms carry the three ROE rates. Restarting from scratch.
 - **RULE v2 AMENDMENT 6 — REACHED-ON-ERROR RATES MEASURED, PRE-REGISTERED 2026-10-06 ~16:00Z UTC (user: "then fix the ROE rate next"):**
   - State: the descent was STOPPED after its production arm (objective 12434, 98% the known HBP term). That arm is discarded; the descent restarts from scratch with these inputs.
   - Engine: P(ROE) on an out-ball that reached the ROE draw = `bip_roe_rate` (0.012, clamped <= 0.1) x {ground 1.40, line 0.85, fly/pop 0.45}.
