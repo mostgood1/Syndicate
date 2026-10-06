@@ -1288,6 +1288,11 @@ death, never life — do not invert it.
 - Blocked by: none (unblocked 2026-10-06, user: "do 2 and 3 and ship if they pass"; runs on the engine as shipped, since the joint re-fit did not ship)
 
 ### mlb-non-pa-outs — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **STEP 2 RESULT, 2026-10-06 ~01:45Z, by the pre-registered rule: PICKOFFS DO NOT SHIP.**
+  - Tune pick: `pickoff_rate` 0.01 (model 0.071 vs 0.099 actual PO/team-game).
+  - Holdout (232 team-games, read once): model 0.069 vs actual 0.034, gap 0.035 > 0.02 limit: FAIL. Every other check passes (BF balance improves; outs/SO/H/BB/ER/totals within limits).
+  - The failing check is dominated by noise in the actual: ~8 real pickoffs, SE ~0.016. Over all 626 cached team-games the real rate is 0.073. No re-test on this holdout; pickoffs move to the combined calibration and are judged on the fresh as-of set (lane `mlb-asof-roster-rebuild`).
+  - Mechanism code (default-off, byte-identical to HEAD, 27 tests) is held OFF main; the patch is in the session scratchpad.
 - **STEP 2 (PICKOFFS): COMPOSITION FIRST, then a SELECTION RULE PRE-REGISTERED 2026-10-06 ~00:30Z before any pickoff code ran** (user: "do pickoffs too").
   - **Composition, real.** Box scores, 626 team-games: balance BF-(OUTS+H+BB+HBP) = -0.71/team-game, made of GIDP 0.61 + CS 0.19 + PICKOFFS 0.07, minus ~0.16 of reach-without-H/BB/HBP.
   - **Composition, model.** 90 games x 30 sims, pbp: DP 0.20, CS 0.15, PO 0 (not modelled), balance -0.01. That implies ~0.34 of reach-without-H/BB/HBP, about 2x real.
