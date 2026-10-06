@@ -85,7 +85,8 @@ def _sim_game(job: dict) -> dict:
     n = int(job["sims"])
     for i in range(n):
         cfg = GameConfig(rng_seed=int(job["seed"]) + i, weather=weather, park=park, umpire=umpire,
-                         manager_pitching="v2", manager_pitching_overrides=job["mp"], pitch_model_overrides=job["pm"])
+                         manager_pitching="v2", manager_pitching_overrides=job["mp"], pitch_model_overrides=job["pm"],
+                         **(job.get("cfg") or {}))
         bs = simulate_game(away, home, cfg).batter_stats or {}
         for pid in lineup:
             row = bs.get(pid) or bs.get(str(pid)) or {}
@@ -116,11 +117,19 @@ def collect(args) -> None:
     cache = Path(os.path.expanduser(args.cache))
     cache.mkdir(parents=True, exist_ok=True)
     mp, pm = rp.forward_overrides()
+    cfgx = {}
+    for src, dst in ((args.set, mp), (args.pm_set, pm), (args.cfg_set, cfgx)):
+        for kv in src or []:
+            k, _, v = kv.partition("=")
+            try:
+                dst[k.strip()] = json.loads(v)
+            except ValueError:
+                dst[k.strip()] = v
     ks = keys()
     jobs = []
     for d in sorted(set(args.dates)):
         for g in rp.games_for_date(data_dir, d):
-            g.update({"sims": args.sims, "seed": args.seed, "mp": mp, "pm": pm, "keys": ks})
+            g.update({"sims": args.sims, "seed": args.seed, "mp": mp, "pm": pm, "cfg": cfgx, "keys": ks})
             jobs.append(g)
     with cf.ProcessPoolExecutor(max_workers=args.workers) as ex:
         results = list(ex.map(_sim_game, jobs, chunksize=1))
@@ -141,7 +150,8 @@ def collect(args) -> None:
                 stat, k = parse_key(key)
                 y[key] = int(_val(a, stat) >= k)
             rows.append({"date": res["date"], "game_pk": res["game_pk"], "pid": int(pid), "p": ps, "y": y})
-    Path(args.rows).write_text(json.dumps({"counters": dict(counters), "sims": args.sims, "rows": rows}), encoding="utf-8")
+    Path(args.rows).write_text(json.dumps({"counters": dict(counters), "sims": args.sims, "mp": mp, "pm": pm, "cfg": cfgx,
+                                           "rows": rows}), encoding="utf-8")
     print(json.dumps({"rows": len(rows), "counters": dict(counters)}))
 
 
@@ -239,6 +249,9 @@ def main(argv=None) -> int:
     ap.add_argument("--lam", type=float, default=10.0)
     ap.add_argument("--min-gain", type=float, default=0.001)
     ap.add_argument("--out")
+    ap.add_argument("--set", action="append", help="manager-pitching override key=value")
+    ap.add_argument("--pm-set", action="append", help="pitch-model override key=value")
+    ap.add_argument("--cfg-set", action="append", help="GameConfig field key=value")
     args = ap.parse_args(argv)
     if args.collect:
         collect(args)
