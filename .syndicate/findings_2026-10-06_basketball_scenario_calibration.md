@@ -75,6 +75,23 @@ is recorded EXONERATED for this engine version.
 spread, S9 3PA, S11 foul-outs (5 PF), all for the 2025-26 season from ESPN mens-college-basketball summaries. It is
 recorded as groundwork; there is no gate and no mechanism.
 
+## Pre-measurement amendments (2026-10-06 ~22:00Z, BEFORE any sim measurement or any real-vs-sim comparison)
+
+1. **S1 pace formula.** The sim's per-draw team box has FGA, FTA, TOV, 3PA and PF but NO offensive rebounds
+   (`events.py` `finalize`). S1 is therefore FGA + 0.44·FTA + TOV (shot + turnover volume) on BOTH sides, not the
+   pre-registered − OREB form. The real side also reports the full formula for reference (not compared).
+2. **S6 / S9 fourth-quarter parts are real-only.** Recorded sim events are truncated at 500 per game
+   (`events.py:986`, `events[:500]`), which cuts off Q4. Without modifying the engine there is no sim-side Q4
+   FTA/3PA. S6 and S9 compare game-level FTA and 3PA per team-game; their Q4 rows are reported real-only. The
+   engine has no intentional-foul free throws at all, so S6's late-game row is a structural mechanism candidate
+   regardless.
+3. **Real-side lines.** ESPN summaries carry no odds after the final. The pregame spread/total for the spread
+   buckets comes from the OddsAPI pre-tip game-line backfill (NBA: C:	mp
+ba_bt\out\cache\oddsapi_hist\games;
+   WNBA: C:	mp\wnba_bt\odds_hist), joined by date + teams.
+4. **Extraction counts (FIT only; validation NOT extracted):** NBA 816 games (2025-11-01..2026-02-28), WNBA 217
+   games (2026-05-01..07-31), 0 fetch failures.
+
 ## Readings
 
 (none yet)
