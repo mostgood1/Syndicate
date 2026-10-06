@@ -66,3 +66,36 @@ def test_bias_window_reachability_filter_off_differs_from_on(root):
 
 def test_espn_table_matches_the_pinned_fixture():
     assert set(ESPN_TYPES) == {2026, 2027}
+
+
+# --- rotation-history lookback (basketball_props_smart_sim._rotation_sim_minutes_from_history_local, loaned) ---------
+
+def _rotation_call(root, monkeypatch, league, slate):
+    import types
+
+    import pandas as pd
+
+    from syndicate.features.shared import basketball_props_smart_sim as bpss
+
+    stints = pd.DataFrame({"team": ["NYK"] * 4, "duration_sec": [600] * 4, "lineup_player_ids": ["1;2;3;4;5"] * 4,
+                           "date": ["2026-10-12", "2026-10-15", "2026-10-17", "2026-10-21"]})
+    mod = types.SimpleNamespace(
+        _read_hist_any=lambda *paths: stints, _roll_minutes_unscaled=None, _regularize_rotation_minutes=None,
+        _minutes_caps_from_team_df=None, _cap_and_redistribute_minutes=None, _rotation_minutes_signal_guardrail=None,
+        _clean_id_str=str, paths=types.SimpleNamespace(data_processed=root))
+    monkeypatch.setattr(bpss, "_espn_name_to_id_map_for_game_local", lambda **k: {})   # stop right after the filter
+    team_df = pd.DataFrame({"player_name": ["A. Player"]})
+    return bpss._rotation_sim_minutes_from_history_local(
+        smart_sim_module=mod, league_code=league, team_df=team_df, date_str=slate, home_tri="NYK", away_tri="BOS",
+        team_tri="NYK")[3]
+
+
+def test_rotation_lookback_keeps_same_phase_stints_only(root, monkeypatch):
+    """Opening night 2026-10-20: the 28-day window holds only preseason stints -> nothing kept (on), while WNBA (off)
+    keeps them. Two days later the regular-season stint survives and the preseason ones do not."""
+    on = _rotation_call(root, monkeypatch, "nba", "2026-10-20")
+    off = _rotation_call(root, monkeypatch, "wnba", "2026-10-20")
+    assert on["reason"] == "no_recent_history" and on["phase_filtered_rows"] == 3 and on["slate_phase"] == "regular"
+    assert off["reason"] == "no_espn_name_map" and "phase_filtered_rows" not in off
+    later = _rotation_call(root, monkeypatch, "nba", "2026-10-22")
+    assert later["reason"] == "no_espn_name_map" and later["phase_filtered_rows"] == 3   # 10-21 regular stint kept

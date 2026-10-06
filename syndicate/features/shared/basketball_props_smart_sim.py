@@ -2383,6 +2383,25 @@ def _rotation_sim_minutes_from_history_local(*, smart_sim_module, league_code: s
         except Exception:
             pass
 
+    # NBA season-phase guard (lane nba-season-phase; function loaned by basketball-injury-exclusion-reinclusion,
+    # 284a15c8). On opening night the 28-day window above is 100% preseason, where starters play ~20 minutes, so
+    # stints from another phase must not shape a regular-season rotation. Same-phase dates only; a preseason or
+    # unknown-phase slate keeps nothing; if the phase check itself fails, nothing is kept (never permissive).
+    if str(league_code or "").strip().lower() == "nba" and "date" in st.columns and not st.empty:
+        try:
+            from syndicate.features.shared.nba_season_phase import same_phase_date_filter
+
+            ok = same_phase_date_filter(str(date_str), processed_root=getattr(source_paths, "data_processed", None))
+            days = pd.to_datetime(st["date"], errors="coerce").dt.strftime("%Y-%m-%d")
+            keep_days = {d for d in days.dropna().unique() if ok(d)}
+            before = len(st)
+            st = st[days.isin(keep_days)].copy()
+            diag["phase_filtered_rows"] = int(before - len(st))
+            diag["slate_phase"] = getattr(ok, "slate_phase", None)
+        except Exception:
+            st = st.iloc[0:0].copy()
+            diag["phase_filter_error"] = True
+
     if st.empty:
         diag["reason"] = "no_recent_history"
         return None, None, None, diag
