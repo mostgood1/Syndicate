@@ -202,3 +202,78 @@ def test_a_DIFFERENT_name_for_one_team_is_reported_rather_than_guessed(espn):
     unused = " | ".join(join["espn_unused"])
     assert "mcneese cowboys" in unused and "massachusetts minutemen" in unused, \
         "the ESPN side of a miss must be printed so the pair is diagnosable"
+
+
+# --- the exclusion flags on the NCAAF path -----------------------------------
+# Both filter/search the finals dict BY ITS OWN KEYS, which the adapter makes
+# `event_id`s for this sport. Proven live on 2026-10-03 first: an explicit
+# --exclude-game-pk took scored_games 49 -> 48 and n 2472 -> 2447 and FAILED the
+# 49-game gate (exit 4), then --search-exclusions searched 52 finals and recovered
+# that same event_id as the UNIQUE match (exit 0). These pin it offline.
+
+def _mini_ledger(tmp_path, rows):
+    p = tmp_path / "ledger.jsonl"
+    p.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    return str(p)
+
+
+def _two_game_fixture(espn):
+    espn["payload"] = _espn([
+        ("Georgia Bulldogs", "Vanderbilt Commodores", "38", "14", "post"),
+        ("Clemson Tigers", "Miami Hurricanes", "13", "41", "post"),
+    ])
+    rows = []
+    for ev, home, away, mp in (("ev-a", "Georgia Bulldogs", "Vanderbilt Commodores", 0.7),
+                               ("ev-b", "Clemson Tigers", "Miami Hurricanes", 0.6)):
+        for q in (10.0, 30.0):
+            rec = _h2h(ev, home, away)
+            rec["model_home_win_prob"] = mp
+            rec["market_fair_prob"] = 0.5
+            rec["quote_age_seconds"] = q
+            rows.append(rec)
+    return rows
+
+
+def test_exclude_game_pk_accepts_an_event_id_on_the_ncaaf_path(espn, tmp_path, capsys):
+    rows = _two_game_fixture(espn)
+    ledger = _mini_ledger(tmp_path, rows)
+    rc = mod.main(["--sport", "ncaaf", "--date", "2026-10-03", "--ledger", ledger,
+                   "--exclude-game-pk", "ev-b"])
+    out = capsys.readouterr().out
+    assert "excluded=['ev-b']" in out, out
+    assert "scored_games=1" in out, "excluding one of two games must drop the count"
+    # exit 3 is DOCUMENTED: "no expectation given (refuses to append blind)". The
+    # exclusion is what this test is about and it took effect above; the tool
+    # declining to bless an unanchored re-score is correct, not a failure.
+    assert rc == 3, "an unanchored run must refuse rather than look successful"
+
+
+def test_an_exclusion_that_is_not_a_final_is_reported_as_having_no_effect(espn, tmp_path, capsys):
+    rows = _two_game_fixture(espn)
+    ledger = _mini_ledger(tmp_path, rows)
+    mod.main(["--sport", "ncaaf", "--date", "2026-10-03", "--ledger", ledger,
+              "--exclude-game-pk", "ev-does-not-exist"])
+    out = capsys.readouterr().out
+    assert "not among" in out and "no effect" in out, out
+    assert "scored_games=2" in out, "a bogus exclusion must not silently shrink the population"
+
+
+def test_search_exclusions_recovers_the_one_excluded_event_uniquely(espn, tmp_path, capsys):
+    """Give the tool the figures that arise from excluding ev-b and NO explicit
+    exclusion; it must search the finals and land on ev-b alone. A search returning
+    0 or >1 is refused upstream -- picking one of several would be a guess."""
+    rows = _two_game_fixture(espn)
+    ledger = _mini_ledger(tmp_path, rows)
+    # derive the one-game expectation with the module's own scorer, so the test pins
+    # the FLAG plumbing rather than restating the scorer's arithmetic
+    one = {"ev-a": (14.0, 38.0)}
+    target = mod.score_ledger_records(rows, mod.finals_from_scores(one), final_scores=one)
+    allr = target["all_records"]
+    rc = mod.main(["--sport", "ncaaf", "--date", "2026-10-03", "--ledger", ledger,
+                   "--search-exclusions",
+                   "--expect-model", str(allr["model"]["brier"]),
+                   "--expect-market", str(allr["market"]["brier"]),
+                   "--expect-n", f"{allr['model']['n']}/{allr['market']['n']}"])
+    out = capsys.readouterr().out
+    assert "1 exact match(es) ['ev-b']" in out, out
+    assert rc == 0, "the gate must pass once the search has found the population"
