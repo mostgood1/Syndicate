@@ -1046,6 +1046,10 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **RULE v2 AMENDMENT 11 — STEALS OF HOME, PRE-REGISTERED 2026-10-06 ~18:15Z UTC (user: "then fix the steal of home next"). The descent is NOT stopped for the count (a read-only pbp pass):**
+  - COUNT (pbp, FIT games, true pre-PA state): attempts = stolen_base_home / caught_stealing_home / pickoff_caught_stealing_home by the runner who started the PA on 3B, any base state, <= 1 out (also reported for 2 outs).
+  - FLOOR (same as amendment 10): fewer than 10 attempts -> too rare to set a rate from 24 dates. Then NO mechanism, recorded, and the descent continues uninterrupted.
+  - >= 10: the descent is stopped and a default-off mechanism is added the amendment-9 way (`sbh_attempt_mult` / `sbh_success_mult` against the runner's profile rates), with tests, a byte-identical proof and the measured values in every arm.
 - **AMENDMENT 10 READINGS 2026-10-06 ~19:05Z (descent not restarted yet):**
   - 16 lead-runner 3B attempts with a runner on 1B (>= 10 floor met): the trailer went on the same event **11/16 = 0.69** [0.44, 0.86]. Steals of home on 1st-and-3rd plays: 5 (info, not modelled).
   - CODE: GameConfig `sb_double_steal_trail_prob` (default 0.0, no RNG draw) inside the steal-of-third block. The trailer reaches 2B; it is his SB only if the lead runner is safe.
