@@ -47031,3 +47031,13 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - **baseline (read 2026-10-06 ~3:50 PM CT on the fleet, real functions under the live-odds-worker role env):** both 10-07 WNBA sims (ATL_NYL, GSV_LVA) match their stamps on all 4 teams (24/18/16/13 keys), so 0 drift.
 - **prediction:** the next WNBA props build that reaches SmartSim prints `SMART_SIM_REUSE_EXCLUSIONS stale=0 reuse=True` for each unchanged 10-07 sim and rebuilds nothing. A sim prints `STALE ... reuse=False` and is rebuilt only if that day's exclusions moved (e.g. a new injury-feed snapshot).
 - **verify:** the `[smart_sim_reuse]` lines in wnba_source/logs/syndicate_refresh_oddsapi_props_<D>.log after 16:35:50 CDT, plus the sim file mtimes. Watcher: scratchpad/watch_reuse.sh (2-min poll, ~12 h).
+
+## 2026-10-06 22:07:08Z (5:07 PM CT) -- READING 1 for d6eb1086 (SmartSim reuse exclusion check): NBA 10-06 build -- **MET for NBA; WNBA reading still OWED** (lane `smart-sim-reuse-stale-exclusions`)
+
+- **source:** nba_source/logs/syndicate_refresh_oddsapi_props_2026-10-06.log, the first props build after the 16:35:50 CDT ff. Caught by the watcher at 17:05:24 CDT.
+  - `SMART_SIM_REUSE_EXCLUSIONS ... smart_sim_2026-10-06_CHA_BKN.json stale=0 reuse=True` (file unchanged, mtime 10:04:53)
+  - `SMART_SIM_REUSE_STALE_EXCLUSIONS ... smart_sim_2026-10-06_OKC_NOP.json stale=1 teams=1 drift=NOP:+-/-N'FALY DANTE,NFALY DANTE reuse=False` (rebuilt, mtime 17:07:08)
+  - `SMART_SIM_REUSE_EXCLUSIONS ... smart_sim_2026-10-06_UTA_DEN.json stale=0 reuse=True` (file unchanged, mtime 10:06:23)
+- **The rebuild was a REAL change, not churn.** N'Faly Dante's last NBA feed row is OUT on 2026-09-30, and he is absent from every snapshot since. He is off the report, yet the 10:05 sim still carried him as excluded. The rebuilt file's NOP stamp holds 0 keys with Dante not in it.
+- **Matches the prediction:** unchanged sims were reused (2 of 2), and the only rebuild was the one whose exclusions had moved. Before d6eb1086 the OKC_NOP sim would have been reused until tip.
+- **OWED:** the WNBA reading on the first 10-07 build that reaches SmartSim. WNBA 10-06 has no games, so its runs stop at missing_props. A WNBA-only watcher is running (scratchpad/watch_reuse_wnba.sh, ~18 h).
