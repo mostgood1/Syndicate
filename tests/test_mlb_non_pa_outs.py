@@ -28,11 +28,16 @@ def _stealing_roster(team_id, abbr, base):
     return replace(r, lineup=replace(r.lineup, batters=bats))
 
 
-def _games():
+def _games(overrides=None):
     away, home = _stealing_roster(1, "AWY", 100000), _stealing_roster(2, "HOM", 200000)
-    cfg = GameConfig(rng_seed=11, manager_pitching="v2")
+    cfg = GameConfig(rng_seed=11, manager_pitching="v2", manager_pitching_overrides=dict(overrides or {}))
     for i in range(N):
         yield simulate_game(away, home, replace(cfg, rng_seed=11 + i))
+
+
+def _summary(overrides=None):
+    return [(r.away_score, r.home_score, sorted((k, sorted(v.items())) for k, v in r.pitcher_stats.items()))
+            for r in _games(overrides)]
 
 
 def _no_walkoff(r):
@@ -54,6 +59,29 @@ class CaughtStealingOutsTests(unittest.TestCase):
             outs = sum(float(row.get("OUTS") or 0.0) for row in (r.pitcher_stats or {}).values())
             self.assertEqual(outs, 3.0 * halves, f"pitcher OUTS {outs} != 3 x {halves} half-innings")
             checked += 1
+        self.assertGreater(checked, 20)
+
+
+class PickoffTests(unittest.TestCase):
+    def test_default_and_explicit_zero_are_byte_identical(self) -> None:
+        self.assertEqual(_summary(None), _summary({"pickoff_rate": 0.0}))
+
+    def test_junk_values_fall_back_to_off(self) -> None:
+        for junk in ("x", None, -1, float("nan")):
+            self.assertEqual(_summary(None), _summary({"pickoff_rate": junk}), f"junk {junk!r}")
+
+    def test_pickoffs_happen_and_are_the_pitchers_outs(self) -> None:
+        po = 0
+        checked = 0
+        for r in _games({"pickoff_rate": 0.10}):
+            po += int(sum(float(v.get("PO", 0.0)) for v in r.pitcher_stats.values()))
+            if not _no_walkoff(r):
+                continue
+            halves = len(r.away_inning_runs) + len(r.home_inning_runs)
+            outs = sum(float(v.get("OUTS") or 0.0) for v in r.pitcher_stats.values())
+            self.assertEqual(outs, 3.0 * halves)
+            checked += 1
+        self.assertGreater(po, 10, "the knob was not read, or the opportunity never arose")
         self.assertGreater(checked, 20)
 
 

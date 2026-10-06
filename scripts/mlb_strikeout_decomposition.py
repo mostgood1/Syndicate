@@ -50,9 +50,15 @@ def _sim_game(job: dict) -> dict:
     n = int(job["sims"])
     for i in range(n):
         cfg = GameConfig(rng_seed=int(job["seed"]) + i, weather=weather, park=park, umpire=umpire,
-                         manager_pitching="v2", manager_pitching_overrides=job["mp"], pitch_model_overrides=job["pm"])
+                         manager_pitching="v2", manager_pitching_overrides=job["mp"], pitch_model_overrides=job["pm"],
+                         pbp="pa", **(job.get("cfg") or {}))
         r = simulate_game(away, home, cfg)
         runs += float(r.away_score) + float(r.home_score)
+        for ev in r.pbp or []:
+            if ev.get("type") == "PA" and int(ev.get("outs_after", 0)) - int(ev.get("outs_before", 0)) >= 2:
+                fside = "home" if int(ev.get("fielding_team_id", 0)) == int(home.team.team_id) else "away"
+                team[fside]["DP"] += 1.0
+        r.pbp = []
         for bid_raw, brow in (r.batter_stats or {}).items():
             bid = int(bid_raw)
             side = "away" if bid in bats["away"] else ("home" if bid in bats["home"] else None)
@@ -64,6 +70,9 @@ def _sim_game(job: dict) -> dict:
             row = ps.get(pid) or ps.get(str(pid)) or {}
             for k in STAT_KEYS:
                 st[side][k] += float(row.get(k) or 0.0)
+            o = float(row.get("OUTS") or 0.0)
+            st[side]["LE9"] += 1.0 if o <= 9 else 0.0
+            st[side]["EQ15"] += 1.0 if o == 15 else 0.0
         for pid_raw, row in ps.items():
             pid = int(pid_raw)
             side = "away" if pid in staff["away"] else ("home" if pid in staff["home"] else None)
@@ -90,6 +99,7 @@ def _actual(box: dict) -> dict:
         whole, _, frac = ip.partition(".")
         tp = ((t.get("teamStats") or {}).get("pitching") or {})
         tb = ((t.get("teamStats") or {}).get("batting") or {})
+        ob = (((box.get("teams") or {}).get("home" if side == "away" else "away") or {}).get("teamStats") or {}).get("batting") or {}
         out[side] = {"pid": pid,
                      "starter": {"OUTS": int(s.get("outs", int(whole or 0) * 3 + int(frac or 0))),
                                  "P": int(s.get("numberOfPitches") or s.get("pitchesThrown") or 0),
@@ -102,7 +112,7 @@ def _actual(box: dict) -> dict:
                                  "BB": int(tb.get("baseOnBalls") or 0), "PA": int(tb.get("plateAppearances") or 0),
                                  "SO": int(tb.get("strikeOuts") or 0), "HBP": int(tb.get("hitByPitch") or 0)},
                      "team": {"SO": int(tp.get("strikeOuts") or 0), "BF": int(tp.get("battersFaced") or 0),
-                              "PO": int(tp.get("pickoffs") or 0),
+                              "PO": int(tp.get("pickoffs") or 0), "DP": int(ob.get("groundIntoDoublePlay") or 0),
                               "P": int(tp.get("numberOfPitches") or tp.get("pitchesThrown") or 0)}}
     return out
 
@@ -155,8 +165,15 @@ def summarise(rows: list[dict], draws: int) -> dict:
         bat[k + "_per_PA"] = {"model": sum(r["model_bat"].get(k, 0.0) for r in rows) / mp_ if mp_ else None,
                               "actual": sum(r["actual_bat"].get(k, 0) for r in rows) / ap_ if ap_ else None}
     out["batting"] = bat
+    out["team_DP_per_game"] = {"model": sum(r["model_team"].get("DP", 0.0) for r in rows) / len(rows),
+                               "actual": sum(r["actual_team"].get("DP", 0) for r in rows) / len(rows)}
+    out["starter_share_le9"] = {"model": sum(r["model_starter"].get("LE9", 0.0) for r in rows) / len(rows),
+                                "actual": sum(1.0 for r in rows if r["actual_starter"]["OUTS"] <= 9) / len(rows)}
+    out["starter_share_eq15"] = {"model": sum(r["model_starter"].get("EQ15", 0.0) for r in rows) / len(rows),
+                                 "actual": sum(1.0 for r in rows if r["actual_starter"]["OUTS"] == 15) / len(rows)}
     out["team_PO_per_game"] = {"model": sum(r["model_team"].get("PO", 0.0) for r in rows) / len(rows),
                                "actual": sum(r["actual_team"].get("PO", 0) for r in rows) / len(rows)}
+    out["objective"] = objective(out)
     # K/start decomposition: model K = (model K/BF)(model BF); swap one term at a time
     kbf_m, kbf_a = s["K_per_BF"]["model"], s["K_per_BF"]["actual"]
     bf_m, bf_a = s["BF"]["model"], s["BF"]["actual"]
@@ -166,6 +183,30 @@ def summarise(rows: list[dict], draws: int) -> dict:
                              "interaction": (kbf_m - kbf_a) * (bf_m - bf_a)}
     return out
 
+
+
+# The pre-registered combined-calibration objective (lanes.md, mlb-combined-calibration).
+# Scales: 5% of actual for per-PA rates, 0.5 outs, 0.03 shares, 0.05 DP/PO per team-game,
+# 0.10 BF balance, 0.30 runs/game.
+def objective(s: dict) -> dict:
+    st, b = s["starter"], s["batting"]
+    rel = lambda m, a: (m - a) / (0.05 * a) if a else 0.0  # noqa: E731
+    terms = {
+        "HBP_per_PA": rel(b["HBP_per_PA"]["model"], b["HBP_per_PA"]["actual"]),
+        "K_per_BF": rel(st["K_per_BF"]["model"], st["K_per_BF"]["actual"]),
+        "P_per_BF": rel(st["P_per_BF"]["model"], st["P_per_BF"]["actual"]),
+        "BB_per_PA": rel(b["BB_per_PA"]["model"], b["BB_per_PA"]["actual"]),
+        "HR_per_PA": rel(b["HR_per_PA"]["model"], b["HR_per_PA"]["actual"]),
+        "H_per_PA": rel(b["H_per_PA"]["model"], b["H_per_PA"]["actual"]),
+        "DP_per_game": (s["team_DP_per_game"]["model"] - s["team_DP_per_game"]["actual"]) / 0.05,
+        "PO_per_game": (s.get("team_PO_per_game", {"model": 0, "actual": 0})["model"] - s.get("team_PO_per_game", {"model": 0, "actual": 0})["actual"]) / 0.05,
+        "BF_balance": (s["bf_integrity_gap"]["model"] - s["bf_integrity_gap"]["actual"]) / 0.10,
+        "outs_mean": (st["OUTS"]["model"] - st["OUTS"]["actual"]) / 0.5,
+        "share_le9": (s["starter_share_le9"]["model"] - s["starter_share_le9"]["actual"]) / 0.03,
+        "share_eq15": (s["starter_share_eq15"]["model"] - s["starter_share_eq15"]["actual"]) / 0.03,
+        "runs_per_game": (s["game_total"]["model"] - s["game_total"]["actual"]) / 0.30,
+    }
+    return {"total": sum(v * v for v in terms.values()), "terms": terms}
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
@@ -177,6 +218,7 @@ def main(argv=None) -> int:
     ap.add_argument("--draws", type=int, default=1000)
     ap.add_argument("--set", action="append", help="manager-pitching override key=value")
     ap.add_argument("--pm-set", action="append", help="pitch-model override key=value")
+    ap.add_argument("--cfg-set", action="append", help="GameConfig field key=value (e.g. bip_dp_rate=0.12)")
     ap.add_argument("--cache", default=os.path.join(os.environ.get("TMPDIR", "/tmp"), "mlb_starter_replay_cache"))
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)
@@ -184,7 +226,8 @@ def main(argv=None) -> int:
     cache = Path(os.path.expanduser(args.cache))
     cache.mkdir(parents=True, exist_ok=True)
     mp, pm = rp.forward_overrides()
-    for src, dst in ((args.set, mp), (args.pm_set, pm)):
+    cfgx = {}
+    for src, dst in ((args.set, mp), (args.pm_set, pm), (args.cfg_set, cfgx)):
         for kv in src or []:
             k, _, v = kv.partition("=")
             try:
@@ -194,7 +237,7 @@ def main(argv=None) -> int:
     jobs = []
     for d in sorted(set(args.dates)):
         for g in rp.games_for_date(data_dir, d):
-            g.update({"sims": args.sims, "seed": args.seed, "mp": mp, "pm": pm})
+            g.update({"sims": args.sims, "seed": args.seed, "mp": mp, "pm": pm, "cfg": cfgx})
             jobs.append(g)
     counters = defaultdict(int)
     rows = []
@@ -221,7 +264,7 @@ def main(argv=None) -> int:
                          "model_team": res["team"][side], "actual_team": a["team"]})
     dates = sorted(set(args.dates))
     cut = dates[int(len(dates) * 2 / 3)] if len(dates) >= 3 else None
-    rep = {"dates": dates, "sims": args.sims, "seed": args.seed, "mp": mp, "pm_set": args.pm_set or [],
+    rep = {"dates": dates, "sims": args.sims, "seed": args.seed, "mp": mp, "pm_set": args.pm_set or [], "cfg_set": args.cfg_set or [],
            "counters": dict(counters), "all": summarise(rows, args.draws)}
     if cut:
         rep["split_date"] = cut

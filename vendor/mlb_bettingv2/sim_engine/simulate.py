@@ -1192,6 +1192,24 @@ def _leverage_index(inning: int, top: bool, outs: int, bases: BaseState, score_d
     return _clamp01(0.45 * late + 0.35 * close + 0.2 * runners + outs_boost)
 
 
+def _pickoff_rate(cfg: Any) -> float:
+    """Per-opportunity pickoff probability from manager_pitching_overrides (default 0.0 = off).
+
+    Real 2026 rate: 0.07 pickoffs per team-game (626 box-score team-games). Clamped to
+    [0, 0.2]; anything unreadable is 0.0, so a bad override can never switch it on.
+    """
+    overrides = getattr(cfg, "manager_pitching_overrides", None) if cfg is not None else None
+    if not isinstance(overrides, dict):
+        return 0.0
+    try:
+        v = float(overrides.get("pickoff_rate", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+    if v != v:  # NaN
+        return 0.0
+    return max(0.0, min(0.2, v))
+
+
 def _score_diff_from_fielding(state: GameState) -> int:
     # Score diff from fielding team's POV.
     # Positive => fielding team leading.
@@ -2611,8 +2629,14 @@ def simulate_game(
                     sr = float(getattr(rprof, "sb_success_rate", 0.72) or 0.72)
                     ar = float(max(0.0, min(0.40, ar)))
                     sr = float(max(0.40, min(0.95, sr)))
-                    if ar > 0.0 and rng.random() < ar:
-                        if rng.random() < sr:
+                    # PICKOFF (lane mlb-non-pa-outs step 2). Same opportunity as the
+                    # steal, drawn BEFORE it. `pickoff_rate` comes from
+                    # manager_pitching_overrides; at the 0.0 default no rng draw is
+                    # made, so every existing game is byte-identical.
+                    po_rate = _pickoff_rate(cfg)
+                    picked_off = po_rate > 0.0 and rng.random() < po_rate
+                    if picked_off or (ar > 0.0 and rng.random() < ar):
+                        if (not picked_off) and rng.random() < sr:
                             # SB
                             st.batter_row(rid)["SB"] += 1
                             _set_half_bases_from_runners(half, 0, rid, int(half.runner_on_3b))
@@ -2632,8 +2656,12 @@ def simulate_game(
                                     }
                                 )
                         else:
-                            # CS
-                            st.batter_row(rid)["CS"] += 1
+                            # CS, or a pickoff: the runner on 1B is out either way.
+                            if picked_off:
+                                po_row = st.pitcher_row(pitcher_id)
+                                po_row["PO"] = float(po_row.get("PO", 0.0)) + 1.0
+                            else:
+                                st.batter_row(rid)["CS"] += 1
                             _set_half_bases_from_runners(half, 0, int(half.runner_on_2b), int(half.runner_on_3b))
                             _sync_runner_reach_sources(state.runner_reach_source_by_id, half)
                             half.outs += 1
@@ -2645,7 +2673,7 @@ def simulate_game(
                             if pbp_mode in ("pa", "pitch"):
                                 _log(
                                     {
-                                        "type": "CS",
+                                        "type": "PO" if picked_off else "CS",
                                         "inning": int(state.inning),
                                         "half": "top" if state.top else "bottom",
                                         "batting_team_id": int(batting_roster.team.team_id),
