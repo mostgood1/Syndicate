@@ -931,7 +931,7 @@ death, never life — do not invert it.
 - Verification: Unit tests: down < 9 min no recover; >= 9 min recover; cap 3/hour; pause file blocks; recovered state clears. Fleet: a watchdog run on the live fleet reports recover=false with status ok; the ps1 acts only on recover=true
 - Blocked by: none
 
-### wnba-boot-vendor-root — OPEN — opened 2026-10-04 — session 936c0a27-a98a-411b-8397-f769b7f2baf7
+### wnba-boot-vendor-root — CLOSED 2026-10-06 — opened 2026-10-04 — session 936c0a27-a98a-411b-8397-f769b7f2baf7
 - **CROSS-LANE WRITE into this lane's `scripts/refresh_odds_sources.py`, USER-APPROVED 2026-10-06 ("Approve") (session 43e4d5fe, lane `soccer-team-history-current-season`):** the soccer current-season history step and its wiring ONLY. `_basketball_source_root` (this lane's scope) is not touched.
 - Goal: No boot-time or orchestrated WNBA refresh on a host with SYNDICATE_DATA_ROOT set can build SmartSims from vendor/wnba_betting_repo: bootstrap_data_root's boot refresh passes <data_root>/wnba_source, and refresh_odds_sources + refresh_wnba_oddsapi_props refuse a vendor source root when SYNDICATE_DATA_ROOT is set
 - Files: scripts/bootstrap_data_root.py (_wnba_refresh_source_root/_bootstrap_wnba_today_artifacts only), scripts/refresh_odds_sources.py (_basketball_source_root only), scripts/refresh_wnba_oddsapi_props.py (source-root validation in main only), tests/test_wnba_vendor_source_root_guard.py (NEW), tests/test_bootstrap_data_root.py (the WNBA boot-refresh vendor assertion only)
@@ -940,6 +940,7 @@ death, never life — do not invert it.
 - Falsification test: A vendor-dir WNBA write with no preceding bootstrap 'refreshing today's WNBA bundle' line in ~/syndicate-prod/logs/bootstrap.log
 - Verification: Unit tests for all three hops; on the fleet after the next supervisor up, vendor/wnba_betting_repo/data/processed gains no new <today> files and bootstrap.log's boot refresh names the prod source root
 - Blocked by: none
+- **CLOSED 2026-10-06 — GOAL MET.** d5f8acca reached the fleet via another lane's ff (9b106614, 10-04 18:25:53Z); the 10-04 19:24Z boot fired the WNBA boot refresh and vendor/ gained no files (deploys.md 2026-10-06 17:18:38Z entry). Guards' REFUSE branches are unit-tested only.
 - **LANDED 2026-10-04 d5f8acca (on origin/main; NOT on the fleet -- ~/Syndicate was at 00876a04).** Takes effect on the fleet with no restart: bootstrap_data_root.py runs fresh at each `local_production.py up`, and refresh_odds_sources/refresh_wnba_oddsapi_props are per-run subprocesses, so any fleet fast-forward carries it. VERIFY OWED after the next ff + `up`: bootstrap.log's boot refresh line, and no new <today> files under ~/Syndicate/vendor/wnba_betting_repo/data/processed. Known red in worktrees, not this lane: test_refresh_odds_sources::test_nba_and_wnba_use_combined_game_and_player_prop_markets... (writes data/nba_source/logs; fails identically on HEAD without this change).
 
 ### daily-optimizer — CLOSED — closed 2026-10-06 — opened 2026-10-05 — session 5942cf5f-48c9-485b-99a8-e6e04c75bd83
