@@ -1,4 +1,4 @@
-﻿"""NHL power-play TIME: real vs what hockeysim's PP segment sampler implies (lane nhl-pp-time).
+"""NHL power-play TIME: real vs what hockeysim's PP segment sampler implies (lane nhl-pp-time).
 
 Real side, per team-game, from cached NHL play-by-play (api-web `gamecenter/<id>/play-by-play`):
 

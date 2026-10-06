@@ -1,4 +1,4 @@
-﻿"""Measure hockeysim's simulated power-play TIME per team-game straight from the engine (lane nhl-pp-time).
+"""Measure hockeysim's simulated power-play TIME per team-game straight from the engine (lane nhl-pp-time).
 
 Runs the props engine path (`player_props.build_prop_projections`'s own inputs: `build_slate_features`
 over an as-of root -> `runtime.run_hockeysim_game`) and reads, per simulated game, each team's PP
@@ -55,6 +55,7 @@ def measure_game(game, n_sims: int) -> dict:
     goalies = {game.home.name: {int(p.player_id) for p in game.home_players if str(p.position).upper() == "G"},
                game.away.name: {int(p.player_id) for p in game.away_players if str(p.position).upper() == "G"}}
     acc = {t: collections.Counter() for t in (game.home.name, game.away.name)}
+    per_player = collections.defaultdict(collections.Counter)
     seed0 = game_seed(game.date, game.game_pk)
     for i in range(n_sims):
         _gs, events = run_hockeysim_game(
@@ -67,6 +68,9 @@ def measure_game(game, n_sims: int) -> dict:
             if team not in acc:
                 continue
             st = str((e.meta or {}).get("strength", "EV")).upper()
+            if e.kind == "shift" and e.player_id is not None and int(e.player_id) not in goalies[team]:
+                if st in ("PP", "PK"):
+                    per_player[(team, int(e.player_id))][st] += float((e.meta or {}).get("dur", 0.0))
             if e.kind == "shift" and e.player_id is not None and int(e.player_id) in goalies[team]:
                 dur = float((e.meta or {}).get("dur", 0.0))
                 acc[team]["sec"] += dur
@@ -91,6 +95,11 @@ def measure_game(game, n_sims: int) -> dict:
     out = {}
     for t, c in acc.items():
         out[t] = {k: v / n_sims for k, v in c.items()}
+    units = {(side.name, int(p.player_id)): (p.pp_unit, getattr(p, "pk_unit", None), p.position)
+             for side, players in ((game.home, game.home_players), (game.away, game.away_players)) for p in players}
+    out["_players"] = [dict(team=t, pid=pid, pp_unit=units.get((t, pid), (None,) * 3)[0], pk_unit=units.get((t, pid), (None,) * 3)[1],
+                            pos=units.get((t, pid), (None,) * 3)[2], pp_sec=c["PP"] / n_sims, pk_sec=c["PK"] / n_sims)
+                       for (t, pid), c in per_player.items()]
     return out
 
 
@@ -205,10 +214,13 @@ def main() -> int:
     random.Random(args.seed_dates).shuffle(roots)
     roots = sorted(roots[: args.dates])
     rows = []
+    players = []
     for r in roots:
         d = Path(r).name
         for g in build_slate_features(d, root=Path(r)):
             m = measure_game(g, args.sims)
+            for pr in m.pop("_players"):
+                players.append(dict(pr, date=d))
             for side, opp in ((g.home, g.away), (g.away, g.home)):
                 rr = real.get((d, side.name))
                 rows.append(dict(date=d, team=side.name, opp=opp.name, matched=rr is not None,
@@ -232,7 +244,7 @@ def main() -> int:
     summary["pp_time_ratio"] = summary["sim_pp_min"] / max(1e-9, summary["real_pp_min"])
     summary["pp_goal_ratio"] = summary["sim_pp_goals"] / max(1e-9, summary["real_pp_goals"])
     print(json.dumps(summary, indent=1))
-    Path(args.out).write_text(json.dumps(dict(summary=summary, rows=rows), indent=1), encoding="utf-8")
+    Path(args.out).write_text(json.dumps(dict(summary=summary, rows=rows, players=players), indent=1), encoding="utf-8")
     return 0
 
 
