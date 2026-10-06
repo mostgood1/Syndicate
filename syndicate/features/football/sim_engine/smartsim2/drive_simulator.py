@@ -22,6 +22,7 @@ from syndicate.features.football.sim_engine.smartsim2.situation_model import URG
 from syndicate.features.football.sim_engine.smartsim2.situation_model import classify_urgency
 from syndicate.features.football.sim_engine.smartsim2.situation_model import fourth_down_buckets
 from syndicate.features.football.sim_engine.smartsim2.situation_model import fourth_down_table
+from syndicate.features.football.sim_engine.smartsim2.situation_model import non_offensive_rates
 
 
 def _clamp(value: float, low: float, high: float) -> float:
@@ -87,6 +88,37 @@ def _punt_result(state: PossessionState, priors: Any, rng: Random) -> tuple[Poss
     )
     net_yards = max(0, gross_distance - return_yards)
     return end_state, gross_distance, net_yards, touchback
+
+
+def _other(owner: str) -> str:
+    return "away" if owner == "home" else "home"
+
+
+def _add_points(state: PossessionState, team: str, points: int) -> PossessionState:
+    if team == "home":
+        return replace(state, score_home=state.score_home + points)
+    return replace(state, score_away=state.score_away + points)
+
+
+def _return_touchdown(state: PossessionState, outcome: PossessionOutcome, rng: Random, profile: CalibrationProfile) -> PossessionState:
+    """H3: the team that just GAINED the ball (turnover, punt, or the kickoff after
+    a score) returns it for a touchdown, then kicks off to the other side. `state`
+    is the drive's end state, so its owner is already the returning team."""
+    rates = non_offensive_rates(profile.name)
+    if outcome == PossessionOutcome.TURNOVER:
+        p = rates["def_td"]
+    elif outcome == PossessionOutcome.PUNT:
+        p = rates["punt_ret_td"]
+    elif outcome in (PossessionOutcome.TOUCHDOWN, PossessionOutcome.FIELD_GOAL) and state.clock_remaining > 0:
+        p = rates["ko_ret_td"]           # no kickoff once the clock has run out
+    else:
+        return state
+    if rng.random() >= p:
+        return state
+    scorer = state.possession_owner
+    state = _add_points(state, scorer, 7)
+    return replace(state, possession_owner=_other(scorer), field_position=25, down=1, distance=10,
+                   drive_index=state.drive_index + 1, possession_index=state.possession_index + 1)
 
 
 def _fourth_down_draw(state: PossessionState, rng: Random, profile: CalibrationProfile) -> str:
@@ -451,6 +483,27 @@ def simulate_drive(
             state = end_state
             break
 
+        # H3: a snap from inside the offense's own 10 can end in a safety.
+        if profile.non_offensive_scoring and state.field_position <= 10:
+            rates = non_offensive_rates(profile.name)
+            if rng.random() < rates["safety_1_5" if state.field_position <= 5 else "safety_6_10"]:
+                clock_consumed = min(state.clock_remaining, max(3, int(round(rng.normalvariate(priors.expected_clock_seconds * 0.16, 4.0)))))
+                end_state = _add_points(advance_possession_clock(state, clock_consumed), _other(state.possession_owner), 2)
+                end_state = replace(end_state, possession_owner=_other(state.possession_owner),
+                                    field_position=int(rates["free_kick_start"]), down=1, distance=10,
+                                    drive_index=state.drive_index + 1, possession_index=state.possession_index + 1)
+                steps.append(PossessionStepResult(
+                    step_index=len(steps) + 1, start_state=state, end_state=end_state,
+                    outcome=PossessionOutcome.SAFETY, yards_gained=-state.field_position,
+                    clock_consumed=clock_consumed, points_scored=0,
+                    summary=f"{state.possession_owner} was tackled for a safety",
+                ))
+                total_clock += clock_consumed
+                possession_change = True
+                terminal_outcome = PossessionOutcome.SAFETY
+                state = end_state
+                break
+
         play_result = simulate_play(play_state, state, simulation_input, priors=priors, rng=rng, profile=profile)
         terminal_outcome = play_result.terminal_drive_outcome
         outcome = PossessionOutcome(play_result.outcome.value)
@@ -487,6 +540,8 @@ def simulate_drive(
         terminal_outcome = PossessionOutcome.END_OF_HALF_STOP if state.clock_remaining <= 0 and state.quarter in {2, 4} else PossessionOutcome.END_OF_QUARTER_STOP
         if state.clock_remaining <= 0:
             state = replace(state, clock_remaining=0)
+    if profile.non_offensive_scoring:
+        state = _return_touchdown(state, terminal_outcome, rng, profile)
     next_owner = state.possession_owner
 
     return DriveResult(

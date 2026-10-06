@@ -272,3 +272,35 @@ def fourth_down_buckets(field_position: int, distance: int) -> tuple[int, int]:
 def fourth_down_table(profile_name: str) -> dict:
     """The sport's table for a profile name (`ncaaf...` -> NCAAF, anything else -> NFL)."""
     return FOURTH_DOWN_TABLES["ncaaf" if str(profile_name).lower().startswith("ncaaf") else "nfl"]
+
+
+# ---------------------------------------------------------------------------
+# MEASURED NON-OFFENSIVE SCORING -- lane `football-scenario-calibration` H3
+# (pre-registered before measuring). Read by `drive_simulator` ONLY when
+# `CalibrationProfile.non_offensive_scoring` is ON. Source:
+# `scripts/football_scenario_rates.py nonoff`, FIT seasons only (NFL nflverse
+# 2023-24 REG, NCAAF CFBD 2024 FBS-vs-FBS REG); 2025 not read.
+# ---------------------------------------------------------------------------
+NON_OFFENSIVE_RATES = {
+    "nfl": {
+        "def_td": 0.08036,  # 106/1319 turnovers
+        "punt_ret_td": 0.00325,  # 14/4309 punts
+        "ko_ret_td": 0.002,  # 11/5501 kickoffs
+        "safety_1_5": 0.0301,  # 18/598 snaps from own 1-5
+        "safety_6_10": 0.00241,  # 3/1245 snaps from own 6-10
+        "free_kick_start": 37,  # mean of n=25
+    },
+    "ncaaf": {
+        "def_td": 0.08947,  # 153/1710 turnovers
+        "punt_ret_td": 0.00267,  # 17/6356 punts
+        "ko_ret_td": 0.00356,  # 29/8135 kickoffs
+        "safety_1_5": 0.02991,  # 28/936 snaps from own 1-5
+        "safety_6_10": 0.00296,  # 5/1691 snaps from own 6-10
+        "free_kick_start": 36,  # mean of n=43
+    },
+}
+
+
+def non_offensive_rates(profile_name: str) -> dict:
+    """The sport's rates for a profile name (`ncaaf...` -> NCAAF, anything else -> NFL)."""
+    return NON_OFFENSIVE_RATES["ncaaf" if str(profile_name).lower().startswith("ncaaf") else "nfl"]

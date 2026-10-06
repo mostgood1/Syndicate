@@ -35,6 +35,9 @@ class PossessionOutcome(str, Enum):
     TURNOVER_ON_DOWNS = "turnover_on_downs"
     END_OF_QUARTER_STOP = "end_of_quarter_stop"
     END_OF_HALF_STOP = "end_of_half_stop"
+    # Lane `football-scenario-calibration` H3; produced only with
+    # `CalibrationProfile.non_offensive_scoring` ON.
+    SAFETY = "safety"
 
 
 @dataclass(frozen=True)

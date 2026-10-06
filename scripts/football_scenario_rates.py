@@ -199,7 +199,7 @@ def add_game(c: Dict[str, float], *, total: float, margin: float, ot: bool, h1: 
 
 _SIM_RESULT = {"touchdown": "TD", "field_goal": "FG", "missed_field_goal": "MFG", "punt": "PUNT",
                "turnover": "TO", "turnover_on_downs": "TOD", "end_of_half_stop": "EOH",
-               "end_of_quarter_stop": "EOH"}
+               "end_of_quarter_stop": "EOH", "safety": "SAF"}
 
 
 def _v(x: Any) -> str:
@@ -1037,6 +1037,117 @@ def cmd_fourth(args) -> None:
 
 
 # ---------------------------------------------------------------------------
+# H3: non-offensive scoring rates (pre-registered)
+# ---------------------------------------------------------------------------
+
+def _wilson(k: int, n: int) -> Tuple[Optional[float], Optional[float]]:
+    if not n:
+        return None, None
+    z = 1.96
+    p = k / n
+    d = 1 + z * z / n
+    c = (p + z * z / (2 * n)) / d
+    h = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
+    return c - h, c + h
+
+
+def nonoff_counts(sport: str, seasons: List[int]) -> Dict[str, List[int]]:
+    """[successes, trials] per rate; plus the free-kick start spots after safeties."""
+    c: Dict[str, List[int]] = defaultdict(lambda: [0, 0])
+    fk: List[int] = []
+    if sport == "nfl":
+        for season in seasons:
+            path = nfl_root() / "tracking" / "nflverse" / "pbp" / f"pbp_{season}.csv"
+            prev_safety_game = None
+            with path.open(encoding="utf-8", newline="") as fh:
+                for r in csv.DictReader(fh):
+                    if r.get("season_type") != "REG":
+                        continue
+                    pt = r.get("play_type")
+                    ret_td = r.get("return_touchdown") == "1"
+                    td_team = r.get("td_team")
+                    if prev_safety_game == r["game_id"] and pt in ("pass", "run"):
+                        fk.append(100 - _i(r.get("yardline_100"), 65))   # first snap after the free kick
+                        prev_safety_game = None
+                    if pt in ("pass", "run") and (r.get("interception") == "1" or r.get("fumble_lost") == "1"):
+                        c["def_td"][1] += 1
+                        c["def_td"][0] += int(ret_td and td_team == r.get("defteam"))
+                    if pt == "punt":
+                        c["punt_ret_td"][1] += 1
+                        c["punt_ret_td"][0] += int(ret_td and td_team == r.get("defteam"))
+                    if pt == "kickoff":
+                        c["ko_ret_td"][1] += 1
+                        c["ko_ret_td"][0] += int(ret_td and td_team == r.get("posteam"))
+                    if pt in ("pass", "run", "qb_kneel", "qb_spike"):
+                        y = _i(r.get("yardline_100"), 50)
+                        if y >= 90:
+                            b = "safety_1_5" if y >= 95 else "safety_6_10"
+                            c[b][1] += 1
+                            c[b][0] += int(r.get("safety") == "1")
+                    if r.get("safety") == "1":
+                        prev_safety_game = r["game_id"]
+    else:
+        root = PRIMARY / "data" / "ncaaf_source" / "historical_truth"
+        to_types = {"Interception", "Pass Interception Return", "Fumble Recovery (Opponent)"}
+        def_td_types = {"Interception Return Touchdown", "Fumble Return Touchdown"}
+        for season in seasons:
+            meta = {int(g["id"]): g for g in _ncaaf_games(season)}
+            for wk in range(1, 17):
+                p = root / f"plays_{season}_wk{wk:02d}.json.gz"
+                if not p.exists():
+                    continue
+                plays = json.load(gzip.open(p, "rt", encoding="utf-8"))
+                plays.sort(key=lambda r: (int(r.get("gameId") or 0), _i(r.get("driveNumber")), _i(r.get("playNumber"))))
+                after_safety = None
+                for r in plays:
+                    g = meta.get(int(r.get("gameId") or 0))
+                    if not g or g.get("seasonType") != "regular" or g.get("homeClassification") != "fbs" \
+                            or g.get("awayClassification") != "fbs":
+                        continue
+                    pt = r.get("playType", "")
+                    if after_safety == r.get("gameId") and pt in ("Rush", "Pass Reception", "Pass Incompletion", "Sack"):
+                        fk.append(100 - _i(r.get("yardsToGoal"), 65))
+                        after_safety = None
+                    if pt in to_types or pt in def_td_types:
+                        c["def_td"][1] += 1
+                        c["def_td"][0] += int(pt in def_td_types)
+                    if pt in ("Punt", "Blocked Punt", "Punt Return Touchdown", "Blocked Punt Touchdown"):
+                        c["punt_ret_td"][1] += 1
+                        c["punt_ret_td"][0] += int(pt.endswith("Touchdown"))
+                    if pt in ("Kickoff", "Kickoff Return (Offense)", "Kickoff Return Touchdown"):
+                        c["ko_ret_td"][1] += 1
+                        c["ko_ret_td"][0] += int(pt == "Kickoff Return Touchdown")
+                    if pt in _CFBD_SCRIM and pt not in ("Punt", "Blocked Punt", "Field Goal Good", "Field Goal Missed",
+                                                         "Blocked Field Goal", "Punt Return Touchdown",
+                                                         "Blocked Punt Touchdown", "Blocked Field Goal Touchdown"):
+                        ytg = _i(r.get("yardsToGoal"), 50)
+                        if ytg >= 90:
+                            b = "safety_1_5" if ytg >= 95 else "safety_6_10"
+                            c[b][1] += 1
+                            c[b][0] += int(pt == "Safety")
+                    if pt == "Safety":
+                        after_safety = r.get("gameId")
+    out = {k: list(v) for k, v in c.items()}
+    out["free_kick_start"] = [sum(fk), len(fk)]
+    return out
+
+
+def cmd_nonoff(args) -> None:
+    c = nonoff_counts(args.sport, args.season_list)
+    path = OUT_ROOT / args.sport / f"nonoff_rates_{'-'.join(map(str, args.season_list))}.json"
+    rates = {}
+    for k, (s, n) in sorted(c.items()):
+        if k == "free_kick_start":
+            rates[k] = {"mean": round(s / n, 2) if n else None, "n": n}
+            print(f"{args.sport} {k:14} mean {rates[k]['mean']}  n={n}")
+            continue
+        lo, hi = _wilson(s, n)
+        rates[k] = {"p": round(s / n, 5) if n else None, "k": s, "n": n, "lo": lo, "hi": hi}
+        print(f"{args.sport} {k:14} {s:5d}/{n:6d} = {s / n if n else 0:.5f}  95% [{lo:.5f}, {hi:.5f}]")
+    path.write_text(json.dumps(rates, indent=1), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
 # COMPARE: a switch ON vs production (OFF), paired on the same games and seeds
 # ---------------------------------------------------------------------------
 
@@ -1120,7 +1231,7 @@ def cmd_compare(args) -> None:
 
 def main(argv: Optional[List[str]] = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=("fetch", "sim", "real", "report", "fourth", "compare"))
+    ap.add_argument("cmd", choices=("fetch", "sim", "real", "report", "fourth", "compare", "nonoff"))
     ap.add_argument("--sport", choices=("nfl", "ncaaf"), required=True)
     ap.add_argument("--seasons", required=True)
     ap.add_argument("--seeds", type=int, default=300)
@@ -1134,7 +1245,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     args.season_list = [int(s) for s in args.seasons.split(",")]
     if 2025 in args.season_list and not os.environ.get("FOOTBALL_SCENARIO_READ_VALIDATION"):
         raise SystemExit("2025 is VALIDATION (read once, pre-registered); set FOOTBALL_SCENARIO_READ_VALIDATION=1 to read it")
-    {"fetch": cmd_fetch, "sim": cmd_sim, "real": cmd_real, "report": cmd_report, "fourth": cmd_fourth, "compare": cmd_compare}[args.cmd](args)
+    {"fetch": cmd_fetch, "sim": cmd_sim, "real": cmd_real, "report": cmd_report, "fourth": cmd_fourth, "compare": cmd_compare, "nonoff": cmd_nonoff}[args.cmd](args)
 
 
 if __name__ == "__main__":

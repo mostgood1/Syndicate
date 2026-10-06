@@ -340,6 +340,14 @@ class CalibrationProfile:
     # unchanged. Default OFF for the same reason as `halftime_kickoff`.
     fourth_down_decision_model: bool = False
 
+    # POINTS THE OFFENSE DID NOT SCORE. Lane `football-scenario-calibration` H3
+    # (2026-10-06). OFF: a turnover, punt or kickoff can never be returned for a
+    # touchdown and no snap ends in a safety -- the sim's non-offensive points are
+    # 0 against a real 1.90/game (NFL 2023-24) and 2.40 (NCAAF 2024). ON: those
+    # happen at the rates in `situation_model.NON_OFFENSIVE_RATES`. Default OFF:
+    # the scoring level was fitted without these points (see `halftime_kickoff`).
+    non_offensive_scoring: bool = False
+
     def to_dict(self) -> dict[str, float | str]:
         return {
             "name": self.name,
@@ -373,6 +381,7 @@ class CalibrationProfile:
             "goal_line_touchdown": self.goal_line_touchdown,
             "halftime_kickoff": self.halftime_kickoff,
             "fourth_down_decision_model": self.fourth_down_decision_model,
+            "non_offensive_scoring": self.non_offensive_scoring,
         }
 
 
