@@ -427,7 +427,7 @@ def cmd_validate(args) -> None:
               "candidate": cand, "gates": {k: {"pass": v[0], "detail": v[1]} for k, v in gates.items()},
               "PASS": passed, "z_production": p_z, "z_candidate": c_z}
     (out / "validation_report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
-    print(f"\n[{sport}] VALIDATION 2025, {len(games)} games, {FINAL_SEEDS} seeds")
+    print(f"\n[{sport}] VALIDATION {VALIDATION_SEASON}, {len(games)} games, {FINAL_SEEDS} seeds")
     for k, (ok, detail) in gates.items():
         print(f"  {'PASS' if ok else 'FAIL'}  {k:28} {detail}")
     print(f"  => {'ALL GATES PASS' if passed else 'NOT SHIPPABLE'}")
