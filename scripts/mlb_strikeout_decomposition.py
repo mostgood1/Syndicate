@@ -19,6 +19,7 @@ import argparse
 import concurrent.futures as cf
 import json
 import os
+import re
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -219,6 +220,7 @@ def main(argv=None) -> int:
     ap.add_argument("--set", action="append", help="manager-pitching override key=value")
     ap.add_argument("--pm-set", action="append", help="pitch-model override key=value")
     ap.add_argument("--cfg-set", action="append", help="GameConfig field key=value (e.g. bip_dp_rate=0.12)")
+    ap.add_argument("--game-pks-from", help="only games with a roster_obj under this dir (fidelity: same game set on both sides)")
     ap.add_argument("--cache", default=os.path.join(os.environ.get("TMPDIR", "/tmp"), "mlb_starter_replay_cache"))
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)
@@ -234,12 +236,19 @@ def main(argv=None) -> int:
                 dst[k.strip()] = json.loads(v)
             except ValueError:
                 dst[k.strip()] = v
+    counters = defaultdict(int)
+    only = None
+    if args.game_pks_from:
+        only = {int(m) for f in Path(os.path.expanduser(args.game_pks_from)).rglob("roster_obj_*.json")
+                for m in re.findall(r"pk(\d+)", f.name)}
     jobs = []
     for d in sorted(set(args.dates)):
         for g in rp.games_for_date(data_dir, d):
+            if only is not None and int(g["game_pk"]) not in only:
+                counters["game_not_in_pk_filter"] += 1
+                continue
             g.update({"sims": args.sims, "seed": args.seed, "mp": mp, "pm": pm, "cfg": cfgx})
             jobs.append(g)
-    counters = defaultdict(int)
     rows = []
     with cf.ProcessPoolExecutor(max_workers=args.workers) as ex:
         results = list(ex.map(_sim_game, jobs, chunksize=1))
