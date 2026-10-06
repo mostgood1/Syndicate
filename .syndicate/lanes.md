@@ -1013,6 +1013,13 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **RULE v2 AMENDMENT 3 — DP-SITUATION FIELDER'S CHOICE RATE MEASURED, PRE-REGISTERED 2026-10-06 ~15:45Z (user: "then fix the DP fielder's choice rate next"), before measuring; pipeline paused at its wait loop again (builds 7/20, 0 descent runs):**
+  - Model: on a ground-ball out with a runner on 1st and <2 outs, after no DP, an FC (a runner out, batter safe) happens with prob `bip_fc_rate` (0.04). It is checked BEFORE the ROE draw.
+  - MEASURED (not fitted) from StatsAPI pbp of the same 316 FIT-date games. Plays: trajectory `ground_ball`, a runner starting on 1B, 0-1 outs before, eventType NOT `grounded_into_double_play`.
+    - fc = #(force_out + fielders_choice_out) / #(force_out + fielders_choice_out + field_out + field_error + fielders_choice).
+    - Bunts are excluded. Reported with n and a Wilson 95% CI. Also reported, INFORMATION ONLY (the DP rate stays a fitted lever): GIDP / (GIDP + that denominator).
+  - The `bip_fc_rate` lever {0.04, 0.02} is REMOVED from the descent grid. Every arm carries `--cfg-set bip_fc_rate=<measured>` alongside the DP-advancement rates.
+  - Production stays at 0.04; checks (a)-(e) are unchanged. ~2 fewer descent runs.
 - **AMENDMENT 2 READINGS 2026-10-06 ~15:20Z (before any descent run):**
   - RATES (scripts/mlb_dp_advancement_rates.py; 316 FIT-date games, 392 GIDP = 0.62/team-game, 171 with 0 outs before): r2 = **47/48 = 0.979** [0.891, 0.996]; r3 = **16/16 = 1.0** [0.806, 1.0]. On a real 0-out DP the other runners essentially always move.
   - CODE: simulate.py DP branch + `bip_dp_r2_to_3b_rate` / `bip_dp_r3_scores_rate` (models.py, default 0.0); DP runs charged R+ER, no RBI. Dead `_resolve_in_play_out` (no caller) removed.
