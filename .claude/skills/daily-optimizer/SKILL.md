@@ -48,6 +48,15 @@ the market number was mislabelled as the prediction -- the first run's "-3.6% to
 population's same band sits beside it -- never instead of it (learnings 2026-09-21). Published
 rows are graded at their first recorded sighting, which can predate publication.
 
+## Staked -- what the portfolio actually bet (2026-10-06)
+
+The published column is most of the board (40-86% of recorded keys), NOT the recommendation set.
+The report's `staked_summary` / "Staked" table grades the execution ledger's portfolio-book paper
+orders: flat stake per unit vs the EV each was admitted on, by sport, basis (model / market_only) and
+books quoting its fair. `stake_scale` is computed from THESE, never from the board; no ledger -> no
+stake-scale entries. First reading (10-02..06, 629 settled): -6.3% vs +3.6% admitted; 1-2 books -11.6%,
+8+ books +17.9%. See `.syndicate/findings_2026-10-06_published_negative_ev.md`.
+
 ## What it may change -- and what it may not
 
 **2026-10-05 PRIME DIRECTIVE: no market is withheld.** The overlay holds only multipliers in

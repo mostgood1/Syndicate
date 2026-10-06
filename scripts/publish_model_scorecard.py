@@ -362,6 +362,26 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as exc:
             log(f"OPTIMIZER_DISABLED state read failed: {type(exc).__name__}: {exc}")
 
+    # THE STAKED SET (lane `published-negative-ev`, 2026-10-06): the execution ledger's portfolio
+    # orders. The job runs with refresh-worker's env, so the ledger is read the way the worker reads it.
+    # A failed read leaves `ledger_orders` None: the report then carries NO stake-scale entries rather
+    # than falling back to the published board.
+    ledger_orders = None
+    wanted_openings: set[str] = set()
+    if opt_state is not None:
+        try:
+            from syndicate.features.shared import execution_ledger
+
+            ledger_orders = list((execution_ledger._load() or {}).get("orders") or [])  # noqa: SLF001
+            known = opt_state.get("orders") or {}
+            wanted_openings = {str(o.get("opening_key")) for o in opt.portfolio_orders(ledger_orders)
+                               if o.get("opening_key") and str(o.get("opening_key")) not in known}
+            log(f"LEDGER orders={len(ledger_orders)} portfolio={len(opt.portfolio_orders(ledger_orders))} "
+                f"openings_wanted={len(wanted_openings)}")
+        except Exception as exc:
+            ledger_orders = None
+            log(f"LEDGER_UNREADABLE {type(exc).__name__}: {exc} -- no stake-scale entries this run")
+
     fetched_ok = 0
     merge_counts: dict[str, Any] = {}
     for day in msc.board_dates_to_fetch(state, today, limit=args.max_board_dates):
@@ -376,7 +396,10 @@ def main(argv: list[str] | None = None) -> int:
             fetched_at=now.strftime("%Y-%m-%dT%H:%M:%SZ"))}
         if opt_state is not None:
             try:
-                keys = opt.published_keys(reader.text(opt.OPENINGS_TEMPLATE.format(date=day)), bs)
+                openings_text = reader.text(opt.OPENINGS_TEMPLATE.format(date=day))
+                keys = opt.published_keys(openings_text, bs)
+                merge_counts[day]["orders_noted"] = opt.note_orders(opt_state, openings_text, bs, wanted_openings)
+                openings_text = None
             except FetchError as exc:
                 log(f"OPENINGS_UNREADABLE {day} {exc} -- this date's games stay out of the published grade")
                 keys = None
@@ -414,13 +437,29 @@ def main(argv: list[str] | None = None) -> int:
     optimizer_outputs: dict[str, str] = {}
     if opt_state is not None:
         try:
+            # Staked orders whose opening date was not among the board dates read above (older dates):
+            # read at most 4 such openings files per run, oldest first, so history fills in over days.
+            if ledger_orders is not None:
+                known = opt_state.get("orders") or {}
+                pending_days = sorted({str(o.get("selected_date")) for o in opt.portfolio_orders(ledger_orders)
+                                       if o.get("opening_key") and str(o.get("opening_key")) not in known
+                                       and str(o.get("selected_date") or "") not in merge_counts})
+                for extra_day in pending_days[:4]:
+                    try:
+                        noted = opt.note_orders(opt_state, reader.text(opt.OPENINGS_TEMPLATE.format(date=extra_day)),
+                                                bs, wanted_openings)
+                        log(f"ORDERS_NOTED {extra_day} {noted}")
+                    except FetchError as exc:
+                        log(f"OPENINGS_UNREADABLE {extra_day} {exc}")
             committed = opt.commit(opt_state, state["games"])
             opt.prune(opt_state, today)
             report, opt_overlay = opt.build_report(opt_state, today=today, now=now,
-                                                   run={"committed": committed}, resamples=args.resamples or opt.RESAMPLES)
+                                                   run={"committed": committed}, resamples=args.resamples or opt.RESAMPLES,
+                                                   orders=ledger_orders)
             optimizer_outputs = {opt.OPT_STATE_PATH: opt.dumps(opt_state), opt.OPTIMIZER_PATH: opt.dumps(report),
                                  opt.OVERLAY_PATH: opt.dumps(opt_overlay)}
             scorecard["optimizer"] = {"path": opt.OPTIMIZER_PATH, "by_sport": report["by_sport"],
+                                      "staked_summary": report.get("staked_summary"),
                                       "edge_shrink": len(opt_overlay["edge_shrink"]),
                                       "stake_scale": len(opt_overlay["stake_scale"]),
                                       "expires_at": opt_overlay["expires_at"]}

@@ -158,6 +158,7 @@ def load_state(payload: Any, grader_signature: str, *, sport_versions: Mapping[s
     state = empty_state(grader_signature, sport_versions)
     state["games"] = dict(payload.get("games") or {})
     state["pub"] = dict(payload.get("pub") or {})
+    state["orders"] = dict(payload.get("orders") or {})
     state["resets"] = resets
     saved = dict(payload.get("sport_versions") or {})
     changed = sorted(s for s in set(saved) | set(sport_versions) if saved.get(s) != sport_versions.get(s))
@@ -173,6 +174,7 @@ def prune(state: dict[str, Any], today: str) -> None:
     state["games"] = {k: g for k, g in state["games"].items() if str(g.get("date") or "") >= floor}
     pub_floor = _shift(today, -PUB_RETAIN_DAYS)
     state["pub"] = {k: p for k, p in state["pub"].items() if str(p.get("seen") or "") >= pub_floor}
+    state["orders"] = {k: m for k, m in (state.get("orders") or {}).items() if str(m.get("seen") or "") >= floor}
 
 
 # ---------------------------------------------------------------------------
@@ -459,6 +461,123 @@ def stake_scales(rec: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# staked orders -- what the portfolio ACTUALLY bet (lane published-negative-ev, 2026-10-06)
+# ---------------------------------------------------------------------------
+#
+# The published column above is most of the board (40-86% of recorded keys on 2026-10-05), not the
+# recommendation set. The recommendation set is the paper portfolio: execution-ledger orders on the
+# portfolio book (venue `paper`). Each is graded flat-stake per unit, pnl / stake, against the EV the
+# portfolio ADMITTED it on (`ev_pct` at entry). Its cell and book count come from the published
+# opening it was placed on (`opening_key`), recorded in the state the day that opening is read.
+
+STAKED_FIELD = "staked"
+PORTFOLIO_VENUE = "paper"
+SETTLED_OUTCOMES = {"won": 1, "win": 1, "lost": 0, "loss": 0, "push": 0}
+
+
+def books_band(books: Any) -> str:
+    try:
+        n = int(float(books))
+    except (TypeError, ValueError):
+        return "books_na"
+    return "books1-2" if n <= 2 else "books3-4" if n <= 4 else "books5-7" if n <= 7 else "books8+"
+
+
+def portfolio_orders(orders: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    """Portfolio-book paper orders (the venue-comparison books are excluded)."""
+    return [o for o in orders if isinstance(o, Mapping) and str(o.get("mode") or "") == "paper"
+            and str(o.get("venue") or "") == PORTFOLIO_VENUE]
+
+
+def note_orders(state: dict[str, Any], text: str | None, bs: Any, wanted: set[str]) -> int:
+    """Record cell / book count for each wanted opening key found in one date's openings text."""
+    if not text or not wanted:
+        return 0
+    from syndicate.features.shared.measured_bucket_skill import _phase
+
+    meta = state.setdefault("orders", {})
+    added = 0
+    for opening in bs.parse_openings_text(text):
+        key = opening.get("key")
+        if key not in wanted or key in meta:
+            continue
+        sport = str(opening.get("sport") or "").strip().lower()
+        market = str(opening.get("market") or "").strip().lower()
+        segment = str(opening.get("segment") or "full").strip().lower() or "full"
+        phase = _phase(opening.get("game_state"), sighted_at=opening.get("captured_at"),
+                       commence_time=opening.get("commence_time"))
+        meta[key] = {"cell": f"{sport}|{market}|{segment}|{phase}", "books": opening.get("books_quoting"),
+                     "seen": str(opening.get("captured_at") or "")[:10]}
+        added += 1
+    return added
+
+
+def _num(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def staked_games(state: Mapping[str, Any], orders: Iterable[Mapping[str, Any]], today: str,
+                 days: int = WINDOW_DAYS) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """Settled portfolio orders as pseudo-games (date, event) carrying `staked` accumulators.
+
+    Same 7-slot shape as `accumulate`'s bands, per unit stake: [bets, wins, pnl, ev, bets, pnl, ev].
+    The "model" slots hold the EV the portfolio admitted the bet on, so `grade_bands` / `stake_scales`
+    measure realised minus PROMISED on exactly what was staked. Bands: `all`, book count, basis.
+    """
+    meta = state.get("orders") or {}
+    floor = _shift(today, -days)
+    games: dict[tuple[str, str], dict[str, Any]] = {}
+    counts: collections.Counter = collections.Counter()
+    for order in portfolio_orders(orders):
+        outcome = str(order.get("outcome") or "").strip().lower()
+        if outcome not in SETTLED_OUTCOMES:
+            continue
+        day = str(order.get("selected_date") or "")
+        if not (floor <= day <= today):
+            continue
+        stake, pnl, ev = _num(order.get("fill_stake_dollars")), _num(order.get("pnl_dollars")), _num(order.get("ev_pct"))
+        if not stake or pnl is None or ev is None:
+            counts["unpriced"] += 1
+            continue
+        info = meta.get(str(order.get("opening_key") or ""))
+        if info is None:
+            counts["unjoined"] += 1
+            continue
+        counts["graded"] += 1
+        basis = "model" if _num(order.get("model_edge_pct")) is not None else "market_only"
+        unit_pnl, unit_ev = pnl / stake, ev / 100.0
+        win = SETTLED_OUTCOMES[outcome]
+        event = str(order.get("event_id") or order.get("position_key") or "")
+        game = games.setdefault((day, event), {"date": day, "key": f"{day}|{event}",
+                                               "sport": str(order.get("sport") or "").lower(), STAKED_FIELD: {}})
+        for band in (ALL_BAND, books_band(info.get("books")), basis):
+            acc = game[STAKED_FIELD].setdefault(f"{info['cell']}|{band}", [0, 0, 0.0, 0.0, 0, 0.0, 0.0])
+            acc[0] += 1
+            acc[1] += win
+            acc[2] += unit_pnl
+            acc[3] += unit_ev
+            acc[4] += 1
+            acc[5] += unit_pnl
+            acc[6] += unit_ev
+    return list(games.values()), dict(counts)
+
+
+def _pooled_bands(rows: Sequence[Mapping[str, Any]], band: str) -> dict[str, Any]:
+    picked = [r for r in rows if r["band"] == band]
+    bets = sum(r["bets"] for r in picked)
+    if not bets:
+        return {"bets": 0}
+    roi = sum((r["roi"] or 0) * r["bets"] for r in picked) / bets
+    model_bets = sum(r["model_bets"] for r in picked)
+    ev = sum((r["predicted_ev"] or 0) * r["model_bets"] for r in picked) / model_bets if model_bets else 0.0
+    return {"bets": bets, "roi": _r(roi), "predicted_ev": _r(ev), "realised_minus_predicted": _r(roi - ev)}
+
+
+# ---------------------------------------------------------------------------
 # overlay
 # ---------------------------------------------------------------------------
 
@@ -542,12 +661,20 @@ def _sum_bands(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 
 
 def build_report(state: Mapping[str, Any], *, today: str, now: datetime, run: Mapping[str, Any] | None = None,
-                 resamples: int = RESAMPLES) -> tuple[dict[str, Any], dict[str, Any]]:
+                 resamples: int = RESAMPLES,
+                 orders: Sequence[Mapping[str, Any]] | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
     games = window_games(state, today)
     calibration = fit_calibration(games, resamples=resamples)
     rec = grade_bands(games, "rec", resamples=resamples)
     pool = grade_bands(games, "pool", resamples=resamples)
-    stakes = stake_scales(rec)
+    # STAKE SCALE comes from what was STAKED, never from the published board (2026-10-06). Orders
+    # unavailable (None) -> no stake-scale entries, rather than a fallback to the board.
+    staked_rows: list[dict[str, Any]] = []
+    staked_counts: dict[str, int] = {"orders_unavailable": 1} if orders is None else {}
+    if orders is not None:
+        staked_list, staked_counts = staked_games(state, orders, today)
+        staked_rows = grade_bands(staked_list, STAKED_FIELD, resamples=resamples)
+    stakes = stake_scales(staked_rows)
     overlay = overlay_payload(calibration, stakes, now=now, window=f"{WINDOW_DAYS}d")
 
     by_sport: dict[str, dict[str, Any]] = {}
@@ -565,6 +692,7 @@ def build_report(state: Mapping[str, Any], *, today: str, now: datetime, run: Ma
             "cells": len(cal_rows),
             "cells_overconfident": sum(1 for r in cal_rows if r["verdict"] == "overconfident"),
             "cells_with_w": len(sdd_weighted),
+            "staked": _pooled_bands([r for r in staked_rows if r["cell"].startswith(sport + "|")], ALL_BAND),
             "recommended": _sum_bands([r for r in rec if r["band"] == ALL_BAND and r["cell"].startswith(sport + "|")]),
             "pooled": _sum_bands([r for r in pool if r["band"] == ALL_BAND and r["cell"].startswith(sport + "|")]),
         }
@@ -580,6 +708,10 @@ def build_report(state: Mapping[str, Any], *, today: str, now: datetime, run: Ma
         "calibration": calibration,
         "recommended": rec,
         "pooled": pool,
+        "staked": staked_rows,
+        "staked_counts": staked_counts,
+        "staked_summary": {band: _pooled_bands(staked_rows, band) for band in
+                           (ALL_BAND, "market_only", "model", "books1-2", "books3-4", "books5-7", "books8+", "books_na")},
         "overlay": overlay,
         "run": dict(run or {}),
         "resets": list(state.get("resets") or []),
@@ -607,13 +739,29 @@ def markdown(report: Mapping[str, Any]) -> str:
                      f"{_pct(rec.get('market_ev'))} | {pool.get('bets', 0)} | {_pct(pool.get('roi'))} |")
     lines += ["", "Model EV = p_model x odds - 1 (what the model promised); market EV = de-vigged fair x odds - 1 "
                   "(~minus the vig unless the price was shopped)."]
+    staked = report.get("staked_summary") or {}
+    if staked:
+        lines += ["", "## Staked (the paper portfolio -- what was actually bet)", "",
+                  f"Settled orders graded: {(report.get('staked_counts') or {}).get('graded', 0)} "
+                  f"(unjoined {(report.get('staked_counts') or {}).get('unjoined', 0)}). Flat stake per unit vs the EV "
+                  "each was admitted on.", "", "| slice | bets | ROI | predicted EV | realised - predicted |",
+                  "|---|---|---|---|---|"]
+        for band, row in staked.items():
+            if row.get("bets"):
+                lines.append(f"| {band} | {row['bets']} | {_pct(row.get('roi'))} | {_pct(row.get('predicted_ev'))} | "
+                             f"{_pct(row.get('realised_minus_predicted'))} |")
+        for sport, srow in report["by_sport"].items():
+            st_ = srow.get("staked") or {}
+            if st_.get("bets"):
+                lines.append(f"| {sport} | {st_['bets']} | {_pct(st_.get('roi'))} | {_pct(st_.get('predicted_ev'))} | "
+                             f"{_pct(st_.get('realised_minus_predicted'))} |")
     overlay = report["overlay"]
     lines += ["", f"Overlay: {len(overlay['edge_shrink'])} edge-shrink, {len(overlay['stake_scale'])} stake-scale "
                   f"entries (rank/stake only; never withholds). Expires {overlay['expires_at']}."]
     for cell, e in list(overlay["edge_shrink"].items())[:15]:
         lines.append(f"- shrink {cell}: x{e['factor']} (w*={e['w']}, CI {e['ci95']}, {e['games']}g/{e['dates']}d)")
     for cell, e in list(overlay["stake_scale"].items())[:15]:
-        lines.append(f"- stake {cell}: x{e['factor']} (pub ROI {_pct(e['roi'])} vs model EV {_pct(e['predicted_ev'])}, {e['games']}g)")
+        lines.append(f"- stake {cell}: x{e['factor']} (staked ROI {_pct(e['roi'])} vs admitted EV {_pct(e['predicted_ev'])}, {e['games']}g)")
     return "\n".join(lines) + "\n"
 
 

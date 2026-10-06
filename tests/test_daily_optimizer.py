@@ -265,3 +265,61 @@ def test_reachability_off_writes_nothing_of_the_optimizer(cron):
     assert pms.main(["--weekly", "off", "--sports", "mlb", "--optimizer", "off", "--resamples", "50"]) == 0
     assert not (root / opt.OPTIMIZER_PATH).exists()
     assert "optimizer" not in json.loads((root / pms.msc.LATEST_PATH).read_text(encoding="utf-8"))
+
+
+# ---------------------------------------------------------------------------
+# staked orders (lane published-negative-ev, 2026-10-06)
+# ---------------------------------------------------------------------------
+
+def _order(key, *, day="2026-09-20", event="e1", outcome="lost", stake=10.0, pnl=-10.0, ev=4.0, me=None,
+           venue="paper", sport="ncaaf"):
+    return {"opening_key": key, "selected_date": day, "event_id": event, "outcome": outcome, "mode": "paper",
+            "venue": venue, "fill_stake_dollars": stake, "pnl_dollars": pnl, "ev_pct": ev, "model_edge_pct": me,
+            "sport": sport}
+
+
+def test_note_orders_records_cell_and_books_from_the_opening():
+    import scripts.bucket_search as bs  # noqa: F401
+    from syndicate.features.shared import model_scorecard as msc
+    bsm = msc.load_bucket_search()
+    text = json.dumps({"key": "k1", "sport": "ncaaf", "market": "h2h", "segment": None, "side": "home",
+                       "game_state": "pregame", "captured_at": "2026-09-20T12:00:00Z",
+                       "commence_time": "2026-09-20T20:00:00Z", "books_quoting": 2}) + "\n"
+    state = opt.empty_state("sig")
+    assert opt.note_orders(state, text, bsm, {"k1", "absent"}) == 1
+    assert state["orders"]["k1"] == {"cell": "ncaaf|h2h|full|pregame", "books": 2, "seen": "2026-09-20"}
+
+
+def test_staked_games_bands_by_books_and_basis_and_counts_what_it_cannot_join():
+    state = opt.empty_state("sig")
+    state["orders"] = {"k1": {"cell": "ncaaf|h2h|full|pregame", "books": 2, "seen": "2026-09-20"}}
+    orders = [_order("k1"), _order("k1", outcome="won", pnl=9.1, event="e2", me=2.0), _order("k9"),
+              _order("k1", venue="paper:kalshi"), _order("k1", outcome=None)]
+    games, counts = opt.staked_games(state, orders, "2026-09-25")
+    assert counts == {"graded": 2, "unjoined": 1}
+    keys = {k for g in games for k in g[opt.STAKED_FIELD]}
+    assert keys == {"ncaaf|h2h|full|pregame|all", "ncaaf|h2h|full|pregame|books1-2",
+                    "ncaaf|h2h|full|pregame|market_only", "ncaaf|h2h|full|pregame|model"}
+    acc = [g for g in games if g["key"] == "2026-09-20|e1"][0][opt.STAKED_FIELD]["ncaaf|h2h|full|pregame|all"]
+    assert acc == [1, 0, -1.0, 0.04, 1, -1.0, 0.04]
+
+
+def test_no_ledger_means_no_stake_scale_never_a_fallback_to_the_board():
+    report, overlay = opt.build_report(opt.empty_state("sig"), today="2026-09-25", now=NOW, resamples=20, orders=None)
+    assert overlay["stake_scale"] == {} and report["staked_counts"] == {"orders_unavailable": 1}
+
+
+def test_a_staked_cell_that_loses_well_below_its_admitted_ev_gets_a_bounded_stake_scale():
+    rng = random.Random(5)
+    state = opt.empty_state("sig")
+    state["orders"] = {"k": {"cell": "nfl|h2h|full|pregame", "books": 2, "seen": "2026-09-10"}}
+    orders = []
+    for g in range(90):
+        for _ in range(3):
+            won = rng.random() < 0.40
+            orders.append(_order("k", day=f"2026-09-{10 + g % 9:02d}", event=f"e{g}", outcome="won" if won else "lost",
+                                 stake=10.0, pnl=9.1 if won else -10.0, ev=4.0))
+    report, overlay = opt.build_report(state, today="2026-09-25", now=NOW, resamples=300, orders=orders)
+    assert "nfl|h2h|full|pregame" in overlay["stake_scale"]
+    assert opt.FACTOR_FLOOR <= overlay["stake_scale"]["nfl|h2h|full|pregame"]["factor"] < 1.0
+    assert report["staked_summary"]["books1-2"]["bets"] == 270
