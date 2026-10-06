@@ -1557,6 +1557,12 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Hypothesis: Soccer needs NO name join: the ledger's soccer game_pk IS ESPN's event id (verified: ledger game_pk 761833 == ESPN usa.1 event 761833 on 2026-09-30), so an id-keyed index joins on the scorer's FIRST lookup key. Draws need no new rule either -- soccer is in DRAW_IS_A_REAL_OUTCOME and finals_from_scores' h>a already maps a level final to False. The provider can therefore reuse fetch_events/LEAGUE_ESPN_SLUGS/active_leagues_for_date and record_is_unplayed wholesale, writing no new HTTP and inheriting the postponed-match rule.
 - Falsification test: If either date fails to reproduce its retained briers at the retained n, the id-join assumption is wrong and soccer must stay unwired rather than append an approximate row. If a DRAW is present and excluding it reproduces the retained figures while including it does not, then the board does NOT score draws as not-a-home-win for this sport and DRAW_IS_A_REAL_OUTCOME does not describe the retained data.
 - Verification: --sport soccer --date 2026-09-30 and --date 2026-10-01 with --expect-from-history both exit 0 with the gate EXACT; plus offline tests for the id join, a draw scored as not-a-home-win, a postponed match excluded, and a ledger game whose game_pk is absent being named.
+### refresh-job-parse-linear — OPEN — opened 2026-10-06 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: The odds-job wrapper (run_refresh_odds_job.py) keeps only a bounded head (2 MB) + rolling tail (8 MB) of each child stream and stops the live echo after the head, so an oversized child output (18:10Z 2026-10-07 run: 106 MB stdout + 1.6 GB stderr, wrapper 2.5 GB RSS for 35+ min) can no longer wedge it or squeeze the refresh-worker container; true sizes still reported. (A first attempt -- raw_decode at an offset -- was MEASURED to change nothing and was reverted.)
+- Files: scripts/run_refresh_odds_job.py (output buffering + live echo ONLY), tests/test_run_refresh_odds_job_large_stdout.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: Unit test timing; fleet wrapper finish time + stderr tail
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

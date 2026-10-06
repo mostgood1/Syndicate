@@ -19,15 +19,89 @@ def _memory_trace_enabled() -> bool:
     return str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_MEMORY_TRACE") or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _stream_child_output(pipe, *, chunks: list[str], target_stream) -> None:
+#: What the wrapper KEEPS of one child stream: the first `_OUTPUT_HEAD_CHARS` and a
+#: rolling last `_OUTPUT_TAIL_CHARS`. Lane `refresh-job-parse-linear` (2026-10-06):
+#: the 18:10Z 2026-10-07 full run returned 106 MB of stdout and 1.6 GB of stderr,
+#: all held in this process's memory; after the child exited 0 the wrapper sat at
+#: 2.5 GB RSS for 35+ minutes and held the refresh-worker container at 91% of 4 GB
+#: until it was killed. Every other run that day stayed under 1 MB.
+_OUTPUT_HEAD_CHARS = int(os.environ.get("SYNDICATE_REFRESH_JOB_OUTPUT_HEAD_CHARS") or 2_000_000)
+_OUTPUT_TAIL_CHARS = int(os.environ.get("SYNDICATE_REFRESH_JOB_OUTPUT_TAIL_CHARS") or 8_000_000)
+
+
+class _BoundedChunks:
+    """A list-like chunk buffer that keeps a head and a rolling tail, and counts the rest.
+
+    Supports what this module does with the buffers: `append`, iteration (for
+    `"".join(...)` and `sum(len(c) for c in ...)`), and `len()`. `total_chars` is the
+    TRUE size seen, so a capped run still reports how much its child printed.
+    """
+
+    def __init__(self, head_chars: int | None = None, tail_chars: int | None = None) -> None:
+        from collections import deque
+
+        self.head_chars = _OUTPUT_HEAD_CHARS if head_chars is None else int(head_chars)
+        self.tail_chars = _OUTPUT_TAIL_CHARS if tail_chars is None else int(tail_chars)
+        self._head: list[str] = []
+        self._head_size = 0
+        self._tail = deque()
+        self._tail_size = 0
+        self.total_chars = 0
+        self.dropped_chars = 0
+
+    def append(self, chunk: str) -> None:
+        chunk = str(chunk)
+        self.total_chars += len(chunk)
+        if self._head_size < self.head_chars:
+            self._head.append(chunk)
+            self._head_size += len(chunk)
+            return
+        self._tail.append(chunk)
+        self._tail_size += len(chunk)
+        while self._tail_size > self.tail_chars and len(self._tail) > 1:
+            dropped = self._tail.popleft()
+            self._tail_size -= len(dropped)
+            self.dropped_chars += len(dropped)
+
+    def __iter__(self):
+        yield from self._head
+        if self.dropped_chars:
+            yield (
+                f"\n[refresh_job_output_capped] {self.dropped_chars} chars dropped of "
+                f"{self.total_chars} (kept head {self._head_size}, tail {self._tail_size})\n"
+            )
+        yield from self._tail
+
+    def __len__(self) -> int:
+        return len(self._head) + len(self._tail) + (1 if self.dropped_chars else 0)
+
+    @property
+    def capped(self) -> bool:
+        return self.dropped_chars > 0
+
+
+def _stream_child_output(pipe, *, chunks, target_stream) -> None:
+    echo_limit = getattr(chunks, "head_chars", None)
+    echoed = 0
+    announced = False
     try:
         while True:
             line = pipe.readline()
             if line == "":
                 break
             chunks.append(line)
-            target_stream.write(line)
-            target_stream.flush()
+            # Live echo up to the kept head only; after that one notice, not 1.6 GB.
+            if echo_limit is None or echoed < echo_limit:
+                target_stream.write(line)
+                target_stream.flush()
+                echoed += len(line)
+            elif not announced:
+                target_stream.write(
+                    f"[refresh_job_output_echo_capped] echoed {echoed} chars; the rest is kept "
+                    "head+tail in odds_refresh.stderr.txt / odds_refresh.json\n"
+                )
+                target_stream.flush()
+                announced = True
     finally:
         try:
             pipe.close()
@@ -246,8 +320,8 @@ def _wait_for_child_process(
     started_at: str,
     command: list[str],
 ) -> tuple[str, str, int]:
-    stdout_chunks: list[str] = []
-    stderr_chunks: list[str] = []
+    stdout_chunks = _BoundedChunks()
+    stderr_chunks = _BoundedChunks()
     wait_started_at = _utc_now()
     live_streaming = _memory_trace_enabled()
     stdout_thread: threading.Thread | None = None
@@ -323,8 +397,8 @@ def _wait_for_child_process(
                     "childPid": int(process.pid),
                     "childPoll": process.poll(),
                     "childReturnCode": process.returncode,
-                    "stdoutBufferLen": sum(len(chunk) for chunk in stdout_chunks),
-                    "stderrBufferLen": sum(len(chunk) for chunk in stderr_chunks),
+                    "stdoutBufferLen": getattr(stdout_chunks, "total_chars", None) or sum(len(chunk) for chunk in stdout_chunks),
+                    "stderrBufferLen": getattr(stderr_chunks, "total_chars", None) or sum(len(chunk) for chunk in stderr_chunks),
                 },
             )
             return "".join(stdout_chunks), "".join(stderr_chunks), int(process.returncode or 0)
@@ -352,8 +426,8 @@ def _wait_for_child_process(
                     "childPid": int(process.pid),
                     "childPoll": process.poll(),
                     "childReturnCode": process.returncode,
-                    "stdoutBufferLen": sum(len(chunk) for chunk in stdout_chunks),
-                    "stderrBufferLen": sum(len(chunk) for chunk in stderr_chunks),
+                    "stdoutBufferLen": getattr(stdout_chunks, "total_chars", None) or sum(len(chunk) for chunk in stdout_chunks),
+                    "stderrBufferLen": getattr(stderr_chunks, "total_chars", None) or sum(len(chunk) for chunk in stderr_chunks),
                 },
             )
 
