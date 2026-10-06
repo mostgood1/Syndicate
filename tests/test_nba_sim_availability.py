@@ -81,3 +81,63 @@ def test_not_applied_off_the_regular_season_or_by_default(root, tmp_path):
 def test_bad_k_is_refused(root):
     _, s = _run(root, doc={"enabled": True, "k": 9})
     assert not s["applied"] and "outside" in s["reason"]
+
+
+def test_traded_player_is_not_dropped_from_his_new_team(root):
+    """Hurt missed NYK's last 2 games; if the sim's props_df puts him on BOS he was traded: no exclusion anywhere."""
+    import pandas as pd
+
+    (root / av.FILE).write_text(json.dumps({"enabled": True}), encoding="utf-8")
+    ex = {}
+    props = pd.DataFrame({"player_name": ["Hurt", "Starter"], "team": ["BOS", "NYK"]})
+    s = av.add_nba_recency_exclusions(ex, processed_root=root, date_str="2026-10-26", league_code="nba", name_key=KEY,
+                                      props_df=props, env={})
+    assert s["skipped_traded"] == 1 and "HURT" not in ex.get("NYK", set()) and "HURT" not in ex.get("BOS", set())
+    props_same = pd.DataFrame({"player_name": ["Hurt"], "team": ["NYK"]})
+    ex2 = {}
+    av.add_nba_recency_exclusions(ex2, processed_root=root, date_str="2026-10-26", league_code="nba", name_key=KEY,
+                                  props_df=props_same, env={})
+    assert ex2["NYK"] == {"HURT"}
+
+
+def test_punctuated_names_with_the_sims_real_name_key(root):
+    """With the sim's own _norm_name_key: an apostrophe name is excluded under the key the pool filter uses, and a
+    prop line spelled with the apostrophe re-admits him."""
+    from syndicate.features.shared.basketball_props_smart_sim import _norm_name_key
+
+    _logs(root, [("De'Aaron Fox", "SAS", "0022600003", "2026-10-20", 34), ("Other", "SAS", "0022600003", "2026-10-20", 30),
+                 ("Other", "SAS", "0022600011", "2026-10-22", 30), ("Other", "SAS", "0022600021", "2026-10-24", 30)])
+    (root / "oddsapi_player_props_2026-10-26.csv").write_text("market,player_name\nplayer_points,Other\n", encoding="utf-8")
+    (root / av.FILE).write_text(json.dumps({"enabled": True}), encoding="utf-8")
+    ex = {}
+    av.add_nba_recency_exclusions(ex, processed_root=root, date_str="2026-10-26", league_code="nba", name_key=_norm_name_key, env={})
+    assert ex["SAS"] == {str(_norm_name_key("De'Aaron Fox")).strip().upper()}
+    (root / "oddsapi_player_props_2026-10-26.csv").write_text("market,player_name\nplayer_points,De'Aaron Fox\n", encoding="utf-8")
+    ex = {}
+    s = av.add_nba_recency_exclusions(ex, processed_root=root, date_str="2026-10-26", league_code="nba", name_key=_norm_name_key, env={})
+    assert "SAS" not in ex and s["readmitted_with_prop_line"] == 1
+
+
+
+def test_the_real_sim_run_reaches_the_nba_call(tmp_path, monkeypatch):
+    """Reachability through _smart_sim_run_date_local: the call fires with the sim's props_df and _norm_name_key,
+    after the injury map (sentinel stops the run before any simulation)."""
+    from syndicate.features.shared import basketball_props_smart_sim as bpss
+
+    (tmp_path / "predictions_2026-10-26.csv").write_text("date,home_team,visitor_team\n2026-10-26,NYK,BOS\n", encoding="utf-8")
+    (tmp_path / "props_predictions_2026-10-26.csv").write_text("player_name,team\nA. Player,NYK\n", encoding="utf-8")
+    seen = {}
+
+    class Stop(Exception):
+        pass
+
+    def fake(excluded_map, **kw):
+        seen.update(kw, excluded_map_type=type(excluded_map).__name__)
+        raise Stop
+
+    monkeypatch.setattr(av, "add_nba_recency_exclusions", fake)
+    with pytest.raises(Stop):
+        bpss._smart_sim_run_date_local(processed_root=tmp_path, raw_root=tmp_path, date_str="2026-10-26", n_sims=1,
+                                       seed=1, max_games=1, overwrite=False, league_code="nba")
+    assert seen["league_code"] == "nba" and seen["date_str"] == "2026-10-26" and seen["name_key"] is bpss._norm_name_key
+    assert list(seen["props_df"]["player_name"]) == ["A. Player"] and seen["excluded_map_type"] == "dict"

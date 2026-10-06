@@ -5464,6 +5464,13 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
 
     add_recency_exclusions(excluded_map, processed_root=processed_root, date_str=date_str, league_code=league_code,
                            props_df=props_df, name_key=_norm_name_key)
+    # NBA: players who missed their team's last 2 regular-season games stay out (lane nba-prop-calibration; this
+    # call loaned by basketball-injury-exclusion-reinclusion, f47f546e). NBA-only, regular season only, re-admits a
+    # player with a posted pre-tip prop line, ADDS keys only; OFF unless nba_sim_availability.json is enabled.
+    from syndicate.features.shared.nba_sim_availability import add_nba_recency_exclusions
+
+    add_nba_recency_exclusions(excluded_map, processed_root=processed_root, date_str=date_str, league_code=league_code,
+                               name_key=_norm_name_key, props_df=props_df)
 
     odds_df = None
     odds_path = processed_root / f"game_odds_{date_str}.csv"
