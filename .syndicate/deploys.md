@@ -46706,3 +46706,13 @@ committing a narrower one. A per-sport ledger one sport's run can erase is not a
 - reading 1: lineups_2026-10-06.csv rewritten 00:13:01Z (first after the ff): 324 slotted skaters, 324 with proj_pp_toi (0.0..7.133; top Reinhart 7.13, Stutzle 6.31, B. Tkachuk 6.16, M. Tkachuk 6.14; 42 with 0.0 = never drawn on the PP).
 - reading 2: `nhl_sim_input_checklist.py` on fleet data -- PASS; proj_pp_toi 16.0% "consumed, thinly populated" only because older dated lineup files predate the column.
 - watch: early-season windows are small -- OTT Yakemchuk (PP2) carries 6.36 PP min/game; the per-player draw follows it.
+
+## 2026-10-06 ~00:40Z (7:40 PM CT 10-05) -- READING: hitter-prop calibration re-fit (5fdd5139) is SERVING -- **MET** (lane `mlb-hr-prop-calibration`)
+
+- **Instrument.** Production's `daily_summary_2026_10_05.json`, written 23:56:51Z by the 23:55Z sim run, after the 23:10:15Z ff.
+- **Check.** For each served topn row, served `p_*_cal` vs sigmoid(a*logit(p_raw)+b) under the NEW map and under the OLD map (d2ecd036).
+  - hits_1plus: 36 rows, |served - new| 0.00000, |served - old| 0.10660.
+  - total_bases_2plus: 36 rows, |served - new| 0.00000, |served - old| 0.09449.
+  - rbi_1plus: 36 rows, |served - new| 0.00000, |served - old| 0.05686.
+- **Verdict:** the board's hitter-prop probabilities are computed with the re-fit maps.
+- **Caught-stealing fix (b6fd6189).** Code path confirmed: the fleet was at b6fd6189 before the 23:41Z and 23:55Z runs. The effect (~+0.1 outs/start) gets a paired replay reading next; not yet measured.

@@ -1276,6 +1276,7 @@ death, never life — do not invert it.
 - Blocked by: mlb-strikeout-bias
 
 ### mlb-hr-prop-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **VERIFIED 2026-10-06 ~00:40Z:** served p_*_cal == new map exactly on production's 23:56Z summary (36 rows/key, |diff| 0.00000 vs 0.057-0.107 for the old map). deploys.md ~00:40Z.
 - **SHIPPED 2026-10-05 23:10:15Z (fleet 5fdd5139):** 10 of 18 hitter-prop keys re-fit by the pre-registered rule; HR + 8 kept. Verification owed at the next MLB sim (deploys.md 23:10:15Z).
 - **SELECTION RULE, PRE-REGISTERED 2026-10-06 ~06:00Z before any replay** (user: "yes, do 2 and 3 and ship if they pass").
   - **Engine** = production as shipped: forward overrides incl. hr_rate_mult 1.1, starter_short_start_prob 0.10.
