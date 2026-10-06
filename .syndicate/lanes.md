@@ -1038,6 +1038,12 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **AMENDMENT 7 READINGS 2026-10-06 ~17:05Z (descent not restarted yet):**
+  - 316 FIT-date games: 223 events (WP 178, PB 23, BK 22) over 31,635 eligible pitches = **0.00705/pitch** [0.00619, 0.00803].
+    - Mean sim multiplier on the real pitch mix 0.962, so **b = 0.00733** vs the model's 0.004 (1.8x low).
+    - Sanity: 178 WP / 316 games = 0.56 per game (MLB ~0.6).
+    - Split (info) WP/PB/BK 0.80/0.10/0.10 vs the model's 0.72/0.18/0.10 on balls; the split only labels the event (every runner moves up one base either way).
+  - Engine unchanged (the field is read directly; its 0.05 clamp does not bind). Every arm adds `--cfg-set bip_misc_advance_pitch_rate=0.00733`.
 - **RULE v2 AMENDMENT 7 — WILD PITCH / PASSED BALL / BALK RATE MEASURED, PRE-REGISTERED 2026-10-06 ~16:45Z (user: "then fix the wild pitch rate next"); descent stopped again (its restart was minutes old; any arm it wrote is discarded by the key change):**
   - Engine: per non-in-play pitch (ball / called / swinging / foul) with a runner on, P(advance event) = `bip_misc_advance_pitch_rate` (0.004) x {ball 1.0, strike 0.9, foul 0.8} x (1.2 if a runner is on 3B).
     - The event type is then split WP/PB/BALK by fixed shares; all runners move up one base.

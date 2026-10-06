@@ -11,6 +11,10 @@ rates that are MEASURED here, never fitted:
         0-1 outs)                                                      bip_sf_rate_flypop / _line
   roe P(batter reaches on error | field_out or field_error), per
         trajectory: ground / line / fly+pop (bunts excluded)          bip_roe_rate_ground / _line / _air
+  misc  P(wild pitch / passed ball / balk | non-in-play pitch with a
+        runner on), base state tracked PITCH BY PITCH from each runner
+        movement's playIndex; reported as the base rate that reproduces
+        it under the sim's multipliers                                 bip_misc_advance_pitch_rate
 
 THE BASE STATE BEFORE A PLAY comes from the previous play's `matchup.postOn*` within the
 same half-inning. A play's `runners` list holds only runners who MOVED: a runner who held
@@ -100,8 +104,44 @@ _SF_YES = ("sac_fly", "sac_fly_double_play")
 _SF_ALL = _SF_YES + ("field_out", "double_play", "field_error")
 
 
+_BALL = ("B", "*B", "P")
+_STRIKE = ("C", "S", "W", "T", "M")
+_FOUL = ("F", "L")
+_MISC = ("wild_pitch", "passed_ball", "balk")
+
+
+def misc_advance(pre: dict, play: dict, acc: dict) -> None:
+    """Walk one play's events with the bases as they stand at each pitch."""
+    bases = dict(pre)
+    moves = {}
+    for r in play.get("runners") or []:
+        moves.setdefault((r.get("details") or {}).get("playIndex"), []).append(r)
+    for i, e in enumerate(play.get("playEvents") or []):
+        idx = e.get("index", i)
+        if e.get("isPitch"):
+            code = ((e.get("details") or {}).get("call") or {}).get("code") or (e.get("details") or {}).get("code")
+            if bases and code in _BALL + _STRIKE + _FOUL:
+                mult = 1.0 if code in _BALL else (0.9 if code in _STRIKE else 0.8)
+                acc["misc_eligible"] += 1
+                acc["misc_mult_sum"] += mult * (1.2 if "3B" in bases else 1.0)
+        here = moves.get(idx) or []
+        kinds = {(r.get("details") or {}).get("eventType") for r in here} & set(_MISC)
+        for k in kinds:
+            acc["misc_events"][k] += 1
+        for r in here:
+            mv = r.get("movement") or {}
+            rid = ((r.get("details") or {}).get("runner") or {}).get("id")
+            start = mv.get("start")
+            if start in ("1B", "2B", "3B") and bases.get(start) == rid:
+                del bases[start]
+            end = mv.get("end")
+            if not mv.get("isOut") and end in ("1B", "2B", "3B") and rid:
+                bases[end] = rid
+
+
 def collect(data: dict, acc: dict) -> None:
     for pre, outs_before, play in plays_with_state(data):
+        misc_advance(pre, play, acc)
         ev = (play.get("result") or {}).get("eventType")
         traj = trajectory(play)
         if ev == "grounded_into_double_play":
@@ -151,7 +191,18 @@ def summarise(acc: dict) -> dict:
             "sf_flypop": sf(("fly_ball", "popup")), "sf_line": sf(("line_drive",)),
             "sf_info": {"fly_ball": sf(("fly_ball",)), "popup": sf(("popup",))},
             **{f"roe_{name}": share(sum(1 for t, e in acc["roe"] if t in trajs and e), sum(1 for t, _ in acc["roe"] if t in trajs))
-               for name, trajs in (("ground", ("ground_ball",)), ("line", ("line_drive",)), ("air", ("fly_ball", "popup")))}}
+               for name, trajs in (("ground", ("ground_ball",)), ("line", ("line_drive",)), ("air", ("fly_ball", "popup")))},
+            "misc": _misc_summary(acc)}
+
+
+def _misc_summary(acc: dict) -> dict:
+    ev, n = sum(acc["misc_events"].values()), acc["misc_eligible"]
+    r = ev / n if n else None
+    mean_mult = acc["misc_mult_sum"] / n if n else None
+    return {"events": dict(acc["misc_events"]), "eligible_pitches": n, "rate_per_eligible_pitch": r,
+            "ci95": wilson(ev, n), "mean_sim_multiplier": mean_mult,
+            "base_rate_b": (r / mean_mult) if r is not None and mean_mult else None,
+            "split": {k: v / ev for k, v in acc["misc_events"].items()} if ev else {}}
 
 
 def main(argv=None) -> int:
@@ -164,7 +215,8 @@ def main(argv=None) -> int:
     data_dir = Path(os.path.expanduser(args.data_root))
     cache = Path(os.path.expanduser(args.cache))
     cache.mkdir(parents=True, exist_ok=True)
-    acc = {"gidp_all": 0, "gidp_zero_out": 0, "r2": [], "r3": [], "grounders": [], "airballs": [], "roe": []}
+    acc = {"gidp_all": 0, "gidp_zero_out": 0, "r2": [], "r3": [], "grounders": [], "airballs": [], "roe": [],
+           "misc_eligible": 0, "misc_mult_sum": 0.0, "misc_events": {k: 0 for k in _MISC}}
     games = failed = 0
     for d in sorted(set(args.dates)):
         for pk in game_pks(data_dir, d):
