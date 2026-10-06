@@ -1016,6 +1016,14 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **RULE v2 AMENDMENT 4 — SAC FLY RATES MEASURED, PRE-REGISTERED 2026-10-06 ~16:30Z (user: "then fix the sac fly rate next"), before measuring; pipeline paused again (builds 10/20, 0 descent runs):**
+  - Model: on a fly/pop/line OUT with a runner on 3rd and <2 outs, the runner scores (batter out, RBI) with prob `bip_sf_rate_flypop` (0.48) for fly+pop or `bip_sf_rate_line` (0.36) for liners. Drawn BEFORE the ROE draw.
+  - MEASURED from StatsAPI pbp of the same 316 FIT-date games. Plays: a runner starting on 3B, 0-1 outs before, eventType in {sac_fly, sac_fly_double_play, field_out, double_play, field_error}.
+    - flypop = #sac_fly* / # among trajectory fly_ball + popup;
+    - line = the same among line_drive.
+    - Wilson 95% CIs. fly_ball and popup are also reported apart (information).
+  - Both enter every descent arm as fixed `--cfg-set` values. Not levers; production keeps 0.48 / 0.36. Checks (a)-(e) unchanged.
+  - Ceiling check before use: the rates go through `_clamp01` only.
 - **AMENDMENT 3 READINGS 2026-10-06 ~16:10Z (before any descent run):**
   - fc = **300/620 = 0.484** [0.445, 0.523] (force_out 295, fielders_choice_out 5 / + field_out 261, field_error 13, fielders_choice 46). The model's 0.04 is ~12x low.
   - DP conversion (info only) 384/1004 = 0.382, inside the DP grid's 0.30-0.40.
