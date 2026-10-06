@@ -1536,6 +1536,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 at ~20:52Z returned SAFE for 1 of 17 CLOSED blocks; moved `nhl-early-season-shot-volume` to lanes_closed.md. The other 16 WAIT (table in log/2026-10-06.md).
 
+### soccer-roster-refresh — OPEN — opened 2026-10-06 — session fc6fc474-5cf8-4333-b451-4dcf68180c23
+- Goal: Soccer ESPN rosters (rosters_<season>.csv, read by the departed-player roster rescue and the team roster pages) are refreshed on production instead of being the 2026-07-20 git seed: refresh_odds_sources runs build_soccer_rosters.py into the data root when a league's file is absent or > 7 days old (kill switch SYNDICATE_SOCCER_ROSTER_REFRESH=0), a sparse ESPN fetch never shrinks a club below its previous rows, and the files are allowlisted; verified by every league's rosters_2026.csv on the fleet carrying an mtime after the ff and per-league row counts before/after recorded in deploys.md
+- Files: scripts/build_soccer_rosters.py, scripts/refresh_odds_sources.py (_soccer_rosters_step + its one wiring loop ONLY; cross-lane write USER-APPROVED 2026-10-06), syndicate/features/shared/artifact_publisher.py (the soccer rosters HOT_ARTIFACT_PATTERNS line ONLY; cross-lane write USER-APPROVED 2026-10-06), tests/test_soccer_roster_refresh.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: Unit tests incl. off!=on for the step and the no-shrink guard; fleet ff under deploy_claim + check_deploy_safety; reading: rosters_2026.csv mtime > ff time for each league with row counts before/after, and the next soccer artifact build's player_substrate/departed filter still reports normally
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
