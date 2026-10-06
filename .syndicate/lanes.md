@@ -1360,6 +1360,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Unit tests incl. off!=on; fleet: [mlb_fetch_event_scoping] cold_segment_refreshed > 0 and MLB rows_stale_quote down
 - Blocked by: none
 
+### nfl-prop-line-reprice — OPEN — opened 2026-10-06 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: An NFL board prop whose exact (stat, player, line) is absent from the projection artifact but whose player+stat IS projected gets the model's probability at the BOARD's line, computed with the same _nfl_prop_model_probability and the artifact's stored inputs (which reproduce the stored probabilities to <1e-5); verified by NFL prop_coverage rows_repriced_at_line > 0 and unmatched_key_rows falling on the fleet board
+- Files: syndicate/features/shared/nfl_prop_projections.py, tests/test_nfl_prop_line_reprice.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: Tests (exactness at an artifact line, reprice at a moved line, off!=on); fleet A/B of attach_nfl_prop_projections on the live grid
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

@@ -111,6 +111,24 @@ class NflPropProjectionIndex:
     def get(self, key: str) -> Mapping[str, Any] | None:
         return self.entries.get(key)
 
+    def inputs_for(self, stat: str, player_segment: str) -> Mapping[str, Any] | None:
+        """Any artifact row for this (stat, player): they share the model inputs.
+
+        The rows for one player and stat differ only in their line; `projected_value`,
+        `projected_sd` and `sample_games` are the player's, so any one of them can
+        price another line with `_nfl_prop_model_probability`. Built lazily from
+        `entries` so the loader is unchanged.
+        """
+        cache = self.__dict__.get("_by_player_stat")
+        if cache is None:
+            cache = {}
+            for key, row in self.entries.items():
+                parts = str(key).split("::")
+                if len(parts) >= 2:
+                    cache.setdefault((parts[0], parts[1]), row)
+            self.__dict__["_by_player_stat"] = cache
+        return cache.get((stat, player_segment))
+
 
 def _season_candidates(resolved_season: Any, selected_date: Any) -> list[int]:
     """Seasons to probe, newest first.
@@ -293,12 +311,16 @@ def attach_nfl_prop_projections(
     unmatched_key_rows = 0
     no_probability_rows = 0
     no_line_rows = 0
+    # Lane `nfl-prop-line-reprice` (2026-10-06): rows whose exact line is not in
+    # the artifact but whose player+stat is, priced at the BOARD's line.
+    rows_repriced_at_line = 0
     unsupported_markets: dict[str, int] = {}
 
     try:
         from syndicate.features.nfl.props import (
             _NFL_PROP_MARKET_TO_STAT,
             _nfl_prop_join_market_key,
+            _nfl_prop_model_probability,
         )
     except Exception:
         return {
@@ -328,6 +350,32 @@ def attach_nfl_prop_projections(
             continue
         key = _nfl_prop_join_market_key(stat, str(row.get("player_name") or ""), line)
         entry = index.get(key)
+        repriced = False
+        if entry is None and line is not None:
+            # THE LINE MOVED, THE PLAYER DID NOT (lane `nfl-prop-line-reprice`,
+            # 2026-10-06). The artifact holds the lines captured when it was
+            # built; a line quoted later missed the join although the model has
+            # this player and stat. Measured on the fleet grid 2026-10-05: 74 rows
+            # whose nearest artifact line sat a median 3.0 away. The artifact's
+            # stored inputs reproduce every stored probability through
+            # `_nfl_prop_model_probability` (max |diff| 8e-6 over 425 rows), so the
+            # board's own line is priced with the SAME model, not interpolated.
+            parts = key.split("::")
+            base = index.inputs_for(parts[0], parts[1]) if len(parts) >= 2 else None
+            if base is not None:
+                try:
+                    reprice = _nfl_prop_model_probability(
+                        stat=stat,
+                        mean=_as_float(base.get("projected_value")),
+                        stdev=_as_float(base.get("projected_sd")),
+                        n=int(base.get("sample_games") or 0),
+                        line=line,
+                    )
+                except Exception:  # noqa: BLE001 -- a bad row must not break the join
+                    reprice = None
+                if reprice is not None:
+                    entry = {**dict(base), "sim_projection": reprice}
+                    repriced = True
         if entry is None:
             unmatched_key_rows += 1
             continue
@@ -351,6 +399,9 @@ def attach_nfl_prop_projections(
             "rate_source": entry.get("rate_source"),
             "player_team": entry.get("player_team"),
         }
+        if repriced:
+            projection["line_repriced"] = True
+            rows_repriced_at_line += 1
         # Sets `model_prob_over`, `market_fair_prob_over` and
         # `edge_vs_market_pct` (or a named `edge_unavailable_reason`), applying
         # the same live-edge suppression every other sport goes through. Reused
@@ -366,6 +417,7 @@ def attach_nfl_prop_projections(
         "rows_with_projection": rows_with_projection,
         "unsupported_market_rows": unsupported_market_rows,
         "unmatched_key_rows": unmatched_key_rows,
+        "rows_repriced_at_line": rows_repriced_at_line,
         "no_probability_rows": no_probability_rows,
         "no_line_rows": no_line_rows,
         # WHICH artifact answered, so an empty join is attributable to a wrong
