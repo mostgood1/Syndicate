@@ -5122,17 +5122,30 @@ def _smart_sim_injuries_excluded_map_for_date_local(*, processed_root: Path, raw
                     df = df[df["date"].notna()].copy()
                     if cutoff is not None:
                         df = df[df["date"] <= cutoff].copy()
-                    if fresh_cutoff is not None and "status" in df.columns:
-                        status0 = df["status"].astype(str).str.upper().str.strip()
-                        season_out0 = (status0.str.contains("SEASON", na=False) & status0.str.contains("OUT", na=False)) | status0.str.contains("INDEFINITE", na=False) | status0.str.contains("SEASON-ENDING", na=False)
-                        df = df[(df["date"] >= fresh_cutoff) | season_out0].copy()
-                    try:
-                        df = df.sort_values(["date"]).copy()
-                        group_cols = [column for column in ["player", "team"] if column in df.columns]
-                        if group_cols:
-                            df = df.groupby(group_cols, as_index=False).tail(1).copy()
-                    except Exception:
-                        pass
+                    # The feed is a stack of DAILY SNAPSHOTS and a returned player simply drops off the next one,
+                    # so status comes from the LATEST SNAPSHOT on or before the game date -- never a player's latest
+                    # row, which kept a returned player excluded for up to 30 days (measured 2026-10-06: Loyd and
+                    # Talbot OUT on 10-04/10-05, absent from 10-06, still left out of both 10-07 sims). Same rule
+                    # as basketball_props_availability.out_players_for_date.
+                    if not df.empty:
+                        day = df["date"].dt.normalize()
+                        counts = day.value_counts().sort_index()
+                        snapshot_day = counts.index[-1]
+                        # A partial fetch would otherwise clear almost every exclusion (the permissive failure):
+                        # a latest snapshot under half the previous one's rows is not trusted.
+                        if len(counts) >= 2 and counts.iloc[-1] < 0.5 * counts.iloc[-2]:
+                            print(
+                                f"[smart_sim] INJURY_SNAPSHOT_PARTIAL date={ds_s} latest={snapshot_day.date()} rows={int(counts.iloc[-1])} "
+                                f"previous={counts.index[-2].date()} rows={int(counts.iloc[-2])} -- using the previous snapshot",
+                                flush=True,
+                            )
+                            snapshot_day = counts.index[-2]
+                        df = df[day == snapshot_day].copy()
+                        # A snapshot older than the freshness window counts only for its season-ending rows.
+                        if fresh_cutoff is not None and snapshot_day < fresh_cutoff and "status" in df.columns:
+                            status0 = df["status"].astype(str).str.upper().str.strip()
+                            season_out0 = (status0.str.contains("SEASON", na=False) & status0.str.contains("OUT", na=False)) | status0.str.contains("INDEFINITE", na=False) | status0.str.contains("SEASON-ENDING", na=False)
+                            df = df[season_out0].copy()
                 status_col = "status" if "status" in df.columns else ("injury_status" if "injury_status" in df.columns else None)
                 name_col = "player" if "player" in df.columns else ("player_name" if "player_name" in df.columns else None)
                 team_col = "team" if "team" in df.columns else ("team_tri" if "team_tri" in df.columns else None)
