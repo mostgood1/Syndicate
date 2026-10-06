@@ -121,9 +121,9 @@ def data_root() -> Path:
 
 
 try:
-    from scripts._base_url import default_base_url
+    from scripts._base_url import admin_token as resolve_admin_token, default_base_url
 except ImportError:  # run as `python scripts/<name>.py`
-    from _base_url import default_base_url
+    from _base_url import admin_token as resolve_admin_token, default_base_url
 
 
 def base_url() -> str:
@@ -131,15 +131,10 @@ def base_url() -> str:
 
 
 def admin_token() -> str:
-    value = str(os.environ.get("ADMIN_TOKEN") or "").strip()
-    if value:
-        return value
-    env = REPO_ROOT / ".env"
-    if env.exists():
-        for line in env.read_text(encoding="utf-8", errors="replace").splitlines():
-            if line.startswith("ADMIN_TOKEN"):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return ""
+    """The token for `base_url()`, or "" -- `_base_url.admin_token` is the one resolver (lane
+    `scripts-fleet-default`): for the fleet it reads the fleet's own token, never repo `.env`'s
+    Render token, which 401s from Windows against the fleet."""
+    return resolve_admin_token(base_url())
 
 
 class WebReader:
