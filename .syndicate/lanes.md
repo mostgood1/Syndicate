@@ -1031,6 +1031,16 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **RULE v2 AMENDMENT 6 — REACHED-ON-ERROR RATES MEASURED, PRE-REGISTERED 2026-10-06 ~16:00Z UTC (user: "then fix the ROE rate next"):**
+  - State: the descent was STOPPED after its production arm (objective 12434, 98% the known HBP term). That arm is discarded; the descent restarts from scratch with these inputs.
+  - Engine: P(ROE) on an out-ball that reached the ROE draw = `bip_roe_rate` (0.012, clamped <= 0.1) x {ground 1.40, line 0.85, fly/pop 0.45}.
+    - NEW optional fields `bip_roe_rate_ground` / `_line` / `_air` (default None = today's base x multiplier; byte-identical to be proven). When set, they are used directly (clamp01).
+  - MEASURED from StatsAPI pbp of the FIT-date games (all base states). Per trajectory t in {ground_ball, line_drive, fly_ball+popup}, bunts excluded:
+    - roe_t = #field_error / #(field_error + field_out).
+    - DP / FC / SF outcomes are excluded from the denominator, because the model draws ROE only after those fail.
+    - Wilson 95% CIs.
+  - The `bip_roe_rate` lever {0.012, 0.006} is REMOVED from the grid (8 levers left). Every arm carries the three measured rates. Production unchanged; checks (a)-(e) unchanged.
+  - Gates: tests, byte-identical proof, reachability.
 - **FIT COVERAGE AS BUILT 2026-10-06 ~18:10Z (before any descent run; no outcome read):** FIT = **24 dates, 311 games** (rebuilt).
   - 06-23 and 06-24 built 0 games. The fleet mirror has no `lineups.json` / `probables.json` for them (only per-game roster files; 4 and 1 stored sims), so there is no pregame lineup to rebuild from. They were ~12 starts in the old stored set.
   - VALIDATION = 15 dates, 205 games (05-30..06-14; 06-04 has 0 games, as in every earlier build).
