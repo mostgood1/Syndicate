@@ -78,7 +78,7 @@ def test_published_bets_that_realise_below_their_predicted_ev_get_a_bounded_stak
     for g in range(80):
         rows = []
         for _ in range(10):
-            y = 1.0 if rng.random() < 0.40 else 0.0  # priced at +150 against a 0.46 fair: predicted +15%, real -0%
+            y = 1.0 if rng.random() < 0.40 else 0.0  # +150, model 0.5: predicted +25% (market +15%), real ~0%
             rows.append({"buckets": [f"{CELL}|x=y"], "p_model": 0.5, "p_market": 0.46, "y": y, "price": 150,
                          "pnl": 1.5 if y else -1.0})
         games.append({"key": f"k{g}", "date": f"2026-09-{10 + g % 8:02d}", "rec": opt.accumulate(rows)[1]})
@@ -86,6 +86,55 @@ def test_published_bets_that_realise_below_their_predicted_ev_get_a_bounded_stak
     scales = opt.stake_scales(rec)
     assert CELL in scales
     assert opt.FACTOR_FLOOR <= scales[CELL]["factor"] < 1.0
+
+
+def _vig_priced_games(*, n_games: int = 80, rows: int = 10, seed: int = 13) -> list[dict]:
+    """Bets at -110 on a 0.5 fair (market EV -4.5%) that the model calls 0.56 (model EV +6.9%); they win at the fair."""
+    rng = random.Random(seed)
+    games = []
+    for g in range(n_games):
+        graded = []
+        for _ in range(rows):
+            y = 1.0 if rng.random() < 0.5 else 0.0
+            graded.append({"buckets": [f"{CELL}|x=y"], "p_model": 0.56, "p_market": 0.5, "y": y, "price": -110,
+                           "pnl": (100 / 110) if y else -1.0})
+        games.append({"key": f"k{g}", "date": f"2026-09-{10 + g % 8:02d}", "rec": opt.accumulate(graded)[1]})
+    return games
+
+
+def test_predicted_ev_is_the_models_and_market_ev_is_the_price_against_the_fair():
+    [row] = [r for r in opt.grade_bands(_vig_priced_games(n_games=3), "rec", resamples=50) if r["band"] == "all"]
+    odds = 1 + 100 / 110
+    assert row["predicted_ev"] == pytest.approx(0.56 * odds - 1, abs=1e-5)
+    assert row["market_ev"] == pytest.approx(0.5 * odds - 1, abs=1e-5)
+    assert row["predicted_ev"] > 0 > row["market_ev"]
+
+
+def test_regression_published_bets_with_a_negative_market_ev_can_still_get_a_stake_scale():
+    """/1 used the market EV as the prediction: ~minus the vig, so `ev <= 0` skipped every vig-priced cell."""
+    scales = opt.stake_scales(opt.grade_bands(_vig_priced_games(), "rec", resamples=400))
+    assert CELL in scales and opt.FACTOR_FLOOR <= scales[CELL]["factor"] < 1.0
+
+
+def test_a_row_without_a_model_probability_is_a_bet_but_never_a_zero_ev_model_bet():
+    graded = [{"buckets": [f"{CELL}|x=y"], "p_model": None, "p_market": 0.5, "y": 1.0, "price": 100, "pnl": 1.0},
+              {"buckets": [f"{CELL}|x=y"], "p_model": 0.6, "p_market": 0.5, "y": 0.0, "price": 100, "pnl": -1.0}]
+    [row] = [r for r in opt.grade_bands([{"key": "k", "date": "2026-10-05", "rec": opt.accumulate(graded)[1]}],
+                                        "rec", resamples=10) if r["band"] == "all"]
+    assert row["bets"] == 2 and row["model_bets"] == 1
+    assert row["predicted_ev"] == pytest.approx(0.2) and row["model_roi"] == pytest.approx(-1.0)
+    assert row["realised_minus_predicted"] == pytest.approx(-1.2)
+    only_market = opt.accumulate(graded[:1])[1]
+    [none] = [r for r in opt.grade_bands([{"key": "k", "date": "2026-10-05", "rec": only_market}], "rec", resamples=10)
+              if r["band"] == "all"]
+    assert none["predicted_ev"] is None and none["realised_minus_predicted"] is None
+
+
+def test_a_v1_state_with_four_slot_accumulators_is_reset_not_mixed():
+    v1 = {"version": "daily_optimizer/1", "grader_signature": "sig", "sport_versions": {},
+          "games": {"nba|1": {"sport": "nba", "rec": {f"{CELL}|all": [1, 1, 1.0, -0.04]}}}, "pub": {}, "resets": []}
+    state, reason = opt.load_state(v1, "sig")
+    assert reason == "state_version_changed" and state["games"] == {}
 
 
 def test_overlay_round_trips_through_the_consumer_validator_and_every_rail_rejects():

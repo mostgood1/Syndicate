@@ -55,7 +55,11 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import date as date_cls, datetime, timedelta, timezone
 from typing import Any
 
-OPTIMIZER_VERSION = "daily_optimizer/1"
+# /2 [2026-10-06]: band accumulators carry the MODEL's EV beside the market's. /1's `predicted_ev` was
+# p_market * odds - 1 -- the price against the de-vigged fair, i.e. ~minus the vig (-3.6% to -5.6% on
+# the first run) -- so it was never what the model promised, and `stake_scale` (needs ev > 0) could
+# fire only on price-shopped cells. /1 states carry 4-slot accumulators and are reset, not migrated.
+OPTIMIZER_VERSION = "daily_optimizer/2"
 REPORT_DIR = "reports/model_scorecard"
 # Names match the EXISTING `HOT_ARTIFACT_PATTERNS` entry `reports/model_scorecard/model_scorecard_*.json`,
 # so publishing needs no allowlist change on web; no ISO date in them, so date-scoped worker pulls skip them.
@@ -223,7 +227,12 @@ def accumulate(graded: Iterable[Mapping[str, Any]]) -> tuple[dict[str, list[floa
     """(calibration sums per cell, banded betting sums per cell|band) for one game's graded rows.
 
     cal[cell]       = [rows, sum d*d, sum d*r]
-    bands[cell|b]   = [bets, wins, pnl, predicted ev]   (b = an EV band, or `all`)
+    bands[cell|b]   = [bets, wins, pnl, market ev, model bets, model pnl, model ev]   (b = an EV band, or `all`)
+
+    market ev = p_market * odds - 1: the price against the de-vigged fair (~minus the vig unless the
+    price was shopped). model ev = p_model * odds - 1: what the model PROMISED, the shortlist's own
+    selection quantity. A row without p_model has no model EV, so it is counted in the market slots
+    only -- never as a zero-EV model bet.
     """
     cal: dict[str, list[float]] = {}
     bands: dict[str, list[float]] = {}
@@ -241,13 +250,19 @@ def accumulate(graded: Iterable[Mapping[str, Any]]) -> tuple[dict[str, list[floa
         price, pnl = row.get("price"), row.get("pnl")
         if price in (None, 0) or p_market is None or pnl is None or y is None:
             continue
-        ev = float(p_market) * _decimal_odds(float(price)) - 1.0
+        odds = _decimal_odds(float(price))
+        ev = float(p_market) * odds - 1.0
+        model_ev = None if p_model is None else float(p_model) * odds - 1.0
         for band in (ev_band(100.0 * ev), ALL_BAND):
-            acc = bands.setdefault(f"{cell}|{band}", [0, 0, 0.0, 0.0])
+            acc = bands.setdefault(f"{cell}|{band}", [0, 0, 0.0, 0.0, 0, 0.0, 0.0])
             acc[0] += 1
             acc[1] += 1 if float(y) >= 1.0 else 0
             acc[2] += float(pnl)
             acc[3] += ev
+            if model_ev is not None:
+                acc[4] += 1
+                acc[5] += float(pnl)
+                acc[6] += model_ev
     return cal, bands
 
 
@@ -387,12 +402,14 @@ def fit_calibration(games: Sequence[Mapping[str, Any]], *, resamples: int = RESA
 
 
 def _roi_gap(parts: Sequence[Sequence[float]]) -> float | None:
-    bets = sum(p[0] for p in parts)
-    return ((sum(p[2] for p in parts) - sum(p[3] for p in parts)) / bets) if bets else None
+    """Realised ROI minus the MODEL's predicted EV, over the bets that carry a model EV."""
+    bets = sum(p[4] for p in parts)
+    return ((sum(p[5] for p in parts) - sum(p[6] for p in parts)) / bets) if bets else None
 
 
 def grade_bands(games: Sequence[Mapping[str, Any]], field: str, *, resamples: int = RESAMPLES) -> list[dict[str, Any]]:
-    """Per cell|band: bets, hit rate, ROI and predicted EV per bet, realised-minus-predicted with a game CI."""
+    """Per cell|band: bets, hit rate, ROI, the model's predicted EV and the market's, realised-minus-predicted
+    (model) with a game CI. `predicted_ev`/`model_roi` are over `model_bets` (rows with a p_model)."""
     per_key: dict[str, list[tuple[str, str, list[float]]]] = collections.defaultdict(list)
     for game in games:
         for key, acc in (game.get(field) or {}).items():
@@ -404,13 +421,17 @@ def grade_bands(games: Sequence[Mapping[str, Any]], field: str, *, resamples: in
         accs = [acc for _, _, acc in entries]
         dates = sorted({day for day, _, _ in entries})
         bets = int(sum(a[0] for a in accs))
+        model_bets = int(sum(a[4] for a in accs))
         cell, band = key.rsplit("|", 1)
         gap = _roi_gap(accs)
         result: dict[str, Any] = {
             "cell": cell, "band": band, "games": len(entries), "dates": len(dates), "bets": bets,
             "hit_rate": _r(sum(a[1] for a in accs) / bets) if bets else None,
             "roi": _r(sum(a[2] for a in accs) / bets) if bets else None,
-            "predicted_ev": _r(sum(a[3] for a in accs) / bets) if bets else None,
+            "market_ev": _r(sum(a[3] for a in accs) / bets) if bets else None,
+            "model_bets": model_bets,
+            "model_roi": _r(sum(a[5] for a in accs) / model_bets) if model_bets else None,
+            "predicted_ev": _r(sum(a[6] for a in accs) / model_bets) if model_bets else None,
             "realised_minus_predicted": _r(gap),
         }
         samples = _bootstrap(accs, _roi_gap, seed=_seed(key, field), resamples=resamples) if len(accs) > 1 else []
@@ -509,8 +530,15 @@ def _sum_bands(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     if not bets:
         return {"bets": 0}
     roi = sum((r["roi"] or 0) * r["bets"] for r in rows) / bets
-    ev = sum((r["predicted_ev"] or 0) * r["bets"] for r in rows) / bets
-    return {"bets": bets, "roi": _r(roi), "predicted_ev": _r(ev), "realised_minus_predicted": _r(roi - ev)}
+    market_ev = sum((r["market_ev"] or 0) * r["bets"] for r in rows) / bets
+    out = {"bets": bets, "roi": _r(roi), "market_ev": _r(market_ev), "realised_minus_market": _r(roi - market_ev)}
+    model_bets = sum(r["model_bets"] for r in rows)
+    out["model_bets"] = model_bets
+    if model_bets:
+        model_roi = sum((r["model_roi"] or 0) * r["model_bets"] for r in rows) / model_bets
+        ev = sum((r["predicted_ev"] or 0) * r["model_bets"] for r in rows) / model_bets
+        out.update(predicted_ev=_r(ev), realised_minus_predicted=_r(model_roi - ev))
+    return out
 
 
 def build_report(state: Mapping[str, Any], *, today: str, now: datetime, run: Mapping[str, Any] | None = None,
@@ -568,21 +596,24 @@ def markdown(report: Mapping[str, Any]) -> str:
     w = report["window"]
     lines = [f"# Daily optimizer -- {report['today']}", "",
              f"Window {w['days']}d nominal: {w['games']} graded games over {w['dates']} dates (first {w['first_date']}).",
-             "", "| sport | games | model Brier - market | cells (overconfident) | published bets | pub ROI | pub pred EV | pooled bets | pooled ROI |",
-             "|---|---|---|---|---|---|---|---|---|"]
+             "", "| sport | games | model Brier - market | cells (overconfident) | published bets | pub ROI | "
+                 "pub model EV | pub market EV | pooled bets | pooled ROI |",
+             "|---|---|---|---|---|---|---|---|---|---|"]
     for sport, s in report["by_sport"].items():
         rec, pool = s["recommended"], s["pooled"]
         brier = "-" if s["model_brier_minus_market"] is None else f"{s['model_brier_minus_market']:+.4f}"
         lines.append(f"| {sport} | {s['games']} | {brier} | {s['cells']} ({s['cells_overconfident']}) | "
                      f"{rec.get('bets', 0)} | {_pct(rec.get('roi'))} | {_pct(rec.get('predicted_ev'))} | "
-                     f"{pool.get('bets', 0)} | {_pct(pool.get('roi'))} |")
+                     f"{_pct(rec.get('market_ev'))} | {pool.get('bets', 0)} | {_pct(pool.get('roi'))} |")
+    lines += ["", "Model EV = p_model x odds - 1 (what the model promised); market EV = de-vigged fair x odds - 1 "
+                  "(~minus the vig unless the price was shopped)."]
     overlay = report["overlay"]
     lines += ["", f"Overlay: {len(overlay['edge_shrink'])} edge-shrink, {len(overlay['stake_scale'])} stake-scale "
                   f"entries (rank/stake only; never withholds). Expires {overlay['expires_at']}."]
     for cell, e in list(overlay["edge_shrink"].items())[:15]:
         lines.append(f"- shrink {cell}: x{e['factor']} (w*={e['w']}, CI {e['ci95']}, {e['games']}g/{e['dates']}d)")
     for cell, e in list(overlay["stake_scale"].items())[:15]:
-        lines.append(f"- stake {cell}: x{e['factor']} (pub ROI {_pct(e['roi'])} vs pred {_pct(e['predicted_ev'])}, {e['games']}g)")
+        lines.append(f"- stake {cell}: x{e['factor']} (pub ROI {_pct(e['roi'])} vs model EV {_pct(e['predicted_ev'])}, {e['games']}g)")
     return "\n".join(lines) + "\n"
 
 

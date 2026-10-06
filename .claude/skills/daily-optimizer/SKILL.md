@@ -41,7 +41,10 @@ model edge toward the market, `w* = Σ d·r / Σ d²` (d = model − market, r =
 
 **Recommendations vs reality** -- the rows the shortlist PUBLISHED (`clv_openings/<date>.jsonl`,
 joined on the recorder's population key: 20,111 of 20,519 published keys matched on 2026-10-04),
-graded by EV band: bets, hit rate, ROI per bet vs the EV predicted for them. The pooled
+graded by EV band: bets, hit rate, ROI per bet vs the EV predicted for them. "Predicted" is the
+MODEL's EV (`p_model x odds - 1`); `market_ev` beside it is the price against the de-vigged fair,
+which sits near minus the vig and is the no-model baseline (before `daily_optimizer/2`, 2026-10-06,
+the market number was mislabelled as the prediction -- the first run's "-3.6% to -5.6%"). The pooled
 population's same band sits beside it -- never instead of it (learnings 2026-09-21). Published
 rows are graded at their first recorded sighting, which can predate publication.
 
