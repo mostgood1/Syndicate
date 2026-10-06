@@ -1013,6 +1013,16 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **RULE v2 AMENDMENT 2 — DP RUNNER ADVANCEMENT, PRE-REGISTERED 2026-10-06 ~14:50Z (user: "then fix the DP runner advancement next"), before any rate is measured or any descent runs:**
+  - MECHANISM (simulate.py DP branch): on a model DP with 0 outs before, a runner on 2nd moves to 3rd with prob `bip_dp_r2_to_3b_rate`, and a runner on 3rd scores with prob `bip_dp_r3_scores_rate`. The run is charged R+ER to the pitcher with NO RBI (scoring rule). With 1 out before, a DP ends the inning: unchanged.
+  - New GameConfig fields default 0.0 = today's behaviour; no extra RNG draw when 0 (byte-identical, to be proven on seeded games).
+  - RATES ARE MEASURED, NOT FITTED, from StatsAPI play-by-play of the 26 FIT dates' games (never the validation dates). Population: plays with eventType `grounded_into_double_play`, 0 outs before.
+    - r2 = share where the runner who started on 2B ends on 3B or scores;
+    - r3 = share where the runner who started on 3B scores.
+    - Each reported with n and a Wilson 95% CI.
+  - Then the descent runs with the mechanism ON at the measured rates in every arm (the levers re-fit around it). The ship checks (a)-(e) still compare against TODAY's production (mechanism off).
+  - Gates before the descent: tests (off byte-identical, on advances runners and scores without RBI, 1-out DP unchanged) and a reachability reading (on != off).
+  - The pipeline was paused at its wait loop for this; no fit replay had run.
 - **RULE v2 AMENDMENT 2026-10-06 ~14:25Z (user: "fix the GIDP gap next"), BEFORE the descent has run (builds 3/20; no fit replay exists):** `bip_dp_rate` grid {0.06, 0.12, 0.18} -> **{0.06, 0.18, 0.30, 0.40}**. Nothing else changes.
   - Why: real GIDP is 0.61/team-game (26 dates; MLB long-run ~0.7) vs model 0.20. The reachability runs (06-15, mechanics only) gave DP 0.19 at 0.06 and 0.275 at 0.12, so 0.18 tops out near 0.36 and the old grid CANNOT close the gap.
   - The rate is the bug, not the mechanism: P(DP | ground-ball OUT, runner on 1st, <2 outs) is ~0.11 GIDP per DP-situation PA / ~0.32 ground-ball outs per PA ~= 0.34. The code default 0.06 is ~6x low.
