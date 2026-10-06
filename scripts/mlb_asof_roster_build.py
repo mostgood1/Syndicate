@@ -17,9 +17,22 @@ How each input is bounded (each verified against the live API on 2026-10-06, not
   * pitchArsenal -> PRIOR season. It returns nothing when given a date range.
   * any OTHER current-season stat type -> refused (LeakRefused). Fail closed:
     nothing unknown passes.
-  * statcast-derived artifacts (features, quality, arsenal leaderboards, batted ball,
-    conditional mix, pitch splits) are full-season files -> OFF. The data root
-    points at an empty dir, and statcast_cache is None.
+  * statcast player FEATURES -> rebuilt per date from the raw pitch files with
+    game_date <= D-1 (`build_statcast_player_feature_set.build_feature_set`, called
+    in-process: its CLI always overwrites the checkout's player_features_2026.json),
+    and injected into build_roster's per-season cache. The vendor tree's own
+    player_features_2026.json is FULL-SEASON; the first rebuild read it (a leak).
+    The prior-season lookup (2025) has no file in production and falls back to
+    player_features_latest.json, i.e. the CURRENT as-of file; mirrored here.
+  * statcast quality map: no file exists in production either -> empty.
+  * the other statcast artifacts (arsenal leaderboards, batted ball, conditional
+    mix, pitch splits) are full-season files -> OFF. The data root points at an
+    empty dir, and statcast_cache is None.
+  * stamina: production builds pitchers through the PROFILE-CACHE HIT path, which
+    re-applies `_apply_statcast_pitch_count_stamina_adjustment` (-4..+6 pitches).
+    The cache-miss path this script takes never does, so it is applied after the
+    feature application (measured: without it the rebuilt starters went 15.51
+    outs against 16.16 stored, the fidelity gate's failure).
   * BvP: production's forward tuning already runs it OFF.
   * lineups / probables: the STORED pregame snapshot files for D.
   * bullpen availability: empty (no feed_live before 06-14 on the fleet).
@@ -134,11 +147,41 @@ def games_for(data_dir: Path, date: str) -> list[dict]:
     return out
 
 
-def build_date(data_dir: Path, out_root: Path, date: str, season: int, counters: Counter) -> int:
+def install_asof_statcast(raw_root: Path, date: str, season: int, counters: Counter) -> None:
+    """Point build_roster's statcast loaders at features built from pitches < D."""
+    from sim_engine.data import build_roster as br
+    from tools.datasets.build_statcast_player_feature_set import build_feature_set
+
+    feats = build_feature_set(raw_root=raw_root, season=season, start_date=dt.date(season, 2, 1),
+                              end_date=dt.date.fromisoformat(_prev_day(date)),
+                              min_pitches_pitcher=450, min_pitches_batter=450,
+                              min_pitches_pitch_type=60, min_bip_ev=25)
+    counters["statcast_pitchers"] = len(feats.get("pitchers") or {})
+    br._STATCAST_FEATURES_CACHE_BY_SEASON.clear()
+    br._STATCAST_FEATURES_CACHE_BY_SEASON.update({season: feats, season - 1: feats})
+    br._STATCAST_QUALITY_CACHE_BY_SEASON.clear()
+    br._STATCAST_QUALITY_CACHE_BY_SEASON.update({season: {}, season - 1: {}})
+    if not getattr(br, "_asof_stamina_wrapped", False):
+        orig = br._apply_statcast_features_to_pitcher
+
+        def wrapped(prof, season_):
+            applied = orig(prof, season_)
+            if applied and br._apply_statcast_pitch_count_stamina_adjustment(prof):
+                counters["stamina_adjusted"] += 1
+            return applied
+
+        br._apply_statcast_features_to_pitcher = wrapped
+        br._asof_stamina_wrapped = True
+
+
+def build_date(data_dir: Path, out_root: Path, date: str, season: int, counters: Counter,
+               raw_root: Path | None = None) -> int:
     from sim_engine.data.build_roster import build_team_roster
     from sim_engine.data.roster_artifact import write_game_roster_artifact
     from sim_engine.models import Team
 
+    if raw_root is not None:
+        install_asof_statcast(raw_root, date, season, counters)
     cache = Path(tempfile.mkdtemp(prefix=f"asof_cache_{date}_"))
     client = make_client(date, season, cache, counters)
     written = 0
@@ -187,6 +230,8 @@ def main(argv=None) -> int:
     ap.add_argument("--out-root", required=True)
     ap.add_argument("--dates", nargs="+", required=True)
     ap.add_argument("--season", type=int, default=2026)
+    ap.add_argument("--statcast-raw-root", default="",
+                    help="statcast/raw_pitches dir; builds as-of features per date (required for fidelity)")
     args = ap.parse_args(argv)
     out_root = Path(os.path.expanduser(args.out_root)).resolve()
     # Statcast-derived artifacts are full-season: point every artifact root at an EMPTY
@@ -201,9 +246,10 @@ def main(argv=None) -> int:
     counters = Counter()
     report = {}
     for d in sorted(set(args.dates)):
-        report[d] = build_date(data_dir, out_root, d, args.season, counters)
+        report[d] = build_date(data_dir, out_root, d, args.season, counters,
+                               raw_root=Path(os.path.expanduser(args.statcast_raw_root)) if args.statcast_raw_root else None)
         print(f"{d}: {report[d]} games", flush=True)
-    summary = {"games_by_date": report, "counters": dict(counters), "as_of_rule": "every current-season stat bounded at D-1 or prior season; statcast off"}
+    summary = {"games_by_date": report, "counters": dict(counters), "as_of_rule": "every current-season stat bounded at D-1 or prior season; statcast features as of D-1" if args.statcast_raw_root else "every current-season stat bounded at D-1 or prior season; statcast off"}
     (out_root / "asof_build_report.json").write_text(json.dumps(summary, indent=1), encoding="utf-8")
     print(json.dumps(summary, indent=1))
     return 0

@@ -223,6 +223,7 @@ def main(argv=None) -> int:
     ap.add_argument("--game-pks-from", help="only games with a roster_obj under this dir (fidelity: same game set on both sides)")
     ap.add_argument("--cache", default=os.path.join(os.environ.get("TMPDIR", "/tmp"), "mlb_starter_replay_cache"))
     ap.add_argument("--out", required=True)
+    ap.add_argument("--dump-rows", action="store_true", help="also write the per-start rows (for paired SEs)")
     args = ap.parse_args(argv)
     data_dir = Path(os.path.expanduser(args.data_root))
     cache = Path(os.path.expanduser(args.cache))
@@ -279,6 +280,8 @@ def main(argv=None) -> int:
         rep["split_date"] = cut
         rep["tune"] = summarise([r for r in rows if r["date"] < cut], args.draws)
         rep["holdout"] = summarise([r for r in rows if r["date"] >= cut], args.draws)
+    if args.dump_rows:
+        rep["rows"] = rows
     Path(args.out).write_text(json.dumps(rep, indent=1, default=str), encoding="utf-8")
     print(json.dumps({k: rep[k] for k in ("counters", "all")}, indent=1, default=str))
     return 0

@@ -1374,7 +1374,20 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### mlb-asof-roster-rebuild — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **FIDELITY v2 RESULT 2026-10-06 ~01:30Z: NOT ADMITTED. The combined calibration ships NOTHING (rule (0): stop, report).**
+  - Rebuilt with as-of statcast features + the cache-hit stamina path (counters: 318-337 statcast pitchers/date, stamina adjusted 72-119/date). 06-15..06-20, 200 sims, same seeds, 129 paired starts / 73 games.
+  - Per-PA economy reproduces (K/BF -0.0024, BB/PA -0.0025, HR/PA +0.0008, H/PA -0.0001, HBP/PA -0.0017, DP -0.004, runs -0.14: all within tolerance).
+  - STARTER LENGTH still does not: outs paired diff **-0.498 (SE 0.058; allowance 0.30) FAIL**; ==15 share **+0.061 (SE 0.006; allowance 0.03) FAIL**; <=9 share +0.004 PASS. v1 was -0.66 / +0.07, so the fix closed ~1/4 of the gap.
+  - Inputs (06-15, 19 starters): stamina -1.9 pitches mean, mean|diff| 5.2; season BF -3.3. The residual is in how production's starters got their stamina/workload, not in the per-PA rates.
+  - Not iterated further on these dates: a second builder change chosen by reading this gate would fit the builder to its own admission test. Evidence: scratchpad fid3_*.json, fid_gate.py, fid_se.py.
+  - Validation builds (05-30..06-14, v2) are still running to ~/asof_out_v2_val; NOT read.
 - **FIDELITY RESULT 2026-10-06:** per-PA economy reproduces; STARTER LENGTH does not (outs -0.66, 15-out share +0.07). Suspects: stamina from byDateRange totals (06-15 inputs: stamina -2.8 pitches), the quality hook with statcast off, empty bullpen availability. NEXT: diagnose and fix the builder, re-run the same gate.
+- **DIAGNOSIS 2026-10-06 (before any rebuilt-v2 outcome is read):** two causes in the builder, neither in the data.
+  - (1) CODE PATH: production builds pitchers through the profile-cache HIT path (build_roster.py ~1872), which re-applies `_apply_statcast_pitch_count_stamina_adjustment` (-4..+6 pitches). This script's cache-miss path never does. That matches stamina -3.5 in 136/151 starters.
+  - (2) LEAK: the vendor loaders read `vendor/.../statcast/features/player_features_2026.json` (FULL-SEASON, not the data root), so the first rebuild had full-season statcast features. Its outputs (~/asof_out_fid, ~/asof_out_val) are VOID.
+  - FIX (scripts/mlb_asof_roster_build.py `--statcast-raw-root`): build features in-process from raw pitches <= D-1 (the CLI always overwrites the checkout's stable file, so it is never run); inject them into build_roster's per-season cache (2025 too: production has no 2025 file and falls back to `_latest`, i.e. the current as-of file); apply the stamina adjustment after a feature application, mirroring the cache-hit path.
+  - Rebuilt into ~/asof_out_v2_{fid,val}. The SAME pre-registered fidelity gate is re-run. Admissible: no validation outcome has been read.
+  - Edit made from lane mlb-combined-calibration's marker; same session owns both lanes.
 - Goal: A leak-free as-of rebuild of MLB sim inputs (TeamRoster artifacts) for past dates, built by a Syndicate-owned script that bounds every stat input at D-1 (statsapi byDateRange endDate=D-1, game logs filtered < D, statcast layers off, BvP end_date=D-1, stored pregame lineups/probables, fresh cache) without touching the production builder; ADMITTED as the combined calibration's validation set only if its fidelity check passes: rebuilt vs stored roster_objs on 06-15..06-20 replay to the same starter/batting moments within MC noise
 - Files: scripts/mlb_asof_roster_build.py (NEW), tests/test_mlb_asof_roster_build.py (NEW), .syndicate/findings_2026-10-06_mlb_asof_roster_rebuild.md (NEW)
 - Hypothesis: With statcast layers off and season stats bounded at D-1, the rebuilt rosters replay to starter outs/K/BF and batting HR/H/BB per PA within MC noise of the stored production rosters
@@ -1427,6 +1440,8 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **FIDELITY v2 RESULT 2026-10-06 ~01:30Z: fidelity gate NOT ADMITTED (see lane mlb-asof-roster-rebuild). The combined calibration ships NOTHING (rule (0): stop, report).**
+  - STARTER LENGTH still does not: outs paired diff **-0.498 (SE 0.058; allowance 0.30) FAIL**; ==15 share **+0.061 (SE 0.006; allowance 0.03) FAIL**; <=9 share +0.004 PASS. v1 was -0.66 / +0.07, so the fix closed ~1/4 of the gap.
 - **FIDELITY GATE (0) RESULT, 2026-10-06 ~01:30Z: FAIL, so the validation set is NOT admitted; per the rule, stop, ship nothing.** Rebuilt vs stored, 06-15..06-20, 73 games, same seeds, 200 sims. Every per-PA moment, DP/PO and runs/game agree within tolerance. FAIL on starter outs mean 16.16 -> 15.51 (-0.66 vs tol 0.30) and the ==15 share 0.38 -> 0.45 (+0.07 vs 0.03). The difference is systematic, not MC. Validation OUTCOMES were never read, so fixing the builder and re-running this same gate is admissible.
 - **COMBINED CALIBRATION RULE, PRE-REGISTERED 2026-10-06 ~02:30Z before any fidelity or descent run** (user: "ship the combined calibration if it passes").
   - **Data.**
