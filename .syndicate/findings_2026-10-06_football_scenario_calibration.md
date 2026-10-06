@@ -159,6 +159,38 @@ Go is the RESIDUAL of two kick ladders, so inside the 30 it is ~never chosen.
   P(FGA|RZ) falls toward the real 0.34. No prediction on accuracy vs results or the close.
 - **Not shipped ON** for the same reason as H1.
 
+## H3 non-offensive scoring — PRE-REGISTERED 2026-10-06 (user: "fix the no non-offensive scoring gap too")
+
+**Code today:** a sim TURNOVER scores 0 (`possession_outcomes.classify_outcome`, `play_simulator`
+turnover branch), punts and the implicit kickoff after a score (own 25) never return for a TD,
+and no snap can end in a safety. S11 real (parser check): NFL 1.90 pts/game, NCAAF 2.40.
+
+- **Mechanism:** `CalibrationProfile.non_offensive_scoring: bool = False`. When ON, in
+  `simulate_drive` (no change to `play_simulator`):
+  - drive ends in TURNOVER -> with p_def_td the defense scores 7, then kicks off to the team that
+    turned it over (own 25);
+  - drive ends in PUNT -> with p_punt_ret_td the receiving team scores 7, then kicks off;
+  - drive ends in TD or FG with clock remaining -> with p_ko_ret_td the receiving team scores 7 on
+    the kickoff, then kicks off back (own 25);
+  - before an ordinary snap (not a 4th-down decision) from field position <= 10 -> with
+    p_safety[bucket] the defense scores 2 and receives the free kick at the measured start spot.
+    New `PossessionOutcome.SAFETY` terminal outcome (an added enum member; no existing value changes).
+  - TD = 7 (the engine's convention). Every rng draw happens only when ON.
+- **Rates (FIT only; NFL 2023-24 REG nflverse, NCAAF 2024 FBS-vs-FBS REG CFBD):**
+  - p_def_td = defensive return TDs / turnovers (NFL: interception or fumble_lost on pass/run,
+    `return_touchdown` and `td_team == defteam`; NCAAF: Interception/Fumble playTypes, the
+    *Return Touchdown* ones in the numerator);
+  - p_punt_ret_td = punt return + blocked punt TDs by the receiving team / punts;
+  - p_ko_ret_td = kickoff return TDs / kickoffs;
+  - p_safety by field position 1-5 and 6-10 = safeties / scrimmage snaps from there;
+  - free-kick start = mean start field position of the drive after a real safety.
+- **Byte-identity OFF:** the same sha (`defba53b...`). **Reachability:** ON != OFF; with ON the sim's
+  S11 non-offensive points/game is within the real 95% CI on the FIT games.
+- **Predictions (FIT, paired seeds):** mean total +1.5..+2.3 (NFL) / +1.8..+2.9 (NCAAF) per game
+  with no re-fit (the sim's turnover and punt counts are close to real, S1); margin change
+  |delta| < 0.3; total SD up. As for H1/H2: **not shipped ON** -- the scoring level was fitted
+  without these points, so ON alone will over-project totals until the joint re-fit.
+
 ## Results
 
 (none yet -- NFL 544-game run in progress, then NCAAF 654)
