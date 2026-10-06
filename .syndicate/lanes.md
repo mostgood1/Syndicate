@@ -1046,6 +1046,15 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **RULE v2 AMENDMENT 9 — STEALS OF THIRD, PRE-REGISTERED 2026-10-06 ~18:00Z (user: "then fix the caught stealing of third next"); descent stopped again:**
+  - MECHANISM (new; the sim only steals 2B): before a PA with a runner on 2B, 3B empty and <= 1 out, that runner attempts 3B with P = his `sb_attempt_rate` x `sb3_attempt_mult`.
+    - He succeeds with P = his `sb_success_rate` x `sb3_success_mult`, clamped like 2B.
+    - SB moves him to 3B. CS removes him: +1 inning out, +1 pitcher OUTS, +1 batter CS. Placed BEFORE the 2B block, inside its guard.
+    - Defaults sb3_attempt_mult 0.0 = off, with no RNG draw (byte-identical).
+  - MEASURED like amendment 8 (scripts/mlb_steal_rate_calibration.py, FIT games, rebuilt rosters). Opportunities = pre-PA runner on 2B, 3B empty, <= 1 out, runner in roster.
+    - Attempts = stolen_base_3b / caught_stealing_3b / pickoff_caught_stealing_3b by that runner in that PA.
+    - sb3_attempt_mult = attempts / sum of profile attempt rate; sb3_success_mult = steals / sum of profile success rate over attempts.
+  - Not levers: every arm carries both. Production unchanged; checks (a)-(e) unchanged. Gates: tests (CS of 3rd credits the pitcher's out), byte-identical proof, reachability.
 - **AMENDMENT 8 READINGS 2026-10-06 ~17:45Z (descent not restarted yet):**
   - scripts/mlb_steal_rate_calibration.py, 311 FIT games with rebuilt rosters; 3388 opportunities (21 runners not in the roster excluded; 5 games without a roster).
     - attempts 233 vs profile-expected 338.2 -> **sb_attempt_mult 0.689** [0.600, 0.777]. Real 0.069 attempts/opportunity vs the profile's 0.100: the per-time-on-base rate drawn per PA over-attempts, as predicted.
