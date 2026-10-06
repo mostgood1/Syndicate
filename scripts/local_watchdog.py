@@ -18,7 +18,8 @@ WHAT IS CHECKED (each a `fail` or a `warn`):
   supervisor      pidfile present and the supervisor process alive           fail
   role:<name>     each role process alive                                    fail
   crashloop:<n>   >= 3 restarts of a role since the previous check           fail
-  healthz         GET /healthz answers 200                                   fail
+  healthz         GET /healthz answers 200 (refused = DOWN)                  fail
+  healthz:slow    /healthz timed out, port listening (UP but saturated)      fail
   heartbeat:<n>   the role's log written within 15 min (hung, not exited)    fail
   job:<name>      a due job did not run today (2 h grace), ran > 4 h,
                   or its last run exited non-zero                            warn
@@ -94,10 +95,35 @@ def _pid_alive(pid: Any) -> bool:
 
 def _healthz(port: int) -> int | str:
     try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=10) as response:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=HEALTHZ_TIMEOUT_SECONDS) as response:
             return int(response.status)
     except Exception as exc:  # noqa: BLE001
-        return f"{type(exc).__name__}: {exc}"[:160]
+        reason = getattr(exc, "reason", None)  # URLError wraps the socket error
+        inner = f" [{type(reason).__name__}]" if isinstance(reason, BaseException) else ""
+        return f"{type(exc).__name__}{inner}: {exc}"[:160]
+
+
+# REFUSED vs SLOW -- lane `web-restart-healthz` `[2026-10-06]`. The watchdog logged
+# "down ... Connection refused" at 18:52:27Z and then kept web DOWN for ~8 min while
+# both gunicorn workers were alive and serving 234-404 s requests: a SATURATED web
+# and an ABSENT one read the same. A timeout means the TCP connect succeeded (the
+# port is listening -- the kernel queues it even with every worker busy) and nothing
+# answered; refused means nothing is listening. They get different keys, so moving
+# from one to the other alerts, and the message says which. Recovery is unaffected:
+# `recovery` acts on the `supervisor` finding only.
+HEALTHZ_TIMEOUT_SECONDS = 10
+
+
+def healthz_kind(health: int | str | None) -> str:
+    """`ok` / `refused` / `slow` / `error` for a `_healthz` reading."""
+    if health == 200:
+        return "ok"
+    text = str(health or "").lower()
+    if "refused" in text:
+        return "refused"
+    if "timeout" in text or "timed out" in text:
+        return "slow"
+    return "error"
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -190,7 +216,14 @@ def evaluate(readings: dict[str, Any], now: dt.datetime, previous_restarts: dict
             findings.append(Finding(f"crashloop:{name}", FAIL,
                                     f"{name} restarted {count - previous_restarts[name]}x since the last check (now {count})"))
     health = readings.get("healthz")
-    if health != 200:
+    kind = healthz_kind(health)
+    if kind == "refused":
+        findings.append(Finding("healthz", FAIL, f"/healthz REFUSED -- nothing is listening on the web port; web is DOWN or restarting ({health})"))
+    elif kind == "slow":
+        findings.append(Finding("healthz:slow", FAIL,
+                                f"/healthz no answer in {HEALTHZ_TIMEOUT_SECONDS} s but the port is listening -- web is UP and "
+                                f"saturated or cold-starting, not down ({health})"))
+    elif kind == "error":
         findings.append(Finding("healthz", FAIL, f"/healthz did not answer 200 ({health})"))
     for name, age in sorted((readings.get("log_ages") or {}).items()):
         if (readings.get("roles_alive") or {}).get(name) and (age is None or age > LOG_STALE_SECONDS):

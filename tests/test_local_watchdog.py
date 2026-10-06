@@ -170,3 +170,40 @@ def test_old_attempts_age_out_of_the_hourly_cap():
     state = {"down_since": T0.isoformat(), "recovery_attempts": [_at(0).isoformat()] * 3}
     d, _ = wd.recovery(DOWN, state, _at(61), paused=False)
     assert d["recover"] is True
+
+
+# --- refused vs slow (lane web-restart-healthz, 2026-10-06) -----------------
+
+def test_refused_is_DOWN_and_a_timeout_is_UP_BUT_SLOW():
+    refused = wd.evaluate(_healthy(healthz="URLError [ConnectionRefusedError]: <urlopen error [Errno 111] Connection refused>"), NOW)
+    slow = wd.evaluate(_healthy(healthz="TimeoutError: timed out"), NOW)
+    assert _keys(refused) == {"healthz": wd.FAIL} and "DOWN" in refused[0].message
+    assert _keys(slow) == {"healthz:slow": wd.FAIL} and "UP" in slow[0].message and "not down" in slow[0].message
+
+
+def test_other_failures_keep_the_old_healthz_finding():
+    assert _keys(wd.evaluate(_healthy(healthz=500), NOW)) == {"healthz": wd.FAIL}
+    assert wd.healthz_kind("URLError [TimeoutError]: <urlopen error timed out>") == "slow"
+    assert wd.healthz_kind(None) == "error"
+
+
+def test_a_slow_web_does_not_trigger_fleet_recovery():
+    findings = wd.evaluate(_healthy(healthz="TimeoutError: timed out"), NOW)
+    decision, _ = wd.recovery(findings, {}, NOW, paused=False)
+    assert decision["recover"] is False
+
+
+def test_real_socket_readings_classify_correctly(monkeypatch):
+    """The labels must come from what urllib ACTUALLY raises, not from strings we typed."""
+    import socket
+
+    with socket.socket() as probe:              # a port with nothing listening
+        probe.bind(("127.0.0.1", 0))
+        closed_port = probe.getsockname()[1]
+    assert wd.healthz_kind(wd._healthz(closed_port)) == "refused"
+
+    monkeypatch.setattr(wd, "HEALTHZ_TIMEOUT_SECONDS", 1)
+    with socket.socket() as listener:           # listening, never answers: a saturated web
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(8)
+        assert wd.healthz_kind(wd._healthz(listener.getsockname()[1])) == "slow"
