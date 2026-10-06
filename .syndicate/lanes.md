@@ -1046,6 +1046,10 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **AMENDMENT 11 RESULT 2026-10-06 ~18:20Z: FLOOR NOT MET -> no mechanism; the descent was never interrupted.**
+  - 310 FIT-window games: **5 steal-of-home attempts**. <= 1 out: 1 (caught); 2 outs: 4 (3 safe, 1 caught). Far below the 10-attempt floor.
+  - Too rare to set a rate from 24 dates, and worth ~0.016 runs per game at most. Recorded as a known unmodelled event.
+  - Note: an ff during the count pulled 12 files from peers (football smartsim2 + ledger). No MLB engine file changed, so the running descent's code is unchanged.
 - **RULE v2 AMENDMENT 11 — STEALS OF HOME, PRE-REGISTERED 2026-10-06 ~18:15Z UTC (user: "then fix the steal of home next"). The descent is NOT stopped for the count (a read-only pbp pass):**
   - COUNT (pbp, FIT games, true pre-PA state): attempts = stolen_base_home / caught_stealing_home / pickoff_caught_stealing_home by the runner who started the PA on 3B, any base state, <= 1 out (also reported for 2 outs).
   - FLOOR (same as amendment 10): fewer than 10 attempts -> too rare to set a rate from 24 dates. Then NO mechanism, recorded, and the descent continues uninterrupted.
