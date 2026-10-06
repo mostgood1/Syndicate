@@ -77,6 +77,28 @@ def game_counts(data: dict, rates: dict, acc: dict, target: str = "2B") -> None:
             acc["steals"] += ATTEMPT[target][0] in att
 
 
+def double_steals(data: dict, acc: dict) -> None:
+    """Lead runner on 2B attempts 3B with a runner on 1B: did the trailer go on the same event?
+    Also counts steals of home on 1st-and-3rd plays (information only)."""
+    for pre, outs_before, play in pbp.plays_with_state(data):
+        runners = play.get("runners") or []
+        ev = lambda r: (r.get("details") or {}).get("eventType") or ""  # noqa: E731
+        rid = lambda r: ((r.get("details") or {}).get("runner") or {}).get("id")  # noqa: E731
+        idx = lambda r: (r.get("details") or {}).get("playIndex")  # noqa: E731
+        if pre.get("1B") and pre.get("3B") and not pre.get("2B"):
+            acc["home_steal_1st_3rd"] += sum(1 for r in runners if rid(r) == pre["3B"] and ev(r).endswith("_home")
+                                             and ("stolen_base" in ev(r) or "caught_stealing" in ev(r)))
+        if not (pre.get("1B") and pre.get("2B")) or pre.get("3B") or outs_before > 1:
+            continue
+        lead = [r for r in runners if rid(r) == pre["2B"] and ev(r) in ATTEMPT["3B"]]
+        if not lead:
+            continue
+        acc["lead_attempts"] += 1
+        li = idx(lead[0])
+        trail = [r for r in runners if rid(r) == pre["1B"] and idx(r) == li and (r.get("movement") or {}).get("end") in ("2B", "3B", "score")]
+        acc["trailer_went"] += bool(trail)
+
+
 def poisson_ratio_ci(k: int, expected: float) -> list[float]:
     if expected <= 0:
         return [float("nan"), float("nan")]
@@ -98,6 +120,7 @@ def main(argv=None) -> int:
     accs = {t: {"opportunities": 0, "expected_attempts": 0.0, "attempts": 0, "expected_successes": 0.0, "steals": 0,
                 "runner_not_in_roster": 0} for t in ("2B", "3B")}
     games = without = 0
+    dbl = {"lead_attempts": 0, "trailer_went": 0, "home_steal_1st_3rd": 0}
     for d in sorted(set(args.dates)):
         profs = profiles(roster_root, d)
         for pk in pbp.game_pks(data_dir, d):
@@ -108,6 +131,7 @@ def main(argv=None) -> int:
             data = pbp.feed(pk, cache)
             for t in ("2B", "3B"):
                 game_counts(data, profs[pk], accs[t], t)
+            double_steals(data, dbl)
 
     def summary(acc):
         return {**acc,
@@ -118,7 +142,9 @@ def main(argv=None) -> int:
                 "profile_success_rate": acc["expected_successes"] / acc["attempts"] if acc["attempts"] else None,
                 "real_attempts_per_opportunity": acc["attempts"] / acc["opportunities"] if acc["opportunities"] else None}
 
-    rep = {"games": games, "games_without_roster": without, "steal_2b": summary(accs["2B"]), "steal_3b": summary(accs["3B"])}
+    rep = {"games": games, "games_without_roster": without, "steal_2b": summary(accs["2B"]), "steal_3b": summary(accs["3B"]),
+           "double_steal": {**dbl, "p_trail": dbl["trailer_went"] / dbl["lead_attempts"] if dbl["lead_attempts"] else None,
+                            "p_trail_ci95": pbp.wilson(dbl["trailer_went"], dbl["lead_attempts"])}}
     Path(args.out).write_text(json.dumps(rep, indent=1), encoding="utf-8")
     print(json.dumps(rep, indent=1))
     return 0

@@ -2263,6 +2263,7 @@ def simulate_game(
     sb_success_mult = max(0.0, float(getattr(cfg, "sb_success_mult", 1.0)))
     sb3_attempt_mult = max(0.0, float(getattr(cfg, "sb3_attempt_mult", 0.0)))
     sb3_success_mult = max(0.0, float(getattr(cfg, "sb3_success_mult", 1.0)))
+    sb_double_steal_trail_prob = _clamp(float(getattr(cfg, "sb_double_steal_trail_prob", 0.0)), 0.0, 1.0)
 
     # Optional: sample per-game pitcher rates (starter + bullpen) once per game.
     # This injects uncertainty into K/BB/HR/in-play hit rates while keeping the
@@ -2638,12 +2639,23 @@ def simulate_game(
                     sr3 = float(max(0.40, min(0.95, float(getattr(rprof3, "sb_success_rate", 0.72) or 0.72) * sb3_success_mult)))
                     if ar3 > 0.0 and rng.random() < ar3:
                         stole3 = rng.random() < sr3
+                        # DOUBLE STEAL: the trailer on 1B goes with the lead runner. He
+                        # reaches 2B either way; it is his SB only when the lead runner is
+                        # safe (otherwise the scorer calls it a fielder's choice).
+                        trail = int(half.runner_on_1b)
+                        trailer_went = bool(
+                            trail and sb_double_steal_trail_prob > 0.0 and rng.random() < sb_double_steal_trail_prob
+                        )
+                        on1_after = 0 if trailer_went else trail
+                        on2_after = trail if trailer_went else 0
+                        if trailer_went and stole3:
+                            st.batter_row(trail)["SB"] += 1
                         if stole3:
                             st.batter_row(rid3)["SB"] += 1
-                            _set_half_bases_from_runners(half, int(half.runner_on_1b), 0, rid3)
+                            _set_half_bases_from_runners(half, on1_after, on2_after, rid3)
                         else:
                             st.batter_row(rid3)["CS"] += 1
-                            _set_half_bases_from_runners(half, int(half.runner_on_1b), 0, 0)
+                            _set_half_bases_from_runners(half, on1_after, on2_after, 0)
                             half.outs += 1
                             st.pitcher_row(pitcher_id)["OUTS"] += 1.0
                         _sync_runner_reach_sources(state.runner_reach_source_by_id, half)

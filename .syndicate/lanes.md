@@ -1046,6 +1046,12 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **AMENDMENT 10 READINGS 2026-10-06 ~19:05Z (descent not restarted yet):**
+  - 16 lead-runner 3B attempts with a runner on 1B (>= 10 floor met): the trailer went on the same event **11/16 = 0.69** [0.44, 0.86]. Steals of home on 1st-and-3rd plays: 5 (info, not modelled).
+  - CODE: GameConfig `sb_double_steal_trail_prob` (default 0.0, no RNG draw) inside the steal-of-third block. The trailer reaches 2B; it is his SB only if the lead runner is safe.
+  - TESTS: 22 pass. With the separate 2B steal disabled, extra SB appear only with the trail prob on; pitcher OUTS == 3 x half-innings.
+  - BYTE-IDENTICAL vs HEAD: 150 seeded games incl. the high-steal fixture, sha256 5441F475... (543 KB, real output).
+  - Every arm adds `sb_double_steal_trail_prob=0.6875`.
 - **RULE v2 AMENDMENT 10 — DOUBLE STEALS, PRE-REGISTERED 2026-10-06 ~18:40Z (user: "then fix the double steal next"); descent stopped again:**
   - Today: when the lead runner (on 2B, runner also on 1B) attempts 3B, the trailer gets only the independent 2B draw (his rate x 0.689), and only if 3B was stolen. Real trailers usually run WITH the lead runner.
   - MEASURE (pbp, FIT games, true pre-PA state): over the lead runner's 3B attempts with a runner on 1B, p_trail = share where the trailer's 2B movement carries the same playIndex.

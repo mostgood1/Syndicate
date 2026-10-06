@@ -190,5 +190,35 @@ class StealOfThirdTests(unittest.TestCase):
             self.assertEqual(outs, 3.0 * halves)
 
 
+def _double_steal_games(trail):
+    from tests.test_mlb_non_pa_outs import _stealing_roster
+    away, home = _stealing_roster(1, "AWY", 100000), _stealing_roster(2, "HOM", 200000)
+    cfg = replace(GameConfig(rng_seed=31, manager_pitching="v2", pbp="pa"),
+                  sb3_attempt_mult=1.0, sb_attempt_mult=0.0, sb_double_steal_trail_prob=trail)
+    return [simulate_game(away, home, replace(cfg, rng_seed=31 + i)) for i in range(40)]
+
+
+class DoubleStealTests(unittest.TestCase):
+    def test_trailer_reaches_second_only_when_set(self) -> None:
+        # sb_attempt_mult 0 disables the separate 2B steal, so any SB credited beyond the
+        # steals of third can only come from a trailer on a double steal.
+        def sb_vs_to3(games):
+            sb = sum(int(row.get("SB") or 0) for r in games for row in (r.batter_stats or {}).values())
+            to3 = sum(1 for r in games for ev in (r.pbp or []) if ev.get("type") == "SB" and ev.get("to") == "3B")
+            return sb, to3
+        sb_off, to3_off = sb_vs_to3(_double_steal_games(0.0))
+        self.assertEqual(sb_off, to3_off)
+        sb_on, to3_on = sb_vs_to3(_double_steal_games(1.0))
+        self.assertGreater(sb_on, to3_on)
+
+    def test_pitcher_outs_still_three_per_half_inning(self) -> None:
+        for r in _double_steal_games(1.0):
+            if r.home_score > r.away_score and len(r.home_inning_runs) == len(r.away_inning_runs):
+                continue
+            halves = len(r.away_inning_runs) + len(r.home_inning_runs)
+            outs = sum(float(row.get("OUTS") or 0.0) for row in (r.pitcher_stats or {}).values())
+            self.assertEqual(outs, 3.0 * halves)
+
+
 if __name__ == "__main__":
     unittest.main()

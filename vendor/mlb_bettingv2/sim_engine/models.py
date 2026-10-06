@@ -686,6 +686,9 @@ class GameConfig:
     # Measured 2026 pbp: 25 attempts in 1763 opportunities -> 0.144 x the profile rate.
     sb3_attempt_mult: float = 0.0
     sb3_success_mult: float = 1.0
+    # Double steal: on a steal-of-third attempt with a runner on 1B, the trailer goes
+    # with it with this prob (2026 pbp: 11/16). 0.0 = he does not (no RNG draw).
+    sb_double_steal_trail_prob: float = 0.0
     bip_fc_rate: float = 0.04
     bip_fc_runner_on_3b_score_rate: float = 0.0
     # On a double play with 0 outs before it, real runners do not hold: the runner on
