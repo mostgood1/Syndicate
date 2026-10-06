@@ -1004,6 +1004,11 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **CS FIX (b6fd6189) PRODUCTION MEASUREMENT, PRE-REGISTERED 2026-10-06 ~14:05Z (user: "then measure the CS fix while it runs"), before any run:**
+  - Fix live on the fleet 2026-10-05 18:23:48 CDT (reflog). Served LIVE sims: PRE-fix = 10-03 + 10-04 (6 games); POST-fix = 10-05 23:26 + 10-06 01:21 CDT (4 games).
+  - Replays of production's own roster_objs, `--validate-only --stored live`, 4000 sims: A = fleet checkout 18425937 (fix), B = the same tree with the one fix line removed.
+  - Readings: (1) paired A-B starter outs = the fix's effect (game play is byte-identical, so this is exact for these rosters). PREDICTION: +0.10/start (holdout said +0.10), each starter >= 0.
+  - (2) Production carries it: offset_pre = mean(served - B) on PRE; on POST, served - A ~ offset_pre and served - B ~ offset_pre + effect. MET if |mean(served - A)_post - offset_pre| < |mean(served - B)_post - offset_pre|. Stated up front: with 8 post starters at 1000 served sims (SE ~0.03-0.05) this reading is WEAK; (1) plus the reflog is the strong evidence.
 - **COMBINED CALIBRATION RULE v2, PRE-REGISTERED 2026-10-06 ~02:40Z (user chose "Rebuild all with today's code"; supersedes the stored-roster rule and fidelity gate v3) -- written before any replay on the rebuilt fit set:**
   - **Data.** FIT = 06-15..07-12 (26 dates) REBUILT with today's builder (`mlb_asof_roster_build.py --statcast-raw-root`: stats <= D-1, statcast features <= D-1, cache-hit stamina path) in ~/asof_out_v2_fit. VALIDATION = 05-30..06-14 built by the SAME builder in ~/asof_out_v2_val (built, never read). Read ONCE at the end.
   - No stored-match gate: fit and validation come from one builder. Known residual differences from live production, stated not fixed: prior-season platoon/arsenal splits, empty bullpen availability, no injuries.
