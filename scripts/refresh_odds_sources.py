@@ -1822,6 +1822,92 @@ def _soccer_players_step(league: str, soccer_root: Path, python_exe: str) -> Ref
     )
 
 
+#: Lane `soccer-team-history-current-season` (2026-10-06). OFF unless set to 1/true/on: absent is OFF.
+_SOCCER_CURRENT_HISTORY_ENV = "SYNDICATE_SOCCER_CURRENT_HISTORY"
+#: Refetch the current-season ratings history once a day, like the player rates.
+_SOCCER_CURRENT_HISTORY_REFRESH_DAYS = 1.0
+#: Days into a season before the first fetch. The fetcher refuses to write an empty
+#: file, so a fetch before the first round has been played fails on every tick.
+_SOCCER_CURRENT_HISTORY_MIN_SEASON_DAYS = 7
+
+
+def _soccer_current_history_step(league: str, soccer_root: Path, python_exe: str) -> RefreshStep | None:
+    """Refetch this league's CURRENT-season ratings history once it goes stale.
+
+    THE GAP. `_soccer_history_step` fetches only when files are MISSING and only
+    COMPLETED seasons, so team ratings never see the season being played:
+    measured 2026-10-05 on the fleet, `team_history/teams_2025.csv` ended
+    2026-05-24 and no `matches_2026.csv` existed, so every 2026-27 rating was
+    built from 2025-26 and earlier (findings 2026-10-05 soccer_xg_totals_bias).
+
+    Same file families `_load_team_ratings` already globs (`teams_*.csv` for the
+    five Understat leagues, `matches_*.csv` for the four goals-rated leagues), so
+    nothing downstream changes shape: the ratings simply include this season.
+    MLS ratings are a live ASA fetch and need no step.
+
+    OFF BY DEFAULT (`SYNDICATE_SOCCER_CURRENT_HISTORY`). Once on, a promoted club
+    a few matches in is rated from those few rows rather than
+    PROMOTED_TEAM_RATING; how that case is handled is being measured first
+    (lane `soccer-team-history-current-season`), and this switch is what keeps
+    the step inert until then.
+    """
+    if str(os.environ.get(_SOCCER_CURRENT_HISTORY_ENV) or "").strip().lower() not in {"1", "true", "on", "yes"}:
+        return None
+    if league == "mls":
+        return None
+    if league in _SOCCER_GOALS_BASED_RATING_LEAGUES:
+        kind, subdir, stem = "matches", "history", "matches"
+    else:
+        kind, subdir, stem = "teams", "team_history", "teams"
+    try:
+        season = int(soccer_default_season(league))
+        season_start, _season_end = soccer_season_date_range(league, season)
+        elapsed_days = (central_today() - season_start).days
+    except Exception:
+        # UNKNOWN DECLINES, as in `_soccer_players_step`.
+        return None
+    if elapsed_days < _SOCCER_CURRENT_HISTORY_MIN_SEASON_DAYS:
+        return None
+    target_dir = soccer_root / league / subdir
+    target = target_dir / f"{stem}_{season}.csv"
+    try:
+        age_days = (time.time() - target.stat().st_mtime) / 86400.0
+    except FileNotFoundError:
+        age_days = None
+    except Exception:
+        # Unreadable is not stale.
+        return None
+    if age_days is not None and age_days < _SOCCER_CURRENT_HISTORY_REFRESH_DAYS:
+        return None
+    print(
+        f"SOCCER_CURRENT_HISTORY_STALE league={league} kind={kind} season={season} file={target} "
+        f"age_days={'absent' if age_days is None else round(age_days, 1)}",
+        file=sys.stderr,
+        flush=True,
+    )
+    return RefreshStep(
+        name=f"soccer_{league}_history_current",
+        # Both phases, matching the other history steps: the autorun launches with
+        # --phase live, so a pregame-only prerequisite would never run there.
+        phases=("pregame", "live"),
+        cwd=REPO_ROOT,
+        command=(
+            python_exe,
+            "scripts/fetch_soccer_history_local.py",
+            "--league",
+            league,
+            "--kind",
+            kind,
+            # CURRENT season only: completed seasons do not change.
+            "--seasons",
+            str(season),
+            "--out-dir",
+            str(target_dir),
+        ),
+        description=f"Refresh {league}'s current-season {kind} history for the team ratings.",
+    )
+
+
 def _soccer_live_scope(date_str: str) -> dict[str, list[str]]:
     """{league: [espn_event_id, ...]} for matches ACTUALLY IN PLAY right now.
 
@@ -2020,6 +2106,9 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
         history_step = _soccer_history_step(league, soccer_root, python_exe)
         if history_step is not None:
             steps.append(history_step)
+        current_history_step = _soccer_current_history_step(league, soccer_root, python_exe)
+        if current_history_step is not None:
+            steps.append(current_history_step)
     # BEFORE the schedule/sim steps below, because those READ the roster this
     # writes. A refetch that lands after the sim has already run is a refetch
     # that takes a day to matter.

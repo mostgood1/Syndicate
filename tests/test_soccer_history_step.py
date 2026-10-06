@@ -126,3 +126,94 @@ def test_unreadable_history_dir_is_not_treated_as_missing(monkeypatch, tmp_path)
 
     monkeypatch.setattr(Path, "glob", _boom)
     assert module._soccer_history_step("la_liga", tmp_path / "soccer_source", "py") is None
+
+
+# --- current-season ratings history (lane `soccer-team-history-current-season`, 2026-10-06) ---------------------
+
+GOALS_FOUR = ("eredivisie", "primeira_liga", "championship", "belgian_pro_league")
+
+
+def _season_window(module, monkeypatch, days_in: int):
+    """Pin `central_today` to `days_in` days after each league's season start, whatever today is."""
+    import datetime as _dt
+
+    starts = {}
+    for league in ALL_LEAGUES:
+        if league == "mls":
+            continue
+        season = int(module.soccer_default_season(league))
+        starts[league] = module.soccer_season_date_range(league, season)[0]
+    first = min(starts.values())
+    monkeypatch.setattr(module, "central_today", lambda: max(starts.values()) + _dt.timedelta(days=days_in))
+    return first
+
+
+def test_current_history_is_off_by_default(monkeypatch, tmp_path):
+    """Absent is OFF: shipping this module changes nothing until the switch is set."""
+    module = _load_orchestrator()
+    monkeypatch.delenv("SYNDICATE_SOCCER_CURRENT_HISTORY", raising=False)
+    for league in ALL_LEAGUES:
+        assert module._soccer_current_history_step(league, tmp_path / "soccer_source", "py") is None
+
+
+def test_current_history_fetches_the_current_season_for_each_branch(monkeypatch, tmp_path):
+    """REACHABILITY (on != off): with the switch on and no current-season file, every league whose ratings
+    are disk-backed gets a fetch of THIS season, of the family `_load_team_ratings` reads for it."""
+    module = _load_orchestrator()
+    monkeypatch.setenv("SYNDICATE_SOCCER_CURRENT_HISTORY", "1")
+    _season_window(module, monkeypatch, 30)
+    root = tmp_path / "soccer_source"
+    assert module._soccer_current_history_step("mls", root, "py") is None
+    for league in ALL_LEAGUES:
+        if league == "mls":
+            continue
+        step = module._soccer_current_history_step(league, root, "py")
+        assert step is not None, f"{league} never refreshes its current-season ratings history"
+        command = list(step.command)
+        kind = "matches" if league in GOALS_FOUR else "teams"
+        assert command[command.index("--kind") + 1] == kind
+        assert command[command.index("--seasons") + 1] == str(int(module.soccer_default_season(league)))
+        out_dir = Path(command[command.index("--out-dir") + 1])
+        assert out_dir == root / league / ("history" if kind == "matches" else "team_history")
+
+
+def test_current_history_refetches_daily_not_every_tick(monkeypatch, tmp_path):
+    import os as _os
+    import time as _time
+
+    module = _load_orchestrator()
+    monkeypatch.setenv("SYNDICATE_SOCCER_CURRENT_HISTORY", "1")
+    _season_window(module, monkeypatch, 30)
+    root = tmp_path / "soccer_source"
+    season = int(module.soccer_default_season("epl"))
+    target = root / "epl" / "team_history" / f"teams_{season}.csv"
+    target.parent.mkdir(parents=True)
+    target.write_text("league,season,team\n", encoding="utf-8")
+    assert module._soccer_current_history_step("epl", root, "py") is None, "a fresh file must not refetch"
+    old = _time.time() - 2 * 86400
+    _os.utime(target, (old, old))
+    assert module._soccer_current_history_step("epl", root, "py") is not None, "a day-old file must refetch"
+
+
+def test_current_history_waits_for_the_season_to_start(monkeypatch, tmp_path):
+    """The fetcher refuses to write an empty file, so fetching before round one would fail every tick."""
+    module = _load_orchestrator()
+    monkeypatch.setenv("SYNDICATE_SOCCER_CURRENT_HISTORY", "1")
+    import datetime as _dt
+
+    season = int(module.soccer_default_season("epl"))
+    start = module.soccer_season_date_range("epl", season)[0]
+    monkeypatch.setattr(module, "central_today", lambda: start + _dt.timedelta(days=2))
+    assert module._soccer_current_history_step("epl", tmp_path / "soccer_source", "py") is None
+
+
+def test_current_history_runs_in_the_live_phase_before_the_sim(monkeypatch, tmp_path):
+    module = _load_orchestrator()
+    monkeypatch.setenv("SYNDICATE_SOCCER_CURRENT_HISTORY", "1")
+    _season_window(module, monkeypatch, 30)
+    root = tmp_path / "soccer_source"
+    args = type("Args", (), {"date": "2026-10-06", "soccer_date": "2026-10-10", "soccer_leagues": "la_liga"})()
+    monkeypatch.setattr(module, "_local_source_bundle_root", lambda slug: root)
+    names = [s.name for s in module._filter_steps(module._build_soccer_steps(args), "live")]
+    assert "soccer_la_liga_history_current" in names
+    assert names.index("soccer_la_liga_history_current") < names.index("soccer_la_liga_artifacts")
