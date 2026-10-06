@@ -1079,6 +1079,11 @@ death, never life — do not invert it.
 - Hypothesis: The single-lever failures were opposing errors; fitted jointly, per-PA rates and per-start/per-game outcomes can match together
 - Falsification test: If no configuration found by the pre-registered descent beats production on every fitted moment while holding the guards on the fresh set, nothing ships
 - Verification: Pre-registered descent on tune, one read of the validation set, production's next sim matches the shipped replay
+- **SHORTLIST MEASUREMENT 2026-10-06 ~14:30Z** (user: "price NHL saves lines on the board's shortlist" -> "Measure first, then decide"; `scripts/nhl_saves_shortlist_rank.py` over the pre-publication population ledger `reports/intelligence/opportunity_population/2026-10-05__nhl__part000.jsonl`):
+  - 46 SAVES candidates (both sides, 4 games): every one scored **-3.03 .. -7.67**, within-game rank 26th..334th of 312-350. A game's 6th seat (SHORTLIST_ROWS_PER_GAME = 6) sat at median **+0.085** (range -0.90 .. +2.59). Other NHL prop candidates: median -6.10.
+  - WHY: SAVES is a two-sided consensus market (3 books), so the board scores it on EV vs the books' own consensus (`eb: market_fair`). The model enters only via the capped sim term (weight 0.125, cap 1.5 EV points; `opportunity_signals._SCORE_SIM_WEIGHT`). Example: Murashov 22.5 over, ev -6.07 + 0.125 x model edge 5.1 = score -5.43. The vig (~5-7 pts) dominates.
+  - Not SAVES-specific: model-probability EV is used only for one-sided `book_margin_model` rows (on 10-05 the 51 NHL goals rows).
+  - No change made; decision with the user.
 - Blocked by: mlb-asof-roster-rebuild
 
 ### nba-season-phase — OPEN — opened 2026-10-05 — session e0a3e383-4fa1-4669-8740-c9a46b681c7a
