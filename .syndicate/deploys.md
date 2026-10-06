@@ -46868,3 +46868,17 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - **Reading:** a boot after the fix arrived DID fire the WNBA boot refresh -- bootstrap.log `2026-10-04T19:24:36.072Z ... refreshing today's WNBA bundle` -- and vendor `processed/` gained NOTHING: newest file still `10-04 09:00`, zero files dated 10-05/10-06 (read 10-06 17:18Z). Prod `smart_sim_2026-10-04_ATL_NYL.json` was rewritten 15:22:04 CDT (20:22Z), after that boot, with no vendor counterpart to be a copy of. So the population was live (the boot path ran) and the vendor write did not happen.
 - **Not measured:** the two REFUSE guards firing on the fleet -- nothing has passed a vendor root since, so they are untested in production; unit tests cover them (tests/test_wnba_vendor_source_root_guard.py, incl. main() exits before the date loop).
 - **Stale vendor files** from the 10-02/10-04 boots remain under ~/Syndicate/vendor/wnba_betting_repo/data/processed; nothing reads them.
+
+## 2026-10-06 17:04:14Z (12:04 PM CT) -- READING: NBA sim availability is RUNNING on the fleet, preseason no-op as predicted -- **MET** (step 1 of 2) (lane `nba-prop-calibration`)
+
+- first production line, from the first NBA props refresh after the 16:49:45Z ff
+  (`nba_source/logs/syndicate_refresh_oddsapi_props_2026-10-06.log:1196`; that run's last timestamp 17:04:14Z; fleet
+  HEAD 467a2a92, which contains 2327738b):
+  `[nba_sim_availability] NBA_SIM_AVAILABILITY {"applied": false, "added": 0, "readmitted_with_prop_line": 0,
+  "skipped_traded": 0, "reason": "slate phase preseason: rule measured on the regular season only"}`
+- This matches the 16:45:28Z entry's prediction exactly. The switch file was read (otherwise the reason would be
+  "absent or not enabled"), the slate's phase resolved to preseason, and nobody was excluded.
+- Caught by watcher scratchpad/watch_avail.sh at 17:08:00Z.
+- verify still OWED (step 2): regular-season week 1, from 2026-10-20. Per NBA props refresh: `applied: true`, players
+  `added` per team-game (first exclusions at each team's 3rd regular game), `readmitted_with_prop_line`,
+  `skipped_traded`; and the minutes shift vs the K-off counterfactual.
