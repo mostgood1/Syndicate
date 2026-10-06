@@ -60,6 +60,28 @@ def _fetch_roster_with_retries(league: str, team_id: str, *, attempts: int = 3, 
     return best
 
 
+def _previous_rows_by_team(out_path: Path, league: str, season: int) -> dict[str, list[dict]]:
+    """The roster this run would replace, per team_id: the file at `out_path` if it
+    exists, else whatever `roster_rows` resolves (the runtime disk, then the git seed)."""
+    rows: list[dict] = []
+    if out_path.exists():
+        try:
+            rows = pd.read_csv(out_path, dtype=str, keep_default_na=False).to_dict("records")
+        except Exception:
+            rows = []
+    if not rows:
+        try:
+            rows = [dict(row) for row in roster_rows(league, season)]
+        except Exception:
+            rows = []
+    by_team: dict[str, list[dict]] = {}
+    for row in rows:
+        team_id = str(row.get("team_id") or "").strip()
+        if team_id:
+            by_team.setdefault(team_id, []).append(row)
+    return by_team
+
+
 def build_rosters(league: str, season: int, *, out_root: Path, sleep_seconds: float = 0.2) -> pd.DataFrame:
     teams = all_teams(league)
     if not teams:
@@ -67,7 +89,16 @@ def build_rosters(league: str, season: int, *, out_root: Path, sleep_seconds: fl
             f"no team directory for {league}; run scripts/build_team_branding_snapshot.py --sport {league} first"
         )
 
+    out_path = out_root / league / "api" / "rosters" / f"rosters_{season}.csv"
+    # A SPARSE FETCH NEVER SHRINKS A CLUB (lane `soccer-roster-refresh`). This now
+    # runs unattended from `refresh_odds_sources`, and ESPN returns short or empty
+    # squads for some clubs for hours at a time (see `_fetch_roster_with_retries`).
+    # Writing that over a fuller roster would cost the departed-player rescue real
+    # players. So a club whose fetch failed, or came back under
+    # SPARSE_ROSTER_THRESHOLD with fewer players than before, keeps its previous rows.
+    previous = _previous_rows_by_team(out_path, league, season)
     rows: list[dict] = []
+    kept_previous: list[str] = []
     for team in teams:
         team_id = str(team.get("team_id") or "").strip()
         team_name = str(team.get("name") or "").strip()
@@ -76,14 +107,27 @@ def build_rosters(league: str, season: int, *, out_root: Path, sleep_seconds: fl
         try:
             players = _fetch_roster_with_retries(league, team_id)
         except Exception as error:
-            print(f"skip {team_name} ({team_id}): {error}")
-            continue
-        for player in players:
-            rows.append({"team_id": team_id, "team": team_name, **player})
+            print(f"fetch failed {team_name} ({team_id}): {error}")
+            players = []
+        old = previous.get(team_id) or []
+        if len(players) < SPARSE_ROSTER_THRESHOLD and len(old) > len(players):
+            rows.extend(old)
+            kept_previous.append(f"{team_name}({len(players)}<{len(old)})")
+        else:
+            for player in players:
+                rows.append({"team_id": team_id, "team": team_name, **player})
         time.sleep(sleep_seconds)
 
+    if not rows:
+        print(f"SOCCER_ROSTERS_EMPTY league={league} season={season}: nothing fetched and no previous roster; not writing {out_path}", flush=True)
+        return pd.DataFrame()
     frame = pd.DataFrame(rows)
-    out_path = out_root / league / "api" / "rosters" / f"rosters_{season}.csv"
+    print(
+        f"SOCCER_ROSTERS_REFRESHED league={league} season={season} rows={len(frame)} "
+        f"previous_rows={sum(len(v) for v in previous.values())} kept_previous={len(kept_previous)} "
+        + (f"e.g. {', '.join(kept_previous[:5])}" if kept_previous else ""),
+        flush=True,
+    )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_csv(out_path, frame)
     print(f"wrote {out_path} ({len(frame)} players across {len(teams)} teams)")

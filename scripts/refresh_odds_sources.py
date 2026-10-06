@@ -1822,6 +1822,69 @@ def _soccer_players_step(league: str, soccer_root: Path, python_exe: str) -> Ref
     )
 
 
+#: Lane `soccer-roster-refresh` (2026-10-06). ON unless set to 0/false/off/no.
+_SOCCER_ROSTER_REFRESH_ENV = "SYNDICATE_SOCCER_ROSTER_REFRESH"
+#: Refetch a league's ESPN roster once it is older than this.
+_SOCCER_ROSTER_REFRESH_DAYS = 7.0
+
+
+def _soccer_rosters_step(league: str, soccer_root: Path, python_exe: str) -> RefreshStep | None:
+    """Refetch this league's ESPN squad roster once it goes stale.
+
+    THE GAP. `rosters_<season>.csv` had no producer: `build_soccer_rosters.py` was
+    run by hand, and measured 2026-10-06 the fleet's files were the 2026-07-20 git
+    seed (bundesliga 142 rows, ligue_1 223, la_liga 353 -- ESPN still filling 2026-27
+    squads in July), with no serie_a growth since. The departed-player rescue in
+    `build_soccer_artifacts._drop_departed_players` and the team roster pages both
+    read this file, so both were reading a pre-season squad list.
+
+    Same shape as `_soccer_players_step`: gated on MTIME, so a fresh file is a
+    no-op and this is not a per-tick network call (~20 ESPN requests per league per
+    refresh). `build_soccer_rosters.py` never lets a sparse fetch shrink a club.
+    """
+    if str(os.environ.get(_SOCCER_ROSTER_REFRESH_ENV) or "").strip().lower() in {"0", "false", "off", "no"}:
+        return None
+    try:
+        season = int(soccer_default_season(league))
+    except Exception:
+        return None
+    target = soccer_root / league / "api" / "rosters" / f"rosters_{season}.csv"
+    try:
+        age_days = (time.time() - target.stat().st_mtime) / 86400.0
+    except FileNotFoundError:
+        age_days = None
+    except Exception:
+        # Unreadable is not stale.
+        return None
+    if age_days is not None and age_days < _SOCCER_ROSTER_REFRESH_DAYS:
+        return None
+    print(
+        f"SOCCER_ROSTERS_STALE league={league} season={season} file={target} "
+        f"age_days={'absent' if age_days is None else round(age_days, 1)}",
+        file=sys.stderr,
+        flush=True,
+    )
+    return RefreshStep(
+        name=f"soccer_{league}_rosters",
+        # Both phases, matching the players step: the autorun launches with --phase live.
+        phases=("pregame", "live"),
+        cwd=REPO_ROOT,
+        command=(
+            python_exe,
+            "scripts/build_soccer_rosters.py",
+            "--league",
+            league,
+            "--season",
+            str(season),
+            # Explicit: the builder defaults --out-root to the REPO tree, which is not
+            # the root the sim reads.
+            "--out-root",
+            str(soccer_root),
+        ),
+        description=f"Refresh {league}'s ESPN squad roster (departed-player rescue, roster pages).",
+    )
+
+
 #: Lane `soccer-team-history-current-season` (2026-10-06). OFF unless set to 1/true/on: absent is OFF.
 _SOCCER_CURRENT_HISTORY_ENV = "SYNDICATE_SOCCER_CURRENT_HISTORY"
 #: Refetch the current-season ratings history once a day, like the player rates.
@@ -2116,6 +2179,10 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
         players_step = _soccer_players_step(league, soccer_root, python_exe)
         if players_step is not None:
             steps.append(players_step)
+        # Lane `soccer-roster-refresh`: the roster the departed-player rescue reads.
+        rosters_step = _soccer_rosters_step(league, soccer_root, python_exe)
+        if rosters_step is not None:
+            steps.append(rosters_step)
     full_rebuild_leagues = _soccer_schedule_full_rebuild_leagues(league_slugs, soccer_root)
     for league in league_slugs:
         steps.append(

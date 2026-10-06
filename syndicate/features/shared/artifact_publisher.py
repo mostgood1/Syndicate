@@ -1273,6 +1273,10 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # WEB READ and nothing else. Do not cite it as precedent for shipping a
     # season-named file to a worker.
     "soccer_source/*/players/players_*.csv",
+    # Lane `soccer-roster-refresh` (2026-10-06): the ESPN squad roster, now refreshed by
+    # `refresh_odds_sources._soccer_rosters_step`. A sim input (the departed-player rescue)
+    # and a web read (team roster pages); season-named like the players file above.
+    "soccer_source/*/api/rosters/rosters_*.csv",
     # CORRECTED 2026-08-08. This note used to read: "reports/intelligence/
     # board_snapshot.json and intelligence_state.json are intentionally excluded
     # here. They're written through refresh_state_store's write_json_file, which
