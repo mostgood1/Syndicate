@@ -41,6 +41,7 @@ from __future__ import annotations
 import json
 import os
 import random
+import sys
 import time
 
 RECYCLE_STAMP_PATH = os.environ.get("SYNDICATE_WEB_WORKER_RECYCLE_STAMP") or "/tmp/syndicate_web_worker_recycle.stamp"
@@ -66,6 +67,16 @@ access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"
 # stock gthread, which gunicorn picks itself because `--threads` > 1).
 if str(os.environ.get("SYNDICATE_WEB_WORKER_DRAIN") or "").strip().lower() not in {"0", "false", "no", "off"}:
     worker_class = "syndicate.web_worker.DrainingThreadWorker"
+
+# A HUP LOADS THE WORKER CLASS FRESH -- lane `web-restart-healthz` `[2026-10-06]`.
+# The MASTER imports `worker_class` and forks every worker from itself, so a change
+# to `syndicate/web_worker.py` used to need a full master restart: on HUP gunicorn
+# re-reads this file and re-resolves the class, but `import_module` returned the copy
+# cached at boot and the new workers ran the OLD class. This file runs again on every
+# HUP, so dropping the cached module here makes `local_production.py reload-web`
+# (HUP, never refused) load worker-class changes too. Only the master holds it
+# before the fork; a worker already running is untouched.
+sys.modules.pop("syndicate.web_worker", None)
 
 
 def _env_int(name: str, default: int) -> int:

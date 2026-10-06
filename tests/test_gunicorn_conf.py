@@ -159,3 +159,17 @@ def test_gunicorn_itself_reads_the_access_log_format():
     cfg.set("access_log_format", namespace["access_log_format"])
     assert cfg.access_log_format.endswith("%(M)sms")
     assert "'M':" in pathlib.Path(glogging.__file__).read_text(encoding="utf-8")
+
+
+def test_loading_the_conf_drops_the_cached_worker_module(monkeypatch):
+    """Lane `web-restart-healthz`: gunicorn re-executes this file on HUP and then
+    re-resolves `worker_class`; without dropping the master's cached module, the new
+    workers ran the OLD class (A/B on a real gunicorn 21.2.0 HUP, 2026-10-06: 0/3
+    probes on the new code with the old conf, 3/3 with this one)."""
+    import runpy
+    import sys
+
+    sentinel = types.ModuleType("syndicate.web_worker")
+    monkeypatch.setitem(sys.modules, "syndicate.web_worker", sentinel)
+    runpy.run_path(str(pathlib.Path(__file__).resolve().parents[1] / "gunicorn.conf.py"))
+    assert sys.modules.get("syndicate.web_worker") is not sentinel
