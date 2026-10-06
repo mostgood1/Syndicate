@@ -142,6 +142,23 @@ def _instance_display_name(rows: Iterable[Mapping[str, Any]]) -> str | None:
 # updating hours ago and now looks like the best line on the board.
 _STALE_BEST_LAG_SECONDS = 900.0
 
+# WHICH CLOCK "STALE" READS `[2026-10-06, lane published-negative-ev, user "Restore book coverage"]`.
+# `age_seconds` is when the book last MOVED its price (OddsAPI `last_update`); on a quiet pregame
+# market one book ticking made every unmoved-but-current book "stale", and `books_quoting` (fresh
+# only) collapsed to 1-2 -- measured 2026-10-05: ncaaf lines 45% / soccer lines 35% / nfl lines 27%
+# of published keys read <= 2 books although >= 4 were captured. A price we SAW in the latest
+# snapshot is current whether or not it moved. So staleness is the lag of `seen_age_seconds` behind
+# the most recently SEEN book on the market, and falls back to the movement lag only where seen-age
+# is unknown (a date with no last-seen tracking). `SYNDICATE_BOOK_GRID_STALE_BASIS=moved` restores
+# the movement-only rule.
+_STALE_BASIS_ENV = "SYNDICATE_BOOK_GRID_STALE_BASIS"
+
+
+def _stale_basis_is_seen() -> bool:
+    import os
+
+    return str(os.environ.get(_STALE_BASIS_ENV) or "").strip().lower() != "moved"
+
 
 def _price(value: Any) -> int | None:
     try:
@@ -588,6 +605,16 @@ def build_book_grid(
                 ),
                 default=None,
             )
+            freshest_seen_age = min(
+                (
+                    cells[b][s]["seen_age_seconds"]
+                    for b in cells
+                    for s in cells[b]
+                    if cells[b][s].get("seen_age_seconds") is not None
+                ),
+                default=None,
+            )
+            seen_basis = _stale_basis_is_seen()
             for book_key, sides_map in cells.items():
                 for side_key, cell in sides_map.items():
                     age = cell.get("age_seconds")
@@ -597,12 +624,21 @@ def build_book_grid(
                         else None
                     )
                     cell["lag_behind_freshest_seconds"] = cell_lag
-                    if cell_lag is not None and cell_lag > _STALE_BEST_LAG_SECONDS:
-                        cell["stale"] = True
-                        cell["reason"] = f"{_duration(cell_lag)} behind the freshest quote on this market"
+                    seen_age = cell.get("seen_age_seconds")
+                    seen_lag = (
+                        round(seen_age - freshest_seen_age, 1)
+                        if seen_basis and seen_age is not None and freshest_seen_age is not None
+                        else None
+                    )
+                    cell["seen_lag_behind_freshest_seconds"] = seen_lag
+                    if seen_lag is not None:
+                        stale_now = seen_lag > _STALE_BEST_LAG_SECONDS
+                        why = f"not seen for {_duration(seen_lag)} longer than the latest look at this market"
                     else:
-                        cell["stale"] = False
-                        cell["reason"] = None
+                        stale_now = cell_lag is not None and cell_lag > _STALE_BEST_LAG_SECONDS
+                        why = f"{_duration(cell_lag)} behind the freshest quote on this market" if stale_now else None
+                    cell["stale"] = bool(stale_now)
+                    cell["reason"] = why if stale_now else None
 
             # best price per side, and the consensus it should be read against.
             #
