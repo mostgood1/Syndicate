@@ -1014,6 +1014,14 @@ def _apply_skill_reliability(score: Any, projection: Any, row: Any = None) -> An
     return adjusted
 
 
+def _cell_seen_age(cell: Any) -> float | None:
+    """One book cell's observation age: seen-age, else book-age (as `_row_quote_age_seconds`)."""
+    if not isinstance(cell, Mapping):
+        return None
+    seen = _as_float(cell.get("seen_age_seconds"))
+    return seen if seen is not None else _as_float(cell.get("age_seconds"))
+
+
 def _row_quote_age_seconds(row: Mapping[str, Any]) -> float | None:
     """How stale is our OBSERVATION of this quote (`#370`).
 
@@ -2732,6 +2740,10 @@ def build_layer2_rows(
     # selection rule in this module already follows.
     no_bettable_book = 0
     repriced_to_bettable = 0
+    # Sides where a STALE book would have won on price while a fresh bettable
+    # book quoted the same line (lane `layer2-stale-book-pick`, 2026-10-06).
+    stale_book_skipped = 0
+    stale_book_skipped_by_sport: dict[str, int] = {}
 
     for row in grid:
         rows_in += 1
@@ -2792,6 +2804,68 @@ def build_layer2_rows(
                 if fallback_book is not None:
                     side_prices = {str(fallback_book): price}
             bettable = book_shortlist.best_bettable(side_prices)
+            # A BOOK THAT STOPPED QUOTING MUST NOT WIN ON ITS LAST PRICE (lane
+            # `layer2-stale-book-pick`, 2026-10-06). `best_bettable` picks on price
+            # alone, and a book that has gone quiet keeps its last -- often the
+            # most generous -- number. Measured on the 2026-10-06 16:48Z board:
+            # 8 of 10 sampled NHL stale-quote rows were one stale book winning
+            # while others quoted the SAME line fresh (betrivers 23.8 h against 9
+            # books at 0.7 h; pinnacle 11-12 h against DraftKings/FanDuel). The
+            # row then carried that book's age and the 1h gate hid it.
+            # Relative, not absolute: only when a FRESH bettable book exists is
+            # the stale one set aside; if none is fresh, the pick is unchanged and
+            # the quote-age gate judges the line as before.
+            # IN PLAY THE LIMITS ARE THE LIVE ONES. A live row is judged by
+            # `opportunity_gate` on the book clock (900 s) and the observation
+            # clock, not the pregame hour -- and in play the stalest book is
+            # usually the best price, because its line froze before the move.
+            # Measured on MNF 2026-10-05 (00:25Z grid, ATL @ NO): 12 of 28 live
+            # full-game sides went to the dead lane on a stale book's age while
+            # other books quoted them fresh, and stale books produced the two
+            # "+EV" sides the implausible-book check then refused.
+            if bettable is not None:
+                cells_by_book = row.get("cells") or {}
+                # The grid row carries the state on `game` (the candidate copies it
+                # to `game_state`/`is_live` later, which is what the gate reads).
+                _game = row.get("game") if isinstance(row.get("game"), Mapping) else {}
+                if str(_game.get("state") or "").strip().lower() == "live":
+                    observed_max = opportunity_gate.live_quote_max_observed_age_seconds()
+
+                    def _cell_is_fresh(cell: Any) -> bool:
+                        if not isinstance(cell, Mapping):
+                            return False
+                        book_age = _as_float(cell.get("age_seconds"))
+                        seen = _cell_seen_age(cell)
+                        return (
+                            book_age is not None
+                            and book_age <= opportunity_gate.LIVE_MARKET_MAX_AGE_SECONDS
+                            and seen is not None
+                            and seen <= observed_max
+                        )
+                else:
+                    ceiling = _sport_quote_age_ceiling(
+                        row.get("sport"),
+                        _env_float("SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS", SHORTLIST_MAX_QUOTE_AGE_SECONDS),
+                    )
+
+                    def _cell_is_fresh(cell: Any) -> bool:
+                        seen = _cell_seen_age(cell)
+                        return ceiling <= 0 or (seen is not None and seen <= ceiling)
+
+                picked_cell = (cells_by_book.get(bettable[0]) or {})
+                picked_cell = picked_cell.get(side) if isinstance(picked_cell, Mapping) else None
+                if isinstance(picked_cell, Mapping) and not _cell_is_fresh(picked_cell):
+                    fresh_prices = {
+                        book: book_price
+                        for book, book_price in side_prices.items()
+                        if _cell_is_fresh(((cells_by_book.get(book) or {}).get(side)))
+                    }
+                    fresh_pick = book_shortlist.best_bettable(fresh_prices) if fresh_prices else None
+                    if fresh_pick is not None:
+                        bettable = fresh_pick
+                        stale_book_skipped += 1
+                        sport_key = str(row.get("sport") or "").strip().lower() or "unknown"
+                        stale_book_skipped_by_sport[sport_key] = stale_book_skipped_by_sport.get(sport_key, 0) + 1
             # THE QUOTE'S AGES BELONG TO THE BOOK WHOSE PRICE IT CARRIES (lane
             # `layer2-stale-quote-sample`, 2026-10-04). A repriced row used to keep
             # `side_best`'s ages -- the UNRESTRICTED best book's -- while showing the
@@ -3279,6 +3353,8 @@ def build_layer2_rows(
         "by_lane": lanes,
         "no_bettable_book": no_bettable_book,
         "repriced_to_bettable": repriced_to_bettable,
+        "stale_book_skipped": stale_book_skipped,
+        "stale_book_skipped_by_sport": dict(sorted(stale_book_skipped_by_sport.items())),
         "bettable_books": list(book_shortlist.DEFAULT_BOOKS),
     }
 

@@ -1316,6 +1316,14 @@ death, never life — do not invert it.
 - Verification: Trigger a run AFTER the approval exists; read its tool_use vs tool_result counts (not elapsed time) and confirm the task's own artifact appeared.
 - Blocked by: none
 
+### layer2-stale-book-pick — OPEN — opened 2026-10-06 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: A book that stopped quoting no longer wins a Layer 2 row on its last price while a fresh bettable book quotes the same line: the bettable pick prefers books seen within the sport's quote-age ceiling when any is bettable; verified by stale_book_skipped_by_sport > 0 and NHL rows_stale_quote falling on the fleet board
+- Files: syndicate/features/shared/layer2_board.py, tests/test_layer2_stale_book_pick.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: Unit tests incl. off!=on; fleet board after restart: stale_book_skipped > 0, NHL/MLB rows_stale_quote lower than the pre-restart reading
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
