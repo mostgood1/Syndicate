@@ -787,13 +787,14 @@ death, never life — do not invert it.
 - Hypothesis: Measured 2026-10-03 on the as-of re-run (662 team-games): 29.05 sim min/team-game go to players absent from the box (2.28/team-game, inactive/injured) and 13.55 to listed DNPs; played players get 157.4 of 200. Most absent players also missed their team's previous game(s), so a recency rule removes most of the 29 minutes with few false drops
 - Falsification test: If no recency rule removes more non-player minutes than played-player minutes it wrongly removes (held-out), or played-player minutes MAE does not improve with a CI excluding 0, recency is not the fix and availability needs the injury feed
 - Verification: Offline table train/test: non-player minutes removed, real players wrongly dropped (count and their actual minutes), played-player minutes bias/MAE with CI, then props re-scored; engine: off!=on reachability test on a re-run date
-### mlb-starter-length — OPEN — opened 2026-10-03 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+### mlb-starter-length — CLOSED — closed 2026-10-06 — opened 2026-10-03 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **The current MLB engine's starter-outs projection is unbiased and its distribution matches real starts (early-exit share and point mass at 15 outs), measured on an AS-OF replay of stored roster_objs against StatsAPI actual starter outs with a time-split holdout; any override change ships only if out-of-sample outs MAE/bias improve without worsening K/hits-allowed/ER or game totals, with the numbers recorded — GOAL: DRIFTED.** Folded into lane `mlb-combined-calibration` (2026-10-06, user: "ship the combined calibration if it passes"): starter_short_start_prob 0.10 SHIPPED and verified; the shelled hook is a lever of the combined fit. Its file claims MOVED to that lane.
 - **2026-10-06: the simulate.py claim MOVED to lane `mlb-non-pa-outs`** (its rule names this transfer). The shelled-hook code stays in the file, OFF.
 - **The current MLB engine's starter-outs projection is unbiased and its distribution matches real starts (early-exit share and point mass at 15 outs), measured on an AS-OF replay of stored roster_objs against StatsAPI actual starter outs with a time-split holdout; any override change ships only if out-of-sample outs MAE/bias improve without worsening K/hits-allowed/ER or game totals, with the numbers recorded — GOAL: NOT MET (partly shipped).** SHIPPED by the pre-registered rule: `starter_short_start_prob` 0.10 (eedfde5e, fleet ff 2026-10-03 18:26:15Z), the only candidate of 9 that passed every guard. Holdout: CRPS 2.344->2.321, outs bias +0.88->+0.73. VERIFIED live 2026-10-05: production matches the 0.10 replay, not 0.06 (deploys.md ~21:45Z). NOT MET because outs are still biased (+0.73) and early exits are still 1.9% vs 8.2%. The shelled hook (simulate.py, OFF) fixes both on outs (bias ~0, <=9-out share 7-10%) but failed the ER/totals guards: pulls look right on outs but charge too few earned runs. That is the next lead. Upstream: PR mostgood1/MLB-BettingV2#2 (hook code, no-op) open. The full-overrides-file PR is HELD: upstream lacks 3 of the 5 knobs. Branch pushed, no PR; user decision pending.
 - **TRIMMED 2026-10-04 by `scripts/trim_lane_narrative.py`. 13 lines / 1186 B of HISTORY moved VERBATIM to `lanes_history.md` under `## TRIMMED FROM lanes.md — 2026-10-04 (mlb-starter-length)`; nothing summarised, nothing deleted, fully reversible. KEPT: the header, the contract keys and their subtrees, the newest dated entry, every line still marking work OUTSTANDING, and every CLAIM-BEARING line — which lines those are was MEASURED by removal, not grepped. Block was 3141 B.
 
 - Goal: The current MLB engine's starter-outs projection is unbiased and its distribution matches real starts (early-exit share and point mass at 15 outs), measured on an AS-OF replay of stored roster_objs against StatsAPI actual starter outs with a time-split holdout; any override change ships only if out-of-sample outs MAE/bias improve without worsening K/hits-allowed/ER or game totals, with the numbers recorded
-- Files: scripts/mlb_starter_length_replay.py (NEW), tests/test_mlb_starter_length_replay.py (NEW), vendor/mlb_bettingv2/data/tuning/manager_pitching_overrides/forward_start_2026_04_14_v1.json (override values + provenance ONLY), .syndicate/findings_2026-10-03_mlb_starter_length.md (NEW), tests/test_mlb_starter_shell_hook.py (NEW)
+- Files: (none held — claims moved to mlb-combined-calibration on close)
 - Hypothesis: Per 09-14 (outs +7.1% on the post-refit engine; total pitches +2.4% but 4.4% too few pitches per out; 14% of real starts end <=9 outs vs 1.7% in the sim) and 08-17 (26.78% of sim mass at exactly 15 outs), the 5-inning leash (starter_min_innings=5, leash-break knobs at always-keep defaults) suppresses early exits; the bias is in the leash/short-start knobs, not the pitch-count hook
 - Falsification test: On the replay, relaxing the leash (starter_min_innings / leash-break thresholds / short-start probability) does not move the <=9-out share toward ~14% or does not reduce out-of-sample outs bias; or the replay's baseline already matches actual starts (then the 09-14 defect was a re-sim artifact)
 - Verification: Replay harness reproduces the STORED 10-03 sims' starter outs_mean (current code) within MC noise; then baseline vs candidate on a time-split holdout of the stored roster_objs dates (06-15..07-12), reported with n starts and CIs
@@ -1142,7 +1143,8 @@ death, never life — do not invert it.
 - **GOAL: MET.** Reading: full 2025-26 paired backtest slotted-but-did-not-play 10.4% -> 6.0%, played-and-projected player-games +4.8% (36,533 -> 38,287), Brier flat on every line (none worse). Fleet (cb1bb280, ff 21:16:36Z): slotted absentees from the team's last game 12/144 -> 1/144 (10-05) and 26/324 -> 3/324 (10-06), every survivor the unfillable 12th-F slot of an 11F+7D last game (deploys.md 21:32Z, 22:02Z). Full history in lanes_history.md.
 - Files: (none -- released at close)
 - Blocked by: none
-### mlb-strikeout-bias — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+### mlb-strikeout-bias — CLOSED — closed 2026-10-06 — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **The current MLB engine's starter strikeout projection is unbiased against real starts (today +0.87 K/start [+0.66,+1.07], 565 starts, with pitches unbiased), measured on the as-of roster_objs replay with a pre-registered tune/holdout pick and side-effect guards on walks, hits, outs and game totals; the cause is located (K/BF vs BF vs pitches/PA) and the commit that flipped K from 18% low (08-18) to 17% high is identified — GOAL: DRIFTED.** Folded into lane `mlb-combined-calibration` (2026-10-06, user: "ship the combined calibration if it passes"): decomposition done; the K excess was mostly HBP + short PAs; base_hbp and the joint re-fit failed their rules. Its file claims MOVED to that lane.
 - **JOINT RE-FIT RESULT, 2026-10-06 ~05:30Z: holdout read ONCE (232 starts). FAILS the pre-registered rule; NOTHING SHIPS.** Combination: base_hbp 0.0015 + early_count_foul_boost 1.5 + hr_rate_mult 1.856.
   - **PASS:** |SO bias| +0.92 -> +0.79; HBP/start 1.74 -> 0.26 (actual 0.26); HR/PA gap -0.0147 -> +0.0018.
   - **FAIL:** starter outs +0.65 -> +0.95; H +0.16 -> +0.79; BB +0.01 -> +0.29; ER +0.05 -> +0.32; game total 9.01 -> 9.60 vs 9.06 actual (gap 0.54 > 0.30).
@@ -1211,7 +1213,7 @@ death, never life — do not invert it.
     - the refit component's |bias| shrinks.
   - Otherwise ship nothing. This is a joint calibration, so ONE knob only; no stacking.
 - Goal: The current MLB engine's starter strikeout projection is unbiased against real starts (today +0.87 K/start [+0.66,+1.07], 565 starts, with pitches unbiased), measured on the as-of roster_objs replay with a pre-registered tune/holdout pick and side-effect guards on walks, hits, outs and game totals; the cause is located (K/BF vs BF vs pitches/PA) and the commit that flipped K from 18% low (08-18) to 17% high is identified
-- Files: .syndicate/findings_2026-10-05_mlb_strikeout_bias.md (NEW), scripts/mlb_strikeout_decomposition.py (NEW)
+- Files: (none held — claims moved to mlb-combined-calibration on close)
 - Hypothesis: Pitches are unbiased while K is 17% high, so the excess is per-PA: either K/BF too high (pitch-level swing/whiff/called-strike mix after the 08-18..09-08 pitch-model and refit changes) or BF inflated by the PA-start counter flagged 09-14 (simulate.py:2657, BF exceeded outs+H+BB by 1.67/start)
 - Falsification test: If model K/BF matches actual K/BF and the excess is entirely BF, the fix is the counter, not the pitch model; if neither K/BF nor BF is biased, the K bias is a starter-vs-bullpen allocation artifact
 - Verification: Decomposition table on the 26-date replay (tune/holdout), then a candidate measured with the same harness and guards
@@ -1233,7 +1235,8 @@ death, never life — do not invert it.
 - Verification: Fleet: after restart, an nfl_props launch within ~1h of the odds file changing; artifact rows cover the 10-11 games; served NFL props with projection rises from 49/92
 - Blocked by: none
 
-### mlb-hr-rate — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+### mlb-hr-rate — CLOSED — closed 2026-10-06 — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **The current MLB engine's home-run rate matches real games on the as-of replay: team HR per game and batter P(HR>=1) unbiased, starting from production's ACTUAL hr_rate_mult (1.1, pinned by the forward pitch-model overrides file; the 09-04 refit's 1.856 never reached production), with a pre-registered tune/holdout pick, side-effect guards, and the shipped value verified on production's next sim — GOAL: DRIFTED.** Folded into lane `mlb-combined-calibration` (2026-10-06, user: "ship the combined calibration if it passes"): the HR pin (1.1 vs the inert 1.856 refit) is a lever of the combined fit. Its file claims MOVED to that lane.
 - **SELECTION RULE, PRE-REGISTERED 2026-10-05 ~23:30Z before any HR replay number exists** (user: "ship the HR fix too if it passes").
   - **Baseline** = production's configuration AFTER `mlb-strikeout-bias` resolves. If that lane's run-scoring refit picks `hr_rate_mult`, this lane VERIFIES that value against the checks below instead of re-fitting it.
   - **Candidates:** forward-file `hr_rate_mult` in {1.1 (current), 1.4, 1.7, 1.856, 2.1}. 200 sims, same seeds, same 26 dates, replay harness.
@@ -1246,13 +1249,14 @@ death, never life — do not invert it.
   - **(3)** If the pick fails, try the next-closest value. If none passes, ship nothing and record that.
   - **Ship** = the forward-file value + provenance on main, then a fleet ff (the sim job is a per-run subprocess, no restart). Verified on production's next sim against a replay at the shipped and the previous value.
 - Goal: The current MLB engine's home-run rate matches real games on the as-of replay: team HR per game and batter P(HR>=1) unbiased, starting from production's ACTUAL hr_rate_mult (1.1, pinned by the forward pitch-model overrides file; the 09-04 refit's 1.856 never reached production), with a pre-registered tune/holdout pick, side-effect guards, and the shipped value verified on production's next sim
-- Files: vendor/mlb_bettingv2/data/tuning/pitch_model_overrides/forward_start_2026_04_14_v1.json (hr_rate_mult value + provenance ONLY), scripts/mlb_run_components.py (NEW), .syndicate/findings_2026-10-05_mlb_hr_rate.md (NEW)
+- Files: (none held — claims moved to mlb-combined-calibration on close)
 - Hypothesis: Production runs HR at hr_rate_mult 1.1 because the forward pitch-model overrides file overrides the 1.856 code default; the May-July as-of backtest saw the sim's P(HR>=1) at 0.090 vs 0.185 realised, so team HR/game is under-predicted on the current engine too
 - Falsification test: If team HR/game on the replay at 1.1 is already unbiased (CI includes 0), the HR deficit was the May-July engine, not this pin, and nothing ships
 - Verification: Component table (HR, non-HR H, BB per team-game; batter P(HR>=1)) at 1.1, then candidates by the pre-registered rule; production's next sim matches the shipped value's replay
 - Blocked by: mlb-strikeout-bias
 
-### mlb-pa-length — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+### mlb-pa-length — CLOSED — closed 2026-10-06 — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **MLB plate appearances are the right length: replay pitches per batter faced matches actual (today 3.44 vs 3.88, -11%) via a JOINT fit of the in-play/foul pitch mix with the strikeout knob (the mix-only fix is FORBIDDEN, learnings 08-18), holding K/BF, H/BF and BB/BF at actual, judged once on a pre-registered holdout against the configuration the joint re-fit ships; shipped only if it passes, then verified on production's next sim — GOAL: DRIFTED.** Folded into lane `mlb-combined-calibration` (2026-10-06, user: "ship the combined calibration if it passes"): PA length is the pitch-mix lever of the combined fit. Its file claims MOVED to that lane.
 - **SELECTION RULE, PRE-REGISTERED 2026-10-06 ~01:30Z before any PA-length run** (user: "yes, do PA length next and ship if it passes").
   - **Baseline** = production after `mlb-strikeout-bias` resolves (its joint re-fit if shipped, else today's config).
   - **Tool:** `mlb_strikeout_decomposition.py`. Same 26 dates, tune < 2026-07-04, holdout >= 2026-07-04, 100 sims for grids, 200 for the judgement.
@@ -1264,7 +1268,7 @@ death, never life — do not invert it.
     - game-total |gap| <= max(0.30 runs, the baseline's).
   - **Otherwise ship nothing.** Ship = pitch-model forward overrides with provenance, fleet ff, verified on production's next sim.
 - Goal: MLB plate appearances are the right length: replay pitches per batter faced matches actual (today 3.44 vs 3.88, -11%) via a JOINT fit of the in-play/foul pitch mix with the strikeout knob (the mix-only fix is FORBIDDEN, learnings 08-18), holding K/BF, H/BF and BB/BF at actual, judged once on a pre-registered holdout against the configuration the joint re-fit ships; shipped only if it passes, then verified on production's next sim
-- Files: .syndicate/findings_2026-10-06_mlb_pa_length.md (NEW)
+- Files: (none held — claims moved to mlb-combined-calibration on close)
 - Hypothesis: base_in_play (0.23 vs ~0.17 real) ends PAs early; raising PA length cuts batters faced per start, removing the residual starter-outs and K/start bias
 - Falsification test: If no in-play/foul/K combination reaches P/BF within 3% of actual while keeping K/BF, H/BF and BB/BF within their holdout guards, nothing ships
 - Verification: Pre-registered grid on tune, holdout read once, production's next sim matches the shipped replay
@@ -1288,7 +1292,8 @@ death, never life — do not invert it.
 - Verification: Replay per-batter P(HR>=1) and hitter buckets vs box outcomes, tune fit, holdout read once; production's next sim serves the re-fitted values
 - Blocked by: none (unblocked 2026-10-06, user: "do 2 and 3 and ship if they pass"; runs on the engine as shipped, since the joint re-fit did not ship)
 
-### mlb-non-pa-outs — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+### mlb-non-pa-outs — CLOSED — closed 2026-10-06 — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **Outs that are not made by a batter are credited to the pitcher on the mound: caught-stealing outs (simulated, simulate.py ~2636, added to half.outs but never to the pitcher's OUTS) count in the pitcher's line, and pickoffs are modelled if the replay shows the residual needs them; measured as starter BF-(OUTS+H+BB+HBP) on the as-of replay moving from +0.05 toward actual -0.40 with starter outs bias not worsening, shipped only if a pre-registered holdout passes — GOAL: DRIFTED.** Folded into lane `mlb-combined-calibration` (2026-10-06, user: "ship the combined calibration if it passes"): step 1 (caught-stealing outs) SHIPPED; step 2 (pickoffs) failed its rule; DP/ROE/FC/pickoffs are levers of the combined fit. Its file claims MOVED to that lane.
 - **STEP 2 RESULT, 2026-10-06 ~01:45Z, by the pre-registered rule: PICKOFFS DO NOT SHIP.**
   - Tune pick: `pickoff_rate` 0.01 (model 0.071 vs 0.099 actual PO/team-game).
   - Holdout (232 team-games, read once): model 0.069 vs actual 0.034, gap 0.035 > 0.02 limit: FAIL. Every other check passes (BF balance improves; outs/SO/H/BB/ER/totals within limits).
@@ -1321,7 +1326,7 @@ death, never life — do not invert it.
     - game-total |gap| <= max(0.30, the baseline's).
   - **Step 2, pickoffs.** Only if the residual BF-balance gap after step 1 is still > 0.20/start. That is a new mechanism, so per standard section 4.4 it needs its own pre-registered rule, written then, before running.
 - Goal: Outs that are not made by a batter are credited to the pitcher on the mound: caught-stealing outs (simulated, simulate.py ~2636, added to half.outs but never to the pitcher's OUTS) count in the pitcher's line, and pickoffs are modelled if the replay shows the residual needs them; measured as starter BF-(OUTS+H+BB+HBP) on the as-of replay moving from +0.05 toward actual -0.40 with starter outs bias not worsening, shipped only if a pre-registered holdout passes
-- Files: tests/test_mlb_non_pa_outs.py (NEW), .syndicate/findings_2026-10-06_mlb_non_pa_outs.md (NEW), vendor/mlb_bettingv2/sim_engine/simulate.py (pre-PA steal block: caught-stealing out crediting ONLY; taken from mlb-starter-length 2026-10-06)
+- Files: (none held — claims moved to mlb-combined-calibration on close)
 - Hypothesis: The CS branch at simulate.py ~2636 increments half.outs but not the current pitcher's OUTS stat, so the pitcher box omits non-PA outs that real box scores (and outs props) count
 - Falsification test: If crediting CS outs moves the BF balance by <0.05/start, CS is too rare in the sim to explain the -0.40 and the residual is pickoffs / other non-PA outs
 - Verification: Unit test: a forced CS credits exactly one OUT to the pitcher of record; replay BF balance + outs bias on tune/holdout by the pre-registered rule; production's next sim verified
@@ -1414,6 +1419,65 @@ death, never life — do not invert it.
   - Registry entry re-measured for the shipped pricing: loses, +0.0156 [+0.0076, +0.0234]; skill_reliability 0.68 -> 0.85.
 - **SHIPPED 2026-10-06 00:05Z (793299cd, refresh-worker restarted 00:06:44Z, pid 1418176):** props-path reading MET (read-only rerun: SAVES == NB 7/7, others Poisson 133/133). Served-board reading OWED -> scheduled task `nhl-saves-negbin-board-verify` (10-06 16:00 CT).
 - Blocked by: none
+
+### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **COMBINED CALIBRATION RULE, PRE-REGISTERED 2026-10-06 ~02:30Z before any fidelity or descent run** (user: "ship the combined calibration if it passes").
+  - **Data.**
+    - FIT = the 26 replay dates 2026-06-15..07-12 (565 starts). The old tune/holdout split is retired: both halves are already read.
+    - VALIDATION = the as-of rebuilt 05-30..06-14 (lane `mlb-asof-roster-rebuild`), never read by any fit. It is read ONCE, at the end.
+  - **(0) FIDELITY GATE, before anything else.** Rebuilt vs stored rosters on 06-15..06-20, production config, 200 sims, same seeds. The set is ADMITTED only if every fitted moment below agrees within max(2 game-clustered SE, tolerance):
+    - per-PA rates <= 0.003 abs (K/BF <= 0.005);
+    - starter outs mean <= 0.30;
+    - <=9 / ==15 shares <= 0.03;
+    - DP and PO per team-game <= 0.05;
+    - runs/game <= 0.30.
+    - If NOT admitted: stop, ship nothing, report.
+  - **FITTED MOMENTS** (model vs box, per the decomposition):
+    - HBP/PA, starter K/BF, P/BF, batting BB/PA, HR/PA, H/PA;
+    - DP/team-game, PO/team-game, starter BF balance;
+    - starter outs mean, <=9-out share, ==15-out share;
+    - runs/game.
+  - **OBJECTIVE** = sum of ((model - actual) / scale)^2. Scales:
+    - 5% of actual for per-PA rates;
+    - 0.5 for outs mean;
+    - 0.03 for shares;
+    - 0.05 for DP and PO per team-game;
+    - 0.10 for BF balance;
+    - 0.30 for runs/game.
+  - **LEVERS and grids.** Coordinate descent, 2 passes, starting from production. 100 sims on all 26 FIT dates. A move is accepted only if the objective drops. Grids:
+    - base_hbp {0.01, 0.0015, 0.0025}
+    - early_count_foul_boost {2.05, 1.5, 1.75}
+    - base_in_play {0.23, 0.20, 0.18} (never moved without the foul term in the same pass)
+    - hr_rate_mult {1.1, 1.5, 1.856}
+    - bip_dp_rate {0.06, 0.12, 0.18}
+    - bip_roe_rate {0.012, 0.006}
+    - bip_fc_rate {0.04, 0.02}
+    - starter_short_start_prob {0.10, 0.06, 0.14}
+    - shelled hook {off, (start 4, weight 1.0), (start 5, weight 1.0)}
+    - pickoff_rate {0, 0.01}
+    - About 36 runs.
+  - **Hitter-prop calibration.** With the chosen config, re-fit the 19 hitter-prop maps on FIT with the `mlb-hr-prop-calibration` procedure.
+  - **SHIP only if every check holds on VALIDATION (200 sims, read once)**, combined config + re-fit maps vs production config + production maps:
+    - (a) objective >= 20% lower than production's;
+    - (b) no fitted moment's standardized error grows by more than 1.0;
+    - (c) starter |SO|, |H|, |BB|, |ER| bias each worsen by <= 0.10;
+    - (d) runs/game |gap| <= max(0.30, production's);
+    - (e) pooled served hitter-prop log-loss over the 19 keys is no worse than production's.
+    - Otherwise ship NOTHING.
+  - **Ship mechanics.**
+    - pitch-model forward overrides (base_hbp, early_count_foul_boost, base_in_play, hr_rate_mult);
+    - manager forward overrides (short start, shelled hook, pickoff_rate);
+    - models.py defaults for the bip rates;
+    - simulate.py pickoff code (default-off, already proven byte-identical);
+    - the hitter-prop and HR calibration files;
+    - then a fleet ff, verified on production's next sim against replays at both configs.
+    - The vendor code changes also go upstream (PR to mostgood1/MLB-BettingV2).
+- Goal: One joint calibration of the coupled MLB engine levers (HBP, pitch mix + foul term, HR multiplier, starter hook incl. shelled hook, double-play / error / fielder's-choice rates, pickoffs) fitted on the 26 replay dates and judged ONCE on the fresh leak-free as-of set (05-30..06-14, lane mlb-asof-roster-rebuild) -- admitted only if that set passes its fidelity gate -- shipped only if every fitted moment improves on production and every out-of-fit guard holds, then verified on production's next sim
+- Files: scripts/mlb_strikeout_decomposition.py, scripts/mlb_starter_length_replay.py, vendor/mlb_bettingv2/sim_engine/simulate.py (shelled hook + pickoff + steal-block code ONLY), vendor/mlb_bettingv2/sim_engine/models.py (bip_dp_rate / bip_roe_rate / bip_fc_rate defaults ONLY), vendor/mlb_bettingv2/data/tuning/pitch_model_overrides/forward_start_2026_04_14_v1.json, vendor/mlb_bettingv2/data/tuning/manager_pitching_overrides/forward_start_2026_04_14_v1.json, tests/test_mlb_non_pa_outs.py, tests/test_mlb_starter_shell_hook.py, .syndicate/findings_2026-10-05_mlb_strikeout_bias.md
+- Hypothesis: The single-lever failures were opposing errors; fitted jointly, per-PA rates and per-start/per-game outcomes can match together
+- Falsification test: If no configuration found by the pre-registered descent beats production on every fitted moment while holding the guards on the fresh set, nothing ships
+- Verification: Pre-registered descent on tune, one read of the validation set, production's next sim matches the shipped replay
+- Blocked by: mlb-asof-roster-rebuild
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
