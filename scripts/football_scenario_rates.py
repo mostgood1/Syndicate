@@ -1036,9 +1036,91 @@ def cmd_fourth(args) -> None:
     print("conversion     " + "".join(f"{(t['conversion'][str(tb)]['p'] or 0):>8.3f} [{t['conversion'][str(tb)]['n']:>3}]" for tb in range(6)))
 
 
+# ---------------------------------------------------------------------------
+# COMPARE: a switch ON vs production (OFF), paired on the same games and seeds
+# ---------------------------------------------------------------------------
+
+def _paired_ci(deltas: List[float], reps: int = 2000, seed: int = 3) -> Tuple[float, float, float]:
+    rng = random.Random(seed)
+    n = len(deltas)
+    mean = sum(deltas) / n
+    bs = sorted(sum(deltas[rng.randrange(n)] for _ in range(n)) / n for _ in range(reps))
+    return mean, bs[int(0.025 * reps)], bs[int(0.975 * reps) - 1]
+
+
+def cmd_compare(args) -> None:
+    sport = args.sport
+    out = OUT_ROOT / sport
+    tag = "-".join(map(str, args.season_list))
+    off = _load(out / f"sim_{tag}_s{args.seeds}.jsonl")
+    on = _load(out / f"sim_{tag}_s{args.seeds}{_variant(args)}.jsonl")
+    real = _load(out / f"real_{tag}.jsonl")
+    common = sorted(set(off) & set(on) & set(real))
+    print(f"COMPARE {sport} {tag} {_variant(args) or '(no variant!)'}: OFF {len(off)}, ON {len(on)}, real {len(real)}, "
+          f"PAIRED {len(common)} games, {args.seeds} seeds each")
+    if len(common) < 20:
+        print("too few paired games for a reading")
+        return
+
+    def rows(fn) -> List[float]:
+        return [fn(g) for g in common]
+
+    lines = []
+    for label, fn in (
+        ("mean total (pts)", lambda g, s: s[g]["total_mean"]),
+        ("mean margin (home, pts)", lambda g, s: s[g]["margin_mean"]),
+        ("total SD (sim)", lambda g, s: s[g]["total_stdev"]),
+        ("margin SD (sim)", lambda g, s: s[g]["margin_stdev"]),
+        ("P(home win)", lambda g, s: s[g]["home_win_rate"]),
+    ):
+        d = rows(lambda g: fn(g, on) - fn(g, off))
+        m, lo, hi = _paired_ci(d)
+        lines.append((label, sum(rows(lambda g: fn(g, off))) / len(common), sum(rows(lambda g: fn(g, on))) / len(common), m, lo, hi))
+    # accuracy vs the actual result -- a NEGATIVE delta is an improvement
+    acc = []
+    for label, fn in (
+        ("MAE total vs actual", lambda g, s: abs(real[g]["total"] - s[g]["total_mean"])),
+        ("MAE margin vs actual", lambda g, s: abs(real[g]["margin"] - s[g]["margin_mean"])),
+        ("Brier home win", lambda g, s: (s[g]["home_win_rate"] - (1.0 if real[g]["margin"] > 0 else 0.0)) ** 2),
+    ):
+        keep = [g for g in common if not (label.startswith("Brier") and real[g]["margin"] == 0)]
+        d = [fn(g, on) - fn(g, off) for g in keep]
+        m, lo, hi = _paired_ci(d)
+        acc.append((label, sum(fn(g, off) for g in keep) / len(keep), sum(fn(g, on) for g in keep) / len(keep), m, lo, hi))
+    close = [g for g in common if real[g].get("close_total") is not None and real[g].get("close_spread") is not None]
+    if close:
+        for label, fn in (
+            ("|sim - close| total", lambda g, s: abs(s[g]["total_mean"] - real[g]["close_total"])),
+            ("|sim - close| margin", lambda g, s: abs(s[g]["margin_mean"] - real[g]["close_spread"])),
+        ):
+            d = [fn(g, on) - fn(g, off) for g in close]
+            m, lo, hi = _paired_ci(d)
+            acc.append((label, sum(fn(g, off) for g in close) / len(close), sum(fn(g, on) for g in close) / len(close), m, lo, hi))
+        ref_t = sum(abs(real[g]["total"] - real[g]["close_total"]) for g in close) / len(close)
+        ref_m = sum(abs(real[g]["margin"] - real[g]["close_spread"]) for g in close) / len(close)
+    print(f"\n{'quantity':30} {'OFF':>9} {'ON':>9} {'ON-OFF':>9} {'95% CI (paired, games)':>24}")
+    for label, a, b, m, lo, hi in lines + acc:
+        sig = "" if lo <= 0 <= hi else "  *"
+        print(f"{label:30} {a:9.3f} {b:9.3f} {m:+9.3f}   [{lo:+.3f}, {hi:+.3f}]{sig}")
+    if close:
+        print(f"{'(close) MAE total / margin':30} {ref_t:9.3f} {ref_m:9.3f}   on the same {len(close)} games")
+
+    # scenario rows: OFF vs ON vs real on the paired games
+    def tot(src: Dict[str, dict]) -> Dict[str, float]:
+        return _sum([src[g]["c_home"] for g in common] + [src[g]["c_away"] for g in common])
+    to, tn, tr = tot(off), tot(on), tot(real)
+    print(f"\n{'scenario row':34} {'real':>8} {'OFF':>8} {'ON':>8}")
+    keys = [r for r in _metric_rows(tr.keys()) if r[0] in ("S1", "S4", "S5", "S6", "S12")]
+    for rid, label, num, den in keys:
+        rr, ro, rn = _rate(tr, num, den), _rate(to, num, den), _rate(tn, num, den)
+        if rr is None or tr.get(den, 0) < 30:
+            continue
+        print(f"{rid:4} {label:29} {rr:8.3f} {_fmt(ro):>8} {_fmt(rn):>8}")
+
+
 def main(argv: Optional[List[str]] = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=("fetch", "sim", "real", "report", "fourth"))
+    ap.add_argument("cmd", choices=("fetch", "sim", "real", "report", "fourth", "compare"))
     ap.add_argument("--sport", choices=("nfl", "ncaaf"), required=True)
     ap.add_argument("--seasons", required=True)
     ap.add_argument("--seeds", type=int, default=300)
@@ -1052,7 +1134,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     args.season_list = [int(s) for s in args.seasons.split(",")]
     if 2025 in args.season_list and not os.environ.get("FOOTBALL_SCENARIO_READ_VALIDATION"):
         raise SystemExit("2025 is VALIDATION (read once, pre-registered); set FOOTBALL_SCENARIO_READ_VALIDATION=1 to read it")
-    {"fetch": cmd_fetch, "sim": cmd_sim, "real": cmd_real, "report": cmd_report, "fourth": cmd_fourth}[args.cmd](args)
+    {"fetch": cmd_fetch, "sim": cmd_sim, "real": cmd_real, "report": cmd_report, "fourth": cmd_fourth, "compare": cmd_compare}[args.cmd](args)
 
 
 if __name__ == "__main__":
