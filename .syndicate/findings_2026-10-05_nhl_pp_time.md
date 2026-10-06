@@ -152,6 +152,14 @@ Reading: C3 is the only arm that fixes PP time and keeps the team level; it is b
 Likely absorber: assist attribution (`assist_share`, position power 1.5) was fitted under the old PP
 time. Nothing enabled.
 
+## 7b. Assist-attribution re-fit on top of C3 (falsified)
+
+Fit window Nov-Dec (19 dates, 5,262 skater-games), criterion ASSISTS@0.5 + POINTS@0.5 Brier d x1e3 vs C3:
+share power 2.5 +0.33, 3.0 +0.73, 3.5 +1.17; position power 2.0 +0.35 -- none improves. Sharper
+attribution helps elite assists (-0.7..-2.1) and costs everyone else more. C3's flattening of P(A>=1)
+(bucket 0.1: 0.160 -> 0.171 vs actual 0.146; bucket 0.4: 0.437 -> 0.421 vs 0.454) is therefore not an
+attribution-sharpness effect; the next candidate is the EV on-ice goal distribution (line quality).
+
 ## 8. PK units (found, not fixed)
 
 PK1 skaters ~88% of team PK time (6.0 sim vs 2.1-2.5 real PK min/game), PK2 0.15 vs 0.42 share, skaters
