@@ -925,7 +925,8 @@ death, never life — do not invert it.
 - Verification: Findings with sub/starter shares for first vs last goals, model calibration split, and (if a fix ships) a re-grade
 - Blocked by: none
 
-### mlb-hr-prop-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+### mlb-hr-prop-calibration — CLOSED — closed 2026-10-06 — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **CLOSED 2026-10-06 (GOAL MET): the 10 re-fit hitter-prop maps shipped (5fdd5139) and served == the new map exactly (verified). File claims MOVED to lane `mlb-combined-calibration`, whose rule v2 re-fits these maps again.**
 - **VERIFIED 2026-10-06 ~00:40Z:** served p_*_cal == new map exactly on production's 23:56Z summary (36 rows/key, |diff| 0.00000 vs 0.057-0.107 for the old map). deploys.md ~00:40Z.
 - **SHIPPED 2026-10-05 23:10:15Z (fleet 5fdd5139):** 10 of 18 hitter-prop keys re-fit by the pre-registered rule; HR + 8 kept. Verification owed at the next MLB sim (deploys.md 23:10:15Z).
 - **SELECTION RULE, PRE-REGISTERED 2026-10-06 ~06:00Z before any replay** (user: "yes, do 2 and 3 and ship if they pass").
@@ -938,7 +939,7 @@ death, never life — do not invert it.
     - Otherwise keep the current map.
   - **Ship** = the changed keys' values + provenance in the two JSON files, then a fleet ff (read per sim run, no restart). Verified on production's next sim: served p_*_cal == sigmoid(a*logit(raw)+b) for the new (a, b).
 - Goal: Hitter prop probabilities the MLB board serves are calibrated on the CURRENT engine: batter P(HR>=1) and the hitter_props buckets (hits/TB/RBI/runs) re-fitted on the as-of replay (tune) against box-score outcomes and judged once on holdout, replacing the 07-17 calibrations fitted to the pre-refit engine; shipped only if holdout log-loss and calibration-in-the-large improve on the shipped engine's raw probabilities
-- Files: vendor/mlb_bettingv2/data/tuning/hitter_hr_calibration/default.json (values + provenance ONLY), vendor/mlb_bettingv2/data/tuning/hitter_props_calibration/default.json (values + provenance ONLY), scripts/mlb_hitter_prop_replay.py (NEW), .syndicate/findings_2026-10-06_mlb_hr_prop_calibration.md (NEW)
+- Files: (none held — claims moved to mlb-combined-calibration on close)
 - Hypothesis: The 07-17 affine-logit HR calibration (a=0.805,b=0.032) compensates the halved HR rate; once hr_rate_mult is fixed it over-inflates, and the raw corrected probabilities are closer to calibrated than calibrated ones
 - Falsification test: If on the shipped engine the raw P(HR>=1) is already calibrated (calibration-in-the-large within CI of 0), a re-fit ships nothing and identity stays
 - Verification: Replay per-batter P(HR>=1) and hitter buckets vs box outcomes, tune fit, holdout read once; production's next sim serves the re-fitted values
@@ -1074,7 +1075,7 @@ death, never life — do not invert it.
     - then a fleet ff, verified on production's next sim against replays at both configs.
     - The vendor code changes also go upstream (PR to mostgood1/MLB-BettingV2).
 - Goal: One joint calibration of the coupled MLB engine levers (HBP, pitch mix + foul term, HR multiplier, starter hook incl. shelled hook, double-play / error / fielder's-choice rates, pickoffs) fitted on the 26 replay dates and judged ONCE on the fresh leak-free as-of set (05-30..06-14, lane mlb-asof-roster-rebuild) -- admitted only if that set passes its fidelity gate -- shipped only if every fitted moment improves on production and every out-of-fit guard holds, then verified on production's next sim
-- Files: scripts/mlb_strikeout_decomposition.py, scripts/mlb_starter_length_replay.py, vendor/mlb_bettingv2/sim_engine/simulate.py (shelled hook + pickoff + steal-block code ONLY), vendor/mlb_bettingv2/sim_engine/models.py (bip_dp_rate / bip_roe_rate / bip_fc_rate defaults ONLY), vendor/mlb_bettingv2/data/tuning/pitch_model_overrides/forward_start_2026_04_14_v1.json, vendor/mlb_bettingv2/data/tuning/manager_pitching_overrides/forward_start_2026_04_14_v1.json, tests/test_mlb_non_pa_outs.py, tests/test_mlb_starter_shell_hook.py, .syndicate/findings_2026-10-05_mlb_strikeout_bias.md
+- Files: scripts/mlb_strikeout_decomposition.py, scripts/mlb_starter_length_replay.py, vendor/mlb_bettingv2/sim_engine/simulate.py (shelled hook + pickoff + steal-block code ONLY), vendor/mlb_bettingv2/sim_engine/models.py (bip_dp_rate / bip_roe_rate / bip_fc_rate defaults ONLY), vendor/mlb_bettingv2/data/tuning/pitch_model_overrides/forward_start_2026_04_14_v1.json, vendor/mlb_bettingv2/data/tuning/manager_pitching_overrides/forward_start_2026_04_14_v1.json, tests/test_mlb_non_pa_outs.py, tests/test_mlb_starter_shell_hook.py, .syndicate/findings_2026-10-05_mlb_strikeout_bias.md, vendor/mlb_bettingv2/data/tuning/hitter_hr_calibration/default.json (values + provenance ONLY), vendor/mlb_bettingv2/data/tuning/hitter_props_calibration/default.json (values + provenance ONLY), scripts/mlb_hitter_prop_replay.py
 - Hypothesis: The single-lever failures were opposing errors; fitted jointly, per-PA rates and per-start/per-game outcomes can match together
 - Falsification test: If no configuration found by the pre-registered descent beats production on every fitted moment while holding the guards on the fresh set, nothing ships
 - Verification: Pre-registered descent on tune, one read of the validation set, production's next sim matches the shipped replay
