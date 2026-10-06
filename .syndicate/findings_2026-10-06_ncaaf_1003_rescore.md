@@ -1,4 +1,9 @@
-# NCAAF 2026-10-03 re-score: the 49 games are CONFIRMED; the brier VALUES are not reproducible from available data
+# NCAAF 2026-10-03 re-score: FULLY REPRODUCED — 49 games and all six brier values, exactly
+
+**SUPERSEDED HEADLINE, kept because the path matters:** this file first concluded the brier values were
+"not reproducible from available data". That was true of the LEDGER AND THE SERVED ARTIFACT ALONE and
+false of the problem — an external finals source closed it. The reasoning that follows is unchanged and
+correct; only the verdict on the briers is replaced, at the bottom.
 
 Lane `ncaaf-1003-rescore-confirm`, 2026-10-06. Ledger fetched from the local fleet
 (`ncaaf_source/data/live_gameline_ledger/live_gameline_ledger_2026-10-03.jsonl`,
@@ -53,14 +58,32 @@ score is not the final score, because the collector stops snapshotting before ma
 end, so the proxy calls some winners losers. It degrades model and market together, which
 is what a bad label does and what a row-selection difference would not.
 
-## What would be needed, and the caveat on it
+## RESOLVED — external finals reproduce every figure EXACTLY `[2026-10-06, lane ncaaf-1003-external-finals]`
 
-An external NCAAF results source for 2026-10-03, keyed to these `event_id`s. That is a
-DIFFERENT finals population from the board's, which is the splice
-`rescore_live_gameline_date.py` refuses by design (`--finals-population statsapi` exists
-precisely to force the caller to declare it). So a brier recomputed that way would not be
-comparable to the neighbouring dates in the series, and must not be pooled with them.
+Source: ESPN's public FBS scoreboard for 2026-10-03 (`groups=80`), 54 events, **all 54 final**, against the
+ledger's 54 distinct `event_id`s. Join on normalised team display names: **49/49 games matched, 0 unmatched,
+0 orientation flips.**
 
-`rescore_live_gameline_date.py` cannot do this date at all: `LEDGER_PATH` and the
-`STATSAPI` schedule URL are both hardcoded to MLB, and `--sport` says so ("only mlb is
-wired").
+| cut | ESPN-population model / market | retained model / market | n | verdict |
+|---|---|---|---|---|
+| all_records | 0.12358 / 0.11869 | 0.12358 / 0.11869 | 2,472 = 2,472 | **EXACT** |
+| fresh_quotes_only | 0.12688 / 0.12189 | 0.12688 / 0.12189 | 2,106 = 2,106 | **EXACT** |
+| priceable_only | 0.14260 / 0.13192 | 0.14260 / 0.13192 | 1,067 = 1,067 | **EXACT** |
+
+Distance from the external recomputation to the retained figure: **0.00000**. To the refuted
+last-captured-score proxy: 0.06893. **So the mislabelled-outcome diagnosis above was right** — the proxy's
+identical-n-but-worse-brier signature was exactly that, and nothing was wrong with the row selection.
+
+**AND THE POPULATION CAVEAT DOES NOT BITE FOR THIS DATE, which is a measured result rather than an
+assumption.** I had warned that an external finals set would be a different population and so unpoolable.
+Six brier values reproducing to 5dp over 2,472 rows with identical n can only happen if the outcome vectors
+are identical, so for NCAAF 2026-10-03 the board's finals and ESPN's coincide exactly. The retained row is
+therefore independently verified END TO END — `records_considered`, game count, all three cuts' n, and all
+six briers — and the NCAAF pool's 198 -> 249 game jump is fully corroborated.
+
+Home-win rate over the 49 games: **28/49 = 0.5714**.
+
+`rescore_live_gameline_date.py` still cannot serve this date (`LEDGER_PATH` and the StatsAPI schedule URL
+are hardcoded to MLB, and `--sport` says "only mlb is wired"), so the reproduction above was done by hand
+against the raw ledger. Wiring an NCAAF finals adapter into that tool is the obvious follow-up and has no
+lane.
