@@ -132,3 +132,12 @@ def test_ratings_file_is_dated_and_readable_by_the_season_reader(tmp_path, monke
     se._TABLES_MEMO.clear()
     rows = se.readiness_rows("ncaab", dt.date(2026, 10, 7))
     assert rows[0]["exists"] is True and rows[0]["row_count"] == 2
+
+
+def test_fleet_supervisor_runs_the_producer_daily_without_publish():
+    from scripts import local_production as lp
+
+    jobs = {job.name: job for job in lp.SCHEDULED_JOBS}
+    job = jobs["ncaab-team-ratings"]
+    assert (job.hour, job.minute, job.weekday) == (10, 45, None)
+    assert job.argv == ("scripts/build_ncaab_team_ratings.py",)

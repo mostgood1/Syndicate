@@ -951,6 +951,13 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # movement weight only when this reads `momentum`/`reversion` on >= 20 games.
     # 10:30Z: after the night's games are final and after the 09:15 backup.
     ScheduledJob("movement-by-sport", 10, 30, ("scripts/consensus_movement_by_sport.py",)),
+    # `ncaab-team-ratings` (lane `intelligence-evidence-coverage`, 2026-10-07,
+    # user "build the NCAAB ratings producer"): adjusted O/D/tempo from ESPN box
+    # scores into ncaab_source/data/processed/team_ratings_<season>_asof_*.csv,
+    # incremental (only new finals are fetched). 10:45Z: after the night's
+    # games are final; in the offseason it re-reads a complete season and
+    # fetches nothing.
+    ScheduledJob("ncaab-team-ratings", 10, 45, ("scripts/build_ncaab_team_ratings.py",)),
 )
 
 
