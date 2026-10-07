@@ -47453,3 +47453,25 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - 10-11: 15:27:20Z, 125 props
 - **Spelling-miss check.** 2 of the 14 newly dropped share a surname with someone on the new roster, and both are different players: Gonçalo Costa (vs Gu/João/Diogo/Alberto Costa), Pedro Gonçalves (vs João/Francisco/Flávio Gonçalves). Neither has a `players_2026.csv` row. Pedro Gonçalves is not on Sporting's current ESPN roster; nothing here shows whether he left or ESPN omits him.
 - **Result:** served 120 -> 130, equal to the offline reproduction. Prop accuracy effect not measured.
+
+## 2026-10-07 ~17:05Z (12:05 PM CT) -- READING: served belgian_pro_league departed filter on the refreshed roster; ALL SEVEN roster-filtered leagues now read (lane `soccer-roster-refresh`)
+
+- **No prior prediction.** The offline number below was computed after the served builds existed, so it is a REPRODUCTION. Run at `nice -n 19`.
+- **Offline A/B** (fleet code, the fleet's current player files; only the roster varies): dropped July **92** -> new **162**. The new roster rescues 1 more player and stops rescuing 71. The roster's row count is nearly flat (555 -> 550): departed players were replaced by new signings.
+- **Served** (builds after the belgian roster write, 00:12:13Z): all read dropped **162**, rows 569, per_club 18/18:
+  - 10-09: 14:59:10Z, 33 props
+  - 10-11: 15:43:34Z, 178 props
+  - 10-10: 16:38:53Z, 171 props
+- **Spelling-miss check.** 5 of the 71 share a surname with someone on the new roster, and all 5 are different players: Atsuki/Ryotaro Ito (vs Joël/Junya Ito), Fedde/Tobe Leysen, Joseph/Davis Opoku, Yoann Cisse (vs Ibrahima Cisse / Isaac Cissé). None of the 71 has a `players_2026.csv` row.
+- **Summary, dropped July -> new, served = offline in every league:**
+  - bundesliga 193 -> 169
+  - ligue_1 245 -> 256
+  - la_liga 179 -> 188
+  - epl 92 -> 140
+  - serie_a 153 -> 225
+  - championship 81 -> 93
+  - eredivisie 70 -> 131
+  - primeira_liga 120 -> 130
+  - belgian 92 -> 162
+  - MLS is single-season and has no departed filter.
+- The first four leagues matched a PREDICTION; eredivisie, primeira and belgian were reproductions. Prop accuracy effect not measured.
