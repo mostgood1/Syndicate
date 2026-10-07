@@ -2299,17 +2299,25 @@ def _board_candidate_rows(selected_date: str, *, limit: int = 12) -> list[dict[s
     Calling that shared function directly means Home and the Board can no
     longer silently disagree about what "cached" means for the same date.
     """
-    try:
-        from syndicate.blueprints.intelligence import _intelligence_page_payload
-        from syndicate.blueprints.intelligence import _cached_intelligence_response_with_source
-    except Exception:
-        return []
+    # ONE LIST (lane intelligence-evidence-coverage, user 2026-10-07): the
+    # Layer 2 board the /intelligence page and Ask already read. The legacy
+    # cascade below served 12 MLB rows reading "Under 0" on 10-07. It stays as
+    # the fallback for a date the combined board has nothing for.
+    from syndicate.features.intelligence_layer2_view import layer2_board_view
 
-    try:
-        payload = _intelligence_page_payload(selected_date, force_refresh=False)
-        response, _source = _cached_intelligence_response_with_source(payload, force_refresh=False)
-    except Exception:
-        return []
+    response: Any = layer2_board_view(selected_date)
+    if not response:
+        try:
+            from syndicate.blueprints.intelligence import _intelligence_page_payload
+            from syndicate.blueprints.intelligence import _cached_intelligence_response_with_source
+        except Exception:
+            return []
+
+        try:
+            payload = _intelligence_page_payload(selected_date, force_refresh=False)
+            response, _source = _cached_intelligence_response_with_source(payload, force_refresh=False)
+        except Exception:
+            return []
     if not isinstance(response, dict):
         return []
 
@@ -2343,6 +2351,8 @@ def _board_candidate_rows(selected_date: str, *, limit: int = 12) -> list[dict[s
                 "is_live": bool(item.get("is_live")),
                 "href": str(item.get("href") or "").strip() or None,
                 "score": abs(edge_fraction) * 150.0,
+                "source": _safe_text(item.get("source"), "") or None,
+                "pick_id": item.get("pick_id"),
             }
         )
         if len(rows) >= limit:
@@ -3518,11 +3528,19 @@ def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str,
     # meaningfully narrower than the board's real candidate-generation path
     # (it can find zero game bets/props on slates where the board finds
     # several), so relying on it alone understates what's actually on offer.
-    top_edges = sorted(
-        [*game_bets, *prop_rows, *_board_candidate_rows(selected_date, limit=16)],
-        key=lambda row: _pct_number(row.get("edge")) or 0.0,
-        reverse=True,
-    )[:12]
+    board_rows = _board_candidate_rows(selected_date, limit=16)
+    if any(str(row.get("source") or "").startswith("layer2") for row in board_rows):
+        # ONE LIST (lane intelligence-evidence-coverage, user 2026-10-07): when
+        # the Layer 2 board has rows, the rail IS the board's top -- in the
+        # board's own order. Re-ranking them against this page's legacy game
+        # bets/props by raw edge put rows reading "Under 0" on top (10-07).
+        top_edges = board_rows[:12]
+    else:
+        top_edges = sorted(
+            [*game_bets, *prop_rows, *board_rows],
+            key=lambda row: _pct_number(row.get("edge")) or 0.0,
+            reverse=True,
+        )[:12]
     summary_cards = [
         {"label": "Board date", "value": selected_date, "meta": f"Polled {_format_home_timestamp(polled_at)}"},
         {"label": "Live sports", "value": str(live_sports), "meta": f"{len(live_watch)} game reads surfaced"},

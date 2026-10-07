@@ -3049,6 +3049,9 @@ def intelligence_slate_phases_api():
     return jsonify(read_published_phases(read=read_json_file))
 
 
+_STATUS_PICK_LIMIT = 150
+
+
 @intelligence_bp.get("/api/intelligence/status")
 def intelligence_status_api():
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
@@ -3084,6 +3087,15 @@ def intelligence_status_api():
                 status = queued_state
             else:
                 status = _empty_default_intelligence_response()
+    # ONE LIST (lane intelligence-evidence-coverage, user 2026-10-07, approach
+    # A): the pick lists come from the Layer 2 board every other surface reads
+    # (`read_combined_intelligence_response`); the build/freshness fields stay
+    # the worker state's. Legacy picks ride along as `legacy_recommendations`
+    # for the comparison window. Capped: this payload echoes the state twice.
+    if isinstance(status, dict):
+        from syndicate.features.intelligence_layer2_view import layer2_board_view, overlay_pick_lists
+
+        status = overlay_pick_lists(status, layer2_board_view(selected_date, limit=_STATUS_PICK_LIMIT))
     state_snapshot = dict(status)
     response_payload = {"ok": True, "status": state_snapshot}
     if isinstance(status, dict) and _response_has_board_content(status):
