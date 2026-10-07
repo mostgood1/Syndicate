@@ -401,6 +401,19 @@ drives/team-game +3.65 -> +6.06, ppd_weak -0.55 -> -2.95.
 4. **2025 is now READ for NFL pregame.** Any next NFL candidate needs a different held-out set (2026
    weeks to date, or a fresh pre-registered split); 2025 cannot be re-used as a clean gate.
 
+### NFL LIVE replay, v1 candidate, 2025 (INFORMATIONAL -- NFL 2025 already spent by the v1 pregame read)
+
+260 games, 1,040 mid-drive states (4/game), 300 sims/state/arm; refused 48 states (`degenerate_ratings`,
+identical in both arms). Candidate - production, game-clustered: L1 Brier -0.0010 [-0.0057, +0.0037]
+FAIL (tol), L2 margin abs err +0.018 [-0.139, +0.194] FAIL (tol), L3 total abs err -0.078
+[-0.239, +0.101] PASS. Production live: Brier 0.163, margin err 7.16, total err 7.54. In-game the v1
+candidate is neutral-to-slightly-better; the pregame over-dispersion matters less once the score is known.
+
+v2 runs launched 2026-10-07 ~02:2xZ (both descents, `refit_v2/`). NCAAF v2 validation + live replay
+queued behind its descent. 142 production-arm NCAAF 2025 game sims from the paused v1 read were carried
+into the v2 cache (deterministic, never analysed). NFL v2 validation waits for >= 128 completed 2026
+games (pre-registered).
+
 H1 prediction (|delta total| < 1.0) FAILED (-1.12). H2 prediction (total in [-0.5, +1.5]) held. Both
 fixes work mechanically (S12 after-half 25.0; S5 4th-down rows inside the real CI) and neither moves
 accuracy alone -- each moves the level or home edge away from the close, as the re-fit design expects.
