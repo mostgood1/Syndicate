@@ -316,6 +316,22 @@ team total. Passing yards remains the only market beating production, corrected 
 book. Next design candidates (each to be pre-registered): per-player carry-share quality (recency weighting,
 injury/availability), and using attribution only where it has shown information (QB passing yards).
 
+### NCAAF Phase B (FIT 2024) — 443 games, 18,310 graded rows, 300 seeds, production NCAAF engine (2026-10-07)
+
+vs the de-vigged BOOK only (production has no 2024 NCAAF prop model input). Log-loss, attr - book, slope attr / book:
+pass_td n 1,932 +0.052 [+0.027, +0.079] 0.33 / 0.99; **pass_yds n 2,194 +0.182 [+0.125, +0.243] 0.03 / 0.98**;
+rec_yds n 7,748 +0.102 [+0.075, +0.129] 0.13 / 0.97; receptions n 1,929 +0.120 [+0.087, +0.155] 0.25 / 1.20;
+rush_att n 166 +0.458 [+0.266, +0.682] 0.05 / 1.14; rush_yds n 4,341 +0.218 [+0.168, +0.278] -0.03 / 1.01.
+Construction (per team-game, sim vs parsed real): pass att 30.9 vs 30.1, pass yds 232.1 vs 222.2, rush att
+32.7 vs 33.9, rush yds 132.3 vs 153.0 -- team volume is close (no run-share correction needed).
+Drops: anytime TD 36,206 one-sided (OddsAPI NCAAF TD props are yes-only -> ungradable by the two-sided rule);
+player side unknown 6,344 / ambiguous 1,631; one-sided 10,342; outside the as-of task set 11,616.
+**Reading:** every market loses to the book with calibration slopes near ZERO -- including passing yards
+(0.03), the one market that carried information in the NFL (0.52). Team volume is right, so the defect is not
+volume: the NCAAF engine's game script, or the NCAAF player inputs (initial+last keys, parsed shares), carry no
+per-player information here. Per the pre-registration Phase C would compare against production on 2025; with no
+FIT market showing information, the recommendation is NOT to spend the NCAAF 2025 props read.
+
 ### NFL Phase B with E1(H=2) shares + (c, r) = (0.7, 0.1) — same 366 games / 122,955 rows (2026-10-07)
 
 attr - prod (game-clustered 95% CI), three runs side by side: uncorrected / +run-share / **+shares**:
