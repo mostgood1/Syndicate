@@ -30,7 +30,36 @@ def _board_score(item: Mapping[str, Any]) -> float | None:
     return None
 
 
+_VIEW_MEMO: dict[tuple, tuple[float, dict[str, Any]]] = {}
+_VIEW_TTL_SECONDS = 120.0
+
+
 def layer2_board_view(selected_date: str | None = None, *, sport: str = "all", limit: int | None = None) -> dict[str, Any]:
+    """Memoised per worker for `_VIEW_TTL_SECONDS`: Home measured 15.5 s before
+    this view and 50-61 s after it (2026-10-07 20:31Z), so the combined read is
+    not cheap on web. The board changes per build (tens of minutes), so a
+    two-minute memo costs no freshness that matters."""
+    import time
+
+    key = (selected_date, sport or "all", limit)
+    hit = _VIEW_MEMO.get(key)
+    now = time.monotonic()
+    if hit is not None and now - hit[0] < _VIEW_TTL_SECONDS:
+        return hit[1]
+    started = time.perf_counter()
+    view = _layer2_board_view_uncached(selected_date, sport=sport, limit=limit)
+    print(
+        f"[layer2_view] READ date={selected_date} sport={sport} limit={limit} rows={view.get('candidate_count', 0)} "
+        f"elapsed_s={time.perf_counter() - started:.2f}",
+        flush=True,
+    )
+    if len(_VIEW_MEMO) > 16:
+        _VIEW_MEMO.clear()
+    _VIEW_MEMO[key] = (now, view)
+    return view
+
+
+def _layer2_board_view_uncached(selected_date: str | None = None, *, sport: str = "all", limit: int | None = None) -> dict[str, Any]:
     try:
         from pipeline.intelligence_state import read_combined_intelligence_response
 

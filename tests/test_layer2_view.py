@@ -16,6 +16,8 @@ _L2 = [
 def combined(monkeypatch):
     import pipeline.intelligence_state as state
 
+    view_mod._VIEW_MEMO.clear()
+
     calls = []
 
     def fake(dates=None, *, sport="all", limit=None, _warm=False):
@@ -37,12 +39,16 @@ def test_view_reads_the_combined_layer2_board(combined):
 def test_view_is_empty_when_the_board_has_nothing(monkeypatch):
     import pipeline.intelligence_state as state
 
+    view_mod._VIEW_MEMO.clear()
+
     monkeypatch.setattr(state, "read_combined_intelligence_response", lambda *a, **k: {"response": {"top_opportunities": []}})
     assert view_mod.layer2_board_view("2026-10-07") == {}
 
 
 def test_view_never_raises(monkeypatch):
     import pipeline.intelligence_state as state
+
+    view_mod._VIEW_MEMO.clear()
 
     def boom(*a, **k):
         raise RuntimeError("keyvalue down")
@@ -80,6 +86,8 @@ def test_home_board_rows_come_from_layer2_and_carry_source(combined):
 
 def test_view_is_in_board_order_layer2_first(monkeypatch):
     import pipeline.intelligence_state as state
+
+    view_mod._VIEW_MEMO.clear()
 
     rows = [
         {"sport_slug": "nhl", "source": "data/props/player_props_lines/date=2026-10-07/oddsapi.csv", "candidate_type": "steam", "edge": 0.318},
