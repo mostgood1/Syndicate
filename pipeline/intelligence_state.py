@@ -1720,6 +1720,28 @@ def _consume_sport_segment_log_threshold_sec() -> float:
     return 10.0
 
 
+def legacy_candidate_pool_enabled() -> bool:
+    """Whether the worker still builds the LEGACY intelligence candidate pool.
+
+    ONE LIST (lane intelligence-evidence-coverage; user 2026-10-07: "we
+    shouldnt have seperate lists being generated", then "continue with ...
+    retiring the legacy build"). The Layer 2 shortlist is the pick list; the
+    legacy collection (`collect_candidates*`, ~120-656 s per build, `#602`)
+    feeds no order and, with L2A on, no served board row except 22 single-book
+    steam rows the 10-02 decision ("NOTHING should reference just a single
+    book") had already replaced with Layer 2's consensus `steam` flag.
+
+    DEFAULT ON (absent = keep building): retiring it is
+    `SYNDICATE_LEGACY_CANDIDATE_POOL=0`. INTERLOCK: it stays ON whenever
+    `board_l2a_fallback_enabled()` is off, because the combined board then
+    serves ONLY legacy rows and retiring the pool would empty it.
+    """
+    raw = str(os.environ.get("SYNDICATE_LEGACY_CANDIDATE_POOL") or "").strip().lower()
+    if raw in {"0", "false", "no", "off"}:
+        return not board_l2a_fallback_enabled()
+    return True
+
+
 def board_l2a_fallback_enabled() -> bool:
     """Whether the board may fall back to persisted L2-A cards (`#268`).
 
@@ -3417,6 +3439,36 @@ def _count_nonblank_lines(path: Path) -> int:
         return sum(1 for line in handle if line.strip())
 
 
+def _pool_from_layer2_shortlist(candidate_pool: Mapping[str, Any], selected_date: str) -> dict[str, Any]:
+    """The candidate pool with its candidates replaced by the date's Layer 2 cards.
+
+    Used only when the legacy pool is retired. Without it the per-date state
+    would carry 0 candidates, which (a) `write_latest_intelligence_state`'s
+    empty-over-good guard refuses for up to 30 min, freezing the state, and
+    (b) triggers the rollover probe -- a whole second build for tomorrow --
+    on every dateless cycle. Cards are kept for games on `selected_date`
+    (US Eastern), the same today-only rule the legacy state had (`#353`).
+    """
+    pool = dict(candidate_pool or {})
+    try:
+        from syndicate.features.shared.layer2_ledger import eastern_game_date
+
+        shortlist = read_layer2_shortlist(selected_date) or {}
+        cards = [
+            dict(card)
+            for card in (shortlist.get("cards") or [])
+            if isinstance(card, Mapping) and eastern_game_date(card) == selected_date
+        ]
+    except Exception as exc:
+        print(f"[intelligence_state] LAYER2_POOL_READ_FAILED date={selected_date} error={type(exc).__name__}: {exc}", flush=True)
+        cards = []
+    pool["candidates"] = cards
+    pool["candidate_count"] = len(cards)
+    pool["pick_list_source"] = "layer2_shortlist"
+    print(f"[intelligence_state] STATE_FROM_LAYER2 date={selected_date} cards={len(cards)}", flush=True)
+    return pool
+
+
 def maybe_record_layer2_board_to_evaluation_ledger(selected_date: str) -> dict[str, Any] | None:
     """Record the Layer 2 shortlist's picks for `selected_date` (first sightings only).
 
@@ -3504,6 +3556,10 @@ def maybe_record_board_state_to_evaluation_ledger(state: dict[str, Any]) -> dict
     # independently of the legacy `source_fingerprint` checked below.
     if selected_date:
         maybe_record_layer2_board_to_evaluation_ledger(selected_date)
+    if not legacy_candidate_pool_enabled():
+        # The state's picks ARE the Layer 2 shortlist now; recording them here
+        # too would put every pick in the ledger twice under two identities.
+        return None
     fingerprint = str(state.get("source_fingerprint") or "").strip()
     if not selected_date or not fingerprint:
         return None
@@ -6686,7 +6742,7 @@ class IntelligenceStateService:
             _t_advanced = time.monotonic()
             _collected = 0
             try:
-                _rows = collect_candidates([sport_row], preferences, odds_history_by_sport) or []
+                _rows = (collect_candidates([sport_row], preferences, odds_history_by_sport) or []) if legacy_candidate_pool_enabled() else []
                 _collected = len(_rows)
                 streamed_candidates.extend(_rows)
             except Exception as exc:
@@ -6907,12 +6963,18 @@ class IntelligenceStateService:
         # OFF by default: `SYNDICATE_CANDIDATE_COLLECTION_PROFILE=all` (or a
         # date). ~1.3-2x on a 280s stage is 90-280s added, so this is a
         # turn-on-read-turn-off diagnostic, never telemetry.
+        if not legacy_candidate_pool_enabled():
+            print(
+                f"[intelligence_state] LEGACY_POOL_SKIPPED date={selected_date} "
+                "(SYNDICATE_LEGACY_CANDIDATE_POOL=0; the state is filled from the Layer 2 shortlist)",
+                flush=True,
+            )
         with profile_branch(
             "SYNDICATE_CANDIDATE_COLLECTION_PROFILE",
             str(selected_date or "all"),
             label="candidate_collection",
         ):
-            raw_candidates = _span(
+            raw_candidates = [] if not legacy_candidate_pool_enabled() else _span(
                 "candidate_collection_with_fallback",
                 _profile_stage,
                 "candidate_collection_with_fallback",
@@ -7053,7 +7115,7 @@ class IntelligenceStateService:
         manifests = self._available_sport_manifests(selected_date)
         candidate_pools: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
         manifest_shard_keys = {sport_slug: resolve_current_shard_key(sport_slug, selected_date) for sport_slug in manifests}
-        for sport_slug, manifest in manifests.items():
+        for sport_slug, manifest in (manifests.items() if legacy_candidate_pool_enabled() else ()):
             if _abort_build_candidate_pool_if_memory_critical(f"manifest_loop_sport={sport_slug}"):
                 return self._memory_guard_aborted_pool(selected_date, source_fingerprint, f"manifest_loop_sport={sport_slug}")
             try:
@@ -8533,6 +8595,8 @@ class IntelligenceStateService:
 
         candidate_pool = _timed_candidate_pool(self._build_candidate_pool, selected_date, source_fingerprint)
         self._refresh_layer2_after_build_abort(selected_date, candidate_pool)
+        if not legacy_candidate_pool_enabled():
+            candidate_pool = _pool_from_layer2_shortlist(candidate_pool, selected_date)
         candidate_pool_count = int(candidate_pool.get("candidate_count") or 0)
         # 2026-07-25: everything below this point (through the final return)
         # was only ever traced via logger.info/_log_stage_timing -- confirmed
@@ -8604,7 +8668,15 @@ class IntelligenceStateService:
             flush=True,
         )
 
-        ranked_candidates = _profile_stage("candidate_scoring", _balanced_recommendation_order, candidates)
+        if candidate_pool.get("pick_list_source") == "layer2_shortlist":
+            from syndicate.features.intelligence_layer2_view import _board_score
+
+            ranked_candidates = sorted(
+                candidates,
+                key=lambda item: -(_board_score(item) if _board_score(item) is not None else float("-inf")),
+            )
+        else:
+            ranked_candidates = _profile_stage("candidate_scoring", _balanced_recommendation_order, candidates)
         print(f"[intelligence_state] CANDIDATES_RANKED count={len(ranked_candidates)}", flush=True)
         if ranked_candidates:
             top_candidates = [dict(candidate) for candidate in ranked_candidates if isinstance(candidate, Mapping)]

@@ -147,3 +147,45 @@ def test_recorder_failure_never_raises(recorder, monkeypatch):
     monkeypatch.setenv("SYNDICATE_LEDGER_RECORD_LAYER2", "1")
     monkeypatch.setattr(state, "read_layer2_shortlist", lambda date: (_ for _ in ()).throw(RuntimeError("boom")))
     assert state.maybe_record_layer2_board_to_evaluation_ledger("2026-10-07") is None
+
+
+# ------------------------------------------------------- retiring the legacy pool
+
+def test_legacy_pool_defaults_on(monkeypatch):
+    import pipeline.intelligence_state as state
+
+    monkeypatch.delenv("SYNDICATE_LEGACY_CANDIDATE_POOL", raising=False)
+    assert state.legacy_candidate_pool_enabled() is True
+
+
+def test_legacy_pool_off_only_when_layer2_serves_the_board(monkeypatch):
+    import pipeline.intelligence_state as state
+
+    monkeypatch.setenv("SYNDICATE_LEGACY_CANDIDATE_POOL", "0")
+    monkeypatch.setattr(state, "board_l2a_fallback_enabled", lambda: True)
+    assert state.legacy_candidate_pool_enabled() is False
+    # INTERLOCK: with L2A off the combined board serves only legacy rows.
+    monkeypatch.setattr(state, "board_l2a_fallback_enabled", lambda: False)
+    assert state.legacy_candidate_pool_enabled() is True
+
+
+def test_state_pool_from_layer2_keeps_the_dates_games(monkeypatch):
+    import pipeline.intelligence_state as state
+
+    tomorrow = dict(_CARD, commence_time="2026-10-08T23:30:00Z", player_name="Other")
+    monkeypatch.setattr(state, "read_layer2_shortlist", lambda date: {"cards": [_CARD, tomorrow]})
+    pool = state._pool_from_layer2_shortlist({"candidates": [], "candidate_count": 0, "layer2_shortlist": {"rows": []}}, "2026-10-07")
+    assert pool["candidate_count"] == 1 and pool["candidates"][0]["player_name"] == "Naz Hillmon"
+    assert pool["pick_list_source"] == "layer2_shortlist" and "layer2_shortlist" in pool
+
+
+def test_legacy_ledger_feed_stands_down_when_the_pool_is_retired(recorder, monkeypatch):
+    state, calls = recorder
+    monkeypatch.setenv("SYNDICATE_LEDGER_RECORD_LAYER2", "1")
+    monkeypatch.setattr(state, "intelligence_ledger_recording_enabled", lambda: True)
+    monkeypatch.setattr(state, "legacy_candidate_pool_enabled", lambda: False)
+    legacy_calls = []
+    monkeypatch.setattr(state, "_canonical_board_state_last_recorded_fingerprint", lambda d: legacy_calls.append(d))
+    out = state.maybe_record_board_state_to_evaluation_ledger({"selected_date": "2026-10-07", "source_fingerprint": "fp", "ranked_all": [{"x": 1}]})
+    assert out is None and legacy_calls == []
+    assert len(calls) == 1 and calls[0]["query"]["query_type"] == "layer2_board_state"
