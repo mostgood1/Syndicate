@@ -47090,3 +47090,16 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - **V1 MET (00:28Z).** On ~/Syndicate at 2bb481ef, GameConfig() and the forward override files resolve to exactly the shipped values (all 16 defaults, 3 pitch, 4 manager; hr map a=0.4086 b=-1.0296).
 - **V2 OWED (pre-registered).** Production's next MLB sims: served starter outs_mean vs replays of their own roster_objs at the new config (A, fleet tree) and the old config (B, 61edcc04 copy), 4000 sims. MET if mean |served - A| < mean |served - B|.
 - verify: V2 reading on the first post-00:28Z MLB sims (a watcher is armed).
+
+## 2026-10-07 ~01:00Z (8:00 PM CT, 10-06) -- READING: the departed-player filter on the refreshed soccer rosters (lane `soccer-roster-refresh`, follow-up to the 22:38:35Z entry)
+
+- **Served:** no bundesliga build since the roster write (00:12:56Z). The newest build (23:13:45Z, July roster) reads `player_substrate.dropped` 193.
+- **Offline A/B** (fleet code 61edcc04, the fleet's player files as they are now, `_load_player_rows`; the only variable is the roster file, July seed vs new). Players dropped, July -> new:
+  - bundesliga 193 -> **169** (34 rescued, 10 newly dropped)
+  - ligue_1 245 -> 256 (+17 / -28)
+  - la_liga 179 -> 188 (+23 / -32)
+  - championship 81 -> 93 (+16 / -28)
+  - epl 92 -> **140** (+0 / -48)
+  - serie_a 153 -> **225** (+0 / -72)
+- **Checked before calling it a regression.** The 48 EPL newly dropped include Romero, Watkins, Rodri, Martinelli, Vicario, Trossard and Curtis Jones. None has a row in `players_2026.csv` (5+ rounds in) and none is on any club in ESPN's current EPL roster. For example, Spurs' 29 now include Robertson, Tonali, Marmoush and Dúbravka, with no Romero or Vicario. By both sources these are departures that the July roster kept rescuing; the filter now removes them, as designed.
+- **Owed:** the served number on the next bundesliga build (prediction: 169), and whether the departures' freed share improves the listed props. Today's roster-only replay found listed players under-predicted, which suggests it will, but that is unmeasured.
