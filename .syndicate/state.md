@@ -488,6 +488,7 @@ once this index exists: re-splitting would orphan the parts.
 | [combined-board-state-rows-lost] | THE COMBINED BOARD DROPS EVERY PERSISTED STATE ROW; ITS AGE IS TOMORROW'S SHORTLIST — FIXED, LIVE ON WEB `b6a0 | `state_board.md` |
 | [board-per-date-freshness] | THE COMBINED BOARD DATES EACH WINDOW DATE ON ITS OWN; THE CHIP SHOWS TODAY APART FROM TOMORROW — LIVE ON WEB ` | `state_board.md` |
 | [inplay-overlay-board-cadence] | THE BOARD'S IN-PLAY ROWS COME FROM THE BOOK GRID EVERY TICK, NOT THE SHORTLIST — LIVE ON ALL THREE SERVICES `[ | `state_board.md` |
+| [intelligence-season-evidence] | INTELLIGENCE EXPLANATIONS NAMED METRICS THEY NEVER READ, AND THE READINESS GATE COULD NOT SEE THE DATA ROOT -- fixed on main `ced2618f`, NOT LOADED | `state_board.md` |
 | [nfl-model-accuracy-backtest] | NFL GAME LINES AND PROPS LOSE TO THE CLOSE IN EVERY MARKET; THE PROP PROBABILITY CARRIES NO INFORMATION AT THE | `state_football.md` |
 | [ncaaf-sim-view-coverage] | NCAAF GAME LINES CARRY A SIM VIEW ON EVERY MARKET; EDGES ARE BOUNDED BY THE 15-POINT CAP; STAKES STAY ON PRICE | `state_football.md` |
 | [nfl-live-prop-capture] | NFL PER-QUARTER PLAYER PRODUCTION IS CAPTURED AND RETRIEVABLE — the allowlist alone moved ZERO bytes `[verifie | `state_football.md` |

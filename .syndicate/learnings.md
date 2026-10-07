@@ -3338,3 +3338,8 @@ own prior verdicts, not by anything failing.
 - **Believed:** the la_liga build stamped 00:20:20Z ran on the refreshed roster written 00:16:51Z, because it was "generated after" the write. Recorded as evidence in deploys.md 2026-10-06 22:38:35Z.
 - **True:** it read the JULY roster. Its departed count, 179, is the July number; every later build reads 188. `generated_at` is stamped at the END of a build, and the inputs were read before 00:16:51Z.
 - **How to apply:** prove provenance with a field only the new input can produce (here the dropped count, predicted beforehand), or compare the input's mtime with the build's START. Never use the end stamp.
+
+## 2026-10-07 — FORBIDDEN: a readiness/presence check that decides what counts by "is the path inside the git checkout" `[session 13ac7622, lane intelligence-evidence-coverage]`
+- **What happened:** `_advanced_readiness_summary` counted only `inside_repo` rows as required. Production data lives under `SYNDICATE_DATA_ROOT` (Render disk, now the fleet's `~/syndicate-prod/data`), so every real input was excluded and `ready = bool(rows) and not missing` was TRUE with nothing present: NCAAF read `ready` 9/9 with 0/27 inputs (fleet 2026-10-07). The same layer printed the metric NAMES of each input file as "Advanced drivers in play" without reading one value (77/77 recs had empty `advanced_signals`).
+- **Rule:** decide REQUIRED by what the consumer needs, and measure EXISTS where production reads it (the data root), never by repo membership. A gate whose required set can be empty must read not-ready, not ready. An explanation may name a metric only next to a value it read.
+- **Evidence:** `ced2618f`; `[intelligence-season-evidence]` in `state_board.md`.
