@@ -3325,3 +3325,11 @@ own prior verdicts, not by anything failing.
 - **The belief:** my scoped gate restarted refresh-worker on "Board build idle (last completed 241 log lines ago)" + no live children.
 - **What was true:** that line is true of a build's RETURN. A 22-min build had returned at 15:07:35Z and not yet persisted; the TERM at 15:10:25Z discarded it, and no board save landed 9:26 to ~10:40 AM CT (traced by lane web-restart-healthz). A fresh child also spawned in the ~4 s between gate read and TERM.
 - **Rule:** gate a refresh-worker restart on the persist line, per the 2026-10-07 restart-after-save rule above (STATE_PERSIST_BEGIN). Treat `Board build idle` as necessary, not sufficient, until check_deploy_safety itself requires the save.
+
+## 2026-10-07 — `MSYS_NO_PATHCONV=1` ALSO BLOCKS `git -C /c/...`: the "fix" for rev:path mangling made a live worktree read as deleted `[session 4d5b3bd3]`
+
+- **What happened:** `MSYS_NO_PATHCONV=1 git -C /c/tmp/syndicate-sessions/<wt> show origin/main:...` failed with `fatal: cannot change to '/c/tmp/...': No such file or directory`. I took it as the worktree being deleted, and spent three checks on a non-event. The directory was intact and the branch fully landed.
+- **Why:** Windows git does not understand `/c/...`. Git Bash normally converts it, and `MSYS_NO_PATHCONV=1` (the standing fix for `rev:path` arguments, see memory "Git Bash mangles path args") turns that conversion off for EVERY argument, `-C` included.
+- **How to apply:**
+  - With `MSYS_NO_PATHCONV=1`, give `-C` a Windows-form path (`C:/tmp/...`), or `cd` first.
+  - Before concluding a path is gone, check it without git (`ls -d`). A git error about a path is evidence about git's view of the path, not the filesystem.
