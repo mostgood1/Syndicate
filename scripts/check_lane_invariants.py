@@ -97,6 +97,9 @@ try:
         _claimable_prefix,
         _claims,
         _DISCLAIMER_MARKERS,
+        # The SAME predicate `lane-guard` permits with, so the report and the
+        # enforcement cannot drift into disagreeing about one file.
+        sections_are_disjoint,
         _paths_in,
         _BULLET_RE,
         _files_bullet_continues,
@@ -491,10 +494,34 @@ def main(argv=None) -> int:
               f"{len({s for s, _ in claim_set})} OPEN lanes, {len(claim_set)} claims")
         print()
 
+    # DISJOINT DECLARED SECTIONS ARE NOT A CONTEST, and the guard already treats
+    # them that way. A group qualifies only when EVERY holder declares a section
+    # for this file and no two name the same one; `sections_are_disjoint` returns
+    # None otherwise, so one undeclared holder keeps the whole group contested.
+    section_split = {}
+    for _key, _holders in list(contested.items()):
+        _rel = _key.split("  (one file, claimed as:")[0].strip()
+        _declared = {}
+        for _slug in _holders:
+            try:
+                _declared[_slug] = sections_are_disjoint(text, _slug, _rel)
+            except Exception:
+                _declared[_slug] = None
+        if _declared and all(_declared.values()):
+            section_split[_key] = _declared
+            del contested[_key]
+
     print(f"[{'FAIL' if contested else 'ok  '}] every claimed file has exactly one OPEN holder")
     for path, holders in sorted(contested.items()):
         print(f"        {path}")
         print(f"          held by: {', '.join(holders)}")
+    # Shown, never swallowed: a convention that silences a check has to stay
+    # visible, or a real contest can hide behind it.
+    for _path, _declared in sorted(section_split.items()):
+        print(f"[ok  ] {_path}: {len(_declared)} lanes hold DIFFERENT declared"
+              f" sections of it, which is not a contest (the guard permits each)")
+        for _slug, _section in sorted(_declared.items()):
+            print(f"          {_slug}: {_section}")
     if contested:
         # THE REMEDY IS PRINTED AT THE INCIDENT, not left in learnings.md.
         #
