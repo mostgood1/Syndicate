@@ -47551,3 +47551,16 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **The ~18:40Z entry says** a4281cc8 was loaded by lane soccer-team-history-current-season's attended down/up and names refresh-worker pid 3197737 (17:09:41Z). **Wrong restart.** pid 3197737 came from lane `web-restart-healthz`'s 17:09:28Z entry -- ff 43afa8cd -> faa1cfea + refresh-worker restart (user override); faa1cfea contains a4281cc8 (`git merge-base --is-ancestor` true), so a4281cc8 rode THAT restart, unlisted in its ride-alongs.
 - **The soccer lane's full down/up was later:** down 18:54:01Z -> healthz 200 18:55:37Z, fleet 75699804 (contains a4281cc8), refresh-worker pid 3342273 -- a RE-load.
 - **The reading stands:** both builds read were made on code containing a4281cc8 by pid 3197737: the first post-17:09 build (rows_player_out_on_feed=4, wnba; Gray seated 0) and the 18:51:37Z build (4, wnba; Gray seated 0, read 18:58Z). Caught because the soccer session reported its restart times.
+
+## 2026-10-07 18:51:32Z (1:51 PM CT) -- READING, no deploy: Layer 2 OUT-player gate FIRES on the served board after the 12:09 refresh-worker restart -- **MET** (lane `layer2-out-gate-reach` owns the gate + carry; reading taken by session 4d5b3bd3 on user request)
+
+- **context:** fleet faa1cfea carries f9adcdd8 (Layer 2 OUT gate) and a4281cc8 (player_availability carried through build_layer2_rows). refresh-worker restarted 12:09:41 CDT and gunicorn workers reloaded 12:10:29, both after the 11:38 ff.
+- **baseline (served build of ~12:08, pre-restart, fetched 12:31):**
+  - rows_player_out_on_feed 0 of 841 considered.
+  - player_availability null on all 142 served prop rows.
+  - Allisha Gray (OUT) not seated: her 7 rows sat only in rows_stale_quote_sample (refused as stale, not by the gate).
+- **reading** (served /api/board/layer2-shortlist, first post-restart build at 13:51:32 CDT, seen 13:54:24, build_age 167 s; watcher scratchpad/watch_l2.sh):
+  - `rows_player_out_on_feed` **4**, `rows_player_out_on_feed_by_sport` {"wnba": 4}, of 824 rows considered.
+  - Allisha Gray occurrences in the whole served payload: **0** (not seated, not in the 10-row stale sample).
+  - Served rows 200, of which 44 wnba (35 props).
+- **believed, NOT verified:** that the 4 gated rows are Gray's lines. The payload counts refusals but does not name them, and she is the slate's only OUT player with live quotes. Confirming it needs the board's refusal detail or a replay.
