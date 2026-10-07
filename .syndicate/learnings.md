@@ -3272,3 +3272,13 @@ own prior verdicts, not by anything failing.
 
 - **Measured:** a scheduled reading appended "Re-armed for 2026-10-10T15:00Z" to `deploys.md`, pushed it (`32d80245`), then froze on the `update_scheduled_task` approval prompt. The task was left DISABLED with no next run. The ledger said the opposite of the system.
 - **Rule:** when a prompt (or you) records a follow-up action in the ledger, do the action first, read it back (`list_scheduled_tasks` `nextRunAt`, a commit on origin/main, a file on disk), and only then write that it happened. When reading someone else's "re-armed / scheduled / deployed" line, check the system, not the line.
+
+## 2026-10-07 -- Parallel harness processes that each (re)generate a SHARED input file race, and the failure looks like speed `[session e0a3e383]`
+
+- **Measured:** 7 parallel sweep processes each called `hist_props_csv(d)`, which rewrites
+  `asof/props_odds_hist/<d>.csv`. Two points finished 6 dates in under an hour, while the others took ~10 min per date.
+  They had simulated **0 games on every date**: truncated snapshots, so SmartSim had no players. One crashed in
+  `copy2`. Nothing errored loudly: the harness wrote 0-game files that would have read as results.
+- **Rule:** generate shared inputs ONCE, before fanning out, and have workers only read them. A run that produced
+  nothing must write no output, not an empty file. A point that runs faster than its peers is a suspect, not a win:
+  compare output counts with the baseline before reading any statistic.
