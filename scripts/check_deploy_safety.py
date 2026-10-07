@@ -388,16 +388,33 @@ def _fleet_board_build_state(lines: list[str]) -> tuple[bool | None, dict[str, A
     """`board_build_state` for the fleet: line order instead of timestamps."""
     import re
 
+    # "DONE" IS THE NEXT LOOP_ITERATION, NOT BOARD_BUILD_TIMING -- lane
+    # `web-restart-healthz` `[2026-10-07]`. BOARD_BUILD_TIMING prints when the build
+    # RETURNS; the ledger record and the state persist still follow it. Measured on
+    # the fleet: at 15:10:21Z this check said "Board build idle (last completed 241
+    # log lines ago)", a peer TERMed refresh-worker at 15:10:25Z, and the 22-minute
+    # build that returned at 15:07:35Z never reached STATE_PERSIST_BEGIN -- the board
+    # lost it. `_background_loop` prints LOOP_ITERATION at the top of every
+    # iteration, i.e. only after the previous iteration's persist (or its failure /
+    # abort) has returned, so it is the first line that proves the work is on disk.
+    # Matches are ANCHORED on the `[intelligence_state] ` prefix: ALL_PROCESS_MEMORY /
+    # MEMORY_WATCHDOG JSON lines carry these tokens too (`last_stage`).
     facts: dict[str, Any] = {"log_source": "fleet refresh-worker.log"}
-    last_enter = last_done = -1
+    last_enter = last_done = last_returned = -1
     enter_stage = ""
+    head = r"^(?:\S+Z )?\[intelligence_state\] "  # optional fleet UTC stamp, then the event
+    enter_re = re.compile(head + r"BUILD_SPAN_ENTER\b")
+    loop_re = re.compile(head + r"LOOP_ITERATION\b")
+    returned_re = re.compile(head + r"BOARD_BUILD_TIMING\b")
     for index, line in enumerate(lines):
-        if "BUILD_SPAN_ENTER" in line:
+        if enter_re.search(line):
             last_enter = index
             match = re.search(r"stage=(\S+)", line)
             enter_stage = match.group(1) if match else ""
-        elif "BOARD_BUILD_TIMING" in line:
+        elif loop_re.search(line):
             last_done = index
+        elif returned_re.search(line):
+            last_returned = index
     expected = _fleet_expected_build_seconds(lines)
     if expected is not None:
         facts["typical_build_seconds"] = int(expected)
@@ -410,8 +427,12 @@ def _fleet_board_build_state(lines: list[str]) -> tuple[bool | None, dict[str, A
     # the log instead -- and never pretend to be a time.
     facts["newest_build_start"] = f"stage={enter_stage}, {len(lines) - 1 - last_enter} log lines ago"
     facts["newest_build_complete"] = (
-        f"{len(lines) - 1 - last_done} log lines ago" if last_done >= 0 else "(none in tail)"
+        f"{len(lines) - 1 - last_done} log lines ago (next LOOP_ITERATION, i.e. persisted)" if last_done >= 0 else "(none in tail)"
     )
+    if in_flight and last_returned > last_enter:
+        # The build returned and is in its ledger-record / persist tail: the most
+        # dangerous moment to restart, because the work is done but not saved.
+        facts["phase"] = "returned, not yet persisted"
     return in_flight, facts
 
 
@@ -989,6 +1010,8 @@ def main() -> int:
             detail += f", typical={typical}min"
         if remaining is not None:
             detail += f", ~{int(remaining) // 60}min remaining"
+        if build_facts.get("phase"):
+            detail += f", phase={build_facts['phase']}"
         blockers.append(f"Board build IN FLIGHT on refresh-worker ({detail})")
     else:
         note = f"Board build idle (last completed {build_facts.get('newest_build_complete')})"

@@ -17,12 +17,21 @@ spec = importlib.util.spec_from_file_location("check_deploy_safety_fleet_under_t
 cds = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cds)
 
-COMPLETE_BUILD = [
+RETURNED_BUILD = [
     "[intelligence_state] BUILD_SPAN_ENTER stage=pull_hot_artifacts date=2026-10-01",
     "noise line 2026-10-04T18:00:00Z",
     "[intelligence_state] BUILD_SPAN_ENTER stage=portfolio_commit date=2026-10-01",
     "[intelligence_state] BUILD_SPAN_EXIT stage=portfolio_commit elapsed_s=34.8",
     "[intelligence_state] BOARD_BUILD_TIMING wall_s=177.8 cpu_s=158.5 off_cpu_pct=10.8 ok=True",
+]
+# A build is COMPLETE only once it is persisted and the loop has come back around
+# (lane `web-restart-healthz` 2026-10-07: a TERM in the returned -> persist gap lost a
+# 22-minute build while this check said idle).
+COMPLETE_BUILD = RETURNED_BUILD + [
+    "[intelligence_state] BOARD_STATE_LEDGER_RECORDED selected_date=2026-10-01 recommendation_count=3",
+    "[intelligence_state] STATE_PERSIST_BEGIN candidate_count=3",
+    "[intelligence_state] PERSIST_LOCKED_BEGIN latest_key=k snapshot_count=2",
+    "[intelligence_state] LOOP_ITERATION pending_keys=0 watched_payloads=1",
 ]
 
 
@@ -30,7 +39,26 @@ def test_completed_build_is_idle_with_typical_from_wall_s():
     in_flight, facts = cds._fleet_board_build_state(COMPLETE_BUILD + ["tail noise"])
     assert in_flight is False
     assert facts["typical_build_seconds"] == 177
-    assert facts["newest_build_complete"] == "1 log lines ago"
+    assert facts["newest_build_complete"].startswith("1 log lines ago")
+
+
+def test_a_returned_but_unpersisted_build_is_IN_FLIGHT():
+    """The 2026-10-07 15:10:21Z reading: returned 241 lines earlier, persist not yet done."""
+    for tail in ([], ["[intelligence_state] STATE_PERSIST_BEGIN candidate_count=90"],
+                 ["[intelligence_state] STATE_PERSIST_BEGIN candidate_count=90",
+                  "[intelligence_state] PERSIST_LOCKED_BEGIN latest_key=k snapshot_count=2"]):
+        in_flight, facts = cds._fleet_board_build_state(RETURNED_BUILD + tail + ["work"])
+        assert in_flight is True, tail
+        assert facts["phase"] == "returned, not yet persisted"
+
+
+def test_memory_telemetry_json_mentioning_tokens_is_not_an_event():
+    lines = COMPLETE_BUILD + [
+        'ALL_PROCESS_MEMORY {"last_stage": "[intelligence_state] BUILD_SPAN_ENTER stage=x"}',
+    ]
+    # Unanchored, this JSON line read as a new build start. The prefix must lead the line's message.
+    in_flight, _ = cds._fleet_board_build_state(lines)
+    assert in_flight is False
 
 
 def test_enter_after_last_timing_is_in_flight():
@@ -51,7 +79,7 @@ def test_no_enter_is_unknown_not_clear():
 
 
 def test_sub_second_timings_do_not_set_typical():
-    lines = COMPLETE_BUILD[:-1] + ["[intelligence_state] BOARD_BUILD_TIMING wall_s=0.2 ok=True"]
+    lines = RETURNED_BUILD[:-1] + ["[intelligence_state] BOARD_BUILD_TIMING wall_s=0.2 ok=True"]
     _, facts = cds._fleet_board_build_state(lines)
     assert "typical_build_seconds" not in facts
 
