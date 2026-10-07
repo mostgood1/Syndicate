@@ -47251,3 +47251,10 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
   - Pools: none of the 14 is simulated (they were never in the props pool), so the pools are unchanged as predicted.
   - Allisha Gray is not simulated; Jewell Loyd is simulated (LVA).
 - **Both lanes' fleet verifications are now complete.**
+
+## 2026-10-07 14:40Z (9:40 AM CT) -- READING: dfb193bb (WNBA predict-date league_id '10' + WNBA-only slate gate) on a NO-WNBA date -- **MET** (lane `wnba-slate-and-out-props`; user: "check the 10-08 predictions file once the refresh finishes")
+
+- **Population was live:** predictions_2026-10-08.csv (NBA-only, constant p=0.6208) had been MOVED to ~/syndicate-quarantine/wnba_nba_predictions_2026-10-06/ on 10-06, so every later refresh had to re-run predict-date rather than reuse a file.
+- **Before (same log, `wnba_source/logs/syndicate_refresh_oddsapi_props_2026-10-08.log`):** predict-date --date 2026-10-08 at 2026-10-06 15:16:10Z and 16:11:47Z produced output; the 16:11Z run wrote the NBA-filled file.
+- **After (dfb193bb live since the 20:09:27Z 10-06 ff):** 6 runs, 2026-10-07 05:04Z, 09:06Z, 11:10Z, 12:10Z, 13:10Z, 14:11Z -- every one logs `No games found on 2026-10-08` and writes no file; step rc 0 (odds_refresh_20261007_130647). predictions_2026-10-08.csv absent at 14:35Z. No `Dropping N non-WNBA` line: the league-'10' scoreboard itself returned nothing, so the gate was not needed.
+- **Also:** post-fix predictions_2026-10-09.csv (written 01:06 CDT 10-07) = 2 rows, 0 non-WNBA.
