@@ -3333,3 +3333,8 @@ own prior verdicts, not by anything failing.
 - **How to apply:**
   - With `MSYS_NO_PATHCONV=1`, give `-C` a Windows-form path (`C:/tmp/...`), or `cd` first.
   - Before concluding a path is gone, check it without git (`ls -d`). A git error about a path is evidence about git's view of the path, not the filesystem.
+
+## 2026-10-07 — FORBIDDEN: using an artifact's `generated_at` to prove a build read a new input `[lane soccer-roster-refresh]`
+- **Believed:** the la_liga build stamped 00:20:20Z ran on the refreshed roster written 00:16:51Z, because it was "generated after" the write. Recorded as evidence in deploys.md 2026-10-06 22:38:35Z.
+- **True:** it read the JULY roster. Its departed count, 179, is the July number; every later build reads 188. `generated_at` is stamped at the END of a build, and the inputs were read before 00:16:51Z.
+- **How to apply:** prove provenance with a field only the new input can produce (here the dropped count, predicted beforehand), or compare the input's mtime with the build's START. Never use the end stamp.
