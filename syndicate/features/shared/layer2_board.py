@@ -5161,6 +5161,9 @@ def select_shortlist(
     implausible_book = 0
     stale_kickoff = 0
     uninformative_ev = 0
+    # A basketball prop whose player is OUT on the injury feed (board_enrichment._flag_out_player_props).
+    player_out_on_feed = 0
+    player_out_on_feed_by_sport: dict[str, int] = {}
     # Counted, never removed (lane `stop-market-withholding`, 2026-10-05).
     on_unmeasured_model = 0
     on_unmeasured_model_by_market: dict[str, int] = {}
@@ -5256,6 +5259,18 @@ def select_shortlist(
         # what this rejected.
         if _row_ev_is_hold_restatement(row):
             uninformative_ev += 1
+            continue
+        # A PROPERTY OF THE LINE, not a market verdict: this line's player is
+        # confirmed OUT on the injury feed, so the bet voids. Flagged upstream
+        # by `board_enrichment._flag_out_player_props` (Layer 1 keeps the row,
+        # marked); here it is not seated. Pre-bucket, like the rules above, so
+        # `kind_floor`/`per_sport` cannot re-seat it. Counted, and the ledger
+        # keeps the row. Confirmed OUT only -- questionable/doubtful stay priced.
+        availability = row.get("player_availability")
+        if isinstance(availability, Mapping) and str(availability.get("status") or "").strip().upper() in {"OUT", "SUSPENDED", "INACTIVE"}:
+            player_out_on_feed += 1
+            out_sport = str(row.get("sport") or "").strip().lower() or "unknown"
+            player_out_on_feed_by_sport[out_sport] = player_out_on_feed_by_sport.get(out_sport, 0) + 1
             continue
         # Rows resting on an unmeasured (or losing) model are COUNTED here and
         # stay in the pool: accuracy ranks them, it does not hide them.
@@ -5523,6 +5538,8 @@ def select_shortlist(
         # `syndicate/blueprints/intelligence.py`, which is held by another lane;
         # see this lane's entry in `lanes.md`.
         "rows_uninformative_ev": uninformative_ev,
+        "rows_player_out_on_feed": player_out_on_feed,
+        "rows_player_out_on_feed_by_sport": dict(sorted(player_out_on_feed_by_sport.items())),
         # `[2026-09-11, user decision]`: one-sided rows withheld because their
         # ONLY value was an unmeasured model's edge. Counter, per-market
         # breakdown and mode ship in the SAME commit as the rule (`#397`).
