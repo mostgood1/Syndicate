@@ -182,6 +182,9 @@ def test_splitting_cards_actually_shrinks_the_combined_key(monkeypatch):
     is bytes on the combined key; a version that wrote the shards and still
     inlined the cards would pass every other test in this file.
     """
+    # Pins the IN-PLACE key names (the kill-switch layout); build-scoped keys
+    # are `test_layer2_shard_generations.py`.
+    monkeypatch.setenv("SYNDICATE_LAYER2_SHARD_GENERATIONS", "0")
     before = _measure(monkeypatch, 300, cards_inline=True)
     after = _measure(monkeypatch, 300, cards_inline=False)
 

@@ -36,6 +36,9 @@ import pipeline.intelligence_state as st
 def store(monkeypatch, tmp_path):
     """An in-memory keyvalue stand-in, keyed by path like the real one."""
     kv: dict[str, dict] = {}
+    # These pin the IN-PLACE key layout, which is what the kill switch restores;
+    # build-scoped keys are `test_layer2_shard_generations.py`.
+    monkeypatch.setenv("SYNDICATE_LAYER2_SHARD_GENERATIONS", "0")
     monkeypatch.setattr(st, "reports_root", lambda: tmp_path)
     monkeypatch.setattr(st, "write_json_file", lambda p, v: kv.__setitem__(str(p), json.loads(json.dumps(v, default=str))))
     monkeypatch.setattr(st, "read_json_file", lambda p: kv.get(str(p)))

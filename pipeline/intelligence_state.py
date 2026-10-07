@@ -2480,7 +2480,7 @@ def _layer2_shortlist_path(selected_date: str) -> Path:
     return reports_root() / "intelligence" / f"layer2_shortlist_{suffix}.json"
 
 
-def _layer2_shortlist_shard_path(selected_date: str, sport: str) -> Path:
+def _layer2_shortlist_shard_path(selected_date: str, sport: str, generation: str | None = None) -> Path:
     """One key per sport. **The 8MB ceiling is PER KEY, and that is the point.**
 
     A single combined key makes every sport compete for one budget: measured
@@ -2502,7 +2502,10 @@ def _layer2_shortlist_shard_path(selected_date: str, sport: str) -> Path:
     import re as _re
 
     token = _re.sub(r"[^a-z0-9]+", "_", str(sport or "").strip().lower()).strip("_") or "unknown"
-    return reports_root() / "intelligence" / f"layer2_shortlist_{suffix}__{token}.json"
+    # `generation` (lane `layer2-shard-generations`): a build-scoped key, so a new
+    # build never overwrites the shards the current index points at.
+    gen = f"__g{generation}" if generation else ""
+    return reports_root() / "intelligence" / f"layer2_shortlist_{suffix}__{token}{gen}.json"
 
 
 def _layer2_combined_keeps_rows() -> bool:
@@ -2523,7 +2526,7 @@ def _layer2_combined_keeps_rows() -> bool:
     return raw not in {"0", "false", "no", "off"}
 
 
-def _layer2_shortlist_cards_shard_path(selected_date: str, sport: str) -> Path:
+def _layer2_shortlist_cards_shard_path(selected_date: str, sport: str, generation: str | None = None) -> Path:
     """One CARDS key per sport, beside the rows shard for the same sport.
 
     WHY CARDS NEEDED SPLITTING AT ALL, measured 2026-08-31. Sharding the rows
@@ -2551,7 +2554,8 @@ def _layer2_shortlist_cards_shard_path(selected_date: str, sport: str) -> Path:
     import re as _re
 
     token = _re.sub(r"[^a-z0-9]+", "_", str(sport or "").strip().lower()).strip("_") or "unknown"
-    return reports_root() / "intelligence" / f"layer2_shortlist_{suffix}__cards__{token}.json"
+    gen = f"__g{generation}" if generation else ""
+    return reports_root() / "intelligence" / f"layer2_shortlist_{suffix}__cards__{token}{gen}.json"
 
 
 def _layer2_combined_keeps_cards() -> bool:
@@ -2635,9 +2639,26 @@ def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dic
         # `written_at` is the ambiguity this whole change is meant to remove.
         payload = _shed_rows_to_fit_keyvalue(payload)
 
+    # BUILD-SCOPED SHARDS (lane `layer2-shard-generations`, 2026-10-07). Shards
+    # used to be overwritten IN PLACE, one sport at a time, ~25-30 s before this
+    # index -- so every read in that window merged two builds by position and
+    # served the previous build's counters under the new `written_at` (fleet
+    # 10-07 18:51:49Z: `LAYER2_SHARD_MERGE rows=3934/5359`, soccer + wnba still
+    # on the 17:08 build). Each build now writes under its own generation and
+    # the index is the ONLY thing that points at it, so the index write is the
+    # flip: a read sees the old build whole, or the new one whole.
+    generation = None
+    previous_index: dict[str, Any] | None = None
+    if _layer2_shard_generations_enabled():
+        generation = f"{time.time_ns():x}"
+        try:
+            previous_index = read_json_file(_layer2_shortlist_path(normalized_date))
+        except Exception:  # noqa: BLE001
+            previous_index = None
+
     key_sizes: dict[str, int] = {}
     rows = payload.get("rows") or []
-    shards = _write_layer2_shards(normalized_date, payload, rows, sizes=key_sizes)
+    shards = _write_layer2_shards(normalized_date, payload, rows, sizes=key_sizes, generation=generation)
 
     # CARDS ARE THE OTHER HALF OF THE PAYLOAD, and the half that actually capped
     # the board. They are built one-per-row, so the combined key scaled at
@@ -2646,7 +2667,7 @@ def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dic
     # (`SHORTLIST_SHED_IMPOSSIBLE`). Sharding rows alone moved the ceiling by
     # almost nothing; this is the change that removes it.
     cards = payload.get("cards") or []
-    card_shards = _write_layer2_card_shards(normalized_date, payload, cards, sizes=key_sizes)
+    card_shards = _write_layer2_card_shards(normalized_date, payload, cards, sizes=key_sizes, generation=generation)
 
     combined = dict(payload)
     if shards:
@@ -2655,6 +2676,25 @@ def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dic
     if card_shards:
         combined["card_shards"] = sorted(card_shards)
         combined["card_total"] = len(cards)
+    history: list[dict[str, Any]] = []
+    if generation and (shards or card_shards):
+        # The two generations a reader may still be using: this one, and the
+        # one the PREVIOUS index pointed at (a read that fetched that index a
+        # moment ago is still reading its shards). Everything older is dropped
+        # after the flip. A previous index with no generation is the in-place
+        # (legacy) layout, kept for exactly one more build so a process still
+        # on the old code never reads an empty board.
+        combined["shard_generation"] = generation
+        history.append({"generation": generation, "shards": sorted(shards), "card_shards": sorted(card_shards)})
+        if isinstance(previous_index, Mapping) and (previous_index.get("shards") or previous_index.get("card_shards")):
+            prev_gen = previous_index.get("shard_generation") or None
+            combined["shard_generation_previous"] = prev_gen
+            history.append({
+                "generation": prev_gen,
+                "shards": list(previous_index.get("shards") or []),
+                "card_shards": list(previous_index.get("card_shards") or []),
+            })
+        combined["shard_generation_history"] = history
     if card_shards and not _layer2_combined_keeps_cards():
         combined["cards"] = []
     if shards and not keeps_rows:
@@ -2676,7 +2716,17 @@ def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dic
         # happened on 2026-08-31. `_merge_layer2_shards` now serves the shards
         # rather than truncating to the stale total, so this is a DEGRADED
         # state (current rows, stale sidecar counters), not a corrupt one.
-        if shards:
+        if history:
+            # Nothing points at this generation, so the board is the previous
+            # build, whole -- STALE, not mixed. Drop the orphaned keys.
+            print(
+                f"[intelligence_state] LAYER2_INDEX_WRITE_FAILED date={normalized_date}"
+                f" generation={generation} -- the previous build is still served whole;"
+                " dropping this build's unreferenced shards.",
+                flush=True,
+            )
+            _delete_layer2_shard_generation(normalized_date, history[0])
+        elif shards:
             print(
                 f"[intelligence_state] LAYER2_INDEX_BEHIND_SHARDS date={normalized_date}"
                 f" shards={sorted(shards)} shard_row_total={len(rows)}"
@@ -2685,9 +2735,61 @@ def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dic
                 flush=True,
             )
         raise
+    if history and isinstance(previous_index, Mapping):
+        keep = {entry.get("generation") for entry in history}
+        for entry in previous_index.get("shard_generation_history") or []:
+            if isinstance(entry, Mapping) and entry.get("generation") not in keep:
+                _delete_layer2_shard_generation(normalized_date, entry)
     if shards and keeps_rows:
         _shadow_verify_layer2_shards(normalized_date, combined, rows)
     return payload
+
+
+def _layer2_shard_generations_enabled() -> bool:
+    """Build-scoped shard keys (lane `layer2-shard-generations`). Default ON.
+
+    `SYNDICATE_LAYER2_SHARD_GENERATIONS=0` is the kill switch: the writer goes back
+    to the in-place keys, and every reader still reads both layouts (the index says
+    which). Turning it off leaves the last generation's keys in the store until it
+    is turned back on; that is the cost of a rollback that cannot empty the board.
+    """
+    raw = str(os.environ.get("SYNDICATE_LAYER2_SHARD_GENERATIONS") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _delete_layer2_shard_generation(selected_date: str, entry: Mapping[str, Any]) -> None:
+    """Delete one generation's row and card shards. Never raises.
+
+    `generation: None` is the legacy in-place layout. A failed delete leaves a key
+    behind, which costs store space and nothing else -- no index points at it.
+    """
+    from syndicate.features.shared import refresh_state_store as _store
+
+    gen = entry.get("generation") or None
+    deleted = 0
+    for sport in entry.get("shards") or []:
+        try:
+            _store.delete_text_file(
+                _layer2_shortlist_shard_path(selected_date, sport, generation=gen)
+                if gen else _layer2_shortlist_shard_path(selected_date, sport)
+            )
+            deleted += 1
+        except Exception:  # noqa: BLE001
+            pass
+    for sport in entry.get("card_shards") or []:
+        try:
+            _store.delete_text_file(
+                _layer2_shortlist_cards_shard_path(selected_date, sport, generation=gen)
+                if gen else _layer2_shortlist_cards_shard_path(selected_date, sport)
+            )
+            deleted += 1
+        except Exception:  # noqa: BLE001
+            pass
+    print(
+        f"[intelligence_state] LAYER2_SHARD_GENERATION_DROPPED date={selected_date}"
+        f" generation={gen or 'legacy'} keys={deleted}",
+        flush=True,
+    )
 
 
 def _row_identity(row: Any) -> tuple:
@@ -2780,7 +2882,7 @@ def shards_of(payload: Mapping[str, Any]) -> list[str]:
 
 def _write_layer2_shards(
     selected_date: str, payload: Mapping[str, Any], rows: list[Any],
-    sizes: dict[str, int] | None = None,
+    sizes: dict[str, int] | None = None, generation: str | None = None,
 ) -> list[str]:
     """One key per sport. Returns the sports actually written.
 
@@ -2843,7 +2945,13 @@ def _write_layer2_shards(
                         f" kept={len(shard['rows'])} dropped={dropped}",
                         flush=True,
                     )
-            write_json_file(_layer2_shortlist_shard_path(selected_date, sport), shard)
+            if generation:
+                shard["generation"] = generation
+            write_json_file(
+                _layer2_shortlist_shard_path(selected_date, sport, generation=generation)
+                if generation else _layer2_shortlist_shard_path(selected_date, sport),
+                shard,
+            )
             written.append(sport)
     except Exception as exc:  # noqa: BLE001
         print(
@@ -2851,6 +2959,9 @@ def _write_layer2_shards(
             " -- falling back to the combined key alone",
             flush=True,
         )
+        if generation and written:
+            # No index will name this generation; drop what it wrote.
+            _delete_layer2_shard_generation(selected_date, {"generation": generation, "shards": written})
         return []
     print(
         f"[intelligence_state] LAYER2_SHARDS_WRITTEN sports={written}"
@@ -2862,7 +2973,7 @@ def _write_layer2_shards(
 
 def _write_layer2_card_shards(
     selected_date: str, payload: Mapping[str, Any], cards: list[Any],
-    sizes: dict[str, int] | None = None,
+    sizes: dict[str, int] | None = None, generation: str | None = None,
 ) -> list[str]:
     """One CARDS key per sport. Returns the sports actually written.
 
@@ -2913,7 +3024,13 @@ def _write_layer2_card_shards(
                         f" kept={len(shard['cards'])} dropped={dropped}",
                         flush=True,
                     )
-            write_json_file(_layer2_shortlist_cards_shard_path(selected_date, sport), shard)
+            if generation:
+                shard["generation"] = generation
+            write_json_file(
+                _layer2_shortlist_cards_shard_path(selected_date, sport, generation=generation)
+                if generation else _layer2_shortlist_cards_shard_path(selected_date, sport),
+                shard,
+            )
             written.append(sport)
     except Exception as exc:  # noqa: BLE001
         print(
@@ -2921,6 +3038,8 @@ def _write_layer2_card_shards(
             " -- falling back to cards on the combined key",
             flush=True,
         )
+        if generation and written:
+            _delete_layer2_shard_generation(selected_date, {"generation": generation, "card_shards": written})
         return []
     print(
         f"[intelligence_state] LAYER2_CARD_SHARDS_WRITTEN sports={written}"
@@ -2955,7 +3074,12 @@ def _hydrate_layer2_cards(selected_date: str, payload: dict[str, Any]) -> dict[s
         name = str(sport or "").strip().lower()
         if not name:
             continue
-        shard = read_json_file(_layer2_shortlist_cards_shard_path(selected_date, name))
+        # The index names its generation; no generation = the legacy in-place keys.
+        _gen = payload.get("shard_generation") or None
+        shard = read_json_file(
+            _layer2_shortlist_cards_shard_path(selected_date, name, generation=_gen)
+            if _gen else _layer2_shortlist_cards_shard_path(selected_date, name)
+        )
         if not isinstance(shard, dict) or not isinstance(shard.get("cards"), list):
             missing.append(name)
             continue
@@ -3271,7 +3395,13 @@ def _merge_layer2_shards(
         name = str(sport or "").strip().lower()
         if not name:
             continue
-        shard = read_json_file(_layer2_shortlist_shard_path(selected_date, name))
+        # Lane `layer2-shard-generations`: read the generation THIS index names,
+        # never "whatever the per-sport key holds now". No generation = legacy.
+        _gen = payload.get("shard_generation") or None
+        shard = read_json_file(
+            _layer2_shortlist_shard_path(selected_date, name, generation=_gen)
+            if _gen else _layer2_shortlist_shard_path(selected_date, name)
+        )
         if not isinstance(shard, dict) or not isinstance(shard.get("rows"), list):
             missing.append(name)
             continue
