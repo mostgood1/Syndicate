@@ -431,6 +431,18 @@ one-time NCAAF 2025 read whatever the descent found. The watcher was replaced (o
 `VALIDATION_READ_2025` absent): the 2025 read (pregame gates + live replay) now runs ONLY if the fitted objective
 is <= 0.8 x production's on FIT -- gate (a)'s own bar. Otherwise NCAAF 2025 stays UNREAD and the result is reported.
 
+### Re-fit v2 descent, NCAAF — DONE 2026-10-07 23:58Z: GATE HELD, NCAAF 2025 UNREAD
+
+Production 227.55 -> switches ON at shipped levers ~381 -> **best fitted 262.50 (15% WORSE than production)**.
+Fitted: four switches ON, `drive_yardage_multiplier` 0.8312, `touchdown_weight_multiplier` 0.6875,
+`red_zone_touchdown_weight_bonus` 0.435, `red_zone_gain_stiffening` 0.525, `home_field_bonus` 0.12,
+`drive_success_offense_sensitivity` 0.3, `drive_success_defense_sensitivity` 0.45. The FIT gate (<= 0.8 x
+production) returned HOLD: the 2025 read did not run and no 2025 marker exists (the only 2025 file holds the
+unanalysed production-arm sims carried over from the paused v1 read). **Reading:** with the scenario switches ON,
+no combination of the available levers brings the NCAAF engine back to production's fit on 2024 -- the switches
+cost NCAAF more than the levers can recover. NCAAF keeps production as shipped; any NCAAF re-fit needs a
+different lever set or a per-switch selection (e.g. NCAAF without H4 / H3), pre-registered as a new step.
+
 H1 prediction (|delta total| < 1.0) FAILED (-1.12). H2 prediction (total in [-0.5, +1.5]) held. Both
 fixes work mechanically (S12 after-half 25.0; S5 4th-down rows inside the real CI) and neither moves
 accuracy alone -- each moves the level or home edge away from the close, as the re-fit design expects.
