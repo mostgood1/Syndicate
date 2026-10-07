@@ -60,6 +60,7 @@ from __future__ import annotations
 import contextvars
 import datetime as _dt
 import re
+from functools import lru_cache
 from typing import Any, Collection, Iterable, Mapping, Sequence
 
 __all__ = [
@@ -2772,7 +2773,24 @@ def _club_token_names(token: Any, club: Any) -> bool:
 
     Conservative on purpose -- see the call site. `ala`/"Alaves" and
     `hof`/"1899 Hoffenheim" match; `mnc`/"Manchester City" does not.
+
+    MEMOISED for string arguments -- lane `web-restart-healthz` `[2026-10-07]`. A
+    pure function of its two strings (`fold_accents` reads no state), called for
+    every token x fixture on every board row: py-spy on the fleet refresh-worker
+    2026-10-07 11:3x CT had `portfolio_commit` (normally 10-50 s) 8+ minutes in
+    here, re-folding the same club names.
     """
+    if type(token) is str and type(club) is str:
+        return _club_token_names_cached(token, club)
+    return _club_token_names_uncached(token, club)
+
+
+@lru_cache(maxsize=65536)
+def _club_token_names_cached(token: str, club: str) -> bool:
+    return _club_token_names_uncached(token, club)
+
+
+def _club_token_names_uncached(token: Any, club: Any) -> bool:
     tok = "".join(ch for ch in str(token or "").lower() if ch.isalnum())
     if len(tok) < 2:
         return False
