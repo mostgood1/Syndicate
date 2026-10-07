@@ -400,6 +400,61 @@ def _files_bullet_continues(stripped):
     return "/" in token or "\\" in token or bool(PATHISH_RE.match(token))
 
 
+_LOAN_RE = re.compile(r"\bLOAN\s+from\s+([A-Za-z0-9][A-Za-z0-9._-]*)", re.I)
+
+
+def _loan_paths(segment):
+    """{path: lender_slug} for the comma-fragments of a Files segment that carry a
+    `LOAN from <lender>` marker.
+
+    SPLIT ON COMMAS because that is how both real loans were written -- the marker is
+    a parenthetical attached to its own path's fragment:
+
+        - Files: a/b.py (LOAN from other-lane, reason...), c/d.py
+
+    A fragment without the marker is an ordinary claim, so an unrelated path on the
+    same line is unaffected.
+    """
+    out = {}
+    for frag in str(segment).split(","):
+        m = _LOAN_RE.search(frag)
+        if not m:
+            continue
+        for f in _paths_in(frag):
+            out[f] = m.group(1)
+    return out
+
+
+def loans(text):
+    """Yield (borrower_slug, borrowed_path, lender_slug) for every OPEN lane.
+
+    A loan is NOT a claim: `_claims` deliberately omits these, so the lender stays the
+    single holder. `lane-guard` consults this to permit the borrower, and only when the
+    lender genuinely claims the path -- see `loan_is_honoured`.
+    """
+    for slug, f, lender in _loan_entries(text):
+        yield slug, f, lender
+
+
+def loan_is_honoured(text, borrower, rel):
+    """The lender slug if `borrower` may write `rel` under a recorded loan, else None.
+
+    A loan is honoured only when the named lender is an OPEN lane that actually claims
+    the path. Otherwise the marker is a SELF-GRANT: any lane could write
+    `(LOAN from whoever)` and walk through the guard, which would make the guard
+    decorative. Checked with `matches`, the same predicate the guard blocks with, so a
+    bare-basename claim by the lender counts exactly as it does everywhere else.
+    """
+    holders = [(slug, f) for slug, f in _claims(text)]
+    for b_slug, b_path, lender in _loan_entries(text):
+        if b_slug != borrower or not matches(rel, b_path):
+            continue
+        for h_slug, h_path in holders:
+            if h_slug == lender and matches(rel, h_path):
+                return lender
+    return None
+
+
 def _claims(text):
     """Yield (slug, claimed_path) for every OPEN lane."""
     slug = None
@@ -439,7 +494,13 @@ def _claims(text):
                 # from writing `.syndicate/lanes.md` at all. Continuation lines
                 # already run through `_claimable_prefix` for exactly this
                 # reason; the initial line never did, which is the gap.
-                for f in _paths_in(_claimable_prefix(m.group(1))):
+                _seg = _claimable_prefix(m.group(1))
+                _loaned = _loan_paths(_seg)
+                for f in _paths_in(_seg):
+                    # A BORROWED path is not a claim. Leaving it in the claim set is
+                    # what deadlocked three lanes on 2026-10-06, including the owner.
+                    if f in _loaned:
+                        continue
                     yield slug, f
             continue
 
@@ -477,7 +538,11 @@ def _claims(text):
                 in_files = False
                 continue
             if open_lane:
-                for f in _paths_in(_claimable_prefix(stripped).lstrip("- ")):
+                _seg = _claimable_prefix(stripped).lstrip("- ")
+                _loaned = _loan_paths(_seg)
+                for f in _paths_in(_seg):
+                    if f in _loaned:
+                        continue
                     yield slug, f
 
 
@@ -685,3 +750,46 @@ def is_exempt(path):
         norm == marker or norm.startswith(marker + "/") or ("/" + marker + "/") in ("/" + norm)
         for marker in (".syndicate", ".claude")
     )
+
+
+def _loan_entries(text):
+    """(borrower_slug, borrowed_path, lender_slug) over OPEN lanes.
+
+    Walks the SAME way `_claims` does -- header state, Files block bounds, the
+    disclaimer prefix cut -- so a loan cannot be read out of a lane's narrative or
+    out of a CLOSED lane. Duplicated structure rather than a shared generator because
+    `_claims` is a public, heavily-called contract whose shape several callers depend
+    on; a second small walker is cheaper than changing that shape.
+    """
+    slug = None
+    open_lane = False
+    in_files = False
+    for line in text.splitlines():
+        if HEADER_RE.match(line):
+            m = LANE_RE.match(line) or ASCII_LANE_RE.match(line)
+            if m:
+                slug = m.group(1)
+                open_lane = bool(OPEN_RE.search(m.group(2)))
+            else:
+                slug, open_lane = None, False
+            in_files = False
+            continue
+        m = FILES_RE.match(line)
+        if m:
+            in_files = True
+            if open_lane:
+                for f, lender in _loan_paths(_claimable_prefix(m.group(1))).items():
+                    yield slug, f, lender
+            continue
+        if in_files:
+            stripped = line.strip()
+            if not stripped or (FIELD_RE.match(line) and not line[:1].isspace()):
+                in_files = False
+                continue
+            if _BULLET_RE.match(stripped) and not _files_bullet_continues(stripped):
+                in_files = False
+                continue
+            if open_lane:
+                seg = _claimable_prefix(stripped).lstrip("- ")
+                for f, lender in _loan_paths(seg).items():
+                    yield slug, f, lender

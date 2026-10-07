@@ -42,6 +42,10 @@ try:
         _malformed_headers,
         _norm,
         is_exempt,
+        # A recorded loan, honoured only when the named lender really holds the
+        # path. Reads the LOCAL lanes.md, so a loan it cannot see FAILS CLOSED --
+        # the write stays blocked. It never over-permits.
+        loan_is_honoured,
         matches,
     )
     from lane_marker import current_lane, safe_session_id as safe_session_id_of
@@ -201,6 +205,20 @@ def main():
                 conflict_source = source
     except Exception:
         return 0
+
+    # A RECORDED LOAN IS HONOURED, but only when the lender really holds the path.
+    # Without this a granted loan was unenforceable: on 2026-10-06 two borrowers and
+    # the OWNER were all blocked on one file, because a borrower's own claim cannot
+    # help it (`slug == current` is skipped) and counts against everyone else.
+    if conflict and current:
+        try:
+            lender = loan_is_honoured(text, current, rel)
+        except Exception:
+            lender = None
+        if lender:
+            sys.stderr.write(
+                f"LOAN HONOURED: {rel} is lent to '{current}' by '{lender}'.\n")
+            return 0
 
     if conflict:
         sys.stderr.write(
