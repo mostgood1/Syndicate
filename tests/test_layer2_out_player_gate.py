@@ -127,3 +127,35 @@ def test_end_to_end_off_is_not_on():
     seated, result = _seated_through_rebuild([_grid_prop("Allisha Gray"), _grid_prop("Rhyne Howard")])
     assert "Allisha Gray" in seated
     assert result["rows_player_out_on_feed"] == 0
+
+
+# ---------------------------------------------------------------------------
+# NAMED REFUSALS (lane layer2-out-gate-named). The counter alone said "4 rows
+# gated" on 2026-10-07 and whose they were could only be inferred from the
+# Layer 1 sweep log. The sample names them, bounded per sport like
+# rows_stale_quote_sample.
+# ---------------------------------------------------------------------------
+
+
+def test_the_sample_names_the_gated_players():
+    _, result = _seated_through_rebuild([_grid_prop("Allisha Gray", **_out()), _grid_prop("Rhyne Howard")])
+    sample = result["rows_player_out_on_feed_sample"]
+    assert {row["player_name"] for row in sample} == {"Allisha Gray"}
+    first = sample[0]
+    assert first["sport"] == "wnba" and first["market"] == "player_threes" and first["line"] == 1.5
+    assert first["availability"]["status"] == "OUT"
+    assert len(sample) == result["rows_player_out_on_feed"]
+
+
+def test_the_sample_is_empty_when_nothing_is_gated():
+    _, result = _seated_through_rebuild([_grid_prop("Allisha Gray"), _grid_prop("Rhyne Howard")])
+    assert result["rows_player_out_on_feed_sample"] == []
+
+
+def test_the_sample_is_capped_per_sport():
+    from syndicate.features.shared import layer2_board as l2
+
+    grid = [_grid_prop(f"Out Player {i}", **_out()) for i in range(l2._OUT_SAMPLE_PER_SPORT + 5)]
+    _, result = _seated_through_rebuild(grid)
+    assert result["rows_player_out_on_feed"] > l2._OUT_SAMPLE_PER_SPORT
+    assert len(result["rows_player_out_on_feed_sample"]) == l2._OUT_SAMPLE_PER_SPORT

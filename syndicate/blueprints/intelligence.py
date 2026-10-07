@@ -4116,6 +4116,7 @@ def board_layer2_shortlist_api():
                 # Basketball props whose player is OUT on the injury feed: not seated, counted.
                 "rows_player_out_on_feed": shortlist.get("rows_player_out_on_feed"),
                 "rows_player_out_on_feed_by_sport": shortlist.get("rows_player_out_on_feed_by_sport"),
+                "rows_player_out_on_feed_sample": shortlist.get("rows_player_out_on_feed_sample"),
                 # One-sided rows whose only value signal is an unmeasured (or
                 # losing) model. COUNTED, not withheld, since 2026-10-05 (lane
                 # `stop-market-withholding`): every line is judged on its own.

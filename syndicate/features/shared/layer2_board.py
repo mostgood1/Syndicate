@@ -5036,6 +5036,9 @@ def _quote_age_group(row: Mapping[str, Any]) -> tuple:
 
 
 _STALE_SAMPLE_PER_SPORT = 10
+# Rows the OUT-player gate refused, named (lane layer2-out-gate-named). Small on
+# purpose: it rides the persisted shortlist, which has a keyvalue size budget.
+_OUT_SAMPLE_PER_SPORT = 10
 _STALE_SAMPLE_FIELDS = (
     "sport", "kind", "market", "segment", "league", "event_id", "home_team", "away_team", "player_name",
     "side", "line", "commence_time", "board_lane", "market_state", "ev_basis", "ev_pct", "source", "price_source",
@@ -5209,6 +5212,7 @@ def select_shortlist(
     # A basketball prop whose player is OUT on the injury feed (board_enrichment._flag_out_player_props).
     player_out_on_feed = 0
     player_out_on_feed_by_sport: dict[str, int] = {}
+    player_out_on_feed_sample: list[dict[str, Any]] = []
     # Counted, never removed (lane `stop-market-withholding`, 2026-10-05).
     on_unmeasured_model = 0
     on_unmeasured_model_by_market: dict[str, int] = {}
@@ -5319,6 +5323,13 @@ def select_shortlist(
             player_out_on_feed += 1
             out_sport = str(row.get("sport") or "").strip().lower() or "unknown"
             player_out_on_feed_by_sport[out_sport] = player_out_on_feed_by_sport.get(out_sport, 0) + 1
+            # Named, not just counted: the count alone could only be attributed by inference.
+            if sum(1 for named in player_out_on_feed_sample if named.get("sport") == out_sport) < _OUT_SAMPLE_PER_SPORT:
+                named = {field: row.get(field) for field in ("sport", "event_id", "home_team", "away_team", "player_name",
+                                                             "market", "line", "side", "commence_time", "ev_pct")
+                         if row.get(field) is not None}
+                named["availability"] = {key: availability.get(key) for key in ("status", "feed_date", "feed_team")}
+                player_out_on_feed_sample.append(named)
             continue
         # Rows resting on an unmeasured (or losing) model are COUNTED here and
         # stay in the pool: accuracy ranks them, it does not hide them.
@@ -5590,6 +5601,7 @@ def select_shortlist(
         "rows_uninformative_ev": uninformative_ev,
         "rows_player_out_on_feed": player_out_on_feed,
         "rows_player_out_on_feed_by_sport": dict(sorted(player_out_on_feed_by_sport.items())),
+        "rows_player_out_on_feed_sample": player_out_on_feed_sample,
         # `[2026-09-11, user decision]`: one-sided rows withheld because their
         # ONLY value was an unmeasured model's edge. Counter, per-market
         # breakdown and mode ship in the SAME commit as the rule (`#397`).
