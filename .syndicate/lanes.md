@@ -1673,6 +1673,23 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **CONDITIONAL WALK FIX, PRE-REGISTERED 2026-10-07 (user: "fix the walk excess if the re-check confirms it"), before any full-window data exists.**
+  - Runs ONLY if the re-check above returns "STRUCTURAL EXCESS CONFIRMED". Otherwise nothing below happens.
+  - SPLIT: the built window's dates in order. FIT = first half; HOLDOUT = second half, never read before the single final read.
+  - DIAGNOSIS (FIT only): the starter BB excess by times through the order (BF 1-9 / 10-18 / 19+), from the replay's PA log against the actual play-by-play. It decides which lever group is tried first; all three are always in the grid.
+  - LEVERS. Two are new, as manager_pitching_overrides knobs whose default equals today's hardcoded value (byte-identical, to be proven before use):
+    - `tto_bb_coef` {1.1 (production), 0.55, 0.0} -- the third-time-through walk multiplier `1 + coef x tto_pen`;
+    - `fatigue_bb_coef` {0.14 (production), 0.07, 0.0} -- the past-stamina walk term;
+    - `inning_fatigue_pitch_scale` {0.35 (production), 0.175} (existing knob).
+    - One coordinate-descent pass from production on FIT, 100 sims; a move is accepted only if the objective drops.
+  - OBJECTIVE (FIT): sum of squared standardized errors of starter BB/start (scale 0.05), team BB/PA (5% of actual), starter K/BF (5%), starter outs mean (0.5), runs/game (0.30). A walk fix may not buy its gain from other moments.
+  - SHIP only if every check holds on HOLDOUT (100 sims, read once), chosen vs production:
+    - (1) |starter BB bias| falls by >= 50%;
+    - (2) no objective moment's |z| grows by more than 1.0;
+    - (3) starter |SO|, |H|, |ER| bias each worsen by <= 0.10;
+    - (4) |runs/game gap| no worse.
+    - Otherwise ship nothing and report.
+  - SHIP MECHANICS: the knob code (defaults = today's constants), the chosen values in the manager forward-override file, a fleet ff, V1 (config resolves) + V2 (post-ship sims match the new-config replay) as for the combined calibration, and an upstream PR addition.
 - **STARTER WALK RE-CHECK, PRE-REGISTERED 2026-10-07 (user: "then re-check the starter walk excess on the full window"), before any full-window data exists:**
   - Runs only if the June gate passes and the 07-16..09-27 build completes.
   - Replay: `mlb_strikeout_decomposition.py` on ~/asof_out_statsapi, all built dates, the SHIPPED config (fleet code 2bb481ef+), 100 sims, `--dump-rows`.
