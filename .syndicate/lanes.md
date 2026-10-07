@@ -1628,6 +1628,15 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Run the guard's decision for lane wnba-slate-and-out-props against basketball_props_smart_sim.py BEFORE the change (expect BLOCKED) and after (expect permitted); a forged loan naming a non-holder must stay BLOCKED; check_lane_invariants drops from 2 contested files to 1 (the unrelated peer collision); tests cover both controls.
 - Blocked by: none
 
+### soccer-model-edge-scale — OPEN — opened 2026-10-06 — session 5942cf5f-48c9-485b-99a8-e6e04c75bd83
+- **GOAL VERDICT 2026-10-06 ~22:30Z (5:30 PM CDT):** Goal: [user 2026-10-06: 'look into the soccer model edge scale issue'] Explain, with production numbers, why soccer Layer 2 rows give model EV = (fair + model_edge_pct/100) x odds - 1 of about -54% (published 10-05, n=2,215), name the code that produces soccer model_edge_pct and its units, and say what consumes it (rank, scorecard p_model, portfolio sizing) and how wrong each is -- ending in a fix proposal. -- **GOAL: MET** (findings `findings_2026-10-06_soccer_model_edge_scale.md`). H1 (units) FALSIFIED: me is absolute pp (me = (model_prob_over - fair) x 100 on served rows). H2 CONFIRMED as ALLOCATION: sim anytime = 0.45x market (0.62x if playing, 798 joined); players' xG sums to team xG exactly (1.000, 188 team-sides) but the priced players carry 0.92 of team goals by the market vs 0.48 by the sim -- goals spread flat over the squad (same bias soccer-shots-allocation-blend measured for shots). Fix belongs in player_props.py (held by soccer-shots-allocation-blend) -- proposed, not implemented; owner notified.
+- Goal: [user 2026-10-06: 'look into the soccer model edge scale issue'] Explain, with production numbers, why soccer Layer 2 rows give model EV = (fair + model_edge_pct/100) x odds - 1 of about -54% (published 10-05, n=2,215), name the code that produces soccer model_edge_pct and its units, and say what consumes it (rank, scorecard p_model, portfolio sizing) and how wrong each is -- ending in a fix proposal.
+- Files: .syndicate/findings_2026-10-06_soccer_model_edge_scale.md (NEW)
+- Hypothesis: H1: soccer model_edge_pct is RELATIVE ((p_model/fair - 1) x 100), not absolute probability points like other sports, so fair + me/100 is far below fair (often negative) on longshot props. H2: alternatively the soccer edge is absolute but its p_model is a different event (e.g. per-90 or team-level rate) than the priced side, so the gap is real model mismatch, not units.
+- Falsification test: H1 false if, on soccer rows, me equals (p_model - fair) x 100 where p_model is read from the row's projection; H2 false if p_model matches the priced event and me is absolute but small.
+- Verification: Per-market table on fleet data: fair, me, implied p_model under each units reading, and the code path (file:line) that sets soccer model_edge_pct; written to the findings file.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
