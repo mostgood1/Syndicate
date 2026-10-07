@@ -1694,6 +1694,15 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Fidelity table (statsapi-source vs stored-input rebuild, June) then per-date coverage of the 07-16..09-27 build
 - Blocked by: none
 
+### layer2-coverage-games-in-sum — CLOSED — opened 2026-10-07 — closed 2026-10-07 — session 5d9a4d65-467f-4895-aad0-fdadc305b279
+- **GOAL VERDICT (closed 2026-10-07).** Goal, verbatim: "games_in_index / games_in_artifact sum across window dates again (date-keyed NBA/NHL/WNBA indexes), so the old-vs-new merge A/B over real per-date coverage differs only in artifact_*, pct_* and tallies" -- **GOAL: MET** in code. The real-payload A/B after the fix: NBA 0 diffs, WNBA 0, NHL 2 (artifact_date, probability_refusals tally), NCAAF 3 (pct, two tallies); 49 tests pass. Fleet load is owed to the next refresh-worker restart (diagnostic fields only); see log/2026-10-07.md.
+- Goal: games_in_index / games_in_artifact sum across window dates again (date-keyed NBA/NHL/WNBA indexes), so the old-vs-new merge A/B over real per-date coverage differs only in artifact_*, pct_* and tallies
+- Files: pipeline/layer2_shortlist.py (_COVERAGE_IDENTITY_KEYS ONLY), tests/test_layer2_coverage_identity_merge.py
+- Hypothesis: a1d3b030 classed games_in_* as identity for NFL's season-wide index; NFL now joins once, so the rule only turns date-keyed sums into lists (NBA 9 -> [3, 6], NHL 13 -> [10, 3], A/B 2026-10-07)
+- Falsification test: A/B after the change still shows games_in_* differing old vs new
+- Verification: Re-run the real-payload A/B: NBA/NHL games_in_* equal old values; unit tests pass
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

@@ -2404,9 +2404,15 @@ _SELF_WINDOWING_PROJECTION_SPORTS = frozenset({"soccer", "nfl"})
 # Coverage-half keys that name the ARTIFACT a join read rather than count rows
 # it joined. Summing them across window dates is meaningless (season 2026 x 7 =
 # 14182), so the window merge carries their distinct values instead.
-# `games_in_index` / `games_in_artifact` are the size of the index consulted,
-# which a date-blind join consults once per pass.
-_COVERAGE_IDENTITY_KEYS = frozenset({"games_in_index", "games_in_artifact"})
+#
+# `games_in_index` / `games_in_artifact` are deliberately NOT here
+# `[2026-10-07, lane layer2-coverage-games-in-sum]`. They were, for NFL's
+# season-wide index, but NFL now joins once, and for the sports that still loop
+# the index is DATE-KEYED, so the sum is the window's real game count. An A/B of
+# the old and new merge over the fleet's real per-date coverage read NBA
+# `games_in_index` 9 -> [3, 6] and NHL `games_in_artifact` 13 -> [10, 3] with
+# them in this set.
+_COVERAGE_IDENTITY_KEYS: frozenset[str] = frozenset()
 
 
 def _is_coverage_identity_key(key: str) -> bool:

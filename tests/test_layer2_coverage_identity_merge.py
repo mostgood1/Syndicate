@@ -77,18 +77,22 @@ def test_distinct_weeks_become_a_sorted_list_and_stay_per_date():
     assert merged["per_date"]["2026-10-12"]["prop_coverage"]["artifact_week"] == 6
 
 
-def test_index_size_is_identity_and_string_identity_survives():
-    """NHL's game half carries `artifact_date` and `games_in_artifact`."""
+def test_string_identity_survives_and_date_keyed_index_sizes_sum():
+    """NHL's game half carries `artifact_date` and `games_in_artifact`.
+
+    The index size SUMS: for every sport that still loops, each date's index is
+    a different slate (A/B on the fleet, 2026-10-07: NBA 3 + 6 = 9, NHL 10 + 3 = 13).
+    """
     merged, _ = _run({
-        "2026-10-06": {"game_coverage": {"artifact_date": "2026-10-06", "games_in_artifact": 9,
-                                         "games_in_index": 321}},
-        "2026-10-07": {"game_coverage": {"artifact_date": "2026-10-07", "games_in_artifact": 9,
-                                         "games_in_index": 321}},
+        "2026-10-06": {"game_coverage": {"artifact_date": "2026-10-06", "games_in_artifact": 10,
+                                         "games_in_index": 3}},
+        "2026-10-07": {"game_coverage": {"artifact_date": "2026-10-07", "games_in_artifact": 3,
+                                         "games_in_index": 6}},
     })
     half = merged["game_coverage"]
     assert half["artifact_date"] == ["2026-10-06", "2026-10-07"]
-    assert half["games_in_artifact"] == 9
-    assert half["games_in_index"] == 321         # not 642
+    assert half["games_in_artifact"] == 13       # not [10, 3]
+    assert half["games_in_index"] == 9           # not [3, 6]
 
 
 def test_tally_dict_sums_per_key_instead_of_first_wins():
