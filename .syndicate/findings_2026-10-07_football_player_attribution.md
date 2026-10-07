@@ -80,6 +80,30 @@ The smoke run (plumbing; 4 FIT games, 1,405 quote rows; not a result) exposed tw
 
 Nothing else changes. Phase B runs after both fixes, on the FIT seasons.
 
+## NCAAF data step — PRE-REGISTERED 2026-10-07 (user: "start the NCAAF attribution data step while that runs")
+
+**What is missing for NCAAF, measured:** local CFBD plays carry no player ids; player box scores exist
+for 2025 only (`ncaaf_player_game_stats_snapshot.csv`, 35,829 player-games); historical prop quotes
+exist for 2026 wk1 only (409 rows, captured 3 days pre-kickoff) -- nothing for FIT 2024 or held-out 2025.
+
+**Part 1 -- who touched the ball, from CFBD `playText` (no API calls).** Rules, fixed now:
+`<A> run for ...` -> rusher A (Rush, Rushing Touchdown, fumble rows of that shape); `<A> pass complete
+to <B> for ...` -> passer A, receiver B (Pass Reception, Passing Touchdown); `<A> pass incomplete( to
+<B>)?` -> passer A, target B; `<A> sacked by` -> passer A (sack); `<A> pass intercepted` -> passer A.
+Yards from CFBD `yardsGained`, never parsed. Names normalised (lower, punctuation and suffixes
+Jr/Sr/II/III/IV stripped). Team = the play's `offense`.
+**Acceptance (before use), on 2025 vs the box scores, joined on (game, team, normalised name):** among
+player-games with a touch on either side, >= 90% within +-5 yds for rushing yards AND receiving yards,
+and >= 90% within +-1 for rush attempts AND receptions; passing yards >= 90% within +-10. Parse
+coverage (plays of those types matched by a rule) reported. Below the bar -> the parser is fixed or
+the NCAAF arm stops; it is never used below the bar.
+
+**Part 2 -- what the book offered (grading data).** OddsAPI historical event odds for NCAAF player
+props, FIT 2024 and held-out 2025, snapshot at kickoff - 10 min (the NFL convention). One probe call
+first to measure the credit cost per event; the bulk pull is sized from that and reported before it
+runs at scale. Stored in a PRIVATE root (`C:\tmp\football_scenarios\ncaaf_props\`), never the shared
+mirror.
+
 ## Results
 
 (none yet)
