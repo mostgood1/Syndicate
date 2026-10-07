@@ -325,7 +325,10 @@ def run_sim(args) -> int:
         dest = out / f"{d}.jsonl"
         if dest.exists():
             continue
-        props_csv = bt.hist_props_csv(BtArgs, d)
+        # REUSE an existing snapshot: parallel sweep processes each rewriting the same shared file raced and left
+        # truncated snapshots (2026-10-07: two sweep points simulated 0 games on every date). Pre-generate once.
+        existing = Path(args.bt_out) / "asof" / "props_odds_hist" / f"{d}.csv"
+        props_csv = existing if existing.exists() and existing.stat().st_size > 1000 else bt.hist_props_csv(BtArgs, d)
         if props_csv is None:
             print(f"SIM_SKIP {d} no props snapshot", flush=True)
             continue
@@ -342,6 +345,9 @@ def run_sim(args) -> int:
                 smart_sim_overwrite=True, log_file=Path(args.out) / f"sim_{args.league}_{d}.log")
         except Exception as exc:  # noqa: BLE001
             print(f"SIM_FAIL {d} {exc!r}"[:300], flush=True)
+        if not games:
+            print(f"SIM_EMPTY {d} -- nothing simulated; no output written (a 0-game file would read as a result)", flush=True)
+            continue
         with dest.open("w", encoding="utf-8") as fh:
             for g in games:
                 fh.write(json.dumps(g) + "\n")
