@@ -29,7 +29,7 @@ from syndicate.features.shared.model_version import code_version
 from syndicate.features.shared.odds_lifecycle import market_feature_summary
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 
 
 SCHEMA_VERSION = 1
@@ -252,6 +252,7 @@ def ledger_index_session(path: Path | str | None = None) -> Iterator[None]:
     _LEDGER_INDEX_SESSION.update(
         {"active": True, "key": key, "index": _read_chunk_index_from_disk(path), "dirty": False}
     )
+    _LEDGER_INDEX_SESSION["touched_chunks"] = {}
     try:
         yield
     finally:
@@ -260,8 +261,18 @@ def ledger_index_session(path: Path | str | None = None) -> Iterator[None]:
                 index = _LEDGER_INDEX_SESSION.get("index")
                 if isinstance(index, dict):
                     _write_chunk_index_to_disk(path, index)
+            # Each chunk appended to during the session is RE-COUNTED ONCE here
+            # (an exact streaming count, so a concurrent writer cannot make it
+            # drift) instead of once per appended record -- see
+            # `_append_evaluation_ledger_record`.
+            for chunk_name, chunk_path in sorted((_LEDGER_INDEX_SESSION.get("touched_chunks") or {}).items()):
+                try:
+                    record_count = _count_jsonl_records(Path(chunk_path))
+                except Exception:
+                    record_count = 1
+                _write_chunk_manifest(path, chunk_name=chunk_name, record_count=record_count)
         finally:
-            _LEDGER_INDEX_SESSION.update({"active": False, "key": None, "index": None, "dirty": False})
+            _LEDGER_INDEX_SESSION.update({"active": False, "key": None, "index": None, "dirty": False, "touched_chunks": {}})
 
 
 def _read_chunk_index_from_disk(path: Path | str | None = None) -> dict[str, dict[str, Any]]:
@@ -457,6 +468,15 @@ def _append_evaluation_ledger_record(path: Path, payload: Mapping[str, Any]) -> 
     if identity:
         index[identity] = {"chunk": chunk_name, "path": str(chunk_path), "updated_at": _utc_now()}
         _write_chunk_index(target, index)
+    # INSIDE A SESSION THE CHUNK IS COUNTED ONCE, AT EXIT -- lane `web-restart-healthz`
+    # `[2026-10-07]`. py-spy on the fleet refresh-worker (2026-10-06 23:15-23:25 CT):
+    # 30.5% of the board loop in `maybe_record_board_state_to_evaluation_ledger`, with
+    # `_count_jsonl_records` (streams the WHOLE day chunk, up to ~1 GB) 12.2% and the
+    # manifest/index rewrites ~15% -- per appended record, so a board's worth of
+    # recommendations cost O(records x chunk size). Outside a session: unchanged.
+    if _LEDGER_INDEX_SESSION.get("active") and _LEDGER_INDEX_SESSION.get("key") == _index_session_key(target):
+        _LEDGER_INDEX_SESSION.setdefault("touched_chunks", {})[chunk_name] = str(chunk_path)
+        return
     try:
         record_count = _count_jsonl_records(chunk_path)
     except Exception:
@@ -2650,28 +2670,33 @@ def build_intelligence_evaluation_bundle(
     policy_control = _policy_control_summary(response=response_payload, recommendations=recommendation_rows)
     portfolio_tracking = _portfolio_tracking_summary(response=response_payload, recommendations=recommendation_rows)
     portfolio_events = _portfolio_event_summary(response=response_payload)
-    prediction_record = record_prediction(query=query_payload, response=response_payload, artifact_metadata=artifact_metadata, persist=persist, ledger_path=ledger_path)
-    recommendation_records = [
-        record_recommendation(
-            prediction_record=prediction_record,
-            recommendation=recommendation,
-            artifact_metadata=artifact_metadata,
-            persist=persist,
-            ledger_path=ledger_path,
-        )
-        for recommendation in recommendation_rows
-    ]
-    portfolio_event_rows = [item for item in response_payload.get("portfolio_events") or [] if isinstance(item, Mapping)]
-    portfolio_event_records = [
-        record_portfolio_event(
-            prediction_record=prediction_record,
-            portfolio_event=portfolio_event,
-            artifact_metadata=artifact_metadata,
-            persist=persist,
-            ledger_path=ledger_path,
-        )
-        for portfolio_event in portfolio_event_rows
-    ]
+    # ONE INDEX WRITE AND ONE COUNT PER CHUNK FOR THE WHOLE BUNDLE, not per record
+    # (lane `web-restart-healthz`, see `_append_evaluation_ledger_record`). The
+    # session is the one settlement already uses; nothing is read differently
+    # inside it -- the in-memory index is the same object the appends mutate.
+    with (ledger_index_session(ledger_path) if persist else nullcontext()):
+        prediction_record = record_prediction(query=query_payload, response=response_payload, artifact_metadata=artifact_metadata, persist=persist, ledger_path=ledger_path)
+        recommendation_records = [
+            record_recommendation(
+                prediction_record=prediction_record,
+                recommendation=recommendation,
+                artifact_metadata=artifact_metadata,
+                persist=persist,
+                ledger_path=ledger_path,
+            )
+            for recommendation in recommendation_rows
+        ]
+        portfolio_event_rows = [item for item in response_payload.get("portfolio_events") or [] if isinstance(item, Mapping)]
+        portfolio_event_records = [
+            record_portfolio_event(
+                prediction_record=prediction_record,
+                portfolio_event=portfolio_event,
+                artifact_metadata=artifact_metadata,
+                persist=persist,
+                ledger_path=ledger_path,
+            )
+            for portfolio_event in portfolio_event_rows
+        ]
     market_features = [
         recommendation.get("market_features")
         for recommendation in recommendation_rows
