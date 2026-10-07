@@ -301,3 +301,18 @@ clears his line -- the weak link is player-level (carry shares, committee backfi
 team total. Passing yards remains the only market beating production, corrected or not. No market beats the
 book. Next design candidates (each to be pre-registered): per-player carry-share quality (recency weighting,
 injury/availability), and using attribution only where it has shown information (QB passing yards).
+
+### NFL Phase B with E1(H=2) shares + (c, r) = (0.7, 0.1) — same 366 games / 122,955 rows (2026-10-07)
+
+attr - prod (game-clustered 95% CI), three runs side by side: uncorrected / +run-share / **+shares**:
+passing_yards -0.074 / -0.078 / **-0.078 [-0.132, -0.030]** (slope 0.52 vs prod 0.30);
+rushing_attempts +0.336 / +0.226 / **+0.197 [+0.138, +0.262]**, slope 0.02;
+rushing_yards +0.086 / +0.089 / **+0.124 [+0.085, +0.168]**, slope 0.13;
+receptions +0.075 / +0.069 / +0.061; receiving_yards +0.024 / +0.028 / +0.030; anytime_td +0.049 / +0.042 /
++0.019 [-0.021, +0.062]; QB markets unchanged (QB fixed by the quote).
+**Reading:** two pre-registered improvements to the skill-position inputs (team volume, then shares) moved the
+rushing and receiving markets only slightly and left their calibration slopes near zero (rushing attempts 0.02):
+for those markets the sim-attributed probabilities carry essentially no information about which player clears a
+line beyond production's rate model. QB passing yards is the only market where simulating the game adds
+information, stable at -0.078 across all three runs. Lane falsification is defined on the HELD-OUT season; on
+FIT the evidence supports narrowing the held-out read to QB passing yards (+ passing attempts as secondary).
