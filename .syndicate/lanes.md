@@ -1680,6 +1680,13 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **FULL BUILD + WALK RE-CHECK RESULT 2026-10-07 ~20:05Z (read once):**
+  - Build: 74/74 dates rc=0, **985 games** (= the schedule's 984 Final + 1 Completed Early); 16 postponed + 1 cancelled skipped; 0 short projections.
+  - Walk re-check (shipped config: forward overrides as served, short 0.14, shell 4; 100 sims; 1964 starts, 6 starter mismatches excluded):
+    - starter BB/start model 1.762 vs actual 1.727, bias **+0.035**, game-clustered SE 0.029 (**+1.2 SE**);
+    - BB/BF 0.0808 vs 0.0815; team BB/PA 0.0863 vs 0.0874.
+  - **VERDICT: NO STRUCTURAL EXCESS -> no change; the conditional walk fix does NOT run.** The June validation +0.126 was period noise. Per batter, starters walk slightly LESS than real.
+  - The window's second half was never read for any fitting decision, so the out-of-sample evaluation proceeds now.
 - **FIDELITY GATE RESULT 2026-10-07 ~18:10Z: PASS -> the 07-16..09-27 build started (scratch root ~/asof_out_statsapi).**
   - 24 June FIT dates built from StatsAPI only (24/24 rc=0). Replayed against the stored-input rebuild: same shipped code, 100 sims, same seeds, game set = stored-input pks. 302 vs 304 games; 551 vs 600 starts.
   - All within tolerance:
