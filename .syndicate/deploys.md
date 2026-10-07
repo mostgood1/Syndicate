@@ -47568,3 +47568,9 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 ## 2026-10-07 ~19:05Z -- CORRECTION to the 18:54:01Z entry (lane `soccer-team-history-current-season`): a4281cc8 was RE-loaded, not first loaded
 
 - a4281cc8 was first loaded at 17:09:28Z by lane web-restart-healthz's ff (43afa8cd -> faa1cfea) + refresh-worker restart (pid 3197737); my 18:55:37Z down/up only re-loaded it. Its owner (layer2-out-gate-reach, session 936c0a27) had already verified it on builds from that earlier worker (rows_player_out_on_feed=4 wnba, Allisha Gray seated 0) and closed GOAL MET; correction on its side in 384c75c9. Nothing else in the 18:54:01Z entry changes.
+
+## 2026-10-07 ~19:30Z (2:30 PM CT) -- ADDENDUM to 18:51:32Z (Layer 2 OUT gate reading): the 4 gated rows ARE Allisha Gray's -- caveat closed by inference, re-derived by session 4d5b3bd3
+
+- The gate counts only rows that carry `player_availability`. Its only writer on origin/main is `board_enrichment.py:1367` (`_flag_out_player_props`); `layer2_board.py` only copies it (:3107) and reads it (:5317).
+- refresh-worker.log, last 50 `OUT_PLAYER_PROPS_FLAGGED` lines spanning the 18:51Z build: 23x `sport=wnba ... rows=9 players=Allisha Gray`, and 27x nba `rows=0 players=<none>`. No other player was stamped on any grid row.
+- So the 4 gated rows are a subset of Gray's 9 grid rows (the rest fell to earlier rules). Reasoning first offered by lane layer2-out-gate-reach's owner; both premises re-checked here. Naming gated rows in the payload would be a separate change.
