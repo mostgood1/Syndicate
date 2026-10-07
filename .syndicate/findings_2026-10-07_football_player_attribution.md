@@ -104,6 +104,47 @@ first to measure the credit cost per event; the bulk pull is sized from that and
 runs at scale. Stored in a PRIVATE root (`C:\tmp\football_scenarios\ncaaf_props\`), never the shared
 mirror.
 
+### NCAAF data step — first validation FAILED; parser amendment (2026-10-07, bar unchanged)
+
+First parse: coverage 96-99% for 2023-24 and wk1-8 of 2025, but **0-6% from 2025 week 9 on** -- CFBD's
+`playText` switched to an official-gamebook style ("(14:14) Shotgun #47 B.Bachmeier pass complete short
+left to #11 P.Kingston caught at BYU34, for 1 yard ..."): jersey numbers, initial.last names. The
+2025 validation FAILED the pre-registered bar on every stat (rush yds 0.576, rec yds 0.604, rush att
+0.607, receptions 0.755, pass yds 0.616 vs 0.90) and the parse was NOT used.
+**Amendment (the pre-registration allows "the parser is fixed"; the bar does not move):** add rules for
+the gamebook style (`#N <name> rush`, `#N <a> pass complete ... to #N <b>`, `pass incomplete ...
+(intended for|to) #N <b>`, `#N <a> sacked`, `#N <a> pass intercepted`), and key players by FIRST
+INITIAL + LAST NAME in every format (and the box scores the same way), since gamebook rows carry only
+the initial. Re-validated on 2025 against the same bar.
+
+Second validation (after the gamebook rules): coverage 98-99%; receptions PASS 0.960; rush yds 0.762,
+rush att 0.819, rec yds 0.862, pass yds 0.800 still FAIL -> not used. Decomposed: QB rows are 1,415 of the
+2,296 rushing failures and adding sack yardage fixes 832 of them -- **NCAAF box scores count sacks as QB
+rushing** (an NFL/NCAAF stat-definition difference, so the NCAAF attribution must also charge a sim
+sack to the QB's rushing); the rest are two unhandled text shapes (summary TD lines "X 7 Yd Run (..
+Kick)" / "X 76 Yd pass from Y", and multi-word gamebook names "#7 C.Del Rio-Wilson"). **Amendment:** sacks
+count as QB rush attempts/yards for NCAAF; both text shapes added. Same bar.
+
+Third validation: rush att 0.908 PASS, receptions 0.968 PASS; rush yds 0.851, rec yds 0.885, pass yds 0.840
+FAIL -> not used. Counts pass and yards fail, so the defect is the YARD field: on 2-9% of plays CFBD's
+`yardsGained` folds in penalty yardage ("pass complete ... for 13 yds ... Personal Foul" -> 28) or is
+corrupt (a "no gain" run at -62). **Amendment (reverses the pre-registered "yards from yardsGained,
+never parsed"):** yards come from the play TEXT when it states them ("for N yd(s)/yard(s)", "for N
+yard(s) loss", "for a loss of N", "for no gain", "N Yd Run/pass"), `yardsGained` only as the fallback.
+Same bar.
+
+Fourth validation (text yards): receiving yds 0.901, rush att 0.908, receptions 0.968 PASS; **rushing yds
+0.873 and passing yds 0.868 still FAIL -> NOT ACCEPTED, not used.** Open leads: kneel-downs in the
+"B. Lowry takes a knee" shape are unparsed while box scores count them as QB rushes; 447 passer rows
+parse with no box match (a join, not a parse, problem -- unexamined).
+
+**Part 2 probe (2026-10-07, 11 credits):** OddsAPI historical NCAAF events for 2024-10-12 15:50Z = 76
+events (1 credit); Alabama vs South Carolina `player_rush_yds` = 5 books, 63 outcomes (10 credits);
+4,127,431 credits remaining. The 2024 NCAAF props archive EXISTS. Bulk estimate, from the repo's
+measured billing (`backfill_nfl_historical_props.py`: 10 credits per market-region per event): ~7
+markets x 10 = ~70 credits per game with props; 2024 + 2025 FBS ~1,300 games -> <= ~91k credits
+(~2% of the cap; fewer, since not every game has props). Not run at scale yet.
+
 ## Results
 
 (none yet)
