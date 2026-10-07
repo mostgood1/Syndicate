@@ -1589,6 +1589,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Unit test timing; fleet wrapper finish time + stderr tail
 - Blocked by: none
 
+### wnba-league-status-roster — OPEN — opened 2026-10-06 — session 4d5b3bd3-f83c-45b6-b8c2-0c4eb3be33d5
+- Goal: WNBA league_status_<D>.csv holds WNBA players only: vendor build_league_status builds its roster from WNBA-native sources (processed rosters file, else the season's WNBA player_logs, WNBA tricodes only) and asks ScoreboardV2 for the WNBA slate (league_id 10), never falling through to nba_api's NBA team/player lists; verified by unit tests (no NBA team or player with NBA-only fallbacks stubbed to NBA data) and, on the fleet, by the next write-pregame-expected-minutes run writing a league_status with 0 non-WNBA tricodes and WNBA rows for the slate teams (baseline: 09-30..10-08 files are ~600 NBA rows, 30 NBA teams), with the downstream reader effects (SmartSim excluded map + pool, predict-props league-status maps) measured old vs new before the ff.
+- Files: vendor/wnba_betting_repo/src/wnba_betting/league_status.py, tests/test_wnba_league_status_roster.py (NEW)
+- Hypothesis: No rosters_*.csv exists in the fleet's wnba processed dir, so build_league_status falls to _fetch_league_rosters_via_nba (nba_api static_teams = NBA list + CommonTeamRoster) and writes the NBA roster; _today_slate_team_tricodes' ScoreboardV2 has no league_id (NBA slate), so NBA ATL/GSW are 'on slate'.
+- Falsification test: If the fixed builder, run on the fleet's 10-07 inputs, still emits a non-WNBA tricode or no WNBA rows, the roster source is elsewhere.
+- Verification: Unit tests; offline build on fleet inputs (to a scratch dir) + reader diffs old vs new; after ff, the next league_status_<D>.csv on the fleet has only WNBA tricodes; deploys.md.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
