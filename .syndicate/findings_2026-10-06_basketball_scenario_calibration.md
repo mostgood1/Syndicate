@@ -164,3 +164,44 @@ Not flagged:
 
 S12 (back-to-back) was not computed: it needs the schedule join -- owed.
 
+## Phase 2 #1 — SPREAD JITTER, PRE-REGISTERED 2026-10-07 ~15:10Z (user: "Spread jitter first"), BEFORE any engine change
+
+**Diagnosis already measured (NBA FIT sims, 794 games with lines):**
+- The sim's margin dispersion around the spread (19.4) is mostly WITHIN-game: the draw SD of the final margin is
+  **18.2**. Only 6.7 is between-game mis-centring of the sim mean vs the line (offset −0.6).
+- Total: within-game 19.3, between-game 6.1.
+- NOT the driver:
+  - **per-draw targets:** fixed per game (`smart_sim.py:3735`);
+  - **team volume difference:** sim within-game SD 8.05 plays vs real 7.12 (real true-possession difference SD
+    3.0).
+- So the excess is possession-level randomness inside `events.py::simulate_pbp_game_boxscore`.
+
+**Levers (each a NEW `EventSimConfig` field, default = today's hardcoded value, so unset == byte-identical):**
+- L1 `possession_alternation` (default 0.85, `events.py:1323`): the probability the next possession switches to the
+  other team. Today the other 15% is a coin flip, an unrealistic source of possession imbalance. Real possessions
+  alternate; offensive rebounds extend inside a possession (already modelled).
+- L2 `env_sd_scale` (default 0.65, `events.py:1786`): the scale of the per-quarter environment random draw
+  `q_sd_mult`.
+- L3 `possessions_jitter` (already a config field, 0.06): the per-quarter possession-count draw.
+- The same fields go in the WNBA engine copy (`vendor/wnba_betting_repo/.../sim/events.py`). Vendor edits also go
+  upstream (CLAUDE.md: a vendor-only fix is reverted by the next re-pull).
+
+**Measurement protocol:**
+1. Byte-identical proof first: seeded sha256 of real output on a fixed 3-game NBA fixture, fields unset vs HEAD.
+2. Reachability: L1 = 1.0 vs default on one game changes the margin SD (off != on).
+3. **Lever sweep on a FIXED FIT subsample: 12 FIT dates chosen by seed 7 (all games on them), 200 draws, the Phase-1
+   harness.** Each lever is moved alone over a pre-set grid:
+   - L1 ∈ {0.85, 0.95, 1.0};
+   - L2 ∈ {0.65, 0.4, 0.2, 0.0};
+   - L3 ∈ {0.06, 0.03, 0.0}.
+   Each point reports within-game margin SD, S8 margin/total SD, S3 quarter SDs, S5 blowout rate, S7 OT rate.
+4. **Joint fit:** over the product of the grid points that moved the targets, choose the config minimising
+   Σ ((sim − real) / real CI half-width)² over S3 (4 rows), S5 (all), S8 (2 rows), S7 (all) on the subsample.
+   The quarter-share rows (S2) are NOT in this objective: that is Phase 2 #2.
+5. Re-run the FULL FIT window with the chosen config; the Phase-1 table must show S8 margin SD inside or nearer
+   the real CI with no S2/S6/S9 row moving by more than its own SE.
+6. VALIDATION is not read here; it is read once at the end of Phase 2, for the combined config.
+
+**Refuted if:** no lever setting brings within-game margin SD below 16.0 on the subsample (the excess is then
+elsewhere: shot-level or lineup randomness, to be diagnosed next) -> L1-L3 recorded as EXONERATED as the driver.
+
