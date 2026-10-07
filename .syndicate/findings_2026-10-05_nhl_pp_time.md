@@ -160,6 +160,15 @@ attribution helps elite assists (-0.7..-2.1) and costs everyone else more. C3's 
 (bucket 0.1: 0.160 -> 0.171 vs actual 0.146; bucket 0.4: 0.437 -> 0.421 vs 0.454) is therefore not an
 attribution-sharpness effect; the next candidate is the EV on-ice goal distribution (line quality).
 
+## 7c. Line-quality re-fit under C3 -> C5 (fit passed, held-out FAILED)
+
+Fit window (Nov-Dec, 5,262 skater-games, d x1e3 vs C3): line quality 0.75 criterion -0.24; 1.0 criterion -1.52
+(ASSISTS@0.5 -0.90 [-1.84,-0.01]; BLOCKS@1.5 +1.18 [+0.43,+1.96]) -> 1.0 chosen (C5). Held-out Jan-Apr regular vs
+PRODUCTION (7,899): ASSISTS@0.5 +0.47 [-0.39,+1.37], POINTS@0.5 +0.09, BLOCKS@1.5 +1.00 [+0.29,+1.68] WORSE;
+SOG@2.5 -0.55, SOG@3.5 -0.35, GOALS@0.5 -0.26 (n.s.). Playoffs: SOG@3.5 -1.09 better, none worse. Full regular
+(13,161): BLOCKS@1.5 +1.11 worse, everything else n.s. Ship rule (ASSISTS and POINTS@0.5 better, nothing worse)
+NOT met. Engine pinned to 25957671 for every arm (467a2a92 turns the roster shot-volume blend on; not tested here).
+
 ## 8. PK units (found, not fixed)
 
 PK1 skaters ~88% of team PK time (6.0 sim vs 2.1-2.5 real PK min/game), PK2 0.15 vs 0.42 share, skaters

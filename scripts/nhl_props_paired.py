@@ -74,6 +74,7 @@ def main() -> int:
     ap.add_argument("--var", required=True)
     ap.add_argument("--records", default="")
     ap.add_argument("--json", default="")
+    ap.add_argument("--from-date", default="", help="score only dates >= this (held-out window)")
     args = ap.parse_args()
     rec_path = args.records or os.path.join(args.base, "records.pkl")
     acts = pickle.load(open(rec_path, "rb"))["actuals"]
@@ -120,6 +121,8 @@ def main() -> int:
     for arm in ("regular", "playoff"):
         a = load(args.base, arm)
         b = load(args.var, arm)
+        if args.from_date:
+            a = {k: v for k, v in a.items() if v["date"] >= args.from_date}
         res[arm] = {}
         print(f"== {arm}: {os.path.basename(args.var)} vs {os.path.basename(args.base)} (d = var - base; negative is better)")
         for seg, sel in segs.items():
