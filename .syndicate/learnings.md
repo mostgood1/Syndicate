@@ -3231,3 +3231,8 @@ own prior verdicts, not by anything failing.
 - **Measured 2026-10-06:** four "Run now" dispatches froze on their first tool call (permission prompt, no child process). After `stop_session`, `list_task_runs` reported each as `status: succeeded`. None had executed a single command.
 - **Rule:** a run's `status` says the session ended, not that the task did its job. Before believing a run, read its last events (`list_events`) or the artifact or ledger entry it was supposed to write. A run whose last event is a tool call with no result, and no matching process on the machine, is FROZEN, not slow.
 - **Same session:** an LLM run's prose summary can contradict its own table ("beat pooled in all four sports" over a table where NFL lost). Relay the numbers, not the summary sentence.
+
+## 2026-10-07 — FORBIDDEN: judging a 2026-27 squad list by what you "know" about who plays where `[lane soccer-roster-refresh]`
+- **What happened:** the refreshed EPL roster newly dropped Romero, Watkins, Rodri, Martinelli and Vicario from the sim, and I called it a regression ("real, current regulars") before checking.
+- **What was true:** none of them had a 2026-27 row in the league's stats file (5+ rounds in), and none was on any club in ESPN's current roster. Spurs' current list holds Robertson, Tonali and Marmoush. They had left, and it was the July roster that had been wrong.
+- **How to apply:** a model's or a session's football knowledge predates the season being served. Before calling a squad change wrong, check the two sources the system itself trusts (the current-season stats file and the current roster) for that player, and say which one disagrees.
