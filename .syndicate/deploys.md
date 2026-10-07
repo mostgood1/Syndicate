@@ -47268,3 +47268,18 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
   - `recommendations_2026-10-09.json` 14:26:30Z: dropped 169, 49 props, 1 match.
 - **Result:** served dropped 193 -> 169, exactly the offline number. The 10-10 slate carries +20 player props. The watcher's checked_at (14:42Z) is later than the first hit (12:04Z): it polled every 120 s, so the gap is most likely the host sleeping. It does not affect the reading.
 - **Still not measured:** whether the props are more accurate as a result.
+
+## 2026-10-07 14:43:51Z (9:43 AM CT) -- LOCAL FLEET FF -> 9d7bd317 (NOT to main's tip) + refresh-worker-only restart: evaluation-ledger append batching -- **LOADED; reading OWED** (lane `web-restart-healthz`)
+
+- **who/why:** user: "yes profile the remaining stages", then "Approve loan" (intelligence_evaluation.py from accuracy-ledger-budget-raise), then "Load now".
+- **diagnosis (py-spy, read-only via `wsl -u root`, refresh-worker pid 2645943, 04:15:16-04:25:07Z, 4,981 samples):** 30.5% of the board loop in `maybe_record_board_state_to_evaluation_ledger` -> `build_intelligence_evaluation_bundle` -> `record_recommendation` -> `_append_evaluation_ledger_record`, per NEW record re-streaming the whole day chunk (`_count_jsonl_records` 12.2%; measured 6.94 s per count on the 334 MB 2026-10-06 chunk) and rewriting index (10.4%) + manifest. That is the ~159 s SETTLEMENT_STRAGGLERS -> STATE_PERSIST gap. Late-night stage timings for reference (04:15Z build): shortlist 123.6 s, kalshi refresh 36.6 s, kalshi join 9.4 s, portfolio 51.3 s.
+- **fix:** 097ea007 (rebased as 9d7bd317 on main): the bundle's appends run in the existing `ledger_index_session`; inside a session each touched chunk is counted ONCE at exit. Equivalence test: identical chunk files + index + manifest, counts 30 -> 2; 29 ledger/evaluation/settlement test files 260 passed, 0 failed.
+- **ff target deliberately 9d7bd317, not main's tip 56e7a5c2:** main had `2790fdf7` (nhl-pk-units, hockeysim engine) and `2989eda0` (soccer few-match gate) AFTER my commit; a refresh-worker restart would have loaded them unannounced. Ride-along up to 9d7bd317: `scripts/football_scenario_{rates,refit,replay}.py` (acfa87bb; offline, referenced only in comments) -- INERT. The first fleet `git fetch` hit a concurrent ref lock (`cannot lock ref refs/remotes/github/main`); re-fetched before reading the diff.
+- **locks:** status re-read (refresh-worker free) immediately before acquire; released after verify.
+- **timeline (CT):** ff 09:43:51; TERM pid 2761492 09:43:51; `exited code=0 after 1995s`; new pid **2767262** 09:44:01; environ limit 6144; `status` code=9d7bd317; web healthz 200 (1.5 ms).
+- **verify (OWED):** the next two builds' SETTLEMENT_STRAGGLERS -> STATE_PERSIST gap vs ~159 s, and whole-build time.
+
+## 2026-10-07 ~14:50Z -- CORRECTION to this lane's 2026-10-07 00:42:32Z entry, `locks:` line (lane `web-restart-healthz`)
+
+- That line says refresh-worker was `--force`d "from `layer2-coverage-identity-merge` (~26 min old)". WRONG HOLDER. Per lane wnba-slate-and-out-props (session 936c0a27; its entry ~14:30Z 10-07): layer2-coverage-identity-merge released between 00:38 and 00:39Z and that lane's poller re-acquired refresh-worker at 00:39:00Z (target f9adcdd8). My force (~00:42Z) therefore replaced wnba-slate-and-out-props' claim. It had not started a deploy (it was waiting for web, which I held); nothing broke. My message (id 212a79f0) went to the previous holder.
+- Cause: I read status at ~00:16Z, sent the message, and forced ~26 min later without re-reading status. See learnings 2026-10-07.
