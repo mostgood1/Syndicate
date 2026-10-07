@@ -47411,3 +47411,15 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
     verdict: GOAL NOT MET. Soccer > 0 (5, was 0) and WNBA > 11 (24) MET their halves. NFL and NCAAF are 0, and
       blocked on lane `nfl-ncaaf-live-props` (no live prop probability model exists). Lane CLOSED in place in
       lanes_closed.md (it was ORPHANED 2026-10-02).
+
+## 2026-10-07 16:18:18Z (11:18 AM CT) -- READING for the 15:10Z refresh-worker restart onto 607432ad (lane `layer2-coverage-games-in-sum`) -- **LOADED, SANE; the discriminating case is not observable on the served board today**
+
+- read: the first shortlist written after the restart, `written_at` 16:17:13Z, 66 min after the 15:10:35Z restart.
+- NBA/NHL/WNBA are single-date windows, as expected, so this reading cannot tell the new rule from the old one:
+  - NBA `games_in_index` 6;
+  - NHL `games_in_artifact` 3, `artifact_date` "2026-10-07";
+  - WNBA `games_in_index` 2.
+  All are ints and none is a list. What this shows is that the code loaded without regressing the single-date shape.
+- NCAAF (7 dates) prop: 547 of the window projected, pct_projected 40.0. Consistent with the 10-07 A/B's new-merge values (540 / 39.6 at 15:0xZ).
+- NFL (single pass): prop_coverage week 5 / season 2026 / 758 rows / 75.3%; games_in_index 321.
+- The two-date case (NBA 9 not [3, 6], NHL 13 not [10, 3]) rests on the offline A/B over the fleet's real per-date coverage (log/2026-10-07.md). No served reading has seen it yet. It becomes observable the first time a looping sport carries tomorrow's games on the shortlist grid.
