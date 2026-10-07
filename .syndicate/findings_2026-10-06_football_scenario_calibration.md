@@ -326,6 +326,35 @@ table, so no FG-frequency lever exists. Residual misses at the fit: P(FG)/drive 
 z +2.5. Home-field bonus HURT in pass 1 and was kept at 0.12 in pass 2, after yardage/TD weight
 moved -- the coupling a one-lever-at-a-time read would have missed. Edge steps tried, none kept.
 
+### NFL VALIDATION 2025 — NOT SHIPPABLE (read 2026-10-07, 272 games, 300 seeds, candidate vs production)
+
+| gate | result | detail |
+|---|---|---|
+| (a) objective >= 20% lower | FAIL | production 122.48, candidate 239.63 |
+| (b) no moment's abs z grows > 1 | FAIL | worst +6.38 (P(FG)/drive z -5.11 -> -11.49) |
+| (c) margin MAE | **FAIL** | +0.366 [+0.057, +0.691] |
+| (d) total MAE | FAIL (tol) | -0.186 [-0.540, +0.174] |
+| (e) home-win Brier | FAIL (tol) | +0.0072 [-0.0002, +0.0148] |
+| (f) abs(sim - close) margin | **FAIL** | +0.848 [+0.575, +1.117] |
+| (f) abs(sim - close) total | PASS | **-0.691 [-0.991, -0.400]** |
+
+z (production -> candidate): mean_total -2.68 -> -1.22, mean_margin -1.32 -> +0.10, total_sd_gap
+-3.55 -> -1.13, p_fg -5.11 -> -11.49, p_punt +2.88 -> +6.44, plays/drive +6.04 -> +2.75,
+drives/team-game +3.65 -> +6.06, ppd_weak -0.55 -> -2.95.
+
+**Diagnosis (stated as findings, not as excuses -- nothing ships):**
+1. **The objective could be satisfied by COMPRESSING team quality.** Both drive-success
+   sensitivities went to 0.6; every moment is an aggregate MEAN, so nothing in the objective saw
+   per-game discrimination. Mean margin was fixed (z +0.10) while per-game margins got worse and moved
+   0.85 pts further from the close. A next design must carry a discrimination moment (e.g. SD of the
+   projected margins vs SD of the close spreads, or slope of actual on projected margin).
+2. **No FG-frequency lever exists with the 4th-down model ON** (both FG levers unreachable), and 2025's
+   FG share sits further from the sim than 2023-24's did; drives/game and punts overshoot with it.
+3. **The scenario fixes DO move the total the right way:** abs(sim - close) total -0.69 with a CI
+   excluding 0, total MAE leaning better, total SD gap -3.55 -> -1.13.
+4. **2025 is now READ for NFL pregame.** Any next NFL candidate needs a different held-out set (2026
+   weeks to date, or a fresh pre-registered split); 2025 cannot be re-used as a clean gate.
+
 H1 prediction (|delta total| < 1.0) FAILED (-1.12). H2 prediction (total in [-0.5, +1.5]) held. Both
 fixes work mechanically (S12 after-half 25.0; S5 4th-down rows inside the real CI) and neither moves
 accuracy alone -- each moves the level or home edge away from the close, as the re-fit design expects.
