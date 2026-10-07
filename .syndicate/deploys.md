@@ -47258,3 +47258,13 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - **Before (same log, `wnba_source/logs/syndicate_refresh_oddsapi_props_2026-10-08.log`):** predict-date --date 2026-10-08 at 2026-10-06 15:16:10Z and 16:11:47Z produced output; the 16:11Z run wrote the NBA-filled file.
 - **After (dfb193bb live since the 20:09:27Z 10-06 ff):** 6 runs, 2026-10-07 05:04Z, 09:06Z, 11:10Z, 12:10Z, 13:10Z, 14:11Z -- every one logs `No games found on 2026-10-08` and writes no file; step rc 0 (odds_refresh_20261007_130647). predictions_2026-10-08.csv absent at 14:35Z. No `Dropping N non-WNBA` line: the league-'10' scoreboard itself returned nothing, so the gate was not needed.
 - **Also:** post-fix predictions_2026-10-09.csv (written 01:06 CDT 10-07) = 2 rows, 0 non-WNBA.
+
+## 2026-10-07 14:42:52Z (9:42 AM CT) -- READING: served bundesliga departed filter on the refreshed roster -- **MATCHES PREDICTION** (lane `soccer-roster-refresh`)
+
+- **Prediction** (offline A/B, deploys.md 2026-10-07 ~01:00Z): the next bundesliga build drops **169**. The last build on the July roster, 23:13:45Z 10-06, dropped 193.
+- **Reading:** the first three bundesliga builds generated after the roster write (00:12:56Z), on the fleet:
+  - `recommendations_2026-10-10.json` 12:04:50Z: dropped **169**, rows 702, per_club 18/18, **269 props** (the 23:13:45Z build of the same date had 249), 6 matches.
+  - `recommendations_2026-10-11.json` 13:53:23Z: dropped 169, 90 props, 2 matches.
+  - `recommendations_2026-10-09.json` 14:26:30Z: dropped 169, 49 props, 1 match.
+- **Result:** served dropped 193 -> 169, exactly the offline number. The 10-10 slate carries +20 player props. The watcher's checked_at (14:42Z) is later than the first hit (12:04Z): it polled every 120 s, so the gap is most likely the host sleeping. It does not affect the reading.
+- **Still not measured:** whether the props are more accurate as a result.
