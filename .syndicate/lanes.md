@@ -1674,6 +1674,19 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **OUT-OF-SAMPLE EVALUATION OF THE SHIPPED CALIBRATION, PRE-REGISTERED 2026-10-07 (user: "then evaluate the shipped calibration on the second half"), before any window data exists:**
+  - DATA: the built 07-16..09-27 window, never touched by the combined fit (06-15..07-12) or its validation (05-30..06-14).
+  - ARMS (same seeds, 100 sims, the window's games):
+    - A = SHIPPED: fleet tree 2bb481ef+. The walk re-check's replay (walk_full.json) IS arm A.
+    - B = PRE-SHIP production: ~/ship_ab_old, the 5 shipped files restored from 61edcc04 and verified (bip_dp_rate 0.06).
+    - The walk fix, if it ships, is NOT in either arm.
+  - SEQUENCING: computed and READ only AFTER the conditional walk fix has made its single holdout read (or been skipped). Nothing in this evaluation can steer the walk fix.
+  - REPORT (no ship decision attached), for the whole window and per half:
+    - the 13-moment objective and each moment's z for A vs B;
+    - starter SO / H / BB / ER / outs bias;
+    - runs/game gap;
+    - pooled hitter-prop log-loss over the 19 keys, each arm with its own tree's calibration maps;
+    - whether checks (a)-(e) of rule v2 would have passed out of sample.
 - **CONDITIONAL WALK FIX, PRE-REGISTERED 2026-10-07 (user: "fix the walk excess if the re-check confirms it"), before any full-window data exists.**
   - Runs ONLY if the re-check above returns "STRUCTURAL EXCESS CONFIRMED". Otherwise nothing below happens.
   - SPLIT: the built window's dates in order. FIT = first half; HOLDOUT = second half, never read before the single final read.
