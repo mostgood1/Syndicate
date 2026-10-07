@@ -130,6 +130,13 @@ The best candidate by summed FIT log-likelihood (carries + targets) is CHOSEN an
 all 366 FIT games with the run-share correction held at (0.7, 0.1), and reported beside the two earlier runs.
 Held-out 2025 untouched.
 
+**Amendment 3 result (2026-10-07):** 1,024 FIT team-games. LL/carry, LL/target, MAE on quoted players (carries /
+targets): E0 -1.4026, -2.1627, 1.357 / 1.689; **E1(H=2) -1.3899, -2.1436, 1.287 / 1.628 (CHOSEN)**; E1(H=4)
+-1.3920, -2.1524; E1(H=8) -1.4174, -2.1816; E2 -1.4625, -2.2157; E3(H=2) -1.4402, -2.1870. Recency helps
+everywhere (~5% less carry error on quoted players); the stricter availability rule HURTS -- it drops players
+returning from absence who carry the ball without a prop line, pushing their touches into "other". Modest
+gain; Phase B re-run with E1(H=2) + (c, r) = (0.7, 0.1).
+
 ## NCAAF data step — PRE-REGISTERED 2026-10-07 (user: "start the NCAAF attribution data step while that runs")
 
 **What is missing for NCAAF, measured:** local CFBD plays carry no player ids; player box scores exist

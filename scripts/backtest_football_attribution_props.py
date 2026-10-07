@@ -186,7 +186,8 @@ def sim_game(task: Dict[str, Any]) -> Dict[str, Any]:
     cur = [r for r in _season_rows(s) if int(r["week"] or 0) < wk]
     prior = _season_rows(s - 1)
     usage = {side: A.build_team_usage(task[side], cur, prior, force_active=task["quoted"][side],
-                                      qb_override=task["quoted_qb"][side]) for side in ("home", "away")}
+                                      qb_override=task["quoted_qb"][side], half_life=task.get("hl"))
+             for side in ("home", "away")}
     acc = A.AttributionAccumulator(home=usage["home"], away=usage["away"], tables=_W["tables"],
                                    pass_odds_multiplier=task.get("c", 1.0), incomplete_as_run=task.get("r", 0.0))
     t0 = time.time()
@@ -336,6 +337,7 @@ def main() -> None:
     ap.add_argument("--fit-run-share", action="store_true", help="amendment 2: grid-fit (c, r) on every 8th FIT game")
     ap.add_argument("--pass-odds-mult", type=float, default=1.0)
     ap.add_argument("--incomplete-as-run", type=float, default=0.0)
+    ap.add_argument("--half-life", type=float, default=None, help="amendment 3 share estimator (E1: recency half-life)")
     args = ap.parse_args()
     from scripts.football_scenario_rates import idle_self
     idle_self()   # fleet shares this machine
@@ -343,6 +345,8 @@ def main() -> None:
     tag = "-".join(map(str, seasons)) + (f"_smoke{args.limit_games}" if args.limit_games else "")
     if args.pass_odds_mult != 1.0 or args.incomplete_as_run != 0.0:
         tag += f"_c{args.pass_odds_mult:g}_r{args.incomplete_as_run:g}"
+    if args.half_life is not None:
+        tag += f"_hl{args.half_life:g}"
     if 2025 in seasons:
         if not os.environ.get("FOOTBALL_SCENARIO_READ_VALIDATION"):
             raise SystemExit("2025 props are the held-out read; set FOOTBALL_SCENARIO_READ_VALIDATION=1 (once)")
@@ -392,7 +396,8 @@ def main() -> None:
         quoted_qb = {side: (max(v, key=v.get) if v else None) for side, v in qb_votes.items()}
         tasks.append({"gid": gid, "season": rs[0]["season"], "week": rs[0]["week"], "home": rs[0]["home"],
                       "away": rs[0]["away"], "asks": asks, "quoted": {k: sorted(v) for k, v in quoted.items()},
-                      "quoted_qb": quoted_qb, "c": args.pass_odds_mult, "r": args.incomplete_as_run})
+                      "quoted_qb": quoted_qb, "c": args.pass_odds_mult, "r": args.incomplete_as_run,
+                      "hl": args.half_life})
     print(f"[attr] {len(done)} games cached, {len(tasks)} to simulate at {SEEDS} seeds", flush=True)
     t0 = time.time()
     if tasks:
