@@ -313,8 +313,12 @@ def project_lineup(usage: List[Dict], date: Optional[str] = None) -> List[Dict]:
             # skaters by these when SimConfig.pp_usage == "minutes" (fixed PP1/PP2 units gave PP1 members
             # 0.903 of PP time against a real 0.632).
             r["proj_pp_toi"] = round(float(r.get("pp_toi_total") or 0.0) / gp, 3)
+            # SHORTHANDED minutes per game `[2026-10-07, lane nhl-pk-units]`: PK skaters are drawn by these when
+            # SimConfig.pk_usage == "minutes" (fixed PK1/PK2 units gave PK1 ~0.88 of PK time against ~0.6 real).
+            r["proj_sh_toi"] = round(float(r.get("sh_toi_total") or 0.0) / gp, 3)
         else:
             r["proj_ev_toi"] = None
             r["proj_pp_toi"] = None
+            r["proj_sh_toi"] = None
         r["is_starter_goalie"] = (r["position"] == "G" and r["player_id"] == starter_id)
     return usage

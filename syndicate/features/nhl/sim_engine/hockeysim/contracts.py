@@ -57,6 +57,8 @@ class HockeyPlayerFeatures:
     proj_ev_toi: Optional[float] = None
     # power-play minutes per game (real PP TOI over the window); drives PP on-ice selection under pp_usage="minutes"
     proj_pp_toi: Optional[float] = None
+    # shorthanded minutes per game (real SH TOI over the window); drives PK on-ice selection under pk_usage="minutes"
+    proj_sh_toi: Optional[float] = None
     # assists per teammate goal while on ice, as of the slate date (lineups CSV); see state.ASSIST_SHARE_PRIOR
     assist_share: Optional[float] = None
     shot_weight: Optional[float] = None
@@ -84,6 +86,7 @@ class HockeyPlayerFeatures:
             "proj_toi": float(self.proj_toi or 0.0),
             "proj_ev_toi": self.proj_ev_toi,
             "proj_pp_toi": self.proj_pp_toi,
+            "proj_sh_toi": self.proj_sh_toi,
             "assist_share": self.assist_share,
             "shot_weight": self.shot_weight,
             "goal_weight": self.goal_weight,

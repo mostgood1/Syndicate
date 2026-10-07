@@ -185,6 +185,18 @@ def load_team_rates_map(date: str, *, root: Optional[Path] = None) -> Dict[str, 
     return out
 
 
+def _proj_sh_toi(row: Dict) -> Optional[float]:
+    """SH minutes per game: the lineups column when present, else total - EV - PP (the lineups builder writes
+    proj_ev_toi = proj_toi - (PP + SH) per game, so the difference is the window's SH minutes) `[lane nhl-pk-units]`."""
+    v = _to_float(row.get("proj_sh_toi"))
+    if v is not None:
+        return v
+    toi, ev, pp = _to_float(row.get("proj_toi")), _to_float(row.get("proj_ev_toi")), _to_float(row.get("proj_pp_toi"))
+    if toi is None or ev is None or pp is None:
+        return None
+    return round(max(0.0, toi - ev - pp), 3)
+
+
 def load_player_rates_map(date: str, *, root: Optional[Path] = None) -> Dict[int, Dict[str, float]]:
     """Load ``{player_id: {"shot_weight":.., "goal_weight":.., "block_weight":..,
     "faceoff_weight":..}}`` for a date.
@@ -476,6 +488,7 @@ def build_player_features(
                 proj_toi=_to_float(row.get("proj_toi")) or 0.0,
                 proj_ev_toi=_to_float(row.get("proj_ev_toi")),
                 proj_pp_toi=_to_float(row.get("proj_pp_toi")),
+                proj_sh_toi=_proj_sh_toi(row),
                 assist_share=_to_float(row.get("assist_share")),
                 shot_weight=(rates or {}).get("shot_weight"),
                 goal_weight=(rates or {}).get("goal_weight"),

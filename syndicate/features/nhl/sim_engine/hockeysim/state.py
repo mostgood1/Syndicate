@@ -28,6 +28,8 @@ class PlayerState:
     ev_toi_proj: Optional[float] = None
     # projected POWER-PLAY minutes; None = unknown (PP falls back to the fixed PP1/PP2 units)
     pp_toi_proj: Optional[float] = None
+    # projected SHORTHANDED minutes; None = unknown (PK falls back to the fixed PK1/PK2 units)
+    sh_toi_proj: Optional[float] = None
     # as-of ASSISTS PER TEAMMATE GOAL while on ice, A/(onGF-G), shrunk to ASSIST_SHARE_PRIOR; None = unknown
     assist_share: Optional[float] = None
     # Weights to bias event attribution while on ice

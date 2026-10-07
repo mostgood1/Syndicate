@@ -126,6 +126,12 @@ class SimConfig:
     # segment draws its skaters by systematic sampling with inclusion = the player's share of the team's
     # projected PP minutes (PlayerState.pp_toi_proj), so an elite who stays on ~79% of the PP keeps it.
     pp_usage: str = "units"
+    # Who is on the ice on a PENALTY KILL `[2026-10-07, lane nhl-pk-units]`. "units" (default): fixed PK1/PK2
+    # units (PK1 ~0.60 + alternation), which put PK1 skaters on ~0.88 of team PK time against ~0.58 F / 0.68 D
+    # real, PK2 0.15 vs 0.43 and every other skater at 0 vs 0.06-0.14. "minutes": each PK segment draws its
+    # skaters by systematic sampling with inclusion = the player's share of the team's projected SH minutes
+    # (PlayerState.sh_toi_proj), mirroring pp_usage="minutes".
+    pk_usage: str = "units"
     # weight = prior_pos ** assist_position_power * (share / prior_pos) ** assist_share_power: the first
     # sets the F-vs-D level, the second how far a player's own share moves him off it. Sequential
     # primary/secondary sampling compresses weight differences, so both need to exceed 1.
@@ -1168,6 +1174,45 @@ class PeriodSimulator:
                     out.append(pid)
             return out if len(out) == k else None
 
+        pk_minutes_mode = str(getattr(self.cfg, "pk_usage", "units") or "units").strip().lower() == "minutes"
+        _pk_incl: Dict[int, Optional[Tuple[List[int], np.ndarray]]] = {}
+
+        def _pk_minutes_group(team: TeamState, dressed: List[List[int]], k: int) -> Optional[List[int]]:
+            """k dressed skaters drawn so P(on ice) = k * sh_min_i / sum(sh_min), capped at 1 (systematic PPS)."""
+            key = id(team)
+            if key not in _pk_incl:
+                pool = {int(p) for grp in dressed for p in (grp or []) if p is not None}
+                cands = [(pid, float(team.players[pid].sh_toi_proj)) for pid in sorted(pool)
+                         if pid in team.players and team.players[pid].sh_toi_proj and float(team.players[pid].sh_toi_proj) > 0]
+                if len(cands) < k:
+                    _pk_incl[key] = None
+                else:
+                    m = np.array([c[1] for c in cands], dtype=float)
+                    pi = k * m / m.sum()
+                    for _ in range(len(pi)):
+                        over = pi > 1.0
+                        if not over.any():
+                            break
+                        pi[over] = 1.0
+                        free = ~over
+                        pi[free] = (k - over.sum()) * m[free] / m[free].sum()
+                    _pk_incl[key] = ([c[0] for c in cands], np.minimum(pi, 1.0))
+            got = _pk_incl[key]
+            if got is None:
+                return None
+            pids, pi = got
+            order = self.np_rng.permutation(len(pids))
+            cum = np.cumsum(pi[order])
+            u = float(self.np_rng.random())
+            out = []
+            for j in range(k):
+                i = int(np.searchsorted(cum, u + j, side="right"))
+                i = min(i, len(pids) - 1)
+                pid = pids[order[i]]
+                if pid not in out:
+                    out.append(pid)
+            return out if len(out) == k else None
+
         pp_home = _pp_units(lineup_home, gs.home)
         pk_home = _pk_units(lineup_home, gs.home)
         pp_away = _pp_units(lineup_away, gs.away)
@@ -1865,7 +1910,10 @@ class PeriodSimulator:
                     idh = _sample_index(w_dh) if d_home else 0
                     ice_h = ((l_home[ih] if l_home else []) + (d_home[idh] if d_home else []))
                 # Away team on PK if units available
-                if pk_away:
+                mk = _pk_minutes_group(gs.away, list(l_away or []) + list(d_away or []), len(pk_away[0]) if pk_away and pk_away[0] else 4) if pk_minutes_mode else None
+                if mk:
+                    ice_a = mk
+                elif pk_away:
                     if usage_model == "stochastic":
                         ice_a = _pick_unit(pk_away, p0=0.66)
                     else:
@@ -1900,7 +1948,10 @@ class PeriodSimulator:
                     ida = _sample_index(w_da) if d_away else 0
                     ice_a = ((l_away[ia] if l_away else []) + (d_away[ida] if d_away else []))
                 # Home team on PK if units available
-                if pk_home:
+                mk = _pk_minutes_group(gs.home, list(l_home or []) + list(d_home or []), len(pk_home[0]) if pk_home and pk_home[0] else 4) if pk_minutes_mode else None
+                if mk:
+                    ice_h = mk
+                elif pk_home:
                     if usage_model == "stochastic":
                         ice_h = _pick_unit(pk_home, p0=0.66)
                     else:
@@ -2123,7 +2174,7 @@ class GameSimulator:
                 sw = float(sw if sw is not None else sw_h)
                 bw = float(bw if bw is not None else bw_h)
                 gw = float(gw if gw is not None else gw_h)
-            p = PlayerState(player_id=pid, full_name=row.get("full_name"), position=pos, team=home_name, toi_proj=toi, shot_weight=float(sw), goal_weight=float(gw), block_weight=float(bw), ev_toi_proj=(float(row["proj_ev_toi"]) if row.get("proj_ev_toi") not in (None, "") else None), pp_toi_proj=(float(row["proj_pp_toi"]) if row.get("proj_pp_toi") not in (None, "") else None), assist_share=(float(row["assist_share"]) if row.get("assist_share") not in (None, "") else None))
+            p = PlayerState(player_id=pid, full_name=row.get("full_name"), position=pos, team=home_name, toi_proj=toi, shot_weight=float(sw), goal_weight=float(gw), block_weight=float(bw), ev_toi_proj=(float(row["proj_ev_toi"]) if row.get("proj_ev_toi") not in (None, "") else None), pp_toi_proj=(float(row["proj_pp_toi"]) if row.get("proj_pp_toi") not in (None, "") else None), sh_toi_proj=(float(row["proj_sh_toi"]) if row.get("proj_sh_toi") not in (None, "") else None), assist_share=(float(row["assist_share"]) if row.get("assist_share") not in (None, "") else None))
             home.players[pid] = p
         for row in roster_away:
             pid = int(row.get("player_id"))
@@ -2139,7 +2190,7 @@ class GameSimulator:
                 sw = float(sw if sw is not None else sw_h)
                 bw = float(bw if bw is not None else bw_h)
                 gw = float(gw if gw is not None else gw_h)
-            p = PlayerState(player_id=pid, full_name=row.get("full_name"), position=pos, team=away_name, toi_proj=toi, shot_weight=float(sw), goal_weight=float(gw), block_weight=float(bw), ev_toi_proj=(float(row["proj_ev_toi"]) if row.get("proj_ev_toi") not in (None, "") else None), pp_toi_proj=(float(row["proj_pp_toi"]) if row.get("proj_pp_toi") not in (None, "") else None), assist_share=(float(row["assist_share"]) if row.get("assist_share") not in (None, "") else None))
+            p = PlayerState(player_id=pid, full_name=row.get("full_name"), position=pos, team=away_name, toi_proj=toi, shot_weight=float(sw), goal_weight=float(gw), block_weight=float(bw), ev_toi_proj=(float(row["proj_ev_toi"]) if row.get("proj_ev_toi") not in (None, "") else None), pp_toi_proj=(float(row["proj_pp_toi"]) if row.get("proj_pp_toi") not in (None, "") else None), sh_toi_proj=(float(row["proj_sh_toi"]) if row.get("proj_sh_toi") not in (None, "") else None), assist_share=(float(row["assist_share"]) if row.get("assist_share") not in (None, "") else None))
             away.players[pid] = p
         return GameState(home=home, away=away, period=0, clock=self.cfg.seconds_per_period)
 
