@@ -712,6 +712,36 @@ def _load_player_rows(league: str, source_root: Path) -> list[dict[str, Any]]:
     return _finalize_player_rows(deduped, latest_frame)
 
 
+#: Same switch as `refresh_odds_sources._soccer_current_history_step`: the gate only matters once current-season
+#: history is on disk, and it must never be off while that is on. Absent is OFF.
+_CURRENT_HISTORY_ENV = "SYNDICATE_SOCCER_CURRENT_HISTORY"
+#: A team rated from fewer rows than this keeps PROMOTED_TEAM_RATING.
+_FEW_MATCH_GATE = 10
+
+
+def _gate_few_match(ratings: dict[str, dict[str, float]], team_names: list[str]) -> list[str]:
+    """A fixture team rated from 1..9 rows gets PROMOTED_TEAM_RATING instead of that rating.
+
+    MEASURED 2026-10-07 (lane `soccer-team-history-current-season`, findings 2026-10-06): with current-season
+    history on, a promoted club a few matches in is otherwise rated from those few rows (`compute_team_ratings`
+    applies no shrinkage). On n 461 leak-free matches (2025-08..2026-09, nine leagues), rating such sides raw was
+    WORSE on 1X2 Brier than this default by +0.0166 [+0.0015, +0.0321]; shrinking toward the default was no
+    better than it (+0.0014 [-0.0091, +0.0109]). OFF unless `SYNDICATE_SOCCER_CURRENT_HISTORY` is on. Returns
+    the rating keys it replaced; their `matches` count is kept so the artifact still shows how thin they were."""
+    if str(os.environ.get(_CURRENT_HISTORY_ENV) or "").strip().lower() not in {"1", "true", "on", "yes"}:
+        return []
+    gated: list[str] = []
+    for team in team_names:
+        key = match_team_name(team, list(ratings))
+        if key is None or key in gated:
+            continue
+        n = float(ratings[key].get("matches", 0.0) or 0.0)
+        if 0 < n < _FEW_MATCH_GATE:
+            ratings[key] = {**PROMOTED_TEAM_RATING, "matches": n}
+            gated.append(key)
+    return gated
+
+
 def _fill_promoted(ratings: dict[str, dict[str, float]], team_names: list[str]) -> list[str]:
     filled: list[str] = []
     for team in team_names:
@@ -1137,6 +1167,7 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
     ratings = _load_team_ratings(league, source_root, iso_date)
     team_names = [fixture["home_team"] for fixture in fixtures_raw] + [fixture["away_team"] for fixture in fixtures_raw]
     promoted = _fill_promoted(ratings, team_names)
+    few_match_gated = _gate_few_match(ratings, team_names)
     player_rows = _load_player_rows(league, source_root)
 
     fixtures = [
@@ -1196,6 +1227,8 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
         # Published for the same reason as `anchor`: the builder's stdout is discarded.
         "corners_estimator": corners_audit,
         "promoted_prior_teams": promoted,
+        # Present only when the few-match gate replaced a rating (flag on), so flag-off payloads are unchanged.
+        **({"few_match_prior_teams": few_match_gated} if few_match_gated else {}),
         # PUBLISHED BECAUSE THE LOGS CANNOT BE READ. See `_apply_market_anchor`.
         "anchor": anchor_audit,
         # Same reason: which player files were read, whether the departed filter
