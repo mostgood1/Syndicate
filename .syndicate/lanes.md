@@ -1057,6 +1057,13 @@ death, never life — do not invert it.
 - Falsification test: holdout paired dBrier (NB - Poisson) CI not entirely < 0, or the fitted k is not finite (no overdispersion)
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — OPEN — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **UPSTREAM PR OPENED 2026-10-07 ~01:10Z (user: "yes, open the upstream PR"): https://github.com/mostgood1/MLB-BettingV2/pull/3**
+  - Stacked on PR #2 (shelled hook). Carries the engine diff ed8af257..HEAD for sim_engine/simulate.py + models.py (applied cleanly to upstream with line offsets only).
+  - The tuning override JSONs and hitter-prop calibration JSONs are NOT included (the earlier user decision to drop the overrides PR); the PR lists the Syndicate values.
+  - Against upstream: Syndicate's baserunning tests pass 29/37.
+    - 4 failures test Syndicate-only `starter_min_innings`.
+    - 4 test the pitcher-OUTS == 3 x half-innings invariant, which upstream ALREADY violates with steals off: 5/31 seeded games, all extra-inning, each short exactly 3 (Syndicate: 0/32). Pre-existing extras divergence; flagged in the PR.
+  - Until #3 merges, a vendor re-pull from upstream would revert the shipped engine changes.
 - **USER OVERRIDE OF CHECK (c), LOGGED 2026-10-07 ~00:30Z — user, verbatim: "yes, ship it as a logged override of check c".**
   - Check (c) failed by 0.021 (starter BB +0.121 vs a 0.10 limit). The other four checks passed. The overridden guard was pre-registered; this is a deviation from the rule, made by the user with the mechanism disclosed (production BB right by cancelling errors).
   - SHIP CONTENT:
