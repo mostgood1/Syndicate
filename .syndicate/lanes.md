@@ -1768,6 +1768,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 - **2026-10-07: CODE LANDED (feb4258a).** AST guard: 8 ScoreboardV2 calls without league_id on origin/main before, 0 after; end-to-end test: boxscores/pbp/finals ask for "10", keep WNBA only (PHO/WAS -> PHX/WSH), finals never reads data.nba.com for the WNBA. 9 WNBA vendor league tests pass. NOT FF'd to the fleet on purpose: production calls none of these paths (rides the next fleet ff, inert there). UPSTREAM PR: pending a user decision.
 ### layer2-withdrawn-lines — OPEN — opened 2026-10-07 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- **LOAN 2026-10-07, LENDER-GRANTED by session b9bb5f37 (not a decision of its user) to lane layer2-out-gate-reach:** layer2_board.py build_layer2_rows gets ONE carry -- candidate["player_availability"] next to the projection carry -- so select_shortlist's OUT-player gate (f9adcdd8) can see board_enrichment's flag. This lane's 5ecf99f1 (_fresh_books_by_event_market, rows_withdrawn_line) untouched. Returned on landing.
 - Goal: A Layer 2 line hidden by the quote-age gate whose OWN book is still quoting that event+market fresh is counted as rows_withdrawn_line (by sport), not rows_stale_quote, so the stale counter alarms only on capture failure; no row's admission changes; verified by unit tests (off != on) and on the fleet board as soccer/NCAAF rows_stale_quote falling with rows_withdrawn_line taking them
 - Files: syndicate/features/shared/layer2_board.py, syndicate/blueprints/intelligence.py (shortlist key list ONLY), tests/test_layer2_withdrawn_lines.py
 - Hypothesis: Most of soccer's ~300 and NCAAF's ~1,400 stale quotes are lines the book withdrew
@@ -1785,11 +1786,11 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 
 ### layer2-out-gate-reach — OPEN — opened 2026-10-07 — session 936c0a27-a98a-411b-8397-f769b7f2baf7
 - Goal: The Layer 2 OUT-player gate (f9adcdd8) is REACHABLE in production: build_layer2_rows carries player_availability onto each candidate, so select_shortlist leaves a flagged OUT player's line unseated and counts it; proven by an end-to-end test through build_layer2_rows -> select_shortlist (off != on) and a replay over the fleet's real 10-07 WNBA grid showing Allisha Gray's candidates carry the flag
-- Files: syndicate/features/shared/layer2_board.py (LOAN requested from layer2-stale-book-pick: carry player_availability in build_layer2_rows ONLY), tests/test_layer2_out_player_gate.py
+- Files: syndicate/features/shared/layer2_board.py (LOAN from layer2-withdrawn-lines, LENDER-GRANTED by session b9bb5f37 -- not a decision of its user: carry player_availability in build_layer2_rows ONLY), tests/test_layer2_out_player_gate.py
 - Hypothesis: Measured 2026-10-07: board_enrichment flags 9 Allisha Gray rows every WNBA build (OUT_PLAYER_PROPS_FLAGGED rows=9) but served rows_player_out_on_feed stays 0 on a post-flag build; build_layer2_rows builds candidates from _IDENTITY_FIELDS + explicit fields (projection at ~3099) and never copies player_availability, so the gate cannot see the flag
 - Falsification test: An end-to-end test through build_layer2_rows still seats a flagged row after the carry, or the fleet replay shows the flag absent on Gray's candidates
 - Verification: Unit: end-to-end off != on; fleet: replay of the real 10-07 WNBA grid through the new build_layer2_rows shows player_availability on Gray's candidates; served counter > 0 once a flagged row survives the earlier rules
-- Blocked by: loan of layer2_board.py from layer2-stale-book-pick
+- Blocked by: none (loan granted 2026-10-07)
 
 ### nfl-prop-name-resolution — OPEN — opened 2026-10-07 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
 - Goal: NFL prop players whose short name collides (Bijan/Brian Robinson), carries a suffix (Penix Jr. -> M.Jr.) or a multi-word surname (Amon-Ra St. Brown -> A.Brown) resolve to the right player id by trying the plain, suffix-stripped and full-surname short names and keeping the ONE candidate on one of the game's two teams (refuse otherwise); verified by tests (off != on, ambiguous still refused) and on the fleet by the weekly artifact covering more stat-player pairs (wk5 baseline 559 of 786) and NFL unmatched_key_rows falling

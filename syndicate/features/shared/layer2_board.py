@@ -3097,6 +3097,14 @@ def build_layer2_rows(
             projection = row.get("projection")
             if projection is not None:
                 candidate["projection"] = refuse_published_certainty(projection)
+            # Same reason as `projection` (#270): `board_enrichment._flag_out_player_props`
+            # stamps `player_availability` on the GRID row, and this fan-out copies a fixed
+            # field list. Without this line select_shortlist's OUT-player gate never saw the
+            # flag (2026-10-07: 9 Allisha Gray rows flagged per WNBA build, served
+            # rows_player_out_on_feed 0). Absent stays absent.
+            availability = row.get("player_availability")
+            if availability is not None:
+                candidate["player_availability"] = availability
 
             # THE LIVE RE-SIM'S BLOCK, carried for the same reason `#270`
             # carried `projection`: the enrichment stamps it on the GRID row and
