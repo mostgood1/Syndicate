@@ -246,3 +246,26 @@ rushing yards, receptions and receiving yards. Nothing beats the book (productio
 48 rows unattributed. The next design step is the run-volume defect (an engine property: the
 scenario lane's v2 re-fit, or a measured run-share correction in the layer) -- to be pre-registered
 before any held-out read.
+
+### NFL Phase B WITH the run-share correction (c = 0.7, r = 0.1) — same 366 games / 122,955 rows (2026-10-07)
+
+| market | attr - prod, uncorrected | **attr - prod, corrected** | slope attr (corrected) |
+|---|---|---|---|
+| passing_yards | -0.074 | **-0.078 [-0.132, -0.030]** | 0.52 (prod 0.30) |
+| passing_attempts | -0.031 | +0.032 [-0.026, +0.086] | 0.12 |
+| passing_tds | +0.005 | **+0.026 [+0.011, +0.042]** | 0.79 |
+| interceptions | +0.009 | +0.007 [-0.002, +0.017] | 0.78 |
+| receptions | +0.075 | +0.069 [+0.048, +0.092] | 0.31 |
+| receiving_yards | +0.024 | +0.028 [+0.011, +0.044] | 0.36 |
+| rushing_attempts | +0.336 | **+0.226 [+0.167, +0.289]** | **0.06** |
+| rushing_yards | +0.086 | +0.089 [+0.053, +0.130] | 0.18 |
+| anytime_td | +0.049 | +0.042 [-0.003, +0.091] | 0.44 |
+
+Team volume moved as designed (rush att 25.6, pass att 30.9, rush yds 138.1, pass yds 219.5 per team-game).
+**Reading:** the correction recovers a third of the rushing-attempts loss and costs passing attempts and
+passing TDs (pass volume now undershoots). Volume was NOT the main rushing defect: a calibration slope of
+0.06 on rushing attempts means the attributed probabilities carry almost no information about WHICH player
+clears his line -- the weak link is player-level (carry shares, committee backfields, availability), not the
+team total. Passing yards remains the only market beating production, corrected or not. No market beats the
+book. Next design candidates (each to be pre-registered): per-player carry-share quality (recency weighting,
+injury/availability), and using attribution only where it has shown information (QB passing yards).
