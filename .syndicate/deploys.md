@@ -47441,3 +47441,15 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **What it loaded:** per-run child jobs (refresh_odds_sources, build_soccer_artifacts, ...) have run 43afa8cd code since 16:01:53Z. Long-running worker processes still hold their start-time code. Runtime commits in 607432ad..43afa8cd (per the watcher): a4281cc8 (layer2 player_availability through build_layer2_rows -- lane layer2-out-gate-reach lists its deploy as PENDING), e406452c, 23239754, 5ecf99f1, fcba19a7, feb4258a, 6b09b469, 0949d7d3.
 - **Effect on this lane:** the SYNDICATE_SOCCER_CURRENT_HISTORY flip needs a full supervisor down/up (env is derived once at `up`), which would load a4281cc8 into the long-running refresh-worker. PAUSED by user decision ("Pause, coordinate first") until layer2-out-gate-reach answers; fleet NOT rewound (child jobs already run 43afa8cd; a rewind would itself be an unrecorded change).
 - **State left:** flag NOT in local_production.env; no drain (cleared 15:56Z); no watchdog_no_autostart marker; no claims held. Board saved 16:17:13Z (the build had sat in layer2_shortlist_build from 15:45:31Z).
+
+## 2026-10-07 ~16:50Z (11:50 AM CT) -- READING: served primeira_liga departed filter on the refreshed roster (lane `soccer-roster-refresh`)
+
+- **No prior prediction.** The offline number below was computed after the served builds existed, so it is a REPRODUCTION. Run at `nice -n 19`.
+- **Offline A/B** (fleet code, the fleet's current player files; only the roster varies): dropped July **120** -> new **130**. The new roster rescues 4 more players and stops rescuing 14.
+- **Served** (builds after the primeira_liga roster write, 00:19:16Z): all read dropped **130**, rows 549, per_club 18/18:
+  - 10-10: 12:47:03Z, 118 props
+  - 10-12: 13:36:37Z, 43 props
+  - 10-09: 14:57:07Z, 85 props
+  - 10-11: 15:27:20Z, 125 props
+- **Spelling-miss check.** 2 of the 14 newly dropped share a surname with someone on the new roster, and both are different players: Gonçalo Costa (vs Gu/João/Diogo/Alberto Costa), Pedro Gonçalves (vs João/Francisco/Flávio Gonçalves). Neither has a `players_2026.csv` row. Pedro Gonçalves is not on Sporting's current ESPN roster; nothing here shows whether he left or ESPN omits him.
+- **Result:** served 120 -> 130, equal to the offline reproduction. Prop accuracy effect not measured.
