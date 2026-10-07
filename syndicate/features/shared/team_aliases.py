@@ -36,7 +36,17 @@ from typing import Any
 
 
 def normalize(value: Any) -> str:
-    return " ".join(str(value or "").strip().lower().replace("_", " ").replace("-", " ").split())
+    # Memoised for plain strings (pure; reads no map). `teams_match` normalises both
+    # sides of every row x chip comparison, over a few hundred distinct team names
+    # (lane `web-restart-healthz`, py-spy 2026-10-06: `normalize` 14.7% of leaves).
+    if type(value) is str:
+        return _normalize_str(value)
+    return _normalize_str(str(value or ""))
+
+
+@lru_cache(maxsize=16384)
+def _normalize_str(value: str) -> str:
+    return " ".join(value.strip().lower().replace("_", " ").replace("-", " ").split())
 
 
 def fold_accents(value: Any) -> str:
@@ -995,20 +1005,68 @@ def unambiguous_club_tokens(sport: str) -> frozenset[str]:
     return frozenset(token for token, count in owners.items() if count == 1)
 
 
+# MEMOS KEYED ON THE MAP OBJECT ITSELF -- lane `web-restart-healthz` `[2026-10-06]`.
+# py-spy on the fleet refresh-worker (20:18 CT, 1,502 samples): 48.5% of the
+# process was in `build_layer2_shortlist`, ~43% in `board_enrichment.attach_game_state`
+# -> `_side_matches` -> `teams_match`, whose leaves were `canonical_team` and
+# `normalize`. `attach_game_state` compares every grid row with every chip (soccer
+# ~300 x 231, 2 sides x 2 keys), and every `canonical_team` call rebuilt
+# `set(mapping.values())` over the whole map.
+#
+# Each entry stores the exact map object(s) it was computed from and is reused only
+# while `_alias_map` / `_nickname_alias_map` still return THOSE objects. The big maps
+# are `lru_cache`d, so in production they never change and every lookup after the
+# first is a hit; a `cache_clear()` (tests swap the NCAAF registry this way) yields a
+# new object and the memo recomputes, so a memo can never outlive the map it read.
+# NFL/WNBA return a fresh dict per call, so they simply never hit -- today's cost.
+_ALIAS_VALUES_MEMO: dict[str, tuple[dict, frozenset]] = {}
+_CANONICAL_MEMO: dict[tuple[str, str], tuple[dict, dict, str | None]] = {}
+_CANONICAL_MEMO_MAX = 65536
+
+
+def _alias_values(slug: str, mapping: dict[str, str]) -> frozenset[str]:
+    hit = _ALIAS_VALUES_MEMO.get(slug)
+    if hit is not None and hit[0] is mapping:
+        return hit[1]
+    values = frozenset(mapping.values())
+    _ALIAS_VALUES_MEMO[slug] = (mapping, values)
+    return values
+
+
 def canonical_team(sport: Any, value: Any) -> str | None:
     """The canonical club name for a token, or None if unresolvable.
 
     Accepts either direction -- a tri-code or an already-full name -- because
     callers genuinely have both and should not have to know which they hold.
+    Memoised per (sport, value) against the map objects it read; see above.
     """
+    if not (isinstance(sport, str) and isinstance(value, str)):
+        return _canonical_team_uncached(sport, value)
+    mapping = _alias_map(sport)
+    nicknames = _nickname_alias_map(normalize(sport))
+    key = (sport, value)
+    hit = _CANONICAL_MEMO.get(key)
+    if hit is not None and hit[0] is mapping and hit[1] is nicknames:
+        return hit[2]
+    result = _canonical_team_uncached(sport, value, mapping=mapping, nicknames=nicknames)
+    if len(_CANONICAL_MEMO) >= _CANONICAL_MEMO_MAX:
+        _CANONICAL_MEMO.clear()
+    _CANONICAL_MEMO[key] = (mapping, nicknames, result)
+    return result
+
+
+def _canonical_team_uncached(
+    sport: Any, value: Any, *, mapping: dict[str, str] | None = None, nicknames: dict[str, str] | None = None
+) -> str | None:
     token = normalize(value)
     if not token:
         return None
-    mapping = _alias_map(sport)
+    if mapping is None:
+        mapping = _alias_map(sport)
     if token in mapping:
         return mapping[token]
     # Already a full name the map knows as a value.
-    if token in set(mapping.values()):
+    if token in _alias_values(normalize(sport), mapping):
         return token
     # The map carries diacritic-free and designator-free keys, so a caller
     # holding "Vitória SC" or "Houston Dynamo FC" resolves without having to
@@ -1022,7 +1080,8 @@ def canonical_team(sport: Any, value: Any) -> str | None:
     # Polymarket sends for NFL. Ambiguous ones are absent from this map by
     # construction, so an unresolvable nickname still returns None rather than
     # picking a club.
-    nicknames = _nickname_alias_map(normalize(sport))
+    if nicknames is None:
+        nicknames = _nickname_alias_map(normalize(sport))
     if token in nicknames:
         return nicknames[token]
     return None
