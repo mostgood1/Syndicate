@@ -1781,6 +1781,22 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Falsification test: If, on the held-out season, attribution props do not beat production's rate-based props on paired log-loss (game-clustered 95% CI excluding 0) in any market, the hypothesis is rejected and nothing is wired.
 - Verification: Per market (pass yds, pass att, completions, pass TD, INT, rush yds, rush att, receptions, rec yds, anytime TD): log-loss and Brier vs production props and vs the de-vigged book at kickoff-10min, FIT NFL 2023-24 for design, held-out 2025 props read once; attribution runs on production's engine profile.
 - Blocked by: none
+### football-sim-player-attribution — OPEN — opened 2026-10-07 — session 20aa7f5b-0620-42a1-9136-fe56ba82b56f
+- Goal: NFL (then NCAAF) player props drawn from the smartsim2 game sim: each simulated offensive play attributed to a passer/rusher/receiver by measured play-type and usage tables, so prop distributions inherit game script; graded per market against production's rate-based props and the de-vigged book, read once on a held-out season.
+- Files: syndicate/features/football/sim_engine/smartsim2/player_attribution.py, scripts/football_attribution_tables.py, scripts/backtest_football_attribution_props.py, tests/test_football_player_attribution.py, .syndicate/findings_2026-10-07_football_player_attribution.md
+- Hypothesis: NFL props lose to the book in 7 of 8 markets with a calibration slope near 0 at the line because the rate-based model ignores game script (play volume, pass rate by score and clock, opponent); props simulated from the game sim's own plays carry that script and improve log-loss vs production's props.
+- Falsification test: If, on the held-out season, attribution props do not beat production's rate-based props on paired log-loss (game-clustered 95% CI excluding 0) in any market, the hypothesis is rejected and nothing is wired.
+- Verification: Per market (pass yds, pass att, completions, pass TD, INT, rush yds, rush att, receptions, rec yds, anytime TD): log-loss and Brier vs production props and vs the de-vigged book at kickoff-10min, FIT NFL 2023-24 for design, held-out 2025 props read once; attribution runs on production's engine profile.
+- Blocked by: none
+
+### layer2-out-gate-reach — OPEN — opened 2026-10-07 — session 936c0a27-a98a-411b-8397-f769b7f2baf7
+- Goal: The Layer 2 OUT-player gate (f9adcdd8) is REACHABLE in production: build_layer2_rows carries player_availability onto each candidate, so select_shortlist leaves a flagged OUT player's line unseated and counts it; proven by an end-to-end test through build_layer2_rows -> select_shortlist (off != on) and a replay over the fleet's real 10-07 WNBA grid showing Allisha Gray's candidates carry the flag
+- Files: syndicate/features/shared/layer2_board.py (LOAN requested from layer2-stale-book-pick: carry player_availability in build_layer2_rows ONLY), tests/test_layer2_out_player_gate.py
+- Hypothesis: Measured 2026-10-07: board_enrichment flags 9 Allisha Gray rows every WNBA build (OUT_PLAYER_PROPS_FLAGGED rows=9) but served rows_player_out_on_feed stays 0 on a post-flag build; build_layer2_rows builds candidates from _IDENTITY_FIELDS + explicit fields (projection at ~3099) and never copies player_availability, so the gate cannot see the flag
+- Falsification test: An end-to-end test through build_layer2_rows still seats a flagged row after the carry, or the fleet replay shows the flag absent on Gray's candidates
+- Verification: Unit: end-to-end off != on; fleet: replay of the real 10-07 WNBA grid through the new build_layer2_rows shows player_availability on Gray's candidates; served counter > 0 once a flagged row survives the earlier rules
+- Blocked by: loan of layer2_board.py from layer2-stale-book-pick
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
