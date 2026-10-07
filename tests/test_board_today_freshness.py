@@ -127,10 +127,15 @@ class CombinedBoardPerDateStampTests(unittest.TestCase):
         self.assertEqual(meta["dates"][TOMORROW]["written_at"], tomorrow_stamp)
         self.assertEqual(meta["dates"][TODAY]["written_at_source"], "layer2_shortlist")
 
-        # The window-level verdict is unchanged: still the oldest input, still stale.
+        # `computed_at` is still the oldest input. The VERDICT changed by user
+        # decision 2026-10-07 (lane `web-restart-healthz`, "Judge each date
+        # fairly"): tomorrow is rebuilt hourly by design, so 2,905 s is inside
+        # its own limit (SYNDICATE_INTELLIGENCE_BOARD_NEXT_DAY_STALE_AFTER_SECONDS,
+        # default 4500) and today's 814 s is inside 900 -- this shape is FRESH now.
+        # The stale cases are pinned in tests/test_combined_board_per_date_freshness.py.
         self.assertEqual(meta["computed_at"], tomorrow_stamp)
-        self.assertEqual(meta["freshness_status"], "stale")
-        self.assertFalse(meta["is_fresh"])
+        self.assertEqual(meta["freshness_status"], "fresh")
+        self.assertTrue(meta["is_fresh"])
         self.assertEqual(meta["window_oldest_date"], TOMORROW)
 
     def test_computed_at_is_always_the_window_oldest_dates_stamp(self):

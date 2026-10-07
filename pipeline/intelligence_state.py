@@ -9507,6 +9507,19 @@ def _combined_board_stale_after_seconds() -> float:
     return max(1.0, float(_env_int("SYNDICATE_INTELLIGENCE_BOARD_STALE_AFTER_SECONDS", 900)))
 
 
+def _combined_board_next_day_stale_after_seconds() -> float:
+    """How old a LATER window date's input may be before the board is not fresh.
+
+    Default 4500 s = the refresh-worker's next-day floor
+    (SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS, 3600 on the fleet)
+    + the 900 s first-date limit for the build itself. Its own knob because web
+    does not carry the worker's floor in its env. Never below the first-date limit.
+    Lane `web-restart-healthz` `[2026-10-07]`.
+    """
+    return max(_combined_board_stale_after_seconds(),
+               float(_env_int("SYNDICATE_INTELLIGENCE_BOARD_NEXT_DAY_STALE_AFTER_SECONDS", 4500)))
+
+
 def _optional_int(value: Any) -> int | None:
     """An int when the value is one, else None -- never 0 for "unreadable".
 
@@ -10041,6 +10054,40 @@ def read_combined_intelligence_response(
         (day for day in sorted(dates_block) if oldest_stamp and dates_block[day]["written_at"] == oldest_stamp),
         None,
     )
+    # EACH DATE IS JUDGED AGAINST ITS OWN CADENCE -- lane `web-restart-healthz`
+    # `[2026-10-07]`. The window's first date is rebuilt every pass and keeps
+    # `stale_after`; later dates are rebuilt at most once per
+    # SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS (refresh-worker:
+    # 3600) BY DESIGN, so judging them against 15 minutes made the board read
+    # "stale" ~45 of every 60 minutes however fast the builds ran (fleet 10-07
+    # morning: 11 saves/hour, served `computed_at` = a 64-min-old next-day
+    # shortlist). They get SYNDICATE_INTELLIGENCE_BOARD_NEXT_DAY_STALE_AFTER_SECONDS.
+    #
+    # "First date of the window", not "today": the window is part of the cache
+    # key, so this verdict cannot outlive a midnight (learnings 2026-09-15).
+    #
+    # `computed_at` STAYS the oldest stamp (its documented meaning). The verdict
+    # rides on `freshness_sla_seconds` instead: the binding date's limit plus the
+    # fixed gap between its stamp and the oldest one. Stamps do not move, so for
+    # every later read "oldest age <= effective sla" is exactly "binding date's
+    # age <= its own limit" -- the serve-time recompute stays correct unchanged.
+    effective_sla = stale_after
+    binding_date = window_oldest_date
+    next_day_after = _combined_board_next_day_stale_after_seconds()
+    if dates_block and oldest_age is not None:
+        first_date = min(requested_dates) if requested_dates else min(dates_block)
+        tightest = None
+        for day, block in dates_block.items():
+            age = _timestamp_age_seconds(block["written_at"])
+            if age is None:
+                continue
+            limit = stale_after if day == first_date else max(stale_after, next_day_after)
+            if tightest is None or limit - age < tightest[0]:
+                tightest = (limit - age, day, limit, age)
+        if tightest is not None:
+            _slack, binding_date, binding_limit, binding_age = tightest
+            effective_sla = binding_limit + (oldest_age - binding_age)
+    status = _freshness_status_from_age(oldest_age, effective_sla)
     combined["state_meta"] = {
         "source": "combined_board_window",
         # `computed_at` IS THE OLDEST ARTIFACT'S STAMP, NOT THE MOMENT OF THE
@@ -10067,13 +10114,18 @@ def read_combined_intelligence_response(
         # threshold rather than the 30 s intelligence-refresh interval that is
         # the default everywhere else. A board assembled from artifacts is not
         # a snapshot and does not turn over that fast.
-        "freshness_sla_seconds": stale_after,
+        "freshness_sla_seconds": int(round(effective_sla)),
         "freshness_status": status,
         "is_fresh": None if oldest_age is None else status == "fresh",
         "newest_age_seconds": newest_age,
         "artifacts_dated": len(dated),
         "dates": dates_block,
         "window_oldest_date": window_oldest_date,
+        # Which date the verdict actually rests on, and the two limits in force,
+        # so `freshness_sla_seconds` (an EFFECTIVE limit on `computed_at`) is never
+        # read as a policy number.
+        "freshness_binding_date": binding_date,
+        "freshness_limits_seconds": {"first_date": stale_after, "later_dates": max(stale_after, next_day_after)},
     }
     # `#363`: the legacy pool's own size, independent of what the board shows.
     # Always emitted, so "is `#308` still live" stays a one-field question now
