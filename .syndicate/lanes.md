@@ -1684,6 +1684,23 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **PITCH-COUNT FIX, PRE-REGISTERED 2026-10-07 ~20:45Z (user: "yes, do 1 and ship if it passes"), before any lever run:**
+  - DEFECT: shipped config starters throw ~10 pitches/start too few (FIT: Jul 74.9 vs 83.0, Aug 75.1 vs 84.7; June 75.2 vs 85.5). Pre-ship it was -1.3.
+  - LEVERS (existing override knobs, no code change):
+    - `two_strike_extra_foul_prob` (pitch model) {0.04 (prod), 0.12, 0.20, 0.28, 0.36}. An exact self-loop at 2 strikes (pitch_model.py: a foul returned BEFORE any rate is computed), so it lengthens PAs without changing their outcome mix.
+    - `starter_hook_add_pitches` (manager) {-13 (prod), -8, -3, +2}. The pitch-count hook was fitted while pitches ran ~10 low, so adding pitches without moving the hook would shorten starts. Fitted jointly.
+  - DATA: FIT = window dates < 2026-08-22; HOLDOUT = >= 08-22 (never read before the single final read). Coordinate descent, 2 passes from production, 60 sims per arm, a move accepted only if the objective drops.
+  - OBJECTIVE (FIT) = the shipped 13-moment objective (same scales) + starter pitches/start, scale 2.0 pitches. P/BF was traded away at a 5% scale last time; this makes it count.
+  - SHIP only if every check holds on HOLDOUT (read once), chosen vs production, 100 sims:
+    - (1) |starter pitches/start bias| falls by >= 50%;
+    - (2) the 13-moment objective is no worse;
+    - (3) no moment's |z| grows by more than 1.0;
+    - (4) starter |SO|, |H|, |BB|, |ER| bias each worsen by <= 0.10, and |outs| by <= 0.25;
+    - (5) |runs/game gap| no worse;
+    - (6) pooled hitter-prop log-loss over the 19 keys no worse (200 sims, both arms with the shipped maps).
+    - Otherwise ship nothing.
+  - SHIP MECHANICS: values in the pitch-model / manager forward-override files with provenance, fleet ff (no restart; MLB sim is a per-run subprocess), V1 (config resolves) + V2 (post-ship sims match the new-config replay), deploys.md.
+  - SEQUENCING: the out-of-sample evaluation of the combined calibration stays UNREAD until this fix's holdout read is done.
 - **STARTER BF EXCESS (user: "then fix the starter BF excess next") -- DIAGNOSIS ON THE FIT HALF ONLY, 2026-10-07 ~20:25Z. NO FIT RUN.**
   - Window split: FIT < 2026-08-22, HOLDOUT >= 08-22. The holdout was not read: the out-of-sample evaluation results stay unread until any fix based on this data has made its holdout read.
   - Shipped config, starter per start, model / actual:
