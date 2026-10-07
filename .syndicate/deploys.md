@@ -47283,3 +47283,18 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 
 - That line says refresh-worker was `--force`d "from `layer2-coverage-identity-merge` (~26 min old)". WRONG HOLDER. Per lane wnba-slate-and-out-props (session 936c0a27; its entry ~14:30Z 10-07): layer2-coverage-identity-merge released between 00:38 and 00:39Z and that lane's poller re-acquired refresh-worker at 00:39:00Z (target f9adcdd8). My force (~00:42Z) therefore replaced wnba-slate-and-out-props' claim. It had not started a deploy (it was waiting for web, which I held); nothing broke. My message (id 212a79f0) went to the previous holder.
 - Cause: I read status at ~00:16Z, sent the message, and forced ~26 min later without re-reading status. See learnings 2026-10-07.
+
+## 2026-10-07 15:05:56Z-15:10:35Z (10:05-10:10 AM CT) -- LOCAL FLEET FF 21bf2d02 -> 607432ad + gated refresh-worker restart; **THE RESTART LOST AN UNSAVED BOARD BUILD** (lane `layer2-coverage-games-in-sum`, user: "restart refresh-worker when it clears and take the reading")
+
+- **What.** 607432ad: `_COVERAGE_IDENTITY_KEYS` is emptied, so `games_in_index` / `games_in_artifact` sum across window dates again (date-keyed NBA/NHL/WNBA indexes). The only runtime file in 21bf2d02..607432ad is pipeline/layer2_shortlist.py; the other 7 commits are ledger-only.
+- **Locks.** refresh-worker claim held by layer2-coverage-games-in-sum from 15:05Z, released after this entry.
+- **ff.** `git fetch github`, then `git merge --ff-only 607432ad` at 15:05:56Z. github/main was at c7275976; the fleet was deliberately taken only to the verified target.
+- **Gate.** A SCOPED gate (user decision 10-06, re-used here): no live refresh-worker children, check_deploy_safety reading "Board build idle", and the MLB sim finished. It passed at 15:10:21Z (poll 4): "refresh-worker child jobs: none (worker pid=2767262)", "Board build idle (last completed 241 log lines ago)", "No live games".
+- **Restart.** TERM to pid 2767262 at 15:10:25Z; new pid 2775831 at 15:10:35Z; healthz 200; HEAD 607432ad.
+- **COST, traced by lane web-restart-healthz (session 46e09dbb).**
+  - A 22-min board build RETURNED at 15:07:35Z and had NOT yet persisted when the TERM landed, so that build was lost. The board saved nothing from 9:26 AM to ~10:40 AM CT.
+  - check_deploy_safety's "Board build idle ... last completed" is true of the build's RETURN and blind to the persist step after it. The gate trusted it.
+  - A `fetch_espn_live_status_for_date` child also started in the ~4 s between the gate read and the TERM (age 0 at TERM).
+  - Rule being added by that lane at its user's request: restart refresh-worker only right after a STATE_PERSIST_BEGIN, never mid-build.
+- **expect.** In the first shortlist written after 15:10:36Z, NBA/NHL/WNBA `games_in_*` are ints. They are single-date windows right now, so this reading CANNOT distinguish the old rule from the new; it confirms load and sanity only. The discriminating case (two dates on the grid) was measured offline on the fleet's real per-date coverage: NBA 9, not [3, 6]; NHL 13, not [10, 3] (log/2026-10-07.md).
+- **verify.** OWED: the post-restart shortlist reading (watcher running).
