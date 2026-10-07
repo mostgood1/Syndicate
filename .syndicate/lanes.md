@@ -1670,6 +1670,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **BUILT + PROBED 2026-10-07 (before the gate):**
+  - Lineup projection B on 06-15..07-12 (588 lineup sides): overlap with the actual starting nine **0.846**; with production's stored Rotowire projection 0.848.
+    - Production's own projection vs actual was 0.816. B carries about production's information level, without hindsight.
+  - Amendment, made from a unit test before any replay: when the same-hand window leaves fewer than 9 rostered players, B fills from the last 15 games of either hand (previously the builder backfilled in roster order). The probe was re-run with it: unchanged.
+  - `--source statsapi` smoke on 06-15: 10 games (stored-input rebuild: 10), 0 short projections; context = production's fetch_game_context (venue, game-time temperature, umpire 1.0 as stored).
+  - Timing: 16m39s wall vs 1m40s CPU per date, i.e. StatsAPI round trips. Added `--shared-cache` (one persistent cache across dates).
+    - Safe because the date-bounded client rewrites current-season requests BEFORE the cache (endDate D-1 is in the key), and gameLog is cached whole and filtered < D after the read. DiskCache writes are atomic (tmp + os.replace).
+  - Code: commit "mlb as-of rebuild: --source statsapi ..." on main.
 - **DESIGN + FIDELITY GATE, PRE-REGISTERED 2026-10-07 (user: "yes, build it with option B"), before any code or build:**
   - SOURCES:
     - games, probables, team ids/abbrev, starting lineups: StatsAPI schedule `hydrate=lineups,probablePitcher,team` (gameType R);
