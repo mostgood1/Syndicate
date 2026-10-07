@@ -205,3 +205,28 @@ S12 (back-to-back) was not computed: it needs the schedule join -- owed.
 **Refuted if:** no lever setting brings within-game margin SD below 16.0 on the subsample (the excess is then
 elsewhere: shot-level or lineup randomness, to be diagnosed next) -> L1-L3 recorded as EXONERATED as the driver.
 
+## Phase 2 #1 — RESULT 2026-10-07 (read once, against the pre-registration above)
+
+- **Sweep:** 12 seed-7 FIT dates, 87 games, 200 draws, each lever moved alone.
+  - Every point paired 87/87 games with the baseline.
+  - Every engine call carried the lever (harness fix 129c7cc2; the first launch had silently run the baseline for
+    L1/L2).
+- **Within-game margin SD**, paired difference vs baseline (18.10), game-bootstrap 95% CI:
+
+| point | SD | diff vs baseline [95% CI] |
+|---|---|---|
+| L1 0.95 | 17.68 | −0.42 [−0.64, −0.19] |
+| L1 1.0 | 17.51 | −0.59 [−0.81, −0.35] |
+| L2 0.4 | 18.12 | +0.02 |
+| L2 0.2 | 18.02 | −0.08 |
+| L2 0.0 | 18.30 | +0.20 [−0.06, +0.49] |
+| L3 0.03 | 18.15 | +0.05 |
+| L3 0.0 | 18.06 | −0.04 |
+
+- **VERDICT: REFUTED.** No setting gets below 16.0, so per the pre-registration L1-L3 are **EXONERATED** as the
+  driver of the excess margin spread.
+  - L1 has a real but small effect (~15% of the 18.1 → ~14 gap at its extreme).
+  - L2 and L3 are null.
+- **Next, as pre-registered:** diagnose shot-level and lineup randomness.
+- **Joint fit (step 4):** not run as a fix for this target. Whether L1 = 1.0 is worth adopting on its own is read off
+  the S3/S5/S7/S8 per-point tables, then decided with the user.

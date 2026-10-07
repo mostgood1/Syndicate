@@ -3365,3 +3365,13 @@ own prior verdicts, not by anything failing.
 ## 2026-10-07 -- RULE: `check_deploy_safety --drain` cannot produce a restart window on the local fleet `[lane: soccer-team-history-current-season]`
 
 - Measured 15:25-15:56Z: the drain stops new BOARD builds, so the board save that the user's rule ("restart the refresh-worker only right after a save") waits for can never come while it is in force; and it does not hold the live-odds-worker, whose odds jobs run continuously, so its CLEAR never arrives either. Use `check_deploy_safety` (idle = a LOOP_ITERATION after STATE_PERSIST_BEGIN, since e28aeafb) WITHOUT a drain as the restart gate, with the three claims held.
+
+## 2026-10-07 -- EXONERATED: possession alternation, quarter environment SD and possession-count jitter are not why the NBA sim's margins are too wide `[session e0a3e383, lane basketball-scenario-calibration]`
+
+- **Pre-registered sweep** (12 FIT dates, 87 games, levers verified at the engine boundary):
+  - within-game margin SD 18.10 at baseline;
+  - best 17.51 with alternation = 1.0;
+  - env_sd_scale and possessions_jitter null down to 0.
+  - Real-game total dispersion is ~14.
+- **Do not re-tune these three expecting to close the gap.** The excess is elsewhere (shot-level or lineup
+  randomness). Details: findings_2026-10-06_basketball_scenario_calibration.md, Phase 2 #1 RESULT.
