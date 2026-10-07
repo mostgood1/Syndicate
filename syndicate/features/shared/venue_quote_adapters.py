@@ -468,7 +468,29 @@ def _kalshi_leg_probability(row: Mapping[str, Any], leg: str) -> float | None:
     return value
 
 
-def _kalshi_game_token(ticker: Any, sport: Any, games: Any) -> str | None:
+def _kalshi_game_token(ticker: Any, sport: Any, games: Any, memo: "dict | None" = None) -> str | None:
+    """`memo` (lane `web-restart-healthz` 2026-10-07): a dict scoped to ONE caller pass
+    with fixed `games`/`sport`, keyed by event blob. Many tickers share one blob
+    (every line of one game), and `match_event_blob` tries every split against the
+    whole schedule -- py-spy on the fleet: 27% of a today shortlist refresh here.
+    The answer depends only on (blob, sport, games), so it is reused within the pass.
+    """
+    if memo is None or not games:
+        return _kalshi_game_token_uncached(ticker, sport, games)
+    try:
+        from syndicate.features.shared.kalshi_catalogue import event_blob_from_ticker
+
+        blob = event_blob_from_ticker(ticker)
+    except Exception:  # noqa: BLE001
+        return _kalshi_game_token_uncached(ticker, sport, games)
+    if blob in memo:
+        return memo[blob]
+    value = _kalshi_game_token_uncached(ticker, sport, games)
+    memo[blob] = value
+    return value
+
+
+def _kalshi_game_token_uncached(ticker: Any, sport: Any, games: Any) -> str | None:
     """The fixture a Kalshi ticker names, as a `game_token`, or None.
 
     --------------------------------------------------------------------------
@@ -589,6 +611,7 @@ def kalshi_outcome(
     except Exception as exc:  # noqa: BLE001
         return SourceOutcome(source="kalshi", status="error", reason=f"classify_unavailable: {type(exc).__name__}")
 
+    game_token_memo: dict = {}  # one pass, fixed `games` -- see `_kalshi_game_token`
     for row in rows:
         if not isinstance(row, Mapping):
             continue
@@ -730,7 +753,7 @@ def kalshi_outcome(
         # that works today can be lost. It can REMOVE a match that was landing
         # on the wrong game, which is the point.
         k_game = (
-            _kalshi_game_token(row.get("ticker"), sport, games)
+            _kalshi_game_token(row.get("ticker"), sport, games, memo=game_token_memo)
             if not prop_player
             else None
         )
@@ -923,12 +946,18 @@ def _polymarket_pair_games(rows: Any, sport: Any, games: Any) -> dict[tuple[str,
     def _toks(value: Any) -> set:
         return set(_re.sub(r"[^a-z0-9 ]", " ", str(value or "").lower()).split())
 
+    # Each game's team tokens ONCE per call, not per row x outcome x game (lane
+    # `web-restart-healthz` 2026-10-07: py-spy had this setcomp at 13.6% of a today
+    # shortlist refresh). Same tokens, same comparisons -- only computed once.
+    game_toks = {id(g): (_toks(g.get("home_team")), _toks(g.get("away_team"))) for g in games}
+
     def _side(name: Any, game: Any) -> str | None:
         n = _toks(name)
         if not n:
             return None
-        in_home = n <= _toks(game.get("home_team"))
-        in_away = n <= _toks(game.get("away_team"))
+        home_toks, away_toks = game_toks.get(id(game)) or (_toks(game.get("home_team")), _toks(game.get("away_team")))
+        in_home = n <= home_toks
+        in_away = n <= away_toks
         if in_home and not in_away:
             return "home"
         if in_away and not in_home:
