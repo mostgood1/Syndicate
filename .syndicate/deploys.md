@@ -47369,3 +47369,45 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
   - 10-11: 15:31:17Z, 48 props, 1 match
 - **Result:** served dropped 81 -> 93, exactly the offline number. No July-roster build of these slates was read, so there is no props comparison.
 - **Six leagues now read; all six match the offline A/B exactly** (bundesliga 169, ligue_1 256, la_liga 188, epl 140, serie_a 225, championship 93).
+
+## 2026-10-07 ~16:30Z (11:30 AM CDT) -- READING, no deploy -- lane `live-props-model-probability` -- soccer 1d64a4b2 + WNBA 8acfd9a1 on the LOCAL fleet: soccer and WNBA grade, NFL/NCAAF still 0 -> lane CLOSED, GOAL NOT MET
+
+Taken by hand by session af3cc595 on user instruction (the scheduled task `live-props-soccer-reading-and-lane-close` froze on its first-command permission prompt twice; its one-time slot lapsed).
+
+    running code (local_production.py status, 2026-10-07 ~16:10Z)
+      refresh-worker   607432ad  contains 1d64a4b2 (soccer modelled_fair_side)  -> YES
+      live-odds-worker a185e337  contains 8acfd9a1 (WNBA NegBin line grid)      -> YES
+
+    population (fleet disk, reports/intelligence/opportunity_population, gs=live & kind=prop)
+      date        soccer rows / la=True / me!=null      wnba rows / la=True / me!=null
+      2026-09-30  200 / 37 / 13                          1711 / 541 / 167
+      2026-10-01  356 / 65 / 0                           1171 /  47 /  23
+      2026-10-02  356 /  0 / 0                            982 / 144 /  58
+      2026-10-03    0 /  0 / 0                              0 /   0 /   0
+      2026-10-04    0 /  0 / 0                           2151 / 689 / 186
+      2026-10-05    0 /  0 / 0                              0 /   0 /   0
+      2026-10-06  373 / 85 / 8                              0 /   0 /   0
+      (2026-09-28/29 were produced on Render and are unreachable. No European league played 09-21..10-08,
+       so soccer live rows here are MLS.)
+
+    refresh-worker LIVE_PROJECTION_JOIN sport=soccer (local logs reach back only to 2026-10-02T15:00:09Z)
+      1,574 lines; nonzero edged_modelled only in the 10-06 MLS slate builds, 2026-10-07T01:20:41Z..02:29:41Z
+      (values 53, 68, 71, 71). Before the fix: me on 0 of 3,547 live-aware soccer props (09-14..09-28).
+      Soccer `me` is non-null on 13 (09-30) and 8 (10-06) live props: the fix REACHES the board on real slates.
+
+    WNBA 09-29 reading: already recorded (deploys.md "2026-09-29 slate -- WNBA grid reading of `8acfd9a1`",
+      JOIN EXERCISED, points grade unreadable because of the suspension). Not re-taken. Later WNBA live props
+      carry `me` on 167 / 23 / 58 / 186 rows (09-30, 10-01, 10-02, 10-04). The 2026 WNBA season's last live
+      props in this window are 10-04.
+
+    model scorecard, local fleet, generated 2026-10-07T11:30:02Z, windows.28d.cells, phase=live,
+    markets other than h2h/spreads/totals and their alternates -- games summed over cells
+      soccer 5 (7 cells)   wnba 24 (10)   ncaaf 0 (6)   nfl 0 (9)   mlb 31 (12)   nba 0 (3)   nhl 0 (5)
+      baseline 2026-09-28 (RENDER, same method): mlb 229, wnba 11, ncaaf 0, nfl 0, soccer 0.
+      CAVEATS: the local 28d window rests on a ledger that starts 2026-09-30 (8 days), so the numbers are NOT
+      like-for-like with the Render baseline. Summing `games` over cells counts a game once PER MARKET CELL it
+      appears in, so these are game-cells, not distinct games (the baseline used the same method).
+
+    verdict: GOAL NOT MET. Soccer > 0 (5, was 0) and WNBA > 11 (24) MET their halves. NFL and NCAAF are 0, and
+      blocked on lane `nfl-ncaaf-live-props` (no live prop probability model exists). Lane CLOSED in place in
+      lanes_closed.md (it was ORPHANED 2026-10-02).
