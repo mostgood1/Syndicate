@@ -369,4 +369,110 @@ def row_explainer(
     narrative = row_narrative(row, context)
     if narrative and narrative.get("text"):
         parts.append(str(narrative["text"]))
+    season = row_season_text(row, context)
+    if season:
+        parts.append(season)
     return " ".join(parts)
+
+
+# --------------------------------------------------------------------------
+# Season metrics -- ONE explanation layer for the ONE list
+# --------------------------------------------------------------------------
+#
+# User 2026-10-07: "we shouldnt have seperate lists being generated" -- the Layer
+# 2 board IS the pick list, so the season-metric evidence that
+# `intelligence_season_evidence` reads (lane intelligence-evidence-coverage,
+# `ced2618f`) belongs on Layer 2 rows. Before this it reached only the legacy
+# intelligence pool (77 recommendations) and 0 of 4,500 served board rows.
+#
+# Display only: appended to `detail`; no field the score, the shortlist floors,
+# `portfolio_commit` or execution read is touched.
+#
+# Memoised in the per-build `context` dict: thousands of rows share a few
+# hundred games, and the signal for a game side does not depend on the book or
+# the line. A caller with no context (None) still gets the sentence, unmemoised.
+
+_PITCHER_MARKET_PREFIX = ("pitcher_",)
+_SEASON_TEXT_MEMO: dict[int, dict] = {}
+_SEASON_TEXT_MEMO_MAX = 4
+
+
+def _season_candidate(row: Mapping[str, Any]) -> dict[str, Any] | None:
+    sport = str(row.get("sport") or "").strip().lower()
+    if not sport:
+        return None
+    home = str(row.get("home_team") or "").strip()
+    away = str(row.get("away_team") or "").strip()
+    side = str(row.get("side") or "").strip().lower()
+    market = str(row.get("market") or "").strip()
+    player = str(row.get("player_name") or "").strip()
+    candidate: dict[str, Any] = {
+        "sport_slug": sport,
+        "matchup": f"{away} @ {home}" if home and away else "",
+        "team": home if side == "home" else (away if side == "away" else ""),
+        "event_id": row.get("event_id"),
+        "market": market,
+        "player_name": player,
+        "league": row.get("league"),
+    }
+    if sport == "mlb" and player:
+        projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
+        player_id = str(projection.get("player_id") or "").strip()
+        if player_id:
+            candidate["player_id"] = player_id
+    return candidate
+
+
+def _season_memo_key(candidate: Mapping[str, Any]) -> tuple:
+    sport = candidate.get("sport_slug")
+    if sport == "mlb":
+        role = "p" if str(candidate.get("market") or "").startswith(_PITCHER_MARKET_PREFIX) else "b"
+        return (sport, "player", candidate.get("player_id"), role)
+    if sport == "soccer":
+        return (sport, "player", str(candidate.get("player_name") or "").lower(), candidate.get("league"))
+    return (sport, "game", candidate.get("matchup"), candidate.get("team"), candidate.get("event_id"))
+
+
+def row_season_text(row: Mapping[str, Any], context: Mapping[str, Any] | None = None) -> str | None:
+    """The season-metric sentence for a Layer 2 row, or None. Never raises."""
+    try:
+        candidate = _season_candidate(row)
+        if candidate is None:
+            return None
+        if candidate["sport_slug"] == "mlb" and not candidate.get("player_id"):
+            return None  # MLB has player-level tables only; no id, nothing to read
+        if candidate["sport_slug"] == "soccer" and not candidate.get("player_name"):
+            return None  # soccer has player-level tables only
+        memo: dict | None = None
+        if isinstance(context, dict):
+            memo = context.setdefault("season_text_memo", {})
+        else:
+            # No per-build context (the in-play overlay calls the card builder
+            # bare, every tick): a small module memo, cleared when full and
+            # keyed on the minute so a rebuilt table is read within ~60 s.
+            import time as _time
+
+            if len(_SEASON_TEXT_MEMO) > _SEASON_TEXT_MEMO_MAX:
+                _SEASON_TEXT_MEMO.clear()
+            memo = _SEASON_TEXT_MEMO.setdefault(int(_time.time() // 60), {})
+            for stale in [k for k in _SEASON_TEXT_MEMO if k != int(_time.time() // 60)]:
+                _SEASON_TEXT_MEMO.pop(stale, None)
+        key = _season_memo_key(candidate)
+        if memo is not None and key in memo:
+            return memo[key]
+        from syndicate.features import intelligence_season_evidence as season
+
+        from syndicate.features.shared.prop_evidence.common import eastern_date
+
+        commence = str(row.get("commence_time") or "").strip()
+        try:
+            today = _date.fromisoformat(eastern_date(commence) or "") if commence else _date.today()
+        except ValueError:
+            today = _date.today()
+        text = season.season_evidence_text(season.candidate_season_signals(candidate, today)) or None
+        if memo is not None:
+            memo[key] = text
+        return text
+    except Exception as exc:  # noqa: BLE001 -- enrichment must never break the build
+        print(f"[layer2_row_context] SEASON_TEXT_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return None

@@ -824,6 +824,25 @@ def _ncaaf_teams_from_event(event_id: Any, keys: set[str]) -> tuple[str, str] | 
     return matches[0] if len(matches) == 1 else None
 
 
+def _ncaaf_table_key(name: str, keys: set[str]) -> str | None:
+    """A board team name ("Kennesaw State Owls") -> its SP+ key ("kennesaw st"), or None.
+
+    Exact normalised match first, then the CFBD registry via `canonical_team`
+    (display name with mascot -> school). Never by dropping trailing words: that
+    turns "Texas Southern Tigers" (FCS, unrated) into "texas" -- a confident
+    wrong join, measured in this lane's backtest on 2026-10-07.
+    """
+    direct = _ncaaf_norm(name)
+    if direct in keys:
+        return direct
+    school = _canonical("ncaaf")(name)
+    if school:
+        key = _ncaaf_norm(school)
+        if key in keys:
+            return key
+    return None
+
+
 def _resolve_side_keys(sport: str, candidate: dict[str, Any], tables: list[Table]) -> tuple[str | None, str | None, str | None]:
     """(away_key, home_key, pick_key) in each table's key space, or Nones."""
     pair = split_matchup(candidate.get("matchup"))
@@ -834,8 +853,8 @@ def _resolve_side_keys(sport: str, candidate: dict[str, Any], tables: list[Table
             keys |= set(table.rows)
         teams = _ncaaf_teams_from_event(candidate.get("event_id"), keys)
         if teams is None and pair is not None:
-            away, home = _ncaaf_norm(pair[0]), _ncaaf_norm(pair[1])
-            teams = (away, home) if away in keys and home in keys else None
+            away, home = _ncaaf_table_key(pair[0], keys), _ncaaf_table_key(pair[1], keys)
+            teams = (away, home) if away and home else None
         if teams is None:
             return None, None, None
         away, home = teams
@@ -864,6 +883,39 @@ def _display_team(candidate: dict[str, Any], side: str) -> str:
     return pair[0] if side == "away" else pair[1]
 
 
+def _prepared(table: Table) -> tuple[dict[str, dict[str, Any]], dict[str, list[float]]]:
+    """Derived rows and each metric's ASCENDING league column, computed once per table.
+
+    The candidate loop asks for the same table thousands of times per build
+    (4,706 Layer 2 cards on 2026-10-07); recomputing these per call cost ~18 ms
+    a game. Stored on the Table, which itself lives for the 60 s table memo.
+    A column with no spread across the league is dropped here: it is a
+    placeholder, not a measurement, and ranking it "1st of 30" for every team
+    would be a confident-looking lie.
+    """
+    cached = getattr(table, "_prepared_cache", None)
+    if cached is not None:
+        return cached
+    derived_rows = {key: _derived(table.family, row) for key, row in table.rows.items()}
+    columns: dict[str, list[float]] = {}
+    for spec in _TEAM_METRICS.get(table.family, []):
+        values = sorted(v for v in (_num(r.get(spec.field)) for r in derived_rows.values()) if v is not None)
+        if len(values) >= 2 and values[0] != values[-1]:
+            columns[spec.field] = values
+    cached = (derived_rows, columns)
+    object.__setattr__(table, "_prepared_cache", cached)
+    return cached
+
+
+def _sorted_rank(ascending: list[float], value: float, higher_is_better: bool) -> int:
+    """1-based league rank against an ascending column (ties share the best rank)."""
+    import bisect
+
+    if higher_is_better:
+        return len(ascending) - bisect.bisect_right(ascending, value) + 1
+    return bisect.bisect_left(ascending, value) + 1
+
+
 def team_signals(sport: str, candidate: dict[str, Any], today: _dt.date) -> list[dict[str, Any]]:
     sport = sport.lower()
     tables = [t for t in season_tables(sport, today) if t.rows and not t.family.startswith("players:")]
@@ -875,13 +927,10 @@ def team_signals(sport: str, candidate: dict[str, Any], today: _dt.date) -> list
     signals: list[dict[str, Any]] = []
     for table in tables:
         status = season_status(sport, table.as_of, today)
-        derived_rows = {key: _derived(table.family, row) for key, row in table.rows.items()}
+        derived_rows, columns = _prepared(table)
         for spec in _TEAM_METRICS.get(table.family, []):
-            league = [v for v in (_num(r.get(spec.field)) for r in derived_rows.values()) if v is not None]
-            if len(league) < 2 or max(league) == min(league):
-                # A column with no spread across the league is a placeholder,
-                # not a measurement; ranking it "1st of 30" for every team
-                # would be a confident-looking lie.
+            league = columns.get(spec.field)
+            if not league:
                 continue
             for side, key in (("away", away), ("home", home)):
                 row = derived_rows.get(key)
@@ -900,7 +949,7 @@ def team_signals(sport: str, candidate: dict[str, Any], today: _dt.date) -> list
                         "team": _display_team(candidate, side),
                         "value": round(value, 4),
                         "display": _format(value, spec.fmt),
-                        "rank": _rank(league, value, spec.higher_is_better),
+                        "rank": _sorted_rank(league, value, spec.higher_is_better),
                         "of": len(league),
                         "higher_is_better": spec.higher_is_better,
                         "league_mean": round(sum(league) / len(league), 4),
@@ -942,7 +991,10 @@ def soccer_player_signals(candidate: dict[str, Any], today: _dt.date) -> list[di
                     "family": table.family,
                     "side": "player",
                     "is_pick_side": True,
-                    "team": row.get("team"),
+                    # The sentence names its subject from this field: the
+                    # player, with the club for disambiguation.
+                    "team": f"{row.get('player_name') or name} ({row.get('team')})" if row.get("team") else (row.get("player_name") or name),
+                    "club": row.get("team"),
                     "value": round(value, 4),
                     "display": _format(value, spec.fmt),
                     "rank": _rank(league + ([value] if value not in league else []), value, spec.higher_is_better) if ranked else None,
