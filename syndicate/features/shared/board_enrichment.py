@@ -305,20 +305,33 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
     ambiguous_game = 0
     other_day_game = 0
     doubleheader_resolved = 0
+    # ONE CHIP SCAN PER DISTINCT TEAM PAIR, not per row -- lane `web-restart-healthz`
+    # `[2026-10-07]`. Every market of one game carries the same (home, away), and the
+    # scan below depends only on that pair and on `chips`, which is fixed for this
+    # call. py-spy on the fleet refresh-worker 2026-10-07 13:17 CT: the today
+    # shortlist (5,359 rows) 15+ minutes in this loop, `teams_match` per row x chip.
+    # The per-row logic after the scan (start-time pick, counters) is unchanged.
+    pair_scan_memo: dict[tuple[str, str], list] = {}
     for row in grid:
         home = row.get("home_team")
         away = row.get("away_team")
         if not home or not away:
             continue
-        pair_hits = []
-        for chip in chips:
-            chip_home = (chip.get("home") or {}) if isinstance(chip.get("home"), dict) else {}
-            chip_away = (chip.get("away") or {}) if isinstance(chip.get("away"), dict) else {}
-            try:
-                if _side_matches(home, chip_home) and _side_matches(away, chip_away):
-                    pair_hits.append(chip)
-            except Exception:
-                continue
+        pair_key = (str(home), str(away))
+        cached_hits = pair_scan_memo.get(pair_key)
+        if cached_hits is not None:
+            pair_hits = list(cached_hits)
+        else:
+            pair_hits = []
+            for chip in chips:
+                chip_home = (chip.get("home") or {}) if isinstance(chip.get("home"), dict) else {}
+                chip_away = (chip.get("away") or {}) if isinstance(chip.get("away"), dict) else {}
+                try:
+                    if _side_matches(home, chip_home) and _side_matches(away, chip_away):
+                        pair_hits.append(chip)
+                except Exception:
+                    continue
+            pair_scan_memo[pair_key] = list(pair_hits)
         if not pair_hits:
             for team in (home, away):
                 unmatched[str(team)] = unmatched.get(str(team), 0) + 1
