@@ -1278,6 +1278,9 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
                 # H38 provenance (lane soccer-shots-allocation-blend): present ONLY when the own-rate blend
                 # produced this row's shot/SOT ladder, so a flag-off artifact is byte-identical to before.
                 **({"own_rate_blend": row["own_rate_blend"]} if row.get("own_rate_blend") else {}),
+                # The allocation inputs this row was built from (lane soccer-goal-allocation, 2026-10-07): makes the
+                # build gradable as-of. Present only when the sim supplied them, so other payloads are unchanged.
+                **({"usage_inputs": row["usage_inputs"]} if row.get("usage_inputs") else {}),
             }
             for row in player_outputs
         ],
