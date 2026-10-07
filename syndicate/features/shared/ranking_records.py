@@ -69,6 +69,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import pickle
 import threading
 import time
 from array import array as _array
@@ -232,6 +233,106 @@ def ranking_records_cache_enabled() -> bool:
 def reset_ranking_records_cache() -> None:
     with _CHUNK_CACHE_LOCK:
         _CHUNK_CACHE.clear()
+        _DISK_SAVED_AT.clear()
+
+
+# ---------------------------------------------------------------------------
+# THE CACHE SURVIVES A RESTART -- lane `web-restart-healthz` `[2026-10-07]`, user
+# decision ("persist the caches to disk"). The per-chunk cache above lived only in
+# the process, so EVERY refresh-worker restart re-parsed 14 days of ledger from
+# byte 0: py-spy on the fleet 2026-10-07 had the first post-restart board build
+# 20+ minutes in `_parse_into_state` (11 s warm). The fleet restarted the worker
+# 8 times that day.
+#
+# Each chunk's `_ChunkState` is pickled next to the chunks after it is parsed or
+# extended (`<chunk root>/../ranking_records_cache/<chunk stem>.pkl`, atomic
+# tmp + os.replace, the growing chunk at most every _DISK_SAVE_MIN_INTERVAL_S). A
+# cold process LOADS it and then runs the SAME revalidation as the in-memory cache
+# (same inode; size+mtime equal -> reused; probe bytes equal -> parse only the new
+# lines; otherwise a full re-parse), so a stale file costs a re-parse, never a wrong
+# record. The blake2b digest is not picklable: it is rebuilt from the saved settled
+# entries in file order, which is exactly how it was built.
+#
+# `hash(identity)` is RANDOMISED PER PROCESS for strings, so pending-line hashes
+# saved by one worker would never match the next one's: `_stable_hash` (64-bit
+# blake2b) replaces it everywhere. A hash is only a prefilter -- a hit re-reads the
+# line and compares the identity exactly -- so a collision costs a read, nothing
+# more. Off: SYNDICATE_RANKING_RECORDS_DISK_CACHE=0 (the memory cache is unchanged).
+# ---------------------------------------------------------------------------
+_DISK_CACHE_ENV = "SYNDICATE_RANKING_RECORDS_DISK_CACHE"
+_DISK_CACHE_VERSION = 1
+_DISK_SAVE_MIN_INTERVAL_S = 120.0
+_DISK_SAVED_AT: "dict[str, float]" = {}
+
+
+def ranking_records_disk_cache_enabled() -> bool:
+    return str(os.environ.get(_DISK_CACHE_ENV, "1")).strip().lower() not in {"0", "false", "off", "no"}
+
+
+def _stable_hash(identity: Any) -> int:
+    raw = json.dumps(identity, separators=(",", ":"), default=str).encode("utf-8")
+    return int.from_bytes(hashlib.blake2b(raw, digest_size=8).digest(), "little", signed=True)
+
+
+def _disk_cache_path(chunk_path: Path) -> Path:
+    return chunk_path.parent.parent / "ranking_records_cache" / f"{chunk_path.stem}.pkl"
+
+
+def _save_chunk_state(chunk_path: Path, state: "_ChunkState", *, force: bool) -> None:
+    key = str(chunk_path)
+    now = time.monotonic()
+    if not force and now - _DISK_SAVED_AT.get(key, float("-inf")) < _DISK_SAVE_MIN_INTERVAL_S:
+        return
+    target = _disk_cache_path(chunk_path)
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "v": _DISK_CACHE_VERSION, "path": key,
+            "ino": state.ino, "dev": state.dev, "size": state.size, "mtime_ns": state.mtime_ns,
+            "offset": state.offset, "probe": state.probe, "lines_seen": state.lines_seen,
+            "unparseable": state.unparseable, "pending_plain": state.pending_plain,
+            "settled": state.settled,
+            "pending_hashes": state.pending_hashes.tobytes(),
+            "pending_offsets": state.pending_offsets.tobytes(),
+        }
+        tmp = target.with_suffix(f".tmp{os.getpid()}")
+        with tmp.open("wb") as handle:
+            pickle.dump(payload, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        os.replace(tmp, target)
+        _DISK_SAVED_AT[key] = now
+    except Exception as exc:  # a cache must never take the load down
+        print(f"[ranking_records] RANKING_CACHE_SAVE_FAILED chunk={chunk_path.name} {type(exc).__name__}: {exc}", flush=True)
+
+
+def _load_chunk_state(chunk_path: Path) -> "_ChunkState | None":
+    target = _disk_cache_path(chunk_path)
+    try:
+        if not target.is_file():
+            return None
+        with target.open("rb") as handle:
+            payload = pickle.load(handle)
+        if not isinstance(payload, dict) or payload.get("v") != _DISK_CACHE_VERSION or payload.get("path") != str(chunk_path):
+            return None
+        state = _ChunkState(int(payload["ino"]), int(payload["dev"]))
+        state.size = int(payload["size"])
+        state.mtime_ns = int(payload["mtime_ns"])
+        state.offset = int(payload["offset"])
+        state.probe = bytes(payload["probe"])
+        state.lines_seen = int(payload["lines_seen"])
+        state.unparseable = int(payload["unparseable"])
+        state.pending_plain = int(payload["pending_plain"])
+        state.settled = list(payload["settled"])
+        state.pending_hashes = _array("q")
+        state.pending_hashes.frombytes(payload["pending_hashes"])
+        state.pending_offsets = _array("q")
+        state.pending_offsets.frombytes(payload["pending_offsets"])
+        for _pending_before, identity, projected in state.settled:
+            state.digest.update(_entry_digest_bytes(identity, projected))
+        _DISK_SAVED_AT[str(chunk_path)] = time.monotonic()
+        return state
+    except Exception as exc:
+        print(f"[ranking_records] RANKING_CACHE_LOAD_FAILED chunk={chunk_path.name} {type(exc).__name__}: {exc}", flush=True)
+        return None
 
 
 class _ChunkState:
@@ -309,7 +410,7 @@ def _parse_into_state(handle: Any, state: _ChunkState, byte_limit: int) -> "tupl
             if identity is None:
                 state.pending_plain += 1
             else:
-                state.pending_hashes.append(hash(identity))
+                state.pending_hashes.append(_stable_hash(identity))
                 state.pending_offsets.append(line_offset)
         state.offset = consumed
         state.probe = (state.probe + raw)[-_PROBE_BYTES:]
@@ -318,6 +419,8 @@ def _parse_into_state(handle: Any, state: _ChunkState, byte_limit: int) -> "tupl
 def _chunk_state_for(chunk_path: Path, handle: Any, st: os.stat_result, byte_limit: int, use_cache: bool) -> "tuple[_ChunkState, str]":
     key = str(chunk_path)
     state = _CHUNK_CACHE.get(key) if use_cache else None
+    if state is None and use_cache and ranking_records_disk_cache_enabled():
+        state = _load_chunk_state(chunk_path)
     if state is not None and (state.ino, state.dev) == (st.st_ino, st.st_dev) and state.offset <= min(st.st_size, byte_limit):
         if (state.size, state.mtime_ns) == (st.st_size, st.st_mtime_ns):
             return state, "reused"
@@ -447,6 +550,11 @@ def load_recent_ranking_records(
                             if use_cache:
                                 _CHUNK_CACHE[str(chunk_path)] = state
                                 planned_keys.add(str(chunk_path))
+                                if parsed and ranking_records_disk_cache_enabled():
+                                    # A chunk read from byte 0 is saved at once; a
+                                    # growing one at most every
+                                    # _DISK_SAVE_MIN_INTERVAL_S.
+                                    _save_chunk_state(chunk_path, state, force=(how == "parsed"))
                         except OSError:
                             _CHUNK_CACHE.pop(str(chunk_path), None)
                 except OSError:
@@ -481,7 +589,7 @@ def load_recent_ranking_records(
                     done = _replay_pending(pending_before, done)
                     if identity is not None:
                         settled_identities.add(identity)
-                        settled_hashes.add(hash(identity))
+                        settled_hashes.add(_stable_hash(identity))
                     records.append(projected)
                     counters["kept"] += 1
                 _replay_pending(len(state.pending_hashes), done)
@@ -495,7 +603,7 @@ def load_recent_ranking_records(
                         before = len(records)
                         _consider(payload)
                         if kind == "settled" and tail_identity is not None:
-                            settled_hashes.add(hash(tail_identity))
+                            settled_hashes.add(_stable_hash(tail_identity))
                         if len(records) > before:
                             fingerprint.update(b"T" + _entry_digest_bytes(tail_identity, records[-1]))
             if use_cache:

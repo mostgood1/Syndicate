@@ -313,3 +313,72 @@ def test_randomised_write_sequences_always_match_a_fresh_read(ledger, monkeypatc
             elif pending_only:
                 assert records.fingerprint == last_fp, op
         last_fp, last_records = records.fingerprint, list(records)
+
+
+# --- the cache survives a restart (lane web-restart-healthz, 2026-10-07) --------------
+# A refresh-worker restart used to re-parse 14 days of ledger (20+ min on the fleet).
+# `reset_ranking_records_cache()` empties the in-process cache, i.e. a new process.
+
+def test_a_cold_process_resumes_from_disk_and_parses_nothing(ledger, monkeypatch):
+    _write(ledger, 2, [_settled(1), _pending(2)])
+    _write(ledger, 1, [_settled(3, "loss"), _pending(4)])
+    first, _ = _load(ledger, monkeypatch, cached=True)
+    assert list((ledger.parent / "ranking_records_cache").glob("*.pkl")), "nothing was saved"
+    rr.reset_ranking_records_cache()                      # "restart"
+    cold, stats = _load(ledger, monkeypatch, cached=True)
+    assert stats["chunks_reused"] == 2 and stats["chunks_parsed"] == 0 and stats["bytes_parsed"] == 0
+    assert list(cold) == list(first) and cold.fingerprint == first.fingerprint
+    _assert_same_as_fresh(ledger, monkeypatch)
+
+
+def test_a_cold_process_extends_from_disk_after_an_append(ledger, monkeypatch):
+    _write(ledger, 0, [_settled(1), _pending(2)])
+    _load(ledger, monkeypatch, cached=True)
+    rr.reset_ranking_records_cache()
+    _append(ledger, 0, _line(_settled(5)) + _line(_pending(6)))
+    cached, stats = _assert_same_as_fresh(ledger, monkeypatch)
+    assert stats["chunks_extended"] == 1 or stats["chunks_reused"] == 1
+
+
+def test_a_settlement_rewrite_after_restart_reparses(ledger, monkeypatch):
+    _write(ledger, 1, [_settled(1), _pending(2)])
+    _load(ledger, monkeypatch, cached=True)
+    rr.reset_ranking_records_cache()
+    _replace(ledger, 1, [_settled(1), _settled(2, "loss")])    # new inode
+    _cached, stats = _assert_same_as_fresh(ledger, monkeypatch)
+
+
+def test_pending_superseding_settled_survives_a_restart(ledger, monkeypatch):
+    # The pending-line prefilter used Python's per-process `hash()`; a saved hash
+    # would never match the next process's. `_stable_hash` must make this hold.
+    _write(ledger, 2, [_settled(7)])
+    _write(ledger, 1, [_pending(7)])
+    fresh, fresh_stats = _load(ledger, monkeypatch, cached=False)
+    _load(ledger, monkeypatch, cached=True)
+    rr.reset_ranking_records_cache()
+    cold, cold_stats = _load(ledger, monkeypatch, cached=True)
+    assert fresh_stats["kept_superseding_pending"] == 1, "fixture must exercise the supersede path"
+    assert list(cold) == list(fresh)
+    assert cold_stats["kept_superseding_pending"] == fresh_stats["kept_superseding_pending"]
+
+
+def test_stable_hash_is_stable_and_not_pythons_hash():
+    ident = ("recommendation_id", "r1")
+    assert rr._stable_hash(ident) == rr._stable_hash(("recommendation_id", "r1"))
+    assert isinstance(rr._stable_hash(ident), int)
+
+
+def test_a_corrupt_cache_file_costs_a_parse_not_a_wrong_answer(ledger, monkeypatch):
+    _write(ledger, 0, [_settled(1)])
+    _load(ledger, monkeypatch, cached=True)
+    for pkl in (ledger.parent / "ranking_records_cache").glob("*.pkl"):
+        pkl.write_bytes(b"not a pickle")
+    rr.reset_ranking_records_cache()
+    _cached, stats = _assert_same_as_fresh(ledger, monkeypatch)
+
+
+def test_disk_switch_off_writes_nothing(ledger, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_RANKING_RECORDS_DISK_CACHE", "0")
+    _write(ledger, 0, [_settled(1)])
+    _load(ledger, monkeypatch, cached=True)
+    assert not (ledger.parent / "ranking_records_cache").exists()
