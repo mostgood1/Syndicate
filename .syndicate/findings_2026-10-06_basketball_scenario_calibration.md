@@ -230,3 +230,36 @@ elsewhere: shot-level or lineup randomness, to be diagnosed next) -> L1-L3 recor
 - **Next, as pre-registered:** diagnose shot-level and lineup randomness.
 - **Joint fit (step 4):** not run as a fix for this target. Whether L1 = 1.0 is worth adopting on its own is read off
   the S3/S5/S7/S8 per-point tables, then decided with the user.
+
+### Phase 2 #1 — per-point S3/S5/S7/S8 table (2026-10-07 ~23:00Z, 87 paired games, real n = 87)
+
+Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
+
+| row | real | base | L1 1.0 | L3 0.0 |
+|---|---|---|---|---|
+| S3 quarter-total SD, P1 [±1.5] | 8.92 | 9.61 | 9.59 | 9.03 |
+| S3 quarter-total SD, P2 [±1.2] | 8.62 | 9.62 | 9.78 | 8.97 |
+| S3 quarter-total SD, P3 [±1.4] | 9.96 | 9.68 | 9.70 | 9.05 |
+| S3 quarter-total SD, P4 [±1.2] | 8.91 | 9.64 | 9.62 | 9.08 |
+| S8 total-vs-line SD [±2.6] | 17.74 | 19.98 | 19.98 | 18.77 |
+| S8 margin-vs-spread SD [±2.3] | 15.21 | 19.12 | 18.69 | 19.17 |
+| S5 blowout entering the last period, all [±0.09] | 0.253 | 0.329 | 0.315 | 0.333 |
+| S7 tied after regulation, all [±0.04] | 0.046 | 0.020 | 0.020 | 0.019 |
+
+- Pre-registered objective Σ((sim − real)/CI half-width)²:
+  - base 10.1;
+  - L1 0.95 9.7; L1 1.0 **8.9**;
+  - L2 0.4 10.6; 0.2 10.9; 0.0 11.4;
+  - L3 0.03 9.4; L3 0.0 **9.0**.
+- **Reading:**
+  - **L3 (possessions_jitter) is a TOTALS lever.** At 0 it brings the quarter-total SDs onto real (~9.0 vs 8.6-10.0)
+    and the total-vs-line SD from 19.98 to 18.77. Margins do not move, as expected, since possession count hits both
+    teams equally.
+  - **L1 is the only MARGIN lever** (−0.4 on S8 margin).
+  - **L2 makes things slightly worse.**
+  - The base quarter SDs were already inside the real CIs, so the S3 gains are not by themselves decisive. The S8
+    total gain (−1.2 of a 2.2 excess) is the material one.
+- **Candidate joint point** (pre-registration step 4, the product of levers that moved targets): L1 1.0 + L3 0.0.
+  NOT run; it needs a user decision (~5 h at nice 19).
+  - The margin excess (S8 margin 19.1 vs 15.2; S5 blowouts) stays unexplained by any lever. That is the refuted
+    target.
