@@ -1688,6 +1688,19 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **PITCH-COUNT FIX RESULT 2026-10-07 ~23:45Z: DO NOT SHIP. Nothing shipped; production unchanged.**
+  - FIT descent chose two_strike_extra_foul_prob 0.12 + starter_hook_add_pitches +2 (from -13). Score 111.9 -> 65.0; pitches 75.1 -> 85.1 vs 84.0; outs ~15.2 -> 16.71 vs 15.39.
+    - Extra fouls alone add ~1 pitch per 0.08 but cost ~0.25 outs (the pitch-count hook fires sooner). The hook carried the pitches, and with them the outs.
+  - HOLDOUT (08-22..09-27, 37 dates, 495 games, 988 starts, read once), prod -> chosen:
+    - (1) **FAIL** pitch bias -5.68 -> +4.30;
+    - (2) pass, objective 92.4 -> 79.7;
+    - (3) **FAIL** outs z +3.21;
+    - (4) **FAIL** outs +1.61, SO +0.55, H +0.57, BB +0.21, ER +0.28;
+    - (5) pass, runs gap 0.691 -> 0.612.
+    - (6) props not run: (1)-(5) already fail and the verdict cannot change.
+  - CONFIRMS THE LATE-SEASON SHORTENING: real starters went from 84.0 pitches / 15.39 outs (FIT half) to **80.9 / 14.61** (08-22 on); production model ~75.2 / 15.11.
+  - Next honest round for pitches: restore the early-count foul boost (the lever the combined calibration moved), with outs held in the objective, AFTER the workload fix. The workload fix now proceeds; the pitch fix's holdout is read.
+  - Disclosure for the workload fix: this read saw POOLED 08-22..09-27 starter outs/pitches under production. Those are the workload fix's fit + holdout dates, read pooled, never split, and its grid is fixed.
 - **WORKLOAD MECHANISM BUILT (default off) 2026-10-07 ~22:30Z; no lever run yet (waits for the pitch fix's holdout read):**
   - Code:
     - `recency.pitcher_recent_start_pitches` (mean pitches over the last n STARTS in the game log; relief outings ignored; None if < 3 starts);
