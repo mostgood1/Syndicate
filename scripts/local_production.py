@@ -1237,6 +1237,9 @@ def cmd_up(args: argparse.Namespace) -> int:
                 # CPU (and API quota) on restarts.
                 item.backoff = 5.0 if ran > 600 else min(item.backoff * 2, 300.0)
                 print(f"  [{item.name}] exited code={code} after {ran:.0f}s -- restarting in {item.backoff:.0f}s", flush=True)
+                verdict = note_role_exit(settings, local, item.name, code, ran)
+                if verdict:
+                    print(f"  [{item.name}] {verdict}", flush=True)
                 deadline = time.time() + item.backoff
                 while time.time() < deadline and not stopping["flag"]:
                     time.sleep(1)
@@ -1259,6 +1262,96 @@ def cmd_up(args: argparse.Namespace) -> int:
         pidfile.unlink(missing_ok=True)
         print("  stopped.", flush=True)
     return 0
+
+
+#: Roles whose signal deaths are checked against a deploy claim. The refresh-
+#: worker is the one a stray restart hurts: it kills the in-flight board build
+#: and the restart pays a ~20 min cold ranking_records rebuild (measured
+#: 2026-10-07, five unannounced restarts in one afternoon kept the board stale).
+CLAIM_GUARDED_ROLES = ("refresh-worker",)
+ROLE_RESTARTS_LOG = "role_restarts.jsonl"
+_CLAIM_DEFAULT_TTL_SECONDS = 45 * 60
+
+
+def deploy_claim_dir(local: dict[str, str]) -> Path:
+    """Where `scripts/deploy_claim.py` writes claims, as seen from THIS host.
+
+    The claims live in the primary Windows tree; the fleet runs from a WSL
+    checkout whose own `.syndicate/deploy_claims` never receives one, so the
+    fleet sets `SYNDICATE_DEPLOY_CLAIM_DIR` to the `/mnt/c/...` path."""
+    override = _setting(local, "SYNDICATE_DEPLOY_CLAIM_DIR")
+    if override:
+        return Path(override).expanduser()
+    return REPO_ROOT / ".syndicate" / "deploy_claims"
+
+
+def active_role_claim(claim_dir: Path, role: str, *, now: float | None = None) -> dict | None:
+    """The unexpired claim on `role`, else None. Same file and TTL rule as
+    deploy_claim.py. Missing, expired AND unreadable all read as unclaimed --
+    an unknown claim must not default to the permissive answer."""
+    try:
+        claim = json.loads((claim_dir / f"{role}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(claim, dict):
+        return None
+    try:
+        age = (time.time() if now is None else now) - float(claim.get("acquired_at") or 0)
+        ttl = float(claim.get("ttl_seconds") or _CLAIM_DEFAULT_TTL_SECONDS)
+    except (TypeError, ValueError):
+        return None
+    return None if age > ttl else claim
+
+
+def _signal_name(code: int | None) -> str | None:
+    """The signal a role died of, from a Popen returncode (-N) or a shell's 128+N."""
+    if code is None:
+        return None
+    number = -code if code < 0 else code - 128 if code in (128 + 9, 128 + 15) else 0
+    if number <= 0:
+        return None
+    try:
+        return signal.Signals(number).name
+    except ValueError:
+        return f"SIG{number}"
+
+
+def record_role_event(settings: Settings, local: dict[str, str], role: str, event: str, **fields: Any) -> dict:
+    """Check `role`'s claim, append one JSON line to logs/role_restarts.jsonl, return it."""
+    claim = active_role_claim(deploy_claim_dir(local), role)
+    entry = {
+        "at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+        "role": role,
+        "event": event,
+        "claimed": claim is not None,
+        "holder": (claim or {}).get("holder"),
+        **fields,
+    }
+    try:
+        settings.logs_dir.mkdir(parents=True, exist_ok=True)
+        with (settings.logs_dir / ROLE_RESTARTS_LOG).open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(entry, sort_keys=True) + "\n")
+    except OSError:
+        pass
+    return entry
+
+
+def note_role_exit(settings: Settings, local: dict[str, str], role: str, code: int | None, ran_s: float) -> str | None:
+    """A guarded role died of a signal the supervisor did not send: say whether a
+    claim covered it. The kill already happened -- this cannot refuse it, only
+    make it impossible to do silently. SIGKILL can also be the kernel OOM killer."""
+    sig = _signal_name(code)
+    if role not in CLAIM_GUARDED_ROLES or sig is None:
+        return None
+    entry = record_role_event(settings, local, role, "signal_exit", code=code, signal=sig, ran_s=round(ran_s))
+    if entry["claimed"]:
+        return f"CLAIMED_RESTART signal={sig} holder={entry['holder']}"
+    hint = " (or the OOM killer)" if sig == "SIGKILL" else ""
+    return (
+        f"UNCLAIMED_RESTART signal={sig}{hint} -- no unexpired deploy claim on {role}. "
+        f"Restart only under `deploy_claim.py acquire --service {role}` + check_deploy_safety, "
+        f"right after a save (learnings.md). Logged to {ROLE_RESTARTS_LOG}."
+    )
 
 
 def _kill_pid_tree(pid: int) -> bool:
@@ -1308,6 +1401,26 @@ def cmd_down(args: argparse.Namespace) -> int:
         print("down.")
         return 0
 
+    # `down` takes the refresh-worker with it, so it needs the same claim a
+    # restart does. systemd's ExecStop (INVOCATION_ID is set) is a host
+    # shutdown and is never refused -- only recorded.
+    local = parse_env_file(settings.env_file)
+    via_systemd = bool(os.environ.get("INVOCATION_ID"))
+    unclaimed_ok = str(getattr(args, "unclaimed_ok", "") or "").strip()
+    claim = active_role_claim(deploy_claim_dir(local), "refresh-worker")
+    if claim is None and not via_systemd and not unclaimed_ok:
+        record_role_event(settings, local, "refresh-worker", "down_refused")
+        print(
+            "REFUSED: `down` stops the refresh-worker, and no unexpired deploy claim covers it.\n"
+            "  python scripts/deploy_claim.py acquire --service refresh-worker --holder <lane>\n"
+            "  then check_deploy_safety (idle = right after a save), then `down` again.\n"
+            "  Override: --unclaimed-ok \"<reason>\" (recorded)."
+        )
+        return 3
+    record_role_event(
+        settings, local, "refresh-worker", "down",
+        via="systemd" if via_systemd else "cli", reason=unclaimed_ok or None,
+    )
     stop_file.write_text("stop", encoding="utf-8")
     deadline = time.time() + float(args.timeout)
     while time.time() < deadline and pidfile.is_file():
@@ -1844,6 +1957,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
 
     p = sub.add_parser("down", help="stop a running `up`")
     p.add_argument("--timeout", type=float, default=90.0)
+    p.add_argument("--unclaimed-ok", metavar="REASON", default="", help="stop without a refresh-worker deploy claim (recorded in logs/role_restarts.jsonl)")
     p.set_defaults(func=cmd_down)
 
     p = sub.add_parser("backup", help="snapshot the data root + redis (hard-linked, keeps --keep); a scheduled job")

@@ -241,7 +241,10 @@ def test_down_with_a_live_supervisor_signals_it_and_waits(settings):
 
         watcher = threading.Thread(target=_behave_like_a_supervisor)
         watcher.start()
-        assert lp.cmd_down(_down_args(settings.home, timeout=30.0)) == 0
+        # the restart-claim guard is covered in test_local_production_restart_guard.py
+        args = _down_args(settings.home, timeout=30.0)
+        args.unclaimed_ok = "test"
+        assert lp.cmd_down(args) == 0
         watcher.join(timeout=10)
         assert supervisor.poll() is None  # a cooperative supervisor is NOT killed
     finally:
