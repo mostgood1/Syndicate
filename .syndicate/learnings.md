@@ -3357,3 +3357,11 @@ own prior verdicts, not by anything failing.
 ## 2026-10-07 — A diagnostic watcher is production load: mine pulled 90 MB from web every 3.5 min for 1.6 h while the user's Ask timed out `[session 13ac7622, lane intelligence-evidence-coverage]`
 - **What happened:** to wait for a new build I polled `/api/intelligence/status` every 180 s. That endpoint returns ~90 MB and took 25-44 s per call on a 2-worker web; the access log shows the calls exactly while I was diagnosing "web-worker contention" behind the Ask rail's timeouts.
 - **Rule:** before scheduling a poll against web, measure the endpoint's bytes and seconds ONCE; prefer a log line or a tiny route (here the worker log's timestamped `STATE_PERSIST_BEGIN`, read locally, costs nothing). When diagnosing contention, list your OWN background jobs first.
+
+## 2026-10-07 -- RULE: a line-ending sniff of a shared ledger file must not be `"\r\n" in text` `[lane: soccer-team-history-current-season]`
+
+- lanes.md carried exactly ONE CRLF line among 2,351 LF lines. A helper that set `crlf = "\r\n" in text` and re-joined with CRLF rewrote every line (a 2351/2351 numstat for a one-line edit); caught before it reached main. Edit ledger files byte-exactly on the `git show origin/main:<path>` blob (replace bytes, never split/re-join with a guessed ending), and read `git diff --numstat` -- it must equal the intended change.
+
+## 2026-10-07 -- RULE: `check_deploy_safety --drain` cannot produce a restart window on the local fleet `[lane: soccer-team-history-current-season]`
+
+- Measured 15:25-15:56Z: the drain stops new BOARD builds, so the board save that the user's rule ("restart the refresh-worker only right after a save") waits for can never come while it is in force; and it does not hold the live-odds-worker, whose odds jobs run continuously, so its CLEAR never arrives either. Use `check_deploy_safety` (idle = a LOOP_ITERATION after STATE_PERSIST_BEGIN, since e28aeafb) WITHOUT a drain as the restart gate, with the three claims held.
