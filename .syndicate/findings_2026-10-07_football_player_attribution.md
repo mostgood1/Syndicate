@@ -105,6 +105,31 @@ be met at once -- the engine runs ~4-5 fewer offensive plays per team-game -- so
 shortfall; rushing yards now OVERSHOOT (~139 vs ~115-120 real). Fixed as chosen; Phase B re-run on all
 366 FIT games at 300 seeds with (0.7, 0.1).
 
+## Amendment 3 — player share estimator, PRE-REGISTERED 2026-10-07 (user: "improve player carry and target shares")
+
+**Why:** with team volume corrected, rushing attempts still score a calibration slope of 0.06 -- the attributed
+probabilities say almost nothing about WHICH player clears his line. Shares are the input that decides that.
+
+**Separable measurement (no sims):** for every FIT team-game (nflverse 2023-24 REG, weeks 2+), predict each
+player's share of the team's CARRIES and of its TARGETS from plays strictly before the week, and score against
+what happened. **Metric (fixed):** multinomial log-likelihood per team-game of the realised carries (targets)
+over the predicted shares, with an "other" bucket for players the estimator did not list (the estimator's
+leftover mass, floored at 0.02); reported per carry and per target, summed over FIT. Secondary: MAE of expected
+touches for the players who were QUOTED that game (the rows props are graded on).
+
+**Candidates (fixed now):**
+- **E0** = today's `build_team_usage`: current season flat + prior season scaled to 4 games; available =
+  touched the ball in the previous game, plus players quoted for this game.
+- **E1(H)** = recency weighting: each past game weighted 0.5^(age/H) with half-life H in {2, 4, 8} games
+  (prior-season games continue the same decay across the offseason gap); same availability as E0.
+- **E2** = E0's weights with stricter availability: drop a player with no touches in the team's last TWO
+  games unless he is quoted for this game; a quoted player with no current-season touches enters at his
+  prior-season share.
+- **E3(H)** = E1(H) with E2's availability.
+The best candidate by summed FIT log-likelihood (carries + targets) is CHOSEN and FIXED, then Phase B is re-run on
+all 366 FIT games with the run-share correction held at (0.7, 0.1), and reported beside the two earlier runs.
+Held-out 2025 untouched.
+
 ## NCAAF data step — PRE-REGISTERED 2026-10-07 (user: "start the NCAAF attribution data step while that runs")
 
 **What is missing for NCAAF, measured:** local CFBD plays carry no player ids; player box scores exist
