@@ -1491,6 +1491,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Falsification test: If a 2-date synthetic window through the real merge yields artifact_week 5 and pct_projected <= 100 before the fix, the defect is elsewhere
 - Verification: New test: 2-date window, week 5 on both dates -> prop_coverage.artifact_week == 5, artifact_season == 2026, pct_projected re-derived; distinct weeks -> sorted list; fleet reading of /api/board/layer2-shortlist after the next fleet ff
 - Blocked by: none
+- **GOAL: MET 2026-10-07 01:23Z** (fleet reading, deploys.md 01:23:18Z): NFL prop_coverage reads week 5 / season 2026 / 72.2%; NCAAF prop 27.7%; NFL joins once. Lane can close.
 
 
 ### soccer-roster-only-players — CLOSED 2026-10-06 (GOAL NOT MET: H-ROSTER FAILED its pre-registered test; not shipped) — opened 2026-10-06 — session fc6fc474-5cf8-4333-b451-4dcf68180c23

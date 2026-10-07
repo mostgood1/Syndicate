@@ -47147,3 +47147,17 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
   - 849826: 14.734 | 15.084 | 15.685, and 15.578 | 15.826 | 16.235.
 - mean |served - A| **0.291** < mean |served - B| **0.704**: MET (pre-registered). Every starter individually is closer to A. The new config moves these starters -0.41 outs (A - B).
 - verify: done -- production's sims run the shipped config. Evidence (scratchpad): v2_A.json, v2_B.json, v2_eval.py, v2_watch.sh.
+
+## 2026-10-07 01:23:18Z (8:23 PM CT 10-06) -- READING: layer2 shortlist coverage-half merge (a1d3b030) SERVING on the fleet -- **MET** (lane `layer2-coverage-identity-merge`)
+
+- loaded by: the `web-restart-healthz` lane's full fleet down/up (deploys.md 00:42:32Z; refresh-worker pid 2627918 up 00:46Z, code 2bb481ef, which contains a1d3b030). This lane made no restart of its own. Its two gated attempts never reached CLEAR: 97 full-check polls between 20:13Z and 22:03Z, and a scoped gate (user decision) still waiting at 00:36Z behind an in-flight `layer2_shortlist_build`. The loop was stopped and the claim released for the peer's restart. That restart had already `--force`d the claim at ~00:40Z on its user's decision. No TERM was ever sent by this lane.
+- baseline (old process, read 20:12:18Z): NFL `prop_coverage` artifact_season 14182, artifact_week 35, artifact_rows 3661, pct_projected 501.9, rows_considered 5187; NFL `game_coverage.games_in_index` 2247; NCAAF `prop_coverage.pct_projected` 195.6.
+- prediction (written 2026-10-06 19:00Z, before the change): NFL artifact_week 5, artifact_season 2026, pct_projected <= 100, rows_considered ~ one pass (~730), games_in_index 321; NCAAF prop pct <= 100.
+- READ: first shortlist after the restart, `written_at` 2026-10-07T01:21:34Z, read 01:23:18Z.
+  - NFL `prop_coverage`: artifact_season 2026, artifact_week 5, artifact_rows 556, rows_considered 770, rows_with_projection 556, pct_projected 72.2 (556/770 = 72.2%, consistent).
+  - NFL `game_coverage.games_in_index` 321.
+  - NFL top level: 722/971 = 74.4%; `window_dates` is now absent, because NFL joins once.
+  - NCAAF `prop_coverage`: 303/1093 = 27.7%, with artifact_weeks {2026_wk6: 303} (the per-week tally now sums and matches the projected count).
+  - NHL `game_coverage.artifact_date` "2026-10-06" (one date, scalar).
+  - Every rate is within 0-100 and equals its own numerator over its denominator.
+- verify: MET. Caveat: any check between 2026-09-29 (`3f28cdb7`) and this reading that read the shortlist's NFL `prop_coverage` identity, pct or counts got summed values.
