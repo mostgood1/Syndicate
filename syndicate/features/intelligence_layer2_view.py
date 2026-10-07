@@ -21,6 +21,15 @@ from typing import Any, Mapping
 PICK_LIST_KEYS = ("recommendations", "top_opportunities", "ranked_all", "board_contract", "by_sport", "candidate_count")
 
 
+def _board_score(item: Mapping[str, Any]) -> float | None:
+    for value in (item.get("board_score"), (item.get("score") or {}).get("score") if isinstance(item.get("score"), Mapping) else item.get("score")):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
 def layer2_board_view(selected_date: str | None = None, *, sport: str = "all", limit: int | None = None) -> dict[str, Any]:
     try:
         from pipeline.intelligence_state import read_combined_intelligence_response
@@ -37,6 +46,17 @@ def layer2_board_view(selected_date: str | None = None, *, sport: str = "all", l
     picks = [item for item in (body.get("top_opportunities") or body.get("ranked_all") or []) if isinstance(item, Mapping)]
     if not picks:
         return {}
+    # THE BOARD'S ORDER: Layer 2 rows by their own board score, then anything
+    # still sourced elsewhere. The combined list is NOT in that order -- served
+    # 2026-10-07 20:23Z, the 22 legacy steam rows came first and took 10 of
+    # Home's 12 rail slots.
+    picks = sorted(
+        picks,
+        key=lambda item: (
+            0 if str(item.get("source") or "").startswith("layer2") else 1,
+            -(_board_score(item) if _board_score(item) is not None else float("-inf")),
+        ),
+    )
     by_sport: "OrderedDict[str, list[Mapping[str, Any]]]" = OrderedDict()
     for item in picks:
         slug = str(item.get("sport_slug") or item.get("sport") or "").strip().lower() or "other"

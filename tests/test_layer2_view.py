@@ -76,3 +76,17 @@ def test_home_board_rows_come_from_layer2_and_carry_source(combined):
     rows = _board_candidate_rows("2026-10-07", limit=16)
     assert [row["source"] for row in rows] == ["layer2_shortlist", "layer2_shortlist"]
     assert rows[0]["pick_id"] == "l2_a"
+
+
+def test_view_is_in_board_order_layer2_first(monkeypatch):
+    import pipeline.intelligence_state as state
+
+    rows = [
+        {"sport_slug": "nhl", "source": "data/props/player_props_lines/date=2026-10-07/oddsapi.csv", "candidate_type": "steam", "edge": 0.318},
+        {"sport_slug": "nba", "source": "layer2_shortlist", "pick_id": "low", "board_score": 0.4},
+        {"sport_slug": "nfl", "source": "layer2_shortlist", "pick_id": "high", "board_score": 2.1},
+        {"sport_slug": "mlb", "source": "layer2_shortlist", "pick_id": "nested", "score": {"score": 1.0}},
+    ]
+    monkeypatch.setattr(state, "read_combined_intelligence_response", lambda *a, **k: {"top_opportunities": rows})
+    view = view_mod.layer2_board_view("2026-10-07")
+    assert [r.get("pick_id") for r in view["recommendations"]] == ["high", "nested", "low", None]
