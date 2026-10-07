@@ -47196,3 +47196,18 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - 10-07 build: overview 02:48:35 -> 02:49:17Z **41.7 s** (NCAAF 14.0 s); shortlist **219.3 s**; persist 02:57:01Z, 19 candidates. 0 `[intelligence_state] MEMORY_GUARD_ABORT` since the 19:46 CT restart.
 - SERVED (`/api/intelligence/query`, 21:59 CT): `dates['2026-10-07'].written_at` **02:53:34Z** (was 2026-10-06T15:41:38Z all day); `computed_at` 02:36:46Z (10-06 state); `freshness_status` **stale** because the oldest input (22 min) exceeds `SYNDICATE_INTELLIGENCE_BOARD_STALE_AFTER_SECONDS` default 900 s. 3,411 rows.
 - NOT MET: "regular schedule". A today-build is ~21 min with live games and host CPU saturated; the board will read stale between saves until a build is < ~12 min. Next costs to profile: post-shortlist stages (~11 min). CPU contention unchanged (Windows research at Idle; vmmemwsl priority needs an elevated shell).
+
+## 2026-10-07 14:10:17Z (9:10 AM CT) -- READINGS: SmartSim reuse check on WNBA (MET) + WNBA league_status (MET); 10-07/10-08 league_status REGENERATED (user decision) -- lanes `smart-sim-reuse-stale-exclusions`, `wnba-league-status-roster`
+
+- **Reuse check, WNBA (d6eb1086):** wnba_source/logs/syndicate_refresh_oddsapi_props_2026-10-07.log, caught 00:01:29 CDT 10-07:
+  - `SMART_SIM_REUSE_EXCLUSIONS league=wnba date=2026-10-07 file=smart_sim_2026-10-07_ATL_NYL.json stale=0 reuse=True`
+  - `... smart_sim_2026-10-07_GSV_LVA.json stale=0 reuse=True`
+  - Both sims are unchanged (mtimes 10-06 16:23:37 / 16:24:38, the peer's snapshot-rule re-sim).
+  - **MET**, matching the prediction: no rebuild on an unchanged feed. NBA reading 1 is above (22:07:08Z).
+- **league_status (fc6ecc96), first new-code file:** league_status_2026-10-09.csv, written 01:07 CDT by the pipeline's once-per-date rotation-inputs step: 289 rows, 0 non-WNBA tricodes, 15 WNBA teams, on slate ATL/GSV/LVA/NYL, Allisha Gray OUT/False, Jewell Loyd DAY-TO-DAY/True. **MET.**
+- **Why the reading came from 10-09:** league_status is written ONCE PER DATE (marker `_rotation_inputs_<D>.json`), so 10-07/10-08 had kept the NBA roster.
+- **Regenerated (user: "Regenerate 10-07 and 10-08 now"):**
+  - Originals backed up to ~/syndicate-quarantine/wnba_league_status_nba_roster_2026-10-07/ (sha256 d59e2b1c... / 43666f39...).
+  - `build_league_status` ran under WNBA_BETTING_DATA_ROOT=<prod>/wnba_source/data (path asserted), nice 15, MemAvailable 10.3 GB, finished 09:10:17 CDT.
+  - Result: 10-07 has 289 rows, 0 non-WNBA, on slate ATL/GSV/LVA/NYL, Gray OUT/False, Loyd DAY-TO-DAY/True, Talbot playing. 10-08 has 289 rows, 0 non-WNBA, none on slate (no WNBA games).
+- **prediction (OWED):** the next 10-07 WNBA props run prints `SMART_SIM_REUSE_STALE_EXCLUSIONS` for both 10-07 sims (the 14 mis-teamed keys leave the stamp) and rebuilds them once, with pools unchanged. Watcher: scratchpad/watch_rebuild.sh (only lines appended after 09:10).
