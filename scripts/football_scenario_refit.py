@@ -485,6 +485,8 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap.add_argument("--resume", action="store_true", help="validate: finish an interrupted 2025 read")
     ap.add_argument("--smoke", action="store_true")
     args = ap.parse_args(argv)
+    from scripts.football_scenario_rates import idle_self
+    idle_self()   # fleet shares this machine
     if args.smoke:
         global SMOKE, DESCENT_SEEDS
         SMOKE, DESCENT_SEEDS = True, 10

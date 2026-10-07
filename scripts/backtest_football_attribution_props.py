@@ -153,7 +153,7 @@ def _init(root: str) -> None:
     H.configure_env(Path(root))
     try:
         import psutil
-        psutil.Process().nice(psutil.BELOW_NORMAL_PRIORITY_CLASS if os.name == "nt" else 10)
+        psutil.Process().nice(psutil.IDLE_PRIORITY_CLASS if os.name == "nt" else 19)
     except Exception:  # noqa: BLE001
         pass
     from scripts import generate_smartsim2_nfl_projections as gen
@@ -262,6 +262,8 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--limit-games", type=int, default=0)
     args = ap.parse_args()
+    from scripts.football_scenario_rates import idle_self
+    idle_self()   # fleet shares this machine
     seasons = [int(s) for s in args.seasons.split(",")]
     tag = "-".join(map(str, seasons)) + (f"_smoke{args.limit_games}" if args.limit_games else "")
     if 2025 in seasons:

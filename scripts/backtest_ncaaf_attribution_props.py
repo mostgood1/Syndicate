@@ -263,6 +263,8 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--limit-games", type=int, default=0)
     args = ap.parse_args()
+    from scripts.football_scenario_rates import idle_self
+    idle_self()   # fleet shares this machine
     if args.season == 2025:
         raise SystemExit("2025 is the held-out Phase C read; its production comparison is not implemented here yet")
     season = args.season

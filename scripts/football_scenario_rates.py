@@ -281,7 +281,9 @@ _W: Dict[str, Any] = {}
 def _lower_priority() -> None:
     try:
         import psutil
-        psutil.Process().nice(psutil.BELOW_NORMAL_PRIORITY_CLASS if os.name == "nt" else 10)
+        # IDLE, not below-normal: the production fleet shares this machine and research workers at
+        # below-normal still starved it (learnings.md 2026-10-07, lane web-restart-healthz).
+        psutil.Process().nice(psutil.IDLE_PRIORITY_CLASS if os.name == "nt" else 19)
     except Exception:  # noqa: BLE001
         pass
 
@@ -312,6 +314,11 @@ def _apply_profile_set(gen: Any, sport: str, overrides: Dict[str, Any]) -> None:
         gen.nfl_calibration_profile = lambda: _replace(base(), **overrides)
     else:
         gen.NCAAF_CALIBRATION_PROFILE = _replace(gen.NCAAF_CALIBRATION_PROFILE, **overrides)
+
+
+def idle_self() -> None:
+    """Every research entry point calls this first; children inherit the class."""
+    _lower_priority()
 
 
 def _nfl_init(root: str, overrides: Dict[str, Any]) -> None:
@@ -1245,6 +1252,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap.add_argument("--profile-set", action="append", default=[],
                     help="CalibrationProfile field=value against production's profile (repeatable)")
     args = ap.parse_args(argv)
+    idle_self()
     args.season_list = [int(s) for s in args.seasons.split(",")]
     if 2025 in args.season_list and not os.environ.get("FOOTBALL_SCENARIO_READ_VALIDATION"):
         raise SystemExit("2025 is VALIDATION (read once, pre-registered); set FOOTBALL_SCENARIO_READ_VALIDATION=1 to read it")

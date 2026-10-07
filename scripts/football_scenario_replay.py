@@ -287,6 +287,8 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--refit-dir", default=REFIT_DIR, help="refit (v1, record) or refit_v2")
     args = ap.parse_args(argv)
+    from scripts.football_scenario_rates import idle_self
+    idle_self()   # fleet shares this machine
     if args.season in (2025, VALIDATION_SEASONS[args.sport]) and args.every != 1:
         raise SystemExit("VALIDATION replays every 2025 game (amendment 3 rule)")
     cmd_run(args)

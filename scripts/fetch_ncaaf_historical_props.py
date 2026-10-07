@@ -92,6 +92,8 @@ def main() -> int:
     ap.add_argument("--execute", action="store_true")
     ap.add_argument("--max-credits", type=int, default=0)
     args = ap.parse_args()
+    from scripts.football_scenario_rates import idle_self
+    idle_self()   # fleet shares this machine
     seasons = [int(s) for s in args.seasons.split(",")]
     _configure()
     gl = games(seasons)
