@@ -98,3 +98,34 @@ def test_view_is_in_board_order_layer2_first(monkeypatch):
     monkeypatch.setattr(state, "read_combined_intelligence_response", lambda *a, **k: {"top_opportunities": rows})
     view = view_mod.layer2_board_view("2026-10-07")
     assert [r.get("pick_id") for r in view["recommendations"]] == ["high", "nested", "low", None]
+
+
+def test_stale_view_is_served_while_one_refresh_runs(monkeypatch):
+    import threading
+    import pipeline.intelligence_state as state
+
+    view_mod._VIEW_MEMO.clear()
+    gate = threading.Event()
+    calls = []
+
+    def slow(*a, **k):
+        calls.append(1)
+        if len(calls) > 1:
+            gate.wait(5)
+        return {"top_opportunities": [{"source": "layer2_shortlist", "pick_id": f"v{len(calls)}", "board_score": 1.0}]}
+
+    monkeypatch.setattr(state, "read_combined_intelligence_response", slow)
+    first = view_mod.layer2_board_view("2026-10-07")
+    key = ("2026-10-07", "all", None)
+    stamp, cached = view_mod._VIEW_MEMO[key]
+    view_mod._VIEW_MEMO[key] = (stamp - 10_000, cached)  # age it past the TTL
+    stale = view_mod.layer2_board_view("2026-10-07")
+    again = view_mod.layer2_board_view("2026-10-07")
+    assert stale is first and again is first  # served stale, not blocked
+    gate.set()
+    for _ in range(50):
+        if not view_mod._REFRESHING:
+            break
+        threading.Event().wait(0.05)
+    assert len(calls) == 2  # exactly one background refresh
+    assert view_mod.layer2_board_view("2026-10-07")["recommendations"][0]["pick_id"] == "v2"

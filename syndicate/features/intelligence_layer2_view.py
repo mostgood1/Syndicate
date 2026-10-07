@@ -31,7 +31,7 @@ def _board_score(item: Mapping[str, Any]) -> float | None:
 
 
 _VIEW_MEMO: dict[tuple, tuple[float, dict[str, Any]]] = {}
-_VIEW_TTL_SECONDS = 120.0
+_VIEW_TTL_SECONDS = 300.0
 
 
 def layer2_board_view(selected_date: str | None = None, *, sport: str = "all", limit: int | None = None) -> dict[str, Any]:
@@ -46,6 +46,13 @@ def layer2_board_view(selected_date: str | None = None, *, sport: str = "all", l
     now = time.monotonic()
     if hit is not None and now - hit[0] < _VIEW_TTL_SECONDS:
         return hit[1]
+    if hit is not None and hit[1]:
+        # STALE-WHILE-REVALIDATE: measured on web 2026-10-07 20:35Z the
+        # combined read costs 20-24 s per worker. A stale entry is served at
+        # once and refreshed by ONE background thread per key; the board only
+        # changes once per build.
+        _refresh_in_background(key, selected_date, sport, limit)
+        return hit[1]
     started = time.perf_counter()
     view = _layer2_board_view_uncached(selected_date, sport=sport, limit=limit)
     print(
@@ -57,6 +64,34 @@ def layer2_board_view(selected_date: str | None = None, *, sport: str = "all", l
         _VIEW_MEMO.clear()
     _VIEW_MEMO[key] = (now, view)
     return view
+
+
+_REFRESHING: set[tuple] = set()
+
+
+def _refresh_in_background(key: tuple, selected_date: str | None, sport: str, limit: int | None) -> None:
+    import threading
+    import time
+
+    if key in _REFRESHING:
+        return
+    _REFRESHING.add(key)
+
+    def run() -> None:
+        try:
+            started = time.perf_counter()
+            view = _layer2_board_view_uncached(selected_date, sport=sport, limit=limit)
+            if view:
+                _VIEW_MEMO[key] = (time.monotonic(), view)
+            print(
+                f"[layer2_view] REFRESH date={selected_date} rows={view.get('candidate_count', 0)} "
+                f"elapsed_s={time.perf_counter() - started:.2f}",
+                flush=True,
+            )
+        finally:
+            _REFRESHING.discard(key)
+
+    threading.Thread(target=run, name="layer2-view-refresh", daemon=True).start()
 
 
 def _layer2_board_view_uncached(selected_date: str | None = None, *, sport: str = "all", limit: int | None = None) -> dict[str, Any]:
