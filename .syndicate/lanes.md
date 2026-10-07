@@ -1673,6 +1673,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **STARTER WALK RE-CHECK, PRE-REGISTERED 2026-10-07 (user: "then re-check the starter walk excess on the full window"), before any full-window data exists:**
+  - Runs only if the June gate passes and the 07-16..09-27 build completes.
+  - Replay: `mlb_strikeout_decomposition.py` on ~/asof_out_statsapi, all built dates, the SHIPPED config (fleet code 2bb481ef+), 100 sims, `--dump-rows`.
+  - Read ONCE: starter BB per start (model - actual) with a game-clustered bootstrap SE (4000 reps). Also reported: starter BB/BF, team BB/PA, and bullpen BB/BF = (team - starter).
+  - DECISION:
+    - |bias| < 2 SE OR |bias| <= 0.10 -> NO STRUCTURAL EXCESS; no change; the 06-15..07-12 vs validation discrepancy is recorded as period noise.
+    - bias > +0.10 AND > 2 SE -> structural excess CONFIRMED. Report it and propose a walk fix under its own pre-registered rule: fit on the first half of the window, judged once on the second half. No change without that.
+    - bias < -0.10 AND beyond 2 SE -> structural DEFICIT; reported the same way.
 - **BUILT + PROBED 2026-10-07 (before the gate):**
   - Lineup projection B on 06-15..07-12 (588 lineup sides): overlap with the actual starting nine **0.846**; with production's stored Rotowire projection 0.848.
     - Production's own projection vs actual was 0.816. B carries about production's information level, without hindsight.
