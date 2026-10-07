@@ -3768,7 +3768,17 @@ def layer2_rows_to_board_cards(
                 "detail": row_explainer(row, quote, row_context),
             }
         )
+        # The bet's stable identity (book-, price- and time-independent), so the
+        # evaluation ledger and every view can join on the ONE list
+        # (`layer2_ledger.pick_id`, lane intelligence-evidence-coverage).
+        cards[-1]["pick_id"] = _layer2_pick_id(cards[-1])
     return cards
+
+
+def _layer2_pick_id(card: Mapping[str, Any]) -> str:
+    from syndicate.features.shared.layer2_ledger import pick_id
+
+    return pick_id(card)
 
 
 #: The market-consensus move (pp of no-vig probability) below which the board

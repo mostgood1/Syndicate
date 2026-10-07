@@ -3417,6 +3417,55 @@ def _count_nonblank_lines(path: Path) -> int:
         return sum(1 for line in handle if line.strip())
 
 
+def maybe_record_layer2_board_to_evaluation_ledger(selected_date: str) -> dict[str, Any] | None:
+    """Record the Layer 2 shortlist's picks for `selected_date` (first sightings only).
+
+    Off unless `SYNDICATE_LEDGER_RECORD_LAYER2` is truthy -- see
+    `syndicate/features/shared/layer2_ledger.py` for why each card is reshaped
+    (MLB StatsAPI pk, same-date only, one record per pick per date). Never
+    raises: a failure here must not cost the legacy recording below it.
+    """
+    try:
+        from syndicate.features.shared import layer2_ledger
+
+        if not layer2_ledger.recording_enabled():
+            return None
+        shortlist = read_layer2_shortlist(selected_date) or {}
+        cards = [card for card in (shortlist.get("cards") or []) if isinstance(card, Mapping)]
+        mlb_index = None
+        if any(str(card.get("sport") or "").lower() == "mlb" for card in cards):
+            from syndicate.features.shared.bet_status_mlb import _schedule_index
+
+            mlb_index = _schedule_index(selected_date)
+        records, counts = layer2_ledger.first_sightings(
+            cards, selected_date, reports_root=reports_root(), mlb_index=mlb_index
+        )
+        if records:
+            from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
+
+            build_intelligence_evaluation_bundle(
+                query={
+                    "question": "layer2 board state",
+                    "selected_date": selected_date,
+                    "sport": "all",
+                    "query_type": "layer2_board_state",
+                },
+                response={"recommendations": records, "selected_date": selected_date},
+                persist=True,
+                include_history_analytics=False,
+            )
+            layer2_ledger.mark_recorded(records, selected_date, reports_root=reports_root())
+        print(
+            f"[intelligence_state] LAYER2_LEDGER_RECORDED date={selected_date} "
+            + " ".join(f"{key}={value}" for key, value in counts.items()),
+            flush=True,
+        )
+        return counts
+    except Exception as exc:
+        print(f"[intelligence_state] LAYER2_LEDGER_RECORD_FAILED date={selected_date} error={type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
 def maybe_record_board_state_to_evaluation_ledger(state: dict[str, Any]) -> dict[str, Any] | None:
     """Persist a board-state response's current recommendations to the
     evaluation ledger, gated on source_fingerprint rather than called
@@ -3449,6 +3498,12 @@ def maybe_record_board_state_to_evaluation_ledger(state: dict[str, Any]) -> dict
     if not intelligence_ledger_recording_enabled():
         return None
     selected_date = str(state.get("selected_date") or "").strip()
+    # ONE LIST (lane intelligence-evidence-coverage): the Layer 2 board's own
+    # picks, recorded alongside the legacy pool for a comparison window. Its own
+    # gate (first sighting per pick per date), because the shortlist changes
+    # independently of the legacy `source_fingerprint` checked below.
+    if selected_date:
+        maybe_record_layer2_board_to_evaluation_ledger(selected_date)
     fingerprint = str(state.get("source_fingerprint") or "").strip()
     if not selected_date or not fingerprint:
         return None
