@@ -12,6 +12,10 @@ class EventSimConfig:
     # Pace / possession controls
     possessions_per_game: float = 98.0
     possessions_jitter: float = 0.06  # stddev fraction applied per quarter
+    # Scenario-calibration levers (Syndicate lane basketball-scenario-calibration, 2026-10-07). Defaults are the
+    # values that were hardcoded before, so an unset config is byte-identical (same RNG draws, same order).
+    possession_alternation: float = 0.85  # P(next possession switches team); else a coin flip
+    env_sd_scale: float = 0.65  # scale of the per-quarter environment random draw
 
     # Outcome priors (fallbacks when player priors are missing)
     base_tov_per_poss: float = 0.125
@@ -566,7 +570,7 @@ def simulate_event_level_boxscore(
             if pidx == 0:
                 offense_home = bool(rng.random() < 0.5)
             else:
-                offense_home = not offense_home if bool(rng.random() < 0.85) else bool(rng.random() < 0.5)
+                offense_home = not offense_home if bool(rng.random() < float(getattr(cfg, "possession_alternation", 0.85))) else bool(rng.random() < 0.5)
 
             # Sample on-court lineups
             # When provided, prefer observed lineup pools (stints) to preserve realistic 5-man correlations.
@@ -1320,7 +1324,7 @@ def simulate_pbp_game_boxscore(
             if pidx == 0:
                 offense_home = bool(rng.random() < 0.5)
             else:
-                offense_home = not offense_home if bool(rng.random() < 0.85) else bool(rng.random() < 0.5)
+                offense_home = not offense_home if bool(rng.random() < float(getattr(cfg, "possession_alternation", 0.85))) else bool(rng.random() < 0.5)
 
             margin_now = int(home_score - away_score)
             flags = _rotation_windows(q=int(q), period_seconds=int(period_seconds), q_remaining=int(q_remaining), margin=int(margin_now))
@@ -1783,7 +1787,7 @@ def simulate_pbp_game_boxscore(
                 q_eff_mu_mult = float(np.clip(np.sqrt(q_mu_mult), 0.94, 1.06))
 
                 # Random env: scale down slightly to avoid over-dispersion.
-                q_sd_mult = float(np.clip(1.0 + rng.normal(0.0, sd_frac * 0.65), 0.85, 1.20))
+                q_sd_mult = float(np.clip(1.0 + rng.normal(0.0, sd_frac * float(getattr(cfg, "env_sd_scale", 0.65))), 0.85, 1.20))
                 q_env_mult = float(np.clip(q_eff_mu_mult * q_sd_mult, 0.82, 1.22))
         except Exception:
             q_env_mult = 1.0
