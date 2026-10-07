@@ -5067,6 +5067,34 @@ def _fresh_lines_by_group(
     return out
 
 
+def _fresh_books_by_event_market(
+    opportunities: Iterable[Mapping[str, Any]], max_quote_age_seconds: Any, age_ceiling: float
+) -> set[tuple]:
+    """(sport, event, market, segment, book) pairs some row is served FRESH at.
+
+    Lane `layer2-withdrawn-lines` (2026-10-07): a hidden line whose own book is
+    still quoting this event+market fresh was WITHDRAWN by that book (a player
+    ruled out, a line replaced) -- not missed by our capture.
+    """
+    out: set[tuple] = set()
+    for row in opportunities or ():
+        if not isinstance(row, Mapping):
+            continue
+        age = _row_quote_age_seconds(row)
+        ceiling = age_ceiling if max_quote_age_seconds is not None else _sport_quote_age_ceiling(row.get("sport"), age_ceiling)
+        if age is None or ceiling <= 0 or age > ceiling:
+            continue
+        book = _row_quote_book(row)
+        if book:
+            out.add(_quote_age_group(row)[:4] + (book,))
+    return out
+
+
+def _row_quote_book(row: Mapping[str, Any]) -> str:
+    quote = row.get("quote")
+    return str((quote.get("bookmaker") if isinstance(quote, Mapping) else "") or "").strip().lower()
+
+
 def select_shortlist(
     opportunities: Iterable[Mapping[str, Any]],
     *,
@@ -5158,6 +5186,15 @@ def select_shortlist(
     stale_quote_sample: list[dict[str, Any]] = []
     stale_sample_per_sport: dict[str, int] = {}
     fresh_lines_by_group = _fresh_lines_by_group(opportunities, max_quote_age_seconds, age_ceiling)
+    # WITHDRAWN, NOT STALE (lane `layer2-withdrawn-lines`, 2026-10-07). Measured
+    # that morning: soccer's 303 `rows_stale_quote` were lines FanDuel had stopped
+    # offering (oldest keys to 3.6 h) while the quote store's FanDuel props for the
+    # same matches had a median seen-age of 0.5 h; NCAAF's were DraftKings Anytime
+    # TD lines pulled from games it still priced. Counting those as stale made
+    # the freshness alarm read a book's own withdrawals as capture failures.
+    fresh_books = _fresh_books_by_event_market(opportunities, max_quote_age_seconds, age_ceiling)
+    withdrawn_line = 0
+    withdrawn_line_by_sport: dict[str, int] = {}
     implausible_book = 0
     stale_kickoff = 0
     uninformative_ev = 0
@@ -5200,6 +5237,9 @@ def select_shortlist(
             if fresh_lines - {_line_token(row.get("line"))}:
                 superseded_line += 1
                 superseded_line_by_sport[sport_key] = superseded_line_by_sport.get(sport_key, 0) + 1
+            elif _row_quote_book(row) and (_quote_age_group(row)[:4] + (_row_quote_book(row),)) in fresh_books:
+                withdrawn_line += 1
+                withdrawn_line_by_sport[sport_key] = withdrawn_line_by_sport.get(sport_key, 0) + 1
             else:
                 stale_quote += 1
                 stale_quote_by_sport[sport_key] = stale_quote_by_sport.get(sport_key, 0) + 1
@@ -5505,6 +5545,8 @@ def select_shortlist(
         "rows_superseded_line_by_sport": dict(sorted(superseded_line_by_sport.items())),
         "rows_stale_quote_by_sport": dict(sorted(stale_quote_by_sport.items())),
         "rows_stale_quote_sample": stale_quote_sample,
+        "rows_withdrawn_line": withdrawn_line,
+        "rows_withdrawn_line_by_sport": dict(sorted(withdrawn_line_by_sport.items())),
         "stale_kickoff_seconds": stale_kickoff_ceiling,
         # Logged, not silently dropped: a sport vanishing from the shortlist
         # should be attributable to its schedule rather than look like an outage.

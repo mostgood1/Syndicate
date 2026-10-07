@@ -1749,6 +1749,13 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: AST guard test (0 ScoreboardV2 calls without league_id in the WNBA package) + reachability tests (each reachable function asks for league '10' and keeps WNBA teams only); upstream PR opened.
 - Blocked by: none
 - **2026-10-07: CODE LANDED (feb4258a).** AST guard: 8 ScoreboardV2 calls without league_id on origin/main before, 0 after; end-to-end test: boxscores/pbp/finals ask for "10", keep WNBA only (PHO/WAS -> PHX/WSH), finals never reads data.nba.com for the WNBA. 9 WNBA vendor league tests pass. NOT FF'd to the fleet on purpose: production calls none of these paths (rides the next fleet ff, inert there). UPSTREAM PR: pending a user decision.
+### layer2-withdrawn-lines — OPEN — opened 2026-10-07 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: A Layer 2 line hidden by the quote-age gate whose OWN book is still quoting that event+market fresh is counted as rows_withdrawn_line (by sport), not rows_stale_quote, so the stale counter alarms only on capture failure; no row's admission changes; verified by unit tests (off != on) and on the fleet board as soccer/NCAAF rows_stale_quote falling with rows_withdrawn_line taking them
+- Files: syndicate/features/shared/layer2_board.py, syndicate/blueprints/intelligence.py (shortlist key list ONLY), tests/test_layer2_withdrawn_lines.py
+- Hypothesis: Most of soccer's ~300 and NCAAF's ~1,400 stale quotes are lines the book withdrew
+- Falsification test: rows_withdrawn_line small and rows_stale_quote still in the hundreds on the next fleet build
+- Verification: Fleet board build after restart
+- Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
