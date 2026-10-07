@@ -47423,3 +47423,14 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - NCAAF (7 dates) prop: 547 of the window projected, pct_projected 40.0. Consistent with the 10-07 A/B's new-merge values (540 / 39.6 at 15:0xZ).
 - NFL (single pass): prop_coverage week 5 / season 2026 / 758 rows / 75.3%; games_in_index 321.
 - The two-date case (NBA 9 not [3, 6], NHL 13 not [10, 3]) rests on the offline A/B over the fleet's real per-date coverage (log/2026-10-07.md). No served reading has seen it yet. It becomes observable the first time a looping sport carries tomorrow's games on the shortlist grid.
+
+## 2026-10-07 ~16:25Z (11:25 AM CT) -- READING: served eredivisie departed filter on the refreshed roster (lane `soccer-roster-refresh`)
+
+- **No prior prediction.** eredivisie was not in the ~01:00Z offline A/B. The offline number below was computed AFTER the served builds existed, so it is a REPRODUCTION, not a prediction.
+- **Offline A/B** (fleet code, the fleet's current player files; only the roster varies): dropped July **70** -> new **131**. The new roster rescues 1 more player and stops rescuing 62.
+- **Served** (builds after the eredivisie roster write, 00:15:56Z): all read dropped **131**, rows 580, per_club 18/18:
+  - 10-10: 12:42:02Z, 178 props
+  - 10-09: 14:54:30Z, 40 props
+  - 10-11: 15:06:17Z, 161 props
+- **Checked for spelling misses before recording.** The roster's row count barely moved (543 -> 530), so 62 extra drops needed explaining. Of the 62, 5 share a surname with someone on the new roster, and all 5 are different players: Casper/Sören Tengstedt, Isak/Victor Jensen, Joel/Davy van den Berg, Kaj de Rooij / Bart van Rooij, Owen/Jinairo Johnson. None of the 62 has a `players_2026.csv` row. So they are departures replaced by new signings, not a fetch or name-join defect.
+- **Result:** served 70 -> 131, equal to the offline reproduction. Prop accuracy effect not measured.
