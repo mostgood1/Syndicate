@@ -47074,3 +47074,19 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
   - Downstream: la_liga `recommendations_2026-10-11.json` generated 00:20:20Z, after la_liga's roster write at 00:16:51Z. `player_substrate` reads departed_filter per_club, clubs_ready 20/20, rows 830, dropped 179, 202 props. The filter is running normally.
 - **NOT measured:** how many players the new rosters rescue from the departed filter (bundesliga dropped 193 / ligue_1 245 on the pre-refresh builds). That reading is the next bundesliga/ligue_1 build's `player_substrate.dropped`.
 - **not live until a restart:** the allowlist line (export/publish paths in long-running processes). The sim reads the roster from the shared fleet disk and does not need it.
+
+## 2026-10-07 00:28:44Z (7:28 PM CT 10-06) -- LOCAL FLEET FF 61edcc04 -> 2bb481ef, NO RESTART: MLB combined calibration SHIPPED by logged user override of check (c) (lane `mlb-combined-calibration`) -- **V1 MET; V2 OWED**
+- **What.** 2bb481ef ships:
+  - pitch-model forward overrides: base_hbp 0.0015, early_count_foul_boost 1.5, hr_rate_mult 1.856;
+  - manager forward overrides: starter_short_start_prob 0.14, shelled hook (4, 1.0), pickoff_rate 0.01;
+  - GameConfig defaults: bip_dp_rate 0.30 + the measured baserunning inputs (fielder's choice, sac fly fly/pop/line, ROE by trajectory, WP/PB/BK, DP advancement, steals of 2B/3B, double steals);
+  - 8 re-fit hitter-prop maps + hr_1plus.
+- **Why (pre-registered rule v2, validation read once, 203 games / 390 starts).**
+  - Passed: (a) objective 10060 -> 34.1; (b) no moment worse; (d) runs gap 0.786 -> 0.496; (e) prop log-loss 0.38917 -> 0.38800.
+  - (c) FAILED by 0.021 (starter BB +0.121 vs 0.10): production's starter BB was right only by cancelling errors (+1.91 BF/start, BB/PA 0.0745 vs 0.0889).
+  - **User override, verbatim: "yes, ship it as a logged override of check c".**
+- **Reach.** daily_update's cfg_kwargs takes every bip_* from its CLI flag (all default None; the sim job passes none) or from GameConfig(). New fields take GameConfig defaults. The forward override files are production's established path.
+- **Fleet.** No MLB sim was running and the checkout was clean before the ff. The MLB sim job is a per-run subprocess, so no restart.
+- **V1 MET (00:28Z).** On ~/Syndicate at 2bb481ef, GameConfig() and the forward override files resolve to exactly the shipped values (all 16 defaults, 3 pitch, 4 manager; hr map a=0.4086 b=-1.0296).
+- **V2 OWED (pre-registered).** Production's next MLB sims: served starter outs_mean vs replays of their own roster_objs at the new config (A, fleet tree) and the old config (B, 61edcc04 copy), 4000 sims. MET if mean |served - A| < mean |served - B|.
+- verify: V2 reading on the first post-00:28Z MLB sims (a watcher is armed).
