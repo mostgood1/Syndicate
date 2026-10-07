@@ -3304,3 +3304,15 @@ own prior verdicts, not by anything failing.
 
 - **Belief overturned:** f9adcdd8's Layer 2 OUT-player gate shipped with 4 passing tests and a served counter, and I recorded it as 'mechanism verified'. All four tests handed rows directly to select_shortlist. Production does not: build_layer2_rows rebuilds every candidate from _IDENTITY_FIELDS plus an explicit field list, and the upstream flag (`player_availability`) was not on it -- the same shape #270 recorded for `projection`. The served counter reading 0 was read as 'no OUT player quoted' when the frame could not have been non-null for a second reason. Caught when Layer 1 fired on a real row (Gray, rows=9) and Layer 2 still read 0 on a post-flag build.
 - **Rule:** a gate on a field stamped upstream needs one test that starts from the upstream row and runs the real transformation chain to the gate (here grid row -> build_layer2_rows -> select_shortlist), and that test must fail with the carry removed. A counter that reads 0 is evidence only after a replay of real input shows it can read non-zero.
+
+## 2026-10-07 -- A lever applied with `hasattr`/`setattr` onto a substituted config is a silent no-op `[session e0a3e383]`
+
+- **Measured:** the sweep added fields to the vendor `EventSimConfig`, but Syndicate passes its own frozen
+  `EventSimConfigLocal`, which lacks them. `hasattr` skipped 5 of 7 sweep points silently (they ran the baseline, with
+  clean logs), and the vendor engine's `getattr(cfg, name, default)` hid it a second time.
+  - Only the 2 points whose field already existed failed loudly, and only because the dataclass is frozen.
+- **Rule:**
+  - Prove a lever at the ENGINE boundary (count the calls whose cfg carries the value), not at the place you set it.
+  - Reject unknown lever names against the engine's own fields.
+  - Engine-level byte-identity and reachability tests do not prove that the production wrapper passes the lever
+    through. Run one through the real call path.
