@@ -80,6 +80,24 @@ The smoke run (plumbing; 4 FIT games, 1,405 quote rows; not a result) exposed tw
 
 Nothing else changes. Phase B runs after both fixes, on the FIT seasons.
 
+## Amendment 2 — run-share correction, PRE-REGISTERED 2026-10-07 (user: "fix the rushing volume with a measured run-share correction")
+
+**Defect (Phase B, FIT):** sim per team-game rush att 21.3 vs real ~27, pass att 35.2 vs ~33.5; the
+engine also runs ~4-5 fewer offensive plays. Runs are starved, passing volume inflated -> rushing
+attempts +0.336 LL vs production, rushing yards / receptions / receiving yards worse.
+
+**Correction (two parameters, applied identically at prediction time, NFL and NCAAF fitted separately):**
+1. `pass_odds_multiplier` c: on yard-GAINING plays, P(pass) -> c*odds / (1 + c*odds). (c = 1 = today.)
+2. `incomplete_as_run` r: a share r of the sim's INCOMPLETE_PASS plays (0 yards) are credited as a
+   RUN for 0 yards -- a stuffed run and an incompletion are the same in yardage, and the engine has no
+   other way to produce a 0-yard run. (r = 0 = today.)
+**Targets (FIT real, nflverse 2023-24 REG, per team-game):** rush attempts = `play_type` run + qb_kneel;
+pass attempts = `play_type` pass, not a sack. **Fit:** grid c in {1.0, 0.85, 0.7, 0.6, 0.5, 0.4},
+r in {0, 0.1, 0.2, 0.3, 0.4, 0.5} on every 8th FIT game (~46 games, 100 seeds, production engine);
+minimise (sim/real - 1)^2 summed over rush att and pass att. The chosen (c, r) is FIXED, then Phase B is
+re-run on all 366 FIT games at 300 seeds and reported beside the uncorrected run. Held-out 2025 is not
+touched by any of this. NCAAF: the same fit on 2024 CFBD parsed targets when its Phase B is read.
+
 ## NCAAF data step — PRE-REGISTERED 2026-10-07 (user: "start the NCAAF attribution data step while that runs")
 
 **What is missing for NCAAF, measured:** local CFBD plays carry no player ids; player box scores exist
