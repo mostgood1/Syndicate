@@ -1683,6 +1683,22 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **STARTER BF EXCESS (user: "then fix the starter BF excess next") -- DIAGNOSIS ON THE FIT HALF ONLY, 2026-10-07 ~20:25Z. NO FIT RUN.**
+  - Window split: FIT < 2026-08-22, HOLDOUT >= 08-22. The holdout was not read: the out-of-sample evaluation results stay unread until any fix based on this data has made its holdout read.
+  - Shipped config, starter per start, model / actual:
+
+    | Period | Starts | BF | Outs | Pitches |
+    |---|---|---|---|---|
+    | June fit set | 551 | 21.82 / 22.04 | 15.21 / 15.47 | 75.2 / 85.5 |
+    | Jul | 415 | 21.75 / 21.45 | 15.11 / 15.32 | 74.9 / 83.0 |
+    | Aug to 08-21 | 561 | 21.83 / 21.75 | 15.19 / 15.44 | 75.1 / 84.7 |
+
+  - (1) There is NO meaningful BF excess in FIT (+0.30, then +0.08; outs slightly LOW). The pooled-window excess (~+0.6, implied by the walk re-check's pooled BB and BB/BF) must sit in late Aug-Sept, where real starters shortened.
+    - A constant lever fitted on FIT cannot see it. One fitted on September would over-shorten April-August.
+    - It is a SEASON-PHASE effect (learning: never mix phases in fits), so it is not fixed by a constant. Left as a finding.
+  - (2) NEW FINDING: pitches per start are ~10 LOW (-12%) in every period under the shipped config. Pre-ship it was -1.3 (June 84.7 vs 86.0).
+    - Cause: the shipped early_count_foul_boost 1.5 (from 2.05) means fewer fouls, so shorter PAs. The combined descent traded it away: P/BF is one moment at a 5% scale.
+    - It also feeds the pitch-count hook (starters reach their limit later per BF). Candidate next lane: restore P/BF without undoing the K/BB gains (e.g. a two-strike foul lever).
 - **FULL BUILD + WALK RE-CHECK RESULT 2026-10-07 ~20:05Z (read once):**
   - Build: 74/74 dates rc=0, **985 games** (= the schedule's 984 Final + 1 Completed Early); 16 postponed + 1 cancelled skipped; 0 short projections.
   - Walk re-check (shipped config: forward overrides as served, short 0.14, shell 4; 100 sims; 1964 starts, 6 starter mismatches excluded):
