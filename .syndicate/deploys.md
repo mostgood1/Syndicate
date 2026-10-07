@@ -47298,3 +47298,11 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
   - Rule being added by that lane at its user's request: restart refresh-worker only right after a STATE_PERSIST_BEGIN, never mid-build.
 - **expect.** In the first shortlist written after 15:10:36Z, NBA/NHL/WNBA `games_in_*` are ints. They are single-date windows right now, so this reading CANNOT distinguish the old rule from the new; it confirms load and sanity only. The discriminating case (two dates on the grid) was measured offline on the fleet's real per-date coverage: NBA 9, not [3, 6]; NHL 13, not [10, 3] (log/2026-10-07.md).
 - **verify.** OWED: the post-restart shortlist reading (watcher running).
+
+## READING 2026-10-07 15:35Z -- soccer-live-serialize-fields-race (c612db03), reading 2, LOCAL fleet
+- **service.** live-odds-worker on the LOCAL WSL fleet (not Render). Running `a185e337` (contains `c612db03`; `contracts.py` unchanged on origin/main since). 21 `==== start` markers in the window, all on post-09-30 fleet code -> no revert window.
+- **measured span.** 2026-10-02T21:47:26Z .. 2026-10-07T15:27:19Z (oldest line in live-odds-worker.log.5 .. read time), all six log files grepped.
+- **gaps.** TWO unmeasured gaps: (a) Render 2026-09-29T15:25:16Z .. 2026-09-30T06:37:51Z (billing suspension; unmeasured by decision), (b) local fleet 2026-09-30 ~22:46Z (fleet start) .. 2026-10-02T21:47:26Z (rotated out of the ~4-day local log retention).
+- **counts.** 0 `LEAGUE_POLL_FAILED` with `bad argument to internal function`; 0 `error=SystemError`. Other `LEAGUE_POLL_FAILED`: 3 `error=ConnectionError` (2026-10-03T21:15Z epl / la_liga / bundesliga). (3 further grep hits were ALL_PROCESS_MEMORY lines quoting the string in a cmdline, not failures.)
+- **exposure.** this window **24** match-ticks over 45,771 `live_state` write lines (24 non-zero, all MLS, logged 2026-10-07 00:56..02:35Z for the 10-06 slate); per UTC day writes/ticks: 10-02 839/0, 10-03 10,684/0, 10-04 8,728/0, 10-05 10,790/0, 10-06 8,690/0, 10-07 6,040/24. Running total since go-live **596** (Render 572 + local 24) against a bar of **2,551**. European leagues at 0 all weekend because the source had no fixtures (ESPN eng.1 20261003: 0 events); the parse does count a live population (MLS).
+- **verdict.** INSUFFICIENT (0 failures, 596 < 2,551). Re-armed for 2026-10-10T15:00Z.
