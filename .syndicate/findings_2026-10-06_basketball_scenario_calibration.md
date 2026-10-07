@@ -95,3 +95,72 @@ ba_bt\out\cache\oddsapi_hist\games;
 ## Readings
 
 (none yet)
+
+### NBA Phase 1 reading `[2026-10-07 ~14:30Z, e0a3e383]`
+
+**Substrate.**
+- REAL: 816 ESPN games, 2025-11-01..2026-02-28 (regular season).
+- SIM: production engine re-run as-of, code 6a666e71 + the fleet's prop-calibration and availability switch files,
+  200 draws per game, 109 dates.
+- **791 games paired** (25 real games had no sim: missing as-of inputs or props snapshot), all 791 with a pre-tip
+  line.
+- Validation NOT extracted or read. Output: C:\tmp\bball_sc\table_nba_2025-11-01_2026-02-28.json.
+
+| id | scenario | bucket | n | real [95% CI] | sim | gap | effect | verdict |
+|---|---|---|---|---|---|---|---|---|
+| S1 | FGA+0.44FTA+TOV per team-game | all | 791 | 114.0 [113.6, 114.5] | 119.6 | **+5.6** | volume, not points* | **FLAG** (props/live volume) |
+| S2 | Q1 share | all | 791 | 0.2546 [0.2524, 0.2567] | 0.2509 | −0.0036 | −0.83 pts | **FLAG** |
+| S2 | Q2 share | all | 791 | 0.2505 [0.2484, 0.2527] | 0.2512 | +0.0007 | +0.16 | EXONERATED (all 4 buckets inside or ≤ 0.53) |
+| S2 | Q3 share | all | 791 | 0.2538 [0.2515, 0.2561] | 0.2493 | −0.0045 | −1.04 pts | **FLAG** |
+| S2 | Q4 share | all | 791 | 0.2411 [0.2389, 0.2435] | 0.2486 | +0.0075 | **+1.71 pts** | **FLAG** |
+| S2 | Q4 share | entering Q4 within 8 | 366 | 0.2405 [0.2369, 0.2438] | 0.2512 | +0.0108 | **+2.47 pts** | **FLAG** |
+| S2 | Q4 share | entering Q4 by 18+ | 182 | 0.2377 [0.2332, 0.2426] | 0.2451 | +0.0074 | +1.69 pts | **FLAG** |
+| S3 | SD of quarter total | Q1..Q4 | 791 | 8.48 / 8.49 / 8.73 / 8.89 | 9.64 / 9.69 / 9.67 / 9.68 | **+0.8..+1.2** | pts | **FLAG** (all four) |
+| S4 | H1 share | all | 791 | 0.5050 [0.5024, 0.5077] | 0.5021 | −0.0029 | −0.67 pts | outside CI, below 0.8 -> not flagged |
+| S5 | P(margin ≥ 18 entering Q4) | all | 791 | 0.230 [0.202, 0.260] | 0.348 | **+0.118** | (drives S8/S10) | **FLAG** |
+| S5 | same | spread 0-4 / 4.5-8 / 8.5+ | 267/275/249 | 0.180 / 0.171 / 0.349 | 0.286 / 0.328 / 0.436 | +0.11 / +0.16 / +0.09 | | **FLAG** (every bucket) |
+| S6 | FTA per team-game | all | 791 | 23.35 [22.95, 23.76] | 20.91 | **−2.44** | −1.9 pts/team | **FLAG** |
+| S7 | P(tied after regulation) | all | 791 | 0.0455 [0.0329, 0.0594] | 0.0173 | −0.028 | ~−0.6 pts game total | outside CI, below 1.0 -> not flagged alone (see S8) |
+| S8 | SD(final total − total line) | all | 791 | 18.29 [17.42, 19.21] | 20.19 | +1.9 | pts | **FLAG** |
+| S8 | SD(final margin + home spread) | all | 791 | 14.00 [13.19, 14.71] | **19.38** | **+5.38** | pts | **FLAG** (largest) |
+| S9 | 3PA per team-game | all | 791 | 37.00 [36.68, 37.33] | 39.42 | +2.43 | threes props | **FLAG** (props) |
+| S10 | top-5 minutes | final margin ≤ 6 | 242 | 31.32 [30.98, 31.61] | 29.73 | −1.58 | min | **FLAG** |
+| S10 | top-5 minutes | final margin ≥ 20 | 156 | 26.87 [26.49, 27.26] | 29.73 | **+2.87** | min | **FLAG** |
+| S11 | foul-outs (≥ 6 PF) per game | all | 791 | 0.193 [0.162, 0.226] | 0.360 | +0.17 | (PF too high) | **FLAG** (see S6) |
+
+*S1's sim points are anchored to the target, so the volume gap shows up as LOWER efficiency on MORE plays, not as
+more points. It matters for FGA/3PA props and the live clock, not the game total.
+
+**What the table says, by root cause (Phase 2 candidates, ranked by effect; each pre-registered separately):**
+1. **Too much game-to-game spread.**
+   - Final margin SD is 19.4 vs 14.0 around the spread (the largest gap), and the total SD 20.2 vs 18.3.
+   - Every quarter's SD is about 1 pt wide.
+   - Blowouts entering Q4 are 35% vs 23%.
+   - OT is too rare (1.7% vs 4.6%), which is the same symptom: a wide margin distribution has less mass at zero.
+   - The engine stacks jitter that the real game does not have: a per-quarter environment draw `q_env_mult` clipped
+     0.82-1.22, a ±6% possession-count draw, and the stress term on quarter sigma.
+   - Mechanism candidate: shrink those jitters (default-off scale factors), measured against S3/S5/S8.
+2. **Quarter shares are hardcoded wrong.**
+   - Real ≈ .255 / .250 / .254 / .241; the engine's split is .245/.245/.255/.255.
+   - Q4 runs +1.7 pts hot (+2.5 in close games), Q1 and Q3 run cold.
+   - This is the period-line target directly; a share refit is a fitted-constant change, not a mechanism.
+3. **Free throws too low while fouls run too high.**
+   - FTA is −2.4 per team while foul-outs are nearly double: the engine's non-shooting fouls award nothing (no bonus)
+     and there is no late intentional fouling (code, `events.py:1492`).
+   - Mechanism candidate: a bonus rule (team fouls per period -> FTs) plus late-game intentional fouls, measured on
+     S6/S11 and the real-only Q4 FTA row.
+4. **Minutes do not respond to game script.**
+   - Starters play 31.3 min in close games and 26.9 in 20+ blowouts; the sim gives 29.7 in both (minutes are an
+     input).
+   - Mechanism candidate: scale each draw's top-rotation minutes by its own margin path (props target). It interacts
+     with #1, since too many sim blowouts would over-apply it, so it goes after #1.
+5. **Volume composition.** +5.6 shots+TOs and +2.4 3PA per team at lower efficiency: the per-player rate priors and
+   the pace term. Props target (FGA/threes); re-fit after #1-#3.
+
+Not flagged:
+- S2 Q2 (EXONERATED);
+- S4 (outside the CI, below the half threshold);
+- S7 alone (below materiality; it moves with #1).
+
+S12 (back-to-back) was not computed: it needs the schedule join -- owed.
+

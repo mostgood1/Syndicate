@@ -1602,6 +1602,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Findings file: Phase 1 real-vs-sim table per league with CIs and the pre-registered decision rule; per mechanism a byte-identical proof + reachability test; final held-out reading read once. Fleet change only by user decision.
 - Blocked by: none
 - STATUS 2026-10-06 ~22:15Z: Phase 1 pre-registered (026d94d7) + amendments; extractor/sim/table phases on main; real FIT extracted (NBA 816, WNBA 217); NBA FIT sim run COMPLETE 109/109 dates (2026-10-07 ~14:10Z; WSL ~/bball_sc, 3 workers, 200 draws, 0 errors).  NEXT: NBA table + flags, WNBA sim setup, NCAAB real table. GOAL: NOT MET (Phase 1 in progress).
+- NBA PHASE 1 READ 2026-10-07 (findings 'NBA Phase 1 reading'; 791 paired FIT games): FLAGGED -- margin SD 19.4 vs 14.0 and blowouts 35% vs 23% (too much spread), quarter shares (Q4 +1.7 pts, +2.5 close), quarter SD +1 pt, FTA -2.4/team with foul-outs x1.9 (no bonus/intentional FTs), top-5 minutes flat vs script (close -1.6, blowout +2.9), volume +5.6 plays/+2.4 3PA. EXONERATED: Q2 share. Phase 2 candidates ranked (spread jitter first); each pre-registered before any engine change. Owed: S12 back-to-back; WNBA sim; NCAAB real table.
 ### closed-lane-archive-20261006-1550 — CLOSED 2026-10-06 (GOAL MET: 1 blocks archived) — opened 2026-10-06 — session cad2e2a3-1131-47d8-9c97-ea6c7b88817e
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
