@@ -286,6 +286,95 @@ def resolve_player_id_with_prior(season: int, full_name: str) -> tuple[str | Non
     return None, "unresolved"
 
 
+_NAME_SUFFIXES = frozenset({"jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "v"})
+_CANDIDATE_CACHE: dict[int, tuple[int, dict[str, frozenset[str]]]] = {}
+
+
+def _cached_name_candidates(season: int) -> dict[str, frozenset[str]]:
+    """`_player_name_candidates`, cached against the identity of the season's plays.
+
+    Keyed on `id(load_player_plays(season))` rather than an `lru_cache`, so a test
+    that clears or patches the play loader gets a fresh scan (the leak
+    `_player_name_candidates`'s docstring warns about cannot happen here).
+    """
+    plays_id = id(load_player_plays(season))
+    held = _CANDIDATE_CACHE.get(season)
+    if held is not None and held[0] == plays_id:
+        return held[1]
+    candidates = _player_name_candidates(season)
+    _CANDIDATE_CACHE[season] = (plays_id, candidates)
+    return candidates
+
+
+def short_name_keys(full_name: str) -> list[str]:
+    """Candidate nflverse short names for a full name, most specific first.
+
+    `short_name_from_full` takes the LAST token, so "Michael Penix Jr." became
+    `m.jr.` and "Amon-Ra St. Brown" became `a.brown` (A.J. Brown). Measured on the
+    2026 week-5 capture (lane `nfl-prop-name-resolution`): suffix names cost 55
+    prop rows / 20 players, and St. Brown 7 rows. Keys, in order: the plain short
+    name (unchanged behaviour), the suffix-stripped one, and first-initial + every
+    remaining token ("a.st. brown") for multi-word surnames.
+    """
+    parts = [part for part in str(full_name or "").strip().split() if part]
+    if len(parts) < 2:
+        return [str(full_name or "").strip().lower()] if parts else []
+    keys = [f"{parts[0][0]}.{parts[-1]}".lower()]
+    core = list(parts)
+    while len(core) > 2 and core[-1].lower() in _NAME_SUFFIXES:
+        core.pop()
+    keys.append(f"{core[0][0]}.{core[-1]}".lower())
+    if len(core) > 2:
+        keys.append(f"{core[0][0]}.{' '.join(core[1:])}".lower())
+    out: list[str] = []
+    for key in keys:
+        if key not in out:
+            out.append(key)
+    return out
+
+
+def resolve_player_id_for_game(
+    season: int,
+    week: int,
+    full_name: str,
+    game_teams: set[str],
+    canonical,
+) -> tuple[str | None, str]:
+    """(player_id, source): the ONE player behind a prop name who plays in THIS game.
+
+    Lane `nfl-prop-name-resolution` (2026-10-07). `resolve_player_id_with_prior`
+    drops any short name two players share, so stars went unrated every week
+    (week 5: Bijan Robinson vs Brian Robinson, Kyren / Javonte / Jameson Williams,
+    Mike Evans -- 59 rows), and it cannot see suffixes or multi-word surnames. The
+    odds row names both clubs, so the disambiguator `player_name_index` calls
+    RECOVERABLE is available: for each candidate short name (`short_name_keys`),
+    current season then prior, keep the candidates whose team
+    (`player_team_with_prior`) is one of the game's two; exactly one wins.
+
+    REFUSES as before when none or several qualify, or when the game's teams are
+    unknown (then it is exactly `resolve_player_id_with_prior`). `canonical` maps
+    a team string to the same canonical form as `game_teams`.
+    """
+    teams = {t for t in (game_teams or set()) if t}
+    if not teams:
+        return resolve_player_id_with_prior(season, full_name)
+    for key in short_name_keys(full_name):
+        for season_try, label in ((season, "current_season"), (season - 1, "prior_season_fallback")):
+            ids = _cached_name_candidates(season_try).get(key)
+            if not ids:
+                continue
+            in_game = []
+            for pid in ids:
+                team, _src = player_team_with_prior(season, week, pid)
+                if team and canonical(team) in teams:
+                    in_game.append(pid)
+            if len(in_game) == 1:
+                return in_game[0], label if len(ids) == 1 else f"{label}_team_disambiguated"
+            if len(in_game) > 1:
+                return None, "ambiguous_in_game"
+    return None, "unresolved"
+
+
 # A week past any real NFL season, so the prior-season lookup takes the WHOLE
 # season rather than a slice. `player_rate` filters `row["week"] < week`, and
 # passing the current week (1) would return an empty prior season too -- the

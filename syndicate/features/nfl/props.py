@@ -35,6 +35,7 @@ from syndicate.features.nfl.player_stats import player_rate_with_prior
 from syndicate.features.nfl.player_stats import player_team_with_prior
 from syndicate.features.nfl.player_stats import resolve_player_id
 from syndicate.features.shared.team_aliases import canonical_team
+from syndicate.features.nfl.player_stats import resolve_player_id_for_game
 from syndicate.features.nfl.player_stats import resolve_player_id_with_prior
 from syndicate.features.nfl.sources import nfl_artifact_output_root
 from syndicate.features.nfl.sources import nfl_source_roots
@@ -756,7 +757,18 @@ def nfl_props_rows_for_week(
         # (`_team_rating` -> `prior_season_fallback`); the player path had no
         # equivalent, so props were structurally dead every week 1 and would
         # have started working in week 2 with nobody knowing why.
-        player_id, id_source = resolve_player_id_with_prior(season, player_name)
+        # RESOLVED AGAINST THIS GAME'S TWO CLUBS (lane `nfl-prop-name-resolution`,
+        # 2026-10-07): a short name two players share, a suffix ("M.Jr.") or a
+        # multi-word surname ("A.Brown" for St. Brown) no longer drops the player;
+        # exactly one candidate on one of these two teams must qualify.
+        _game_teams = {
+            canonical_team("nfl", str(row.get("away_team") or "")),
+            canonical_team("nfl", str(row.get("home_team") or "")),
+        }
+        _game_teams.discard(None)
+        player_id, id_source = resolve_player_id_for_game(
+            season, week, player_name, _game_teams, lambda team: canonical_team("nfl", team)
+        )
         if player_id is None:
             continue
         # THE TEAM CHECK. A resolved id is not yet the right human.

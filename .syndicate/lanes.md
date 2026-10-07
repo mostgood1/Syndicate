@@ -1806,6 +1806,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Unit: end-to-end off != on; fleet: replay of the real 10-07 WNBA grid through the new build_layer2_rows shows player_availability on Gray's candidates; served counter > 0 once a flagged row survives the earlier rules
 - Blocked by: loan of layer2_board.py from layer2-stale-book-pick
 
+### nfl-prop-name-resolution — OPEN — opened 2026-10-07 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: NFL prop players whose short name collides (Bijan/Brian Robinson), carries a suffix (Penix Jr. -> M.Jr.) or a multi-word surname (Amon-Ra St. Brown -> A.Brown) resolve to the right player id by trying the plain, suffix-stripped and full-surname short names and keeping the ONE candidate on one of the game's two teams (refuse otherwise); verified by tests (off != on, ambiguous still refused) and on the fleet by the weekly artifact covering more stat-player pairs (wk5 baseline 559 of 786) and NFL unmatched_key_rows falling
+- Files: syndicate/features/nfl/player_stats.py (new resolver ONLY), syndicate/features/nfl/props.py (the resolve call in nfl_props_rows_for_week ONLY), tests/test_nfl_prop_name_resolution.py
+- Hypothesis: ~110 of the ~245 unprojected NFL props are these three name failures
+- Falsification test: artifact pair coverage and unmatched_key_rows barely move after the next hourly rebuild
+- Verification: Offline rebuild of wk5 rows old vs new on the fleet; fleet board after ff (builder runs from the checkout)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
