@@ -37,7 +37,8 @@ _SUFFIX = re.compile(r"\b(jr|sr|ii|iii|iv|v)\b\.?")
 _GBN = r"#\d+\s+(?P<%s>[A-Za-z][A-Za-z'.\-]*(?:\s[A-Z][A-Za-z'.\-]*)*)"
 # summary touchdown lines: "Landry Lyddy 7 Yd Run (X Kick)", "Elijah Metcalf 76 Yd pass from Landry Lyddy (X Kick)"
 SUM_RUN = re.compile(r"^(?P<a>.+?) \d+ Yd Run\b")
-SUM_PASS = re.compile(r"^(?P<b>.+?) \d+ Yd pass from (?P<a>.+?)(?: \(|$)")
+SUM_PASS = re.compile(r"^(?P<b>.+?) \d+ Yd pass from (?P<a>[^,(]+?)(?:,| \(|$)")
+PASS_TO = re.compile(r"^(?P<a>.+?) pass to (?P<b>.+?) for ")
 GB_RUN = re.compile(_GBN % "a" + r"\s+(?:rush|scramble|kneels|takes)")
 GB_COMPLETE = re.compile(_GBN % "a" + r"\s+pass complete\b.*?\bto\s+" + _GBN % "b")
 GB_INCOMPLETE = re.compile(_GBN % "a" + r"\s+pass incomplete(?:.*?\b(?:intended for|to)\s+" + _GBN % "b" + r")?")
@@ -48,7 +49,10 @@ STEPBACK_INC = re.compile(r"^(?P<a>\S+) steps back to pass\. Pass incomplete(?: 
 CATCHMADE = re.compile(r"^(?P<a>\S+) pass complete\. Catch made by (?P<b>\S+) for ")
 
 RUSH_TYPES = {"Rush", "Rushing Touchdown"}
-COMP_TYPES = {"Pass Reception", "Passing Touchdown"}
+COMP_TYPES = {"Pass Reception", "Passing Touchdown", "Pass Completion"}
+# offensive plays CFBD files under other types (a fumble after the run/catch, a counted penalty, ...)
+OTHER_TYPES = {"Fumble Recovery (Own)", "Fumble Recovery (Opponent)", "Fumble", "Fumble Return Touchdown",
+               "Penalty", "Uncategorized"}
 INC_TYPES = {"Pass Incompletion"}
 SACK_TYPES = {"Sack"}
 INT_TYPES = {"Interception", "Pass Interception Return", "Interception Return Touchdown"}
@@ -63,6 +67,22 @@ def player_key(name: Optional[str]) -> str:
     return parts[0][0] + " " + parts[-1] if len(parts) > 1 else parts[0]
 
 
+def resolve_key(key: str, roster: List[str]) -> str:
+    """Map a parsed player key onto a team-game roster's keys: exact, else the UNIQUE same-last-name
+    player, else the UNIQUE same-initial near-spelling (difflib >= 0.85). Unresolved -> unchanged.
+    Applied identically wherever parsed players meet a roster (validation now, usage later)."""
+    if not key or key in roster:
+        return key
+    import difflib
+    last = key.split()[-1]
+    same_last = [k for k in roster if k.split()[-1] == last]
+    if len(same_last) == 1:
+        return same_last[0]
+    near = [k for k in roster if k[:1] == key[:1]
+            and difflib.SequenceMatcher(None, k.split()[-1], last).ratio() >= 0.85]
+    return near[0] if len(near) == 1 else key
+
+
 def norm(name: Optional[str]) -> str:
     if not name:
         return ""
@@ -75,7 +95,19 @@ def norm(name: Optional[str]) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
-_YDS = re.compile(r"\bfor (?:(?P<nogain>no gain)|a loss of (?P<lossof>\d+)|(?P<n>-?\d+) (?:yds?|yards?)(?P<loss> loss)?)"
+KNEEL = re.compile(r"^(?P<a>[A-Z][A-Za-z.'\- ]+?) (?:takes a knee|kneels)\b")
+_BAD_NAME = re.compile(r"[\d,]|\bto\b|\bfor\b|\bpenalty\b|\bconversion\b", re.I)
+
+
+def ok_name(name: Optional[str]) -> bool:
+    """Reject fragments captured as names (2-pt / penalty text): digits, commas, connective words, > 4 words."""
+    if not name:
+        return True                      # an absent optional target is fine
+    n = name.strip()
+    return 0 < len(n) <= 40 and len(n.split()) <= 4 and not _BAD_NAME.search(n)
+
+
+_YDS = re.compile(r"\bfor (?:(?P<nogain>no gain)|a loss of (?P<lossof>\d+)|loss of (?P<lossof2>\d+)|(?P<n>-?\d+) (?:yds?|yards?)(?P<loss> loss)?)"
                   r"|^.+? (?P<sum>\d+) Yd (?:Run|pass)\b", re.I)
 
 
@@ -87,8 +119,8 @@ def text_yards(text: str) -> Optional[int]:
         return None
     if m["nogain"]:
         return 0
-    if m["lossof"]:
-        return -int(m["lossof"])
+    if m["lossof"] or m["lossof2"]:
+        return -int(m["lossof"] or m["lossof2"])
     if m["n"] is not None:
         y = int(m["n"])
         return -abs(y) if m["loss"] else y
@@ -97,36 +129,51 @@ def text_yards(text: str) -> Optional[int]:
 
 def parse_play(r: dict) -> Optional[dict]:
     t, text = r.get("playType"), (r.get("playText") or "").strip()
+    if t in OTHER_TYPES:
+        if "no play" in text.lower():
+            return None
+        # classify by the text's leading action, then parse as that type
+        if COMPLETE.match(text) or PASS_TO.match(text) or GB_COMPLETE.search(text) or CATCHMADE.match(text):
+            t = "Pass Reception"
+        elif INCOMPLETE.match(text) or GB_INCOMPLETE.search(text):
+            t = "Pass Incompletion"
+        elif SACK.match(text) or GB_SACK.search(text):
+            t = "Sack"
+        elif RUN.match(text) or GB_RUN.search(text):
+            t = "Rush"
+        else:
+            return None
     ty = text_yards(text)
     base = {"game_id": str(r.get("gameId")), "season": r.get("season"), "week": r.get("week"),
             "posteam": r.get("offense"), "yards_gained": ty if ty is not None else int(r.get("yardsGained") or 0),
             "touchdown": "1" if t in ("Rushing Touchdown", "Passing Touchdown") else "0",
             "passer_player_id": "", "receiver_player_id": "", "rusher_player_id": "", "complete_pass": "0", "sack": "0"}
     if t in RUSH_TYPES:
-        m = RUN.match(text) or GB_RUN.search(text) or SUM_RUN.match(text)
-        if not m:
+        m = RUN.match(text) or GB_RUN.search(text) or SUM_RUN.match(text) or KNEEL.match(text)
+        if not m or not ok_name(m["a"]):
             return None
         return dict(base, play_type="run", rusher_player_id=player_key(m["a"]), rusher_player_name=m["a"])
     if t in COMP_TYPES:
-        m = COMPLETE.match(text) or GB_COMPLETE.search(text) or CATCHMADE.match(text) or SUM_PASS.match(text)
-        if not m:
+        m = (COMPLETE.match(text) or GB_COMPLETE.search(text) or CATCHMADE.match(text) or SUM_PASS.match(text)
+             or PASS_TO.match(text))
+        if not m or not ok_name(m["a"]) or not ok_name(m["b"]):
             return None
         return dict(base, play_type="pass", passer_player_id=player_key(m["a"]), passer_player_name=m["a"],
                     receiver_player_id=player_key(m["b"]), receiver_player_name=m["b"], complete_pass="1")
     if t in INC_TYPES:
         m = INCOMPLETE.match(text) or GB_INCOMPLETE.search(text) or STEPBACK_INC.match(text)
-        if not m:
+        if not m or not ok_name(m["a"]) or not ok_name(m["b"]):
             return None
         return dict(base, play_type="pass", passer_player_id=player_key(m["a"]), passer_player_name=m["a"],
                     receiver_player_id=player_key(m["b"]) if m["b"] else "", receiver_player_name=m["b"] or "", yards_gained=0)
     if t in SACK_TYPES:
         m = SACK.match(text) or GB_SACK.search(text) or re.match(r"^(?P<a>.+?) sacked for", text)
-        if not m:
+        if not m or not ok_name(m["a"]):
             return None
         return dict(base, play_type="pass", passer_player_id=player_key(m["a"]), passer_player_name=m["a"], sack="1")
     if t in INT_TYPES:
         m = INTERCEPT.match(text) or GB_INTERCEPT.search(text)
-        if not m:
+        if not m or not ok_name(m["a"]):
             return None
         return dict(base, play_type="pass", passer_player_id=player_key(m["a"]), passer_player_name=m["a"], yards_gained=0,
                     interception="1")
@@ -149,7 +196,7 @@ def cmd_parse(seasons: List[int]) -> None:
                 continue
             for r in json.load(gzip.open(p, "rt", encoding="utf-8")):
                 t = r.get("playType")
-                if t not in RUSH_TYPES | COMP_TYPES | INC_TYPES | SACK_TYPES | INT_TYPES:
+                if t not in RUSH_TYPES | COMP_TYPES | INC_TYPES | SACK_TYPES | INT_TYPES | OTHER_TYPES:
                     continue
                 n_type[t] += 1
                 d = parse_play(r)
@@ -170,36 +217,50 @@ def cmd_parse(seasons: List[int]) -> None:
 
 
 def cmd_validate(season: int) -> None:
-    parsed: Dict[Tuple[str, str, str], Dict[str, float]] = defaultdict(lambda: defaultdict(float))
-    with (OUT / f"ncaaf_attributed_plays_{season}.csv").open(encoding="utf-8", newline="") as fh:
-        for r in csv.DictReader(fh):
-            g, team, y = r["game_id"], norm(r["posteam"]), float(r["yards_gained"] or 0)
-            if r["play_type"] == "run" and r["rusher_player_id"]:
-                d = parsed[(g, team, r["rusher_player_id"])]
-                d["rushing_attempts"] += 1
-                d["rushing_yards"] += y
-            elif r["play_type"] == "pass" and r["sack"] == "1" and r["passer_player_id"]:
-                d = parsed[(g, team, r["passer_player_id"])]      # NCAAF: a sack is QB rushing
-                d["rushing_attempts"] += 1
-                d["rushing_yards"] += y
-            elif r["play_type"] == "pass" and r["sack"] != "1":
-                if r["passer_player_id"]:
-                    d = parsed[(g, team, r["passer_player_id"])]
-                    d["passing_attempts"] += 1
-                    if r["complete_pass"] == "1":
-                        d["passing_yards"] += y
-                if r["complete_pass"] == "1" and r["receiver_player_id"]:
-                    d = parsed[(g, team, r["receiver_player_id"])]
-                    d["receptions"] += 1
-                    d["receiving_yards"] += y
+    # Box first: its team-game rosters are what `resolve_key` maps parsed players onto.
     box: Dict[Tuple[str, str, str], Dict[str, float]] = {}
+    roster: Dict[Tuple[str, str], List[str]] = defaultdict(list)
     with BOX.open(encoding="utf-8", newline="") as fh:
         for r in csv.DictReader(fh):
             if int(r["season"]) != season:
                 continue
-            box[(r["game_id"], norm(r["team"]), player_key(r["player_name"]))] = {
-                k: float(r[k] or 0) for k in ("rushing_attempts", "rushing_yards", "receptions", "receiving_yards",
-                                              "passing_attempts", "passing_yards")}
+            k = (r["game_id"], norm(r["team"]), player_key(r["player_name"]))
+            box[k] = {s: float(r[s] or 0) for s in ("rushing_attempts", "rushing_yards", "receptions",
+                                                    "receiving_yards", "passing_attempts", "passing_yards")}
+            roster[k[:2]].append(k[2])
+    parsed: Dict[Tuple[str, str, str], Dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    resolved = changed = 0
+    with (OUT / f"ncaaf_attributed_plays_{season}.csv").open(encoding="utf-8", newline="") as fh:
+        for r in csv.DictReader(fh):
+            g, team, y = r["game_id"], norm(r["posteam"]), float(r["yards_gained"] or 0)
+            ros = roster.get((g, team), [])
+
+            def pk(col: str) -> str:
+                nonlocal resolved, changed
+                raw = r[col]
+                out = resolve_key(raw, ros) if raw else raw
+                resolved += 1 if raw else 0
+                changed += 1 if raw and out != raw else 0
+                return out
+            if r["play_type"] == "run" and r["rusher_player_id"]:
+                d = parsed[(g, team, pk("rusher_player_id"))]
+                d["rushing_attempts"] += 1
+                d["rushing_yards"] += y
+            elif r["play_type"] == "pass" and r["sack"] == "1" and r["passer_player_id"]:
+                d = parsed[(g, team, pk("passer_player_id"))]      # NCAAF: a sack is QB rushing
+                d["rushing_attempts"] += 1
+                d["rushing_yards"] += y
+            elif r["play_type"] == "pass" and r["sack"] != "1":
+                if r["passer_player_id"]:
+                    d = parsed[(g, team, pk("passer_player_id"))]
+                    d["passing_attempts"] += 1
+                    if r["complete_pass"] == "1":
+                        d["passing_yards"] += y
+                if r["complete_pass"] == "1" and r["receiver_player_id"]:
+                    d = parsed[(g, team, pk("receiver_player_id"))]
+                    d["receptions"] += 1
+                    d["receiving_yards"] += y
+    print(f"{season}: identity resolver remapped {changed} of {resolved} player references")
     games = {k[0] for k in parsed} & {k[0] for k in box}
     checks = (("rushing_yards", 5, "rushing_attempts"), ("receiving_yards", 5, "receptions"),
               ("rushing_attempts", 1, "rushing_attempts"), ("receptions", 1, "receptions"),

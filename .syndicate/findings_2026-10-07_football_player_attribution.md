@@ -138,6 +138,31 @@ Fourth validation (text yards): receiving yds 0.901, rush att 0.908, receptions 
 "B. Lowry takes a knee" shape are unparsed while box scores count them as QB rushes; 447 passer rows
 parse with no box match (a join, not a parse, problem -- unexamined).
 
+**Amendment (2026-10-07, user: "fix the kneel-down and passer join"; bar unchanged).** Of 3,188 parsed
+passer-games, 447 had no box row: (i) spelling/nickname variants of ONE player ("Zolten Osborne" vs box
+"Osbourne", "Goose" vs "Will" Crowder); (ii) junk captured as a name from 2-pt / penalty fragments
+("Drew Allar, Two Point Conversion Failed...", "to Griffin Wilde, Preston Stone"); (iii) players absent
+from the box entirely (unfixable here; they stay misses). Fixes: a NAME SANITY rule (no digits, commas,
+"to ", > 4 words -> unparsed); an IDENTITY RESOLVER applied identically wherever parsed players meet a
+roster -- an unmatched parsed key maps to the team-game roster player with the SAME last name, else a
+same-initial near-spelling (difflib >= 0.85), ONLY when exactly one candidate qualifies; kneel-downs
+("<A> takes a knee" / "<A> kneels", "for loss of N") parsed as QB rushes. Team kneels ("Kneel down by
+Kansas") name no player and stay unattributed.
+Fifth validation (after that amendment): unmatched passer rows 447 -> 10 (join FIXED); rec yds 0.914,
+rush att 0.924, receptions 0.980 PASS; **rush yds 0.894 and pass yds 0.860 FAIL -> not used.** Pass-yard
+misses are mostly the parse running LOWER by 20-50 yds (287 of 381): whole plays missing. Measured
+cause: ~1,900 2025 offensive plays live under OTHER playTypes -- "Pass Completion" (753, an unlisted
+type name, text "X pass to Y for N yds"), fumble recoveries whose text starts with the run/catch
+(1,065), counted penalties (62), "Fumble" (60). **Amendment (same request, same bar):** "Pass
+Completion" + the "pass to ... for" shape; for Fumble*/Penalty/Uncategorized types, parse the leading
+run/pass from the text unless it says "no play"; the summary-line passer stops at the first comma.
+
+**Sixth validation -- ACCEPTED (2026-10-07).** 2025, 888 games with both parse and box, identity resolver
+remapped 1,829 of 148,883 player references: rush yds 0.932, rec yds 0.937, rush att 0.937, receptions
+0.986, pass yds 0.917 -- all >= 0.90. Plays attributed: 2023 110,305 / 2024 110,984 / 2025 115,432.
+Stated limit: box scores exist for 2025 only, so 2023-24 are validated only through the 2025 weeks that
+share their (classic) text style (wk1-8); the parser and resolver are identical across seasons.
+
 **Part 2 probe (2026-10-07, 11 credits):** OddsAPI historical NCAAF events for 2024-10-12 15:50Z = 76
 events (1 credit); Alabama vs South Carolina `player_rush_yds` = 5 books, 63 outcomes (10 credits);
 4,127,431 credits remaining. The 2024 NCAAF props archive EXISTS. Bulk estimate, from the repo's
