@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import dataclasses
 import json
 import math
 import random
@@ -240,6 +241,24 @@ def run_real(args) -> int:
     return 0
 
 
+
+_LEVER_CLS_CACHE: Dict[Any, Any] = {}
+
+
+def _lever_cfg(cfg: Any, levers: Dict[str, float]) -> Any:
+    """Copy of `cfg` (a frozen dataclass) with `levers` applied, adding any field the class lacks."""
+    if cfg is None:
+        raise SystemExit("LEVER_FAIL draw has no cfg to apply levers to")
+    base = {f.name: getattr(cfg, f.name) for f in dataclasses.fields(cfg)}
+    extra = tuple(sorted(k for k in levers if k not in base))
+    key = (type(cfg), extra)
+    cls = _LEVER_CLS_CACHE.get(key)
+    if cls is None:
+        cls = dataclasses.make_dataclass(f"{type(cfg).__name__}Lever", [(k, float, 0.0) for k in extra],
+                                         bases=(type(cfg),), frozen=True)
+        _LEVER_CLS_CACHE[key] = cls
+    return cls(**{**base, **levers})
+
 def _compact_draw(h_box: Dict[str, Any], a_box: Dict[str, Any], hq: Any, aq: Any, foul_limit: int) -> Dict[str, Any]:
     def team(b: Dict[str, Any]) -> List[int]:
         return [int(b.get(k) or 0) for k in ("team_total_fga", "team_total_fta", "team_total_tov", "team_total_fg3a", "team_total_pf")]
@@ -297,10 +316,11 @@ def run_sim(args) -> int:
         inner = orig_rec(simulate_draw, recorded_draws)
 
         def wrapped(**kw):
-            cfg = kw.get("cfg")
-            for name, value in levers.items():     # Phase 2 lever sweep: set on this draw's EventSimConfig
-                if cfg is not None and hasattr(cfg, name):
-                    setattr(cfg, name, value)
+            if levers:
+                # Phase 2 lever sweep. The cfg reaching here is Syndicate's FROZEN EventSimConfigLocal, which does not
+                # carry the new vendor fields at all -- the first sweep's `hasattr`/`setattr` silently skipped L1/L2
+                # (they ran the baseline) and crashed L3 (frozen). Rebuild the cfg with the levers instead.
+                kw["cfg"] = _lever_cfg(kw.get("cfg"), levers)
             res = inner(**kw)
             try:
                 h_box, a_box, hq, aq = res
@@ -315,6 +335,29 @@ def run_sim(args) -> int:
 
     bpss._call_source_simulate_smart_game_local = call
     bpss._recording_sim_draws_local = rec
+
+    lever_seen = {"calls": 0, "with_levers": 0}
+    if levers:
+        # FAIL LOUDLY on a lever the vendor engine does not read: an unknown name would otherwise be a silent no-op.
+        pkg = "wnba_betting" if args.league == "wnba" else "nba_betting"
+        real_events = bpss._import_real_events_module_local(package_name=pkg)
+        if real_events is None:
+            raise SystemExit(f"LEVER_FAIL vendor {pkg}.sim.events not importable -- levers would not reach an engine")
+        vendor_fields = {f.name for f in dataclasses.fields(real_events.EventSimConfig)}
+        unknown = sorted(set(levers) - vendor_fields)
+        if unknown:
+            raise SystemExit(f"LEVER_FAIL {unknown} are not fields of {pkg} EventSimConfig")
+        # Reachability at the ENGINE boundary: count real-engine calls whose cfg carries every lever value.
+        orig_real = bpss._call_real_events_entrypoint_local
+
+        def real_probe(*, entrypoint_name, league_code, kwargs):
+            lever_seen["calls"] += 1
+            c = kwargs.get("cfg")
+            if c is not None and all(getattr(c, k, None) == v for k, v in levers.items()):
+                lever_seen["with_levers"] += 1
+            return orig_real(entrypoint_name=entrypoint_name, league_code=league_code, kwargs=kwargs)
+
+        bpss._call_real_events_entrypoint_local = real_probe
 
     all_dates = rs._dates(f"{args.start}..{args.end}", asof)
     if args.dates_file:
@@ -345,6 +388,10 @@ def run_sim(args) -> int:
                 smart_sim_overwrite=True, log_file=Path(args.out) / f"sim_{args.league}_{d}.log")
         except Exception as exc:  # noqa: BLE001
             print(f"SIM_FAIL {d} {exc!r}"[:300], flush=True)
+        if levers:
+            print(f"LEVER_REACH {d} engine_calls={lever_seen['calls']} with_levers={lever_seen['with_levers']}", flush=True)
+            if lever_seen["calls"] and lever_seen["with_levers"] != lever_seen["calls"]:
+                raise SystemExit(f"LEVER_FAIL {d} only {lever_seen['with_levers']}/{lever_seen['calls']} engine calls saw the levers")
         if not games:
             print(f"SIM_EMPTY {d} -- nothing simulated; no output written (a 0-game file would read as a result)", flush=True)
             continue
