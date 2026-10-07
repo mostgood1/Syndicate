@@ -414,6 +414,17 @@ queued behind its descent. 142 production-arm NCAAF 2025 game sims from the paus
 into the v2 cache (deterministic, never analysed). NFL v2 validation waits for >= 128 completed 2026
 games (pre-registered).
 
+### Re-fit v2 descent, NFL — DONE 2026-10-07 (136 FIT games, 60 seeds; objective incl. the slope moments)
+
+Production 61.28 -> **fitted 29.17 (-52%)** (v1 reached -29% on its own, slope-free objective). Fitted: all
+four switches ON, `drive_yardage_multiplier` 0.875, `touchdown_weight_multiplier` 1.125,
+`red_zone_touchdown_weight_bonus` 0.2475, `red_zone_gain_stiffening` 0.6, `home_field_bonus` 0.09,
+`drive_success_offense_sensitivity` 0.6, `drive_success_defense_sensitivity` 0.6. Fitted z: P(FG) -3.73
+(v1 -4.9; still the worst moment), plays/drive +2.24, mean margin -1.50, margin slope -1.33 (slope still a
+little under 1 -- mild over-dispersion, far less than v1's 0.70), total slope +0.33, mean total -0.54.
+**VALIDATION waits for >= 128 completed 2026 NFL games (pre-registered; ~late October).** NCAAF v2 descent
+still running (30 evals, nothing below production 227.5 yet); its 2025 validation is queued behind it.
+
 H1 prediction (|delta total| < 1.0) FAILED (-1.12). H2 prediction (total in [-0.5, +1.5]) held. Both
 fixes work mechanically (S12 after-half 25.0; S5 4th-down rows inside the real CI) and neither moves
 accuracy alone -- each moves the level or home edge away from the close, as the re-fit design expects.
