@@ -1367,9 +1367,30 @@ def _resolve_branding(team_id: str) -> Any | None:
     return _team_branding_index().get(str(team_id).strip()) if team_id else None
 
 
+# BUILT ONCE PER ROWS OBJECT -- lane `web-restart-healthz` `[2026-10-06]`. py-spy on
+# the fleet refresh-worker during the board's NCAAF hydration (20:45 CT, 553 NCAAF
+# samples): 59.5% in `_team_context`, 36.5% in `_team_registry_index` (rebuilt and
+# regex-normalised over the WHOLE registry on every `_resolve_team` call) and 32.5% in
+# `_count_rows` (a full roster/transfer scan per team). The board's NCAAF branch grew to
+# 570 s by evening (10-06). The rows loaders are `lru_cache`d, so in production these
+# indexes are built once; each memo is reused only while its loader returns the SAME
+# tuple object, so a `cache_clear()` (tests) rebuilds rather than serving stale rows.
+_REGISTRY_INDEX_MEMO: list[Any] = [None, None]  # [rows object, index]
+_COUNT_INDEX_MEMO: dict[str, tuple[Any, dict[str, list[str]]]] = {}
+
+
 def _team_registry_index() -> dict[str, dict[str, Any]]:
+    rows = _team_registry_rows()
+    if _REGISTRY_INDEX_MEMO[0] is rows:
+        return _REGISTRY_INDEX_MEMO[1]
+    index = _build_team_registry_index(rows)
+    _REGISTRY_INDEX_MEMO[0], _REGISTRY_INDEX_MEMO[1] = rows, index
+    return index
+
+
+def _build_team_registry_index(rows: tuple[dict[str, Any], ...]) -> dict[str, dict[str, Any]]:
     index: dict[str, dict[str, Any]] = {}
-    for row in _team_registry_rows():
+    for row in rows:
         if not isinstance(row, dict):
             continue
         for candidate in (
@@ -1409,6 +1430,29 @@ def _first_row(rows: tuple[dict[str, Any], ...], *, team_id: str | None = None, 
 
 
 def _count_rows(rows: tuple[dict[str, Any], ...], *, key: str, team_id: str, season: int | None = None) -> int:
+    # Same count as the linear scan it replaced (kept as `_count_rows_scan`): rows whose
+    # `key` equals `team_id` (both stripped), and whose `season` is empty or equal to
+    # `season` when one is given. The per-team seasons come from an index built once per
+    # (rows object, key); see `_COUNT_INDEX_MEMO` above.
+    if not isinstance(rows, tuple):
+        return _count_rows_scan(rows, key=key, team_id=team_id, season=season)
+    hit = _COUNT_INDEX_MEMO.get(key)
+    if hit is None or hit[0] is not rows:
+        index: dict[str, list[str]] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            index.setdefault(str(row.get(key) or "").strip(), []).append(str(row.get("season") or "").strip())
+        hit = (rows, index)
+        _COUNT_INDEX_MEMO[key] = hit
+    seasons = hit[1].get(str(team_id).strip(), ())
+    if season is None:
+        return len(seasons)
+    wanted = str(season)
+    return sum(1 for row_season in seasons if not row_season or row_season == wanted)
+
+
+def _count_rows_scan(rows, *, key: str, team_id: str, season: int | None = None) -> int:
     total = 0
     for row in rows:
         if not isinstance(row, dict):
