@@ -3316,3 +3316,7 @@ own prior verdicts, not by anything failing.
   - Reject unknown lever names against the engine's own fields.
   - Engine-level byte-identity and reachability tests do not prove that the production wrapper passes the lever
     through. Run one through the real call path.
+
+## 2026-10-07 — RULE (user decision): research and backtest jobs launch at LOW priority; production shares this machine `[lane web-restart-healthz, session 46e09dbb; user: "yes ask the research sessions to launch low priority"]`
+- **Why:** WSL `nice` is invisible to Windows, and Windows sees the whole fleet as one Normal process (`vmmemwsl`). Measured 10-06/10-07: host CPU 100%, the VM got 2-3.6 of 12 cores, and the board's shortlist step took 1,924 s (vs ~120-230 s with cores free) -- 1.5 h with no board save. Inside the VM, research at nice 0 (7 x `basketball_scenario_rates.py sim`, ~5 cores) competed equally with refresh-worker.
+- **How to apply:** WSL: `nice -n 19 <cmd>` (multiprocessing children inherit). Windows: `start /low /b python ...`, or set `.PriorityClass = 'Idle'` right after launch (children inherit). An operator who finds a running job at normal priority may lower it (`renice -n 19 -p <pid>` / `PriorityClass = 'Idle'`); it keeps running. Unattended scheduled tasks cannot be messaged -- put the prefix in the task prompt itself.
