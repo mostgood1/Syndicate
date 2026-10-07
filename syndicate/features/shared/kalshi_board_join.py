@@ -457,8 +457,18 @@ def _resolve_event(
     market: Mapping[str, Any],
     board_rows: Sequence[Mapping[str, Any]],
     code_names: Mapping[str, Mapping[str, str]] | None = None,
+    *,
+    games: Sequence[Mapping[str, Any]] | None = None,
+    memo: dict | None = None,
 ) -> dict[str, Any]:
-    """Which of our games this game-line market belongs to."""
+    """Which of our games this game-line market belongs to.
+
+    `games` (from `_distinct_games(board_rows)`) and `memo` let the game-line
+    branch resolve 6,000 markets without rescanning ~5,600 rows per market and
+    re-matching the same event blob for every market of one game: py-spy on the
+    fleet 2026-10-07 had that at 96% of a ~500 s join. The answer is a pure
+    function of (blob, series family, sport, ticker start) over a fixed board,
+    so the memo hands back a copy of the identical result."""
     from syndicate.features.shared.kalshi_catalogue import (
         event_blob_from_ticker,
         event_start_from_ticker,
@@ -473,6 +483,35 @@ def _resolve_event(
     # Nationals in mlb and the Mystics in wnba, and resolving against the wrong
     # map is how a bet lands on the wrong league's game.
     sport = sport_for_series(market.get("series"))
+    family = _series_family(market.get("series"))
+    commence_hint = event_start_from_ticker(market.get("ticker"))
+    key = (blob, family, sport, repr(commence_hint))
+    if memo is not None and key in memo:
+        return dict(memo[key])
+    if games is None:
+        games = _distinct_games(board_rows)
+    # Kalshi's own code -> name pairing for THIS COMPETITION only. Absent for
+    # every sport that does not supply one, which leaves those resolutions
+    # byte-identical to before.
+    family_names = (code_names or {}).get(family) if code_names else None
+    result = match_event_blob(
+        blob,
+        [dict(g) for g in games],
+        sport=sport,
+        code_names=family_names,
+        # The ticker's own start stamp, in Eastern, converted through zoneinfo.
+        # Used ONLY to separate an otherwise-ambiguous pair -- it never matches
+        # a game on its own, because a slate has many simultaneous starts.
+        commence_hint=commence_hint,
+    )
+    result.setdefault("sport", sport)
+    if memo is not None:
+        memo[key] = dict(result)
+    return result
+
+
+def _distinct_games(board_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """One entry per event_id, first row wins: what `_resolve_event` matches against."""
     # DISTINCT GAMES ONLY. The board carries one row per market per game, so
     # feeding every row in would make an ordinary slate look ambiguous.
     seen: dict[str, dict[str, Any]] = {}
@@ -490,22 +529,7 @@ def _resolve_event(
                 # was correct and the caller handed it nothing to decide on.
                 "commence_time": row.get("commence_time"),
             }
-    # Kalshi's own code -> name pairing for THIS COMPETITION only. Absent for
-    # every sport that does not supply one, which leaves those resolutions
-    # byte-identical to before.
-    family_names = (code_names or {}).get(_series_family(market.get("series"))) if code_names else None
-    result = match_event_blob(
-        blob,
-        list(seen.values()),
-        sport=sport,
-        code_names=family_names,
-        # The ticker's own start stamp, in Eastern, converted through zoneinfo.
-        # Used ONLY to separate an otherwise-ambiguous pair -- it never matches
-        # a game on its own, because a slate has many simultaneous starts.
-        commence_hint=event_start_from_ticker(market.get("ticker")),
-    )
-    result.setdefault("sport", sport)
-    return result
+    return list(seen.values())
 
 
 def _row_market(row: Mapping[str, Any]) -> str:
@@ -1313,6 +1337,11 @@ def join_kalshi_to_board(
     # this is read rather than guessed, and it is scoped per competition
     # because four measured codes mean different clubs in different leagues.
     club_code_names = build_club_code_names(kalshi_markets)
+    # The game-line resolver's inputs, built ONCE: `board_rows` is fixed from here
+    # on, so its distinct games are too, and every market of one game shares a
+    # blob (see `_resolve_event`).
+    resolve_games = _distinct_games(board_rows)
+    resolve_memo: dict = {}
 
     # Bound ONCE here rather than per market: this file imports
     # `sport_for_series` function-locally everywhere else, and `_date_ok` runs
@@ -1482,7 +1511,9 @@ def join_kalshi_to_board(
                     )
                     continue
 
-            resolution = _resolve_event(market, board_rows, club_code_names)
+            resolution = _resolve_event(
+                market, board_rows, club_code_names, games=resolve_games, memo=resolve_memo
+            )
             status = str(resolution.get("status") or "")
             if resolution.get("matched_by") == "commence_time":
                 # A doubleheader half that was separated on start time. Counted
