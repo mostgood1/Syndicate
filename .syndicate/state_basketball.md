@@ -998,6 +998,8 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   period were never removed from the pool (the vendored filter strips punctuation; the exclusion keys keep it) --
   injury and availability exclusions, WNBA and NBA. After the fix + a scoped re-sim: 0 same-team excluded players in the
   10-07 pools (was 2: Ny'Ceara Pryor 22.9 min, Ta'Niya Latson 6.7).
+- **Injury feed read as DAILY SNAPSHOTS since e3f2c3c0 (2026-10-06, lane wnba-slate-and-out-props):** a player who
+  drops off the report is no longer excluded (was: latest row within 30 days). 10-07: Loyd, Talbot back in LVA's pool.
   NBA (read 2026-10-05): filter stage verified on production data (ATL 10-05 roster: old handoff drops none, new
   drops N'Faly Dante); no NBA sim yet has had a punctuated exclusion that would otherwise make the pool.
 - **Live since 2026-10-05 19:08:40Z (FILE SWITCH):** prop shape (`wnba_prop_shape.json`, reb/ast/threes NB at league
