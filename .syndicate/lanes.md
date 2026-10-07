@@ -1939,9 +1939,10 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Offline: apply_corners_estimator over the fleet data root for the 10-10/10-11 MLS fixtures returns team_rates_pressure_v1. On production: the next fleet MLS pre-kickoff freeze carries corners_basis=team_rates_pressure_v1.
 - Blocked by: none
 
-### layer2-shard-window-flags — OPEN — opened 2026-10-07 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+### layer2-shard-window-flags — CLOSED 2026-10-07 (GOAL MET) — opened 2026-10-07 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- **GOAL VERDICT (2026-10-07 21:31Z, lane CLOSED). GOAL: MET.** Goal verbatim: "The served /api/board/layer2-shortlist says when its counters belong to an older build than its written_at: shard_index_stale, index_written_at, rows_from_shards, shards_loaded, shards_missing forwarded from read_layer2_shortlist; verified by a unit test through the route and a fleet read". Unit: tests/test_layer2_shortlist_shard_window_flags.py 2/2 through the real merge (a2a7621b). Fleet: 21:30:56Z read shard_index_stale true with index_written_at 21:01:44Z under written_at 21:30:44Z; 21:31:06Z consistent and false (deploys.md 21:31:06Z). Files released at close.
 - Goal: The served /api/board/layer2-shortlist says when its counters belong to an older build than its written_at: shard_index_stale, index_written_at, rows_from_shards, shards_loaded, shards_missing forwarded from read_layer2_shortlist; verified by a unit test through the route and a fleet read
-- Files: syndicate/blueprints/intelligence.py (shortlist key list ONLY), tests/test_layer2_shortlist_shard_window_flags.py
+- Files: (none -- released 2026-10-07 at close)
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: Unit test: a payload merged mid-write serves shard_index_stale true + index_written_at; a consistent one serves false. Fleet: after web HUP the served payload carries the keys (false outside a write)
@@ -1949,11 +1950,11 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 
 ### layer2-shard-generations — OPEN — opened 2026-10-07 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
 - Goal: A Layer 2 board read never mixes builds: write_layer2_shortlist writes each build's row/card shards under build-scoped keys and flips the index last, so the merge serves either the previous build or the new one, rows and counters together; verified by a unit test that interleaves a read between shard and index writes and a fleet window with 0 LAYER2_SHARD_INDEX_STALE across >=3 builds
-- Files: pipeline/intelligence_state.py (write_layer2_shortlist, _write_layer2_shards, _write_layer2_card_shards, _merge_layer2_shards, _hydrate_layer2_cards ONLY -- NEEDS A LOAN, not yet granted), tests/test_layer2_shard_generations.py
+- Files: tests/test_layer2_shard_generations.py (the engine file is named in Blocked by, NOT claimed until a loan is recorded here)
 - Hypothesis: Shards are overwritten in place one sport at a time before the index, so for ~25-30 s per build the merge combines two builds by position (fleet 10-07 18:51:49Z: rows=3934/5359, soccer+wnba still 17:08) and relabels written_at over the old counters
 - Falsification test: With build-scoped keys, a read between shard and index writes still returns rows from two different written_at stamps
 - Verification: Unit test as in Goal; fleet: web log 0 LAYER2_SHARD_INDEX_STALE and 0 LAYER2_SHARD_MERGE unplaceable over >=3 builds after a claimed, idle-after-save refresh-worker restart (recorded in deploys.md); redis peak +~30 MB measured
-- Blocked by: loan of pipeline/intelligence_state.py writer/merge sections from its current holders
+- Blocked by: a loan of pipeline/intelligence_state.py (write_layer2_shortlist, _write_layer2_shards, _write_layer2_card_shards, _merge_layer2_shards, _hydrate_layer2_cards ONLY) from its current holder web-restart-healthz
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
