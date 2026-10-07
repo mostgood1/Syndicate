@@ -65,7 +65,8 @@ def _games(**cfg_fields):
 
 class GameTests(unittest.TestCase):
     def test_reachable_off_differs_from_on(self) -> None:
-        off = [(r.away_score, r.home_score) for r in _games()]
+        # "off" is explicit: since 2026-10-07 the GameConfig defaults ARE the measured rates.
+        off = [(r.away_score, r.home_score) for r in _games(bip_dp_r2_to_3b_rate=0.0, bip_dp_r3_scores_rate=0.0)]
         on = [(r.away_score, r.home_score) for r in _games(bip_dp_r2_to_3b_rate=1.0, bip_dp_r3_scores_rate=1.0)]
         # Direction is proven by the resolver tests: once the RNG streams diverge,
         # 40 whole games are too noisy to show a run increase this small.

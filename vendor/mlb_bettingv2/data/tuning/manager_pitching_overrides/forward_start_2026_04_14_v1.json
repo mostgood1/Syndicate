@@ -67,54 +67,124 @@
       "batch_artifacts": "vendor/mlb_bettingv2/data/eval/_prototype_test/full46_baseline_v2, full46_happyplace_test; betting_accuracy.py"
     },
     "starter_short_start_prob": {
-      "generated_at": "2026-10-03",
-      "lane": "mlb-starter-length (Syndicate); selection rule pre-registered in .syndicate/lanes.md before any candidate result was read",
-      "description": "Raises the rare large negative hook shift (\"short start\": quick hook for ineffectiveness/injury) from its code default 0.06 to 0.10. Measured on an AS-OF replay of the current engine over stored roster_objs (scripts/mlb_starter_length_replay.py, validated against production's stored 10-03 sims: +0.09 outs over 8 starters), 26 dates 2026-06-15..07-12, 565 starts, 100 sims/game, same seeds per config. Baseline defect: starter outs +0.72 [+0.36,+1.10], only 1.8% of starts <=9 outs vs 9.0% actual, 35% of mass at exactly 15 outs vs 20.5%.",
-      "selected_value": 0.1,
-      "holdout_2026_07_04_to_07_12": {
-        "outs_crps": [
-          2.344,
-          2.321
+      "generated_at": "2026-10-07",
+      "lane": "mlb-combined-calibration (Syndicate)",
+      "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
+      "validation": {
+        "objective": [
+          10060.33,
+          34.14
         ],
-        "outs_bias": [
-          0.88,
-          0.73
+        "runs_gap": [
+          0.786,
+          0.496
         ],
-        "share_le9_outs_model_vs_actual": [
-          [
-            0.016,
-            0.019
-          ],
-          0.082
+        "prop_logloss": [
+          0.38917,
+          0.388
         ],
-        "so_bias": [
-          0.92,
-          0.86
-        ],
-        "hits_bias": [
-          0.19,
-          0.14
-        ],
-        "er_bias": [
-          0.03,
-          0.006
-        ],
-        "game_total_model_vs_actual": [
-          [
-            9.014,
-            9.027
-          ],
-          9.47
-        ],
-        "n_starts": 232
+        "starter_bias_change": {
+          "SO": -0.494,
+          "H": -0.182,
+          "BB": 0.121,
+          "ER": 0.026
+        }
       },
-      "why_not_the_shelled_hook": "starter_shell_runs_start/_weight (simulate.py, default no-op) ranked 1-5 on tune CRPS (2.352-2.380) and fit starter outs far better (holdout CRPS ~2.27, bias ~0, <=9-out share 7-10% vs 8.2%), but every variant failed a pre-registered side-effect guard: earned runs worsened by 0.11-0.19 or the game-total gap to actual grew. Left OFF; next lead.",
-      "previous_value": "0.06 (code default in simulate.py)"
+      "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
+      "selected_value": 0.14,
+      "previous_value": 0.1
+    },
+    "starter_shell_runs_start": {
+      "generated_at": "2026-10-07",
+      "lane": "mlb-combined-calibration (Syndicate)",
+      "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
+      "validation": {
+        "objective": [
+          10060.33,
+          34.14
+        ],
+        "runs_gap": [
+          0.786,
+          0.496
+        ],
+        "prop_logloss": [
+          0.38917,
+          0.388
+        ],
+        "starter_bias_change": {
+          "SO": -0.494,
+          "H": -0.182,
+          "BB": 0.121,
+          "ER": 0.026
+        }
+      },
+      "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
+      "selected_value": 4,
+      "previous_value": "code default"
+    },
+    "starter_shell_runs_weight": {
+      "generated_at": "2026-10-07",
+      "lane": "mlb-combined-calibration (Syndicate)",
+      "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
+      "validation": {
+        "objective": [
+          10060.33,
+          34.14
+        ],
+        "runs_gap": [
+          0.786,
+          0.496
+        ],
+        "prop_logloss": [
+          0.38917,
+          0.388
+        ],
+        "starter_bias_change": {
+          "SO": -0.494,
+          "H": -0.182,
+          "BB": 0.121,
+          "ER": 0.026
+        }
+      },
+      "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
+      "selected_value": 1.0,
+      "previous_value": "code default"
+    },
+    "pickoff_rate": {
+      "generated_at": "2026-10-07",
+      "lane": "mlb-combined-calibration (Syndicate)",
+      "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
+      "validation": {
+        "objective": [
+          10060.33,
+          34.14
+        ],
+        "runs_gap": [
+          0.786,
+          0.496
+        ],
+        "prop_logloss": [
+          0.38917,
+          0.388
+        ],
+        "starter_bias_change": {
+          "SO": -0.494,
+          "H": -0.182,
+          "BB": 0.121,
+          "ER": 0.026
+        }
+      },
+      "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
+      "selected_value": 0.01,
+      "previous_value": "code default"
     }
   },
   "starter_hook_add_pitches": -13,
   "starter_hook_stamina_excess_weight": 0.75,
   "starter_quality_hook_weight": 1.0,
   "starter_tto_quality_scaling": 0.0,
-  "starter_short_start_prob": 0.1
+  "starter_short_start_prob": 0.14,
+  "starter_shell_runs_start": 4,
+  "starter_shell_runs_weight": 1.0,
+  "pickoff_rate": 0.01
 }

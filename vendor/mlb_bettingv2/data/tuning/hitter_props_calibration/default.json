@@ -78,59 +78,75 @@
     "hits_1plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 0.5104103212201277,
-      "b": 0.2958689062844206,
+      "a": 0.46604489063333326,
+      "b": 0.25262746482420895,
       "diag": {
-        "fit": "Syndicate lane mlb-hr-prop-calibration 2026-10-06: penalised affine-logit (L2 lambda=10 toward a=1,b=0), Newton",
-        "engine": "current production engine replayed over stored as-of roster_objs (scripts/mlb_hitter_prop_replay.py, 200 sims), raw P(X>=k) per lineup batter who appeared",
-        "tune": "2026-06-15..07-03, n=3024",
-        "holdout": "2026-07-04..07-12, n=1930, read once",
-        "holdout_rate": 0.589119170984456,
-        "holdout_logloss": {
-          "previous": 0.6911157352266991,
-          "refit": 0.6796331698732174,
-          "identity": 0.6881194048161955
+        "generated_at": "2026-10-07",
+        "lane": "mlb-combined-calibration (Syndicate)",
+        "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
+        "validation": {
+          "objective": [
+            10060.33,
+            34.14
+          ],
+          "runs_gap": [
+            0.786,
+            0.496
+          ],
+          "prop_logloss": [
+            0.38917,
+            0.388
+          ],
+          "starter_bias_change": {
+            "SO": -0.494,
+            "H": -0.182,
+            "BB": 0.121,
+            "ER": 0.026
+          }
         },
-        "holdout_mean_p": {
-          "previous": 0.5240898868833633,
-          "refit": 0.6203890281276401,
-          "identity": 0.5935466321243531
-        },
+        "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
+        "fit": "penalised affine-logit (L2 lambda=10), mlb-hr-prop-calibration procedure, on the COMBINED engine config",
         "previous": {
-          "a": 0.7882212733209201,
-          "b": -0.21158018743212978,
-          "fitted": "2026-09-01"
-        },
-        "disclosure": "the previous map was fitted on a window containing these dates, so it was judged in-sample here"
+          "a": 0.5104103212201277,
+          "b": 0.2958689062844206
+        }
       }
     },
     "hits_2plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 0.5032507735025726,
-      "b": -0.5474560993371611,
+      "a": 0.42149700295978537,
+      "b": -0.7120389061854233,
       "diag": {
-        "fit": "Syndicate lane mlb-hr-prop-calibration 2026-10-06: penalised affine-logit (L2 lambda=10 toward a=1,b=0), Newton",
-        "engine": "current production engine replayed over stored as-of roster_objs (scripts/mlb_hitter_prop_replay.py, 200 sims), raw P(X>=k) per lineup batter who appeared",
-        "tune": "2026-06-15..07-03, n=3024",
-        "holdout": "2026-07-04..07-12, n=1930, read once",
-        "holdout_rate": 0.20103626943005182,
-        "holdout_logloss": {
-          "previous": 0.5113433053003597,
-          "refit": 0.5051763477573032,
-          "identity": 0.5140675910016942
+        "generated_at": "2026-10-07",
+        "lane": "mlb-combined-calibration (Syndicate)",
+        "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
+        "validation": {
+          "objective": [
+            10060.33,
+            34.14
+          ],
+          "runs_gap": [
+            0.786,
+            0.496
+          ],
+          "prop_logloss": [
+            0.38917,
+            0.388
+          ],
+          "starter_bias_change": {
+            "SO": -0.494,
+            "H": -0.182,
+            "BB": 0.121,
+            "ER": 0.026
+          }
         },
-        "holdout_mean_p": {
-          "previous": 0.1612815497239816,
-          "refit": 0.23036191904464204,
-          "identity": 0.21882642487046655
-        },
+        "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
+        "fit": "penalised affine-logit (L2 lambda=10), mlb-hr-prop-calibration procedure, on the COMBINED engine config",
         "previous": {
-          "a": 0.7014791092432703,
-          "b": -0.7484946665960454,
-          "fitted": "2026-09-01"
-        },
-        "disclosure": "the previous map was fitted on a window containing these dates, so it was judged in-sample here"
+          "a": 0.5032507735025726,
+          "b": -0.5474560993371611
+        }
       }
     },
     "hits_3plus": {
@@ -253,30 +269,38 @@
     "runs_1plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 0.6820728158314638,
-      "b": -0.1027567075413609,
+      "a": 0.4379930057827204,
+      "b": -0.23560538214540264,
       "diag": {
-        "fit": "Syndicate lane mlb-hr-prop-calibration 2026-10-06: penalised affine-logit (L2 lambda=10 toward a=1,b=0), Newton",
-        "engine": "current production engine replayed over stored as-of roster_objs (scripts/mlb_hitter_prop_replay.py, 200 sims), raw P(X>=k) per lineup batter who appeared",
-        "tune": "2026-06-15..07-03, n=3024",
-        "holdout": "2026-07-04..07-12, n=1930, read once",
-        "holdout_rate": 0.3797927461139896,
-        "holdout_logloss": {
-          "previous": 0.6740386106785352,
-          "refit": 0.666971102087653,
-          "identity": 0.6724630195196619
+        "generated_at": "2026-10-07",
+        "lane": "mlb-combined-calibration (Syndicate)",
+        "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
+        "validation": {
+          "objective": [
+            10060.33,
+            34.14
+          ],
+          "runs_gap": [
+            0.786,
+            0.496
+          ],
+          "prop_logloss": [
+            0.38917,
+            0.388
+          ],
+          "starter_bias_change": {
+            "SO": -0.494,
+            "H": -0.182,
+            "BB": 0.121,
+            "ER": 0.026
+          }
         },
-        "holdout_mean_p": {
-          "previous": 0.3356592771920671,
-          "refit": 0.39600283755544213,
-          "identity": 0.3862901554404146
-        },
+        "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
+        "fit": "penalised affine-logit (L2 lambda=10), mlb-hr-prop-calibration procedure, on the COMBINED engine config",
         "previous": {
-          "a": 0.8742687256552696,
-          "b": -0.28150445157968135,
-          "fitted": "2026-09-01"
-        },
-        "disclosure": "the previous map was fitted on a window containing these dates, so it was judged in-sample here"
+          "a": 0.6820728158314638,
+          "b": -0.1027567075413609
+        }
       }
     },
     "runs_2plus": {
@@ -355,146 +379,186 @@
     "total_bases_1plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 0.5104103212201277,
-      "b": 0.2958689062844206,
+      "a": 0.46604489063333326,
+      "b": 0.25262746482420895,
       "diag": {
-        "fit": "Syndicate lane mlb-hr-prop-calibration 2026-10-06: penalised affine-logit (L2 lambda=10 toward a=1,b=0), Newton",
-        "engine": "current production engine replayed over stored as-of roster_objs (scripts/mlb_hitter_prop_replay.py, 200 sims), raw P(X>=k) per lineup batter who appeared",
-        "tune": "2026-06-15..07-03, n=3024",
-        "holdout": "2026-07-04..07-12, n=1930, read once",
-        "holdout_rate": 0.589119170984456,
-        "holdout_logloss": {
-          "previous": 0.6911157352266991,
-          "refit": 0.6796331698732174,
-          "identity": 0.6881194048161955
+        "generated_at": "2026-10-07",
+        "lane": "mlb-combined-calibration (Syndicate)",
+        "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
+        "validation": {
+          "objective": [
+            10060.33,
+            34.14
+          ],
+          "runs_gap": [
+            0.786,
+            0.496
+          ],
+          "prop_logloss": [
+            0.38917,
+            0.388
+          ],
+          "starter_bias_change": {
+            "SO": -0.494,
+            "H": -0.182,
+            "BB": 0.121,
+            "ER": 0.026
+          }
         },
-        "holdout_mean_p": {
-          "previous": 0.5240898868833633,
-          "refit": 0.6203890281276401,
-          "identity": 0.5935466321243531
-        },
+        "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
+        "fit": "penalised affine-logit (L2 lambda=10), mlb-hr-prop-calibration procedure, on the COMBINED engine config",
         "previous": {
-          "a": 0.7882212733209201,
-          "b": -0.21158018743212978,
-          "fitted": "2026-09-01"
-        },
-        "disclosure": "the previous map was fitted on a window containing these dates, so it was judged in-sample here"
+          "a": 0.5104103212201277,
+          "b": 0.2958689062844206
+        }
       }
     },
     "total_bases_2plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 0.5086813725670329,
-      "b": -0.1352532679525173,
+      "a": 0.4194933034542782,
+      "b": -0.2961146976017708,
       "diag": {
-        "fit": "Syndicate lane mlb-hr-prop-calibration 2026-10-06: penalised affine-logit (L2 lambda=10 toward a=1,b=0), Newton",
-        "engine": "current production engine replayed over stored as-of roster_objs (scripts/mlb_hitter_prop_replay.py, 200 sims), raw P(X>=k) per lineup batter who appeared",
-        "tune": "2026-06-15..07-03, n=3024",
-        "holdout": "2026-07-04..07-12, n=1930, read once",
-        "holdout_rate": 0.34196891191709844,
-        "holdout_logloss": {
-          "previous": 0.6539112669314585,
-          "refit": 0.6460872518104496,
-          "identity": 0.6542252385293762
+        "generated_at": "2026-10-07",
+        "lane": "mlb-combined-calibration (Syndicate)",
+        "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
+        "validation": {
+          "objective": [
+            10060.33,
+            34.14
+          ],
+          "runs_gap": [
+            0.786,
+            0.496
+          ],
+          "prop_logloss": [
+            0.38917,
+            0.388
+          ],
+          "starter_bias_change": {
+            "SO": -0.494,
+            "H": -0.182,
+            "BB": 0.121,
+            "ER": 0.026
+          }
         },
-        "holdout_mean_p": {
-          "previous": 0.28786205270112253,
-          "refit": 0.3780531356852596,
-          "identity": 0.33350518134715046
-        },
+        "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
+        "fit": "penalised affine-logit (L2 lambda=10), mlb-hr-prop-calibration procedure, on the COMBINED engine config",
         "previous": {
-          "a": 0.7250349027680957,
-          "b": -0.40158518032308305,
-          "fitted": "2026-09-01"
-        },
-        "disclosure": "the previous map was fitted on a window containing these dates, so it was judged in-sample here"
+          "a": 0.5086813725670329,
+          "b": -0.1352532679525173
+        }
       }
     },
     "total_bases_3plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 0.5633755467120324,
-      "b": -0.34574756699912723,
+      "a": 0.398234641895058,
+      "b": -0.7140942392613125,
       "diag": {
-        "fit": "Syndicate lane mlb-hr-prop-calibration 2026-10-06: penalised affine-logit (L2 lambda=10 toward a=1,b=0), Newton",
-        "engine": "current production engine replayed over stored as-of roster_objs (scripts/mlb_hitter_prop_replay.py, 200 sims), raw P(X>=k) per lineup batter who appeared",
-        "tune": "2026-06-15..07-03, n=3024",
-        "holdout": "2026-07-04..07-12, n=1930, read once",
-        "holdout_rate": 0.20880829015544042,
-        "holdout_logloss": {
-          "previous": 0.5270187165396522,
-          "refit": 0.5160925582269251,
-          "identity": 0.5276022764240852
+        "generated_at": "2026-10-07",
+        "lane": "mlb-combined-calibration (Syndicate)",
+        "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
+        "validation": {
+          "objective": [
+            10060.33,
+            34.14
+          ],
+          "runs_gap": [
+            0.786,
+            0.496
+          ],
+          "prop_logloss": [
+            0.38917,
+            0.388
+          ],
+          "starter_bias_change": {
+            "SO": -0.494,
+            "H": -0.182,
+            "BB": 0.121,
+            "ER": 0.026
+          }
         },
-        "holdout_mean_p": {
-          "previous": 0.16762045986773882,
-          "refit": 0.22959679467846686,
-          "identity": 0.1833134715025906
-        },
+        "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
+        "fit": "penalised affine-logit (L2 lambda=10), mlb-hr-prop-calibration procedure, on the COMBINED engine config",
         "previous": {
-          "a": 0.8551004751269042,
-          "b": -0.31820850263560196,
-          "fitted": "2026-09-01"
-        },
-        "disclosure": "the previous map was fitted on a window containing these dates, so it was judged in-sample here"
+          "a": 0.5633755467120324,
+          "b": -0.34574756699912723
+        }
       }
     },
     "total_bases_4plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 0.5088191484475741,
-      "b": -0.5647395509470959,
+      "a": 0.43714736999859505,
+      "b": -0.8972619179074701,
       "diag": {
-        "fit": "Syndicate lane mlb-hr-prop-calibration 2026-10-06: penalised affine-logit (L2 lambda=10 toward a=1,b=0), Newton",
-        "engine": "current production engine replayed over stored as-of roster_objs (scripts/mlb_hitter_prop_replay.py, 200 sims), raw P(X>=k) per lineup batter who appeared",
-        "tune": "2026-06-15..07-03, n=3024",
-        "holdout": "2026-07-04..07-12, n=1930, read once",
-        "holdout_rate": 0.1544041450777202,
-        "holdout_logloss": {
-          "previous": 0.44051983526776745,
-          "refit": 0.43156291415815856,
-          "identity": 0.4450918969454371
+        "generated_at": "2026-10-07",
+        "lane": "mlb-combined-calibration (Syndicate)",
+        "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
+        "validation": {
+          "objective": [
+            10060.33,
+            34.14
+          ],
+          "runs_gap": [
+            0.786,
+            0.496
+          ],
+          "prop_logloss": [
+            0.38917,
+            0.388
+          ],
+          "starter_bias_change": {
+            "SO": -0.494,
+            "H": -0.182,
+            "BB": 0.121,
+            "ER": 0.026
+          }
         },
-        "holdout_mean_p": {
-          "previous": 0.11826619543423926,
-          "refit": 0.16529278081764975,
-          "identity": 0.11984974093264246
-        },
+        "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
+        "fit": "penalised affine-logit (L2 lambda=10), mlb-hr-prop-calibration procedure, on the COMBINED engine config",
         "previous": {
-          "a": 0.7843008468047663,
-          "b": -0.42271184111210186,
-          "fitted": "2026-09-01"
-        },
-        "disclosure": "the previous map was fitted on a window containing these dates, so it was judged in-sample here"
+          "a": 0.5088191484475741,
+          "b": -0.5647395509470959
+        }
       }
     },
     "total_bases_5plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 0.6040647360255812,
-      "b": -0.6709026375931779,
+      "a": 0.6288091606857832,
+      "b": -0.9491607144080966,
       "diag": {
-        "fit": "Syndicate lane mlb-hr-prop-calibration 2026-10-06: penalised affine-logit (L2 lambda=10 toward a=1,b=0), Newton",
-        "engine": "current production engine replayed over stored as-of roster_objs (scripts/mlb_hitter_prop_replay.py, 200 sims), raw P(X>=k) per lineup batter who appeared",
-        "tune": "2026-06-15..07-03, n=3024",
-        "holdout": "2026-07-04..07-12, n=1930, read once",
-        "holdout_rate": 0.06994818652849741,
-        "holdout_logloss": {
-          "previous": 0.2634905971892034,
-          "refit": 0.26091247126247946,
-          "identity": 0.26519701823728004
+        "generated_at": "2026-10-07",
+        "lane": "mlb-combined-calibration (Syndicate)",
+        "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
+        "validation": {
+          "objective": [
+            10060.33,
+            34.14
+          ],
+          "runs_gap": [
+            0.786,
+            0.496
+          ],
+          "prop_logloss": [
+            0.38917,
+            0.388
+          ],
+          "starter_bias_change": {
+            "SO": -0.494,
+            "H": -0.182,
+            "BB": 0.121,
+            "ER": 0.026
+          }
         },
-        "holdout_mean_p": {
-          "previous": 0.051034841961816235,
-          "refit": 0.08078246760965352,
-          "identity": 0.0566994818652852
-        },
+        "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
+        "fit": "penalised affine-logit (L2 lambda=10), mlb-hr-prop-calibration procedure, on the COMBINED engine config",
         "previous": {
-          "a": 0.722716192325312,
-          "b": -0.846169468541303,
-          "fitted": "2026-09-01"
-        },
-        "disclosure": "the previous map was fitted on a window containing these dates, so it was judged in-sample here"
+          "a": 0.6040647360255812,
+          "b": -0.6709026375931779
+        }
       }
     },
     "triples_1plus": {
