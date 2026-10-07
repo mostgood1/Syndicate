@@ -57,6 +57,29 @@ nothing wired. Any market that does beat it is a candidate for wiring (a separat
 that do not keep the rate model -- every market is its own decision (learnings: "every line is its own
 decision").
 
+## Phase A — measured (FIT 2023-24, nflverse REG)
+
+51,422 yard-gaining pass/run plays, 386 (down, to-go, diff, time, yards) cells. P(INT | turnover) 0.649
+(817 INT, 442 lost fumbles); P(pass | lost fumble) 0.686. Pooled P(pass | gaining play) runs from 0.145
+(1st and 1-3) to 0.843 (4th and 8+). Tables: `C:\tmp\football_scenarios\attribution\attribution_tables_2023-2024.json`.
+
+## Amendment 1 — 2026-10-07, after a 4-game FIT SMOKE run, before any Phase B reading
+
+The smoke run (plumbing; 4 FIT games, 1,405 quote rows; not a result) exposed two construction defects:
+- **A1 starter QB.** The "most dropbacks over the last 3 games" proxy credited Pickett on 2023 wk14 PIT
+  (Trubisky started) and Richardson on 2024 wk5 IND@JAX (Flacco started) -- the quoted QB's attempts
+  were 0 in every seed. Fix: a QB with a passing quote for the game IS the passer (the quotes are pregame,
+  kickoff -10 min, and production holds the same rows when it builds props); any player with a quote for
+  the game joins the availability set.
+- **A2 yards.** The engine's per-play yards are not a real pass/run mixture: smoke team rushing 133-173
+  yds on 20-22 carries (6.3-7.9 ypc vs real ~4.3), team offense ~380 yds vs real ~330. Fix: the sim still
+  supplies game SCRIPT -- play count, game state, outcome class and the pass/run choice -- but the YARDS
+  credited to players are drawn from the REAL empirical distribution of that play type in that
+  (down, to-go) bucket (FIT pbp quantiles; completions and runs separately), conditioned on the sim's
+  sign (a loss stays a loss); a touchdown keeps the sim's yards-to-goal.
+
+Nothing else changes. Phase B runs after both fixes, on the FIT seasons.
+
 ## Results
 
 (none yet)
