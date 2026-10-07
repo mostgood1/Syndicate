@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import re
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Mapping
 
 from pipeline.intelligence_models import IntelligenceResult
 
@@ -1549,6 +1549,35 @@ def _board_row_recommendation(row: dict[str, Any]) -> dict[str, Any]:
     return recommendation
 
 
+# How many board cards an Ask answer carries. No Ask client renders them
+# (`ask_bar.js`, the Layer 2 rail, reads `schema` / `visuals` / `prop_evidence`;
+# `syndicate.html` reads `schema_type`), so this is context, not a board.
+_ASK_BOARD_CARD_LIMIT = 25
+
+
+def _slim_board_contract(board_contract: Mapping[str, Any], board_row: Mapping[str, Any] | None) -> dict[str, Any]:
+    """The board contract an Ask answer carries: every summary key, few cards.
+
+    Measured on the fleet 2026-10-07 (user: the Layer 2 rail's Ask "isnt
+    working" -- "Timed out" at the client's 45 s): one answer about Naz
+    Hillmon was 4,799,541 bytes, of which 2.58 MB was the WHOLE board's card
+    list and a second identical 2.58 MB copy sat under `engine`. First byte
+    came at 25.8 s and the last at 52.0 s -- writing the body took as long as
+    computing it. The cards kept are the asked bet's own game first, then the
+    board's leading cards, up to `_ASK_BOARD_CARD_LIMIT`.
+    """
+    contract = dict(board_contract or {})
+    cards = [card for card in (contract.get("cards") or []) if isinstance(card, Mapping)]
+    event_id = str((board_row or {}).get("event_id") or "").strip()
+    same_game = [card for card in cards if event_id and str(card.get("event_id") or "").strip() == event_id]
+    rest = [card for card in cards if not (event_id and str(card.get("event_id") or "").strip() == event_id)]
+    kept = (same_game + rest)[:_ASK_BOARD_CARD_LIMIT]
+    contract["cards"] = kept
+    contract["cards_total"] = len(cards)
+    contract["cards_served"] = len(kept)
+    return contract
+
+
 def build_syndicate_query_response(
     *,
     question: str,
@@ -1562,7 +1591,7 @@ def build_syndicate_query_response(
     pipeline_context = _mapping_or_empty(_result_value(result, "pipeline_context", {}))
     structured_response = _mapping_or_empty(_result_value(result, "structured_response", {}))
     routing_context = _mapping_or_empty(pipeline_context.get("routing_context")) or _mapping_or_empty(context)
-    board_contract = build_intelligence_board_contract(_result_payload(result))
+    board_contract = _slim_board_contract(build_intelligence_board_contract(_result_payload(result)), board_row)
     daily_update = _mapping_or_empty(_result_value(result, "daily_update", {}))
     simulation_contract = _mapping_or_empty(daily_update.get("simulation_contract"))
 
@@ -1638,7 +1667,13 @@ def build_syndicate_query_response(
             "evaluation_history": _mapping_or_empty(_result_value(result, "evaluation_history", {})),
             "readiness_gate": _mapping_or_empty(_result_value(result, "readiness_gate", {})),
             "local_only": _result_value(result, "local_only", None),
-            "board_contract": board_contract,
+            # A pointer, not a second copy: the top-level `board_contract` above
+            # is the one block (see `_slim_board_contract`).
+            "board_contract": {
+                key: board_contract.get(key)
+                for key in ("schema", "board_summary", "lane_counts", "recommendation_count", "cards_total", "cards_served")
+                if key in board_contract
+            },
             "daily_update": daily_update,
             "simulation_contract": simulation_contract,
         },
