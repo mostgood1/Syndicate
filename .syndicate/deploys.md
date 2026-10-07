@@ -47574,3 +47574,11 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - The gate counts only rows that carry `player_availability`. Its only writer on origin/main is `board_enrichment.py:1367` (`_flag_out_player_props`); `layer2_board.py` only copies it (:3107) and reads it (:5317).
 - refresh-worker.log, last 50 `OUT_PLAYER_PROPS_FLAGGED` lines spanning the 18:51Z build: 23x `sport=wnba ... rows=9 players=Allisha Gray`, and 27x nba `rows=0 players=<none>`. No other player was stamped on any grid row.
 - So the 4 gated rows are a subset of Gray's 9 grid rows (the rest fell to earlier rules). Reasoning first offered by lane layer2-out-gate-reach's owner; both premises re-checked here. Naming gated rows in the payload would be a separate change.
+
+## 2026-10-07 19:12:25Z (2:12 PM CT) -- LOCAL FLEET FF 75699804 -> b51aa5c1 + refresh-worker restart (user: "Loan + restart once with both"): ranking-records disk cache + venue-quote matching memo -- **LOADED; reading OWED** (lane `web-restart-healthz`)
+
+- **loads:** 1357191d (ranking_records per-chunk cache pickled to reports/intelligence/ranking_records_cache, revalidated on load; `_stable_hash` replaces per-process `hash()`; off: SYNDICATE_RANKING_RECORDS_DISK_CACHE=0) and b51aa5c1 (Kalshi game token memo per pass by event blob; Polymarket game tokens once per call). No ride-alongs (runtime diff = these two files).
+- **why:** py-spy 13:4x CT on the 13:32 worker: the today refresh 58% in the venue fan-in (`_kalshi_game_token` 27%, `_polymarket_pair_games` 13.6%) after the per-pair fix removed `attach_game_state` from the profile; no today refresh had completed 38 min after that restart.
+- **context:** the worker TERMed here was pid 3342273, not my 13:32 pid 3335749, and `status` read restarts=1 afterwards -- another session restarted the fleet in between (likely soccer-team-history-current-season's announced down/up; not verified here).
+- **timeline (CT):** ff 14:12:25; TERM 14:12:25; new pid **3346779** 14:12:35; code=b51aa5c1; claim released.
+- **verify (OWED):** first `LAYER2_TODAY_CADENCE ran=yes elapsed_s=`; `RANKING_RECORDS_LOADED ... cache=` and `*.pkl` files appearing (this first load still parses; the NEXT restart should read `reused`); served today stamp cadence.
