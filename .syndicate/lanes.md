@@ -1061,6 +1061,14 @@ death, never life — do not invert it.
 - Verification: holdout table, then fleet: props file SAVES p_over equals the NB price, served grid SAVES basis sim_mean_negbin, registry re-measured
 ### mlb-combined-calibration — CLOSED (GOAL MET) — closed 2026-10-07 — opened 2026-10-05 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
 - **GOAL VERDICT 2026-10-07: MET (with one logged user override).** Shipped 2bb481ef to the fleet 00:28:44Z. V1 (config resolves) MET; V2 (post-ship production sims match the new-config replay, |served-A| 0.29 vs |served-B| 0.70, 4/4 starters) MET. Validation checks a/b/d/e passed; c (starter BB +0.121 vs 0.10) overridden by the user, logged verbatim. Upstream PR mostgood1/MLB-BettingV2#3 open (stacked on #2); until it merges a vendor re-pull reverts the engine changes.
+- **FOLLOW-UP 2026-10-07 (user: "then fix the starter walk excess next"): NO CHANGE — the excess does not reproduce.**
+  - Shipped config, starter BB per start (model / actual / bias):
+    - FIT (24 dates, 551 starts): 1.771 / 1.786 / **-0.015** (-0.3 SE); BB/BF 0.0812 vs 0.0810.
+    - VALIDATION (15 dates, 390 starts): 1.844 / 1.718 / **+0.126** (+1.9 SE, Poisson SE 0.066).
+    - Pooled: +0.044 over 941 starts (~1 SE).
+  - The REAL rate moved between windows (1.786 -> 1.718), and team BB/PA flips sign (fit: model 0.0862 vs 0.0842; val: 0.0871 vs 0.0889). That is period noise, not a structural bias.
+  - Tuning to the validation reading would fit noise and move the fit set ~0.13 BB/start off.
+  - Re-check when fresh regular-season data exists (2027, or a 07-13..09-29 rebuild if those inputs are ever recovered).
 - **UPSTREAM PR OPENED 2026-10-07 ~01:10Z (user: "yes, open the upstream PR"): https://github.com/mostgood1/MLB-BettingV2/pull/3**
   - Stacked on PR #2 (shelled hook). Carries the engine diff ed8af257..HEAD for sim_engine/simulate.py + models.py (applied cleanly to upstream with line offsets only).
   - The tuning override JSONs and hitter-prop calibration JSONs are NOT included (the earlier user decision to drop the overrides PR); the PR lists the Syndicate values.
