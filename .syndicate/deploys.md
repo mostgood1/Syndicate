@@ -47481,3 +47481,13 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **Baseline:** wk5 artifact 15:34:07Z (old code): 758 rows, 263 stat-player pairs; refused_wrong_team 38 in an offline rebuild.
 - **verify (reading):** wk5 artifact 16:46:49Z (new code): **914 rows, 341 stat-player pairs**. Michael Penix Jr., Amon-Ra St. Brown, Kyren Williams, Javonte Williams, Mike Evans and Marvin Harrison Jr. are now rated; Bijan Robinson is still refused (B.Robinson = 2 candidates, both on the game's teams). Odds also grew between builds; the same-odds offline A/B attributes +109 rows / +44 pairs to the fix.
 - Not yet read: the board's NFL `prop_coverage.unmatched_key_rows` (245 on 10-07 14:22Z).
+
+## 2026-10-07 ~17:20Z (12:20 PM CT) -- READING: mls builds after the roster refresh -- **NO EFFECT, as expected** (lane `soccer-roster-refresh`)
+
+- **Why no effect was predicted:** the builder's only roster reader is the departed-player filter (`build_soccer_artifacts.py:707`, `_current_roster_names`). `_load_player_rows` returns before it when a league has a single season of stats (`players_2026.csv` only), which is MLS's case.
+- **Reading:** the builds after the mls roster write (00:18:40Z, 888 -> 962 rows) all show `departed_filter: single_season`, rows **853**, dropped none, the same as the last July-roster build:
+  - 10-06: 04:22:48Z, 56 props (the July-roster build at 00:08:07Z also had 56)
+  - 10-11: 12:35:48Z, 57 props
+  - 10-14: 13:45:28Z, 853 props, 15 matches
+  - 10-10: 14:53:05Z, 796 props, 14 matches
+- **Result:** the MLS roster refresh is inert for the sim until MLS gains a second season file. It still serves the team roster pages (once web reloads) and any future roster consumer.
