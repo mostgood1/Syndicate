@@ -1757,6 +1757,13 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Fleet board build after restart
 - Blocked by: none
 
+### football-sim-player-attribution — OPEN — opened 2026-10-07 — session 20aa7f5b-0620-42a1-9136-fe56ba82b56f
+- Goal: NFL (then NCAAF) player props drawn from the smartsim2 game sim: each simulated offensive play attributed to a passer/rusher/receiver by measured play-type and usage tables, so prop distributions inherit game script; graded per market against production's rate-based props and the de-vigged book, read once on a held-out season.
+- Files: syndicate/features/football/sim_engine/smartsim2/player_attribution.py, scripts/football_attribution_tables.py, scripts/backtest_football_attribution_props.py, tests/test_football_player_attribution.py, .syndicate/findings_2026-10-07_football_player_attribution.md
+- Hypothesis: NFL props lose to the book in 7 of 8 markets with a calibration slope near 0 at the line because the rate-based model ignores game script (play volume, pass rate by score and clock, opponent); props simulated from the game sim's own plays carry that script and improve log-loss vs production's props.
+- Falsification test: If, on the held-out season, attribution props do not beat production's rate-based props on paired log-loss (game-clustered 95% CI excluding 0) in any market, the hypothesis is rejected and nothing is wired.
+- Verification: Per market (pass yds, pass att, completions, pass TD, INT, rush yds, rush att, receptions, rec yds, anytime TD): log-loss and Brier vs production props and vs the de-vigged book at kickoff-10min, FIT NFL 2023-24 for design, held-out 2025 props read once; attribution runs on production's engine profile.
+- Blocked by: none
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
