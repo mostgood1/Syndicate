@@ -1981,6 +1981,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Unit test as in Goal; fleet: web log 0 LAYER2_SHARD_INDEX_STALE and 0 LAYER2_SHARD_MERGE unplaceable over >=3 builds after a claimed, idle-after-save refresh-worker restart (recorded in deploys.md); redis peak +~30 MB measured
 - Blocked by: none for code; the refresh-worker restart waits for web-restart-healthz to release its claim (~5:30 PM CT, its measurement window)
 
+### lane-guard-loan-main-text — OPEN — opened 2026-10-07 — session 74f50e68-fc47-474b-9b59-8887927f3eb3
+- Goal: lane-guard's loan and disjoint-section exemptions read the same lanes.md view effective_claims enforces (origin/main + entries added locally since the fork point), so a loan recorded on main is honoured even when the primary tree's lanes.md lacks the borrower block; a self-granted loan from a non-holder still blocks
+- Files: .claude/hooks/lane_claims_source.py, .claude/hooks/lane_claims.py, .claude/hooks/lane-guard.py, tests/test_lane_guard_loan_main_text.py (NEW)
+- Hypothesis: n/a (defect measured 2026-10-07 ~16:35 CT: web-restart-healthz loan of kalshi_board_join.py honoured by loan_is_honoured over origin/main text, blocked by the guard because it passed the primary tree's text)
+- Falsification test: If the guard over a git repo whose origin/main lanes.md holds the loan and whose working lanes.md lacks the borrower block still blocks, the fix failed
+- Verification: tests/test_lane_guard_loan_main_text.py runs the real guard against a temp git repo: loan-on-main allowed; self-granted loan from non-holder blocked; plus existing tests/test_lane_loans.py, test_lane_section_scope.py, test_lane_guard_claim_source.py green
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

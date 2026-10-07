@@ -445,8 +445,19 @@ def loan_is_honoured(text, borrower, rel):
     decorative. Checked with `matches`, the same predicate the guard blocks with, so a
     bare-basename claim by the lender counts exactly as it does everywhere else.
     """
-    holders = [(slug, f) for slug, f in _claims(text)]
-    for b_slug, b_path, lender in _loan_entries(text):
+    return loan_is_honoured_among(_loan_entries(text), _claims(text), borrower, rel)
+
+
+def loan_is_honoured_among(loan_entries, holders, borrower, rel):
+    """`loan_is_honoured` over entries the caller already derived.
+
+    `lane-guard` passes the claim set it BLOCKS with (origin/main + local additions,
+    from `lane_claims_source`) as `holders`. Re-parsing the primary tree's copy here
+    instead was the defect measured 2026-10-07: a loan recorded on main was refused
+    because the stale primary copy lacked the borrower's block.
+    """
+    holders = [(slug, f) for slug, f in holders]
+    for b_slug, b_path, lender in loan_entries:
         if b_slug != borrower or not matches(rel, b_path):
             continue
         for h_slug, h_path in holders:
@@ -498,7 +509,13 @@ def sections_are_disjoint(text, current, rel):
     lane's. Anything else returns None and the caller blocks -- a holder without a
     declaration, or a second lane naming the same section, is a real collision.
     """
-    scopes = section_scopes(text)
+    return sections_are_disjoint_among(_section_entries(text), _claims(text), current, rel)
+
+
+def sections_are_disjoint_among(section_entries, holders, current, rel):
+    """`sections_are_disjoint` over entries the caller already derived -- see
+    `loan_is_honoured_among` for why `lane-guard` needs this form."""
+    scopes = {(slug, f): section for slug, f, section in section_entries}
     mine = None
     for (slug, f), section in scopes.items():
         if slug == current and matches(rel, f):
@@ -506,7 +523,7 @@ def sections_are_disjoint(text, current, rel):
             break
     if not mine:
         return None
-    for slug, f in _claims(text):
+    for slug, f in holders:
         if slug == current or not matches(rel, f):
             continue
         theirs = None

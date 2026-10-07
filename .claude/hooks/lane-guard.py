@@ -39,17 +39,19 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
     from lane_claims import (
         _claims,
+        _loan_entries,
         _malformed_headers,
         _norm,
+        _section_entries,
         is_exempt,
         # A recorded loan, honoured only when the named lender really holds the
-        # path. Reads the LOCAL lanes.md, so a loan it cannot see FAILS CLOSED --
-        # the write stays blocked. It never over-permits.
-        loan_is_honoured,
+        # path -- judged against the SAME claim entries the guard blocks with, so
+        # a loan it cannot see FAILS CLOSED and a self-grant never over-permits.
+        loan_is_honoured_among,
         matches,
         # Disjoint DECLARED sections of one file. Honours a declaration, does not
         # verify it; a holder without one still blocks.
-        sections_are_disjoint,
+        sections_are_disjoint_among,
     )
     from lane_marker import current_lane, safe_session_id as safe_session_id_of
 except Exception as exc:  # pragma: no cover - only when the module is missing
@@ -213,9 +215,26 @@ def main():
     # Without this a granted loan was unenforceable: on 2026-10-06 two borrowers and
     # the OWNER were all blocked on one file, because a borrower's own claim cannot
     # help it (`slug == current` is skipped) and counts against everyone else.
+    #
+    # THE EXEMPTIONS READ THE SAME VIEW THE CLAIMS CAME FROM (lane
+    # `lane-guard-loan-main-text`). They used to re-parse `text`, the primary
+    # tree's copy, while `entries` came from origin/main. Measured 2026-10-07
+    # ~16:35 CT: a user-approved loan recorded on main (55547ac5) was BLOCKED
+    # because the primary copy lacked the borrower's block. The lender check
+    # uses `entries` itself -- the exact holder set this guard blocks with.
+    holders = [(slug, f) for slug, f, _source in entries]
+
+    def _effective_view(kind):
+        try:
+            from lane_claims_source import effective_entries
+
+            return effective_entries(root, text, kind)[0]
+        except Exception:
+            return list((_loan_entries if kind == "loans" else _section_entries)(text))
+
     if conflict and current:
         try:
-            lender = loan_is_honoured(text, current, rel)
+            lender = loan_is_honoured_among(_effective_view("loans"), holders, current, rel)
         except Exception:
             lender = None
         if lender:
@@ -232,7 +251,8 @@ def main():
     # lane naming the SAME section, still blocks.
     if conflict and current:
         try:
-            section = sections_are_disjoint(text, current, rel)
+            section = sections_are_disjoint_among(
+                _effective_view("sections"), holders, current, rel)
         except Exception:
             section = None
         if section:
