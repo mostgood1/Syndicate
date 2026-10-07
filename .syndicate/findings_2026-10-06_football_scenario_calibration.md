@@ -267,6 +267,31 @@ NOT read -- no moment, gate or score was computed). Fixed: `validate` scores EVE
 (`Evaluator(..., every=1)`), resumed with `--resume`. Nothing else changes; NCAAF's validation uses
 the same rule.
 
+## LIVE mid-drive replay gate — PRE-REGISTERED 2026-10-07 (user: "start the mid-drive live replay harness while that runs")
+
+The lane's Verification names a mid-drive live replay; the existing live backtests resume only at
+quarter ends with the clock at 0:00. `scripts/football_scenario_replay.py`:
+
+- **Engine path = production's own live functions**, called with a `profile` argument:
+  `nfl/live_resim.resim_live_game` and `ncaaf/live_resim.resim_live_game`. Ratings as the live tick
+  feeds them: NFL raw `team_rating` as-of the week (the ratings artifact, no level shrink); NCAAF the
+  raw as-of SP+/PPA blend with the function's OWN live level shrink (`level_shrink=None`).
+- **Two deliberate departures, both identical across arms:** the publish-time output guard
+  (`UNINFORMATIVE_BAND`) is disabled, because it refuses close states and would drop them from the
+  grade (this grades the ENGINE, not the publication gate); `rating_sd = 0`. Sims 300 per state (the
+  tick uses 120), seeds 1..300 in both arms.
+- **States:** every VALIDATION game (2025 REG; NCAAF FBS-vs-FBS weeks 3-15); per game ONE scrimmage
+  snap drawn per regulation quarter (4 states), seeded by (game id, quarter), clock > 0. Down,
+  distance, field position in the possessor's frame, possession owner, and the score AT THE START
+  of the snap (NFL `posteam_score`/`defteam_score`; CFBD `offenseScore`/`defenseScore`).
+- **Arms:** production profile vs the descent's candidate overrides (`descent_result.json`).
+- **Metrics per state:** Brier of P(home win) (raw share, ties = 1/2) vs the final result; abs error
+  of the projected final margin and total. Paired candidate - production, game-clustered bootstrap.
+- **Live gates (all must pass, same tolerances as pregame):** (L1) Brier delta upper 95% CI < +0.003;
+  (L2) margin abs-error delta upper CI < +0.15; (L3) total abs-error delta upper CI < +0.15. By-quarter
+  rows are reported for information only.
+- **2025 read ONCE per sport** (its own marker); development runs use FIT seasons only.
+
 ## Results
 
 ### Phase 1, NFL (2023-24 REG, all 544 games, 300 seeds; real-vs-sim, flag rule as pre-registered)
