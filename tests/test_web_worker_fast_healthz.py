@@ -25,7 +25,7 @@ import unittest
 import urllib.request
 from pathlib import Path
 
-from syndicate.web_worker import healthz_request, healthz_response
+from syndicate.web_healthz import healthz_request, healthz_response
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
