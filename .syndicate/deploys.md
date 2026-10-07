@@ -47229,3 +47229,13 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - **Odds-job output cap (61edcc04) -- unit-verified only.** The 2026-10-06 18:10Z 10-07 full run (1.6 GB stderr, wrapper 2.5 GB RSS for 35+ min, killed ~20:30Z by the user) has not recurred; the source of the 1.6 GB is not identified. Bounded buffer measured offline: 200 MB of output -> peak 11.6 MB (was 217 MB).
 - **Readings that move with time of day:** the 14:22Z build reads `rows_stale_quote` ncaaf 1462, soccer 211, wnba 9, mlb 1. That is the first morning build after the restart and is NOT compared with the afternoon reading. NCAAF far-week props are on the user-kept 6h cadence ("keep NCAAF at 6h", 2026-10-06).
 - `rows_player_out_on_feed` 0 on this build (lane wnba-slate-and-out-props owns that reading).
+
+## 2026-10-07 14:35Z (9:35 AM CT) -- READING for the 17:44:35Z + 20:09:27Z ffs (published-negative-ev fixes 1-4 + ProphetX/Novig fees) -- MOSTLY MET; two items still OWED (lane `published-negative-ev`)
+
+- loaded by a NATURAL restart (the user's decision, 2026-10-06 ~21:20Z): refresh-worker pid 2761492 `code=a185e337` (restarts=3), which CONTAINS `2f10c2db`, `53fd1923`, `eb5a32d8` (`git merge-base --is-ancestor`).
+- (a) fair-noise sizing -- MET: the paper plan of 09:24:52 CT 10-07 shows `below_min_ev_pct_after_fair_noise` 84 (absent before), 14 positions (22 on 10-06).
+- (b) book coverage -- MET 10-06 18:55Z on web by content (nfl grid 1-2-book sides 10/100).
+- (c) fees -- MET at the FILL: 386 exchange fills since 10-07 00:00Z; prophetx 157 `prophetx_win_commission_at_settlement`, novig 104 `novig_pregame_straight`, kalshi 81 and polymarket 31 with fees > 0. 13 fills with basis `none` were all filled by 00:08:04Z on the old code; every new-basis fill is from 01:28:21Z on -- a clean cutover. OWED: the first SETTLED prophetx WIN on the new basis must show pnl = gross - 2% of gross. The only settled win so far was filled on the old code at 00:07:56Z, so pnl == gross is correct for it.
+- (d) closing marks -- MET: 1,626 ledger orders carry `closing_mark`.
+- (e) optimizer -- MET: the 10-07 11:30:02Z report carries `## Staked`: 695 graded, 0 unjoined; ROI -7.8% vs +3.6% admitted; books 1-2 -11.4% (439), 3-4 -7.9%, 5-7 +2.4%, 8+ +4.6% (71). No stake-scale entries yet (sample floor).
+- still OWED: forward ROI under the new sizing (needs days), and the prophetx settlement charge above.
