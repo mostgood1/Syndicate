@@ -137,6 +137,20 @@ everywhere (~5% less carry error on quoted players); the stricter availability r
 returning from absence who carry the ball without a prop line, pushing their touches into "other". Modest
 gain; Phase B re-run with E1(H=2) + (c, r) = (0.7, 0.1).
 
+## NFL Phase C — HELD-OUT 2025 READ, PRE-REGISTERED 2026-10-07 (user: "take QB passing yards to the 2025 held-out read")
+
+- **Markets:** PRIMARY `passing_yards`; SECONDARY `passing_attempts` (reported, does not decide). No other market
+  is read on 2025 -- the FIT evidence showed no information beyond production in them.
+- **Configuration, fixed from FIT:** production engine (scenario switches OFF), attribution tables
+  `attribution_tables_2023-2024.json`, shares E1(H=2), run-share (c, r) = (0.7, 0.1), A1 quoted starter QB,
+  A2 real yards, 300 seeds.
+- **Rows:** every 2025 REG two-sided passing-yards (and attempts) quote, kickoff -10 min, de-vigged per book,
+  production probability via the same production functions as FIT. Game-clustered paired bootstrap.
+- **Gate (primary):** attribution beats production on passing_yards log-loss with the paired 95% CI entirely
+  below 0. Reported beside it: attr - book, Brier, calibration slopes, n rows / games.
+- **Read ONCE** (marker `PROPS_2025_READ`). Pass -> passing yards is a candidate for wiring into production
+  props (a separate decision and a separate lane); fail -> the hypothesis is rejected for NFL props.
+
 ## NCAAF data step — PRE-REGISTERED 2026-10-07 (user: "start the NCAAF attribution data step while that runs")
 
 **What is missing for NCAAF, measured:** local CFBD plays carry no player ids; player box scores exist
