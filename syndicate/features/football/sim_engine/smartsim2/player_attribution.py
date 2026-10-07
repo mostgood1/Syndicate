@@ -105,6 +105,7 @@ class PlayerUsage:
     incompletion_share: float = 0.0     # targets that were not caught
     ypr: float = LEAGUE_YPR
     ypc: float = LEAGUE_YPC
+    target_share: float = 0.0           # share of the team's targets (amendment 3 scoring)
 
 
 @dataclass(frozen=True)
@@ -271,17 +272,25 @@ def prob_over(values: Sequence[float], line: float) -> Optional[float]:
 
 def build_team_usage(team: str, current: Iterable[Mapping[str, Any]], prior: Iterable[Mapping[str, Any]],
                      *, k_prior_games: float = 4.0, force_active: Iterable[str] = (),
-                     qb_override: Optional[str] = None) -> TeamUsage:
+                     qb_override: Optional[str] = None, half_life: Optional[float] = None,
+                     availability: str = "last1") -> TeamUsage:
     """`current` / `prior`: nflverse pbp rows STRICTLY before the week (the caller filters).
 
     Counts are the current season plus the prior season scaled to `k_prior_games`
     games; shares are over the players who touched the ball in the team's most
-    recent game (the availability proxy -- no as-of inactive list exists)."""
+    recent game (the availability proxy -- no as-of inactive list exists).
+
+    Amendment 3 options (defaults reproduce the original estimator E0 exactly, checked on 20 team-weeks):
+      half_life -- weight each past game 0.5 ** (age / half_life), age 1 = the most recent team game,
+                   prior-season games continuing the same age count;
+      availability="last2_or_quoted" -- active = touched the ball in either of the team's last TWO games,
+                   plus players quoted for this game."""
     def tally(rows):
         c: Dict[str, Dict[str, float]] = {}
         names: Dict[str, str] = {}
         games: List[str] = []
         dropbacks: Dict[str, Dict[str, int]] = {}
+        per_game: Dict[str, Dict[str, Dict[str, float]]] = {}
         for r in rows:
             if r.get("posteam") != team or r.get("play_type") not in ("pass", "run"):
                 continue
@@ -298,6 +307,12 @@ def build_team_usage(team: str, current: Iterable[Mapping[str, Any]], prior: Ite
                 rid = r.get("receiver_player_id")
                 if rid and r.get("sack") != "1":
                     names[rid] = r.get("receiver_player_name") or rid
+                    per_game.setdefault(gid, {}).setdefault(rid, {})
+                    pg = per_game[gid][rid]
+                    pg["targets"] = pg.get("targets", 0) + 1
+                    if r.get("complete_pass") == "1":
+                        pg["rec"] = pg.get("rec", 0) + 1
+                        pg["rec_yds"] = pg.get("rec_yds", 0) + float(r.get("yards_gained") or 0)
                     d = c.setdefault(rid, {})
                     d["targets"] = d.get("targets", 0) + 1
                     if r.get("complete_pass") == "1":
@@ -307,21 +322,35 @@ def build_team_usage(team: str, current: Iterable[Mapping[str, Any]], prior: Ite
                 rid = r.get("rusher_player_id")
                 if rid:
                     names[rid] = r.get("rusher_player_name") or rid
+                    per_game.setdefault(gid, {}).setdefault(rid, {})
+                    pg = per_game[gid][rid]
+                    pg["carries"] = pg.get("carries", 0) + 1
+                    pg["rush_yds"] = pg.get("rush_yds", 0) + float(r.get("yards_gained") or 0)
                     d = c.setdefault(rid, {})
                     d["carries"] = d.get("carries", 0) + 1
                     d["rush_yds"] = d.get("rush_yds", 0) + float(r.get("yards_gained") or 0)
-        return c, names, games, dropbacks
+        return c, names, games, dropbacks, per_game
 
-    cur, n1, g1, db1 = tally(current)
-    pri, n2, g2, db2 = tally(prior)
+    current, prior = list(current), list(prior)
+    cur, n1, g1, db1, pg1 = tally(current)
+    pri, n2, g2, db2, pg2 = tally(prior)
     names = {**n2, **n1}
-    scale = (k_prior_games / len(g2)) if g2 else 0.0
     blended: Dict[str, Dict[str, float]] = {}
-    for src, w in ((cur, 1.0), (pri, scale)):
-        for pid, d in src.items():
-            b = blended.setdefault(pid, {})
-            for k, v in d.items():
-                b[k] = b.get(k, 0.0) + w * v
+    if half_life is None:                             # E0: flat current + prior scaled to k games
+        scale = (k_prior_games / len(g2)) if g2 else 0.0
+        for src, w in ((cur, 1.0), (pri, scale)):
+            for pid, d in src.items():
+                b = blended.setdefault(pid, {})
+                for k, v in d.items():
+                    b[k] = b.get(k, 0.0) + w * v
+    else:                                             # E1/E3: recency decay across both seasons
+        ordered = [(gid, pg1) for gid in reversed(g1)] + [(gid, pg2) for gid in reversed(g2)]
+        for age, (gid, pg) in enumerate(ordered, start=1):
+            w = 0.5 ** (age / float(half_life))
+            for pid, d in pg.get(gid, {}).items():
+                b = blended.setdefault(pid, {})
+                for k, v in d.items():
+                    b[k] = b.get(k, 0.0) + w * v
     # availability: touched the ball in the most recent game (current season, else prior)
     recent_rows_src, recent_games, recent_db = (current, g1, db1) if g1 else (prior, g2, db2)
     last = recent_games[-1] if recent_games else None
@@ -332,6 +361,17 @@ def build_team_usage(team: str, current: Iterable[Mapping[str, Any]], prior: Ite
                 for col in ("receiver_player_id", "rusher_player_id", "passer_player_id"):
                     if r.get(col):
                         active.add(r[col])
+    if availability == "last2_or_quoted":             # E2/E3: touched in either of the last two games
+        recent2 = list(reversed(g1))[:2]
+        if len(recent2) < 2:
+            recent2 += list(reversed(g2))[: 2 - len(recent2)]
+        active = set()
+        for gid in recent2:
+            for pg in (pg1, pg2):
+                active |= set(pg.get(gid, {}).keys())
+        for gid in recent2:                           # passers who only threw
+            for db in (db1, db2):
+                active |= set(db.get(gid, {}).keys())
     # A1: players quoted for this game are playing (pregame information the book publishes)
     active |= set(force_active)
     tot_t = sum(d.get("targets", 0) for p, d in blended.items() if p in active) or 1.0
@@ -349,6 +389,7 @@ def build_team_usage(team: str, current: Iterable[Mapping[str, Any]], prior: Ite
             incompletion_share=max(0.0, tgt - rec) / max(1.0, tot_t - tot_r),
             ypr=(d["rec_yds"] / rec) if rec >= 3 else LEAGUE_YPR,
             ypc=(d["rush_yds"] / d["carries"]) if d.get("carries", 0) >= 5 else LEAGUE_YPC,
+            target_share=tgt / tot_t,
         ))
     # primary QB: most dropbacks over the last 3 games of the season that has games
     qb_counts: Dict[str, int] = {}
