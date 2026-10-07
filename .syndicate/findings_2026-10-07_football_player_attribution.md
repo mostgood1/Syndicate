@@ -192,4 +192,32 @@ markets x 10 = ~70 credits per game with props; 2024 + 2025 FBS ~1,300 games -> 
 
 ## Results
 
-(none yet)
+### NFL Phase B (FIT 2023-24) — 366 games, 122,955 quote rows, 300 seeds, production engine (2026-10-07)
+
+Log-loss per row; deltas paired, game-clustered 95% CI (negative = attribution better). Slopes =
+calibration slope of y on p (1 = calibrated, 0 = no information).
+
+| market | n | LL attr | LL prod | LL book | attr - prod | attr - book | slope attr / prod / book |
+|---|---|---|---|---|---|---|---|
+| passing_yards | 10,297 | 0.7136 | 0.7872 | 0.6651 | **-0.074 [-0.135, -0.016]** | +0.049 | **0.58** / 0.30 / 0.90 |
+| passing_attempts | 4,059 | 0.7544 | 0.7854 | 0.6919 | -0.031 [-0.096, +0.033] | +0.062 | 0.10 / -0.03 / 0.98 |
+| passing_tds | 5,590 | 0.6555 | 0.6506 | 0.6398 | +0.005 [-0.009, +0.018] | +0.016 | 0.80 / 0.96 / 1.06 |
+| interceptions | 4,201 | 0.6834 | 0.6742 | 0.6664 | +0.009 [-0.001, +0.020] | +0.017 | 0.75 / 0.91 / 1.05 |
+| receiving_yards | 44,115 | 0.7548 | 0.7309 | 0.6663 | +0.024 [+0.005, +0.042] | +0.089 | 0.32 / 0.41 / 0.99 |
+| receptions | 28,946 | 0.8067 | 0.7318 | 0.6630 | +0.075 [+0.050, +0.101] | +0.144 | 0.27 / 0.43 / 1.03 |
+| rushing_yards | 19,258 | 0.8416 | 0.7556 | 0.6687 | +0.086 [+0.050, +0.124] | +0.173 | 0.20 / 0.26 / 0.93 |
+| rushing_attempts | 6,058 | 1.1087 | 0.7728 | 0.6901 | **+0.336 [+0.271, +0.406]** | +0.419 | 0.09 / 0.14 / 0.99 |
+| anytime_td | 383 | 0.5666 | 0.5179 | 0.4838 | +0.049 [+0.002, +0.099] | +0.083 | 0.42 / 0.70 / 1.02 |
+
+**Construction check (sim per team-game, n = 732):** pass att 35.2, pass yds 253.2, rush att **21.3**,
+rush yds 112.4 -- against real NFL roughly 33.5 / ~215 / ~27 / ~115. The engine produces too few
+yard-gaining plays and the attribution starves runs (a volume defect, measured at smoke and now on
+the full FIT set).
+
+**Reading (FIT, not a ship decision):** attribution BEATS production on passing yards (-0.074, CI
+excludes 0) with a much better calibration slope (0.58 vs 0.30) -- game script carries information
+for the QB's volume. It LOSES where its volume input is wrong: rushing attempts badly (+0.336),
+rushing yards, receptions and receiving yards. Nothing beats the book (production does not either).
+48 rows unattributed. The next design step is the run-volume defect (an engine property: the
+scenario lane's v2 re-fit, or a measured run-share correction in the layer) -- to be pre-registered
+before any held-out read.
