@@ -47189,3 +47189,10 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - **ride-along:** none (runtime diff = `syndicate/features/ncaaf/cards.py` only, read before the ff).
 - **timeline (CT):** ff 21:19:08; TERM pid 2639670 21:19:08; `exited code=0 after 2153s -- restarting in 5s`; new pid **2645943** 21:19:17; environ limit 6144; `status` code=a185e337; web healthz 200 (2 ms). Claim released.
 - **verify (OWED):** NCAAF `SPORT_OVERVIEW_PHASES ... total_s` on the next build vs 159.9 s / 570 s; whole-build time vs ~24.5 min; served board `dates['2026-10-07']` newer than 02:19Z and fresh.
+
+## 2026-10-07 02:59Z (9:59 PM CT 10-06) -- READING: board builds on both memo fixes (team_aliases 8a8fafec, NCAAF cards b300cf1c) -- **10-07 UNSTUCK; cadence still above the 15-min stale threshold** (lane `web-restart-healthz`)
+
+- 10-06 build (first on both fixes, refresh-worker pid 2645943): overview 02:20:21 -> 02:22:55Z **153.3 s** (NCAAF `sport_branch` total **95.1 s**; was 570 s at 00:50Z, 159.9 s on the first fix only); `layer2_shortlist_build` **231.3 s** (was ~690 s old code, 408.6 s first fix); persist 02:41:22Z, 246 candidates; ~21 min start -> persist, ~11 min of it AFTER the shortlist (kalshi join, portfolio commit, settlement -- not yet profiled).
+- 10-07 build: overview 02:48:35 -> 02:49:17Z **41.7 s** (NCAAF 14.0 s); shortlist **219.3 s**; persist 02:57:01Z, 19 candidates. 0 `[intelligence_state] MEMORY_GUARD_ABORT` since the 19:46 CT restart.
+- SERVED (`/api/intelligence/query`, 21:59 CT): `dates['2026-10-07'].written_at` **02:53:34Z** (was 2026-10-06T15:41:38Z all day); `computed_at` 02:36:46Z (10-06 state); `freshness_status` **stale** because the oldest input (22 min) exceeds `SYNDICATE_INTELLIGENCE_BOARD_STALE_AFTER_SECONDS` default 900 s. 3,411 rows.
+- NOT MET: "regular schedule". A today-build is ~21 min with live games and host CPU saturated; the board will read stale between saves until a build is < ~12 min. Next costs to profile: post-shortlist stages (~11 min). CPU contention unchanged (Windows research at Idle; vmmemwsl priority needs an elevated shell).
