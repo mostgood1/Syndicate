@@ -316,6 +316,24 @@ team total. Passing yards remains the only market beating production, corrected 
 book. Next design candidates (each to be pre-registered): per-player carry-share quality (recency weighting,
 injury/availability), and using attribution only where it has shown information (QB passing yards).
 
+### NFL Phase C — HELD-OUT 2025 READ (once; marker 2026-10-07T21:25:08Z) — GATE PASSED, NO EDGE
+
+224 games, 5,934 rows (QB markets only, as pre-registered), 300 seeds, config fixed from FIT.
+
+| market | n | LL attr | LL prod | LL book | attr - prod | attr - book | slope attr / prod / book |
+|---|---|---|---|---|---|---|---|
+| **passing_yards (primary)** | 3,195 | 0.7476 | 0.8688 | 0.6924 | **-0.121 [-0.205, -0.039] PASS** | +0.055 [+0.022, +0.092] | 0.04 / -0.20 / 1.55 |
+| passing_attempts (secondary) | 2,739 | 0.8026 | 0.8080 | 0.6942 | -0.005 [-0.094, +0.079] | +0.108 [+0.066, +0.154] | 0.08 / 0.03 / 0.43 |
+
+**Verdict against the pre-registration:** the primary gate PASSES (attribution beats production on passing-yards
+log-loss, CI entirely below 0). **Honest reading:** the margin is mostly production being badly miscalibrated on
+2025 -- LL 0.869, WORSE than a coin (0.693), slope -0.20. Attribution is also worse than a coin (0.748) and its
+slope collapsed from 0.52 (FIT) to 0.04, so on 2025 it barely ranks QBs. Both lose to the book. Implications:
+(1) production's NFL passing-yards probabilities are actively harmful on held-out data -- a finding in its own
+right; (2) attribution is a less-bad replacement, not an edge; wiring it is a separate decision and lane, and
+neither model should drive bets against the market on this evidence. The lane's hypothesis ("props simulated
+from the game sim beat production's") holds for one market on held-out data and is rejected everywhere else.
+
 ### NCAAF Phase B (FIT 2024) — 443 games, 18,310 graded rows, 300 seeds, production NCAAF engine (2026-10-07)
 
 vs the de-vigged BOOK only (production has no 2024 NCAAF prop model input). Log-loss, attr - book, slope attr / book:
