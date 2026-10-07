@@ -455,6 +455,70 @@ def loan_is_honoured(text, borrower, rel):
     return None
 
 
+_SECTION_RE = re.compile(r"\(([^()]*\bsection\b[^()]*\bonly\b[^()]*)\)", re.I)
+
+
+def _section_of(fragment):
+    """The declared section for a Files-line fragment, or None.
+
+    DELIBERATELY NARROW: the parenthetical must contain both `section` and `only`. The
+    ledger is full of other `ONLY` qualifiers (`_soccer_rosters_step + its one wiring
+    loop ONLY`) that scope a claim to part of a CODE file, and those are not section
+    declarations about a document; widening this to any `only` would start permitting
+    concurrent writes to code on the strength of a comment.
+    """
+    m = _SECTION_RE.search(str(fragment))
+    if not m:
+        return None
+    return re.sub(r"\s+", " ", m.group(1)).strip().lower()
+
+
+def _section_entries(text):
+    """(slug, path, section) for every OPEN lane claim carrying a section qualifier."""
+    for slug, seg in _files_segments(text):
+        for frag in str(seg).split(","):
+            section = _section_of(frag)
+            if not section:
+                continue
+            for f in _paths_in(frag):
+                yield slug, f, section
+
+
+def section_scopes(text):
+    """{(slug, path): section} -- the declared section per claim, where one is declared."""
+    return {(slug, f): section for slug, f, section in _section_entries(text)}
+
+
+def sections_are_disjoint(text, current, rel):
+    """The current lane's declared section if it may write `rel` alongside other
+    section-scoped holders, else None.
+
+    Requires ALL of: this lane declares a section for a claim matching `rel`; every OTHER
+    OPEN holder of `rel` also declares one; and no other holder's section equals this
+    lane's. Anything else returns None and the caller blocks -- a holder without a
+    declaration, or a second lane naming the same section, is a real collision.
+    """
+    scopes = section_scopes(text)
+    mine = None
+    for (slug, f), section in scopes.items():
+        if slug == current and matches(rel, f):
+            mine = section
+            break
+    if not mine:
+        return None
+    for slug, f in _claims(text):
+        if slug == current or not matches(rel, f):
+            continue
+        theirs = None
+        for (s2, f2), section in scopes.items():
+            if s2 == slug and matches(rel, f2):
+                theirs = section
+                break
+        if theirs is None or theirs == mine:
+            return None
+    return mine
+
+
 def _claims(text):
     """Yield (slug, claimed_path) for every OPEN lane."""
     slug = None
@@ -793,3 +857,40 @@ def _loan_entries(text):
                 seg = _claimable_prefix(stripped).lstrip("- ")
                 for f, lender in _loan_paths(seg).items():
                     yield slug, f, lender
+
+
+def _files_segments(text):
+    """(slug, claimable_segment) for every OPEN lane's Files declaration lines.
+
+    The same walk `_claims` performs, factored out for the readers that need the TEXT of
+    a declaration rather than the paths in it (section qualifiers, loan markers).
+    """
+    slug = None
+    open_lane = False
+    in_files = False
+    for line in text.splitlines():
+        if HEADER_RE.match(line):
+            m = LANE_RE.match(line) or ASCII_LANE_RE.match(line)
+            if m:
+                slug = m.group(1)
+                open_lane = bool(OPEN_RE.search(m.group(2)))
+            else:
+                slug, open_lane = None, False
+            in_files = False
+            continue
+        m = FILES_RE.match(line)
+        if m:
+            in_files = True
+            if open_lane:
+                yield slug, _claimable_prefix(m.group(1))
+            continue
+        if in_files:
+            stripped = line.strip()
+            if not stripped or (FIELD_RE.match(line) and not line[:1].isspace()):
+                in_files = False
+                continue
+            if _BULLET_RE.match(stripped) and not _files_bullet_continues(stripped):
+                in_files = False
+                continue
+            if open_lane:
+                yield slug, _claimable_prefix(stripped).lstrip("- ")

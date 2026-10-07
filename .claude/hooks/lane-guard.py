@@ -47,6 +47,9 @@ try:
         # the write stays blocked. It never over-permits.
         loan_is_honoured,
         matches,
+        # Disjoint DECLARED sections of one file. Honours a declaration, does not
+        # verify it; a holder without one still blocks.
+        sections_are_disjoint,
     )
     from lane_marker import current_lane, safe_session_id as safe_session_id_of
 except Exception as exc:  # pragma: no cover - only when the module is missing
@@ -218,6 +221,24 @@ def main():
         if lender:
             sys.stderr.write(
                 f"LOAN HONOURED: {rel} is lent to '{current}' by '{lender}'.\n")
+            return 0
+
+    # DISJOINT DECLARED SECTIONS of one file, honoured the same way a loan is: the
+    # owners said in their own Files lines that they do not overlap. Measured
+    # 2026-10-07: two lanes holding '(watchdog section only)' and '(web reload
+    # section only)' on one runbook blocked EACH OTHER. A hook cannot verify which
+    # lines a write touches, so this honours the declaration and leaves
+    # lane-postwrite-check as the net. A holder with no declaration, or a second
+    # lane naming the SAME section, still blocks.
+    if conflict and current:
+        try:
+            section = sections_are_disjoint(text, current, rel)
+        except Exception:
+            section = None
+        if section:
+            sys.stderr.write(
+                f"SECTION-SCOPED: {rel} is held by '{current}' for '{section}',"
+                f" and every other holder declares a different section.\n")
             return 0
 
     if conflict:
