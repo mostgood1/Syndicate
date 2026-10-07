@@ -1827,6 +1827,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Before: VIOLATED 1 contested file (the runbook, two section holders). After: that pair reported on an informational line and the contested count 0, with check_lane_invariants exiting clean; plus tests that a same-section pair and an undeclared holder still count as contested, and that test_lane_guard_prohibition_marker still passes.
 - Blocked by: none
 
+### wnba-fetch-rosters-season — OPEN — opened 2026-10-07 — session 4d5b3bd3-f83c-45b6-b8c2-0c4eb3be33d5
+- Goal: The vendored WNBA fetch-rosters command never writes a roster under a season it does not hold: ESPN serves only the CURRENT roster, so fetch_rosters labels its output (file name, SEASON, LEAGUE_SEASON) with the current WNBA season and prints ROSTER_SEASON_NORMALISED when a different (e.g. NBA-style 2025-26) season was requested; both CLI commands (fetch-rosters, fetch-rosters-cmd) default to the current WNBA season with WNBA help text; verified by tests (requested 2025-26 -> rosters_<current>.csv with SEASON <current>; off != on vs the old code).
+- Files: vendor/wnba_betting_repo/src/wnba_betting/rosters.py (fetch_rosters season label only), vendor/wnba_betting_repo/src/wnba_betting/cli.py (the two fetch_rosters_cmd option defaults/help only), tests/test_wnba_fetch_rosters_season.py (NEW)
+- Hypothesis: n/a (defect is read from the code: _fetch_espn_roster takes no season; season only names the file/columns; both CLI defaults and app.py's cron default are 2025-26).
+- Falsification test: n/a
+- Verification: unit tests with ESPN stubbed; no fleet change (production never runs fetch-rosters; no rosters_* on the fleet).
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
