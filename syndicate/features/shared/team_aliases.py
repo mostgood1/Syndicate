@@ -851,6 +851,24 @@ def _ncaab_alias_to_name() -> dict[str, str]:
     return {key: next(iter(owners)) for key, owners in offers.items() if len(owners) == 1}
 
 
+# NFL AND WNBA RETURN A STABLE OBJECT -- lane `web-restart-healthz` `[2026-10-07]`.
+# They used to build a fresh dict on EVERY call, so `canonical_team`'s memo (keyed on
+# the map object) never hit for them and `_alias_values` rebuilt per call: py-spy on
+# the fleet refresh-worker 2026-10-07 11:03 CT, an NFL-heavy shortlist 17+ min in
+# `_alias_map` / `canonical_team`. The copy is rebuilt only when a SOURCE object
+# changes (identity), so a patched or cleared source never serves a stale map.
+_DERIVED_MAPS: dict[str, tuple[tuple[int, ...], tuple[Any, ...], dict[str, str]]] = {}
+
+
+def _derived_map(name: str, sources: tuple[Any, ...], build) -> dict[str, str]:
+    hit = _DERIVED_MAPS.get(name)
+    if hit is not None and len(hit[1]) == len(sources) and all(a is b for a, b in zip(hit[1], sources)):
+        return hit[2]
+    value = build()
+    _DERIVED_MAPS[name] = (tuple(id(s) for s in sources), sources, value)
+    return value
+
+
 def _alias_map(sport: str) -> dict[str, str]:
     slug = normalize(sport)
     if slug == "mlb":
@@ -858,16 +876,19 @@ def _alias_map(sport: str) -> dict[str, str]:
     if slug == "nhl":
         return _nhl_alias_to_name()
     if slug == "nfl":
-        return dict(_NFL_ALIAS_TO_NAME)
+        return _derived_map("nfl", (_NFL_ALIAS_TO_NAME,), lambda: dict(_NFL_ALIAS_TO_NAME))
     if slug in {"nba", "wnba"}:
         mapping = _basketball_alias_to_name(slug)
         if slug == "wnba":
             # setdefault direction matters: the vendored map wins where it has
             # an answer, so a future vendor fix silently takes precedence over
             # this supplement rather than being shadowed by it.
-            merged = dict(_WNBA_ALIAS_SUPPLEMENT)
-            merged.update(mapping)
-            return merged
+            def _merge() -> dict[str, str]:
+                merged = dict(_WNBA_ALIAS_SUPPLEMENT)
+                merged.update(mapping)
+                return merged
+
+            return _derived_map("wnba", (_WNBA_ALIAS_SUPPLEMENT, mapping), _merge)
         return mapping
     if slug == "soccer":
         return _soccer_alias_to_name()
