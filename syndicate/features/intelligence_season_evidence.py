@@ -437,9 +437,11 @@ def _soccer_player_tables() -> list[Table]:
 
 
 def _ncaab_tables() -> list[Table]:
-    paths = sorted(_glob_all("ncaab", "**/team_ratings_*.csv"), key=lambda p: p.stat().st_mtime)
+    # Dated tables from `scripts/build_ncaab_team_ratings.py`
+    # (`team_ratings_<season>_asof_<YYYYMMDD>.csv`): newest season, then newest as-of.
+    path = _newest_asof(_glob_all("ncaab", "processed/team_ratings_*.csv"), r"team_ratings")
     return [
-        _team_table("ncaab", "team_ratings", "Team efficiency ratings", paths[-1] if paths else None, key_field="team", canonical=_canonical("ncaab")),
+        _team_table("ncaab", "team_ratings", "Team efficiency ratings", path, key_field="team", canonical=_canonical("ncaab")),
     ]
 
 
@@ -641,7 +643,7 @@ _FAMILY_METRICS: dict[str, list[str]] = {
     "team_elo": ["Elo"],
     "team_epa": ["Offense EPA/play", "Defense EPA/play allowed"],
     "sp_plus": ["SP+ overall", "SP+ offense", "SP+ defense"],
-    "team_ratings": ["Adjusted offense", "Adjusted defense", "Tempo"],
+    "team_ratings": ["Adjusted efficiency margin", "Adjusted offense", "Adjusted defense", "Tempo"],
 }
 
 
@@ -740,6 +742,7 @@ _TEAM_METRICS: dict[str, list[MetricSpec]] = {
         MetricSpec("sp_defense", "sp_defense", "SP+ defense (pts allowed)", False, "num1"),
     ],
     "team_ratings": [
+        MetricSpec("adj_em", "adj_em", "Adjusted efficiency margin", True, "signed1"),
         MetricSpec("adj_off", "adj_off", "Adjusted offense", True, "num1"),
         MetricSpec("adj_def", "adj_def", "Adjusted defense", False, "num1"),
         MetricSpec("tempo", "tempo", "Tempo", True, "num1"),
