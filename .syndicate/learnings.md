@@ -3282,3 +3282,20 @@ own prior verdicts, not by anything failing.
 - **Rule:** generate shared inputs ONCE, before fanning out, and have workers only read them. A run that produced
   nothing must write no output, not an empty file. A point that runs faster than its peers is a suspect, not a win:
   compare output counts with the baseline before reading any statistic.
+
+## 2026-10-07 — FORBIDDEN merge=union WAS LIVE FOR 5 WEEKS THROUGH UNTRACKED CONFIG: `.git/config` `core.attributesFile` pointed at a session scratchpad file applying `.syndicate/*.md merge=union` to every session `[lane wnba-props-out-player-leak, session 4d5b3bd3]`
+
+- **What was true:** since 2026-08-31 14:40 CT, the primary repo's LOCAL config had `core.attributesFile = <session 5611932c scratchpad>/push-wt/.git-union-attrs`. That 28-byte file holds `.syndicate/*.md merge=union`.
+  - Local config is shared by every worktree, so every session's rebase union-merged lanes.md, deploys.md, learnings.md and the rest.
+  - session_isolation_protocol.md forbids exactly this, twice: a union merge cannot carry a deliberate deletion, so a removed block comes back on the next rebase.
+- **How it hid:**
+  - The tracked `.gitattributes` has no merge line, so `git grep` and the repo history show nothing.
+  - Only `git check-attr merge -- .syndicate/lanes.md` (`merge: union`) and `git config --show-origin --get core.attributesFile` reveal it.
+  - The pointer lived in another session's scratchpad, outside every tree any guard reads.
+- **Cost, measured on origin/main:** 81 commits on lanes.md since 08-31 mention "duplicate" (a message match, not proof of cause for each). This morning two lanes were duplicated by concurrent rebases and needed three cleanup commits in about 10 minutes (0fd47526, 4352357f, 946a2231). Meanwhile the ledger guard refused every ledger commit repo-wide.
+- **My own error, corrected by the peer:** I attributed the 10:37 duplicate to 7fc5dd79 (lane layer2-out-gate-reach) from the commit that first showed it. Its owner's trace was right: 7fc5dd79 carried one copy, and a later rebase (e406452c) doubled it through the union merge. A commit that SHOWS a duplicate is not the commit that MADE it, while union merging is on.
+- **Fixed 2026-10-07 ~11:10 CT (user: "yes, unset it and record the learning"):** `git config --local --unset core.attributesFile`. Afterwards `git config --get core.attributesFile` returns nothing (rc 1), and `git check-attr merge` reports `unspecified` for lanes.md/deploys.md in the primary tree and in a session worktree.
+- **How to apply:**
+  - When ledger blocks duplicate, or deletions "come back", run `git check-attr merge -- .syndicate/lanes.md` before blaming a session. Anything but `unspecified` is the cause.
+  - Never point repo-level config (`core.attributesFile`, `core.hooksPath`, merge drivers) at a session scratchpad: it outlives the session, applies to all sessions, and is invisible to every tracked-file check.
+  - A conflict in a ledger file is meant to surface at `land` and be rebuilt on upstream (the ledger-append recipe), not be made quiet.
