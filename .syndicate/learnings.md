@@ -3299,3 +3299,8 @@ own prior verdicts, not by anything failing.
   - When ledger blocks duplicate, or deletions "come back", run `git check-attr merge -- .syndicate/lanes.md` before blaming a session. Anything but `unspecified` is the cause.
   - Never point repo-level config (`core.attributesFile`, `core.hooksPath`, merge drivers) at a session scratchpad: it outlives the session, applies to all sessions, and is invisible to every tracked-file check.
   - A conflict in a ledger file is meant to surface at `land` and be rebuilt on upstream (the ledger-append recipe), not be made quiet.
+
+## 2026-10-07 -- A GATE TESTED BY FEEDING ROWS STRAIGHT IN IS NOT TESTED; TEST THROUGH THE REBUILD PRODUCTION USES (lane layer2-out-gate-reach)
+
+- **Belief overturned:** f9adcdd8's Layer 2 OUT-player gate shipped with 4 passing tests and a served counter, and I recorded it as 'mechanism verified'. All four tests handed rows directly to select_shortlist. Production does not: build_layer2_rows rebuilds every candidate from _IDENTITY_FIELDS plus an explicit field list, and the upstream flag (`player_availability`) was not on it -- the same shape #270 recorded for `projection`. The served counter reading 0 was read as 'no OUT player quoted' when the frame could not have been non-null for a second reason. Caught when Layer 1 fired on a real row (Gray, rows=9) and Layer 2 still read 0 on a post-flag build.
+- **Rule:** a gate on a field stamped upstream needs one test that starts from the upstream row and runs the real transformation chain to the gate (here grid row -> build_layer2_rows -> select_shortlist), and that test must fail with the carry removed. A counter that reads 0 is evidence only after a replay of real input shows it can read non-zero.
