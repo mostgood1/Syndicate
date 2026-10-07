@@ -263,7 +263,7 @@ class StatsApiSource:
 
 def build_date(data_dir: Path, out_root: Path, date: str, season: int, counters: Counter,
                raw_root: Path | None = None, games: list[dict] | None = None,
-               shared_cache: Path | None = None) -> int:
+               shared_cache: Path | None = None, stamina_recent_weight: float = 0.0) -> int:
     from sim_engine.data.build_roster import build_team_roster
     from sim_engine.data.roster_artifact import write_game_roster_artifact
     from sim_engine.models import Team
@@ -296,6 +296,7 @@ def build_date(data_dir: Path, out_root: Path, date: str, season: int, counters:
                     pitcher_availability={}, roster_type="active", fallback_roster_types=["40Man"],
                     injured_player_ids=None, roster_entries=None, fast_mode=False,
                     profile_cache=None, use_profile_cache=False,
+                    starter_stamina_recent_weight=float(stamina_recent_weight),
                 )
         except LeakRefused:
             raise
@@ -326,6 +327,8 @@ def main(argv=None) -> int:
     ap.add_argument("--source", choices=["stored", "statsapi"], default="stored",
                     help="stored = the fleet's lineups/probables/sim records; statsapi = schedule + as-of lineup projection + live-feed context")
     ap.add_argument("--statsapi-cache", default="~/mlb_statsapi_asof_cache")
+    ap.add_argument("--starter-stamina-recent-weight", type=float, default=0.0,
+                    help="build_team_roster starter_stamina_recent_weight (late-season workload lever; 0 = production today)")
     ap.add_argument("--shared-cache", default="",
                     help="persistent StatsAPI cache shared across dates (default: a fresh cache per date)")
     ap.add_argument("--statcast-raw-root", default="",
@@ -356,6 +359,7 @@ def main(argv=None) -> int:
             ctx_client = make_client(d, args.season, shared or Path(tempfile.mkdtemp(prefix=f"asof_ctx_{d}_")), counters)
             games = source.games_for(out_root, d, ctx_client, counters)
         report[d] = build_date(data_dir, out_root, d, args.season, counters, games=games, shared_cache=shared,
+                               stamina_recent_weight=args.starter_stamina_recent_weight,
                                raw_root=Path(os.path.expanduser(args.statcast_raw_root)) if args.statcast_raw_root else None)
         print(f"{d}: {report[d]} games", flush=True)
     summary = {"games_by_date": report, "counters": dict(counters), "as_of_rule": "every current-season stat bounded at D-1 or prior season; statcast features as of D-1" if args.statcast_raw_root else "every current-season stat bounded at D-1 or prior season; statcast off"}

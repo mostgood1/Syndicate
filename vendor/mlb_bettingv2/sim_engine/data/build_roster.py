@@ -26,7 +26,7 @@ from .statsapi import (
     fetch_person_home_away_splits,
     fetch_person_stat_splits,
 )
-from .recency import batter_recent_rates, pitcher_recent_rates
+from .recency import batter_recent_rates, pitcher_recent_rates, pitcher_recent_start_pitches
 from ..features import RecencyConfig, apply_recency_to_batter, apply_recency_to_pitcher
 from .disk_cache import DiskCache
 from .statsapi import fetch_person_pitch_arsenal
@@ -712,6 +712,24 @@ def _statcast_pitch_count_pressure(quality: Any, *, role: str) -> Optional[float
     pressure *= _ratio(chase, 0.30, -0.9, 0.94, 1.07)
     pressure *= _ratio(zone, 0.49, -0.5, 0.96, 1.04)
     return max(0.92, min(1.10, pressure))
+
+
+def _blend_recent_starter_stamina(client, pid: int, season: int, stamina: int, weight: float, starts: int) -> int:
+    """Late-season workload (lane mlb-statsapi-asof-rebuild): blend the season-derived stamina with
+    the starter's mean pitches over his last `starts` starts. Real starters are pulled earlier as a
+    season wears on and a season-to-date average lags that; recent starts track it.
+    weight 0.0 (the default) returns `stamina` untouched and makes no request."""
+    w = float(weight or 0.0)
+    if w <= 0.0:
+        return int(stamina)
+    try:
+        recent = pitcher_recent_start_pitches(client, int(pid), int(season), starts=int(starts))
+    except Exception:
+        recent = None
+    if recent is None:
+        return int(stamina)
+    w = min(1.0, w)
+    return int(max(70, min(115, round((1.0 - w) * float(stamina) + w * float(recent)))))
 
 
 def _apply_statcast_pitch_count_stamina_adjustment(prof: PitcherProfile) -> bool:
@@ -1631,6 +1649,8 @@ def build_team_roster(
     pitcher_recency_games: int = 6,
     pitcher_recency_weight: float = 0.15,
     starter_stamina_shrink_n0: float = 10.0,
+    starter_stamina_recent_weight: float = 0.0,
+    starter_stamina_recent_starts: int = 5,
     fallback_roster_types: Optional[List[str]] = None,
     injured_player_ids: Optional[List[int]] = None,
     exclude_injured: bool = True,
@@ -1868,6 +1888,10 @@ def build_team_roster(
                             prof.stamina_pitches = int(max(float(getattr(prof, "stamina_pitches", 0) or 0.0), float(derived_stamina)))
                         except Exception:
                             pass
+                        if probable_pitcher_id and int(pid) == int(probable_pitcher_id):
+                            prof.stamina_pitches = _blend_recent_starter_stamina(
+                                client, pid, season, int(prof.stamina_pitches),
+                                starter_stamina_recent_weight, starter_stamina_recent_starts)
                         try:
                             _apply_statcast_pitch_count_stamina_adjustment(prof)
                         except Exception:
@@ -1895,6 +1919,10 @@ def build_team_roster(
                     force_starter=bool(probable_pitcher_id and int(pid) == int(probable_pitcher_id)),
                     starter_shrink_n0=float(starter_stamina_shrink_n0),
                 )
+                if probable_pitcher_id and int(pid) == int(probable_pitcher_id):
+                    stamina_pitches = _blend_recent_starter_stamina(
+                        client, pid, season, int(stamina_pitches),
+                        starter_stamina_recent_weight, starter_stamina_recent_starts)
 
                 prof = PitcherProfile(
                     player=player,

@@ -90,3 +90,24 @@ def pitcher_recent_rates(client: StatsApiClient, person_id: int, season: int, ga
     if r is not None:
         out["inplay_hit_rate"] = r
     return out
+
+
+def pitcher_recent_start_pitches(client: StatsApiClient, person_id: int, season: int, starts: int = 5,
+                                 min_starts: int = 3) -> Optional[float]:
+    """Mean pitches over the pitcher's last `starts` STARTS in the game log (None if < min_starts).
+
+    The game log a builder sees is the one its client returns: production's is today's, the
+    as-of rebuild's is filtered to games before D, so this never looks past the build date.
+    """
+    splits = fetch_person_gamelog(client, person_id, season, group="pitching")
+    pcs = []
+    for s in splits or []:
+        st = s.get("stat", {}) or {}
+        if _safe_float(st.get("gamesStarted")) >= 1:
+            n = _safe_float(st.get("numberOfPitches"))
+            if n > 0:
+                pcs.append(n)
+    tail = pcs[-int(starts):]
+    if len(tail) < int(min_starts):
+        return None
+    return sum(tail) / len(tail)

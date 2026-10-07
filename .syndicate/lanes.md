@@ -1687,6 +1687,15 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **WORKLOAD MECHANISM BUILT (default off) 2026-10-07 ~22:30Z; no lever run yet (waits for the pitch fix's holdout read):**
+  - Code:
+    - `recency.pitcher_recent_start_pitches` (mean pitches over the last n STARTS in the game log; relief outings ignored; None if < 3 starts);
+    - `build_roster._blend_recent_starter_stamina`, applied to the probable starter on both stamina paths (profile-cache hit and miss), before the statcast adjustment;
+    - `build_team_roster(starter_stamina_recent_weight=0.0, starter_stamina_recent_starts=5)`;
+    - as-of builder flag `--starter-stamina-recent-weight`.
+  - TESTS: tests/test_mlb_stamina_recency.py 4 pass (last-starts only; < 3 starts -> None; weight 0 makes no request; blend + clamps). Builder tests still pass (14 total).
+  - BYTE-IDENTICAL at weight 0: a full as-of roster build of 06-15 with HEAD's code (no mechanism; grep count 0) vs the new code. 10 roster files each, **sha256 1707e2ef... both**.
+    - The first attempt was void: WSL git could not archive the Windows worktree, so the HEAD build never ran ("ROSTERS DIFFER" against 0 files). Redone with a Windows-made archive.
 - **LATE-SEASON WORKLOAD FIX, PRE-REGISTERED 2026-10-07 ~21:30Z (user: "then do the late-season workload fix next"), before any code is run on data:**
   - DEFECT (from pooled readings, FIT-half diagnosis above): real starters faced fewer batters as the season went on (June 22.0 -> Jul 21.45 -> the pooled window ~21.2), while the model's season-to-date stamina stayed flat. A season-phase effect, so the fix is a MECHANISM that tracks it, not a constant.
   - MECHANISM (build_roster, probable starter only):
