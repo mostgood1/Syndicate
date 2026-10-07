@@ -1837,6 +1837,15 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: unit tests with ESPN stubbed; no fleet change (production never runs fetch-rosters; no rosters_* on the fleet).
 - Blocked by: none
 
+### lane-open-test-encoding — CLOSED 2026-10-07 — opened 2026-10-07 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- **GOAL: MET — 125 passed BOTH ways, and the failure was mine to begin with.** Goal verbatim: "tests/test_lane_open.py passes identically with and without PYTHONIOENCODING=utf-8 in the environment: every subprocess capture in it pins the decode to UTF-8 and pins the child's PYTHONIOENCODING, so the em-dash assertion no longer depends on the ambient locale." **Hypothesis CONFIRMED and it exonerates the product:** `lane_open.py` is fine. The test FAILED with `PYTHONIOENCODING=utf-8` exported and PASSED without it — the child inherits that variable and emits the em dash as UTF-8 (E2 80 94), while `subprocess.run(text=True)` with no `encoding=` decoded with the locale (cp1252), so `assert EM in r.stdout` saw `â€”`. **I CAUSED the failing condition:** I export `PYTHONIOENCODING=utf-8` on every command, so the red I kept reporting as "pre-existing" was conditional on my own environment. The fragility predates me; the failure did not. Fixed in the TEST, not the tool: one `_utf8_capture` helper pins BOTH ends (decode `encoding="utf-8"` AND the child's `PYTHONIOENCODING`), used by all four captures of the tool — pinning one end alone would leave the ambient value deciding the other. **Verified under three environments:** `utf-8`, unset, and a deliberately hostile `cp1252` — 12 passed in each; full lane+checker suite **125 passed** with the variable and 125 without. `test_source_is_pure_ascii` still holds: the tool must EMIT U+2014 without CONTAINING one, and the tool was not touched.
+- Goal: tests/test_lane_open.py passes identically with and without PYTHONIOENCODING=utf-8 in the environment: every subprocess capture in it pins the decode to UTF-8 and pins the child's PYTHONIOENCODING, so the em-dash assertion no longer depends on the ambient locale.
+- Files: tests/test_lane_open.py
+- Hypothesis: The product is fine and the TEST's capture is wrong: _run uses subprocess.run(text=True) with no encoding=, so the parent decodes with the locale (cp1252) while the child emits UTF-8 whenever PYTHONIOENCODING=utf-8 is inherited. Measured: the test FAILS with that variable set and PASSES without it, so pinning both ends to UTF-8 makes it deterministic.
+- Falsification test: If the test still fails with encoding pinned at both ends, the mismatch is not the cause and lane_open.py itself is emitting something wrong. If it then fails WITHOUT the variable, the fix has broken the previously-passing case.
+- Verification: Run the whole file both ways -- with PYTHONIOENCODING=utf-8 and with it unset -- and require identical all-passed results, plus the neighbouring test_source_is_pure_ascii still green since the tool must stay ASCII-only.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

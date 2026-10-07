@@ -9,6 +9,7 @@ exactly the defect this tool exists to prevent.
 
 from __future__ import annotations
 
+import os
 import pathlib
 import subprocess
 import sys
@@ -19,6 +20,21 @@ REPO = pathlib.Path(__file__).resolve().parent.parent
 TOOL = REPO / "scripts" / "lane_open.py"
 sys.path.insert(0, str(REPO / ".claude" / "hooks"))
 import lane_claims  # noqa: E402
+
+
+def _utf8_capture(cmd):
+    """Run `cmd` with BOTH ends pinned to UTF-8.
+
+    Measured 2026-10-07: without this, `test_dry_run_writes_nothing` FAILED when
+    `PYTHONIOENCODING=utf-8` was exported and PASSED when it was not. The child
+    inherits that variable and emits the em dash as UTF-8; `text=True` with no
+    `encoding=` decodes with the locale (cp1252 here), so the assertion saw the
+    mojibake `\u00e2\u20ac\u201d`. Pinning one end is not enough -- the ambient value
+    would still decide the other.
+    """
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    return subprocess.run(cmd, capture_output=True, text=True,
+                          encoding="utf-8", env=env)
 
 EM = "—"
 
@@ -49,7 +65,7 @@ def _run(lanes: pathlib.Path, *extra: str) -> subprocess.CompletedProcess:
     cmd = [sys.executable, str(TOOL), "--lanes", str(lanes), "--slug", "new-lane",
            "--goal", "a testable outcome", "--files", "scripts/x.py",
            "--session", "sess-1", "--date", "2026-09-23", "--no-marker", *extra]
-    return subprocess.run(cmd, capture_output=True, text=True)
+    return _utf8_capture(cmd)
 
 
 def _header(lanes: pathlib.Path, slug: str) -> str:
@@ -97,20 +113,18 @@ def test_block_lands_inside_the_open_section_not_at_eof(tmp_path):
 
 def test_refuses_duplicate_slug(tmp_path):
     lanes = _lanes(tmp_path)
-    r = subprocess.run(
+    r = _utf8_capture(
         [sys.executable, str(TOOL), "--lanes", str(lanes), "--slug", "existing-lane",
-         "--goal", "g", "--files", "f.py", "--session", "s", "--no-marker"],
-        capture_output=True, text=True)
+         "--goal", "g", "--files", "f.py", "--session", "s", "--no-marker"])
     assert r.returncode == 2
     assert "already exists" in r.stderr
 
 
 def test_refuses_without_a_session(tmp_path):
     lanes = _lanes(tmp_path)
-    r = subprocess.run(
+    r = _utf8_capture(
         [sys.executable, str(TOOL), "--lanes", str(lanes), "--slug", "s2",
-         "--goal", "g", "--files", "f.py", "--session", "", "--no-marker"],
-        capture_output=True, text=True)
+         "--goal", "g", "--files", "f.py", "--session", "", "--no-marker"])
     assert r.returncode == 2
 
 
@@ -156,7 +170,7 @@ def _run_with_marker(lanes: pathlib.Path) -> subprocess.CompletedProcess:
     cmd = [sys.executable, str(TOOL), "--lanes", str(lanes), "--slug", "new-lane",
            "--goal", "a testable outcome", "--files", "scripts/x.py",
            "--session", "sess-1", "--date", "2026-09-23"]
-    return subprocess.run(cmd, capture_output=True, text=True)
+    return _utf8_capture(cmd)
 
 
 def _git(cwd: pathlib.Path, *args: str) -> None:
