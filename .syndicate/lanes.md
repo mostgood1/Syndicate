@@ -1393,7 +1393,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 
 ### layer2-stale-book-pick — OPEN — opened 2026-10-06 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
 - Goal: A book that stopped quoting no longer wins a Layer 2 row on its last price while a fresh bettable book quotes the same line: the bettable pick prefers books seen within the sport's quote-age ceiling when any is bettable; verified by stale_book_skipped_by_sport > 0 and NHL rows_stale_quote falling on the fleet board
-- Files: syndicate/features/shared/layer2_board.py, tests/test_layer2_stale_book_pick.py, pipeline/layer2_shortlist.py (LOAN, per-sport stats dict key ONLY)
+- Files: syndicate/features/shared/layer2_board.py, tests/test_layer2_stale_book_pick.py
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: Unit tests incl. off!=on; fleet board after restart: stale_book_skipped > 0, NHL/MLB rows_stale_quote lower than the pre-restart reading
@@ -1460,8 +1460,8 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - **LANDED 2026-10-06: dfb193bb (predict-date league id + slate gate) and ea5a8877 (props OUT filter); NOT on the fleet.** Off/on: 3/4 predict-date tests fail on the old vendor code; props filter over prod's real 10-07 inputs drops exactly Gray, Loyd, Talbot = the 3 players absent from both 10-07 sim files. Impact of (a) so far: NBA rows sat inert in predictions_2026-10-0{5,6,8}.csv only -- recommendations_slate 0 picks on those dates, no NBA game in any derived file (a 'Kings' grep hit in cards_sim_detail_10-06 is a substring false positive). Those 3 files are reused while they have rows, so they persist until moved. OPEN: Layer 1/2 rows come from book quotes (board_enrichment.attach_projections, layer2_board) and are NOT filtered -- other lanes' files; upstream re-derivation of the vendor fix in mostgood1/WNBA-Betting owed.
 ### layer2-coverage-identity-merge — OPEN — opened 2026-10-06 — session 5d9a4d65-467f-4895-aad0-fdadc305b279
 - Goal: The windowed merge of the nested game_coverage/prop_coverage halves never sums identity fields (artifact_season/artifact_week/artifact_rows/artifact_date) and re-derives each half's pct_* rate from its own summed counts, so a 7-date NFL window serves week 5 / season 2026, not 35 / 14182, and a pct_projected <= 100
-- Files: tests/test_layer2_coverage_identity_merge.py (NEW)
-- **LENT 2026-10-06 ~6:20 PM CT to lane `layer2-stale-book-pick` (session b9bb5f37), USER DECISION verbatim "borrow layer2_shortlist.py": `pipeline/layer2_shortlist.py` moved off the Files line above (this lane holds the coverage-half merge branch of _attach_projections_over_window ONLY; the borrower adds ONE key, `stale_book_skipped`, to the per-sport stats dict next to `repriced_to_bettable`, ~line 1764). Returned when the borrower lands.**
+- Files: pipeline/layer2_shortlist.py (coverage-half merge branch of _attach_projections_over_window ONLY), tests/test_layer2_coverage_identity_merge.py (NEW)
+- RETURNED 2026-10-06 by lane `layer2-stale-book-pick` (session b9bb5f37) after landing d221c0c2 (one key, `stale_book_skipped`, in the per-sport stats dict ONLY).
 - Hypothesis: The coverage_halves branch sums every numeric sub-key, so identity fields from a week-keyed artifact loaded once per window date are multiplied by the date count (week 5 x 7 = 35) and the half's pct_projected is a sum of per-date percentages (482.3)
 - Falsification test: If a 2-date synthetic window through the real merge yields artifact_week 5 and pct_projected <= 100 before the fix, the defect is elsewhere
 - Verification: New test: 2-date window, week 5 on both dates -> prop_coverage.artifact_week == 5, artifact_season == 2026, pct_projected re-derived; distinct weeks -> sorted list; fleet reading of /api/board/layer2-shortlist after the next fleet ff
