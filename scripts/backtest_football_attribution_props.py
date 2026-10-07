@@ -338,6 +338,7 @@ def main() -> None:
     ap.add_argument("--pass-odds-mult", type=float, default=1.0)
     ap.add_argument("--incomplete-as-run", type=float, default=0.0)
     ap.add_argument("--half-life", type=float, default=None, help="amendment 3 share estimator (E1: recency half-life)")
+    ap.add_argument("--markets", default="", help="comma list of production stat names to grade (Phase C: passing_yards,passing_attempts)")
     args = ap.parse_args()
     from scripts.football_scenario_rates import idle_self
     idle_self()   # fleet shares this machine
@@ -359,6 +360,10 @@ def main() -> None:
     H.configure_env(ROOT)
     from syndicate.features.shared.team_aliases import canonical_team
     rows, drops = build_rows(seasons)
+    if args.markets:
+        keep = {m.strip() for m in args.markets.split(",") if m.strip()}
+        rows = [r for r in rows if r["stat"] in keep]
+        tag += "_" + "-".join(sorted(keep))
     games = sorted({r["gid"] for r in rows})
     if args.limit_games:
         games = games[:: max(1, len(games) // args.limit_games)][: args.limit_games]
