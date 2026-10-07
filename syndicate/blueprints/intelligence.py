@@ -4024,6 +4024,18 @@ def board_layer2_shortlist_api():
                 # exactly that purpose polled for ten minutes against a
                 # pre-fix artifact and could never have known.
                 "written_at": shortlist.get("written_at"),
+                # `layer2-shard-window-flags` (2026-10-07). While a build is
+                # being written, the shards land ~25-30 s before the index, and
+                # the merge relabels `written_at` with the NEW shard stamp while
+                # every counter on this payload is still the PREVIOUS build's.
+                # A watcher keyed on `written_at` fired inside that window on
+                # 10-07 (18:51:57Z) and read the 17:08 build's counters under the
+                # 18:51:36Z stamp. These say which case a reading is.
+                "shard_index_stale": bool(shortlist.get("shard_index_stale")),
+                "index_written_at": shortlist.get("index_written_at") or shortlist.get("written_at"),
+                "rows_from_shards": bool(shortlist.get("rows_from_shards")),
+                "shards_loaded": shortlist.get("shards_loaded"),
+                "shards_missing": shortlist.get("shards_missing"),
                 # `layer2-prior-date-live-carryover`: the age every `live` row
                 # is judged against, and how many rows were relabelled.
                 "build_age_seconds": build_age_seconds,
