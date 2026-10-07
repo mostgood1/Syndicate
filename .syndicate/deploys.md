@@ -47306,3 +47306,12 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - **counts.** 0 `LEAGUE_POLL_FAILED` with `bad argument to internal function`; 0 `error=SystemError`. Other `LEAGUE_POLL_FAILED`: 3 `error=ConnectionError` (2026-10-03T21:15Z epl / la_liga / bundesliga). (3 further grep hits were ALL_PROCESS_MEMORY lines quoting the string in a cmdline, not failures.)
 - **exposure.** this window **24** match-ticks over 45,771 `live_state` write lines (24 non-zero, all MLS, logged 2026-10-07 00:56..02:35Z for the 10-06 slate); per UTC day writes/ticks: 10-02 839/0, 10-03 10,684/0, 10-04 8,728/0, 10-05 10,790/0, 10-06 8,690/0, 10-07 6,040/24. Running total since go-live **596** (Render 572 + local 24) against a bar of **2,551**. European leagues at 0 all weekend because the source had no fixtures (ESPN eng.1 20261003: 0 events); the parse does count a live population (MLS).
 - **verdict.** INSUFFICIENT (0 failures, 596 < 2,551). Re-armed for 2026-10-10T15:00Z.
+
+## 2026-10-07 15:34:53Z (10:34 AM CT) -- READING: served ligue_1 departed filter on the refreshed roster -- **MATCHES PREDICTION** (lane `soccer-roster-refresh`)
+
+- **Prediction** (offline A/B, ~01:00Z): **256** dropped. The last July-roster build (23:36:43Z 10-06) dropped 245. The new roster rescues 17 players and stops rescuing 28 who are absent from both the current stats file and ESPN's current squads.
+- **Reading:** the builds generated after the ligue_1 roster write (00:17:35Z), on the fleet:
+  - `recommendations_2026-10-10.json` 12:31:17Z: dropped **256**, rows 841, per_club 18/18, **254 props** (the July-roster build had 253), 5 matches.
+  - `recommendations_2026-10-11.json` 14:04:14Z: dropped 256, 156 props (the July-roster 10-11 build, 17:13:55Z 10-06, had 168), 3 matches.
+  - `recommendations_2026-10-09.json` 14:37:06Z: dropped 256, 51 props (July-roster build: 52), 1 match.
+- **Result:** served dropped 245 -> 256, exactly the offline number. Props per slate are about flat (+1 / -12 / -1): the squads swapped stale players for current ones rather than growing. Prop accuracy effect not measured.
