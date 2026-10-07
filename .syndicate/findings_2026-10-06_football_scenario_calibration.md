@@ -292,6 +292,32 @@ quarter ends with the clock at 0:00. `scripts/football_scenario_replay.py`:
   rows are reported for information only.
 - **2025 read ONCE per sport** (its own marker); development runs use FIT seasons only.
 
+## RE-FIT v2 — PRE-REGISTERED 2026-10-07 (user: "Hold it, fix the objective first")
+
+**NCAAF 2025 status:** the v1 NCAAF validation started automatically at 01:35:52Z when the NCAAF
+descent finished, and was PAUSED ~17 min later (processes killed, no orphans) after the NFL v1
+failure: game sims only, `validation_report.json` never written, no moment, gate or score
+computed. NCAAF 2025 is UNREAD. The v1 NCAAF candidate (offense sensitivity 0.6, TD weight 0.48,
+home bonus 0.03) is NOT validated and is superseded by v2.
+
+**What changes from v1 (everything else as pre-registered for v1):**
+1. **Discrimination moments added** -- the v1 objective was satisfiable by compressing team
+   quality. `margin_slope`: OLS slope of the ACTUAL home margin on the projected margin across the
+   FIT games (target 1.0; compression drives it above 1). `total_slope`: same for totals. SE by a
+   game-clustered bootstrap of the slope with production's projections held fixed. z = (slope - 1)/SE.
+   Outcome-based on purpose -- the close is a gate, never a fit target.
+2. **FG lever:** both FG levers are unreachable with the 4th-down model ON, and the gap is drive
+   progress (P(reach RZ) 0.253 vs 0.298), not the 4th-down choice. Add `red_zone_gain_stiffening`
+   (multiplicative grid as the others) -- drives that stall in the red zone kick.
+3. Output to `refit_v2/`; v1 files kept as the record.
+
+**Validation sets:**
+- **NCAAF: 2025**, unread; gates (a)-(f) and L1-L3 as pre-registered.
+- **NFL: 2026 REG games completed at read time**, fetched fresh from nflverse into a PRIVATE root
+  (the shared `data/nfl_source` mirror is not written). NFL 2025 is spent (v1 read). **Read only once
+  >= 128 completed 2026 games exist** (about week 8, late October); below that the paired CIs cannot
+  resolve the 0.15-pt tolerances and the read would waste the set. Same gates (a)-(f), L1-L3.
+
 ## Results
 
 ### Phase 1, NFL (2023-24 REG, all 544 games, 300 seeds; real-vs-sim, flag rule as pre-registered)
