@@ -1303,6 +1303,82 @@ def _enforce_live_edge_policy(grid: list) -> dict:
     }
 
 
+_OUT_PLAYER_FEED_ROOTS = {
+    "wnba": ("SYNDICATE_WNBA_SOURCE_ROOT", "wnba_source"),
+    "nba": ("SYNDICATE_NBA_SOURCE_ROOT", "nba_source"),
+}
+
+
+def _injury_feed_root(sport: str) -> Path | None:
+    from syndicate.features.shared.source_roots import preferred_artifact_roots
+
+    env_var, local_dir = _OUT_PLAYER_FEED_ROOTS[sport]
+    for root in preferred_artifact_roots(__file__, env_var=env_var, local_dir_name=local_dir):
+        if (Path(root) / "data" / "raw" / "injuries.csv").is_file():
+            return Path(root)
+    return None
+
+
+def _flag_out_player_props(grid: list, *, sport: str, selected_date: str) -> dict:
+    """Flag basketball prop rows whose player is OUT on the injury feed, and clear their edges.
+
+    The baseline props path refuses these lines at `export_props_edges_local`
+    (`basketball_props_availability`, lane wnba-props-out-player-leak), but the
+    boards are built from BOOKMAKER QUOTES, so an OUT player's quote still
+    reached both: unmatched to any projection, and in Layer 2 ranked on market
+    EV alone. Same rule as that path -- the latest snapshot on or before the
+    date, confirmed OUT/SUSPENDED/INACTIVE only (questionable and doubtful stay
+    priced) -- so the three surfaces cannot disagree about who is out.
+
+    FLAGGED, NOT REMOVED: Layer 1 keeps the quote, marked, with no edge
+    (`[2026-10-05]` stop-market-withholding: nothing is kept off the board by a
+    market-level verdict; this is a property of the line). Layer 2's selection
+    reads `player_availability` to leave the line unseated. Reported even when
+    zero, so a silent feed is visible.
+    """
+    from syndicate.features.shared.basketball_props_availability import REFUSAL_REASON, out_players_for_date, player_key
+
+    root = _injury_feed_root(sport)
+    if root is None:
+        return {"out_player_props": {"feed_status": "absent", "rows_flagged": 0}}
+    feed = out_players_for_date(source_root=root, date_str=selected_date)
+    out = feed.get("out") or {}
+    flagged = 0
+    players: set[str] = set()
+    for row in grid:
+        if not isinstance(row, dict) or str(row.get("kind") or "") != "prop":
+            continue
+        entry = out.get(player_key(row.get("player_name")))
+        if not entry:
+            continue
+        row["player_availability"] = {
+            "status": entry.get("status") or "OUT",
+            "reason": REFUSAL_REASON,
+            "feed_date": entry.get("feed_date"),
+            "feed_team": entry.get("team"),
+        }
+        projection = row.get("projection")
+        if isinstance(projection, dict):
+            projection["edge_vs_market_pct"] = None
+            projection["edge_vs_line"] = None
+            projection["edge_unavailable_reason"] = REFUSAL_REASON
+        flagged += 1
+        players.add(str(row.get("player_name") or ""))
+    summary = {
+        "feed_status": feed.get("feed_status"),
+        "snapshot_date": feed.get("snapshot_date"),
+        "out_players_on_feed": len(out),
+        "rows_flagged": flagged,
+        "players": sorted(players),
+    }
+    print(
+        f"[board_enrichment] OUT_PLAYER_PROPS_FLAGGED sport={sport} date={selected_date} "
+        f"snapshot={summary['snapshot_date']} out_on_feed={len(out)} rows={flagged} players={','.join(sorted(players)) or '<none>'}",
+        flush=True,
+    )
+    return {"out_player_props": summary}
+
+
 def attach_projections(grid: list, *, sport: str, selected_date: str) -> dict:
     """Per-sport projection join, plus a cross-sport degeneracy check (`#425`).
 
@@ -1329,6 +1405,13 @@ def attach_projections(grid: list, *, sport: str, selected_date: str) -> dict:
         coverage["live_edge_enforcement"] = "failed"
     else:
         coverage.update(enforced)
+    if sport in _OUT_PLAYER_FEED_ROOTS:
+        try:
+            coverage.update(_flag_out_player_props(grid, sport=sport, selected_date=selected_date))
+        except Exception:
+            # Loud in the payload, not just the log: if this fails, OUT players' quotes stay unflagged.
+            _LOGGER.exception("OUT_PLAYER_PROPS_FAILURE sport=%s", sport)
+            coverage["out_player_props"] = {"feed_status": "failed", "rows_flagged": 0}
     try:
         degeneracy = detect_degenerate_projections(grid, sport=sport)
     except Exception:
