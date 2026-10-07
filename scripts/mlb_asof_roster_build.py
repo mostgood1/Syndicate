@@ -39,6 +39,14 @@ How each input is bounded (each verified against the live API on 2026-10-06, not
   * injuries: none (injuries_raw exists only for 05-29).
   * a fresh StatsAPI cache per run, so no later response is reused.
 
+SOURCE MODE `--source statsapi` (lane mlb-statsapi-asof-rebuild) rebuilds dates whose stored
+inputs are gone (2026-07-13..09-29 lived on Render). Instead of lineups.json / probables.json /
+the stored sim record it uses: the StatsAPI schedule (games, teams, probable starters), an as-of
+lineup PROJECTION from earlier games (scripts/mlb_asof_lineup_projection.py, option B -- passed
+as projected ids with confirmed empty, as production mostly ran), and production's own
+`fetch_game_context` + umpire shrink 0.75 for park / weather / umpire. It writes a synthetic
+sim record per game in production's field layout so the replay tools run unchanged.
+
 Two known gaps from the production inputs: no statcast layers, and no bullpen
 availability. The FIDELITY CHECK exists to measure them. Rebuild dates that DO
 have real roster_objs (06-15..06-20), replay both, and compare.
@@ -174,18 +182,101 @@ def install_asof_statcast(raw_root: Path, date: str, season: int, counters: Coun
         br._asof_stamina_wrapped = True
 
 
+UMPIRE_SHRINK = 0.75  # production's --umpire-shrink default (tools/daily_update.py)
+
+
+def _context_obj(weather, park, umpire) -> dict:
+    """Production's sim-record layout for the context (tools/daily_update.py, roster_snap)."""
+    out = {}
+    if weather is not None:
+        wm = weather.multipliers()
+        out["weather"] = {"source": weather.source, "condition": weather.condition, "temperature_f": weather.temperature_f,
+                          "wind_speed_mph": weather.wind_speed_mph, "wind_direction": weather.wind_direction,
+                          "wind_raw": weather.wind_raw, "is_dome": weather.is_dome,
+                          "multipliers": {"hr_mult": wm.hr_mult, "inplay_hit_mult": wm.inplay_hit_mult, "xb_share_mult": wm.xb_share_mult}}
+    if park is not None:
+        pm = park.multipliers()
+        out["park"] = {"source": park.source, "venue_id": park.venue_id, "venue_name": park.venue_name,
+                       "roof_type": park.roof_type, "roof_status": park.roof_status, "left_line": park.left_line,
+                       "center": park.center, "right_line": park.right_line,
+                       "multipliers": {"hr_mult": pm.hr_mult, "inplay_hit_mult": pm.inplay_hit_mult, "xb_share_mult": pm.xb_share_mult}}
+    if umpire is not None:
+        old = float(getattr(umpire, "called_strike_mult", 1.0) or 1.0)
+        umpire.called_strike_mult = float(1.0 + UMPIRE_SHRINK * (old - 1.0))
+        out["umpire"] = {"source": umpire.source, "home_plate_umpire_id": umpire.home_plate_umpire_id,
+                         "home_plate_umpire_name": getattr(umpire, "home_plate_umpire_name", None),
+                         "called_strike_mult": umpire.called_strike_mult,
+                         "multipliers": {"called_strike_mult": umpire.multipliers().called_strike_mult}}
+    return out
+
+
+class StatsApiSource:
+    """Games / probables / projected lineups / context for a date from StatsAPI only."""
+
+    PLAYED = ("Final", "Completed Early", "Game Over")
+
+    def __init__(self, cache: Path, season: int, last_date: str):
+        import mlb_asof_lineup_projection as lp
+
+        self.lp = lp
+        self.http = lp.Http(cache)
+        self.games = lp.season_games(self.http, f"{season}-03-01", last_date)
+        self.hands = lp.pitch_hands(self.http, [g[f"{s}_probable"] for g in self.games for s in ("away", "home")])
+        self.history = lp.team_history(self.games, self.hands)
+
+    def games_for(self, out_root: Path, date: str, client, counters: Counter) -> list[dict]:
+        from sim_engine.data.statsapi import fetch_game_context
+
+        out = []
+        sim_dir = out_root / "daily" / "sims" / date
+        sim_dir.mkdir(parents=True, exist_ok=True)
+        todays = sorted((g for g in self.games if g["date"] == date), key=lambda g: (g["game_pk"], g["game_number"]))
+        for i, g in enumerate(todays):
+            if g["status"] not in self.PLAYED:
+                counters[f"skipped_status:{g['status']}"] += 1
+                continue
+            if not (g["away_probable"] and g["home_probable"]):
+                counters["skipped_no_probable"] += 1
+                continue
+            proj = {}
+            for side, opp in (("away", "home"), ("home", "away")):
+                roster = self.lp.active_roster(self.http, g[f"{side}_team_id"], date)
+                proj[side] = self.lp.project(self.history[g[f"{side}_team_id"]], date,
+                                             self.hands.get(g[f"{opp}_probable"]), roster)
+                counters["projected_short"] += int(len(proj[side]) < 9)
+            weather, park, umpire = fetch_game_context(client, g["game_pk"])
+            rec = {"date": date, "game_pk": g["game_pk"], "source": "statsapi_asof_rebuild",
+                   "schedule": {"game_number": g["game_number"]},
+                   "away": {"team_id": g["away_team_id"], "name": g["away_name"], "abbreviation": g["away_abbr"]},
+                   "home": {"team_id": g["home_team_id"], "name": g["home_name"], "abbreviation": g["home_abbr"]},
+                   "starters": {"away": g["away_probable"], "home": g["home_probable"]},
+                   "lineups_projected": proj, **_context_obj(weather, park, umpire)}
+            path = sim_dir / f"sim_{i}_{g['away_abbr']}_at_{g['home_abbr']}_pk{g['game_pk']}_g{g['game_number']}.json"
+            path.write_text(json.dumps(rec, indent=1), encoding="utf-8")
+            out.append({"game_pk": g["game_pk"], "sim_path": path, "rec": rec,
+                        "away_lineup": [], "home_lineup": [],
+                        "away_projected": proj["away"], "home_projected": proj["home"],
+                        "away_prob": g["away_probable"], "home_prob": g["home_probable"]})
+        counters["statsapi_games"] += len(out)
+        return out
+
+
 def build_date(data_dir: Path, out_root: Path, date: str, season: int, counters: Counter,
-               raw_root: Path | None = None) -> int:
+               raw_root: Path | None = None, games: list[dict] | None = None,
+               shared_cache: Path | None = None) -> int:
     from sim_engine.data.build_roster import build_team_roster
     from sim_engine.data.roster_artifact import write_game_roster_artifact
     from sim_engine.models import Team
 
     if raw_root is not None:
         install_asof_statcast(raw_root, date, season, counters)
-    cache = Path(tempfile.mkdtemp(prefix=f"asof_cache_{date}_"))
+    # A SHARED cache is safe across dates: the date-bounded client rewrites every
+    # current-season request BEFORE it reaches the cache (byDateRange endDate=D-1 is part of
+    # the key), and gameLog responses are cached whole and filtered < D after the read.
+    cache = shared_cache if shared_cache is not None else Path(tempfile.mkdtemp(prefix=f"asof_cache_{date}_"))
     client = make_client(date, season, cache, counters)
     written = 0
-    for i, g in enumerate(games_for(data_dir, date)):
+    for i, g in enumerate(games if games is not None else games_for(data_dir, date)):
         rec = g["rec"]
         teams = {}
         for side in ("away", "home"):
@@ -218,9 +309,11 @@ def build_date(data_dir: Path, out_root: Path, date: str, season: int, counters:
                                    meta={"asof_rebuild": True, "as_of_end": _prev_day(date), "lane": "mlb-asof-roster-rebuild"})
         dst = out_root / "daily" / "sims" / date / g["sim_path"].name
         dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(g["sim_path"], dst)
+        if Path(g["sim_path"]).resolve() != dst.resolve():
+            shutil.copyfile(g["sim_path"], dst)
         written += 1
-    shutil.rmtree(cache, ignore_errors=True)
+    if shared_cache is None:
+        shutil.rmtree(cache, ignore_errors=True)
     return written
 
 
@@ -230,6 +323,11 @@ def main(argv=None) -> int:
     ap.add_argument("--out-root", required=True)
     ap.add_argument("--dates", nargs="+", required=True)
     ap.add_argument("--season", type=int, default=2026)
+    ap.add_argument("--source", choices=["stored", "statsapi"], default="stored",
+                    help="stored = the fleet's lineups/probables/sim records; statsapi = schedule + as-of lineup projection + live-feed context")
+    ap.add_argument("--statsapi-cache", default="~/mlb_statsapi_asof_cache")
+    ap.add_argument("--shared-cache", default="",
+                    help="persistent StatsAPI cache shared across dates (default: a fresh cache per date)")
     ap.add_argument("--statcast-raw-root", default="",
                     help="statcast/raw_pitches dir; builds as-of features per date (required for fidelity)")
     args = ap.parse_args(argv)
@@ -245,8 +343,19 @@ def main(argv=None) -> int:
     data_dir = Path(os.path.expanduser(args.data_root)).resolve()
     counters = Counter()
     report = {}
+    shared = Path(os.path.expanduser(args.shared_cache)) if args.shared_cache else None
+    if shared is not None:
+        shared.mkdir(parents=True, exist_ok=True)
+    source = None
+    if args.source == "statsapi":
+        sys.path.insert(0, str(REPO / "scripts"))
+        source = StatsApiSource(Path(os.path.expanduser(args.statsapi_cache)), args.season, max(args.dates))
     for d in sorted(set(args.dates)):
-        report[d] = build_date(data_dir, out_root, d, args.season, counters,
+        games = None
+        if source is not None:
+            ctx_client = make_client(d, args.season, shared or Path(tempfile.mkdtemp(prefix=f"asof_ctx_{d}_")), counters)
+            games = source.games_for(out_root, d, ctx_client, counters)
+        report[d] = build_date(data_dir, out_root, d, args.season, counters, games=games, shared_cache=shared,
                                raw_root=Path(os.path.expanduser(args.statcast_raw_root)) if args.statcast_raw_root else None)
         print(f"{d}: {report[d]} games", flush=True)
     summary = {"games_by_date": report, "counters": dict(counters), "as_of_rule": "every current-season stat bounded at D-1 or prior season; statcast features as of D-1" if args.statcast_raw_root else "every current-season stat bounded at D-1 or prior season; statcast off"}
