@@ -48,7 +48,11 @@ from scripts import football_scenario_rates as F  # noqa: E402
 SWITCHES = {"halftime_kickoff": True, "fourth_down_decision_model": True,
             "non_offensive_scoring": True, "possession_aware_priors": True}
 FIT_SEASONS = {"nfl": [2023, 2024], "ncaaf": [2024]}
+# v2 (pre-registered bc646508): NFL 2025 was spent by v1; NFL validates on 2026.
 VALIDATION_SEASON = 2025
+VALIDATION_SEASONS = {"nfl": 2026, "ncaaf": 2025}
+MIN_VALIDATION_GAMES = {"nfl": 128, "ncaaf": 1}
+OUT_DIR = "refit_v2"
 DESCENT_SEEDS = 60
 SMOKE = False   # --smoke: 6 games, 10 seeds, 2 grid values, separate output dir
 FINAL_SEEDS = 300
@@ -61,17 +65,23 @@ MULT_FACTORS = (0.75, 0.875, 1.0, 1.125, 1.25)
 # FG ladder) -- the smoke run's reachability check dropped it -- so the FG-frequency
 # lever is `field_goal_weight_multiplier` instead.
 MULT_LEVERS = ("drive_yardage_multiplier", "touchdown_weight_multiplier",
-               "red_zone_touchdown_weight_bonus", "field_goal_weight_multiplier")
+               "red_zone_touchdown_weight_bonus", "field_goal_weight_multiplier",
+               "red_zone_gain_stiffening")   # v2: drives that stall in the red zone kick
 ABS_LEVERS = {"home_field_bonus": (0.0, 0.03, 0.06, 0.09, 0.12),
-              "drive_success_offense_sensitivity": (0.6, 0.8, 1.0, 1.2),
-              "drive_success_defense_sensitivity": (0.6, 0.8, 1.0, 1.2)}
+              # v2 amendment 1: widened -- v1 was OVER-dispersed and 0.6 was the floor
+              "drive_success_offense_sensitivity": (0.3, 0.45, 0.6, 0.8, 1.0, 1.2),
+              "drive_success_defense_sensitivity": (0.3, 0.45, 0.6, 0.8, 1.0, 1.2)}
 LEVER_ORDER = ("home_field_bonus", "drive_yardage_multiplier", "touchdown_weight_multiplier",
                "red_zone_touchdown_weight_bonus", "field_goal_weight_multiplier",
-               "drive_success_offense_sensitivity", "drive_success_defense_sensitivity")
+               "drive_success_offense_sensitivity", "drive_success_defense_sensitivity",
+               "red_zone_gain_stiffening")
 
 MOMENTS = ("mean_total", "mean_margin", "total_sd_gap", "margin_sd_gap",
            "p_td", "p_fg", "p_punt", "p_to", "plays_per_drive", "drives_per_team_game", "p_td_rz",
-           "ppd_weak", "ppd_strong")
+           "ppd_weak", "ppd_strong",
+           # v2: DISCRIMINATION. v1 lowered its objective by compressing team quality;
+           # a slope of actual on projected above 1 is exactly that compression.
+           "margin_slope", "total_slope")
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +170,12 @@ def _sd(xs: List[float]) -> float:
     return math.sqrt(sum((x - m) ** 2 for x in xs) / len(xs))
 
 
+def _slope(xs: List[float], ys: List[float]) -> float:
+    mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+    vx = sum((x - mx) ** 2 for x in xs)
+    return sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / vx if vx else float("nan")
+
+
 def moments(src: Dict[str, dict], games: List[str], terc: Dict[Tuple[str, str], str],
             sims_for_game_level: Optional[Dict[str, dict]] = None, real: Optional[Dict[str, dict]] = None,
             is_real: bool = False) -> Dict[str, float]:
@@ -191,6 +207,8 @@ def moments(src: Dict[str, dict], games: List[str], terc: Dict[Tuple[str, str], 
         out["mean_margin"] = sum(src[g]["margin"] for g in games) / len(games)
         out["total_sd_gap"] = 0.0
         out["margin_sd_gap"] = 0.0
+        out["margin_slope"] = 1.0
+        out["total_slope"] = 1.0
     else:
         out["mean_total"] = sum(src[g]["total_mean"] for g in games) / len(games)
         out["mean_margin"] = sum(src[g]["margin_mean"] for g in games) / len(games)
@@ -199,14 +217,17 @@ def moments(src: Dict[str, dict], games: List[str], terc: Dict[Tuple[str, str], 
                                - _sd([real[g]["total"] - src[g]["total_mean"] for g in games]))
         out["margin_sd_gap"] = (sum(src[g]["margin_stdev"] for g in games) / len(games)
                                 - _sd([real[g]["margin"] - src[g]["margin_mean"] for g in games]))
+        out["margin_slope"] = _slope([src[g]["margin_mean"] for g in games], [real[g]["margin"] for g in games])
+        out["total_slope"] = _slope([src[g]["total_mean"] for g in games], [real[g]["total"] for g in games])
     return out
 
 
 def real_se(real: Dict[str, dict], games: List[str], terc: Dict[Tuple[str, str], str],
-            reps: int = 400, seed: int = 5) -> Dict[str, float]:
+            prod: Optional[Dict[str, dict]] = None, reps: int = 400, seed: int = 5) -> Dict[str, float]:
     rng = random.Random(seed)
     draws: Dict[str, List[float]] = {m: [] for m in MOMENTS}
     sd_t, sd_m = [], []
+    sl_m, sl_t = [], []
     for _ in range(reps):
         sample = [games[rng.randrange(len(games))] for _ in games]
         # duplicate keys collapse in a dict, so resample by index into lists
@@ -215,10 +236,16 @@ def real_se(real: Dict[str, dict], games: List[str], terc: Dict[Tuple[str, str],
             draws[k].append(v)
         sd_t.append(_sd([real[g]["total"] for g in sample]))
         sd_m.append(_sd([real[g]["margin"] for g in sample]))
+        if prod is not None:   # v2: slope SE with production's projections held fixed
+            sl_m.append(_slope([prod[g]["margin_mean"] for g in sample], [real[g]["margin"] for g in sample]))
+            sl_t.append(_slope([prod[g]["total_mean"] for g in sample], [real[g]["total"] for g in sample]))
     se = {k: _sd(v) for k, v in draws.items() if v}
     # the SD-gap moments: SE of a realised SD
     se["total_sd_gap"] = _sd(sd_t)
     se["margin_sd_gap"] = _sd(sd_m)
+    if sl_m:
+        se["margin_slope"] = _sd(sl_m)
+        se["total_slope"] = _sd(sl_t)
     return se
 
 
@@ -226,8 +253,8 @@ def _moments_from_list(real: Dict[str, dict], sample: List[str], terc) -> Dict[s
     fake = {f"{g}#{i}": real[g] for i, g in enumerate(sample)}
     tf = {(f"{g}#{i}", s): terc[(g, s)] for i, g in enumerate(sample) for s in ("home", "away")}
     m = moments(fake, list(fake), tf, is_real=True)
-    m.pop("total_sd_gap")
-    m.pop("margin_sd_gap")
+    for k in ("total_sd_gap", "margin_sd_gap", "margin_slope", "total_slope"):
+        m.pop(k)
     return m
 
 
@@ -265,7 +292,7 @@ def grids(sport: str) -> Dict[str, List[float]]:
 
 def cmd_descent(args) -> None:
     sport = args.sport
-    out = F.OUT_ROOT / sport / ("refit_smoke" if SMOKE else "refit")
+    out = F.OUT_ROOT / sport / ("refit_v2_smoke" if SMOKE else OUT_DIR)
     out.mkdir(parents=True, exist_ok=True)
     real_all = F._load(F.OUT_ROOT / sport / f"real_{'-'.join(map(str, FIT_SEASONS[sport]))}.jsonl")
     ev = Evaluator(sport, FIT_SEASONS[sport], DESCENT_SEEDS, args.workers, out / f"descent_s{DESCENT_SEEDS}.jsonl")
@@ -276,7 +303,7 @@ def cmd_descent(args) -> None:
         print(f"[{sport}] FIT games {len(ev.tasks)}, with real outcomes {len(games)}, {DESCENT_SEEDS} seeds")
         terc = _terciles(prod, games)
         real_m = moments(real_all, games, terc, is_real=True)
-        se = real_se(real_all, games, terc)
+        se = real_se(real_all, games, terc, prod=prod)
 
         def score(ov: Dict[str, Any], label: str) -> float:
             sims = ev.run(ov)
@@ -363,22 +390,23 @@ def cmd_validate(args) -> None:
     sport = args.sport
     if not os.environ.get("FOOTBALL_SCENARIO_READ_VALIDATION"):
         raise SystemExit("2025 is VALIDATION; set FOOTBALL_SCENARIO_READ_VALIDATION=1 to read it (once)")
-    out = F.OUT_ROOT / sport / "refit"
-    marker = out / "VALIDATION_READ"
+    out = F.OUT_ROOT / sport / OUT_DIR
+    season = VALIDATION_SEASONS[sport]
+    marker = out / f"VALIDATION_READ_{season}"
     if marker.exists() and not args.resume:
         raise SystemExit(f"2025 was already read for {sport} ({marker.read_text().strip()}); it is read ONCE")
     fit = json.loads((out / "descent_result.json").read_text(encoding="utf-8"))
     cand = fit["overrides"]
     marker.write_text(f"{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())} candidate={cand}", encoding="utf-8")
     if sport == "nfl":
-        real = F.real_nfl([VALIDATION_SEASON])
+        real = F.real_nfl([season])
         close = {g: (r["close_spread"], r["close_total"]) for g, r in real.items()}
     else:
         if not (F.ncaaf_work() / "cache" / "ppa_games_2025_wk01.json").exists():
             import shutil
             for p in Path(r"C:\tmp\ncaaf_lpb\cache").glob("ppa_games_2025_wk*.json"):
                 shutil.copy2(p, F.ncaaf_work() / "cache" / p.name)
-        real = F.real_ncaaf([VALIDATION_SEASON])
+        real = F.real_ncaaf([season])
         from scripts import backtest_ncaaf_lines_props as H
         lines = H.load_cfbd_lines_2025()
         close = {str(g): (-b["spread"] if b.get("spread") is not None else None, b.get("total")) for g, b in lines.items()}
@@ -393,8 +421,13 @@ def cmd_validate(args) -> None:
         real_rec[gid] = rec
     # Amendment 3: VALIDATION scores EVERY 2025 game. The every-4th subset is a
     # descent cost-saving; reusing it here would have graded on ~68 NFL games.
-    ev = Evaluator(sport, [VALIDATION_SEASON], FINAL_SEEDS, args.workers, out / f"validation_s{FINAL_SEEDS}.jsonl",
+    ev = Evaluator(sport, [season], FINAL_SEEDS, args.workers, out / f"validation_{season}_s{FINAL_SEEDS}.jsonl",
                    every=1)
+    if len(ev.tasks) < MIN_VALIDATION_GAMES[sport]:
+        ev.close()
+        marker.unlink()
+        raise SystemExit(f"only {len(ev.tasks)} completed {season} games; v2 pre-registered >= "
+                         f"{MIN_VALIDATION_GAMES[sport]} before reading -- nothing read")
     try:
         prod = ev.run({})
         candd = ev.run(cand)
@@ -403,7 +436,7 @@ def cmd_validate(args) -> None:
     games = sorted(set(prod) & set(candd) & set(real_rec))
     terc = _terciles(prod, games)
     real_m = moments(real_rec, games, terc, is_real=True)
-    se = real_se(real_rec, games, terc)
+    se = real_se(real_rec, games, terc, prod=prod)
     p_obj, p_z = objective(moments(prod, games, terc, real=real_rec), real_m, se)
     c_obj, c_z = objective(moments(candd, games, terc, real=real_rec), real_m, se)
     gates = {}
@@ -426,11 +459,11 @@ def cmd_validate(args) -> None:
         m, lo, hi = _paired([abs(candd[g][key] - close[g][idx]) - abs(prod[g][key] - close[g][idx]) for g in keep])
         gates[name] = (hi < 0.15, f"delta {m:+.3f} [{lo:+.3f}, {hi:+.3f}] n={len(keep)}")
     passed = all(v[0] for v in gates.values())
-    report = {"sport": sport, "season": VALIDATION_SEASON, "games": len(games), "seeds": FINAL_SEEDS,
+    report = {"sport": sport, "season": season, "games": len(games), "seeds": FINAL_SEEDS,
               "candidate": cand, "gates": {k: {"pass": v[0], "detail": v[1]} for k, v in gates.items()},
               "PASS": passed, "z_production": p_z, "z_candidate": c_z}
     (out / "validation_report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
-    print(f"\n[{sport}] VALIDATION {VALIDATION_SEASON}, {len(games)} games, {FINAL_SEEDS} seeds")
+    print(f"\n[{sport}] VALIDATION {season}, {len(games)} games, {FINAL_SEEDS} seeds")
     for k, (ok, detail) in gates.items():
         print(f"  {'PASS' if ok else 'FAIL'}  {k:28} {detail}")
     print(f"  => {'ALL GATES PASS' if passed else 'NOT SHIPPABLE'}")
@@ -438,9 +471,9 @@ def cmd_validate(args) -> None:
         from syndicate.features.shared.calibration_profile_store import save_versioned_profile
         prof = dataclasses.replace(_shipped(sport), **cand)
         path = save_versioned_profile(prof, artifact_path=out / f"{sport}_candidate_profile.json",
-                                      version=f"{sport}-scenario-refit-1",
+                                      version=f"{sport}-scenario-refit-2",
                                       fit_from={"lane": "football-scenario-calibration", "fit": FIT_SEASONS[sport],
-                                                "validation": VALIDATION_SEASON, "gates": report["gates"]})
+                                                "validation": season, "gates": report["gates"]})
         print(f"  candidate artifact (NOT promoted): {path}")
 
 

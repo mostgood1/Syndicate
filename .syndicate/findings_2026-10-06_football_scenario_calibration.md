@@ -318,6 +318,25 @@ home bonus 0.03) is NOT validated and is superseded by v2.
   >= 128 completed 2026 games exist** (about week 8, late October); below that the paired CIs cannot
   resolve the 0.15-pt tolerances and the read would waste the set. Same gates (a)-(f), L1-L3.
 
+### v2 amendment 1 — 2026-10-07, BEFORE any v2 run: the v1 diagnosis was backwards
+
+Measured on the CACHED v1 FIT descent sims (136 NFL 2023-24 games, 60 seeds; no new sims, no 2025):
+
+| arm | SD(projected margin) | corr(projected, actual) | corr(projected, close) | margin slope (actual on projected) |
+|---|---|---|---|---|
+| close line | 5.81 | 0.492 | -- | -- |
+| production | 6.10 | 0.396 | 0.850 | 0.88 |
+| v1 candidate | **7.92** | 0.406 | 0.855 | **0.70** |
+
+The v1 candidate's projected margins are ~30% MORE spread than production's for the same information
+-> OVER-dispersion, which is what moved per-game margins away from the outcome and the close. The
+sensitivity cut to 0.6 was the descent partly FIGHTING that spread, with nothing in the objective to
+see it. Source, as a HYPOTHESIS only: H4 -- with both rating paths reading the right teams, team
+differences now count in full, where the defect partly cancelled them. v2's slope moment is still the
+right instrument (slope < 1 = over-dispersion). **Amendment:** the two `drive_success_*_sensitivity`
+grids widen to {0.3, 0.45, 0.6, 0.8, 1.0, 1.2} so the descent can reach the dispersion the slope asks
+for. Nothing else changes.
+
 ## Results
 
 ### Phase 1, NFL (2023-24 REG, all 544 games, 300 seeds; real-vs-sim, flag rule as pre-registered)
@@ -369,7 +388,8 @@ z (production -> candidate): mean_total -2.68 -> -1.22, mean_margin -1.32 -> +0.
 drives/team-game +3.65 -> +6.06, ppd_weak -0.55 -> -2.95.
 
 **Diagnosis (stated as findings, not as excuses -- nothing ships):**
-1. **The objective could be satisfied by COMPRESSING team quality.** Both drive-success
+1. **[RETRACTED 2026-10-07 -- see "v2 amendment 1"; the candidate is OVER-dispersed, not compressed]**
+   ~~The objective could be satisfied by COMPRESSING team quality.~~ Both drive-success
    sensitivities went to 0.6; every moment is an aggregate MEAN, so nothing in the objective saw
    per-game discrimination. Mean margin was fixed (z +0.10) while per-game margins got worse and moved
    0.85 pts further from the close. A next design must carry a discrimination moment (e.g. SD of the

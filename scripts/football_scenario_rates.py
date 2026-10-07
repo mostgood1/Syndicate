@@ -369,7 +369,10 @@ def sim_task(task: Dict[str, Any]) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def nfl_root() -> Path:
-    return PRIMARY / "data" / "nfl_source"
+    # A PRIVATE root (e.g. a fresh nflverse pull for a 2026 read) never writes the
+    # shared mirror the fleet reads; absent = the primary checkout's mirror.
+    override = os.environ.get("FOOTBALL_SCENARIO_NFL_ROOT")
+    return Path(override) if override else PRIMARY / "data" / "nfl_source"
 
 
 def nfl_tasks(seasons: List[int], seeds: int) -> List[Dict[str, Any]]:

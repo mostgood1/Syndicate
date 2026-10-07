@@ -41,7 +41,8 @@ if str(REPO) not in sys.path:
 from scripts import football_scenario_rates as F  # noqa: E402
 
 SIMS = 300
-VALIDATION_SEASON = 2025
+VALIDATION_SEASONS = {"nfl": 2026, "ncaaf": 2025}   # v2 (bc646508): NFL 2025 spent by v1
+REFIT_DIR = "refit_v2"
 _NCAAF_SNAP = {"Rush", "Pass Reception", "Pass Incompletion", "Sack", "Passing Touchdown", "Rushing Touchdown",
                "Interception", "Pass Interception Return", "Interception Return Touchdown",
                "Fumble Recovery (Own)", "Fumble Recovery (Opponent)", "Fumble Return Touchdown"}
@@ -196,12 +197,12 @@ def replay_game(task: Dict[str, Any]) -> Dict[str, Any]:
 
 def cmd_run(args) -> None:
     sport, season = args.sport, args.season
-    out = F.OUT_ROOT / sport / "refit"
+    out = F.OUT_ROOT / sport / args.refit_dir
     out.mkdir(parents=True, exist_ok=True)
-    if season == VALIDATION_SEASON:
+    if season in (2025, VALIDATION_SEASONS[sport]):
         if not os.environ.get("FOOTBALL_SCENARIO_READ_VALIDATION"):
-            raise SystemExit("2025 is VALIDATION; set FOOTBALL_SCENARIO_READ_VALIDATION=1 to read it (once)")
-        marker = out / "LIVE_VALIDATION_READ"
+            raise SystemExit(f"{season} is VALIDATION; set FOOTBALL_SCENARIO_READ_VALIDATION=1 to read it (once)")
+        marker = out / f"LIVE_VALIDATION_READ_{season}"
         if marker.exists() and not args.resume:
             raise SystemExit(f"live 2025 already read for {sport}: {marker.read_text().strip()}")
         marker.write_text(time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), encoding="utf-8")
@@ -284,8 +285,9 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap.add_argument("--every", type=int, default=1)
     ap.add_argument("--workers", type=int, default=2)
     ap.add_argument("--resume", action="store_true")
+    ap.add_argument("--refit-dir", default=REFIT_DIR, help="refit (v1, record) or refit_v2")
     args = ap.parse_args(argv)
-    if args.season == VALIDATION_SEASON and args.every != 1:
+    if args.season in (2025, VALIDATION_SEASONS[args.sport]) and args.every != 1:
         raise SystemExit("VALIDATION replays every 2025 game (amendment 3 rule)")
     cmd_run(args)
 
