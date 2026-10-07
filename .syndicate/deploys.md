@@ -47114,3 +47114,27 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - **timeline (CT):** down 19:42:32 -> `down.` 19:43:13; supervisor exited 19:44:20; `Start-ScheduledTask SyndicateLocalProduction` 19:44:44; bootstrap rc=0 16 s; `/healthz` 200 at **19:46:00** (outage ~3.5 min). All roles `code=2bb481ef`, restarts 0. refresh-worker pid 2627918 environ `SYNDICATE_LOCAL_MEMORY_LIMIT_MB=6144` (READ). Healthz served `X-Syndicate-Health: worker-loop`.
 - **ride-along:** the fleet checkout had been ff'd by peers to 2bb481ef (incl. "mlb: ship the combined calibration (logged user override of check c)" and published-negative-ev's pending refresh-worker changes); this restart is what loads them into refresh-worker / live-odds-worker. Not mine to verify -- their lanes' readings apply from 19:46 CT.
 - **verify (OWED):** 0 `MEMORY_GUARD_ABORT` since 00:44Z at 19:55 CT (one build in, not yet at persist). MET when the served board's `dates['2026-10-07'].written_at` is newer than 00:46Z and `freshness_status` = fresh. Watcher: scratchpad `board_watch.py` (every 4 min, 150 min). First post-restart board query on cold web: 147.7 s.
+
+## 2026-10-07 00:58:40Z (7:58 PM CT 10-06) -- LOCAL FLEET FF 2bb481ef -> fc6ecc96, NO RESTART: WNBA league_status builds a WNBA roster + WNBA slate + snapshot injuries -- **VERIFY OWED** (lane `wnba-league-status-roster`)
+
+- **change:** fc6ecc96 changes vendor/wnba_betting_repo/src/wnba_betting/league_status.py.
+  - Roster: the processed rosters file, else the season's WNBA player_logs. The NBA-only nba_api fallbacks (static_teams + CommonTeamRoster, static_players + CommonPlayerInfo) are deleted.
+  - ScoreboardV2 is called with league_id 10.
+  - Injury status comes from the latest snapshot: partial-snapshot fallback, and a stale snapshot keeps season-ending rows only.
+- **ride-alongs (2bb481ef..fc6ecc96, runtime paths incl. vendor/):**
+  - f9adcdd8 (layer2_board.py + intelligence.py: Layer 2 leaves an OUT basketball prop unseated; another lane, tested). It is loaded by the refresh-worker/web in-process loops, so it is on disk but NOT active until a restart of those roles. I did not restart.
+  - scripts/nhl_props_paired.py (offline --from-date arg).
+  - .claude/hooks lane tooling (not service code).
+- **how:**
+  - Claim live-odds-worker (holder wnba-league-status-roster, token c276f972), released after.
+  - check_deploy_safety read NOT CLEAR: MLB sim (fingerprint_change, age 10m), odds refreshes, NBA props. An ff kills none of them, and none loads league_status mid-run.
+  - Guarded `git merge --ff-only` (HEAD 2bb481ef and a clean tree asserted).
+  - After: `_roster_from_player_logs` present, healthz 200.
+- **baseline:** wnba league_status_<D>.csv 09-30..10-08 = ~596-600 rows, 30 NBA teams (+ a numeric junk 'team'), 0 WNBA players. NBA ATL/GSW/IND etc. were flagged on slate.
+- **pre-ff measurement (fleet inputs for 10-07, scratch root /tmp/ls_measure, never the prod file):**
+  - New file: 289 rows, 15 WNBA teams, on slate ATL/GSV/LVA/NYL. Allisha Gray OUT/not playing; Loyd and Talbot playing (off the 10-06 snapshot).
+  - SmartSim exclusion map old->new removes 14 mis-teamed keys (e.g. Diggins/Cloud/Stevens under ATL, Plum under NYL) and adds none. None of the 14 is in the 10-07 props pool, so the pools are unchanged.
+  - The SmartSim reuse check (d6eb1086) will rebuild each future-dated WNBA sim ONCE on the changed stamp.
+- **prediction:** the next write-pregame-expected-minutes run writes league_status_<D> with 0 non-WNBA tricodes, WNBA slate teams on slate, Gray OUT and Loyd playing.
+- **verify:** watcher scratchpad/watch_ls.sh reports the first league_status_*.csv newer than 19:58:40 CDT (non_wnba_tricodes, on_slate, Gray/Loyd rows).
+- **owed separately:** an upstream re-derivation in mostgood1/WNBA-Betting, or the next vendor re-pull reverts this.
