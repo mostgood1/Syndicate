@@ -47475,3 +47475,9 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - belgian 92 -> 162
   - MLS is single-season and has no departed filter.
 - The first four leagues matched a PREDICTION; eredivisie, primeira and belgian were reproductions. Prop accuracy effect not measured.
+
+## 2026-10-07 16:46:49Z (11:46 AM CT) -- NFL prop name resolution (e406452c) live in the hourly props build -- MET (lane `nfl-prop-name-resolution`)
+- **Load:** fleet ff to 43afa8cd. The first ff in that sequence ran `git merge --ff-only origin/main`; on the fleet `origin` is the local mirror /mnt/c/SyndicateProd/repo, not GitHub, so HEAD stayed 607432ad (57 behind). Use `github/main` on the fleet. The builder runs from the checkout, so no restart is needed.
+- **Baseline:** wk5 artifact 15:34:07Z (old code): 758 rows, 263 stat-player pairs; refused_wrong_team 38 in an offline rebuild.
+- **verify (reading):** wk5 artifact 16:46:49Z (new code): **914 rows, 341 stat-player pairs**. Michael Penix Jr., Amon-Ra St. Brown, Kyren Williams, Javonte Williams, Mike Evans and Marvin Harrison Jr. are now rated; Bijan Robinson is still refused (B.Robinson = 2 candidates, both on the game's teams). Odds also grew between builds; the same-odds offline A/B attributes +109 rows / +44 pairs to the fix.
+- Not yet read: the board's NFL `prop_coverage.unmatched_key_rows` (245 on 10-07 14:22Z).
