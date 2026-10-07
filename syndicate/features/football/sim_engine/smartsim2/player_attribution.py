@@ -149,6 +149,12 @@ class AttributionAccumulator:
     tables: AttributionTables
     # NCAAF box scores count a sack as a QB rush (attempt + its negative yards); the NFL does not.
     sacks_are_rushing: bool = False
+    # Amendment 2 (measured run-share correction). The engine yields too few yard-gaining plays, so
+    # runs are starved: `pass_odds_multiplier` c scales the pass ODDS on gaining plays, and
+    # `incomplete_as_run` r credits that share of 0-yard incompletions as stuffed 0-yard runs. Fitted per
+    # sport to real team rush / pass attempts; the defaults (1.0, 0.0) consume no extra rng.
+    pass_odds_multiplier: float = 1.0
+    incomplete_as_run: float = 0.0
     results: Dict[str, Dict[str, List[float]]] = field(default_factory=dict)
     seeds: int = 0
     team_totals: Dict[str, Dict[str, List[float]]] = field(default_factory=dict)
@@ -171,13 +177,19 @@ class AttributionAccumulator:
             touchdown = outcome == "touchdown"
             if outcome in ("incomplete_pass", "sack"):
                 kind = "incomplete" if outcome == "incomplete_pass" else "sack"
+                if kind == "incomplete" and self.incomplete_as_run > 0 and rng.random() < self.incomplete_as_run:
+                    kind, yards = "run", 0                # a stuffed run, not an incompletion
             elif outcome == "turnover":
                 if rng.random() < self.tables.p_int_given_turnover:
                     kind = "interception"
                 else:
                     kind = "fumble_pass" if rng.random() < self.tables.p_pass_given_fumble else "fumble_run"
             else:
-                is_pass = rng.random() < self.tables.p_pass(key)
+                p = self.tables.p_pass(key)
+                if self.pass_odds_multiplier != 1.0 and 0.0 < p < 1.0:
+                    odds = self.pass_odds_multiplier * p / (1.0 - p)
+                    p = odds / (1.0 + odds)
+                is_pass = rng.random() < p
                 if outcome == "turnover_on_downs":
                     kind = "incomplete" if is_pass else "run"
                     yards = 0

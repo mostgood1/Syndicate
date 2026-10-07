@@ -187,7 +187,8 @@ def sim_game(task: Dict[str, Any]) -> Dict[str, Any]:
     prior = _season_rows(s - 1)
     usage = {side: A.build_team_usage(task[side], cur, prior, force_active=task["quoted"][side],
                                       qb_override=task["quoted_qb"][side]) for side in ("home", "away")}
-    acc = A.AttributionAccumulator(home=usage["home"], away=usage["away"], tables=_W["tables"])
+    acc = A.AttributionAccumulator(home=usage["home"], away=usage["away"], tables=_W["tables"],
+                                   pass_odds_multiplier=task.get("c", 1.0), incomplete_as_run=task.get("r", 0.0))
     t0 = time.time()
     gen.build_projection(season=s, week=wk, home_team=task["home"], away_team=task["away"], game_id=task["gid"],
                          current_plays=_plays(s), prior_plays=_plays(s - 1), seeds=SEEDS, segment_accumulator=acc)
@@ -204,6 +205,77 @@ def sim_game(task: Dict[str, Any]) -> Dict[str, Any]:
     return {"gid": task["gid"], "probs": probs, "team_means": team, "secs": round(time.time() - t0, 1),
             "qb": {side: usage[side].qb_id for side in ("home", "away")},
             "n_players": {side: len(usage[side].players) for side in ("home", "away")}}
+
+
+# Amendment 2 grid (pre-registered a5f2b4e0)
+GRID_C = (1.0, 0.85, 0.7, 0.6, 0.5, 0.4)
+GRID_R = (0.0, 0.1, 0.2, 0.3, 0.4, 0.5)
+
+
+class _FanOut:
+    """Hands each seed's output to every grid accumulator: the engine runs once per game."""
+
+    def __init__(self, accs):
+        self.accs = accs
+
+    def add(self, output):
+        for a in self.accs.values():
+            a.add(output)
+
+
+def fit_game(task: Dict[str, Any]) -> Dict[str, Any]:
+    gen, A = _W["gen"], _W["A"]
+    s, wk = task["season"], task["week"]
+    cur = [r for r in _season_rows(s) if int(r["week"] or 0) < wk]
+    prior = _season_rows(s - 1)
+    usage = {side: A.build_team_usage(task[side], cur, prior) for side in ("home", "away")}
+    accs = {f"{c}|{r}": A.AttributionAccumulator(home=usage["home"], away=usage["away"], tables=_W["tables"],
+                                                 pass_odds_multiplier=c, incomplete_as_run=r)
+            for c in GRID_C for r in GRID_R}
+    gen.build_projection(season=s, week=wk, home_team=task["home"], away_team=task["away"], game_id=task["gid"],
+                         current_plays=_plays(s), prior_plays=_plays(s - 1), seeds=task["seeds"],
+                         segment_accumulator=_FanOut(accs))
+    return {"gid": task["gid"], "grid": {k: {side: {st: sum(v) / len(v) for st, v in a.team_totals[side].items()
+                                                  if st in ("rush_att", "pass_att", "rush_yds", "pass_yds")}
+                                           for side in ("home", "away")} for k, a in accs.items()}}
+
+
+def run_fit(rows: List[Dict[str, Any]], workers: int, every: int, seeds: int) -> Dict[str, Any]:
+    games = sorted({r["gid"] for r in rows})[::every]
+    meta = {r["gid"]: r for r in rows}
+    tasks = [{"gid": g, "season": meta[g]["season"], "week": meta[g]["week"], "home": meta[g]["home"],
+              "away": meta[g]["away"], "seeds": seeds} for g in games]
+    print(f"[fit] {len(tasks)} FIT games x {seeds} seeds, {len(GRID_C) * len(GRID_R)} grid points per engine run", flush=True)
+    sums: Dict[str, Dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    n = 0
+    with ProcessPoolExecutor(max_workers=workers, initializer=_init, initargs=(str(ROOT),)) as ex:
+        for i, f in enumerate(as_completed([ex.submit(fit_game, t) for t in tasks]), 1):
+            d = f.result()
+            for k, sides in d["grid"].items():
+                for side in sides.values():
+                    for st, v in side.items():
+                        sums[k][st] += v
+            n += 2
+            if i % 10 == 0 or i == len(tasks):
+                print(f"[fit] {i}/{len(tasks)}", flush=True)
+    TARGET = {"rush_att": 27.0, "pass_att": 33.24}     # nflverse FIT 2023-24, 1,088 team-games
+    table = []
+    for k, st in sums.items():
+        m = {x: v / n for x, v in st.items()}
+        loss = sum((m[x] / TARGET[x] - 1.0) ** 2 for x in TARGET)
+        c, r = map(float, k.split("|"))
+        table.append((loss, c, r, m))
+    table.sort()
+    for loss, c, r, m in table[:8]:
+        print(f"  c={c:<5} r={r:<4} loss {loss:.5f}  rush_att {m['rush_att']:.2f}  pass_att {m['pass_att']:.2f}  "
+              f"rush_yds {m['rush_yds']:.1f}  pass_yds {m['pass_yds']:.1f}")
+    base = next(t for t in table if t[1] == 1.0 and t[2] == 0.0)
+    print(f"  (uncorrected c=1 r=0: rush_att {base[3]['rush_att']:.2f} pass_att {base[3]['pass_att']:.2f})")
+    best = table[0]
+    out = {"c": best[1], "r": best[2], "loss": best[0], "means": best[3], "games": len(tasks), "seeds": seeds,
+           "target": TARGET, "uncorrected": base[3]}
+    (OUT / "run_share_fit_nfl.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -261,11 +333,16 @@ def main() -> None:
     ap.add_argument("--seasons", required=True)
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--limit-games", type=int, default=0)
+    ap.add_argument("--fit-run-share", action="store_true", help="amendment 2: grid-fit (c, r) on every 8th FIT game")
+    ap.add_argument("--pass-odds-mult", type=float, default=1.0)
+    ap.add_argument("--incomplete-as-run", type=float, default=0.0)
     args = ap.parse_args()
     from scripts.football_scenario_rates import idle_self
     idle_self()   # fleet shares this machine
     seasons = [int(s) for s in args.seasons.split(",")]
     tag = "-".join(map(str, seasons)) + (f"_smoke{args.limit_games}" if args.limit_games else "")
+    if args.pass_odds_mult != 1.0 or args.incomplete_as_run != 0.0:
+        tag += f"_c{args.pass_odds_mult:g}_r{args.incomplete_as_run:g}"
     if 2025 in seasons:
         if not os.environ.get("FOOTBALL_SCENARIO_READ_VALIDATION"):
             raise SystemExit("2025 props are the held-out read; set FOOTBALL_SCENARIO_READ_VALIDATION=1 (once)")
@@ -283,6 +360,11 @@ def main() -> None:
         games = games[:: max(1, len(games) // args.limit_games)][: args.limit_games]
         rows = [r for r in rows if r["gid"] in set(games)]
     print(f"[attr] {len(rows)} quote rows over {len(games)} games, drops {drops}", flush=True)
+    if args.fit_run_share:
+        if 2025 in seasons:
+            raise SystemExit("the run-share fit is FIT-only")
+        run_fit(rows, args.workers, every=8, seeds=100)
+        return
     OUT.mkdir(parents=True, exist_ok=True)
     cache = OUT / f"attr_sims_{tag}.jsonl"
     done = {}
@@ -310,7 +392,7 @@ def main() -> None:
         quoted_qb = {side: (max(v, key=v.get) if v else None) for side, v in qb_votes.items()}
         tasks.append({"gid": gid, "season": rs[0]["season"], "week": rs[0]["week"], "home": rs[0]["home"],
                       "away": rs[0]["away"], "asks": asks, "quoted": {k: sorted(v) for k, v in quoted.items()},
-                      "quoted_qb": quoted_qb})
+                      "quoted_qb": quoted_qb, "c": args.pass_odds_mult, "r": args.incomplete_as_run})
     print(f"[attr] {len(done)} games cached, {len(tasks)} to simulate at {SEEDS} seeds", flush=True)
     t0 = time.time()
     if tasks:
