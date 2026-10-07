@@ -1589,7 +1589,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Falsification test: No combined config beats production on the held-out window on every gate (each clearing its own SE) -> nothing ships; every scenario whose real rate contains the sim rate in its 95% CI is recorded EXONERATED.
 - Verification: Findings file: Phase 1 real-vs-sim table per league with CIs and the pre-registered decision rule; per mechanism a byte-identical proof + reachability test; final held-out reading read once. Fleet change only by user decision.
 - Blocked by: none
-- STATUS 2026-10-06 ~22:15Z: Phase 1 pre-registered (026d94d7) + amendments; extractor/sim/table phases on main; real FIT extracted (NBA 816, WNBA 217); NBA FIT sim run 29/109 dates (WSL ~/bball_sc, 3 workers, 200 draws, 0 errors). NEXT: NBA table + flags, WNBA sim setup, NCAAB real table. GOAL: NOT MET (Phase 1 in progress).
+- STATUS 2026-10-06 ~22:15Z: Phase 1 pre-registered (026d94d7) + amendments; extractor/sim/table phases on main; real FIT extracted (NBA 816, WNBA 217); NBA FIT sim run COMPLETE 109/109 dates (2026-10-07 ~14:10Z; WSL ~/bball_sc, 3 workers, 200 draws, 0 errors).  NEXT: NBA table + flags, WNBA sim setup, NCAAB real table. GOAL: NOT MET (Phase 1 in progress).
 ### closed-lane-archive-20261006-1550 — CLOSED 2026-10-06 (GOAL MET: 1 blocks archived) — opened 2026-10-06 — session cad2e2a3-1131-47d8-9c97-ea6c7b88817e
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
