@@ -280,6 +280,7 @@ def run_sim(args) -> int:
     from syndicate.features.shared.basketball_props_predictions import export_props_predictions_local
 
     bpss._resolve_smart_sim_roster_mode_local = lambda **_k: "pregame"
+    levers = {k: float(v) for k, v in (x.split("=", 1) for x in (args.lever or []))}
     games: List[Dict[str, Any]] = []
     cur: Dict[str, Any] = {}
     orig_call, orig_rec = bpss._call_source_simulate_smart_game_local, bpss._recording_sim_draws_local
@@ -296,6 +297,10 @@ def run_sim(args) -> int:
         inner = orig_rec(simulate_draw, recorded_draws)
 
         def wrapped(**kw):
+            cfg = kw.get("cfg")
+            for name, value in levers.items():     # Phase 2 lever sweep: set on this draw's EventSimConfig
+                if cfg is not None and hasattr(cfg, name):
+                    setattr(cfg, name, value)
             res = inner(**kw)
             try:
                 h_box, a_box, hq, aq = res
@@ -311,7 +316,11 @@ def run_sim(args) -> int:
     bpss._call_source_simulate_smart_game_local = call
     bpss._recording_sim_draws_local = rec
 
-    dates = [d for i, d in enumerate(rs._dates(f"{args.start}..{args.end}", asof)) if i % args.workers == args.worker]
+    all_dates = rs._dates(f"{args.start}..{args.end}", asof)
+    if args.dates_file:
+        keep = {ln.strip() for ln in Path(args.dates_file).read_text(encoding="utf-8").splitlines() if ln.strip()}
+        all_dates = [d for d in all_dates if d in keep]
+    dates = [d for i, d in enumerate(all_dates) if i % args.workers == args.worker]
     for d in dates:
         dest = out / f"{d}.jsonl"
         if dest.exists():
@@ -574,6 +583,8 @@ def main(argv=None) -> int:
     ap.add_argument("--worker", type=int, default=0)
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--copy-file", action="append", help="extra production switch file copied into each scratch")
+    ap.add_argument("--lever", action="append", help="EventSimConfig field=value applied to every draw (Phase 2 sweeps)")
+    ap.add_argument("--dates-file", default="", help="only these dates (one per line)")
     args = ap.parse_args(argv)
     if args.phase == "table":
         return run_table(args)
