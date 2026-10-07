@@ -147,6 +147,8 @@ class AttributionAccumulator:
     home: TeamUsage
     away: TeamUsage
     tables: AttributionTables
+    # NCAAF box scores count a sack as a QB rush (attempt + its negative yards); the NFL does not.
+    sacks_are_rushing: bool = False
     results: Dict[str, Dict[str, List[float]]] = field(default_factory=dict)
     seeds: int = 0
     team_totals: Dict[str, Dict[str, List[float]]] = field(default_factory=dict)
@@ -209,7 +211,10 @@ class AttributionAccumulator:
 
         qb = usage.qb_id
         if kind == "sack":
-            return                                   # NFL: sack yards are not passing yards
+            if self.sacks_are_rushing:               # NCAAF stat rule
+                add(qb, "rush_att")
+                add(qb, "rush_yds", yards)
+            return                                   # NFL: a sack is neither passing nor rushing
         if kind in ("completion", "incomplete", "interception", "fumble_pass"):
             add(qb, "pass_att")
             if kind == "completion" or kind == "fumble_pass":

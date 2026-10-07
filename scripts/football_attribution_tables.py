@@ -40,7 +40,24 @@ def _i(x, d=0):
         return d
 
 
-def measure(seasons: List[int]) -> Dict:
+NCAAF_PARSED = Path(r"C:\tmp\football_scenarios\ncaaf_attribution")
+
+
+def _rows(sport: str, season: int):
+    """nflverse rows as-is; NCAAF parsed-CFBD rows adapted to the same field names."""
+    if sport == "nfl":
+        with (PBP / f"pbp_{season}.csv").open(encoding="utf-8", newline="") as fh:
+            yield from csv.DictReader(fh)
+        return
+    with (NCAAF_PARSED / f"ncaaf_attributed_plays_{season}.csv").open(encoding="utf-8", newline="") as fh:
+        for r in csv.DictReader(fh):
+            is_pass = r["play_type"] == "pass"
+            r["incomplete_pass"] = "1" if (is_pass and r["complete_pass"] != "1" and r["sack"] != "1"
+                                           and r.get("interception") != "1") else "0"
+            yield r
+
+
+def measure(seasons: List[int], sport: str = "nfl") -> Dict:
     cell: Dict[Tuple, List[int]] = defaultdict(lambda: [0, 0])     # [pass, total]
     pooled: Dict[Tuple, List[int]] = defaultdict(lambda: [0, 0])
     to = {"int": 0, "fumble_pass": 0, "fumble_run": 0}
@@ -48,8 +65,8 @@ def measure(seasons: List[int]) -> Dict:
     ydist: Dict[str, List[int]] = defaultdict(list)
     n_rows = 0
     for season in seasons:
-        with (PBP / f"pbp_{season}.csv").open(encoding="utf-8", newline="") as fh:
-            for r in csv.DictReader(fh):
+        if True:
+            for r in _rows(sport, season):
                 if r.get("season_type") != "REG" or r.get("play_type") not in ("pass", "run"):
                     continue
                 if r.get("aborted_play") == "1" or r.get("qb_kneel") == "1" or r.get("qb_spike") == "1":
@@ -99,13 +116,15 @@ def measure(seasons: List[int]) -> Dict:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--seasons", required=True)
+    ap.add_argument("--sport", choices=("nfl", "ncaaf"), default="nfl")
     args = ap.parse_args()
     seasons = [int(s) for s in args.seasons.split(",")]
     if 2025 in seasons:
         raise SystemExit("2025 is the held-out props season; tables are FIT-only")
-    t = measure(seasons)
+    t = measure(seasons, args.sport)
     OUT.mkdir(parents=True, exist_ok=True)
-    path = OUT / f"attribution_tables_{'-'.join(map(str, seasons))}.json"
+    prefix = "" if args.sport == "nfl" else "ncaaf_"
+    path = OUT / f"{prefix}attribution_tables_{'-'.join(map(str, seasons))}.json"
     path.write_text(json.dumps(t, indent=1), encoding="utf-8")
     print(f"{t['n_rows']} gaining plays, {len(t['pass_rate'])} cells -> {path}")
     print(f"P(INT | turnover) {t['p_int_given_turnover']}  P(pass | lost fumble) {t['p_pass_given_fumble']}  {t['turnover_counts']}")

@@ -129,6 +129,7 @@ def text_yards(text: str) -> Optional[int]:
 
 def parse_play(r: dict) -> Optional[dict]:
     t, text = r.get("playType"), (r.get("playText") or "").strip()
+    original_type = t
     if t in OTHER_TYPES:
         if "no play" in text.lower():
             return None
@@ -146,6 +147,13 @@ def parse_play(r: dict) -> Optional[dict]:
     ty = text_yards(text)
     base = {"game_id": str(r.get("gameId")), "season": r.get("season"), "week": r.get("week"),
             "posteam": r.get("offense"), "yards_gained": ty if ty is not None else int(r.get("yardsGained") or 0),
+            # situation, nflverse-named, for the attribution tables (Phase B)
+            "down": r.get("down"), "ydstogo": r.get("distance"), "qtr": r.get("period"),
+            "quarter_seconds_remaining": int((r.get("clock") or {}).get("minutes") or 0) * 60
+                                         + int((r.get("clock") or {}).get("seconds") or 0),
+            "score_differential": int(r.get("offenseScore") or 0) - int(r.get("defenseScore") or 0),
+            "yardline_100": r.get("yardsToGoal"),
+            "fumble_lost": "1" if original_type in ("Fumble Recovery (Opponent)", "Fumble Return Touchdown") else "0",
             "touchdown": "1" if t in ("Rushing Touchdown", "Passing Touchdown") else "0",
             "passer_player_id": "", "receiver_player_id": "", "rusher_player_id": "", "complete_pass": "0", "sack": "0"}
     if t in RUSH_TYPES:
@@ -182,7 +190,8 @@ def parse_play(r: dict) -> Optional[dict]:
 
 COLS = ("game_id", "season", "week", "posteam", "play_type", "passer_player_id", "passer_player_name",
         "receiver_player_id", "receiver_player_name", "rusher_player_id", "rusher_player_name",
-        "complete_pass", "sack", "interception", "touchdown", "yards_gained", "season_type")
+        "complete_pass", "sack", "interception", "touchdown", "yards_gained", "season_type",
+        "down", "ydstogo", "qtr", "quarter_seconds_remaining", "score_differential", "yardline_100", "fumble_lost")
 
 
 def cmd_parse(seasons: List[int]) -> None:
