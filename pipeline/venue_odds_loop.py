@@ -65,6 +65,12 @@ _stop = threading.Event()
 _lock = threading.Lock()
 
 
+def venue_odds_loop_running() -> bool:
+    """True only when the loop thread is alive in THIS process (not merely enabled)."""
+    thread = globals().get("_thread")
+    return bool(thread is not None and thread.is_alive())
+
+
 def venue_odds_loop_enabled() -> bool:
     """Default OFF. See the module docstring on why this is not the default."""
     raw = (os.environ.get("SYNDICATE_VENUE_ODDS_LOOP_ENABLED") or "").strip().lower()
@@ -109,6 +115,60 @@ def _venues() -> list[tuple[str, Callable[[], Any], Callable[[], float]]]:
     return out
 
 
+_LAST_KALSHI_COVERAGE_AT = [float("-inf")]
+
+
+def kalshi_board_coverage_interval_seconds() -> float:
+    """How often the Kalshi-vs-board join runs here. 0 disables it.
+
+    Lane `web-restart-healthz` `[2026-10-07]`: the join used to run inside EVERY
+    board build (`kalshi_board_join` stage, 10-100 s, after the shortlist), holding
+    up the board save. The build ignores its return value, but the join has two
+    side effects that MUST keep happening: `_capture_kalshi_quotes` (Kalshi's
+    matched prices -> `book_quotes`, the only source of exchange PROP prices) and
+    `_record_board_demand` (which series the Kalshi refresh fetches). Default 600 s
+    -- at least as often as board builds ran on 10-07 (one per 10-80 min) -- and
+    interval-gated because it is O(markets x rows) CPU in the same process.
+    """
+    raw = str(os.environ.get("SYNDICATE_KALSHI_BOARD_COVERAGE_SECONDS") or "").strip()
+    try:
+        return max(0.0, float(raw)) if raw else 600.0
+    except ValueError:
+        return 600.0
+
+
+def _maybe_kalshi_board_coverage(result: Any) -> None:
+    """Join Kalshi's markets to TODAY's published shortlist: coverage line, Kalshi
+    quote capture into `book_quotes`, board demand. Never raises."""
+    interval = kalshi_board_coverage_interval_seconds()
+    now = time.monotonic()
+    if interval <= 0 or now - _LAST_KALSHI_COVERAGE_AT[0] < interval:
+        return
+    try:
+        markets = (result or {}).get("markets") if isinstance(result, dict) else None
+        if not markets:
+            return
+        from pipeline.intelligence_state import read_layer2_shortlist
+        from pipeline.kalshi_odds_refresh import join_to_board
+        from syndicate.features.shared.timezone import central_today_iso
+
+        import datetime as _dt
+
+        today = central_today_iso()
+        _LAST_KALSHI_COVERAGE_AT[0] = now
+        # Today AND the next two days: the build joined every board date it built,
+        # and the next-day joins are where tomorrow's Kalshi prices become the
+        # OPENING quotes a CLV grade needs (incl. forward-dated soccer markets).
+        base = _dt.date.fromisoformat(today)
+        for offset in (0, 1, 2):
+            day = (base + _dt.timedelta(days=offset)).isoformat()
+            rows = (read_layer2_shortlist(day) or {}).get("rows") or []
+            if rows:
+                join_to_board(list(markets), list(rows), selected_date=day)
+    except Exception as exc:
+        print(f"[venue_odds_loop] KALSHI_COVERAGE_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+
 def _refresh_once(name: str, refresh: Callable[[], Any]) -> None:
     """One venue refresh. Reports, retains nothing, and never raises.
 
@@ -120,6 +180,8 @@ def _refresh_once(name: str, refresh: Callable[[], Any]) -> None:
     started = time.monotonic()
     try:
         result = refresh() or {}
+        if name == "kalshi":
+            _maybe_kalshi_board_coverage(result)
         status = str(result.get("status") or "?")
         count = result.get("count")
         if count is None:

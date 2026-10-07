@@ -269,6 +269,38 @@ def _layer2_fast_kalshi_capture(selected_date: str, shortlist: dict[str, Any] | 
         return f"failed:{type(exc).__name__}"
 
 
+def _board_build_kalshi_inline() -> bool:
+    """Whether the board build runs the Kalshi refresh + board join itself.
+
+    "1"/"0" force it; unset = only when `venue_odds_loop` is NOT running in this
+    process (then nothing else would refresh Kalshi or capture its quotes).
+    Lane `web-restart-healthz` `[2026-10-07]`.
+    """
+    raw = str(os.environ.get("SYNDICATE_BOARD_BUILD_KALSHI_INLINE") or "").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    try:
+        from pipeline.venue_odds_loop import venue_odds_loop_running
+
+        return not venue_odds_loop_running()
+    except Exception:
+        return True
+
+
+def _layer2_today_refresh_seconds() -> int:
+    """Max age of TODAY's Layer 2 shortlist before the loop refreshes it first. 0 = off.
+
+    Lane `web-restart-healthz` `[2026-10-07]`, user decision ("go ahead with #1"):
+    today's shortlist was written only mid-way through each FULL board build (10-80
+    min on 10-07), plus around the hourly next-day build. The shortlist-only path
+    (`_refresh_layer2_shortlist_only`, ~90 s on the fleet) now also runs at the top
+    of any loop iteration that finds today's older than this. Default 300 s.
+    """
+    return max(0, _env_int("SYNDICATE_LAYER2_TODAY_REFRESH_SECONDS", 300))
+
+
 def _layer2_fast_refresh_min_interval_seconds() -> int:
     """The fast path's per-date rate limit. One definition for both callers."""
     return max(60, _env_int("SYNDICATE_LAYER2_FAST_REFRESH_SECONDS", 300))
@@ -5335,6 +5367,65 @@ class IntelligenceStateService:
         )
         return shortlist
 
+    def _refresh_today_layer2_on_cadence(self) -> str:
+        """Refresh TODAY's Layer 2 shortlist at the top of a loop tick when it is stale.
+
+        Lane `web-restart-healthz` `[2026-10-07]`, user decision ("go ahead with #1").
+        Today's shortlist used to be written only mid-way through each full board
+        build (10-80 min on the fleet that day) and around the hourly next-day
+        build. This runs the same shortlist-only path (~90 s) whenever today's is
+        older than SYNDICATE_LAYER2_TODAY_REFRESH_SECONDS (default 300; 0 = off),
+        with the same holds as the carry-over path: deploy drain, a resident MLB
+        sim, and the execution guard taken NON-blocking (a build in flight wins).
+        The fast path keeps its own rate limit and memory floor.
+
+        Returns "yes" / "no" / "fresh" / "held:<why>" / "disabled". Never raises.
+        One `LAYER2_TODAY_CADENCE` line when it acts or is held, none when fresh.
+        """
+        try:
+            limit = _layer2_today_refresh_seconds()
+            if limit <= 0:
+                return "disabled"
+            today = central_today_iso()
+            seen = self._layer2_fast_refresh_seen(today)
+            age = (time.time() - seen) if seen else None
+            if age is not None and age < limit:
+                return "fresh"
+            hold: str | None = None
+            try:
+                from syndicate.features.shared.deploy_drain import drain_hold_reason
+
+                hold = drain_hold_reason() or None
+            except Exception:
+                hold = None
+            if hold is None and _mlb_sim_subprocess_running():
+                hold = "sim_subprocess_resident"
+            if hold is None and not self._execution_guard.acquire(blocking=False):
+                hold = "board_build_in_flight"
+            elif hold is None:
+                started = time.time()
+                try:
+                    shortlist = self._refresh_layer2_shortlist_only(today)
+                finally:
+                    self._execution_guard.release()
+                ran = "yes" if shortlist is not None else "no"
+                print(
+                    f"[intelligence_state] LAYER2_TODAY_CADENCE today={today} ran={ran} "
+                    f"age_before_s={'none' if age is None else format(age, '.0f')} limit_s={limit} "
+                    f"elapsed_s={time.time() - started:.1f}",
+                    flush=True,
+                )
+                return ran
+            print(
+                f"[intelligence_state] LAYER2_TODAY_CADENCE today={today} ran=held reason={hold} "
+                f"age_before_s={'none' if age is None else format(age, '.0f')} limit_s={limit}",
+                flush=True,
+            )
+            return f"held:{hold}"
+        except Exception as exc:  # pragma: no cover - must never take the loop down
+            print(f"[intelligence_state] LAYER2_TODAY_CADENCE_FAILED error={type(exc).__name__}: {exc}", flush=True)
+            return "no"
+
     def _refresh_today_layer2_around_next_day_build(self, build_date: str | None, phase: str) -> str:
         """Write TODAY's Layer 2 shortlist right before and right after a NEXT-DAY board build.
 
@@ -7209,34 +7300,47 @@ class IntelligenceStateService:
             # OPENING prices a CLV grade needs -- those exist days before the
             # OddsAPI board carries the slate at all.
             kalshi_markets: list = []
-            try:
-                from pipeline.kalshi_odds_refresh import join_to_board, run_kalshi_odds_refresh
+            # NOT ON THE BOARD'S CRITICAL PATH WHILE THE VENUE LOOP RUNS -- lane
+            # `web-restart-healthz` `[2026-10-07]`, user decision. Measured on the
+            # fleet 10-07: `kalshi_odds_refresh` 37-115 s (not the cache read the
+            # comment above assumed) + `kalshi_board_join` 10-100 s, every build,
+            # AFTER the shortlist and BEFORE the save. `venue_odds_loop` already
+            # owns the refresh cadence and now also runs the join (with its quote
+            # capture + board demand) for today and the next two days -- see
+            # `venue_odds_loop.kalshi_board_coverage_interval_seconds`.
+            # SYNDICATE_BOARD_BUILD_KALSHI_INLINE: "1" always inline (old
+            # behaviour), "0" never, unset = inline only if the loop is NOT running.
+            if not _board_build_kalshi_inline():
+                print("[intelligence_state] KALSHI_INLINE_SKIPPED reason=venue_odds_loop_running", flush=True)
+            else:
+                try:
+                    from pipeline.kalshi_odds_refresh import join_to_board, run_kalshi_odds_refresh
 
-                _kalshi_refresh_mark = _build_span_enter("kalshi_odds_refresh", selected_date)
-                odds = run_kalshi_odds_refresh()
-                _build_span_exit("kalshi_odds_refresh", _kalshi_refresh_mark)
-                kalshi_markets = odds.get("markets") or []
-                # `layer2_shortlist["rows"]`, NOT a bare `rows` -- there is no
-                # such name here, and the NameError would have been swallowed by
-                # the except below and printed as KALSHI_ODDS_FAILED. My bug
-                # wearing Kalshi's name is exactly the confusion this whole
-                # thread has been untangling.
-                shortlist_rows = (layer2_shortlist or {}).get("rows") or []
-                if kalshi_markets and shortlist_rows:
-                    # SPANNED SEPARATELY FROM THE REFRESH ABOVE. They are
-                    # different quantities -- the refresh is a venue read that
-                    # may return cached, the join is O(markets x rows) CPU over
-                    # ~6,000 x ~1,300. A single span over both would report a
-                    # cache hit and a full join as the same number.
-                    _kalshi_join_mark = _build_span_enter("kalshi_board_join", selected_date)
-                    join_to_board(
-                        kalshi_markets,
-                        list(shortlist_rows),
-                        selected_date=str(selected_date or ""),
-                    )
-                    _build_span_exit("kalshi_board_join", _kalshi_join_mark)
-            except Exception as exc:
-                print(f"[intelligence_state] KALSHI_ODDS_FAILED error={exc}", flush=True)
+                    _kalshi_refresh_mark = _build_span_enter("kalshi_odds_refresh", selected_date)
+                    odds = run_kalshi_odds_refresh()
+                    _build_span_exit("kalshi_odds_refresh", _kalshi_refresh_mark)
+                    kalshi_markets = odds.get("markets") or []
+                    # `layer2_shortlist["rows"]`, NOT a bare `rows` -- there is no
+                    # such name here, and the NameError would have been swallowed by
+                    # the except below and printed as KALSHI_ODDS_FAILED. My bug
+                    # wearing Kalshi's name is exactly the confusion this whole
+                    # thread has been untangling.
+                    shortlist_rows = (layer2_shortlist or {}).get("rows") or []
+                    if kalshi_markets and shortlist_rows:
+                        # SPANNED SEPARATELY FROM THE REFRESH ABOVE. They are
+                        # different quantities -- the refresh is a venue read that
+                        # may return cached, the join is O(markets x rows) CPU over
+                        # ~6,000 x ~1,300. A single span over both would report a
+                        # cache hit and a full join as the same number.
+                        _kalshi_join_mark = _build_span_enter("kalshi_board_join", selected_date)
+                        join_to_board(
+                            kalshi_markets,
+                            list(shortlist_rows),
+                            selected_date=str(selected_date or ""),
+                        )
+                        _build_span_exit("kalshi_board_join", _kalshi_join_mark)
+                except Exception as exc:
+                    print(f"[intelligence_state] KALSHI_ODDS_FAILED error={exc}", flush=True)
 
             from pipeline.portfolio_commit import run_portfolio_commit
 
@@ -7892,6 +7996,10 @@ class IntelligenceStateService:
                     f"error={type(_chip_pub_exc).__name__}: {_chip_pub_exc}",
                     flush=True,
                 )
+            # TODAY'S LAYER 2 ON ITS OWN CADENCE (lane `web-restart-healthz`): here,
+            # before the next full build starts, so today's shortlist is never
+            # older than ~one full build + the limit. Never raises.
+            self._refresh_today_layer2_on_cadence()
             # #93 follow-up. Independent of the canonical board-state flags
             # below -- this seeds the legacy _watched_payloads queue (the
             # storage that's actually live in production) with an explicit
