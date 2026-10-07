@@ -98,6 +98,13 @@ minimise (sim/real - 1)^2 summed over rush att and pass att. The chosen (c, r) i
 re-run on all 366 FIT games at 300 seeds and reported beside the uncorrected run. Held-out 2025 is not
 touched by any of this. NCAAF: the same fit on 2024 CFBD parsed targets when its Phase B is read.
 
+**Amendment 2 fit (2026-10-07):** 46 FIT games (every 8th), 100 seeds, one engine run per game fanned to
+36 grid points. Uncorrected rush/pass att 21.28 / 35.41. **Chosen (grid minimum): c = 0.7, r = 0.1** ->
+rush att 25.61, pass att 31.08 (targets 27.0 / 33.24), rush yds 138.7, pass yds 222.4. Both targets cannot
+be met at once -- the engine runs ~4-5 fewer offensive plays per team-game -- so the fit splits the
+shortfall; rushing yards now OVERSHOOT (~139 vs ~115-120 real). Fixed as chosen; Phase B re-run on all
+366 FIT games at 300 seeds with (0.7, 0.1).
+
 ## NCAAF data step — PRE-REGISTERED 2026-10-07 (user: "start the NCAAF attribution data step while that runs")
 
 **What is missing for NCAAF, measured:** local CFBD plays carry no player ids; player box scores exist
