@@ -47357,3 +47357,15 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
   - `recommendations_2026-10-12.json` 14:36:13Z: dropped 225, 103 props, 2 matches.
 - **Result:** served dropped 153 -> 225, exactly the offline number. The 10-10 slate has 18 fewer props (162 -> 144): departed players no longer carry a projection.
 - **All five leagues read (bundesliga 169, ligue_1 256, la_liga 188, epl 140, serie_a 225) match the offline A/B exactly.** Still not measured: whether prop accuracy moves.
+
+## 2026-10-07 16:12:31Z (11:12 AM CT) -- READING: served championship departed filter on the refreshed roster -- **MATCHES PREDICTION** (lane `soccer-roster-refresh`)
+
+- **Prediction** (offline A/B, ~01:00Z): **93** dropped. The July roster dropped 81: +16 rescued, 28 no longer rescued.
+- **Reading:** builds generated after the championship roster write (00:14:14Z), on the fleet. All read dropped **93**, rows 707, per_club 24/24:
+  - 10-10: 10:31:58Z, 424 props, 10 matches
+  - 10-13: 10:47:47Z, 338 props, 8 matches
+  - 10-14: 13:48:10Z, 175 props, 4 matches
+  - 10-09: 14:58:15Z, 41 props, 1 match
+  - 10-11: 15:31:17Z, 48 props, 1 match
+- **Result:** served dropped 81 -> 93, exactly the offline number. No July-roster build of these slates was read, so there is no props comparison.
+- **Six leagues now read; all six match the offline A/B exactly** (bundesliga 169, ligue_1 256, la_liga 188, epl 140, serie_a 225, championship 93).
