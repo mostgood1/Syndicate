@@ -234,6 +234,11 @@ class PlayerPropProjection:
     # H38: None when the blend did not run for this row; else the inputs and both means, so the artifact
     # says which estimator produced the shot ladder.
     own_rate_blend: dict[str, float] | None = None
+    # THE INPUTS THIS ROW WAS ALLOCATED FROM `[2026-10-07, lane soccer-goal-allocation, user "Store inputs in
+    # builds"]`. Builds stored only outputs, and the per-league player files are overwritten in place, so a
+    # build could never be graded against what the sim knew BEFORE the match -- H40 (goal share) was
+    # untestable for exactly that reason. Carried on every row so each future build is gradable as-of.
+    usage_inputs: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -243,6 +248,7 @@ class PlayerPropProjection:
             "position": self.position,
             "team": self.team,
             "expected_minutes_share": self.expected_minutes_share,
+            "usage_inputs": dict(self.usage_inputs) if self.usage_inputs else None,
             "expected_shots": self.expected_shots,
             "expected_shots_on_target": self.expected_shots_on_target,
             "expected_goals": self.expected_goals,
@@ -263,6 +269,29 @@ class PlayerPropProjection:
             "ladder_conditioning": dict(self.ladder_conditioning),
             "own_rate_blend": dict(self.own_rate_blend) if self.own_rate_blend else None,
         }
+
+
+# Raw per-player fields copied from the profile's source row into `usage_inputs`: what the shares were built
+# from. Names as they appear in the per-league player files (`players_<season>.csv`).
+_USAGE_INPUT_RAW_KEYS = ("season", "source", "minutes", "games", "appearances", "starts", "xg_per90",
+                         "goals_per90", "shots_per90", "xa_per90", "rate_own_weight")
+
+
+def _usage_inputs(profile: "PlayerUsageProfile") -> dict[str, Any]:
+    """The allocation inputs and the raw rates behind them, for as-of grading of this build."""
+    raw = profile.metadata or {}
+    inputs: dict[str, Any] = {
+        "goal_share": round(float(profile.goal_share), 6),
+        "on_pitch_goal_share": (round(float(profile.on_pitch_goal_share), 6)
+                                if profile.on_pitch_goal_share is not None else None),
+        "start_probability": (round(float(profile.start_probability), 6)
+                              if profile.start_probability is not None else None),
+        "expected_minutes_share_input": round(float(profile.expected_minutes_share), 6),
+    }
+    for key in _USAGE_INPUT_RAW_KEYS:
+        if raw.get(key) not in (None, ""):
+            inputs[key] = raw.get(key)
+    return inputs
 
 
 def _team_volumes(distribution: MatchDistributionSummary, side: str) -> tuple[float, float, float]:
@@ -288,6 +317,7 @@ def project_player_props(
         opponent_goals, opponent_on_target = _opponent_volumes(distribution, usage_profile.side)
         expected_saves = max(0.0, (opponent_on_target - opponent_goals)) * minutes
         return PlayerPropProjection(
+            usage_inputs=_usage_inputs(usage_profile),
             player_id=usage_profile.player_id,
             player_name=usage_profile.player_name,
             side=usage_profile.side,
@@ -478,6 +508,7 @@ def project_player_props(
         shots_conditioning = UNCONDITIONAL
 
     return PlayerPropProjection(
+        usage_inputs=_usage_inputs(usage_profile),
         player_id=usage_profile.player_id,
         player_name=usage_profile.player_name,
         side=usage_profile.side,
