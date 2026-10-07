@@ -1678,6 +1678,16 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **FIDELITY GATE RESULT 2026-10-07 ~18:10Z: PASS -> the 07-16..09-27 build started (scratch root ~/asof_out_statsapi).**
+  - 24 June FIT dates built from StatsAPI only (24/24 rc=0). Replayed against the stored-input rebuild: same shipped code, 100 sims, same seeds, game set = stored-input pks. 302 vs 304 games; 551 vs 600 starts.
+  - All within tolerance:
+    - K/BF -0.0004; BB/PA +0.0004; HR/PA +0.0009; H/PA **+0.0026** (tol 0.003); HBP/PA 0.0000;
+    - DP +0.007; PO +0.002;
+    - outs -0.109; <=9 share +0.002; ==15 share +0.000;
+    - runs/game **+0.282** (tol 0.30).
+  - CAVEAT, carried into every use of this data: starter mismatches excluded 71 (stored) vs 8 (StatsAPI).
+    - The schedule's probablePitcher for a FINISHED game is usually corrected to the real starter, so this source knows the starter better than production did in ~10% of games.
+    - Starter-level moments are unaffected (mismatches are excluded either way). Game-level moments (runs, game totals) are slightly optimistic vs production.
 - **OUT-OF-SAMPLE EVALUATION OF THE SHIPPED CALIBRATION, PRE-REGISTERED 2026-10-07 (user: "then evaluate the shipped calibration on the second half"), before any window data exists:**
   - DATA: the built 07-16..09-27 window, never touched by the combined fit (06-15..07-12) or its validation (05-30..06-14).
   - ARMS (same seeds, 100 sims, the window's games):
