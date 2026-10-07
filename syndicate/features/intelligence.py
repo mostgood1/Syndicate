@@ -60,6 +60,7 @@ from syndicate.features.nba.sources import season_betting_card_day_path as nba_s
 from syndicate.features.ncaaf import sources as ncaaf_sources
 from syndicate.features.ncaab import sources as ncaab_sources
 from syndicate.features.nfl import sources as nfl_sources
+from syndicate.features import intelligence_season_evidence as _season_evidence
 from syndicate.features.nhl.sources import processed_path as nhl_processed_path
 from syndicate.features.nhl.sources import props_lines_snapshot_path as nhl_props_lines_snapshot_path
 from syndicate.features.nhl.sources import recommendation_path as nhl_recommendation_path
@@ -1057,11 +1058,32 @@ def _market_shape_profile(market_key: str | None, *, candidate_type: str, sport_
     }
 
 
+def _model_probability_pct(candidate: dict[str, Any]) -> float | None:
+    """The model's win probability in percent, or None -- never a price.
+
+    `confidence` is normally "71.3%", but NCAAF Anytime TD candidates arrived
+    carrying the American PRICE there ("+700"). Read as a percent that became
+    model_probability 700.0 and price_edge_pct 687.5 (fleet 2026-10-07, 2 of
+    77 recommendations), and `_market_score_adjustment` paid it the maximum
+    +13.5. A signed value or anything outside 0..100 is not a probability; fall
+    back to the candidate's own 0..1 `model_probability`, else None.
+    """
+    raw = candidate.get("confidence")
+    text = str(raw or "").strip()
+    value = _pct_hint(raw)
+    if value is not None and not text.startswith(("+", "-")) and 0.0 <= float(value) <= 100.0:
+        return float(value)
+    fallback = _numeric_hint(candidate.get("model_probability"))
+    if fallback is not None and 0.0 < float(fallback) <= 1.0:
+        return float(fallback) * 100.0
+    return None
+
+
 def _market_context(candidate: dict[str, Any]) -> dict[str, Any]:
     american_odds = _american_odds_value(candidate.get("odds"))
     decimal_odds = _american_to_decimal(american_odds)
     implied_probability = odds_to_implied_probability(american_odds)
-    model_probability_pct = _pct_hint(candidate.get("confidence"))
+    model_probability_pct = _model_probability_pct(candidate)
     price_edge_pct = None
     if implied_probability is not None and model_probability_pct is not None:
         price_edge_pct = model_probability_pct - (implied_probability * 100.0)
@@ -1672,6 +1694,11 @@ def _mlb_statcast_feature_payload() -> dict[str, Any]:
 
 
 def _mlb_statcast_profile_from_ids(batter_id: int | None, pitcher_id: int | None) -> dict[str, Any] | None:
+    # Nothing to look up -> do not parse the ~9 MB feature file for it. It is
+    # read uncached on every call, and game candidates (no ids) reached here
+    # once each per build.
+    if batter_id is None and pitcher_id is None:
+        return None
     payload = _mlb_statcast_feature_payload()
     if not payload:
         return None
@@ -4691,6 +4718,19 @@ def _resolve_nhl_shift_context_path(context_label: str) -> Path:
     return _latest_matching_path(direct.parent, "shifts_*.csv", requested_date=context_label) or direct
 
 
+def _season_evidence_date(sport: Mapping[str, Any] | None = None, candidate: Mapping[str, Any] | None = None) -> date:
+    """The slate date season status is judged against: the candidate's, the sport's, else today (US Central)."""
+    for source in (candidate or {}, sport or {}):
+        for key in ("game_date", "context_label", "selected_date"):
+            text = str(source.get(key) or "").strip()
+            if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+                try:
+                    return date.fromisoformat(text)
+                except ValueError:
+                    continue
+    return date.fromisoformat(_effective_date(None))
+
+
 def _advanced_input_rows_for_sport(sport: dict[str, Any], tracked: set[str]) -> list[dict[str, Any]]:
     advanced_rows: list[dict[str, Any]] = []
     for spec in _advanced_input_specs_for_sport(sport):
@@ -4702,6 +4742,15 @@ def _advanced_input_rows_for_sport(sport: dict[str, Any], tracked: set[str]) -> 
                 **status,
             }
         )
+    # The season tables the explanation reads VALUES from, measured on the data
+    # root (lane `intelligence-evidence-coverage`). These rows are `required`:
+    # unlike the per-slate inputs above, their absence means every pick in the
+    # sport is explained without its season context.
+    slug = _safe_text(sport.get("slug"), "").lower()
+    try:
+        advanced_rows.extend(_season_evidence.readiness_rows(slug, _season_evidence_date(sport)))
+    except Exception as exc:
+        print(f"[intelligence] SEASON_READINESS_FAILED sport={slug} error={type(exc).__name__}: {exc}", flush=True)
     return advanced_rows
 
 
@@ -4712,7 +4761,11 @@ def _available_advanced_inputs_for_sport(sport: dict[str, Any], tracked: set[str
 
 
 def _advanced_readiness_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    required_rows = [row for row in rows if bool(row.get("inside_repo"))]
+    # A row counts when it is REQUIRED (a season table on the data root) or,
+    # as before, inside the git checkout. Counting only `inside_repo` made the
+    # gate vacuous wherever data lives under SYNDICATE_DATA_ROOT: measured on
+    # the fleet 2026-10-07, NCAAF read `ready` with 0 of 27 inputs present.
+    required_rows = [row for row in rows if bool(row.get("inside_repo")) or bool(row.get("required"))]
     tracked_rows = [row for row in required_rows if bool(row.get("tracked"))]
     exists_rows = [row for row in required_rows if bool(row.get("exists"))]
     total = len(required_rows)
@@ -4725,8 +4778,21 @@ def _advanced_readiness_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "path": _safe_text(row.get("path"), "-"),
             "missing_reason": "missing",
         }
-        for row in rows
-        if row.get("inside_repo") and not row.get("exists")
+        for row in required_rows
+        if not row.get("exists")
+    ]
+    # Present but built before the current season opened: still served (it is
+    # the best prior there is), named here so the gap is visible and the
+    # explanation can say "last season's numbers".
+    stale = [
+        {
+            "label": _safe_text(row.get("label"), "Season input"),
+            "path": _safe_text(row.get("path"), "-"),
+            "as_of": row.get("as_of"),
+            "season_status": row.get("season_status"),
+        }
+        for row in required_rows
+        if row.get("exists") and row.get("season_status") == "prior_season"
     ]
     publish_missing = [
         {
@@ -4744,6 +4810,7 @@ def _advanced_readiness_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "ratio": round(ratio, 3),
         "ready": bool(rows) and not missing,
         "missing_inputs": missing,
+        "stale_inputs": stale,
         "publish_missing_inputs": publish_missing,
     }
 
@@ -4809,6 +4876,10 @@ def _build_readiness_gate(overview: list[dict[str, Any]], tracked: set[str]) -> 
 
 
 def _advanced_driver_text(rows: list[dict[str, Any]], *, limit_groups: int = 2, limit_metrics: int = 3) -> str:
+    # Only inputs that are ON DISK: this text reads "Advanced drivers in play",
+    # and listing a file that does not exist claimed evidence nobody had
+    # (fleet 2026-10-07: NCAAF named three absent files as its drivers).
+    rows = [row for row in (rows or []) if row.get("exists", True) is not False]
     if not rows:
         return ""
     groups: list[str] = []
@@ -5029,7 +5100,9 @@ def build_intelligence_status(
                     advanced_ready_count += 1
 
         artifact_exists = any(bool(row.get("exists")) for row in artifact_rows)
-        advanced_exists = any(bool(row.get("exists")) for row in advanced_rows)
+        # Season tables exist all year, so they must not make an offseason
+        # sport read as active today; only the dated per-slate inputs may.
+        advanced_exists = any(bool(row.get("exists")) for row in advanced_rows if not row.get("season_input"))
         active_today = bool(sport.get("active_today")) or artifact_exists or advanced_exists
         data_warnings = [str(item).strip() for item in (sport.get("data_warnings") or []) if str(item).strip()]
         if not artifact_exists and not advanced_exists:
@@ -5058,7 +5131,7 @@ def build_intelligence_status(
                 "advanced_inputs": advanced_rows,
                 "active_today": active_today,
                 "tracked_ready": all(row.get("tracked") for row in artifact_rows if row.get("inside_repo")) if artifact_rows else False,
-                "advanced_ready": all(row.get("exists") for row in advanced_rows if row.get("inside_repo")) if advanced_rows else False,
+                "advanced_ready": bool(_advanced_readiness_summary(advanced_rows).get("ready")),
                 "advanced_gate": _advanced_readiness_summary(advanced_rows),
             }
         )
@@ -8488,6 +8561,13 @@ def _apply_advanced_context_to_candidates(
         ]
         candidate["advanced_context"] = advanced_context
         candidate["advanced_gate"] = readiness_summary
+        # Season metric VALUES for the explanation. Deliberately NOT merged into
+        # `advanced_signals`: that list feeds `advanced_signal_score` and the
+        # rank key, and a new ranking term is a backtested decision, not a
+        # side effect of a data fix (lane intelligence-evidence-coverage).
+        season_signals = _season_evidence.candidate_season_signals(candidate, _season_evidence_date(None, candidate))
+        candidate["season_signals"] = season_signals
+        candidate["season_evidence"] = _season_evidence.season_evidence_text(season_signals)
         candidate["market_context"] = market_context
         candidate["market_focuses"] = market_focuses
         candidate["market_fit"] = market_fit
@@ -8751,9 +8831,25 @@ def _candidate_model_probability(candidate: dict[str, Any]) -> float | None:
     return max(0.0, min(1.0, float(score_value) / 100.0))
 
 
+def _confidence_note_value(candidate: dict[str, Any]) -> str:
+    """The confidence to print in a rationale, or "" when it is not a probability."""
+    if _safe_text(candidate.get("confidence"), "-") == "-":
+        return ""
+    pct = _model_probability_pct(candidate)
+    if pct is None:
+        return ""
+    raw = _safe_text(candidate.get("confidence"), "")
+    return raw if _model_probability_pct({"confidence": raw}) is not None else f"{pct:.1f}%"
+
+
 def _candidate_rationale(candidate: dict[str, Any]) -> str:
     advanced_context = candidate.get("advanced_context") if isinstance(candidate.get("advanced_context"), list) else []
     advanced_driver_text = _advanced_driver_text(advanced_context)
+    # Real season numbers win over the list of metric NAMES an input file
+    # "covers": the names-only sentence claimed evidence nothing had read.
+    season_evidence = _safe_text(candidate.get("season_evidence"), "")
+    if season_evidence:
+        advanced_driver_text = season_evidence.rstrip(".")
     advanced_gate = candidate.get("advanced_gate") if isinstance(candidate.get("advanced_gate"), dict) else {}
     market_context = candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else {}
     market_fit = candidate.get("market_fit") if isinstance(candidate.get("market_fit"), dict) else {}
@@ -8775,8 +8871,8 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
             notes.append(f"Live model projection is {candidate.get('live_projection')} versus a current line of {candidate.get('line')}.")
         if _safe_text(candidate.get("edge"), "-") != "-":
             notes.append(f"Model edge is {candidate.get('edge')} against the current book price.")
-        if _safe_text(candidate.get("confidence"), "-") != "-":
-            notes.append(f"Win-rate confidence sits at {candidate.get('confidence')}.")
+        if _confidence_note_value(candidate):
+            notes.append(f"Win-rate confidence sits at {_confidence_note_value(candidate)}.")
         if _safe_text(candidate.get("odds"), "-") != "-":
             notes.append(f"The quoted book number is {candidate.get('odds')} on {candidate.get('pick')}.")
         if market_context.get("implied_probability") is not None:
@@ -8784,7 +8880,7 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
         if market_context.get("price_edge_pct") is not None:
             notes.append(f"Model versus price edge is {market_context.get('price_edge_pct')} points.")
         if advanced_driver_text:
-            notes.append(f"Advanced drivers in play: {advanced_driver_text}.")
+            notes.append(f"Advanced drivers in play -- {advanced_driver_text}." if season_evidence else f"Advanced drivers in play: {advanced_driver_text}.")
         missing_inputs = advanced_gate.get("missing_inputs") if isinstance(advanced_gate.get("missing_inputs"), list) else []
         if missing_inputs:
             notes.append(f"Readiness is partial because {len(missing_inputs)} advanced inputs are missing or unpublished.")
@@ -8802,8 +8898,8 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
         notes.append(f"Live rest-of-game projection is {candidate.get('live_projection')} with current box score at {actual_value}.")
     if _safe_text(candidate.get("edge"), "-") != "-":
         notes.append(f"The stored edge reads {candidate.get('edge')}.")
-    if _safe_text(candidate.get("confidence"), "-") != "-":
-        notes.append(f"Sim confidence is {candidate.get('confidence')}.")
+    if _confidence_note_value(candidate):
+        notes.append(f"Sim confidence is {_confidence_note_value(candidate)}.")
     if market_context.get("implied_probability") is not None:
         notes.append(f"Market implied probability is {market_context.get('implied_probability')}%.")
     if market_context.get("price_edge_pct") is not None:
@@ -8813,7 +8909,7 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
     if _safe_text(candidate.get("live_total"), "-") != "-":
         notes.append(f"Game context currently points to a live total of {candidate.get('live_total')}.")
     if advanced_driver_text:
-        notes.append(f"Advanced drivers in play: {advanced_driver_text}.")
+        notes.append(f"Advanced drivers in play -- {advanced_driver_text}." if season_evidence else f"Advanced drivers in play: {advanced_driver_text}.")
     signal_text = _advanced_signal_text(candidate)
     if signal_text:
         notes.append(f"Candidate-level advanced signals: {signal_text}.")
@@ -8946,6 +9042,11 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
         },
         "advanced_signal_score": round(float(candidate.get("advanced_signal_score") or 0.0), 2),
         "source_summary_score": round(float(candidate.get("source_summary_score") or 0.0), 2),
+        "season_evidence": _safe_text(candidate.get("season_evidence"), ""),
+        "season_signals": [
+            dict(item) for item in (candidate.get("season_signals") or [])[:12] if isinstance(item, dict)
+        ],
+        "stale_season_inputs": list((candidate.get("advanced_gate") or {}).get("stale_inputs") or [])[:4],
         "selection_direction": _candidate_selection_direction(candidate),
         "subject_key": _candidate_subject_key(candidate),
         "team_key": _candidate_team_key(candidate),

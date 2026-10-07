@@ -5064,6 +5064,10 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                         set(),
                     )
 
+        # Season-table rows (lane intelligence-evidence-coverage) read the data
+        # root, which this fixture does not populate; the fallback under test
+        # is the per-slate source-artifact rows.
+        rows = [row for row in rows if not row.get("season_input")]
         self.assertTrue(rows)
         self.assertTrue(all(bool(row.get("exists")) for row in rows))
         self.assertTrue(any(str(row.get("path") or "").replace("\\", "/").endswith("current_week.json") for row in rows))
@@ -5087,6 +5091,10 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     set(),
                 )
 
+        # Season-table rows (lane intelligence-evidence-coverage) read the data
+        # root, which this fixture does not populate; the fallback under test
+        # is the per-slate source-artifact rows.
+        rows = [row for row in rows if not row.get("season_input")]
         self.assertTrue(rows)
         self.assertTrue(all(bool(row.get("exists")) for row in rows))
         self.assertTrue(any(str(row.get("path") or "").replace("\\", "/").endswith("recommendations_summary/index.json") for row in rows))
