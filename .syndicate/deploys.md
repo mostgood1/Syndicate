@@ -47347,3 +47347,13 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
   - `recommendations_2026-10-11.json` 14:23:43Z: dropped 140, **135 props** (the July-roster build at 00:12:04Z had 148), 3 matches.
   - `recommendations_2026-10-12.json` 14:24:36Z: dropped 140, 45 props, 1 match.
 - **Result:** served dropped 92 -> 140, exactly the offline number. On the one slate with a July-roster comparison, props fell by 13 (148 -> 135): departed players no longer carry a projection. Prop accuracy effect not measured.
+
+## 2026-10-07 16:03:21Z (11:03 AM CT) -- READING: served serie_a departed filter on the refreshed roster -- **MATCHES PREDICTION** (lane `soccer-roster-refresh`)
+
+- **Prediction** (offline A/B, ~01:00Z): **225** dropped. The July roster dropped 153: +0 rescued, 72 no longer rescued (no `players_2026.csv` row, and on no club in ESPN's current serie_a rosters).
+- **Reading:** the builds generated after the serie_a roster write (00:20:27Z), on the fleet. The dropped count identifies the roster (153 July, 225 new).
+  - `recommendations_2026-10-10.json` 14:28:35Z: dropped **225**, rows 809, per_club 20/20, **144 props** (the July-roster build at 23:19:48Z 10-06 had 162), 3 matches.
+  - `recommendations_2026-10-11.json` 14:34:02Z: dropped 225, 254 props, 5 matches.
+  - `recommendations_2026-10-12.json` 14:36:13Z: dropped 225, 103 props, 2 matches.
+- **Result:** served dropped 153 -> 225, exactly the offline number. The 10-10 slate has 18 fewer props (162 -> 144): departed players no longer carry a projection.
+- **All five leagues read (bundesliga 169, ligue_1 256, la_liga 188, epl 140, serie_a 225) match the offline A/B exactly.** Still not measured: whether prop accuracy moves.
