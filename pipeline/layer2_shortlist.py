@@ -1762,6 +1762,10 @@ def build_layer2_shortlist(
                 # three places, not one.
                 "no_bettable_book": int(result.get("no_bettable_book") or 0),
                 "repriced_to_bettable": int(result.get("repriced_to_bettable") or 0),
+                # Lane `layer2-stale-book-pick` (2026-10-06): sides where a stale
+                # book would have won the bettable pick and a fresh one was taken.
+                # Computed by `build_layer2_rows`; forwarded here or it reaches nobody.
+                "stale_book_skipped": int(result.get("stale_book_skipped") or 0),
             }
         except Exception as exc:
             per_sport_stats[sport] = {"error": f"{type(exc).__name__}: {exc}"}
