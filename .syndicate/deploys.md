@@ -47338,3 +47338,12 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - **Result:** served dropped 179 -> 188, exactly the offline number. Props per slate are about flat.
 - **CORRECTION to the 2026-10-06 22:38:35Z entry.** It cited the la_liga build generated 00:20:20Z ("after la_liga's roster write at 00:16:51Z", dropped 179) as evidence that the departed filter runs normally on the NEW roster. That build was still on the JULY roster: 179 is the July number. `generated_at` is stamped at the END of a build, which read its inputs before 00:16:51Z. The filter did run normally, but on the old file. The first verified new-roster readings are the ones above and the bundesliga/ligue_1 entries.
 - **How to apply:** to show a build used an input, compare the input's mtime with the build's START, or with a field that only the new input can produce (here, the dropped count). Comparing with `generated_at` is not enough.
+
+## 2026-10-07 15:57:32Z (10:57 AM CT) -- READING: served epl departed filter on the refreshed roster -- **MATCHES PREDICTION** (lane `soccer-roster-refresh`)
+
+- **Prediction** (offline A/B, ~01:00Z): **140** dropped. The July roster dropped 92; the 48 extra have no `players_2026.csv` row and are on no club in ESPN's current EPL rosters.
+- **Reading:** the builds generated after the epl roster write (00:15:14Z), on the fleet. The dropped count itself proves which roster each build used: 92 is July, 140 is new.
+  - `recommendations_2026-10-10.json` 14:21:36Z: dropped **140**, rows 721, per_club 20/20, 281 props, 6 matches.
+  - `recommendations_2026-10-11.json` 14:23:43Z: dropped 140, **135 props** (the July-roster build at 00:12:04Z had 148), 3 matches.
+  - `recommendations_2026-10-12.json` 14:24:36Z: dropped 140, 45 props, 1 match.
+- **Result:** served dropped 92 -> 140, exactly the offline number. On the one slate with a July-roster comparison, props fell by 13 (148 -> 135): departed players no longer carry a projection. Prop accuracy effect not measured.
