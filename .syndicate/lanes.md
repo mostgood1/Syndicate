@@ -1666,6 +1666,31 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Reachability test (off != on; default byte-identical); nhl_sim_input_checklist.py green; engine-measure unit shares vs real (scripts/nhl_pp_time_unit_split.py); paired per-market table; after a user decision to ship, the fleet's next lineups carry proj_sh_toi and the served slate's PK shares are read and recorded in deploys.md.
 - Blocked by: none
 
+### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **DESIGN + FIDELITY GATE, PRE-REGISTERED 2026-10-07 (user: "yes, build it with option B"), before any code or build:**
+  - SOURCES:
+    - games, probables, team ids/abbrev, starting lineups: StatsAPI schedule `hydrate=lineups,probablePitcher,team` (gameType R);
+    - hands: /people pitchHand;
+    - context: production's own `fetch_game_context` + `_apply_umpire_shrink(0.75)` (production default);
+    - stats / statcast: unchanged (bounded at D-1).
+    - A synthetic sim record (teams, schedule.game_number, starters, weather/park/umpire in production's field layout) is written per game, so the replay tools run unchanged.
+  - LINEUP PROJECTION B (as-of; uses only games with officialDate < D):
+    - Take the team's last N=15 regular-season games whose opposing PROBABLE starter had the same hand as D's opposing probable (fewer than 5 -> the last 15 games of any hand).
+    - The 9 players with the most starts there, restricted to D's active roster (/teams/<id>/roster?date=D); ties go to the most recent start; order by mean batting slot.
+    - Passed as projected_lineup_ids with confirmed EMPTY, as production mostly did.
+  - INFORMATION (reported, not gating): on 06-15..07-12, overlap of B with production's stored projected_ids and with the actual starting nine (production's Rotowire projection vs actual was 0.768 on 06-15..22).
+  - **GATE:** rebuild FIT 06-15..07-12 with `--source statsapi` and replay it against the existing stored-input rebuild (~/asof_out_v2_fit).
+    - Same code (the shipped config), 100 sims, same seeds, `--game-pks-from` the intersection.
+    - Moments and tolerances as the earlier gate: HBP/BB/HR/H per PA <= 0.003; K/BF <= 0.005; starter outs <= 0.30; <=9 / ==15 shares <= 0.03; DP and PO per team-game <= 0.05; runs/game <= 0.30. Each within max(2 game-clustered paired SE, tolerance).
+    - Pass -> build 07-16..09-27 into ~/asof_out_statsapi (never the production root). Fail -> stop and report.
+  - The June dates in this gate are already spent, so the gate only tests source fidelity.
+- Goal: A StatsAPI-only as-of rebuild of MLB 2026-07-16..09-27 (74 dates, 984 games): scripts/mlb_asof_roster_build.py gains --source statsapi (schedule + live-feed probables/context + an as-of lineup projection from prior boxscores, option B), admitted only if its pre-registered June fidelity gate passes, then built into a scratch root for use as fresh validation/fit data
+- Files: scripts/mlb_asof_roster_build.py, scripts/mlb_asof_lineup_projection.py (NEW), tests/test_mlb_asof_roster_build.py, tests/test_mlb_asof_lineup_projection.py (NEW), .syndicate/findings_2026-10-07_mlb_statsapi_asof_rebuild_scope.md
+- Hypothesis: H1: an as-of lineup projection (most frequent prior lineup vs the starter's hand) reproduces production's Rotowire projections closely enough that a June rebuild from StatsAPI alone replays to the same moments as the stored-input rebuild within the earlier gate's tolerances
+- Falsification test: Any gate moment beyond max(2 game-clustered paired SE, tolerance) on 06-15..07-12 -> the source is not admitted; report and stop
+- Verification: Fidelity table (statsapi-source vs stored-input rebuild, June) then per-date coverage of the 07-16..09-27 build
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
