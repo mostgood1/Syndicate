@@ -17,6 +17,7 @@ def combined(monkeypatch):
     import pipeline.intelligence_state as state
 
     view_mod._VIEW_MEMO.clear()
+    monkeypatch.setattr(state, "read_layer2_shortlist", lambda date: {})
 
     calls = []
 
@@ -40,6 +41,7 @@ def test_view_is_empty_when_the_board_has_nothing(monkeypatch):
     import pipeline.intelligence_state as state
 
     view_mod._VIEW_MEMO.clear()
+    monkeypatch.setattr(state, "read_layer2_shortlist", lambda date: {})
 
     monkeypatch.setattr(state, "read_combined_intelligence_response", lambda *a, **k: {"response": {"top_opportunities": []}})
     assert view_mod.layer2_board_view("2026-10-07") == {}
@@ -49,6 +51,7 @@ def test_view_never_raises(monkeypatch):
     import pipeline.intelligence_state as state
 
     view_mod._VIEW_MEMO.clear()
+    monkeypatch.setattr(state, "read_layer2_shortlist", lambda date: {})
 
     def boom(*a, **k):
         raise RuntimeError("keyvalue down")
@@ -88,6 +91,7 @@ def test_view_is_in_board_order_layer2_first(monkeypatch):
     import pipeline.intelligence_state as state
 
     view_mod._VIEW_MEMO.clear()
+    monkeypatch.setattr(state, "read_layer2_shortlist", lambda date: {})
 
     rows = [
         {"sport_slug": "nhl", "source": "data/props/player_props_lines/date=2026-10-07/oddsapi.csv", "candidate_type": "steam", "edge": 0.318},
@@ -105,6 +109,7 @@ def test_stale_view_is_served_while_one_refresh_runs(monkeypatch):
     import pipeline.intelligence_state as state
 
     view_mod._VIEW_MEMO.clear()
+    monkeypatch.setattr(state, "read_layer2_shortlist", lambda date: {})
     gate = threading.Event()
     calls = []
 
@@ -129,3 +134,20 @@ def test_stale_view_is_served_while_one_refresh_runs(monkeypatch):
         threading.Event().wait(0.05)
     assert len(calls) == 2  # exactly one background refresh
     assert view_mod.layer2_board_view("2026-10-07")["recommendations"][0]["pick_id"] == "v2"
+
+
+def test_shortlist_is_the_first_source(monkeypatch):
+    import pipeline.intelligence_state as state
+
+    view_mod._VIEW_MEMO.clear()
+    called = []
+    monkeypatch.setattr(state, "read_layer2_shortlist", lambda date: {"cards": [
+        {"sport_slug": "nba", "source": "layer2_shortlist", "pick_id": "lo", "board_score": 0.2},
+        {"sport_slug": "wnba", "source": "layer2_shortlist", "pick_id": "hi", "board_score": 1.9},
+    ]})
+    monkeypatch.setattr(state, "read_combined_intelligence_response", lambda *a, **k: called.append(1) or {})
+    view = view_mod.layer2_board_view("2026-10-07")
+    assert [r["pick_id"] for r in view["recommendations"]] == ["hi", "lo"]
+    assert view["pick_list_source"] == "layer2_shortlist" and called == []
+    sport_view = view_mod._layer2_board_view_uncached("2026-10-07", sport="wnba")
+    assert [r["pick_id"] for r in sport_view["recommendations"]] == ["hi"]

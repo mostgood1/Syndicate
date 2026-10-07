@@ -95,6 +95,22 @@ def _refresh_in_background(key: tuple, selected_date: str | None, sport: str, li
 
 
 def _layer2_board_view_uncached(selected_date: str | None = None, *, sport: str = "all", limit: int | None = None) -> dict[str, Any]:
+    # CHEAP SOURCE FIRST: the date's persisted Layer 2 shortlist IS the board
+    # (cards already in card form). The combined reader merges the whole window
+    # and the legacy rows on top, and measured 20-24 s per web worker on
+    # 2026-10-07 20:35Z -- enough to slow Ask on the same two workers.
+    if selected_date:
+        try:
+            from pipeline.intelligence_state import read_layer2_shortlist
+
+            shortlist = read_layer2_shortlist(selected_date) or {}
+            cards = [card for card in (shortlist.get("cards") or []) if isinstance(card, Mapping)]
+            if sport and sport != "all":
+                cards = [card for card in cards if str(card.get("sport_slug") or card.get("sport") or "").lower() == sport]
+            if cards:
+                return _view_from_picks(cards, {}, source="layer2_shortlist")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[layer2_view] SHORTLIST_READ_FAILED date={selected_date} error={type(exc).__name__}: {exc}", flush=True)
     try:
         from pipeline.intelligence_state import read_combined_intelligence_response
 
@@ -110,6 +126,10 @@ def _layer2_board_view_uncached(selected_date: str | None = None, *, sport: str 
     picks = [item for item in (body.get("top_opportunities") or body.get("ranked_all") or []) if isinstance(item, Mapping)]
     if not picks:
         return {}
+    return _view_from_picks(picks, body, source="layer2_combined_board")
+
+
+def _view_from_picks(picks: list[Mapping[str, Any]], body: Mapping[str, Any], *, source: str) -> dict[str, Any]:
     # THE BOARD'S ORDER: Layer 2 rows by their own board score, then anything
     # still sourced elsewhere. The combined list is NOT in that order -- served
     # 2026-10-07 20:23Z, the 22 legacy steam rows came first and took 10 of
@@ -132,7 +152,7 @@ def _layer2_board_view_uncached(selected_date: str | None = None, *, sport: str 
         "board_contract": body.get("board_contract") if isinstance(body.get("board_contract"), Mapping) else {},
         "by_sport": dict(by_sport),
         "candidate_count": len(picks),
-        "pick_list_source": "layer2_combined_board",
+        "pick_list_source": source,
         "layer2_rows": sum(1 for item in picks if str(item.get("source") or "").startswith("layer2")),
     }
 
