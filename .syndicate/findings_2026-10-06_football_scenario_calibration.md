@@ -425,6 +425,12 @@ little under 1 -- mild over-dispersion, far less than v1's 0.70), total slope +0
 **VALIDATION waits for >= 128 completed 2026 NFL games (pre-registered; ~late October).** NCAAF v2 descent
 still running (30 evals, nothing below production 227.5 yet); its 2025 validation is queued behind it.
 
+**v2 amendment 2 (2026-10-07, user: "Validate only if FIT beats production"), before NCAAF 2025 is read:** after 42
+NCAAF evals nothing had beaten production (227.5) on the FIT games, and the queued watcher would have spent the
+one-time NCAAF 2025 read whatever the descent found. The watcher was replaced (old one stopped, no orphans,
+`VALIDATION_READ_2025` absent): the 2025 read (pregame gates + live replay) now runs ONLY if the fitted objective
+is <= 0.8 x production's on FIT -- gate (a)'s own bar. Otherwise NCAAF 2025 stays UNREAD and the result is reported.
+
 H1 prediction (|delta total| < 1.0) FAILED (-1.12). H2 prediction (total in [-0.5, +1.5]) held. Both
 fixes work mechanically (S12 after-half 25.0; S5 4th-down rows inside the real CI) and neither moves
 accuracy alone -- each moves the level or home edge away from the close, as the re-fit design expects.
