@@ -47239,3 +47239,15 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - (d) closing marks -- MET: 1,626 ledger orders carry `closing_mark`.
 - (e) optimizer -- MET: the 10-07 11:30:02Z report carries `## Staked`: 695 graded, 0 unjoined; ROI -7.8% vs +3.6% admitted; books 1-2 -11.4% (439), 3-4 -7.9%, 5-7 +2.4%, 8+ +4.6% (71). No stake-scale entries yet (sample floor).
 - still OWED: forward ROI under the new sizing (needs days), and the prophetx settlement charge above.
+
+## 2026-10-07 14:32:51Z (9:32 AM CT) -- READING: the regenerated 10-07 league_status rebuilt both 10-07 WNBA sims ONCE, exactly as predicted -- **MET** (lanes `smart-sim-reuse-stale-exclusions`, `wnba-league-status-roster`)
+
+- **log:** wnba_source/logs/syndicate_refresh_oddsapi_props_2026-10-07.log, lines appended after 09:10 CDT:
+  - `SMART_SIM_REUSE_STALE_EXCLUSIONS ... ATL_NYL.json stale=1 teams=2 drift=ATL:+-/-AICHA COULIBALY,AZURA STEVENS,DIJONAI CARRINGTON,NATASHA CLOUD,RICKEA JACKSON,SKYLAR DIGGINS;NYL:+-/-JOVANA NOGIC,KARA DUNN,KELSEY PLUM reuse=False`
+  - `SMART_SIM_REUSE_STALE_EXCLUSIONS ... GSV_LVA.json stale=1 teams=2 drift=GSV:+-/-TYASHA HARRIS;LVA:+-/-AALIYAH NYE,CAMERON BRINK,NDJAKALENGA MWENENTANDA,SHYANNE SELLERS reuse=False`
+  - then on the next run: `SMART_SIM_REUSE_EXCLUSIONS ... GSV_LVA.json stale=0 reuse=True` (no churn).
+- **drift matches the pre-ff measurement exactly:** the same 14 mis-teamed keys removed, 0 added.
+- **rebuilt:** GSV_LVA 09:22:37 and ATL_NYL 09:26:06 CDT.
+  - Pools: none of the 14 is simulated (they were never in the props pool), so the pools are unchanged as predicted.
+  - Allisha Gray is not simulated; Jewell Loyd is simulated (LVA).
+- **Both lanes' fleet verifications are now complete.**
