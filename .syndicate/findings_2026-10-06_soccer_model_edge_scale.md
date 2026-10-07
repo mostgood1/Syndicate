@@ -72,3 +72,13 @@ actual), subs over-projected (0.646 vs 0.566). One allocation defect across goal
 3. **Until fixed, a positive scorer/SOT edge is suspect**, not a bet. This needs no new gate: the existing `skill_reliability`
    scaling and the fair-noise shrink already hold stakes down. The fix must come from the model, never a market withhold
    (2026-10-05 PRIME DIRECTIVE).
+
+## CORRECTION 2026-10-07 (lane `soccer-goal-allocation`) -- the "0.48 vs 0.92" market comparison overstated the gap; the outcome-graded error is goals on players who do not appear
+
+- **What was wrong.** The 0.92 "market-implied share of team goals" and the "sim anytime = 0.45x market" ratio used the board's `fair_probability` for ONE-SIDED scorer props. That fair is `book_margin_model` with an assumed hold of about 6-7% (`edge_vs_modelled_fair_hold_pct` 6.098 / 7.417 on the rows above). Scorer markets carry far more overround: a median-over-books vigged market share computed on 87 matches came out at 2.03 of team goals, which is impossible. So those fairs OVERSTATE the market's probability, and both figures exaggerate the sim's shortfall. The units finding (`me` is absolute pp) and the per-team sum check (players' xG = team xG) stand.
+- **What the outcomes say** (H40 fit, 5,882 LISTED players, 119 matches, 7 dates 09-17..09-30, goals from the backfilled log):
+  - the current model puts **58.3 of 355 expected goals on players who did not appear** (they scored 0);
+  - players who appeared run 1.16x actual/model (starters 1.11x, subs 1.53x);
+  - by band: < 0.02 -> 2.38x, 0.30+ -> 0.84x.
+  The board's unconditional scorer probability is mostly wrong about WHO APPEARS, not about how goals split among regular starters.
+- H40 (shrunk xG/90 x start-weighted minutes) is NOT SUPPORTED: details are in the lane block. A post-hoc variant with an as-of P(appear) term did beat the current model (NLL CI [-0.0123, -0.0007]) but must be pre-registered and tested on fresh dates.
