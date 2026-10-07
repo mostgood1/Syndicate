@@ -108,10 +108,10 @@ def _key(ov: Dict[str, Any]) -> str:
 
 
 class Evaluator:
-    def __init__(self, sport: str, seasons: List[int], seeds: int, workers: int, cache: Path) -> None:
+    def __init__(self, sport: str, seasons: List[int], seeds: int, workers: int, cache: Path, every: int = EVERY) -> None:
         self.sport, self.seeds, self.cache = sport, seeds, cache
         tasks = (F.nfl_tasks if sport == "nfl" else F.ncaaf_tasks)(seasons, seeds)
-        self.tasks = tasks[::EVERY] if EVERY else tasks
+        self.tasks = tasks[::every] if every else tasks
         if SMOKE:
             self.tasks = self.tasks[:: max(1, len(self.tasks) // 6)][:6]
         arg = str(F.nfl_root()) if sport == "nfl" else str(F.ncaaf_work())
@@ -391,7 +391,10 @@ def cmd_validate(args) -> None:
                 F.add_drive(rec[f"c_{side}"], d, sport)
             F.add_team_game(rec[f"c_{side}"], mine)
         real_rec[gid] = rec
-    ev = Evaluator(sport, [VALIDATION_SEASON], FINAL_SEEDS, args.workers, out / f"validation_s{FINAL_SEEDS}.jsonl")
+    # Amendment 3: VALIDATION scores EVERY 2025 game. The every-4th subset is a
+    # descent cost-saving; reusing it here would have graded on ~68 NFL games.
+    ev = Evaluator(sport, [VALIDATION_SEASON], FINAL_SEEDS, args.workers, out / f"validation_s{FINAL_SEEDS}.jsonl",
+                   every=1)
     try:
         prod = ev.run({})
         candd = ev.run(cand)

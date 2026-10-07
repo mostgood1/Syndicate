@@ -257,6 +257,16 @@ The smoke run (plumbing only; `refit_smoke/`, nothing from it is a result) showe
   (x0.875 / x1.125, or one grid step for absolute levers), kept only if the objective drops.
 Nothing else changes.
 
+### Re-fit amendment 3 — 2026-10-07 00:1xZ, NFL validation STOPPED before any result was read
+
+User: "validate NFL now, don't wait for NCAAF". The first NFL 2025 run (marker 00:08:33Z) reused the
+descent's every-4th-game subset, which would have graded on ~68 of 2025's games -- the pre-registration
+says nothing about subsampling VALIDATION, and 68 games cannot resolve gates (c)-(f). Stopped within
+minutes; `validation_s300.jsonl` held ~10 KB of production-arm game sims (deterministic, cached,
+NOT read -- no moment, gate or score was computed). Fixed: `validate` scores EVERY 2025 game
+(`Evaluator(..., every=1)`), resumed with `--resume`. Nothing else changes; NCAAF's validation uses
+the same rule.
+
 ## Results
 
 ### Phase 1, NFL (2023-24 REG, all 544 games, 300 seeds; real-vs-sim, flag rule as pre-registered)
