@@ -163,6 +163,26 @@ remapped 1,829 of 148,883 player references: rush yds 0.932, rec yds 0.937, rush
 Stated limit: box scores exist for 2025 only, so 2023-24 are validated only through the 2025 weeks that
 share their (classic) text style (wk1-8); the parser and resolver are identical across seasons.
 
+## NCAAF Phase B/C — PRE-REGISTERED 2026-10-07 (user: "run the NCAAF attribution backtest when the props pull finishes")
+
+Same design as NFL, with these NCAAF-specific choices fixed now:
+- **Engine:** production's NCAAF `build_projection` (promoted `ncaaf-goal-line-refit-1`, all scenario
+  switches OFF), as-of SP+/PPA blend tasks from the scenario harness (FBS-vs-FBS, weeks 3-15), 300 seeds.
+- **Tables:** P(pass | down, to-go, diff, time, yards), real yard quantiles and P(INT | turnover) measured
+  on CFBD 2024 plays (FIT) through the ACCEPTED parser. **NCAAF sack rule:** a sim sack is a QB rush
+  attempt with its (negative) yards, as in the box scores.
+- **Usage:** as-of from the parsed plays (current season before the week + prior season scaled to 4
+  games); availability = touched the ball in the team's previous game, plus every player quoted for this
+  game (A1). Players are keyed by first initial + last name; quote names and roster keys meet through the
+  same `resolve_key` the parser validation used.
+- **Rows:** OddsAPI historical quotes (private root), two-sided only, de-vigged per book; anytime TD
+  needs yes AND no. **Actuals:** the parsed per-player-game totals (the accepted parser) for both seasons.
+- **Phase B (FIT 2024):** attribution vs the de-vigged BOOK only -- production's NCAAF yardage props
+  (`prop_projections`) are built from player box scores, which exist for 2025 only, so production has
+  nothing to say about 2024. Construction check: simulated team pass/rush attempts and yards vs parsed.
+- **Phase C (held-out 2025, read once):** attribution vs production's `prop_projections.prob_over` (as-of
+  week) vs the book, same rows, game-clustered paired log-loss per market. Falsification as for NFL.
+
 **Part 2 probe (2026-10-07, 11 credits):** OddsAPI historical NCAAF events for 2024-10-12 15:50Z = 76
 events (1 credit); Alabama vs South Carolina `player_rush_yds` = 5 books, 63 outcomes (10 credits);
 4,127,431 credits remaining. The 2024 NCAAF props archive EXISTS. Bulk estimate, from the repo's
