@@ -1703,6 +1703,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Re-run the real-payload A/B: NBA/NHL games_in_* equal old values; unit tests pass
 - Blocked by: none
 
+### soccer-goal-allocation — OPEN — opened 2026-10-07 — session 5942cf5f-48c9-485b-99a8-e6e04c75bd83
+- Goal: [user 2026-10-07: 'implement the soccer goal allocation fix'] The soccer sim's per-player goal share stops spreading team goals flat across the squad: behind a default-off flag, a goal-share estimator (fitted, pre-registered) lifts the share of the players who actually start/score while team totals stay fixed; shipped only if it beats the current model on held-out per-player goal outcomes, then verified on the fleet as the priced players' sim share of team goals moving from 0.48 toward the market's 0.92 and sim anytime/market moving up from 0.45.
+- Files: syndicate/features/soccer/sim_engine/soccersim/player_props.py (goals/anytime path only, own default-off flag; LENT by soccer-shots-allocation-blend e3382789), tests/test_soccer_goal_share.py (NEW), .syndicate/findings_2026-10-07_soccer_goal_allocation.md (NEW)
+- Hypothesis: H40 (pre-registered before any fit): for players on post-fix pre-kickoff builds, goal share = minutes_w * xg90_shrunk / sum over the side, where xg90_shrunk = (own xG + k * position-group league xG/90 * own minutes/90) / (own minutes/90 + k) with k pseudo-90s fitted by LEAVE-ONE-DATE-OUT Poisson likelihood of actual goals, and minutes_w = P(start)-weighted expected minutes this match; team goals unchanged. Beats the current share if held-out per-player Poisson NLL (new - current) has a match-bootstrap 95% CI wholly below 0.
+- Falsification test: H40 not supported -> nothing ships: NLL difference CI not wholly below 0, OR the fitted k is at the grid edge (no information), OR anytime Brier at the market's own lines does not improve.
+- Verification: Offline: held-out NLL + anytime Brier vs current, per league, with the n it rests on; reachability test off != on on the real build path; then (if shipped) a fleet artifact rebuild reading priced-player share of team goals and sim/market anytime ratio before vs after.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
