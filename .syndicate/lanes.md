@@ -1880,6 +1880,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Unit: the sample names the gated players, is bounded per sport, and is empty when nothing is gated; served /api/board/layer2-shortlist carries rows_player_out_on_feed_sample naming Allisha Gray while rows_player_out_on_feed > 0
 - Blocked by: loan of layer2_board.py + intelligence.py key list from layer2-withdrawn-lines
 
+### soccer-mls-corner-history-backfill — OPEN — opened 2026-10-07 — session a14e9b8c-dd51-40ff-b992-8cd338bb2c87
+- Goal: Fleet MLS pregame corners back on the estimator: a re-freeze on the fleet publishes corners_basis=team_rates_pressure_v1 for MLS matches, from an ESPN-backfilled MLS 2026 corner history (through 2026-09-29) at <fleet data root>/soccer_source/mls/history/matches_2026.csv
+- Files: scripts/soccer_season_audit/backfill_mls_corner_history.py
+- Hypothesis: MLS falls back to sim on the fleet only because the fleet holds 3 MLS corner rows (< MIN_LEAGUE_ROWS 30): mls/history is empty and the season's live_state files stayed on Render's disk
+- Falsification test: With >=30 backfilled rows in history/matches_2026.csv, apply_corners_estimator still returns basis sim for MLS fixtures (estimate_corners declines for another reason)
+- Verification: Offline: apply_corners_estimator over the fleet data root for the 10-10/10-11 MLS fixtures returns team_rates_pressure_v1. On production: the next fleet MLS pre-kickoff freeze carries corners_basis=team_rates_pressure_v1.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
