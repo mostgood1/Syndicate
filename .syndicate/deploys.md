@@ -47564,3 +47564,7 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - Allisha Gray occurrences in the whole served payload: **0** (not seated, not in the 10-row stale sample).
   - Served rows 200, of which 44 wnba (35 props).
 - **believed, NOT verified:** that the 4 gated rows are Gray's lines. The payload counts refusals but does not name them, and she is the slate's only OUT player with live quotes. Confirming it needs the board's refusal detail or a replay.
+
+## 2026-10-07 ~19:05Z -- CORRECTION to the 18:54:01Z entry (lane `soccer-team-history-current-season`): a4281cc8 was RE-loaded, not first loaded
+
+- a4281cc8 was first loaded at 17:09:28Z by lane web-restart-healthz's ff (43afa8cd -> faa1cfea) + refresh-worker restart (pid 3197737); my 18:55:37Z down/up only re-loaded it. Its owner (layer2-out-gate-reach, session 936c0a27) had already verified it on builds from that earlier worker (rows_player_out_on_feed=4 wnba, Allisha Gray seated 0) and closed GOAL MET; correction on its side in 384c75c9. Nothing else in the 18:54:01Z entry changes.
