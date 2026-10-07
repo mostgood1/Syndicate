@@ -1685,6 +1685,29 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **LATE-SEASON WORKLOAD FIX, PRE-REGISTERED 2026-10-07 ~21:30Z (user: "then do the late-season workload fix next"), before any code is run on data:**
+  - DEFECT (from pooled readings, FIT-half diagnosis above): real starters faced fewer batters as the season went on (June 22.0 -> Jul 21.45 -> the pooled window ~21.2), while the model's season-to-date stamina stayed flat. A season-phase effect, so the fix is a MECHANISM that tracks it, not a constant.
+  - MECHANISM (build_roster, probable starter only):
+    - stamina = clamp(70, 115, round((1-w) x season_derived + w x recent));
+    - recent = mean `numberOfPitches` over the starter's last n=5 game-log starts (gamesStarted >= 1; game log < D in the as-of builder); needs >= 3 such starts.
+    - New build_team_roster args `starter_stamina_recent_weight` (default 0.0 = today, no extra work: byte-identical, to be proven) and `starter_stamina_recent_starts` (5).
+    - Applied before the statcast stamina adjustment, like the season-derived value.
+  - ORDER: starts only AFTER the pitch-count fix has made its holdout read, and on top of whatever that fix ships. Rosters are rebuilt per arm, because stamina is baked into roster_objs.
+  - DATA (the late period, where the effect lives): FIT = 2026-08-22..09-08; HOLDOUT = 09-09..09-27, read once.
+    - EARLY GUARD = 07-16..08-21 (already spent by the pitch fix), rebuilt with the chosen w.
+  - GRID: w {0.0 (prod), 0.25, 0.5, 0.75}; n fixed 5. 100 sims.
+  - OBJECTIVE (FIT): the pitch-fix objective (13 moments + pitches/start, scale 2.0) + starter BF/start bias (scale 0.5).
+  - SHIP only if ALL hold:
+    - HOLDOUT, chosen vs production:
+      - (1) |starter BF bias| falls >= 50%, and |outs bias| ends <= 0.25;
+      - (2) objective no worse;
+      - (3) no moment's |z| grows > 1.0;
+      - (4) starter |SO|, |H|, |BB|, |ER| bias each worsen <= 0.10;
+      - (5) |runs gap| no worse;
+      - (6) pooled hitter-prop log-loss no worse.
+    - EARLY GUARD: (7) starter |BF| and |outs| bias each worsen <= 0.10. A recency term must not hurt the part of the season without the drift.
+    - Otherwise ship nothing.
+  - SHIP MECHANICS: build_team_roster default w = chosen (vendor code; production builds rosters daily, so it takes effect on the next build), fleet ff (no restart), V1 + V2, deploys.md, upstream PR.
 - **PITCH-COUNT FIX, PRE-REGISTERED 2026-10-07 ~20:45Z (user: "yes, do 1 and ship if it passes"), before any lever run:**
   - DEFECT: shipped config starters throw ~10 pitches/start too few (FIT: Jul 74.9 vs 83.0, Aug 75.1 vs 84.7; June 75.2 vs 85.5). Pre-ship it was -1.3.
   - LEVERS (existing override knobs, no code change):
