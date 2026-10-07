@@ -47138,3 +47138,12 @@ Scheduled check `nfl-wk5-rebuild-check`, read-only on the WSL fleet (nothing res
 - **prediction:** the next write-pregame-expected-minutes run writes league_status_<D> with 0 non-WNBA tricodes, WNBA slate teams on slate, Gray OUT and Loyd playing.
 - **verify:** watcher scratchpad/watch_ls.sh reports the first league_status_*.csv newer than 19:58:40 CDT (non_wnba_tricodes, on_slate, Gray/Loyd rows).
 - **owed separately:** an upstream re-derivation in mostgood1/WNBA-Betting, or the next vendor re-pull reverts this.
+
+## 2026-10-07 01:05Z (8:05 PM CT 10-06) -- V2 READING for the 00:28:44Z fleet ff 2bb481ef (MLB combined calibration) -- **MET**
+- Post-ship production sims: 10-06 LAD@ATL (849819) and MIL@SD (849826), rewritten after 00:28:44Z; 4 starters.
+- Replays of their own roster_objs, `--validate-only --stored live`, 4000 sims: A = fleet tree 2bb481ef; B = the same tree with the 5 shipped files restored from 61edcc04 (B's models.py verified to read bip_dp_rate 0.06).
+- Served starter outs_mean vs replays (served | A | B):
+  - 849819: 16.080 | 16.315 | 16.785, and 15.226 | 15.557 | 15.727;
+  - 849826: 14.734 | 15.084 | 15.685, and 15.578 | 15.826 | 16.235.
+- mean |served - A| **0.291** < mean |served - B| **0.704**: MET (pre-registered). Every starter individually is closer to A. The new config moves these starters -0.41 outs (A - B).
+- verify: done -- production's sims run the shipped config. Evidence (scratchpad): v2_A.json, v2_B.json, v2_eval.py, v2_watch.sh.
