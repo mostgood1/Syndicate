@@ -1739,6 +1739,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Falsification test: n/a
 - Verification: AST guard test (0 ScoreboardV2 calls without league_id in the WNBA package) + reachability tests (each reachable function asks for league '10' and keeps WNBA teams only); upstream PR opened.
 - Blocked by: none
+- **2026-10-07: CODE LANDED (feb4258a).** AST guard: 8 ScoreboardV2 calls without league_id on origin/main before, 0 after; end-to-end test: boxscores/pbp/finals ask for "10", keep WNBA only (PHO/WAS -> PHX/WSH), finals never reads data.nba.com for the WNBA. 9 WNBA vendor league tests pass. NOT FF'd to the fleet on purpose: production calls none of these paths (rides the next fleet ff, inert there). UPSTREAM PR: pending a user decision.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
