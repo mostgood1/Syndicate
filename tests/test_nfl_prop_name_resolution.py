@@ -36,7 +36,7 @@ def _resolve(name, teams):
 
 
 def test_a_suffix_is_stripped():
-    assert ps.short_name_keys("Michael Penix Jr.") == ["m.jr.", "m.penix"]
+    assert ps.short_name_keys("Michael Penix Jr.") == ["m.jr.", "m.penix", "mi.penix"]
     assert _resolve("Michael Penix Jr.", {"ATL", "NO"})[0] == "P-PENIX"
 
 
@@ -63,3 +63,14 @@ def test_off_is_not_on_without_game_teams_it_is_the_old_resolver(monkeypatch):
 
 def test_a_player_on_neither_team_is_refused():
     assert _resolve("Kyren Williams", {"DAL", "TB"}) == (None, "unresolved")
+
+
+def test_two_letter_prefix_is_tried_after_an_ambiguous_initial(monkeypatch):
+    """nflverse 2026 spells Bijan / Brian Robinson `bi.robinson` / `br.robinson`;
+    `b.robinson` (prior season) holds both on ATL. 2026-10-08: 12 rows refused."""
+    cands = {2026: {"bi.robinson": ["bijan"], "br.robinson": ["brian"]}, 2025: {"b.robinson": ["bijan", "brian"]}}
+    monkeypatch.setattr(ps, "_cached_name_candidates", lambda season: cands.get(season, {}))
+    monkeypatch.setattr(ps, "player_team_with_prior", lambda season, week, pid: ("ATL", "x"))
+    canon = lambda t: str(t)
+    assert ps.resolve_player_id_for_game(2026, 5, "Bijan Robinson", {"ATL", "BAL"}, canon)[0] == "bijan"
+    assert ps.resolve_player_id_for_game(2026, 5, "Brian Robinson Jr.", {"ATL", "BAL"}, canon)[0] == "brian"

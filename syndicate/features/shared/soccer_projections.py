@@ -246,6 +246,7 @@ def _prob_at_line(entry: Mapping[str, Any], field: str, line: Any) -> float | No
 _DERIVED_SCORER_MARKETS = {"player_first_goal_scorer", "player_last_goal_scorer"}
 
 _TOTALS_EXACT_PROB_LINE = 2.5
+_BTTS_MARKETS = frozenset({"btts", "both_teams_to_score"})
 
 # Game markets whose third leg is a KNOWN, enumerable outcome (the draw), so a
 # three-leg de-vig spans the whole outcome space. `_no_vig_over_probability`
@@ -729,6 +730,73 @@ def _total_prob_from_scorelines(scorelines: Any, line: float) -> tuple[float, fl
     if line > max_total:
         return None
     return over, push
+
+
+def _scoreline_outcomes(scorelines: Any) -> list[tuple[int, int, float]] | None:
+    """(home goals, away goals, probability) from `scoreline_probabilities`, or
+    None when it is not a distribution (mass off 1 by more than 1%)."""
+    if not isinstance(scorelines, dict) or not scorelines:
+        return None
+    out: list[tuple[int, int, float]] = []
+    for key, raw in scorelines.items():
+        prob = _as_float(raw)
+        parts = str(key).replace(":", "-").split("-")
+        if prob is None or len(parts) != 2:
+            continue
+        try:
+            out.append((int(parts[0]), int(parts[1]), prob))
+        except (TypeError, ValueError):
+            continue
+    mass = sum(p for _, _, p in out)
+    if not out or mass < 0.99 or mass > 1.01:
+        return None
+    return out
+
+
+def _btts_prob_from_scorelines(scorelines: Any) -> float | None:
+    """P(both teams score), summed from the scoreline distribution. A
+    transformation of the sim's own output, like `_total_prob_from_scorelines`."""
+    outcomes = _scoreline_outcomes(scorelines)
+    if outcomes is None:
+        return None
+    mass = sum(p for _, _, p in outcomes)
+    return sum(p for h, a, p in outcomes if h > 0 and a > 0) / mass
+
+
+def _handicap_prob_from_scorelines(scorelines: Any, away_line: float) -> tuple[float, float] | None:
+    """(P(home covers), push share) for an ASIAN HANDICAP at the grid's line.
+
+    THE LINE IS IN THE AWAY FRAME (`book_grid._canonical_line`, #262): home's
+    own handicap is -L, so home wins a half-stake at l when margin > l, pushes
+    when margin == l, loses below. Quarter lines (x.25 / x.75) split the stake
+    over l -/+ 0.25.
+
+    ONE NUMBER FOR A SPLIT STAKE. With W = the stake-weighted win share and
+    U = the stake-weighted push share, a bet at fair odds d = 1/p has the same
+    EV as a binary bet with p = W / (1 - U) -- which reduces to P(win | no push)
+    on whole lines, to P(win) on half lines, and makes the home and away
+    numbers sum to exactly 1 on every line, so the shared two-way de-vig and the
+    board's side negation stay valid. Refused beyond the simulated support
+    (a hard 0/1 there is the sim's granularity, not knowledge).
+    """
+    outcomes = _scoreline_outcomes(scorelines)
+    if outcomes is None:
+        return None
+    mass = sum(p for _, _, p in outcomes)
+    margins = [(h - a, p / mass) for h, a, p in outcomes]
+    reach = max(abs(m) for m, _ in margins)
+    if abs(away_line) > reach:
+        return None
+    frac = abs(away_line * 4) % 2
+    halves = [away_line - 0.25, away_line + 0.25] if abs(frac - 1) < 1e-9 else [away_line]
+    win = push = 0.0
+    for l in halves:
+        win += sum(p for m, p in margins if m > l + 1e-9) / len(halves)
+        push += sum(p for m, p in margins if abs(m - l) < 1e-9) / len(halves)
+    live = 1.0 - push
+    if live < 1e-6:
+        return None
+    return win / live, push
 
 
 def _probability_projection(
@@ -1462,8 +1530,38 @@ def attach_soccer_projections(
             margin = _as_float((match.get("spread_distribution") or {}).get("home"))
             if margin is None:
                 margin = _as_float((match.get("team_projection") or {}).get("margin_mean"))
-            if margin is not None:
+            line_value = _as_float(row.get("line"))
+            # User 2026-10-08 ("make sure everything is getting sim data"): the
+            # handicap is priced from the scoreline distribution the sim already
+            # publishes -- a transformation, not an inferred variance. Falls back
+            # to the margin mean exactly as before when it cannot be priced.
+            handicap = (
+                _handicap_prob_from_scorelines(match.get("scoreline_probabilities"), line_value)
+                if line_value is not None
+                else None
+            )
+            if handicap is not None:
+                p_home, p_push = handicap
+                projection = _probability_projection(
+                    p_home, basis="scoreline_handicap", side="home", sims_run=match.get("simulations")
+                )
+                if margin is not None:
+                    projection["projected"] = round(margin, 3)
+                if p_push > 0:
+                    projection["push_probability"] = round(p_push, 4)
+                projection["ladder"] = _scoreline_ladder(match.get("scoreline_probabilities"), line_value, margin=True)
+                projection["ladder_kind"] = "margin"
+            elif margin is not None:
                 projection = _mean_projection(margin, row.get("line"), basis="margin_mean")
+        elif market in _BTTS_MARKETS:
+            totals = match.get("total_distribution") or {}
+            prob = _as_float(totals.get("both_teams_scored_probability"))
+            basis = "both_teams_scored_probability"
+            if prob is None:
+                prob = _btts_prob_from_scorelines(match.get("scoreline_probabilities"))
+                basis = "scoreline_distribution"
+            if prob is not None:
+                projection = _probability_projection(prob, basis=basis, side="yes")
         elif market in _DERIVED_SCORER_MARKETS:
             if _norm_name(row.get("player_name")) in _NON_PLAYER_SELECTIONS:
                 non_player_selection_rows += 1

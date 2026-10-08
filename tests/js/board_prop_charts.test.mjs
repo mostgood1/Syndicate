@@ -79,5 +79,14 @@ const mlr = Object.assign({}, spread, { market: 'h2h', side: 'away', line: null 
 eq('moneyline: W-L of the backed team', api.recentFormText(mlr), 'Tampa Bay Buccaneers L2 1–1');
 eq('no team_recent: game row has no form', api.recentForm({ market: 'totals', kind: 'game', side: 'over', line: 6 }), null);
 
+// Spreads: the card carries the side's OWN line; the ladder is in the away frame.
+const sp = [[-0.5, 0.62], [0.5, 0.48], [1.5, 0.30], [2.5, 0.16], [3.5, 0.08]];
+const homeSp = api.simLadderBuckets({ sim_ladder: sp, sim_ladder_kind: 'margin', line: -1.5, side: 'home', confidence: 0.30 });
+eq('home -1.5 reads P(margin > +1.5)', homeSp && Math.round(homeSp.pSide * 100), 30);
+const awaySp = api.simLadderBuckets({ sim_ladder: sp, sim_ladder_kind: 'margin', line: 1.5, side: 'away', confidence: 0.70 });
+eq('away +1.5 reads 1 - P(margin > +1.5)', awaySp && Math.round(awaySp.pSide * 100), 70);
+const named = api.simLadderBuckets({ sim_ladder: sp, sim_ladder_kind: 'margin', line: -0.5, side: 'Real Madrid', home_team: 'Real Madrid', away_team: 'Villarreal', confidence: 0.48 });
+eq('soccer team-name side resolves to home', named && named.sideWord, 'home covers');
+
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASS');
 process.exit(failures ? 1 : 0);

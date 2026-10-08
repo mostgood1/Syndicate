@@ -336,6 +336,13 @@ def short_name_keys(full_name: str) -> list[str]:
     keys.append(f"{core[0][0]}.{core[-1]}".lower())
     if len(core) > 2:
         keys.append(f"{core[0][0]}.{' '.join(core[1:])}".lower())
+    # nflverse disambiguates same-initial teammates with a two-letter prefix
+    # ("bi.robinson" Bijan / "br.robinson" Brian, ATL 2026); the one-letter key
+    # alone fell back to last season and read both as ambiguous (12 rows,
+    # measured 2026-10-08). Tried after the plain keys, so nothing that joined
+    # before changes.
+    if len(core[0]) >= 2 and core[0][1].isalpha():
+        keys.append(f"{core[0][:2]}.{core[-1]}".lower())
     out: list[str] = []
     for key in keys:
         if key not in out:
@@ -368,6 +375,7 @@ def resolve_player_id_for_game(
     teams = {t for t in (game_teams or set()) if t}
     if not teams:
         return resolve_player_id_with_prior(season, full_name)
+    ambiguous = False
     for key in short_name_keys(full_name):
         for season_try, label in ((season, "current_season"), (season - 1, "prior_season_fallback")):
             ids = _cached_name_candidates(season_try).get(key)
@@ -381,8 +389,12 @@ def resolve_player_id_for_game(
             if len(in_game) == 1:
                 return in_game[0], label if len(ids) == 1 else f"{label}_team_disambiguated"
             if len(in_game) > 1:
-                return None, "ambiguous_in_game"
-    return None, "unresolved"
+                # A LATER, more specific key may still separate them -- nflverse's
+                # two-letter "bi.robinson" / "br.robinson" (2026-10-08). Refused
+                # only once every key has been tried.
+                ambiguous = True
+                break
+    return None, "ambiguous_in_game" if ambiguous else "unresolved"
 
 
 # A week past any real NFL season, so the prior-season lookup takes the WHOLE

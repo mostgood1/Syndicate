@@ -493,3 +493,86 @@ class TeamRecentResults(unittest.TestCase):
         from syndicate.features.shared.team_recent_results import team_recent_results
 
         self.assertEqual(team_recent_results("nba", "Boston Celtics", "2026-10-08"), [])
+
+
+class SoccerBttsAndHandicapPricing(unittest.TestCase):
+    """User 2026-10-08 "make sure everything is getting sim data": BTTS and
+    Asian handicaps priced from the sim's own scoreline distribution."""
+
+    SCORES = {"0-0": 0.10, "1-0": 0.20, "0-1": 0.10, "1-1": 0.15, "2-0": 0.15, "2-1": 0.15, "0-2": 0.05, "3-1": 0.10}
+
+    def test_btts_sums_the_both_scored_cells(self) -> None:
+        from syndicate.features.shared.soccer_projections import _btts_prob_from_scorelines
+
+        self.assertAlmostEqual(_btts_prob_from_scorelines(self.SCORES), 0.40)  # 1-1, 2-1, 3-1
+
+    def test_half_line_is_plain_cover_probability(self) -> None:
+        from syndicate.features.shared.soccer_projections import _handicap_prob_from_scorelines
+
+        p, push = _handicap_prob_from_scorelines(self.SCORES, 0.5)  # away +0.5 / home -0.5: home must win
+        self.assertAlmostEqual(p, 0.60)
+        self.assertEqual(push, 0.0)
+
+    def test_whole_line_conditions_out_the_push(self) -> None:
+        from syndicate.features.shared.soccer_projections import _handicap_prob_from_scorelines
+
+        # home -1 (away line +1): win by 2+ = 0.25 (2-0, 3-1... 2-0 is +2, 3-1 is +2), push on +1 = 0.35
+        p, push = _handicap_prob_from_scorelines(self.SCORES, 1.0)
+        self.assertAlmostEqual(push, 0.35)
+        self.assertAlmostEqual(p, 0.25 / 0.65)
+
+    def test_quarter_line_home_and_away_sum_to_one(self) -> None:
+        from syndicate.features.shared.soccer_projections import _handicap_prob_from_scorelines
+
+        home, _ = _handicap_prob_from_scorelines(self.SCORES, 0.25)
+        # The away leg of the same market is the home leg of the mirrored line.
+        mirrored = {f"{k.split('-')[1]}-{k.split('-')[0]}": v for k, v in self.SCORES.items()}
+        away, _ = _handicap_prob_from_scorelines(mirrored, -0.25)
+        self.assertAlmostEqual(home + away, 1.0)
+
+    def test_beyond_the_simulated_support_is_refused(self) -> None:
+        from syndicate.features.shared.soccer_projections import _handicap_prob_from_scorelines
+
+        self.assertIsNone(_handicap_prob_from_scorelines(self.SCORES, 3.5))
+
+
+class SimUnpricedReason(unittest.TestCase):
+    def test_reason_words(self) -> None:
+        from syndicate.features.shared.layer2_board import _sim_unpriced_reason as why
+
+        self.assertEqual(why({"model_prob_over": 0.3, "edge_unavailable_reason": "the model probability is inside its own simulation noise: x"}, {}), "noise")
+        self.assertEqual(why({"projected": 10.5, "model_prob_over": None, "probability_unavailable_reason": "source carries a mean"}, {}), "average")
+        self.assertEqual(why({"model_prob_over": 0.6, "edge_unavailable_reason": "one-sided market: no two-sided fair"}, {}), "one_sided")
+
+
+class NflSegmentPricing(unittest.TestCase):
+    """User 2026-10-08: NFL quarter/half lines priced from the sim's segment histograms."""
+
+    def _blocks(self):
+        import json
+        import tempfile
+        from pathlib import Path
+
+        from syndicate.features.shared.nfl_segment_projections import load_nfl_segment_blocks
+
+        seg = {"total_points_dist": {"7": 40, "10": 30, "14": 30}, "margin_dist": {"-3": 30, "0": 20, "3": 30, "7": 20},
+               "home_points_mean": 6.0, "away_points_mean": 5.0}
+        payload = {"games": {"2026_05_TB_DAL": {"sims": 100, "segments": {"q1": seg, "full": seg}}}}
+        tmp = tempfile.mkdtemp()
+        (Path(tmp) / "smartsim2_segment_distributions_2026_wk5.json").write_text(json.dumps(payload), encoding="utf-8")
+        return load_nfl_segment_blocks([Path(tmp)])
+
+    def test_quarter_total_and_full_spread_are_priced(self) -> None:
+        from syndicate.features.shared.nfl_segment_projections import attach_nfl_segment_projections
+
+        blocks = self._blocks()
+        base = {"kind": "game", "home_team": "Dallas Cowboys", "away_team": "Tampa Bay Buccaneers",
+                "commence_time": "2026-10-09T00:15:00Z"}
+        total = dict(base, market="totals", segment="q1", line=10.5)
+        spread = dict(base, market="spreads", segment="full", line=1.5, projection={"projected": 1.0, "model_prob_over": None})
+        priced_full = dict(base, market="spreads", segment="full", line=1.5, projection={"model_prob_over": 0.4})
+        got = attach_nfl_segment_projections([total, spread, priced_full], blocks)
+        self.assertAlmostEqual(total["projection"]["model_prob_over"], 0.3)       # only the 14s clear 10.5
+        self.assertAlmostEqual(spread["projection"]["model_prob_over"], 0.5)      # home margin > 1.5: 3 and 7
+        self.assertEqual(priced_full["projection"]["model_prob_over"], 0.4)      # an existing probability is left alone
+        self.assertEqual(got["segment_rows_priced"], 2)

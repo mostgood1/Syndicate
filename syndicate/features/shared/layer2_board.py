@@ -3787,6 +3787,26 @@ def layer2_rows_to_board_cards(
     return cards
 
 
+def _sim_unpriced_reason(projection: Mapping[str, Any], row: Mapping[str, Any]) -> str:
+    """One word for why a row with a model view carries no model edge:
+    `noise` (inside the sim's own Monte-Carlo noise), `average` (the model has
+    a mean, not a probability), `one_sided` (no two-sided fair), `live`, or
+    `other`. Display only."""
+    reason = " ".join(
+        str(projection.get(key) or "")
+        for key in ("edge_unavailable_reason", "probability_unavailable_reason", "market_fair_unavailable_reason")
+    ).lower()
+    if "noise" in reason:
+        return "noise"
+    if projection.get("model_prob_over") is None and _as_float(row.get("model_probability")) is None:
+        return "average"
+    if "one-sided" in reason or "one_sided" in reason or "incomplete price set" in reason:
+        return "one_sided"
+    if "live" in reason:
+        return "live"
+    return "other"
+
+
 def _chart_columns(row: Mapping[str, Any]) -> dict[str, Any]:
     """The two prop charts' data (user 2026-10-08, approved mockup board 10;
     lane layer2-board-ui-redesign). Display only -- nothing scores on these.
@@ -4956,6 +4976,11 @@ def _layer2_board_columns(
                 or _as_float(projection.get("model_prob_over")) is not None
             )
             columns["sim_view"] = "unpriced" if has_view else "none"
+            if has_view:
+                # WHY it is unpriced, so the tag can say it (user 2026-10-08: a
+                # soccer moneyline held inside its own sim noise was tagged "no
+                # two-sided market", which was false).
+                columns["sim_unpriced_reason"] = _sim_unpriced_reason(projection, row)
         else:
             columns["sim_view"] = "live_contradicts" if sim_is_live else "contradicts"
             columns["sim_line_gap"] = contradiction

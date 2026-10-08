@@ -96,6 +96,8 @@
       <span><span class="board-disclosure__chip">sim contradicts</span> our model thinks the other side of the line is more likely</span>
       <span><span class="board-disclosure__chip">sim off-scale</span> our model is so far from the market (15+ points) that it is set aside; the row ranks on price alone</span>
       <span><span class="board-disclosure__chip">sim, no edge</span> our model has a view but there is no two-sided market to price it against</span>
+      <span><span class="board-disclosure__chip">sim, in noise</span> our model's gap to the market is smaller than the simulation's own noise</span>
+      <span><span class="board-disclosure__chip">sim, average only</span> our model projects an average here, not a probability at this line</span>
       <span><span class="board-disclosure__chip">sim &plusmn;</span> our model returned 0% or 100% &mdash; an instrument reading, not an opinion</span>
       <span><span class="board-disclosure__chip">no sim view</span> no model for this market &mdash; ranked on price alone</span>
       <span class="board-ranks__note">No tag changes the score. The weights are a stated prior, not a measured result.</span>
@@ -2855,6 +2857,21 @@
     return gap >= SIM_OFF_SCALE_POINTS ? gap : null;
   }
 
+  // WHY a row with a model view carries no edge (`sim_unpriced_reason`,
+  // layer2_board). The old single tag said "no two-sided market" for all of
+  // them, which was false for soccer moneylines held inside their own sim noise.
+  const SIM_UNPRICED_TAGS = {
+    noise: ["sim, in noise", "Our simulation has a probability for this side, but the gap to the market is smaller than the simulation's own random noise, so it is not counted as an edge. Ranked on price."],
+    average: ["sim, average only", "Our model projects an average for this market (see the Projected column) but no probability at this line, so it cannot be priced into an edge. Ranked on price."],
+    one_sided: ["sim, no edge", "Our simulation has a view, but only one side of this market is quoted, so there is no two-sided fair to price it against. Ranked on price."],
+    live: ["sim, pregame", "Our simulation's number is from before the game; it is not priced against a live market. Ranked on price."],
+  };
+
+  function simUnpricedBadge(item) {
+    const [label, title] = SIM_UNPRICED_TAGS[item && item.sim_unpriced_reason] || ["sim, no edge", "Our simulation has a view on this row (see the Projected column) but it could not be priced into an edge against this market. Ranked on price; the model number is shown but is not scoring."];
+    return `<span class="board-badge board-badge--sim-noview" title="${escapeHtml(title)}">${escapeHtml(label)}</span>`;
+  }
+
   function simViewBadgeKind(item) {
     const view = item && item.sim_view;
     // `unpriced` is the BACKEND's own name for this state (`layer2_board`), and
@@ -4160,7 +4177,7 @@
                 : simNoViewKind === "none"
                 ? `<span class="board-badge board-badge--sim-noview" title="Our simulation has no view on this row at all. That is NOT the same as the model agreeing with it -- this row is ranked on price alone.">no sim view</span>`
                 : simNoViewKind === "unpriced"
-                ? `<span class="board-badge board-badge--sim-noview" title="Our simulation DOES have a view on this row -- see the Projected column -- but it could not be priced into an edge against this market, usually because only one side is quoted so there is no two-sided fair to compare against. Ranked on price; the model number is shown but is not scoring.">sim, no edge</span>`
+                ? simUnpricedBadge(item)
                 : "";
               return `
                 <tr ${rowAttrs}>
@@ -4681,12 +4698,17 @@
     const kind = String((item && item.sim_ladder_kind) || "stat");
     // A moneyline is "margin > 0": no line on the row, 0 on the chart.
     const rawLine = item && item.line;
-    const line = (rawLine === null || rawLine === undefined || rawLine === "") && kind === "margin" ? 0 : numericValue(Number(rawLine));
-    if (!ladder || ladder.length < 3 || line === null) return null;
+    const ownLine = (rawLine === null || rawLine === undefined || rawLine === "") && kind === "margin" ? 0 : numericValue(Number(rawLine));
+    if (!ladder || ladder.length < 3 || ownLine === null) return null;
+    // Game rows may name the TEAM as the side (soccer); read it as home/away.
+    const rawSide = kind === "margin" ? gameSide(item) : String(item.side || "").toLowerCase();
+    // A margin ladder is P(home - away > t) in the AWAY frame the producers
+    // price at (`book_grid._canonical_line`), while the card carries the
+    // side's OWN line: home -1.5 covers when the margin is > +1.5.
+    const line = kind === "margin" && rawSide === "home" ? -ownLine : ownLine;
     const points = ladder.map((p) => [Number(p[0]), Number(p[1])]).filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
     if (points.length < 3) return null;
     const atLine = points.find((p) => Math.abs(p[0] - line) < 1e-6);
-    const rawSide = String(item.side || "").toLowerCase();
     // over/home are the ladder's own frame (P(stat or margin > t)); under/away the complement.
     const side = ["over", "home", "yes", "1"].includes(rawSide) ? "over" : ["under", "away", "no", "2"].includes(rawSide) ? "under" : "";
     const raw = numericValue(Number(item.sim_ladder_raw_over));
@@ -4711,7 +4733,7 @@
     const sideWord = kind === "margin"
       ? (rawSide === "home" ? (line === 0 ? "home wins" : "home covers") : rawSide === "away" ? (line === 0 ? "away wins" : "away covers") : side)
       : (rawSide === "home" || rawSide === "away" ? rawSide : side);
-    return { buckets, line, side, pSide, kind, sideWord, raw: raw !== null };
+    return { buckets, line, ownLine, side, pSide, kind, sideWord, raw: raw !== null };
   }
 
   function simSpreadChart(item, opts) {
@@ -4730,7 +4752,8 @@
         + `<text x="${(i * (barW + gap) + barW / 2).toFixed(1)}" y="${height - 1}" class="chart-axis" text-anchor="middle">${escapeHtml(b.label)}</text>`;
     }).join("");
     const what = data.kind === "margin" ? "Sim margin (home − away)" : data.kind === "total" ? "Sim total" : "Sim spread";
-    return `<figure class="prop-chart"><figcaption>${what} · line ${escapeHtml(String(data.line))} · <b>${Math.round(data.pSide * 100)}% ${escapeHtml(data.sideWord)}</b>${data.raw ? " · sim before the book blend" : ""}</figcaption>`
+    const lineText = data.kind === "margin" && data.line !== data.ownLine ? `${data.ownLine} (margin ${data.line})` : String(data.line);
+    return `<figure class="prop-chart"><figcaption>${what} · line ${escapeHtml(lineText)} · <b>${Math.round(data.pSide * 100)}% ${escapeHtml(data.sideWord)}</b>${data.raw ? " · sim before the book blend" : ""}</figcaption>`
       + `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Simulated distribution, ${Math.round(data.pSide * 100)} percent ${escapeHtml(data.side)} ${escapeHtml(String(data.line))}">${bars}</svg></figure>`;
   }
 

@@ -1795,6 +1795,22 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
                 "rows_with_projection": 0,
             }
 
+        # SEGMENTS (user 2026-10-08: NFL h1/h2/q1-q4 rows were 14 of 14 "no sim
+        # view" while the sim's segment histograms sat unread). A third join that
+        # writes only h1/h2/q1-q4 rows and full-game spreads still lacking a
+        # probability, so it cannot contend with the game join above.
+        try:
+            from syndicate.features.shared.nfl_segment_projections import (
+                attach_nfl_segment_projections,
+                load_nfl_segment_blocks,
+            )
+
+            segment_blocks = load_nfl_segment_blocks()
+            if segment_blocks:
+                game_coverage = {**game_coverage, **attach_nfl_segment_projections(grid, segment_blocks)}
+        except Exception:
+            _LOGGER.exception("BOOK_GRID_SEGMENT_PROJECTION_FAILURE sport=nfl date=%s", selected_date)
+
         prop_coverage: dict[str, Any] = {"supported": True, "rows_with_projection": 0}
         try:
             from syndicate.features.shared.nfl_prop_projections import (

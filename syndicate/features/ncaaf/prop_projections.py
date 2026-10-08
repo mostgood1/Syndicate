@@ -891,6 +891,20 @@ def _fold_team(value: Any) -> str:
         return str(value or "").strip().casefold()
 
 
+def _surname_keys(value: Any) -> set[str]:
+    """The folded last name, and each part of a hyphenated one."""
+    import unicodedata
+
+    text = unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode().lower()
+    tokens = [t.strip(".,'") for t in text.split() if t.strip(".,'")]
+    while len(tokens) > 1 and tokens[-1] in {"jr", "sr", "ii", "iii", "iv", "v"}:
+        tokens.pop()
+    if len(tokens) < 2:
+        return set()
+    last = tokens[-1]
+    return {last, *[part for part in last.split("-") if len(part) >= 3]}
+
+
 def find_player(
     index: NcaafPropProjectionIndex, player_name: Any, teams: Iterable[str | None]
 ) -> tuple[dict[str, Any] | None, str]:
@@ -905,7 +919,22 @@ def find_player(
         return None, "teams_unresolved"
     candidates = index.candidates(player_name)
     if not candidates:
-        return None, "player_not_in_artifact"
+        # SURNAME ON THIS GAME'S SCHOOLS, EXACTLY ONE (user 2026-10-08, lane
+        # layer2-board-ui-redesign). Books and CFBD spell the same player
+        # differently -- "Matt Fuller"/"Matthew Fuller", "Gio Lopez"/"Giovanni
+        # Lopez", "Hollywood Smothers"/"Daylan Smothers", "Ryan Coleman-Williams"/
+        # "Ryan Williams": 15 board rows, 8 players, all in the artifact on the
+        # right team (measured 2026-10-08). Accepted only when the surname is
+        # unique across the two schools, so a namesake is refused, not guessed.
+        wanted_surnames = _surname_keys(player_name)
+        by_surname = [
+            entry
+            for entry in index.by_id.values()
+            if _fold_team(entry.get("team")) in wanted and wanted_surnames & _surname_keys(entry.get("name"))
+        ]
+        if len(by_surname) == 1:
+            return by_surname[0], ""
+        return None, "player_not_in_artifact" if not by_surname else "ambiguous_player"
     on_team = [c for c in candidates if _fold_team(c.get("team")) in wanted]
     if not on_team:
         return None, "player_not_on_either_team"
