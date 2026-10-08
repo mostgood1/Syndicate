@@ -1437,6 +1437,35 @@ def _ncaaf_allowed_by_team(box: NcaafBox, stat: str) -> dict[str, list[tuple[int
     return out
 
 
+# Prior-season history (user 2026-10-08: "build the NCAAF player history vs team source"):
+# `scripts/build_ncaaf_player_history.py` writes the snapshot's columns + `opponent` for the
+# two seasons before the snapshot's, current players only, to a SEPARATE file -- the snapshot
+# itself is indexed whole on every board build, so it is not extended. Read here only, for
+# the vs-opponent split; indexed by player id once per build.
+NCAAF_HISTORY_FILE = "processed/player_game_stats/ncaaf_player_game_history.csv"
+
+
+def _ncaaf_history_index() -> dict[str, list[dict[str, Any]]]:
+    path = C.first_existing(NCAAF_DIR, NCAAF_HISTORY_FILE)
+    if path is None:
+        return {}
+    cache = C._READ_CACHE.get()
+    key = ("ncaaf_history", C._cache_key(path)) if cache is not None else None
+    if key is not None and key in cache:
+        return cache[key]
+    index: dict[str, list[dict[str, Any]]] = {}
+    for row in C.iter_csv(path):
+        index.setdefault(str(row.get("player_id") or ""), []).append(row)
+    if key is not None:
+        cache[key] = index
+    return index
+
+
+def _ncaaf_history_vs(player_ids: set[str], opponent: str) -> list[dict[str, Any]]:
+    index = _ncaaf_history_index()
+    return [row for pid in player_ids for row in index.get(pid, []) if _fold(row.get("opponent")) == _fold(opponent)]
+
+
 def _ncaaf_matchup(subject: PropSubject, stat: str | None, label: str, box: NcaafBox | None, home, away) -> LayerEvidence:
     if stat is None:
         return absent(Layer.MATCHUP, f"{ABSENT_NOT_APPLICABLE}:market {subject.market} has no football stat mapping")
@@ -1461,9 +1490,23 @@ def _ncaaf_matchup(subject: PropSubject, stat: str | None, label: str, box: Ncaa
                             ["Game", "Opponent faced", f"{label} allowed"], rows, Layer.MATCHUP))
         facts.update({"allowed_per_game": avg, "allowed_games": len(allowed), "allowed_rank": rank_text})
     vs = [g for g in box.games if _fold(g.get("opponent")) == _fold(opponent)]
+    ids = {str(g.get("player_id") or "") for g in box.games + box.other_school_games} - {""}
+    in_snapshot = {str(g.get("game_id") or "") for g in vs}
+    vs += [g for g in _ncaaf_history_vs(ids, opponent) if str(g.get("game_id") or "") not in in_snapshot]
+    vs.sort(key=lambda g: (int(C.to_float(g.get("season")) or 0), int(C.to_float(g.get("week")) or 0)), reverse=True)
     if vs:
-        vrows = [[_week_label(g.get("season"), g.get("week")), C.fmt_num(g.get(stat), 0)] for g in vs]
-        tables.append(table(f"{subject.player_name} vs {opponent}", ["Game", label], vrows, Layer.MATCHUP))
+        event = stat == "anytime_td"
+
+        def _value(g: dict[str, Any]) -> float | None:
+            v = C.to_float(g.get(stat))
+            return (1.0 if (v or 0) > 0 else 0.0) if event else v
+
+        vrows = [[_week_label(g.get("season"), g.get("week")), C.fmt_num(_value(g), 0)] for g in vs]
+        rate = C.hit_rate([_value(g) for g in vs], _line_for(subject, stat), _norm_side(subject.side))
+        if rate:
+            vrows.append([f"Hit rate vs {C.fmt_line(_line_for(subject, stat))}", C.hit_rate_text(rate)])
+            facts["vs_opponent"] = {"games": len(vs), "hit_rate": rate}
+        tables.append(table(f"{subject.player_name} vs {opponent} (snapshot + prior-season history)", ["Game", label], vrows, Layer.MATCHUP))
         facts["vs_opponent_games"] = len(vs)
     if not tables:
         return absent(Layer.MATCHUP, f"{ABSENT_NO_MATCH}:{opponent} has no measurable games in ncaaf_player_game_stats_snapshot.csv")
