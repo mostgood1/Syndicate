@@ -463,3 +463,48 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
   Target: within-game H2-on-H1 slope → −0.17 and Q4 → −0.14; S8 margin toward 14; S5 blowouts toward 0.23.
 - Per model_engine_standard, mechanism-vs-estimator: adding M-B to a calibrated engine needs a re-fit of the rates
   it absorbs. Measure joint, not additive.
+
+## Phase 2 #1c — M-A TEAM-STRENGTH SHRINK, PRE-REGISTERED 2026-10-08 (user: "start the team-strength shrink"), BEFORE any engine change
+
+**Mechanism (read, file:line):**
+- In PBP mode, `events.py:1159-1173` first calibrates each team's make/FT multiplier to its per-game point target
+  (`eff_mult = clip(target_ppp / base_ppp, 0.85, 1.15)`).
+- It THEN multiplies by `eff_prior` (`events.py:1087-1088`, from `home_team_adj["eff_mult"]`), clipped 0.75-1.25.
+- `eff_prior` is built by `_team_adj_from_advanced_stats_local` (basketball_props_smart_sim.py ~:4240-4284):
+  off_rtg/league × opponent def_rtg/league, then × the home-court multiplier (#474).
+- The targets are the market-anchored quarter means: SYNDICATE_BASKETBALL_SIM_MARKET_ANCHOR on, margin_w 0.95,
+  total_w 0.7. So they already carry strength and home court, and eff_prior counts them a second time.
+
+**Pre-change evidence:**
+- Full FIT: sim mean margin vs −spread slope **1.59**, SD 13.06 vs 7.56.
+- 26 surviving scratch games: target margin vs market slope 0.93, but sim mean margin vs TARGET slope **1.32**. The
+  amplification happens after the targets.
+- One game, CHA-POR 2026-02-28: market −7.5, target +6.96, sim +10.05.
+  - eff_prior about ×1.03 home vs ×0.99 away, plus HCA.
+
+**Lever:**
+- New `EventSimConfig` field `eff_prior_weight: float = 1.0` in BOTH vendor engines (nba, wnba).
+- Applied ONLY where the target calibration ran (tpp present): `eff_mult *= eff_prior ** w`.
+- `w == 1.0` takes the unchanged expression, for byte-identity. Where no target exists, eff_prior stays the only
+  strength signal and is untouched.
+- Default 1.0 = byte-identical (seeded sha256 proof, both leagues, as for fcba19a7). Reachability: w = 0 vs 1 changes
+  the mean margin on one game.
+
+**Sweep:**
+- On top of the accepted J1 config: the same 12 seed-7 FIT dates (87 games), 200 draws, nice 19.
+- w ∈ {1.0 (J1 control, re-run in this sweep for a same-time baseline), 0.5, 0.0}.
+
+**Readings:**
+- PRIMARY: OLS slope of the per-game sim mean margin on −spread (target 1.0) and SD(sim mean − (−spread)).
+- Secondary: S8 margin SD (real 14.0), S5 blowouts, S8 total SD, S3 quarter-total SD.
+- Guards: S1 pace, S6 FTA, S9 3PA, judged against measured run noise. The w = 1.0 re-run vs the existing J1 sweep
+  point on the same 87 games gives that noise directly. Never against the single-run sim SE (lesson of 804385c2).
+
+**Calls (fixed now):**
+- **Confirmed** if w = 0 brings the slope inside [0.85, 1.15] and S8 margin SD falls by more than its run noise.
+- **Refuted** if w = 0 leaves the slope > 1.30. Then the amplification lives elsewhere: the 0.85-1.15 target
+  clip, `tov_mult`/`oreb_mult`/`foul_mult` four-factor priors, or player-rating spread in base_ppp. Next: the same
+  lever on those.
+- The intermediate w = 0.5 is read only for shape. A w outside {0, 0.5, 1} is not picked from these data.
+- The full FIT re-run follows a confirmation, as in #1. VALIDATION is untouched.
+- Mechanism-vs-estimator: if adopted, the S8 total and quarter rows are re-read jointly with J1, not assumed additive.
