@@ -3417,3 +3417,9 @@ own prior verdicts, not by anything failing.
 
 - **Measured:** `mcp__scheduled-tasks__update_scheduled_task` IS in `.claude/settings.local.json`'s allow list, yet an unattended run's call to it hung > 4 min with no effect (the task's SKILL.md was unchanged afterwards). In the same run every Bash/PowerShell call matching a rule ran with no prompt. A 2026-10-07 run had done the same thing: wrote "Re-armed for 2026-10-10" to `deploys.md`, then froze on this call, leaving the task disabled.
 - **Rule:** routine prompts must not call scheduled-tasks tools (update/list/run). A run REPORTS the next fire time and its new carried-forward numbers in its final message; an attended session applies them, then reads the schedule back (`nextRunAt`). After every scheduled reading, check that its re-arm actually happened.
+
+## 2026-10-08 -- A RECYCLE'S STATED CAUSE IS A BELIEF, NOT A MEASUREMENT: live-odds-worker's 6 h restart "resets page cache"; the growth it resets is anonymous heap (lane live-odds-worker-rss-drift)
+
+- **What was believed:** `run_live_odds_refresh_worker.py:1085-1094` (2026-07-15) says the worker's climb (~416 -> ~989 MB) is page cache from routine file I/O, and recycles every 6 h to reset it. State's subject key still reads `live-odds-worker-memory-is-page-cache`.
+- **What was measured (fleet, 10-04..10-08):** the PROCESS's post-GC/post-`malloc_trim` floor rises +10..+95 MB/h within each boot. RssAnon is 89% of RSS, RssFile 11%, shmem 0. Page cache is not in a process's RSS at all; a cgroup reading (Render) counts both, which is how the two got conflated.
+- **Rule:** when a mitigation's comment names a cause, check that the cause is in the quantity being mitigated (RSS vs cgroup `memory.current` vs `anon`) before trusting it, and before "the recycle handles it" closes the question. Here the recycle WORKS (median 27 s tick cost, no cross-day leak); it just works on something other than what it says.
