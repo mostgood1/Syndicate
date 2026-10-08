@@ -3465,3 +3465,7 @@ own prior verdicts, not by anything failing.
 - **Rule:** when a claim says "within X", subtract each X's mean (or use a fixed-effects regression) before pooling,
   and state the demeaning in the result line.
   - A fast check: compute the slope on the X means alone. If it is large, the pooled slope is measuring it.
+
+## 2026-10-08 -- A numstat you print AFTER the commit is not a gate `[lane prop-recency-budget]`
+- `git diff --numstat` read `1036 1036` for a one-line move in `.syndicate/leads.md` (the autocrlf working copy's CRLF went into the blob), but the commit was chained in the same command, so the number was read after it had landed (e5592355; restored da62cb56).
+- **Rule:** for ledger edits, run the numstat as its OWN step and only commit when insertions/deletions match the edit's size (an append: N/0; a one-line move: 1/1 or 2/1). A count near the file's line count is a line-ending rewrite, not an edit.
