@@ -280,6 +280,16 @@ def resolve_player_id_with_prior(season: int, full_name: str) -> tuple[str | Non
     current = player_name_index(season).get(key)
     if current is not None:
         return current, "current_season"
+    # AMBIGUOUS IS NOT ABSENT (lane `nfl-passing-yards-prop-coin`, 2026-10-08). A
+    # short name two current-season players share must NOT fall through to the
+    # prior season, where it may have been unique: "Jalon Daniels" (TB, 2026)
+    # collides with Jayden Daniels on `j.daniels`, and the fallback returned
+    # Jayden's id because 2025 had only him. Fall back only when the name is
+    # genuinely unknown this season. The board resolves through
+    # `resolve_player_id_for_game` and reaches this only without game teams; the
+    # backtest harnesses call it directly (27 names / 277 FIT quote rows).
+    if key in player_name_collisions(season):
+        return None, "ambiguous_current_season"
     prior = player_name_index(season - 1).get(key)
     if prior is not None:
         return prior, "prior_season_fallback"

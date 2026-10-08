@@ -120,3 +120,18 @@ the attempts sack convention remain. This removes the worst rows; it does not ma
 positive. IN EFFECT NOWHERE until deployed AND the weekly prop artifact rebuilds (the builder calls
 `nfl_props_rows_for_week(use_artifact=False)`; the line reprice cannot resurrect a refused player+stat because no
 artifact row exists to reprice from).
+
+## 2026-10-08 -- sack convention fix: built, re-fitted, NOT better on real quotes (held on a branch)
+
+Branch `nfl-attempts-official-convention` (399efd11). Extractor excludes sacks + two-point tries (official 561/561 2025 QB-games). Re-fits with the original scripts and splits: LEAGUE_SPREAD_CV 0.5444 -> **0.4281** (method reproduces 0.5444 / 0.4256 exactly on the old convention); k 2 -> **4** (fit min Brier, k=4/6 tie broken by bucket gap; held 2024-25 Brier 0.166145 vs k=2 0.166868, bucket 0.1238 vs 0.1429); blend 0.9449 -> **0.8987** (OOS +0.003046; all other markets returned their documented weights exactly).
+
+| identical FIT quote rows, official grading | n | LL old | LL new | new - old [95% CI] | mean P(over) old / new | over-rate |
+|---|---|---|---|---|---|---|
+| passing_attempts, kept after starts refusal | 3,774 (352 games) | 0.7598 | 0.7616 | +0.0018 [-0.0182, +0.0210] | 0.517 / 0.419 | 0.498 |
+| passing_yards (control) | 9,555 | 0.7218 | 0.7218 | 0.0000 | 0.436 / 0.436 | 0.508 |
+
+The sack inflation was cancelling the log-normal blend's under-lean (cause #2 above, now visible in attempts too). The calibrators grade on a ladder of lines centred on the MEAN, so they cannot see a lean that appears at lines set at the MEDIAN. Shipping the fix needs the blend lean addressed in the same pass (a re-fit on real quoted lines), or it trades a hidden bias for a visible one.
+
+## 2026-10-08 -- name fallback fix (on main)
+
+`resolve_player_id_with_prior` fell back to the prior season when the current-season short name was AMBIGUOUS ("Jalon Daniels" TB 2026 -> Jayden Daniels via `j.daniels`). The board resolves through `resolve_player_id_for_game` (team-checked) and was correct; the defect reached its no-teams branch and every backtest harness. FIT harness effect: 27 names / 277 quote rows now refused (player_unresolved 73 -> 100). Earlier FIT numbers in this file include those rows.
