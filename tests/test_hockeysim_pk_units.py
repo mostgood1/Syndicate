@@ -64,9 +64,12 @@ class PKUsageTest(unittest.TestCase):
     def test_default_is_units(self) -> None:
         self.assertEqual(SimConfig().pk_usage, "units")
 
+    def test_production_profile_ships_minutes(self) -> None:
+        self.assertEqual(NHL_CALIBRATION_PROFILE.pk_usage, "minutes")
+
     def test_minutes_is_reachable_and_spreads_pk_time(self) -> None:
         seeds = range(25)
-        units, d_units = _pk_seconds(NHL_CALIBRATION_PROFILE, seeds)
+        units, d_units = _pk_seconds(replace(NHL_CALIBRATION_PROFILE, pk_usage="units"), seeds)
         mins, d_mins = _pk_seconds(replace(NHL_CALIBRATION_PROFILE, pk_usage="minutes"), seeds)
         self.assertNotEqual(d_units, d_mins)  # off != on
         pk1 = {1000, 1001, 1020, 1021}

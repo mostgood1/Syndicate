@@ -129,6 +129,13 @@ NHL_CALIBRATION_PROFILE_DEFAULT: SimConfig = SimConfig(
     # (CIs exclude 0); GOALS, POINTS@1.5, BLOCKS flat; playoffs SOG@2.5 -0.00173. Elite assists 0.77x ->
     # 0.74x (they no longer get an inflated PP share). Total PP time is NOT changed here (lane nhl-pp-time).
     pp_usage="minutes",
+    # PENALTY-KILL skaters drawn by projected SH minutes, not fixed PK1/PK2 units `[2026-10-07, lane
+    # nhl-pk-units]`. Fixed units put PK1 on ~0.88 of team PK time (PK2 0.15, everyone else 0 of a /5 share
+    # vs real PK1 0.58-0.68, PK2 0.42, others 0.06-0.15); "minutes" lands every group within +/-0.05 of real
+    # (386 games vs NHL stats timeonice). Paired vs production, every 3rd 2025-26 regular date (13,161
+    # player-games): Brier BLOCKS@1.5 -0.00285 [-0.00370, -0.00193], no market worse; playoffs BLOCKS@1.5
+    # -0.00163, POINTS@0.5 +0.00153 [+0.00007, +0.00299] worse (non-PP skaters; not deciding). User: "Ship it".
+    pk_usage="minutes",
     assist_attribution="onice_share",
     assist_position_power=1.5,
     assist_share_power=2.0,
