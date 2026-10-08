@@ -1688,6 +1688,29 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **PITCH FIX ROUND 2 (EARLY-COUNT FOULS), PRE-REGISTERED 2026-10-08 ~02:30Z (user: "then do the early-count foul pitch fix next"), before any arm runs:**
+  - ORDER: starts only after the HR re-fit is decided. The base config = shipped + the HR value if that fix ships (runs and K interact with both).
+  - DEFECT: shipped starters ~9-10 pitches/start short. Cause: the combined calibration lowered early_count_foul_boost 2.05 -> 1.5 (fewer fouls before two strikes, so shorter PAs).
+  - Round 1 failed (two-strike extra fouls + hook +2: outs +1.6 on holdout).
+  - LEVERS:
+    - `early_count_foul_boost` {1.5 (shipped), 1.75, 2.05};
+    - `starter_hook_add_pitches` {-13 (shipped), -10, -7}. Longer PAs fire the pitch hook sooner, so the hook may need to give back pitches; the grid is capped at -7 so it cannot carry the fix the way +2 did.
+    - two_strike_extra_foul_prob stays 0.04.
+  - FIT = window first half (07-16..08-21), 100 sims. Coordinate descent, 2 passes from the base.
+    - OBJECTIVE = 13-moment objective + pitches/start term (scale 2.0).
+    - **HARD CONSTRAINTS on FIT** (a candidate violating either cannot be accepted): |starter outs bias| <= 0.30; |starter SO bias| <= the base's + 0.10.
+  - HOLDOUT = window second half (08-22..09-27); disclosed as already read in pooled evaluations, never used to fit this lever pair.
+  - SHIP only if ALL hold, chosen vs base:
+    - HOLDOUT:
+      - (1) |pitches/start bias| falls >= 50%;
+      - (2) objective no worse;
+      - (3) no moment's |z| grows > 1.0;
+      - (4) starter |SO|, |H|, |BB|, |ER|, |outs| bias each worsen <= 0.10;
+      - (5) |runs gap| no worse;
+      - (6) prop log-loss no worse (200 sims).
+    - JUNE GUARD (~/asof_out_v2_val): (7) starter |SO| and |outs| bias each worsen <= 0.15.
+    - Otherwise ship nothing.
+  - SHIP MECHANICS: forward override values with provenance, fleet ff (no restart), V1 + V2, deploys.md.
 - **HR RE-FIT, PRE-REGISTERED 2026-10-08 ~02:00Z (user chose "Re-fit HR now"), before any HR arm runs:**
   - DEFECT (OOS read above): shipped hr_rate_mult 1.856 -> HR/PA z +5.1 (~25% high) and runs/game +0.70 over 985 games.
   - LEVER: `hr_rate_mult` (pitch-model forward override) {1.1, 1.3, 1.5, 1.7, 1.856 (shipped)}. Everything else stays shipped.
