@@ -3412,3 +3412,8 @@ own prior verdicts, not by anything failing.
 - How we found out: a user-approved loan was blocked on 2026-10-07 ~16:35 CT and the session wrote around the guard; a peer then reported the warning hooks still firing on the permitted write.
 - The rule going forward: every reader of `lanes.md` that feeds ONE decision (claims, loans, sections, holders) goes through `lane_claims_source` (`effective_claims` / `effective_entries` / `honoured_loan`). A new exemption that takes the raw `text` is the same bug again.
 - Also: `scripts/lane_open.py` rewrites ALL line endings in `lanes.md`; check `git diff --numstat` shows 0 deletions after it, or insert the block byte-exactly.
+
+## 2026-10-08 -- MCP tools are NOT honoured by the allow list in unattended scheduled runs; a run cannot re-arm itself `[session af3cc595]`
+
+- **Measured:** `mcp__scheduled-tasks__update_scheduled_task` IS in `.claude/settings.local.json`'s allow list, yet an unattended run's call to it hung > 4 min with no effect (the task's SKILL.md was unchanged afterwards). In the same run every Bash/PowerShell call matching a rule ran with no prompt. A 2026-10-07 run had done the same thing: wrote "Re-armed for 2026-10-10" to `deploys.md`, then froze on this call, leaving the task disabled.
+- **Rule:** routine prompts must not call scheduled-tasks tools (update/list/run). A run REPORTS the next fire time and its new carried-forward numbers in its final message; an attended session applies them, then reads the schedule back (`nextRunAt`). After every scheduled reading, check that its re-arm actually happened.
