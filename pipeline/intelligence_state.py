@@ -1906,6 +1906,19 @@ def _merge_inplay_overlay(cards: list[dict[str, Any]], requested_date: str, *, s
     return {"replaced": replaced, "added": len(overlay) - replaced}
 
 
+def _restate_in_web_request() -> bool:
+    """True inside a Flask request, unless SYNDICATE_LAYER2_RESTATE_INLINE_ON_WEB says
+    to build inline there anyway. The worker's loop has no request context."""
+    if str(os.environ.get("SYNDICATE_LAYER2_RESTATE_INLINE_ON_WEB") or "").strip().lower() in {"1", "true", "yes", "on"}:
+        return False
+    try:
+        from flask import has_request_context
+
+        return bool(has_request_context())
+    except Exception:
+        return False
+
+
 #: Sports where one team pair cannot play on consecutive days, so a chip filed
 #: under an ADJACENT date (ESPN's date for a late kickoff) is still the card's
 #: game. Everything else (MLB series, NHL home-and-home) must match exactly.
@@ -2105,11 +2118,21 @@ def _refresh_layer2_live_state(
                     slot.append(chip)
                 pair_dates.setdefault((sport, a, h), set()).add(chip_date)
 
+    # INSIDE A WEB REQUEST, THE PUBLISHED CHIPS ONLY. The inline build is the
+    # worker's job: in a request it fanned out over every sport (with live ESPN /
+    # StatsAPI fetches) for EVERY requested date, even when the worker's chips
+    # were fresh, and then ranked the published ones first anyway. Measured on
+    # the fleet 2026-10-08 in a fresh process: ~65-80% of a cold
+    # /api/syndicate/query (47.9 s live, over ask_bar.js's 45 s abort; warm
+    # 2.6-3.2 s). Stale published chips still restate; a date with none is left
+    # as the worker wrote it -- "stale, not empty", this function's own rule.
+    # SYNDICATE_LAYER2_RESTATE_INLINE_ON_WEB=1 restores the inline build on web.
+    inline_allowed = build_game_chips is not None and not _restate_in_web_request()
     for requested_date in requested_dates or ():
         chip_date = str(requested_date).strip()[:10]
         published, published_fresh = _published_chips(str(requested_date))
         inline: list[Mapping[str, Any]] = []
-        if build_game_chips is not None:
+        if inline_allowed:
             try:
                 inline = list(build_game_chips(str(requested_date), list(sports)) or [])
             except Exception:
