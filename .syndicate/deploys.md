@@ -47790,3 +47790,19 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - The 10-07 false exclusions are back in the pools: Fauthoux 11.8 min, Gueye 4.1, Talbot 31.2. **MET.**
   - healthz 200; no restart.
 - **rollback:** delete `wnba_sim_availability.json` (or env `SYNDICATE_WNBA_SIM_AVAILABILITY=0`); no restart needed.
+
+## 2026-10-08 14:38:26Z (9:38 AM CT) -- LOCAL FLEET FF ac48cdcd -> 6cd415f3, NO RESTART: MLB hr_rate_mult 1.856 -> 1.5 + 11 prop maps re-fit at 1.5 (logged USER OVERRIDE; lane `mlb-statsapi-asof-rebuild`) -- **V1 MET; V2 OWED**
+- **Why.** The out-of-sample evaluation of the combined calibration: StatsAPI-only as-of rebuild of 07-16..09-27, 985 games. 1.856 over-predicted HR ~25% (z +5.1) and runs +0.70/game.
+  - A pre-registered re-fit chose 1.5 on the fit half. Holdout: runs gap 0.691 -> 0.116, HR z +4.76 -> -0.05, prop log-loss 0.37045 -> 0.36910.
+  - It FAILED the June guard (HR z -3.70, runs gap 1.34) and outs (+0.166). Cause: June 2026 was a league-wide HR spike (.0343 vs season .0303; not temperature: June was cooler than Jul/Aug), and 1.856 had been fitted inside it.
+  - **User, verbatim: "yes, set HR to 1.5 and scope the count-shape fix".**
+- **What.**
+  - Pitch-model forward override `hr_rate_mult` 1.5.
+  - hitter_props_calibration: hits 1/2/3+, rbi 3+, runs 2/3+, TB 1-4+ re-fit at 1.5.
+  - hitter_hr_calibration hr_1plus a 0.4866, b -1.0483.
+  - Each with provenance.
+- **Fleet.** No MLB sim running, clean checkout. MLB sim is a per-run subprocess, so no restart. The refresh-worker was not touched.
+- **V1 MET (14:38Z).** ~/Syndicate at 6cd415f3 resolves hr_rate_mult 1.5; hr map a=0.4866 b=-1.0483 and hits_1plus a=0.3783 b=0.1966 equal the re-fit values.
+- **V2 OWED (pre-registered).** The next production MLB sims after 14:38:26Z: served starter outs_mean vs replays at the new (6cd415f3) and old (ac48cdcd files; verified 1.856) configs, 4000 sims. MET if mean |served - new| < mean |served - old|. A watcher is armed.
+- **Known cost.** June-like HR spikes will be under-predicted.
+- verify: V2 reading on the first post-14:38Z MLB sims.
