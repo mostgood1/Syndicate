@@ -181,7 +181,7 @@ def test_no_player_or_no_id_means_no_face():
 def test_a_modelled_prop_reads_sim_against_market_then_projection():
     text = row_explainer(_prop_row(), _quote())
     assert text.startswith("Our sim has Kyle Freeland over 11.5 outs at 62.0%; the no-vig market across 7 books says 53.3%.")
-    assert "It projects 14.8 against the 11.5 line." in text
+    assert "It projects an average of 14.8 against the 11.5 line." in text
 
 
 def test_the_write_up_context_follows_but_its_price_sentence_does_not():

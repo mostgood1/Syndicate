@@ -118,7 +118,10 @@ def test_points_projection_is_attached(tmp_path):
 def test_under_side_when_the_model_is_below_the_line(tmp_path):
     grid = [_row("player_assists", 7.5)]     # model ast = 4.27
     attach_wnba_projections(grid, _index(tmp_path))
-    assert grid[0]["projection"]["side"] == "under"
+    # `side` names the framing of `model_prob_over` (always "over" for a prop);
+    # the model's lean is `lean` (2026-10-08, lane layer2-board-ui-redesign).
+    assert grid[0]["projection"]["side"] == "over"
+    assert grid[0]["projection"]["lean"] == "under"
     assert grid[0]["projection"]["edge_vs_line"] == -3.23
 
 

@@ -333,6 +333,29 @@ def _is_count_market(row: Mapping[str, Any]) -> bool:
     return str(row.get("market") or "").strip().lower().startswith("totals")
 
 
+def _projection_sentence(row: Mapping[str, Any], model: float, projected: float, line: float) -> str:
+    """The projection, said so it cannot read as a contradiction of the line above it.
+
+    `projected` is the sim's MEAN. On a skewed count the mean and the likely
+    result can sit on opposite sides of a low line: Michael Van Buren Jr. Under
+    0.5 passing TDs read "Our sim has him under 0.5 at 52.3% ... It projects 0.7
+    against the 0.5 line" (user 2026-10-08, item 9) -- both true, and read
+    together as the sim contradicting itself. When the mean is on the far side
+    from the side the sim prices above 50%, say why both hold.
+    """
+    side = str(row.get("side") or "").strip().lower()
+    line_text = _fmt_line(line)
+    mean_over = projected > line
+    mean_under = projected < line
+    if side in {"over", "under"} and model >= 0.5 and ((side == "under" and mean_over) or (side == "over" and mean_under)):
+        pull = "up by its big games" if side == "under" else "down by its quiet ones"
+        return (
+            f"Its average is {projected:.1f}, on the other side of the {line_text} line, "
+            f"but {model:.1%} of its simulations finish {side} it: the average is pulled {pull}."
+        )
+    return f"It projects an average of {projected:.1f} against the {line_text} line."
+
+
 def row_explainer(
     row: Mapping[str, Any], quote: Mapping[str, Any], context: Mapping[str, Any] | None = None
 ) -> str | None:
@@ -365,7 +388,7 @@ def row_explainer(
     projected = _as_float(projection.get("projected"))
     line = _as_float(row.get("line"))
     if model is not None and projected is not None and line is not None and _is_count_market(row):
-        parts.append(f"It projects {projected:.1f} against the {_fmt_line(line)} line.")
+        parts.append(_projection_sentence(row, model, projected, line))
     narrative = row_narrative(row, context)
     if narrative and narrative.get("text"):
         parts.append(str(narrative["text"]))

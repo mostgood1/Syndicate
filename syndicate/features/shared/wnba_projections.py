@@ -351,10 +351,21 @@ def attach_wnba_projections(
             if reason:
                 projection["edge_vs_line"] = None
                 projection["edge_unavailable_reason"] = reason
-                projection["side"] = "over" if edge > 0 else "under"
             else:
                 projection["edge_vs_line"] = edge
-                projection["side"] = "over" if edge > 0 else "under"
+            # `side` NAMES THE FRAMING OF `model_prob_over`, never the model's lean
+            # `[2026-10-08, user: "fix all three sports", lane layer2-board-ui-redesign]`.
+            # Every reader (`layer2_board._model_prob_for_side` / `_model_edge_for`,
+            # `board_enrichment`, the Ask adapter) complements the probability when
+            # this differs from the row's side. Writing the LEAN here ("under" when
+            # the mean is below the line) told them an OVER probability was an UNDER
+            # one, so every under-leaning prop shipped P(under) and a sign-flipped
+            # edge on its OVER row. Measured on the served board 2026-10-08 15:47Z:
+            # 297 of 520 NHL prop rows (Gage Goncalves o0.5 assists showed 76.4%,
+            # the sim's own P(over) 23.6%) and 7 WNBA rows, 273 tagged "sim agrees".
+            # The lean is kept, under its own name.
+            projection["side"] = "over"
+            projection["lean"] = "over" if edge > 0 else "under"
         # EVERY BLANK EDGE MUST BE DIAGNOSABLE BY REASON (`#601`).
         #
         # A mean-only row leaves `edge_vs_market_pct` None and states

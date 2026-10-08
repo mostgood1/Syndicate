@@ -275,7 +275,19 @@ def attach_nhl_prop_projections(
             projection["edge_unavailable_reason"] = "no probability to price: row has no line"
         else:
             projection["edge_vs_line"] = round(lam - line, 3)
-            projection["side"] = "over" if lam > line else "under"
+            # `side` NAMES THE FRAMING OF `model_prob_over`, never the model's lean
+            # `[2026-10-08, user: "fix all three sports", lane layer2-board-ui-redesign]`.
+            # Every reader (`layer2_board._model_prob_for_side` / `_model_edge_for`,
+            # `board_enrichment`, the Ask adapter) complements the probability when
+            # this differs from the row's side. Writing the LEAN here ("under" when
+            # the mean is below the line) told them an OVER probability was an UNDER
+            # one, so every under-leaning prop shipped P(under) and a sign-flipped
+            # edge on its OVER row. Measured on the served board 2026-10-08 15:47Z:
+            # 297 of 520 NHL prop rows (Gage Goncalves o0.5 assists showed 76.4%,
+            # the sim's own P(over) 23.6%) and 7 WNBA rows, 273 tagged "sim agrees".
+            # The lean is kept, under its own name.
+            projection["side"] = "over"
+            projection["lean"] = "over" if lam > line else "under"
             refusal = line_refusal(index.context.get((_norm(row.get("player_name")), code)), code)
             if refusal is None:
                 _attach_sim_probability_edge(projection, row=row, model_prob=price_p_over(code, line, lam))

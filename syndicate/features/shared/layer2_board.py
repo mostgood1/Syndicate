@@ -2246,6 +2246,17 @@ def _sim_direction_contradiction(row: Mapping[str, Any], projection: Mapping[str
         return None
     if abs(gap) / abs(line) < _SIM_CONTRADICTION_MIN_GAP:
         return None
+    # THE AVERAGE IS NOT THE VERDICT ON A SKEWED COUNT `[user 2026-10-08, item
+    # 9, lane layer2-board-ui-redesign]`. Michael Van Buren Jr. Under 0.5
+    # passing TDs: projected (a MEAN) 0.745, yet the sim's own P(0 TDs) was
+    # 52.3% -- the mean is pulled up by 2- and 3-TD games while zero stays the
+    # single most likely result. The mean sat on the far side of the line and
+    # the sim still preferred the under, so "the sim contradicts this bet" was
+    # false. Where the sim prices THIS side, it vetoes the mean: a direction
+    # contradiction needs the sim's own probability for the side under 50% too.
+    side_prob = _model_prob_for_side(row)
+    if side_prob is not None and side_prob >= 0.5:
+        return None
     return round(gap, 3)
 
 

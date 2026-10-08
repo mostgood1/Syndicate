@@ -164,3 +164,89 @@ class TopPlaysAndHowRanks(unittest.TestCase):
         cap = re.search(r"_MODEL_EDGE_MAX_POINTS\s*=\s*([0-9.]+)", board)
         self.assertIsNotNone(cap)
         self.assertIn(f"const SIM_OFF_SCALE_POINTS = {int(float(cap.group(1)))};", self.text)
+
+
+class ProjectionIsNotAContradiction(unittest.TestCase):
+    """Item 9: Michael Van Buren Jr. Under 0.5 passing TDs, served 2026-10-08 --
+    sim P(under) 0.523, projected (a MEAN) 0.745. Both true; the old sentence
+    read as the sim contradicting itself, and the direction tag judged on the
+    mean alone."""
+
+    ROW = {"player_name": "Michael Van Buren Jr.", "market": "player_pass_tds", "side": "under", "line": 0.5,
+           "projection": {"projected": 0.745, "prob_over": 0.477}}
+
+    def test_sentence_explains_mean_versus_likely_result(self) -> None:
+        from syndicate.features.shared.layer2_row_context import _projection_sentence
+
+        text = _projection_sentence(self.ROW, 0.523, 0.745, 0.5)
+        self.assertIn("Its average is 0.7", text)
+        self.assertIn("52.3% of its simulations finish under", text)
+        self.assertNotIn("It projects 0.7 against", text)
+
+    def test_agreeing_mean_keeps_the_plain_sentence(self) -> None:
+        from syndicate.features.shared.layer2_row_context import _projection_sentence
+
+        row = dict(self.ROW, side="over")
+        self.assertEqual(_projection_sentence(row, 0.62, 14.8, 11.5),
+                         "It projects an average of 14.8 against the 11.5 line.")
+
+    def test_side_probability_vetoes_a_mean_only_contradiction(self) -> None:
+        from unittest.mock import patch
+
+        from syndicate.features.shared import layer2_board
+
+        projection = {"projected": 0.745}
+        with patch.object(layer2_board, "_model_prob_for_side", return_value=0.523):
+            self.assertIsNone(layer2_board._sim_direction_contradiction(self.ROW, projection))
+        with patch.object(layer2_board, "_model_prob_for_side", return_value=0.41):
+            self.assertEqual(layer2_board._sim_direction_contradiction(self.ROW, projection), 0.245)
+        with patch.object(layer2_board, "_model_prob_for_side", return_value=None):
+            self.assertEqual(layer2_board._sim_direction_contradiction(self.ROW, projection), 0.245)
+
+
+class PropSideFramingEndToEnd(unittest.TestCase):
+    """Item 9's root cause: NHL/NBA/WNBA producers wrote the model's LEAN into
+    `projection["side"]`, and every reader treats that field as the framing of
+    `model_prob_over` -- so an under-leaning prop shipped P(under) on its OVER
+    row. Producer -> board, through the real NHL attach and the real
+    `_model_prob_for_side`. (Gage Goncalves o0.5 assists, 2026-10-08: lam 0.269,
+    served 76.4%, true P(over) 23.6%.)"""
+
+    def _nhl_rows(self, lam: float, line: float):
+        from syndicate.features.nhl import prop_projections as npp
+
+        idx = npp.NhlPropProjectionIndex(date="2026-10-02")
+        idx.by_key[(npp._norm("Gage Goncalves"), "ASSISTS")] = (npp._norm("Detroit Red Wings"), npp._norm("New York Rangers"), lam)
+        idx.context[(npp._norm("Gage Goncalves"), "ASSISTS")] = {"line_slot": "L1", "proj_toi": "18.0", "sim_starter": "", "game_type": "regular"}
+        base = {"kind": "prop", "sport": "nhl", "market": "player_assists", "player_name": "Gage Goncalves", "line": line,
+                "home_team": "Detroit Red Wings", "away_team": "New York Rangers", "commence_time": "2026-10-02T23:00:00Z"}
+        rows = [dict(base, side="over"), dict(base, side="under")]
+        npp.attach_nhl_prop_projections(rows, idx, selected_date="2026-10-02")
+        return rows
+
+    def test_under_leaning_prop_keeps_its_over_probability_on_the_over_row(self) -> None:
+        import math
+
+        from syndicate.features.shared.layer2_board import _model_prob_for_side
+
+        over, under = self._nhl_rows(0.269, 0.5)
+        p_over = 1 - math.exp(-0.269)
+        self.assertEqual(over["projection"]["side"], "over")
+        self.assertEqual(over["projection"]["lean"], "under")
+        self.assertAlmostEqual(_model_prob_for_side(over), p_over, places=3)
+        self.assertAlmostEqual(_model_prob_for_side(under), 1 - p_over, places=3)
+
+    def test_over_leaning_prop_is_unchanged(self) -> None:
+        import math
+
+        from syndicate.features.shared.layer2_board import _model_prob_for_side
+
+        over, _ = self._nhl_rows(2.0, 1.5)
+        self.assertEqual(over["projection"]["lean"], "over")
+        self.assertAlmostEqual(_model_prob_for_side(over), 1 - math.exp(-2) * 3, places=3)
+
+    def test_no_producer_writes_the_lean_into_side(self) -> None:
+        for rel in ("syndicate/features/nhl/prop_projections.py", "syndicate/features/shared/nba_projections.py",
+                    "syndicate/features/shared/wnba_projections.py"):
+            text = (ROOT / rel).read_text(encoding="utf-8")
+            self.assertNotRegex(text, r'projection\["side"\] = "over" if', rel)
