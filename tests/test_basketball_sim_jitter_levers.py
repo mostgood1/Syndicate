@@ -54,3 +54,30 @@ def test_each_lever_is_reachable(pkg):
     base = _digest(ev)
     assert _digest(ev, possession_alternation=1.0) != base
     assert _digest(ev, env_sd_scale=0.0) != base
+
+
+def _mean_margin(ev, n: int = 60, **kw) -> float:
+    """Mean home-minus-away points over n seeded games, with a strong home team prior."""
+    tot = 0.0
+    for seed in range(n):
+        _hb, _ab, hq, aq = ev.simulate_pbp_game_boxscore(np.random.default_rng(seed), _team("H"), _team("A"), **kw)
+        tot += (sum(hq) - sum(aq)) / n
+    return tot
+
+
+def test_nba_team_prior_stacking_switch_default_keeps_old_behaviour_and_false_stops_the_double_count():
+    """Phase 2 #1c (M-A): the market-anchored targets already price team quality, so stacking the team prior on top
+    counted it twice. Default True = today's NBA engine; False = the WNBA 2026-10-01 behaviour."""
+    ev = _events("nba_betting")
+    assert ev.EventSimConfig().team_prior_stacks_on_target is True
+    adj = dict(home_team_adj={"eff_mult": 1.10}, away_team_adj={"eff_mult": 0.92})
+    tgt = dict(target_home_points=112.0, target_away_points=112.0, quarters=QUARTERS)
+    stacked = _mean_margin(ev, cfg=ev.EventSimConfig(), **tgt, **adj)
+    unstacked = _mean_margin(ev, cfg=ev.EventSimConfig(team_prior_stacks_on_target=False), **tgt, **adj)
+    neutral = _mean_margin(ev, cfg=ev.EventSimConfig(), **tgt)
+    assert stacked > unstacked + 8.0                 # off != on: the prior adds a large margin on top of an even target
+    assert abs(unstacked - neutral) < 3.0            # without stacking, the even target drives the margin
+    # No target: the prior is the only strength signal and must still apply when stacking is off.
+    plain = _mean_margin(ev, cfg=ev.EventSimConfig(team_prior_stacks_on_target=False))
+    boosted = _mean_margin(ev, cfg=ev.EventSimConfig(team_prior_stacks_on_target=False), **adj)
+    assert boosted > plain + 8.0

@@ -16,6 +16,10 @@ class EventSimConfig:
     # values that were hardcoded before, so an unset config is byte-identical (same RNG draws, same order).
     possession_alternation: float = 0.85  # P(next possession switches team); else a coin flip
     env_sd_scale: float = 0.65  # scale of the per-quarter environment random draw
+    # When a points TARGET is given, whether the team-quality prior (team_adj eff_mult) is multiplied on top of the
+    # target calibration. The targets are market-anchored (margin 95%), so they already price team quality; the
+    # WNBA engine turned this off on 2026-10-01 (TEAM_PRIOR_STACKS_ON_TARGET). True = today's NBA behaviour.
+    team_prior_stacks_on_target: bool = True
 
     # Outcome priors (fallbacks when player priors are missing)
     base_tov_per_poss: float = 0.125
@@ -1169,8 +1173,11 @@ def simulate_pbp_game_boxscore(
 
     # Apply opponent-aware/team prior efficiency multipliers (kept bounded).
     try:
-        eff_mult_h = float(np.clip(float(eff_mult_h) * float(eff_prior_h), 0.75, 1.25))
-        eff_mult_a = float(np.clip(float(eff_mult_a) * float(eff_prior_a), 0.75, 1.25))
+        _stack = bool(getattr(cfg, "team_prior_stacks_on_target", True))
+        if _stack or tpp_h is None:
+            eff_mult_h = float(np.clip(float(eff_mult_h) * float(eff_prior_h), 0.75, 1.25))
+        if _stack or tpp_a is None:
+            eff_mult_a = float(np.clip(float(eff_mult_a) * float(eff_prior_a), 0.75, 1.25))
     except Exception:
         pass
 
