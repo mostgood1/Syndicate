@@ -77,7 +77,11 @@ def _team_box(team_stats: List[Dict[str, Any]]) -> Dict[str, Optional[float]]:
     tpm, tpa = _pair(by.get("threePointFieldGoalsMade-threePointFieldGoalsAttempted"))
     ftm, fta = _pair(by.get("freeThrowsMade-freeThrowsAttempted"))
     tov = _num(by.get("totalTurnovers") if by.get("totalTurnovers") is not None else by.get("turnovers"))
-    return {"fga": fga, "fg3a": tpa, "fta": fta, "oreb": _num(by.get("offensiveRebounds")), "tov": tov}
+    # Makes, rebounds, blocks, steals and assists (Phase 2 #1d: the targets of the ported WNBA engine fixes).
+    return {"fga": fga, "fg3a": tpa, "fta": fta, "oreb": _num(by.get("offensiveRebounds")), "tov": tov,
+            "fgm": fgm, "fg3m": tpm, "ftm": ftm, "dreb": _num(by.get("defensiveRebounds")),
+            "reb": _num(by.get("totalRebounds")), "blk": _num(by.get("blocks")), "stl": _num(by.get("steals")),
+            "ast": _num(by.get("assists"))}
 
 
 def _clock_seconds(clock: Any) -> Optional[float]:
@@ -263,11 +267,16 @@ def _compact_draw(h_box: Dict[str, Any], a_box: Dict[str, Any], hq: Any, aq: Any
     def team(b: Dict[str, Any]) -> List[int]:
         return [int(b.get(k) or 0) for k in ("team_total_fga", "team_total_fta", "team_total_tov", "team_total_fg3a", "team_total_pf")]
 
+    def team_x(b: Dict[str, Any]) -> List[int]:
+        # Phase 2 #1d: makes, rebounds, blocks, steals, assists (kept in a separate key so old draw files still read).
+        return [int(b.get(k) or 0) for k in ("team_total_fgm", "team_total_threes", "team_total_ftm", "team_total_reb",
+                                             "team_total_blk", "team_total_stl", "team_total_ast")]
+
     fo = sum(1 for b in (h_box, a_box) for p in (b.get("players") or []) if int(p.get("pf") or 0) >= foul_limit)
     return {"hq": [int(x or 0) for x in list(hq or [])[:4]], "aq": [int(x or 0) for x in list(aq or [])[:4]],
             "hot": int(sum(int(x or 0) for x in (h_box.get("ot_pts") or []) if x is not None)),
             "aot": int(sum(int(x or 0) for x in (a_box.get("ot_pts") or []) if x is not None)),
-            "h": team(h_box), "a": team(a_box), "fo": fo}
+            "h": team(h_box), "a": team(a_box), "hx": team_x(h_box), "ax": team_x(a_box), "fo": fo}
 
 
 def run_sim(args) -> int:
@@ -337,7 +346,8 @@ def run_sim(args) -> int:
     bpss._recording_sim_draws_local = rec
 
     lever_seen = {"calls": 0, "with_levers": 0}
-    if levers:
+    flags: Dict[str, Any] = {}
+    if levers or args.engine_flag:
         # FAIL LOUDLY on a lever the vendor engine does not read: an unknown name would otherwise be a silent no-op.
         pkg = "wnba_betting" if args.league == "wnba" else "nba_betting"
         real_events = bpss._import_real_events_module_local(package_name=pkg)
@@ -347,13 +357,29 @@ def run_sim(args) -> int:
         unknown = sorted(set(levers) - vendor_fields)
         if unknown:
             raise SystemExit(f"LEVER_FAIL {unknown} are not fields of {pkg} EventSimConfig")
-        # Reachability at the ENGINE boundary: count real-engine calls whose cfg carries every lever value.
+        # Module-level engine switches (Phase 2 #1d: the ported WNBA fixes are module constants, not cfg fields).
+        for name, raw in (x.split("=", 1) for x in (args.engine_flag or [])):
+            if not hasattr(real_events, name):
+                raise SystemExit(f"LEVER_FAIL engine flag {name} is not an attribute of {pkg}.sim.events")
+            cur = getattr(real_events, name)
+            if isinstance(cur, bool):
+                if raw.strip().lower() not in ("1", "0", "true", "false"):
+                    raise SystemExit(f"LEVER_FAIL engine flag {name}={raw!r}: expected a boolean")
+                val: Any = raw.strip().lower() in ("1", "true")
+            else:
+                val = type(cur)(raw)
+            setattr(real_events, name, val)
+            flags[name] = val
+        print(f"ENGINE_FLAGS {flags}", flush=True)
+        # Reachability at the ENGINE boundary: count real-engine calls whose cfg carries every lever value AND whose
+        # engine module carries every switch value at call time.
         orig_real = bpss._call_real_events_entrypoint_local
 
         def real_probe(*, entrypoint_name, league_code, kwargs):
             lever_seen["calls"] += 1
             c = kwargs.get("cfg")
-            if c is not None and all(getattr(c, k, None) == v for k, v in levers.items()):
+            cfg_ok = not levers or (c is not None and all(getattr(c, k, None) == v for k, v in levers.items()))
+            if cfg_ok and all(getattr(real_events, k) == v for k, v in flags.items()):
                 lever_seen["with_levers"] += 1
             return orig_real(entrypoint_name=entrypoint_name, league_code=league_code, kwargs=kwargs)
 
@@ -388,7 +414,7 @@ def run_sim(args) -> int:
                 smart_sim_overwrite=True, log_file=Path(args.out) / f"sim_{args.league}_{d}.log")
         except Exception as exc:  # noqa: BLE001
             print(f"SIM_FAIL {d} {exc!r}"[:300], flush=True)
-        if levers:
+        if levers or flags:
             print(f"LEVER_REACH {d} engine_calls={lever_seen['calls']} with_levers={lever_seen['with_levers']}", flush=True)
             if lever_seen["calls"] and lever_seen["with_levers"] != lever_seen["calls"]:
                 raise SystemExit(f"LEVER_FAIL {d} only {lever_seen['with_levers']}/{lever_seen['calls']} engine calls saw the levers")
@@ -652,6 +678,7 @@ def main(argv=None) -> int:
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--copy-file", action="append", help="extra production switch file copied into each scratch")
     ap.add_argument("--lever", action="append", help="EventSimConfig field=value applied to every draw (Phase 2 sweeps)")
+    ap.add_argument("--engine-flag", action="append", help="module-level engine switch NAME=VALUE on the real events module (Phase 2 #1d)")
     ap.add_argument("--dates-file", default="", help="only these dates (one per line)")
     args = ap.parse_args(argv)
     if args.phase == "table":
