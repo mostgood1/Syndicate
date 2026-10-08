@@ -415,3 +415,51 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
      lever (target slope ≤ 0).
   2. Separately, score-effect feedback: blowout pace/efficiency scaling (`garbage_time_*`, `blowout_*`), tested
      against the real Q4 slope −0.076.
+
+### Phase 2 #1b — CORRECTION 2026-10-08 ~20:45Z: the exploratory "persistent per-draw shock" is RETRACTED
+
+**The error:**
+- The "within-draw" slopes (+0.212 H2-on-H1, +0.096 Q4) pooled draws ACROSS games with only the grand mean removed.
+  They were mostly the spread of game means, not a within-draw effect.
+- Caught by the code survey: there is NO random term drawn once per draw, per half or per stint in the NBA PBP path.
+  - Lineups are redrawn every possession.
+  - Every per-quarter draw is shared by both teams or is already exonerated.
+  - Team, player and minutes inputs are fixed per game.
+- The volume/efficiency decomposition above DID demean per game and stands.
+
+**Re-measured** (script scratchpad slope_fix.py; 791 games):
+
+| slope | SIM, within game, per-game demeaned | REAL, line-adjusted (each period minus its share of −spread) |
+|---|---|---|
+| H2 margin on H1 | **−0.001** [−0.006, +0.004] | **−0.174** [−0.240, −0.106] |
+| Q4 margin on margin entering Q4 | **+0.001** [−0.002, +0.004] | **−0.141** [−0.184, −0.096] |
+
+- Line error in the real adjustment biases the real slope UP, so −0.17 is conservative.
+- **Reading:** the sim has NO momentum and NO reversion: its halves are independent. Real games revert strongly
+  once the market expectation is removed. That negative covariance is what compresses real full-game margins.
+  - The code survey agrees: garbage time scales both teams equally, the only margin-dependent foul term favours the
+    LEADER, possession count ignores the score, and `bench_weight_boost` is dead (always called with
+    blowout_boost_bench=False).
+  - => **missing score-effect feedback** (exploratory, to pre-register).
+
+**SECOND DEFECT, found by the same re-measure: team-strength over-extrapolation.**
+- The SD across games of the sim's mean margin is **13.06** vs the market's expected margin **7.56**.
+  - corr 0.919, slope of sim mean on −spread **1.59**, mean offset −0.52.
+  - The sim turns a 10-pt favourite into a ~16-pt favourite.
+- This is the "6.7 between-game mis-centring" from Phase 1: √(13.06² + 7.56² − 2 · 0.919 · 13.06 · 7.56) ≈ 6.8.
+- Code-survey candidate (unverified): `eff_mult` (events.py:1163-1173) stacks calibration to the quarter targets,
+  which already carry ratings, market anchor and home court, with `eff_prior` from advanced stats and home court
+  again (wrapper :4240-4284), clipped 0.75-1.25. That may double-count strength.
+- **Production impact:** the raw sim spread/ML probabilities are biased toward favourites. The served NBA game
+  lines are blended toward the de-vigged book (nba_game_book_blend.json, preseason weights 0), which limits but does
+  not remove this. Measure before claiming the size.
+- **Variance budget:** S8 margin 18.89² ≈ within 17.6² + mis-centring 6.8². Fixing the mean alone leaves 17.6 vs
+  real total 14.0, so BOTH defects must move.
+
+**Next pre-registration (two mechanisms, one at a time, default-off levers):**
+- **M-A team-strength shrink:** lever on the eff_prior stacking. Target: slope of sim mean on −spread → 1.0 and
+  mis-centring SD down. Guard: S1 pace, S6, S9 unchanged.
+- **M-B score-effect feedback:** asymmetric leader-side scaling and/or trailing-team fouling that grants possessions.
+  Target: within-game H2-on-H1 slope → −0.17 and Q4 → −0.14; S8 margin toward 14; S5 blowouts toward 0.23.
+- Per model_engine_standard, mechanism-vs-estimator: adding M-B to a calibrated engine needs a re-fit of the rates
+  it absorbs. Measure joint, not additive.

@@ -3455,3 +3455,13 @@ own prior verdicts, not by anything failing.
 
 - **What happened:** from Git Bash with cwd = `C:\tmp\syndicate-sessions\<lane>`, `wsl -d Ubuntu-24.04 -- bash -c 'cd /home/amyn/Syndicate && git merge-base --is-ancestor <sha> HEAD'` printed `fatal: not a git repository: /mnt/c/tmp/syndicate-sessions/<lane>/C:/.../.git/worktrees/<lane>` and my `|| echo no` turned it into "**fleet lacks the fix**". The truth, read via PowerShell `wsl --cd /home/amyn/Syndicate` from `C:\`, was `1884c0e5`, containing it. `env -u GIT_DIR ...` did not help, and `env | grep ^GIT_` was 0 on the good path.
 - **Rule:** read the fleet checkout with `wsl -d Ubuntu-24.04 --cd /home/amyn/Syndicate -- ...` from a neutral cwd (PowerShell, `Set-Location C:\`), or `git -C /home/amyn/Syndicate`, and NEVER fold a git error into a yes/no with `||`: print the sha, then decide.
+
+## 2026-10-08 -- A "within-group" slope needs per-group demeaning; pooling across groups measures the groups `[session e0a3e383]`
+
+- **Measured:** an NBA sim "within-draw" H1→H2 margin slope of +0.21 pooled 158k draws across 791 games, removing
+  only the grand mean. Per-game demeaned it was −0.001. The +0.21 was the spread of the sim's game means (SD 13.1).
+- The wrong number was written up as a "persistent per-draw shock" and handed to a code survey, which found no such
+  term and spotted the missing demeaning.
+- **Rule:** when a claim says "within X", subtract each X's mean (or use a fixed-effects regression) before pooling,
+  and state the demeaning in the result line.
+  - A fast check: compute the slope on the X means alone. If it is large, the pooled slope is measuring it.
