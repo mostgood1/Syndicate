@@ -150,3 +150,7 @@ Pre-registered (571d2dd9): mean AND sd from full starts only (share >= 0.7, same
 | passing_attempts | 0.58 | 2,329 / 229 | 0.7732 -> 0.7619 (-0.0113 [-0.0449, +0.0201]) | 0.493 -> 0.464 | 0.499 | NO SHIP (gap 0.035) |
 
 Reproduced through the production code on the same 5,702 rows: on 0.7074 / off 0.7341 (exact). Still worse than a coin (0.693) and the book (0.671): this removes a bias, it is not an edge. Book LL on the held rows 0.6707.
+
+## 2026-10-08 -- attempts mean fix: SHIPPED on its pre-registered read
+
+Official attempts (sacks + 2pt excluded) + starts-only mean/sd (CV 0.4281, k=4) + blend w fitted on REAL 2023+2024 quotes pooled (w = 0.16, fit LL 0.7441 vs production 0.7598). Validated on 2025 real quotes (DISCLOSED: read twice earlier today for production diagnostics only, never this variant), identical rows, starts-refused rows excluded, official grading: 2,557 rows / 220 games, LL 0.7371 -> **0.7183** (-0.0188 [-0.0420, +0.0038]), mean P(over) 0.509 -> 0.495 vs over-rate 0.470 (gap 0.025 <= 0.03). Book 0.6931. Reproduced exactly through the shipped code. Still at/above a coin: a bias removed, not an edge.

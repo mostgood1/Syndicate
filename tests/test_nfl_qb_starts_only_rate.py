@@ -55,9 +55,10 @@ def test_blend_weight_switches_with_the_rate(monkeypatch):
     assert P._nfl_prop_model_probability(**args) != pytest.approx(normal)
 
 
-def test_attempts_are_not_switched():
-    """passing_attempts failed its pre-registered rule; it keeps the all-games rate and its blend."""
-    assert "passing_attempts" not in ps.QB_STARTS_ONLY_RATE_STATS
+def test_attempts_joined_on_its_own_read():
+    """passing_attempts passed its own pre-registered read (2025): starts-only rate, blend w=0.16."""
+    assert "passing_attempts" in ps.QB_STARTS_ONLY_RATE_STATS
+    assert P._STARTS_ONLY_BLEND_WEIGHT == {"passing_yards": 0.0, "passing_attempts": 0.16}
 
 
 def _rows(monkeypatch):

@@ -245,13 +245,18 @@ def _safe_float(value: Any) -> float | None:
 # `rushing_attempts`) all want ~0.05 LESS log-normal now, because a wider Normal
 # already supplies some of the right-skew the blend was buying. `receiving_yards`
 # and `interceptions` want more.
+_STARTS_ONLY_BLEND_WEIGHT: dict[str, float] = {"passing_yards": 0.0, "passing_attempts": 0.16}
+
 _COVER_PROBABILITY_BLEND_WEIGHT: dict[str, float] = {
     "passing_yards": 0.689,      # re-fit 0.4994 REJECTED, worse out of sample
     # RE-FITTED AGAIN 2026-09-28 after `passing_attempts` took a k=2 spread
     # override: 0.9480 -> 0.9449, OOS +0.004144. Every OTHER market came back
     # unchanged to four decimals, which is the check that the re-fit isolated
     # the one market whose spread moved rather than drifting the whole table.
-    "passing_attempts": 0.9449,
+    # RE-FITTED 2026-10-08 ON OFFICIAL ATTEMPTS (sacks excluded, CV 0.4281, k=4; lane
+    # `nfl-passing-yards-prop-coin`): 0.9449 -> 0.8987, OOS +0.003046. Every other market came back
+    # unchanged to four decimals (the isolation check).
+    "passing_attempts": 0.8987,
     # DEAD AS OF THE DISCRETE BRANCH. `passing_tds` and `interceptions` now
     # return from `_DISCRETE_COUNT_STATS` before any blend is consulted, so these
     # two weights are unreachable. Kept rather than deleted so the re-fit history
@@ -447,9 +452,10 @@ def _nfl_prop_model_probability(*, stat: str, mean: float | None, stdev: float |
     normal_prob = 1.0 - statistics.NormalDist(mean, stdev).cdf(line)
     weight = _COVER_PROBABILITY_BLEND_WEIGHT.get(stat, 0.0)
     if stat in QB_STARTS_ONLY_RATE_STATS and qb_starts_only_rate_enabled():
-        # Re-fitted ON TOP OF the starts-only rate (real 2023 quotes): 0.0. Switched on the
-        # same flag as the rate so they cannot ship apart -- see player_stats.QB_STARTS_ONLY_RATE_STATS.
-        weight = 0.0
+        # Re-fitted ON TOP OF the starts-only rate on REAL quotes (passing_yards on 2023: 0.0;
+        # passing_attempts on 2023+2024 pooled: 0.16). Switched on the same flag as the rate so
+        # they cannot ship apart -- see player_stats.QB_STARTS_ONLY_RATE_STATS.
+        weight = _STARTS_ONLY_BLEND_WEIGHT[stat]
     if weight <= 0.0:
         return normal_prob
     lognormal_prob = _lognormal_cover_probability(mean, stdev, line)

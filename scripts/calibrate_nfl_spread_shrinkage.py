@@ -95,7 +95,7 @@ MIN_PRIOR_GAMES_FOR_POOL = 4
 # a frozen table rather than assuming it does.
 STATIC_LEAGUE_CV: dict[str, float] = {
     "passing_yards": 0.4256,
-    "passing_attempts": 0.5444,
+    "passing_attempts": 0.4281,  # re-derived 2026-10-08 on OFFICIAL attempts (sacks excluded); was 0.5444
     "passing_tds": 0.9354,
     "rushing_yards": 1.2271,
     "rushing_attempts": 0.9129,

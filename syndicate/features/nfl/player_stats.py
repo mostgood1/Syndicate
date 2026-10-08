@@ -30,6 +30,9 @@ _PLAY_COLUMNS = (
     "passer_player_name",
     "passing_yards",
     "pass_attempt",
+    # Official attempts exclude sacks and two-point tries; nflverse's `pass_attempt` counts both.
+    "sack",
+    "two_point_attempt",
     "pass_touchdown",
     "rusher_player_id",
     "rusher_player_name",
@@ -488,7 +491,11 @@ def player_team_with_prior(season: int, week: int, player_id: str) -> tuple[str 
 
 _STAT_EXTRACTORS = {
     "passing_yards": lambda play, pid: float(play["passing_yards"] or 0) if play.get("passer_player_id") == pid and play.get("passing_yards") else 0.0,
-    "passing_attempts": lambda play, pid: 1.0 if play.get("passer_player_id") == pid and play.get("pass_attempt") == "1" else 0.0,
+    # OFFICIAL attempts (lane `nfl-passing-yards-prop-coin`, 2026-10-08). nflverse's `pass_attempt` is 1 on
+    # SACKS (and two-point tries), so this counted +2.42 attempts per QB-game vs the official box score
+    # (exact on 12% of 561 2025 QB-games; with both excluded, exact on 100%). The market prices official
+    # attempts, and the same extractor grades every backtest, so the over-rate read 0.607 vs 0.492.
+    "passing_attempts": lambda play, pid: 1.0 if play.get("passer_player_id") == pid and play.get("pass_attempt") == "1" and play.get("sack") != "1" and play.get("two_point_attempt") != "1" else 0.0,
     "passing_tds": lambda play, pid: 1.0 if play.get("passer_player_id") == pid and play.get("pass_touchdown") == "1" else 0.0,
     "rushing_yards": lambda play, pid: float(play["rushing_yards"] or 0) if play.get("rusher_player_id") == pid and play.get("rushing_yards") else 0.0,
     "rushing_attempts": lambda play, pid: 1.0 if play.get("rusher_player_id") == pid and play.get("rush_attempt") == "1" else 0.0,
@@ -699,7 +706,7 @@ def player_rate(season: int, week: int, player_id: str, stat: str) -> tuple[floa
 #: starter is shrunk toward a starter-sized spread.
 LEAGUE_SPREAD_CV: dict[str, float] = {
     "passing_yards": 0.4256,
-    "passing_attempts": 0.5444,
+    "passing_attempts": 0.4281,  # re-derived 2026-10-08 on OFFICIAL attempts (sacks excluded); was 0.5444
     "passing_tds": 0.9354,
     "rushing_yards": 1.2271,
     "rushing_attempts": 0.9129,
@@ -767,8 +774,17 @@ SPREAD_SHRINKAGE_K = 6.0
 #: outcomes, so a continuous model is the right family and only the width was
 #: wrong. `interceptions` and `passing_tds` have 5 and 6, and no k fixes those --
 #: they moved to a Poisson (`props._DISCRETE_COUNT_STATS`).
+#: RE-SELECTED 2026-10-08 ON OFFICIAL ATTEMPTS (lane `nfl-passing-yards-prop-coin`). The table above was
+#: fitted on nflverse `pass_attempt`, which counts SACKS; the extractor now excludes them, the league CV was
+#: re-derived (0.5444 -> 0.4281) and k re-swept with the same script, split, p70 usage filter and rule
+#: (min fit Brier; ties within 0.1% broken by bucket gap). k=4 and k=6 tie on fit Brier; k=4 wins the gap:
+#:
+#:     k      fit Brier   fit bucket  |  held Brier   held bucket  held cov80
+#:     2       0.173426     0.0952    |   0.166868      0.1429      0.8245
+#:     4       0.172558     0.1085    |   0.166145      0.1238      0.8715   <- selected
+#:     6       0.172576     0.1241    |   0.166186      0.1490      0.8997
 SPREAD_SHRINKAGE_K_BY_MARKET: dict[str, float] = {
-    "passing_attempts": 2.0,
+    "passing_attempts": 4.0,
 }
 
 
@@ -1006,7 +1022,11 @@ def qb_starts_refused(season: int, week: int, player_id: str, stat: str, rate_so
 #
 # The fitted blend weight on top of it is 0.0 (Normal only); the props module
 # switches its weight on the same flag so the two can never ship apart.
-QB_STARTS_ONLY_RATE_STATS = frozenset({"passing_yards"})
+#
+# passing_attempts JOINED 2026-10-08 on its own pre-registered read (official attempts + starts-only, w fitted on
+# real 2023+2024 quotes pooled = 0.16, validated on 2025 real quotes, identical rows): LL 0.7371 -> 0.7183
+# (-0.0188 [-0.0420, +0.0038]), mean P(over) 0.495 vs official over-rate 0.470 (gap 0.025 <= 0.03). SHIP.
+QB_STARTS_ONLY_RATE_STATS = frozenset({"passing_yards", "passing_attempts"})
 
 
 def qb_starts_only_rate_enabled() -> bool:
