@@ -162,7 +162,8 @@ def _write_csv(path: Path, rates: dict, shot_idx: dict, block_idx: dict, faceoff
                     "pk_shot_index_allowed", "block_rate_index", "faceoff_ev_index",
                     "faceoff_oz_index", "faceoff_dz_index", "faceoff_nz_index",
                     "faceoff_pp_role_index", "faceoff_pk_role_index", "games",
-                    "pp_opportunities", "pp_goals", "pk_opportunities", "pp_goals_against"])
+                    "pp_opportunities", "pp_goals", "pk_opportunities", "pp_goals_against",
+                    "committed_per_game_recent", "recent_asof"])
         for abbr, r in rows:
             sidx = shot_idx.get(abbr)
             pp_shot_index = sidx.pp_shot_index if sidx is not None else DEFAULT_SHOT_INDEX
@@ -185,7 +186,8 @@ def _write_csv(path: Path, rates: dict, shot_idx: dict, block_idx: dict, faceoff
                         pk_shot_index, block_rate_index, faceoff_ev_index, faceoff_oz_index,
                         faceoff_dz_index, faceoff_nz_index, faceoff_pp_role_index,
                         faceoff_pk_role_index, r.games, r.pp_opportunities,
-                        r.pp_goals, r.pk_opportunities, r.pp_goals_against])
+                        r.pp_goals, r.pk_opportunities, r.pp_goals_against,
+                        r.committed_per_game_recent, r.recent_asof])
     return len(rows)
 
 

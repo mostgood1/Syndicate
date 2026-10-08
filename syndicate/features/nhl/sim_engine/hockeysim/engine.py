@@ -67,6 +67,9 @@ class SimConfig:
     # carries 1.0% of all PP time). Off switch: env SYNDICATE_NHL_PP_TIME_MODEL=minors_2min.
     pp_time_model: str = "minors_2min"
     pp_seconds_per_minor: float = 120.0
+    # Which committed rate drives per_minor PP time: "season" (season-to-date mean, default) or "recent" (the
+    # special-teams file's committed_per_game_recent, C20, when present and current) `[2026-10-08, nhl-pp-time]`.
+    pp_rate_source: str = "season"
     # EVEN-STRENGTH rate scales `[lane nhl-pp-time, 2026-10-06]` (default 1.0 = byte-identical). With PP time
     # corrected, the minutes leave a 0.24x-shots PK state for EV, and team SOG/goals rise ~6% -- the inflated
     # PK time had been offsetting the base rate. These rescale EV segments only (shot lambda / per-shot goal
@@ -1319,6 +1322,9 @@ class PeriodSimulator:
             if pp_time_model == "per_minor":
                 # SimConfig.pp_time_model: PP seconds per committed minor are measured, not assumed 120,
                 # and OT uses the REGULATION per-second rate (the legacy OT denominator caps at 0.45).
+                if str(getattr(self.cfg, "pp_rate_source", "season") or "season").strip().lower() == "recent":
+                    h_comm = _f(st_home.get("committed_per_game_recent", h_comm), h_comm)
+                    a_comm = _f(st_away.get("committed_per_game_recent", a_comm), a_comm)
                 reg_game_seconds = float(max(1.0, float(self.cfg.periods) * float(self.cfg.seconds_per_period)))
                 per_minor = max(0.0, _f(getattr(self.cfg, "pp_seconds_per_minor", 120.0), 120.0))
                 pp_frac_total = max(0.0, min(0.45, float(h_comm + a_comm) * per_minor / reg_game_seconds))

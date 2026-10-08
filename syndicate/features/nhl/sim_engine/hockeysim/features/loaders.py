@@ -340,6 +340,12 @@ def load_team_special_teams_map(date: str, *, root: Optional[Path] = None) -> Di
             entry["pk_pct"] = pk
         if committed is not None:
             entry["committed_per_game"] = committed
+        # Recency-weighted committed rate (lane nhl-pp-time), only when the file is current: a prior-season
+        # file read before the in-season switch carries LAST April's level, which must not price October.
+        recent = _to_float(lower.get("committed_per_game_recent"))
+        recent_asof = str(lower.get("recent_asof") or "")[:10]
+        if recent is not None and recent_asof and _recent_is_current(recent_asof, date):
+            entry["committed_per_game_recent"] = recent
         if pp_shot_idx is not None:
             entry["pp_shot_index"] = pp_shot_idx
         if pk_shot_idx is not None:
@@ -361,6 +367,15 @@ def load_team_special_teams_map(date: str, *, root: Optional[Path] = None) -> Di
         if entry:
             out[key] = entry
     return out
+
+
+def _recent_is_current(asof: str, date: str, max_days: int = 14) -> bool:
+    try:
+        from datetime import date as _d
+        gap = (_d.fromisoformat(str(date)[:10]) - _d.fromisoformat(asof)).days
+    except ValueError:
+        return False
+    return 0 <= gap <= max_days
 
 
 def load_lineups(date: str, *, root: Optional[Path] = None) -> Dict[str, List[Dict[str, str]]]:

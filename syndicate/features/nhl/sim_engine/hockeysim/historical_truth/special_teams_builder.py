@@ -21,7 +21,8 @@ Pure function, no I/O — mirrors `elo_builder.py`'s shape. The producer script
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Sequence
+from datetime import date as _date, timedelta
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from .contracts import HistoricalGameRecord
 
@@ -32,6 +33,13 @@ DEFAULT_COMMITTED_PER_GAME = 3.0
 # (e.g. 1-for-2 reads as a 50% power play, which is not a real signal). Below this many
 # opportunities, fall back to the league-average default rather than publish a noisy rate.
 MIN_OPPORTUNITIES_FOR_RATE = 15
+# Recency-weighted committed rate `[2026-10-08, lane nhl-pp-time, "C20"]`: the team's own games weighted with a
+# half-life of RECENT_HALF_LIFE_GAMES, times the league's trailing-RECENT_LEAGUE_DAYS-day committed level over its
+# season level. Offline on 2025-26 (official PP time, 1,362 held-out team-games): sim/real PP-time ratio 1.061
+# (season-to-date) -> 1.012. Read by the engine only under pp_time_model="per_minor" + pp_rate_source="recent".
+RECENT_HALF_LIFE_GAMES = 20.0
+RECENT_LEAGUE_DAYS = 20
+RECENT_MIN_GAMES = 5
 
 
 @dataclass(frozen=True)
@@ -45,6 +53,8 @@ class TeamSpecialTeamsRates:
     pp_goals: int
     pk_opportunities: int
     pp_goals_against: int
+    committed_per_game_recent: Optional[float] = None
+    recent_asof: Optional[str] = None
 
 
 def compute_special_teams_rates(
@@ -84,6 +94,7 @@ def compute_special_teams_rates(
         h["committed"] += g.penalties_committed_home
         a["committed"] += g.penalties_committed_away
 
+    recent, asof = _recent_committed(games)
     out: Dict[str, TeamSpecialTeamsRates] = {}
     for team, row in acc.items():
         games_n = row["games"]
@@ -102,5 +113,37 @@ def compute_special_teams_rates(
             pp_goals=row["pp_goals"],
             pk_opportunities=row["pk_opp"],
             pp_goals_against=row["pp_ga"],
+            committed_per_game_recent=recent.get(team),
+            recent_asof=asof,
         )
     return out
+
+
+def _recent_committed(games: Sequence[HistoricalGameRecord]) -> Tuple[Dict[str, float], Optional[str]]:
+    """``({team: recency-weighted committed minors per game}, last game date)``; see RECENT_HALF_LIFE_GAMES."""
+    per_team: Dict[str, List[Tuple[str, int]]] = {}
+    league: List[Tuple[str, int]] = []
+    for g in games:
+        d = str(g.date or "")[:10]
+        if not d:
+            continue
+        for team, c in ((g.home_abbr, g.penalties_committed_home), (g.away_abbr, g.penalties_committed_away)):
+            per_team.setdefault(team, []).append((d, int(c)))
+            league.append((d, int(c)))
+    if not league:
+        return {}, None
+    asof = max(d for d, _ in league)
+    cutoff = (_date.fromisoformat(asof) - timedelta(days=RECENT_LEAGUE_DAYS)).isoformat()
+    recent_l = [c for d, c in league if d >= cutoff]
+    season_mean = sum(c for _, c in league) / len(league)
+    ratio = (sum(recent_l) / len(recent_l)) / season_mean if recent_l and season_mean > 0 else 1.0
+    out: Dict[str, float] = {}
+    for team, rows in per_team.items():
+        rows.sort()
+        if len(rows) < RECENT_MIN_GAMES:
+            continue
+        n = len(rows)
+        w = [0.5 ** ((n - 1 - i) / RECENT_HALF_LIFE_GAMES) for i in range(n)]
+        ewm = sum(wi * c for wi, (_, c) in zip(w, rows)) / sum(w)
+        out[team] = round(ewm * ratio, 4)
+    return out, asof
