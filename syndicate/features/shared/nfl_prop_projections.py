@@ -408,6 +408,22 @@ def attach_nfl_prop_projections(
         # rather than hand-rolled -- this would otherwise be the sixth copy of
         # one de-vig.
         _attach_sim_probability_edge(projection, row=row, model_prob=model_prob)
+        # Display ladder for the board's sim-spread chart (lane
+        # layer2-board-ui-redesign): the SAME `_nfl_prop_model_probability`
+        # evaluated at nearby lines -- Poisson thresholds for count stats,
+        # +/- 0.5 SD steps for yardage. anytime_td has no line, so no ladder.
+        if line is not None and stat != "anytime_td":
+            from syndicate.features.nfl.props import _DISCRETE_COUNT_STATS
+            from syndicate.features.shared.price_ladder import price_ladder
+
+            _mean = _as_float(entry.get("projected_value"))
+            _sd = _as_float(entry.get("projected_sd"))
+            _n = int(entry.get("sample_games") or 0)
+            projection["ladder"] = price_ladder(
+                lambda t, _s=stat, _m=_mean, _d=_sd, _k=_n: _nfl_prop_model_probability(stat=_s, mean=_m, stdev=_d, n=_k, line=t),
+                line,
+                sd=None if stat in _DISCRETE_COUNT_STATS else _sd,
+            )
         row["projection"] = refuse_published_certainty(projection)
         rows_with_projection += 1
 

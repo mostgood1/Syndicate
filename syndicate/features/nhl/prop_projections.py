@@ -291,6 +291,10 @@ def attach_nhl_prop_projections(
             refusal = line_refusal(index.context.get((_norm(row.get("player_name")), code)), code)
             if refusal is None:
                 _attach_sim_probability_edge(projection, row=row, model_prob=price_p_over(code, line, lam))
+                # Display ladder for the board's sim-spread chart (lane layer2-board-ui-redesign).
+                from syndicate.features.shared.price_ladder import price_ladder
+
+                projection["ladder"] = price_ladder(lambda t, _c=code, _l=lam: price_p_over(_c, t, _l), line)
                 priced += 1
             else:
                 projection["probability_unavailable_reason"] = refusal

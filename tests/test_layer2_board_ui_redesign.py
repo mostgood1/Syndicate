@@ -341,3 +341,56 @@ class TeamLogosAndChipSituation(unittest.TestCase):
         self.assertEqual(_live_situation({"live_state": {"status": "In Progress | Top 7 | 1 out"}}, "TOP 7"), "1 out")
         self.assertEqual(_live_situation({"status": {"detailed": "3rd & 4 at TB 38"}}, "Q2 3:21"), "3rd & 4 at TB 38")
         self.assertIsNone(_live_situation({"live_state": {"status": "In Progress"}}, "Q2 3:21"))
+
+
+class ChartsAndHeadshots(unittest.TestCase):
+    """Approved mockup board 10 + headshots (user 2026-10-08)."""
+
+    def test_price_ladder_reproduces_the_producer_price_at_the_line(self) -> None:
+        from syndicate.features.nhl.prop_projections import price_p_over
+        from syndicate.features.shared.price_ladder import price_ladder
+
+        ladder = price_ladder(lambda t: price_p_over("ASSISTS", t, 0.269), 0.5)
+        at_line = [p for t, p in ladder if t == 0.5][0]
+        self.assertAlmostEqual(at_line, round(price_p_over("ASSISTS", 0.5, 0.269), 4), places=4)
+        self.assertEqual([t for t, _ in ladder][:3], [-0.5, 0.5, 1.5])
+        self.assertTrue(all(ladder[i][1] >= ladder[i + 1][1] for i in range(len(ladder) - 1)))
+
+    def test_continuous_ladder_steps_in_half_sd(self) -> None:
+        from syndicate.features.shared.price_ladder import price_ladder
+
+        ladder = price_ladder(lambda t: max(0.0, min(1.0, 1 - t / 200)), 60.5, sd=20)
+        self.assertEqual([t for t, _ in ladder], [30.5, 40.5, 50.5, 60.5, 70.5, 80.5, 90.5])
+
+    def test_chart_columns_carry_ladder_and_recent_values(self) -> None:
+        from unittest.mock import patch
+
+        from syndicate.features.shared import layer2_board
+
+        row = {"kind": "prop", "projection": {"ladder": [[-0.5, 1.0], [0.5, 0.48], [1.5, 0.16]]}}
+        with patch("syndicate.features.intelligence_recent_matchup.recent_values_for",
+                   return_value={"values": [0, 1, 0], "line": 0.5, "side": "under"}):
+            cols = layer2_board._chart_columns(row)
+        self.assertEqual(cols["sim_ladder"][1], [0.5, 0.48])
+        self.assertEqual(cols["recent_values"], [0, 1, 0])
+
+    def test_headshot_name_maps_drop_ambiguous_names(self) -> None:
+        from syndicate.features.shared.player_headshots import _unique
+
+        out = _unique([("jsmith", "1"), ("jsmith", "2"), ("adoe", "3"), ("adoe", "3")])
+        self.assertEqual(out, {"adoe": "3"})
+
+    def test_nhl_headshot_uses_the_team_free_latest_path(self) -> None:
+        from unittest.mock import patch
+
+        from syndicate.features.shared import player_headshots
+
+        with patch.object(player_headshots, "_nhl_ids", return_value={"austonmatthews": "8479318"}):
+            url = player_headshots.headshot_url({"sport": "nhl", "player_name": "Auston Matthews"})
+        self.assertEqual(url, "https://assets.nhle.com/mugs/nhl/latest/8479318.png")
+
+    @unittest.skipUnless(shutil.which("node"), "node not on PATH")
+    def test_chart_node_harness(self) -> None:
+        result = subprocess.run(["node", str(ROOT / "tests" / "js" / "board_prop_charts.test.mjs")],
+                                capture_output=True, text=True, timeout=60)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

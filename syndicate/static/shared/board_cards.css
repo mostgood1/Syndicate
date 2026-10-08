@@ -2493,3 +2493,18 @@ table.board-blotter tbody tr:last-child td {
 .board-crest-pair { display: inline-flex; flex-direction: column; gap: 2px; flex: none; }
 .board-top-rail__who .board-crest, .board-top-rail__who .board-crest--single { width: 22px; height: 22px; }
 .board-top-rail__who .board-crest-pair { flex-direction: row; }
+
+/* Prop charts: sim spread + recent form (approved mockup board 10). */
+.prop-charts { display: flex; flex-wrap: wrap; gap: 14px 24px; margin: 4px 0 8px; }
+.prop-chart { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.prop-chart figcaption { font-size: 11px; color: var(--cards-text-dim); }
+.prop-chart figcaption b { color: var(--cards-text); }
+.chart-bar { fill: #3a5a78; }
+.chart-bar--side { fill: #7ee2a8; }
+.chart-axis { fill: var(--cards-text-dim); font-size: 9px; font-family: inherit; }
+.chart-line { stroke: #f3cf8a; stroke-width: 1.5; stroke-dasharray: 4 3; }
+.board-blotter__form { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 11px; color: var(--cards-text-soft); }
+.prop-spark svg { display: block; }
+.board-research__charts { border-bottom: 1px solid var(--cards-line); padding-bottom: 10px; }
+.board-research__charts-title { font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+.board-research__charts .prop-charts { flex-direction: column; }

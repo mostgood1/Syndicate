@@ -3783,7 +3783,36 @@ def layer2_rows_to_board_cards(
         # evaluation ledger and every view can join on the ONE list
         # (`layer2_ledger.pick_id`, lane intelligence-evidence-coverage).
         cards[-1]["pick_id"] = _layer2_pick_id(cards[-1])
+        cards[-1].update(_chart_columns(row))
     return cards
+
+
+def _chart_columns(row: Mapping[str, Any]) -> dict[str, Any]:
+    """The two prop charts' data (user 2026-10-08, approved mockup board 10;
+    lane layer2-board-ui-redesign). Display only -- nothing scores on these.
+
+    * `sim_ladder`: the producer's own P(over t) at the line and nearby lines
+      (`projection["ladder"]`, `shared/price_ladder.py`). The page draws it only
+      if the point at the row's line reproduces `model_probability`.
+    * `recent_values`: newest-first per-game values behind the row's "Recent
+      form" sentence (`intelligence_recent_matchup.recent_values_for`, written
+      when `row_explainer` above computed that sentence), <= 10.
+    """
+    out: dict[str, Any] = {}
+    projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
+    ladder = projection.get("ladder")
+    if isinstance(ladder, list) and len(ladder) >= 3:
+        out["sim_ladder"] = ladder
+    if str(row.get("kind") or "").lower() == "prop":
+        try:
+            from syndicate.features.intelligence_recent_matchup import recent_values_for
+
+            recent = recent_values_for(row)
+        except Exception:  # noqa: BLE001 -- a chart must never break a card
+            recent = None
+        if isinstance(recent, Mapping) and recent.get("values"):
+            out["recent_values"] = [v for v in list(recent.get("values"))[:10]]
+    return out
 
 
 def _layer2_pick_id(card: Mapping[str, Any]) -> str:

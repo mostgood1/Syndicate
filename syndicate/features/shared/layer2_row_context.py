@@ -267,7 +267,12 @@ def row_identity(row: Mapping[str, Any], context: Mapping[str, Any] | None) -> d
         # `player_id` is NOT set here: consumers read it as an MLBAM-style id,
         # and an ESPN id in that field would be a wrong id, not a missing one.
         return {"headshot_url": _NFL_HEADSHOT_URL.format(espn_id=espn_id)} if espn_id else {}
-    return {}
+    # NHL / NBA / WNBA / NCAAF / soccer (lane layer2-board-ui-redesign,
+    # 2026-10-08): cached name -> CDN id maps, ambiguous names dropped.
+    from syndicate.features.shared.player_headshots import headshot_url
+
+    url = headshot_url(row)
+    return {"headshot_url": url} if url else {}
 
 
 def _market_words(market: str) -> str:

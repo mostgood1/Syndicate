@@ -333,6 +333,10 @@ def attach_wnba_projections(
                 if hit_prob is not None:
                     projection["basis"] = "empirical_sim_ladder"
                     _attach_sim_probability_edge(projection, row=row, model_prob=hit_prob)
+                    # Display ladder for the board's sim-spread chart (lane layer2-board-ui-redesign).
+                    from syndicate.features.shared.price_ladder import price_ladder
+
+                    projection["ladder"] = price_ladder(lambda t, _l=ladder: _hit_prob_over(_l, t), line_value)
                     rows_with_distribution += 1
         if line_value is not None:
             edge = round(mean - line_value, 3)

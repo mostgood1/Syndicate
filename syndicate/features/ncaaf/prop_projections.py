@@ -111,6 +111,7 @@ artifact (NFL's shape) cannot price a line quoted later.
 
 from __future__ import annotations
 
+from syndicate.features.shared.price_ladder import price_ladder as _price_ladder
 import csv
 import json
 import logging
@@ -1133,6 +1134,9 @@ def attach_ncaaf_prop_projections(grid: Iterable[dict[str, Any]], *, selected_da
             "source": PROJECTION_SOURCE,
             "distribution": entry.get("dist"),
             "projected_sd": _as_float(entry.get("sd")),
+            # Display ladder for the board's sim-spread chart (lane layer2-board-ui-redesign).
+            "ladder": _price_ladder(lambda t, _e=entry: prob_over(_e, t), line,
+                                    sd=None if str(entry.get("dist") or "") in COUNT_DISTRIBUTIONS else entry.get("sd")),
             "dispersion": _as_float(entry.get("dispersion")),
             "season_mean": _as_float(entry.get("season_mean")),
             "sample_games": entry.get("season_games"),

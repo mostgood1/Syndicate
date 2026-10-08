@@ -130,6 +130,7 @@
         <h2 class="board-section-title">Ask the Syndicate</h2>
         <button type="button" class="board-research__close" data-research-toggle aria-label="Hide Ask the Syndicate" aria-controls="board-research">⟩</button>
       </div>
+      <div id="board-research-charts" class="board-research__charts" hidden></div>
       <div id="ask-bar-panel" class="board-research__ask"></div>
       <div class="board-research__tabs" role="tablist" aria-label="Your picks">
         <button type="button" role="tab" class="cards-tab is-active" data-research-tab="watchlist" aria-selected="true">Watchlist</button>
@@ -2167,10 +2168,12 @@
         ` : ""}
         ${movementHtml ? `<div class="board-card__movement">${movementHtml}</div>` : ""}
         ${badges.length ? `<div class="board-card__badges">${badges.join("")}</div>` : ""}
-        ${reasoning ? `
+        ${recentFormText(item) ? `<div class="board-blotter__form">${recentFormChart(item, { compact: true })}<span>${escapeHtml(recentFormText(item))}</span></div>` : ""}
+        ${reasoning || propChartsBlock(item) ? `
           <details class="board-card__reasoning">
             <summary>Why this pick</summary>
-            <p>${escapeHtml(reasoning)}</p>
+            ${propChartsBlock(item)}
+            ${reasoning ? `<p>${escapeHtml(reasoning)}</p>` : ""}
           </details>
         ` : ""}
         <div class="board-card__footer">
@@ -4161,6 +4164,7 @@
                         <div class="board-blotter__primary">${escapeHtml(title)} <span class="board-badge board-badge--${itemState === "live" ? "live" : "pregame"}">${itemState === "live" ? "Live" : "Pre"}</span>${steamBadge}</div>
                         <div class="board-blotter__line">${escapeHtml(propText || "")}${item.segment_label ? `<span class="board-segment-chip" title="This line is for ${escapeHtml(item.segment_label)}, not the full game">${escapeHtml(item.segment_label)}</span>` : ""}</div>
                         <div class="board-blotter__meta">${escapeHtml(sport)}${matchup ? " &middot; " + escapeHtml(matchup) : ""}${updatedDisplay ? ` &middot; <span title="${escapeHtml(updatedIso)}">${escapeHtml(updatedDisplay)}</span>` : ""}</div>
+                        ${recentFormText(item) ? `<div class="board-blotter__form">${recentFormChart(item, { compact: true })}<span>${escapeHtml(recentFormText(item))}</span></div>` : ""}
                       </div>
                     </div>
                   </td>
@@ -4184,7 +4188,7 @@
                     </div>
                   </td>
                 </tr>
-                ${reasoning ? `<tr class="board-blotter__reason-row" ${rowAttrs}><td></td><td colspan="${visibleColumns.length}">${escapeHtml(reasoning)}</td></tr>` : ""}
+                ${reasoning || propChartsBlock(item) ? `<tr class="board-blotter__reason-row" ${rowAttrs}><td></td><td colspan="${visibleColumns.length}">${propChartsBlock(item)}${escapeHtml(reasoning || "")}</td></tr>` : ""}
               `;
             }).join("")}
           </tbody>
@@ -4630,12 +4634,132 @@
     // Asking about a row opens the rail (transient: the reader did not choose
     // to change their default, they asked a question).
     document.addEventListener("syndicate:ask", () => setResearchState("open", { transient: true }));
+    // The row being asked about gets its charts at the top of the rail. Read
+    // from the click (capture phase, before ask_bar.js handles it): the ask
+    // event carries the question, not the row.
+    document.addEventListener("click", (event) => {
+      const button = event.target && event.target.closest ? event.target.closest("#board-cards [data-ask-action='ask-pick']") : null;
+      if (!button) return;
+      const holder = button.closest("[data-pick-id]");
+      const key = holder ? holder.getAttribute("data-pick-id") : "";
+      const item = key ? lastRenderItems.find((row) => pickKey(row) === key) : null;
+      const slot = document.getElementById("board-research-charts");
+      if (!slot) return;
+      const html = item ? propChartsBlock(item) : "";
+      slot.innerHTML = html ? `<div class="board-research__charts-title">${escapeHtml(displayTitle(item))} · ${escapeHtml(propLine(item) || "")}</div>${html}` : "";
+      slot.hidden = !html;
+    }, true);
     document.addEventListener("syndicate:slip-count", (event) => updateSlipCount(event.detail && event.detail.count));
     const seeded = document.querySelector("#bet-slip-panel .bet-slip__count");
     updateSlipCount(seeded ? Number(seeded.textContent) : 0);
     const onBreakpoint = () => { setResearchState(readResearchPreference(), { transient: true }); setSlipState("closed"); };
     if (OVERLAY_QUERY && OVERLAY_QUERY.addEventListener) OVERLAY_QUERY.addEventListener("change", onBreakpoint);
     if (PHONE_QUERY && PHONE_QUERY.addEventListener) PHONE_QUERY.addEventListener("change", onBreakpoint);
+  }
+
+  // PROP CHARTS `[user 2026-10-08: "charts that show sim dispersion of the line
+  // and the L5/L10 of the line" -- approved mockup board 10]`. Inline SVG, no
+  // library. Two inputs, both shipped on the row by the worker:
+  //   * `sim_ladder`: [[threshold, P(over threshold)], ...] from the producer's
+  //     OWN pricing function (`shared/price_ladder.py`). Drawn ONLY when the
+  //     point at the row's line reproduces the row's own sim probability
+  //     within 2 points -- a chart that disagrees with the number beside it
+  //     would be the contradiction item 9 was about.
+  //   * `recent_values`: newest-first per-game values behind "Recent form".
+  const CHART_AGREE_TOLERANCE = 0.02;
+
+  function simLadderBuckets(item) {
+    const ladder = Array.isArray(item && item.sim_ladder) ? item.sim_ladder : null;
+    const line = numericValue(Number(item && item.line));
+    if (!ladder || ladder.length < 3 || line === null) return null;
+    const points = ladder.map((p) => [Number(p[0]), Number(p[1])]).filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+    if (points.length < 3) return null;
+    const atLine = points.find((p) => Math.abs(p[0] - line) < 1e-6);
+    const side = String(item.side || "").toLowerCase();
+    const model = confidenceValue(item);
+    if (!atLine || !["over", "under"].includes(side) || model === null) return null;
+    const pSide = side === "over" ? atLine[1] : 1 - atLine[1];
+    if (Math.abs(pSide - model) > CHART_AGREE_TOLERANCE) return null;
+    const isCount = points.every((p) => Math.abs(p[0] - Math.floor(p[0]) - 0.5) < 1e-6 || Math.abs(p[0] - line) < 1e-6);
+    const fmt = (v) => (Math.abs(v - Math.round(v)) < 1e-6 ? String(Math.round(v)) : v.toFixed(1));
+    const buckets = [];
+    // A count cannot be below zero: no "<= -1" bucket when the ladder starts at -0.5.
+    if (!(isCount && points[0][0] < 0)) {
+      buckets.push({ p: 1 - points[0][1], label: isCount ? `≤${fmt(points[0][0] - 0.5)}` : `<${fmt(points[0][0])}`, over: points[0][0] <= line ? false : null });
+    }
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const lo = points[i][0];
+      const hi = points[i + 1][0];
+      buckets.push({ p: Math.max(0, points[i][1] - points[i + 1][1]), label: isCount ? fmt(hi - 0.5) : `${fmt(lo)}–${fmt(hi)}`, over: lo >= line });
+    }
+    const last = points[points.length - 1];
+    buckets.push({ p: last[1], label: isCount ? `≥${fmt(last[0] + 0.5)}` : `>${fmt(last[0])}`, over: last[0] >= line });
+    return { buckets, line, side, pSide };
+  }
+
+  function simSpreadChart(item, opts) {
+    const data = simLadderBuckets(item);
+    if (!data) return "";
+    const compact = Boolean(opts && opts.compact);
+    const width = compact ? 160 : 260;
+    const height = compact ? 46 : 84;
+    const gap = 3;
+    const barW = (width - gap * (data.buckets.length - 1)) / data.buckets.length;
+    const max = Math.max(...data.buckets.map((b) => b.p), 0.01);
+    const bars = data.buckets.map((b, i) => {
+      const h = Math.max(1, (b.p / max) * (height - 14));
+      const onSide = data.side === "over" ? b.over === true : b.over === false;
+      return `<rect x="${(i * (barW + gap)).toFixed(1)}" y="${(height - 12 - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="2" class="${onSide ? "chart-bar chart-bar--side" : "chart-bar"}"><title>${escapeHtml(b.label)}: ${(b.p * 100).toFixed(1)}%</title></rect>`
+        + `<text x="${(i * (barW + gap) + barW / 2).toFixed(1)}" y="${height - 1}" class="chart-axis" text-anchor="middle">${escapeHtml(b.label)}</text>`;
+    }).join("");
+    return `<figure class="prop-chart"><figcaption>Sim spread · line ${escapeHtml(String(data.line))} · <b>${Math.round(data.pSide * 100)}% ${escapeHtml(data.side)}</b></figcaption>`
+      + `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Simulated distribution, ${Math.round(data.pSide * 100)} percent ${escapeHtml(data.side)} ${escapeHtml(String(data.line))}">${bars}</svg></figure>`;
+  }
+
+  function recentForm(item) {
+    const values = Array.isArray(item && item.recent_values) ? item.recent_values.map(Number).filter(Number.isFinite) : [];
+    const line = numericValue(Number(item && item.line));
+    const side = String((item && item.side) || "").toLowerCase();
+    if (!values.length || line === null || !["over", "under"].includes(side)) return null;
+    const hit = (v) => (side === "over" ? v > line : v < line);
+    const l5 = values.slice(0, 5);
+    const l10 = values.slice(0, 10);
+    return { values: l10, line, side, hit,
+      l5: `${l5.filter(hit).length}/${l5.length}`, l10: `${l10.filter(hit).length}/${l10.length}` };
+  }
+
+  function recentFormText(item) {
+    const form = recentForm(item);
+    return form ? `L5 ${form.l5} · L10 ${form.l10}` : "";
+  }
+
+  function recentFormChart(item, opts) {
+    const form = recentForm(item);
+    if (!form) return "";
+    const compact = Boolean(opts && opts.compact);
+    const width = compact ? 70 : 260;
+    const height = compact ? 18 : 84;
+    const oldestFirst = form.values.slice().reverse();
+    const gap = compact ? 1.5 : 3;
+    const barW = (width - gap * (oldestFirst.length - 1)) / oldestFirst.length;
+    const max = Math.max(...oldestFirst, form.line * 1.5, 1);
+    const base = compact ? height : height - 12;
+    const lineY = base - (form.line / max) * (base - 2);
+    const bars = oldestFirst.map((v, i) => {
+      const h = Math.max(1.5, (v / max) * (base - 2));
+      const x = i * (barW + gap);
+      return `<rect x="${x.toFixed(1)}" y="${(base - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" class="${form.hit(v) ? "chart-bar chart-bar--side" : "chart-bar"}"><title>${escapeHtml(String(v))}</title></rect>`
+        + (compact ? "" : `<text x="${(x + barW / 2).toFixed(1)}" y="${height - 1}" class="chart-axis" text-anchor="middle">${escapeHtml(String(Math.round(v * 10) / 10))}</text>`);
+    }).join("");
+    const lineMark = `<line x1="0" x2="${width}" y1="${lineY.toFixed(1)}" y2="${lineY.toFixed(1)}" class="chart-line" />`;
+    const svg = `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Last ${form.values.length} games against the ${escapeHtml(String(form.line))} line: ${form.l10} ${escapeHtml(form.side)}">${bars}${lineMark}</svg>`;
+    if (compact) return `<span class="prop-spark" title="Last ${form.values.length}, oldest left; dashed = the line">${svg}</span>`;
+    return `<figure class="prop-chart"><figcaption>Recent form · <b>L5 ${form.l5} · L10 ${form.l10}</b> ${escapeHtml(form.side)} ${escapeHtml(String(form.line))}</figcaption>${svg}</figure>`;
+  }
+
+  function propChartsBlock(item) {
+    const charts = [simSpreadChart(item), recentFormChart(item)].filter(Boolean);
+    return charts.length ? `<div class="prop-charts">${charts.join("")}</div>` : "";
   }
 
   // THE RESULTS BAR `[user 2026-10-08: "way more informative ... giving us
