@@ -227,6 +227,13 @@ class PitchModelConfig:
     # the count (self-loop). This increases pitches/PA while (in expectation)
     # preserving outcome rates, since it only adds delay.
     two_strike_extra_foul_prob: float = 0.04
+    # Per-count outcome multipliers, {"b-s": {"ball"|"called"|"swing"|"foul"|"inplay": mult}},
+    # applied to the outcome weights just before normalisation (lane mlb-statsapi-asof-rebuild).
+    # Real hitters' swing/take behaviour changes sharply by count (3-0: 58% called strikes,
+    # 2% in play; two strikes: ~4% called third strikes) while the base weights barely
+    # move with the count. Measured from play-by-play by iterative proportional fitting.
+    # None = no table (the behaviour before 2026-10-08).
+    count_outcome_mult: Optional[Dict[str, Dict[str, float]]] = None
     bb_ball_bias_mult: float = 1.05
 
     # Optional calibration of strikeout target (k_tgt) via logit scaling.
@@ -763,6 +770,16 @@ def simulate_pitch(
             p_called *= _bc
 
     # Normalize after HBP
+    _tab = getattr(cfg, "count_outcome_mult", None)
+    if _tab:
+        _row = _tab.get(f"{int(balls)}-{int(strikes)}")
+        if _row:
+            p_ball *= float(_row.get("ball", 1.0))
+            p_called *= float(_row.get("called", 1.0))
+            p_whiff *= float(_row.get("swing", 1.0))
+            p_foul *= float(_row.get("foul", 1.0))
+            p_inplay *= float(_row.get("inplay", 1.0))
+
     rest = 1.0 - p_hbp
     s = p_ball + p_called + p_whiff + p_foul + p_inplay
     if s <= 0:
