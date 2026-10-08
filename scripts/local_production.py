@@ -1344,18 +1344,24 @@ def record_role_event(settings: Settings, local: dict[str, str], role: str, even
 
 
 def note_role_exit(settings: Settings, local: dict[str, str], role: str, code: int | None, ran_s: float) -> str | None:
-    """A guarded role died of a signal the supervisor did not send: say whether a
-    claim covered it. The kill already happened -- this cannot refuse it, only
-    make it impossible to do silently. SIGKILL can also be the kernel OOM killer."""
-    sig = _signal_name(code)
-    if role not in CLAIM_GUARDED_ROLES or sig is None:
+    """A guarded role exited without the supervisor stopping it: say whether a claim
+    covered it. The exit already happened -- this cannot refuse it, only make it
+    impossible to do silently. SIGKILL can also be the kernel OOM killer.
+
+    ANY exit counts, not only a signal death: the refresh-worker traps SIGTERM and
+    exits 0, so a manual `kill -TERM` reads `code=0` (measured 2026-10-07 19:14 CT,
+    `exited code=0 after 17334s`). A signal-only check missed exactly the restarts
+    it was written for."""
+    if role not in CLAIM_GUARDED_ROLES or code is None:
         return None
-    entry = record_role_event(settings, local, role, "signal_exit", code=code, signal=sig, ran_s=round(ran_s))
+    sig = _signal_name(code)
+    entry = record_role_event(settings, local, role, "exit", code=code, signal=sig, ran_s=round(ran_s))
+    how = f"signal={sig}" if sig else f"code={code}"
     if entry["claimed"]:
-        return f"CLAIMED_RESTART signal={sig} holder={entry['holder']}"
-    hint = " (or the OOM killer)" if sig == "SIGKILL" else ""
+        return f"CLAIMED_RESTART {how} holder={entry['holder']}"
+    hint = " (or the OOM killer)" if sig == "SIGKILL" else (" (graceful TERM, or a crash)" if not sig else "")
     return (
-        f"UNCLAIMED_RESTART signal={sig}{hint} -- no unexpired deploy claim on {role}. "
+        f"UNCLAIMED_RESTART {how}{hint} -- no unexpired deploy claim on {role}. "
         f"Restart only under `deploy_claim.py acquire --service {role}` + check_deploy_safety, "
         f"right after a save (learnings.md). Logged to {ROLE_RESTARTS_LOG}."
     )

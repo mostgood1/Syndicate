@@ -69,7 +69,7 @@ def test_unclaimed_term_is_announced_and_logged(fleet):
     verdict = lp.note_role_exit(settings, local, "refresh-worker", -15, 812.4)
     assert verdict and verdict.startswith("UNCLAIMED_RESTART signal=SIGTERM")
     [event] = _events(settings)
-    assert event["event"] == "signal_exit" and event["claimed"] is False and event["ran_s"] == 812
+    assert event["event"] == "exit" and event["claimed"] is False and event["ran_s"] == 812
 
 
 def test_claimed_term_names_the_holder(fleet):
@@ -80,8 +80,19 @@ def test_claimed_term_names_the_holder(fleet):
     assert _events(settings)[0]["holder"] == "web-restart-healthz"
 
 
-@pytest.mark.parametrize("role,code", [("refresh-worker", 1), ("refresh-worker", 0), ("web", -15)])
-def test_crashes_and_unguarded_roles_are_not_restart_events(fleet, role, code):
+@pytest.mark.parametrize("code", [0, 1])
+def test_a_graceful_or_crash_exit_is_recorded_too(fleet, code):
+    """The refresh-worker traps SIGTERM and exits 0: a manual TERM reads code=0
+    (fleet 2026-10-07 19:14 CT). A signal-only guard missed it."""
+    settings, local, _ = fleet
+    verdict = lp.note_role_exit(settings, local, "refresh-worker", code, 17334)
+    assert verdict and verdict.startswith(f"UNCLAIMED_RESTART code={code}")
+    [event] = _events(settings)
+    assert event["code"] == code and event["signal"] is None
+
+
+@pytest.mark.parametrize("role,code", [("web", -15), ("web", 0), ("refresh-worker", None)])
+def test_unguarded_roles_and_still_running_are_not_restart_events(fleet, role, code):
     settings, local, _ = fleet
     assert lp.note_role_exit(settings, local, role, code, 5) is None
     assert _events(settings) == []
