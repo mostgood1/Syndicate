@@ -1695,6 +1695,24 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **HR INPUT FIX -- DIAGNOSIS 2026-10-08 (user: "do the per-count diagnosis and the HR input fix"): no input fix is possible from as-of data; nothing built or shipped.**
+  - The input-shrinkage hypothesis was WRONG: batter/pitcher HR rates are RAW season-to-date (no prior). The log5 league constant (0.03) was checked too: input level b x p / 0.03 moves only +7% across periods.
+  - What moved is REAL league HR/PA (StatsAPI teams/stats, regular season): Apr .0281, May .0285, **Jun .0343**, Jul .0320, Aug .0290, Sep .0308 (season .0303).
+    - **June 2026 was a league-wide HR spike.** The combined calibration's fit (06-15..07-12) and validation (05-30..06-14) both sat inside it, so 1.856 fitted an outlier month. The rest of the season wants ~1.5.
+  - An as-of environment factor E = last-30-day / season-to-date league HR/PA (as of D-1) was probed: 06-15 1.108, 07-01 1.138, **07-16 1.105**, 08-01 1.034, 08-22 0.923, 09-10 0.983.
+    - It LAGS the turns: June needs mult ~1.84 at E ~1.05 while 07-16..08-21 needs ~1.46 at E ~1.06. No positive weight on E fits both.
+    - The June spike was not predictable as-of, so the environment term was NOT built.
+  - Remaining choice (user): a full-season constant (~1.5) under a new rule that treats June as the outlier month, or keep 1.856.
+- **PER-COUNT PITCH DIAGNOSIS 2026-10-08 (shipped config, 311 June-fit games, 4 sims/game vs the same games' real pbp):**
+  - Pitches/PA model **3.461** vs real **3.866** (-10.5%).
+  - The model's outcome mix is nearly COUNT-INVARIANT (ball ~.31-.36, called ~.13, in-play .16-.28 at every count). Real behaviour swings hard by count. Key cells (model / real):
+    - in play 1-0 .250/.165, 2-0 .234/.162, **3-0 .283/.021**, 0-1 .255/.177, 2-2 .163/.236, 3-2 .161/.287;
+    - called 1-0 .133/.218, 2-0 .132/.285, **3-0 .122/.584**, **0-2 .140/.038**, **1-2 .129/.037**, 2-2 .157/.053;
+    - swinging 0-0 .050/.084, 0-1 .095/.136, 2-2 .110/.152;
+    - ball 0-2 .303/.447, 3-2 .359/.232.
+  - So hitters ahead in the count put balls in play far too often (PAs end early), and with two strikes take called third strikes 3-4x too often.
+  - The defect is the missing COUNT SHAPE, not a level, which is why single foul / hook levers could not move it.
+  - Next honest fix: a MEASURED count-shape table (outcome multipliers per count, from real pbp on a fit set), then a re-fit of the rates it absorbs (K, BB, in-play, foul boost). Pre-register first. Evidence: scratchpad count_diag.py / count_diag.json.
 - **PITCH FIX ROUND 2 RESULT 2026-10-08 ~08:00Z: no feasible move -> the descent stays at the shipped base; nothing to ship; no holdout read.**
   - FIT (07-16..08-21). Base: P/start 75.1 vs 84.0, SO cap 0.384. Every arm was INFEASIBLE (the starter SO cap binds; more BF per start means more SO per start):
     - foul 1.75: 75.4 P, outs 15.19;
