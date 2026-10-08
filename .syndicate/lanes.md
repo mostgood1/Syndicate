@@ -2289,6 +2289,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Read the keyvalue copy read-only on the fleet: order count by mode/date/outcome, per-field bytes. Enumerate readers and their windows. After the fix: the ledger size and cadence, the archive's row count == the trimmed count, readers' totals unchanged across a trim, and 0 KEYVALUE_WRITE_REJECTED for the ledger over a stated window, recorded in deploys.md.
 - Blocked by: none
 
+### soccer-roster-refresh-accuracy — OPEN — opened 2026-10-08 — session fc6fc474-5cf8-4333-b451-4dcf68180c23
+- Goal: Grade, exactly as pre-registered in .syndicate/findings_2026-10-08_soccer_roster_refresh_accuracy_prereg.md (written before any population match kicked off), whether the refreshed ESPN rosters (6a97aafc) make soccer props more accurate than the July roster: paired replay, roster the only variable, SOT 0.5 + anytime log loss on appeared players listed in both arms, match bootstrap; first grade 2026-10-15, re-grade 2026-10-22 if < 60 matches; verdict SUPPORTED / REFUTED / INCONCLUSIVE recorded in the findings file
+- Files: scripts/soccer_season_audit/roster_refresh_grade.py (NEW), .syndicate/findings_2026-10-08_soccer_roster_refresh_accuracy_prereg.md (NEW)
+- Hypothesis: H-RR: B (new roster) < A (July roster) log loss on both markets, because listed players were under-predicted and departed players held share. Design fixed in the findings file.
+- Falsification test: B - A CI wholly > 0 on either market (REFUTED) -> lead to re-fit the share calibration; no revert of the roster, no re-tuning on this window
+- Verification: The grade runs on 2026-10-15 (scheduled task soccer-roster-refresh-grade) and the findings file carries n matches/players, per-market B-A with CI, calibration per arm, and the verdict
+- Blocked by: calendar: population matches 10-09..10-14
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
