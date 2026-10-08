@@ -1707,6 +1707,25 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **COUNT-SHAPE ROUND 2 RESULT 2026-10-09 ~03:00Z: DO NOT SHIP (fails 4, 5, 8). Nothing shipped; production unchanged.**
+  - DESCENT (corrected hook grid) chose hook **+2** (with k_logit_bias +0.15, bb_ball_bias_mult 1.2). FIT score 78.3 -> 44.9; outs 15.79 vs 15.39; P 88.7 vs 84.0.
+  - HOLDOUT (988 starts; second read of this holdout for this fix family, as pre-disclosed):
+    - (1) PASS count mix 0.01653 -> 0.00017;
+    - (2) PASS P/PA 3.518 -> **3.900** (real 3.890);
+    - (3) PASS objective 70.0 -> 45.3;
+    - (4) **FAIL** BB_per_PA z +1.57;
+    - (5) **FAIL** outs +0.518 (base 15.27, chosen 15.79, actual 14.61), H +0.277;
+    - (6) PASS runs gap 0.116 -> **0.037**;
+    - (7) PASS props 0.36910 -> 0.36897.
+  - JUNE: (8) **FAIL**, outs +0.545.
+  - READING across rounds 1-2:
+    - The COUNT TABLE WORKS in both: count mix ~99% closer, pitches/PA exact, runs and props better.
+    - Two blockers remain, and neither is the count shape:
+      - (a) **Starter length is season-phase dependent.** Hook -10 is too short for June, +2 too long for late season (real outs: June ~15.4, Aug-Sep 14.61). No constant serves both.
+      - (b) **BB/PA drifts up** (+1.4 / +1.6 z) whenever the table is on; no round-2 lever targets walks.
+  - NATURAL NEXT STEP (user decision): with pitches/PA now fixed, the late-season workload mechanism (recency stamina, built, default 0) no longer collides with a pitch deficit.
+    - A joint round: table + hook + recency weight + a walk lever, fitted on BOTH phases (June-fit + window first half).
+    - Judged on the late-season holdout (a third read, disclosed) and the June validation set.
 - **COUNT-SHAPE ROUND 1 RESULT 2026-10-08 ~23:30Z: DO NOT SHIP (fails 4 and 8) -> round 2 runs (pre-registered).**
   - TABLE (IPF, 801 FIT games, 233,823 real pitches): count-mix distance 0.01667 -> 0.00004; pitches/PA 3.507 -> 3.894 (real 3.879).
   - DESCENT (window first half, 60 sims) chose:
