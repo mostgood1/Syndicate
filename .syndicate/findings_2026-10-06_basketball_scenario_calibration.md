@@ -319,3 +319,11 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
 - **Not done, per the pre-registration:**
   - VALIDATION is not read here; it is read once at the end of Phase 2, for the combined config.
   - The margin excess (18.9 vs 14.0) stays open: shot-level / lineup diagnosis.
+
+**USER DECISION 2026-10-08 (~19:40Z): "Accept, carry into Phase 2".**
+- The S2 guard is judged against run-to-run noise (above), recorded as an explicit user override of the literal guard.
+- J1 (possession_alternation = 1.0, possessions_jitter = 0.0) is the Phase 2 #1 config. Later Phase 2 steps build on
+  it.
+- Production adoption ONLY after the end-of-Phase-2 VALIDATION read, for the combined config.
+- **Follow-up for future guards:** state the threshold in units of measured run-to-run noise (√2 × sim-SE, or a
+  measured same-config re-run), never the single-run sim SE.
