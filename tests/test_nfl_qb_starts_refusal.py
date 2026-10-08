@@ -33,6 +33,7 @@ _PLAYS = tuple(
 @pytest.fixture(autouse=True)
 def _fixture(monkeypatch):
     monkeypatch.delenv("SYNDICATE_NFL_QB_STARTS_REFUSAL", raising=False)
+    monkeypatch.delenv("SYNDICATE_NFL_QB_STARTS_ONLY_RATE", raising=False)
     monkeypatch.setattr(ps, "load_player_plays", lambda season: _PLAYS if season == 2026 else ())
     ps._pass_attempt_shares.cache_clear()
     yield
@@ -92,5 +93,8 @@ def test_the_row_builder_withholds_the_probability_but_keeps_the_odds(monkeypatc
 def test_off_is_not_on(monkeypatch):
     """Reachability: with the switch off the same backup IS priced, so the refusal above is this code's doing."""
     monkeypatch.setenv("SYNDICATE_NFL_QB_STARTS_REFUSAL", "off")
+    # Isolated from the starts-only RATE (2026-10-08): it cannot price a QB with < 2 starts either,
+    # so for passing_yards BOTH switches must be off to restore the old row.
+    monkeypatch.setenv("SYNDICATE_NFL_QB_STARTS_ONLY_RATE", "off")
     _odds, sims = _rows(monkeypatch, [_quote("Backup Qb", "Passing Yards", 220.5)])
     assert [r["entity"] for r in sims] == ["Backup Qb"]

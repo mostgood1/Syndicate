@@ -139,3 +139,14 @@ The sack inflation was cancelling the log-normal blend's under-lean (cause #2 ab
 ## 2026-10-08 -- blend re-fit on REAL quotes: NO SHIP
 
 Pre-registered (lanes.md, adbf31ad): w on 2023 quotes, held 2024, ship iff LL(new) < LL(production) on identical rows AND |mean P(over) - over-rate| <= 0.03. Selected w = 0.33. Held 2024 (2,329 rows, 229 games): LL 0.7767 vs 0.7732 (+0.0036 [-0.0162, +0.0226]); mean P(over) 0.428 vs 0.499. **The lean is in the MEAN, not the blend:** on 2,445 2024 rows the official season-average minus line is median -1.12 / mean -2.28 while actual minus line is +0.5 / -0.24; the sack-inflated mean (+1.26 / +0.17) was right by accident. Next lever: the as-of mean (starts-only rate), measured on real quotes before any convention change ships.
+
+## 2026-10-08 -- starts-only mean: passing_yards SHIPPED, passing_attempts NOT
+
+Pre-registered (571d2dd9): mean AND sd from full starts only (share >= 0.7, same log as player_rate_with_prior, sd via shrink_spread), blend w re-fitted on real 2023 quotes, held 2024, identical rows, starts-refused rows excluded, rule: LL below production AND |mean P(over) - over-rate| <= 0.03.
+
+| market | w (fit 2023) | held 2024 rows / games | LL production -> new [95% CI] | mean P(over) prod -> new | over-rate | verdict |
+|---|---|---|---|---|---|---|
+| passing_yards | 0.00 | 5,702 / 231 | 0.7341 -> **0.7074** (-0.0267 [-0.0603, +0.0029]) | 0.428 -> 0.511 | 0.500 | **SHIP** |
+| passing_attempts | 0.58 | 2,329 / 229 | 0.7732 -> 0.7619 (-0.0113 [-0.0449, +0.0201]) | 0.493 -> 0.464 | 0.499 | NO SHIP (gap 0.035) |
+
+Reproduced through the production code on the same 5,702 rows: on 0.7074 / off 0.7341 (exact). Still worse than a coin (0.693) and the book (0.671): this removes a bias, it is not an edge. Book LL on the held rows 0.6707.

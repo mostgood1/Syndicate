@@ -34,6 +34,7 @@ from syndicate.features.nfl.player_stats import anytime_td_rate_with_prior
 from syndicate.features.nfl.player_stats import player_rate_with_prior
 from syndicate.features.nfl.player_stats import player_team_with_prior
 from syndicate.features.nfl.player_stats import qb_starts_refused
+from syndicate.features.nfl.player_stats import QB_STARTS_ONLY_RATE_STATS, qb_starts_only_rate, qb_starts_only_rate_enabled
 from syndicate.features.nfl.player_stats import resolve_player_id
 from syndicate.features.shared.team_aliases import canonical_team
 from syndicate.features.nfl.player_stats import resolve_player_id_for_game
@@ -445,6 +446,10 @@ def _nfl_prop_model_probability(*, stat: str, mean: float | None, stdev: float |
         return None
     normal_prob = 1.0 - statistics.NormalDist(mean, stdev).cdf(line)
     weight = _COVER_PROBABILITY_BLEND_WEIGHT.get(stat, 0.0)
+    if stat in QB_STARTS_ONLY_RATE_STATS and qb_starts_only_rate_enabled():
+        # Re-fitted ON TOP OF the starts-only rate (real 2023 quotes): 0.0. Switched on the
+        # same flag as the rate so they cannot ship apart -- see player_stats.QB_STARTS_ONLY_RATE_STATS.
+        weight = 0.0
     if weight <= 0.0:
         return normal_prob
     lognormal_prob = _lognormal_cover_probability(mean, stdev, line)
@@ -827,6 +832,9 @@ def nfl_props_rows_for_week(
             if mean is not None and qb_starts_refused(season, week, player_id, stat, rate_source):
                 refused_qb_starts += 1
                 continue
+            if mean is not None and stat in QB_STARTS_ONLY_RATE_STATS and qb_starts_only_rate_enabled():
+                # The line is for a START: rate from full starts only (>= 2 guaranteed by the refusal above).
+                mean, stdev, n = qb_starts_only_rate(season, week, player_id, stat, rate_source)
         # Game context. Applied to the MEAN only: the rolling stdev describes
         # this player's own game-to-game spread and a scoring-environment shift
         # is not evidence about that dispersion.

@@ -993,6 +993,50 @@ def qb_starts_refused(season: int, week: int, player_id: str, stat: str, rate_so
     return qb_full_starts(season, week, player_id, rate_source) < QB_MIN_FULL_STARTS
 
 
+# STARTS-ONLY RATE (lane `nfl-passing-yards-prop-coin`, pre-registered 2026-10-08,
+# user: "If it passes, ship it"). A quoted line is for a START, so the as-of mean
+# and sd come from the player's full starts only -- relief and injury-exit games
+# no longer drag the mean below the line. Selected on REAL 2023 OddsAPI quotes,
+# read once on 2024 (2025 untouched), identical rows, starts-refused rows excluded:
+#
+#     passing_yards     LL 0.7341 -> 0.7074 (-0.0267 [-0.0603, +0.0029]),
+#                       mean P(over) 0.428 -> 0.511 vs over-rate 0.500   SHIP
+#     passing_attempts  LL 0.7732 -> 0.7619, mean P(over) 0.464 vs 0.499
+#                       (gap 0.035 > 0.03)                              NO SHIP
+#
+# The fitted blend weight on top of it is 0.0 (Normal only); the props module
+# switches its weight on the same flag so the two can never ship apart.
+QB_STARTS_ONLY_RATE_STATS = frozenset({"passing_yards"})
+
+
+def qb_starts_only_rate_enabled() -> bool:
+    """DEFAULT ON. `off`/`0`/`false`/`no` restores the all-games rate AND its blend weight."""
+    raw = str(os.environ.get("SYNDICATE_NFL_QB_STARTS_ONLY_RATE") or "").strip().lower()
+    return raw not in {"off", "0", "false", "no"}
+
+
+def qb_starts_only_rate(
+    season: int, week: int, player_id: str, stat: str, rate_source: str
+) -> tuple[float | None, float | None, int]:
+    """(mean, shrunk sd, n starts) over the same as-of log `player_rate_with_prior` used, full starts only."""
+    import statistics
+
+    if rate_source == "current_season_rolling":
+        log_season, before = season, int(week)
+    else:
+        log_season, before = season - 1, _ALL_WEEKS
+    shares = _pass_attempt_shares(log_season)
+    values = [
+        row[stat]
+        for row in player_game_log(log_season, player_id)
+        if row["week"] < before and shares.get((row["game_id"], player_id), 0.0) >= QB_FULL_START_SHARE
+    ]
+    if len(values) < 2:
+        return None, None, len(values)
+    mean = statistics.fmean(values)
+    return mean, shrink_spread(statistics.stdev(values), len(values), mean, stat), len(values)
+
+
 def final_stat_value(season: int, game_id: str, player_id: str, stat: str) -> float | None:
     """The real settled value for one game -- this module's actual-result
     grading primitive, the NFL analog of
