@@ -2161,6 +2161,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: served page on the local fleet: every route's nav lists Home/The Syndicate/Betting Board/Portfolio/8 sports; filter counts equal client recount; rail split visible at 1440 and 1100 widths with no column hidden; Van Buren-type rows read P(side)+most likely; Messick-type rows tagged off-scale; image coverage per sport measured before/after; /intelligence bytes and load time measured before (67.95 MB, 44.1 s on 2026-10-08 13:58Z) and after
 - Blocked by: none
 
+### live-odds-worker-rss-drift — OPEN — opened 2026-10-08 — session 73bd5e1f-0d5f-4e48-8849-3838dcfb6581
+- Goal: Attribute the live-odds-worker process RSS rise (p50 727/767/867/959 MB over 10-05..10-08, time-matched) to a named cause -- in-boot growth (leak/unbounded cache) vs per-boot baseline (load) -- with per-boot curves and the allocation site or workload behind it
+- Files: none (read-only diagnosis over ~/syndicate-prod/logs; a fix, if any, gets its own lane)
+- Hypothesis: H1 in-boot growth: RSS climbs within each boot (slope > 0 that does not plateau), and day medians rise because boots run longer. H2 load: boot-start RSS and plateau rise day over day (more sports/markets in October), flat within a boot
+- Falsification test: H1 is falsified if per-boot RSS plateaus within ~1 h and the plateau level, not the slope, carries the day-over-day rise. H2 is falsified if same-day boots show the same plateau regardless of sports active, or if the plateau does not move with workload
+- Verification: Per-boot table (start, +1h, +3h, end, slope MB/h) over all boots in live-odds-worker.log*, plus the census/smaps/arena lines the memory watchdog already logs, naming the growth's owner
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
