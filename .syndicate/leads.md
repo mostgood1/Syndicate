@@ -35,6 +35,7 @@ because the work kept deviating:
 ---
 
 ## Open
+- [ ] 2026-10-08 — from `mlb-statsapi-asof-rebuild` — MLB count-shape fix scoped (pitches/PA 3.46 vs 3.87; outcome mix count-invariant), not built — evidence: .syndicate/findings_2026-10-08_mlb_count_shape_scope.md
 - [ ] 2026-10-07 — from `intelligence-evidence-coverage` — lane-guard blocks a borrower editing in a session WORKTREE even when `lane_claims.loan_is_honoured` returns the lender: the hook resolves the path relative to the primary tree (`../../../../../tmp/syndicate-sessions/<slug>/pipeline/intelligence_state.py`), which fails the loan path match while the lender basename claim still matches — evidence: Edit on pipeline/intelligence_state.py BLOCKED at origin/main@96157b3f with the loan honoured by the predicate on the same text
 - [ ] 2026-10-07 — from `intelligence-evidence-coverage` — NCAAF Anytime TD candidates carry the American price in `confidence` ("+700") from the prop producer (home._build_prop_dashboard_row via intelligence._prop_candidate_from_item) and model_probability 0.47 for a +700 TD scorer; intelligence guards display/score since ced2618f, producer unfixed — evidence: fleet GET /api/intelligence/status 2026-10-07 16:33Z, 2/77 recs with market_context.model_probability 700.0
 - [ ] 2026-10-07 — from `mlb-combined-calibration` — StatsAPI-only as-of rebuild of MLB 07-16..09-27 (74 dates, 984 games) is feasible; scoped, not built — evidence: .syndicate/findings_2026-10-07_mlb_statsapi_asof_rebuild_scope.md
