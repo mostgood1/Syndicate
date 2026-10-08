@@ -966,6 +966,9 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # write dated files the board's recency/matchup sentence reads.
     ScheduledJob("mlb-matchup-splits", 10, 50, ("scripts/build_mlb_matchup_splits.py",)),
     ScheduledJob("nfl-defense-vs-position", 10, 55, ("scripts/build_nfl_defense_vs_position.py",)),
+    # NBA / WNBA: what each team allows to G/F/C per game, one table per
+    # (season, phase) -- regular season and playoffs never mixed (~9 s).
+    ScheduledJob("basketball-defense-vs-position", 11, 0, ("scripts/build_basketball_defense_vs_position.py",)),
 )
 
 

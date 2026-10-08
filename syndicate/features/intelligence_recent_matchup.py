@@ -500,6 +500,91 @@ def nfl_vs_position_text(row: Mapping[str, Any], opponent: str | None) -> str | 
         return None
 
 
+# ------------------------------------------------------ NBA / WNBA vs position
+#
+# Phase 2 (user 2026-10-08): `scripts/build_basketball_defense_vs_position.py`
+# writes `<sport>_defense_vs_position_<season>_<phase>_asof_<date>.json` beside
+# the box-score history. The sentence reads the REGULAR-SEASON table of the
+# board date's own season only -- never last season's (an NBA board in October
+# 2026 gets nothing until 2026-27 games exist) and never a mixed-phase table.
+
+_BB_MARKET_STAT = (
+    ("points_rebounds_assists", "pra", "points + rebounds + assists"), ("pra", "pra", "points + rebounds + assists"),
+    ("points_rebounds", "pr", "points + rebounds"), ("points_assists", "pa", "points + assists"),
+    ("rebounds_assists", "ra", "rebounds + assists"),
+    ("threes", "fg3m", "threes"), ("3-point", "fg3m", "threes"), ("3pt", "fg3m", "threes"),
+    ("rebounds", "reb", "rebounds"), ("assists", "ast", "assists"), ("points", "pts", "points"),
+)
+_BB_POSITION_WORD = {"G": "guards", "F": "forwards", "C": "centers"}
+_WNBA_TEAM_ALIASES = {"GS": "GSV", "LV": "LVA", "LA": "LAS", "NY": "NYL", "CONN": "CON", "WAS": "WSH", "PHO": "PHX"}
+
+
+def _bb_season(sport: str, selected_date: str) -> str:
+    if sport == "wnba":
+        return selected_date[:4]
+    year, month = int(selected_date[:4]), int(selected_date[5:7])
+    start = year if month >= 8 else year - 1
+    return f"{start}-{str(start + 1)[2:]}"
+
+
+def _bb_dvp_table(sport: str, season: str) -> Mapping[str, Any] | None:
+    import os
+    from pathlib import Path
+
+    from syndicate.features.shared.prop_evidence import common as C
+
+    override = str(os.environ.get(f"SYNDICATE_{sport.upper()}_SOURCE_ROOT") or "").strip()
+    root = Path(override) if override else C.data_root() / f"{sport}_source"
+    directory = root / ("source_artifacts/data/processed" if sport == "nba" else "data/processed")
+    pattern = f"{sport}_defense_vs_position_{season}_regular_asof_*.json"
+    cache = C._READ_CACHE.get()
+    key = ("bb_dvp", str(directory), pattern) if cache is not None else None
+    if key is not None and key in cache:
+        return cache[key]
+    files = sorted(directory.glob(pattern)) if directory.is_dir() else []
+    table = C.load_json(files[-1]) if files else None
+    table = table if isinstance(table, Mapping) else None
+    if key is not None:
+        cache[key] = table
+    return table
+
+
+def basketball_vs_position_text(row: Mapping[str, Any], opponent: str | None, *, selected_date: str) -> str | None:
+    """'Vs position: LVA allows 42.9 points a game to guards (rank 2 of 15, 1 = fewest; 2026 regular season).' Never raises."""
+    try:
+        sport = str(row.get("sport") or "").lower()
+        if sport not in {"nba", "wnba"} or not opponent:
+            return None
+        market = str(row.get("market") or "").lower().replace(" ", "_")
+        stat = next(((key, words) for token, key, words in _BB_MARKET_STAT if token in market), None)
+        combo = sum(1 for word in ("points", "rebounds", "assists") if word in market)
+        if stat is None or (combo > 1 and stat[0] in {"pts", "reb", "ast"}):  # a combo never reads one stat
+            return None
+        table = _bb_dvp_table(sport, _bb_season(sport, selected_date))
+        if not table:
+            return None
+        from syndicate.features.shared.prop_evidence import common as C
+
+        name = str(row.get("player_name") or "")
+        position = next((pos for known, pos in (table.get("player_positions") or {}).items() if C.names_match(known, name)), None)
+        if position not in _BB_POSITION_WORD:
+            return None
+        team = str(opponent).strip().upper()
+        if sport == "wnba":
+            team = _WNBA_TEAM_ALIASES.get(team, team)
+        cell = (((table.get("teams") or {}).get(team) or {}).get(position) or {}).get(stat[0])
+        if not isinstance(cell, Mapping):
+            return None
+        return (
+            f"Vs position: {team} allows {_fmt(_num(cell.get('per_game')))} {stat[1]} a game to "
+            f"{_BB_POSITION_WORD[position]} (rank {cell.get('rank')} of {cell.get('of')}, 1 = fewest; "
+            f"{table.get('season')} regular season, {cell.get('games')} game{'' if cell.get('games') == 1 else 's'})."
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[recent_matchup] BB_DVP_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
 def _memo_key(row: Mapping[str, Any]) -> tuple:
     return (
         str(row.get("sport") or "").lower(),
@@ -541,6 +626,9 @@ def prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str, memo
             if key[0] == "nfl":
                 opponent = str((match_facts or {}).get("opponent") or "").strip() or None
                 pieces.append(nfl_vs_position_text(row, opponent))
+            elif key[0] in {"nba", "wnba"}:
+                opponent = str((match_facts or {}).get("opponent") or "").strip() or None
+                pieces.append(basketball_vs_position_text(row, opponent, selected_date=selected_date))
             text = " ".join(piece for piece in pieces if piece) or None
     except Exception as exc:  # noqa: BLE001 -- an explanation must never break a card
         print(f"[recent_matchup] FAILED sport={key[0]} error={type(exc).__name__}: {exc}", flush=True)
