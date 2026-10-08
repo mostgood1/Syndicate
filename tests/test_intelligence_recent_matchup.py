@@ -80,3 +80,63 @@ def test_row_text_is_memoised_per_bet_and_never_raises(monkeypatch):
     monkeypatch.setattr(pe, "build_prop_evidence", lambda row, selected_date: (_ for _ in ()).throw(RuntimeError("x")))
     assert rm.prop_recent_matchup_text(dict(row, line=13.5), selected_date="2026-10-07", memo=memo) is None
     assert rm.prop_recent_matchup_text({"kind": "game", "sport": "nba"}, selected_date="2026-10-07") is None
+
+
+def _mlb_root(tmp_path, monkeypatch):
+    import json as _json
+
+    root = tmp_path / "mlb"
+    (root / "processed").mkdir(parents=True)
+    (root / "processed" / "mlb_batter_game_log.csv").write_text(
+        "date,game_pk,player_id,player_name,team,opponent,ab,h,r,rbi,hr,bb,so,tb\n"
+        + "".join(f"2026-09-{d:02d},1,643289,Mauricio Dubon,ATL,X,4,{d % 2},0,{1 if d % 3 == 0 else 0},0,0,1,1\n" for d in range(1, 13)),
+        encoding="utf-8",
+    )
+    (root / "processed" / "mlb_pitcher_game_log.csv").write_text(
+        "date,game_pk,player_id,player_name,team,opponent,is_starter,ip,outs,pitches,k,bb,er,h,r,hr\n"
+        "2026-09-20,1,607259,Nick Martinez,TB,X,1,6.0,18,90,7,1,2,5,2,1\n"
+        "2026-09-26,2,607259,Nick Martinez,TB,X,1,5.0,15,85,4,2,3,6,3,0\n",
+        encoding="utf-8",
+    )
+    snap = root / "daily" / "snapshots" / "2026-10-07"
+    snap.mkdir(parents=True)
+    (snap / "probables.json").write_text(_json.dumps({"games": [{
+        "home": {"abbr": "ATL"}, "away": {"abbr": "LAD"},
+        "home_probable_id": 111, "away_probable_id": 677,
+        "home_validation": {"selected_name": "Spencer Strider"}, "away_validation": {"selected_name": "Tyler Glasnow"},
+    }]}), encoding="utf-8")
+    bvp = root / "statcast" / "bvp"
+    bvp.mkdir(parents=True)
+    (bvp / f"bvp_pairs_{677 % 64:02d}.json").write_text(_json.dumps({
+        "fields": ["pa", "hits", "hr", "so", "bb", "hbp", "inplay_pa", "inplay_hits"],
+        "pitchers": {"677": {"643289": [11, 4, 2, 3, 1, 0, 7, 4]}},
+    }), encoding="utf-8")
+    monkeypatch.setenv("SYNDICATE_MLB_DATA_ROOT", str(root))
+    return root
+
+
+def test_mlb_batter_gets_recent_form_and_career_bvp_vs_the_opposing_starter(tmp_path, monkeypatch):
+    _mlb_root(tmp_path, monkeypatch)
+    row = {"kind": "prop", "sport": "mlb", "market": "batter_rbis", "line": 0.5, "side": "over", "player_name": "Mauricio Dubon",
+           "home_team": "Atlanta Braves", "away_team": "Los Angeles Dodgers", "projection": {"player_id": "643289"}}
+    text = rm.mlb_prop_recent_matchup_text(row, selected_date="2026-10-07")
+    # last 10 logged games are 09-03..09-12; rbi=1 on 09-03,06,09,12 -> 4 of 10
+    assert "Recent form: over 0.5 in 4 of the last 10 logged games (avg 0.4; log since 2026-09-03)." in text
+    # ATL batter faces the AWAY starter
+    assert "Matchup: vs Tyler Glasnow (career) 4 hits in 11 PA, 2 HR, 3 K, 1 BB." in text
+
+
+def test_mlb_pitcher_gets_recent_form_from_starts(tmp_path, monkeypatch):
+    _mlb_root(tmp_path, monkeypatch)
+    row = {"kind": "prop", "sport": "mlb", "market": "pitcher_strikeouts", "line": 5.5, "side": "over", "player_name": "Nick Martinez",
+           "home_team": "New York Yankees", "away_team": "Tampa Bay Rays", "projection": {"player_id": "607259"}}
+    text = rm.mlb_prop_recent_matchup_text(row, selected_date="2026-10-07")
+    assert text == "Recent form: over 5.5 in 1 of the last 2 logged games (avg 5.5; log since 2026-09-20)."
+
+
+def test_mlb_first_meeting_and_missing_id(tmp_path, monkeypatch):
+    _mlb_root(tmp_path, monkeypatch)
+    row = {"kind": "prop", "sport": "mlb", "market": "batter_hits", "line": 0.5, "side": "over", "player_name": "X",
+           "home_team": "Atlanta Braves", "away_team": "Los Angeles Dodgers", "projection": {"player_id": "999"}}
+    assert rm.mlb_prop_recent_matchup_text(row, selected_date="2026-10-07") is None  # no log -> no team -> no starter
+    assert rm.mlb_prop_recent_matchup_text(dict(row, projection={}), selected_date="2026-10-07") is None

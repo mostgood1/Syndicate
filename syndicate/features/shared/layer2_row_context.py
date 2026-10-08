@@ -402,7 +402,7 @@ def row_explainer(
 # cache, the name memo and the NCAAF/soccer index fixes: wnba 30 ms, nfl 7 ms,
 # ncaaf 71 ms, soccer 69 ms, nhl 103 ms per card (identical facts cached vs
 # uncached). MLB is served by its batter-vs-pitcher path, not this one.
-_RECENT_MATCHUP_SPORTS = frozenset({"nba", "wnba", "nfl", "nhl", "ncaaf", "soccer"})
+_RECENT_MATCHUP_SPORTS = frozenset({"mlb", "nba", "wnba", "nfl", "nhl", "ncaaf", "soccer"})
 # Per-build, PER-SPORT budget: cards are built in board order, so each sport's
 # top rows are served first, and one slow sport can neither starve the others
 # (measured 2026-10-08: a single shared 120 s budget ran out before NHL got any)

@@ -123,6 +123,174 @@ def matchup_text(facts: Mapping[str, Any] | None) -> str | None:
     return ("Matchup: " + "; ".join(parts) + ".") if parts else None
 
 
+# --------------------------------------------------------------------------- MLB
+#
+# MLB is not a prop_evidence provider (Ask serves it from its reference fetchers),
+# so its board sentences are read here, lean, from the same artifacts:
+#   * recent form -- `processed/mlb_batter_game_log.csv` / `mlb_pitcher_game_log.csv`
+#     (built from feed_live; on 2026-10-08 they cover 17 dates since 06-14, so the
+#     sentence says "logged games", never implies a full season);
+#   * batter vs pitcher -- `statcast/bvp/bvp_pairs_<pitcher_id % 64>.json`
+#     (career, schema mlb_bvp_pairs_v1, fields pa/hits/hr/so/bb/hbp/...), the
+#     opposing starter from `daily/snapshots/<date>/probables.json`.
+# All reads go through `prop_evidence.common`, so a board build's read cache
+# parses each file once.
+
+_MLB_BATTER_STAT = {
+    "batter_hits": ("h",), "batter_total_bases": ("tb",), "batter_home_runs": ("hr",), "batter_rbis": ("rbi",),
+    "batter_runs_scored": ("r",), "batter_strikeouts": ("so",), "batter_walks": ("bb",),
+    "batter_hits_runs_rbis": ("h", "r", "rbi"),
+}
+_MLB_PITCHER_STAT = {
+    "pitcher_strikeouts": ("k",), "pitcher_outs": ("outs",), "pitcher_hits_allowed": ("h",),
+    "pitcher_earned_runs": ("er",), "pitcher_walks": ("bb",),
+}
+_MLB_LAST_N = 10
+
+
+def _mlb_root():
+    import os
+    from pathlib import Path
+
+    override = str(os.environ.get("SYNDICATE_MLB_DATA_ROOT") or "").strip()
+    if override:
+        return Path(override)
+    from syndicate.features.shared.prop_evidence.common import data_root
+
+    return data_root() / "mlb_source" / "source_artifacts" / "data"
+
+
+def _mlb_log(kind: str) -> dict[str, list[dict[str, str]]]:
+    """player_id -> rows (file order) from the batter/pitcher game log; {} if absent."""
+    from syndicate.features.shared.prop_evidence import common as C
+
+    path = _mlb_root() / "processed" / f"mlb_{kind}_game_log.csv"
+    cache = C._READ_CACHE.get()
+    key = ("mlb_log", kind, C._cache_key(path)) if cache is not None else None
+    if key is not None and key in cache:
+        return cache[key]
+    out: dict[str, list[dict[str, str]]] = {}
+    if path.is_file():
+        for row in C.iter_csv(path):
+            out.setdefault(str(row.get("player_id") or ""), []).append(row)
+    if key is not None:
+        cache[key] = out
+    return out
+
+
+def _mlb_probables(selected_date: str) -> list[Mapping[str, Any]]:
+    from syndicate.features.shared.prop_evidence import common as C
+
+    path = _mlb_root() / "daily" / "snapshots" / selected_date / "probables.json"
+    if not path.is_file():
+        return []
+    payload = C.load_json(path)
+    games = payload.get("games") if isinstance(payload, Mapping) else None
+    return [g for g in games or [] if isinstance(g, Mapping)]
+
+
+def _mlb_bvp(pitcher_id: int, batter_id: int) -> dict[str, int] | None:
+    from syndicate.features.shared.prop_evidence import common as C
+
+    path = _mlb_root() / "statcast" / "bvp" / f"bvp_pairs_{int(pitcher_id) % 64:02d}.json"
+    if not path.is_file():
+        return None
+    shard = C.load_json(path)
+    fields = [str(f) for f in (shard.get("fields") or [])]
+    values = ((shard.get("pitchers") or {}).get(str(int(pitcher_id))) or {}).get(str(int(batter_id)))
+    if not values:
+        return {}
+    try:
+        return {f: int(v) for f, v in zip(fields, values)}
+    except (TypeError, ValueError):
+        return None
+
+
+def _mlb_side_values(rows: list[Mapping[str, str]], cols: tuple[str, ...]) -> list[float]:
+    values = []
+    for row in rows:
+        total = 0.0
+        for col in cols:
+            v = _num(row.get(col))
+            if v is None:
+                break
+            total += v
+        else:
+            values.append(total)
+    return values
+
+
+def mlb_prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str) -> str | None:
+    """MLB prop: recent form from the game log + batter-vs-starter (career). Never raises."""
+    try:
+        market = str(row.get("market") or "").strip().lower()
+        projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
+        player_id = str(projection.get("player_id") or row.get("player_id") or "").strip()
+        if not player_id:
+            return None
+        is_pitcher = market in _MLB_PITCHER_STAT
+        cols = _MLB_PITCHER_STAT.get(market) or _MLB_BATTER_STAT.get(market)
+        pieces: list[str] = []
+        log_rows = _mlb_log("pitcher" if is_pitcher else "batter").get(player_id) or []
+        if is_pitcher:
+            log_rows = [r for r in log_rows if str(r.get("is_starter") or "") in {"1", "True", "true"}] or log_rows
+        recent = sorted(log_rows, key=lambda r: str(r.get("date") or ""))[-_MLB_LAST_N:]
+        if cols and recent:
+            values = _mlb_side_values(recent, cols)
+            line = _num(row.get("line"))
+            side = str(row.get("side") or "").lower()
+            if values and line is not None and side in {"over", "under"}:
+                hits = sum(1 for v in values if (v > line if side == "over" else v < line))
+                pieces.append(
+                    f"Recent form: {side} {_fmt(line)} in {hits} of the last {len(values)} logged games "
+                    f"(avg {_fmt(sum(values) / len(values))}; log since {recent[0].get('date')})."
+                )
+        if not is_pitcher:
+            team = str((sorted(log_rows, key=lambda r: str(r.get("date") or ""))[-1:] or [{}])[0].get("team") or "")
+            pitcher = _mlb_opposing_starter(row, team, selected_date)
+            if pitcher is not None:
+                pid, name = pitcher
+                counts = _mlb_bvp(pid, int(player_id))
+                if counts is not None:
+                    pa = counts.get("pa", 0)
+                    if pa > 0:
+                        hits_n = counts.get("hits", 0)
+                        pieces.append(
+                            f"Matchup: vs {name} (career) {hits_n} hit{'' if hits_n == 1 else 's'} in {pa} PA, "
+                            f"{counts.get('hr', 0)} HR, {counts.get('so', 0)} K, {counts.get('bb', 0)} BB."
+                        )
+                    else:
+                        pieces.append(f"Matchup: first career meeting with {name}.")
+        return " ".join(pieces) or None
+    except Exception as exc:  # noqa: BLE001
+        print(f"[recent_matchup] MLB_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
+def _mlb_opposing_starter(row: Mapping[str, Any], team_abbr: str, selected_date: str) -> tuple[int, str] | None:
+    """(pitcher id, name) of the starter the batter's team faces, from the date's probables."""
+    from syndicate.features.shared.team_aliases import canonical_team
+
+    home = canonical_team("mlb", str(row.get("home_team") or ""))
+    away = canonical_team("mlb", str(row.get("away_team") or ""))
+    mine = canonical_team("mlb", team_abbr) if team_abbr else None
+    if not home or not away or mine not in {home, away}:
+        return None
+    for game in _mlb_probables(selected_date):
+        g_home = canonical_team("mlb", str((game.get("home") or {}).get("abbr") or ""))
+        g_away = canonical_team("mlb", str((game.get("away") or {}).get("abbr") or ""))
+        if (g_home, g_away) != (home, away):
+            continue
+        side = "home" if mine == away else "away"  # the OTHER team's starter
+        pid = game.get(f"{side}_probable_id")
+        name = ((game.get(f"{side}_validation") or {}).get("selected_name")) or f"pitcher {pid}"
+        try:
+            return int(pid), str(name)
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
 def _memo_key(row: Mapping[str, Any]) -> tuple:
     return (
         str(row.get("sport") or "").lower(),
@@ -143,6 +311,11 @@ def prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str, memo
     if memo is not None and key in memo:
         return memo[key]
     text = None
+    if key[0] == "mlb":
+        text = mlb_prop_recent_matchup_text(row, selected_date=selected_date)
+        if memo is not None:
+            memo[key] = text
+        return text
     try:
         from syndicate.features.shared.prop_evidence import build_prop_evidence
         from syndicate.features.shared.prop_evidence.contract import Layer
