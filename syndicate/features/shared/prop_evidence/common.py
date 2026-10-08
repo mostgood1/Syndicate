@@ -25,6 +25,9 @@ import logging
 import math
 import os
 import re
+from contextlib import contextmanager
+from functools import lru_cache
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
@@ -120,12 +123,60 @@ def slate_dates(selected_date: str, commence_time: str) -> list[str]:
     return dates
 
 
+# PER-BUILD READ CACHE (lane intelligence-evidence-coverage, 2026-10-08). The
+# rule above -- nothing parsed is cached across requests -- is right for an Ask
+# click, and stays the default. A BOARD BUILD is different: it asks for the
+# recent-form / matchup evidence of thousands of rows that share a few dozen
+# files, and uncached that measured 1-16 s PER CARD on the fleet (2026-10-08,
+# 2,414 prop cards). Inside `build_read_cache()` each (path, mtime, size) is
+# parsed once; outside it nothing changes. A ContextVar, not a module global,
+# so a concurrent Ask in another thread never sees a build's cache.
+_READ_CACHE: "ContextVar[dict | None]" = ContextVar("prop_evidence_read_cache", default=None)
+
+
+@contextmanager
+def build_read_cache() -> Iterator[dict]:
+    cache: dict = {}
+    token = _READ_CACHE.set(cache)
+    try:
+        yield cache
+    finally:
+        _READ_CACHE.reset(token)
+
+
+def _cache_key(path: Path | str) -> tuple | None:
+    try:
+        stat = os.stat(path)
+    except OSError:
+        return None
+    return (str(path), stat.st_mtime_ns, stat.st_size)
+
+
 def load_json(path: Path | str) -> Any:
+    cache = _READ_CACHE.get()
+    key = _cache_key(path) if cache is not None else None
+    if key is not None and ("json", key) in cache:
+        return cache[("json", key)]
     with open(path, encoding="utf-8") as handle:
-        return json.load(handle)
+        value = json.load(handle)
+    if key is not None:
+        cache[("json", key)] = value
+    return value
 
 
 def iter_csv(path: Path | str) -> Iterator[dict[str, str]]:
+    cache = _READ_CACHE.get()
+    key = _cache_key(path) if cache is not None else None
+    if key is not None:
+        rows = cache.get(("csv", key))
+        if rows is None:
+            with open(path, encoding="utf-8", newline="") as handle:
+                rows = list(csv.DictReader(handle))
+            cache[("csv", key)] = rows
+        # Shallow copies: a caller that edits a row must not edit it for the next card.
+        for row in rows:
+            yield dict(row)
+        return
     with open(path, encoding="utf-8", newline="") as handle:
         yield from csv.DictReader(handle)
 
@@ -182,6 +233,22 @@ def name_keys(value: Any) -> set[str]:
     Moore" -- a real NFL row, and they never met. The collapsed form joins them
     by gluing single-letter runs back together.
     """
+    if isinstance(value, str):
+        return set(_name_keys_cached(value))
+    return _name_keys_uncached(value)
+
+
+# MEMOISED (lane intelligence-evidence-coverage, 2026-10-08). Profiled on the
+# fleet: 25 WNBA prop cards spent 692 of 729 s in `names_match`, because
+# `_box_games` compares the player against every box-score row and each call
+# re-folded both names (1,517,190 `name_key` calls). A name's keys are a pure
+# function of the string, so a bounded LRU changes no result.
+@lru_cache(maxsize=65536)
+def _name_keys_cached(value: str) -> frozenset[str]:
+    return frozenset(_name_keys_uncached(value))
+
+
+def _name_keys_uncached(value: Any) -> set[str]:
     keys = {name_key(value), name_key_loose(value)}
     parts = name_key_loose(value).split()
     if any(len(part) == 1 for part in parts):
@@ -196,7 +263,8 @@ def name_keys(value: Any) -> set[str]:
 
 
 def names_match(a: Any, b: Any) -> bool:
-    keys_a, keys_b = name_keys(a), name_keys(b)
+    keys_a = _name_keys_cached(a) if isinstance(a, str) else name_keys(a)
+    keys_b = _name_keys_cached(b) if isinstance(b, str) else name_keys(b)
     if not keys_a or not keys_b:
         return False
     return bool(keys_a & keys_b)
