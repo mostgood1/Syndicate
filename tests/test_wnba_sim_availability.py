@@ -124,3 +124,18 @@ def test_only_the_json_true_enables_and_unknown_is_off(tmp_path):
         m, s = _run(_switch(_season(root), body), env={})
         assert m == {} and s["applied"] is False and "unset and switch file" in s["reason"], body
 
+
+def test_playoff_rows_under_espn_codes_count_as_the_teams_games(tmp_path):
+    """Discriminating (2026-10-08): production writes PLAYOFF box rows as GS/LV/NY. Unfolded, LVA's "last game" stayed
+    its regular-season finale, so a player who sat the finale but played the playoff game was excluded (10-07:
+    Marine Fauthoux 31 min, Dana Evans 18, Aminata Gueye 13 -- all left out, all played)."""
+    root = _history(tmp_path, [
+        ("g1", "2026-09-29", "LVA", "A'ja Wilson", 34), ("g1", "2026-09-29", "LVA", "Dana Evans", 0),   # finale: DNP
+        ("p1", "2026-10-04", "LV", "A'ja Wilson", 36), ("p1", "2026-10-04", "LV", "Dana Evans", 18),    # playoff, ESPN code
+    ])
+    m = {}
+    s = A.add_recency_exclusions(m, processed_root=root, date_str="2026-10-07", league_code="wnba", props_df=None,
+                                 name_key=_norm_name_key, env=ON)
+    assert _norm_name_key("Dana Evans").upper() not in m.get("LVA", set())
+    assert "LV" not in m                                       # nothing keyed under the raw ESPN code
+

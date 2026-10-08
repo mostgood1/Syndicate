@@ -36,6 +36,7 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Set, Tuple
 FLAG = "SYNDICATE_WNBA_SIM_AVAILABILITY"
 K_ENV = "SYNDICATE_WNBA_SIM_AVAILABILITY_MISSED_GAMES"
 HISTORY_FILE = "boxscores_history.csv"
+TEAM_ALIASES = {"GS": "GSV", "LV": "LVA", "LA": "LAS", "NY": "NYL", "CONN": "CON", "WAS": "WSH", "PHO": "PHX"}
 
 
 SWITCH_FILE = "wnba_sim_availability.json"
@@ -94,7 +95,11 @@ def _read_history(path: Path, date_str: str) -> Tuple[Optional[Dict[str, List[Tu
                 d = str(r.get("date") or r.get("GAME_DATE") or "")[:10]
                 if not d or d >= date_str:
                     continue
-                team = str(r.get("TEAM_ABBREVIATION") or "").strip().upper()
+                # Fold ESPN codes into Syndicate tricodes: production writes PLAYOFF box rows as GS/LV/NY (measured
+                # 2026-10-08), so without this a team's "last game" stayed its regular-season finale and the rule
+                # excluded players who had played every playoff game (10-07: Fauthoux 31 min, Evans 18, Gueye 13).
+                raw_team = str(r.get("TEAM_ABBREVIATION") or "").strip().upper()
+                team = TEAM_ALIASES.get(raw_team, raw_team)
                 gid = str(r.get("game_id") or r.get("GAME_ID") or r.get("gameId") or d)
                 name = str(r.get("PLAYER_NAME") or "")
                 if not team or not name:
