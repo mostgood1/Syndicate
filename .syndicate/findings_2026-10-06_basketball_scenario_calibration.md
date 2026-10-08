@@ -369,3 +369,49 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
   hot-hand terms. Add default-off levers, then the same sweep protocol.
 - H-V confirmed → the same for possession/TOV/FTA generation.
 - VALIDATION is untouched.
+
+### Phase 2 #1b — RESULT 2026-10-08 (791 games; J1 draws; script scratchpad margin_decomp.py)
+
+**Pre-registered readings:**
+
+| component | real, across games (upper bound) | sim, within game |
+|---|---|---|
+| total margin SD | 13.99 [13.22, 14.81] | 17.62 [17.55, 17.68] |
+| VOLUME (ΔFGA/Δ3PA/ΔFTA/ΔTOV fitted) | 3.63 [2.77, 4.76] | **8.14** [8.05, 8.23] |
+| EFFICIENCY (residual) | 13.51 [12.74, 14.24] | **15.62** [15.56, 15.67] |
+| β(ΔFGA, Δ3PA, ΔFTA, ΔTOV) | 0.04, 0.13, 0.21, −0.49 | 0.02, 0.20, 0.40, −1.16 |
+
+- **H-S CONFIRMED** and **H-V CONFIRMED** as pre-registered.
+- **Binomial check:** sim per-team points variance after volume is 122 vs 140 for independent shots, ratio 0.87
+  (p10 0.74, p90 1.01).
+  - That is NOT > 1.3, so the engine adds no per-team efficiency noise beyond shot independence.
+  - The efficiency excess is exactly two INDEPENDENT teams' binomial luck: √(2 × 122) = 15.6.
+  - Real games sit BELOW that (13.5 even including talent and line error). So real margins are compressed by
+    something that couples the two teams.
+- **Volume:** the per-diff SDs are NOT inflated (exploratory: sim within vs real across, ΔFGA 7.07 vs 9.31, Δ3PA
+  7.38 vs 10.13, ΔFTA 9.46 vs 8.94, ΔTOV 5.15 vs 5.40).
+  - The volume component is large because in the sim each ΔTOV/ΔFTA is worth ~2× more points (β −1.16 vs −0.49;
+    0.40 vs 0.21).
+  - In real games, volume swings are offset by other channels.
+
+**EXPLORATORY (not pre-registered, a lead for the next pre-registration) — score effects:**
+
+| slope | real [95% CI] | sim, within draw |
+|---|---|---|
+| Q4 margin on margin entering Q4 | −0.076 [−0.116, −0.034] | **+0.096** |
+| H2 margin on H1 margin | −0.053 [−0.124, +0.015] | **+0.212** |
+
+- Real games REVERT: the leader gives some back. That holds even though the real across-game slope includes team
+  talent, which pushes it positive.
+- The sim COMPOUNDS within a draw: a draw that leads at half keeps out-scoring. Within a draw there is no talent
+  term, so a positive slope means a PERSISTENT per-draw shock.
+  - Examples: per-draw rotation/minutes or lineup sampling, per-draw team adjustments, player availability or form.
+  - Sim per-quarter environment (L2) is exonerated.
+- Together with the missing negative feedback (real garbage time / effort / fouling), this explains margin SD too
+  wide (18.9 vs 14.0) and blowouts too frequent (0.34 vs 0.23).
+- **Next (to pre-register):**
+  1. Enumerate every per-draw-persistent random term in the SmartSim path (smart_sim.py, events.py,
+     basketball_props_smart_sim.py) and measure each one's share of the within-draw H1→H2 slope with a default-off
+     lever (target slope ≤ 0).
+  2. Separately, score-effect feedback: blowout pace/efficiency scaling (`garbage_time_*`, `blowout_*`), tested
+     against the real Q4 slope −0.076.
