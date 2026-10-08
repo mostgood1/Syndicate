@@ -263,3 +263,27 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
   NOT run; it needs a user decision (~5 h at nice 19).
   - The margin excess (S8 margin 19.1 vs 15.2; S5 blowouts) stays unexplained by any lever. That is the refuted
     target.
+
+### Phase 2 #1 — JOINT point L1 = 1.0 + L3 = 0.0 (run 00:19Z-02:57Z 10-08, nice 19)
+
+- **Run:** 87/87 games on the 12 dates. LEVER_REACH carried both levers on every engine call (17,400/17,400
+  cumulative).
+- **Composes:**
+
+| row | real | base | J1 |
+|---|---|---|---|
+| S8 total-vs-line SD | 17.74 | 19.98 | **18.80** |
+| S8 margin-vs-spread SD | 15.21 | 19.12 | **18.84** |
+| S3 quarter-total SD | 8.6-10.0 | ~9.6 | 9.0-9.1 |
+| S5 blowouts, all | 0.253 | 0.329 | 0.327 |
+| S7 tied after regulation | 0.046 | 0.020 | 0.017 |
+
+  - The L3 totals gain is kept in full, and about half the L1 margin gain is kept.
+- **Objective:** base 10.1 → **J1 8.4**, the best of all 9 points.
+- **Guard rows:**
+  - S1 pace −0.04 (SE 0.35), S6 FTA −0.08 (SE 0.16), S9 3PA +0.02 (SE 0.44), S10 unchanged: no move.
+  - S2 quarter shares move ≤ 0.001 of share, beyond the sim's own tiny SE (~0.0003) but ~0.2 pt, which is
+    immaterial. Some move toward real, some away.
+  - S11 foul-outs 0.331 → 0.275 (real 0.103): toward real.
+- **Next (pre-registration step 5):** re-run the FULL FIT window with J1 before any adoption. That is ~791 games, so
+  ~24 h at nice 19 at the J1 pace (87 games in 2.6 h). This needs a user decision.
