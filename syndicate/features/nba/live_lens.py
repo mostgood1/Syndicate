@@ -569,6 +569,41 @@ def validate_live_lens_snapshot(snapshot: Any) -> bool:
     return not _value_has_non_finite_number(snapshot)
 
 
+_SIM_PLAYER_ROW_KEYS = ("players", "missing_prop_players", "injuries")
+
+
+def _without_sim_player_rows(games: list[Any]) -> list[Any]:
+    """Copies of `games` with the per-player SmartSim rows emptied.
+
+    The snapshot is ONE keyvalue value, refused above 8 MB. Measured on the fleet
+    2026-10-08: once the slate's SmartSim player rows landed (~530 KB per game,
+    mostly `prop_ladders`), the 6-game preseason snapshot went from 212 KB to
+    9,596,984 B, because the same games list sits in it three times (`games`,
+    `page_context.games`, `api_payload.games`). Every write from 05:52Z on was
+    refused, and web kept serving the 05:51Z copy.
+
+    Nothing that reads the lens needs these rows. The snapshot already declares
+    `players_included: False`. `cards_source.js` loads them on demand from
+    `/nba/api/cards/sim-detail` whenever `sim.players_loaded` is falsy. The
+    projection and evidence readers read `cards_sim_detail_<date>.json` from
+    disk. `players_summary` stays, so the card can still show the row count.
+    Copies only: the cards context these games come from may be cached.
+    """
+    out: list[Any] = []
+    for game in games:
+        sim = game.get("sim") if isinstance(game, dict) else None
+        if not isinstance(sim, dict):
+            out.append(game)
+            continue
+        slim_sim = dict(sim)
+        for key in _SIM_PLAYER_ROW_KEYS:
+            if key in slim_sim:
+                slim_sim[key] = {"away": [], "home": []}
+        slim_sim["players_loaded"] = False
+        out.append({**game, "sim": slim_sim})
+    return out
+
+
 def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str, Any]:
     _run_nba_live_lens_tick(selected_date)
     try:
@@ -583,18 +618,23 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str
     live_player_lens_payload = _compute_live_player_lens_payload(resolved_date, event_ids, ttl=20, allow_stored_date_fallback=True)
     live_lines_payload = _compute_live_lines_payload(resolved_date, event_ids, ttl=20, include_period_totals=True, allow_stored_date_fallback=True)
     live_pbp_stats_payload = _compute_live_pbp_stats_payload(resolved_date, event_ids, ttl=20, allow_stored_date_fallback=True)
+    page_context = dict(page_context)
+    api_payload = dict(api_payload)
+    for container in (page_context, api_payload):
+        if isinstance(container.get("games"), list):
+            container["games"] = _without_sim_player_rows(container["games"])
     snapshot = {
         "ok": True,
         "date": resolved_date,
         "requested_date": selected_date,
-        "generated_at": api_payload.get("generated_at") if isinstance(api_payload, dict) else None,
+        "generated_at": api_payload.get("generated_at"),
         "source_path": str(page_context.get("source_path") or live_lens_snapshot_path()),
-        "page_context": dict(page_context),
-        "api_payload": dict(api_payload),
+        "page_context": page_context,
+        "api_payload": api_payload,
         "live_player_lens_payload": dict(live_player_lens_payload) if isinstance(live_player_lens_payload, dict) else _empty_live_player_lens_payload(resolved_date, event_ids),
         "live_lines_payload": dict(live_lines_payload) if isinstance(live_lines_payload, dict) else _empty_live_lines_payload(resolved_date, event_ids, include_period_totals=True),
         "live_pbp_stats_payload": dict(live_pbp_stats_payload) if isinstance(live_pbp_stats_payload, dict) else _empty_live_pbp_stats_payload(resolved_date, event_ids),
-        "games": games[:limit],
+        "games": _without_sim_player_rows(games[:limit]),
         "rank_cards": [dict(card) for card in (page_context.get("rank_cards") if isinstance(page_context.get("rank_cards"), list) else []) if isinstance(card, dict)][:limit],
     }
     return snapshot
