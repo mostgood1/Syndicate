@@ -945,3 +945,12 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
   + 6 stale) -- too thin. Needs a fuller slate.
 
 ---
+
+## [layer2-board-redesign] LAYER 2 BOARD PAGE: ONE NAV, VISIBLE FILTERS, RESEARCH RAIL + SLIP TRAY, LOGOS, AND AN EMBED THAT PARSES -- LIVE on web `2735d39a`, refresh-worker `6eae7e0a` `[verified 2026-10-08 15:46-17:49Z on the served fleet page, lane layer2-board-ui-redesign]`
+
+- **Nav:** one macro, `templates/shared/_site_nav.html`, called by `base.html` and `_standalone_app_header.html`. Before, the standalone copy lacked Portfolio (~40 sport pages) and `/mlb/live-lens`, `/nfl/preseason` had no nav.
+- **The home embed parses in a browser, and it did not before:** escaped twice since ebd17ee2 (2026-09-22, `&#34;`), and it carried bare `NaN` (21 tokens 10-08). Now `| safe` in the template and `json_safe_value` in `_embed_json_text`. With the API blocked, rows render in 6.1 s (before: never). Embed 49.0 MB -> 18.1 MB raw (`top_opportunities` = pick_id refs into `ranked_all`, `recommendations` = alias); gzip 7.84 -> 2.93 MB.
+- **Prop `projection["side"]` is the FRAMING of `model_prob_over`, always "over"; the lean is `projection["lean"]`** (NHL/NBA/WNBA producers). Writing the lean there inverted every under-leaning prop's probability and edge. NHL: 367 inverted / 230 consistent at 16:59Z -> 0 / 597 at 17:30Z.
+- **Team logos:** `features/shared/team_logos.py` from the committed branding CSVs (mlb/nba/nhl/ncaab tracked since 2735d39a); stamped as `home_logo`/`away_logo` in `_hydrate_board_response_payload`. 5,205 / 5,206 served rows.
+- **Layout:** research rail 340 px >=1280, 260 px 1024-1279, pull-out 768-1023, bottom sheet <768; blotter 9 columns (fits: 1071 in 1072 at 1440). Slip = pill + tray. NOT `.board-rail`, so `board_rail_toggle.js` stays a no-op here.
+- **NOT live yet:** game-chip `logo` / `situation` (on main 1d333384, refresh-worker code; loads at its next restart).
