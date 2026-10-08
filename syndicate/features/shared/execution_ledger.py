@@ -96,7 +96,14 @@ STATUS_REJECTED = "rejected"
 STATUS_FAILED = "failed"
 
 # Bounds. See the storage note above.
-_MAX_RECORDS = 5000
+#
+# 3,000, down from 5,000 [2026-10-08, lane execution-ledger-keyvalue-growth,
+# user-approved]. Trimmed rows now move to the disk archive, so the cap bounds only
+# the live keyvalue document, not the history. Measured on the fleet that day:
+# 1,173-1,461 B/order by date, so 5,000 sat at 6.7-7.3 MB (80-87% of the 8 MB
+# refusal) and the next added field would have reached it. 3,000 holds 4.0-4.4 MB,
+# about four days of paper at ~600 orders a day beside 552 live rows.
+_MAX_RECORDS = 3000
 _WARN_BYTES = 2 * 1024 * 1024  # a quarter of the store's 8MB refusal ceiling
 
 
@@ -440,6 +447,138 @@ def _ledger_path() -> Path:
     # NO DATE TOKEN -- see the module docstring. A dated path takes the store's
     # 10-day TTL and the record of what was placed would silently expire.
     return reports_root() / "intelligence" / "execution_ledger.json"
+
+
+# --------------------------------------------------------------------------
+# THE ARCHIVE: where rows go when the record cap moves them out of the document
+# [2026-10-08, lane execution-ledger-keyvalue-growth]
+# --------------------------------------------------------------------------
+#
+# MEASURED 2026-10-08 on the local fleet, keyvalue copy read read-only: 4,698
+# orders / 6,255,391 B, 4,146 paper (all since 10-02, ~600 a day) and 552 live.
+# `_MAX_RECORDS` keeps the document under the 8 MB refusal, but `_trim_to_cap`
+# used to DROP the oldest paper rows outright -- ~600 decisions a day gone for
+# good, while the all-time ROI, the credibility sample
+# (`settled_decisions_by_sport`), the scorecard's 28-day staked window and both
+# probability fitters read this ledger as if it were the whole history. An
+# accumulator that silently loses records invents its aggregates.
+#
+# So a trimmed row is MOVED, not dropped: appended here BEFORE the document that
+# omits it is written. If the append fails the rows stay in the document (over
+# the cap, loudly) -- never in neither place.
+#
+# DISK, NOT KEYVALUE. Plain file IO, never `write_json_file`: an append-only
+# archive has no business in the 8 MB-capped shared cache it exists to relieve
+# (`#637` made the same call for `venue_odds/`). Every fleet role shares one
+# `SYNDICATE_REPORTS_ROOT` (verified 2026-10-08 by hash: web, live-odds-worker,
+# refresh-worker), and the daily data backup snapshots it. On a deployment whose
+# services do NOT share a disk, each service archives what IT trimmed and the
+# full-history readers see only their own service's archive -- a partial
+# history, never a fabricated one.
+#
+# Sharded by the row's `selected_date` MONTH (the order's date, not the trim's)
+# so no file grows without bound. A row can be archived twice -- a concurrent
+# writer re-adding a row another process trimmed, or a CAS attempt that trimmed
+# and then lost -- so readers keep the LAST copy per identity, and a row still in
+# the live document always beats its archived copy.
+_ARCHIVE_DIRNAME = "execution_ledger_archive"
+
+
+def _archive_dir() -> Path:
+    return reports_root() / "intelligence" / _ARCHIVE_DIRNAME
+
+
+def _archive_shard(order: Mapping[str, Any]) -> str:
+    stamp = str(order.get("selected_date") or "")[:7]
+    return stamp if re.fullmatch(r"\d{4}-\d{2}", stamp) else "undated"
+
+
+def _archive_rows(rows: Sequence[Mapping[str, Any]]) -> None:
+    """Append `rows` to the disk archive, durably. Raises on any failure."""
+    if not rows:
+        return
+    by_shard: dict[str, list[str]] = {}
+    for row in rows:
+        by_shard.setdefault(_archive_shard(row), []).append(
+            json.dumps(row, separators=(",", ":"), sort_keys=True, default=str) + "\n"
+        )
+    directory = _archive_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    for shard, lines in sorted(by_shard.items()):
+        with open(directory / f"orders_{shard}.jsonl", "a", encoding="utf-8") as handle:
+            try:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            except ImportError:  # Windows dev box: one writer, no lock needed
+                pass
+            handle.write("".join(lines))
+            handle.flush()
+            os.fsync(handle.fileno())
+
+
+# path -> ((mtime_ns, size), rows). A closed month's shard never changes, so a
+# long-running reader parses each shard once; the current month's re-parses only
+# after an append.
+_ARCHIVE_PARSE_CACHE: dict[str, tuple[tuple[int, int], list[dict[str, Any]]]] = {}
+_ARCHIVE_PARSE_LOCK = threading.Lock()
+
+
+def _parse_shard(path: Path) -> list[dict[str, Any]]:
+    stat = path.stat()
+    stamp = (stat.st_mtime_ns, stat.st_size)
+    with _ARCHIVE_PARSE_LOCK:
+        cached = _ARCHIVE_PARSE_CACHE.get(str(path))
+        if cached is not None and cached[0] == stamp:
+            return cached[1]
+    rows: list[dict[str, Any]] = []
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue  # a torn final line: the document still held that batch
+            if isinstance(row, dict):
+                rows.append(row)
+    with _ARCHIVE_PARSE_LOCK:
+        _ARCHIVE_PARSE_CACHE[str(path)] = (stamp, rows)
+    return rows
+
+
+def archived_orders(months: Sequence[str] | None = None) -> list[dict[str, Any]]:
+    """Every archived row (or only `months`' shards, "YYYY-MM"), last copy per
+    identity, oldest shard first. Rows are shared with the parse cache: copy
+    before mutating."""
+    directory = _archive_dir()
+    if not directory.is_dir():
+        return []
+    wanted = None if months is None else {f"orders_{m}.jsonl" for m in months}
+    latest: dict[str, dict[str, Any]] = {}
+    for path in sorted(directory.glob("orders_*.jsonl")):
+        if wanted is not None and path.name not in wanted:
+            continue
+        for row in _parse_shard(path):
+            identity = _order_identity(row)
+            latest.pop(identity, None)  # re-insert at the newest copy's position
+            latest[identity] = row
+    return list(latest.values())
+
+
+def full_history_orders() -> list[dict[str, Any]]:
+    """The archive plus the live document: EVERY order ever recorded.
+
+    For readers whose answer is an all-time or multi-week aggregate (ROI,
+    credibility samples, fitters, the scorecard window). Operational readers --
+    placement, idempotency, reconciliation, settlement of open rows -- keep
+    `_load()`, which is the document they write back. Archived rows come first
+    (they are older), and a row present in both is taken from the document."""
+    return _with_archive(list(_load().get("orders") or []))
+
+
+def _with_archive(live: list[dict[str, Any]], months: Sequence[str] | None = None) -> list[dict[str, Any]]:
+    # Rows pass through untouched; a malformed one is the caller's to skip.
+    present = {_order_identity(o) for o in live if isinstance(o, Mapping)}
+    return [dict(o) for o in archived_orders(months) if _order_identity(o) not in present] + live
 
 
 def _utc_now() -> str:
@@ -946,8 +1085,14 @@ _cas_announced = False
 
 def _trim_to_cap(
     orders: list[dict[str, Any]], cap: int
-) -> tuple[list[dict[str, Any]], int, dict[str, int], int]:
-    """Fit the document to `cap` by dropping the oldest PAPER rows, and nothing else.
+) -> tuple[list[dict[str, Any]], int, dict[str, int], int, list[dict[str, Any]]]:
+    """Fit the document to `cap` by moving out the oldest PAPER rows, and nothing else.
+
+    [2026-10-08, lane execution-ledger-keyvalue-growth] SETTLED paper rows go
+    first, oldest first; an UNGRADED paper row leaves only once no settled one is
+    left to take. The rows leaving are returned so `_persist` can archive them
+    before the write (see `_archive_rows`): a row that leaves ungraded can no
+    longer be graded, because settlement writes this document, not the archive.
 
     [2026-09-15, lane execution-ledger-live-trim] The cap used to drop the
     oldest rows of ANY mode. Paper volume (about 230 orders a day) holds the
@@ -966,19 +1111,24 @@ def _trim_to_cap(
     """
     over = len(orders) - cap
     if over <= 0:
-        return orders, 0, {}, 0
+        return orders, 0, {}, 0, []
     drop: set[int] = set()
-    for index, order in enumerate(orders):
-        if len(drop) >= over:
-            break
-        if str(order.get("mode") or "") == PAPER:
+    for settled_pass in (True, False):
+        for index, order in enumerate(orders):
+            if len(drop) >= over:
+                break
+            if index in drop or str(order.get("mode") or "") != PAPER:
+                continue
+            if settled_pass and order.get("outcome") is None:
+                continue
             drop.add(index)
     dropped_by_mode: dict[str, int] = {}
     for index in drop:
         mode = str(orders[index].get("mode") or "")
         dropped_by_mode[mode] = dropped_by_mode.get(mode, 0) + 1
     kept = [order for index, order in enumerate(orders) if index not in drop]
-    return kept, len(drop), dropped_by_mode, max(0, len(kept) - cap)
+    dropped = [order for index, order in enumerate(orders) if index in drop]
+    return kept, len(drop), dropped_by_mode, max(0, len(kept) - cap), dropped
 
 
 def _persist(state: dict[str, Any]) -> dict[str, Any]:
@@ -1039,12 +1189,26 @@ def _persist(state: dict[str, Any]) -> dict[str, Any]:
         # No `else` branch: `_load` carries `last_blind_write` forward, so a
         # healthy write preserves it rather than clearing it. A successful merge
         # later does not un-lose whatever the blind one may have dropped.
-        orders, trimmed, dropped_by_mode, protected_over = _trim_to_cap(orders, _MAX_RECORDS)
+        untrimmed = orders
+        orders, trimmed, dropped_by_mode, protected_over, dropped = _trim_to_cap(orders, _MAX_RECORDS)
+        archive_error = None
+        if dropped:
+            # WRITE-AHEAD: the archive gets the rows before the document that
+            # omits them is SET. Per attempt, so a CAS retry may archive a row
+            # twice; `archived_orders` keeps one copy per identity.
+            try:
+                _archive_rows(dropped)
+            except Exception as exc:  # noqa: BLE001
+                # NOWHERE TO PUT THEM, SO THEY STAY. Over the cap beats lost.
+                archive_error = f"{type(exc).__name__}: {exc}"
+                orders, trimmed, dropped_by_mode = untrimmed, 0, {}
+                protected_over = max(0, len(orders) - _MAX_RECORDS)
         doc["orders"] = orders
         doc["updated_at"] = _utc_now()
         written.clear()
         written.update(doc=doc, counts=merge_counts, trimmed=trimmed,
-                       dropped_by_mode=dropped_by_mode, protected_over=protected_over)
+                       dropped_by_mode=dropped_by_mode, protected_over=protected_over,
+                       archive_error=archive_error)
         return doc
 
     try:
@@ -1113,7 +1277,15 @@ def _persist(state: dict[str, Any]) -> dict[str, Any]:
     if trimmed:
         print(
             f"[execution_ledger] TRIMMED dropped={trimmed} kept={len(orders)} cap={_MAX_RECORDS}"
-            f" dropped_by_mode={written.get('dropped_by_mode') or {}}",
+            f" dropped_by_mode={written.get('dropped_by_mode') or {}}"
+            f" archived_to={_archive_dir().name}/",
+            flush=True,
+        )
+    if written.get("archive_error"):
+        print(
+            f"[execution_ledger] LEDGER_ARCHIVE_FAILED error={written['archive_error']}"
+            f" kept={len(orders)} cap={_MAX_RECORDS} -- the rows the cap would have moved"
+            " stay in the document; nothing was dropped",
             flush=True,
         )
     if written.get("protected_over"):
@@ -3533,9 +3705,13 @@ def _reconcilable(order: Mapping[str, Any]) -> tuple[bool, str]:
 
 
 def ledger_summary(selected_date: str | None = None) -> dict[str, Any]:
-    orders = _load().get("orders") or []
+    state = _load()
+    orders = state.get("orders") or []
     if selected_date:
-        orders = [o for o in orders if o.get("selected_date") == selected_date]
+        # A past date's rows may have been moved to the archive by the record
+        # cap; its month's shard is enough to find them.
+        orders = [o for o in _with_archive(list(orders), [str(selected_date)[:7]])
+                  if o.get("selected_date") == selected_date]
     by_status: dict[str, int] = {}
     staked = 0.0
     for order in orders:
@@ -3554,7 +3730,7 @@ def ledger_summary(selected_date: str | None = None) -> dict[str, Any]:
         # `None` on a healthy ledger. Non-null means a persist could not read
         # the current document and wrote blind, so concurrent edits from the
         # other service may have been lost at that timestamp. See `_persist`.
-        "last_blind_write": (_load() or {}).get("last_blind_write"),
+        "last_blind_write": state.get("last_blind_write"),
         "modes": sorted({str(o.get("mode") or "unknown") for o in orders}),
         "unreconciled": sum(1 for o in orders if o.get("status") == STATUS_SUBMITTED),
     }

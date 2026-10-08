@@ -372,7 +372,9 @@ def main(argv: list[str] | None = None) -> int:
         try:
             from syndicate.features.shared import execution_ledger
 
-            ledger_orders = list((execution_ledger._load() or {}).get("orders") or [])  # noqa: SLF001
+            # FULL HISTORY: the 28-day staked window outlives the ledger's record
+            # cap, whose trimmed rows live in the disk archive (execution-ledger-keyvalue-growth).
+            ledger_orders = execution_ledger.full_history_orders()
             known = opt_state.get("orders") or {}
             wanted_openings = {str(o.get("opening_key")) for o in opt.portfolio_orders(ledger_orders)
                                if o.get("opening_key") and str(o.get("opening_key")) not in known}

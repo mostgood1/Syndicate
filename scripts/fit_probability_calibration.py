@@ -137,14 +137,34 @@ def row_from_order(order: Mapping[str, Any], *, artifact_root: str) -> dict[str,
     }
 
 
+def _archived_ledger_orders(root: Path) -> list[Mapping[str, Any]]:
+    """Rows the ledger's record cap moved to `<root>/intelligence/execution_ledger_archive/`
+    (lane execution-ledger-keyvalue-growth), last copy per idempotency key."""
+    latest: dict[str, Mapping[str, Any]] = {}
+    for path in sorted((root / "intelligence" / "execution_ledger_archive").glob("orders_*.jsonl")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                order = json.loads(line)
+            except ValueError:
+                continue  # a torn final line from an interrupted append
+            if isinstance(order, Mapping):
+                key = str(order.get("idempotency_key") or "") or line
+                latest.pop(key, None)
+                latest[key] = order
+    return list(latest.values())
+
+
 def load_execution_ledger_rows(root: Path) -> list[dict[str, Any]]:
     path = root / "intelligence" / "execution_ledger.json"
-    if not path.is_file():
-        return []
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    orders = payload.get("orders") if isinstance(payload, Mapping) else None
-    if not isinstance(orders, list):
-        return []
+    orders: list[Any] = []
+    if path.is_file():
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        document = payload.get("orders") if isinstance(payload, Mapping) else None
+        orders = document if isinstance(document, list) else []
+    # The document wins for any row present in both.
+    present = {str(o.get("idempotency_key") or "") for o in orders if isinstance(o, Mapping)} - {""}
+    orders = [o for o in _archived_ledger_orders(root)
+              if str(o.get("idempotency_key") or "") not in present] + orders
     rows = []
     for order in orders:
         if isinstance(order, Mapping):

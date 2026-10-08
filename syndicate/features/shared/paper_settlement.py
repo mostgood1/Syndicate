@@ -606,8 +606,13 @@ def settle_orders(
     # all-time says "is this working". Clicking through days and adding them up
     # by eye is not the second answer, it is a chore that produces a guess.
     try:
-        by_date = settlement_summary(normalized, orders=orders)
-        all_time = settlement_summary(None, orders=state.get("orders") or [])
+        # Both over the FULL history: the date's settled rows may already sit in
+        # the archive the record cap moves them to, with only stragglers left here.
+        from syndicate.features.shared.execution_ledger import full_history_orders
+
+        history = full_history_orders()
+        by_date = settlement_summary(normalized, orders=history)
+        all_time = settlement_summary(None, orders=history)
         for scope, summary in (("date=" + normalized, by_date), ("all_time", all_time)):
             total = summary.get("total") or {}
             # ROI stays ABSENT rather than 0.0 when nothing is settled -- a
@@ -1205,10 +1210,11 @@ def settlement_summary(
     0.0% ROI on zero settled bets and a 0.0% ROI on fifty are the same string
     and opposite facts.
     """
-    from syndicate.features.shared.execution_ledger import _load
+    # FULL HISTORY, archive included -- see `settled_decisions_by_sport`.
+    from syndicate.features.shared.execution_ledger import full_history_orders
     from syndicate.features.shared.execution_guard import is_non_position
 
-    rows = list(orders) if orders is not None else (_load().get("orders") or [])
+    rows = list(orders) if orders is not None else full_history_orders()
     if selected_date:
         rows = [o for o in rows if o.get("selected_date") == str(selected_date)]
 
@@ -1441,9 +1447,12 @@ def settled_decisions_by_sport(
     `unknown` is excluded: it is a failed sport join, not a sport, and letting
     it collect rows would credential nothing at all.
     """
-    from syndicate.features.shared.execution_ledger import _load
+    # FULL HISTORY, not `_load()`: the record cap moves old rows to the disk
+    # archive, and an all-time figure over the document alone would quietly
+    # become a last-few-days figure [2026-10-08, execution-ledger-keyvalue-growth].
+    from syndicate.features.shared.execution_ledger import full_history_orders
 
-    rows = list(orders) if orders is not None else (_load().get("orders") or [])
+    rows = list(orders) if orders is not None else full_history_orders()
 
     seen: dict[str, set[str]] = {}
     for order in rows:
@@ -1563,9 +1572,12 @@ def sim_view_roi_summary(
     `_grouped`: a 0.0% ROI on zero settled bets and a 0.0% ROI on fifty are the
     same string and opposite facts.
     """
-    from syndicate.features.shared.execution_ledger import _load
+    # FULL HISTORY, not `_load()`: the record cap moves old rows to the disk
+    # archive, and an all-time figure over the document alone would quietly
+    # become a last-few-days figure [2026-10-08, execution-ledger-keyvalue-growth].
+    from syndicate.features.shared.execution_ledger import full_history_orders
 
-    rows = list(orders) if orders is not None else (_load().get("orders") or [])
+    rows = list(orders) if orders is not None else full_history_orders()
     if selected_dates is not None:
         keep = {str(d) for d in selected_dates}
         rows = [o for o in rows if str(o.get("selected_date") or "") in keep]

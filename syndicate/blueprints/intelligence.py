@@ -4625,8 +4625,8 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         LIVE,
         PAPER,
         execution_mode,
+        full_history_orders,
         ledger_summary,
-        _load,
     )
     from pipeline.execute_portfolio import execution_enabled
 
@@ -4655,9 +4655,12 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         # `/portfolio/live` redirects). This filter is what keeps them off THIS
         # page, and the merge did not move it -- the wall is between live and
         # SIMULATED, not between live and the user's own real logged bets.
+        # FULL HISTORY: the record cap moves old rows to a disk archive, and
+        # both a past date and the all-dates tile must still find them
+        # [2026-10-08, lane execution-ledger-keyvalue-growth, user-approved loan].
         all_orders = [
             order
-            for order in (_load().get("orders") or [])
+            for order in full_history_orders()
             if str(order.get("mode") or PAPER) != LIVE
         ]
         orders = [

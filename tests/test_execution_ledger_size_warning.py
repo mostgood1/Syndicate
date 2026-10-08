@@ -50,9 +50,11 @@ def test_the_break_even_per_order_size_is_the_number_that_matters() -> None:
     """Documents the actual risk surface: not time, not count -- per-order size."""
     ceiling = execution_ledger._store_max_bytes()
     break_even = ceiling / execution_ledger._MAX_RECORDS
-    assert break_even == pytest.approx(1677.7, abs=1.0)
-    # 1094 measured -> a 53% per-order growth is required before the cap stops working.
-    assert break_even / 1094 == pytest.approx(1.53, abs=0.02)
+    assert break_even == pytest.approx(2796.2, abs=1.0)
+    # 2026-10-08 (lane execution-ledger-keyvalue-growth): the cap fell 5,000 -> 3,000
+    # once trimmed rows moved to the disk archive. The worst date measured that day
+    # was 1,461 B/order; a further +91% per order is needed before the cap stops working.
+    assert break_even / 1461 == pytest.approx(1.91, abs=0.02)
 
 
 def test_the_ceiling_is_read_from_the_store_not_copied() -> None:
@@ -109,8 +111,8 @@ def test_the_warning_says_UNBOUNDED_when_the_cap_stops_protecting(
     approaching failure and must not read like the healthy case."""
     monkeypatch.setattr(execution_ledger, "write_json_file", lambda path, state: None)
     monkeypatch.setattr(execution_ledger, "_ledger_path", lambda: tmp_path / "l.json")
-    # ~2,100 bytes/order -> 5000 x 2100 = 10.5MB, above the 8MB ceiling.
-    orders = [{"idempotency_key": f"k{i}", "pad": "x" * 2050} for i in range(1100)]
+    # ~3,050 bytes/order -> 3000 x 3050 = 9.2MB, above the 8MB ceiling.
+    orders = [{"idempotency_key": f"k{i}", "pad": "x" * 3000} for i in range(1100)]
 
     execution_ledger._persist({"orders": orders})
 
@@ -129,7 +131,7 @@ def test_the_two_verdicts_are_distinguishable_at_the_SAME_total_size(
 
     execution_ledger._persist({"orders": [{"k": i, "pad": "x" * 1040} for i in range(2300)]})
     safe = _warn_line(capsys)
-    execution_ledger._persist({"orders": [{"k": i, "pad": "x" * 2050} for i in range(1170)]})
+    execution_ledger._persist({"orders": [{"k": i, "pad": "x" * 3000} for i in range(800)]})
     risky = _warn_line(capsys)
 
     safe_bytes = int(safe.split("bytes=")[1].split()[0])

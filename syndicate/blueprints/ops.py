@@ -399,10 +399,18 @@ def api_ops_execution_ledger_summary() -> Any:
     want_mode = str(request.args.get("mode") or "").strip().lower()
 
     try:
-        from syndicate.features.shared.execution_ledger import _ledger_path
+        from syndicate.features.shared.execution_ledger import _ledger_path, archived_orders
         from syndicate.features.shared.refresh_state_store import read_json_file
 
         payload = read_json_file(_ledger_path())
+        if payload:
+            # `days` reaches past the record cap; trimmed rows are in the disk
+            # archive (lane execution-ledger-keyvalue-growth). The document wins
+            # for any row present in both.
+            live = [o for o in (payload.get("orders") or []) if isinstance(o, dict)]
+            present = {str(o.get("idempotency_key") or "") for o in live} - {""}
+            payload = dict(payload, orders=[o for o in archived_orders()
+                                            if str(o.get("idempotency_key") or "") not in present] + live)
     except Exception as exc:  # noqa: BLE001
         # An ops read must not 500 -- it is the tool reached for when things are
         # already broken.

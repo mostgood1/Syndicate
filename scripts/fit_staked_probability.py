@@ -221,9 +221,10 @@ def rows_from_records(
 
 
 def load_ledger_records() -> tuple[list[dict[str, Any]], str]:
-    from syndicate.features.shared.execution_ledger import _ledger_path, _load
+    # FULL HISTORY: rows the record cap moved out live in the disk archive.
+    from syndicate.features.shared.execution_ledger import _ledger_path, full_history_orders
 
-    return list(_load().get("orders") or []), str(_ledger_path())
+    return full_history_orders(), str(_ledger_path())
 
 
 def load_jsonl_records(path: Path) -> list[dict[str, Any]]:
