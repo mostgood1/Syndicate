@@ -1008,9 +1008,13 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   out so the NB is not widened twice). Verified on the rebuilt 10-07 sims: shape 3 ladders/player, dispersion 5.
   `SYNDICATE_WNBA_SIM_MINUTES_REDISTRIBUTION` is refuted (lane closed), never hooked.
 - **First real games with all four on:** 2026-10-07 (ATL-NYL 23:30Z, GSV-LVA 01:30Z 10-08). Not yet graded.
-- **Known cost:** the availability rule leaves out a player returning after one missed game (~3.6% of player-games,
-  held-out 10-03). Measured on production's 10-04 slate (rule applied after the fact): it would have excluded 2 players
-  who played -- Aminata Gueye (GSV, 13 min) and Marine Fauthoux (NYL, 12 min).
+- **Availability rule fixed 2026-10-08 (7c69cb85, fleet ff 13:37:54Z):** (1) playoff box rows are written under ESPN
+  codes (GS/LV/NY) -- the rule now folds them (0a3946ef); before, a team's "last game" stayed its regular-season
+  finale; (2) a player whose missed games the injury report explains and who has left it is re-admitted. Graded
+  10-07: the rule as served excluded 3 players who played (Fauthoux 31 min, Evans 18, Gueye 13); with both fixes,
+  0 rule-attributable (Evans stays out only because the FEED listed her OUT through 10-07).
+- **First graded slate (10-07, all four estimators, pre-registered b3f825a3):** 162 rows, served-book Brier +0.0161,
+  player-clustered 95% CI [-0.0142, +0.0466] -- indistinguishable from the book on 2 games; rebounds and RA beat it.
 - **Grading needs a pre-tip snapshot:** production overwrites `oddsapi_player_props_<D>.csv` after the slate (10-04's is
   header-only by 10-05), so served-vs-book grading must copy the capture before tip. Done for 10-07 by
   `C:/tmp/wnba_bt/watch_grade_1007.py`; grader `scripts/grade_wnba_served_props.py` (pre-registered b3f825a3).
