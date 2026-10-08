@@ -979,6 +979,9 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # Soccer per-match player log (ESPN summaries; incremental -- one request per new
     # final): what soccer prop recency / vs-opponent history reads before live boxes.
     ScheduledJob("soccer-player-match-log", 11, 15, ("scripts/build_soccer_player_match_log.py",)),
+    # NBA / WNBA multi-season player game log with opponent (ESPN; incremental): the
+    # "history vs this team" basketball props read beyond the one-season box history.
+    ScheduledJob("basketball-player-game-log", 11, 20, ("scripts/build_basketball_player_game_log.py",)),
 )
 
 

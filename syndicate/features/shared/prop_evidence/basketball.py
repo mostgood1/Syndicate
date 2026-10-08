@@ -81,6 +81,21 @@ COMBO_NO_DRAWS = {"pr", "pa", "ra"}
 _BOX_COLUMNS = ("MIN", "PTS", "REB", "AST", "FG3M", "STL", "BLK", "TOV")
 
 
+# ESPN / production box codes -> Syndicate tricodes. The WNBA playoff box rows are
+# written as GS/LV/NY (measured 2026-10-08), and the multi-season player game log
+# (scripts/build_basketball_player_game_log.py) folds ESPN's codes the same way, so
+# a meeting is one team whatever source recorded it.
+_TEAM_ALIASES = {
+    "wnba": {"GS": "GSV", "LV": "LVA", "LA": "LAS", "NY": "NYL", "CONN": "CON", "WAS": "WSH", "PHO": "PHX"},
+    "nba": {"GS": "GSW", "NY": "NYK", "SA": "SAS", "NO": "NOP", "UTAH": "UTA", "WSH": "WAS", "PHO": "PHX"},
+}
+
+
+def _code(sport: str, abbr: Any) -> str:
+    raw = str(abbr or "").strip().upper()
+    return _TEAM_ALIASES.get(sport, {}).get(raw, raw)
+
+
 def _local_dir(sport: str) -> str:
     return f"{sport}_source"
 
@@ -189,6 +204,15 @@ def _box_sources(sport: str, as_of: str) -> list[Path]:
             dated.setdefault(iso, raw)
     for iso in sorted(dated)[-MAX_DATED_BOX_FILES:]:
         paths.append(dated[iso])
+    # Multi-season player game logs (ESPN; user 2026-10-08 "player history vs team"):
+    # the history file holds one WNBA season and a gappy NBA one. Read AFTER the box
+    # files, and `_box_games` keeps one line per player per DATE, so a game both
+    # sources hold is counted once (the box file's line wins).
+    logs: dict[str, Path] = {}
+    for root in C.sport_roots(_local_dir(sport)):
+        for raw in (root / "processed").glob("player_game_log_????.csv"):
+            logs.setdefault(raw.name, raw)
+    paths.extend(logs[name] for name in sorted(logs, reverse=True))
     return paths
 
 
@@ -203,7 +227,7 @@ def _box_games(sport: str, player_name: str, as_of: str) -> tuple[list[dict[str,
         try:
             for row in C.iter_csv(path):
                 game_id = str(row.get("game_id") or row.get("gameId") or "").strip()
-                team = str(row.get("TEAM_ABBREVIATION") or row.get("teamTricode") or "").strip().upper()
+                team = _code(sport, row.get("TEAM_ABBREVIATION") or row.get("teamTricode"))
                 if game_id and team:
                     by_game_teams.setdefault(game_id, set()).add(team)
                 name = str(row.get("PLAYER_NAME") or "").strip() or " ".join(
@@ -211,7 +235,9 @@ def _box_games(sport: str, player_name: str, as_of: str) -> tuple[list[dict[str,
                 if not C.names_match(name, player_name):
                     continue
                 date = str(row.get("date") or "")[:10]
-                key = game_id or date
+                # one line per player per DATE: two sources number the same game differently
+                # (nba.com 00225..., ESPN 4017...), and a player plays at most one game a day
+                key = date or game_id
                 entry: dict[str, Any] = {"date": date, "game_id": game_id, "team": team}
                 for col in _BOX_COLUMNS:
                     entry[col] = C.to_float(row.get(col))
@@ -375,24 +401,31 @@ def _recent_form(subject: PropSubject, games: list[dict[str, Any]], box_path: Pa
 
 def _matchup(subject: PropSubject, found, games: list[dict[str, Any]], columns: tuple[str, ...] | None, label: str,
              advanced: dict[str, dict[str, float]]) -> LayerEvidence:
-    if found is None:
-        return absent(Layer.MATCHUP, f"{ABSENT_NO_MATCH}:opponent unknown without the player's sim row")
-    player = found[0]
-    opponent = str(player.get("opponent") or "").upper()
+    if found is not None:
+        player = found[0]
+        opponent = _code(subject.sport, player.get("opponent"))
+    else:
+        # No sim row for this day: the opponent is the side of THIS game the player's
+        # newest team is not on (box rows are newest first). Unknown stays unknown.
+        player = {"team": games[0].get("team")} if games else {}
+        codes = {g.get("team") for g in games} | {g.get("opponent") for g in games} | set(advanced)
+        opponent = _opponent_from_teams(subject, games[0].get("team"), codes) if games else ""
+        if not opponent:
+            return absent(Layer.MATCHUP, f"{ABSENT_NO_MATCH}:opponent unknown without the player's sim row or a box team on this game")
     rows: list[list[Any]] = []
     facts: dict[str, Any] = {"opponent": opponent}
     tables: list[dict[str, Any]] = []
-    vs = [g for g in games if str(g.get("opponent") or "").upper() == opponent] if opponent else []
+    # EVERY logged meeting (box history + the multi-season player game log), newest
+    # first -- "history vs this team" is more than this season's one or two games
+    vs = [g for g in games if _code(subject.sport, g.get("opponent")) == opponent] if opponent else []
     if vs and columns:
-        season = subject.selected_date[:4]
-        vs = [g for g in vs if g["date"][:4] == season] or vs
         for game in vs[:6]:
             rows.append([game["date"], C.fmt_num(game.get("MIN"), 0), C.fmt_num(_stat_value(game, columns), 0)])
         rate = C.hit_rate([_stat_value(g, columns) for g in vs], subject.line, subject.side)
         if rate:
             rows.append([f"Hit rate vs {C.fmt_line(subject.line)}", "", C.hit_rate_text(rate)])
-        facts["vs_opponent"] = {"games": len(vs), "hit_rate": rate}
-        tables.append(table(f"{subject.player_name} vs {opponent} ({len(vs)} meeting{'s' if len(vs) != 1 else ''})",
+        facts["vs_opponent"] = {"games": len(vs), "hit_rate": rate, "since": vs[-1]["date"]}
+        tables.append(table(f"{subject.player_name} vs {opponent} ({len(vs)} meeting{'s' if len(vs) != 1 else ''} since {vs[-1]['date']})",
                             ["Date", "MIN", label], rows, Layer.MATCHUP))
     team = str(player.get("team") or "").upper()
     opp_stats = advanced.get(opponent) or {}
@@ -413,6 +446,23 @@ def _matchup(subject: PropSubject, found, games: list[dict[str, Any]], columns: 
     if not tables:
         return absent(Layer.MATCHUP, f"{ABSENT_NO_MATCH}:no meetings with {opponent or 'opponent'} and no team advanced stats row")
     return LayerEvidence(Layer.MATCHUP, tables=tables, facts=facts, source=f"{subject.sport}:boxscores_history+team_advanced_stats")
+
+
+def _opponent_from_teams(subject: PropSubject, team_code: Any, codes: Any) -> str:
+    """The other side of this game as a tricode, matched by canonical team name against codes in hand
+    (the player's box teams and opponents, the team-advanced table); '' when unresolvable."""
+    try:
+        from syndicate.features.shared.team_aliases import canonical_team
+    except Exception:
+        return ""
+    sport = subject.sport
+    mine = canonical_team(sport, _code(sport, team_code)) if team_code else None
+    home, away = canonical_team(sport, subject.home_team), canonical_team(sport, subject.away_team)
+    if not mine or not home or not away or mine not in {home, away}:
+        return ""
+    other = away if mine == home else home
+    matches = {_code(sport, c) for c in codes if c and canonical_team(sport, _code(sport, c)) == other}
+    return next(iter(matches)) if len(matches) == 1 else ""
 
 
 def _advanced(subject: PropSubject, found, stat: str | None, games: list[dict[str, Any]], label: str) -> LayerEvidence:
