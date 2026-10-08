@@ -33,6 +33,7 @@ from syndicate.features.nfl.player_stats import player_rate
 from syndicate.features.nfl.player_stats import anytime_td_rate_with_prior
 from syndicate.features.nfl.player_stats import player_rate_with_prior
 from syndicate.features.nfl.player_stats import player_team_with_prior
+from syndicate.features.nfl.player_stats import qb_starts_refused
 from syndicate.features.nfl.player_stats import resolve_player_id
 from syndicate.features.shared.team_aliases import canonical_team
 from syndicate.features.nfl.player_stats import resolve_player_id_for_game
@@ -723,6 +724,7 @@ def nfl_props_rows_for_week(
     # 194 unknowns as 194 wrong-team joins.
     refused_wrong_team = 0
     refused_unknown_team = 0
+    refused_qb_starts = 0
     for row in _best_price_player_props(season, week):
         stat = _NFL_PROP_MARKET_TO_STAT.get(str(row.get("market") or "").strip())
         if stat is None:
@@ -818,6 +820,13 @@ def nfl_props_rows_for_week(
             stdev = None
         else:
             mean, stdev, n, rate_source = player_rate_with_prior(season, week, player_id, stat)
+            # UNDER-2-STARTS REFUSAL (lane `nfl-passing-yards-prop-coin`): a QB whose
+            # as-of log is mostly relief/mop-up games is priced at P(over) ~0.07 for a
+            # START and goes over ~half the time -- 5% of FIT rows carrying 68% of the
+            # excess log-loss. The quoted line survives; the model's opinion does not.
+            if mean is not None and qb_starts_refused(season, week, player_id, stat, rate_source):
+                refused_qb_starts += 1
+                continue
         # Game context. Applied to the MEAN only: the rolling stdev describes
         # this player's own game-to-game spread and a scoring-environment shift
         # is not evidence about that dispersion.
@@ -852,7 +861,7 @@ def nfl_props_rows_for_week(
         f"sim_source={'artifact' if artifact_rows is not None else 'computed'} "
         f"odds_rows={len(odds_rows)} "
         f"sim_rows={len(sim_rows)} refused_wrong_team={refused_wrong_team} "
-        f"refused_unknown_team={refused_unknown_team}",
+        f"refused_unknown_team={refused_unknown_team} refused_qb_starts={refused_qb_starts}",
         flush=True,
     )
     return odds_rows, sim_rows

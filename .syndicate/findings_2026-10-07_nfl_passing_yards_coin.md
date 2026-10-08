@@ -100,3 +100,23 @@ no positive evidence — it should not raise any row's rank — until (2)/(3) ar
 
 Not measured: venue execution (Kalshi/Polymarket) of NFL passing-yards edges; the served board (substrate is
 checkout); other markets' identity defect (rushing/receiving use the zero-game imputation instead, a different path).
+
+## Shipped in code 2026-10-08: the under-2-starts refusal (user: "Do the per-line refusal for under-2-starts QBs")
+
+`player_stats.qb_starts_refused` + `qb_full_starts` (a full start = >= 0.7 of the team's `pass_attempt` plays in
+that game, counted over the SAME as-of log `player_rate_with_prior` priced from); `props.nfl_props_rows_for_week`
+withholds the passing_yards / passing_attempts probability when full starts < 2 and counts it
+(`refused_qb_starts=` on the `[nfl_props] JOIN` line). The odds row survives. Switch:
+`SYNDICATE_NFL_QB_STARTS_REFUSAL` (absent = ON). Threshold fixed from the 10-07 diagnosis; checked on FIT only
+(2025 NOT read a third time). Through the shipped function on FIT 2023-24:
+
+| market | refused | agrees with diagnosis | LL all -> kept | refused rows: LL, mean p, over-rate | share of excess LL |
+|---|---|---|---|---|---|
+| passing_yards | 539 / 10,297 (5.2%, 36 games) | 99.8% | 0.7872 -> **0.7214** | 1.978, 0.071, 0.521 | 71% |
+| passing_attempts | 211 / 4,059 (5.2%, 33 games) | 99.8% | 0.7854 -> **0.7338** | 1.726, 0.128, 0.673 | 58% |
+
+**The kept rows are still worse than a coin** (0.721 / 0.734 vs 0.693; book 0.665 / 0.692): causes #2 and #3 and
+the attempts sack convention remain. This removes the worst rows; it does not make the market's model edge
+positive. IN EFFECT NOWHERE until deployed AND the weekly prop artifact rebuilds (the builder calls
+`nfl_props_rows_for_week(use_artifact=False)`; the line reprice cannot resurrect a refused player+stat because no
+artifact row exists to reprice from).

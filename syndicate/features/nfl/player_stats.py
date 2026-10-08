@@ -897,6 +897,80 @@ def anytime_td_rate(season: int, week: int, player_id: str, *, prior_weight: flo
     return shrink_count_mean(raw_mean, n, prior_mean, prior_weight), n
 
 
+# QB STARTS REFUSAL (lane `nfl-passing-yards-prop-coin`, user decision 2026-10-08).
+#
+# `player_rate` averages EVERY game a passer has a play in. A quarterback quoted
+# for a START whose log is mostly relief, mop-up or injury-exit appearances
+# (59-73 passing yards per such game) gets a mean far below the line and
+# P(over) ~0.07 -- and goes over ~51% of the time. Measured through the
+# production probability on OddsAPI kickoff-10min quotes
+# (`.syndicate/findings_2026-10-07_nfl_passing_yards_coin.md`): rows with fewer
+# than 2 full starts in the as-of log are 5% of FIT 2023-24 passing-yards rows
+# and carry 68% of the log-loss in excess of a coin (2025: 6% / 57%). The model
+# has no evidence about this player AS A STARTER, so it gives no opinion.
+QB_FULL_START_SHARE = 0.7
+QB_MIN_FULL_STARTS = 2
+QB_STARTS_REFUSAL_STATS = frozenset({"passing_yards", "passing_attempts"})
+
+
+def qb_starts_refusal_enabled() -> bool:
+    """DEFAULT ON. `off`/`0`/`false`/`no` restores the unrefused rows (the off != on test)."""
+    raw = str(os.environ.get("SYNDICATE_NFL_QB_STARTS_REFUSAL") or "").strip().lower()
+    return raw not in {"off", "0", "false", "no"}
+
+
+@lru_cache(maxsize=8)
+def _pass_attempt_shares(season: int) -> dict[tuple[str, str], float]:
+    """(game_id, passer_id) -> the passer's share of his team's pass attempts in that game.
+
+    `pass_attempt` (sacks included) in both numerator and denominator, so the
+    share is a dropback share; the team is the play's `posteam`.
+    """
+    mine: dict[tuple[str, str], int] = {}
+    team_of: dict[tuple[str, str], str] = {}
+    team_total: dict[tuple[str, str], int] = {}
+    for play in load_player_plays(season):
+        passer = play.get("passer_player_id")
+        if not passer or play.get("pass_attempt") != "1":
+            continue
+        key = (play["game_id"], passer)
+        mine[key] = mine.get(key, 0) + 1
+        team_of[key] = play.get("posteam") or ""
+        team_key = (play["game_id"], team_of[key])
+        team_total[team_key] = team_total.get(team_key, 0) + 1
+    return {
+        key: count / team_total[(key[0], team_of[key])]
+        for key, count in mine.items()
+        if team_total.get((key[0], team_of[key]))
+    }
+
+
+def qb_full_starts(season: int, week: int, player_id: str, rate_source: str) -> int:
+    """Games in the SAME as-of log `player_rate_with_prior` priced from in which
+    this player took >= `QB_FULL_START_SHARE` of his team's pass attempts.
+
+    `rate_source` picks the log exactly as the rate did: the current season
+    strictly before `week`, or the whole prior season for the fallback.
+    """
+    if rate_source == "current_season_rolling":
+        log_season, before = season, int(week)
+    else:
+        log_season, before = season - 1, _ALL_WEEKS
+    shares = _pass_attempt_shares(log_season)
+    return sum(
+        1
+        for row in player_game_log(log_season, player_id)
+        if row["week"] < before and shares.get((row["game_id"], player_id), 0.0) >= QB_FULL_START_SHARE
+    )
+
+
+def qb_starts_refused(season: int, week: int, player_id: str, stat: str, rate_source: str) -> bool:
+    """True when the model must NOT price this passing line (see the block above)."""
+    if stat not in QB_STARTS_REFUSAL_STATS or not qb_starts_refusal_enabled():
+        return False
+    return qb_full_starts(season, week, player_id, rate_source) < QB_MIN_FULL_STARTS
+
+
 def final_stat_value(season: int, game_id: str, player_id: str, stat: str) -> float | None:
     """The real settled value for one game -- this module's actual-result
     grading primitive, the NFL analog of
