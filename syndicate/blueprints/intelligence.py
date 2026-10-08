@@ -2049,6 +2049,40 @@ def _slim_embedded_board_payload(response: Any) -> Any:
         slim["board_contract"] = contract
         slim["_embed_dropped"] = ["board_contract.cards"]
 
+    # `top_opportunities` IS A SUBSET OF `ranked_all`, ROW FOR ROW, and
+    # `recommendations` IS `top_opportunities` -- the exact-match rule above
+    # compares whole lists to `ranked_all`, so it saw neither. MEASURED on the
+    # served `/` 2026-10-08 17:09Z (lane layer2-board-ui-redesign): a 48.7 MB
+    # embed (7.8 MB gzipped) carried ranked_all 17.8 MB (5,188 rows) plus
+    # top_opportunities 15.4 MB and recommendations 15.4 MB (the same 4,500
+    # rows, every one also in ranked_all). Same rule as above: each row must be
+    # EXACTLY its ranked_all row by `pick_id` (unique), or nothing changes.
+    top = slim.get("top_opportunities")
+    if isinstance(top, list) and top and isinstance(canonical_rows, list) and canonical_rows:
+        by_id: dict[str, Any] = {}
+        ids: list[str] | None = []
+        for row in canonical_rows:
+            pid = row.get("pick_id") if isinstance(row, dict) else None
+            if not pid or pid in by_id:
+                ids = None
+                break
+            by_id[str(pid)] = row
+        if ids is not None:
+            for row in top:
+                pid = str(row.get("pick_id") or "") if isinstance(row, dict) else ""
+                # Identity first: the hydrated lists usually share row objects,
+                # and serialising 4,500 rows twice cost 9.5 s on the 10-08 payload.
+                if not pid or pid not in by_id or not (row is by_id[pid] or _same(row, by_id[pid])):
+                    ids = None
+                    break
+                ids.append(pid)
+        if ids:
+            if "recommendations" in slim and _same(slim.get("recommendations"), top):
+                slim.pop("recommendations", None)
+                aliases["recommendations"] = "top_opportunities"
+            slim.pop("top_opportunities", None)
+            slim["_embed_row_refs"] = {"top_opportunities": {"from": "ranked_all", "key": "pick_id", "ids": ids}}
+
     if aliases:
         slim["_embed_aliases"] = aliases
 

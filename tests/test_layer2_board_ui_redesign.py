@@ -250,3 +250,54 @@ class PropSideFramingEndToEnd(unittest.TestCase):
                     "syndicate/features/shared/wnba_projections.py"):
             text = (ROOT / rel).read_text(encoding="utf-8")
             self.assertNotRegex(text, r'projection\["side"\] = "over" if', rel)
+
+
+class EmbedRowReferences(unittest.TestCase):
+    """Page size: top_opportunities rides as pick_id references into ranked_all,
+    recommendations as an alias of it -- only when every row is exactly its
+    ranked_all row. Measured 2026-10-08: 48.7M -> 17.9M chars, gzip 5.0 -> 1.85 MB."""
+
+    def _payload(self):
+        rows = [{"pick_id": f"p{i}", "sport": "nhl", "x": i} for i in range(5)]
+        top = [dict(rows[3]), dict(rows[1])]
+        return {"ranked_all": rows, "top_opportunities": top, "recommendations": [dict(r) for r in top]}
+
+    def test_subset_becomes_references_and_recommendations_an_alias(self) -> None:
+        from syndicate.blueprints.intelligence import _slim_embedded_board_payload
+
+        slim = _slim_embedded_board_payload(self._payload())
+        self.assertNotIn("top_opportunities", slim)
+        self.assertNotIn("recommendations", slim)
+        self.assertEqual(slim["_embed_row_refs"]["top_opportunities"]["ids"], ["p3", "p1"])
+        self.assertEqual(slim["_embed_aliases"]["recommendations"], "top_opportunities")
+
+    def test_a_row_that_differs_keeps_the_full_list(self) -> None:
+        from syndicate.blueprints.intelligence import _slim_embedded_board_payload
+
+        payload = self._payload()
+        payload["top_opportunities"][0]["x"] = 99
+        slim = _slim_embedded_board_payload(payload)
+        self.assertIn("top_opportunities", slim)
+        self.assertNotIn("_embed_row_refs", slim)
+
+    @unittest.skipUnless(shutil.which("node"), "node not on PATH")
+    def test_the_page_rebuilds_the_references(self) -> None:
+        text = TEMPLATE.read_text(encoding="utf-8")
+        start = text.index("  function rehydrateAliases(payload) {")
+        depth, seen, end = 0, False, start
+        for i in range(start, len(text)):
+            if text[i] == "{":
+                depth, seen = depth + 1, True
+            elif text[i] == "}":
+                depth -= 1
+                if seen and depth == 0:
+                    end = i + 1
+                    break
+        from syndicate.blueprints.intelligence import _slim_embedded_board_payload
+
+        slim = _slim_embedded_board_payload(self._payload())
+        script = text[start:end] + "\nconst p = " + json.dumps(slim) + ";\nrehydrateAliases(p);\n" \
+            "console.log(JSON.stringify([p.top_opportunities.map(r => r.pick_id), p.recommendations === p.top_opportunities]));"
+        out = subprocess.run(["node", "-e", script], capture_output=True, text=True, timeout=60)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(json.loads(out.stdout.strip()), [["p3", "p1"], True])

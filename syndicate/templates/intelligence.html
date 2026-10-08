@@ -660,6 +660,24 @@
         });
     }
 
+    // ROW REFERENCES (2026-10-08): `top_opportunities` arrives as `pick_id`s
+    // into `ranked_all`, sent only when every row was EXACTLY its ranked_all
+    // row (`_slim_embedded_board_payload`). Rebuilt BEFORE the aliases below,
+    // because `recommendations` may alias the rebuilt list.
+    const rowRefs = payload._embed_row_refs;
+    if (rowRefs && typeof rowRefs === "object") {
+      Object.keys(rowRefs).forEach(function (key) {
+        const spec = rowRefs[key] || {};
+        const source = payload[spec.from];
+        if (!Array.isArray(source) || !Array.isArray(spec.ids)) return;
+        const byKey = new Map();
+        source.forEach(function (row) {
+          if (row && row[spec.key] !== undefined && row[spec.key] !== null) byKey.set(String(row[spec.key]), row);
+        });
+        payload[key] = spec.ids.map(function (id) { return byKey.get(String(id)); }).filter(Boolean);
+      });
+    }
+
     // `_embed_aliases` is the HTML embed's; `_response_aliases` is the API's
     // opt-in slimming. Same rebuild, two producers.
     const aliases = payload._embed_aliases || payload._response_aliases;
