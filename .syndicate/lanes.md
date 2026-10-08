@@ -2397,6 +2397,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Served cards (iec_history_served.py) on a warm build: NHL and soccer Recent form share >= 95% of props whose evidence has history; budget lines counted per build in refresh-worker.log.
 - Blocked by: none
 
+### odds-step-stdout-markers — OPEN — opened 2026-10-08 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: SOCCER_CONFIRMED_LINEUPS survives the odds job: refresh_odds_sources keeps allowlisted child-stdout marker lines (bounded) before blanking stdout, re-emits them as STEP_MARKER on stderr and carries them as stdout_markers in the compact step view; verified by a unit test through _run_command and a fleet odds_refresh.stderr.txt carrying STEP_MARKER ... SOCCER_CONFIRMED_LINEUPS
+- Files: scripts/refresh_odds_sources.py (step-marker extraction in _run_command + stdout_markers in _compact_step_result_view ONLY), tests/test_refresh_odds_step_markers.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: Unit: a child printing SOCCER_CONFIRMED_LINEUPS yields STEP_MARKER on stderr and stdout_markers after compaction; unrelated lines are not kept; the cap holds. Fleet: after the user's fleet ff (scripts run from the checkout, no restart), a new migration_runs/<date>/*/odds_refresh.stderr.txt holds STEP_MARKER name=soccer_<league>_artifacts ... SOCCER_CONFIRMED_LINEUPS
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

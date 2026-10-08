@@ -2636,6 +2636,31 @@ def _record_step_in_sim_ledger(step: RefreshStep, *, started: str, finished: str
         return
 
 
+# CHILD-STDOUT LINES THAT MUST OUTLIVE THE BLANKING (lane `odds-step-stdout-markers`,
+# 2026-10-08). `_compact_step_result` blanks every step's stdout to keep the
+# payload small, so a line a child prints for operators is captured and then lost.
+# `build_soccer_artifacts.py`'s `SOCCER_CONFIRMED_LINEUPS ... sides_confirmed=X/Y`
+# had 0 hits in 3 days of `data/reports/migration_runs`, which left "do confirmed
+# lineups ever reach the soccer sim" unmeasurable. Lines containing one of these
+# tokens are kept (bounded), re-emitted on stderr as `STEP_MARKER` beside
+# `STEP_END` (which does persist, in `odds_refresh.stderr.txt`), and carried as
+# `stdout_markers` in the compact step view. An ALLOWLIST, so the payload cannot
+# grow with whatever a child happens to print.
+_STEP_STDOUT_MARKERS = ("SOCCER_CONFIRMED_LINEUPS",)
+_STEP_MARKER_MAX_LINES = 64
+_STEP_MARKER_MAX_CHARS = 300
+
+
+def _step_stdout_markers(stdout_text: str) -> list[str]:
+    markers: list[str] = []
+    for line in str(stdout_text or "").splitlines():
+        if any(token in line for token in _STEP_STDOUT_MARKERS):
+            markers.append(line.strip()[:_STEP_MARKER_MAX_CHARS])
+            if len(markers) >= _STEP_MARKER_MAX_LINES:
+                break
+    return markers
+
+
 def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
     env = os.environ.copy()
     if step.env_updates:
@@ -2732,6 +2757,9 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
         file=sys.stderr,
         flush=True,
     )
+    stdout_markers = _step_stdout_markers(stdout_text)
+    for marker in stdout_markers:
+        print(f"STEP_MARKER name={step.name} {marker}", file=sys.stderr, flush=True)
     print(
         f"[refresh_odds_sources] END step={step.name} return_code={result.returncode} timeout_seconds={timeout_seconds if timeout_seconds is not None else 'none'}",
         flush=True,
@@ -2758,6 +2786,7 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
         "row_counts": row_counts or None,
         "stdout": stdout_text,
         "stderr": stderr_text,
+        "stdout_markers": stdout_markers,
         "ok": result.returncode == 0,
         "dry_run": False,
     }
@@ -2842,6 +2871,10 @@ def _compact_step_result_view(step_result: dict[str, Any] | None) -> dict[str, A
     row_counts = step_result.get("row_counts")
     if isinstance(row_counts, dict) and row_counts:
         compact["row_counts"] = row_counts
+    stdout_markers = step_result.get("stdout_markers")
+    if isinstance(stdout_markers, list) and stdout_markers:
+        # `odds-step-stdout-markers`: already bounded at capture (`_step_stdout_markers`).
+        compact["stdout_markers"] = list(stdout_markers)
     rows_loaded = _step_rows_loaded(step_result)
     if rows_loaded is not None:
         compact["rows_loaded"] = rows_loaded
