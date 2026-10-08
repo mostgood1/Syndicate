@@ -310,3 +310,34 @@ class EmbedIsBrowserJson(unittest.TestCase):
         text = _embed_json_text({"ranked_all": [{"line": float("nan"), "x": float("inf"), "y": 1.5}]})
         parsed = json.loads(text, parse_constant=lambda name: (_ for _ in ()).throw(ValueError(name)))
         self.assertEqual(parsed["ranked_all"][0], {"line": None, "x": None, "y": 1.5})
+
+
+class TeamLogosAndChipSituation(unittest.TestCase):
+    def test_logo_resolves_by_name_key_or_alias_from_a_branding_file(self) -> None:
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+
+        from syndicate.features.shared import team_logos
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "nhl_team_branding.csv"
+            path.write_text("team_id,abbreviation,location,display_name,primary_color,secondary_color,logo_url,source_snapshot_date\n"
+                            "1,TOR,Toronto,Toronto Maple Leafs,,,https://x/tor.png,2026-10-01\n", encoding="utf-8")
+            team_logos._index.cache_clear()
+            with patch.object(team_logos, "_branding_files", return_value=[path]):
+                self.assertEqual(team_logos.logo_url("nhl", "Toronto Maple Leafs"), "https://x/tor.png")
+                self.assertEqual(team_logos.logo_url("nhl", "toronto maple leafs"), "https://x/tor.png")
+                self.assertIsNone(team_logos.logo_url("nhl", "Atlantis Squids"))
+                rows = [{"sport": "nhl", "home_team": "Toronto Maple Leafs", "away_team": "Nowhere"}]
+                self.assertEqual(team_logos.stamp_row_logos(rows), 1)
+                self.assertEqual(rows[0]["home_logo"], "https://x/tor.png")
+                self.assertNotIn("away_logo", rows[0])
+            team_logos._index.cache_clear()
+
+    def test_live_situation_drops_what_the_token_already_says(self) -> None:
+        from syndicate.features.shared.game_chip_scoreboard import _live_situation
+
+        self.assertEqual(_live_situation({"live_state": {"status": "In Progress | Top 7 | 1 out"}}, "TOP 7"), "1 out")
+        self.assertEqual(_live_situation({"status": {"detailed": "3rd & 4 at TB 38"}}, "Q2 3:21"), "3rd & 4 at TB 38")
+        self.assertIsNone(_live_situation({"live_state": {"status": "In Progress"}}, "Q2 3:21"))

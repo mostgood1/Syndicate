@@ -1410,6 +1410,19 @@ def _hydrate_board_response_payload(response_payload: dict[str, object] | None) 
     # here so the answer is current as of this request rather than as of
     # whenever the pool was last built.
     _regate_board_rows(current)
+    # TEAM LOGOS on every row (user 2026-10-08 item 8, lane
+    # layer2-board-ui-redesign): `home_logo` / `away_logo` from the committed
+    # ESPN branding snapshots, read once per process -- dictionary lookups here,
+    # no network. Measured on the 10-08 board: 5,199 of 5,200 rows resolve.
+    # Every row list gets the same deterministic stamp, so the embed's
+    # exact-match row references (`_slim_embedded_board_payload`) still hold.
+    try:
+        from syndicate.features.shared.team_logos import stamp_row_logos
+
+        for key in ("ranked_all", "top_opportunities", "recommendations"):
+            stamp_row_logos(current.get(key))
+    except Exception as exc:  # noqa: BLE001 -- a logo must never break the board
+        print(f"[team_logos] STAMP_FAILED {type(exc).__name__}: {exc}", flush=True)
     return current
 
 

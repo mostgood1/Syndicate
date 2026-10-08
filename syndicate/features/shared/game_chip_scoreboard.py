@@ -533,6 +533,51 @@ def _matchup_text(game: dict[str, Any]) -> str:
     return f"{away} @ {home}"
 
 
+# THE LIVE SITUATION, beyond the clock `[2026-10-08, lane layer2-board-ui-redesign,
+# LOAN from web-restart-healthz: build_game_chip output fields ONLY]`. User: the
+# games rail must show "all relevant game info" once live. Built ONLY from text the
+# provider already fetched (no new network or file IO per chip -- the loan's
+# condition): MLB's `live_state.status` already reads "In Progress | Top 7 | 1 out",
+# and football/hockey detail strings carry down-and-distance or power-play text
+# when the source sends them. Parts the status token already shows, and bare state
+# words, are dropped; capped so a chip stays small.
+_SITUATION_NOISE = {"in progress", "live", "final", "scheduled", "pre-game", "pregame", "warmup", "delayed start"}
+_SITUATION_MAX_CHARS = 40
+
+
+def _side_logo(sport: str, game: dict[str, Any], side: str) -> str | None:
+    """Team logo from the cached branding index (`team_logos`) -- read once per
+    process, so no IO per chip (the loan's condition). None when unknown."""
+    try:
+        from syndicate.features.shared.team_logos import logo_url
+
+        return logo_url(sport, _side_name(game, side), _side_key(sport, game, side), _side_label(game, side))
+    except Exception:  # noqa: BLE001 -- a logo must never break a chip
+        return None
+
+
+def _live_situation(game: dict[str, Any], status_token: str | None) -> str | None:
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    status = game.get("status") if isinstance(game.get("status"), dict) else {}
+    token = _text(status_token).lower()
+    for source in (live_state.get("situation"), live_state.get("status"), status.get("detailed"), game.get("detail")):
+        text = _text(source)
+        if not text:
+            continue
+        parts = [part.strip() for part in re.split(r"\s*[|·]\s*", text) if part.strip()]
+        kept = []
+        for part in parts:
+            low = part.lower()
+            if low in _SITUATION_NOISE or (token and (low == token or low in token or token in low)):
+                continue
+            if _INNING_TEXT_RE.fullmatch(part) or _PERIOD_CLOCK_RE.fullmatch(part):
+                continue
+            kept.append(part)
+        if kept:
+            return " · ".join(kept)[:_SITUATION_MAX_CHARS]
+    return None
+
+
 def build_game_chip(sport: str, game: dict[str, Any]) -> dict[str, Any]:
     sport_slug = _text(sport).lower()
     is_live, is_final = _game_flags(game)
@@ -628,12 +673,14 @@ def build_game_chip(sport: str, game: dict[str, Any]) -> dict[str, Any]:
             "name": _side_name(game, "away"),
             "key": _side_key(sport_slug, game, "away"),
             "score": away_score,
+            "logo": _side_logo(sport_slug, game, "away"),
         },
         "home": {
             "abbr": _side_label(game, "home"),
             "name": _side_name(game, "home"),
             "key": _side_key(sport_slug, game, "home"),
             "score": home_score,
+            "logo": _side_logo(sport_slug, game, "home"),
         },
         "state": state,
         "status_token": status_token,
@@ -643,6 +690,8 @@ def build_game_chip(sport: str, game: dict[str, Any]) -> dict[str, Any]:
         "score_suppressed": score_suppressed,
         "leader": leader,
         "start_time_utc": start_time_utc.isoformat() if start_time_utc else None,
+        # Live only; None otherwise. Additive: every consumer reads with .get().
+        "situation": _live_situation(game, status_token) if state == "live" else None,
     }
 
 

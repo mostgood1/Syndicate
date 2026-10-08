@@ -1117,9 +1117,37 @@
     return String(item.headshot_url || item.headshotUrl || item.player_image || "").trim();
   }
 
+  // A FACE OR A CREST ON EVERY ROW (user 2026-10-08 item 8). Headshot when the
+  // row has one; else the picked team's crest on a game line; else both crests
+  // (a prop row does not say which side the player is on). `home_logo` /
+  // `away_logo` are stamped server-side from the ESPN branding snapshots
+  // (`team_logos.py`). A broken image removes itself rather than showing a
+  // broken-image glyph.
+  function teamCrest(url, extraClass) {
+    return url ? `<img class="board-crest${extraClass ? " " + extraClass : ""}" src="${escapeHtml(url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()" />` : "";
+  }
+
+  function rowCrests(item) {
+    const home = String(item.home_logo || "").trim();
+    const away = String(item.away_logo || "").trim();
+    if (!home && !away) return "";
+    const side = String(item.side || "").trim().toLowerCase();
+    const team = String(item.team || "").trim().toLowerCase();
+    const isProp = String(item.kind || item.candidate_type || "").toLowerCase() === "prop" || Boolean(item.player_name);
+    let picked = "";
+    if (!isProp) {
+      if (side === "home" || (team && team === String(item.home_team || "").trim().toLowerCase())) picked = home;
+      else if (side === "away" || (team && team === String(item.away_team || "").trim().toLowerCase())) picked = away;
+    }
+    if (picked) return teamCrest(picked, "board-crest--single");
+    return `<span class="board-crest-pair">${teamCrest(away)}${teamCrest(home)}</span>`;
+  }
+
   function playerHeadshot(item) {
     const url = playerHeadshotUrl(item);
-    return url ? `<img class="board-blotter__headshot" src="${escapeHtml(url)}" alt="" loading="lazy" />` : "";
+    return url
+      ? `<img class="board-blotter__headshot" src="${escapeHtml(url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()" />`
+      : rowCrests(item);
   }
 
   function displayMatchup(item) {
@@ -2121,7 +2149,7 @@
       <article class="board-card board-card--tier-${tier}" data-pick-id="${escapeHtml(pickKey(item))}" data-syndicate-question="${escapeHtml(item.question || "")}" data-syndicate-sport="${escapeHtml(sportAttr)}" data-syndicate-sport-slug="${escapeHtml(item.sport_slug || "")}" data-syndicate-market="${escapeHtml(market)}" data-syndicate-candidate-type="${escapeHtml(item.candidate_type || item.type || "")}" data-syndicate-selection="${escapeHtml(item.selection || item.pick || "")}" data-syndicate-matchup="${escapeHtml(displayMatchup(item) || "")}" data-syndicate-player-name="${escapeHtml(item.player_name || "")}" data-syndicate-name="${escapeHtml(title)}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}" data-syndicate-odds="${escapeHtml(String(item.odds ?? item.odds_current ?? ""))}" data-syndicate-prop-line="${escapeHtml(prop || "")}" data-syndicate-event-id="${escapeHtml(String(item.event_id || item.game_id || ""))}" data-syndicate-game-date="${escapeHtml(item.context_label || "")}" ${askIdentityAttrs(item)}>
         <div class="board-card__head">
           <div class="board-card__head-id">
-            ${playerHeadshotUrl(item) ? `<img class="board-card__headshot" src="${escapeHtml(playerHeadshotUrl(item))}" alt="" loading="lazy" />` : ""}
+            ${playerHeadshotUrl(item) ? `<img class="board-card__headshot" src="${escapeHtml(playerHeadshotUrl(item))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()" />` : rowCrests(item)}
             <div>
               <div class="board-card__title">${index === 0 ? "🔥 " : ""}${escapeHtml(title)}</div>
               <div class="board-card__subtitle">${subtitleContext ? `${escapeHtml(subtitleContext)} · ` : ""}${escapeHtml(sport)}</div>
@@ -2840,6 +2868,7 @@
     const score = team.score == null || team.score === "" ? "–" : team.score;
     return `
       <div class="game-mini-card__team${isLeader ? " game-mini-card__team--leader" : ""}">
+        ${team.logo ? `<img class="game-mini-card__logo" src="${escapeHtml(team.logo)}" alt="" width="20" height="20" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
         <span class="game-mini-card__team-abbr">${escapeHtml(team.abbr || "")}</span>
         <span class="game-mini-card__team-score">${escapeHtml(String(score))}</span>
       </div>
@@ -3553,6 +3582,8 @@
                 <div class="game-mini-card__head"><span>${headLeft}</span><span>${stateLabel}</span></div>
                 ${chipTeamRow("away", chip)}
                 ${chipTeamRow("home", chip)}
+                ${isLive && chip.situation ? `<div class="game-mini-card__situation">${escapeHtml(chip.situation)}</div>` : ""}
+                <div class="game-mini-card__meta">${game.count ? `${game.count} play${game.count === 1 ? "" : "s"}` : "no plays"}</div>
               </button>
             `;
           }

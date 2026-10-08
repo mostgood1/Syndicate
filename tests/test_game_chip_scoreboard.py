@@ -31,11 +31,14 @@ class GameChipBuilderTests(unittest.TestCase):
         # club the alias map cannot place carries `None` here rather than a
         # guess, because a WRONG key attaches one game's score to another
         # game's card.
+        # `logo` (2026-10-08, lane layer2-board-ui-redesign) is additive and
+        # depends on the branding snapshot being on disk; the key is always there.
+        self.assertIn("logo", chip["away"])
         self.assertEqual(
-            chip["away"], {"abbr": "NYY", "name": "", "key": "new york yankees", "score": "4"}
+            {k: v for k, v in chip["away"].items() if k != "logo"}, {"abbr": "NYY", "name": "", "key": "new york yankees", "score": "4"}
         )
         self.assertEqual(
-            chip["home"], {"abbr": "BOS", "name": "", "key": "boston red sox", "score": "2"}
+            {k: v for k, v in chip["home"].items() if k != "logo"}, {"abbr": "BOS", "name": "", "key": "boston red sox", "score": "2"}
         )
         self.assertEqual(chip["leader"], "away")
         self.assertEqual(chip["game_key"], "823759")

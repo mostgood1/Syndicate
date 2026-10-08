@@ -2481,3 +2481,15 @@ table.board-blotter tbody tr:last-child td {
 .board-badge--sim-offscale { background: rgba(243, 207, 138, .18); color: #f3cf8a; border: 1px solid rgba(243, 207, 138, .4); }
 @media (max-width: 900px) { .board-ranks__steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .board-ranks__steps { grid-template-columns: minmax(0, 1fr); } }
+
+/* Games rail: logos + live situation (lane layer2-board-ui-redesign). */
+.game-mini-card__logo { width: 20px; height: 20px; object-fit: contain; flex: none; margin-right: 6px; }
+.game-mini-card__team { display: flex; align-items: center; }
+.game-mini-card__situation { margin-top: 4px; font-size: 11px; color: #ff8f8f; font-weight: 600; }
+
+/* Team crests (row image fallback when there is no headshot). */
+.board-crest { width: 26px; height: 26px; object-fit: contain; flex: none; }
+.board-crest--single { width: 34px; height: 34px; }
+.board-crest-pair { display: inline-flex; flex-direction: column; gap: 2px; flex: none; }
+.board-top-rail__who .board-crest, .board-top-rail__who .board-crest--single { width: 22px; height: 22px; }
+.board-top-rail__who .board-crest-pair { flex-direction: row; }
