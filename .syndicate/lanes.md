@@ -2331,13 +2331,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 - **CLOSED 2026-10-08 18:54Z:** fix e5438b8d on the fleet web since 18:52:24Z. Reading 18:52:38Z: 24/24 cards carry a /latest/ headshot, 15/15 unique URLs answer 200 (baseline: 16/24 cards, all /2026/{TEAM}/ URLs 302 -> default-skater.png). Loan of nhl/cards.py returned to nhl-board-row-date-mismatch. Note for layer2-board-ui-redesign: the `player_headshots.py` module docstring (lines 12-16) still describes `_nhl_headshot_url` as building `/2026/TOR/` and is now stale.
 
-### nhl-headshot-docstring — OPEN — opened 2026-10-08 — session 3c03f29e-cbc0-43c8-a365-9b598352db50
+### nhl-headshot-docstring — CLOSED 2026-10-08 (GOAL MET: docstring-only, 35/35 layer2 tests; loan returned) — opened 2026-10-08 — session 3c03f29e-cbc0-43c8-a365-9b598352db50
 - Goal: player_headshots.py module docstring no longer says nhl/cards.py::_nhl_headshot_url builds /2026/TOR/ URLs (fixed in e5438b8d); docstring-only change, no behaviour change
 - Files: syndicate/features/shared/player_headshots.py (LOAN from layer2-board-ui-redesign; USER-APPROVED 2026-10-08 in session 3c03f29e: 'fix the stale player_headshots.py docstring too'; module docstring NHL bullet ONLY)
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: git diff shows docstring lines only; tests/test_layer2_board_ui_redesign.py passes
 - Blocked by: none
+- **CLOSED 2026-10-08:** docstring NHL bullet rewritten (5+/4-, no code); tests/test_layer2_board_ui_redesign.py 35 passed. No deploy: no behaviour change; the fleet carries it at its next ff. Loan of player_headshots.py returned to layer2-board-ui-redesign.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
