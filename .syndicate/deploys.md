@@ -47884,3 +47884,8 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - 820x1180: rail closed by default; "Ask" on a row -> rail open as overlay (left 420, width 400), scrim shown.
   - 390x844 (mobile emulation): document width 390 (preview pre-fix: 1,560); mobile bar shown, pill hidden; "Ask" on a row -> sheet open; "+ Slip" -> count 1 on the bar.
 - **rollback:** revert 12bc778e, ff, `reload-web`.
+
+## 2026-10-08 17:01:51Z (12:01 PM CT) -- MEASUREMENT (lane `intelligence-evidence-coverage`): NCAAF prior-season history + soccer event_id fix LIVE via a peer's refresh-worker restart onto a4259073
+- **not my deploy:** lane `execution-ledger-keyvalue-growth` held all three claims and restarted the refresh-worker at 16:44:34Z, `code=a4259073`, which contains c95afea9 (NCAAF history + vs-opponent hit rate) and b10f59f7 (soccer match-log `event_id` fix). User decision for this lane was "load the NCAAF history and soccer fix at the next clean restart"; this was it.
+- **verify (first build of the new process, state persisted 17:01:51Z, shortlist 298.5 s):** `prop_evidence provider for soccer raised` = 0 since 16:44:34Z (was 1 in the 15:23Z process's first build); ANY provider raised = 0. NCAAF prop cards with a vs-opponent HIT RATE in the served detail: 61 of 185 (was structurally 0 -- the provider counted meetings only), e.g. "Matchup: under 3.5 in 2 of 2 vs Arkansas State".
+- **not yet loaded:** 333bdbdd (MLB/NHL/NFL multi-season history readers) -- waits for its backfills and the next restart.
