@@ -284,6 +284,7 @@ Product decisions, not engineering ones. Do not re-take them.
   contended by every live session and will block edits to your own lane's
   files. Verified: global-only still blocks, per-session allows own lane,
   per-session naming a different lane still blocks.
+- **Lane LOANS are honoured by all three lane hooks as of 2026-10-08** (`a99d1c1c`). `lane-guard`, `scope-guard` and `lane-postwrite-check` judge a `(LOAN from <lender>` on the borrower's `Files:` line against origin/main + local additions, and only when the lender truly holds the path (`lane_claims_source.honoured_loan`). Verified live in the primary tree: a borrower is allowed, a non-borrower is blocked; a self-granted loan still blocks/warns (tests).
 
 ## [shipped-verified] SHIPPED / VERIFIED — current status by item `[2026-08-18; replaces a dozen dated snapshot sections]`
 

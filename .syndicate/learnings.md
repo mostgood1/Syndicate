@@ -3404,3 +3404,11 @@ own prior verdicts, not by anything failing.
 
 - I read the ride-alongs 27424623..50910fb3, then ran `git merge --ff-only github/main` on the fleet; main had moved to fdf487f6 in the 20 minutes between, so one commit (prop_evidence read cache, off by default, inert without a restart) rode along unread and was only read after the fact.
 - **How to apply:** fast-forward the fleet to the exact SHA you enumerated (`git merge --ff-only <sha>`), never to a remote branch name; re-list ride-alongs if you change the target.
+
+## 2026-10-08 -- A guard that reads its BLOCK from one ledger view must read its EXEMPTIONS from the same view `[lanes lane-guard-loan-main-text, loan-aware-warn-hooks, session 74f50e68]`
+
+- What we believed: lane `lane-guard-main-claims` (2026-09-17) had made lane-guard read origin/main + local additions instead of the stale primary `lanes.md`.
+- What was actually true: only the CLAIMS moved. The loan and disjoint-section exemptions added later re-parsed the primary copy, so a loan recorded on main (55547ac5) was blocked because the stale copy lacked the borrower's block. The two warning hooks (`scope-guard`, `lane-postwrite-check`) did not consult loans at all.
+- How we found out: a user-approved loan was blocked on 2026-10-07 ~16:35 CT and the session wrote around the guard; a peer then reported the warning hooks still firing on the permitted write.
+- The rule going forward: every reader of `lanes.md` that feeds ONE decision (claims, loans, sections, holders) goes through `lane_claims_source` (`effective_claims` / `effective_entries` / `honoured_loan`). A new exemption that takes the raw `text` is the same bug again.
+- Also: `scripts/lane_open.py` rewrites ALL line endings in `lanes.md`; check `git diff --numstat` shows 0 deletions after it, or insert the block byte-exactly.
