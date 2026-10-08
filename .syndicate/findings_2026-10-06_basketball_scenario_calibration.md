@@ -327,3 +327,45 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
 - Production adoption ONLY after the end-of-Phase-2 VALIDATION read, for the combined config.
 - **Follow-up for future guards:** state the threshold in units of measured run-to-run noise (√2 × sim-SE, or a
   measured same-config re-run), never the single-run sim SE.
+
+## Phase 2 #1b — MARGIN-EXCESS DIAGNOSIS, PRE-REGISTERED 2026-10-08 (user: "start the margin-excess diagnosis"), BEFORE computing
+
+**Target:** S8 margin-vs-spread SD, sim 18.89 (J1) vs real 14.00 [13.19, 14.71]. L1-L3 are exonerated.
+
+**Data:**
+- J1 full-FIT draws (`C:	mpball_scit_j1\sim_nba`, 200 draws × 791 paired games).
+- Real ESPN boxes (`real_nba.jsonl`), FIT window, regular season, the same 791 games.
+- Fields common to both: per-team FGA, 3PA, FTA, TOV. Sim draws carry no makes and no OREB; real carries OREB but no
+  makes in the stored record.
+
+**Decomposition (identical regression on both sides):**
+- margin = b0 + b1·ΔFGA + b2·Δ3PA + b3·ΔFTA + b4·ΔTOV + e, where Δ = home − away.
+- The VOLUME component is the fitted part; the EFFICIENCY component is the residual e (makes per attempt, i.e. shot
+  luck plus true shooting difference).
+  - REAL: across games, margin + home spread (centred on the line) on the Δs. Report SD(volume), SD(e).
+  - SIM: WITHIN-game, each draw minus its game mean for the margin and every Δ, pooled. Report SD(volume), SD(e).
+- Real SD(e) includes line mis-centring and true talent differences, so it is an UPPER bound on real within-game
+  efficiency luck. Sim within-game excludes both. A sim within-game component ABOVE the real total component is
+  therefore conclusive in direction.
+- CIs: game-clustered bootstrap, 1000 reps.
+
+**Hypotheses:**
+- **H-S (shot level):** sim within-game SD(e) > real SD(e) upper bound, CIs not overlapping.
+  - Falsified if sim SD(e) ≤ the real upper CI.
+- **H-V (volume):** sim within-game SD(volume) > real SD(volume), CIs not overlapping.
+  - Falsified if sim ≤ the real upper CI.
+- **Binomial check on H-S** (sim only, no real makes needed): per team-draw, the expected points variance from
+  independent shots given its own FGA/3PA/FTA at league rates (2P .545, 3P .360, FT .780, rounded 2025-26 league
+  values). Compare it with the sim's within-game per-team points variance after removing volume.
+  - A ratio > 1.3 means the engine adds efficiency noise beyond shot independence (e.g. per-draw efficiency
+    multipliers).
+  - ≈ 1 means its shot luck is binomial, and the excess must then be over-dispersed volume or something not
+    measured.
+- **Remainder rule:** if neither H-S nor H-V holds, the excess is attributed to what the saved draws cannot see
+  (lineup/rotation, OREB), which needs new per-draw instrumentation. That is NOT inferred from these numbers.
+
+**What happens next under each outcome** (fixed now):
+- H-S confirmed → read events.py for efficiency noise sources: per-draw or per-quarter make-probability multipliers,
+  hot-hand terms. Add default-off levers, then the same sweep protocol.
+- H-V confirmed → the same for possession/TOV/FTA generation.
+- VALIDATION is untouched.
