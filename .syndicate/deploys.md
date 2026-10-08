@@ -47766,3 +47766,27 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **proof lines (refresh-worker log):** `02:52:44.683Z LEGACY_POOL_SKIPPED date=2026-10-07`; `02:55:23.186Z STATE_FROM_LAYER2 date=2026-10-07 cards=315`; `CANDIDATE_POOL_READY count=315`; `02:55:25.576Z LAYER2_LEDGER_RECORDED cards=4217 other_date=3902 already=189 new=126 mlb_pk_stamped=40 mlb_pk_missing=0`; `02:55:26.474Z STATE_PERSIST_BEGIN candidate_count=315`. NO `STATE_WRITE_SKIPPED_EMPTY_OVER_GOOD`; no `candidate_collection_with_fallback` span at all.
 - **build time:** board_publication **239,604 ms** (overview 51.6 s, layer2_shortlist_build 59.7 s) -- the first build after a COLD full up. Today's legacy-pool builds: cold after full up 2,031 s (00:51Z up) and 1,268 s (01:42Z up); legacy collection 110-455 s per build. CONFOUND, stated: this build also ran on fdf487f6 (name-match memo) and the shortlist itself was faster than the 272-503 s seen today; the legacy stage's removal is the direct saving, the rest is not attributed.
 - **served state:** the per-date state is the Layer 2 list (315 cards for 10-07, board order) -- the one list.
+
+
+## 2026-10-08 13:37:54Z (8:37 AM CT) -- LOCAL FLEET FF fdf487f6 -> 7c69cb85 (no restart) + scoped 10-09 WNBA re-sim: availability rule fixed (team aliases + injury-aware re-admit) -- **MET** (lane `wnba-sim-availability`; user: "Fix both, then deploy", then "Ship all, then re-sim 10-09")
+
+- **why:** the pre-registered 10-07 grading found 3 players the availability rule excluded who PLAYED: Fauthoux 31 min, Evans 18, Gueye 13.
+  - Cause 1: production writes PLAYOFF box rows under ESPN codes (GS/LV/NY), so for those teams the rule saw the regular-season finale as the "last game". Fixed by 0a3946ef (alias folding).
+  - Cause 2: players returning from injury. Fixed by 7c69cb85, which re-admits a player whose missed games the injury report explains and who has left it. Unknown never re-admits; a partial latest snapshot falls back to the previous one.
+  - 10-07 re-check with both fixes: rule-attributable false exclusions 3 -> 0. Evans stays out because the FEED listed her OUT through 10-07 (a feed error the injury map acts on anyway).
+- **locks:** deploy_claim live-odds-worker + refresh-worker held by wnba-sim-availability (13:32Z).
+- **ride-alongs (enumerated before the ff, 27 commits; user approved shipping them):**
+  - 559a6036 and 623308fd: Layer 2 explanations lead with recent form + matchup.
+  - e6f2cd04: MLB matchup-splits producer + its scheduling in local_production.py. Effective at the next `up`.
+  - d6478de8: NFL defense-vs-position producer.
+  - c6a85698: NCAAF re-fit record / replay script.
+  - The rest is ledger, tests and reports. No restart was made, so long-running roles load none of it until their next restart.
+- **baseline (13:37:47Z):** fleet fdf487f6, clean; no WNBA refresh in flight; 10-09 sims built 05:05-05:06Z on the alias-bug rule; healthz 200.
+- **applied:** `git merge --ff-only 7c69cb85` (13:37:54Z, HEAD verified, `injury_explained_returns` present). Then production's orchestrator, scoped to NYL-ATL,LVA-GSV for 2026-10-09 under the live-odds-worker role env, rc 0. Sims rebuilt at 13:39:02Z / 13:39:23Z.
+- **reading (13:40Z, the fleet's code; injury status read as daily snapshots, latest 10-08):**
+  - availability applied switch=file (104 added, no re-admits needed).
+  - Same-team excluded players in the pools: 0. OUT-on-latest-snapshot players in the pools: 0.
+  - rate_shrink, prop_shape and prop_dispersion all applied switch=file.
+  - The 10-07 false exclusions are back in the pools: Fauthoux 11.8 min, Gueye 4.1, Talbot 31.2. **MET.**
+  - healthz 200; no restart.
+- **rollback:** delete `wnba_sim_availability.json` (or env `SYNDICATE_WNBA_SIM_AVAILABILITY=0`); no restart needed.
