@@ -456,8 +456,7 @@ v2 showed the four switches together cost NCAAF more than the levers recover (be
   shipped levers are themselves off-optimum.
 - **Gate to the held-out read (unchanged, amendment 2):** NCAAF 2025 (still UNREAD) is read only if Stage 2's fitted
   objective is <= 0.8 x production's on FIT; then gates (a)-(f) and the live L1-L3 replay as pre-registered.
-- Output `C:	mpootball_scenarios
-caafefit_v3\`; v2 files kept as the record.
+- Output `C:\tmp\football_scenarios\ncaaf\refit_v3\`; v2 files kept as the record.
 
 H1 prediction (|delta total| < 1.0) FAILED (-1.12). H2 prediction (total in [-0.5, +1.5]) held. Both
 fixes work mechanically (S12 after-half 25.0; S5 4th-down rows inside the real CI) and neither moves
