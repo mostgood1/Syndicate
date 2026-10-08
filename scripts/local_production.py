@@ -1408,14 +1408,114 @@ def _kill_pid_tree(pid: int) -> bool:
         return False
 
 
+ODDS_JOB_SCRIPT = "run_refresh_odds_job.py"
+
+
+def _manifest_path_arg(cmdline: list[str]) -> str | None:
+    for i, arg in enumerate(cmdline):
+        if arg == "--manifest-path" and i + 1 < len(cmdline):
+            return cmdline[i + 1]
+        if arg.startswith("--manifest-path="):
+            return arg.split("=", 1)[1]
+    return None
+
+
+def fleet_odds_job_pids(data_root: Path, processes: Iterable[tuple[int, list[str]]]) -> list[int]:
+    """Pids of this fleet's odds-refresh jobs: `run_refresh_odds_job.py` whose
+    `--manifest-path` lies under `data_root`. Matched on the command line, never
+    the environment, so a research run or another checkout's job is not this
+    fleet's even when it runs the same script."""
+    root = Path(data_root).resolve()
+    found: list[int] = []
+    for pid, cmdline in processes:
+        if not any(str(arg).replace("\\", "/").endswith("/" + ODDS_JOB_SCRIPT) or arg == ODDS_JOB_SCRIPT for arg in cmdline):
+            continue
+        manifest = _manifest_path_arg([str(a) for a in cmdline])
+        if not manifest:
+            continue
+        try:
+            Path(manifest).resolve().relative_to(root)
+        except (ValueError, OSError):
+            continue
+        found.append(int(pid))
+    return found
+
+
+def _reap_fleet_odds_jobs(settings: Settings, *, keep: bool = False, timeout: float = 15.0) -> list[int]:
+    """Stop the odds-refresh jobs the roles launched, after the roles are gone.
+
+    WHY `down` HAS TO DO THIS ITSELF. `ops_refresh` launches every odds job with
+    `start_new_session=True` (`ops_refresh.py:1466`, so the launch never blocks the
+    tick), which puts it outside the role's process group -- and `_terminate`
+    stops a role with `killpg` on that group. Measured 2026-10-08 on the fleet:
+    both full downs that night (00:50Z, 01:39Z) left a `run_refresh_odds_job.py`
+    tree running, reparented away from the supervisor, outside every role's
+    memory reading, and running the code from BEFORE the restart. Killing it
+    loses one refresh attempt: the next tick's `_assert_no_active_refresh_run`
+    finds `running` with a dead pid, stamps it `failed`, and launches again.
+
+    Only `down`. A role that exits on its own (the live-odds-worker's 6 h uptime
+    recycle, a crash) keeps its jobs, which is the point of detaching them; the
+    next worker sees them through the manifest pid. Other detached work (the MLB
+    daily sim) is meant to outlive a restart and is not touched here.
+    """
+    try:
+        import psutil
+    except Exception:
+        print("  [odds-jobs] psutil unavailable -- detached odds jobs NOT checked", flush=True)
+        return []
+    snapshot: list[tuple[int, list[str]]] = []
+    for proc in psutil.process_iter(["pid", "cmdline"]):
+        try:
+            cmdline = proc.info.get("cmdline") or []
+        except Exception:
+            continue
+        if proc.info.get("pid") != os.getpid() and cmdline:
+            snapshot.append((int(proc.info["pid"]), list(cmdline)))
+    pids = fleet_odds_job_pids(settings.data_root, snapshot)
+    if not pids:
+        return []
+    if keep:
+        print(f"  [odds-jobs] kept {len(pids)} detached odds job(s) (--keep-odds-jobs): {', '.join(map(str, pids))}", flush=True)
+        return []
+    victims: list[Any] = []
+    for pid in pids:
+        try:
+            leader = psutil.Process(pid)
+            # Children FIRST: once the leader dies they are reparented and can no
+            # longer be found from it.
+            victims.extend([leader, *leader.children(recursive=True)])
+        except Exception:
+            continue
+    for proc in victims:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+    _gone, alive = psutil.wait_procs(victims, timeout=timeout)
+    for proc in alive:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+    for pid in pids:
+        manifest = next((_manifest_path_arg(c) for p, c in snapshot if p == pid), None) or ""
+        run = Path(manifest).parent.name if manifest else "?"
+        print(f"  [odds-jobs] stopped detached odds job pid={pid} run={run}", flush=True)
+    print(f"  [odds-jobs] {len(pids)} job(s), {len(victims)} process(es); {len(alive)} needed SIGKILL", flush=True)
+    return pids
+
+
 def cmd_down(args: argparse.Namespace) -> int:
     from syndicate.features.shared.process_liveness import pid_is_alive
 
     settings = settings_from_args(args)
+    keep_odds_jobs = bool(getattr(args, "keep_odds_jobs", False))
     pidfile = settings.run_dir / PIDFILE_NAME
     stop_file = settings.run_dir / "stop"
     if not pidfile.is_file():
         print("not running (no pidfile).")
+        _reap_fleet_odds_jobs(settings, keep=keep_odds_jobs)
         return 0
     info = json.loads(pidfile.read_text(encoding="utf-8"))
     pid = int(info.get("supervisor_pid") or 0)
@@ -1435,6 +1535,7 @@ def cmd_down(args: argparse.Namespace) -> int:
                 print(f"  [{name}] orphan pid={child_pid} {'killed' if killed else 'could not be killed'}")
         pidfile.unlink(missing_ok=True)
         stop_file.unlink(missing_ok=True)
+        _reap_fleet_odds_jobs(settings, keep=keep_odds_jobs)
         print("down.")
         return 0
 
@@ -1470,6 +1571,7 @@ def cmd_down(args: argparse.Namespace) -> int:
             _kill_pid_tree(pid)
         pidfile.unlink(missing_ok=True)
     stop_file.unlink(missing_ok=True)
+    _reap_fleet_odds_jobs(settings, keep=keep_odds_jobs)
     print("down.")
     return 0
 
@@ -1995,6 +2097,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     p = sub.add_parser("down", help="stop a running `up`")
     p.add_argument("--timeout", type=float, default=90.0)
     p.add_argument("--unclaimed-ok", metavar="REASON", default="", help="stop without a refresh-worker deploy claim (recorded in logs/role_restarts.jsonl)")
+    p.add_argument("--keep-odds-jobs", action="store_true", help="leave the roles' detached run_refresh_odds_job.py trees running (the pre-2026-10-08 behaviour)")
     p.set_defaults(func=cmd_down)
 
     p = sub.add_parser("backup", help="snapshot the data root + redis (hard-linked, keeps --keep); a scheduled job")
