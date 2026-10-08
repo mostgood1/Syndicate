@@ -2252,6 +2252,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Unit: detached leader+grandchild both dead after reap; outside-data-root job untouched; --keep-odds-jobs leaves it alive (off != on). Fleet: next full down prints the reaped jobs and ps shows 0 run_refresh_odds_job.py afterwards
 - Blocked by: none
 
+### soccer-last-scorer-lineup — OPEN — opened 2026-10-08 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: Say whether a confirmed-lineup last-goalscorer race (starter/bench role known pre-kickoff, bench priced conditional on appearing since DNP voids) is better calibrated and bettable at the price, out of sample, with a ship / no-ship verdict recorded in a findings file
+- Files: scripts/soccer_season_audit/last_scorer_lineup_test.py (NEW, measurement only), .syndicate/findings_2026-10-08_soccer_last_scorer_lineup.md (NEW)
+- Hypothesis: PRE-REGISTERED 2026-10-08 before any run. H1: replacing w(minutes share) with the lineup role (w=1 starting XI, w=0 bench) and scaling bench rates by 1/P(appear|bench) (fitted before the split) lowers last-scorer log-loss vs BOTH the board race and the 10-05 time-aware race on matches on/after 2026-09-16 (post-09-07 builds), and moves sub realised/expected (2.10 board, 2.92 time-aware) toward 1. H2: at the price (same lines/rules as last_scorer_price_test.py) the EV>0 ROI improves. Roles come from ESPN starter flags, standing in for the confirmed lineup ESPN publishes ~1h pre-kickoff (an upper bound: late changes ignored).
+- Falsification test: H1 falsified if the log-loss difference vs the time-aware race has a 95% CI including 0 or above 0. H2: SHIP only if the EV>0 ROI difference vs the board race has a CI excluding 0 AND point ROI >= 0; otherwise no-ship, whatever H1 says.
+- Verification: Findings file with the per-role calibration, log-loss and ROI tables + CIs, the number of dates/matches/lines, and the verdict; plus the share of live last-scorer lines priced from a build that had confirmed starters (whether the mechanism could reach the board at all).
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
