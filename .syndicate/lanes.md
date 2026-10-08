@@ -1712,6 +1712,13 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **JOINT ROUND DESCENT 2026-10-09: chose w = 0 (recency rejected at every weight), hook +2, bb_ball_bias_mult 1.2, k_logit_bias -0.15; score 157.3 -> 91.0. Holdout read running per the rule.**
+  - All 183 rebuilds OK (24 June-fit + 37 window-first-half dates at each w).
+  - Chosen on FIT: June outs 15.86 vs 15.47, P 89.1 vs 85.5; window-1st outs 15.76 vs 15.39, P 88.7 vs 84.0.
+  - **DESIGN FLAW (mine, pre-registration):** both fit sets (June 06-15..07-12, window 07-16..08-21) PRECEDE the late-season shortening, which starts 08-22, inside the holdout.
+    - The fit never saw the phase the recency mechanism exists for, so it could not select it. Recency lowered outs in both fit phases, which were already near or above actual there.
+    - Any honest test of recency needs late-season data IN the fit, and there is none left that has not been the holdout.
+  - Expectation, recorded before the read: the chosen config is ~round 2's (outs too long late-season), so check (5) outs is likely to fail again.
 - **JOINT ROUND (count table + workload + walk), PRE-REGISTERED 2026-10-09 (user chose "Joint round"), before any rebuild or arm:**
   - WHY: count-shape rounds 1-2 fixed the count mix and pitches/PA but failed on SEASON-PHASE starter length (June ~15.4 outs vs late season 14.61; no constant hook serves both) and on BB/PA drift. With pitches/PA fixed, the recency-stamina mechanism (built, default 0) no longer collides with a pitch deficit.
   - COMPONENTS:
