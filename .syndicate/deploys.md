@@ -47664,3 +47664,23 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **READING:** multiplicative k=0.780 home=2.93 pts, held-out RMSE 11.25 raw -> **11.16 calibrated**, MAE 8.93 -> 8.85; additive k=0.789 home=2.94, RMSE 11.16 (tie -> model unchanged); naive home+3.5: RMSE 13.29 / MAE 10.48. Cause: the opponent-adjustment fixed point amplifies spread (sd 15.76 per 100 at convergence vs 9.37 raw; converged by ~20 iterations, not diverging).
 - **applied (commit below):** `MARGIN_CALIBRATION_K = 0.78`, this season's O/D deviations shrunk toward the league mean BEFORE the early-season prior blend (a calibrated prior must not be scaled twice); `calibration_k` column; `HOME_POINTS = 2.9` documented for margin use.
 - **fleet table regenerated** (no fetch: `dates_checked=0 games_fetched=0`, 12,598 box rows, 361 teams) -> `team_ratings_2026_asof_20260406.csv`: adj_em sd **12.30** (was 15.76), max **+34.17** Michigan, min -29.75; order unchanged (Michigan, Duke, Arizona, Illinois, Houston).
+
+## 2026-10-08 00:14:22Z (7:14 PM CT 10-07) -- refresh-worker restart onto 27e5d820 (Kalshi board-join memo): today's Layer 2 refresh 1,450 s -> 108 / 151 s; full build ~53 min -> ~8 min (lane `web-restart-healthz`)
+
+- **who/why:** user: "once it's identical push it and restart the worker after a save". The Kalshi board-coverage join (moved into venue_odds_loop by 44604a28) spent 96% of its time in `_resolve_event` (py-spy 16:13 CT), ran in the refresh-worker process, and took 589-645 s per pass, against 93-128 s without it. Today's Layer 2 cadence refresh measured 993 s cold and 1,450 s at 4:06 PM.
+- **fix:** 27e5d820 `kalshi_board_join`: distinct games built once per join and the resolution memoised per (blob, series family, sport, ticker start). The prop branch is unchanged (loan from mlb-doubleheader-e2e, 55547ac5).
+- **equivalence (fleet data, read-only, nice 19):** 11,703 markets x 4,646 shortlist rows for 10-07: `identical_report=True`, matched 737 both ways; join 97.7 s -> 27.8 s.
+- **gate:** claim refresh-worker (holder web-restart-healthz, token 55c6633d). check_deploy_safety under the worker env, run at each save from 4:51 PM, read NOT CLEAR for refresh-worker children until the 7:13:51 PM save:
+  - 4:51 PM: MLB pre-game sim.
+  - 5:43, 6:10, 6:27 PM: odds/soccer child jobs.
+  - 6:48 PM: MLB fingerprint resim.
+  - 6:59 PM: odds/soccer child jobs.
+  - 7:13:51 PM: refresh-worker children `none`, MLB sim finished, board idle after the save. Only live-odds-worker jobs and the live-games WARNING remained; a refresh-worker-only TERM does not touch those (user chose "next clear save").
+- **action:** fleet ff 88c532cd -> 27e5d820 (ride-alongs on the worker: 85639e7f, 17ead0fd, dac18590, plus 20d36d31, which stays OFF because SYNDICATE_LEDGER_RECORD_LAYER2 is absent from the env file, the worker env and render.yaml, and absent means False). `kill -TERM 3350915` at 00:14:22Z; the supervisor respawned pid 3479878 at 00:14:29Z.
+- **READINGS (log, new pid):**
+  - LAYER2_TODAY_CADENCE ran=yes: elapsed_s **108.0** (00:16:20Z, cold) and **151.0** (00:28:48Z, age_before_s 409).
+  - Kalshi refresh with join: **70.6 / 62.5 / 56.1 s** every ~5 min.
+  - First full build: pull_hot_artifacts 00:16:27Z -> STATE_PERSIST_BEGIN **00:24:36Z (~8 min)**. Spans: overview 59.8 s (was 275-335), shortlist 82.0 s (was 337-1924), portfolio_commit 54.8 s (was 503-561). LOOP_ITERATION 00:26:16Z.
+- **CONFOUND (stated, not removed):** host load was 13 at 19:29 CT against 23 at 16:07 CT; the 16:07 reading also had three nice-19 research jobs at ~80% CPU each. Part of the build-time drop is less contention. The join speedup on its own is measured on identical inputs (3.5x).
+- **guard finding:** the old worker exited `code=0 after 17334s`. It traps SIGTERM, so 88c532cd's signal-only restart guard would have missed this. Fixed in 07c0c683 (any guarded-role exit is recorded). It takes effect at the next supervisor `up`.
+- **verify:** the reading above. Released the refresh-worker claim after this entry.
