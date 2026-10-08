@@ -1688,6 +1688,19 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **WORKLOAD FIX RESULT 2026-10-08 ~01:40Z: FIT CHOOSES w = 0 (production) -> nothing to ship; the holdout (09-09..09-27) was not read for it.**
+  - Rebuilt 08-22..09-27 at w 0.25 / 0.5 / 0.75 (37 dates each, all built). Replayed FIT 08-22..09-08 (18 dates, 490 starts), 100 sims. Pre-registered score, then starter bias for BF / outs / P:
+
+    | w | score | BF | outs | P |
+    |---|---|---|---|---|
+    | 0 | **120.39** | +0.24 | -0.14 | -9.4 |
+    | 0.25 | 126.63 | +0.09 | -0.24 | -9.9 |
+    | 0.5 | 130.28 | -0.03 | -0.32 | -10.3 |
+    | 0.75 | 133.55 | -0.13 | -0.39 | -10.7 |
+
+  - The recency term DOES remove the BF excess (+0.24 -> -0.03 at 0.5), but it pushes outs further low and widens the pitch deficit. It collides with the shipped config's pitch-count defect (PAs ~10 pitches/start short): a lower stamina then cuts starts short on every other moment.
+  - The two defects are coupled. Next honest round: restore pitches/PA FIRST (early-count foul boost, with outs held in the objective), then re-try workload on top. The mechanism stays in code at default 0 (byte-identical).
+  - The out-of-sample evaluation of the combined calibration is now read: no fix is waiting on the second half.
 - **PITCH-COUNT FIX RESULT 2026-10-07 ~23:45Z: DO NOT SHIP. Nothing shipped; production unchanged.**
   - FIT descent chose two_strike_extra_foul_prob 0.12 + starter_hook_add_pitches +2 (from -13). Score 111.9 -> 65.0; pitches 75.1 -> 85.1 vs 84.0; outs ~15.2 -> 16.71 vs 15.39.
     - Extra fouls alone add ~1 pitch per 0.08 but cost ~0.25 outs (the pitch-count hook fires sooner). The hook carried the pitches, and with them the outs.
