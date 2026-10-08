@@ -135,3 +135,7 @@ The sack inflation was cancelling the log-normal blend's under-lean (cause #2 ab
 ## 2026-10-08 -- name fallback fix (on main)
 
 `resolve_player_id_with_prior` fell back to the prior season when the current-season short name was AMBIGUOUS ("Jalon Daniels" TB 2026 -> Jayden Daniels via `j.daniels`). The board resolves through `resolve_player_id_for_game` (team-checked) and was correct; the defect reached its no-teams branch and every backtest harness. FIT harness effect: 27 names / 277 quote rows now refused (player_unresolved 73 -> 100). Earlier FIT numbers in this file include those rows.
+
+## 2026-10-08 -- blend re-fit on REAL quotes: NO SHIP
+
+Pre-registered (lanes.md, adbf31ad): w on 2023 quotes, held 2024, ship iff LL(new) < LL(production) on identical rows AND |mean P(over) - over-rate| <= 0.03. Selected w = 0.33. Held 2024 (2,329 rows, 229 games): LL 0.7767 vs 0.7732 (+0.0036 [-0.0162, +0.0226]); mean P(over) 0.428 vs 0.499. **The lean is in the MEAN, not the blend:** on 2,445 2024 rows the official season-average minus line is median -1.12 / mean -2.28 while actual minus line is +0.5 / -0.24; the sack-inflated mean (+1.26 / +0.17) was right by accident. Next lever: the as-of mean (starts-only rate), measured on real quotes before any convention change ships.
