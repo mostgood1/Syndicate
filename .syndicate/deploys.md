@@ -47759,3 +47759,10 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **reading (same script, same slate, before -> after):** mean projected BLOCKS by pk_unit: PK1 1.360 -> **1.155** (n 81), PK2 0.747 -> **0.871** (n 79), no PK unit 0.458 -> **0.487** (n 199). Slate total 261.2 -> 260.2 (-0.4%, team level unchanged). Every direction as predicted.
 - **checklist:** `nhl_sim_input_checklist.py` with SYNDICATE_ARTIFACT_ROOT_NHL=~/syndicate-prod/data/nhl_source -- PASS; proj_sh_toi 43.7% "thin" only because older dated lineups predate the column (same as proj_pp_toi).
 - **off switch:** profile field pk_usage="units" (a SYNDICATE_CALIBRATION_PROFILE_PATH_NHL override) or revert 50910fb3; no restart needed either way.
+
+## 2026-10-08 ~02:56Z (9:56 PM CT 10-07) -- READING: legacy pick list RETIRED -- first build MET (lane `intelligence-evidence-coverage`, session 13ac7622)
+
+- **for:** the 02:44:03Z full down/up (SYNDICATE_LEGACY_CANDIDATE_POOL=0, code fdf487f6).
+- **proof lines (refresh-worker log):** `02:52:44.683Z LEGACY_POOL_SKIPPED date=2026-10-07`; `02:55:23.186Z STATE_FROM_LAYER2 date=2026-10-07 cards=315`; `CANDIDATE_POOL_READY count=315`; `02:55:25.576Z LAYER2_LEDGER_RECORDED cards=4217 other_date=3902 already=189 new=126 mlb_pk_stamped=40 mlb_pk_missing=0`; `02:55:26.474Z STATE_PERSIST_BEGIN candidate_count=315`. NO `STATE_WRITE_SKIPPED_EMPTY_OVER_GOOD`; no `candidate_collection_with_fallback` span at all.
+- **build time:** board_publication **239,604 ms** (overview 51.6 s, layer2_shortlist_build 59.7 s) -- the first build after a COLD full up. Today's legacy-pool builds: cold after full up 2,031 s (00:51Z up) and 1,268 s (01:42Z up); legacy collection 110-455 s per build. CONFOUND, stated: this build also ran on fdf487f6 (name-match memo) and the shortlist itself was faster than the 272-503 s seen today; the legacy stage's removal is the direct saving, the rest is not attributed.
+- **served state:** the per-date state is the Layer 2 list (315 cards for 10-07, board order) -- the one list.
