@@ -12,7 +12,9 @@ For every player in this season's Statcast splits (batters and pitchers), per se
 Writes, under `<mlb data root>/derived/`:
     mlb_player_game_log_<season>_hitting.csv / _pitching.csv
     mlb_hand_splits_<season>.csv
-INCREMENTAL: a past season's player already in its file is not re-fetched; the CURRENT season is always
+INCREMENTAL: a past season's player already FETCHED is not re-fetched -- recorded in
+`mlb_player_game_log_<season>_<group>.fetched.json`, because a player with no games that season leaves no row
+to prove it; a failed fetch is not recorded, so the next run retries it. The CURRENT season is always
 re-fetched (it changes daily). Regular season ("R") and postseason (F/D/L/W) kept and labelled.
 
     python scripts/build_mlb_player_game_logs.py                   # 2023 .. this season
@@ -149,8 +151,18 @@ def run(season: int, *, current: int, fetch: FetchJson = _fetch, pause: float = 
     for group, stats in (("hitting", HITTING), ("pitching", PITCHING)):
         path = root / "derived" / f"mlb_player_game_log_{season}_{group}.csv"
         existing = _read(path)
-        have = {r["player_id"] for r in existing} if season != current else set()
-        rows: list[dict[str, Any]] = [r for r in existing if r["player_id"] in have]
+        # WHO WAS FETCHED, not who has rows: a past-season player with no games that season leaves no row,
+        # so "has rows" re-fetched him every run (2024: 573 of 1,530, 2025: 385 -- 2026-10-08 hand run).
+        fetched_path = path.with_suffix(".fetched.json")
+        fetched: set[str] = set()
+        if season != current and fetched_path.is_file():
+            try:
+                fetched = {str(x) for x in json.loads(fetched_path.read_text(encoding="utf-8"))}
+            except (OSError, ValueError):
+                fetched = set()
+        with_rows = {r["player_id"] for r in existing}
+        have = (with_rows | fetched) if season != current else set()
+        rows: list[dict[str, Any]] = [r for r in existing if r["player_id"] in with_rows and r["player_id"] in have]
         for pid in sorted(players[group]):
             if pid in have:
                 summary["kept"] += 1
@@ -161,12 +173,17 @@ def run(season: int, *, current: int, fetch: FetchJson = _fetch, pause: float = 
                     splits.extend(split_rows(group, season, pid, fetch(
                         f"{BASE}/people/{pid}/stats?stats=statSplits&sitCodes=vl,vr&season={season}&group={group}")))
                 summary["fetched"] += 1
+                fetched.add(pid)
             except Exception as exc:  # noqa: BLE001
                 summary["failed"] += 1
                 print(f"[mlb_logs] FETCH_FAILED season={season} group={group} player={pid} {type(exc).__name__}", flush=True)
             time.sleep(pause)
         rows.sort(key=lambda r: (str(r["date"]), str(r["player_id"])))
         _write(path, LOG_KEYS + stats, rows)
+        if season != current:  # a failed fetch is NOT recorded, so the next run retries it
+            tmp = fetched_path.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(sorted(fetched | with_rows)), encoding="utf-8")
+            os.replace(tmp, fetched_path)
         summary[f"{group}_rows"] = len(rows)
     _write(split_path, SPLIT_FIELDS, splits)
     summary["split_rows"] = len(splits)

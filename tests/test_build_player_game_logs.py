@@ -134,3 +134,29 @@ def test_recent_values_side_channel_matches_the_sentence(tmp_path, monkeypatch):
     rm.prop_recent_matchup_text(row, selected_date="2025-07-01", memo=memo)
     rm.prop_recent_matchup_text(row, selected_date="2025-07-01", memo=memo)  # memo hit: values still there
     assert rm.recent_values_for(row)["values"] == got["values"]
+
+
+def test_mlb_past_season_never_refetches_a_player_with_no_games(tmp_path, monkeypatch):
+    root = tmp_path / "data"
+    monkeypatch.setenv("SYNDICATE_MLB_DATA_ROOT", str(root))
+    (root / "derived").mkdir(parents=True)
+    (root / "derived" / "mlb_matchup_splits_2026_asof_20260927.json").write_text(
+        json.dumps({"batters": {"1": {}, "2": {}, "3": {}}, "pitchers": {}}), encoding="utf-8")
+    calls = []
+
+    def fetch(url):
+        calls.append(url)
+        if "people/3/" in url:
+            raise OSError("boom")  # a failed fetch: must be retried next run
+        if "people/1/" in url and "gameLog" in url:
+            return {"stats": [{"splits": [{"date": "2024-05-01", "player": {"id": 1}, "stat": {"hits": 1}}]}]}
+        return {"stats": [{"splits": []}]}  # player 2: no games in 2024
+
+    mlb.run(2024, current=2026, fetch=fetch, pause=0)
+    assert any("people/2/" in c for c in calls)
+    calls.clear()
+    summary = mlb.run(2024, current=2026, fetch=fetch, pause=0)
+    hitting = [c for c in calls if "group=hitting" in c]
+    assert not any("people/1/" in c or "people/2/" in c for c in hitting)  # fetched once, never again
+    assert any("people/3/" in c for c in hitting)                           # the failure is retried
+    assert summary["hitting_rows"] == 1
