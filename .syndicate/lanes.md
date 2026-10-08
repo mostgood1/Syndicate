@@ -2246,7 +2246,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 
 ### down-reaps-odds-jobs — OPEN — opened 2026-10-08 — session 73bd5e1f-0d5f-4e48-8849-3838dcfb6581
 - Goal: local_production.py down leaves no run_refresh_odds_job.py of this fleet alive: after a full down on the fleet, 0 such processes remain (measured by ps), with --keep-odds-jobs restoring the old behaviour
-- Files: scripts/local_production.py (cmd_down + a new _reap_fleet_odds_jobs helper + the down parser's --keep-odds-jobs flag ONLY; SCHEDULED_JOBS stays intelligence-evidence-coverage's), tests/test_local_production_down_reap.py (NEW)
+- Files: scripts/local_production.py (LOAN from intelligence-evidence-coverage USER-APPROVED 2026-10-08: cmd_down + new _reap_fleet_odds_jobs helper + down --keep-odds-jobs flag ONLY), tests/test_local_production_down_reap.py (NEW)
 - Hypothesis: Odds jobs are launched with start_new_session=True (ops_refresh.py:1466), so the role's killpg (_terminate, local_production.py:1101-1123) cannot reach them and they survive down reparented; a cmdline+data-root match in cmd_down, after the supervisor exits, can
 - Falsification test: A real detached test job (own session, with a grandchild) survives the reap, or the reap matches a process whose manifest path is outside the data root
 - Verification: Unit: detached leader+grandchild both dead after reap; outside-data-root job untouched; --keep-odds-jobs leaves it alive (off != on). Fleet: next full down prints the reaped jobs and ps shows 0 run_refresh_odds_job.py afterwards
