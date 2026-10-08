@@ -1,0 +1,33 @@
+team_id,abbreviation,location,display_name,primary_color,secondary_color,logo_url,source_snapshot_date
+25,ANA,Anaheim,Anaheim Ducks,#fc4c02,#000000,https://a.espncdn.com/i/teamlogos/nhl/500/ana.png,2026-07-20
+1,BOS,Boston,Boston Bruins,#231f20,#fdb71a,https://a.espncdn.com/i/teamlogos/nhl/500/bos.png,2026-07-20
+2,BUF,Buffalo,Buffalo Sabres,#00468b,#fdb71a,https://a.espncdn.com/i/teamlogos/nhl/500/buf.png,2026-07-20
+3,CGY,Calgary,Calgary Flames,#dd1a32,#000000,https://a.espncdn.com/i/teamlogos/nhl/500/cgy.png,2026-07-20
+7,CAR,Carolina,Carolina Hurricanes,#e30426,#000000,https://a.espncdn.com/i/teamlogos/nhl/500/car.png,2026-07-20
+4,CHI,Chicago,Chicago Blackhawks,#e31937,#000000,https://a.espncdn.com/i/teamlogos/nhl/500/chi.png,2026-07-20
+17,COL,Colorado,Colorado Avalanche,#860038,#005ea3,https://a.espncdn.com/i/teamlogos/nhl/500/col.png,2026-07-20
+29,CBJ,Columbus,Columbus Blue Jackets,#002d62,#e31937,https://a.espncdn.com/i/teamlogos/nhl/500/cbj.png,2026-07-20
+9,DAL,Dallas,Dallas Stars,#20864c,#000000,https://a.espncdn.com/i/teamlogos/nhl/500/dal.png,2026-07-20
+5,DET,Detroit,Detroit Red Wings,#e30526,#ffffff,https://a.espncdn.com/i/teamlogos/nhl/500/det.png,2026-07-20
+6,EDM,Edmonton,Edmonton Oilers,#00205b,#ff4c00,https://a.espncdn.com/i/teamlogos/nhl/500/edm.png,2026-07-20
+26,FLA,Florida,Florida Panthers,#e51937,#002d62,https://a.espncdn.com/i/teamlogos/nhl/500/fla.png,2026-07-20
+8,LA,Los Angeles,Los Angeles Kings,#121212,#a2aaad,https://a.espncdn.com/i/teamlogos/nhl/500/la.png,2026-07-20
+30,MIN,Minnesota,Minnesota Wild,#124734,#ae122a,https://a.espncdn.com/i/teamlogos/nhl/500/min.png,2026-07-20
+10,MTL,Montreal,Montreal Canadiens,#c41230,#013a81,https://a.espncdn.com/i/teamlogos/nhl/500/mtl.png,2026-07-20
+27,NSH,Nashville,Nashville Predators,#fdba31,#002d62,https://a.espncdn.com/i/teamlogos/nhl/500/nsh.png,2026-07-20
+11,NJ,New Jersey,New Jersey Devils,#e30b2b,#000000,https://a.espncdn.com/i/teamlogos/nhl/500/nj.png,2026-07-20
+12,NYI,New York,New York Islanders,#00529b,#f47d31,https://a.espncdn.com/i/teamlogos/nhl/500/nyi.png,2026-07-20
+13,NYR,New York,New York Rangers,#0056ae,#e51937,https://a.espncdn.com/i/teamlogos/nhl/500/nyr.png,2026-07-20
+14,OTT,Ottawa,Ottawa Senators,#dd1a32,#b79257,https://a.espncdn.com/i/teamlogos/nhl/500/ott.png,2026-07-20
+15,PHI,Philadelphia,Philadelphia Flyers,#fe5823,#000000,https://a.espncdn.com/i/teamlogos/nhl/500/phi.png,2026-07-20
+16,PIT,Pittsburgh,Pittsburgh Penguins,#000000,#fdb71a,https://a.espncdn.com/i/teamlogos/nhl/500/pit.png,2026-07-20
+18,SJ,San Jose,San Jose Sharks,#00788a,#070707,https://a.espncdn.com/i/teamlogos/nhl/500/sj.png,2026-07-20
+124292,SEA,Seattle,Seattle Kraken,#000d33,#a3dce4,https://a.espncdn.com/i/teamlogos/nhl/500/sea.png,2026-07-20
+19,STL,St. Louis,St. Louis Blues,#0070b9,#fdb71a,https://a.espncdn.com/i/teamlogos/nhl/500/stl.png,2026-07-20
+20,TB,Tampa Bay,Tampa Bay Lightning,#003e7e,#ffffff,https://a.espncdn.com/i/teamlogos/nhl/500/tb.png,2026-07-20
+21,TOR,Toronto,Toronto Maple Leafs,#003e7e,#ffffff,https://a.espncdn.com/i/teamlogos/nhl/500/tor.png,2026-07-20
+129764,UTAH,Utah,Utah Mammoth,#000000,#7ab2e1,https://a.espncdn.com/i/teamlogos/nhl/500/utah.png,2026-07-20
+22,VAN,Vancouver,Vancouver Canucks,#003e7e,#008752,https://a.espncdn.com/i/teamlogos/nhl/500/van.png,2026-07-20
+37,VGK,Vegas,Vegas Golden Knights,#344043,#b4975a,https://a.espncdn.com/i/teamlogos/nhl/500/vgk.png,2026-07-20
+23,WSH,Washington,Washington Capitals,#d71830,#0b1f41,https://a.espncdn.com/i/teamlogos/nhl/500/wsh.png,2026-07-20
+28,WPG,Winnipeg,Winnipeg Jets,#002d62,#c41230,https://a.espncdn.com/i/teamlogos/nhl/500/wpg.png,2026-07-20

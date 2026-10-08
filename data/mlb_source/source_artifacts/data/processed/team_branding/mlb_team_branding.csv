@@ -1,0 +1,31 @@
+team_id,abbreviation,location,display_name,primary_color,secondary_color,logo_url,source_snapshot_date
+29,ARI,Arizona,Arizona Diamondbacks,#aa182c,#000000,https://a.espncdn.com/i/teamlogos/mlb/500/ari.png,2026-07-20
+11,ATH,Athletics,Athletics,#003831,#efb21e,https://a.espncdn.com/i/teamlogos/mlb/500/ath.png,2026-07-20
+15,ATL,Atlanta,Atlanta Braves,#0c2340,#ba0c2f,https://a.espncdn.com/i/teamlogos/mlb/500/atl.png,2026-07-20
+1,BAL,Baltimore,Baltimore Orioles,#df4601,#000000,https://a.espncdn.com/i/teamlogos/mlb/500/bal.png,2026-07-20
+2,BOS,Boston,Boston Red Sox,#0d2b56,#bd3039,https://a.espncdn.com/i/teamlogos/mlb/500/bos.png,2026-07-20
+16,CHC,Chicago,Chicago Cubs,#0e3386,#cc3433,https://a.espncdn.com/i/teamlogos/mlb/500/chc.png,2026-07-20
+4,CHW,Chicago,Chicago White Sox,#000000,#c4ced4,https://a.espncdn.com/i/teamlogos/mlb/500/chw.png,2026-07-20
+17,CIN,Cincinnati,Cincinnati Reds,#c6011f,#ffffff,https://a.espncdn.com/i/teamlogos/mlb/500/cin.png,2026-07-20
+5,CLE,Cleveland,Cleveland Guardians,#002b5c,#e31937,https://a.espncdn.com/i/teamlogos/mlb/500/cle.png,2026-07-20
+27,COL,Colorado,Colorado Rockies,#33006f,#000000,https://a.espncdn.com/i/teamlogos/mlb/500/col.png,2026-07-20
+6,DET,Detroit,Detroit Tigers,#0a2240,#ff4713,https://a.espncdn.com/i/teamlogos/mlb/500/det.png,2026-07-20
+18,HOU,Houston,Houston Astros,#002d62,#eb6e1f,https://a.espncdn.com/i/teamlogos/mlb/500/hou.png,2026-07-20
+7,KC,Kansas City,Kansas City Royals,#004687,#7ab2dd,https://a.espncdn.com/i/teamlogos/mlb/500/kc.png,2026-07-20
+3,LAA,Los Angeles,Los Angeles Angels,#ba0021,#c4ced4,https://a.espncdn.com/i/teamlogos/mlb/500/laa.png,2026-07-20
+19,LAD,Los Angeles,Los Angeles Dodgers,#005a9c,#ffffff,https://a.espncdn.com/i/teamlogos/mlb/500/lad.png,2026-07-20
+28,MIA,Miami,Miami Marlins,#00a3e0,#000000,https://a.espncdn.com/i/teamlogos/mlb/500/mia.png,2026-07-20
+8,MIL,Milwaukee,Milwaukee Brewers,#13294b,#ffc72c,https://a.espncdn.com/i/teamlogos/mlb/500/mil.png,2026-07-20
+9,MIN,Minnesota,Minnesota Twins,#031f40,#e20e32,https://a.espncdn.com/i/teamlogos/mlb/500/min.png,2026-07-20
+21,NYM,New York,New York Mets,#002d72,#ff5910,https://a.espncdn.com/i/teamlogos/mlb/500/nym.png,2026-07-20
+10,NYY,New York,New York Yankees,#132448,#c4ced4,https://a.espncdn.com/i/teamlogos/mlb/500/nyy.png,2026-07-20
+22,PHI,Philadelphia,Philadelphia Phillies,#e81828,#003278,https://a.espncdn.com/i/teamlogos/mlb/500/phi.png,2026-07-20
+23,PIT,Pittsburgh,Pittsburgh Pirates,#000000,#fdb827,https://a.espncdn.com/i/teamlogos/mlb/500/pit.png,2026-07-20
+25,SD,San Diego,San Diego Padres,#2f241d,#ffc425,https://a.espncdn.com/i/teamlogos/mlb/500/sd.png,2026-07-20
+26,SF,San Francisco,San Francisco Giants,#000000,#fd5a1e,https://a.espncdn.com/i/teamlogos/mlb/500/sf.png,2026-07-20
+12,SEA,Seattle,Seattle Mariners,#005c5c,#0c2c56,https://a.espncdn.com/i/teamlogos/mlb/500/sea.png,2026-07-20
+24,STL,St. Louis,St. Louis Cardinals,#be0a14,#001541,https://a.espncdn.com/i/teamlogos/mlb/500/stl.png,2026-07-20
+30,TB,Tampa Bay,Tampa Bay Rays,#092c5c,#8fbce6,https://a.espncdn.com/i/teamlogos/mlb/500/tb.png,2026-07-20
+13,TEX,Texas,Texas Rangers,#003278,#c0111f,https://a.espncdn.com/i/teamlogos/mlb/500/tex.png,2026-07-20
+14,TOR,Toronto,Toronto Blue Jays,#134a8e,#6cace5,https://a.espncdn.com/i/teamlogos/mlb/500/tor.png,2026-07-20
+20,WSH,Washington,Washington Nationals,#ab0003,#11225b,https://a.espncdn.com/i/teamlogos/mlb/500/wsh.png,2026-07-20

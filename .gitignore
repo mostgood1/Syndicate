@@ -75,6 +75,41 @@ data/wnba_source/source_artifacts/data/*
 data/wnba_source/source_artifacts/data/processed/*
 !data/wnba_source/source_artifacts/data/processed/team_branding/
 
+# TEAM LOGOS FOR EVERY SPORT (2026-10-08, lane layer2-board-ui-redesign): the
+# Layer 2 board and game chips read every sport's team_branding CSV through
+# syndicate/features/shared/team_logos.py. MLB/NBA/NHL/NCAAB had theirs only on
+# dev machines, so production served 0 logos for those sports while NFL, NCAAF,
+# WNBA and soccer (tracked) served 100%. Same narrow exception as WNBA: the
+# team_branding/ folder only, one ~3KB CSV each.
+!data/mlb_source/source_artifacts/
+data/mlb_source/source_artifacts/*
+!data/mlb_source/source_artifacts/data/
+data/mlb_source/source_artifacts/data/*
+!data/mlb_source/source_artifacts/data/processed/
+data/mlb_source/source_artifacts/data/processed/*
+!data/mlb_source/source_artifacts/data/processed/team_branding/
+!data/nba_source/source_artifacts/
+data/nba_source/source_artifacts/*
+!data/nba_source/source_artifacts/data/
+data/nba_source/source_artifacts/data/*
+!data/nba_source/source_artifacts/data/processed/
+data/nba_source/source_artifacts/data/processed/*
+!data/nba_source/source_artifacts/data/processed/team_branding/
+!data/nhl_source/source_artifacts/
+data/nhl_source/source_artifacts/*
+!data/nhl_source/source_artifacts/data/
+data/nhl_source/source_artifacts/data/*
+!data/nhl_source/source_artifacts/data/processed/
+data/nhl_source/source_artifacts/data/processed/*
+!data/nhl_source/source_artifacts/data/processed/team_branding/
+!data/ncaab_source/source_artifacts/
+data/ncaab_source/source_artifacts/*
+!data/ncaab_source/source_artifacts/data/
+data/ncaab_source/source_artifacts/data/*
+!data/ncaab_source/source_artifacts/data/processed/
+data/ncaab_source/source_artifacts/data/processed/*
+!data/ncaab_source/source_artifacts/data/processed/team_branding/
+
 # SmartSim 2.0 historical-truth caches: regenerable via ncaaf_historical_loader.py /
 # nfl_historical_loader.py (CFBD API / nflverse release download); mirror caches, not source.
 # Exception: NCAAF's games_{season}.json.gz (schedule-level, ~40-95KB each,
