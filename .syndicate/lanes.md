@@ -2433,9 +2433,10 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: served board: NFL segment rows with a sim view, before 0/14; a held-out check that the segment probabilities are calibrated before they rank anything
 - Blocked by: none
 
-### status-effective-memory-cap — OPEN — opened 2026-10-08 — session 73bd5e1f-0d5f-4e48-8849-3838dcfb6581
+### status-effective-memory-cap — CLOSED 2026-10-08 (GOAL MET: status prints the running cap, 2048/6144/3072 on the fleet) — opened 2026-10-08 — session 73bd5e1f-0d5f-4e48-8849-3838dcfb6581
+- **GOAL VERDICT:** "local_production.py status shows each role's EFFECTIVE memory cap (the running process's SYNDICATE_LOCAL_MEMORY_LIMIT_MB) instead of the hard-coded Render-plan default, and flags when the env file would give a different cap at the next up; on the fleet live-odds-worker reads 3072" -- **GOAL: MET.** Code `9a745bdc`; new code run read-only against the live fleet 2026-10-08 ~20:55Z: web `cap 2048 MB`, refresh-worker `cap 6144 MB`, live-odds-worker `cap 3072 MB`, no pending-env note (env file agrees). The fleet checkout's old label printed 2048 / 4096 / 2048 in the same read. Tests 8/8 on Windows and Linux; existing local_production tests 75 passed / 3 skipped. Reaches `~/Syndicate` at its next ff (no restart needed: `status` is a CLI).
 - Goal: local_production.py status shows each role's EFFECTIVE memory cap (the running process's SYNDICATE_LOCAL_MEMORY_LIMIT_MB) instead of the hard-coded Render-plan default, and flags when the env file would give a different cap at the next up; on the fleet live-odds-worker reads 3072
-- Files: scripts/local_production.py (cmd_status cap label + a role-cap helper ONLY), tests/test_local_production_status_cap.py (NEW)
+- Files: (none -- code landed in 9a745bdc, released 2026-10-08)
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: Unit: running cap read from a real child process's environ; differing next-up value flagged; unreadable environ falls back with a label. Fleet: status prints cap 3072 for live-odds-worker, 6144 refresh-worker, 2048 web
