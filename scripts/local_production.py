@@ -119,8 +119,9 @@ PIDFILE_NAME = "supervisor.json"
 ROLE_ORDER = ("web", "refresh-worker", "live-odds-worker")
 # render.yaml service name -> local role name
 SERVICE_TO_ROLE = {"syndicate": "web", "refresh-worker": "refresh-worker", "live-odds-worker": "live-odds-worker"}
-# Render plan memory, reported by `status` next to each role's RSS so a local
-# reading can be held against the ceiling it used to run under.
+# Render plan memory: each role's DEFAULT emulated cap (`derive_role_env`), which
+# `local_production.env` overrides. `status` prints the cap a role actually runs
+# with (`role_running_memory_cap_mb`), not this.
 PLAN_MEMORY_MB = {"web": 2048, "refresh-worker": 4096, "live-odds-worker": 2048}
 
 EXECUTION_KEYS = ("SYNDICATE_EXECUTION_MODE", "SYNDICATE_EXECUTION_LIVE_ARMED", "SYNDICATE_EXECUTION_ENABLED")
@@ -1816,6 +1817,45 @@ def role_loaded_commit(pid: int | None) -> str | None:
         return None
 
 
+MEMORY_LIMIT_KEY = "SYNDICATE_LOCAL_MEMORY_LIMIT_MB"
+
+
+def _cap_mb(raw: Any) -> int | None:
+    try:
+        value = int(float(str(raw).strip()))
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def role_running_memory_cap_mb(pid: int | None) -> int | None:
+    """The cap a role RUNS with: `SYNDICATE_LOCAL_MEMORY_LIMIT_MB` from its own
+    environment (that one key only). The env is built once at `up` and a role
+    restart reuses it, so this -- not the env file -- is the cap in force."""
+    if not pid:
+        return None
+    try:
+        import psutil
+
+        return _cap_mb(psutil.Process(int(pid)).environ().get(MEMORY_LIMIT_KEY))
+    except Exception:
+        return None
+
+
+def memory_cap_label(running: int | None, next_up: int | None, plan: int | None) -> str:
+    """`status`'s cap text. It used to print `PLAN_MEMORY_MB` ("Render plan 2048
+    MB") whatever the role ran with: measured 2026-10-08, live-odds-worker read
+    2048 there while it ran under 3072. A next-`up` value that differs is named,
+    because nothing else shows an env-file edit still waiting for a full `up`."""
+    if running is not None:
+        if next_up is not None and next_up != running:
+            return f"cap {running} MB; env file gives {next_up} MB at next up"
+        return f"cap {running} MB"
+    if next_up is not None:
+        return f"cap ? MB (role env unreadable; env file gives {next_up} MB)"
+    return f"cap ? MB (plan default {plan} MB)" if plan else ""
+
+
 def head_at(epoch: float, repo: Path = REPO_ROOT) -> str | None:
     """The checkout's HEAD at `epoch`, from its reflog (newest first). None when
     the reflog cannot answer: no git, no reflog, or `epoch` older than it."""
@@ -2022,7 +2062,18 @@ def cmd_status(args: argparse.Namespace) -> int:
     except Exception:
         psutil = None  # type: ignore[assignment]
     head = git_commit()
+    try:
+        blueprint, local = load_blueprint(), parse_env_file(settings.env_file)
+    except Exception:
+        blueprint = local = None
     for name, pid in (info.get("roles") or {}).items():
+        next_up = None
+        if blueprint is not None and local is not None and name in PLAN_MEMORY_MB:
+            try:
+                env, _ = derive_role_env(name, blueprint, local, settings, live=load_live_env(settings, name), base_env={})
+                next_up = _cap_mb(env.get(MEMORY_LIMIT_KEY))
+            except Exception:
+                next_up = None
         rss = "?"
         alive = False
         if psutil is not None and pid:
@@ -2033,12 +2084,12 @@ def cmd_status(args: argparse.Namespace) -> int:
                 rss = f"{total / 1024 / 1024:.0f} MB"
             except Exception:
                 pass
-        cap = PLAN_MEMORY_MB.get(name)
+        cap = memory_cap_label(role_running_memory_cap_mb(pid), next_up, PLAN_MEMORY_MB.get(name))
         loaded, source = role_code(pid, name)
         code = ""
         if loaded:
             code = f"  code={loaded[:8]}" + ("" if source == "reflog" else "(env stamp)") + code_stamp_note(loaded, head)
-        print(f"  {name:17} pid={pid} {'up' if alive else 'DOWN'}  rss={rss}" + (f" (Render plan {cap} MB)" if cap else "")
+        print(f"  {name:17} pid={pid} {'up' if alive else 'DOWN'}  rss={rss}" + (f" ({cap})" if cap else "")
               + f"  restarts={(info.get('restarts') or {}).get(name, 0)}" + code)
     port = int(info.get("port") or settings.port)
     for path in ("/healthz", "/api/ops/version"):
