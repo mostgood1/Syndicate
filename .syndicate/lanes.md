@@ -1688,6 +1688,25 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **HR RE-FIT, PRE-REGISTERED 2026-10-08 ~02:00Z (user chose "Re-fit HR now"), before any HR arm runs:**
+  - DEFECT (OOS read above): shipped hr_rate_mult 1.856 -> HR/PA z +5.1 (~25% high) and runs/game +0.70 over 985 games.
+  - LEVER: `hr_rate_mult` (pitch-model forward override) {1.1, 1.3, 1.5, 1.7, 1.856 (shipped)}. Everything else stays shipped.
+  - FIT = window first half (07-16..08-21), 100 sims. Choose the argmin of the shipped 13-moment objective (it contains HR/PA and runs/game).
+  - MAPS: with the chosen value, re-fit the 19 hitter-prop maps on FIT (the mlb-hr-prop-calibration procedure: a date split inside FIT, lambda 10, min gain 0.001). A lower HR multiplier lowers the raw HR / TB probabilities the current maps were fitted to.
+  - HOLDOUT = window second half (08-22..09-27). **Disclosed: already read in pooled evaluations (the pitch-fix holdout and the OOS evaluation), never used to fit HR.** No untouched regular-season data remains; postseason is a different population.
+  - SHIP only if ALL hold, chosen + re-fit maps vs shipped + shipped maps:
+    - HOLDOUT:
+      - (1) |runs/game gap| falls by >= 50%;
+      - (2) |HR/PA z| <= 2.0 (within ~10%);
+      - (3) no other moment's |z| grows by more than 1.0;
+      - (4) starter |SO|, |H|, |BB|, |ER|, |outs| bias each worsen <= 0.10;
+      - (5) pooled hitter-prop log-loss no worse (200 sims).
+    - EARLY GUARD, June validation set (~/asof_out_v2_val; the season phase that chose 1.856):
+      - (6) |runs gap| <= 0.30;
+      - (7) |HR/PA z| <= 3.0.
+    - Otherwise ship nothing.
+  - If the argmin is 1.856 itself, nothing ships.
+  - SHIP MECHANICS: hr_rate_mult and the re-fit maps (with provenance) in the forward files, fleet ff (no restart), V1 + V2 (post-ship sims vs replays at both configs), deploys.md.
 - **OUT-OF-SAMPLE EVALUATION OF THE SHIPPED CALIBRATION, READ ONCE 2026-10-08 ~01:50Z (pre-registered; no ship decision attached): it would NOT have passed out of sample, because HR/runs overshoot.**
   - Window 07-16..09-27, 985 games, 1964 starts. A = shipped (2bb481ef) vs B = pre-ship (61edcc04 files), same games and seeds, 100 sims; props 200 sims, each arm with its own maps.
   - WHOLE WINDOW:
@@ -1876,7 +1895,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
     - Pass -> build 07-16..09-27 into ~/asof_out_statsapi (never the production root). Fail -> stop and report.
   - The June dates in this gate are already spent, so the gate only tests source fidelity.
 - Goal: A StatsAPI-only as-of rebuild of MLB 2026-07-16..09-27 (74 dates, 984 games): scripts/mlb_asof_roster_build.py gains --source statsapi (schedule + live-feed probables/context + an as-of lineup projection from prior boxscores, option B), admitted only if its pre-registered June fidelity gate passes, then built into a scratch root for use as fresh validation/fit data
-- Files: scripts/mlb_asof_roster_build.py, scripts/mlb_asof_lineup_projection.py (NEW), tests/test_mlb_asof_roster_build.py, tests/test_mlb_asof_lineup_projection.py (NEW), .syndicate/findings_2026-10-07_mlb_statsapi_asof_rebuild_scope.md, vendor/mlb_bettingv2/sim_engine/data/build_roster.py (stamina recency ONLY), vendor/mlb_bettingv2/sim_engine/data/recency.py, tests/test_mlb_stamina_recency.py (NEW), vendor/mlb_bettingv2/data/tuning/pitch_model_overrides/forward_start_2026_04_14_v1.json, vendor/mlb_bettingv2/data/tuning/manager_pitching_overrides/forward_start_2026_04_14_v1.json
+- Files: scripts/mlb_asof_roster_build.py, scripts/mlb_asof_lineup_projection.py (NEW), tests/test_mlb_asof_roster_build.py, tests/test_mlb_asof_lineup_projection.py (NEW), .syndicate/findings_2026-10-07_mlb_statsapi_asof_rebuild_scope.md, vendor/mlb_bettingv2/sim_engine/data/build_roster.py (stamina recency ONLY), vendor/mlb_bettingv2/sim_engine/data/recency.py, tests/test_mlb_stamina_recency.py (NEW), vendor/mlb_bettingv2/data/tuning/pitch_model_overrides/forward_start_2026_04_14_v1.json, vendor/mlb_bettingv2/data/tuning/manager_pitching_overrides/forward_start_2026_04_14_v1.json, vendor/mlb_bettingv2/data/tuning/hitter_props_calibration/default.json, vendor/mlb_bettingv2/data/tuning/hitter_hr_calibration/default.json
 - Hypothesis: H1: an as-of lineup projection (most frequent prior lineup vs the starter's hand) reproduces production's Rotowire projections closely enough that a June rebuild from StatsAPI alone replays to the same moments as the stored-input rebuild within the earlier gate's tolerances
 - Falsification test: Any gate moment beyond max(2 game-clustered paired SE, tolerance) on 06-15..07-12 -> the source is not admitted; report and stop
 - Verification: Fidelity table (statsapi-source vs stored-input rebuild, June) then per-date coverage of the 07-16..09-27 build
