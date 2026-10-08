@@ -10,10 +10,11 @@ process and cached:
 
   * NHL   -- newest `roster_snapshot_*.csv` (`full_name, player_id`) ->
              `assets.nhle.com/mugs/nhl/latest/{id}.png`. NOT `/{year}/{TEAM}/`:
-             `nhl/cards.py::_nhl_headshot_url` builds `/2026/TOR/...`, which
-             answered 302 for Auston Matthews where `/latest/8479318.png` and
-             `/20252026/TOR/...` answered 200 (measured 2026-10-08). `latest`
-             also needs no team, so a traded player still resolves.
+             `/2026/TOR/...` answered 302 (to default-skater.png) for Auston
+             Matthews where `/latest/8479318.png` and `/20252026/TOR/...`
+             answered 200 (measured 2026-10-08). `latest` also needs no team,
+             so a traded player still resolves. `nhl/cards.py::_nhl_headshot_url`
+             uses the same form since e5438b8d.
   * NBA / WNBA -- `home._basketball_resolve_player_id` (the existing index:
              nba player_ids.csv, wnba boxscores) -> cdn.nba.com / cdn.wnba.com.
   * NCAAF -- `ncaaf_roster_snapshot.csv` (`player_id` IS the ESPN athlete id:
