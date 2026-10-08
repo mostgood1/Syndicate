@@ -107,6 +107,14 @@ def _histogram(block: Mapping[str, Any], key: str) -> dict[float, int] | None:
     return out or None
 
 
+def _chart_ladder(hist: Mapping[float, int], line: float, *, allow_negative: bool = False):
+    """`probability_above` at nearby lines, for the board's chart only (lane
+    layer2-board-ui-redesign). Same no-push conditioning as the published number."""
+    from syndicate.features.shared.price_ladder import price_ladder
+
+    return price_ladder(lambda t, _h=hist: probability_above(_h, t)[0], line, allow_negative=allow_negative)
+
+
 def probability_above(hist: Mapping[float, int], line: float) -> tuple[float | None, float]:
     """`(P(outcome > line | not a push), P(push))`.
 
@@ -232,6 +240,8 @@ def segment_projection(
                 )
             else:
                 projection["model_prob_over"] = round(prob, 4)
+                projection["ladder"] = _chart_ladder(hist, line)
+                projection["ladder_kind"] = "total"
         return projection
 
     margin_hist = _histogram(seg, "margin_dist")
@@ -263,6 +273,8 @@ def segment_projection(
                 )
             else:
                 projection["model_prob_over"] = round(prob, 4)
+                projection["ladder"] = _chart_ladder(margin_hist, line, allow_negative=True)
+                projection["ladder_kind"] = "margin"
         return projection
 
     if market == "h2h":
@@ -291,6 +303,8 @@ def segment_projection(
                 )
             else:
                 projection["model_prob_over"] = round(prob, 4)
+                projection["ladder"] = _chart_ladder(margin_hist, 0.0, allow_negative=True)
+                projection["ladder_kind"] = "margin"
         return projection
 
     return None

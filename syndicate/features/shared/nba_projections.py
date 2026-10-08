@@ -275,6 +275,14 @@ def attach_nba_prop_projections(
                 served_prob, blend_meta = served_prop_probability(hit_prob, _no_vig_over_probability(row), stat)
                 projection.update(blend_meta)
                 _attach_sim_probability_edge(projection, row=row, model_prob=served_prob)
+                # Display ladder (lane layer2-board-ui-redesign, user-approved
+                # 2026-10-08): the RAW sim ladder. The served number is the book
+                # blend, so the page checks this against `p_model_raw` and labels
+                # the chart "sim, before the book blend".
+                from syndicate.features.shared.price_ladder import price_ladder
+                from syndicate.features.shared.wnba_projections import _hit_prob_over as _ladder_prob
+
+                projection["ladder"] = price_ladder(lambda t, _l=ladder: _ladder_prob(_l, t), line)
             edge = round(mean - line, 3)
             # `side` NAMES THE FRAMING OF `model_prob_over`, never the model's lean
             # `[2026-10-08, user: "fix all three sports", lane layer2-board-ui-redesign]`.

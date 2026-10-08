@@ -3803,6 +3803,14 @@ def _chart_columns(row: Mapping[str, Any]) -> dict[str, Any]:
     ladder = projection.get("ladder")
     if isinstance(ladder, list) and len(ladder) >= 3:
         out["sim_ladder"] = ladder
+        # "total" / "margin" (home minus away) for game lines; absent = the prop's stat.
+        if projection.get("ladder_kind"):
+            out["sim_ladder_kind"] = projection.get("ladder_kind")
+        # NBA's served number is a book blend; the ladder is the RAW sim, so the
+        # page checks it against the raw P(over) and labels it as such.
+        raw = projection.get("p_model_raw")
+        if isinstance(raw, (int, float)) and projection.get("book_blend") == "applied":
+            out["sim_ladder_raw_over"] = float(raw)
     if str(row.get("kind") or "").lower() == "prop":
         try:
             from syndicate.features.intelligence_recent_matchup import recent_values_for
@@ -3812,6 +3820,20 @@ def _chart_columns(row: Mapping[str, Any]) -> dict[str, Any]:
             recent = None
         if isinstance(recent, Mapping) and recent.get("values"):
             out["recent_values"] = [v for v in list(recent.get("values"))[:10]]
+    elif str(row.get("kind") or "").lower() == "game":
+        # Game lines (mockup board 11): each team's last-10 final scores; the
+        # page derives over/under, covers and W/L against TODAY's line.
+        try:
+            from syndicate.features.shared.team_recent_results import team_recent_results
+
+            sport = str(row.get("sport") or "").lower()
+            when = row.get("commence_time") or row.get("date")
+            home = team_recent_results(sport, row.get("home_team"), when)
+            away = team_recent_results(sport, row.get("away_team"), when)
+        except Exception:  # noqa: BLE001 -- a chart must never break a card
+            home = away = []
+        if home or away:
+            out["team_recent"] = {"home": home, "away": away}
     return out
 
 

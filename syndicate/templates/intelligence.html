@@ -4678,14 +4678,20 @@
 
   function simLadderBuckets(item) {
     const ladder = Array.isArray(item && item.sim_ladder) ? item.sim_ladder : null;
-    const line = numericValue(Number(item && item.line));
+    const kind = String((item && item.sim_ladder_kind) || "stat");
+    // A moneyline is "margin > 0": no line on the row, 0 on the chart.
+    const rawLine = item && item.line;
+    const line = (rawLine === null || rawLine === undefined || rawLine === "") && kind === "margin" ? 0 : numericValue(Number(rawLine));
     if (!ladder || ladder.length < 3 || line === null) return null;
     const points = ladder.map((p) => [Number(p[0]), Number(p[1])]).filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
     if (points.length < 3) return null;
     const atLine = points.find((p) => Math.abs(p[0] - line) < 1e-6);
-    const side = String(item.side || "").toLowerCase();
-    const model = confidenceValue(item);
-    if (!atLine || !["over", "under"].includes(side) || model === null) return null;
+    const rawSide = String(item.side || "").toLowerCase();
+    // over/home are the ladder's own frame (P(stat or margin > t)); under/away the complement.
+    const side = ["over", "home", "yes", "1"].includes(rawSide) ? "over" : ["under", "away", "no", "2"].includes(rawSide) ? "under" : "";
+    const raw = numericValue(Number(item.sim_ladder_raw_over));
+    const model = raw !== null ? (side === "over" ? raw : 1 - raw) : confidenceValue(item);
+    if (!atLine || !side || model === null) return null;
     const pSide = side === "over" ? atLine[1] : 1 - atLine[1];
     if (Math.abs(pSide - model) > CHART_AGREE_TOLERANCE) return null;
     const isCount = points.every((p) => Math.abs(p[0] - Math.floor(p[0]) - 0.5) < 1e-6 || Math.abs(p[0] - line) < 1e-6);
@@ -4702,7 +4708,10 @@
     }
     const last = points[points.length - 1];
     buckets.push({ p: last[1], label: isCount ? `≥${fmt(last[0] + 0.5)}` : `>${fmt(last[0])}`, over: last[0] >= line });
-    return { buckets, line, side, pSide };
+    const sideWord = kind === "margin"
+      ? (rawSide === "home" ? (line === 0 ? "home wins" : "home covers") : rawSide === "away" ? (line === 0 ? "away wins" : "away covers") : side)
+      : (rawSide === "home" || rawSide === "away" ? rawSide : side);
+    return { buckets, line, side, pSide, kind, sideWord, raw: raw !== null };
   }
 
   function simSpreadChart(item, opts) {
@@ -4720,11 +4729,115 @@
       return `<rect x="${(i * (barW + gap)).toFixed(1)}" y="${(height - 12 - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="2" class="${onSide ? "chart-bar chart-bar--side" : "chart-bar"}"><title>${escapeHtml(b.label)}: ${(b.p * 100).toFixed(1)}%</title></rect>`
         + `<text x="${(i * (barW + gap) + barW / 2).toFixed(1)}" y="${height - 1}" class="chart-axis" text-anchor="middle">${escapeHtml(b.label)}</text>`;
     }).join("");
-    return `<figure class="prop-chart"><figcaption>Sim spread · line ${escapeHtml(String(data.line))} · <b>${Math.round(data.pSide * 100)}% ${escapeHtml(data.side)}</b></figcaption>`
+    const what = data.kind === "margin" ? "Sim margin (home − away)" : data.kind === "total" ? "Sim total" : "Sim spread";
+    return `<figure class="prop-chart"><figcaption>${what} · line ${escapeHtml(String(data.line))} · <b>${Math.round(data.pSide * 100)}% ${escapeHtml(data.sideWord)}</b>${data.raw ? " · sim before the book blend" : ""}</figcaption>`
       + `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Simulated distribution, ${Math.round(data.pSide * 100)} percent ${escapeHtml(data.side)} ${escapeHtml(String(data.line))}">${bars}</svg></figure>`;
   }
 
+  // GAME LINES (mockup board 11): each team's last-10 final scores
+  // (`team_recent`, [date, for, against] newest first), read against TODAY's
+  // line. Totals: game total over/under the line. Spreads: the team's margin
+  // plus ITS line (the other team's line is the negative). Moneyline: W/L.
+  function gameMarketKind(item) {
+    const market = String((item && item.market) || "").toLowerCase();
+    if (market.includes("total")) return "total";
+    if (market.includes("spread") || market.includes("handicap") || market.includes("runline") || market.includes("puckline")) return "spread";
+    if (market.includes("h2h") || market.includes("moneyline") || market === "ml") return "h2h";
+    return null;
+  }
+
+  // "home" / "away" for a game row's side, whether it is stored as the word,
+  // the team name, or 1 / 2; totals keep over / under.
+  function gameSide(item) {
+    const side = String((item && item.side) || "").trim().toLowerCase();
+    const named = (key) => String((item && item[key]) || "").trim().toLowerCase();
+    if (side === "home" || side === "1" || (side && side === named("home_team"))) return "home";
+    if (side === "away" || side === "2" || (side && side === named("away_team"))) return "away";
+    return side;
+  }
+
+  function teamForm(item, which) {
+    const recent = item && item.team_recent;
+    const games = recent && Array.isArray(recent[which]) ? recent[which] : [];
+    const kind = gameMarketKind(item);
+    if (!games.length || !kind) return null;
+    const side = gameSide(item);
+    const line = numericValue(Number(item && item.line));
+    const rows = games.slice(0, 10).map((g) => [Number(g[1]), Number(g[2])]).filter((g) => g.every(Number.isFinite));
+    if (!rows.length) return null;
+    let values; let hit; let mark; let label;
+    if (kind === "total") {
+      if (line === null) return null;
+      const under = side === "under";
+      values = rows.map(([f, a]) => f + a);
+      hit = (v) => (under ? v < line : v > line);
+      mark = line;
+      label = `${under ? "under" : "over"} ${line}`;
+    } else if (kind === "spread") {
+      if (line === null || !["home", "away"].includes(side)) return null;
+      const teamLine = which === side ? line : -line;
+      values = rows.map(([f, a]) => f - a);
+      hit = (v) => v + teamLine > 0;
+      mark = -teamLine;
+      label = `covered ${teamLine > 0 ? "+" : ""}${teamLine}`;
+    } else {
+      values = rows.map(([f, a]) => f - a);
+      hit = (v) => v > 0;
+      mark = 0;
+      label = "won";
+    }
+    const l5 = values.slice(0, 5);
+    const wins = values.filter(hit).length;
+    const record = kind === "h2h"
+      ? `${wins}–${values.filter((v) => v < 0).length}${values.some((v) => v === 0) ? `–${values.filter((v) => v === 0).length}` : ""}`
+      : `${wins}/${values.length}`;
+    return { values, hit, mark, label, kind, which, record,
+      l5: `${l5.filter(hit).length}/${l5.length}`, l10: `${wins}/${values.length}`,
+      team: String((item && item[`${which}_team`]) || which) };
+  }
+
+  // The team the row backs (spread / moneyline); totals back neither, so the
+  // compact spark shows the home side and the full chart shows both.
+  function backedSide(item) {
+    return gameSide(item) === "away" ? "away" : "home";
+  }
+
+  function gameFormChart(form, opts) {
+    const compact = Boolean(opts && opts.compact);
+    const width = compact ? 70 : 260;
+    const height = compact ? 18 : 64;
+    const oldestFirst = form.values.slice().reverse();
+    const gap = compact ? 1.5 : 3;
+    const barW = (width - gap * (oldestFirst.length - 1)) / oldestFirst.length;
+    const hi = Math.max(...oldestFirst, form.mark, 1);
+    const lo = Math.min(...oldestFirst, form.mark, 0);
+    const span = hi - lo || 1;
+    const y = (v) => 1 + (1 - (v - lo) / span) * (height - 2);
+    const zero = y(Math.max(lo, Math.min(hi, form.kind === "total" ? lo : 0)));
+    const bars = oldestFirst.map((v, i) => {
+      const top = Math.min(y(v), zero);
+      const h = Math.max(1.5, Math.abs(y(v) - zero));
+      return `<rect x="${(i * (barW + gap)).toFixed(1)}" y="${top.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" class="${form.hit(v) ? "chart-bar chart-bar--side" : "chart-bar"}"><title>${escapeHtml(String(v))}</title></rect>`;
+    }).join("");
+    const markY = y(form.mark).toFixed(1);
+    const svg = `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${escapeHtml(form.team)} last ${form.values.length}: ${escapeHtml(form.label)} ${form.record}">${bars}<line x1="0" x2="${width}" y1="${markY}" y2="${markY}" class="chart-line" /></svg>`;
+    if (compact) return `<span class="prop-spark" title="${escapeHtml(form.team)} last ${form.values.length}, oldest left; dashed = today's line">${svg}</span>`;
+    return `<div class="game-form-row"><span class="game-form-row__team">${escapeHtml(form.team)}</span>${svg}<b>${escapeHtml(form.label)} ${escapeHtml(form.record)}</b></div>`;
+  }
+
+  function gameFormBlock(item) {
+    const forms = ["away", "home"].map((w) => teamForm(item, w)).filter(Boolean);
+    if (!forms.length) return "";
+    const kind = forms[0].kind;
+    const title = kind === "total" ? "Each team's last 10 game totals" : kind === "spread" ? "Each team's last 10 against today's spread" : "Each team's last 10";
+    return `<figure class="prop-chart game-form"><figcaption>${title} · dashed = today's line</figcaption>${forms.map((f) => gameFormChart(f)).join("")}</figure>`;
+  }
+
   function recentForm(item) {
+    if (item && item.team_recent) {
+      const form = teamForm(item, backedSide(item));
+      return form ? Object.assign({}, form, { game: true }) : null;
+    }
     const values = Array.isArray(item && item.recent_values) ? item.recent_values.map(Number).filter(Number.isFinite) : [];
     const line = numericValue(Number(item && item.line));
     const side = String((item && item.side) || "").toLowerCase();
@@ -4738,12 +4851,17 @@
 
   function recentFormText(item) {
     const form = recentForm(item);
+    if (form && form.game) {
+      const n = form.values.length;
+      return form.kind === "h2h" ? `${form.team} L${n} ${form.record}` : `${form.team} L${n} ${form.label} ${form.record}`;
+    }
     return form ? `L5 ${form.l5} · L10 ${form.l10}` : "";
   }
 
   function recentFormChart(item, opts) {
     const form = recentForm(item);
     if (!form) return "";
+    if (form.game) return opts && opts.compact ? gameFormChart(form, opts) : gameFormBlock(item);
     const compact = Boolean(opts && opts.compact);
     const width = compact ? 70 : 260;
     const height = compact ? 18 : 84;

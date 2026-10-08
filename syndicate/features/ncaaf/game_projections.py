@@ -518,6 +518,17 @@ def _normal_prob_above(threshold: float | None, mean: float | None, stdev: float
     return 0.5 * math.erfc(((threshold - mean) / stdev) / math.sqrt(2.0))
 
 
+def _chart_normal_ladder(mean: Any, stdev: Any, line: Any) -> Any:
+    """The SAME `_normal_prob_above` at nearby lines, for the board's chart only
+    (lane layer2-board-ui-redesign). None when the sim gave no usable spread."""
+    m, sd = _as_float(mean), _as_float(stdev)
+    if m is None or sd is None or sd <= 0 or line is None:
+        return None
+    from syndicate.features.shared.price_ladder import price_ladder
+
+    return price_ladder(lambda t, _m=m, _s=sd: _normal_prob_above(t, _m, _s), line, sd=sd)
+
+
 def _game_projection(row: Mapping[str, Any], market: str, entry: Mapping[str, Any]) -> dict[str, Any] | None:
     """The sim's view of one full-game row, in the ROW's home/away frame.
 
@@ -553,6 +564,10 @@ def _game_projection(row: Mapping[str, Any], market: str, entry: Mapping[str, An
             "projected": None,
             "basis": "smartsim2_home_win_rate",
             "model_skill": skill_note("margins"),
+            # Chart only (lane layer2-board-ui-redesign): the margin normal with
+            # 0 marked; drawn only if P(margin > 0) is within 2 pts of the rate.
+            "ladder": _chart_normal_ladder(entry.get("margin_mean"), entry.get("margin_stdev"), 0.0),
+            "ladder_kind": "margin",
         }
 
     if market == "totals":
@@ -567,6 +582,8 @@ def _game_projection(row: Mapping[str, Any], market: str, entry: Mapping[str, An
             "basis": "smartsim2_total_normal",
             "model_prob_over": round(prob, 4) if prob is not None else None,
             "model_skill": skill_note("totals"),
+            "ladder": _chart_normal_ladder(mean, entry.get("total_stdev"), line),
+            "ladder_kind": "total",
         }
         if line is not None:
             projection["edge_vs_line"] = round(mean - line, 3)
@@ -595,6 +612,8 @@ def _game_projection(row: Mapping[str, Any], market: str, entry: Mapping[str, An
         "basis": "smartsim2_margin_normal",
         "model_prob_over": round(prob, 4) if prob is not None else None,
         "model_skill": skill_note("margins"),
+        "ladder": _chart_normal_ladder(mean, entry.get("margin_stdev"), line),
+        "ladder_kind": "margin",
     }
     if line is not None:
         projection["edge_vs_line"] = round(mean - line, 3)

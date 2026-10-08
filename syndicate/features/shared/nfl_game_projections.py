@@ -545,6 +545,14 @@ def attach_nfl_game_projections(
                             1.0 - _normal_cdf((line - mean) / stdev), 4
                         )
                         projection["basis"] = "smartsim2_total_normal"
+                        # Display ladder for the board's chart (lane
+                        # layer2-board-ui-redesign): the same normal at nearby lines.
+                        from syndicate.features.shared.price_ladder import price_ladder
+
+                        projection["ladder"] = price_ladder(
+                            lambda t, _m=mean, _s=stdev: 1.0 - _normal_cdf((t - _m) / _s), line, sd=stdev
+                        )
+                        projection["ladder_kind"] = "total"
 
                 # `#426`. THIS BRANCH PRODUCED A PROBABILITY AND NO EDGE, AND SAID
                 # NOTHING ABOUT WHY.

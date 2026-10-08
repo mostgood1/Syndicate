@@ -310,6 +310,14 @@ def _projection_from_dist(
     return projection
 
 
+def _chart_ladder(dist: Mapping[Any, Any], line: float, *, allow_negative: bool = False) -> Any:
+    """The histogram's own P(X > t) near the line, for the board's chart only."""
+    from syndicate.features.shared.price_ladder import price_ladder
+    from syndicate.features.shared.prop_projections import _display_prob_over
+
+    return price_ladder(lambda t, _d=dist: _display_prob_over(_d, t), line, allow_negative=allow_negative)
+
+
 def _projection_from_dist_unchecked(
     row: Mapping[str, Any], market: str, block: Mapping[str, Any], *, segment: str, sims: Any
 ) -> dict[str, Any] | None:
@@ -337,6 +345,9 @@ def _projection_from_dist_unchecked(
             "source": "wnba_smart_sim_draws",
             "sim_draws": sims,
             "model_prob_over": _dist_prob_over(dist, line),
+            # Display ladder for the board's sim-spread chart (lane layer2-board-ui-redesign).
+            "ladder": _chart_ladder(dist, line),
+            "ladder_kind": "total",
         }
     if market == "spreads":
         dist = block.get("margin")
@@ -350,6 +361,8 @@ def _projection_from_dist_unchecked(
             "source": "wnba_smart_sim_draws",
             "sim_draws": sims,
             "model_prob_over": _dist_prob_over(dist, line),
+            "ladder": _chart_ladder(dist, line, allow_negative=True),
+            "ladder_kind": "margin",
         }
     if market == "h2h":
         dist = block.get("margin")
@@ -374,6 +387,9 @@ def _projection_from_dist_unchecked(
                 "probability-space edge, so none was priced"
             ),
             "market_fair_prob_over": _no_vig_over_probability(row),
+            # The margin the win probability comes from, 0 marked on the chart.
+            "ladder": _chart_ladder(dist, 0.0, allow_negative=True),
+            "ladder_kind": "margin",
         }
     return None
 

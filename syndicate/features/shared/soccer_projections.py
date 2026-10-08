@@ -643,6 +643,39 @@ def _as_int(value: Any) -> int | None:
     return count if count > 0 else None
 
 
+def _scoreline_ladder(scorelines: Any, line: float, *, margin: bool) -> Any:
+    """P(total > t) (or P(home - away > t)) near the line, from the scoreline
+    distribution, no-push conditioned like the published number. Chart only."""
+    if not isinstance(scorelines, dict) or not scorelines:
+        return None
+    outcomes: list[tuple[int, float]] = []
+    for key, raw in scorelines.items():
+        prob = _as_float(raw)
+        parts = str(key).replace(":", "-").split("-")
+        if prob is None or len(parts) != 2:
+            continue
+        try:
+            home, away = int(parts[0]), int(parts[1])
+        except (TypeError, ValueError):
+            continue
+        outcomes.append((home - away if margin else home + away, prob))
+    if not outcomes:
+        return None
+
+    def over(t: float) -> float | None:
+        above = sum(p for v, p in outcomes if v > t)
+        mass = sum(p for _, p in outcomes)
+        # Totals: no-push conditioned like the published total. Margin: the
+        # 3-way win probability is UNconditional (a draw is a listed outcome).
+        push = 0.0 if margin else sum(p for v, p in outcomes if abs(v - t) < 1e-9)
+        live = mass - push
+        return above / live if live > 1e-9 else None
+
+    from syndicate.features.shared.price_ladder import price_ladder
+
+    return price_ladder(over, line, allow_negative=margin)
+
+
 def _total_prob_from_scorelines(scorelines: Any, line: float) -> tuple[float, float] | None:
     """(P(over), P(push)) for ANY total line, from the scoreline distribution.
 
@@ -1335,6 +1368,9 @@ def attach_soccer_projections(
                 )
                 projection["draw_probability"] = _as_float(win.get("draw"))
                 projection["away_probability"] = _as_float(win.get("away"))
+                # The goal margin (home minus away), 0 marked, for the chart only.
+                projection["ladder"] = _scoreline_ladder(match.get("scoreline_probabilities"), 0.0, margin=True)
+                projection["ladder_kind"] = "margin"
         elif market in {"totals", "totals_alt"}:
             totals = match.get("total_distribution") or {}
             line_value = _as_float(row.get("line"))
@@ -1373,6 +1409,12 @@ def attach_soccer_projections(
                 )
                 if mean is not None:
                     projection = _mean_projection(mean, row.get("line"), basis="total_mean")
+            # Display ladder for the board's chart (lane layer2-board-ui-redesign,
+            # user-approved cross-lane write 2026-10-08): the scoreline
+            # distribution at nearby lines, same no-push conditioning.
+            if projection is not None and projection.get("model_prob_over") is not None and line_value is not None:
+                projection["ladder"] = _scoreline_ladder(match.get("scoreline_probabilities"), line_value, margin=False)
+                projection["ladder_kind"] = "total"
         elif market in _CORNERS_MARKETS:
             # CORNERS, PRICED FROM THE CORNERS MEAN -- never from the goals model.
             #
@@ -1502,6 +1544,14 @@ def attach_soccer_projections(
             if exact is not None:
                 projection = _probability_projection(exact, basis=prob_field)
                 projection["conditioning"] = family
+                # Display ladder for the board's sim-spread chart (lane
+                # layer2-board-ui-redesign, cross-lane write user-approved
+                # 2026-10-08): the SAME exact-match table at nearby rungs.
+                from syndicate.features.shared.price_ladder import price_ladder
+
+                projection["ladder"] = price_ladder(
+                    lambda t, _e=entry, _f=prob_field: 1.0 if t < 0 else _prob_at_line(_e, _f, t), row.get("line")
+                )
             elif market not in _PLAYER_FIELDS:
                 # An assists row whose exact line the sim did not price. Named
                 # rather than counted as a player miss: the player matched, the

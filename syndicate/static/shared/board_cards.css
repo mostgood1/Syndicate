@@ -2499,6 +2499,11 @@ table.board-blotter tbody tr:last-child td {
 .prop-chart { margin: 0; display: flex; flex-direction: column; gap: 4px; }
 .prop-chart figcaption { font-size: 11px; color: var(--cards-text-dim); }
 .prop-chart figcaption b { color: var(--cards-text); }
+/* Game lines: each team's last 10 against today's line (mockup board 11). */
+.game-form-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--cards-text-dim); min-width: 0; }
+.game-form-row__team { flex: 0 1 110px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.game-form-row svg { flex: 1 1 auto; max-width: 100%; height: auto; }
+.game-form-row b { color: var(--cards-text); white-space: nowrap; }
 .chart-bar { fill: #3a5a78; }
 .chart-bar--side { fill: #7ee2a8; }
 .chart-axis { fill: var(--cards-text-dim); font-size: 9px; font-family: inherit; }

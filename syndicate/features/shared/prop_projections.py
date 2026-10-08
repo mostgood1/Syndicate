@@ -285,6 +285,29 @@ def _dist_prob_over(dist: Mapping[str, Any], line: float) -> float | None:
     return probability
 
 
+def _display_prob_over(dist: Mapping[Any, Any], threshold: float) -> float | None:
+    """P(X > threshold) from a `{value: count}` dist, WITHOUT the certainty
+    refusal `_dist_prob_over` applies -- a display ladder's tail points are
+    legitimately 0 or 1. Display only (lane layer2-board-ui-redesign)."""
+    total = 0.0
+    above = 0.0
+    for key, count in dist.items():
+        try:
+            value, weight = float(key), float(count)
+        except (TypeError, ValueError):
+            continue
+        total += weight
+        if value > threshold:
+            above += weight
+    return above / total if total > 0 else None
+
+
+def _display_ladder(price_over: Any, line: Any, *, allow_negative: bool = False) -> Any:
+    from syndicate.features.shared.price_ladder import price_ladder
+
+    return price_ladder(price_over, line, allow_negative=allow_negative)
+
+
 def _bucket_for_line(prefix: str, line: float) -> str | None:
     """`total_bases` + line 1.5 -> `total_bases_2plus`.
 
@@ -687,6 +710,7 @@ class PropProjectionIndex:
                 "model_prob_over": _dist_prob_over(dist, line_value),
                 "source": "pitcher_distribution",
                 "basis": dist_key,
+                "ladder": _display_ladder(lambda t, _d=dist: _display_prob_over(_d, t), line_value),
             }
 
         if market_key == _HR_MARKET:
@@ -726,6 +750,10 @@ class PropProjectionIndex:
                 "model_prob_over": round(float(prob), 4),
                 "source": "hitter_threshold",
                 "basis": bucket,
+                "ladder": _display_ladder(
+                    lambda t, _r=row: 1.0 if t < 0 else _r.get(f"p_hr_{int(math.floor(t)) + 1}plus_cal", _r.get(f"p_hr_{int(math.floor(t)) + 1}plus")),
+                    line_value,
+                ),
             }
 
         if market_key in _HITTER_BUCKETS:
@@ -768,6 +796,10 @@ class PropProjectionIndex:
                 "model_prob_over": round(float(prob), 4) if prob is not None else None,
                 "source": "hitter_threshold",
                 "basis": bucket,
+                "ladder": _display_ladder(
+                    lambda t, _n=name, _p=prefix: 1.0 if t < 0 else self._hitter_rung_prob(_n, f"{_p}_{int(math.floor(t)) + 1}plus"),
+                    line_value,
+                ),
             }
             if derived_from:
                 # Say that the number was DERIVED rather than simulated. Same
@@ -778,6 +810,19 @@ class PropProjectionIndex:
             return payload
 
         return None
+
+    def _hitter_rung_prob(self, name: str, bucket: str) -> float | None:
+        """P(stat >= N) for one `<prefix>_<N>plus` rung -- the same calibrated-
+        first pick `project` uses. None when the (top-N) list lacks the rung."""
+        row = self._hitters.get((name, bucket))
+        if not row:
+            return None
+        keys = [k for k in row if isinstance(k, str) and k.startswith("p_")]
+        pick = next((k for k in keys if k.endswith("_cal")), keys[0] if keys else None)
+        try:
+            return float(row[pick]) if pick is not None else None
+        except (TypeError, ValueError):
+            return None
 
 
 def starter_ids_from_roster_snapshots(snapshot_dir: Path | str) -> dict[str, str]:
@@ -983,6 +1028,14 @@ def _project_game_market_uncensored(
             # can tell a conditional number from a raw one without re-deriving
             # it -- the `basis` discipline #263 asked for, applied here.
             "basis": f"{basis}/win_prob_decided" if renormalised else f"{basis}/win_prob",
+            # The margin the win probability comes from, 0 marked on the chart.
+            # Unconditional, so on a segment with ties the page's 2-point check
+            # will (correctly) refuse to draw it against a decided-space price.
+            "ladder": _display_ladder(
+                lambda t, _d=payload.get("run_margin_dist"): _display_prob_over(_d, t) if isinstance(_d, Mapping) else None,
+                0.0, allow_negative=True,
+            ),
+            "ladder_kind": "margin",
         }
 
     try:
@@ -1014,6 +1067,8 @@ def _project_game_market_uncensored(
             "model_prob_over": prob,
             "source": "game_simulation",
             "basis": f"{basis}/total_runs_dist",
+            "ladder": _display_ladder(lambda t, _d=dist: _display_prob_over(_d, t), line_value),
+            "ladder_kind": "total",
         }
 
     # `spreads_alt` likewise -- same `run_margin_dist`, different line. The
@@ -1053,6 +1108,8 @@ def _project_game_market_uncensored(
             "model_prob_over": prob,
             "source": "game_simulation",
             "basis": f"{basis}/run_margin_dist",
+            "ladder": _display_ladder(lambda t, _d=dist: _display_prob_over(_d, t), line_value, allow_negative=True),
+            "ladder_kind": "margin",
         }
 
     return None

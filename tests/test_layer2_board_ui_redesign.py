@@ -416,3 +416,80 @@ class PropShowsOnlyThePlayersTeam(unittest.TestCase):
         text = TEMPLATE.read_text(encoding="utf-8")
         self.assertIn('return isProp ? "" : `<span class="board-crest-pair">', text)
         self.assertIn("item.player_side", text)
+
+
+class GameAndRemainingPropLadders(unittest.TestCase):
+    """User 2026-10-08: "build it all" -- game-line charts + NBA / MLB / soccer props."""
+
+    def test_ncaaf_normal_ladder_reproduces_the_published_probability(self) -> None:
+        from syndicate.features.ncaaf.game_projections import _chart_normal_ladder, _normal_prob_above
+
+        ladder = _chart_normal_ladder(52.0, 14.0, 55.5)
+        at = [p for t, p in ladder if t == 55.5][0]
+        self.assertAlmostEqual(at, round(_normal_prob_above(55.5, 52.0, 14.0), 4), places=4)
+
+    def test_soccer_margin_ladder_is_unconditional_home_win(self) -> None:
+        from syndicate.features.shared.soccer_projections import _scoreline_ladder
+
+        scorelines = {"1-0": 0.3, "0-0": 0.25, "0-1": 0.2, "2-1": 0.15, "1-1": 0.1}
+        ladder = _scoreline_ladder(scorelines, 0.0, margin=True)
+        at0 = [p for t, p in ladder if t == 0.0][0]
+        self.assertAlmostEqual(at0, 0.45, places=4)  # P(home wins) incl. draws in the denominator
+        totals = _scoreline_ladder(scorelines, 1.5, margin=False)
+        self.assertAlmostEqual([p for t, p in totals if t == 1.5][0], 0.25, places=4)  # 2-1 + 1-1
+
+    def test_mlb_display_prob_does_not_refuse_tails(self) -> None:
+        from syndicate.features.shared.prop_projections import _display_prob_over
+
+        dist = {"0": 10, "1": 30, "2": 60}
+        self.assertEqual(_display_prob_over(dist, 2.5), 0.0)
+        self.assertEqual(_display_prob_over(dist, -0.5), 1.0)
+        self.assertAlmostEqual(_display_prob_over(dist, 0.5), 0.9)
+
+    def test_price_ladder_skips_missing_rungs_but_needs_the_line(self) -> None:
+        from syndicate.features.shared.price_ladder import price_ladder
+
+        table = {0.5: 0.4, 1.5: 0.12}
+        self.assertEqual(price_ladder(lambda t: 1.0 if t < 0 else table.get(t), 0.5),
+                         [[-0.5, 1.0], [0.5, 0.4], [1.5, 0.12]])
+        self.assertIsNone(price_ladder(lambda t: 1.0 if t < 0 else table.get(t), 2.5))
+
+    def test_board_passes_kind_and_raw_probability(self) -> None:
+        from syndicate.features.shared import layer2_board
+
+        row = {"kind": "game", "projection": {"ladder": [[-0.5, 0.6], [0.0, 0.55], [0.5, 0.5]], "ladder_kind": "margin",
+                                              "p_model_raw": 0.55, "book_blend": "applied"}}
+        cols = layer2_board._chart_columns(row)
+        self.assertEqual(cols["sim_ladder_kind"], "margin")
+        self.assertEqual(cols["sim_ladder_raw_over"], 0.55)
+
+
+class TeamRecentResults(unittest.TestCase):
+    """Game-row last-10 (mockup board 11): scores from local files, no network."""
+
+    def test_nfl_scores_newest_first_inside_the_window(self) -> None:
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+
+        from syndicate.features.shared import team_recent_results as trr
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "nfl_source" / "tracking" / "nflverse"
+            path.mkdir(parents=True)
+            (path / "schedules_games.csv").write_text(
+                "gameday,home_team,away_team,home_score,away_score\n"
+                "2026-01-04,DAL,NYG,20,10\n"      # last season: outside the window
+                "2026-09-20,DAL,NYG,37,20\n"
+                "2026-09-27,PHI,DAL,34,31\n"
+                "2026-10-11,DAL,TB,,\n",          # unplayed
+                encoding="utf-8",
+            )
+            with mock.patch.dict("os.environ", {"SYNDICATE_DATA_ROOT": tmp}):
+                got = trr.team_recent_results("nfl", "DAL", "2026-10-08T23:00:00Z")
+        self.assertEqual(got, [["2026-09-27", 31.0, 34.0], ["2026-09-20", 37.0, 20.0]])
+
+    def test_unknown_sport_is_empty_not_a_guess(self) -> None:
+        from syndicate.features.shared.team_recent_results import team_recent_results
+
+        self.assertEqual(team_recent_results("nba", "Boston Celtics", "2026-10-08"), [])

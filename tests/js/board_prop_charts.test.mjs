@@ -25,9 +25,13 @@ const api = (new Function(`
   const escapeHtml = (v) => String(v);
   ${extract('confidenceValue')}
   ${extract('simLadderBuckets')}
+  ${extract('gameMarketKind')}
+  ${extract('gameSide')}
+  ${extract('teamForm')}
+  ${extract('backedSide')}
   ${extract('recentForm')}
   ${extract('recentFormText')}
-  return { simLadderBuckets, recentForm, recentFormText };
+  return { simLadderBuckets, recentForm, recentFormText, teamForm };
 `))();
 
 let failures = 0;
@@ -53,6 +57,27 @@ eq('L5/L10 count the side shown, newest first', api.recentFormText(form), 'L5 3/
 eq('over side counts the other way', api.recentFormText({ ...form, side: 'over' }), 'L5 2/5 · L10 5/10');
 eq('fewer than 5 games still reads honestly', api.recentFormText({ recent_values: [3, 1], line: 1.5, side: 'over' }), 'L5 1/2 · L10 1/2');
 eq('no values, no text', api.recentFormText({ line: 0.5, side: 'under' }), '');
+
+// Game lines: a moneyline has no line (0 on the chart), sides are home/away.
+const marg = [[-2.5, 0.8], [-1.5, 0.7], [-0.5, 0.6], [0, 0.55], [0.5, 0.5], [1.5, 0.4], [2.5, 0.3]];
+const ml0 = api.simLadderBuckets({ sim_ladder: marg, sim_ladder_kind: 'margin', line: null, side: 'away', confidence: 0.45 });
+eq('moneyline away row draws at line 0', ml0 && ml0.line, 0);
+eq('away side is the complement', ml0 && Math.round(ml0.pSide * 100), 45);
+const raw = api.simLadderBuckets({ sim_ladder: marg, sim_ladder_kind: 'margin', line: 0, side: 'home', confidence: 0.70, sim_ladder_raw_over: 0.55 });
+eq('NBA blended row checks against the RAW sim and says so', raw && raw.raw, true);
+
+// Team last-10 on game rows: [date, for, against], newest first.
+const tr = { home: [['d', 34, 30], ['d', 31, 34], ['d', 37, 20], ['d', 10, 13]], away: [['d', 20, 24], ['d', 27, 3]] };
+const spread = { market: 'spreads', side: 'Dallas Cowboys', home_team: 'Dallas Cowboys', away_team: 'Tampa Bay Buccaneers', line: -3, team_recent: tr };
+eq('spread: home covers -3 when margin > 3', api.teamForm(spread, 'home').record, '2/4');
+eq('spread: the other team gets +3', api.teamForm(spread, 'away').label, 'covered +3');
+eq('spread: away covers +3 when margin > -3', api.teamForm(spread, 'away').record, '1/2');
+eq('spread text names the backed team', api.recentFormText(spread), 'Dallas Cowboys L4 covered -3 2/4');
+const tot = Object.assign({}, spread, { market: 'totals', side: 'over', line: 50.5 });
+eq("totals: game total over today's line", api.teamForm(tot, 'home').record, '3/4');
+const mlr = Object.assign({}, spread, { market: 'h2h', side: 'away', line: null });
+eq('moneyline: W-L of the backed team', api.recentFormText(mlr), 'Tampa Bay Buccaneers L2 1–1');
+eq('no team_recent: game row has no form', api.recentForm({ market: 'totals', kind: 'game', side: 'over', line: 6 }), null);
 
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASS');
 process.exit(failures ? 1 : 0);
