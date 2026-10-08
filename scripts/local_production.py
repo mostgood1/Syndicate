@@ -985,6 +985,9 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # MLB multi-season player game logs + hand splits (StatsAPI; past seasons kept, the
     # current season re-fetched): "last 10", "vs this team" and "vs LHP/RHP" over years.
     ScheduledJob("mlb-player-game-logs", 11, 25, ("scripts/build_mlb_player_game_logs.py",)),
+    # NCAAF weekly recommendation summary (cards / picks fallback, archive, readiness gate):
+    # newest projections week x newest book grids, every row carrying the model's skill verdict.
+    ScheduledJob("ncaaf-recommendation-summary", 11, 35, ("scripts/build_ncaaf_recommendation_summary.py",)),
 )
 
 
