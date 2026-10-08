@@ -14,8 +14,12 @@ Writes `soccer_source/<league>/history/player_match_log_<season>.csv`:
 Only players who entered the match (minutes from `compute_minutes_played`; an unused substitute has no
 row). League matches only (each league's own ESPN slug; cups and friendlies are other slugs).
 
-INCREMENTAL: event_ids already in the file are never re-fetched, so a daily run costs one summary request
-per newly finished match plus the scoreboard windows. Atomic rewrite of the whole file.
+INCREMENTAL: event_ids already in the file are never re-fetched, and the SCOREBOARD walk is bounded too:
+a season that ended more than SETTLED_DAYS ago and already has a file is skipped outright, and the current
+season is re-read only from RESCAN_DAYS before its newest logged match. ESPN refuses date-range scoreboard
+requests, so each window costs one request per DAY: the first version re-walked every day of both seasons
+for all 10 leagues and took 1,255 s on 2026-10-08 (lead in leads.md). `--full` walks everything (to pick up
+a match a failed fetch missed). Atomic rewrite of the whole file.
 
     python scripts/build_soccer_player_match_log.py                          # every league, this + last season
     python scripts/build_soccer_player_match_log.py --league epl --seasons 2025,2026
@@ -25,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import datetime as dt
 import os
 import sys
 import time
@@ -92,18 +97,45 @@ def _write(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     os.replace(tmp, path)
 
 
-def run_league(league: str, season: int, *, pause: float = 0.25) -> dict[str, Any]:
+SETTLED_DAYS = 7    # a season whose last day is this far back gains no matches
+RESCAN_DAYS = 3     # the current season is re-read from this many days before its newest logged match
+WINDOW_DAYS = 15
+
+
+def windows_to_scan(league: str, season: int, existing: list[dict[str, str]], *, today: dt.date, full: bool) -> list[str]:
+    """`YYYYMMDD-YYYYMMDD` windows this run must walk; [] when the season is settled and logged."""
+    from syndicate.features.soccer.features.schedule import season_date_range
+
+    start, end = season_date_range(league, season)
+    end = min(end, today)
+    if end < start:
+        return []
+    if not full and existing:
+        if end <= today - dt.timedelta(days=SETTLED_DAYS) and season_date_range(league, season)[1] < today:
+            return []
+        newest = max((str(r.get("date") or "") for r in existing), default="")
+        if newest:
+            start = max(start, dt.date.fromisoformat(newest) - dt.timedelta(days=RESCAN_DAYS))
+    windows, cursor = [], start
+    while cursor <= end:
+        window_end = min(cursor + dt.timedelta(days=WINDOW_DAYS - 1), end)
+        windows.append(f"{cursor:%Y%m%d}-{window_end:%Y%m%d}")
+        cursor = window_end + dt.timedelta(days=1)
+    return windows
+
+
+def run_league(league: str, season: int, *, pause: float = 0.25, full: bool = False, today: dt.date | None = None) -> dict[str, Any]:
     from syndicate.features.soccer.ingestion.espn_lineups import fetch_completed_events, fetch_match_summary
-    from syndicate.features.soccer.ingestion.espn_player_stats import season_date_windows
 
     path = soccer_root() / league / "history" / f"player_match_log_{season}.csv"
     existing = _read(path)
     have = {r["event_id"] for r in existing}
-    windows = season_date_windows(league, season)
+    windows = windows_to_scan(league, season, existing, today=today or dt.date.today(), full=full)
     summary = {"league": league, "season": season, "windows": len(windows), "kept_events": len(have),
                "new_events": 0, "failed": 0, "rows": len(existing)}
     if not windows:
-        print("[soccer_log] " + " ".join(f"{k}={v}" for k, v in summary.items()) + " (season not started)", flush=True)
+        why = "settled and logged -- skipped" if existing else "season not started"
+        print("[soccer_log] " + " ".join(f"{k}={v}" for k, v in summary.items()) + f" ({why})", flush=True)
         return summary
     events = fetch_completed_events(league, date_windows=windows)
     rows: list[dict[str, Any]] = list(existing)
@@ -136,13 +168,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--league", action="append", help="default: every league with an ESPN slug")
     parser.add_argument("--seasons", default=None, help="comma list; default: this season and last")
+    parser.add_argument("--full", action="store_true", help="walk every day of each season (recover a missed match)")
     args = parser.parse_args(argv)
     for league in args.league or sorted(LEAGUE_ESPN_SLUGS):
         current = default_season(league)
         seasons = [int(s) for s in args.seasons.split(",")] if args.seasons else [current - 1, current]
         for season in seasons:
             try:
-                run_league(league, season)
+                run_league(league, season, full=args.full)
             except Exception as exc:  # noqa: BLE001 -- one league's outage must not stop the others
                 print(f"[soccer_log] LEAGUE_FAILED league={league} season={season} {type(exc).__name__}: {exc}", flush=True)
     return 0

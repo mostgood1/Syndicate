@@ -87,3 +87,19 @@ def test_a_live_boxed_team_date_is_never_filled_from_the_log(tmp_path, monkeypat
                      not_in_roster=[{"date": "2026-09-20", "event_id": "x", "opponent": "Chelsea"}])
     scan = S.merge_match_log(live, ctx, subject)
     assert [g["date"] for g in scan.appearances] == ["2026-09-01"] and scan.appearances[0]["event_id"] == "y"
+
+
+def test_scan_windows_skip_a_settled_season_and_start_near_the_newest_match():
+    import datetime as dt
+
+    today = dt.date(2026, 10, 8)
+    logged = [{"date": "2026-09-20"}, {"date": "2026-10-04"}]
+    # a finished European season with a file: nothing to walk (it took 1,255 s to re-walk them all on 2026-10-08)
+    assert log.windows_to_scan("epl", 2025, logged, today=today, full=False) == []
+    # the current season: from three days before the newest logged match, through today
+    assert log.windows_to_scan("epl", 2026, logged, today=today, full=False) == ["20261001-20261008"]
+    # --full, or a first run with no file, walks the whole season to date
+    assert log.windows_to_scan("epl", 2025, logged, today=today, full=True)[0] == "20250801-20250815"
+    assert log.windows_to_scan("epl", 2026, [], today=today, full=False)[0] == "20260801-20260815"
+    # a calendar-year league's season still in progress is never "settled"
+    assert log.windows_to_scan("mls", 2026, [{"date": "2026-10-05"}], today=today, full=False) == ["20261002-20261008"]
