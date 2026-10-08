@@ -3340,7 +3340,7 @@ class DateArchiveHelperTests(unittest.TestCase):
         card = (payload.get("cards") or [{}])[0]
 
         self.assertEqual(card.get("player_id"), 8484153)
-        self.assertEqual(card.get("headshot_url"), "https://assets.nhle.com/mugs/nhl/2026/CAR/8484153.png")
+        self.assertEqual(card.get("headshot_url"), "https://assets.nhle.com/mugs/nhl/latest/8484153.png")
 
     def test_finalize_home_prop_rows_uses_matched_game_for_real_away_home_labels(self) -> None:
         from syndicate.blueprints import home as home_module

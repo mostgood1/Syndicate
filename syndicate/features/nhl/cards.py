@@ -804,15 +804,15 @@ def _player_identity_maps_for_date(selected_date: str) -> tuple[dict[str, str], 
     return player_id_by_name, team_by_name
 
 
-def _nhl_headshot_url(player_id: Any, *, team_abbr: Any = None, selected_date: str | None = None) -> str | None:
+def _nhl_headshot_url(player_id: Any) -> str | None:
+    # `latest` needs no team or season, so a traded player still resolves.
+    # The old `/{calendar year}/{TEAM}/{id}.png` form answered 302 for Auston
+    # Matthews (8479318) where `/latest/8479318.png` answered 200 (2026-10-08):
+    # NHL seasons are keyed `20252026`, never a bare calendar year.
     text = str(player_id or "").strip()
     if not text.isdigit():
         return None
-    team = team_abbreviation(team_abbr)
-    if not team:
-        return None
-    season = parse_iso_date(selected_date or default_date()).year
-    return f"https://assets.nhle.com/mugs/nhl/{season}/{team}/{text}.png"
+    return f"https://assets.nhle.com/mugs/nhl/latest/{text}.png"
 
 
 def _split_reason_tokens(value: Any) -> list[str]:
@@ -925,7 +925,7 @@ def build_props_cards_payload(selected_date: str | None, top: int = 12) -> dict[
             {
             "player": player_name or None,
             "player_id": int(player_id) if player_id.isdigit() else None,
-                "headshot_url": _nhl_headshot_url(player_id, team_abbr=team, selected_date=resolved_date),
+                "headshot_url": _nhl_headshot_url(player_id),
                 "team_logo": team_logo_url(team),
                 "team_primary_color": team_primary_color(team),
                 "team_secondary_color": team_secondary_color(team),
