@@ -243,11 +243,12 @@ def _mlb_hand_multi() -> tuple[dict[tuple[str, str, str], dict[str, float]], lis
     for path in files:
         for row in C.iter_csv(path):
             k = (str(row.get("group")), str(row.get("player_id")), str(row.get("code")))
-            cell = sums.setdefault(k, {})
+            cell = sums.setdefault(k, {"_seasons": set()})
             for f in ("pa", "ab", "h", "tb", "hr", "so", "bb"):
                 cell[f] = cell.get(f, 0.0) + (_num(row.get(f)) or 0.0)
-            if str(row.get("season") or "").isdigit():
+            if str(row.get("season") or "").isdigit() and (_num(row.get("pa")) or 0) > 0:
                 seasons.add(int(row["season"]))
+                cell["_seasons"].add(int(row["season"]))
     result = (sums, sorted(seasons))
     if key is not None:
         cache[key] = result
@@ -391,7 +392,7 @@ def mlb_prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str) 
             multi_l, multi_r = hand_multi.get(("pitching", player_id, "vl")), hand_multi.get(("pitching", player_id, "vr"))
             if multi_l and multi_r and multi_l.get("pa", 0) >= 10 and multi_r.get("pa", 0) >= 10:
                 vs_l, vs_r = multi_l, multi_r
-                splits = dict(splits, season=_season_span(hand_seasons))
+                splits = dict(splits, season=_season_span(sorted(multi_l["_seasons"] | multi_r["_seasons"])))
             if int(vs_l.get("pa") or 0) >= 10 and int(vs_r.get("pa") or 0) >= 10:
                 k_l = 100.0 * int(vs_l.get("so") or 0) / int(vs_l["pa"])
                 k_r = 100.0 * int(vs_r.get("so") or 0) / int(vs_r["pa"])
@@ -412,13 +413,23 @@ def mlb_prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str) 
                     multi_hand = hand_multi.get(("hitting", player_id, "vl" if throws == "L" else "vr"))
                     hand = _slash(multi_hand) if multi_hand else None
                     if hand:
-                        span = _season_span(hand_seasons)
+                        span = _season_span(sorted(multi_hand["_seasons"]))
                     else:
                         hand = _slash(batter_splits.get(f"vs_{throws}"))
                     if hand:
                         split_bits.append(f"vs {'LHP' if throws == 'L' else 'RHP'} {hand}")
             opponent = _mlb_opponent(row, team)
-            if opponent:
+            vs_multi = [r for r in multi if opponent and _canonical_mlb(str(r.get("opponent") or "")) == opponent]
+            if vs_multi:
+                cell = {f: sum(_num(r.get(f)) or 0.0 for r in vs_multi) for f in ("pa", "ab", "h", "hr")}
+                line_text = _slash(cell)
+                years = sorted({str(r.get("date") or "")[:4] for r in vs_multi})
+                if line_text:
+                    who = next((str(r.get("opponent")) for r in vs_multi), "")
+                    abbr = next((a for a in (batter_splits.get("vs_team") or {}) if _canonical_mlb(a) == opponent), who)
+                    split_bits.append(f"vs {abbr} {line_text} ({years[0]}-{years[-1][2:]})" if len(years) > 1
+                                      else f"vs {abbr} {line_text} ({years[0]})")
+            elif opponent:
                 for abbr, cell in (batter_splits.get("vs_team") or {}).items():
                     if _canonical_mlb(abbr) == opponent:
                         line = _slash(cell)
