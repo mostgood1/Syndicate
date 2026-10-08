@@ -141,3 +141,11 @@ def test_season_failure_never_breaks_the_explainer(data_root, monkeypatch):
     monkeypatch.setattr(se, "candidate_season_signals", boom)
     text = rc.row_explainer(_nba_row(), {"price": -120, "fair_probability": 0.52}, {})
     assert text and "Season metrics" not in text
+
+
+def test_recent_matchup_budget_is_per_sport_with_a_soccer_raise():
+    """Lane prop-recency-budget (user 2026-10-08): soccer kept running out of the 30 s per-sport budget."""
+    from syndicate.features.shared import layer2_row_context as rc
+
+    assert rc._recent_matchup_budget("soccer") == 45.0
+    assert rc._recent_matchup_budget("nhl") == rc._RECENT_MATCHUP_BUDGET_SECONDS_PER_SPORT == 30.0

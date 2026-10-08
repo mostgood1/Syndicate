@@ -448,6 +448,16 @@ _RECENT_MATCHUP_SPORTS = frozenset({"mlb", "nba", "wnba", "nfl", "nhl", "ncaaf",
 # (measured 2026-10-08: a single shared 120 s budget ran out before NHL got any)
 # nor stretch a build by more than this per sport.
 _RECENT_MATCHUP_BUDGET_SECONDS_PER_SPORT = 30.0
+# Per-sport raises (lane prop-recency-budget, user 2026-10-08 "raise the NHL/soccer budget if it
+# persists"). Soccer ran out in every build measured 18:58-20:18Z, including the warm 20:08Z one
+# (Recent form 867/920 props); NHL recovered once the host was not loaded (1,096/1,101), so it keeps
+# the default. Soccer's per-card cost after the match-log index: ~175 ms (was 276 ms; 69 ms before the
+# multi-season logs).
+_RECENT_MATCHUP_BUDGET_OVERRIDES: dict[str, float] = {"soccer": 45.0}
+
+
+def _recent_matchup_budget(sport: str) -> float:
+    return _RECENT_MATCHUP_BUDGET_OVERRIDES.get(sport, _RECENT_MATCHUP_BUDGET_SECONDS_PER_SPORT)
 # Sentences persist ACROSS builds for this long: form and matchup data change
 # daily, so a later build only computes picks it has not seen. Only the short
 # strings persist -- parsed logs live in the per-build read cache and are freed.
@@ -487,7 +497,7 @@ def row_recent_matchup_text(row: Mapping[str, Any], context: Mapping[str, Any] |
                 _RECENT_MATCHUP_MODULE.pop(stale, None)
             state = _RECENT_MATCHUP_MODULE.setdefault(bucket, {"read_cache": {}, "spent": {}, "logged": set()})
         spent = state["spent"].get(sport, 0.0)
-        if spent >= _RECENT_MATCHUP_BUDGET_SECONDS_PER_SPORT:
+        if spent >= _recent_matchup_budget(sport):
             if sport not in state["logged"]:
                 state["logged"].add(sport)
                 print(f"[layer2_row_context] RECENT_MATCHUP_BUDGET_SPENT sport={sport} seconds={spent:.1f}", flush=True)

@@ -741,6 +741,28 @@ def _same_team(a: Any, b: Any) -> bool:
     return bool(ca) and ca == cb
 
 
+def _match_log_index(path: Path) -> dict[str, list[dict[str, str]]]:
+    """name token -> the log rows whose player carries it, built ONCE per board build.
+
+    The scan it replaces read every row of up to three seasons' logs (~35k rows a season) and
+    name-matched each, for every prop: soccer went from 69 to 276 ms a card once 2024 was
+    backfilled (fleet 2026-10-08), and the row-sentence budget ran out. Indexed by EVERY token of
+    the loose name key, so a candidate is any row sharing a token with the board's name; the final
+    join is still `names_match`, unchanged.
+    """
+    cache = C._READ_CACHE.get()
+    key = ("soccer_match_log_index", C._cache_key(path)) if cache is not None else None
+    if key is not None and key in cache:
+        return cache[key]
+    index: dict[str, list[dict[str, str]]] = {}
+    for row in C.iter_csv(path):
+        for token in set(C.name_key_loose(row.get("player_name") or "").split()):
+            index.setdefault(token, []).append(row)
+    if key is not None:
+        cache[key] = index
+    return index
+
+
 def match_log_appearances(ctx: "Resolved", subject: PropSubject) -> list[dict[str, Any]]:
     """The player's league-match lines from the match log, newest first, strictly before the match."""
     if not ctx.league or not ctx.match_date or not ctx.team:
@@ -755,7 +777,10 @@ def match_log_appearances(ctx: "Resolved", subject: PropSubject) -> list[dict[st
         path = C.first_existing(LOCAL_DIR, f"{ctx.league}/history/player_match_log_{season}.csv")
         if path is None:
             continue
-        candidates = [row for row in C.iter_csv(path)
+        index = _match_log_index(path)
+        tokens = {t for n in names for t in C.name_key_loose(n).split()}
+        pool = {id(r): r for t in tokens for r in index.get(t, ())}.values()
+        candidates = [row for row in pool
                       if str(row.get("date") or "") < ctx.match_date
                       and any(C.names_match(str(row.get("player_name") or ""), n) for n in names)]
         # one PERSON: a name two player ids share is two people -- keep the one on
