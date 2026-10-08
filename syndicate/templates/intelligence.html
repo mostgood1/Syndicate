@@ -1136,12 +1136,20 @@
     const team = String(item.team || "").trim().toLowerCase();
     const isProp = String(item.kind || item.candidate_type || "").toLowerCase() === "prop" || Boolean(item.player_name);
     let picked = "";
-    if (!isProp) {
-      if (side === "home" || (team && team === String(item.home_team || "").trim().toLowerCase())) picked = home;
-      else if (side === "away" || (team && team === String(item.away_team || "").trim().toLowerCase())) picked = away;
+    if (isProp) {
+      // ONE crest, the PLAYER'S team (user 2026-10-08: "they should only show
+      // one team not both"). `player_side` is resolved on the worker from the
+      // per-sport roster files; unknown -> no crest, never both.
+      const playerSide = String(item.player_side || "").trim().toLowerCase();
+      picked = playerSide === "home" ? home : playerSide === "away" ? away : "";
+    } else if (side === "home" || (team && team === String(item.home_team || "").trim().toLowerCase())) {
+      picked = home;
+    } else if (side === "away" || (team && team === String(item.away_team || "").trim().toLowerCase())) {
+      picked = away;
     }
     if (picked) return teamCrest(picked, "board-crest--single");
-    return `<span class="board-crest-pair">${teamCrest(away)}${teamCrest(home)}</span>`;
+    // A game line with no side to pick (a total) keeps both: it IS about both teams.
+    return isProp ? "" : `<span class="board-crest-pair">${teamCrest(away)}${teamCrest(home)}</span>`;
   }
 
   function playerHeadshot(item) {

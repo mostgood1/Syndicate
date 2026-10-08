@@ -394,3 +394,25 @@ class ChartsAndHeadshots(unittest.TestCase):
         result = subprocess.run(["node", str(ROOT / "tests" / "js" / "board_prop_charts.test.mjs")],
                                 capture_output=True, text=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+
+class PropShowsOnlyThePlayersTeam(unittest.TestCase):
+    """User 2026-10-08: a prop showed BOTH team logos; it must show the player's team only."""
+
+    def test_player_side_matches_by_logo(self) -> None:
+        from unittest.mock import patch
+
+        from syndicate.features.shared import player_headshots
+
+        logos = {"TOR": "u/tor.png", "Toronto Maple Leafs": "u/tor.png", "Vegas Golden Knights": "u/vgk.png"}
+        row = {"sport": "nhl", "player_name": "Auston Matthews", "home_team": "Vegas Golden Knights", "away_team": "Toronto Maple Leafs"}
+        with patch.object(player_headshots, "_nhl_teams", return_value={"austonmatthews": "TOR"}), \
+                patch("syndicate.features.shared.team_logos.logo_url", side_effect=lambda sport, *names: next((logos[n] for n in names if n in logos), None)):
+            self.assertEqual(player_headshots.player_side(row), "away")
+        with patch.object(player_headshots, "_nhl_teams", return_value={}):
+            self.assertIsNone(player_headshots.player_side(row))
+
+    def test_page_never_draws_two_crests_on_a_prop(self) -> None:
+        text = TEMPLATE.read_text(encoding="utf-8")
+        self.assertIn('return isProp ? "" : `<span class="board-crest-pair">', text)
+        self.assertIn("item.player_side", text)

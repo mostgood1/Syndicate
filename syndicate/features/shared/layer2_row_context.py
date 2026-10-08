@@ -250,6 +250,18 @@ def _mlb_headshot(player_id: str) -> str | None:
 
 
 def row_identity(row: Mapping[str, Any], context: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Headshot (+ MLB player_id) and, for props, which side the player is on."""
+    out = dict(_row_identity_images(row, context))
+    if str(row.get("player_name") or "").strip():
+        from syndicate.features.shared.player_headshots import player_side
+
+        side = player_side(row)
+        if side:
+            out["player_side"] = side
+    return out
+
+
+def _row_identity_images(row: Mapping[str, Any], context: Mapping[str, Any] | None) -> dict[str, Any]:
     """`headshot_url` (and, for MLB, `player_id`) where an id source exists. Else {}."""
     player = str(row.get("player_name") or "").strip()
     if not player:

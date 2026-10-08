@@ -86,6 +86,21 @@ def _unique(pairs: Iterable[tuple[str, str]]) -> dict[str, str]:
 
 
 @lru_cache(maxsize=1)
+def _nhl_rows() -> list[dict[str, str]]:
+    for root in _roots("nhl"):
+        found = sorted(Path(root).glob("source_artifacts/data/processed/roster_snapshot_*.csv"))
+        found += sorted(Path(root).glob("data/processed/roster_snapshot_*.csv"))
+        if found:
+            return list(_read_csv(max(found, key=lambda p: p.name)))
+    return []
+
+
+@lru_cache(maxsize=1)
+def _nhl_teams() -> dict[str, str]:
+    return _unique((_norm(r.get("full_name") or r.get("player")), str(r.get("team") or "").strip()) for r in _nhl_rows())
+
+
+@lru_cache(maxsize=1)
 def _nhl_ids() -> dict[str, str]:
     for root in _roots("nhl"):
         found = sorted(Path(root).glob("source_artifacts/data/processed/roster_snapshot_*.csv"))
@@ -120,6 +135,26 @@ def _ncaaf_index() -> tuple[dict[tuple[str, str], str], dict[str, str], dict[str
                     teams.setdefault(_norm(key), tid)
         break
     return by_team, _unique(pairs), teams
+
+
+@lru_cache(maxsize=1)
+def _soccer_teams() -> dict[str, str]:
+    for root in _roots("soccer"):
+        files = sorted(Path(root).glob("*/api/rosters/rosters_*.csv"))
+        if files:
+            return _unique((_norm(r.get("player_name")), str(r.get("team") or "").strip())
+                           for path in files for r in _read_csv(path))
+    return {}
+
+
+@lru_cache(maxsize=2)
+def _basketball_teams(sport: str) -> dict[str, str]:
+    """name -> canonical team tri from the existing basketball id index."""
+    try:
+        from syndicate.blueprints.home import _basketball_player_id_index
+    except Exception:  # noqa: BLE001
+        return {}
+    return _unique((name, team) for (team, name), _pid in _basketball_player_id_index(sport).items() if team)
 
 
 @lru_cache(maxsize=1)
@@ -167,4 +202,66 @@ def headshot_url(row: Mapping[str, Any]) -> str | None:
     return None
 
 
-__all__ = ["headshot_url"]
+def _player_team(row: Mapping[str, Any]) -> str | None:
+    """The team the PLAYER plays for, as any name/abbr the logo index knows."""
+    sport = str(row.get("sport") or "").strip().lower()
+    player = str(row.get("player_name") or "").strip()
+    projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
+    for key in ("player_team", "team_abbr", "player_team_abbr"):
+        value = str(projection.get(key) or "").strip()
+        if value:
+            return value
+    if sport == "nhl":
+        return _nhl_teams().get(_norm(player))
+    if sport == "soccer":
+        return _soccer_teams().get(_norm(player))
+    if sport in {"nba", "wnba"}:
+        try:
+            from syndicate.blueprints.home import _mlb_name_key
+
+            return _basketball_teams(sport).get(_mlb_name_key(player))
+        except Exception:  # noqa: BLE001
+            return None
+    return None
+
+
+def player_side(row: Mapping[str, Any]) -> str | None:
+    """"home" / "away" -- which side of the game the prop's player is on, or None.
+
+    A prop row names the game, not the player's team, so the page drew BOTH
+    crests (user 2026-10-08: "they should only show one team not both"). The
+    team comes from the same per-sport files as the headshot (NHL roster, soccer
+    rosters, basketball id index, NFL/MLB projection's `player_team`, NCAAF
+    roster team_id) and is matched to a side by LOGO, so a full name and an
+    abbreviation of the same club agree. Unknown -> None, and the page then shows
+    no crest rather than two. Never raises.
+    """
+    try:
+        sport = str(row.get("sport") or "").strip().lower()
+        if not str(row.get("player_name") or "").strip():
+            return None
+        if sport == "ncaaf":
+            by_team, _unique_ids, teams = _ncaaf_index()
+            name = _norm(row.get("player_name"))
+            for side in ("home", "away"):
+                tid = teams.get(_norm(row.get(f"{side}_team"))) or teams.get(_norm(row.get(f"{side}_key")))
+                if tid and (tid, name) in by_team:
+                    return side
+            return None
+        team = _player_team(row)
+        if not team:
+            return None
+        from syndicate.features.shared.team_logos import logo_url
+
+        mine = logo_url(sport, team)
+        if not mine:
+            return None
+        for side in ("home", "away"):
+            if logo_url(sport, row.get(f"{side}_team"), row.get(f"{side}_key")) == mine:
+                return side
+    except Exception:  # noqa: BLE001
+        return None
+    return None
+
+
+__all__ = ["headshot_url", "player_side"]
