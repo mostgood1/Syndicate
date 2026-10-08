@@ -2112,7 +2112,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: tests/test_loan_aware_warn_hooks.py green and failing on the unfixed hooks; .claude/hooks/test_scope_guard.py and test_lane_postwrite_check.py still green
 - Blocked by: none
 
-### live-odds-memory-cap — OPEN — opened 2026-10-07 — session 73bd5e1f-0d5f-4e48-8849-3838dcfb6581
+### live-odds-memory-cap — CLOSED 2026-10-08 (GOAL MET: cap 3072 live, peak 79.5%) — opened 2026-10-07 — session 73bd5e1f-0d5f-4e48-8849-3838dcfb6581
 - Goal: live-odds-worker's reported container_memory_max_mb on the local fleet reads the new cap (above 2048) after an attended restart, with healthz 200, and pct_of_max at the next MLB/Polymarket peak measured and logged
 - Files: ~/syndicate-prod/local_production.env (WSL, outside the repo: one new LIVE_ODDS_WORKER__SYNDICATE_LOCAL_MEMORY_LIMIT_MB line ONLY)
 - Hypothesis: The 2048 MB cap is the Render-plan EMULATION (scripts/local_production.py:124 PLAN_MEMORY_MB, applied :401). It is not a cgroup and nothing OOM-kills at it; it is the ceiling memory_headroom_snapshot measures against (memory_observability.py:192/353), so near it the live-lens gates (300 MB floor, live_lens_loop.py:453) and the odds-refresh-during-sim gate refuse work
@@ -2127,6 +2127,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
   - **Refusals the cap caused (4.4 d):** 180 `LIVE_LENS_TICK_DIAG ... reason=low_headroom` (first: 10-03 17:42Z, mlb current 2050/2048) and 156/156 `ODDS_REFRESH_MEMORY_HEADROOM_CHECK sufficient=false`. 0 MEMORY_GUARD aborts, 0 kills.
   - **Budget:** WSL VM 15,747 MB (no .wslconfig; Windows host 32 GB) + 4 GB swap. `free -m` at 00:53Z: used 3,866, available 11,881. Caps are not reservations: the role already USES up to 2988 MB under a 2048 "cap". Raising the cap adds only the work the gates start admitting (live-lens ticks, odds refreshes during an MLB sim).
   - **Side findings:** (a) a peer's full down/up ran at 00:50:07Z (`intelligence-evidence-coverage`). Its `down` left `run_refresh_odds_job.py` pid 3484289 and its children alive, reparented to /init (ppid 3342152 = init), OUTSIDE the new worker's measured tree. So right after any restart the role under-reports. (b) 24 live-odds-worker root pids in 4.4 d, i.e. frequent restarts.
+- **VERDICT 2026-10-08 02:44Z: GOAL MET.** Full down/up 01:39:40Z (healthz 01:42:30Z, ~2m50s). The worker reports `container_memory_max_mb` 3072.0 (01:43:03Z). First MLB + Polymarket hour peaked at 2443 MB = 79.5% (MLB 2303 = 75.0%), 0 samples >= 85%, 0 live-lens refusals, odds-during-sim gate 5/11 sufficient. deploys.md 01:39:40Z + 02:43:43Z. User chose 3072 over 4096. Files released.
 
 ### nfl-passing-yards-prop-coin — OPEN — opened 2026-10-07 — session f628c245-6aae-4710-a0e7-829c2a108ddb
 - Goal: Name the measured cause(s) of production's NFL passing-yards (and passing-attempts) prop probability scoring worse than a 50/50 coin (2025 LL 0.869, FIT 2023-24 LL 0.787): each candidate (spread/tail, mean inputs incl. context multiplier, QB identity/as-of rates, line/side convention) measured on FIT 2023-24 through the production functions, and a recommendation on whether production should stop publishing NFL passing-yards prop edges until fixed. Measurement only: no deploy, no production code change.

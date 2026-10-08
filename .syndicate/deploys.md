@@ -47734,3 +47734,10 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **baseline (read 02:01:44Z, 10-08 slate, all_markets written 01:36:54Z):** mean projected BLOCKS by pk_unit: PK1 1.360 (n 81), PK2 0.747 (n 79), no PK unit 0.458 (n 199).
 - **expect:** on the first 10-08 all_markets rewrite after 02:13:30Z: PK1 mean BLOCKS DOWN, PK2 and no-PK UP, total BLOCKS across the slate ~unchanged (team level not moved); lineups unchanged (the profile is engine-side).
 - **verify:** READING OWED -- the same script (`/mnt/c/tmp/pk_reading.py`) on the first post-ff rewrite of props_recommendations_all_markets_2026-10-08.csv.
+
+## 2026-10-08 02:43:43Z (9:43 PM CT 10-07) -- READING: live-odds-worker at 3072 MB through the first MLB odds refresh + Polymarket slate writes -- **MET** (lane `live-odds-memory-cap`, CLOSED)
+
+- **window:** 01:42:30Z (healthz after the 01:39:40Z down/up) -> 02:43:43Z. 264 `ALL_PROCESS_MEMORY` samples, all reading `container_memory_max_mb` 3072.0. CAVEAT: the heartbeat ran at ~4.3/min against ~14/min in the 4.4-day baseline, so this is a coarser sample.
+- **peak:** role tree max **2443 MB = 79.5% of cap** (02:34:43Z, not during MLB). During MLB odds refreshes (201 samples, first 01:46:43Z) the max was **2303 MB = 75.0%** (02:15:43Z). 13 `POLYMARKET_US_SLATE_WRITE` in the window (01:47:46Z -> 02:42:32Z). Samples >= 85% / 90% / 95%: **0 / 0 / 0** (4 samples >= 70%). p50 1284, p95 1947, p99 2250 MB.
+- **gates:** live-lens `low_headroom` refusals **0** (baseline 180 in 4.4 d, ~41/day). Odds-refresh-during-MLB-sim gate **sufficient 5 / insufficient 6** (baseline 0 / 156). The predicted behaviour change is live.
+- **reading:** the 2443 MB peak would have been **119% of the old 2048 cap**. p50 1284 is above the baseline's 931; one hour cannot separate a busy evening from the work the gates now admit. Watch whether p50/p95 settle when the 4-day re-read is done.
