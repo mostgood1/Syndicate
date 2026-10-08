@@ -1689,6 +1689,21 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **HR RE-FIT RESULT 2026-10-08 ~05:30Z: DO NOT SHIP (fails 4, 6, 7). Production keeps hr_rate_mult 1.856.**
+  - FIT (07-16..08-21): an interior optimum at **1.5** (objective 105.0 / 74.2 / **64.0** / 74.0 / 96.1 for 1.1 / 1.3 / 1.5 / 1.7 / 1.856; HR z +0.50, runs z -0.27 at 1.5). 12 of 19 prop maps re-fit.
+  - HOLDOUT (08-22..09-27, 988 starts; disclosed as previously read):
+    - (1) PASS runs gap 0.691 -> **0.116** (actual 9.028; shipped 9.719; chosen 8.912);
+    - (2) PASS HR z +4.76 -> -0.05;
+    - (3) PASS (largest growth +0.34);
+    - (4) **FAIL** outs +0.166 (SO +0.02, H -0.08, BB +0.01, ER +0.07);
+    - (5) PASS prop log-loss 0.37045 -> 0.36910.
+  - JUNE GUARD:
+    - (6) **FAIL** runs gap 0.559 -> 1.340;
+    - (7) **FAIL** HR z +0.26 -> -3.70.
+  - **FINDING: the HR multiplier is SEASON-PHASE dependent.** June wants 1.856, Jul-Sep wants 1.5, and no constant serves both.
+    - The multiplier is compensating an input that changes over the season. Most likely, early-season HR rates are shrunk harder toward a prior, so they read low.
+    - That is the same shape as the stamina drift. The proper fix is in the inputs (the HR-rate shrinkage), not the multiplier.
+  - Production impact unchanged: Jul-Sep totals biased ~+0.7 runs/game under 1.856. Next path is a user decision.
 - **PITCH FIX ROUND 2 (EARLY-COUNT FOULS), PRE-REGISTERED 2026-10-08 ~02:30Z (user: "then do the early-count foul pitch fix next"), before any arm runs:**
   - ORDER: starts only after the HR re-fit is decided. The base config = shipped + the HR value if that fix ships (runs and K interact with both).
   - DEFECT: shipped starters ~9-10 pitches/start short. Cause: the combined calibration lowered early_count_foul_boost 2.05 -> 1.5 (fewer fouls before two strikes, so shorter PAs).
