@@ -35,6 +35,7 @@ because the work kept deviating:
 ---
 
 ## Open
+- [ ] 2026-10-08 — from `prop-recency-budget` — `build_mlb_player_game_logs.py` re-fetches past-season players with no games that season every run (2024: 573 of 1,530, 2025: 385) because 'already fetched' is inferred from rows present; record fetched-with-zero-rows ids -- evidence: C:	mp\iec_run_jobs_once.log
 - [ ] 2026-10-08 — from `prop-recency-budget` — the daily `soccer-player-match-log` job took 1,255 s on a hand run (ESPN refuses ranges, so every past day of both seasons is re-walked day by day); a finished season could skip its scoreboard walk -- evidence: C:\tmp\iec_run_jobs_once.log
 - [ ] 2026-10-08 — from `mlb-statsapi-asof-rebuild` — MLB count-shape fix scoped (pitches/PA 3.46 vs 3.87; outcome mix count-invariant), not built — evidence: .syndicate/findings_2026-10-08_mlb_count_shape_scope.md
 - [ ] 2026-10-07 — from `intelligence-evidence-coverage` — lane-guard blocks a borrower editing in a session WORKTREE even when `lane_claims.loan_is_honoured` returns the lender: the hook resolves the path relative to the primary tree (`../../../../../tmp/syndicate-sessions/<slug>/pipeline/intelligence_state.py`), which fails the loan path match while the lender basename claim still matches — evidence: Edit on pipeline/intelligence_state.py BLOCKED at origin/main@96157b3f with the loan honoured by the predicate on the same text
