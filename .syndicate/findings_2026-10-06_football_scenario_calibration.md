@@ -497,3 +497,41 @@ checked its magnitudes. Fixed (replay uses `sp_offense_defense_rating`; a plausi
 when production's own live total error exceeds 20 pts); re-checked on 2024 (21 games): production Brier 0.124,
 margin 7.2, total 7.9 -- sane. The invalid 2025 live files are kept as `*.INVALID_raw_sp_ratings`; the 2025 live
 marker exists. A corrected 2025 live re-run would be informational only (pregame already fails gate b).
+
+
+## RE-FIT v4 (NCAAF) — PRE-REGISTERED 2026-10-08 (user: "set up the NCAAF v4 with both fixes")
+
+**Why (a LEAD, not a finding):** a descriptive split of production's already-read NCAAF 2025 pregame errors (644 games)
+showed the sim under-rating the stronger side early in the season: non-conference P4-vs-G5 games in weeks <= 6,
+actual - sim margin signed toward the P4 team **+6.10 [+0.60, +11.33] (n 39)**; conference games weeks <= 6 **+3.51
+[+0.80, +6.26] (n 114)**, fading to +0.86 [-0.68, +2.41] from week 7. Several cuts were made, so any one cell clearing
+zero can be chance; 2025 is spent, so it can only motivate this design. v3 also failed gate (b) on `ppd_weak`.
+
+**Start point:** v3's chosen switch subset {`non_offensive_scoring`} and v3's fitted levers.
+
+**New levers (INPUT transforms in the research harness; production code untouched -- a shipped result would be
+implemented in the NCAAF generator as a separate, reviewed step):**
+- `tier_offset` d (SP+ points) in {0, 1, 2, 3, 4}: every P4 team (SEC, Big Ten, Big 12, ACC, Notre Dame; membership from
+  that season's CFBD games file) gets +d offense and -d defense-allowed added to its as-of SP+/PPA blend entry before
+  `sp_offense_defense_rating` -- a cross-tier strength gap. Same-tier games are unaffected in margin.
+- `tier_decay_weeks` K in {0 = constant, 4, 8}: d is multiplied by max(0, 1 - (week - 3) / K) -- an EARLY-SEASON gap
+  that vanishes as conference play supplies common opponents. (K = 0 means no decay.)
+- `blend_beta` b in {0.5, 0.75, 1.0, 1.5} x the harness's 44.66: the in-season PPA blend's prior weight -- smaller b
+  leans on in-season data sooner (the "stronger early-season blending" fix).
+- v2/v3 levers as before (incl. the 0.3..1.2 sensitivity grids), `home_field_bonus` included.
+
+**New moments (otherwise the descent cannot see the defect):** `bias_tier_early` = mean (actual - sim) home margin
+signed toward the P4 team over FIT P4-vs-G5 games in weeks 3-6 (target 0); `bias_conf_early` = mean (actual - sim)
+home margin over FIT conference games weeks 3-6 (target 0). SE by game-clustered bootstrap. Objective = sum z^2 over
+v2's 15 moments + these 2.
+
+**FIT:** NCAAF 2024 wk3-15, every 4th game as before PLUS every P4-vs-G5 and every conference game in weeks 3-6 (so
+the two new moments rest on enough games), 60 seeds. **Descent:** v2 rules (2 passes, keep a move only if the
+objective drops, edge steps, reachability check -- `tier_offset` must move margins on one P4-vs-G5 game or it is
+dropped).
+
+**HELD-OUT: NCAAF 2026** (2025 is spent for pregame AND live). FBS-vs-FBS, weeks 3+, read ONCE when >= 300 such games
+are complete; fresh CFBD games / PPA for 2026 into a PRIVATE root (shared mirror untouched). Gates (a)-(f) as v2, plus
+L1-L3 on the CORRECTED live harness (plausibility guard on), after a dry run whose production magnitudes are checked.
+Gate to the read: the fitted objective must be <= 0.8 x production's on FIT (amendment 2). Output
+`C:\tmp\football_scenarios\ncaaf\refit_v4\`.
