@@ -1712,6 +1712,27 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **JOINT ROUND RESULT 2026-10-09: DO NOT SHIP (fails 4, 5, 6, 8). Nothing shipped; production unchanged (6cd415f3).**
+  - HOLDOUT (third read, disclosed), base -> chosen:
+    - (1) PASS count mix 0.01653 -> **0.00014**;
+    - (2) PASS P/PA 3.518 -> 3.916 (real 3.890);
+    - (3) PASS objective 70.0 -> 46.2;
+    - (4) **FAIL** BB_per_PA z +1.82;
+    - (5) **FAIL** outs +0.495 (15.77 vs 14.61), H +0.356, SO -0.29, ER -0.11;
+    - (6) **FAIL** runs gap 0.116 -> 0.170;
+    - (7) PASS props 0.36910 -> 0.36893.
+  - JUNE: (8) **FAIL**, outs +0.487.
+  - **CONCLUSIONS across count-shape rounds 1-2 + joint:**
+    - (i) The IPF count table is a real, repeatable improvement: count mix ~99% closer and pitches/PA exact in all three.
+    - (ii) Starter length cannot be served by one hook. June wants ~-1, late season ~-10.
+    - (iii) The 13-moment objective under-weights outs (scale 0.5). The joint descent took +0.4 outs in BOTH fit phases to buy pitch-count fit.
+    - (iv) BB/PA drifts +1.4 to +1.8 z whenever the table is on; bb_ball_bias_mult cannot correct it.
+    - (v) The recency-stamina mechanism was never fairly tested: no fit set contained late-season data (my design flaw).
+  - All engine code stays in place, default off and byte-identical: count_outcome_mult, recency stamina.
+  - The table is saved (scratchpad count_table.json -> to be committed as an artifact) for a 2027 re-test on clean data, with a pre-registration that:
+    - puts late-season dates in the fit;
+    - weights outs as a constraint;
+    - adds a dedicated walk lever.
 - **JOINT ROUND DESCENT 2026-10-09: chose w = 0 (recency rejected at every weight), hook +2, bb_ball_bias_mult 1.2, k_logit_bias -0.15; score 157.3 -> 91.0. Holdout read running per the rule.**
   - All 183 rebuilds OK (24 June-fit + 37 window-first-half dates at each w).
   - Chosen on FIT: June outs 15.86 vs 15.47, P 89.1 vs 85.5; window-1st outs 15.76 vs 15.39, P 88.7 vs 84.0.
