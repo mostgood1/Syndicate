@@ -361,13 +361,13 @@ def run_sim(args) -> int:
         for name, raw in (x.split("=", 1) for x in (args.engine_flag or [])):
             if not hasattr(real_events, name):
                 raise SystemExit(f"LEVER_FAIL engine flag {name} is not an attribute of {pkg}.sim.events")
-            cur = getattr(real_events, name)
-            if isinstance(cur, bool):
+            current = getattr(real_events, name)   # NOT `cur`: that is the per-game recorder dict above
+            if isinstance(current, bool):
                 if raw.strip().lower() not in ("1", "0", "true", "false"):
                     raise SystemExit(f"LEVER_FAIL engine flag {name}={raw!r}: expected a boolean")
                 val: Any = raw.strip().lower() in ("1", "true")
             else:
-                val = type(cur)(raw)
+                val = type(current)(raw)
             setattr(real_events, name, val)
             flags[name] = val
         print(f"ENGINE_FLAGS {flags}", flush=True)
@@ -416,6 +416,8 @@ def run_sim(args) -> int:
             print(f"SIM_FAIL {d} {exc!r}"[:300], flush=True)
         if levers or flags:
             print(f"LEVER_REACH {d} engine_calls={lever_seen['calls']} with_levers={lever_seen['with_levers']}", flush=True)
+            if lever_seen["calls"] == 0 and games:
+                raise SystemExit(f"LEVER_FAIL {d} games recorded but 0 real-engine calls: the levers reached nothing")
             if lever_seen["calls"] and lever_seen["with_levers"] != lever_seen["calls"]:
                 raise SystemExit(f"LEVER_FAIL {d} only {lever_seen['with_levers']}/{lever_seen['calls']} engine calls saw the levers")
         if not games:
