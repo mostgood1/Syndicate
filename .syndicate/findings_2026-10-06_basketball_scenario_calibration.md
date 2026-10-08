@@ -508,3 +508,24 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
 - The intermediate w = 0.5 is read only for shape. A w outside {0, 0.5, 1} is not picked from these data.
 - The full FIT re-run follows a confirmation, as in #1. VALIDATION is untouched.
 - Mechanism-vs-estimator: if adopted, the S8 total and quarter rows are re-read jointly with J1, not assumed additive.
+
+**AMENDMENT to #1c (2026-10-08, BEFORE any engine change or data read):**
+
+- **Precedent found:** the WNBA engine already ships this fix. Commit c0d406d3 (2026-10-01, upstream-merged) adds
+  `TEAM_PRIOR_STACKS_ON_TARGET = False`: "stacking the prior counted it twice"; LVA-IND anchored total 180.8 vs sim
+  198.0. Tests are in tests/test_basketball_sim_team_calibration.py.
+- **The NBA engine has NONE of the eight WNBA engine switches:** SHOOTER_FT_RATE, FOULED_MISS_NOT_FGA,
+  EXACT_TARGET_CALIBRATION, TEAM_PRIOR_STACKS_ON_TARGET, TOV_PER_ATTEMPT, PLAYER_REBOUND_CREDIT, BLOCK_MODE,
+  BLOCK_ALLOC_BY_RATE (grep count 0 each).
+- **Lever changed to match the WNBA mechanism:**
+  - `EventSimConfig.team_prior_stacks_on_target: bool = True` in the NBA engine (True = today = byte-identical).
+  - False = no team prior on top of a target; still applied without one.
+  - Binary, so the w = 0.5 point is DROPPED. The confirm/refute calls are unchanged, with w = 0 ≡ False.
+- **EXACT_TARGET_CALIBRATION is NOT ported in this step:** its solver (`_solve_eff_mult` /
+  `_loop_points_per_possession`) models the WNBA loop including SHOOTER_FT_RATE and FOULED_MISS_NOT_FGA, which the
+  NBA loop lacks. Porting it alone would calibrate against the wrong loop.
+  - The residual sim-vs-target slope after this step decides whether it is next. That is read on the per-game
+    target in the smart_sim JSONs, which needs the sweep to keep its scratch output.
+- **Sweep points (12 dates, J1 levers in both):**
+  - C = J1 control, re-run now: the same-time baseline, and the run-noise measure vs the existing J1 sweep point.
+  - T = J1 + team_prior_stacks_on_target = 0.
