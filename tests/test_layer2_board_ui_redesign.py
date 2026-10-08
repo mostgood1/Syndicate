@@ -301,3 +301,12 @@ class EmbedRowReferences(unittest.TestCase):
         out = subprocess.run(["node", "-e", script], capture_output=True, text=True, timeout=60)
         self.assertEqual(out.returncode, 0, out.stderr)
         self.assertEqual(json.loads(out.stdout.strip()), [["p3", "p1"], True])
+
+
+class EmbedIsBrowserJson(unittest.TestCase):
+    def test_nan_and_infinity_become_null(self) -> None:
+        # Python's json.loads ACCEPTS NaN; a browser's JSON.parse does not. Parse
+        # strictly, the way the browser does.
+        text = _embed_json_text({"ranked_all": [{"line": float("nan"), "x": float("inf"), "y": 1.5}]})
+        parsed = json.loads(text, parse_constant=lambda name: (_ for _ in ()).throw(ValueError(name)))
+        self.assertEqual(parsed["ranked_all"][0], {"line": None, "x": None, "y": 1.5})

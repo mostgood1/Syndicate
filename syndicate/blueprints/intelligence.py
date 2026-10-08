@@ -2141,7 +2141,15 @@ def _embed_json_text(payload: Any) -> str:
     `<script>` block is byte-for-byte what the template used to emit."""
     from jinja2.utils import htmlsafe_json_dumps
 
-    return str(htmlsafe_json_dumps(payload, dumps=lambda obj, **kw: json.dumps(obj, default=str, **kw)))
+    # NaN / Infinity -> null FIRST, the same `json_safe_value` the app's JSON
+    # provider applies to every jsonify() response. This path bypasses that
+    # provider, and Python's json.dumps writes a bare `NaN` that browsers reject:
+    # measured 2026-10-08 17:2xZ, one row's `"line": NaN` made `JSON.parse` throw,
+    # the page's try/catch turned the whole embed into `{}`, and the board sat on
+    # "Loading board…" until /api/intelligence/query landed (rows at 12.9 s).
+    # Python's own json.loads accepts NaN, which is why every server-side check
+    # passed. Lane layer2-board-ui-redesign.
+    return str(htmlsafe_json_dumps(_json_safe_value(payload), dumps=lambda obj, **kw: json.dumps(obj, default=str, **kw)))
 
 
 def _embed_is_cacheable(payload: Any) -> bool:
