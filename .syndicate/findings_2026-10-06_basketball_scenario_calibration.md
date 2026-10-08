@@ -287,3 +287,35 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
   - S11 foul-outs 0.331 → 0.275 (real 0.103): toward real.
 - **Next (pre-registration step 5):** re-run the FULL FIT window with J1 before any adoption. That is ~791 games, so
   ~24 h at nice 19 at the J1 pace (87 games in 2.6 h). This needs a user decision.
+
+### Phase 2 #1 — step 5, FULL FIT re-run with J1 (L1 = 1.0 + L3 = 0.0), read 2026-10-08 ~19:35Z
+
+- **Run:** 13:26Z-19:28Z, 3 workers, nice 19. 806 games / 109 dates, identical to Phase 1 per date (0 mismatched).
+  - LEVER_REACH: every engine call on every worker.
+  - Table: paired = 791, the same population as Phase 1.
+  - 2025-12-09 (2 games) and 2025-12-16 (1 game), NBA Cup knockout dates, fail identically in BOTH runs ("no player
+    rows", draws = 0) and drop out of both tables.
+
+| row | real [CI] | Phase 1 | J1 | reading |
+|---|---|---|---|---|
+| S8 total-vs-line SD | 18.29 [17.42, 19.22] | 20.19 | **18.95** | NOW INSIDE |
+| S8 margin-vs-spread SD | 14.00 [13.19, 14.71] | 19.38 | 18.89 | nearer, still far outside |
+| S3 quarter-total SD P1-P4 | 8.48-8.89 | 9.64-9.68 | 9.02-9.06 | all nearer; P3, P4 now inside |
+| S5 blowouts entering the last period, all | 0.230 | 0.348 | 0.337 | nearer, small |
+| S6 FTA / S9 3PA / S1 pace / S10 / S11 | — | — | — | unchanged (≤ 0.03 SE) |
+| S7 tied after regulation, \|spread\| 4.5-8 | — | — | — | −0.001, crosses the CI edge (0.018): immaterial |
+
+- **Guard on S2 (quarter shares), against the literal pre-registration:**
+  - 7 of 16 rows move by more than the sim's own SE. **By the letter, the guard FAILS.**
+  - The largest is P4 "entering last: 9-17": −0.0007, 4.6 sim-SE, ~0.16 pt, toward real. Every other row is
+    ≤ 0.0004 (≤ 0.09 pt). Every S2 move is < 0.35 of the REAL SE.
+- **Why the literal guard is mis-specified** (stated, NOT used to re-score):
+  - The harness is not deterministic (measured 10-07), so Phase 1 vs J1 differ by run-to-run noise of ~√2 × sim-SE
+    even at an identical config.
+  - Under pure noise, |d| > 1 sim-SE is expected in ~48% of rows, ~7.7 of 16. Observed: 7.
+  - Only P4 9-17 stands out (~3.2σ of run noise), and it moves toward real.
+  - The S2 guard threshold was below the instrument's own repeatability. Whether to accept this reading is the
+    user's call, recorded with the decision.
+- **Not done, per the pre-registration:**
+  - VALIDATION is not read here; it is read once at the end of Phase 2, for the combined config.
+  - The margin excess (18.9 vs 14.0) stays open: shot-level / lineup diagnosis.
