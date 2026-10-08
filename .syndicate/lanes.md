@@ -2323,6 +2323,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: calendar: population matches 10-09..10-14
 
 ### nhl-cards-headshot-latest — CLOSED 2026-10-08 (GOAL MET: served NHL props headshots /latest/, 15/15 HTTP 200, deploys.md 18:52Z) — opened 2026-10-08 — session 3c03f29e-cbc0-43c8-a365-9b598352db50
+- **GOAL VERDICT 2026-10-08 (checkpoint, session 3c03f29e):** Goal verbatim: "NHL /nhl/cards player headshot URLs use the team-independent assets.nhle.com/mugs/nhl/latest/{id}.png form and resolve HTTP 200 on the served page, where /mugs/nhl/2026/TOR/8479318.png returns 302 (measured 2026-10-08)" -- **GOAL: MET -- served /nhl/api/cards/props on the fleet 18:52:38Z: 24/24 cards carry a /latest/ headshot, 15/15 unique URLs HTTP 200 (baseline 18:45:30Z: 16/24, all /2026/{TEAM}/ -> 302); deploys.md 18:52Z.**
 - Goal: NHL /nhl/cards player headshot URLs use the team-independent assets.nhle.com/mugs/nhl/latest/{id}.png form and resolve HTTP 200 on the served page, where /mugs/nhl/2026/TOR/8479318.png returns 302 (measured 2026-10-08)
 - Files: syndicate/features/nhl/cards.py (LOAN from nhl-board-row-date-mismatch; USER-APPROVED 2026-10-08 in session 3c03f29e; _nhl_headshot_url and its one call site ONLY; lender's predictions-row loaders untouched), tests/test_nhl_headshot_url.py (NEW), tests/test_archives.py (the one NHL props headshot_url assertion ONLY)
 - Hypothesis: n/a
@@ -2332,6 +2333,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - **CLOSED 2026-10-08 18:54Z:** fix e5438b8d on the fleet web since 18:52:24Z. Reading 18:52:38Z: 24/24 cards carry a /latest/ headshot, 15/15 unique URLs answer 200 (baseline: 16/24 cards, all /2026/{TEAM}/ URLs 302 -> default-skater.png). Loan of nhl/cards.py returned to nhl-board-row-date-mismatch. Note for layer2-board-ui-redesign: the `player_headshots.py` module docstring (lines 12-16) still describes `_nhl_headshot_url` as building `/2026/TOR/` and is now stale.
 
 ### nhl-headshot-docstring — CLOSED 2026-10-08 (GOAL MET: docstring-only, 35/35 layer2 tests; loan returned) — opened 2026-10-08 — session 3c03f29e-cbc0-43c8-a365-9b598352db50
+- **GOAL VERDICT 2026-10-08 (checkpoint, session 3c03f29e):** Goal verbatim: "player_headshots.py module docstring no longer says nhl/cards.py::_nhl_headshot_url builds /2026/TOR/ URLs (fixed in e5438b8d); docstring-only change, no behaviour change" -- **GOAL: MET -- git diff of 9c68c054 is docstring lines only (5+/4-); tests/test_layer2_board_ui_redesign.py 35 passed.**
 - Goal: player_headshots.py module docstring no longer says nhl/cards.py::_nhl_headshot_url builds /2026/TOR/ URLs (fixed in e5438b8d); docstring-only change, no behaviour change
 - Files: syndicate/features/shared/player_headshots.py (LOAN from layer2-board-ui-redesign; USER-APPROVED 2026-10-08 in session 3c03f29e: 'fix the stale player_headshots.py docstring too'; module docstring NHL bullet ONLY)
 - Hypothesis: n/a
