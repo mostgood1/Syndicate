@@ -47751,3 +47751,11 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **NOT a pure env change:** the fleet checkout had been fast-forwarded to **fdf487f6** after the 01:42Z up (roles ran 27424623). Ride-alongs read before the start: 50910fb3 (NHL PK skaters by projected SH minutes, another lane, user "Ship it"), 05386a63 (diagnostic script only), fdf487f6 (mine: prop_evidence per-build read cache -- off by default, no caller on this code -- and memoised name matching, results verified identical).
 - **timeline (UTC):** down 02:44:03 -> 02:44:42; Start-ScheduledTask 02:45:09; /healthz 200 at **02:45:39**; web 3504291, refresh-worker 3504330, live-odds-worker 3504331, code=fdf487f6, restarts=0; watchdog marker set/cleared.
 - **verify (OWED):** first build logs `LEGACY_POOL_SKIPPED` and `STATE_FROM_LAYER2 cards>0`, NO `STATE_WRITE_SKIPPED_EMPTY_OVER_GOOD`, a `STATE_PERSIST_BEGIN`; `candidate_collection_with_fallback` ~0 s vs 110-455 s on the legacy builds today; LAYER2_LEDGER_RECORDED still writing.
+
+
+## 2026-10-08 02:53:47Z (9:53 PM CT 10-07) -- READING for the 02:13:30Z ff (fdf487f6, NHL pk_usage="minutes") -- **MET** (lane `nhl-pk-units`)
+
+- **artifact (first post-ff rewrite):** lineups_2026-10-08.csv 02:48:51Z (proj_sh_toi 405/449), props_recommendations_all_markets_2026-10-08.csv 02:52:50Z.
+- **reading (same script, same slate, before -> after):** mean projected BLOCKS by pk_unit: PK1 1.360 -> **1.155** (n 81), PK2 0.747 -> **0.871** (n 79), no PK unit 0.458 -> **0.487** (n 199). Slate total 261.2 -> 260.2 (-0.4%, team level unchanged). Every direction as predicted.
+- **checklist:** `nhl_sim_input_checklist.py` with SYNDICATE_ARTIFACT_ROOT_NHL=~/syndicate-prod/data/nhl_source -- PASS; proj_sh_toi 43.7% "thin" only because older dated lineups predate the column (same as proj_pp_toi).
+- **off switch:** profile field pk_usage="units" (a SYNDICATE_CALIBRATION_PROFILE_PATH_NHL override) or revert 50910fb3; no restart needed either way.
