@@ -16,7 +16,8 @@ asked for (the local schedule date, as in the box history). Regular season and p
 never mixed by a reader that cares (learnings: season-phase models).
 
 INCREMENTAL: game ids already in the file are kept and never re-fetched; scoreboards are re-read from three
-days before the newest game in the file. Atomic rewrite.
+days before the newest game in the file (`--full`: every day, to pick up a game a failed fetch missed --
+fetches are retried 3x with backoff first). Atomic rewrite.
 
     python scripts/build_basketball_player_game_log.py                       # both sports, this + last 2 seasons
     python scripts/build_basketball_player_game_log.py --sport wnba --seasons 2024,2025,2026
@@ -57,9 +58,17 @@ def source_root(sport: str) -> Path:
     return Path(os.environ.get("SYNDICATE_DATA_ROOT", str(REPO / "data"))) / f"{sport}_source"
 
 
-def _fetch(url: str) -> Any:
-    with urllib.request.urlopen(url, timeout=30) as response:
-        return json.loads(response.read())
+def _fetch(url: str, attempts: int = 3) -> Any:
+    """GET JSON, retried with backoff: a transient URLError must not drop a game (the incremental
+    rescan only looks back three days, so a game lost here stays lost until a --full run)."""
+    for attempt in range(attempts):
+        try:
+            with urllib.request.urlopen(url, timeout=30) as response:
+                return json.loads(response.read())
+        except Exception:  # noqa: BLE001
+            if attempt == attempts - 1:
+                raise
+            time.sleep(5.0 * (attempt + 1))
 
 
 def season_days(sport: str, season: int, today: dt.date) -> list[dt.date]:
@@ -144,7 +153,8 @@ def _write(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     os.replace(tmp, path)
 
 
-def run(sport: str, season: int, *, today: dt.date | None = None, fetch: FetchJson = _fetch, pause: float = 0.2) -> dict[str, Any]:
+def run(sport: str, season: int, *, today: dt.date | None = None, fetch: FetchJson = _fetch, pause: float = 0.2,
+        full: bool = False) -> dict[str, Any]:
     today = today or dt.date.today()
     league = sport  # ESPN path segment: nba / wnba
     path = source_root(sport) / "data" / "processed" / f"player_game_log_{season}.csv"
@@ -152,7 +162,7 @@ def run(sport: str, season: int, *, today: dt.date | None = None, fetch: FetchJs
     have = {r["game_id"] for r in rows}
     newest = max((r["date"] for r in rows), default="")
     days = season_days(sport, season, today)
-    if newest:
+    if newest and not full:
         floor = (dt.date.fromisoformat(newest) - dt.timedelta(days=3))
         days = [d for d in days if d >= floor]
     summary = {"sport": sport, "season": season, "days_scanned": len(days), "kept_games": len(have),
@@ -193,6 +203,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--sport", choices=("nba", "wnba"), action="append")
     parser.add_argument("--seasons", default=None, help="comma list of START years; default: this season and the two before")
+    parser.add_argument("--full", action="store_true", help="rescan every day of the season (picks up games a failed fetch missed)")
     args = parser.parse_args(argv)
     today = dt.date.today()
     for sport in args.sport or ("wnba", "nba"):
@@ -200,7 +211,7 @@ def main(argv: list[str] | None = None) -> int:
         seasons = [int(s) for s in args.seasons.split(",")] if args.seasons else [current - 2, current - 1, current]
         for season in seasons:
             try:
-                run(sport, season, today=today)
+                run(sport, season, today=today, full=args.full)
             except Exception as exc:  # noqa: BLE001 -- one season's outage must not stop the rest
                 print(f"[bb_log] SEASON_FAILED {sport} {season} {type(exc).__name__}: {exc}", flush=True)
     return 0
