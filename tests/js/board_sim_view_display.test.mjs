@@ -369,7 +369,18 @@ console.log('\n--- "no sim view" is a CLAIM, and it must read the fields it clai
 // `sim_view` is a function of `model_edge_pct` alone, so `none` has always meant
 // "no PRICED edge", never "no model". The blank cell hid that; the badge printed
 // it as a falsehood.
-const simViewBadgeKind = (new Function(`${extract('simViewBadgeKind')}\nreturn simViewBadgeKind;`))();
+// `simOffScaleGap` (2026-10-08, lane layer2-board-ui-redesign) is extracted with
+// it; `itemQuote` is stubbed to the row's own `quote`, which is all it reads.
+const simViewBadgeKind = (new Function(
+  `const SIM_OFF_SCALE_POINTS = 15;\nconst itemQuote = (item) => (item && item.quote) || null;\n${extract('simOffScaleGap')}\n${extract('simViewBadgeKind')}\nreturn simViewBadgeKind;`
+))();
+
+console.log('\n--- a refused, off-scale sim view is NOT "no edge" ---');
+// Parker Messick o6.5 K, served 2026-10-08: model 0.7355, fair 0.4167 (+140).
+eq('a 32-point gap is off-scale', simViewBadgeKind({ sim_view: 'unpriced', model_probability: 0.7355, quote: { fair_probability: 0.4167 } }), 'offscale');
+eq('a 5-point gap with no edge is still unpriced', simViewBadgeKind({ sim_view: 'unpriced', model_probability: 0.52, quote: { fair_probability: 0.47 } }), 'unpriced');
+eq('no fair price cannot be called off-scale', simViewBadgeKind({ sim_view: 'unpriced', model_probability: 0.9 }), 'unpriced');
+eq('a railed 100% is the sim +/- tag, not off-scale', simViewBadgeKind({ sim_view: 'unpriced', model_probability: 1, quote: { fair_probability: 0.4 } }), 'unpriced');
 
 // The row the user reported, values copied off the served payload.
 eq('Corey Seager over 1.5 TB: projected 1.046, no priced edge -> NOT "no sim view"',

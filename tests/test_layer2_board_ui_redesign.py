@@ -138,3 +138,29 @@ class ResearchRailAndSlipTray(unittest.TestCase):
         for media in ("(min-width: 1024px) and (max-width: 1279px)", "(max-width: 1023px)", "(max-width: 767px)"):
             self.assertIn(media, self.css, media)
         self.assertIn(".board-toolbar { grid-template-columns: minmax(0, 1fr); }", self.css)
+
+
+class TopPlaysAndHowRanks(unittest.TestCase):
+    """Phase 4: the Best opportunities strip became a 3-tab Top plays rail, and
+    How this board ranks was rewritten -- the 1.5-point sim cap still stated."""
+
+    def setUp(self) -> None:
+        self.text = TEMPLATE.read_text(encoding="utf-8")
+
+    def test_top_plays_rail_has_three_tabs(self) -> None:
+        self.assertNotIn("🔥 Best opportunities</h2>", self.text)
+        for value in ('value: "sport"', 'value: "moving"', 'value: "agree"'):
+            self.assertIn(value, self.text)
+        self.assertIn('data-pick-id="${escapeHtml(pickKey(item))}"', self.text)
+
+    def test_how_ranks_still_states_the_sim_cap(self) -> None:
+        block = self.text[self.text.index('<details class="board-ranks"'):self.text.index("</details>", self.text.index('<details class="board-ranks"'))]
+        self.assertIn("at most 1.5 points", block)
+        self.assertIn("sim off-scale", block)
+        self.assertNotIn("Under 53.5", self.text)
+
+    def test_off_scale_matches_the_backend_cap(self) -> None:
+        board = (ROOT / "syndicate" / "features" / "shared" / "layer2_board.py").read_text(encoding="utf-8")
+        cap = re.search(r"_MODEL_EDGE_MAX_POINTS\s*=\s*([0-9.]+)", board)
+        self.assertIsNotNone(cap)
+        self.assertIn(f"const SIM_OFF_SCALE_POINTS = {int(float(cap.group(1)))};", self.text)

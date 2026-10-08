@@ -68,67 +68,39 @@
   </div>
 
   {#
-    SAY WHAT THIS BOARD ACTUALLY IS.
+    HOW THIS BOARD RANKS -- rewritten 2026-10-08 `[user: "needs to be updated
+    completely", lane layer2-board-ui-redesign]`, as four steps and a tag key,
+    collapsed to one line by default.
 
-    `opportunity_signals.py` states the condition in the code itself:
-    "THE SURFACE MUST SAY WHAT IT IS ... must NOT be presented as 'our model
-    found these'. If the page cannot say that, keep it off the main board
-    rather than raising this number to make it look like a model board."
-
-    REWRITTEN 2026-08-22 IN THE SAME COMMIT AS THE WEIGHT CHANGE, which is
-    exactly what the previous version of this block demanded of whoever changed
-    it. The sim term is no longer zero: `_SCORE_SIM_WEIGHT = 0.125` bounded by
-    `_SCORE_SIM_CAP_PCT = 1.5` EV points. The old text ("carries no weight in
-    the score", "the sim contributed to the ranking of NONE of them") is now
-    FALSE, and left standing the board would have told the reader the opposite
-    of what it does.
-
-    THE CAP IS THE PART THE TEXT HAS TO CARRY, not the weight. A bare weight
-    scales with the edge, so a large enough model disagreement always wins
-    eventually; the bound is what keeps this a price-led board the sim breaks
-    ties on rather than a model board. Measured against the distribution that
-    caused the weight to be zeroed (`scripts/score_sim_weight_impact.py`): at
-    0.5 uncapped the sim promoted 286 of 286 negative-EV rows; capped it
-    promotes 0 and still separates the two sides of a market.
-
-    Still static text, not a computed banner, for the original reason: it
-    describes how the ranking is built, which is a property of the code, and a
-    banner that could silently stop rendering would put us back where we
-    started. If the weight or the cap changes again, this block changes in the
-    same commit.
+    THE RULES THE OLD BLOCK CARRIED STILL HOLD (its history is in git, ebd17ee2
+    and earlier): this is static text because it describes how the ranking is
+    built, which is a property of the code -- a computed banner that silently
+    stopped rendering would put us back where we started. The SIM CAP is the part
+    it must carry: `_SCORE_SIM_WEIGHT = 0.125` bounded by `_SCORE_SIM_CAP_PCT =
+    1.5` EV points (`layer2_board.py`). If the weight or the cap changes, this
+    block changes in the same commit. What was removed is the 2026-09-03 anecdote
+    and the "980 of 1,198 rows" count: written for us, not for someone deciding a
+    bet, and a month stale.
   #}
-  <p class="board-disclosure">
-    <strong>How this board ranks.</strong> Rows are scored on expected value
-    against the no-vig market price, plus how much of that value survives price
-    shopping. Our simulation contributes as well, but it is
-    <strong>capped at 1.5 EV points</strong> — enough to order rows that are
-    otherwise close, and to decide which <em>side</em> of a market we prefer,
-    and it can carry a row across our value floor onto the board — but only by
-    that much, so it can rescue a marginal price and never a materially bad
-    one. A row our model loves by 40 points earns no more than one it likes by
-    12. So this is a price-led board that the simulation breaks ties on and
-    nudges the margins of, <em>not</em> a list of bets our model picked. The <span class="board-disclosure__chip">sim disagrees</span>
-    tag marks rows our own model rates worse than the price implies. That is a
-    statement about <em>rating</em>, and it needs a priced model edge to exist at
-    all — which is why a second tag was added. <span class="board-disclosure__chip">sim contradicts</span>
-    is about <em>direction</em>: our simulation's own projected number lands on
-    the far side of the line from the bet being shown, whether or not it has
-    ever been priced. On 2026-09-03 the board's second-best row was
-    <em>Under 53.5</em> against a projection of <em>67.8</em>, with no tag of any
-    kind. <span class="board-disclosure__chip">sim ±</span> is neither: it means
-    the model returned a certainty (0% or 100%), which is an instrument reading
-    off-scale rather than an opinion. And <span class="board-disclosure__chip">sim, no edge</span> means the model DID
-    have a view -- the Projected column shows it -- but it could not be priced against
-    this market, usually because only one side is quoted. <span class="board-disclosure__chip">no sim view</span>
-    is shown deliberately, because a blank must not read the same as agreement —
-    on that same board the model had no view on 980 of 1,198 rows.
-    <strong>None of these change the score.</strong> The measurement that would
-    size a penalty does not exist yet: nothing on this board has been graded
-    against outcomes by the sim's own verdict.
-    <strong>Nothing here has been graded against outcomes yet</strong> — the
-    weights are a stated prior, not a measured finding, and the Score column
-    takes itself apart on hover so you can disagree with it.
-  </p>
+  <details class="board-ranks" id="board-ranks">
+    <summary class="board-ranks__summary"><strong>How this board ranks</strong><span class="board-ranks__hint">Price first, the simulation nudges, stale prices sink. Tap for the details and the tag key.</span></summary>
+    <div class="board-ranks__steps">
+      <div class="board-ranks__step"><span class="board-ranks__n">1</span><strong>Price first</strong><span>Every row is scored on its expected value against the no-vig price across all books, plus how much of that edge survives shopping for the best price.</span></div>
+      <div class="board-ranks__step"><span class="board-ranks__n">2</span><strong>The sim nudges, it doesn't decide</strong><span>Our simulation can add or take away at most 1.5 points. That breaks ties and picks which side we prefer &mdash; it can't turn a bad price into a play.</span></div>
+      <div class="board-ranks__step"><span class="board-ranks__n">3</span><strong>Stale or thin prices sink</strong><span>Old quotes, a single book, or a price that has moved away from us all lower the score.</span></div>
+      <div class="board-ranks__step"><span class="board-ranks__n">4</span><strong>Hover any Score</strong><span>to see how many points came from price, sim, freshness and movement.</span></div>
+    </div>
+    <div class="board-ranks__key">
+      <strong>Sim tags</strong>
+      <span><span class="board-disclosure__chip">sim disagrees</span> our model rates this side worse than the price implies</span>
+      <span><span class="board-disclosure__chip">sim contradicts</span> our model thinks the other side of the line is more likely</span>
+      <span><span class="board-disclosure__chip">sim off-scale</span> our model is so far from the market (15+ points) that it is set aside; the row ranks on price alone</span>
+      <span><span class="board-disclosure__chip">sim, no edge</span> our model has a view but there is no two-sided market to price it against</span>
+      <span><span class="board-disclosure__chip">sim &plusmn;</span> our model returned 0% or 100% &mdash; an instrument reading, not an opinion</span>
+      <span><span class="board-disclosure__chip">no sim view</span> no model for this market &mdash; ranked on price alone</span>
+      <span class="board-ranks__note">No tag changes the score. The weights are a stated prior, not a measured result.</span>
+    </div>
+  </details>
 
   <section class="board-games-section">
     <div id="board-game-cards"></div>
@@ -2128,7 +2100,7 @@
     })();
 
     return `
-      <article class="board-card board-card--tier-${tier}" data-syndicate-question="${escapeHtml(item.question || "")}" data-syndicate-sport="${escapeHtml(sportAttr)}" data-syndicate-sport-slug="${escapeHtml(item.sport_slug || "")}" data-syndicate-market="${escapeHtml(market)}" data-syndicate-candidate-type="${escapeHtml(item.candidate_type || item.type || "")}" data-syndicate-selection="${escapeHtml(item.selection || item.pick || "")}" data-syndicate-matchup="${escapeHtml(displayMatchup(item) || "")}" data-syndicate-player-name="${escapeHtml(item.player_name || "")}" data-syndicate-name="${escapeHtml(title)}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}" data-syndicate-odds="${escapeHtml(String(item.odds ?? item.odds_current ?? ""))}" data-syndicate-prop-line="${escapeHtml(prop || "")}" data-syndicate-event-id="${escapeHtml(String(item.event_id || item.game_id || ""))}" data-syndicate-game-date="${escapeHtml(item.context_label || "")}" ${askIdentityAttrs(item)}>
+      <article class="board-card board-card--tier-${tier}" data-pick-id="${escapeHtml(pickKey(item))}" data-syndicate-question="${escapeHtml(item.question || "")}" data-syndicate-sport="${escapeHtml(sportAttr)}" data-syndicate-sport-slug="${escapeHtml(item.sport_slug || "")}" data-syndicate-market="${escapeHtml(market)}" data-syndicate-candidate-type="${escapeHtml(item.candidate_type || item.type || "")}" data-syndicate-selection="${escapeHtml(item.selection || item.pick || "")}" data-syndicate-matchup="${escapeHtml(displayMatchup(item) || "")}" data-syndicate-player-name="${escapeHtml(item.player_name || "")}" data-syndicate-name="${escapeHtml(title)}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}" data-syndicate-odds="${escapeHtml(String(item.odds ?? item.odds_current ?? ""))}" data-syndicate-prop-line="${escapeHtml(prop || "")}" data-syndicate-event-id="${escapeHtml(String(item.event_id || item.game_id || ""))}" data-syndicate-game-date="${escapeHtml(item.context_label || "")}" ${askIdentityAttrs(item)}>
         <div class="board-card__head">
           <div class="board-card__head-id">
             ${playerHeadshotUrl(item) ? `<img class="board-card__headshot" src="${escapeHtml(playerHeadshotUrl(item))}" alt="" loading="lazy" />` : ""}
@@ -2809,6 +2781,23 @@
   // build rather than waiting on one, which matters because the backend half
   // (`layer2_board`'s `contradicts`) is deployed to web and NOT to
   // refresh-worker as I write this.
+  // OFF-SCALE: the sim HAS a priced view, and it is so far from the market
+  // that the board refuses it -- `_MODEL_EDGE_MAX_POINTS = 15.0` in
+  // layer2_board.py drops any model edge past 15 points, which leaves
+  // `sim_view = "unpriced"`. That was labelled "sim, no edge -- usually because
+  // only one side is quoted", the wrong reason, beside a Win% that contradicted
+  // the price with no explanation (Parker Messick o6.5 K, 2026-10-08: model
+  // 73.6% vs fair 41.7%). Returns the gap in points, or null.
+  const SIM_OFF_SCALE_POINTS = 15;
+  function simOffScaleGap(item) {
+    const model = Number(item && item.model_probability);
+    const quote = itemQuote(item) || {};
+    const fair = Number(quote.fair_probability ?? (item && item.fair_probability));
+    if (!Number.isFinite(model) || !Number.isFinite(fair) || model <= 0 || model >= 1) return null;
+    const gap = Math.abs(model - fair) * 100;
+    return gap >= SIM_OFF_SCALE_POINTS ? gap : null;
+  }
+
   function simViewBadgeKind(item) {
     const view = item && item.sim_view;
     // `unpriced` is the BACKEND's own name for this state (`layer2_board`), and
@@ -2817,7 +2806,7 @@
     // ships the split. Written at the same time as that backend change for
     // exactly that reason: a renderer that only understands the old vocabulary
     // is a landmine armed by the next deploy.
-    if (view === "unpriced") return "unpriced";
+    if (view === "unpriced") return simOffScaleGap(item) !== null ? "offscale" : "unpriced";
     if (view && view !== "none") return null;          // agrees/disagrees/contradicts speak for themselves
     // Derived, for the build where the worker has not shipped `unpriced` yet.
     // Both inputs are already on the row, so this is correct against either.
@@ -3576,29 +3565,139 @@
     });
   }
 
+  // TOP PLAYS RAIL `[user 2026-10-08: "Best opportunities rail may need to be
+  // retired ... open to something different" -> "Can we leverage A, B, and C
+  // somehow?"]`. One rail, three tabs, all over the rows the filters leave:
+  //   * Top by sport  -- the best Score per sport (the old strip sorted on raw
+  //     edge, so it repeated the table's first rows in a different order and on
+  //     a prop-heavy day was all one sport);
+  //   * Moving now    -- the market's no-vig consensus for the row's side moved
+  //     >= 1 point in the last hour (from `movement_series`, minutes since
+  //     `movement_series_start`, probability in basis points);
+  //   * Model + market agree -- +EV against the market AND `sim_view` agrees.
+  // Each card carries the other two signals as badges. Clicking one scrolls
+  // to its row in the board and flashes it.
+  const TOP_RAIL_TABS = [
+    { value: "sport", label: "Top by sport" },
+    { value: "moving", label: "Moving now" },
+    { value: "agree", label: "Model + market agree" },
+  ];
+  let topRailTab = "sport";
+  const MOVING_WINDOW_MINUTES = 60;
+  const MOVING_MIN_PP = 1.0;
+
+  // The consensus move for this row's side over the last hour, in probability
+  // points (positive = toward the pick). Null when the row has no series or
+  // nothing in the window.
+  function pickKey(item) {
+    return String((item && (item.pick_id || item.recommendation_id || item.prediction_id)) || "");
+  }
+
+  function recentMovePp(item, nowMs) {
+    const series = Array.isArray(item && item.movement_series) ? item.movement_series : [];
+    const startMs = Date.parse(String((item && item.movement_series_start) || ""));
+    if (series.length < 2 || !Number.isFinite(startMs)) return null;
+    const points = series
+      .map((pair) => (Array.isArray(pair) ? { t: startMs + Number(pair[0]) * 60000, v: Number(pair[1]) } : null))
+      .filter((p) => p && Number.isFinite(p.t) && Number.isFinite(p.v));
+    if (points.length < 2) return null;
+    const last = points[points.length - 1];
+    const cutoff = (nowMs || Date.now()) - MOVING_WINDOW_MINUTES * 60000;
+    if (last.t < cutoff) return null;
+    let base = null;
+    for (const point of points) {
+      if (point.t <= cutoff) base = point;
+    }
+    if (!base) base = points[0];
+    return (last.v - base.v) / 100;
+  }
+
+  function topRailRows(items, tab) {
+    const byScore = (a, b) => (boardScoreValue(b) ?? -Infinity) - (boardScoreValue(a) ?? -Infinity);
+    if (tab === "moving") {
+      const now = Date.now();
+      return items
+        .map((item) => ({ item, move: recentMovePp(item, now) }))
+        .filter((row) => row.move !== null && Math.abs(row.move) >= MOVING_MIN_PP)
+        .sort((a, b) => Math.abs(b.move) - Math.abs(a.move))
+        .map((row) => row.item);
+    }
+    if (tab === "agree") {
+      return items
+        .filter((item) => (evVsFairValue(item) ?? 0) > 0 && String(item.sim_view || "").replace(/^live_/, "") === "agrees")
+        .sort(byScore);
+    }
+    const best = new Map();
+    for (const item of items.slice().sort(byScore)) {
+      const sport = String(item.sport_slug || item.sport || "").toLowerCase();
+      if (sport && !best.has(sport)) best.set(sport, item);
+    }
+    return [...best.values()].sort(byScore);
+  }
+
+  function topRailCard(item) {
+    const ev = evVsFairValue(item);
+    const move = recentMovePp(item, Date.now());
+    const view = String(item.sim_view || "").replace(/^live_/, "");
+    const badges = [];
+    if (view === "agrees") badges.push('<span class="board-top-rail__badge board-top-rail__badge--agree">✓ sim</span>');
+    if (view === "contradicts") badges.push('<span class="board-top-rail__badge board-top-rail__badge--warn">sim contradicts</span>');
+    if (view === "disagrees") badges.push('<span class="board-top-rail__badge board-top-rail__badge--warn">sim disagrees</span>');
+    if (move !== null && Math.abs(move) >= MOVING_MIN_PP) {
+      badges.push(`<span class="board-top-rail__badge board-top-rail__badge--move" title="Market consensus moved ${move > 0 ? "toward" : "away from"} this pick in the last hour">${move > 0 ? "↗" : "↘"} ${Math.abs(move).toFixed(1)} pts</span>`);
+    }
+    const odds = displayOdds(item);
+    const key = String(item.pick_id || item.recommendation_id || item.prediction_id || "");
+    return `
+      <button type="button" class="board-top-rail__card" data-top-rail-pick="${escapeHtml(key)}">
+        <span class="board-top-rail__sport">${escapeHtml(String(item.sport_slug || item.sport || "").toUpperCase())}</span>
+        <span class="board-top-rail__who">${playerHeadshot(item)}${escapeHtml(displayTitle(item))}</span>
+        <span class="board-top-rail__pick">${escapeHtml(propLine(item) || "")}</span>
+        <span class="board-top-rail__price">${Number.isFinite(ev) ? `<b>${ev > 0 ? "+" : ""}${ev.toFixed(1)}%</b>` : ""}${odds ? ` · ${escapeHtml(odds)}` : ""}</span>
+        <span class="board-top-rail__badges">${badges.join("")}</span>
+      </button>
+    `;
+  }
+
   function renderTopStrip(items) {
     const container = document.getElementById("board-top-strip");
     if (!container) return;
-    // #137: steam moves are now real, filterable board candidates (see
-    // STEAM_TABS/isSteamCandidate) instead of taking over this rail --
-    // this strip is the edge-ranked highlights only now.
-    const top = items.slice().sort((a, b) => edgeValue(b) - edgeValue(a)).slice(0, 6);
-    if (!top.length) {
+    if (!items.length) {
       container.innerHTML = "";
       return;
     }
+    const counts = Object.fromEntries(TOP_RAIL_TABS.map((tab) => [tab.value, topRailRows(items, tab.value).length]));
+    const rows = topRailRows(items, topRailTab).slice(0, 10);
     container.innerHTML = `
-      <h2 class="board-section-title">🔥 Best opportunities</h2>
-      <div class="board-strip">
-        ${top.map((item) => `
-          <div class="board-strip-card">
-            <div class="board-strip-card__title">${escapeHtml(displayTitle(item))}</div>
-            <div class="board-strip-card__edge">${(edgeValue(item) * 100).toFixed(1)}%</div>
-            <div class="board-strip-card__pick">${escapeHtml(propLine(item) || "")}</div>
+      <div class="board-top-rail">
+        <div class="board-top-rail__head">
+          <h2 class="board-section-title">Top plays</h2>
+          <div class="board-tabs cards-tabs" role="tablist" aria-label="Top plays">
+            ${TOP_RAIL_TABS.map((tab) => `<button type="button" role="tab" class="cards-tab${tab.value === topRailTab ? " is-active" : ""}${counts[tab.value] === 0 && tab.value !== topRailTab ? " is-empty" : ""}" aria-selected="${tab.value === topRailTab}" data-top-rail-tab="${tab.value}">${escapeHtml(tab.label)}<span class="board-tab-count">${counts[tab.value]}</span></button>`).join("")}
           </div>
-        `).join("")}
+        </div>
+        ${rows.length
+          ? `<div class="board-top-rail__cards">${rows.map(topRailCard).join("")}</div>`
+          : `<div class="board-top-rail__empty">${topRailTab === "moving" ? `No market moved ${MOVING_MIN_PP} point or more in the last hour under these filters.` : "Nothing under these filters."}</div>`}
       </div>
     `;
+    container.querySelectorAll("[data-top-rail-tab]").forEach((button) => {
+      button.addEventListener("click", () => {
+        topRailTab = button.getAttribute("data-top-rail-tab");
+        renderTopStrip(items);
+      });
+    });
+    container.querySelectorAll("[data-top-rail-pick]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const key = button.getAttribute("data-top-rail-pick");
+        if (!key) return;
+        const row = document.querySelector(`#board-cards [data-pick-id="${CSS.escape(key)}"]`);
+        if (!row) return;
+        row.scrollIntoView({ behavior: "smooth", block: "center" });
+        row.classList.add("is-flashed");
+        window.setTimeout(() => row.classList.remove("is-flashed"), 1600);
+      });
+    });
   }
 
   function renderCards(items) {
@@ -3936,7 +4035,7 @@
               const pendingMarketHtml = '<span style="color:var(--cards-text-dim);font-style:italic;">Not posted</span>';
               const updatedIso = String(item.last_updated ?? item.updated_at ?? "").trim();
               const updatedDisplay = formatRelativeTime(updatedIso);
-              const rowAttrs = `data-syndicate-name="${escapeHtml(title)}" data-syndicate-sport="${escapeHtml(sport)}" data-syndicate-market="${escapeHtml(item.market || item.market_label || "")}" data-syndicate-selection="${escapeHtml(item.selection || item.pick || "")}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}" data-syndicate-odds="${escapeHtml(oddsText)}" data-syndicate-prop-line="${escapeHtml(propText)}" data-syndicate-event-id="${escapeHtml(String(item.event_id || item.game_id || ""))}" data-syndicate-game-date="${escapeHtml(item.context_label || "")}" data-syndicate-matchup="${escapeHtml(matchup || "")}" ${askIdentityAttrs(item)}`;
+              const rowAttrs = `data-pick-id="${escapeHtml(pickKey(item))}" data-syndicate-name="${escapeHtml(title)}" data-syndicate-sport="${escapeHtml(sport)}" data-syndicate-market="${escapeHtml(item.market || item.market_label || "")}" data-syndicate-selection="${escapeHtml(item.selection || item.pick || "")}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}" data-syndicate-odds="${escapeHtml(oddsText)}" data-syndicate-prop-line="${escapeHtml(propText)}" data-syndicate-event-id="${escapeHtml(String(item.event_id || item.game_id || ""))}" data-syndicate-game-date="${escapeHtml(item.context_label || "")}" data-syndicate-matchup="${escapeHtml(matchup || "")}" ${askIdentityAttrs(item)}`;
               const headshot = playerHeadshot(item);
               const steamBadge = isSteamCandidate(item) ? '<span class="board-badge board-badge--steam" title="Steam move: a sharp, fast line/price move detected by the odds tracker">⚡ Steam</span>' : "";
               // OUR OWN SIM RATES THIS ROW WORSE THAN ITS PRICE IMPLIES.
@@ -3995,7 +4094,10 @@
               // on purpose: this is the unremarkable case and must not compete
               // with the two tags above for attention.
               const simNoViewKind = (!simDissents && !simContradicts) ? simViewBadgeKind(item) : null;
-              const simNoView = simNoViewKind === "none"
+              const offScaleGap = simNoViewKind === "offscale" ? simOffScaleGap(item) : null;
+              const simNoView = simNoViewKind === "offscale"
+                ? `<span class="board-badge board-badge--sim-offscale" title="Our simulation says ${Math.round(Number(item.model_probability) * 100)}% for this side; the no-vig market says ${Math.round(Number((itemQuote(item) || {}).fair_probability ?? item.fair_probability) * 100)}%. A ${offScaleGap.toFixed(0)}-point gap is more than the board trusts (${SIM_OFF_SCALE_POINTS}) and usually means a data or line mismatch, so the sim is set aside: this row ranks on price alone.">sim off-scale</span>`
+                : simNoViewKind === "none"
                 ? `<span class="board-badge board-badge--sim-noview" title="Our simulation has no view on this row at all. That is NOT the same as the model agreeing with it -- this row is ranked on price alone.">no sim view</span>`
                 : simNoViewKind === "unpriced"
                 ? `<span class="board-badge board-badge--sim-noview" title="Our simulation DOES have a view on this row -- see the Projected column -- but it could not be priced into an edge against this market, usually because only one side is quoted so there is no two-sided fair to compare against. Ranked on price; the model number is shown but is not scoring.">sim, no edge</span>`
@@ -4017,7 +4119,7 @@
                   <td data-label="Fair">${renderBlotterFair(item)}</td>
                   <td data-label="EV" title="Edge ${(edge * 100).toFixed(1)}%">${renderBlotterEv(item)}</td>
                   <td data-label="Sim" class="board-blotter__sim">
-                    <div class="board-blotter__sim-prob">${confidence !== null ? Math.round(confidence * 100) + "%" : "&mdash;"}</div>
+                    <div class="board-blotter__sim-prob${offScaleGap !== null ? " board-blotter__muted" : ""}">${confidence !== null ? Math.round(confidence * 100) + "%" + (offScaleGap !== null ? " (set aside)" : "") : "&mdash;"}</div>
                     ${projectedDisplay && !/%$/.test(projectedDisplay) ? `<div class="board-blotter__muted">proj ${escapeHtml(projectedDisplay)}</div>` : ""}
                     ${simBadge}${simRailed}${simNoView}
                   </td>
