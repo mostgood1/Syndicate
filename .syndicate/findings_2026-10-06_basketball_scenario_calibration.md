@@ -573,3 +573,29 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
 - **Adoption:** none from this step. The combined config goes to the end-of-Phase-2 VALIDATION read, and the user
   decides. The vendor change goes upstream to mostgood1/NBA-Betting (CLAUDE.md: a vendor-only fix is reverted by
   the next re-pull).
+
+### Phase 2 #1c — RESULT 2026-10-08 (sweep done 22:15Z / 5:15 PM CDT; 87/87 games every point; levers on 17,400/17,400 engine calls)
+
+| point | sim mean margin on −spread slope [95% CI] | mis-centring SD | target → sim slope | S8 margin SD (real 14.0) | S8 total SD |
+|---|---|---|---|---|---|
+| J1 (earlier run) | 1.493 [1.309, 1.672] | 6.54 | — | 18.84 | 18.79 |
+| C = J1, re-run | 1.454 [1.256, 1.652] | 6.50 | 1.525 | 18.64 | 18.79 |
+| **T = J1 + team_prior_stacks_on_target = False** | **0.869** [0.762, 0.983] | **3.72** | 0.918 | **17.99** | 18.80 |
+
+- Paired T − C slope: **−0.585** [−0.772, −0.416].
+- Run noise, same config (C vs the earlier J1): slope −0.038; per-game mean margin SD of the difference 1.79;
+  S8 margin 0.20.
+- **VERDICT: CONFIRMED** as pre-registered.
+  - The slope is inside [0.85, 1.15] (point estimate).
+  - Mis-centring falls 6.50 → 3.72.
+  - S8 margin SD falls 0.65, more than its run noise of 0.20.
+  - Totals are unchanged, as expected for a margin-only mechanism. Within-game SD is unchanged (17.6): that excess is
+    M-B, score effects.
+- The slope now sits slightly UNDER 1, and target → sim is 0.92. The old ±15% eff clip can stop a team reaching an
+  extreme target. EXACT_TARGET_CALIBRATION (#1d, ported 27ef92f8) addresses exactly that and is read next.
+- Team priors were applied on 62/87 games; early-season games lack them, which is why the November-only early peek
+  showed no difference.
+- **Next:** #1d measured on top of T (J1 + no stacking) on the same 12 dates. The full FIT re-run waits until #1d
+  reads, so ONE full re-run covers the combined config.
+  - Deviation from #1c's "full FIT re-run follows a confirmation" (amended here, before #1d data): it saves a ~6 h
+    run and reads the same rows.
