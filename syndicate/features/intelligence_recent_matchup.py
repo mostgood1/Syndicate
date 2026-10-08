@@ -291,6 +291,113 @@ def _mlb_opposing_starter(row: Mapping[str, Any], team_abbr: str, selected_date:
     return None
 
 
+# ------------------------------------------------------------- NFL vs position
+#
+# Phase 2 (user 2026-10-08): `scripts/build_nfl_defense_vs_position.py` writes
+# `nfl_source/tracking/derived/nfl_defense_vs_position_<season>_wk<NN>.json`
+# (per defense, per position, per stat: per-game allowed + rank, 1 = fewest).
+# The prop's player gets his position from the nflverse roster; the market
+# names the stat.
+
+_NFL_MARKET_STAT = (
+    ("receiving yards", "rec_yds", "receiving yards"),
+    ("receptions", "receptions", "receptions"),
+    ("rushing yards", "rush_yds", "rushing yards"),
+    ("rush attempts", "carries", "carries"),
+    ("carries", "carries", "carries"),
+    ("passing yards", "pass_yds", "passing yards"),
+    ("pass completions", "completions", "completions"),
+    ("completions", "completions", "completions"),
+    ("passing td", "pass_td", "passing TDs"),
+    ("pass td", "pass_td", "passing TDs"),
+    ("interceptions", "interceptions", "interceptions"),
+)
+_POSITION_WORD = {"QB": "QBs", "RB": "RBs", "WR": "WRs", "TE": "TEs"}
+
+
+def _nfl_root():
+    import os
+    from pathlib import Path
+
+    override = str(os.environ.get("SYNDICATE_NFL_SOURCE_ROOT") or "").strip()
+    if override:
+        return Path(override)
+    from syndicate.features.shared.prop_evidence.common import data_root
+
+    return data_root() / "nfl_source"
+
+
+def _nfl_dvp_table() -> Mapping[str, Any] | None:
+    import re
+
+    from syndicate.features.shared.prop_evidence import common as C
+
+    derived = _nfl_root() / "tracking" / "derived"
+    best = None
+    for path in derived.glob("nfl_defense_vs_position_*_wk*.json") if derived.is_dir() else []:
+        m = re.fullmatch(r"nfl_defense_vs_position_(\d{4})_wk(\d+)\.json", path.name)
+        if m and (best is None or (int(m.group(1)), int(m.group(2))) > best[0]):
+            best = ((int(m.group(1)), int(m.group(2))), path)
+    return C.load_json(best[1]) if best else None
+
+
+def _nfl_position(player_name: str, season: Any) -> str | None:
+    from syndicate.features.shared.prop_evidence import common as C
+
+    path = _nfl_root() / "tracking" / "nflverse" / "roster" / f"roster_{season}.csv"
+    if not path.is_file():
+        return None
+    cache = C._READ_CACHE.get()
+    key = ("nfl_roster_positions", C._cache_key(path)) if cache is not None else None
+    index = cache.get(key) if key is not None else None
+    if index is None:
+        index = {}
+        for row in C.iter_csv(path):
+            pos = str(row.get("position") or "").upper()
+            pos = {"HB": "RB", "FB": "RB"}.get(pos, pos)
+            if pos in _POSITION_WORD:
+                index.setdefault(str(row.get("full_name") or ""), pos)
+        if key is not None:
+            cache[key] = index
+    for name, pos in index.items():
+        if C.names_match(name, player_name):
+            return pos
+    return None
+
+
+def nfl_vs_position_text(row: Mapping[str, Any], opponent: str | None) -> str | None:
+    """'Vs position: GB allows 33.2 receiving yards a game to TEs (rank 6 of 32, 1 = fewest).' Never raises."""
+    try:
+        if not opponent:
+            return None
+        market = str(row.get("market") or "").lower()
+        table = _nfl_dvp_table()
+        if not table:
+            return None
+        position = _nfl_position(str(row.get("player_name") or ""), table.get("season"))
+        if position is None:
+            return None
+        stat = None
+        for token, key, words in _NFL_MARKET_STAT:
+            if token in market:
+                stat = (key, words)
+                break
+        if "anytime" in market or market.strip() in {"touchdowns", "anytime td"}:
+            stat = ("rush_td", "rushing TDs") if position == "RB" else ("rec_td", "receiving TDs") if position in {"WR", "TE"} else None
+        if stat is None:
+            return None
+        cell = (((table.get("teams") or {}).get(opponent) or {}).get(position) or {}).get(stat[0])
+        if not isinstance(cell, Mapping):
+            return None
+        return (
+            f"Vs position: {opponent} allows {_fmt(_num(cell.get('per_game')))} {stat[1]} a game to "
+            f"{_POSITION_WORD[position]} (rank {cell.get('rank')} of {cell.get('of')}, 1 = fewest; through week {table.get('through_week')})."
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[recent_matchup] NFL_DVP_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
 def _memo_key(row: Mapping[str, Any]) -> tuple:
     return (
         str(row.get("sport") or "").lower(),
@@ -324,10 +431,14 @@ def prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str, memo
         if evidence is not None:
             recent = evidence.layers.get(Layer.RECENT_FORM)
             match = evidence.layers.get(Layer.MATCHUP)
+            match_facts = match.facts if match is not None else None
             pieces = [
                 recent_form_text(recent.facts if recent is not None else None),
-                matchup_text(match.facts if match is not None else None),
+                matchup_text(match_facts),
             ]
+            if key[0] == "nfl":
+                opponent = str((match_facts or {}).get("opponent") or "").strip() or None
+                pieces.append(nfl_vs_position_text(row, opponent))
             text = " ".join(piece for piece in pieces if piece) or None
     except Exception as exc:  # noqa: BLE001 -- an explanation must never break a card
         print(f"[recent_matchup] FAILED sport={key[0]} error={type(exc).__name__}: {exc}", flush=True)
