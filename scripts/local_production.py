@@ -982,6 +982,9 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # NBA / WNBA multi-season player game log with opponent (ESPN; incremental): the
     # "history vs this team" basketball props read beyond the one-season box history.
     ScheduledJob("basketball-player-game-log", 11, 20, ("scripts/build_basketball_player_game_log.py",)),
+    # MLB multi-season player game logs + hand splits (StatsAPI; past seasons kept, the
+    # current season re-fetched): "last 10", "vs this team" and "vs LHP/RHP" over years.
+    ScheduledJob("mlb-player-game-logs", 11, 25, ("scripts/build_mlb_player_game_logs.py",)),
 )
 
 

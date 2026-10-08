@@ -204,6 +204,62 @@ def _mlb_derived(pattern: str) -> Any:
     return out
 
 
+def _mlb_multi_log(group: str) -> dict[str, list[dict[str, str]]]:
+    """player_id -> rows across EVERY `derived/mlb_player_game_log_<season>_<group>.csv` (StatsAPI).
+
+    User 2026-10-08: "we need robust history ... years of data, not just days". Built by
+    `scripts/build_mlb_player_game_logs.py` (2023 onward, every prop stat incl. runs / RBIs,
+    regular season + postseason). Indexed once per board build.
+    """
+    from syndicate.features.shared.prop_evidence import common as C
+
+    directory = _mlb_root() / "derived"
+    files = sorted(directory.glob(f"mlb_player_game_log_*_{group}.csv")) if directory.is_dir() else []
+    cache = C._READ_CACHE.get()
+    key = ("mlb_multi_log", group, tuple(C._cache_key(f) for f in files)) if cache is not None else None
+    if key is not None and key in cache:
+        return cache[key]
+    out: dict[str, list[dict[str, str]]] = {}
+    for path in files:
+        for row in C.iter_csv(path):
+            out.setdefault(str(row.get("player_id") or ""), []).append(row)
+    if key is not None:
+        cache[key] = out
+    return out
+
+
+def _mlb_hand_multi() -> tuple[dict[tuple[str, str, str], dict[str, float]], list[int]]:
+    """(group, player_id, 'vl'|'vr') -> counts summed over every `mlb_hand_splits_<season>.csv`, and the seasons."""
+    from syndicate.features.shared.prop_evidence import common as C
+
+    directory = _mlb_root() / "derived"
+    files = sorted(directory.glob("mlb_hand_splits_*.csv")) if directory.is_dir() else []
+    cache = C._READ_CACHE.get()
+    key = ("mlb_hand_multi", tuple(C._cache_key(f) for f in files)) if cache is not None else None
+    if key is not None and key in cache:
+        return cache[key]
+    sums: dict[tuple[str, str, str], dict[str, float]] = {}
+    seasons: set[int] = set()
+    for path in files:
+        for row in C.iter_csv(path):
+            k = (str(row.get("group")), str(row.get("player_id")), str(row.get("code")))
+            cell = sums.setdefault(k, {})
+            for f in ("pa", "ab", "h", "tb", "hr", "so", "bb"):
+                cell[f] = cell.get(f, 0.0) + (_num(row.get(f)) or 0.0)
+            if str(row.get("season") or "").isdigit():
+                seasons.add(int(row["season"]))
+    result = (sums, sorted(seasons))
+    if key is not None:
+        cache[key] = result
+    return result
+
+
+def _season_span(seasons: list[int]) -> str:
+    if not seasons:
+        return ""
+    return f"{seasons[0]}-{str(seasons[-1])[2:]}" if len(seasons) > 1 else str(seasons[0])
+
+
 def _slash(cell: Mapping[str, Any] | None) -> str | None:
     """'.271 AVG, 4 HR in 210 PA' from a splits cell; None below 10 PA."""
     if not isinstance(cell, Mapping):
@@ -301,6 +357,16 @@ def mlb_prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str) 
         if season_rows and cols and set(cols) <= _STATCAST_LOG_COLS:
             cutoff = max(str(r.get("date") or "") for r in season_rows)
             source_rows = list(season_rows) + [r for r in log_rows if str(r.get("date") or "") > cutoff]
+        # Multi-season StatsAPI logs, when built, are the base (every market, several seasons);
+        # the feed_live / Statcast rows only add games they do not hold (by game, then by date).
+        multi = (_mlb_multi_log("pitching" if is_pitcher else "hitting").get(player_id) or [])
+        if is_pitcher:
+            multi = [r for r in multi if str(r.get("is_starter") or "") in {"1", "True", "true"}]
+        if multi:
+            pks = {str(r.get("game_pk") or "") for r in multi} - {""}
+            days = {str(r.get("date") or "") for r in multi}
+            source_rows = list(multi) + [r for r in source_rows if str(r.get("game_pk") or "") not in pks
+                                         and str(r.get("date") or "") not in days]
         recent = sorted(source_rows, key=lambda r: str(r.get("date") or ""))[-_MLB_LAST_N:]
         if cols and recent:
             values = _mlb_side_values(recent, cols)
@@ -313,9 +379,14 @@ def mlb_prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str) 
                     f"(avg {_fmt(sum(values) / len(values))}; log since {recent[0].get('date')})."
                 )
         splits = _mlb_derived("mlb_matchup_splits_*_asof_*.json") or {}
+        hand_multi, hand_seasons = _mlb_hand_multi()
         if is_pitcher:
             mine = (splits.get("pitchers") or {}).get(player_id) or {}
             vs_l, vs_r = mine.get("vs_L") or {}, mine.get("vs_R") or {}
+            multi_l, multi_r = hand_multi.get(("pitching", player_id, "vl")), hand_multi.get(("pitching", player_id, "vr"))
+            if multi_l and multi_r and multi_l.get("pa", 0) >= 10 and multi_r.get("pa", 0) >= 10:
+                vs_l, vs_r = multi_l, multi_r
+                splits = dict(splits, season=_season_span(hand_seasons))
             if int(vs_l.get("pa") or 0) >= 10 and int(vs_r.get("pa") or 0) >= 10:
                 k_l = 100.0 * int(vs_l.get("so") or 0) / int(vs_l["pa"])
                 k_r = 100.0 * int(vs_r.get("so") or 0) / int(vs_r["pa"])
@@ -324,15 +395,21 @@ def mlb_prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str) 
                     f"opponents hit {_slash(vs_l)} (LHB), {_slash(vs_r)} (RHB)."
                 )
         if not is_pitcher:
-            newest = sorted(list(log_rows) + list(season_rows), key=lambda r: str(r.get("date") or ""))[-1:]
+            newest = sorted(list(log_rows) + list(season_rows) + list(multi), key=lambda r: str(r.get("date") or ""))[-1:]
             team = str((newest or [{}])[0].get("team") or "")
             pitcher = _mlb_opposing_starter(row, team, selected_date)
             batter_splits = (splits.get("batters") or {}).get(player_id) or {}
             split_bits: list[str] = []
+            span = str(splits.get("season") or "")
             if pitcher is not None:
                 throws = ((splits.get("pitchers") or {}).get(str(pitcher[0])) or {}).get("throws")
                 if throws in {"L", "R"}:
-                    hand = _slash(batter_splits.get(f"vs_{throws}"))
+                    multi_hand = hand_multi.get(("hitting", player_id, "vl" if throws == "L" else "vr"))
+                    hand = _slash(multi_hand) if multi_hand else None
+                    if hand:
+                        span = _season_span(hand_seasons)
+                    else:
+                        hand = _slash(batter_splits.get(f"vs_{throws}"))
                     if hand:
                         split_bits.append(f"vs {'LHP' if throws == 'L' else 'RHP'} {hand}")
             opponent = _mlb_opponent(row, team)
@@ -344,7 +421,17 @@ def mlb_prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str) 
                             split_bits.append(f"vs {abbr} {line}")
                         break
             if split_bits:
-                pieces.append(f"Splits ({splits.get('season')} regular season): " + "; ".join(split_bits) + ".")
+                label = f"{span} regular season" if span == str(splits.get("season") or "") else span
+                pieces.append(f"Splits ({label}): " + "; ".join(split_bits) + ".")
+            # HISTORY vs this team across every logged season (StatsAPI logs), on the board's own line
+            line, side = _num(row.get("line")), str(row.get("side") or "").lower()
+            if opponent and multi and cols and line is not None and side in {"over", "under"}:
+                vs_games = [r for r in multi if _canonical_mlb(str(r.get("opponent") or "")) == opponent]
+                values = _mlb_side_values(vs_games, cols)
+                if values:
+                    hits = sum(1 for v in values if (v > line if side == "over" else v < line))
+                    first = min(str(r.get("date") or "") for r in vs_games)
+                    pieces.append(f"History vs this team: {side} {_fmt(line)} in {hits} of {len(values)} games since {first}.")
             if pitcher is not None:
                 pid, name = pitcher
                 counts = _mlb_bvp(pid, int(player_id))

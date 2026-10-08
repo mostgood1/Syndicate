@@ -527,6 +527,9 @@ def _nfl_prop_rows(prop, stat: str, player_name: str) -> list[tuple[float | None
     return out
 
 
+NFL_USAGE_SEASONS = 4  # this season and the three before it
+
+
 def _nfl_usage(season: int | None, player: NflPlayer | None) -> tuple[list[dict[str, Any]], Path | None, list[str]]:
     """The player's per-game lines from `nfl_fantasy_usage_<season>.json`, newest first.
 
@@ -537,8 +540,12 @@ def _nfl_usage(season: int | None, player: NflPlayer | None) -> tuple[list[dict[
     tried: list[str] = []
     if season is None or player is None or not player.id:
         return [], None, tried
+    # EVERY season on disk back to NFL_USAGE_SEASONS, merged (user 2026-10-08: "we need robust history ...
+    # years of data, not just days"). It used to read last season ONLY when this season held no line, so in
+    # week 3 "last 10" was two games and "vs this team" reached no earlier meeting.
     first_path: Path | None = None
-    for year in (season, season - 1):
+    lines: list[dict[str, Any]] = []
+    for year in range(season, season - NFL_USAGE_SEASONS, -1):
         name = f"nfl_fantasy_usage_{year}.json"
         tried.append(name)
         path = C.first_existing(NFL_DIR, f"fantasy/{name}")
@@ -546,12 +553,10 @@ def _nfl_usage(season: int | None, player: NflPlayer | None) -> tuple[list[dict[
             continue
         first_path = first_path or path
         payload = _load(path, "fantasy usage")
-        lines = [dict(line) for line in (payload.get("player_game_lines") or []) if isinstance(line, dict)
-                 and str(line.get("player_id") or "") == player.id] if isinstance(payload, dict) else []
-        if lines:
-            lines.sort(key=lambda l: (int(l.get("season") or 0), int(l.get("week") or 0)), reverse=True)
-            return lines, path, tried
-    return [], first_path, tried
+        lines += [dict(line) for line in (payload.get("player_game_lines") or []) if isinstance(line, dict)
+                  and str(line.get("player_id") or "") == player.id] if isinstance(payload, dict) else []
+    lines.sort(key=lambda l: (int(l.get("season") or 0), int(l.get("week") or 0)), reverse=True)
+    return lines, first_path, tried
 
 
 def _usage_opponent(line: dict[str, Any]) -> str:

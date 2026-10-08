@@ -408,20 +408,43 @@ class GameLog:
     matched_by: str = "player_id"
 
 
-def _game_log(subject: PropSubject, ident: Identity, market: NhlMarket | None) -> GameLog:
-    path = game_log_path()
-    if path is None:
-        return GameLog(None, [], None)
-    home, away = _board_teams(subject)
-    game_teams = {t for t in (home, away) if t}
-    cutoff = _parse_ts(subject.commence_time)
-    slate = slate_date(subject)
+def _log_rows_all(path: Path) -> list[dict[str, str]]:
+    """The current game-stats file, then every prior-season `player_game_log_<season>.csv` beside it.
+
+    User 2026-10-08: "we need robust history ... years of data, not just days". The current file spans
+    last spring's playoffs onward; `scripts/build_nhl_player_game_logs.py` writes earlier seasons in the
+    SAME columns (+ `opponent`), so one reader serves both. A game in two files is kept once (by gamePk).
+    """
+    rows = list(_read_rows(path))
+    for extra in sorted(path.parent.glob("player_game_log_????????.csv"), reverse=True):
+        rows.extend(_read_rows(extra))
+    return rows
+
+
+@dataclass
+class _LogIndex:
+    by_pid: dict[str, list[tuple[dict[str, str], str, str, Any, str]]]
+    by_initial: dict[str, list[tuple[dict[str, str], str, str, Any, str]]]
+    teams_by_game: dict[str, set[str]]
+    window: tuple[str, str] | None
+
+
+def _log_index(path: Path) -> _LogIndex:
+    """Every log row parsed ONCE per board build, indexed by player id and by initial key.
+
+    Three prior seasons are ~300k rows; the old per-prop full scan of one 6k-row file would have
+    become 300k rows x ~1,000 NHL props per build. Held in the build's read cache.
+    """
+    extras = sorted(path.parent.glob("player_game_log_????????.csv"), reverse=True)
+    cache = C._READ_CACHE.get()
+    key = ("nhl_log_index", C._cache_key(path), tuple(C._cache_key(e) for e in extras)) if cache is not None else None
+    if key is not None and key in cache:
+        return cache[key]
+    by_pid: dict[str, list] = {}
+    by_initial: dict[str, list] = {}
     teams_by_game: dict[str, set[str]] = {}
-    dates: list[str] = []
-    candidates: dict[str, list[dict[str, Any]]] = {}
-    role = market.role if market else None
-    wanted_initial = C.initial_key(subject.player_name)
-    for row in _read_rows(path):
+    lo = hi = None
+    for row in _log_rows_all(path):
         game_pk = str(row.get("gamePk") or "").strip()
         team = _team_abbr(row.get("team")) or str(row.get("team") or "").strip().upper()
         ts = _parse_ts(row.get("date"))
@@ -430,13 +453,35 @@ def _game_log(subject: PropSubject, ident: Identity, market: NhlMarket | None) -
         if ts is None:
             continue
         date_et = _eastern_date(ts)
-        dates.append(date_et)
+        lo = date_et if lo is None or date_et < lo else lo
+        hi = date_et if hi is None or date_et > hi else hi
+        parsed = (row, game_pk, team, ts, date_et)
         player_id = str(row.get("player_id") or "").strip()
-        if ident.player_id:
-            if player_id != ident.player_id:
-                continue
-        elif C.initial_key(_log_name(row.get("player"))) != wanted_initial:
-            continue
+        if player_id:
+            by_pid.setdefault(player_id, []).append(parsed)
+        by_initial.setdefault(C.initial_key(_log_name(row.get("player"))), []).append(parsed)
+    index = _LogIndex(by_pid, by_initial, teams_by_game, (lo, hi) if lo else None)
+    if key is not None:
+        cache[key] = index
+    return index
+
+
+def _game_log(subject: PropSubject, ident: Identity, market: NhlMarket | None) -> GameLog:
+    path = game_log_path()
+    if path is None:
+        return GameLog(None, [], None)
+    home, away = _board_teams(subject)
+    game_teams = {t for t in (home, away) if t}
+    cutoff = _parse_ts(subject.commence_time)
+    slate = slate_date(subject)
+    index = _log_index(path)
+    teams_by_game = index.teams_by_game
+    candidates: dict[str, list[dict[str, Any]]] = {}
+    role = market.role if market else None
+    wanted_initial = C.initial_key(subject.player_name)
+    pool = index.by_pid.get(ident.player_id, []) if ident.player_id else index.by_initial.get(wanted_initial, [])
+    for row, game_pk, team, ts, date_et in pool:
+        player_id = str(row.get("player_id") or "").strip()
         if role and str(row.get("role") or "").strip().lower() != role:
             continue
         # Only games BEFORE this one: the board's kickoff when known, else its slate date.
@@ -458,18 +503,23 @@ def _game_log(subject: PropSubject, ident: Identity, market: NhlMarket | None) -
             "shots": shots, "goals": C.to_float(row.get("goals")), "assists": C.to_float(row.get("assists")),
             "blocked": C.to_float(row.get("blocked")), "saves": C.to_float(row.get("saves")),
             "shots_against": C.to_float(row.get("shotsAgainst")), "decision": str(row.get("decision") or ""),
+            "opponent_hint": _team_abbr(row.get("opponent")) or str(row.get("opponent") or "").strip().upper(),
         }
         candidates.setdefault(player_id or entry["name"], []).append(entry)
-    window = (min(dates), max(dates)) if dates else None
+    window = index.window
     if not ident.player_id and len(candidates) > 1:
         in_game = {pid: rows for pid, rows in candidates.items() if any(r["team"] in game_teams for r in rows)}
         if len(in_game) != 1:
             return GameLog(path, [], window, ambiguous=True)
         candidates = in_game
     games = next(iter(candidates.values()), [])
+    unique: dict[str, dict[str, Any]] = {}
+    for game in games:
+        unique.setdefault(game["game_pk"] or game["date"], game)
+    games = list(unique.values())
     for game in games:
         others = teams_by_game.get(game["game_pk"], set()) - {game["team"]}
-        game["opponent"] = next(iter(others), "")
+        game["opponent"] = next(iter(others), "") or game.get("opponent_hint") or ""
         game["type"] = "playoff" if game["game_pk"][4:6] == "03" else "regular" if game["game_pk"][4:6] == "02" else ""
     games.sort(key=lambda g: g["ts"], reverse=True)
     return GameLog(path, games, window, player_name=games[0]["name"] if games else None,
