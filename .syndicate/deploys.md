@@ -47994,3 +47994,18 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - verify: `migration_runs/2026-10-08/odds_refresh_20261008_230456/odds_refresh.stderr.txt` holds `STEP_MARKER name=soccer_mls_artifacts [build_soccer_artifacts] SOCCER_CONFIRMED_LINEUPS league=mls date=2026-10-11 sides_confirmed=0/2 home=0/1 away=0/1`. The same run's `odds_refresh.json` carries `stdout_markers` (2 occurrences, file 66,507 B). 0/2 is expected: kickoff is ~2 days out, and ESPN posts lineups ~1 h before.
 - Why it took 2 h 40 min: soccer was not due. `FIXTURE_CADENCE ... skip:mid:38h_out:age=28664s<28800s` (8 h cadence while the next fixtures are 38 h out). The first watcher (20:23-22:23Z) saw 82 runs and 0 soccer artifact steps. Not a failure.
 - Not touched: the stdout blanking itself, and `build_soccer_artifacts.py` (claimed by soccer-corners-model-rebuild).
+
+## 2026-10-08 23:45Z (6:45 PM CT) -- V2 READING for the 14:38:26Z ff 6cd415f3 (MLB hr_rate_mult 1.5) -- **INCONCLUSIVE; V2b pre-registered and armed**
+- The first post-ship production sim was 10-08 CLE@CWS (pk849832). Production re-simulated it LIVE during the game, while the watcher ran:
+  - replay A read served starter outs 15.90 / 16.10;
+  - replay B read 16.22 / 16.31 minutes later.
+  - The pre-registered starter-outs comparison therefore mixed two production snapshots. Its "NOT MET" (0.462 vs 0.424) is VOID.
+- A re-run of both replays on a byte-STABLE file (sha 824d76e2): served 16.223 / 16.308; new 16.866 / 16.689; old 16.732 / 16.646, i.e. closer to OLD by 0.13 / 0.04.
+  - The new replay itself moved from the earlier run, because the live re-sim also rewrote the roster_objs.
+  - The served file is an in-game sim the replay harness cannot reproduce, and HR 1.5 moves starter outs by only ~0.1-0.2. **Not a usable instrument here; no conclusion drawn.**
+- V1 (14:38Z: the config resolves 1.5 and the new maps in production's code path) stands. The served records name the calibration files by path only.
+- **V2b, PRE-REGISTERED before any reading:**
+  - Instrument: the next post-ship production sim, snapshotted with its roster_objs at the same moment (no MLB sim running). The served total HR/game (sum of batters' hr_mean) vs replays of that snapshot at new (fleet 6cd415f3: 1.5) and old (ac48cdcd files: 1.856), 2000 sims each.
+  - MET if every game has |served - new| < |served - old|, and |new - old| > 3 SE. The expected ~19% HR drop makes this discriminating per game.
+  - A watcher is armed (scratchpad hrv2b_watch.sh).
+- verify: V2b reading on the next post-ship sim.
