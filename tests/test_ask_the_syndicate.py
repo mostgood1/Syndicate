@@ -2611,8 +2611,16 @@ class AskTheSyndicateNflEvidenceTests(unittest.TestCase):
         # has data for -- e.g. 2026 -- isn't invisible to it) -- pin it to
         # this fixture's own season so the test doesn't depend on
         # whatever real data happens to exist on disk outside the fixture.
+        # The projection is read through `default_nfl_source_root()`, which does
+        # NOT follow SYNDICATE_DATA_ROOT -- it picks a root by probing for
+        # `upcoming_recs_*.csv`, so without this pin the fixture was never read and
+        # the test passed or failed on whatever real `data/` was on disk (failed in
+        # a data-less session worktree, measured 2026-10-08). Weeks and lines are
+        # globbed under SYNDICATE_DATA_ROOT, so both now point at the fixture.
         with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": self.root}), patch(
             "syndicate.features.nfl.sources.latest_season", return_value=2025,
+        ), patch(
+            "syndicate.features.nfl.sources.default_nfl_source_root", return_value=Path(self.nfl_root),
         ):
             self._write_branding()
             write_projection_artifact([projection], season=2025, week=10, data_root=Path(self.nfl_root))

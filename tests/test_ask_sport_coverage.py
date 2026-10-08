@@ -28,13 +28,29 @@ class NflNicknameMatchingTests(unittest.TestCase):
     so `_nfl_matchup_evidence` returned None at `len(teams) < 2` before it ever
     opened an artifact, and NFL produced zero evidence for every question."""
 
+    def _require_nfl_branding(self) -> None:
+        """These read the git-tracked branding CSV under `data/`. A session
+        worktree is created WITHOUT `data/` (`scripts/session_worktree.py`), and
+        there every alias is empty: measured 2026-10-08, five failures that read
+        as a matching regression while all eight passed on a tree with `data/`.
+        Skipped by name rather than failed, so a worktree run cannot pass for a
+        verdict about main. The ambiguity tests are skipped too: with no rows
+        they pass vacuously, which proves nothing."""
+        if not data_module._nfl_team_branding_rows():
+            self.skipTest(
+                "NFL team branding CSV not found under the data root "
+                "(no data/ -- e.g. a session worktree); judge these on a tree that has it"
+            )
+
     def test_mascot_alone_resolves_to_the_full_team(self) -> None:
+        self._require_nfl_branding()
         self.assertEqual(
             data_module._nfl_teams_in_question("Patriots vs Seahawks projection"),
             ["New England Patriots", "Seattle Seahawks"],
         )
 
     def test_single_mascot_resolves(self) -> None:
+        self._require_nfl_branding()
         self.assertEqual(
             data_module._nfl_teams_in_question("What does the model project for the Patriots"),
             ["New England Patriots"],
@@ -42,6 +58,7 @@ class NflNicknameMatchingTests(unittest.TestCase):
 
     def test_full_names_still_resolve(self) -> None:
         """The widening must not cost the behaviour that already worked."""
+        self._require_nfl_branding()
         self.assertEqual(
             data_module._nfl_teams_in_question("New England Patriots vs Seattle Seahawks"),
             ["New England Patriots", "Seattle Seahawks"],
@@ -51,15 +68,18 @@ class NflNicknameMatchingTests(unittest.TestCase):
         """"New York" is Giants AND Jets; "Los Angeles" is Rams AND Chargers.
         Resolving either to one team would be a fabricated entity, which is
         strictly worse than declining to match."""
+        self._require_nfl_branding()
         self.assertEqual(data_module._nfl_teams_in_question("the New York game tonight"), [])
         self.assertEqual(data_module._nfl_teams_in_question("Los Angeles spread"), [])
 
     def test_unambiguous_location_resolves(self) -> None:
+        self._require_nfl_branding()
         self.assertIn("Miami Dolphins", data_module._nfl_teams_in_question("miami total"))
 
     def test_alias_ambiguity_is_computed_from_the_data_not_hardcoded(self) -> None:
         """The uniqueness guard must be derived, so a future relocation that
         creates a collision DROPS the alias instead of resolving it wrongly."""
+        self._require_nfl_branding()
         aliases = data_module._nfl_name_aliases()
         normalized = [alias for alias, _display in aliases]
         self.assertEqual(len(normalized), len(set(normalized)), "aliases must be unambiguous")
