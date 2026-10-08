@@ -133,6 +133,11 @@ def matchup_text(facts: Mapping[str, Any] | None) -> str | None:
 #   * batter vs pitcher -- `statcast/bvp/bvp_pairs_<pitcher_id % 64>.json`
 #     (career, schema mlb_bvp_pairs_v1, fields pa/hits/hr/so/bb/hbp/...), the
 #     opposing starter from `daily/snapshots/<date>/probables.json`.
+#   * phase 2 -- `scripts/build_mlb_matchup_splits.py` (raw Statcast pitches,
+#     regular season) writes `derived/mlb_batter_game_log_statcast_<season>.csv`
+#     (every batter-game of the season, so "last 10" reaches past feed_live's
+#     window) and `derived/mlb_matchup_splits_<season>_asof_<date>.json` (batter
+#     vs LHP/RHP and vs each team; pitcher vs LHB/RHB + throwing hand).
 # All reads go through `prop_evidence.common`, so a board build's read cache
 # parses each file once.
 
@@ -158,6 +163,47 @@ def _mlb_root():
     from syndicate.features.shared.prop_evidence.common import data_root
 
     return data_root() / "mlb_source" / "source_artifacts" / "data"
+
+
+# market columns the Statcast batter-game log carries (no runs / RBIs there)
+_STATCAST_LOG_COLS = {"h", "tb", "hr", "so", "bb"}
+
+
+def _mlb_derived(pattern: str) -> Any:
+    """Newest `derived/<pattern>` file, parsed (CSV -> player_id -> rows, JSON -> dict); None if absent."""
+    from syndicate.features.shared.prop_evidence import common as C
+
+    directory = _mlb_root() / "derived"
+    cache = C._READ_CACHE.get()
+    key = ("mlb_derived", pattern, str(directory)) if cache is not None else None
+    if key is not None and key in cache:
+        return cache[key]
+    files = sorted(directory.glob(pattern)) if directory.is_dir() else []
+    out: Any = None
+    if files:
+        path = files[-1]
+        if path.suffix == ".csv":
+            out = {}
+            for row in C.iter_csv(path):
+                out.setdefault(str(row.get("player_id") or ""), []).append(row)
+        else:
+            payload = C.load_json(path)
+            out = payload if isinstance(payload, Mapping) else None
+    if key is not None:
+        cache[key] = out
+    return out
+
+
+def _slash(cell: Mapping[str, Any] | None) -> str | None:
+    """'.271 AVG, 4 HR in 210 PA' from a splits cell; None below 10 PA."""
+    if not isinstance(cell, Mapping):
+        return None
+    pa, ab = int(cell.get("pa") or 0), int(cell.get("ab") or 0)
+    if pa < 10 or ab <= 0:
+        return None
+    avg = f"{int(cell.get('h') or 0) / ab:.3f}".lstrip("0")
+    hr = int(cell.get("hr") or 0)
+    return f"{avg} AVG, {hr} HR in {pa} PA"
 
 
 def _mlb_log(kind: str) -> dict[str, list[dict[str, str]]]:
@@ -234,7 +280,18 @@ def mlb_prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str) 
         log_rows = _mlb_log("pitcher" if is_pitcher else "batter").get(player_id) or []
         if is_pitcher:
             log_rows = [r for r in log_rows if str(r.get("is_starter") or "") in {"1", "True", "true"}] or log_rows
-        recent = sorted(log_rows, key=lambda r: str(r.get("date") or ""))[-_MLB_LAST_N:]
+        season_rows: list[Mapping[str, str]] = []
+        if not is_pitcher:
+            season_rows = (_mlb_derived("mlb_batter_game_log_statcast_*.csv") or {}).get(player_id) or []
+        # the full-season Statcast log when it carries the market's columns
+        # (feed_live covers 17 dates); runs / RBIs only live in feed_live. The
+        # Statcast log is regular season only, so feed_live games dated after
+        # its last game (the postseason) are appended -- "last 10" stays recent.
+        source_rows = log_rows
+        if season_rows and cols and set(cols) <= _STATCAST_LOG_COLS:
+            cutoff = max(str(r.get("date") or "") for r in season_rows)
+            source_rows = list(season_rows) + [r for r in log_rows if str(r.get("date") or "") > cutoff]
+        recent = sorted(source_rows, key=lambda r: str(r.get("date") or ""))[-_MLB_LAST_N:]
         if cols and recent:
             values = _mlb_side_values(recent, cols)
             line = _num(row.get("line"))
@@ -245,9 +302,39 @@ def mlb_prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str) 
                     f"Recent form: {side} {_fmt(line)} in {hits} of the last {len(values)} logged games "
                     f"(avg {_fmt(sum(values) / len(values))}; log since {recent[0].get('date')})."
                 )
+        splits = _mlb_derived("mlb_matchup_splits_*_asof_*.json") or {}
+        if is_pitcher:
+            mine = (splits.get("pitchers") or {}).get(player_id) or {}
+            vs_l, vs_r = mine.get("vs_L") or {}, mine.get("vs_R") or {}
+            if int(vs_l.get("pa") or 0) >= 10 and int(vs_r.get("pa") or 0) >= 10:
+                k_l = 100.0 * int(vs_l.get("so") or 0) / int(vs_l["pa"])
+                k_r = 100.0 * int(vs_r.get("so") or 0) / int(vs_r["pa"])
+                pieces.append(
+                    f"Splits ({splits.get('season')} regular season): K rate {k_l:.0f}% vs LHB, {k_r:.0f}% vs RHB; "
+                    f"opponents hit {_slash(vs_l)} (LHB), {_slash(vs_r)} (RHB)."
+                )
         if not is_pitcher:
-            team = str((sorted(log_rows, key=lambda r: str(r.get("date") or ""))[-1:] or [{}])[0].get("team") or "")
+            newest = sorted(list(log_rows) + list(season_rows), key=lambda r: str(r.get("date") or ""))[-1:]
+            team = str((newest or [{}])[0].get("team") or "")
             pitcher = _mlb_opposing_starter(row, team, selected_date)
+            batter_splits = (splits.get("batters") or {}).get(player_id) or {}
+            split_bits: list[str] = []
+            if pitcher is not None:
+                throws = ((splits.get("pitchers") or {}).get(str(pitcher[0])) or {}).get("throws")
+                if throws in {"L", "R"}:
+                    hand = _slash(batter_splits.get(f"vs_{throws}"))
+                    if hand:
+                        split_bits.append(f"vs {'LHP' if throws == 'L' else 'RHP'} {hand}")
+            opponent = _mlb_opponent(row, team)
+            if opponent:
+                for abbr, cell in (batter_splits.get("vs_team") or {}).items():
+                    if _canonical_mlb(abbr) == opponent:
+                        line = _slash(cell)
+                        if line:
+                            split_bits.append(f"vs {abbr} {line}")
+                        break
+            if split_bits:
+                pieces.append(f"Splits ({splits.get('season')} regular season): " + "; ".join(split_bits) + ".")
             if pitcher is not None:
                 pid, name = pitcher
                 counts = _mlb_bvp(pid, int(player_id))
@@ -265,6 +352,21 @@ def mlb_prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str) 
     except Exception as exc:  # noqa: BLE001
         print(f"[recent_matchup] MLB_FAILED error={type(exc).__name__}: {exc}", flush=True)
         return None
+
+
+def _canonical_mlb(abbr: str) -> str | None:
+    from syndicate.features.shared.team_aliases import canonical_team
+
+    return canonical_team("mlb", str(abbr or "")) or None
+
+
+def _mlb_opponent(row: Mapping[str, Any], team_abbr: str) -> str | None:
+    """The canonical team the batter's team plays in this row's game."""
+    home, away = _canonical_mlb(str(row.get("home_team") or "")), _canonical_mlb(str(row.get("away_team") or ""))
+    mine = _canonical_mlb(team_abbr) if team_abbr else None
+    if not home or not away or mine not in {home, away}:
+        return None
+    return away if mine == home else home
 
 
 def _mlb_opposing_starter(row: Mapping[str, Any], team_abbr: str, selected_date: str) -> tuple[int, str] | None:

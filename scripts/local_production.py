@@ -958,6 +958,14 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # games are final; in the offseason it re-reads a complete season and
     # fetches nothing.
     ScheduledJob("ncaab-team-ratings", 10, 45, ("scripts/build_ncaab_team_ratings.py",)),
+    # `mlb-matchup-splits` + `nfl-defense-vs-position` (lane
+    # `intelligence-evidence-coverage`, phase 2, 2026-10-08, user "focus on
+    # recency and matchups"): batter vs LHP/RHP / vs team + the full-season
+    # batter-game log from the raw Statcast pitches (~21 s, 68 MB), and what
+    # each NFL defense allows per position from nflverse pbp + roster. Both
+    # write dated files the board's recency/matchup sentence reads.
+    ScheduledJob("mlb-matchup-splits", 10, 50, ("scripts/build_mlb_matchup_splits.py",)),
+    ScheduledJob("nfl-defense-vs-position", 10, 55, ("scripts/build_nfl_defense_vs_position.py",)),
 )
 
 
