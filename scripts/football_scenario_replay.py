@@ -158,8 +158,14 @@ def _ratings(task: Dict[str, Any]):
         ho, hd, _ = gen.team_rating(task["home"], week=task["week"], current_plays=plays, prior_plays=prior)
         ao, ad, _ = gen.team_rating(task["away"], week=task["week"], current_plays=plays, prior_plays=prior)
         return ho, hd, ao, ad
+    # The live tick feeds ENGINE ratings: SP+/PPA components centred on the league means, scaled, and
+    # defense NEGATED (SP+ defense is points ALLOWED) -- `sp_offense_defense_rating`, the same function
+    # pregame `build_projection` uses. Passing the raw components (the first version of this harness) put
+    # every team miles from average: projected Q1 totals of 114 and margins of -99 in BOTH arms.
     gen = F._W["gen"]
-    (ho, hd), (ao, ad) = task["index"][gen.norm(task["home"])], task["index"][gen.norm(task["away"])]
+    means = tuple(task["means"])
+    ho, hd = gen.sp_offense_defense_rating(task["home"], task["index"], means)
+    ao, ad = gen.sp_offense_defense_rating(task["away"], task["index"], means)
     return ho, hd, ao, ad
 
 
@@ -270,6 +276,16 @@ def grade(sport: str, cache: Path, season: int) -> None:
     for q in sorted(by_q):
         row = by_q[q]
         print(f"     Q{q}: " + "  ".join(f"{k} {sum(v) / len(v):+.4f} (n={len(v)})" for k, v in row.items()))
+    # PLAUSIBILITY GUARD. A dry run that only "completes" proves nothing: the first NCAAF version graded both
+    # arms on mis-scaled ratings (production live total error 33.6 pts, margin 23.0) and printed gates anyway.
+    # Live projections from a mid-game state cannot sensibly miss the final total by more than ~20 on average.
+    prod_total_err = gates["L3_total_abs_err"]["production"]
+    if prod_total_err > 20.0:
+        print(f"  !! IMPLAUSIBLE: production's own live total abs error is {prod_total_err:.1f} pts -- a harness "
+              f"input defect, not an engine reading. Gates NOT valid.")
+        for v in gates.values():
+            v["pass"] = False
+            v["invalid"] = "implausible production error"
     passed = all(v["pass"] for v in gates.values())
     print(f"  => {'LIVE GATES PASS' if passed else 'LIVE GATES FAIL'}")
     (cache.with_suffix(".report.json")).write_text(json.dumps({"sport": sport, "season": season, "games": len(per_game),

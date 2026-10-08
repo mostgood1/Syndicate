@@ -461,3 +461,39 @@ v2 showed the four switches together cost NCAAF more than the levers recover (be
 H1 prediction (|delta total| < 1.0) FAILED (-1.12). H2 prediction (total in [-0.5, +1.5]) held. Both
 fixes work mechanically (S12 after-half 25.0; S5 4th-down rows inside the real CI) and neither moves
 accuracy alone -- each moves the level or home edge away from the close, as the re-fit design expects.
+
+
+### Re-fit v3 NCAAF — RESULTS 2026-10-08: pregame NOT SHIPPABLE (gate b); live replay RETRACTED (harness defect)
+
+**Stage 1 (16 subsets at shipped levers, FIT 2024, 164 games, 60 seeds):** only ONE subset beats production --
+`non_offensive_scoring` alone, 222.33 vs 227.55. Every subset containing `possession_aware_priors` (H4) or
+`fourth_down_decision_model` (H2) is far worse (301-455); `halftime_kickoff` alone 248.89.
+**Stage 2 (descent from {non_offensive_scoring}):** fitted **179.44 = 0.789 x production** -> the FIT gate
+(<= 0.8) opened and NCAAF 2025 was read. Fitted: `non_offensive_scoring` ON, `touchdown_weight_multiplier`
+0.4125, `red_zone_touchdown_weight_bonus` 0.435, `red_zone_gain_stiffening` 0.7,
+`drive_success_offense_sensitivity` 0.3, `drive_success_defense_sensitivity` 0.45.
+
+**Pregame VALIDATION 2025 (644 games, 300 seeds, production's own build_projection):**
+| gate | result | detail |
+|---|---|---|
+| (a) objective >= 20% lower | PASS | production 588.99, candidate 457.65 (-22%) |
+| (b) no moment's abs z grows > 1 | **FAIL** | `ppd_weak` z -0.22 -> -2.09 (+1.86); `p_punt` +1.09 -> +2.15 (+1.06) |
+| (c) margin MAE | PASS | -0.089 [-0.175, +0.005] |
+| (d) total MAE | PASS | **-0.321 [-0.456, -0.176]** |
+| (e) home-win Brier | PASS | -0.0010 [-0.0032, +0.0013] |
+| (f) abs(sim - close) margin | PASS | -0.092 [-0.172, -0.005] |
+| (f) abs(sim - close) total | PASS | **-0.837 [-0.967, -0.708]** |
+=> **NOT SHIPPABLE** (all gates must pass). The candidate is materially better on totals (closer to the outcome AND
+the close) and on the scoring moments (p_td z +4.61 -> +1.06, p_td_rz +15.0 -> +12.6, total SD gap -8.1 -> -6.6),
+but under-scores WEAK offenses (ppd_weak) and over-punts -- likely the offense sensitivity at its 0.3 floor
+compressing the low end. NCAAF 2025 is now SPENT for pregame.
+
+**LIVE replay 2025 -- RETRACTED.** `scripts/football_scenario_replay.py` passed RAW SP+/PPA components to NCAAF's
+live function; the live tick (and pregame) feed `sp_offense_defense_rating` -- centred on the league means, scaled,
+defense NEGATED (points allowed -> strength). Both arms were graded on mis-scaled teams: production's own live
+errors read margin 22.8 / total 35.6 pts (projected Q1 totals of 114, margins of -99.7). The printed "LIVE GATES
+PASS" is NOT a reading. The 2024 dry run had the same defect and was accepted because it COMPLETED -- nobody
+checked its magnitudes. Fixed (replay uses `sp_offense_defense_rating`; a plausibility guard now voids the gates
+when production's own live total error exceeds 20 pts); re-checked on 2024 (21 games): production Brier 0.124,
+margin 7.2, total 7.9 -- sane. The invalid 2025 live files are kept as `*.INVALID_raw_sp_ratings`; the 2025 live
+marker exists. A corrected 2025 live re-run would be informational only (pregame already fails gate b).
