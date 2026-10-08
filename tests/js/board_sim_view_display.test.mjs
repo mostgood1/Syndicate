@@ -105,82 +105,8 @@ eq('agreement is not badged (a chip on every row is a chip nobody reads)',
 eq('exactly-zero edge is neutral, not endorsement', simBadgeText({ sim_view: 'neutral' }), null);
 eq('no model at all is never typeset as approval', simBadgeText({ sim_view: 'none' }), null);
 
-// --- the odds range filter ----------------------------------------------
-//
-// The board ranks on EV, and EV alone cannot pick a side -- so a longshot with
-// a fat nominal edge sorts to the top. `_SCORE_DEVIG_ABS_ERROR_FLOOR` already
-// stops the worst of that in the SCORE (a +6000 soccer h2h reached #1 on the
-// first production shortlist); this is the reader's own control over what
-// reaches their eyes.
-const ladderSrc = html.match(/const ODDS_LADDER = \[([\s\S]*?)\];/);
-if (!ladderSrc) throw new Error('ODDS_LADDER not found in ' + template);
-const LADDER = ladderSrc[1].split(',').map((s) => s.trim()).filter(Boolean).map(Number);
-
-const impliedProbability = (american) =>
-  american > 0 ? 100 / (american + 100) : -american / (-american + 100);
-
-console.log('\n--- the odds ladder is monotonic, which is what makes min/max mean anything ---');
-let monotonic = true;
-for (let i = 1; i < LADDER.length; i += 1) {
-  if (!(impliedProbability(LADDER[i]) < impliedProbability(LADDER[i - 1]))) monotonic = false;
-}
-eq('ascending odds == strictly descending implied probability', monotonic, true);
-eq('the ladder spans the decision band with real stops', LADDER.length >= 20, true);
-eq('both ends are open sentinels', LADDER[0] <= -100000 && LADDER[LADDER.length - 1] >= 100000, true);
-
-// Mirror of matchesOddsRange's core, over the REAL ladder read from the file.
-function inRange(price, minIdx, maxIdx) {
-  if (minIdx === 0 && maxIdx === LADDER.length - 1) return true;
-  if (!Number.isFinite(price)) return true;
-  return !(price < LADDER[minIdx] || price > LADDER[maxIdx]);
-}
-const LONGSHOT_CAP = LADDER.indexOf(300);
-const FULL = LADDER.length - 1;
-
-console.log('\n--- it removes longshots and keeps the decision band ---');
-eq('+6000 longshot is hidden at a +300 cap', inRange(6000, 0, LONGSHOT_CAP), false);
-eq('+250 survives a +300 cap', inRange(250, 0, LONGSHOT_CAP), true);
-eq('-110 survives a +300 cap', inRange(-110, 0, LONGSHOT_CAP), true);
-eq('a heavy -1000 favourite is hidden by a -300 floor',
-  inRange(-1000, LADDER.indexOf(-300), FULL), false);
-eq('nothing is hidden at the default full range', inRange(6000, 0, FULL), true);
-
-console.log('\n--- and it never hides an absence ---');
-eq('a row with no price survives a narrowed filter', inRange(NaN, 0, LONGSHOT_CAP), true);
-eq('null price survives too', inRange(Number(null ?? undefined), 0, LONGSHOT_CAP), true);
-
-// --- the default position must show EVERYTHING ---------------------------
-//
-// SHIPPED BROKEN, and this is the regression test for it. `clampOddsIndex`
-// guarded with `Number.isFinite`, but `urlParams.get("odds_max")` returns
-// `null` when the parameter is absent and `Number(null)` is `0` -- finite --
-// so the fallback never ran. On every normal visit (no URL params) oddsMax
-// came out 0 instead of 29, both handles pinned to the low sentinel, the
-// visible range collapsed to [-100000, -100000], and THE BOARD RENDERED BLANK.
-const clampSrc = extract('clampOddsIndex');
-const clampOddsIndex = (new Function(
-  `const ODDS_LADDER_MAX_DEFAULT = ${LADDER.length - 1};\n${clampSrc}\nreturn clampOddsIndex;`
-))();
-
-console.log('\n--- an ABSENT url param falls back, it does not read as index 0 ---');
-const noParams = new URLSearchParams('');
-eq('absent odds_max falls back to the open end',
-  clampOddsIndex(noParams.get('odds_max'), LADDER.length - 1), LADDER.length - 1);
-eq('absent odds_min falls back to the open end',
-  clampOddsIndex(noParams.get('odds_min'), 0), 0);
-eq('an EMPTY param falls back too (Number("") is also 0)',
-  clampOddsIndex(new URLSearchParams('odds_max=').get('odds_max'), LADDER.length - 1), LADDER.length - 1);
-eq('a real value is still honoured', clampOddsIndex('11', 0), 11);
-eq('garbage falls back rather than clamping to 0', clampOddsIndex('abc', LADDER.length - 1), LADDER.length - 1);
-eq('out-of-range clamps into the ladder', clampOddsIndex('999', 0), LADDER.length - 1);
-
-console.log('\n--- and the default position hides NOTHING ---');
-const defMin = clampOddsIndex(noParams.get('odds_min'), 0);
-const defMax = clampOddsIndex(noParams.get('odds_max'), LADDER.length - 1);
-eq('default range is the full ladder', `${defMin}..${defMax}`, `0..${LADDER.length - 1}`);
-for (const price of [-1000, -110, 100, 250, 6000]) {
-  eq(`a ${price > 0 ? '+' : ''}${price} row survives the default`, inRange(price, defMin, defMax), true);
-}
+// --- the odds range filter was REMOVED 2026-10-08 (user: "remove odds range
+// entirely", lane layer2-board-ui-redesign); its ladder/clamp tests went with it.
 
 // --- the alt-line filter -------------------------------------------------
 //

@@ -2258,21 +2258,34 @@ table.board-blotter tbody tr:last-child td {
   font-weight: 800;
 }
 
+/* ---- Layer 2 filter grid + results bar `[user 2026-10-08, lane layer2-board-ui-redesign]` ----
+   Every filter visible (no fold, no odds slider), each in a labelled group, each
+   option carrying the number of rows it would leave. A zero option is dimmed,
+   never hidden. */
+.board-filter-grid { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.board-filter-group { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.board-filter-group--wide { flex-basis: 100%; }
+.board-filter-group--wide .cards-tabs { border-radius: 18px; padding: 6px 8px; }
+.board-filter-label { flex: none; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--cards-text-dim); }
+.board-tab-count { display: inline-block; margin-left: 6px; padding: 2px 6px; border-radius: 999px; background: rgba(132, 166, 196, .16); color: var(--cards-text-dim); font-size: 10px; font-weight: 700; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.cards-tab.is-active .board-tab-count { background: rgba(6, 18, 28, .16); color: var(--cards-bg); }
+.cards-tab.is-empty { opacity: .45; }
+.board-filter-grid .board-clear-filters { margin-left: auto; }
 
-/* ---- odds range filter -------------------------------------------------
-   Sits inside the "More filters" disclosure beside the tab rows, so it has to
-   read as one of them rather than as a transplanted form control. Colours come
-   from the same variables the surrounding pills use; nothing here hard-codes a
-   value that would only work on one theme. */
-.board-odds-filter { display: flex; flex-direction: column; gap: .4rem; width: 100%; padding: .55rem .7rem;
-  border: 1px solid var(--card-border, rgba(255,255,255,.12)); border-radius: 10px;
-  background: var(--card-surface, rgba(255,255,255,.03)); }
-.board-odds-filter__head { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; }
-.board-odds-filter__label { font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; opacity: .75; }
-.board-odds-filter__readout { font-variant-numeric: tabular-nums; font-weight: 600; font-size: .82rem; }
-.board-odds-filter__row { display: grid; grid-template-columns: 4.6rem 1fr; align-items: center; gap: .6rem; font-size: .76rem; }
-.board-odds-filter__row input[type="range"] { width: 100%; accent-color: var(--accent, #6ea8fe); min-height: 1.5rem; }
-.board-odds-filter__row input[type="range"]:focus-visible { outline: 2px solid var(--accent, #6ea8fe); outline-offset: 3px; }
-/* The note explains a real behaviour (unpriced rows survive the filter), so it
-   must stay legible rather than decorative -- .6 is the floor here, not .4. */
-.board-odds-filter__note { margin: .1rem 0 0; font-size: .69rem; line-height: 1.4; opacity: .6; }
+.board-results-bar { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; margin-bottom: 10px; border-radius: 16px; border: 1px solid rgba(78, 205, 196, .35); background: rgba(15, 30, 47, .96); }
+.board-results-bar__head { font-size: 15px; color: var(--cards-text); }
+.board-results-bar__head strong { color: var(--cards-accent-strong); }
+.board-results-bar__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.board-results-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(78, 205, 196, .5); background: rgba(78, 205, 196, .1); color: var(--cards-text); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.board-results-chip:hover { border-color: var(--cards-accent-strong); }
+.board-results-chip__n { color: var(--cards-text-dim); font-variant-numeric: tabular-nums; }
+.board-results-bar__facts { font-size: 12px; color: var(--cards-text-dim); line-height: 1.5; }
+.board-freshness-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; margin-bottom: 14px; }
+
+@media (max-width: 720px) {
+  .board-filter-grid { flex-direction: column; align-items: stretch; gap: 8px; }
+  .board-filter-group { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .board-filter-group .board-tabs { width: 100%; }
+  .board-filter-grid .board-clear-filters { margin-left: 0; }
+  .board-freshness-row .cards-nav-pill[href="/intelligence/status"] { display: none; }
+}

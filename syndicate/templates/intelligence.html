@@ -16,8 +16,17 @@
      once per TTL per worker instead of once per request (see
      `blueprints/intelligence.py::cached_home_embed_json`; measured 2026-09-22, the
      build is ~7.6 s and the serialisation is not the cost). The `tojson` branch
-     stays for every other caller of this template, which passes the object. #}
-  <script id="initial-intelligence-response" type="application/json">{% if initial_intelligence_response_json %}{{ initial_intelligence_response_json }}{% else %}{{ initial_intelligence_response | default({}) | tojson }}{% endif %}</script>
+     stays for every other caller of this template, which passes the object.
+
+     `| safe` IS LOAD-BEARING. `_embed_json_text` returns a plain `str` of
+     `htmlsafe_json_dumps` output (already escaped for a <script> block: <, >, &
+     and ' are \u-escaped), and Jinja autoescape escaped it AGAIN -- every `"`
+     became `&#34;`, `JSON.parse` failed on the first byte, and from 2026-09-22
+     (ebd17ee2) to 2026-10-08 every visit downloaded a 68 MB embed it threw away
+     and sat on "Loading board…" until the /api/intelligence/query fetch landed.
+     Found by lane layer2-board-ui-redesign; pinned by
+     tests/test_layer2_board_ui_redesign.py. #}
+  <script id="initial-intelligence-response" type="application/json">{% if initial_intelligence_response_json %}{{ initial_intelligence_response_json | safe }}{% else %}{{ initial_intelligence_response | default({}) | tojson }}{% endif %}</script>
 
   <form id="board-toolbar" class="cards-control-card board-toolbar">
     <div class="board-toolbar-row">
@@ -28,55 +37,31 @@
         <button type="submit" class="cards-submit-button">Refresh</button>
       </div>
     </div>
-    <div class="board-toolbar-row">
-      <div class="board-tabs cards-tabs" id="board-state-tabs" role="tablist" aria-label="Game state filter"></div>
-      <div style="display:flex; gap:8px; align-items:center;">
-        <div id="board-freshness-chip" class="board-chip" hidden></div>
-        <div id="board-refresh-status" class="board-refresh-status" role="status" aria-live="polite"></div>
-        <a class="cards-nav-pill" href="/intelligence/status">Data coverage</a>
-      </div>
-    </div>
-    <!-- Sport, day and game-state stay visible; the rest fold away. Six
-         stacked rails put ~25 buttons above the content on a phone, which
-         is most of a viewport before a single opportunity is visible. The
-         disclosure opens itself whenever a filter is actually active, so a
-         narrowed board never hides why it is narrow. -->
-    <div class="board-toolbar-row">
-      <details id="board-more-filters" class="board-more-filters">
-        <summary class="board-more-filters__summary">
-          <span>More filters</span>
-          <span id="board-filter-count" class="board-filter-count" hidden></span>
-        </summary>
-        <div class="board-more-filters__body">
-          <div class="board-tabs cards-tabs" id="board-market-tabs" role="tablist" aria-label="Market family filter"></div>
-          <div class="board-tabs cards-tabs" id="board-edge-tabs" role="tablist" aria-label="Minimum edge filter"></div>
-          <div class="board-tabs cards-tabs" id="board-lane-tabs" role="tablist" aria-label="Board lane"></div>
-          <div class="board-tabs cards-tabs" id="board-view-tabs" role="tablist" aria-label="Board view"></div>
-          <div class="board-tabs cards-tabs" id="board-steam-tabs" role="tablist" aria-label="Steam move filter"></div>
-          <div class="board-tabs cards-tabs" id="board-alt-tabs" role="tablist" aria-label="Alternate line filter"></div>
-          <div class="board-tabs cards-tabs board-tabs--wrap" id="board-bettype-tabs" role="tablist" aria-label="Bet type filter"></div>
-          <div class="board-odds-filter" id="board-odds-filter">
-            <div class="board-odds-filter__head">
-              <span class="board-odds-filter__label">Odds range</span>
-              <output id="board-odds-filter-readout" class="board-odds-filter__readout" for="board-odds-min board-odds-max"></output>
-            </div>
-            <label class="board-odds-filter__row">
-              <span>Shortest</span>
-              <input type="range" id="board-odds-min" min="0" max="29" step="1" value="0" aria-label="Shortest odds to show">
-            </label>
-            <label class="board-odds-filter__row">
-              <span>Longest</span>
-              <input type="range" id="board-odds-max" min="0" max="29" step="1" value="29" aria-label="Longest odds to show">
-            </label>
-            <p class="board-odds-filter__note">Hides prices outside the range. Rows with no posted price are never hidden by this filter &mdash; an unpriced row is not a longshot.</p>
-          </div>
-          <button type="button" id="board-clear-filters" class="cards-nav-pill board-clear-filters" hidden>Clear filters</button>
-        </div>
-      </details>
+    <!-- EVERY FILTER IS VISIBLE `[user 2026-10-08, lane layer2-board-ui-redesign]`.
+         The "More filters" fold and the odds-range slider are gone. Each option
+         shows how many rows it would leave given every OTHER filter
+         (`filterOptionCount`), so a click that would empty the board says so
+         before it is made; a zero option is dimmed, never hidden. -->
+    <div class="board-filter-grid">
+      <div class="board-filter-group"><span class="board-filter-label">State</span><div class="board-tabs cards-tabs" id="board-state-tabs" role="tablist" aria-label="Game state filter"></div></div>
+      <div class="board-filter-group"><span class="board-filter-label">Market</span><div class="board-tabs cards-tabs" id="board-market-tabs" role="tablist" aria-label="Market family filter"></div></div>
+      <div class="board-filter-group"><span class="board-filter-label">Period</span><div class="board-tabs cards-tabs" id="board-period-tabs" role="tablist" aria-label="Full game or game intervals"></div></div>
+      <div class="board-filter-group"><span class="board-filter-label">Edge</span><div class="board-tabs cards-tabs" id="board-edge-tabs" role="tablist" aria-label="Minimum edge filter"></div></div>
+      <div class="board-filter-group"><span class="board-filter-label">Lines</span><div class="board-tabs cards-tabs" id="board-alt-tabs" role="tablist" aria-label="Alternate line filter"></div></div>
+      <div class="board-filter-group"><span class="board-filter-label">Show</span><div class="board-tabs cards-tabs" id="board-lane-tabs" role="tablist" aria-label="Board lane"></div></div>
+      <div class="board-filter-group"><span class="board-filter-label">Moves</span><div class="board-tabs cards-tabs" id="board-steam-tabs" role="tablist" aria-label="Steam move filter"></div></div>
+      <div class="board-filter-group"><span class="board-filter-label">Layout</span><div class="board-tabs cards-tabs" id="board-view-tabs" role="tablist" aria-label="Board view"></div></div>
+      <div class="board-filter-group board-filter-group--wide"><span class="board-filter-label">Bet type</span><div class="board-tabs cards-tabs board-tabs--wrap" id="board-bettype-tabs" role="tablist" aria-label="Bet type filter"></div></div>
+      <button type="button" id="board-clear-filters" class="cards-nav-pill board-clear-filters" hidden>Clear filters</button>
     </div>
   </form>
 
-  <div id="board-summary-strip" class="board-summary-strip" hidden></div>
+  <section id="board-summary-strip" class="board-results-bar" aria-live="polite" hidden></section>
+  <div class="board-freshness-row">
+    <div id="board-freshness-chip" class="board-chip" hidden></div>
+    <div id="board-refresh-status" class="board-refresh-status" role="status" aria-live="polite"></div>
+    <a class="cards-nav-pill" href="/intelligence/status">Data coverage</a>
+  </div>
 
   {#
     SAY WHAT THIS BOARD ACTUALLY IS.
@@ -212,121 +197,44 @@
   ];
   const EDGE_TABS = [
     { value: "0", label: "Any edge" },
+    // "+EV": any positive edge. 0.01 (a hundredth of a percent) rather than a
+    // separate flag so it rides the existing `minEdge` comparison.
+    { value: "0.01", label: "+EV" },
     { value: "3", label: "3%+" },
     { value: "5", label: "5%+" },
     { value: "8", label: "8%+" },
   ];
-  // THE ODDS LADDER. Discrete stops, NOT a linear numeric range, and the
-  // difference is the whole design.
+  // THE ODDS-RANGE SLIDER WAS REMOVED 2026-10-08 `[user: "lets remove odds range
+  // entirely", lane layer2-board-ui-redesign]`, with its ladder, URL params and
+  // tests. Stale `?odds_min=`/`?odds_max=` links are ignored.
+
+  // PERIOD: full game vs game intervals `[user 2026-10-08: "add a filter for Full
+  // Game vs Game intervals when it comes to game lines"]`.
   //
-  // American odds run from about -2000 to +10000 on this board. A linear
-  // slider over that span puts ~90% of its travel in the region between
-  // -2000 and -300 -- prices almost nobody filters on -- and compresses the
-  // entire -110..+300 band, which is where essentially every real decision
-  // is made, into a few pixels. So the slider moves over an INDEX into this
-  // ladder and every stop is a round number a bettor recognises.
-  //
-  // WHY MIN/MAX IS EVEN WELL-DEFINED ON AMERICAN ODDS: the range (-100, +100)
-  // is empty, so ascending numeric order is exactly descending implied
-  // probability -- -1000 (90.9%), -110 (52.4%), +110 (47.6%), +6000 (1.6%).
-  // "Shortest" is therefore the low end and "longest" the high end with no
-  // special-casing around zero. `board_sim_view_display.test.mjs` asserts that
-  // monotonicity rather than trusting this comment.
-  //
-  // The two ends are deliberate sentinels well outside any real price, so the
-  // default range excludes nothing and reads as "Any".
-  const ODDS_LADDER = [
-    -100000, -1000, -600, -400, -300, -250, -200, -175, -150, -130, -120, -110,
-    100, 110, 120, 130, 150, 175, 200, 250, 300, 400, 500, 750, 1000, 1500,
-    2000, 3000, 5000, 100000,
+  // A row says which part of the game it prices in one of TWO places, and a
+  // filter that read only one would silently file the other as "full game":
+  //   * `segment` -- first1/first3/first5/first7, h1/h2, q1-q4, p1-p3, with
+  //     null/"full"/"full_game"/"game" meaning the whole game
+  //     (`layer2_board.py::_segment_label`);
+  //   * a market-key suffix on rows that carry no `segment` --
+  //     `totals_1st_5_innings`, `spreads_q1`, `h2h_h1`, `h2h_1h`, `_p2`, the
+  //     same forms `kalshi_catalogue.py::segment_for_board_row` resolves.
+  // Player props are never "intervals" -- the filter is about game lines, and a
+  // prop's market name (`player_pass_tds`) carries no period.
+  const PERIOD_TABS = [
+    { value: "all", label: "All" },
+    { value: "full", label: "Full game" },
+    { value: "intervals", label: "Game intervals" },
   ];
-  const ODDS_LADDER_MIN_DEFAULT = 0;
-  const ODDS_LADDER_MAX_DEFAULT = ODDS_LADDER.length - 1;
+  const FULL_GAME_SEGMENTS = new Set(["", "full", "full_game", "game", "fg"]);
+  const SEGMENT_SUFFIX_RE = /_(?:1st_\d+_innings?|1st_inning|q[1-4]|h[12]|[12]h|p[1-3]|first_?\d+)$/;
 
-  function clampOddsIndex(raw, fallback) {
-    // ABSENT IS NOT ZERO, and conflating them shipped a BLANK BOARD.
-    //
-    // `urlParams.get("odds_max")` returns `null` when the parameter is not
-    // there, and `Number(null)` is `0` -- a finite number -- so the
-    // `Number.isFinite` guard accepted it and the fallback never ran. With no
-    // URL params at all (i.e. every normal visit) `oddsMax` came out 0 instead
-    // of 29, both handles pinned to the low sentinel, and the visible range
-    // collapsed to [-100000, -100000]. Every row on the board failed it.
-    //
-    // `Number("")` is 0 too, so an empty parameter had the same effect.
-    // Checked as a STRING first for that reason: only a non-empty string is a
-    // value the caller actually supplied.
-    if (raw === null || raw === undefined) return fallback;
-    const text = String(raw).trim();
-    if (!text) return fallback;
-    const n = Number(text);
-    if (!Number.isFinite(n)) return fallback;
-    return Math.min(ODDS_LADDER_MAX_DEFAULT, Math.max(0, Math.round(n)));
-  }
-
-  function oddsFilterIsNarrowed() {
-    return state.oddsMin > ODDS_LADDER_MIN_DEFAULT || state.oddsMax < ODDS_LADDER_MAX_DEFAULT;
-  }
-
-  function matchesOddsRange(item) {
-    if (!oddsFilterIsNarrowed()) return true;
-    const price = Number(item.odds ?? item.odds_current);
-    // AN UNPRICED ROW IS NOT A LONGSHOT. A missing price cannot satisfy a
-    // price constraint, but hiding it would be the silent drop this board
-    // refuses everywhere else -- those rows already render "pending market"
-    // and the reader can see exactly what they are. The filter removes prices
-    // it can read and outside the range; it never removes an absence.
-    if (!Number.isFinite(price)) return true;
-    // Ascending numeric American odds == descending implied probability (the
-    // (-100, +100) gap is empty), so this needs no special case around zero.
-    if (price < ODDS_LADDER[state.oddsMin]) return false;
-    if (price > ODDS_LADDER[state.oddsMax]) return false;
-    return true;
-  }
-
-  function renderOddsFilter() {
-    const minInput = document.getElementById("board-odds-min");
-    const maxInput = document.getElementById("board-odds-max");
-    const readout = document.getElementById("board-odds-filter-readout");
-    if (!minInput || !maxInput) return;
-    minInput.max = String(ODDS_LADDER_MAX_DEFAULT);
-    maxInput.max = String(ODDS_LADDER_MAX_DEFAULT);
-    minInput.value = String(state.oddsMin);
-    maxInput.value = String(state.oddsMax);
-    if (readout) {
-      readout.textContent = oddsFilterIsNarrowed()
-        ? `${oddsLadderLabel(state.oddsMin)} to ${oddsLadderLabel(state.oddsMax)}`
-        : "Any price";
-    }
-    if (minInput.dataset.bound === "1") return;
-    minInput.dataset.bound = "1";
-    maxInput.dataset.bound = "1";
-    const commit = (which) => (event) => {
-      const value = clampOddsIndex(event.target.value, which === "min" ? 0 : 29);
-      // THE HANDLES MUST NOT CROSS. Letting them pass through each other gives
-      // an empty inverted range that looks like "the board has no rows" --
-      // exactly the unexplained-empty-board failure this page keeps paying for.
-      // The pushed handle moves with the dragged one instead.
-      if (which === "min") {
-        state.oddsMin = value;
-        if (state.oddsMax < value) state.oddsMax = value;
-      } else {
-        state.oddsMax = value;
-        if (state.oddsMin > value) state.oddsMin = value;
-      }
-      syncUrlState();
-      renderOddsFilter();
-      updateFilterDisclosure();
-      renderBoardBody();
-    };
-    minInput.addEventListener("input", commit("min"));
-    maxInput.addEventListener("input", commit("max"));
-  }
-
-  function oddsLadderLabel(index) {
-    if (index <= ODDS_LADDER_MIN_DEFAULT || index >= ODDS_LADDER_MAX_DEFAULT) return "Any";
-    const value = ODDS_LADDER[index];
-    return value > 0 ? `+${value}` : String(value);
+  function isIntervalRow(item) {
+    if (!item || typeof item !== "object") return false;
+    const segment = String(item.segment || "").trim().toLowerCase();
+    if (!FULL_GAME_SEGMENTS.has(segment)) return true;
+    const market = String(item.market || item.market_key || "").trim().toLowerCase();
+    return SEGMENT_SUFFIX_RE.test(market);
   }
 
   const STEAM_TABS = [
@@ -391,12 +299,12 @@
     }
     const tabs = [...counts.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .map(([key, n]) => ({ value: key, label: `${betTypeLabel(key)} (${n})` }));
+      .map(([key, n]) => ({ value: key, label: betTypeLabel(key), count: n }));
     // The current selection is kept even at zero, so a filter combination that
     // empties it does not silently reset to "All" and hide why the board is
     // blank.
     if (state.betType !== "all" && !counts.has(state.betType)) {
-      tabs.unshift({ value: state.betType, label: `${betTypeLabel(state.betType)} (0)` });
+      tabs.unshift({ value: state.betType, label: betTypeLabel(state.betType), count: 0 });
     }
     return [{ value: "all", label: "All bet types" }, ...tabs];
   }
@@ -634,10 +542,8 @@
     gameState: urlParams.get("game_state") || "all",
     marketFamily: urlParams.get("market_family") || "all",
     minEdge: Number(urlParams.get("min_edge") || 0) || 0,
-    // Indices into ODDS_LADDER, clamped on read: a hand-edited or stale URL
-    // must not put the slider off its own scale and silently empty the board.
-    oddsMin: clampOddsIndex(urlParams.get("odds_min"), 0),
-    oddsMax: clampOddsIndex(urlParams.get("odds_max"), 29),
+    // Full game vs game intervals (PERIOD_TABS). "all" by default.
+    period: ["full", "intervals"].includes(String(urlParams.get("period") || "")) ? urlParams.get("period") : "all",
     // An explicit ?view= always wins. Otherwise the default is
     // viewport-dependent: the blotter is an 11-column table with a
     // min-width of 880px, which on a 390px phone is a 2.3x horizontal
@@ -817,8 +723,10 @@
     if (state.gameState && state.gameState !== "all") url.searchParams.set("game_state", state.gameState); else url.searchParams.delete("game_state");
     if (state.marketFamily && state.marketFamily !== "all") url.searchParams.set("market_family", state.marketFamily); else url.searchParams.delete("market_family");
     if (state.minEdge > 0) url.searchParams.set("min_edge", String(state.minEdge)); else url.searchParams.delete("min_edge");
-    if (state.oddsMin > ODDS_LADDER_MIN_DEFAULT) url.searchParams.set("odds_min", String(state.oddsMin)); else url.searchParams.delete("odds_min");
-    if (state.oddsMax < ODDS_LADDER_MAX_DEFAULT) url.searchParams.set("odds_max", String(state.oddsMax)); else url.searchParams.delete("odds_max");
+    if (state.period !== "all") url.searchParams.set("period", state.period); else url.searchParams.delete("period");
+    // The odds range is gone; drop its params from old shared links.
+    url.searchParams.delete("odds_min");
+    url.searchParams.delete("odds_max");
     if (state.view && state.view !== "blotter") url.searchParams.set("view", state.view); else url.searchParams.delete("view");
     if (state.lane && state.lane !== "opportunity") url.searchParams.set("lane", state.lane); else url.searchParams.delete("lane");
     if (state.game && state.game !== "all") url.searchParams.set("game", state.game); else url.searchParams.delete("game");
@@ -834,9 +742,13 @@
   function renderTabs(containerId, tabs, activeValue, onSelect) {
     const container = document.getElementById(containerId);
     if (!container) return;
-    container.innerHTML = tabs.map((tab) => `
-      <button type="button" class="cards-tab${tab.value === activeValue ? " is-active" : ""}" data-tab-value="${escapeHtml(tab.value)}">${escapeHtml(tab.label)}</button>
-    `).join("");
+    container.innerHTML = tabs.map((tab) => {
+      const active = tab.value === activeValue;
+      const hasCount = typeof tab.count === "number";
+      const empty = hasCount && tab.count === 0 && !active;
+      const count = hasCount ? `<span class="board-tab-count">${escapeHtml(tab.count.toLocaleString())}</span>` : "";
+      return `<button type="button" class="cards-tab${active ? " is-active" : ""}${empty ? " is-empty" : ""}" data-tab-value="${escapeHtml(tab.value)}"${empty ? ' title="No rows under the other filters you have set"' : ""}>${escapeHtml(tab.label)}${count}</button>`;
+    }).join("");
     container.querySelectorAll("[data-tab-value]").forEach((button) => {
       button.addEventListener("click", () => onSelect(button.getAttribute("data-tab-value")));
     });
@@ -893,158 +805,146 @@
     decorateSportTabs();
   }
 
+  // HOW MANY ROWS AN OPTION WOULD LEAVE, given every OTHER filter as set.
+  // Implemented by applying the option to `state`, counting through the very
+  // predicates the board renders with, and restoring -- so a count can never
+  // disagree with what clicking the option shows. ~35 passes over the slate per
+  // filter change.
+  function filterOptionCount(patch) {
+    const saved = {};
+    for (const key of Object.keys(patch)) saved[key] = state[key];
+    Object.assign(state, patch);
+    let n = 0;
+    try {
+      for (const item of lastRenderItems) {
+        if (matchesFilters(item) && matchesClientFilters(item) && matchesLane(item)) n += 1;
+      }
+    } finally {
+      Object.assign(state, saved);
+    }
+    return n;
+  }
+
+  function withCounts(tabs, toPatch) {
+    return tabs.map((tab) => ({ ...tab, count: filterOptionCount(toPatch(tab.value)) }));
+  }
+
+  function rerenderAfterFilter() {
+    syncUrlState();
+    renderFilterTabs();
+    renderBoardBody();
+  }
+
   function renderFilterTabs() {
-    // Sport and game-state tabs used to call loadIntelligence({forceRefresh:
-    // true}) here -- a full server round trip. Two problems: (1) the board
-    // already fetches every sport/lane in one shot (recommendations/
-    // top_opportunities cover everything), so lastRenderItems already has
-    // what a tab click needs; (2) intelligenceQueryPayload used to vary the
-    // "question" text and add sport/game_state fields whenever a non-"all"
-    // tab was active, which changed the request's cache key -- the
-    // pre-warmed "top edges today" snapshot the background worker keeps
-    // fresh was never a hit for that key, so every tab click fell through
-    // to a slow, sometimes-empty-mid-compute cold path. Filtering
-    // client-side (matchesFilters, same as the market/min-edge tabs below
-    // already do via matchesClientFilters) makes tab switches instant and
-    // removes the dependence on that cold path entirely.
-    // #93 follow-up: day tabs are now a client-side refinement too, same as
-    // sport/game-state below -- the default "All" fetch already contains
-    // every currently-relevant date (see read_combined_intelligence_response
-    // server-side), so Today/Tomorrow/All just narrow lastRenderItems via
-    // matchesClientFilters' date clause instead of triggering a new
-    // /api/intelligence/query round trip. The free-text #board-date input
-    // (below, in the DOM) is the one remaining path that still does a real
-    // server fetch -- it's the explicit override for a date outside the
-    // warm window, which genuinely isn't in lastRenderItems yet.
+    // Every filter here is a client-side refinement over the one combined fetch
+    // (#93): switching never re-queries the server. The free-text #board-date
+    // input is the one control that does -- it is the explicit override for a
+    // date outside the warm window.
     const activeDayValue = _currentDayTabValue();
-    renderTabs("board-day-tabs", DAY_TABS, activeDayValue, (value) => {
+    renderTabs("board-day-tabs", withCounts(DAY_TABS, (v) => ({ date: _dayFilterDate(v) || "" })), activeDayValue, (value) => {
       const tab = DAY_TABS.find((candidate) => candidate.value === value);
       if (!tab) return;
       const nextDate = tab.date || "";
       if (nextDate === (state.date || "") && !state.explicitDateOverride) return;
       state.date = nextDate;
       state.explicitDateOverride = false;
-      // The day tab deliberately CLEARS the #board-date input rather than
-      // filling it. That input means "explicit server-side override" and the
-      // toolbar submit reads its value back as exactly that; writing a tab's
-      // date into it made the next Refresh click silently escalate a
-      // client-side tab into a server fetch that leaves the combined board.
+      // The day tab CLEARS #board-date rather than filling it: that input means
+      // "explicit server-side override", and filling it made the next Refresh
+      // silently escalate a client-side tab into a fetch off the combined board.
       const dateInput = document.getElementById("board-date");
       if (dateInput) dateInput.value = "";
-      syncUrlState();
-      renderFilterTabs();
-      renderBoardBody();
+      rerenderAfterFilter();
     });
-    renderTabs("board-sport-tabs", SPORT_TABS, state.sport, (value) => {
+    renderTabs("board-sport-tabs", withCounts(SPORT_TABS, (v) => ({ sport: v })), state.sport, (value) => {
       state.sport = value;
-      syncUrlState();
-      renderFilterTabs();
-      renderBoardBody();
+      rerenderAfterFilter();
     });
     decorateSportTabs();
-    renderTabs("board-state-tabs", STATE_TABS, state.gameState, (value) => {
+    renderTabs("board-state-tabs", withCounts(STATE_TABS, (v) => ({ gameState: v })), state.gameState, (value) => {
       state.gameState = value;
-      syncUrlState();
-      renderFilterTabs();
-      renderBoardBody();
+      rerenderAfterFilter();
     });
-    // Market family, min-edge, and view are client-side refinements over
-    // whatever the server already returned for the current sport/lane --
-    // they re-render from lastRenderItems instead of re-querying the board.
-    renderTabs("board-market-tabs", MARKET_TABS, state.marketFamily, (value) => {
+    renderTabs("board-market-tabs", withCounts(MARKET_TABS, (v) => ({ marketFamily: v })), state.marketFamily, (value) => {
       state.marketFamily = value;
-      syncUrlState();
-      renderFilterTabs();
-      renderBoardBody();
+      rerenderAfterFilter();
     });
-    renderTabs("board-edge-tabs", EDGE_TABS, String(state.minEdge), (value) => {
+    renderTabs("board-period-tabs", withCounts(PERIOD_TABS, (v) => ({ period: v })), state.period, (value) => {
+      state.period = value;
+      rerenderAfterFilter();
+    });
+    renderTabs("board-edge-tabs", withCounts(EDGE_TABS, (v) => ({ minEdge: Number(v) || 0 })), String(state.minEdge), (value) => {
       state.minEdge = Number(value) || 0;
-      syncUrlState();
-      renderFilterTabs();
-      renderBoardBody();
+      rerenderAfterFilter();
     });
+    // Layout is a display preference, not a filter: no counts.
     renderTabs("board-view-tabs", VIEW_TABS, state.view, (value) => {
       state.view = value;
-      syncUrlState();
-      renderFilterTabs();
-      renderBoardBody();
+      rerenderAfterFilter();
     });
-    renderTabs("board-lane-tabs", LANE_TABS, state.lane, (value) => {
+    renderTabs("board-lane-tabs", withCounts(LANE_TABS, (v) => ({ lane: v })), state.lane, (value) => {
       state.lane = value;
-      syncUrlState();
-      renderFilterTabs();
-      renderBoardBody();
+      rerenderAfterFilter();
     });
-    renderTabs("board-alt-tabs", ALT_LINE_TABS, state.altLines, (value) => {
+    // Always a full re-render (rerenderAfterFilter), never a partial update:
+    // the active state is baked in at render time, and a handler that skipped
+    // the re-render once left the old button highlighted -- the filter WORKED
+    // and looked broken.
+    renderTabs("board-alt-tabs", withCounts(ALT_LINE_TABS, (v) => ({ altLines: v })), state.altLines, (value) => {
       state.altLines = value;
-      syncUrlState();
-      // `renderFilterTabs()`, NOT `updateFilterDisclosure()`. The tab row's
-      // active state is baked in at render time by `renderTabs`, so a handler
-      // that mutates state without re-rendering leaves the old button
-      // highlighted forever -- the filter WORKED and looked broken, which is
-      // worse than not working. Every other handler in this function calls it;
-      // this one did not.
-      renderFilterTabs();
-      renderBoardBody();
+      rerenderAfterFilter();
     });
     renderTabs("board-bettype-tabs", betTypeTabs(), state.betType, (value) => {
       state.betType = value;
-      syncUrlState();
-      renderFilterTabs();
-      renderBoardBody();
+      rerenderAfterFilter();
     });
-    renderTabs("board-steam-tabs", STEAM_TABS, state.steamOnly ? "steam" : "all", (value) => {
+    renderTabs("board-steam-tabs", withCounts(STEAM_TABS, (v) => ({ steamOnly: v === "steam" })), state.steamOnly ? "steam" : "all", (value) => {
       state.steamOnly = value === "steam";
-      syncUrlState();
-      renderFilterTabs();
-      renderBoardBody();
+      rerenderAfterFilter();
     });
-    renderOddsFilter();
     updateFilterDisclosure();
   }
 
-  // Which of the folded-away controls are actually narrowing the board.
-  // `view` is deliberately excluded -- it is a display preference, not a
-  // filter, and counting it would claim the board is narrowed when it is
-  // not.
+  // EVERY filter that is removing rows right now, INCLUDING the two defaults
+  // that do (Opportunities-only and Main-lines-only). The old count left those
+  // out, which is how the strip could read "778 hidden by 0 filters" (user
+  // 2026-10-08). `open` is the patch that stops the filter hiding anything --
+  // used by the chip's x and to say how many rows each filter alone removes.
+  // `view` is excluded: it is a display preference, not a filter.
   function activeRefinements() {
-    const active = [];
-    if (state.marketFamily && state.marketFamily !== "all") active.push("market");
-    if (state.minEdge > 0) active.push("edge");
-    if (oddsFilterIsNarrowed()) active.push("odds");
-    if (state.steamOnly) active.push("steam");
-    if (state.altLines !== "main") active.push("alt");
-    if (state.betType !== "all") active.push("bet_type");
-    return active;
+    const out = [];
+    const label = (tabs, value) => ((tabs.find((t) => t.value === value) || {}).label || value);
+    if (state.sport !== "all") out.push({ key: "sport", text: label(SPORT_TABS, state.sport), open: { sport: "all" } });
+    if (state.game !== "all") out.push({ key: "game", text: "One game", open: { game: "all" } });
+    if (state.gameState !== "all") out.push({ key: "state", text: label(STATE_TABS, state.gameState), open: { gameState: "all" } });
+    if (state.marketFamily !== "all") out.push({ key: "market", text: label(MARKET_TABS, state.marketFamily), open: { marketFamily: "all" } });
+    if (state.period !== "all") out.push({ key: "period", text: label(PERIOD_TABS, state.period), open: { period: "all" } });
+    if (state.minEdge > 0) out.push({ key: "edge", text: label(EDGE_TABS, String(state.minEdge)), open: { minEdge: 0 } });
+    if (state.altLines !== "all") out.push({ key: "alt", text: label(ALT_LINE_TABS, state.altLines), open: { altLines: "all" } });
+    if (state.lane !== "all") out.push({ key: "lane", text: label(LANE_TABS, state.lane), open: { lane: "all" } });
+    if (state.steamOnly) out.push({ key: "steam", text: "Steam moves only", open: { steamOnly: false } });
+    if (state.betType !== "all") out.push({ key: "bet_type", text: betTypeLabel(state.betType), open: { betType: "all" } });
+    return out;
+  }
+
+  // The defaults a fresh visit lands on. Clear returns here (keeping the day),
+  // so Clear never throws a reader onto the 5,000-row everything-board.
+  const FILTER_DEFAULTS = {
+    sport: "all", game: "all", gameState: "all", marketFamily: "all", period: "all",
+    minEdge: 0, altLines: "main", lane: "opportunity", steamOnly: false, betType: "all",
+  };
+
+  function filtersAtDefault() {
+    return Object.keys(FILTER_DEFAULTS).every((key) => state[key] === FILTER_DEFAULTS[key]);
   }
 
   function updateFilterDisclosure() {
-    const count = activeRefinements().length;
-    const badge = document.getElementById("board-filter-count");
-    if (badge) {
-      badge.textContent = String(count);
-      badge.hidden = count === 0;
-    }
     const clearButton = document.getElementById("board-clear-filters");
-    if (clearButton) clearButton.hidden = count === 0;
-    const disclosure = document.getElementById("board-more-filters");
-    // Only ever force it OPEN, never closed: a board narrowed by a filter
-    // must not hide the reason it looks empty. Closing is left to the user
-    // so their choice is not undone on the next re-render.
-    if (disclosure && count > 0 && !disclosure.open) disclosure.open = true;
+    if (clearButton) clearButton.hidden = filtersAtDefault();
   }
 
   function clearRefinements() {
-    state.marketFamily = "all";
-    state.minEdge = 0;
-    state.oddsMin = ODDS_LADDER_MIN_DEFAULT;
-    state.oddsMax = ODDS_LADDER_MAX_DEFAULT;
-    state.steamOnly = false;
-    state.altLines = "main";
-    state.betType = "all";
-    syncUrlState();
-    renderFilterTabs();
-    renderBoardBody();
+    Object.assign(state, FILTER_DEFAULTS);
+    rerenderAfterFilter();
   }
 
   function setRefreshStatus(message, tone) {
@@ -1875,12 +1775,11 @@
     // "Steam moves only", which is the one view where they must never
     // disappear.
     if (state.minEdge > 0 && !isSteamCandidate(item) && edgeValue(item) * 100 < state.minEdge) return false;
-    // THE ODDS RANGE, and note it does NOT exempt steam the way min-edge does.
-    // That asymmetry is deliberate and the reasons are different: edgeValue()
-    // defaults a steam row to 0, so a min-edge filter would hide every steam
-    // row as an ARTEFACT of the default. A steam row's PRICE is real, and a
-    // +6000 steam longshot is exactly what this filter exists to remove.
-    if (!matchesOddsRange(item)) return false;
+    if (state.period !== "all") {
+      const interval = isIntervalRow(item);
+      if (state.period === "full" && interval) return false;
+      if (state.period === "intervals" && !interval) return false;
+    }
     if (state.steamOnly && !isSteamCandidate(item)) return false;
     if (state.altLines !== "all") {
       const alt = isAltLine(item);
@@ -4397,56 +4296,86 @@
     `).join("");
   }
 
-  // THE STRIP DESCRIBED THE SLATE, NOT THE VIEW. `lane_counts` comes from the
-  // server and never moved when a filter did, so "12 live · 88 pregame" sat
-  // above a board narrowed to nine rows and quietly contradicted it. A reader
-  // cannot tell a filter that hid 90 rows from a slate that only had ten.
+  // THE RESULTS BAR `[user 2026-10-08: "way more informative ... giving us
+  // numbers by filter"]`. It replaced a strip that read "468 of 5435 pregame ·
+  // 778 hidden by 0 filters": the 5,435 was every day in the window (not the
+  // day on screen), and the hidden count included the default Opportunities and
+  // Main-lines filters, which the filter count did not.
   //
-  // Now it reports BOTH, and only says "of N" when the two differ -- an
-  // unfiltered board should not grow noise to state that nothing is hidden.
+  // Everything here is counted through the same predicates the board renders
+  // with (`filterOptionCount`), so no number can drift from what is on screen:
+  //   * "Showing N of M": M is the selected day with NO filter applied.
+  //   * one chip per filter that is narrowing the board, with the number of rows
+  //     it ALONE removes (rows that come back if only that filter is cleared) --
+  //     the chips do not sum to M-N when filters overlap, and that is honest;
+  //   * what is left, split by sport, by props vs game lines, and by sim view.
   let lastSummaryData = null;
+
+  function dayLabelForSummary() {
+    if (!state.date) return "all days";
+    if (state.date === TODAY_ISO) return "today";
+    if (state.date === TOMORROW_ISO) return "tomorrow";
+    const date = new Date(`${state.date}T12:00:00`);
+    return Number.isNaN(date.getTime()) ? state.date
+      : new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric" }).format(date);
+  }
+
+  function isPropRow(item) {
+    const candidateType = String(item.candidate_type || item.type || item.kind || "").trim().toLowerCase();
+    return candidateType === "prop" || Boolean(item.player_name || item.player_id);
+  }
 
   function renderSummaryStrip(data) {
     if (data) lastSummaryData = data;
     const payload = lastSummaryData;
     const container = document.getElementById("board-summary-strip");
     if (!container || !payload) return;
-    const boardContract = payload.boardContract || {};
-    const laneCounts = boardContract.lane_counts || {};
-    const parts = [];
-    if (boardContract.board_summary && boardContract.board_summary.headline) {
-      parts.push(boardContract.board_summary.headline);
-    }
 
-    // Counted over the SAME pipeline the board renders, so the numbers cannot
-    // drift from what is on screen.
-    const dateFiltered = lastRenderItems.filter(matchesDateFilter);
+    const dayTotal = lastRenderItems.filter(matchesDateFilter).length;
     const shown = lastRenderItems.filter(matchesFilters).filter(matchesClientFilters).filter(matchesLane);
-    const liveShown = shown.filter((item) => itemMarketState(item) === "live").length;
-    const pregameShown = shown.length - liveShown;
+    const fmt = (n) => Number(n || 0).toLocaleString();
 
-    const withTotal = (label, visible, total) => (
-      typeof total === "number" && total !== visible
-        ? `${visible} of ${total} ${label}`
-        : `${visible} ${label}`
-    );
-    parts.push(withTotal("live", liveShown, laneCounts.live));
-    parts.push(withTotal("pregame", pregameShown, laneCounts.pregame));
+    const chips = activeRefinements().map((refinement) => {
+      const removed = Math.max(0, filterOptionCount(refinement.open) - shown.length);
+      return `<button type="button" class="board-results-chip" data-clear-filter="${escapeHtml(refinement.key)}" title="Remove this filter${removed ? ` (brings back ${fmt(removed)})` : ""}">`
+        + `${escapeHtml(refinement.text)}${removed ? ` <span class="board-results-chip__n">−${fmt(removed)}</span>` : ""} <span aria-hidden="true">×</span></button>`;
+    });
 
-    // The one number that says a filter is doing something. Shown only when it
-    // is, and it names the CAUSE rather than leaving the reader to infer it.
-    const hidden = dateFiltered.length - shown.length;
-    if (hidden > 0) {
-      const active = activeRefinements();
-      parts.push(`${hidden} hidden by ${active.length} filter${active.length === 1 ? "" : "s"}`);
+    const bySport = new Map();
+    let props = 0;
+    let live = 0;
+    const sim = { agrees: 0, contradicts: 0, disagrees: 0 };
+    for (const item of shown) {
+      const sport = String(item.sport_slug || item.sport || "other").toUpperCase();
+      bySport.set(sport, (bySport.get(sport) || 0) + 1);
+      if (isPropRow(item)) props += 1;
+      if (itemMarketState(item) === "live") live += 1;
+      const view = String(item.sim_view || "").replace(/^live_/, "");
+      if (view in sim) sim[view] += 1;
     }
-    if (payload.parlays && payload.parlays.length) parts.push(`${payload.parlays.length} parlays`);
-    if (!parts.length) {
-      container.hidden = true;
-      return;
-    }
+    const sportText = [...bySport.entries()].sort((a, b) => b[1] - a[1])
+      .map(([sport, n]) => `${sport} ${fmt(n)}`).join(" · ");
+    const facts = [];
+    if (sportText) facts.push(sportText);
+    if (shown.length) facts.push(`props ${fmt(props)} · game lines ${fmt(shown.length - props)}`);
+    if (live) facts.push(`${fmt(live)} live`);
+    if (shown.length) facts.push(`sim agrees ${fmt(sim.agrees)} · contradicts ${fmt(sim.contradicts)} · disagrees ${fmt(sim.disagrees)}`);
+    if (payload.parlays && payload.parlays.length) facts.push(`${fmt(payload.parlays.length)} parlays`);
+
     container.hidden = false;
-    container.innerHTML = parts.map((part) => `<span class="board-chip">${escapeHtml(part)}</span>`).join("");
+    container.innerHTML = `
+      <div class="board-results-bar__head">Showing <strong>${fmt(shown.length)}</strong> of ${fmt(dayTotal)} plays · ${escapeHtml(dayLabelForSummary())}</div>
+      ${chips.length ? `<div class="board-results-bar__chips">${chips.join("")}</div>` : ""}
+      ${facts.length ? `<div class="board-results-bar__facts">${escapeHtml(facts.join("  ·  "))}</div>` : ""}
+    `;
+    container.querySelectorAll("[data-clear-filter]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const refinement = activeRefinements().find((r) => r.key === button.getAttribute("data-clear-filter"));
+        if (!refinement) return;
+        Object.assign(state, refinement.open);
+        rerenderAfterFilter();
+      });
+    });
   }
 
   function renderIntelligence(response) {
@@ -4463,6 +4392,10 @@
     // slice of what was already returned.
     lastRenderItems = data.topOpportunities.length ? data.topOpportunities : data.recommendations;
     renderBoardBody();
+    // AFTER renderBoardBody: the per-option counts read the alt-line groups it
+    // rebuilds. Without this the counts (and the bet-type list, which had the
+    // same gap) stayed at whatever the first, pre-data render computed.
+    renderFilterTabs();
     renderPortfolio(data);
     renderParlays(data);
     renderSummaryStrip(data);
