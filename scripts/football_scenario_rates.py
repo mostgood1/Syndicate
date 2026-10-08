@@ -450,7 +450,9 @@ def cmd_fetch(args) -> None:
     print(f"CFBD calls this run: {calls}")
 
 
-def ncaaf_tasks(seasons: List[int], seeds: int) -> List[Dict[str, Any]]:
+def ncaaf_tasks(seasons: List[int], seeds: int, blend_k: Optional[float] = None) -> List[Dict[str, Any]]:
+    """`blend_k` overrides the in-season blend's prior-weight constant k (w = n / (n + k); re-fit v4 lever);
+    None = the generator's own default, exactly as before."""
     from scripts import backtest_ncaaf_lines_props as H
     work = ncaaf_prepare_work()
     _ncaaf_env(work)
@@ -467,7 +469,8 @@ def ncaaf_tasks(seasons: List[int], seeds: int) -> List[Dict[str, Any]]:
                 if not p.exists():
                     raise SystemExit(f"missing {p}; run `fetch` first")
                 rows.extend(json.loads(p.read_text(encoding="utf-8")))
-            index, _ = gen.inseason_blend_index(prior, rows, by_id, beta=H.BLEND_BETA_ASOF_2025)
+            kw = {} if blend_k is None else {"k": float(blend_k)}
+            index, _ = gen.inseason_blend_index(prior, rows, by_id, beta=H.BLEND_BETA_ASOF_2025, **kw)
             means = gen.sp_league_means(index)
             for g in games:
                 if int(g.get("week") or 0) != week or not _final(g) or g.get("seasonType") != "regular":

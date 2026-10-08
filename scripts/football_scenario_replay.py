@@ -148,7 +148,8 @@ def _init(sport: str, arg: str, candidate: Dict[str, Any]) -> None:
         F._ncaaf_init(arg, {})
         from syndicate.features.ncaaf import live_resim as L
         from syndicate.features.football.sim_engine.smartsim2.ncaaf_calibration_profile import NCAAF_CALIBRATION_PROFILE as P
-    _W.update(sport=sport, L=L, arms={"production": P, "candidate": dataclasses.replace(P, **candidate)})
+    from scripts.football_scenario_refit_v4 import profile_part
+    _W.update(sport=sport, L=L, arms={"production": P, "candidate": dataclasses.replace(P, **profile_part(candidate))})
 
 
 def _ratings(task: Dict[str, Any]):
@@ -171,7 +172,8 @@ def _ratings(task: Dict[str, Any]):
 
 def replay_game(task: Dict[str, Any]) -> Dict[str, Any]:
     L, sport = _W["L"], _W["sport"]
-    ho, hd, ao, ad = _ratings(task)
+    ratings = {"production": _ratings(task),
+               "candidate": _ratings(task["cand_task"]) if task.get("cand_task") else _ratings(task)}
     rows = []
     for st in task["states"]:
         cls = L.NflLiveGameState if sport == "nfl" else L.NcaafLiveGameState
@@ -180,6 +182,7 @@ def replay_game(task: Dict[str, Any]) -> Dict[str, Any]:
                     distance=st["distance"], field_position=st["field_position"], possession_owner=st["owner"])
         rec = {"q": st["q"]}
         for arm, prof in _W["arms"].items():
+            ho, hd, ao, ad = ratings[arm]
             if sport == "nfl":
                 res = L.resim_live_game(state, home_offense=ho, home_defense=hd, away_offense=ao, away_defense=ad,
                                         sims=SIMS, profile=prof, env={"SYNDICATE_NFL_LIVE_RESIM": "1"}, rating_sd=0.0)
@@ -214,6 +217,15 @@ def cmd_run(args) -> None:
         marker.write_text(time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), encoding="utf-8")
     candidate = json.loads((out / "descent_result.json").read_text(encoding="utf-8"))["overrides"]
     tasks = (F.nfl_tasks if sport == "nfl" else F.ncaaf_tasks)([season], SIMS)
+    from scripts import football_scenario_refit_v4 as V4
+    if sport == "ncaaf" and any(k in candidate for k in V4.INPUT_LEVERS):
+        from scripts import generate_smartsim2_ncaaf_projections as gen
+        p4 = V4.p4_norm_set(season, gen.norm)
+        k = candidate.get("blend_k")
+        ctasks = {str(t["game_id"]): t for t in F.ncaaf_tasks([season], SIMS,
+                  blend_k=None if k in (None, V4.DEFAULTS_V4["blend_k"]) else float(k))}
+        tasks = [dict(t, cand_task=V4.apply_input_levers(ctasks[str(t["game_id"])], candidate, p4))
+                 for t in tasks if str(t["game_id"]) in ctasks]
     if args.every > 1:
         tasks = tasks[:: args.every]
     ids = {str(t["game_id"]) for t in tasks}

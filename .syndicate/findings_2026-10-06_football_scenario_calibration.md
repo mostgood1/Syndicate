@@ -535,3 +535,9 @@ are complete; fresh CFBD games / PPA for 2026 into a PRIVATE root (shared mirror
 L1-L3 on the CORRECTED live harness (plausibility guard on), after a dry run whose production magnitudes are checked.
 Gate to the read: the fitted objective must be <= 0.8 x production's on FIT (amendment 2). Output
 `C:\tmp\football_scenarios\ncaaf\refit_v4\`.
+
+**v4 amendment 1 (2026-10-08, BEFORE any v4 run):** the pre-registration's `blend_beta` named the wrong parameter --
+in `inseason_blend_index`, `beta` is the PPA-to-points SCALE; the in-season weight is w = n / (n + k) with
+`INSEASON_BLEND_K` = 2.0 (half weight on in-season data after 2 games). The early-season lever is therefore
+**`blend_k` in {0.5, 1, 2, 4, 8}** (production 2), letting the data choose the direction (smaller = trust early games
+sooner, larger = lean on the prior season longer). `beta` stays at the harness value. Nothing else changes.
