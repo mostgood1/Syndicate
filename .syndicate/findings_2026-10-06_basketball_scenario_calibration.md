@@ -529,3 +529,47 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
 - **Sweep points (12 dates, J1 levers in both):**
   - C = J1 control, re-run now: the same-time baseline, and the run-noise measure vs the existing J1 sweep point.
   - T = J1 + team_prior_stacks_on_target = 0.
+
+## Phase 2 #1d — PORT THE WNBA ENGINE FIXES TO NBA, PRE-REGISTERED 2026-10-08 (user: "run these"), BEFORE any code change
+
+**Scope:** the six WNBA engine commits of 2026-10-01 not present in the NBA engine.
+- **8fd37ff3** SHOOTER_FT_RATE: free throws follow the shooter's own foul-drawing.
+- **c0d406d3** FOULED_MISS_NOT_FGA + EXACT_TARGET_CALIBRATION (`_solve_eff_mult` / `_loop_points_per_possession` /
+  `_loop_shot_share`). Its TEAM_PRIOR_STACKS_ON_TARGET is already ported as an NBA cfg field (b08aeb72).
+- **9f561ca3** TOV_PER_ATTEMPT: p_tov per shot iteration. Its wrapper half (PRIOR_BLEND_MISSING_RECENT_IS_ABSENT)
+  is league-wide and already applies to NBA.
+- **863e9e09** PLAYER_REBOUND_CREDIT.
+- **cbb14a73** BLOCK_MODE.
+- **4ec1fd72** BLOCK_ALLOC_BY_RATE.
+- 066ac9ea was reverted upstream (80bdd00c) and is NOT ported.
+
+**Implementation rules:**
+- Module-level switches with the WNBA names. NBA default = today's behaviour, so the port is byte-identical (seeded
+  sha256 HEAD vs patched, with team_adj and targets present). Each switch must be reachable (off != on), with tests
+  mirroring the WNBA tests.
+- Constants the WNBA fitted on WNBA data are RE-FITTED on NBA FIT-window ESPN boxes (2025-11-01..2026-02-28,
+  regular season). They are never copied: player OREB per own miss, DREB per opponent miss, block rate on missed
+  2PA, and any other league-fitted rate in these commits. VALIDATION is untouched.
+- The harness gets `--engine-flag NAME=VALUE`, which sets module switches on the real events module per run, with
+  the same LEVER_FAIL / reachability-count discipline as `--lever`.
+- The compact draw records team FGM, 3PM, FTM, REB, BLK, STL and AST. The real extractor adds the same from the
+  cached ESPN summaries (no new fetch).
+
+**Measurement:**
+- Same 12 dates / 87 games, 200 draws, nice 19. Run AFTER #1c reads, on top of its chosen stacking state.
+- Points: control vs all six switches ON jointly. The WNBA shipped them together and they interact: EXACT
+  calibration solves against the loop that SHOOTER_FT_RATE and FOULED_MISS_NOT_FGA define. Then a leave-one-out only
+  for any switch whose own target row does not move.
+- Per-switch target rows, team per game, sim vs real (FIT, same 87 games):
+  - FOULED_MISS_NOT_FGA: FGA and FG%.
+  - EXACT_TARGET_CALIBRATION: team points vs the anchored target; |bias| < 1 pt.
+  - SHOOTER_FT_RATE: FTA (team) and the FTA concentration on the top-2 shooters. The latter needs a player-level
+    reading, so if it cannot be read it is labelled UNREAD, not passed.
+  - TOV_PER_ATTEMPT: TOV.
+  - PLAYER_REBOUND_CREDIT: REB.
+  - BLOCK_MODE / BLOCK_ALLOC_BY_RATE: BLK.
+- Pass per row: the sim moves toward real by more than run noise (C vs prior J1 point, same config).
+- Guards: S8 total/margin, S3, S5, S1 pace do not move AWAY from real by more than run noise.
+- **Adoption:** none from this step. The combined config goes to the end-of-Phase-2 VALIDATION read, and the user
+  decides. The vendor change goes upstream to mostgood1/NBA-Betting (CLAUDE.md: a vendor-only fix is reverted by
+  the next re-pull).
