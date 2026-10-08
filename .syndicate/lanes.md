@@ -1698,6 +1698,44 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **COUNT-SHAPE FIX, PRE-REGISTERED 2026-10-08 ~15:30Z (user: "yes, build it and ship if it passes"), before any code:**
+  - BASE = production now (6cd415f3: the combined calibration + hr_rate_mult 1.5 + its maps).
+  - ENGINE: `PitchModelConfig.count_outcome_mult` {"b-s": {ball, called, swing, foul, inplay: mult}}, multiplied into the outcome weights immediately before pitch_model's normalisation.
+    - Default {} = byte-identical, proven on seeded games before use.
+  - STEP 1, TABLE (measured, IPF). Real per-count outcome shares from cached StatsAPI pbp of the FIT games.
+    - Model shares from pbp="pitch" replays at the base config, 2 sims/game.
+    - Update per cell: mult *= (real share / model share), shrunk toward 1 by n/(n+2000) on the real pitch count.
+    - Then clamp to [0.2, 5]. 4 rounds. HBP untouched.
+  - STEP 2, LEVER RE-FIT with the table fixed. Coordinate descent, 2 passes from the base, 60 sims, on the window first half. Grids:
+    - `k_logit_bias` {0, -0.15, +0.15}
+    - `bb_ball_bias_mult` {1.05, 0.9, 1.2}
+    - `base_in_play` {0.23, 0.20, 0.26}
+    - `early_count_foul_boost` {1.5, 1.0, 2.05}
+    - `two_strike_extra_foul_prob` {0.04, 0.0, 0.12}
+    - `starter_hook_add_pitches` {-13, -10, -16, -19}
+    - Objective = 13 moments + pitches/start (scale 2.0).
+  - STEP 3, MAPS: the 19 hitter-prop maps re-fit on FIT at the final config (the same procedure as before).
+  - DATA:
+    - FIT = June-fit rosters 06-15..07-12 (stored-input rebuild, 311 games; table only) + window first half 07-16..08-21 (table + levers + maps).
+    - HOLDOUT = window second half 08-22..09-27 (495 games). **Disclosed: already read in pooled evaluations, never used to fit count shape.**
+    - JUNE GUARD = June validation set 05-30..06-14.
+  - SHIP only if ALL hold, final config vs base:
+    - HOLDOUT, read once:
+      - (1) the per-count mix distance halves -- sum over the 12 counts and 5 outcomes of real_reach x (model_share - real_share)^2;
+      - (2) |pitches/PA gap| halves;
+      - (3) the 13-moment objective is no worse;
+      - (4) no moment's |z| grows > 1.0;
+      - (5) starter |SO|, |H|, |BB|, |ER|, |outs| bias each worsen <= 0.10;
+      - (6) |runs gap| no worse;
+      - (7) pooled hitter-prop log-loss no worse (200 sims, each arm with its own maps).
+    - JUNE GUARD:
+      - (8) starter |SO| and |outs| bias each worsen <= 0.15, and |runs gap| <= the base's + 0.15.
+    - Otherwise ship nothing.
+  - SHIP MECHANICS:
+    - engine code (table support);
+    - the table + lever values in the pitch-model / manager forward overrides, with provenance;
+    - the re-fit maps;
+    - fleet ff (no restart), V1 + V2, deploys.md, an upstream PR addition.
 - **HR ship correction + weather check 2026-10-08:** 11 maps were re-fit at 1.5, not 12: hits 1/2/3+, hr_1plus, rbi 3+, runs 2/3+, TB 1-4+. Weather does NOT explain the June spike. Open-air game-time mean temperature: Jun 77.9F, Jul 80.1F, Aug 79.5F, Sep 75.4F. June was cooler than Jul/Aug yet had the most HR (.0343 vs .0320/.0290). The model weather HR mult already tracks temperature (1.011 / 1.020 / 1.030 / 1.012).
 - **USER OVERRIDE, LOGGED 2026-10-08 -- user, verbatim: "yes, set HR to 1.5 and scope the count-shape fix".**
   - The pre-registered HR re-fit FAILED checks 4 (outs +0.166), 6 (June runs gap 1.340) and 7 (June HR z -3.70). Shipping 1.5 is the user's decision, made with the cause disclosed: June 2026 was a league-wide HR spike (.0343 vs season .0303), not predictable as-of, and 1.5 fits the rest of the season (holdout runs gap 0.691 -> 0.116, HR z +4.76 -> -0.05).
@@ -1982,7 +2020,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
     - Pass -> build 07-16..09-27 into ~/asof_out_statsapi (never the production root). Fail -> stop and report.
   - The June dates in this gate are already spent, so the gate only tests source fidelity.
 - Goal: A StatsAPI-only as-of rebuild of MLB 2026-07-16..09-27 (74 dates, 984 games): scripts/mlb_asof_roster_build.py gains --source statsapi (schedule + live-feed probables/context + an as-of lineup projection from prior boxscores, option B), admitted only if its pre-registered June fidelity gate passes, then built into a scratch root for use as fresh validation/fit data
-- Files: scripts/mlb_asof_roster_build.py, scripts/mlb_asof_lineup_projection.py (NEW), tests/test_mlb_asof_roster_build.py, tests/test_mlb_asof_lineup_projection.py (NEW), .syndicate/findings_2026-10-07_mlb_statsapi_asof_rebuild_scope.md, vendor/mlb_bettingv2/sim_engine/data/build_roster.py (stamina recency ONLY), vendor/mlb_bettingv2/sim_engine/data/recency.py, tests/test_mlb_stamina_recency.py (NEW), vendor/mlb_bettingv2/data/tuning/pitch_model_overrides/forward_start_2026_04_14_v1.json, vendor/mlb_bettingv2/data/tuning/manager_pitching_overrides/forward_start_2026_04_14_v1.json, vendor/mlb_bettingv2/data/tuning/hitter_props_calibration/default.json, vendor/mlb_bettingv2/data/tuning/hitter_hr_calibration/default.json, .syndicate/findings_2026-10-08_mlb_count_shape_scope.md (NEW)
+- Files: scripts/mlb_asof_roster_build.py, scripts/mlb_asof_lineup_projection.py (NEW), tests/test_mlb_asof_roster_build.py, tests/test_mlb_asof_lineup_projection.py (NEW), .syndicate/findings_2026-10-07_mlb_statsapi_asof_rebuild_scope.md, vendor/mlb_bettingv2/sim_engine/data/build_roster.py (stamina recency ONLY), vendor/mlb_bettingv2/sim_engine/data/recency.py, tests/test_mlb_stamina_recency.py (NEW), vendor/mlb_bettingv2/data/tuning/pitch_model_overrides/forward_start_2026_04_14_v1.json, vendor/mlb_bettingv2/data/tuning/manager_pitching_overrides/forward_start_2026_04_14_v1.json, vendor/mlb_bettingv2/data/tuning/hitter_props_calibration/default.json, vendor/mlb_bettingv2/data/tuning/hitter_hr_calibration/default.json, .syndicate/findings_2026-10-08_mlb_count_shape_scope.md (NEW), vendor/mlb_bettingv2/sim_engine/pitch_model.py (count_outcome_mult ONLY), tests/test_mlb_count_shape.py (NEW)
 - Hypothesis: H1: an as-of lineup projection (most frequent prior lineup vs the starter's hand) reproduces production's Rotowire projections closely enough that a June rebuild from StatsAPI alone replays to the same moments as the stored-input rebuild within the earlier gate's tolerances
 - Falsification test: Any gate moment beyond max(2 game-clustered paired SE, tolerance) on 06-15..07-12 -> the source is not admitted; report and stop
 - Verification: Fidelity table (statsapi-source vs stored-input rebuild, June) then per-date coverage of the 07-16..09-27 build
