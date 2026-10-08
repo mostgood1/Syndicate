@@ -169,7 +169,15 @@ SOG@2.5 -0.55, SOG@3.5 -0.35, GOALS@0.5 -0.26 (n.s.). Playoffs: SOG@3.5 -1.09 be
 (13,161): BLOCKS@1.5 +1.11 worse, everything else n.s. Ship rule (ASSISTS and POINTS@0.5 better, nothing worse)
 NOT met. Engine pinned to 25957671 for every arm (467a2a92 turns the roster shot-volume blend on; not tested here).
 
-## 8. PK units (found, not fixed)
+## 7d. Recency-weighted rate C20 -> candidate D (2026-10-08, user override of the offline falsification)
+
+Offline (official PP time, 2025-26 from 11-01): C20 = own-games EWM half-life 20 x league trailing-20-day ratio;
+held-out Jan-Apr ratio 1.012 (production 1.061), April 1.084. Engine (386 games): PP time 1.491 -> 1.043x real; after
+shot re-fit (pp 1.2917 / pk 0.4557) PP goals 1.027, PP SOG 1.023; EV scales 0.9177 / 1.0064 to production level.
+Props vs PRODUCTION (pk minutes + roster blend), held-out Jan-Apr regular: ASSISTS@0.5 +0.38, POINTS@0.5 +0.84 (not
+better), elite ASSISTS@0.5 +3.45 [+0.45,+6.69] and POINTS@0.5 +4.47 [+0.44,+8.52] WORSE. Ship rule NOT met.
+
+## 8. PK units (FIXED and shipped in lane nhl-pk-units, 2026-10-07) (found, not fixed)
 
 PK1 skaters ~88% of team PK time (6.0 sim vs 2.1-2.5 real PK min/game), PK2 0.15 vs 0.42 share, skaters
 outside the PK units 0 vs 0.06-0.14 -- the fixed-unit defect PP had before af737b31.
