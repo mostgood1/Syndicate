@@ -969,6 +969,10 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # NBA / WNBA: what each team allows to G/F/C per game, one table per
     # (season, phase) -- regular season and playoffs never mixed (~9 s).
     ScheduledJob("basketball-defense-vs-position", 11, 0, ("scripts/build_basketball_defense_vs_position.py",)),
+    # NHL this-season team table for explanations ONLY (user 2026-10-08: "advanced
+    # data that includes this season"): writes nhl_team_season_to_date_<season>.csv,
+    # never a `<stem>_<season>.csv` the sim loaders prefer. Cached payloads: ~3 requests a new game.
+    ScheduledJob("nhl-season-to-date", 11, 5, ("scripts/build_nhl_season_to_date.py",)),
 )
 
 

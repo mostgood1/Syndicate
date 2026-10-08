@@ -286,8 +286,25 @@ def _read_rows(path: Path | None) -> list[dict[str, str]]:
         return []
 
 
-def _team_table(name: str) -> tuple[dict[str, dict[str, float]], Path | None]:
-    path = C.first_existing(LOCAL_DIR, f"processed/{name}")
+def _nhl_season(selected_date: str | None) -> str | None:
+    try:
+        year, month = int(str(selected_date)[:4]), int(str(selected_date)[5:7])
+    except (TypeError, ValueError):
+        return None
+    start = year if month >= 9 else year - 1
+    return f"{start}-{start + 1}"
+
+
+def _team_table(name: str, selected_date: str | None = None) -> tuple[dict[str, dict[str, float]], Path | None]:
+    """A team table by its `_latest` name, THIS season's file first (user 2026-10-08: use
+    advanced data that includes this season). `<stem>_<season>.csv` is the in-season
+    blend production's sim reads (team xG from the first game, the rest from Nov 1)."""
+    season = _nhl_season(selected_date)
+    path = None
+    if season and name.endswith("_latest.csv"):
+        path = C.first_existing(LOCAL_DIR, f"processed/{name[: -len('_latest.csv')]}_{season}.csv")
+    if path is None or not Path(path).is_file():
+        path = C.first_existing(LOCAL_DIR, f"processed/{name}")
     out: dict[str, dict[str, float]] = {}
     for row in _read_rows(path):
         abbr = str(row.get("abbr") or "").strip().upper()
@@ -684,12 +701,29 @@ def _matchup(subject: PropSubject, market: NhlMarket | None, line: float | None,
         add(f"Penalties committed per game ({opponent})", special, opponent, "committed_per_game", True, "1 = most PP chances")
         if market is None or market.code == "SOG":
             add(f"Shot-block rate index ({opponent})", special, opponent, "block_rate_index", True, "1 = blocks most")
+    season_table, _ = teams.get("nhl_team_season_to_date", ({}, None))
+    now = season_table.get(opponent) or {}
+    if now.get("games"):
+        n = C.fmt_num(now.get("games"), 0)
+        if role == "goalie" or (market is not None and market.code == "BLOCKS"):
+            add(f"xG for per game ({opponent}, this season, {n} GP)", season_table, opponent, "xgf_pg", True, "1 = most dangerous")
+            add(f"Shots per game ({opponent}, this season, {n} GP)", season_table, opponent, "shots_pg", True, "1 = most shots", 1)
+        else:
+            add(f"xG against per game ({opponent}, this season, {n} GP)", season_table, opponent, "xga_pg", False, "1 = stingiest")
+            add(f"Goals against per game ({opponent}, this season, {n} GP)", season_table, opponent, "ga_pg", False, "1 = fewest")
+            add(f"Penalty kill % ({opponent}, this season, {n} GP)", season_table, opponent, "pk_pct", True, "1 = best PK")
     if profile:
         games = (xg.get(opponent) or special.get(opponent) or {}).get("games")
-        tables.append(table(f"Opponent profile — {opponent} (team_xg / team_rates / team_special_teams _latest, {C.fmt_num(games, 0)} games)",
+        sources = " / ".join(p.name for p in (teams[k][1] for k in ("team_xg_latest.csv", "team_rates_latest.csv",
+                                                                       "team_special_teams_latest.csv")) if p is not None)
+        tables.append(table(f"Opponent profile — {opponent} ({sources}; xG file covers {C.fmt_num(games, 0)} games)",
                             ["Measure", "Value", "League rank"], profile, Layer.MATCHUP))
+        xg_path = teams["team_xg_latest.csv"][1]
         facts["opponent_profile"] = {
-            "xg": xg.get(opponent), "rates": rates.get(opponent), "special_teams": special.get(opponent)}
+            "xg": xg.get(opponent), "rates": rates.get(opponent), "special_teams": special.get(opponent),
+            "xg_blended": bool(xg_path is not None and not xg_path.name.endswith("_latest.csv"))}
+        if now.get("games"):
+            facts["opponent_this_season"] = dict(now)
     if not tables:
         return absent(Layer.MATCHUP, f"{ABSENT_NO_MATCH}:no meetings with {opponent} and no team_xg/team_rates/team_special_teams row for {opponent}")
     return LayerEvidence(Layer.MATCHUP, tables=tables, facts=facts, source="nhl:player_game_stats+team_*_latest",
@@ -875,8 +909,11 @@ def build(subject: PropSubject) -> PropEvidence:
     predictions = pick_dated("predictions", subject)
     ident = _resolve_identity(subject, lineups)
     log = _game_log(subject, ident, market)
-    teams = {name: _team_table(name) for name in (
+    teams = {name: _team_table(name, subject.selected_date) for name in (
         "team_xg_latest.csv", "team_rates_latest.csv", "team_special_teams_latest.csv", "team_elo_latest.csv")}
+    season = _nhl_season(subject.selected_date)
+    if season:  # scripts/build_nhl_season_to_date.py -- display only, never a sim input
+        teams["nhl_team_season_to_date"] = _team_table(f"nhl_team_season_to_date_{season}.csv")
 
     player_sim = _player_sim(subject, market, line, props)
     evidence.set(player_sim)

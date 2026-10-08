@@ -89,8 +89,18 @@ def _opponent_detail(facts: Mapping[str, Any]) -> str | None:
     if isinstance(prof, Mapping):
         xg = prof.get("xg") if isinstance(prof.get("xg"), Mapping) else {}
         xga = _num(xg.get("xga60"))
+        now = facts.get("opponent_this_season") if isinstance(facts.get("opponent_this_season"), Mapping) else {}
+        now_xga, now_games = _num(now.get("xga_pg")), _num(now.get("games"))
+        this_season = ""
+        if now_xga is not None and now_games:
+            rank = now.get("xga_pg_rank")
+            rank_text = f", {int(_num(rank))} of 32 (1 = stingiest)" if _num(rank) is not None else ""
+            this_season = f"; this season {_fmt(now_xga, 2)} xG a game{rank_text}, {int(now_games)} GP"
         if xga is not None:
-            return f"{opponent} allows {_fmt(xga, 2)} xG/60"
+            blended = " (blended with this season)" if prof.get("xg_blended") else ""
+            return f"{opponent} allows {_fmt(xga, 2)} xG/60{blended}{this_season}"
+        if this_season:
+            return f"{opponent}{this_season[1:]}"
     # NCAAF: allowed_per_game + allowed_rank
     allowed = _num(facts.get("allowed_per_game"))
     if allowed is not None:

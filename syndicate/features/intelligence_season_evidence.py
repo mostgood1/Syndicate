@@ -243,6 +243,9 @@ class Table:
     rows: dict[str, dict[str, Any]] = field(default_factory=dict)
     sample_field: str | None = None
     note: str = ""
+    # appended to every metric label from this table, e.g. "this season" -- so a
+    # sentence mixing a season-to-date table with a full-season one says which is which
+    metric_suffix: str = ""
 
 
 def _newest_asof(paths: list[Path], stem_regex: str) -> Path | None:
@@ -323,16 +326,49 @@ def _basketball_tables(sport: str) -> list[Table]:
     ]
 
 
-def _nhl_tables() -> list[Table]:
+def _nhl_season_code(today: _dt.date) -> str:
+    start = today.year if today.month >= 9 else today.year - 1
+    return f"{start}-{start + 1}"
+
+
+def _nhl_tables(today: _dt.date) -> list[Table]:
+    """NHL season tables, THIS season first where it exists (user 2026-10-08: "utilize
+    advanced data that includes this season").
+
+    * `<stem>_<season>.csv` -- the in-season blend production's sim reads (lane
+      `nhl-season-inputs-in-season`: team xG from the first game, the other stems
+      from Nov 1) -- is preferred over the frozen `<stem>_latest.csv`. Its `games`
+      column counts THIS season's games while the value blends last season in, so
+      it carries no sample and says "blended" on the label.
+    * `nhl_team_season_to_date_<season>.csv` (scripts/build_nhl_season_to_date.py)
+      -- this season's raw numbers, labelled "this season", FIRST in order so the
+      sentence reads this season, then the blend, then last season's tables.
+    """
     canonical = _canonical("nhl")
+    season = _nhl_season_code(today)
     out: list[Table] = []
     for family, label, stem in (
-        ("team_xg", "Team expected goals (5v5-weighted)", "team_xg_latest.csv"),
-        ("team_special_teams", "Special teams", "team_special_teams_latest.csv"),
-        ("team_rates", "Shot and faceoff rates", "team_rates_latest.csv"),
-        ("team_elo", "Elo rating", "team_elo_latest.csv"),
+        ("team_season_to_date", f"This season to date ({season} regular season)", None),
+        ("team_xg", "Team expected goals (5v5-weighted)", "team_xg"),
+        ("team_special_teams", "Special teams", "team_special_teams"),
+        ("team_rates", "Shot and faceoff rates", "team_rates"),
+        ("team_elo", "Elo rating", "team_elo"),
     ):
-        paths = sorted(_glob_all("nhl", f"processed/{stem}"), key=lambda p: p.stat().st_mtime)
+        if stem is None:
+            paths = _glob_all("nhl", f"processed/nhl_team_season_to_date_{season}.csv")
+            table = _team_table("nhl", family, label, paths[0] if paths else None, key_field="abbr",
+                                canonical=canonical, sample_field="games")
+            table.metric_suffix = "this season"
+            out.append(table)
+            continue
+        current = sorted(_glob_all("nhl", f"processed/{stem}_{season}.csv"), key=lambda p: p.stat().st_mtime)
+        if current:
+            table = _team_table("nhl", family, f"{label}, last season blended with this season's games", current[-1],
+                                key_field="abbr", canonical=canonical, sample_field=None)
+            table.metric_suffix = "blended with this season"
+            out.append(table)
+            continue
+        paths = sorted(_glob_all("nhl", f"processed/{stem}_latest.csv"), key=lambda p: p.stat().st_mtime)
         sample = None if family == "team_elo" else "games"
         out.append(
             _team_table("nhl", family, label, paths[-1] if paths else None, key_field="abbr", canonical=canonical, sample_field=sample)
@@ -620,7 +656,7 @@ def _season_tables_uncached(sport: str, today: _dt.date) -> list[Table]:
     if sport in {"nba", "wnba"}:
         return _basketball_tables(sport)
     if sport == "nhl":
-        return _nhl_tables()
+        return _nhl_tables(today)
     if sport == "nfl":
         return _nfl_tables()
     if sport == "ncaaf":
@@ -641,6 +677,7 @@ _FAMILY_METRICS: dict[str, list[str]] = {
     "team_special_teams": ["PP%", "PK%"],
     "team_rates": ["Shots/60", "Faceoff win%"],
     "team_elo": ["Elo"],
+    "team_season_to_date": ["xG share", "Goals/game", "Goals against/game", "PP%", "PK%"],
     "team_epa": ["Offense EPA/play", "Defense EPA/play allowed"],
     "sp_plus": ["SP+ overall", "SP+ offense", "SP+ defense"],
     "team_ratings": ["Adjusted efficiency margin", "Adjusted offense", "Adjusted defense", "Tempo"],
@@ -732,6 +769,13 @@ _TEAM_METRICS: dict[str, list[MetricSpec]] = {
         MetricSpec("faceoff_win_pct", "faceoff_win_pct", "Faceoff win%", True, "pct1"),
     ],
     "team_elo": [MetricSpec("elo", "elo", "Elo", True, "int")],
+    "team_season_to_date": [
+        MetricSpec("xg_share", "std_xg_share", "xG share", True, "pct1"),
+        MetricSpec("gf_pg", "std_gf_pg", "Goals/game", True, "num2"),
+        MetricSpec("ga_pg", "std_ga_pg", "Goals against/game", False, "num2"),
+        MetricSpec("pp_pct", "std_pp_pct", "Power play", True, "pct1"),
+        MetricSpec("pk_pct", "std_pk_pct", "Penalty kill", True, "pct1"),
+    ],
     "team_epa": [
         MetricSpec("offense_epa", "offense_epa", "Offense EPA/play", True, "signed3"),
         MetricSpec("defense_epa", "defense_epa", "Defense EPA/play (higher = fewer allowed)", True, "signed3"),
@@ -944,9 +988,10 @@ def team_signals(sport: str, candidate: dict[str, Any], today: _dt.date) -> list
                 signals.append(
                     {
                         "key": f"{sport}_{spec.key}",
-                        "label": spec.label,
+                        "label": f"{spec.label} {table.metric_suffix}" if table.metric_suffix else spec.label,
                         "kind": "season_metric",
                         "family": table.family,
+                        "table_suffix": table.metric_suffix or None,
                         "side": side,
                         "is_pick_side": pick is not None and key == pick,
                         "team": _display_team(candidate, side),
@@ -1045,12 +1090,31 @@ def season_evidence_text(signals: list[dict[str, Any]], *, limit_metrics: int = 
         return ""
     by_key: dict[str, dict[str, dict[str, Any]]] = {}
     order: list[str] = []
+    family_of: dict[str, str] = {}
     for signal in signals:
         key = str(signal.get("key"))
         if key not in by_key:
             by_key[key] = {}
             order.append(key)
+            family_of[key] = str(signal.get("family") or "")
         by_key[key][str(signal.get("side"))] = signal
+    # One metric from each table before a second from any: with several tables
+    # (NHL: in-season blend, this season, last season) the head metric of each is
+    # what the sentence is for. Stable within a table.
+    seen_in: dict[str, int] = {}
+    position: dict[str, int] = {}
+    for key in order:
+        family = family_of[key]
+        position[key] = seen_in.get(family, 0)
+        seen_in[family] = position[key] + 1
+    # Current-season tables before last season's, so a stale table never crowds
+    # out a current one at the metric limit.
+    def _is_prior(key: str) -> bool:
+        return str(next(iter(by_key[key].values())).get("season_status")) in _STATUS_NOTE
+
+    order = sorted(order, key=lambda k: (_is_prior(k), position[k]))
+    shown_status = {_is_prior(k) for k in order[:limit_metrics]}
+    mixed = shown_status == {True, False}
     fragments: list[str] = []
     statuses: set[str] = set()
     for key in order[:limit_metrics]:
@@ -1063,18 +1127,25 @@ def season_evidence_text(signals: list[dict[str, Any]], *, limit_metrics: int = 
             rank_text = f" ({_ordinal(int(rank))} of {signal.get('of')})" if rank else ""
             return f"{signal.get('team')} {signal.get('display')}{rank_text}"
 
+        label = str(first.get("label"))
+        if mixed and _is_prior(key):
+            label += " (last season)"  # mixed sentence: tag the stale fragment, not the whole sentence
         if "player" in sides:
-            fragments.append(f"{first.get('label')} {one(sides['player'])}")
+            fragments.append(f"{label} {one(sides['player'])}")
         elif "away" in sides and "home" in sides:
-            fragments.append(f"{first.get('label')} {one(sides['away'])} vs {one(sides['home'])}")
+            fragments.append(f"{label} {one(sides['away'])} vs {one(sides['home'])}")
         else:
-            fragments.append(f"{first.get('label')} {one(first)}")
-    games = sorted({int(s["sample_games"]) for s in signals if s.get("sample_games")})
+            fragments.append(f"{label} {one(first)}")
+    shown = [s for key in order[:limit_metrics] for s in by_key[key].values()]
+    games = sorted({int(s["sample_games"]) for s in shown if s.get("sample_games")})
     sample = f", {games[0]}-{games[-1]} games" if len(games) > 1 else (f", {games[0]} games" if games else "")
-    pitches = [int(s["sample_pitches"]) for s in signals if s.get("sample_pitches")]
+    sampled_suffixes = {s.get("table_suffix") for s in shown if s.get("sample_games")}
+    if sample and sampled_suffixes == {"this season"}:
+        sample = sample.replace(", ", ", this season ", 1)
+    pitches = [int(s["sample_pitches"]) for s in shown if s.get("sample_pitches")]
     if pitches and not sample:
         sample = f", {pitches[0]:,} pitches"
-    caveat = "; ".join(_STATUS_NOTE[s] for s in sorted(statuses) if s in _STATUS_NOTE)
+    caveat = "" if mixed else "; ".join(_STATUS_NOTE[s] for s in sorted(statuses) if s in _STATUS_NOTE)
     head = f"Season metrics{sample}"
     if caveat:
         head += f" ({caveat})"
