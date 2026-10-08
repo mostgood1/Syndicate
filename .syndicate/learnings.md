@@ -3450,3 +3450,8 @@ own prior verdicts, not by anything failing.
 - **Why it hid:** live, the game has not been played, so every one of these is correct in production. Only a replay over past dates sees the future rows -- and the result looks like signal.
 - **How it was caught:** a per-row assertion "newest game used < sighting date" refused 2,269 / 2,269 WNBA rows and ~4,400 NHL rows on the first H3 pass. Without it the test would have scored on leaked outcomes.
 - **Rule:** a backtest that calls a production evidence/feature reader must (a) cut every history list at the decision time itself and (b) assert per row that the newest input predates it. Never infer point-in-time from a parameter name.
+
+## 2026-10-08 -- A FLEET READING TAKEN THROUGH `wsl` FROM A WORKTREE CWD CAN BE ABOUT THE WORKTREE: `git` in `bash -c 'cd ~/Syndicate && git ...'` answered for my Windows worktree (lane down-reaps-odds-jobs)
+
+- **What happened:** from Git Bash with cwd = `C:\tmp\syndicate-sessions\<lane>`, `wsl -d Ubuntu-24.04 -- bash -c 'cd /home/amyn/Syndicate && git merge-base --is-ancestor <sha> HEAD'` printed `fatal: not a git repository: /mnt/c/tmp/syndicate-sessions/<lane>/C:/.../.git/worktrees/<lane>` and my `|| echo no` turned it into "**fleet lacks the fix**". The truth, read via PowerShell `wsl --cd /home/amyn/Syndicate` from `C:\`, was `1884c0e5`, containing it. `env -u GIT_DIR ...` did not help, and `env | grep ^GIT_` was 0 on the good path.
+- **Rule:** read the fleet checkout with `wsl -d Ubuntu-24.04 --cd /home/amyn/Syndicate -- ...` from a neutral cwd (PowerShell, `Set-Location C:\`), or `git -C /home/amyn/Syndicate`, and NEVER fold a git error into a yes/no with `||`: print the sha, then decide.
