@@ -3398,3 +3398,9 @@ own prior verdicts, not by anything failing.
 - The rule going forward: a dry run is accepted only after its baseline arm's absolute numbers are checked against a known-sane reference (another sport, the pregame error, the book). Paired deltas between two arms fed the same broken input look perfectly normal -- they cannot reveal an input defect. Spending a held-out read on a dry run that was only checked for completion is FORBIDDEN.
 - Cost: the one-time NCAAF 2025 live read was spent on an invalid harness (pregame 2025 was valid and is reported); a corrected re-run is now informational only.
 - **Check, not just prose:** `football_scenario_replay.grade` now voids every gate when production's own live total abs error exceeds 20 pts (sane NFL/NCAAF values are ~7-8). The same pattern -- a plausibility band on the BASELINE arm, not the delta -- belongs in any paired harness before a held-out read.
+
+
+## 2026-10-08 -- RECURRENCE of 10-03 "pin the deploy to the HEAD you enumerated" `[lane nhl-pk-units, session dd07cae9]`
+
+- I read the ride-alongs 27424623..50910fb3, then ran `git merge --ff-only github/main` on the fleet; main had moved to fdf487f6 in the 20 minutes between, so one commit (prop_evidence read cache, off by default, inert without a restart) rode along unread and was only read after the fact.
+- **How to apply:** fast-forward the fleet to the exact SHA you enumerated (`git merge --ff-only <sha>`), never to a remote branch name; re-list ride-alongs if you change the target.
