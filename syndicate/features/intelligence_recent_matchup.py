@@ -595,6 +595,94 @@ def basketball_vs_position_text(row: Mapping[str, Any], opponent: str | None, *,
         return None
 
 
+# ------------------------------------------------------------ NHL vs position
+#
+# User 2026-10-08 (props must weigh "average stats allowed to players position"):
+# `scripts/build_nhl_defense_vs_position.py` writes
+# `nhl_source/data/processed/nhl_defense_vs_position_<season>_asof_<date>.json` --
+# per team, what opposing FORWARDS and DEFENSEMEN produce per game against it,
+# this season's regular season only, with ranks. Box-score names are
+# "R. Donato", so the player's position is matched on (first initial, surname)
+# and refused when two skaters share that key with different positions.
+
+_NHL_MARKET_STAT = {"sog": ("sog", "shots on goal"), "shots on goal": ("sog", "shots on goal"),
+                    "player_shots_on_goal": ("sog", "shots on goal"), "points": ("points", "points"),
+                    "player_points": ("points", "points"), "assists": ("assists", "assists"),
+                    "player_assists": ("assists", "assists"), "goals": ("goals", "goals"),
+                    "player_goals": ("goals", "goals"), "player_goal_scorer_anytime": ("goals", "goals")}
+_NHL_POSITION_WORD = {"F": "forwards", "D": "defensemen"}
+
+
+def _initial_surname(name: str) -> tuple[str, str] | None:
+    parts = [p for p in str(name or "").replace(".", ". ").split() if p]
+    if len(parts) < 2:
+        return None
+    return parts[0][0].lower(), " ".join(parts[1:]).lower().replace(".", "").strip()
+
+
+def _nhl_dvp_table(selected_date: str) -> Mapping[str, Any] | None:
+    import os
+    from pathlib import Path
+
+    from syndicate.features.shared.prop_evidence import common as C
+
+    try:
+        year, month = int(selected_date[:4]), int(selected_date[5:7])
+    except (TypeError, ValueError):
+        return None
+    start = year if month >= 9 else year - 1
+    override = str(os.environ.get("SYNDICATE_NHL_SOURCE_ROOT") or "").strip()
+    root = Path(override) if override else C.data_root() / "nhl_source"
+    directory = root / "data" / "processed"
+    pattern = f"nhl_defense_vs_position_{start}-{start + 1}_asof_*.json"
+    cache = C._READ_CACHE.get()
+    key = ("nhl_dvp", str(directory), pattern) if cache is not None else None
+    if key is not None and key in cache:
+        return cache[key]
+    files = sorted(directory.glob(pattern)) if directory.is_dir() else []
+    table = C.load_json(files[-1]) if files else None
+    table = table if isinstance(table, Mapping) else None
+    if table is not None:
+        index: dict[tuple[str, str], set[str]] = {}
+        for name, pos in (table.get("player_positions") or {}).items():
+            k = _initial_surname(name)
+            if k:
+                index.setdefault(k, set()).add(str(pos))
+        table = dict(table, _index=index)
+    if key is not None:
+        cache[key] = table
+    return table
+
+
+def nhl_vs_position_text(row: Mapping[str, Any], opponent: str | None, *, selected_date: str) -> str | None:
+    """'Vs position: BOS allows 20.8 shots on goal a game to forwards (rank 18 of 32, 1 = fewest; 4 games this season).'"""
+    try:
+        if not opponent:
+            return None
+        stat = _NHL_MARKET_STAT.get(str(row.get("market") or "").strip().lower())
+        table = _nhl_dvp_table(selected_date)
+        if stat is None or not table:
+            return None
+        k = _initial_surname(str(row.get("player_name") or ""))
+        positions = (table.get("_index") or {}).get(k) if k else None
+        if not positions or len(positions) != 1:
+            return None  # unknown or ambiguous (two skaters, two positions): never guessed
+        position = next(iter(positions))
+        team = str(opponent).strip().upper()
+        cell = (((table.get("teams") or {}).get(team) or {}).get(position) or {}).get(stat[0])
+        if not isinstance(cell, Mapping) or position not in _NHL_POSITION_WORD:
+            return None
+        games = int(cell.get("games") or 0)
+        return (
+            f"Vs position: {team} allows {_fmt(_num(cell.get('per_game')))} {stat[1]} a game to "
+            f"{_NHL_POSITION_WORD[position]} (rank {cell.get('rank')} of {cell.get('of')}, 1 = fewest; "
+            f"{games} game{'' if games == 1 else 's'} this season)."
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[recent_matchup] NHL_DVP_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
 def _memo_key(row: Mapping[str, Any]) -> tuple:
     return (
         str(row.get("sport") or "").lower(),
@@ -636,6 +724,9 @@ def prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str, memo
             if key[0] == "nfl":
                 opponent = str((match_facts or {}).get("opponent") or "").strip() or None
                 pieces.append(nfl_vs_position_text(row, opponent))
+            elif key[0] == "nhl":
+                opponent = str((match_facts or {}).get("opponent") or "").strip() or None
+                pieces.append(nhl_vs_position_text(row, opponent, selected_date=selected_date))
             elif key[0] in {"nba", "wnba"}:
                 opponent = str((match_facts or {}).get("opponent") or "").strip() or None
                 pieces.append(basketball_vs_position_text(row, opponent, selected_date=selected_date))

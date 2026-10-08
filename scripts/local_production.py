@@ -973,6 +973,9 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # data that includes this season"): writes nhl_team_season_to_date_<season>.csv,
     # never a `<stem>_<season>.csv` the sim loaders prefer. Cached payloads: ~3 requests a new game.
     ScheduledJob("nhl-season-to-date", 11, 5, ("scripts/build_nhl_season_to_date.py",)),
+    # NHL: what each team allows to opposing forwards / defensemen per game (this
+    # season's cached box scores, no fetching); after nhl-season-to-date fills the cache.
+    ScheduledJob("nhl-defense-vs-position", 11, 10, ("scripts/build_nhl_defense_vs_position.py",)),
 )
 
 
