@@ -24,6 +24,8 @@ nothing about it.
 live-odds-worker carry NO `LAYER2` keys. **`ROWS_TOTAL=3000` is UNEXERCISED** —
 today's board is ~1,600 rows, so it has never bound.
 
+**Build-scoped shards, live since 2026-10-08 00:51Z** `[verified 2026-10-08 01:52Z, lane layer2-shard-generations, deploys.md 01:52:38Z]`: the writer no longer overwrites shards in place. Each build writes `__g<gen>` row/card keys and the index (`shard_generation`) is the only pointer, so its write is the flip; a read gets one whole build. Current + previous generation kept (+~45 MB shortlist keys for one date), legacy in-place keys dropped at the second generation build. 889 reads over 3 builds: 0 `shard_index_stale`. The `written_at`-from-shards relabel below now fires only for legacy-layout indexes (e.g. old dates). The route forwards `shard_index_stale` / `index_written_at` (a2a7621b). Kill switch `SYNDICATE_LAYER2_SHARD_GENERATIONS=0`.
+
 **Fixed and live** (`865c89be` 19:46:59Z, still in live `132559e1`): the merge sizes
 from `max(index_total, highest_position+1)`, so a refused write leaves the board
 STALE not WRONG, and `written_at` comes from the shards when stamps disagree —
