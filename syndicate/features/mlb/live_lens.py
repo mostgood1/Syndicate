@@ -1874,7 +1874,9 @@ def _snapshot_route_context(selected_date: str, *, season: int | None = None, sn
     base["route_path"] = route_path
     base["api_path"] = f"/mlb/api/season/{int(season)}/live-lens" if season is not None else "/mlb/api/live-lens"
     base["form_action"] = route_path
-    base["show_app_header"] = False
+    # The site menu shows here like every other page (user 2026-10-08: "the top
+    # menu needs to be the same across the entire site"); this page had none.
+    base["show_app_header"] = True
     base["page_body_class"] = "cards-body syndicate-mlb-live-lens-page" + (" syndicate-mlb-live-lens-page--season" if season is not None else "")
     base["page_shell_class"] = "syndicate-mlb-live-lens-shell"
     return attach_live_lens_contract(apply_game_board_contract(base, sport="mlb", module="live_lens"), sport="mlb", module="live_lens")

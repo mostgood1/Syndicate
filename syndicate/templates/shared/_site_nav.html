@@ -1,0 +1,32 @@
+{#- The ONE site menu. `base.html` and `_standalone_app_header.html` both call
+    this macro with their own CSS classes. Before 2026-10-08 each had a
+    hand-written copy and only base.html's had Portfolio, so ~40 sport pages
+    were missing it (user report, lane layer2-board-ui-redesign).
+
+    The current page is highlighted from the request path, falling back to
+    `active_slug` for pages served under a path that does not start with the
+    item's own (e.g. a sport hub rendered at a shared route). `?date=` is kept
+    on the date-scoped links. -#}
+{% macro site_nav(link_class, active_class, active_slug=None, nav_class=None) -%}
+{%- set nav_date = request.args.get('date') if request else None -%}
+{%- set nav_path = request.path if request else '' -%}
+{%- set date_qs = ('?date=' ~ nav_date) if nav_date else '' -%}
+{%- set items = [
+    {'slug': 'home', 'label': 'Home', 'href': '/', 'match': nav_path == '/' or nav_path == '/intelligence', 'dated': False},
+    {'slug': 'syndicate', 'label': 'The Syndicate', 'href': '/syndicate', 'match': nav_path.startswith('/syndicate'), 'dated': True},
+    {'slug': 'market-board', 'label': 'Betting Board', 'href': '/market-board', 'match': nav_path.startswith('/market-board'), 'dated': True},
+    {'slug': 'portfolio', 'label': 'Portfolio', 'href': '/portfolio', 'match': nav_path.startswith('/portfolio'), 'dated': False},
+] -%}
+<nav class="{{ nav_class or '' }}" aria-label="Site">
+{%- for item in items %}
+  <a class="{{ link_class }}{% if item.match or active_slug == item.slug %} {{ active_class }}{% endif %}" href="{{ item.href }}{% if item.dated %}{{ date_qs }}{% endif %}"{% if item.match or active_slug == item.slug %} aria-current="page"{% endif %}>{{ item.label }}</a>
+{%- endfor %}
+{%- for sport in syndicate_sports %}
+  {%- set is_active = nav_path.startswith('/' ~ sport.slug) or active_slug == sport.slug %}
+  <a class="{{ link_class }}{% if is_active %} {{ active_class }}{% endif %}" href="/{{ sport.slug }}{{ date_qs }}"{% if is_active %} aria-current="page"{% endif %}>{{ sport.name }}</a>
+{%- endfor %}
+{%- if request and request.args.get('admin_token') %}
+  <a class="{{ link_class }}" href="/ops/odds-refresh?admin_token={{ request.args.get('admin_token') }}">Ops</a>
+{%- endif %}
+</nav>
+{%- endmacro %}

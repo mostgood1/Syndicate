@@ -1016,7 +1016,9 @@ def apply_game_board_contract(
     out.setdefault("show_app_header", False)
     out.setdefault(
         "show_standalone_cards_header",
-        str(module or "").strip().lower() in {"cards", "game_detail", "season_review"},
+        # preseason_cards had no menu at all until 2026-10-08 (lane
+        # layer2-board-ui-redesign): every rendered page carries the site nav.
+        str(module or "").strip().lower() in {"cards", "game_detail", "season_review", "preseason_cards"},
     )
     out.setdefault("active_sport_slug", normalized_sport)
     out.setdefault("active_sport_name", normalized_sport.upper())
