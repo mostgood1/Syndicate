@@ -976,6 +976,9 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # NHL: what each team allows to opposing forwards / defensemen per game (this
     # season's cached box scores, no fetching); after nhl-season-to-date fills the cache.
     ScheduledJob("nhl-defense-vs-position", 11, 10, ("scripts/build_nhl_defense_vs_position.py",)),
+    # Soccer per-match player log (ESPN summaries; incremental -- one request per new
+    # final): what soccer prop recency / vs-opponent history reads before live boxes.
+    ScheduledJob("soccer-player-match-log", 11, 15, ("scripts/build_soccer_player_match_log.py",)),
 )
 
 

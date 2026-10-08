@@ -413,6 +413,7 @@ class BoxScan:
     ambiguous: int = 0
     team_matches: list[dict[str, Any]] = field(default_factory=list)
     opponent_matches: list[dict[str, Any]] = field(default_factory=list)
+    match_log_games: int = 0
 
 
 def _stat_int(stats: Mapping[str, Any], key: str) -> float | None:
@@ -710,6 +711,88 @@ def _form_line_side(subject: PropSubject, spec: MarketSpec) -> tuple[float | Non
     return subject.line, "under" if subject.side == "under" else "over"
 
 
+# ---------------------------------------------------------------------------
+# Player match log (user 2026-10-08: "build the soccer player history source")
+# ---------------------------------------------------------------------------
+#
+# `scripts/build_soccer_player_match_log.py` writes one dated row per player per
+# league match from ESPN match summaries:
+# `<league>/history/player_match_log_<season>.csv`. live_state player boxes
+# exist only since PLAYER_BOXES_SINCE, so "last 10" and "vs this opponent"
+# could not reach back further. Log appearances are MERGED into the scan's
+# appearances for dates the live_state boxes do not cover, strictly before the
+# match, in the same shape. They carry no goal ORDER, so first/last-scorer
+# values stay None for them (excluded from those hit rates, never a miss).
+
+MATCH_LOG_SEASONS = 2  # this season's file and the two before it by calendar year
+
+
+def _same_team(a: Any, b: Any) -> bool:
+    if not a or not b:
+        return False
+    if C.names_match(str(a), str(b)):
+        return True
+    try:
+        from syndicate.features.shared.team_aliases import canonical_team
+
+        ca, cb = canonical_team("soccer", str(a)), canonical_team("soccer", str(b))
+    except Exception:
+        return False
+    return bool(ca) and ca == cb
+
+
+def match_log_appearances(ctx: "Resolved", subject: PropSubject) -> list[dict[str, Any]]:
+    """The player's league-match lines from the match log, newest first, strictly before the match."""
+    if not ctx.league or not ctx.match_date or not ctx.team:
+        return []
+    try:
+        year = int(ctx.match_date[:4])
+    except ValueError:
+        return []
+    names = [n for n in (str((ctx.entry or {}).get("player_name") or ""), str(subject.player_name or "")) if n]
+    out: dict[str, dict[str, Any]] = {}
+    for season in range(year, year - MATCH_LOG_SEASONS - 1, -1):
+        path = C.first_existing(LOCAL_DIR, f"{ctx.league}/history/player_match_log_{season}.csv")
+        if path is None:
+            continue
+        candidates = [row for row in C.iter_csv(path)
+                      if str(row.get("date") or "") < ctx.match_date
+                      and any(C.names_match(str(row.get("player_name") or ""), n) for n in names)]
+        # one PERSON: a name two player ids share is two people -- keep the one on
+        # this team, or refuse; never guess
+        ids = {str(row.get("player_id") or "") for row in candidates}
+        if len(ids) > 1:
+            on_team = {str(r.get("player_id") or "") for r in candidates if _same_team(r.get("team"), ctx.team)}
+            if len(on_team) != 1:
+                continue
+            candidates = [r for r in candidates if str(r.get("player_id") or "") in on_team]
+        for row in candidates:
+            key = str(row.get("event_id") or row.get("date"))
+            out.setdefault(key, {
+                "date": str(row.get("date") or ""), "opponent": str(row.get("opponent") or ""),
+                "venue": "home" if str(row.get("side") or "") == "home" else "away",
+                "minutes": C.to_float(row.get("minutes")),
+                "starter": str(row.get("starter") or "") in {"1", "True", "true"},
+                "goals": C.to_float(row.get("goals")), "assists": C.to_float(row.get("assists")),
+                "shots": C.to_float(row.get("shots")), "shots_on_target": C.to_float(row.get("shots_on_target")),
+                "first_goal": None, "last_goal": None, "source": "match_log",
+            })
+    return sorted(out.values(), key=lambda g: g["date"], reverse=True)
+
+
+def merge_match_log(scan: "BoxScan | None", ctx: "Resolved", subject: PropSubject) -> "BoxScan | None":
+    """Add match-log appearances on dates the live_state boxes do not hold."""
+    logged = match_log_appearances(ctx, subject) if ctx.entry is not None else []
+    if not logged:
+        return scan
+    scan = scan or BoxScan()
+    boxed = {g.get("date") for g in scan.appearances}
+    scan.appearances = sorted(scan.appearances + [g for g in logged if g["date"] not in boxed],
+                              key=lambda g: str(g.get("date") or ""), reverse=True)
+    scan.match_log_games = sum(1 for g in scan.appearances if g.get("source") == "match_log")
+    return scan
+
+
 def _form_value(game: Mapping[str, Any], spec: MarketSpec) -> float | None:
     if spec.kind in ("first", "last"):
         return C.to_float(game.get(f"{spec.kind}_goal"))
@@ -730,10 +813,10 @@ def _recent_form(subject: PropSubject, ctx: Resolved, spec: MarketSpec | None, f
         return absent(Layer.RECENT_FORM, ctx.match_reason)
     if ctx.entry is None:
         return absent(Layer.RECENT_FORM, ctx.player_reason)
-    if not files or scan is None:
+    if (not files or scan is None) and not (scan is not None and scan.appearances):
         return absent(Layer.RECENT_FORM, f"{ABSENT_NO_ARTIFACT}:no {ctx.league} live_state_<date>.json in the "
-                                         f"{FORM_LOOKBACK_DAYS} days before {ctx.match_date}")
-    if scan.files_with_player_box == 0:
+                                         f"{FORM_LOOKBACK_DAYS} days before {ctx.match_date} and no player match log")
+    if scan.files_with_player_box == 0 and not scan.appearances:
         return absent(Layer.RECENT_FORM, f"{ABSENT_NO_SAMPLE}:{scan.files} {ctx.league} live_state files "
                                          f"{scan.oldest_file}..{scan.newest_file}, none with a player box "
                                          f"(player boxes published since {PLAYER_BOXES_SINCE})")
@@ -775,7 +858,7 @@ def _recent_form(subject: PropSubject, ctx: Resolved, spec: MarketSpec | None, f
         rows.append(["Listed but did not play (void, not a miss)", ", ".join(_vs_text(v) for v in scan.unused[:6]), "", "", ""])
     if scan.not_in_roster:
         rows.append([f"{ctx.team} played, he was not in the box roster", ", ".join(_vs_text(v) for v in scan.not_in_roster[:6]), "", "", ""])
-    if len(games) < SMALL_SAMPLE:
+    if len(games) < SMALL_SAMPLE and not scan.match_log_games:
         rows.append([f"SMALL SAMPLE: {len(games)} appearance{'s' if len(games) != 1 else ''} with a player box "
                      f"(live_state {scan.oldest_file}..{scan.newest_file}; boxes published since {PLAYER_BOXES_SINCE})", "", "", "", ""])
     stale_days = _days_between(games[0]["date"], ctx.match_date)
@@ -789,14 +872,17 @@ def _recent_form(subject: PropSubject, ctx: Resolved, spec: MarketSpec | None, f
         charts.append(chart_obj)
     return LayerEvidence(
         Layer.RECENT_FORM,
-        tables=[table(f"Recent matches — {subject.player_name} ({ctx.league} live_state box, through {games[0]['date']})",
+        tables=[table(f"Recent matches — {subject.player_name} ({ctx.league} "
+                      + ("live_state box + player match log" if scan.match_log_games else "live_state box")
+                      + f", through {games[0]['date']})",
                       columns, rows, Layer.RECENT_FORM)],
         charts=charts,
         facts={"games": len(games), "values": values, "hit_rate": rate, "newest_game": games[0]["date"],
                "small_sample": len(games) < SMALL_SAMPLE, "stale_days": stale_days,
                "unused_dates": [v["date"] for v in scan.unused], "not_in_roster_dates": [v["date"] for v in scan.not_in_roster],
                "ambiguous_boxes": scan.ambiguous, "files_read": scan.files,
-               "files_with_player_box": scan.files_with_player_box, "window": [scan.oldest_file, scan.newest_file]},
+               "files_with_player_box": scan.files_with_player_box, "window": [scan.oldest_file, scan.newest_file],
+               "match_log_games": scan.match_log_games},
         source="soccer:live_state.match_box",
         as_of=games[0]["date"],
     )
@@ -840,7 +926,7 @@ def _ppda_text(value: Any) -> str:
     return C.fmt_num(number, 1)
 
 
-def _matchup(subject: PropSubject, ctx: Resolved, scan: BoxScan | None) -> LayerEvidence:
+def _matchup(subject: PropSubject, ctx: Resolved, scan: BoxScan | None, spec: MarketSpec | None = None) -> LayerEvidence:
     if ctx.match is None:
         return absent(Layer.MATCHUP, ctx.match_reason)
     if ctx.entry is None:
@@ -894,9 +980,19 @@ def _matchup(subject: PropSubject, ctx: Resolved, scan: BoxScan | None) -> Layer
         tables.append(table(f"{ctx.opponent} recent matches — what they conceded (live_state team stats)",
                             ["Match", "Shots conceded", "SOT conceded", "Goals conceded"], opp_rows, Layer.MATCHUP))
         facts["opponent_recent_conceded"] = {"matches": len(recent), **conceded}
-    vs = [g for g in (scan.appearances if scan else []) if C.names_match(g.get("opponent"), ctx.opponent)]
+    vs = [g for g in (scan.appearances if scan else []) if _same_team(g.get("opponent"), ctx.opponent)]
     if vs:
         facts["vs_opponent_appearances"] = len(vs)
+        if spec is not None and spec.kind not in ("first", "last"):
+            line, side = _form_line_side(subject, spec)
+            rate = C.hit_rate([_form_value(g, spec) for g in vs], line, side)
+            if rate:
+                facts["vs_opponent"] = {"games": len(vs), "hit_rate": rate}
+                vs_rows = [[g["date"], C.fmt_num(g.get("minutes"), 0), C.fmt_num(_form_value(g, spec), 0)] for g in vs[:6]]
+                vs_rows.append([f"Hit rate vs {C.fmt_line(line)}", "", C.hit_rate_text(rate)])
+                noun = "meeting" if len(vs) == 1 else "meetings"
+                tables.append(table(f"{subject.player_name} vs {ctx.opponent} ({len(vs)} {noun})",
+                                    ["Date", "Min", spec.label], vs_rows, Layer.MATCHUP))
     return LayerEvidence(Layer.MATCHUP, tables=tables, facts=facts, source="soccer:recommendations.adapter_metadata+live_state",
                          as_of=ctx.match_date)
 
@@ -1115,11 +1211,12 @@ def build(subject: PropSubject) -> PropEvidence:
     ctx.generated_at = str(meta.get("generated_at") or "")
     files = live_state_files(ctx.roots, ctx.league, ctx.match_date) if ctx.match is not None else []
     scan = scan_boxes(files, ctx, subject) if files else None
+    scan = merge_match_log(scan, ctx, subject)
     rates = season_rates(ctx.roots, ctx.league, ctx.entry or {}, ctx.match_date) if ctx.entry is not None else []
 
     evidence.set(_player_sim(subject, ctx, spec))
     evidence.set(_recent_form(subject, ctx, spec, files, scan))
-    evidence.set(_matchup(subject, ctx, scan))
+    evidence.set(_matchup(subject, ctx, scan, spec))
     evidence.set(_advanced(subject, ctx, spec, rates, meta))
     evidence.set(_game_sim(subject, ctx, meta))
     evidence.set(_environment(subject, ctx, meta, scan))
