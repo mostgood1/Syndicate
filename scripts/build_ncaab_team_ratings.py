@@ -57,6 +57,17 @@ HOME_EDGE = 0.014  # ~3.5 points on a 100-possession game, the usual college est
 PRIOR_GAMES = 8.0  # games at which this season's rating and last season's weigh equally
 PRIOR_REGRESSION = 0.30  # last season's rating is regressed this far toward the mean first
 ITERATIONS = 40
+# MARGIN CALIBRATION, fitted 2026-10-07 by walk-forward on the 2025-26 season
+# (ratings from games strictly before each date; both teams >= 5 prior games):
+# actual_margin = k * model_margin + home, OLS on Nov-Jan (2,605 games), judged
+# on Feb-Apr (1,955 held out). k = 0.780, home = 2.93 pts; held-out RMSE 11.25
+# uncalibrated -> 11.16 calibrated (naive home+3.5: 13.29). The opponent
+# adjustment's fixed point amplifies spread (sd 15.8 per 100 vs 9.4 raw); the
+# additive form tied it (k 0.789, RMSE 11.16), so the model is unchanged and
+# its deviations from the league mean are shrunk by k. A predicted margin in
+# points is then (adj_em_a - adj_em_b) * game_tempo / 100 + HOME_POINTS at a home site.
+MARGIN_CALIBRATION_K = 0.78
+HOME_POINTS = 2.9
 
 BOX_FIELDS = (
     "season", "game_id", "date", "season_type", "team_id", "team", "opp_id", "opp",
@@ -64,7 +75,7 @@ BOX_FIELDS = (
 )
 RATING_FIELDS = (
     "team", "espn_id", "adj_off", "adj_def", "adj_em", "tempo", "raw_off", "raw_def",
-    "games", "prior_weight", "season", "as_of", "source",
+    "games", "prior_weight", "calibration_k", "season", "as_of", "source",
 )
 
 
@@ -269,6 +280,11 @@ def compute_ratings(
     for t in games:
         n = len(games[t])
         o, d, tp = adj_o[t], adj_d[t], adj_t[t]
+        # Calibrated scale (see MARGIN_CALIBRATION_K): THIS season's estimate is
+        # shrunk toward the league mean BEFORE the prior blend -- last season's
+        # table is already calibrated, and shrinking after would scale it twice.
+        o = league + MARGIN_CALIBRATION_K * (o - league)
+        d = league + MARGIN_CALIBRATION_K * (d - league)
         weight = 1.0
         if prior and t in prior:
             p = prior[t]
@@ -280,6 +296,7 @@ def compute_ratings(
         out[t] = {
             "adj_off": round(o, 2), "adj_def": round(d, 2), "adj_em": round(o - d, 2), "tempo": round(tp, 2),
             "raw_off": round(raw[t][0], 2), "raw_def": round(raw[t][1], 2), "games": n, "prior_weight": round(1 - weight, 3),
+            "calibration_k": MARGIN_CALIBRATION_K,
         }
     return out
 

@@ -47656,3 +47656,11 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 ## 2026-10-08 00:27:23Z (7:27 PM CT 10-07) -- READING: Troyes few-match gate -- **MET** (lane `soccer-team-history-current-season`, CLOSED)
 
 - ligue_1 `recommendations_2026-10-11.json` rebuilt 00:27:23Z: `promoted_prior_teams=[]`, `few_match_prior_teams=['Troyes']` (5 rows in `teams_2026.csv`). Every promoted club seen on a rebuilt slate so far is gated: Le Mans, Troyes (ligue_1), Hull, Coventry (epl). Nothing left owed by this lane.
+
+## 2026-10-07 ~23:5xZ (6:5x PM CT) -- DATA REWRITE (no deploy): NCAAB ratings CALIBRATED to game margins; fleet table regenerated -- **MET** (lane `intelligence-evidence-coverage`, session 13ac7622)
+
+- **who/why:** user: "calibrate the NCAAB ratings scale". The 22:05Z table's scale was wider than KenPom's (top +43.8).
+- **method (fixed before computing):** walk-forward on the fleet's 2025-26 box log -- ratings from games strictly before each date, both teams >= 5 prior D-I games; `actual_margin = k * model_margin + home`, OLS on Nov-Jan (2,605 games), judged on Feb-Apr (1,955 held out); multiplicative (current) vs additive adjustment, lower held-out RMSE wins, tie keeps the current model.
+- **READING:** multiplicative k=0.780 home=2.93 pts, held-out RMSE 11.25 raw -> **11.16 calibrated**, MAE 8.93 -> 8.85; additive k=0.789 home=2.94, RMSE 11.16 (tie -> model unchanged); naive home+3.5: RMSE 13.29 / MAE 10.48. Cause: the opponent-adjustment fixed point amplifies spread (sd 15.76 per 100 at convergence vs 9.37 raw; converged by ~20 iterations, not diverging).
+- **applied (commit below):** `MARGIN_CALIBRATION_K = 0.78`, this season's O/D deviations shrunk toward the league mean BEFORE the early-season prior blend (a calibrated prior must not be scaled twice); `calibration_k` column; `HOME_POINTS = 2.9` documented for margin use.
+- **fleet table regenerated** (no fetch: `dates_checked=0 games_fetched=0`, 12,598 box rows, 361 teams) -> `team_ratings_2026_asof_20260406.csv`: adj_em sd **12.30** (was 15.76), max **+34.17** Michigan, min -29.75; order unchanged (Michigan, Duke, Arizona, Illinois, Houston).

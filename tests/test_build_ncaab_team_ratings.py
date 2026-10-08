@@ -141,3 +141,18 @@ def test_fleet_supervisor_runs_the_producer_daily_without_publish():
     job = jobs["ncaab-team-ratings"]
     assert (job.hour, job.minute, job.weekday) == (10, 45, None)
     assert job.argv == ("scripts/build_ncaab_team_ratings.py",)
+
+
+def test_calibration_shrinks_this_season_but_not_the_calibrated_prior_twice():
+    d1 = {"A": "A", "B": "B"}
+    game = _game("1", "A", "B", 80, 70)
+    plain = ratings.compute_ratings(game, d1)
+    league = (plain["A"]["adj_off"] + plain["B"]["adj_off"]) / 2
+    # Shrunk toward the league mean by exactly k.
+    raw_em = plain["A"]["raw_off"] - plain["A"]["raw_def"]
+    assert plain["A"]["adj_em"] == pytest.approx(ratings.MARGIN_CALIBRATION_K * raw_em, abs=0.05)
+    # A prior equal to the league mean on both sides pulls toward 0 without re-shrinking itself.
+    prior = {"A": {"adj_off": league, "adj_def": league, "tempo": 70.0}, "B": {"adj_off": league, "adj_def": league, "tempo": 70.0}}
+    blended = ratings.compute_ratings(game, d1, prior=prior)
+    w = 1 / (1 + ratings.PRIOR_GAMES)
+    assert blended["A"]["adj_em"] == pytest.approx(w * plain["A"]["adj_em"], abs=0.05)
