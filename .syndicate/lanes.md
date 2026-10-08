@@ -1704,6 +1704,22 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **COUNT-SHAPE ROUND 1 RESULT 2026-10-08 ~23:30Z: DO NOT SHIP (fails 4 and 8) -> round 2 runs (pre-registered).**
+  - TABLE (IPF, 801 FIT games, 233,823 real pitches): count-mix distance 0.01667 -> 0.00004; pitches/PA 3.507 -> 3.894 (real 3.879).
+  - DESCENT (window first half, 60 sims) chose:
+    - k_logit_bias +0.15, bb_ball_bias_mult 1.2, hook -10;
+    - base_in_play 0.23 / early foul 1.5 / extra foul 0.04 unchanged;
+    - score 92.2 -> 78.3.
+  - HOLDOUT (08-22..09-27, 495 games, 988 starts):
+    - (1) PASS count mix 0.01653 -> **0.00020**;
+    - (2) PASS pitches/PA 3.518 -> **3.912** (real 3.890);
+    - (3) PASS objective 70.0 -> 64.5;
+    - (4) **FAIL** BB_per_PA z +1.43;
+    - (5) PASS starter SO -0.48, H -0.16, BB +0.06, ER +0.09, outs -0.55 (outs base 15.27, chosen 14.50, actual 14.61);
+    - (6) PASS runs gap 0.116 -> 0.068;
+    - (7) PASS props 0.36910 -> 0.36890.
+  - JUNE GUARD: (8) **FAIL**, outs +0.563 (SO -0.26; runs gap 1.340 -> 1.085).
+  - READING: the count shape is fixed. What blocks it is again the SEASON PHASE: the shorter starts match late-season reality (14.61) but are too short for June. Round 2 loosens the hook (pre-registered grid -13 / -8 / -3 / +2).
 - **COUNT-SHAPE ROUND 2 (CONDITIONAL), PRE-REGISTERED 2026-10-08 (user: "if it fails, run the new round with the corrected hook grid"), before round 1's holdout is read:**
   - RUNS ONLY if round 1 fails its checks.
   - WHY: round 1's hook grid {-13, -10, -16, -19} was mis-specified in direction (my error). The table adds ~4.5 pitches/start, so the pitch-count hook fires sooner and outs fell (fit half: ~14.2 vs 15.39). The hook must LOOSEN; only -10 does, by 3.
