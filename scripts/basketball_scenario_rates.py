@@ -399,6 +399,21 @@ def run_sim(args) -> int:
             for g in games:
                 fh.write(json.dumps(g) + "\n")
         print(f"SIM {d} games={len(games)} draws={sum(len(g['draws']) for g in games)}", flush=True)
+        # Per-game engine summary (the market-anchored TARGET vs the sim mean): the scratch is rebuilt per date, so keep
+        # it now. Needed to read whether the event sim lands on the target it was given (Phase 2 #1c).
+        summ = Path(args.out) / f"smart_sim_summary_{args.league}" / f"{d}.jsonl"
+        summ.parent.mkdir(parents=True, exist_ok=True)
+        with summ.open("w", encoding="utf-8") as fh:
+            for f in sorted((src_root / "data" / "processed").glob(f"smart_sim_{d}_*.json")):
+                try:
+                    j = json.loads(f.read_text(encoding="utf-8"))
+                except Exception:  # noqa: BLE001
+                    continue
+                sc = j.get("score") or {}
+                fh.write(json.dumps({"date": d, "home": j.get("home"), "away": j.get("away"),
+                                     "market_anchor": j.get("market_anchor"),
+                                     "score": {k: sc.get(k) for k in ("home_mean", "away_mean", "margin_mean", "total_mean")},
+                                     "team_advanced_priors_applied": ((j.get("context") or {}).get("team_advanced_priors") or {}).get("applied")}) + "\n")
     return 0
 
 
