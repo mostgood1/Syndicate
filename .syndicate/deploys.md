@@ -47871,3 +47871,16 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **What is true:** they fail only in a session worktree. `session_worktree.py` excludes `data/` by default, and `_nfl_team_branding_rows()` reads the git-tracked `data/nfl_source/source_artifacts/data/processed/team_branding/nfl_team_branding.csv`. In the worktree it returned 0 rows, so every alias was empty. "Without e82e958e" was also run in that same worktree.
 - **Measured:** on the fleet checkout (4bb1d024, has `data/`), `-k "NflNickname or matchup_evidence_pairs"`: **8 passed**. Under the live web worker's env: 32 branding rows; "Patriots vs Seahawks projection" -> [New England Patriots, Seattle Seahawks]; "miami total" -> [Miami Dolphins].
 - **No code change.** The rule already in memory ("worktree results are not main") is the one I broke: a test that reads `data/` must be judged on a tree that has it.
+
+## 2026-10-08 16:18:48Z (11:18 AM CT) -- LOCAL FLEET FF 4bb1d024 -> 12bc778e + `reload-web` (web ONLY): research rail + bet slip tray + 9-column blotter + phone/iPad layouts -- **MET** (lane `layer2-board-ui-redesign`, session d4409ac4; user: mockups approved, "deploy what's done and keep going")
+
+- **what:** 12bc778e -- Ask the Syndicate docked as a research rail (340px >=1280, 260px 1024-1279, edge pull-out 768-1023, bottom sheet <768); bet slip as a pill + bottom tray; blotter 16 -> 9 columns; phone filter sheet, site nav Menu (<768) / Sports dropdown (768-1279).
+- **lock:** deploy_claim web by layer2-board-ui-redesign, token b4d1f27e, 16:18:08Z. Web only.
+- **ride-alongs (read before the ff):** 45bd8c6e (`scripts/local_production.py` down reaps detached odds trees -- supervisor code; the running supervisor does NOT load it; `reload-web` ran through the new file's `reload-web` path without change), 6620cf4f (nfl player_stats ambiguous short name no longer falls back to the prior season -- loaded on web for Ask/evidence), b10f59f7 (soccer evidence live-boxed date guard -- loaded on web).
+- **applied:** `git merge --ff-only 12bc778e` (HEAD asserted) then `reload-web` 16:18:48Z: elapsed 4.0 s, failures 0, workers [3655605, 3655606].
+- **reading (MET), headless Chromium against 127.0.0.1:10000, 16:19-16:24Z, Ask/portfolio requests blocked at the network layer:**
+  - 1440x950: research open (left 1090, 340 wide); blotter right edge 1071 within board column right 1072 (pre-change on the preview: 1446 in a 1072 column).
+  - 1180x820: rail 260; blotter right 891 within 892 (Move hidden at this width).
+  - 820x1180: rail closed by default; "Ask" on a row -> rail open as overlay (left 420, width 400), scrim shown.
+  - 390x844 (mobile emulation): document width 390 (preview pre-fix: 1,560); mobile bar shown, pill hidden; "Ask" on a row -> sheet open; "+ Slip" -> count 1 on the bar.
+- **rollback:** revert 12bc778e, ff, `reload-web`.
