@@ -6,7 +6,13 @@
     The current page is highlighted from the request path, falling back to
     `active_slug` for pages served under a path that does not start with the
     item's own (e.g. a sport hub rendered at a shared route). `?date=` is kept
-    on the date-scoped links. -#}
+    on the date-scoped links.
+
+    SMALL SCREENS (approved mockups 2026-10-08): under 768px the whole menu sits
+    behind a "Menu" button; from 768 to 1279px the eight sport links sit behind
+    "Sports ▾" so the row stays one line. Same items, same order everywhere --
+    only what is folded changes. The styles and the toggle script are inline so
+    both headers (which load different stylesheets) get them. -#}
 {% macro site_nav(link_class, active_class, active_slug=None, nav_class=None) -%}
 {%- set nav_date = request.args.get('date') if request else None -%}
 {%- set nav_path = request.path if request else '' -%}
@@ -17,16 +23,59 @@
     {'slug': 'market-board', 'label': 'Betting Board', 'href': '/market-board', 'match': nav_path.startswith('/market-board'), 'dated': True},
     {'slug': 'portfolio', 'label': 'Portfolio', 'href': '/portfolio', 'match': nav_path.startswith('/portfolio'), 'dated': False},
 ] -%}
-<nav class="{{ nav_class or '' }}" aria-label="Site">
+<style>
+  .site-nav { position: relative; }
+  .site-nav__menu-btn, .site-nav__sports-btn { display: none; }
+  .site-nav__sports { display: contents; }
+  @media (min-width: 768px) and (max-width: 1279px) {
+    .site-nav__sports-btn { display: inline-flex; align-items: center; cursor: pointer; font: inherit; }
+    .site-nav__sports { display: none; }
+    .site-nav[data-sports-open="true"] .site-nav__sports {
+      display: flex; flex-wrap: wrap; gap: 6px; position: absolute; right: 0; top: calc(100% + 6px); z-index: 80;
+      width: min(360px, 90vw); padding: 10px; border-radius: 16px; background: #0f1e2f;
+      border: 1px solid rgba(132, 166, 196, .3); box-shadow: 0 16px 40px rgba(0, 0, 0, .5);
+    }
+  }
+  @media (max-width: 767px) {
+    .site-nav__menu-btn { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font: inherit; min-height: 44px; }
+    .site-nav > a, .site-nav__sports { display: none; }
+    .site-nav[data-menu-open="true"] { flex-wrap: wrap; }
+    .site-nav[data-menu-open="true"] > a { display: inline-flex; }
+    .site-nav[data-menu-open="true"] .site-nav__sports { display: contents; }
+  }
+</style>
+<nav class="site-nav {{ nav_class or '' }}" aria-label="Site" data-menu-open="false" data-sports-open="false">
+  <button type="button" class="{{ link_class }} site-nav__menu-btn" aria-expanded="false" data-site-nav-menu>Menu &#8801;</button>
 {%- for item in items %}
   <a class="{{ link_class }}{% if item.match or active_slug == item.slug %} {{ active_class }}{% endif %}" href="{{ item.href }}{% if item.dated %}{{ date_qs }}{% endif %}"{% if item.match or active_slug == item.slug %} aria-current="page"{% endif %}>{{ item.label }}</a>
 {%- endfor %}
+  <button type="button" class="{{ link_class }} site-nav__sports-btn" aria-expanded="false" data-site-nav-sports>Sports &#9662;</button>
+  <span class="site-nav__sports">
 {%- for sport in syndicate_sports %}
   {%- set is_active = nav_path.startswith('/' ~ sport.slug) or active_slug == sport.slug %}
   <a class="{{ link_class }}{% if is_active %} {{ active_class }}{% endif %}" href="/{{ sport.slug }}{{ date_qs }}"{% if is_active %} aria-current="page"{% endif %}>{{ sport.name }}</a>
 {%- endfor %}
+  </span>
 {%- if request and request.args.get('admin_token') %}
   <a class="{{ link_class }}" href="/ops/odds-refresh?admin_token={{ request.args.get('admin_token') }}">Ops</a>
 {%- endif %}
 </nav>
+<script>
+(function () {
+  var nav = document.currentScript && document.currentScript.previousElementSibling;
+  if (!nav || !nav.classList.contains("site-nav")) return;
+  function toggle(attr, button) {
+    var open = nav.getAttribute(attr) !== "true";
+    nav.setAttribute(attr, open ? "true" : "false");
+    button.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  var menu = nav.querySelector("[data-site-nav-menu]");
+  var sports = nav.querySelector("[data-site-nav-sports]");
+  if (menu) menu.addEventListener("click", function () { toggle("data-menu-open", menu); });
+  if (sports) sports.addEventListener("click", function (event) { event.stopPropagation(); toggle("data-sports-open", sports); });
+  document.addEventListener("click", function (event) {
+    if (sports && nav.getAttribute("data-sports-open") === "true" && !nav.contains(event.target)) toggle("data-sports-open", sports);
+  });
+})();
+</script>
 {%- endmacro %}

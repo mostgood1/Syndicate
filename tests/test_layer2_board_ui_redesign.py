@@ -98,3 +98,43 @@ class FiltersAllVisible(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ResearchRailAndSlipTray(unittest.TestCase):
+    """Phase 3: Ask docks on the right, the slip is a pill + tray, and the
+    blotter fits beside the rail (9 columns, Live/Actual only when live)."""
+
+    def setUp(self) -> None:
+        self.text = TEMPLATE.read_text(encoding="utf-8")
+        self.css = (ROOT / "syndicate" / "static" / "shared" / "board_cards.css").read_text(encoding="utf-8")
+
+    def test_ask_and_slip_live_in_separate_containers(self) -> None:
+        research = self.text[self.text.index('id="board-research"'):self.text.index('class="board-research-tab"')]
+        self.assertIn('id="ask-bar-panel"', research)
+        self.assertNotIn('id="bet-slip-panel"', research)
+        tray = self.text[self.text.index('id="board-slip-tray"'):self.text.index('class="board-slip-pill"')]
+        self.assertIn('id="bet-slip-panel"', tray)
+
+    def test_page_does_not_use_the_layer1_rail_toggle_class(self) -> None:
+        # board_rail_toggle.js acts on `.board-rail`; this page must not have one.
+        self.assertNotIn('class="board-rail"', self.text)
+
+    def test_asking_opens_the_rail_and_the_slip_reports_its_count(self) -> None:
+        self.assertIn('addEventListener("syndicate:ask"', self.text)
+        self.assertIn('addEventListener("syndicate:slip-count"', self.text)
+        ask = (ROOT / "syndicate" / "static" / "shared" / "ask_bar.js").read_text(encoding="utf-8")
+        slip = (ROOT / "syndicate" / "static" / "shared" / "bet_slip.js").read_text(encoding="utf-8")
+        self.assertIn('new CustomEvent("syndicate:ask"', ask)
+        self.assertIn('new CustomEvent("syndicate:slip-count"', slip)
+
+    def test_blotter_has_nine_columns_and_live_columns_are_conditional(self) -> None:
+        block = self.text[self.text.index("  const BLOTTER_COLUMNS = ["):]
+        block = block[:block.index("\n  ];")]
+        keys = re.findall(r'\{ key: "(\w+)"', block)
+        self.assertEqual(keys, ["score", "pick", "book", "fair", "ev", "winpct", "move", "age", "live", "actual"])
+        self.assertEqual(len(re.findall(r"liveOnly: true", block)), 2)
+
+    def test_breakpoints_from_the_approved_mockups(self) -> None:
+        for media in ("(min-width: 1024px) and (max-width: 1279px)", "(max-width: 1023px)", "(max-width: 767px)"):
+            self.assertIn(media, self.css, media)
+        self.assertIn(".board-toolbar { grid-template-columns: minmax(0, 1fr); }", self.css)

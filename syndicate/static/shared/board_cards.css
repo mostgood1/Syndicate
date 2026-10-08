@@ -2289,3 +2289,158 @@ table.board-blotter tbody tr:last-child td {
   .board-filter-grid .board-clear-filters { margin-left: 0; }
   .board-freshness-row .cards-nav-pill[href="/intelligence/status"] { display: none; }
 }
+
+/* ---- Layer 2: research rail + bet slip tray `[user 2026-10-08, lane layer2-board-ui-redesign]` ----
+   Ask the Syndicate docks on the right and is never covered; the slip is a pill
+   that opens a tray from the bottom, left of the rail, so no board column is
+   ever hidden. Breakpoints match the approved mockups:
+     >=1280  340px rail          1024-1279  260px rail
+     768-1023  rail is a right-edge pull-out over the board
+     <768  Ask and Slip are bottom sheets opened from a pinned two-button bar. */
+.board-layout--research { grid-template-columns: minmax(0, 1fr) 340px; }
+.board-layout--research[data-research-state="closed"] { grid-template-columns: minmax(0, 1fr) 44px; }
+.board-research {
+  position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; min-width: 0;
+  display: flex; flex-direction: column; gap: 12px; padding: 14px; box-sizing: border-box;
+  border-radius: 18px; border: 1px solid rgba(124, 108, 240, .5); background: var(--cards-surface-strong);
+}
+.board-layout--research[data-research-state="closed"] .board-research { display: none; }
+.board-research__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.board-research__head .board-section-title { margin: 0; }
+.board-research__close, .board-slip-tray__close {
+  min-height: 36px; min-width: 36px; padding: 6px 10px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--cards-line-strong); background: transparent; color: var(--cards-text); font: inherit; font-size: 13px;
+}
+/* Inside the rail the Ask panel is always open: the rail's own toggle replaces its header. */
+.board-research__ask .ask-bar__header { display: none; }
+.board-research__ask[data-collapsed="true"] .ask-bar__body { display: block; }
+.board-research__tabs { display: flex; gap: 6px; border-top: 1px solid var(--cards-line); padding-top: 10px; }
+.board-research-tab { display: none; }
+.board-layout--research[data-research-state="closed"] .board-research-tab {
+  display: flex; align-items: center; justify-content: center; position: sticky; top: 12px;
+  width: 44px; height: 220px; padding: 0; border-radius: 14px; cursor: pointer;
+  border: 1px solid rgba(124, 108, 240, .55); background: var(--cards-surface-strong); color: #c9c1ff;
+  writing-mode: vertical-rl; font: 600 12px/1 "Space Grotesk", sans-serif; letter-spacing: .1em; text-transform: uppercase;
+}
+
+.board-slip-pill {
+  position: fixed; left: 16px; bottom: 16px; z-index: 45; display: inline-flex; align-items: center; gap: 10px;
+  min-height: 44px; padding: 8px 10px 8px 16px; border: 0; border-radius: 999px; cursor: pointer;
+  background: #f3cf8a; color: #06121c; font: 700 13px/1 "IBM Plex Sans", sans-serif; box-shadow: 0 12px 30px rgba(0, 0, 0, .5);
+}
+.board-slip-pill__open { background: #06121c; color: #f3cf8a; border-radius: 999px; padding: 7px 10px; }
+.board-slip-dock[data-slip-count="0"] .board-slip-pill { opacity: .8; }
+.board-slip-dock[data-slip-state="open"] .board-slip-pill { display: none; }
+.board-slip-tray {
+  position: fixed; left: 16px; bottom: 0; z-index: 46; box-sizing: border-box;
+  width: min(760px, calc(100vw - 32px - 360px)); max-height: 60vh; overflow-y: auto;
+  padding: 12px 14px; border-radius: 18px 18px 0 0; border: 1px solid #f3cf8a; border-bottom: 0;
+  background: #0f1e2f; box-shadow: 0 -16px 40px rgba(0, 0, 0, .5);
+  transform: translateY(105%); visibility: hidden; transition: transform .2s ease, visibility .2s;
+}
+.board-slip-dock[data-slip-state="open"] .board-slip-tray { transform: none; visibility: visible; }
+.board-slip-tray__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.board-slip-tray__head .board-section-title { margin: 0; color: #f3cf8a; }
+/* In the tray the slip is always expanded: the pill is its collapsed form. */
+.board-slip-tray #bet-slip-panel .bet-slip__toggle { display: none; }
+.board-slip-tray #bet-slip-panel[data-collapsed="true"] .bet-slip__body { display: flex; }
+.board-mobile-bar { display: none; }
+.board-sheet-scrim { position: fixed; inset: 0; z-index: 52; background: rgba(0, 0, 0, .45); }
+.board-sheet-scrim[hidden] { display: none; }
+/* Room for the floating pill below the last row. */
+.board-layout--research .board-main { padding-bottom: 72px; }
+
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .board-layout--research { grid-template-columns: minmax(0, 1fr) 260px; }
+  .board-slip-tray { width: min(760px, calc(100vw - 32px - 280px)); }
+}
+
+@media (max-width: 1023px) {
+  .board-layout--research, .board-layout--research[data-research-state="closed"] { grid-template-columns: minmax(0, 1fr); }
+  .board-research {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 60; width: min(400px, 92vw); max-height: none;
+    border-radius: 18px 0 0 18px; transform: translateX(105%); visibility: hidden; transition: transform .2s ease, visibility .2s;
+  }
+  .board-layout--research[data-research-state="closed"] .board-research { display: flex; }
+  .board-layout--research[data-research-state="open"] .board-research { transform: none; visibility: visible; }
+  .board-layout--research[data-research-state="closed"] .board-research-tab {
+    position: fixed; right: 0; top: 40%; z-index: 44; width: 40px; height: 150px; border-radius: 14px 0 0 14px; border-right: 0;
+  }
+  .board-slip-tray { width: calc(100vw - 32px); }
+}
+
+@media (max-width: 767px) {
+  .board-research {
+    top: auto; left: 0; width: auto; height: 82vh; border-radius: 22px 22px 0 0;
+    transform: translateY(105%);
+  }
+  .board-layout--research[data-research-state="closed"] .board-research-tab { display: none; }
+  .board-slip-pill { display: none; }
+  .board-slip-tray { left: 0; width: 100vw; max-height: 82vh; z-index: 60; border-radius: 22px 22px 0 0; border-left: 0; border-right: 0; }
+  .board-mobile-bar {
+    display: flex; gap: 8px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(180deg, rgba(8, 19, 31, 0), #08131f 35%);
+  }
+  .board-mobile-bar button {
+    flex: 1; min-height: 48px; border-radius: 14px; cursor: pointer; font: 700 14px/1 "IBM Plex Sans", sans-serif;
+  }
+  .board-mobile-bar__ask { border: 0; background: #4c3fb8; color: #fff; }
+  .board-mobile-bar__slip { border: 0; background: #f3cf8a; color: #06121c; }
+  .board-layout--research .board-main { padding-bottom: 88px; }
+  /* iOS zooms any focused input under 16px. */
+  .board-research .ask-bar__input { font-size: 16px; }
+}
+
+/* ---- Layer 2 compact blotter: 9 columns that fit beside the research rail ---- */
+.board-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.board-layout--research table.board-blotter { min-width: 760px; }
+.board-blotter__pick { display: flex; gap: 10px; align-items: center; min-width: 200px; }
+.board-blotter__pick-text { min-width: 0; }
+.board-blotter__line { color: var(--cards-accent-strong); font-weight: 600; font-size: 13px; }
+.board-blotter__sim { min-width: 96px; }
+.board-blotter__sim .board-badge { margin-top: 4px; }
+.board-blotter__sim-prob { font-weight: 700; }
+.board-blotter__actions { display: grid; grid-template-columns: repeat(2, auto); gap: 4px; justify-content: start; }
+.board-blotter__actions .board-action-button { min-width: 36px; min-height: 32px; padding: 4px 8px; }
+
+/* ---- toolbar day row + phone filter sheet (approved mockup 2026-10-08) ---- */
+.board-toolbar-day { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; min-width: 0; max-width: 100%; }
+.board-toolbar-row > * { min-width: 0; max-width: 100%; }
+/* A grid item's min-width is its content, so one unwrapped pill rail widened the whole page on a phone (measured 1,560px at a 390px viewport). */
+.board-toolbar { grid-template-columns: minmax(0, 1fr); }
+.board-toolbar > * { min-width: 0; }
+.board-filter-sheet-open, .board-filter-sheet-head, .board-filter-sheet-done { display: none; }
+
+@media (min-width: 1024px) and (max-width: 1279px) {
+  /* iPad landscape: 7 columns beside a 260px rail; Move is in the row's tooltip trail. */
+  .board-layout--research table.board-blotter { min-width: 0; }
+  .board-layout--research table.board-blotter th[data-sort-key="move"],
+  .board-layout--research table.board-blotter td[data-label="Move"] { display: none; }
+}
+
+@media (max-width: 767px) {
+  .board-toolbar-day { width: 100%; }
+  .board-toolbar-day .board-tabs { flex: 1 1 100%; }
+  .board-filter-sheet-open {
+    display: block; width: 100%; min-height: 48px; border-radius: 14px; cursor: pointer; text-align: left; padding: 0 14px;
+    border: 1px solid var(--cards-line-strong); background: #0d1c2a; color: var(--cards-text); font: 600 14px/1 "IBM Plex Sans", sans-serif;
+  }
+  .board-filter-grid {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; max-height: 80vh; overflow-y: auto; box-sizing: border-box;
+    padding: 16px 14px calc(16px + env(safe-area-inset-bottom, 0px)); border-radius: 22px 22px 0 0;
+    background: #0f1e2f; border-top: 1px solid var(--cards-line-strong); box-shadow: 0 -16px 40px rgba(0, 0, 0, .5);
+    transform: translateY(105%); visibility: hidden; transition: transform .2s ease, visibility .2s;
+  }
+  #board-toolbar[data-filter-sheet="open"] .board-filter-grid { transform: none; visibility: visible; }
+  /* A column that WRAPS sends its tail into an off-screen second column. */
+  .board-filter-grid { flex-wrap: nowrap; overflow-x: hidden; }
+  .board-filter-grid > * { max-width: 100%; }
+  .board-filter-sheet-head { display: flex; align-items: center; justify-content: space-between; font: 600 17px/1 "Space Grotesk", sans-serif; }
+  .board-filter-sheet-clear { min-height: 44px; border: 0; background: none; color: var(--cards-accent-strong); font: 600 14px/1 "IBM Plex Sans", sans-serif; cursor: pointer; }
+  .board-filter-sheet-done {
+    display: block; position: sticky; bottom: 0; width: 100%; min-height: 50px; margin-top: 8px; border: 0; border-radius: 14px; cursor: pointer;
+    background: linear-gradient(90deg, var(--cards-accent-strong), #f3cf8a); color: #06121c; font: 700 15px/1 "IBM Plex Sans", sans-serif;
+  }
+  .board-filter-grid .board-clear-filters { display: none; }
+}

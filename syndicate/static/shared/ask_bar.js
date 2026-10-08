@@ -133,6 +133,12 @@ window.SyndicateAskBar = (function () {
     inFlight = true;
     collapsed = false;
     saveCollapsed();
+    // The Layer 2 page opens its research rail on this, so an answer never
+    // lands in a hidden panel (lane layer2-board-ui-redesign). No listener on
+    // other pages: a no-op there.
+    try {
+      document.dispatchEvent(new CustomEvent("syndicate:ask", { detail: { question: trimmed, context: context || {} } }));
+    } catch (_error) { /* decoration only */ }
     setStatus("Thinking…", "loading");
     renderPanel();
 

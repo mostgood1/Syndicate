@@ -31,18 +31,21 @@
   <form id="board-toolbar" class="cards-control-card board-toolbar">
     <div class="board-toolbar-row">
       <div class="board-tabs cards-tabs" id="board-sport-tabs" role="tablist" aria-label="Sport filter"></div>
-      <div style="display:flex; gap:10px; align-items:center;">
+      <div class="board-toolbar-day">
         <div class="board-tabs cards-tabs" id="board-day-tabs" role="tablist" aria-label="Day"></div>
-        <input id="board-date" type="date" class="board-date-input" value="{{ initial_intelligence_selected_date | default('', true) }}" />
+        <input id="board-date" type="date" class="board-date-input" aria-label="Pick a date" value="{{ initial_intelligence_selected_date | default('', true) }}" />
         <button type="submit" class="cards-submit-button">Refresh</button>
       </div>
+      {# Phone only (board_cards.css): the filters below become a bottom sheet. #}
+      <button type="button" class="board-filter-sheet-open" id="board-filter-sheet-open" aria-controls="board-filter-grid" aria-expanded="false">Filters</button>
     </div>
     <!-- EVERY FILTER IS VISIBLE `[user 2026-10-08, lane layer2-board-ui-redesign]`.
          The "More filters" fold and the odds-range slider are gone. Each option
          shows how many rows it would leave given every OTHER filter
          (`filterOptionCount`), so a click that would empty the board says so
          before it is made; a zero option is dimmed, never hidden. -->
-    <div class="board-filter-grid">
+    <div class="board-filter-grid" id="board-filter-grid">
+      <div class="board-filter-sheet-head"><strong>Filters</strong><button type="button" class="board-filter-sheet-clear" data-filter-sheet-clear>Clear all</button></div>
       <div class="board-filter-group"><span class="board-filter-label">State</span><div class="board-tabs cards-tabs" id="board-state-tabs" role="tablist" aria-label="Game state filter"></div></div>
       <div class="board-filter-group"><span class="board-filter-label">Market</span><div class="board-tabs cards-tabs" id="board-market-tabs" role="tablist" aria-label="Market family filter"></div></div>
       <div class="board-filter-group"><span class="board-filter-label">Period</span><div class="board-tabs cards-tabs" id="board-period-tabs" role="tablist" aria-label="Full game or game intervals"></div></div>
@@ -53,6 +56,7 @@
       <div class="board-filter-group"><span class="board-filter-label">Layout</span><div class="board-tabs cards-tabs" id="board-view-tabs" role="tablist" aria-label="Board view"></div></div>
       <div class="board-filter-group board-filter-group--wide"><span class="board-filter-label">Bet type</span><div class="board-tabs cards-tabs board-tabs--wrap" id="board-bettype-tabs" role="tablist" aria-label="Bet type filter"></div></div>
       <button type="button" id="board-clear-filters" class="cards-nav-pill board-clear-filters" hidden>Clear filters</button>
+      <button type="button" class="board-filter-sheet-done" data-filter-sheet-close>Show plays</button>
     </div>
   </form>
 
@@ -130,7 +134,16 @@
     <div id="board-game-cards"></div>
   </section>
 
-  <div class="board-layout">
+  {# RESEARCH RAIL + BET SLIP TRAY `[user 2026-10-08, lane layer2-board-ui-redesign:
+     "seperate the bet slip from the ask the syndicate function ... shrinks the
+     bet slip by default but allows the ask the syndicate module to be present"]`.
+     Ask docks on the right (watchlist / portfolio / parlays tabbed under it); the
+     slip is a pill that opens a tray from the bottom and never covers a column.
+     NOT `.board-rail`, so the Layer 1 boards' `board_rail_toggle.js` stays a
+     no-op here. Breakpoints (board_cards.css `.board-layout--research`):
+     >=1280 340px rail; 1024-1279 260px; 768-1023 edge pull-out; <768 bottom
+     sheets opened from a pinned Ask / Slip bar. #}
+  <div class="board-layout board-layout--research" id="board-layout" data-research-state="open">
     <div class="board-main">
       <section>
         <div id="board-top-strip"></div>
@@ -140,29 +153,42 @@
         <div id="board-cards"></div>
       </section>
     </div>
-    <aside class="board-rail">
-      <section>
+    <aside class="board-research" id="board-research" aria-label="Research">
+      <div class="board-research__head">
         <h2 class="board-section-title">Ask the Syndicate</h2>
-        <div id="ask-bar-panel"></div>
-      </section>
-      <section>
-        <h2 class="board-section-title">Watchlist</h2>
-        <div id="watchlist-panel"></div>
-      </section>
-      <section>
-        <h2 class="board-section-title">Bet slip</h2>
-        <div id="bet-slip-panel"></div>
-      </section>
-      <section>
-        <h2 class="board-section-title">Portfolio</h2>
-        <div id="board-portfolio"></div>
-      </section>
-      <section>
-        <h2 class="board-section-title">Parlays</h2>
-        <div id="board-parlays"></div>
-      </section>
+        <button type="button" class="board-research__close" data-research-toggle aria-label="Hide Ask the Syndicate" aria-controls="board-research">⟩</button>
+      </div>
+      <div id="ask-bar-panel" class="board-research__ask"></div>
+      <div class="board-research__tabs" role="tablist" aria-label="Your picks">
+        <button type="button" role="tab" class="cards-tab is-active" data-research-tab="watchlist" aria-selected="true">Watchlist</button>
+        <button type="button" role="tab" class="cards-tab" data-research-tab="portfolio" aria-selected="false">Portfolio</button>
+        <button type="button" role="tab" class="cards-tab" data-research-tab="parlays" aria-selected="false">Parlays</button>
+      </div>
+      <div class="board-research__panel" data-research-panel="watchlist"><div id="watchlist-panel"></div></div>
+      <div class="board-research__panel" data-research-panel="portfolio" hidden><div id="board-portfolio"></div></div>
+      <div class="board-research__panel" data-research-panel="parlays" hidden><div id="board-parlays"></div></div>
     </aside>
+    <button type="button" class="board-research-tab" data-research-toggle aria-controls="board-research" aria-expanded="true">Ask the Syndicate ⟨</button>
   </div>
+
+  <div class="board-slip-dock" id="board-slip-dock" data-slip-state="closed">
+    <section class="board-slip-tray" id="board-slip-tray" aria-label="Bet slip">
+      <div class="board-slip-tray__head">
+        <h2 class="board-section-title">Bet slip</h2>
+        <button type="button" class="board-slip-tray__close" data-slip-toggle aria-controls="board-slip-tray">Minimise ▾</button>
+      </div>
+      <div id="bet-slip-panel"></div>
+    </section>
+    <button type="button" class="board-slip-pill" data-slip-toggle aria-controls="board-slip-tray" aria-expanded="false">
+      Bet slip · <span data-slip-count-label>0 picks</span> <span class="board-slip-pill__open" aria-hidden="true">Open ▴</span>
+    </button>
+  </div>
+
+  <nav class="board-mobile-bar" aria-label="Research and bet slip">
+    <button type="button" class="board-mobile-bar__ask" data-research-toggle aria-controls="board-research">Ask the Syndicate</button>
+    <button type="button" class="board-mobile-bar__slip" data-slip-toggle aria-controls="board-slip-tray">Slip · <span data-slip-count-n>0</span></button>
+  </nav>
+  <div class="board-sheet-scrim" id="board-sheet-scrim" hidden></div>
 </main>
 {% endblock %}
 
@@ -937,9 +963,48 @@
     return Object.keys(FILTER_DEFAULTS).every((key) => state[key] === FILTER_DEFAULTS[key]);
   }
 
+  // How many filters differ from the defaults -- the phone's "Filters · N on".
+  function nonDefaultFilterCount() {
+    return Object.keys(FILTER_DEFAULTS).filter((key) => state[key] !== FILTER_DEFAULTS[key]).length;
+  }
+
   function updateFilterDisclosure() {
     const clearButton = document.getElementById("board-clear-filters");
     if (clearButton) clearButton.hidden = filtersAtDefault();
+    const n = nonDefaultFilterCount();
+    const opener = document.getElementById("board-filter-sheet-open");
+    if (opener) opener.textContent = n ? `Filters · ${n} on` : "Filters";
+    const done = document.querySelector("[data-filter-sheet-close]");
+    if (done) {
+      const shown = lastRenderItems.length
+        ? lastRenderItems.filter(matchesFilters).filter(matchesClientFilters).filter(matchesLane).length
+        : null;
+      done.textContent = shown === null ? "Show plays" : `Show ${shown.toLocaleString()} play${shown === 1 ? "" : "s"}`;
+    }
+  }
+
+  // PHONE FILTER SHEET (approved mockup, 2026-10-08): under 768px the filter
+  // grid is a bottom sheet; sport and day stay on the page. The sheet's button
+  // states how many plays the current filters leave before it is closed.
+  function setFilterSheet(open) {
+    const toolbar = document.getElementById("board-toolbar");
+    if (!toolbar) return;
+    toolbar.setAttribute("data-filter-sheet", open ? "open" : "closed");
+    const opener = document.getElementById("board-filter-sheet-open");
+    if (opener) opener.setAttribute("aria-expanded", open ? "true" : "false");
+    const scrim = document.getElementById("board-sheet-scrim");
+    if (scrim && open) scrim.hidden = false;
+    if (scrim && !open) syncSheetScrim();
+  }
+
+  function setupFilterSheet() {
+    const opener = document.getElementById("board-filter-sheet-open");
+    if (opener) opener.addEventListener("click", () => setFilterSheet(true));
+    document.querySelectorAll("[data-filter-sheet-close]").forEach((button) => button.addEventListener("click", () => setFilterSheet(false)));
+    document.querySelectorAll("[data-filter-sheet-clear]").forEach((button) => button.addEventListener("click", () => clearRefinements()));
+    const scrim = document.getElementById("board-sheet-scrim");
+    if (scrim) scrim.addEventListener("click", () => setFilterSheet(false));
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape") setFilterSheet(false); });
   }
 
   function clearRefinements() {
@@ -3637,63 +3702,46 @@
   // a raw comparable primitive (not the display string) so e.g. odds sort
   // numerically (-150 before +200) rather than lexicographically. The
   // trailing action-button column has no entry -- it isn't sortable.
+  // NINE COLUMNS, NOT SIXTEEN `[user 2026-10-08, lane layer2-board-ui-redesign:
+  // "information isnt being hidden"]`. At 1440px beside the research rail the
+  // board column is ~1,070px and the old 16-column blotter was 1,446px, so the
+  // right-hand columns (Win%, Edge, Move) scrolled out of view whether or not
+  // the slip was open. Folded, not dropped:
+  //   * Lane + Line + Matchup -> the Pick cell (badge, the bet, the game);
+  //   * Odds + Book -> Best price (renderBlotterBook already carried the price);
+  //   * Projected + Win% + the sim tags -> Sim;
+  //   * Edge -> EV's tooltip (the same number on Layer 2 rows: ev_vs_fair);
+  //   * Live / Actual render only when a live row is on screen.
+  // Every old sort survives under its new column.
   const BLOTTER_COLUMNS = [
-    { key: "lane", label: "Lane", type: "number", getValue: (item) => (recommendationState(item) === "live" ? 1 : 0) },
-    // #243: the blended rank. Value (EV vs no-vig fair, plus the sim's
-    // disagreement at half weight) multiplied by how much the row deserves to
-    // be believed (field size, book freshness). Its components ship on the row
-    // and are shown in the cell title, because a single opaque number is not
-    // something a bettor should be asked to trust.
+    // #243: the blended rank; its components are in the cell title.
     { key: "score", label: "Score", type: "number", getValue: (item) => boardScoreValue(item) },
-    { key: "matchup", label: "Matchup", type: "string", getValue: (item) => displayTitle(item).toLowerCase() },
-    { key: "pick", label: "Pick", type: "string", getValue: (item) => (propLine(item) || "").toLowerCase() },
-    { key: "odds", label: "Odds", type: "number", getValue: (item) => {
-        const raw = Number(item.odds ?? item.odds_current);
-        return Number.isFinite(raw) ? raw : null;
-      } },
-    // #240: the price columns. Everything #215-#239 built lived ONLY in
-    // renderPriceStrip, which the card view calls and the blotter never did --
-    // and the blotter is the default view on any viewport over 900px. So the
-    // book, the best price, the no-vig fair price and the book clock were all
-    // being computed, shipped, and shown to nobody.
-    //
-    // Sorted by what makes each column actionable: Book sorts on the price
-    // IMPROVEMENT (biggest line-shopping gain first, which is the #211 +2.79
-    // ROI points made clickable), not on the price itself.
-    { key: "book", label: "Book", type: "number", getValue: (item) => priceImprovementValue(item) },
+    { key: "pick", label: "Pick", type: "string", getValue: (item) => displayTitle(item).toLowerCase() },
+    // Sorts on the price IMPROVEMENT available (#211: line shopping is +2.79
+    // ROI points), not on the price itself.
+    { key: "book", label: "Best price", type: "number", getValue: (item) => priceImprovementValue(item) },
     { key: "fair", label: "Fair", type: "number", getValue: (item) => fairPriceValue(item) },
     { key: "ev", label: "EV", type: "number", getValue: (item) => evVsFairValue(item) },
-    // Ascending puts the FRESHEST first, which is why missing-sorts-last
-    // matters here: a row with no book clock must not read as "brand new".
-    // Pregame sorts on when we last CHECKED (user 2026-10-02, "Last polled
-    // <=1h"); live keeps the book clock, where an unmoved number means a
-    // suspended market.
+    { key: "winpct", label: "Sim", type: "number", getValue: (item) => confidenceValue(item),
+      // `confidence` is the side-correct model probability (until 2026-08-21 it
+      // was the books-quoting multiplier). Blank where there is no model view.
+      title: "The simulation's probability that THIS side wins, with its projection and any dissent tag. Blank where we have no model view -- never a substitute number." },
+    { key: "move", label: "Move", type: "number", getValue: movementSortValue },
+    // Ascending = freshest first; pregame sorts on when we last CHECKED (user
+    // 2026-10-02), live on the book clock.
     { key: "age", label: "Age", type: "number", getValue: (item) => pregameCheckedAgeSeconds(item) ?? bookAgeValue(item) },
-    { key: "projected", label: "Projected", type: "number", getValue: (item) => {
-        const raw = Number(item.sim_projection ?? item.projected ?? item.projected_sim);
-        return Number.isFinite(raw) ? raw : null;
-      } },
-    { key: "live", label: "Live", type: "number", getValue: (item) => {
+    { key: "live", label: "Live", type: "number", liveOnly: true, getValue: (item) => {
         if (recommendationState(item) !== "live") return null;
         const candidateType = String(item.candidate_type || item.type || "").trim().toLowerCase();
         const isProp = candidateType === "prop" || Boolean(item.player_name || item.player_id);
         const raw = Number(isProp ? item.live_projection : (item.live_projection ?? item.live_total));
         return Number.isFinite(raw) ? raw : null;
       } },
-    { key: "actual", label: "Actual", type: "number", getValue: (item) => {
+    { key: "actual", label: "Actual", type: "number", liveOnly: true, getValue: (item) => {
         if (recommendationState(item) !== "live") return null;
         const raw = Number(item.actual);
         return Number.isFinite(raw) ? raw : null;
       } },
-    { key: "winpct", label: "Win%", type: "number", getValue: (item) => confidenceValue(item),
-      // `confidence` carried the BOOKS-QUOTING multiplier until 2026-08-21
-      // (0.5/0.7/0.85/1.0 straight off `_book_confidence`), so this column
-      // read "Win% 100%" to mean "5+ books quote this". It now carries the
-      // side-correct model probability and is blank where there is no model,
-      // which is the honest empty rather than a book count in a percent sign.
-      title: "The simulation's probability that THIS side wins. Blank where we have no model view for the row -- never a substitute number." },
-    { key: "edge", label: "Edge", type: "number", getValue: (item) => edgeValue(item) },
-    { key: "move", label: "Move", type: "number", getValue: movementSortValue },
   ];
 
   // Missing values always sort to the bottom regardless of direction --
@@ -3836,16 +3884,18 @@
     const activeColumn = BLOTTER_COLUMNS.find((col) => col.key === state.sortColumn) || BLOTTER_COLUMNS.find((col) => col.key === "score");
     const sortDirection = state.sortColumn ? state.sortDirection : "desc";
     const sorted = items.slice().sort((a, b) => compareBlotterItems(a, b, activeColumn, sortDirection));
-    const headerCells = BLOTTER_COLUMNS.map((col) => {
+    const anyLive = sorted.some((item) => recommendationState(item) === "live");
+    const visibleColumns = BLOTTER_COLUMNS.filter((col) => !col.liveOnly || anyLive);
+    const headerCells = visibleColumns.map((col) => {
       const active = col.key === activeColumn.key && Boolean(state.sortColumn);
       const arrow = active ? `<span class="board-blotter__sort-arrow">${sortDirection === "asc" ? "▲" : "▼"}</span>` : "";
-      return `<th class="board-blotter__sortable${active ? " board-blotter__sortable--active" : ""}" data-sort-key="${col.key}">${escapeHtml(col.label)}${arrow}</th>`;
+      return `<th class="board-blotter__sortable${active ? " board-blotter__sortable--active" : ""}" data-sort-key="${col.key}"${col.title ? ` title="${escapeHtml(col.title)}"` : ""}>${escapeHtml(col.label)}${arrow}</th>`;
     }).join("");
     container.innerHTML = `
       <div class="board-blotter-wrap">
         <table class="board-blotter">
           <thead>
-            <tr>${headerCells}<th></th></tr>
+            <tr>${headerCells}<th><span class="board-visually-hidden">Actions</span></th></tr>
           </thead>
           <tbody>
             ${sorted.map((item) => {
@@ -3952,34 +4002,38 @@
                 : "";
               return `
                 <tr ${rowAttrs}>
-                  <td data-label="State"><span class="board-badge board-badge--${itemState === "live" ? "live" : "pregame"}">${itemState === "live" ? "Live" : "Pre"}</span>${steamBadge}${simBadge}${simRailed}${simNoView}</td>
                   <td data-label="Score">${renderBlotterScore(item)}</td>
                   <td data-label="Pick" class="board-blotter__cell--primary">
-                    <div class="board-blotter__primary">${headshot}${escapeHtml(title)}</div>
-                    <div class="board-blotter__meta">${escapeHtml(sport)}${matchup ? " &middot; " + escapeHtml(matchup) : ""}${updatedDisplay ? ` &middot; <span title="${escapeHtml(updatedIso)}">${escapeHtml(updatedDisplay)}</span>` : ""}</div>
+                    <div class="board-blotter__pick">
+                      ${headshot}
+                      <div class="board-blotter__pick-text">
+                        <div class="board-blotter__primary">${escapeHtml(title)} <span class="board-badge board-badge--${itemState === "live" ? "live" : "pregame"}">${itemState === "live" ? "Live" : "Pre"}</span>${steamBadge}</div>
+                        <div class="board-blotter__line">${escapeHtml(propText || "")}${item.segment_label ? `<span class="board-segment-chip" title="This line is for ${escapeHtml(item.segment_label)}, not the full game">${escapeHtml(item.segment_label)}</span>` : ""}</div>
+                        <div class="board-blotter__meta">${escapeHtml(sport)}${matchup ? " &middot; " + escapeHtml(matchup) : ""}${updatedDisplay ? ` &middot; <span title="${escapeHtml(updatedIso)}">${escapeHtml(updatedDisplay)}</span>` : ""}</div>
+                      </div>
+                    </div>
                   </td>
-                  <td data-label="Line">${escapeHtml(propText || "-")}${item.segment_label ? `<span class="board-segment-chip" title="This line is for ${escapeHtml(item.segment_label)}, not the full game">${escapeHtml(item.segment_label)}</span>` : ""}</td>
-                  <td data-label="Odds">${oddsDisplay ? escapeHtml(oddsDisplay) : (hasMarket ? "&mdash;" : pendingMarketHtml)}</td>
-                  <td data-label="Book">${renderBlotterBook(item)}</td>
+                  <td data-label="Best price">${hasMarket ? renderBlotterBook(item) : pendingMarketHtml}</td>
                   <td data-label="Fair">${renderBlotterFair(item)}</td>
-                  <td data-label="EV">${renderBlotterEv(item)}</td>
+                  <td data-label="EV" title="Edge ${(edge * 100).toFixed(1)}%">${renderBlotterEv(item)}</td>
+                  <td data-label="Sim" class="board-blotter__sim">
+                    <div class="board-blotter__sim-prob">${confidence !== null ? Math.round(confidence * 100) + "%" : "&mdash;"}</div>
+                    ${projectedDisplay && !/%$/.test(projectedDisplay) ? `<div class="board-blotter__muted">proj ${escapeHtml(projectedDisplay)}</div>` : ""}
+                    ${simBadge}${simRailed}${simNoView}
+                  </td>
+                  <td data-label="Move">${movementHtml || "&mdash;"}</td>
                   <td data-label="Age">${renderBlotterAge(item)}</td>
-                  <td data-label="Projected">${projectedDisplay ? escapeHtml(projectedDisplay) : (hasMarket ? "&mdash;" : pendingMarketHtml)}</td>
-                  <td data-label="Live proj.">${liveDisplay ? escapeHtml(liveDisplay) : "&mdash;"}</td>
-                  <td data-label="Actual">${actualDisplay ? escapeHtml(actualDisplay) : "&mdash;"}</td>
-                  <td data-label="Confidence">${confidence !== null ? Math.round(confidence * 100) + "%" : "&mdash;"}</td>
-                  <td data-label="Edge" class="board-blotter__edge board-blotter__edge--${tier}">${(edge * 100).toFixed(1)}%</td>
-                  <td data-label="Movement">${movementHtml || "&mdash;"}</td>
-                  <td data-label="">
-                    <div style="display:flex;gap:6px;">
-                      <button type="button" class="board-action-button board-action-button--add" data-portfolio-action="add">Add</button>
-                      <button type="button" class="board-action-button board-action-button--slip" data-slip-action="toggle">🎫</button>
-                      <button type="button" class="board-action-button board-action-button--watch" data-watch-action="toggle">☆</button>
-                      <button type="button" class="board-action-button board-action-button--ask" data-ask-action="ask-pick">☰</button>
+                  ${anyLive ? `<td data-label="Live proj.">${liveDisplay ? escapeHtml(liveDisplay) : "&mdash;"}</td><td data-label="Actual">${actualDisplay ? escapeHtml(actualDisplay) : "&mdash;"}</td>` : ""}
+                  <td data-label="" class="board-blotter__actions-cell">
+                    <div class="board-blotter__actions">
+                      <button type="button" class="board-action-button board-action-button--add" data-portfolio-action="add" title="Add to portfolio">Add</button>
+                      <button type="button" class="board-action-button board-action-button--slip" data-slip-action="toggle" title="Add to bet slip" aria-label="Add to bet slip">🎫</button>
+                      <button type="button" class="board-action-button board-action-button--watch" data-watch-action="toggle" title="Watch" aria-label="Watch">☆</button>
+                      <button type="button" class="board-action-button board-action-button--ask" data-ask-action="ask-pick" title="Ask the Syndicate about this pick" aria-label="Ask the Syndicate">Ask</button>
                     </div>
                   </td>
                 </tr>
-                ${reasoning ? `<tr class="board-blotter__reason-row" ${rowAttrs}><td></td><td colspan="10">${escapeHtml(reasoning)}</td></tr>` : ""}
+                ${reasoning ? `<tr class="board-blotter__reason-row" ${rowAttrs}><td></td><td colspan="${visibleColumns.length}">${escapeHtml(reasoning)}</td></tr>` : ""}
               `;
             }).join("")}
           </tbody>
@@ -4296,6 +4350,143 @@
     `).join("");
   }
 
+  // RESEARCH RAIL + SLIP TRAY CONTROLLER (see the markup comment above
+  // `#board-layout`). Two independent states, each on its own element:
+  //   * `data-research-state` open|closed on #board-layout -- the Ask rail. Open
+  //     by default from 1024px up (it is the reason the rail exists), closed
+  //     below, where it is an overlay. A reader's explicit choice is remembered
+  //     per device class, because "I closed it on my phone" says nothing about
+  //     the desktop.
+  //   * `data-slip-state` open|closed on #board-slip-dock -- closed by default
+  //     everywhere; the pill carries the count so a closed slip never looks
+  //     empty.
+  // Asking about a row (ask_bar.js dispatches `syndicate:ask`) opens the rail,
+  // so "Ask" on a row never answers into a hidden panel. On a phone only one
+  // sheet is open at a time.
+  const RESEARCH_STORAGE_PREFIX = "syndicate_board_research_v1:";
+  const OVERLAY_QUERY = window.matchMedia ? window.matchMedia("(max-width: 1023px)") : null;
+  const PHONE_QUERY = window.matchMedia ? window.matchMedia("(max-width: 767px)") : null;
+
+  function researchDeviceClass() {
+    if (PHONE_QUERY && PHONE_QUERY.matches) return "phone";
+    if (OVERLAY_QUERY && OVERLAY_QUERY.matches) return "tablet";
+    return "desktop";
+  }
+
+  function readResearchPreference() {
+    try {
+      const value = window.localStorage.getItem(RESEARCH_STORAGE_PREFIX + researchDeviceClass());
+      if (value === "open" || value === "closed") return value;
+    } catch (_error) { /* storage unavailable: use the default */ }
+    return researchDeviceClass() === "desktop" ? "open" : "closed";
+  }
+
+  function rememberResearchPreference(value) {
+    try { window.localStorage.setItem(RESEARCH_STORAGE_PREFIX + researchDeviceClass(), value); } catch (_error) { /* ignore */ }
+  }
+
+  function syncSheetScrim() {
+    const scrim = document.getElementById("board-sheet-scrim");
+    const layout = document.getElementById("board-layout");
+    const dock = document.getElementById("board-slip-dock");
+    if (!scrim || !layout || !dock) return;
+    const overlay = researchDeviceClass() !== "desktop";
+    const researchOpen = layout.getAttribute("data-research-state") === "open";
+    const slipOpen = dock.getAttribute("data-slip-state") === "open";
+    const phone = researchDeviceClass() === "phone";
+    scrim.hidden = !((overlay && researchOpen) || (phone && slipOpen));
+  }
+
+  function setResearchState(value, options) {
+    const layout = document.getElementById("board-layout");
+    if (!layout) return;
+    layout.setAttribute("data-research-state", value);
+    document.querySelectorAll("[data-research-toggle]").forEach((button) => {
+      button.setAttribute("aria-expanded", value === "open" ? "true" : "false");
+    });
+    if (!(options && options.transient)) rememberResearchPreference(value);
+    // One sheet at a time on a phone.
+    if (value === "open" && researchDeviceClass() === "phone") setSlipState("closed");
+    syncSheetScrim();
+  }
+
+  function setSlipState(value) {
+    const dock = document.getElementById("board-slip-dock");
+    if (!dock) return;
+    dock.setAttribute("data-slip-state", value);
+    document.querySelectorAll("[data-slip-toggle]").forEach((button) => {
+      button.setAttribute("aria-expanded", value === "open" ? "true" : "false");
+    });
+    if (value === "open" && researchDeviceClass() === "phone") {
+      const layout = document.getElementById("board-layout");
+      if (layout) layout.setAttribute("data-research-state", "closed");
+    }
+    syncSheetScrim();
+  }
+
+  function selectResearchTab(name) {
+    document.querySelectorAll("[data-research-tab]").forEach((tab) => {
+      const on = tab.getAttribute("data-research-tab") === name;
+      tab.classList.toggle("is-active", on);
+      tab.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    document.querySelectorAll("[data-research-panel]").forEach((panel) => {
+      panel.hidden = panel.getAttribute("data-research-panel") !== name;
+    });
+  }
+
+  function updateSlipCount(count) {
+    const n = Number(count) || 0;
+    document.querySelectorAll("[data-slip-count-label]").forEach((node) => {
+      node.textContent = `${n} pick${n === 1 ? "" : "s"}`;
+    });
+    document.querySelectorAll("[data-slip-count-n]").forEach((node) => { node.textContent = String(n); });
+    const dock = document.getElementById("board-slip-dock");
+    if (dock) dock.setAttribute("data-slip-count", String(n));
+  }
+
+  function setupResearchAndSlip() {
+    setResearchState(readResearchPreference(), { transient: true });
+    setSlipState("closed");
+    document.querySelectorAll("[data-research-toggle]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const layout = document.getElementById("board-layout");
+        const open = layout && layout.getAttribute("data-research-state") === "open";
+        setResearchState(open ? "closed" : "open");
+      });
+    });
+    document.querySelectorAll("[data-slip-toggle]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const dock = document.getElementById("board-slip-dock");
+        setSlipState(dock && dock.getAttribute("data-slip-state") === "open" ? "closed" : "open");
+      });
+    });
+    document.querySelectorAll("[data-research-tab]").forEach((tab) => {
+      tab.addEventListener("click", () => selectResearchTab(tab.getAttribute("data-research-tab")));
+    });
+    const scrim = document.getElementById("board-sheet-scrim");
+    if (scrim) {
+      scrim.addEventListener("click", () => {
+        if (researchDeviceClass() !== "desktop") setResearchState("closed", { transient: true });
+        if (researchDeviceClass() === "phone") setSlipState("closed");
+      });
+    }
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      setSlipState("closed");
+      if (researchDeviceClass() !== "desktop") setResearchState("closed", { transient: true });
+    });
+    // Asking about a row opens the rail (transient: the reader did not choose
+    // to change their default, they asked a question).
+    document.addEventListener("syndicate:ask", () => setResearchState("open", { transient: true }));
+    document.addEventListener("syndicate:slip-count", (event) => updateSlipCount(event.detail && event.detail.count));
+    const seeded = document.querySelector("#bet-slip-panel .bet-slip__count");
+    updateSlipCount(seeded ? Number(seeded.textContent) : 0);
+    const onBreakpoint = () => { setResearchState(readResearchPreference(), { transient: true }); setSlipState("closed"); };
+    if (OVERLAY_QUERY && OVERLAY_QUERY.addEventListener) OVERLAY_QUERY.addEventListener("change", onBreakpoint);
+    if (PHONE_QUERY && PHONE_QUERY.addEventListener) PHONE_QUERY.addEventListener("change", onBreakpoint);
+  }
+
   // THE RESULTS BAR `[user 2026-10-08: "way more informative ... giving us
   // numbers by filter"]`. It replaced a strip that read "468 of 5435 pregame ·
   // 778 hidden by 0 filters": the 5,435 was every day in the window (not the
@@ -4540,6 +4731,8 @@
   renderBetSlip();
   window.SyndicateWatchlist.init();
   window.SyndicateAskBar.init();
+  setupResearchAndSlip();
+  setupFilterSheet();
   setRefreshStatus("Loading board…", "loading");
 
   void loadSlatePhases();

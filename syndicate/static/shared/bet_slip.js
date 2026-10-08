@@ -412,6 +412,8 @@ window.SyndicateBetSlip = (function () {
     try {
       const handle = document.querySelector(".board-rail .board-rail-handle");
       if (handle) handle.setAttribute("data-slip-count", String(count));
+      // The Layer 2 page's slip pill / phone bar (lane layer2-board-ui-redesign).
+      document.dispatchEvent(new CustomEvent("syndicate:slip-count", { detail: { count } }));
     } catch (e) {
       /* the badge is decoration; the slip is not */
     }
