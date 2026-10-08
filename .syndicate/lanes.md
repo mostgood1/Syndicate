@@ -1702,6 +1702,17 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **COUNT-SHAPE ROUND 2 (CONDITIONAL), PRE-REGISTERED 2026-10-08 (user: "if it fails, run the new round with the corrected hook grid"), before round 1's holdout is read:**
+  - RUNS ONLY if round 1 fails its checks.
+  - WHY: round 1's hook grid {-13, -10, -16, -19} was mis-specified in direction (my error). The table adds ~4.5 pitches/start, so the pitch-count hook fires sooner and outs fell (fit half: ~14.2 vs 15.39). The hook must LOOSEN; only -10 does, by 3.
+  - DESIGN: the same IPF table (count_table.json). Start from round 1's chosen config. Coordinate descent, 2 passes, 60 sims, on the window first half. Grids:
+    - `starter_hook_add_pitches` {-13, -8, -3, +2} (corrected direction);
+    - `base_in_play` {round-1 value, 0.20, 0.26};
+    - `k_logit_bias` {round-1 value, -0.15, +0.15}.
+    - Objective unchanged (13 moments + pitches/start).
+    - Then the map re-fit on FIT.
+  - HOLDOUT: the same window second half. **Disclosed: if round 1 reached its holdout read, this is a SECOND read of the same holdout for the same fix family.** It is the only regular-season data left, and the round-2 change (the hook grid) was fixed before that read.
+  - SHIP CHECKS: the same 8 as round 1, unchanged.
 - **COUNT-SHAPE FIX, PRE-REGISTERED 2026-10-08 ~15:30Z (user: "yes, build it and ship if it passes"), before any code:**
   - BASE = production now (6cd415f3: the combined calibration + hr_rate_mult 1.5 + its maps).
   - ENGINE: `PitchModelConfig.count_outcome_mult` {"b-s": {ball, called, swing, foul, inplay: mult}}, multiplied into the outcome weights immediately before pitch_model's normalisation.
