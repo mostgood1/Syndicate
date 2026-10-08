@@ -44,6 +44,8 @@ different lens input" instead of diverging for unstated reasons. The hash is
 over the normalised games, not the raw payload, because the raw payload churns
 on timestamps that change nothing.
 
+- **NBA LENS SIZE `[measured 2026-10-08, lane nba-live-lens-oversize-write]`:** the NBA snapshot is now ~250 KB (6-game preseason slate). It hit 9.6 MB on 10-08 and was REFUSED at the 8 MB keyvalue cap from 05:52Z to 14:29Z because SmartSim per-player rows (~530 KB/game, `prop_ladders`) rode inside its games list, which it stores 3x. ac48cdcd strips them (lazy route `/nba/api/cards/sim-detail` serves them). Other keys near the cap, same day: `query_state_cache.json` swings 4.9-8.06 MB and was refused 232x 10-07 05:11Z..10-08 00:45Z; `execution_ledger.json` grows ~0.85 MB/day (1.05 MB 10-02 -> 6.21 MB 10-08, cap ~10-10 at that rate); `polymarket_us_games.json` flat at 7.10-7.11 MB for 4 days. Local fleet Redis: `maxmemory 0`, `noeviction`, 457 MB used.
+
 ## [live-surface-tier5] THE LIVE SURFACE — Tier 5 `[measured 08-15 02:3x–03:0xZ]`
 
 Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md`.
