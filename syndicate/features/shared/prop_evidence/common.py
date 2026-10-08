@@ -135,8 +135,10 @@ _READ_CACHE: "ContextVar[dict | None]" = ContextVar("prop_evidence_read_cache", 
 
 
 @contextmanager
-def build_read_cache() -> Iterator[dict]:
-    cache: dict = {}
+def build_read_cache(cache: dict | None = None) -> Iterator[dict]:
+    """Activate a read cache; pass the SAME dict again to reuse it across calls
+    (a board build keeps one in its per-build context)."""
+    cache = {} if cache is None else cache
     token = _READ_CACHE.set(cache)
     try:
         yield cache

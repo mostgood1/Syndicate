@@ -1130,18 +1130,24 @@ class NcaafBox:
     other_school_games: list[dict[str, Any]] = field(default_factory=list)
 
 
-def _ncaaf_box(subject: PropSubject, home: str | None, away: str | None) -> NcaafBox | None:
-    """ONE pass over the CFBD player-game snapshot: the player's lines plus per-team game sums."""
-    path = C.first_existing(NCAAF_DIR, "processed/player_game_stats/ncaaf_player_game_stats_snapshot.csv")
-    if path is None:
-        return None
-    wanted = {_fold(t): t for t in (home, away) if t}
-    matcher = NameMatcher(subject.player_name)
-    mine: dict[str, dict[str, Any]] = {}
-    other: list[dict[str, Any]] = []
+def _ncaaf_snapshot(path: Path):
+    """The CFBD player-game snapshot, parsed once: (rows, team_game, game_meta, dates, by_name).
+
+    PLAYER-INDEPENDENT, so inside `C.build_read_cache()` it is built once per
+    (path, mtime, size) and shared by every card (lane intelligence-evidence-
+    coverage, 2026-10-08: the per-card full pass measured ~12 s/card on the
+    fleet's 52,276-row snapshot). Outside a cache it is built per call, exactly
+    as the one-pass loop was. `team_game` / `game_meta` are READ-ONLY to callers.
+    """
+    cache = C._READ_CACHE.get()
+    key = C._cache_key(path) if cache is not None else None
+    if key is not None and ("ncaaf_snapshot", key) in cache:
+        return cache[("ncaaf_snapshot", key)]
+    rows: list[tuple[str, str, dict[str, Any], dict[str, Any]]] = []
     team_game: dict[tuple[str, str], dict[str, float]] = {}
     game_meta: dict[str, dict[str, Any]] = {}
     dates: set[str] = set()
+    by_name: dict[str, list[int]] = {}
     try:
         for row in C.iter_csv(path):
             gid = str(row.get("game_id") or "").strip()
@@ -1171,16 +1177,44 @@ def _ncaaf_box(subject: PropSubject, home: str | None, away: str | None) -> Ncaa
                     sums[col] += value
             if row.get("source_snapshot_date"):
                 dates.add(str(row.get("source_snapshot_date")))
-            if matcher(row.get("player_name")):
-                entry.update({"game_id": gid, "team": team, "season": row.get("season"), "week": row.get("week"),
-                              "player_id": str(row.get("player_id") or "").strip()})
-                if _fold(team) in wanted:
-                    mine.setdefault(gid, entry)
-                else:
-                    other.append(entry)
+            extra = {"game_id": gid, "team": team, "season": row.get("season"), "week": row.get("week"),
+                     "player_id": str(row.get("player_id") or "").strip()}
+            by_name.setdefault(str(row.get("player_name") or ""), []).append(len(rows))
+            rows.append((gid, team, entry, extra))
     except Exception:
         logger.exception("prop_evidence football: unreadable %s", path)
         return None
+    value = (rows, team_game, game_meta, dates, by_name)
+    if key is not None:
+        cache[("ncaaf_snapshot", key)] = value
+    return value
+
+
+def _ncaaf_box(subject: PropSubject, home: str | None, away: str | None) -> NcaafBox | None:
+    """ONE pass over the CFBD player-game snapshot: the player's lines plus per-team game sums."""
+    path = C.first_existing(NCAAF_DIR, "processed/player_game_stats/ncaaf_player_game_stats_snapshot.csv")
+    if path is None:
+        return None
+    wanted = {_fold(t): t for t in (home, away) if t}
+    matcher = NameMatcher(subject.player_name)
+    mine: dict[str, dict[str, Any]] = {}
+    other: list[dict[str, Any]] = []
+    snapshot = _ncaaf_snapshot(path)
+    if snapshot is None:
+        return None
+    rows, team_game, game_meta, dates, by_name = snapshot
+    # The matcher runs once per DISTINCT name, then the matched rows are walked in
+    # FILE ORDER -- so `mine.setdefault` keeps the same first occurrence the
+    # one-pass loop kept. Entries are copied: `opponent` is written into them below.
+    matched = sorted(i for name, positions in by_name.items() if matcher(name) for i in positions)
+    for i in matched:
+        gid, team, base, extra = rows[i]
+        entry = dict(base)
+        entry.update(extra)
+        if _fold(team) in wanted:
+            mine.setdefault(gid, entry)
+        else:
+            other.append(entry)
 
     def _order(g: dict[str, Any]) -> tuple[int, int, str]:
         return int(C.to_float(g.get("season")) or 0), int(C.to_float(g.get("week")) or 0), str(g.get("game_id") or "")

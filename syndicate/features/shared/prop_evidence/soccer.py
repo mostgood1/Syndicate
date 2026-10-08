@@ -204,7 +204,18 @@ def slate_window(selected_date: str) -> list[str]:
 def load_index(roots: list[Path], selected_date: str, window: list[str]):
     from syndicate.features.shared import soccer_projections
 
-    return soccer_projections.load_soccer_projections(roots, selected_date, window_dates=window)
+    # Inside `C.build_read_cache()` (a board build) the index is loaded once per
+    # (roots, date, window) and shared: per card it re-read ~33 projection files
+    # and re-folded every name, ~5 s/card on the fleet (2026-10-08). A cache
+    # lives for one build, so no staleness key is needed. Outside it: unchanged.
+    cache = C._READ_CACHE.get()
+    key = ("soccer_index", tuple(str(root) for root in roots), selected_date, tuple(window or ()))
+    if cache is not None and key in cache:
+        return cache[key]
+    value = soccer_projections.load_soccer_projections(roots, selected_date, window_dates=window)
+    if cache is not None:
+        cache[key] = value
+    return value
 
 
 def lookup_player(pool: Mapping[str, Any], board_name: Any) -> tuple[Any, str]:

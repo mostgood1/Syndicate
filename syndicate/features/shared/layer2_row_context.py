@@ -87,8 +87,8 @@ _LEAD_SENTENCE_RE = re.compile(
 
 def load_layer2_row_context(selected_date: Any) -> dict[str, Any]:
     """The per-build context the card builder reads. Never raises."""
-    context: dict[str, Any] = {"narratives": {}, "nfl_espn_ids": {}, "errors": {}}
     date_text = str(selected_date or "").strip()
+    context: dict[str, Any] = {"narratives": {}, "nfl_espn_ids": {}, "errors": {}, "selected_date": date_text}
     if not date_text:
         return context
     try:
@@ -369,6 +369,11 @@ def row_explainer(
     narrative = row_narrative(row, context)
     if narrative and narrative.get("text"):
         parts.append(str(narrative["text"]))
+    # RECENCY + MATCHUP LEAD the evidence (user 2026-10-08): right after the
+    # price/sim sentence, before projection detail and season context.
+    recent = row_recent_matchup_text(row, context)
+    if recent:
+        parts.insert(1 if parts else 0, recent)
     season = row_season_text(row, context)
     if season:
         parts.append(season)
@@ -391,6 +396,74 @@ def row_explainer(
 # Memoised in the per-build `context` dict: thousands of rows share a few
 # hundred games, and the signal for a game side does not depend on the book or
 # the line. A caller with no context (None) still gets the sentence, unmemoised.
+
+# Sports whose prop recency/matchup evidence is cheap enough per card for a
+# board build -- warm, cached, measured on the fleet 2026-10-08 after the read
+# cache, the name memo and the NCAAF/soccer index fixes: wnba 30 ms, nfl 7 ms,
+# ncaaf 71 ms, soccer 69 ms, nhl 103 ms per card (identical facts cached vs
+# uncached). MLB is served by its batter-vs-pitcher path, not this one.
+_RECENT_MATCHUP_SPORTS = frozenset({"nba", "wnba", "nfl", "nhl", "ncaaf", "soccer"})
+# Per-build, PER-SPORT budget: cards are built in board order, so each sport's
+# top rows are served first, and one slow sport can neither starve the others
+# (measured 2026-10-08: a single shared 120 s budget ran out before NHL got any)
+# nor stretch a build by more than this per sport.
+_RECENT_MATCHUP_BUDGET_SECONDS_PER_SPORT = 30.0
+# Sentences persist ACROSS builds for this long: form and matchup data change
+# daily, so a later build only computes picks it has not seen. Only the short
+# strings persist -- parsed logs live in the per-build read cache and are freed.
+_RECENT_MATCHUP_TTL_SECONDS = 1800.0
+_RECENT_MATCHUP_TEXT: dict[tuple, tuple[float, str | None]] = {}
+_RECENT_MATCHUP_TEXT_MAX = 20000
+_RECENT_MATCHUP_MODULE: dict[int, dict] = {}
+
+
+def row_recent_matchup_text(row: Mapping[str, Any], context: Mapping[str, Any] | None = None) -> str | None:
+    """'Recent form: ... Matchup: ...' for a prop row, or None. Never raises."""
+    import time as _time
+
+    try:
+        sport = str(row.get("sport") or "").strip().lower()
+        if sport not in _RECENT_MATCHUP_SPORTS or str(row.get("kind") or "").lower() != "prop":
+            return None
+        from syndicate.features.intelligence_recent_matchup import _memo_key, prop_recent_matchup_text
+        from syndicate.features.shared.prop_evidence.common import build_read_cache, eastern_date
+
+        commence = str(row.get("commence_time") or "").strip()
+        # The BUILD's date when there is one (Ask passes the board date too): keyed
+        # per game date, soccer re-loaded its projection index for every kickoff
+        # date in the window (70 s on the fleet, 2026-10-08).
+        board_date = str((context or {}).get("selected_date") or "").strip() if isinstance(context, Mapping) else ""
+        selected = board_date or (eastern_date(commence) if commence else None) or _date.today().isoformat()
+        key = (selected,) + _memo_key(row)
+        now = _time.monotonic()
+        hit = _RECENT_MATCHUP_TEXT.get(key)
+        if hit is not None and now - hit[0] < _RECENT_MATCHUP_TTL_SECONDS:
+            return hit[1]
+        if isinstance(context, dict):
+            state = context.setdefault("recent_matchup", {"read_cache": {}, "spent": {}, "logged": set()})
+        else:
+            bucket = int(_time.time() // 60)
+            for stale in [k for k in _RECENT_MATCHUP_MODULE if k != bucket]:
+                _RECENT_MATCHUP_MODULE.pop(stale, None)
+            state = _RECENT_MATCHUP_MODULE.setdefault(bucket, {"read_cache": {}, "spent": {}, "logged": set()})
+        spent = state["spent"].get(sport, 0.0)
+        if spent >= _RECENT_MATCHUP_BUDGET_SECONDS_PER_SPORT:
+            if sport not in state["logged"]:
+                state["logged"].add(sport)
+                print(f"[layer2_row_context] RECENT_MATCHUP_BUDGET_SPENT sport={sport} seconds={spent:.1f}", flush=True)
+            return None
+        started = _time.perf_counter()
+        with build_read_cache(state["read_cache"]):
+            text = prop_recent_matchup_text(row, selected_date=selected)
+        state["spent"][sport] = spent + (_time.perf_counter() - started)
+        if len(_RECENT_MATCHUP_TEXT) >= _RECENT_MATCHUP_TEXT_MAX:
+            _RECENT_MATCHUP_TEXT.clear()
+        _RECENT_MATCHUP_TEXT[key] = (now, text)
+        return text
+    except Exception as exc:  # noqa: BLE001 -- enrichment must never break the build
+        print(f"[layer2_row_context] RECENT_MATCHUP_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return None
+
 
 _PITCHER_MARKET_PREFIX = ("pitcher_",)
 _SEASON_TEXT_MEMO: dict[int, dict] = {}
