@@ -1696,6 +1696,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **HR ship correction + weather check 2026-10-08:** 11 maps were re-fit at 1.5, not 12: hits 1/2/3+, hr_1plus, rbi 3+, runs 2/3+, TB 1-4+. Weather does NOT explain the June spike. Open-air game-time mean temperature: Jun 77.9F, Jul 80.1F, Aug 79.5F, Sep 75.4F. June was cooler than Jul/Aug yet had the most HR (.0343 vs .0320/.0290). The model weather HR mult already tracks temperature (1.011 / 1.020 / 1.030 / 1.012).
 - **USER OVERRIDE, LOGGED 2026-10-08 -- user, verbatim: "yes, set HR to 1.5 and scope the count-shape fix".**
   - The pre-registered HR re-fit FAILED checks 4 (outs +0.166), 6 (June runs gap 1.340) and 7 (June HR z -3.70). Shipping 1.5 is the user's decision, made with the cause disclosed: June 2026 was a league-wide HR spike (.0343 vs season .0303), not predictable as-of, and 1.5 fits the rest of the season (holdout runs gap 0.691 -> 0.116, HR z +4.76 -> -0.05).
   - SHIP CONTENT:

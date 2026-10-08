@@ -78,97 +78,52 @@
     "hits_1plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 0.46604489063333326,
-      "b": 0.25262746482420895,
+      "a": 0.37832490396587704,
+      "b": 0.19658321946815388,
       "diag": {
-        "generated_at": "2026-10-07",
-        "lane": "mlb-combined-calibration (Syndicate)",
-        "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
-        "validation": {
-          "objective": [
-            10060.33,
-            34.14
-          ],
-          "runs_gap": [
-            0.786,
-            0.496
-          ],
-          "prop_logloss": [
-            0.38917,
-            0.388
-          ],
-          "starter_bias_change": {
-            "SO": -0.494,
-            "H": -0.182,
-            "BB": 0.121,
-            "ER": 0.026
-          }
-        },
-        "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
-        "fit": "penalised affine-logit (L2 lambda=10), mlb-hr-prop-calibration procedure, on the COMBINED engine config",
+        "generated_at": "2026-10-08",
+        "lane": "mlb-statsapi-asof-rebuild (Syndicate)",
+        "basis": "StatsAPI-only as-of rebuild of 07-16..09-27 (985 games). Fit 07-16..08-21: interior optimum 1.5 (objective 105.0/74.2/64.0/74.0/96.1 for 1.1/1.3/1.5/1.7/1.856). Holdout 08-22..09-27: runs gap 0.691 -> 0.116, HR z +4.76 -> -0.05, prop log-loss 0.37045 -> 0.36910.",
+        "override": "Pre-registered checks 4 (outs +0.166), 6 and 7 (June guard: HR z -3.70, runs gap 1.34) FAILED. Shipped by explicit user decision: June 2026 was a league-wide HR spike (.0343 vs season .0303); 1.856 was fitted inside it.",
+        "fit": "penalised affine-logit at hr_rate_mult 1.5",
         "previous": {
-          "a": 0.5104103212201277,
-          "b": 0.2958689062844206
+          "a": 0.46604489063333326,
+          "b": 0.25262746482420895
         }
       }
     },
     "hits_2plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 0.42149700295978537,
-      "b": -0.7120389061854233,
+      "a": 0.4400560735411921,
+      "b": -0.7618734540222056,
       "diag": {
-        "generated_at": "2026-10-07",
-        "lane": "mlb-combined-calibration (Syndicate)",
-        "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
-        "validation": {
-          "objective": [
-            10060.33,
-            34.14
-          ],
-          "runs_gap": [
-            0.786,
-            0.496
-          ],
-          "prop_logloss": [
-            0.38917,
-            0.388
-          ],
-          "starter_bias_change": {
-            "SO": -0.494,
-            "H": -0.182,
-            "BB": 0.121,
-            "ER": 0.026
-          }
-        },
-        "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
-        "fit": "penalised affine-logit (L2 lambda=10), mlb-hr-prop-calibration procedure, on the COMBINED engine config",
+        "generated_at": "2026-10-08",
+        "lane": "mlb-statsapi-asof-rebuild (Syndicate)",
+        "basis": "StatsAPI-only as-of rebuild of 07-16..09-27 (985 games). Fit 07-16..08-21: interior optimum 1.5 (objective 105.0/74.2/64.0/74.0/96.1 for 1.1/1.3/1.5/1.7/1.856). Holdout 08-22..09-27: runs gap 0.691 -> 0.116, HR z +4.76 -> -0.05, prop log-loss 0.37045 -> 0.36910.",
+        "override": "Pre-registered checks 4 (outs +0.166), 6 and 7 (June guard: HR z -3.70, runs gap 1.34) FAILED. Shipped by explicit user decision: June 2026 was a league-wide HR spike (.0343 vs season .0303); 1.856 was fitted inside it.",
+        "fit": "penalised affine-logit at hr_rate_mult 1.5",
         "previous": {
-          "a": 0.5032507735025726,
-          "b": -0.5474560993371611
+          "a": 0.42149700295978537,
+          "b": -0.7120389061854233
         }
       }
     },
     "hits_3plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 0.8998575940348083,
-      "b": -0.6502503555354828,
+      "a": 0.6794007557089323,
+      "b": -1.0067435521359867,
       "diag": {
-        "n": 7470,
-        "iters": 5,
-        "nll_before": 1390.544598360215,
-        "nll_after": 1362.2809138754121,
-        "sum_w": 7470.0,
-        "prior_a": 1.0,
-        "prior_b": 0.0,
-        "l2_a": 0.001,
-        "l2_b": 0.001,
-        "val_logloss": 0.16778618414497057,
-        "val_brier": 0.03897196547508784,
-        "selected_l2": 0.001,
-        "selected_l2_b": 0.001,
-        "rank_weight_alpha": 0.0
+        "generated_at": "2026-10-08",
+        "lane": "mlb-statsapi-asof-rebuild (Syndicate)",
+        "basis": "StatsAPI-only as-of rebuild of 07-16..09-27 (985 games). Fit 07-16..08-21: interior optimum 1.5 (objective 105.0/74.2/64.0/74.0/96.1 for 1.1/1.3/1.5/1.7/1.856). Holdout 08-22..09-27: runs gap 0.691 -> 0.116, HR z +4.76 -> -0.05, prop log-loss 0.37045 -> 0.36910.",
+        "override": "Pre-registered checks 4 (outs +0.166), 6 and 7 (June guard: HR z -3.70, runs gap 1.34) FAILED. Shipped by explicit user decision: June 2026 was a league-wide HR spike (.0343 vs season .0303); 1.856 was fitted inside it.",
+        "fit": "penalised affine-logit at hr_rate_mult 1.5",
+        "previous": {
+          "a": 0.8998575940348083,
+          "b": -0.6502503555354828
+        }
       }
     },
     "rbi_1plus": {
@@ -225,23 +180,18 @@
     "rbi_3plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 1.1082234689950647,
-      "b": -0.052743929541283804,
+      "a": 0.8039672829681959,
+      "b": -0.7759008540284235,
       "diag": {
-        "n": 7074,
-        "iters": 4,
-        "nll_before": 965.4929656182464,
-        "nll_after": 940.9650615447678,
-        "sum_w": 7074.0,
-        "prior_a": 1.0,
-        "prior_b": 0.0,
-        "l2_a": 1000.0,
-        "l2_b": 1000.0,
-        "val_logloss": 0.1417911732909422,
-        "val_brier": 0.031937712428131454,
-        "selected_l2": 1000.0,
-        "selected_l2_b": 1000.0,
-        "rank_weight_alpha": 0.0
+        "generated_at": "2026-10-08",
+        "lane": "mlb-statsapi-asof-rebuild (Syndicate)",
+        "basis": "StatsAPI-only as-of rebuild of 07-16..09-27 (985 games). Fit 07-16..08-21: interior optimum 1.5 (objective 105.0/74.2/64.0/74.0/96.1 for 1.1/1.3/1.5/1.7/1.856). Holdout 08-22..09-27: runs gap 0.691 -> 0.116, HR z +4.76 -> -0.05, prop log-loss 0.37045 -> 0.36910.",
+        "override": "Pre-registered checks 4 (outs +0.166), 6 and 7 (June guard: HR z -3.70, runs gap 1.34) FAILED. Shipped by explicit user decision: June 2026 was a league-wide HR spike (.0343 vs season .0303); 1.856 was fitted inside it.",
+        "fit": "penalised affine-logit at hr_rate_mult 1.5",
+        "previous": {
+          "a": 1.1082234689950647,
+          "b": -0.052743929541283804
+        }
       }
     },
     "rbi_4plus": {
@@ -306,52 +256,35 @@
     "runs_2plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 0.8162571315913764,
-      "b": -0.3393530599046219,
+      "a": 0.688093299261062,
+      "b": -0.8034777924691044,
       "diag": {
-        "fit": "Syndicate lane mlb-hr-prop-calibration 2026-10-06: penalised affine-logit (L2 lambda=10 toward a=1,b=0), Newton",
-        "engine": "current production engine replayed over stored as-of roster_objs (scripts/mlb_hitter_prop_replay.py, 200 sims), raw P(X>=k) per lineup batter who appeared",
-        "tune": "2026-06-15..07-03, n=3024",
-        "holdout": "2026-07-04..07-12, n=1930, read once",
-        "holdout_rate": 0.08393782383419689,
-        "holdout_logloss": {
-          "previous": 0.2933867463603052,
-          "refit": 0.2909749782769699,
-          "identity": 0.2928381872139893
-        },
-        "holdout_mean_p": {
-          "previous": 0.06061525518000245,
-          "refit": 0.09440348709373057,
-          "identity": 0.08850000000000002
-        },
+        "generated_at": "2026-10-08",
+        "lane": "mlb-statsapi-asof-rebuild (Syndicate)",
+        "basis": "StatsAPI-only as-of rebuild of 07-16..09-27 (985 games). Fit 07-16..08-21: interior optimum 1.5 (objective 105.0/74.2/64.0/74.0/96.1 for 1.1/1.3/1.5/1.7/1.856). Holdout 08-22..09-27: runs gap 0.691 -> 0.116, HR z +4.76 -> -0.05, prop log-loss 0.37045 -> 0.36910.",
+        "override": "Pre-registered checks 4 (outs +0.166), 6 and 7 (June guard: HR z -3.70, runs gap 1.34) FAILED. Shipped by explicit user decision: June 2026 was a league-wide HR spike (.0343 vs season .0303); 1.856 was fitted inside it.",
+        "fit": "penalised affine-logit at hr_rate_mult 1.5",
         "previous": {
-          "a": 0.6914549333898226,
-          "b": -1.107618834404751,
-          "fitted": "2026-09-01"
-        },
-        "disclosure": "the previous map was fitted on a window containing these dates, so it was judged in-sample here"
+          "a": 0.8162571315913764,
+          "b": -0.3393530599046219
+        }
       }
     },
     "runs_3plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 0.1824074110113749,
-      "b": -4.031575786592906,
+      "a": 0.8867510866214953,
+      "b": -0.6507037124546192,
       "diag": {
-        "n": 7074,
-        "iters": 6,
-        "nll_before": 373.9677952776428,
-        "nll_after": 329.2549808190909,
-        "sum_w": 7074.0,
-        "prior_a": 1.0,
-        "prior_b": 0.0,
-        "l2_a": 0.3,
-        "l2_b": 0.3,
-        "val_logloss": 0.0684835306275068,
-        "val_brier": 0.012461046879310985,
-        "selected_l2": 0.3,
-        "selected_l2_b": 0.3,
-        "rank_weight_alpha": 0.0
+        "generated_at": "2026-10-08",
+        "lane": "mlb-statsapi-asof-rebuild (Syndicate)",
+        "basis": "StatsAPI-only as-of rebuild of 07-16..09-27 (985 games). Fit 07-16..08-21: interior optimum 1.5 (objective 105.0/74.2/64.0/74.0/96.1 for 1.1/1.3/1.5/1.7/1.856). Holdout 08-22..09-27: runs gap 0.691 -> 0.116, HR z +4.76 -> -0.05, prop log-loss 0.37045 -> 0.36910.",
+        "override": "Pre-registered checks 4 (outs +0.166), 6 and 7 (June guard: HR z -3.70, runs gap 1.34) FAILED. Shipped by explicit user decision: June 2026 was a league-wide HR spike (.0343 vs season .0303); 1.856 was fitted inside it.",
+        "fit": "penalised affine-logit at hr_rate_mult 1.5",
+        "previous": {
+          "a": 0.1824074110113749,
+          "b": -4.031575786592906
+        }
       }
     },
     "sb_1plus": {
@@ -379,148 +312,68 @@
     "total_bases_1plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 0.46604489063333326,
-      "b": 0.25262746482420895,
+      "a": 0.37832490396587704,
+      "b": 0.19658321946815388,
       "diag": {
-        "generated_at": "2026-10-07",
-        "lane": "mlb-combined-calibration (Syndicate)",
-        "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
-        "validation": {
-          "objective": [
-            10060.33,
-            34.14
-          ],
-          "runs_gap": [
-            0.786,
-            0.496
-          ],
-          "prop_logloss": [
-            0.38917,
-            0.388
-          ],
-          "starter_bias_change": {
-            "SO": -0.494,
-            "H": -0.182,
-            "BB": 0.121,
-            "ER": 0.026
-          }
-        },
-        "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
-        "fit": "penalised affine-logit (L2 lambda=10), mlb-hr-prop-calibration procedure, on the COMBINED engine config",
+        "generated_at": "2026-10-08",
+        "lane": "mlb-statsapi-asof-rebuild (Syndicate)",
+        "basis": "StatsAPI-only as-of rebuild of 07-16..09-27 (985 games). Fit 07-16..08-21: interior optimum 1.5 (objective 105.0/74.2/64.0/74.0/96.1 for 1.1/1.3/1.5/1.7/1.856). Holdout 08-22..09-27: runs gap 0.691 -> 0.116, HR z +4.76 -> -0.05, prop log-loss 0.37045 -> 0.36910.",
+        "override": "Pre-registered checks 4 (outs +0.166), 6 and 7 (June guard: HR z -3.70, runs gap 1.34) FAILED. Shipped by explicit user decision: June 2026 was a league-wide HR spike (.0343 vs season .0303); 1.856 was fitted inside it.",
+        "fit": "penalised affine-logit at hr_rate_mult 1.5",
         "previous": {
-          "a": 0.5104103212201277,
-          "b": 0.2958689062844206
+          "a": 0.46604489063333326,
+          "b": 0.25262746482420895
         }
       }
     },
     "total_bases_2plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 0.4194933034542782,
-      "b": -0.2961146976017708,
+      "a": 0.475462482966565,
+      "b": -0.3592313278333202,
       "diag": {
-        "generated_at": "2026-10-07",
-        "lane": "mlb-combined-calibration (Syndicate)",
-        "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
-        "validation": {
-          "objective": [
-            10060.33,
-            34.14
-          ],
-          "runs_gap": [
-            0.786,
-            0.496
-          ],
-          "prop_logloss": [
-            0.38917,
-            0.388
-          ],
-          "starter_bias_change": {
-            "SO": -0.494,
-            "H": -0.182,
-            "BB": 0.121,
-            "ER": 0.026
-          }
-        },
-        "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
-        "fit": "penalised affine-logit (L2 lambda=10), mlb-hr-prop-calibration procedure, on the COMBINED engine config",
+        "generated_at": "2026-10-08",
+        "lane": "mlb-statsapi-asof-rebuild (Syndicate)",
+        "basis": "StatsAPI-only as-of rebuild of 07-16..09-27 (985 games). Fit 07-16..08-21: interior optimum 1.5 (objective 105.0/74.2/64.0/74.0/96.1 for 1.1/1.3/1.5/1.7/1.856). Holdout 08-22..09-27: runs gap 0.691 -> 0.116, HR z +4.76 -> -0.05, prop log-loss 0.37045 -> 0.36910.",
+        "override": "Pre-registered checks 4 (outs +0.166), 6 and 7 (June guard: HR z -3.70, runs gap 1.34) FAILED. Shipped by explicit user decision: June 2026 was a league-wide HR spike (.0343 vs season .0303); 1.856 was fitted inside it.",
+        "fit": "penalised affine-logit at hr_rate_mult 1.5",
         "previous": {
-          "a": 0.5086813725670329,
-          "b": -0.1352532679525173
+          "a": 0.4194933034542782,
+          "b": -0.2961146976017708
         }
       }
     },
     "total_bases_3plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 0.398234641895058,
-      "b": -0.7140942392613125,
+      "a": 0.5188243250294092,
+      "b": -0.6832245045971019,
       "diag": {
-        "generated_at": "2026-10-07",
-        "lane": "mlb-combined-calibration (Syndicate)",
-        "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
-        "validation": {
-          "objective": [
-            10060.33,
-            34.14
-          ],
-          "runs_gap": [
-            0.786,
-            0.496
-          ],
-          "prop_logloss": [
-            0.38917,
-            0.388
-          ],
-          "starter_bias_change": {
-            "SO": -0.494,
-            "H": -0.182,
-            "BB": 0.121,
-            "ER": 0.026
-          }
-        },
-        "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
-        "fit": "penalised affine-logit (L2 lambda=10), mlb-hr-prop-calibration procedure, on the COMBINED engine config",
+        "generated_at": "2026-10-08",
+        "lane": "mlb-statsapi-asof-rebuild (Syndicate)",
+        "basis": "StatsAPI-only as-of rebuild of 07-16..09-27 (985 games). Fit 07-16..08-21: interior optimum 1.5 (objective 105.0/74.2/64.0/74.0/96.1 for 1.1/1.3/1.5/1.7/1.856). Holdout 08-22..09-27: runs gap 0.691 -> 0.116, HR z +4.76 -> -0.05, prop log-loss 0.37045 -> 0.36910.",
+        "override": "Pre-registered checks 4 (outs +0.166), 6 and 7 (June guard: HR z -3.70, runs gap 1.34) FAILED. Shipped by explicit user decision: June 2026 was a league-wide HR spike (.0343 vs season .0303); 1.856 was fitted inside it.",
+        "fit": "penalised affine-logit at hr_rate_mult 1.5",
         "previous": {
-          "a": 0.5633755467120324,
-          "b": -0.34574756699912723
+          "a": 0.398234641895058,
+          "b": -0.7140942392613125
         }
       }
     },
     "total_bases_4plus": {
       "enabled": true,
       "mode": "affine_logit",
-      "a": 0.43714736999859505,
-      "b": -0.8972619179074701,
+      "a": 0.5671609831623745,
+      "b": -0.8328246341076473,
       "diag": {
-        "generated_at": "2026-10-07",
-        "lane": "mlb-combined-calibration (Syndicate)",
-        "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
-        "validation": {
-          "objective": [
-            10060.33,
-            34.14
-          ],
-          "runs_gap": [
-            0.786,
-            0.496
-          ],
-          "prop_logloss": [
-            0.38917,
-            0.388
-          ],
-          "starter_bias_change": {
-            "SO": -0.494,
-            "H": -0.182,
-            "BB": 0.121,
-            "ER": 0.026
-          }
-        },
-        "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
-        "fit": "penalised affine-logit (L2 lambda=10), mlb-hr-prop-calibration procedure, on the COMBINED engine config",
+        "generated_at": "2026-10-08",
+        "lane": "mlb-statsapi-asof-rebuild (Syndicate)",
+        "basis": "StatsAPI-only as-of rebuild of 07-16..09-27 (985 games). Fit 07-16..08-21: interior optimum 1.5 (objective 105.0/74.2/64.0/74.0/96.1 for 1.1/1.3/1.5/1.7/1.856). Holdout 08-22..09-27: runs gap 0.691 -> 0.116, HR z +4.76 -> -0.05, prop log-loss 0.37045 -> 0.36910.",
+        "override": "Pre-registered checks 4 (outs +0.166), 6 and 7 (June guard: HR z -3.70, runs gap 1.34) FAILED. Shipped by explicit user decision: June 2026 was a league-wide HR spike (.0343 vs season .0303); 1.856 was fitted inside it.",
+        "fit": "penalised affine-logit at hr_rate_mult 1.5",
         "previous": {
-          "a": 0.5088191484475741,
-          "b": -0.5647395509470959
+          "a": 0.43714736999859505,
+          "b": -0.8972619179074701
         }
       }
     },

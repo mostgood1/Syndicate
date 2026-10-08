@@ -1,53 +1,64 @@
 {
   "enabled": true,
   "mode": "affine_logit",
-  "a": 0.4086239533500249,
-  "b": -1.0296090487171292,
+  "a": 0.48663376401934144,
+  "b": -1.0483161272899018,
   "diag": {
-    "generated_at": "2026-10-07",
-    "lane": "mlb-combined-calibration (Syndicate)",
-    "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
-    "validation": {
-      "objective": [
-        10060.33,
-        34.14
-      ],
-      "runs_gap": [
-        0.786,
-        0.496
-      ],
-      "prop_logloss": [
-        0.38917,
-        0.388
-      ],
-      "starter_bias_change": {
-        "SO": -0.494,
-        "H": -0.182,
-        "BB": 0.121,
-        "ER": 0.026
-      }
-    },
-    "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
-    "fit": "penalised affine-logit on the COMBINED engine config",
+    "generated_at": "2026-10-08",
+    "lane": "mlb-statsapi-asof-rebuild (Syndicate)",
+    "basis": "StatsAPI-only as-of rebuild of 07-16..09-27 (985 games). Fit 07-16..08-21: interior optimum 1.5 (objective 105.0/74.2/64.0/74.0/96.1 for 1.1/1.3/1.5/1.7/1.856). Holdout 08-22..09-27: runs gap 0.691 -> 0.116, HR z +4.76 -> -0.05, prop log-loss 0.37045 -> 0.36910.",
+    "override": "Pre-registered checks 4 (outs +0.166), 6 and 7 (June guard: HR z -3.70, runs gap 1.34) FAILED. Shipped by explicit user decision: June 2026 was a league-wide HR spike (.0343 vs season .0303); 1.856 was fitted inside it.",
+    "fit": "penalised affine-logit at hr_rate_mult 1.5",
     "previous": {
-      "a": 0.804710803583747,
-      "b": 0.03209402508602343
+      "a": 0.4086239533500249,
+      "b": -1.0296090487171292
     },
     "previous_diag": {
-      "n": 7470,
-      "iters": 5,
-      "nll_before": 2826.2776552641667,
-      "nll_after": 2733.9073265261572,
-      "sum_w": 7470.0,
-      "prior_a": 1.0,
-      "prior_b": 0.0,
-      "l2_a": 1.0,
-      "l2_b": 1.0,
-      "val_logloss": 0.34565431763907767,
-      "val_brier": 0.09935154720445513,
-      "selected_l2": 1.0,
-      "selected_l2_b": 1.0,
-      "rank_weight_alpha": 0.0
+      "generated_at": "2026-10-07",
+      "lane": "mlb-combined-calibration (Syndicate)",
+      "rule": "pre-registered rule v2 in .syndicate/lanes.md; coordinate descent on 24 rebuilt as-of FIT dates (311 games), judged once on 15 rebuilt VALIDATION dates (203 games, 390 starts)",
+      "validation": {
+        "objective": [
+          10060.33,
+          34.14
+        ],
+        "runs_gap": [
+          0.786,
+          0.496
+        ],
+        "prop_logloss": [
+          0.38917,
+          0.388
+        ],
+        "starter_bias_change": {
+          "SO": -0.494,
+          "H": -0.182,
+          "BB": 0.121,
+          "ER": 0.026
+        }
+      },
+      "override": "check (c) FAILED (starter BB +0.121 > 0.10: production's BB was right only by cancelling errors, +1.91 BF/start vs BB/PA 0.0745 vs 0.0889). Shipped by explicit user override, logged in lanes.md and deploys.md.",
+      "fit": "penalised affine-logit on the COMBINED engine config",
+      "previous": {
+        "a": 0.804710803583747,
+        "b": 0.03209402508602343
+      },
+      "previous_diag": {
+        "n": 7470,
+        "iters": 5,
+        "nll_before": 2826.2776552641667,
+        "nll_after": 2733.9073265261572,
+        "sum_w": 7470.0,
+        "prior_a": 1.0,
+        "prior_b": 0.0,
+        "l2_a": 1.0,
+        "l2_b": 1.0,
+        "val_logloss": 0.34565431763907767,
+        "val_brier": 0.09935154720445513,
+        "selected_l2": 1.0,
+        "selected_l2_b": 1.0,
+        "rank_weight_alpha": 0.0
+      }
     }
   },
   "_meta": {
