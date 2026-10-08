@@ -612,6 +612,7 @@ once this index exists: re-splitting would orphan the parts.
 | [settlement-resolver-coverage] | SETTLEMENT: NFL CAN BE GRADED, NCAAF IS WIRED-BUT-UNVERIFIED, and three sports still cannot settle a bet `[ver | `state_model.md` |
 | [execution-ledger-lost-live-rows] | 30 LIVE FILLS PLACED 2026-09-01..09-04 ARE MISSING FROM THE EXECUTION LEDGER, BY DESIGN NOT RESTORED — correct | `state_model.md` |
 | [execution-ledger-cross-service-race] | THE MONEY LEDGER IS WRITTEN BY THREE SERVICES, AND SINCE 2026-09-11 EVERY WRITE IS ONE COMPARE-AND-SWAP (#656) | `state_model.md` |
+| [execution-ledger-archive] | THE EXECUTION LEDGER'S RECORD CAP (3,000) MOVES ROWS TO A DISK ARCHIVE; FULL-HISTORY READERS READ BOTH `[verified on the fleet 2026-10-08T17:01Z, lane execution-ledger-keyvalue-growth]` | `state_model.md` |
 | [probability-statistic-ownership] | PROBABILITY-STATISTIC OWNERSHIP `[measured 08-15, shipped `2ac3c6bc`]` | `state_model.md` |
 | [nhl-sim-engine] | NHL SIM (hockeysim) — `nhl_sim_input_checklist.py` PASSES, exit 0 `[measured 2026-08-20, lane nhl-model-owner] | `state_model.md` |
 | [nhl-player-props] | NHL PLAYER PROPS PROJECTED AND PRICED, PER-LINE GATED; PP/PK units from real PP/SH minutes; engine still loses to player average in most markets (ice-time and per-minute errors cancel) `[verified 2026-10-05, lanes nhl-player-props-projection / nhl-pp-units-real-toi]` | `state_model.md` |

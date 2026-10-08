@@ -265,6 +265,13 @@ demonstrating the bug. Pinned is not fixed.
 
 **How to use this:** before trusting a ledger-derived number that includes 2026-09-01..09-04, add these 30 orders back or state the undercount.
 
+## [execution-ledger-archive] THE EXECUTION LEDGER'S RECORD CAP (3,000) MOVES ROWS TO A DISK ARCHIVE; FULL-HISTORY READERS READ BOTH `[verified on the fleet 2026-10-08T17:01Z, lane execution-ledger-keyvalue-growth, a4259073]`
+
+- `reports/intelligence/execution_ledger.json` (keyvalue) holds at most `_MAX_RECORDS=3000` rows (was 5000). Over the cap, `_trim_to_cap` takes SETTLED paper rows first, then ungraded paper; live rows are never trimmed. The rows are appended to `reports/intelligence/execution_ledger_archive/orders_<YYYY-MM>.jsonl` (plain disk under SYNDICATE_REPORTS_ROOT, shared by all three fleet roles, in the daily data backup) BEFORE the SET; a failed append keeps them in the document (`LEDGER_ARCHIVE_FAILED`).
+- Measured 17:01Z: document 3,000 / 3,745,861 B (44% of 8,388,608); archive 1,719 rows; `full_history_orders()` 4,719 = the pre-trim count + 2. Paper inflow ~600 orders/day.
+- **Read history with `execution_ledger.full_history_orders()`**, not `_load()`: paper_settlement all-time summaries + credibility sample, the paper page, `ledger_summary(date)`, ops execution summary, the scorecard, both fitters do. `_load()` is the operational window (~4 days of paper). `apply_segment_regrade` still matches `_load()` only.
+- An ungraded row that is archived can never be graded. 2,147 ungraded paper + 552 live = 2,699 of 3,000 at 17:01Z, driven by a NCAAF backlog (leads.md 2026-10-08).
+
 ## [execution-ledger-cross-service-race] THE MONEY LEDGER IS WRITTEN BY THREE SERVICES, AND SINCE 2026-09-11 EVERY WRITE IS ONE COMPARE-AND-SWAP (#656); the lost-update history is below `[CAS verified on production 2026-09-11T03:36Z, lane execution-ledger-cas; history verified 2026-08-28, lane portfolio-venue-and-side-integrity]`
 
 `execution_ledger._persist` does a blind whole-document `write_json_file` — no
