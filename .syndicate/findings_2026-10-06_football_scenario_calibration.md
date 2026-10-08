@@ -443,6 +443,22 @@ no combination of the available levers brings the NCAAF engine back to productio
 cost NCAAF more than the levers can recover. NCAAF keeps production as shipped; any NCAAF re-fit needs a
 different lever set or a per-switch selection (e.g. NCAAF without H4 / H3), pre-registered as a new step.
 
+## RE-FIT v3 (NCAAF, switch subset) — PRE-REGISTERED 2026-10-07 (user: "start the NCAAF re-fit with only some of the fixes on")
+
+v2 showed the four switches together cost NCAAF more than the levers recover (best 262.50 vs production 227.55).
+- **Stage 1 -- switch selection, all 16 subsets.** Every on/off combination of `halftime_kickoff`,
+  `fourth_down_decision_model`, `non_offensive_scoring`, `possession_aware_priors`, at production's SHIPPED levers,
+  on the same NCAAF FIT set and objective as v2 (2024 wk3-15 every 4th game, ~164 games, 60 seeds, 13 moments + the
+  two slope moments, sum z^2). The subset with the lowest objective is CHOSEN; the empty subset is production.
+- **Stage 2 -- descent from the chosen subset,** v2's levers and grids (incl. amendment 1's widened sensitivities and
+  `red_zone_gain_stiffening`; `home_field_bonus` only matters with H4 or H1 on and stays in the grid regardless).
+  If the chosen subset is EMPTY, Stage 2 still runs (levers only, all switches off) -- it answers whether NCAAF's
+  shipped levers are themselves off-optimum.
+- **Gate to the held-out read (unchanged, amendment 2):** NCAAF 2025 (still UNREAD) is read only if Stage 2's fitted
+  objective is <= 0.8 x production's on FIT; then gates (a)-(f) and the live L1-L3 replay as pre-registered.
+- Output `C:	mpootball_scenarios
+caafefit_v3\`; v2 files kept as the record.
+
 H1 prediction (|delta total| < 1.0) FAILED (-1.12). H2 prediction (total in [-0.5, +1.5]) held. Both
 fixes work mechanically (S12 after-half 25.0; S5 4th-down rows inside the real CI) and neither moves
 accuracy alone -- each moves the level or home edge away from the close, as the re-fit design expects.
