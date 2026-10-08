@@ -769,7 +769,8 @@ def match_log_appearances(ctx: "Resolved", subject: PropSubject) -> list[dict[st
         for row in candidates:
             key = str(row.get("event_id") or row.get("date"))
             out.setdefault(key, {
-                "date": str(row.get("date") or ""), "opponent": str(row.get("opponent") or ""),
+                "date": str(row.get("date") or ""), "event_id": str(row.get("event_id") or ""),
+                "opponent": str(row.get("opponent") or ""),
                 "venue": "home" if str(row.get("side") or "") == "home" else "away",
                 "minutes": C.to_float(row.get("minutes")),
                 "starter": str(row.get("starter") or "") in {"1", "True", "true"},
@@ -786,7 +787,11 @@ def merge_match_log(scan: "BoxScan | None", ctx: "Resolved", subject: PropSubjec
     if not logged:
         return scan
     scan = scan or BoxScan()
-    boxed = {g.get("date") for g in scan.appearances}
+    # Every date a live box covers for his TEAM is the box's call (appeared, unused, not in the
+    # roster) -- settlement's own matching rule; the log only fills dates no live box holds.
+    # Measured 2026-10-08 15:31Z: a log line on a date the live box called "not in roster" reached
+    # `_environment`, which keys on `event_id`, and raised.
+    boxed = {g.get("date") for g in scan.appearances} | {v.get("date") for v in scan.team_matches}
     scan.appearances = sorted(scan.appearances + [g for g in logged if g["date"] not in boxed],
                               key=lambda g: str(g.get("date") or ""), reverse=True)
     scan.match_log_games = sum(1 for g in scan.appearances if g.get("source") == "match_log")
@@ -1184,8 +1189,8 @@ def _environment(subject: PropSubject, ctx: Resolved, meta: Mapping[str, Any], s
         facts["squad_audit"] = dict(audit)
     if scan is not None and ctx.entry is not None and scan.team_matches:
         last = scan.team_matches[0]
-        if any(g["date"] == last["date"] and g["event_id"] == last["event_id"] for g in scan.appearances):
-            game = next(g for g in scan.appearances if g["event_id"] == last["event_id"])
+        if any(g.get("date") == last["date"] and g.get("event_id") == last["event_id"] for g in scan.appearances):
+            game = next(g for g in scan.appearances if g.get("event_id") == last["event_id"])
             status = f"appeared, {'started' if game.get('starter') else 'off the bench'}, {C.fmt_num(game.get('minutes'), 0)} min"
         elif any(v["event_id"] == last["event_id"] for v in scan.unused):
             status = "in the squad, did not play"

@@ -67,3 +67,23 @@ def test_merge_adds_log_games_before_the_match_only_and_keeps_live_boxes(tmp_pat
     assert [g["date"] for g in scan.appearances] == ["2026-09-20", "2026-09-01", "2026-08-21"]
     assert scan.appearances[0]["source"] == "live" and scan.match_log_games == 2
     assert S.merge_match_log(None, ctx, subject).match_log_games == 3  # no live boxes at all: the log stands alone
+
+
+def test_a_live_boxed_team_date_is_never_filled_from_the_log(tmp_path, monkeypatch):
+    """15:31Z 2026-10-08: a log line on a date the live box called 'not in roster' reached _environment and raised."""
+    from syndicate.features.shared.prop_evidence import soccer as S
+    from syndicate.features.shared.prop_evidence.contract import PropSubject
+
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    base = {"league": "epl", "season": 2026, "team": "Arsenal", "side": "home", "player_id": "1", "player_name": "Bukayo Saka",
+            "starter": 1, "minutes": 90, "shots_on_target": 1}
+    _write_log(tmp_path / "soccer_source" / "epl" / "history" / "player_match_log_2026.csv", [
+        dict(base, date="2026-09-20", event_id="x", opponent="Chelsea"), dict(base, date="2026-09-01", event_id="y", opponent="Spurs")])
+    ctx = S.Resolved(league="epl", match_date="2026-10-04", team="Arsenal", opponent="Chelsea", entry={"player_name": "Bukayo Saka"})
+    subject = PropSubject.from_board_row({"sport": "soccer", "kind": "prop", "player_name": "Bukayo Saka",
+                                          "market": "player_shots_on_target", "line": 0.5, "side": "over",
+                                          "home_team": "Arsenal", "away_team": "Chelsea"}, selected_date="2026-10-04")
+    live = S.BoxScan(files=1, files_with_player_box=1, team_matches=[{"date": "2026-09-20", "event_id": "x", "opponent": "Chelsea"}],
+                     not_in_roster=[{"date": "2026-09-20", "event_id": "x", "opponent": "Chelsea"}])
+    scan = S.merge_match_log(live, ctx, subject)
+    assert [g["date"] for g in scan.appearances] == ["2026-09-01"] and scan.appearances[0]["event_id"] == "y"
