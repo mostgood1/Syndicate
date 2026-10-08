@@ -139,3 +139,66 @@ def test_playoff_rows_under_espn_codes_count_as_the_teams_games(tmp_path):
     assert _norm_name_key("Dana Evans").upper() not in m.get("LVA", set())
     assert "LV" not in m                                       # nothing keyed under the raw ESPN code
 
+
+# ---- injury-aware re-admit (2026-10-08, user decision "Fix both, then deploy") -----------------------------------
+
+def _layout(tmp_path, hist_rows, injury_rows):
+    proc, raw = tmp_path / "processed", tmp_path / "raw"
+    proc.mkdir(); raw.mkdir()
+    _history(proc, hist_rows)
+    if injury_rows is not None:
+        with (raw / "injuries.csv").open("w", newline="", encoding="utf-8") as fh:
+            w = csv.writer(fh)
+            w.writerow(["team", "player", "status", "injury", "date"])
+            w.writerows(injury_rows)
+    return proc
+
+
+HIST = [("g1", "2026-10-01", "LVA", "A'ja Wilson", 34), ("g1", "2026-10-01", "LVA", "Dana Evans", 15),
+        ("g1", "2026-10-01", "LVA", "Deep Bench", 2),
+        ("g2", "2026-10-04", "LV", "A'ja Wilson", 36), ("g2", "2026-10-04", "LV", "Dana Evans", 0),
+        ("g2", "2026-10-04", "LV", "Deep Bench", 0)]
+FILLER = [("XXX", f"Filler {i}", "OUT", "x", d) for d in ("2026-10-04", "2026-10-05", "2026-10-06") for i in range(20)]
+
+
+def _run_readmit(proc, date="2026-10-07"):
+    m = {}
+    s = A.add_recency_exclusions(m, processed_root=proc, date_str=date, league_code="wnba", props_df=None,
+                                 name_key=_norm_name_key, env=ON)
+    return m.get("LVA", set()), s
+
+
+def test_injury_explained_absence_that_has_ended_is_readmitted(tmp_path):
+    """Discriminating: 10-07 Dana Evans -- OUT on the report for 10-04 (the game she missed), off the 10-06 report,
+    played 18 min; the K=1 rule alone excluded her."""
+    proc = _layout(tmp_path, HIST, FILLER + [("LVA", "Dana Evans", "OUT", "knee", "2026-10-04"),
+                                             ("LVA", "Dana Evans", "OUT", "knee", "2026-10-05")])
+    excl, s = _run_readmit(proc)
+    assert _norm_name_key("Dana Evans").upper() not in excl
+    assert f"LVA:{_norm_name_key('Dana Evans').upper()}" in s["readmitted_injury_return"]
+    assert _norm_name_key("Deep Bench").upper() in excl          # never on the report: a coach's decision, stays out
+
+
+def test_still_on_the_report_is_not_readmitted(tmp_path):
+    proc = _layout(tmp_path, HIST, FILLER + [("LVA", "Dana Evans", "OUT", "knee", d)
+                                             for d in ("2026-10-04", "2026-10-05", "2026-10-06")])
+    excl, _s = _run_readmit(proc)
+    assert _norm_name_key("Dana Evans").upper() in excl
+
+
+def test_unknown_never_readmits(tmp_path):
+    no_feed, _ = _run_readmit(_layout(tmp_path / "a", HIST, None)) if (tmp_path / "a").mkdir() is None else (None, None)
+    assert _norm_name_key("Dana Evans").upper() in no_feed       # no injury feed at all
+    (tmp_path / "b").mkdir()
+    stale = _layout(tmp_path / "b", HIST, [("LVA", "Dana Evans", "OUT", "knee", "2026-09-28")]
+                    + [("XXX", f"F{i}", "OUT", "x", "2026-09-28") for i in range(20)])
+    excl, s = _run_readmit(stale)
+    assert _norm_name_key("Dana Evans").upper() in excl and "stale" in s["readmit_reason"]
+
+
+def test_a_partial_latest_snapshot_does_not_read_as_everyone_returned(tmp_path):
+    rows = FILLER[:40] + [("LVA", "Dana Evans", "OUT", "knee", "2026-10-04"), ("LVA", "Dana Evans", "OUT", "knee", "2026-10-05")]
+    rows += [("XXX", "Lone Row", "OUT", "x", "2026-10-06")]          # 1 row vs 21 the day before: a partial fetch
+    excl, _s = _run_readmit(_layout(tmp_path, HIST, rows))
+    assert _norm_name_key("Dana Evans").upper() in excl            # falls back to 10-05, where she is still OUT
+

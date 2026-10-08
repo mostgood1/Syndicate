@@ -119,9 +119,10 @@ def _read_history(path: Path, date_str: str) -> Tuple[Optional[Dict[str, List[Tu
     return dict(by_team), dict(seen), "ok"
 
 
-def recency_exclusions(*, processed_root: Path, date_str: str, k: int,
-                       name_key: Callable[[object], str]) -> Tuple[Dict[str, Set[str]], str]:
-    """{team: {player keys}} for players with team history who did not play in any of the team's last k games."""
+def recency_exclusions(*, processed_root: Path, date_str: str, k: int, name_key: Callable[[object], str],
+                       window_dates: Optional[Dict[str, List[str]]] = None) -> Tuple[Dict[str, Set[str]], str]:
+    """{team: {player keys}} for players with team history who did not play in any of the team's last k games.
+    `window_dates`, when given, is filled with {team: [dates of those last k games]} (the games the player missed)."""
     by_team, seen, reason = _read_history(Path(processed_root) / HISTORY_FILE, str(date_str)[:10])
     if by_team is None:
         return {}, reason
@@ -129,6 +130,8 @@ def recency_exclusions(*, processed_root: Path, date_str: str, k: int,
     for team, rows in by_team.items():
         if len(rows) < k:
             continue
+        if window_dates is not None:
+            window_dates[team] = [d for d, _p in rows[-k:]]
         recent: Set[str] = set()
         for _d, played in rows[-k:]:
             recent |= played
@@ -137,6 +140,76 @@ def recency_exclusions(*, processed_root: Path, date_str: str, k: int,
                 key = name_key(name)
                 if key:
                     out.setdefault(team, set()).add(str(key).strip().upper())
+    return out, "ok"
+
+
+INJURY_FILE = "injuries.csv"                     # in the raw root next to processed/ (data/raw)
+OUT_STATUSES = {"OUT", "DOUBTFUL", "SUSPENDED", "INACTIVE"}
+SNAPSHOT_MAX_AGE_DAYS = 3
+PARTIAL_SNAPSHOT_RATIO = 0.5
+
+
+def _injury_snapshots(processed_root: Path, name_key: Callable[[object], str]) -> Tuple[Optional[Dict[str, Dict[str, str]]], str]:
+    """{snapshot date: {player key: STATUS}} from raw/injuries.csv, a stack of DAILY snapshots (e3f2c3c0)."""
+    path = Path(processed_root).parent / "raw" / INJURY_FILE
+    if not path.is_file():
+        return None, f"injury feed absent: {path}"
+    snaps: Dict[str, Dict[str, str]] = defaultdict(dict)
+    try:
+        with path.open(encoding="utf-8", errors="replace") as fh:
+            for r in csv.DictReader(fh):
+                d = str(r.get("date") or "")[:10]
+                k = str(name_key(r.get("player")) or "").strip().upper()
+                if d and k:
+                    snaps[d][k] = str(r.get("status") or "").strip().upper()
+    except Exception as exc:  # noqa: BLE001
+        return None, f"injury feed unreadable: {type(exc).__name__}"
+    return dict(snaps), "ok"
+
+
+def _snapshot_on_or_before(snaps: Dict[str, Dict[str, str]], date_str: str) -> Optional[str]:
+    days = sorted(d for d in snaps if d <= date_str)
+    if not days:
+        return None
+    latest = days[-1]
+    if len(days) >= 2 and len(snaps[latest]) < PARTIAL_SNAPSHOT_RATIO * len(snaps[days[-2]]):
+        return days[-2]                              # a partial fetch must not read as "everyone returned"
+    return latest
+
+
+def injury_explained_returns(excluded: Dict[str, Set[str]], window_dates: Dict[str, List[str]], *, processed_root: Path,
+                             date_str: str, name_key: Callable[[object], str]) -> Tuple[Set[Tuple[str, str]], str]:
+    """(team, player key) pairs the recency rule excluded whose absence the injury report EXPLAINS and who have since
+    LEFT it: on every missed game the snapshot on/before that date listed them OUT/DOUBTFUL/SUSPENDED/INACTIVE, and the
+    latest snapshot on/before the slate does not. Measured 2026-10-07: Dana Evans (18 min) and Stephanie Talbot (21)
+    were OUT for 10-04, off the 10-06 report, and the K=1 rule still dropped them. Unknown never re-admits: no feed, no
+    snapshot for a missed game, or a latest snapshot older than SNAPSHOT_MAX_AGE_DAYS keeps the exclusion."""
+    snaps, reason = _injury_snapshots(processed_root, name_key)
+    if not snaps:
+        return set(), reason
+    ds = str(date_str)[:10]
+    now = _snapshot_on_or_before(snaps, ds)
+    if now is None:
+        return set(), "no injury snapshot on or before the slate"
+    from datetime import date as _date
+    if (_date.fromisoformat(ds) - _date.fromisoformat(now)).days > SNAPSHOT_MAX_AGE_DAYS:
+        return set(), f"latest injury snapshot {now} is stale"
+    out: Set[Tuple[str, str]] = set()
+    for team, keys in excluded.items():
+        missed = window_dates.get(team) or []
+        if not missed:
+            continue
+        for key in keys:
+            if snaps[now].get(key, "") in OUT_STATUSES:
+                continue                              # still on the report: not returned
+            explained = True
+            for g in missed:
+                s = _snapshot_on_or_before(snaps, g)
+                if s is None or snaps[s].get(key, "") not in OUT_STATUSES:
+                    explained = False
+                    break
+            if explained:
+                out.add((team, key))
     return out, "ok"
 
 
@@ -160,7 +233,9 @@ def add_recency_exclusions(excluded_map: Dict[str, Set[str]], *, processed_root:
                 return summary
         summary["switch"] = "env" if state == "on" else "file"
         k = missed_games_k(env)
-        add, reason = recency_exclusions(processed_root=processed_root, date_str=date_str, k=k, name_key=name_key)
+        window: Dict[str, List[str]] = {}
+        add, reason = recency_exclusions(processed_root=processed_root, date_str=date_str, k=k, name_key=name_key,
+                                         window_dates=window)
         if not add:
             summary["reason"] = reason if reason != "ok" else "nobody to exclude"
             print(f"[wnba_sim_availability] SIM_AVAILABILITY skipped reason={summary['reason']}", flush=True)
@@ -173,16 +248,21 @@ def add_recency_exclusions(excluded_map: Dict[str, Set[str]], *, processed_root:
                         playing.add((str(row.get("team") or "").strip().upper(), str(name_key(row.get("player_name")) or "").upper()))
         except Exception:  # noqa: BLE001
             playing = set()
+        returned, why = injury_explained_returns(add, window, processed_root=processed_root, date_str=date_str,
+                                                 name_key=name_key)
+        summary["readmitted_injury_return"] = sorted(f"{t}:{k_}" for t, k_ in returned)
+        summary["readmit_reason"] = why
         for team, keys in add.items():
             for key in keys:
-                if (team, key) in playing:
+                if (team, key) in playing or (team, key) in returned:
                     continue
                 bucket = excluded_map.setdefault(team, set())
                 if key not in bucket:
                     bucket.add(key)
                     summary["added"] += 1
         summary.update(applied=summary["added"] > 0, k=k, reason="ok")
-        print(f"[wnba_sim_availability] SIM_AVAILABILITY applied date={date_str} k={k} added={summary['added']}", flush=True)
+        print(f"[wnba_sim_availability] SIM_AVAILABILITY applied date={date_str} k={k} added={summary['added']} "
+              f"readmitted_injury_return={len(returned)} ({why})", flush=True)
     except Exception as exc:  # noqa: BLE001 -- availability must never cost the sim its run
         summary["reason"] = f"failed: {type(exc).__name__}: {exc}"
         print(f"[wnba_sim_availability] SIM_AVAILABILITY_FAILED {type(exc).__name__}: {exc}", flush=True)
