@@ -1688,6 +1688,22 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **OUT-OF-SAMPLE EVALUATION OF THE SHIPPED CALIBRATION, READ ONCE 2026-10-08 ~01:50Z (pre-registered; no ship decision attached): it would NOT have passed out of sample, because HR/runs overshoot.**
+  - Window 07-16..09-27, 985 games, 1964 starts. A = shipped (2bb481ef) vs B = pre-ship (61edcc04 files), same games and seeds, 100 sims; props 200 sims, each arm with its own maps.
+  - WHOLE WINDOW:
+    - (a) PASS objective 9691.6 -> 91.6 (HBP z +97 -> -2.3);
+    - (b) **FAIL** runs z grows +1.70;
+    - (c) **FAIL** starter H +0.154 (SO -0.49, BB -0.04, ER +0.03);
+    - (d) **FAIL** runs |gap| 0.191 -> **0.700** (actual 8.859; model now HIGH);
+    - (e) PASS prop log-loss 0.36952 -> 0.36951 (a tie; 1st half slightly worse, 2nd half better).
+    - The same pattern holds in each half.
+  - Biggest movers A vs B:
+    - **HR/PA z -6.2 -> +5.1** (~30% too few -> ~25% too many);
+    - DP -9.3 -> -2.0; BF bias +2.42 -> +0.64; outs +0.67 -> +0.13; SO +0.87 -> +0.38; ==15 share z +8.7 -> +5.7.
+  - READING: hr_rate_mult 1.856 (the June-fitted value) overshoots July-Sept. Pre-ship runs were close only because its errors cancelled (HR -30%, HBP +97 z); the shipped engine is now biased HIGH on totals (+0.7 runs/game).
+    - A plausible mechanism, not tested: early-season HR inputs are shrunk toward priors, so June needed a bigger multiplier than mid-season inputs do. That would be another season-phase interaction.
+  - The probable-pitcher hindsight caveat applies to both arms equally.
+  - Production impact is a USER decision (reverting or re-tuning a shipped value needs an explicit override): options reported in chat.
 - **WORKLOAD FIX RESULT 2026-10-08 ~01:40Z: FIT CHOOSES w = 0 (production) -> nothing to ship; the holdout (09-09..09-27) was not read for it.**
   - Rebuilt 08-22..09-27 at w 0.25 / 0.5 / 0.75 (37 dates each, all built). Replayed FIT 08-22..09-08 (18 dates, 490 starts), 100 sims. Pre-registered score, then starter bias for BF / outs / P:
 
