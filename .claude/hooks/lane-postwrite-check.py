@@ -69,6 +69,8 @@ WHAT IT DOES NOT CATCH, stated plainly so nobody reads a clean run as proof:
   * a write made and reverted inside ONE command (the signature comes back);
   * a write to a file NO open lane claims -- out of scope by design, that is
     not a lane violation;
+  * a write to a file LENT to your lane under a loan lane-guard honours -- the
+    ledger permits it (`lane_claims_source.honoured_loan`, 2026-10-07);
   * a write to a claim the parser cannot see. 8 of the 44 claims live when this
     was written named a path absent from `git ls-files` -- brace expansions
     (`scripts/{build_wnba_recon`), globs, prose read as a claim. Those guard
@@ -288,6 +290,32 @@ def _post(payload, session_id):
         return 0
 
     lane = _my_lane(payload.get("cwd") or ".", session_id)
+
+    # A FILE LENT TO YOUR LANE IS NOT AN OUT-OF-LANE WRITE. `claims_by_path` has
+    # only the lender as holder (a loan is deliberately not a claim), so a shell
+    # write lane-guard would PERMIT was reported here -- 2026-10-07, lane
+    # `layer2-shard-generations` on `pipeline/intelligence_state.py`. Asked only
+    # for paths that actually changed, so a quiet Bash call pays nothing. Same
+    # view and predicate as lane-guard (`lane_claims_source.honoured_loan`): a
+    # self-grant from a non-holder still reports.
+    if lane:
+        try:
+            from lane_claims_source import honoured_loan
+
+            texts = {}
+            kept = []
+            for item in changed:
+                root = item[1].get("root") or ""
+                if root not in texts:
+                    with open(os.path.join(root, ".syndicate", "lanes.md"), encoding="utf-8") as fh:
+                        texts[root] = fh.read()
+                if not honoured_loan(root, texts[root], lane, item[1].get("claimed", "")):
+                    kept.append(item)
+            changed = kept
+        except Exception:
+            pass
+        if not changed:
+            return 0
     sys.stderr.write(
         "OUT-OF-LANE WRITE: a file claimed by another OPEN lane CHANGED while "
         "your shell" + chr(10) +

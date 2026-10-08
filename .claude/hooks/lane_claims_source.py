@@ -139,6 +139,26 @@ def effective_entries(root, primary_text, kind):
     return sorted(main_set | local_added), info
 
 
+def honoured_loan(root, primary_text, borrower, rel):
+    """The lender if `lane-guard` would honour a loan of `rel` to `borrower`, else None.
+
+    One answer for every hook. `scope-guard` and `lane-postwrite-check` used to
+    ignore loans entirely, so a write lane-guard PERMITTED still drew an
+    out-of-lane warning from both (reported 2026-10-07 by lane
+    `layer2-shard-generations` on `pipeline/intelligence_state.py`). Same view,
+    same predicate as the guard: the lender must hold `rel` in the claim entries
+    the guard blocks with, so a self-grant still warns.
+    """
+    from lane_claims import loan_is_honoured_among
+
+    if not borrower:
+        return None
+    entries, _info = effective_claims(root, primary_text)
+    holders = [(slug, f) for slug, f, _source in entries]
+    loans, _info = effective_entries(root, primary_text, "loans")
+    return loan_is_honoured_among(loans, holders, borrower, rel)
+
+
 def effective_claims(root, primary_text):
     """([(slug, path, source), ...], info) for the guard to match against.
 

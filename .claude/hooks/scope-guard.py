@@ -142,6 +142,8 @@ WHAT IT DOES NOT CATCH, stated so nobody reads a clean run as proof:
     the instrument for that; this one only sees the file system.
   * a session whose lane declares no parseable claims -- reported once, as
     itself, because `check_lane_claims.py` exists for that class of defect.
+  * a write to a file LENT to this lane under a loan lane-guard honours. That is
+    in scope by the ledger's own record, not drift (`honoured_loan`, 2026-10-07).
 
 `_goal_for()` LIVES HERE AND ITS HOME IS `lane_claims.py`. It is the only
 lanes.md field parser outside that module. It is here because it has exactly one
@@ -380,6 +382,23 @@ def main():
             "this session")
 
     areas, n_claims = _my_areas(text, slug)
+
+    # A FILE LENT TO THIS LANE IS IN SCOPE. A loan is recorded on the BORROWER's
+    # `Files:` line, but `_claims` deliberately omits it (the lender stays the one
+    # holder), so a write lane-guard had just PERMITTED was reported here as
+    # outside the lane -- reported 2026-10-07 by lane `layer2-shard-generations`
+    # on `pipeline/intelligence_state.py`. Asked only on the path that would
+    # otherwise warn, so ordinary edits pay no git call. Same view and predicate
+    # as lane-guard (`lane_claims_source.honoured_loan`): a self-grant still warns.
+    # Not recorded in `seen`, so the rest of that area is still judged normally.
+    if not n_claims or _area(rel) not in areas:
+        try:
+            from lane_claims_source import honoured_loan
+
+            if honoured_loan(root, text, slug, rel):
+                return 0
+        except Exception:
+            pass
 
     if not n_claims:
         if "\x00no-claims" in seen:

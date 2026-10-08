@@ -2085,9 +2085,10 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: tests/test_lane_guard_loan_main_text.py runs the real guard against a temp git repo: loan-on-main allowed; self-granted loan from non-holder blocked; plus existing tests/test_lane_loans.py, test_lane_section_scope.py, test_lane_guard_claim_source.py green
 - Blocked by: none
 
-### loan-aware-warn-hooks — OPEN — opened 2026-10-07 — session 74f50e68-fc47-474b-9b59-8887927f3eb3
+### loan-aware-warn-hooks — CLOSED 2026-10-07 — opened 2026-10-07 — session 74f50e68-fc47-474b-9b59-8887927f3eb3
+- **GOAL: MET (2026-10-07).** Both warning hooks now ask `lane_claims_source.honoured_loan` (same main+local view and lender-holds predicate as lane-guard) and only on the path that would otherwise warn, so ordinary edits/Bash calls pay no git call. Verified: tests/test_loan_aware_warn_hooks.py 7/7, of which the 3 loan cases FAIL on the unfixed hooks while both reachability checks and both self-grant controls pass on both; .claude/hooks/test_scope_guard.py 31/31 and test_lane_postwrite_check.py 34/34; lane-guard suites 21/21. Live: honoured_loan(layer2-shard-generations, pipeline/intelligence_state.py) -> web-restart-healthz, a non-borrower -> None, scope-guard as the borrower exit 0.
 - Goal: scope-guard and lane-postwrite-check stop warning on a write lane-guard permits under an honoured loan (read from the same origin/main+local view lane-guard uses); a self-granted loan from a non-holder still warns in both.
-- Files: .claude/hooks/scope-guard.py, .claude/hooks/lane-postwrite-check.py, .claude/hooks/lane_claims_source.py, tests/test_loan_aware_warn_hooks.py (NEW)
+- Files: (none -- released at close; shipped: .claude/hooks/scope-guard.py, .claude/hooks/lane-postwrite-check.py, .claude/hooks/lane_claims_source.py, tests/test_loan_aware_warn_hooks.py)
 - Hypothesis: n/a (reported 2026-10-07 by lane layer2-shard-generations, session b9bb5f37: its lane-guard-honoured loan write to pipeline/intelligence_state.py drew an out-of-lane warning from BOTH hooks; neither file mentions loans)
 - Falsification test: the new tests run the real hooks against a temp git repo whose loan is on origin/main only; if either hook still warns for the borrower, the fix failed
 - Verification: tests/test_loan_aware_warn_hooks.py green and failing on the unfixed hooks; .claude/hooks/test_scope_guard.py and test_lane_postwrite_check.py still green
