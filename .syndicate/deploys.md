@@ -47864,3 +47864,10 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **tests:** `tests/test_local_production_down_reap.py`, real detached leader + grandchild: 5/5 on Linux (fleet venv, native FS copy) and Windows; `keep=True` leaves the job alive and `keep=False` kills both (off != on). Existing `test_local_production*.py`: 70 passed, 3 skipped.
 - **rollout (user decision):** NO fleet ff now (fleet `~/Syndicate` at 6cd415f3 when read). It goes live when the next full restart ffs the checkout before `down` (the standard recipe). Ride-alongs seen at 6cd415f3..45bd8c6e, not mine: 4bb1d024, c95afea9, e82e958e, 59bc4bf2, ccd9639b.
 - **verify (OWED at the next full down):** that `down`'s output carries `[odds-jobs] ...` lines (or none, if no job was in flight), and `ps -eo args | grep -c '[r]un_refresh_odds_job.py'` == 0 right after `down.`. If a job WAS in flight, its manifest reads `failed` and the next tick relaunches the lane.
+
+## 2026-10-08 ~16:05Z (11:05 AM CT) -- CORRECTION to the 15:51:01Z cold-Ask entry: the "5 pre-existing Ask test failures" were an artefact of a data-less worktree, NOT failures on main (lane `web-restart-healthz`)
+
+- **What the entry said:** 5 failures in tests/test_ask_sport_coverage.py + test_ask_the_syndicate.py (NFL nickname matching) "fail identically on main without e82e958e".
+- **What is true:** they fail only in a session worktree. `session_worktree.py` excludes `data/` by default, and `_nfl_team_branding_rows()` reads the git-tracked `data/nfl_source/source_artifacts/data/processed/team_branding/nfl_team_branding.csv`. In the worktree it returned 0 rows, so every alias was empty. "Without e82e958e" was also run in that same worktree.
+- **Measured:** on the fleet checkout (4bb1d024, has `data/`), `-k "NflNickname or matchup_evidence_pairs"`: **8 passed**. Under the live web worker's env: 32 branding rows; "Patriots vs Seahawks projection" -> [New England Patriots, Seattle Seahawks]; "miami total" -> [Miami Dolphins].
+- **No code change.** The rule already in memory ("worktree results are not main") is the one I broke: a test that reads `data/` must be judged on a tree that has it.
