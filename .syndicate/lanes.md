@@ -1695,6 +1695,16 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **USER OVERRIDE, LOGGED 2026-10-08 -- user, verbatim: "yes, set HR to 1.5 and scope the count-shape fix".**
+  - The pre-registered HR re-fit FAILED checks 4 (outs +0.166), 6 (June runs gap 1.340) and 7 (June HR z -3.70). Shipping 1.5 is the user's decision, made with the cause disclosed: June 2026 was a league-wide HR spike (.0343 vs season .0303), not predictable as-of, and 1.5 fits the rest of the season (holdout runs gap 0.691 -> 0.116, HR z +4.76 -> -0.05).
+  - SHIP CONTENT:
+    - pitch-model forward override hr_rate_mult 1.856 -> **1.5**;
+    - the **12 prop maps re-fit at 1.5** on FIT (hits 1/2/3+, hr_1plus, rbi 3+, runs 2/3+, total bases 1-4+), which is the configuration the holdout prop check (5) passed (0.37045 -> 0.36910). The remaining 7 maps are unchanged.
+  - Known cost: June-like HR spikes will be under-predicted (June validation: HR z -3.70, runs gap 1.34).
+  - VERIFY, pre-registered before the ff:
+    - V1: the fleet checkout resolves hr_rate_mult 1.5 and the new maps.
+    - V2: the next production MLB sims; served starter outs_mean is closer to a replay at the new config than at the old (2bb481ef) config. MET if mean |served - new| < mean |served - old|.
+    - V2b: the served game total's mean runs sits closer to the new replay's runs than to the old one's.
 - **HR INPUT FIX -- DIAGNOSIS 2026-10-08 (user: "do the per-count diagnosis and the HR input fix"): no input fix is possible from as-of data; nothing built or shipped.**
   - The input-shrinkage hypothesis was WRONG: batter/pitcher HR rates are RAW season-to-date (no prior). The log5 league constant (0.03) was checked too: input level b x p / 0.03 moves only +7% across periods.
   - What moved is REAL league HR/PA (StatsAPI teams/stats, regular season): Apr .0281, May .0285, **Jun .0343**, Jul .0320, Aug .0290, Sep .0308 (season .0303).
