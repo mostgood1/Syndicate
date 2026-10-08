@@ -1708,6 +1708,26 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **JOINT ROUND (count table + workload + walk), PRE-REGISTERED 2026-10-09 (user chose "Joint round"), before any rebuild or arm:**
+  - WHY: count-shape rounds 1-2 fixed the count mix and pitches/PA but failed on SEASON-PHASE starter length (June ~15.4 outs vs late season 14.61; no constant hook serves both) and on BB/PA drift. With pitches/PA fixed, the recency-stamina mechanism (built, default 0) no longer collides with a pitch deficit.
+  - COMPONENTS:
+    - the IPF count table (fixed, count_table.json);
+    - levers:
+      - `starter_stamina_recent_weight` w {0 (prod), 0.25, 0.5, 0.75}. Rosters are REBUILT per w for every fit root; w=0 = the existing builds.
+      - `starter_hook_add_pitches` {-10, -6, -3, 0, +2};
+      - `bb_ball_bias_mult` {1.2, 1.05, 0.9} (the walk lever);
+      - `k_logit_bias` {0.15, 0, -0.15}.
+    - Start = round 1's chosen config. Coordinate descent, 2 passes, 50 sims.
+  - FIT sees BOTH phases. Score = (13-moment objective + pitches/start term) on the June-fit set (06-15..07-12, stored-input rebuild) PLUS the same on the window first half (07-16..08-21).
+  - MAPS: 19 prop maps re-fit on the window first half at the final config.
+  - HOLDOUT = window second half (08-22..09-27), rebuilt at the chosen w. **Disclosed: third read of this holdout for this fix family; no other regular-season data remains.**
+  - JUNE GUARD = June validation set (05-30..06-14), rebuilt at the chosen w.
+  - SHIP only if ALL 8 checks hold (the same definitions as count-shape rounds 1-2), base = production (6cd415f3).
+  - SHIP MECHANICS:
+    - the table + levers in the forward override files;
+    - w as the build_team_roster default (code);
+    - the re-fit maps;
+    - fleet ff (no restart; production picks w up at its next roster build), V1 + V2, deploys.md, upstream PR addition.
 - **COUNT-SHAPE ROUND 2 RESULT 2026-10-09 ~03:00Z: DO NOT SHIP (fails 4, 5, 8). Nothing shipped; production unchanged.**
   - DESCENT (corrected hook grid) chose hook **+2** (with k_logit_bias +0.15, bb_ball_bias_mult 1.2). FIT score 78.3 -> 44.9; outs 15.79 vs 15.39; P 88.7 vs 84.0.
   - HOLDOUT (988 starts; second read of this holdout for this fix family, as pre-disclosed):
