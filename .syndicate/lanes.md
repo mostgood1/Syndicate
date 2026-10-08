@@ -2061,6 +2061,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: tests/test_lane_guard_loan_main_text.py runs the real guard against a temp git repo: loan-on-main allowed; self-granted loan from non-holder blocked; plus existing tests/test_lane_loans.py, test_lane_section_scope.py, test_lane_guard_claim_source.py green
 - Blocked by: none
 
+### loan-aware-warn-hooks — OPEN — opened 2026-10-07 — session 74f50e68-fc47-474b-9b59-8887927f3eb3
+- Goal: scope-guard and lane-postwrite-check stop warning on a write lane-guard permits under an honoured loan (read from the same origin/main+local view lane-guard uses); a self-granted loan from a non-holder still warns in both.
+- Files: .claude/hooks/scope-guard.py, .claude/hooks/lane-postwrite-check.py, .claude/hooks/lane_claims_source.py, tests/test_loan_aware_warn_hooks.py (NEW)
+- Hypothesis: n/a (reported 2026-10-07 by lane layer2-shard-generations, session b9bb5f37: its lane-guard-honoured loan write to pipeline/intelligence_state.py drew an out-of-lane warning from BOTH hooks; neither file mentions loans)
+- Falsification test: the new tests run the real hooks against a temp git repo whose loan is on origin/main only; if either hook still warns for the borrower, the fix failed
+- Verification: tests/test_loan_aware_warn_hooks.py green and failing on the unfixed hooks; .claude/hooks/test_scope_guard.py and test_lane_postwrite_check.py still green
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
