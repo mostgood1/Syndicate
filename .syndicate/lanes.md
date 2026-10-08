@@ -1689,6 +1689,16 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **PITCH FIX ROUND 2 RESULT 2026-10-08 ~08:00Z: no feasible move -> the descent stays at the shipped base; nothing to ship; no holdout read.**
+  - FIT (07-16..08-21). Base: P/start 75.1 vs 84.0, SO cap 0.384. Every arm was INFEASIBLE (the starter SO cap binds; more BF per start means more SO per start):
+    - foul 1.75: 75.4 P, outs 15.19;
+    - foul 2.05: 75.8 P, outs 15.22;
+    - hook -10: 76.7 P, outs 15.45;
+    - hook -7: 78.5 P, outs 15.81.
+  - **CORRECTION of my diagnosis above** ("shipped early_count_foul_boost 1.5 caused the ~10-pitch deficit"): WRONG. Restoring 2.05 adds only +0.7 pitches/start.
+    - P/BF was ~11% LOW both BEFORE and AFTER the ship (validation P_per_BF z -2.5 pre-ship / -2.3 shipped; OOS -2.5 / -2.3).
+    - Pre-ship pitches/start looked right only because starters faced +1.9 BF too many: opposing errors, the same shape as the starter walks.
+    - The ship fixed BF and EXPOSED a long-standing pitches-per-PA deficit (model ~3.45 vs real ~3.85 P/PA). The real lever is the count / PA-length shape (ball/strike/foul mix per count), not a single foul term. Next round needs a per-count diagnosis first.
 - **HR RE-FIT RESULT 2026-10-08 ~05:30Z: DO NOT SHIP (fails 4, 6, 7). Production keeps hr_rate_mult 1.856.**
   - FIT (07-16..08-21): an interior optimum at **1.5** (objective 105.0 / 74.2 / **64.0** / 74.0 / 96.1 for 1.1 / 1.3 / 1.5 / 1.7 / 1.856; HR z +0.50, runs z -0.27 at 1.5). 12 of 19 prop maps re-fit.
   - HOLDOUT (08-22..09-27, 988 starts; disclosed as previously read):
