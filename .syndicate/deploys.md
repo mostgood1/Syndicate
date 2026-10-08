@@ -47806,3 +47806,8 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **V2 OWED (pre-registered).** The next production MLB sims after 14:38:26Z: served starter outs_mean vs replays at the new (6cd415f3) and old (ac48cdcd files; verified 1.856) configs, 4000 sims. MET if mean |served - new| < mean |served - old|. A watcher is armed.
 - **Known cost.** June-like HR spikes will be under-predicted.
 - verify: V2 reading on the first post-14:38Z MLB sims.
+
+## 2026-10-08 14:38Z (9:38 AM CT) -- CORRECTION to the 01:52:38Z 10-08 reading (lane layer2-shard-generations, closed): the 10-01 lines were NOT read after the restart. Nothing reads the 10-01 board.
+- That entry said web.log held 7 `LAYER2_SHARD_INDEX_STALE`/`MERGE` lines for date=2026-10-01 "since 00:51Z", from a reader of an old artifact. Wrong. The filter was `awk '$1>="2026-10-08T00:51"'`, and those 7 lines carry NO timestamp: they start `[intelligence_state]`, which sorts after "2026-...", so they passed the filter whatever their age.
+- Measured 14:3xZ 10-08: all 7 sit at web.log lines 22383-43450 of 279,580. That is before the first timestamped line (74639, `2026-10-02T15:00:06Z`). Their neighbouring access-log lines read `[01/Oct/2026:18:33:47 -0500]` and `18:40:24`: the 10-01 board on its own day, under the old in-place writer. Timestamped 10-01 shard lines: 0. The only 10-01 request since 10-07 is one ops `GET /api/ops/clv/report?date=2026-10-01&sport=nba` (18:12:26Z 10-07), which does not touch the shortlist.
+- The entry's live-date claim STANDS: the same filter is a superset (it admits every unstamped line), and it found 0 for date=2026-10-07.
