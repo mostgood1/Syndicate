@@ -27,6 +27,7 @@ Promotion to the fleet is a separate decision; this script promotes nothing.
 from __future__ import annotations
 
 import argparse
+import itertools
 import dataclasses
 import hashlib
 import json
@@ -53,6 +54,9 @@ VALIDATION_SEASON = 2025
 VALIDATION_SEASONS = {"nfl": 2026, "ncaaf": 2025}
 MIN_VALIDATION_GAMES = {"nfl": 128, "ncaaf": 1}
 OUT_DIR = "refit_v2"
+# v3 (pre-registered ee505734): the descent can start from a SUBSET of the switches. A subset is written
+# as its ON switches only, so the empty subset is exactly production's override set ({}).
+SWITCH_BASE: Dict[str, Any] = dict(SWITCHES)
 DESCENT_SEEDS = 60
 SMOKE = False   # --smoke: 6 games, 10 seeds, 2 grid values, separate output dir
 FINAL_SEEDS = 300
@@ -316,8 +320,8 @@ def cmd_descent(args) -> None:
             return obj
 
         prod_obj = score({}, "PRODUCTION (all switches OFF)")
-        cur = dict(SWITCHES)
-        cur_obj = score(cur, "switches ON, shipped levers")
+        cur = dict(SWITCH_BASE)
+        cur_obj = score(cur, f"switch base {sorted(cur) or 'NONE'}, shipped levers")
         g = grids(sport)
         if SMOKE:
             g = {k: [v[0], v[-1]] for k, v in g.items()}
@@ -371,6 +375,39 @@ def cmd_descent(args) -> None:
     finally:
         log.close()
         ev.close()
+
+
+def cmd_subsets(args) -> None:
+    """v3 stage 1: every on/off subset of the four switches at SHIPPED levers, on the FIT set."""
+    sport = args.sport
+    out = F.OUT_ROOT / sport / OUT_DIR
+    out.mkdir(parents=True, exist_ok=True)
+    real_all = F._load(F.OUT_ROOT / sport / f"real_{'-'.join(map(str, FIT_SEASONS[sport]))}.jsonl")
+    ev = Evaluator(sport, FIT_SEASONS[sport], DESCENT_SEEDS, args.workers, out / f"descent_s{DESCENT_SEEDS}.jsonl")
+    rows = []
+    try:
+        prod = ev.run({})
+        games = sorted(set(prod) & set(real_all))
+        terc = _terciles(prod, games)
+        real_m = moments(real_all, games, terc, is_real=True)
+        se = real_se(real_all, games, terc, prod=prod)
+        names = sorted(SWITCHES)
+        for bits in itertools.product((False, True), repeat=len(names)):
+            ov = {n: True for n, on in zip(names, bits) if on}
+            sims = ev.run(ov)
+            obj, z = objective(moments(sims, games, terc, real=real_all), real_m, se)
+            rows.append((obj, ov, z))
+            print(f"  {str(sorted(ov) or ['PRODUCTION']):110} obj {obj:9.2f}", flush=True)
+    finally:
+        ev.close()
+    rows.sort(key=lambda r: r[0])
+    best = rows[0]
+    result = {"sport": sport, "chosen": best[1], "chosen_objective": best[0],
+              "production_objective": next(r[0] for r in rows if not r[1]),
+              "all": [{"switches": sorted(r[1]), "objective": r[0], "z": r[2]} for r in rows]}
+    (out / "subsets_result.json").write_text(json.dumps(result, indent=1), encoding="utf-8")
+    print(f"\n[{sport}] CHOSEN subset {sorted(best[1]) or 'NONE (production)'}  obj {best[0]:.2f}  "
+          f"(production {result['production_objective']:.2f})")
 
 
 def _task_once(ev: Evaluator, tasks: List[dict], ov: Dict[str, Any]) -> dict:
@@ -479,7 +516,10 @@ def cmd_validate(args) -> None:
 
 def main(argv: Optional[List[str]] = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=("descent", "validate"))
+    ap.add_argument("cmd", choices=("descent", "validate", "subsets"))
+    ap.add_argument("--out-dir", default=None, help="output folder under <sport>/ (v3: refit_v3)")
+    ap.add_argument("--switches", default=None,
+                    help="descent: comma list of switches to start ON, or 'auto' = subsets_result.json's choice")
     ap.add_argument("--sport", choices=("nfl", "ncaaf"), required=True)
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--resume", action="store_true", help="validate: finish an interrupted 2025 read")
@@ -490,7 +530,19 @@ def main(argv: Optional[List[str]] = None) -> None:
     if args.smoke:
         global SMOKE, DESCENT_SEEDS
         SMOKE, DESCENT_SEEDS = True, 10
-    {"descent": cmd_descent, "validate": cmd_validate}[args.cmd](args)
+    global OUT_DIR, SWITCH_BASE
+    if args.out_dir:
+        OUT_DIR = args.out_dir
+    if args.switches is not None:
+        if args.switches == "auto":
+            chosen = json.loads((F.OUT_ROOT / args.sport / OUT_DIR / "subsets_result.json").read_text(encoding="utf-8"))["chosen"]
+            SWITCH_BASE = dict(chosen)
+        else:
+            SWITCH_BASE = {n.strip(): True for n in args.switches.split(",") if n.strip()}
+        unknown = set(SWITCH_BASE) - set(SWITCHES)
+        if unknown:
+            raise SystemExit(f"unknown switches {unknown}")
+    {"descent": cmd_descent, "validate": cmd_validate, "subsets": cmd_subsets}[args.cmd](args)
 
 
 if __name__ == "__main__":
