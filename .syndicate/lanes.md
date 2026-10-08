@@ -2322,13 +2322,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: The grade runs on 2026-10-15 (scheduled task soccer-roster-refresh-grade) and the findings file carries n matches/players, per-market B-A with CI, calibration per arm, and the verdict
 - Blocked by: calendar: population matches 10-09..10-14
 
-### nhl-cards-headshot-latest — OPEN — opened 2026-10-08 — session 3c03f29e-cbc0-43c8-a365-9b598352db50
+### nhl-cards-headshot-latest — CLOSED 2026-10-08 (GOAL MET: served NHL props headshots /latest/, 15/15 HTTP 200, deploys.md 18:52Z) — opened 2026-10-08 — session 3c03f29e-cbc0-43c8-a365-9b598352db50
 - Goal: NHL /nhl/cards player headshot URLs use the team-independent assets.nhle.com/mugs/nhl/latest/{id}.png form and resolve HTTP 200 on the served page, where /mugs/nhl/2026/TOR/8479318.png returns 302 (measured 2026-10-08)
 - Files: syndicate/features/nhl/cards.py (LOAN from nhl-board-row-date-mismatch; USER-APPROVED 2026-10-08 in session 3c03f29e; _nhl_headshot_url and its one call site ONLY; lender's predictions-row loaders untouched), tests/test_nhl_headshot_url.py (NEW), tests/test_archives.py (the one NHL props headshot_url assertion ONLY)
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: unit test pins latest form; curl of every headshot URL on local-fleet http://127.0.0.1:10000/nhl/cards returns 200
 - Blocked by: none
+- **CLOSED 2026-10-08 18:54Z:** fix e5438b8d on the fleet web since 18:52:24Z. Reading 18:52:38Z: 24/24 cards carry a /latest/ headshot, 15/15 unique URLs answer 200 (baseline: 16/24 cards, all /2026/{TEAM}/ URLs 302 -> default-skater.png). Loan of nhl/cards.py returned to nhl-board-row-date-mismatch. Note for layer2-board-ui-redesign: the `player_headshots.py` module docstring (lines 12-16) still describes `_nhl_headshot_url` as building `/2026/TOR/` and is now stale.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
