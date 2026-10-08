@@ -23,6 +23,14 @@ NBA / WNBA are left out on purpose: the box-score history ends with LAST
 season's playoffs, and a last-10 drawn from another season (and another
 phase) is not this team's form.
 
+INTERVALS ONLY WHERE THE SOURCE HAS THEM (user 2026-10-08: "are we sure the
+game interval charts are actually showing interval historical results and not
+full game?" -- they were not: 65 first-5 / half / quarter rows were drawn
+against full-game finals). ``segment`` other than full returns ``[]`` except
+NCAAF, whose game files carry per-quarter line scores (h1 = q1+q2,
+h2 = q3+q4+OT, qN = that quarter). MLB innings and NFL quarters have no
+single-file source, so those rows get no team history at all.
+
 Only games inside ``_WINDOW_DAYS`` before the slate count, so an early-season
 "last 10" is honestly short ("last 4") instead of reaching into last season.
 """
@@ -68,8 +76,30 @@ def _num(value: Any) -> float | None:
         return None
 
 
-def _add(index: dict, sport: str, day: str, home: Any, away: Any, hs: float, as_: float) -> None:
+_NCAAF_SEGMENTS = ("h1", "h2", "q1", "q2", "q3", "q4")
+
+
+def _quarters(raw: Any) -> list[float] | None:
+    if not isinstance(raw, list) or len(raw) < 4:
+        return None
+    vals = [_num(v) for v in raw]
+    return None if any(v is None for v in vals[:4]) else [float(v or 0.0) for v in vals]
+
+
+def _segment_points(quarters: list[float], segment: str) -> float | None:
+    if segment == "h1":
+        return quarters[0] + quarters[1]
+    if segment == "h2":
+        return sum(quarters[2:])  # q3 + q4 + every overtime, as segment_actuals grades it
+    if segment in {"q1", "q2", "q3", "q4"}:
+        return quarters[int(segment[1]) - 1]
+    return None
+
+
+def _add(index: dict, sport: str, day: str, home: Any, away: Any, hs: float, as_: float, *, segment: str = "full") -> None:
     hk, ak = _key(sport, home), _key(sport, away)
+    if segment != "full":
+        hk, ak = (f"{hk}|{segment}" if hk else None), (f"{ak}|{segment}" if ak else None)
     if hk:
         index[hk].append((day, hs, as_))
     if ak:
@@ -102,7 +132,14 @@ def _ncaaf(paths: list[Path]) -> dict:
             # startDate is UTC; a 7:30pm ET kickoff is the next UTC day. The
             # window is days wide, so a one-day slip cannot change membership
             # except at its edge.
-            _add(index, "ncaaf", str(g.get("startDate") or "")[:10], g.get("homeTeam"), g.get("awayTeam"), hs, as_)
+            day = str(g.get("startDate") or "")[:10]
+            _add(index, "ncaaf", day, g.get("homeTeam"), g.get("awayTeam"), hs, as_)
+            home_q, away_q = _quarters(g.get("homeLineScores")), _quarters(g.get("awayLineScores"))
+            if home_q and away_q:
+                for seg in _NCAAF_SEGMENTS:
+                    h, a = _segment_points(home_q, seg), _segment_points(away_q, seg)
+                    if h is not None and a is not None:
+                        _add(index, "ncaaf", day, g.get("homeTeam"), g.get("awayTeam"), h, a, segment=seg)
     return index
 
 
@@ -208,7 +245,7 @@ def _index(sport: str) -> dict[str, list[tuple[str, float, float]]]:
     return built
 
 
-def team_recent_results(sport: Any, team: Any, before: Any, n: int = 10) -> list[list[Any]]:
+def team_recent_results(sport: Any, team: Any, before: Any, n: int = 10, *, segment: Any = "full") -> list[list[Any]]:
     """Newest-first ``[date, pts_for, pts_against]`` for ``team``'s games strictly
     before ``before`` (an ISO date or datetime), within ``_WINDOW_DAYS``. ``[]``
     when the sport has no source or the team is unknown -- never a guess."""
@@ -221,6 +258,11 @@ def team_recent_results(sport: Any, team: Any, before: Any, n: int = 10) -> list
     key = _key(sport, team)
     if not key:
         return []
+    segment = str(segment or "full").strip().lower() or "full"
+    if segment not in {"full", "game"}:
+        if sport != "ncaaf" or segment not in _NCAAF_SEGMENTS:
+            return []
+        key = f"{key}|{segment}"
     floor = (cutoff - timedelta(days=_WINDOW_DAYS)).isoformat()
     games = _index(sport).get(key) or []
     out = [[d, f, a] for d, f, a in games if floor <= d < day]

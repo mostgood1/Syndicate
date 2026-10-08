@@ -3848,12 +3848,18 @@ def _chart_columns(row: Mapping[str, Any]) -> dict[str, Any]:
 
             sport = str(row.get("sport") or "").lower()
             when = row.get("commence_time") or row.get("date")
-            home = team_recent_results(sport, row.get("home_team"), when)
-            away = team_recent_results(sport, row.get("away_team"), when)
+            # THE ROW'S OWN INTERVAL: a first-5 or Q1 line read against
+            # full-game finals is a different bet (user 2026-10-08). Sports with
+            # no interval history return [] and the row shows none.
+            segment = str(row.get("segment") or "full").strip().lower() or "full"
+            home = team_recent_results(sport, row.get("home_team"), when, segment=segment)
+            away = team_recent_results(sport, row.get("away_team"), when, segment=segment)
         except Exception:  # noqa: BLE001 -- a chart must never break a card
             home = away = []
+            segment = "full"
         if home or away:
             out["team_recent"] = {"home": home, "away": away}
+            out["team_recent_segment"] = segment
     return out
 
 

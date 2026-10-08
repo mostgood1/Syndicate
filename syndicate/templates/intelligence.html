@@ -4780,6 +4780,11 @@
   }
 
   function teamForm(item, which) {
+    // The history must be for the ROW'S interval: a first-5 / Q1 line read
+    // against full-game finals is a different bet (user 2026-10-08).
+    const rowSeg = String((item && item.segment) || "full").toLowerCase() || "full";
+    const recentSeg = String((item && item.team_recent_segment) || "full").toLowerCase();
+    if ((rowSeg === "game" ? "full" : rowSeg) !== recentSeg) return null;
     const recent = item && item.team_recent;
     const games = recent && Array.isArray(recent[which]) ? recent[which] : [];
     const kind = gameMarketKind(item);
@@ -4852,7 +4857,9 @@
     const forms = ["away", "home"].map((w) => teamForm(item, w)).filter(Boolean);
     if (!forms.length) return "";
     const kind = forms[0].kind;
-    const title = kind === "total" ? "Each team's last 10 game totals" : kind === "spread" ? "Each team's last 10 against today's spread" : "Each team's last 10";
+    const seg = String(item.team_recent_segment || "full").toLowerCase();
+    const segWord = seg === "full" ? "" : ` (${String(item.segment_label || seg.toUpperCase())} only)`;
+    const title = (kind === "total" ? "Each team's last 10 game totals" : kind === "spread" ? "Each team's last 10 against today's spread" : "Each team's last 10") + segWord;
     return `<figure class="prop-chart game-form"><figcaption>${title} · dashed = today's line</figcaption>${forms.map((f) => gameFormChart(f)).join("")}</figure>`;
   }
 

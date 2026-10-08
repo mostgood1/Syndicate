@@ -88,5 +88,11 @@ eq('away +1.5 reads 1 - P(margin > +1.5)', awaySp && Math.round(awaySp.pSide * 1
 const named = api.simLadderBuckets({ sim_ladder: sp, sim_ladder_kind: 'margin', line: -0.5, side: 'Real Madrid', home_team: 'Real Madrid', away_team: 'Villarreal', confidence: 0.48 });
 eq('soccer team-name side resolves to home', named && named.sideWord, 'home covers');
 
+// Interval rows: team history must be for the row's own interval (user 2026-10-08).
+const f5 = Object.assign({}, tot, { segment: 'first5', team_recent_segment: undefined });
+eq('first-5 row with full-game history draws nothing', api.teamForm(f5, 'home'), null);
+const h1 = Object.assign({}, tot, { segment: 'h1', team_recent_segment: 'h1' });
+eq('h1 row with h1 history draws', api.teamForm(h1, 'home') !== null, true);
+
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASS');
 process.exit(failures ? 1 : 0);

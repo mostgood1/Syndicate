@@ -576,3 +576,33 @@ class NflSegmentPricing(unittest.TestCase):
         self.assertAlmostEqual(spread["projection"]["model_prob_over"], 0.5)      # home margin > 1.5: 3 and 7
         self.assertEqual(priced_full["projection"]["model_prob_over"], 0.4)      # an existing probability is left alone
         self.assertEqual(got["segment_rows_priced"], 2)
+
+
+class TeamRecentIntervals(unittest.TestCase):
+    """User 2026-10-08: interval rows must not show full-game history."""
+
+    def test_ncaaf_halves_and_quarters_come_from_line_scores(self) -> None:
+        import gzip
+        import json
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+
+        from syndicate.features.shared import team_recent_results as trr
+
+        game = {"startDate": "2026-10-03T16:00:00.000Z", "completed": True, "homeTeam": "TCU", "awayTeam": "Baylor",
+                "homePoints": 10, "awayPoints": 17, "homeLineScores": [0, 7, 3, 0], "awayLineScores": [0, 7, 10, 0]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "ncaaf_source" / "historical_truth"
+            path.mkdir(parents=True)
+            with gzip.open(path / "games_2026.json.gz", "wt", encoding="utf-8") as fh:
+                json.dump([game], fh)
+            with mock.patch.dict("os.environ", {"SYNDICATE_DATA_ROOT": tmp}):
+                full = trr.team_recent_results("ncaaf", "TCU", "2026-10-10")
+                h1 = trr.team_recent_results("ncaaf", "TCU", "2026-10-10", segment="h1")
+                h2 = trr.team_recent_results("ncaaf", "TCU", "2026-10-10", segment="h2")
+                mlb_f5 = trr.team_recent_results("mlb", "NYY", "2026-10-10", segment="first5")
+        self.assertEqual(full, [["2026-10-03", 10.0, 17.0]])
+        self.assertEqual(h1, [["2026-10-03", 7.0, 7.0]])
+        self.assertEqual(h2, [["2026-10-03", 3.0, 10.0]])
+        self.assertEqual(mlb_f5, [])  # no interval source: nothing, never full-game finals
