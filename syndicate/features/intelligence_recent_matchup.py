@@ -370,6 +370,11 @@ def mlb_prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str) 
         recent = sorted(source_rows, key=lambda r: str(r.get("date") or ""))[-_MLB_LAST_N:]
         if cols and recent:
             values = _mlb_side_values(recent, cols)
+            try:  # the chart side-channel must never cost the sentence
+                paired = [(str(r.get("date") or ""), v) for r in recent for v in _mlb_side_values([r], cols)]
+                _record_values(row, [v for _d, v in reversed(paired)], [d for d, _v in reversed(paired)])
+            except Exception:  # noqa: BLE001
+                pass
             line = _num(row.get("line"))
             side = str(row.get("side") or "").lower()
             if values and line is not None and side in {"over", "under"}:
@@ -770,6 +775,39 @@ def nhl_vs_position_text(row: Mapping[str, Any], opponent: str | None, *, select
         return None
 
 
+# ---------------------------------------------------------------- per-game values
+#
+# For the Layer 2 board's per-row L5/L10 charts (lane layer2-board-ui-redesign,
+# user-approved 2026-10-08): the per-game values the "Recent form" sentence was
+# computed from, kept beside it so the chart and the sentence can never disagree
+# and no second evidence build is run. Written ONLY where that sentence's values
+# are computed; additive -- the text, the memo and the budget are untouched.
+# Bounded: cleared whole when it passes RECENT_VALUES_MAX (a board build is ~5k rows).
+
+RECENT_VALUES: dict[tuple, dict[str, Any]] = {}
+RECENT_VALUES_MAX = 20000
+
+
+def _record_values(row: Mapping[str, Any], values: list[Any], dates: list[Any] | None = None) -> None:
+    if len(RECENT_VALUES) >= RECENT_VALUES_MAX:
+        RECENT_VALUES.clear()
+    vals = [float(v) for v in list(values)[:_RECENT_VALUES_N] if v is not None]
+    if not vals:
+        return
+    entry: dict[str, Any] = {"values": vals, "line": _num(row.get("line")), "side": str(row.get("side") or "").lower()}
+    if dates and len(dates) == len(vals):
+        entry["dates"] = [str(d) for d in dates]
+    RECENT_VALUES[_memo_key(row)] = entry
+
+
+def recent_values_for(row: Mapping[str, Any]) -> dict[str, Any] | None:
+    """{values (newest first, <= 10), line, side, [dates]} behind this row's Recent form sentence, or None."""
+    return RECENT_VALUES.get(_memo_key(row))
+
+
+_RECENT_VALUES_N = 10
+
+
 def _memo_key(row: Mapping[str, Any]) -> tuple:
     return (
         str(row.get("sport") or "").lower(),
@@ -803,6 +841,12 @@ def prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str, memo
         if evidence is not None:
             recent = evidence.layers.get(Layer.RECENT_FORM)
             match = evidence.layers.get(Layer.MATCHUP)
+            try:  # the chart side-channel must never cost the sentence
+                facts = getattr(recent, "facts", None) or {}
+                if getattr(recent, "filled", True) and isinstance(facts.get("values"), list):
+                    _record_values(row, facts["values"])
+            except Exception:  # noqa: BLE001
+                pass
             match_facts = match.facts if match is not None else None
             pieces = [
                 recent_form_text(recent.facts if recent is not None else None),

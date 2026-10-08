@@ -111,3 +111,26 @@ def test_nfl_usage_reads_every_season_back_four(tmp_path, monkeypatch):
     lines, _path, tried = F._nfl_usage(2026, player)
     assert [(l["season"], l["week"]) for l in lines] == [(2026, 2), (2026, 1), (2025, 17), (2025, 16), (2023, 3)]
     assert len(tried) == 4
+
+
+def test_recent_values_side_channel_matches_the_sentence(tmp_path, monkeypatch):
+    """Layer 2 L5/L10 charts read the values the Recent form sentence was computed from (lane layer2-board-ui-redesign)."""
+    from syndicate.features import intelligence_recent_matchup as rm
+
+    root = tmp_path / "data"
+    monkeypatch.setenv("SYNDICATE_MLB_DATA_ROOT", str(root))
+    rows = [{"date": f"2025-06-{d:02d}", "game_pk": d, "player_id": "1", "team": "Cleveland Guardians",
+             "opponent": "Detroit Tigers", "h": d % 3} for d in range(1, 13)]
+    _csv(root / "derived" / "mlb_player_game_log_2025_hitting.csv", mlb.LOG_KEYS + mlb.HITTING, rows)
+    row = {"sport": "mlb", "kind": "prop", "player_name": "A B", "market": "batter_hits", "line": 0.5, "side": "over", "player_id": "1"}
+    rm.RECENT_VALUES.clear()
+    text = rm.mlb_prop_recent_matchup_text(row, selected_date="2025-07-01")
+    got = rm.recent_values_for(row)
+    assert got["dates"][0] == "2025-06-12" and len(got["values"]) == 10  # newest first, last 10
+    assert got["values"] == [float(d % 3) for d in range(12, 2, -1)]
+    hits = sum(1 for v in got["values"] if v > 0.5)
+    assert f"in {hits} of the last 10 logged games" in text
+    memo: dict = {}
+    rm.prop_recent_matchup_text(row, selected_date="2025-07-01", memo=memo)
+    rm.prop_recent_matchup_text(row, selected_date="2025-07-01", memo=memo)  # memo hit: values still there
+    assert rm.recent_values_for(row)["values"] == got["values"]
