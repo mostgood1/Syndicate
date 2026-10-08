@@ -2261,6 +2261,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Findings file with the per-role calibration, log-loss and ROI tables + CIs, the number of dates/matches/lines, and the verdict; plus the share of live last-scorer lines priced from a build that had confirmed starters (whether the mechanism could reach the board at all).
 - Blocked by: none
 
+### execution-ledger-keyvalue-growth — OPEN — opened 2026-10-08 — session a9190ad7-229e-4bde-901b-ccb4a55c2787
+- Goal: [user 2026-10-08: 'spin up a session to fix the execution_ledger growth'] reports/intelligence/execution_ledger.json never has a keyvalue write refused AND no ledger row is lost when it is bounded: rows leaving the live document land in a durable, disk-backed archive that every full-history reader reads
+- Files: .syndicate/findings_2026-10-08_execution_ledger_growth.md (NEW)
+- Hypothesis: MEASURED 10-08 BEFORE ANY FIX (SIZE_WARNING lines, refresh-worker logs 10-03..10-08): growth is ORDER COUNT (1741 -> 4698 orders, ~270/day), bytes/order 1205 -> 1333. _MAX_RECORDS=5000 + _trim_to_cap bound the doc to ~6.66MB at the cap (79% of 8,388,608), so the brief's linear 8MB-by-10-10 projection is WRONG: the cap will hold. H1: the real event is ~10-09, when TRIMMED starts DROPPING the oldest paper rows permanently (no archive exists), which loses settled history that full-history readers (paper_settlement / daily optimizer / fit_probability_calibration / ROI) need. H2: the residual refusal risk is bytes/order creep: the ceiling is reached at 1,678 B/order x 5000. H3: query_state_cache.json's refusals are a DIFFERENT cause (not an accumulator).
+- Falsification test: H1 false if something already archives trimmed rows, or no reader needs rows older than the cap window. H2 false if the per-field composition shows no field growing per order. H3 false if query_state_cache grows by accumulation like the ledger.
+- Verification: Read the keyvalue copy read-only on the fleet: order count by mode/date/outcome, per-field bytes. Enumerate readers and their windows. After the fix: the ledger size and cadence, the archive's row count == the trimmed count, readers' totals unchanged across a trim, and 0 KEYVALUE_WRITE_REJECTED for the ledger over a stated window, recorded in deploys.md.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
