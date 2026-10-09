@@ -541,3 +541,15 @@ in `inseason_blend_index`, `beta` is the PPA-to-points SCALE; the in-season weig
 `INSEASON_BLEND_K` = 2.0 (half weight on in-season data after 2 games). The early-season lever is therefore
 **`blend_k` in {0.5, 1, 2, 4, 8}** (production 2), letting the data choose the direction (smaller = trust early games
 sooner, larger = lean on the prior season longer). `beta` stays at the harness value. Nothing else changes.
+
+### Re-fit v4 descent (NCAAF) — DONE 2026-10-08
+
+FIT 2024: 283 games (49 early P4-vs-G5, 111 early conference), 60 seeds. Production 337.84 -> v3 start point 282.00 ->
+**fitted 259.54 (0.768 x production; FIT gate <= 0.8 OPEN)**. Fitted: v3's switch + levers, plus **`tier_offset` 3.0 SP+
+pts, `tier_decay_weeks` 8** (the gap fades to 0 by ~week 11), `drive_success_defense_sensitivity` 1.0,
+`red_zone_gain_stiffening` 0.6; `blend_k` stayed at production's 2 (no move improved the objective).
+z production -> fitted: **bias_tier_early +2.90 -> +0.25** (the 2025 lead CONFIRMED on FIT and fixed), p_td +2.38 -> -0.96,
+ppd_strong +3.01 -> +1.04, margin_sd_gap -2.41 -> -1.58; **ppd_weak -2.01 -> -3.66 (+1.65), p_punt +1.59 -> +2.48 (+0.89),
+mean_total -1.82 -> -2.56** -- the same weak-offense under-scoring that failed v3's gate (b) on 2025, with
+`drive_success_offense_sensitivity` still at its 0.3 floor. On FIT this candidate would fail gate (b). The 2026 read is
+NOT scheduled pending a user decision (2026 is the last clean NCAAF held-out set).
