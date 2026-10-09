@@ -43,9 +43,10 @@ def test_synthetic_parity_is_exact(sampler_name):
     assert n == 24
 
 
-def test_engine_py_is_the_port_of_the_vendored_source():
-    out = subprocess.run([sys.executable, str(ROOT / "scripts" / "port_basketball_engine.py"), "--check"], capture_output=True, text=True)
-    assert out.returncode == 0, out.stdout + out.stderr
+# The port tool's `--check` (engine.py == a regeneration from the vendored source) was a gate only until the switch.
+# Since 2026-10-09 (63a58748, parity 5,400/5,400 real calls) engine.py is the source of truth, and native-only edits
+# (P3 mechanisms, calibration levers) are expected to diverge from the vendored text. scripts/port_basketball_engine.py
+# stays as the record of how the port was derived.
 
 
 def _box(lp: LeagueParams, seed: int, kw):
