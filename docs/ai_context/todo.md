@@ -7,8 +7,8 @@
 2026 WNBA season is over, so P5 can only be verified by backtest; the production reading cannot be
 taken until games are live again.
 
-**Already done (2026-10-09, prerequisite-free):** the 2026 checkpoint corpus (344 games, regular 330 /
-playoffs 14, end Q1/Q2/Q3 + 5:00 Q4, `scripts/build_wnba_live_checkpoint_corpus.py`, persisted on the fleet
+**Already done (2026-10-09, prerequisite-free):** the 2026 checkpoint corpus (v2: 346 games, regular 332 /
+playoffs 14, state from P2's `LiveGameState`, anchors from production's smart-sim index, end Q1/Q2/Q3 + 5:00 Q4, `scripts/build_wnba_live_checkpoint_corpus.py`, persisted on the fleet
 `~/wnba_bt/live_checkpoints/`), the vendored-call inventory, and the linear lens's baseline
 (`.syndicate/findings_2026-10-09_wnba_live_vendored_inventory.md`).
 

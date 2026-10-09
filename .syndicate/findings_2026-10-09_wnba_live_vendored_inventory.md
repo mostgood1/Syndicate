@@ -78,57 +78,68 @@ Clean (no vendored reference): `wnba_live_prop_projection.py`, `wnba_live_prop_p
   blended `(1-bw)·sim_mean + bw·actual/played·target`, `bw = clamp(played/target, .25, .85)`.
   Uses `sim.players` — so the WNBA lens is reached by the sim path, unlike NBA's.
 
-## The verification corpus (built this session)
+## The verification corpus
 
-`scripts/build_wnba_live_checkpoint_corpus.py` — one row per (game, checkpoint ∈ end Q1/Q2/Q3,
-5:00 Q4) from ESPN pbp, state reconstructed from plays only (score, box-so-far, team fouls in
-period, player PF/PTS/REB/AST/3PM, on-floor fives, next possession), the as-of pregame anchors,
-ESPN's own live WP, the outcome, and the **linear lens's own prediction computed by the shipped
-functions** (imported, not re-implemented). Regular season and playoffs are separate `phase`s.
+`scripts/build_wnba_live_checkpoint_corpus.py` -- one row per (game, checkpoint: end Q1 / Q2 / Q3,
+5:00 Q4). **v2, 2026-10-09 ~21Z, supersedes v1 (~17Z):**
 
-**Built 2026-10-09** (offline from the ESPN cache, `--start 2026-05-01 --end 2026-10-31`):
+- **State = P2's `LiveGameState`** (`shared/basketball_live_state.py`, lane `basketball-native-live-state`),
+  built on an AS-OF summary per checkpoint -- the same parser production's live tick uses, so P3/P5
+  resume from what the backtest grades. v1's own tracker was deleted. Cross-check before deleting it,
+  all 1,376 v1 cells: score, team fouls, both fives, per-player PF/PTS/REB/AST/3PM identical on every
+  cell; differences only where expected (clock: P2 = the last play's, 5:00-5:25 at "5:00 Q4"; possession
+  at 5:00 Q4 on 42 cells, where v1 LOOKED AHEAD and P2 reads past plays only).
+- **As-of score = the sum of scoring plays to the cut, not the plays' running `homeScore`.** The
+  running field lags the play sum on **36 of 347** games (1 to 132 consecutive plays) while the play
+  sum reaches the official final on every kept game; 9 of 1,384 checkpoint cells sit inside such a lag.
+  v1 and its tracker BOTH read the running field, so their agreement proved nothing on this point.
+- **Anchors = what production's lens actually reads.** `betting.p_home_win` / `p_home_cover` /
+  `p_total_over` / `pred_total` come from the per-game `smart_sim_<d>_<H>_<A>.json` via
+  `refresh_wnba_oddsapi_props.py::_smart_sim_projection_index` (called, not re-implemented). **v1 used
+  `predictions_<d>.csv`, a different estimate** (DAL v TOR 2026-08-12: p_home_win 0.657 vs 0.74;
+  total 165.8 vs 180.0). Source: the `wnba-lines-props-backtest` as-of re-run, fleet
+  `~/wnba_bt/archive/<d>/smart_sim_*.json` (340 games).
+- ESPN pbp `sequenceNumber` is NOT chronological; the list order is (sorting on it broke 27 of 218).
 
-| | value |
+| | v2 |
 |---|---|
-| games seen / kept | 347 / **344** (excluded: 2 `score` — the feed's last play is 2 pts short of the header, a feed defect; 1 `no_plays`) |
-| by phase | **regular 330** (the full 15-team x 44 schedule), **playoffs 14** |
-| rows | 1,376 = 344 x 4 checkpoints; every cell 330 / 14 |
-| props-unreconciled games (kept for game lines, flagged `props_reconciled:false`) | 14 (a 1-2 count stat correction on one player) |
-| as-of anchors joined | 338 games (regular 329, playoffs 9); 116 `predictions_<d>.csv` files, 05-08..10-01 |
-| stint-reconstructed minutes within 1 min of the box | 6,901 / 6,901 (diffs span -0.50..+0.48 = the box's integer rounding; 0 players with zero pbp minutes) |
+| games seen / kept | 347 / **346** (1 excluded: no plays). The 2 v1 `score` exclusions were the running-field lag above |
+| by phase | **regular 332**, **playoffs 14** |
+| rows | 1,384 = 346 x 4 |
+| props-unreconciled games (kept for lines, `props_reconciled:false`) | 14 |
+| anchors joined | **340 / 340** available (regular 331, playoffs 9), 0 unjoined |
+| P2 stint minutes within 1 min of box | 99.97% of 6,901 |
+| cells where P2's lineup fallback read the FINAL box minutes | 0 |
 | dates | 2026-05-08 .. 2026-10-07 |
 
-**Trap found and fixed while building:** ESPN's `sequenceNumber` is NOT chronological. Sorting on it
-put the last play mid-game on 27 of 218 games and dropped the minutes match to 0.82; the feed's LIST
-order is chronological (score reconciliation 205/218 -> 344/347 on the full set).
+Persisted: fleet WSL `~/wnba_bt/live_checkpoints/` -- `wnba_live_checkpoints_2026.jsonl.gz` (sha256
+`a648cb1a…f7302`), `.summary.json`, `linear_lens_baseline_2026.json`, `espn_cache_wnba_2026.tgz`
+(rebuild with `--offline --sim-anchors <dir of the archive's smart_sim files>`). v1 kept beside it as
+`v1_predcsv_anchors_*` -- do not use it.
 
-Persisted (scratch is per-session): fleet WSL `~/wnba_bt/live_checkpoints/` —
-`wnba_live_checkpoints_2026.jsonl.gz` (sha256 `d1bf5580…5fbe26`), `.summary.json`, and
-`espn_cache_wnba_2026.tgz` (rebuild with `--offline`). Anchors: `~/wnba_bt/archive/<d>/predictions_<d>.csv`.
+### The bar: the CURRENT linear lens on v2 (anchored; `scripts/score_wnba_live_checkpoint_baseline.py --anchored`)
 
-### The bar: the CURRENT linear lens on this corpus (anchored games; `scripts/score_wnba_live_checkpoint_baseline.py --anchored`)
+Total MAE vs the FINAL (incl. OT). Brier: ML vs the home win; cover vs margin + the sim's market
+spread; over vs total > the sim's market total (pushes excluded). 95% bootstrap CI over games.
+ESPN's live WP is a third-party ML reference.
 
-Total MAE vs the FINAL (incl. OT). ML Brier vs the home win. 95% bootstrap CI over games. ESPN's own
-live WP at the same play is a third-party reference.
+| phase / checkpoint | n | total MAE [CI] | pregame-anchor MAE | ML Brier | ESPN | ML − ESPN [CI] | cover Brier [CI] | over Brier [CI] |
+|---|---|---|---|---|---|---|---|---|
+| regular / end Q1 | 331 | 12.46 [11.39, 13.51] | 14.94 | 0.1860 | 0.1861 | −0.0000 [−0.011, +0.010] | 0.2364 [0.225, 0.248] | 0.2209 [0.210, 0.232] |
+| regular / end Q2 | 331 | 11.00 [10.04, 11.92] | 14.94 | 0.1538 | 0.1431 | **+0.0107 [+0.004, +0.017]** | 0.2045 [0.185, 0.224] | 0.1773 [0.159, 0.196] |
+| regular / end Q3 | 331 | 7.96 [7.28, 8.79] | 14.94 | 0.1325 | 0.1238 | **+0.0087 [+0.003, +0.015]** | 0.1457 [0.121, 0.170] | 0.1138 [0.095, 0.135] |
+| regular / 5:00 Q4 | 331 | 5.99 [5.34, 6.75] | 14.94 | 0.0997 | 0.0986 | +0.0011 [−0.003, +0.005] | 0.1088 [0.088, 0.133] | 0.0870 [0.069, 0.107] |
+| playoffs / end Q1 | 9 | 14.96 | 12.70 | 0.2224 | 0.1952 | +0.027 [−0.033, +0.073] | 0.2666 | 0.2303 |
+| playoffs / end Q2 | 9 | 13.96 | 12.70 | 0.1587 | 0.1273 | +0.031 [+0.004, +0.060] | 0.1486 | 0.2575 |
+| playoffs / end Q3 | 9 | 7.69 | 12.70 | 0.0708 | 0.0656 | +0.005 [−0.011, +0.022] | 0.0529 | 0.2089 |
+| playoffs / 5:00 Q4 | 9 | 4.28 | 12.70 | 0.0228 | 0.0249 | −0.002 [−0.013, +0.004] | 0.0151 | 0.0785 |
 
-| phase / checkpoint | n | linear total MAE [CI] | pregame-anchor MAE | linear ML Brier [CI] | ESPN Brier | linear − ESPN dBrier [CI] |
-|---|---|---|---|---|---|---|
-| regular / end Q1 | 329 | 13.14 [12.05, 14.18] | 17.02 | 0.2057 [0.192, 0.220] | 0.1864 | **+0.0193 [+0.004, +0.034]** |
-| regular / end Q2 | 329 | 11.31 [10.36, 12.25] | 17.02 | 0.1640 [0.146, 0.184] | 0.1437 | **+0.0202 [+0.011, +0.029]** |
-| regular / end Q3 | 329 | 8.01 [7.30, 8.77] | 17.02 | 0.1359 [0.112, 0.162] | 0.1241 | **+0.0119 [+0.005, +0.019]** |
-| regular / 5:00 Q4 | 329 | 6.20 [5.55, 6.93] | 17.02 | 0.1013 [0.079, 0.126] | 0.0992 | +0.0020 [−0.003, +0.007] |
-| playoffs / end Q1 | 9 | 14.47 [8.36, 21.02] | 14.26 | 0.2407 | 0.1952 | +0.0455 [+0.017, +0.070] |
-| playoffs / end Q2 | 9 | 13.16 | 14.26 | 0.1653 | 0.1273 | +0.0381 [+0.009, +0.077] |
-| playoffs / end Q3 | 9 | 7.49 | 14.26 | 0.0708 | 0.0656 | +0.0052 [−0.012, +0.021] |
-| playoffs / 5:00 Q4 | 9 | 4.30 | 14.26 | 0.0229 | 0.0249 | −0.0020 [−0.013, +0.004] |
+Readings: the linear ML is **level with ESPN's live WP at end Q1** and **worse at end Q2 and end Q3**
+(CIs exclude 0), level again by 5:00 Q4. **CORRECTION:** v1 reported "worse at end Q1/Q2/Q3
+(+0.019/+0.020/+0.012)"; the Q1 deficit was the WRONG ANCHOR, not the lens. Cover/over Brier are near
+0.25 early (cover 0.236 at end Q1): little beyond a coin there. Playoffs: 9 anchored games -- report,
+do not conclude.
 
-Readings: the linear lens's ML is **measurably worse than ESPN's live WP at end Q1/Q2/Q3** (CI
-excludes 0) and level by 5:00 Q4 — so a better live ML is demonstrably available from game state
-alone. Playoffs n=9 anchored games: report, do not conclude. The pregame anchor MAE (17.0) is the
-as-of SIM `pred_total`, not the market close.
-
-**OWED for the P5 comparison (not in this corpus):** the pregame `p_home_cover` / `p_total_over`
-anchors (production derives them from sim SAMPLES, `basketball_props_smart_sim.py:1406/1410`, not
-from `predictions_<d>.csv`), so cover / over Brier cannot be scored for either side yet; and the
-live CLOSE (no WNBA live line was ever captured — `[wnba-live-edge-is-leakage]`), so grading is vs
-the final only.
+Not in the corpus: the live CLOSE (no WNBA live line was ever captured --
+`[wnba-live-edge-is-leakage]`), so grading is vs the final only; and the 6 kept games without an
+as-of sim (no anchor, so the lens has no pregame `p_*`).

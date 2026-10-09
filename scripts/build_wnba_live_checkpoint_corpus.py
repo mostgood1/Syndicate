@@ -1,8 +1,7 @@
 """Build the 2026 WNBA in-game CHECKPOINT corpus from ESPN play-by-play.
 
 Lane `wnba-native-live-cutover` (P5 of `docs/ai_context/basketball_live_native_plan.md`),
-prerequisite-free part. P1 (native engine), P2 (native live state) and P3 (NBA live re-sim)
-have not landed, so nothing here simulates. This produces the FIXED, PAIRED population that
+prerequisite-free part: nothing here simulates. This produces the FIXED, PAIRED population that
 P5's verification is scored on: the native re-sim and the current linear lens must be graded
 on the SAME games at the SAME checkpoints, and that population is decided here, before either
 side is run.
@@ -10,19 +9,23 @@ side is run.
 One row per (game, checkpoint). Checkpoints: end of Q1, end of Q2, end of Q3, 5:00 left in Q4
 (the plan's P3 list). A row carries:
 
-* ``state`` -- what a resume API needs, reconstructed from pbp only: period, seconds left in the
-  period and in regulation, score, per-team box-so-far (FGA/3PA/FTA/OREB/TOV, possessions
-  estimate), team fouls in the current period, per-player PF / PTS / REB / AST / 3PM so far,
-  the five on the floor for each side, and the team that has the next possession.
+* ``state`` -- P2's typed ``LiveGameState`` (`syndicate/features/shared/basketball_live_state.py`)
+  built from an AS-OF summary (plays cut at the checkpoint, header score = the running score, status
+  in progress) -- the SAME parser production's live tick uses, so P3/P5 resume from exactly what the
+  backtest grades. Its clock is the last play's (what a live tick sees), so the "5:00 Q4" cell is
+  usually 5:0x-5:2x; ``checkpoint_secs_left_regulation`` keeps the nominal instant. Added beside it:
+  per-player REB / AST / 3PM so far (P2 carries PTS and PF), ESPN's live WP at the cut, and, at an
+  end-of-period cut only, the next period's possession (fixed by the alternating rule; basis
+  ``quarter_start_rule_observed``). ``stints`` / ``notes`` are dropped for size;
+  ``lineup_fill_by_final_box_minutes`` counts P2's one fallback that reads the FINAL box (0 of 1,376
+  cells on the 2026 build).
 * ``pregame`` -- ESPN pickcenter spread (home-relative) and total, when present.
-* ``espn_home_wp`` -- ESPN's own live win probability at the checkpoint's last play, a free
-  third comparator.
 * ``outcome`` -- final (incl. OT) and regulation scores, OT flag, and each player's final box.
 
 WHY THE RECONCILIATION BLOCK IS THE GATE. A corpus whose state is parsed wrong grades both
 models against a fiction, and they would agree with each other perfectly while doing it. Every
-game is reconciled: the pbp-reconstructed final score must equal the header score, and the
-pbp-summed per-player PTS / REB / AST / PF must equal the box. A score failure EXCLUDES the game;
+game is reconciled on P2's full-game reconstruction: the sum of the log's scoring plays must equal
+the header score, and per-player PTS / REB / AST / PF must equal the box. A score failure EXCLUDES the game;
 a stat failure keeps it for game lines and marks ``props_reconciled: false`` so a prop backtest
 drops it. Both are COUNTED in the summary, never silent. Minutes from the stint
 reconstruction are reported as a match rate (box minutes are rounded integers, and ESPN omits
@@ -41,7 +44,7 @@ Usage (run at Idle priority -- the fleet shares this machine):
 from __future__ import annotations
 
 import argparse
-import csv
+import copy
 import glob
 import gzip
 import json
@@ -57,6 +60,8 @@ for _p in (REPO, REPO / "scripts"):
         sys.path.insert(0, str(_p))
 
 import basketball_scenario_rates as bsr  # noqa: E402
+from syndicate.features.shared import basketball_live_state as bls  # noqa: E402
+from syndicate.features.shared import basketball_pbp as pbp  # noqa: E402
 
 
 LEAGUE = "wnba"
@@ -71,30 +76,12 @@ CHECKPOINTS: Tuple[Tuple[str, int, float], ...] = (
 )
 SEASON_TYPES = {2: "regular", 3: "playoffs"}
 
-# Personal fouls (count toward a player's six). Technicals and defensive-3-second technicals do not.
-_PERSONAL_FOUL_TYPES = {
-    "personal foul", "shooting foul", "offensive foul", "loose ball foul", "offensive charge",
-    "personal take foul", "away from play foul", "flagrant foul type 1", "flagrant foul type 2",
-    "clear path foul", "transition take foul", "inbound foul", "personal block foul",
-}
-# Offensive fouls are personal fouls but not TEAM fouls for the bonus.
-_OFFENSIVE_FOUL_TYPES = {"offensive foul", "offensive charge"}
-
-
 def _play_type(p: Dict[str, Any]) -> str:
     return str((p.get("type") or {}).get("text") or "").strip().lower()
 
 
 def _period(p: Dict[str, Any]) -> int:
     return int(((p.get("period") or {}).get("number")) or 0)
-
-
-def _participants(p: Dict[str, Any]) -> List[str]:
-    return [str((x.get("athlete") or {}).get("id") or "") for x in p.get("participants") or []]
-
-
-def _is_turnover(t: str) -> bool:
-    return "turnover" in t and not t.startswith("no turnover")
 
 
 def _game_sides(summary: Dict[str, Any]) -> Optional[Dict[str, Dict[str, Any]]]:
@@ -152,268 +139,172 @@ def _elapsed(period: int, secs_left: float) -> float:
     return REG_PERIODS * PERIOD_SECONDS + (period - REG_PERIODS - 1) * 300.0 + (300.0 - secs_left)
 
 
-class _Tracker:
-    """Replays plays in order; snapshot() returns the state after the last applied play."""
-
-    def __init__(self, sides: Dict[str, Dict[str, Any]], box: Dict[str, Dict[str, Any]]):
-        self.team_side = {sides["home"]["id"]: "home", sides["away"]["id"]: "away"}
-        self.box = box
-        self.score = {"home": 0.0, "away": 0.0}
-        self.team = {s: Counter() for s in ("home", "away")}
-        self.player: Dict[str, Counter] = defaultdict(Counter)
-        self.team_fouls_period = {"home": 0, "away": 0}
-        self.period = 1
-        self.secs_left = PERIOD_SECONDS
-        self.last_play_id: Optional[str] = None
-        # on-floor: per side, a set; seeded from box starters, corrected per period (see _period_lineups)
-        self.on_floor = {s: {a for a, b in box.items() if b["side"] == s and b["starter"]} for s in ("home", "away")}
-        self.stint_start: Dict[str, float] = {a: 0.0 for s in self.on_floor.values() for a in s}
-        self.minutes = Counter()
-
-    def _side_of_player(self, aid: str) -> Optional[str]:
-        b = self.box.get(aid)
-        return b["side"] if b else None
-
-    def set_period_lineup(self, period: int, lineups: Dict[str, set]) -> None:
-        t0 = _elapsed(period, PERIOD_SECONDS if period <= REG_PERIODS else 300.0)
-        for side in ("home", "away"):
-            for a in list(self.on_floor[side]):
-                self.minutes[a] += max(0.0, self.stint_start_close(a, t0))
-            self.on_floor[side] = set(lineups.get(side) or self.on_floor[side])
-            for a in self.on_floor[side]:
-                self.stint_start[a] = t0
-
-    def stint_start_close(self, aid: str, t: float) -> float:
-        start = self.stint_start.pop(aid, None)
-        return 0.0 if start is None else t - start
-
-    def apply(self, p: Dict[str, Any]) -> None:
+def _cut_index(plays: List[Dict[str, Any]], cp_period: int, cp_secs: float) -> Optional[int]:
+    """Index of the first play strictly AFTER the checkpoint instant (the feed's list order is
+    chronological). None when the game never got past it."""
+    for i, p in enumerate(plays):
         per = _period(p)
         secs = bsr._clock_seconds(p.get("clock"))
-        if per != self.period:
-            self.team_fouls_period = {"home": 0, "away": 0}
-            self.period = per
-        if secs is not None:
-            self.secs_left = secs
-        t = _elapsed(per, self.secs_left)
-        hs, as_ = bsr._num(p.get("homeScore")), bsr._num(p.get("awayScore"))
-        if hs is not None and as_ is not None:
-            self.score = {"home": hs, "away": as_}
-        self.last_play_id = str(p.get("id") or "")
-        typ = _play_type(p)
-        txt = str(p.get("text") or "").lower()
-        parts = _participants(p)
-        side = self.team_side.get(str((p.get("team") or {}).get("id") or ""))
-        actor = parts[0] if parts else None
-
-        if typ == "substitution" and len(parts) >= 2:
-            enters, leaves = parts[0], parts[1]
-            s = self._side_of_player(enters) or self._side_of_player(leaves)
-            if s:
-                if leaves in self.on_floor[s]:
-                    self.on_floor[s].discard(leaves)
-                    self.minutes[leaves] += max(0.0, self.stint_start_close(leaves, t))
-                self.on_floor[s].add(enters)
-                self.stint_start[enters] = t
-            return
-
-        if bool(p.get("shootingPlay")) and side:
-            is_ft = typ.startswith("free throw")
-            made = bool(p.get("scoringPlay"))
-            tc = self.team[side]
-            if is_ft:
-                tc["fta"] += 1
-            else:
-                tc["fga"] += 1
-                if p.get("pointsAttempted") == 3:
-                    tc["fg3a"] += 1
-            if actor:
-                if made:
-                    self.player[actor]["pts"] += float(p.get("scoreValue") or 0)
-                    if not is_ft and p.get("pointsAttempted") == 3:
-                        self.player[actor]["fg3m"] += 1
-                if made and not is_ft and len(parts) >= 2 and "assist" in txt:
-                    self.player[parts[1]]["ast"] += 1
-            return
-
-        if typ in ("offensive rebound", "defensive rebound") and side:
-            if typ == "offensive rebound":
-                self.team[side]["oreb"] += 1
-            if actor:
-                self.player[actor]["reb"] += 1
-            return
-
-        if _is_turnover(typ) and side:
-            self.team[side]["tov"] += 1
-            return
-
-        if typ in _PERSONAL_FOUL_TYPES and side:
-            if actor:
-                self.player[actor]["pf"] += 1
-            if typ not in _OFFENSIVE_FOUL_TYPES:
-                self.team_fouls_period[side] += 1
-
-    def close_minutes(self, t_end: float) -> Counter:
-        out = Counter(self.minutes)
-        for side in ("home", "away"):
-            for a in self.on_floor[side]:
-                st = self.stint_start.get(a)
-                if st is not None:
-                    out[a] += max(0.0, t_end - st)
-        return out
-
-    def snapshot(self, period: int, secs_left: float) -> Dict[str, Any]:
-        """State AT the checkpoint instant (period, secs_left), not at the last play's clock: the last
-        play before 5:00 of Q4 can be at 5:12, and a quarter need not end on an End Period play."""
-        teams = {}
-        for s in ("home", "away"):
-            c = self.team[s]
-            teams[s] = {
-                "pts": self.score[s], "fga": c["fga"], "fg3a": c["fg3a"], "fta": c["fta"],
-                "oreb": c["oreb"], "tov": c["tov"],
-                "poss_est": round(c["fga"] + 0.44 * c["fta"] + c["tov"] - c["oreb"], 2),
-                "team_fouls_period": self.team_fouls_period[s],
-                "on_floor": sorted(self.on_floor[s]),
-            }
-        players = {
-            a: {k: float(v) for k, v in c.items()} for a, c in self.player.items() if any(c.values())
-        }
-        t = _elapsed(period, secs_left)
-        mins = self.close_minutes(t)
-        for a, m in mins.items():
-            if m > 0:
-                players.setdefault(a, {})["min"] = round(m / 60.0, 2)
-        return {
-            "period": period, "secs_left_period": secs_left,
-            "secs_left_regulation": max(0.0, REG_PERIODS * PERIOD_SECONDS - t),
-            "home_score": self.score["home"], "away_score": self.score["away"],
-            "teams": teams, "players": players,
-        }
+        if per > cp_period or (per == cp_period and secs is not None and secs < cp_secs):
+            return i
+    return None
 
 
-def _period_lineups(plays: List[Dict[str, Any]], box: Dict[str, Dict[str, Any]]) -> Dict[int, Dict[str, set]]:
-    """Five per side at the START of each period: players who act before (or without) entering,
-    plus those who are subbed out before being subbed in. ESPN omits period-start lineups, so this
-    is the standard inference; periods where it finds != 5 fall back to the carried-over five."""
-    out: Dict[int, Dict[str, set]] = {}
-    by_period: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
-    for p in plays:
-        by_period[_period(p)].append(p)
-    for per, ps in by_period.items():
-        entered: Dict[str, set] = {"home": set(), "away": set()}
-        starters: Dict[str, set] = {"home": set(), "away": set()}
-        for p in ps:
-            typ = _play_type(p)
-            parts = _participants(p)
-            if typ == "substitution" and len(parts) >= 2:
-                enters, leaves = parts[0], parts[1]
-                for aid in (leaves,):
-                    b = box.get(aid)
-                    if b and aid not in entered[b["side"]]:
-                        starters[b["side"]].add(aid)
-                b = box.get(enters)
-                if b:
-                    entered[b["side"]].add(enters)
-                continue
-            if typ in ("jumpball",) or "timeout" in typ or "review" in typ or "challenge" in typ:
-                continue
-            for aid in parts[:2] if typ != "jumpball" else parts:
-                b = box.get(aid)
-                if b and aid not in entered[b["side"]]:
-                    starters[b["side"]].add(aid)
-        out[per] = {s: v for s, v in starters.items() if len(v) == 5}
+def as_of_summary(summary: Dict[str, Any], cut: int) -> Dict[str, Any]:
+    """The summary a LIVE tick would have fetched at the checkpoint: plays up to the cut, the
+    header score = the score AT the cut, status in progress, no linescores.
+
+    WHY THE HEADER IS REWRITTEN: `basketball_live_state.build_live_game_state` takes the team score
+    from ESPN's HEADER (its documented choice, measured on 1,420 NBA games). A completed game's header
+    holds the FINAL score, so passing the truncated plays alone would score every checkpoint with the
+    final.
+
+    WHY THE SCORE IS THE SUM OF SCORING PLAYS, NOT THE PLAYS' RUNNING `homeScore`: measured 2026-10-09
+    on the 2026 WNBA season, the running field lags the sum of scoring plays on 36 of 347 games, for 1
+    to 132 consecutive plays (a basket missing from the running field), while the play sum reaches the
+    official final on every kept game. A live tick reads ESPN's official header, which the play sum
+    tracks; the running field does not. (This script's first version read the running field, and a
+    cross-check against its own tracker "agreed" on every cell -- because both read the same field.)
+    """
+    plays = list(summary.get("plays") or [])[:cut]
+    header = copy.deepcopy(summary.get("header") or {})
+    comp = (header.get("competitions") or [{}])[0]
+    comp["status"] = {"type": {"state": "in", "completed": False, "name": "STATUS_IN_PROGRESS"}}
+    out = {k: v for k, v in summary.items() if k not in ("plays", "header", "winprobability")}
+    out["plays"] = plays
+    out["header"] = header
+    meta = pbp.game_meta(out, LEAGUE)
+    score = pbp.reconstructed_score(pbp.normalize_plays(out, meta))
+    for c in comp.get("competitors") or []:
+        side = str(c.get("homeAway") or "")
+        if side in score:
+            c["score"] = str(score[side])
+        c["linescores"] = []
     return out
 
 
-def _next_possession(plays: List[Dict[str, Any]], start_idx: int, team_side: Dict[str, str]) -> Optional[str]:
-    """Side of the first offensive action after the checkpoint (field-goal attempt, turnover, or an
-    offensive foul). A derived field, labelled as such."""
-    for p in plays[start_idx:]:
-        typ = _play_type(p)
+def _player_counts(events: List[Any]) -> Dict[str, Dict[str, int]]:
+    """REB / AST / 3PM per player so far, from P2's NORMALIZED events (P2's PlayerLiveState carries
+    PTS and PF but not these; live props need them). Participant 0 is the actor, 1 the assister."""
+    out: Dict[str, Dict[str, int]] = defaultdict(lambda: {"reb": 0, "ast": 0, "fg3m": 0})
+    for e in events:
+        if not e.players:
+            continue
+        if e.kind in ("rebound_off", "rebound_def"):
+            out[e.players[0]]["reb"] += 1
+        elif e.kind == "shot" and e.made:
+            if e.points_attempted == 3:
+                out[e.players[0]]["fg3m"] += 1
+            if len(e.players) >= 2 and "assist" in e.text.lower():
+                out[e.players[1]]["ast"] += 1
+    return out
+
+
+def _quarter_start_possession(plays: List[Dict[str, Any]], cut: int, team_side: Dict[str, str]) -> Optional[str]:
+    """At an end-of-period cut the log says nothing about who starts the next period (P2 returns
+    None, basis `end_period`). That side is fixed by the alternating-possession rule, so reading it
+    off the next period's first offensive action is the RULE's answer, not outcome leakage. Never
+    used for a mid-period cut, where it WOULD leak (who won the next rebound)."""
+    for p in plays[cut:]:
+        t = _play_type(p)
         side = team_side.get(str((p.get("team") or {}).get("id") or ""))
         if not side:
             continue
-        if (bool(p.get("shootingPlay")) and not typ.startswith("free throw")) or _is_turnover(typ) \
-                or typ in _OFFENSIVE_FOUL_TYPES:
+        if (bool(p.get("shootingPlay")) and not t.startswith("free throw")) or "turnover" in t \
+                or t in ("offensive foul", "offensive charge"):
             return side
     return None
 
 
+_DROP_STATE_KEYS = ("stints", "notes")
+
+
+def state_at(summary: Dict[str, Any], cp_period: int, cp_secs: float, team_side: Dict[str, str],
+             date_str: str) -> Optional[Dict[str, Any]]:
+    """P2's LiveGameState at the checkpoint, plus the per-player REB/AST/3PM P2 does not carry."""
+    plays = list(summary.get("plays") or [])
+    cut = _cut_index(plays, cp_period, cp_secs)
+    if cut is None or cut == 0:
+        return None
+    s = as_of_summary(summary, cut)
+    st = bls.build_live_game_state(s, LEAGUE, date=date_str, built_at="corpus")
+    d = st.to_dict()
+    notes = list(st.notes)
+    for k in _DROP_STATE_KEYS:
+        d.pop(k, None)
+    d["lineup_fill_by_final_box_minutes"] = sum(1 for n in notes if "filled_by_minutes" in n)
+    d["notes_n"] = len(notes)
+    meta = pbp.game_meta(s, LEAGUE, date=date_str)
+    counts = _player_counts(pbp.normalize_plays(s, meta))
+    for pl in d["players"]:
+        pl.update(counts.get(pl["player_id"], {"reb": 0, "ast": 0, "fg3m": 0}))
+    if d.get("possession_side") is None and cp_secs == 0.0:
+        d["possession_side"] = _quarter_start_possession(plays, cut, team_side)
+        d["possession_basis"] = "quarter_start_rule_observed" if d["possession_side"] else d.get("possession_basis")
+    last_run = next((q for q in reversed(plays[:cut]) if q.get("homeScore") is not None and q.get("awayScore") is not None), None)
+    d["running_score_field_lagged"] = bool(last_run) and (
+        int(last_run["homeScore"]), int(last_run["awayScore"])) != (d["home"]["score"], d["away"]["score"])
+    last_id = str(plays[cut - 1].get("id") or "")
+    wp = {str(w.get("playId")): w.get("homeWinPercentage") for w in summary.get("winprobability") or []}
+    d["espn_home_wp"] = wp.get(last_id)
+    d["checkpoint_secs_left_regulation"] = max(0.0, REG_PERIODS * PERIOD_SECONDS - _elapsed(cp_period, cp_secs))
+    return d
+
+
 def build_game(summary: Dict[str, Any], event: Dict[str, Any]) -> Dict[str, Any]:
-    """Returns {"rows": [...], "recon": {...}}. rows is empty when reconciliation fails."""
+    """Returns {"rows": [...], "recon": {...}}. rows is empty when reconciliation fails.
+
+    State comes from P2 (`basketball_live_state.build_live_game_state`) on an AS-OF summary per
+    checkpoint -- one parser for the corpus and for production's live tick. Cross-checked 2026-10-09
+    against this script's former tracker over all 1,376 cells: score, team fouls, both on-floor
+    fives and per-player PF/PTS/REB/AST/3PM identical on every cell."""
     sides = _game_sides(summary)
     if not sides:
         return {"rows": [], "recon": {"ok": False, "reason": "no_home_away"}}
     team_side = {sides["home"]["id"]: "home", sides["away"]["id"]: "away"}
     box = _box_players(summary, team_side)
-    # The feed's LIST order is chronological; `sequenceNumber` is not (sorting on it put the last
-    # play mid-game on 27 of 218 games, measured 2026-10-09).
     plays = list(summary.get("plays") or [])
     if not plays:
         return {"rows": [], "recon": {"ok": False, "reason": "no_plays"}}
-    lineups = _period_lineups(plays, box)
-    tr = _Tracker(sides, box)
-    wp_by_play = {str(w.get("playId")): w.get("homeWinPercentage") for w in summary.get("winprobability") or []}
 
-    pending = list(CHECKPOINTS)
-    snaps: Dict[str, Dict[str, Any]] = {}
-    cur_period = 0
-    for i, p in enumerate(plays):
-        per = _period(p)
-        secs = bsr._clock_seconds(p.get("clock"))
-        # Close any checkpoint this play is strictly AFTER.
-        while pending:
-            label, cp_per, cp_secs = pending[0]
-            after = per > cp_per or (per == cp_per and secs is not None and secs < cp_secs)
-            if not after:
-                break
-            s = tr.snapshot(cp_per, cp_secs)
-            s["next_possession"] = _next_possession(plays, i, team_side)
-            s["espn_home_wp"] = wp_by_play.get(tr.last_play_id or "")
-            snaps[label] = s
-            pending.pop(0)
-        if per != cur_period:
-            if per in lineups:
-                tr.set_period_lineup(per, lineups[per])
-            cur_period = per
-        tr.apply(p)
-
+    # ---- reconciliation, on P2's full-game reconstruction ---------------------------------------
+    final = bls.build_live_game_state(summary, LEAGUE, date=event["date"], built_at="corpus")
+    meta = pbp.game_meta(summary, LEAGUE, date=event["date"])
+    counts = _player_counts(pbp.normalize_plays(summary, meta))
+    p2 = {pl.player_id: pl for pl in final.players}
     h, a = sides["home"], sides["away"]
+    score_ok = final.pbp_score == {"home": h["score"], "away": a["score"]}
     reg_lines_ok = len(h["lines"]) >= REG_PERIODS and len(a["lines"]) >= REG_PERIODS
-    final_home, final_away = h["score"], a["score"]
-    reg_home = sum(h["lines"][:REG_PERIODS]) if reg_lines_ok else None
-    reg_away = sum(a["lines"][:REG_PERIODS]) if reg_lines_ok else None
-
-    # ---- reconciliation ------------------------------------------------------------------
-    end_t = _elapsed(tr.period, tr.secs_left)
-    pbp_min = tr.close_minutes(end_t)
     mism = Counter()
     min_close = min_n = 0
     for aid, b in box.items():
         if not b["played"]:
             continue
-        pc = tr.player.get(aid, Counter())
+        mine = p2.get(aid)
+        got = {"pts": mine.pts if mine else 0, "pf": mine.pf if mine else 0, **counts.get(aid, {"reb": 0, "ast": 0})}
         for k in ("pts", "reb", "ast", "pf"):
-            if b[k] is not None and abs(float(pc.get(k, 0)) - b[k]) > 1e-6:
+            if b[k] is not None and abs(float(got.get(k, 0)) - b[k]) > 1e-6:
                 mism[k] += 1
         if b["min"] is not None:
             min_n += 1
-            if abs(pbp_min.get(aid, 0.0) / 60.0 - b["min"]) <= 1.0:
+            if abs((mine.seconds_played if mine else 0.0) / 60.0 - b["min"]) <= 1.0:
                 min_close += 1
-    score_ok = (tr.score["home"] == final_home and tr.score["away"] == final_away)
+    snaps = {label: state_at(summary, per, secs, team_side, event["date"]) for label, per, secs in CHECKPOINTS}
+    snaps = {k: v for k, v in snaps.items() if v is not None}
     # Game lines need the SCORE state; props need the per-player stats too. A game whose box and
     # pbp disagree by a stat correction stays in the game-line population, flagged for props.
     ok = score_ok and reg_lines_ok and len(snaps) == len(CHECKPOINTS)
     recon = {
         "ok": ok, "score_ok": score_ok, "props_ok": not mism, "stat_mismatches": dict(mism),
-        "minutes_within_1": min_close, "minutes_n": min_n,
-        "checkpoints_found": len(snaps), "lineup_periods_inferred": len(lineups),
+        "minutes_within_1": min_close, "minutes_n": min_n, "checkpoints_found": len(snaps),
+        "p2_anomalies": final.anomalies,
     }
     if not ok:
         recon["reason"] = ("score" if not score_ok else
                            "linescores" if not reg_lines_ok else "checkpoints")
         return {"rows": [], "recon": recon}
 
+    final_home, final_away = h["score"], a["score"]
     spread = total = None
     for pc in summary.get("pickcenter") or []:
         if spread is None and pc.get("spread") is not None:
@@ -423,7 +314,8 @@ def build_game(summary: Dict[str, Any], event: Dict[str, Any]) -> Dict[str, Any]
     outcome = {
         "home": final_home, "away": final_away, "total": final_home + final_away,
         "margin": final_home - final_away, "home_win": final_home > final_away,
-        "reg_home": reg_home, "reg_away": reg_away, "ot_periods": max(0, len(h["lines"]) - REG_PERIODS),
+        "reg_home": sum(h["lines"][:REG_PERIODS]), "reg_away": sum(a["lines"][:REG_PERIODS]),
+        "ot_periods": max(0, len(h["lines"]) - REG_PERIODS),
         "players": {aid: {k: b[k] for k in ("side", "name", "starter", "min", "pts", "reb", "ast", "fg3m", "pf")}
                     for aid, b in box.items() if b["played"]},
     }
@@ -440,48 +332,57 @@ def build_game(summary: Dict[str, Any], event: Dict[str, Any]) -> Dict[str, Any]
     return {"rows": rows, "recon": recon}
 
 
-def load_anchors(anchor_dir: Optional[Path]) -> Dict[Tuple[str, str], Dict[str, Any]]:
-    """(date, home team display name) -> pregame anchors from production-schema
-    `predictions_<date>.csv` files (the `wnba-lines-props-backtest` as-of re-run of today's pregame path,
-    `.syndicate/findings_2026-10-02_wnba_lines_props_backtest.md`). Both the native re-sim and the
-    linear lens must be given THESE anchors, so the comparison isolates the live mechanism."""
-    out: Dict[Tuple[str, str], Dict[str, Any]] = {}
-    if not anchor_dir:
+def load_anchors(sim_dir: Optional[Path]) -> Dict[Tuple[str, str, str], Dict[str, Any]]:
+    """(date, HOME code, AWAY code) -> the pregame anchors PRODUCTION's live lens reads.
+
+    The lens reads `game["betting"]` (`wnba/cards.py:1365`), whose `p_home_win` / `p_home_cover` /
+    `p_total_over` / `pred_total` / `pred_margin` are threaded into `game_cards` from the per-game
+    `smart_sim_<date>_<HOME>_<AWAY>.json` by `scripts/refresh_wnba_oddsapi_props.py::
+    _smart_sim_projection_index` -- which is CALLED here, not re-implemented. (The first build of this
+    corpus read `predictions_<date>.csv` instead: a different estimate -- e.g. DAL v TOR 2026-08-12
+    p_home_win 0.657 there vs 0.74 in the sim, total 165.8 vs 180.0 -- so its baseline was anchored on
+    numbers production never served.) Source: the `wnba-lines-props-backtest` as-of re-run, today's
+    pregame path per date (fleet `~/wnba_bt/archive/<d>/smart_sim_*.json`).
+
+    The lines are the sim's OWN market inputs (`market_home_spread`, `market_total`): the line its
+    cover / over probabilities were computed against. Production's lens prices against the card's
+    book line, which at sim time is the same quote."""
+    import refresh_wnba_oddsapi_props as producer
+
+    out: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+    if not sim_dir:
         return out
-    for f in sorted(Path(anchor_dir).glob("predictions_2026-*.csv")):
-        with f.open(encoding="utf-8", newline="") as fh:
-            for r in csv.DictReader(fh):
-                out[(str(r.get("date")), str(r.get("home_team")))] = {
-                    "p_home_win": bsr._num(r.get("home_win_prob")),
-                    "pred_margin": bsr._num(r.get("spread_margin")),
-                    "pred_total": bsr._num(r.get("totals")),
-                    "book_home_spread": bsr._num(r.get("home_spread")),
-                    "book_total": bsr._num(r.get("total")),
-                    "visitor_team": r.get("visitor_team"),
-                    "file": f.name,
-                }
+    dates = sorted({f.name[len("smart_sim_"):len("smart_sim_") + 10] for f in Path(sim_dir).glob("smart_sim_2026-*.json")})
+    for d in dates:
+        for (home, away), entry in producer._smart_sim_projection_index(processed_root=Path(sim_dir), date_str=d).items():
+            out[(d, home, away)] = {**{k: entry.get(k) for k in (
+                "p_home_win", "p_home_cover", "p_total_over", "pred_total", "pred_margin",
+                "market_home_spread", "market_total")}, "file": f"smart_sim_{d}_{home}_{away}.json"}
     return out
 
 
 def linear_lens(state: Dict[str, Any], anchors: Optional[Dict[str, Any]], market_total: Optional[float]) -> Dict[str, Any]:
     """The CURRENT native lens's prediction at this checkpoint, computed by the SHIPPED functions in
     `syndicate/features/wnba/cards.py` (imported, never re-implemented, so the baseline cannot drift
-    from production). Same anchor precedence as the call site: pred_total, else the market total."""
+    from production). Same anchor precedence as the call site (:1429): pred_total, else the line."""
     from syndicate.features.wnba import cards
 
-    elapsed = 40.0 - float(state["secs_left_regulation"]) / 60.0
-    margin = float(state["home_score"]) - float(state["away_score"])
-    cur_total = float(state["home_score"]) + float(state["away_score"])
-    p_pre = (anchors or {}).get("p_home_win")
-    pre_total = (anchors or {}).get("pred_total")
-    if pre_total is None:
-        pre_total = (anchors or {}).get("book_total")
-    if pre_total is None:
-        pre_total = market_total
+    anc = anchors or {}
+    # P2's clock: the last play's, i.e. what a live tick sees (at "5:00 Q4" it is often 5:0x-5:2x).
+    elapsed = min(float(state["elapsed"]), float(state["regulation_seconds"])) / 60.0
+    margin = float(state["home"]["score"]) - float(state["away"]["score"])
+    cur_total = float(state["home"]["score"]) + float(state["away"]["score"])
+    line_total = anc.get("market_total") if anc.get("market_total") is not None else market_total
+    pre_total = anc.get("pred_total") if anc.get("pred_total") is not None else line_total
+    total_proj = cards._wnba_live_total_projection(pre_total, cur_total, elapsed) if elapsed else None
     return {
-        "home_win_prob": cards._wnba_live_margin_win_prob(p_pre, margin, elapsed),
-        "total_proj": cards._wnba_live_total_projection(pre_total, cur_total, elapsed) if elapsed else None,
+        "home_win_prob": cards._wnba_live_margin_win_prob(anc.get("p_home_win"), margin, elapsed),
+        "home_cover_prob": cards._wnba_live_cover_prob(anc.get("p_home_cover"), margin, anc.get("market_home_spread"), elapsed),
+        "total_proj": total_proj,
+        "total_over_prob": cards._wnba_live_total_over_prob(anc.get("p_total_over"), total_proj, line_total, elapsed),
         "anchor_total_used": pre_total,
+        "home_spread_line": anc.get("market_home_spread"),
+        "total_line": line_total,
     }
 
 
@@ -506,7 +407,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--start", default="2026-05-01")
     ap.add_argument("--end", default="2026-10-20")
     ap.add_argument("--offline", action="store_true", help="use cached scoreboards/summaries only")
-    ap.add_argument("--anchors", default=None, help="dir of production-schema predictions_<date>.csv")
+    ap.add_argument("--sim-anchors", default=None, help="dir of as-of smart_sim_<date>_<HOME>_<AWAY>.json")
     args = ap.parse_args(argv)
     out = Path(args.out)
     cache = out / "cache" / LEAGUE
@@ -515,7 +416,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     phase_games = Counter()
     excluded_types = Counter()
     min_close = min_n = games = props_bad = 0
-    anchors = load_anchors(Path(args.anchors) if args.anchors else None)
+    anchors = load_anchors(Path(args.sim_anchors) if args.sim_anchors else None)
     anchored_games = 0
     for ev in _iter_events(out, date.fromisoformat(args.start), date.fromisoformat(args.end), args.offline):
         if ev["season_type"] not in SEASON_TYPES:
@@ -535,7 +436,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             recon_fail[rec.get("reason", "unknown")] += 1
             continue
         phase_games[res["rows"][0]["phase"]] += 1
-        anc = anchors.get((ev["date"], str(res["rows"][0]["home_name"])))
+        st0 = res["rows"][0]["state"]
+        anc = anchors.get((ev["date"], st0["home"]["code"], st0["away"]["code"]))
         anchored_games += 1 if anc else 0
         for r in res["rows"]:
             r["anchors"] = anc
@@ -551,7 +453,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         "games_excluded_recon": dict(recon_fail), "excluded_season_types": dict(excluded_types),
         "games_by_phase": dict(phase_games),
         "games_kept_props_unreconciled": props_bad,
-        "anchor_files": len({a["file"] for a in anchors.values()}),
+        "anchor_games_available": len(anchors),
+        "anchors_unjoined": len(set(anchors) - {(r["date"], r["state"]["home"]["code"], r["state"]["away"]["code"]) for r in rows}),
         "games_with_anchors": anchored_games,
         "games_with_anchors_by_phase": dict(Counter(r["phase"] for r in rows if r["checkpoint"] == "end_q1" and r.get("anchors"))),
         "rows_by_phase_checkpoint": dict(Counter(f"{r['phase']}/{r['checkpoint']}" for r in rows)),
@@ -560,6 +463,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         "dates": [min((r["date"] for r in rows), default=None), max((r["date"] for r in rows), default=None)],
         "rows_with_pregame_total": sum(1 for r in rows if r["pregame"]["total"] is not None),
         "rows_with_espn_wp": sum(1 for r in rows if r["state"].get("espn_home_wp") is not None),
+        "possession_basis": dict(Counter(f"{r['checkpoint']}/{r['state'].get('possession_basis')}" for r in rows)),
+        "cells_running_score_field_lagged": sum(1 for r in rows if r["state"]["running_score_field_lagged"]),
+        "cells_lineup_filled_by_final_box_minutes": sum(1 for r in rows if r["state"]["lineup_fill_by_final_box_minutes"]),
+        "q4_5min_clock_left_seconds": {
+            "min": min((r["state"]["clock_left"] for r in rows if r["checkpoint"] == "q4_5min"), default=None),
+            "max": max((r["state"]["clock_left"] for r in rows if r["checkpoint"] == "q4_5min"), default=None)},
         "out": str(dest),
     }
     (out / "wnba_live_checkpoints_2026.summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")

@@ -401,8 +401,12 @@ residual) sigma is justified; a constant rescale is not.
 - **The plan's end-state grep (`vendor\.` over `syndicate/features/...`) returns clean while two of those remain:**
   the sim loads go through `importlib.import_module(f"{package_name}.sim.events")`, and the snapshot producer is under
   `scripts/`. Widen the grep before calling P5 (or P1) done.
-- Corpus: 344 of 347 2026 games (regular 330, playoffs 14), score-reconciled; fleet `~/wnba_bt/live_checkpoints/`.
-  The current linear lens's ML Brier is worse than ESPN's live WP at end Q1/Q2/Q3 (CI excludes 0, regular, n=329).
+- Corpus v2 (2026-10-09 ~21Z): 346 of 347 2026 games (regular 332, playoffs 14), state = P2's `LiveGameState` on as-of
+  summaries, anchors = production's `_smart_sim_projection_index` on the as-of sims (340 games); fleet
+  `~/wnba_bt/live_checkpoints/`. The current linear lens's ML Brier is LEVEL with ESPN's live WP at end Q1 and worse at
+  end Q2 / Q3 (+0.011 / +0.009, CI excludes 0, regular, n=331); total MAE 12.46 / 11.00 / 7.96 / 5.99.
+- ESPN's per-play running `homeScore`/`awayScore` LAGS the sum of scoring plays on 36 of 347 2026 WNBA games (1-132
+  consecutive plays); the play sum reaches the official final on every kept game. Score a cut from the play sum.
 - ESPN pbp `sequenceNumber` is NOT chronological; the `plays` list order is.
 
 ## [wnba-live-edge-is-leakage] THE WNBA LIVE ENGINE'S +41% ROI IS AN ARTEFACT — no live line has ever been captured `[verified 2026-08-31, lane wnba-accuracy-assessment]`

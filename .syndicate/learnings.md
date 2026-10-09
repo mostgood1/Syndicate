@@ -3668,3 +3668,7 @@ forbids. A lone CR mid-line is a CHARACTER, not a line ending, and must survive.
   eats one backslash level. Build such fragments with chr(92), or assert the text
   contains no CR before writing it. That is how a real CR got into this very entry
   on the first attempt.
+
+## 2026-10-09 — OVERTURNED (mine): "the WNBA linear live lens's ML is worse than ESPN from end Q1". The baseline was anchored on a file the lens never reads `[lane wnba-native-live-cutover, session 99686b8c]`
+
+v1 of the 2026 checkpoint corpus fed the shipped lens functions `predictions_<date>.csv`'s `home_win_prob` / `totals`. Production's lens reads `game["betting"]`, whose `p_home_win` / `pred_total` / `p_home_cover` / `p_total_over` come from the per-game `smart_sim_*.json` via `refresh_wnba_oddsapi_props._smart_sim_projection_index` -- a different estimate (DAL v TOR 2026-08-12: 0.657 vs 0.74; 165.8 vs 180.0). Re-anchored, the end-Q1 deficit (+0.020, CI excluding 0) became level (-0.000). **RULE:** importing the shipped FUNCTION is not enough to reproduce a production baseline; feed it the INPUT production feeds it, traced from the call site (`cards.py:1365 betting = game["betting"]`) back to the producer, and call the producer too. Second half, same session: a parser cross-check that "agreed on every cell" was empty for the score, because both sides read ESPN's per-play running `homeScore`, which lags the scoring-play sum on 36 of 347 games. Agreement between two readers of one field says nothing about that field.
