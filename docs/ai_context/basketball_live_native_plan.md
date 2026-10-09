@@ -64,7 +64,7 @@ This doc is the shared plan. Each phase is a separate session with its own lane.
 | P2 | Native live game-state ingestion + rotation-stints producer | — (parallel with P1) | `basketball-native-live-state` | in progress (opened 2026-10-09) |
 | P3 | NBA native live re-sim, situations re-fit, cut the vendored tick | P1, P2 | | not started |
 | P4 | NCAAB live tier on the native engine | P1, P2 (P3 helps) | | not started |
-| P5 | WNBA cut-over to native live | P1, P2, P3 | | not started |
+| P5 | WNBA cut-over to native live | P1, P2, P3 | `wnba-native-live-cutover` | blocked on P1-P3; prerequisite-free work DONE 2026-10-09: 2026 checkpoint corpus (344 games) + vendored-call inventory + linear-lens baseline (`.syndicate/findings_2026-10-09_wnba_live_vendored_inventory.md`). End-state grep must be widened (see findings). Live reading owed May 2027 (`#694`) |
 
 ### P1 — native possession engine + resumable state
 - Port the possession engine into a Syndicate package as ONE league-parametric engine

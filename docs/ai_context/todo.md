@@ -1,5 +1,29 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#694` — **WNBA NATIVE LIVE LENS: the LIVE reading is OWED at the 2027 season opener (May 2027); P5 itself is blocked on P1-P3** — lane `wnba-native-live-cutover`, session 99686b8c
+
+**Why.** User decision 2026-10-09: the basketball live lens must be fully Syndicate-native
+(`docs/ai_context/basketball_live_native_plan.md`). P5 cuts WNBA over to P3's native live re-sim. The
+2026 WNBA season is over, so P5 can only be verified by backtest; the production reading cannot be
+taken until games are live again.
+
+**Already done (2026-10-09, prerequisite-free):** the 2026 checkpoint corpus (344 games, regular 330 /
+playoffs 14, end Q1/Q2/Q3 + 5:00 Q4, `scripts/build_wnba_live_checkpoint_corpus.py`, persisted on the fleet
+`~/wnba_bt/live_checkpoints/`), the vendored-call inventory, and the linear lens's baseline
+(`.syndicate/findings_2026-10-09_wnba_live_vendored_inventory.md`).
+
+**Done when** (in order):
+1. P1, P2, P3 land; P5 replaces `wnba/live_lens.py:65`'s vendored tick, the `_load_source_app` producer in
+   `scripts/refresh_wnba_oddsapi_props.py`, and the linear `_wnba_live_*` lens with P3 under WNBA params.
+2. Backtest on the corpus: native re-sim beats the linear lens on total MAE and ML Brier, paired, CI per
+   checkpoint, regular season separate from playoffs (bar in the findings file); cover / over Brier once
+   the `p_home_cover` / `p_total_over` anchors are joined.
+3. The plan's end-state grep, WIDENED to catch `importlib`-by-name loads and `scripts/`, returns no
+   vendored import on the WNBA live or sim path.
+4. **At the 2027 opener (WNBA starts in May 2027):** on the local fleet, the served WNBA lens reads
+   `live_resim` for an in-progress game, edges publish, keyvalue payload under cap. Record it in
+   `.syndicate/deploys.md`.
+
 ### `#693` — **SOCCER LIVE GAME-LINES: the in-play reading is OWED -- both fixes are live on the local fleet and have never run with a match in play** — lane `soccer-live-gameline-index-diag` (CLOSED 2026-10-01 on user instruction with this open), session a83ad238
 
 **Why.** `attach_live_gamelines_for_sport` raised `UnboundLocalError: index_diag` on every soccer tick with a
