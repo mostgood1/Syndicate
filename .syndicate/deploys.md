@@ -48138,3 +48138,10 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - Watcher: fleet `~/gpv2/watch.sh`, gated on meta mtime > the ff.
 - **Expected visible effect.** MLB game totals and run lines drop ~1.7 runs/game in expectation. Board HR/hit/TB prop means move to the props-profile level.
 - **Rollback.** Revert 988fa33d and ff.
+
+## 2026-10-09 21:11Z -- June reading (NON-GATING) for fleet ff 988fa33d (lane `mlb-game-profile-pitch-config`)
+- Same script and arms over the June rebuilds. Diffs are F (forward file) minus D (class defaults).
+  - 05-30..06-14, 205 games: CRPS +0.072 [-0.051, +0.196]; Brier +0.0031 [-0.0028, +0.0090]; runs bias +0.48 -> -1.22.
+  - 06-15..07-12, 309 games: CRPS -0.014 [-0.129, +0.101]; Brier -0.0021 [-0.0071, +0.0028]; runs bias +0.88 -> -0.86; |runs err| -0.263 [-0.450, -0.076].
+- **Reading.** No significant CRPS difference in June either way. The forward file under-predicts June scoring by ~1 run. That is the known cost of HR 1.5 in a league HR-spike month (the 2026-10-08 entry), now visible on game lines too.
+- Excluded from the rule at pre-registration; recorded so the trade-off is on file.
