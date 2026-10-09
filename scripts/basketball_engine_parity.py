@@ -233,15 +233,18 @@ def _strip_volatile(obj: Any, volatile: set[str]) -> Any:
     return obj
 
 
-def compare_sim_artifacts(dir_a: Path, prefix_a: str, dir_b: Path, prefix_b: str, volatile: set[str]) -> dict[str, Any]:
+def compare_sim_artifacts(dir_a: Path, prefix_a: str, dir_b: Path, prefix_b: str, volatile: set[str], roots: tuple[str, str] | None = None) -> dict[str, Any]:
     """End-to-end A/B: the smart_sim_<date>_<H>_<A>.json each arm wrote, leaf for leaf (volatile keys named, not hidden)."""
     a_files = {p.name[len(prefix_a):]: p for p in Path(dir_a).glob(f"{prefix_a}_*.json")}
     b_files = {p.name[len(prefix_b):]: p for p in Path(dir_b).glob(f"{prefix_b}_*.json")}
     games = sorted(set(a_files) | set(b_files))
     out: dict[str, Any] = {"games": len(games), "only_in_a": sorted(set(a_files) - set(b_files)), "only_in_b": sorted(set(b_files) - set(a_files)), "identical": 0, "differ": {}, "volatile_keys_ignored": sorted(volatile)}
     for g in sorted(set(a_files) & set(b_files)):
-        ja = _strip_volatile(json.loads(a_files[g].read_text(encoding="utf-8")), volatile)
-        jb = _strip_volatile(json.loads(b_files[g].read_text(encoding="utf-8")), volatile)
+        ta, tb = a_files[g].read_text(encoding="utf-8"), b_files[g].read_text(encoding="utf-8")
+        if roots:  # each arm runs on its own copy of the data: an input PATH echoed into the artifact names the copy
+            ta, tb = ta.replace(roots[0], "<DATA_ROOT>"), tb.replace(roots[1], "<DATA_ROOT>")
+        ja = _strip_volatile(json.loads(ta), volatile)
+        jb = _strip_volatile(json.loads(tb), volatile)
         d = leaf_diffs(ja, jb, "$", [], limit=10)
         if d:
             out["differ"][g] = d
@@ -258,6 +261,7 @@ def main(argv: list[str] | None = None) -> int:
     src.add_argument("--synthetic", type=int, help="number of synthetic cases")
     src.add_argument("--compare-sims", nargs=4, metavar=("DIR_A", "PREFIX_A", "DIR_B", "PREFIX_B"), help="end-to-end: compare two arms' smart_sim JSON artifacts")
     ap.add_argument("--volatile-key", action="append", default=[], help="a key to ignore in --compare-sims (repeatable; listed in the report)")
+    ap.add_argument("--data-roots", nargs=2, metavar=("ROOT_A", "ROOT_B"), help="--compare-sims: each arm's data root, normalised to one token before comparing")
     ap.add_argument("--sampler", choices=("production", "vendored_default"), default="production")
     ap.add_argument("--json-out", type=Path)
     ap.add_argument("--max-cases", type=int, default=None)
@@ -265,7 +269,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.compare_sims:
         da, pa, db, pb = args.compare_sims
-        report = compare_sim_artifacts(Path(da).expanduser(), pa, Path(db).expanduser(), pb, set(args.volatile_key))
+        report = compare_sim_artifacts(Path(da).expanduser(), pa, Path(db).expanduser(), pb, set(args.volatile_key), tuple(args.data_roots) if args.data_roots else None)
         text = json.dumps(report, indent=2)
         print(text)
         if args.json_out:
