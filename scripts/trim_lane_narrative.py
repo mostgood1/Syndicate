@@ -63,6 +63,11 @@ import re
 import sys
 import types
 
+# One helper for every ledger read/write -- see scripts/ledger_io.py. This file
+# pinned newline=LF on the write but read with universal newlines, which still
+# split lanes.md's mid-line bare CR. Measured 2026-10-09.
+from ledger_io import read_ledger, write_ledger
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LANES = os.path.join(REPO, ".syndicate", "lanes.md")
 HIST = os.path.join(REPO, ".syndicate", "lanes_history.md")
@@ -192,10 +197,13 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     claims = claims_fn()
-    with open(LANES, encoding="utf-8") as fh:
-        text = fh.read()
-    with open(HIST, encoding="utf-8") as fh:
-        hist = orig_hist = fh.read()
+    # read_ledger, not a bare open(): the default is UNIVERSAL NEWLINES, which maps
+    # lanes.md's mid-line bare CR to a line break and splits a peer's line. This file
+    # already pinned newline=LF on the WRITE and still had the read half -- the shape
+    # of a half-fix. Measured 2026-10-09.
+    text, lanes_eol = read_ledger(LANES)
+    hist, hist_eol = read_ledger(HIST)
+    orig_hist = hist
     lines = text.split(LF)
     saved = 0
 
@@ -296,11 +304,9 @@ def main(argv=None):
     if o_old != o_new:
         sys.stderr.write("  REFUSE OPEN header count moved\n")
         return 3
-    with open(LANES, "w", encoding="utf-8", newline=LF) as fh:
-        fh.write(new_text)
+    write_ledger(LANES, new_text, lanes_eol)
     if hist != orig_hist:
-        with open(HIST, "w", encoding="utf-8", newline=LF) as fh:
-            fh.write(hist)
+        write_ledger(HIST, hist, hist_eol)
     print("wrote lanes.md and lanes_history.md")
     return 0
 

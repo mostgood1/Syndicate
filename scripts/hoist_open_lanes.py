@@ -38,6 +38,12 @@ import re
 import sys
 import types
 
+# One helper for every ledger read/write. Universal newlines at the READ maps a
+# mid-line bare CR to a line break -- that split a peer's line in lanes.md -- and
+# write_text with no newline= churns every line ending, which rewrote 4MB of
+# lanes_history.md LF -> CRLF. Both measured 2026-10-09. See scripts/ledger_io.py.
+from ledger_io import read_ledger, write_ledger
+
 LANES = pathlib.Path(".syndicate/lanes.md")
 GUARD = pathlib.Path(".claude/hooks/lane-guard.py")
 
@@ -75,7 +81,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     try:
-        text = LANES.read_text(encoding="utf-8", errors="replace")
+        text, lanes_eol = read_ledger(LANES)
     except OSError as exc:
         print(f"cannot read {LANES}: {exc}")
         return 2
@@ -172,7 +178,7 @@ def main(argv=None):
     # session's two appends, dropping the header while keeping the later
     # checkpoint"). Cheap, and it turns a silent data loss into a retry.
     try:
-        current = LANES.read_text(encoding="utf-8", errors="replace")
+        current, _ = read_ledger(LANES)
     except OSError as exc:
         print(f"REFUSED: cannot re-read before writing: {exc}")
         return 2
@@ -182,7 +188,7 @@ def main(argv=None):
         print("Nothing written. Re-run -- the transformation is idempotent.")
         return 1
 
-    LANES.write_text(new_text, encoding="utf-8")
+    write_ledger(LANES, new_text, lanes_eol)
     print("\nWROTE lanes.md.")
     return 0
 

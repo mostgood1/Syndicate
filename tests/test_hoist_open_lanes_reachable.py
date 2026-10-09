@@ -41,6 +41,9 @@ def _project(tmp_path, stranded: bool):
     shutil.copytree(_ROOT / ".claude" / "hooks", tmp_path / ".claude" / "hooks",
                     dirs_exist_ok=True)
     shutil.copy2(_TOOL, tmp_path / "scripts" / "hoist_open_lanes.py")
+    # the tool imports scripts/ledger_io.py (byte-safe ledger read/write), and it
+    # resolves that by sys.path[0] = the script's own directory
+    shutil.copy2(_ROOT / "scripts/ledger_io.py", tmp_path / "scripts" / "ledger_io.py")
     blocks = [
         "### a-normal-open-lane " + EM + " OPEN " + EM + " opened 2026-10-09 " + EM + " session s-aaaa",
         "- Goal: a lane that is already in the right place",
@@ -106,3 +109,32 @@ def test_a_clean_ledger_is_a_no_op(tmp_path):
     r = _run(_project(tmp_path, stranded=False))
     assert r.returncode == 0, (r.stdout + r.stderr)[-800:]
     assert "nothing to move" in r.stdout
+
+
+def test_apply_leaves_a_mid_line_bare_CR_intact(tmp_path):
+    """End-to-end byte safety, not just the helper in isolation.
+
+    lanes.md carries exactly one mid-line bare CR, inside a peer's verdict line.
+    Before scripts/ledger_io.py every one of these tools read with universal
+    newlines, which maps that CR to a line break -- splitting the line. 74da0acd
+    had to repair that split once, and archive_released_lanes.py reproduced it.
+    """
+    p = _project(tmp_path, stranded=True)
+    lanes = p / ".syndicate" / "lanes.md"
+    raw = lanes.read_bytes()
+    marker = b"- Goal: this block sits BELOW the archive marker"
+    assert raw.count(marker) == 1
+    # plant a bare CR mid-line, exactly the shape lanes.md has
+    planted = raw.replace(marker, b"- Goal: payload cut from 68 MB" + bytes([13])
+                          + b'" -- below the archive marker', 1)
+    lanes.write_bytes(planted)
+    lone = lambda b: b.count(bytes([13])) - b.count(bytes([13, 10]))
+    assert lone(planted) == 1
+
+    r = _run(p, "--apply")
+    assert r.returncode == 0, (r.stdout + r.stderr)[-1200:]
+    after = lanes.read_bytes()
+    assert lone(after) == 1, "the bare CR was consumed -- the line was split"
+    kept = [l for l in after.split(bytes([10])) if b"68 MB" in l]
+    assert len(kept) == 1, "the line was split at the bare CR"
+    assert b"below the archive marker" in kept[0], "the halves are no longer one line"

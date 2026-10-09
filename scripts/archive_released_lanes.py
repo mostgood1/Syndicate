@@ -68,6 +68,12 @@ import re
 import sys
 import types
 
+# One helper for every ledger read/write. Universal newlines at the READ maps a
+# mid-line bare CR to a line break -- that split a peer's line in lanes.md -- and
+# write_text with no newline= churns every line ending, which rewrote 4MB of
+# lanes_history.md LF -> CRLF. Both measured 2026-10-09. See scripts/ledger_io.py.
+from ledger_io import read_ledger, write_ledger
+
 # THE CAP COMES FROM `session-start.sh`, the only component that ENFORCES it.
 # A local copy drifts silently in the worst direction: it keeps reporting a file
 # OVER budget after the budget was raised. That is exactly what the old
@@ -144,8 +150,8 @@ def main(argv=None):
 
     dest = pathlib.Path(args.dest)
     try:
-        text = LANES.read_text(encoding="utf-8", errors="replace")
-        history = dest.read_text(encoding="utf-8", errors="replace")
+        text, lanes_eol = read_ledger(LANES)
+        history, hist_eol = read_ledger(dest)
     except OSError as exc:
         print(f"cannot read: {exc}")
         return 2
@@ -262,8 +268,8 @@ def main(argv=None):
         print("Re-run with --apply to write.")
         return 0
 
-    dest.write_text(history + banner + moved_text + "\n", encoding="utf-8")
-    LANES.write_text(kept, encoding="utf-8")
+    write_ledger(dest, history + banner + moved_text + "\n", hist_eol)
+    write_ledger(LANES, kept, lanes_eol)
     print(f"\nWROTE lanes.md and {dest.name}"
           f"{'' if args.no_pointers else f' (+{len(by_slug)} pointers in lanes.md)'}.")
     return 0
