@@ -1081,3 +1081,26 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **NOT DONE (blocked on P1):** the resumed native sim, the mechanisms and their re-fit, `live_resim`
   publish, nba in `_LIVE_GAMELINE_SPORTS`, and deleting `nba/live_lens.py`'s vendored import.
 - **OWED:** the live-close reading (fetch in flight, findings §4).
+
+## [basketball-native-engine] THE BASKETBALL POSSESSION ENGINE IS SYNDICATE'S -- live on the fleet, parity-proven on 5,400 real production calls `[2026-10-09, lane basketball-native-engine, plan P1, fleet 63a58748]`
+
+- **What runs.** Every per-draw call of the NBA/WNBA smart sim goes to `syndicate/features/basketball_engine/` (`engine.py`, `league.py`, `league_engine.py`, `resume.py`). It no longer goes to `vendor/*/sim/events.py`. `basketball_props_smart_sim._engine_for_league_local(code)` returns a `LeagueEngine`:
+  - the vendored module switches are attributes under their vendored names, and assigning one swaps in `dataclasses.replace(LeagueParams)`;
+  - the lineup sampler (`_sample_lineup_local`) is a parameter.
+  The vendored import route, the patched `_sample_lineup` global and the flat fallback are DELETED. A broken engine now fails the game by name.
+- **Parity (substrate: a copy of the fleet's production data root, 2026-10-09).**
+  - 5,400 real engine calls across 27 games (NBA 4 dates, WNBA 7 dates): 0 mismatches on every output leaf and on the RNG state after each call. 5,400/5,400 vendored replays reproduced production's recorded output.
+  - End to end, same seed: 8 full sims, 303,204 leaves, 0 differences, re-confirmed on the DEPLOYED checkout. `deploys.md` 2026-10-09 21:29:34Z.
+- **Resume API (`GameState`).**
+  - Consumed: period, clock, per-period score, possession (first possession only), on-floor five (first possession only), fouled-out players (zero lineup weight).
+  - CARRIED, not consumed: team fouls, bonus, player fouls below the limit. Adding those is a P3 mechanism plus a re-fit.
+  - Proven: the opening tip is seed-identical to the pregame run. Win probability is monotone in the margin and grows as the clock runs down; 10 up with 2:00 left gives >= 0.97.
+  - No production caller until P3.
+- **Gate.** `scripts/basketball_engine_input_checklist.py` enumerates `dataclasses.fields()` of EventSimConfig, LeagueParams and GameState, derives consumption by AST, measures population over the recorded corpus, checks the per-draw wiring, and exits 1 on an alarm. Reachability: `tests/test_basketball_engine_parity.py` flips every consumed LeagueParams switch and asserts the output moves.
+- **Facts found on the way:**
+  - The vendored `simulate_event_level_boxscore` raised NameError on every call in both leagues, so it was never usable. It is not ported; the native one refuses by name.
+  - `regulation_team_minutes` is inert in the vendored engines too: assigned, never read. It is pinned by a test.
+  - The rebuilt `engine.py` is the source of truth. Do NOT re-run `scripts/port_basketball_engine.py` (it regenerates from vendor and discards native edits).
+- **Edits to the engine** go to `syndicate/features/basketball_engine/`. Vendor `events.py` edits are INERT at runtime. Open loan: `engine.py` `score_effect_k` section to lane basketball-scenario-calibration (2026-10-09).
+- **STILL VENDORED, and no plan phase owns it:** the orchestrator `vendor/*/sim/smart_sim.py:simulate_smart_game` (4,652 / 4,930 lines). It runs around the engine, and its import still imports vendored `events.py` (never executed). The user decision "not reliant on the vendored app in any way" is NOT met until it is ported.
+- **Owed:** the first NEWLY simulated production game after 21:29:34Z (a `smart_sim_*.json` with later mtime) completes with `failures == 0`.
