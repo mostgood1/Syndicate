@@ -1841,6 +1841,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: On the fleet after the fix: query_state_cache size distribution over >= 24 h including a slate rollover; 0 KEYVALUE_WRITE_REJECTED key=...query_state_cache.json and 0 STATE_PERSIST_TRIMMED in that stated window (emitter-prefix anchored, both ends bounded); live copy shows the latest snapshot response present; a reload reproduces layer2_shortlist row counts equal to read_layer2_shortlist(date). Recorded in deploys.md.
 - Blocked by: none
 
+### nfl-qb-prop-unpriced-inputs — OPEN — opened 2026-10-09 — session f628c245-6aae-4710-a0e7-829c2a108ddb
+- Goal: Measure whether two inputs never tested for NFL QB props -- game-day WIND (nflverse schedules; dome/closed = 0) and the QB's final PRACTICE status that week (Limited or Did Not Participate vs Full/none; nflverse injuries) -- carry information beyond the de-vigged book line for passing_yards and passing_attempts: per input and market, y ~ a + b1*logit(p_book) + b2*x fitted on real 2023 OddsAPI quotes, applied to 2024; report b2 [game-clustered 95% CI] and the 2024 paired log-loss vs the book alone. Measurement only.
+- Files: scripts/measure_nfl_qb_prop_unpriced_inputs.py, .syndicate/findings_2026-10-09_nfl_qb_prop_unpriced_inputs.md
+- Hypothesis: Both are priced by a kickoff-10min line (weather forecasts and the injury report are public by then), so neither adds information: b2 CIs span 0 and no combination beats the book on 2024. Practice is underpowered (~70 Limited/DNP QB-weeks a season, few of whom start) and is reported with its n.
+- Falsification test: For any input x market: b2 CI on 2023 excludes 0 AND the 2023-fitted combination beats the book on 2024 with a paired game-clustered CI entirely below 0 -> that input carries usable information the line lacks.
+- Verification: Table per input x market: n rows/games (and n rows with x != 0), b2 [CI] on 2023, 2024 LL book vs combined with paired delta [CI]. All two-sided quote rows (an input that the line misses applies whether or not the model prices the row); official grading for attempts; 2025 untouched.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
