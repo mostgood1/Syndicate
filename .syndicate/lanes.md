@@ -1423,6 +1423,13 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **HR 1.5 V2b status 2026-10-09 ~17:15Z: watcher is DURABLE on the fleet; no reading yet.**
+  - No MLB sim since 10-08 18:35 CDT: no games 10-09. Next: 10-10 CWS (DS G5, time TBD), then the LCS from 10-11.
+  - The watcher runs detached (`setsid nohup`) as `~/hrv2b/hrv2b_watch3.sh` on the fleet. It covers sims for 10-10..10-13, for up to 4 days.
+    - It snapshots the first post-ship sim + roster_objs together, then writes `~/hrv2b/hrv2b_A.json` / `hrv2b_B.json` / `hrv2b_status.txt`.
+    - Read it with `~/.venvs/syndicate/bin/python ~/hrv2b/hrv2b_eval.py` (the pre-registered rule). The old-config tree is `~/ship_ab_hrold` (1.856).
+  - Mechanics smoke (200 sims on the spoiled 10-08 live file; NOT the reading): both trees load their own value (1.5 / 1.856), and replays separate by ~0.4 HR/game.
+  - PATH TRACE: production reads `FORWARD_PITCH_MODEL_OVERRIDES_PATH`, both in daily_update `_apply_forward_tuning_defaults` (no `--pitch-model-overrides` passed by run_mlb_daily_sim_job.py) and in live_mc.py. V1 checked the right file.
 - **A StatsAPI-only as-of rebuild of MLB 2026-07-16..09-27 (74 dates, 984 games): scripts/mlb_asof_roster_build.py gains --source statsapi (schedule + live-feed probables/context + an as-of lineup projection from prior boxscores, option B), admitted only if its pre-registered June fidelity gate passes, then built into a scratch root for use as fresh validation/fit data — GOAL: MET.** Reading: the June fidelity gate passed (every moment within tolerance; runs +0.28 of 0.30), and the build completed 74/74 dates, 985 games (= the schedule). Lineup projection B vs actual: 0.846 (production's Rotowire: 0.816).
 - **HELD OPEN ONLY for the HR 1.5 ship's V2b reading** (deploys.md 2026-10-08 23:45Z; watcher scratchpad hrv2b_watch.sh on the fleet). Close it when V2b reads.
 - Downstream work done under this lane (each result in deploys.md / log 2026-10-09):
