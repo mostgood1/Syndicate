@@ -1337,6 +1337,12 @@ unsaved anywhere.
   `expand_persisted_state` first** — a raw read returns an envelope that still
   passes `isinstance(dict)`, so it degrades silently rather than raising. This
   has bitten four ops diagnostics.
+- **`query_state_cache.json` persists each snapshot WITHOUT `response.layer2_shortlist`** `[verified 2026-10-09, lane query-state-cache-oversize, fc1762da]`:
+  a marker (`omitted_from_query_state_cache`, date, rows/cards counts, no `rows` key) stands in;
+  read the shortlist with `read_layer2_shortlist(date)`. Before the fix the shortlist was 40.8 of
+  42.4 MB raw per date-snapshot, so every write with 2-3 board-window dates was refused (11.7-13.6 MB),
+  and the raw-byte trim fallback wrote `kept_full=0`, a cache with NO responses. After: 446,206 B on the wire
+  with 1 snapshot (18:28Z). The 2-3 snapshot reading across a rollover is owed.
 - **`render.yaml`'s web `envVars:` anchor is never referenced anywhere**, so
   nothing was ever shared and worker-only keys accumulated on web for months.
   Web block cut 62 → 52. Blueprint drift: 0 values a sync would revert — a
