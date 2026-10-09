@@ -2484,6 +2484,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Per market: n rows/games, b1, b2 [CI] on 2023; 2024 LL book vs combined vs model, paired delta [CI]. Starts-refused rows excluded (production refuses them); official grading for attempts; 2025 untouched.
 - Blocked by: none
 
+### soccer-lineup-reach — OPEN — opened 2026-10-09 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: Measure what share of soccer matches were priced from a build that had the confirmed starting XI: a read-only script over the fleet's prekickoff freezes (last pre-kickoff build per match) and odds-job STEP_MARKER lines, run on the 10-09..10-12 slate, with the number written to the lineup findings
+- Files: scripts/soccer_season_audit/lineup_reach.py (NEW, read-only measurement)
+- Hypothesis: n/a (measurement)
+- Falsification test: n/a
+- Verification: Script runs on the fleet; a positive control (a side the classifier marks confirmed has exactly the ESPN XI) or an explicit statement that none exists yet; after the weekend: confirmed share by minutes-before-kickoff bucket, n matches, appended to findings_2026-10-08_soccer_last_scorer_lineup.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
