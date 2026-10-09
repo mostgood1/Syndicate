@@ -1191,6 +1191,30 @@ def _apply_totals_calibration_local(*, processed_root: Path, date_str: str, home
     return float(home_mu), float(away_mu), q_biases
 
 
+NBA_TOTAL_INPUTS_FILE_LOCAL = "nba_sim_total_inputs.json"
+
+
+def _nba_total_inputs_switch_local(*, processed_root: Path, league) -> dict[str, bool]:
+    """NBA raw-total input switches (lane basketball-scenario-calibration, Phase 2 #1f; loan from lane
+    basketball-injury-exclusion-reinclusion, user-approved 2026-10-09). File `nba_sim_total_inputs.json` on the NBA
+    processed root, re-read per call; ABSENT = today's behaviour. Measured on 780 2025-26 FIT games: the raw total ran
+    -17.05 vs actual; the opponent-def subtraction on points-derived ratings cost -5.1 and the injury-count penalties
+    -8.5 -- with both removed the raw equals the game model's own prediction (-3.35). Never raises."""
+    try:
+        if str(getattr(league, "code", "") or "").strip().lower() != "nba" or processed_root is None:
+            return {}
+        path = Path(processed_root) / NBA_TOTAL_INPUTS_FILE_LOCAL
+        if not path.is_file():
+            return {}
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            return {}
+        return {"skip_def_subtraction": bool(raw.get("skip_def_subtraction", False)),
+                "skip_outs_penalties": bool(raw.get("skip_outs_penalties", False))}
+    except Exception:
+        return {}
+
+
 def _simulate_quarters_local(*, processed_root: Path, inp: GameInputsLocal, league, n_samples: int = 5000, anchor_policy: MarketAnchorPolicyLocal | None = None) -> QuarterSummaryLocal:
     import numpy as np
 
@@ -1198,6 +1222,8 @@ def _simulate_quarters_local(*, processed_root: Path, inp: GameInputsLocal, leag
         anchor_policy = _market_anchor_policy_local()
     home = inp.home
     away = inp.away
+    total_switch = _nba_total_inputs_switch_local(processed_root=processed_root, league=league)
+    skip_outs = bool(total_switch.get("skip_outs_penalties"))
     pace = np.mean([
         _safe_float_local(home.pace, getattr(league, "baseline_pace")),
         _safe_float_local(away.pace, getattr(league, "baseline_pace")),
@@ -1208,7 +1234,7 @@ def _simulate_quarters_local(*, processed_root: Path, inp: GameInputsLocal, leag
             b2b_drag += 1.0
         if bool(away.back_to_back):
             b2b_drag += 1.0
-        inj_drag = 0.3 * max(0, int(home.injuries_out or 0)) + 0.3 * max(0, int(away.injuries_out or 0))
+        inj_drag = 0.0 if skip_outs else (0.3 * max(0, int(home.injuries_out or 0)) + 0.3 * max(0, int(away.injuries_out or 0)))
         pace = max(getattr(league, "baseline_pace") - 8.0, pace - b2b_drag - inj_drag)
     except Exception:
         pass
@@ -1229,14 +1255,18 @@ def _simulate_quarters_local(*, processed_root: Path, inp: GameInputsLocal, leag
     # (opponent def - baseline) counted it twice -- against a constant 101.5 when the
     # 2026 WNBA league def is 104.2, i.e. ~-2.3 pts/team. Walk-forward 2026, 299 games:
     # total MAE -0.46 [CI -0.89, -0.01], margin MAE 11.71 -> 10.64. Real ratings keep it.
-    if bool(getattr(home, "off_rating_from_points", False)) and bool(getattr(away, "off_rating_from_points", False)):
+    if (bool(getattr(home, "off_rating_from_points", False)) and bool(getattr(away, "off_rating_from_points", False))) or bool(total_switch.get("skip_def_subtraction")):
         home_eff = _clip_rating(home_off)
         away_eff = _clip_rating(away_off)
     else:
         home_eff = _clip_rating(home_off - (away_def - league_avg_rating))
         away_eff = _clip_rating(away_off - (home_def - league_avg_rating))
-    home_mu = max(getattr(league, "min_team_points"), (home_eff / 100.0) * pace) + _adjustments_local(home)
-    away_mu = max(getattr(league, "min_team_points"), (away_eff / 100.0) * pace) + _adjustments_local(away)
+    home_adj_ctx, away_adj_ctx = home, away
+    if skip_outs:
+        import dataclasses as _dc
+        home_adj_ctx, away_adj_ctx = _dc.replace(home, injuries_out=0), _dc.replace(away, injuries_out=0)
+    home_mu = max(getattr(league, "min_team_points"), (home_eff / 100.0) * pace) + _adjustments_local(home_adj_ctx)
+    away_mu = max(getattr(league, "min_team_points"), (away_eff / 100.0) * pace) + _adjustments_local(away_adj_ctx)
     try:
         home_mu, away_mu, q_biases = _apply_totals_calibration_local(processed_root=processed_root, date_str=inp.date, home_tri=str(home.team).upper(), away_tri=str(away.team).upper(), home_mu=home_mu, away_mu=away_mu)
     except Exception:
@@ -1274,6 +1304,8 @@ def _simulate_quarters_local(*, processed_root: Path, inp: GameInputsLocal, leag
         "anchored_total": float(home_mu + away_mu),
         "anchored_margin": float(home_mu - away_mu),
     }
+    if total_switch:
+        market_anchor_record["nba_total_inputs"] = dict(total_switch)
     home_splits = _quarter_splits_for_team_local(processed_root=processed_root, team_tri=home.team, is_home=True, league=league)
     away_splits = _quarter_splits_for_team_local(processed_root=processed_root, team_tri=away.team, is_home=False, league=league)
     cur_total_mu = float(home_mu + away_mu)
