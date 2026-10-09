@@ -734,3 +734,30 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
 - Combined config + walk-forward calibration files (each date's file fitted on fit_combo games before it) copied
   into the scratch.
 - PASS if sim total bias vs real is within ±1.5/game and S8 total SD is no worse than run noise.
+
+### Phase 2 #1e — END-TO-END RESULT 2026-10-09 ~03:40Z (10:40 PM CDT 10-08)
+
+**Run:** 12 dates, 87/87 games, all engine calls with every lever and switch.
+- E2E = combined config (J1 + no stacking + six ported switches) + the walk-forward calibration files. Each date's
+  file is fitted on fit_combo games strictly before it; global bias 7.3 → 15.0 (clipped) across the window.
+- **Reachability:** model_total_raw E2E − P is +12.77 on average (min +4.89, max +21.79, n = 87), so the reader
+  applied the files.
+
+| point | sim total bias vs real [95% CI] | MAE | target bias | S8 total SD | S8 margin SD |
+|---|---|---|---|---|---|
+| T2 (old engine overshoot, no calibration) | +1.68 [−2.09, +5.55] | 13.64 | −4.51 | 18.56 | 17.92 |
+| P (combined, no calibration) | −5.15 [−8.76, −1.56] | 14.19 | −4.51 | 18.37 | 17.63 |
+| **E2E (combined + calibration)** | **−1.18** [−4.99, +2.73] | **13.53** | **−0.68** | 18.45 | **17.48** |
+
+- **VERDICT: PASS** as pre-registered. The sim total bias is within ±1.5. S8 total SD is 18.45 vs P 18.37, +0.08,
+  inside run noise (~0.2).
+- The combined config now lands on an unbiased target, with the best total MAE of the three. The margin SD is the
+  lowest yet.
+- T2's near-zero bias was two cancelling errors: target −4.5, plus engine overshoot +6.
+- **Open:**
+  - The raw-bias |2| gate missed by 0.26, the ±15 clip (walk-forward above). User decision.
+  - The bias GROWS through the season: the fitted global term is 7.3 in early Nov and at the 15 clip from late Nov.
+    That points to a structural drift in the ratings × pace raw (S-a/S-b/S-c), not a constant offset.
+  - The seed value for opening night is still unset: the final-14-day fit is 15.0, clipped.
+  - Production wiring is a user decision. Per the pre-registration, adoption follows the end-of-Phase-2 VALIDATION
+    read.
