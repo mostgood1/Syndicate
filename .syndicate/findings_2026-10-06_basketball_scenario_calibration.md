@@ -649,3 +649,55 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
 - All six switches CONFIRMED on their own target rows.
 - Combined adoption BLOCKED on the NBA totals-target bias (new item, port of WNBA G1).
 - No production change.
+
+## Phase 2 #1e — NBA TOTALS CALIBRATION, PRE-REGISTERED 2026-10-09 ~00:45Z (user: "Build NBA totals calibration"), BEFORE any code
+
+**Problem (measured, #1d):**
+- 87 FIT games: NBA `model_total_raw` 215.40 vs market 230.70 vs real 230.62. The raw is −15.3; the market is
+  unbiased.
+- The anchor (total_w 0.7) leaves targets ~4.5 low. EXACT_TARGET_CALIBRATION then lands the sim on that low target.
+
+**Why no correction applies:**
+- The designed correction (`calibration_totals_<date>.json`, read by `_apply_totals_calibration_local`: global
+  bias ±15, team ±4) has NO NBA writer. Fleet NBA processed root `/home/amyn/syndicate-prod/data/...`: 0 files.
+  The replay pristine also has 0, so every raw total in this lane is UNcalibrated.
+- WNBA got `scripts/build_wnba_totals_calibration.py` (lane wnba-game-total-level, closed 2026-10-01).
+- The NBA raw total is NOT a game-model prediction as in WNBA. It is ratings × pace in `_simulate_quarters_local`
+  (basketball_props_smart_sim.py ~1199-1245):
+  `home_mu = (home_off − (away_def − baseline_off)) / 100 × pace + adj`, pace reduced by back-to-back
+  (1/team) and 0.3 × injuries_out per team, then the calibration file, then the anchor.
+
+**Structural suspects (recorded, measured, NOT fixed in this step):**
+- (S-a) NBA `baseline_off_rating` = `baseline_def_rating` = 110.6 (basketball_props_smart_sim.py:341) vs the
+  2025-26 as-of league ~113.1 (team_advanced_priors). This mis-centres the def subtraction by ~2.5/team.
+- (S-b) the injury pace drag 0.3 × injuries_out (production contexts show injuries_out = 5 per team), ~−3
+  possessions.
+- (S-c) baseline pace 100.
+
+**Builder (G1 port), `scripts/build_nba_totals_calibration.py`:**
+- WNBA recipe unchanged: winsorized (5/95) mean(actual − raw total) over the last 14 days (season-to-date under 8
+  games), clip ±15; team terms = residual sum / (n + 20), clip ±4. The anchor is the day before the slate. Atomic
+  write; skip if the file exists unless --force.
+- **Input:** NBA's own per-game `smart_sim_<date>_*.json` on the processed root (`market_anchor.model_total_raw`),
+  which the fleet already retains.
+  - When a calibration file was in effect for a past date, its terms are backed out to recover the uncalibrated
+    raw. The reader picks the newest file dated ≤ day − 1; the builder uses the same rule.
+- **Actuals:** NBA final scores from an existing fleet artifact; the source is stated in the implementation.
+- **REGULAR-SEASON games only** (nba_season_phase). Preseason sims never feed it.
+- **Opening night:** with < 8 regular-season games, fall back to a SEED file. It is written once from this lane's
+  2025-26 FIT-window fit (the final 14 days), labelled `seed`, read only until 8 games exist.
+
+**Measurement (walk-forward, no new sim for the fit):**
+- Data: the full-FIT combined-config run launched 2026-10-09 00:35Z (`fit_combo`). Its per-game summaries carry
+  uncalibrated model_total_raw for ~791 games.
+- For each date D: fit on games before D, correct D's raw. Report raw-total bias and MAE vs actual, before/after,
+  with a game-clustered CI on the paired MAE change.
+- **Gate:** |bias after| < 2 and MAE change CI < 0. The anchored target follows: the post-calibration target bias
+  vs real is reported.
+- **End-to-end:** the 12-date point with the combined config + calibration files written walk-forward into its
+  scratch.
+  - PASS if sim total bias vs real is within ±1.5 per game AND S8 total SD is no worse than run noise vs T2 / P.
+  - That verifies EXACT_TARGET_CALIBRATION + calibration together.
+- **Wiring** (default OFF; a file switch like the other NBA switches) is decided with the user AFTER the
+  measurement: the builder called from `scripts/refresh_nba_oddsapi_props.py` before the sim, as WNBA does. No
+  production change in this step.
