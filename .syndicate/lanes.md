@@ -1852,6 +1852,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Table per input x market: n rows/games (and n rows with x != 0), b2 [CI] on 2023, 2024 LL book vs combined with paired delta [CI]. All two-sided quote rows (an input that the line misses applies whether or not the model prices the row); official grading for attempts; 2025 untouched.
 - Blocked by: none
 
+### basketball-live-native-plan — OPEN — opened 2026-10-09 — session d48f3a34-5dd7-4517-8870-292b82d44b4a
+- Goal: A plan doc on origin/main (docs/ai_context/basketball_live_native_plan.md) defines the phased, fully Syndicate-native basketball live lens (no vendored app or vendored sim at runtime) for NBA/WNBA/NCAAB, and one session per phase is spawned with a self-contained brief
+- Files: docs/ai_context/basketball_live_native_plan.md
+- Hypothesis: n/a (planning)
+- Falsification test: n/a
+- Verification: The doc is on origin/main and five spawned task chips exist, each naming its phase, prerequisites and verification.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
