@@ -1190,6 +1190,14 @@ death, never life — do not invert it.
 - Verification: check_lane_invariants.py on origin/main reports 0 contested; check_lane_claims.py BAD lists no orphaned lane
 - Blocked by: none
 
+### home-embed-by-sport-dedupe — OPEN — opened 2026-10-09 — session 12420da3-1160-4944-9cbc-b3489ef4d580
+- Goal: The / HTML embed drops by_sport again (alias-rebuilt client-side): logo stamping covers by_sport rows so _slim_embedded_board_payload's exact match holds; page ~50MB -> ~21MB
+- Files: syndicate/blueprints/intelligence.py, tests/test_home_payload_duplication.py
+- Hypothesis: 1d333384 stamped home_logo/away_logo on ranked_all/top_opportunities/recommendations but not by_sport, so the by_sport exact-match dedupe has failed on every request since 2026-10-08
+- Falsification test: after stamping by_sport, the embed still carries by_sport (rows differ in some other field) -- NOT FALSIFIED 2026-10-09: patched code on the fleet's live board (5,189 rows) dropped by_sport, embed 49.5M -> 21.2M chars
+- Verification: unit test on the real hydrate+slim path (fails without the fix); served / on the fleet after the next web reload: by_sport absent, _embed_aliases.by_sport present, embed parses strictly, page bytes measured
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

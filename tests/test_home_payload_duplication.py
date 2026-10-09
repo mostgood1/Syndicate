@@ -222,3 +222,54 @@ def test_the_page_still_does_not_read_the_embedded_board_cards():
         f"{code_reads}. The embed drops that list (_slim_embedded_board_payload); "
         "either stop dropping it or make the new reader tolerate its absence."
     )
+
+
+# --------------------------------------------------------------------------
+# 2026-10-09: HYDRATION MUST STAMP `by_sport` LIKE EVERY OTHER ROW LIST.
+#
+# Logo stamping (10-08) covered ranked_all / top_opportunities /
+# recommendations and not `by_sport`, so the exact-match dedupe above failed on
+# EVERY request and the served `/` carried the board twice: 25.4 MB of a
+# 49.8 MB page for a key the page never reads (lane home-embed-by-sport-dedupe).
+# The unit tests above all fed the slimmer by hand and so could not see it.
+# This one runs the real hydrate -> slim chain the route runs.
+# --------------------------------------------------------------------------
+
+
+def test_hydration_keeps_by_sport_droppable_from_the_embed(tmp_path, monkeypatch):
+    from syndicate.blueprints import intelligence as bp
+    from syndicate.features.shared import team_logos
+
+    branding = tmp_path / "nhl_team_branding.csv"
+    branding.write_text(
+        "team_id,abbreviation,location,display_name,primary_color,secondary_color,logo_url,source_snapshot_date\n"
+        "1,TOR,Toronto,Toronto Maple Leafs,,,https://x/tor.png,2026-10-01\n"
+        "2,BOS,Boston,Boston Bruins,,,https://x/bos.png,2026-10-01\n",
+        encoding="utf-8",
+    )
+    team_logos._index.cache_clear()
+    monkeypatch.setattr(team_logos, "_branding_files", lambda *a, **k: [branding])
+    try:
+        rows = [
+            {"sport": "nhl", "pick_id": f"p{i}", "home_team": "Toronto Maple Leafs", "away_team": "Boston Bruins", "ev_pct": float(i)}
+            for i in range(3)
+        ]
+        # by_sport as its own row objects, as the producer sends it -- a shared
+        # object would be stamped once and hide the bug.
+        payload = {"ok": True, "ranked_all": rows, "by_sport": {"nhl": [dict(r) for r in rows]}}
+        hydrated = bp._hydrate_board_response_payload(payload)
+        assert all(r.get("home_logo") == "https://x/tor.png" for r in hydrated["by_sport"]["nhl"])
+
+        slim = bp._slim_embedded_board_payload(hydrated)
+        assert "by_sport" not in slim, "by_sport diverged from ranked_all and was shipped a second time"
+        assert slim["_embed_aliases"]["by_sport"] == "__group_ranked_all_by_sport__"
+        # Strict parse of the text the route actually serves, by the browser's
+        # rules: no NaN/Infinity (learnings 2026-10-08).
+        slim["ranked_all"][0]["line"] = float("nan")
+
+        def _refuse(token):
+            raise ValueError(token)
+
+        json.loads(bp._embed_json_text(slim), parse_constant=_refuse)
+    finally:
+        team_logos._index.cache_clear()
