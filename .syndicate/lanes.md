@@ -1801,9 +1801,10 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verdict: MET. owner_liveness --idle-min 240 gave 19 SAFE of 79 CLOSED; all 19 moved to lanes_closed.md with pointers. Invariant FAILs identical to the pre-apply baseline. Table and WAIT reasons in log/2026-10-09.md.
 - Moved: polymarket-h2h-nickname-sides, nfl-kalshi-forward-clv, daily-optimizer, nhl-saves-overdispersion, closed-lane-archive-20261006-1700, closed-lane-archive-20261006-1235, wnba-slate-and-out-props, wnba-props-out-player-leak, harvest-export-latency, smart-sim-reuse-stale-exclusions, closed-lane-archive-20261006-1550, wnba-league-status-roster, soccer-model-edge-scale, wnba-scoreboard-league-id, layer2-out-gate-reach, wnba-fetch-rosters-season, soccer-mls-corner-history-backfill, nhl-cards-headshot-latest, nhl-headshot-docstring
 
-### rotation-history-league-code — OPEN — opened 2026-10-09 — session 49ca44fc-0033-44a5-aa53-be94c24e0b0f
+### rotation-history-league-code — CLOSED 2026-10-09 — opened 2026-10-09 — session 49ca44fc-0033-44a5-aa53-be94c24e0b0f
+- **CLOSED 2026-10-09:** landed 6c044ec2. Verification ran: tests/test_rotation_history_league_code.py 2 failed on origin/main with `TypeError: missing ... league_code` at :2645, 2 passed with the fix (+18 test_basketball_rotation_stints). Code fix only; reaches production only via a pregame_safe=False (backfill / non-pregame-safe) sim.
 - Goal: _rotation_sim_minutes_for_team_local's non-empty-gid / empty-stints history fallback passes league_code, so a pregame_safe=False sim no longer raises TypeError; a test reaches that branch and gets the history path's diag back
-- Files: syndicate/features/shared/basketball_props_smart_sim.py (LOAN from basketball-native-engine, _rotation_sim_minutes_for_team_local history-fallback call ONLY), tests/test_rotation_history_league_code.py (NEW)
+- Files: (none -- released at close; LOAN returned to basketball-native-engine)
 - Hypothesis: n/a (defect stated with file:line by lane basketball-native-live-state 2026-10-09)
 - Falsification test: the new test raises TypeError before the fix and passes after; if it passes before, the branch was not reached
 - Verification: pytest tests/test_rotation_history_league_code.py red on origin/main, green with the fix; diag source=history present
