@@ -761,3 +761,42 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
   - The seed value for opening night is still unset: the final-14-day fit is 15.0, clipped.
   - Production wiring is a user decision. Per the pre-registration, adoption follows the end-of-Phase-2 VALIDATION
     read.
+
+## Phase 2 #1f — NBA RAW-TOTAL DRIFT, PRE-REGISTERED 2026-10-09 (user: "Fix the drift's cause"), BEFORE measuring
+
+**Observation (#1e):** the walk-forward global bias rises 7.3 (early Nov) → ≥ 15 (from late Nov, clipped).
+
+**Mechanism read** (basketball_props_smart_sim.py, job build ~5800-5895; `_simulate_quarters_local` ~1199-1245):
+- `home_off_rtg = (0.5 × (pred_total + pred_margin)) / matchup_pace × 100`. That is the vendor game model's
+  predicted points, which already price the opponent.
+- `off_rtg_from_points` is set True ONLY for WNBA ("NBA has not been backtested"). So for NBA:
+  `home_eff = home_off − (away_def − 110.6)`, i.e. the opponent's defense subtracted again, centred on the stale
+  NBA baseline 110.6 (as-of 2025-26 league def ~113.1).
+- Pace: `pace = mean(home_pace, away_pace) − b2b (1/team) − 0.3 × home_outs − 0.3 × away_outs`, floored at
+  baseline − 8. `*_outs` = number of players in the sim's excluded map (injury / availability), capped at 5.
+- Then `mu = eff / 100 × pace + _adjustments_local(team)`.
+
+**Hypotheses:**
+- **H-D1 (G2 analog):** the def subtraction on points-derived ratings double counts. Expected sign: mostly
+  negative, because opp def − 110.6 > 0 for an average team when the league def is 113.1.
+  - Counterfactual: no subtraction (the WNBA rule).
+- **H-D2 (injury pace drag drifts):** `*_outs` rises through the season, lowering pace and the raw.
+  - Counterfactual: no outs drag. Read the slope of outs vs date and its share of the trend.
+- **H-D3 (input drift):** the vendor game model's own pred_total is biased or drifting. The raw inherits it.
+  - Counterfactual: raw = pred_total.
+- **H-D4 (pace floor/scale):** the matchup pace and the clip/floor change the level.
+  - Read: the counterfactual with pace = matchup_pace.
+
+**Measurement:**
+- A fast full-FIT re-run (combined config, 4 draws; the raw is computed before any draw) with the harness recording
+  each game's sim JOB (pred mu via off_rtg × matchup_pace, def, pace, outs, b2b, rest).
+- **IDENTITY CHECK FIRST:** recompute model_total_raw from the recorded inputs with the module's own functions.
+  It must match the recorded raw within 0.05 on ≥ 99% of games, else the decomposition is wrong and nothing below
+  is read.
+- For each counterfactual: bias vs real (mean), MAE, and the bias-vs-date slope (pts per 30 days), with
+  game-bootstrap CIs.
+- A hypothesis is **CONFIRMED** if its counterfactual cuts |bias| AND the season trend (slope CI excludes the
+  baseline slope, or the slope CI includes 0 where the baseline's does not).
+- **Fix:** whatever is confirmed goes behind a default-off switch in basketball_props_smart_sim.py. That file is
+  CLAIMED by lane basketball-injury-exclusion-reinclusion, so a loan is needed. The totals calibration is then
+  re-read: the global term must fall well inside its ±15 clip. No production change without the user.
