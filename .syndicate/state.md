@@ -658,6 +658,7 @@ once this index exists: re-splitting would orphan the parts.
 | [order-model-attribution] | AN ORDER RECORDS THE SIM'S VERDICT — DEPLOYED AND VERIFIED ON PRODUCTION; THE COMMIT GATE MAKES FOUR OF THE NI | `state_portfolio.md` |
 | [soccer-roster-only-players] | SOCCER SIM SQUADS: ADDING ROSTER-ONLY PLAYERS (TEAM TOTALS FIXED) FAILED ITS PRE-REGISTERED TEST, AND THE ESPN | `state_soccer.md` |
 | [soccer-projection-unit-dates] | SOCCER PREGAME PROJECTIONS: MLS UNITS WERE KEYED ON THE UTC DATE, SO EVENING KICKOFFS GOT EMPTY FILES; EPL/SER | `state_soccer.md` |
+| [soccer-confirmed-lineups] | CONFIRMED XI REACHES THE SOCCER SIM IN THE LAST MINUTE BEFORE KICKOFF, BUT ONLY 7-10 OF 11 STARTERS ARE RECOGN | `state_soccer.md` |
 | [soccer-season-market-audit] | SEASON TO DATE NO SOCCER MARKET BEATS THE CLOSE, AND THE PROP MODEL IS PRICING LAST SEASON'S SQUADS `[measured | `state_soccer.md` |
 | [soccer-prop-book-coverage] | WIDENING SOCCER PROP REGIONS BUYS ONE SOFT BOOK FOR ~1M CREDITS/MONTH — **KNOB SHIPPED, DELIBERATELY LEFT OFF* | `state_soccer.md` |
 | [soccer-input-gate] | THE SOCCER INPUT GATE NOW RUNS, AND 4 OF ITS 9 ALARMS WERE DECISIONS — MEASURED 2026-09-07 `[lane soccer-unfed | `state_soccer.md` |

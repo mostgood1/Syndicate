@@ -1786,6 +1786,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### soccer-lineup-reach — OPEN — opened 2026-10-09 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- **CHECKPOINT 2026-10-09 16:49Z. GOAL: NOT MET.** Goal verbatim: "Measure what share of soccer matches were priced from a build that had the confirmed starting XI: a read-only script over the fleet's prekickoff freezes (last pre-kickoff build per match) and odds-job STEP_MARKER lines, run on the 10-09..10-12 slate, with the number written to the lineup findings". Script landed (d401fd81) and its positive control exists (10-07 Chicago v Vancouver: middle band 12/10 at 210 min out, 0/0 at 0.1 min). Left: run it after the 10-09..12 matches, then write the share into the findings. Blocked only by the calendar. Owner session b9bb5f37; the worktree is closed (reopen with session_worktree.py open --lane soccer-lineup-reach).
 - Goal: Measure what share of soccer matches were priced from a build that had the confirmed starting XI: a read-only script over the fleet's prekickoff freezes (last pre-kickoff build per match) and odds-job STEP_MARKER lines, run on the 10-09..10-12 slate, with the number written to the lineup findings
 - Files: scripts/soccer_season_audit/lineup_reach.py (NEW, read-only measurement)
 - Hypothesis: n/a (measurement)
@@ -1808,6 +1809,15 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: served /api/board/game-chips per sport and state: share of chips with a pregame footer, live situation fields during live games, plays result on finals; screenshot of the rail at 1440
+- Blocked by: none
+
+### suite-baseline-flakiness — OPEN — opened 2026-10-09 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- **GOAL: NOT MET — the primary-tree run is at 99% and has emitted no summary line, so the baseline this lane exists to produce does not exist yet.** Goal verbatim: "A full-suite baseline for origin/main on Windows that a later session can trust: the primary-tree run's own summary line recorded verbatim, and every failure it reports classified as REPRODUCING or NONDETERMINISTIC by a per-file isolated re-run, with the nondeterministic set named -- so no future session reads a single-pass failure count as a regression." LEFT: (a) the primary-tree run at `4d9f4ade` must emit its summary — started 2026-10-08 08:27:49, 99% at 2026-10-09 11:33, 69,503s CPU, repeatedly starved to 0% at Idle while the fleet held ~11 of 12 cores; (b) a per-file isolated re-run of ITS failures, because the sparse-worktree study covered only 23 files from a 31.3% snapshot and 367 failures across 72 files were never examined. BLOCKING: host contention only — the run is alive, not stuck. Evidence: `.syndicate/findings_2026-10-09_suite_baseline.md`.
+- Goal: A full-suite baseline for origin/main on Windows that a later session can trust: the primary-tree run's own summary line recorded verbatim, and every failure it reports classified as REPRODUCING or NONDETERMINISTIC by a per-file isolated re-run, with the nondeterministic set named -- so no future session reads a single-pass failure count as a regression.
+- Files: .syndicate/findings_2026-10-09_suite_baseline.md
+- Hypothesis: A large share of this suite's reported failures on Windows are not defects and not data gaps but RUN-DEPENDENT: measured 2026-10-07, test_inplay_board_cadence failed 7 tests in a long run and 9 alone with ZERO overlap, and test_execution_multi_venue failed exactly one test each time -- a different one. If so, a single full-suite pass cannot establish a failure count at all.
+- Falsification test: If the primary-tree failures re-run per-file reproduce as an identical set (as test_archives 32/32 and test_bet_status_ncaaf 10/10 did), the failures are real or data-dependent and nondeterminism is NOT the dominant explanation.
+- Verification: The primary-tree pytest summary line quoted verbatim, plus a per-file isolated re-run of every file it reports, scored three ways (reproduced / did not reproduce / only-in-isolation) with parametrize ids normalised.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
@@ -2438,15 +2448,6 @@ the full block, including any ORPHANED 'to resume' note.
 - `wnba-no-player-props` — archived 2026-10-04 to `lanes_closed.md` (1 block(s))
 - `wnba-odds-run-failures` — archived 2026-10-04 to `lanes_closed.md` (1 block(s))
 - `worker-memory-heartbeat` — archived 2026-10-04 to `lanes_closed.md` (1 block(s))
-
-### suite-baseline-flakiness — OPEN — opened 2026-10-09 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
-- **GOAL: NOT MET — the primary-tree run is at 99% and has emitted no summary line, so the baseline this lane exists to produce does not exist yet.** Goal verbatim: "A full-suite baseline for origin/main on Windows that a later session can trust: the primary-tree run's own summary line recorded verbatim, and every failure it reports classified as REPRODUCING or NONDETERMINISTIC by a per-file isolated re-run, with the nondeterministic set named -- so no future session reads a single-pass failure count as a regression." LEFT: (a) the primary-tree run at `4d9f4ade` must emit its summary — started 2026-10-08 08:27:49, 99% at 2026-10-09 11:33, 69,503s CPU, repeatedly starved to 0% at Idle while the fleet held ~11 of 12 cores; (b) a per-file isolated re-run of ITS failures, because the sparse-worktree study covered only 23 files from a 31.3% snapshot and 367 failures across 72 files were never examined. BLOCKING: host contention only — the run is alive, not stuck. Evidence: `.syndicate/findings_2026-10-09_suite_baseline.md`.
-- Goal: A full-suite baseline for origin/main on Windows that a later session can trust: the primary-tree run's own summary line recorded verbatim, and every failure it reports classified as REPRODUCING or NONDETERMINISTIC by a per-file isolated re-run, with the nondeterministic set named -- so no future session reads a single-pass failure count as a regression.
-- Files: .syndicate/findings_2026-10-09_suite_baseline.md
-- Hypothesis: A large share of this suite's reported failures on Windows are not defects and not data gaps but RUN-DEPENDENT: measured 2026-10-07, test_inplay_board_cadence failed 7 tests in a long run and 9 alone with ZERO overlap, and test_execution_multi_venue failed exactly one test each time -- a different one. If so, a single full-suite pass cannot establish a failure count at all.
-- Falsification test: If the primary-tree failures re-run per-file reproduce as an identical set (as test_archives 32/32 and test_bet_status_ncaaf 10/10 did), the failures are real or data-dependent and nondeterminism is NOT the dominant explanation.
-- Verification: The primary-tree pytest summary line quoted verbatim, plus a per-file isolated re-run of every file it reports, scored three ways (reproduced / did not reproduce / only-in-isolation) with parametrize ids normalised.
-- Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

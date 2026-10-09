@@ -3517,3 +3517,9 @@ session cannot read a single-pass count as a regression.
    with two simultaneous Idle processes (Normal 94% of a core, Idle 30% and 1%).
    Related and already in this file: an Idle run yields to the fleet entirely
    because Windows sees the whole WSL fleet as ONE Normal process.
+
+## 2026-10-09 -- A test that passes in a data-less worktree is not a passing test -- run it with SYNDICATE_DATA_ROOT=prod before trusting it `[lane nfl-name-test-hermetic]`
+My 10-07 reachability test asserted `(None, "unresolved")` and passed in my worktree. A peer's 10-08 change added a collision branch that, with REAL data, returns `ambiguous_current_season` for `k.williams`, and the fleet CI (on a checkout with data) flagged it. The same blindness cut the other way the same day: 19 odds-test failures I saw in worktrees were pure data absence (the fleet CI passes both files). **Rule:** a worktree's test result is a statement about a tree with no data/. Before calling a test green or red, run it on the fleet with `SYNDICATE_DATA_ROOT=$HOME/syndicate-prod/data` (read-only, nice 19), or read the latest `logs/job-ci-suite.log`, which runs the full suite against data.
+
+## 2026-10-09 -- A classifier built from the code's write path still needs a read of the real file before it is trusted `[lane soccer-lineup-reach]`
+I wrote the confirmed-XI classifier from `build_usage_profiles` (10-11 players at >=0.75) and it reported 0 confirmed on every side. Two blind spots: it keyed sides off `match.home_team`, which the freeze does not carry (0 rows everywhere), and EPL season shares alone reach 12-16 at >=0.75. Printing one side's raw shares showed the real signature (0 players in the middle band) in a minute. **Rule:** before running a classifier over a population, print the raw field for one known-positive and one known-negative case; a classifier whose every output is the same answer has measured nothing.
