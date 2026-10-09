@@ -1661,6 +1661,39 @@ reservation (correct -- it guards the moment the file exists) and nothing else.
 the repository (4 such tokens exist in the live ledger), and `box/` does not
 bleed into `box_old/`.
 
+**A FOURTH SHAPE, AND THE FIX THAT LANES ARE NOW USING `[2026-10-09, lane
+lanes-archive-over-budget / the 10-07 section predicate]`.** A SCOPE QUALIFIER is
+a claim shape too: `path (the nhl live-lens allowlist and pull entries ONLY)` lets
+two lanes hold one file without contesting. The predicate added 2026-10-07
+required the literal word `section`, and MEASURED over lanes.md: of 432
+parenthesised qualifiers on Files lines, **110 say ONLY without `section` and just
+7 use both** -- it recognised ~6% of real declarations and reported 5 contests
+whose holders had each declared a distinct scope. Widened 2026-10-09 (user
+decision) to a qualifier ENDING in `only`; ends-with rather than contains is the
+safety margin, since prose like `(user decision there: ... functions only; this
+lane's P2 ...)` must still be rejected, and the word boundary keeps `(readonly)`
+out. Unchanged: EVERY holder must declare, and no two may declare the same scope.
+
+**It is working in practice, which is the part to re-derive rather than trust.**
+Contested files REPORTED went 5 -> 0 over the day: `f1435c63` saw lane
+`mlb-game-profile-pitch-config` restate its own qualifier to end in `only` so the
+parser could read it (`the --game-pitch-model-overrides argparse default only`).
+As of 331d20e2: 2 contested files, both excused by disjoint declared sections, 0
+reported.
+
+**lanes.md IS BACK UNDER BUDGET.** 718,930 -> 513,014 B (0.93x of the 550,000
+session-start cap) after archiving 63 CLOSED blocks (`5ac74a83`, plus a peer's 19
+in `9de0d099`), claim set unchanged by SET comparison 336 -> 336. The digest's
+OVER BUDGET line now names only `learnings.md` (494KB>449KB).
+
+**CAUTION ON THE TOOLING.** `archive_released_lanes.py` and `trim_lane_blocks.py`
+write ledger files in TEXT mode. On Windows that rewrote the whole 4MB
+`lanes_history.md` LF -> CRLF and converted lanes.md's single mid-line bare CR
+into a line break, splitting a peer's line -- the failure `74da0acd` had already
+repaired once. Unstaged `git diff` showed 679/0 and hid it; the STAGED diff was
+38,213/37,535. Check `git diff --cached --numstat` before committing after either
+tool runs.
+
 ## [lane-claim-truncation] A LANE CAN CLAIM FILES THE GUARD DOES NOT ENFORCE, AND NOTHING SAID SO -- 17 OPEN lanes affected, now REPORTED `[verified 2026-09-24, lane lane-claim-truncation-visible]`
 
 - **The mechanism.** `lane_claims._claimable_prefix` cuts a `- Files:` line at
