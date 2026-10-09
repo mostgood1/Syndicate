@@ -933,3 +933,47 @@ walk-forward on the switched raw.
   syndicate/features/basketball_engine/, so vendor events.py edits are inert. M-B levers go in engine.py on a loan
   from that lane. tests/test_basketball_sim_jitter_levers.py and tests/test_nba_sim_engine_port.py still test the
   vendored module and are owed a repoint.
+
+## Phase 2 #2 (M-B) — LATE-GAME CATCH-UP / SCORE EFFECTS, PRE-REGISTERED 2026-10-09, BEFORE any engine change
+
+**Measured gap (#1b correction, 46247612):**
+- Within-game slopes, sim (per-game demeaned) vs real (each period minus its share of −spread; line error biases the
+  real slope UP, so the real values are conservative):
+  - H2 margin on H1 margin: sim −0.001 vs real −0.174 [−0.240, −0.106];
+  - Q4 on margin entering Q4: sim +0.001 vs real −0.141 [−0.184, −0.096].
+- The sim's halves are independent; real games revert.
+
+**Engine read (native engine, c2b99d4f; the code survey of the vendored copy agrees):**
+- Garbage time (`garbage_time_eff_scale` 0.96, `garbage_time_pace_scale` on TOV) scales BOTH teams.
+- The only margin-dependent foul term favours the LEADER.
+- Possession count ignores the score.
+- `bench_weight_boost` is dead (always called with blowout_boost_bench=False).
+
+**Mechanism:**
+- New `EventSimConfig.score_effect_k: float = 0.0` (0 = byte-identical: no branch taken, no RNG draw).
+- On every shot, the offense's make probability (and FT% for its free throws) is multiplied by
+  `clip(1 − k × dev, 0.85, 1.15)`, where `dev` = the offense's current lead minus its EXPECTED lead to date.
+  - Expected lead to date = (target own − target opponent) × the share of regulation elapsed; 0 when there is no
+    target.
+- Symmetric around expectation, so it should not move the mean margin. It pulls deviations back: the team ahead of
+  expectation shoots slightly worse, the team behind slightly better (effort, rotations, fouling folded into one
+  term).
+- Location: syndicate/features/basketball_engine/engine.py, the make-probability and FT sites. **LOAN required**
+  from lane basketball-native-engine (session d10f7421).
+
+**Sweep:**
+- On the accepted Phase 2 config: the same 12 dates (87 games), 200 draws, nice 19.
+- k ∈ {0 (control), 0.005, 0.01, 0.02} per point of deviation.
+
+**Readings:**
+- PRIMARY: within-game H2-on-H1 slope (target −0.17) and Q4 slope (target −0.14).
+- Secondary: S8 margin SD (real 15.2 on these games), S5 blowouts (real 0.253), S7 ties.
+- Guards (vs run noise, √2 × single-run SE): sim mean margin vs −spread slope and mean offset (must not move), S8
+  total SD, S3 quarter totals, S1 pace, team points vs target.
+
+**Calls:**
+- **Confirmed** if some k brings both slopes within ±0.05 of real AND S8 margin falls by more than run noise with no
+  guard worse than noise.
+- **Refuted** if even k = 0.02 leaves the H2 slope above −0.10. Then the reversion is not an efficiency effect;
+  next candidates are possession/foul-driven (trailing teams gaining possessions).
+- The k is chosen from the grid only. A full FIT re-run follows a confirmation. VALIDATION is untouched.
