@@ -121,3 +121,10 @@ def test_capture_skips_pregame_and_already_final_games(tmp_path):
 
     out = live.capture_live_states("nba", "2026-10-09", fetch_scoreboard=lambda *_: board, fetch_summary=summary, out_dir=tmp_path)
     assert fetched == ["999"] and out[0]["advanced"] and out[0]["score"] == [2, 0]
+
+
+def test_score_prefers_espn_header_and_keeps_the_play_sum():
+    g = Game("nba", state="in")
+    g.shot(1, "11:00", "home", "h1")
+    st = live.build_live_game_state(g.summary(official=(4, 0)), "nba", date="2026-01-15", built_at="t")
+    assert (st.home.score, st.score_source, st.pbp_score["home"]) == (4, "official", 2)

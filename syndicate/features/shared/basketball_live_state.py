@@ -105,7 +105,9 @@ class LiveGameState:
     players: tuple[PlayerLiveState, ...]
     stints: tuple[pbp.LineupStint, ...]
     recent: tuple[RecentWindow, ...]
-    official_score: dict[str, int | None]  # ESPN header score at fetch time, for cross-checks
+    official_score: dict[str, int | None]  # ESPN header score at fetch time
+    pbp_score: dict[str, int]  # sum of the log's scoring plays
+    score_source: str  # "official" (header) or "pbp" (no header score); see build_live_game_state
     anomalies: int
     notes: tuple[str, ...]
     built_at: str = ""
@@ -232,7 +234,15 @@ def build_live_game_state(summary: Mapping[str, Any], league: str, *, date: str 
     rules = pbp.rules_for(league)
     rec = pbp.reconstruct(summary, league, date=date)
     meta, events = rec.meta, rec.events
-    score = pbp.reconstructed_score(events)
+    # The team score is ESPN's header score when it has one. Measured over the 2025-26 NBA backfill
+    # (1,420 games): the sum of scoring plays matched the official final 1,412 times; in 6 of the 8 misses
+    # ESPN's own running score was wrong too (plays missing from the log), and once the play values
+    # double-counted (MIN-DEN 2025-11-15, +4 each) while the running score was right. The play sum is kept
+    # beside it (`pbp_score`), and the stint points always come from the log.
+    pbp_score = pbp.reconstructed_score(events)
+    official = {"home": meta.home.score, "away": meta.away.score}
+    use_official = official["home"] is not None and official["away"] is not None and (meta.status_state in {"in", "post"} or events)
+    score = dict(official) if use_official else dict(pbp_score)
     pf = pbp.personal_fouls(events, league)
     period = rec.period or 1
     clock_left = rec.clock_left if events else float(rules.period_length(1))
@@ -287,7 +297,7 @@ def build_live_game_state(summary: Mapping[str, Any], league: str, *, date: str 
         possession_side=possession, possession_basis=basis, home=teams["home"], away=teams["away"],
         players=tuple(players), stints=tuple(rec.stints),
         recent=tuple(_recent_window(events, rules, rec.elapsed, w) for w in RECENT_WINDOWS_SEC),
-        official_score={"home": meta.home.score, "away": meta.away.score},
+        official_score=official, pbp_score=pbp_score, score_source="official" if use_official else "pbp",
         anomalies=rec.anomalies, notes=tuple(rec.notes[:50]),
         built_at=built_at or dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
     )
