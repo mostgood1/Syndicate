@@ -2890,6 +2890,26 @@
     return hasNumber ? "unpriced" : "none";
   }
 
+  // "3 plays · lines 2–1 · props 1–0, 1 pending" on a FINAL card (mockup 4,
+  // user 2026-10-09 "Lines now, props overnight"); `chip.plays` from
+  // `game_chip_plays`. Postponed: "plays void". Empty string = say nothing.
+  function chipPlaysText(chip) {
+    const plays = chip && chip.plays;
+    if (!plays || !plays.total) return "";
+    const n = `${plays.total} play${plays.total === 1 ? "" : "s"}`;
+    if (plays.void) return `${n} · void`;
+    if (chip.state !== "final") return "";
+    const record = (r) => {
+      if (!r) return "";
+      const decided = `${r.win}–${r.loss}${r.push ? `–${r.push}` : ""}`;
+      return r.pending ? (r.win + r.loss + r.push ? `${decided}, ${r.pending} pending` : `${r.pending} pending`) : decided;
+    };
+    const parts = [n];
+    if (plays.lines && plays.line_results) parts.push(`lines ${record(plays.line_results)}`);
+    if (plays.props && plays.prop_results) parts.push(`props ${record(plays.prop_results)}`);
+    return parts.join(" · ");
+  }
+
   function chipTeamRow(side, chip) {
     const team = chip[side] || {};
     const isLeader = chip.leader === side;
@@ -3594,9 +3614,17 @@
           const chip = chipForGame(game);
           if (chip) {
             const isLive = chip.state === "live";
+            // A game that will not be played is its own state (`postponed` /
+            // `cancelled` / `suspended`), not "PREGAME" (mockup 4).
+            const notPlayed = ["postponed", "cancelled", "suspended"].includes(String(chip.state || ""));
             const stateLabel = isLive
               ? '<span class="live-dot">&#9679; LIVE</span>'
-              : chip.state === "final" ? "FINAL" : "PREGAME";
+              : chip.state === "final" ? "FINAL" : notPlayed ? escapeHtml(chip.status_token || chip.state.toUpperCase()) : "PREGAME";
+            // Pregame footer (probables / goalies / slot + the line), or the
+            // not-played note. Never a placeholder: absent means no source had it.
+            const footer = notPlayed
+              ? `${chip.state === "postponed" ? "Postponed" : chip.state === "cancelled" ? "Cancelled" : "Suspended"} · plays on it are void`
+              : chip.state === "pregame" ? (chip.footer || "") : "";
             const sportLabel = cardSportLabel(game, chip);
             const headLeft = chip.status_token && chip.state !== "final"
               ? `${escapeHtml(sportLabel)} · ${escapeHtml(chip.status_token)}`
@@ -3611,7 +3639,8 @@
                 ${chipTeamRow("away", chip)}
                 ${chipTeamRow("home", chip)}
                 ${isLive && chip.situation ? `<div class="game-mini-card__situation">${escapeHtml(chip.situation)}</div>` : ""}
-                <div class="game-mini-card__meta">${game.count ? `${game.count} play${game.count === 1 ? "" : "s"}` : "no plays"}</div>
+                ${footer ? `<div class="game-mini-card__footer">${escapeHtml(footer)}</div>` : ""}
+                <div class="game-mini-card__meta">${chipPlaysText(chip) || (game.count ? `${game.count} play${game.count === 1 ? "" : "s"}` : "no plays")}</div>
               </button>
             `;
           }

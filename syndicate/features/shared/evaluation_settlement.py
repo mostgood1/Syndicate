@@ -647,6 +647,15 @@ def _settle_date_for_sports(
         )
     if writes and not dry_run:
         _persist_settled_records(target_ledger_path, writes, date_token=date_token)
+        # The games-rail card's prop results (lane games-rail-full-detail): a
+        # small {pick_id: result} beside the ledger, because the card cannot
+        # read a 343 MB chunk. Never allowed to cost the settlement.
+        try:
+            from syndicate.features.shared.game_chip_plays import write_pick_results
+
+            write_pick_results(date_token, writes, reports_dir=target_ledger_path.parent.parent)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[evaluation_settlement] PICK_RESULTS_WRITE_FAILED date={date_token} error={type(exc).__name__}", flush=True)
     return [result for result in results if result is not None]
 
 

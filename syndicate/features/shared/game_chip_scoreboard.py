@@ -691,8 +691,63 @@ def build_game_chip(sport: str, game: dict[str, Any]) -> dict[str, Any]:
         "leader": leader,
         "start_time_utc": start_time_utc.isoformat() if start_time_utc else None,
         # Live only; None otherwise. Additive: every consumer reads with .get().
-        "situation": _live_situation(game, status_token) if state == "live" else None,
+        # The sport-specific line (runners / down & distance / red cards) when
+        # the game carries it, else the cleaned status text as before.
+        "situation": (_chip_live_detail(sport_slug, game) or _live_situation(game, status_token)) if state == "live" else None,
+        # Pregame only (mockup 4, lane games-rail-full-detail): probables /
+        # goalies / slot, and the line. None when no source has any of it.
+        "footer": _chip_footer(sport_slug, game, start_time_utc) if state == "pregame" else None,
     }
+
+
+def _chip_live_detail(sport: str, game: dict[str, Any]) -> str | None:
+    try:
+        from syndicate.features.shared.game_chip_detail import live_detail
+
+        text = live_detail(sport, game)
+    except Exception:  # noqa: BLE001 -- a detail line must never break a chip
+        return None
+    return text[:_SITUATION_MAX_CHARS] if text else None
+
+
+def _chip_footer(sport: str, game: dict[str, Any], start_utc: datetime | None) -> str | None:
+    try:
+        from syndicate.features.shared.game_chip_detail import pregame_footer
+
+        return pregame_footer(
+            sport,
+            game,
+            away=_side_label(game, "away"),
+            home=_side_label(game, "home"),
+            away_name=_side_name(game, "away"),
+            home_name=_side_name(game, "home"),
+            start_utc=start_utc,
+        )
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _attach_board_plays(chips: list[dict[str, Any]], date_value: str, sports: tuple[str, ...]) -> None:
+    """Our board plays per game, and on finals how they did (mockup 4, lane
+    games-rail-full-detail; `game_chip_plays`).
+
+    The play RECORD is refreshed only by the full-slate build -- the one the
+    worker publishes (`layer2_shortlist`, every default sport) -- because it
+    reads the saved shortlist (~1.4 s). The per-sport builds elsewhere on the
+    worker, and every web build, only read the small record file.
+    """
+    try:
+        from syndicate.features.shared.game_chip_plays import attach_plays, _is_worker
+
+        cards = None
+        if _is_worker() and set(GAME_CHIP_DEFAULT_SPORTS) <= set(sports):
+            from pipeline.intelligence_state import read_layer2_shortlist
+
+            payload = read_layer2_shortlist(date_value) or {}
+            cards = payload.get("cards") if isinstance(payload.get("cards"), list) else None
+        attach_plays(chips, date_value, cards=cards)
+    except Exception:  # noqa: BLE001 -- the plays line must never cost the scoreboard
+        return
 
 
 def _ensure_sport_data_providers() -> None:
@@ -852,6 +907,8 @@ def _build_game_chips_uncached(date_value, normalized_sports, cache_key, now):
         for game in games or []:
             if isinstance(game, dict):
                 chips.append(build_game_chip(slug, game))
+
+    _attach_board_plays(chips, date_value, normalized_sports)
 
     with _cache_lock:
         _cache[cache_key] = (now, chips)

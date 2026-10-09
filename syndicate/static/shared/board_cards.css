@@ -2513,3 +2513,6 @@ table.board-blotter tbody tr:last-child td {
 .board-research__charts { border-bottom: 1px solid var(--cards-line); padding-bottom: 10px; }
 .board-research__charts-title { font-size: 12px; font-weight: 700; margin-bottom: 6px; }
 .board-research__charts .prop-charts { flex-direction: column; }
+
+/* Games rail card footer (mockup 4, lane games-rail-full-detail). */
+.game-mini-card__footer { font-size: 11px; line-height: 1.3; color: var(--cards-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
