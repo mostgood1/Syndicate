@@ -325,6 +325,16 @@ def shape(records: list[dict[str, Any]], priors: Mapping[str, Any]) -> dict[str,
             for minute, value in share.items():
                 starter_on[minute].append(value)
         rate = {k: {"n": len(v), "rate_vs_prior": round(statistics.fmean(v), 4)} for k, v in sorted(rate_by_margin.items())}
+        # 5. half split: regulation points in H1 vs H2 (bonus free throws and end-game fouling live in H2)
+        h1 = [(r["home"]["linescores"][0] or 0) + (r["away"]["linescores"][0] or 0) for r in rs]
+        h2 = [(r["home"]["linescores"][1] or 0) + (r["away"]["linescores"][1] or 0) for r in rs]
+        half_split = {
+            "n": len(rs),
+            "h1_points_mean": round(statistics.fmean(h1), 2),
+            "h2_points_mean": round(statistics.fmean(h2), 2),
+            "h2_minus_h1_mean": round(statistics.fmean(b - a for a, b in zip(h1, h2)), 2),
+            "h2_minus_h1_se": round(statistics.stdev(b - a for a, b in zip(h1, h2)) / math.sqrt(len(rs)), 2),
+        }
         foul_rates = {}
         for (window, bucket), minutes in sorted(foul_minutes.items()):
             foul_rates[f"{window} margin {bucket}"] = {
@@ -335,6 +345,7 @@ def shape(records: list[dict[str, Any]], priors: Mapping[str, Any]) -> dict[str,
         out[phase] = {
             "games": len(rs),
             "h2_on_h1_margin_reversion": {**_ols_slope(xs, ys), "nba_real": -0.174, "nba_sim": -0.001},
+            "regulation_half_split": half_split,
             "h2_scoring_rate_by_margin_vs_prior": rate,
             "end_game_fouls": foul_rates,
             "starter_on_floor_share_by_minute": {m: round(statistics.fmean(v), 3) for m, v in sorted(starter_on.items()) if v},
