@@ -192,7 +192,9 @@ def test_snapshot_publishes_one_lane_per_live_game_and_counts_refusals(tmp_path,
                                        fetch_summary=lambda *_a: live, inputs_root=tmp_path)
     lane = snap["games"][0]["gameLens"][0]
     assert lane["source"] == "live_resim" and snap["refusalsByReason"] == {}
-    assert (snap["games"][0]["home"], snap["games"][0]["away"]) == ("GSW", "NYK")
+    g0 = snap["games"][0]
+    assert (g0["home"], g0["away"]) == ("Golden State Warriors", "New York Knicks")  # what the join keys on
+    assert (g0["home_code"], g0["away_code"]) == ("GSW", "NYK")
 
 
 # ------------------------------------------------------------------------------------------- live props
@@ -315,3 +317,48 @@ def test_with_live_mechanisms_keeps_pregame_values_and_off_is_the_same_object():
     assert lr.with_live_mechanisms(inputs, {})["cfg"] is cfg
     out = lr.with_live_mechanisms(inputs, {"endgame_foul_window_s": 120})["cfg"]
     assert out.possessions_per_game == 101.5 and out.endgame_foul_window_s == 120 and out.endgame_foul_p == 0.0
+
+# ------------------------------------------------------------------------------------------- tick / loop
+
+def test_loop_is_off_unless_explicitly_on():
+    assert lr.nba_live_resim_enabled({}) is False
+    assert lr.nba_live_resim_enabled({lr.LIVE_RESIM_ENV: "0"}) is False
+    assert lr.nba_live_resim_enabled({lr.LIVE_RESIM_ENV: "on"}) is True
+
+
+def test_oversize_snapshot_drops_props_never_game_lines():
+    snap = {"games": [{"gameLens": [{"source": "live_resim", "simsRun": 200}], "liveProps": [{"x": "y" * 500}]}]}
+    out, size = lr.fit_snapshot_to_budget(snap, max_bytes=200)
+    g = out["games"][0]
+    assert g["liveProps"] == [] and g["livePropsRefusal"] == "props_over_size_budget"
+    assert g["gameLens"] == [{"source": "live_resim", "simsRun": 200}] and out["propsDroppedForSize"] is True
+    small, n = lr.fit_snapshot_to_budget({"games": []}, max_bytes=200)
+    assert "propsDroppedForSize" not in small and n < 200
+
+
+def test_tick_writes_the_snapshot_and_reports(monkeypatch, tmp_path):
+    written = {}
+    monkeypatch.setattr(lr, "build_live_lens_snapshot", lambda d, **k: {
+        "games": [{"gameLens": [{"source": "live_resim"}]}, {"gameLens": [{"source": "pregame_only"}]}],
+        "refusalsByReason": {"no_pregame_inputs": 1}})
+    import syndicate.features.shared.refresh_state_store as store
+    monkeypatch.setattr(store, "write_json_file", lambda path, payload: written.update(path=path, payload=payload))
+    st = lr.run_live_resim_tick("2026-10-20")
+    assert st["written"] and st["games"] == 2 and st["resimmed"] == 1
+    assert written["path"].name == "nba_live_resim.json"
+
+
+# ------------------------------------------------------------------------------------------- page-lens merge
+
+def test_page_lens_merges_native_lanes_and_props_for_the_same_date_only(monkeypatch):
+    from syndicate.features.nba import live_lens as page
+
+    resim = {"date": "2026-10-20", "generatedAt": "t", "refusalsByReason": {},
+             "games": [{"event_id": "401", "gameLens": [{"source": "live_resim"}], "liveProps": [{"p": 1}]}]}
+    monkeypatch.setattr(page, "read_json_file", lambda path: resim)
+    games = [{"event_id": "401", "home": "BOS"}, {"event_id": "402"}]
+    info = page._attach_native_resim(games, "2026-10-20")
+    assert info["merged"] == 1 and games[0]["gameLens"] == [{"source": "live_resim"}] and "gameLens" not in games[1]
+    games2 = [{"event_id": "401"}]
+    assert page._attach_native_resim(games2, "2026-10-21")["reason"] == "native_resim_snapshot_other_date"
+    assert "gameLens" not in games2[0]

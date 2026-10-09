@@ -604,6 +604,36 @@ def _without_sim_player_rows(games: list[Any]) -> list[Any]:
     return out
 
 
+_NATIVE_RESIM_GAME_KEYS = ("gameLens", "liveProps", "livePropsCoverage", "livePropsRefusal")
+
+
+def _attach_native_resim(games: list[dict[str, Any]], resolved_date: str) -> dict[str, Any]:
+    """Merge `nba/live_resim.py`'s published lanes and props into these games by ESPN `event_id`.
+
+    A READ of the file the dedicated re-sim thread writes -- never a re-sim here. Only a snapshot for the SAME date
+    is merged; anything else is reported, not used. The props join reads THIS snapshot's `liveProps`; the gameline
+    join reads the re-sim file directly (`board_enrichment._LIVE_GAMELINE_SNAPSHOT_PATHS`)."""
+    from syndicate.features.nba.live_resim import live_lens_snapshot_path as _resim_path
+
+    resim = read_json_file(_resim_path())
+    if not isinstance(resim, dict):
+        return {"merged": 0, "reason": "no_native_resim_snapshot"}
+    if str(resim.get("date") or "") != str(resolved_date):
+        return {"merged": 0, "reason": "native_resim_snapshot_other_date", "resim_date": resim.get("date")}
+    by_event = {str(g.get("event_id") or ""): g for g in resim.get("games") or [] if isinstance(g, dict)}
+    merged = 0
+    for game in games:
+        src = by_event.get(str(game.get("event_id") or "").strip())
+        if not src:
+            continue
+        for key in _NATIVE_RESIM_GAME_KEYS:
+            if key in src:
+                game[key] = src[key]
+        merged += 1
+    return {"merged": merged, "resim_generated_at": resim.get("generatedAt"),
+            "refusals": resim.get("refusalsByReason") or {}}
+
+
 def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str, Any]:
     _run_nba_live_lens_tick(selected_date)
     try:
@@ -623,6 +653,8 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str
     for container in (page_context, api_payload):
         if isinstance(container.get("games"), list):
             container["games"] = _without_sim_player_rows(container["games"])
+    games_out = _without_sim_player_rows(games[:limit])
+    native_resim = _attach_native_resim(games_out, resolved_date)
     snapshot = {
         "ok": True,
         "date": resolved_date,
@@ -634,7 +666,8 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str
         "live_player_lens_payload": dict(live_player_lens_payload) if isinstance(live_player_lens_payload, dict) else _empty_live_player_lens_payload(resolved_date, event_ids),
         "live_lines_payload": dict(live_lines_payload) if isinstance(live_lines_payload, dict) else _empty_live_lines_payload(resolved_date, event_ids, include_period_totals=True),
         "live_pbp_stats_payload": dict(live_pbp_stats_payload) if isinstance(live_pbp_stats_payload, dict) else _empty_live_pbp_stats_payload(resolved_date, event_ids),
-        "games": _without_sim_player_rows(games[:limit]),
+        "games": games_out,
+        "native_resim": native_resim,
         "rank_cards": [dict(card) for card in (page_context.get("rank_cards") if isinstance(page_context.get("rank_cards"), list) else []) if isinstance(card, dict)][:limit],
     }
     return snapshot

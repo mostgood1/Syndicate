@@ -1239,6 +1239,14 @@ def start_live_lens_loop() -> bool:
 			daemon=True,
 		)
 		_LIVE_LENS_LOOP_THREAD.start()
+		# The NBA native live re-sim runs in ITS OWN thread (`nba/live_resim.py` says why): tens of seconds per game
+		# would stall every other sport's lens here. It starts only when SYNDICATE_NBA_LIVE_RESIM is on (absent = off).
+		try:
+			from syndicate.features.nba.live_resim import start_nba_live_resim_loop
+
+			start_nba_live_resim_loop()
+		except Exception as exc:  # noqa: BLE001 -- never let the NBA thread stop the shared loop starting
+			print(f"[live_lens_loop] NBA_LIVE_RESIM_LOOP_START_FAILED {type(exc).__name__}: {exc}", flush=True)
 		return True
 
 

@@ -728,13 +728,19 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
 
 def _lane_row(event_id: str, home: str, away: str, facts: Optional[ResumeFacts], result: Any,
               match: Optional[Mapping[str, Any]] = None) -> dict[str, Any]:
+    home_name = NBA_TEAM_NAMES.get(str(home).upper(), "")
+    away_name = NBA_TEAM_NAMES.get(str(away).upper(), "")
     return {
         "event_id": event_id,
-        "home": home,
-        "away": away,
+        # FULL NAMES under `home`/`away`: `live_gameline_join` keys on the first of (matchup, away/home,
+        # away_name/home_name) that yields two names, so tricodes here would win and match no board row.
         # SHARED BY THE SUCCESS AND THE REFUSAL PATH (NHL's rule): a refusal the board cannot key is invisible.
-        "home_name": NBA_TEAM_NAMES.get(str(home).upper(), ""),
-        "away_name": NBA_TEAM_NAMES.get(str(away).upper(), ""),
+        "home": home_name,
+        "away": away_name,
+        "home_name": home_name,
+        "away_name": away_name,
+        "home_code": str(home).upper(),
+        "away_code": str(away).upper(),
         # The props join decides live/final from this text; only games resumed from an `in` state reach here
         # with facts, and a refused game says nothing it does not know.
         "status": {"detailedState": "In Progress" if facts else "Unknown"},
@@ -751,3 +757,106 @@ def _refusals_by_reason(games: Sequence[Mapping[str, Any]]) -> dict[str, int]:
                 r = str(lane.get("liveResimRefusal") or "unknown")
                 out[r] = out.get(r, 0) + 1
     return out
+
+
+# ------------------------------------------------------------------------------------------- the tick / loop
+#
+# A DEDICATED THREAD, NOT A `_LIVE_LENS_SPORTS` BUILDER. The shared live-lens loop builds every sport in turn, and
+# a re-sim at 100-200 sims/game takes tens of seconds per game (measured 2026-10-09, engine column memo on: ~0.25
+# s/draw at end Q1, ~0.05 at 5:00 Q4). Inside that loop it would delay every other sport's lens. Here it runs on its
+# own cadence and writes `live/nba_live_resim.json`; the board's gameline join reads that file
+# (`board_enrichment._LIVE_GAMELINE_SNAPSHOT_PATHS["nba"]`) and the NBA page lens merges its lanes and props in.
+#
+# OFF UNLESS `SYNDICATE_NBA_LIVE_RESIM` IS SET. Absent is off, checked not assumed: turning on a CPU-heavy loop is a
+# fleet decision, and a restart for another lane must not switch it on by accident.
+
+LIVE_RESIM_ENV = "SYNDICATE_NBA_LIVE_RESIM"
+LIVE_RESIM_INTERVAL_ENV = "SYNDICATE_NBA_LIVE_RESIM_INTERVAL_SECONDS"
+# Well under the 8 MB keyvalue cap (2026-10-08: the NBA lens was refused at 9.6 MB for per-player rows). Over
+# this, props are dropped (`props_over_size_budget`); game lines are never dropped for size.
+MAX_SNAPSHOT_BYTES = 6_000_000
+
+import threading as _threading  # noqa: E402
+
+_LOOP_THREAD: Optional[_threading.Thread] = None
+_LOOP_STOP = _threading.Event()
+_LOOP_LOCK = _threading.Lock()
+
+
+def nba_live_resim_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
+    raw = str((env if env is not None else os.environ).get(LIVE_RESIM_ENV, "") or "").strip().lower()
+    return raw in {"1", "true", "on", "yes"}
+
+
+def _interval_seconds(env: Optional[Mapping[str, str]] = None) -> float:
+    raw = str((env if env is not None else os.environ).get(LIVE_RESIM_INTERVAL_ENV, "") or "").strip()
+    try:
+        return max(30.0, float(raw or 120))
+    except ValueError:
+        return 120.0
+
+
+def fit_snapshot_to_budget(snapshot: dict[str, Any], *, max_bytes: int = MAX_SNAPSHOT_BYTES) -> tuple[dict[str, Any], int]:
+    """Measure the serialized snapshot; over budget, drop props (never game lines) and say so per game."""
+    import json
+
+    size = len(json.dumps(snapshot, separators=(",", ":")))
+    if size <= max_bytes:
+        return snapshot, size
+    for g in snapshot.get("games") or []:
+        if g.get("liveProps"):
+            g["liveProps"] = []
+            g["livePropsRefusal"] = "props_over_size_budget"
+    snapshot["propsDroppedForSize"] = True
+    return snapshot, len(json.dumps(snapshot, separators=(",", ":")))
+
+
+def run_live_resim_tick(date_str: Optional[str] = None, **kwargs: Any) -> dict[str, Any]:
+    """One tick: build, size-check, write. Returns a small status dict (also printed, prefix NBA_LIVE_RESIM_TICK)."""
+    from syndicate.features.shared.refresh_state_store import write_json_file
+    from syndicate.features.shared.timezone import central_today_iso
+
+    date_str = date_str or central_today_iso()
+    started = time.monotonic()
+    snapshot = build_live_lens_snapshot(date_str, **kwargs)
+    snapshot, size = fit_snapshot_to_budget(snapshot)
+    status = {
+        "date": date_str,
+        "games": len(snapshot.get("games") or []),
+        "resimmed": sum(1 for g in snapshot.get("games") or []
+                        for lane in g.get("gameLens") or [] if lane.get("source") == LIVE_RESIM_LENS_SOURCE),
+        "refusals": snapshot.get("refusalsByReason") or {},
+        "bytes": size,
+        "written": False,
+        "elapsed_s": None,
+    }
+    if size <= MAX_SNAPSHOT_BYTES:
+        write_json_file(live_lens_snapshot_path(), snapshot)
+        status["written"] = True
+    status["elapsed_s"] = round(time.monotonic() - started, 1)
+    print("NBA_LIVE_RESIM_TICK " + " ".join(f"{k}={v}" for k, v in status.items()), flush=True)
+    return status
+
+
+def _loop() -> None:
+    while not _LOOP_STOP.is_set():
+        try:
+            run_live_resim_tick()
+        except Exception as exc:  # noqa: BLE001 -- a bad tick must not kill the loop; it is named, never silent
+            print(f"NBA_LIVE_RESIM_TICK_ERROR {type(exc).__name__}: {str(exc)[:300]}", flush=True)
+        _LOOP_STOP.wait(_interval_seconds())
+
+
+def start_nba_live_resim_loop() -> bool:
+    """Start the dedicated thread once per process, only when `SYNDICATE_NBA_LIVE_RESIM` is on."""
+    global _LOOP_THREAD
+    if not nba_live_resim_enabled():
+        return False
+    with _LOOP_LOCK:
+        if _LOOP_THREAD is not None and _LOOP_THREAD.is_alive():
+            return False
+        _LOOP_STOP.clear()
+        _LOOP_THREAD = _threading.Thread(target=_loop, name="syndicate-nba-live-resim", daemon=True)
+        _LOOP_THREAD.start()
+        print("NBA_LIVE_RESIM_LOOP_STARTED interval_s=%s" % _interval_seconds(), flush=True)
+        return True
