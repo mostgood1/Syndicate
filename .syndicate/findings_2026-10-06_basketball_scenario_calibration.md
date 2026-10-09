@@ -701,3 +701,36 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
 - **Wiring** (default OFF; a file switch like the other NBA switches) is decided with the user AFTER the
   measurement: the builder called from `scripts/refresh_nba_oddsapi_props.py` before the sim, as WNBA does. No
   production change in this step.
+
+### Phase 2 #1e — WALK-FORWARD RESULT 2026-10-09 ~03:05Z (10:05 PM CDT 10-08)
+
+**Data:** the full-FIT combined-config run (`fit_combo`: J1 + no stacking + the six ported switches).
+- 2026-10-09 00:35Z-03:01Z. 109 dates; the two NBA Cup dates fail identically as in every run.
+- All engine calls carried every lever and switch. 791 games with raw total + actual.
+- For each date the recipe is fitted on earlier games only (777 of 791 had terms).
+
+| quantity vs actual total | bias | MAE |
+|---|---|---|
+| raw model total (uncalibrated) | −16.91 | 21.84 |
+| **calibrated raw** | **−2.26** | **17.46**; paired −4.38 [−5.24, −3.43] |
+| anchored target (raw) | −4.92 | 15.17 |
+| **anchored target (calibrated)** | **−0.53** | **14.81**; paired −0.35 [−0.65, −0.04] |
+| market | +0.15 | 14.52 |
+
+**Gate by the letter:**
+- MAE change CI < 0: PASS.
+- |bias after| < 2: **FAIL by 0.26** (−2.26).
+- Cause: the raw bias (−16.9) exceeds the ±15 global clip, which is applied by the WNBA recipe AND by the sim's
+  reader (`_apply_totals_calibration_local`, ±15). The clip binds, and the seed fit (final 14 days) is also 15.0
+  (clipped).
+- The quantity the sim consumes, the anchored target, is near-unbiased (−0.53) and improves with CI < 0.
+- Not re-scored. The options go to the user:
+  - accept on the target reading;
+  - remove part of the bias structurally (S-a: the stale 110.6 baseline; S-b: injury pace drag) so the remainder
+    fits under the clip;
+  - widen the clip in the reader. That file is claimed by lane basketball-injury-exclusion-reinclusion.
+
+**Next (pre-registered):** the end-to-end 12-date point.
+- Combined config + walk-forward calibration files (each date's file fitted on fit_combo games before it) copied
+  into the scratch.
+- PASS if sim total bias vs real is within ±1.5/game and S8 total SD is no worse than run noise.
