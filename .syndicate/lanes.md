@@ -1907,6 +1907,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: rules parity test + team-model refusal test pass; corpus covers 2025-26 with n per season type and pbp-final==box-final rate reported; live reading owed at opening week (early Nov 2026) once P1/P2 land
 - Blocked by: P1 basketball-native-engine and P2 basketball-native-live-state (not opened as of 2026-10-09) for the live lens itself
 
+### board-history-charts — OPEN — opened 2026-10-09 — session 43e4d5fe-e05e-41bc-aae6-6d6986460b22
+- Goal: Every prop chart on the Layer 2 board carries per-game DATES (and opponents) aligned with its values, for every sport whose recent-form evidence has them (basketball, NHL, soccer, NFL, NCAAF, MLB), measured on the served page; and the props that have no history today are explained per sport (NCAAF 140 of 584 and NFL 117 of 929 without values, page of 2026-10-09). Step 1 of findings_2026-10-09_history_charts_inventory.md (user: 'proceed with plan')
+- Files: syndicate/features/shared/prop_evidence/basketball.py (recent-form facts only), syndicate/features/shared/prop_evidence/nhl.py (recent-form facts only), syndicate/features/shared/prop_evidence/soccer.py (recent-form facts only), syndicate/features/shared/prop_evidence/football.py (recent-form facts only), syndicate/features/intelligence_recent_matchup.py (chart side channel only), syndicate/features/shared/layer2_board.py (_chart_columns only), syndicate/templates/intelligence.html (prop recent-form chart only), tests/test_board_history_charts.py (NEW)
+- Hypothesis: n/a (display feature, nothing scores on these charts). Baseline read 2026-10-09 from the served /intelligence embed (45.6 MB): props with recent_values wnba 203/203, soccer 1526/1628, nhl 261/266, nfl 812/929, ncaaf 444/584; with dates 0 in every sport
+- Falsification test: n/a
+- Verification: Served /intelligence embed after a board build on the new code: per sport, rows with recent_dates == rows with recent_values (dates aligned, same length); payload delta measured (expect ~+0.5 MB); a reason per sport for props still without history; tests pass incl. a reachability test that the dates reach _chart_columns' output
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
