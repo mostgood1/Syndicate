@@ -985,3 +985,14 @@ walk-forward on the switched raw.
 - P3 measured the same gap independently: real H2-on-H1 −0.164 [−0.233, −0.096] vs sim −0.001
   (findings_2026-10-09_nba_live_situation_targets.md).
 - **Owed:** post the chosen k (and its readings) here and to P3 when the sweep reads.
+
+**HOLD (USER DECISION 2026-10-09, relayed by the basketball-native coordinator d48f3a34):** NBA mechanism RE-FITS are
+on hold, including fitting `score_effect_k`, until #473 is fixed.
+- #473: NBA team_adj was unfed on 0/30 team-sides and starter flags on 0/517 over real 10-05..08 production sims.
+- **This lane's corpus, checked directly** (probe at the native engine boundary, own as-of replay, 2 dates
+  2025-11-13 and 2026-02-25, 18 engine calls; script C:	mpball_sc\probe_inputs.py):
+  - home/away_team_adj present and non-neutral on 18/18 calls: FED here, unlike production;
+  - starter flags (`starter_prob` / `is_starter` non-zero) on 0/18: UNFED here too.
+- => The corpus is PARTLY affected. The M-B sweep running since 22:06Z is kept as a dose-response
+  CHARACTERISATION of the mechanism only. No k is chosen, recorded as fitted, or handed to P3 until #473 is fixed and
+  `scripts/basketball_engine_input_checklist.py` is re-run.
