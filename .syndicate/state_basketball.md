@@ -1103,4 +1103,8 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - The rebuilt `engine.py` is the source of truth. Do NOT re-run `scripts/port_basketball_engine.py` (it regenerates from vendor and discards native edits).
 - **Edits to the engine** go to `syndicate/features/basketball_engine/`. Vendor `events.py` edits are INERT at runtime. Open loan: `engine.py` `score_effect_k` section to lane basketball-scenario-calibration (2026-10-09).
 - **STILL VENDORED, and no plan phase owns it:** the orchestrator `vendor/*/sim/smart_sim.py:simulate_smart_game` (4,652 / 4,930 lines). It runs around the engine, and its import still imports vendored `events.py` (never executed). The user decision "not reliant on the vendored app in any way" is NOT met until it is ported.
+- **The engine checklist over the corpus EXITS 1 (2026-10-09, substrate: copy of the fleet data root, 27 games).** Three PRE-EXISTING unfed inputs, none caused by P1:
+  - **NBA team adjustments absent on 0/30 NBA team-sides** (WNBA 24/24). The NBA sim runs with NEUTRAL team quality. This is `#473`, live NOW in preseason: its "zero production impact" note is out of date.
+  - Lineup pools: NBA 0/15 games, WNBA 3/12 (no `rotation_stints_history` producer yet; P2).
+  - Starter flags: NBA 0/517 player rows, WNBA 55/219. The engine falls back to a minutes ranking.
 - **Owed:** the first NEWLY simulated production game after 21:29:34Z (a `smart_sim_*.json` with later mtime) completes with `failures == 0`.
