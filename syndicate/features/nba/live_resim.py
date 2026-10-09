@@ -324,6 +324,48 @@ def map_state_names(gs: Any, home_frame: Any, away_frame: Any):
 
 # ------------------------------------------------------------------------------------------- the re-sim
 
+# THE LIVE MECHANISMS (engine.py EventSimConfig, default-off). NOT ENABLED IN PRODUCTION: their rates need a
+# re-fit, and re-fits are ON HOLD until #473 (NBA team_adj unfed) -- user decision 2026-10-09. The env switch exists
+# so the backtest and the fleet can measure a mechanism without a code change; ABSENT IS OFF, checked not assumed.
+LIVE_MECHANISMS_ENV = "SYNDICATE_NBA_LIVE_MECHANISMS"
+
+
+def live_mechanisms_from_env(env: Optional[Mapping[str, str]] = None) -> dict[str, Any]:
+    """`SYNDICATE_NBA_LIVE_MECHANISMS='{"endgame_foul_window_s": 120, ...}'` -> fields. Absent, empty, unparseable
+    or naming a field the engine does not have -> {} (OFF), never a partial guess."""
+    import json
+    from dataclasses import fields as _fields
+
+    from syndicate.features.basketball_engine.engine import EventSimConfig
+
+    raw = (env if env is not None else os.environ).get(LIVE_MECHANISMS_ENV, "")
+    if not str(raw or "").strip():
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        return {}
+    known = {f.name for f in _fields(EventSimConfig)}
+    if not isinstance(parsed, dict) or not parsed or set(parsed) - known:
+        return {}
+    return dict(parsed)
+
+
+def with_live_mechanisms(inputs: Mapping[str, Any], mechanisms: Mapping[str, Any]) -> dict[str, Any]:
+    """The pregame inputs with `cfg` rebuilt as the ENGINE's EventSimConfig: every value the pregame config carries,
+    plus `mechanisms`. Empty `mechanisms` returns the inputs untouched (the pregame config object itself)."""
+    if not mechanisms:
+        return dict(inputs)
+    from dataclasses import fields as _fields
+
+    from syndicate.features.basketball_engine.engine import EventSimConfig
+
+    base = inputs.get("cfg")
+    names = {f.name for f in _fields(EventSimConfig)}
+    vals = {f.name: getattr(base, f.name) for f in (_fields(base) if base is not None else ()) if f.name in names}
+    return {**dict(inputs), "cfg": EventSimConfig(**{**vals, **dict(mechanisms)})}
+
+
 def stable_seed(event_id: str, last_seq: int) -> int:
     """Same game + same logged state -> same seed, so an unchanged state reproduces its number."""
     return zlib.crc32(f"nba-live-resim|{event_id}|{int(last_seq)}".encode("utf-8")) & 0x7FFFFFFF
@@ -655,6 +697,9 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
             games.append(_lane_row(event_id, home, away, facts, inputs))
             continue
         gs, match = map_state_names(gs, inputs["home_players"], inputs["away_players"])
+        mechanisms = live_mechanisms_from_env()
+        inputs = with_live_mechanisms(inputs, mechanisms)
+        match = {**match, "mechanisms": sorted(mechanisms)}
         if clock() >= deadline:
             games.append(_lane_row(event_id, home, away, facts, NbaResimRefusal("budget_exhausted", "before_start")))
             continue

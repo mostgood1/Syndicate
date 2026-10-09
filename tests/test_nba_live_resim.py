@@ -257,3 +257,61 @@ def test_snapshot_carries_live_props_and_names_the_join_keys_on(tmp_path, monkey
     assert g["livePropsCoverage"]["lines_available"] == 1
     # H1 has 0 banked in the fixture box (PTS column), 6 or 12 remaining -> half the draws clear 10.5
     assert [(r["playerName"], r["prop"], r["liveModelProbOver"]) for r in g["liveProps"]] == [("H1", "player_points", 0.5)]
+
+
+# ------------------------------------------------------------------------------------------- pregame persist hook
+
+def test_pregame_engine_call_persists_inputs_once_per_game_and_changes_nothing(monkeypatch):
+    from syndicate.features.shared import basketball_props_smart_sim as bps
+
+    kw = _kwargs(seed=3)
+    for side, team in (("home_players", "GSW"), ("away_players", "NYK")):
+        kw[side] = kw[side].assign(team=team, asof_date="2026-01-15")
+    calls = []
+    monkeypatch.setattr(lr, "persist_engine_inputs", lambda d, h, a, k, **_: calls.append((d, h, a, sorted(k))) or _P())
+    bps._PERSISTED_ENGINE_INPUT_KEYS.clear()
+
+    def run(seed):
+        rng = np.random.default_rng(seed)
+        return bps._simulate_pbp_game_boxscore_local(league_code="nba", rng=rng, **kw)
+
+    a = run(5)
+    b = run(5)  # a second draw of the SAME game: no second write
+    assert len(calls) == 1 and calls[0][:3] == ("2026-01-15", "GSW", "NYK")
+    assert set(lr._INPUT_KEYS) - set(calls[0][3]) <= {"cfg", "quarters", "home_team_adj", "away_team_adj",
+                                                      "home_lineups", "away_lineups", "home_lineup_weights",
+                                                      "away_lineup_weights", "target_home_points", "target_away_points"}
+    # same seed, same output -- the hook is write-only
+    assert a[2] == b[2] and a[3] == b[3]
+    bps._PERSISTED_ENGINE_INPUT_KEYS.clear()
+    monkeypatch.setattr(lr, "persist_engine_inputs", lambda *a_, **k_: (_ for _ in ()).throw(OSError("disk full")))
+    c = run(5)  # a failing write never reaches the sim
+    assert c[2] == a[2] and c[3] == a[3]
+
+
+class _P:
+    def stat(self):
+        class _S:
+            st_size = 1
+        return _S()
+
+
+# ------------------------------------------------------------------------------------------- live mechanisms switch
+
+def test_live_mechanisms_absent_or_bad_is_off_and_known_fields_pass():
+    assert lr.live_mechanisms_from_env({}) == {}
+    assert lr.live_mechanisms_from_env({lr.LIVE_MECHANISMS_ENV: ""}) == {}
+    assert lr.live_mechanisms_from_env({lr.LIVE_MECHANISMS_ENV: "{not json"}) == {}
+    assert lr.live_mechanisms_from_env({lr.LIVE_MECHANISMS_ENV: '{"endgame_foul_p": 0.5, "made_up": 1}'}) == {}
+    on = lr.live_mechanisms_from_env({lr.LIVE_MECHANISMS_ENV: '{"endgame_foul_window_s": 120, "endgame_foul_p": 0.5}'})
+    assert on == {"endgame_foul_window_s": 120, "endgame_foul_p": 0.5}
+
+
+def test_with_live_mechanisms_keeps_pregame_values_and_off_is_the_same_object():
+    from syndicate.features.shared.basketball_props_smart_sim import EventSimConfigLocal
+
+    cfg = EventSimConfigLocal(possessions_per_game=101.5)
+    inputs = {"cfg": cfg, "home_players": 1}
+    assert lr.with_live_mechanisms(inputs, {})["cfg"] is cfg
+    out = lr.with_live_mechanisms(inputs, {"endgame_foul_window_s": 120})["cfg"]
+    assert out.possessions_per_game == 101.5 and out.endgame_foul_window_s == 120 and out.endgame_foul_p == 0.0

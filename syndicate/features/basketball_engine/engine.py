@@ -29,6 +29,7 @@ mismatches.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import itertools
 from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -57,6 +58,22 @@ class EventSimConfig:
     # of regulation elapsed). Real games revert (line-adjusted H2-on-H1 margin slope -0.17); the sim's halves were
     # independent (0.00). 0.0 = off: the factor is exactly 1.0 and no RNG draw is made, so output is byte-identical.
     score_effect_k: float = 0.0
+    # P3 LIVE MECHANISMS (lane nba-native-live-resim, LOAN from basketball-native-engine, user-approved 2026-10-09).
+    # Every field defaults OFF; unset, the loop is `range(q_poss)` and no extra RNG draw is made (byte-identical).
+    # Read with getattr defaults, because production passes its own frozen config class that lacks these fields.
+    # End-of-game intentional fouling: in the final REGULATION period with <= `endgame_foul_window_s` left, a
+    # defense trailing by 1..`endgame_foul_max_deficit` fouls at the start of a possession with probability
+    # `endgame_foul_p` -- two free throws for an on-court offensive player, ~`endgame_foul_seconds` of clock.
+    # Measured target (2025-26 regular season, 1,231 games): the trailer fouls 1.15/1.34/0.86 per minute in the last
+    # 2:00 down 1-3/4-6/7-10 vs ~0.34 earlier in Q4; FTA/min 2.75/3.54/2.36; pts/min 6.0/7.5/6.0. The engine
+    # without it: FTA/min ~1.0 and pts/min ~5.0 at every deficit (.syndicate/findings_2026-10-09_nba_live_situation_targets.md).
+    endgame_foul_window_s: int = 0  # 0 = off
+    endgame_foul_max_deficit: int = 10
+    endgame_foul_p: float = 0.0
+    endgame_foul_seconds: float = 5.0
+    # Let the CLOCK, not the pace pre-count, end a fouling final period: possessions continue past `q_poss` while
+    # time is left and the window/deficit still hold. Without it extra fouls only re-label possessions.
+    endgame_extend_possessions: bool = False
 
     # Outcome priors (fallbacks when player priors are missing)
     base_tov_per_poss: float = 0.125
@@ -501,7 +518,42 @@ def _player_rebound_credited(rng: np.random.Generator, offensive: bool, *, lp: L
     return bool(rng.random() < min(1.0, max(0.0, p)))
 
 
-def _player_usage_weights(players: pd.DataFrame, col_pm: str, lineup_idx: List[int], *, lp: LeagueParams) -> np.ndarray:
+def _numeric_col(players: pd.DataFrame, col: str) -> np.ndarray:
+    return _safe_series(players, col).to_numpy(dtype=float)
+
+
+def _per_call_column_memo() -> Callable[[pd.DataFrame, str], np.ndarray]:
+    """A column reader that parses each (frame, column) ONCE per engine call. PERFORMANCE ONLY, DRAWS NOTHING.
+
+    `_player_usage_weights` runs on every possession and used to re-run `pd.to_numeric(...).fillna(0)` on the same
+    constant player frames each time: ~60% of a draw, measured 2026-10-09 by cProfile on P1's recorded production
+    corpus (lane nba-native-live-resim, loan from basketball-native-engine). The memo is built at the top of
+    `simulate_pbp_game_boxscore` and dropped when it returns, so it never outlives the frames it is keyed on --
+    `id()` is unique among live objects, and a module-level cache would alias across games once ids are reused.
+    Cached arrays are READ-ONLY: a caller writing into one would raise instead of silently corrupting later
+    possessions. Parity gate: P1's 5,400-case corpus replay, 0 mismatches."""
+    memo: Dict[Tuple[int, str], np.ndarray] = {}
+
+    def read(players: pd.DataFrame, col: str) -> np.ndarray:
+        key = (id(players), col)
+        arr = memo.get(key)
+        if arr is None:
+            arr = _numeric_col(players, col)
+            arr.setflags(write=False)
+            memo[key] = arr
+        return arr
+
+    return read
+
+
+def _player_usage_weights(
+    players: pd.DataFrame,
+    col_pm: str,
+    lineup_idx: List[int],
+    *,
+    lp: LeagueParams,
+    cols: Optional[Callable[[pd.DataFrame, str], np.ndarray]] = None,
+) -> np.ndarray:
     """Return selection weights for the current on-court lineup.
 
     Key realism guardrail:
@@ -513,7 +565,8 @@ def _player_usage_weights(players: pd.DataFrame, col_pm: str, lineup_idx: List[i
     if n <= 0:
         return np.zeros(0, dtype=float)
 
-    pm = _safe_series(players, col_pm).to_numpy(dtype=float)
+    read = cols or _numeric_col
+    pm = read(players, col_pm)
     pm = np.maximum(0.0, np.where(np.isfinite(pm), pm, 0.0))
     if lp.block_alloc_by_rate and col_pm == "_prior_blk_pm":
         w = np.zeros(n, dtype=float)
@@ -528,7 +581,7 @@ def _player_usage_weights(players: pd.DataFrame, col_pm: str, lineup_idx: List[i
     # Compress outliers (robust even if a bad prior slips through).
     pm = np.log1p(pm)
 
-    mins = _safe_series(players, "_sim_min").to_numpy(dtype=float)
+    mins = read(players, "_sim_min")
     mins = np.maximum(0.0, np.where(np.isfinite(mins), mins, 0.0))
 
     w = np.zeros(n, dtype=float)
@@ -552,7 +605,7 @@ def _player_usage_weights(players: pd.DataFrame, col_pm: str, lineup_idx: List[i
     pred_norm = None
     if col_pm in ("_prior_fga_pm", "_prior_threes_att_pm"):
         try:
-            pred = _safe_series(players, "pred_pts").to_numpy(dtype=float)
+            pred = read(players, "pred_pts")
             pred = np.maximum(0.0, np.where(np.isfinite(pred), pred, 0.0))
             pred = np.log1p(pred)
             pred_line = pred[idx]
@@ -705,7 +758,7 @@ def simulate_pbp_game_boxscore(
     lp = league
     cfg = cfg or EventSimConfig(possessions_per_game=float(lp.default_possessions_per_game))
     sample_lineup = sample_lineup or sample_lineup_minutes_weighted
-    _usage_w = partial(_player_usage_weights, lp=lp)
+    _usage_w = partial(_player_usage_weights, lp=lp, cols=_per_call_column_memo())
     _rates = partial(_team_rates_from_priors, lp=lp)
     _windows = partial(_rotation_windows, lp=lp)
     _blk_drawn = partial(_block_drawn, lp=lp)
@@ -1097,6 +1150,46 @@ def simulate_pbp_game_boxscore(
             expected = (tgt_margin if off_home else -tgt_margin) * share
             return float(np.clip(1.0 - se_k * (lead - expected), 0.85, 1.15))
 
+        def _endgame_intentional_foul(off_home: bool, h_line_: List[int], a_line_: List[int]) -> None:
+            """P3 mechanism: the trailing defense fouls on purpose. Two FTs (same FT% formula as the shooting-foul
+            path), the fouler's PF, and ~endgame_foul_seconds off the clock. Only reachable when enabled."""
+            nonlocal home_score, away_score, q_remaining
+            off_players, def_players = (home_players, away_players) if off_home else (away_players, home_players)
+            off_line, def_line = (h_line_, a_line_) if off_home else (a_line_, h_line_)
+            off_box, def_box = (h, a) if off_home else (a, h)
+            off_q = hq if off_home else aq
+            ft_pct = h_ft_pct if off_home else a_ft_pct
+            eff = eff_mult_h if off_home else eff_mult_a
+            fta_w = _usage_w(off_players, "_prior_fta_pm", off_line)
+            sh_ = int(_pick_weighted(rng, list(range(len(off_players))), fta_w) or 0)
+            dur_ = int(np.clip(rng.normal(eg_sec, 1.5), 1.0, 12.0))
+            q_remaining = max(0, int(q_remaining) - dur_)
+            q_elapsed_ = int(period_seconds - q_remaining)
+            seg_ = int(np.clip(q_elapsed_ // segment_seconds, 0, n_segments - 1))
+            min_ = int(np.clip(q_elapsed_ // minute_seconds, 0, n_minutes - 1))
+            off_box["fta"][sh_] += 2
+            ftp_ = float(np.clip(float(ft_pct[sh_]) * eff * q_env_mult * _score_effect(off_home), 0.45, 0.95))
+            made_ = int(rng.binomial(2, ftp_))
+            if made_ > 0:
+                off_box["ftm"][sh_] += made_
+                off_box["pts"][sh_] += made_
+                _add_q_stat(off_q["pts"], q, sh_, made_)
+                if off_home:
+                    home_score += made_
+                    _add_q_seg(home_q_seg_pts, q, seg_, made_)
+                    _add_q_min(home_q_min_pts, q, min_, made_)
+                else:
+                    away_score += made_
+                    _add_q_seg(away_q_seg_pts, q, seg_, made_)
+                    _add_q_min(away_q_min_pts, q, min_, made_)
+            pf_w_ = _usage_w(def_players, "_prior_pf_pm", def_line)
+            didx_ = _pick_weighted(rng, list(range(len(def_players))), pf_w_)
+            if didx_ is not None:
+                def_box["pf"][int(didx_)] += 1
+            if record_events:
+                events.append({"q": q, "type": "FTA", "off": "H" if off_home else "A", "sh": sh_, "fta": 2,
+                               "ftm": made_, "intentional": True})
+
         # RESUME: start_remaining is the clock left in a period already under way; None = the whole period, the
         # only value a pregame run ever passes (and then every expression below is the vendored one).
         period_left = int(period_seconds) if start_remaining is None else int(start_remaining)
@@ -1113,7 +1206,18 @@ def simulate_pbp_game_boxscore(
         # The 6-possession floor is a full-period rule; a partial period may have none left.
         q_poss = int(max(6 if start_remaining is None else 0, round(base_poss * q_pace_mult * (1.0 + jitter))))
 
-        for pidx in range(q_poss):
+        eg_window = int(getattr(cfg, "endgame_foul_window_s", 0) or 0)
+        eg_on = eg_window > 0 and int(q) == N_PERIODS
+        eg_max = int(getattr(cfg, "endgame_foul_max_deficit", 10) or 10)
+        eg_p = float(getattr(cfg, "endgame_foul_p", 0.0) or 0.0)
+        eg_sec = float(getattr(cfg, "endgame_foul_seconds", 5.0) or 5.0)
+        eg_extend = eg_on and bool(getattr(cfg, "endgame_extend_possessions", False))
+        for pidx in (itertools.count() if eg_extend else range(q_poss)):
+            if pidx >= q_poss:
+                # Extension only (eg_extend): the clock, not the pre-count, ends a fouling final period.
+                m_now = int(home_score - away_score)
+                if not (int(q_remaining) > 0 and int(q_remaining) <= eg_window and 1 <= abs(m_now) <= eg_max):
+                    break
             if pidx == 0:
                 offense_home = bool(rng.random() < 0.5) if first_offense_home is None else bool(first_offense_home)
             else:
@@ -1185,6 +1289,12 @@ def simulate_pbp_game_boxscore(
                     blowout_boost_bench=False,
                     bench_boost=cfg.bench_weight_boost,
                 )
+
+            if eg_on and eg_p > 0.0 and int(q_remaining) <= eg_window:
+                lead_off = int(home_score - away_score) if offense_home else int(away_score - home_score)
+                if 1 <= lead_off <= eg_max and float(rng.random()) < eg_p:
+                    _endgame_intentional_foul(bool(offense_home), h_line, a_line)
+                    continue
 
             # Possession may include multiple shot attempts on offensive rebounds.
             max_shots_this_poss = 5

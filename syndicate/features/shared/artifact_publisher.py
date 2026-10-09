@@ -1627,6 +1627,9 @@ EXPORT_ONLY_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # Lane `basketball-native-live-state`: one normalised play-by-play log per completed basketball
     # game (~10-20 KB gzipped, thousands a season) -- P3's backtest substrate. Auditable, never swept.
     "*_source/data/processed/pbp_events/*/*.jsonl.gz",
+    # Lane `nba-native-live-resim` (P3): the pregame engine inputs per NBA game (~100 KB pickle), written at pregame
+    # sim time and read by the live re-sim on the SAME host. Auditable, never swept or published.
+    "nba_source/data/processed/engine_inputs/*/*.pkl",
 )
 
 
