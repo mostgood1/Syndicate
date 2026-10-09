@@ -86,14 +86,43 @@ def test_a_CLOSED_section_holder_does_not_contest_at_all():
     assert _blocked_by(text, "watchdog-lane", DOC) is None, "a closed lane holds nothing"
 
 
-def test_the_qualifier_must_say_SECTION_and_ONLY_not_merely_only():
-    """Narrow on purpose. The ledger is full of other `ONLY` qualifiers scoping a claim
-    to part of a CODE file; widening this to any `only` would start permitting
-    concurrent writes to code on the strength of a comment."""
+def test_the_qualifier_must_END_with_only_and_prose_is_not_a_declaration():
+    """WIDENED 2026-10-09 by user decision, after measuring the convention.
+
+    This test previously required the word `section` as well as `only`, on the reasoning
+    that a code-scoping `ONLY` is not a section declaration. MEASURED over `lanes.md`: of
+    432 parenthesised qualifiers on Files lines, 110 say ONLY without `section` and just 7
+    use both -- so the old rule recognised 7 of 117 real declarations (~6%) and reported 5
+    contests whose holders had each declared a distinct scope. The code-scoped ones turned
+    out to be the MOST precise: two different named functions in one script, two different
+    call sites in one vendor tool.
+
+    The rule is now ENDS-WITH `only`, not contains, and that distinction is the whole
+    safety margin -- the prose cases below contain `only` mid-string and must still be
+    rejected, because they are narrative, not a scope. An unrecognised qualifier leaves
+    the file contested, which blocks: the safe direction.
+    """
+    # the convention, in both of its cases
     assert lc._section_of("(watchdog section only)") == "watchdog section only"
-    assert lc._section_of("(_soccer_rosters_step + its one wiring loop ONLY)") is None
-    assert lc._section_of("(reload-web subcommand only)") is None
+    assert lc._section_of("(the nhl live-lens allowlist and pull entries ONLY)")
+    assert lc._section_of("(_soccer_rosters_step + its one wiring loop ONLY)")
+    assert lc._section_of("(reload-web subcommand only)")
+    assert lc._section_of("(Status table row P3 only)")
+
+    # not declarations at all
     assert lc._section_of("(no parenthetical qualifier)") is None
+    assert lc._section_of("(NEW)") is None
+
+    # prose that merely CONTAINS only -- a contains-check would wrongly accept these
+    assert lc._section_of(
+        "(user decision there: Take a scoped claim, pull watermark functions only;"
+        " this lane P2 and P3)") is None
+    assert lc._section_of(
+        "(the `--game-pitch-model-overrides` default ONLY; `_collect_game_recommendations`"
+        " stays with mlb-doubleheader-e2e)") is None
+
+    # a word that merely ENDS in only must not count
+    assert lc._section_of("(readonly)") is None
 
 
 def test_the_section_qualifier_does_not_leak_to_other_paths_on_the_line():

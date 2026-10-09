@@ -466,17 +466,34 @@ def loan_is_honoured_among(loan_entries, holders, borrower, rel):
     return None
 
 
-_SECTION_RE = re.compile(r"\(([^()]*\bsection\b[^()]*\bonly\b[^()]*)\)", re.I)
+# The parenthetical must END with `only` (trailing space/`.`/`;` allowed). MEASURED
+# 2026-10-09 over lanes.md: of 432 parenthesised qualifiers on Files lines, 110 say
+# ONLY without the word "section" and just 7 use both -- the convention is
+# `(the nhl live-lens allowlist and pull entries ONLY)`, not `(... section only)`.
+# ENDS-WITH rather than contains is what keeps prose out: `(was SCOPED, recorded
+# 2026-09-18 ...)` and `(user decision there: "Take a scoped claim", pull watermark
+# functions only; this lane's P2 ...)` are not scope declarations, and a contains
+# check would accept the second. Rejecting is the safe direction -- an unrecognised
+# qualifier leaves the file contested, which blocks.
+_SECTION_RE = re.compile(r"\(([^()]*\bonly)[\s.;]*\)", re.I)
 
 
 def _section_of(fragment):
     """The declared section for a Files-line fragment, or None.
 
-    DELIBERATELY NARROW: the parenthetical must contain both `section` and `only`. The
-    ledger is full of other `ONLY` qualifiers (`_soccer_rosters_step + its one wiring
-    loop ONLY`) that scope a claim to part of a CODE file, and those are not section
-    declarations about a document; widening this to any `only` would start permitting
-    concurrent writes to code on the strength of a comment.
+    THE QUALIFIER MUST END WITH `only`. This originally also required the word
+    `section`, on the reasoning that a code-scoping `ONLY` is not a section
+    declaration and accepting it would permit concurrent writes to code on the
+    strength of a comment. MEASURED 2026-10-09, that was built on the RARE form: 110
+    of 117 real scope declarations say ONLY without `section`, and the code-scoped
+    ones are the most precise of all -- two different named functions in
+    `scripts/refresh_nba_oddsapi_props.py`, two different call sites in
+    `vendor/.../daily_update_multi_profile.py`. The old rule recognised 7 of 117 and
+    produced 5 false contests whose holders had every one declared a distinct scope.
+
+    What still protects this: the caller requires EVERY holder of the path to declare
+    a scope and no two to declare the SAME one, and ENDS-WITH keeps prose out. A
+    qualifier this does not recognise leaves the file contested, which blocks.
     """
     m = _SECTION_RE.search(str(fragment))
     if not m:
