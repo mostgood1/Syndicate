@@ -989,6 +989,13 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # NCAAF weekly recommendation summary (cards / picks fallback, archive, readiness gate):
     # newest projections week x newest book grids, every row carrying the model's skill verdict.
     ScheduledJob("ncaaf-recommendation-summary", 11, 35, ("scripts/build_ncaaf_recommendation_summary.py",)),
+    # NBA / WNBA / NCAAB rotation stints from completed games' ESPN play-by-play (lane
+    # `basketball-native-live-state`, P2 of docs/ai_context/basketball_live_native_plan.md): dated
+    # per-day stints / player intervals / pair minutes / play context, consolidated into the
+    # `rotation_stints_history` the smart sim reads. Replaces the vendored `update-rotations-espn-history`
+    # step the props refreshes used to subprocess. Incremental (only dates not yet complete are fetched;
+    # one ESPN summary per new final). 11:45Z: after the night's games are final.
+    ScheduledJob("basketball-rotation-stints", 11, 45, ("scripts/build_basketball_rotation_stints.py",)),
 )
 
 

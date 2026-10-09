@@ -2501,7 +2501,11 @@ def _ensure_rotation_inputs_for_props_refresh(
         return
     results: dict[str, int] = {}
     steps = (
-        (["update-rotations-espn-history", "--date", yesterday], 10 * 60),
+        # `update-rotations-espn-history` (the VENDORED stints builder) was removed 2026-10-09, lane
+        # `basketball-native-live-state`: rotation_stints_history / pair_minutes_history /
+        # play_context_history now come from scripts/build_basketball_rotation_stints.py (scheduled
+        # `basketball-rotation-stints`, 11:45Z). The vendored step appended its own, differently keyed
+        # stints for yesterday into the parquet the sim reads first -- duplicating that day's minutes.
         (["update-pbp-espn-history", "--date", yesterday], 10 * 60),
         (["build-lineup-teammate-effects"], 10 * 60),
     )

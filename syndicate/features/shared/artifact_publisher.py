@@ -1490,6 +1490,26 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # day a card is written. Narrow on purpose, matching the sidecar entry
     # above: this one directory under `eval/seasons/*/`, not `eval/**`.
     "*_source/source_artifacts/data/eval/seasons/*/locked_cards_retuned/*.json",
+    # Lane `basketball-native-live-state` (P2 of docs/ai_context/basketball_live_native_plan.md):
+    # the Syndicate-owned basketball rotation producer (scripts/build_basketball_rotation_stints.py)
+    # and live game state (syndicate/features/shared/basketball_live_state.py). Every one is a
+    # smart-sim INPUT or its verification evidence (model_engine_standard Sec3). Dated files are
+    # one per game day (stints / player stints / checks / pair minutes ~10-200 KB; play context
+    # parquet ~0.1-0.5 MB); a live state is ~15-25 KB a game. The consolidated histories are
+    # undated: NBA's rotation_stints_history.csv is ~15 MB a season, over _PUBLISH_MAX_BYTES, so
+    # the sweep will not ship it and /api/ops/artifacts/stream reads it -- the sim reads it on the
+    # disk it is written to, so the allowlist is observability here, not a functional dependency.
+    "*_source/data/processed/rotation_stints/*.csv",
+    "*_source/data/processed/rotation_stints/*.parquet",
+    "*_source/data/processed/rotation_stints/_dates.json",
+    "*_source/data/processed/rotation_stints_history.csv",
+    "*_source/data/processed/rotation_stints_history.parquet",
+    "*_source/data/processed/rotation_stints_*_*.csv",
+    "*_source/data/processed/pair_minutes_history.csv",
+    "*_source/data/processed/pair_minutes_history.parquet",
+    "*_source/data/processed/play_context_history.parquet",
+    "*_source/data/processed/live_state/*/*.json",
+    "*_source/data/processed/live_state/*/*.ticks.jsonl",
 )
 
 
@@ -1604,6 +1624,9 @@ EXPORT_ONLY_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/source_artifacts/data/raw/statsapi/feed_live/*/*/*.json.gz",
     # Prop-history CSVs, under `tracking/` -- not a bootstrap root, not swept.
     "*_source/tracking/odds_*_props_history_*.csv",
+    # Lane `basketball-native-live-state`: one normalised play-by-play log per completed basketball
+    # game (~10-20 KB gzipped, thousands a season) -- P3's backtest substrate. Auditable, never swept.
+    "*_source/data/processed/pbp_events/*/*.jsonl.gz",
 )
 
 
