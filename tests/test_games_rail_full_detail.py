@@ -63,6 +63,12 @@ class LiveDetail(unittest.TestCase):
     def test_no_live_fields_is_none(self) -> None:
         self.assertIsNone(detail.live_detail("nba", {"live_state": {"status": "Q3 4:10"}}))
 
+    def test_basketball_run_from_scoring_events(self) -> None:
+        ev = lambda team, pts, i: {"type": "points", "team": team, "weight": pts, "possession_index": i}
+        narrator = [ev("SAC", 3, 1), ev("LAL", 2, 2), ev("SAC", 2, 3), ev("LAL", 3, 4), ev("LAL", 2, 5), ev("LAL", 2, 6)]
+        self.assertEqual(detail.basketball_run(narrator), ("LAL", 9, 2))
+        self.assertIsNone(detail.basketball_run([ev("LAL", 2, 1), ev("SAC", 2, 2)]))
+
 
 class BoardPlays(unittest.TestCase):
     """User 2026-10-09: "Lines now, props overnight"."""
@@ -126,6 +132,22 @@ class BoardPlays(unittest.TestCase):
                   "away": {"key": "ucf"}, "home": {"key": "ohio state"}}]
         plays.attach_plays(chips, "2026-10-10")                     # found by the 10-10 card
         self.assertEqual(chips[0]["plays"]["total"], 1)
+
+    def test_soccer_draw_loses_a_side_bet_and_corners_are_not_graded(self) -> None:
+        from syndicate.features.shared import game_chip_plays as plays
+
+        self._env()
+        base = {"sport": "soccer", "away_key": "a", "home_key": "b", "kind": "game", "segment": "full", "ev_vs_fair_pct": 1.0}
+        cards = [dict(base, pick_id="h", market="h2h", side="home", line=None),
+                 dict(base, pick_id="d", market="h2h", side="draw", line=None),
+                 dict(base, pick_id="y", market="btts", side="yes", line=None),
+                 dict(base, pick_id="c", market="alternate_totals_corners", side="over", line=9.5)]
+        chips = [{"sport": "soccer", "state": "final", "away": {"key": "a", "score": "1"}, "home": {"key": "b", "score": "1"}}]
+        plays.attach_plays(chips, "2026-10-09", cards=cards)
+        got = chips[0]["plays"]
+        self.assertEqual(got["line_results"], {"win": 2, "loss": 1, "push": 0, "pending": 0})  # draw + BTTS win, home loses
+        self.assertEqual((got["lines"], got["other"]), (3, 1))
+
 
 if __name__ == "__main__":
     unittest.main()

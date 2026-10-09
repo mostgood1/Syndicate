@@ -693,18 +693,18 @@ def build_game_chip(sport: str, game: dict[str, Any]) -> dict[str, Any]:
         # Live only; None otherwise. Additive: every consumer reads with .get().
         # The sport-specific line (runners / down & distance / red cards) when
         # the game carries it, else the cleaned status text as before.
-        "situation": (_chip_live_detail(sport_slug, game) or _live_situation(game, status_token)) if state == "live" else None,
+        "situation": (_chip_live_detail(sport_slug, game, start_time_utc) or _live_situation(game, status_token)) if state == "live" else None,
         # Pregame only (mockup 4, lane games-rail-full-detail): probables /
         # goalies / slot, and the line. None when no source has any of it.
         "footer": _chip_footer(sport_slug, game, start_time_utc) if state == "pregame" else None,
     }
 
 
-def _chip_live_detail(sport: str, game: dict[str, Any]) -> str | None:
+def _chip_live_detail(sport: str, game: dict[str, Any], start_utc: datetime | None = None) -> str | None:
     try:
         from syndicate.features.shared.game_chip_detail import live_detail
 
-        text = live_detail(sport, game)
+        text = live_detail(sport, game, start_utc)
     except Exception:  # noqa: BLE001 -- a detail line must never break a chip
         return None
     return text[:_SITUATION_MAX_CHARS] if text else None

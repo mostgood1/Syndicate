@@ -29,7 +29,20 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 _LOCK = threading.Lock()
-_GRADEABLE = {"h2h", "spreads", "totals", "h2h_3_way", "spreads_alt", "totals_alt", "alternate_spreads", "alternate_totals"}
+_GRADEABLE = {"h2h", "spreads", "totals", "h2h_3_way", "spreads_alt", "totals_alt", "alternate_spreads", "alternate_totals", "btts"}
+# Sports whose moneyline is THREE-way: a draw loses a home or away bet.
+_THREE_WAY_H2H_SPORTS = {"soccer"}
+
+
+def gradeable_from_score(play: Mapping[str, Any]) -> bool:
+    """A full-game line the FINAL SCORE settles. Corners, cards and interval
+    (h1/q1/first5) lines need data the card does not have: they are reported as
+    "not graded", never left "pending" forever (user 2026-10-09 board check)."""
+    return (
+        play.get("kind") == "game"
+        and play.get("segment") in ("full", "", "game", None)
+        and (play.get("market") or "") in _GRADEABLE
+    )
 
 
 def _reports_root() -> Path:
@@ -140,10 +153,10 @@ def record_plays(date: str, cards: Iterable[Mapping[str, Any]]) -> int:
     return total_added
 
 
-def _grade_line(play: Mapping[str, Any], away_score: float, home_score: float, home_team: Any, away_team: Any) -> str | None:
+def _grade_line(play: Mapping[str, Any], away_score: float, home_score: float, home_team: Any, away_team: Any, sport: Any = None) -> str | None:
     """win / loss / push for a full-game line play, or None when not gradeable."""
     market = play.get("market") or ""
-    if play.get("kind") != "game" or play.get("segment") not in ("full", "", "game") or market not in _GRADEABLE:
+    if not gradeable_from_score(play):
         return None
     side = play.get("side") or ""
     if side == str(home_team or "").strip().lower():
@@ -152,6 +165,9 @@ def _grade_line(play: Mapping[str, Any], away_score: float, home_score: float, h
         side = "away"
     margin = home_score - away_score
     line = play.get("line")
+    if market == "btts":
+        both = home_score > 0 and away_score > 0
+        return None if side not in ("yes", "no") else ("win" if both == (side == "yes") else "loss")
     if "total" in market:
         if line is None or side not in ("over", "under"):
             return None
@@ -171,7 +187,8 @@ def _grade_line(play: Mapping[str, Any], away_score: float, home_score: float, h
     if side not in ("home", "away"):
         return None
     if margin == 0:
-        return "loss" if market == "h2h_3_way" else "push"
+        three_way = market == "h2h_3_way" or str(sport or "").lower() in _THREE_WAY_H2H_SPORTS
+        return "loss" if three_way else "push"
     return "win" if (margin > 0) == (side == "home") else "loss"
 
 
@@ -203,7 +220,8 @@ def attach_plays(chips: list[dict[str, Any]], date: str, *, cards: Iterable[Mapp
             plays = games_for(day).get(_game_key(chip.get("sport"), away.get("key"), home.get("key")) or "")
             if not plays:
                 continue
-            lines = [p for p in plays.values() if p.get("kind") == "game"]
+            game_rows = [p for p in plays.values() if p.get("kind") == "game"]
+            lines = [p for p in game_rows if gradeable_from_score(p)]
             props = [(pid, p) for pid, p in plays.items() if p.get("kind") != "game"]
             if props and day not in prop_results:
                 from datetime import date as _date, timedelta
@@ -212,12 +230,13 @@ def attach_plays(chips: list[dict[str, Any]], date: str, *, cards: Iterable[Mapp
                 merged.update(_read(_results_path(day)))
                 prop_results[day] = merged
             day_results = prop_results.get(day, {})
-            out: dict[str, Any] = {"total": len(plays), "lines": len(lines), "props": len(props)}
+            out: dict[str, Any] = {"total": len(plays), "lines": len(lines), "props": len(props),
+                                   "other": len(game_rows) - len(lines)}
             if chip.get("state") == "final":
                 a, h = _num(away.get("score")), _num(home.get("score"))
                 if a is not None and h is not None:
                     out["line_results"] = _tally(
-                        _grade_line(p, a, h, home.get("name"), away.get("name")) for p in lines
+                        _grade_line(p, a, h, home.get("name"), away.get("name"), chip.get("sport")) for p in lines
                     )
                 out["prop_results"] = _tally(
                     (day_results.get(pid) or {}).get("result") if isinstance(day_results.get(pid), dict) else day_results.get(pid)

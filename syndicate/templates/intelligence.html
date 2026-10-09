@@ -2907,6 +2907,9 @@
     const parts = [n];
     if (plays.lines && plays.line_results) parts.push(`lines ${record(plays.line_results)}`);
     if (plays.props && plays.prop_results) parts.push(`props ${record(plays.prop_results)}`);
+    // Corners / intervals: the final score cannot settle them, so say so
+    // rather than show them "pending" forever.
+    if (plays.other) parts.push(`${plays.other} not graded`);
     return parts.join(" · ");
   }
 

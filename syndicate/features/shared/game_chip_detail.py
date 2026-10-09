@@ -323,7 +323,53 @@ def _bases(offense: Mapping[str, Any]) -> str | None:
     return "On " + " & ".join(on)
 
 
-def live_detail(sport: str, game: Mapping[str, Any]) -> str | None:
+def _load_momentum(path: Path) -> dict:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    games = payload.get("games") if isinstance(payload, Mapping) else None
+    return games if isinstance(games, dict) else {}
+
+
+def basketball_run(narrator: Any, min_points: int = 7, max_against: int = 4) -> tuple[str, int, int] | None:
+    """(team, for, against) of the CURRENT scoring run from the momentum
+    file's scoring events, or None when there is no run worth naming.
+
+    Walked back from the latest basket: the run keeps going while the other
+    side has scored at most `max_against` -- the usual "9-2 run" reading."""
+    events = [e for e in (narrator or []) if isinstance(e, Mapping) and e.get("type") == "points" and e.get("team")]
+    if not events:
+        return None
+    events.sort(key=lambda e: (_num(e.get("possession_index")) or 0.0, _num(e.get("clock_seconds")) or 0.0))
+    team = events[-1].get("team")
+    pts_for = pts_against = 0
+    for event in reversed(events):
+        weight = int(_num(event.get("weight")) or 0)
+        if event.get("team") == team:
+            pts_for += weight
+        else:
+            if pts_against + weight > max_against:
+                break
+            pts_against += weight
+    if pts_for < min_points or pts_for - pts_against < 5:
+        return None
+    return str(team), pts_for, pts_against
+
+
+def _basketball_run_text(sport: str, game: Mapping[str, Any], day: str | None) -> str | None:
+    if not day:
+        return None
+    games = _cached(_first(f"{sport}_source/source_artifacts/data/live_lens/momentum_events_{day}.json"), _load_momentum) or {}
+    entry = None
+    for key in (game.get("event_id"), game.get("gamePk"), game.get("game_id")):
+        if key is not None and str(key) in games:
+            entry = games[str(key)]
+            break
+    if not isinstance(entry, Mapping):
+        return None
+    run = basketball_run(entry.get("narrator"))
+    return f"{run[0]} on a {run[1]}–{run[2]} run" if run else None
+
+
+def live_detail(sport: str, game: Mapping[str, Any], start_utc: datetime | None = None) -> str | None:
     """The sport-specific live line from fields the game already carries, or None."""
     try:
         sport = str(sport or "").lower()
@@ -370,6 +416,9 @@ def live_detail(sport: str, game: Mapping[str, Any]) -> str | None:
                 if n:
                     reds.append(f"{int(n)} red ({side})")
             return " · ".join(reds) or None
+        if sport in {"nba", "wnba"}:
+            # Bonus has no source (no foul events are captured); the run does.
+            return _basketball_run_text(sport, game, _ct_date(start_utc))
         if sport == "nhl":
             sog_h, sog_a = _num(live.get("home_sog")), _num(live.get("away_sog"))
             if sog_h is not None and sog_a is not None:
