@@ -63,7 +63,7 @@ This doc is the shared plan. Each phase is a separate session with its own lane.
 | P1 | Native possession engine + resumable state | — | | not started |
 | P2 | Native live game-state ingestion + rotation-stints producer | — (parallel with P1) | `basketball-native-live-state` | built + backfilled NBA/WNBA, verified 2026-10-09 (deploys.md 18:56:24Z); NCAAB reading + live tick reading owed |
 | P3 | NBA native live re-sim, situations re-fit, cut the vendored tick | P1, P2 | | not started |
-| P4 | NCAAB live tier on the native engine | P1, P2 (P3 helps) | | not started |
+| P4 | NCAAB live tier on the native engine | P1, P2 (P3 helps) | `ncaab-native-live-tier` | blocked on P1/P2; prerequisite-free work DONE 2026-10-09 (`9002f65e`): the ONE shared rulebook `shared/basketball_league_rules.py` (P1 and P2 pin to it), NCAAB team-model inputs `ncaab/live_team_model.py` + checklist, 2025-26 pbp corpus (6,275 games, local) and baseline-to-beat + scoring shape (`docs/ai_context/ncaab_live_tier.md`: H2 +8.0 pts over H1, reversion -0.187, last-2:00 trailing fouls 1.6/min). No NCAAB player model, so game lines only. Live close needs OddsAPI in-play history (user decision). Live reading owed at opening week, Nov 2026 |
 | P5 | WNBA cut-over to native live | P1, P2, P3 | `wnba-native-live-cutover` | blocked on P1-P3; prerequisite-free work DONE 2026-10-09: 2026 checkpoint corpus (344 games) + vendored-call inventory + linear-lens baseline (`.syndicate/findings_2026-10-09_wnba_live_vendored_inventory.md`). End-state grep must be widened (see findings). Live reading owed May 2027 (`#694`) |
 
 ### P1 — native possession engine + resumable state
