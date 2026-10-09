@@ -2475,6 +2475,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Unit: running cap read from a real child process's environ; differing next-up value flagged; unreadable environ falls back with a label. Fleet: status prints cap 3072 for live-odds-worker, 6144 refresh-worker, 2048 web
 - Blocked by: none
 
+### nfl-qb-prop-info-beyond-line — OPEN — opened 2026-10-09 — session f628c245-6aae-4710-a0e7-829c2a108ddb
+- Goal: Measure whether production's NFL passing_yards and passing_attempts prop probability (code 018a7c64) carries information BEYOND the de-vigged book line: logistic y ~ a + b1*logit(p_book) + b2*logit(p_model) fitted on real 2023 OddsAPI quotes, applied to real 2024 quotes; report b2 with a game-clustered 95% CI and the 2024 paired log-loss of the combined probability vs the book alone. Measurement only: no production change.
+- Files: scripts/measure_nfl_qb_prop_info_beyond_line.py, .syndicate/findings_2026-10-09_nfl_qb_prop_info_beyond_line.md
+- Hypothesis: After the starts-only and convention fixes the model's probability still adds ~nothing beyond the line (the 10-03 finding: the information is in the line), so b2's CI includes 0 and the combination does not beat the book on 2024.
+- Falsification test: b2 > 0 with a 2023 CI excluding 0 AND the 2023-fitted combination beats the book on 2024 log-loss with a paired game-clustered CI entirely below 0 -> the model does carry usable information beyond the line for that market.
+- Verification: Per market: n rows/games, b1, b2 [CI] on 2023; 2024 LL book vs combined vs model, paired delta [CI]. Starts-refused rows excluded (production refuses them); official grading for attempts; 2025 untouched.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
