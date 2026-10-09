@@ -870,6 +870,25 @@ def _launch_autorun_nfl_lines_refresh() -> None:
     )
 
 
+def _soccer_pregame_refresh_lane() -> str | None:
+    """The soccer pregame autorun's OWN refresh lane (lane `soccer-live-lane-priority`, 2026-10-09).
+
+    It used to share the combined sweep's lane, and on the fleet a soccer pregame run
+    took ~40 min of every 45 (`SYNDICATE_SOCCER_PREGAME_REFRESH_INTERVAL_SECONDS=2700`;
+    10-09 17:57:16-18:36:55Z, 34 min of it `soccer_<league>_artifacts`). Every phase=live
+    sweep in that window was refused `lane_busy` (118 refusals on 10-09), so in-play
+    soccer quotes aged past the gate's 300 s observed ceiling and every live row went
+    `dead`. Same shape as `_nfl_lines_refresh_lane`. The live props capture now MERGES
+    into the pregame file (55655758), which is what makes the two safe to overlap.
+
+    `SYNDICATE_SOCCER_PREGAME_REFRESH_LANE=combined` puts it back on the shared lane.
+    """
+    raw_value = str(os.environ.get("SYNDICATE_SOCCER_PREGAME_REFRESH_LANE") or "").strip()
+    if raw_value.lower() in {"combined", "shared", "none"}:
+        return None
+    return raw_value or "live-odds-worker-soccer-pregame"
+
+
 def _launch_autorun_soccer_pregame_refresh() -> None:
     if not _soccer_pregame_refresh_enabled():
         return
@@ -893,6 +912,8 @@ def _launch_autorun_soccer_pregame_refresh() -> None:
     last_epoch = float((last_status or {}).get("epoch") or 0.0)
     if last_epoch > 0.0 and (time.time() - last_epoch) < float(_soccer_pregame_refresh_interval_seconds()):
         return
+    lane = _soccer_pregame_refresh_lane()
+    lane_kwargs = {"lane": lane} if lane else {}
     try:
         result = launch_refresh_run(
             date=selected_date,
@@ -903,6 +924,7 @@ def _launch_autorun_soccer_pregame_refresh() -> None:
             skip_mirror=True,
             mode=str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_MODE") or "full"),
             launch_mode="web_process",
+            **lane_kwargs,
         )
     except Exception as exc:
         if _is_refresh_run_contention_error(exc):
@@ -933,7 +955,7 @@ def _launch_autorun_soccer_pregame_refresh() -> None:
     )
     print(
         f"[live_odds_worker] SOCCER_PREGAME_AUTORUN_LAUNCHED date={selected_date} "
-        f"pid={result.get('pid')} stamp={result.get('run_stamp')}",
+        f"pid={result.get('pid')} stamp={result.get('run_stamp')} lane={lane or 'combined'}",
         flush=True,
     )
 
