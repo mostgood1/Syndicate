@@ -3566,3 +3566,31 @@ section where the bad append left it — `lane-guard` reads `lanes.md` and nothi
 else, so a block below `## Archived lanes` has its claims silently un-enforced.
 The post-write guard named it immediately; it was right and I should have fixed it
 before pushing anything further.
+
+## 2026-10-09 — THE SPARSE-WORKTREE PENALTY, NOW MEASURED AT SUITE SCALE: ~10x THE FAILURE COUNT `[lane suite-baseline-flakiness, session 4ab694ed]`
+
+The rule that a worktree supports no conclusion about code reading `data/` is
+already in this file. What was missing was the SIZE of the effect on the full
+suite, which is what makes a sparse count look like a credible regression report.
+
+**Same suite, same week, one process, serial, both runs to completion:**
+
+| tree | tests | result |
+|---|---|---|
+| sparse worktree `b1d9ce0f` | 22,003 | **331 failed, 191 errors** (10h29m) |
+| primary tree `4d9f4ade` | 22,784 | **49 failed, 6 errors** (1d 3h59m) |
+
+**The discriminating evidence, not the inference.** Earlier I split the sparse
+failures per file into 13 whose failure set was STABLE across two independent runs
+and 8 whose set CHANGED. I guessed from test NAMES that the stable 13 were data
+dependence. All 13 are GREEN in the complete checkout — `test_archives.py` (32
+failures), `test_bet_status_ncaaf.py` (10), `test_ask_sport_coverage.py` (4) and
+the rest. They were confirmed by DISAPPEARANCE, which is a measurement; the names
+were only a hypothesis.
+
+**How to apply.** Never quote a sparse-worktree failure count as the suite's
+state — it is wrong by about an order of magnitude here. If a sparse run is all
+you have, say so and give the figure as an upper bound. And note the corollary:
+the 55 real failures live in 26 files with ZERO overlap against the 23 files the
+sparse run pointed at, so a sparse run does not even identify the right FILES to
+investigate.

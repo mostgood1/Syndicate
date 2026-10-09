@@ -1487,6 +1487,26 @@ full run are interrupted mid-line by test debug dumps (`PROCESS_ENUM_DEBUG`,
 `ALL_PROCESS_MEMORY`), so a character count silently UNDERCOUNTS — it read 15,683
 executed where pytest itself said 99%. Use pytest's own summary line.
 
+**THE BASELINE, MEASURED ON A COMPLETE CHECKOUT `[2026-10-09, lane
+suite-baseline-flakiness]`.** Primary tree `4d9f4ade`, one process, no ignores,
+1 day 3h59m25s:
+
+    49 failed, 22701 passed, 33 skipped, 1 xfailed, 16 warnings, 6 errors,
+    602 subtests passed in 100765.20s
+
+**A SPARSE WORKTREE INFLATES THE FAILURE COUNT BY ROUGHLY 10x.** The same suite
+in a worktree without `data/`/`vendor/` gave `331 failed / 191 errors` over
+22,003 tests. All 13 files whose failure sets were stable across two sparse runs
+are GREEN in the complete checkout — so those ~77 failures were data dependence,
+confirmed by disappearance rather than inferred from test names. **Never quote a
+sparse-worktree failure count as the suite's state.**
+
+The 55 real failures sit in 26 files with **zero overlap** against the 23 files
+isolated from the sparse run, concentrated in NFL / layer2 / props / refresh
+(`test_nfl_player_stats.py` 14, `test_layer2_out_player_gate.py` 5,
+`test_nfl_props.py` 4, `test_refresh_worker.py` 4). NOT yet re-run in isolation,
+so not yet established as defects.
+
 ## [test-suite-writes-tracked-mirror] THE TEST SUITE WROTE INTO THE TRACKED `data/` MIRROR, AND NOTHING SAID SO — **GUARDED SINCE 2026-09-09** `[lane data-tree-write-guard, commits b099d557..e35f710f, NO DEPLOY]`
 
 `tests/conftest.py` now fails any test that writes under a tracked artifact
