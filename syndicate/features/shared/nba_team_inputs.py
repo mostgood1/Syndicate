@@ -30,7 +30,9 @@ WHAT THIS BUILDS, and which POPULATION each number comes from (never mixed acros
     sim's minutes inputs are untouched): starter_prob = share of the team's last 5 games (date < slate) in which ESPN's
     box score marked the player a starter (P2's `rotation_stints/player_checks_<date>.csv`). Population: the slate's
     own phase of the current season when the team has >= 3 such games; otherwise the current season's games of any
-    phase; otherwise the prior season's regular-season games. The population is written per row in `exp_min_source`.
+    phase when >= 3; otherwise the share of the team's WHOLE prior regular season. Not its last 5: measured on the
+    2025-26 tail, a season's final week is rest/tank lineups (UTA "started" Tshiebwe and Hinson). The population is
+    written per row in `exp_min_source`.
 
 OFF SWITCH. `SYNDICATE_NBA_TEAM_INPUTS=0` restores the previous inputs exactly: the producers are not called AND files
 these producers wrote are ignored on read (`is_ours`), so off == the pre-fix sim even on a disk that holds them.
@@ -51,7 +53,7 @@ NO_PRIOR_GAMES_K = 10.0  # shrink toward the league mean when a team has no prio
 STARTER_WINDOW = 5
 STARTER_MIN_SAME_PHASE = 3
 STARTER_FLAG_MIN_PROB = 0.6  # started >= 3 of the last 5
-STARTER_LOOKBACK_FILES = 120
+STARTER_LOOKBACK_FILES = 400  # a full prior season (~235 game dates) plus the current one
 RATING_COLS = ("pace", "off_rtg", "def_rtg", "efg_pct", "tov_pct", "orb_pct", "ft_rate", "fg3a_rate", "fg3_pct")
 # nba_season_phase names -> the `season_type` values P2's stints producer writes
 _PHASE_TO_SEASON_TYPE = {"preseason": "preseason", "regular": "regular", "postseason": "playoffs", "play_in": "play-in"}
@@ -246,15 +248,14 @@ def build_starters(*, processed_root: Path, date_str: str, slate_phase: Optional
         cur = games[games["season"] == season]
         same = cur[cur["season_type"] == want_type] if want_type else cur.iloc[0:0]
         if len(same) >= STARTER_MIN_SAME_PHASE:
-            pick, pop = same, f"{season}_{want_type}"
-        elif len(cur):
-            pick, pop = cur, f"{season}_any_phase"
+            ids, pop = list(same["event_id"].head(STARTER_WINDOW)), f"{season}_{want_type}"
+        elif len(cur) >= STARTER_MIN_SAME_PHASE:
+            ids, pop = list(cur["event_id"].head(STARTER_WINDOW)), f"{season}_any_phase"
         else:
             prior = games[(games["season"] == season - 1) & (games["season_type"] == "regular")]
             if prior.empty:
                 continue
-            pick, pop = prior, f"{season - 1}_regular"
-        ids = list(pick["event_id"].head(STARTER_WINDOW))
+            ids, pop = list(prior["event_id"]), f"{season - 1}_regular_full"
         window = grp[grp["event_id"].isin(ids)].groupby(["event_id", "player_name"], as_index=False)["starter"].max()
         share = window.groupby("player_name")["starter"].sum() / float(len(ids))
         for name, prob in share.items():
