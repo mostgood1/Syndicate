@@ -57,6 +57,51 @@ def test_values_only_callers_are_unchanged():
     assert "recent_dates" not in out
 
 
+def _roster(monkeypatch, rows):
+    from syndicate.features.shared.prop_evidence import football as fb
+
+    monkeypatch.setattr(fb.C, "first_existing", lambda *a, **k: "roster.csv")
+    monkeypatch.setattr(fb, "_read_csv", lambda path, label: rows)
+    return fb
+
+
+def _subject(name):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(player_name=name)
+
+
+def test_nfl_roster_fallback_resolves_a_player_the_projections_omit(monkeypatch):
+    """2026-10-09: 29 NFL prop players (Justin Jefferson, Jayden Daniels, ...) had no chart because the id
+    lookup read only the projections file; their game lines are keyed by gsis id in the usage file."""
+    fb = _roster(monkeypatch, [
+        {"gsis_id": "00-0036322", "full_name": "Justin Jefferson", "team": "MIN", "position": "WR"},
+        {"gsis_id": "00-0036415", "full_name": "Van Jefferson", "team": "TEN", "position": "WR"},
+    ])
+    p = fb._nfl_roster_player(2026, _subject("Justin Jefferson"), None)
+    assert p is not None and p.id == "00-0036322" and p.index == -1 and p.basis == {}
+
+
+def test_nfl_roster_fallback_refuses_an_ambiguous_name(monkeypatch):
+    fb = _roster(monkeypatch, [
+        {"gsis_id": "A", "full_name": "Chris Bell", "team": "LV", "position": "WR"},
+        {"gsis_id": "B", "full_name": "Chris Bell", "team": "BUF", "position": "WR"},
+    ])
+    assert fb._nfl_roster_player(2026, _subject("Chris Bell"), None) is None
+
+
+def test_nfl_name_miss_is_not_reported_as_a_missing_file():
+    from types import SimpleNamespace
+
+    from syndicate.features.shared.prop_evidence import football as fb
+
+    subject = SimpleNamespace(player_name="Nobody Known", market="Receiving Yards")
+    layer = fb._nfl_recent_form(subject, "rec_yards", "Receiving yards", None, ([], None, []), 2026)
+    why = str(layer.absent_reason)
+    assert "no gsis id" in why, why
+    assert "not on this disk" not in why
+
+
 def test_capped_at_ten_and_kept_in_step():
     row = _row()
     vals = list(range(14))

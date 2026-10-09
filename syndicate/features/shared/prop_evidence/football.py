@@ -481,6 +481,36 @@ def _nfl_find_player(fantasy, subject: PropSubject, game: NflGame | None) -> Nfl
     return hits[0]
 
 
+def _nfl_roster_player(season: int | None, subject: PropSubject, game: NflGame | None) -> NflPlayer | None:
+    """The player's gsis id from the nflverse roster, for RECENT FORM ONLY (lane board-history-charts).
+
+    `_nfl_find_player` reads `nfl_fantasy_projections_<season>.json`, which omits players the projector
+    skips -- measured on the served board 2026-10-09: 29 distinct NFL prop players had no chart, among
+    them Justin Jefferson, Jayden Daniels, Kyler Murray, Nico Collins and Sam Darnold, whose game lines
+    ARE in `nfl_fantasy_usage_<season>.json` (keyed by gsis id, short names only, e.g. "J.Jefferson").
+    The roster carries the full name beside the gsis id. Same `NameMatcher`; several hits are narrowed to
+    the game's two clubs; still ambiguous -> None (a wrong player's history is worse than none).
+    Returned with index -1 and no basis: it must not reach the projection-row lookups."""
+    if season is None:
+        return None
+    path = C.first_existing(NFL_DIR, f"tracking/nflverse/roster/roster_{season}.csv")
+    rows = _read_csv(path, "roster")
+    if not rows:
+        return None
+    matcher = NameMatcher(subject.player_name)
+    hits: dict[str, NflPlayer] = {}
+    for raw in rows:
+        gsis = str(raw.get("gsis_id") or "").strip()
+        if gsis and matcher(raw.get("full_name")):
+            hits[gsis] = NflPlayer(id=gsis, name=str(raw.get("full_name") or ""), team=str(raw.get("team") or "").upper(),
+                                   pos=str(raw.get("position") or ""), index=-1, basis={})
+    found = list(hits.values())
+    if game is not None and len(found) > 1:
+        clubs = {_nfl_canon(game.home), _nfl_canon(game.away)}
+        found = [h for h in found if _nfl_canon(h.team) in clubs]
+    return found[0] if len(found) == 1 else None
+
+
 def _fantasy_row(payload: dict[str, Any], player: NflPlayer, week: int | None) -> dict[str, float] | None:
     """The player's per-game row for `week` (or the season row when week is None), keyed by column."""
     columns = payload.get("row_columns") or []
@@ -698,11 +728,14 @@ def _nfl_recent_form(subject: PropSubject, stat: str | None, label: str, player:
     if stat is None:
         return absent(Layer.RECENT_FORM, f"{ABSENT_NOT_APPLICABLE}:market {subject.market} has no football stat mapping")
     lines, path, tried = usage
+    # PLAYER FIRST: with no player, `_nfl_usage` returns without trying any file, and this used to be
+    # reported as "artifact not on this disk" -- a name miss read as a missing file (lane
+    # board-history-charts, 2026-10-09: 40 of 40 sampled NFL props said so while the file existed).
+    if player is None:
+        return absent(Layer.RECENT_FORM, f"{ABSENT_NO_MATCH}:{subject.player_name} has no gsis id (not in nfl_fantasy_projections_{season}.json or roster_{season}.csv) to join game lines")
     if path is None:
         names = " / ".join(tried) if tried else f"nfl_fantasy_usage_{season}.json"
         return absent(Layer.RECENT_FORM, f"{ABSENT_NO_ARTIFACT}:{names} not on this disk -- no per-game NFL player stat artifact is published to web")
-    if player is None:
-        return absent(Layer.RECENT_FORM, f"{ABSENT_NO_MATCH}:{subject.player_name} has no gsis id (not in nfl_fantasy_projections_{season}.json) to join game lines")
     if not lines:
         return absent(Layer.RECENT_FORM, f"{ABSENT_NO_MATCH}:{subject.player_name} ({player.id}) has no lines in {' / '.join(tried)}")
     last = lines[:C.LAST_N_GAMES]
@@ -1008,9 +1041,13 @@ def build_nfl(subject: PropSubject) -> PropEvidence:
     player = _nfl_find_player(fantasy, subject, game)
     prop = _nfl_prop_artifact(season, game.week if game else None) if stat else None
     usage = _nfl_usage(season, player)
+    # RECENT FORM may fall back to the roster's gsis id when the projections omit the player; every
+    # other layer keeps `player` / `usage` exactly as before (lane board-history-charts).
+    form_player = player or _nfl_roster_player(season, subject, game)
+    form_usage = usage if form_player is player else _nfl_usage(season, form_player)
 
     evidence.set(_nfl_player_sim(subject, stat, label, season, game, player, prop, fantasy))
-    evidence.set(_nfl_recent_form(subject, stat, label, player, usage, season))
+    evidence.set(_nfl_recent_form(subject, stat, label, form_player, form_usage, season))
     evidence.set(_nfl_matchup(subject, stat, label, game, player, fantasy, usage))
     evidence.set(_nfl_advanced(subject, stat, label, game, player, fantasy, usage))
     evidence.set(_nfl_game_sim(subject, game))
