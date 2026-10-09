@@ -3610,3 +3610,9 @@ The 10-08 lead framed query_state_cache refusals as "readers get a stale copy". 
 ## 2026-10-09 - RULE: copy fleet files to the Windows side through the //wsl.localhost share, not with cp/dd from inside WSL to `/mnt/c` `[lane nfl-kalshi-clv-pooled, session f628c245]`
 - **What happened:** `cp` and then `dd bs=1M` from `~/syndicate-prod/data` to `/mnt/c/...` failed with `Cannot allocate memory` on 40-160 MB files (drvfs write path) while WSL reported 9.8 GB available; one file was left truncated (40.9 of 41.5 MB). Separately, `$VAR`s in an inline `wsl bash -lc '...'` arrived EMPTY from Git Bash, so `cd $D` went to `~` and a file was written into the WSL home.
 - **Rule:** read fleet data from Windows (PowerShell `Copy-Item` from the //wsl.localhost/Ubuntu-24.04/home/amyn/... share), hash every copied file, and compare sizes against the source. Put multi-variable WSL commands in a script file (`wsl bash /mnt/c/.../x.sh`) rather than inline.
+
+
+## 2026-10-09 -- RULE: ESPN NCAAB summary payloads drop lines and headlines; read the core odds API and header.gameNote `[lane ncaab-native-live-tier, session e48a0f9b]`
+- Measured: `summary?event=` has an EMPTY `pickcenter` for early-season games (0 of 169 on 2025-11-03, 0 of 82 on 11-15, present by 12-10), while `sports.core.api.espn.com/.../events/<id>/competitions/<id>/odds` still holds ESPN BET open/close. The summary's `competitions[0].notes` is None; the tournament headline is `header.gameNote`.
+- ESPN keeps NO in-play line history: provider 59 ("ESPN Bet - Live Odds") holds one untimestamped last quote, and `/odds/<p>/history/0/movement` returns 0 items. Do not grade a "live close" against it.
+- How to apply: a corpus that reads only the summary silently loses ~10% of its lines (the early season) and labels every NCAA tournament game as other postseason.
