@@ -1861,6 +1861,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: The doc is on origin/main and five spawned task chips exist, each naming its phase, prerequisites and verification.
 - Blocked by: none
 
+### wnba-native-live-cutover — OPEN — opened 2026-10-09 — session 99686b8c-f37e-47fa-90ed-c129c73e7dd7
+- Goal: P5 of docs/ai_context/basketball_live_native_plan.md: WNBA live game lines and props come from the P3 native re-sim under WNBA engine parameters; syndicate/features/wnba/ has no runtime vendored import on the live or sim path; the linear _wnba_live_* lens is retired. Verified by a 2026 WNBA pbp checkpoint backtest (end Q1/Q2/Q3, 5:00 Q4) where the native re-sim beats the linear lens on MAE/Brier with game-clustered CI, regular season separate from playoffs, plus the plan's end-state grep. BLOCKED on P1/P2/P3 (none started 2026-10-09); this session does ONLY the prerequisite-free work: the checkpoint corpus and the vendored-call inventory. LIVE reading owed at the 2027 WNBA opener (May 2027).
+- Files: scripts/build_wnba_live_checkpoint_corpus.py, tests/test_build_wnba_live_checkpoint_corpus.py, .syndicate/findings_2026-10-09_wnba_live_vendored_inventory.md, docs/ai_context/basketball_live_native_plan.md (Status table P5 row only)
+- Hypothesis: The linear lens (pace extrapolation + constant logistic scale) is beatable at every checkpoint by a resumed possession sim; the corpus must carry the linear lens's own prediction per checkpoint so the comparison is paired on the same games.
+- Falsification test: If the native re-sim does not beat the linear lens with a CI excluding 0 at >=1 checkpoint and loses at none, the cut-over waits.
+- Verification: Corpus: n games/checkpoints per phase, reconstructed finals == ESPN box finals on 100%. Inventory: every vendored reference on the WNBA live+sim path listed with file:line and its P1/P2/P3 replacement.
+- Blocked by: basketball-native-engine (P1), basketball-native-live-state (P2), nba-native-live-resim (P3) -- none opened as of 2026-10-09
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
