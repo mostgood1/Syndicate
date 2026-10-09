@@ -553,3 +553,21 @@ ppd_strong +3.01 -> +1.04, margin_sd_gap -2.41 -> -1.58; **ppd_weak -2.01 -> -3.
 mean_total -1.82 -> -2.56** -- the same weak-offense under-scoring that failed v3's gate (b) on 2025, with
 `drive_success_offense_sensitivity` still at its 0.3 floor. On FIT this candidate would fail gate (b). The 2026 read is
 NOT scheduled pending a user decision (2026 is the last clean NCAAF held-out set).
+
+
+## RE-FIT v4.1 (NCAAF) — PRE-REGISTERED 2026-10-09 (user: "Fix weak offense first")
+
+v4 fixed the early tier bias on FIT (z +2.90 -> +0.25) but under-scores weak offenses (`ppd_weak` z -2.01 -> -3.66), the
+same defect that failed v3's gate (b) on 2025 -- and the descent had no reason to avoid it: the objective traded it
+for gains elsewhere.
+- **Constrained descent (the fix):** a move is accepted only if the objective drops AND gate (b) holds ON FIT --
+  no moment's abs z exceeds production's abs z (same FIT set) by more than 1.0. A candidate therefore cannot fail
+  (b) in sample by construction.
+- **Start point:** production + the v4 tier finding only: `tier_offset` 3.0, `tier_decay_weeks` 8 (checked against
+  the constraint first; if it violates it, the start is production itself).
+- **Levers:** v4's grids, with `drive_success_offense_sensitivity` floored at 0.45 ({0.45, 0.6, 0.8, 1.0, 1.2}) and
+  `non_offensive_scoring` as an on/off lever (v3 chose it; v4.1 re-tests it under the constraint).
+- **Same FIT set (283 games, 60 seeds), moments, objective and reachability rules as v4.** Output
+  `C:\tmp\football_scenarios\ncaaf\refit_v41\`.
+- **Gate to the 2026 read:** fitted objective <= 0.8 x production on FIT (amendment 2), now with (b) satisfied in
+  sample. The 2026 read itself is unchanged (once, >= 300 FBS-vs-FBS games weeks 3+, gates (a)-(f) + L1-L3).
