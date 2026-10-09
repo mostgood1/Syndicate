@@ -2644,6 +2644,7 @@ def _rotation_sim_minutes_for_team_local(*, smart_sim_module, league_code: str, 
     if stints is None or stints.empty:
         sim_min, lineups, lw, diag2 = _rotation_sim_minutes_from_history_local(
             smart_sim_module=smart_sim_module,
+            league_code=league_code,
             team_df=team_df,
             date_str=date_str,
             home_tri=home_tri,
