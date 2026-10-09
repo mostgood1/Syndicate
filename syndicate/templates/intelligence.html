@@ -4897,14 +4897,30 @@
       const form = teamForm(item, backedSide(item));
       return form ? Object.assign({}, form, { game: true }) : null;
     }
-    const values = Array.isArray(item && item.recent_values) ? item.recent_values.map(Number).filter(Number.isFinite) : [];
+    // Per-bar labels (lane board-history-charts): `recent_dates` (a date, or
+    // "2026 W5" where the source has only season + week) and `recent_opponents`,
+    // aligned with `recent_values` by the worker. Kept in step with the values
+    // through the finite filter, and dropped if they are not aligned.
+    const rawValues = Array.isArray(item && item.recent_values) ? item.recent_values : [];
+    const rawDates = Array.isArray(item && item.recent_dates) && item.recent_dates.length >= rawValues.length ? item.recent_dates : null;
+    const rawOpps = Array.isArray(item && item.recent_opponents) && item.recent_opponents.length >= rawValues.length ? item.recent_opponents : null;
+    const values = [];
+    const dates = [];
+    const opps = [];
+    rawValues.forEach((raw, i) => {
+      const v = Number(raw);
+      if (!Number.isFinite(v)) return;
+      values.push(v);
+      dates.push(rawDates ? String(rawDates[i] || "") : "");
+      opps.push(rawOpps ? String(rawOpps[i] || "") : "");
+    });
     const line = numericValue(Number(item && item.line));
     const side = String((item && item.side) || "").toLowerCase();
     if (!values.length || line === null || !["over", "under"].includes(side)) return null;
     const hit = (v) => (side === "over" ? v > line : v < line);
     const l5 = values.slice(0, 5);
     const l10 = values.slice(0, 10);
-    return { values: l10, line, side, hit,
+    return { values: l10, dates: dates.slice(0, 10), opps: opps.slice(0, 10), line, side, hit,
       l5: `${l5.filter(hit).length}/${l5.length}`, l10: `${l10.filter(hit).length}/${l10.length}` };
   }
 
@@ -4925,6 +4941,8 @@
     const width = compact ? 70 : 260;
     const height = compact ? 18 : 84;
     const oldestFirst = form.values.slice().reverse();
+    const datesOldestFirst = (form.dates || []).slice().reverse();
+    const oppsOldestFirst = (form.opps || []).slice().reverse();
     const gap = compact ? 1.5 : 3;
     const barW = (width - gap * (oldestFirst.length - 1)) / oldestFirst.length;
     const max = Math.max(...oldestFirst, form.line * 1.5, 1);
@@ -4933,13 +4951,18 @@
     const bars = oldestFirst.map((v, i) => {
       const h = Math.max(1.5, (v / max) * (base - 2));
       const x = i * (barW + gap);
-      return `<rect x="${x.toFixed(1)}" y="${(base - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" class="${form.hit(v) ? "chart-bar chart-bar--side" : "chart-bar"}"><title>${escapeHtml(String(v))}</title></rect>`
+      const when = [datesOldestFirst[i], oppsOldestFirst[i]].filter(Boolean).join(" ");
+      const tip = when ? `${when}: ${v}` : String(v);
+      return `<rect x="${x.toFixed(1)}" y="${(base - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" class="${form.hit(v) ? "chart-bar chart-bar--side" : "chart-bar"}"><title>${escapeHtml(tip)}</title></rect>`
         + (compact ? "" : `<text x="${(x + barW / 2).toFixed(1)}" y="${height - 1}" class="chart-axis" text-anchor="middle">${escapeHtml(String(Math.round(v * 10) / 10))}</text>`);
     }).join("");
     const lineMark = `<line x1="0" x2="${width}" y1="${lineY.toFixed(1)}" y2="${lineY.toFixed(1)}" class="chart-line" />`;
     const svg = `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Last ${form.values.length} games against the ${escapeHtml(String(form.line))} line: ${form.l10} ${escapeHtml(form.side)}">${bars}${lineMark}</svg>`;
     if (compact) return `<span class="prop-spark" title="Last ${form.values.length}, oldest left; dashed = the line">${svg}</span>`;
-    return `<figure class="prop-chart"><figcaption>Recent form · <b>L5 ${form.l5} · L10 ${form.l10}</b> ${escapeHtml(form.side)} ${escapeHtml(String(form.line))}</figcaption>${svg}</figure>`;
+    const span = form.dates && form.dates.length && form.dates[0]
+      ? ` · ${escapeHtml(form.dates[form.dates.length - 1] || "")} → ${escapeHtml(form.dates[0])}`
+      : "";
+    return `<figure class="prop-chart"><figcaption>Recent form · <b>L5 ${form.l5} · L10 ${form.l10}</b> ${escapeHtml(form.side)} ${escapeHtml(String(form.line))}${span}</figcaption>${svg}</figure>`;
   }
 
   function propChartsBlock(item) {
