@@ -64,18 +64,25 @@ def test_prior_join_uses_the_priors_own_name_key():
     assert sim._prior_rates_for_player_local(priors=priors, team_tri="LVA", pkey="NOBODY", player_name="Nobody") == {}
 
 
-def test_the_real_engine_runs_with_the_local_sampler_and_is_restored(monkeypatch):
+def test_the_engine_runs_with_the_local_sampler_as_a_parameter(monkeypatch):
+    """The sampler reaches the engine as an ARGUMENT. Before 2026-10-09 it was patched into the vendored module's
+    `_sample_lineup` global for each call. The native engine has no such global to patch."""
+    import functools
+
+    from syndicate.features.basketball_engine import engine as native
+
     seen = {}
+    original = native.simulate_pbp_game_boxscore
 
-    def vendor_sample(*args, **kwargs):
-        return "vendor"
-
-    def entry(players):
-        seen["sampler"] = fake._sample_lineup
+    @functools.wraps(original)
+    def spy(*args, **kwargs):
+        seen.update(kwargs)
         return "ok"
 
-    fake = SimpleNamespace(_sample_lineup=vendor_sample, simulate_pbp_game_boxscore=entry)
-    monkeypatch.setattr(sim, "_import_real_events_module_local", lambda package_name: fake)
-    assert sim._call_real_events_entrypoint_local(entrypoint_name="simulate_pbp_game_boxscore", league_code="wnba", kwargs={"players": None}) == "ok"
-    assert seen["sampler"] is sim._sample_lineup_local
-    assert fake._sample_lineup is vendor_sample
+    monkeypatch.setattr(native, "simulate_pbp_game_boxscore", spy)
+    out = sim._simulate_pbp_game_boxscore_local(league_code="wnba", rng=None, home_players=None, away_players=None, not_an_engine_arg=1)
+    assert out == "ok"
+    assert seen["sample_lineup"] is sim._sample_lineup_local
+    assert seen["league"].code == "wnba"
+    assert "not_an_engine_arg" not in seen  # filtered to the engine's signature, as the vendored call filtered
+    assert not hasattr(native, "_sample_lineup")

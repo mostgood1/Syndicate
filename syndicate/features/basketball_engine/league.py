@@ -34,7 +34,10 @@ class LeagueParams:
     regulation_periods: int  # NBA/WNBA 4 quarters; NCAAB 2 halves
     regulation_period_seconds: int  # NBA 720, WNBA 600, NCAAB 1200
     overtime_period_seconds: int  # 300 in all three
-    regulation_team_minutes: float  # 5 x regulation minutes; fallback when no player has _sim_min
+    # 5 x regulation minutes. INERT, in the vendored engines too: _team_rates_from_priors assigns it to `total_min` when
+    # no player has _sim_min, then never reads `total_min`. Carried so the port stays the vendored text; pinned inert
+    # by tests/test_basketball_engine_parity.py.
+    regulation_team_minutes: float
     shot_clock_seconds: int  # HOOK (P4): carried, no shot-clock mechanism in the loop yet
     personal_foul_limit: int  # foul-out; consumed only for players a resumed GameState says are already out
     team_fouls_for_bonus: int  # HOOK (P3/P4): carried, the loop has no bonus mechanism yet

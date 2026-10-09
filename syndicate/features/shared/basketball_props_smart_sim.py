@@ -3101,121 +3101,6 @@ def _opponent_position_rate_context_local(*, smart_sim_module, date_str: str, lo
     return out
 
 
-def _event_safe_series_local(df, col: str):
-    import pandas as pd
-
-    if df is None or getattr(df, "empty", True) or col not in getattr(df, "columns", []):
-        return pd.Series([0.0] * (0 if df is None else len(df)), dtype=float)
-    return pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-
-
-def _player_usage_weights_local(*, players, col_pm: str, lineup_idx):
-    import numpy as np
-
-    n = int(len(players))
-    if n <= 0:
-        return np.zeros(0, dtype=float)
-
-    pm = _event_safe_series_local(players, col_pm).to_numpy(dtype=float)
-    pm = np.maximum(0.0, np.where(np.isfinite(pm), pm, 0.0))
-    pm = np.log1p(pm)
-
-    mins = _event_safe_series_local(players, "_sim_min").to_numpy(dtype=float)
-    mins = np.maximum(0.0, np.where(np.isfinite(mins), mins, 0.0))
-
-    weights = np.zeros(n, dtype=float)
-    idx = [int(i) for i in (lineup_idx or []) if 0 <= int(i) < n]
-    if not idx:
-        return weights
-
-    pm_line = pm[idx]
-    mins_line = mins[idx]
-
-    mins_floor = np.maximum(1.0, mins_line)
-    mins_sum = float(mins_floor.sum())
-    if np.isfinite(mins_sum) and mins_sum > 0:
-        mins_norm = mins_floor / mins_sum
-    else:
-        mins_norm = np.full(len(idx), 1.0 / len(idx))
-
-    pm_sum = float(pm_line.sum())
-
-    pred_weight = 0.0
-    pred_norm = None
-    if col_pm in ("_prior_fga_pm", "_prior_threes_att_pm"):
-        try:
-            pred = _event_safe_series_local(players, "pred_pts").to_numpy(dtype=float)
-            pred = np.maximum(0.0, np.where(np.isfinite(pred), pred, 0.0))
-            pred = np.log1p(pred)
-            pred_line = pred[idx]
-            pred_sum = float(pred_line.sum())
-            if np.isfinite(pred_sum) and pred_sum > 0:
-                pred_norm = pred_line / pred_sum
-                pred_weight = 0.20
-        except Exception:
-            pred_weight = 0.0
-            pred_norm = None
-
-    if (not np.isfinite(pm_sum)) or pm_sum <= 0:
-        probs = mins_norm
-        if pred_norm is not None and pred_weight > 0:
-            probs = pred_weight * pred_norm + (1.0 - pred_weight) * mins_norm
-    else:
-        pm_norm = pm_line / pm_sum
-        pri_weight = 0.75
-        base = pri_weight * pm_norm + (1.0 - pri_weight) * mins_norm
-        if pred_norm is not None and pred_weight > 0:
-            probs = (1.0 - pred_weight) * base + pred_weight * pred_norm
-        else:
-            probs = base
-
-    probs = np.maximum(0.0, probs)
-    total = float(probs.sum())
-    if not np.isfinite(total) or total <= 0:
-        probs = np.full(len(idx), 1.0 / len(idx))
-    else:
-        probs = probs / total
-
-    for j, i in enumerate(idx):
-        weights[int(i)] = float(probs[j])
-    return weights
-
-
-def _local_event_boxscore_team_players(*, players_df) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    if players_df is None or getattr(players_df, "empty", True):
-        return rows
-    for _, row in players_df.iterrows():
-        name = str(row.get("player_name") or "").strip()
-        if not name:
-            continue
-        pts = _first_present_float_local(row, "pred_pts", "mean_pts", "pts_mean", default=0.0)
-        reb = _first_present_float_local(row, "pred_reb", "mean_reb", "reb_mean", default=0.0)
-        ast = _first_present_float_local(row, "pred_ast", "mean_ast", "ast_mean", default=0.0)
-        threes = _first_present_float_local(row, "pred_threes", "mean_threes", "threes_mean", default=0.0)
-        stl = _first_present_float_local(row, "pred_stl", "mean_stl", "stl_mean", default=0.0)
-        blk = _first_present_float_local(row, "pred_blk", "mean_blk", "blk_mean", default=0.0)
-        tov = _first_present_float_local(row, "pred_tov", "mean_tov", "tov_mean", default=0.0)
-        rows.append(
-            {
-                "player_name": name,
-                "player_id": row.get("player_id"),
-                "pts": int(round(max(0.0, pts))),
-                "reb": int(round(max(0.0, reb))),
-                "ast": int(round(max(0.0, ast))),
-                "threes": int(round(max(0.0, threes))),
-                "stl": int(round(max(0.0, stl))),
-                "blk": int(round(max(0.0, blk))),
-                "tov": int(round(max(0.0, tov))),
-                "q_pts": [0, 0, 0, 0],
-                "q_reb": [0, 0, 0, 0],
-                "q_ast": [0, 0, 0, 0],
-                "q_threes": [0, 0, 0, 0],
-            }
-        )
-    return rows
-
-
 def _local_boxscore_geometry(league_code: str | None = None) -> tuple[int, int, int]:
     """(segment_seconds, minute_buckets_per_quarter, ot_seconds) for a league.
 
@@ -3233,157 +3118,67 @@ def _local_boxscore_geometry(league_code: str | None = None) -> tuple[int, int, 
     return max(1, quarter_seconds // 4), max(1, int(quarter_minutes)), 5 * 60
 
 
-def _local_simulate_pbp_game_boxscore(*, rng=None, home_players=None, away_players=None, cfg=None, home_lineups=None, home_lineup_weights=None, away_lineups=None, away_lineup_weights=None, target_home_points=None, target_away_points=None, quarters=None, home_team_adj=None, away_team_adj=None, league_code: str | None = None, **_extra_kwargs):
-    hq = [int(round(max(0.0, float(getattr(q, "home_pts_mu", 0.0) or 0.0)))) for q in (quarters or [])[:4]]
-    aq = [int(round(max(0.0, float(getattr(q, "away_pts_mu", 0.0) or 0.0)))) for q in (quarters or [])[:4]]
-    while len(hq) < 4:
-        hq.append(0)
-    while len(aq) < 4:
-        aq.append(0)
-    h_players = _local_event_boxscore_team_players(players_df=home_players)
-    a_players = _local_event_boxscore_team_players(players_df=away_players)
-    # `#478`: these were hardcoded to NBA geometry (segment_seconds=180,
-    # 12 minute-buckets), and the vendored engine TRUSTS them: after computing
-    # `seg_seconds` correctly from `LEAGUE.regulation_period_seconds`
-    # (600s/4 = 150s for WNBA), `smart_sim.py:4174-4176` OVERRIDES it with
-    # whatever `segment_seconds` this box dict carries. So a WNBA sim
-    # published 4x180s = 720s of segments over a 600s quarter, leaving
-    # segment 4 covering only the final 60s while the model distributed a
-    # full 180s window of scoring into it.
-    #
-    # Measured against 89 paired production games (`#476`): predicted
-    # segment-4 share 0.183 vs an actual 0.120 -- the sim over-predicted that
-    # segment by 52% while the whole-game total stayed correct (177.0 vs
-    # 177.8). A pure shape error, in exactly the field a per-segment or
-    # quarter-derivative market prices off.
-    #
-    # Derived from the league rather than replaced with another constant, so
-    # NBA (720s/4 = 180s, 12 minute-buckets) is unchanged and neither league
-    # can drift again.
-    segment_seconds, minute_buckets, ot_seconds = _local_boxscore_geometry(league_code)
-    h_box = {"players": h_players, "team_total_pts": int(sum(hq)), "q_segment_pts": [[0, 0, 0, 0] for _ in range(4)], "q_minute_pts": [[0] * minute_buckets for _ in range(4)], "segment_seconds": segment_seconds, "minute_seconds": 60, "ot_pts": [], "ot_seconds": ot_seconds}
-    a_box = {"players": a_players, "team_total_pts": int(sum(aq)), "q_segment_pts": [[0, 0, 0, 0] for _ in range(4)], "q_minute_pts": [[0] * minute_buckets for _ in range(4)], "segment_seconds": segment_seconds, "minute_seconds": 60, "ot_pts": [], "ot_seconds": ot_seconds}
-    return h_box, a_box, hq, aq
+# THE POSSESSION ENGINE IS SYNDICATE'S  [2026-10-09, lane basketball-native-engine, plan P1 of
+# docs/ai_context/basketball_live_native_plan.md].
+#
+# Every per-draw call the vendored `simulate_smart_game` makes reaches
+# `syndicate.features.basketball_engine`. It no longer reaches
+# `vendor/<pkg>_repo/src/<pkg>/sim/events.py`. Three things were deleted with the
+# vendored route, and none of them comes back:
+#   * `_import_real_events_module_local` / `_call_real_events_entrypoint_local`, which
+#     imported the vendored module and patched its `_sample_lineup` global for the
+#     duration of each call. The sampler is now a PARAMETER (`_sample_lineup_local`,
+#     below), handed to the engine.
+#   * The FLAT FALLBACK (`_local_simulate_pbp_game_boxscore` and its event-level twin).
+#     It rounded the quarter means straight to a score, with zero per-sim variance,
+#     and ran whenever the vendored import failed. A broken engine now FAILS the game
+#     by name. It no longer publishes a degenerate distribution that looks like a sim.
+#   * `_LOCAL_EVENTS_MODULE` and the fallback-only usage-weight port, which nothing else read.
+#
+# NO BEHAVIOUR CHANGE. The parity gate (scripts/basketball_engine_parity.py) replayed a
+# corpus of REAL production engine calls, with each call's recorded RNG state, through
+# both engines. Every leaf of every output was identical, and so was the RNG state
+# after each call. The corpus size and the reading are in .syndicate/deploys.md.
+_ENGINES_LOCAL: dict[str, Any] = {}
 
 
-def _local_simulate_event_level_boxscore(*, rng=None, home_players=None, away_players=None, home_q_pts=None, away_q_pts=None, cfg=None, home_lineups=None, home_lineup_weights=None, away_lineups=None, away_lineup_weights=None, home_team_adj=None, away_team_adj=None, **_extra_kwargs):
-    hq = [int(x) for x in list(home_q_pts or [0, 0, 0, 0])[:4]]
-    aq = [int(x) for x in list(away_q_pts or [0, 0, 0, 0])[:4]]
-    h_players = _local_event_boxscore_team_players(players_df=home_players)
-    a_players = _local_event_boxscore_team_players(players_df=away_players)
-    return {"players": h_players, "team_total_pts": int(sum(hq))}, {"players": a_players, "team_total_pts": int(sum(aq))}
+def _engine_for_league_local(league_code: str | None):
+    """The league's possession engine (a `LeagueEngine`: switches as attributes, sampler bound).
 
-
-_LOCAL_EVENTS_MODULE = SimpleNamespace(
-    EventSimConfig=EventSimConfigLocal,
-    _player_usage_weights=lambda players, col_pm, lineup_idx: _player_usage_weights_local(players=players, col_pm=col_pm, lineup_idx=lineup_idx),
-    simulate_pbp_game_boxscore=_local_simulate_pbp_game_boxscore,
-    simulate_event_level_boxscore=_local_simulate_event_level_boxscore,
-)
-
-
-def _call_events_entrypoint_local(*, entrypoint_name: str, kwargs: dict[str, Any]):
-    events_module = _LOCAL_EVENTS_MODULE
-    sentinel = object()
-    original_value = getattr(events_module, "_player_usage_weights", sentinel)
-    try:
-        setattr(
-            events_module,
-            "_player_usage_weights",
-            lambda players, col_pm, lineup_idx: _player_usage_weights_local(
-                players=players,
-                col_pm=col_pm,
-                lineup_idx=lineup_idx,
-            ),
-        )
-        entrypoint = getattr(events_module, entrypoint_name)
-        return entrypoint(**kwargs)
-    finally:
-        if original_value is sentinel:
-            delattr(events_module, "_player_usage_weights")
-        else:
-            setattr(events_module, "_player_usage_weights", original_value)
-
-
-def _import_real_events_module_local(*, package_name: str) -> Any | None:
-    """Import the vendored <package>.sim.events module (the real possession engine).
-
-    events.py has zero dependency on the `paths` singleton (pure computation
-    over already-passed-in DataFrames/rng), so unlike smart_sim.py it needs
-    no path pinning -- just the same sys.path setup, cached per package.
+    Code mapping is the vendored route's, unchanged: "wnba" -> WNBA, anything else -> NBA.
+    Calibration tooling may set a switch on the returned object (`engine.BLOCK_MODE = ...`).
+    That is process-local, exactly as setting the vendored module global was.
     """
-    cache_key = f"{package_name}.events"
-    if cache_key in _REAL_SMART_SIM_MODULE_CACHE_LOCAL:
-        return _REAL_SMART_SIM_MODULE_CACHE_LOCAL[cache_key]
-    module = None
-    try:
-        vendor_root = _vendor_smart_sim_code_root_local(package_name=package_name)
-        src_root = vendor_root / "src"
-        src_root_s = str(src_root)
-        if src_root.is_dir() and src_root_s not in sys.path:
-            sys.path.insert(0, src_root_s)
-        module = importlib.import_module(f"{package_name}.sim.events")
-        if not hasattr(module, "simulate_pbp_game_boxscore") or not hasattr(module, "simulate_event_level_boxscore"):
-            module = None
-    except Exception:
-        module = None
-    _REAL_SMART_SIM_MODULE_CACHE_LOCAL[cache_key] = module
-    return module
+    from syndicate.features.basketball_engine import league_params
+    from syndicate.features.basketball_engine.league_engine import LeagueEngine
+
+    code = "wnba" if str(league_code or "").strip().lower() == "wnba" else "nba"
+    if code not in _ENGINES_LOCAL:
+        _ENGINES_LOCAL[code] = LeagueEngine(league_params(code), sample_lineup=_sample_lineup_local)
+    return _ENGINES_LOCAL[code]
 
 
-def _call_real_events_entrypoint_local(*, entrypoint_name: str, league_code: str, kwargs: dict[str, Any]):
-    package_name = "wnba_betting" if str(league_code or "").strip().lower() == "wnba" else "nba_betting"
-    real_module = _import_real_events_module_local(package_name=package_name)
-    if real_module is None:
-        return None
-    fn = getattr(real_module, entrypoint_name, None)
-    if fn is None:
-        return None
-    params = inspect.signature(fn).parameters
-    if not any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
-        kwargs = {k: v for k, v in kwargs.items() if k in params}
-    # The REAL engine resolves `_sample_lineup` from its own module globals, so
-    # the exact-inclusion sampler only takes effect if installed there for the
-    # call (see `_sample_lineup_local`). Restored afterwards so the vendored
-    # module is never left modified.
-    sentinel = object()
-    original = getattr(real_module, "_sample_lineup", sentinel)
-    real_module._sample_lineup = _sample_lineup_local
-    try:
-        return fn(**kwargs)
-    finally:
-        if original is sentinel:
-            try:
-                delattr(real_module, "_sample_lineup")
-            except AttributeError:
-                pass
-        else:
-            real_module._sample_lineup = original
+def _call_native_engine_local(*, entrypoint_name: str, league_code: str, kwargs: dict[str, Any]):
+    """One engine call. The kwargs are filtered to the engine's positional/keyword parameters, as the vendored call
+    filtered them to the vendored signature. The engine-only keywords (league, sample_lineup, state) are the
+    engine object's to supply, never a caller's.
+    """
+    from syndicate.features.basketball_engine import engine as native_engine
+
+    params = inspect.signature(getattr(native_engine, entrypoint_name)).parameters
+    allowed = {name for name, p in params.items() if p.kind is not inspect.Parameter.KEYWORD_ONLY}
+    call_kwargs = {k: v for k, v in kwargs.items() if k in allowed}
+    return getattr(_engine_for_league_local(league_code), entrypoint_name)(**call_kwargs)
 
 
 def _simulate_pbp_game_boxscore_local(*, league_code: str = "nba", **kwargs):
-    # _local_simulate_pbp_game_boxscore below is a flat, deterministic
-    # stand-in (rounds the Gaussian quarter-mean straight to an integer
-    # score with zero per-sim variance) -- it produced identical score_q
-    # p10/p50/p90 across every simulation. The real events.py possession
-    # engine is pure computation with no file-I/O/paths dependency, so it
-    # is safe to call directly; only fall back to the flat stand-in if the
-    # vendor checkout genuinely can't be imported.
-    result = _call_real_events_entrypoint_local(entrypoint_name="simulate_pbp_game_boxscore", league_code=league_code, kwargs=kwargs)
-    if result is not None:
-        return result
-    # `#478`: the fallback builds the box dict whose `segment_seconds` the
-    # vendored engine TRUSTS over its own league-derived value, so it must
-    # know which league it is standing in for. Dropping `league_code` here
-    # is what let NBA geometry reach a WNBA sim.
-    return _call_events_entrypoint_local(entrypoint_name="simulate_pbp_game_boxscore", kwargs={**kwargs, "league_code": league_code})
+    return _call_native_engine_local(entrypoint_name="simulate_pbp_game_boxscore", league_code=league_code, kwargs=kwargs)
 
 
 def _simulate_event_level_boxscore_local(*, league_code: str = "nba", **kwargs):
-    result = _call_real_events_entrypoint_local(entrypoint_name="simulate_event_level_boxscore", league_code=league_code, kwargs=kwargs)
-    if result is not None:
-        return result
-    return _call_events_entrypoint_local(entrypoint_name="simulate_event_level_boxscore", kwargs=kwargs)
+    # The legacy non-PBP simulator REFUSES (NotImplementedError). In both vendored copies it raised a NameError on its
+    # first possession, for every input. See syndicate/features/basketball_engine/engine.py.
+    return _call_native_engine_local(entrypoint_name="simulate_event_level_boxscore", league_code=league_code, kwargs=kwargs)
 
 
 def _water_fill_minutes_local(base, *, total: float, caps):

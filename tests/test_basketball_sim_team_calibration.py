@@ -14,7 +14,12 @@ import pytest
 
 from syndicate.features.shared import basketball_props_smart_sim as sim
 
-events = sim._import_real_events_module_local(package_name="wnba_betting")
+from syndicate.features.basketball_engine import WNBA  # noqa: E402
+from syndicate.features.basketball_engine.league_engine import LeagueEngine  # noqa: E402
+
+# The WNBA engine with its default lineup sampler -- what this file tested when it called the vendored module
+# directly (native since 2026-10-09, lane basketball-native-engine; parity-gated against the vendored engine).
+events = LeagueEngine(WNBA)
 pytestmark = pytest.mark.skipif(events is None, reason="vendored wnba engine not importable")
 
 FLAGS = ("FOULED_MISS_NOT_FGA", "EXACT_TARGET_CALIBRATION", "TEAM_PRIOR_STACKS_ON_TARGET")

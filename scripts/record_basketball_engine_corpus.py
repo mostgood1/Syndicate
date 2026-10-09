@@ -138,6 +138,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--env-from-pid", type=int, default=None)
     ap.add_argument("--prod-data-root", default="~/syndicate-prod/data")
     ap.add_argument("--scratch-data-root", default=None)
+    ap.add_argument("--seed", type=int, default=None, help="fixed seed (also seeds the global numpy/random RNGs the quarter model draws from)")
+    ap.add_argument("--no-record", action="store_true", help="run the sim only (end-to-end A/B arm), record no corpus")
+    ap.add_argument("--out-prefix", default="engine_corpus")
     args = ap.parse_args(argv)
 
     source_root = args.source_root.expanduser().resolve()
@@ -159,7 +162,17 @@ def main(argv: list[str] | None = None) -> int:
     for date in [d.strip() for d in args.dates.split(",") if d.strip()]:
         rec = Recorder(out_dir, args.league, date, "simulate_pbp_game_boxscore")
         original = bps._simulate_pbp_game_boxscore_local
-        bps._simulate_pbp_game_boxscore_local = rec.wrap(original)
+        if not args.no_record:
+            bps._simulate_pbp_game_boxscore_local = rec.wrap(original)
+        if args.seed is not None:
+            # The quarter model draws from the GLOBAL numpy RNG (it takes no rng); seed both, as
+            # scripts/ab_basketball_sim_anchor.py does, so two arms differ only in the code under test.
+            import random
+
+            import numpy as np
+
+            np.random.seed(int(args.seed))
+            random.seed(int(args.seed))
         started = time.time()
         try:
             result = bps._smart_sim_run_date_local(
@@ -167,13 +180,13 @@ def main(argv: list[str] | None = None) -> int:
                 raw_root=source_root / "data" / "raw",
                 date_str=date,
                 n_sims=int(args.n_sims),
-                seed=None,
+                seed=args.seed,
                 max_games=args.max_games,
                 overwrite=True,
                 pbp=True,
                 workers=1,
                 roster_mode=bps._resolve_smart_sim_roster_mode_local(date_str=date, roster_mode="historical"),
-                out_prefix="engine_corpus",
+                out_prefix=str(args.out_prefix),
                 league_code=args.league,
             )
         finally:
@@ -187,6 +200,8 @@ def main(argv: list[str] | None = None) -> int:
         print("CORPUS_DATE " + json.dumps(row), flush=True)
         summary.append(row)
     (out_dir / f"record_summary_{args.league}.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    if args.no_record:
+        return 0 if all((r.get("run_summary") or {}).get("failures", 1) == 0 for r in summary) else 1
     return 0 if all(r["engine_calls"] > 0 for r in summary) else 1
 
 

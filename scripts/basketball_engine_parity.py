@@ -225,15 +225,53 @@ def synthetic_cases(n: int, seed: int = 20261009) -> Iterable[tuple[str, dict[st
         yield f"synthetic#{i}", {"league": league, "entrypoint": entrypoint, "kwargs": kwargs, "rng_state": state}
 
 
+def _strip_volatile(obj: Any, volatile: set[str]) -> Any:
+    if isinstance(obj, dict):
+        return {k: _strip_volatile(v, volatile) for k, v in obj.items() if k not in volatile}
+    if isinstance(obj, list):
+        return [_strip_volatile(v, volatile) for v in obj]
+    return obj
+
+
+def compare_sim_artifacts(dir_a: Path, prefix_a: str, dir_b: Path, prefix_b: str, volatile: set[str]) -> dict[str, Any]:
+    """End-to-end A/B: the smart_sim_<date>_<H>_<A>.json each arm wrote, leaf for leaf (volatile keys named, not hidden)."""
+    a_files = {p.name[len(prefix_a):]: p for p in Path(dir_a).glob(f"{prefix_a}_*.json")}
+    b_files = {p.name[len(prefix_b):]: p for p in Path(dir_b).glob(f"{prefix_b}_*.json")}
+    games = sorted(set(a_files) | set(b_files))
+    out: dict[str, Any] = {"games": len(games), "only_in_a": sorted(set(a_files) - set(b_files)), "only_in_b": sorted(set(b_files) - set(a_files)), "identical": 0, "differ": {}, "volatile_keys_ignored": sorted(volatile)}
+    for g in sorted(set(a_files) & set(b_files)):
+        ja = _strip_volatile(json.loads(a_files[g].read_text(encoding="utf-8")), volatile)
+        jb = _strip_volatile(json.loads(b_files[g].read_text(encoding="utf-8")), volatile)
+        d = leaf_diffs(ja, jb, "$", [], limit=10)
+        if d:
+            out["differ"][g] = d
+        else:
+            out["identical"] += 1
+    out["verdict"] = "PASS" if (out["identical"] == len(games) and games) else "FAIL"
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Native vs vendored basketball engine parity (exit 1 on any mismatch).")
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--corpus", type=Path, help="directory of recorded *.pkl games")
     src.add_argument("--synthetic", type=int, help="number of synthetic cases")
+    src.add_argument("--compare-sims", nargs=4, metavar=("DIR_A", "PREFIX_A", "DIR_B", "PREFIX_B"), help="end-to-end: compare two arms' smart_sim JSON artifacts")
+    ap.add_argument("--volatile-key", action="append", default=[], help="a key to ignore in --compare-sims (repeatable; listed in the report)")
     ap.add_argument("--sampler", choices=("production", "vendored_default"), default="production")
     ap.add_argument("--json-out", type=Path)
     ap.add_argument("--max-cases", type=int, default=None)
     args = ap.parse_args(argv)
+
+    if args.compare_sims:
+        da, pa, db, pb = args.compare_sims
+        report = compare_sim_artifacts(Path(da).expanduser(), pa, Path(db).expanduser(), pb, set(args.volatile_key))
+        text = json.dumps(report, indent=2)
+        print(text)
+        if args.json_out:
+            args.json_out.parent.mkdir(parents=True, exist_ok=True)
+            args.json_out.write_text(text, encoding="utf-8")
+        return 0 if report["verdict"] == "PASS" else 1
 
     sampler = production_sampler() if args.sampler == "production" else None
     cases = iter_corpus(args.corpus) if args.corpus else synthetic_cases(args.synthetic)

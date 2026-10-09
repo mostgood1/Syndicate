@@ -391,56 +391,36 @@ class BasketballPropsPredictionsTests(unittest.TestCase):
         self.assertEqual(quarter_splits_mock.call_count, 1)
         self.assertIs(quarter_splits_mock.call_args.kwargs["league"], fake_league)
 
-    def test_local_event_wrappers_route_usage_helper(self) -> None:
-        usage_calls: list[dict[str, object]] = []
-        entrypoint_calls: list[tuple[str, object]] = []
-        fake_events_module = SimpleNamespace()
+    def test_local_engine_wrappers_route_to_the_native_engine(self) -> None:
+        # Since 2026-10-09 (lane basketball-native-engine) both per-draw wrappers call Syndicate's engine, with the
+        # league and the local lineup sampler as ARGUMENTS. The flat fallback and its usage-helper patching are gone:
+        # a broken engine fails the game by name instead of publishing a zero-variance stand-in.
+        import functools
 
-        def _original_usage(*args, **kwargs):
-            raise AssertionError("expected local usage helper to be patched in")
+        from syndicate.features.basketball_engine import engine as native
 
-        def _fake_simulate_pbp_game_boxscore(**kwargs):
-            entrypoint_calls.append(("pbp", fake_events_module._player_usage_weights("players", "_prior_fga_pm", [1, 2, 3])))
-            return {"mode": "pbp", "kwargs": dict(kwargs)}
+        calls: list[tuple[str, str, object, dict]] = []
 
-        def _fake_simulate_event_level_boxscore(**kwargs):
-            entrypoint_calls.append(("event", fake_events_module._player_usage_weights("players", "_prior_tov_pm", [4, 5])))
-            return {"mode": "event", "kwargs": dict(kwargs)}
+        def _spy(name, original):
+            @functools.wraps(original)
+            def spy(*args, **kwargs):
+                calls.append((name, kwargs["league"].code, kwargs["sample_lineup"], {k: v for k, v in kwargs.items() if k not in ("league", "sample_lineup")}))
+                return name
 
-        fake_events_module._player_usage_weights = _original_usage
-        fake_events_module.simulate_pbp_game_boxscore = _fake_simulate_pbp_game_boxscore
-        fake_events_module.simulate_event_level_boxscore = _fake_simulate_event_level_boxscore
+            return spy
 
-        with patch.object(smart_sim_module, "_LOCAL_EVENTS_MODULE", fake_events_module), patch.object(
-            smart_sim_module,
-            "_player_usage_weights_local",
-            side_effect=lambda **kwargs: usage_calls.append(dict(kwargs)) or {"local_usage": kwargs["col_pm"]},
-        ), patch.object(
-            # The flat local stub is now a fallback used only when the real
-            # vendored events.py possession engine can't be imported (e.g.
-            # missing vendor checkout) -- force that path here so this test
-            # still exercises the fallback routing/usage-helper patching it
-            # was written to verify, rather than hitting the real engine
-            # (which requires real rng/players/etc. this synthetic test
-            # doesn't provide).
-            smart_sim_module,
-            "_call_real_events_entrypoint_local",
-            return_value=None,
+        with patch.object(native, "simulate_pbp_game_boxscore", _spy("pbp", native.simulate_pbp_game_boxscore)), patch.object(
+            native, "simulate_event_level_boxscore", _spy("event", native.simulate_event_level_boxscore)
         ):
-            pbp_out = smart_sim_module._simulate_pbp_game_boxscore_local(mode="pbp")
-            event_out = smart_sim_module._simulate_event_level_boxscore_local(mode="event")
+            pbp_out = smart_sim_module._simulate_pbp_game_boxscore_local(league_code="wnba", rng="R", home_players="H", mode="pbp")
+            event_out = smart_sim_module._simulate_event_level_boxscore_local(rng="R", home_q_pts=[1], mode="event")
 
-        self.assertEqual(pbp_out["mode"], "pbp")
-        self.assertEqual(event_out["mode"], "event")
-        self.assertEqual(entrypoint_calls, [("pbp", {"local_usage": "_prior_fga_pm"}), ("event", {"local_usage": "_prior_tov_pm"})])
-        self.assertEqual(
-            usage_calls,
-            [
-                {"players": "players", "col_pm": "_prior_fga_pm", "lineup_idx": [1, 2, 3]},
-                {"players": "players", "col_pm": "_prior_tov_pm", "lineup_idx": [4, 5]},
-            ],
-        )
-        self.assertIs(fake_events_module._player_usage_weights, _original_usage)
+        self.assertEqual((pbp_out, event_out), ("pbp", "event"))
+        self.assertEqual([(c[0], c[1]) for c in calls], [("pbp", "wnba"), ("event", "nba")])
+        self.assertTrue(all(c[2] is smart_sim_module._sample_lineup_local for c in calls))
+        self.assertEqual(calls[0][3], {"rng": "R", "home_players": "H"})  # `mode` is not an engine argument: dropped
+        self.assertFalse(hasattr(smart_sim_module, "_LOCAL_EVENTS_MODULE"))
+        self.assertFalse(hasattr(smart_sim_module, "_call_real_events_entrypoint_local"))
 
     def test_export_props_predictions_local_uses_local_branch_without_smart_sim(self) -> None:
         with TemporaryDirectory() as tmp_dir:

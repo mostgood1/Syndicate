@@ -639,3 +639,73 @@ Possessions ARE derived and used in production — just not from the live
 payload the original finding was about. Recommend updating the terse
 `learnings.md` line to point at `game_shape.py`'s fuller explanation rather
 than fixing anything in code.
+
+---
+
+## 9. The possession engine is Syndicate's — pipeline trace from the per-draw call down `[2026-10-09, lane basketball-native-engine, plan P1]`
+
+Plan: `docs/ai_context/basketball_live_native_plan.md` (P1). The engine that
+draws every possession is `syndicate/features/basketball_engine/`. It is no
+longer `vendor/{nba,wnba}_betting_repo/src/*/sim/events.py`. Sec1 above still
+describes the layers that BUILD the engine's inputs, and those are unchanged.
+
+```
+scripts/refresh_{nba,wnba}_oddsapi_props.py   export_props_predictions_local(...)   (nba :3239, wnba :4989)
+  -> basketball_props_predictions.export_props_predictions_local                    (:409 -> :457)
+    -> basketball_props_smart_sim.export_props_predictions_with_smart_sim_local      (:6019)
+      -> _smart_sim_run_date_local                                                   (:5271)
+        -> _smart_sim_worker_run_local                                               (:5093)
+          -> _call_source_simulate_smart_game_local                                  (:4404)
+               replacements["simulate_pbp_game_boxscore"] =
+                 _recording_sim_draws_local(lambda **kw: _simulate_pbp_game_boxscore_local(league_code=..., **kw))  (:4526)
+            -> VENDORED smart_sim.simulate_smart_game, per draw                      (nba :3883, wnba :4145)
+                 calls the REPLACED name (its own `from .events import ...` binding is overwritten first)
+              -> _simulate_pbp_game_boxscore_local                                   (:3173)
+                -> _call_native_engine_local    kwargs filtered to the engine signature (:3160)
+                  -> _engine_for_league_local   LeagueEngine(league_params(code), sample_lineup=_sample_lineup_local)  (:3144)
+                    -> syndicate/features/basketball_engine/engine.py
+                         simulate_pbp_game_boxscore(..., league=LeagueParams, sample_lineup=..., state=None)
+   writes: nothing. It returns (home_box, away_box, home_q_pts, away_q_pts) for each draw. The smart sim
+           writes <processed_root>/smart_sim_<date>_<HOME>_<AWAY>.json, as in Sec1.
+```
+
+**What the engine reads.** Only its arguments. It opens no file and reads no
+env. `LeagueParams` (`league.py`) are code constants, one set per league. Every
+data input reaches it as a kwarg built by the smart-sim layer, which is
+disk-backed and allowlisted as Sec1-Sec5 describe. The gating checklist is
+`scripts/basketball_engine_input_checklist.py`. It enumerates
+`dataclasses.fields()` of `EventSimConfig` / `LeagueParams` / `GameState`,
+derives consumption from the engine's AST, measures population over a
+recorded production corpus, checks that production's per-draw helper reaches
+the native engine, and exits 1 on an alarm.
+
+**Reuse flag.** `_smart_sim_run_date_local` REUSES an existing
+`smart_sim_<date>_*.json` unless `overwrite` is set or `smart_sim_reuse` decides
+to re-simulate it. So an engine change reaches only games simulated after it.
+For P1 that is harmless, because parity is exact. For any P3 engine change it
+means a re-sim.
+
+**Parity, and how to re-run it.**
+`scripts/record_basketball_engine_corpus.py` records real production engine
+calls on the fleet: the kwargs, the RNG state before each call, and a digest of
+the output production computed. It runs against a SCRATCH copy of the data
+root. `scripts/basketball_engine_parity.py --corpus <dir>` replays every call
+through the vendored engine and through the native one. It fails on any leaf
+difference, on any difference in the RNG state after the call, and on any call
+whose vendored replay does not reproduce production's recorded output.
+`scripts/port_basketball_engine.py` regenerates `engine.py` from the vendored
+NBA source, with anchor-checked edits, and records how the port was derived.
+
+**Not ported, deliberately:** `simulate_event_level_boxscore` (the non-PBP
+path). In both vendored copies it raised `NameError: period_seconds` on its
+first possession, for every input. The native one refuses by name.
+
+**STILL VENDORED after P1, and NO phase in the plan owns it.** The orchestrator
+`vendor/{pkg}_repo/src/{pkg}/sim/smart_sim.py:simulate_smart_game` (nba 4,652 /
+wnba 4,930 lines) is still imported and run. It runs the per-draw loop, the
+quarter model, the player-store aggregation and the ladders, with ~20 helpers
+replaced by Syndicate ports (Sec0). Its module import also still imports the
+vendored `events.py`. No vendored engine code EXECUTES, because the binding is
+replaced before every call, but the import is a dependency. The user decision
+of 2026-10-09 ("not reliant on the vendored app IN ANY WAY") is not met until
+someone ports this orchestrator.
