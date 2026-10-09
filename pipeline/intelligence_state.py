@@ -768,6 +768,46 @@ def _watched_payload_eviction_reason(payload: dict[str, Any] | None, today_iso: 
 _PERSISTED_SNAPSHOTS_BUDGET_BYTES = 6 * 1024 * 1024
 
 
+_QUERY_STATE_LAYER2_OMITTED_KEY = "omitted_from_query_state_cache"
+
+
+def _query_state_persist_response(response: Any) -> Any:
+    """A snapshot response as STATE_PATH stores it: `layer2_shortlist` omitted.
+
+    Lane `query-state-cache-oversize`. Measured on the fleet 2026-10-09: the
+    shortlist was 40,805,534 of a response's 42,396,873 raw bytes (96%), which
+    compresses to ~5.36MB per snapshot against ~215KB without it. The cache
+    holds one snapshot per board-window date (2-3), so every write that day
+    was refused at 11.7-13.5MB and fell back to `_budgeted_snapshots_payload`,
+    whose RAW-byte budget cannot keep even one 42MB snapshot: 546 of 546
+    fallbacks wrote `kept_full=0`, i.e. a cache with no response at all.
+
+    The shortlist is not lost: `write_layer2_shortlist` already persists it per
+    date as its own artifact, and every served Layer 2 surface reads it through
+    `read_layer2_shortlist(date)`, never off this response. What stays is a
+    marker with the date and row count, deliberately WITHOUT a `rows` key, so a
+    consumer that wrongly reaches for rows here gets None rather than an empty
+    list that reads like "the gate rejected everything".
+
+    The in-memory snapshot is untouched; only the persisted copy changes.
+    """
+    if not isinstance(response, dict):
+        return response
+    shortlist = response.get("layer2_shortlist")
+    if not isinstance(shortlist, dict) or shortlist.get(_QUERY_STATE_LAYER2_OMITTED_KEY):
+        return response
+    rows = shortlist.get("rows")
+    cards = shortlist.get("cards")
+    marker = {
+        _QUERY_STATE_LAYER2_OMITTED_KEY: True,
+        "read_from": "read_layer2_shortlist",
+        "selected_date": shortlist.get("selected_date") or response.get("selected_date"),
+        "rows_count": len(rows) if isinstance(rows, list) else None,
+        "cards_count": len(cards) if isinstance(cards, list) else None,
+    }
+    return {**response, "layer2_shortlist": marker}
+
+
 def _budgeted_snapshots_payload(snapshots_payload: dict[str, dict[str, Any]], latest_key: str | None) -> dict[str, dict[str, Any]]:
     """The snapshots section trimmed to fit the keyvalue ceiling.
 
@@ -9417,7 +9457,7 @@ class IntelligenceStateService:
             key: {
                 "key": snapshot.key,
                 "payload": snapshot.payload,
-                "response": snapshot.response,
+                "response": _query_state_persist_response(snapshot.response),
                 "computed_at": snapshot.computed_at,
                 "source_fingerprint": snapshot.source_fingerprint,
             }
