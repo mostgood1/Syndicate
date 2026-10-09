@@ -851,3 +851,23 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
 
 **LEAD:** duplicated matchups. 12 keys on 6 dates in Dec-Jan get two sim jobs with different game-model inputs; the
 later one overwrites the smart_sim file. Source not traced; see the next leads.md entry.
+
+### Phase 2 #1f — FIX BUILT + measurement PRE-REGISTERED 2026-10-09 ~18:00Z, BEFORE reading it
+
+**Fix (51d08f7a):** file switch `nba_sim_total_inputs.json` on the NBA processed root.
+- `skip_def_subtraction`: the WNBA points-derived rule.
+- `skip_outs_penalties`: no injury pace drag, no −0.5/out.
+- NBA only; absent = today. Recorded in market_anchor.nba_total_inputs when present.
+- basketball_props_smart_sim.py: user-approved edit. At edit time NO open lane claimed the file
+  (lane basketball-injury-exclusion-reinclusion is no longer OPEN; `lane_claims._claims` shows no claim), so no loan
+  was needed. Tests 3/3, plus 44 neighbouring tests.
+
+**Measurement:**
+- **(1) Walk-forward:** the #1e recipe re-run on the switched raw (fit_raw D1 + D2 counterfactual, identity-validated
+  on 784 games).
+  - Gate as #1e: |calibrated raw bias| < 2 and MAE change CI < 0. Expect a global term near +3, inside ±15.
+- **(2) End-to-end, 12 dates:** combined config + switch file ON (both keys) + calibration files re-fitted
+  walk-forward on the switched raw.
+  - PASS if sim total bias vs real is within ±1.5, S8 total SD no worse than run noise vs E2E (the #1e point), and
+    S8 margin / S5 / S3 rows not worse than run noise vs E2E.
+- No production change without the user.
