@@ -69,8 +69,15 @@ def _read(path: Path) -> dict:
 
 
 def _is_worker() -> bool:
-    # The web never writes the record (display-only role); it reads it.
-    return not os.environ.get("SYNDICATE_WEB_DYNO")
+    """The web never writes the record (display-only role); it reads it.
+
+    NOT `SYNDICATE_WEB_DYNO`: the local fleet loads one env file into every
+    role, so the refresh-worker carries it too (measured 2026-10-09 -- the first
+    deploy wrote no record). The web is the process gunicorn runs.
+    """
+    import sys
+
+    return not os.environ.get("GUNICORN_CMD_ARGS") and "gunicorn" not in os.path.basename(sys.argv[0] or "")
 
 
 def record_plays(date: str, cards: Iterable[Mapping[str, Any]]) -> int:
