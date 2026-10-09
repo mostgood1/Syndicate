@@ -32,7 +32,16 @@ if str(ROOT) not in sys.path:
 def _run(arm: str, rest: list[str]) -> int:
     from scripts import record_basketball_engine_corpus as rec
 
-    value = "1" if arm == "on" else "0"
+    value = "0" if arm == "off" else "1"
+    if arm == "on_nostack":
+        # DIAGNOSTIC ARM, scratch only: NBA stops multiplying the team prior onto the market-anchored points target,
+        # as WNBA has since 2026-10-01. Separates what the input does from the double count it switches on.
+        # Pair it with `nba_sim_total_inputs.json` {"skip_def_subtraction": true} in the arm's scratch processed root.
+        from dataclasses import replace
+
+        from syndicate.features.basketball_engine import league
+
+        league._BY_CODE["nba"] = replace(league.NBA, team_prior_stacks_on_target=False)
     os.environ["SYNDICATE_NBA_TEAM_INPUTS"] = value
     original = rec.load_role_env
 
@@ -115,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv[:1] == ["run"]:
         ap = argparse.ArgumentParser()
-        ap.add_argument("--arm", required=True, choices=("on", "off"))
+        ap.add_argument("--arm", required=True, choices=("on", "off", "on_nostack"))
         rest = argv[argv.index("--") + 1:] if "--" in argv else []
         args = ap.parse_args(argv[1:argv.index("--")] if "--" in argv else argv[1:])
         return _run(args.arm, rest)

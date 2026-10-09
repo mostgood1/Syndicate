@@ -170,3 +170,16 @@ def test_no_prior_season_shrinks_current_toward_the_mean(tmp_path):
     mean, raw = cur["off_rtg"].mean(), cur.set_index("team").loc["NYK", "off_rtg"]
     assert set(out["population"]) == {"current_regular_shrunk_to_mean"}
     assert out.loc["NYK", "off_rtg"] == pytest.approx((5 * raw + nti.NO_PRIOR_GAMES_K * mean) / (5 + nti.NO_PRIOR_GAMES_K))
+
+
+def test_starters_fall_back_to_the_whole_prior_regular_season_not_its_last_week(tmp_path):
+    rows = []
+    for i in range(10):  # 2025-26 regular season: "Star" starts 8 of 10, rested in the final two (tank week)
+        starters = ["Star", "B", "C", "D", "E"] if i < 8 else ["Bench", "B", "C", "D", "E"]
+        rows += _check_rows(f"2026-03-{i + 1:02d}", f"r{i}", 2026, "regular", "UTA", starters, [n for n in ("Star", "Bench") if n not in starters])
+    rows += _check_rows("2026-10-02", "p0", 2027, "preseason", "UTA", ["Bench", "B", "C", "D", "E"], ["Star"])  # 1 current game < 3
+    _write_checks(tmp_path, rows)
+    out = nti.build_starters(processed_root=tmp_path, date_str="2026-10-04", slate_phase="preseason").set_index("player_name")
+    assert set(out["exp_min_source"]) == {"nba_starters_v1:2026_regular_full:last10"}
+    assert out.loc["Star", "starter_prob"] == pytest.approx(0.8) and bool(out.loc["Star", "is_starter"])
+    assert out.loc["Bench", "starter_prob"] == pytest.approx(0.2) and not bool(out.loc["Bench", "is_starter"])
