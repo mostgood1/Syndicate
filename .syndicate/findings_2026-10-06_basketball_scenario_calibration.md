@@ -599,3 +599,53 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
   reads, so ONE full re-run covers the combined config.
   - Deviation from #1c's "full FIT re-run follows a confirmation" (amended here, before #1d data): it saves a ~6 h
     run and reads the same rows.
+
+### Phase 2 #1d — RESULT 2026-10-09 ~00:30Z (7:30 PM CDT 10-08)
+
+**Run:**
+- T2 = J1 + no stacking (control). P = T2 + the six ported switches (SHOOTER_FT_RATE, FOULED_MISS_NOT_FGA,
+  EXACT_TARGET_CALIBRATION, TOV_PER_ATTEMPT, PLAYER_REBOUND_CREDIT, BLOCK_MODE = team_prior, BLOCK_ALLOC_BY_RATE).
+- Both 87/87 games, all engine calls carrying every lever and switch.
+- The first P launch ran 0 games because of a harness bug (fixed 2681c800, see the log). That launch was discarded.
+- Real side: re-extracted ESPN boxes (realx, 816 games).
+
+**Per-switch target rows** (team per game; real / T2 / P; P − T2 [95% CI]; run noise T2 vs T):
+
+| switch | row | real | T2 | P | P − T2 [95% CI] |
+|---|---|---|---|---|---|
+| FOULED_MISS_NOT_FGA | FGA | 89.63 | 94.11 | **88.59** | −5.53 [−5.68, −5.37] |
+| FOULED_MISS_NOT_FGA | FG% | .468 | .449 | **.462** | — |
+| EXACT_TARGET_CALIBRATION | sim total − anchored target, per game | — | +5.71 | **−1.18** | −0.59/team, \|bias\| < 1 PASS |
+| SHOOTER_FT_RATE | FTA | 22.76 | 20.72 | 21.18 | +0.47 [+0.28, +0.65] |
+| TOV_PER_ATTEMPT | TOV | 14.24 | 15.67 | **14.35** | −1.32 |
+| PLAYER_REBOUND_CREDIT | REB | 44.20 | 44.57 | **44.13** | −0.44 |
+| BLOCK_MODE + BLOCK_ALLOC_BY_RATE | BLK | 4.94 | 2.77 | **5.24** | +2.47 |
+
+- SHOOTER_FT_RATE's top-2 concentration is **UNREAD** (no player-level reading in this harness); only its team FTA
+  row passed.
+- Run noise T2 vs T is ≤ 0.10 on every row read. **Every pre-registered target row moved toward real, by far more
+  than noise.**
+
+**Guards** (T2 → P, moves vs real):
+- **Toward real:** S1 pace 118.9 → 112.3 (real 113.9); S8 total SD 18.56 → 18.37; S8 margin SD 17.92 → 17.63;
+  S9 3PA; S7 ties.
+- **Away, small:** S3 P1 quarter-total SD 8.93 → 8.76 (real 8.92, still inside the real CI); S11 foul-outs +0.020;
+  S5 rows ≤ 0.013 (within noise).
+- **Not guarded, moved away:** AST 24.5 → 23.7 (real 27.3); STL 8.59 → 7.88 (real 8.36); FT% .812 → .781 (real .796);
+  3P% .380 → .394 (real .360).
+
+**MATERIAL FINDING — the NBA totals TARGET is low; EXACT calibration exposes it:**
+- On the 87 games: market total 230.70, real 230.62 (market unbiased, −0.07). But **model_total_raw 215.40
+  (−15.3 vs market)**.
+- At total_w 0.7 the anchored target is 226.11, ~4.5 low. The old engine overshot its target by +5.7 and hid this.
+  With EXACT calibration the sim lands ON the low target: points/team 112.7 vs real 115.3.
+- **This is WNBA's G1** (lane wnba-game-total-level, closed 2026-10-01): the vendored game model's raw total is
+  biased, and the designed correction (`calibration_totals_<date>.json`, read by `_apply_totals_calibration_local`)
+  is written by NOTHING for NBA. WNBA got `scripts/build_wnba_totals_calibration.py`; NBA has no builder.
+- => EXACT_TARGET_CALIBRATION must NOT be adopted for NBA without an NBA totals-calibration builder. Production today
+  is "right" on totals only because two errors cancel.
+
+**Verdict #1d:**
+- All six switches CONFIRMED on their own target rows.
+- Combined adoption BLOCKED on the NBA totals-target bias (new item, port of WNBA G1).
+- No production change.
