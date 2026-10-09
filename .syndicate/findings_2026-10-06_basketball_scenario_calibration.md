@@ -890,3 +890,30 @@ later one overwrites the smart_sim file. Source not traced; see the next leads.m
 - Seed for opening night (final 14 days, switched raw): +2.50.
 - Calibration files for the 12 dates were written to `C:	mpball_sc\calfiles_sw` (walk-forward, switched raw)
   for measurement (2), which was launched 2026-10-09 17:51Z.
+
+### Phase 2 #1f — measurement (2) RESULT: end-to-end with the switches (read 2026-10-09)
+
+**Run:** E2E_sw = combined config + `nba_sim_total_inputs.json` (both keys on) + calibration files re-fitted
+walk-forward on the switched raw.
+- 12 dates, 87/87 games, 17,400/17,400 engine calls with every lever and switch.
+- **Reach:** market_anchor.nba_total_inputs both-on in 87/87 games.
+
+| point | sim total bias vs real [95% CI] | MAE | target bias | S8 total SD | S8 margin SD |
+|---|---|---|---|---|---|
+| E2E (#1e: calibration only) | −1.18 | 13.53 | −0.68 | 18.45 | 17.48 |
+| **E2E_sw (switches + calibration)** | **−0.35** [−4.03, +3.51] | **13.47** | +0.33 | 18.51 | 17.68 |
+
+**Guards** (E2E_sw vs E2E; run noise ≈ √2 × single-run sim SE):
+- Within noise: S8 total +0.06 (noise 0.17), S3 quarter totals, S1, S6, S9, S7, S11, S10.
+- **Away from real, beyond noise:**
+  - S8 margin SD +0.20 (noise 0.13);
+  - S5 blowouts all +0.010 (noise 0.006).
+- S5 at |spread| 8.5+ moved TOWARD real (+0.021).
+
+**VERDICT by the letter:**
+- Total bias PASS (within ±1.5); S8 total PASS.
+- **Guard FAIL on S8 margin and S5-all**, small (+1.1% / +1 pt).
+- Likely mechanism, stated not proven: the switches raise scoring ~4 pts/game to its real level, and margin
+  dispersion scales with points. This is the known margin excess (M-B, missing late-game catch-up) showing more at
+  the correct level, not a new defect.
+- Not re-scored. The decision is the user's.
