@@ -159,3 +159,14 @@ def test_reachability_starter_flags_on_vs_off(tmp_path):
     with mock.patch.object(nti, "ensure_starters") as ensure:
         bpss._load_pregame_expected_minutes_local(processed_root=tmp_path, date_str="2026-10-10", league_code="wnba")
     ensure.assert_not_called()
+
+
+def test_no_prior_season_shrinks_current_toward_the_mean(tmp_path):
+    games = [{"id": f"00226{i:05d}", "date": f"2026-10-{21 + i:02d}", "season": "2026-27", "sid": "22026",
+              "home": "NYK", "away": "BOS", "hp": 115, "ap": 105} for i in range(5)]
+    _write_logs(tmp_path, games)
+    out = nti.build_team_ratings_asof(processed_root=tmp_path, season=2027, as_of="2026-10-31").set_index("team")
+    cur = nti.team_season_ratings(nti._load_regular_player_logs(tmp_path), season_label="2026-27")
+    mean, raw = cur["off_rtg"].mean(), cur.set_index("team").loc["NYK", "off_rtg"]
+    assert set(out["population"]) == {"current_regular_shrunk_to_mean"}
+    assert out.loc["NYK", "off_rtg"] == pytest.approx((5 * raw + nti.NO_PRIOR_GAMES_K * mean) / (5 + nti.NO_PRIOR_GAMES_K))

@@ -22,7 +22,9 @@ WHAT THIS BUILDS, and which POPULATION each number comes from (never mixed acros
         rating = (n * current + K * (mean + BETA * (prior - mean))) / (n + K)
     BETA = 0.573: slope of next-season on this-season mean margin, 270 team-season pairs, regular seasons 2017-2026
     (`games_nba_api.csv`). K = 15 games: minimised rest-of-season margin MSE over n in {3,5,10,20} (flat 12..20). At
-    n = 0 the shrunk prior cut rest-of-season margin MSE 25.47 -> 17.81 vs a neutral rating. BETA is measured on
+    n = 0 the shrunk prior cut rest-of-season margin MSE 25.47 -> 17.81 vs a neutral rating. With NO prior season
+    (an expansion team, or a history replay whose prior season is not in player_logs.csv) the current rating is shrunk
+    toward the league mean with NO_PRIOR_GAMES_K = 10 (same MSE fit, no prior term; flat 8..12). BETA is measured on
     MARGIN and applied to every rating column's deviation; per-column persistence is not separately measured.
   * `build_starters` -> `pregame_expected_minutes_<date>.csv` with STARTER COLUMNS ONLY (no `exp_min_*`, so the
     sim's minutes inputs are untouched): starter_prob = share of the team's last 5 games (date < slate) in which ESPN's
@@ -45,6 +47,7 @@ TEAM_RATINGS_SOURCE = "syndicate_nba_team_inputs_v1"
 STARTERS_SOURCE_PREFIX = "nba_starters_v1"
 YOY_BETA = 0.573
 PRIOR_GAMES_K = 15.0
+NO_PRIOR_GAMES_K = 10.0  # shrink toward the league mean when a team has no prior season; measured, see docstring
 STARTER_WINDOW = 5
 STARTER_MIN_SAME_PHASE = 3
 STARTER_FLAG_MIN_PROB = 0.6  # started >= 3 of the last 5
@@ -170,6 +173,7 @@ def build_team_ratings_asof(*, processed_root: Path, season: int, as_of: str):
     for team in teams:
         n = float(cur_i.at[team, "games"]) if (cur_i is not None and team in cur_i.index) else 0.0
         has_prior = prior_i is not None and team in prior_i.index
+        k = PRIOR_GAMES_K if has_prior else NO_PRIOR_GAMES_K
         row: Dict[str, Any] = {"team": team, "games": int(n), "prior_games": int(prior_i.at[team, "games"]) if has_prior else 0}
         for c in RATING_COLS:
             if has_prior:
@@ -177,7 +181,7 @@ def build_team_ratings_asof(*, processed_root: Path, season: int, as_of: str):
             else:  # no prior rating (expansion/relabel): shrink toward the league mean with the same weight
                 anchor = cur_mean.get(c, prior_mean.get(c, float("nan")))
             cur_v = float(cur_i.at[team, c]) if n > 0 else 0.0
-            row[c] = (n * cur_v + PRIOR_GAMES_K * anchor) / (n + PRIOR_GAMES_K)
+            row[c] = (n * cur_v + k * anchor) / (n + k)
         row["population"] = ("prior_regular_shrunk" if n == 0 else "current_regular_blend") if has_prior else "current_regular_shrunk_to_mean"
         rows.append(row)
     out = pd.DataFrame(rows).replace([np.inf, -np.inf], np.nan)
