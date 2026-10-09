@@ -48009,3 +48009,11 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - MET if every game has |served - new| < |served - old|, and |new - old| > 3 SE. The expected ~19% HR drop makes this discriminating per game.
   - A watcher is armed (scratchpad hrv2b_watch.sh).
 - verify: V2b reading on the next post-ship sim.
+
+## 2026-10-09 00:35Z (7:35 PM CT 10-08) -- READING for 8f7a2e59 + eac5ef96 + 018a7c64 (NFL QB props: refusal, yards starts-only, attempts official + starts-only) -- **MET** (lane `nfl-passing-yards-prop-coin`, CLOSED)
+
+- **source:** fleet refresh-worker log + `~/syndicate-prod/data/nfl_source/nfl_prop_projections_2026_wk5.json` (generated_at 2026-10-09T00:13:33Z, 1,331 rows), read-only; recomputation with the fleet checkout's own code (018a7c64) against the fleet data, `nice -n 19`, no role env.
+- **refusal:** `[nfl_props] JOIN ... week=5` refused_qb_starts = 22 (21:45:54Z), 20 (23:04:35Z), 21 (00:13:33Z); Jayden Daniels / Jalon Daniels / Tyson Bagent absent from passing_yards and passing_attempts rows. (The 13:48Z pre-change build had no such counter.)
+- **passing_yards (eac5ef96):** 113 rows / 27 QBs. Artifact `projected_value` and `sample_games` == `qb_starts_only_rate` x context for 25/25 resolvable QBs; for the 3 QBs whose starts-only and all-games rates differ, the artifact carries the starts-only value. Mean P(over) 0.503 (pre-change ~0.42 on the FIT read).
+- **passing_attempts (018a7c64):** 40 rows / 26 QBs; 24/24 resolvable QBs match the starts-only rate computed on OFFICIAL attempts; 2 QBs with differing rates carry the starts-only value. Projection - line median +0.38 / mean +0.50 (sack-inflated ~+1.3 before); mean P(over) 0.485.
+- 2 QBs per market unresolved by MY check only (it calls the name resolver without game teams); not an artifact defect.
