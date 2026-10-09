@@ -101,11 +101,31 @@ class LeagueRules:
         return p
 
 
-RULES: dict[str, LeagueRules] = {
-    "nba": LeagueRules("nba", 4, 720, 300, 6, 4, 3, None, True, "period", 0.44),
-    "wnba": LeagueRules("wnba", 4, 600, 300, 6, 4, 3, None, True, "period", 0.44),
-    "ncaab": LeagueRules("ncaab", 2, 1200, 300, 5, 6, 6, 9, False, "half", 0.475),
-}
+# Possessions = FGA + TOV + c*FTA - OREB. `c` is an ESTIMATOR, not a rule, so it lives here.
+POSSESSION_FTA_COEF = {"nba": 0.44, "wnba": 0.44, "ncaab": 0.475}
+
+
+def _from_rulebook(code: str) -> LeagueRules:
+    """This module's view of the ONE rulebook, `basketball_league_rules` (agreed P1/P2/P4 2026-10-09).
+
+    The rulebook states thresholds as "the award starts FROM the Nth team foul, counting this one";
+    `penalty_after` here is the count of fouls already committed, i.e. N - 1.
+    """
+    from syndicate.features.shared import basketball_league_rules as rulebook
+
+    r = rulebook.rules_for(code)
+    first_award = r.one_and_one_from or r.two_shots_from
+    ot_first = r.overtime_two_shots_from or first_award  # NCAAB: overtime continues the 2nd half's count
+    return LeagueRules(
+        code=r.league, regulation_periods=r.periods, period_sec=r.period_seconds, ot_sec=r.overtime_seconds,
+        foul_out=r.foul_out, penalty_after=first_award - 1, ot_penalty_after=ot_first - 1,
+        double_bonus_after=(r.two_shots_from - 1) if r.one_and_one_from else None,
+        last_two_minute_rule=r.late_period_seconds is not None, foul_period=r.bonus_scope,
+        possession_fta_coef=POSSESSION_FTA_COEF[code],
+    )
+
+
+RULES: dict[str, LeagueRules] = {code: _from_rulebook(code) for code in ("nba", "wnba", "ncaab")}
 
 
 def rules_for(league: str) -> LeagueRules:

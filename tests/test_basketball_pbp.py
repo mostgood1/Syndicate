@@ -131,3 +131,15 @@ def test_live_game_leaves_the_current_stint_open():
     assert len(open_home) == 1 and "h6" in open_home[0].lineup
     assert open_home[0].end_elapsed == pytest.approx(270.0)  # 4:30 into the game: the last play
     assert rec.on_floor["home"] == sorted(["h2", "h3", "h4", "h5", "h6"])
+
+
+def test_rules_come_from_the_one_rulebook():
+    expected = {  # the values the 2026-10-09 backfill was graded with
+        "nba": (4, 720, 300, 6, 4, 3, None, True, "period"),
+        "wnba": (4, 600, 300, 6, 4, 3, None, True, "period"),
+        "ncaab": (2, 1200, 300, 5, 6, 6, 9, False, "half"),
+    }
+    for code, values in expected.items():
+        r = pbp.rules_for(code)
+        assert (r.regulation_periods, r.period_sec, r.ot_sec, r.foul_out, r.penalty_after, r.ot_penalty_after,
+                r.double_bonus_after, r.last_two_minute_rule, r.foul_period) == values, code
