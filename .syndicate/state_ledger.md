@@ -1501,11 +1501,23 @@ are GREEN in the complete checkout — so those ~77 failures were data dependenc
 confirmed by disappearance rather than inferred from test names. **Never quote a
 sparse-worktree failure count as the suite's state.**
 
-The 55 real failures sit in 26 files with **zero overlap** against the 23 files
-isolated from the sparse run, concentrated in NFL / layer2 / props / refresh
-(`test_nfl_player_stats.py` 14, `test_layer2_out_player_gate.py` 5,
-`test_nfl_props.py` 4, `test_refresh_worker.py` 4). NOT yet re-run in isolation,
-so not yet established as defects.
+The 52 distinct failures sit in 26 files with **zero overlap** against the 23 files
+isolated from the sparse run -- so a sparse run does not even identify the right
+FILES. All 26 were re-run per file, alone, in the primary tree:
+**37 REPRODUCED, 15 run-dependent, 0 only-in-isolation.**
+
+The complete checkout is therefore far MORE deterministic than the sparse runs
+suggested (those scored 92/56/41, with 41 failures appearing only in isolation).
+The instability was substantially the sparse tree plus a saturated host, not the
+tests. Reproducing clusters worth owning: **`test_nfl_player_stats.py` 14/14**
+(including `test_shrinkage_is_REACHABLE_off_differs_from_on`, which by the
+model-engine standard means a feature may be inert),
+**`test_layer2_out_player_gate.py` 5/5**, `test_ncaaf_props_board.py` 2/2,
+`test_nfl_props_board.py` 2/2, `test_nfl_props.py` 3/4. Run-dependent (pass alone,
+so NOT defects on this evidence): `test_refresh_worker.py` 2,
+`test_board_freshness_derived.py` 2, `test_market_gone_drop.py` 2,
+`test_publisher_identity_header.py` 2, and 7 singletons.
+Full list: `.syndicate/findings_2026-10-09_suite_baseline.md`.
 
 ## [test-suite-writes-tracked-mirror] THE TEST SUITE WROTE INTO THE TRACKED `data/` MIRROR, AND NOTHING SAID SO — **GUARDED SINCE 2026-09-09** `[lane data-tree-write-guard, commits b099d557..e35f710f, NO DEPLOY]`
 

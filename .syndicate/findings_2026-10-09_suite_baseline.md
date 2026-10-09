@@ -127,3 +127,132 @@ complete checkout removes the data-dependent class outright.
 
 Output lives at `C:/tmp/a1-draft/final_pr.txt` (worktree run: `final_wt.txt`,
 117 MB; per-file isolation results: `C:/tmp/a1-draft/rerun/*.txt`).
+
+## 7. RESOLVED — the primary-tree baseline and its classification
+
+The run finished **2026-10-09 12:30:35**, 1 day 3h59m25s, primary tree
+`4d9f4ade`, one process at Idle, no `--ignore` list:
+
+    49 failed, 22701 passed, 33 skipped, 1 xfailed, 16 warnings, 6 errors,
+    602 subtests passed in 100765.20s (1 day, 3:59:25)
+
+All 26 failing files were then re-run per file, alone, in the same tree. Node
+names come from pytest's own `-rfE` summary in BOTH runs, so this is a direct
+comparison and not a position-mapping; parametrize ids are normalised.
+
+```
+  files re-run: 26 of 26   (complete)
+
+  REPRODUCED       37   real candidate defects
+  NOT REPRODUCED   15   run-dependent in the full suite
+  ONLY ISOLATED     0   the full run was masking these
+
+    file                                                 run  iso  repro  rundep  new
+    tests/test_board_freshness_derived.py                  2    0      0       2    0
+    tests/test_duplicate_module_names.py                   1    1      1       0    0
+    tests/test_fetch_ncaaf_oddsapi_props_local.py          1    0      0       1    0
+    tests/test_intelligence_state_persist_budget.py        1    1      1       0    0
+    tests/test_layer2_fast_refresh.py                      1    0      0       1    0
+    tests/test_layer2_out_player_gate.py                   5    5      5       0    0
+    tests/test_layer2_prior_date_carryover.py              1    0      0       1    0
+    tests/test_layer2_row_context.py                       1    1      1       0    0
+    tests/test_layer2_row_parity.py                        1    1      1       0    0
+    tests/test_market_gone_drop.py                         2    0      0       2    0
+    tests/test_nba_cards_keyvalue_backend.py               1    0      0       1    0
+    tests/test_ncaaf_live_resim.py                         1    1      1       0    0
+    tests/test_ncaaf_props_board.py                        2    2      2       0    0
+    tests/test_nfl_injury_adjustment.py                    1    0      0       1    0
+    tests/test_nfl_market_board.py                         1    1      1       0    0
+    tests/test_nfl_player_stats.py                        14   14     14       0    0
+    tests/test_nfl_props.py                                4    3      3       1    0
+    tests/test_nfl_props_board.py                          2    2      2       0    0
+    tests/test_nhl_confirmed_goalies.py                    1    1      1       0    0
+    tests/test_probability_differential.py                 1    1      1       0    0
+    tests/test_publisher_identity_header.py                2    0      0       2    0
+    tests/test_refresh_worker.py                           2    0      0       2    0
+    tests/test_slate_date_timezone_discipline.py           1    1      1       0    0
+    tests/test_slate_phase_wiring.py                       1    1      1       0    0
+    tests/test_soccer_team_ratings_as_of.py                1    0      0       1    0
+    tests/test_worker_shutdown.py                          1    1      1       0    0
+
+  REPRODUCED -- these are the ones worth looking at:
+    [FAILED] tests/test_duplicate_module_names.py::test_no_module_level_name_is_defined_twice_anywhere
+    [FAILED] tests/test_intelligence_state_persist_budget.py::GuardReleaseTests::test_guard_releases_when_the_install_stretch_raises
+    [FAILED] tests/test_layer2_out_player_gate.py::test_end_to_end_an_out_player_is_not_seated
+    [FAILED] tests/test_layer2_out_player_gate.py::test_end_to_end_off_is_not_on
+    [FAILED] tests/test_layer2_out_player_gate.py::test_the_flag_survives_build_layer2_rows
+    [FAILED] tests/test_layer2_out_player_gate.py::test_the_sample_is_capped_per_sport
+    [FAILED] tests/test_layer2_out_player_gate.py::test_the_sample_names_the_gated_players
+    [FAILED] tests/test_layer2_row_context.py::test_the_write_up_context_follows_but_its_price_sentence_does_not
+    [FAILED] tests/test_layer2_row_parity.py::test_the_row_context_brings_the_write_up
+    [FAILED] tests/test_ncaaf_live_resim.py::test_the_probability_moves_with_the_score_which_is_the_entire_point
+    [FAILED] tests/test_ncaaf_props_board.py::test_best_price_across_books_wins_and_names_the_book
+    [FAILED] tests/test_ncaaf_props_board.py::test_unbettable_books_are_excluded_by_default
+    [FAILED] tests/test_nfl_market_board.py::NflMarketBoardBuilderTests::test_build_nfl_market_board_shapes_games
+    [FAILED] tests/test_nfl_player_stats.py::NflPlayerStatsTests::test_anytime_td_attributed_to_scorer_only
+    [FAILED] tests/test_nfl_player_stats.py::NflPlayerStatsTests::test_anytime_td_league_prior_excludes_current_and_later_weeks
+    [FAILED] tests/test_nfl_player_stats.py::NflPlayerStatsTests::test_anytime_td_rate_requires_two_games_same_as_player_rate
+    [FAILED] tests/test_nfl_player_stats.py::NflPlayerStatsTests::test_anytime_td_rate_shrinks_a_zero_history_toward_the_league
+    [FAILED] tests/test_nfl_player_stats.py::NflPlayerStatsTests::test_final_stat_value_returns_real_settled_value
+    [FAILED] tests/test_nfl_player_stats.py::NflPlayerStatsTests::test_interceptions_attributed_to_passer_only
+    [FAILED] tests/test_nfl_player_stats.py::NflPlayerStatsTests::test_player_game_log_extracts_all_stats
+    [FAILED] tests/test_nfl_player_stats.py::NflPlayerStatsTests::test_player_rate_excludes_current_and_later_weeks
+    [FAILED] tests/test_nfl_player_stats.py::NflPlayerStatsTests::test_player_rate_requires_at_least_two_games
+    [FAILED] tests/test_nfl_player_stats.py::NflPlayerStatsTests::test_player_rate_returns_the_SAMPLE_sd_not_the_population_sd
+    [FAILED] tests/test_nfl_player_stats.py::NflPlayerStatsTests::test_receiving_yards_attributed_to_receiver_only
+    [FAILED] tests/test_nfl_player_stats.py::NflPlayerStatsTests::test_resolve_player_id_matches_full_name_to_short_name
+    [FAILED] tests/test_nfl_player_stats.py::NflPlayerStatsTests::test_shrinkage_is_REACHABLE_off_differs_from_on
+    [FAILED] tests/test_nfl_player_stats.py::NflPlayerStatsTests::test_the_spread_is_SHRUNK_toward_a_usage_scaled_league_prior
+    [FAILED] tests/test_nfl_props.py::NflPropsTests::test_available_weeks_excludes_header_only_stubs
+    [FAILED] tests/test_nfl_props.py::NflPropsTests::test_header_only_stub_returns_empty
+    [FAILED] tests/test_nfl_props.py::NflPropsTests::test_missing_file_returns_empty
+    [FAILED] tests/test_nfl_props_board.py::test_a_genuinely_empty_week_still_resolves_to_a_concrete_path
+    [FAILED] tests/test_nfl_props_board.py::test_week_enumeration_unions_every_root
+    [FAILED] tests/test_nhl_confirmed_goalies.py::test_refresh_never_raises_and_has_an_off_switch
+    [FAILED] tests/test_probability_differential.py::test_every_converter_is_registered_or_excused
+    [FAILED] tests/test_slate_date_timezone_discipline.py::SlateDateTimezoneDisciplineTests::test_no_new_timezone_ambiguous_date_calls
+    [FAILED] tests/test_slate_phase_wiring.py::test_tick_publishes_for_the_board_only_while_observing
+    [FAILED] tests/test_worker_shutdown.py::test_the_record_survives_a_signal_that_lands_MID_PRINT
+
+  NOT REPRODUCED -- run-dependent:
+    tests/test_board_freshness_derived.py::CombinedBoardStateMetaTests::test_age_is_the_OLDEST_input_and_newest_is_reported_beside_it
+    tests/test_board_freshness_derived.py::CombinedBoardStateMetaTests::test_fresh_shortlist_is_reported_fresh_with_a_real_age
+    tests/test_fetch_ncaaf_oddsapi_props_local.py::FetchNcaafOddsApiPropsLocalTests::test_main_requires_api_key
+    tests/test_layer2_fast_refresh.py::Layer2FastRefreshTests::test_shortlist_rebuilds_while_the_layer1_floor_is_refusing
+    tests/test_layer2_prior_date_carryover.py::PriorDateCarryoverTests::test_it_yields_to_a_board_build_holding_the_guard_and_releases_its_own
+    tests/test_market_gone_drop.py::test_market_gone_rows_are_dropped
+    tests/test_market_gone_drop.py::test_one_sports_dead_market_does_not_touch_another
+    tests/test_nba_cards_keyvalue_backend.py::NbaCardsKeyvalueBackendTests::test_live_snapshot_payload_cache_invalidates_on_new_keyvalue_write
+    tests/test_nfl_injury_adjustment.py::OffenseAdjustmentIntegrationTests::test_questionable_status_is_not_adjusted
+    tests/test_nfl_props.py::NflPropsTests::test_anytime_td_sim_row_uses_the_shrunk_rate_not_the_raw_zero
+    tests/test_publisher_identity_header.py::test_an_UNSET_lane_sends_empty_rather_than_a_guess
+    tests/test_publisher_identity_header.py::test_the_JSON_path_sends_the_publisher
+    tests/test_refresh_worker.py::RefreshWorkerTests::test_main_run_once_executes_runner_when_pending
+    tests/test_refresh_worker.py::RefreshWorkerTests::test_main_run_once_recovers_stuck_claim_before_launch
+    tests/test_soccer_team_ratings_as_of.py::test_every_caller_passes_as_of
+```
+
+### What this settles
+
+- **The sparse worktree overstated the suite by ~10x** (331 failed / 191 errors
+  over 22,003). All 13 files whose failure sets were stable across two sparse runs
+  are GREEN here — data dependence, confirmed by DISAPPEARANCE, not by names.
+- **A sparse run does not identify the right FILES.** Zero overlap: the 26 files
+  failing here include none of the 23 the sparse run pointed at.
+- **A complete checkout is far more deterministic.** 37/15/0 here against 92/56/41
+  from the sparse runs, where 41 failures appeared only in isolation. The earlier
+  instability was substantially the sparse tree plus a host at 100% CPU.
+- **15 failures are run-dependent** (pass alone): NOT defects on this evidence.
+
+### Leads handed on — NOT taken by this lane
+
+- **`test_nfl_player_stats.py` 14/14 reproduce.** One is
+  `test_shrinkage_is_REACHABLE_off_differs_from_on`; by
+  `docs/ai_context/model_engine_standard.md` a failing reachability test means the
+  feature may be INERT, which is the standard's primary failure mode.
+- **`test_layer2_out_player_gate.py` 5/5 reproduce**, including
+  `test_end_to_end_an_out_player_is_not_seated` and `test_end_to_end_off_is_not_on`
+  — an OUT-player gate that may not be gating.
+- Smaller stable clusters: `test_ncaaf_props_board.py` 2/2,
+  `test_nfl_props_board.py` 2/2, `test_nfl_props.py` 3/4,
+  `test_duplicate_module_names.py` 1/1.
