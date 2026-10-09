@@ -53,6 +53,12 @@ def guard_claims(text):
     """(slug, path) pairs exactly as the live hook computes them."""
     src = GUARD.read_text(encoding="utf-8").replace("sys.exit(main())", "pass")
     mod = types.ModuleType("lane_guard_readonly")
+    # `lane-guard.py` does `sys.path.insert(0, dirname(abspath(__file__)))` at
+    # import, to reach its own `lane_claims`. `exec` into a bare module dict
+    # defines no `__file__`, so that line raised NameError -- and guard_claims()
+    # only runs on the path where there IS something to hoist, so the tool passed
+    # a dry run and died exactly when the guard told a session to use it.
+    mod.__file__ = str(GUARD.resolve())
     exec(compile(src, str(GUARD), "exec"), mod.__dict__)  # noqa: S102
     return set(mod._claims(text))
 
