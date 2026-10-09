@@ -1193,13 +1193,14 @@ death, never life — do not invert it.
 - Verification: check_lane_invariants.py on origin/main reports 0 contested; check_lane_claims.py BAD lists no orphaned lane
 - Blocked by: none
 
-### home-embed-by-sport-dedupe — OPEN — opened 2026-10-09 — session 12420da3-1160-4944-9cbc-b3489ef4d580
+### home-embed-by-sport-dedupe — CLOSED 2026-10-09 — opened 2026-10-09 — session 12420da3-1160-4944-9cbc-b3489ef4d580
 - Goal: The / HTML embed drops by_sport again (alias-rebuilt client-side): logo stamping covers by_sport rows so _slim_embedded_board_payload's exact match holds; page ~50MB -> ~21MB
 - Files: syndicate/blueprints/intelligence.py, tests/test_home_payload_duplication.py
 - Hypothesis: 1d333384 stamped home_logo/away_logo on ranked_all/top_opportunities/recommendations but not by_sport, so the by_sport exact-match dedupe has failed on every request since 2026-10-08
 - Falsification test: after stamping by_sport, the embed still carries by_sport (rows differ in some other field) -- NOT FALSIFIED 2026-10-09: patched code on the fleet's live board (5,189 rows) dropped by_sport, embed 49.5M -> 21.2M chars
 - Verification: unit test on the real hydrate+slim path (fails without the fix); served / on the fleet after the next web reload: by_sport absent, _embed_aliases.by_sport present, embed parses strictly, page bytes measured
 - Blocked by: none
+- Outcome: GOAL MET 2026-10-09 22:44Z -- served / (fleet web 68d8443b, loaded by another session's ff+reload at 22:09Z) has no by_sport, alias present, strict parse ok; page 48.8 MB -> 19.8 MB, gzip 8.5 -> 3.9 MB. deploys.md 2026-10-09 22:44:00Z.
 
 ### basketball-native-orchestrator — OPEN — opened 2026-10-09 — session 2d413211-0162-420b-9603-72b7ea9f9867
 - Goal: P6 of docs/ai_context/basketball_live_native_plan.md: simulate_smart_game and everything it calls run from Syndicate code as ONE league-parametric orchestrator (nba, wnba; ncaab hooks), outputs IDENTICAL to the vendored vendor/{nba,wnba}_betting_repo/src/*/sim/smart_sim.py (same seed: every leaf of smart_sim_*.json, >=15 NBA and >=10 WNBA real production games over several dates, corpus size reported); the ~20 replaced helpers folded in as direct calls (no globals-patching); after it basketball_props_smart_sim.py imports nothing from vendor/*/sim/ and no vendored sim module is imported at runtime; input checklist over dataclasses.fields() exiting non-zero, pipeline trace, reachability test; remaining vendored uses on basketball paths outside the sim listed in the plan; verified on the deployed fleet checkout (same-seed same-snapshot identical vs vendored arm; first newly simulated production game carries no run_summary failures).
