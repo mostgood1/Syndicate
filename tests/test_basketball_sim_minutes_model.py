@@ -80,5 +80,9 @@ def test_short_rotation_keeps_the_vendor_path():
 
 
 def test_the_sim_routes_derive_sim_minutes_to_the_local_port():
-    source = Path(sim.__file__).read_text(encoding="utf-8")
-    assert '"_derive_sim_minutes": lambda team_df, date_str=None, team_tri=None: _derive_sim_minutes_local(' in source
+    # Plan P6: the orchestrator is Syndicate's; its `_derive_sim_minutes` is the hook to the local port.
+    from syndicate.features.basketball_engine.orchestrator import hooks
+    from syndicate.features.basketball_engine.orchestrator import smart_sim as native_smart_sim
+
+    assert native_smart_sim._derive_sim_minutes is hooks._derive_sim_minutes
+    assert "_derive_sim_minutes_local(" in Path(hooks.__file__).read_text(encoding="utf-8")

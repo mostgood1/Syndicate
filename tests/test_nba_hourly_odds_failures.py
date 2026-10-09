@@ -40,12 +40,13 @@ def test_missing_league_and_no_code_raises_instead_of_guessing():
         sim._smart_sim_league_local(SimpleNamespace(), None)
 
 
-def test_the_nba_vendor_module_really_has_no_league():
-    """Precondition: the fallback is the path production takes for NBA."""
-    module = sim._import_real_smart_sim_module_local(package_name="nba_betting")
-    if module is None:
-        pytest.skip("vendored nba engine not importable")
-    assert not hasattr(module, "LEAGUE")
+def test_the_nba_orchestrator_view_really_has_no_league(tmp_path):
+    """Precondition: the fallback is the path production takes for NBA. Plan P6: the ports read the native
+    orchestrator's VIEW, which carries `LEAGUE` for WNBA only, exactly as only the WNBA fork exported one."""
+    from syndicate.features.basketball_engine.orchestrator import OrchestratorEnv, module_view
+
+    assert not hasattr(module_view(OrchestratorEnv.for_processed_root(tmp_path, "nba")), "LEAGUE")
+    assert module_view(OrchestratorEnv.for_processed_root(tmp_path, "wnba")).LEAGUE.regulation_team_minutes == 200.0
 
 
 def _module_without_league(base):
@@ -74,27 +75,34 @@ def test_derive_sim_minutes_off_vs_on():
     assert out.sum() == pytest.approx(240.0)
 
 
-def test_the_sim_wiring_hands_league_code_to_both_ports(tmp_path):
-    """Drive the REAL replacement dict: the module the vendor sim sees has no LEAGUE."""
+def test_the_sim_wiring_hands_league_code_to_both_ports(tmp_path, monkeypatch):
+    """Drive the REAL hooks (plan P6: the orchestrator's direct calls into the ports): the module the ports
+    see has no LEAGUE, so league_code must arrive through the hook."""
+    from syndicate.features.basketball_engine import orchestrator as orch_pkg
+    from syndicate.features.basketball_engine.orchestrator import hooks
+
     seen = {}
     m = _module_without_league(NBA_ROTATION)
     df = pd.DataFrame({"player_name": [f"p{i}" for i in range(len(NBA_ROTATION))]})
+    for name in ("_frame_numeric_series", "_weighted_positive_mean", "_bounded_split_multiplier",
+                 "_normalize_position", "_boolish_series", "_safe_float"):
+        if not hasattr(m, name):
+            setattr(m, name, lambda *a, **k: None)
+    m._derive_sim_minutes = lambda team_df, date_str=None, team_tri=None: sim._derive_sim_minutes_local(
+        smart_sim_module=m, team_df=team_df, date_str=date_str, team_tri=team_tri, league_code="nba")
+    monkeypatch.setattr(hooks, "_view", lambda orch: m)
 
-    def simulate_smart_game(**_kwargs):
-        seen["minutes"] = float(m._derive_sim_minutes(df, date_str="2026-10-03", team_tri="TOR").sum())
+    def simulate_smart_game(*, orch, **_kwargs):
+        seen["minutes"] = float(hooks._derive_sim_minutes(df, date_str="2026-10-03", team_tri="TOR", orch=orch).sum())
         try:
-            m._apply_player_priors(pd.DataFrame(), None, "TOR")
+            hooks._apply_player_priors(pd.DataFrame(), None, "TOR", orch=orch)
             seen["priors"] = "ok"
         except AttributeError as exc:  # pragma: no cover - the failure this guards
             seen["priors"] = f"AttributeError: {exc}"
         return {}
 
-    m.simulate_smart_game = simulate_smart_game
-    for name in ("_frame_numeric_series", "_derive_sim_minutes", "_weighted_positive_mean", "_bounded_split_multiplier",
-                 "_normalize_position", "_boolish_series", "_safe_float"):
-        if not hasattr(m, name):
-            setattr(m, name, lambda *a, **k: None)
-    sim._call_source_simulate_smart_game_local(smart_sim_module=m, processed_root=tmp_path, league_code="nba", kwargs={})
+    monkeypatch.setattr(orch_pkg, "simulate_smart_game", simulate_smart_game)
+    sim._call_source_simulate_smart_game_local(processed_root=tmp_path, league_code="nba", kwargs={})
     assert seen == {"minutes": pytest.approx(240.0), "priors": "ok"}
 
 

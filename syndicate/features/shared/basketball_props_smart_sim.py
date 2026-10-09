@@ -26,7 +26,6 @@ _TOTALS_CALIBRATION_CACHE_LOCAL: dict[tuple[str, str], dict[str, Any] | None] = 
 _TEAM_ADVANCED_STATS_CACHE_LOCAL: dict[tuple[str, int, str], object] = {}
 _PREGAME_EXPECTED_MINUTES_CACHE_LOCAL: dict[tuple[str, str], object] = {}
 _MARKET_PLAYER_NAMES_CACHE_LOCAL: dict[tuple[str, str], dict[tuple[str, str], set[str]]] = {}
-_REAL_SMART_SIM_MODULE_CACHE_LOCAL: dict[str, Any] = {}
 _ADVANCED_STATS_BUILDER_MODULE_CACHE_LOCAL: dict[tuple[str, str], tuple[Any, Any]] = {}
 
 # --- Pre-simulation market anchoring (pricing plane v1, step 2 / P3) -------------
@@ -749,111 +748,6 @@ def _first_present_float_local(row, *columns: str, default: float = 0.0) -> floa
     return float(default)
 
 
-def _smart_sim_team_players_local(*, props_df, team_tri: str, opp_tri: str, processed_root: Path | None = None, date_str: str | None = None):
-    import pandas as pd
-
-    frame = _team_players_from_props_local(
-        props_df=props_df,
-        team_tri=team_tri,
-        opp_tri=opp_tri,
-        processed_root=processed_root,
-        date_str=date_str,
-    )
-    if frame is None or getattr(frame, "empty", True):
-        return pd.DataFrame()
-    out = frame.copy()
-    if "team" not in out.columns:
-        out["team"] = str(team_tri or "").strip().upper()
-    if "player_name" in out.columns:
-        out["player_name"] = out["player_name"].astype(str).str.strip()
-        out = out[out["player_name"].ne("")].copy()
-    if "player_id" not in out.columns:
-        out["player_id"] = None
-    return out.reset_index(drop=True)
-
-
-def _build_player_sim_rows_local(*, players_df, team_tri: str, opp_tri: str) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    if players_df is None or getattr(players_df, "empty", True):
-        return rows
-    for _, row in players_df.iterrows():
-        player_name = str(row.get("player_name") or "").strip()
-        if not player_name:
-            continue
-        pts_mean = _first_present_float_local(row, "mean_pts", "pts_mean", "pred_points", "projected_points", "points", default=0.0)
-        reb_mean = _first_present_float_local(row, "mean_reb", "reb_mean", "pred_rebounds", "projected_rebounds", "rebounds", default=0.0)
-        ast_mean = _first_present_float_local(row, "mean_ast", "ast_mean", "pred_assists", "projected_assists", "assists", default=0.0)
-        threes_mean = _first_present_float_local(row, "mean_threes", "threes_mean", "pred_threes", "projected_threes", "threes", default=0.0)
-        stl_mean = _first_present_float_local(row, "mean_stl", "stl_mean", "pred_steals", "projected_steals", "steals", default=0.0)
-        blk_mean = _first_present_float_local(row, "mean_blk", "blk_mean", "pred_blocks", "projected_blocks", "blocks", default=0.0)
-        tov_mean = _first_present_float_local(row, "mean_tov", "tov_mean", "pred_turnovers", "projected_turnovers", "turnovers", default=0.0)
-        pra_mean = _first_present_float_local(row, "mean_pra", "pra_mean", default=(pts_mean + reb_mean + ast_mean))
-        position = str(row.get("position") or "").strip() or None
-        minutes = _first_present_float_local(row, "pred_min", "minutes", "min", "mp", "min_played", "minutes_played", default=-999.0)
-
-        def _sd_for(mean_value: float, key: str) -> float:
-            return _first_present_float_local(row, f"sd_{key}", f"{key}_sd", default=max(1.0, abs(float(mean_value)) * 0.25))
-
-        player_dict = {
-            "team": str(team_tri or "").strip().upper(),
-            "opponent": str(opp_tri or "").strip().upper(),
-            "player_name": player_name,
-            "player_id": row.get("player_id"),
-            "pts_mean": pts_mean,
-            "reb_mean": reb_mean,
-            "ast_mean": ast_mean,
-            "threes_mean": threes_mean,
-            "pra_mean": pra_mean,
-            "stl_mean": stl_mean,
-            "blk_mean": blk_mean,
-            "tov_mean": tov_mean,
-            "pts_sd": _sd_for(pts_mean, "pts"),
-            "reb_sd": _sd_for(reb_mean, "reb"),
-            "ast_sd": _sd_for(ast_mean, "ast"),
-            "threes_sd": _sd_for(threes_mean, "threes"),
-            "pra_sd": _sd_for(pra_mean, "pra"),
-            "stl_sd": _sd_for(stl_mean, "stl"),
-            "blk_sd": _sd_for(blk_mean, "blk"),
-            "tov_sd": _sd_for(tov_mean, "tov"),
-            "q_pts": [0, 0, 0, 0],
-            "q_reb": [0, 0, 0, 0],
-            "q_ast": [0, 0, 0, 0],
-            "q_threes": [0, 0, 0, 0],
-        }
-        if position is not None:
-            player_dict["position"] = position
-        if minutes > 0:
-            player_dict["minutes"] = minutes
-        rows.append(player_dict)
-    log_list_memory("basketball_props_smart_sim.player_rows", rows)
-    rows.sort(key=lambda item: (float(item.get("pra_mean") or 0.0), float(item.get("pts_mean") or 0.0)), reverse=True)
-    return rows
-
-
-def _simulate_smart_game_local(*, date_str: str, home_tri: str, away_tri: str, props_df=None, quarters=None, market_total=None, market_home_spread=None, cfg=None, excluded_player_keys_by_team=None, pregame_context=None, processed_root: Path | None = None, **_kwargs):
-    home_players_df = _smart_sim_team_players_local(props_df=props_df, team_tri=home_tri, opp_tri=away_tri, processed_root=processed_root, date_str=date_str)
-    away_players_df = _smart_sim_team_players_local(props_df=props_df, team_tri=away_tri, opp_tri=home_tri, processed_root=processed_root, date_str=date_str)
-    home_players = _build_player_sim_rows_local(players_df=home_players_df, team_tri=home_tri, opp_tri=away_tri)
-    away_players = _build_player_sim_rows_local(players_df=away_players_df, team_tri=away_tri, opp_tri=home_tri)
-    return {
-        "date": str(date_str or ""),
-        "home": str(home_tri or "").strip().upper(),
-        "away": str(away_tri or "").strip().upper(),
-        "market_total": market_total,
-        "market_home_spread": market_home_spread,
-        "quarters": quarters or [],
-        "players": {
-            "home": home_players,
-            "away": away_players,
-        },
-        "home_team_total_pts_mean": sum(float(row.get("pts_mean") or 0.0) for row in home_players),
-        "away_team_total_pts_mean": sum(float(row.get("pts_mean") or 0.0) for row in away_players),
-        "excluded_player_keys_by_team": excluded_player_keys_by_team or {},
-        "pregame_context": pregame_context or {},
-        "n_sims": int(getattr(cfg, "n_sims", 0) or 0),
-    }
-
-
 def _vendor_smart_sim_code_root_local(*, package_name: str) -> Path:
     # Same ephemeral-checkout-vs-persistent-data-disk split as
     # _models_dir_for_source_root in basketball_props_predictions.py: the
@@ -865,53 +759,18 @@ def _vendor_smart_sim_code_root_local(*, package_name: str) -> Path:
     return repo_root_from(__file__) / "vendor" / f"{package_name}_repo"
 
 
-def _import_real_smart_sim_module_local(*, package_name: str) -> Any | None:
-    """Import the vendored <package>.sim.smart_sim module (the real engine).
-
-    Cached per package so the (only-needed-once) sys.path mutation and
-    import cost is paid once per process, not once per game. Returns None
-    if the vendor checkout/package is unavailable, so callers can fall back
-    to the flat local stub rather than crash the refresh pipeline.
-    """
-    if package_name in _REAL_SMART_SIM_MODULE_CACHE_LOCAL:
-        return _REAL_SMART_SIM_MODULE_CACHE_LOCAL[package_name]
-    module = None
-    try:
-        vendor_root = _vendor_smart_sim_code_root_local(package_name=package_name)
-        src_root = vendor_root / "src"
-        src_root_s = str(src_root)
-        if src_root.is_dir() and src_root_s not in sys.path:
-            sys.path.insert(0, src_root_s)
-        module = importlib.import_module(f"{package_name}.sim.smart_sim")
-        if not hasattr(module, "simulate_smart_game"):
-            module = None
-    except Exception:
-        module = None
-    _REAL_SMART_SIM_MODULE_CACHE_LOCAL[package_name] = module
-    return module
-
-
 def _build_local_smart_sim_module(*, processed_root: Path, league_code: str):
-    source_root = processed_root.parent.parent if processed_root.parent.name.lower() == "data" else processed_root.parent
-    package_name = "wnba_betting" if str(league_code or "").strip().lower() == "wnba" else "nba_betting"
-    real_module = _import_real_smart_sim_module_local(package_name=package_name)
-    if real_module is not None:
-        # The real module's internal helpers (simulate_pbp_game_boxscore,
-        # _rotation_sim_minutes_from_history, _apply_player_priors, etc.)
-        # are swapped for Render-data-root-aware local ports by
-        # _call_source_simulate_smart_game_local's monkeypatch dict, keyed
-        # by these exact function names. Pin `paths` explicitly too (rather
-        # than trusting the module's own env-var-derived singleton) so this
-        # always matches the processed_root the caller actually wants,
-        # regardless of WNBA_BETTING_DATA_ROOT/NBA_BETTING_DATA_ROOT drift.
-        real_module.paths = SimpleNamespace(data_processed=processed_root, data_raw=source_root / "data" / "raw", root=source_root)
-        return real_module
-    return SimpleNamespace(
-        simulate_smart_game=_simulate_smart_game_local,
-        paths=SimpleNamespace(data_processed=processed_root, root=source_root),
-        _clean_id_str=_clean_id_str_local,
-        _norm_player_key=_norm_name_key,
-    )
+    """What the ports below read as ``smart_sim_module``: the native orchestrator's read-only VIEW (plan P6).
+
+    Until P6 this returned the VENDORED ``<package>.sim.smart_sim`` module (``sys.path`` insert +
+    ``importlib``), with its ``paths`` global pinned to ``processed_root``, or -- when that import
+    failed -- a flat stub (``_simulate_smart_game_local``, sums of means, no score block: the #440
+    fallback). Both are gone. The orchestrator is ``syndicate/features/basketball_engine/orchestrator``;
+    ``module_view`` hands the ports the same helper names, bound to this root, and mutates nothing.
+    """
+    from syndicate.features.basketball_engine.orchestrator import OrchestratorEnv, module_view
+
+    return module_view(OrchestratorEnv.for_processed_root(processed_root, league_code))
 
 
 def _clamp_local(value: Any, lo: float, hi: float) -> float:
@@ -4482,257 +4341,77 @@ def _excluded_keys_for_source_filter(excluded_map: dict, teams, smart_sim_module
     return out
 
 
-def _call_source_simulate_smart_game_local(*, smart_sim_module, processed_root: Path, league_code: str, kwargs: dict[str, Any]):
-    original_values: dict[str, Any] = {}
-    raw_root = processed_root.parent / "raw"
-    # One list per game call; see `_attach_sim_distributions_local`.
+def _call_source_simulate_smart_game_local(*, processed_root: Path, league_code: str, kwargs: dict[str, Any]):
+    """One game through Syndicate's smart-sim ORCHESTRATOR (plan P6), then the bridge's post-processing.
+
+    Until P6 this ``setattr``-ed 29 replacement lambdas onto the VENDORED ``smart_sim`` module, called
+    its ``simulate_smart_game``, and restored the originals in a ``finally``. The orchestrator is now
+    ``syndicate/features/basketball_engine/orchestrator`` and calls those 29 ports directly
+    (``orchestrator/hooks.py``); nothing is patched. Parity against the vendored orchestrator, every leaf
+    of the output on real production games: ``scripts/basketball_orchestrator_parity.py``.
+    """
+    from syndicate.features.basketball_engine.orchestrator import OrchestratorEnv, simulate_smart_game
+    from syndicate.features.basketball_engine.orchestrator.prop_ladders import build_exact_ladder_payload
+
+    # One list per game call; see `_attach_sim_distributions_local`. The orchestrator's per-draw hook fills it.
     recorded_draws: list[dict[str, Any]] = []
-    replacements = {
-        "_period_lines_from_processed": lambda date_str, home_tri, away_tri: _period_lines_from_processed_local(
-            processed_root=processed_root,
-            date_str=date_str,
-            home_tri=home_tri,
-            away_tri=away_tri,
-        ),
-        "_market_lines_from_processed_odds": lambda date_str, home_tri, away_tri: _market_lines_from_processed_odds_local(
-            processed_root=processed_root,
-            date_str=date_str,
-            home_tri=home_tri,
-            away_tri=away_tri,
-        ),
-        "_load_smartsim_total_calibration": lambda: _load_smartsim_total_calibration_local(processed_root=processed_root),
-        "_team_players_from_props": lambda props_df, team_tri, opp_tri: _team_players_from_props_local(
-            props_df=props_df,
-            team_tri=team_tri,
-            opp_tri=opp_tri,
-        ),
-        "_coalesce_team_player_frames": lambda *frames: _coalesce_team_player_frames_local(*frames),
-        "_infer_game_id": lambda date_str, home_tri, away_tri: _infer_game_id_local(
-            processed_root=processed_root,
-            date_str=date_str,
-            home_tri=home_tri,
-            away_tri=away_tri,
-        ),
-        "_team_players_from_processed_boxscores": lambda date_str, home_tri, away_tri, team_tri, game_id=None: _team_players_from_processed_boxscores_local(
-            processed_root=processed_root,
-            date_str=date_str,
-            home_tri=home_tri,
-            away_tri=away_tri,
-            team_tri=team_tri,
-            game_id=game_id,
-        ),
-        "_team_players_from_processed_rosters": lambda date_str, home_tri, away_tri, team_tri: _team_players_from_processed_rosters_local(
-            processed_root=processed_root,
-            date_str=date_str,
-            home_tri=home_tri,
-            away_tri=away_tri,
-            team_tri=team_tri,
-        ),
-        "_filter_team_players_against_processed_roster": lambda team_df, date_str, home_tri, away_tri, team_tri, min_keep=5: _filter_team_players_against_processed_roster_local(
-            processed_root=processed_root,
-            team_df=team_df,
-            date_str=date_str,
-            home_tri=home_tri,
-            away_tri=away_tri,
-            team_tri=team_tri,
-            min_keep=min_keep,
-        ),
-        "_team_players_from_espn_boxscore": lambda date_str, home_tri, away_tri, team_tri, event_id=None: _team_players_from_espn_boxscore_local(
-            processed_root=processed_root,
-            league_code=league_code,
-            date_str=date_str,
-            home_tri=home_tri,
-            away_tri=away_tri,
-            team_tri=team_tri,
-            event_id=event_id,
-        ),
-        "_espn_name_to_id_map_for_game": lambda date_str, home_tri, away_tri, event_id=None: _espn_name_to_id_map_for_game_local(
-            smart_sim_module=smart_sim_module,
-            date_str=date_str,
-            home_tri=home_tri,
-            away_tri=away_tri,
-            event_id=event_id,
-        ),
-        "_merge_pregame_expected_minutes_for_team": lambda team_df, date_str, team_tri: _merge_pregame_expected_minutes_for_team_local(
-            processed_root=processed_root,
-            team_df=team_df,
-            date_str=date_str,
-            team_tri=team_tri,
-        ),
-        "_prune_pregame_rotation_pool": lambda team_df, team_tri, min_keep=8, max_keep=None, protected_names=None: _prune_pregame_rotation_pool_local(
-            team_df=team_df,
-            team_tri=team_tri,
-            min_keep=min_keep,
-            max_keep=max_keep,
-            protected_names=protected_names,
-            league_code=league_code,
-        ),
-        "_market_player_names_for_matchup": lambda props_df, date_str=None, home_tri="", away_tri="": _market_player_names_for_matchup_local(
-            processed_root=processed_root,
-            raw_root=raw_root,
-            props_df=props_df,
-            date_str=date_str,
-            home_tri=home_tri,
-            away_tri=away_tri,
-        ),
-        "_rotation_sim_minutes_from_history": lambda team_df, date_str, home_tri, away_tri, team_tri, lookback_days=28: _rotation_sim_minutes_from_history_local(
-            smart_sim_module=smart_sim_module,
-            league_code=league_code,
-            team_df=team_df,
-            date_str=date_str,
-            home_tri=home_tri,
-            away_tri=away_tri,
-            team_tri=team_tri,
-            lookback_days=lookback_days,
-        ),
-        "_player_split_rate_context": lambda date_str, team_tri, lookback_days=120: _player_split_rate_context_local(
-            smart_sim_module=smart_sim_module,
-            date_str=date_str,
-            team_tri=team_tri,
-            lookback_days=lookback_days,
-        ),
-        "_player_career_opponent_rate_context": lambda date_str, lookback_days=720: _player_career_opponent_rate_context_local(
-            smart_sim_module=smart_sim_module,
-            date_str=date_str,
-            lookback_days=lookback_days,
-        ),
-        "_opponent_position_rate_context": lambda date_str, lookback_days=120: _opponent_position_rate_context_local(
-            smart_sim_module=smart_sim_module,
-            date_str=date_str,
-            lookback_days=lookback_days,
-        ),
-        # Every draw is also RECORDED (lane wnba-sim-distributions), so the
-        # distributions the vendor sim draws but never publishes can be
-        # attached to its output below. The call itself is unchanged.
-        "simulate_pbp_game_boxscore": _recording_sim_draws_local(
-            lambda **inner_kwargs: _simulate_pbp_game_boxscore_local(league_code=league_code, **inner_kwargs),
-            recorded_draws,
-        ),
-        "simulate_event_level_boxscore": lambda **inner_kwargs: _simulate_event_level_boxscore_local(league_code=league_code, **inner_kwargs),
-        "_rotation_sim_minutes_for_team": lambda team_df, date_str, home_tri, away_tri, team_tri, side, game_id: _rotation_sim_minutes_for_team_local(
-            smart_sim_module=smart_sim_module,
-            league_code=league_code,
-            team_df=team_df,
-            date_str=date_str,
-            home_tri=home_tri,
-            away_tri=away_tri,
-            team_tri=team_tri,
-            side=side,
-            game_id=game_id,
-        ),
-        "_apply_player_priors": lambda team_df, priors, team_tri, sim_minutes=None, date_str=None: _apply_player_priors_local(
-            smart_sim_module=smart_sim_module,
-            team_df=team_df,
-            priors=priors,
-            team_tri=team_tri,
-            sim_minutes=sim_minutes,
-            date_str=date_str,
-            league_code=league_code,
-        ),
-        "_compute_player_priors_cached": lambda asof_date_str, days_back: _compute_player_priors_cached_local(
-            processed_root=processed_root,
-            asof_date_str=asof_date_str,
-            days_back=days_back,
-        ),
-        # Bench-first shrink to regulation minutes (see _derive_sim_minutes_local).
-        # The local port calls the vendor's OTHER helpers, never this name, so
-        # swapping it here cannot recurse.
-        "_derive_sim_minutes": lambda team_df, date_str=None, team_tri=None: _derive_sim_minutes_local(
-            smart_sim_module=smart_sim_module,
-            team_df=team_df,
-            date_str=date_str,
-            team_tri=team_tri,
-            league_code=league_code,
-        ),
-        "_team_adj_from_advanced_stats": lambda date_str, home_tri, away_tri: _team_adj_from_advanced_stats_local(
-            processed_root=processed_root,
-            date_str=date_str,
-            home_tri=home_tri,
-            away_tri=away_tri,
-            league=_league_for_code_local(league_code),
-        ),
-        # P3: the vendor's `quarters is None` fallback must not re-anchor behind
-        # SYNDICATE_BASKETBALL_SIM_MARKET_ANCHOR -- route it through the local port.
-        "simulate_quarters": lambda inp, n_samples=3000: _simulate_quarters_from_vendor_inputs_local(
-            processed_root=processed_root,
-            league_code=league_code,
-            inp=inp,
-            n_samples=n_samples,
-        ),
-        "_load_intervals_band_calibration": lambda: _load_intervals_band_calibration_local(processed_root=processed_root),
-        "_load_intervals_time_profile": lambda: _load_intervals_time_profile_local(processed_root=processed_root, league_code=league_code),
-        "_load_player_stat_calibration": lambda: _load_player_stat_calibration_local(processed_root=processed_root),
-    }
-    try:
-        for name, value in replacements.items():
-            original_values[name] = getattr(smart_sim_module, name, None)
-            setattr(smart_sim_module, name, value)
-        simulate_smart_game = getattr(smart_sim_module, "simulate_smart_game")
-        # The real vendored simulate_smart_game's signature has no
-        # processed_root param (it resolves paths via the module-level
-        # `paths` singleton, pinned above) and no **kwargs catch-all, unlike
-        # the flat local stub -- drop args it doesn't declare rather than
-        # let an unexpected-keyword TypeError silently fail every game.
-        params = inspect.signature(simulate_smart_game).parameters
-        accepts_var_keyword = any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values())
-        call_kwargs = kwargs if accepts_var_keyword else {k: v for k, v in kwargs.items() if k in params}
-        out = simulate_smart_game(**call_kwargs)
-        _attach_sim_distributions_local(
-            out,
-            recorded_draws,
-            build_ladder=getattr(smart_sim_module, "build_exact_ladder_payload", None),
-        )
-        # Shrink per-minute prop rates toward each player's own as-of rate (lane wnba-sim-rate-shrink): moves the means
-        # and SHIFTS the ladders, width untouched; runs BEFORE the widening below. WNBA-only, OFF unless
-        # SYNDICATE_WNBA_SIM_RATE_SHRINK is set.
-        from syndicate.features.shared.wnba_sim_rate_shrink import apply_rate_shrink
+    orch = OrchestratorEnv.for_processed_root(processed_root, league_code, draw_sink=recorded_draws)
+    # The orchestrator's signature has no processed_root (it reads `orch.paths`) and no **kwargs
+    # catch-all: drop what it does not declare, as the vendored call did.
+    params = inspect.signature(simulate_smart_game).parameters
+    accepts_var_keyword = any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values())
+    call_kwargs = {k: v for k, v in kwargs.items() if k != "orch" and (accepts_var_keyword or k in params)}
+    out = simulate_smart_game(**call_kwargs, orch=orch)
+    _attach_sim_distributions_local(
+        out,
+        recorded_draws,
+        build_ladder=build_exact_ladder_payload,
+    )
+    # Shrink per-minute prop rates toward each player's own as-of rate (lane wnba-sim-rate-shrink): moves the means
+    # and SHIFTS the ladders, width untouched; runs BEFORE the widening below. WNBA-only, OFF unless
+    # SYNDICATE_WNBA_SIM_RATE_SHRINK is set.
+    from syndicate.features.shared.wnba_sim_rate_shrink import apply_rate_shrink
 
-        apply_rate_shrink(
-            out,
-            league_code=league_code,
-            processed_root=processed_root,
-            build_ladder=getattr(smart_sim_module, "build_exact_ladder_payload", None),
-            name_key=_norm_name_key,
-        )
-        # Negative-binomial shape for the reb/ast/threes ladders at the (shrunk) mean (lane wnba-prop-shape). WNBA-only,
-        # OFF unless SYNDICATE_WNBA_PROP_SHAPE is set; after the rate shrink, before any widening.
-        from syndicate.features.shared.wnba_prop_shape import apply_prop_shape
+    apply_rate_shrink(
+        out,
+        league_code=league_code,
+        processed_root=processed_root,
+        build_ladder=build_exact_ladder_payload,
+        name_key=_norm_name_key,
+    )
+    # Negative-binomial shape for the reb/ast/threes ladders at the (shrunk) mean (lane wnba-prop-shape). WNBA-only,
+    # OFF unless SYNDICATE_WNBA_PROP_SHAPE is set; after the rate shrink, before any widening.
+    from syndicate.features.shared.wnba_prop_shape import apply_prop_shape
 
-        apply_prop_shape(
-            out,
-            league_code=league_code,
-            processed_root=processed_root,
-            build_ladder=getattr(smart_sim_module, "build_exact_ladder_payload", None),
-            name_key=_norm_name_key,
-        )
-        # Widen the prop ladders to their measured width (lane wnba-prop-dispersion). WNBA-only and OFF unless
-        # SYNDICATE_WNBA_PROP_DISPERSION is set; runs AFTER the combo ladders above so pr/pa/ra are widened too.
-        from syndicate.features.shared.wnba_prop_dispersion import apply_prop_dispersion
+    apply_prop_shape(
+        out,
+        league_code=league_code,
+        processed_root=processed_root,
+        build_ladder=build_exact_ladder_payload,
+        name_key=_norm_name_key,
+    )
+    # Widen the prop ladders to their measured width (lane wnba-prop-dispersion). WNBA-only and OFF unless
+    # SYNDICATE_WNBA_PROP_DISPERSION is set; runs AFTER the combo ladders above so pr/pa/ra are widened too.
+    from syndicate.features.shared.wnba_prop_dispersion import apply_prop_dispersion
 
-        apply_prop_dispersion(
-            out,
-            league_code=league_code,
-            processed_root=processed_root,
-            build_ladder=getattr(smart_sim_module, "build_exact_ladder_payload", None),
-        )
-        # NBA prop calibration (lane nba-prop-calibration, LOANED call site): per-minute rate shrink of the means +
-        # NBA-fit sd/ladder scale. NBA-only and OFF unless SYNDICATE_NBA_PROP_CALIBRATION is set; a no-op for WNBA.
-        from syndicate.features.shared.nba_prop_calibration import apply_nba_prop_calibration
+    apply_prop_dispersion(
+        out,
+        league_code=league_code,
+        processed_root=processed_root,
+        build_ladder=build_exact_ladder_payload,
+    )
+    # NBA prop calibration (lane nba-prop-calibration, LOANED call site): per-minute rate shrink of the means +
+    # NBA-fit sd/ladder scale. NBA-only and OFF unless SYNDICATE_NBA_PROP_CALIBRATION is set; a no-op for WNBA.
+    from syndicate.features.shared.nba_prop_calibration import apply_nba_prop_calibration
 
-        apply_nba_prop_calibration(
-            out,
-            league_code=league_code,
-            processed_root=processed_root,
-            build_ladder=getattr(smart_sim_module, "build_exact_ladder_payload", None),
-            name_key=_norm_name_key,
-        )
-        return out
-    finally:
-        for name, value in original_values.items():
-            try:
-                setattr(smart_sim_module, name, value)
-            except Exception:
-                pass
+    apply_nba_prop_calibration(
+        out,
+        league_code=league_code,
+        processed_root=processed_root,
+        build_ladder=build_exact_ladder_payload,
+        name_key=_norm_name_key,
+    )
+    return out
 
 
 # THE DRAWS THE SIM THROWS AWAY, PUBLISHED  [2026-09-18, lane wnba-sim-distributions].
@@ -4749,8 +4428,8 @@ def _call_source_simulate_smart_game_local(*, smart_sim_module, processed_root: 
 #   - 58 combo props shipped a mean only ("model ships means, not a
 #     distribution").
 #
-# The per-draw helper is already Syndicate's own (`_simulate_pbp_game_boxscore_local`,
-# swapped in above), so each draw can be recorded there and the distributions
+# The per-draw helper is Syndicate's own (`_simulate_pbp_game_boxscore_local`,
+# reached through orchestrator/hooks.py), so each draw can be recorded there and the distributions
 # rebuilt HERE from the same draws. No vendor file changes, so a re-pull
 # cannot revert this.
 #
@@ -5238,7 +4917,6 @@ def _smart_sim_worker_run_local(job: dict) -> dict:
         excluded_map_local = state.get("excluded_map") or {}
         excluded_game = _excluded_keys_for_source_filter(excluded_map_local, (home_tri, away_tri), smart_sim_module)
         out = _call_source_simulate_smart_game_local(
-            smart_sim_module=smart_sim_module,
             processed_root=out_path.parent,
             league_code=str(state.get("league_code") or "nba"),
             kwargs={

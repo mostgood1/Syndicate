@@ -5,7 +5,7 @@ anchoring is a FLAGGED, RECORDED mechanism.
 pre-flag code) | off (no blend at all) | weights:<tw>,<mw>.
 
 The tests here are about REACHABILITY as much as output: under `off` the blend
-function must never execute (wrapper port AND the vendor fallback), and the
+function must never execute (wrapper port AND the orchestrator's `quarters=None` fallback), and the
 artifact must carry the raw model means in every state so a row can be
 de-anchored post hoc.
 """
@@ -266,50 +266,35 @@ def _vendor_inputs(vendor_quarters):
     )
 
 
-@pytest.mark.parametrize("package", ["nba_betting", "wnba_betting"])
-def test_vendor_quarters_fallback_is_routed_through_the_local_port(package, tmp_path, monkeypatch):
-    """The vendored `simulate_smart_game` calls its own `simulate_quarters` when
-    the caller passes `quarters=None`. Prove that (a) the vendor blend IS live
-    when called directly (positive control), and (b) inside the wrapper's
-    monkeypatch scope it is never reached under `off`, and even under `on` the
-    blend that runs is the wrapper's, not the vendor's.
+@pytest.mark.parametrize("league_code", ["nba", "wnba"])
+def test_orchestrator_quarters_fallback_is_routed_through_the_local_port(league_code, tmp_path, monkeypatch):
+    """The orchestrator calls `simulate_quarters` when the caller passes `quarters=None`. That name must be
+    the hook to the wrapper's local port (`_simulate_quarters_from_vendor_inputs_local`), so under `off` no
+    blend runs and under `on` the blend that runs is the wrapper's.
+
+    Plan P6: the orchestrator is Syndicate's (syndicate/features/basketball_engine/orchestrator). The vendored
+    quarter model, and its `_blend_weights`, is not ported at all: nothing can reach it.
     """
-    import importlib
+    from syndicate.features.basketball_engine import orchestrator as orch_pkg
+    from syndicate.features.basketball_engine.orchestrator import quarters as native_quarters
+    from syndicate.features.basketball_engine.orchestrator import smart_sim as native_smart_sim
 
-    real_module = smart_sim._import_real_smart_sim_module_local(package_name=package)
-    if real_module is None:
-        pytest.skip(f"vendor package {package} not importable here")
-    vendor_quarters = importlib.import_module(f"{package}.sim.quarters")
-    original_vendor_simulate_quarters = vendor_quarters.simulate_quarters
-    league_code = "wnba" if package == "wnba_betting" else "nba"
-
-    vendor_blend_calls: list[object] = []
-    real_vendor_blend = vendor_quarters._blend_weights
-
-    def vendor_blend_spy(inp):
-        vendor_blend_calls.append(inp)
-        return real_vendor_blend(inp)
-
-    monkeypatch.setattr(vendor_quarters, "_blend_weights", vendor_blend_spy)
-
-    # (a) positive control: the sentinel is live on the vendor's own path.
-    np.random.seed(1)
-    original_vendor_simulate_quarters(_vendor_inputs(vendor_quarters), n_samples=1000)
-    assert len(vendor_blend_calls) == 1
-    vendor_blend_calls.clear()
-
-    # (b) inside the wrapper scope, the vendor's `quarters is None` fallback
-    # resolves `simulate_quarters` from the module namespace -- exactly what a
-    # fake simulate_smart_game does here.
+    assert not hasattr(native_quarters, "_blend_weights") and not hasattr(native_quarters, "simulate_quarters")
     captured: dict[str, object] = {}
 
-    def fake_simulate_smart_game(**kwargs):
-        captured["simulate_quarters"] = real_module.simulate_quarters
-        captured["result"] = real_module.simulate_quarters(_vendor_inputs(vendor_quarters), n_samples=1000)
+    def fake_simulate_smart_game(*, orch, **kwargs):
+        inp = native_quarters.GameInputs(
+            date="2026-07-22",
+            home=native_quarters.TeamContext(team="LVA", pace=79.5, off_rating=105.0, def_rating=99.0),
+            away=native_quarters.TeamContext(team="NYL", pace=79.5, off_rating=103.0, def_rating=101.0),
+            market_total=165.5,
+            market_home_spread=-3.5,
+        )
+        # The name the generated orchestrator resolves at its `quarters is None` call site.
+        captured["result"] = native_smart_sim.simulate_quarters(inp, n_samples=1000, orch=orch)
         return {"ok": True}
 
-    monkeypatch.setattr(real_module, "simulate_smart_game", fake_simulate_smart_game)
-
+    monkeypatch.setattr(orch_pkg, "simulate_smart_game", fake_simulate_smart_game)
     local_blend_calls: list[dict] = []
     real_local_blend = smart_sim._apply_market_anchor_local
 
@@ -318,52 +303,49 @@ def test_vendor_quarters_fallback_is_routed_through_the_local_port(package, tmp_
         return real_local_blend(**kwargs)
 
     monkeypatch.setattr(smart_sim, "_apply_market_anchor_local", local_blend_spy)
-
     for state, expect_local_calls in (("off", 0), ("on", 1)):
         monkeypatch.setenv(FLAG, state)
         local_blend_calls.clear()
-        vendor_blend_calls.clear()
         captured.clear()
         np.random.seed(1)
         out = smart_sim._call_source_simulate_smart_game_local(
-            smart_sim_module=real_module,
             processed_root=tmp_path,
             league_code=league_code,
             kwargs={"date_str": "2026-07-22", "home_tri": "LVA", "away_tri": "NYL", "quarters": None},
         )
         assert out == {"ok": True}
-        assert captured["simulate_quarters"] is not original_vendor_simulate_quarters, "vendor simulate_quarters was not replaced"
-        assert vendor_blend_calls == [], f"vendor blend reached under {state}"
         assert len(local_blend_calls) == expect_local_calls
         result = captured["result"]
         assert isinstance(result, smart_sim.QuarterSummaryLocal)
         assert result.market_anchor["state"] == state
         assert len(result.quarters) == 4
-        # vendor consumers read these attributes off each quarter
         assert all(hasattr(q, "home_pts_mu") and hasattr(q, "away_pts_sigma") and hasattr(q, "corr") for q in result.quarters)
 
-    # The monkeypatch scope restored the vendor's own function afterwards.
-    assert real_module.simulate_quarters is original_vendor_simulate_quarters
+
+def test_orchestrator_simulate_quarters_is_the_hook_by_name():
+    """Name-level guard: the generated orchestrator's `simulate_quarters` must stay the hook to the local port.
+    A rename on either side would leave the call unresolved (or bound to something else)."""
+    from syndicate.features.basketball_engine.orchestrator import hooks
+    from syndicate.features.basketball_engine.orchestrator import smart_sim as native_smart_sim
+
+    assert native_smart_sim.simulate_quarters is hooks.simulate_quarters
+    assert "simulate_quarters" in hooks.HOOK_NAMES
 
 
-def test_replacements_cover_simulate_quarters_by_name(tmp_path):
-    """Name-level guard: the replacement dict must keep targeting the vendor's
-    module-level import `simulate_quarters` (smart_sim.py: `from .quarters import
-    ... simulate_quarters`). A rename on either side would silently re-enable
-    the vendor blend behind the flag."""
-    seen: dict[str, object] = {}
-
-    def fake_simulate_smart_game(**kwargs):
-        seen["simulate_quarters"] = module.simulate_quarters
-        return {}
-
-    module = SimpleNamespace(simulate_smart_game=fake_simulate_smart_game)
-    smart_sim._call_source_simulate_smart_game_local(smart_sim_module=module, processed_root=tmp_path, league_code="nba", kwargs={})
-    assert callable(seen["simulate_quarters"])
-    # The wrapper restores every replaced name to `getattr(module, name, None)`
-    # afterwards (pre-existing behaviour for all ~20 replacements), so an
-    # attribute that did not exist before comes back as None, not absent.
-    assert module.simulate_quarters is None
+def _stub_orchestrator(*, orch, date_str, home_tri, away_tri, props_df=None, quarters=None, market_total=None, market_home_spread=None, game_id=None, cfg=None, excluded_player_keys_by_team=None, pregame_context=None):
+    """A stand-in orchestrator for the ARTIFACT plumbing: it echoes the quarters it was handed (the anchored
+    ones) and one row per prop player, and needs no data root."""
+    players = {"home": [], "away": []}
+    if props_df is not None:
+        for _, r in props_df.iterrows():
+            side = "home" if str(r.get("team")).upper() == home_tri else "away"
+            players[side].append({"player_name": str(r.get("player_name")), "pts_mean": float(r.get("mean_pts") or 0.0)})
+    return {
+        "date": str(date_str), "home": home_tri, "away": away_tri,
+        "market_total": market_total, "market_home_spread": market_home_spread,
+        "quarters": quarters or [], "players": players,
+        "n_sims": int(getattr(cfg, "n_sims", 0) or 0),
+    }
 
 
 # --- the artifact carries market_anchor in every state ----------------------------
@@ -390,12 +372,10 @@ def test_worker_artifact_carries_market_anchor(state, tmp_path, monkeypatch):
     date_str = "2026-07-22"
     props_path = _seed_props(processed_root, date_str)
 
-    # Use the flat local stub instead of the vendored engine: the artifact
-    # plumbing under test is the wrapper's, and the stub needs no data root.
-    def stub_module(*, processed_root, league_code):
-        return SimpleNamespace(simulate_smart_game=smart_sim._simulate_smart_game_local, paths=SimpleNamespace(data_processed=processed_root, root=processed_root.parent))
+    # A stand-in orchestrator: the artifact plumbing under test is the wrapper's.
+    from syndicate.features.basketball_engine import orchestrator as orch_pkg
 
-    monkeypatch.setattr(smart_sim, "_build_local_smart_sim_module", stub_module)
+    monkeypatch.setattr(orch_pkg, "simulate_smart_game", _stub_orchestrator)
     smart_sim._smart_sim_worker_init_local(date_str, 10, 1, False, str(props_path), "historical", "wnba", {}, {}, {}, {}, {})
     out_path = processed_root / f"smart_sim_{date_str}_LVA_NYL.json"
     np.random.seed(5)
@@ -489,7 +469,7 @@ def test_harness_refuses_without_local_data_and_names_the_files(tmp_path, capsys
 
 
 def test_harness_runs_both_arms_on_a_synthetic_slate(tmp_path, monkeypatch, capsys):
-    """End to end through `_smart_sim_run_date_local` with the flat stub engine:
+    """End to end through `_smart_sim_run_date_local` with a stand-in orchestrator:
     two arms, identical seeds, per-game rows, and the on-arm shift is the anchor."""
     import importlib.util
 
@@ -506,10 +486,9 @@ def test_harness_runs_both_arms_on_a_synthetic_slate(tmp_path, monkeypatch, caps
     (processed_root / f"game_odds_{date_str}.csv").write_text("home_team,visitor_team,total,home_spread\nLVA,NYL,165.5,-3.5\n", encoding="utf-8")
     _seed_props(processed_root, date_str)
 
-    def stub_module(*, processed_root, league_code):
-        return SimpleNamespace(simulate_smart_game=smart_sim._simulate_smart_game_local, paths=SimpleNamespace(data_processed=processed_root, root=processed_root.parent))
+    from syndicate.features.basketball_engine import orchestrator as orch_pkg
 
-    monkeypatch.setattr(smart_sim, "_build_local_smart_sim_module", stub_module)
+    monkeypatch.setattr(orch_pkg, "simulate_smart_game", _stub_orchestrator)
     monkeypatch.delenv(FLAG, raising=False)
 
     report = module.run_ab(data_root=data_root, date=date_str, league="wnba", n_sims=10, seed=3, max_games=None, keep=False)

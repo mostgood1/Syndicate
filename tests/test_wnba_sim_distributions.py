@@ -139,34 +139,33 @@ def test_combo_ladders_are_the_ladder_of_the_summed_draws_and_never_overwrite():
 
 
 def test_reachability_through_the_real_wrapper_off_is_not_on(monkeypatch, tmp_path):
-    """The stand-in vendor module calls its module-level
-    `simulate_pbp_game_boxscore` per draw, as the real one does. Inside
-    `_call_source_simulate_smart_game_local` that name is Syndicate's recorder."""
-    draws = iter(DRAWS)
+    """A stand-in orchestrator calls the per-draw hook (`orchestrator/hooks.py:simulate_pbp_game_boxscore`), as
+    the real one does. Through `_call_source_simulate_smart_game_local` each draw lands in the game's draw sink
+    and the distributions are attached; called with a bare env and no wrapper, nothing is attached."""
+    from syndicate.features.basketball_engine import orchestrator as orch_pkg
+    from syndicate.features.basketball_engine.orchestrator import OrchestratorEnv, hooks, prop_ladders
+
+    draws = iter(DRAWS + DRAWS)
     monkeypatch.setattr(smart_sim, "_simulate_pbp_game_boxscore_local", lambda **kw: next(draws))
+    monkeypatch.setattr(prop_ladders, "build_exact_ladder_payload", _ladder)
 
-    module = SimpleNamespace(build_exact_ladder_payload=_ladder)
-
-    def simulate_smart_game(n_sims):
+    def simulate_smart_game(n_sims, *, orch):
         for _ in range(n_sims):
-            module.simulate_pbp_game_boxscore(rng=None)
+            hooks.simulate_pbp_game_boxscore(rng=None, orch=orch)
         return {"score": {"p_total_over": 0.5}, "players": {"home": [{"player_name": "A Guard"}], "away": []}}
 
-    module.simulate_smart_game = simulate_smart_game
-
-    # OFF: the vendor sim called directly never reaches the recorder.
-    module.simulate_pbp_game_boxscore = lambda **kw: DRAWS[0]
-    direct = module.simulate_smart_game(n_sims=4)
-    assert "dist" not in direct["score"]
+    # OFF: the orchestrator called directly records draws but nothing publishes them.
+    bare = OrchestratorEnv.for_processed_root(tmp_path / "data" / "processed", "wnba")
+    direct = simulate_smart_game(n_sims=4, orch=bare)
+    assert "dist" not in direct["score"] and len(bare.draw_sink) == 4
 
     # ON: through the wrapper.
+    monkeypatch.setattr(orch_pkg, "simulate_smart_game", simulate_smart_game)
     out = smart_sim._call_source_simulate_smart_game_local(
-        smart_sim_module=module, processed_root=tmp_path / "data" / "processed", league_code="wnba", kwargs={"n_sims": 4}
+        processed_root=tmp_path / "data" / "processed", league_code="wnba", kwargs={"n_sims": 4}
     )
     assert out["score"]["dist"]["n"] == 4
     assert "pa" in out["players"]["home"][0]["prop_ladders"]
-    # The wrapper restores the module's own attribute afterwards.
-    assert module.simulate_pbp_game_boxscore(rng=None) == DRAWS[0]
 
 
 # 5. ---------------------------------------------------------------------------

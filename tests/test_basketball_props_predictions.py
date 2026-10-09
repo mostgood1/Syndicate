@@ -708,38 +708,43 @@ class BasketballPropsPredictionsTests(unittest.TestCase):
             smart_game_calls: list[dict[str, object]] = []
             helper_route_checks: list[tuple[object, object, object, object, object, object, object, object, object, object, object, object, object, object, object, object, object, object, object, object, object, object, object, object, object, object]] = []
 
+            # Plan P6: the orchestrator is Syndicate's and reaches each port through orchestrator/hooks.py
+            # (direct calls; nothing is patched onto a module). Imported before numpy/pandas are faked below.
+            from syndicate.features.basketball_engine import orchestrator as orch_pkg
+            from syndicate.features.basketball_engine.orchestrator import hooks as orch_hooks
+
             fake_smart_sim_module = SimpleNamespace()
 
-            def _fake_simulate_smart_game(**kwargs):
+            def _fake_simulate_smart_game(*, orch, **kwargs):
                 helper_route_checks.append(
                     (
-                        getattr(fake_smart_sim_module, "_period_lines_from_processed")("2026-05-22", "ATL", "CHI"),
-                        getattr(fake_smart_sim_module, "_market_lines_from_processed_odds")("2026-05-22", "ATL", "CHI"),
-                        getattr(fake_smart_sim_module, "_load_smartsim_total_calibration")(),
-                        getattr(fake_smart_sim_module, "_team_players_from_props")(None, "ATL", "CHI"),
-                        getattr(fake_smart_sim_module, "_coalesce_team_player_frames")({"a": 1}),
-                        getattr(fake_smart_sim_module, "_infer_game_id")("2026-05-22", "ATL", "CHI"),
-                        getattr(fake_smart_sim_module, "_team_players_from_processed_boxscores")("2026-05-22", "ATL", "CHI", "ATL", "100"),
-                        getattr(fake_smart_sim_module, "_team_players_from_processed_rosters")("2026-05-22", "ATL", "CHI", "ATL"),
-                        getattr(fake_smart_sim_module, "_filter_team_players_against_processed_roster")({"team": "ATL"}, "2026-05-22", "ATL", "CHI", "ATL"),
-                        getattr(fake_smart_sim_module, "_team_players_from_espn_boxscore")("2026-05-22", "ATL", "CHI", "ATL", "evt"),
-                        getattr(fake_smart_sim_module, "_espn_name_to_id_map_for_game")("2026-05-22", "ATL", "CHI", "evt"),
-                        getattr(fake_smart_sim_module, "_merge_pregame_expected_minutes_for_team")({"team": "ATL"}, "2026-05-22", "ATL"),
-                        getattr(fake_smart_sim_module, "_prune_pregame_rotation_pool")({"team": "ATL"}, "ATL", 8, None, {"A"}),
-                        getattr(fake_smart_sim_module, "_market_player_names_for_matchup")(None, "2026-05-22", "ATL", "CHI"),
-                        getattr(fake_smart_sim_module, "_rotation_sim_minutes_from_history")({"team": "ATL"}, "2026-05-22", "ATL", "CHI", "ATL", 28),
-                        getattr(fake_smart_sim_module, "_player_split_rate_context")("2026-05-22", "ATL", 120),
-                        getattr(fake_smart_sim_module, "_player_career_opponent_rate_context")("2026-05-22", 720),
-                        getattr(fake_smart_sim_module, "_opponent_position_rate_context")("2026-05-22", 120),
-                        getattr(fake_smart_sim_module, "simulate_pbp_game_boxscore")(mode="pbp"),
-                        getattr(fake_smart_sim_module, "simulate_event_level_boxscore")(mode="event"),
-                        getattr(fake_smart_sim_module, "_rotation_sim_minutes_for_team")({"team": "ATL"}, "2026-05-22", "ATL", "CHI", "ATL", "home", "100"),
-                        getattr(fake_smart_sim_module, "_apply_player_priors")({"team": "ATL"}, {"priors": True}, "ATL", "sim_min", "2026-05-22"),
-                        getattr(fake_smart_sim_module, "_compute_player_priors_cached")("2026-05-21", 21),
-                        getattr(fake_smart_sim_module, "_team_adj_from_advanced_stats")("2026-05-22", "ATL", "CHI"),
-                        getattr(fake_smart_sim_module, "_load_intervals_band_calibration")(),
-                        getattr(fake_smart_sim_module, "_load_intervals_time_profile")(),
-                        getattr(fake_smart_sim_module, "_load_player_stat_calibration")(),
+                        orch_hooks._period_lines_from_processed("2026-05-22", "ATL", "CHI", orch=orch),
+                        orch_hooks._market_lines_from_processed_odds("2026-05-22", "ATL", "CHI", orch=orch),
+                        orch_hooks._load_smartsim_total_calibration(orch=orch),
+                        orch_hooks._team_players_from_props(None, "ATL", "CHI", orch=orch),
+                        orch_hooks._coalesce_team_player_frames({"a": 1}, orch=orch),
+                        orch_hooks._infer_game_id("2026-05-22", "ATL", "CHI", orch=orch),
+                        orch_hooks._team_players_from_processed_boxscores("2026-05-22", "ATL", "CHI", "ATL", "100", orch=orch),
+                        orch_hooks._team_players_from_processed_rosters("2026-05-22", "ATL", "CHI", "ATL", orch=orch),
+                        orch_hooks._filter_team_players_against_processed_roster({"team": "ATL"}, "2026-05-22", "ATL", "CHI", "ATL", orch=orch),
+                        orch_hooks._team_players_from_espn_boxscore("2026-05-22", "ATL", "CHI", "ATL", "evt", orch=orch),
+                        orch_hooks._espn_name_to_id_map_for_game("2026-05-22", "ATL", "CHI", "evt", orch=orch),
+                        orch_hooks._merge_pregame_expected_minutes_for_team({"team": "ATL"}, "2026-05-22", "ATL", orch=orch),
+                        orch_hooks._prune_pregame_rotation_pool({"team": "ATL"}, "ATL", 8, None, {"A"}, orch=orch),
+                        orch_hooks._market_player_names_for_matchup(None, "2026-05-22", "ATL", "CHI", orch=orch),
+                        orch_hooks._rotation_sim_minutes_from_history({"team": "ATL"}, "2026-05-22", "ATL", "CHI", "ATL", 28, orch=orch),
+                        orch_hooks._player_split_rate_context("2026-05-22", "ATL", 120, orch=orch),
+                        orch_hooks._player_career_opponent_rate_context("2026-05-22", 720, orch=orch),
+                        orch_hooks._opponent_position_rate_context("2026-05-22", 120, orch=orch),
+                        orch_hooks.simulate_pbp_game_boxscore(mode="pbp", orch=orch),
+                        orch_hooks.simulate_event_level_boxscore(mode="event", orch=orch),
+                        orch_hooks._rotation_sim_minutes_for_team({"team": "ATL"}, "2026-05-22", "ATL", "CHI", "ATL", "home", "100", orch=orch),
+                        orch_hooks._apply_player_priors({"team": "ATL"}, {"priors": True}, "ATL", "sim_min", "2026-05-22", orch=orch),
+                        orch_hooks._compute_player_priors_cached("2026-05-21", 21, orch=orch),
+                        orch_hooks._team_adj_from_advanced_stats("2026-05-22", "ATL", "CHI", orch=orch),
+                        orch_hooks._load_intervals_band_calibration(orch=orch),
+                        orch_hooks._load_intervals_time_profile(orch=orch),
+                        orch_hooks._load_player_stat_calibration(orch=orch),
                     )
                 )
                 smart_game_calls.append(dict(kwargs))
@@ -748,7 +753,6 @@ class BasketballPropsPredictionsTests(unittest.TestCase):
                 # of writing an empty artifact.
                 return {"players": {"home": [{"player_id": 1, "player_name": "Player A"}], "away": []}}
 
-            fake_smart_sim_module.simulate_smart_game = _fake_simulate_smart_game
 
             original_state = smart_sim_module._SMARTSIM_WORKER_STATE
             smart_sim_module._SMARTSIM_WORKER_STATE = {
@@ -767,6 +771,7 @@ class BasketballPropsPredictionsTests(unittest.TestCase):
                 with ExitStack() as stack:
                     stack.enter_context(patch.dict(sys.modules, {"pandas": fake_pandas, "numpy": fake_numpy}))
                     stack.enter_context(patch.object(smart_sim_module, "_build_local_smart_sim_module", side_effect=lambda **kwargs: fake_smart_sim_module))
+                    stack.enter_context(patch.object(orch_pkg, "simulate_smart_game", _fake_simulate_smart_game))
                     stack.enter_context(patch.object(smart_sim_module, "_period_lines_from_processed_local", side_effect=lambda **kwargs: period_line_calls.append(dict(kwargs)) or {"period": "ok"}))
                     stack.enter_context(patch.object(smart_sim_module, "_market_lines_from_processed_odds_local", side_effect=lambda **kwargs: market_line_calls.append(dict(kwargs)) or (160.0, -3.0)))
                     stack.enter_context(patch.object(smart_sim_module, "_load_smartsim_total_calibration_local", side_effect=lambda **kwargs: total_cal_calls.append(dict(kwargs)) or {"points_mult": 1.0}))
