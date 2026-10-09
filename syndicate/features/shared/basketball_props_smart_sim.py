@@ -748,17 +748,6 @@ def _first_present_float_local(row, *columns: str, default: float = 0.0) -> floa
     return float(default)
 
 
-def _vendor_smart_sim_code_root_local(*, package_name: str) -> Path:
-    # Same ephemeral-checkout-vs-persistent-data-disk split as
-    # _models_dir_for_source_root in basketball_props_predictions.py: the
-    # trained-model-adjacent simulation code only ships inside this repo's
-    # vendor/<pkg>_repo checkout, never on the Render data disk.
-    override = str(os.environ.get(f"SYNDICATE_VENDOR_ROOT_{package_name.upper()}") or "").strip()
-    if override:
-        return Path(override).expanduser().resolve()
-    return repo_root_from(__file__) / "vendor" / f"{package_name}_repo"
-
-
 def _build_local_smart_sim_module(*, processed_root: Path, league_code: str):
     """What the ports below read as ``smart_sim_module``: the native orchestrator's read-only VIEW (plan P6).
 
@@ -3738,34 +3727,31 @@ def _team_adv_stats_cache_is_fresh_local(path: Path) -> bool:
 
 
 def _import_advanced_stats_builders_local(*, package_name: str, processed_root: Path) -> tuple[Any, Any]:
-    """Import the vendored `<package>.advanced_stats_boxscores` /
-    `_player_logs` builder modules and pin their `paths` to `processed_root`
-    -- same pattern `_build_local_smart_sim_module` already uses for
-    `smart_sim.py` (explicit pin, not trusting
-    `WNBA_BETTING_DATA_ROOT`/`NBA_BETTING_DATA_ROOT` to already match).
-    Cached per (package, processed_root) so the sys.path mutation and
-    import cost is paid once per process, not once per game."""
+    """The team-advanced-stats BUILDERS for one data root: Syndicate's port (plan P6, pass 2).
+
+    Until P6 this imported the vendored `<package>.advanced_stats_boxscores` / `_player_logs` (sys.path insert
+    into vendor/<pkg>_repo/src + importlib) and pinned their `paths` global to `processed_root`. The forks differ
+    in algorithm, so the port keeps each fork's builder verbatim behind a `fork` switch
+    (syndicate/features/basketball_engine/orchestrator/advanced_stats_*.py); the fork is chosen exactly as the
+    package was. The returned objects expose the vendored function names, so callers are unchanged. Cached per
+    (package, processed_root), as before."""
     cache_key = (package_name, str(processed_root))
     cached = _ADVANCED_STATS_BUILDER_MODULE_CACHE_LOCAL.get(cache_key)
     if cached is not None:
         return cached
-    boxscores_mod: Any = None
-    player_logs_mod: Any = None
-    try:
-        vendor_root = _vendor_smart_sim_code_root_local(package_name=package_name)
-        src_root = vendor_root / "src"
-        src_root_s = str(src_root)
-        if src_root.is_dir() and src_root_s not in sys.path:
-            sys.path.insert(0, src_root_s)
-        source_root = processed_root.parent.parent if processed_root.parent.name.lower() == "data" else processed_root.parent
-        pinned_paths = SimpleNamespace(data_processed=processed_root, data_raw=source_root / "data" / "raw", root=source_root)
-        boxscores_mod = importlib.import_module(f"{package_name}.advanced_stats_boxscores")
-        boxscores_mod.paths = pinned_paths
-        player_logs_mod = importlib.import_module(f"{package_name}.advanced_stats_player_logs")
-        player_logs_mod.paths = pinned_paths
-    except Exception:
-        boxscores_mod = None
-        player_logs_mod = None
+    from functools import partial
+
+    from syndicate.features.basketball_engine.orchestrator import OrchestratorEnv
+    from syndicate.features.basketball_engine.orchestrator import advanced_stats_boxscores, advanced_stats_player_logs
+
+    fork = "nba" if package_name == "nba_betting" else "wnba"
+    orch = OrchestratorEnv.for_processed_root(processed_root, fork)
+    boxscores_mod = SimpleNamespace(
+        compute_team_advanced_stats_from_boxscores=partial(advanced_stats_boxscores.compute_team_advanced_stats_from_boxscores, fork=fork, orch=orch)
+    )
+    player_logs_mod = SimpleNamespace(
+        compute_team_advanced_stats_from_player_logs=partial(advanced_stats_player_logs.compute_team_advanced_stats_from_player_logs, fork=fork, orch=orch)
+    )
     result = (boxscores_mod, player_logs_mod)
     _ADVANCED_STATS_BUILDER_MODULE_CACHE_LOCAL[cache_key] = result
     return result

@@ -29,7 +29,7 @@ from syndicate.features.shared import basketball_props_smart_sim as bps
 
 ROOT = Path(__file__).resolve().parents[1]
 PKG = "syndicate.features.basketball_engine.orchestrator"
-GENERATED = ("smart_sim", "quarters", "connected_game", "boxscores", "prob_calibration", "prop_ladders", "roster_files", "player_names", "player_priors", "league_config")
+GENERATED = ("smart_sim", "quarters", "connected_game", "boxscores", "prob_calibration", "prop_ladders", "roster_files", "player_names", "player_priors", "league_config", "advanced_stats_boxscores", "advanced_stats_player_logs", "wnba_teams")
 
 
 def _game(tmp_path: Path, league: str, seed: int = 11):

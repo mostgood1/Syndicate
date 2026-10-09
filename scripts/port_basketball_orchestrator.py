@@ -411,7 +411,7 @@ class Gen:
     text: str
 
 
-def thread_and_rewrite(gen: Gen, threaded: set[tuple[str, str]], resolve_name, stats: dict[str, int]) -> str:
+def thread_and_rewrite(gen: Gen, threaded: set[tuple[str, str]], resolve_name, stats: dict[str, int], globals_map: dict[str, str] | None = None) -> str:
     """Apply the mechanical AST edits to one definition's text."""
     text = gen.text
     tree = ast.parse(text)
@@ -421,11 +421,12 @@ def thread_and_rewrite(gen: Gen, threaded: set[tuple[str, str]], resolve_name, s
     def pos(lineno: int, col: int) -> int:
         return offs[lineno - 1] + col
 
+    gmap = GLOBALS_TO_ORCH if globals_map is None else globals_map
     edits: list[tuple[int, int, str]] = []
     is_fn = isinstance(node, ast.FunctionDef)
     bound = _bound_names(node) if is_fn else set()
     if is_fn:
-        for g in list(GLOBALS_TO_ORCH) + ["orch"]:
+        for g in list(gmap) + ["orch"]:
             if g in bound:
                 raise SystemExit(f"{gen.rel}.{gen.name} binds {g!r} locally; threading would be ambiguous")
 
@@ -447,12 +448,12 @@ def thread_and_rewrite(gen: Gen, threaded: set[tuple[str, str]], resolve_name, s
                 stats["call_sites"] += 1
     for n in ast.walk(node):
         if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load):
-            if n.id in GLOBALS_TO_ORCH:
-                edits.append((pos(n.lineno, n.col_offset), pos(n.end_lineno, n.end_col_offset), GLOBALS_TO_ORCH[n.id]))
+            if n.id in gmap:
+                edits.append((pos(n.lineno, n.col_offset), pos(n.end_lineno, n.end_col_offset), gmap[n.id]))
                 stats["global_reads"] += 1
             elif id(n) not in calls_func_ids and resolve_name(gen.rel, n.id) in threaded and n.id != gen.name:
                 raise SystemExit(f"{gen.rel}.{gen.name}: threaded function {n.id} used as a VALUE, not called")
-        if isinstance(n, ast.ImportFrom) and n.level and n is not node:
+        if isinstance(n, ast.ImportFrom) and n.level and n is not node and gen.rel in MODULES:
             mod = _resolve(gen.rel, n)
             names = []
             for a in n.names:
@@ -636,17 +637,174 @@ def build() -> tuple[dict[str, str], list[str]]:
     # league_config: the vendored WNBA LeagueConfig + LEAGUE, by value (the ports' LEAGUE for WNBA).
     lg = VMod.load("wnba", "league")
     out["league_config"] = (
-        _header("league", "league_config", [("league", "LeagueConfig"), ("league", "LEAGUE")], None)
-        + "from dataclasses import dataclass\n\n\n"
-        + lg.source("LeagueConfig")
-        + "\n\n\n"
-        + lg.source("LEAGUE")
+        _header("league", "league_config", [("league", n) for n in ("LeagueConfig", "LEAGUE") + LEAGUE_HELPERS], None)
+        + "from dataclasses import dataclass\nfrom datetime import date, datetime\n\n\n"
+        + "\n\n\n".join(lg.source(n) for n in ("LeagueConfig", "LEAGUE") + LEAGUE_HELPERS)
         + "\n"
     )
+    out.update(build_builders(log))
     log.append(f"mechanical: {stats}")
     log.append(f"threaded functions: {len(threaded) - len(hooks)} native + {len(hooks)} hooks")
     log.append(f"emitted definitions: {len(need)} ({sum(1 for k in need if k[0] == 'sim.smart_sim')} in smart_sim)")
     return out, log
+
+
+# ---------------------------------------------------------------------------
+# PASS 2: the team-advanced-stats BUILDERS. The bridge imported them from the vendored package to build
+# team_advanced_stats_<season>_asof_<date>.csv when that file is missing or stale
+# (`_ensure_team_advanced_stats_asof_local`). Unlike the orchestrator, the two forks differ in ALGORITHM here
+# (season filtering, the game-date map, a WNBA team filter), so a divergent definition is kept VERBATIM per
+# fork (`<name>__nba`, `<name>__wnba`) behind a dispatcher that takes `fork`; the bridge picks the fork exactly
+# as it picked the package. Identical definitions are emitted once. Only `paths` is threaded (`orch.paths`);
+# the WNBA fork's `LEAGUE` and season helpers are fork constants, ported by value into league_config.py.
+BUILDERS: dict[str, str] = {
+    "advanced_stats_boxscores": "compute_team_advanced_stats_from_boxscores",
+    "advanced_stats_player_logs": "compute_team_advanced_stats_from_player_logs",
+}
+BUILDER_EXTERNAL: dict[tuple[str, str], str] = {
+    ("league", "LEAGUE"): ".league_config",
+    ("league", "season_year_from_date"): ".league_config",
+    ("league", "season_label_from_year"): ".league_config",
+    ("teams", "TEAM_TRICODES"): ".wnba_teams",
+}
+LEAGUE_HELPERS = ("_coerce_date", "season_start_year_from_date", "season_year_from_date", "season_label_from_year")
+
+
+def _module_closure(m: VMod, root: str) -> list[str]:
+    seen: list[str] = []
+    stack = [root]
+    while stack:
+        n = stack.pop()
+        if n in seen:
+            continue
+        seen.append(n)
+        for nm in _names(m.defs[n]):
+            if nm in m.defs and nm not in seen:
+                stack.append(nm)
+            elif nm in m.imports:
+                tgt = m.imports[nm]
+                if tgt == ("config", "paths"):
+                    continue
+                if tgt not in BUILDER_EXTERNAL:
+                    raise SystemExit(f"builder {m.rel}.{n} reaches unmapped {tgt}")
+    return seen
+
+
+def _rename_def(text: str, old: str, new: str) -> str:
+    m = re.search(r"\b(def|class)\s+" + re.escape(old) + r"\b", text)
+    if not m:
+        raise SystemExit(f"cannot rename {old}")
+    return text[: m.start()] + m.group(1) + " " + new + text[m.end():]
+
+
+def _rename_calls(text: str, mapping: dict[str, str]) -> str:
+    tree = ast.parse(text)
+    offs = _line_offsets(text)
+    edits = []
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load) and n.id in mapping:
+            a = offs[n.lineno - 1] + n.col_offset
+            edits.append((a, a + len(n.id), mapping[n.id]))
+    for a, b, new in sorted(edits, reverse=True):
+        text = text[:a] + new + text[b:]
+    return text
+
+
+def _is_fn(text: str) -> bool:
+    return isinstance(ast.parse(text).body[0], ast.FunctionDef)
+
+
+def build_builders(log: list[str]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    stats = {"call_sites": 0, "global_reads": 0, "local_imports": 0, "signatures": 0}
+    for rel, root in BUILDERS.items():
+        mods = {lg: VMod.load(lg, rel) for lg in ("nba", "wnba")}
+        clos = {lg: _module_closure(mods[lg], root) for lg in mods}
+        union = list(dict.fromkeys(clos["wnba"] + clos["nba"]))
+        order = {n: (mods["wnba"].defs[n].lineno if n in mods["wnba"].defs else mods["nba"].defs[n].lineno) for n in union}
+        union.sort(key=lambda n: order[n])
+        divergent = [n for n in union if n in clos["nba"] and n in clos["wnba"] and _norm(mods["nba"].source(n)) != _norm(mods["wnba"].source(n))]
+        texts: list[tuple[str, str, str]] = []  # (emitted name, source fork, text)
+        for n in union:
+            if n in divergent:
+                for lg in ("nba", "wnba"):
+                    t = _rename_def(mods[lg].source(n), n, f"{n}__{lg}")
+                    t = _rename_calls(t, {d: f"{d}__{lg}" for d in divergent if d != n})
+                    texts.append((f"{n}__{lg}", lg, t))
+            else:
+                lg = "wnba" if n in clos["wnba"] else "nba"
+                t = mods[lg].source(n)
+                if _names(ast.parse(t)) & set(divergent):
+                    raise SystemExit(f"shared {rel}.{n} calls a divergent definition")
+                texts.append((n, lg, t))
+        threaded = {name for name, _, t in texts if _is_fn(t) and "paths" in _names(ast.parse(t))}
+        changed = True
+        while changed:
+            changed = False
+            for name, _, t in texts:
+                if name in threaded or not _is_fn(t):
+                    continue
+                if any(isinstance(c, ast.Call) and isinstance(c.func, ast.Name) and c.func.id in threaded for c in ast.walk(ast.parse(t))):
+                    threaded.add(name)
+                    changed = True
+        local = {name for name, _, _ in texts}
+
+        def resolve(_rel, nm, _local=local, _rel_fixed=rel):
+            return (_rel_fixed, nm) if nm in _local else None
+
+        th = {(rel, n) for n in threaded}
+        emitted = [thread_and_rewrite(Gen(rel, name, t), th, resolve, stats, globals_map={"paths": "orch.paths"}) for name, _, t in texts]
+        for n in [d for d in divergent if d == root]:  # internal divergent helpers are reached through their fork's root
+            if not isinstance(mods["wnba"].defs[n], ast.FunctionDef):
+                raise SystemExit(f"divergent non-function {rel}.{n}")
+            needs = f"{n}__nba" in threaded or f"{n}__wnba" in threaded
+            emitted.append(
+                f"def {n}(*args, fork: str{', orch' if needs else ''}, **kwargs):\n"
+                f'    """`{n}` of the vendored fork the bridge chose: "nba" -> nba_betting, anything else -> wnba_betting."""\n'
+                f'    impl = {n}__nba if fork == "nba" else {n}__wnba\n'
+                f"    return impl(*args{', orch=orch' if needs else ''}, **kwargs)"
+            )
+        m = mods["wnba"]
+        lines: list[str] = []
+        for node in m.top_imports:
+            if isinstance(node, ast.ImportFrom) and (node.level or node.module == "__future__"):
+                continue
+            seg = ast.get_source_segment(m.text, node)
+            if seg and seg not in lines:
+                lines.append(seg)
+        used: set[str] = set()
+        for t in emitted:
+            used |= _names(ast.parse(t))
+        ext: dict[str, set[str]] = {}
+        for (_mod, name), target in BUILDER_EXTERNAL.items():
+            if name in used:
+                ext.setdefault(target, set()).add(name)
+        imp = "\n".join(lines)
+        if ext:
+            imp += "\n\n" + "\n".join(f"from {mod} import {', '.join(sorted(v))}" for mod, v in sorted(ext.items()))
+        header = (
+            '"""GENERATED by scripts/port_basketball_orchestrator.py, PASS 2 (plan P6, lane basketball-native-orchestrator).\n\n'
+            f"Native port of the team-advanced-stats builder `{root}` from\n"
+            f"  vendor/nba_betting_repo/src/nba_betting/{rel}.py (sha256 {_sha(SRC['nba'] / (rel + '.py'))}...)\n"
+            f"  vendor/wnba_betting_repo/src/wnba_betting/{rel}.py (sha256 {_sha(SRC['wnba'] / (rel + '.py'))}...)\n"
+            f"The forks differ in ALGORITHM in: {', '.join(divergent)}. Each is kept VERBATIM per fork (`__nba`, `__wnba`)\n"
+            "behind a dispatcher taking `fork`. Every other definition is identical in both forks and emitted once.\n"
+            "Mechanical edits only: global `paths` -> `orch.paths` (a keyword-only `orch` where needed); the WNBA fork's\n"
+            "`LEAGUE`, season helpers and `TEAM_TRICODES` come from league_config.py / wnba_teams.py (copied by value).\n"
+            "PARITY: scripts/basketball_orchestrator_parity.py builders (DataFrame equality on real production data).\n"
+            '"""\n\nfrom __future__ import annotations\n\n'
+        )
+        out[rel] = header + imp + "\n\n\n" + "\n\n\n".join(emitted).rstrip() + "\n"
+        log.append(f"builders {rel}: {len(texts)} definitions emitted, divergent kept per fork: {divergent}")
+    tm = VMod.load("wnba", "teams")
+    need = sorted(_module_closure(tm, "TEAM_TRICODES"), key=lambda n: tm.defs[n].lineno)
+    out["wnba_teams"] = (
+        '"""GENERATED by scripts/port_basketball_orchestrator.py, PASS 2: the WNBA fork\'s TEAM_TRICODES\n'
+        f"(vendor/wnba_betting_repo/src/wnba_betting/teams.py, sha256 {_sha(SRC['wnba'] / 'teams.py')}...), by value.\n"
+        '"""\n\n' + "\n\n".join(tm.source(n) for n in need) + "\n"
+    )
+    log.append(f"builders mechanical: {stats}")
+    return out
 
 
 def _literal_tuple(filename: str, name: str) -> list[str]:

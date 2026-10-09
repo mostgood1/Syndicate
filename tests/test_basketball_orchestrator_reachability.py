@@ -43,7 +43,7 @@ def test_production_worker_call_reaches_the_native_orchestrator(tmp_path, monkey
 
 def test_no_vendored_sim_module_is_imported_by_the_production_path():
     """A FRESH interpreter imports the bridge and the orchestrator, builds a module view and resolves every
-    hook: no `nba_betting` / `wnba_betting` module may load. The pre-P6 bridge failed this (it imported
+    hook, and builds both forks' team-advanced-stats builders: no `nba_betting` / `wnba_betting` module may load. The pre-P6 bridge failed this (it imported
     `<pkg>.sim.smart_sim`, which imports `<pkg>.sim.events`)."""
     code = (
         "import sys, tempfile, pathlib\n"
@@ -52,6 +52,9 @@ def test_no_vendored_sim_module_is_imported_by_the_production_path():
         "for lg in ('nba', 'wnba'):\n"
         "    v = b._build_local_smart_sim_module(processed_root=pathlib.Path(tempfile.mkdtemp()), league_code=lg)\n"
         "    [getattr(v, n) for n in hooks.HOOK_NAMES]\n"
+        "for pkg in ('nba_betting', 'wnba_betting'):\n"
+        "    box, logs = b._import_advanced_stats_builders_local(package_name=pkg, processed_root=pathlib.Path(tempfile.mkdtemp()))\n"
+        "    assert callable(box.compute_team_advanced_stats_from_boxscores) and callable(logs.compute_team_advanced_stats_from_player_logs)\n"
         "bad = sorted(m for m in sys.modules if m.split('.')[0] in ('nba_betting', 'wnba_betting'))\n"
         "print('VENDORED', bad)\n"
     )

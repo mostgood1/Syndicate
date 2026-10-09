@@ -4,7 +4,7 @@ Native port of the definitions production EXECUTES from
   vendor/wnba_betting_repo/src/wnba_betting/league.py (sha256 3e4c6c37f5e44f60...)
 checked definition by definition against
   (no NBA twin)
-Ported: LeagueConfig, LEAGUE.
+Ported: LeagueConfig, LEAGUE, _coerce_date, season_start_year_from_date, season_year_from_date, season_label_from_year.
 
 Mechanical edits: global `paths` / `LEAGUE` reads -> `orch.paths` / `orch.league` (runtime.OrchestratorEnv);
 a keyword-only `orch` on every function that needs it, passed at every call; relative imports re-pointed
@@ -15,6 +15,7 @@ orchestrator and the vendored one, same seed, and compares every leaf of the out
 """
 
 from dataclasses import dataclass
+from datetime import date, datetime
 
 
 @dataclass(frozen=True)
@@ -68,3 +69,24 @@ LEAGUE = LeagueConfig(
     spread_winprob_sigma=9.75,
     min_event_possessions=67.5,
 )
+
+
+def _coerce_date(value: date | datetime | str) -> date:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return datetime.fromisoformat(str(value).strip()).date()
+
+
+def season_start_year_from_date(value: date | datetime | str) -> int:
+    dt = _coerce_date(value)
+    return int(dt.year) if int(dt.month) >= int(LEAGUE.season_start_month) else int(dt.year) - 1
+
+
+def season_year_from_date(value: date | datetime | str) -> int:
+    return season_start_year_from_date(value)
+
+
+def season_label_from_year(season_year: int) -> str:
+    return str(int(season_year))

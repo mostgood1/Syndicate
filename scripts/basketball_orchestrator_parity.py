@@ -66,6 +66,7 @@ _VENDORED_ARM_FUNCS = (
     "_import_real_smart_sim_module_local",
     "_build_local_smart_sim_module",
     "_call_source_simulate_smart_game_local",
+    "_import_advanced_stats_builders_local",
 )
 BRIDGE_REL = "syndicate/features/shared/basketball_props_smart_sim.py"
 
@@ -170,6 +171,7 @@ def _vendored_ns() -> dict[str, Any]:
         bps = _bridge()
         ns = dict(vars(bps))
         ns["_REAL_SMART_SIM_MODULE_CACHE_LOCAL"] = {}
+        ns["_ADVANCED_STATS_BUILDER_MODULE_CACHE_LOCAL"] = {}
         ns["_simulate_smart_game_local"] = None  # the deleted flat fallback: never an arm
         exec(compile(vendored_arm_source(), f"<vendored arm {VENDORED_ARM_COMMIT}>", "exec"), ns)
         _VENDORED_NS = ns
@@ -353,6 +355,59 @@ def cmd_replay(args) -> int:
     return 0 if report["verdict"] == "PASS" else 1
 
 
+def cmd_builders(args) -> int:
+    """PASS 2: the team-advanced-stats builders, vendored vs native, on one data root.
+
+    For each date it calls exactly what `_ensure_team_advanced_stats_asof_local` calls (season from
+    `_season_from_date_str_local`, as_of = compact date, min_games 10 for NBA else 1), through each arm's
+    `_import_advanced_stats_builders_local`, and compares the DataFrames: shape, columns, every cell."""
+    import pandas as pd
+
+    bps = _bridge()
+    processed_root = args.source_root.expanduser().resolve() / "data" / "processed"
+    league = bps._league_for_code_local(args.league)
+    package = "wnba_betting" if args.league != "nba" else "nba_betting"
+    v_box, v_logs = _vendored_ns()["_import_advanced_stats_builders_local"](package_name=package, processed_root=processed_root)
+    if v_box is None or v_logs is None:
+        raise SystemExit("vendored arm: advanced-stats builders did not import")
+    n_box, n_logs = bps._import_advanced_stats_builders_local(package_name=package, processed_root=processed_root)
+    min_games = 1 if args.league != "nba" else 10
+    rows, cells, bad = [], 0, 0
+    for date in [d.strip() for d in args.dates.split(",") if d.strip()]:
+        season = bps._season_from_date_str_local(date_str=date, league=league)
+        as_of = date.replace("-", "")
+        for kind, vf, nf in (
+            ("boxscores", v_box.compute_team_advanced_stats_from_boxscores, n_box.compute_team_advanced_stats_from_boxscores),
+            ("player_logs", v_logs.compute_team_advanced_stats_from_player_logs, n_logs.compute_team_advanced_stats_from_player_logs),
+        ):
+            out = {}
+            for arm, fn in (("vendored", vf), ("native", nf)):
+                try:
+                    out[arm] = fn(int(season), min_games=min_games, as_of=as_of)
+                except Exception as exc:
+                    out[arm] = f"{type(exc).__name__}: {exc}"
+            a, b = out["vendored"], out["native"]
+            if isinstance(a, pd.DataFrame) and isinstance(b, pd.DataFrame):
+                same = a.shape == b.shape and list(a.columns) == list(b.columns) and a.equals(b)
+                n = int(a.size)
+            else:
+                same = (not isinstance(a, pd.DataFrame)) and (not isinstance(b, pd.DataFrame)) and str(a) == str(b)
+                n = 0
+            cells += n
+            bad += 0 if same else 1
+            row = {"date": date, "season": season, "kind": kind, "rows": int(a.shape[0]) if isinstance(a, pd.DataFrame) else None,
+                   "cells": n, "verdict": "IDENTICAL" if same else "DIFFERS",
+                   "vendored": None if isinstance(a, pd.DataFrame) else str(a)[:200], "native": None if isinstance(b, pd.DataFrame) else str(b)[:200]}
+            print("ORCH_BUILDERS " + json.dumps(row), flush=True)
+            rows.append(row)
+    rep = {"league": args.league, "comparisons": len(rows), "non_empty": sum(1 for r in rows if r["rows"]), "cells_compared": cells, "failed": bad,
+           "verdict": "PASS" if rows and bad == 0 else "FAIL", "rows": rows}
+    if args.json_out:
+        Path(args.json_out).expanduser().write_text(json.dumps(rep, indent=2), encoding="utf-8")
+    print("ORCH_BUILDERS_PARITY " + json.dumps({k: v for k, v in rep.items() if k != "rows"}), flush=True)
+    return 0 if rep["verdict"] == "PASS" else 1
+
+
 def cmd_compare(args) -> int:
     from scripts.basketball_engine_parity import compare_sim_artifacts
 
@@ -389,6 +444,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--prod-data-root", default="~/syndicate-prod/data")
     p.add_argument("--scratch-data-root", default=None)
     p.add_argument("--vendored-bridge", type=Path, default=None)
+    bl = sub.add_parser("builders")
+    bl.add_argument("--league", required=True, choices=("nba", "wnba"))
+    bl.add_argument("--dates", required=True)
+    bl.add_argument("--source-root", required=True, type=Path, help="SCRATCH copy of <league>_source")
+    bl.add_argument("--json-out", default=None)
+    bl.add_argument("--vendored-bridge", type=Path, default=None)
     c = sub.add_parser("compare")
     c.add_argument("--dir-a", required=True)
     c.add_argument("--prefix-a", default="smart_sim")
@@ -400,7 +461,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     global VENDORED_BRIDGE_FILE
     VENDORED_BRIDGE_FILE = getattr(args, "vendored_bridge", None)
-    return {"record": cmd_record, "replay": cmd_replay, "compare": cmd_compare}[args.cmd](args)
+    return {"record": cmd_record, "replay": cmd_replay, "compare": cmd_compare, "builders": cmd_builders}[args.cmd](args)
 
 
 if __name__ == "__main__":
