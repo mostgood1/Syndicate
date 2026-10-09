@@ -51,6 +51,12 @@ class EventSimConfig:
     # target calibration. The targets are market-anchored (margin 95%), so they already price team quality; the
     # WNBA engine turned this off on 2026-10-01 (TEAM_PRIOR_STACKS_ON_TARGET). True = today's NBA behaviour.
     team_prior_stacks_on_target: bool = True
+    # Late-game catch-up / score effects (lane basketball-scenario-calibration, Phase 2 #2, pre-registered 10da26d5;
+    # LOAN from basketball-native-engine). Each shot's make probability (and the shooter's FT%) is multiplied by
+    # clip(1 - k * dev, 0.85, 1.15), dev = the offense's lead now minus its expected lead to date (target margin x share
+    # of regulation elapsed). Real games revert (line-adjusted H2-on-H1 margin slope -0.17); the sim's halves were
+    # independent (0.00). 0.0 = off: the factor is exactly 1.0 and no RNG draw is made, so output is byte-identical.
+    score_effect_k: float = 0.0
 
     # Outcome priors (fallbacks when player priors are missing)
     base_tov_per_poss: float = 0.125
@@ -1073,6 +1079,24 @@ def simulate_pbp_game_boxscore(
     ) -> None:
         nonlocal home_score, away_score
 
+        se_k = float(getattr(cfg, "score_effect_k", 0.0) or 0.0)
+
+        def _score_effect(off_home: bool) -> float:
+            # Score effect for the offense (Phase 2 #2). 1.0 exactly when k == 0, so the default path is unchanged.
+            if se_k == 0.0:
+                return 1.0
+            if q > N_PERIODS:
+                share = 1.0
+            else:
+                share = ((int(q) - 1) * float(quarter_seconds) + (float(quarter_seconds) - float(q_remaining))) / (float(N_PERIODS) * float(quarter_seconds))
+                share = float(min(1.0, max(0.0, share)))
+            tgt_margin = (float(target_home_points) - float(target_away_points)) if (target_home_points is not None and target_away_points is not None) else 0.0
+            if not np.isfinite(tgt_margin):
+                tgt_margin = 0.0
+            lead = float(home_score - away_score) if off_home else float(away_score - home_score)
+            expected = (tgt_margin if off_home else -tgt_margin) * share
+            return float(np.clip(1.0 - se_k * (lead - expected), 0.85, 1.15))
+
         # RESUME: start_remaining is the clock left in a period already under way; None = the whole period, the
         # only value a pregame run ever passes (and then every expression below is the vendored one).
         period_left = int(period_seconds) if start_remaining is None else int(start_remaining)
@@ -1310,7 +1334,7 @@ def simulate_pbp_game_boxscore(
 
                     eff_scale = cfg.garbage_time_eff_scale if blowout else 1.0
                     base_p = float(h_3p_pct[sh] if shot_is_3 else h_fg_pct[sh])
-                    make_p = float(np.clip(base_p * eff_scale * eff_mult_h * q_env_mult, 0.05, 0.95))
+                    make_p = float(np.clip(base_p * eff_scale * eff_mult_h * q_env_mult * _score_effect(True), 0.05, 0.95))
                     made = bool(rng.random() < make_p)
 
                     blk = False
@@ -1340,7 +1364,7 @@ def simulate_pbp_game_boxscore(
 
                         if foul and rng.random() < 0.32:
                             h["fta"][sh] += 1
-                            ftp = float(np.clip(float(h_ft_pct[sh]) * eff_mult_h * q_env_mult, 0.45, 0.95))
+                            ftp = float(np.clip(float(h_ft_pct[sh]) * eff_mult_h * q_env_mult * _score_effect(True), 0.45, 0.95))
                             if rng.random() < ftp:
                                 h["ftm"][sh] += 1
                                 h["pts"][sh] += 1
@@ -1368,7 +1392,7 @@ def simulate_pbp_game_boxscore(
                             if shot_is_3:
                                 h["fg3a"][sh] -= 1
                         h["fta"][sh] += int(n_ft)
-                        ftp = float(np.clip(float(h_ft_pct[sh]) * eff_mult_h * q_env_mult, 0.45, 0.95))
+                        ftp = float(np.clip(float(h_ft_pct[sh]) * eff_mult_h * q_env_mult * _score_effect(True), 0.45, 0.95))
                         made_fts = int(rng.binomial(int(n_ft), ftp))
                         if made_fts > 0:
                             h["ftm"][sh] += made_fts
@@ -1434,7 +1458,7 @@ def simulate_pbp_game_boxscore(
 
                     eff_scale = cfg.garbage_time_eff_scale if blowout else 1.0
                     base_p = float(a_3p_pct[sh] if shot_is_3 else a_fg_pct[sh])
-                    make_p = float(np.clip(base_p * eff_scale * eff_mult_a * q_env_mult, 0.05, 0.95))
+                    make_p = float(np.clip(base_p * eff_scale * eff_mult_a * q_env_mult * _score_effect(False), 0.05, 0.95))
                     made = bool(rng.random() < make_p)
 
                     blk = False
@@ -1464,7 +1488,7 @@ def simulate_pbp_game_boxscore(
 
                         if foul and rng.random() < 0.32:
                             a["fta"][sh] += 1
-                            ftp = float(np.clip(float(a_ft_pct[sh]) * eff_mult_a * q_env_mult, 0.45, 0.95))
+                            ftp = float(np.clip(float(a_ft_pct[sh]) * eff_mult_a * q_env_mult * _score_effect(False), 0.45, 0.95))
                             if rng.random() < ftp:
                                 a["ftm"][sh] += 1
                                 a["pts"][sh] += 1
@@ -1492,7 +1516,7 @@ def simulate_pbp_game_boxscore(
                             if shot_is_3:
                                 a["fg3a"][sh] -= 1
                         a["fta"][sh] += int(n_ft)
-                        ftp = float(np.clip(float(a_ft_pct[sh]) * eff_mult_a * q_env_mult, 0.45, 0.95))
+                        ftp = float(np.clip(float(a_ft_pct[sh]) * eff_mult_a * q_env_mult * _score_effect(False), 0.45, 0.95))
                         made_fts = int(rng.binomial(int(n_ft), ftp))
                         if made_fts > 0:
                             a["ftm"][sh] += made_fts
