@@ -194,6 +194,8 @@ def _setup(ev: V4Evaluator, real: Dict[str, dict], meta: Dict[str, dict]):
 # ---------------------------------------------------------------------------
 
 SMOKE = False
+VARIANT = "v4"          # "v41": constrained descent (gate b enforced on FIT), pre-registered 913af5d6
+V41_START = {"tier_offset": 3.0, "tier_decay_weeks": 8.0}
 
 
 def fit_select(meta: Dict[str, dict]):
@@ -220,24 +222,48 @@ def cmd_descent(args) -> None:
         prod, games, terc, real_m, se, tier, conf = _setup(ev, real, meta)
         print(f"[v4] FIT games {len(games)} (early P4-vs-G5 {len(tier)}, early conference {len(conf)}), {R.DESCENT_SEEDS} seeds")
 
+        last_z: Dict[str, Dict[str, float]] = {}
+
         def score(ov: Dict[str, Any], label: str) -> float:
             obj, z, m = full_objective(ev.run(ov), games, terc, real, real_m, se, tier, conf)
-            log.write(json.dumps({"label": label, "overrides": ov, "objective": obj, "z": z, "moments": m}) + "\n")
+            last_z[R._key(ov)] = z
+            ok = feasible(z)
+            log.write(json.dumps({"label": label, "overrides": ov, "objective": obj, "z": z, "moments": m,
+                                  "feasible_b": ok}) + "\n")
             log.flush()
-            print(f"  {label:58} obj {obj:9.2f}   " + " ".join(f"{k}={v:+.1f}" for k, v in z.items() if abs(v) >= 2),
-                  flush=True)
+            print(f"  {label:58} obj {obj:9.2f} {'' if ok else '[violates b]'}  "
+                  + " ".join(f"{k}={v:+.1f}" for k, v in z.items() if abs(v) >= 2), flush=True)
             return obj
 
+        prod_z: Dict[str, float] = {}
+
+        def feasible(z: Dict[str, float]) -> bool:
+            """v4.1: gate (b) on FIT -- no moment's abs z more than 1.0 above production's. Always true for v4."""
+            if VARIANT != "v41" or not prod_z:
+                return True
+            return all(abs(z[k]) - abs(prod_z.get(k, 0.0)) <= 1.0 for k in z)
+
         prod_obj = score({}, "PRODUCTION")
-        v3 = json.loads((F.OUT_ROOT / SPORT / "refit_v3" / "descent_result.json").read_text(encoding="utf-8"))["overrides"]
-        cur = dict(v3)
-        cur_obj = score(cur, "v3 fitted (start point)")
+        prod_z.update(last_z[R._key({})])
+        if VARIANT == "v41":
+            cur = dict(V41_START)
+            cur_obj = score(cur, "v4.1 start: production + tier offset 3 / decay 8")
+            if not feasible(last_z[R._key(cur)]):
+                print("  start violates the (b) constraint -> starting from production")
+                cur, cur_obj = {}, prod_obj
+        else:
+            v3 = json.loads((F.OUT_ROOT / SPORT / "refit_v3" / "descent_result.json").read_text(encoding="utf-8"))["overrides"]
+            cur = dict(v3)
+            cur_obj = score(cur, "v3 fitted (start point)")
         R.SWITCH_BASE = {}  # v4 levers below; switches stay as v3 chose
         g = dict(R.grids(SPORT))
         g.update({k: list(v) for k, v in GRIDS_V4.items()})
+        if VARIANT == "v41":
+            g["drive_success_offense_sensitivity"] = [0.45, 0.6, 0.8, 1.0, 1.2]   # floor raised (v4.1)
+            g["non_offensive_scoring"] = [False, True]
         if SMOKE:
             g = {k: [v[0], v[-1]] for k, v in g.items()}
-        order = list(GRIDS_V4) + list(R.LEVER_ORDER)
+        order = (["non_offensive_scoring"] if VARIANT == "v41" else []) + list(GRIDS_V4) + list(R.LEVER_ORDER)
         # the LATEST-week early tier game: at week 3 the decay factor is 1 for every K, so a week-3 probe
         # would wrongly report tier_decay_weeks as unreachable (it did, in the smoke run)
         tier_tasks = sorted((t for t in ev._tasks(None) if str(t["game_id"]) in set(tier)), key=lambda t: -int(t["week"]))
@@ -272,13 +298,18 @@ def cmd_descent(args) -> None:
                 for v in g[lever]:
                     if v == base_v:
                         continue
-                    o = score(dict(cur, **{lever: v}), f"pass {pass_no} {lever}={v}")
-                    if o < best_obj - 1e-9:
+                    ov = dict(cur, **{lever: v})
+                    if v is False:
+                        ov.pop(lever)                   # an OFF switch is written as absent
+                    o = score(ov, f"pass {pass_no} {lever}={v}")
+                    if o < best_obj - 1e-9 and feasible(last_z[R._key(ov)]):
                         best_v, best_obj = v, o
                 if best_obj < cur_obj:
                     cur[lever], cur_obj = best_v, best_obj
+                    if cur[lever] is False:
+                        cur.pop(lever)
                     print(f"  -> keep {lever}={best_v}  obj {cur_obj:.2f}", flush=True)
-        result = {"sport": SPORT, "version": "v4", "production_objective": prod_obj, "fitted_objective": cur_obj,
+        result = {"sport": SPORT, "version": VARIANT, "feasible_b_on_fit": feasible(last_z.get(R._key(cur), {})), "production_objective": prod_obj, "fitted_objective": cur_obj,
                   "overrides": cur, "games": len(games), "early_tier_games": len(tier), "early_conf_games": len(conf)}
         (out / "descent_result.json").write_text(json.dumps(result, indent=1), encoding="utf-8")
         print(f"\n[v4] production obj {prod_obj:.2f} -> fitted obj {cur_obj:.2f} (ratio {cur_obj / prod_obj:.3f})\n  {cur}")
@@ -376,9 +407,13 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap.add_argument("--season", type=int, default=2026)
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--variant", choices=("v4", "v41"), default="v4")
     args = ap.parse_args(argv)
-    global SMOKE
+    global SMOKE, VARIANT, OUT_DIR
     SMOKE = args.smoke
+    VARIANT = args.variant
+    if VARIANT == "v41":
+        OUT_DIR = "refit_v41"
     F.idle_self()   # fleet shares this machine
     {"descent": cmd_descent, "validate": cmd_validate}[args.cmd](args)
 
