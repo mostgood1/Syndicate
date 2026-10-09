@@ -871,3 +871,22 @@ later one overwrites the smart_sim file. Source not traced; see the next leads.m
   - PASS if sim total bias vs real is within ±1.5, S8 total SD no worse than run noise vs E2E (the #1e point), and
     S8 margin / S5 / S3 rows not worse than run noise vs E2E.
 - No production change without the user.
+
+### Phase 2 #1f — measurement (1) RESULT: walk-forward on the SWITCHED raw (780 games, 107 dates)
+
+| | bias | MAE |
+|---|---|---|
+| switched raw (D1 + D2) | −3.34 | 16.36 |
+| switched raw, calibrated | **+0.59** | 16.16 |
+| anchored target, switched raw | −0.93 | 14.68 |
+| anchored target, calibrated | +0.26 | 14.69 |
+
+- Paired MAE change, calibrated − switched raw: −0.19 [−0.53, +0.17].
+- The global term: min −1.79, median 3.81, max 7.17. **Well inside the ±15 clip:** the clip no longer binds.
+- **Gate by the letter:** |bias| < 2 PASS (+0.59). MAE change CI < 0 **FAIL** (the CI includes 0).
+- **Reading:** the two structural switches remove ~14 of the 17 points. The calibration file then mops up only the
+  game model's ~3-pt level, with no significant MAE gain on top. The switches do the work; the calibration is a small
+  safety term.
+- Seed for opening night (final 14 days, switched raw): +2.50.
+- Calibration files for the 12 dates were written to `C:	mpball_sc\calfiles_sw` (walk-forward, switched raw)
+  for measurement (2), which was launched 2026-10-09 17:51Z.
