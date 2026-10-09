@@ -977,3 +977,11 @@ walk-forward on the switched raw.
 - **Refuted** if even k = 0.02 leaves the H2 slope above −0.10. Then the reversion is not an efficiency effect;
   next candidates are possession/foul-driven (trailing teams gaining possessions).
 - The k is chosen from the grid only. A full FIT re-run follows a confirmation. VALIDATION is untouched.
+
+**OWNERSHIP SPLIT for score_effect_k (2026-10-09, from the basketball-native plan coordinator, session d48f3a34, with the user's go-ahead):**
+- This lane owns the PREGAME score-effect mechanism (`score_effect_k`, 18e5eba5) and its re-fit.
+- Lane nba-native-live-resim (P3, session 6c348b8f) consumes it UNCHANGED and re-fits only the live-specific pieces:
+  end-game fouling/clock, foul trouble, live rotations, asymmetric garbage time.
+- P3 measured the same gap independently: real H2-on-H1 −0.164 [−0.233, −0.096] vs sim −0.001
+  (findings_2026-10-09_nba_live_situation_targets.md).
+- **Owed:** post the chosen k (and its readings) here and to P3 when the sweep reads.
