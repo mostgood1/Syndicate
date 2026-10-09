@@ -1852,7 +1852,8 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Table per input x market: n rows/games (and n rows with x != 0), b2 [CI] on 2023, 2024 LL book vs combined with paired delta [CI]. All two-sided quote rows (an input that the line misses applies whether or not the model prices the row); official grading for attempts; 2025 untouched.
 - Blocked by: none
 
-### basketball-live-native-plan — OPEN — opened 2026-10-09 — session d48f3a34-5dd7-4517-8870-292b82d44b4a
+### basketball-live-native-plan — CLOSED 2026-10-09 — opened 2026-10-09 — session d48f3a34-5dd7-4517-8870-292b82d44b4a
+- GOAL VERDICT: Goal: A plan doc on origin/main (docs/ai_context/basketball_live_native_plan.md) defines the phased, fully Syndicate-native basketball live lens (no vendored app or vendored sim at runtime) for NBA/WNBA/NCAAB, and one session per phase is spawned with a self-contained brief -- **GOAL: MET**: plan landed e8261815; five chips spawned 2026-10-09 (P1 task_a50f226d, P2 task_0ea1e449, P3 task_ce22c8b3, P4 task_aaad8063, P5 task_2baaded0). P3-P5 briefs self-guard on prerequisites. Phase status lives in the plan's Status table.
 - Goal: A plan doc on origin/main (docs/ai_context/basketball_live_native_plan.md) defines the phased, fully Syndicate-native basketball live lens (no vendored app or vendored sim at runtime) for NBA/WNBA/NCAAB, and one session per phase is spawned with a self-contained brief
 - Files: docs/ai_context/basketball_live_native_plan.md
 - Hypothesis: n/a (planning)
