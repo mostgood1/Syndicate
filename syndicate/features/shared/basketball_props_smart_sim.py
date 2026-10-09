@@ -2300,6 +2300,50 @@ def _espn_name_to_id_map_for_game_local(*, smart_sim_module, date_str: str, home
         except Exception:
             return {}
 
+    def _from_native_player_checks(lookback_days: int = 120) -> dict[tuple[str, str], str]:
+        """(team, name key) -> ESPN athlete id from the native rotation producer's per-game player checks
+        (`rotation_stints/player_checks_<date>.csv`, scripts/build_basketball_rotation_stints.py).
+
+        Lane basketball-native-live-state, 2026-10-09: for a PREGAME game ESPN has no box yet, and the
+        only other fallback reads the vendored `pbp_espn_history.csv`. Measured on the fleet: the map
+        came back EMPTY for 2026-10-10 TOR v LAC and ATL v IND, so every pregame rotation-history call
+        refused with `no_espn_name_map`. Newest game wins per (team, name).
+        """
+        try:
+            checks_dir = source_paths.data_processed / "rotation_stints"
+            if not checks_dir.is_dir():
+                return {}
+            cutoff = pd.to_datetime(str(date_str), errors="coerce")
+            if pd.isna(cutoff):
+                return {}
+            start = cutoff - pd.Timedelta(days=int(lookback_days))
+            teams = {str(t or "").upper().strip() for t in (home_tri, away_tri)} - {""}
+            frames = []
+            for fp in sorted(checks_dir.glob("player_checks_*.csv")):
+                day = pd.to_datetime(fp.stem.rsplit("_", 1)[-1], errors="coerce")
+                if pd.isna(day) or day < start or day > cutoff:
+                    continue
+                df = pd.read_csv(fp, usecols=["date", "team", "player_id", "player_name"], dtype=str)
+                df["team"] = df["team"].astype(str).str.upper().str.strip()
+                frames.append(df[df["team"].isin(list(teams))] if teams else df)
+            if not frames:
+                return {}
+            combo = pd.concat(frames, ignore_index=True).sort_values(["date"], kind="stable")
+            out: dict[tuple[str, str], str] = {}
+            for _, row in combo.iterrows():
+                key = str(norm_player_key(row.get("player_name")) or "").upper().strip()
+                player_id = clean_id_str(row.get("player_id"))
+                if row["team"] and key and player_id:
+                    out[(row["team"], key)] = player_id
+            return out
+        except Exception:
+            return {}
+
+    def _fallback() -> dict[tuple[str, str], str]:
+        merged = dict(_from_pbp_history())
+        merged.update(_from_native_player_checks())  # native wins on a conflict
+        return merged
+
     try:
         eid = str(event_id or "").strip() or (
             _espn_event_id_for_matchup_local(
@@ -2312,7 +2356,7 @@ def _espn_name_to_id_map_for_game_local(*, smart_sim_module, date_str: str, home
             or ""
         )
         if not eid:
-            return _from_pbp_history()
+            return _fallback()
         summary = _espn_summary_local(
             processed_root=source_paths.data_processed,
             event_id=eid,
@@ -2321,7 +2365,7 @@ def _espn_name_to_id_map_for_game_local(*, smart_sim_module, date_str: str, home
         box = (summary or {}).get("boxscore") or {}
         teams = box.get("players") or []
         if not isinstance(teams, list) or not teams:
-            return _from_pbp_history()
+            return _fallback()
 
         out: dict[tuple[str, str], str] = {}
         for team_payload in teams:
@@ -2348,9 +2392,9 @@ def _espn_name_to_id_map_for_game_local(*, smart_sim_module, date_str: str, home
                 if not key:
                     continue
                 out[(str(team_tri).upper().strip(), str(key).upper().strip())] = player_id
-        return out or _from_pbp_history()
+        return out or _fallback()
     except Exception:
-        return _from_pbp_history()
+        return _fallback()
 
 
 def _rotation_sim_minutes_from_history_local(*, smart_sim_module, league_code: str, team_df, date_str: str, home_tri: str, away_tri: str, team_tri: str, lookback_days: int = 28):
