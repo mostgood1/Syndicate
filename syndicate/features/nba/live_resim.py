@@ -72,6 +72,29 @@ _INPUT_KEYS = (
 )
 
 
+# Tricode -> the OddsAPI full name. `live_gameline_join` keys games on (away, home) NAMES and the board's rows
+# carry OddsAPI names; ESPN's displayName differs for at least the Clippers ("LA Clippers"), so names are not
+# taken from ESPN.
+NBA_TEAM_NAMES: dict[str, str] = {
+    "ATL": "Atlanta Hawks", "BOS": "Boston Celtics", "BKN": "Brooklyn Nets", "CHA": "Charlotte Hornets",
+    "CHI": "Chicago Bulls", "CLE": "Cleveland Cavaliers", "DAL": "Dallas Mavericks", "DEN": "Denver Nuggets",
+    "DET": "Detroit Pistons", "GSW": "Golden State Warriors", "HOU": "Houston Rockets", "IND": "Indiana Pacers",
+    "LAC": "Los Angeles Clippers", "LAL": "Los Angeles Lakers", "MEM": "Memphis Grizzlies", "MIA": "Miami Heat",
+    "MIL": "Milwaukee Bucks", "MIN": "Minnesota Timberwolves", "NOP": "New Orleans Pelicans", "NYK": "New York Knicks",
+    "OKC": "Oklahoma City Thunder", "ORL": "Orlando Magic", "PHI": "Philadelphia 76ers", "PHX": "Phoenix Suns",
+    "POR": "Portland Trail Blazers", "SAC": "Sacramento Kings", "SAS": "San Antonio Spurs", "TOR": "Toronto Raptors",
+    "UTA": "Utah Jazz", "WAS": "Washington Wizards",
+}
+
+
+def props_csv_path(date: str, *, root: Optional[Path] = None) -> Path:
+    if root is None:
+        from syndicate.features.shared.basketball_live_state import source_root
+
+        root = source_root(LEAGUE)
+    return Path(root) / "data" / "processed" / f"oddsapi_player_props_{date}.csv"
+
+
 @dataclass(frozen=True)
 class NbaResimRefusal:
     """Why one game could not be re-simulated. `reason` is a stable token."""
@@ -332,13 +355,16 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
     margins: list[int] = []
     periods_h: list[list[int]] = []
     periods_a: list[list[int]] = []
+    rem: dict[str, dict[str, dict[str, list[int]]]] = {"home": {}, "away": {}}
     for i in range(int(sims)):
         if deadline is not None and clock() >= deadline:
             return NbaResimRefusal("budget_exhausted", f"{i}/{sims}")
         try:
-            _hb, _ab, hq, aq = simulate(rng, game_state)
+            hb, ab, hq, aq = simulate(rng, game_state)
         except Exception as exc:  # noqa: BLE001
             return NbaResimRefusal("engine_resume_rejected", type(exc).__name__)
+        _collect_player_remainders(rem, "home", hb, i)
+        _collect_player_remainders(rem, "away", ab, i)
         h, a = int(sum(hq)), int(sum(aq))
         totals.append(h + a)
         margins.append(h - a)
@@ -354,8 +380,161 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
         "total_dist": _hist(totals),
         "margin_dist": _hist(margins),
         "segments": _segments(periods_h, periods_a),
+        "player_remainders": _player_remainder_hists(rem, n),
     }
     return out
+
+
+# Per-player REST-OF-GAME stats. A resumed run's player box lines are the remainder only (resume.py), so the
+# final for a prop is actual-so-far + this. Keyed by the engine frame's `player_name`.
+PROP_STATS: tuple[tuple[str, str], ...] = (("pts", "points"), ("reb", "rebounds"), ("ast", "assists"), ("threes", "threes"))
+
+
+def _collect_player_remainders(rem: dict, side: str, box: Any, draw: int) -> None:
+    rows = (box or {}).get("players") if isinstance(box, Mapping) else None
+    for row in rows or []:
+        name = str(row.get("player_name") or "").strip()
+        if not name:
+            continue
+        slot = rem[side].setdefault(name, {k: [] for k, _ in PROP_STATS})
+        for key, _label in PROP_STATS:
+            vals = slot[key]
+            vals.extend([0] * (draw - len(vals)))  # absent from earlier boxes = scored 0 there
+            vals.append(int(row.get(key) or 0))
+
+
+def _player_remainder_hists(rem: dict, n: int) -> dict[str, dict[str, dict[str, dict[str, int]]]]:
+    out: dict[str, dict[str, dict[str, dict[str, int]]]] = {"home": {}, "away": {}}
+    for side, players in rem.items():
+        for name, stats in players.items():
+            hists = {}
+            for key, _label in PROP_STATS:
+                vals = stats[key] + [0] * (n - len(stats[key]))
+                if any(vals):
+                    hists[key] = _hist(vals)
+            if hists:
+                out[side][name] = hists
+    return out
+
+
+def actuals_from_summary(summary: Mapping[str, Any]) -> dict[str, dict[str, int]]:
+    """Banked production per player NAME from the LIVE box score (ESPN updates it in game).
+
+    `{normalized name: {"pts","reb","ast","threes"}}`. A malformed cell is skipped, never read as 0: a missing
+    actual and a genuine zero are different facts (`wnba_live_prop_rows.to_snapshot_live_props`)."""
+    out: dict[str, dict[str, int]] = {}
+    for block in ((summary or {}).get("boxscore") or {}).get("players") or []:
+        for stat in block.get("statistics") or []:
+            names = [str(n) for n in stat.get("names") or []]
+            idx = {k: names.index(k) for k in ("PTS", "REB", "AST", "3PT") if k in names}
+            for a in stat.get("athletes") or []:
+                nm = normalize_name(((a.get("athlete") or {}).get("displayName")) or "")
+                vals = a.get("stats") or []
+                if not nm or not vals:
+                    continue
+                row: dict[str, int] = {}
+                for col, key in (("PTS", "pts"), ("REB", "reb"), ("AST", "ast"), ("3PT", "threes")):
+                    i = idx.get(col)
+                    if i is None or i >= len(vals):
+                        continue
+                    raw = str(vals[i]).split("-", 1)[0]
+                    try:
+                        row[key] = int(float(raw))
+                    except ValueError:
+                        continue
+                if row:
+                    out[nm] = row
+    return out
+
+
+BOARD_PROP_MARKETS = {"pts": "player_points", "reb": "player_rebounds", "ast": "player_assists", "threes": "player_threes"}
+_CSV_MARKET_TO_STAT = {v: k for k, v in BOARD_PROP_MARKETS.items()}
+
+
+def lines_from_props_csv(path: Path, home_name: str, away_name: str) -> dict[tuple[str, str], float]:
+    """`(normalized player, stat) -> line` for ONE game from Syndicate's captured OddsAPI props CSV.
+
+    One line per (player, stat): the MODE across books, ties broken low (the WNBA rule,
+    `wnba/live_lens.py::_lines_from_odds_csv`). Scoped to the game by both full team names.
+    Any failure -> {} (no row is priced)."""
+    import csv
+    from collections import Counter as _Counter
+
+    counts: dict[tuple[str, str], Any] = {}
+    try:
+        with Path(path).open("r", encoding="utf-8", newline="") as fh:
+            for row in csv.DictReader(fh):
+                teams = (str(row.get("home_team") or "").strip(), str(row.get("away_team") or "").strip())
+                if teams != (home_name, away_name):
+                    continue
+                stat = _CSV_MARKET_TO_STAT.get(str(row.get("market") or "").strip().lower())
+                if not stat or str(row.get("outcome_name") or "").strip().lower() != "over":
+                    continue
+                try:
+                    line = float(row.get("point"))
+                except (TypeError, ValueError):
+                    continue
+                key = (normalize_name(row.get("player_name")), stat)
+                counts.setdefault(key, _Counter())[line] += 1
+    except Exception:  # noqa: BLE001
+        return {}
+    out = {}
+    for key, c in counts.items():
+        top = max(c.values())
+        out[key] = min(v for v, k in c.items() if k == top)
+    return out
+
+
+def build_live_props(result: Mapping[str, Any], actuals: Mapping[str, Mapping[str, int]],
+                     lines: Mapping[tuple[str, str], float]) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """`liveProps` rows in the snapshot contract `live_projection_join.build_live_prop_index` reads.
+
+    A row exists only where a LINE exists (a probability needs something to be about) and the player has a
+    banked actual (a missing actual is not a zero). P(over) = share of draws whose actual + remainder exceeds
+    the line. An exact 0 or 1 is a statement about the sample, so it is published as None with the reason."""
+    rows: list[dict[str, Any]] = []
+    counts = {"players_simmed": 0, "rows": 0, "priced": 0, "no_actual": 0, "certainty_refused": 0}
+    for side in ("home", "away"):
+        for name, hists in ((result.get("player_remainders") or {}).get(side) or {}).items():
+            counts["players_simmed"] += 1
+            nk = normalize_name(name)
+            act = actuals.get(nk)
+            for key, _label in PROP_STATS:
+                line = lines.get((nk, key))
+                if line is None:
+                    continue
+                if act is None or key not in act:
+                    counts["no_actual"] += 1
+                    continue
+                hist = hists.get(key) or {"0": int(result.get("sims_run") or 0)}
+                total = sum(int(v) for v in hist.values())
+                if total <= 0:
+                    continue
+                banked = int(act[key])
+                over = sum(int(c) for v, c in hist.items() if banked + int(v) > line)
+                mean_rem = sum(int(v) * int(c) for v, c in hist.items()) / total
+                p_over: Optional[float] = round(over / total, 4)
+                reason = None
+                if p_over in (0.0, 1.0):
+                    p_over, reason = None, "certainty_refused"
+                    counts["certainty_refused"] += 1
+                else:
+                    counts["priced"] += 1
+                row = {
+                    "playerName": name,
+                    "prop": BOARD_PROP_MARKETS[key],
+                    "line": line,
+                    "liveProjection": round(banked + mean_rem, 3),
+                    "liveModelProbOver": p_over,
+                    "actualSoFar": float(banked),
+                    "simsRun": int(result.get("sims_run") or 0),
+                    "side": side,
+                }
+                if reason:
+                    row["unpricedReason"] = reason
+                rows.append(row)
+                counts["rows"] += 1
+    return rows, counts
 
 
 def _hist(values: Sequence[int]) -> dict[str, int]:
@@ -481,7 +660,14 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
             continue
         result = resim_live_game(inputs, gs, sims=sims, base_seed=stable_seed(facts.event_id, facts.last_seq),
                                  deadline=deadline, clock=clock)
-        games.append(_lane_row(event_id, home, away, facts, result, match))
+        row = _lane_row(event_id, home, away, facts, result, match)
+        if not isinstance(result, NbaResimRefusal):
+            lines = lines_from_props_csv(props_csv_path(str(date_str), root=inputs_root),
+                                         row["home_name"], row["away_name"])
+            props, coverage = build_live_props(result, actuals_from_summary(summary), lines)
+            row["liveProps"] = props
+            row["livePropsCoverage"] = {**coverage, "lines_available": len(lines)}
+        games.append(row)
     return {
         "sport": LEAGUE,
         "date": str(date_str),
@@ -501,6 +687,12 @@ def _lane_row(event_id: str, home: str, away: str, facts: Optional[ResumeFacts],
         "event_id": event_id,
         "home": home,
         "away": away,
+        # SHARED BY THE SUCCESS AND THE REFUSAL PATH (NHL's rule): a refusal the board cannot key is invisible.
+        "home_name": NBA_TEAM_NAMES.get(str(home).upper(), ""),
+        "away_name": NBA_TEAM_NAMES.get(str(away).upper(), ""),
+        # The props join decides live/final from this text; only games resumed from an `in` state reach here
+        # with facts, and a refused game says nothing it does not know.
+        "status": {"detailedState": "In Progress" if facts else "Unknown"},
         "gameLens": build_game_lens(facts, result, live_state_as_of=facts.as_of if facts else "",
                                     match_report=match),
     }

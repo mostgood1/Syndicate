@@ -193,3 +193,67 @@ def test_snapshot_publishes_one_lane_per_live_game_and_counts_refusals(tmp_path,
     lane = snap["games"][0]["gameLens"][0]
     assert lane["source"] == "live_resim" and snap["refusalsByReason"] == {}
     assert (snap["games"][0]["home"], snap["games"][0]["away"]) == ("GSW", "NYK")
+
+
+# ------------------------------------------------------------------------------------------- live props
+
+def test_live_props_price_actual_plus_remainder_and_refuse_certainty():
+    result = {"sims_run": 100, "player_remainders": {"home": {"Jaren Jackson Jr.": {
+        "pts": {"0": 20, "4": 50, "10": 30}, "reb": {"0": 100}}}, "away": {"Nobody": {"pts": {"2": 100}}}}}
+    actuals = {"jaren jackson": {"pts": 18, "reb": 9}}
+    lines = {("jaren jackson", "pts"): 21.5, ("jaren jackson", "reb"): 6.5, ("nobody", "pts"): 10.5}
+    rows, cov = lr.build_live_props(result, actuals, lines)
+    by = {r["prop"]: r for r in rows}
+    pts = by["player_points"]
+    assert pts["liveModelProbOver"] == 0.8 and pts["actualSoFar"] == 18.0  # 18+4 and 18+10 clear 21.5
+    assert pts["liveProjection"] == pytest.approx(18 + 0.5 * 4 + 0.3 * 10)
+    reb = by["player_rebounds"]  # 9 already banked over 6.5: decided, so no probability is published
+    assert reb["liveModelProbOver"] is None and reb["unpricedReason"] == "certainty_refused"
+    assert cov == {"players_simmed": 2, "rows": 2, "priced": 1, "no_actual": 1, "certainty_refused": 1}
+
+
+def test_lines_are_the_mode_across_books_for_this_game_only(tmp_path):
+    f = tmp_path / "props.csv"
+    hdr = "snapshot_ts,event_id,commence_time,bookmaker,bookmaker_title,market,outcome_name,player_name,point,price,last_update,home_team,away_team\n"
+    rows = [
+        "t,e1,c,dk,DK,player_points,Over,Stephen Curry,27.5,-110,t,Golden State Warriors,New York Knicks",
+        "t,e1,c,fd,FD,player_points,Over,Stephen Curry,26.5,-110,t,Golden State Warriors,New York Knicks",
+        "t,e1,c,mg,MG,player_points,Over,Stephen Curry,26.5,-110,t,Golden State Warriors,New York Knicks",
+        "t,e1,c,mg,MG,player_points,Under,Stephen Curry,30.5,-110,t,Golden State Warriors,New York Knicks",
+        "t,e2,c,dk,DK,player_points,Over,LeBron James,24.5,-110,t,Los Angeles Lakers,Sacramento Kings",
+        "t,e1,c,dk,DK,h2h,Golden State Warriors,,,-150,t,Golden State Warriors,New York Knicks",
+    ]
+    f.write_text(hdr + "\n".join(rows) + "\n", encoding="utf-8")
+    out = lr.lines_from_props_csv(f, "Golden State Warriors", "New York Knicks")
+    assert out == {("stephen curry", "pts"): 26.5}
+    assert lr.lines_from_props_csv(tmp_path / "missing.csv", "A", "B") == {}
+
+
+def test_actuals_come_from_the_live_box_and_a_bad_cell_is_not_a_zero():
+    s = _in_q2().summary(pf={"h2": 1})
+    s["boxscore"]["players"][0]["statistics"][0]["athletes"][0]["stats"][1] = "--"  # H1's PTS unreadable
+    act = lr.actuals_from_summary(s)
+    assert "pts" not in act.get("h1", {})
+    assert act["h2"]["pts"] == 0  # a genuine zero survives
+
+
+def test_snapshot_carries_live_props_and_names_the_join_keys_on(tmp_path, monkeypatch):
+    live = _in_q2().summary()
+    sb = {"events": [{"id": "999", "competitions": [{"status": {"type": {"state": "in"}}, "competitors": []}]}]}
+    kw = _kwargs()
+    lr.persist_engine_inputs("2026-01-15", "GSW", "NYK", {**{k: None for k in lr._INPUT_KEYS}, **kw}, root=tmp_path)
+    csv = lr.props_csv_path("2026-01-15", root=tmp_path)
+    csv.write_text("market,outcome_name,player_name,point,home_team,away_team\n"
+                   "player_points,Over,H1,10.5,Golden State Warriors,New York Knicks\n", encoding="utf-8")
+    monkeypatch.setattr(lr, "resim_live_game", lambda *a, **k: {
+        "sims_run": 200, "home_win_prob": 0.4, "total_mean": 1.0, "home_margin_mean": -1.0,
+        "total_dist": {"1": 200}, "margin_dist": {"-1": 200}, "segments": {},
+        "player_remainders": {"home": {"H1": {"pts": {"6": 100, "12": 100}}}, "away": {}}})
+    snap = lr.build_live_lens_snapshot("2026-01-15", fetch_scoreboard=lambda *_a: sb,
+                                       fetch_summary=lambda *_a: live, inputs_root=tmp_path)
+    g = snap["games"][0]
+    assert (g["away_name"], g["home_name"]) == ("New York Knicks", "Golden State Warriors")
+    assert g["status"]["detailedState"] == "In Progress"
+    assert g["livePropsCoverage"]["lines_available"] == 1
+    # H1 has 0 banked in the fixture box (PTS column), 6 or 12 remaining -> half the draws clear 10.5
+    assert [(r["playerName"], r["prop"], r["liveModelProbOver"]) for r in g["liveProps"]] == [("H1", "player_points", 0.5)]
