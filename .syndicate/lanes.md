@@ -1924,6 +1924,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Falsification test: Pooled fee-net CLV CI wholly > 0 at n >= 100 -> timing edges on Kalshi NFL props are real and earned; CI spanning 0 -> inconclusive, reported as such with n.
 - Verification: The pooled read written to findings with per-week n and the same table as findings_2026-10-06_nfl_kalshi_forward_clv.md; fleet book_quotes copied read-only with sha256. Reading date: first run after a completed week where n_with_close >= 100 (expected after wk5 MNF 2026-10-12 or wk6 MNF 2026-10-19). An interim read before then carries no verdict.
 - Blocked by: none
+- **INTERIM 2026-10-09 ~18:45Z -- NO VERDICT** (n_with_close 50 < 100; weeks 4 + 5 Thursday): bets fee-net CLV -2.07% [-3.32, -0.76], control -5.19%. The read is scheduled: task `nfl-kalshi-clv-pooled-read` 2026-10-13 11:00 CT (re-schedules for wk6 if n < 100). findings_2026-10-09_nfl_kalshi_clv_pooled.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
