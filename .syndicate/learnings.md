@@ -3616,3 +3616,14 @@ The 10-08 lead framed query_state_cache refusals as "readers get a stale copy". 
 - Measured: `summary?event=` has an EMPTY `pickcenter` for early-season games (0 of 169 on 2025-11-03, 0 of 82 on 11-15, present by 12-10), while `sports.core.api.espn.com/.../events/<id>/competitions/<id>/odds` still holds ESPN BET open/close. The summary's `competitions[0].notes` is None; the tournament headline is `header.gameNote`.
 - ESPN keeps NO in-play line history: provider 59 ("ESPN Bet - Live Odds") holds one untimestamped last quote, and `/odds/<p>/history/0/movement` returns 0 items. Do not grade a "live close" against it.
 - How to apply: a corpus that reads only the summary silently loses ~10% of its lines (the early season) and labels every NCAA tournament game as other postseason.
+
+## 2026-10-09 - RULE: a "beat the incumbent" ship gate must also carry a NAIVE baseline `[lane nba-native-live-resim, session 6c348b8f]`
+- **What happened:** P3's gate was written as "beat the current vendored live projection".
+  - Replayed on 780 games, the vendored NBA live tick LOST to the simplest estimator available: current
+    score + the pregame line's pro-rata share of the remaining time.
+  - It lost on margin at end Q1 (+0.86 MAE, CI +0.40..+1.30) and on ML at end Q2 and 5:00 Q4.
+  - A native sim that beat the incumbent could still be worse than doing nothing clever.
+- **Rule:** every model gate names a naive baseline beside the incumbent, and reports both. A candidate
+  ships only if it beats the better of the two.
+- **Related:** a mechanism measured in one season phase is not a target in another. Regular-season
+  score-effect reversion (−0.17) was not detectable in the playoffs (n=91).

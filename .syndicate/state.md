@@ -470,6 +470,7 @@ once this index exists: re-splitting would orphan the parts.
 | [wnba] | WNBA | `state_basketball.md` |
 | [wnba-props-model-skill] | WNBA PROPS: NO MARKET BEATS THE BOOK; ALL FOUR ESTIMATORS + INJURY EXCLUSIONS LIVE ON | `state_basketball.md` |
 | [basketball-native-live-state] | SYNDICATE OWNS BASKETBALL PLAY-BY-PLAY: typed LiveGameState + the rotation-stints producer (P2) -- built, back | `state_basketball.md` |
+| [nba-live-native-p3] | NBA LIVE (P3): THE VENDORED LIVE TICK LOSES TO "SCORE + PREGAME LINE PRO RATA"; per-population situation targets measured; the resumed sim waits on P1 `[verified 2026-10-09, lane nba-native-live-resim]` | `state_basketball.md` |
 | [wnba-game-state] | WNBA GAME-STATE AND FIXTURE COVERAGE — 2026-08-17 (lane `wnba-live-tier`) — **ARCHIVED 2026-08-19 to `state_ar | `state_basketball.md` |
 | [wnba-fixture-identity] | WNBA fixture identity + the sweep ownership gap - VERIFIED 2026-08-17 — **ARCHIVED 2026-08-19 to `state_archiv | `state_basketball.md` |
 | [wnba-sweep-ownership-gate] | WNBA SWEEP OWNERSHIP GATE + PHASE 2 AUTORUN `[collapsed 2026-08-18 from three 2026-08-17/18 snapshots; newest  | `state_basketball.md` |
