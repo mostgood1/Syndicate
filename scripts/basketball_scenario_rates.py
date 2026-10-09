@@ -364,9 +364,19 @@ def run_sim(args) -> int:
     if levers or args.engine_flag:
         # FAIL LOUDLY on a lever the vendor engine does not read: an unknown name would otherwise be a silent no-op.
         pkg = "wnba_betting" if args.league == "wnba" else "nba_betting"
-        real_events = bpss._import_real_events_module_local(package_name=pkg)
+        # The engine that RUNS: the native Syndicate engine once lane basketball-native-engine switched the runtime
+        # off vendor/ (its LeagueEngine carries the switches under the vendored names; assigning one swaps the league
+        # params); the vendored events module before that. Whichever runs is the one the levers must reach.
+        native = hasattr(bpss, "_engine_for_league_local") and hasattr(bpss, "_call_native_engine_local")
+        if native:
+            real_events = bpss._engine_for_league_local(args.league)
+            entry_name, pkg = "_call_native_engine_local", f"native basketball_engine ({args.league})"
+        else:
+            real_events = bpss._import_real_events_module_local(package_name=pkg)
+            entry_name = "_call_real_events_entrypoint_local"
         if real_events is None:
-            raise SystemExit(f"LEVER_FAIL vendor {pkg}.sim.events not importable -- levers would not reach an engine")
+            raise SystemExit(f"LEVER_FAIL {pkg} engine not importable -- levers would not reach an engine")
+        print(f"ENGINE {pkg} via bpss.{entry_name}", flush=True)
         vendor_fields = {f.name for f in dataclasses.fields(real_events.EventSimConfig)}
         unknown = sorted(set(levers) - vendor_fields)
         if unknown:
@@ -387,7 +397,7 @@ def run_sim(args) -> int:
         print(f"ENGINE_FLAGS {flags}", flush=True)
         # Reachability at the ENGINE boundary: count real-engine calls whose cfg carries every lever value AND whose
         # engine module carries every switch value at call time.
-        orig_real = bpss._call_real_events_entrypoint_local
+        orig_real = getattr(bpss, entry_name)
 
         def real_probe(*, entrypoint_name, league_code, kwargs):
             lever_seen["calls"] += 1
@@ -397,7 +407,7 @@ def run_sim(args) -> int:
                 lever_seen["with_levers"] += 1
             return orig_real(entrypoint_name=entrypoint_name, league_code=league_code, kwargs=kwargs)
 
-        bpss._call_real_events_entrypoint_local = real_probe
+        setattr(bpss, entry_name, real_probe)
 
     all_dates = rs._dates(f"{args.start}..{args.end}", asof)
     if args.dates_file:
