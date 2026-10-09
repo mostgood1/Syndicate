@@ -61,7 +61,7 @@ This doc is the shared plan. Each phase is a separate session with its own lane.
 | # | Phase | Needs | Lane (fill in) | Status |
 |---|---|---|---|---|
 | P1 | Native possession engine + resumable state | — | | not started |
-| P2 | Native live game-state ingestion + rotation-stints producer | — (parallel with P1) | | not started |
+| P2 | Native live game-state ingestion + rotation-stints producer | — (parallel with P1) | `basketball-native-live-state` | in progress (opened 2026-10-09) |
 | P3 | NBA native live re-sim, situations re-fit, cut the vendored tick | P1, P2 | | not started |
 | P4 | NCAAB live tier on the native engine | P1, P2 (P3 helps) | | not started |
 | P5 | WNBA cut-over to native live | P1, P2, P3 | | not started |

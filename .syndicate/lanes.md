@@ -1869,6 +1869,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Corpus: n games/checkpoints per phase, reconstructed finals == ESPN box finals on 100%. Inventory: every vendored reference on the WNBA live+sim path listed with file:line and its P1/P2/P3 replacement.
 - Blocked by: basketball-native-engine (P1), basketball-native-live-state (P2), nba-native-live-resim (P3) -- none opened as of 2026-10-09
 
+### basketball-native-live-state — OPEN — opened 2026-10-09 — session 82bc583a-3fe5-4468-98c9-7d48dce41879
+- Goal: P2 of docs/ai_context/basketball_live_native_plan.md: Syndicate owns (a) a live ESPN play-by-play ingestion yielding a typed LiveGameState (period, clock, score, possessions, team fouls/bonus, player PF, on-floor five, stint log, timeouts, recent pace/runs/droughts) for NBA/WNBA/NCAAB, disk-backed under SYNDICATE_DATA_ROOT, no vendored import; and (b) a scheduled, dated, allowlisted rotation_stints_history producer backfilled for 2025-26 NBA, 2026 WNBA, 2025-26 NCAAB with season phases kept separate
+- Files: syndicate/features/shared/basketball_pbp.py (NEW), syndicate/features/shared/basketball_live_state.py (NEW), scripts/build_basketball_rotation_stints.py (NEW), scripts/capture_basketball_live_state.py (NEW), scripts/verify_basketball_rotation_stints.py (NEW), tests/test_basketball_pbp.py (NEW), tests/test_basketball_live_state.py (NEW), tests/test_basketball_rotation_stints.py (NEW), syndicate/features/shared/artifact_publisher.py (the basketball rotation-stints / live-state allowlist entries ONLY), scripts/local_production.py (SCHEDULED_JOBS basketball-rotation-stints entry ONLY), docs/ai_context/basketball_live_native_plan.md (Status table P2 row ONLY)
+- Hypothesis: n/a (build); diagnostic claims recorded before testing in this block
+- Falsification test: Reconstructed final score != official on any of >=20 completed games per league, or <95% of player-games within 1 min of box minutes, or the sim's stints path returns no_rotation_stints_history with the table present (off == on)
+- Verification: >=20 completed games per league: reconstructed final == official; per-player stint minutes within 1 min of box on >=95% of player-games (misses reported); one live NBA game captured on the local fleet with state advancing tick by tick; sim stints path reads the table (off != on on sim minutes)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
