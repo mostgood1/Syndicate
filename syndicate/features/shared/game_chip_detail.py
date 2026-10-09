@@ -369,7 +369,7 @@ def _basketball_run_text(sport: str, game: Mapping[str, Any], day: str | None) -
     return f"{run[0]} on a {run[1]}–{run[2]} run" if run else None
 
 
-def live_detail(sport: str, game: Mapping[str, Any], start_utc: datetime | None = None) -> str | None:
+def live_detail(sport: str, game: Mapping[str, Any], start_utc: datetime | None = None, labels: Mapping[str, str] | None = None) -> str | None:
     """The sport-specific live line from fields the game already carries, or None."""
     try:
         sport = str(sport or "").lower()
@@ -395,6 +395,18 @@ def live_detail(sport: str, game: Mapping[str, Any], start_utc: datetime | None 
             text = " · ".join(p for p in parts if p)
             return text or None
         if sport in {"nfl", "ncaaf"}:
+            espn = live.get("espn_situation") if isinstance(live.get("espn_situation"), Mapping) else None
+            if espn:
+                # ESPN's own phrasing ("3rd & 4 at TB 38"), plus who has it.
+                side = live.get("possession_side")
+                team = (labels or {}).get(side) if side else None
+                text = str(espn.get("downDistanceText") or espn.get("shortDownDistanceText") or "").strip()
+                parts = [f"{team} ball" if team else None, text or None]
+                if espn.get("isRedZone"):
+                    parts.append("red zone")
+                joined = " · ".join(p for p in parts if p)
+                if joined:
+                    return joined
             down = _num(shape.get("down") or live.get("down"))
             dist = _num(shape.get("distance") or live.get("distance"))
             team = shape.get("possession_team") or live.get("possession_team") or live.get("possession")

@@ -258,6 +258,10 @@ def _state_rows_for_date(iso_date: str) -> list[dict[str, Any]]:
         clock = str(status.get("displayClock") or "").strip()
         if clock:
             state["clock"] = clock
+        # Same raw block the poller records (`_board_fields_from_event`), so the
+        # fetch fallback and the worker record carry the same fields.
+        if isinstance(competition.get("situation"), Mapping):
+            state["situation"] = dict(competition["situation"])
 
         rows.append(state)
     return rows
@@ -513,6 +517,22 @@ def attach_ncaaf_live_game_state(
             live_state["away_pts"] = state["away_score"]
         if state.get("home_score") is not None:
             live_state["home_pts"] = state["home_score"]
+        # DOWN / DISTANCE / POSSESSION for the games-rail card (lane
+        # games-rail-full-detail): the raw ESPN `situation` the poller already
+        # records, live games only, with the possessing SIDE resolved by the one
+        # owner of that resolution (`live_resim.possession_side_from_espn`).
+        if state.get("in_progress") and isinstance(state.get("situation"), Mapping):
+            try:
+                from syndicate.features.ncaaf.live_resim import possession_side_from_espn
+
+                side, raw = possession_side_from_espn(
+                    {"situation": state["situation"]}, home_id=state.get("home_id"), away_id=state.get("away_id")
+                )
+            except Exception:  # noqa: BLE001 -- a display field never breaks the card
+                side, raw = None, dict(state["situation"])
+            live_state["espn_situation"] = raw
+            if side:
+                live_state["possession_side"] = side
         # PER-PERIOD SCORES, CARRIED RATHER THAN DROPPED.
         #
         # `poll_ncaaf_live_state._game_from_event` has written

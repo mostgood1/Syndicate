@@ -69,6 +69,18 @@ class LiveDetail(unittest.TestCase):
         self.assertEqual(detail.basketball_run(narrator), ("LAL", 9, 2))
         self.assertIsNone(detail.basketball_run([ev("LAL", 2, 1), ev("SAC", 2, 2)]))
 
+    def test_espn_situation_gives_possession_and_down_distance(self) -> None:
+        game = {"live_state": {"espn_situation": {"downDistanceText": "1st & 10 at FSU 45", "possession": "52"},
+                               "possession_side": "away"}}
+        self.assertEqual(detail.live_detail("ncaaf", game, None, {"away": "FS", "home": "LOU"}),
+                         "FS ball · 1st & 10 at FSU 45")
+
+    def test_espn_clock_period_text_is_not_repeated_as_situation(self) -> None:
+        from syndicate.features.shared.game_chip_scoreboard import _live_situation
+
+        game = {"live_state": {"status": "8:34 - 1st"}}
+        self.assertIsNone(_live_situation(game, "Q1 8:34"))
+
 
 class BoardPlays(unittest.TestCase):
     """User 2026-10-09: "Lines now, props overnight"."""

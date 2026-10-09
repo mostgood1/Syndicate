@@ -543,6 +543,7 @@ def _matchup_text(game: dict[str, Any]) -> str:
 # words, are dropped; capped so a chip stays small.
 _SITUATION_NOISE = {"in progress", "live", "final", "scheduled", "pre-game", "pregame", "warmup", "delayed start"}
 _SITUATION_MAX_CHARS = 40
+_CLOCK_PERIOD_TEXT_RE = re.compile(r"\d{1,2}:\d{2}\s*-\s*(?:\d(?:st|nd|rd|th)|OT\d?)", re.IGNORECASE)
 
 
 def _side_logo(sport: str, game: dict[str, Any], side: str) -> str | None:
@@ -571,6 +572,9 @@ def _live_situation(game: dict[str, Any], status_token: str | None) -> str | Non
             if low in _SITUATION_NOISE or (token and (low == token or low in token or token in low)):
                 continue
             if _INNING_TEXT_RE.fullmatch(part) or _PERIOD_CLOCK_RE.fullmatch(part):
+                continue
+            if _CLOCK_PERIOD_TEXT_RE.fullmatch(part):
+                # ESPN's "8:34 - 1st" restates the status token's Q1 8:34.
                 continue
             kept.append(part)
         if kept:
@@ -704,7 +708,7 @@ def _chip_live_detail(sport: str, game: dict[str, Any], start_utc: datetime | No
     try:
         from syndicate.features.shared.game_chip_detail import live_detail
 
-        text = live_detail(sport, game, start_utc)
+        text = live_detail(sport, game, start_utc, {"home": _side_label(game, "home"), "away": _side_label(game, "away")})
     except Exception:  # noqa: BLE001 -- a detail line must never break a chip
         return None
     return text[:_SITUATION_MAX_CHARS] if text else None
