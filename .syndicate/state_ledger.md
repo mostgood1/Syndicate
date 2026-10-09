@@ -1404,10 +1404,15 @@ while its neighbours each ran.
 
 ## [full-suite-run-method] RUNNING THE FULL SUITE ON THIS MACHINE NEEDS BATCHING, AN ISOLATION RETRY AND A PINNED MANIFEST — and the failure LIST expires within hours `[2026-09-05/06, lane nfl-fantasy-artifact-root]`
 
-**`py -3 -m pytest tests/` IN ONE PROCESS CANNOT FINISH.** 989 files / ~15.7k
-tests died at 31% with `OSError [WinError 1450] Insufficient system resources`
-creating a tmp_path, then INTERNALERROR/MemoryError formatting that error. Not a
-test defect: 4,866 tests had passed with 0 failures at that point.
+**ONE PROCESS CAN FINISH IT NOW — CORRECTED 2026-10-07/08, lane
+suite-baseline-flakiness.** A single `py -3 -m pytest tests/` ran **22,003 tests
+to completion in 10h29m15s**: `331 failed, 21257 passed, 314 skipped, 1 xfailed,
+191 errors, 528 subtests passed in 37755.48s`. The older reading stands as history,
+not as a current limit — 989 files / ~15.7k tests once died at 31% with `OSError
+[WinError 1450] Insufficient system resources` creating a tmp_path, then
+INTERNALERROR/MemoryError formatting that error, and that was not a test defect
+because 4,866 tests had passed with 0 failures at that point. Batching is now an
+OPTION for speed, not a requirement for completion.
 
 **A LONG-LIVED PARENT IS NOT ENOUGH EITHER.** Batching into 25 pytest processes
 ran batches 1-3 clean then failed EVERY batch from 4 on — WinError 1450 now on
@@ -1435,6 +1440,52 @@ before offering any suite failure as work.**
 **AND A WORKTREE WITHOUT `data/` CANNOT ANSWER THE QUESTION.** The same re-check
 read "369 passed, 32 skipped" and looked green; the 32 skips WERE the
 data-dependent tests. Reading a skip count as a pass is how a real failure hides.
+
+**A SINGLE PASS CANNOT ESTABLISH A FAILURE COUNT ON THIS SUITE. MEASURED
+2026-10-07/09.** Per-file isolated re-runs (whole file, fresh process, parametrize
+ids normalised) of the 23 files failing in one long run: **92 reproduced, 56 did
+not, 41 failed ONLY in isolation.** The files split into two populations, per FILE
+and not per test:
+
+- **STABLE — identical sets both times** (13 files): `test_archives.py` 32/32,
+  `test_bet_status_ncaaf.py` 10/10, `test_ask_sport_coverage.py` 4/4.
+- **UNSTABLE — the set CHANGES between runs** (8 files):
+  `test_inplay_board_cadence.py` failed **7 one run, 9 the other, ZERO overlap**;
+  `test_execution_multi_venue.py` failed exactly 1 each time — **a different
+  test**; `test_intelligence.py` 40 vs 38 with only 14 shared. Also
+  `test_football_sim_engine.py`, `test_http_compression.py`,
+  `test_fotmob_match_id.py`, `test_formatter.py`,
+  `test_football_calibration_artifacts.py`.
+
+Zero overlap rules out "earlier state masked it"; the mechanism is nondeterminism,
+and these are thread/lock/launcher/socket tests on a host at 100% CPU. Of the
+completed run's 514 named FAILED/ERROR lines over 91 files: **77 in the 13 stable
+files, 70 in 6 unstable ones, and 367 across 72 files nobody has examined** — the
+unexamined ones are autorun/refresh/poll-loop families, the same shape as the
+proven-unstable set. Detail:
+`.syndicate/findings_2026-10-09_suite_baseline.md`.
+
+**ONE UNCOLLECTABLE FILE TAKES THE WHOLE SUITE TO ZERO TESTS.** Measured:
+`22003 tests collected, 1 error` then `Interrupted: 1 error during collection`,
+**0 executed**. A collection error is a suite outage, not one red test. In a SPARSE
+worktree 43 files were uncollectable and **42 were sparseness alone** (30 `No
+module named 'vendor'`, 8 `sim_engine`, 4 `wnba_betting` — all collectable in the
+primary tree, which collected 22,477 with 0 errors). The 43rd was real: `fcntl`
+reached through a module-scope gunicorn import, fixed upstream by lane
+`web-restart-healthz`.
+
+**PRIORITY IS THE THROUGHPUT LEVER AND THE FLEET OWNS THE HOST.** A/B with two
+simultaneous Idle controls: Normal took **94% of one core**, the Idle controls 30%
+and **1%**. With the fleet holding ~11 of 12 cores an Idle run took **0.0s of CPU
+over 30s** — indistinguishable from a hang, and the reason an `xdist` run was
+misdiagnosed as an execnet deadlock. Windows sees the whole fleet as ONE Normal
+process. USER DECISION 2026-10-07: run the suite at Idle and accept it may not
+finish.
+
+**DO NOT COUNT PROGRESS CHARACTERS TO GET LIVE TOTALS.** 160 progress lines in a
+full run are interrupted mid-line by test debug dumps (`PROCESS_ENUM_DEBUG`,
+`ALL_PROCESS_MEMORY`), so a character count silently UNDERCOUNTS — it read 15,683
+executed where pytest itself said 99%. Use pytest's own summary line.
 
 ## [test-suite-writes-tracked-mirror] THE TEST SUITE WROTE INTO THE TRACKED `data/` MIRROR, AND NOTHING SAID SO — **GUARDED SINCE 2026-09-09** `[lane data-tree-write-guard, commits b099d557..e35f710f, NO DEPLOY]`
 

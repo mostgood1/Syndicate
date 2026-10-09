@@ -3482,3 +3482,38 @@ The combined calibration was fitted on 06-15..07-12 and validated on 05-30..06-1
 
 ## 2026-10-09 -- A fix that closes one bias can EXPOSE a second one that was cancelling it -- check the metric before AND after the change before attributing it `[lane mlb-statsapi-asof-rebuild]`
 I attributed the shipped config's ~10-pitch-per-start deficit to its early_count_foul_boost change (2.05 -> 1.5) and pre-registered a pitch fix on it. Restoring 2.05 added only +0.7 pitches. Pitches per PA had been ~11% low BOTH before and after the ship (P/BF z -2.5 / -2.3, a field I already had); pre-ship pitches per START looked right only because starters faced +1.9 BF too many. The same shape occurred with starter walks the same week (right only by cancellation). **Rule:** when a shipped change seems to "cause" a regression, read the per-unit metric (P/BF, BB/BF) pre and post first. If the per-unit metric did not move, the change exposed an old error; it did not create one, and the fix target is the old error.
+
+## 2026-10-09 — A SINGLE FULL-SUITE PASS CANNOT ESTABLISH A FAILURE COUNT ON THIS SUITE `[lane suite-baseline-flakiness, session 4ab694ed]`
+
+**Rule.** Never offer a full-suite failure count as a result without re-running
+the failing files in isolation first. On this suite, per FILE, the failure set is
+sometimes not even stable between runs.
+
+**Why, measured 2026-10-07/09.** Per-file isolated re-runs of the 23 files that
+failed in one long run: **92 reproduced, 56 did not reproduce, and 41 failed ONLY
+in isolation.** The decisive cases are not marginal:
+`test_inplay_board_cadence.py` failed **7 tests in the long run and 9 alone, with
+ZERO tests in common**; `test_execution_multi_venue.py` failed exactly **one test
+in each run — a different one**. Zero overlap kills the obvious story ("earlier
+state masked it"): the mechanism is nondeterminism, in thread/lock/launcher/socket
+tests, on a host pinned at 100% CPU.
+
+**How to apply.** Classify per file, three ways: reproduced / did not reproduce /
+only-in-isolation. Normalise parametrize ids before comparing — they are
+GENERATED per run (`[823494-574050c1]` vs `[823543-394e1e2b]`), and comparing raw
+node ids reported one test as BOTH an artefact AND a newly-masked failure. Quote
+the stable group as signal and name the unstable group explicitly, so the next
+session cannot read a single-pass count as a regression.
+
+**Two corrections this produced.**
+1. `state.md`'s `[full-suite-run-method]` said **"`py -3 -m pytest tests/` IN ONE
+   PROCESS CANNOT FINISH"**. It can: 22,003 tests, 10h29m15s, one process.
+   Overwritten in place.
+2. I diagnosed an `xdist -n 3` run as an execnet DEADLOCK on the strength of
+   0.00s CPU across controller and 3 workers for 8.5 minutes, and designed a whole
+   args-file sharding replacement around that. It was **CPU starvation at Idle**
+   while the fleet held ~11 of 12 cores. **0% CPU and a hang are
+   indistinguishable without a control** — the control that settled it was an A/B
+   with two simultaneous Idle processes (Normal 94% of a core, Idle 30% and 1%).
+   Related and already in this file: an Idle run yields to the fleet entirely
+   because Windows sees the whole WSL fleet as ONE Normal process.
