@@ -728,7 +728,11 @@ def _nfl_recent_form(subject: PropSubject, stat: str | None, label: str, player:
         Layer.RECENT_FORM,
         tables=[table(f"Last {len(last)} games — {subject.player_name} ({path.name})", ["Game", "Opp", volume_label, label], rows, Layer.RECENT_FORM)],
         charts=charts,
-        facts={"games": len(last), "hit_rate": rate, "values": values, "seasons": seasons, "source_file": path.name},
+        # `game_labels` (season + week, the only per-game key the usage file has) / `opponents`:
+        # aligned with `values`, newest first -- the board chart's bar labels (lane board-history-charts).
+        facts={"games": len(last), "hit_rate": rate, "values": values, "seasons": seasons, "source_file": path.name,
+               "game_labels": [_week_label(g.get("season"), g.get("week")) for g in last],
+               "opponents": [_usage_opponent(g) for g in last]},
         source="nfl:nfl_fantasy_usage", as_of=C.mtime_iso(path))
 
 
@@ -1342,7 +1346,9 @@ def _ncaaf_recent_form(subject: PropSubject, stat: str | None, label: str, box: 
         charts=charts,
         facts={"games": len(last), "hit_rate": rate, "values": values, "team": box.team, "snapshot_through": through,
                "season_to_date": season_fact, "other_school_games": sum(1 for g in last if g.get("team") != box.team),
-               "other_schools": other_schools},
+               "other_schools": other_schools,
+               # Aligned with `values`, newest first -- the board chart's bar labels (lane board-history-charts).
+               "game_labels": [_game_label(g) for g in last], "opponents": [g.get("opponent") or "" for g in last]},
         source="ncaaf:player_game_stats_snapshot", as_of=through if through != "—" else C.mtime_iso(box.path))
 
 

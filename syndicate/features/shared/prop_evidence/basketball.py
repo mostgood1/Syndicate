@@ -393,7 +393,10 @@ def _recent_form(subject: PropSubject, games: list[dict[str, Any]], box_path: Pa
         tables=[table(f"Last {len(last)} games — {subject.player_name} (through {last[0]['date']})",
                       ["Date", "Opp", "MIN", label], rows, Layer.RECENT_FORM)],
         charts=charts,
-        facts={"games": len(last), "hit_rate": rate, "values": values, "newest_game": last[0]["date"], "stale_days": stale_days},
+        # `game_labels` / `opponents`: aligned with `values`, newest first -- the board's
+        # per-row chart labels its bars with them (lane board-history-charts).
+        facts={"games": len(last), "hit_rate": rate, "values": values, "newest_game": last[0]["date"], "stale_days": stale_days,
+               "game_labels": [g["date"] for g in last], "opponents": [g.get("opponent") or "" for g in last]},
         source=f"{subject.sport}:boxscores_history",
         as_of=last[0]["date"],
     )

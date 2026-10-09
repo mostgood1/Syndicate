@@ -912,7 +912,10 @@ def _recent_form(subject: PropSubject, ctx: Resolved, spec: MarketSpec | None, f
                "unused_dates": [v["date"] for v in scan.unused], "not_in_roster_dates": [v["date"] for v in scan.not_in_roster],
                "ambiguous_boxes": scan.ambiguous, "files_read": scan.files,
                "files_with_player_box": scan.files_with_player_box, "window": [scan.oldest_file, scan.newest_file],
-               "match_log_games": scan.match_log_games},
+               "match_log_games": scan.match_log_games,
+               # Aligned with `values`, newest first -- the board chart's bar labels (lane board-history-charts).
+               "game_labels": [g["date"] for g in games],
+               "opponents": [f"{'v' if g['venue'] == 'home' else '@'} {g['opponent']}" for g in games]},
         source="soccer:live_state.match_box",
         as_of=games[0]["date"],
     )

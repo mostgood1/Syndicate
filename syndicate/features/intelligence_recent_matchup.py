@@ -799,20 +799,41 @@ RECENT_VALUES: dict[tuple, dict[str, Any]] = {}
 RECENT_VALUES_MAX = 20000
 
 
-def _record_values(row: Mapping[str, Any], values: list[Any], dates: list[Any] | None = None) -> None:
+def _record_values(
+    row: Mapping[str, Any],
+    values: list[Any],
+    dates: list[Any] | None = None,
+    opponents: list[Any] | None = None,
+) -> None:
+    """Keep `values` (+ `dates` / `opponents` when they are ALIGNED with them) for the board chart.
+
+    Labels are filtered TOGETHER with the values: dropping a `None` value used to
+    happen after the fact, so one game with no stat silently cost the whole row
+    its dates (the length check then failed). A label list that is not aligned
+    with `values` is not used at all -- a mislabelled bar is worse than none.
+    """
     if len(RECENT_VALUES) >= RECENT_VALUES_MAX:
         RECENT_VALUES.clear()
-    vals = [float(v) for v in list(values)[:_RECENT_VALUES_N] if v is not None]
-    if not vals:
+    raw = list(values)[:_RECENT_VALUES_N]
+    labels = list(dates)[:_RECENT_VALUES_N] if dates and len(dates) >= len(raw) else None
+    opps = list(opponents)[:_RECENT_VALUES_N] if opponents and len(opponents) >= len(raw) else None
+    keep = [i for i, v in enumerate(raw) if v is not None]
+    if not keep:
         return
-    entry: dict[str, Any] = {"values": vals, "line": _num(row.get("line")), "side": str(row.get("side") or "").lower()}
-    if dates and len(dates) == len(vals):
-        entry["dates"] = [str(d) for d in dates]
+    entry: dict[str, Any] = {
+        "values": [float(raw[i]) for i in keep],
+        "line": _num(row.get("line")),
+        "side": str(row.get("side") or "").lower(),
+    }
+    if labels is not None:
+        entry["dates"] = [str(labels[i]) for i in keep]
+    if opps is not None:
+        entry["opponents"] = [str(opps[i] or "") for i in keep]
     RECENT_VALUES[_memo_key(row)] = entry
 
 
 def recent_values_for(row: Mapping[str, Any]) -> dict[str, Any] | None:
-    """{values (newest first, <= 10), line, side, [dates]} behind this row's Recent form sentence, or None."""
+    """{values (newest first, <= 10), line, side, [dates], [opponents]} behind this row's Recent form sentence, or None."""
     return RECENT_VALUES.get(_memo_key(row))
 
 
@@ -855,7 +876,7 @@ def prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str, memo
             try:  # the chart side-channel must never cost the sentence
                 facts = getattr(recent, "facts", None) or {}
                 if getattr(recent, "filled", True) and isinstance(facts.get("values"), list):
-                    _record_values(row, facts["values"])
+                    _record_values(row, facts["values"], facts.get("game_labels"), facts.get("opponents"))
             except Exception:  # noqa: BLE001
                 pass
             match_facts = match.facts if match is not None else None

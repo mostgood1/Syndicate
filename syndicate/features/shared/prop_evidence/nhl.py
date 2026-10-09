@@ -681,7 +681,9 @@ def _recent_form(subject: PropSubject, market: NhlMarket | None, line: float | N
         charts=charts,
         facts={"games": len(last), "hit_rate": rate, "values": values, "newest_game": last[0]["date"],
                "stale_days": stale_days, "log_window": list(log.window) if log.window else None,
-               "game_types": sorted(t for t in types if t), "matched_by": log.matched_by},
+               "game_types": sorted(t for t in types if t), "matched_by": log.matched_by,
+               # Aligned with `values`, newest first -- the board chart's bar labels (lane board-history-charts).
+               "game_labels": [g["date"] for g in last], "opponents": [g.get("opponent") or "" for g in last]},
         source="nhl:player_game_stats", as_of=last[0]["date"],
     )
 

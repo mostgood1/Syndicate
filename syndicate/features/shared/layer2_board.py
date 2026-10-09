@@ -3839,7 +3839,16 @@ def _chart_columns(row: Mapping[str, Any]) -> dict[str, Any]:
         except Exception:  # noqa: BLE001 -- a chart must never break a card
             recent = None
         if isinstance(recent, Mapping) and recent.get("values"):
-            out["recent_values"] = [v for v in list(recent.get("values"))[:10]]
+            values = [v for v in list(recent.get("values"))[:10]]
+            out["recent_values"] = values
+            # Per-bar labels (lane board-history-charts): a date ("2026-10-04") or,
+            # where the source has no date, a season + week ("2026 W5"); and the
+            # opponent. Emitted ONLY when aligned with the values above -- a
+            # mislabelled bar is worse than an unlabelled one.
+            for src, dst in (("dates", "recent_dates"), ("opponents", "recent_opponents")):
+                labels = recent.get(src)
+                if isinstance(labels, (list, tuple)) and len(labels) >= len(values):
+                    out[dst] = [str(x) for x in list(labels)[: len(values)]]
     elif str(row.get("kind") or "").lower() == "game":
         # Game lines (mockup board 11): each team's last-10 final scores; the
         # page derives over/under, covers and W/L against TODAY's line.
