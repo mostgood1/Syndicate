@@ -56,8 +56,15 @@ def test_two_candidates_in_the_same_game_still_refuse():
 
 def test_off_is_not_on_without_game_teams_it_is_the_old_resolver(monkeypatch):
     """Reachability: with no teams the new path defers to `resolve_player_id_with_prior`,
-    which drops the shared name -- so the match above is the team tie-break's doing."""
+    which drops the shared name -- so the match above is the team tie-break's doing.
+
+    HERMETIC (lane `nfl-name-test-hermetic`, 2026-10-09): `player_name_collisions` is
+    stubbed too. `nfl-passing-yards-prop-coin` (10-08) made the fallback return
+    `ambiguous_current_season` for a short name two current players share, and with real
+    data `k.williams` is one -- so this passed in a data-less worktree and failed in the
+    fleet CI run on 018a7c64 (`(None, 'ambiguous_current_season') != (None, 'unresolved')`)."""
     monkeypatch.setattr(ps, "player_name_index", lambda season: {})
+    monkeypatch.setattr(ps, "player_name_collisions", lambda season: set())
     assert _resolve("Kyren Williams", set()) == (None, "unresolved")
 
 

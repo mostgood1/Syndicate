@@ -1792,6 +1792,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Script runs on the fleet; a positive control (a side the classifier marks confirmed has exactly the ESPN XI) or an explicit statement that none exists yet; after the weekend: confirmed share by minutes-before-kickoff bucket, n matches, appended to findings_2026-10-08_soccer_last_scorer_lineup.md
 - Blocked by: none
 
+### nfl-name-test-hermetic — OPEN — opened 2026-10-09 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: tests/test_nfl_prop_name_resolution.py passes with real data: the reachability test stubs player_name_collisions too, so it no longer depends on the checkout having no data (it failed in the fleet CI run on 018a7c64 after nfl-passing-yards-prop-coin added the collision branch)
+- Files: tests/test_nfl_prop_name_resolution.py
+- Hypothesis: The fleet CI failure is the test, not the code: with data, k.williams is a 2026 collision and resolve_player_id_with_prior returns ambiguous_current_season, not unresolved
+- Falsification test: With player_name_collisions stubbed empty the test still fails on the fleet
+- Verification: The test passes locally and on the fleet CI checkout (or the fleet venv over its checkout) with real data
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
