@@ -1032,3 +1032,16 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Grading needs a pre-tip snapshot:** production overwrites `oddsapi_player_props_<D>.csv` after the slate (10-04's is
   header-only by 10-05), so served-vs-book grading must copy the capture before tip. Done for 10-07 by
   `C:/tmp/wnba_bt/watch_grade_1007.py`; grader `scripts/grade_wnba_served_props.py` (pre-registered b3f825a3).
+
+## [basketball-native-live-state] SYNDICATE OWNS BASKETBALL PLAY-BY-PLAY: typed LiveGameState + the rotation-stints producer (P2) -- built, backfilled on the fleet, the vendored stints step removed `[2026-10-09, lane basketball-native-live-state, d3e4e9ad / 2bf917ce, fleet ff NO restart]`
+
+- **Code:** `syndicate/features/shared/basketball_pbp.py` (ESPN fetch, typed events, league rules, period-start lineup inference, stints) and `basketball_live_state.py` (typed `LiveGameState`, plain-file capture under `<league>_source/data/processed/live_state/<date>/`). `scripts/build_basketball_rotation_stints.py` is the producer, `verify_basketball_rotation_stints.py` grades it, `capture_basketball_live_state.py` captures live games. **No `vendor.` import** (a test asserts it).
+- **Source:** ESPN summary only, for all three leagues. The NBA CDN is not needed. ESPN never logs a substitution made BETWEEN periods: period-start fives are INFERRED from who acts first in each period.
+- **The "no producer" claim was stale:** the vendored CLI step `update-rotations-espn-history` fed `rotation_stints_history` once a day (17 KB NBA / 1,592 WNBA rows on 10-09). It was removed from both props refreshes (live on the fleet since the 18:56Z ff). Its two sibling outputs, `pair_minutes_history` and `play_context_history` (read by the still-vendored `build-lineup-teammate-effects`), are now produced natively in the same schemas.
+- **Measured on the fleet** (deploys.md 2026-10-09 18:56:24Z): WNBA 2026 scores 364/364, minutes within 1 of box 99.93%. NBA 2025-26 + 2026-27 preseason scores 1,412/1,420 (the misses are ESPN-log gaps plus the All-Star exhibition), minutes 99.85%. Reachability: the sim's history path applies with the table and refuses without it.
+- **Score:** `LiveGameState` takes ESPN's header score and keeps the play sum as `pbp_score`. Stint points always come from the log.
+- **Phases:** every row carries `season_type` (preseason / regular / play-in / playoffs), with one table per (season, phase). The sim's NBA reader filters by phase; **the WNBA reader does not**, so its 28-day window mixes the regular season and playoffs at the turn. That is a consumer gap for P3/P5, not a producer one.
+- **OWED:**
+  - the scheduled job `basketball-rotation-stints` loads only at the next full `down`/`up` (user: ride the next restart);
+  - the NCAAB 2025-26 backfill reading;
+  - the live tick-by-tick reading on 10-09 MEM@CHI.
