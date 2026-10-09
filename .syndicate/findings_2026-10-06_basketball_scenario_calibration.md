@@ -917,3 +917,19 @@ walk-forward on the switched raw.
   dispersion scales with points. This is the known margin excess (M-B, missing late-game catch-up) showing more at
   the correct level, not a new defect.
 - Not re-scored. The decision is the user's.
+
+**USER DECISION 2026-10-09: "Accept, then late-game".**
+- The S8-margin / S5-all guard miss in #1f (2) is overridden as the user's decision.
+- The accepted Phase 2 config is now:
+  - J1 (possession_alternation 1.0, possessions_jitter 0.0);
+  - team_prior_stacks_on_target False;
+  - the six ported WNBA switches;
+  - `nba_sim_total_inputs.json` both keys on;
+  - the NBA totals calibration builder (seed +2.50 from the switched-raw fit).
+- Production adoption only after the end-of-Phase-2 VALIDATION read.
+- **Next:** M-B late-game catch-up (score-effect feedback). The real line-adjusted H2-on-H1 slope is −0.174 and Q4
+  −0.141; the sim's is 0.00.
+- **Engine note:** the native engine switch landed (c2b99d4f, lane basketball-native-engine). The sim now runs
+  syndicate/features/basketball_engine/, so vendor events.py edits are inert. M-B levers go in engine.py on a loan
+  from that lane. tests/test_basketball_sim_jitter_levers.py and tests/test_nba_sim_engine_port.py still test the
+  vendored module and are owed a repoint.
