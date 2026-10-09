@@ -492,7 +492,35 @@ class TeamRecentResults(unittest.TestCase):
     def test_unknown_sport_is_empty_not_a_guess(self) -> None:
         from syndicate.features.shared.team_recent_results import team_recent_results
 
-        self.assertEqual(team_recent_results("nba", "Boston Celtics", "2026-10-08"), [])
+        # Was "nba" until lane board-history-charts gave basketball a source (2026-10-09).
+        self.assertEqual(team_recent_results("cricket", "Boston Celtics", "2026-10-08"), [])
+
+    def test_basketball_reads_only_the_current_season(self) -> None:
+        """NBA/WNBA team history comes from the NEWEST season's player log only: an October NBA board
+        must not reach last June's Finals through the 120-day window (lane board-history-charts)."""
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+
+        from syndicate.features.shared import team_recent_results as trr
+
+        header = "game_id,date,season,season_type,TEAM_ABBREVIATION,opponent,home_away,PLAYER_ID,PLAYER_NAME,PTS\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            for sport, last_season, current in (
+                ("nba", "g1,2026-06-12,2025,playoffs,BOS,DAL,home,1,A,60\ng1,2026-06-12,2025,playoffs,DAL,BOS,away,2,B,55\n", ""),
+                ("wnba", "", "w1,2026-10-04,2026,playoffs,NYL,ATL,home,3,C,50\nw1,2026-10-04,2026,playoffs,NYL,ATL,home,4,D,32\n"
+                              "w1,2026-10-04,2026,playoffs,ATL,NYL,away,5,E,92\nw0,2026-09-01,2026,preseason,ATL,NYL,away,5,E,70\n"),
+            ):
+                base = Path(tmp) / f"{sport}_source" / "data" / "processed"
+                base.mkdir(parents=True)
+                (base / "player_game_log_2025.csv").write_text(header + last_season, encoding="utf-8")
+                (base / "player_game_log_2026.csv").write_text(header + current, encoding="utf-8")
+            trr._CACHE.clear()
+            with mock.patch.dict("os.environ", {"SYNDICATE_DATA_ROOT": tmp}):
+                nba = trr.team_recent_results("nba", "BOS", "2026-10-08")
+                wnba = trr.team_recent_results("wnba", "NYL", "2026-10-08")
+        self.assertEqual(nba, [], "last season's Finals must not appear on an October NBA board")
+        self.assertEqual(wnba, [["2026-10-04", 82.0, 92.0]], "points summed per team; preseason excluded")
 
 
 class SoccerBttsAndHandicapPricing(unittest.TestCase):

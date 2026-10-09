@@ -19,9 +19,16 @@ One local file per sport, parsed once per (path, mtime, size) into
 * mlb   -- batter-log ``r`` summed per (game_pk, team).
 * soccer -- every league's ``api/schedule/schedule_<season>.json``, ``post`` only.
 
-NBA / WNBA are left out on purpose: the box-score history ends with LAST
-season's playoffs, and a last-10 drawn from another season (and another
-phase) is not this team's form.
+* nba / wnba -- ``player_game_log_<season>.csv`` ``PTS`` summed per (game_id,
+           team), regular season and playoffs only (lane board-history-charts,
+           user 2026-10-09 "proceed" on the history-charts plan). These logs are
+           refreshed daily for the CURRENT season. They used to be left out because
+           the box-score history then ended with LAST season's playoffs. Only the
+           NEWEST season's file is read (the 120-day window alone would still reach
+           last June's Finals from an October board), so an NBA preseason board gets
+           ``[]`` until this season's games exist.
+           Exhibition teams the board cannot name (WNBA All-Star COOP / SPO) map to
+           no key and are dropped.
 
 INTERVALS ONLY WHERE THE SOURCE HAS THEM (user 2026-10-08: "are we sure the
 game interval charts are actually showing interval historical results and not
@@ -177,6 +184,41 @@ def _mlb(paths: list[Path]) -> dict:
     return _summed(paths, "mlb", "game_pk", "team", "r", lambda gid: True)
 
 
+_BASKETBALL_SEASON_TYPES = frozenset({"regular", "playoffs"})
+
+
+def _basketball(sport: str) -> Callable[[list[Path]], dict]:
+    """Per-player PTS -> one score per (game_id, team), across every given season file."""
+
+    def build(paths: list[Path]) -> dict:
+        totals: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+        days: dict[str, str] = {}
+        for path in paths:
+            with open(path, encoding="utf-8", newline="") as fh:
+                for row in csv.DictReader(fh):
+                    game = str(row.get("game_id") or "")
+                    team = str(row.get("TEAM_ABBREVIATION") or "").strip()
+                    if not game or not team:
+                        continue
+                    if str(row.get("season_type") or "").strip().lower() not in _BASKETBALL_SEASON_TYPES:
+                        continue
+                    totals[game][team] += _num(row.get("PTS")) or 0.0
+                    days.setdefault(game, str(row.get("date") or "")[:10])
+        index: dict = defaultdict(list)
+        for game, teams in totals.items():
+            if len(teams) != 2:
+                continue  # one side missing from the log: no honest score
+            (a, sa), (b, sb) = teams.items()
+            ka, kb = _key(sport, a), _key(sport, b)
+            if ka:
+                index[ka].append((days[game], sa, sb))
+            if kb:
+                index[kb].append((days[game], sb, sa))
+        return index
+
+    return build
+
+
 def _soccer(paths: list[Path]) -> dict:
     index: dict = defaultdict(list)
     for path in paths:
@@ -213,6 +255,17 @@ def _sources(sport: str) -> tuple[list[Path], Callable[[list[Path]], dict]] | No
     if sport == "soccer":
         found = sorted(glob.glob(str(root / "soccer_source" / "*" / "api" / "schedule" / "schedule_*.json")))
         return ([Path(p) for p in found], _soccer)
+    if sport in {"nba", "wnba"}:
+        # THE NEWEST SEASON'S LOG ONLY. The 120-day window is not enough here: on an October NBA
+        # preseason board it still reaches last June's Finals, i.e. another season and another phase.
+        # The newest file is the current season's (the daily job creates it, empty, before the season
+        # starts), so an NBA board gets [] until this season's games exist.
+        for base in (root / f"{sport}_source" / "data" / "processed",
+                     root / f"{sport}_source" / "source_artifacts" / "data" / "processed"):
+            found = sorted(glob.glob(str(base / "player_game_log_*.csv")))[-1:]
+            if found:
+                return ([Path(p) for p in found], _basketball(sport))
+        return ([], _basketball(sport))
     return None
 
 
