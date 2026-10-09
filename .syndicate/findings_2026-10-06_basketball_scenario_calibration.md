@@ -800,3 +800,54 @@ Columns are base / L1 1.0 / L3 0.0. The real CI half-width is in brackets.
 - **Fix:** whatever is confirmed goes behind a default-off switch in basketball_props_smart_sim.py. That file is
   CLAIMED by lane basketball-injury-exclusion-reinclusion, so a loan is needed. The totals calibration is then
   re-read: the global term must fall well inside its ±15 clip. No production change without the user.
+
+### Phase 2 #1f — RESULT 2026-10-09 ~17:35Z (12:35 PM CDT)
+
+**Data:** fast full-FIT combined-config run (`fit_raw`, 4 draws, 2026-10-09 16:29Z-17:21Z, nice 19), 109 dates
+(the two Cup dates fail as always), 809 recorded jobs, 806 with a recorded raw.
+
+**Identity check:**
+- 0.9864 by the letter (pre-registered ≥ 0.99): **FAIL as written**.
+- All 11 misses sit on 11 DUPLICATED matchup keys: the same game was simulated twice on one date with different
+  game-model inputs (e.g. LAL-DET 12-30 home off 119.07 vs 106.54), and only one smart_sim file survives.
+- Exactly one job of every duplicated pair reproduces the recorded raw (11/11). On the 784 non-duplicated games the
+  identity is exact (100%, max |dev| 0.000).
+- The decomposition is therefore valid, and is read on the 780 non-duplicated games with an actual. Stated, not
+  hidden.
+
+| raw-total counterfactual (780 games, 107 dates; date-clustered CIs) | bias | MAE | slope per 30 days |
+|---|---|---|---|
+| recorded raw | −17.05 [−18.78, −15.38] | 21.93 | −0.60 [−2.00, +1.00] |
+| D1 no def subtraction | −11.95 [−13.46, −10.45] | 18.65 | −0.03 |
+| D1b def centred on the day's league def | −12.02 | 19.41 | −0.06 |
+| D2 no outs (pace drag + −0.5/out) | −8.57 [−10.14, −6.88] | 18.15 | +0.63 |
+| **D1 + D2** | **−3.34** [−4.81, −1.89] | **16.36** | +1.22 [−0.12, +2.57] |
+| D3 game-model pred total | −3.35 [−4.86, −1.82] | 16.36 | +1.21 [−0.03, +2.55] |
+
+- Monthly means: outs per team 2.71 / 3.87 / 4.08 / 4.30 (Nov-Feb); opp def − 110.6 +1.9 / +3.0 / +2.9 / +2.6;
+  recorded bias −15.0 / −20.9 / −15.2 / −18.2.
+
+**Verdicts:**
+- **"Drift" premise REFUTED.** The recorded raw has no significant season trend (slope CI spans 0). The pre-registered
+  trend criterion cannot be met by any counterfactual because there is no trend to cut. The rising walk-forward term
+  (7.3 → 15) reflected the short early-season window and the ±15 clip, not a drifting model.
+- **It is a LEVEL bias, fully decomposed.**
+  - D1, the def subtraction on points-derived ratings (WNBA G2 analog): −5.1 pts.
+  - D2, the outs penalties (pace −0.3/out and −0.5 pts/out at ~3.7 outs per team): −8.5 pts.
+  - With both removed the raw equals the vendor game model's own prediction exactly (−3.34 vs −3.35). The game
+    model's −3.3 is the only true model bias, and that is what the calibration file should mop up, well inside ±15.
+  - D1 and D2 each cut |bias| and MAE with CIs clear of the recorded raw.
+- **Note on D2:**
+  - The game model's prediction may already price injuries, so the outs penalty may double count the same
+    absences.
+  - The sim's player pool already excludes the out players, and the market prices injuries too.
+  - Its removal is judged on the walk-forward and end-to-end readings, not on this argument.
+
+**Next (to pre-register with the fix):**
+- Two default-off switches in `_simulate_quarters_local` / the job build: NBA points-derived ratings skip the def
+  subtraction (the WNBA rule), and NBA skips the outs penalties when ratings are points-derived.
+- The file is CLAIMED by lane basketball-injury-exclusion-reinclusion, so a loan is needed.
+- Then: the walk-forward global term should fall to ~+3 (inside the clip), and the end-to-end 12-date re-run.
+
+**LEAD:** duplicated matchups. 12 keys on 6 dates in Dec-Jan get two sim jobs with different game-model inputs; the
+later one overwrites the smart_sim file. Source not traced; see the next leads.md entry.
