@@ -1510,6 +1510,11 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/data/processed/play_context_history.parquet",
     "*_source/data/processed/live_state/*/*.json",
     "*_source/data/processed/live_state/*/*.ticks.jsonl",
+    # Lane `nba-sim-team-adj-473` (`#473`): the smart sim's starter-flag feed. WNBA's is written by its refresh, NBA's
+    # by `nba_team_inputs.ensure_starters` (starter columns only); ~3-8 KB a slate date. The NBA team-ratings file it
+    # writes beside it is already covered by `team_advanced_stats_*.csv` above.
+    "*_source/data/processed/pregame_expected_minutes_*.csv",
+    "*_source/data/processed/pregame_expected_minutes_*.parquet",
 )
 
 

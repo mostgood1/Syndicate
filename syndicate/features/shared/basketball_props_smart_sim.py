@@ -23,8 +23,8 @@ _QUARTERS_CALIBRATION_CACHE_LOCAL: dict[str, dict[str, Any] | None] = {}
 _DEFAULT_BLEND_WEIGHTS_CACHE_LOCAL: dict[str, tuple[float, float]] = {}
 _TOTALS_CALIBRATION_INDEX_LOCAL: dict[str, list[tuple[object, Path]]] = {}
 _TOTALS_CALIBRATION_CACHE_LOCAL: dict[tuple[str, str], dict[str, Any] | None] = {}
-_TEAM_ADVANCED_STATS_CACHE_LOCAL: dict[tuple[str, int, str], object] = {}
-_PREGAME_EXPECTED_MINUTES_CACHE_LOCAL: dict[tuple[str, str], object] = {}
+_TEAM_ADVANCED_STATS_CACHE_LOCAL: dict[tuple[str, int, str, bool], object] = {}
+_PREGAME_EXPECTED_MINUTES_CACHE_LOCAL: dict[tuple[str, str, bool], object] = {}
 _MARKET_PLAYER_NAMES_CACHE_LOCAL: dict[tuple[str, str], dict[tuple[str, str], set[str]]] = {}
 _ADVANCED_STATS_BUILDER_MODULE_CACHE_LOCAL: dict[tuple[str, str], tuple[Any, Any]] = {}
 
@@ -1528,13 +1528,24 @@ def _coalesce_team_player_frames_local(*frames):
     return out
 
 
-def _load_pregame_expected_minutes_local(*, processed_root: Path, date_str: str):
+def _load_pregame_expected_minutes_local(*, processed_root: Path, date_str: str, league_code: str = ""):
     import pandas as pd
+    from syndicate.features.shared import nba_team_inputs
 
-    cache_key = (str(processed_root), str(date_str).strip())
+    # `#473`: NBA has no pregame_expected_minutes producer, so its starter flags were never fed. With
+    # SYNDICATE_NBA_TEAM_INPUTS on (default) the NBA call builds a STARTER-COLUMNS-ONLY file from P2's ESPN box
+    # starters; off, files that producer wrote are ignored so off == the pre-#473 inputs.
+    nba = str(league_code or "").strip().lower() == "nba"
+    nba_on = nba and nba_team_inputs.enabled()
+    cache_key = (str(processed_root), str(date_str).strip(), nba_on)
     cached = _PREGAME_EXPECTED_MINUTES_CACHE_LOCAL.get(cache_key)
     if cached is not None:
         return cached
+    if nba_on:
+        try:
+            nba_team_inputs.ensure_starters(processed_root=processed_root, date_str=str(date_str).strip())
+        except Exception as exc:  # noqa: BLE001 -- a producer failure degrades to the minutes ranking, loudly
+            print(f"NBA_STARTERS_PRODUCER_FAILED date={date_str} err={type(exc).__name__}: {exc}", flush=True)
     file_csv = processed_root / f"pregame_expected_minutes_{str(date_str).strip()}.csv"
     file_parquet = processed_root / f"pregame_expected_minutes_{str(date_str).strip()}.parquet"
     file_path = file_csv if file_csv.exists() else file_parquet
@@ -1555,7 +1566,7 @@ def _load_pregame_expected_minutes_local(*, processed_root: Path, date_str: str)
             df = pd.read_csv(file_path)
     except Exception:
         df = pd.DataFrame()
-    if df is None or df.empty:
+    if df is None or df.empty or (nba and not nba_on and "exp_min_source" in df.columns and df["exp_min_source"].map(nba_team_inputs.is_ours).all()):
         df = pd.DataFrame()
         _PREGAME_EXPECTED_MINUTES_CACHE_LOCAL[cache_key] = df
         return df
@@ -1587,7 +1598,7 @@ def _load_pregame_expected_minutes_local(*, processed_root: Path, date_str: str)
     return out
 
 
-def _merge_pregame_expected_minutes_for_team_local(*, processed_root: Path, team_df, date_str: str, team_tri: str):
+def _merge_pregame_expected_minutes_for_team_local(*, processed_root: Path, team_df, date_str: str, team_tri: str, league_code: str = ""):
     import pandas as pd
     import numpy as np
 
@@ -1595,7 +1606,7 @@ def _merge_pregame_expected_minutes_for_team_local(*, processed_root: Path, team
     if team_df is None or getattr(team_df, "empty", True):
         diag["reason"] = "empty_team_df"
         return (pd.DataFrame() if team_df is None else team_df), diag
-    pem = _load_pregame_expected_minutes_local(processed_root=processed_root, date_str=str(date_str))
+    pem = _load_pregame_expected_minutes_local(processed_root=processed_root, date_str=str(date_str), league_code=league_code)
     if pem is None or pem.empty:
         diag["reason"] = "missing_pregame_expected_minutes"
         return team_df, diag
@@ -3772,6 +3783,18 @@ def _ensure_team_advanced_stats_asof_local(*, processed_root: Path, league_code:
             return out_path
     except OSError:
         pass
+    if str(league_code or "").strip().lower() == "nba":
+        # `#473`: the vendored NBA builders can only fill season N (END year) from N's REGULAR-season games with
+        # min_games=10 -- empty from the preseason to ~week 3, so every NBA sim ran with neutral team quality.
+        # Syndicate's producer blends the prior regular season (shrunk) with the current one; see nba_team_inputs.
+        from syndicate.features.shared import nba_team_inputs
+
+        if nba_team_inputs.enabled():
+            try:
+                return nba_team_inputs.ensure_team_ratings_asof(processed_root=processed_root, season=int(season), as_of=as_of_s)
+            except Exception as exc:  # noqa: BLE001 -- degrade to neutral team quality, loudly
+                print(f"NBA_TEAM_RATINGS_PRODUCER_FAILED season={season} as_of={as_of_s} err={type(exc).__name__}: {exc}", flush=True)
+                return None
     package_name = "wnba_betting" if str(league_code or "").strip().lower() != "nba" else "nba_betting"
     boxscores_mod, player_logs_mod = _import_advanced_stats_builders_local(package_name=package_name, processed_root=processed_root)
     if boxscores_mod is None and player_logs_mod is None:
@@ -3820,7 +3843,11 @@ def _load_team_advanced_stats_asof_local(*, processed_root: Path, season: int, a
             as_of_date_str=str(as_of_date_str),
         )
 
-    cache_key = (str(processed_root), int(season), str(as_of_date_str).strip())
+    from syndicate.features.shared import nba_team_inputs
+
+    # `#473`: off must equal the pre-fix inputs even on a disk holding files the NBA producer wrote.
+    ignore_ours = str(league_code or "").strip().lower() == "nba" and not nba_team_inputs.enabled()
+    cache_key = (str(processed_root), int(season), str(as_of_date_str).strip(), ignore_ours)
     cached = _TEAM_ADVANCED_STATS_CACHE_LOCAL.get(cache_key)
     if cached is not None:
         return cached
@@ -3844,7 +3871,7 @@ def _load_team_advanced_stats_asof_local(*, processed_root: Path, season: int, a
         import numpy as np
 
         df = pd.read_csv(file_path)
-        if df is None or df.empty:
+        if df is None or df.empty or (ignore_ours and "source" in df.columns and df["source"].map(nba_team_inputs.is_ours).all()):
             df = pd.DataFrame()
             _TEAM_ADVANCED_STATS_CACHE_LOCAL[cache_key] = df
             return df
