@@ -3523,3 +3523,12 @@ My 10-07 reachability test asserted `(None, "unresolved")` and passed in my work
 
 ## 2026-10-09 -- A classifier built from the code's write path still needs a read of the real file before it is trusted `[lane soccer-lineup-reach]`
 I wrote the confirmed-XI classifier from `build_usage_profiles` (10-11 players at >=0.75) and it reported 0 confirmed on every side. Two blind spots: it keyed sides off `match.home_team`, which the freeze does not carry (0 rows everywhere), and EPL season shares alone reach 12-16 at >=0.75. Printing one side's raw shares showed the real signature (0 players in the middle band) in a minute. **Rule:** before running a classifier over a population, print the raw field for one known-positive and one known-negative case; a classifier whose every output is the same answer has measured nothing.
+
+## 2026-10-08 -- A MULTI-FILE LEDGER EDIT AND ITS COMMIT MUST NOT RUN IN PARALLEL: the commit recorded 1 of 3 files under a message claiming all 3 (lane status-effective-memory-cap)
+
+- **What happened:** one script edited state_worker.md, then lanes.md, then the log. It raised `ValueError` at lanes.md (the lane was the LAST block under `## OPEN`, so "next `
+### `" did not exist). The commit was a SEPARATE tool call in the SAME batch, so it ran anyway and pushed `state_worker.md` alone under "close lane". The script's numstat line, printed before the commit, already showed only 1 file.
+- **Rule:** run the commit in a LATER turn than the edit, after reading the edit's output; or gate it in one command (`script && git add ... && [ "$(git diff --cached --name-only | wc -l)" = 3 ] && git commit`). Bound a lane block by the next heading of EITHER level (`
+##` or `
+###`), never `
+###` alone.
