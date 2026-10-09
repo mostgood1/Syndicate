@@ -447,13 +447,21 @@ _RECENT_MATCHUP_SPORTS = frozenset({"mlb", "nba", "wnba", "nfl", "nhl", "ncaaf",
 # top rows are served first, and one slow sport can neither starve the others
 # (measured 2026-10-08: a single shared 120 s budget ran out before NHL got any)
 # nor stretch a build by more than this per sport.
-_RECENT_MATCHUP_BUDGET_SECONDS_PER_SPORT = 30.0
+#
+# RAISED 30 -> 60 s (lane board-history-charts, user 2026-10-09 "Raise the budget"). The budget ran out
+# in builds on 2026-10-09 for ncaaf (11x), wnba (6x), nfl (5x), soccer (2x), nhl (1x) -- and a row past the
+# budget has no sentence AND no per-row chart values (they ride the same computation). Measured on the
+# served page that day: props with chart values ncaaf 444/584, nfl 812/929. Cost: at most +30 s per
+# in-season sport per build when a sport would have hit the old cap.
+_RECENT_MATCHUP_BUDGET_SECONDS_PER_SPORT = 60.0
 # Per-sport raises (lane prop-recency-budget, user 2026-10-08 "raise the NHL/soccer budget if it
 # persists"). Soccer ran out in every build measured 18:58-20:18Z, including the warm 20:08Z one
 # (Recent form 867/920 props); NHL recovered once the host was not loaded (1,096/1,101), so it keeps
 # the default. Soccer's per-card cost after the match-log index: ~175 ms (was 276 ms; 69 ms before the
 # multi-season logs).
-_RECENT_MATCHUP_BUDGET_OVERRIDES: dict[str, float] = {"soccer": 45.0}
+# Soccer 45 -> 90 s with the default's raise (lane board-history-charts, 2026-10-09): it carries the most
+# prop rows (1,628 on 10-09) at the highest per-card cost.
+_RECENT_MATCHUP_BUDGET_OVERRIDES: dict[str, float] = {"soccer": 90.0}
 
 
 def _recent_matchup_budget(sport: str) -> float:

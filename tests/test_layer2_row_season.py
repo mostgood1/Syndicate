@@ -144,8 +144,10 @@ def test_season_failure_never_breaks_the_explainer(data_root, monkeypatch):
 
 
 def test_recent_matchup_budget_is_per_sport_with_a_soccer_raise():
-    """Lane prop-recency-budget (user 2026-10-08): soccer kept running out of the 30 s per-sport budget."""
+    """Lane prop-recency-budget (user 2026-10-08): soccer kept running out of the 30 s per-sport budget.
+    Raised again 2026-10-09 (lane board-history-charts, user "Raise the budget"): default 30 -> 60 s,
+    soccer 45 -> 90 s -- rows past the budget get no sentence and no per-row chart values."""
     from syndicate.features.shared import layer2_row_context as rc
 
-    assert rc._recent_matchup_budget("soccer") == 45.0
-    assert rc._recent_matchup_budget("nhl") == rc._RECENT_MATCHUP_BUDGET_SECONDS_PER_SPORT == 30.0
+    assert rc._recent_matchup_budget("soccer") == 90.0
+    assert rc._recent_matchup_budget("nhl") == rc._RECENT_MATCHUP_BUDGET_SECONDS_PER_SPORT == 60.0
