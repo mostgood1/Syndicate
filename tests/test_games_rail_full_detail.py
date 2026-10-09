@@ -114,5 +114,18 @@ class BoardPlays(unittest.TestCase):
         self.assertEqual(chips[0]["plays"]["line_results"]["win"], 1)
 
 
+    def test_a_game_is_filed_under_its_own_day(self) -> None:
+        from syndicate.features.shared import game_chip_plays as plays
+
+        self._env()
+        card = {"sport": "ncaaf", "away_key": "ucf", "home_key": "ohio state", "pick_id": "y", "kind": "game",
+                "market": "spreads", "side": "home", "line": -10.5, "segment": "full", "ev_vs_fair_pct": 1.0,
+                "commence_time": "2026-10-10T16:00:00Z"}
+        plays.attach_plays([], "2026-10-09", cards=[card])          # recorded by the 10-09 board
+        chips = [{"sport": "ncaaf", "state": "pregame", "start_time_utc": "2026-10-10T16:00:00+00:00",
+                  "away": {"key": "ucf"}, "home": {"key": "ohio state"}}]
+        plays.attach_plays(chips, "2026-10-10")                     # found by the 10-10 card
+        self.assertEqual(chips[0]["plays"]["total"], 1)
+
 if __name__ == "__main__":
     unittest.main()

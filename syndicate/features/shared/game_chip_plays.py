@@ -55,6 +55,25 @@ def _num(value: Any) -> float | None:
         return None
 
 
+def _ct_day(stamp: Any, fallback: str) -> str:
+    """The game's own Central date -- a board date spans a multi-day horizon,
+    so each game is FILED under the day it is played, and a card for that day
+    finds it whatever board build recorded it."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    text = str(stamp or "").strip()
+    if not text:
+        return fallback
+    try:
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return fallback
+    if moment.tzinfo is None:
+        return text[:10]
+    return moment.astimezone(ZoneInfo("America/Chicago")).date().isoformat()
+
+
 def _game_key(sport: Any, away: Any, home: Any) -> str | None:
     a, h = str(away or "").strip().lower(), str(home or "").strip().lower()
     return f"{str(sport or '').lower()}|{a}|{h}" if a and h else None
@@ -82,14 +101,15 @@ def _is_worker() -> bool:
 
 def record_plays(date: str, cards: Iterable[Mapping[str, Any]]) -> int:
     """Union this build's +EV cards into the per-date record. Returns plays added."""
-    games: dict[str, dict[str, dict]] = {}
+    by_day: dict[str, dict[str, dict[str, dict]]] = {}
     for card in cards or ():
         ev = _num(card.get("ev_vs_fair_pct"))
         pid = card.get("pick_id")
         key = _game_key(card.get("sport"), card.get("away_key"), card.get("home_key"))
         if ev is None or ev <= 0 or not pid or not key:
             continue
-        games.setdefault(key, {})[str(pid)] = {
+        day = _ct_day(card.get("commence_time"), date)
+        by_day.setdefault(day, {}).setdefault(key, {})[str(pid)] = {
             "kind": card.get("kind"),
             "market": str(card.get("market") or "").lower(),
             "segment": str(card.get("segment") or "full").lower(),
@@ -98,25 +118,26 @@ def record_plays(date: str, cards: Iterable[Mapping[str, Any]]) -> int:
             "home_team": card.get("home_team"),
             "away_team": card.get("away_team"),
         }
-    if not games:
-        return 0
-    path = _plays_path(date)
-    with _LOCK:
-        current = _read(path)
-        stored = current.get("games") if isinstance(current.get("games"), dict) else {}
-        added = 0
-        for key, plays in games.items():
-            bucket = stored.setdefault(key, {})
-            for pid, play in plays.items():
-                if pid not in bucket:
-                    added += 1
-                bucket[pid] = play
-        if added:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = path.with_suffix(".tmp")
-            tmp.write_text(json.dumps({"date": date, "games": stored}), encoding="utf-8")
-            tmp.replace(path)
-    return added
+    total_added = 0
+    for day, games in by_day.items():
+        path = _plays_path(day)
+        with _LOCK:
+            current = _read(path)
+            stored = current.get("games") if isinstance(current.get("games"), dict) else {}
+            added = 0
+            for key, plays in games.items():
+                bucket = stored.setdefault(key, {})
+                for pid, play in plays.items():
+                    if pid not in bucket:
+                        added += 1
+                    bucket[pid] = play
+            if added:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                tmp = path.with_suffix(".tmp")
+                tmp.write_text(json.dumps({"date": day, "games": stored}), encoding="utf-8")
+                tmp.replace(path)
+        total_added += added
+    return total_added
 
 
 def _grade_line(play: Mapping[str, Any], away_score: float, home_score: float, home_team: Any, away_team: Any) -> str | None:
@@ -166,17 +187,31 @@ def attach_plays(chips: list[dict[str, Any]], date: str, *, cards: Iterable[Mapp
     try:
         if cards is not None and _is_worker():
             record_plays(date, cards)
-        stored = _read(_plays_path(date)).get("games") or {}
-        if not stored:
-            return
-        prop_results = _read(_results_path(date))
+        stores: dict[str, dict] = {}
+
+        def games_for(day: str) -> dict:
+            if day not in stores:
+                stores[day] = _read(_plays_path(day)).get("games") or {}
+            return stores[day]
+
+        # Prop results are keyed by the LEDGER (board) date, which can be the
+        # day before the game: read both.
+        prop_results: dict = {}
         for chip in chips:
             away, home = chip.get("away") or {}, chip.get("home") or {}
-            plays = stored.get(_game_key(chip.get("sport"), away.get("key"), home.get("key")) or "")
+            day = _ct_day(chip.get("start_time_utc"), date)
+            plays = games_for(day).get(_game_key(chip.get("sport"), away.get("key"), home.get("key")) or "")
             if not plays:
                 continue
             lines = [p for p in plays.values() if p.get("kind") == "game"]
             props = [(pid, p) for pid, p in plays.items() if p.get("kind") != "game"]
+            if props and day not in prop_results:
+                from datetime import date as _date, timedelta
+
+                merged = dict(_read(_results_path((_date.fromisoformat(day) - timedelta(days=1)).isoformat())))
+                merged.update(_read(_results_path(day)))
+                prop_results[day] = merged
+            day_results = prop_results.get(day, {})
             out: dict[str, Any] = {"total": len(plays), "lines": len(lines), "props": len(props)}
             if chip.get("state") == "final":
                 a, h = _num(away.get("score")), _num(home.get("score"))
@@ -185,7 +220,7 @@ def attach_plays(chips: list[dict[str, Any]], date: str, *, cards: Iterable[Mapp
                         _grade_line(p, a, h, home.get("name"), away.get("name")) for p in lines
                     )
                 out["prop_results"] = _tally(
-                    (prop_results.get(pid) or {}).get("result") if isinstance(prop_results.get(pid), dict) else prop_results.get(pid)
+                    (day_results.get(pid) or {}).get("result") if isinstance(day_results.get(pid), dict) else day_results.get(pid)
                     for pid, _p in props
                 )
             elif chip.get("state") in {"postponed", "cancelled"}:

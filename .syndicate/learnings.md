@@ -3594,3 +3594,8 @@ you have, say so and give the figure as an upper bound. And note the corollary:
 the 55 real failures live in 26 files with ZERO overlap against the 23 files the
 sparse run pointed at, so a sparse run does not even identify the right FILES to
 investigate.
+
+## 2026-10-09 -- FORBIDDEN: listing a role's env KEYS with `tr '\0' '\n' < /proc/<pid>/environ | cut -d= -f1` -- a multi-line value (a PEM key) prints its body lines as "names" `[lane games-rail-full-detail, session d4409ac4]`
+- **What happened:** to find which env keys only the web process has, I split `/proc/<pid>/environ` on NUL -> newline and cut at `=`. `KALSHI_PRIVATE_KEY` is a PEM with embedded newlines, so every line of its body after the first had no `=` and was printed whole as a "key name" -- private-key material landed in the session transcript. User told to rotate the key.
+- **Rule:** read a role's env in PYTHON (`dict(x.split("=", 1) for x in raw.split("\0") if "=" in x)`) and print only KEY NAMES that match `^[A-Z][A-Z0-9_]*$` (or booleans / lengths for chosen keys). Never line-split environ in a shell pipeline. Same family as the 2026-10-07 xargs rule: any tool run against a production env is a secret-handling operation.
+- **Also measured:** the local fleet loads ONE env file into every role, so `SYNDICATE_WEB_DYNO` is set on the refresh-worker too -- it does not identify the web there. Web-only keys are `GUNICORN_CMD_ARGS` / `PORT`.
