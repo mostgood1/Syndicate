@@ -345,6 +345,20 @@ def run_sim(args) -> int:
     bpss._call_source_simulate_smart_game_local = call
     bpss._recording_sim_draws_local = rec
 
+    # Phase 2 #1f: keep each game's sim JOB (the inputs of the pre-sim raw total: points-derived ratings, def, pace,
+    # outs, b2b, rest) so the raw can be decomposed offline. The jobs run in-process (smart_sim_workers=1).
+    job_rec: List[Dict[str, Any]] = []
+    orig_job = bpss._smart_sim_worker_run_local
+    JOB_KEYS = ("home_tri", "away_tri", "market_total", "home_spread", "home_pace", "away_pace", "matchup_pace",
+                "home_def_rtg", "away_def_rtg", "home_off_rtg", "away_off_rtg", "off_rtg_from_points", "home_outs",
+                "away_outs", "home_b2b", "away_b2b", "home_rest_days", "away_rest_days")
+
+    def job_wrapped(job):
+        job_rec.append({k: job.get(k) for k in JOB_KEYS})
+        return orig_job(job)
+
+    bpss._smart_sim_worker_run_local = job_wrapped
+
     lever_seen = {"calls": 0, "with_levers": 0}
     flags: Dict[str, Any] = {}
     if levers or args.engine_flag:
@@ -405,6 +419,7 @@ def run_sim(args) -> int:
         for extra in args.copy_file or []:     # production switch files absent from the pristine copy
             shutil.copy2(extra, scratch / "nba_source" / "data" / "processed" / Path(extra).name)
         games.clear()
+        job_rec.clear()
         src_root = scratch / "nba_source"
         try:
             export_props_predictions_local(
@@ -429,6 +444,11 @@ def run_sim(args) -> int:
         print(f"SIM {d} games={len(games)} draws={sum(len(g['draws']) for g in games)}", flush=True)
         # Per-game engine summary (the market-anchored TARGET vs the sim mean): the scratch is rebuilt per date, so keep
         # it now. Needed to read whether the event sim lands on the target it was given (Phase 2 #1c).
+        jobs_out = Path(args.out) / f"smart_sim_jobs_{args.league}" / f"{d}.jsonl"
+        jobs_out.parent.mkdir(parents=True, exist_ok=True)
+        with jobs_out.open("w", encoding="utf-8") as fh:
+            for jr in job_rec:
+                fh.write(json.dumps({"date": d, **jr}, default=str) + "\n")
         summ = Path(args.out) / f"smart_sim_summary_{args.league}" / f"{d}.jsonl"
         summ.parent.mkdir(parents=True, exist_ok=True)
         with summ.open("w", encoding="utf-8") as fh:
