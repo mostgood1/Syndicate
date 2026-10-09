@@ -1350,7 +1350,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Falsification test: (1) or (2) fails, or the sign flips between windows.
 - Verification: the next game-profile `daily/snapshots/<d>/meta.json` carries the forward keys (hr_rate_mult 1.5), and a served-sim replay matches arm F (not D) by > 3 SE.
 - **2026-10-09 contested-file note.** `daily_update_multi_profile.py` is also listed by `mlb-doubleheader-e2e` (its `_collect_game_recommendations` ONLY). That lane's owner session 3692ff18 is ARCHIVED (last active 2026-09-23), so its claim is orphaned. This lane claims ONLY the `--game-pitch-model-overrides` argparse default (one line, ~5939). Doubleheader code is not touched. User decision 2026-10-09: "if it passes, land it" (the borrow is conditional on the pre-registered rule passing). Raised by the hoist_open_lanes verification session; the doubleheader block is left unedited.
-- Files: vendor/mlb_bettingv2/tools/daily_update_multi_profile.py (the `--game-pitch-model-overrides` default ONLY; `_collect_game_recommendations` stays with mlb-doubleheader-e2e), scripts/mlb_game_line_config_ab.py (NEW), tests/test_mlb_game_line_config_ab.py (NEW)
+- Files: vendor/mlb_bettingv2/tools/daily_update_multi_profile.py (the --game-pitch-model-overrides argparse default ONLY), scripts/mlb_game_line_config_ab.py (NEW), tests/test_mlb_game_line_config_ab.py (NEW)
 - Blocked by: none
 
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
