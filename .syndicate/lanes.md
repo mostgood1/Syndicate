@@ -945,6 +945,23 @@ death, never life — do not invert it.
 - Blocked by: none
 - STATUS 2026-10-06 ~22:15Z: Phase 1 pre-registered (026d94d7) + amendments; extractor/sim/table phases on main; real FIT extracted (NBA 816, WNBA 217); NBA FIT sim run COMPLETE 109/109 dates (2026-10-07 ~14:10Z; WSL ~/bball_sc, 3 workers, 200 draws, 0 errors).  NEXT: NBA table + flags, WNBA sim setup, NCAAB real table. GOAL: NOT MET (Phase 1 in progress).
 - NBA PHASE 1 READ 2026-10-07 (findings 'NBA Phase 1 reading'; 791 paired FIT games): FLAGGED -- margin SD 19.4 vs 14.0 and blowouts 35% vs 23% (too much spread), quarter shares (Q4 +1.7 pts, +2.5 close), quarter SD +1 pt, FTA -2.4/team with foul-outs x1.9 (no bonus/intentional FTs), top-5 minutes flat vs script (close -1.6, blowout +2.9), volume +5.6 plays/+2.4 3PA. EXONERATED: Q2 share. Phase 2 candidates ranked (spread jitter first); each pre-registered before any engine change. Owed: S12 back-to-back; WNBA sim; NCAAB real table.
+### mlb-oos-market-backtest — OPEN — opened 2026-10-09 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- Goal: measure, out of sample (07-16..09-27), whether production's CURRENT MLB engine beats the de-vigged book on each game-line and prop market, and how far the 10-09 game-profile fix moved it, using `scripts/backtest_mlb_lines_props.py` unchanged.
+- **Why now.** The 10-02 headline ("0 of 23 markets beat the book", 05-28..07-12) was measured on the game profile's class-default pitch config, and the calibration was later fitted inside that window. No out-of-sample market read exists.
+- **Inputs (scratch only, never production's data root):**
+  - **Odds.** OddsAPI historical, one pregame instant per game (first pitch - 10 min), 19 markets: full/F5 ML, run line, total; F3/F1 totals; 6 hitter and 5 pitcher props.
+    - Written in the live fetcher's own shape (its assembly reused; HTTP seams swapped). Fetcher: scratchpad `hist_snapshots.py`.
+    - Dry run 993 events, upper bound 188,670 credits; user OK to spend under 200k ("proceed"); hard abort at 200k. Quota attributed via record_oddsapi_quota. Output: `C:/tmp/mlb_hist_odds`.
+  - **Sims.** Served-shape records via production's `_sim_many`, with the game-profile `cfg_kwargs` and calibration maps read from production's 10-08 `meta.json`.
+    - Two arms: `fwd` (production from 988fa33d) and `none` (before). 500 sims/game.
+    - `apply_conditional_mix_to_rosters` is omitted (season-level table = leak; the fidelity-gated replays omit it too).
+    - Fleet `~/ssims/full`.
+- **Reported per market (stated before results):** n, model/book Brier and log-loss, paired game-clustered CI, and the script's verdict, for each arm. Plus fwd-minus-none per market. This is a MEASUREMENT: nothing ships from it.
+- Falsification test: n/a (measurement). Coverage per family and the intersection are printed first, per CLAUDE.md.
+- Verification: the report file plus a findings file; numbers go into state_mlb [mlb-asof-backtest].
+- Files: (none; scratch scripts only)
+- Blocked by: none
+
 ### mlb-game-profile-pitch-config — OPEN — opened 2026-10-09 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
 - 2026-10-09: upstream PR mostgood1/MLB-BettingV2#5 (same one-line default; upstream had the identical missing-file default). Until it merges, a vendor re-pull would revert 988fa33d; the regression test tests/test_mlb_multi_profile_pitch_overrides.py would then fail.
 - **STATUS 2026-10-09 20:35Z: SHIPPED, V2 OWED.** Pre-registered rule PASSED on all three checks: primary CRPS -0.155 [-0.233, -0.077]; Brier +0.0006 [-0.0028, +0.0040]; full window -0.160. Runs bias +1.67 -> -0.03/game. `988fa33d` fleet ff 20:35:21Z; V1 MET. V2 watcher `~/gpv2/watch.sh` (deploys.md 20:35Z). Close the lane when V2 reads.
