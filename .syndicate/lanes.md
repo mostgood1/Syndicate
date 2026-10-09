@@ -1199,6 +1199,14 @@ death, never life — do not invert it.
 - Verification: unit test on the real hydrate+slim path (fails without the fix); served / on the fleet after the next web reload: by_sport absent, _embed_aliases.by_sport present, embed parses strictly, page bytes measured
 - Blocked by: none
 
+### basketball-native-orchestrator — OPEN — opened 2026-10-09 — session 2d413211-0162-420b-9603-72b7ea9f9867
+- Goal: P6 of docs/ai_context/basketball_live_native_plan.md: simulate_smart_game and everything it calls run from Syndicate code as ONE league-parametric orchestrator (nba, wnba; ncaab hooks), outputs IDENTICAL to the vendored vendor/{nba,wnba}_betting_repo/src/*/sim/smart_sim.py (same seed: every leaf of smart_sim_*.json, >=15 NBA and >=10 WNBA real production games over several dates, corpus size reported); the ~20 replaced helpers folded in as direct calls (no globals-patching); after it basketball_props_smart_sim.py imports nothing from vendor/*/sim/ and no vendored sim module is imported at runtime; input checklist over dataclasses.fields() exiting non-zero, pipeline trace, reachability test; remaining vendored uses on basketball paths outside the sim listed in the plan; verified on the deployed fleet checkout (same-seed same-snapshot identical vs vendored arm; first newly simulated production game carries no run_summary failures).
+- Files: syndicate/features/basketball_engine/orchestrator.py (NEW), syndicate/features/basketball_engine/orchestrator_support.py (NEW), scripts/port_basketball_orchestrator.py (NEW), scripts/record_basketball_orchestrator_corpus.py (NEW), scripts/basketball_orchestrator_parity.py (NEW), scripts/basketball_orchestrator_input_checklist.py (NEW), tests/test_basketball_orchestrator_parity.py (NEW), tests/test_basketball_orchestrator_reachability.py (NEW), syndicate/features/shared/basketball_props_smart_sim.py (orchestrator import + _call_source_simulate_smart_game_local section only; coordinated with basketball-native-engine), docs/ai_context/basketball_live_native_plan.md (P6 Status row + P6 section only), docs/ai_context/basketball_sim_engine_reference.md (Sec10 NEW section only)
+- Hypothesis: A text port of the vendored NBA orchestrator with anchor-checked edits, league branches for the 46 NBA/WNBA hunks and the replaced helpers called directly, reproduces both vendored orchestrators leaf-for-leaf under the same seed.
+- Falsification test: Any leaf difference in smart_sim_*.json on the recorded corpus, or a vendored replay that does not reproduce production's recorded output.
+- Verification: parity tool over >=15 NBA + >=10 WNBA production games, 0 differences; same-seed e2e identical on the deployed fleet checkout; first newly simulated game after ff has run_summary failures == 0 (deploys.md)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
