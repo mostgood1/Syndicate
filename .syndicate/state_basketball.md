@@ -391,6 +391,20 @@ vs the shipped +39.56%**. The overconfidence ratio decays **1.61 (May–Jun) →
 legacy and current calibration is already near-exact. An **adaptive** (trailing
 residual) sigma is justified; a constant rescale is not.
 
+## [wnba-live-native-cutover] WNBA LIVE PATH: 14 VENDORED CALLS INVENTORIED; THE PLAN'S END-STATE GREP CANNOT SEE TWO; 2026 CHECKPOINT CORPUS + LINEAR-LENS BAR BUILT `[verified 2026-10-09, lane wnba-native-live-cutover, commit c1681c82]`
+
+- The WNBA live lens still runs the VENDORED tick (`wnba/live_lens.py:65`, return value discarded; its effect is writing
+  `live_lens_signals/projections_<d>.jsonl`) and the vendored app as a module from
+  `scripts/refresh_wnba_oddsapi_props.py:5774` (`_load_source_app`, producer of `live_snapshots/live_lines_*` /
+  `live_player_lens_*`). The WNBA sim IS the vendored `simulate_smart_game` / `sim.events` when importable
+  (`basketball_props_smart_sim.py:885/3292`). Full table: `.syndicate/findings_2026-10-09_wnba_live_vendored_inventory.md`.
+- **The plan's end-state grep (`vendor\.` over `syndicate/features/...`) returns clean while two of those remain:**
+  the sim loads go through `importlib.import_module(f"{package_name}.sim.events")`, and the snapshot producer is under
+  `scripts/`. Widen the grep before calling P5 (or P1) done.
+- Corpus: 344 of 347 2026 games (regular 330, playoffs 14), score-reconciled; fleet `~/wnba_bt/live_checkpoints/`.
+  The current linear lens's ML Brier is worse than ESPN's live WP at end Q1/Q2/Q3 (CI excludes 0, regular, n=329).
+- ESPN pbp `sequenceNumber` is NOT chronological; the `plays` list order is.
+
 ## [wnba-live-edge-is-leakage] THE WNBA LIVE ENGINE'S +41% ROI IS AN ARTEFACT — no live line has ever been captured `[verified 2026-08-31, lane wnba-accuracy-assessment]`
 
 1,689 live player-prop signals over 2026-08-17..08-30, graded against FINAL ESPN

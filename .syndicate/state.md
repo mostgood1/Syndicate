@@ -462,6 +462,7 @@ once this index exists: re-splitting would orphan the parts.
 | [wnba-settlement-live] | WNBA SETTLES AGAIN — all three causes fixed, deployed and verified on the served payload `[verified 2026-09-01 | `state_basketball.md` |
 | [wnba-instruments-all-zero] | THE THREE CAUSES, AS FOUND `[historical, 2026-08-31; all three now fixed — see above]` | `state_basketball.md` |
 | [wnba-model-vs-board-mismatch] | THE WNBA SIM'S ONE EDGE IS THE MONEYLINE, AND THE BOARD BET IT TWICE ALL SEASON `[verified 2026-08-31, lane wn | `state_basketball.md` |
+| [wnba-live-native-cutover] | WNBA LIVE PATH: 14 VENDORED CALLS INVENTORIED; THE PLAN'S END-STATE GREP CANNOT SEE TWO; 2026 CHECKPOINT CORPUS + LINEAR-LENS BAR BUILT `[verified 2026-10-09, lane wnba-native-live-cutover]` | `state_basketball.md` |
 | [wnba-live-edge-is-leakage] | THE WNBA LIVE ENGINE'S +41% ROI IS AN ARTEFACT — no live line has ever been captured `[verified 2026-08-31, la | `state_basketball.md` |
 | [wnba-execution-disconnect] | THE WNBA BOARD NEVER SEES THE VENUE IT TRADES ON, AND LAYER 2 NEVER SEES WNBA `[verified 2026-08-31, lane wnba | `state_basketball.md` |
 | [wnba-game-lines-gradeable] | WNBA GAME LINES CAN BE GRADED — a player box gives the team score, and always could `[verified 2026-08-28, lan | `state_basketball.md` |
