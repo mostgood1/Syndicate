@@ -3532,3 +3532,37 @@ I wrote the confirmed-XI classifier from `build_usage_profiles` (10-11 players a
 ##` or `
 ###`), never `
 ###` alone.
+
+## 2026-10-09 — A "TAKE MY SIDE FROM THE MARKER TO EOF" CONFLICT RESOLVER IS SAFE ONLY IF YOUR SECTION IS AT EOF `[lane suite-baseline-flakiness, session 4ab694ed]`
+
+**Rule.** When auto-resolving a ledger rebase conflict, extract YOUR addition by
+its own bounds — marker to the next heading — never marker-to-end-of-file. And
+assert an invariant that would catch the failure (no duplicated entries, one
+`## Archived lanes` heading) before writing.
+
+**Why, measured.** My land script resolved every conflicted ledger file with
+"upstream + my side from my marker to EOF". For `log/<date>.md` and
+`learnings.md` that is correct, because an append IS at EOF. For `lanes.md` it is
+not: a lane block goes at the end of `## OPEN`, which is byte 4,478 of a
+736,805-byte file, so marker-to-EOF captured my block PLUS the entire archived
+section and appended a second copy. Result on `origin/main`: lanes.md
+728,228 -> 834,895 B (+106,667), the one-line archived index 516 -> 1,032 entries
+with 516 duplicated, and 638 added lines.
+
+**Why it was not caught sooner.** The obvious check did not see it. `### ` block
+slugs stayed DISTINCT (144 -> 145) because what duplicated was the one-line INDEX,
+not the blocks — so "no duplicate slugs" read as clean while 104,199 bytes were
+duplicated. The signal that did show it was the SIZE delta: +103,007 B for a
+2,465 B block. **Check the magnitude against what you intended to add.**
+
+**Repair, for the pattern.** The duplicated span was byte-identical to the
+original across all 104,199 bytes (only a trailing newline differed), which is
+what made deleting it safe rather than merging it. Verify that equality explicitly
+before removing a six-figure byte count; do not infer it from headings that look
+repeated.
+
+**Also.** A peer (`0d4fd33b`) had already hoisted my block out of the archived
+section where the bad append left it — `lane-guard` reads `lanes.md` and nothing
+else, so a block below `## Archived lanes` has its claims silently un-enforced.
+The post-write guard named it immediately; it was right and I should have fixed it
+before pushing anything further.
