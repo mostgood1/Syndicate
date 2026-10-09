@@ -3627,3 +3627,44 @@ The 10-08 lead framed query_state_cache refusals as "readers get a stale copy". 
   ships only if it beats the better of the two.
 - **Related:** a mechanism measured in one season phase is not a target in another. Regular-season
   score-effect reversion (−0.17) was not detectable in the playoffs (n=91).
+
+## 2026-10-09 — `git diff` CAN SHOW A LINE-ENDING REWRITE AS CLEAN WHILE THE COMMIT RECORDS EVERY LINE `[lane lanes-archive-over-budget, session 4ab694ed]`
+
+**Rule.** After any tool writes a shared ledger file, read `git diff --cached
+--numstat` BEFORE committing, and check the committed blob's line endings after.
+Unstaged `git diff` is not a safe preview of what the commit will record.
+
+**Why, measured.** `scripts/archive_released_lanes.py` writes in text mode, so on
+Windows it rewrote the whole 4MB `lanes_history.md` from LF to CRLF. I checked for
+exactly that and got a false all-clear: unstaged `git diff --numstat` reported
+**679 insertions / 0 deletions**, so I concluded git would normalise it. The
+staged diff was **38,213 / 37,535**, and that is what 5ac74a83 pushed.
+
+**The asymmetry that produced it.** `core.autocrlf=true`, no `.gitattributes` rule
+for these paths. git normalised `lanes.md` (committed CRLF 0, bare LF 1,870) and
+did **NOT** normalise `lanes_history.md` (committed CRLF 38,213, bare LF 0). The
+difference: `lanes_history.md` contained a **bare CR**, which makes git decline to
+treat the file as normalisable text. Two files written the same way by the same
+tool in one commit, landing with opposite line endings.
+
+**The second, worse half.** That same text-mode write converted `lanes.md`'s single
+mid-line bare CR into a line break, SPLITTING a peer's line inside the archived
+`layer2-board-ui-redesign` block — byte for byte the failure `74da0acd` repaired
+after an earlier text-mode rewrite of `lanes.md`, and what the 10-06 standing rule
+forbids. A lone CR mid-line is a CHARACTER, not a line ending, and must survive.
+
+**How to apply.**
+- A regex `^...$` with MULTILINE is unsafe on a CRLF file: `.` matches CR, so `$`
+  sits after it and the match swallows the CR. Reassembling then emits a bare CR.
+  Match the line body with [^\r\n]* instead. This bit me twice in one
+  session; only a lone-CR assertion caught the second.
+- Assert lone-CR conservation across every file a write touches, AND across the
+  PAIR when a tool moves content between two files: the CR left `lanes.md` and did
+  not arrive in `lanes_history.md`, which a per-file check calls fine.
+- Prove content separately from formatting. The honest figure for this archive is
+  the diff against the commit BEFORE it — 678 insertions / 0 deletions, 0 prior
+  lines missing — not the line-ending churn.
+- Writing \r\n inside a shell heredoc collapses to a real CR: the heredoc
+  eats one backslash level. Build such fragments with chr(92), or assert the text
+  contains no CR before writing it. That is how a real CR got into this very entry
+  on the first attempt.
