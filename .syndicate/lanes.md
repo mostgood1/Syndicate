@@ -67,6 +67,16 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### nba-native-live-resim — OPEN — opened 2026-10-09 — session 6c348b8f-56fa-4e5f-9fe9-ce6752ad27bb
+- Goal: P3 of docs/ai_context/basketball_live_native_plan.md: NBA live lens from a resumed native sim (live_resim), vendored tick deleted. P1+P2 NOT LANDED at open (2026-10-09) -> this session does ONLY the prerequisite-free part: pbp checkpoint backtest harness, measured score-effect / garbage-time / end-game-foul targets, refusal design.
+- Files: scripts/basketball_live_checkpoint_backtest.py, scripts/basketball_live_situation_targets.py, tests/test_basketball_live_checkpoint_backtest.py, docs/ai_context/nba_live_resim_refusal_design.md, .syndicate/findings_2026-10-09_nba_live_situation_targets.md, docs/ai_context/basketball_live_native_plan.md (Status table row P3 only)
+- Hypothesis: Real NBA games show strong score-effect reversion (H2-on-H1 margin slope ~ -0.17), trailing-team pace up and leading-team bench minutes up in blowouts, and a measurable end-game foul/FT spike when the margin is 1-6 inside 2:00 Q4; these are the targets the P3 mechanisms must reproduce.
+- Falsification test: If the measured slope on regular-season pbp is near 0 or the garbage-time asymmetry is not distinguishable from noise at n>=500 games, the mechanism is not a target and must not be added.
+- Verification: Targets reported with n and CI per population (regular/playoffs/preseason); harness runs the vendored live projection at end Q1/Q2/Q3/5:00 Q4 and grades vs final, with n per checkpoint.
+- Blocked by: none
+
+
+
 ### accuracy-ledger-budget-raise — OPEN — **EXERCISED 2026-09-11 (autorun 12:48-12:52Z on refresh-worker `1e1285a4`, both changes content-verified): COVERAGE HALF MET (one `LEDGER_CHUNKS_ACCEPTED count=39 dates=39 skipped_budget=0 truncated=0`), MEMORY HALF NOT MET AS WRITTEN (in-run peak anon 3,179.0 MiB; the peak sample is `board_contract_end` and the pre-run ambient was higher, 3,540.0) -- revert line crossed, NOT recommended on this evidence, user decides; needs an attributable memory reading or a restated criterion** — opened 2026-09-04 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885 (adopted 2026-09-10 by session 218b778c-1a91-4ff0-b90d-55d1133b09eb)
 - **TRIMMED 2026-09-25 by `scripts/trim_lane_narrative.py`. 12 lines / 7801 B of HISTORY moved VERBATIM to `lanes_history.md` under `## TRIMMED FROM lanes.md — 2026-09-25 (accuracy-ledger-budget-raise)`; nothing summarised, nothing deleted, fully reversible. KEPT: the header, the contract keys and their subtrees, the newest dated entry, every line still marking work OUTSTANDING, and every CLAIM-BEARING line — which lines those are was MEASURED by removal, not grepped. Block was 12567 B. Batch trim of every OPEN lane whose owners were idle >=240 min by transcript mtime, the authority owner_liveness.py uses; lanes owned by a session active at the time were excluded, and liveness was recomputed immediately before the write.
 
