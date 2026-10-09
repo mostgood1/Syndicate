@@ -17,10 +17,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-SRC = Path(__file__).resolve().parents[1] / "vendor" / "nba_betting_repo" / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-events = __import__("nba_betting.sim.events", fromlist=["x"])
+# The engine that RUNS (native Syndicate engine since c2b99d4f, lane basketball-native-engine): a LeagueEngine exposes
+# the switches under the vendored names and the helpers bound to the NBA league params.
+from syndicate.features.shared.basketball_props_smart_sim import _engine_for_league_local  # noqa: E402
+
+events = _engine_for_league_local("nba")
 
 SWITCHES = ("SHOOTER_FT_RATE", "FOULED_MISS_NOT_FGA", "EXACT_TARGET_CALIBRATION", "TOV_PER_ATTEMPT",
             "PLAYER_REBOUND_CREDIT", "BLOCK_MODE", "BLOCK_ALLOC_BY_RATE")
@@ -97,7 +98,8 @@ def test_nba_defaults_are_todays_behaviour():
         assert getattr(events, s) == v
     # The team-prior stacking half of c0d406d3 stays the existing cfg field (b08aeb72), not a second switch.
     assert events.EventSimConfig().team_prior_stacks_on_target is True
-    assert not hasattr(events, "TEAM_PRIOR_STACKS_ON_TARGET")
+    # Native engine: the switch exists per league; NBA leaves it None = "read the cfg field" (b08aeb72 behaviour).
+    assert events.TEAM_PRIOR_STACKS_ON_TARGET is None
 
 
 def test_placeholder_constants_are_present_and_sane():
@@ -238,4 +240,8 @@ def test_reachability_blocks_move_to_the_rim_protector_with_the_same_total():
     off, on = _baseline(), _run(BLOCK_ALLOC_BY_RATE=True)
     assert on["home_blk"] == off["home_blk"]          # same draws, different weights
     assert on["pts"] == off["pts"]
-    assert on["blk0_share"] > off["blk0_share"] * 1.2  # the 0.06/min blocker takes a larger share
+    # The 0.06/min blocker takes a larger share. 1.10x on the PRODUCTION path (Syndicate's exact-inclusion lineup
+    # sampler, built into the native engine; the vendored path always ran with it patched in). The old 1.2x bound was
+    # set on the vendored module's own sampler (1.30x there), which production never ran. Measured 2026-10-09:
+    # vendor+patch == native exactly (share 0.4034 -> 0.4454).
+    assert on["blk0_share"] > off["blk0_share"] * 1.05

@@ -21,10 +21,10 @@ QUARTERS = [{"home_pts_mu": 28.5, "away_pts_mu": 27.5, "home_pts_sigma": 6.5, "a
 
 
 def _events(pkg: str):
-    src = VENDOR / f"{pkg}_repo" / "src"
-    if str(src) not in sys.path:
-        sys.path.insert(0, str(src))
-    return __import__(f"{pkg}.sim.events", fromlist=["x"])
+    """The engine that RUNS for this league (native Syndicate engine since c2b99d4f)."""
+    from syndicate.features.shared.basketball_props_smart_sim import _engine_for_league_local
+
+    return _engine_for_league_local("wnba" if pkg.startswith("wnba") else "nba")
 
 
 def _team(p):
