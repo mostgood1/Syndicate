@@ -48089,3 +48089,12 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **ride-alongs (runtime):** `2bf917ce` basketball_live_state (imported only by `scripts/capture_basketball_live_state.py`, a separate capture process -- no long-lived role loads it; its lane recorded its own ff in `e52007c0`), `7309b5ae` / `4a7c73ff` offline scripts; e78d43d8..bb876c11 ledger only.
 - **baseline (served /intelligence embed, 2026-10-09 ~18:30Z):** props with recent_values wnba 203/203, soccer 1526/1628, nhl 261/266, nfl 812/929, ncaaf 444/584; with dates 0 in every sport; page 45.6 MB.
 - **verify (OWED):** after the refresh-worker restart and its first full build: per sport, rows with `recent_dates` == rows with `recent_values`; ncaaf/nfl coverage vs baseline; build time vs prior; page size delta.
+
+## 2026-10-09 19:30Z -- 24h reading: execution-ledger archive (lane execution-ledger-keyvalue-growth)
+
+- **reading 4 (24h)**, read-only on the local WSL fleet (`/mnt/c/tmp/elg/reading24h.py`, nice 19, finished 19:30Z = 14:30 CDT). Window 2026-10-08T17:01:11Z (first trim) -> 2026-10-09T18:55:42Z (13:55 CDT, the last stamp read), ~25.9 h. Follows the entry "2026-10-08 17:01:11Z ... execution ledger trims MOVE rows to a disk archive" (a4259073).
+- **(a) MET:** document 3,000 orders (paper 2,448 / live 552), 3,664,863 B (< 4.5 MB; 44% of 8,388,608), updated_at 18:55:41Z.
+- **(b) MET:** archive `orders_2026-10.jsonl` 2,349 lines / 3,511,634 B == sum dropped over all 365 TRIMMED lines (2,349); unique 2,349 (0 duplicates), 0 overlap with the document; full history 5,349. Growth since the first trim: 630 rows.
+- **(c) MET:** counts in window: KEYVALUE_WRITE_LARGE 442 (the population), TRIMMED 365; **0 LEDGER_ARCHIVE_FAILED, 0 KEYVALUE_WRITE_REJECTED.**
+- **(d) ARCHIVED UNGRADED paper rows: 0.** But the margin is gone: the document holds ungraded paper 2,438 + live 552 = **2,990 of 3,000**; only **10 settled paper rows** remain to trim first. From here a trim takes UNGRADED paper rows, which can never be graded once archived (they are not lost: they sit in the archive). Ungraded paper by sport: ncaaf 2,028, nfl 144, wnba 93, soccer 65, nba 55, mlb 52. **The NCAAF grading lead (leads.md 2026-10-08) is now urgent.**
+- **verdict:** (a)(b)(c) MET; lane closed GOAL MET. No restart, no deploy.
