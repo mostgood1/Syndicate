@@ -48098,3 +48098,16 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **(c) MET:** counts in window: KEYVALUE_WRITE_LARGE 442 (the population), TRIMMED 365; **0 LEDGER_ARCHIVE_FAILED, 0 KEYVALUE_WRITE_REJECTED.**
 - **(d) ARCHIVED UNGRADED paper rows: 0.** But the margin is gone: the document holds ungraded paper 2,438 + live 552 = **2,990 of 3,000**; only **10 settled paper rows** remain to trim first. From here a trim takes UNGRADED paper rows, which can never be graded once archived (they are not lost: they sit in the archive). Ungraded paper by sport: ncaaf 2,028, nfl 144, wnba 93, soccer 65, nba 55, mlb 52. **The NCAAF grading lead (leads.md 2026-10-08) is now urgent.**
 - **verdict:** (a)(b)(c) MET; lane closed GOAL MET. No restart, no deploy.
+
+## 2026-10-09 20:34:28Z (3:34 PM CT) -- basketball-rotation-stints SCHEDULED JOB LOADED and ran; NCAAB 2025-26 backfill graded (lane `basketball-native-live-state`, session 82bc583a; no deploy by this lane)
+
+- **job loaded:** the fleet WSL VM restarted ~20:21Z; supervisor `up` (pid 361, fleet HEAD bb876c11) lists `job basketball-rotation-stints 11:45Z`. The job ran at boot because 11:45Z had passed. NBA 8 dates considered, 0 built (6 done, 2 empty); WNBA 0 built (128 done, 44 empty); NCAAB resumed the backfill my manual run had left at 110/166 when the VM went down: 56 dates, 1,181 games, 795 s. That is the incremental path working on its first scheduled run. The 18:56Z entry's OWED "job loads at the next up" is DISCHARGED.
+- **casualty of the VM restart:** the live capture (pid 4072456) died. Relaunched 20:3xZ (pid 3669, nice 19) from /home/amyn/bbp2 at e73eb9b4.
+- **NCAAB 2025-26 (fleet disk; verify_basketball_rotation_stints.py):** 6,318 games, 43 of them without ESPN play-by-play. Of the 6,275 with plays:
+  - score 6,258 exact (99.7%);
+  - minutes within 1 of box 124,358/126,968 = 97.94%;
+  - PF 99.5%;
+  - by phase: regular (incl. conference tournaments, ESPN type 2) 6,170 games, playoffs (NCAA/NIT/CBC, type 3) 105.
+  - **Split by D-I (ncaab_team_registry.csv):** both sides D-I 5,622 games, minutes 98.43% (111,313 player-games); a non-D-I side 653 games, 94.46%. The gross misses (a player at 0 stint minutes against 27-35 box minutes) sit on non-D-I sides whose plays ESPN logs without player participants.
+  - 1,078 games carry at least one counted anomaly (a missed substitution repaired or a lineup over five). These are ESPN college log gaps, counted not hidden.
+- **history size:** NCAAB rotation_stints_history.csv 47.0 MB (300,130 rows; parquet beside it), pair rows 492,949, play context 2,915,731 rows (parquet only). Over _PUBLISH_MAX_BYTES, so the sweep will not ship it; it is read on the disk it is written to.

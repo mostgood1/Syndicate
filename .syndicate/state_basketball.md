@@ -1041,10 +1041,9 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Measured on the fleet** (deploys.md 2026-10-09 18:56:24Z): WNBA 2026 scores 364/364, minutes within 1 of box 99.93%. NBA 2025-26 + 2026-27 preseason scores 1,412/1,420 (the misses are ESPN-log gaps plus the All-Star exhibition), minutes 99.85%. Reachability: the sim's history path applies with the table and refuses without it.
 - **Score:** `LiveGameState` takes ESPN's header score and keeps the play sum as `pbp_score`. Stint points always come from the log.
 - **Phases:** every row carries `season_type` (preseason / regular / play-in / playoffs), with one table per (season, phase). The sim's NBA reader filters by phase; **the WNBA reader does not**, so its 28-day window mixes the regular season and playoffs at the turn. That is a consumer gap for P3/P5, not a producer one.
-- **OWED:**
-  - the scheduled job `basketball-rotation-stints` loads only at the next full `down`/`up` (user: ride the next restart);
-  - the NCAAB 2025-26 backfill reading;
-  - the live tick-by-tick reading on 10-09 MEM@CHI.
+- **NCAAB 2025-26** (deploys.md 2026-10-09 20:34:28Z): scores 6,258/6,275 exact; minutes 97.94% overall, 98.43% D-I v D-I, 94.46% when a side is non-D-I (ESPN logs those players thinly). 43 games without pbp. Conference tournaments are ESPN type 2, so they sit in `regular`.
+- **Scheduled job LOADED** (fleet VM restart + up, 2026-10-09 ~20:21Z) and ran incrementally.
+- **OWED:** the live tick-by-tick reading on 10-09 MEM@CHI (capture relaunched after the VM restart).
 
 ## [nba-live-native-p3] NBA LIVE (P3): THE VENDORED LIVE TICK LOSES TO "SCORE + PREGAME LINE PRO RATA"; per-population situation targets measured; the resumed sim waits on P1 `[verified 2026-10-09, lane nba-native-live-resim, 7e390c8f / 529c5e30]`
 
