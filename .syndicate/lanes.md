@@ -1434,6 +1434,46 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - **2026-10-07 ~22:40Z (5:40 PM CT) SHIP RULE MET on the regular season (H2 SUPPORTED); awaiting a user decision to ship.** Paired props vs PRODUCTION (current main code incl. the always-on roster blend; every 3rd regular date from 11-01 + all playoffs; 200 sims; lean in-process runner, Idle priority), regular 13,161 skater-games / 523 starter-goalie games, Brier d x1e3: **BLOCKS@1.5 -2.85 [-3.70,-1.93] better** (no-PP-unit -4.36, PP2 -2.11, PP1 -1.33, all CIs < 0); SOG@1.5 +0.32, @2.5 -0.46, @3.5 -0.29; GOALS@0.5 -0.37; ASSISTS@0.5 -0.12; POINTS@0.5 -0.22, @1.5 -0.09; SAVES +1.04/+0.84/+0.46 -- none worse; elite SOG@2.5 -3.47 better, none worse. Playoffs (reported, not deciding; 2,769): BLOCKS@1.5 -1.63 better; POINTS@0.5 +1.53 [+0.07,+2.99] WORSE (no-PP-unit ASSISTS@0.5 +1.44, POINTS@0.5 +2.45 drive it); rest n.s. Ship = `calibration_profile.py` pk_usage="minutes" (unclaimed) + fleet ff; no refresh-worker restart (NHL generation runs on live-odds-worker as a per-run child).
 - Blocked by: none
 
+### mlb-game-profile-pitch-config — OPEN — opened 2026-10-09 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- Goal: make production's MLB game-ROI profile (served `daily/sims`) run the calibrated forward pitch-model file, if the pre-registered A/B shows it scores better than what it runs today.
+- **FINDING (measured 2026-10-09, fleet):** the game-ROI profile has NEVER used the forward pitch file.
+  - `daily_update_multi_profile.py` passes it `--pitch-model-overrides data/tuning/pitch_model_overrides/_tmp_hr_bbhbp1p04_starterbbhbp1p04.json`. That file does not exist and was never tracked.
+    - `_load_jsonish` returns None, so overrides = {}.
+    - The explicit flag also suppresses `_apply_forward_tuning_defaults`.
+  - Evidence: `daily/snapshots/<d>/meta.json` `cfg_kwargs.pitch_model_overrides` = {} on 06-20, 07-12, 10-01, 10-05, 10-07, 10-08.
+    - `daily_hitter_props/` and `daily_pitcher_props/` carry the forward file (hr 1.856 on 10-07, 1.5 on 10-08).
+  - Replay on the 10-08 frozen served sim (pk 849832, 1000 sims/arm):
+    - served runs 6.648: class-defaults arm 6.647; fwd@1.856 6.186 (-3.5 SE); fwd@1.5 5.659 (-7.5 SE);
+    - served HR 1.98: class-defaults arm 2.05; fwd@1.5 1.688 (6.2 SE).
+  - So the game profile runs PitchModelConfig class defaults: hr 1.856, base_hbp 0.01, early_count_foul_boost 2.05, k_combine_log5_weight 0.0, xb_share_mult 0.94.
+- **Blast radius (code trace, file:line in log 2026-10-09).** The game-profile sims feed:
+  - the board, season and game-detail sim panels (game lines AND hitter/pitcher prop means/probs);
+  - ladders, top props, hub, and Ask/live-lens prop candidates.
+  - Only these use the props-profile sims: locked-policy reco card, K-ladder targets and HR targets.
+  - So HR 1.5 reached only those three surfaces.
+- Hypothesis: the forward file (the pitch config the combined calibration and HR 1.5 were fitted with) scores game lines better than class defaults.
+- **PRE-REGISTERED RULE (written before any result).**
+  - **Method:** `scripts/mlb_game_line_config_ab.py` replays both arms over the StatsAPI as-of rebuild (`~/asof_out_statsapi`, 07-16..09-27), with identical rosters, context, seeds and N.
+    - Arm D = pm {} (today). Arm F = the forward file.
+    - The manager file and GameConfig defaults are identical in both arms (as in production).
+  - **Scoring**, per game against StatsAPI finals:
+    - full-game total-runs CRPS;
+    - home-win Brier;
+    - runs bias;
+    - F5 total CRPS (from the linescore).
+  - **PRIMARY window = 08-22..09-27** (the HR holdout half). Disclosed: count-shape work has already read it 3+ times; no clean 2026 regular-season data remains.
+  - **SHIP iff, on the PRIMARY window:**
+    - (1) paired total-runs CRPS diff F-D < 0 with 95% CI upper < 0;
+    - (2) home-win Brier diff CI lower <= 0 (F not significantly worse);
+    - (3) the full 07-16..09-27 window shows the same sign on (1).
+  - June (05-30..07-12) is reported but NOT gating, because of the June league HR spike (same basis as the HR 1.5 override).
+  - **Prop rule:** props served from these sims change too. Prop log-loss is reported but not gating, because the forward file was already chosen on prop log-loss (HR 1.5 holdout 0.37045 -> 0.36910).
+  - **Ship =** set `--game-pitch-model-overrides` default to `off` (the forward default then applies), plus a note upstream. Fleet ff only, no restart, and no MLB sim running.
+- Falsification test: (1) or (2) fails, or the sign flips between windows.
+- Verification: the next game-profile `daily/snapshots/<d>/meta.json` carries the forward keys (hr_rate_mult 1.5), and a served-sim replay matches arm F (not D) by > 3 SE.
+- Files: vendor/mlb_bettingv2/tools/daily_update_multi_profile.py (the `--game-pitch-model-overrides` default ONLY; `_collect_game_recommendations` stays with mlb-doubleheader-e2e), scripts/mlb_game_line_config_ab.py (NEW), tests/test_mlb_game_line_config_ab.py (NEW)
+- Blocked by: none
+
 ### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
 - **HR 1.5 V2b status 2026-10-09 ~17:15Z: watcher is DURABLE on the fleet; no reading yet.**
   - No MLB sim since 10-08 18:35 CDT: no games 10-09. Next: 10-10 CWS (DS G5, time TBD), then the LCS from 10-11.

@@ -48048,3 +48048,17 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **verify (18:17:44Z..18:28:13Z, 3 populated persists, n=1 snapshot):** 0 KEYVALUE_WRITE_REJECTED / 0 TRIMMED / 0 FAILED / 0 WRITE_LARGE for the key. Live keyvalue copy read 18:28Z: **446,206 B on the wire** (before: 5.3 MB per snapshot), snapshot 2026-10-09 response is a dict (1,784 candidates, 3,116,155 B raw), layer2_shortlist marker rows_count 5,395. The shortlist's own artifact read at the same instant had 5,218 rows: a different generation, and no reader takes rows from the marker.
 - **OWED:** the >= 24 h reading across tonight's slate rollover, with 2-3 snapshots held: size distribution (qsc wire bytes per persist), 0 REJECTED/TRIMMED for the key over the stated window, every snapshot's response a dict.
 - **rollback:** revert fc1762da, ff, restart refresh-worker after a save. Harmless either way: the old reader loads a marker-bearing snapshot as an ordinary dict.
+
+## 2026-10-09 ~19:45Z — CORRECTION to the 2026-10-07 combined-calibration and 2026-10-08 HR 1.5 verifications (lane `mlb-game-profile-pitch-config`; no deploy)
+- **What the earlier V1 readings checked:** that `_apply_forward_tuning_defaults` points at the forward pitch file.
+- **What they missed:** the multi-profile runner gives the GAME-ROI profile an explicit `--pitch-model-overrides` that points at a missing file (`_tmp_hr_bbhbp1p04_starterbbhbp1p04.json`). That profile therefore runs pm = {}, i.e. PitchModelConfig class defaults.
+- **Measured** (fleet `meta.json` `cfg_kwargs`, 10-08 runs):
+  - `daily/`: pitch_model_overrides {};
+  - `daily_hitter_props/` and `daily_pitcher_props/`: the forward file (hr_rate_mult 1.5, base_hbp 0.0015, early_count_foul_boost 1.5).
+  - Replay on the 10-08 frozen served sim: served total runs 6.648 vs class-defaults arm 6.647; fwd@1.5 5.659 (7.5 SE away).
+- **Consequences:**
+  - HR 1.5 and the pitch-file half of the combined calibration (base_hbp, foul boost, k log5) reached ONLY the props-profile sims: the locked-policy reco card, K-ladder targets and HR targets.
+  - Everything else on the board still runs hr 1.856 / base_hbp 0.01: game lines, sim panels, ladders, top props, hub, and Ask candidates.
+  - The combined calibration's GameConfig and manager halves DO reach the game profile (meta carries them).
+  - The HR V2b watcher compared served game sims against two forward-file arms. It was misframed and was STOPPED before it read.
+  - HR 1.5 V1 holds for the props profiles only.
