@@ -1916,6 +1916,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Served /intelligence embed after a board build on the new code: per sport, rows with recent_dates == rows with recent_values (dates aligned, same length); payload delta measured (expect ~+0.5 MB); a reason per sport for props still without history; tests pass incl. a reachability test that the dates reach _chart_columns' output
 - Blocked by: none
 
+### nfl-kalshi-clv-pooled — OPEN — opened 2026-10-09 — session f628c245-6aae-4710-a0e7-829c2a108ddb
+- Goal: Pool the forward Kalshi NFL prop CLV read (scripts/measure_nfl_kalshi_forward_clv.py, rules unchanged from lane nfl-kalshi-forward-clv: first fee-net +EV liquid Kalshi ask per line+side, >= 3-book consensus, production taker fee) over every completed week since capture began (2026 wk4 onward) until the bets with a close reach n >= 100, then read once: mean fee-net CLV with a game-clustered 95% CI, gross-of-fee CLV beside it, CLV~EV slope, realized ROI where pbp has the games. Measurement only.
+- Files: .syndicate/findings_2026-10-09_nfl_kalshi_clv_pooled.md
+- Hypothesis: Kalshi +EV asks are stale or adversely selected rather than early: pooled fee-net CLV CI wholly <= 0 at n >= 100 (week 4 alone: -1.87% [-3.22, -0.67], n=44).
+- Falsification test: Pooled fee-net CLV CI wholly > 0 at n >= 100 -> timing edges on Kalshi NFL props are real and earned; CI spanning 0 -> inconclusive, reported as such with n.
+- Verification: The pooled read written to findings with per-week n and the same table as findings_2026-10-06_nfl_kalshi_forward_clv.md; fleet book_quotes copied read-only with sha256. Reading date: first run after a completed week where n_with_close >= 100 (expected after wk5 MNF 2026-10-12 or wk6 MNF 2026-10-19). An interim read before then carries no verdict.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
