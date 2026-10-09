@@ -48024,3 +48024,9 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **verify (served /intelligence, BOTH dates re-saved after the respawn: 10-08 00:50:13Z, 10-09 00:56:13Z):** soccer BTTS priced **45/45** (0/40 at 20:01Z); soccer handicaps priced **46/46** with chart 46/46 (0/37); NFL full-game spreads 5/5; `no sim view` **27** (140 at 20:01Z, 73 at 20:55Z: nfl props 18, ncaaf props 4, nhl props 3, ncaaf game 1, mlb prop 1). Interval rows on the board: mlb first5 30 + first3 6, team history 0/36 -- correct, MLB innings have no interval source. Full-game rows with team last-10: soccer 431, ncaaf 288, nfl 88, nhl 57, mlb 9 (nba/wnba none by design).
 - **NOT measurable on this population:** NCAAF interval team history (no NCAAF interval rows on the board at 01:00Z; fleet-data reproduction 2026-10-08: TCU h1 + h2 = full on every game); NFL interval rows (0 on the board now; 12/12 priced at 20:50Z).
 - **rollback:** revert a5defd29 on the fleet checkout + refresh-worker restart after a save.
+
+## 2026-10-09 16:44Z -- READING (follow-up): NBA live-lens fix held 26 h incl. the 10-08 slate (lane `nba-live-lens-oversize-write`, session d48f3a34)
+
+- **for:** the 2026-10-08 14:30:06Z ff to ac48cdcd + live-odds-worker restart.
+- **reading:** anchored `KEYVALUE_WRITE_REJECTED ... /live/nba_live_lens.json` = 0 over 10-08 14:30:39Z..10-09 16:44Z, logs continuous over the window (live-odds-worker.log.2 starts 10-08 06:42:51Z, .log ends 10-09 16:44:27Z). 0 `KEYVALUE_WRITE_LARGE` for the key, so every write < 1 MB through the evening slate.
+- **still owed:** a served-payload read while an NBA game is in play.
