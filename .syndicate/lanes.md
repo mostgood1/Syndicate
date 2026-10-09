@@ -1313,6 +1313,7 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Blocked by: none
 
 ### mlb-game-profile-pitch-config — OPEN — opened 2026-10-09 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **STATUS 2026-10-09 20:35Z: SHIPPED, V2 OWED.** Pre-registered rule PASSED on all three checks: primary CRPS -0.155 [-0.233, -0.077]; Brier +0.0006 [-0.0028, +0.0040]; full window -0.160. Runs bias +1.67 -> -0.03/game. `988fa33d` fleet ff 20:35:21Z; V1 MET. V2 watcher `~/gpv2/watch.sh` (deploys.md 20:35Z). Close the lane when V2 reads.
 - Goal: make production's MLB game-ROI profile (served `daily/sims`) run the calibrated forward pitch-model file, if the pre-registered A/B shows it scores better than what it runs today.
 - **FINDING (measured 2026-10-09, fleet):** the game-ROI profile has NEVER used the forward pitch file.
   - `daily_update_multi_profile.py` passes it `--pitch-model-overrides data/tuning/pitch_model_overrides/_tmp_hr_bbhbp1p04_starterbbhbp1p04.json`. That file does not exist and was never tracked.

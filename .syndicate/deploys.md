@@ -48111,3 +48111,30 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - **Split by D-I (ncaab_team_registry.csv):** both sides D-I 5,622 games, minutes 98.43% (111,313 player-games); a non-D-I side 653 games, 94.46%. The gross misses (a player at 0 stint minutes against 27-35 box minutes) sit on non-D-I sides whose plays ESPN logs without player participants.
   - 1,078 games carry at least one counted anomaly (a missed substitution repaired or a lineup over five). These are ESPN college log gaps, counted not hidden.
 - **history size:** NCAAB rotation_stints_history.csv 47.0 MB (300,130 rows; parquet beside it), pair rows 492,949, play context 2,915,731 rows (parquet only). Over _PUBLISH_MAX_BYTES, so the sweep will not ship it; it is read on the disk it is written to.
+
+## 2026-10-09 20:35:21Z (3:35 PM CT) -- LOCAL FLEET FF bb876c11 -> 988fa33d, NO RESTART: MLB game-ROI profile now runs the forward pitch-model file (lane `mlb-game-profile-pitch-config`, session b98d59a1) -- **V1 MET; V2 OWED**
+- **Why.** The game-ROI profile (served `daily/sims`, i.e. game lines and every board prop number except the locked card / K and HR targets) ran pm {} = PitchModelConfig class defaults. Cause: `daily_update_multi_profile.py` passed it a `--pitch-model-overrides` path that never existed. See the 19:45Z correction entry.
+- **Pre-registered A/B** (`scripts/mlb_game_line_config_ab.py`, 300 sims/arm/game, nice 19, StatsAPI as-of rebuild). Arm D = today; arm F = forward file. Diffs are F-D, game-paired, 95% CI.
+  - **PRIMARY 08-22..09-27 (495 games, 37 dates):**
+    - total-runs CRPS 2.681 -> 2.526, -0.155 [-0.233, -0.077]: rule (1) PASS;
+    - home-win Brier 0.2401 -> 0.2407, +0.0006 [-0.0028, +0.0040]: rule (2) PASS (not worse);
+    - runs bias/game +1.670 -> -0.025;
+    - |runs err| 3.944 -> 3.532;
+    - F5 CRPS -0.036 [-0.081, +0.009];
+    - HR bias/game +0.53 -> +0.05.
+  - **FULL 07-16..09-27 (985 games):** CRPS -0.160 [-0.217, -0.103], same sign: rule (3) PASS. Brier +0.0004 [-0.0021, +0.0028]; F5 CRPS -0.047 [-0.078, -0.015].
+  - Window caveat (disclosed at pre-registration): the window has been read 3+ times. June is non-gating and is still running at this entry.
+- **User decision 2026-10-09:** "if it passes, land it".
+- **Change.** `988fa33d`: `--game-pitch-model-overrides` default `off`, so no flag is passed and `_apply_forward_tuning_defaults` applies. `tests/test_mlb_multi_profile_pitch_overrides.py` requires every profile default to be `off` or an existing file. Checked that the predicate FAILS on the old default.
+- **Edited section** declared disjoint from `mlb-doubleheader-e2e` (orphaned owner 3692ff18), honoured by lane-guard.
+- **Fleet.**
+  - Claim refresh-worker (holder mlb-game-profile-pitch-config, token b455036e), released. No restart: MLB sim runs as a per-run subprocess.
+  - Checks before the ff: no MLB sim running; HEAD == bb876c11 checked; `merge --ff-only`. Dirty files: only the two pipeline-written statcast feature JSONs.
+  - **Runtime ride-alongs:** `297881b9` prop_evidence/football.py (NFL recent form; loads at the next refresh-worker restart) and `9eaa70ff` basketball_pbp.py (values pinned unchanged). The rest are offline scripts.
+- **V1 MET (20:35Z).** With the game profile's argv (no `--pitch-model-overrides`), `~/Syndicate` at 988fa33d resolves the forward file: hr_rate_mult 1.5, base_hbp 0.0015, early_count_foul_boost 1.5, k_combine_log5_weight 1.0, xb_share_mult 1.1.
+- **V2 OWED (pre-registered).** The first post-ff game-profile run (10-10+).
+  - Its `daily/snapshots/<d>/meta.json` `cfg_kwargs.pitch_model_overrides.hr_rate_mult` == 1.5.
+  - AND on a same-moment sims+roster snapshot, served total runs sits closer to the fwd arm than the none arm, with the arms > 3 SE apart.
+  - Watcher: fleet `~/gpv2/watch.sh`, gated on meta mtime > the ff.
+- **Expected visible effect.** MLB game totals and run lines drop ~1.7 runs/game in expectation. Board HR/hit/TB prop means move to the props-profile level.
+- **Rollback.** Revert 988fa33d and ff.
