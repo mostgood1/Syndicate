@@ -127,6 +127,21 @@ def _write_text_atomic(path: Path, text: str) -> None:
     tmp.replace(path)
 
 
+def _keep_unscoped_rows(existing: list[dict[str, Any]], scoped_ids: set[str]) -> list[dict[str, Any]]:
+    """Rows of `existing` whose event is NOT in this scoped (`--event-ids`) capture.
+
+    THE LIVE CAPTURE WRITES THE PREGAME FILE (lane `soccer-live-lane-priority`,
+    2026-10-09). `refresh_odds_sources`' `soccer_<league>_props_live` step points
+    `--out` at the same `props/<date>.csv` the pregame step writes, scoped to the
+    events in play, and this script used to REPLACE the file -- so every live
+    capture wiped the day's not-yet-started fixtures until the next pregame sweep
+    (45 min apart on the fleet). A scoped capture now replaces only its own events:
+    their rows are dropped here and the fresh ones appended (an event that came
+    back empty -- props pulled in play -- loses its rows, as before).
+    """
+    return [row for row in existing if str(row.get("event_id") or "").strip() not in scoped_ids]
+
+
 def _ordered_bookmakers(bookmakers: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """All bookmakers, preferred books first.
 
@@ -502,8 +517,10 @@ def main() -> int:
         print(f"[soccer_props] PROP_REGIONS base={args.region} -> {region}", flush=True)
     events = fetch_events(api_key, sport_key=sport_key, region=region)
     print(f"Fetched {len(events)} events for {sport_key}")
+    scoped_ids: set[str] = set()
     if args.event_ids:
         wanted = {e.strip() for e in args.event_ids.split(",") if e.strip()}
+        scoped_ids = set(wanted)
         before = len(events)
         events = [e for e in events if str(e.get("id") or "") in wanted]
         # Counted, and NAMED when it drops to zero: an empty scope must not look
@@ -547,6 +564,18 @@ def main() -> int:
             if args.game_out
             else Path(args.out).with_name(f"game_markets_{Path(args.out).stem}.json")
         )
+        if scoped_ids and game_out.exists():
+            # Same merge as the props CSV below (`_keep_unscoped_rows`): a scoped
+            # live capture must not wipe the day's other fixtures' btts/corners.
+            try:
+                prior = json.loads(game_out.read_text(encoding="utf-8")).get("rows") or []
+            except Exception as exc:  # noqa: BLE001 -- a corrupt file is replaced, as before
+                print(f"GAME_MARKET_MERGE_READ_FAILED {type(exc).__name__}: {exc}", flush=True)
+                prior = []
+            kept = _keep_unscoped_rows([r for r in prior if isinstance(r, dict)], scoped_ids)
+            print(f"GAME_MARKET_LIVE_MERGE kept={len(kept)} fresh={len(game_rows)} "
+                  f"scoped_events={len(scoped_ids)}", flush=True)
+            game_rows = kept + game_rows
         game_df = pd.DataFrame(game_rows)
         # THE FEED DUPLICATES (book, market, side, line) WITH DIFFERENT PRICES.
         # Measured 2026-08-22, fanduel `alternate_totals_corners`: 50 outcomes
@@ -613,8 +642,19 @@ def main() -> int:
         print("NO_GAME_MARKET_ROWS: btts/corners returned no priced outcomes "
               f"for {len(events)} event(s) in region {args.region}", flush=True)
 
-    df = _stable_props_df(pd.DataFrame(rows))
     out_path = Path(args.out)
+    if scoped_ids and out_path.exists():
+        try:
+            prior_df = pd.read_csv(out_path, dtype={"event_id": "string"}, keep_default_na=False)
+            prior_rows = prior_df.to_dict(orient="records")
+        except Exception as exc:  # noqa: BLE001 -- unreadable: replaced, as before
+            print(f"PROPS_MERGE_READ_FAILED {type(exc).__name__}: {exc}", flush=True)
+            prior_rows = []
+        kept = _keep_unscoped_rows(prior_rows, scoped_ids)
+        print(f"PROPS_LIVE_MERGE kept={len(kept)} of {len(prior_rows)} fresh={len(rows)} "
+              f"scoped_events={len(scoped_ids)}", flush=True)
+        rows = kept + rows
+    df = _stable_props_df(pd.DataFrame(rows))
     _write_text_atomic(out_path, df.to_csv(index=False))
     print(f"Wrote {len(df)} prop rows to {out_path}")
     return 0

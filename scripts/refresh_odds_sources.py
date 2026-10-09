@@ -2794,6 +2794,19 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
 
 _FAILED_STEP_STDERR_TAIL_CHARS = 1600
 
+# API KEYS OUT OF FAILURE SUMMARIES (lane `soccer-live-lane-priority`, 2026-10-09).
+# A child that fails on an HTTP error prints the request URL, query string and all,
+# and that tail is persisted into `odds_refresh.json` and `refresh_job_status.json`
+# (`stderr_tail`, `failureSummary.failing_steps[].stderr_tail`). Measured on the
+# fleet: the Odds API key in clear in 3 runs (10-01, 10-03, 10-09), 4 occurrences
+# each, from a 502 on `soccer_championship_props`.
+_SECRET_QUERY_RE = re.compile(r"(?i)\b(api_?key|apikey|access_token|token|key)=([^&\s\"'<>]+)")
+
+
+def _redact_secrets(text: str) -> str:
+    """Mask credential-looking query values (`apiKey=...` -> `apiKey=***`)."""
+    return _SECRET_QUERY_RE.sub(lambda m: f"{m.group(1)}=***", str(text or ""))
+
 
 def _failed_step_stderr_tail(stderr_text: str) -> str:
     """The diagnostic tail, falling back to a raw tail if the helper is absent.
@@ -2807,9 +2820,9 @@ def _failed_step_stderr_tail(stderr_text: str) -> str:
             sys.path.insert(0, str(REPO_ROOT))
         from syndicate.features.shared.refresh_log_tail import diagnostic_tail
 
-        return diagnostic_tail(stderr_text, limit=_FAILED_STEP_STDERR_TAIL_CHARS)
+        return _redact_secrets(diagnostic_tail(stderr_text, limit=_FAILED_STEP_STDERR_TAIL_CHARS))
     except Exception:
-        return stderr_text[-_FAILED_STEP_STDERR_TAIL_CHARS:]
+        return _redact_secrets(stderr_text[-_FAILED_STEP_STDERR_TAIL_CHARS:])
 
 
 def _compact_step_result(step_result: dict[str, Any]) -> None:
@@ -2867,7 +2880,7 @@ def _compact_step_result_view(step_result: dict[str, Any] | None) -> dict[str, A
             if isinstance(raw_stderr, str) and raw_stderr.strip():
                 stderr_tail = raw_stderr[-_FAILED_STEP_STDERR_TAIL_CHARS:]
         if isinstance(stderr_tail, str) and stderr_tail.strip():
-            compact["stderr_tail"] = stderr_tail
+            compact["stderr_tail"] = _redact_secrets(stderr_tail)
     row_counts = step_result.get("row_counts")
     if isinstance(row_counts, dict) and row_counts:
         compact["row_counts"] = row_counts

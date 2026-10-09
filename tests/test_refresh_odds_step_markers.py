@@ -65,3 +65,16 @@ def test_the_marker_list_is_bounded(module, capsys):
     markers = result["stdout_markers"]
     assert len(markers) == module._STEP_MARKER_MAX_LINES
     assert all(len(m) <= module._STEP_MARKER_MAX_CHARS for m in markers)
+
+
+def test_an_api_key_in_a_failed_steps_stderr_is_masked(module):
+    """Lane `soccer-live-lane-priority` (2026-10-09): a 502 on `soccer_championship_props`
+    put the Odds API key in clear into `stderr_tail` / `failureSummary` on the fleet."""
+    url = "requests.exceptions.HTTPError: 502 for url: https://api.example.test/v4/sports/x/odds?apiKey=SECRETVALUE123&regions=us"
+    result = {"name": "soccer_championship_props", "ok": False, "return_code": 1,
+              "stdout": "", "stderr": "Traceback ...\n" + url, "stdout_markers": []}
+    module._compact_step_result(result)
+    view = module._compact_step_result_view(result)
+    assert "SECRETVALUE123" not in view["stderr_tail"]
+    assert "apiKey=***" in view["stderr_tail"]
+    assert "regions=us" in view["stderr_tail"]  # only the credential is masked

@@ -1151,6 +1151,14 @@ death, never life — do not invert it.
 - Verification: Dry run read in full first (it reported 712244 -> 492091 B, 0.89x of cap, claims unchanged 334). After --apply, re-derive independently: lane_claims._claims() count, OPEN block count, presence of all 63 archived slugs in lanes_history.md, lone-CR count, and one pointer line per archived slug.
 - Blocked by: none
 
+### soccer-live-lane-priority — OPEN — opened 2026-10-09 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: In-play soccer is captured within the live 300 s ceiling instead of waiting behind the 45-min soccer pre-match autorun: (1) the live props write merges into props/<date>.csv instead of replacing it with in-play-only rows, (2) step failure summaries mask apiKey values, (3) _launch_autorun_soccer_pregame_refresh runs on its own lane; verified by lane_busy refusals per hour for phase=live soccer launches and in-play soccer row freshness on the board, before vs after
+- Files: scripts/fetch_soccer_oddsapi_props_local.py (live --event-ids merge ONLY), scripts/refresh_odds_sources.py (failure-summary apiKey redaction ONLY), scripts/run_live_odds_refresh_worker.py (_launch_autorun_soccer_pregame_refresh lane ONLY), tests/test_soccer_props_live_merge.py (NEW), tests/test_refresh_odds_step_markers.py (redaction test ONLY), tests/test_soccer_pregame_autorun_lane.py (NEW)
+- Hypothesis: Live soccer rows die mostly because the shared combined lane is held by the soccer pre-match autorun (~40 min of every 45, measured 10-09: 17:57-18:37Z run, 118 lane_busy refusals that day), so in-play captures miss the 300 s observed-age ceiling
+- Falsification test: With the autorun on its own lane, phase=live soccer launches are still refused lane_busy at a similar rate per hour, or in-play soccer opportunity rows do not increase while matches are live
+- Verification: Baseline BEFORE the restart: lane_busy refusals/hour for sweeps containing soccer and live soccer opportunity-row counts over >=1 h of live soccer. AFTER: the same over >=1 h of live soccer, recorded in deploys.md. Unit: merge keeps non-scoped events; redaction masks the key; autorun passes its lane (off != on).
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
