@@ -48079,3 +48079,13 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - The vendored `build_lineup_teammate_effects` reader accepts the native pair / play-context / stints tables (local: 374 teammate rows).
 - **live capture:** `capture_basketball_live_state.py --league nba,wnba --loop --until-done` started 18:34Z (pid 4072456). It already wrote the 10-09 12:00Z HOU@DAL final (117-135 = official). **OWED: the tick-by-tick reading on MEM@CHI (00:00Z) and the two WNBA playoff games.**
 - **rollback:** revert d3e4e9ad's two refresh-script hunks and ff; the native tables can stay (columns are a superset of the vendored builder's).
+
+## 2026-10-09 19:18:43Z (2:18 PM CT) -- LOCAL FLEET FF d3e4e9ad -> bb876c11 + web reload (HUP): dated prop charts + recent-form budget -- **web template LOADED; refresh-worker restart PENDING (waits for check_deploy_safety idle after a save)** (lane `board-history-charts`)
+
+- **who/why:** user: "proceed with plan" (findings_2026-10-09_history_charts_inventory.md step 1), then "Yes, after a board save" and "Raise the budget".
+- **change:** `28d1f927` worker: each sport's recent-form evidence records `game_labels` + `opponents` aligned with `values`; `_chart_columns` emits `recent_dates` / `recent_opponents`. `b563ed4a` template: bar tooltips "2026-10-04 v Arsenal: 3" + date span in the caption (edited on a section loan from games-rail-full-detail, returned). `e78d43d8`: recent-form budget 30 -> 60 s per sport, soccer 45 -> 90.
+- **locks:** web + refresh-worker + live-odds-worker 19:17-19:20Z, released; refresh-worker to be re-acquired for its restart.
+- **applied:** guarded `git merge --ff-only` (only the two pipeline-written `vendor/mlb_bettingv2/data/statcast/features/player_features_*.json` were dirty; untouched by the range). Then `local_production.py reload-web`: HUP, 8.8 s, 1 slow probe (5.0 s TimeoutError), never refused, `/healthz` 200; new workers carry the new template.
+- **ride-alongs (runtime):** `2bf917ce` basketball_live_state (imported only by `scripts/capture_basketball_live_state.py`, a separate capture process -- no long-lived role loads it; its lane recorded its own ff in `e52007c0`), `7309b5ae` / `4a7c73ff` offline scripts; e78d43d8..bb876c11 ledger only.
+- **baseline (served /intelligence embed, 2026-10-09 ~18:30Z):** props with recent_values wnba 203/203, soccer 1526/1628, nhl 261/266, nfl 812/929, ncaaf 444/584; with dates 0 in every sport; page 45.6 MB.
+- **verify (OWED):** after the refresh-worker restart and its first full build: per sport, rows with `recent_dates` == rows with `recent_values`; ncaaf/nfl coverage vs baseline; build time vs prior; page size delta.
