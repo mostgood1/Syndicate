@@ -53,7 +53,11 @@ import urllib.request
 from collections import defaultdict
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Protocol, Sequence, Tuple
+from typing import Any, Callable, Mapping, Dict, Iterable, List, Optional, Protocol, Sequence, Tuple
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))  # the native_resim projector imports syndicate.features.nba.live_resim
 
 ESPN_BASE = "https://site.web.api.espn.com/apis/site/v2/sports/basketball/{sport}/{kind}"
 
@@ -695,6 +699,8 @@ class Projection:
     first_half_total: Optional[float] = None
     fidelity: str = "exact"
     refusal: Optional[str] = None  # a NAMED reason; a refused projection is graded as missing, never imputed
+    total_dist: Optional[Dict[str, int]] = None  # {value: count}, full game incl. OT (sim projectors only)
+    margin_dist: Optional[Dict[str, int]] = None
 
 
 class Projector(Protocol):
@@ -809,6 +815,125 @@ class EspnWinProbProjector:
         if not idx:
             return Projection(refusal="no_espn_winprob")
         return Projection(p_home=game.winprob[max(idx)], fidelity="external_reference")
+
+
+def truncate_summary(summary: Dict[str, Any], checkpoint: str) -> Dict[str, Any]:
+    """The ESPN summary AS IT WOULD HAVE LOOKED LIVE at `checkpoint`: plays cut at the checkpoint (inclusive
+    of every play at that clock, the same rule as `state_at`), header score set to the last kept play's
+    running score, linescores cut to the periods begun, status `in`. Box-score fields are kept: P2 reads
+    names/starters from them and fouls from the plays, never final box stats."""
+    import copy
+
+    period, clock = CHECKPOINTS[checkpoint]
+    kept: List[Dict[str, Any]] = []
+    for raw in summary.get("plays") or []:
+        p = int(((raw.get("period") or {}).get("number")) or 0)
+        cs = clock_seconds((raw.get("clock") or {}).get("displayValue"))
+        if p and cs is not None and (p > period or (p == period and cs < clock)):
+            break
+        kept.append(raw)
+    out = copy.deepcopy({k: v for k, v in summary.items() if k not in ("plays", "winprobability")})
+    out["plays"] = copy.deepcopy(kept)
+    last = kept[-1] if kept else {}
+    score = {"home": int(last.get("homeScore") or 0), "away": int(last.get("awayScore") or 0)}
+    cum = {"home": [], "away": []}
+    for q in range(1, period + 1):
+        rows = [r for r in kept if int(((r.get("period") or {}).get("number")) or 0) == q]
+        if rows:
+            cum["home"].append(int(rows[-1].get("homeScore") or 0))
+            cum["away"].append(int(rows[-1].get("awayScore") or 0))
+    comp = ((out.get("header") or {}).get("competitions") or [{}])[0]
+    for c in comp.get("competitors") or []:
+        side = c.get("homeAway")
+        if side in score:
+            c["score"] = str(score[side])
+            per = [b - a for a, b in zip([0] + cum[side][:-1], cum[side])]
+            c["linescores"] = [{"displayValue": str(x), "value": float(x)} for x in per]
+    status_type = {"id": "2", "name": "STATUS_IN_PROGRESS", "state": "in", "completed": False,
+                   "description": "In Progress", "detail": "In Progress", "shortDetail": "In Progress"}
+    if isinstance(comp.get("status"), dict):
+        comp["status"]["type"] = dict(status_type)
+    else:
+        comp["status"] = {"type": dict(status_type)}
+    return out
+
+
+def index_engine_inputs(root: Optional[Path]) -> Dict[Tuple[str, str, str], Path]:
+    """(date, HOME tricode, AWAY tricode) -> pickle, for both the production persist format
+    (`engine_inputs/<date>/<H>_<A>.pkl`) and P1's recorded corpus (`<league>_<date>_<n>_<h>v<a>.pkl`)."""
+    import pickle
+
+    out: Dict[Tuple[str, str, str], Path] = {}
+    if not root or not root.exists():
+        return out
+    for f in sorted(root.rglob("*.pkl")):
+        try:
+            with f.open("rb") as fh:
+                doc = pickle.load(fh)
+            kw = doc.get("kwargs") or {}
+            h = str(kw["home_players"]["team"].iloc[0]).upper()
+            a = str(kw["away_players"]["team"].iloc[0]).upper()
+            out[(str(doc.get("date")), h, a)] = f
+        except Exception:  # noqa: BLE001 -- an unreadable pickle is simply not indexed
+            continue
+    return out
+
+
+class NativeResimProjector:
+    """The P3 live re-sim, run through `syndicate.features.nba.live_resim` exactly as the live tick runs it
+    (resume_from_summary -> map_state_names -> resim_live_game), on a summary cut at the checkpoint and the
+    game's recorded pregame engine inputs. Nothing about the resume is re-implemented here."""
+
+    name = "native_resim"
+
+    def __init__(self, *, inputs_root: Optional[Path] = None, summary_caches: Sequence[Path] = (),
+                 sims: int = 100) -> None:
+        self.inputs = index_engine_inputs(inputs_root)
+        self.summary_caches = list(summary_caches)
+        self.sims = sims
+
+    def _summary(self, event_id: str) -> Optional[Dict[str, Any]]:
+        for root in self.summary_caches:
+            p = root / f"summary_{event_id}.json.gz"
+            if p.exists():
+                return _read_gz(p)
+        return None
+
+    def project(self, game, st, pre, rules):
+        import pickle
+
+        from syndicate.features.nba import live_resim as lr
+
+        if rules.key != "nba":
+            return Projection(refusal="native_resim_nba_only")
+        key = (game.date, ESPN_TO_TRI.get(game.home, game.home), ESPN_TO_TRI.get(game.away, game.away))
+        path = self.inputs.get(key)
+        if path is None:
+            return Projection(refusal="no_pregame_inputs")
+        summary = self._summary(game.event_id)
+        if summary is None:
+            return Projection(refusal="no_summary")
+        resumed = lr.resume_from_summary(truncate_summary(summary, st.checkpoint), date=game.date)
+        if isinstance(resumed, lr.NbaResimRefusal):
+            return Projection(refusal=resumed.reason)
+        _state, gs, facts = resumed
+        with path.open("rb") as fh:
+            inputs = dict(pickle.load(fh)["kwargs"])
+        gs, _match = lr.map_state_names(gs, inputs["home_players"], inputs["away_players"])
+        res = lr.resim_live_game(inputs, gs, sims=self.sims, base_seed=lr.stable_seed(facts.event_id, facts.last_seq))
+        if isinstance(res, lr.NbaResimRefusal):
+            return Projection(refusal=res.reason)
+        seg = res.get("segments") or {}
+        q = st.period
+        nxt = (seg.get(f"q{q + 1}") or {}).get("total_mean") if st.clock_s == 0 and q < rules.periods else None
+        cur = (seg.get(f"q{q}") or {}).get("total_mean") if st.clock_s > 0 else None
+        h1 = (seg.get("h1") or {}).get("total_mean")
+        return Projection(
+            total=res["total_mean"], margin=res["home_margin_mean"], p_home=res["home_win_prob"],
+            next_period_total=nxt, current_period_total=cur,
+            second_half_total=(res["total_mean"] - h1) if (h1 is not None and st.period < rules.periods // 2) else None,
+            fidelity=f"native_resim_{res['sims_run']}sims", total_dist=res["total_dist"], margin_dist=res["margin_dist"],
+        )
 
 
 PROJECTORS: Dict[str, Callable[[], Projector]] = {
@@ -1121,6 +1246,11 @@ def grade(games: Sequence[PbpGame], projectors: Sequence[Projector], *, lines, s
                         cell["projectors"].setdefault(name, {})[f"vs_{baseline}"] = {
                             "n_paired": len(diffs), "mean_diff": m, "ci95": [lo, hi],
                             "verdict": "better" if hi < 0 else ("worse" if lo > 0 else "not_separable")}
+            if market in ("total", "margin"):
+                for name in names:
+                    cov = _coverage(market, [(r["proj"][name], r["truth"]) for r in rs])
+                    if cov and name in cell["projectors"]:
+                        cell["projectors"][name]["coverage"] = cov
             lc_rows = [r for r in rs if r.get("live_close")]
             if lc_rows and market in ("total", "margin", "p_home"):
                 cell["live_close"] = _grade_vs_live_close(market, lc_rows, names)
@@ -1128,6 +1258,42 @@ def grade(games: Sequence[PbpGame], projectors: Sequence[Projector], *, lines, s
                 report["cells"].append(cell)
     report["n_rows"] = len(rows)
     return report
+
+
+def central_interval(dist: Mapping[str, Any], level: float) -> Optional[Tuple[float, float]]:
+    """Equal-tailed central interval of a {value: count} histogram (inclusive bounds)."""
+    pts = sorted((float(k), float(v)) for k, v in (dist or {}).items() if float(v) > 0)
+    n = sum(c for _, c in pts)
+    if n <= 0:
+        return None
+    lo_q, hi_q = (1 - level) / 2 * n, (1 + level) / 2 * n
+    run, lo, hi = 0.0, None, None
+    for v, c in pts:
+        run += c
+        if lo is None and run > lo_q:
+            lo = v
+        if hi is None and run >= hi_q:
+            hi = v
+    return (lo, hi if hi is not None else pts[-1][0])
+
+
+def _coverage(market: str, pairs: Sequence[Tuple["Projection", "Truth"]]) -> Optional[Dict[str, Any]]:
+    """Share of games whose final falls inside the projector's central 50% / 80% interval (nominal +- 3pp is
+    the design's distribution gate)."""
+    attr = "total_dist" if market == "total" else "margin_dist"
+    hits = {0.5: [], 0.8: []}
+    for pr, tr in pairs:
+        d = getattr(pr, attr, None)
+        if not d:
+            continue
+        target = tr.final_total if market == "total" else tr.final_margin
+        for lvl in hits:
+            iv = central_interval(d, lvl)
+            if iv:
+                hits[lvl].append(1.0 if iv[0] <= target <= iv[1] else 0.0)
+    if not hits[0.5]:
+        return None
+    return {"n": len(hits[0.5]), "cover50": statistics.fmean(hits[0.5]), "cover80": statistics.fmean(hits[0.8])}
 
 
 def _grade_vs_live_close(market: str, rs: List[Dict[str, Any]], names: Sequence[str]) -> Dict[str, Any]:
@@ -1204,7 +1370,14 @@ def run_grade(args: argparse.Namespace) -> int:
     sims = load_sim_draws(Path(args.sim_draws)) if args.sim_draws else {}
     lines = load_pregame_lines(Path(args.lines_cache)) if args.lines_cache else {}
     live = load_live_close(Path(args.live_close)) if args.live_close else {}
-    projectors = [PROJECTORS[n]() for n in args.projectors]
+    projectors = []
+    for n in args.projectors:
+        if n == "native_resim":
+            caches = [Path(c) for c in (args.summary_cache or [])]
+            projectors.append(NativeResimProjector(inputs_root=Path(args.engine_inputs) if args.engine_inputs else None,
+                                                   summary_caches=caches, sims=args.resim_sims))
+        else:
+            projectors.append(PROJECTORS[n]())
     rep = grade(games, projectors, lines=lines, sims=sims, live_close=live, baseline=args.baseline)
     rep["inputs"] = {"games": len(games), "sim_games": len(sims), "pregame_lines": len(lines), "live_close": len(live),
                      "projectors": args.projectors, "baseline": args.baseline}
@@ -1238,7 +1411,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     g.add_argument("--lines-cache")
     g.add_argument("--live-close")
     g.add_argument("--population", action="append", choices=sorted(set(POPULATION_BY_SEASON_TYPE.values())))
-    g.add_argument("--projectors", nargs="+", default=["pregame_rate", "vendored_replay", "espn_wp"])
+    g.add_argument("--projectors", nargs="+", default=["pregame_rate", "vendored_replay", "espn_wp"],
+                   choices=sorted([*PROJECTORS, "native_resim"]))
+    g.add_argument("--engine-inputs", help="dir of pregame engine-input pickles (native_resim)")
+    g.add_argument("--summary-cache", action="append", help="ESPN summary cache dir(s) (native_resim)")
+    g.add_argument("--resim-sims", type=int, default=100)
     g.add_argument("--baseline", default="vendored_replay")
     g.add_argument("--out", required=True)
     lc = sub.add_parser("live-close")

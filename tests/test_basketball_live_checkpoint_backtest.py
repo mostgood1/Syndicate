@@ -42,18 +42,18 @@ def _summary(q=((30, 25), (28, 27), (20, 30), (25, 22)), extra_plays=()):
             # a foul + FTs exactly at 5:00 of Q4 (must be INSIDE the q4_5min state)
             plays.append(_play(pid, 4, "5:00", h, a, "Shooting Foul", "2", parts=("a1", "h1"))); pid += 1
             h += 2
-            plays.append(_play(pid, 4, "5:00", h, a, "Free Throw - 2 of 2", "1", scoring=True, value=1, parts=("h1",))); pid += 1
+            plays.append(_play(pid, 4, "5:00", h, a, "Free Throw - 2 of 2", "1", scoring=True, value=2, parts=("h1",))); pid += 1
             plays.append(_play(pid, 4, "4:59", h, a, "Substitution", "1", parts=("h6", "h1"))); pid += 1
             qh -= 2
         h += qh
-        plays.append(_play(pid, i, "0:30", h, a, "Jump Shot", "1", scoring=True, value=2, parts=("h1",), shooting=True)); pid += 1
+        plays.append(_play(pid, i, "0:30", h, a, "Jump Shot", "1", scoring=True, value=qh, parts=("h1",), shooting=True)); pid += 1
         a += qa
-        plays.append(_play(pid, i, "0:00", h, a, "Jump Shot", "2", scoring=True, value=2, parts=("a1",), shooting=True)); pid += 1
+        plays.append(_play(pid, i, "0:00", h, a, "Jump Shot", "2", scoring=True, value=qa, parts=("a1",), shooting=True)); pid += 1
         plays.append(_play(pid, i, "0:00", h, a, "End Period", "")); pid += 1
     plays.extend(extra_plays)
     ls = list(zip(*q))
     return {
-        "header": {"competitions": [{"competitors": [
+        "header": {"id": "999", "season": {"year": 2026, "type": 2}, "competitions": [{"competitors": [
             {"homeAway": "home", "team": {"id": "1", "abbreviation": "HOM"}, "score": str(sum(ls[0])),
              "linescores": [{"displayValue": str(x)} for x in ls[0]]},
             {"homeAway": "away", "team": {"id": "2", "abbreviation": "AWY"}, "score": str(sum(ls[1])),
@@ -262,3 +262,23 @@ def test_snapshot_cache_resolves_by_validity_interval(tmp_path):
     assert c.lookup("2026-01-01T00:04:59Z") is not None
     assert c.lookup("2026-01-01T00:05:00Z") is None
     assert bt._SnapshotCache(tmp_path).lookup("2026-01-01T00:02:00Z") is not None  # re-indexed from disk
+
+
+def test_truncated_summary_is_what_the_live_path_would_have_seen():
+    """The backtest cuts a FINAL summary at the checkpoint; P2's live parser must then read exactly the
+    checkpoint state (score, period, clock) and an in-progress status -- otherwise native_resim is graded on a
+    state the live tick would never see."""
+    from syndicate.features.nba import live_resim as lr
+
+    s = _summary()
+    g = _game()
+    for cp in ("end_q2", "q4_5min"):
+        st = bt.state_at(g, cp)
+        cut = bt.truncate_summary(s, cp)
+        out = lr.resume_from_summary(cut)
+        assert not isinstance(out, lr.NbaResimRefusal), out
+        _state, gs, facts = out
+        assert (facts.home_score, facts.away_score) == (st.home, st.away)
+        assert facts.period == st.period and facts.clock_seconds == st.clock_s
+    _s, gs, _f = lr.resume_from_summary(bt.truncate_summary(s, "end_q2"))
+    assert (gs.period, gs.seconds_remaining) == (3, None)  # resumes from the Q3 tip
