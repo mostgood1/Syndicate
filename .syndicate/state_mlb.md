@@ -1351,7 +1351,13 @@ Other readings:
 - **Hitter H/TB/RBI/R beat the player's own as-of rate on Brier and still do not beat the price.**
 - **Starter length.** In this engine vintage, model starter outs average 20.5 against 15.8 actual.
 - **Scope.** This is the May–July engine. The 09-01/09-05/09-08 refits are unmeasured as-of, because their stored projections are post-game re-sims.
-- **Unreachable dates.** 07-13..09-29 sims live only on suspended Render.
+- **07-13..09-29 inputs** live only on suspended Render, but an AS-OF REBUILD from StatsAPI alone now covers 07-16..09-27 (74 dates / 985 games; fleet scratch `~/asof_out_statsapi`; `scripts/mlb_asof_roster_build.py --source statsapi`). It passed a June fidelity gate `[verified 2026-10-07]`.
+- **Production MLB engine as of 2026-10-08** `[verified: V1 config resolution on the fleet]`:
+  - the combined calibration `2bb481ef` (HBP, DP and baserunning rates measured from pbp; the hook);
+  - plus `hr_rate_mult` 1.5 and 11 prop maps `6cd415f3`, a user override; 1.856 had been fitted inside a June league-wide HR spike;
+  - the count-shape table and recency stamina are in code, default OFF.
+  - Out of sample (07-16..09-27) the combined calibration fixed HBP / DP / BF / outs / SO; pitches/PA remain ~10% low (count shape missing).
+  - Lane `mlb-statsapi-asof-rebuild`; details in log 2026-10-09.
 
 **The board keeps serving `model_prob_over`/edge on every MLB pregame market BY USER DECISION** -- USER DECISION 2026-10-02 ~8:15 PM CT, verbatim: "MLB should still show everything - the prime directive of the app is that every line is its own decision. we should have a model that is accurate that then helps inform each decision". Code: `prop_projections.py:687/726/768`, `project_game_market`. Stakes still follow price (`[portfolio-sim-sizing-gate]`). A mean-only gate was built and discarded unshipped (lane `mlb-board-mean-only`, CLOSED).
 

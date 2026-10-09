@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1266 rules `[generated]`
+## Index — 1345 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -3476,3 +3476,9 @@ A restart-after-save watcher read `Board build idle` 7.5 min after a supervisor 
 ## 2026-10-09 — FORBIDDEN: rewriting a ledger file in TEXT mode; read and write bytes `[lane soccer-roster-refresh-accuracy]`
 - **What happened:** a checkpoint edit read `lanes.md` with Python's default universal newlines and wrote it back. A peer lane's verdict line held an embedded `\r`, which became a line break: the peer's line was split in two (d55a3c17, numstat `3 1` where `1 0` was intended). Repaired byte-exactly in 74da0acd.
 - **How to apply:** to splice a line into a shared ledger file, `open(p, 'rb')`, insert bytes, `open(p, 'wb')`. Then check `git diff --cached --numstat` shows deletions == 0 before committing. A nonzero deletion on an append-only edit means your write changed someone else's bytes.
+
+## 2026-10-09 -- A calibration fitted AND validated inside one month inherits that month's environment `[lanes mlb-combined-calibration, mlb-statsapi-asof-rebuild]`
+The combined calibration was fitted on 06-15..07-12 and validated on 05-30..06-14, and its hr_rate_mult 1.856 passed. Out of sample (07-16..09-27, 985 games) it over-predicted HR ~25% and runs +0.70/game. Reason: June 2026 was a league-wide HR spike (StatsAPI HR/PA: Jun .0343 vs season .0303; not temperature, June was cooler than Jul/Aug), and both sets sat inside it. A fit + validation pair from adjacent weeks shares one environment, so validation cannot catch an environment-specific fit. **Rule:** before trusting a level parameter, compare the fit window's league rate for that stat against the season's (StatsAPI teams/stats byDateRange, one call per month); if the window is an outlier month, the validation set must come from a different month.
+
+## 2026-10-09 -- A fix that closes one bias can EXPOSE a second one that was cancelling it -- check the metric before AND after the change before attributing it `[lane mlb-statsapi-asof-rebuild]`
+I attributed the shipped config's ~10-pitch-per-start deficit to its early_count_foul_boost change (2.05 -> 1.5) and pre-registered a pitch fix on it. Restoring 2.05 added only +0.7 pitches. Pitches per PA had been ~11% low BOTH before and after the ship (P/BF z -2.5 / -2.3, a field I already had); pre-ship pitches per START looked right only because starters faced +1.9 BF too many. The same shape occurred with starter walks the same week (right only by cancellation). **Rule:** when a shipped change seems to "cause" a regression, read the per-unit metric (P/BF, BB/BF) pre and post first. If the per-unit metric did not move, the change exposed an old error; it did not create one, and the fix target is the old error.
