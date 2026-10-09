@@ -1885,6 +1885,14 @@ un.py` (0 differing lines vs candidate, matching sha256 on each), directories pr
 - Verification: Parity script over the recorded production corpus: N cases per league, 0 mismatched leaves (corpus size reported); tests: tip-off resume == pregame, monotone win prob over margin/clock grid, off!=on reachability for the native switch; checklist exits non-zero on an unfed field; fleet: same-date same-seed pregame sim outputs unchanged vs vendored baseline after the switch, recorded in deploys.md.
 - Blocked by: none (coordination: basketball-scenario-calibration claims both vendor events.py files and edits them -- parity target must be frozen or their changes mirrored)
 
+### ncaab-native-live-tier — OPEN — opened 2026-10-09 — session e48a0f9b-f667-43d8-8c65-7d743b31624c
+- Goal: P4 of docs/ai_context/basketball_live_native_plan.md: an NCAAB live lens builder in _LIVE_LENS_SPORTS resumes the native engine under NCAAB rules and publishes live total/spread/ML edges via live_gameline_join. THIS SESSION (P1/P2 not started): the prerequisite-free part only -- NCAAB league rules as engine parameters, the team-model inputs from the efficiency ratings tables, and a 2025-26 pbp backtest corpus
+- Files: syndicate/features/shared/basketball_league_rules.py syndicate/features/ncaab/live_team_model.py scripts/build_ncaab_pbp_corpus.py scripts/ncaab_live_input_checklist.py tests/test_basketball_league_rules.py tests/test_ncaab_live_team_model.py tests/test_build_ncaab_pbp_corpus.py docs/ai_context/ncaab_live_tier.md docs/ai_context/basketball_live_native_plan.md (P4 Status row only)
+- Hypothesis: n/a for the build half; the corpus measures NCAAB's scoring shape (H2-on-H1 reversion, end-of-game foul rate by margin) before any engine mechanism is chosen
+- Falsification test: rules: NBA rotation windows from the shared rules reproduce the vendored _rotation_windows exactly on a full grid; team model: a team with no rated row is REFUSED by name, never defaulted; corpus: reconstructed final from pbp equals the official final on every corpus game
+- Verification: rules parity test + team-model refusal test pass; corpus covers 2025-26 with n per season type and pbp-final==box-final rate reported; live reading owed at opening week (early Nov 2026) once P1/P2 land
+- Blocked by: P1 basketball-native-engine and P2 basketball-native-live-state (not opened as of 2026-10-09) for the live lens itself
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
