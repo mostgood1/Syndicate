@@ -110,6 +110,19 @@ def prepare_scratch(pristine: Path, scratch: Path, d: str, asof: Path, props_csv
                 shutil.copy2(p, sdata / sub / p.name)
     for p in (pdata / "processed").glob("schedule_*"):
         shutil.copy2(p, sdata / "processed" / p.name)
+    # ESPN box starters (P2 rotation_stints/player_checks_<date>.csv) feed the #473 NBA starter flags. Dated and in a
+    # sub-directory, so the loop above never copied them: every replay ran with starters unfed (probe 2026-10-10:
+    # 0/18 engine calls). As-of: only dates strictly BEFORE the slate.
+    pc_src = pdata / "processed" / "rotation_stints"
+    if pc_src.is_dir():
+        (sdata / "processed" / "rotation_stints").mkdir(parents=True, exist_ok=True)
+        n_pc = 0
+        for p in pc_src.glob("player_checks_*.csv"):
+            pd_ = _date_of(p.name)
+            if pd_ and pd_ < d:
+                shutil.copy2(p, sdata / "processed" / "rotation_stints" / p.name)
+                n_pc += 1
+        info["player_checks_files"] = n_pc
     for rel, col in HISTORY_FILES.items():
         if (pdata / rel).exists():
             info[rel] = _truncate_csv(pdata / rel, sdata / rel, col, d)
