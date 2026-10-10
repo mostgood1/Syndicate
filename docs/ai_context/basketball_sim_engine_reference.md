@@ -793,7 +793,26 @@ simulated games only. Parity is exact, so that is harmless here.
   * `builders` compares the advanced-stats DataFrames cell for cell.
   * `compare` does the end-to-end artifact A/B.
 
-Results: PENDING (fleet run 2026-10-09).
+Results, 2026-10-10 ~01:30Z. Substrate: the fleet's production data root
+(`nba_source` and `wnba_source`), copied to `~/p6/data` at 23:30Z on 10-09; seed
+20261009; 100 sims; nice 19.
+  * **NBA: 22 games over 8 dates (10-03..10-10).** The vendored replay reproduced
+    the recorded digest on 22/22 games. The native replay was identical on
+    **862,659 leaves**. End to end, all 22 `smart_sim_*.json` were byte-identical
+    (862,923 leaves).
+  * **WNBA: 13 games over 8 dates (05-27, 05-28, 09-30, 10-01, 10-02, 10-04, 10-07,
+    10-09).** One of the 13 is the NBA game SAS@OKC that leaked into the 05-28
+    WNBA slate. That is the vendored league-id bug, and it fails the same way in
+    both arms. Replay: 13/13 reproduced, **265,118 leaves**, identical. End to
+    end, all 12 written artifacts were byte-identical (265,257 leaves).
+  * **Builders: 24 DataFrame comparisons, 0 differences.**
+    - NBA `player_logs`: 1,680 cells.
+    - WNBA `boxscores`: 1,260 cells.
+    - NBA `boxscores` and WNBA `player_logs` returned EMPTY frames in BOTH arms on
+      every date tried. Those two paths are not exercised on real data.
+  * **Checklist:** PASS for both leagues. Its wiring check fires on the pre-P6
+    bridge, and its population check fires on a corpus missing a consumed key
+    (tests).
 
 **Checklist** (`scripts/basketball_orchestrator_input_checklist.py`) runs over
 `dataclasses.fields()` of SmartSimConfigLocal, SmartSimConfig,
