@@ -1100,3 +1100,34 @@ stay untouched.
 - If two grid points qualify, the one with H2 nearer real is taken. No interpolated k is adopted.
 - A confirmation is followed by a full FIT re-run. The chosen k and its readings are then sent to P3
   (nba-native-live-resim). VALIDATION is untouched.
+
+### Phase 2 #2b — FINE GRID RESULT 2026-10-10 ~16:30Z (11:30 AM CDT)
+
+**Run:** #473 inputs fed (team_adj + starters 18/18), SYNDICATE_NBA_TEAM_INPUTS=1, the accepted config. 12 dates,
+87/87 games each, 17,400/17,400 engine calls with every lever and switch.
+
+| k | H2-on-H1 (real −0.174) | Q4 (real −0.141) | within-game SD | S8 margin (real 15.21) | S8 total | blowouts (real 0.253) | mkt slope | total bias |
+|---|---|---|---|---|---|---|---|---|
+| 0 (new baseline) | −0.015 | −0.003 | 17.52 | 17.65 | 18.21 | 0.280 | 0.939 | −0.20 |
+| 0.001 | −0.085 | −0.044 | 16.10 | 16.22 | 18.32 | 0.253 | 0.925 | −0.16 |
+| 0.002 | −0.162 [−0.180, −0.147] | −0.085 [−0.096, −0.075] | 14.82 | **14.91** | 18.38 | 0.222 | 0.938 | +0.38 |
+| 0.003 | −0.233 | −0.127 | 13.72 | 13.85 | 18.44 | 0.197 | 0.944 | +0.40 |
+| old inputs k = 0 (MB_k000) | +0.007 | +0.000 | 17.56 | 17.71 | 18.30 | 0.274 | 0.919 | −0.48 |
+
+**VERDICT by the letter: NOT CONFIRMED.** No grid point has BOTH slopes within ±0.05 of real.
+- k = 0.002: H2 PASS (off 0.012), Q4 FAIL (off 0.056).
+- k = 0.003: Q4 PASS (off 0.014), H2 FAIL (off 0.059).
+- No interpolated k is adopted (pre-registered).
+- Guards hold at every k: sim-vs-market slope 0.93-0.94, total bias within 0.4, S8 total ~18.2-18.4.
+
+**Reading, NOT a re-score:**
+- One uniform per-shot k cannot match both the half-level and the Q4-level reversion. Real reversion is relatively
+  stronger in Q4.
+- That Q4 excess is the territory P3 (nba-native-live-resim) owns: end-game intentional fouling and clock management.
+- k = 0.002 matches the H2 slope and the S8 margin SD (14.91 vs 15.21, the closest of any config so far); its Q4
+  shortfall would be left to P3's end-game mechanisms.
+- The new #473 inputs alone moved H2 to −0.015 and the mkt slope to 0.939 (from 0.919).
+- **User decision owed:**
+  - accept k = 0.002 with the Q4 tolerance overridden and P3 owning the Q4 remainder;
+  - pre-register a late-weighted variant;
+  - or keep k off.
