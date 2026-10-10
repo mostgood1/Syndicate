@@ -94,7 +94,7 @@ def nfl_states(season: int, game_ids: set) -> Dict[str, Dict[str, Any]]:
 
 
 def ncaaf_states(season: int, game_ids: set) -> Dict[str, Dict[str, Any]]:
-    root = F.PRIMARY / "data" / "ncaaf_source" / "historical_truth"
+    root = F.ncaaf_truth_root()
     meta = {str(g["id"]): g for g in F._ncaaf_games(season)}
     by_game: Dict[str, Dict[int, List[dict]]] = defaultdict(lambda: defaultdict(list))
     for wk in range(1, 17):

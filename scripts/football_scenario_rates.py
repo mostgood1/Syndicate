@@ -382,6 +382,13 @@ def nfl_root() -> Path:
     return Path(override) if override else PRIMARY / "data" / "nfl_source"
 
 
+def ncaaf_truth_root() -> Path:
+    # Same rule as `nfl_root`: a PRIVATE CFBD pull (games/drives/plays/sp_ratings for a 2026 read)
+    # never writes the shared mirror; absent = the primary checkout's historical_truth.
+    override = os.environ.get("FOOTBALL_SCENARIO_NCAAF_ROOT")
+    return Path(override) if override else PRIMARY / "data" / "ncaaf_source" / "historical_truth"
+
+
 def nfl_tasks(seasons: List[int], seeds: int) -> List[Dict[str, Any]]:
     from scripts import backtest_nfl_lines_props as H
     sched = H.load_schedule(nfl_root())
@@ -413,16 +420,19 @@ def ncaaf_prepare_work() -> Path:
         shutil.copy2(src_profile, work / "calib" / "ncaaf_profile.json")
     ht = work / "dataroot" / "ncaaf_source" / "historical_truth"
     ht.mkdir(parents=True, exist_ok=True)
-    src = PRIMARY / "data" / "ncaaf_source" / "historical_truth"
-    for name in ("sp_ratings_2023.json", "sp_ratings_2024.json", "games_2024.json.gz", "games_2025.json.gz"):
-        if not (ht / name).exists() and (src / name).exists():
+    src = ncaaf_truth_root()
+    for name in ("sp_ratings_2023.json", "sp_ratings_2024.json", "sp_ratings_2025.json",
+                 "games_2024.json.gz", "games_2025.json.gz", "games_2026.json.gz"):
+        # re-copy when the source is newer: an in-season games file gains `completed` flags weekly
+        if (src / name).exists() and (not (ht / name).exists()
+                                      or (src / name).stat().st_mtime > (ht / name).stat().st_mtime):
             shutil.copy2(src / name, ht / name)
     (work / "cache").mkdir(exist_ok=True)
     return work
 
 
 def _ncaaf_games(season: int) -> List[dict]:
-    path = PRIMARY / "data" / "ncaaf_source" / "historical_truth" / f"games_{season}.json.gz"
+    path = ncaaf_truth_root() / f"games_{season}.json.gz"
     return json.load(gzip.open(path, "rt", encoding="utf-8"))
 
 
@@ -631,7 +641,7 @@ _CFBD_SCRIM = {"Rush", "Pass Reception", "Pass Incompletion", "Sack", "Passing T
 
 
 def real_ncaaf(seasons: List[int]) -> Dict[str, Dict[str, Any]]:
-    root = PRIMARY / "data" / "ncaaf_source" / "historical_truth"
+    root = ncaaf_truth_root()
     games: Dict[str, Dict[str, Any]] = {}
     for season in seasons:
         meta = {int(g["id"]): g for g in _ncaaf_games(season)}
@@ -974,7 +984,7 @@ def fourth_down_rows(sport: str, seasons: List[int]) -> List[Tuple[int, int, str
                     conv = (r.get("fourth_down_converted") == "1") if dec == "go" else None
                     rows.append((fp, _i(r.get("ydstogo"), 10), dec, conv))
     else:
-        root = PRIMARY / "data" / "ncaaf_source" / "historical_truth"
+        root = ncaaf_truth_root()
         for season in seasons:
             meta = {int(g["id"]): g for g in _ncaaf_games(season)}
             for wk in range(1, 17):
@@ -1100,7 +1110,7 @@ def nonoff_counts(sport: str, seasons: List[int]) -> Dict[str, List[int]]:
                     if r.get("safety") == "1":
                         prev_safety_game = r["game_id"]
     else:
-        root = PRIMARY / "data" / "ncaaf_source" / "historical_truth"
+        root = ncaaf_truth_root()
         to_types = {"Interception", "Pass Interception Return", "Fumble Recovery (Opponent)"}
         def_td_types = {"Interception Return Touchdown", "Fumble Return Touchdown"}
         for season in seasons:
