@@ -297,3 +297,132 @@ snapshots lose some rows. n is reported per cell.
 - **Overlap to know about:** the `wnba-native-live-cutover` lane (P5) builds its own WNBA checkpoint corpus
   (`scripts/build_wnba_live_checkpoint_corpus.py`). This harness is league-parametric (`LEAGUES` has
   wnba/ncaab clock rules), so P5/P4 can reuse its grading rather than fork it.
+
+## 6. P3 build after P1 landed (2026-10-09 evening, session 6c348b8f)
+
+**Prerequisites.** Both verified on origin/main before resuming:
+- P1 `c2b99d4f` (`syndicate/features/basketball_engine/`, `GameState` resume);
+- P2 `d3e4e9ad` / `2bf917ce`.
+
+**Split agreed with basketball-scenario-calibration** (via the plan coordinator d48f3a34):
+- That lane owns `score_effect_k`, its mechanism and its re-fit.
+- P3 consumes the chosen k unchanged and re-fits only the live mechanisms.
+
+**User decisions relayed in chat** (by d48f3a34; not seen directly by this session):
+1. Three section loans from basketball-native-engine:
+   - the engine column memo;
+   - the default-off live mechanisms;
+   - the pregame input persist.
+2. **ALL NBA mechanism RE-FITS ARE ON HOLD until #473** (NBA team_adj unfed 0/30, starter flags 0/517).
+
+### 6a. Engine cost and the column memo (loan a)
+
+ms/draw on P1's recorded production inputs (3 NBA games, 20 draws, Idle on a loaded host):
+
+| state | before | after the per-call column memo |
+|---|---|---|
+| pregame | 570-690 | 305-337 |
+| end Q1 | 415-505 | 216-258 |
+| end Q2 | 310-380 | 118-196 |
+| end Q3 | 145-215 | 62-111 |
+| 5:00 Q4 | 76-107 | 39-71 |
+
+- **Before the memo**, cProfile put ~60% of a draw in `_player_usage_weights -> _safe_series`: pandas
+  to_numeric/fillna on the same constant frames, every possession.
+- **The memo** is scoped to one `simulate_pbp_game_boxscore` call, keyed on (frame id, column), with read-only
+  arrays.
+- **Evidence it changed nothing:**
+  - same-seed mean totals are unchanged;
+  - P1's suites pass, 48 tests.
+- **Production-corpus gate:** the 5,400-case parity replay plus a same-seed e2e A/B, in flight at writing (see
+  deploys.md / the lane).
+
+### 6b. Native resumed sim on 2026 preseason (FIRST READING; team_adj UNFED, so neutral team quality)
+
+**Population:**
+- 15 games with recorded production inputs (P1's corpus, 10-05..10-08);
+- n = 14-15 per checkpoint.
+
+**Native vs `pregame_rate`, paired:**
+
+| market | native vs pregame_rate |
+|---|---|
+| total MAE, end Q1 | **+2.43** [+0.39, +4.54] (native worse) |
+| total MAE, end Q2 | **+1.76** [+0.57, +2.93] (native worse) |
+| total MAE, end Q3 | **+1.26** [+0.75, +1.77] (native worse) |
+| total MAE, 5:00 Q4 | +0.06 n.s. |
+| margin MAE | n.s. at every checkpoint |
+| ML Brier | n.s. at every checkpoint except 5:00 Q4: +0.018 [+0.005, +0.034] (native worse) |
+
+**Bias:** both over-project preseason totals.
+- `pregame_rate`: +1.7 / +6.1 / +4.2 / −1.2 at end Q1 / Q2 / Q3 / 5:00 Q4.
+- Native: a further ~2.5-3 points.
+
+**Lead, not a finding** (n = 14): preseason second halves score below their lines (starters sit), and the
+native engine has no mechanism for that.
+
+**Not shippable, and not graded for shipping:**
+- n is tiny;
+- team_adj is unfed;
+- the preseason is its own population.
+
+### 6c. End-game fouling: the sim vs real, and the mechanism's reach (loan b)
+
+**The native engine, OFF.** Resumed at 2:00 Q4 with home trailing by d, 4-5 recorded games × 30-40 draws:
+FTA/min ~1.0 and pts/min ~5.0 at EVERY deficit.
+
+**Real (§2c, 1,231 games):**
+
+| down | FTA/min | pts/min |
+|---|---|---|
+| 1-3 | 2.75 | 6.0 |
+| 4-6 | 3.54 | 7.5 |
+| 7-10 | 2.36 | 6.0 |
+| 11+ | 1.25 | 4.9 |
+
+**The mechanism** (`EventSimConfig.endgame_foul_*`, default-off, getattr-read, so production's
+EventSimConfigLocal is off):
+- the trailing defense fouls at possession start with probability p;
+- two FTs with the same FT% formula;
+- ~5 s of clock;
+- possessions are clock-governed past the pace pre-count while the window holds.
+
+**EXPLORATORY sweep, NOT A FIT.** Last-2:00 FTA/min / pts/min at down 2 / 5 / 8 / 14:
+
+| p | down 2 | down 5 | down 8 | down 14 |
+|---|---|---|---|---|
+| 0.0 | 1.05 / 5.28 | 1.00 / 4.94 | 1.02 / 4.79 | 0.99 / 4.89 |
+| 0.3 | 2.10 / 6.08 | 2.30 / 5.83 | 2.02 / 6.01 | 1.14 / 5.08 |
+| 0.5 | 2.84 / 6.62 | 2.99 / 6.83 | 2.82 / 6.06 | 1.24 / 5.36 |
+| 0.7 | 3.78 / 7.11 | 4.14 / 6.95 | 3.81 / 6.57 | 1.52 / 5.36 |
+
+**Reading:**
+- The mechanism REACHES the real range: p ≈ 0.5 gives FTA 2.8-3.0 and pts 6.1-6.8.
+- The real curve peaks at 4-6 down and the sim's is flat, so the re-fit should be per deficit bucket.
+- 14-down drifts up because the margin re-enters the band.
+- No value is chosen until #473 is fixed.
+
+### 6d. Production wiring, and what is deliberately NOT enabled
+
+**What exists:**
+- `nba/live_resim.py`:
+  - P2 state → P1 `GameState` resume, refusing by name;
+  - persisted pregame inputs;
+  - a seeded N-sim under a deadline;
+  - full-game, quarter and half histograms;
+  - live props (actual + remainder, lines = mode across books from the props CSV);
+  - a dedicated loop writing `live/nba_live_resim.json` within a 6 MB budget.
+- The NBA page lens merges the re-sim's lanes and props by event_id.
+- `_call_native_engine_local` persists each newly simulated game's engine inputs (write-only).
+
+**What is NOT enabled:**
+- `SYNDICATE_NBA_LIVE_RESIM` (the loop): absent = off.
+- `SYNDICATE_NBA_LIVE_MECHANISMS`: absent = off.
+- nba is NOT in `_LIVE_GAMELINE_SPORTS`.
+- The vendored tick is NOT deleted.
+
+**Reason:** the design's §7 cut-over order. The only native reading so far (6b) does not beat `pregame_rate`, and
+re-fits are on hold.
+
+**Preseason props cannot be priced:** today's NBA props CSV carries h2h/spreads/totals only, no player markets.
+Priced live props start with the regular season.

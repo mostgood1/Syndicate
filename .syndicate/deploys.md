@@ -48211,3 +48211,22 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **gate:** claims web (22:58Z) + refresh-worker (holder games-rail-full-detail) acquired after `basketball-native-engine` released; both TERMs fired by the save-newer-than-boot watcher; 2 + 3 refresh-worker odds children killed (user-approved 2026-10-08). Released.
 - **verify (served /api/board/game-chips 2026-10-09):** finals after 23:34:47Z -- ESP @ MCF 1-1 lines 3W 3L 0 push 0 pending, 3 not graded (before: 3W 2L 1 PUSH 3 PENDING); SVW @ DOR 2-2 3W 2L, 2 not graded; LYO @ RCL 2W 4L, 2 not graded; no line pending anywhere. Live after 00:05:53Z: **NCAAF FS @ LOU "FS ball . 4th & Goal at LOU 2 . red zone"** (before "11:44 - 1st"). NHL live cards: period only (no clock at source, SOG not in the game dict). WNBA ATL @ NYL: momentum file joined (event 401918299, 27 scoring events), no qualifying run at the reading -- correct, not missing.
 - **NOT YET MEASURED:** prop W/L (first nightly settlement with the hook); MLB live line (no MLB games -- the two MLB cards are phantoms, lead logged c61364c6).
+
+## 2026-10-10 01:13Z (8:13 PM CT 10-09) -- READING, NO DEPLOY, NO RESTART: P3 engine changes gated before landing (lane `nba-native-live-resim`, loans from basketball-native-engine)
+- **What landed (code only; the fleet runs it after the next ff):**
+  - engine per-call column memo (performance; draws nothing);
+  - default-off `EventSimConfig.endgame_foul_*` mechanism (getattr-read; production's EventSimConfigLocal lacks the fields, so it is off);
+  - pregame engine-input persist at `_call_native_engine_local` (NBA, write-only);
+  - `nba/live_resim.py` loop, OFF unless `SYNDICATE_NBA_LIVE_RESIM` is set.
+- **GATE 1, P1's production-corpus parity replay:** `scripts/basketball_engine_parity.py --corpus ~/bn_corpus/corpus` on the P3 code.
+  - **5,400/5,400 cases reproduce production, mismatched_cases 0** (NBA 3,000, WNBA 2,400; 27 games); PASS.
+  - elapsed 6,206 s, Idle.
+- **GATE 2, same-seed e2e A/B** (P1's method, deploys.md 2026-10-09 21:29:34Z):
+  - snapshot `~/bn_corpus/ab/base` (21:14:38Z), NBA 2026-10-08, seed 20261009, 200 sims;
+  - arm A = deployed checkout `68d8443b`, arm B = P3 code;
+  - `--compare-sims ... --data-roots`: **22/22 smart_sim files identical, PASS** (the 6 re-simulated 10-08 games among them);
+  - arm B persisted **6/6** games' engine inputs (`engine_inputs/2026-10-08/*.pkl`), **0** `NBA_ENGINE_INPUTS_PERSIST_FAILED`.
+  - Arm B's first launch died before simulating: the refresh-worker restarted during arm A and its `/proc/<pid>/environ` vanished. Re-run with the pid resolved at launch.
+  - Arms read the worker env from before (A) and after (B) that restart. Output was still identical.
+- **Scope of the gate.** Both gates ran on base `006ca0d6`. The landed base adds `45e03ae2` (P2's pregame ESPN name-map fallback in `basketball_props_smart_sim.py`, input preparation, outside every P3 section). Its interaction is covered by output-neutrality, not by a re-run.
+- **verify (after the next fleet ff):** grep `NBA_ENGINE_INPUTS_PERSISTED` on the refresh-worker for the first newly simulated NBA game, with 0 `NBA_ENGINE_INPUTS_PERSIST_FAILED` and a matching `<nba_source>/data/processed/engine_inputs/<date>/<H>_<A>.pkl`.
