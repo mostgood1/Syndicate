@@ -3780,3 +3780,15 @@ These read the VENDORED `config.paths`, which the bridge never pinned. It matche
 ## 2026-10-10 -- Feeding a previously-NEUTRAL input switches on every consumer's handling of it, including the wrong ones `[lane nba-sim-team-adj-473, session eb2ba139]`
 - **What happened.** #473 fed real NBA team ratings where every consumer had only ever seen neutral values. Two consumers were wrong in ways a neutral input hid: the engine stacked team quality on a 95%-market-anchored target (counted twice), and the quarter model subtracted the opponent's def rating with the wrong sign on points-derived ratings. As built, the published margin moved 4.2 pts/game and |pub - market| went 1.83 -> 4.57 (22 same-seed games); the checklist said the input was "populated" and passed.
 - **Rule.** Before shipping an unfed-input fix, A/B the PUBLISHED output (not just the input checklist) on the same games and seed, and enumerate every consumer of the field (grep the reader, not the writer: here `_load_adv_map` fed pace/def to a second model). A consumer that was "calibrated" while the input was constant was calibrated to nothing. Same family as mechanism vs estimator (`model_engine_standard.md`).
+
+## 2026-10-10 RULE: a board-card fix is live only when EVERY date's stored shortlist has been rewritten -- not at the first post-deploy save
+**Evidence (lane board-history-charts):** the corners guard in `layer2_board._chart_columns` was loaded at 15:39:49Z. The served board read 285 -> 115 -> 103 -> 0 corners rows with team history, over 35 minutes.
+- Today's shortlist, written 15:56:54Z by the new worker, was 0/182 from its first write.
+- The page also merges the next days' stored shortlists. The 10-11 one had been written at 14:18:03Z by the OLD code (183/183) and was only rewritten at 16:06:41Z.
+- The first post-deploy STATE_PERSIST therefore served a mix of new-code and old-code cards.
+**How to apply:**
+- After a card-level change, read `written_at` of EVERY date in the board horizon (`read_layer2_shortlist(<date>)`, with the web's state env keys) before measuring.
+- Gate the measurement on the newest one being after the deploy AND a STATE_PERSIST finishing after that.
+- A partial reading in between is a mixed board, not a partial fix. Two more traps in the same hour:
+  - An Ask probe built from a shortlist fetched before the last rebuild matches no row, because resolve_board_row is exact-or-nothing, and reads as "broken".
+  - A probe that does not reproduce the button's payload (nested `context`, "What's the case for and against ..." wording) is routed out_of_scope.
