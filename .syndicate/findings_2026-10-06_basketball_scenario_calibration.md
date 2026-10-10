@@ -1001,3 +1001,26 @@ on hold, including fitting `score_effect_k`, until #473 is fixed.
 - `scripts/basketball_engine_parity.py --corpus ~/bn_corpus/corpus` on the engine with 18e5eba5: 5,400/5,400 real
   production calls reproduce production output, 0 mismatched (NBA 3,000, WNBA 2,400; 27 games), verdict PASS.
 - The engine.py loan from basketball-native-engine is returned (removed from this lane's Files).
+
+### Phase 2 #2 (M-B) — CHARACTERISATION (NOT a fit; NBA re-fits on hold, #473), read 2026-10-10 ~01:45Z
+
+**Run:** accepted Phase 2 config + score_effect_k ∈ {0, 0.005, 0.01, 0.02}; 12 dates, 87/87 games each;
+17,400/17,400 engine calls with every lever and switch. Within-game slopes are per-game demeaned.
+
+| k | H2-on-H1 (real −0.174) | Q4 (real −0.141) | within-game SD | S8 margin (real 15.21) | blowouts (real 0.253) | sim-vs-market slope | total bias |
+|---|---|---|---|---|---|---|---|
+| 0 | +0.007 | +0.000 | 17.56 | 17.71 | 0.274 | 0.919 | −0.48 |
+| 0.005 | −0.392 | −0.215 | 11.71 | 11.83 | 0.152 | 0.943 | +0.69 |
+| 0.01 | −0.558 | −0.334 | 9.51 | 9.62 | 0.097 | 0.953 | +1.27 |
+| 0.02 | −0.670 | −0.411 | 8.16 | 8.28 | 0.063 | 0.960 | +1.77 |
+
+- **Reading:** the mechanism works as designed: monotone reversion, the mean margin vs the market unmoved, totals
+  barely moved.
+- **The whole pre-registered grid OVERSHOOTS.** k = 0.005 already doubles the real H2 reversion and takes the
+  margin SD to 11.8 (real 15.2), because the factor applies on every shot and compounds.
+- The pre-registered refutation ("even k = 0.02 leaves H2 above −0.10") is NOT met. The mechanism is too strong,
+  not too weak.
+- The real-matching k lies in (0, 0.005). By interpolation it is near 0.0015-0.0025; that is a guess, not a
+  measurement.
+- **When the hold lifts** (#473 fixed + input checklist re-run): a finer pre-registered grid
+  k ∈ {0.001, 0.002, 0.003} on the same protocol, then a full FIT re-run. Nothing is chosen or handed to P3 now.
