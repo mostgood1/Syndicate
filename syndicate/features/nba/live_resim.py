@@ -62,6 +62,9 @@ _REGULATION_PERIODS = 4
 DEFAULT_SIMS = int(os.environ.get("SYNDICATE_NBA_LIVE_RESIM_SIMS", "200") or 200)
 DEFAULT_BUDGET_SECONDS = float(os.environ.get("SYNDICATE_NBA_LIVE_RESIM_BUDGET_SECONDS", "240") or 240)
 MIN_SIMS = 100  # below this a lane is refused (`sims_below_floor`), never published thin
+# How far ESPN's header score may run ahead of the play log, per side, and still be read as the log lagging (one
+# play: a 3, or an and-one). More than this, or the log AHEAD of the header, is `pbp_score_mismatch`.
+MAX_HEADER_LEAD = 3
 
 ENGINE_INPUTS_DIRNAME = "engine_inputs"
 ENGINE_INPUTS_SCHEMA = 1
@@ -117,6 +120,9 @@ class ResumeFacts:
     possession: Optional[str]
     last_seq: int
     as_of: str
+    # "official" when the log's scoring plays sum to ESPN's header score; "pbp_lagging_header" when the header is
+    # ahead by at most one play (MAX_HEADER_LEAD) and the resume uses the log's own state (<= 1 play stale).
+    score_source: str = "official"
 
 
 def _utc_now_iso() -> str:
@@ -179,11 +185,19 @@ def resume_from_summary(summary: Mapping[str, Any], *, date: str = "", as_of: st
         return NbaResimRefusal("no_clock")
 
     hp, ap = period_points(rec.events, period)
+    score_source = "official"
     if (sum(hp), sum(ap)) != (state.home.score, state.away.score):
-        # The design's `pbp_score_mismatch`: the log's scoring plays and the official score disagree, so
-        # the per-period split the engine resumes from is not trustworthy. The backtest excludes the same.
-        return NbaResimRefusal("pbp_score_mismatch",
-                               f"pbp {sum(hp)}-{sum(ap)} official {state.home.score}-{state.away.score}")
+        lead_h, lead_a = state.home.score - sum(hp), state.away.score - sum(ap)
+        if 0 <= lead_h <= MAX_HEADER_LEAD and 0 <= lead_a <= MAX_HEADER_LEAD:
+            # ESPN's header score updates before the play reaches the log (P2, 2026-10-10). Resume from the LOG'S
+            # state -- period split, clock and score all from one consistent source, at most one play stale --
+            # and say so on the lane rather than refusing every such tick.
+            score_source = "pbp_lagging_header"
+        else:
+            # The design's `pbp_score_mismatch`: the log and the official score disagree by more than one play
+            # (or the log is AHEAD), so the per-period split is not trustworthy. The backtest excludes the same.
+            return NbaResimRefusal("pbp_score_mismatch",
+                                   f"pbp {sum(hp)}-{sum(ap)} official {state.home.score}-{state.away.score}")
 
     # Where to resume.
     if clock <= 0:
@@ -195,6 +209,13 @@ def resume_from_summary(summary: Mapping[str, Any], *, date: str = "", as_of: st
         hp, ap = hp + (0,), ap + (0,)
     else:
         r_period, r_secs = period, int(round(clock))
+        # A live five that is not 5 distinct players (P2: ~1 tick in 200, ESPN posts half a substitution first;
+        # the next tick heals) is refused for THIS tick, never resumed as a guess. P1's GameState.validate would
+        # reject it, and silently sampling a lineup instead would hide it.
+        for side in ("home", "away"):
+            five = _names(state, side)
+            if len(set(five)) != 5:
+                return NbaResimRefusal("on_floor_incomplete", f"{side}:{len(set(five))}")
 
     fouls = {p.name: int(p.pf) for p in state.players if p.pf}
     home_names = {p.name for p in state.players if p.side == "home"}
@@ -213,9 +234,9 @@ def resume_from_summary(summary: Mapping[str, Any], *, date: str = "", as_of: st
     )
     facts = ResumeFacts(
         event_id=str(state.event_id), home_code=str(state.home.code), away_code=str(state.away.code),
-        home_score=int(state.home.score), away_score=int(state.away.score), period=period,
+        home_score=int(sum(hp)), away_score=int(sum(ap)), period=period,
         clock_seconds=float(clock), possession=state.possession_side, last_seq=int(state.last_seq),
-        as_of=as_of or state.built_at or _utc_now_iso(),
+        as_of=as_of or state.built_at or _utc_now_iso(), score_source=score_source,
     )
     return state, gs, facts
 
@@ -635,6 +656,7 @@ def build_game_lens(facts: Optional[ResumeFacts], result: Any, *, live_state_as_
             "awayScore": facts.away_score,
             "period": facts.period,
             "clockSeconds": facts.clock_seconds,
+            "scoreSource": facts.score_source,
             # Full-game histograms. Priced by `price_distribution_market` ONLY once the backtest gate has
             # passed for the market (design §5); until then nba is not in `_LIVE_GAMELINE_SPORTS`.
             "totalRunsDist": result["total_dist"],

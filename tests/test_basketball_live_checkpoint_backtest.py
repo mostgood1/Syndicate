@@ -272,7 +272,9 @@ def test_truncated_summary_is_what_the_live_path_would_have_seen():
 
     s = _summary()
     g = _game()
-    for cp in ("end_q2", "q4_5min"):
+    # period-end checkpoints: this fixture rosters 1-2 players a side, so a MID-period resume is (correctly)
+    # refused `on_floor_incomplete`; mid-period fives are covered with P2's full fixture in test_nba_live_resim.py
+    for cp in ("end_q1", "end_q2", "end_q3"):
         st = bt.state_at(g, cp)
         cut = bt.truncate_summary(s, cp)
         out = lr.resume_from_summary(cut)

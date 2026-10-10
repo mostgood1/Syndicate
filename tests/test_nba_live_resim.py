@@ -61,8 +61,24 @@ def test_status_refusals_are_named(state, reason):
 
 def test_pbp_score_disagreeing_with_the_official_score_is_refused():
     g = _in_q2()
-    out = lr.resume_from_summary(g.summary(official=(9, 5)))
+    out = lr.resume_from_summary(g.summary(official=(9, 5)))  # header 5 ahead: more than one play
     assert isinstance(out, lr.NbaResimRefusal) and out.reason == "pbp_score_mismatch"
+    behind = lr.resume_from_summary(g.summary(official=(3, 5)))  # log AHEAD of the header
+    assert isinstance(behind, lr.NbaResimRefusal) and behind.reason == "pbp_score_mismatch"
+
+
+def test_header_one_play_ahead_resumes_from_the_log_and_says_so():
+    g = _in_q2()  # log: 4-5
+    _st, gs, facts = lr.resume_from_summary(g.summary(official=(7, 5)))  # a 3 the log has not posted yet
+    assert (facts.home_score, facts.away_score) == (4, 5) and facts.score_source == "pbp_lagging_header"
+    assert gs.home_score == 4
+
+
+def test_a_four_man_five_refuses_this_tick():
+    g = Game("nba", state="in")
+    g.shot(1, "11:00", "home", "h1").sub_out(1, "10:00", "home", "h5")  # half a substitution posted first
+    out = lr.resume_from_summary(g.summary())
+    assert isinstance(out, lr.NbaResimRefusal) and out.reason == "on_floor_incomplete" and out.detail == "home:4"
 
 
 # ------------------------------------------------------------------------------------------- inputs
