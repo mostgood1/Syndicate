@@ -947,6 +947,7 @@ death, never life — do not invert it.
 - STATUS 2026-10-06 ~22:15Z: Phase 1 pre-registered (026d94d7) + amendments; extractor/sim/table phases on main; real FIT extracted (NBA 816, WNBA 217); NBA FIT sim run COMPLETE 109/109 dates (2026-10-07 ~14:10Z; WSL ~/bball_sc, 3 workers, 200 draws, 0 errors).  NEXT: NBA table + flags, WNBA sim setup, NCAAB real table. GOAL: NOT MET (Phase 1 in progress).
 - NBA PHASE 1 READ 2026-10-07 (findings 'NBA Phase 1 reading'; 791 paired FIT games): FLAGGED -- margin SD 19.4 vs 14.0 and blowouts 35% vs 23% (too much spread), quarter shares (Q4 +1.7 pts, +2.5 close), quarter SD +1 pt, FTA -2.4/team with foul-outs x1.9 (no bonus/intentional FTs), top-5 minutes flat vs script (close -1.6, blowout +2.9), volume +5.6 plays/+2.4 3PA. EXONERATED: Q2 share. Phase 2 candidates ranked (spread jitter first); each pre-registered before any engine change. Owed: S12 back-to-back; WNBA sim; NCAAB real table.
 ### mlb-probability-calibration — OPEN — opened 2026-10-10 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **USER DECISION 2026-10-10: "Ship the 5 passing cells"** of rule v2 (outs, strikeouts, spreads|first5, totals|first5, totals|first1). This needs the new default-identity `market_shrink` method.
 - **RESULT v2 2026-10-10. The rule passes 5 of 13 cells; NOT SHIPPED, held for a user decision.**
   - **Passing cells:** outs w=0.00, spreads|first5 w=0.01, totals|first5 w=0.09, strikeouts w=0.06, totals|first1 w=0.67.
   - **THE FINDING IS THE WEIGHTS.** The Brier-optimal weight on the model vs the de-vigged book is <= 0.31 in 10 of 13 markets.
@@ -1008,7 +1009,7 @@ death, never life — do not invert it.
   - Coverage, disclosed: the seam reaches layer2 (rank, edge, EV, sizer), NOT the cards/ladders sim panels (`cards.py:3438` reads the dist directly).
 - Falsification test: no cell passes (1) and (2) -> nothing ships.
 - Verification: after restart, served MLB layer2 rows of a shipped cell carry `calibration_method=affine_logit` with `model_probability_cal != model_probability_raw`. Other sports' rows carry `identity`.
-- Files: (fleet artifacts + env only; scratch fitter `cal_fit.py`)
+- Files: syndicate/features/shared/probability_calibration.py, syndicate/features/shared/layer2_board.py (the _calibrate_model_edge seam only), tests/test_probability_calibration_market_shrink.py
 - Blocked by: none
 
 ### mlb-oos-market-backtest — CLOSED (GOAL MET) — closed 2026-10-10 — opened 2026-10-09 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
