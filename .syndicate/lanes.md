@@ -947,6 +947,18 @@ death, never life — do not invert it.
 - STATUS 2026-10-06 ~22:15Z: Phase 1 pre-registered (026d94d7) + amendments; extractor/sim/table phases on main; real FIT extracted (NBA 816, WNBA 217); NBA FIT sim run COMPLETE 109/109 dates (2026-10-07 ~14:10Z; WSL ~/bball_sc, 3 workers, 200 draws, 0 errors).  NEXT: NBA table + flags, WNBA sim setup, NCAAB real table. GOAL: NOT MET (Phase 1 in progress).
 - NBA PHASE 1 READ 2026-10-07 (findings 'NBA Phase 1 reading'; 791 paired FIT games): FLAGGED -- margin SD 19.4 vs 14.0 and blowouts 35% vs 23% (too much spread), quarter shares (Q4 +1.7 pts, +2.5 close), quarter SD +1 pt, FTA -2.4/team with foul-outs x1.9 (no bonus/intentional FTs), top-5 minutes flat vs script (close -1.6, blowout +2.9), volume +5.6 plays/+2.4 3PA. EXONERATED: Q2 share. Phase 2 candidates ranked (spread jitter first); each pre-registered before any engine change. Owed: S12 back-to-back; WNBA sim; NCAAB real table.
 ### mlb-probability-calibration — OPEN — opened 2026-10-10 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **STATUS 2026-10-10 15:1xZ: STAGED, INERT; activation BLOCKED on peer replies.**
+  - Code 3691bcd1 (`market_shrink` + the seam passes the fair; 47 tests pass) is on the fleet: ff 5439c6c8 -> 3691bcd1 at 15:02:10Z under a claim (token 430ee23f, released). No restart.
+  - Profile: `~/syndicate-prod/data/mlb_source/calibration/probability_calibration.json`, version mlb-market-shrink-2026-10-10.
+    - Cells outs w=0, spreads|first5 0.01, strikeouts 0.06, totals|first5 0.09, totals|first1 0.67; each with held-out provenance.
+  - Inert until `SYNDICATE_PRICING_CALIBRATION=on`. The supervisor freezes role env at `up`, so the flag needs a FULL down/up. User approved: "Down/up now, gated".
+  - **Blocker 1.** The full down/up would load unloaded peer code into the refresh-worker, which runs a032eb94:
+    - #473 team inputs, default ON (a8550771/b71232fb/...); that lane says "cannot ship alone";
+    - native orchestrator switch 984312a8 / 38deec5c;
+    - P3 c9971e75/f5781082/...
+    - Owners asked 15:1xZ (#473, P6, P3). Nothing is done until they answer.
+  - **Blocker 2.** check_deploy_safety was NOT CLEAR at 15:0xZ: board build in flight, soccer live odds jobs, live games.
+  - The boot task relaunches `up` with the same args (paper money).
 - **USER DECISION 2026-10-10: "Ship the 5 passing cells"** of rule v2 (outs, strikeouts, spreads|first5, totals|first5, totals|first1). This needs the new default-identity `market_shrink` method.
 - **RESULT v2 2026-10-10. The rule passes 5 of 13 cells; NOT SHIPPED, held for a user decision.**
   - **Passing cells:** outs w=0.00, spreads|first5 w=0.01, totals|first5 w=0.09, strikeouts w=0.06, totals|first1 w=0.67.
