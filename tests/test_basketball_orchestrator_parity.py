@@ -181,3 +181,20 @@ def test_compare_outputs_detects_a_difference(tmp_path):
     changed["players"]["home"][0]["pts_mean"] = 20.000001
     (b / "g1.pkl").write_bytes(pickle.dumps(changed))
     assert par.main(["compare-outputs", "--dir-a", str(a), "--dir-b", str(b)]) == 1
+
+
+def test_p1_recorder_sees_every_engine_call_through_the_module_attribute(tmp_path, monkeypatch):
+    """scripts/record_basketball_engine_corpus.py REPLACES `basketball_props_smart_sim._simulate_pbp_game_boxscore_local`.
+    The native orchestrator must resolve that name on the module at call time (hooks.simulate_pbp_game_boxscore does),
+    or the recorder sees 0 calls and P1's corpus can no longer be re-recorded."""
+    processed, kw = _game(tmp_path, "nba")
+    calls = []
+    real = bps._simulate_pbp_game_boxscore_local
+
+    def counting(**kwargs):
+        calls.append(1)
+        return real(**kwargs)
+
+    monkeypatch.setattr(bps, "_simulate_pbp_game_boxscore_local", counting)
+    _run("native", processed, "nba", kw)
+    assert len(calls) == kw["cfg"].n_sims == 5
