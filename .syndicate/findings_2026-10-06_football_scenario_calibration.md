@@ -571,3 +571,15 @@ for gains elsewhere.
   `C:\tmp\football_scenarios\ncaaf\refit_v41\`.
 - **Gate to the 2026 read:** fitted objective <= 0.8 x production on FIT (amendment 2), now with (b) satisfied in
   sample. The 2026 read itself is unchanged (once, >= 300 FBS-vs-FBS games weeks 3+, gates (a)-(f) + L1-L3).
+
+**v4.1 RESULT (2026-10-09, completed after one restart-kill + cache relaunch; 120 evals, 2 passes):**
+production obj 337.84 -> fitted **248.99 (ratio 0.737 <= 0.8)**, **`feasible_b_on_fit` true** -> the pre-registered gate
+to the 2026 read is MET. Fitted overrides: `tier_offset` 2.0, `tier_decay_weeks` 0 (constant, no fade),
+`non_offensive_scoring` on, `red_zone_touchdown_weight_bonus` 0.435, `drive_success_offense_sensitivity` 0.45 (the new
+floor), `drive_success_defense_sensitivity` 1.2, `red_zone_gain_stiffening` 0.6, `touchdown_weight_multiplier` 0.6188;
+`blend_k` stayed at production's 2. z production -> fitted: bias_tier_early +2.90 -> +1.17 (partly fixed; v4 reached
++0.25 by breaking ppd_weak), ppd_weak -2.01 -> -2.73 (within the +1.0 constraint), p_td +2.38 -> +0.18, ppd_strong
++3.01 -> +1.21, plays_per_drive +7.87 -> +5.95, p_td_rz +9.48 -> +7.92, margin_sd_gap -2.41 -> -1.56. Worse: p_punt
++1.59 -> +2.35, drives_per_team_game -0.40 -> +1.37 (both inside the constraint). Unmoved structural misses: total_sd_gap
+-5.7, p_fg -5.9, total_slope -7.4 (no lever reaches them). Output `C:\tmp\football_scenarios\ncaaf\refit_v41\`.
+The 2026 read is NOT yet scheduled: it is the last clean NCAAF held-out set and needs >= 300 FBS-vs-FBS games weeks 3+.
