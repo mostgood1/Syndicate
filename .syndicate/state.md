@@ -479,6 +479,7 @@ once this index exists: re-splitting would orphan the parts.
 | [nba-model-skill-2025-26] | THE NBA MODEL IS LESS ACCURATE THAN THE PLAYER'S OWN AVERAGE, AND THE REASONS ARE MEASURED — as-of 2025-26 bac | `state_basketball.md` |
 | [nba-layer2-projections] | NBA LINES CARRY THE MODEL ON LAYER 2 -- game lines LIVE and VERIFIED; props wired but no NBA prop quote exists | `state_basketball.md` |
 | [basketball-native-engine] | THE BASKETBALL POSSESSION ENGINE IS SYNDICATE'S -- live on the fleet, parity-proven on 5,400 real production calls | `state_basketball.md` |
+| [nba-sim-totals-and-strength] | NBA SMART-SIM TOTALS + TEAM STRENGTH: measured defects, fixes built DEFAULT-OFF, nothing enabled | `state_basketball.md` |
 | [board-freshness] | BOARD FRESHNESS AND STALENESS | `state_board.md` |
 | [board-intelligence-engine] | BOARD / INTELLIGENCE ENGINE — structural facts, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19. | `state_board.md` |
 | [locked-cards-retuned-no-autorun] | `locked_cards_retuned` HAS NO AUTOMATIC TRIGGER, ANYWHERE `[measured 2026-08-18]` | `state_board.md` |

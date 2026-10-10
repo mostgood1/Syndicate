@@ -1101,3 +1101,21 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - Lineup pools: NBA 0/15 games, WNBA 3/12 (no `rotation_stints_history` producer yet; P2).
   - Starter flags: NBA 0/517 player rows, WNBA 55/219. The engine falls back to a minutes ranking.
 - **Owed:** the first NEWLY simulated production game after 21:29:34Z (a `smart_sim_*.json` with later mtime) completes with `failures == 0`.
+
+## [nba-sim-totals-and-strength] NBA SMART-SIM TOTALS + TEAM STRENGTH: measured defects, fixes built DEFAULT-OFF, nothing enabled `[2026-10-10, lane basketball-scenario-calibration]`
+
+- **Raw total −17 vs actual** (780 2025-26 FIT games): `_simulate_quarters_local` subtracts the opponent def from
+  points-derived ratings (−5.1) and applies injury-count pace/points penalties (−8.5). The rest (−3.3) is the game
+  model's own.
+  - Switch file `nba_sim_total_inputs.json` (skip_def_subtraction, skip_outs_penalties), NBA only, ABSENT on the
+    fleet = today's behaviour (51d08f7a).
+- **No NBA `calibration_totals_*.json` exists on the fleet** (0 files, 2026-10-09).
+  - The builder `scripts/build_nba_totals_calibration.py` (a1545bf4) is NOT wired into the NBA refresh. Its opening
+    seed (+2.50, switched raw) is not set in code.
+- **Team strength double count:** `team_prior_stacks_on_target` (cfg, default True = today). False brings the sim
+  mean margin from 1.45× to 0.87× the market (d731172f). Not enabled.
+- **Six ported WNBA engine fixes:** in the native engine at NBA defaults = off; each confirmed on its box row
+  (3d1fd556). Not enabled.
+- **score_effect_k** (late-game catch-up, native engine, default 0): not fitted. NBA re-fits are on hold for #473.
+- **Production today is right on totals only because errors cancel:** target −4.5 plus engine overshoot +6.
+  Enabling EXACT_TARGET_CALIBRATION alone would lower NBA totals ~5.

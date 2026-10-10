@@ -3687,3 +3687,13 @@ v1 of the 2026 checkpoint corpus fed the shipped lens functions `predictions_<da
   - Launch with `setsid nohup ... < /dev/null & disown` and confirm the pid is alive in a later call.
   - Resolve a role pid in the same shell line that uses it.
   - An A/B compare is only valid when the arm's run line says `exit=0` and wrote N.
+
+## 2026-10-10 -- A rising walk-forward correction is not a drifting model: read the residual's own trend first `[session e0a3e383]`
+
+- **Measured:** an NBA totals calibration term rose 7.3 → 15 (clipped) across the season. It read as "the model
+  drifts", and a fix was pre-registered on that premise.
+- The raw residual's own trend was −0.60 per 30 days [−2.00, +1.00]: none. The rise was a short early-season window
+  plus the ±15 clip binding.
+- The real cause was a constant LEVEL: −5.1 from a double-counted defense and −8.5 from injury penalties.
+- **Rule:** before attributing a moving correction to drift, regress the uncorrected residual on date with a
+  date-clustered CI. A fitted term's path also carries its window and its clip.
