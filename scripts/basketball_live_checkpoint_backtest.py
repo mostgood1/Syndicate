@@ -50,6 +50,7 @@ import statistics
 import sys
 import time
 import urllib.request
+import zlib
 from collections import defaultdict
 from datetime import date, timedelta
 from pathlib import Path
@@ -887,10 +888,21 @@ class NativeResimProjector:
     name = "native_resim"
 
     def __init__(self, *, inputs_root: Optional[Path] = None, summary_caches: Sequence[Path] = (),
-                 sims: int = 100) -> None:
+                 sims: int = 100, cache_dir: Optional[Path] = None) -> None:
         self.inputs = index_engine_inputs(inputs_root)
         self.summary_caches = list(summary_caches)
         self.sims = sims
+        # Per (game, checkpoint) results, so `--shard i/n` processes can fill it in parallel and one final grade run
+        # reads it without simulating. Keyed on the inputs file's size+mtime and the sim count: a re-recorded input
+        # or a different N never reuses a stale projection.
+        self.cache_dir = cache_dir
+
+    def _cache_path(self, game, checkpoint: str, inputs_path: Path) -> Optional[Path]:
+        if self.cache_dir is None:
+            return None
+        st = inputs_path.stat()
+        tag = f"{game.event_id}_{checkpoint}_n{self.sims}_{st.st_size}_{int(st.st_mtime)}"
+        return self.cache_dir / f"{tag}.json"
 
     def _summary(self, event_id: str) -> Optional[Dict[str, Any]]:
         for root in self.summary_caches:
@@ -910,6 +922,22 @@ class NativeResimProjector:
         path = self.inputs.get(key)
         if path is None:
             return Projection(refusal="no_pregame_inputs")
+        cpath = self._cache_path(game, st.checkpoint, path)
+        if cpath is not None and cpath.exists():
+            return Projection(**json.loads(cpath.read_text(encoding="utf-8")))
+        proj = self._project_uncached(game, st, rules, path)
+        if cpath is not None:
+            cpath.parent.mkdir(parents=True, exist_ok=True)
+            tmp = cpath.with_suffix(".tmp")
+            tmp.write_text(json.dumps(dataclasses.asdict(proj)), encoding="utf-8")
+            tmp.replace(cpath)
+        return proj
+
+    def _project_uncached(self, game, st, rules, path):
+        import pickle
+
+        from syndicate.features.nba import live_resim as lr
+
         summary = self._summary(game.event_id)
         if summary is None:
             return Projection(refusal="no_summary")
@@ -1367,6 +1395,9 @@ def run_grade(args: argparse.Namespace) -> int:
     games = load_games(Path(args.games))
     if args.population:
         games = [g for g in games if g.population in set(args.population)]
+    if args.shard:
+        i, n = (int(x) for x in str(args.shard).split("/", 1))
+        games = [g for g in games if zlib.crc32(g.event_id.encode("utf-8")) % n == i]
     sims = load_sim_draws(Path(args.sim_draws)) if args.sim_draws else {}
     lines = load_pregame_lines(Path(args.lines_cache)) if args.lines_cache else {}
     live = load_live_close(Path(args.live_close)) if args.live_close else {}
@@ -1375,7 +1406,8 @@ def run_grade(args: argparse.Namespace) -> int:
         if n == "native_resim":
             caches = [Path(c) for c in (args.summary_cache or [])]
             projectors.append(NativeResimProjector(inputs_root=Path(args.engine_inputs) if args.engine_inputs else None,
-                                                   summary_caches=caches, sims=args.resim_sims))
+                                                   summary_caches=caches, sims=args.resim_sims,
+                                                   cache_dir=Path(args.native_cache) if args.native_cache else None))
         else:
             projectors.append(PROJECTORS[n]())
     rep = grade(games, projectors, lines=lines, sims=sims, live_close=live, baseline=args.baseline)
@@ -1416,6 +1448,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     g.add_argument("--engine-inputs", help="dir of pregame engine-input pickles (native_resim)")
     g.add_argument("--summary-cache", action="append", help="ESPN summary cache dir(s) (native_resim)")
     g.add_argument("--resim-sims", type=int, default=100)
+    g.add_argument("--native-cache", help="dir caching native_resim projections per (game, checkpoint)")
+    g.add_argument("--shard", help="i/n: grade only games whose crc32(event_id) %% n == i (fill the cache in parallel)")
     g.add_argument("--baseline", default="vendored_replay")
     g.add_argument("--out", required=True)
     lc = sub.add_parser("live-close")

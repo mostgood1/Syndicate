@@ -284,3 +284,20 @@ def test_truncated_summary_is_what_the_live_path_would_have_seen():
         assert facts.period == st.period and facts.clock_seconds == st.clock_s
     _s, gs, _f = lr.resume_from_summary(bt.truncate_summary(s, "end_q2"))
     assert (gs.period, gs.seconds_remaining) == (3, None)  # resumes from the Q3 tip
+
+
+def test_native_projection_cache_is_reused_and_keyed_on_the_inputs(tmp_path, monkeypatch):
+    g = _game()
+    pj = bt.NativeResimProjector(cache_dir=tmp_path / "cache", sims=100)
+    inp = tmp_path / "x.pkl"
+    inp.write_bytes(b"1")
+    pj.inputs = {(g.date, "HOM", "AWY"): inp}
+    calls = []
+    monkeypatch.setattr(pj, "_project_uncached", lambda *a: calls.append(1) or bt.Projection(total=200.0, fidelity="t"))
+    st = bt.state_at(g, "end_q2")
+    a = pj.project(g, st, bt.Pregame(None, None, None, "t"), NBA)
+    b = pj.project(g, st, bt.Pregame(None, None, None, "t"), NBA)
+    assert a.total == b.total == 200.0 and len(calls) == 1  # second read came from the cache
+    inp.write_bytes(b"22")  # a re-recorded input invalidates the cached projection
+    pj.project(g, st, bt.Pregame(None, None, None, "t"), NBA)
+    assert len(calls) == 2
