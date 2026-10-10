@@ -946,6 +946,36 @@ death, never life — do not invert it.
 - Blocked by: none
 - STATUS 2026-10-06 ~22:15Z: Phase 1 pre-registered (026d94d7) + amendments; extractor/sim/table phases on main; real FIT extracted (NBA 816, WNBA 217); NBA FIT sim run COMPLETE 109/109 dates (2026-10-07 ~14:10Z; WSL ~/bball_sc, 3 workers, 200 draws, 0 errors).  NEXT: NBA table + flags, WNBA sim setup, NCAAB real table. GOAL: NOT MET (Phase 1 in progress).
 - NBA PHASE 1 READ 2026-10-07 (findings 'NBA Phase 1 reading'; 791 paired FIT games): FLAGGED -- margin SD 19.4 vs 14.0 and blowouts 35% vs 23% (too much spread), quarter shares (Q4 +1.7 pts, +2.5 close), quarter SD +1 pt, FTA -2.4/team with foul-outs x1.9 (no bonus/intentional FTs), top-5 minutes flat vs script (close -1.6, blowout +2.9), volume +5.6 plays/+2.4 3PA. EXONERATED: Q2 share. Phase 2 candidates ranked (spread jitter first); each pre-registered before any engine change. Owed: S12 back-to-back; WNBA sim; NCAAB real table.
+### mlb-probability-calibration — OPEN — opened 2026-10-10 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- Goal: give MLB game-line and pitcher-prop probabilities a per-market calibration on the board's existing pricing seam (`probability_calibration.py` / `layer2_board._calibrate_model_edge`), for every market where it pre-registeredly beats the raw probability out of sample.
+- **Why.** `findings_2026-10-09_mlb_oos_market_backtest.md`: the loss to the book is RELIABILITY. The model p is overspread: slopes 0.06-0.5, and the sd of p is ~5x the book's on totals.
+- **Data.** Per-row probabilities from `scripts/backtest_mlb_lines_props.py` run unchanged (rows captured by a scratch wrapper around its own builders), over the fwd arm: production config from 988fa33d, 985 games, 07-16..09-27.
+- **Curve.** SIDE-SYMMETRIC affine-logit, `logit(p') = b*logit(p)` (a = 0).
+  - The seam applies one curve to each side's own p, so a != 0 would make over+under != 1.
+  - Fitted with the module's own `fit_affine_logit` on mirrored rows (p,y) + (1-p,1-y), which forces a = 0.
+  - One cell per `<market>|<segment>` the seam keys on.
+- **PRE-REGISTERED RULE (written before any fit).**
+  - **Windows:** fit 07-16..08-21; judge 08-22..09-27. Disclosed: these windows have been read before, and no clean 2026 regular season remains.
+  - **Cells eligible:**
+    - h2h, spreads and totals on segments full and first5;
+    - totals on segments first3 and first1;
+    - pitcher strikeouts, outs, hits_allowed, walks, earned_runs.
+  - **Hitter props are EXCLUDED.** Production serves the sim-time-calibrated `p_*_cal`, while the backtest scores the raw dist, so their rows do not represent the served number.
+  - **A cell SHIPS iff, on the judge window:**
+    - (1) paired, game-clustered bootstrap (1000 draws, seed 7) dBrier(cal - raw) has CI upper < 0;
+    - (2) log-loss(cal) <= log-loss(raw).
+  - Every other cell is left absent (= identity). Per-line principle: a cell only reshapes the probability; it never withholds a line.
+- **Ship.**
+  - Write `mlb_source/calibration/probability_calibration.json` on the fleet data root via `save_profile`, cells carrying held-out provenance.
+  - Set `SYNDICATE_PRICING_CALIBRATION=on` in `~/syndicate-prod/local_production.env`, which is absent today.
+    - No other sport has a profile, so for them it is identity plus 4 provenance stamps per row.
+  - Restart the refresh-worker only under the restart rule (claim + check_deploy_safety idle right after a save + deploys.md); reload web.
+  - Coverage, disclosed: the seam reaches layer2 (rank, edge, EV, sizer), NOT the cards/ladders sim panels (`cards.py:3438` reads the dist directly).
+- Falsification test: no cell passes (1) and (2) -> nothing ships.
+- Verification: after restart, served MLB layer2 rows of a shipped cell carry `calibration_method=affine_logit` with `model_probability_cal != model_probability_raw`. Other sports' rows carry `identity`.
+- Files: (fleet artifacts + env only; scratch fitter `cal_fit.py`)
+- Blocked by: none
+
 ### mlb-oos-market-backtest — CLOSED (GOAL MET) — closed 2026-10-10 — opened 2026-10-09 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
 - **GOAL VERDICT 2026-10-10: GOAL: MET.** Reading: `findings_2026-10-09_mlb_oos_market_backtest.md`. The current engine beats the de-vigged book in 0 of 18 markets with book rows. It is at parity in 3 (F1 total, F3 total, pitcher walks) and worse in 15. The 988fa33d fix narrowed the gap in 11 of 18: full total +0.0163 -> +0.0118, outs +0.0629 -> +0.0493, walks to parity. The remaining loss is RELIABILITY: slopes 0.06-0.5, and the model p is ~5x more spread than the book on totals. HR is unmeasurable (one-sided quotes). Nothing shipped. Lead: per-market calibration layer.
 - **2026-10-09 OddsAPI spend, ACTUAL:** 186,984 credits in 3,054 calls (74/74 dates done; dry-run upper bound 188,670; cap 200,000). That is 3.7% of the 5M monthly budget. The spend was intended: the user said "proceed" to "spend if under ~200k". **Priority lapse:** the fetcher ran on Windows at Normal priority, not Idle, against the low-priority rule. It was flagged by the watcher session and had already exited when read. It was mostly network-bound. Relaunches go Idle. The fleet sims run at nice 19.
