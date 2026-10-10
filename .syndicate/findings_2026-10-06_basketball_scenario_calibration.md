@@ -1063,3 +1063,13 @@ stay untouched.
   no-stack, but NOT skip_def.
 - The key is this lane's to control. Owed from nba-sim-team-adj-473: the deploy SHA plus the input-checklist reading
   (that lifts the NBA re-fit hold).
+
+**#473 option A LIVE (reported by nba-sim-team-adj-473, re-read here 2026-10-10 15:09Z):**
+- Code a31ba2bf reached the fleet via ff to 62909c36 at 14:54:10Z.
+- This lane's key file, checked directly: `/home/amyn/syndicate-prod/data/nba_source/data/processed/nba_sim_total_inputs.json`
+  = `{"skip_def_subtraction": true}` (31 bytes, mtime 15:06:05Z), matching deploys.md 0974846c.
+- At 15:09Z the newest fleet NBA sim was smart_sim_2026-10-10_TOR_LAC.json from 12:38 local, BEFORE the file. No sim
+  has read it yet, so the first market_anchor.nba_total_inputs reading is owed (their watcher).
+- Owed by that lane: todo #695, the regular-season totals reading (≥ 30 finals; delete the file if totals stay
+  ≥ ~+2 worse than OFF).
+- The NBA re-fit hold stands until the post-deploy input checklist passes.
