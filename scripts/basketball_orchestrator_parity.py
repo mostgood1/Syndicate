@@ -31,6 +31,8 @@ SUBCOMMANDS
            input. Otherwise every leaf is compared with the recorded output.
   compare  End-to-end: the smart_sim_*.json two runs wrote, leaf for leaf (P1's
            ``compare_sim_artifacts``).
+  compare-outputs  Two ``replay --save-outputs`` runs (one per arm, same checkout) against EACH OTHER.
+           Use it after a shared port changed since recording, when the recorded output no longer applies.
 
 SAFETY. ``--source-root`` must not be inside ``--prod-data-root``. ``--env-from-pid``
 loads a fleet role's env as a Python dict from /proc/<pid>/environ (P1's
@@ -323,6 +325,11 @@ def cmd_replay(args) -> int:
             row.update(verdict="CRASH", error=err[:500])
             bad += 1
         else:
+            if args.save_outputs:
+                save_dir = Path(args.save_outputs).expanduser()
+                save_dir.mkdir(parents=True, exist_ok=True)
+                with (save_dir / name).open("wb") as fh:
+                    pickle.dump(out, fh, protocol=4)
             digest = output_digest(out)
             row["digest_reproduced"] = digest == case["output_digest"]
             n, diffs = leaf_compare(case["output"], out)
@@ -408,6 +415,33 @@ def cmd_builders(args) -> int:
     return 0 if rep["verdict"] == "PASS" else 1
 
 
+def cmd_compare_outputs(args) -> int:
+    """Two `replay --save-outputs` directories, game by game, every leaf.
+
+    This is the check that survives a change to a SHARED port: run both arms on the same checkout and compare them
+    to EACH OTHER. The comparison against the recorded output is only valid when the ports are unchanged since
+    recording."""
+    a_dir, b_dir = Path(args.dir_a).expanduser(), Path(args.dir_b).expanduser()
+    names = sorted({p.name for p in a_dir.glob("*.pkl")} | {p.name for p in b_dir.glob("*.pkl")})
+    rows, leaves, bad = [], 0, 0
+    for name in names:
+        pa, pb = a_dir / name, b_dir / name
+        if not (pa.exists() and pb.exists()):
+            rows.append({"case": name, "verdict": "MISSING_IN_" + ("A" if not pa.exists() else "B")})
+            bad += 1
+            continue
+        with pa.open("rb") as fa, pb.open("rb") as fb:
+            a, b = pickle.load(fa), pickle.load(fb)
+        n, diffs = leaf_compare(a, b)
+        leaves += n
+        bad += 1 if diffs else 0
+        rows.append({"case": name, "leaves": n, "diffs": diffs, "verdict": "DIFFERS" if diffs else "IDENTICAL"})
+        print("ORCH_OUT " + json.dumps(rows[-1])[:1500], flush=True)
+    rep = {"games": len(names), "leaves_compared": leaves, "games_failed": bad, "verdict": "PASS" if names and not bad else "FAIL"}
+    print("ORCH_OUT_PARITY " + json.dumps(rep), flush=True)
+    return 0 if rep["verdict"] == "PASS" else 1
+
+
 def cmd_compare(args) -> int:
     from scripts.basketball_engine_parity import compare_sim_artifacts
 
@@ -444,6 +478,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--prod-data-root", default="~/syndicate-prod/data")
     p.add_argument("--scratch-data-root", default=None)
     p.add_argument("--vendored-bridge", type=Path, default=None)
+    p.add_argument("--save-outputs", default=None, help="pickle each replayed output here (for compare-outputs)")
+    co = sub.add_parser("compare-outputs")
+    co.add_argument("--dir-a", required=True)
+    co.add_argument("--dir-b", required=True)
     bl = sub.add_parser("builders")
     bl.add_argument("--league", required=True, choices=("nba", "wnba"))
     bl.add_argument("--dates", required=True)
@@ -461,7 +499,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     global VENDORED_BRIDGE_FILE
     VENDORED_BRIDGE_FILE = getattr(args, "vendored_bridge", None)
-    return {"record": cmd_record, "replay": cmd_replay, "compare": cmd_compare, "builders": cmd_builders}[args.cmd](args)
+    return {"record": cmd_record, "replay": cmd_replay, "compare": cmd_compare, "builders": cmd_builders, "compare-outputs": cmd_compare_outputs}[args.cmd](args)
 
 
 if __name__ == "__main__":

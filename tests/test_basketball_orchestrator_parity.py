@@ -165,3 +165,19 @@ def test_checklist_fires_on_an_unfed_consumed_input(tmp_path):
         assert hit == (name == "unfed"), alarms
         if name == "unfed":
             assert rc == 1
+
+
+def test_compare_outputs_detects_a_difference(tmp_path):
+    import pickle
+
+    a, b = tmp_path / "a", tmp_path / "b"
+    a.mkdir()
+    b.mkdir()
+    out = {"score": {"total_mean": 210.5, "dist": np.array([1, 2, 3])}, "players": {"home": [{"pts_mean": 20.0}]}}
+    for d in (a, b):
+        (d / "g1.pkl").write_bytes(pickle.dumps(out))
+    assert par.main(["compare-outputs", "--dir-a", str(a), "--dir-b", str(b)]) == 0
+    changed = copy.deepcopy(out)
+    changed["players"]["home"][0]["pts_mean"] = 20.000001
+    (b / "g1.pkl").write_bytes(pickle.dumps(changed))
+    assert par.main(["compare-outputs", "--dir-a", str(a), "--dir-b", str(b)]) == 1
