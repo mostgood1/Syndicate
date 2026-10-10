@@ -964,7 +964,8 @@ death, never life — do not invert it.
 - Files: (none; scratch scripts only)
 - Blocked by: none
 
-### mlb-game-profile-pitch-config — OPEN — opened 2026-10-09 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+### mlb-game-profile-pitch-config — CLOSED (GOAL MET) — closed 2026-10-10 — opened 2026-10-09 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **make production's MLB game-ROI profile (served `daily/sims`) run the calibrated forward pitch-model file, if the pre-registered A/B shows it scores better than what it runs today. — GOAL: MET.** Readings: (a) the A/B passed all 3 pre-registered checks (primary CRPS -0.155 [-0.233, -0.077]); (b) V1: the fleet at 988fa33d resolves the forward file; (c) V2 on the first post-ff run (10-10 CWS@CLE): meta hr_rate_mult 1.5; served runs 8.209 vs fwd replay 8.142 (0.4 SE) and old 9.786 (~9 SE); arms 7 SE apart. Upstream PR MLB-BettingV2#5 open. Claim released.
 - 2026-10-09: upstream PR mostgood1/MLB-BettingV2#5 (same one-line default; upstream had the identical missing-file default). Until it merges, a vendor re-pull would revert 988fa33d; the regression test tests/test_mlb_multi_profile_pitch_overrides.py would then fail.
 - **STATUS 2026-10-09 20:35Z: SHIPPED, V2 OWED.** Pre-registered rule PASSED on all three checks: primary CRPS -0.155 [-0.233, -0.077]; Brier +0.0006 [-0.0028, +0.0040]; full window -0.160. Runs bias +1.67 -> -0.03/game. `988fa33d` fleet ff 20:35:21Z; V1 MET. V2 watcher `~/gpv2/watch.sh` (deploys.md 20:35Z). Close the lane when V2 reads.
 - Goal: make production's MLB game-ROI profile (served `daily/sims`) run the calibrated forward pitch-model file, if the pre-registered A/B shows it scores better than what it runs today.
@@ -1007,7 +1008,8 @@ death, never life — do not invert it.
 - Files: vendor/mlb_bettingv2/tools/daily_update_multi_profile.py (the --game-pitch-model-overrides argparse default ONLY), scripts/mlb_game_line_config_ab.py (NEW), tests/test_mlb_game_line_config_ab.py (NEW)
 - Blocked by: none
 
-### mlb-statsapi-asof-rebuild — OPEN — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+### mlb-statsapi-asof-rebuild — CLOSED (GOAL MET) — closed 2026-10-10 — opened 2026-10-07 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- 2026-10-10 close: it was held open only for the HR 1.5 V2b. That watcher was misframed and STOPPED: it compared game-profile sims, which never ran the forward file. HR 1.5 is now verified on the props profiles (meta 10-08) and the game profile (lane mlb-game-profile-pitch-config V2). Nothing owed. The tuning-file claim is released (Files below kept for history).
 - **HR 1.5 V2b status 2026-10-09 ~17:15Z: watcher is DURABLE on the fleet; no reading yet.**
   - No MLB sim since 10-08 18:35 CDT: no games 10-09. Next: 10-10 CWS (DS G5, time TBD), then the LCS from 10-11.
   - The watcher runs detached (`setsid nohup`) as `~/hrv2b/hrv2b_watch3.sh` on the fleet. It covers sims for 10-10..10-13, for up to 4 days.

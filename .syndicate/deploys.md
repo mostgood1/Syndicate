@@ -48246,3 +48246,11 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - **Transient non-5 fives:** 3 of 604 in-play ticks (CHI P3 2:40-2:23; NYL P2 6:42). ESPN posts half of a substitution first; the next tick rebuilds and heals, and the anomaly is counted. P3 should refuse a tick whose fives are not 5v5.
   - **Clock correction:** one tick went back 1 s (LVA P4 5:31 -> 5:32 while seq advanced). This is ESPN correcting the clock.
 - **rollback:** revert 45e03ae2 and ff; the sim returns to the box-or-vendored map.
+
+## 2026-10-10 ~00:00Z -- V2 MET for fleet ff 988fa33d (MLB game profile on the forward pitch file; lane `mlb-game-profile-pitch-config`)
+- **Run.** First post-ff game-profile run: 2026-10-10 slate, meta generated 2026-10-09T23:12Z (18:12 CDT), after the 20:35Z ff.
+  - `cfg_kwargs.pitch_model_overrides`: hr_rate_mult 1.5, base_hbp 0.0015, early_count_foul_boost 1.5 (was {}).
+- **Same-moment snapshot** (sims + roster_objs, 23:20Z), pk 849831 CWS@CLE, 1000 sims/arm:
+  - served total runs 8.209: fwd replay 8.142 (0.4 SE), old (none) 9.786 (~9 SE); arms 1.64 apart = 7.1 SE;
+  - served HR 1.844: fwd 1.821, old 2.276.
+- **MET** by the pre-registered rule (meta == 1.5 AND served closer to fwd, arms > 3 SE apart).

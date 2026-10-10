@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1345 rules `[generated]`
+## Index — 1364 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -3714,3 +3714,14 @@ v1 of the 2026 checkpoint corpus fed the shipped lens functions `predictions_<da
   - **A process kill matched other sessions' work.** I killed my leftover pytest by a command-line fragment (`pytest` + `no:cacheprovider`), and it also killed P1's and another session's test runs. Match your OWN pid, or a unique token in your own argv, never a shared flag.
   - **I described `up` as light.** On a running fleet `up` refuses until `down`, so it is a full restart. Read `cmd_up` before offering it.
 - **Cost:** about 20 hours with a false "MET" on the ledger (2026-10-09 18:56Z -> 2026-10-10 14:25Z fix). No production harm: preseason NBA slates admit no history anyway, and WNBA sims ran before the backfill. Two other sessions' test runs were interrupted.
+
+## 2026-10-10 -- A config "resolves" check proves the resolver, not the run: read the run's own recorded config, PER PROFILE `[lane mlb-game-profile-pitch-config]`
+**The miss.** Two MLB ships (combined calibration 10-07, HR 1.5 10-08) were V1-verified by calling `_apply_forward_tuning_defaults` and confirming it points at the forward pitch file.
+- Production never relied on that default for game lines. The multi-profile runner passes the game-ROI profile an EXPLICIT `--pitch-model-overrides` pointing at a file that never existed.
+- A missing path loads as `{}`, and the explicit flag suppresses the default.
+- So game lines, and every board prop number read from `daily/sims`, ran class defaults all season. The props profiles did get the file.
+- The evidence was in the run's own `daily/snapshots/<d>/meta.json` (`cfg_kwargs.pitch_model_overrides: {}`) the whole time.
+**Rule.**
+- Verify a config ship against the `cfg_kwargs` the production RUN recorded, for EACH profile/output dir that serves a surface.
+- A V2 replay must include an arm for "the config the run actually used", not only new-vs-old of the intended path.
+- A loader that maps a missing file to `{}` must be paired with a test that every configured path exists.

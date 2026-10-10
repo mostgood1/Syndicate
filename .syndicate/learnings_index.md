@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1345 rules `[generated]`
+## Index — 1364 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 511**
+**FORBIDDEN — 512**
 
 - [2026-09-21 FORBIDDEN: diagnosing a failure from its most vivid example `[lane layer2-li…](#2026-09-21-forbidden-diagnosing-a-failure-from-its-most-vivid-example-lane-layer2-line-move-magnitude)
 - [2026-09-21 FORBIDDEN: verifying that a signal was COMPUTED as verifying that it is REAL…](#2026-09-21-forbidden-verifying-that-a-signal-was-computed-as-verifying-that-it-is-real-lane-layer2-line-move-magnitude)
@@ -120,6 +120,7 @@
 - [2026-10-07 — FORBIDDEN: a readiness/presence check that decides what counts by "is the…](#2026-10-07-forbidden-a-readinesspresence-check-that-decides-what-counts-by-is-the-path-inside-the-git-checkout-session-13ac7622-lane-intelligence-evidence-coverage)
 - [2026-10-07 — FORBIDDEN: `xargs -0 -a /proc/<pid>/environ env -i <cmd>` to borrow a role…](#2026-10-07-forbidden-xargs--0--a-procpidenviron-env--i-cmd-to-borrow-a-roles-env----xargs-appends-the-items-as-argv-session-13ac7622-lane-intelligence-evidence-coverage)
 - [2026-10-09 — FORBIDDEN: rewriting a ledger file in TEXT mode; read and write bytes `[la…](#2026-10-09-forbidden-rewriting-a-ledger-file-in-text-mode-read-and-write-bytes-lane-soccer-roster-refresh-accuracy)
+- [2026-10-09 -- FORBIDDEN: listing a role's env KEYS with `tr '\0' '\n' < /proc/<pid>/env…](#2026-10-09----forbidden-listing-a-roles-env-keys-with-tr-0-n-procpidenviron-cut--d--f1----a-multi-line-value-a-pem-key-prints-its-body-lines-as-names-lane-games-rail-full-detail-session-d4409ac4)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -532,7 +533,7 @@
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 - [2026-09-03 — EXONERATED: `deploys.md` and `learnings.md` ARE guarded. Two sessions file…](learnings_archive.md#2026-09-03-exonerated-deploysmd-and-learningsmd-are-guarded-two-sessions-filed-the-same-false-gap-and-the-second-re-derived-it-with-the-same-blind-spot) `[evidence]`
 
-**Rules and corrections — 827**
+**Rules and corrections — 845**
 
 - [2026-09-16 — a detector that matches a FORMULA at published precision has a FALSE-POSIT…](#2026-09-16-a-detector-that-matches-a-formula-at-published-precision-has-a-false-positive-rate-and-mine-fired-at-about-1-row-per-1200-session-abacd435-lane-soccer-anytime-scorer)
 - [2026-09-16 — OVERTURNED: "the pre-registered criterion is the safe part, the risk is in…](#2026-09-16-overturned-the-pre-registered-criterion-is-the-safe-part-the-risk-is-in-the-mechanism-two-hypotheses-in-one-night-died-on-the-criterion-session-abacd435-fixes-4-and-5a-no-lane)
@@ -731,6 +732,24 @@
 - [2026-10-08 -- "Board build idle" on a FRESH refresh-worker means its first build has no…](#2026-10-08----board-build-idle-on-a-fresh-refresh-worker-means-its-first-build-has-not-started-not-that-a-save-happened-lane-layer2-board-ui-redesign)
 - [2026-10-09 -- A calibration fitted AND validated inside one month inherits that month's…](#2026-10-09----a-calibration-fitted-and-validated-inside-one-month-inherits-that-months-environment-lanes-mlb-combined-calibration-mlb-statsapi-asof-rebuild)
 - [2026-10-09 -- A fix that closes one bias can EXPOSE a second one that was cancelling it…](#2026-10-09----a-fix-that-closes-one-bias-can-expose-a-second-one-that-was-cancelling-it----check-the-metric-before-and-after-the-change-before-attributing-it-lane-mlb-statsapi-asof-rebuild)
+- [2026-10-09 — A SINGLE FULL-SUITE PASS CANNOT ESTABLISH A FAILURE COUNT ON THIS SUITE `[…](#2026-10-09-a-single-full-suite-pass-cannot-establish-a-failure-count-on-this-suite-lane-suite-baseline-flakiness-session-4ab694ed)
+- [2026-10-09 -- A test that passes in a data-less worktree is not a passing test -- run i…](#2026-10-09----a-test-that-passes-in-a-data-less-worktree-is-not-a-passing-test----run-it-with-syndicate_data_rootprod-before-trusting-it-lane-nfl-name-test-hermetic)
+- [2026-10-09 -- A classifier built from the code's write path still needs a read of the r…](#2026-10-09----a-classifier-built-from-the-codes-write-path-still-needs-a-read-of-the-real-file-before-it-is-trusted-lane-soccer-lineup-reach)
+- [2026-10-08 -- A MULTI-FILE LEDGER EDIT AND ITS COMMIT MUST NOT RUN IN PARALLEL: the com…](#2026-10-08----a-multi-file-ledger-edit-and-its-commit-must-not-run-in-parallel-the-commit-recorded-1-of-3-files-under-a-message-claiming-all-3-lane-status-effective-memory-cap)
+- [2026-10-09 — A "TAKE MY SIDE FROM THE MARKER TO EOF" CONFLICT RESOLVER IS SAFE ONLY IF…](#2026-10-09-a-take-my-side-from-the-marker-to-eof-conflict-resolver-is-safe-only-if-your-section-is-at-eof-lane-suite-baseline-flakiness-session-4ab694ed)
+- [2026-10-09 — THE SPARSE-WORKTREE PENALTY, NOW MEASURED AT SUITE SCALE: ~10x THE FAILURE…](#2026-10-09-the-sparse-worktree-penalty-now-measured-at-suite-scale-10x-the-failure-count-lane-suite-baseline-flakiness-session-4ab694ed)
+- [2026-10-09 — RULE: ESPN basketball `plays[].sequenceNumber` is not chronological; use t…](#2026-10-09-rule-espn-basketball-playssequencenumber-is-not-chronological-use-the-list-order-and-gate-any-pbp-replay-on-the-reconstructed-final-the-header-score-lane-wnba-native-live-cutover-session-99686b8c)
+- [2026-10-09 -- a refusal with a fallback is not a stale copy: read what the FALLBACK wro…](#2026-10-09----a-refusal-with-a-fallback-is-not-a-stale-copy-read-what-the-fallback-wrote-lane-query-state-cache-oversize)
+- [2026-10-09 - RULE: copy fleet files to the Windows side through the //wsl.localhost sha…](#2026-10-09---rule-copy-fleet-files-to-the-windows-side-through-the-wsllocalhost-share-not-with-cpdd-from-inside-wsl-to-mntc-lane-nfl-kalshi-clv-pooled-session-f628c245)
+- [2026-10-09 -- RULE: ESPN NCAAB summary payloads drop lines and headlines; read the core…](#2026-10-09----rule-espn-ncaab-summary-payloads-drop-lines-and-headlines-read-the-core-odds-api-and-headergamenote-lane-ncaab-native-live-tier-session-e48a0f9b)
+- [2026-10-09 - RULE: a "beat the incumbent" ship gate must also carry a NAIVE baseline `[…](#2026-10-09---rule-a-beat-the-incumbent-ship-gate-must-also-carry-a-naive-baseline-lane-nba-native-live-resim-session-6c348b8f)
+- [2026-10-09 — `git diff` CAN SHOW A LINE-ENDING REWRITE AS CLEAN WHILE THE COMMIT RECORD…](#2026-10-09-git-diff-can-show-a-line-ending-rewrite-as-clean-while-the-commit-records-every-line-lane-lanes-archive-over-budget-session-4ab694ed)
+- [2026-10-09 — OVERTURNED (mine): "the WNBA linear live lens's ML is worse than ESPN from…](#2026-10-09-overturned-mine-the-wnba-linear-live-lenss-ml-is-worse-than-espn-from-end-q1-the-baseline-was-anchored-on-a-file-the-lens-never-reads-lane-wnba-native-live-cutover-session-99686b8c)
+- [2026-10-09 -- OVERTURNED: "#473 has zero current production impact because NBA is offse…](#2026-10-09----overturned-473-has-zero-current-production-impact-because-nba-is-offseason-lane-basketball-native-engine-session-d10f7421)
+- [2026-10-10 - RULE: a fleet job launched from a short-lived shell must be detached, and…](#2026-10-10---rule-a-fleet-job-launched-from-a-short-lived-shell-must-be-detached-and-must-resolve-a-worker-pid-at-use-lane-nba-native-live-resim-session-6c348b8f)
+- [2026-10-10 -- A rising walk-forward correction is not a drifting model: read the residu…](#2026-10-10----a-rising-walk-forward-correction-is-not-a-drifting-model-read-the-residuals-own-trend-first-session-e0a3e383)
+- [2026-10-10 — RULE: measure a sim input's reachability on a PREGAME call, never on a com…](#2026-10-10-rule-measure-a-sim-inputs-reachability-on-a-pregame-call-never-on-a-completed-game-a-finished-game-hands-the-sim-lookups-espn-box---nameid-map-that-a-pregame-call-does-not-have-lane-basketball-native-live-state-session-82bc583a)
+- [2026-10-10 -- A config "resolves" check proves the resolver, not the run: read the run'…](#2026-10-10----a-config-resolves-check-proves-the-resolver-not-the-run-read-the-runs-own-recorded-config-per-profile-lane-mlb-game-profile-pitch-config)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
