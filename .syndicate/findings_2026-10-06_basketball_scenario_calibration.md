@@ -1036,3 +1036,11 @@ on hold, including fitting `score_effect_k`, until #473 is fixed.
 - Their same-seed A/B on 22 preseason games: skip_def adds raw +4.35 / published +1.95, consistent with this lane's
   −5.1 (780 FIT games). Preseason totals already over; not regular-season evidence.
 - The return SHA is owed by that lane. The NBA re-fit hold persists until it is live and the input checklist passes.
+
+**Correction to the loan above (2026-10-10):** nba-sim-team-adj-473 WITHDREW the code-loan request. Per the user's
+decision relayed by d48f3a34, the approved change is the DATA file only.
+- It will write `nba_sim_total_inputs.json` = {"skip_def_subtraction": true} to the fleet's NBA processed root in its
+  deploy, recorded there as a cross-lane write. The reader code is untouched.
+- Checked 2026-10-10: no fleet copy existed (`/home/amyn/syndicate-prod/data/nba_source/data/processed`), so there is
+  nothing to merge.
+- Reachability field: market_anchor.nba_total_inputs on every NBA sim.
