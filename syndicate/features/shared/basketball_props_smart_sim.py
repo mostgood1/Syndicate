@@ -3056,9 +3056,23 @@ def _engine_for_league_local(league_code: str | None):
     from syndicate.features.basketball_engine.league_engine import LeagueEngine
 
     code = "wnba" if str(league_code or "").strip().lower() == "wnba" else "nba"
-    if code not in _ENGINES_LOCAL:
-        _ENGINES_LOCAL[code] = LeagueEngine(league_params(code), sample_lineup=_sample_lineup_local)
-    return _ENGINES_LOCAL[code]
+    # `#473` (LOAN from basketball-native-engine, this no-stack section only; USER DECISION 2026-10-10, option A):
+    # once NBA team ratings are fed, stacking team_adj eff_mult on the 95%-market-anchored points target counts team
+    # quality twice, as WNBA found on 2026-10-01. Same-seed scratch A/B, 22 NBA games 10-03..10-10: stacked,
+    # |published margin - market| 1.83 -> 4.57; not stacked 1.83 -> 1.67. Coupled to SYNDICATE_NBA_TEAM_INPUTS so off
+    # restores the stacking engine; league.py stays the vendored-parity record.
+    from syndicate.features.shared import nba_team_inputs
+
+    no_stack = code == "nba" and nba_team_inputs.enabled()
+    key = f"{code}:nostack" if no_stack else code
+    if key not in _ENGINES_LOCAL:
+        params = league_params(code)
+        if no_stack:
+            import dataclasses
+
+            params = dataclasses.replace(params, team_prior_stacks_on_target=False)
+        _ENGINES_LOCAL[key] = LeagueEngine(params, sample_lineup=_sample_lineup_local)
+    return _ENGINES_LOCAL[key]
 
 
 def _call_native_engine_local(*, entrypoint_name: str, league_code: str, kwargs: dict[str, Any]):

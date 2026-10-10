@@ -183,3 +183,40 @@ def test_starters_fall_back_to_the_whole_prior_regular_season_not_its_last_week(
     assert set(out["exp_min_source"]) == {"nba_starters_v1:2026_regular_full:last10"}
     assert out.loc["Star", "starter_prob"] == pytest.approx(0.8) and bool(out.loc["Star", "is_starter"])
     assert out.loc["Bench", "starter_prob"] == pytest.approx(0.2) and not bool(out.loc["Bench", "is_starter"])
+
+
+def _engine(flag: str, league: str):
+    bpss._ENGINES_LOCAL.clear()
+    with mock.patch.dict(os.environ, {"SYNDICATE_NBA_TEAM_INPUTS": flag}):
+        return bpss._engine_for_league_local(league)
+
+
+def test_no_stack_engine_is_coupled_to_the_flag_and_nba_only():
+    try:
+        assert _engine("0", "nba").params.team_prior_stacks_on_target is None  # today's NBA engine (stacks via cfg)
+        assert _engine("1", "nba").params.team_prior_stacks_on_target is False
+        assert _engine("0", "wnba").params == _engine("1", "wnba").params  # WNBA untouched either way
+    finally:
+        bpss._ENGINES_LOCAL.clear()
+
+
+def test_no_stack_moves_a_draw_when_targets_and_team_adj_are_present():
+    import numpy as np
+
+    from tests.basketball_engine_fixtures import synthetic_game_kwargs
+
+    try:
+        off, on = _engine("0", "nba"), _engine("1", "nba")
+        moved = False
+        for seed in range(12):
+            kw = synthetic_game_kwargs(np.random.default_rng(300 + seed), league="nba", entrypoint="simulate_pbp_game_boxscore")
+            if kw.get("target_home_points") is None or not kw.get("home_team_adj"):
+                continue
+            a = off.simulate_pbp_game_boxscore(rng=np.random.default_rng(seed), **kw)
+            b = on.simulate_pbp_game_boxscore(rng=np.random.default_rng(seed), **kw)
+            if a != b:
+                moved = True
+                break
+        assert moved, "no-stack never changed a draw with targets + team_adj present (inert)"
+    finally:
+        bpss._ENGINES_LOCAL.clear()
