@@ -30,8 +30,9 @@ League constants carry no defaults (every field is set explicitly per league), s
 for them the check is CONSUMED only: an unconsumed constant is reported as dead.
 
 CONSUMED + UNPOPULATED is the alarm, exit 1. The explicit lists keep the gate
-honest: EXPECTED_CONSTANT (production rightly leaves the default) and
-EXPECTED_SPARSE (legitimately absent for some games), each with its reason. An
+honest: EXPECTED_CONSTANT (production rightly leaves the default),
+EXPECTED_SPARSE (legitimately absent for some games) and DEFAULT_IS_A_VALUE (the
+bridge always sets it, and the default is one of its real values), each with its reason. An
 entry that stops being true FAILS the gate, so the lists cannot rot.
 
 SUBSTRATE: the corpus is a copy of the fleet's production data root taken at
@@ -64,6 +65,13 @@ EXPECTED_CONSTANT: dict[str, str] = {
     "cfg.priors_days_back": "21-day priors window; the bridge never overrides it (the priors port reads its own windows)",
     "cfg.use_pbp": "True is the default and the only production mode (the event-level path refuses by name, P1)",
     "cfg.seed": "None in production (a fresh draw per run); parity runs set it, which is why this can read populated",
+}
+# The default IS a production value, always set explicitly by the bridge (not an absence).
+DEFAULT_IS_A_VALUE: dict[str, str] = {
+    "cfg.roster_mode": (
+        "the bridge always passes it (`_build_smart_sim_config_local(roster_mode=_resolve_smart_sim_roster_mode_local(...))`): "
+        "'historical' for a past date, 'pregame' for today or later. A corpus that re-simulates past dates reads 'historical'"
+    ),
 }
 # Legitimately absent for some or all production games.
 EXPECTED_SPARSE: dict[str, str] = {
@@ -257,6 +265,8 @@ def main(argv: list[str] | None = None) -> int:
                     alarms.append(f"{key} is fed in {r['fed']} games but listed EXPECTED_CONSTANT: remove the entry")
             elif key in EXPECTED_SPARSE:
                 status = "EXPECTED_SPARSE"
+            elif key in DEFAULT_IS_A_VALUE:
+                status = "DEFAULT_IS_A_VALUE"
             elif not is_consumed:
                 status = "NOT_CONSUMED"
             elif r["unfed"]:

@@ -144,3 +144,24 @@ def test_every_call_to_an_orch_function_passes_orch():
                 if "orch" in params and params["orch"].kind is inspect.Parameter.KEYWORD_ONLY and not any(k.arg == "orch" for k in n.keywords):
                     bad.append(f"{m}:{n.lineno} {n.func.id}")
     assert bad == []
+
+
+def test_checklist_fires_on_an_unfed_consumed_input(tmp_path):
+    """Population positive control: a corpus whose games never carry `pregame_context["home_pace"]` (a key the
+    orchestrator reads) must FAIL the checklist; the same corpus with it present must not raise that alarm."""
+    import pickle
+
+    from scripts import basketball_orchestrator_input_checklist as chk
+
+    _, kw = _game(tmp_path, "nba")
+    for name, ctx in (("unfed", {k: v for k, v in kw["pregame_context"].items() if k != "home_pace"}), ("fed", kw["pregame_context"])):
+        corpus = tmp_path / name
+        corpus.mkdir()
+        case = {"league": "nba", "date": "2026-10-05", "kwargs": {**kw, "pregame_context": ctx}}
+        (corpus / "nba_2026-10-05_000_BOS_NYK.pkl").write_bytes(pickle.dumps(case))
+        rc = chk.main(["--corpus", str(corpus), "--json-out", str(tmp_path / f"{name}.json")])
+        alarms = __import__("json").loads((tmp_path / f"{name}.json").read_text())["alarms"]
+        hit = any("ctx.home_pace" in a for a in alarms)
+        assert hit == (name == "unfed"), alarms
+        if name == "unfed":
+            assert rc == 1

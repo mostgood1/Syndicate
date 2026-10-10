@@ -709,3 +709,99 @@ vendored `events.py`. No vendored engine code EXECUTES, because the binding is
 replaced before every call, but the import is a dependency. The user decision
 of 2026-10-09 ("not reliant on the vendored app IN ANY WAY") is not met until
 someone ports this orchestrator.
+
+## 10. The orchestrator is Syndicate's — pipeline trace from the refresh job down `[2026-10-09, lane basketball-native-orchestrator, plan P6]`
+
+Plan: `docs/ai_context/basketball_live_native_plan.md` (P6). This section
+SUPERSEDES Sec9's last paragraph ("STILL VENDORED after P1"). The orchestrator
+`simulate_smart_game`, and every vendored function it executed, now runs from
+`syndicate/features/basketball_engine/orchestrator/`. That is ONE
+league-parametric orchestrator: nba and wnba, with ncaab a named refusal. The
+team-advanced-stats builders the bridge imported are ported there too. No
+vendored module is imported on the sim path.
+
+```
+scripts/refresh_odds_sources.py   RefreshStep: python scripts/refresh_{nba,wnba}_oddsapi_props.py   (SUBPROCESS per job, :858 / :898)
+  -> export_props_predictions_local (nba :3239, wnba :4989) -> basketball_props_predictions (:457)
+    -> basketball_props_smart_sim.export_props_predictions_with_smart_sim_local                       (:5684)
+      -> _smart_sim_run_date_local                                                                     (:4936)
+        -> _smart_sim_worker_run_local                                                                 (:4759)
+          -> _call_source_simulate_smart_game_local   builds orch = OrchestratorEnv(processed root, league, draw_sink)  (:4250)
+            -> orchestrator.smart_sim.simulate_smart_game(**kwargs, orch=orch)                         (:4270 -> smart_sim.py:1143)
+                 the 29 helpers Syndicate had replaced -> orchestrator/hooks.py -> the bridge's *_local ports (direct calls)
+                 per draw: hooks.simulate_pbp_game_boxscore -> bridge._recording_sim_draws_local
+                           -> _simulate_pbp_game_boxscore_local -> P1's native engine (Sec9)
+                 ESPN event id / lineup teammate effects -> orchestrator/boxscores.py, connected_game.py   (smart_sim.py:1502, :1537)
+                 period-prob calibration                 -> orchestrator/prob_calibration.py                 (smart_sim.py:1623, :1642)
+                 quarter sampling / ladders              -> orchestrator/quarters.py, prop_ladders.py
+            then the bridge's post-processing (distributions, WNBA shrink/shape/dispersion, NBA calibration), unchanged
+   writes: <processed_root>/smart_sim_<date>_<HOME>_<AWAY>.json (unchanged path; allowlisted as in Sec1)
+
+team adjustments, when team_advanced_stats_<season>_asof_<date>.csv is missing or stale:
+  _team_adj_from_advanced_stats_local -> _load_team_advanced_stats_asof_local -> _ensure_team_advanced_stats_asof_local (:3680)
+    -> _import_advanced_stats_builders_local (:3649) -> orchestrator/advanced_stats_{boxscores,player_logs}.py (fork = "nba" | "wnba")
+   writes: <processed_root>/team_advanced_stats_<season>_asof_<YYYYMMDD>.csv
+```
+
+**What changed against the vendored code, and nothing else.**
+`scripts/port_basketball_orchestrator.py` generates every module except three
+hand-written ones (`runtime.py`, `hooks.py`, `view.py`). It records each edit in
+the module headers, and `--check` exits 1 if a generated file drifts from its
+generator.
+  * **Only what production executes is ported.** That is the closure from
+    `simulate_smart_game` and the helpers the ports read: 79 definitions over 9
+    modules. The 29 replaced names are cut: their vendored bodies never ran.
+  * **NBA and WNBA are checked definition by definition.** The port is
+    generated from the WNBA fork, which already reads `LEAGUE`. Ten
+    definitions differ, every one a league constant or a WNBA-only step: the
+    pregame pool prune, the team/opponent stamp, and a log line. The NBA
+    literals are fields of `OrchestratorLeague` (`runtime.NBA`). The
+    possession clip is two fields because the forks do not share a formula:
+    NBA (88, 112), WNBA (bp-8, bp+10). Any divergence not declared aborts the
+    port.
+  * **`paths` / `LEAGUE` globals are one explicit, hashable `orch` keyword**
+    (`OrchestratorEnv`). The `lru_cache` loaders therefore key on the data
+    root. Two caches in `prob_calibration` became per-root. That module no
+    longer reads the vendored repo tree (`vendor/<pkg>_repo/data/processed`),
+    which held 0 calibration files for either league, measured 2026-10-09 on
+    the fleet.
+  * **The bridge's ports read a read-only VIEW, not a patched module**
+    (`view.module_view`). Replaced names resolve to their hooks, as they did
+    mid-patch. `LEAGUE` exists for WNBA only, as only the WNBA fork exported
+    one.
+  * **The builders (pass 2) differ in ALGORITHM between the forks.** These are
+    the season filter, the game-date map and a WNBA team filter. Each
+    divergent definition is therefore kept VERBATIM per fork (`__nba`,
+    `__wnba`) behind a `fork` dispatcher.
+
+**Deleted:** `_import_real_smart_sim_module_local`,
+`_vendor_smart_sim_code_root_local`, the flat #440 stub
+(`_simulate_smart_game_local`) and its two helpers, and the
+`replacements`/`setattr`/`finally` patching.
+
+**Reuse flag.** This is unchanged from Sec9: `_smart_sim_run_date_local`
+reuses an existing sim file with players, so the change reaches newly
+simulated games only. Parity is exact, so that is harmless here.
+
+**Parity.** `scripts/basketball_orchestrator_parity.py`:
+  * `record` runs the production entrypoint on a scratch copy of the fleet's
+    data root, with the vendored arm (the pre-P6 bridge functions read from
+    `a1ee82cb`) and a fixed seed. It saves each game's kwargs, global RNG
+    states and output.
+  * `replay` reruns each game in a fresh process. The same arm must reproduce
+    the recorded digest. The other arm must match every leaf.
+  * `builders` compares the advanced-stats DataFrames cell for cell.
+  * `compare` does the end-to-end artifact A/B.
+
+Results: PENDING (fleet run 2026-10-09).
+
+**Checklist** (`scripts/basketball_orchestrator_input_checklist.py`) runs over
+`dataclasses.fields()` of SmartSimConfigLocal, SmartSimConfig,
+OrchestratorLeague and SmartSimPaths, the `simulate_smart_game` parameters,
+and the `pregame_context` keys read. It checks consumed (AST) against
+populated (a recorded corpus), adds a wiring check (no vendored sim import, no
+`setattr` patching), and exits 1 on an alarm. **Reachability**:
+`tests/test_basketball_orchestrator_reachability.py`. It includes a FRESH
+interpreter that runs the production path and must load no
+`nba_betting`/`wnba_betting` module, and a wiring check proven to fire on the
+pre-P6 bridge.

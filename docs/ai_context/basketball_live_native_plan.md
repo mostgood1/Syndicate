@@ -140,6 +140,43 @@ This doc is the shared plan. Each phase is a separate session with its own lane.
 - The season is over: verify by backtest on the 2026 season's pbp. The live reading is owed
   at the 2027 opener; say so in the lane.
 
+### P6 — native smart-sim orchestrator (needs P1)
+- Port `vendor/{nba,wnba}_betting_repo/src/*/sim/smart_sim.py:simulate_smart_game`, and everything it calls, into
+  ONE league-parametric orchestrator (`syndicate/features/basketball_engine/orchestrator/`). The ~20 (in fact 29)
+  helpers Syndicate had already replaced become direct calls (`hooks.py`). No globals are patched.
+- Method, as P1: a port script with anchored edits (`scripts/port_basketball_orchestrator.py`), then a parity gate on
+  real production games before the switch (`scripts/basketball_orchestrator_parity.py`). The standard's checklist,
+  pipeline trace (`basketball_sim_engine_reference.md` Sec10) and reachability tests come with it.
+- Also ported (pass 2), because the bridge imported them on the sim path: the team-advanced-stats BUILDERS
+  (`advanced_stats_{boxscores,player_logs}`). The forks differ in algorithm, so each fork's divergent function is
+  kept verbatim behind a `fork` switch.
+
+**Vendored uses that REMAIN on basketball paths outside the sim** (inventory 2026-10-09, line numbers on
+`origin/main` at that date). Each needs its own decision; none is in P6's scope:
+
+| area | where | what it uses | runs |
+|---|---|---|---|
+| **sim inputs (data, not code)** | `basketball_props_predictions.py:149` `_models_dir_for_source_root` | ONNX props models read from `vendor/<pkg>_repo/models` | effectively every props run (the data root has no `models/`) |
+| live lens | `nba/live_lens.py:97`, `wnba/live_lens.py:65` | the vendored app's `_live_lens_tick_payload` | every live-lens tick (P3 / P5 own) |
+| loop | `live_refresh_loop.py:664` | `python -m <pkg>.cli fetch-injuries` | every lineup-check interval |
+| loop | `live_refresh_loop.py:4204` | `vendor/wnba_betting_repo/data/processed/schedule_2026.json` | always (WNBA commence times) |
+| history | `nba_history_refresh.py:43,48` | `nba_betting.player_logs._fetch_season_player_logs` | 6 h throttle |
+| WNBA refresh | `refresh_wnba_oddsapi_props.py` `_ensure_source_game_inputs` (:3846, :3924, :3975; :3878, :3907, :3801-3806, :4002) | `python -m wnba_betting.cli` fetch-schedule / fetch-injuries / predict-date (+ fetch, build-features, rotation builders, daily-update) | every full export (some when stale / per date / on failure) |
+| WNBA refresh | `refresh_wnba_oddsapi_props.py:5778` -> :514/:537 | the vendored WNBA Flask app's `_live_oddsapi_period_totals_for_game` | every live-snapshot export while games are live, NOT flag-gated |
+| WNBA refresh | `:6064`; `:824`, `:6187`, `:6297` | vendored app `/api/cards`; live exports | fallback / `SYNDICATE_WNBA_SOURCE_APP_FALLBACK` |
+| WNBA refresh | `:5740` | `wnba_betting.playoff_transition` from `<source_root>/src` (the vendored copy `bootstrap_data_root.py:49` places there) | every run |
+| WNBA refresh | `:142` -> `build_wnba_totals_calibration.py:105-114` | `wnba_betting.cli`, `config.paths`, `features_enhanced`, `games_npu` | daily |
+| WNBA refresh | `:1305`, `:4529`; `:5676-5706` | vendored history seed / predictions copy; vendored recon and lens-tuning tools | fallback; when artifacts are missing |
+| NBA refresh | `refresh_nba_oddsapi_props.py:840` | `python -m nba_betting.cli export-game-cards` | every full export |
+| NBA refresh | `:2553-2679`, `:764`, `:2998`, `:3678-3704`, `:3826` | CLI game-input bootstrap, history seed, predictions copy, recon tools, source app | fallback / missing artifacts / `SYNDICATE_NBA_SOURCE_APP_FALLBACK` |
+| schedule | `schedule_adapter.py:237` | `python -m <pkg>.cli fetch-schedule` | fallback when no schedule file |
+| identity | `wnba_fixture_identity.py:73` | the vendored `schedule_2026.csv` | always, when present |
+| boot | `scripts/bootstrap_data_root.py:49,338` | copies `vendor/wnba_betting_repo/src` onto `<data_root>/wnba_source/src` | every boot |
+
+Board and analytics helpers (`basketball_market_board.py`, `game_shape.py`, `basketball_momentum.py`,
+`basketball_pbp.py`, `basketball_live_state.py`) and the NBA/WNBA cards only MENTION the vendored app in comments;
+no runtime dependency was found there.
+
 ## End-state check (whoever closes the last phase runs it)
 `git grep -n "nba_betting_repo\|wnba_betting_repo\|vendor\." -- syndicate/features/nba
 syndicate/features/wnba syndicate/features/ncaab syndicate/features/shared/basketball*
