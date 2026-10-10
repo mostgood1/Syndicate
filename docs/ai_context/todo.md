@@ -1,5 +1,12 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#695` — **NBA #473 option A: the REGULAR-SEASON totals reading is OWED -- `skip_def_subtraction` raised preseason totals further above the market** — lane `nba-sim-team-adj-473`, session eb2ba139
+- **What shipped (#473, user decision 2026-10-10 option A):** real NBA team ratings + starter flags (`syndicate/features/shared/nba_team_inputs.py`, `SYNDICATE_NBA_TEAM_INPUTS`, absent = ON), NBA no-stack of the team prior on the market-anchored target (same flag), and the fleet DATA file `nba_source/data/processed/nba_sim_total_inputs.json` = `{"skip_def_subtraction": true}` (basketball-scenario-calibration's key; independent of the flag).
+- **Why owed:** the 22-game same-seed scratch read (NBA 10-03..10-10, 20 PRESEASON finals) had published total minus market +4.82 (OFF) -> +6.77 (option A), total bias vs actual +4.15 -> +6.10; the move comes from `skip_def_subtraction` itself (raw +4.35, ~30% passed through the anchor). The calibration lane's opposite finding (raw totals -5.1 LOW without it, 780 2025-26 FIT games) is REGULAR season; preseason is a different population, so neither settles it.
+- **The reading (condition of the user's ff approval, relayed by d48f3a34, 2026-10-10):** once the 2026-27 regular season (opener ~10-20) has >= 30 NBA finals graded under this config, re-read published total minus market and total MAE vs actual against a same-seed OFF arm (`scripts/measure_nba_team_inputs_shift.py`; OFF arm = no data file + `SYNDICATE_NBA_TEAM_INPUTS=0`, or no data file only to isolate skip_def). Regular-season games only.
+- **Decision rule:** if published totals stay >= ~+2 worse than OFF, revert skip_def ALONE by deleting the data file (no code change, no deploy). The team inputs and no-stack stay.
+- **Rollbacks:** skip_def = delete the data file; team inputs + no-stack = `SYNDICATE_NBA_TEAM_INPUTS=0` in the refresh-worker role env (needs a restart to re-inject).
+
 ### `#694` — **WNBA NATIVE LIVE LENS: the LIVE reading is OWED at the 2027 season opener (May 2027); P5 itself is blocked on P1-P3** — lane `wnba-native-live-cutover`, session 99686b8c
 
 **Why.** User decision 2026-10-09: the basketball live lens must be fully Syndicate-native
