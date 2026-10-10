@@ -10636,3 +10636,12 @@ Slugs: accuracy-assessment-0914, bandwidth-controlled-transfer, ci-red-on-main, 
 - Verification: git diff shows docstring lines only; tests/test_layer2_board_ui_redesign.py passes
 - Blocked by: none
 - **CLOSED 2026-10-08:** docstring NHL bullet rewritten (5+/4-, no code); tests/test_layer2_board_ui_redesign.py 35 passed. No deploy: no behaviour change; the fleet carries it at its next ff. Loan of player_headshots.py returned to layer2-board-ui-redesign.
+
+### lane-orphan-sweep-1009 — CLOSED 2026-10-09 — opened 2026-10-09 — session d51fbb0e-8d50-4170-b49d-f017185ea838
+- **Goal (verbatim): "Mark the three OPEN lanes whose owning sessions are archived (kalshi-shard-balance-gate, mlb-doubleheader-e2e, soccer-goal-allocation) ORPHANED with claims released, by user decision, so check_lane_invariants and check_lane_claims stop reporting their contest and bad path" -- GOAL: MET.** Landed e5aea416 (14 add / 3 del; lane_claims._claims delta: 13 lost, all from the three lanes). Reading on origin/main e5aea416, 21:3xZ: check_lane_invariants.py exit 0, check_lane_claims.py exit 0.
+- Goal: Mark the three OPEN lanes whose owning sessions are archived (kalshi-shard-balance-gate, mlb-doubleheader-e2e, soccer-goal-allocation) ORPHANED with claims released, by user decision, so check_lane_invariants and check_lane_claims stop reporting their contest and bad path
+- Files: .syndicate/lanes.md (the three orphaned lane headers and one release note each ONLY)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: check_lane_invariants.py on origin/main reports 0 contested; check_lane_claims.py BAD lists no orphaned lane
+- Blocked by: none

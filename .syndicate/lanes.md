@@ -1271,15 +1271,6 @@ death, never life — do not invert it.
 - Verification: Baseline BEFORE the restart: lane_busy refusals/hour for sweeps containing soccer and live soccer opportunity-row counts over >=1 h of live soccer. AFTER: the same over >=1 h of live soccer, recorded in deploys.md. Unit: merge keeps non-scoped events; redaction masks the key; autorun passes its lane (off != on).
 - Blocked by: none
 
-### lane-orphan-sweep-1009 — CLOSED 2026-10-09 — opened 2026-10-09 — session d51fbb0e-8d50-4170-b49d-f017185ea838
-- **Goal (verbatim): "Mark the three OPEN lanes whose owning sessions are archived (kalshi-shard-balance-gate, mlb-doubleheader-e2e, soccer-goal-allocation) ORPHANED with claims released, by user decision, so check_lane_invariants and check_lane_claims stop reporting their contest and bad path" -- GOAL: MET.** Landed e5aea416 (14 add / 3 del; lane_claims._claims delta: 13 lost, all from the three lanes). Reading on origin/main e5aea416, 21:3xZ: check_lane_invariants.py exit 0, check_lane_claims.py exit 0.
-- Goal: Mark the three OPEN lanes whose owning sessions are archived (kalshi-shard-balance-gate, mlb-doubleheader-e2e, soccer-goal-allocation) ORPHANED with claims released, by user decision, so check_lane_invariants and check_lane_claims stop reporting their contest and bad path
-- Files: .syndicate/lanes.md (the three orphaned lane headers and one release note each ONLY)
-- Hypothesis: n/a
-- Falsification test: n/a
-- Verification: check_lane_invariants.py on origin/main reports 0 contested; check_lane_claims.py BAD lists no orphaned lane
-- Blocked by: none
-
 ### home-embed-by-sport-dedupe — CLOSED 2026-10-09 — opened 2026-10-09 — session 12420da3-1160-4944-9cbc-b3489ef4d580
 - Goal: The / HTML embed drops by_sport again (alias-rebuilt client-side): logo stamping covers by_sport rows so _slim_embedded_board_payload's exact match holds; page ~50MB -> ~21MB
 - Files: syndicate/blueprints/intelligence.py, tests/test_home_payload_duplication.py
@@ -1327,6 +1318,11 @@ death, never life — do not invert it.
 - Falsification test: If the guard passes against the pre-change tree it is not testing anything. If it cannot distinguish a ledger DOCUMENT rewrite from a JSON/report/marker/fixture write, it will be silenced by an allowlist and is worthless.
 - Verification: Run the new guard against the current tree (must FAIL, naming the five) and after the conversions (must PASS); each converted tool still runs; and the existing 141 lane-tooling tests stay green.
 - Blocked by: none
+
+### closed-lane-archive-20261010-0959 — CLOSED 2026-10-10 (GOAL MET: 1 block archived) — opened 2026-10-10 — session dc80e1a5-c9b3-42e5-bee4-6122c31c413f
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness.py --idle-min 240 gave 1 SAFE of 8 CLOSED; moved `lane-orphan-sweep-1009` (owner d51fbb0e idle 1048m). 7 WAIT on live owners. Table + Part B in log/2026-10-10.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1453,6 +1449,7 @@ death, never life — do not invert it.
 - `lane-guard-main-claims` — CLOSED 2026-09-17 — opened 2026-09-17 — session a1e40980-cceb-493f-adf9-5a5ca879acf6 — **GOAL: MET**
 - `lane-narrative-trimmer` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `lane-open-marker-primary-tree` — CLOSED 2026-09-28 — opened 2026-09-28 — session acb76ba7-70eb-4b26-b7b8-3cb425e6a6a0
+- `lane-orphan-sweep-1009` — CLOSED 2026-10-09 — opened 2026-10-09 — session d51fbb0e-8d50-4170-b49d-f017185ea838
 - `lanes-budget-attribution` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `lanes-md-archive-sweep-1004` — CLOSED — closed 2026-10-04 — opened 2026-10-04 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - `lanes-md-cap-raise` — CLOSED — closed 2026-10-05 — opened 2026-10-05 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
