@@ -10,6 +10,11 @@ Run after appending a rule:  py -3 scripts/build_learnings_index.py
 """
 import glob, io, os, re, sys
 
+# One helper for every ledger read/write -- see scripts/ledger_io.py. io.open() with
+# no newline= uses universal newlines on read (a mid-line bare CR becomes a line
+# break) and the platform default on write (every line ending churns).
+from ledger_io import read_ledger, write_ledger
+
 PATH = ".syndicate/learnings.md"
 EVIDENCE = ".syndicate/learnings_evidence.md"
 EVIDENCE_LINK = "learnings_evidence.md"
@@ -59,7 +64,7 @@ def _headings(text):
 
 
 def main():
-    src = io.open(PATH, encoding="utf-8").read()
+    src, path_eol = read_ledger(PATH)
     entries = [(h, None) for h in _headings(src)]
 
     # THE INDEX MUST SPAN THE EVIDENCE FILE TOO.
@@ -71,7 +76,7 @@ def main():
     # find is a rule you will break again, so compaction must not cost
     # discoverability.
     try:
-        ev = io.open(EVIDENCE, encoding="utf-8").read()
+        ev, _ = read_ledger(EVIDENCE)
     except OSError:
         ev = ""
     seen = {h for h, _ in entries}
@@ -81,7 +86,7 @@ def main():
             seen.add(h)
 
     try:
-        ar = io.open(ARCHIVE, encoding="utf-8").read()
+        ar, _ = read_ledger(ARCHIVE)
     except OSError:
         ar = ""
     for h in _headings(ar):
@@ -104,7 +109,7 @@ def main():
     # the pass whose output must stay indexed.
     for path in sorted(glob.glob(".syndicate/learnings_archive_*.md")):
         try:
-            txt = io.open(path, encoding="utf-8").read()
+            txt, _ = read_ledger(path)
         except OSError:
             continue
         link = os.path.basename(path)
@@ -170,7 +175,7 @@ def main():
     # spanning the evidence file took the index from 104 to 193 entries (~35KB),
     # which pushed learnings.md over budget — discoverability eating the thing
     # being discovered. learnings.md keeps a short pointer instead.
-    io.open(INDEX_PATH, "w", encoding="utf-8").write(block + "\n")
+    write_ledger(INDEX_PATH, block + "\n", path_eol)
 
     pointer = "\n".join([
         START,
@@ -196,7 +201,7 @@ def main():
         cut = src.rindex("\n---\n", 0, anchor)
         out = src[:cut] + "\n\n" + pointer + "\n" + src[cut:]
 
-    io.open(PATH, "w", encoding="utf-8").write(out)
+    write_ledger(PATH, out, path_eol)
     print(
         "index written: %d rules (%d FORBIDDEN, %d EXONERATED, %d other)"
         % (

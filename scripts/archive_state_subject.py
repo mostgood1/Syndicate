@@ -56,6 +56,11 @@ from __future__ import annotations
 import argparse
 import pathlib
 import re
+
+# One helper for every ledger read/write -- see scripts/ledger_io.py. This file had
+# already pinned its WRITE and still read with universal newlines, which maps a
+# mid-line bare CR to a line break: the shape of a half-fix. Measured 2026-10-09.
+from ledger_io import read_ledger, write_ledger
 import sys
 
 NL = "\n"
@@ -109,7 +114,7 @@ def main(argv=None) -> int:
     if not part.exists():
         print(f"REFUSED: {part} does not exist.")
         return 2
-    text = part.read_text(encoding="utf-8", errors="replace")
+    text, part_eol = read_ledger(part)
     lines = text.split(NL)
     i, j = subject_span(lines, args.subject)
     sec = lines[i:j]
@@ -198,11 +203,12 @@ def main(argv=None) -> int:
               f"{len(move)} sub-block(s), {moved_chars:,} chars, moved VERBATIM. Nothing "
               f"summarised. The live section in `{part.name}` keeps the other {len(keep)} and "
               f"points here.{NL}{NL}")
-    prior = arch.read_text(encoding="utf-8", errors="replace") if arch.exists() else (
+    # the archive has its own line endings; do not assume the part's
+    prior, arch_eol = read_ledger(arch) if arch.exists() else ((
         f"# state archive — 2026-10-05{NL}{NL}Subjects' superseded sub-block history, moved "
         f"verbatim out of the COUNTED state files by `scripts/archive_state_subject.py`. "
         f"Archives are excluded from `STATE_TOTAL`; counted files are not. Nothing here is "
-        f"deleted or summarised, and every live section points here.{NL}")
+        f"deleted or summarised, and every live section points here.{NL}"), part_eol)
     new_arch = prior.rstrip(NL) + banner + moved_text + NL
 
     # conservation: nothing may end up in neither file
@@ -222,8 +228,8 @@ def main(argv=None) -> int:
     if not args.apply:
         print("  DRY RUN. Re-run with --apply.")
         return 0
-    arch.write_text(new_arch, encoding="utf-8", newline=NL)
-    part.write_text(out, encoding="utf-8", newline=NL)
+    write_ledger(arch, new_arch, arch_eol)
+    write_ledger(part, out, part_eol)
     print("  WROTE both files.")
     return 0
 

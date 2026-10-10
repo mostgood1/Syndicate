@@ -44,6 +44,12 @@ import collections
 import datetime
 import pathlib
 import re
+
+# One helper for every ledger read/write -- see scripts/ledger_io.py. The READ is
+# the half that silently loses data: universal newlines maps a mid-line bare CR to a
+# line break, which split a peer's line in lanes.md. The platform-default WRITE is a
+# separate defect that churns every line ending. Both measured 2026-10-09.
+from ledger_io import read_ledger, write_ledger
 import sys
 
 # THE CAP COMES FROM `session-start.sh`, NOT FROM A CONSTANT HERE. A tool that
@@ -149,8 +155,8 @@ def main(argv=None):
         cap_source = "--cap on the command line"
 
     try:
-        text = LEARN.read_text(encoding="utf-8", errors="replace")
-        evid = EVID.read_text(encoding="utf-8", errors="replace")
+        text, learn_eol = read_ledger(LEARN)
+        evid, evid_eol = read_ledger(EVID)
     except OSError as exc:
         print(f"cannot read: {exc}")
         return 2
@@ -233,7 +239,7 @@ def main(argv=None):
         print("\nDRY RUN. Re-run with --apply to write.")
         return 0
 
-    current = LEARN.read_text(encoding="utf-8", errors="replace")
+    current, _ = read_ledger(LEARN)
     if current != text:
         print(f"REFUSED: learnings.md changed while this ran ({len(text)} -> {len(current)} B). "
               "Nothing written; re-run.")
@@ -253,8 +259,8 @@ def main(argv=None):
               f"Nothing summarised or deleted. Each entry keeps its heading AND its rule in\n"
               f"`learnings.md`; this is the full working. `learnings_index.md` spans both\n"
               f"files — regenerate with `py -3 scripts/build_learnings_index.py`.\n\n")
-    EVID.write_text(evid + banner + moved_text + "\n", encoding="utf-8")
-    LEARN.write_text(new_text, encoding="utf-8")
+    write_ledger(EVID, evid + banner + moved_text + "\n", evid_eol)
+    write_ledger(LEARN, new_text, learn_eol)
     print("\nWROTE learnings.md and learnings_evidence.md.")
     print("NEXT: py -3 scripts/build_learnings_index.py")
     return 0

@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1364 rules `[generated]`
+## Index — 1365 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -533,7 +533,7 @@
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 - [2026-09-03 — EXONERATED: `deploys.md` and `learnings.md` ARE guarded. Two sessions file…](learnings_archive.md#2026-09-03-exonerated-deploysmd-and-learningsmd-are-guarded-two-sessions-filed-the-same-false-gap-and-the-second-re-derived-it-with-the-same-blind-spot) `[evidence]`
 
-**Rules and corrections — 845**
+**Rules and corrections — 846**
 
 - [2026-09-16 — a detector that matches a FORMULA at published precision has a FALSE-POSIT…](#2026-09-16-a-detector-that-matches-a-formula-at-published-precision-has-a-false-positive-rate-and-mine-fired-at-about-1-row-per-1200-session-abacd435-lane-soccer-anytime-scorer)
 - [2026-09-16 — OVERTURNED: "the pre-registered criterion is the safe part, the risk is in…](#2026-09-16-overturned-the-pre-registered-criterion-is-the-safe-part-the-risk-is-in-the-mechanism-two-hypotheses-in-one-night-died-on-the-criterion-session-abacd435-fixes-4-and-5a-no-lane)
@@ -750,6 +750,7 @@
 - [2026-10-10 -- A rising walk-forward correction is not a drifting model: read the residu…](#2026-10-10----a-rising-walk-forward-correction-is-not-a-drifting-model-read-the-residuals-own-trend-first-session-e0a3e383)
 - [2026-10-10 — RULE: measure a sim input's reachability on a PREGAME call, never on a com…](#2026-10-10-rule-measure-a-sim-inputs-reachability-on-a-pregame-call-never-on-a-completed-game-a-finished-game-hands-the-sim-lookups-espn-box---nameid-map-that-a-pregame-call-does-not-have-lane-basketball-native-live-state-session-82bc583a)
 - [2026-10-10 -- A config "resolves" check proves the resolver, not the run: read the run'…](#2026-10-10----a-config-resolves-check-proves-the-resolver-not-the-run-read-the-runs-own-recorded-config-per-profile-lane-mlb-game-profile-pitch-config)
+- [2026-10-10 — A HALF-FIX LOOKS EXACTLY LIKE A FIX: PIN BOTH ENDS OF AN IO PAIR `[lane le…](#2026-10-10-a-half-fix-looks-exactly-like-a-fix-pin-both-ends-of-an-io-pair-lane-ledger-tools-byte-safe-io-session-4ab694ed-5dfddf6e)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

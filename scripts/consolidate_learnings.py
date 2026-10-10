@@ -42,6 +42,11 @@ import datetime
 import io
 import pathlib
 import re
+
+# One helper for every ledger read/write -- see scripts/ledger_io.py. This file had
+# already pinned its WRITE and still read with universal newlines, which maps a
+# mid-line bare CR to a line break: the shape of a half-fix. Measured 2026-10-09.
+from ledger_io import read_ledger, write_ledger
 import sys
 
 LEARN = pathlib.Path(".syndicate/learnings.md")
@@ -88,7 +93,7 @@ def main(argv=None):
     archive = pathlib.Path(args.archive or
                            f".syndicate/learnings_archive_{datetime.date.today()}.md")
     try:
-        raw = LEARN.read_text(encoding="utf-8")
+        raw, learn_eol = read_ledger(LEARN)
         entry = io.open(args.entry_file, encoding="utf-8").read().rstrip("\n")
         wanted = [l.rstrip("\n") for l in io.open(args.headings_file, encoding="utf-8")
                   if l.strip() and not l.startswith("#!")]
@@ -162,8 +167,8 @@ def main(argv=None):
 
     # utf-8-sig would strip learnings.md's BOM on the way back out; the file has
     # one (ef bb bf) and losing it has bitten this repo before.
-    archive.write_text(archive_text, encoding="utf-8", newline="")
-    LEARN.write_text(new_learn, encoding="utf-8", newline="")
+    write_ledger(archive, archive_text, learn_eol)
+    write_ledger(LEARN, new_learn, learn_eol)
     print(f"WROTE {LEARN} and {archive}. Now run: py -3 {GENERATOR}")
     return 0
 
