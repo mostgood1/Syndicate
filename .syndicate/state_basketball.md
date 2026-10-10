@@ -1104,6 +1104,37 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - Starter flags: NBA 0/517 player rows, WNBA 55/219. The engine falls back to a minutes ranking.
 - **Owed:** the first NEWLY simulated production game after 21:29:34Z (a `smart_sim_*.json` with later mtime) completes with `failures == 0`.
 
+## [basketball-native-orchestrator] THE BASKETBALL SMART-SIM ORCHESTRATOR IS SYNDICATE'S; the sim path imports no vendored module -- live on the fleet, parity-proven on 35 real production games `[verified 2026-10-10 15:05Z, lane basketball-native-orchestrator, plan P6, fleet ff 24d7b19c]`
+
+- **What runs.** `basketball_props_smart_sim._call_source_simulate_smart_game_local` calls `syndicate/features/basketball_engine/orchestrator/smart_sim.py:simulate_smart_game(..., orch=OrchestratorEnv)`. That replaces `vendor/*/sim/smart_sim.py`.
+  - The 29 helpers Syndicate had replaced are direct calls in `orchestrator/hooks.py`. The bridge's ports read a read-only `view.module_view(orch)`. Nothing is patched.
+  - The team-advanced-stats builders are native (`orchestrator/advanced_stats_{boxscores,player_logs}.py`). They are kept verbatim per fork, because the forks differ in algorithm.
+  - Deleted: `_import_real_smart_sim_module_local`, `_vendor_smart_sim_code_root_local`, the flat #440 stub (`_simulate_smart_game_local`) and its two helpers.
+- **What was vendored and actually executing (beyond the orchestrator loop).**
+  - `connected_game` lineup teammate effects APPLIED in production WNBA (e.g. 10-09 LVA, 20 nudges).
+  - `boxscores` fetched from ESPN (scoreboard and summary, cached under `<processed>/_espn_cache`).
+  - `prob_calibration` read data.
+  - Each of these read the VENDORED `config.paths`, which the bridge never pinned. On the fleet it resolved to the same `<league>_source/data` root through `NBA/WNBA_BETTING_DATA_ROOT` (measured on the refresh-worker env, booleans only).
+- **Parity (substrate: the fleet's production data root copied to `~/p6/data` 2026-10-09 23:30Z; seed 20261009).**
+  - NBA: 22 games over 8 dates. 862,659 leaves.
+  - WNBA: 13 games over 8 dates, one of them the leaked NBA SAS@OKC. 265,118 leaves.
+  - 0 differences in both. The vendored replay reproduced every recorded digest, and all 34 end-to-end `smart_sim_*.json` were byte-identical.
+  - Builders: 24 DataFrame comparisons, 0 differences. NBA `boxscores` and WNBA `player_logs` were empty in both arms, so those paths are unexercised.
+  - Re-verified on the DEPLOYED checkout with both arms compared to each other (`deploys.md` 2026-10-10 14:39:11Z).
+- **Gate.** `scripts/basketball_orchestrator_input_checklist.py`:
+  - enumerates `dataclasses.fields()` of SmartSimConfigLocal, SmartSimConfig, OrchestratorLeague and SmartSimPaths, plus the parameters and the `pregame_context` keys;
+  - runs a wiring check (no vendored sim import, no setattr) that is proven to fire on the pre-P6 bridge;
+  - PASS on both leagues' corpora.
+  Reachability: `tests/test_basketball_orchestrator_reachability.py`, which includes a fresh interpreter that must load 0 vendored modules.
+- **Editing.** The generated modules match `scripts/port_basketball_orchestrator.py --check` (pinned by a test). A deliberate native edit means deleting that test and saying so in the module header. Do not re-run the port after such an edit.
+- **Still vendored on basketball paths, OUTSIDE the sim** (table in the plan's P6 section):
+  - the ONNX props models in `vendor/<pkg>_repo/models`, read on every props run (`basketball_props_predictions.py:149`);
+  - the live-lens ticks (P3/P5);
+  - the refresh scripts' `python -m <pkg>.cli` steps;
+  - the vendored WNBA app's live period totals, not flag-gated;
+  - `bootstrap_data_root.py`, which copies the vendored WNBA src onto the data disk.
+- **Owed:** the first NEWLY simulated production game after 14:39:11Z. Read it for health: players present, score block present, no failures file after the ff. Not read yet: existing sims are reused. #473 (NBA team inputs, default ON) shipped after it through P6's hooks, so NBA outputs now differ from vendored by design.
+
 ## [nba-sim-totals-and-strength] NBA SMART-SIM TOTALS + TEAM STRENGTH: measured defects, fixes built DEFAULT-OFF, nothing enabled `[2026-10-10, lane basketball-scenario-calibration]`
 
 - **Raw total −17 vs actual** (780 2025-26 FIT games): `_simulate_quarters_local` subtracts the opponent def from

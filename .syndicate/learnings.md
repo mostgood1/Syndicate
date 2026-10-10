@@ -3762,3 +3762,17 @@ caught it. Fix was prose, not code: name siblings by ROLE. Verified by comparing
 closure membership against HEAD, which also showed `archive_released_lanes` was
 already in the closure before my change — pre-existing, not mine.
 **Prose in a docstring is an input to a deploy heuristic here.**
+
+## 2026-10-10 OVERTURNED: "only the vendored orchestrator LOOP runs; the data computation is Syndicate's" (basketball_sim_engine_reference.md Sec0) -- lane basketball-native-orchestrator
+
+**The belief:** Sec0 said the ~20 monkeypatched helpers meant only `simulate_smart_game`'s own loop was vendored code running in production.
+
+**What the P6 closure showed:** the loop called OTHER vendored modules that nobody had patched.
+- `connected_game._apply_lineup_teammate_effects_to_priors` APPLIED in production WNBA. Measured 10-09 LVA@GSV: 20 nudges.
+- `boxscores` made ESPN scoreboard and summary HTTP calls with an on-disk cache.
+- `prob_calibration` read calibration files.
+- The bridge also imported the vendored team-advanced-stats BUILDERS.
+
+These read the VENDORED `config.paths`, which the bridge never pinned. It matched the bridge's root only because the fleet env sets `NBA/WNBA_BETTING_DATA_ROOT`. On a machine without that env, the same code reads `vendor/<pkg>_repo/data`.
+
+**Rule:** "we replaced its helpers" is not "its data path is ours". Compute the executed closure by AST from the entrypoint, cutting only at the names actually replaced. List every module it reaches, and every global the reached code reads (`paths`, `LEAGUE`, module caches). An unpinned global in a module you never patched is an input you do not own.
