@@ -48254,3 +48254,4 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - served total runs 8.209: fwd replay 8.142 (0.4 SE), old (none) 9.786 (~9 SE); arms 1.64 apart = 7.1 SE;
   - served HR 1.844: fwd 1.821, old 2.276.
 - **MET** by the pre-registered rule (meta == 1.5 AND served closer to fwd, arms > 3 SE apart).
+- **follow-up 2026-10-10T14:41Z (board-history-charts):** served /intelligence ranked_all: NFL props with recent_values **848/853** (dates 848) -- MET (expected ~849/851). Props are back on the board in all three sports: NCAAF 233 (225 w/values), NHL 655 (649). NFL/NCAAF book_quotes written 14:39Z. The 10-09 22:45Z collapse cleared once prop odds refreshed; it was quote aging, with no lasting effect from the restart.
