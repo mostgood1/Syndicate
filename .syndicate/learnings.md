@@ -3677,3 +3677,13 @@ v1 of the 2026 checkpoint corpus fed the shipped lens functions `predictions_<da
 - **Belief (state_basketball [basketball-smart-sim-engine], 2026-08-19):** NBA's team-advanced-stats rebuild returns nothing, but this has "zero current production impact since NBA is offseason".
 - **Measured 2026-10-09** (engine input checklist over 15 real NBA production sims, 10-05..08): `home/away_team_adj` was absent on **0 of 30 NBA team-sides**, against **24 of 24 WNBA**. The NBA preseason sims are live and run with neutral team quality.
 - **Rule.** A defect parked with "no impact because the season is off" carries a due date: the season opener. Re-measure it then, with the checklist, not the note. Same family as "a documented caveat is a scheduled defect".
+
+## 2026-10-10 - RULE: a fleet job launched from a short-lived shell must be detached, and must resolve a worker pid AT USE `[lane nba-native-live-resim, session 6c348b8f]`
+- **What happened:** two of three fleet verification jobs failed for reasons unrelated to the code under test.
+  - A parity replay started with `nohup ... &` inside `wsl -- bash script.sh` died with an empty log when the WSL session exited.
+  - An A/B arm read `--env-from-pid` resolved 28 minutes earlier; the refresh-worker restarted in between, so `/proc/<pid>/environ` was gone.
+  - The first compare then ran arm A against STALE files in arm B's untouched data copy and printed FAIL.
+- **Rule:**
+  - Launch with `setsid nohup ... < /dev/null & disown` and confirm the pid is alive in a later call.
+  - Resolve a role pid in the same shell line that uses it.
+  - An A/B compare is only valid when the arm's run line says `exit=0` and wrote N.

@@ -1049,38 +1049,31 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Scheduled job LOADED** (fleet VM restart + up, 2026-10-09 ~20:21Z) and ran incrementally.
 - **OWED:** the live tick-by-tick reading on 10-09 MEM@CHI (capture relaunched after the VM restart).
 
-## [nba-live-native-p3] NBA LIVE (P3): THE VENDORED LIVE TICK LOSES TO "SCORE + PREGAME LINE PRO RATA"; per-population situation targets measured; the resumed sim waits on P1 `[verified 2026-10-09, lane nba-native-live-resim, 7e390c8f / 529c5e30]`
+## [nba-live-native-p3] NBA LIVE (P3): native resumed re-sim BUILT and engine-neutral on main, NOT switched on; the vendored live tick loses to "score + pregame line pro rata"; per-population situation targets measured `[verified 2026-10-10 01:13Z, lane nba-native-live-resim, c9971e75 / f5781082]`
 
-- **Harness:** `scripts/basketball_live_checkpoint_backtest.py`.
-  - Checkpoints: end Q1 / Q2 / Q3 and 5:00 Q4.
-  - Populations: regular, postseason and preseason, never pooled.
-  - Paired game-bootstrap CIs.
-  - `live-close` reads OddsAPI historical in-play lines at-or-before the state, at 30 credits/snapshot.
-- **Targets:** `scripts/basketball_live_situation_targets.py`.
-- **Refusal design:** `docs/ai_context/nba_live_resim_refusal_design.md`.
-- **Readings:** `.syndicate/findings_2026-10-09_nba_live_situation_targets.md`.
-- **Baseline (regular season, FIT window 2025-11..2026-02, n≈780):** the vendored replay is WORSE than
-  `pregame_rate` on:
-  - margin at end Q1 (+0.86 MAE) and end Q2 (+0.58);
-  - ML Brier at end Q2 and 5:00 Q4.
-  It is better only on margin at 5:00 Q4 (−0.11, CI −0.22..−0.004). `pregame_rate` ML ties ESPN's
-  published win probability.
-- **Implication for the P3 gate:** "beat vendored" is a low bar, and the native sim must ALSO beat
-  `pregame_rate`. The vendored replay exists only in that window, because no historical SmartSim exists
-  elsewhere.
-- **Targets: regular season vs postseason.**
-  - Regular-season reversion is strong: rest-margin slope −0.24 / −0.17 / −0.13 / −0.09 at the four
-    checkpoints.
-  - Postseason reversion is NOT detectable (n=91).
-- **Targets: all populations.**
-  - Total pace persistence ≈ 0 everywhere.
-  - End-game trailer fouling, down 1-10 inside 2:00, runs 3-4x baseline in every population.
-  - Garbage-time benching depends on the margin band: the trailer concedes first at 11-20, the leader
-    benches first at 21+.
+- **Built** (on main, off by default):
+  - `syndicate/features/nba/live_resim.py`: resumes P1's engine from P2's LiveGameState on persisted pregame inputs, with named refusals and a `pregame_only` lane;
+  - full-game, quarter and half histograms, and live props;
+  - a dedicated loop writing `live/nba_live_resim.json`, run only if `SYNDICATE_NBA_LIVE_RESIM` is set (absent = off).
+- **Pregame inputs** are persisted per newly simulated NBA game at `_call_native_engine_local` (`engine_inputs/<date>/<H>_<A>.pkl`, ~100 KB). A game reused from an existing smart_sim has none (`no_pregame_inputs`).
+- **Engine-neutral, gated:**
+  - P1's production-corpus parity 5,400/5,400;
+  - same-seed e2e A/B 22/22 identical (deploys.md 2026-10-10 01:13Z).
+  - The engine column memo roughly halves ms/draw.
+- **NOT enabled:**
+  - nba is NOT in `_LIVE_GAMELINE_SPORTS`;
+  - the vendored tick (`nba/live_lens.py:97`) is NOT deleted;
+  - `endgame_foul_*` is off.
+  - Reasons: native preseason (n=14, team_adj unfed) loses to pregame_rate on totals, and NBA mechanism re-fits are on hold until #473 (user decision 2026-10-09).
+- **Baseline:** the vendored replay is WORSE than `pregame_rate` on margin at end Q1 (+0.86 MAE) and end Q2, and on ML at end Q2 and 5:00 Q4 (FIT window, n~780). `pregame_rate` ML ties ESPN's live win probability.
+- **Targets:**
+  - Regular-season reversion: rest-margin slope -0.24 / -0.17 / -0.13 / -0.09. Postseason: not detectable (n=91).
+  - Total pace persistence ~0.
+  - Trailer end-game fouling 3-4x in every population.
+  - Garbage-time benching is band-dependent.
   - Foul trouble is strongest in the playoffs and absent in the preseason.
-- **NOT DONE (blocked on P1):** the resumed native sim, the mechanisms and their re-fit, `live_resim`
-  publish, nba in `_LIVE_GAMELINE_SPORTS`, and deleting `nba/live_lens.py`'s vendored import.
-- **OWED:** the live-close reading (fetch in flight, findings §4).
+  - The engine OFF has a flat ~1.0 FTA/min in the last 2:00 vs real 2.4-3.5.
+- Detail: `.syndicate/findings_2026-10-09_nba_live_situation_targets.md` §1-§6.
 
 ## [basketball-native-engine] THE BASKETBALL POSSESSION ENGINE IS SYNDICATE'S -- live on the fleet, parity-proven on 5,400 real production calls `[2026-10-09, lane basketball-native-engine, plan P1, fleet 63a58748]`
 
