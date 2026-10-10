@@ -1024,3 +1024,15 @@ on hold, including fitting `score_effect_k`, until #473 is fixed.
   measurement.
 - **When the hold lifts** (#473 fixed + input checklist re-run): a finer pre-registered grid
   k ∈ {0.001, 0.002, 0.003} on the same protocol, then a full FIT re-run. Nothing is chosen or handed to P3 now.
+
+**SECTION LOAN GRANTED 2026-10-10 to lane nba-sim-team-adj-473 (#473, user-approved there):**
+- Scope: `_nba_total_inputs_switch_local`, a 2-line edit. File ABSENT + `SYNDICATE_NBA_TEAM_INPUTS` on →
+  {skip_def_subtraction: True, skip_outs_penalties: False}. A file present wins; flag off = today exactly.
+- Conditions:
+  - the source (flag / file) recorded in market_anchor;
+  - tests added to tests/test_nba_sim_total_inputs.py (flag-on/no-file, file-wins, flag-off unchanged, WNBA
+    ignores);
+  - strict env parsing; the reader never raises.
+- Their same-seed A/B on 22 preseason games: skip_def adds raw +4.35 / published +1.95, consistent with this lane's
+  −5.1 (780 FIT games). Preseason totals already over; not regular-season evidence.
+- The return SHA is owed by that lane. The NBA re-fit hold persists until it is live and the input checklist passes.
