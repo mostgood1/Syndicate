@@ -1044,3 +1044,13 @@ decision relayed by d48f3a34, the approved change is the DATA file only.
 - Checked 2026-10-10: no fleet copy existed (`/home/amyn/syndicate-prod/data/nba_source/data/processed`), so there is
   nothing to merge.
 - Reachability field: market_anchor.nba_total_inputs on every NBA sim.
+
+**Final #473 shape (2026-10-10, from nba-sim-team-adj-473; the withdrawal of the withdrawal):**
+- (a) The DATA file `nba_sim_total_inputs.json` = {"skip_def_subtraction": true} on the fleet; skip_outs_penalties
+  is not set.
+- (b) No-stack is coupled to `SYNDICATE_NBA_TEAM_INPUTS` inside `_engine_for_league_local` (on a loan from P1). With
+  the flag on, and ABSENT = ON, `_engine_for_league_local("nba")` returns the `nba:nostack` engine object.
+- **For every future NBA sweep from this lane:** set `SYNDICATE_NBA_TEAM_INPUTS` EXPLICITLY in the launch line.
+  - With it on, a sweep inherits team_prior_stacks_on_target = False at the engine level regardless of the cfg lever.
+  - `=0` gives the old stacking engine and neutral team inputs.
+- This lane's engine tests now pin the flag to 0 when fetching the engine (09e3d940).
