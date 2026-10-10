@@ -583,3 +583,12 @@ floor), `drive_success_defense_sensitivity` 1.2, `red_zone_gain_stiffening` 0.6,
 +1.59 -> +2.35, drives_per_team_game -0.40 -> +1.37 (both inside the constraint). Unmoved structural misses: total_sd_gap
 -5.7, p_fg -5.9, total_slope -7.4 (no lever reaches them). Output `C:\tmp\football_scenarios\ncaaf\refit_v41\`.
 The 2026 read is NOT yet scheduled: it is the last clean NCAAF held-out set and needs >= 300 FBS-vs-FBS games weeks 3+.
+
+**v4.1 live dry run (NCAAF 2024, FIT season -- harness check, NOT evidence; 2026-10-10):** `football_scenario_replay.py run
+--sport ncaaf --season 2024 --refit-dir refit_v41 --every 4` at Idle, 164 games / 656 states, refused {}, 109 min.
+Production magnitudes are PLAUSIBLE (guard threshold 20): live total abs err **9.99**, margin abs err 8.34, Brier 0.1341.
+cand-prod: L1 Brier -0.0021 [-0.0051, +0.0005], L2 margin -0.170 [-0.282, -0.062], L3 total -0.180 [-0.302, -0.064]
+(all inside tolerance; by quarter Q1 largest gain, Q4 ~0). In-sample, so this only validates the harness wiring for
+the v4.1 candidate (input levers via cand_task); the 2026 live read (scheduled task `ncaaf-2026-refit-v41-validation`,
+Mon 2026-10-26 09:00 CT) MAY run L1-L3. Report: `C:\tmp\football_scenarios\ncaaf\refit_v41\live_replay_2024_every4.report.json`.
+Private-root override for that read landed as be3b2cf7 (`FOOTBALL_SCENARIO_NCAAF_ROOT`).
