@@ -10,6 +10,7 @@ blocks}.py). The runs are seeded, so every comparison is deterministic.
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -21,7 +22,17 @@ import pytest
 # the switches under the vendored names and the helpers bound to the NBA league params.
 from syndicate.features.shared.basketball_props_smart_sim import _engine_for_league_local  # noqa: E402
 
-events = _engine_for_league_local("nba")
+# Pin SYNDICATE_NBA_TEAM_INPUTS off for the fetch: with that flag on (lane nba-sim-team-adj-473), the NBA engine object
+# is the `nba:nostack` variant (team_prior_stacks_on_target forced False). These tests pin the documented NBA defaults.
+_prev_flag = os.environ.get("SYNDICATE_NBA_TEAM_INPUTS")
+os.environ["SYNDICATE_NBA_TEAM_INPUTS"] = "0"
+try:
+    events = _engine_for_league_local("nba")
+finally:
+    if _prev_flag is None:
+        os.environ.pop("SYNDICATE_NBA_TEAM_INPUTS", None)
+    else:
+        os.environ["SYNDICATE_NBA_TEAM_INPUTS"] = _prev_flag
 
 SWITCHES = ("SHOOTER_FT_RATE", "FOULED_MISS_NOT_FGA", "EXACT_TARGET_CALIBRATION", "TOV_PER_ATTEMPT",
             "PLAYER_REBOUND_CREDIT", "BLOCK_MODE", "BLOCK_ALLOC_BY_RATE")

@@ -24,7 +24,17 @@ def _events(pkg: str):
     """The engine that RUNS for this league (native Syndicate engine since c2b99d4f)."""
     from syndicate.features.shared.basketball_props_smart_sim import _engine_for_league_local
 
-    return _engine_for_league_local("wnba" if pkg.startswith("wnba") else "nba")
+    import os
+
+    prev = os.environ.get("SYNDICATE_NBA_TEAM_INPUTS")
+    os.environ["SYNDICATE_NBA_TEAM_INPUTS"] = "0"   # the documented-default engine, not the #473 no-stack variant
+    try:
+        return _engine_for_league_local("wnba" if pkg.startswith("wnba") else "nba")
+    finally:
+        if prev is None:
+            os.environ.pop("SYNDICATE_NBA_TEAM_INPUTS", None)
+        else:
+            os.environ["SYNDICATE_NBA_TEAM_INPUTS"] = prev
 
 
 def _team(p):
