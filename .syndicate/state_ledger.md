@@ -1686,13 +1686,24 @@ session-start cap) after archiving 63 CLOSED blocks (`5ac74a83`, plus a peer's 1
 in `9de0d099`), claim set unchanged by SET comparison 336 -> 336. The digest's
 OVER BUDGET line now names only `learnings.md` (494KB>449KB).
 
-**CAUTION ON THE TOOLING.** `archive_released_lanes.py` and `trim_lane_blocks.py`
-write ledger files in TEXT mode. On Windows that rewrote the whole 4MB
-`lanes_history.md` LF -> CRLF and converted lanes.md's single mid-line bare CR
-into a line break, splitting a peer's line -- the failure `74da0acd` had already
-repaired once. Unstaged `git diff` showed 679/0 and hid it; the STAGED diff was
-38,213/37,535. Check `git diff --cached --numstat` before committing after either
-tool runs.
+**THE LEDGER TOOLING IS NOW BYTE-SAFE `[fixed 2026-10-09, lane
+ledger-tools-byte-safe-io, 5dfddf6e]`.** All four rewriting tools --
+`archive_released_lanes.py`, `trim_lane_blocks.py`, `trim_lane_narrative.py`,
+`hoist_open_lanes.py` -- read and write through `scripts/ledger_io.py`, which
+preserves a file's own line endings and leaves a mid-line bare CR as a character.
+Verified off != on with one fixture: an LF file at 78 B / CRLF 0 / lone_CR 1 came
+back from the OLD call pattern as 84 B / CRLF 6 / lone_CR 0, and from the helper
+byte-identical; same for a CRLF file. 141 tests pass, including an end-to-end
+`--apply` that plants a mid-line bare CR and requires it intact.
+
+**THE CAUSE WAS THE READ, NOT THE WRITE.** `read_text()` and bare `open()` use
+UNIVERSAL NEWLINES, which maps a lone CR to LF before any processing -- that is
+what split a peer's line. The text-mode write was a SECOND defect, which churned
+4MB of `lanes_history.md` LF -> CRLF. `trim_lane_narrative.py` had pinned
+`newline=LF` on its write and still had the read half, which is the shape of a
+half-fix here. STILL TRUE AND WORTH KEEPING: unstaged `git diff` showed that churn
+as 679/0 and hid it; the STAGED diff was 38,213/37,535. Read
+`git diff --cached --numstat` before committing after any ledger tool runs.
 
 ## [lane-claim-truncation] A LANE CAN CLAIM FILES THE GUARD DOES NOT ENFORCE, AND NOTHING SAID SO -- 17 OPEN lanes affected, now REPORTED `[verified 2026-09-24, lane lane-claim-truncation-visible]`
 

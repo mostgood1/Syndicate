@@ -3647,11 +3647,17 @@ difference: `lanes_history.md` contained a **bare CR**, which makes git decline 
 treat the file as normalisable text. Two files written the same way by the same
 tool in one commit, landing with opposite line endings.
 
-**The second, worse half.** That same text-mode write converted `lanes.md`'s single
-mid-line bare CR into a line break, SPLITTING a peer's line inside the archived
-`layer2-board-ui-redesign` block — byte for byte the failure `74da0acd` repaired
-after an earlier text-mode rewrite of `lanes.md`, and what the 10-06 standing rule
-forbids. A lone CR mid-line is a CHARACTER, not a line ending, and must survive.
+**The second, worse half — AND I NAMED ITS CAUSE WRONG `[corrected 2026-10-09,
+lane ledger-tools-byte-safe-io]`.** A peer's line inside the archived
+`layer2-board-ui-redesign` block was SPLIT at `lanes.md`'s single mid-line bare CR
+— byte for byte the failure `74da0acd` repaired after an earlier rewrite, and what
+the 10-06 standing rule forbids. I blamed the text-mode WRITE. It was the **READ**:
+`pathlib.read_text()` and a bare `open()` use UNIVERSAL NEWLINES, which maps a lone
+CR to LF before any processing runs, so the line was already two lines in memory.
+Measured: on-disk `a CR b LF c LF` reads back as `a LF b LF c LF`, and with
+`newline=""` as `a CR b LF c LF`. The text-mode write is a SEPARATE defect — it
+churned the line endings. Both are now fixed behind `scripts/ledger_io.py`.
+A lone CR mid-line is a CHARACTER, not a line ending, and must survive.
 
 **How to apply.**
 - A regex `^...$` with MULTILINE is unsafe on a CRLF file: `.` matches CR, so `$`
@@ -3725,3 +3731,34 @@ v1 of the 2026 checkpoint corpus fed the shipped lens functions `predictions_<da
 - Verify a config ship against the `cfg_kwargs` the production RUN recorded, for EACH profile/output dir that serves a surface.
 - A V2 replay must include an arm for "the config the run actually used", not only new-vs-old of the intended path.
 - A loader that maps a missing file to `{}` must be paired with a test that every configured path exists.
+
+## 2026-10-10 — A HALF-FIX LOOKS EXACTLY LIKE A FIX: PIN BOTH ENDS OF AN IO PAIR `[lane ledger-tools-byte-safe-io, session 4ab694ed, 5dfddf6e]`
+
+**Rule.** When a defect involves reading AND writing a file, fix and test both
+ends. A tool that pins only the write still corrupts on the read, and the symptom
+is identical, so the half-fix reads as done.
+
+**Why, measured.** `trim_lane_narrative.py` already wrote with `newline=LF` — the
+write half of the bare-CR problem, correctly pinned — and still read with a bare
+`open()`, i.e. universal newlines, which maps a lone CR to LF. It would have split
+a peer's line exactly like the three tools that had neither end pinned. I would
+have shipped the same half-fix: my first instinct was "the tools write in text
+mode", and the write is the half that is easy to see because it churns a visible
+4MB diff. The read is the half that silently loses a character.
+
+**How to apply.** Audit the PAIR across every tool in a family before fixing one.
+Here: 4 tools, all 4 unsafe on read, 3 also unsafe on write — one shared helper at
+the choke point, not four local patches. The audit table is the deliverable; a
+per-tool fix would have left `trim_lane_narrative.py` looking already-correct.
+
+**A SECOND, UNRELATED TRAP THIS EXPOSED — naming a sibling script in a docstring
+can change deploy classification.** `scripts/pending_deploys.py` builds a
+TRANSITIVE closure of script basenames NAMED anywhere in runtime-reachable text,
+and demotes a `scripts/` path to "owns no service" only when nothing names it.
+My new helper's docstring named two sibling tools; that pulled them into the
+closure and, through one of their texts, a third — re-promoting pure ledger tooling
+to runtime code. `tests/test_pending_deploys_runtime.py::test_pure_tooling_is_demoted`
+caught it. Fix was prose, not code: name siblings by ROLE. Verified by comparing
+closure membership against HEAD, which also showed `archive_released_lanes` was
+already in the closure before my change — pre-existing, not mine.
+**Prose in a docstring is an input to a deploy heuristic here.**
