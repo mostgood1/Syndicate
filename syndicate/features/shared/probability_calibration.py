@@ -25,6 +25,8 @@ Curve families, deliberately few:
   isotonic        monotone breakpoints, linear interpolation, clamped to the
                   fitted range -- the same shape `_apply_prob_curve` reads,
                   so a basketball curve could be re-expressed here verbatim
+  market_shrink   p_cal = fair + w * (p - fair)            one number; needs
+                  the row's fair, scales the edge, never flips its side
 
 `calibrate` NEVER raises and never returns a number outside [0, 1]. A cell it
 cannot parse is identity with the reason on the meta, because a curve that
@@ -59,7 +61,13 @@ PROFILE_FILENAME = f"{PROFILE_KEY}.json"
 METHOD_IDENTITY = "identity"
 METHOD_AFFINE_LOGIT = "affine_logit"
 METHOD_ISOTONIC = "isotonic"
-METHODS = (METHOD_IDENTITY, METHOD_AFFINE_LOGIT, METHOD_ISOTONIC)
+#: `p_cal = fair + w * (p - fair)`: shrink the model TOWARD THE MARKET, `w` in
+#: [0, 1]. Unlike a curve on `p` alone it scales the edge and never flips its
+#: side. Lane `mlb-probability-calibration`: a symmetric affine-logit fitted on
+#: MLB flattened p toward 0.5, improved Brier, and made EV>0 bets lose MORE in
+#: 6 of 8 markets, because the residual edge became `0.5 - fair`.
+METHOD_MARKET_SHRINK = "market_shrink"
+METHODS = (METHOD_IDENTITY, METHOD_AFFINE_LOGIT, METHOD_ISOTONIC, METHOD_MARKET_SHRINK)
 
 #: Wildcard segment inside a cell key: `"<market>|*"` answers for every segment
 #: that has no cell of its own.
@@ -323,6 +331,7 @@ def calibrate(
     p: Any,
     *,
     profile: ProbabilityCalibrationProfile | None,
+    fair: Any = None,
 ) -> tuple[float | None, dict[str, Any]]:
     """`(p_cal, meta)`. Identity when there is no profile or no cell.
 
@@ -363,6 +372,18 @@ def calibrate(
         xs, ys = parsed
         meta["method"] = METHOD_ISOTONIC
         return apply_isotonic(value, xs, ys), meta
+    if method == METHOD_MARKET_SHRINK:
+        w = _as_float(cell.get("w"))
+        if w is None or not 0.0 <= w <= 1.0:
+            meta["cell_error"] = "market_shrink cell needs numeric w in [0, 1]"
+            return value, meta
+        fair_prob = _as_float(fair)
+        if fair_prob is None or not 0.0 <= fair_prob <= 1.0:
+            # No market to shrink toward: identity, and the row says why.
+            meta["cell_error"] = "market_shrink needs the row's fair probability"
+            return value, meta
+        meta["method"] = METHOD_MARKET_SHRINK
+        return _clamp01(fair_prob + w * (value - fair_prob)), meta
     meta["cell_error"] = f"unknown method {method!r}"
     return value, meta
 

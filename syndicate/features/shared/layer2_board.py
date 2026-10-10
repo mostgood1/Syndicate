@@ -2530,7 +2530,7 @@ CALIBRATION_METHOD_UPSTREAM = "upstream"
 CALIBRATION_METHOD_BYPASSED = "skipped_no_fair"
 #: The methods that actually MOVE the probability; identity/upstream/bypassed
 #: leave the edge and the model EV exactly as the producer priced them.
-_CALIBRATION_METHODS_THAT_MOVE = frozenset({"affine_logit", "isotonic"})
+_CALIBRATION_METHODS_THAT_MOVE = frozenset({"affine_logit", "isotonic", "market_shrink"})
 
 
 def _calibrate_model_edge(
@@ -2603,7 +2603,7 @@ def _calibrate_model_edge(
         stamps["calibration_method"] = CALIBRATION_METHOD_UPSTREAM
         return model_edge, stamps
     profile, _meta = _pc.cached_profile(sport)
-    p_cal, meta = _pc.calibrate(sport, row.get("market"), row.get("segment"), p_raw, profile=profile)
+    p_cal, meta = _pc.calibrate(sport, row.get("market"), row.get("segment"), p_raw, profile=profile, fair=fair_prob)
     stamps["calibration_version"] = meta.get("version")
     stamps["calibration_method"] = meta.get("method")
     if meta.get("cell") is not None:
