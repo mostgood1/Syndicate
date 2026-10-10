@@ -78,3 +78,29 @@ def test_off_is_not_on_an_unscoped_capture_still_replaces_the_file(mod, monkeypa
                         fresh_props=[_prop("live1", "New Live", 150)], fresh_games=[_game("live1", 95)])
     assert list(props.player) == ["New Live"]
     assert [g["event_id"] for g in games] == ["live1"]
+
+
+def test_espn_live_ids_resolve_to_the_odds_api_event_with_the_same_clubs(mod, monkeypatch, tmp_path):
+    """The live scope passes ESPN ids (`live_state` keys). They never equal Odds API ids,
+    so every in-play capture was PROPS_SCOPE_EMPTY (fleet 10-10: 0 of 555 live props fresh)."""
+    import syndicate.features.soccer.sources as sources
+
+    out = tmp_path / "2026-10-10.csv"
+    pd.DataFrame([_prop("oddsLATER", "Later Player", 120)]).to_csv(out, index=False)
+    monkeypatch.setattr(sources, "live_state_payload", lambda league, date: {"games": {
+        "401878776": {"home_team": "Arsenal", "away_team": "Chelsea"}}})
+    fetched = []
+    monkeypatch.setenv("ODDS_API_KEY", "test-key")
+    monkeypatch.setattr(mod, "_load_env", lambda: None)
+    monkeypatch.setattr(mod, "fetch_events", lambda *a, **k: [
+        {"id": "oddsLIVE", "home_team": "Arsenal FC", "away_team": "Chelsea FC"},
+        {"id": "oddsLATER", "home_team": "Leeds United", "away_team": "Everton"}])
+    monkeypatch.setattr(mod, "fetch_event_player_props", lambda *a, event_id, **k: fetched.append(event_id) or {"id": event_id})
+    monkeypatch.setattr(mod, "parse_event_to_rows", lambda payload, league: [_prop(payload["id"], "Live Player", 200)])
+    monkeypatch.setattr(mod, "parse_event_to_game_rows", lambda payload, league: [])
+    monkeypatch.setattr(mod, "_append_soccer_prop_book_quotes", lambda **k: None)
+    monkeypatch.setattr(sys, "argv", ["x", "--league", "epl", "--out", str(out), "--event-ids", "401878776"])
+    assert mod.main() == 0
+    assert fetched == ["oddsLIVE"]
+    props = pd.read_csv(out, dtype={"event_id": "string"})
+    assert sorted(props.player) == ["Later Player", "Live Player"]

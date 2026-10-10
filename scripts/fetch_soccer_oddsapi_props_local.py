@@ -470,6 +470,47 @@ def _append_soccer_prop_book_quotes(*, league: str, payloads: list[dict[str, Any
         print(f"[odds_book_quotes] soccer props append FAILED {type(exc).__name__}: {exc}")
 
 
+def _events_for_live_espn_games(
+    events: list[dict[str, Any]], espn_ids: set[str], league: str, *, out_date: str
+) -> list[dict[str, Any]]:
+    """Odds API events for the requested ESPN live-state games, matched on BOTH clubs.
+
+    Reads `live_state_<date>.json` (the file the live scope came from) for each
+    requested game's home/away names and keeps the Odds API event whose home AND
+    away match (`team_names.match_team_name`). A game that matches no event, or
+    more than one, is skipped and counted -- a wrong match would price one match's
+    props against another's.
+    """
+    try:
+        from syndicate.features.soccer.features.team_names import match_team_name
+        from syndicate.features.soccer.sources import live_state_payload
+
+        games = (live_state_payload(league, out_date) or {}).get("games") or {}
+    except Exception as exc:  # noqa: BLE001
+        print(f"PROPS_LIVE_SCOPE_UNRESOLVED live_state unreadable {type(exc).__name__}: {exc}", flush=True)
+        return []
+    matched: list[dict[str, Any]] = []
+    unmatched = 0
+    for espn_id in sorted(espn_ids):
+        game = games.get(espn_id) if isinstance(games, dict) else None
+        if not isinstance(game, dict):
+            unmatched += 1
+            continue
+        home, away = str(game.get("home_team") or ""), str(game.get("away_team") or "")
+        hits = [
+            e for e in events
+            if match_team_name(home, [str(e.get("home_team") or "")]) is not None
+            and match_team_name(away, [str(e.get("away_team") or "")]) is not None
+        ]
+        if len(hits) == 1:
+            matched.append(hits[0])
+        else:
+            unmatched += 1
+    print(f"PROPS_LIVE_SCOPE_RESOLVED league={league} espn_requested={len(espn_ids)} "
+          f"matched={len(matched)} unmatched={unmatched}", flush=True)
+    return matched
+
+
 def main() -> int:
     _load_env()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -524,9 +565,19 @@ def main() -> int:
     scoped_ids: set[str] = set()
     if args.event_ids:
         wanted = {e.strip() for e in args.event_ids.split(",") if e.strip()}
-        scoped_ids = set(wanted)
         before = len(events)
-        events = [e for e in events if str(e.get("id") or "") in wanted]
+        direct = [e for e in events if str(e.get("id") or "") in wanted]
+        # THE LIVE SCOPE IS ESPN IDS (lane `soccer-live-lane-priority`, 2026-10-10).
+        # `refresh_odds_sources._soccer_live_scope` passes the keys of
+        # `live_state_<date>.json`'s `games` map -- ESPN event ids ('401878776') --
+        # and this filter matched them against Odds API ids, so it never matched:
+        # every in-play props capture was PROPS_SCOPE_EMPTY (fleet 10-10 15:28Z:
+        # 0 of 555 live soccer props observed within 300 s, median 77 min). Until
+        # 55655758 that empty capture also REPLACED props/<date>.csv with nothing.
+        # When nothing matches directly, resolve each requested ESPN game to the
+        # Odds API event with the same two clubs.
+        events = direct if direct else _events_for_live_espn_games(events, wanted, args.league, out_date=Path(args.out).stem)
+        scoped_ids = {str(e.get("id") or "") for e in events} if events else set(wanted)
         # Counted, and NAMED when it drops to zero: an empty scope must not look
         # like an empty slate. The event-list call has already been spent either
         # way, so reporting the miss is free and its absence would be a silent
