@@ -996,3 +996,8 @@ on hold, including fitting `score_effect_k`, until #473 is fixed.
 - => The corpus is PARTLY affected. The M-B sweep running since 22:06Z is kept as a dose-response
   CHARACTERISATION of the mechanism only. No k is chosen, recorded as fitted, or handed to P3 until #473 is fixed and
   `scripts/basketball_engine_input_checklist.py` is re-run.
+
+**score_effect_k default proof + LOAN RETURNED (2026-10-10 ~01:40Z):**
+- `scripts/basketball_engine_parity.py --corpus ~/bn_corpus/corpus` on the engine with 18e5eba5: 5,400/5,400 real
+  production calls reproduce production output, 0 mismatched (NBA 3,000, WNBA 2,400; 27 games), verdict PASS.
+- The engine.py loan from basketball-native-engine is returned (removed from this lane's Files).
