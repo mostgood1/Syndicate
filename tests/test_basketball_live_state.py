@@ -128,3 +128,10 @@ def test_score_prefers_espn_header_and_keeps_the_play_sum():
     g.shot(1, "11:00", "home", "h1")
     st = live.build_live_game_state(g.summary(official=(4, 0)), "nba", date="2026-01-15", built_at="t")
     assert (st.home.score, st.score_source, st.pbp_score["home"]) == (4, "official", 2)
+
+
+def test_tick_record_carries_the_log_score_beside_the_header_score():
+    g = Game("nba", state="in")
+    g.shot(1, "11:00", "home", "h1")
+    tick = live.build_live_game_state(g.summary(official=(4, 0)), "nba", built_at="t").tick_record()
+    assert tick["score"] == [4, 0] and tick["pbp_score"] == [2, 0] and tick["score_source"] == "official"

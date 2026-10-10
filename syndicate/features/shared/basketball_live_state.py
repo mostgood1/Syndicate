@@ -124,6 +124,8 @@ class LiveGameState:
             "elapsed": round(self.elapsed, 1),
             "last_seq": self.last_seq,
             "score": [self.home.score, self.away.score],
+            "pbp_score": [self.pbp_score.get("home"), self.pbp_score.get("away")],  # the log's own sum: P3 measures header lead
+            "score_source": self.score_source,
             "possession": self.possession_side,
             "team_fouls": [self.home.team_fouls_period, self.away.team_fouls_period],
             "on_floor": [list(self.home.on_floor), list(self.away.on_floor)],
