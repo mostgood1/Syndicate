@@ -387,6 +387,19 @@ def with_live_mechanisms(inputs: Mapping[str, Any], mechanisms: Mapping[str, Any
     return {**dict(inputs), "cfg": EventSimConfig(**{**vals, **dict(mechanisms)})}
 
 
+def resume_engine_label() -> str:
+    """Which engine a live resume runs: the league plus the #473 no-stack switch, for the lane's audit trail."""
+    try:
+        from syndicate.features.shared.basketball_props_smart_sim import _engine_for_league_local
+
+        params = _engine_for_league_local(LEAGUE).params
+        value = getattr(params, "team_prior_stacks_on_target", None)
+        # None = the league defers to the config's own `team_prior_stacks_on_target` (vendored default: stack).
+        return f"{params.code}:stack={'cfg' if value is None else bool(value)}"
+    except Exception as exc:  # noqa: BLE001
+        return f"unknown:{type(exc).__name__}"
+
+
 def stable_seed(event_id: str, last_seq: int) -> int:
     """Same game + same logged state -> same seed, so an unchanged state reproduces its number."""
     return zlib.crc32(f"nba-live-resim|{event_id}|{int(last_seq)}".encode("utf-8")) & 0x7FFFFFFF
@@ -402,14 +415,17 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
     import numpy as np
 
     if simulate is None:
-        from syndicate.features import basketball_engine as eng
-        from syndicate.features.shared.basketball_props_smart_sim import _sample_lineup_local
+        # THE SAME ENGINE OBJECT THE PREGAME SIM USES. `_engine_for_league_local("nba")` binds the league params AND
+        # production's lineup sampler, and since #473 (a31ba2bf) the params carry `team_prior_stacks_on_target=False`
+        # while SYNDICATE_NBA_TEAM_INPUTS is on. Building `league_params("nba")` here would resume with the team prior
+        # STACKED on the target -- a different engine from the one that produced the pregame number. The flag is a
+        # process env, so both workers must carry the same value; `resumeEngine` on the lane records which ran.
+        from syndicate.features.shared.basketball_props_smart_sim import _engine_for_league_local
 
-        lp = eng.league_params(LEAGUE)
+        engine = _engine_for_league_local(LEAGUE)
 
         def simulate(rng, gs):  # noqa: E306
-            return eng.simulate_pbp_game_boxscore(rng=rng, **dict(inputs), league=lp,
-                                                  sample_lineup=_sample_lineup_local, state=gs)
+            return engine.simulate_pbp_game_boxscore(rng=rng, **dict(inputs), state=gs)
 
     if sims < MIN_SIMS:
         return NbaResimRefusal("sims_below_floor", f"{sims}<{MIN_SIMS}")
@@ -721,7 +737,7 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         gs, match = map_state_names(gs, inputs["home_players"], inputs["away_players"])
         mechanisms = live_mechanisms_from_env()
         inputs = with_live_mechanisms(inputs, mechanisms)
-        match = {**match, "mechanisms": sorted(mechanisms)}
+        match = {**match, "mechanisms": sorted(mechanisms), "resumeEngine": resume_engine_label()}
         if clock() >= deadline:
             games.append(_lane_row(event_id, home, away, facts, NbaResimRefusal("budget_exhausted", "before_start")))
             continue

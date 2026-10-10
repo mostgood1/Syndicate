@@ -378,3 +378,28 @@ def test_page_lens_merges_native_lanes_and_props_for_the_same_date_only(monkeypa
     games2 = [{"event_id": "401"}]
     assert page._attach_native_resim(games2, "2026-10-21")["reason"] == "native_resim_snapshot_other_date"
     assert "gameLens" not in games2[0]
+
+
+def test_live_resume_uses_the_pregame_engine_object_including_the_473_no_stack(monkeypatch):
+    """#473: with SYNDICATE_NBA_TEAM_INPUTS on (absent = ON) the pregame engine does NOT stack the team prior on the
+    target. The live resume must run that same object, not a fresh league_params("nba") that stacks."""
+    from syndicate.features.shared import basketball_props_smart_sim as bps
+
+    monkeypatch.delenv("SYNDICATE_NBA_TEAM_INPUTS", raising=False)
+    bps._ENGINES_LOCAL.clear()
+    assert bps._engine_for_league_local("nba").params.team_prior_stacks_on_target is False
+    assert lr.resume_engine_label() == "nba:stack=False"
+    seen = {}
+    real = bps._engine_for_league_local
+
+    def spy(code):
+        eng = real(code)
+        seen["params"] = eng.params
+        return eng
+    monkeypatch.setattr(bps, "_engine_for_league_local", spy)
+    lr.resim_live_game(_kwargs(), None, sims=100, base_seed=1)
+    assert seen["params"].team_prior_stacks_on_target is False
+    monkeypatch.setenv("SYNDICATE_NBA_TEAM_INPUTS", "0")
+    bps._ENGINES_LOCAL.clear()
+    assert lr.resume_engine_label() == "nba:stack=cfg"  # off: the league defers to the config (which stacks)
+    bps._ENGINES_LOCAL.clear()

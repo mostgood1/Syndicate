@@ -10,7 +10,9 @@ engine call of every game, writing its kwargs with `syndicate.features.nba.live_
 Writing through the production persist function is deliberate: the backtest then reads the exact format the
 live tick will read.
 
-Only the kwargs are kept; the handful of draws the run makes is discarded (`--n-sims` small: inputs do not depend
+#473 (a31ba2bf): the scratch also gets the player_checks and nba_sim_total_inputs.json that feed NBA team quality and
+starter flags (`_add_473_inputs`); inputs recorded before 2026-10-10 15:06Z carry the team-neutral sim and are
+superseded. Only the kwargs are kept; the handful of draws the run makes is discarded (`--n-sims` small: inputs do not depend
 on n_sims). Run in WSL with the fleet venv, at nice 19, never against the production data root:
 
   nice -n 19 ~/.venvs/syndicate/bin/python scripts/record_nba_engine_inputs_asof.py \
@@ -27,6 +29,27 @@ from pathlib import Path
 from typing import Any, Dict
 
 
+def _add_473_inputs(live_processed: Path, dst: Path, d: str) -> None:
+    """#473 (a31ba2bf) feeds NBA team quality and starter flags. The scratch recipe copies only top-level processed
+    files, so without this every as-of game would replay the PRE-#473 (team-neutral) sim:
+      * `rotation_stints/player_checks_<date>.csv` dated BEFORE the slate (starter flags read date < slate);
+      * `nba_sim_total_inputs.json` (skip_def_subtraction, a data switch since 2026-10-10 15:06Z).
+    Team ratings need nothing extra: they are built from the scratch's date-truncated player_logs.csv."""
+    import shutil
+
+    stints = dst / "rotation_stints"
+    stints.mkdir(parents=True, exist_ok=True)
+    n = 0
+    for f in sorted((live_processed / "rotation_stints").glob("player_checks_*.csv")):
+        if f.stem[len("player_checks_"):] < d:
+            shutil.copy2(f, stints / f.name)
+            n += 1
+    ti = live_processed / "nba_sim_total_inputs.json"
+    if ti.exists():
+        shutil.copy2(ti, dst / ti.name)
+    print(f"INPUTS_473 {d} player_checks={n} total_inputs={'yes' if ti.exists() else 'NO'}", flush=True)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--code", required=True)
@@ -38,6 +61,8 @@ def main(argv=None) -> int:
     ap.add_argument("--start", required=True)
     ap.add_argument("--end", required=True)
     ap.add_argument("--n-sims", type=int, default=2)
+    ap.add_argument("--live-processed", default="~/syndicate-prod/data/nba_source/data/processed",
+                    help="READ-ONLY source of #473's inputs the pristine copy lacks (player_checks, total-inputs file)")
     ap.add_argument("--worker", type=int, default=0)
     ap.add_argument("--workers", type=int, default=1)
     args = ap.parse_args(argv)
@@ -99,6 +124,7 @@ def main(argv=None) -> int:
             print(f"REC_SKIP {d} no props snapshot", flush=True)
             continue
         rs.prepare_scratch(pristine, scratch, d, asof, props_csv)
+        _add_473_inputs(Path(args.live_processed).expanduser(), scratch / "nba_source" / "data" / "processed", d)
         cur["date"] = d
         seen.clear()
         before = written["n"]
