@@ -1047,7 +1047,9 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Phases:** every row carries `season_type` (preseason / regular / play-in / playoffs), with one table per (season, phase). The sim's NBA reader filters by phase; **the WNBA reader does not**, so its 28-day window mixes the regular season and playoffs at the turn. That is a consumer gap for P3/P5, not a producer one.
 - **NCAAB 2025-26** (deploys.md 2026-10-09 20:34:28Z): scores 6,258/6,275 exact; minutes 97.94% overall, 98.43% D-I v D-I, 94.46% when a side is non-D-I (ESPN logs those players thinly). 43 games without pbp. Conference tournaments are ESPN type 2, so they sit in `regular`.
 - **Scheduled job LOADED** (fleet VM restart + up, 2026-10-09 ~20:21Z) and ran incrementally.
-- **OWED:** the live tick-by-tick reading on 10-09 MEM@CHI (capture relaunched after the VM restart).
+- **Pregame name map (45e03ae2, fleet 2026-10-10 14:25Z):** before it, a PREGAME sim's ESPN name->id map was EMPTY, so the history path could never apply pregame. The 10-09 postgame-only reachability reading was retracted. It now falls back to the native player checks. Pregame reachability is MET on WNBA (NYL: 13 mapped, 152 lineups, applied). NBA preseason slates admit no history BY DESIGN (nba-season-phase).
+- **Live capture MET** (2026-10-09): MEM@CHI 215 in-play ticks, final = official; two WNBA playoff games, one through OT. Live caveats: 3/604 ticks had a transient 4-man five (ESPN posts half a substitution first; the next tick heals), and one 1 s clock correction.
+- **OWED:** a production NBA smart_sim diag showing `rotation_minutes.applied` after the 2026-27 regular season starts (~10-21).
 
 ## [nba-live-native-p3] NBA LIVE (P3): native resumed re-sim BUILT and engine-neutral on main, NOT switched on; the vendored live tick loses to "score + pregame line pro rata"; per-population situation targets measured `[verified 2026-10-10 01:13Z, lane nba-native-live-resim, c9971e75 / f5781082]`
 

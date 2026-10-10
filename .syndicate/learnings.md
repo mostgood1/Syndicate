@@ -3697,3 +3697,20 @@ v1 of the 2026 checkpoint corpus fed the shipped lens functions `predictions_<da
 - The real cause was a constant LEVEL: −5.1 from a double-counted defense and −8.5 from injury penalties.
 - **Rule:** before attributing a moving correction to drift, regress the uncorrected residual on date with a
   date-clustered CI. A fitted term's path also carries its window and its clip.
+
+## 2026-10-10 — RULE: measure a sim input's reachability on a PREGAME call, never on a completed game; a finished game hands the sim lookups (ESPN box -> name/id map) that a pregame call does not have `[lane basketball-native-live-state, session 82bc583a]`
+- **What we believed:** the native `rotation_stints_history` reaches the NBA smart sim. deploys.md 2026-10-09 18:56:24Z recorded "Reachability (off != on) ... MET" on PHI v MEM 2026-03-10: ON applied, 49-lineup pool; OFF `no_rotation_stints_history`.
+- **What was actually true:**
+  - That game was COMPLETED. `_espn_name_to_id_map_for_game_local` read its ESPN box and mapped 26 players.
+  - For a PREGAME game there is no box. The only other fallback read the vendored `pbp_espn_history.csv`, and the map came back EMPTY (2026-10-10 TOR v LAC 0, ATL v IND 0).
+  - Every production pregame call would have refused with `no_espn_name_map`, and the "MET" described a path production never takes.
+  - (NBA preseason slates also admit no history by design, lane nba-season-phase. That is a second, intended gate the probe never met either.)
+- **How we found out:** lane nba-sim-team-adj-473 ran fresh NBA sims and messaged that `lineup_pools` was 0/4. I verified the empty map on the fleet myself, fixed it with a native fallback from `rotation_stints/player_checks_*.csv` (45e03ae2), and re-measured with the box lookup FORCED EMPTY: WNBA NYL 13 mapped, applied, 152 lineups (deploys.md 2026-10-10 14:25:14Z).
+- **Technical failure:** an input's id-join depended on an artifact (the game's own box) that exists only after the game.
+- **Epistemic failure:** I chose a COMPLETED game for the probe because the probe needed a roster, and the completed game supplied one. The probe built its inputs from the very artifact production lacks. Memory `[[feedback_confirm_the_code_ran]]` and learnings 2026-10-05 ("a verification is only as good as the population it ran on") both already said this, and I still did it. A rule I had read was not enough.
+- **The rule going forward:** a reachability reading for a pregame model input is taken with the post-game lookups forced off (here `_espn_event_id_for_matchup_local -> ""`), or on a live-dated pregame slate. Its record names which lookups the probe could see.
+- **Proposed check, not prose:** P1's `scripts/basketball_sim_input_checklist.py` should read PRODUCTION `smart_sim_<date>_*.json` on the fleet and report the `rotation_minutes.{home,away}.reason` distribution. It should exit non-zero when the history file exists and 0% of regular-season sims applied it. That reads what production did, which no probe can fake.
+- **Also this lane, smaller (each recorded where it happened):**
+  - **A process kill matched other sessions' work.** I killed my leftover pytest by a command-line fragment (`pytest` + `no:cacheprovider`), and it also killed P1's and another session's test runs. Match your OWN pid, or a unique token in your own argv, never a shared flag.
+  - **I described `up` as light.** On a running fleet `up` refuses until `down`, so it is a full restart. Read `cmd_up` before offering it.
+- **Cost:** about 20 hours with a false "MET" on the ledger (2026-10-09 18:56Z -> 2026-10-10 14:25Z fix). No production harm: preseason NBA slates admit no history anyway, and WNBA sims ran before the backfill. Two other sessions' test runs were interrupted.

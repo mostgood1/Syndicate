@@ -48230,3 +48230,19 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - Arms read the worker env from before (A) and after (B) that restart. Output was still identical.
 - **Scope of the gate.** Both gates ran on base `006ca0d6`. The landed base adds `45e03ae2` (P2's pregame ESPN name-map fallback in `basketball_props_smart_sim.py`, input preparation, outside every P3 section). Its interaction is covered by output-neutrality, not by a re-run.
 - **verify (after the next fleet ff):** grep `NBA_ENGINE_INPUTS_PERSISTED` on the refresh-worker for the first newly simulated NBA game, with 0 `NBA_ENGINE_INPUTS_PERSIST_FAILED` and a matching `<nba_source>/data/processed/engine_inputs/<date>/<H>_<A>.pkl`.
+
+## 2026-10-10 14:25:14Z (9:25 AM CT) -- LOCAL FLEET ff a032eb94 -> 45e03ae2, NO restart: pregame ESPN name-map falls back to the native player checks; P2 live and pregame-reachability readings (lane `basketball-native-live-state`, session 82bc583a; user "ff now")
+
+- **RETRACTION of the 2026-10-09 18:56:24Z reachability reading.** It was taken on a COMPLETED game (PHI v MEM 2026-03-10), where ESPN's box gives the sim a name->id map. Lane nba-sim-team-adj-473 reported `lineup_pools` 0/4 on fresh NBA runs; verified myself on the fleet: for PREGAME games the map was EMPTY (2026-10-10 TOR v LAC 0 entries, ATL v IND 0; completed PHI v MEM 26). Every pregame rotation-history call would have refused with `no_espn_name_map`. That is the "fixture took a cheaper path than production" trap.
+- **fix (45e03ae2):** `_espn_name_to_id_map_for_game_local` falls back to `rotation_stints/player_checks_*.csv` (120-day lookback, newest game wins, native beats the vendored pbp_espn_history on a conflict). Tests: tests/test_basketball_name_map_native.py.
+- **gate:** claim refresh-worker (token 283bebc7), HEAD == a032eb94 checked, `merge --ff-only 45e03ae2`, released. Ride-along: none (the only code change is this one).
+- **pregame reachability (bbp2 at 45e03ae2, production `_rotation_sim_minutes_from_history_local`):**
+  - WNBA NYL v ATL 2026-10-09, with ESPN's box lookup FORCED EMPTY (the pregame condition): 13 dressed NYL players mapped, minutes frac 1.00, lineup pool 152, applied=True. OFF: `no_rotation_stints_history`. Without forcing (game in progress): NYL applied (149 lineups), ATL applied (168).
+  - NBA TOR v LAC 2026-10-10: the name map now resolves (TOR 11, LAC 15), but the NBA same-phase filter admits NOTHING on a preseason slate. That is lane nba-season-phase's design ("a preseason slate admits nothing"). So NBA pregame sims first use the history once 2026-27 REGULAR-season dates exist (opener 10-20). **OWED: read a production NBA smart_sim diag `rotation_minutes.applied` after ~10-21.**
+- **live capture (pid 3669, nice 19), 2026-10-09 slate:**
+  - **NBA MEM@CHI 401908940:** 215 in-play ticks, 00:11:39Z-02:38:56Z, periods 1-4, elapsed monotone; final 100-104 = official = play sum; state 19,059 B.
+  - **WNBA ATL@NYL 401918299:** 180 ticks, final 83-85 = official.
+  - **WNBA GSV@LVA 401918300:** 209 ticks through OT (period 5), final 77-87 = official.
+  - **Transient non-5 fives:** 3 of 604 in-play ticks (CHI P3 2:40-2:23; NYL P2 6:42). ESPN posts half of a substitution first; the next tick rebuilds and heals, and the anomaly is counted. P3 should refuse a tick whose fives are not 5v5.
+  - **Clock correction:** one tick went back 1 s (LVA P4 5:31 -> 5:32 while seq advanced). This is ESPN correcting the clock.
+- **rollback:** revert 45e03ae2 and ff; the sim returns to the box-or-vendored map.
