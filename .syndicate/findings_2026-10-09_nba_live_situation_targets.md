@@ -426,3 +426,27 @@ re-fits are on hold.
 
 **Preseason props cannot be priced:** today's NBA props CSV carries h2h/spreads/totals only, no player markets.
 Priced live props start with the regular season.
+
+### 6e. Native preseason RE-READ with #473 inputs (2026-10-10 ~16:3xZ)
+
+**Inputs.**
+- 20 games, 10-03..10-09, re-recorded on a copy of the live NBA root at code ≥ a31ba2bf.
+- team_adj non-neutral, starter flags fed, skip_def file present.
+- Persisted by the production hook: **20/20, 0 failures**.
+- 200 sims. n = 16-18 per checkpoint (pbp/linescore mismatches excluded).
+
+**Native vs `pregame_rate`, paired:**
+
+| market | end Q1 | end Q2 | end Q3 | 5:00 Q4 |
+|---|---|---|---|---|
+| total MAE | **+2.63** [+0.39, +4.88] | **+2.53** [+1.41, +3.60] | **+1.74** [+1.19, +2.35] | n.s. |
+| total bias, native / pregame_rate | **+8.0 / +1.7** | **+10.0 / +6.1** | **+6.8 / +4.2** | +1.8 / -1.2 |
+| margin MAE | n.s. (-0.55) | n.s. (-0.39) | n.s. | n.s. |
+| ML Brier | n.s. (-0.050) | n.s. (-0.043) | n.s. | **+0.021** [+0.005, +0.042] |
+
+- Interval coverage 80%: 0.69-0.94 (n too small to judge).
+
+**Reading:** #473 did NOT change the preseason picture.
+- The native sim over-projects rest-of-game scoring in the preseason by ~3-4 points more than the market already does.
+- The candidate is a preseason population effect: second halves played by benches, which neither the market line nor the engine models.
+- At n ≈ 16 it is indistinguishable from a general level bias. The 2025-26 regular-season gate decides.
