@@ -1054,3 +1054,12 @@ decision relayed by d48f3a34, the approved change is the DATA file only.
   - With it on, a sweep inherits team_prior_stacks_on_target = False at the engine level regardless of the cfg lever.
   - `=0` gives the old stacking engine and neutral team inputs.
 - This lane's engine tests now pin the flag to 0 when fetching the engine (09e3d940).
+
+**Code loan NOT taken (final, 2026-10-10):** `_nba_total_inputs_switch_local` and tests/test_nba_sim_total_inputs.py
+stay untouched.
+- skip_def ships ONLY as the data file {"skip_def_subtraction": true} on the fleet NBA processed root, written at the
+  #473 deploy and recorded in deploys.md. market_anchor.nba_total_inputs shows it per sim.
+- **ROLLBACK of skip_def = delete that file.** `SYNDICATE_NBA_TEAM_INPUTS=0` rolls back the ratings, starters and
+  no-stack, but NOT skip_def.
+- The key is this lane's to control. Owed from nba-sim-team-adj-473: the deploy SHA plus the input-checklist reading
+  (that lifts the NBA re-fit hold).
