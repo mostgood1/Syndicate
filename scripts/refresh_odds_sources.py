@@ -1570,6 +1570,9 @@ def _soccer_history_step(league: str, soccer_root: Path, python_exe: str) -> Ref
         # --phase live, under which only `_artifacts` and `_live_state` run. A
         # pregame-only prerequisite would never execute on the path that needs it.
         phases=("pregame", "live"),
+        # Full refreshes only (lane `soccer-live-lane-priority`, 2026-10-10): the soccer-live fast
+        # autorun must carry only the in-play captures. Fleet sweeps run mode=full, so unchanged.
+        modes=("full",),
         cwd=REPO_ROOT,
         command=(
             python_exe,
@@ -1800,6 +1803,9 @@ def _soccer_players_step(league: str, soccer_root: Path, python_exe: str) -> Ref
         # Both phases, matching the history step: the autorun launches with
         # --phase live, so a pregame-only prerequisite would never run there.
         phases=("pregame", "live"),
+        # Full refreshes only (lane `soccer-live-lane-priority`, 2026-10-10): the soccer-live fast
+        # autorun must carry only the in-play captures. Fleet sweeps run mode=full, so unchanged.
+        modes=("full",),
         cwd=REPO_ROOT,
         command=(
             python_exe,
@@ -1868,6 +1874,9 @@ def _soccer_rosters_step(league: str, soccer_root: Path, python_exe: str) -> Ref
         name=f"soccer_{league}_rosters",
         # Both phases, matching the players step: the autorun launches with --phase live.
         phases=("pregame", "live"),
+        # Full refreshes only (lane `soccer-live-lane-priority`, 2026-10-10): the soccer-live fast
+        # autorun must carry only the in-play captures. Fleet sweeps run mode=full, so unchanged.
+        modes=("full",),
         cwd=REPO_ROOT,
         command=(
             python_exe,
@@ -1953,6 +1962,9 @@ def _soccer_current_history_step(league: str, soccer_root: Path, python_exe: str
         # Both phases, matching the other history steps: the autorun launches with
         # --phase live, so a pregame-only prerequisite would never run there.
         phases=("pregame", "live"),
+        # Full refreshes only (lane `soccer-live-lane-priority`, 2026-10-10): the soccer-live fast
+        # autorun must carry only the in-play captures. Fleet sweeps run mode=full, so unchanged.
+        modes=("full",),
         cwd=REPO_ROOT,
         command=(
             python_exe,
@@ -2300,6 +2312,9 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 # not any soccer is playing. Dropping `live` unconditionally would
                 # stop soccer's sims for hours at a time.
                 phases=("pregame",) if league in live_scope else ("pregame", "live"),
+                # Full refreshes only (lane `soccer-live-lane-priority`, 2026-10-10): the soccer-live fast
+                # autorun must carry only the in-play captures. Fleet sweeps run mode=full, so unchanged.
+                modes=("full",),
                 cwd=REPO_ROOT,
                 command=(
                     python_exe,
@@ -2320,6 +2335,9 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
             RefreshStep(
                 name=f"soccer_{league}_picks",
                 phases=("pregame",),
+                # Full refreshes only (lane `soccer-live-lane-priority`, 2026-10-10): the soccer-live fast
+                # autorun must carry only the in-play captures. Fleet sweeps run mode=full, so unchanged.
+                modes=("full",),
                 cwd=REPO_ROOT,
                 command=(
                     python_exe,
@@ -2369,6 +2387,9 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
             # script exits before touching disk when today's report is fresh, so
             # the 60s cadence costs a process spawn, not a ratings build.
             phases=("pregame", "live"),
+            # Full refreshes only (lane `soccer-live-lane-priority`, 2026-10-10): the soccer-live fast
+            # autorun must carry only the in-play captures. Fleet sweeps run mode=full, so unchanged.
+            modes=("full",),
             cwd=REPO_ROOT,
             command=(
                 python_exe,

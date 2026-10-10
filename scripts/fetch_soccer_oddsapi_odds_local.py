@@ -228,7 +228,11 @@ def _game_markets() -> list[str]:
 
 def _write_text_atomic(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    # PER-WRITER temp name (lane `soccer-live-lane-priority`, 2026-10-10): the soccer
+    # live fast lane and the pregame/combined runs can now write this file at the same
+    # time, and a shared `.tmp` let one writer's replace() move the other's half-written
+    # file into place.
+    tmp = path.with_suffix(path.suffix + f".{os.getpid()}.tmp")
     tmp.write_text(text, encoding="utf-8")
     tmp.replace(path)
 

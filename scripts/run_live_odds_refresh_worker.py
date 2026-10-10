@@ -736,6 +736,127 @@ def _launch_autorun_ncaaf_lines_refresh() -> None:
     )
 
 
+# SOCCER LIVE, ITS OWN FAST LANE (lane `soccer-live-lane-priority`, 2026-10-10).
+#
+# Measured 10-10 11-14Z, EPL and Bundesliga in play: 86-87% of the loop's
+# soccer-including sweeps were refused `lane_busy`, and the holders were the
+# loop's OWN live sweeps (11-23 min each: artifacts for leagues not in play,
+# nhl_oddsapi_refresh, ...). So an in-play soccer price was re-captured every
+# 11-20 min, far past `opportunity_gate`'s 300 s observed ceiling, and every live
+# soccer row went `dead` (10-09: 1,587 live props, 0 opportunity). Moving the
+# pregame autorun off the shared lane (edb493a7) was necessary and not enough.
+#
+# This launches `phase=live mode=fast` soccer on its own lane while a match is in
+# play. The soccer artifacts/history/players/rosters/picks/checklist steps are
+# `modes=("full",)`, so the run is the in-play odds + props captures and the
+# live-state poll -- seconds, and scoped to the events in play (single-digit
+# Odds API calls per run, `_soccer_live_scope`). Both capture scripts append to
+# the book_quotes tape themselves, so the board sees it without the full path.
+#
+# DEFAULT OFF, this file's convention for new periodic work (`#241`):
+# SYNDICATE_ENABLE_SOCCER_LIVE_REFRESH_AUTORUN=1 turns it on.
+_SOCCER_LIVE_LEAGUES = (
+    "epl", "la_liga", "bundesliga", "serie_a", "ligue_1", "mls",
+    "eredivisie", "primeira_liga", "championship", "belgian_pro_league",
+)
+
+
+def _soccer_live_refresh_enabled() -> bool:
+    raw_value = str(os.environ.get("SYNDICATE_ENABLE_SOCCER_LIVE_REFRESH_AUTORUN") or "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def _soccer_live_refresh_interval_seconds() -> int:
+    raw_value = str(os.environ.get("SYNDICATE_SOCCER_LIVE_REFRESH_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw_value or 120)
+    except ValueError:
+        value = 120
+    return max(30, value)
+
+
+def _soccer_live_refresh_lane() -> str:
+    raw_value = str(os.environ.get("SYNDICATE_SOCCER_LIVE_REFRESH_LANE") or "").strip()
+    return raw_value or "live-odds-worker-soccer-live"
+
+
+def _soccer_live_autorun_status_path() -> Path:
+    return reports_root() / "refresh_status" / "latest" / "soccer_live_autorun_status.json"
+
+
+def _soccer_in_play_leagues(date_str: str) -> list[str]:
+    """Leagues with a match IN PLAY now, from `live_state_<date>.json` -- the same
+    signal `refresh_odds_sources._soccer_live_scope` scopes the run with. Any
+    failure reads as none in play: the safe direction, since a wrong guess here
+    costs credits."""
+    try:
+        from syndicate.features.soccer.sources import live_state_payload
+    except Exception:  # noqa: BLE001
+        return []
+    leagues: list[str] = []
+    for league in _SOCCER_LIVE_LEAGUES:
+        try:
+            payload = live_state_payload(league, date_str)
+        except Exception:  # noqa: BLE001
+            continue
+        games = payload.get("games") if isinstance(payload, dict) else None
+        if isinstance(games, dict) and games:
+            leagues.append(league)
+    return leagues
+
+
+def _launch_autorun_soccer_live_refresh() -> None:
+    if not _soccer_live_refresh_enabled():
+        return
+    selected_date = central_today_iso()
+    in_play = _soccer_in_play_leagues(selected_date)
+    if not in_play:
+        return
+    status_path = _soccer_live_autorun_status_path()
+    last_status = read_json_file(status_path) or {}
+    last_epoch = float((last_status or {}).get("epoch") or 0.0)
+    if last_epoch > 0.0 and (time.time() - last_epoch) < float(_soccer_live_refresh_interval_seconds()):
+        return
+    try:
+        result = launch_refresh_run(
+            date=selected_date,
+            sports="soccer",
+            phase="live",
+            execution_mode="source",
+            regions="us",
+            skip_mirror=True,
+            mode="fast",
+            launch_mode="web_process",
+            lane=_soccer_live_refresh_lane(),
+        )
+    except Exception as exc:
+        if _is_refresh_run_contention_error(exc):
+            # The previous fast run is still going: keep the original epoch so the
+            # next tick retries, rather than charging a full interval.
+            write_json_file(status_path, {**last_status, "sports": "soccer", "date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
+        else:
+            write_json_file(status_path, {"epoch": time.time(), "sports": "soccer", "date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
+        print(f"[live_odds_worker] SOCCER_LIVE_AUTORUN_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return
+    write_json_file(
+        status_path,
+        {
+            "epoch": time.time(),
+            "sports": "soccer",
+            "date": selected_date,
+            "in_play_leagues": in_play,
+            "artifactsDir": (result or {}).get("artifactsDir") or (result or {}).get("artifacts_dir"),
+            "runStamp": (result or {}).get("runStamp") or (result or {}).get("run_stamp"),
+        },
+    )
+    print(
+        f"[live_odds_worker] SOCCER_LIVE_AUTORUN_LAUNCHED date={selected_date} phase=live mode=fast "
+        f"lane={_soccer_live_refresh_lane()} in_play={','.join(in_play)} "
+        f"interval_s={_soccer_live_refresh_interval_seconds()}",
+        flush=True,
+    )
+
+
 def _nfl_lines_refresh_enabled() -> bool:
     # DEFAULT OFF, this file's convention for new periodic work (`#241`).
     raw_value = str(os.environ.get("SYNDICATE_ENABLE_NFL_LINES_REFRESH_AUTORUN") or "").strip().lower()
@@ -2943,6 +3064,10 @@ def _launch_inplay_capture_autoruns(source: str) -> None:
             _launch_autorun_ncaaf_lines_refresh()
         except Exception as exc:  # noqa: BLE001
             print(f"[live_odds_worker] NCAAF_LINES_AUTORUN_ERROR source={source} {type(exc).__name__}: {exc}", flush=True)
+        try:
+            _launch_autorun_soccer_live_refresh()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[live_odds_worker] SOCCER_LIVE_AUTORUN_ERROR source={source} {type(exc).__name__}: {exc}", flush=True)
         try:
             _launch_autorun_nfl_lines_refresh()
         except Exception as exc:  # noqa: BLE001
