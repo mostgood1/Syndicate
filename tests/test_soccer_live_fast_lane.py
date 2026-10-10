@@ -61,10 +61,10 @@ def test_off_is_not_on_a_full_live_run_still_builds_the_artifacts(ros, monkeypat
 
 def _autorun(worker, monkeypatch, *, enabled, in_play, last_epoch=0.0):
     calls = []
-    if enabled:
-        monkeypatch.setenv("SYNDICATE_ENABLE_SOCCER_LIVE_REFRESH_AUTORUN", "1")
-    else:
+    if enabled is None:
         monkeypatch.delenv("SYNDICATE_ENABLE_SOCCER_LIVE_REFRESH_AUTORUN", raising=False)
+    else:
+        monkeypatch.setenv("SYNDICATE_ENABLE_SOCCER_LIVE_REFRESH_AUTORUN", "1" if enabled else "0")
     monkeypatch.delenv("SYNDICATE_SOCCER_LIVE_REFRESH_LANE", raising=False)
     monkeypatch.setattr(worker, "central_today_iso", lambda: "2026-10-10")
     monkeypatch.setattr(worker, "_soccer_in_play_leagues", lambda date: list(in_play))
@@ -75,7 +75,12 @@ def _autorun(worker, monkeypatch, *, enabled, in_play, last_epoch=0.0):
     return calls
 
 
-def test_the_autorun_is_off_by_default(worker, monkeypatch):
+def test_the_autorun_is_on_by_default(worker, monkeypatch):
+    """User-approved 2026-10-10: default ON (the fleet loads env only at `up`)."""
+    assert len(_autorun(worker, monkeypatch, enabled=None, in_play=["epl"])) == 1
+
+
+def test_off_is_not_on_zero_turns_it_off(worker, monkeypatch):
     assert _autorun(worker, monkeypatch, enabled=False, in_play=["epl"]) == []
 
 

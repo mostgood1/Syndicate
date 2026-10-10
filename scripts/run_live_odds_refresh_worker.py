@@ -753,8 +753,12 @@ def _launch_autorun_ncaaf_lines_refresh() -> None:
 # Odds API calls per run, `_soccer_live_scope`). Both capture scripts append to
 # the book_quotes tape themselves, so the board sees it without the full path.
 #
-# DEFAULT OFF, this file's convention for new periodic work (`#241`):
-# SYNDICATE_ENABLE_SOCCER_LIVE_REFRESH_AUTORUN=1 turns it on.
+# DEFAULT ON -- a deliberate, USER-APPROVED (2026-10-10) exception to this file's
+# off-by-default convention for new periodic work (`#241`). That convention exists
+# for memory pressure; this run is seconds of fetch scripts, and the local fleet
+# derives role env only at `up`, so an env-gated default-off switch could not be
+# turned on without restarting all three roles (cold board ~20 min).
+# SYNDICATE_ENABLE_SOCCER_LIVE_REFRESH_AUTORUN=0 turns it off.
 _SOCCER_LIVE_LEAGUES = (
     "epl", "la_liga", "bundesliga", "serie_a", "ligue_1", "mls",
     "eredivisie", "primeira_liga", "championship", "belgian_pro_league",
@@ -763,7 +767,7 @@ _SOCCER_LIVE_LEAGUES = (
 
 def _soccer_live_refresh_enabled() -> bool:
     raw_value = str(os.environ.get("SYNDICATE_ENABLE_SOCCER_LIVE_REFRESH_AUTORUN") or "").strip().lower()
-    return raw_value in {"1", "true", "yes", "on"}
+    return raw_value not in {"0", "false", "no", "off"}
 
 
 def _soccer_live_refresh_interval_seconds() -> int:
