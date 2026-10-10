@@ -48264,3 +48264,35 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **Pre-deploy evidence (scratch copy of the fleet data root, seed 7, 300 draws).** 22 NBA games 10-03..10-10 (20 preseason finals), OFF / ON-as-built / option A: pub margin MAE 12.09 / 14.63 / 11.95; Brier .273 / .331 / .276; |pub margin - market| 1.83 / 4.57 / 1.67; pub total - market +4.82 / +5.20 / +6.77 (from skip_def). Checklist option A: team_adj non-neutral 44/44 team-sides, starter flags 100%; OFF 0/44, 0%. E2E wiring on the native orchestrator (base d27c8ad6): flag=0 byte-identical to origin/main 2/2 games (compare-sims PASS); flag=1 + data file identical to the measured option-A arm 2/2.
 - **Rollbacks.** skip_def: delete the data file (no restart; re-read per call). Team inputs + no-stack: `SYNDICATE_NBA_TEAM_INPUTS=0` in the refresh-worker role env (restart to re-inject).
 - **verify: OWED** -- the first NBA `smart_sim_*.json` written after 15:06:05Z: `context.team_advanced_priors.applied == true` with `source` starting `syndicate_nba_team_inputs_v1`, `context.pregame_expected_minutes.{home,away}.applied == true`, `market_anchor.nba_total_inputs.skip_def_subtraction == true`, run_summary failures == 0; then `scripts/basketball_engine_input_checklist.py` over a fresh corpus recorded from post-deploy production inputs. Owed regular-season totals reading: todo `#695`.
+
+## 2026-10-10 14:39:11Z (9:39 AM CT) -- LOCAL FLEET ff 45e03ae2 -> 24d7b19c, NO restart: the basketball smart sim's ORCHESTRATOR is Syndicate's (plan P6); the sim bridge imports no vendored module (lane `basketball-native-orchestrator`, session 2d413211)
+
+- **User decision 2026-10-10:** "Yes, ff after props idle". Claim refresh-worker held by basketball-native-orchestrator (token 5196bb0e..., acquired ~14:27Z, released 14:40:39Z).
+- **Change.**
+  - `984312a8`: `vendor/{nba,wnba}_betting_repo/src/*/sim/smart_sim.py:simulate_smart_game` and every vendored function it executed (79 definitions, 9 modules) now run from `syndicate/features/basketball_engine/orchestrator/`. That is ONE league-parametric orchestrator; ncaab is a named refusal.
+  - The 29 helpers Syndicate had replaced are direct calls (`hooks.py`). Nothing is patched.
+  - Deleted: `_import_real_smart_sim_module_local`, the flat #440 stub and its helpers, and the replacements/setattr patching.
+  - `38deec5c`: the team-advanced-stats BUILDERS are ported too. They are kept verbatim per fork, because the forks differ in algorithm. `_vendor_smart_sim_code_root_local` is deleted.
+  - Also `75ab78cf` (checklist and docs), `58206ee2` (results), `24d7b19c` (parity tool).
+- **Fleet.**
+  - `check_deploy_safety` read in full at 14:38:59Z: NOT CLEAR. In flight were soccer odds/artifact children, one live run (`mlb,nba,nhl,soccer`) already on its soccer step, and a board build. No `refresh_{nba,wnba}_oddsapi_props` was running. Proceeded deliberately: an ff without restart kills nothing.
+  - Guard: HEAD == 45e03ae2, then `merge --ff-only 24d7b19c`.
+  - Dirty files before and after: only the two pipeline-written MLB statcast JSONs.
+  - The approval was given at ~14:25Z for a032eb94 -> 24d7b19c. Lane basketball-native-live-state had ff'd a032eb94 -> 45e03ae2 at 14:25:14Z, so its ESPN-map change is its own deploy. The guard aborted once on the moved HEAD and was re-run against 45e03ae2.
+- **Ride-alongs 45e03ae2..24d7b19c (code):**
+  - `c9971e75`: P3 engine column memo, which draws nothing (P3 gated 5,400/5,400), plus default-off mechanisms. It runs in the sim subprocesses now.
+  - `f5781082`: the NBA live re-sim loop. `SYNDICATE_NBA_LIVE_RESIM` absent = off, and it is in long-lived roles, so it is not loaded without a restart.
+  - `9da2dffb` / `e2f2a958`: findings and test only.
+- **No restart.** The orchestrator runs only in the per-job `refresh_{nba,wnba}_oddsapi_props.py` subprocesses (`refresh_odds_sources` RefreshSteps). The refresh-worker imports bridge helpers only.
+- **PRE-DEPLOY parity.** Substrate: the fleet's production data root copied to `~/p6/data` at 2026-10-09 23:30Z; seed 20261009; 100 sims; nice 19.
+  - **NBA, 22 games over 8 dates (10-03..10-10).** The vendored replay reproduced production's recorded digest 22/22. The native replay was identical on **862,659 leaves**. All 22 end-to-end `smart_sim_*.json` were byte-identical.
+  - **WNBA, 13 games over 8 dates (05-27..10-09).** One of them is SAS@OKC, an NBA game that leaked into the 05-28 WNBA slate (the vendored league-id bug); it fails the same in both arms. The replay was identical on **265,118 leaves**, and all 12 written artifacts were byte-identical.
+  - **Builders.** 24 DataFrame comparisons, 0 differences: NBA `player_logs` 1,680 cells, WNBA `boxscores` 1,260 cells. NBA `boxscores` and WNBA `player_logs` were EMPTY in both arms on every date, so those two paths are unexercised on real data.
+  - **Checklist** (`scripts/basketball_orchestrator_input_checklist.py`): PASS for both leagues.
+- **VERIFY -- MET (~15:05Z), on the DEPLOYED checkout** (`/home/amyn/Syndicate` at 24d7b19c, both arms run there and compared to EACH OTHER):
+  - A fresh interpreter building the module view and both builders loads **no** `nba_betting`/`wnba_betting` module. `_import_real_smart_sim_module_local` is absent.
+  - Corpus replays: NBA 22/22 (862,659 leaves) and WNBA 13/13 (265,118 leaves), `compare-outputs` PASS.
+  - End to end on fresh copies of the same data, same seed: NBA 10-08 6/6 and WNBA 10-09 2/2 `smart_sim_*.json` identical (PASS).
+- **OWED (timing, not failure):** the first NEWLY simulated production game after 14:39:11Z. Existing sims with players are reused, so today's games are not re-simulated. Read: a `smart_sim_*.json` with mtime > 14:39:11Z that has players and a score block, no stub key, and no `smart_sim_failures_<date>.csv` written after the ff.
+  - Confound, named: the fleet moved on to 3691bcd1 (14:58Z, 15:02Z, other lanes). That includes #473 NBA team inputs (`a8550771`/`b71232fb`/`bdf84981`, `SYNDICATE_NBA_TEAM_INPUTS` default ON), a deliberate NBA output change routed through P6's hooks. The reading therefore checks P6's HEALTH, not vendored equality.
+- **Rollback.** Revert 984312a8 + 38deec5c and ff. No restart. The vendored path comes back with its import.
