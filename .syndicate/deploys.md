@@ -48328,3 +48328,40 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - Not done: the existing fleet run reports with the key in clear (10-01/10-03/10-09); key rotation is the user's call.
 - **follow-up 2026-10-10T16:15Z (board-history-charts): board half of 62909c36 MET.** Loaded by lane mlb-probability-calibration's full down/up (down 15:39:00Z, up 15:39:49Z, all roles code=64909dba, which contains 62909c36; verified by `merge-base --is-ancestor` + `status`). Served /intelligence embed `ranked_all`, read after the 16:08:07Z STATE_PERSIST had finished (LOOP_ITERATION 16:14:12Z): game rows on corners/cards/bookings/team-total markets with `team_recent` **0/195**; score-settled game rows with it 1,051/2,210 (unchanged behaviour: intervals/innings carry none by design).
   - **Two early readings were the instrument, not the code.** 15:44Z / 15:49Z read 285/285: the page was still the pre-restart persisted board (first post-restart STATE_PERSIST_BEGIN was 16:00:05Z). 16:01Z read 115 and 16:10Z read 103: rows merged in from the stored **10-11** shortlist, written 14:18:03Z by the old code (183/183 corners cards with team_recent), rewritten at 16:06:41Z by the new worker (0 corners cards); the 16:08 persist cleared them. Today's 10-10 shortlist, written 15:56:54Z, had 0/182 from the start. Lesson: a card fix reaches a multi-date board only once EVERY date's stored shortlist is rewritten, not at the first post-deploy save.
+
+## 2026-10-10 15:39:00Z (10:39 AM CT) -- LOCAL FLEET FULL down/up: `SYNDICATE_PRICING_CALIBRATION=on` + MLB market-shrink profile (5 cells); all roles 64909dba (lane `mlb-probability-calibration`, session b98d59a1)
+- **Why.** `findings_2026-10-09_mlb_oos_market_backtest.md` + rule v2 in lanes.md (f098ec7a).
+  - Cells: outs w=0.00, spreads|first5 0.01, strikeouts 0.06, totals|first5 0.09, totals|first1 0.67.
+  - User decisions: "Ship the 5 passing cells", then "Down/up now, gated".
+- **Code and profile.**
+  - Code `3691bcd1` (`market_shrink` method; the seam passes the fair), fleet ff 15:02:10Z.
+  - Profile `~/syndicate-prod/data/mlb_source/calibration/probability_calibration.json` (mlb-market-shrink-2026-10-10, with held-out provenance).
+- **Env.** `local_production.env` += `SYNDICATE_PRICING_CALIBRATION=on` (backups `.bak_pricingcal_20261010T152247Z` / `...T153900Z`). No sport other than MLB has a profile, so the rest are identity plus stamps.
+- **Why a FULL down/up.** The supervisor freezes role env at `up`; a role restart reuses it.
+- **Peer approvals before loading their unloaded code:** P3 nba-native-live-resim "(a) OK"; #473 "(a) OK" (released its claim); P6 "(a) OK"; board-history-charts approved 62909c36.
+- **Gate.**
+  - First attempt: `down` REFUSED 15:22:47Z. The claims had been taken with `deploy_claim.py` on the WSL fleet checkout, but the guard reads the Windows primary tree's claim dir (lead 9b583dcb).
+  - The env flag line was already appended then. Nothing restarted.
+  - Re-claimed web / refresh-worker / live-odds-worker from the primary tree (holder mlb-probability-calibration).
+  - check_deploy_safety GATE OK 15:39:00Z: refresh-worker child jobs none; board build idle ("persisted", but 277 log lines after the last completion, not immediately after it); MLB sim finished.
+  - ACCEPTED: soccer live-odds children (5 jobs, 15 processes, stopped by `down`, retried next tick) and the live-games warning.
+- **Applied.** `down` 15:39:00Z -> supervisor gone 15:39:25Z -> `schtasks /run SyndicateLocalProduction` 15:39:45Z (same args as the boot task: paper money) -> supervisor pid 332145 up 15:39:49Z, healthz 200 15:39:51Z.
+  - web / refresh-worker / live-odds-worker all `code=64909dba`, restarts=0.
+  - The flag is present in the env of the running gunicorn, run_refresh_worker.py and run_live_odds_refresh_worker.py processes (key only).
+- **Ride-alongs loaded** (refresh-worker was a032eb94; runtime commits through 64909dba):
+  - #473: a8550771, b71232fb, 6d5d9f06, 5faad7c5, bdf84981. Owner OK; NBA sims are child jobs and already used it.
+  - P6: 984312a8, 38deec5c, 75ab78cf, 58206ee2, 24d7b19c. The orchestrator runs in child jobs; in-process it is helpers only.
+  - P3: c9971e75, f5781082, 5b2cf473, 5cec5802. Live loop OFF: SYNDICATE_NBA_LIVE_RESIM absent.
+  - P2: 30393870, 45e03ae2.
+  - Soccer live lane: 467a1a6c, 5439c6c8.
+  - board-history-charts: 62909c36.
+  - Mine: 3691bcd1.
+  - Up-time sent to #473, P3 and board-history-charts.
+- **Verify.**
+  - (a) Deployed code + deployed profile + flag (fleet probe through `layer2_board._calibrate_model_edge`): strikeouts edge 4.40 -> 0.264; outs 7.80 -> 0.0; totals|first5 8.00 -> 0.72; totals|first1 8.00 -> 5.36; spreads|first5 5.00 -> 0.05.
+    - Identity for totals|full, earned_runs and `totals_alt|first5`.
+  - (b) Served board after the rebuild (snapshot 16:06:41Z): 6,340 rows (mlb 144). The calibration stamps are NOT in the served slim row shape for any sport, so the stamp cannot be read off the served payload.
+- **COVERAGE GAP (found on the served board).** Today's MLB F5/F1/F3 game rows are almost all `totals_alt` / `spreads_alt`. The pre-registered cells name `totals` / `spreads`, so those rows stay identity, and the three game-line cells rarely touch a served row.
+  - In practice the shipped effect is pitcher strikeouts and outs.
+- **Rollback.** Delete the profile file (identity everywhere, no restart), or remove the env line + full down/up.
+- Claims released after this entry.
