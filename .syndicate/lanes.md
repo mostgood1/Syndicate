@@ -947,6 +947,17 @@ death, never life — do not invert it.
 - STATUS 2026-10-06 ~22:15Z: Phase 1 pre-registered (026d94d7) + amendments; extractor/sim/table phases on main; real FIT extracted (NBA 816, WNBA 217); NBA FIT sim run COMPLETE 109/109 dates (2026-10-07 ~14:10Z; WSL ~/bball_sc, 3 workers, 200 draws, 0 errors).  NEXT: NBA table + flags, WNBA sim setup, NCAAB real table. GOAL: NOT MET (Phase 1 in progress).
 - NBA PHASE 1 READ 2026-10-07 (findings 'NBA Phase 1 reading'; 791 paired FIT games): FLAGGED -- margin SD 19.4 vs 14.0 and blowouts 35% vs 23% (too much spread), quarter shares (Q4 +1.7 pts, +2.5 close), quarter SD +1 pt, FTA -2.4/team with foul-outs x1.9 (no bonus/intentional FTs), top-5 minutes flat vs script (close -1.6, blowout +2.9), volume +5.6 plays/+2.4 3PA. EXONERATED: Q2 share. Phase 2 candidates ranked (spread jitter first); each pre-registered before any engine change. Owed: S12 back-to-back; WNBA sim; NCAAB real table.
 ### mlb-probability-calibration — OPEN — opened 2026-10-10 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **RESULT 2026-10-10 (judge window 08-22..09-27): the rule PASSES for 8 of 13 cells. NOT SHIPPED; held for a user decision.**
+  - Passing: totals|full b=0.21, totals|first5 0.055, totals|first3 0.54, spreads|first5 0.16, outs 0.033, strikeouts 0.24, hits_allowed 0.19, earned_runs 0.41.
+    - dBrier e.g. outs -0.040 [-0.053, -0.026], totals|full -0.013 [-0.021, -0.006].
+  - Failing: h2h full/first5, spreads|full, totals|first1, walks_allowed.
+- **Betting-impact check (added AFTER the rule, not part of it).** EV>0 bets at the book's own prices, raw -> cal:
+  - ROI is WORSE in 6 of the 8 passing cells: totals|full -7.6% -> -12.7%; outs -4.6% -> -7.1%; K -10.3% -> -14.3%; hits allowed -6.0% -> -9.5%; ER -9.1% -> -10.5%; F5 total -6.1% -> -9.0%.
+  - Better in 2: spreads|first5 -11.0% -> -6.4%; totals|first3 -1.0% -> +3.6%.
+- **Mechanism.** Slopes near 0 flatten p toward 0.5. The seam re-differences against the fair, so the residual edge becomes (0.5 - fair). That systematically favours the plus-money side.
+  - The Brier gain is real, but the target is wrong for pricing: shrink toward the MARKET, not toward 0.5.
+  - The daily optimizer's w* already does market-ward shrink, on rank/stake only.
+- Scratch: `cal_fit.py`, `cal_ev.py`, `cal_fit_result.json` (session scratchpad).
 - Goal: give MLB game-line and pitcher-prop probabilities a per-market calibration on the board's existing pricing seam (`probability_calibration.py` / `layer2_board._calibrate_model_edge`), for every market where it pre-registeredly beats the raw probability out of sample.
 - **Why.** `findings_2026-10-09_mlb_oos_market_backtest.md`: the loss to the book is RELIABILITY. The model p is overspread: slopes 0.06-0.5, and the sd of p is ~5x the book's on totals.
 - **Data.** Per-row probabilities from `scripts/backtest_mlb_lines_props.py` run unchanged (rows captured by a scratch wrapper around its own builders), over the fwd arm: production config from 988fa33d, 985 games, 07-16..09-27.
