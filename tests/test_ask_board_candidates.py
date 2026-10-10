@@ -235,8 +235,10 @@ class RegistrationTests(unittest.TestCase):
         # still the board fetcher alone; soccer now also reads its own sim for a
         # board row's fixture (lane `ask-sport-parity`), after the board fetcher.
         names = {sport: [f.__name__ for f in _fetchers_for_sport(sport, "best edges today")] for sport in ("soccer", "ncaab")}
-        self.assertEqual(names["ncaab"], ["_board_candidates_evidence"])
-        self.assertEqual(names["soccer"], ["_board_candidates_evidence", "_soccer_match_evidence"])
+        # `_team_trend_evidence` (lane board-history-charts) runs for every sport
+        # and answers only a GAME board row, so it is second everywhere.
+        self.assertEqual(names["ncaab"], ["_board_candidates_evidence", "_team_trend_evidence"])
+        self.assertEqual(names["soccer"], ["_board_candidates_evidence", "_team_trend_evidence", "_soccer_match_evidence"])
 
     def test_the_mlb_ranking_branch_still_takes_precedence_for_its_own_markets(self) -> None:
         # M1 must not displace the MLB leaderboard for a question that names an

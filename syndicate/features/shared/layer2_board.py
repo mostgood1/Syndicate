@@ -3852,9 +3852,13 @@ def _chart_columns(row: Mapping[str, Any]) -> dict[str, Any]:
     elif str(row.get("kind") or "").lower() == "game":
         # Game lines (mockup board 11): each team's last-10 final scores; the
         # page derives over/under, covers and W/L against TODAY's line.
+        # Only for a market the score settles -- a corners total got goal
+        # totals until 2026-10-10 (`is_score_market`).
         try:
-            from syndicate.features.shared.team_recent_results import team_recent_results
+            from syndicate.features.shared.team_recent_results import is_score_market, team_recent_results
 
+            if not is_score_market(row.get("market")):
+                raise LookupError("market is not settled by the score")
             sport = str(row.get("sport") or "").lower()
             when = row.get("commence_time") or row.get("date")
             # THE ROW'S OWN INTERVAL: a first-5 or Q1 line read against

@@ -110,3 +110,16 @@ def test_capped_at_ten_and_kept_in_step():
     out = _chart_columns(row)
     assert len(out["recent_values"]) == 10
     assert out["recent_dates"] == labels[:10]
+
+
+def test_score_history_only_for_markets_the_score_settles(monkeypatch):
+    """2026-10-10: 132 soccer corners totals carried goal totals ("over 10.5 0/10")."""
+    from syndicate.features.shared import team_recent_results as trr
+
+    assert trr.is_score_market("totals") and trr.is_score_market("spreads") and trr.is_score_market("h2h")
+    for market in ("alternate_totals_corners", "totals_cards", "player_bookings", "team_totals", ""):
+        assert not trr.is_score_market(market), market
+    monkeypatch.setattr(trr, "team_recent_results", lambda *a, **k: [["2026-10-05", 2, 1]])
+    game = {"kind": "game", "sport": "soccer", "home_team": "A", "away_team": "B", "commence_time": "2026-10-10"}
+    assert "team_recent" in _chart_columns({**game, "market": "totals"})
+    assert "team_recent" not in _chart_columns({**game, "market": "alternate_totals_corners"})

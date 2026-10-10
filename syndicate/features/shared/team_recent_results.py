@@ -58,7 +58,19 @@ from typing import Any, Callable
 from syndicate.features.shared.prop_evidence.common import data_root
 
 _WINDOW_DAYS = 120
+# Markets these scores do NOT settle (lane board-history-charts, 2026-10-10):
+# a corners or cards total is not the game's goal total, and a team total is
+# one side's score, not the sum. Measured on the served board that day: 132
+# soccer `alternate_totals_corners` rows carried goal totals against a corners
+# line ("over 10.5 0/10"), because "total" matched any totals market.
+_NOT_SCORE_MARKET_WORDS = ("corner", "card", "booking", "team_total")
 _LOCK = threading.Lock()
+
+
+def is_score_market(market: Any) -> bool:
+    """True when the row's market is settled by the final (or interval) score."""
+    text = str(market or "").lower()
+    return bool(text) and not any(word in text for word in _NOT_SCORE_MARKET_WORDS)
 _CACHE: dict[tuple[str, tuple[tuple[str, int, int], ...]], dict[str, list[tuple[str, float, float]]]] = {}
 
 

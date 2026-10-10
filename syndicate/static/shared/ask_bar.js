@@ -335,27 +335,42 @@ window.SyndicateAskBar = (function () {
   function renderEvidenceChart(chart, key, open) {
     const points = (Array.isArray(chart.points) ? chart.points : []).slice(0, 30);
     const values = points.map((p) => finiteNumber(Number(p && p.y)) ?? 0);
-    const maxY = Math.max(...values, 0.0001);
+    // `marker` = today's line (lane board-history-charts): drawn dashed across
+    // the bars. A margin chart has losses below zero, so the scale is signed;
+    // `hit` dims the games that missed today's line. A chart with neither
+    // renders exactly as before.
+    const markerY = chart.marker ? finiteNumber(Number(chart.marker.y)) : null;
+    const graded = points.some((p) => p && typeof p.hit === "boolean");
+    const hi = Math.max(...values, markerY ?? 0, 0.0001);
+    const lo = Math.min(...values, markerY ?? 0, 0);
+    const span = hi - lo || 1;
+    const pct = (v) => ((v - lo) / span) * 100;
     const labelEvery = points.length > 12 ? 2 : 1;
     const bars = points.map((p, i) => {
       const x = safeText(p && p.x, "");
       const value = formatChartValue(values[i], chart.y_label);
       const show = i % labelEvery === 0;
-      const height = Math.max(2, Math.round((Math.max(values[i], 0) / maxY) * 100));
+      const v = values[i];
+      const height = Math.max(2, Math.round((Math.abs(v) / span) * 100));
+      const bottom = Math.round(pct(Math.min(v, 0)));
+      const dim = graded && p.hit === false ? "opacity:0.35;" : "";
+      const line = markerY === null ? "" : `<div style="position:absolute;left:0;right:0;bottom:${pct(markerY).toFixed(1)}%;border-top:1px dashed var(--cards-text-dim);"></div>`;
+      const hitText = graded ? (p.hit ? " (hit)" : " (miss)") : "";
       return `
-        <div class="ask-bar__chart-col" title="${escapeHtml(x)}: ${escapeHtml(value)}">
+        <div class="ask-bar__chart-col" title="${escapeHtml(x)}: ${escapeHtml(value)}${hitText}">
           <span class="ask-bar__chart-value">${show ? escapeHtml(value) : ""}</span>
-          <div class="ask-bar__chart-track"><div class="ask-bar__chart-bar" style="height:${height}%"></div></div>
+          <div class="ask-bar__chart-track" style="position:relative;"><div class="ask-bar__chart-bar" style="position:absolute;left:15%;width:70%;bottom:${bottom}%;height:${height}%;${dim}"></div>${line}</div>
           <span class="ask-bar__chart-label">${show ? escapeHtml(x) : ""}</span>
         </div>`;
     }).join("");
+    const markerNote = markerY === null ? "" : ` · dashed = ${escapeHtml(safeText(chart.marker.label, "line"))} ${escapeHtml(formatChartValue(markerY, chart.y_label))}`;
     const xLabel = safeText(chart.x_label, "");
     const yLabel = safeText(chart.y_label, "");
     return `
       <details class="ask-bar__answer-section ask-bar__answer-chart"${sectionAttrs(key, open)}>
         <summary class="ask-bar__answer-table-title">${escapeHtml(safeText(chart.title, "Chart"))}</summary>
         <div class="ask-bar__chart">${bars}</div>
-        ${xLabel || yLabel ? `<div class="ask-bar__chart-axes"><span>${escapeHtml(xLabel)}</span><span>${escapeHtml(yLabel)}</span></div>` : ""}
+        ${xLabel || yLabel || markerNote ? `<div class="ask-bar__chart-axes"><span>${escapeHtml(xLabel)}</span><span>${escapeHtml(yLabel)}${markerNote}</span></div>` : ""}
       </details>`;
   }
 

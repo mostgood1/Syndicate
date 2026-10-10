@@ -3736,6 +3736,115 @@ def _board_candidates_evidence(question: str, context: dict[str, Any]) -> dict[s
 
 
 # ---------------------------------------------------------------------------
+# Game-line team trend (lane board-history-charts)
+# ---------------------------------------------------------------------------
+#
+# The board's game rows chart each team's last 10 against TODAY's line
+# (`intelligence.html` `teamForm`); Ask had no team history at all, so a game
+# line asked from the board was answered without it. Same source
+# (`team_recent_results`, the row's own interval), same rules as the board:
+# totals = game total vs the line, spreads = the team's margin plus ITS line,
+# moneyline = won. Display only.
+
+
+def _game_market_kind(market: Any) -> str | None:
+    from syndicate.features.shared.team_recent_results import is_score_market
+
+    text = str(market or "").lower()
+    if not is_score_market(text):  # corners / cards / team totals: the score does not settle them
+        return None
+    if "total" in text:
+        return "total"
+    if any(k in text for k in ("spread", "handicap", "runline", "puckline")):
+        return "spread"
+    if "h2h" in text or "moneyline" in text or text == "ml":
+        return "h2h"
+    return None
+
+
+def _game_side(row: dict[str, Any]) -> str:
+    side = str(row.get("side") or "").strip().lower()
+    if side in {"home", "1"} or (side and side == str(row.get("home_team") or "").strip().lower()):
+        return "home"
+    if side in {"away", "2"} or (side and side == str(row.get("away_team") or "").strip().lower()):
+        return "away"
+    return side
+
+
+def _team_trend_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
+    row = context.get("board_row")
+    if not isinstance(row, dict) or str(row.get("kind") or "").lower() != "game":
+        return None
+    kind = _game_market_kind(row.get("market"))
+    if kind is None:
+        return None
+    side = _game_side(row)
+    line = _to_float(row.get("line"))
+    if kind == "total" and line is None:
+        return None
+    if kind == "spread" and (line is None or side not in {"home", "away"}):
+        return None
+    from syndicate.features.shared.team_recent_results import team_recent_results
+
+    sport = str(row.get("sport") or "").lower()
+    when = row.get("commence_time") or row.get("date")
+    segment = str(row.get("segment") or "full").strip().lower() or "full"
+    seg_note = "" if segment in {"full", "game"} else f" ({segment.upper()} only)"
+    tables: list[dict[str, Any]] = []
+    charts: list[dict[str, Any]] = []
+    facts: dict[str, Any] = {"source": "team_recent_results", "market_kind": kind, "segment": segment}
+    newest = ""
+    for which in ("away", "home"):
+        team = str(row.get(f"{which}_team") or "").strip()
+        games = team_recent_results(sport, team, when, LAST_N_GAMES, segment=segment) if team else []
+        if not games:
+            continue
+        if kind == "total":
+            under = side == "under"
+            values = [float(f) + float(a) for _, f, a in games]
+            hit = [(v < line) if under else (v > line) for v in values]
+            mark, word, measure = line, f"{'under' if under else 'over'} {_fmt_line(line)}", "Game total"
+        elif kind == "spread":
+            team_line = line if which == side else -line
+            values = [float(f) - float(a) for _, f, a in games]
+            hit = [v + team_line > 0 for v in values]
+            mark, word, measure = -team_line, f"covered {'+' if team_line > 0 else ''}{_fmt_line(team_line)}", "Margin"
+        else:
+            values = [float(f) - float(a) for _, f, a in games]
+            hit = [v > 0 for v in values]
+            mark, word, measure = 0.0, "won", "Margin"
+        record = f"{sum(hit)}/{len(values)}"
+        newest = max(newest, str(games[0][0]))
+        # Newest first in the table (like every last-10 table here), oldest
+        # first on the chart so it reads left to right.
+        tables.append({
+            "title": f"{team} — last {len(games)}{seg_note}: {word} {record}",
+            "columns": ["Date", "Score", measure, "Today's line"],
+            "rows": [[d, f"{_num_text(f, 0)}-{_num_text(a, 0)}", _num_text(v, 0), "hit" if h else "miss"]
+                     for (d, f, a), v, h in zip(games, values, hit)],
+            "layer": "recent_form",
+        })
+        charts.append({
+            "type": "bar",
+            "title": f"{team} — {measure.lower()} by game{seg_note} ({word} {record})",
+            "x_label": "Game (oldest left)",
+            "y_label": measure,
+            "points": [{"x": str(d)[5:] or str(d), "y": v, "hit": h}
+                       for (d, _, _), v, h in reversed(list(zip(games, values, hit)))],
+            "marker": {"y": mark, "label": "Today's line" if kind != "h2h" else "Even"},
+            "layer": "recent_form",
+        })
+        facts[which] = {"team": team, "games": len(games), "record": record, "values": values}
+    if not charts:
+        return None
+    return {"evidence": facts, "tables": tables, "charts": charts, "as_of": newest, "sport": sport or None}
+
+
+def _fmt_line(value: float) -> str:
+    return _num_text(value, 1).rstrip("0").rstrip(".") if value is not None else ""
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -3751,7 +3860,10 @@ def _fetchers_for_sport(sport: str, question: str) -> list:
     # sites, and editing each is how a sport added later is silently missed.
     # `_board_candidates_evidence` self-gates on ranking intent, so listing it
     # everywhere costs a set-intersection on a non-ranking question.
-    fetchers: list = [_board_candidates_evidence]
+    # `_team_trend_evidence` likewise self-gates (a GAME board row only) and
+    # is listed for every sport for the same reason; it goes before the entity
+    # fetchers so `MAX_CHARTS` never cuts the two team charts.
+    fetchers: list = [_board_candidates_evidence, _team_trend_evidence]
     return fetchers + _entity_fetchers_for_sport(sport, question)
 
 

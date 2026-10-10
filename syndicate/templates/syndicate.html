@@ -589,29 +589,43 @@
   function renderVisualChart(chart) {
     if (!chart || !Array.isArray(chart.points) || !chart.points.length) return "";
     const points = chart.points.slice(0, 30);
-    const maxY = Math.max(...points.map((p) => Number(p.y) || 0), 0.0001);
+    const values = points.map((p) => (Number.isFinite(Number(p.y)) ? Number(p.y) : 0));
+    // `marker` = today's line (lane board-history-charts), dashed across the
+    // bars; a signed scale so a margin chart's losses draw below zero; `hit`
+    // dims the games that missed the line. Same as ask_bar.js renderEvidenceChart.
+    const markerY = chart.marker && Number.isFinite(Number(chart.marker.y)) ? Number(chart.marker.y) : null;
+    const graded = points.some((p) => p && typeof p.hit === "boolean");
+    const hi = Math.max(...values, markerY ?? 0, 0.0001);
+    const lo = Math.min(...values, markerY ?? 0, 0);
+    const span = hi - lo || 1;
+    const pct = (v) => ((v - lo) / span) * 100;
     const labelEvery = points.length > 16 ? 2 : 1;
     const bars = points.map((p, i) => {
-      const y = Number(p.y) || 0;
-      const heightPct = Math.max(2, Math.round((y / maxY) * 100));
+      const y = values[i];
+      const heightPct = Math.max(2, Math.round((Math.abs(y) / span) * 100));
+      const bottomPct = Math.round(pct(Math.min(y, 0)));
       const showLabel = i % labelEvery === 0;
       const label = showLabel ? esc(String(p.x)) : "";
       const valueText = showLabel ? esc(formatChartValue(y, chart.y_label)) : "";
+      const dim = graded && p.hit === false ? "opacity:0.35;" : "";
+      const line = markerY === null ? "" : `<div style="position:absolute;left:0;right:0;bottom:${pct(markerY).toFixed(1)}%;border-top:1px dashed var(--cards-text-dim);"></div>`;
+      const hitText = graded ? (p.hit ? " (hit)" : " (miss)") : "";
       return `
-        <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;min-width:0;" title="${esc(String(p.x))}: ${esc(String(y))}">
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;min-width:0;" title="${esc(String(p.x))}: ${esc(String(y))}${hitText}">
           <span style="font-size:0.68rem;color:var(--cards-text);font-weight:700;margin-bottom:3px;white-space:nowrap;">${valueText}</span>
-          <div style="width:70%;height:${heightPct}%;background:linear-gradient(180deg, var(--cards-accent-strong), var(--cards-accent));border-radius:3px 3px 0 0;"></div>
+          <div style="position:relative;flex:1;width:100%;"><div style="position:absolute;left:15%;width:70%;bottom:${bottomPct}%;height:${heightPct}%;background:linear-gradient(180deg, var(--cards-accent-strong), var(--cards-accent));border-radius:3px 3px 0 0;${dim}"></div>${line}</div>
           <span style="font-size:0.65rem;color:var(--cards-text-dim);margin-top:4px;overflow:hidden;text-overflow:ellipsis;max-width:100%;white-space:nowrap;">${label}</span>
         </div>
       `;
     }).join("");
+    const markerNote = markerY === null ? "" : ` · dashed = ${esc(safeText(chart.marker.label, "line"))} ${esc(formatChartValue(markerY, chart.y_label))}`;
     return `
       <div class="soft-card" style="margin-bottom:12px;">
         <div class="syndicate-section-title">${esc(safeText(chart.title, "Chart"))}</div>
         <div style="display:flex;align-items:stretch;gap:2px;height:140px;padding-top:8px;">${bars}</div>
         <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:var(--cards-text-dim);margin-top:6px;">
           <span>${esc(safeText(chart.x_label, ""))}</span>
-          <span>${esc(safeText(chart.y_label, ""))}</span>
+          <span>${esc(safeText(chart.y_label, ""))}${markerNote}</span>
         </div>
       </div>
     `;
