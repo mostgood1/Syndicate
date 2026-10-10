@@ -1535,7 +1535,10 @@ def _load_pregame_expected_minutes_local(*, processed_root: Path, date_str: str,
     # `#473`: NBA has no pregame_expected_minutes producer, so its starter flags were never fed. With
     # SYNDICATE_NBA_TEAM_INPUTS on (default) the NBA call builds a STARTER-COLUMNS-ONLY file from P2's ESPN box
     # starters; off, files that producer wrote are ignored so off == the pre-#473 inputs.
-    nba = str(league_code or "").strip().lower() == "nba"
+    # The native orchestrator's hook passes no league_code (orchestrator/hooks.py); every caller's processed root is
+    # `<league>_source/data/processed`, so an absent code is read from that layout. An explicit code always wins.
+    code = str(league_code or "").strip().lower() or (Path(processed_root).parent.parent.name.lower().removesuffix("_source") if processed_root else "")
+    nba = code == "nba"
     nba_on = nba and nba_team_inputs.enabled()
     cache_key = (str(processed_root), str(date_str).strip(), nba_on)
     cached = _PREGAME_EXPECTED_MINUTES_CACHE_LOCAL.get(cache_key)

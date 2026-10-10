@@ -220,3 +220,28 @@ def test_no_stack_moves_a_draw_when_targets_and_team_adj_are_present():
         assert moved, "no-stack never changed a draw with targets + team_adj present (inert)"
     finally:
         bpss._ENGINES_LOCAL.clear()
+
+
+def test_starters_reach_the_native_orchestrator_hook_without_a_league_code(tmp_path):
+    # orchestrator/hooks.py calls the merge with no league_code; the NBA root layout must still select the producer.
+    root = tmp_path / "nba_source" / "data" / "processed"
+    rows = []
+    for k, date in enumerate(["2026-10-02", "2026-10-04", "2026-10-06"]):
+        rows += _check_rows(date, f"e{k}", 2027, "preseason", "BOS", ["Jayson Tatum"], ["Sam Hauser"])
+    _write_checks(root, rows)
+    team_df = pd.DataFrame({"player_name": ["Jayson Tatum", "Sam Hauser"], "team": ["BOS"] * 2})
+    from syndicate.features.basketball_engine.orchestrator import OrchestratorEnv, hooks
+
+    with mock.patch.dict(os.environ, {"SYNDICATE_NBA_TEAM_INPUTS": "1"}):
+        out, diag = hooks._merge_pregame_expected_minutes_for_team(
+            team_df, "2026-10-09", "BOS", orch=OrchestratorEnv.for_processed_root(root, "nba"))
+    assert diag["applied"] is True, diag
+    assert out.set_index("player_name")["starter_prob"].to_dict() == {"Jayson Tatum": 1.0, "Sam Hauser": 0.0}
+    # a WNBA root never runs the NBA producer
+    wroot = tmp_path / "wnba_source" / "data" / "processed"
+    _write_checks(wroot, rows)
+    bpss._PREGAME_EXPECTED_MINUTES_CACHE_LOCAL.clear()
+    with mock.patch.dict(os.environ, {"SYNDICATE_NBA_TEAM_INPUTS": "1"}):
+        _out, wdiag = hooks._merge_pregame_expected_minutes_for_team(
+            team_df, "2026-10-09", "BOS", orch=OrchestratorEnv.for_processed_root(wroot, "wnba"))
+    assert wdiag["reason"] == "missing_pregame_expected_minutes"
