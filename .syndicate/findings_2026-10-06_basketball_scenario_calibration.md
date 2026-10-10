@@ -1073,3 +1073,30 @@ stay untouched.
 - Owed by that lane: todo #695, the regular-season totals reading (≥ 30 finals; delete the file if totals stay
   ≥ ~+2 worse than OFF).
 - The NBA re-fit hold stands until the post-deploy input checklist passes.
+
+## Phase 2 #2b — score_effect_k FINE GRID, PRE-REGISTERED 2026-10-10 (hold lifted by nba-sim-team-adj-473 after its post-deploy checklist), BEFORE running
+
+**Inputs re-checked in THIS lane's replay** (code origin/main b0c8c6b7, which carries #473; probe 2025-11-13 + 2026-02-25,
+18 engine calls):
+- team_adj present and non-neutral 18/18;
+- starter flags non-zero 18/18, after scratch-builder fix a7a6fdf3 (as-of player_checks).
+- Earlier replays had starters 0/18, so EVERY earlier NBA reading in this file used starters unfed.
+
+**Config (all explicit in the launch line):**
+- SYNDICATE_NBA_TEAM_INPUTS=1;
+- J1 levers + team_prior_stacks_on_target=0;
+- the six ported switches;
+- nba_sim_total_inputs.json both keys (the accepted config; the fleet has skip_def only);
+- calibration files calfiles_sw.
+
+**Run:**
+- Grid k ∈ {0 (control, the new baseline under the new inputs), 0.001, 0.002, 0.003}.
+- The same 12 dates, 200 draws, nice 19.
+
+**Readings / calls (as #2):**
+- Primary: within-game H2-on-H1 (real −0.174) and Q4 (real −0.141).
+- **Confirmed** for a k whose H2 and Q4 are both within ±0.05 of real, with S8 margin moving toward 15.21 by more
+  than run noise and no guard (mean margin vs market, S8 total, S3, S1, total bias) worse than run noise.
+- If two grid points qualify, the one with H2 nearer real is taken. No interpolated k is adopted.
+- A confirmation is followed by a full FIT re-run. The chosen k and its readings are then sent to P3
+  (nba-native-live-resim). VALIDATION is untouched.
