@@ -1211,3 +1211,33 @@ stay untouched.
 **Next:**
 - message P3 k = 0.002 (its fit reads ~/nba_live_bt/k_value.json);
 - the full FIT re-run with k = 0.002 + lineup pools, launched 2026-10-12 ~15:50Z.
+
+### Phase 2 #2 — FULL FIT CONFIRMATION, score_effect_k = 0.002 with lineup pools (read 2026-10-12 ~20:00Z, 3:00 PM CDT)
+
+**Run:** fit_k002_pools, 2026-10-12 15:45Z-19:55Z, 109 dates; the 2 NBA Cup dates fail as always. All engine calls
+carry every lever and switch. Paired 791 games. Inputs: #473 team_adj + starters, lineup pools, accepted config,
+105 walk-forward calibration files, SYNDICATE_NBA_TEAM_INPUTS=1.
+
+| 791 FIT games | real [CI] | full J1 (Phase 2 #1) | full combo (+ports, no k, no calib) | **full k = 0.002 + pools** |
+|---|---|---|---|---|
+| H2-on-H1 (demeaned) | −0.174 | −0.001 | −0.004 | **−0.172** [−0.176, −0.167] |
+| Q4 | −0.141 | +0.001 | −0.004 | −0.093 [−0.097, −0.090] |
+| S8 margin SD | 14.00 [13.19, 14.71] | 18.89 | 17.65 | **14.91** (just outside) |
+| S8 total SD | 18.29 [17.42, 19.22] | 18.95 | 18.59 | **18.46** IN |
+| S5 blowouts, all | 0.230 [0.202, 0.260] | 0.337 | 0.280 | **0.228** IN |
+| sim-vs-market margin slope | 1.0 | 1.588 | 0.867 | 0.918 |
+| total bias vs actual | — | +0.71 | −5.61 | **−0.22** |
+
+- **Guard rows vs full J1:**
+  - TOWARD real: S1 pace 113.1 (real 114.0), S3 P1-P4, S5 all buckets, S6, S7, S8 total, S9 3PA. Inside the CI
+    now: S3 P3/P4, S5 0-4 / 4.5-8 / all, S7 4.5-8, S8 total, S9.
+  - **AWAY:**
+    - S10 top-5 minutes when the final |margin| ≥ 20: 29.7 → 31.7 (real 26.9). Starters now play a FLAT 31.7
+      regardless of game script; the new starter flags, with no blowout rest.
+    - S11 foul-outs 0.361 → 0.473 (real 0.193).
+  - Both are input/rotation effects, not k. They are Phase 2 #4 (minutes vs game script) and a foul-out item.
+- **VERDICT:** the 12-date k = 0.002 readings REPRODUCE on the full FIT (H2 −0.172 vs −0.170). k = 0.002 is
+  confirmed. The Q4 remainder (−0.093 vs −0.141) stays with P3.
+- Still a PROPOSAL: production k = 0. Adoption follows the end-of-Phase-2 VALIDATION read.
+- Real readings note: the readout scripts print the 12-date real values for S8 margin / blowouts (15.21 / 0.253).
+  The full-FIT reals are 14.00 / 0.230 (table above).
