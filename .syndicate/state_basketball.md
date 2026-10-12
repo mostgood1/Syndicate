@@ -1136,7 +1136,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - the refresh scripts' `python -m <pkg>.cli` steps;
   - the vendored WNBA app's live period totals, not flag-gated;
   - `bootstrap_data_root.py`, which copies the vendored WNBA src onto the data disk.
-- **Owed:** the first NEWLY simulated production game after 14:39:11Z. Read it for health: players present, score block present, no failures file after the ff. Not read yet: existing sims are reused. #473 (NBA team inputs, default ON) shipped after it through P6's hooks, so NBA outputs now differ from vendored by design.
+- **First newly simulated production games: HEALTHY `[verified 2026-10-12 13:35Z]`.** NBA 2026-10-11: 4 games written 05:43Z on fleet 64909dba (which contains 24d7b19c). Players 33-36 each, score block present, no stub key, no failures file. This is a HEALTH reading: #473 (NBA team inputs, default ON) rides through P6's hooks, so NBA outputs differ from vendored by design. No WNBA game has been simulated since the switch (season over).
 
 ## [nba-sim-totals-and-strength] NBA SMART-SIM TOTALS + TEAM STRENGTH: measured defects, fixes built DEFAULT-OFF, nothing enabled `[2026-10-10, lane basketball-scenario-calibration]`
 

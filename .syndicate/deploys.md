@@ -48371,3 +48371,14 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **Fields, per sim:** `context.team_advanced_priors.applied` = true with source `syndicate_nba_team_inputs_v1:prior=2025-26...` on **8/8** (16/16 team-sides non-neutral; eff h/a e.g. ATL_OKC 0.963/1.009, UTA_SAS 0.970/1.054, DEN_CHI 1.046/0.998); `context.pregame_expected_minutes.{home,away}.applied` = true on **16/16** sides; `market_anchor.nba_total_inputs` = `{"skip_def_subtraction": true, "skip_outs_penalties": false}` on **8/8**.
 - **Run health:** `smart_sim_run_date_local` summaries `failures: 0, job_count: 4` for 2026-10-11 and 2026-10-12; no `NBA_TEAM_RATINGS_PRODUCER_FAILED` / `NBA_STARTERS_PRODUCER_FAILED` in any NBA log.
 - **verify: MET.** Owed separately: todo `#695` (regular-season totals, >= 30 finals). Rollbacks unchanged (delete the data file; `SYNDICATE_NBA_TEAM_INPUTS=0`).
+
+## 2026-10-11 05:43Z (12:43 AM CT) -- VERIFY READING, NO DEPLOY: P6's first NEWLY simulated production games are healthy on the native orchestrator -- **MET** (lane `basketball-native-orchestrator`, session 2d413211; read 2026-10-12 13:35Z)
+
+- **What this closes:** the reading owed by the 2026-10-10 14:39:11Z entry (fleet ff 45e03ae2 -> 24d7b19c).
+- **Code live at the time:** fleet HEAD 64909dba since 2026-10-10 15:37Z (reflog). It contains 24d7b19c. Every HEAD from 14:39:11Z on contains it. At 64909dba the bridge imports `basketball_engine.orchestrator` (4 sites), and `_import_real_smart_sim_module_local` is absent.
+- **Reading** (fleet watcher `/mnt/c/tmp/p6/first_new_sim.py`: the first `smart_sim_*.json` with mtime > 14:39:11Z under `~/syndicate-prod/data/{nba,wnba}_source/data/processed`):
+  - NBA 2026-10-11 CHA_MIL, CLE_ORL, DEN_CHI, HOU_DAL, written 05:43:19Z-05:43:59Z.
+  - Players 34 / 34 / 36 / 33. Every file has a `score` block, `n_sims` 100, and no stub key (`home_team_total_pts_mean`).
+  - `smart_sim_failures_2026-10-11.csv` does not exist.
+- **Scope of the reading:** HEALTH, not vendored equality. These sims also carry #473 (NBA team inputs, default ON since 15:06Z, routed through P6's hooks). Equality with the vendored orchestrator was proven before and after the ff on the 35-game corpus (14:39:11Z entry). `lineup_effects.home.reason = no_espn_id_map` on all four is preseason behaviour, also seen pre-P6 (10-08..10-10 artifacts).
+- **No WNBA game** has been simulated since the ff; the season is over. WNBA health on the native orchestrator therefore rests on the corpus and deployed-checkout parity only.
