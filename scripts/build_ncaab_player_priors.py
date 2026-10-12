@@ -49,7 +49,7 @@ import sys
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Sequence
 
 _SCRIPTS = Path(__file__).resolve().parent
 _SPEC = importlib.util.spec_from_file_location("build_ncaab_team_ratings", _SCRIPTS / "build_ncaab_team_ratings.py")
@@ -64,12 +64,28 @@ BOX_FIELDS = (
 PRIOR_FIELDS = (
     "season", "as_of", "team_id", "athlete_id", "player_name", "games", "minutes", "min_proj", "starter_prob",
     "last_game", "prior_season_minutes",
-) + tuple(f"{k}_pm" for k in RATE_STATS)
+) + tuple(f"{k}_pm" for k in RATE_STATS) + ("prior_source",)
 
 SHRINK_MINUTES = 60.0
 PRIOR_SEASON_WEIGHT = 0.5
 RECENT_GAMES = 5
 MISSED_GAMES_OUT = 3
+# PRESEASON (user request 2026-10-12: opening night must not refuse for want of a table). Before a
+# season's first finals the table is built from the team's CURRENT ESPN roster joined, by athlete id,
+# to last season's box -- transfers keep their id. A newcomer with no D-I history gets league rates
+# and NEWCOMER_MINUTES, labelled `newcomer` so a thin projection is visible, never dressed as a fit.
+NEWCOMER_MINUTES = 8.0
+# Early in the season the preseason projection is BLENDED into minutes and starter share, worth
+# PRESEASON_WEIGHT_GAMES games, fading linearly to zero by PRESEASON_FADE_GAMES team games.
+PRESEASON_WEIGHT_GAMES = 3.0
+PRESEASON_FADE_GAMES = 10
+# STALE ROSTERS ARE EXCLUDED, NOT PROJECTED. Measured 2026-10-12: ESPN still served LAST season's
+# roster for most teams (sample of 8 per band: 0/8 stale at <= 65% returning, 8/8 at 65-95%, 5/8 at
+# >= 95%) -- the tell is a player labelled "Freshman" who already has D-I box rows, which a real
+# freshman cannot. A stale team is left OUT of the table, so its games refuse by name at game time
+# rather than being priced off players who left. The daily job re-reads rosters; a team enters the
+# table the day ESPN loads its real one.
+STALE_RETURNING_SHARE = 0.95
 
 
 def processed_dir() -> Path:
@@ -86,6 +102,10 @@ def box_dates_path(season: int) -> Path:
 
 def priors_path(season: int, as_of: dt.date) -> Path:
     return processed_dir() / f"player_priors_{season}_asof_{as_of:%Y%m%d}.csv"
+
+
+def preseason_path(season: int, as_of: dt.date) -> Path:
+    return processed_dir() / f"player_preseason_{season}_asof_{as_of:%Y%m%d}.csv"
 
 
 # ----------------------------------------------------------------------- parse
@@ -171,8 +191,13 @@ def compute_priors(
     as_of: dt.date,
     d1: Mapping[str, str] | None = None,
     prior_rows: Iterable[Mapping[str, Any]] = (),
+    preseason: Mapping[tuple[str, str], Mapping[str, Any]] | None = None,
 ) -> dict[tuple[str, str], dict[str, Any]]:
     """{(team_id, athlete_id): prior} from box rows strictly before `as_of`.
+
+    `preseason` ({(team_id, athlete_id): preseason prior}) is blended into min_proj and
+    starter_prob early in the season (PRESEASON_WEIGHT_GAMES, fading by PRESEASON_FADE_GAMES
+    team games): one or two games are not a rotation.
 
     `prior_rows` is last season's box (any team): it feeds the RATES only, at
     PRIOR_SEASON_WEIGHT, keyed by athlete id. Minutes and starter share come from this
@@ -223,6 +248,12 @@ def compute_priors(
             rates[f"{k}_pm"] = round((num + SHRINK_MINUTES * league[k]) / (minutes + p_min + SHRINK_MINUTES), 5)
         min_proj = sum(_f(by_game.get(g, {}), "min") for g in recent) / max(1, len(recent))
         starts = sum(int(_f(by_game.get(g, {}), "starter") > 0) for g in recent) / max(1, len(recent))
+        pre = (preseason or {}).get((tid, aid))
+        weight = PRESEASON_WEIGHT_GAMES * max(0.0, (PRESEASON_FADE_GAMES - len(order)) / PRESEASON_FADE_GAMES)
+        if pre is not None and weight > 0:
+            n = len(recent)
+            min_proj = (n * min_proj + weight * _f(pre, "min_proj")) / (n + weight)
+            starts = (n * starts + weight * _f(pre, "starter_prob")) / (n + weight)
         out[(tid, aid)] = {
             "team_id": tid,
             "athlete_id": aid,
@@ -234,7 +265,88 @@ def compute_priors(
             "last_game": max(str(r.get("date")) for r in played),
             "prior_season_minutes": round(float(p["min"]) if p else 0.0, 1),
             **rates,
+            "prior_source": "in_season+preseason" if pre is not None and weight > 0 else "in_season",
         }
+    return out
+
+
+def stale_roster_reason(roster: Sequence[Mapping[str, Any]], prev_athletes: set[str], team_id: str,
+                        prev_teams: Mapping[str, set[str]]) -> str | None:
+    """Why this roster looks like LAST season's, or None. See STALE_RETURNING_SHARE."""
+    if not roster:
+        return "empty_roster"
+    if any(str(p.get("experience") or "").lower() == "freshman" and str(p.get("athlete_id")) in prev_athletes for p in roster):
+        return "freshman_with_prior_season_box"
+    returning = sum(1 for p in roster if str(team_id) in prev_teams.get(str(p.get("athlete_id")), set()))
+    if returning / len(roster) >= STALE_RETURNING_SHARE:
+        return "returning_share_at_or_above_stale_floor"
+    return None
+
+
+def compute_preseason(
+    rosters: Mapping[str, Sequence[Mapping[str, Any]]],
+    prev_rows: Iterable[Mapping[str, Any]],
+    *,
+    stale_out: dict[str, str] | None = None,
+) -> dict[tuple[str, str], dict[str, Any]]:
+    """{(team_id, athlete_id): prior} for every rostered player, before any game is played.
+
+    `rosters` is {team_id: [{"athlete_id", "player_name"}...]} from ESPN's CURRENT team roster;
+    `prev_rows` is last season's player box, any team. Rates use ALL of last season (it is the
+    only data there is), shrunk to last season's league; minutes are last season's per-game
+    minutes when he played, else NEWCOMER_MINUTES. `prior_source` says which:
+    returning (same team) / transfer (another team) / newcomer (no D-I box rows).
+    """
+    prev = [r for r in prev_rows if _f(r, "min") > 0]
+    tot_min = sum(_f(r, "min") for r in prev)
+    league = {k: (sum(_f(r, k) for r in prev) / tot_min if tot_min > 0 else 0.0) for k in RATE_STATS}
+    acc: dict[str, dict[str, Any]] = {}
+    for r in prev:
+        a = acc.setdefault(str(r.get("athlete_id")), {"min": 0.0, "games": 0, "starts": 0, "teams": set(), **{k: 0.0 for k in RATE_STATS}})
+        a["min"] += _f(r, "min")
+        a["games"] += 1
+        a["starts"] += int(_f(r, "starter") > 0)
+        a["teams"].add(str(r.get("team_id")))
+        for k in RATE_STATS:
+            a[k] += _f(r, k)
+    prev_teams = {aid: a["teams"] for aid, a in acc.items()}
+    out: dict[tuple[str, str], dict[str, Any]] = {}
+    for tid, roster in rosters.items():
+        stale = stale_roster_reason(roster, set(acc), str(tid), prev_teams)
+        if stale:
+            if stale_out is not None:
+                stale_out[str(tid)] = stale
+            continue
+        for player in roster:
+            aid = str(player.get("athlete_id") or "")
+            if not aid:
+                continue
+            a = acc.get(aid)
+            if a:
+                source = "returning" if str(tid) in a["teams"] else "transfer"
+                rates = {f"{k}_pm": round((a[k] + SHRINK_MINUTES * league[k]) / (a["min"] + SHRINK_MINUTES), 5) for k in RATE_STATS}
+                min_proj, starter = a["min"] / a["games"], a["starts"] / a["games"]
+            else:
+                source = "newcomer"
+                rates = {f"{k}_pm": round(league[k], 5) for k in RATE_STATS}
+                min_proj, starter = NEWCOMER_MINUTES, 0.0
+            out[(str(tid), aid)] = {
+                "team_id": str(tid), "athlete_id": aid, "player_name": str(player.get("player_name") or ""),
+                "games": 0, "minutes": 0.0, "min_proj": round(min_proj, 2), "starter_prob": round(starter, 3),
+                "last_game": "", "prior_season_minutes": round(a["min"], 1) if a else 0.0, **rates,
+                "prior_source": source,
+            }
+    return out
+
+
+def fetch_roster(team_id: str) -> list[dict[str, str]]:
+    """ESPN's CURRENT roster for one team (the coming season's, in the preseason)."""
+    payload = ratings._get_json(f"teams/{team_id}/roster")
+    out = []
+    for a in payload.get("athletes") or []:
+        if isinstance(a, Mapping) and a.get("id"):
+            out.append({"athlete_id": str(a["id"]), "player_name": str(a.get("displayName") or a.get("fullName") or ""),
+                        "experience": str((a.get("experience") or {}).get("displayValue") or "")})
     return out
 
 
@@ -258,8 +370,8 @@ def append_box(path: Path, rows: list[Mapping[str, Any]]) -> None:
             writer.writerow({k: row.get(k) for k in BOX_FIELDS})
 
 
-def write_priors(season: int, as_of: dt.date, priors: Mapping[Any, Mapping[str, Any]]) -> Path:
-    path = priors_path(season, as_of)
+def write_priors(season: int, as_of: dt.date, priors: Mapping[Any, Mapping[str, Any]], *, path: Path | None = None) -> Path:
+    path = path or priors_path(season, as_of)
     tmp = path.with_suffix(".csv.tmp")
     path.parent.mkdir(parents=True, exist_ok=True)
     with tmp.open("w", encoding="utf-8", newline="") as handle:
@@ -327,13 +439,56 @@ def crawl(season: int, today: dt.date, *, rate: float, max_new_games: int | None
     return {**counts, "games_total": len(have)}
 
 
-def run(season: int, today: dt.date, *, rate: float, max_new_games: int | None, crawl_only: bool) -> dict[str, Any]:
+def newest_preseason(season: int) -> dict[tuple[str, str], dict[str, Any]]:
+    paths = sorted(processed_dir().glob(f"player_preseason_{season}_asof_*.csv"))
+    return {(r["team_id"], r["athlete_id"]): r for r in read_csv(paths[-1])} if paths else {}
+
+
+def build_preseason(season: int, today: dt.date, *, rate: float) -> dict[str, Any]:
+    """Rosters for every D-I team -> the preseason table, written TWICE: as `player_preseason_*`
+    (the blend's source once the season starts) and as `player_priors_*` dated today (what the
+    live re-sim reads until the first in-season table supersedes it)."""
+    d1 = ratings.load_registry()
+    rosters: dict[str, list] = {}
+    errors = 0
+    for tid in sorted(d1):
+        try:
+            rosters[tid] = fetch_roster(tid)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[ncaab_player_priors] ROSTER_FAILED team={tid} {exc}", flush=True)
+            errors += 1
+        time.sleep(1.0 / rate)
+    prev = read_csv(box_path(season - 1))
+    stale: dict[str, str] = {}
+    pre = compute_preseason(rosters, prev, stale_out=stale)
+    sources: dict[str, int] = defaultdict(int)
+    for p in pre.values():
+        sources[p["prior_source"]] += 1
+    out = {"teams_rostered": sum(1 for v in rosters.values() if v), "roster_errors": errors,
+           "teams_stale_excluded": len(stale), "teams_in_table": len({k[0] for k in pre}),
+           "prev_box_rows": len(prev), "preseason_players": len(pre), **{f"preseason_{k}": v for k, v in sources.items()}}
+    if pre and prev:
+        write_priors(season, today, pre, path=preseason_path(season, today))
+        out["written"] = str(write_priors(season, today, pre))
+    elif not prev:
+        # WITHOUT LAST SEASON'S BOX EVERY PLAYER IS A NEWCOMER: refuse to write a table that would
+        # look complete and carry no information.
+        out["refused"] = f"no prior-season box at {box_path(season - 1)}"
+    return out
+
+
+def run(season: int, today: dt.date, *, rate: float, max_new_games: int | None, crawl_only: bool,
+        preseason: bool = False) -> dict[str, Any]:
     counts = crawl(season, today, rate=rate, max_new_games=max_new_games)
     written = None
     rows = read_csv(box_path(season))
-    if rows and not crawl_only:
+    if not crawl_only and (preseason or not rows):
+        counts.update(build_preseason(season, today, rate=rate))
+        written = counts.get("written")
+    elif rows and not crawl_only:
         as_of = min(today, dt.date.fromisoformat(max(r["date"] for r in rows)) + dt.timedelta(days=1))
-        priors = compute_priors(rows, as_of=as_of, d1=ratings.load_registry(), prior_rows=read_csv(box_path(season - 1)))
+        priors = compute_priors(rows, as_of=as_of, d1=ratings.load_registry(), prior_rows=read_csv(box_path(season - 1)),
+                                preseason=newest_preseason(season))
         if priors:
             written = str(write_priors(season, as_of, priors))
         counts["players_rated"] = len(priors)
@@ -348,10 +503,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--rate", type=float, default=4.0)
     parser.add_argument("--max-new-games", type=int, default=None)
     parser.add_argument("--crawl-only", action="store_true", help="fetch box rows, write no priors table")
+    parser.add_argument("--preseason", action="store_true", help="build the roster-based preseason table even if games exist")
     args = parser.parse_args(argv)
     today = dt.date.today()
     season = args.season or ratings.default_season(today)
-    summary = run(season, today, rate=max(args.rate, 0.2), max_new_games=args.max_new_games, crawl_only=args.crawl_only)
+    summary = run(season, today, rate=max(args.rate, 0.2), max_new_games=args.max_new_games, crawl_only=args.crawl_only,
+                  preseason=args.preseason)
     return 0 if summary["errors"] == 0 or summary["games_fetched"] > 0 else 1
 
 

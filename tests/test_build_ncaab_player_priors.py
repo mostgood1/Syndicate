@@ -114,3 +114,60 @@ def test_priors_table_is_dated_and_atomic(tmp_path, monkeypatch):
     assert path.name == "player_priors_2026_asof_20260201.csv" and not list(tmp_path.glob("*.tmp"))
     text = path.read_text(encoding="utf-8").splitlines()
     assert text[0].split(",") == list(pp.PRIOR_FIELDS) and len(text) == 2
+
+
+# ------------------------------------------------------------------ preseason (roster x last season)
+
+def _prev(aid, team, games=10, minutes=30.0, pts=15.0, starter=1):
+    return [{"date": f"2026-01-{g + 1:02d}", "game_id": f"{team}-{g}", "team_id": team, "athlete_id": aid,
+             "player_name": f"P{aid}", "starter": starter, "min": minutes, **{k: (pts if k == "pts" else 1.0) for k in pp.RATE_STATS}}
+            for g in range(games)]
+
+
+def test_preseason_sources_rates_and_minutes():
+    prev = _prev("1", "10") + _prev("2", "20", minutes=20, starter=0) + _prev("9", "10", minutes=10)
+    roster = {"10": [{"athlete_id": "1", "player_name": "Ret", "experience": "Senior"},
+                     {"athlete_id": "2", "player_name": "Xfer", "experience": "Junior"},
+                     {"athlete_id": "3", "player_name": "Frosh", "experience": "Freshman"}]}
+    pre = pp.compute_preseason(roster, prev)
+    assert {k[1]: v["prior_source"] for k, v in pre.items()} == {"1": "returning", "2": "transfer", "3": "newcomer"}
+    assert pre[("10", "1")]["min_proj"] == 30.0 and pre[("10", "1")]["starter_prob"] == 1.0
+    assert pre[("10", "2")]["min_proj"] == 20.0 and pre[("10", "2")]["starter_prob"] == 0.0
+    assert pre[("10", "3")]["min_proj"] == pp.NEWCOMER_MINUTES and pre[("10", "3")]["prior_season_minutes"] == 0.0
+    league_pts = (15 * 10 * 3) / (300 + 200 + 100)  # 15 points a game each, per minute over all minutes
+    assert pre[("10", "3")]["pts_pm"] == pytest.approx(round(league_pts, 5))
+
+
+def test_a_stale_roster_is_excluded_not_projected():
+    """ESPN served last season's roster for most teams on 2026-10-12: a 'Freshman' with D-I box rows."""
+    prev = _prev("1", "10") + _prev("5", "10", minutes=15)
+    stale_roster = {"10": [{"athlete_id": "1", "experience": "Senior"}, {"athlete_id": "5", "experience": "Freshman"},
+                           {"athlete_id": "7", "experience": "Freshman"}]}
+    out: dict = {}
+    assert pp.compute_preseason(stale_roster, prev, stale_out=out) == {}
+    assert out == {"10": "freshman_with_prior_season_box"}
+    all_returning = {"10": [{"athlete_id": "1", "experience": "Senior"}, {"athlete_id": "5", "experience": "Sophomore"}]}
+    out = {}
+    assert pp.compute_preseason(all_returning, prev, stale_out=out) == {}
+    assert out == {"10": "returning_share_at_or_above_stale_floor"}
+
+
+def test_preseason_blends_into_early_season_minutes_then_fades():
+    pre = {("10", "1"): {"min_proj": 30.0, "starter_prob": 1.0}}
+    early = _rows(aid="1", games=1, minutes=10)
+    blended = pp.compute_priors(early, as_of=dt.date(2026, 2, 1), preseason=pre)[("10", "1")]
+    w = pp.PRESEASON_WEIGHT_GAMES * (pp.PRESEASON_FADE_GAMES - 1) / pp.PRESEASON_FADE_GAMES
+    assert blended["min_proj"] == pytest.approx(round((10 + w * 30) / (1 + w), 2), abs=0.01)
+    assert blended["prior_source"] == "in_season+preseason"
+    late = _rows(aid="1", games=pp.PRESEASON_FADE_GAMES, minutes=10)
+    faded = pp.compute_priors(late, as_of=dt.date(2026, 2, 1), preseason=pre)[("10", "1")]
+    assert faded["min_proj"] == 10.0 and faded["prior_source"] == "in_season"
+
+
+def test_no_prior_season_box_refuses_to_write(tmp_path, monkeypatch):
+    monkeypatch.setattr(pp, "processed_dir", lambda: tmp_path)
+    monkeypatch.setattr(pp.ratings, "load_registry", lambda: {"10": "Home U"})
+    monkeypatch.setattr(pp, "fetch_roster", lambda tid: [{"athlete_id": "1", "player_name": "A", "experience": "Senior"}])
+    monkeypatch.setattr(pp.time, "sleep", lambda s: None)
+    out = pp.build_preseason(2027, dt.date(2026, 10, 12), rate=100)
+    assert "refused" in out and not list(tmp_path.glob("player_priors_*"))

@@ -3,10 +3,10 @@
 Phase P4 of `docs/ai_context/basketball_live_native_plan.md`. Lane
 `ncaab-native-live-tier`. Written 2026-10-09.
 
-**Status: the prerequisite-free half is built. The live lens itself is BLOCKED
-on P1 (native resumable engine) and P2 (native `LiveGameState` incl. NCAAB),
-neither of which had a lane when this was written.** Nothing here runs in
-production yet: no module below is imported by a route, a loop or a job.
+**Status 2026-10-12: BUILT AND ON MAIN, OFF IN PRODUCTION.** The NCAAB live lens
+resumes P1's PLAYER-level engine (user decision 2026-10-12) from P2's live state and
+joins the board (`3c45f78f`). It does nothing until `SYNDICATE_NCAAB_LIVE_RESIM` is set
+on the fleet. That is a fleet decision, gated on the backtest below.
 
 ## What exists
 
@@ -17,6 +17,9 @@ production yet: no module below is imported by a route, a loop or a job.
 | input checklist | `scripts/ncaab_live_input_checklist.py` | engine standard section 1 for the team model; exits 1 on a consumed+unfed field or D-I coverage < 95%, 2 with no table. |
 | pbp corpus | `scripts/build_ncaab_pbp_corpus.py` | one compact record per finished D-I game: every play (incl. directed subs, fouls, timeouts, wallclock, ESPN win prob), pregame open/close lines, team box rows. |
 | corpus analysis | `scripts/ncaab_corpus_baseline.py` | coverage, walk-forward team-model grade, the in-game baseline to beat, and NCAAB's scoring shape. |
+| player priors | `scripts/build_ncaab_player_priors.py` | ESPN per-player box rows (incremental) and a DATED `player_priors_<season>_asof_<d>.csv`: per-minute rates shrunk to the league (60 min), min_proj (last 5 team games), starter share; out of rotation after 3 DNPs. Scheduled 11:40Z. |
+| live re-sim | `syndicate/features/ncaab/live_resim.py` | builds the engine inputs from the team model and player priors, resumes P1's engine (`league_params("ncaab")`) from P2's state, rotates a big slate across ticks, publishes `live_resim` / `pregame_only` lanes. |
+| backtest | `scripts/ncaab_live_resim_backtest.py` | walk-forward, checkpoint by checkpoint: the engine vs the final, the naive baseline and ESPN WP. |
 
 ### For P1: what the NCAAB rules require of the engine
 
@@ -52,25 +55,46 @@ hardcodes four quarters. Each spot and its replacement:
 - `HOME_POINTS = 2.9` is the producer's walk-forward fit; it moves the margin,
   not the total. A test pins both constants to the producer.
 
-## Pipeline trace (planned; file:line filled in when P1/P2 land)
+## Pipeline trace (2026-10-12, main `3c45f78f`)
 
 ```
-live_lens_loop._LIVE_LENS_SPORTS += "ncaab"            (syndicate/features/shared/live_lens_loop.py:254)
-  -> _LIVE_LENS_BUILDERS["ncaab"]                       (NEW, P4 after P1/P2)
-    -> P2 native LiveGameState (ESPN summary/pbp)       (P2)
-    -> live_team_model.prior_for_game(date, home, away) (syndicate/features/ncaab/live_team_model.py)
-         reads <SYNDICATE_DATA_ROOT>/ncaab_source/data/processed/team_ratings_<season>_asof_<YYYYMMDD>.csv
-         written by scripts/build_ncaab_team_ratings.py (local_production SCHEDULED_JOBS "ncaab-team-ratings" 10:45Z)
-    -> native engine resume(rules=NCAAB, state, prior)  (P1)
-  -> write_json_file(snapshot)  keyvalue, 8 MB cap      (refresh_state_store.py:594)
-  -> live_gameline_join / board_enrichment._LIVE_GAMELINE_SPORTS += "ncaab"
+live_lens_loop.start_live_lens_loop                      (shared/live_lens_loop.py:1253, beside NBA's)
+  -> ncaab/live_resim.start_ncaab_live_resim_loop        (:742)  OFF unless SYNDICATE_NCAAB_LIVE_RESIM
+    -> run_live_resim_tick (:709), every SYNDICATE_NCAAB_LIVE_RESIM_INTERVAL_SECONDS (default 120)
+      -> build_live_lens_snapshot (:569)   refuses in a request path; rotates the slate; carries forward
+        -> basketball_pbp.fetch_scoreboard / fetch_summary          (P2, ESPN, groups=50)
+        -> resume_from_summary (:274) -> basketball_live_state.build_live_game_state (P2) -> GameState (P1)
+        -> build_engine_inputs (:204)
+             -> live_team_model.prior_for_game  reads team_ratings_<season>_asof_<d>.csv   (strictly < game date)
+                  written by build_ncaab_team_ratings.py       local_production SCHEDULED_JOBS 10:45Z (:961)
+             -> load_player_priors (:134)       reads player_priors_<season>_asof_<d>.csv  (<= game date)
+                  written by build_ncaab_player_priors.py      local_production SCHEDULED_JOBS 11:40Z (:1002)
+        -> ncaab_engine (:249) = LeagueEngine(league_params("ncaab"), sample_lineup=_sample_lineup_local)
+             -> simulate_pbp_game_boxscore(state=GameState)   x 200 sims, 240 s budget
+      -> fit_snapshot_to_budget (:660)  <= 20 KB/lane, <= 4 MB total
+      -> write_json_file(live/ncaab_live_resim.json)      keyvalue, 8 MiB cap (refresh_state_store.py:594, :715)
+board: board_enrichment._LIVE_GAMELINE_SPORTS (:2424) + _LIVE_GAMELINE_SNAPSHOT_PATHS["ncaab"] (:2442)
+  -> live_gameline_join.LIVE_LENS_SOURCES_BY_SPORT["ncaab"] = ("live_resim",)  (:119)
 ```
 
-Today `syndicate/features/ncaab/live_lens.py` (164 lines) only displays mirrored
-`live_state_*.json` / `live_lines_*.json`; NCAAB is not in `_LIVE_LENS_SPORTS`.
+**Reuse flag (engine standard section 3):** none. Inputs are rebuilt on every tick from the
+newest dated tables. A new input therefore needs only a new table, not a rebuild.
 
-**Props**: there is NO NCAAB player model in Syndicate (no player priors, no
-prop pipeline for ncaab). The live tier is game lines only until one exists.
+**Why a dedicated thread, not `_LIVE_LENS_SPORTS`:** P3's reason (a resume takes seconds
+per game) times NCAAB's slate. Measured on real 2025-11-03 priors: 0.156 s/draw pregame,
+~0.055 at H2 10:00. A tick reaches 15-40 games, so the slate ROTATES: each tick starts where
+the last stopped and re-publishes the rest unchanged, with `liveStateCarriedForward` on the lane.
+
+**Engine behaviour verified (real engine, real priors):** a tip resume is seed-identical to the
+pregame run; at H2 10:00 the home win probability is 0.10 / 0.42 / 0.56 / 0.72 / 0.95 at a lead
+of -12 / -4 / 0 / +4 / +12.
+
+**Props**: NCAAB player priors now exist for the engine, but no NCAAB prop pipeline prices
+them (no prop lines captured, no `liveProps`). Game lines only.
+
+**Known gaps the backtest measures:** P1's engine has NO team-foul bonus mechanism, while NCAAB
+second halves score +8.0 more than first halves. The engine also does not land exactly on the
+team-model targets (pregame smoke: 148.5 vs a 142.8 target).
 
 ## Keyvalue budget — size it before opening week
 
@@ -170,21 +194,35 @@ The -4 to -5 total bias is the half split below. A flat rate cannot represent it
 
 ## What is owed, in order
 
-1. P1 + P2 land (their lanes). Then the NCAAB builder: resume the native engine
-   under `NCAAB` from P2's state with `live_team_model.prior_for_game`; refuse
-   by name when either is missing; register in `_LIVE_LENS_SPORTS` and
-   `_LIVE_GAMELINE_SPORTS`.
-2. The P4 backtest proper: the engine at the checkpoints above, against this
-   corpus, beating the baseline below at each checkpoint, n per checkpoint,
-   regular season separate from the tournament.
-3. **The live close.** ESPN keeps pregame lines only (core odds provider 59
-   keeps a single untimestamped last in-play quote, no movement history —
-   probed 2026-10-09). Grading against the live close needs OddsAPI historical
-   in-play snapshots at the checkpoint wallclocks (each play carries `wall`).
-   That spends OddsAPI quota: a user decision.
-4. Fit the NCAAB rotation windows from P2's stints (or this corpus's
-   starter-share curve) and flip `rotation_windows_fitted`.
-5. The live reading at opening week (early November 2026) on the local fleet:
-   the served lens reads `live_resim`, edges are published, and 0
-   `KEYVALUE_WRITE_REJECTED` lines over the slate.
-6. Copy the corpus to the fleet's data root. It was built locally (see Corpus and results).
+1. **The backtest verdict** (`scripts/ncaab_live_resim_backtest.py`, running 2026-10-12). Per
+   checkpoint and phase, the engine must beat the naive baseline on total and margin MAE and
+   ESPN's Brier, before `SYNDICATE_NCAAB_LIVE_RESIM` goes on.
+2. **Fleet switch-on** before opening week (~11-03): fast-forward the fleet to main, restart the
+   role that runs `live_lens_loop` with the env set (user approval + deploy claim), and check that
+   the 11:40Z priors job loaded.
+3. **The live close.** ESPN keeps pregame lines only (core odds provider 59 keeps one
+   untimestamped last in-play quote; no movement history; probed 2026-10-09). Grading against
+   the live close needs OddsAPI historical in-play snapshots at the checkpoint wallclocks (each
+   play carries `wall`). That spends quota: a user decision.
+4. A college bonus mechanism in the engine (1-and-1 at 7, double bonus at 10:
+   `basketball_league_rules.bonus_free_throws`), measured against the +8.0 half split. It needs
+   a loan of P1's engine.py, and the absorbed rates must be re-fit afterwards.
+5. Fit the NCAAB rotation windows from P2's stints or this corpus's starter curve, and flip
+   `rotation_windows_fitted`.
+6. Opening-week live reading on the fleet: the served lens reads `live_resim`, edges are
+   published, and 0 `[refresh_state_store] KEYVALUE_WRITE_REJECTED key=` lines over the slate.
+7. **Opening night: PRESEASON TABLE BUILT 2026-10-12** (`build_ncaab_player_priors.py`, used
+   automatically while the season has no finals). Each D-I team's CURRENT ESPN roster is joined
+   by athlete id to the 2025-26 box. Returning players and transfers carry their own rates,
+   minutes and starter share; newcomers get league rates and 8 min, labelled `newcomer`. Once
+   games exist, the preseason minutes and starter share blend in at 3 games' weight, fading by
+   10 team games. **STALE ROSTERS ARE EXCLUDED**: on 2026-10-12, 254 of 362 ESPN rosters were
+   still last season's (a "Freshman" with D-I box rows), so 108 teams are in the table (1,607
+   players: 502 returning / 470 transfers / 635 newcomers). The daily job re-reads rosters, and a
+   team enters the table when ESPN loads its real one. Until then its games refuse
+   (`team_has_no_player_priors`). KNOWN WEAKNESS: an impact freshman projects at the newcomer
+   default (Duke's freshmen at 6.8 min) until he has played.
+8. Copy the corpus and the 2025-26 player box to the fleet's data root. Both were built
+   locally, and next season's priors use 2025-26 as the prior-season carryover.
+9. Collapse `ncaab/live_resim.resume_from_summary` into P3's league-parametric one (P3 added
+   `league=` on 2026-10-12).
