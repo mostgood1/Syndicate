@@ -450,3 +450,42 @@ Priced live props start with the regular season.
 - The native sim over-projects rest-of-game scoring in the preseason by ~3-4 points more than the market already does.
 - The candidate is a preseason population effect: second halves played by benches, which neither the market line nor the engine models.
 - At n ≈ 16 it is indistinguishable from a general level bias. The 2025-26 regular-season gate decides.
+
+## 7. PRE-REGISTERED 2026-10-12 (before any measurement): end-game fouling re-fit (mechanism M-EG)
+
+**Mechanism:** `EventSimConfig.endgame_foul_*` (c9971e75), extended to a per-deficit-bucket probability
+(`endgame_foul_p_by_deficit`, buckets 1-3 / 4-6 / 7-10).
+- Window 120 s.
+- Clock-governed extension on.
+- Foul possession ~5 s.
+- All other rates fixed; `score_effect_k` as the calibration lane ships it (k = 0 until stated).
+
+**Population:**
+- 2025-26 REGULAR season games whose state at exactly 2:00 Q4 (every play at 2:00 included, the `state_at` rule)
+  has |margin| in 1..10.
+- pbp/linescore-consistent.
+- With v3 as-of engine inputs (#473 + 2024-25 prior).
+- Postseason and preseason excluded (separate populations; the postseason gets its own reading only if n >= 30
+  per bucket).
+
+**Split:**
+- FIT 2025-11-01..2026-02-28;
+- VALIDATION 2026-03-01..2026-04-12, read ONCE.
+
+**Game-matched measurement:**
+- Resume the native sim from each game's own 2:00 state via `live_resim.resume_from_summary` on the summary cut at
+  2:00, with that game's own inputs, 40 draws per (game, p).
+- Per game: REAL = regulation points scored after 2:00 (Q4 linescore total minus Q4 points at 2:00); SIM = the
+  mean of the same.
+- Also trailer FTA after 2:00 (real from pbp, sim from recorded FTA events).
+
+**Grid:** p ∈ {0, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7} per bucket.
+
+**Selection (FIT):** per bucket, the p minimising |mean(SIM - REAL)| on last-2:00 points.
+
+**Ship rule (VALIDATION, read once):** per bucket,
+- (a) |mean(SIM - REAL)| at the chosen p is inside REAL's game-resampled 95% CI half-width, AND
+- (b) it is smaller than at p = 0.
+
+**A bucket that fails keeps p = 0.** The mechanism's live effect is then judged by the checkpoint gate (5:00 Q4
+total / margin / ML vs `pregame_rate`) with M-EG on vs off on the same games.
