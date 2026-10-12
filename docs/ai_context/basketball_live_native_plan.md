@@ -171,7 +171,7 @@ This doc is the shared plan. Each phase is a separate session with its own lane.
 | NBA refresh | `:2553-2679`, `:764`, `:2998`, `:3678-3704`, `:3826` | CLI game-input bootstrap, history seed, predictions copy, recon tools, source app | fallback / missing artifacts / `SYNDICATE_NBA_SOURCE_APP_FALLBACK` |
 | schedule | `schedule_adapter.py:237` | `python -m <pkg>.cli fetch-schedule` | fallback when no schedule file |
 | identity | `wnba_fixture_identity.py:73` | the vendored `schedule_2026.csv` | always, when present |
-| boot | `scripts/bootstrap_data_root.py:49,338` | copies `vendor/wnba_betting_repo/src` onto `<data_root>/wnba_source/src` | every boot |
+| ~~boot~~ **REMOVED 2026-10-12** (lane `wnba-bootstrap-src-off-vendor`) | `scripts/bootstrap_data_root.py` `BOOTSTRAP_VENDOR_ROOTS` | no longer copies `vendor/wnba_betting_repo/src` onto the data disk; the vendored-app fallbacks load the vendor tree's own `src` (`_load_source_app`). The copy already on the fleet disk is left in place, unused | was: every boot |
 
 Board and analytics helpers (`basketball_market_board.py`, `game_shape.py`, `basketball_momentum.py`,
 `basketball_pbp.py`, `basketball_live_state.py`) and the NBA/WNBA cards only MENTION the vendored app in comments;

@@ -5753,6 +5753,15 @@ def _load_source_app(source_root: Path):
     for candidate in candidate_roots:
         app_path = candidate / "app.py"
         if app_path.exists() and app_path.is_file():
+            # The vendored app imports `wnba_betting` from whatever is first on sys.path (it never inserts its own
+            # src/). The props steps earlier in this process put <data_root>/wnba_source/src first, a copy that
+            # bootstrap_data_root.py no longer maintains (lane wnba-bootstrap-src-off-vendor, 2026-10-12). Put the
+            # app's OWN src first so it imports the package it ships with, never a stale data-disk copy.
+            own_src = str(candidate / "src")
+            if (candidate / "src" / "wnba_betting").is_dir():
+                if own_src in sys.path:
+                    sys.path.remove(own_src)
+                sys.path.insert(0, own_src)
             return _load_module_from_path("syndicate_wnba_source_app", app_path)
     return None
 

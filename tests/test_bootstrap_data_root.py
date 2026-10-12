@@ -490,7 +490,6 @@ class BootstrapDataRootTests(unittest.TestCase):
                     "reports/odds_control_plane",
                     "reports/daily_update/latest",
                     "reports/refresh_status/latest",
-                    "vendor/wnba_betting_repo/src",
                 ],
             )
 
@@ -660,7 +659,8 @@ class BootstrapDataRootTests(unittest.TestCase):
             for source, _, _, policy in pairs
             if policy == module.OVERWRITE
         )
-        self.assertEqual(overwriting, ["vendor/wnba_betting_repo/src"])
+        # The only OVERWRITE root was vendor/wnba_betting_repo/src, removed 2026-10-12 (lane wnba-bootstrap-src-off-vendor).
+        self.assertEqual(overwriting, [])
         self.assertTrue(
             all(policy in (module.SEED_ONLY, module.OVERWRITE) for _, _, _, policy in pairs)
         )
