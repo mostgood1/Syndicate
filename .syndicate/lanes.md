@@ -1399,6 +1399,14 @@ ba_rot_check.sh (keep that file) and reports production NBA smart_sim rotation_m
 - Verification: sha256 equality per file; fleet A/B of _export_props_predictions_without_smart_sim_local on a scratch copy, old vs new models dir, identical CSV; deployed checkout resolves to props_models/
 - Blocked by: none
 
+### soccer-live-anytime-scorer — OPEN — opened 2026-10-12 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: Live soccer anytime-goalscorer props carry a LIVE model probability: the resumed live re-sim publishes P(player scores in the rest of the match) per player, soccer_live_prop_index indexes it, and live_projection_join attaches it to line-less anytime-scorer rows, so they are no longer dropped as uninformative (hold-restatement) EV and are judged on the model edge
+- Files: syndicate/features/soccer/features/live_lens.py (live anytime-goal probability ONLY), scripts/poll_soccer_live_state.py (publishing it beside shots_over_probabilities ONLY), syndicate/features/shared/soccer_live_gameline_source.py (soccer_live_prop_index ONLY), syndicate/features/shared/live_projection_join.py (line-less yes/no scorer rows -> the goals 0.5 key ONLY), tests/test_soccer_live_anytime_scorer.py (NEW)
+- Hypothesis: Measured 10-10 (population ledger + LIVE_PROJECTION_JOIN): 1,986 of 2,030 live soccer props in the opportunity lane were dropped by _row_ev_is_hold_restatement because they had no model_edge_pct; the live join skips line-less rows (miss_line 1,558 of 3,477) and the live re-sim publishes only shots_over_probabilities (0.5-4.5, top 12 players/match). A live P(score) attached to anytime-scorer rows will give them a model edge, so they reach value judgment instead of being dropped.
+- Falsification test: With the change live on the fleet during >=1 h of live soccer, live anytime-scorer rows still carry no model_edge_pct (projected count unchanged), or the probabilities are miscalibrated against settled live outcomes (to be measured before relying on them for ranking).
+- Verification: Model-engine standard (docs/ai_context/model_engine_standard.md): input checklist entry + pipeline trace (file:line) + reachability test off != on. Unit: re-sim publishes P(score) for players; index keys it; join attaches it to a line-less anytime row. Fleet: LIVE_PROJECTION_JOIN sport=soccer projected rises and miss_line falls; population ledger shows live anytime-scorer rows with model_edge; recorded in deploys.md. A calibration check of live P(score) vs outcomes before the edge is trusted for ranking.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
