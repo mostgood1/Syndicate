@@ -86,3 +86,25 @@ def test_production_config_class_without_the_fields_is_unaffected():
 
     names = {f.name for f in dataclasses.fields(EventSimConfigLocal)}
     assert not names & {"endgame_foul_window_s", "endgame_foul_p", "endgame_extend_possessions"}
+
+
+def test_per_deficit_bucket_probability_routes_by_deficit():
+    """Bucket 4-6 ON alone must raise late FTA at down 5 and leave down 2 at the OFF rate."""
+    kw = _kw()
+    only_4_6 = dict(ENDGAME_ON, endgame_foul_p=0.0, endgame_foul_p_by_deficit=(0.0, 0.7, 0.0))
+    down2 = GameState(period=4, seconds_remaining=120, home_period_pts=(25, 25, 25, 23), away_period_pts=(25, 25, 25, 25))
+    off2, _ = _late_rates(_with_cfg(kw), down2, draws=40)
+    on2, _ = _late_rates(_with_cfg(kw, **only_4_6), down2, draws=40)
+    off5, _ = _late_rates(_with_cfg(kw), DOWN5_2MIN, draws=40)
+    on5, _ = _late_rates(_with_cfg(kw, **only_4_6), DOWN5_2MIN, draws=40)
+    assert on5 > off5 + 1.0
+    # down 2 bites only once the margin wanders into 4-6 during the 2:00 (a real path), so its lift is a fraction
+    # of the direct one
+    assert (on5 - off5) > 2.0 * (on2 - off2)
+
+
+def test_empty_bucket_tuple_is_the_scalar_path():
+    kw = _kw()
+    a = _run(_with_cfg(kw, **ENDGAME_ON), DOWN5_2MIN, 9)
+    b = _run(_with_cfg(kw, **ENDGAME_ON, endgame_foul_p_by_deficit=()), DOWN5_2MIN, 9)
+    assert a[0][2] == b[0][2] and a[1] == b[1]

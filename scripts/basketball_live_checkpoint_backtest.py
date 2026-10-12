@@ -823,9 +823,14 @@ def truncate_summary(summary: Dict[str, Any], checkpoint: str) -> Dict[str, Any]
     of every play at that clock, the same rule as `state_at`), header score set to the last kept play's
     running score, linescores cut to the periods begun, status `in`. Box-score fields are kept: P2 reads
     names/starters from them and fouls from the plays, never final box stats."""
+    period, clock = CHECKPOINTS[checkpoint]
+    return truncate_summary_at(summary, period, clock)
+
+
+def truncate_summary_at(summary: Dict[str, Any], period: int, clock: float) -> Dict[str, Any]:
+    """`truncate_summary` at an arbitrary (period, clock seconds left): every play at that clock included."""
     import copy
 
-    period, clock = CHECKPOINTS[checkpoint]
     kept: List[Dict[str, Any]] = []
     for raw in summary.get("plays") or []:
         p = int(((raw.get("period") or {}).get("number")) or 0)

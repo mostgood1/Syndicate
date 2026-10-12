@@ -70,6 +70,9 @@ class EventSimConfig:
     endgame_foul_window_s: int = 0  # 0 = off
     endgame_foul_max_deficit: int = 10
     endgame_foul_p: float = 0.0
+    # Per trailing-deficit bucket (1-3, 4-6, 7-10): the real rate peaks at 4-6 down (findings §2c). Empty = use
+    # `endgame_foul_p` for every deficit. Re-fit game-matched at 2:00 Q4 (findings §7, pre-registered 2026-10-12).
+    endgame_foul_p_by_deficit: Tuple[float, ...] = ()
     endgame_foul_seconds: float = 5.0
     # Let the CLOCK, not the pace pre-count, end a fouling final period: possessions continue past `q_poss` while
     # time is left and the window/deficit still hold. Without it extra fouls only re-label possessions.
@@ -1210,6 +1213,13 @@ def simulate_pbp_game_boxscore(
         eg_on = eg_window > 0 and int(q) == N_PERIODS
         eg_max = int(getattr(cfg, "endgame_foul_max_deficit", 10) or 10)
         eg_p = float(getattr(cfg, "endgame_foul_p", 0.0) or 0.0)
+        eg_p_by = tuple(float(x) for x in (getattr(cfg, "endgame_foul_p_by_deficit", ()) or ()))
+
+        def _eg_p_for(deficit: int) -> float:
+            if not eg_p_by:
+                return eg_p
+            idx = 0 if deficit <= 3 else (1 if deficit <= 6 else 2)
+            return float(eg_p_by[min(idx, len(eg_p_by) - 1)])
         eg_sec = float(getattr(cfg, "endgame_foul_seconds", 5.0) or 5.0)
         eg_extend = eg_on and bool(getattr(cfg, "endgame_extend_possessions", False))
         for pidx in (itertools.count() if eg_extend else range(q_poss)):
@@ -1290,9 +1300,9 @@ def simulate_pbp_game_boxscore(
                     bench_boost=cfg.bench_weight_boost,
                 )
 
-            if eg_on and eg_p > 0.0 and int(q_remaining) <= eg_window:
+            if eg_on and (eg_p > 0.0 or any(x > 0.0 for x in eg_p_by)) and int(q_remaining) <= eg_window:
                 lead_off = int(home_score - away_score) if offense_home else int(away_score - home_score)
-                if 1 <= lead_off <= eg_max and float(rng.random()) < eg_p:
+                if 1 <= lead_off <= eg_max and float(rng.random()) < _eg_p_for(lead_off):
                     _endgame_intentional_foul(bool(offense_home), h_line, a_line)
                     continue
 
