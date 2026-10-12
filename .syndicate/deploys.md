@@ -48563,3 +48563,18 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - The first WNBA refresh to START after the ff (first command 19:21:04Z) finished at 19:22:23Z with the usual offseason warning ("no WNBA input rows") and **0 Tracebacks** in the day's WNBA props log.
 - **Not done here:** the NBA twin in `refresh_nba_oddsapi_props.py` is `unavailable` on the fleet, because there is no `nba_source/src`. The `bootstrap_data_root.py` copy of the vendored WNBA src onto the data disk is unchanged; other vendored CLI steps still run from it.
 - **Rollback:** revert 1cbaf4ab and ff. No restart.
+
+## 2026-10-12 18:00:30Z (1:00 PM CT) -- LOCAL FLEET ff e256bf42 -> 2c9dd444 (exact SHA, not the github/main tip), NO restart. Lane soccer-live-anytime-scorer. Written 20:31Z on a peer's request: the entry was owed and missing.
+- What: `git merge --ff-only 2c9dd444` in ~/Syndicate. 2c9dd444 = live anytime-goalscorer probability (live_lens -> soccer_live_prop_index -> live_projection_join).
+- Ride-alongs in e256bf42..2c9dd444 (18 commits; runtime paths scripts/ syndicate/ pipeline/ vendor/ checked before the ff):
+  - 8a15327a ncaab live resim SYNDICATE_NCAAB_EXACT_TARGET: verified DEFAULT OFF IN CODE (`exact_target_enabled` true only for 1/true/on/yes), not from the commit message;
+  - 740401ac lane-claims checker (tooling);
+  - ee472411 ci-suite stale-test fixes (tests);
+  - the rest ledger/docs/checkpoints.
+  - No overlap with the fleet's local vendor/ edits.
+- SKIPPED, stated plainly: no check_deploy_safety before the ff, and NO CLAIM held at the ff itself. The refresh-worker claim (holder soccer-live-anytime-scorer, token-held) was acquired right AFTER the ff (~18:01Z), for the restart. Rationale at the time: an ff restarts nothing. That is incomplete -- child jobs (poll_soccer_live_state.py, refresh_odds_sources.py) load code from disk with no restart, so the ff was live for them at once.
+- Restart: NONE. A watcher ran check_deploy_safety every 20 s from ~18:02Z and never read CLEAR in ~24 min. Blockers: an in-flight board build (typical 7.3-9.8 min) plus refresh-worker and live-odds-worker child jobs; the check is fleet-wide, so during a live slate the live-odds worker's back-to-back jobs keep it NOT CLEAR. User chose to wait for tonight's quiet.
+- The claim read `free` at ~18:27Z, ~25 min into its 45-min TTL, without my release (expired early, or another session forced and released it -- no journal to tell). Nothing was restarted under it.
+- Scheduled: a background job acquires the claim at 21:15Z, restarts the refresh-worker only on a real idle-after-save CLEAR (gives up after ~40 min), and releases by token. Its outcome gets its own entry.
+- verify (publication, child-job path, live from the ff): 20:31:09Z live_state live_player_props carry goals_over_probabilities for 36 players (serie_a, matches near full time). Samples: Gueye 0.017, Simeone 0.0126, Zaniolo 0.0079 (shots>0.5 for the same players 0.14/0.09/0.09), goals_so_far 0. Small values are expected this late in a match.
+- NOT yet verified: rows on the BOARD (the join runs in the refresh-worker, not restarted); calibration of live P(score) vs outcomes. Both owed, on the next live slate after the restart (10-13 18:45Z Championship).
