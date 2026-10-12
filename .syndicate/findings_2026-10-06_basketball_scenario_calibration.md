@@ -1141,3 +1141,11 @@ stay untouched.
   - Walk-forward calibration files for all FIT dates: 105 files, C:	mpball_sc\calfiles_sw_all.
   - Then k and its readings go to P3.
 - Nothing in production.
+
+**#473 CLOSED + VERIFIED in production (reported by nba-sim-team-adj-473; re-read here 2026-10-12 ~13:45Z):**
+- All 8 fleet NBA sims since the deploy (10-11 + 10-12) carry
+  market_anchor.nba_total_inputs = {skip_def_subtraction: true, skip_outs_penalties: false}, with
+  team_advanced_priors applied on each.
+- First: smart_sim_2026-10-11_CHA_MIL.json (05:43:19Z). Deploy a31ba2bf; fleet 64909dba.
+- **todo #695 handed to this lane:** the regular-season totals reading (≥ 30 finals; delete the data file if
+  published totals stay ≥ ~+2 worse than OFF).
