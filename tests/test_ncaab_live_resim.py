@@ -282,3 +282,12 @@ def test_a_carried_forward_lane_reaches_the_row_marked_as_carried():
     row = _grid_row()
     attach_live_gamelines([row], _index(_lanes(carried=True)))
     assert row["live_gameline"]["carried_forward"] is True
+
+
+def test_exact_target_switch_is_off_unless_set_and_binds_a_different_engine(monkeypatch):
+    monkeypatch.delenv("SYNDICATE_NCAAB_EXACT_TARGET", raising=False)
+    assert lr.exact_target_enabled() is False
+    assert lr.exact_target_enabled({"SYNDICATE_NCAAB_EXACT_TARGET": "1"}) is True
+    off, on = lr.ncaab_engine(False), lr.ncaab_engine(True)
+    assert off is not on
+    assert off.EXACT_TARGET_CALIBRATION is False and on.EXACT_TARGET_CALIBRATION is True

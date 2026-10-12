@@ -242,22 +242,37 @@ def build_engine_inputs(date: str, home_id: str, away_id: str, *, neutral: bool,
     }
 
 
-_ENGINE: Any = None
+_ENGINES: dict[bool, Any] = {}
 _ENGINE_LOCK = threading.Lock()
+# The engine's exact points-per-possession target solve (`engine.py` EXACT_TARGET_CALIBRATION, a
+# LeagueParams field, False for NCAAB in league.py). The P4 backtest (2026-10-12) found the default
+# approximate solve overshoots NCAAB totals by +6..+10 at the tip; this switch is the measured fix
+# candidate. ABSENT IS OFF until the re-backtest decides (`ncaab_live_tier.md`).
+EXACT_TARGET_ENV = "SYNDICATE_NCAAB_EXACT_TARGET"
 
 
-def ncaab_engine():
+def exact_target_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
+    raw = str((env if env is not None else os.environ).get(EXACT_TARGET_ENV, "") or "").strip().lower()
+    return raw in {"1", "true", "on", "yes"}
+
+
+def ncaab_engine(exact_target: Optional[bool] = None):
     """P1's engine bound to NCAAB params and production's lineup sampler. Never NBA's: the smart sim's
     `_engine_for_league_local` maps every non-WNBA code to NBA, so it is NOT used here."""
-    global _ENGINE
+    exact = exact_target_enabled() if exact_target is None else bool(exact_target)
     with _ENGINE_LOCK:
-        if _ENGINE is None:
+        if exact not in _ENGINES:
+            import dataclasses
+
             from syndicate.features.basketball_engine import league_params
             from syndicate.features.basketball_engine.league_engine import LeagueEngine
             from syndicate.features.shared.basketball_props_smart_sim import _sample_lineup_local
 
-            _ENGINE = LeagueEngine(league_params(LEAGUE), sample_lineup=_sample_lineup_local)
-        return _ENGINE
+            params = league_params(LEAGUE)
+            if exact:
+                params = dataclasses.replace(params, exact_target_calibration=True)
+            _ENGINES[exact] = LeagueEngine(params, sample_lineup=_sample_lineup_local)
+        return _ENGINES[exact]
 
 
 _ENGINE_KWARGS = ("home_players", "away_players", "cfg", "target_home_points", "target_away_points")
