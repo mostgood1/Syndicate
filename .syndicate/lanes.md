@@ -1333,6 +1333,14 @@ ba_rot_check.sh (keep that file) and reports production NBA smart_sim rotation_m
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness.py --idle-min 240 gave 1 SAFE of 8 CLOSED; moved `lane-orphan-sweep-1009` (owner d51fbb0e idle 1048m). 7 WAIT on live owners. Table + Part B in log/2026-10-10.md.
 
+### lan-forward-guard — OPEN — opened 2026-10-12 — session 12420da3-1160-4944-9cbc-b3489ef4d580
+- Goal: The Windows LAN forward (<lan-ip>:10000 -> WSL web) guard + installer live in deploy/local and the runbook, so the boot-time task survives a host rebuild
+- Files: deploy/local/lan_forward_guard.ps1 (NEW), deploy/local/install_lan_forward_task.ps1 (NEW), docs/ai_context/local_production_runbook.md (section 5 LAN access subsection only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: installer from deploy/local re-registers SyndicateLanForward pointing at C:\SyndicateProd\lan-forward; heartbeat last_run.txt keeps updating; healthz 200 on the LAN address
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
