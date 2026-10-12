@@ -160,6 +160,14 @@ class BoardPlays(unittest.TestCase):
         self.assertEqual(got["line_results"], {"win": 2, "loss": 1, "push": 0, "pending": 0})  # draw + BTTS win, home loses
         self.assertEqual((got["lines"], got["other"]), (3, 1))
 
+    def test_pick_results_read_the_pick_id_inside_recommendation(self) -> None:
+        from syndicate.features.shared import game_chip_plays as plays
+
+        root = self._env()
+        n = plays.write_pick_results("2026-10-10", [{"result": "win", "recommendation": {"pick_id": "l2_x"}},
+                                                    {"result": "pending", "recommendation": {"pick_id": "l2_y"}}], reports_dir=root)
+        self.assertEqual(n, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -253,7 +253,10 @@ def write_pick_results(date: str, records: Iterable[Mapping[str, Any]], *, repor
     """Settlement hook: merge {pick_id: result} for settled Layer 2 records."""
     found = {}
     for record in records or ():
-        pid = record.get("pick_id")
+        # Ledger records keep the Layer 2 pick id INSIDE `recommendation`
+        # (`layer2_ledger`), not at the top level (measured 2026-10-10).
+        rec = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else {}
+        pid = record.get("pick_id") or rec.get("pick_id")
         result = str(record.get("result") or "").lower()
         if pid and result in {"win", "loss", "push", "void"}:
             found[str(pid)] = result
