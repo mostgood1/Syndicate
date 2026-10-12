@@ -45,10 +45,38 @@ resolve"**:
   `tests/test_ncaaf_live_autorun.py` while the file it created was
   `tests/test_ncaaf_lines_autorun.py`.
 
+  TWO CONDITIONS NARROW THAT ESCALATION, both added 2026-10-12 after it
+  misfired on two live claims at once. A close name is evidence of a typo only
+  when the lane has not said otherwise and the neighbour is actually adoptable:
+
+    * THE NEIGHBOUR MUST NOT BE ANOTHER OPEN LANE'S. The suggestion told
+      `nba-lineup-pools` its reserved `tests/test_nba_lineup_pools.py` was
+      "almost certainly a TYPO for `tests/test_nba_pregame_lineup_pools.py`" --
+      a file the OPEN lane `nba-pregame-lineup-pools` claims. Following the
+      remedy would have put two OPEN lanes on one path and had `lane-guard`
+      block one of them. A check whose advice manufactures the contest the
+      guards exist to prevent is worse than silence, so a held neighbour is
+      never offered as a fix and the holder is named instead.
+
+    * A PATH THE LANE MARKED `(NEW)` IS A RESERVATION, NOT A GUESS. Measured on
+      the live ledger the same day: 44 of 74 `Files:` lines carry a `(NEW)`
+      marker, so it is the ledger's established way of writing down a file the
+      lane is about to create -- which is precisely the NOT WRITTEN YET shape
+      below. It is honoured rather than overridden because the worked example
+      did NOT use it: `ncaaf-live-cadence`'s typo'd path carries no marker, so
+      reading the marker costs that catch nothing. The neighbour is still
+      printed, as information, without the typo assertion.
+
   NOT WRITTEN YET (reported, exit 0) -- a well-formed path, absent, with
-  nothing close to it. A lane legitimately claims a file it is about to create,
+  nothing close to it, OR with a close name that the lane has excused by
+  marking the claim `(NEW)` or that another OPEN lane holds (see the two
+  conditions above). A lane legitimately claims a file it is about to create,
   and such a claim starts guarding the moment the file lands. Reported so it is
   visible, never failed, because failing on it is the wolf-crying case.
+
+  Either way the claim guards NOTHING until the file exists -- a reservation is
+  unenforceable, and saying so is the point of listing it here. What changed is
+  only which remedy is printed, never whether the gap is reported.
 
   NEAR-MISS HEADER (exit 1) -- the block declares files, but its header status
   is REOPENED/OPENED rather than a standalone OPEN, so `\\bOPEN\\b` rejects it
@@ -243,6 +271,68 @@ def _near_miss(claim, by_base):
     return by_base[close[0]][0]
 
 
+def _marked_new_at(line, at):
+    """True when a `(NEW...)` parenthetical follows the claim at `at`.
+
+    Written WITHOUT a regex on purpose. The first cut used one and a
+    backslash escape did not survive being written through a shell heredoc
+    and a non-raw string literal: the word-boundary became a literal
+    backspace byte (0x08), the pattern matched nothing, and the detector was
+    INERT while every test that mattered still passed -- the marker simply
+    never registered, so every reservation kept reading as a typo. Plain
+    string work cannot be mangled that way.
+    """
+    rest = line[at:].lstrip("` ")
+    if not rest.startswith("("):
+        return False
+    inner = rest[1:].lstrip()
+    if inner[:3].lower() != "new":
+        return False
+    return len(inner) == 3 or not (inner[3].isalnum() or inner[3] == '_')
+
+
+def _new_marked(text):
+    """(slug, claim) pairs whose `Files:` entry the lane marked `(NEW)`.
+
+    The marker is a statement of intent the ledger already uses heavily -- 44
+    of 74 `Files:` lines on 2026-10-12 -- and it is the difference between "I
+    mistyped a path" and "I have reserved a path I am about to create". The
+    parser that builds claim sets strips the parenthetical, so by the time a
+    claim reaches the classification loop the marker is gone; this reads it back
+    off the raw block.
+
+    Deliberately matched only when the parenthetical FOLLOWS the path and its
+    first word is `new`, so `(NEW, the as-of replay)` counts and a section
+    qualifier like `(the ncaab entries only)` does not. Case-insensitive
+    because the ledger writes both `(NEW)` and `(new)`.
+    """
+    out = set()
+    slug = None
+    in_files = False
+    for line in text.splitlines():
+        if HEADER_RE.match(line):
+            m = LANE_RE.match(line) or ASCII_LANE_RE.match(line)
+            slug = m.group(1) if m else None
+            in_files = False
+            continue
+        if slug is None:
+            continue
+        if FILES_RE.match(line):
+            in_files = True
+        elif FIELD_RE.match(line):
+            in_files = False
+        if not in_files:
+            continue
+        for claim in _paths_in(line):
+            at = line.find(claim)
+            while at != -1:
+                if _marked_new_at(line, at + len(claim)):
+                    out.add((slug, claim))
+                    break
+                at = line.find(claim, at + 1)
+    return out
+
+
 def _why(claim):
     """The shape of the breakage, because the fix differs by shape."""
     if "{" in claim or "}" in claim:
@@ -322,14 +412,31 @@ def main():
 
     near_headers = _near_miss_open(text)
 
+    # Who holds what, so a suggestion can never name another lane's file, and
+    # which claims the lane itself marked `(NEW)`. Both are read from the SAME
+    # text the claim set came from, so they cannot describe a different ledger.
+    new_marked = _new_marked(text)
+    holders = {}
+    for slug, claim in claims:
+        holders.setdefault(claim, set()).add(slug)
+
     broken, unwritten, inert = [], [], []
     for slug, claim in claims:
         if not _resolves(claim, paths, by_base, root):
             neighbour = _near_miss(claim, by_base)
-            if _impossible(claim) or neighbour:
-                broken.append((slug, claim, neighbour))
+            held_by = sorted(holders.get(neighbour, set()) - {slug}) if neighbour else []
+            # An impossible token stays BROKEN however it is marked: a glob or a
+            # brace list cannot resolve when the file lands, so `(NEW)` does not
+            # excuse it. For a well-formed path, the typo hypothesis survives
+            # only if the lane did not reserve the path AND the neighbour is
+            # free to adopt.
+            if _impossible(claim):
+                broken.append((slug, claim, neighbour, held_by))
+            elif neighbour and not held_by and (slug, claim) not in new_marked:
+                broken.append((slug, claim, neighbour, held_by))
             else:
-                unwritten.append((slug, claim))
+                unwritten.append((slug, claim, neighbour, held_by,
+                                  (slug, claim) in new_marked))
         elif is_exempt(claim):
             inert.append((slug, claim))
 
@@ -381,14 +488,19 @@ def main():
         print("       their lane's owner has no way to tell from reading the "
               "ledger:")
         by_lane = {}
-        for slug, claim, neighbour in broken:
-            by_lane.setdefault(slug, []).append((claim, neighbour))
+        for slug, claim, neighbour, held_by in broken:
+            by_lane.setdefault(slug, []).append((claim, neighbour, held_by))
         for slug in sorted(by_lane):
             print()
             print("       %s" % slug)
-            for claim, neighbour in by_lane[slug]:
+            for claim, neighbour, held_by in by_lane[slug]:
                 print("         %s" % claim)
-                if neighbour:
+                if neighbour and held_by:
+                    print("           -> `%s` is the closest name, but DO NOT ADOPT IT:"
+                          % neighbour)
+                    print("              the OPEN lane(s) %s claim it."
+                          % ", ".join(held_by))
+                elif neighbour:
                     print("           -> almost certainly a TYPO for `%s`, which exists."
                           % neighbour)
                 else:
@@ -403,17 +515,33 @@ def main():
         print()
         print("[note] %d claim(s) name a well-formed path that does not exist "
               "YET." % len(unwritten))
-        for slug, claim in unwritten:
-            print("         %-52s (%s)" % (claim, slug))
+        for slug, claim, neighbour, held_by, is_new in unwritten:
+            print("         %-52s (%s)%s"
+                  % (claim, slug, "  [marked NEW]" if is_new else ""))
+            if neighbour and held_by:
+                print("           close name `%s` exists but the OPEN lane(s) %s claim it,"
+                      % (neighbour, ", ".join(held_by)))
+                print("           so it is NOT a typo to adopt -- taking it would contest "
+                      "that lane.")
+            elif neighbour:
+                print("           close name `%s` exists and no lane claims it. Read as a"
+                      % neighbour)
+                print("           reservation because this claim is marked (NEW); if the "
+                      "new file")
+                print("           was in fact never written, that neighbour is the likely "
+                      "intent.")
         print("       REPORTED, NOT FAILED. A lane legitimately claims a file "
               "it is about to")
         print("       create, and such a claim starts guarding the moment the "
               "file lands, so")
         print("       failing on it would be a check that cries wolf at every "
               "session start.")
-        print("       Nothing close to these names exists -- if one did, it "
-              "would be a typo and")
-        print("       would be listed as BAD above with the neighbour named.")
+        print("       Every one of these guards NOTHING until its file exists. "
+              "A close-named")
+        print("       file is a TYPO only when the lane did not mark the path "
+              "(NEW) and no")
+        print("       other OPEN lane holds the neighbour -- those are listed "
+              "as BAD above.")
 
     # A near-miss HEADER is the same failure as a broken claim -- files
     # declared, nothing enforced -- so it fails the check on its own.

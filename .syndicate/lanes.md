@@ -1074,6 +1074,14 @@ death, never life — do not invert it.
 - Verification: parity test vendored (AST-extracted closure) vs native over every branch; fresh-interpreter check that building live lines loads no vendored module; fleet ff verify: the native function runs on the deployed checkout against OddsAPI; live in-progress reading owed May 2027
 - Blocked by: none
 
+### lane-claims-new-marker — OPEN — opened 2026-10-12 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: check_lane_claims.py never proposes adopting a path another OPEN lane claims, and treats a Files entry the lane marked (NEW) as the not-written-yet case rather than asserting a typo, while a non-(NEW) absent claim with an unclaimed close-named neighbour still fails exit 1 as the ncaaf-live-cadence worked example requires.
+- Files: scripts/check_lane_claims.py,tests/test_check_lane_claims.py
+- Hypothesis: The near-miss escalation at the classification loop overrides the NOT WRITTEN YET severity unconditionally: it consults neither the (NEW) marker nor who holds the neighbour, so an explicit reservation is reported as a typo and the suggested remedy can name another OPEN lane file.
+- Falsification test: If the worked-example typo (ncaaf-live-cadence, tests/test_ncaaf_live_autorun.py vs tests/test_ncaaf_lines_autorun.py) had carried a (NEW) marker, honouring the marker would demote a real typo and the fix would be a weakening rather than a correction.
+- Verification: New tests: (1) a (NEW)-marked absent claim with an unclaimed neighbour exits 0 and the output never asserts TYPO; (2) a non-(NEW) absent claim with an unclaimed neighbour still exits 1 and names the neighbour; (3) a neighbour claimed by another OPEN lane is never offered as a fix and is reported as that lane s; (4) impossible tokens still exit 1. Plus the real ledger: the checker run against origin/main lanes.md.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
