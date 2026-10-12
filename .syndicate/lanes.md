@@ -1148,6 +1148,14 @@ death, never life — do not invert it.
 - Verification: tests; fleet: bootstrap pairs exclude it; a refresh-process probe loads 0 modules from the data-disk src
 - Blocked by: none
 
+### ncaaf-resim-test-saturation — OPEN — opened 2026-10-12 — session 12420da3-1160-4944-9cbc-b3489ef4d580
+- Goal: tests/test_ncaaf_live_resim.py::test_the_probability_moves_with_the_score passes under the PRODUCTION calibration profile (data/calibration/ncaaf_profile.json) as well as the default, by testing even ratings with enough sims to avoid saturation; stale live-shrink comment corrected; todo #697 updated
+- Files: tests/test_ncaaf_live_resim.py, syndicate/features/ncaaf/live_resim.py (the live-shrink comment in resim_live_game only), docs/ai_context/todo.md (#697 only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: the test passes with and without SYNDICATE_CALIBRATION_PROFILE_DIR pointing at the production profile, and in the fleet ci-checkout env
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
