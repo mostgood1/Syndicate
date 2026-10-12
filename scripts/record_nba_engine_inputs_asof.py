@@ -52,7 +52,7 @@ def _add_473_inputs(live_processed: Path, dst: Path, d: str) -> None:
     # `no_rotation_stints_history` and recorded home/away_lineups = None on 2,588/2,588 sides (nba-lineup-pools,
     # 2026-10-12). P2's native producer writes them date-keyed; copy them TRUNCATED to date < slate (the sim also
     # filters [slate - 28 d, slate)). Non-dated aggregates REMOVE_ALWAYS drops stay out: they would only leak.
-    import pandas as pd
+    import csv as _csv
 
     hist = {}
     for name in ("rotation_stints_history.csv", "pair_minutes_history.csv"):
@@ -60,10 +60,21 @@ def _add_473_inputs(live_processed: Path, dst: Path, d: str) -> None:
         if not src.exists():
             hist[name] = "absent"
             continue
-        df = pd.read_csv(src, dtype={"event_id": str, "game_id": str})
-        df = df[df["date"].astype(str).str[:10] < d]
-        df.to_csv(dst / name, index=False)
-        hist[name] = len(df)
+        # RAW-STRING filter, never a pandas round-trip: re-writing through a DataFrame turns an int column holding
+        # any blank into floats ("1610612742.0"), and on 2026-01-15 that refused 3 more sides with
+        # `rotation_minutes_conflict_with_current_signals` than the same history read in place (nba-lineup-pools).
+        kept = 0
+        with src.open(newline="", encoding="utf-8") as fin, (dst / name).open("w", newline="", encoding="utf-8") as fout:
+            reader = _csv.reader(fin)
+            writer = _csv.writer(fout, lineterminator="\n")
+            header = next(reader)
+            di = header.index("date")
+            writer.writerow(header)
+            for row in reader:
+                if len(row) > di and row[di][:10] < d:
+                    writer.writerow(row)
+                    kept += 1
+        hist[name] = kept
     print(f"INPUTS_473 {d} player_checks={n} total_inputs={'yes' if ti.exists() else 'NO'} history_rows={hist}", flush=True)
 
 
