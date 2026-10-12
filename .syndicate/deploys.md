@@ -48365,3 +48365,9 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - In practice the shipped effect is pitcher strikeouts and outs.
 - **Rollback.** Delete the profile file (identity everywhere, no restart), or remove the env line + full down/up.
 - Claims released after this entry.
+
+## 2026-10-12 13:3xZ -- READING, NO DEPLOY: #473 option A VERIFIED on production-written NBA sims (lane `nba-sim-team-adj-473`, session eb2ba139; deploy entry 2026-10-10 15:06:05Z / 0974846c)
+- **Population:** every NBA `smart_sim_*.json` newer than `nba_sim_total_inputs.json` (15:06:05Z): 8 games, 4 on 10-11 (written 05:43-05:44Z 10-11) + 4 on 10-12 (written 03:48-03:50Z 10-12), fleet HEAD 64909dba (contains a31ba2bf). That is every game in game_cards for both dates (4 + 4).
+- **Fields, per sim:** `context.team_advanced_priors.applied` = true with source `syndicate_nba_team_inputs_v1:prior=2025-26...` on **8/8** (16/16 team-sides non-neutral; eff h/a e.g. ATL_OKC 0.963/1.009, UTA_SAS 0.970/1.054, DEN_CHI 1.046/0.998); `context.pregame_expected_minutes.{home,away}.applied` = true on **16/16** sides; `market_anchor.nba_total_inputs` = `{"skip_def_subtraction": true, "skip_outs_penalties": false}` on **8/8**.
+- **Run health:** `smart_sim_run_date_local` summaries `failures: 0, job_count: 4` for 2026-10-11 and 2026-10-12; no `NBA_TEAM_RATINGS_PRODUCER_FAILED` / `NBA_STARTERS_PRODUCER_FAILED` in any NBA log.
+- **verify: MET.** Owed separately: todo `#695` (regular-season totals, >= 30 finals). Rollbacks unchanged (delete the data file; `SYNDICATE_NBA_TEAM_INPUTS=0`).
