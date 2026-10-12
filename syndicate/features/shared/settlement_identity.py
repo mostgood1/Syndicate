@@ -848,6 +848,21 @@ _NON_MLB_PROP_STATS: dict[str, dict[str, str]] = {
     },
 }
 _NON_MLB_PROP_STATS["ncaaf"] = dict(_NON_MLB_PROP_STATS["nfl"])
+_BASKETBALL_PROP_STATS = {
+    "points": "points", "player_points": "points", "pts": "points",
+    "rebounds": "rebounds", "player_rebounds": "rebounds", "reb": "rebounds",
+    "assists": "assists", "player_assists": "assists", "ast": "assists",
+    "threes": "threes", "3-pointers made": "threes", "3pt made": "threes", "player_threes": "threes", "3pm": "threes",
+    "steals": "steals", "player_steals": "steals", "blocks": "blocks", "player_blocks": "blocks",
+    "turnovers": "turnovers", "player_turnovers": "turnovers",
+    "pts + reb + ast": "pra", "points + rebounds + assists": "pra", "pra": "pra", "player_points_rebounds_assists": "pra",
+    "pts + reb": "pts_reb", "points + rebounds": "pts_reb", "player_points_rebounds": "pts_reb",
+    "pts + ast": "pts_ast", "points + assists": "pts_ast", "player_points_assists": "pts_ast",
+    "reb + ast": "reb_ast", "rebounds + assists": "reb_ast", "player_rebounds_assists": "reb_ast",
+    "steals + blocks": "stl_blk", "player_blocks_steals": "stl_blk",
+}
+_NON_MLB_PROP_STATS["nba"] = dict(_BASKETBALL_PROP_STATS)
+_NON_MLB_PROP_STATS["wnba"] = dict(_BASKETBALL_PROP_STATS)
 _NON_MLB_PROP_STATS["nhl"] = {
     "goals": "goals", "player_goals": "goals", "anytime goalscorer": "goals", "player_goal_scorer_anytime": "goals",
     "assists": "assists", "player_assists": "assists",

@@ -1127,7 +1127,20 @@ def graded_rows_for_date(sport: str, date_str: str) -> list[dict[str, Any]]:
     grader = GRADED_OUTCOME_GRADERS.get(sport_slug)
     if grader is None:
         return []
-    return grader(date_str)
+    rows = list(grader(date_str))
+    # Final-score + player-box rows for the sports whose own grader does not
+    # append them itself (lane settlement-graders-all-sports; NFL and NHL do).
+    if sport_slug in _SPORT_ROWS_APPENDED_HERE:
+        try:
+            from syndicate.features.shared.settlement_sport_rows import rows_for_ledger_date
+
+            rows.extend(rows_for_ledger_date(sport_slug, date_str))
+        except Exception as exc:  # noqa: BLE001 -- extra rows never cost the existing ones
+            print(f"[graded_outcomes] SPORT_ROWS_FAILED sport={sport_slug} date={date_str} error={type(exc).__name__}", flush=True)
+    return rows
+
+
+_SPORT_ROWS_APPENDED_HERE = frozenset({"nba", "wnba", "ncaaf", "soccer"})
 
 
 __all__ = [

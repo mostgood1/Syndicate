@@ -394,6 +394,131 @@ def nhl_rows_for_date(date_str: str) -> list[dict[str, Any]]:
     return rows
 
 
+# ------------------------------------------------------------ NBA / WNBA
+
+
+def _sport_files(sport: str, pattern: str) -> list[Path]:
+    roots = []
+    env = os.environ.get("SYNDICATE_DATA_ROOT")
+    if env:
+        roots.append(Path(env) / f"{sport}_source")
+    roots.append(Path(__file__).resolve().parents[3] / "data" / f"{sport}_source")
+    out: list[Path] = []
+    for root in roots:
+        for rel in ("data/processed", "source_artifacts/data/processed"):
+            out += sorted((root / rel).glob(pattern))
+    return out
+
+
+def _espn_scoreboard_events(sport: str, date_str: str) -> list[dict[str, Any]]:
+    """[{game_id, home, away, completed, home_score, away_score}] from ESPN's
+    scoreboard cache. The cache is often the PRE-game snapshot (10-10 NBA read
+    'Scheduled' after the games), so it is trusted for WHO is home, and for a
+    score only when it says completed."""
+    files = _sport_files(sport, f"_espn_cache/scoreboard_{date_str.replace('-', '')}.json")
+    if not files:
+        return []
+    try:
+        payload = json.loads(files[0].read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    out = []
+    for event in payload.get("events") or []:
+        comp = (event.get("competitions") or [{}])[0]
+        sides = {c.get("homeAway"): c for c in comp.get("competitors") or [] if isinstance(c, Mapping)}
+        home, away = sides.get("home") or {}, sides.get("away") or {}
+        ha, aa = (home.get("team") or {}).get("abbreviation"), (away.get("team") or {}).get("abbreviation")
+        if not ha or not aa:
+            continue
+        completed = bool(((event.get("status") or {}).get("type") or {}).get("completed"))
+        out.append({"game_id": str(event.get("id") or ""), "home": ha, "away": aa, "completed": completed,
+                    "home_score": _num(home.get("score")) if completed else None,
+                    "away_score": _num(away.get("score")) if completed else None})
+    return out
+
+
+_BASKETBALL_RECON_STATS = {"pts": "points", "reb": "rebounds", "ast": "assists", "threes": "threes",
+                           "stl": "steals", "blk": "blocks", "tov": "turnovers"}
+_BASKETBALL_BOX_STATS = {"PTS": "points", "REB": "rebounds", "AST": "assists", "FG3M": "threes",
+                         "STL": "steals", "BLK": "blocks", "TOV": "turnovers"}
+
+
+def _basketball_players(sport: str, date_str: str) -> dict[str, list[dict[str, Any]]]:
+    """{game_id: players} from `recon_props_<date>.csv` (the pipeline's own
+    actuals), else `boxscores_<date>.csv`. 0 minutes = did not play = absent."""
+    out: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for pattern, cols, name_col, team_col, id_col, min_col in (
+        (f"recon_props_{date_str}.csv", _BASKETBALL_RECON_STATS, "player_name", "team_abbr", "player_id", "min"),
+        (f"boxscores_{date_str}.csv", _BASKETBALL_BOX_STATS, "PLAYER_NAME", "TEAM_ABBREVIATION", "PLAYER_ID", "MIN"),
+    ):
+        files = _sport_files(sport, pattern)
+        if not files:
+            continue
+        with open(files[0], encoding="utf-8", newline="") as fh:
+            for row in csv.DictReader(fh):
+                minutes = _num(str(row.get(min_col) or "").split(":")[0])
+                name = str(row.get(name_col) or "").strip()
+                if not minutes or not name:
+                    continue
+                stats = {key: (_num(row.get(col)) or 0.0) for col, key in cols.items()}
+                stats["pra"] = stats["points"] + stats["rebounds"] + stats["assists"]
+                stats["pts_reb"] = stats["points"] + stats["rebounds"]
+                stats["pts_ast"] = stats["points"] + stats["assists"]
+                stats["reb_ast"] = stats["rebounds"] + stats["assists"]
+                stats["stl_blk"] = stats["steals"] + stats["blocks"]
+                out[str(row.get("game_id") or row.get("gameId") or "")].append({
+                    "id": str(row.get(id_col) or ""), "name": name, "name_key": _name_key(name),
+                    "team": row.get(team_col), PROP_GROUP: stats})
+        if out:
+            break
+    return out
+
+
+def _basketball_rows_for_date(sport: str, date_str: str) -> list[dict[str, Any]]:
+    """Score rows: `recon_games` (home_tri/away_tri/home_pts/visitor_pts),
+    else ESPN completed events, else box points summed per team with ESPN's
+    home/away -- only when the box covers BOTH teams."""
+    rows: list[dict[str, Any]] = []
+    games: dict[str, dict[str, Any]] = {}
+    files = _sport_files(sport, f"recon_games_{date_str}.csv")
+    if files:
+        with open(files[0], encoding="utf-8", newline="") as fh:
+            for row in csv.DictReader(fh):
+                hs, as_ = _num(row.get("home_pts")), _num(row.get("visitor_pts"))
+                gid = str(row.get("game_id") or row.get("gameId") or "")
+                if gid and hs is not None and as_ is not None and row.get("home_tri") and row.get("away_tri"):
+                    games[gid] = {"game_id": gid, "home": row["home_tri"], "away": row["away_tri"], "home_score": hs, "away_score": as_}
+    events = _espn_scoreboard_events(sport, date_str)
+    players = _basketball_players(sport, date_str)
+    for event in events:
+        if event["game_id"] in games:
+            continue
+        if event["completed"] and event["home_score"] is not None:
+            games[event["game_id"]] = event
+            continue
+        box = players.get(event["game_id"]) or []
+        by_team: dict[str, float] = defaultdict(float)
+        for p in box:
+            by_team[str(p.get("team") or "")] += p[PROP_GROUP]["points"]
+        if event["home"] in by_team and event["away"] in by_team:
+            games[event["game_id"]] = {**event, "home_score": by_team[event["home"]], "away_score": by_team[event["away"]]}
+    for game in games.values():
+        rows.append(_score_row(sport, game["game_id"], game["home"], game["away"], game["home_score"], game["away_score"],
+                               "basketball_actuals", game_date=date_str))
+        box = players.get(game["game_id"]) or []
+        if box:
+            rows.append(_box_row(sport, game["game_id"], game["home"], game["away"], box, "basketball_actuals", game_date=date_str))
+    return rows
+
+
+def nba_rows_for_date(date_str: str) -> list[dict[str, Any]]:
+    return _basketball_rows_for_date("nba", date_str)
+
+
+def wnba_rows_for_date(date_str: str) -> list[dict[str, Any]]:
+    return _basketball_rows_for_date("wnba", date_str)
+
+
 # ------------------------------------------------------------------- window
 
 # A board (ledger) date carries picks for its whole horizon -- the 10-08 board
@@ -403,7 +528,7 @@ def nhl_rows_for_date(date_str: str) -> list[dict[str, Any]]:
 # fixture join requires the pick's own game date to match it.
 WINDOW_DAYS = 8
 
-_BUILDERS = {"nfl": nfl_rows_for_date, "nhl": nhl_rows_for_date}
+_BUILDERS = {"nfl": nfl_rows_for_date, "nhl": nhl_rows_for_date, "nba": nba_rows_for_date, "wnba": wnba_rows_for_date}
 
 
 def rows_for_ledger_date(sport: str, date_str: str, *, days: int = WINDOW_DAYS) -> list[dict[str, Any]]:
