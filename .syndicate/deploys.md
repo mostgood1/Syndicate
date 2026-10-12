@@ -48595,3 +48595,21 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **Effect timing:** bootstrap runs at `local_production.py up`, so the copy simply stops being refreshed from the next boot. The existing `/home/amyn/syndicate-prod/data/wnba_source/src` stays on disk, unused (user chose not to delete it).
 - **VERIFY -- MET** on the deployed checkout (5ec59447): `tests/test_bootstrap_no_vendor_src.py` 2/2 pass there; the real bootstrap pairs for the production data root are 16 pairs with **0 vendor roots**.
 - **Rollback:** revert 5ec59447 + f8d12b59 and ff. No restart.
+
+
+## 2026-10-12 22:01:47Z (5:01 PM CT) -- LOCAL FLEET ff 5ec59447 -> 264b38df (exact SHA), NO restart: NCAAB live tier code reaches the fleet checkout -- **MET** (lane `ncaab-native-live-tier`, session e48a0f9b)
+
+- **User decision 2026-10-12:** "fast-forward the fleet to main". Claim refresh-worker token 0dc96e63..., acquired 22:01:12Z, released 22:03:00Z.
+- **Safety, read IN FULL before the ff:** NOT CLEAR, with six live-odds-worker children in flight (odds refreshes soccer/mlb/nba/nhl, `build_soccer_artifacts`, `fetch_espn_live_status_for_date`). Proceeded deliberately:
+  - an ff with no restart kills no process;
+  - none of those jobs imports a changed runtime module. The importers of `basketball_engine` / `ncaab.live_resim` / `ncaaf.live_resim` are the refresh-worker loop, the basketball props smart sim, live_lens_loop and offline scripts (grep on the target tree);
+  - the engine change is default-OFF and parity-proven.
+  - Refresh-worker child jobs: none. MLB sim finished. Board build idle.
+- **Ride-alongs (21 commits):** runtime code is only `basketball_engine/engine.py` (bonus free throws, default OFF; P1 parity + resume suites 94 pass), `ncaab/live_resim.py` (OFF unless `SYNDICATE_NCAAB_LIVE_RESIM`) and `ncaaf/live_resim.py` (db49b352, a peer's). The rest is scripts, tests, docs and ledger. `vendor/`: no diff. Two pre-existing dirty files (`vendor/mlb_bettingv2/data/statcast/features/player_features_{2026,latest}.json`, runtime output) did not overlap and are untouched.
+- **Effect timing:** running roles keep the code they loaded until their next restart; scheduled jobs use the new checkout from their next run.
+- **VERIFY -- MET** on the fleet checkout (264b38df):
+  - `tests/test_basketball_engine_bonus.py` + `tests/test_ncaab_live_resim.py` 24/24 pass;
+  - `SCHEDULED_JOBS` carries `ncaab-player-priors` 11:40Z;
+  - `build_ncaab_player_priors.default_season(2026-10-12) == 2027`, so the next run builds the 2026-27 PRESEASON table from the swapped-in 2025-26 box (fleet stale-roster exclusion applies).
+- **Owed:** read the 2026-10-13 ~11:40Z run (`logs/job-ncaab-player-priors.log`: `teams_in_table`, `teams_stale_excluded`, `written=`).
+- **Rollback:** ff is forward-only; to undo the NCAAB code, revert on main and ff. No restart needed either way.
