@@ -1282,3 +1282,14 @@ about simulated playing time.
   from basketball-native-engine;
 - swept against the S10-sim slope;
 - guards S8 margin, S5, H2/Q4, totals.
+
+**#4 side finding (2026-10-12, code read): the PREGAME engine loop has NO foul-out disqualification.**
+- `_fouled_out_names` (resume.py) is used only in the RESUME branch (engine.py ~:1014-1021), to drop pool lineups
+  containing players who already fouled out in a live state.
+- In a pregame draw a player who reaches 6 PF stays on court, keeps playing and keeps fouling.
+- Consistent with S11: foul-outs 0.473/game vs real 0.193 (full FIT), up from 0.361 once #473 starters put
+  starters on court more.
+- The sim's "foul-outs" count players ending ≥ 6 PF, so a missing disqualification inflates it directly. It likely
+  also inflates star minutes and stats in high-foul draws.
+- **Ownership:** foul trouble is P3's under the agreed split (nba-native-live-resim), but this is a PREGAME gap.
+  Flagged to P3 and to the user; not fixed in #4.
