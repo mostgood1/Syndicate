@@ -995,6 +995,11 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # `rotation_stints_history` the smart sim reads. Replaces the vendored `update-rotations-espn-history`
     # step the props refreshes used to subprocess. Incremental (only dates not yet complete are fetched;
     # one ESPN summary per new final). 11:45Z: after the night's games are final.
+    # `ncaab-player-priors` (lane `ncaab-native-live-tier`, P4; user decision 2026-10-12: the NCAAB
+    # live lens resumes P1's PLAYER engine): per-player box rows for new finals, then a DATED
+    # player_priors_<season>_asof_<date>.csv the live re-sim reads. Incremental; in the offseason it
+    # re-reads a complete season and fetches nothing. 11:40Z: after the night's finals.
+    ScheduledJob("ncaab-player-priors", 11, 40, ("scripts/build_ncaab_player_priors.py",)),
     ScheduledJob("basketball-rotation-stints", 11, 45, ("scripts/build_basketball_rotation_stints.py",)),
 )
 
