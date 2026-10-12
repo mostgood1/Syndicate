@@ -85,8 +85,9 @@ def run(args: argparse.Namespace) -> int:
             real_fta = sum(1 for p in g.plays if p.period == 4 and p.clock_s < 120 and p.kind == "ft")
             seed = zlib.crc32(f"eg|{g.event_id}".encode()) & 0x7FFFFFFF
             sims: Dict[str, Any] = {}
+            base = json.loads(args.base_mechanisms or "{}")
             for p in GRID:
-                mech = {"record_events": True}
+                mech = {"record_events": True, **base}
                 if p > 0:
                     mech.update(endgame_foul_window_s=120, endgame_foul_max_deficit=10, endgame_foul_p=0.0,
                                 endgame_foul_p_by_deficit=(p, p, p), endgame_foul_seconds=5.0,
@@ -101,6 +102,7 @@ def run(args: argparse.Namespace) -> int:
                     fta.append(sum(int(e.get("fta", 0)) for e in evs if e.get("q") == 4 and e.get("type") == "FTA"))
                 sims[str(p)] = {"pts": statistics.fmean(pts), "fta": statistics.fmean(fta)}
             fh.write(json.dumps({"event_id": g.event_id, "date": g.date, "bucket": bucket(abs(margin)),
+                                 "base_mechanisms": base,
                                  "margin_at_2min": margin, "real_pts": real_pts, "real_fta": real_fta, "sims": sims}) + "\n")
             fh.flush()
             counts["graded"] = counts.get("graded", 0) + 1
@@ -159,6 +161,8 @@ def main(argv=None) -> int:
     r.add_argument("--out", required=True)
     r.add_argument("--draws", type=int, default=40)
     r.add_argument("--shard")
+    r.add_argument("--base-mechanisms", default="{}",
+                   help='JSON EventSimConfig fields in EVERY arm, e.g. {"score_effect_k": 0.002} (the shipping config)')
     s = sub.add_parser("summarize")
     s.add_argument("--rows", nargs="+", required=True)
     s.add_argument("--out", required=True)

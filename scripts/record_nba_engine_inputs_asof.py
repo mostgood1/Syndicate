@@ -47,7 +47,24 @@ def _add_473_inputs(live_processed: Path, dst: Path, d: str) -> None:
     ti = live_processed / "nba_sim_total_inputs.json"
     if ti.exists():
         shutil.copy2(ti, dst / ti.name)
-    print(f"INPUTS_473 {d} player_checks={n} total_inputs={'yes' if ti.exists() else 'NO'}", flush=True)
+    # LINEUP POOLS. `resim_nba_availability.REMOVE_ALWAYS` deletes rotation_stints_history / pair_minutes_history from
+    # every scratch (the old vendored builder leaked future games into them), so every replay hit
+    # `no_rotation_stints_history` and recorded home/away_lineups = None on 2,588/2,588 sides (nba-lineup-pools,
+    # 2026-10-12). P2's native producer writes them date-keyed; copy them TRUNCATED to date < slate (the sim also
+    # filters [slate - 28 d, slate)). Non-dated aggregates REMOVE_ALWAYS drops stay out: they would only leak.
+    import pandas as pd
+
+    hist = {}
+    for name in ("rotation_stints_history.csv", "pair_minutes_history.csv"):
+        src = live_processed / name
+        if not src.exists():
+            hist[name] = "absent"
+            continue
+        df = pd.read_csv(src, dtype={"event_id": str, "game_id": str})
+        df = df[df["date"].astype(str).str[:10] < d]
+        df.to_csv(dst / name, index=False)
+        hist[name] = len(df)
+    print(f"INPUTS_473 {d} player_checks={n} total_inputs={'yes' if ti.exists() else 'NO'} history_rows={hist}", flush=True)
 
 
 def main(argv=None) -> int:

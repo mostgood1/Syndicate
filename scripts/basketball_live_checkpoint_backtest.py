@@ -893,7 +893,8 @@ class NativeResimProjector:
     name = "native_resim"
 
     def __init__(self, *, inputs_root: Optional[Path] = None, summary_caches: Sequence[Path] = (),
-                 sims: int = 100, cache_dir: Optional[Path] = None) -> None:
+                 sims: int = 100, cache_dir: Optional[Path] = None,
+                 mechanisms: Optional[Dict[str, Any]] = None) -> None:
         self.inputs = index_engine_inputs(inputs_root)
         self.summary_caches = list(summary_caches)
         self.sims = sims
@@ -901,12 +902,16 @@ class NativeResimProjector:
         # reads it without simulating. Keyed on the inputs file's size+mtime and the sim count: a re-recorded input
         # or a different N never reuses a stale projection.
         self.cache_dir = cache_dir
+        # EventSimConfig fields applied to every resume (e.g. {"score_effect_k": 0.002}); in the cache key, so arms
+        # with different mechanisms never share a projection.
+        self.mechanisms = dict(mechanisms or {})
 
     def _cache_path(self, game, checkpoint: str, inputs_path: Path) -> Optional[Path]:
         if self.cache_dir is None:
             return None
         st = inputs_path.stat()
-        tag = f"{game.event_id}_{checkpoint}_n{self.sims}_{st.st_size}_{int(st.st_mtime)}"
+        mech = zlib.crc32(json.dumps(self.mechanisms, sort_keys=True).encode()) if self.mechanisms else 0
+        tag = f"{game.event_id}_{checkpoint}_n{self.sims}_{st.st_size}_{int(st.st_mtime)}_m{mech}"
         return self.cache_dir / f"{tag}.json"
 
     def _summary(self, event_id: str) -> Optional[Dict[str, Any]]:
@@ -953,6 +958,7 @@ class NativeResimProjector:
         with path.open("rb") as fh:
             inputs = dict(pickle.load(fh)["kwargs"])
         gs, _match = lr.map_state_names(gs, inputs["home_players"], inputs["away_players"])
+        inputs = lr.with_live_mechanisms(inputs, self.mechanisms)
         res = lr.resim_live_game(inputs, gs, sims=self.sims, base_seed=lr.stable_seed(facts.event_id, facts.last_seq))
         if isinstance(res, lr.NbaResimRefusal):
             return Projection(refusal=res.reason)
@@ -1412,7 +1418,8 @@ def run_grade(args: argparse.Namespace) -> int:
             caches = [Path(c) for c in (args.summary_cache or [])]
             projectors.append(NativeResimProjector(inputs_root=Path(args.engine_inputs) if args.engine_inputs else None,
                                                    summary_caches=caches, sims=args.resim_sims,
-                                                   cache_dir=Path(args.native_cache) if args.native_cache else None))
+                                                   cache_dir=Path(args.native_cache) if args.native_cache else None,
+                                                   mechanisms=json.loads(args.native_mechanisms or "{}")))
         else:
             projectors.append(PROJECTORS[n]())
     rep = grade(games, projectors, lines=lines, sims=sims, live_close=live, baseline=args.baseline)
@@ -1454,6 +1461,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     g.add_argument("--summary-cache", action="append", help="ESPN summary cache dir(s) (native_resim)")
     g.add_argument("--resim-sims", type=int, default=100)
     g.add_argument("--native-cache", help="dir caching native_resim projections per (game, checkpoint)")
+    g.add_argument("--native-mechanisms", default="{}", help='JSON EventSimConfig fields for native_resim, e.g. {"score_effect_k": 0.002}')
     g.add_argument("--shard", help="i/n: grade only games whose crc32(event_id) %% n == i (fill the cache in parallel)")
     g.add_argument("--baseline", default="vendored_replay")
     g.add_argument("--out", required=True)
