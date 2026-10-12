@@ -48543,3 +48543,23 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **Verify.** Upstream main `sim_engine/models.py` carries `bip_dp_rate: float = 0.3`, `bip_fc_rate: float = 0.484`, the steal / double-steal and pop-up sac-fly fields. `simulate.py` carries `starter_shell_runs_start`, `roe_rates`, `sb_attempt_mult`, `double_steal`.
 - **Still Syndicate-only (a vendor re-pull would DROP them; both default-off):** `count_outcome_mult` (pitch_model.py) and recency-weighted starter stamina (build_roster.py / recency.py). Also the vendor tuning JSONs, which upstream does not track.
 - Remaining open upstream PR: #4 (another lane's hits_runs_rbis rung), untouched.
+
+## 2026-10-12 19:16:01Z (2:16 PM CT) -- LOCAL FLEET ff 2c9dd444 -> 1cbaf4ab, NO restart: the WNBA refresh no longer imports the vendored playoff transition -- **MET** (lane `wnba-playoff-transition-off-vendor`, session 2d413211)
+
+- **User decisions 2026-10-12:** "move wnba playoffs of vendor", then "Yes, ff after props idle".
+  - Claim refresh-worker token 9428b95a...: acquired ~19:15Z, released 19:16:23Z.
+  - The acquire replaced an EXPIRED claim (74.6 min old, past the 45-min TTL) held by `soccer-live-anytime-scorer`.
+- **Finding that decided "remove", not "port".** Measured with the exact copy production imported (`<data root>/wnba_source/src/wnba_betting/playoff_transition.py`, identical to the vendored file):
+  - `resolve_regular_season_window` raised "No regular-season schedule rows found" for every 2026 date tried: 05-20, 07-15, 09-20, 09-30, 10-09, 10-12.
+  - It only accepts NBA game ids (`002...`) and `YYYY-YY` seasons. The WNBA schedule files carry ESPN ids (`040...`) and `season_year` `2026` / `2025`.
+  - So the step returned `skipped` on every WNBA refresh, and never wrote a `playoff_transition_*.json` receipt or a data-root `models/`. Both roots were checked: 0 files.
+  - The 2026-09-25 belief that it "fires once a season when the playoffs open (09-27)" was wrong (learnings.md).
+- **Change (1cbaf4ab):** removed `_run_playoff_transition_if_needed`, its call, and the receipt copy (it had no producer). Tests: `test_wnba_playoff_transition_removed.py` (new), the zero-recs tests drop their patch, and the runner/zero-recs/allowlist/period-lines suites pass (122+6).
+- **Fleet.**
+  - `check_deploy_safety` read in full at 19:15:47Z: NOT CLEAR, on an NFL projections build, soccer odds and live-state jobs, a `wnba_betting.cli fetch-schedule` child and a board build. No basketball props job was running.
+  - Guard: HEAD == 2c9dd444, then `merge --ff-only 1cbaf4ab`. **0 ride-alongs** (exact parent).
+- **VERIFY -- MET.**
+  - On the deployed checkout, `refresh_wnba_oddsapi_props` has no playoff runner, writes no `state["playoff_transition"]`, and importing it loads 0 `wnba_betting` modules.
+  - The first WNBA refresh to START after the ff (first command 19:21:04Z) finished at 19:22:23Z with the usual offseason warning ("no WNBA input rows") and **0 Tracebacks** in the day's WNBA props log.
+- **Not done here:** the NBA twin in `refresh_nba_oddsapi_props.py` is `unavailable` on the fleet, because there is no `nba_source/src`. The `bootstrap_data_root.py` copy of the vendored WNBA src onto the data disk is unchanged; other vendored CLI steps still run from it.
+- **Rollback:** revert 1cbaf4ab and ff. No restart.

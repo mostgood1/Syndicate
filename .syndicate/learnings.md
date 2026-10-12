@@ -1944,3 +1944,8 @@ prefer single-quoted arguments there.
   2. `.rstrip(b"\r")` every captured line.
   3. Assert `b"\r" not in out` before writing.
   4. The numstat gate (lines changed == lines meant) is what caught it, again.
+
+## 2026-10-12 OVERTURNED: "the WNBA playoff transition fires once a season when the playoffs open" (artifact_publisher.py allowlist comment and tests/test_nhl_quote_shard_dates.py, 2026-09-25) `[lane wnba-playoff-transition-off-vendor, session 2d413211]`
+
+- **Measured:** the vendored `wnba_betting.playoff_transition` is NBA-shaped. It accepts only NBA regular-season game ids (`002...`) and `YYYY-YY` seasons, while the WNBA schedule carries ESPN ids (`040...`) and `YYYY`. The production copy raised before doing anything for every 2026 date, playoff opening included, and returned `skipped`. It never wrote a receipt or a model. The step was removed (1cbaf4ab).
+- **Rule:** a step that is "waiting for its one chance" must be dry-run against real data BEFORE that chance. Call its gate function (here `resolve_regular_season_window`) for the dates when it should fire, read-only. An allowlisted receipt pattern proves the receipt would be visible, not that it would ever be written. The allowlist entry in artifact_publisher.py is now dead; it is harmless and is left in place.
