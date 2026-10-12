@@ -3863,6 +3863,27 @@ frame could not have been non-null.
   - Prefer as-of truncation to deletion. For a fitted all-history artifact that cannot be truncated
     (lineup_teammate_effects), record it as a stated replay-vs-production difference.
 
-## 2026-10-12 -- after `local_production.py down`, WAIT for the scheduled task to read `Ready` before `Start-ScheduledTask` -- a start sent while it still reads `Running` is a no-op and the fleet stays down `[lane settlement-graders-all-sports, session d4409ac4]`
-- **What happened:** my restart script slept 5 s after `down` and called `Start-ScheduledTask SyndicateLocalProduction`. The task instance was still exiting, so the start did nothing; it then went to `Ready` with no fleet running. With `watchdog_no_autostart` set, nothing recovered it: web was down 15:12-15:19Z (7.7 min, vs ~1 min on the 10-08 run that waited for `Ready`).
-- **Rule:** poll `(Get-ScheduledTask -TaskName SyndicateLocalProduction).State` until `Ready`, THEN start it, then gate on `/healthz` 200 -- and if healthz has not answered within ~60 s, check the task state and processes instead of waiting out the loop.
+## 2026-10-12 — BACKTICKS IN A DOUBLE-QUOTED SHELL ARGUMENT EXECUTE, AND SILENTLY DELETE THE WORD FROM A LEDGER WRITE `[lane layer2-out-gate-fixture-game-field, session 4ab694ed]`
+
+**Rule.** Never put a backtick inside a double-quoted shell argument that writes to
+the ledger. `lane_open.py --goal "... the `game` field ..."` runs `game` as a
+command and substitutes its (empty) output, so the lane block is written with the
+word MISSING. Use single quotes for the whole argument, or build the backtick with
+`chr(96)` from Python.
+
+**Why, measured.** Opening a lane this way printed four `bash: game: command not
+found` lines and still exited 0 — `lane_open.py` wrote the block, and the Goal and
+Falsification lines read *"giving the grid fixture the  field real rows carry"* and
+*"the missing field is not  and the premise is wrong"*. The ledger recorded a goal
+with its subject deleted. Repaired by hand the same session.
+
+**Why this is not the existing backtick rule.** The other backtick entries in this
+file are about `lane_claims._paths_in` treating a backticked token as a CLAIM, and
+about `_mask_backticked` doing the opposite job. Those concern how the ledger is
+PARSED. This one is about the ledger being WRITTEN wrong before any parser sees it,
+and the symptom is a missing word rather than an extra claim.
+
+**How to apply.** The failure is loud on stderr and invisible in the file, so the
+check is to read back what was written, not to watch the command. Any `lane_open.py`
+/ `lead` / commit-message invocation that carries markdown backticks is exposed;
+prefer single-quoted arguments there.
