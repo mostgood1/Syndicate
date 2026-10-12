@@ -111,8 +111,40 @@ def _main_worktree_root() -> Path:
     return REPO_ROOT
 
 
+def _local_production_env_claim_dir() -> Path | None:
+    """`SYNDICATE_DEPLOY_CLAIM_DIR` as the local_production supervisor resolves it.
+
+    THE FAILURE THIS REMOVES, measured 2026-10-10 (lane deploy-claim-dir-parity).
+    On the WSL fleet the supervisor's `down`/restart guard reads claims from
+    `SYNDICATE_DEPLOY_CLAIM_DIR` in `<home>/local_production.env` -- the Windows
+    primary tree under `/mnt/c` -- while this script, run from `~/Syndicate`,
+    wrote to `~/Syndicate/.syndicate/deploy_claims`. `down` was REFUSED with
+    three claims HELD per `status`: every claim taken on the fleet was invisible
+    to the guard, and the two directories were never mutually exclusive.
+
+    Same order as `local_production._setting`: the environment, then the env
+    file in `SYNDICATE_LOCAL_HOME` (else `~/syndicate-prod`). A named directory
+    that does not exist is ignored rather than created -- a typo must not
+    silently split the lock again.
+    """
+    raw = os.environ.get("SYNDICATE_DEPLOY_CLAIM_DIR", "").strip()
+    if not raw:
+        home = Path(os.environ.get("SYNDICATE_LOCAL_HOME", "").strip() or (Path.home() / "syndicate-prod")).expanduser()
+        try:
+            for line in (home / "local_production.env").read_text(encoding="utf-8").splitlines():
+                key, sep, value = line.strip().partition("=")
+                if sep and key.strip() == "SYNDICATE_DEPLOY_CLAIM_DIR":
+                    raw = value.strip().strip('"').strip("'")
+        except OSError:
+            return None
+    if not raw:
+        return None
+    path = Path(raw).expanduser()
+    return path if path.is_dir() else None
+
+
 #: Tests monkeypatch this attribute, so it stays a module-level constant.
-CLAIM_DIR = _main_worktree_root() / ".syndicate" / "deploy_claims"
+CLAIM_DIR = _local_production_env_claim_dir() or (_main_worktree_root() / ".syndicate" / "deploy_claims")
 # `#647`: the three cron services, added 2026-09-08. Until then `--service
 # ci-suite` was rejected by `choices`, so a cron deploy could not be serialised
 # at all -- while `deploy-guard.py` matched the cron deploy endpoint, resolved
