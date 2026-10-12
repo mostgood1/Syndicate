@@ -192,11 +192,20 @@ Faithful copy, not a re-model: P3's (NBA) and P5's (WNBA) re-sims are what repla
   - A private Flask app carries only the four routes; the vendored minimal-UI `before_request` allowlist
     admits all four.
   - Validation: every global is bound and nothing vendored is imported, except the names in `KNOWN_UNDEFINED`.
-- **Vendored defect found and KEPT for parity (WNBA).** `_live_oddsapi_player_props_for_game._update_registry_bucket`
-  reads `current_last_updates`, but the WNBA copy lost that keyword parameter (the NBA copy has it) while every
-  caller still passes it. Each call raises TypeError and the enclosing `try` swallows it, so the WNBA live-props
-  registry (first/last seen, observations) is never written. Fixing it changes WNBA live-props output, so it is a
-  separate decision.
+- **Vendored defect FIXED in the port (WNBA, user decision 2026-10-12).**
+  `_live_oddsapi_player_props_for_game._update_registry_bucket` reads `current_last_updates`, but the WNBA copy lost
+  that keyword parameter (the NBA copy has it) while every caller still passes it.
+  - Effect: each call raised TypeError and the enclosing `try` swallowed it. The WNBA live-props registry
+    (`processed/live_lens_registry/`) was never written, and the first/last-seen, first/last line and price and
+    observation maps the live player lens reads stayed `{}`. On the fleet the WNBA live tick ran on 12 days with
+    no registry directory at all; NBA has one.
+  - The port restores the parameter. It is the generator's only FIX (`FIXES`), and `--without-fixes` regenerates
+    the verbatim, parity-proven text.
+  - `tests/test_basketball_live_tick_fixes.py` pins that the two differ by exactly that line. It also checks the
+    fixed port writes the registry and fills the maps on synthetic OddsAPI responses, while the verbatim text
+    (the control) writes nothing and leaves them empty, with every other returned key identical.
+  - The 2026-10-09 doctored parity never reaches this code (no OddsAPI event matched that slate), so it still reads
+    0 diffs with the fix in place.
 - **Behaviour that is deliberately not carried over** (none changes the tick's output on the fleet):
   - The vendored IMPORT ran `nba_betting.config.reconcile_repo_data_to_active()`. It copies the vendored
     repo's `data/` into the data root whenever the repo copy is newer. Fleet dry-runs on 2026-10-12 would copy
