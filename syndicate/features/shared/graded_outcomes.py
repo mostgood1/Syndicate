@@ -710,7 +710,11 @@ def _nba_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
 def _nhl_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
     from syndicate.features.nhl.market_accuracy import build_market_accuracy_payload
 
-    return _local_market_accuracy_graded_rows_for_date("nhl", date_str, build_payload=build_market_accuracy_payload)
+    rows = _local_market_accuracy_graded_rows_for_date("nhl", date_str, build_payload=build_market_accuracy_payload)
+    # Final-score + player-box rows (lane settlement-graders-all-sports).
+    from syndicate.features.shared.settlement_sport_rows import rows_for_ledger_date
+
+    return list(rows) + rows_for_ledger_date("nhl", date_str)
 
 
 # ---------------------------------------------------------------------------

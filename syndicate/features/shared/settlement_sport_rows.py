@@ -268,6 +268,132 @@ def nfl_rows_for_date(date_str: str) -> list[dict[str, Any]]:
     return rows
 
 
+# ---------------------------------------------------------------------- NHL
+
+
+def _nhl_roots() -> list[Path]:
+    roots = []
+    env = os.environ.get("SYNDICATE_DATA_ROOT")
+    if env:
+        roots.append(Path(env) / "nhl_source")
+    roots.append(Path(__file__).resolve().parents[3] / "data" / "nhl_source")
+    return [r for r in roots if r.exists()]
+
+
+@lru_cache(maxsize=4)
+def _nhl_boxscore_dates(signature: tuple[str, int, int]) -> dict[str, tuple[str, ...]]:
+    """{gameDate: (boxscore paths)} for one cache directory listing."""
+    out: dict[str, list[str]] = defaultdict(list)
+    for path in sorted(Path(signature[0]).glob("boxscore_*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        day = str(payload.get("gameDate") or "")[:10]
+        if day:
+            out[day].append(str(path))
+    return {day: tuple(paths) for day, paths in out.items()}
+
+
+def _nhl_cache_dir() -> Path | None:
+    for root in _nhl_roots():
+        for rel in ("data/ingestion_cache", "source_artifacts/data/ingestion_cache"):
+            if (root / rel).is_dir():
+                return root / rel
+    return None
+
+
+@lru_cache(maxsize=512)
+def _nhl_full_names(stamp: tuple[str, int, int]) -> dict[int, str]:
+    out: dict[int, str] = {}
+    with open(stamp[0], encoding="utf-8", newline="") as fh:
+        for row in csv.DictReader(fh):
+            try:
+                out[int(str(row.get("player_id") or "").strip())] = str(row.get("full_name") or "").strip()
+            except ValueError:
+                continue
+    return out
+
+
+def _nhl_roster_names() -> dict[int, str]:
+    """Every roster snapshot, newest name winning per id. A daily snapshot
+    holds only that day's teams (6 of 32 on 2026-10-12), so one file names
+    a fifth of the league."""
+    found: list[Path] = []
+    for root in _nhl_roots():
+        for rel in ("data/processed", "source_artifacts/data/processed"):
+            found += sorted((root / rel).glob("roster_snapshot_*.csv"))
+    out: dict[int, str] = {}
+    for path in sorted(found, key=lambda p: p.name):
+        stamp = _stamp(path)
+        if stamp:
+            out.update(_nhl_full_names(stamp))
+    return out
+
+
+_NHL_FINAL_STATES = frozenset({"OFF", "FINAL"})
+
+
+def nhl_rows_for_date(date_str: str) -> list[dict[str, Any]]:
+    """Score + box rows for NHL games on `date_str` (the API's local gameDate)
+    from the boxscore cache. Final score is the API's, which counts a shootout
+    winner's goal -- how books settle moneylines, puck lines and totals."""
+    cache = _nhl_cache_dir()
+    if cache is None:
+        return []
+    try:
+        st = cache.stat()
+    except OSError:
+        return []
+    listing = (str(cache), st.st_mtime_ns, len(list(cache.glob("boxscore_*.json"))))
+    paths = _nhl_boxscore_dates(listing).get(date_str) or ()
+    names = _nhl_roster_names()
+    rows: list[dict[str, Any]] = []
+    for path in paths:
+        try:
+            box = json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if str(box.get("gameState") or "").upper() not in _NHL_FINAL_STATES or str(box.get("gameScheduleState") or "OK").upper() != "OK":
+            continue
+        home_t, away_t = box.get("homeTeam") or {}, box.get("awayTeam") or {}
+        home, away = str(home_t.get("abbrev") or ""), str(away_t.get("abbrev") or "")
+        hs, as_ = _num(home_t.get("score")), _num(away_t.get("score"))
+        game_id = str(box.get("id") or "")
+        if not home or not away or hs is None or as_ is None or not game_id:
+            continue
+        rows.append(_score_row("nhl", game_id, home, away, hs, as_, "nhl_boxscore", game_date=date_str))
+        players = []
+        by_side = box.get("playerByGameStats") or {}
+        for side_key, team in (("homeTeam", home), ("awayTeam", away)):
+            groups = by_side.get(side_key) or {}
+            for group in ("forwards", "defense"):
+                for p in groups.get(group) or []:
+                    if str(p.get("toi") or "00:00") in ("00:00", "0:00", ""):
+                        continue  # dressed, did not play: absent, not zero
+                    pid = p.get("playerId")
+                    name = names.get(int(pid)) if pid is not None else None
+                    if not name:
+                        continue
+                    stats = {k: _num(p.get(k)) for k in ("goals", "assists", "points", "sog", "blockedShots", "hits", "powerPlayGoals", "pim")}
+                    players.append({"id": pid, "name": name, "name_key": _name_key(name), "team": team,
+                                    PROP_GROUP: {k: v for k, v in stats.items() if v is not None}})
+            for p in groups.get("goalies") or []:
+                saves_text = str(p.get("saveShotsAgainst") or "")
+                if "/" not in saves_text or saves_text.startswith("0/0") or str(p.get("toi") or "00:00") in ("00:00", ""):
+                    continue
+                pid = p.get("playerId")
+                name = names.get(int(pid)) if pid is not None else None
+                if not name:
+                    continue
+                saves, _shots = saves_text.split("/", 1)
+                players.append({"id": pid, "name": name, "name_key": _name_key(name), "team": team,
+                                PROP_GROUP: {"saves": _num(saves), "goals_against": _num(p.get("goalsAgainst"))}})
+        if players:
+            rows.append(_box_row("nhl", game_id, home, away, players, "nhl_boxscore", game_date=date_str))
+    return rows
+
+
 # ------------------------------------------------------------------- window
 
 # A board (ledger) date carries picks for its whole horizon -- the 10-08 board
@@ -277,7 +403,7 @@ def nfl_rows_for_date(date_str: str) -> list[dict[str, Any]]:
 # fixture join requires the pick's own game date to match it.
 WINDOW_DAYS = 8
 
-_BUILDERS = {"nfl": nfl_rows_for_date}
+_BUILDERS = {"nfl": nfl_rows_for_date, "nhl": nhl_rows_for_date}
 
 
 def rows_for_ledger_date(sport: str, date_str: str, *, days: int = WINDOW_DAYS) -> list[dict[str, Any]]:

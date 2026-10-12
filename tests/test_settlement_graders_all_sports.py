@@ -78,5 +78,37 @@ class NflSegments(unittest.TestCase):
         self.assertEqual(rows._nfl_segment_scores({1: (0.0, 0.0), 2: (7.0, 7.0)}), {})
 
 
+class NhlBoxscoreRows(unittest.TestCase):
+    def test_final_boxscore_gives_score_and_player_rows(self) -> None:
+        import json
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+
+        box = {"id": 2026020086, "gameDate": "2026-10-11", "gameState": "OFF", "gameScheduleState": "OK",
+               "homeTeam": {"abbrev": "PHI", "score": 1}, "awayTeam": {"abbrev": "CAR", "score": 4},
+               "playerByGameStats": {
+                   "awayTeam": {"forwards": [{"playerId": 1, "toi": "18:24", "goals": 1, "assists": 1, "points": 2, "sog": 2}],
+                                "defense": [{"playerId": 3, "toi": "00:00", "goals": 0}],
+                                "goalies": [{"playerId": 2, "toi": "60:00", "saveShotsAgainst": "18/19", "goalsAgainst": 1}]},
+                   "homeTeam": {"forwards": [], "defense": [], "goalies": [{"playerId": 4, "toi": "00:00", "saveShotsAgainst": "0/0"}]}}}
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "nhl_source" / "data" / "ingestion_cache"
+            cache.mkdir(parents=True)
+            (cache / "boxscore_2026020086.json").write_text(json.dumps(box), encoding="utf-8")
+            proc = Path(tmp) / "nhl_source" / "data" / "processed"
+            proc.mkdir(parents=True)
+            (proc / "roster_snapshot_2026-10-11.csv").write_text("full_name,player_id" + chr(10) + "Sebastian Aho,1" + chr(10) + "Frederik Andersen,2" + chr(10) + "Bench Guy,3" + chr(10), encoding="utf-8")
+            rows._nhl_boxscore_dates.cache_clear()
+            with mock.patch.dict("os.environ", {"SYNDICATE_DATA_ROOT": tmp}):
+                got = rows.nhl_rows_for_date("2026-10-11")
+        score = [r for r in got if r["market"] == "game_score"][0]
+        self.assertEqual((score["home_score"], score["away_score"]), (1.0, 4.0))
+        players = {p["name"]: p["player"] for r in got if r["market"] == "player_box" for p in r["players"]}
+        self.assertEqual(players["Sebastian Aho"]["points"], 2.0)
+        self.assertEqual(players["Frederik Andersen"]["saves"], 18.0)
+        self.assertNotIn("Bench Guy", players)  # 00:00 TOI: absent, not zero
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -848,6 +848,15 @@ _NON_MLB_PROP_STATS: dict[str, dict[str, str]] = {
     },
 }
 _NON_MLB_PROP_STATS["ncaaf"] = dict(_NON_MLB_PROP_STATS["nfl"])
+_NON_MLB_PROP_STATS["nhl"] = {
+    "goals": "goals", "player_goals": "goals", "anytime goalscorer": "goals", "player_goal_scorer_anytime": "goals",
+    "assists": "assists", "player_assists": "assists",
+    "points": "points", "player_points": "points",
+    "sog": "sog", "shots on goal": "sog", "player_shots_on_goal": "sog",
+    "blocked shots": "blockedShots", "blocks": "blockedShots", "player_blocked_shots": "blockedShots",
+    "power play goals": "powerPlayGoals", "player_power_play_goals": "powerPlayGoals",
+    "saves": "saves", "player_total_saves": "saves", "goalie saves": "saves",
+}
 # Yes/no props graded as over/under 0.5 of their count stat.
 _YES_NO_PROP_STATS = frozenset({"anytime_td", "goals_scorer"})
 
