@@ -87,9 +87,9 @@ EXPECTED_UNCONSUMED_CONFIG: dict[str, str] = {
     "reconcile_max_changes_per_quarter": "vestigial, as above",
 }
 CARRIED: dict[str, str] = {
-    "home_team_fouls": "no bonus mechanism in the loop yet: adding one is a P3 mechanism + re-fit",
-    "away_team_fouls": "as above",
-    "home_in_bonus": "as above",
+    # home/away_team_fouls are CONSUMED since 2026-10-12 (lane ncaab-native-live-tier): the bonus free-throw
+    # mechanism (EventSimConfig.bonus_free_throws, default OFF) seeds its team-foul scope from them on a resume.
+    "home_in_bonus": "derived by the bonus mechanism from team fouls + the shared rulebook, never read",
     "away_in_bonus": "as above",
     "shot_clock_seconds": "NCAAB hook (P4): the loop has no shot-clock mechanism",
     "team_fouls_for_bonus": "hook (P3/P4): no bonus mechanism",
@@ -97,7 +97,8 @@ CARRIED: dict[str, str] = {
 }
 # GameState fields are consumed but have NO production caller until P3 wires live re-sims; pregame passes the tip.
 RESUME_ONLY: set[str] = {"period", "seconds_remaining", "home_period_pts", "away_period_pts", "possession",
-                         "home_on_floor", "away_on_floor", "home_player_fouls", "away_player_fouls"}
+                         "home_on_floor", "away_on_floor", "home_player_fouls", "away_player_fouls",
+                         "home_team_fouls", "away_team_fouls"}
 KNOWN_UNFED: dict[str, str] = {}
 COLUMN_FLOOR = 0.5  # share of player rows with a finite, non-zero value
 ALT_COLUMNS = ({"starter_prob", "is_starter"},)  # either one feeds the same signal

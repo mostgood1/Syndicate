@@ -77,6 +77,24 @@ class EventSimConfig:
     # Let the CLOCK, not the pace pre-count, end a fouling final period: possessions continue past `q_poss` while
     # time is left and the window/deficit still hold. Without it extra fouls only re-label possessions.
     endgame_extend_possessions: bool = False
+    # BONUS FREE THROWS (lane ncaab-native-live-tier, P4; user 2026-10-12 "build the bonus free throw mechanism").
+    # Default OFF: no team-foul counter, no extra RNG draw, byte-identical. On: a NON-SHOOTING defensive foul is drawn
+    # at the START of a possession with probability `bonus_nonshoot_foul_per_poss`. It counts toward the defense's
+    # team fouls; when the offense is in the bonus (shared/basketball_league_rules.bonus_free_throws -- NCAAB 1-and-1
+    # from the 7th team foul of a HALF, two shots from the 10th, overtime continuing the second half; NBA/WNBA two
+    # from the 5th per quarter, 4th in OT, 2nd in the last 2:00) the free-throw trip ENDS the possession. Out of the
+    # bonus the foul is a PF and play goes on. Team fouls = box PF since the scope began (shooting, non-shooting and
+    # intentional fouls all count) + GameState home/away_team_fouls when resuming inside a scope. The legacy
+    # non-shooting PF "noise" (`base_nonshooting_foul_per_poss`, PF only) is UNTOUCHED: its fouls count toward the
+    # bonus, and this rate is the bonus-eligible foul ON TOP of it -- fitted as such. Rate 0 with the switch on is
+    # therefore the default RNG stream (pinned by tests/test_basketball_engine_bonus.py). Measured target (2025-26 NCAAB regular season, 5,865 games, both teams per game): second halves
+    # +6.9 FT points over first halves of a +7.7 total; fouls 14.5 -> 19.7; FTA 15.3 -> 24.6.
+    bonus_free_throws: bool = False
+    bonus_nonshoot_foul_per_poss: float = 0.0
+    # Second-half multiplier on that rate (from `lp.second_half_first_period`, overtime included). Measured: fouls
+    # per 4 minutes 2.0-3.2 in NCAAB first halves vs 3.4-4.8 in second halves, and a constant rate leaves the half
+    # split at ~0 whatever its level (fit 2026-10-12). 1.0 = off.
+    bonus_second_half_mult: float = 1.0
 
     # Outcome priors (fallbacks when player priors are missing)
     base_tov_per_poss: float = 0.125
@@ -1026,6 +1044,17 @@ def simulate_pbp_game_boxscore(
             "first_a_line": _lineup_indices(a_names, state.away_on_floor, side="away"),
         }
 
+    # BONUS FREE THROWS (default off; see EventSimConfig). Team fouls per side = base + box PF - PF at scope start.
+    bonus_on = bool(getattr(cfg, "bonus_free_throws", False))
+    bonus_rate = float(getattr(cfg, "bonus_nonshoot_foul_per_poss", 0.0) or 0.0)
+    bonus_h2_mult = float(getattr(cfg, "bonus_second_half_mult", 1.0) or 1.0)
+    bonus_rules = None
+    if bonus_on:
+        from syndicate.features.shared.basketball_league_rules import rules_for as _bonus_rules_for
+
+        bonus_rules = _bonus_rules_for(lp.code)
+    bonus_tf: Dict[str, Any] = {"h": [0, 0], "a": [0, 0], "late": {"h": None, "a": None}}
+
     home_score = int(state.home_score)
     away_score = int(state.away_score)
     home_q_pts: List[int] = []
@@ -1193,6 +1222,85 @@ def simulate_pbp_game_boxscore(
                 events.append({"q": q, "type": "FTA", "off": "H" if off_home else "A", "sh": sh_, "fta": 2,
                                "ftm": made_, "intentional": True})
 
+        # BONUS: the team-foul scope for this period (NCAAB: per half, overtime continues the second half).
+        if bonus_on:
+            hs_, as_ = int(np.sum(h["pf"])), int(np.sum(a["pf"]))
+            resumed_first = (int(q) == int(start_period)) and not opening_tip
+            resets = bonus_rules.foul_count_resets(int(q))
+            if resumed_first and (start_remaining is not None or not resets):
+                # Resuming INSIDE a scope: the fouls already committed in it come from the live state.
+                bonus_tf["h"] = [int(getattr(state, "home_team_fouls", 0) or 0), hs_]
+                bonus_tf["a"] = [int(getattr(state, "away_team_fouls", 0) or 0), as_]
+            elif resets:
+                bonus_tf["h"] = [0, hs_]
+                bonus_tf["a"] = [0, as_]
+            bonus_tf["late"] = {"h": None, "a": None}
+
+        def _bonus_team_fouls(side: str) -> int:
+            box = h if side == "h" else a
+            base, snap = bonus_tf[side]
+            return int(base) + int(np.sum(box["pf"])) - int(snap)
+
+        def _bonus_late_fouls(side: str) -> int:
+            # Fouls in the last `late_period_seconds` (NBA/WNBA). Snapshot taken at the first query inside the
+            # window, so a foul in the window before any possession-start query is not counted (documented).
+            late = getattr(bonus_rules, "late_period_seconds", None)
+            if late is None or int(q_remaining) > int(late):
+                return 0
+            box = h if side == "h" else a
+            now = int(np.sum(box["pf"]))
+            if bonus_tf["late"][side] is None:
+                bonus_tf["late"][side] = now
+            return now - int(bonus_tf["late"][side])
+
+        def _bonus_pf(def_side: str, h_line_: List[int], a_line_: List[int]) -> None:
+            def_players, def_line, def_box = (away_players, a_line_, a) if def_side == "a" else (home_players, h_line_, h)
+            pf_w_ = _usage_w(def_players, "_prior_pf_pm", def_line)
+            didx_ = _pick_weighted(rng, list(range(len(def_players))), pf_w_)
+            if didx_ is not None:
+                def_box["pf"][int(didx_)] += 1
+
+        def _bonus_trip(off_home: bool, award: str, h_line_: List[int], a_line_: List[int]) -> None:
+            """A non-shooting foul in the bonus: free throws (1-and-1 or two), the fouler's PF, a possession's clock."""
+            nonlocal home_score, away_score, q_remaining
+            off_players = home_players if off_home else away_players
+            off_line = h_line_ if off_home else a_line_
+            off_box = h if off_home else a
+            off_q = hq if off_home else aq
+            ft_pct = h_ft_pct if off_home else a_ft_pct
+            eff = eff_mult_h if off_home else eff_mult_a
+            fta_w = _usage_w(off_players, "_prior_fta_pm", off_line)
+            sh_ = int(_pick_weighted(rng, list(range(len(off_players))), fta_w) or 0)
+            avg_ = float(period_left) / float(max(1, q_poss))
+            dur_ = int(np.clip(rng.normal(avg_, 4.0), 4.0, 28.0))
+            q_remaining = max(0, int(q_remaining) - dur_)
+            q_elapsed_ = int(period_seconds - q_remaining)
+            seg_ = int(np.clip(q_elapsed_ // segment_seconds, 0, n_segments - 1))
+            min_ = int(np.clip(q_elapsed_ // minute_seconds, 0, n_minutes - 1))
+            ftp_ = float(np.clip(float(ft_pct[sh_]) * eff * q_env_mult * _score_effect(off_home), 0.45, 0.95))
+            if award == "two_shots":
+                attempts, made_ = 2, int(rng.binomial(2, ftp_))
+            else:  # one_and_one: the second shot only after a make
+                first = bool(rng.random() < ftp_)
+                attempts, made_ = (2, 1 + int(rng.random() < ftp_)) if first else (1, 0)
+            off_box["fta"][sh_] += attempts
+            if made_ > 0:
+                off_box["ftm"][sh_] += made_
+                off_box["pts"][sh_] += made_
+                _add_q_stat(off_q["pts"], q, sh_, made_)
+                if off_home:
+                    home_score += made_
+                    _add_q_seg(home_q_seg_pts, q, seg_, made_)
+                    _add_q_min(home_q_min_pts, q, min_, made_)
+                else:
+                    away_score += made_
+                    _add_q_seg(away_q_seg_pts, q, seg_, made_)
+                    _add_q_min(away_q_min_pts, q, min_, made_)
+            _bonus_pf("a" if off_home else "h", h_line_, a_line_)
+            if record_events:
+                events.append({"q": q, "type": "FTA", "off": "H" if off_home else "A", "sh": sh_, "fta": attempts,
+                               "ftm": made_, "bonus": award})
+
         # RESUME: start_remaining is the clock left in a period already under way; None = the whole period, the
         # only value a pregame run ever passes (and then every expression below is the vendored one).
         period_left = int(period_seconds) if start_remaining is None else int(start_remaining)
@@ -1305,6 +1413,18 @@ def simulate_pbp_game_boxscore(
                 if 1 <= lead_off <= eg_max and float(rng.random()) < _eg_p_for(lead_off):
                     _endgame_intentional_foul(bool(offense_home), h_line, a_line)
                     continue
+
+            if bonus_on and bonus_rate > 0.0 and float(rng.random()) < bonus_rate * (
+                    bonus_h2_mult if int(q) >= int(lp.second_half_first_period) else 1.0):
+                def_side_ = "a" if offense_home else "h"
+                award_ = bonus_rules.bonus_free_throws(
+                    _bonus_team_fouls(def_side_) + 1, period=int(q), remaining_in_period=float(q_remaining),
+                    fouls_in_late_window=_bonus_late_fouls(def_side_) + 1,
+                )
+                if award_ != "none":
+                    _bonus_trip(bool(offense_home), award_, h_line, a_line)
+                    continue
+                _bonus_pf(def_side_, h_line, a_line)
 
             # Possession may include multiple shot attempts on offensive rebounds.
             max_shots_this_poss = 5

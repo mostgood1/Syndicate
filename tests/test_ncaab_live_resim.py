@@ -291,3 +291,26 @@ def test_exact_target_switch_is_off_unless_set_and_binds_a_different_engine(monk
     off, on = lr.ncaab_engine(False), lr.ncaab_engine(True)
     assert off is not on
     assert off.EXACT_TARGET_CALIBRATION is False and on.EXACT_TARGET_CALIBRATION is True
+
+
+def test_half_split_is_off_unless_set_and_shifts_the_halves(tmp_path, monkeypatch):
+    monkeypatch.delenv("SYNDICATE_NCAAB_HALF_SPLIT", raising=False)
+    _write_priors(tmp_path, "2026-01-10")
+    pri = lr.load_player_priors(dt.date(2026, 1, 10), dirs=[tmp_path])
+    off = lr.build_engine_inputs("2026-01-10", "10", "20", neutral=False, priors=pri, team_prior=_team_prior())
+    assert off["quarters"] is None and off["_provenance"]["halfSplit"] is False
+    monkeypatch.setenv("SYNDICATE_NCAAB_HALF_SPLIT", "1")
+    on = lr.build_engine_inputs("2026-01-10", "10", "20", neutral=False, priors=pri, team_prior=_team_prior())
+    h1, h2 = on["quarters"]
+    assert h1["home_pts_mu"] + h2["home_pts_mu"] == pytest.approx(73.0)
+    assert h1["home_pts_mu"] / 73.0 == pytest.approx(lr.H1_SHARE)
+    engine = lr.ncaab_engine(False)
+
+    def halves(inputs):
+        kw = {k: inputs[k] for k in lr._ENGINE_KWARGS}
+        outs = [engine.simulate_pbp_game_boxscore(rng=np.random.default_rng(s), **kw) for s in range(30)]
+        return np.mean([hq[0] + aq[0] for _hb, _ab, hq, aq in outs]), np.mean([hq[1] + aq[1] for _hb, _ab, hq, aq in outs])
+
+    off_h1, off_h2 = halves(off)
+    on_h1, on_h2 = halves(on)
+    assert (on_h2 - on_h1) > (off_h2 - off_h1) + 2, ((off_h1, off_h2), (on_h1, on_h2))

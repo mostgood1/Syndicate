@@ -232,7 +232,9 @@ def build_engine_inputs(date: str, home_id: str, away_id: str, *, neutral: bool,
         "cfg": EventSimConfig(possessions_per_game=float(team_prior.possessions)),
         "target_home_points": float(team_prior.home_points),
         "target_away_points": float(team_prior.away_points),
+        "quarters": half_targets(team_prior.home_points, team_prior.away_points) if half_split_enabled() else None,
         "_provenance": {
+            "halfSplit": half_split_enabled(),
             "ratingsAsOf": team_prior.ratings_as_of.isoformat(),
             "priorSeasonFallback": bool(team_prior.prior_season_fallback),
             "playerPriorsAsOf": priors.as_of.isoformat(),
@@ -275,7 +277,31 @@ def ncaab_engine(exact_target: Optional[bool] = None):
         return _ENGINES[exact]
 
 
-_ENGINE_KWARGS = ("home_players", "away_players", "cfg", "target_home_points", "target_away_points")
+_ENGINE_KWARGS = ("home_players", "away_players", "cfg", "target_home_points", "target_away_points", "quarters")
+
+# THE HALF SPLIT (estimator, default OFF until the paired backtest decides). NCAAB first halves score 47.43% of a
+# game's points (2025-26 regular season, measured 2026-10-12); the engine splits a target evenly, so it projected
+# first halves ~7.5 too high and second halves short. The engine already reads per-period targets (`quarters`:
+# home/away_pts_mu, sigma, corr) and shifts each period's pace and efficiency toward them (sqrt split, clipped
+# +-6%). Sigma is set to the engine's 2% floor (sd_frac) so the input moves the MEAN and adds almost no noise: the
+# sim's own randomness already produces the measured ~10% half-to-half variation.
+HALF_SPLIT_ENV = "SYNDICATE_NCAAB_HALF_SPLIT"
+H1_SHARE = 0.4743
+_HALF_SIGMA_FRAC = 0.02
+
+
+def half_split_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
+    raw = str((env if env is not None else os.environ).get(HALF_SPLIT_ENV, "") or "").strip().lower()
+    return raw in {"1", "true", "on", "yes"}
+
+
+def half_targets(home_points: float, away_points: float) -> list[dict[str, float]]:
+    out = []
+    for share in (H1_SHARE, 1.0 - H1_SHARE):
+        hm, am = float(home_points) * share, float(away_points) * share
+        out.append({"home_pts_mu": hm, "away_pts_mu": am, "home_pts_sigma": _HALF_SIGMA_FRAC * hm,
+                    "away_pts_sigma": _HALF_SIGMA_FRAC * am, "corr": 1.0})
+    return out
 
 
 # ------------------------------------------------------------------------------------------- live state
