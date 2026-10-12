@@ -89,3 +89,23 @@ long, because it priced bench players unconditionally.
 A larger out-of-sample window (more dates of the same race), and a measured reach. Shipping would mean
 adding a lineup role and an appear-conditional bench price to `soccer_scorer_markets`, under
 `model_engine_standard.md`: an input checklist, a pipeline trace, and a reachability test (off != on).
+
+## Measured reach, 2026-10-09..10-12 (lane soccer-lineup-reach, run 2026-10-12 23:08Z)
+
+`lineup_reach.py --dates 2026-10-09,2026-10-10,2026-10-11,2026-10-12` on the fleet (`~/syndicate-prod/data`).
+Unit: the LAST pre-kickoff build per match (prekickoff freeze).
+
+- **Matches priced with BOTH confirmed XIs: 95 of 102 (93.1%).** Sides: 190 of 204 (93.1%).
+- **By lead (minutes before kickoff of that last build):**
+  - <=60 min: 190 of 198 sides;
+  - 60-120 min: 0 of 6;
+  - nothing older than 2 h.
+  - Median lead 5.1 min.
+- **All 7 misses are on 10-10:**
+  - 3 matches whose last build was 85-115 min out: AZ v Feyenoord, Barcelona v Getafe, Club Brugge v La Louviere. That is before XIs are out, so it is a build-cadence gap.
+  - 4 matches unconfirmed at 9-44 min out, when the XIs should have been out: Frankfurt v Leipzig 40 min; Houston v Minnesota and Portland v Sporting KC, both 44 min; Kortrijk v Genk 9 min.
+  - Neither cause is diagnosed here.
+- **Positive control:** Lyon (ligue_1, 10-09, 29.9 min out) is confirmed with 11 of 11 starters recognised and an empty middle band. Lens (same match) has 10 of 11; Heerenveen (eredivisie, 10-09) has 11 of 11.
+- **Recognition, the next gap.** Of the 190 confirmed sides, only 64 have all 11 starters recognised in the player rows. 82 have 10, 29 have 9, and 15 have 7-8. So "confirmed" means the side's minutes split cleanly into starters and non-starters, not that every named starter was matched. An unrecognised starter is priced without the lineup.
+- **Instrument limit:** the odds-job STEP_MARKER (`SOCCER_CONFIRMED_LINEUPS`) was found for only 4 of 31 league-dates. The stderr files are not retained per run, so this is a retention artefact, not evidence that the lineup step did not run. The share above rests on the prekickoff freezes alone.
+- **Bearing on the NO-SHIP verdict above:** reach is no longer the constraint; 93% of matches are priced from a confirmed XI. A bench/appear-conditional price would act on the ~7% of matches without an XI plus the unrecognised starters, so the verdict stands.
