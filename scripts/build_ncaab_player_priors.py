@@ -104,6 +104,17 @@ def priors_path(season: int, as_of: dt.date) -> Path:
     return processed_dir() / f"player_priors_{season}_asof_{as_of:%Y%m%d}.csv"
 
 
+def default_season(today: dt.date) -> int:
+    """The season this job should serve: the UPCOMING one from October.
+
+    The ratings producer's `default_season` keeps the finished season until November 1, which is
+    right for ratings but wrong here. Measured 2026-10-12 on the fleet: the scheduled job re-crawled
+    the finished 2025-26 season and would never have built the 2026-27 preseason table before the
+    ~11-03 opener. October has no games, so October belongs to the coming season.
+    """
+    return today.year + 1 if today.month >= 10 else ratings.default_season(today)
+
+
 def preseason_path(season: int, as_of: dt.date) -> Path:
     return processed_dir() / f"player_preseason_{season}_asof_{as_of:%Y%m%d}.csv"
 
@@ -506,7 +517,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--preseason", action="store_true", help="build the roster-based preseason table even if games exist")
     args = parser.parse_args(argv)
     today = dt.date.today()
-    season = args.season or ratings.default_season(today)
+    season = args.season or default_season(today)
     summary = run(season, today, rate=max(args.rate, 0.2), max_new_games=args.max_new_games, crawl_only=args.crawl_only,
                   preseason=args.preseason)
     return 0 if summary["errors"] == 0 or summary["games_fetched"] > 0 else 1

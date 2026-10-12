@@ -171,3 +171,12 @@ def test_no_prior_season_box_refuses_to_write(tmp_path, monkeypatch):
     monkeypatch.setattr(pp.time, "sleep", lambda s: None)
     out = pp.build_preseason(2027, dt.date(2026, 10, 12), rate=100)
     assert "refused" in out and not list(tmp_path.glob("player_priors_*"))
+
+
+def test_october_serves_the_upcoming_season():
+    """2026-10-12 on the fleet: the job re-crawled the finished season and built no preseason table."""
+    assert pp.default_season(dt.date(2026, 10, 12)) == 2027
+    assert pp.default_season(dt.date(2026, 11, 5)) == 2027
+    assert pp.default_season(dt.date(2027, 3, 1)) == 2027
+    assert pp.default_season(dt.date(2027, 6, 1)) == 2027
+    assert pp.default_season(dt.date(2027, 9, 30)) == 2027
