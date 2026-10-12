@@ -192,11 +192,50 @@ The -4 to -5 total bias is the half split below. A flat rate cannot represent it
   `bench_stint` 240-480 s. Starters never return above ~0.69. The last two minutes FALL (blowouts
   empty benches). `rotation_windows_fitted` stays False until this is fitted against P2's stints.
 
+## P4 backtest: P1's engine resumed, walk-forward, 2025-26 (run 2026-10-12)
+
+`scripts/ncaab_live_resim_backtest.py --regular-sample 300 --sims 100`. **Substrate: LOCAL**
+(corpus + player box under `C:	mp\syndicate-data
+caab_source`). 608 games graded: 210 regular
+season (sampled, seed 20261012) and 398 tournament (every conf / NCAA / other postseason game).
+96 were skipped before simulation: 11 first date, 38 no team prior, 47 under 5 prior games.
+0 refusals inside the simulation. On-court five mapped on 83-98% of in-half checkpoints.
+Report: `C:	mp\syndicate-data
+caab_live_resim_backtest_2026.json`.
+
+Paired, per game, engine minus comparator (negative = engine better), 95% CI:
+
+| checkpoint | regular: abs total err vs naive | regular: abs margin err vs naive | regular: Brier vs ESPN WP | tournaments: abs total err vs naive | tournaments: Brier vs ESPN |
+|---|---|---|---|---|---|
+| tip | **+0.99** [+0.21,+1.77] | +0.25 [-0.09,+0.58] | n/a | **+2.11** [+1.53,+2.68] | n/a |
+| half | **-0.44** [-0.87,-0.01] | **+0.23** [+0.04,+0.41] | +0.002 [-0.007,+0.010] | -0.01 [-0.33,+0.31] | **+0.008** [+0.001,+0.014] |
+| H2 10:00 | **-0.51** [-0.74,-0.28] | -0.02 [-0.15,+0.11] | -0.002 [-0.008,+0.005] | **-0.42** [-0.58,-0.25] | +0.003 [-0.002,+0.008] |
+| H2 5:00 | **-0.34** [-0.46,-0.22] | -0.01 [-0.09,+0.06] | -0.003 [-0.008,+0.003] | **-0.33** [-0.42,-0.24] | +0.003 [-0.001,+0.008] |
+| H2 2:00 | **-0.22** [-0.27,-0.16] | -0.01 [-0.06,+0.05] | +0.001 [-0.006,+0.008] | **-0.21** [-0.26,-0.16] | -0.001 [-0.007,+0.004] |
+
+Absolute levels (regular): engine total MAE 15.44 / 10.99 / 8.40 / 6.92 / 5.85 at tip / half /
+H2 10:00 / 5:00 / 2:00. Engine total BIAS +6.42 / -1.85 / -3.90 / -4.45 / -4.56. Margin MAE
+8.94 / 7.16 / 5.62 / 4.12 / 2.99.
+
+**Verdict:**
+- **Totals:** in-game, the engine beats the naive baseline at every second-half checkpoint
+  (CI excludes 0, both phases). The gain is small.
+- **Margin:** no gain.
+- **Moneyline:** indistinguishable from ESPN's win probability in the regular season, slightly
+  worse at tournament halftime.
+- **At the tip it is WORSE than the team model.** It overshoots the total by +6.4 (regular) and
+  +10.5 (conf tournaments) instead of landing on its targets. The overshoot carries into the
+  first half.
+- **Second half:** the −4 total bias is the missing college bonus mechanism (owed item 4).
+- **Against a market: no evidence either way.** The live close is not graded. Since the
+  2026-10-05 directive (no sport-level withholding), switching the producer on publishes per-line
+  edges behind the join's own gates. The live-gameline ledger is then the live-close grade.
+
 ## What is owed, in order
 
-1. **The backtest verdict** (`scripts/ncaab_live_resim_backtest.py`, running 2026-10-12). Per
-   checkpoint and phase, the engine must beat the naive baseline on total and margin MAE and
-   ESPN's Brier, before `SYNDICATE_NCAAB_LIVE_RESIM` goes on.
+1. **Early-game total overshoot** (backtest above): measure the engine's `EXACT_TARGET_CALIBRATION`
+   switch for NCAAB (a LeagueEngine attribute, process-local in `ncaab_engine()`) on the tip and
+   half checkpoints before switch-on. Mechanism vs estimator: re-backtest every checkpoint.
 2. **Fleet switch-on** before opening week (~11-03): fast-forward the fleet to main, restart the
    role that runs `live_lens_loop` with the env set (user approval + deploy claim), and check that
    the 11:40Z priors job loaded.
