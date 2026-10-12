@@ -114,6 +114,9 @@ LIVE_LENS_SOURCES_BY_SPORT: dict[str, tuple[str, ...]] = {
     # warns about. The stamp is the discriminator again.
     "nfl": ("live_resim",),
     "ncaaf": ("live_resim",),
+    # NCAAB resumes P1's possession engine from P2's live state (`ncaab/live_resim.py`, P4). Same stamp
+    # and the same reason: refusals publish `pregame_only` lanes with no probability, rejected here.
+    "ncaab": ("live_resim",),
     # NHL's re-sim restarts hockeysim from the current period, clock and score
     # (`nhl/live_resim.py`). Same stamp as ncaaf and for the same reason: that
     # module also publishes a lane stamped `pregame_only` for every game it

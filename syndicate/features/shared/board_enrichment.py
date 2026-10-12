@@ -2415,7 +2415,13 @@ _LIVE_PROP_SPORTS = frozenset({"mlb", "wnba", "soccer"})
 # goals up reads 0.9867. NOT CLAIMED: that the probability is CALIBRATED --
 # hockeysim is an EV/Poisson approximation per period and its market backtest is
 # unpowered (n=14-15 games / 12 dates).
-_LIVE_GAMELINE_SPORTS = frozenset({"mlb", "wnba", "soccer", "ncaaf", "nhl", "nfl"})
+# `ncaab` JOINED 2026-10-12 (lane `ncaab-native-live-tier`, P4; this entry and its snapshot path are a
+# user-approved LOAN in this lane's block). `ncaab/live_resim.py` resumes P1's possession engine under
+# NCAAB rules from P2's live state and publishes `modelHomeWinProb` + `simsRun`; refusals are
+# `pregame_only` lanes with no probability. The producer is OFF unless SYNDICATE_NCAAB_LIVE_RESIM is
+# set, so -- exactly as ncaaf and nhl above -- enabling the sport changes no edge until it runs, and
+# says "no published live-lens snapshot" instead of "no live re-sim wired" until then.
+_LIVE_GAMELINE_SPORTS = frozenset({"mlb", "wnba", "soccer", "ncaaf", "nhl", "nfl", "ncaab"})
 
 # WHERE THE BOARD READS EACH SPORT'S LIVE SNAPSHOT, when it is not the default
 # `live/<sport>_live_lens.json`. `nfl` is the one entry and it exists because
@@ -2431,6 +2437,9 @@ _LIVE_GAMELINE_SPORTS = frozenset({"mlb", "wnba", "soccer", "ncaaf", "nhl", "nfl
 # resolve one path, so a future collision is caught rather than discovered.
 _LIVE_GAMELINE_SNAPSHOT_PATHS: dict[str, str] = {
     "nfl": "nfl_live_resim.json",
+    # Its own key, not `ncaab_live_lens.json`: the NCAAB live-lens PAGE has its own mirrored payloads,
+    # and one Redis key with two writers is the nfl collision above (R8).
+    "ncaab": "ncaab_live_resim.json",
 }
 
 

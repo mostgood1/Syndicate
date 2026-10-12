@@ -540,6 +540,15 @@ def _previous_lanes(date_str: str) -> dict[str, dict[str, Any]]:
 _ROTATION_CURSOR: dict[str, int] = {}
 
 
+def _carry(game: Mapping[str, Any]) -> dict[str, Any]:
+    """A previous tick's game row, re-published unchanged except for the carry marks. The LANE flag is
+    what the join reads (`live_gameline_join`: `liveStateCarriedForward`, MLB's convention); its
+    `liveStateAsOf` stays the time it was computed, so freshness is judged on the real age."""
+    out = {**game, "carriedForward": True}
+    out["gameLens"] = [{**lane, "liveStateCarriedForward": True} for lane in game.get("gameLens") or []]
+    return out
+
+
 def _neutral(summary: Mapping[str, Any]) -> bool:
     comp = ((summary.get("header") or {}).get("competitions") or [{}])[0]
     return bool(comp.get("neutralSite"))
@@ -588,7 +597,7 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         if clock() >= deadline:
             for rest in order[pos:]:
                 if rest in previous:
-                    games[rest] = {**previous[rest], "carriedForward": True}
+                    games[rest] = _carry(previous[rest])
                     counts["carried_forward"] += 1
                 else:
                     games[rest] = _lane_row(rest, {}, None, NcaabResimRefusal("budget_exhausted", "not_reached"))
@@ -622,7 +631,7 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         result = resim_live_game(inputs, gs, sims=sims, base_seed=stable_seed(facts.event_id, facts.last_seq),
                                  deadline=deadline, clock=clock)
         if isinstance(result, NcaabResimRefusal) and result.reason == "budget_exhausted" and event_id in previous:
-            games[event_id] = {**previous[event_id], "carriedForward": True}
+            games[event_id] = _carry(previous[event_id])
             counts["carried_forward"] += 1
             next_cursor = (start + pos) % max(1, len(ids))
             continue

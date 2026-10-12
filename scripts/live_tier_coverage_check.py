@@ -157,9 +157,15 @@ DECLARATIONS: dict[str, Declaration] = {
                            "(refresh-worker's own loop, not live_lens_loop's tick)",
     ),
     "ncaab": Declaration(
-        gameline=NONE,
+        gameline=LIVE_RESIM,
         props=PROPS_NONE,
-        evidence="no live tier of any kind; source-app-mirror only",
+        evidence="ncaab/live_resim.py resumes P1's possession engine (league_params('ncaab')) from "
+                 "P2's LiveGameState; refusals publish a `pregame_only` lane carrying NO probability, "
+                 "and the join rejects that stamp",
+        alternate_producer="syndicate/features/ncaab/live_resim.py "
+                           "(its own thread started beside NBA's in live_lens_loop, behind "
+                           "SYNDICATE_NCAAB_LIVE_RESIM, code default OFF; writes live/ncaab_live_resim.json)",
+        note="Game lines only: NCAAB player priors exist for the engine, but no prop pipeline prices them.",
     ),
     "soccer": Declaration(
         gameline=LIVE_RESIM,

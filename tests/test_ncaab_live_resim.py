@@ -164,7 +164,10 @@ def test_rotation_and_carry_forward(monkeypatch):
     # The second tick STARTS at game 3 (the one the first tick never reached) and carries forward the rest.
     assert second["counts"]["resimmed"] == 3 and second["counts"]["carried_forward"] == 1
     assert [g["event_id"] for g in second["games"]] == ["0", "1", "2", "3"]
-    assert sum(1 for g in second["games"] if g.get("carriedForward")) == 1
+    carried = [g for g in second["games"] if g.get("carriedForward")]
+    assert len(carried) == 1 and all(l.get("liveStateCarriedForward") for l in carried[0]["gameLens"])
+    assert not any(l.get("liveStateCarriedForward") for g in second["games"] if not g.get("carriedForward")
+                   for l in g["gameLens"])
 
 
 def test_loop_is_off_unless_switched_on():
@@ -196,3 +199,86 @@ def test_engine_reachability_tip_equals_pregame_and_lead_moves_it(tmp_path):
         return sum(1 for hq, aq in outs if sum(hq) > sum(aq))
 
     assert wins(10) > wins(-10)
+
+
+# ------------------------------------------------------------------ the board interlock, end to end
+# Mirrors tests/test_ncaaf_live_gameline_registration.py: presence != reachability. The lane must index,
+# PRICE the row from the live probability, and RELEASE the edge -- and a refusal must do none of that.
+
+AWAY, HOME = "Army Black Knights", "Duke Blue Devils"
+
+
+def _grid_row(*, state="live", age_seconds=30.0):
+    return {
+        "kind": "game", "market": "h2h", "segment": "full", "away_team": AWAY, "home_team": HOME,
+        "age_seconds": age_seconds, "game": {"state": state},
+        "projection": {"model_prob_over": 0.62, "market_fair_prob_over": 0.40, "basis": "ncaab_team_model"},
+    }
+
+
+def _lanes(result=None, facts=True, carried=False):
+    from syndicate.features.ncaab.live_resim import _carry
+
+    if result is None:
+        # A clear home lead late: 190 of 200 draws won, so the interval is narrow and PRICEABLE_SIGMA passes
+        # for the right reason, and the live probability is NOT the pregame 0.62.
+        def simulate(rng, gs, i=[0]):
+            i[0] += 1
+            return {}, {}, [40, 40], [40, 30 if i[0] % 20 else 45]
+        result = lr.resim_live_game({}, None, sims=200, simulate=simulate)
+    f = lr.ResumeFacts("401", "10", "20", 70, 58, 2, 120.0, "home", 400, "2026-11-05T01:00:00+00:00") if facts else None
+    game = lr._lane_row("401", {"home": HOME, "away": AWAY, "source": "odds"}, f, result)
+    if carried:
+        game = _carry(game)
+    return {"games": [game]}
+
+
+def _index(snapshot):
+    from syndicate.features.shared.live_gameline_join import build_live_gameline_index, lens_sources_for_sport
+
+    return build_live_gameline_index(snapshot, sources=lens_sources_for_sport("ncaab"), sport="ncaab")
+
+
+def test_the_board_gate_lists_ncaab_and_reads_its_own_key():
+    from syndicate.features.shared.board_enrichment import _LIVE_GAMELINE_SNAPSHOT_PATHS, _LIVE_GAMELINE_SPORTS
+
+    assert "ncaab" in _LIVE_GAMELINE_SPORTS
+    assert _LIVE_GAMELINE_SNAPSHOT_PATHS["ncaab"] == lr.live_lens_snapshot_path().name
+
+
+def test_a_live_resim_lane_indexes_prices_and_releases_the_edge():
+    from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
+    from syndicate.features.shared.live_gameline_join import attach_live_gamelines
+
+    index = _index(_lanes())
+    assert len(index) == 1
+    row = _grid_row()
+    assert live_edge_unavailable_reason(row) is not None, "the pregame row alone stays suppressed"
+    coverage = attach_live_gamelines([row], index)
+    assert coverage["index_size"] == 1
+    proj = row["projection"]
+    assert proj["live_aware"] is True and proj["edge_basis"] == "live"
+    assert row["live_gameline"]["home_win_prob"] == pytest.approx(0.95)
+    # From the LIVE number: the pregame pairing (0.62 - 0.40) would be 22.0.
+    assert proj["edge_vs_market_pct"] is not None and round(proj["edge_vs_market_pct"], 1) != 22.0
+    assert proj["edge_vs_market_pct"] > 40
+    assert live_edge_unavailable_reason(row) is None
+
+
+def test_a_refused_lane_indexes_nothing_and_the_edge_stays_suppressed():
+    from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
+    from syndicate.features.shared.live_gameline_join import attach_live_gamelines
+
+    snap = _lanes(result=lr.NcaabResimRefusal("thin_rotation", "x"), facts=False)
+    assert _index(snap) == {}
+    row = _grid_row()
+    attach_live_gamelines([row], _index(snap))
+    assert "live_aware" not in row["projection"] and live_edge_unavailable_reason(row) is not None
+
+
+def test_a_carried_forward_lane_reaches_the_row_marked_as_carried():
+    from syndicate.features.shared.live_gameline_join import attach_live_gamelines
+
+    row = _grid_row()
+    attach_live_gamelines([row], _index(_lanes(carried=True)))
+    assert row["live_gameline"]["carried_forward"] is True
