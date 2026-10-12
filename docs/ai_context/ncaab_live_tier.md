@@ -231,11 +231,33 @@ H2 10:00 / 5:00 / 2:00. Engine total BIAS +6.42 / -1.85 / -3.90 / -4.45 / -4.56.
   2026-10-05 directive (no sport-level withholding), switching the producer on publishes per-line
   edges behind the join's own gates. The live-gameline ledger is then the live-close grade.
 
+### Exact target calibration: measured 2026-10-12, NOT ADOPTED
+
+User: "test the exact target calibration first". The same 608 games and seeds were run with
+`SYNDICATE_NCAAB_EXACT_TARGET=1` (engine `EXACT_TARGET_CALIBRATION`). Reachability first: 0 of 52
+early games were identical between arms. Report: `C:	mp\syndicate-data
+caab_live_resim_backtest_2026_exact.json`.
+Paired, exact minus default, abs total error, 95% CI:
+
+| | tip | half | H2 10:00 | H2 5:00 | H2 2:00 |
+|---|---|---|---|---|---|
+| regular (n=210) | **-1.00** [-1.73,-0.27] | **+0.45** [+0.06,+0.85] | **+0.51** [+0.30,+0.72] | **+0.37** [+0.26,+0.49] | **+0.19** [+0.15,+0.24] |
+| tournaments (n=398) | **-1.97** [-2.53,-1.42] | +0.06 [-0.25,+0.36] | **+0.39** [+0.24,+0.55] | **+0.24** [+0.15,+0.33] | **+0.16** [+0.12,+0.21] |
+
+Total bias, regular, default -> exact: tip +6.42 -> +1.06, half -1.85 -> -4.57, H2 10:00 -3.90 -> -5.33.
+Margin and Brier barely move. With exact on, the engine's in-game total edge over the naive
+baseline disappears.
+
+**Why: mechanism vs estimator, again.** The default solve's overshoot was partly absorbing the
+missing college BONUS (second halves score +8.0 over first halves; the engine has no bonus).
+Pinning the engine to its targets removes that compensation, so the second half under-projects
+by more. **Decision: OFF.** Add the bonus mechanism first, then re-test exact calibration together
+with it, on these same games and seeds.
+
 ## What is owed, in order
 
-1. **Early-game total overshoot** (backtest above): measure the engine's `EXACT_TARGET_CALIBRATION`
-   switch for NCAAB (a LeagueEngine attribute, process-local in `ncaab_engine()`) on the tip and
-   half checkpoints before switch-on. Mechanism vs estimator: re-backtest every checkpoint.
+1. **Early-game total overshoot**: exact target calibration was MEASURED and REJECTED alone (above).
+   The fix is the bonus mechanism (item 4) plus exact calibration, re-backtested together.
 2. **Fleet switch-on** before opening week (~11-03): fast-forward the fleet to main, restart the
    role that runs `live_lens_loop` with the env set (user approval + deploy claim), and check that
    the 11:40Z priors job loaded.
