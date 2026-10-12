@@ -874,6 +874,11 @@ def _nfl_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
                 under_result = "push" if actual_total == total_line else ("win" if actual_total < total_line else "loss")
                 rows.append({"sport": "nfl", "market": "total", "selection": "over", "home": home_team, "away": away_team, "title": title, "line": total_line, "actual": actual_total, "odds": -110, "result": over_result})
                 rows.append({"sport": "nfl", "market": "total", "selection": "under", "home": home_team, "away": away_team, "title": title, "line": total_line, "actual": actual_total, "odds": -110, "result": under_result})
+    # Final-score + player-box rows (lane settlement-graders-all-sports): game
+    # lines at ANY line and props, for the ledger date's whole horizon.
+    from syndicate.features.shared.settlement_sport_rows import rows_for_ledger_date
+
+    rows.extend(rows_for_ledger_date("nfl", date_str))
     return rows
 
 

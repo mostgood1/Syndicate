@@ -1377,7 +1377,7 @@ ba_rot_check.sh (keep that file) and reports production NBA smart_sim rotation_m
 
 ### settlement-graders-all-sports — OPEN — opened 2026-10-12 — session d4409ac4-6318-47ee-87d5-fa88304fd907
 - Goal: Evaluation settlement grades Layer 2 board picks for NFL, NHL, NCAAF, soccer, NBA and WNBA as it already does for MLB: score rows (final score -> game lines at any line) and player-box rows (props) per sport from data already on the fleet, joined to board picks by game id or, where ids differ, by the fixture's club pair; measured as each sport's matched share of settleable Layer 2 picks on a dry run, then a real settle, with prop W/L reaching the games-rail cards
-- Files: syndicate/features/shared/graded_outcomes.py (per-sport score + player-box rows section only), syndicate/features/shared/settlement_identity.py (non-MLB fixture join + per-sport prop stat map section only), tests/test_settlement_graders_all_sports.py (NEW)
+- Files: syndicate/features/shared/graded_outcomes.py (per-sport score + player-box rows section only), syndicate/features/shared/settlement_identity.py (non-MLB fixture join + per-sport prop stat map section only), tests/test_settlement_graders_all_sports.py (NEW), syndicate/features/shared/settlement_sport_rows.py (NEW)
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: worker-env dry run per sport over the last 7 days: matched / settleable for Layer 2 picks, before vs after; then a real settle; served games-rail finals show props W-L for each sport

@@ -827,6 +827,43 @@ def _declared_prop_group(raw: str) -> str | None:
     return None
 
 
+# NON-MLB PROP STATS (lane settlement-graders-all-sports, 2026-10-12): the
+# board's market labels / OddsAPI keys -> the stat keys the sport's player-box
+# rows carry (`settlement_sport_rows`). Group is always "player". A label not
+# in the table refuses by name (`prop_market_unmapped`), as for MLB.
+_NON_MLB_PROP_STATS: dict[str, dict[str, str]] = {
+    "nfl": {
+        "passing yards": "pass_yds", "player_pass_yds": "pass_yds",
+        "passing attempts": "pass_att", "player_pass_attempts": "pass_att",
+        "passing completions": "pass_cmp", "pass completions": "pass_cmp", "player_pass_completions": "pass_cmp",
+        "passing tds": "pass_td", "passing touchdowns": "pass_td", "player_pass_tds": "pass_td",
+        "interceptions": "pass_int", "player_pass_interceptions": "pass_int",
+        "rushing yards": "rush_yds", "player_rush_yds": "rush_yds",
+        "rushing attempts": "rush_att", "player_rush_attempts": "rush_att",
+        "receiving yards": "rec_yds", "player_reception_yds": "rec_yds",
+        "receptions": "rec", "player_receptions": "rec",
+        "rush + rec yards": "rush_rec_yds", "rushing + receiving yards": "rush_rec_yds", "player_rush_reception_yds": "rush_rec_yds",
+        "pass + rush yards": "pass_rush_yds", "player_pass_rush_yds": "pass_rush_yds",
+        "anytime td": "anytime_td", "player_anytime_td": "anytime_td",
+    },
+}
+_NON_MLB_PROP_STATS["ncaaf"] = dict(_NON_MLB_PROP_STATS["nfl"])
+# Yes/no props graded as over/under 0.5 of their count stat.
+_YES_NO_PROP_STATS = frozenset({"anytime_td", "goals_scorer"})
+
+
+def _non_mlb_prop_stat(sport: str, record: Mapping[str, Any]) -> tuple[tuple[str, str, str] | None, str | None]:
+    table = _NON_MLB_PROP_STATS.get(sport)
+    if not table:
+        return None, "prop_sport_not_boxed"
+    recommendation = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else record
+    raws = [" ".join(str(recommendation.get(key) or "").strip().lower().split()) for key in _PROP_MARKET_FIELDS]
+    for raw in raws:
+        if raw and raw in table:
+            return ("player", table[raw], raw), None
+    return None, "prop_market_unmapped"
+
+
 def prop_stat_for_record(sport: str | None, record: Mapping[str, Any]) -> tuple[tuple[str, str, str] | None, str | None]:
     """((group, stat, market_key), refusal) for an MLB prop record.
 
@@ -839,7 +876,7 @@ def prop_stat_for_record(sport: str | None, record: Mapping[str, Any]) -> tuple[
     against the pitcher's line. Two fields naming different groups refuse too.
     """
     if normalize(sport) != "mlb":
-        return None, "prop_sport_not_boxed"
+        return _non_mlb_prop_stat(normalize(sport), record)
     from syndicate.features.shared.bet_status_mlb import _stat_for_market
     from syndicate.features.shared.market_keys import canonical_market_key
 
@@ -942,10 +979,18 @@ def grade_record_on_player_box(
     if mapped is None:
         return None, refusal or "prop_market_unmapped"
     group, stat, market_key = mapped
-    if record_id.side not in {"over", "under"}:
-        return None, "prop_side_unmapped"
     recommendation = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else {}
-    line, refusal = _prop_line(sport, recommendation)
+    side = record_id.side
+    if stat in _YES_NO_PROP_STATS:
+        # "Anytime TD: yes" is over 0.5 touchdowns; "no" is under.
+        raw_side = normalize(recommendation.get("side") or side)
+        side = {"yes": "over", "no": "under"}.get(raw_side, side)
+    if side not in {"over", "under"}:
+        return None, "prop_side_unmapped"
+    if stat in _YES_NO_PROP_STATS and _coerce_float(recommendation.get("line")) is None:
+        line, refusal = 0.5, None
+    else:
+        line, refusal = _prop_line(sport, recommendation)
     if line is None:
         return None, refusal or "prop_line_missing"
     row = rows[0]
@@ -966,14 +1011,14 @@ def grade_record_on_player_box(
     if actual == line:
         result = "push"
     else:
-        result = "win" if (actual > line) == (record_id.side == "over") else "loss"
+        result = "win" if (actual > line) == (side == "over") else "loss"
     graded = {
         "sport": row.get("sport") or sport,
         "game_id": row.get("game_id"),
         "game_pk": row.get("game_pk"),
         "market": market_key,
         "segment": SEGMENT_FULL,
-        "selection": record_id.side,
+        "selection": side,
         "player": player.get("name"),
         "player_id": player.get("id"),
         "team": player.get("team"),
@@ -1071,6 +1116,25 @@ def _loose_row_keys(row: Mapping[str, Any]) -> set[str]:
     return {item for item in keys if item}
 
 
+def _record_game_day(record: Mapping[str, Any]) -> str | None:
+    """The pick's game date in US Eastern (the schedules' `gameday`), from its
+    `commence_time`; None when the record does not carry one."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    recommendation = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else record
+    text = str(recommendation.get("commence_time") or record.get("commence_time") or "").strip()
+    if not text:
+        return None
+    try:
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        return text[:10]
+    return moment.astimezone(ZoneInfo("America/New_York")).date().isoformat()
+
+
 def find_graded_row(
     record: Mapping[str, Any],
     rows: GradedRowIndex | Iterable[Mapping[str, Any]],
@@ -1092,10 +1156,32 @@ def find_graded_row(
     # and if the index carries ids at all, a record that shares NONE stops
     # here -- it names a game the grader did not grade (or a different one),
     # and the club paths below must not be allowed to find a look-alike.
+    # FIXTURE FALLBACK FOR SPORTS WITHOUT DOUBLEHEADERS (lane
+    # settlement-graders-all-sports, 2026-10-12). Board picks carry the
+    # OddsAPI event id; the non-MLB score / player-box rows carry the
+    # source's own game id (nflverse `2026_05_TB_DAL`, ESPN ids). The two
+    # namespaces never meet, so every board pick read `game_absent` (soccer)
+    # or never reached its game's final score (NFL / NHL / NBA / NCAAF).
+    # Outside MLB a club pair plays at most once on a date, so the fixture
+    # IS the game: score / box rows whose clubs match the record's stand in
+    # for an id join. MLB keeps id-only (doubleheaders share both clubs).
+    fixture_candidates: list[int] = []
+    if normalize(sport_slug) != "mlb" and (record_id.home or record_id.away or record_id.clubs()):
+        record_day = _record_game_day(record)
+        for position, row in enumerate(index.rows):
+            if not (index.score_row[position] or index.box_row[position]):
+                continue
+            row_day = str(row.get("game_date") or "")[:10]
+            if row_day and record_day and row_day != record_day:
+                continue  # same clubs on ANOTHER day is another game
+            if _same_fixture(sport_slug, record_id, index.identities[position]):
+                fixture_candidates.append(position)
+    id_candidates: list[int] = []
     if record_id.game_ids and index.carries_game_ids:
-        candidates: list[int] = []
         for game_id in record_id.game_ids:
-            candidates.extend(index.by_game_id.get(game_id, ()))
+            id_candidates.extend(index.by_game_id.get(game_id, ()))
+    if (record_id.game_ids and index.carries_game_ids) or fixture_candidates:
+        candidates: list[int] = id_candidates or fixture_candidates
         if not candidates:
             return MatchOutcome(row=None, phase=None, reason=_classify_miss(record_id, game_reason=REASON_GAME_ABSENT))
         score_rows: list[Mapping[str, Any]] = []
