@@ -1115,6 +1115,31 @@ death, never life — do not invert it.
 - Verification: fleet: resolve_regular_season_window raises for every 2026 date (done); no receipt or data-root models exist (done); after the change the refresh imports no wnba_betting module for the playoff step (fresh interpreter + deployed checkout)
 - Blocked by: none
 
+### mlb-pitcher-outs-k-dist — OPEN — opened 2026-10-12 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- Goal: find out, out of sample and pre-registered, whether a post-sim correction of the starter OUTS and STRIKEOUTS distributions (mean pulled toward the pitcher's as-of history, spread widened) beats the raw sim on priced lines. MEASUREMENT + proposal only; any engine change is a separate user decision.
+- **Why.** `findings_2026-10-09_mlb_oos_market_backtest.md`:
+  - outs: dBrier vs book +0.049, dispersion 0.70, corr(model mean, actual) 0.095 vs 0.371 for the pitcher's own as-of average;
+  - K: +0.031, dispersion 0.73.
+  - The live market-shrink fit w = 0.00 (outs) and 0.06 (K), i.e. the model adds ~nothing over the price.
+- **Data.**
+  - Fwd-arm as-of sims (`~/ssims/full/fwd`, production config 988fa33d): starter `outs_dist` / `so_dist`. K already includes the production Poisson-model blend.
+  - Two-sided pregame pitcher-prop quotes (`C:/tmp/mlb_hist_odds`); actuals from StatsAPI.
+  - As-of history = the pitcher's season-to-date starts strictly before the date (>= 5 starts), from the backtest's own helpers.
+- **PRE-REGISTERED RULE (written before any fit).**
+  - **Transform, per market m in {outs, strikeouts}:** `c = (1-alpha)*mu_sim + alpha*mu_hist`; each sim mass point `x -> c + s*(x - mu_sim)`; P(over line) from the transformed points.
+    - Grid alpha in {0.0, 0.1, ..., 1.0}, s in {0.8, 0.9, ..., 2.0}.
+    - Fit by minimum log-loss on priced lines, 07-16..08-21.
+  - **Judge 08-22..09-27. PROPOSE iff:**
+    - (1) game-clustered bootstrap dBrier(T - raw) CI upper < 0;
+    - (2) dlogloss <= 0;
+    - (3) EV>0-bet ROI at book prices not lower than raw;
+    - (4) (alpha, s) != (0, 1).
+  - Also reported: dBrier(T - book), and the market-shrink w re-fit on T.
+- Falsification test: no market passes -> no proposal; record why.
+- Verification: a findings file with per-market fit/judge numbers; the lane verdict.
+- Files: (scratch scripts only)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
