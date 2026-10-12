@@ -1051,31 +1051,28 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Live capture MET** (2026-10-09): MEM@CHI 215 in-play ticks, final = official; two WNBA playoff games, one through OT. Live caveats: 3/604 ticks had a transient 4-man five (ESPN posts half a substitution first; the next tick heals), and one 1 s clock correction.
 - **OWED:** a production NBA smart_sim diag showing `rotation_minutes.applied` after the 2026-27 regular season starts (~10-21).
 
-## [nba-live-native-p3] NBA LIVE (P3): native resumed re-sim BUILT and engine-neutral on main, NOT switched on; the vendored live tick loses to "score + pregame line pro rata"; per-population situation targets measured `[verified 2026-10-10 01:13Z, lane nba-native-live-resim, c9971e75 / f5781082]`
+## [nba-live-native-p3] NBA LIVE (P3): native resumed re-sim BUILT, engine-neutral, persisting pregame inputs IN PRODUCTION; NOT switched on; the vendored live tick loses to "score + pregame line pro rata" `[verified 2026-10-12 13:35Z, lane nba-native-live-resim, c9971e75 / 5cec5802]`
 
 - **Built** (on main, off by default):
-  - `syndicate/features/nba/live_resim.py`: resumes P1's engine from P2's LiveGameState on persisted pregame inputs, with named refusals and a `pregame_only` lane;
-  - full-game, quarter and half histograms, and live props;
-  - a dedicated loop writing `live/nba_live_resim.json`, run only if `SYNDICATE_NBA_LIVE_RESIM` is set (absent = off).
-- **Pregame inputs** are persisted per newly simulated NBA game at `_call_native_engine_local` (`engine_inputs/<date>/<H>_<A>.pkl`, ~100 KB). A game reused from an existing smart_sim has none (`no_pregame_inputs`).
-- **Engine-neutral, gated:**
-  - P1's production-corpus parity 5,400/5,400;
-  - same-seed e2e A/B 22/22 identical (deploys.md 2026-10-10 01:13Z).
-  - The engine column memo roughly halves ms/draw.
+  - `syndicate/features/nba/live_resim.py`: resumes P1's engine (production's `_engine_for_league_local("nba")`, #473 no-stack) from P2's LiveGameState on the persisted pregame inputs;
+  - named refusals, including `on_floor_incomplete` and `pbp_score_mismatch` (a header up to 3 ahead of the log resumes from the log);
+  - histograms and live props;
+  - a loop writing `live/nba_live_resim.json`, run only if `SYNDICATE_NBA_LIVE_RESIM` is set (absent = off; verified absent on the fleet).
+- **Persist in production:** `_call_native_engine_local` writes `engine_inputs/<date>/<H>_<A>.pkl` (~65 KB) per newly simulated NBA game. 8/8 games since the 10-10 15:39Z load (deploys.md 2026-10-12 13:35Z). A reused sim has none (`no_pregame_inputs`).
+- **Engine-neutral:** parity 5,400/5,400; same-seed e2e A/B 22/22 (deploys.md 2026-10-10 01:13Z). The column memo roughly halves ms/draw.
 - **NOT enabled:**
-  - nba is NOT in `_LIVE_GAMELINE_SPORTS`;
-  - the vendored tick (`nba/live_lens.py:97`) is NOT deleted;
+  - nba is not in `_LIVE_GAMELINE_SPORTS`;
+  - the vendored tick (`nba/live_lens.py:97`) is not deleted;
   - `endgame_foul_*` is off.
-  - Reasons: native preseason (n=14, team_adj unfed) loses to pregame_rate on totals, and NBA mechanism re-fits are on hold until #473 (user decision 2026-10-09).
-- **Baseline:** the vendored replay is WORSE than `pregame_rate` on margin at end Q1 (+0.86 MAE) and end Q2, and on ML at end Q2 and 5:00 Q4 (FIT window, n~780). `pregame_rate` ML ties ESPN's live win probability.
+- **Native vs pregame_rate on totals, preseason with #473 (n=16-18):** WORSE (+2.6 / +2.5 / +1.7 MAE at end Q1 / Q2 / Q3).
+- **Regular-season gate:** not yet run; inputs ready (201 dates / 1,294 games with #473 + the 2024-25 prior).
+- **Baseline:** the vendored replay is worse than `pregame_rate` on margin at end Q1/Q2 and on ML at end Q2 / 5:00 Q4 (n~780). `pregame_rate` ML ties ESPN.
 - **Targets:**
-  - Regular-season reversion: rest-margin slope -0.24 / -0.17 / -0.13 / -0.09. Postseason: not detectable (n=91).
-  - Total pace persistence ~0.
+  - Regular-season reversion -0.24 / -0.17 / -0.13 / -0.09; postseason not detectable.
+  - Pace persistence ~0.
   - Trailer end-game fouling 3-4x in every population.
-  - Garbage-time benching is band-dependent.
-  - Foul trouble is strongest in the playoffs and absent in the preseason.
   - The engine OFF has a flat ~1.0 FTA/min in the last 2:00 vs real 2.4-3.5.
-- Detail: `.syndicate/findings_2026-10-09_nba_live_situation_targets.md` §1-§6.
+- Detail: `.syndicate/findings_2026-10-09_nba_live_situation_targets.md` §1-§6e.
 
 ## [basketball-native-engine] THE BASKETBALL POSSESSION ENGINE IS SYNDICATE'S -- live on the fleet, parity-proven on 5,400 real production calls `[2026-10-09, lane basketball-native-engine, plan P1, fleet 63a58748]`
 
