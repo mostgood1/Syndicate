@@ -1081,6 +1081,15 @@ death, never life — do not invert it.
 - Files: scripts/check_lane_claims.py,tests/test_check_lane_claims.py
 - Outcome: two conditions narrow the near-miss escalation — a neighbour held by another OPEN lane is never offered (the holder is named), and a `(NEW)`-marked path is read as a reservation (44 of 74 Files: lines use the marker). Impossible tokens still BROKEN. Narrative in .syndicate/log/2026-10-12.md (16:54Z).
 - Blocked by: none
+
+### ci-suite-red-1012 — OPEN — opened 2026-10-12 — session 12420da3-1160-4944-9cbc-b3489ef4d580
+- Goal: The fleet ci-suite's 21 baseline regressions (all reproduced on origin/main f590550e) are each recorded with an owner in todo #697, and the two that are stale tests in unclaimed files are fixed
+- Files: tests/test_export_only_patterns.py, tests/test_refresh_step_modes.py, docs/ai_context/todo.md (new item #697 only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: the two fixed tests pass at origin/main in the ci-checkout env; #697 lists all 21 with first-failure date and owning lane
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
