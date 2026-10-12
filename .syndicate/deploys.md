@@ -48578,3 +48578,20 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - Scheduled: a background job acquires the claim at 21:15Z, restarts the refresh-worker only on a real idle-after-save CLEAR (gives up after ~40 min), and releases by token. Its outcome gets its own entry.
 - verify (publication, child-job path, live from the ff): 20:31:09Z live_state live_player_props carry goals_over_probabilities for 36 players (serie_a, matches near full time). Samples: Gueye 0.017, Simeone 0.0126, Zaniolo 0.0079 (shots>0.5 for the same players 0.14/0.09/0.09), goals_so_far 0. Small values are expected this late in a match.
 - NOT yet verified: rows on the BOARD (the join runs in the refresh-worker, not restarted); calibration of live P(score) vs outcomes. Both owed, on the next live slate after the restart (10-13 18:45Z Championship).
+
+## 2026-10-12 20:46:20Z (3:46 PM CT) -- LOCAL FLEET ff 1cbaf4ab -> 5ec59447, NO restart: vendored WNBA src is no longer copied onto the data disk; the vendored-app fallbacks import the vendor tree's own src -- **MET** (lane `wnba-bootstrap-src-off-vendor`, session 2d413211)
+
+- **User decisions 2026-10-12:** "move bootstrap src copy off vendor", then "Yes, ff after props idle" (stale copy NOT deleted). Claim refresh-worker token 2838c8c0..., released 20:46:54Z.
+- **Change.**
+  - `f8d12b59`: `bootstrap_data_root.BOOTSTRAP_VENDOR_ROOTS = ()`. It used to sync `vendor/wnba_betting_repo/src` -> `<data_root>/wnba_source/src` (OVERWRITE) at every boot. Its one real consumer, the playoff transition, was removed in 1cbaf4ab.
+  - `5ec59447`:
+    - `refresh_wnba_oddsapi_props._load_source_app` puts the app's OWN `src` first on `sys.path` before loading the vendored app. The app never inserts its own src; the props steps leave the data-disk copy first.
+    - Tests: `test_bootstrap_no_vendor_src.py` (new), plus `test_bootstrap_data_root.py`'s two pinned expectations (no vendor root; no OVERWRITE root left).
+- **Ride-alongs:** none, only these two commits (fleet was at 1cbaf4ab).
+- **Fleet / safety read.**
+  - The ff guard checked props-idle and HEAD == 1cbaf4ab. Its script printed a TRUNCATED `check_deploy_safety` report, and the FULL report was read only 9 s AFTER the ff (20:46:29Z).
+  - That report was NOT CLEAR. In flight were: an MLB sim (tip-off window, started 20:41:58Z), MLB daily_update children, NHL/soccer odds runs and a board build.
+  - Nothing was harmed: an ff without restart kills no process, and the ff changed only `bootstrap_data_root.py`, the WNBA refresh script, tests and docs, none of which those jobs load. But the full read must come FIRST. That is a repeat of the 2026-10-06 lesson; memory updated.
+- **Effect timing:** bootstrap runs at `local_production.py up`, so the copy simply stops being refreshed from the next boot. The existing `/home/amyn/syndicate-prod/data/wnba_source/src` stays on disk, unused (user chose not to delete it).
+- **VERIFY -- MET** on the deployed checkout (5ec59447): `tests/test_bootstrap_no_vendor_src.py` 2/2 pass there; the real bootstrap pairs for the production data root are 16 pairs with **0 vendor roots**.
+- **Rollback:** revert 5ec59447 + f8d12b59 and ff. No restart.
