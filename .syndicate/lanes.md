@@ -1091,7 +1091,8 @@ death, never life — do not invert it.
 - Outcome: two conditions narrow the near-miss escalation — a neighbour held by another OPEN lane is never offered (the holder is named), and a `(NEW)`-marked path is read as a reservation (44 of 74 Files: lines use the marker). Impossible tokens still BROKEN. Narrative in .syndicate/log/2026-10-12.md (16:54Z).
 - Blocked by: none
 
-### ci-suite-red-1012 — OPEN — opened 2026-10-12 — session 12420da3-1160-4944-9cbc-b3489ef4d580
+### ci-suite-red-1012 — CLOSED 2026-10-12 — opened 2026-10-12 — session 12420da3-1160-4944-9cbc-b3489ef4d580
+- GOAL VERDICT: Goal: The fleet ci-suite's 21 baseline regressions (all reproduced on origin/main f590550e) are each recorded with an owner in todo #697, and the two that are stale tests in unclaimed files are fixed -- GOAL: MET 2026-10-12. tests/test_export_only_patterns.py + tests/test_refresh_step_modes.py: 39 passed in the ci-checkout env at 3102b584 + patch; todo #697 lists all 21 by first-failure date and owning lane (19 owed to other lanes). Log 2026-10-12.
 - Goal: The fleet ci-suite's 21 baseline regressions (all reproduced on origin/main f590550e) are each recorded with an owner in todo #697, and the two that are stale tests in unclaimed files are fixed
 - Files: tests/test_export_only_patterns.py, tests/test_refresh_step_modes.py, docs/ai_context/todo.md (new item #697 only)
 - Hypothesis: n/a

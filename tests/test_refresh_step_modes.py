@@ -158,14 +158,24 @@ def test_the_game_line_step_is_the_one_that_writes_prices(mod):
     assert len(price_steps) == 1, [s.name for s in fast]
 
 
+# Sports that opted in DELIBERATELY, each with the change that did it. Anything not
+# listed here must stay unscoped. Soccer: lane `soccer-live-lane-priority`
+# (467a1a6c, 2026-10-10) scoped the players/rosters/history prerequisites to
+# mode=full so the soccer-live fast autorun carries only the in-play captures;
+# the reason is at each step in `scripts/refresh_odds_sources.py`. It did not
+# update this check, which kept the fleet ci-suite red (todo #697).
+_DELIBERATE_MODE_SCOPES = {"ncaaf", "soccer"}
+
+
 def test_no_other_sport_gained_a_mode_scope(mod):
-    """Blast-radius check. Only NCAAF opts in; every other registered sport's
-    steps must still be unscoped, or this change is not the narrow one it
-    claims to be."""
+    """Blast-radius check. Only the sports in `_DELIBERATE_MODE_SCOPES` opt in;
+    every other registered sport's steps must still be unscoped. Adding a sport
+    to that set is a decision, so it gets a dated reason there, not a silent
+    widening here."""
     args = argparse.Namespace(season=None, week=None, date="2026-09-03")
     scoped = {}
     for slug, spec in mod.REGISTRY.items():
-        if slug == "ncaaf":
+        if slug in _DELIBERATE_MODE_SCOPES:
             continue
         try:
             steps = spec.step_builder(args)

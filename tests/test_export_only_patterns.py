@@ -45,6 +45,16 @@ EXPORT_ONLY_SAMPLES = (
     "mlb_source/source_artifacts/data/raw/statsapi/feed_live/2026/2026-06-14/822722.json.gz",
     "mlb_source/source_artifacts/data/raw/statsapi/feed_live/2026/2026-06-14/822722.json",
     "mlb_source/tracking/odds_mlb_hitter_props_history_2026-06-10.csv",
+    # The basketball-native lanes added five patterns 2026-10-09..12 without a sample, which kept
+    # this file red on the fleet ci-suite (todo #697). Each path below was READ on the fleet data
+    # root 2026-10-12, except player_priors (see its note).
+    "nba_source/data/processed/pbp_events/2026/401810667.jsonl.gz",
+    "nba_source/data/processed/engine_inputs/2026-10-11/HOU_DAL.pkl",
+    "ncaab_source/data/processed/player_game_box_2026.csv",
+    "ncaab_source/data/processed/team_ratings_2026_asof_20260406.csv",
+    # NOT YET ON DISK at 2026-10-12 16:22Z: the `ncaab-player-priors` job was mid-way through its first
+    # backfill. Shape is the producer's own (`scripts/build_ncaab_player_priors.py` output path).
+    "ncaab_source/data/processed/player_priors_2026_asof_20260406.csv",
 )
 
 FEED_LIVE_SAMPLE = EXPORT_ONLY_SAMPLES[0]

@@ -1,5 +1,34 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#697` — **The fleet `ci-suite` has been RED every day since at least 2026-10-02: 21 baseline regressions, all reproduced on `origin/main` `f590550e` (2026-10-12), 2 fixed here, 19 owed to their lanes** — lane `ci-suite-red-1012`, session 12420da3
+
+The 08:00Z `ci-suite` job (`local_production.py ci-run` -> `run_ci_suite.py` in `<home>/ci-checkout`, scrubbed env) exits 1 daily. It only reports and gates nothing, so it went unread. "NEW FAILURE(S)" count by day: 10-02 1, 10-03 3, 10-05 5, 10-06 6, 10-07 6, 10-08 14, 10-09 19, 10-10 20, 10-11 21, 10-12 21. **The archive suite (what Render CI ran) has failed since 10-09.** Log: `~/syndicate-prod/logs/job-ci-suite.log`; summary `~/syndicate-prod/run/ci-suite-latest.json`. All 21 fail deterministically: rerun 2x at fleet `64909dba` and 1x at `f590550e` in the ci-checkout env.
+
+**"Window" = commits that touched the area between the last passing and the first failing CI run. NOT bisected.** Each owner decides whether the CODE or the TEST is wrong.
+
+- **FIXED by this lane (test-only, unclaimed files):**
+  - `test_export_only_patterns::test_every_export_only_pattern_matches_something_real` (10-10): five patterns added by the basketball-native lanes had no sample. Four real fleet paths added. The `ncaab player_priors` sample is producer-shaped: the job was mid-first-backfill.
+  - `test_refresh_step_modes::test_no_other_sport_gained_a_mode_scope` (10-11): soccer's `modes=("full",)` was deliberate (`soccer-live-lane-priority`, 467a1a6c). The check now carries an explicit allowlist with that reason.
+- **Rule checks, in files OTHER open lanes hold:**
+  - `test_probability_differential::test_every_converter_is_registered_or_excused` (10-03): `scripts/backtest_ncaaf_attribution_props.py:_devig` (and siblings) not in `scripts/probability_differential.py` REGISTRY / NOT_A_SCALAR_CONVERTER. That file is held by `nba-lines-props-backtest`.
+  - `test_slate_date_timezone_discipline` (10-05): `date.today()` in `syndicate/features/nhl/inseason_season_inputs.py` (2x) and `inseason_team_xg.py`. Owner `nhl-season-inputs-in-season`.
+  - `test_basketball_orchestrator_reachability::test_the_generated_modules_match_the_port_script` (10-11): PORT_CHECK DIFFERS across smart_sim, quarters, boxscores, ... Owner `basketball-native-orchestrator`.
+- **Behaviour, NCAAF:**
+  - `test_ncaaf_props_board` x2 (10-03): book count 3 vs expected 2; the unbettable-books case finds 0 rows.
+  - `test_ncaaf_live_resim::test_the_probability_moves_with_the_score...` (10-05): `1.0 < 1.0`, the live win prob does not move with the score. Window ad231ea0 / 68832abf (live total-level shrink 1.0 -> 0.3). **Read this one first: it reads like a real bug, not a stale test.**
+- **Behaviour, NFL:**
+  - `test_nfl_market_board::test_build_nfl_market_board_shapes_games` (10-05): market list gained anytime_td / interceptions / passing ...
+  - `test_nfl_player_stats::NflPerMarketShrinkageTests` x2 (10-09): k 4.0 vs 2.0; 10.70 vs 8.99. Window 018a7c64 / eac5ef96 (passing-attempts re-fits).
+- **Behaviour, NHL:** `test_nhl_confirmed_goalies::test_refresh_never_raises_and_has_an_off_switch` (10-08).
+- **Behaviour, Layer 2 board (10-08; window 85639e7f / dac18590 / a4281cc8 / 20d36d31):**
+  - `test_layer2_out_player_gate` x5: "fixture must produce candidates" -- the fixture now yields 0 rows.
+  - `test_layer2_row_context` and `test_layer2_row_parity`.
+- **Behaviour, board page (10-09; window = the 10-08 board redesign, 04d9047a .. 6f614d10):**
+  - `test_archives::HomeBoardTests::test_home_page_poll_preserves_date_query`: `board-date-input` with the requested date is not rendered.
+  - `test_intelligence::...blotter_view_includes_odds_projected_and_live_columns`: the `{ key: "odds", label: "Odds"` column is gone from `intelligence.html`.
+
+**Close when** the job reads `0 NEW FAILURE(S)` and the archive suite is `ok`, or each remaining failure is a deliberate `--update` named in a commit.
+
 ### `#696` — **NBA engine lineup pools: the first REGULAR-SEASON production reading is OWED (preseason is unfed by design, user decision 2026-10-12)** — lane `nba-lineup-pools`, session eb2ba139
 - **State:** pools come from `_rotation_sim_minutes_from_history_local` (basketball_props_smart_sim.py). Production preseason sims are 0/16 sides fed (`rotation_minutes.reason=no_recent_history`): the nba-season-phase guard admits no stints for a preseason slate. User decision 2026-10-12: leave as designed (no preseason admission, no phase mixing).
 - **Expected (measured on the production pregame path as-of, 3 regular-season dates 2025-12-10 / 2026-01-15 / 2026-03-10, 44 sides, WITH a prior season in player_logs as production will have):** 34/44 APPLIED (77%; pools 148-344 lineups), 10/44 refused by the signal guardrail (`rotation_minutes_conflict_with_current_signals`). Without the prior season it read 36/44 -- the prior season shifts the minutes signals the guard compares (P3 isolated this). Peer replay (nba-pregame-lineup-pools, 84 games): 119/168, 118/140 from the 3rd slate. Ramp: 2nd regular slate ~0%, 4th ~60%.
