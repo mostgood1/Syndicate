@@ -1131,7 +1131,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   Reachability: `tests/test_basketball_orchestrator_reachability.py`, which includes a fresh interpreter that must load 0 vendored modules.
 - **Editing.** The generated modules match `scripts/port_basketball_orchestrator.py --check` (pinned by a test). A deliberate native edit means deleting that test and saying so in the module header. Do not re-run the port after such an edit.
 - **Still vendored on basketball paths, OUTSIDE the sim** (table in the plan's P6 section):
-  - the ONNX props models in `vendor/<pkg>_repo/models`, read on every props run (`basketball_props_predictions.py:149`);
+  - ~~the ONNX props models~~ MOVED 2026-10-12: the props path reads `syndicate/features/basketball_engine/props_models/<league>` (byte-identical copies; lane basketball-props-models-native, deploys.md 14:57:13Z / 15:22:12Z). The vendor copies stay only for the vendored WNBA daily-update fallback and `playoff_transition`;
   - the live-lens ticks (P3/P5);
   - the refresh scripts' `python -m <pkg>.cli` steps;
   - the vendored WNBA app's live period totals, not flag-gated;

@@ -48483,3 +48483,13 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **sequence:** ff 4e1699be -> a25bbdc2; `down` 15:11:58-15:12:40Z (1 odds job stopped, 0 SIGKILL); `Start-ScheduledTask` 15:12:48Z was a NO-OP -- the task instance was still exiting (state went Running -> Ready with nothing started); fleet stayed DOWN until a second `Start-ScheduledTask` 15:19:3xZ; `/healthz` 200 15:19:42Z. Marker removed, all three claims released 15:19:4xZ.
 - **verify:** roles fresh (supervisor 1376029, gunicorn 1376061-63), `RENDER_GIT_COMMIT` a25bbdc2 on refresh-worker, `EVALUATION_SETTLEMENT_SPORTS` = mlb,wnba,nfl,nhl,ncaaf,nba,soccer as seen by the worker process.
 - **next reading:** the 2026-10-13 ~11:00Z settlement autorun: `state completed`, per-sport settled counts for all seven, `layer2_pick_results/2026-10-11|12.json` written, no oomKilled.
+
+## 2026-10-12 15:22:12Z (10:22 AM CT) -- VERIFY READING, NO DEPLOY: the first production props run after the props-models ff loads Syndicate's model copies -- **MET** (lane `basketball-props-models-native`, session 2d413211)
+
+- **Closes** the reading owed by the 14:57:13Z entry (fleet ff ac0f0a3b -> 4e1699be).
+- **Reading:**
+  - NBA `props_predictions_2026-10-12.csv` was rewritten at 15:22:12Z: 157 rows (16 teams), 8 `pred_` columns, `pred_pts` non-null 157/157.
+  - The day's props log shows `SMART_SIM_RESULT_LOAD_COMPLETE rows=135` -> `SMART_SIM_MERGE_COMPLETE rows=157`, and 0 tracebacks in the tail.
+  - **0 "Props model artifacts missing"** lines. The baseline is 0 in every props log from 2026-09-30 to 10-12, and the predictor prints that line whenever it falls back.
+- **Resolution on the deployed checkout** (read 14:58Z): `syndicate/features/basketball_engine/props_models/<league>`, no `vendor` in the path.
+- **Not covered:** no WNBA props run since the ff (season over). WNBA rests on the A/B (317 rows x 2 dates identical) and the deployed load test.
