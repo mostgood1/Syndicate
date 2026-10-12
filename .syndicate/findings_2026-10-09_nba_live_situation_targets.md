@@ -489,3 +489,23 @@ Priced live props start with the regular season.
 
 **A bucket that fails keeps p = 0.** The mechanism's live effect is then judged by the checkpoint gate (5:00 Q4
 total / margin / ML vs `pregame_rate`) with M-EG on vs off on the same games.
+
+### 7a. Mechanism targets handed over by basketball-scenario-calibration (full-FIT confirmation, 2026-10-12)
+
+**Run:** 791 games, 2025-11..2026-02, with lineup pools, #473 inputs, `score_effect_k = 0.002` (CONFIRMED; still a
+proposal, production pregame k = 0).
+
+**Residuals that are P3's to close:**
+- **Q4 reversion:** sim -0.093 [-0.097, -0.090] vs real -0.141. The end-game mechanism (§7) is the planned
+  closer; it is fitted ON TOP of k = 0.002.
+- **Blowout rest:** top-5 starter minutes are FLAT at 31.7 whatever the score, vs real 26.9 when the final
+  margin is >= 20.
+  - It is the garbage-time mechanism's target.
+  - The band-dependent benching in §2b applies: the trailer concedes first at 11-20, the leader benches at 21+.
+- **Foul-outs:** 0.47 per game in the sim vs real 0.19.
+  - It is the foul-trouble mechanism's target. Real starters sit after 2 PF in Q1 / 3 in Q2 / 4 in Q3 / 5 in Q4
+    (§2d: on-floor share gaps -0.27 / -0.51 / -0.28 / -0.14 regular season); the engine has no in-sim
+    foul-trouble benching (resume.py: player fouls below the limit are CARRIED, not consumed).
+- **The gate states its config:** each arm is labelled "score_effect_k = 0 (production pregame)" or
+  "score_effect_k = 0.002 (proposed)". The live re-sim must run the same k as production pregame, so a resume at
+  the tip reproduces the pregame number; the user picks one config for both at switch-on.
