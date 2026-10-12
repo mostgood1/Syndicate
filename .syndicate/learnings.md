@@ -3887,3 +3887,14 @@ and the symptom is a missing word rather than an extra claim.
 check is to read back what was written, not to watch the command. Any `lane_open.py`
 / `lead` / commit-message invocation that carries markdown backticks is exposed;
 prefer single-quoted arguments there.
+
+## 2026-10-12 -- A failure reason belongs to the diag it came from: name the diag KEY before attributing a reason to a feature `[session ee14e4ec / 7693274b, lane nba-pregame-lineup-pools]`
+
+- **Overturned belief:** "NBA lineup pools 0/4: `no_espn_id_map` 3/4, DAL_HOU `no_team_rows`" (#473 post-deploy checklist,
+  repeated in state_basketball and in this lane's brief). Those strings exist only in `lineup_effects` (teammate
+  effects, orchestrator/connected_game.py:234/:279). The POOL's diag is `rotation_minutes`, and on those games it read
+  `team_not_in_history` / `no_recent_history` (preseason guard). The pool never reached a name map.
+- The misattribution sent a fix (45e03ae2, native name-map fallback) to a stage that was not failing, and hid a real
+  gap: teammate effects have their own name-map copy with no native fallback (leads.md 2026-10-12).
+- **Rule:** when quoting a refusal reason for feature X, cite the diag key it was read from, and grep that the
+  emitter of the reason string is X's code path. Two features with a name map each emit look-alike reasons.
