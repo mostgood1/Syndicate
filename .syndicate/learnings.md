@@ -3862,3 +3862,7 @@ frame could not have been non-null.
     production (team_adj, starters, lineup pools...). Do not trust the builder's file list.
   - Prefer as-of truncation to deletion. For a fitted all-history artifact that cannot be truncated
     (lineup_teammate_effects), record it as a stated replay-vs-production difference.
+
+## 2026-10-12 -- after `local_production.py down`, WAIT for the scheduled task to read `Ready` before `Start-ScheduledTask` -- a start sent while it still reads `Running` is a no-op and the fleet stays down `[lane settlement-graders-all-sports, session d4409ac4]`
+- **What happened:** my restart script slept 5 s after `down` and called `Start-ScheduledTask SyndicateLocalProduction`. The task instance was still exiting, so the start did nothing; it then went to `Ready` with no fleet running. With `watchdog_no_autostart` set, nothing recovered it: web was down 15:12-15:19Z (7.7 min, vs ~1 min on the 10-08 run that waited for `Ready`).
+- **Rule:** poll `(Get-ScheduledTask -TaskName SyndicateLocalProduction).State` until `Ready`, THEN start it, then gate on `/healthz` 200 -- and if healthz has not answered within ~60 s, check the task state and processes instead of waiting out the loop.
