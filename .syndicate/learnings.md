@@ -3802,9 +3802,36 @@ These read the VENDORED `config.paths`, which the bridge never pinned. It matche
 - Prefer a market-ward form (`p' = fair + w*(p - fair)`): it scales the edge and never flips its side.
 - A fitted w near 0 is a finding about the model's information content, not a calibration to celebrate.
 
-## 2026-10-12 -- FORBIDDEN: `git merge --ff-only github/main` on the fleet. A fleet ff targets YOUR OWN EXACT SHA; the tip carries other lanes' default-on code live before their owners ship it `[session d48f3a34, lanes nba-sim-team-adj-473 / soccer-live-lane-priority]`
-- **What happened (2026-10-10, fleet reflog /home/amyn/Syndicate):** 14:54:10Z `merge github/main` -> 62909c36 and 14:58:40Z -> 5439c6c8 (soccer-live-lane-priority, b9bb5f37), 15:02:10Z -> 3691bcd1 (mlb-probability-calibration, b98d59a1). The 14:54 tip ff carried lane nba-sim-team-adj-473's DEFAULT-ON NBA team-inputs code onto disk while that owner was still waiting on `check_deploy_safety` CLEAR and before its paired `nba_sim_total_inputs.json` was written -- i.e. the measured-worse "fix alone" config (|pub margin - market| 1.54 -> 5.12) sat live 11m55s. Exposure 0 NBA games re-simulated, by luck. Basketball/odds child jobs load code from DISK per run, so an ff is a deploy with no restart. The ff-ing entry also called that code "env-gated" from its commit message; the default was ON.
-- **Not a doc defect -- a habit.** `git merge --ff-only github/main` appears 14x in deploys.md and in no doc/skill; it spreads by copying entries, and a user instruction "fetch github main and merge it" reads the same way.
-- **Rule.** On the fleet: `git merge --ff-only <your-sha>` where `<your-sha>` is the commit you enumerated ride-alongs against, and abort if HEAD moved (learnings 2026-10-03). If the tip is genuinely wanted, enumerate every lane's change in range and read each one's DEFAULT (absent = on or off?) before the ff -- not its commit message.
-- **My own miss (attribution).** I reported all three ffs as "unrecorded" after grepping deploys.md for one SHA; all three were recorded, two in entries written after I looked and under different SHAs. Search ledger evidence by reflog TIME as well as SHA, and re-read before calling something missing.
-- **Guard (proposed, not built):** a fleet-side pre-merge check (or `deploy_claim.py` hook) that refuses an ff whose target is not the claim's `--target-commit`.
+## 2026-10-12 — A GUARD'S OWN DETECTOR MUST RECOGNISE THE FIX IT ENFORCES `[lane ledger-writer-byte-safety-guard, session 4ab694ed, 84dec600]`
+
+**Rule.** When you write a test that enforces "use helper X", its detector has to
+know what a call to X looks like. Otherwise the files that already comply are
+classified as out-of-scope and stop being checked — the guard goes quiet exactly
+where it was supposed to be loudest.
+
+**Why, measured.** The first cut of `tests/test_ledger_writers_byte_safe.py`
+decided "does this module write a ledger doc?" by searching for `write_text(`,
+`write_bytes(` and `open(...,"w")`. It did not search for `write_ledger(`, the
+helper every converted tool now uses. So all eight converted tools scored as PURE
+READERS, and the guard skipped their reads — the exact files it had just been
+written to protect. A second control now pins this:
+`_writes_a_ledger("write_ledger(LANES, text, eol)")` must be true.
+
+**Second instance in the same guard.** Its first cut also flagged
+`check_trimmed_contracts.py`, a pure reader that writes nothing and therefore
+cannot corrupt anything. A guard whose name says "rewrite" must not fail on reads
+in non-writers, or it accumulates allowlist entries for harmless files and the
+allowlist becomes the thing people edit instead of the code.
+
+**How to apply.** For any new guard, write two controls before trusting it: one
+asserting it SEES a compliant file (so scope cannot silently collapse) and one
+asserting it FIRES on the pre-fix tree. This guard has both, plus a third
+asserting every allowlisted file still uses the mechanism its allowlist entry
+claims — an allowlist entry that names a mechanism can be checked; a waiver
+cannot.
+
+**And a null result worth stating as one.** Run against 35 later peer commits the
+guard reported 26 passed, but its candidate set is 15 scripts and NONE of the 4
+new peer scripts touch a ledger doc. So that green says the 15 pre-existing
+candidates are still clean; it does not say the guard caught anything new. The
+frame could not have been non-null.

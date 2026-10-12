@@ -1686,15 +1686,34 @@ session-start cap) after archiving 63 CLOSED blocks (`5ac74a83`, plus a peer's 1
 in `9de0d099`), claim set unchanged by SET comparison 336 -> 336. The digest's
 OVER BUDGET line now names only `learnings.md` (494KB>449KB).
 
-**THE LEDGER TOOLING IS NOW BYTE-SAFE `[fixed 2026-10-09, lane
-ledger-tools-byte-safe-io, 5dfddf6e]`.** All four rewriting tools --
-`archive_released_lanes.py`, `trim_lane_blocks.py`, `trim_lane_narrative.py`,
-`hoist_open_lanes.py` -- read and write through `scripts/ledger_io.py`, which
-preserves a file's own line endings and leaves a mid-line bare CR as a character.
-Verified off != on with one fixture: an LF file at 78 B / CRLF 0 / lone_CR 1 came
-back from the OLD call pattern as 84 B / CRLF 6 / lone_CR 0, and from the helper
-byte-identical; same for a CRLF file. 141 tests pass, including an end-to-end
-`--apply` that plants a mid-line bare CR and requires it intact.
+**THE LEDGER TOOLING IS BYTE-SAFE, AND THE RULE IS NOW EXECUTABLE `[fixed
+2026-10-09/10, lanes ledger-tools-byte-safe-io + ledger-writer-byte-safety-guard,
+5dfddf6e and 84dec600]`.** EIGHT rewriting tools read and write through
+`scripts/ledger_io.py`, which preserves a file's own line endings and leaves a
+mid-line bare CR as a character: `archive_released_lanes.py`,
+`trim_lane_blocks.py`, `trim_lane_narrative.py`, `hoist_open_lanes.py`,
+`compact_learnings.py`, `consolidate_learnings.py`, `build_learnings_index.py`,
+`archive_state_subject.py`. Verified off != on with one fixture: an LF file at
+78 B / CRLF 0 / lone_CR 1 came back from the OLD call pattern as 84 B / CRLF 6 /
+lone_CR 0, and from the helper byte-identical; same for a CRLF file.
+
+**`tests/test_ledger_writers_byte_safe.py` IS THE ENFORCEMENT, and it is what to
+keep.** It FAILS against the pre-fix tree naming each offence and passes after --
+19 of its own tests, 26 with the helper's. Guard scope: an unsafe WRITE always
+fails; an unsafe READ fails only in a module that also writes. Allowlist names a
+MECHANISM per file (`lane_open.py` bytes + BOM, `compact_state.py` bytes + explicit
+CRLF + utf-8-sig), and a test asserts each allowlisted file really does handle
+bytes. **`compact_state.py` needed no change** -- it was already correct, making
+THREE pre-existing correct implementations (with `lane_open.py` and
+`build_soccer_player_match_log.py`'s `newline=""`) against four wrong and two
+half-right. That ratio is why this is a test and not a note.
+
+**STILL EXPOSED, recorded not enforced:** ~20 pure READERS of ledger docs use
+universal newlines and can mis-parse a line holding a bare CR -- a wrong answer,
+not corruption. Only `lanes_history.md`, `leads.md` and `log/2026-10-08.md` carry
+a bare CR today (1 each); every other tracked `.syndicate/*.md` is pure LF.
+`leads.md` has no script writer -- it is written by the `/lead` command, i.e. by an
+agent, so the 10-06 standing rule is its only guard.
 
 **THE CAUSE WAS THE READ, NOT THE WRITE.** `read_text()` and bare `open()` use
 UNIVERSAL NEWLINES, which maps a lone CR to LF before any processing -- that is
