@@ -1156,7 +1156,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   (3d1fd556). Not enabled.
 - **score_effect_k** (late-game catch-up, native engine, default 0): k = 0.002 ACCEPTED by the user 2026-10-10 as a
   PROPOSAL (fine grid 48cb10ff; Q4 tolerance overridden, Q4 remainder to P3). NOT enabled: nothing sets it in
-  production. It was chosen on replays WITHOUT engine lineup pools; being re-measured WITH pools 2026-10-12
-  (pre-registered becb8a53) before any full FIT.
+  production. Re-measured WITH engine lineup pools 2026-10-12 (e481f08b): k = 0.002 still fits (H2 -0.170 vs
+  real -0.174). Full FIT confirmation running.
 - **Production today is right on totals only because errors cancel:** target −4.5 plus engine overshoot +6.
   Enabling EXACT_TARGET_CALIBRATION alone would lower NBA totals ~5.
