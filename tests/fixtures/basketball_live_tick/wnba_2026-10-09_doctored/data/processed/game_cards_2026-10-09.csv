@@ -1,0 +1,2 @@
+date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri,pred_margin,pred_total,home_spread_price,away_spread_price,total_over_price,total_under_price,fixture_id,p_home_win,p_home_cover,p_total_over,market_home_spread,market_total
+2026-10-09,401918300,Las Vegas Aces,Golden State Valkyries,2026-10-10T01:37:00Z,-184.50995907096453,184.50995907096453,-2.5,2.5,149.5,oddsapi_consensus,LVA,GSV,5.09,158.41,,,,,,0.61,0.52,0.57,-4.0,156.5

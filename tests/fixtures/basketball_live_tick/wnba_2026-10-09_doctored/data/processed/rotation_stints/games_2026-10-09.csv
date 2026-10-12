@@ -1,0 +1,3 @@
+league,season,season_type,date,event_id,home,away,official_home,official_away,pbp_home,pbp_away,running_home,running_away,score_match,plays,stints,anomalies,notes,source
+wnba,2026,playoffs,2026-10-09,401918299,NYL,ATL,83,85,83,85,83,85,1,372,32,0,,syndicate_espn_pbp_v1
+wnba,2026,playoffs,2026-10-09,401918300,LVA,GSV,77,87,77,87,77,87,1,425,42,0,,syndicate_espn_pbp_v1

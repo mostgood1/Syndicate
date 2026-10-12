@@ -1,6 +1,7 @@
-"""Parity gate: Syndicate NBA live-lens tick (syndicate/features/nba/live_tick) == the vendored tick.
+"""Parity gate: Syndicate basketball live-lens tick (syndicate/features/<league>/live_tick) == the vendored tick.
 
-Lane nba-live-tick-native (2026-10-12). Record/replay, one arm per PROCESS (each arm resolves its data root at import):
+Lane nba-live-tick-native (2026-10-12; NBA and WNBA, `--league`). Record/replay, one arm per PROCESS (each arm
+resolves its data root at import):
 
   record   run the VENDORED `_live_lens_tick_payload(date)` against the real network. Every `requests` call is
            recorded to a tape (the OddsAPI key is stripped from the tape and from the replay key), every data file
@@ -8,7 +9,7 @@ Lane nba-live-tick-native (2026-10-12). Record/replay, one arm per PROCESS (each
            -- is saved.
   replay   run either arm with the network served from the tape. A request the tape does not hold is a failure.
   compare  leaf-compare two outputs; `--plant` first changes one leaf, which must then be reported (positive control).
-  fixture  copy the files a recording opened, the tape and the vendored output into a test fixture directory.
+  reduce   cut a committable test fixture out of a recording (see `cmd_reduce`).
 
 DETERMINISM. Nothing in the tick uses threads or randomness, so the only other inputs are the clock and the files:
 `time.time()` is a call counter (base + 1 ms per call) and `datetime.now()/utcnow()/today()` read the same counter,
@@ -16,21 +17,22 @@ so two arms that take the same path see the same clock. The real network call in
 does not advance the counter. Each arm gets its OWN copy of the data root and live-lens dir (the tick read-modify-
 writes `processed/live_lens_registry/` and appends to `player_ids.csv` and the JSONLs).
 
-The vendored arm runs with NBA_BETTING_RECONCILE_REPO_DATA=0: the vendored app's IMPORT copies its repo data into the
-data root, which is not part of the tick (and the port does not do it; see the plan's P6 section).
+The vendored arm runs with <LEAGUE>_BETTING_RECONCILE_REPO_DATA=0: the vendored app's IMPORT copies its repo data into
+the data root, which is not part of the tick (and the port does not do it; see the plan's P6 section).
 
 Usage (fleet, at Idle):
-  nice -n 19 python scripts/nba_live_tick_parity.py record --date 2026-10-12 --data-root A/data --live-lens-dir A/ll \
+  nice -n 19 python scripts/basketball_live_tick_parity.py record --league nba --date 2026-10-12 --data-root A/data --live-lens-dir A/ll \
       --tape T.json --out vendored.json
-  nice -n 19 python scripts/nba_live_tick_parity.py replay --arm port --date 2026-10-12 --data-root B/data \
+  nice -n 19 python scripts/basketball_live_tick_parity.py replay --league nba --arm port --date 2026-10-12 --data-root B/data \
       --live-lens-dir B/ll --tape T.json --out port.json
-  python scripts/nba_live_tick_parity.py compare vendored.json port.json [--plant]
+  python scripts/basketball_live_tick_parity.py compare vendored.json port.json [--plant]
 """
 from __future__ import annotations
 
 import argparse
 import base64
 import datetime as _dt_mod
+import gzip
 import hashlib
 import json
 import os
@@ -109,6 +111,36 @@ def _scrub(url: str) -> str:
     return urllib.parse.urlunsplit((parts.scheme, parts.netloc, parts.path, urllib.parse.urlencode(q), ""))
 
 
+def doctor_live(url: str, content: bytes) -> bytes:
+    """`--doctor-live`: make a FINISHED slate read as in progress (3rd quarter, 5:00) in ESPN scoreboard responses.
+
+    For parity when no game is live (the WNBA between playoff games). Both arms are fed the same doctored bytes from
+    the tape, so this changes which branches run, never whether the arms agree. A doctored tape is marked as such
+    and is never evidence about live behaviour.
+    """
+    if "espn.com" not in url or "/scoreboard" not in url:
+        return content
+    try:
+        j = json.loads(content.decode("utf-8"))
+    except Exception:
+        return content
+    for ev in j.get("events") or []:
+        for comp in ev.get("competitions") or []:
+            for status in (comp.get("status"), ev.get("status")):
+                if not isinstance(status, dict):
+                    continue
+                status["period"] = 3
+                status["displayClock"] = "5:00"
+                status["clock"] = 300.0
+                t = status.setdefault("type", {})
+                t.update({"state": "in", "completed": False, "name": "STATUS_IN_PROGRESS", "description": "In Progress",
+                          "detail": "5:00 - 3rd Quarter", "shortDetail": "5:00 - 3rd"})
+    return json.dumps(j).encode("utf-8")
+
+
+DOCTOR = False
+
+
 def install_tape(mode: str, tape: dict) -> None:
     import requests
     from requests.structures import CaseInsensitiveDict
@@ -136,6 +168,8 @@ def install_tape(mode: str, tape: dict) -> None:
                 raise
             finally:
                 CLOCK.passthrough -= 1
+            if DOCTOR:
+                resp._content = doctor_live(url, resp.content)
             entries.append({
                 "key": key,
                 "status": resp.status_code,
@@ -150,6 +184,7 @@ def install_tape(mode: str, tape: dict) -> None:
             tape["misses"].append(key)
             raise requests.exceptions.ConnectionError(f"parity tape miss: {key[:200]}")
         e = q.pop(0) if len(q) > 1 else q[0]
+        tape.setdefault("served", []).append(key)
         if "error" in e:
             mod, name, msg = e["error"]
             cls = getattr(sys.modules.get(mod), name, None) or requests.exceptions.RequestException
@@ -222,24 +257,40 @@ def snapshot_hashes(data_root: Path, live_lens_dir: Path) -> dict[str, str]:
 def run_arm(args, mode: str, arm: str) -> int:
     data_root = Path(args.data_root).resolve()
     live_lens_dir = Path(args.live_lens_dir).resolve()
-    os.environ["NBA_BETTING_DATA_ROOT"] = str(data_root)
-    os.environ["NBA_LIVE_LENS_DIR"] = str(live_lens_dir)
+    league = args.league
+    up = league.upper()
+    # Both apps read <LEAGUE>_BETTING_DATA_ROOT / <LEAGUE>_LIVE_LENS_DIR first (WNBA then falls back to the NBA names).
+    os.environ[f"{up}_BETTING_DATA_ROOT"] = str(data_root)
+    os.environ[f"{up}_LIVE_LENS_DIR"] = str(live_lens_dir)
     os.environ["NBA_BETTING_RECONCILE_REPO_DATA"] = "0"
+    os.environ["WNBA_BETTING_RECONCILE_REPO_DATA"] = "0"
     os.environ.pop("LIVE_LENS_DIR", None)
     tape_path = Path(args.tape)
-    tape: dict[str, Any] = json.loads(tape_path.read_text(encoding="utf-8")) if mode == "replay" else {"date": args.date}
+    tape: dict[str, Any] = load_tape(tape_path) if mode == "replay" else {"date": args.date, "league": args.league}
     base = float(tape.get("clock_base") or _time_mod.time())
     tape["clock_base"] = base
+    # Whether the OddsAPI key is SET changes the path (no key = no OddsAPI calls). The tape never holds the key; it
+    # records whether the recording had one, and a replay reproduces that with a dummy, whatever its own shell holds.
+    if mode == "record":
+        tape["odds_api_key_present"] = bool((os.environ.get("ODDS_API_KEY") or "").strip())
+    elif tape.get("odds_api_key_present"):
+        os.environ["ODDS_API_KEY"] = "parity-replay-dummy-key"
+    else:
+        os.environ.pop("ODDS_API_KEY", None)
+    if mode == "record" and getattr(args, "doctor_live", False):
+        global DOCTOR
+        DOCTOR = True
+        tape["doctored"] = "finished slate rewritten to in-progress (3rd, 5:00) in ESPN scoreboards"
     install_clock(base)
     install_tape(mode, tape)
     opened: set[str] = set()
     install_open_audit({"data": data_root, "live_lens": live_lens_dir}, opened)
     before = snapshot_hashes(data_root, live_lens_dir)
     sys.path.insert(0, str(ROOT))
-    if arm == "vendored":
-        from vendor.nba_betting_repo.app import _live_lens_tick_payload as fn  # noqa: WPS433
-    else:
-        from syndicate.features.nba.live_tick.tick import _live_lens_tick_payload as fn  # noqa: WPS433
+    import importlib
+
+    mod = f"vendor.{league}_betting_repo.app" if arm == "vendored" else f"syndicate.features.{league}.live_tick.tick"
+    fn = importlib.import_module(mod)._live_lens_tick_payload
     clock_at_call = CLOCK.calls
     CLOCK.calls = 0  # import-time clock reads differ between arms; the tick itself starts at 0 in both
     t0 = _time_mod.perf_counter()
@@ -250,12 +301,13 @@ def run_arm(args, mode: str, arm: str) -> int:
     elapsed = _time_mod.perf_counter() - t0
     out = {
         "arm": arm,
+        "league": league,
         "date": args.date,
         "result": result,
         "files": collect_outputs(data_root, live_lens_dir, before),
         "meta": {"data_root": str(data_root), "live_lens_dir": str(live_lens_dir), "clock_calls": CLOCK.calls, "import_clock_calls": clock_at_call, "seconds": round(elapsed, 2),
                  "requests": len(tape["entries"]) if mode == "record" else None,
-                 "misses": tape.get("misses", [])},
+                 "misses": tape.get("misses", []), "served": tape.get("served", [])},
     }
     Path(args.out).write_text(json.dumps(out, sort_keys=True, default=str), encoding="utf-8")
     if mode == "record":
@@ -268,7 +320,14 @@ def run_arm(args, mode: str, arm: str) -> int:
                       "opened": len(opened), "seconds": out["meta"]["seconds"],
                       "value_keys": sorted(result["value"].keys())[:20] if isinstance(result.get("value"), dict) else None,
                       "games": len(games) if isinstance(games, list) else None}))
-    return 0 if result["ok"] and not out["meta"]["misses"] else 2
+    return 0 if result["ok"] and (getattr(args, "allow_misses", False) or not out["meta"]["misses"]) else 2
+
+
+def load_tape(path: Path) -> dict[str, Any]:
+    raw = path.read_bytes()
+    if path.suffix == ".gz":
+        raw = gzip.decompress(raw)
+    return json.loads(raw.decode("utf-8"))
 
 
 # ---------------------------------------------------------------- compare
@@ -324,7 +383,10 @@ def _plant(obj: Any) -> str | None:
 
 def _neutral_roots(out: dict) -> dict:
     """Each arm runs on its own copy of the data root / live-lens dir; the path itself is not an output."""
-    text = json.dumps({"result": out["result"], "files": out["files"]}, sort_keys=True)
+    meta = out.get("meta") or {}
+    # The clock-call count and the tape misses are outputs too: a different path through the tick shows in them.
+    text = json.dumps({"result": out["result"], "files": out["files"], "clock_calls": meta.get("clock_calls"),
+                       "misses": meta.get("misses") or []}, sort_keys=True)
     for key, token in (("live_lens_dir", "<LIVE_LENS_DIR>"), ("data_root", "<DATA_ROOT>")):
         root = (out.get("meta") or {}).get(key)
         if root:
@@ -347,25 +409,39 @@ def cmd_compare(args) -> int:
     return 0 if not diffs else 1
 
 
-def cmd_fixture(args) -> int:
-    """Copy what the recording read (from the PRISTINE copies, i.e. before the tick wrote) into a test fixture."""
-    tape = json.loads(Path(args.tape).read_text(encoding="utf-8"))
+def cmd_reduce(args) -> int:
+    """Cut a COMMITTABLE fixture out of a recording.
+
+    The tick opens thousands of files per run (365 MB on 2026-10-12), so the fixture keeps only the files it opened
+    that are dated `--date` and are at most `--max-bytes`. Every other input is simply
+    absent, for BOTH arms: the fixture's golden output is the VENDORED tick replayed on this same reduced root
+    (`replay --arm vendored --allow-misses`), so the reduction changes which branches run, never whether the arms
+    agree. The tape is written gzipped and without the opened-file list.
+    """
+    tape = load_tape(Path(args.tape))
     out = Path(args.dest)
     roots = {"data": Path(args.pristine_data_root), "live_lens": Path(args.pristine_live_lens_dir)}
-    n = 0
+    kept = skipped = size = 0
     for item in tape.get("opened", []):
         tag, _, rel = item.partition("/")
         sp = roots[tag] / rel
-        if sp.is_file():
-            dp = out / tag / rel
-            dp.parent.mkdir(parents=True, exist_ok=True)
-            dp.write_bytes(sp.read_bytes())
-            n += 1
+        if not sp.is_file():
+            continue
+        n = sp.stat().st_size
+        if n > args.max_bytes or args.date not in rel:
+            skipped += 1
+            continue
+        dp = out / tag / rel
+        dp.parent.mkdir(parents=True, exist_ok=True)
+        dp.write_bytes(sp.read_bytes())
+        kept += 1
+        size += n
     (out / "data" / "processed").mkdir(parents=True, exist_ok=True)
     (out / "live_lens").mkdir(parents=True, exist_ok=True)
-    (out / "tape.json").write_text(json.dumps(tape, sort_keys=True), encoding="utf-8")
-    (out / "vendored_output.json").write_bytes(Path(args.vendored_output).read_bytes())
-    print(json.dumps({"files": n, "dest": str(out)}))
+    tape.pop("opened", None)
+    tape.pop("misses", None)
+    (out / "tape.json.gz").write_bytes(gzip.compress(json.dumps(tape, sort_keys=True).encode("utf-8"), mtime=0))
+    print(json.dumps({"kept": kept, "skipped": skipped, "bytes": size, "dest": str(out)}))
     return 0
 
 
@@ -374,22 +450,27 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     for name in ("record", "replay"):
         p = sub.add_parser(name)
+        p.add_argument("--league", choices=("nba", "wnba"), required=True)
         p.add_argument("--date", required=True)
         p.add_argument("--data-root", required=True)
         p.add_argument("--live-lens-dir", required=True)
         p.add_argument("--tape", required=True)
         p.add_argument("--out", required=True)
+        if name == "record":
+            p.add_argument("--doctor-live", action="store_true", help="see doctor_live(); the tape is marked doctored")
         if name == "replay":
             p.add_argument("--arm", choices=("vendored", "port"), required=True)
+            p.add_argument("--allow-misses", action="store_true", help="a tape miss raises in the arm (deterministically) instead of failing the run")
     c = sub.add_parser("compare")
     c.add_argument("a")
     c.add_argument("b")
     c.add_argument("--plant", action="store_true")
-    f = sub.add_parser("fixture")
+    f = sub.add_parser("reduce")
     f.add_argument("--tape", required=True)
-    f.add_argument("--vendored-output", required=True)
+    f.add_argument("--date", required=True)
     f.add_argument("--pristine-data-root", required=True)
     f.add_argument("--pristine-live-lens-dir", required=True)
+    f.add_argument("--max-bytes", type=int, default=1_000_000)
     f.add_argument("--dest", required=True)
     args = ap.parse_args(argv)
     if args.cmd == "record":
@@ -398,7 +479,7 @@ def main(argv: list[str] | None = None) -> int:
         return run_arm(args, "replay", args.arm)
     if args.cmd == "compare":
         return cmd_compare(args)
-    return cmd_fixture(args)
+    return cmd_reduce(args)
 
 
 if __name__ == "__main__":

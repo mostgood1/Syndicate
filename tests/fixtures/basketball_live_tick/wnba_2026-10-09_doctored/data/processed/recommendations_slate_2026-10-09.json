@@ -1,0 +1,96 @@
+{
+  "date": "2026-10-09",
+  "counts": {
+    "games": 1,
+    "picks": 4
+  },
+  "per_game": [
+    {
+      "home": "LVA",
+      "away": "GSV",
+      "matchup": "GSV @ LVA",
+      "picks": [
+        {
+          "market": "Threes",
+          "team": "LVA",
+          "display_pick": "Chelsea Gray UNDER 2.5",
+          "selection": "UNDER 2.5",
+          "projection": 1.607450308378559,
+          "projected": 1.607450308378559,
+          "odds": 108.0,
+          "price": 108.0,
+          "score": 59.3684010847933,
+          "ev_pct": 59.3684010847933,
+          "win_prob": 0.7661942359845831,
+          "p_win": 0.7661942359845831,
+          "basketball_summary": "Threes projection 1.6",
+          "top_play_reasons": [
+            "EV 59.4%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "GSV @ LVA"
+        },
+        {
+          "market": "Pts",
+          "team": "LVA",
+          "display_pick": "Jackie Young OVER 9.5",
+          "selection": "OVER 9.5",
+          "projection": 16.49232140544799,
+          "projected": 16.49232140544799,
+          "odds": -104.0,
+          "price": -104.0,
+          "score": 33.636649882526456,
+          "ev_pct": 33.636649882526456,
+          "win_prob": 0.6812848817540564,
+          "p_win": 0.6812848817540564,
+          "basketball_summary": "Pts projection 16.5",
+          "top_play_reasons": [
+            "EV 33.6%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "GSV @ LVA"
+        },
+        {
+          "market": "ATS",
+          "team": "Las Vegas Aces",
+          "display_pick": "Las Vegas Aces -2.5",
+          "selection": "Las Vegas Aces",
+          "price": -110.0,
+          "score": 2.59,
+          "ev_pct": 11.774999999999999,
+          "win_prob": 0.5854886275,
+          "p_win": 0.5854886275,
+          "basketball_summary": "Model margin 5.1 vs market -2.5",
+          "top_play_reasons": [
+            "Edge 2.6",
+            "EV 11.8%"
+          ],
+          "matchup": "GSV @ LVA"
+        },
+        {
+          "market": "Ast",
+          "team": "GSV",
+          "display_pick": "Tiffany Hayes UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "projection": 2.2037046838332683,
+          "projected": 2.2037046838332683,
+          "odds": 104.0,
+          "price": 104.0,
+          "score": 11.302492228294748,
+          "ev_pct": 11.302492228294748,
+          "win_prob": 0.545600452099484,
+          "p_win": 0.545600452099484,
+          "basketball_summary": "Ast projection 2.2",
+          "top_play_reasons": [
+            "EV 11.3%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "GSV @ LVA"
+        }
+      ]
+    }
+  ]
+}

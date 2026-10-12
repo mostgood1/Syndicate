@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-09",
+  "enabled": true,
+  "feed_path": "/home/amyn/syndicate-prod/data/wnba_source/data/raw/injuries.csv",
+  "feed_rows": 448,
+  "feed_status": "read",
+  "league": "wnba",
+  "lines_considered": 256,
+  "lines_refused": 0,
+  "out_players_on_feed": 48,
+  "players_refused": [],
+  "reason": "player OUT on the injury feed",
+  "snapshot_date": "2026-10-09",
+  "written_at": "2026-10-10T02:53:41.463403+00:00"
+}

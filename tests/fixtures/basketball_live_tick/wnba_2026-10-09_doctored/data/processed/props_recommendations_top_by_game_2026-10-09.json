@@ -1,0 +1,141 @@
+{
+  "data": [
+    {
+      "basketball_summary": "model 1.5 vs line 0.5 (+1.0)",
+      "game_id": "401918300",
+      "game_key": "GSV@LVA",
+      "model": {
+        "ast": 5.9488885814872186,
+        "blk": 0.87,
+        "pa": 18.83868311991326,
+        "pr": 16.831397814146605,
+        "pra": 22.780286395633823,
+        "pts": 12.889794538426042,
+        "ra": 9.890491857207781,
+        "reb": 3.9416032757205626,
+        "stl": 1.27,
+        "threes": 1.539113943161584,
+        "tov": 1.71
+      },
+      "opponent": "LVA",
+      "player": "Veronica Burton",
+      "score": 73.5705116147081,
+      "score_adj": 73.5705116147081,
+      "team": "GSV",
+      "team_tricode": "GSV",
+      "tier": "High",
+      "top_play": {
+        "book": "fanduel",
+        "edge": 0.34378743745190704,
+        "ev": 0.735705116147081,
+        "ev_pct": 73.5705116147081,
+        "line": 0.5,
+        "market": "threes",
+        "p_win": 0.8110771570780753,
+        "price": 114.0,
+        "side": "OVER",
+        "snapshot_ts": null,
+        "stat": "threes"
+      },
+      "top_play_reasons": [
+        "EV 73.6%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ]
+    },
+    {
+      "basketball_summary": "model 1.6 vs line 2.5 (-0.9)",
+      "game_id": "401918300",
+      "game_key": "GSV@LVA",
+      "model": {
+        "ast": 6.126036817419162,
+        "blk": 0.3,
+        "pa": 18.436952340895864,
+        "pr": 15.965678267709762,
+        "pra": 22.09171508512892,
+        "pts": 12.310915523476702,
+        "ra": 9.780799561652223,
+        "reb": 3.654762744233061,
+        "stl": 1.22,
+        "threes": 1.607450308378559,
+        "tov": 2.68
+      },
+      "opponent": "GSV",
+      "player": "Chelsea Gray",
+      "score": 59.3684010847933,
+      "score_adj": 59.3684010847933,
+      "team": "LVA",
+      "team_tricode": "LVA",
+      "tier": "High",
+      "top_play": {
+        "book": "fanduel",
+        "edge": 0.28542500521535236,
+        "ev": 0.593684010847933,
+        "ev_pct": 59.3684010847933,
+        "line": 2.5,
+        "market": "threes",
+        "p_win": 0.7661942359845831,
+        "price": 108.0,
+        "side": "UNDER",
+        "snapshot_ts": null,
+        "stat": "threes"
+      },
+      "top_play_reasons": [
+        "EV 59.4%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ]
+    },
+    {
+      "basketball_summary": "model 16.5 vs line 9.5 (+7.0)",
+      "game_id": "401918300",
+      "game_key": "GSV@LVA",
+      "model": {
+        "ast": 5.97829371418679,
+        "blk": 0.14,
+        "pa": 22.47061511963478,
+        "pr": 20.471148418673724,
+        "pra": 26.44944213286052,
+        "pts": 16.49232140544799,
+        "ra": 9.957120727412526,
+        "reb": 3.978827013225736,
+        "stl": 0.66,
+        "threes": 1.992928800361152,
+        "tov": 2.54
+      },
+      "opponent": "GSV",
+      "player": "Jackie Young",
+      "score": 33.636649882526456,
+      "score_adj": 33.636649882526456,
+      "team": "LVA",
+      "team_tricode": "LVA",
+      "tier": "High",
+      "top_play": {
+        "book": "fanduel",
+        "edge": 0.17148096018542902,
+        "ev": 0.3363664988252646,
+        "ev_pct": 33.636649882526456,
+        "line": 9.5,
+        "market": "pts",
+        "p_win": 0.6812848817540564,
+        "price": -104.0,
+        "side": "OVER",
+        "snapshot_ts": null,
+        "stat": "pts"
+      },
+      "top_play_reasons": [
+        "EV 33.6%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ]
+    }
+  ],
+  "date": "2026-10-09",
+  "lightweight_refresh": {
+    "date": "2026-10-09",
+    "rows_updated": 3,
+    "signals_rows": 101,
+    "sport": "wnba",
+    "updated_at": "2026-10-10T04:53:54+00:00"
+  }
+}
