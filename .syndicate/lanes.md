@@ -1201,6 +1201,14 @@ death, never life — do not invert it.
 - Files: (scratch scripts only)
 - Blocked by: none
 
+### nba-live-tick-native — OPEN — opened 2026-10-12 — session 2d413211
+- Goal: Move the NBA live-lens tick off vendor: a faithful Syndicate port of vendor/nba_betting_repo/app.py _live_lens_tick_payload and its full closure (4 in-process routes, nba_betting odds_api/teams/player_names/odds_bovada, tools/daily_live_lens_audit), identical output proven by mocked-input parity and a same-moment live A/B, switched in nba/live_lens.py, deployed with a measurement.
+- Files: syndicate/features/nba/live_tick/, scripts/port_nba_live_tick.py, scripts/nba_live_tick_parity.py, tests/test_nba_live_tick_parity.py, tests/test_nba_live_tick_reachability.py, docs/ai_context/basketball_live_native_plan.md (P6 vendored-uses table section only)
+- Hypothesis: The closure is 112 app.py defs (~10.3k lines) + ~1k lines of package/tools code; extraction by statement selection plus 6 anchored edits reproduces output byte-for-byte.
+- Falsification test: Any leaf difference between vendored and port on the same replayed network responses and the same files, or a positive control that fails to detect a planted difference.
+- Verification: Parity harness PASS on mocked + recorded-live inputs (with positive control); after deploy, the live-odds-worker's NBA live_lens_signals/projections JSONL keep being written by the port with no tick errors.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
