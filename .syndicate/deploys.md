@@ -48493,3 +48493,9 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - **0 "Props model artifacts missing"** lines. The baseline is 0 in every props log from 2026-09-30 to 10-12, and the predictor prints that line whenever it falls back.
 - **Resolution on the deployed checkout** (read 14:58Z): `syndicate/features/basketball_engine/props_models/<league>`, no `vendor` in the path.
 - **Not covered:** no WNBA props run since the ff (season over). WNBA rests on the A/B (317 rows x 2 dates identical) and the deployed load test.
+
+## 2026-10-12 16:24:09Z -- UPSTREAM MERGE, no fleet change: mostgood1/MLB-BettingV2#5 squash-merged (1e9b6a6a) (lane `mlb-game-profile-pitch-config`, archived; session b98d59a1)
+- **What.** Upstream `tools/daily_update_multi_profile.py` `--game-pitch-model-overrides` default -> `off`, the same fix as Syndicate 988fa33d.
+- **User.** "Yes, squash-merge #5".
+- **Verify.** GitHub contents API on upstream main reads `default="off"`. A vendor re-pull no longer reverts the game-profile fix; `tests/test_mlb_multi_profile_pitch_overrides.py` still guards it.
+- **Not merged:** PRs #2 and #3 (stacked engine changes).
