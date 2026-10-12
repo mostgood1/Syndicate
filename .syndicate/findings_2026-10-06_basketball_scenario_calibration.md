@@ -1241,3 +1241,44 @@ carry every lever and switch. Paired 791 games. Inputs: #473 team_adj + starters
 - Still a PROPOSAL: production k = 0. Adoption follows the end-of-Phase-2 VALIDATION read.
 - Real readings note: the readout scripts print the 12-date real values for S8 margin / blowouts (15.21 / 0.253).
   The full-FIT reals are 14.00 / 0.230 (table above).
+
+## Phase 2 #4 — MINUTES vs GAME SCRIPT, PRE-REGISTERED 2026-10-12 (user: "start phase 2#4 minutes vs game script"), BEFORE measuring
+
+**What the S10 row actually measured:** the sim side of S10 is the INPUT minutes. The engine's per-player `min`
+(native engine.py:1798) is `mins[i]`, constant across draws, and the harness keeps minutes once per game. So
+"starters flat at 31.7 regardless of game script" is true by construction of the INSTRUMENT. It says nothing yet
+about simulated playing time.
+
+**What the engine does in blowouts (read, native engine):**
+- When `blowout` (quarter-start: Q3+ |margin| ≥ 18, or Q4 ≥ 15), it skips the lineup pools and samples a lineup
+  each possession with context weights (`_contextual_minutes_weights` blowout branch).
+- The dedicated bench boost (`sample_lineup_minutes_weighted(..., blowout_boost_bench)`, cfg `bench_weight_boost`
+  1.35) is hard-coded `blowout_boost_bench=False` at both call sites (~:1290, :1299). It is DEAD.
+- No per-draw playing time is reported.
+
+**Step 1 — instrument, no engine change:**
+- The harness counts per draw the possessions each player is on court, by wrapping the two lineup producers in the
+  harness process only:
+  - engine module `_pick_lineup_from_pool`, attributed to home/away by the lineups object's identity;
+  - the LeagueEngine's bound `sample_lineup`, attributed by the players frame's identity.
+- Sim minutes for player i = on-court possessions / team possessions × 48 (regulation).
+- Per draw: the mean sim minutes of the top-5 by INPUT minutes, per team, keyed to the draw's final |margin|.
+- **Reachability:** the counted team possessions per draw must equal the engine's possession count (sum of lineup
+  selections), and the mean sim minutes over all draws must be ≈ the input minutes share.
+
+**Readings (accepted config incl. score_effect_k = 0.002 + lineup pools, the same 12 dates, 200 draws):**
+- **S10-sim:** top-5 mean minutes by final |margin| bucket (≤ 6, 7-19, ≥ 20), vs real ESPN starters (FIT window:
+  31.3 / 30.0 / 26.9).
+- The game-script SLOPE: the minutes drop from ≤ 6 to ≥ 20, real −4.4.
+- Foul-outs alongside (real 0.193, sim 0.473 on the full FIT).
+
+**Hypotheses:**
+- **H-M1:** the sim's starter minutes drop less with margin than real: sim ≥ 20-bucket drop < 50% of the real −4.4.
+  - Falsified if the sim drop is within ±1.5 min of real.
+- **H-M2:** foul-outs track starter on-court time: foul-outs higher in draws where the top-5 play more.
+
+**If H-M1 holds** (next, separately pre-registered):
+- a default-off lever enabling the dead blowout bench boost (cfg field + the two call sites), on an engine.py LOAN
+  from basketball-native-engine;
+- swept against the S10-sim slope;
+- guards S8 margin, S5, H2/Q4, totals.
