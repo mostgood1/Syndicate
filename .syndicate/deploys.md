@@ -48394,3 +48394,9 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - first slate 10-11 05:43Z: CHA_MIL 64,688 B, CLE_ORL 64,683, DEN_CHI 67,869, HOU_DAL 63,154.
 - **Why files:** NBA sim stdout does not land in `logs/refresh-worker.log` (no NBA sim line in it or `.log.1`), so a watcher on `NBA_ENGINE_INPUTS_PERSISTED` there would have read silence as success.
 - **Also verified at the load:** `NBA_LIVE_RESIM_LOOP_STARTED` count **0** on both workers, and `SYNDICATE_NBA_LIVE_RESIM` / `SYNDICATE_NBA_LIVE_MECHANISMS` absent from local_production.env and both workers' env (key names only). The NBA live re-sim stays OFF.
+
+## 2026-10-12 CORRECTION to "2026-10-10 16:03Z ... soccer in-play capture fixed" (session b9bb5f37) -- my fleet fast-forwards carried other lanes' unshipped code
+- Who: b9bb5f37 ran `git merge --ff-only github/main` on the fleet at 14:54:10Z 10-10 (24d7b19c -> 62909c36) and 14:58:40Z (-> 5439c6c8), plus 15:37Z (-> 64909dba). The 15:02:10Z ff to 3691bcd1 and the 10-10 web `kill -HUP` were NOT this session.
+- The claim held was live-odds-worker ONLY (holder soccer-live-lane-priority). The ff changes code on disk for every role and for child jobs, which load from disk with no restart.
+- WRONG in the original entry: it called basketball_props_smart_sim #473 "env-gated", from its commit message, without reading the default. It is DEFAULT-ON (lane nba-sim-team-adj-473). The 14:54 ff put that code on disk ~12 min before its owner shipped it, while the owner was still waiting for check_deploy_safety CLEAR and before its paired data file existed -- the "fix alone" config measured 1.54 -> 5.12 pts/game worse vs market. Exposure: 0 NBA games (no NBA slate in the window), by luck. Traced by d48f3a34.
+- Rule adopted: fast-forward the fleet only to my own exact SHA (`git merge --ff-only <sha>`), never to the github/main tip.
