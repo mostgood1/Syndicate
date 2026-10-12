@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1374 rules `[generated]`
+## Index — 1377 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1949,3 +1949,11 @@ prefer single-quoted arguments there.
 
 - **Measured:** the vendored `wnba_betting.playoff_transition` is NBA-shaped. It accepts only NBA regular-season game ids (`002...`) and `YYYY-YY` seasons, while the WNBA schedule carries ESPN ids (`040...`) and `YYYY`. The production copy raised before doing anything for every 2026 date, playoff opening included, and returned `skipped`. It never wrote a receipt or a model. The step was removed (1cbaf4ab).
 - **Rule:** a step that is "waiting for its one chance" must be dry-run against real data BEFORE that chance. Call its gate function (here `resolve_regular_season_window`) for the dates when it should fire, read-only. An allowlisted receipt pattern proves the receipt would be visible, not that it would ever be written. The allowlist entry in artifact_publisher.py is now dead; it is harmless and is left in place.
+
+## 2026-10-12 -- Before building features for a market, test whether ANY available input adds to the de-vigged price `[lanes mlb-pitcher-outs-k-dist, mlb-starter-workload-signal]`
+**What happened.** The plan after a failed distribution fix was a starter-length feature project.
+- A one-hour pre-registered test first: logistic BOOK vs BOOK+inputs, fit on one window, game-clustered dlogloss on the next.
+- Every candidate input (the sim, recent pitch counts, rest, averages) added nothing to the starter outs/K price; for outs the extra inputs were significantly WORSE (overfit).
+- That one test retired a multi-day build.
+**Rule.** For a market where the model already loses to the book, run "does input X add to logit(p_book)?" out of sample BEFORE engineering X into the engine.
+- If the market-shrink w is ~0 and nothing adds to the book, the market is efficiently priced for the inputs you have: stop, or source a faster / non-public input.

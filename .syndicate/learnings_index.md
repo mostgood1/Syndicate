@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1374 rules `[generated]`
+## Index — 1377 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -534,7 +534,7 @@
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 - [2026-09-03 — EXONERATED: `deploys.md` and `learnings.md` ARE guarded. Two sessions file…](learnings_archive.md#2026-09-03-exonerated-deploysmd-and-learningsmd-are-guarded-two-sessions-filed-the-same-false-gap-and-the-second-re-derived-it-with-the-same-blind-spot) `[evidence]`
 
-**Rules and corrections — 854**
+**Rules and corrections — 857**
 
 - [2026-09-16 — a detector that matches a FORMULA at published precision has a FALSE-POSIT…](#2026-09-16-a-detector-that-matches-a-formula-at-published-precision-has-a-false-positive-rate-and-mine-fired-at-about-1-row-per-1200-session-abacd435-lane-soccer-anytime-scorer)
 - [2026-09-16 — OVERTURNED: "the pre-registered criterion is the safe part, the risk is in…](#2026-09-16-overturned-the-pre-registered-criterion-is-the-safe-part-the-risk-is-in-the-mechanism-two-hypotheses-in-one-night-died-on-the-criterion-session-abacd435-fixes-4-and-5a-no-lane)
@@ -750,6 +750,9 @@
 - [2026-10-12 -- A replay builder that deletes files to prevent leakage also deletes produ…](#2026-10-12----a-replay-builder-that-deletes-files-to-prevent-leakage-also-deletes-production-inputs-probe-the-engine-boundary-for-every-consumed-input-session-e0a3e383)
 - [2026-10-12 — BACKTICKS IN A DOUBLE-QUOTED SHELL ARGUMENT EXECUTE, AND SILENTLY DELETE T…](#2026-10-12-backticks-in-a-double-quoted-shell-argument-execute-and-silently-delete-the-word-from-a-ledger-write-lane-layer2-out-gate-fixture-game-field-session-4ab694ed)
 - [2026-10-12 -- A failure reason belongs to the diag it came from: name the diag KEY befo…](#2026-10-12----a-failure-reason-belongs-to-the-diag-it-came-from-name-the-diag-key-before-attributing-a-reason-to-a-feature-session-ee14e4ec-7693274b-lane-nba-pregame-lineup-pools)
+- [2026-10-12 VARIANT of the lone-CR trap: a regex that captures a `- Goal:` line keeps it…](#2026-10-12-variant-of-the-lone-cr-trap-a-regex-that-captures-a---goal-line-keeps-its-r-lane-wnba-live-period-lines-native-session-2d413211)
+- [2026-10-12 OVERTURNED: "the WNBA playoff transition fires once a season when the playof…](#2026-10-12-overturned-the-wnba-playoff-transition-fires-once-a-season-when-the-playoffs-open-artifact_publisherpy-allowlist-comment-and-teststest_nhl_quote_shard_datespy-2026-09-25-lane-wnba-playoff-transition-off-vendor-session-2d413211)
+- [2026-10-12 -- Before building features for a market, test whether ANY available input a…](#2026-10-12----before-building-features-for-a-market-test-whether-any-available-input-adds-to-the-de-vigged-price-lanes-mlb-pitcher-outs-k-dist-mlb-starter-workload-signal)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

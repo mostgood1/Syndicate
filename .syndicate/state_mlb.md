@@ -1370,6 +1370,7 @@ Other readings:
     - `SYNDICATE_PRICING_CALIBRATION=on` on all roles. Other sports have no profile, so they are identity.
     - Alt cells added 2026-10-12 14:32Z: `totals_alt|first3` w=0.30, `spreads_alt|first3` 0.28, `totals_alt|first1` 0.87. F5 alt (`totals_alt`/`spreads_alt` first5) stays IDENTITY: it failed the ROI guard. The profile now has 8 cells `[verified: fleet probe + served board 14:58Z]`.
     - **Out of sample the model's weight vs the book is <= 0.31 in 10 of 13 markets.** The model adds little information beyond the price for MLB pitcher K/outs, F5 and moneyline.
+    - **Starter outs / K: no public as-of signal beyond the book** `[verified 2026-10-12, lanes mlb-pitcher-outs-k-dist + mlb-starter-workload-signal]`: neither a level+spread correction nor workload features (last / last-3 pitches, rest, averages) add information over the de-vigged price out of sample.
   - Lane `mlb-statsapi-asof-rebuild`; details in log 2026-10-09.
 
 **The board keeps serving `model_prob_over`/edge on every MLB pregame market BY USER DECISION** -- USER DECISION 2026-10-02 ~8:15 PM CT, verbatim: "MLB should still show everything - the prime directive of the app is that every line is its own decision. we should have a model that is accurate that then helps inform each decision". Code: `prop_projections.py:687/726/768`, `project_game_market`. Stakes still follow price (`[portfolio-sim-sizing-gate]`). A mean-only gate was built and discarded unshipped (lane `mlb-board-mean-only`, CLOSED).
