@@ -12,7 +12,6 @@ from . import basketball_props_calibration
 from . import basketball_props_features
 from . import basketball_props_onnx
 from . import basketball_props_smart_sim
-from .source_roots import repo_root_from
 
 
 _TEAM_ALIASES = {
@@ -121,18 +120,26 @@ def _to_tricode(name: object) -> str:
     return value
 
 
+# Syndicate's own copies of the props models (lane basketball-props-models-native, 2026-10-12): byte-identical to the
+# vendored vendor/<pkg>_repo/models props files (sha256-pinned by tests/test_basketball_props_models_native.py),
+# git-tracked, so they ship with the checkout exactly as the vendored copies did.
+_PROPS_MODELS_ROOT = Path(__file__).resolve().parents[1] / "basketball_engine" / "props_models"
+
+
 def _models_dir_for_source_root(source_root: Path) -> Path:
     """Resolve the props model artifacts directory for a source root.
 
-    On Render, source_root is a persistent *data* disk
-    (e.g. /opt/render/project/data/wnba_source) that has no models/
-    directory -- the trained model artifacts only ship inside this repo's
-    vendored code checkout (vendor/<pkg>_repo/models). Blindly using
-    source_root/models made PureONNXPredictorLocal raise FileNotFoundError
-    on props_feature_columns.joblib every run, silently downgrading all
-    props predictions to the priors + rolling-stat fallback. Same
-    ephemeral-vs-persistent path class as _vendor_code_root in
-    refresh_wnba_oddsapi_props.py.
+    1. ``<source_root>/models`` when it holds the feature-columns gate file. The vendored ``playoff_transition``
+       retrains the props models into its own config root, which is the data root when it runs from the
+       bootstrapped ``<source_root>/src`` copy, so a retrain there still wins.
+    2. Otherwise Syndicate's committed copies, ``syndicate/features/basketball_engine/props_models/<league>``.
+       Until 2026-10-12 this fell back to ``vendor/<pkg>_repo/models`` (and honoured ``SYNDICATE_VENDOR_ROOT_<PKG>``,
+       which nothing set). On the fleet that fallback was the path every props run took: no data root has a
+       ``models/`` directory (measured 2026-10-12).
+
+    Why a fallback at all: on a data disk ``source_root`` has no ``models/``. Using ``source_root/models`` blindly made
+    PureONNXPredictorLocal raise FileNotFoundError on props_feature_columns.joblib every run, silently downgrading all
+    props predictions to the priors + rolling-stat fallback.
     """
     local = source_root / "models"
     try:
@@ -141,12 +148,8 @@ def _models_dir_for_source_root(source_root: Path) -> Path:
             return local
     except OSError:
         pass
-    name = str(source_root).lower()
-    package_name = "wnba_betting" if "wnba" in name else "nba_betting"
-    override = str(os.environ.get(f"SYNDICATE_VENDOR_ROOT_{package_name.upper()}") or "").strip()
-    if override:
-        return Path(override).expanduser().resolve() / "models"
-    return repo_root_from(__file__) / "vendor" / f"{package_name}_repo" / "models"
+    league = "wnba" if "wnba" in str(source_root).lower() else "nba"
+    return _PROPS_MODELS_ROOT / league
 
 
 def _export_props_predictions_without_smart_sim_local(*, source_root: Path, date_str: str, out_path: Path) -> tuple[int, Path]:

@@ -156,7 +156,7 @@ This doc is the shared plan. Each phase is a separate session with its own lane.
 
 | area | where | what it uses | runs |
 |---|---|---|---|
-| **sim inputs (data, not code)** | `basketball_props_predictions.py:149` `_models_dir_for_source_root` | ONNX props models read from `vendor/<pkg>_repo/models` | effectively every props run (the data root has no `models/`) |
+| ~~sim inputs (data, not code)~~ **MOVED 2026-10-12** (lane `basketball-props-models-native`) | `basketball_props_predictions.py` `_models_dir_for_source_root` | now `syndicate/features/basketball_engine/props_models/<league>` (byte-identical, git-tracked copies of the props files; `<source_root>/models` still wins). The vendor copies remain ONLY for vendored paths: WNBA `daily-update` fallback step 11 and `playoff_transition` retraining | fleet A/B: identical predictions, 287,680 cells |
 | live lens | `nba/live_lens.py:97`, `wnba/live_lens.py:65` | the vendored app's `_live_lens_tick_payload` | every live-lens tick (P3 / P5 own) |
 | loop | `live_refresh_loop.py:664` | `python -m <pkg>.cli fetch-injuries` | every lineup-check interval |
 | loop | `live_refresh_loop.py:4204` | `vendor/wnba_betting_repo/data/processed/schedule_2026.json` | always (WNBA commence times) |
