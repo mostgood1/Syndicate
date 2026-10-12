@@ -571,6 +571,7 @@ once this index exists: re-splitting would orphan the parts.
 | [ncaaf-kickoff-cache] | AN UPCOMING NCAAF CARD READ "TBD" BECAUSE THE COMMITTED CFBD CACHE WAS THE JULY SNAPSHOT — FIXED BOTH HALVES,  | `state_layer2.md` |
 | [mlb-live-gameline-venue-segment] | MLB LIVE GAME LINES SERVE NO SIM EDGE BECAUSE THE VENUES QUOTE FULL-GAME CONTRACTS AND THE LIVE BOARD IS MOSTL | `state_layer2.md` |
 | [layer2-board-redesign] | LAYER 2 BOARD PAGE: ONE NAV, VISIBLE FILTERS, RESEARCH RAIL + SLIP TRAY, LOGOS, AND AN EMBED THAT PARSES -- LIVE on web `2735d39a`, refresh-worker `6eae7e0a` | `state_layer2.md` |
+| [layer2-history-charts] | LAYER 2 + ASK HISTORY CHARTS: DATED PROP FORM, TEAM TRENDS VS TODAY'S LINE, NO GOAL HISTORY ON CORNERS -- LIVE `64909dba` | `state_layer2.md` |
 | [segment-misgrade-regrade] | 53 OF 173 SETTLED SEGMENT ORDERS WERE GRADED AGAINST THE WRONG ACTUAL — 30.6%, AND THE ERRORS NEARLY CANCEL `[ | `state_ledger.md` |
 | [stale-test-triage] | "THE TEST IS STALE" IS A HYPOTHESIS, AND IT WAS WRONG FOR 4 OF 18 `[2026-09-05, lane stale-test-repair, commit | `state_ledger.md` |
 | [full-suite-completes] | THE FULL SUITE RAN TO COMPLETION FOR THE FIRST TIME -- 15,307 tests, 61m06s, and the 27 "NEW" failures are 6 p | `state_ledger.md` |
