@@ -1935,3 +1935,12 @@ prefer single-quoted arguments there.
   gap: teammate effects have their own name-map copy with no native fallback (leads.md 2026-10-12).
 - **Rule:** when quoting a refusal reason for feature X, cite the diag key it was read from, and grep that the
   emitter of the reason string is X's code path. Two features with a name map each emit look-alike reasons.
+
+## 2026-10-12 VARIANT of the lone-CR trap: a regex that captures a `- Goal:` line keeps its `\r` `[lane wnba-live-period-lines-native, session 2d413211]`
+
+- **What happened:** in a CRLF working copy, `re.search(rb"\n- Goal: (.*?)\n", ...)` captures the goal text WITH its trailing `\r`. Pasting that capture into a verdict line plants a lone CR mid-line. Git then marks the file `w/-text` (`git ls-files --eol`) and stops normalising line endings, so the commit would have rewritten the whole file to CRLF: 1,839+/1,838- for a 2-line edit. The games-rail lane hit the same trap the same day.
+- **How to apply:**
+  1. Build ledger edits from the BLOB (`git show HEAD:<path>`, which is LF here), not from the CRLF working copy.
+  2. `.rstrip(b"\r")` every captured line.
+  3. Assert `b"\r" not in out` before writing.
+  4. The numstat gate (lines changed == lines meant) is what caught it, again.
