@@ -330,10 +330,14 @@ def run_sim(args) -> int:
                 # carry the new vendor fields at all -- the first sweep's `hasattr`/`setattr` silently skipped L1/L2
                 # (they ran the baseline) and crashed L3 (frozen). Rebuild the cfg with the levers instead.
                 kw["cfg"] = _lever_cfg(kw.get("cfg"), levers)
+            if oc_track:
+                _oc_reset()
             res = inner(**kw)
             try:
                 h_box, a_box, hq, aq = res
                 cur["draws"].append(_compact_draw(h_box, a_box, hq, aq, FOUL_LIMIT[args.league]))
+                if oc_track:
+                    cur["draws"][-1].update(_oc_finish())
                 if cur.get("minutes") is None:   # minutes are INPUTS (constant across draws): keep them once
                     cur["minutes"] = {side: [[str(p.get("player_name") or ""), float(p.get("min") or 0.0)]
                                              for p in (b.get("players") or [])] for side, b in (("home", h_box), ("away", a_box))}
@@ -344,6 +348,109 @@ def run_sim(args) -> int:
 
     bpss._call_source_simulate_smart_game_local = call
     bpss._recording_sim_draws_local = rec
+
+    # Phase 2 #4: SIMULATED playing time. The engine reports INPUT minutes only, so count, per draw, how often the
+    # top-5 (by input minutes) are on court. Lineups come from two producers: the per-possession sampler (blowout /
+    # late-game windows; wrapped -> observed) and the lineup pool (a nested engine function; not wrappable). Pool
+    # picks do not depend on the score (fixed weights per game), so a pool possession contributes the pool's EXPECTED
+    # top-5 count, computed exactly from the pool lineups and weights the engine received. Possession boundaries and
+    # the index->input-minutes map come from `_contextual_minutes_weights`, called home then away once per possession.
+    oc_track = bool(getattr(args, "track_oncourt", False))
+    oc: Dict[str, Any] = {}
+
+    def _oc_reset() -> None:
+        oc.update(ctx_i=0, mins=[None, None], top5=[None, None], epool=[None, None], has_pool=[False, False],
+                  buf=[], t5sum=[0.0, 0.0], poss=[0, 0], unknown=0, started=False)
+
+    def _top5(m):
+        order = sorted(range(len(m)), key=lambda i: -float(m[i]))
+        return set(order[:5])
+
+    def _expected_pool_top5(lineups, weights, top5, n):
+        tot, acc = 0.0, 0.0
+        for j, lu in enumerate(lineups or []):
+            idx = [int(x) for x in (lu or []) if 0 <= int(x) < n]
+            if len(idx) != 5:
+                continue
+            w = float(weights[j]) if weights is not None and j < len(weights) else 1.0
+            if w <= 0:
+                continue
+            tot += w
+            acc += w * len(set(idx) & top5)
+        return acc / tot if tot > 0 else None
+
+    def _oc_close_possession() -> None:
+        if not oc.get("started"):
+            return
+        buf = oc["buf"]
+        if len(buf) == 2:
+            sides = [0, 1]
+        elif len(buf) == 1:
+            no_pool = [s for s in (0, 1) if not oc["has_pool"][s]]
+            sides = [no_pool[0] if len(no_pool) == 1 else 0]
+        else:
+            sides = []
+        sampled = dict(zip(sides, buf))
+        for s in (0, 1):
+            if oc["top5"][s] is None:
+                continue
+            if s in sampled:
+                oc["t5sum"][s] += len(set(sampled[s]) & oc["top5"][s])
+                oc["poss"][s] += 1
+            elif oc["epool"][s] is not None:
+                oc["t5sum"][s] += oc["epool"][s]
+                oc["poss"][s] += 1
+            else:
+                oc["unknown"] += 1
+        oc["buf"] = []
+
+    def _oc_finish() -> Dict[str, Any]:
+        _oc_close_possession()
+        t5m = [round(oc["t5sum"][s] / (5.0 * oc["poss"][s]) * 48.0, 3) if oc["poss"][s] else None for s in (0, 1)]
+        t5in = [round(sum(float(oc["mins"][s][i]) for i in oc["top5"][s]) / 5.0, 3) if oc["top5"][s] else None for s in (0, 1)]
+        return {"t5m": t5m, "t5in": t5in, "ocposs": list(oc["poss"]), "ocunk": oc["unknown"]}
+
+    if oc_track:
+        from syndicate.features.basketball_engine import engine as _neng
+
+        _oc_reset()
+        orig_ctx = _neng._contextual_minutes_weights
+
+        def ctx_w(base_weights, *a, **k):
+            side = oc["ctx_i"] % 2
+            if side == 0:
+                _oc_close_possession()
+                oc["started"] = True
+            if oc["mins"][side] is None:
+                m = [float(x) for x in list(base_weights)]
+                oc["mins"][side] = m
+                oc["top5"][side] = _top5(m)
+                key = "home" if side == 0 else "away"
+                kwg = oc.get("kw") or {}
+                lus, ws = kwg.get(f"{key}_lineups"), kwg.get(f"{key}_lineup_weights")
+                oc["has_pool"][side] = bool(lus)
+                oc["epool"][side] = _expected_pool_top5(lus, ws, oc["top5"][side], len(m)) if lus else None
+            oc["ctx_i"] += 1
+            return orig_ctx(base_weights, *a, **k)
+
+        _neng._contextual_minutes_weights = ctx_w
+        eng_oc = bpss._engine_for_league_local(args.league)
+        orig_samp = eng_oc.sample_lineup
+
+        def samp_w(rng, players, *a, **k):
+            res = orig_samp(rng, players, *a, **k)
+            oc["buf"].append(list(res or []))
+            return res
+
+        eng_oc.sample_lineup = samp_w
+        orig_entry = bpss._call_native_engine_local
+
+        def entry_w(*, entrypoint_name, league_code, kwargs):
+            oc["kw"] = kwargs
+            return orig_entry(entrypoint_name=entrypoint_name, league_code=league_code, kwargs=kwargs)
+
+        bpss._call_native_engine_local = entry_w
+        print("ONCOURT_TRACK on (sampler observed; pool picks at their exact expected top-5 count)", flush=True)
 
     # Phase 2 #1f: keep each game's sim JOB (the inputs of the pre-sim raw total: points-derived ratings, def, pace,
     # outs, b2b, rest) so the raw can be decomposed offline. The jobs run in-process (smart_sim_workers=1).
@@ -711,6 +818,7 @@ def main(argv=None) -> int:
     ap.add_argument("--copy-file", action="append", help="extra production switch file copied into each scratch")
     ap.add_argument("--lever", action="append", help="EventSimConfig field=value applied to every draw (Phase 2 sweeps)")
     ap.add_argument("--engine-flag", action="append", help="module-level engine switch NAME=VALUE on the real events module (Phase 2 #1d)")
+    ap.add_argument("--track-oncourt", action="store_true", help="record per-draw simulated minutes of the top-5 (Phase 2 #4)")
     ap.add_argument("--dates-file", default="", help="only these dates (one per line)")
     args = ap.parse_args(argv)
     if args.phase == "table":
