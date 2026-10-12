@@ -1165,7 +1165,22 @@ death, never life — do not invert it.
 - Verification: the test passes with and without SYNDICATE_CALIBRATION_PROFILE_DIR pointing at the production profile, and in the fleet ci-checkout env
 - Blocked by: none
 
-### mlb-starter-workload-signal — OPEN — opened 2026-10-12 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+### mlb-starter-workload-signal — CLOSED (GOAL MET) — closed 2026-10-12 — opened 2026-10-12 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **measure, out of sample and pre-registered, whether as-of recent-workload features carry information about starter OUTS and STRIKEOUTS lines BEYOND the de-vigged book price. MEASUREMENT only; it decides whether a starter-length feature project is worth building. — GOAL: MET (answer: NO signal beyond the book; the feature project is NOT recommended).**
+  - Judge window 08-22..09-27, dlogloss vs a BOOK-only logistic, game-clustered CI.
+  - **outs (n 1105):**
+    - +SIM +0.0019 [-0.0008, +0.0044];
+    - +workload +0.0050 [+0.0004, +0.0093] (WORSE);
+    - +both +0.0090 [+0.0021, +0.0151] (WORSE).
+  - **K (n 1042):**
+    - +SIM +0.0013 [-0.0006, +0.0033];
+    - +workload -0.0013 [-0.0070, +0.0042];
+    - +both +0.0010 [-0.0056, +0.0082].
+  - Even recalibrating the book alone (0.6857) is no better than the raw de-vigged book (0.6834) for outs.
+  - **Reading.** With these public as-of inputs (last / last-3 pitch counts, days rest, season / last-3 averages, the sim), nothing adds to the starter outs/K price at ~1,050 judge rows per market.
+    - Consistent with market-shrink w = 0.00 / 0.06 and with lane mlb-pitcher-outs-k-dist.
+    - Stop investing in MLB starter-prop engine accuracy against these markets unless a NON-public or faster input appears (confirmed lineups/scratches, opener announcements, late pitch-count news).
+  - Scratch: `wl_feats.py`, `wl_fit.py`; fleet `~/ssims/rows_wl.json`.
 - Goal: measure, out of sample and pre-registered, whether as-of recent-workload features carry information about starter OUTS and STRIKEOUTS lines BEYOND the de-vigged book price. MEASUREMENT only; it decides whether a starter-length feature project is worth building.
 - **Why.** Lane mlb-pitcher-outs-k-dist: reshaping the sim's dist cannot reach the book (market-shrink w = 0.00 even after correction). The open question is whether ANY as-of public signal adds to the price.
 - **Features (as-of, strictly before the start date, from StatsAPI game logs):**
