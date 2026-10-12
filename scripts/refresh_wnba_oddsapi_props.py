@@ -497,6 +497,13 @@ def _load_period_lines_rows_by_matchup(*, source_root: Path, processed_root: Pat
     return out
 
 
+def _live_oddsapi_period_totals_for_game(date_str: str, home_tri: str, away_tri: str) -> dict[str, object]:
+    """Live OddsAPI period totals/spreads and game lines for one in-progress matchup (Syndicate's port)."""
+    from syndicate.features.wnba.live_period_lines import live_oddsapi_period_totals_for_game
+
+    return live_oddsapi_period_totals_for_game(date_str, home_tri, away_tri)
+
+
 def _build_source_live_lines_payload(
     *,
     source_root: Path,
@@ -511,10 +518,11 @@ def _build_source_live_lines_payload(
 
     odds_by_matchup = _load_game_odds_rows_by_matchup(source_root=source_root, processed_root=processed_root, date_str=date_str)
     period_by_matchup = _load_period_lines_rows_by_matchup(source_root=source_root, processed_root=processed_root, date_str=date_str)
-    source_app = _load_source_app(source_root)
+    # Live OddsAPI period totals/spreads come from Syndicate's port (syndicate/features/wnba/live_period_lines.py,
+    # lane wnba-live-period-lines-native, 2026-10-12). This used to import the whole vendored Flask app
+    # (vendor/wnba_betting_repo/app.py, via _load_source_app) on every live-snapshot export to reach one function.
     if diagnostic_sink is not None:
-        diagnostic_sink["source_app_loaded"] = source_app is not None
-        diagnostic_sink["source_app_has_period_fn"] = bool(source_app is not None and hasattr(source_app, "_live_oddsapi_period_totals_for_game"))
+        diagnostic_sink["period_lines_source"] = "syndicate_native"
         diagnostic_sink["per_game"] = {}
 
     out_games: list[dict[str, object]] = []
@@ -531,10 +539,10 @@ def _build_source_live_lines_payload(
         period_lines = dict(period_by_matchup.get(matchup_key) or {})
         live_lines = {}
         game_diag: dict[str, object] = {"in_progress": bool(game.get("in_progress")), "attempted": False}
-        if bool(game.get("in_progress")) and source_app is not None and hasattr(source_app, "_live_oddsapi_period_totals_for_game"):
+        if bool(game.get("in_progress")):
             game_diag["attempted"] = True
             try:
-                live_lines = source_app._live_oddsapi_period_totals_for_game(date_str, home_tri, away_tri) or {}
+                live_lines = _live_oddsapi_period_totals_for_game(date_str, home_tri, away_tri) or {}
                 game_diag["raw_period_totals"] = live_lines.get("period_totals")
                 game_diag["raw_period_spreads"] = live_lines.get("period_spreads")
             except Exception as exc:

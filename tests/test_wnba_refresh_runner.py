@@ -83,6 +83,10 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         # want to exercise it (test_load_source_app_*) still can.
         module._real_load_source_app = module._load_source_app
         module._load_source_app = lambda source_root: None
+        # Same rail for the live period-lines seam (lane wnba-live-period-lines-native): the real one calls OddsAPI
+        # when a key is in the environment. Tests that want lines patch it explicitly.
+        module._real_live_oddsapi_period_totals_for_game = module._live_oddsapi_period_totals_for_game
+        module._live_oddsapi_period_totals_for_game = lambda date_str, home_tri, away_tri: {}
         return module
 
     def test_main_calls_syndicate_cli_refresh_path(self) -> None:
@@ -3046,7 +3050,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             (source_root / "data" / "processed").mkdir(parents=True, exist_ok=True)
             processed_root.mkdir(parents=True, exist_ok=True)
 
-            with patch.object(module, "_load_source_app", return_value=_FakeSourceApp()):
+            with patch.object(module, "_live_oddsapi_period_totals_for_game", _FakeSourceApp._live_oddsapi_period_totals_for_game):
                 payload = module._build_source_live_lines_payload(
                     source_root=source_root,
                     processed_root=processed_root,
@@ -3106,7 +3110,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             (source_root / "data" / "processed").mkdir(parents=True, exist_ok=True)
             processed_root.mkdir(parents=True, exist_ok=True)
 
-            with patch.object(module, "_load_source_app", return_value=_FakeSourceApp()):
+            with patch.object(module, "_live_oddsapi_period_totals_for_game", _FakeSourceApp._live_oddsapi_period_totals_for_game):
                 payload = module._build_source_live_lines_payload(
                     source_root=source_root,
                     processed_root=processed_root,
@@ -3352,8 +3356,8 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
 
             with patch.object(module, "_source_app_fallback_enabled", return_value=False), patch.object(
                 module,
-                "_load_source_app",
-                return_value=_FakeSourceApp(),
+                "_live_oddsapi_period_totals_for_game",
+                _FakeSourceApp._live_oddsapi_period_totals_for_game,
             ), patch.object(
                 module,
                 "_build_local_live_snapshot_payload",

@@ -1066,6 +1066,14 @@ death, never life — do not invert it.
 - Verification: Per-side lineup_effects reasons on production sims (prod data root, read-only); table mtime / max date / team set / season_type; A/B on the as-of replay (nice -n 19, scratch copy) with the population and dates stated; any shipped change measured off != on and recorded in deploys.md.
 - Blocked by: none
 
+### wnba-live-period-lines-native — OPEN — opened 2026-10-12 — session 2d413211-0162-420b-9603-72b7ea9f9867
+- Goal: Move the WNBA live period totals off the vendored app: refresh_wnba_oddsapi_props._build_source_live_lines_payload gets in-progress games' OddsAPI period totals/spreads and live game lines from a Syndicate-owned port (syndicate/features/wnba/live_period_lines.py) of vendor/wnba_betting_repo/app.py:_live_oddsapi_period_totals_for_game, instead of importing the 46,820-line vendored Flask app; outputs identical to the vendored function on the same OddsAPI responses (parity over recorded-shape responses, every branch); no vendored app import on that path; the live reading is owed to the 2027 WNBA season (no in-progress games now).
+- Files: syndicate/features/wnba/live_period_lines.py (NEW), tests/test_wnba_live_period_lines.py (NEW), scripts/refresh_wnba_oddsapi_props.py (_build_source_live_lines_payload live period section only), tests/test_wnba_refresh_runner.py (_load_module stub and live-lines builder tests section only), docs/ai_context/basketball_live_native_plan.md (P6 vendored-uses table WNBA live period totals row section only)
+- Hypothesis: A faithful port of the vendored function (and its team-code closure) returns identical dicts for the same HTTP responses, so the live-lines payload is unchanged.
+- Falsification test: Any output difference between vendored and native on the same mocked OddsAPI responses, or any vendored module imported on the live-lines path.
+- Verification: parity test vendored (AST-extracted closure) vs native over every branch; fresh-interpreter check that building live lines loads no vendored module; fleet ff verify: the native function runs on the deployed checkout against OddsAPI; live in-progress reading owed May 2027
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
