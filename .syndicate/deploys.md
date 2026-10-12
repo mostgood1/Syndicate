@@ -48537,3 +48537,9 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - The native function's one real `/events` call returned 1 WNBA event (GSV v ATL, 2026-10-17T19:30Z), logged `PERIOD_MARKET_EVENT_MATCH_FAILED` for the absent matchup, and returned `{}`. That is the vendored behaviour.
 - **OWED:** a live in-progress reading (period totals parsed for a real live WNBA game). Candidate: GSV v ATL 2026-10-17 if the refresh marks it in progress; otherwise the 2027 season opener.
 - **Rollback.** Revert e256bf42 and ff. No restart.
+
+## 2026-10-12 ~16:4xZ -- UPSTREAM MERGES, no fleet change: mostgood1/MLB-BettingV2 #2 (c2cd8e8c) and #3 (d293b4fd) squash-merged (lanes `mlb-combined-calibration` / `mlb-starter-length`, archived; session b98d59a1)
+- **Context.** User: "proceed next action" on the listed item "merge #2 and #3 ... needs your OK". #3 contained #2's commit 869dc1ab, so #2 was merged first and #3 re-checked MERGEABLE/CLEAN before merging. Both branches deleted.
+- **Verify.** Upstream main `sim_engine/models.py` carries `bip_dp_rate: float = 0.3`, `bip_fc_rate: float = 0.484`, the steal / double-steal and pop-up sac-fly fields. `simulate.py` carries `starter_shell_runs_start`, `roe_rates`, `sb_attempt_mult`, `double_steal`.
+- **Still Syndicate-only (a vendor re-pull would DROP them; both default-off):** `count_outcome_mult` (pitch_model.py) and recency-weighted starter stamina (build_roster.py / recency.py). Also the vendor tuning JSONs, which upstream does not track.
+- Remaining open upstream PR: #4 (another lane's hits_runs_rbis rung), untouched.
