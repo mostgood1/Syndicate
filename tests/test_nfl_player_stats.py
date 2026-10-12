@@ -332,12 +332,19 @@ if __name__ == "__main__":
 
 
 class NflPerMarketShrinkageTests(unittest.TestCase):
-    """`passing_attempts` overrides the global spread shrinkage at k=2.
+    """`passing_attempts` overrides the global spread shrinkage at k=4.
 
     It was the LAST market failing the `#499` bar. A full per-market table was
     swept and refused (pooled Brier -0.000077, three markets worse, gaps moving
     backwards on the two best-calibrated), so the override list is deliberately
     one entry and the global k stands everywhere it is not beaten decisively.
+
+    k WAS 2.0 UNTIL `018a7c64` (2026-10-08) re-fitted it to 4.0 on OFFICIAL
+    attempts, which also moved cv 0.5444 -> 0.4281. The selection table lives
+    beside the constant: k=4 took held Brier 0.166145 and cov80 0.8715 against
+    k=2's 0.166868 / 0.8245. These assertions were NOT updated with it and failed
+    for two days; they pin the SELECTED value on purpose, so the next re-fit has
+    to come back here and confirm rather than drift silently.
     """
 
     def test_the_override_is_REACHED_and_differs_from_the_global_k(self) -> None:
@@ -348,12 +355,14 @@ class NflPerMarketShrinkageTests(unittest.TestCase):
         overridden = player_stats.shrink_spread(*same_inputs, "passing_attempts")
         globaldflt = player_stats.shrink_spread(*same_inputs, "receiving_yards")
         self.assertNotAlmostEqual(overridden, globaldflt, places=6)
-        self.assertEqual(player_stats.SPREAD_SHRINKAGE_K_BY_MARKET["passing_attempts"], 2.0)
+        self.assertEqual(player_stats.SPREAD_SHRINKAGE_K_BY_MARKET["passing_attempts"], 4.0)
 
-    def test_the_override_uses_k2_not_the_global_6(self) -> None:
+    def test_the_override_uses_k4_not_the_global_6(self) -> None:
+        """The k is written out, not read from the table, so this stays a real
+        assertion: reading the constant would make it pass for ANY k."""
         raw, n, mean = 5.0, 3.0, 35.0
         cv = player_stats.LEAGUE_SPREAD_CV["passing_attempts"]
-        expected = (n * raw + 2.0 * cv * mean) / (n + 2.0)
+        expected = (n * raw + 4.0 * cv * mean) / (n + 4.0)
         self.assertAlmostEqual(
             player_stats.shrink_spread(raw, int(n), mean, "passing_attempts"),
             expected, places=9)
