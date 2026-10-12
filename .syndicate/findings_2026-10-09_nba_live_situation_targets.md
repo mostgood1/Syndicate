@@ -509,3 +509,35 @@ proposal, production pregame k = 0).
 - **The gate states its config:** each arm is labelled "score_effect_k = 0 (production pregame)" or
   "score_effect_k = 0.002 (proposed)". The live re-sim must run the same k as production pregame, so a resume at
   the tip reproduces the pregame number; the user picks one config for both at switch-on.
+
+## 8. PRE-REGISTERED 2026-10-12 (before any measurement): foul-out + foul-trouble benching (mechanism M-FT)
+
+**Mechanisms** (engine, default-off):
+- `foul_out_in_sim` (disqualification at the league limit);
+- `foul_trouble_bench_mult`, with thresholds 2/3/4/5 PF in Q1-Q4 and no benching inside the final 240 s of
+  regulation.
+
+**Measured first, before this pre-registration, on 40 FIT games × 20 pregame draws (v4 inputs,
+score_effect_k = 0.002):**
+- players reaching 6 PF/game: OFF 0.745, disqualification-only 0.765;
+- players EXCEEDING 6 PF: OFF 0.438, disqualification-only 0.014.
+- So disqualification fixes "fouling past the limit" but not the foul-out RATE.
+- Real 0.193/game (basketball-scenario-calibration full FIT).
+
+**Population:** 2025-26 regular season, v4 as-of inputs, k = 0.002, `foul_out_in_sim` ON in every arm.
+- FIT: 60 games sampled from 2025-11..2026-02.
+- VALIDATION: 60 games from 2026-03-01..04-12, read once.
+- 20 pregame draws/game, common random numbers.
+
+**Grid:** `foul_trouble_bench_mult` ∈ {1.0, 0.5, 0.3, 0.15, 0.05}.
+
+**Selection (FIT):** the mult minimising |sim foul-outs/game − 0.193|.
+
+**Ship rule (VALIDATION):**
+- |sim − 0.193| ≤ 0.05 at the chosen mult, AND
+- total PF/game within ±5% of the mult = 1.0 arm. Benching may move who fouls, not how much a team fouls; if it
+  moves the total, it is absorbing a foul-rate re-fit and that has to be done jointly.
+
+**Secondary (reported, not gated):** the live-resume check. From real states where a starter has just reached
+the threshold (§2d), the sim's share of the rest of the period with that player on the floor vs real
+0.19 / 0.21 / 0.21 / 0.46. Needs per-possession lineup recording; deferred if the engine cannot report it.
