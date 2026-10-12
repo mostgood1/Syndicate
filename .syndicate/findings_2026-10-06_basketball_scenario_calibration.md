@@ -1310,3 +1310,40 @@ P3's.
 - P3 builds no separate leader-bench lever.
 - Order: whichever of #4 and P3's M-FT lands second is measured with the first ON.
 - Owed to P3: the #4 starter-minutes-by-margin baseline (M4_base, running).
+
+### Phase 2 #4 — BASELINE RESULT 2026-10-12 ~22:30Z (5:30 PM CDT): simulated starter minutes vs game script
+
+**Run:** M4_base, the accepted config incl. k = 0.002 + lineup pools + #473 inputs, --track-oncourt. 12 dates, 87
+games, 17,400/17,400 engine calls with levers; 0 unattributed possessions.
+
+| final \|margin\| | real ESPN starters min (team-sides) | sim top-5 min (team-side draws) | sim INPUT top-5 min |
+|---|---|---|---|
+| ≤ 6 | 31.06 (n 44) | 32.27 (10,290) | 32.04 |
+| 7-19 | 30.77 (90) | 31.96 (16,452) | 32.05 |
+| ≥ 20 | 26.69 (40) | **31.11** (8,058) | 32.05 |
+
+- Game-script drop (≥ 20 minus ≤ 6): real −4.38, sim −1.17.
+- **H-M1 HOLDS:** the sim drop is < 50% of real. In ≥ 20-pt games sim starters play +4.4 min more than real.
+- **H-M2:** foul-outs rise with draw top-5 minutes, slope +0.0142 per minute. Mean foul-outs 0.379 (real 0.193;
+  the disqualification gap is P3's).
+
+## Phase 2 #4b — BLOWOUT BENCH REST lever, PRE-REGISTERED (before any engine change)
+
+**Mechanism:** the dead bench boost in `sample_lineup_minutes_weighted` (top-5 by minutes weight ÷ b, the rest × b,
+n ≥ 8) is hard-coded off at the two blowout-path sampler call sites (native engine ~:1290, :1299).
+- New `EventSimConfig.blowout_bench_rest: bool = False`; when True, those two calls pass
+  `blowout_boost_bench=blowout`.
+- Strength = the existing `bench_weight_boost` (1.35).
+- Off = byte-identical: proven on the 5,400-call corpus parity + seeded sha.
+- **LOAN needed:** engine.py, from P3 (nba-native-live-resim), whose section covers the EventSimConfig fields.
+
+**Sweep:** the accepted config, --track-oncourt, the same 12 dates. Points: rest off (= M4_base) / rest on with
+b ∈ {1.35, 2.0, 3.0}.
+
+**Readings:**
+- PRIMARY: the sim ≥ 20 bucket top-5 minutes vs real 26.69, and the drop vs real −4.38.
+- **Guards** (run noise): the ≤ 6 bucket unchanged within 0.5 min; S8 margin SD, S5 blowouts, H2/Q4 slopes, total
+  bias, and foul-outs not worse.
+- **Confirmed** for a b whose drop is within ±1.5 min of real with all guards holding. If none, refuted: the blowout
+  flag (quarter-start Q3+ ≥ 18 / Q4 ≥ 15) is too coarse a trigger. P3's band-dependent asymmetric garbage time is then
+  the next candidate.
