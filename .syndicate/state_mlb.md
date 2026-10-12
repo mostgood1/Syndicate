@@ -1368,7 +1368,7 @@ Other readings:
   - **Board pricing seam (live 2026-10-10 15:39Z):** MLB market-shrink calibration toward the de-vigged fair.
     - Cells: outs w=0, strikeouts 0.06, spreads|first5 0.01, totals|first5 0.09, totals|first1 0.67.
     - `SYNDICATE_PRICING_CALIBRATION=on` on all roles. Other sports have no profile, so they are identity.
-    - The board's F5/F1/F3 game rows are `*_alt` markets and are NOT covered.
+    - Alt cells added 2026-10-12 14:32Z: `totals_alt|first3` w=0.30, `spreads_alt|first3` 0.28, `totals_alt|first1` 0.87. F5 alt (`totals_alt`/`spreads_alt` first5) stays IDENTITY: it failed the ROI guard. The profile now has 8 cells `[verified: fleet probe + served board 14:58Z]`.
     - **Out of sample the model's weight vs the book is <= 0.31 in 10 of 13 markets.** The model adds little information beyond the price for MLB pitcher K/outs, F5 and moneyline.
   - Lane `mlb-statsapi-asof-rebuild`; details in log 2026-10-09.
 
