@@ -39,13 +39,11 @@ def current_season(date_str: str) -> str:
 
 
 def _vendor_fetch() -> Callable[[str], Any]:
-    try:
-        from nba_betting import player_logs as pl  # type: ignore
-    except Exception:  # noqa: BLE001
-        src = Path(__file__).resolve().parents[3] / "vendor" / "nba_betting_repo" / "src"
-        if str(src) not in sys.path:
-            sys.path.insert(0, str(src))
-        from nba_betting import player_logs as pl  # type: ignore
+    # Name kept for its callers. Since 2026-10-12 (lane nba-live-tick-native, under a loan from this lane) this is a
+    # verbatim Syndicate copy of the vendored nba_betting.player_logs._fetch_season_player_logs; nothing here imports
+    # the vendored package or puts vendor/ on sys.path (tests/test_nba_player_logs_fetch.py).
+    from syndicate.features.shared import nba_player_logs_fetch as pl
+
     return lambda season: pl._fetch_season_player_logs(season, max_attempts=2)
 
 
