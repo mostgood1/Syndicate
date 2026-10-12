@@ -90,11 +90,23 @@ NBA_TEAM_NAMES: dict[str, str] = {
 }
 
 
-def props_csv_path(date: str, *, root: Optional[Path] = None) -> Path:
+# Per-league tricode -> OddsAPI full name. P5 (WNBA) registers its own map with `register_team_names("wnba", ...)`.
+TEAM_NAMES_BY_LEAGUE: dict[str, dict[str, str]] = {"nba": NBA_TEAM_NAMES}
+
+
+def register_team_names(league: str, names: Mapping[str, str]) -> None:
+    TEAM_NAMES_BY_LEAGUE[str(league).lower()] = {str(k).upper(): str(v) for k, v in names.items()}
+
+
+def team_name(league: str, code: Any) -> str:
+    return (TEAM_NAMES_BY_LEAGUE.get(str(league).lower()) or {}).get(str(code or "").upper(), "")
+
+
+def props_csv_path(date: str, *, root: Optional[Path] = None, league: str = LEAGUE) -> Path:
     if root is None:
         from syndicate.features.shared.basketball_live_state import source_root
 
-        root = source_root(LEAGUE)
+        root = source_root(league)
     return Path(root) / "data" / "processed" / f"oddsapi_player_props_{date}.csv"
 
 
@@ -147,7 +159,7 @@ def period_points(events: Sequence[Any], period: int) -> tuple[tuple[int, ...], 
     return tuple(home), tuple(away)
 
 
-def resume_from_summary(summary: Mapping[str, Any], *, date: str = "", as_of: str = ""):
+def resume_from_summary(summary: Mapping[str, Any], *, date: str = "", as_of: str = "", league: str = LEAGUE):
     """ESPN summary -> (LiveGameState, GameState, ResumeFacts), or a named refusal.
 
     The resume point is AFTER the last logged play. At a period's end (clock 0) the engine starts the
@@ -160,8 +172,8 @@ def resume_from_summary(summary: Mapping[str, Any], *, date: str = "", as_of: st
     if not isinstance(summary, Mapping):
         return NbaResimRefusal("summary_not_a_mapping")
     try:
-        rec = pbp.reconstruct(summary, LEAGUE, date=date)
-        state = build_live_game_state(summary, LEAGUE, date=date)
+        rec = pbp.reconstruct(summary, league, date=date)
+        state = build_live_game_state(summary, league, date=date)
     except Exception as exc:  # noqa: BLE001 -- a feed we cannot parse is a refusal, named
         return NbaResimRefusal("live_state_unparseable", type(exc).__name__)
 
@@ -200,10 +212,11 @@ def resume_from_summary(summary: Mapping[str, Any], *, date: str = "", as_of: st
                                    f"pbp {sum(hp)}-{sum(ap)} official {state.home.score}-{state.away.score}")
 
     # Where to resume.
+    reg_periods = int(pbp.rules_for(league).regulation_periods)  # 4 quarters (NBA/WNBA), 2 halves (NCAAB); no default
     if clock <= 0:
         # A period just ended. Resume from the NEXT period's tip -- in regulation always, after Q4 or an
         # OT only if the game is tied (that is overtime); otherwise the game is decided.
-        if period >= _REGULATION_PERIODS and sum(hp) != sum(ap):
+        if period >= reg_periods and sum(hp) != sum(ap):
             return NbaResimRefusal("regulation_over")
         r_period, r_secs = period + 1, None
         hp, ap = hp + (0,), ap + (0,)
@@ -249,37 +262,37 @@ def _names(state: Any, side: str) -> list[str]:
 
 # ------------------------------------------------------------------------------------------- engine inputs
 
-def engine_inputs_dir(date: str, *, root: Optional[Path] = None) -> Path:
+def engine_inputs_dir(date: str, *, root: Optional[Path] = None, league: str = LEAGUE) -> Path:
     if root is None:
         from syndicate.features.shared.basketball_live_state import source_root
 
-        root = source_root(LEAGUE)
+        root = source_root(league)
     return Path(root) / "data" / "processed" / ENGINE_INPUTS_DIRNAME / str(date)
 
 
-def engine_inputs_path(date: str, home: str, away: str, *, root: Optional[Path] = None) -> Path:
-    return engine_inputs_dir(date, root=root) / f"{str(home).upper()}_{str(away).upper()}.pkl"
+def engine_inputs_path(date: str, home: str, away: str, *, root: Optional[Path] = None, league: str = LEAGUE) -> Path:
+    return engine_inputs_dir(date, root=root, league=league) / f"{str(home).upper()}_{str(away).upper()}.pkl"
 
 
 def persist_engine_inputs(date: str, home: str, away: str, kwargs: Mapping[str, Any], *,
-                          root: Optional[Path] = None) -> Path:
+                          root: Optional[Path] = None, league: str = LEAGUE) -> Path:
     """Write the pregame engine kwargs for one game (atomic). Called once per game at pregame sim time.
 
     Pickle, because the kwargs are DataFrames + an `EventSimConfig` + `QuarterResult`s and the engine
     must receive the same objects bit for bit (the recorded-corpus pickles are ~100 KB/game)."""
-    path = engine_inputs_path(date, home, away, root=root)
+    path = engine_inputs_path(date, home, away, root=root, league=league)
     path.parent.mkdir(parents=True, exist_ok=True)
     body = {k: kwargs[k] for k in _INPUT_KEYS if k in kwargs}
     tmp = path.with_suffix(".tmp")
     with tmp.open("wb") as fh:
-        pickle.dump({"schema": ENGINE_INPUTS_SCHEMA, "league": LEAGUE, "date": str(date), "home": str(home).upper(),
+        pickle.dump({"schema": ENGINE_INPUTS_SCHEMA, "league": str(league).lower(), "date": str(date), "home": str(home).upper(),
                      "away": str(away).upper(), "written_at": _utc_now_iso(), "kwargs": body}, fh, protocol=4)
     tmp.replace(path)
     return path
 
 
-def load_engine_inputs(date: str, home: str, away: str, *, root: Optional[Path] = None):
-    path = engine_inputs_path(date, home, away, root=root)
+def load_engine_inputs(date: str, home: str, away: str, *, root: Optional[Path] = None, league: str = LEAGUE):
+    path = engine_inputs_path(date, home, away, root=root, league=league)
     if not path.exists():
         return NbaResimRefusal("no_pregame_inputs", str(path.name))
     try:
@@ -387,12 +400,12 @@ def with_live_mechanisms(inputs: Mapping[str, Any], mechanisms: Mapping[str, Any
     return {**dict(inputs), "cfg": EventSimConfig(**{**vals, **dict(mechanisms)})}
 
 
-def resume_engine_label() -> str:
+def resume_engine_label(league: str = LEAGUE) -> str:
     """Which engine a live resume runs: the league plus the #473 no-stack switch, for the lane's audit trail."""
     try:
         from syndicate.features.shared.basketball_props_smart_sim import _engine_for_league_local
 
-        params = _engine_for_league_local(LEAGUE).params
+        params = _engine_for_league_local(league).params
         value = getattr(params, "team_prior_stacks_on_target", None)
         # None = the league defers to the config's own `team_prior_stacks_on_target` (vendored default: stack).
         return f"{params.code}:stack={'cfg' if value is None else bool(value)}"
@@ -407,7 +420,7 @@ def stable_seed(event_id: str, last_seq: int) -> int:
 
 def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = DEFAULT_SIMS, base_seed: int = 0,
                     deadline: Optional[float] = None, simulate: Optional[Callable[..., Any]] = None,
-                    clock: Callable[[], float] = time.monotonic):
+                    clock: Callable[[], float] = time.monotonic, league: str = LEAGUE):
     """Run `sims` resumed games from `game_state`; aggregate full-game and per-period distributions.
 
     `deadline` is a `clock()` value. Hitting it before `sims` draws finish is `budget_exhausted` -- the
@@ -422,7 +435,7 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
         # process env, so both workers must carry the same value; `resumeEngine` on the lane records which ran.
         from syndicate.features.shared.basketball_props_smart_sim import _engine_for_league_local
 
-        engine = _engine_for_league_local(LEAGUE)
+        engine = _engine_for_league_local(league)
 
         def simulate(rng, gs):  # noqa: E306
             return engine.simulate_pbp_game_boxscore(rng=rng, **dict(inputs), state=gs)
@@ -685,16 +698,16 @@ def build_game_lens(facts: Optional[ResumeFacts], result: Any, *, live_state_as_
 
 # ------------------------------------------------------------------------------------------- the snapshot
 
-def live_lens_snapshot_path():
+def live_lens_snapshot_path(league: str = LEAGUE):
     from syndicate.features.shared.refresh_state_store import data_root
 
-    return data_root() / "live" / "nba_live_resim.json"
+    return data_root() / "live" / f"{str(league).lower()}_live_resim.json"
 
 
-def _game_identity(summary: Mapping[str, Any]) -> tuple[str, str, str]:
+def _game_identity(summary: Mapping[str, Any], league: str = LEAGUE) -> tuple[str, str, str]:
     from syndicate.features.shared import basketball_pbp as pbp
 
-    meta = pbp.game_meta(summary, LEAGUE)
+    meta = pbp.game_meta(summary, league)
     return meta.event_id, meta.home.code, meta.away.code
 
 
@@ -702,7 +715,7 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
                              fetch_scoreboard: Optional[Callable[..., Any]] = None,
                              fetch_summary: Optional[Callable[..., Any]] = None,
                              inputs_root: Optional[Path] = None,
-                             clock: Callable[[], float] = time.monotonic) -> dict[str, Any]:
+                             clock: Callable[[], float] = time.monotonic, league: str = LEAGUE) -> dict[str, Any]:
     from syndicate.features.shared import basketball_pbp as pbp
     from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
 
@@ -712,7 +725,7 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
     started = clock()
     deadline = started + float(budget_seconds)
     games: list[dict[str, Any]] = []
-    scoreboard = fetch_scoreboard(LEAGUE, str(date_str).replace("-", ""))
+    scoreboard = fetch_scoreboard(league, str(date_str).replace("-", ""))
     events = pbp.scoreboard_events(scoreboard)
     for ev in events:
         event_id = str(ev.get("event_id") or ev.get("id") or "")
@@ -720,39 +733,41 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         if state != "in":
             continue
         try:
-            summary = fetch_summary(LEAGUE, event_id)
+            summary = fetch_summary(league, event_id)
         except Exception as exc:  # noqa: BLE001
-            games.append(_lane_row(event_id, "", "", None, NbaResimRefusal("summary_fetch_failed", type(exc).__name__)))
+            games.append(_lane_row(event_id, "", "", None, NbaResimRefusal("summary_fetch_failed", type(exc).__name__),
+                                   league=league))
             continue
-        _eid, home, away = _game_identity(summary)
-        resumed = resume_from_summary(summary, date=str(date_str))
+        _eid, home, away = _game_identity(summary, league)
+        resumed = resume_from_summary(summary, date=str(date_str), league=league)
         if isinstance(resumed, NbaResimRefusal):
-            games.append(_lane_row(event_id, home, away, None, resumed))
+            games.append(_lane_row(event_id, home, away, None, resumed, league=league))
             continue
         _state, gs, facts = resumed
-        inputs = load_engine_inputs(str(date_str), home, away, root=inputs_root)
+        inputs = load_engine_inputs(str(date_str), home, away, root=inputs_root, league=league)
         if isinstance(inputs, NbaResimRefusal):
-            games.append(_lane_row(event_id, home, away, facts, inputs))
+            games.append(_lane_row(event_id, home, away, facts, inputs, league=league))
             continue
         gs, match = map_state_names(gs, inputs["home_players"], inputs["away_players"])
         mechanisms = live_mechanisms_from_env()
         inputs = with_live_mechanisms(inputs, mechanisms)
-        match = {**match, "mechanisms": sorted(mechanisms), "resumeEngine": resume_engine_label()}
+        match = {**match, "mechanisms": sorted(mechanisms), "resumeEngine": resume_engine_label(league)}
         if clock() >= deadline:
-            games.append(_lane_row(event_id, home, away, facts, NbaResimRefusal("budget_exhausted", "before_start")))
+            games.append(_lane_row(event_id, home, away, facts, NbaResimRefusal("budget_exhausted", "before_start"),
+                                   league=league))
             continue
         result = resim_live_game(inputs, gs, sims=sims, base_seed=stable_seed(facts.event_id, facts.last_seq),
-                                 deadline=deadline, clock=clock)
-        row = _lane_row(event_id, home, away, facts, result, match)
+                                 deadline=deadline, clock=clock, league=league)
+        row = _lane_row(event_id, home, away, facts, result, match, league=league)
         if not isinstance(result, NbaResimRefusal):
-            lines = lines_from_props_csv(props_csv_path(str(date_str), root=inputs_root),
+            lines = lines_from_props_csv(props_csv_path(str(date_str), root=inputs_root, league=league),
                                          row["home_name"], row["away_name"])
             props, coverage = build_live_props(result, actuals_from_summary(summary), lines)
             row["liveProps"] = props
             row["livePropsCoverage"] = {**coverage, "lines_available": len(lines)}
         games.append(row)
     return {
-        "sport": LEAGUE,
+        "sport": str(league).lower(),
         "date": str(date_str),
         "generatedAt": _utc_now_iso(),
         "source": LIVE_RESIM_LENS_SOURCE,
@@ -765,9 +780,9 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
 
 
 def _lane_row(event_id: str, home: str, away: str, facts: Optional[ResumeFacts], result: Any,
-              match: Optional[Mapping[str, Any]] = None) -> dict[str, Any]:
-    home_name = NBA_TEAM_NAMES.get(str(home).upper(), "")
-    away_name = NBA_TEAM_NAMES.get(str(away).upper(), "")
+              match: Optional[Mapping[str, Any]] = None, *, league: str = LEAGUE) -> dict[str, Any]:
+    home_name = team_name(league, home)
+    away_name = team_name(league, away)
     return {
         "event_id": event_id,
         # FULL NAMES under `home`/`away`: `live_gameline_join` keys on the first of (matchup, away/home,

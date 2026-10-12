@@ -403,3 +403,32 @@ def test_live_resume_uses_the_pregame_engine_object_including_the_473_no_stack(m
     bps._ENGINES_LOCAL.clear()
     assert lr.resume_engine_label() == "nba:stack=cfg"  # off: the league defers to the config (which stacks)
     bps._ENGINES_LOCAL.clear()
+
+
+# ------------------------------------------------------------------------------------------- league parameter (P5)
+
+def test_league_keyword_threads_through_storage_and_names(tmp_path):
+    p = lr.persist_engine_inputs("2026-08-01", "LVA", "NYL", {k: k for k in lr._INPUT_KEYS}, root=tmp_path, league="wnba")
+    import pickle
+
+    assert pickle.loads(p.read_bytes())["league"] == "wnba"
+    assert lr.load_engine_inputs("2026-08-01", "LVA", "NYL", root=tmp_path, league="wnba") == {k: k for k in lr._INPUT_KEYS}
+    assert lr.live_lens_snapshot_path("wnba").name == "wnba_live_resim.json"
+    assert lr.live_lens_snapshot_path().name == "nba_live_resim.json"  # default unchanged
+    assert lr.team_name("wnba", "LVA") == ""  # P5 registers its own map
+    lr.register_team_names("wnba", {"lva": "Las Vegas Aces"})
+    assert lr.team_name("wnba", "LVA") == "Las Vegas Aces" and lr.team_name("nba", "GSW") == "Golden State Warriors"
+    lr.TEAM_NAMES_BY_LEAGUE.pop("wnba", None)
+
+
+def test_wnba_summary_resumes_with_wnba_rules():
+    g = Game("wnba", state="in")
+    g.shot(1, "9:00", "home", "h1").end_period(1)
+    _st, gs, facts = lr.resume_from_summary(g.summary(), league="wnba")
+    assert (gs.period, gs.seconds_remaining) == (2, None) and facts.home_score == 2
+
+
+def test_ncaab_halves_end_regulation_after_period_two():
+    g = Game("ncaab", state="in")
+    g.shot(1, "15:00", "home", "h1").end_period(2)  # end of the 2nd half, home up 2: decided, not "go to period 3"
+    assert lr.resume_from_summary(g.summary(), league="ncaab") == lr.NbaResimRefusal("regulation_over")
