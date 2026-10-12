@@ -48,11 +48,15 @@ HISTORY_FILES = {
     "processed/features.csv": "date",
     "processed/boxscores_history.csv": "date",
     "raw/games_nba_api.csv": "date",
+    # Engine lineup pools (rotation stints). Production regular-season sims carry them; replays deleted the file, so
+    # every replay ran with no lineup pools (no_rotation_stints_history). As-of truncation (date < slate) here; the
+    # parquet copy stays removed so the reader (parquet first) falls back to this truncated CSV. 2026-10-12.
+    "processed/rotation_stints_history.csv": "date",
 }
 REMOVE_ALWAYS = ("processed/features.parquet", "raw/games_nba_api.parquet", "processed/team_period_shares.csv",
                  "processed/home_court_advantage.json", "processed/lineup_player_baselines.parquet",
                  "processed/lineup_teammate_effects.parquet", "raw/injuries.csv",
-                 "processed/rotation_stints_history.csv", "processed/rotation_stints_history.parquet",
+                 "processed/rotation_stints_history.parquet",
                  "processed/pbp_espn_history.csv", "processed/pbp_espn_history.parquet",
                  "processed/pair_minutes_history.csv", "processed/pair_minutes_history.parquet",
                  "processed/play_context_history.csv", "processed/play_context_history.parquet",
