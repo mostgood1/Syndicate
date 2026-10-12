@@ -1365,6 +1365,11 @@ Other readings:
     - The loss is reliability: the model p is ~5x more spread than the book on totals.
     - See `findings_2026-10-09_mlb_oos_market_backtest.md`.
   - Pitches/PA remain ~10% low (count shape missing).
+  - **Board pricing seam (live 2026-10-10 15:39Z):** MLB market-shrink calibration toward the de-vigged fair.
+    - Cells: outs w=0, strikeouts 0.06, spreads|first5 0.01, totals|first5 0.09, totals|first1 0.67.
+    - `SYNDICATE_PRICING_CALIBRATION=on` on all roles. Other sports have no profile, so they are identity.
+    - The board's F5/F1/F3 game rows are `*_alt` markets and are NOT covered.
+    - **Out of sample the model's weight vs the book is <= 0.31 in 10 of 13 markets.** The model adds little information beyond the price for MLB pitcher K/outs, F5 and moneyline.
   - Lane `mlb-statsapi-asof-rebuild`; details in log 2026-10-09.
 
 **The board keeps serving `model_prob_over`/edge on every MLB pregame market BY USER DECISION** -- USER DECISION 2026-10-02 ~8:15 PM CT, verbatim: "MLB should still show everything - the prime directive of the app is that every line is its own decision. we should have a model that is accurate that then helps inform each decision". Code: `prop_projections.py:687/726/768`, `project_game_market`. Stakes still follow price (`[portfolio-sim-sizing-gate]`). A mean-only gate was built and discarded unshipped (lane `mlb-board-mean-only`, CLOSED).

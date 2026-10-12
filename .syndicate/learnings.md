@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1365 rules `[generated]`
+## Index — 1369 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -3792,3 +3792,12 @@ These read the VENDORED `config.paths`, which the bridge never pinned. It matche
 - A partial reading in between is a mixed board, not a partial fix. Two more traps in the same hour:
   - An Ask probe built from a shortlist fetched before the last rebuild matches no row, because resolve_board_row is exact-or-nothing, and reads as "broken".
   - A probe that does not reproduce the button's payload (nested `context`, "What's the case for and against ..." wording) is routed out_of_scope.
+
+## 2026-10-12 -- A calibration that improves Brier can make the BETS worse: on a pricing seam, shrink toward the market, not toward 0.5 `[lane mlb-probability-calibration]`
+**The miss.** A symmetric affine-logit fitted out of sample on MLB passed the pre-registered Brier rule in 8 of 13 markets.
+- The same curves made the ROI of EV>0 bets at the book's prices WORSE in 6 of those 8: full total -7.6% -> -12.7%, K -10.3% -> -14.3%.
+- Mechanism: slopes near 0 flatten p toward 0.5, and the seam re-differences against the fair, so the residual edge becomes (0.5 - fair). That favours plus-money sides wherever the market is not 50/50.
+**Rule.**
+- A calibration that feeds an edge must be judged on the EDGE it produces (ROI of the bets it selects, at real prices) as well as on Brier.
+- Prefer a market-ward form (`p' = fair + w*(p - fair)`): it scales the edge and never flips its side.
+- A fitted w near 0 is a finding about the model's information content, not a calibration to celebrate.

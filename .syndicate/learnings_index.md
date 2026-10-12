@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1365 rules `[generated]`
+## Index — 1369 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -533,7 +533,7 @@
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 - [2026-09-03 — EXONERATED: `deploys.md` and `learnings.md` ARE guarded. Two sessions file…](learnings_archive.md#2026-09-03-exonerated-deploysmd-and-learningsmd-are-guarded-two-sessions-filed-the-same-false-gap-and-the-second-re-derived-it-with-the-same-blind-spot) `[evidence]`
 
-**Rules and corrections — 846**
+**Rules and corrections — 850**
 
 - [2026-09-16 — a detector that matches a FORMULA at published precision has a FALSE-POSIT…](#2026-09-16-a-detector-that-matches-a-formula-at-published-precision-has-a-false-positive-rate-and-mine-fired-at-about-1-row-per-1200-session-abacd435-lane-soccer-anytime-scorer)
 - [2026-09-16 — OVERTURNED: "the pre-registered criterion is the safe part, the risk is in…](#2026-09-16-overturned-the-pre-registered-criterion-is-the-safe-part-the-risk-is-in-the-mechanism-two-hypotheses-in-one-night-died-on-the-criterion-session-abacd435-fixes-4-and-5a-no-lane)
@@ -751,6 +751,10 @@
 - [2026-10-10 — RULE: measure a sim input's reachability on a PREGAME call, never on a com…](#2026-10-10-rule-measure-a-sim-inputs-reachability-on-a-pregame-call-never-on-a-completed-game-a-finished-game-hands-the-sim-lookups-espn-box---nameid-map-that-a-pregame-call-does-not-have-lane-basketball-native-live-state-session-82bc583a)
 - [2026-10-10 -- A config "resolves" check proves the resolver, not the run: read the run'…](#2026-10-10----a-config-resolves-check-proves-the-resolver-not-the-run-read-the-runs-own-recorded-config-per-profile-lane-mlb-game-profile-pitch-config)
 - [2026-10-10 — A HALF-FIX LOOKS EXACTLY LIKE A FIX: PIN BOTH ENDS OF AN IO PAIR `[lane le…](#2026-10-10-a-half-fix-looks-exactly-like-a-fix-pin-both-ends-of-an-io-pair-lane-ledger-tools-byte-safe-io-session-4ab694ed-5dfddf6e)
+- [2026-10-10 OVERTURNED: "only the vendored orchestrator LOOP runs; the data computation…](#2026-10-10-overturned-only-the-vendored-orchestrator-loop-runs-the-data-computation-is-syndicates-basketball_sim_engine_referencemd-sec0----lane-basketball-native-orchestrator)
+- [2026-10-10 -- Feeding a previously-NEUTRAL input switches on every consumer's handling…](#2026-10-10----feeding-a-previously-neutral-input-switches-on-every-consumers-handling-of-it-including-the-wrong-ones-lane-nba-sim-team-adj-473-session-eb2ba139)
+- [2026-10-10 RULE: a board-card fix is live only when EVERY date's stored shortlist has b…](#2026-10-10-rule-a-board-card-fix-is-live-only-when-every-dates-stored-shortlist-has-been-rewritten----not-at-the-first-post-deploy-save)
+- [2026-10-12 -- A calibration that improves Brier can make the BETS worse: on a pricing s…](#2026-10-12----a-calibration-that-improves-brier-can-make-the-bets-worse-on-a-pricing-seam-shrink-toward-the-market-not-toward-05-lane-mlb-probability-calibration)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
