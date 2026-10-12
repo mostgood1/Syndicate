@@ -15,8 +15,15 @@ from syndicate.features.soccer.sim_engine.soccersim import player_props as PP
 
 
 def test_live_and_pregame_price_the_same_prop_markets():
-    """The parity claim itself, as a test rather than a comment."""
-    assert set(src.SOCCER_LIVE_PROP_MARKETS) == set(_PLAYER_PROB_BY_LINE)
+    """The parity claim itself, as a test rather than a comment.
+
+    Live also carries `player_goals` (lane `soccer-live-anytime-scorer`, 2026-10-12):
+    the live anytime-scorer probability, which pregame prices too, through
+    `_PLAYER_FIELDS["player_goal_scorer_anytime"]` rather than the by-line table."""
+    from syndicate.features.shared.soccer_projections import _PLAYER_FIELDS
+
+    assert "player_goal_scorer_anytime" in _PLAYER_FIELDS
+    assert set(src.SOCCER_LIVE_PROP_MARKETS) == set(_PLAYER_PROB_BY_LINE) | {"player_goals"}
 
 
 def test_live_reuses_pregame_constants_rather_than_restating_them():

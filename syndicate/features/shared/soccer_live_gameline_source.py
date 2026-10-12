@@ -424,6 +424,10 @@ SOCCER_LIVE_PROP_MARKETS: dict[str, tuple[str, str]] = {
     "player_shots": ("shots_over_probabilities", "projected_final_shots"),
     "player_shots_on_target": ("shots_on_target_over_probabilities", "projected_final_shots_on_target"),
     "player_assists": ("assists_over_probabilities", "projected_final_assists"),
+    # Anytime goalscorer, keyed (player, "player_goals", 0.5) -- `live_projection_join`
+    # maps a line-less `player_goal_scorer_anytime` row onto this key (lane
+    # `soccer-live-anytime-scorer`, 2026-10-12).
+    "player_goals": ("goals_over_probabilities", "projected_final_goals"),
 }
 
 
@@ -509,6 +513,7 @@ def soccer_live_prop_index(
                 "player_shots": prop.get("shots_so_far"),
                 "player_shots_on_target": prop.get("shots_on_target_so_far"),
                 "player_assists": prop.get("assists_so_far"),
+                "player_goals": prop.get("goals_so_far"),
             }
             indexed_any = False
             for market, (prob_field, mean_field) in SOCCER_LIVE_PROP_MARKETS.items():

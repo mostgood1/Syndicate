@@ -511,6 +511,14 @@ class LivePlayerPropProjection:
     assists_so_far: int = 0
     projected_final_assists: float = 0.0
     assists_over_probabilities: dict[str, float] = field(default_factory=dict)
+    # LIVE ANYTIME GOALSCORER (lane `soccer-live-anytime-scorer`, 2026-10-12). The
+    # market books keep up in play, and the one live soccer prop that had NO live
+    # model: on 10-10, 1,986 of 2,030 live props reaching the opportunity lane were
+    # dropped as hold-restatement EV for want of a model edge. Pregame formula,
+    # applied to the sim's REMAINDER goals; a goal already scored banks the bet.
+    goals_so_far: int = 0
+    projected_final_goals: float = 0.0
+    goals_over_probabilities: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -527,10 +535,38 @@ class LivePlayerPropProjection:
             "assists_so_far": self.assists_so_far,
             "projected_final_assists": self.projected_final_assists,
             "assists_over_probabilities": dict(self.assists_over_probabilities),
+            "goals_so_far": self.goals_so_far,
+            "projected_final_goals": self.projected_final_goals,
+            "goals_over_probabilities": dict(self.goals_over_probabilities),
         }
 
 
 _SHOT_LINES = (0.5, 1.5, 2.5, 3.5, 4.5)
+# Anytime scorer is "1+ goals", i.e. over 0.5. Only that line: 2+ goals has no
+# board market here, and a line nothing reads is output nobody can check.
+_GOAL_LINES = (0.5,)
+# Pregame's penalty-taker nudge (`player_props`: `expected_goals += 0.03` per
+# match). Live applies the share of the match still to play.
+_PENALTY_TAKER_GOALS_PER_MATCH = 0.03
+_MATCH_SECONDS = 5400.0
+
+
+def _remaining_match_fraction(live_state: dict[str, Any]) -> float:
+    """Share of nominal match time still to play, from the live clock.
+
+    `clock_remaining` is seconds left in the CURRENT half (`espn_live_state`); in
+    the first half the whole second half is still to come. Unknown -> 0.0, so a
+    missing clock adds no penalty-taker nudge rather than a full match's worth.
+    """
+    try:
+        remaining = float(live_state.get("clock_remaining"))
+        half = int(live_state.get("half") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+    if half not in (1, 2):
+        return 0.0
+    total = remaining + (_MATCH_SECONDS / 2.0 if half == 1 else 0.0)
+    return min(1.0, max(0.0, total / _MATCH_SECONDS))
 # IMPORTED, NOT RESTATED. These define what the PREGAME tier means by an
 # assist line and by "share of goals that are assisted". A second copy here
 # would let the two tiers drift into answering the same market with different
@@ -601,6 +637,7 @@ def project_live_player_props(
     mean_home_remainder_goals = mean(home_remainder_goals) if home_remainder_goals else 0.0
     mean_away_remainder_goals = mean(away_remainder_goals) if away_remainder_goals else 0.0
 
+    remaining_fraction = _remaining_match_fraction(live_state)
     projections: list[LivePlayerPropProjection] = []
     for side, rows, team_remainder, team_remainder_goals in (
         ("home", home_player_rows, mean_home_remainder, mean_home_remainder_goals),
@@ -637,6 +674,15 @@ def project_live_player_props(
                 * min(1.0, max(0.0, float(profile_row.assist_share or 0.0)))
             )
 
+            # GOALS -> anytime scorer. Pregame:
+            # `expected_goals = team_goals * goal_share` (+0.03 for a penalty taker),
+            # anytime = P(goals >= 1). Applied to the REMAINDER goals; a goal already
+            # scored is banked (`_over` then returns 1.0, the bet has won).
+            goals_already = int(stats.get("goals_so_far") or 0)
+            goal_remainder = team_remainder_goals * min(1.0, max(0.0, float(profile_row.goal_share or 0.0)))
+            if getattr(profile_row, "penalty_taker", False):
+                goal_remainder += _PENALTY_TAKER_GOALS_PER_MATCH * remaining_fraction
+
             def _over(remaining: float, banked: int, lines) -> dict[str, float]:
                 # `int(line + 0.5)` is the smallest whole count that CLEARS the
                 # line; subtracting what is banked leaves what still has to
@@ -663,6 +709,9 @@ def project_live_player_props(
                     assists_so_far=assists_already,
                     projected_final_assists=round(assists_already + assist_remainder, 4),
                     assists_over_probabilities=_over(assist_remainder, assists_already, _ASSIST_LINES),
+                    goals_so_far=goals_already,
+                    projected_final_goals=round(goals_already + goal_remainder, 4),
+                    goals_over_probabilities=_over(goal_remainder, goals_already, _GOAL_LINES),
                 )
             )
     return tuple(projections)

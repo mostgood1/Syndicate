@@ -111,6 +111,17 @@ _MARKET_ALIASES: dict[str, tuple[str, ...]] = {
 
 _LINE_TOLERANCE = 1e-6
 
+# YES/NO MARKETS WITH NO LINE ON THE BOARD (lane `soccer-live-anytime-scorer`,
+# 2026-10-12). The join keys on (player, market, line), and a line-less row was
+# counted `miss_no_line` and skipped before any lookup -- soccer 10-10 19:53Z:
+# 1,558 of 3,477 live prop rows, the anytime-scorer market among them. A "yes" on
+# "scores at any time" IS "over 0.5 goals", so it reads the live re-sim's
+# (player, player_goals, 0.5) key. Explicit, like `_MARKET_ALIASES`: first/last
+# scorer are races, not a goal count, and must never land here.
+_YES_NO_LINE_KEYS: dict[str, tuple[str, float]] = {
+    "player_goal_scorer_anytime": ("player_goals", 0.5),
+}
+
 
 def _build_canonical_markets() -> dict[str, str]:
     """Collapse every alias family to one canonical name, both directions.
@@ -528,12 +539,16 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
             miss_no_player += 1
             continue
         line = _as_float(row.get("line"))
+        lookup_markets = _market_candidates(row.get("market"))
         if line is None:
-            miss_no_line += 1
-            continue
+            yes_no = _YES_NO_LINE_KEYS.get(_norm_market(row.get("market")))
+            if yes_no is None:
+                miss_no_line += 1
+                continue
+            lookup_markets, line = (yes_no[0],), yes_no[1]
 
         hit = None
-        for candidate in _market_candidates(row.get("market")):
+        for candidate in lookup_markets:
             hit = index.get((player, _canonical_market(candidate), line))
             if hit is not None:
                 break
@@ -555,7 +570,7 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
             #                                batter_hits_runs_rbis is fetched at
             #                                1.5/2.5/3.5, batter_strikeouts at
             #                                0.5/1.5)
-            tried = [_canonical_market(c) for c in _market_candidates(row.get("market"))]
+            tried = [_canonical_market(c) for c in lookup_markets]
             if not _has_attribution:
                 # Older payload: keep the pre-split behaviour exactly rather
                 # than guessing which of the three causes applied.

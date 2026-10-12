@@ -46,7 +46,24 @@ def _run(fixture, paths=None):
     projection = ll.project_live_match(f["state"], home_rating=f["home"], away_rating=f["away"], simulations=SIMS, paths=paths)
     props = ll.project_live_player_props(f["state"], home_rating=f["home"], away_rating=f["away"],
                                          home_player_rows=HOME_ROWS, away_player_rows=AWAY_ROWS, simulations=SIMS, paths=paths)
-    return {"projection": projection.to_dict(), "props": [p.to_dict() for p in props]}
+    return _recorded_keys_only({"projection": projection.to_dict(), "props": [p.to_dict() for p in props]})
+
+
+def _recorded_keys_only(result):
+    """Each prop row restricted to the keys GOLDEN recorded.
+
+    `GOLDEN` predates fields added since (lane `soccer-live-anytime-scorer`,
+    2026-10-12: `goals_so_far`, `projected_final_goals`, `goals_over_probabilities`).
+    The claim here is that NO NUMBER MOVES, and a field that did not exist when the
+    golden was taken is not a moved number. Every recorded key is still compared
+    exactly, and a recorded key that went MISSING still fails.
+    """
+    recorded = set()
+    for fixture in GOLDEN.values():
+        for row in fixture.get("props") or []:
+            recorded |= set(row)
+    result["props"] = [{k: v for k, v in row.items() if k in recorded} for row in result["props"]]
+    return result
 
 
 def _paths(fixture, **over):
