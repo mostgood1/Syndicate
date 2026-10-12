@@ -1301,3 +1301,12 @@ P3's.
 - Applies to pregame too; enabling it for pregame is a user decision P3 brings.
 - **Interaction rule for #4:** P3's disqualification and any #4 blowout-rest lever BOTH move starter minutes.
   Whichever lands second is measured JOINTLY with the first on (mechanism vs estimator), never assumed additive.
+
+**#4 ownership split with P3 (agreed 2026-10-12):**
+- **BLOWOUT REST** (`blowout_boost_bench`, a pregame-shape lever): this lane.
+- **P3:** "asymmetric garbage time", built ON TOP of it (with it ON) for the band-dependent asymmetry it cannot
+  express: the trailer concedes first at 11-20 from 6:00 Q4, the leader benches first at 21+, the trailer's pace
+  rises. Also P3's: foul-out disqualification and foul-trouble benching.
+- P3 builds no separate leader-bench lever.
+- Order: whichever of #4 and P3's M-FT lands second is measured with the first ON.
+- Owed to P3: the #4 starter-minutes-by-margin baseline (M4_base, running).
