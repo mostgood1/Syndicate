@@ -2092,84 +2092,18 @@ def _espn_name_to_id_map_for_game_local(*, smart_sim_module, date_str: str, home
     if not str(event_id or "").strip() and not str(date_str or "").strip():
         return {}
 
-    def _from_pbp_history(lookback_days: int = 120) -> dict[tuple[str, str], str]:
-        try:
-            fp = source_paths.data_processed / "pbp_espn_history.csv"
-            if not fp.exists():
-                return {}
-            usecols = [
-                "date",
-                "team",
-                "enter_player_id",
-                "exit_player_id",
-                "enter_player_name",
-                "exit_player_name",
-            ]
-            hist = pd.read_csv(fp, usecols=usecols)
-            if hist is None or hist.empty:
-                return {}
-
-            teams = {str(home_tri or "").upper().strip(), str(away_tri or "").upper().strip()}
-            teams = {team for team in teams if team}
-            if teams:
-                hist["team"] = hist["team"].astype(str).str.upper().str.strip()
-                hist = hist[hist["team"].isin(list(teams))].copy()
-            if hist.empty:
-                return {}
-
-            try:
-                cutoff = pd.to_datetime(str(date_str), errors="coerce")
-                if pd.notna(cutoff):
-                    start = cutoff - pd.Timedelta(days=int(lookback_days))
-                    hist["date"] = pd.to_datetime(hist["date"], errors="coerce")
-                    hist = hist[(hist["date"].notna()) & (hist["date"] >= start) & (hist["date"] <= cutoff)].copy()
-            except Exception:
-                pass
-            if hist.empty:
-                return {}
-
-            def _rows(id_col: str, name_col: str) -> pd.DataFrame:
-                try:
-                    df = hist[["team", "date", id_col, name_col]].copy()
-                    df["id"] = df[id_col].map(clean_id_str)
-                    df["key"] = df[name_col].astype(str).map(norm_player_key)
-                    df = df[(df["id"].astype(str).str.len() > 0) & (df["key"].astype(str).str.len() > 0)].copy()
-                    df["team"] = df["team"].astype(str).str.upper().str.strip()
-                    df["key"] = df["key"].astype(str).str.upper().str.strip()
-                    return df[["team", "key", "id", "date"]]
-                except Exception:
-                    return pd.DataFrame(columns=["team", "key", "id", "date"])
-
-            enter_df = _rows("enter_player_id", "enter_player_name")
-            exit_df = _rows("exit_player_id", "exit_player_name")
-            combo = pd.concat([enter_df, exit_df], ignore_index=True)
-            if combo.empty:
-                return {}
-
-            try:
-                combo = combo.sort_values(["date"])
-            except Exception:
-                pass
-            combo = combo.drop_duplicates(subset=["team", "key"], keep="last")
-            out: dict[tuple[str, str], str] = {}
-            for _, row in combo.iterrows():
-                team = str(row.get("team") or "").upper().strip()
-                key = str(row.get("key") or "").upper().strip()
-                player_id = clean_id_str(row.get("id"))
-                if team and key and player_id:
-                    out[(team, key)] = player_id
-            return out
-        except Exception:
-            return {}
-
     def _from_native_player_checks(lookback_days: int = 120) -> dict[tuple[str, str], str]:
         """(team, name key) -> ESPN athlete id from the native rotation producer's per-game player checks
         (`rotation_stints/player_checks_<date>.csv`, scripts/build_basketball_rotation_stints.py).
 
-        Lane basketball-native-live-state, 2026-10-09: for a PREGAME game ESPN has no box yet, and the
-        only other fallback reads the vendored `pbp_espn_history.csv`. Measured on the fleet: the map
-        came back EMPTY for 2026-10-10 TOR v LAC and ATL v IND, so every pregame rotation-history call
-        refused with `no_espn_name_map`. Newest game wins per (team, name).
+        Lane basketball-native-live-state, 2026-10-09: for a PREGAME game ESPN has no box yet. Measured on
+        the fleet: the map came back EMPTY for 2026-10-10 TOR v LAC and ATL v IND, so every pregame
+        rotation-history call refused with `no_espn_name_map`. Newest game wins per (team, name).
+
+        Lane nba-pregame-lineup-pools, 2026-10-12: this is now the ONLY fallback. The vendored
+        `pbp_espn_history.csv` reader that sat under it was removed: over every game with native player
+        checks on the fleet, pregame (D-1) map per game, it added 0 keys for players who played (WNBA
+        0/7,399 over 366 games; NBA 0/31,936 over 1,434 -- NBA holds only the .parquet, which it never read).
         """
         try:
             checks_dir = source_paths.data_processed / "rotation_stints"
@@ -2202,9 +2136,7 @@ def _espn_name_to_id_map_for_game_local(*, smart_sim_module, date_str: str, home
             return {}
 
     def _fallback() -> dict[tuple[str, str], str]:
-        merged = dict(_from_pbp_history())
-        merged.update(_from_native_player_checks())  # native wins on a conflict
-        return merged
+        return _from_native_player_checks()
 
     try:
         eid = str(event_id or "").strip() or (
@@ -2605,7 +2537,11 @@ def _rotation_sim_minutes_for_team_local(*, smart_sim_module, league_code: str, 
     total_raw = float(mins_df["minutes"].sum())
     diag["rotation_total_minutes_raw"] = total_raw
     if (not np.isfinite(total_raw)) or total_raw <= 0 or total_raw < (0.8 * float(league.regulation_team_minutes)) or total_raw > (1.42 * float(league.regulation_team_minutes)):
-        sim_min, lineups, lw, diag2 = rotation_sim_minutes_from_history(
+        # Was `rotation_sim_minutes_from_history(` -- an undefined name, so this branch raised NameError (lane
+        # nba-pregame-lineup-pools, 2026-10-12). Reached only with a per-game stints file (non-pregame modes).
+        sim_min, lineups, lw, diag2 = _rotation_sim_minutes_from_history_local(
+            smart_sim_module=smart_sim_module,
+            league_code=league_code,
             team_df=team_df,
             date_str=date_str,
             home_tri=home_tri,
