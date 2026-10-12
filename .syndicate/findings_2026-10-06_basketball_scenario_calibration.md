@@ -1188,3 +1188,26 @@ stay untouched.
   - The size of that effect on the score-effect / margin readings is UNMEASURED.
   - Reproducing it as-of needs a per-date rebuild.
   - **Recorded as a known replay-vs-production difference. Not fixed in #2c.**
+
+### Phase 2 #2c — RESULT 2026-10-12 ~15:45Z (10:45 AM CDT): k = 0.002 STAYS (with lineup pools)
+
+**Run:** lineup pools + #473 inputs fed, SYNDICATE_NBA_TEAM_INPUTS=1, accepted config. 12 dates, 87/87 games each,
+17,400/17,400 engine calls with every lever and switch.
+
+| k | H2-on-H1 (real −0.174) | Q4 (real −0.141) | within-game SD | S8 margin (real 15.21) | S8 total | blowouts (real 0.253) | mkt slope | total bias |
+|---|---|---|---|---|---|---|---|---|
+| 0 | +0.000 | +0.002 | 17.58 | 17.74 | 18.42 | 0.279 | 0.888 | −0.64 |
+| 0.001 | −0.082 | −0.045 | 16.07 | 16.26 | 18.39 | 0.253 | 0.933 | −0.52 |
+| **0.002** | **−0.170** [−0.182, −0.154] | −0.084 [−0.094, −0.074] | 14.79 | **14.94** | 18.29 | 0.222 | 0.925 | −0.37 |
+| 0.003 | −0.236 | −0.126 | 13.69 | 13.84 | 18.67 | 0.199 | 0.939 | −0.07 |
+| no pools, 0.002 (#2b) | −0.162 | −0.085 | 14.82 | 14.91 | 18.38 | 0.222 | 0.938 | +0.38 |
+
+**VERDICT per the #2c rule:** k = 0.002 STAYS.
+- H2 is within ±0.05 (off 0.004).
+- S8 margin goes 17.74 → 14.94, far beyond noise.
+- No other grid k fits H2 better.
+- Lineup pools barely move the k = 0.002 readings. Q4 still misses (user override, remainder to P3).
+
+**Next:**
+- message P3 k = 0.002 (its fit reads ~/nba_live_bt/k_value.json);
+- the full FIT re-run with k = 0.002 + lineup pools, launched 2026-10-12 ~15:50Z.
