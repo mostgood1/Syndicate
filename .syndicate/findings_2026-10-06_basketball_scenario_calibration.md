@@ -1347,3 +1347,13 @@ b ∈ {1.35, 2.0, 3.0}.
 - **Confirmed** for a b whose drop is within ±1.5 min of real with all guards holding. If none, refuted: the blowout
   flag (quarter-start Q3+ ≥ 18 / Q4 ≥ 15) is too coarse a trigger. P3's band-dependent asymmetric garbage time is then
   the next candidate.
+
+**#4b AMENDMENT (2026-10-12, BEFORE any engine change):**
+- The engine.py LOAN is granted by P3: blowout_bench_rest field + the two sample_lineup blowout_boost_bench arguments
+  only.
+- Condition: branch from P3's commit. Its `foul_out_in_sim` + `foul_trouble_bench_mult` edit the same lineup block
+  and land after its corpus replay (~1 h).
+- **Arms are now doubled:** every #4b point is run with P3's two fields OFF and ON (foul_out_in_sim on,
+  foul_trouble_bench_mult 0.05, P3's chosen value).
+- Read foul-outs in each arm too (real 0.193; P3's fit alone 0.213).
+- Same readings and confirmation rule otherwise.
