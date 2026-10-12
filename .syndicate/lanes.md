@@ -949,6 +949,29 @@ death, never life — do not invert it.
 - Blocked by: none
 - STATUS 2026-10-06 ~22:15Z: Phase 1 pre-registered (026d94d7) + amendments; extractor/sim/table phases on main; real FIT extracted (NBA 816, WNBA 217); NBA FIT sim run COMPLETE 109/109 dates (2026-10-07 ~14:10Z; WSL ~/bball_sc, 3 workers, 200 draws, 0 errors).  NEXT: NBA table + flags, WNBA sim setup, NCAAB real table. GOAL: NOT MET (Phase 1 in progress).
 - NBA PHASE 1 READ 2026-10-07 (findings 'NBA Phase 1 reading'; 791 paired FIT games): FLAGGED -- margin SD 19.4 vs 14.0 and blowouts 35% vs 23% (too much spread), quarter shares (Q4 +1.7 pts, +2.5 close), quarter SD +1 pt, FTA -2.4/team with foul-outs x1.9 (no bonus/intentional FTs), top-5 minutes flat vs script (close -1.6, blowout +2.9), volume +5.6 plays/+2.4 3PA. EXONERATED: Q2 share. Phase 2 candidates ranked (spread jitter first); each pre-registered before any engine change. Owed: S12 back-to-back; WNBA sim; NCAAB real table.
+### mlb-alt-market-calibration — OPEN — opened 2026-10-12 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- Goal: extend the live MLB market-shrink calibration to the alt game-line markets the board actually serves (`totals_alt` first5/first3/first1, `spreads_alt` first5/first3), for every cell that passes the pre-registered rule out of sample.
+- **Why.** Lead 2026-10-12: the board's MLB F5/F1/F3 game rows are `*_alt` markets, so the shipped `totals|first5` / `spreads|first5` / `totals|first1` cells never match them.
+- **Data.**
+  - Odds: OddsAPI historical alternate markets (`alternate_totals_1st_5_innings`, `alternate_spreads_1st_5_innings`, `alternate_totals_1st_3_innings`, `alternate_spreads_1st_3_innings`, `alternate_totals_1st_1_innings`).
+    - Same instants as the 10-09 backfill (first pitch - 10 min), 07-16..09-27.
+    - Scratch `C:/tmp/mlb_hist_odds_alt`. Probe 1 call and dry-run the cost first.
+  - Model p from the existing fwd-arm sims (`~/ssims/full/fwd`, production config 988fa33d): P(over line) / P(cover) from the segment dists, with the backtest's own helpers.
+  - One row per (game, cell, alt line) with both sides quoted. Book p de-vigged two-way.
+- **PRE-REGISTERED RULE (= v2, written before any alt data is fetched).**
+  - `p' = fair + w*(p - fair)`; w fit per cell by minimum Brier on 07-16..08-21 (grid step 0.01).
+  - **SHIP a cell iff, on 08-22..09-27:**
+    - (1) game-clustered bootstrap dBrier(cal - raw) CI upper < 0;
+    - (2) dlogloss <= 0;
+    - (3) EV>0-bet ROI at the book's prices not lower than raw;
+    - (4) w < 1.
+  - A game contributes several alt lines; the game is the bootstrap cluster.
+- **Ship.** Add the passing cells to the existing profile via `save_profile`. The reader re-reads on mtime/size, so no restart is needed.
+- Falsification test: no cell passes -> nothing ships.
+- Verification: the fleet probe through the deployed `_calibrate_model_edge` resolves each shipped `*_alt` cell with its w. On the next served board, alt rows in shipped cells show `model_edge_pct` == w * the raw edge, recomputed from the row's model_probability and fair_price.
+- Files: (fleet profile + scratch scripts only)
+- Blocked by: none
+
 ### mlb-probability-calibration — CLOSED (GOAL MET) — closed 2026-10-12 — opened 2026-10-10 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
 - **give MLB game-line and pitcher-prop probabilities a per-market calibration on the board's existing pricing seam (`probability_calibration.py` / `layer2_board._calibrate_model_edge`), for every market where it pre-registeredly beats the raw probability out of sample. — GOAL: MET.** Reading: rule v2 (market-ward shrink + ROI guard, pre-registered f098ec7a) passed 5 cells. Live since the full down/up at 2026-10-10 15:39Z. The fleet probe through the deployed `_calibrate_model_edge` + profile + flag reproduces each cell (K 4.40 -> 0.264, outs 7.80 -> 0.0). The verification as worded (stamps on SERVED rows) is unreadable: the served slim shape drops calibration_* for all sports. The probe was substituted and is disclosed. Left open as a lead: alt-market (`totals_alt`/`spreads_alt`) coverage. Claims released.
 - **STATUS 2026-10-10 16:5xZ: LIVE.** Full down/up at 15:39Z (deploys.md entry). The seam is verified on the deployed code + profile + env. **OPEN ITEM:** the board's MLB F5/F1/F3 game rows are `totals_alt` / `spreads_alt`, which the cells do not cover. Extending to alt markets needs its own pre-registered check (the fit was on primary lines).
