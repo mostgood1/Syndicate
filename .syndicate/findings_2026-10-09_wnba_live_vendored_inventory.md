@@ -143,3 +143,28 @@ do not conclude.
 Not in the corpus: the live CLOSE (no WNBA live line was ever captured --
 `[wnba-live-edge-is-leakage]`), so grading is vs the final only; and the 6 kept games without an
 as-of sim (no anchor, so the lens has no pregame `p_*`).
+
+## As-of engine inputs for the native re-sim (2026-10-12, user decision: record now, backtest after P3's re-fits)
+
+`scripts/record_wnba_engine_inputs_asof.py` (main `0f222403`) re-ran today's production pregame path as of each
+2026 date on a scratch root and persisted the first engine call per game through
+`live_resim.persist_engine_inputs(..., league="wnba")` (P3 made `live_resim` league-parametric at this lane's
+request). Ran on the fleet 2026-10-12 14:23-14:52Z, nice 19, 2 workers, frozen code `d74f1387` + the recorder
+(`~/wnba_live_bt/CODE_USED.txt`).
+
+| | |
+|---|---|
+| dates / games recorded | 116 / **340**, 0 failures, 0 zero-game dates |
+| join to the corpus | 340 recorded == 340 anchored corpus games (0 either way); regular 331, playoffs 9 |
+| production switches present | all four on every date (availability, rate shrink, prop dispersion, prop shape) |
+| sides with an EMPTY lineup pool | 56 / 680 (8.2%): May 20/126, Jun 11/164, Jul 6/142, Aug 15/170, Sep 3/76 |
+| output | fleet `~/wnba_live_bt/engine_inputs_asof/data/processed/engine_inputs/<date>/<HOME>_<AWAY>.pkl` |
+
+Two production-equivalence gaps in the scratch recipe, found by the smoke and fixed before the run:
+production's WNBA file switches were absent from the pristine copy (the engine would have run with availability
+and rate shrink OFF), and `rotation_stints_history` was deleted (0 lineup pools on 3/3 smoke games) -> copied
+truncated to date < D, player-checks files < D only. P3's NBA recorder had the same stints gap (fixed f7195eae).
+The empty pools that remain are production's own behaviour (e.g. `rotation_minutes_conflict_with_current_signals`
+for DAL and GSV on 2026-08-12), not a recorder defect. **Not reproducible as-of, stated:** the season-fit
+lineup-effect tables (`lineup_effects` reason `missing_tables`); `pair_minutes_history` / `play_context_history`
+feed only those tables, not the sim path. The inputs are TODAY's code as-of, not what production ran per date.

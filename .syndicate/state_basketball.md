@@ -407,6 +407,8 @@ residual) sigma is justified; a constant rescale is not.
   end Q2 / Q3 (+0.011 / +0.009, CI excludes 0, regular, n=331); total MAE 12.46 / 11.00 / 7.96 / 5.99.
 - ESPN's per-play running `homeScore`/`awayScore` LAGS the sum of scoring plays on 36 of 347 2026 WNBA games (1-132
   consecutive plays); the play sum reaches the official final on every kept game. Score a cut from the play sum.
+- As-of WNBA engine inputs recorded for all 340 anchored 2026 games (fleet `~/wnba_live_bt/engine_inputs_asof/`,
+  2026-10-12, code `d74f1387` + `record_wnba_engine_inputs_asof.py`), for the P5 native re-sim backtest.
 - ESPN pbp `sequenceNumber` is NOT chronological; the `plays` list order is.
 
 ## [wnba-live-edge-is-leakage] THE WNBA LIVE ENGINE'S +41% ROI IS AN ARTEFACT — no live line has ever been captured `[verified 2026-08-31, lane wnba-accuracy-assessment]`
