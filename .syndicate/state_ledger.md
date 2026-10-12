@@ -1766,5 +1766,30 @@ as 679/0 and hid it; the STAGED diff was 38,213/37,535. Read
 - **`check_lane_invariants.py` now reports `INVARIANTS HOLD`** (156 claims,
   every one with exactly one OPEN holder), against `LEDGER INCOHERENT` at
   session start.
+- **THE CHECKER'S OWN REMEDY COULD MANUFACTURE A CONTEST, AND A `(NEW)`
+  RESERVATION READ AS A TYPO** `[fixed 2026-10-12, lane lane-claims-new-marker,
+  commit 740401ac, NO DEPLOY]`. `check_lane_claims.py` escalated ANY absent
+  claim with a close-named tracked neighbour to BROKEN plus "almost certainly a
+  TYPO for `<neighbour>`", unconditionally. On the live ledger it misfired on
+  BOTH of the only two claims it flagged, and one remedy was harmful: it told
+  `nba-lineup-pools` to adopt `tests/test_nba_pregame_lineup_pools.py`,
+  **which the OPEN lane `nba-pregame-lineup-pools` claims** -- advice that would
+  have put two OPEN lanes on one path and had `lane-guard` block one of them.
+  **Two conditions now narrow it:** a neighbour another OPEN lane holds is NEVER
+  offered (the holder is named and the claim drops to NOT WRITTEN YET), and a
+  path the lane marked `(NEW)` is read as a reservation. **`(NEW)` is
+  load-bearing and nothing in the repo had ever read it: 44 of 74 `Files:`
+  lines carry the marker.** Safe because the worked example the escalation
+  exists for (`ncaaf-live-cadence`) carries NO marker -- checked in
+  `lanes_history.md` BEFORE writing the code -- and its output is
+  BYTE-IDENTICAL old vs new. Impossible tokens (glob, brace list, prose) stay
+  BROKEN however marked. Reservations now print tagged `[marked NEW]`, and the
+  note says outright that each guards nothing until its file exists. Real
+  ledger exit 1 -> 0; `tests/test_check_lane_claims.py` is NEW (6 cases; the
+  file had none); 149/149 across the 12 lane-machinery test files. Confirmed
+  the same evening: the soccer lane created its reserved
+  `tests/test_soccer_live_anytime_scorer.py`, so the reservation became a real
+  enforceable claim exactly as the marker says.
+
 
 ---

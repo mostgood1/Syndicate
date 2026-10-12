@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1377 rules `[generated]`
+## Index — 1380 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1963,3 +1963,47 @@ prefer single-quoted arguments there.
 - Measured (NCAAB, 608 paired games, same seeds): turning on the engine's exact target calibration cut the tip total bias from +6.4 to +1.1, and made EVERY in-game total checkpoint worse (CI excludes 0). The early overshoot had been compensating for the missing second-half free-throw lift (+6.9 FT points).
 - Second instance, same day: a bonus free-throw mechanism matched real FTA and fouls but left the half split at ~0. A bonus trip REPLACES a possession; real halves have equal possessions (34.2 / 34.9), so the split lives in scoring per possession, not in foul rules.
 - How to apply: before switching on a "fix" for a calibrated engine, run it paired against the current default at EVERY checkpoint the product serves, not only the one it was built for. Decompose the target (here FT vs FG points, possessions per half) before choosing the mechanism.
+
+## 2026-10-12 FORBIDDEN: reading a tool's EMPTY output as a negative result -- a tool that REFUSED and a tool that found nothing print the same thing `[lane lane-claims-new-marker, session 4ab694ed]`
+
+- **Measured twice in one hour, opposite failure modes, identical reading.**
+  (1) `pending_deploys.py` piped through `grep -i check_lane_claims` printed
+  nothing, and I reported that the dev checker was not pulled into the deploy
+  closure. Re-run with the UNFILTERED output captured: **exit 2, one line,
+  `could not read live commits from deploy_preflight -- refusing to guess`.** It
+  is fail-CLOSED and had answered nothing at all. (2) An off/on comparison ran
+  the `HEAD` copy of a script from the scratchpad and reported no typo
+  assertion for ALL THREE fixtures -- including the one that MUST fail. That
+  script bootstraps `sys.path` from `dirname(HERE)/.claude/hooks`, so outside
+  the repo the shared parser import fails and it takes its documented
+  fail-OPEN branch: exit 0, silent. The filtered print showed only lines
+  starting `->`, which hid the import-failure message.
+- **Rule: before reporting an empty result, prove the instrument produced a
+  population.** Read the exit code AND the line count of the unfiltered output.
+  A grep over a crashed, refused, or fail-open tool is indistinguishable from a
+  clean negative, and a filter that drops the error line is what makes it look
+  clean. Fail-open and fail-closed differ in every way EXCEPT how their silence
+  reads.
+- **Corollary for a script copied out of its repo:** a tool whose `sys.path`
+  bootstrap is relative to its own location cannot work from a scratchpad. Put
+  the support tree beside it inside the fixture, and create those support files
+  AFTER `git add` so they never enter `ls-files` and perturb what is measured.
+- Same family as [[feedback_instrument_blindness]] and
+  [[feedback_null_result_needs_a_live_population]]: a healthy reading is
+  evidence only once you know what makes it read unhealthy.
+
+## 2026-10-12 FORBIDDEN: bounding a block in a structured ledger file by the next SAME-LEVEL heading `[lane lanes-archive-20261012, session 4ab694ed]`
+
+- **Measured.** Closing a lane in place, I bounded my block by scanning for the
+  next `### ` heading. That block was the LAST `### ` in `lanes.md`, so the
+  boundary ran to EOF and the rewrite replaced **765 lines with 7**, deleting
+  **114,376 chars**: the `## MERGED FROM`, `## Archive pointers` and
+  `## Archived lanes` sections, 763 lines that all live BELOW the last lane
+  block. Caught before the commit by the line-count print, not by any guard.
+- **Rule: bound a block by the next heading of ANY level** (`^#{1,6} `), and
+  assert the block is a plausible size before writing -- a lane block is ~6-14
+  lines, 765 is not a lane block. Re-count the file's `## ` sections and `### `
+  blocks after the write.
+- Third instance of one shape: **from my marker to EOF is only safe when your
+  section IS at EOF.** The other two were a land script that duplicated 104,199
+  B of `lanes.md`, and a prefix rewrite that clobbered 1,125 lines.

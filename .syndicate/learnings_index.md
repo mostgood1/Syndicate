@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1377 rules `[generated]`
+## Index — 1380 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 513**
+**FORBIDDEN — 515**
 
 - [2026-09-21 FORBIDDEN: diagnosing a failure from its most vivid example `[lane layer2-li…](#2026-09-21-forbidden-diagnosing-a-failure-from-its-most-vivid-example-lane-layer2-line-move-magnitude)
 - [2026-09-21 FORBIDDEN: verifying that a signal was COMPUTED as verifying that it is REAL…](#2026-09-21-forbidden-verifying-that-a-signal-was-computed-as-verifying-that-it-is-real-lane-layer2-line-move-magnitude)
@@ -78,6 +78,8 @@
 - [2026-10-09 — FORBIDDEN: rewriting a ledger file in TEXT mode; read and write bytes `[la…](#2026-10-09-forbidden-rewriting-a-ledger-file-in-text-mode-read-and-write-bytes-lane-soccer-roster-refresh-accuracy)
 - [2026-10-09 -- FORBIDDEN: listing a role's env KEYS with `tr '\0' '\n' < /proc/<pid>/env…](#2026-10-09----forbidden-listing-a-roles-env-keys-with-tr-0-n-procpidenviron-cut--d--f1----a-multi-line-value-a-pem-key-prints-its-body-lines-as-names-lane-games-rail-full-detail-session-d4409ac4)
 - [2026-10-12 REPEAT of the 2026-10-06 FORBIDDEN (text-mode ledger rewrite), and a committ…](#2026-10-12-repeat-of-the-2026-10-06-forbidden-text-mode-ledger-rewrite-and-a-committed-merge-marker-found-by-the-same-check-lane-basketball-props-models-native-session-2d413211)
+- [2026-10-12 FORBIDDEN: reading a tool's EMPTY output as a negative result -- a tool that…](#2026-10-12-forbidden-reading-a-tools-empty-output-as-a-negative-result----a-tool-that-refused-and-a-tool-that-found-nothing-print-the-same-thing-lane-lane-claims-new-marker-session-4ab694ed)
+- [2026-10-12 FORBIDDEN: bounding a block in a structured ledger file by the next SAME-LEV…](#2026-10-12-forbidden-bounding-a-block-in-a-structured-ledger-file-by-the-next-same-level-heading-lane-lanes-archive-20261012-session-4ab694ed)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -534,7 +536,7 @@
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 - [2026-09-03 — EXONERATED: `deploys.md` and `learnings.md` ARE guarded. Two sessions file…](learnings_archive.md#2026-09-03-exonerated-deploysmd-and-learningsmd-are-guarded-two-sessions-filed-the-same-false-gap-and-the-second-re-derived-it-with-the-same-blind-spot) `[evidence]`
 
-**Rules and corrections — 857**
+**Rules and corrections — 858**
 
 - [2026-09-16 — a detector that matches a FORMULA at published precision has a FALSE-POSIT…](#2026-09-16-a-detector-that-matches-a-formula-at-published-precision-has-a-false-positive-rate-and-mine-fired-at-about-1-row-per-1200-session-abacd435-lane-soccer-anytime-scorer)
 - [2026-09-16 — OVERTURNED: "the pre-registered criterion is the safe part, the risk is in…](#2026-09-16-overturned-the-pre-registered-criterion-is-the-safe-part-the-risk-is-in-the-mechanism-two-hypotheses-in-one-night-died-on-the-criterion-session-abacd435-fixes-4-and-5a-no-lane)
@@ -753,6 +755,7 @@
 - [2026-10-12 VARIANT of the lone-CR trap: a regex that captures a `- Goal:` line keeps it…](#2026-10-12-variant-of-the-lone-cr-trap-a-regex-that-captures-a---goal-line-keeps-its-r-lane-wnba-live-period-lines-native-session-2d413211)
 - [2026-10-12 OVERTURNED: "the WNBA playoff transition fires once a season when the playof…](#2026-10-12-overturned-the-wnba-playoff-transition-fires-once-a-season-when-the-playoffs-open-artifact_publisherpy-allowlist-comment-and-teststest_nhl_quote_shard_datespy-2026-09-25-lane-wnba-playoff-transition-off-vendor-session-2d413211)
 - [2026-10-12 -- Before building features for a market, test whether ANY available input a…](#2026-10-12----before-building-features-for-a-market-test-whether-any-available-input-adds-to-the-de-vigged-price-lanes-mlb-pitcher-outs-k-dist-mlb-starter-workload-signal)
+- [2026-10-12 -- RULE: a calibrated engine's known bias may be ABSORBING a missing mechani…](#2026-10-12----rule-a-calibrated-engines-known-bias-may-be-absorbing-a-missing-mechanism-fix-one-and-the-other-shows-test-the-pair-never-one-alone-lane-ncaab-native-live-tier-session-e48a0f9b)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
