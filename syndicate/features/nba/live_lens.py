@@ -84,17 +84,17 @@ def _load_live_lens_snapshot() -> dict[str, Any] | None:
 
 
 def _run_nba_live_lens_tick(selected_date: str) -> dict[str, Any] | None:
-    """Run the vendored pace-adjusted live-projection pipeline in-process.
+    """Run the pace-adjusted live-projection pipeline in-process.
 
     Writes live_lens_signals_<date>.jsonl / live_lens_projections_<date>.jsonl
     (read by nba/cards.py's live player-lens builders) for any games currently
-    in progress. Mirrors mlb/live_lens.py's _persist_live_lens_report, which
-    imports and calls MLB's vendored _live_lens_payload directly instead of
-    going over HTTP -- vendor.nba_betting_repo.app._live_lens_tick_payload is
-    the same kind of extraction, done for WNBA first and mirrored here.
+    in progress. The tick is Syndicate's own since 2026-10-12 (lane
+    nba-live-tick-native): syndicate/features/nba/live_tick/ is a generated,
+    parity-gated port of the vendored app's _live_lens_tick_payload and its
+    closure (scripts/port_nba_live_tick.py, scripts/nba_live_tick_parity.py).
     """
     try:
-        from vendor.nba_betting_repo.app import _live_lens_tick_payload
+        from syndicate.features.nba.live_tick.tick import _live_lens_tick_payload
     except Exception:
         return None
     try:
