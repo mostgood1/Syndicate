@@ -1341,6 +1341,14 @@ ba_rot_check.sh (keep that file) and reports production NBA smart_sim rotation_m
 - Verification: installer from deploy/local re-registers SyndicateLanForward pointing at C:\SyndicateProd\lan-forward; heartbeat last_run.txt keeps updating; healthz 200 on the LAN address
 - Blocked by: none
 
+### fleet-ff-exact-commit-rule — OPEN — opened 2026-10-12 — session d48f3a34-5dd7-4517-8870-292b82d44b4a
+- Goal: learnings.md on origin/main carries the rule that a fleet ff targets the deployer's own exact SHA, never github/main, with the 2026-10-10 evidence
+- Files: .syndicate/learnings.md (append only)
+- Hypothesis: n/a (ledger rule)
+- Falsification test: n/a
+- Verification: The entry is on origin/main with 0 deletions in learnings.md.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
