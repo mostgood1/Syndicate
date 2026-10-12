@@ -48511,3 +48511,29 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   sha256 src == dst `44959a2f1bbf640d`; the job did NOT relaunch (pgrep empty 5 s after).
 - owed: the October season fix (`396ef6e9`) reaches the fleet only with a fleet fast-forward. Until then the daily job re-reads 2025-26
   (a no-op: every date is done) and builds NO 2026-27 preseason table. Fast-forward before ~11-01.
+
+## 2026-10-12 17:42:14Z (12:42 PM CT) -- LOCAL FLEET ff a25bbdc2 -> e256bf42, NO restart: WNBA live OddsAPI period totals come from Syndicate's port, not the vendored Flask app (lane `wnba-live-period-lines-native`, session 2d413211)
+
+- **User decisions 2026-10-12:** "move the WNBA live period totals off the vendored app", then "Yes, ff after props idle". Claim refresh-worker token c8c753f8..., released 17:42:47Z.
+- **Change (e256bf42).**
+  - Before: `refresh_wnba_oddsapi_props._build_source_live_lines_payload` imported `vendor/wnba_betting_repo/app.py` (46,820 lines, via `_load_source_app`) on every live-snapshot export, to call `_live_oddsapi_period_totals_for_game` for in-progress games.
+  - Now: it calls `syndicate/features/wnba/live_period_lines.py`. That is the vendored function and its team-code closure, extracted byte-for-byte. Two documented edits in `_load_team_maps`: the nba_api merge is dropped (it only matters for NBA full team names), and the read of the non-existent `teams_wnba.json` is dropped.
+  - `_load_source_app` remains for the other, env-gated vendored-app fallbacks.
+- **Pre-deploy:** `tests/test_wnba_live_period_lines.py` passes 32/32.
+  - The vendored function (AST-extracted, no Flask import) and the native one ran on the same mocked OddsAPI responses: 13 scenarios x 2 input forms. Output dicts AND diagnostic log lines were identical.
+  - Also covered: the 20 s cache, the no-key path, team codes for every WNBA name and code, a positive control (median -> mean is caught), and a fresh interpreter that builds live lines for an in-progress game with 0 vendored modules.
+  - The WNBA refresh-runner suite passes (115 with the new tests).
+- **Fleet.**
+  - `check_deploy_safety` read in full at 17:42:09Z: NOT CLEAR, on soccer live odds runs and an MLB game-pk fetch only. No basketball props job was running.
+  - Guard: HEAD == a25bbdc2, then `merge --ff-only e256bf42`.
+- **Ride-alongs a25bbdc2..e256bf42 (code), each its own lane's to record:**
+  - `63e802bb`: the NBA pregame name map becomes native-only, which changes NBA sims.
+  - `bb12a57c` / `396ef6e9`: the NCAAB player-priors job.
+  - `3c45f78f`: the NCAAB live-lines board join. Its producer is OFF, and the refresh-worker loads it only on a restart.
+  - `c3a5f11b`: deploy_claim's directory resolution.
+  - `7798db26`, `fc112732`: scripts.
+- **VERIFY -- MET (17:42Z) on the DEPLOYED checkout**, with the refresh-worker's env loaded as a dict (key present; no value printed):
+  - `_build_source_live_lines_payload` for an in-progress LVA@NYL gave `period_lines_source=syndicate_native`, `attempted=True`, no error, and 0 vendored modules loaded.
+  - The native function's one real `/events` call returned 1 WNBA event (GSV v ATL, 2026-10-17T19:30Z), logged `PERIOD_MARKET_EVENT_MATCH_FAILED` for the absent matchup, and returned `{}`. That is the vendored behaviour.
+- **OWED:** a live in-progress reading (period totals parsed for a real live WNBA game). Candidate: GSV v ATL 2026-10-17 if the refresh marks it in progress; otherwise the 2027 season opener.
+- **Rollback.** Revert e256bf42 and ff. No restart.
