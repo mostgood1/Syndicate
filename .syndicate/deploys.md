@@ -48443,3 +48443,25 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **VERIFY -- MET (14:58Z) on the deployed checkout:** both leagues resolve to `/home/amyn/Syndicate/syndicate/features/basketball_engine/props_models/<league>` (no `vendor` in the path). The deployed copies load and predict NBA 10-10 (582 rows) and WNBA 10-09 (317 rows) with no fallback warning.
 - **OWED:** the first production props run after 14:57:13Z. It must write fresh `props_predictions_<date>.csv` with zero "Props model artifacts missing" lines; the baseline is 0 in every props log from 09-30 to 10-12. A watcher is running.
 - **Rollback.** Revert 4e1699be and ff. No restart. The vendor copies are still there.
+
+## 2026-10-12 14:32:53Z (9:32 AM CT) -- PROFILE UPDATE, NO RESTART: MLB market-shrink extended to 3 alt game-line cells (lane `mlb-alt-market-calibration`, session b98d59a1)
+- **Rule.** Pre-registered v2 rule in lanes.md (06e5e257); user: "ship the alt cells if they pass".
+- **Data.**
+  - OddsAPI historical alternates (F5/F3 alternate totals + spreads, F1 alternate totals) at first pitch - 10 min, 07-16..09-27: **49,394 credits**, Idle priority, scratch `C:/tmp/mlb_hist_odds_alt`.
+  - 15,684 alt-lane rows scored against the fwd-arm as-of sims with the backtest's own helpers.
+- **Judge window 08-22..09-27, shipped:**
+  - `totals_alt|first3` w=0.30: Brier 0.2417 -> 0.2369 (book 0.2369), dB CI [-0.0091, -0.0002]; ROI -2.1% -> +5.8%.
+  - `spreads_alt|first3` w=0.28: 0.2102 -> 0.2067 (book 0.2069), CI [-0.0069, -0.0001]; ROI -3.6% -> -0.1%.
+  - `totals_alt|first1` w=0.87: 0.2349 -> 0.2339, CI [-0.0016, -0.0005]; ROI -5.3% -> -4.2%.
+- **NOT shipped (failed the ROI guard):** `totals_alt|first5` w=0.21 (ROI -8.3% -> -14.5%) and `spreads_alt|first5` w=0.12 (-10.7% -> -17.8%). Both improved Brier.
+- **Applied.**
+  - `probability_calibration.json` rewritten via `save_profile`, version mlb-market-shrink-2026-10-12, 8 cells: the original 5 + 3 alt.
+  - Backup `...probability_calibration.json.bak_20261012T143253Z`.
+  - The board reader re-reads on mtime/size, so there was no restart. Fleet code ac0f0a3b (unchanged).
+- **Verify.**
+  - (a) Fleet probe through the deployed `_calibrate_model_edge` + profile, at 10-point raw edges: totals_alt|first3 -> 3.0, spreads_alt|first3 -> 2.8, totals_alt|first1 -> 8.7. Both F5 alt cells stay identity. The original 5 cells are unchanged.
+  - (b) **Served board 14:58:08Z, 88 MLB alt rows:** served / raw edge (raw recomputed from the row's `model_probability` and `fair_price`):
+    - F3 alt run line 0.295 and 0.282 (w 0.28); F3 alt total 0.301 (w 0.30);
+    - F5 alt median 0.986 (totals, n=25) and 0.953 (spreads, n=20): identity.
+    - **Limitation:** 2 F3 alt-total rows flip sign and one F1 row reads 1.899. The seam differences against the multi-book consensus fair, while the row displays a single `fair_price`. Where those differ, the served-field ratio is not w. A curve cannot flip a sign, so those rows' seam fair is not the displayed one.
+- **Rollback.** Copy the .bak over the profile (no restart).
