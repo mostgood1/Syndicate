@@ -1957,3 +1957,9 @@ prefer single-quoted arguments there.
 - That one test retired a multi-day build.
 **Rule.** For a market where the model already loses to the book, run "does input X add to logit(p_book)?" out of sample BEFORE engineering X into the engine.
 - If the market-shrink w is ~0 and nothing adds to the book, the market is efficiently priced for the inputs you have: stop, or source a faster / non-public input.
+
+
+## 2026-10-12 -- RULE: a calibrated engine's known bias may be ABSORBING a missing mechanism; fix one and the other shows. Test the pair, never one alone `[lane ncaab-native-live-tier, session e48a0f9b]`
+- Measured (NCAAB, 608 paired games, same seeds): turning on the engine's exact target calibration cut the tip total bias from +6.4 to +1.1, and made EVERY in-game total checkpoint worse (CI excludes 0). The early overshoot had been compensating for the missing second-half free-throw lift (+6.9 FT points).
+- Second instance, same day: a bonus free-throw mechanism matched real FTA and fouls but left the half split at ~0. A bonus trip REPLACES a possession; real halves have equal possessions (34.2 / 34.9), so the split lives in scoring per possession, not in foul rules.
+- How to apply: before switching on a "fix" for a calibrated engine, run it paired against the current default at EVERY checkpoint the product serves, not only the one it was built for. Decompose the target (here FT vs FG points, possessions per half) before choosing the mechanism.
