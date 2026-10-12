@@ -48420,3 +48420,26 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **loads:** ac0f0a3b (`game_chip_plays.write_pick_results` reads `recommendation.pick_id`). The ff carried no other runtime commit (`git log 64909dba..ac0f0a3b -- syndicate pipeline scripts vendor` = ac0f0a3b only). The worker had been up since 2026-10-10 10:39 CT (166,040 s), so the restart ALSO loaded changes already in the checkout and pending a restart, among them NHL `pk_usage=minutes` and the WNBA availability alias 0a3946ef (named by the watcher session; not mine).
 - **gate:** refresh-worker claim taken by the deploy script (holder `games-rail-full-detail`) after `basketball-props-models-native` released it; released 13:47:16Z. Idle check: the fixed `restart_after_save.py` TERMs only when `iec_safety.py` reads `Board build idle` with no build in flight AND the served `layer2_shortlist` is newer than the worker's start -- the run's per-poll lines were cut by a `| tail -4` in the script, so the exact CLEAR reading is NOT retained (said plainly). TERM 13:47:06Z pid 332235, respawn 13:47:15Z pid 1329807, 0 odds children killed.
 - **verify:** board healthy afterwards (the watcher session: written 9:09 AM CT, 2,000 rows). The hook's own reading is the next settlement write of `layer2_pick_results/`.
+
+## 2026-10-12 14:57:13Z (9:57 AM CT) -- LOCAL FLEET ff ac0f0a3b -> 4e1699be, NO restart: the NBA/WNBA ONNX props models are read from Syndicate's own copies, not vendor/ (lane `basketball-props-models-native`, session 2d413211)
+
+- **User decisions 2026-10-12:** "move the ONNX props models out of vendor", then "Yes, ff after props idle". Claim refresh-worker token 19ccb060..., acquired 14:56:15Z, released 14:59:14Z.
+- **Change.**
+  - `116c6d73`: 50 props model files, byte-identical (sha256) to `vendor/<pkg>_repo/models`, now live at `syndicate/features/basketball_engine/props_models/{nba,wnba}/` (git-tracked).
+  - `4e1699be`: `basketball_props_predictions._models_dir_for_source_root` falls back to those copies. `<source_root>/models` still wins, because the vendored `playoff_transition` retrains there. The vendor fallback and the never-set `SYNDICATE_VENDOR_ROOT_<PKG>` override are gone.
+  - `610c031f`: tests.
+  - The vendor copies REMAIN, but only the vendored code reads them: the WNBA `daily-update` fallback (step 11 predict-props) and `playoff_transition`.
+- **Pre-deploy.**
+  - Fleet A/B on the `~/p6` snapshot ran the production `predict_props_pure_onnx_local` twice, once with the vendor dir and once with the copies. NBA 10-10/10-08 and WNBA 10-09/10-07: **287,680 cells identical**, and the models loaded in both arms (the guard checks the fallback warning is absent).
+  - Tests: 37 passed.
+- **Fleet.**
+  - `check_deploy_safety` read in full at 14:56:39Z: NOT CLEAR. In flight were the odds runs (refresh-worker on its soccer step; live-odds-worker `nba,nhl,soccer` on its NHL step), a soccer build and a board build. No `refresh_{nba,wnba}_oddsapi_props` was running, and the ff ran only once that was confirmed.
+  - Guard: HEAD == ac0f0a3b, then `merge --ff-only 4e1699be`. Dirty files: only the two MLB statcast JSONs.
+- **Ride-alongs ac0f0a3b..4e1699be (code), each its own lane's to record:**
+  - `d74f1387`: NFL board picks graded in settlement (`settlement_sport_rows.py`), a behaviour change. It loads where settlement runs; the refresh-worker was not restarted.
+  - `52ef1dc6`: NBA `live_resim` league keyword (NBA unchanged).
+  - `f618efee`: P3 per-deficit end-game foul probability, default off.
+  - `2cb08409`: replay scratch builder (script).
+- **VERIFY -- MET (14:58Z) on the deployed checkout:** both leagues resolve to `/home/amyn/Syndicate/syndicate/features/basketball_engine/props_models/<league>` (no `vendor` in the path). The deployed copies load and predict NBA 10-10 (582 rows) and WNBA 10-09 (317 rows) with no fallback warning.
+- **OWED:** the first production props run after 14:57:13Z. It must write fresh `props_predictions_<date>.csv` with zero "Props model artifacts missing" lines; the baseline is 0 in every props log from 09-30 to 10-12. A watcher is running.
+- **Rollback.** Revert 4e1699be and ff. No restart. The vendor copies are still there.
