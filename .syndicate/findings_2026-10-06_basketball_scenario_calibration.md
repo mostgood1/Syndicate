@@ -1131,3 +1131,13 @@ stay untouched.
   - accept k = 0.002 with the Q4 tolerance overridden and P3 owning the Q4 remainder;
   - pre-register a late-weighted variant;
   - or keep k off.
+
+**USER DECISION 2026-10-10: "Accept k=0.002".**
+- The Q4 tolerance miss (−0.085 vs real −0.141, off 0.056 against ±0.05) is overridden as the user's decision.
+- The Q4 remainder is left to P3 (nba-native-live-resim: end-game fouling / clock).
+- `score_effect_k = 0.002` joins the accepted Phase 2 config.
+- **Next (pre-registered):** the full FIT re-run with k = 0.002 on the #473 inputs, launched 2026-10-12 ~13:40Z.
+  - 3 workers, nice 19, SYNDICATE_NBA_TEAM_INPUTS=1.
+  - Walk-forward calibration files for all FIT dates: 105 files, C:	mpball_sc\calfiles_sw_all.
+  - Then k and its readings go to P3.
+- Nothing in production.
