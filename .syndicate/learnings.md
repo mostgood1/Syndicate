@@ -3848,3 +3848,17 @@ frame could not have been non-null.
   1. Every ledger edit is `read_bytes()` / `split(b"\n")` / `write_bytes()`, including conflict resolution.
   2. Before every ledger commit, `git diff --cached --numstat <file>` must equal the lines you meant to touch.
   3. After a rebase that touched a ledger, grep `origin/main`'s copy for `^<<<<<<< |^>>>>>>> `.
+
+## 2026-10-12 -- A replay builder that deletes files to prevent leakage also deletes production inputs: probe the engine boundary for every consumed input `[session e0a3e383]`
+
+- **Measured:** the NBA as-of replay scratch builder removed dated files and a REMOVE_ALWAYS list, to stop
+  all-history artifacts leaking future games. It thereby silently removed two inputs that production feeds:
+  - ESPN box starters (player_checks, a dated sub-directory): starters 0/18;
+  - rotation_stints_history (lineup pools): no_rotation_stints_history on every side.
+- A pre-registered fit (score_effect_k) had been chosen on those replays.
+- Fixed by as-of truncation (date < slate) instead of deletion.
+- **Rule:**
+  - Before any fit on replays, probe at the engine boundary that each consumed input is POPULATED in the replay as in
+    production (team_adj, starters, lineup pools...). Do not trust the builder's file list.
+  - Prefer as-of truncation to deletion. For a fitted all-history artifact that cannot be truncated
+    (lineup_teammate_effects), record it as a stated replay-vs-production difference.
