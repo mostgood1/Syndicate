@@ -1149,3 +1149,27 @@ stay untouched.
 - First: smart_sim_2026-10-11_CHA_MIL.json (05:43:19Z). Deploy a31ba2bf; fleet 64909dba.
 - **todo #695 handed to this lane:** the regular-season totals reading (≥ 30 finals; delete the data file if
   published totals stay ≥ ~+2 worse than OFF).
+
+## Phase 2 #2c — LINEUP POOLS GAP + score_effect_k RE-MEASURE, PRE-REGISTERED 2026-10-12, BEFORE running
+
+**Gap (reported by nba-lineup-pools, eb2ba139; verified here):**
+- The replay scratch builder DELETED rotation_stints_history.{csv,parquet} (REMOVE_ALWAYS), and the pristine copy
+  had neither file. So every replay in this lane, including the #2b fine grid that chose k = 0.002, ran with NO
+  engine lineup pools (`no_rotation_stints_history`). Production regular-season sims carry them.
+- Fix 2cb08409: the CSV is kept and truncated as-of (date < slate); the parquet is still removed, so the reader
+  (parquet first) falls back to the truncated CSV.
+  - The production copy is in pristine: 63,971 rows, 2025-10-02..2026-10-11, 40,739 in the FIT window.
+  - The reader also filters date < slate within 28 days, same phase.
+- Probe (2 dates, 18 calls): lineup pools home 18/18, away 16/18; team_adj 18/18; starters 18/18.
+- The stopped full-FIT k = 0.002 run (17/109 dates, no pools) is kept as a reference only.
+
+**Re-measure:**
+- The #2b grid again, k ∈ {0, 0.001, 0.002, 0.003}, same 12 dates, same config, now with lineup pools.
+- **Decision rule (fixed now):**
+  - If k = 0.002 still has H2 within ±0.05 of real and S8 margin moves toward 15.21 by more than run noise (the
+    user's acceptance covered the Q4 miss), k stays 0.002 and the full FIT re-run follows.
+  - If another grid k fits H2 better under the #2b rule, or 0.002 no longer fits H2, the choice goes back to the
+    user.
+- **Open check, not in this step:** REMOVE_ALWAYS also deletes pair_minutes_history, play_context_history,
+  lineup_player_baselines, lineup_teammate_effects and pbp_espn_history. Whether production sims consume them is
+  unverified. Run the engine input checklist on a replay corpus before the full FIT.
