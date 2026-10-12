@@ -1173,3 +1173,18 @@ stay untouched.
 - **Open check, not in this step:** REMOVE_ALWAYS also deletes pair_minutes_history, play_context_history,
   lineup_player_baselines, lineup_teammate_effects and pbp_espn_history. Whether production sims consume them is
   unverified. Run the engine input checklist on a replay corpus before the full FIT.
+
+**#2c open check, partly answered (2026-10-12, grep over syndicate/):** the other REMOVE_ALWAYS histories.
+- pair_minutes_history, play_context_history: read only by artifact_publisher (allowlist), NOT by the sim. Deleting
+  them in replays is harmless.
+- pbp_espn_history.csv: read in basketball_props_smart_sim.py ~:2097 as a FALLBACK (game-id map path). It is unclear
+  whether production takes that branch.
+- **lineup_teammate_effects:** applied to player priors by the native orchestrator
+  (orchestrator/smart_sim.py:1534-1545, connected_game._apply_lineup_teammate_effects_to_priors). Production has the
+  file.
+  - It is a FITTED artifact over all history, so copying it into a replay would leak future games; that is why the
+    builder deletes it.
+  - Replays therefore run WITHOUT teammate effects while production runs WITH them.
+  - The size of that effect on the score-effect / margin readings is UNMEASURED.
+  - Reproducing it as-of needs a per-date rebuild.
+  - **Recorded as a known replay-vs-production difference. Not fixed in #2c.**
