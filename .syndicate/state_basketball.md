@@ -1140,8 +1140,10 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Raw total −17 vs actual** (780 2025-26 FIT games): `_simulate_quarters_local` subtracts the opponent def from
   points-derived ratings (−5.1) and applies injury-count pace/points penalties (−8.5). The rest (−3.3) is the game
   model's own.
-  - Switch file `nba_sim_total_inputs.json` (skip_def_subtraction, skip_outs_penalties), NBA only, ABSENT on the
-    fleet = today's behaviour (51d08f7a).
+  - Switch file `nba_sim_total_inputs.json` (skip_def_subtraction, skip_outs_penalties), NBA only (51d08f7a). ON THE
+    FLEET since 2026-10-10 15:06:05Z as {"skip_def_subtraction": true} (the #473 deploy). Verified 2026-10-12 on
+    8/8 NBA sims (10-11, 10-12) via market_anchor.nba_total_inputs. skip_outs_penalties is NOT set. Rollback = delete
+    the file. The regular-season totals reading is owed (todo #695).
 - **No NBA `calibration_totals_*.json` exists on the fleet** (0 files, 2026-10-09).
   - The builder `scripts/build_nba_totals_calibration.py` (a1545bf4) is NOT wired into the NBA refresh. Its opening
     seed (+2.50, switched raw) is not set in code.
@@ -1149,6 +1151,8 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   mean margin from 1.45× to 0.87× the market (d731172f). Not enabled.
 - **Six ported WNBA engine fixes:** in the native engine at NBA defaults = off; each confirmed on its box row
   (3d1fd556). Not enabled.
-- **score_effect_k** (late-game catch-up, native engine, default 0): not fitted. NBA re-fits are on hold for #473.
+- **score_effect_k** (late-game catch-up, native engine, default 0): k = 0.002 ACCEPTED by the user 2026-10-10 as a
+  PROPOSAL (fine grid 48cb10ff; Q4 tolerance overridden, Q4 remainder to P3). NOT enabled: nothing sets it in
+  production. Full FIT confirmation running 2026-10-12.
 - **Production today is right on totals only because errors cancel:** target −4.5 plus engine overshoot +6.
   Enabling EXACT_TARGET_CALIBRATION alone would lower NBA totals ~5.
