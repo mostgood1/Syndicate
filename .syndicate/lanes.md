@@ -1140,6 +1140,14 @@ death, never life — do not invert it.
 - Files: (scratch scripts only)
 - Blocked by: none
 
+### wnba-bootstrap-src-off-vendor — OPEN — opened 2026-10-12 — session 2d413211-0162-420b-9603-72b7ea9f9867
+- Goal: Stop copying vendored code onto the data disk: scripts/bootstrap_data_root.py no longer syncs vendor/wnba_betting_repo/src onto <data_root>/wnba_source/src at boot (its one real consumer, the vendored playoff transition, was removed in 1cbaf4ab), and the remaining vendored-app fallbacks in refresh_wnba_oddsapi_props (_load_source_app) import wnba_betting from the vendor tree explicitly instead of from whatever data-disk copy earlier sys.path inserts left first; verified by tests and on the fleet (bootstrap leaves the copy untouched, a refresh process loads no module from <data_root>/wnba_source/src).
+- Files: scripts/bootstrap_data_root.py (BOOTSTRAP_VENDOR_ROOTS section only), scripts/refresh_wnba_oddsapi_props.py (_load_source_app section only), tests/test_bootstrap_no_vendor_src.py (NEW), docs/ai_context/basketball_live_native_plan.md (P6 vendored-uses table boot row section only)
+- Hypothesis: Nothing reads <data_root>/wnba_source/src except via sys.path order, and the code there is a copy of the vendor tree, so stopping the copy and pinning _load_source_app to the vendor src changes no production output.
+- Falsification test: Any production code path that imports a module from <data_root>/wnba_source/src after the change, or any test that depended on the copy.
+- Verification: tests; fleet: bootstrap pairs exclude it; a refresh-process probe loads 0 modules from the data-disk src
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
