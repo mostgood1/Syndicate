@@ -5733,40 +5733,6 @@ def _target_refresh_dates(*, date_str: str, days_ahead: int) -> list[str]:
     return [(parsed + dt.timedelta(days=offset)).isoformat() for offset in range(0, max(0, int(days_ahead)) + 1)]
 
 
-def _run_playoff_transition_if_needed(*, source_root: Path, date_str: str) -> dict[str, object]:
-    module_path = source_root / "src" / "wnba_betting" / "playoff_transition.py"
-    if not module_path.exists() or not module_path.is_file():
-        return {"status": "unavailable"}
-    src_root = source_root / "src"
-    try:
-        src_root_text = str(src_root)
-        inserted = False
-        if src_root_text not in sys.path:
-            sys.path.insert(0, src_root_text)
-            inserted = True
-        importlib.invalidate_caches()
-        module = importlib.import_module("wnba_betting.playoff_transition")
-        runner = getattr(module, "run_playoff_transition", None)
-        if runner is None:
-            return {"status": "unavailable"}
-        summary = runner(target_date=dt.datetime.strptime(date_str, "%Y-%m-%d").date())
-        return {"status": "ok", "summary": _json_ready(summary)}
-    except Exception as exc:
-        if isinstance(exc, ModuleNotFoundError):
-            return {"status": "unavailable", "reason": f"missing dependency: {getattr(exc, 'name', 'unknown')}"}
-        message = str(exc)
-        lowered = message.lower()
-        if "regular season has not completed" in lowered or "regular-season" in lowered:
-            return {"status": "skipped", "reason": message}
-        return {"status": "error", "error": message}
-    finally:
-        try:
-            if inserted:
-                sys.path.remove(src_root_text)
-        except Exception:
-            pass
-
-
 def _load_source_app(source_root: Path):
     # Root-caused live 2026-08-01: on Render, refresh_odds_sources.py's
     # _basketball_source_root("wnba", "wnba_betting_repo") always returns the
@@ -6413,13 +6379,6 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
     advanced_stats_paths = _export_team_advanced_stats_artifacts(source_root=source_root, processed_root=processed_root)
     if advanced_stats_paths:
         copied["team_advanced_stats_paths"] = advanced_stats_paths
-    for transition_path in sorted((source_root / "data" / "processed").glob(f"playoff_transition_*_{date_text}.json")):
-        if not transition_path.is_file():
-            continue
-        destination = processed_root / transition_path.name
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(transition_path, destination)
-        copied.setdefault("playoff_transition_paths", []).append(str(destination))
     return copied
 
 
@@ -6904,8 +6863,11 @@ def main() -> int:
                     "error": f"refresh runner returned no state for {target_date}",
                     "artifact_bundle_root": str(artifact_root_path) if artifact_root_path else None,
                 }
-        if source_root is not None:
-            state["playoff_transition"] = _run_playoff_transition_if_needed(source_root=source_root, date_str=target_date)
+        # The vendored WNBA playoff transition (wnba_betting.playoff_transition, imported from the bootstrapped
+        # <source_root>/src) was removed 2026-10-12 (lane wnba-playoff-transition-off-vendor). It only recognised NBA
+        # game ids ("002...") and "YYYY-YY" seasons, so for WNBA data it raised before doing anything, every run,
+        # and returned status "skipped": measured on the fleet for every 2026 date, with no receipt and no retrained
+        # models ever written. A real WNBA playoff retune would be new Syndicate code, not this.
         # Diagnostic added 2026-08-01: the live_lines artifact's own
         # generated_at was observed stuck for 20+ minutes on a live WNBA game
         # despite the outer adaptive tick relaunching this whole script every

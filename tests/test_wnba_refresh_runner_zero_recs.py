@@ -72,7 +72,7 @@ class WnbaRefreshRunnerZeroRecsTests(unittest.TestCase):
                 "mode": "fast",
             }
 
-            with patch.object(module, "_existing_refresh_state", return_value=None), patch.object(module, "_existing_artifact_bundle_state", return_value=None), patch.object(module, "_run_refresh_via_cli", return_value=fake_state), patch.object(module, "_run_playoff_transition_if_needed", return_value={"status": "unavailable"}), patch.object(sys, "argv", argv):
+            with patch.object(module, "_existing_refresh_state", return_value=None), patch.object(module, "_existing_artifact_bundle_state", return_value=None), patch.object(module, "_run_refresh_via_cli", return_value=fake_state), patch.object(sys, "argv", argv):
                 rc = module.main()
 
         self.assertEqual(rc, 0)
@@ -131,7 +131,7 @@ class WnbaRefreshRunnerZeroRecsTests(unittest.TestCase):
                 "mode": "full",
             }
 
-            with patch.object(module, "_existing_refresh_state", return_value=None), patch.object(module, "_existing_artifact_bundle_state", return_value=None), patch.object(module, "_run_refresh_via_cli", return_value=fake_state), patch.object(module, "_run_playoff_transition_if_needed", return_value={"status": "unavailable"}), patch.object(sys, "argv", argv):
+            with patch.object(module, "_existing_refresh_state", return_value=None), patch.object(module, "_existing_artifact_bundle_state", return_value=None), patch.object(module, "_run_refresh_via_cli", return_value=fake_state), patch.object(sys, "argv", argv):
                 rc = module.main()
 
         self.assertEqual(rc, 0)

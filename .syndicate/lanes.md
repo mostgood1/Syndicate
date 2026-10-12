@@ -1100,6 +1100,14 @@ death, never life — do not invert it.
 - Verification: the two fixed tests pass at origin/main in the ci-checkout env; #697 lists all 21 with first-failure date and owning lane
 - Blocked by: none
 
+### wnba-playoff-transition-off-vendor — OPEN — opened 2026-10-12 — session 2d413211-0162-420b-9603-72b7ea9f9867
+- Goal: Take the WNBA playoff transition off the vendored app: refresh_wnba_oddsapi_props.py stops importing wnba_betting.playoff_transition (the vendored retrain pipeline, via the bootstrapped <source_root>/src copy) on every refresh. Measured 2026-10-12 on the fleet with the exact production copy: for every date May-Oct 2026 it raises 'No regular-season schedule rows found' (it only recognises NBA game ids '002...' and 'YYYY-YY' season strings; the WNBA schedule has ESPN ids '040...' and 'YYYY'), so it always returned status 'skipped' and has never retrained anything (no receipt, no data-root models). Removing it is behaviour-identical; verified by tests and on the deployed checkout (no vendored module imported by a refresh's playoff step).
+- Files: scripts/refresh_wnba_oddsapi_props.py (_run_playoff_transition_if_needed + its call + the playoff receipt copy section only), tests/test_wnba_playoff_transition_removed.py (NEW), tests/test_wnba_refresh_runner_zero_recs.py (playoff-transition patch removal section only), docs/ai_context/basketball_live_native_plan.md (P6 vendored-uses table WNBA playoff_transition row section only)
+- Hypothesis: The vendored WNBA playoff transition can never pass resolve_regular_season_window for WNBA data, so removing the call changes no production output.
+- Falsification test: Any 2026 WNBA date for which the production copy resolves a regular-season window, or any receipt/models it ever wrote.
+- Verification: fleet: resolve_regular_season_window raises for every 2026 date (done); no receipt or data-root models exist (done); after the change the refresh imports no wnba_betting module for the playoff step (fresh interpreter + deployed checkout)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
