@@ -203,6 +203,33 @@ Web binds `127.0.0.1` by default. Do not port-forward it. To serve the public:
 
 `.github/workflows/daily-update.yml` (manual trigger) takes a `base_url` input. Point it at the tunnel URL; it still needs the `ADMIN_TOKEN` secret to match your local one.
 
+### LAN access (other devices on the home network) `[lane lan-forward-guard, 2026-10-12]`
+
+"Do not port-forward it" above means the ROUTER (internet -> host). Reaching the site from a phone or laptop on the
+same network is a different thing: a Windows `portproxy` rule `<lan-ip>:10000 -> 127.0.0.1:10000`, which WSL
+localhost forwarding then carries into the VM. The rule needs a Private-profile inbound firewall rule for TCP 10000,
+and the IP Helper service (`iphlpsvc`) to serve it.
+
+**The rule alone is not enough.** iphlpsvc binds a rule's listener only when the service starts. If the LAN address
+is not up yet (boot before Wi-Fi/DHCP, resume from sleep), the bind fails silently and is never retried. Measured
+2026-10-09: rule present, firewall rule present, iphlpsvc Running, and no listener on `10.0.0.199:10000`, so every
+LAN connection was refused while `localhost:10000` worked.
+
+The fix is a SYSTEM task, `SyndicateLanForward`. It runs at boot, on every network connect, and every 5 minutes. It
+re-points the rule if DHCP moved the address, and restarts iphlpsvc if the listener is missing. Install once from an
+**admin** PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\local\install_lan_forward_task.ps1
+```
+
+- **State lives in `C:\SyndicateProd\lan-forward\`.** `last_run.txt` is overwritten on every run, so a stale time
+  there means the task is not firing. `lan_forward.log` records repairs only.
+- **A repair blips Tailscale.** `Restart-Service iphlpsvc` needs `-Force`, because Tailscale depends on it, and
+  `-Force` stops Tailscale too. The guard restarts any dependent that was running.
+- **A non-admin session cannot read this task's status** (`Get-ScheduledTaskInfo` returns access denied). Read
+  `last_run.txt` instead.
+
 ## 6. Verified in the lane session (Linux container, 2026-09-30)
 
 This is what was measured, and what was not.
