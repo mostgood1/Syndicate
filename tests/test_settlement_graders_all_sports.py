@@ -110,5 +110,66 @@ class NhlBoxscoreRows(unittest.TestCase):
         self.assertNotIn("Bench Guy", players)  # 00:00 TOI: absent, not zero
 
 
+class SoccerAndNames(unittest.TestCase):
+    def _rows(self, hs, as_):
+        score = rows._score_row("soccer", "401879266", "Arsenal", "Chelsea", hs, as_, "test", game_date="2026-10-11")
+        box = rows._box_row("soccer", "401879266", "Arsenal", "Chelsea", [
+            {"id": "1", "name": "Erling Haaland", "name_key": "erling haaland", "team": "Arsenal",
+             "player": {"shots": 4.0, "shots_on_target": 2.0, "goals": 1.0, "goals_scorer": 1.0, "assists": 0.0}},
+            {"id": "2", "name": "Yéremy Pino", "name_key": "yeremy pino", "team": "Chelsea",
+             "player": {"shots": 1.0, "shots_on_target": 0.0, "goals": 0.0, "goals_scorer": 0.0, "assists": 1.0}},
+        ], "test", game_date="2026-10-11")
+        return si.GradedRowIndex([score, box])
+
+    def _pick(self, market, side, line=None, player=None, kind="game"):
+        rec = {"sport": "soccer", "market": market, "market_key": market, "side": side, "line": line, "kind": kind,
+               "segment": "full", "home_team": "Arsenal", "away_team": "Chelsea",
+               "commence_time": "2026-10-11T14:00:00Z", "event_id": "oddsapi", "pick_id": "l2_s"}
+        if player:
+            rec.update({"player_name": player, "selection": player})
+        return {"recommendation": rec, "result": "pending"}
+
+    def _grade(self, record, idx):
+        out = si.find_graded_row(record, idx, sport="soccer", markets_compatible=_markets_ok)
+        return (out.row or {}).get("result")
+
+    def test_soccer_draw_and_side_bets_on_a_level_score(self) -> None:
+        idx = self._rows(1.0, 1.0)
+        self.assertEqual(self._grade(self._pick("h2h", "draw"), idx), "win")
+        self.assertEqual(self._grade(self._pick("h2h", "home"), idx), "loss")
+
+    def test_btts(self) -> None:
+        self.assertEqual(self._grade(self._pick("btts", "yes"), self._rows(1.0, 1.0)), "win")
+        self.assertEqual(self._grade(self._pick("btts", "yes"), self._rows(2.0, 0.0)), "loss")
+
+    def test_loose_names_join_middle_names_and_accents(self) -> None:
+        idx = self._rows(1.0, 0.0)
+        self.assertEqual(self._grade(self._pick("player_shots_on_target", "over", 1.5, player="Erling Braut Haaland", kind="prop"), idx), "win")
+        self.assertEqual(self._grade(self._pick("player_assists", "over", 0.5, player="Yeremi Pino", kind="prop"), idx), "win")
+
+
+class BasketballRows(unittest.TestCase):
+    def test_recon_files_give_scores_and_players(self) -> None:
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory() as tmp:
+            proc = Path(tmp) / "nba_source" / "data" / "processed"
+            proc.mkdir(parents=True)
+            nl = chr(10)
+            (proc / "recon_games_2026-10-10.csv").write_text(
+                "date,game_id,home_tri,away_tri,home_pts,visitor_pts" + nl + "2026-10-10,401,TOR,LAC,114,106" + nl, encoding="utf-8")
+            (proc / "recon_props_2026-10-10.csv").write_text(
+                "game_id,player_id,player_name,team_abbr,pts,reb,ast,threes,stl,blk,tov,min" + nl
+                + "401,1,Derrick Jones Jr.,LAC,5,2,0,1,0,0,0,18" + nl + "401,2,Bench Guy,LAC,0,0,0,0,0,0,0,0" + nl, encoding="utf-8")
+            with mock.patch.dict("os.environ", {"SYNDICATE_DATA_ROOT": tmp}):
+                got = rows.nba_rows_for_date("2026-10-10")
+        score = [r for r in got if r["market"] == "game_score"][0]
+        self.assertEqual((score["home"], score["home_score"], score["away_score"]), ("TOR", 114.0, 106.0))
+        names = [p["name"] for r in got if r["market"] == "player_box" for p in r["players"]]
+        self.assertEqual(names, ["Derrick Jones Jr."])  # 0 minutes = absent
+
+
 if __name__ == "__main__":
     unittest.main()

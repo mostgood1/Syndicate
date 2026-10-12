@@ -519,6 +519,164 @@ def wnba_rows_for_date(date_str: str) -> list[dict[str, Any]]:
     return _basketball_rows_for_date("wnba", date_str)
 
 
+# -------------------------------------------------------------------- NCAAF
+
+
+def _ncaaf_files(relative_glob: str) -> list[Path]:
+    roots = []
+    env = os.environ.get("SYNDICATE_DATA_ROOT")
+    if env:
+        roots.append(Path(env) / "ncaaf_source")
+    roots.append(Path(__file__).resolve().parents[3] / "data" / "ncaaf_source")
+    out: list[Path] = []
+    for root in roots:
+        out += sorted(root.glob(relative_glob))
+    return out
+
+
+@lru_cache(maxsize=4)
+def _ncaaf_games(stamp: tuple[str, int, int]) -> tuple[dict[str, Any], ...]:
+    import gzip
+
+    with gzip.open(stamp[0], "rt", encoding="utf-8") as fh:
+        payload = json.load(fh)
+    games = payload if isinstance(payload, list) else (payload.get("games") or [])
+    return tuple(g for g in games if isinstance(g, dict))
+
+
+@lru_cache(maxsize=2)
+def _ncaaf_players(stamp: tuple[str, int, int]) -> dict[str, list[dict[str, Any]]]:
+    cols = {"passing_yards": "pass_yds", "passing_attempts": "pass_att", "passing_completions": "pass_cmp",
+            "passing_tds": "pass_td", "interceptions": "pass_int", "rushing_yards": "rush_yds",
+            "rushing_attempts": "rush_att", "rushing_tds": "rush_td", "receptions": "rec",
+            "receiving_yards": "rec_yds", "receiving_tds": "rec_td", "anytime_td": "anytime_td"}
+    out: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    with open(stamp[0], encoding="utf-8", newline="") as fh:
+        for row in csv.DictReader(fh):
+            name = str(row.get("player_name") or "").strip()
+            game = str(row.get("game_id") or "").strip()
+            if not name or not game:
+                continue
+            stats = {key: (_num(row.get(col)) or 0.0) for col, key in cols.items()}
+            stats["rush_rec_yds"] = stats["rush_yds"] + stats["rec_yds"]
+            stats["pass_rush_yds"] = stats["pass_yds"] + stats["rush_yds"]
+            out[game].append({"id": str(row.get("player_id") or ""), "name": name, "name_key": _name_key(name),
+                              "team": row.get("team"), PROP_GROUP: stats})
+    return dict(out)
+
+
+def _et_date(stamp: Any) -> str | None:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    text = str(stamp or "").strip()
+    if not text:
+        return None
+    try:
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        return text[:10]
+    return moment.astimezone(ZoneInfo("America/New_York")).date().isoformat()
+
+
+def ncaaf_rows_for_date(date_str: str) -> list[dict[str, Any]]:
+    """Score rows (full, q1-q4, h1, h2 = q3+q4+OT) from CFBD `games_<season>.json.gz`
+    and player-box rows from the CFBD player game stats snapshot."""
+    season = date_str[:4] if int(date_str[5:7]) >= 3 else str(int(date_str[:4]) - 1)
+    game_files = _ncaaf_files(f"historical_truth/games_{season}.json.gz")
+    if not game_files:
+        return []
+    player_files = _ncaaf_files("source_artifacts/data/processed/player_game_stats/ncaaf_player_game_stats_snapshot.csv")         + _ncaaf_files("data/processed/player_game_stats/ncaaf_player_game_stats_snapshot.csv")
+    players_by_game = _ncaaf_players(_stamp(player_files[0])) if player_files else {}
+    rows: list[dict[str, Any]] = []
+    for game in _ncaaf_games(_stamp(game_files[0])):
+        if not game.get("completed") or _et_date(game.get("startDate")) != date_str:
+            continue
+        hs, as_ = _num(game.get("homePoints")), _num(game.get("awayPoints"))
+        home, away = str(game.get("homeTeam") or "").strip(), str(game.get("awayTeam") or "").strip()
+        game_id = str(game.get("id") or "").strip()
+        if hs is None or as_ is None or not home or not away or not game_id:
+            continue
+        rows.append(_score_row("ncaaf", game_id, home, away, hs, as_, "cfbd_games", game_date=date_str))
+        hq, aq = game.get("homeLineScores") or [], game.get("awayLineScores") or []
+        if len(hq) >= 4 and len(aq) >= 4 and abs(sum(_num(x) or 0 for x in hq) - hs) < 1e-9 and abs(sum(_num(x) or 0 for x in aq) - as_) < 1e-9:
+            hqv, aqv = [_num(x) or 0.0 for x in hq], [_num(x) or 0.0 for x in aq]
+            for q in range(4):
+                rows.append(_score_row("ncaaf", game_id, home, away, hqv[q], aqv[q], "cfbd_linescores", segment=f"q{q + 1}", game_date=date_str))
+            rows.append(_score_row("ncaaf", game_id, home, away, hqv[0] + hqv[1], aqv[0] + aqv[1], "cfbd_linescores", segment="h1", game_date=date_str))
+            rows.append(_score_row("ncaaf", game_id, home, away, sum(hqv[2:]), sum(aqv[2:]), "cfbd_linescores", segment="h2", game_date=date_str))
+        players = players_by_game.get(game_id) or []
+        if players:
+            rows.append(_box_row("ncaaf", game_id, home, away, players, "cfbd_player_game_stats", game_date=date_str))
+    return rows
+
+
+# ------------------------------------------------------------------- soccer
+
+
+def _soccer_files(relative_glob: str) -> list[Path]:
+    roots = []
+    env = os.environ.get("SYNDICATE_DATA_ROOT")
+    if env:
+        roots.append(Path(env) / "soccer_source")
+    roots.append(Path(__file__).resolve().parents[3] / "data" / "soccer_source")
+    out: list[Path] = []
+    for root in roots:
+        out += sorted(root.glob(relative_glob))
+    return out
+
+
+@lru_cache(maxsize=32)
+def _soccer_schedule(stamp: tuple[str, int, int]) -> tuple[dict[str, Any], ...]:
+    payload = json.loads(Path(stamp[0]).read_text(encoding="utf-8"))
+    return tuple(m for m in (payload.get("matches") or []) if isinstance(m, dict))
+
+
+@lru_cache(maxsize=32)
+def _soccer_players(stamp: tuple[str, int, int]) -> dict[str, list[dict[str, Any]]]:
+    out: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    with open(stamp[0], encoding="utf-8", newline="") as fh:
+        for row in csv.DictReader(fh):
+            minutes = _num(row.get("minutes"))
+            name = str(row.get("player_name") or "").strip()
+            event = str(row.get("event_id") or "").strip()
+            if not minutes or not name or not event:
+                continue  # unused substitute: absent, not zero
+            stats = {k: (_num(row.get(k)) or 0.0) for k in ("shots", "shots_on_target", "goals", "assists")}
+            stats["goals_scorer"] = stats["goals"]
+            stats["goals_assists"] = stats["goals"] + stats["assists"]
+            out[event].append({"id": str(row.get("player_id") or ""), "name": name, "name_key": _name_key(name),
+                               "team": row.get("team"), PROP_GROUP: stats})
+    return dict(out)
+
+
+def soccer_rows_for_date(date_str: str) -> list[dict[str, Any]]:
+    """Full-time score rows from every league's `api/schedule/schedule_<season>.json`
+    (`status_state == post`) and player-box rows from `history/player_match_log_<season>.csv`,
+    joined on ESPN's event id."""
+    rows: list[dict[str, Any]] = []
+    for schedule in _soccer_files("*/api/schedule/schedule_*.json"):
+        league_dir = schedule.parents[2]
+        season = schedule.stem.split("_")[-1]
+        logs = sorted(league_dir.glob(f"history/player_match_log_{season}.csv"))
+        players = _soccer_players(_stamp(logs[0])) if logs else {}
+        for match in _soccer_schedule(_stamp(schedule)):
+            if str(match.get("status_state") or "").lower() != "post" or _et_date(match.get("date")) != date_str:
+                continue
+            hs, as_ = _num(match.get("home_score")), _num(match.get("away_score"))
+            home, away = str(match.get("home_team") or "").strip(), str(match.get("away_team") or "").strip()
+            event = str(match.get("event_id") or "").strip()
+            if hs is None or as_ is None or not home or not away or not event:
+                continue
+            rows.append(_score_row("soccer", event, home, away, hs, as_, "espn_schedule", game_date=date_str))
+            box = players.get(event) or []
+            if box:
+                rows.append(_box_row("soccer", event, home, away, box, "espn_player_match_log", game_date=date_str))
+    return rows
+
+
 # ------------------------------------------------------------------- window
 
 # A board (ledger) date carries picks for its whole horizon -- the 10-08 board
@@ -528,7 +686,7 @@ def wnba_rows_for_date(date_str: str) -> list[dict[str, Any]]:
 # fixture join requires the pick's own game date to match it.
 WINDOW_DAYS = 8
 
-_BUILDERS = {"nfl": nfl_rows_for_date, "nhl": nhl_rows_for_date, "nba": nba_rows_for_date, "wnba": wnba_rows_for_date}
+_BUILDERS = {"nfl": nfl_rows_for_date, "nhl": nhl_rows_for_date, "nba": nba_rows_for_date, "wnba": wnba_rows_for_date, "ncaaf": ncaaf_rows_for_date, "soccer": soccer_rows_for_date}
 
 
 def rows_for_ledger_date(sport: str, date_str: str, *, days: int = WINDOW_DAYS) -> list[dict[str, Any]]:

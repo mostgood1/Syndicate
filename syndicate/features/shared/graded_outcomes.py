@@ -579,7 +579,7 @@ def grade_score_bet(
     if kind == SCORE_BET_MONEYLINE:
         level = home == away
         if side == "draw":
-            if segment == "full":
+            if segment == "full" and three_way is not True:
                 return None, None, "draw_side_on_full_game_moneyline"
             return ("win" if level else "loss"), abs(home - away), None
         if side not in {"home", "away"}:

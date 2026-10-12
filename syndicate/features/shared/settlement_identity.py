@@ -685,6 +685,11 @@ def score_market_kind(sport: str | None, record: Mapping[str, Any]) -> tuple[str
             three_way = key_three_way
         elif kind == SCORE_BET_MONEYLINE and machine and base == "h2h":
             three_way = False
+        if kind == SCORE_BET_MONEYLINE and normalize(sport) == "soccer":
+            # Soccer's moneyline IS three-way (home / draw / away): a level
+            # full-time score loses a side bet and wins the draw
+            # (lane settlement-graders-all-sports, 2026-10-12).
+            three_way = True
         return kind, three_way
     return None, None
 
@@ -745,6 +750,36 @@ def _score_side_and_line(
     return side, line, None
 
 
+def _btts_on_score_rows(record: Mapping[str, Any], rows: Sequence[Mapping[str, Any]], *, sport: str | None,
+                        segment: str) -> tuple[dict[str, Any] | None, str] | None:
+    """Both-teams-to-score from the final score; None when the record is not BTTS."""
+    recommendation = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else record
+    markets = {normalize(recommendation.get(k)) for k in ("market_key", "market")}
+    if not markets & {"btts", "both teams to score"}:
+        return None
+    if segment != SEGMENT_FULL:
+        return None, "btts_segment_not_graded"
+    side = normalize(recommendation.get("side") or recommendation.get("selection"))
+    if side not in {"yes", "no"}:
+        return None, "btts_side_unmapped"
+    full = [row for row in rows if str(row.get("segment") or SEGMENT_FULL) == SEGMENT_FULL]
+    if len(full) != 1:
+        return None, "score_rows_ambiguous" if full else "segment_score_unavailable"
+    row = full[0]
+    home, away = _coerce_float(row.get("home_score")), _coerce_float(row.get("away_score"))
+    if home is None or away is None:
+        return None, "score_missing"
+    both = home > 0 and away > 0
+    result = "win" if both == (side == "yes") else "loss"
+    return {
+        "sport": row.get("sport") or sport, "game_id": row.get("game_id"), "game_pk": row.get("game_pk"),
+        "market": "btts", "segment": SEGMENT_FULL, "selection": side, "player": None, "team": None,
+        "home": row.get("home"), "away": row.get("away"), "title": row.get("title"), "line": None,
+        "actual": 1.0 if both else 0.0, "odds": None, "result": result, "pnl": None,
+        "home_score": home, "away_score": away, "graded_from": "final_score",
+    }, "graded"
+
+
 def grade_record_on_score_rows(
     record: Mapping[str, Any],
     record_id: SettlementIdentity,
@@ -760,6 +795,9 @@ def grade_record_on_score_rows(
         return None, "segment_unrecognized"
     if record_id.player:
         return None, "prop_not_graded"
+    btts = _btts_on_score_rows(record, rows, sport=sport, segment=segment)
+    if btts is not None:
+        return btts
     kind, three_way = score_market_kind(sport, record)
     if kind is None:
         return None, "not_a_score_market"
@@ -863,6 +901,13 @@ _BASKETBALL_PROP_STATS = {
 }
 _NON_MLB_PROP_STATS["nba"] = dict(_BASKETBALL_PROP_STATS)
 _NON_MLB_PROP_STATS["wnba"] = dict(_BASKETBALL_PROP_STATS)
+_NON_MLB_PROP_STATS["soccer"] = {
+    "shots": "shots", "player_shots": "shots", "total shots": "shots",
+    "shots on target": "shots_on_target", "player_shots_on_target": "shots_on_target", "sot": "shots_on_target",
+    "anytime goalscorer": "goals_scorer", "player_goal_scorer_anytime": "goals_scorer", "goalscorer": "goals_scorer",
+    "goals": "goals", "player_goals": "goals",
+    "assists": "assists", "player_assists": "assists",
+}
 _NON_MLB_PROP_STATS["nhl"] = {
     "goals": "goals", "player_goals": "goals", "anytime goalscorer": "goals", "player_goal_scorer_anytime": "goals",
     "assists": "assists", "player_assists": "assists",
@@ -963,7 +1008,7 @@ def _record_player_ids(recommendation: Mapping[str, Any], group: str) -> list[in
     return out
 
 
-def _find_box_player(players: Sequence[Mapping[str, Any]], *, ids: Sequence[int], name_key: str) -> tuple[Mapping[str, Any] | None, str | None]:
+def _find_box_player(players: Sequence[Mapping[str, Any]], *, ids: Sequence[int], name_key: str, loose_name: Any = None) -> tuple[Mapping[str, Any] | None, str | None]:
     """(player, refusal). Id first; a name that names a DIFFERENT player than
     the id refuses. Name alone must be unique within the game."""
     by_name = [player for player in players if name_key and player.get("name_key") == name_key]
@@ -977,7 +1022,36 @@ def _find_box_player(players: Sequence[Mapping[str, Any]], *, ids: Sequence[int]
         return None, "player_name_ambiguous"
     if by_name:
         return by_name[0], None
+    if loose_name:
+        # NON-MLB FALLBACK (lane settlement-graders-all-sports): books and box
+        # sources spell the same player differently -- "Erling Braut Haaland" /
+        # "Erling Haaland", "Yeremi Pino" / "Yeremy Pino", a hyphen in another
+        # code point. Measured 2026-10-11 soccer: 250 of 936 "not in box" picks
+        # had a same-surname player in that game's box. Accepted only when
+        # EXACTLY ONE player in the game matches at a step; never a guess.
+        want = _folded_tokens(loose_name)
+        if want:
+            for key in (lambda t: tuple(t), lambda t: (t[0], t[-1]) if len(t) > 1 else None, lambda t: t[-1]):
+                target = key(want)
+                if target is None:
+                    continue
+                hits = [p for p in players if (lambda t: t and key(t) == target)(_folded_tokens(p.get("name")))]
+                if len(hits) == 1:
+                    return hits[0], None
+                if len(hits) > 1:
+                    return None, "player_name_ambiguous"
     return None, "player_not_in_boxscore"
+
+
+def _folded_tokens(value: Any) -> tuple[str, ...]:
+    """Accent-folded, punctuation-free name tokens, generational suffix dropped."""
+    import unicodedata
+
+    text = unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode().lower()
+    tokens = [t for t in re.sub(r"[^a-z0-9]+", " ", text).split() if t]
+    while len(tokens) > 2 and tokens[-1] in {"jr", "sr", "ii", "iii", "iv", "v"}:
+        tokens.pop()
+    return tuple(tokens)
 
 
 def grade_record_on_player_box(
@@ -1023,6 +1097,7 @@ def grade_record_on_player_box(
         players,
         ids=_record_player_ids(recommendation, group),
         name_key=player_name_key(record_id.player),
+        loose_name=(recommendation.get("player_name") or record_id.player) if normalize(sport) != "mlb" else None,
     )
     if player is None:
         return None, refusal or "player_not_in_boxscore"
