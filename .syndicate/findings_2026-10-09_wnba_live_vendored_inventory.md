@@ -168,3 +168,19 @@ The empty pools that remain are production's own behaviour (e.g. `rotation_minut
 for DAL and GSV on 2026-08-12), not a recorder defect. **Not reproducible as-of, stated:** the season-fit
 lineup-effect tables (`lineup_effects` reason `missing_tables`); `pair_minutes_history` / `play_context_history`
 feed only those tables, not the sim path. The inputs are TODAY's code as-of, not what production ran per date.
+
+## Inventory re-check, 2026-10-12 21:4xZ (origin/main, after P1 + P6 shipped)
+
+Method: an AST scan (imports, `importlib`/`sys.path`/`spec_from_file_location` calls, vendor path literals) over
+`syndicate/features/{wnba,basketball_engine}` and `shared/{basketball*,wnba*,live_lens_loop,live_gameline_join}.py`
+(73 files) -- not a name grep, so provenance docstrings in the native ports are not counted -- plus a read of the
+`scripts/refresh_wnba_oddsapi_props.py` call sites, plus the fallback flag on every running fleet process
+(presence/truthiness only, never the value).
+
+| row | was | now |
+|---|---|---|
+| 1 `wnba/live_lens.py:65` vendored tick | runs unconditionally | **UNCHANGED -- the one vendored call that still runs on the WNBA live path.** P5 deletes it |
+| 2 `_load_source_app` in `refresh_wnba_oddsapi_props.py` | live snapshot producer | live OddsAPI period lines now NATIVE (`wnba/live_period_lines.py`, lane `wnba-live-period-lines-native`); the 4 remaining call sites (live snapshot export :832, cards_sim_detail :6047, recon :6170, live-lens artifact export :6280) are present but every vendored fetch is gated by `SYNDICATE_WNBA_SOURCE_APP_FALLBACK`, which is **off on all 23 fleet python processes** (web, refresh-worker, live-odds-worker: set non-truthy; others absent). Dead at runtime; delete with P5 |
+| 6-8 vendored `simulate_smart_game` / `sim.events` / advanced-stats imports | the WNBA sim | **GONE** -- P1 engine + P6 native orchestrator; the scan finds no vendored import on the sim path |
+| 12 `sys.path.insert(source_root/src)` in props predictions/edges | no-op in prod | unchanged: `basketball_props_predictions.py:158/202/434`, `basketball_props_edges.py:672`. No-op in production (data root has no `src/`); in an as-of SCRATCH the pristine `src/` IS on the path -- harmless while nothing imports from it (P6: "the bridge loads no vendored module") |
+| new: `shared/wnba_fixture_identity.py:73` | -- | reads `vendor/wnba_betting_repo/data/processed/schedule_2026.csv` (DATA, fixture identity / board) -- off the live and sim path; belongs to the plan's "outside" list |
