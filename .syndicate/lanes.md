@@ -1051,14 +1051,12 @@ death, never life — do not invert it.
 - Verification: Per-side rotation_minutes + _lineup_effects diags on the 4 games (copy of the fleet data root, nice -n 19); as-of regular-season replay pool counts with the population stated; checklist games_with_lineup_pools on a fresh post-opener production corpus, recorded in deploys.md.
 - Blocked by: none
 
-### lanes-archive-20261012 — OPEN — opened 2026-10-12 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+### lanes-archive-20261012 — CLOSED — opened 2026-10-12 — closed 2026-10-12 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - Goal: lanes.md is under its 550,000-byte cap on origin/main with every archivable CLOSED lane block moved VERBATIM to lanes_history.md, a one-line pointer left in lanes.md for each, and the 320-pair claim set plus every OPEN block unchanged.
+- GOAL: MET — on origin/main `be08ffc8`: lanes.md 590,233 -> 489,987 B (0.89x of the 550,000-byte cap, was 1.07x), claim set unchanged at 322 pairs, all 74 OPEN blocks present, 0 CLOSED blocks left, all 25 departed blocks byte-identical in lanes_history.md with a pointer each, lanes_history.md +419/-0, lone CR conserved 2 -> 2, check_lane_invariants.py INVARIANTS HOLD.
 - Files: .syndicate/lanes.md,.syndicate/lanes_history.md
-- Hypothesis: n/a
-- Falsification test: n/a
-- Verification: archive_released_lanes.py reports claims unchanged at 320; lanes.md on origin/main under 550,000 BYTES; every archived block body byte-identical in lanes_history.md; OPEN block count equal before and after; zero lone CR introduced.
+- Outcome: 25 released blocks archived, 100,246 B reclaimed. Narrative in .syndicate/log/2026-10-12.md (15:59Z). Two claim-path typos found that belong to lanes nba-lineup-pools and soccer-live-anytime-scorer — surfaced in that log, NOT edited across lanes.
 - Blocked by: none
-
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
