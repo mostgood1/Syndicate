@@ -1293,3 +1293,11 @@ about simulated playing time.
   also inflates star minutes and stats in high-foul draws.
 - **Ownership:** foul trouble is P3's under the agreed split (nba-native-live-resim), but this is a PREGAME gap.
   Flagged to P3 and to the user; not fixed in #4.
+
+**Foul-out disqualification: TAKEN by P3** (nba-native-live-resim, 2026-10-12). engine.py's live-mechanism section is now
+P3's.
+- Default-off EventSimConfig field, byte-identical off, graded vs real 0.193 on top of k = 0.002 + pools. Then
+  foul-trouble benching.
+- Applies to pregame too; enabling it for pregame is a user decision P3 brings.
+- **Interaction rule for #4:** P3's disqualification and any #4 blowout-rest lever BOTH move starter minutes.
+  Whichever lands second is measured JOINTLY with the first on (mechanism vs estimator), never assumed additive.
