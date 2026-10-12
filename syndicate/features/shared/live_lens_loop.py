@@ -1247,6 +1247,14 @@ def start_live_lens_loop() -> bool:
 			start_nba_live_resim_loop()
 		except Exception as exc:  # noqa: BLE001 -- never let the NBA thread stop the shared loop starting
 			print(f"[live_lens_loop] NBA_LIVE_RESIM_LOOP_START_FAILED {type(exc).__name__}: {exc}", flush=True)
+		# The NCAAB native live re-sim (`ncaab/live_resim.py`, P4) runs in ITS OWN thread for the same reason, and
+		# rotates through a 50-150 game slate across ticks. Only when SYNDICATE_NCAAB_LIVE_RESIM is on (absent = off).
+		try:
+			from syndicate.features.ncaab.live_resim import start_ncaab_live_resim_loop
+
+			start_ncaab_live_resim_loop()
+		except Exception as exc:  # noqa: BLE001 -- never let the NCAAB thread stop the shared loop starting
+			print(f"[live_lens_loop] NCAAB_LIVE_RESIM_LOOP_START_FAILED {type(exc).__name__}: {exc}", flush=True)
 		return True
 
 
