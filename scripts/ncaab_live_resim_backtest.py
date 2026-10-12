@@ -302,6 +302,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--report", type=Path, required=True)
     args = ap.parse_args(argv)
     tasks, skipped = build_tasks(args.season, regular_sample=args.regular_sample, sims=args.sims, seed=args.seed, min_games=args.min_games)
+    # INTERLEAVED BY PHASE (seeded), so a partial run -- this takes hours at Idle on a shared host --
+    # is a balanced read of every phase rather than November's regular season only.
+    by_phase: dict[str, list] = defaultdict(list)
+    for t in tasks:
+        by_phase[t["record"]["phase"]].append(t)
+    shuffler = random.Random(args.seed)
+    for lst in by_phase.values():
+        shuffler.shuffle(lst)
+    queues = sorted(by_phase.values(), key=len)
+    tasks = [q[i] for i in range(max((len(q) for q in queues), default=0)) for q in queues if i < len(q)]
     if args.max_games is not None:
         tasks = tasks[: args.max_games]
     done = {}
