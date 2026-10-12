@@ -1635,6 +1635,12 @@ EXPORT_ONLY_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # Lane `nba-native-live-resim` (P3): the pregame engine inputs per NBA game (~100 KB pickle), written at pregame
     # sim time and read by the live re-sim on the SAME host. Auditable, never swept or published.
     "nba_source/data/processed/engine_inputs/*/*.pkl",
+    # Lane `ncaab-native-live-tier` (P4): the NCAAB live re-sim's two dated input tables and the player
+    # box they are built from (model engine standard section 3: every engine input auditable). Read on the
+    # SAME host by the re-sim; never swept or published.
+    "ncaab_source/data/processed/player_priors_*_asof_*.csv",
+    "ncaab_source/data/processed/player_game_box_*.csv",
+    "ncaab_source/data/processed/team_ratings_*_asof_*.csv",
 )
 
 
