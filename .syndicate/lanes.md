@@ -1115,7 +1115,16 @@ death, never life — do not invert it.
 - Verification: fleet: resolve_regular_season_window raises for every 2026 date (done); no receipt or data-root models exist (done); after the change the refresh imports no wnba_betting module for the playoff step (fresh interpreter + deployed checkout)
 - Blocked by: none
 
-### mlb-pitcher-outs-k-dist — OPEN — opened 2026-10-12 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+### mlb-pitcher-outs-k-dist — CLOSED (GOAL MET) — closed 2026-10-12 — opened 2026-10-12 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- **find out, out of sample and pre-registered, whether a post-sim correction of the starter OUTS and STRIKEOUTS distributions (mean pulled toward the pitcher's as-of history, spread widened) beats the raw sim on priced lines. MEASUREMENT + proposal only; any engine change is a separate user decision. — GOAL: MET (answer: NO; nothing proposed).**
+  - Rows: 2,162 outs and 2,089 K priced lines (identical to the backtest's counts). Judge window 08-22..09-27.
+  - **Outs:** fit alpha=0.9, s=2.0. Brier raw 0.2893 -> T 0.2750 (book 0.2452); dB CI [-0.0294, +0.0004] FAILS (1). EV>0 ROI -4.2% -> -8.6% FAILS (3).
+  - **K:** fit alpha=0.7, s=1.9. Brier 0.2879 -> 0.2620 (book 0.2421); dB CI [-0.0374, -0.0153] passes. ROI -10.3% -> -17.8% FAILS (3).
+  - The market-shrink w re-fit on the corrected dists is still 0.00 for both.
+  - **Reading.** The fit wants the mean almost entirely from history and the spread ~doubled (s at the grid edge 2.0). The corrected dist is still far from the book, and its EV>0 picks lose more.
+    - Level and spread are not the missing piece. The book prices information neither the sim nor the season average carries: expected pitch count / leash, role, opener/bulk usage, injury.
+    - Next lever, if pursued: features, not shape. Recent workload (last-3 pitch counts, days rest) and team bullpen-usage patterns as as-of inputs to starter length. Measure before building.
+  - Scratch: `pk_rows.py`, `pk_fit.py`, `pk_fit_result.json`; fleet `~/ssims/rows_pk.json`.
 - Goal: find out, out of sample and pre-registered, whether a post-sim correction of the starter OUTS and STRIKEOUTS distributions (mean pulled toward the pitcher's as-of history, spread widened) beats the raw sim on priced lines. MEASUREMENT + proposal only; any engine change is a separate user decision.
 - **Why.** `findings_2026-10-09_mlb_oos_market_backtest.md`:
   - outs: dBrier vs book +0.049, dispersion 0.70, corr(model mean, actual) 0.095 vs 0.371 for the pitcher's own as-of average;
