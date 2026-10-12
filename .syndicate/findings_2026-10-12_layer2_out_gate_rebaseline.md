@@ -85,3 +85,35 @@ file are all UNCLAIMED as of 2026-10-12. `board_enrichment.py` is held by
 `web-restart-healthz`. Start from a REAL grid row and compare its keys against
 `_grid_prop`'s; do not change the gate or the rebuild until (a) vs (b) is decided,
 because both fixes move board behaviour.
+
+## SETTLED 2026-10-12 against a real payload: (a). The fixture was stale.
+
+`/api/board/book-grid?sport=nfl&limit=5000` -> 249 rows, 128 of kind `prop`.
+All 128 through `build_layer2_rows`:
+
+    rows_in 128  sides_priced 222  candidates 222  scored 222
+    by_lane {'opportunity': 186, 'dead': 36}      opportunities 186
+
+A single real prop row alone -> `{'opportunity': 1}`. So the price DOES reach the
+gate in production and **(b) is refuted -- there is no board defect and props are
+not being under-seated.**
+
+Of the ten keys a real row carries that `_grid_prop` lacked -- `age_seconds`,
+`books`, `complete`, `consensus`, `game`, `gaps`, `league`, `modelled_fair`,
+`seen_age_seconds`, `updated_at` -- adding each alone, exactly one flips the lane:
+
+    + game  ->  {'opportunity': 2}        (every other key: still {'watchlist': 2})
+
+Fixed by giving the fixture a realistic `game` block copied from a real row. 10/10.
+
+**A correction to the root cause above.** `og.evaluate()` on a RAW grid row returns
+`no_market_posted` even for a REAL row, because the `quote` is synthesised during
+the rebuild. So probing the grid row directly was the wrong instrument; only the
+REBUILT candidate's verdict means anything, and that is what `by_lane` reports.
+
+**The tests now reach the gate, proven by mutation rather than claimed.** Neutering
+the `player_availability` fan-out at `layer2_board.py:3116` fails 4 of the
+end-to-end tests while the 5 direct ones stay green. That fan-out dropping the flag
+is a documented past defect (comment at :3112-3115, `rows_player_out_on_feed` 0),
+so these tests are its regression guard -- and for several days they were asserting
+against empty sets instead.

@@ -98,6 +98,24 @@ def _grid_prop(player: str, **extra: object) -> dict:
         "best": {"over": {"price": 118, "bookmaker": "fanduel", "books_quoting": 4, "age_seconds": 30.0},
                  "under": {"price": -140, "bookmaker": "draftkings", "books_quoting": 4, "age_seconds": 30.0}},
         "projection": {"edge_vs_market_pct": 6.0, "model_skill": {"status": "measured", "sample_games": 120}},
+        # SETTLED 2026-10-12 against a real payload: without `game`, build_layer2_rows
+        # rebuilds both sides, scores them, and then opportunity_gate demotes every one
+        # to `watchlist` -- so `opportunities` came back EMPTY and the five end-to-end
+        # tests below asserted against empty sets for two days while reading as a
+        # gate failure. 128 real prop rows from /api/board/book-grid give
+        # by_lane {'opportunity': 186, 'dead': 36}, and of the ten keys a real row
+        # carries that this fixture lacked, adding `game` ALONE flips it from
+        # {'watchlist': 2} to {'opportunity': 2}. Shape copied from a real row
+        # (2026_05_BUF_LA); only `state` is load-bearing here, the rest is realism.
+        "game": {
+            "game_key": "2026_10_NYL_ATL",
+            "matchup": "NYL @ ATL",
+            "state": "pregame",
+            "start_time_utc": "2026-10-07T23:30:00+00:00",
+            "home_score": None,
+            "away_score": None,
+            "status_token": "6:30P CT",
+        },
     }
     row.update(extra)
     return row
