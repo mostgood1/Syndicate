@@ -3835,3 +3835,16 @@ guard reported 26 passed, but its candidate set is 15 scripts and NONE of the 4
 new peer scripts touch a ledger doc. So that green says the 15 pre-existing
 candidates are still clean; it does not say the guard caught anything new. The
 frame could not have been non-null.
+
+## 2026-10-12 REPEAT of the 2026-10-06 FORBIDDEN (text-mode ledger rewrite), and a committed merge marker found by the same check `[lane basketball-props-models-native, session 2d413211]`
+
+- **The repeat.** In my 2026-10-09 rebase-conflict fix (commit 984312a8), and in later one-line lane edits, I read `lanes.md` with Python TEXT mode (`open(p, encoding=...)`). Two lone CR bytes in other lanes' lines became line breaks:
+  - games-rail-full-detail: its 10-10 00:10Z verdict;
+  - basketball-native-live-state: an NCAAB PROGRESS line, which gained a blank line.
+  The whole file also went CRLF -> LF. That diff was 1,952+/1,949-, and it was the only sign. I gated on "my block replaced" and never on numstat.
+- **Found today** because a byte-exact edit showed 1/1 while my text-mode version of the same edit showed 8 changed lines. Repair: the NCAAB line was rejoined byte-exactly. The games-rail lane had already replaced its verdict head, so the detached tail is now an orphan in its block; I told its owner (session d4409ac4) rather than edit their block.
+- **Second finding, same check:** `d93bfc7e` committed UNRESOLVED merge markers into lanes.md. Both sides were pure additions, with the shared `- Blocked by: none` factored out. `check_lane_invariants` then reported "not a ledger", and the markers hid a new lane's claims on the orchestrator package. Resolved in 05a0be1c by keeping both sides and restoring the factored line to each block.
+- **How to apply:**
+  1. Every ledger edit is `read_bytes()` / `split(b"\n")` / `write_bytes()`, including conflict resolution.
+  2. Before every ledger commit, `git diff --cached --numstat <file>` must equal the lines you meant to touch.
+  3. After a rebase that touched a ledger, grep `origin/main`'s copy for `^<<<<<<< |^>>>>>>> `.
