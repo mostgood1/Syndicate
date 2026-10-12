@@ -48613,3 +48613,16 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - `build_ncaab_player_priors.default_season(2026-10-12) == 2027`, so the next run builds the 2026-27 PRESEASON table from the swapped-in 2025-26 box (fleet stale-roster exclusion applies).
 - **Owed:** read the 2026-10-13 ~11:40Z run (`logs/job-ncaab-player-priors.log`: `teams_in_table`, `teams_stale_excluded`, `written=`).
 - **Rollback:** ff is forward-only; to undo the NCAAB code, revert on main and ff. No restart needed either way.
+
+## 2026-10-12 22:06:24Z -- refresh-worker restart (local fleet), loads soccer live anytime-scorer join 2c9dd444 `[lane soccer-live-anytime-scorer, session b9bb5f37]`
+- **What:** `kill -TERM` refresh-worker pid 1376115 at 22:06:24.544Z; the supervisor respawned pid 1545899 at 22:06:40Z. Fleet checkout HEAD 264b38df (contains 2c9dd444; set by ncaab-native-live-tier's 22:01:47Z ff, no ff by me). Claim `refresh-worker` held by soccer-live-anytime-scorer for the restart, released by token right after.
+- **Gate:** `check_deploy_safety` WITHOUT drain, scoped to the refresh-worker: its only blockers were live-odds-worker child jobs (which a refresh-worker TERM does not touch); `Board build idle (... next LOOP_ITERATION, i.e. persisted)`, `Odds refresh: idle`, refresh-worker child count 0 re-read immediately before the TERM.
+- **Failed attempts, for the record:** (1) 21:15-22:00Z, the fleet-wide gate never CLEARed, because NFL/NCAAF live autoruns, soccer pre-match and NHL odds jobs ran continuously on the live-odds-worker. (2) ~22:01Z drain refused: the claim was held by ncaab-native-live-tier. (3) 22:05:00Z `--drain` returned rc=2 (`Drain requires the keyvalue backend`; the shell is not configured), undrained, and the claim was released. learnings 2026-10-07 already says `--drain` cannot make a restart window on the local fleet; I had missed it.
+- **Ride-alongs loaded by this restart (all inert unless switched on):** `basketball_engine/engine.py` bonus free throws (default OFF), `ncaab/live_resim.py` (needs `SYNDICATE_NCAAB_LIVE_RESIM`), `ncaaf/live_resim.py` (db49b352), and everything else up to 264b38df that refresh-worker imports. See ncaab-native-live-tier's 22:01:47Z entry.
+- **verify:**
+  - restart **MET**: new pid at 22:06:40Z on HEAD 264b38df.
+  - effect **OWED**, needs a live soccer slate (next: Championship 2026-10-13 18:45Z):
+    - `refresh-worker.log` `LIVE_PROJECTION_JOIN sport=soccer`: `projected` up and `miss_line` down vs 10-10 (miss_line 1,558 of 3,477);
+    - population ledger: live `player_goal_scorer_anytime` rows carry `me` (model edge);
+    - count of those rows reaching the board.
+- **Rollback:** set `_YES_NO_LINE_KEYS = {}` in `live_projection_join.py` (the reachability test proves this reverts to miss_no_line), land, ff to that SHA, and restart under a claim.
