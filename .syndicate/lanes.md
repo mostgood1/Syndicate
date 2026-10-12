@@ -950,6 +950,19 @@ death, never life — do not invert it.
 - Blocked by: none
 - STATUS 2026-10-06 ~22:15Z: Phase 1 pre-registered (026d94d7) + amendments; extractor/sim/table phases on main; real FIT extracted (NBA 816, WNBA 217); NBA FIT sim run COMPLETE 109/109 dates (2026-10-07 ~14:10Z; WSL ~/bball_sc, 3 workers, 200 draws, 0 errors).  NEXT: NBA table + flags, WNBA sim setup, NCAAB real table. GOAL: NOT MET (Phase 1 in progress).
 - NBA PHASE 1 READ 2026-10-07 (findings 'NBA Phase 1 reading'; 791 paired FIT games): FLAGGED -- margin SD 19.4 vs 14.0 and blowouts 35% vs 23% (too much spread), quarter shares (Q4 +1.7 pts, +2.5 close), quarter SD +1 pt, FTA -2.4/team with foul-outs x1.9 (no bonus/intentional FTs), top-5 minutes flat vs script (close -1.6, blowout +2.9), volume +5.6 plays/+2.4 3PA. EXONERATED: Q2 share. Phase 2 candidates ranked (spread jitter first); each pre-registered before any engine change. Owed: S12 back-to-back; WNBA sim; NCAAB real table.
+### deploy-claim-dir-parity — OPEN — opened 2026-10-12 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- Goal: make `scripts/deploy_claim.py` write and read claims in the SAME directory the local_production supervisor guards check, so a claim taken on the WSL fleet is seen by `down`/restart (and vice versa).
+- **Why.** Lead 9b583dcb.
+  - On 2026-10-10 `down` was REFUSED with 3 claims HELD per the fleet's `deploy_claim.py status`.
+  - `local_production.py` resolves `SYNDICATE_DEPLOY_CLAIM_DIR` (from `local_production.env`) to `/mnt/c/.../Syndicate/.syndicate/deploy_claims`.
+  - `deploy_claim.py` ignores it and writes `~/Syndicate/.syndicate/deploy_claims`.
+  - So every fleet-side claim was invisible to the guard, and mutual exclusion between the two places was non-existent.
+- Hypothesis: resolving the dir as env var -> `local_production.env` key -> main-worktree default makes both tools agree.
+- Falsification test: on the fleet, `deploy_claim.py acquire` then the supervisor's own `active_role_claim(deploy_claim_dir(local), role)` returns the claim; release -> None.
+- Verification: that fleet reading, plus a unit test of the resolution order.
+- Files: scripts/deploy_claim.py, tests/test_deploy_claim_dir.py (NEW)
+- Blocked by: none
+
 ### mlb-alt-market-calibration — CLOSED (GOAL MET) — closed 2026-10-12 — opened 2026-10-12 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
 - **extend the live MLB market-shrink calibration to the alt game-line markets the board actually serves (`totals_alt` first5/first3/first1, `spreads_alt` first5/first3), for every cell that passes the pre-registered rule out of sample. — GOAL: MET.** Reading: 3 of 5 cells passed rule v2 and are live since 14:32:53Z (totals_alt|first3 w=0.30, spreads_alt|first3 w=0.28, totals_alt|first1 w=0.87). F5 alt cells failed the ROI guard and stay identity. The fleet probe resolves all 3. The served board 14:58Z shows edge ratios 0.30 / 0.28-0.295 on rows where the consensus and displayed fairs agree; F5 alt reads ~1.0. Spend 49,394 credits. deploys.md 2026-10-12 14:32:53Z.
 - Goal: extend the live MLB market-shrink calibration to the alt game-line markets the board actually serves (`totals_alt` first5/first3/first1, `spreads_alt` first5/first3), for every cell that passes the pre-registered rule out of sample.
