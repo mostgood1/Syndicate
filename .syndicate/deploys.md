@@ -48499,3 +48499,15 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **User.** "Yes, squash-merge #5".
 - **Verify.** GitHub contents API on upstream main reads `default="off"`. A vendor re-pull no longer reverts the game-profile fix; `tests/test_mlb_multi_profile_pitch_overrides.py` still guards it.
 - **Not merged:** PRs #2 and #3 (stacked engine changes).
+
+
+
+## 2026-10-12 16:27:30Z -- FLEET DATA, NO DEPLOY, NO RESTART: 2025-26 NCAAB player box swapped in; the fleet's own crawl of it stopped (lane ncaab-native-live-tier)
+- what: user in chat 2026-10-12 "copy the 2025-26 player box to the fleet", then chose "stop job, swap in my copy".
+  The supervisor had started the newly scheduled `ncaab-player-priors` job (fleet HEAD a25bbdc2, 11:40Z slot already past) and it was
+  re-crawling the same box. Sent `kill -TERM` to that JOB (pid 1376117, a scheduled job, not a role); it exited within 30 s.
+  Then copied to temporary names and renamed into place: `~/syndicate-prod/data/ncaab_source/data/processed/player_game_box_2026.csv` and `.dates.json`.
+- verify (reading): before 22,777,791 B / 122 dates (the fleet crawl's partial); after 24,984,518 B, 196,865 rows, 166 dates;
+  sha256 src == dst `44959a2f1bbf640d`; the job did NOT relaunch (pgrep empty 5 s after).
+- owed: the October season fix (`396ef6e9`) reaches the fleet only with a fleet fast-forward. Until then the daily job re-reads 2025-26
+  (a no-op: every date is done) and builds NO 2026-27 preseason table. Fast-forward before ~11-01.
