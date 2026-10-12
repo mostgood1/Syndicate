@@ -1165,6 +1165,25 @@ death, never life — do not invert it.
 - Verification: the test passes with and without SYNDICATE_CALIBRATION_PROFILE_DIR pointing at the production profile, and in the fleet ci-checkout env
 - Blocked by: none
 
+### mlb-starter-workload-signal — OPEN — opened 2026-10-12 — session b98d59a1-6033-4eb7-b3b3-2b5c91a1c490
+- Goal: measure, out of sample and pre-registered, whether as-of recent-workload features carry information about starter OUTS and STRIKEOUTS lines BEYOND the de-vigged book price. MEASUREMENT only; it decides whether a starter-length feature project is worth building.
+- **Why.** Lane mlb-pitcher-outs-k-dist: reshaping the sim's dist cannot reach the book (market-shrink w = 0.00 even after correction). The open question is whether ANY as-of public signal adds to the price.
+- **Features (as-of, strictly before the start date, from StatsAPI game logs):**
+  - last-start pitches; mean pitches over the last 3 starts; days rest since the last start;
+  - season-average outs (or K) per start; last-3 average outs (or K);
+  - the raw sim P(over).
+- **PRE-REGISTERED RULE (written before any fit).**
+  - Per market, two logistic regressions on the 07-16..08-21 rows:
+    - BOOK: y ~ logit(p_book);
+    - BOOK+X: y ~ logit(p_book) + standardized features (each minus the line where it is a count of outs/K) + logit(p_sim).
+  - Judge 08-22..09-27: dlogloss(BOOK+X - BOOK), game-clustered bootstrap (1000, seed 7).
+  - **"Signal beyond the book" iff CI upper < 0.**
+  - Also reported: the same with p_sim only (no workload), to separate the sim's information from the features'.
+- Falsification test: CI includes 0 -> no public workload/sim signal beyond the price at this sample size; the feature project is NOT recommended.
+- Verification: lane verdict with the numbers.
+- Files: (scratch scripts only)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
