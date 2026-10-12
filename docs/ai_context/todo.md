@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#697` — **The fleet `ci-suite` has been RED every day since at least 2026-10-02: 21 baseline regressions, all reproduced on `origin/main` `f590550e` (2026-10-12), 2 fixed here, 19 owed to their lanes** — lane `ci-suite-red-1012`, session 12420da3
+### `#697` — **The fleet `ci-suite` has been RED every day since at least 2026-10-02: 21 baseline regressions, all reproduced on `origin/main` `f590550e` (2026-10-12), 3 fixed (2 here, 1 by `ncaaf-resim-test-saturation`), 18 owed to their lanes** — lane `ci-suite-red-1012`, session 12420da3
 
 The 08:00Z `ci-suite` job (`local_production.py ci-run` -> `run_ci_suite.py` in `<home>/ci-checkout`, scrubbed env) exits 1 daily. It only reports and gates nothing, so it went unread. "NEW FAILURE(S)" count by day: 10-02 1, 10-03 3, 10-05 5, 10-06 6, 10-07 6, 10-08 14, 10-09 19, 10-10 20, 10-11 21, 10-12 21. **The archive suite (what Render CI ran) has failed since 10-09.** Log: `~/syndicate-prod/logs/job-ci-suite.log`; summary `~/syndicate-prod/run/ci-suite-latest.json`. All 21 fail deterministically: rerun 2x at fleet `64909dba` and 1x at `f590550e` in the ci-checkout env.
 
@@ -15,7 +15,7 @@ The 08:00Z `ci-suite` job (`local_production.py ci-run` -> `run_ci_suite.py` in 
   - `test_basketball_orchestrator_reachability::test_the_generated_modules_match_the_port_script` (10-11): PORT_CHECK DIFFERS across smart_sim, quarters, boxscores, ... Owner `basketball-native-orchestrator`.
 - **Behaviour, NCAAF:**
   - `test_ncaaf_props_board` x2 (10-03): book count 3 vs expected 2; the unbettable-books case finds 0 rows.
-  - `test_ncaaf_live_resim::test_the_probability_moves_with_the_score...` (10-05): `1.0 < 1.0`, the live win prob does not move with the score. Window ad231ea0 / 68832abf (live total-level shrink 1.0 -> 0.3). **Read this one first: it reads like a real bug, not a stale test.**
+  - ~~`test_ncaaf_live_resim::test_the_probability_moves_with_the_score...`~~ **FIXED 2026-10-12, lane `ncaaf-resim-test-saturation`; NOT a model bug (the earlier "read this first, real bug" was WRONG).** Its mismatch fixture (Oregon 1.2/0.6 vs 0.1/0.1) prices 7-7 at ~0.91, and after ad231ea0 (live shrink 1.0 -> 0.3) the 40 fixed seeds won all 40 at 7-7 AND at 21-0 under the PROMOTED profile. Promoted profile, 400 sims: 0.430 / 0.912 / 0.998; even teams 0.072 / 0.545 / 0.953. A worktree without `data/` loads the default profile and passed, which made it look environmental. The test now uses even ratings plus a spread floor.
 - **Behaviour, NFL:**
   - `test_nfl_market_board::test_build_nfl_market_board_shapes_games` (10-05): market list gained anytime_td / interceptions / passing ...
   - `test_nfl_player_stats::NflPerMarketShrinkageTests` x2 (10-09): k 4.0 vs 2.0; 10.70 vs 8.99. Window 018a7c64 / eac5ef96 (passing-attempts re-fits).

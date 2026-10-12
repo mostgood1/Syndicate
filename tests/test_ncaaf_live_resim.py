@@ -142,12 +142,27 @@ def test_a_decided_game_prices_at_the_boundary_not_near_it():
 
 
 def test_the_probability_moves_with_the_score_which_is_the_entire_point():
+    """EVEN ratings, not `_resim`'s mismatch. With Oregon 1.2/0.6 vs 0.1/0.1 the level
+    game is ~0.91 for the home side, so 40 fixed seeds can win all 40 at 7-7 as well as
+    at 21-0. They did once the live level shrink went 1.0 -> 0.3 (ad231ea0) under the
+    PROMOTED profile: `1.0 < 1.0`, red on the fleet ci-suite from 2026-10-05 (todo #697).
+    A worktree without `data/` falls back to the default profile and passed, which is
+    why it looked environmental. Measured 2026-10-12, 40 sims, (0-21, 7-7, 21-0):
+    default 0.05 / 0.65 / 0.99; promoted 0.18 / 0.71 / 1.00; promoted with the
+    shrink kill switch 0.05 / 0.56 / 0.96."""
     kw = dict(away_team="Boise State", home_team="Oregon", period=2,
               clock_seconds=900, possession_owner="home")
-    level = _resim(lr.NcaafLiveGameState(home_score=7, away_score=7, **kw))["home_win_prob"]
-    behind = _resim(lr.NcaafLiveGameState(home_score=0, away_score=21, **kw))["home_win_prob"]
-    ahead = _resim(lr.NcaafLiveGameState(home_score=21, away_score=0, **kw))["home_win_prob"]
+
+    def even(home_score, away_score):
+        state = lr.NcaafLiveGameState(home_score=home_score, away_score=away_score, **kw)
+        return lr.resim_live_game(state, home_offense=0.5, home_defense=0.5,
+                                  away_offense=0.5, away_defense=0.5, sims=40)["home_win_prob"]
+
+    behind, level, ahead = even(0, 21), even(7, 7), even(21, 0)
     assert behind < level < ahead
+    # Strict ordering alone passes a near-flat response; three touchdowns of score in
+    # the second quarter must move the price a lot (smallest measured spread: 0.825).
+    assert ahead - behind > 0.5
 
 
 def test_unknown_possession_is_marginalised_over_both_sides():
