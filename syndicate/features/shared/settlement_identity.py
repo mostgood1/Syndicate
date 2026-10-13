@@ -907,7 +907,12 @@ _NON_MLB_PROP_STATS["soccer"] = {
     "anytime goalscorer": "goals_scorer", "player_goal_scorer_anytime": "goals_scorer", "goalscorer": "goals_scorer",
     "goals": "goals", "player_goals": "goals",
     "assists": "assists", "player_assists": "assists",
+    # Races, graded off the box row's ordered `goals` (`_grade_soccer_scorer_race`).
+    "player_first_goal_scorer": "first_goal_scorer", "first goalscorer": "first_goal_scorer",
+    "player_last_goal_scorer": "last_goal_scorer", "last goalscorer": "last_goal_scorer",
 }
+_SOCCER_SCORER_RACES = frozenset({"first_goal_scorer", "last_goal_scorer"})
+_NO_SCORER_NAMES = frozenset({"no scorer", "no goalscorer", "no goal scorer", "no goal"})
 _NON_MLB_PROP_STATS["nhl"] = {
     "goals": "goals", "player_goals": "goals", "anytime goalscorer": "goals", "player_goal_scorer_anytime": "goals",
     "assists": "assists", "player_assists": "assists",
@@ -1029,18 +1034,100 @@ def _find_box_player(players: Sequence[Mapping[str, Any]], *, ids: Sequence[int]
         # code point. Measured 2026-10-11 soccer: 250 of 936 "not in box" picks
         # had a same-surname player in that game's box. Accepted only when
         # EXACTLY ONE player in the game matches at a step; never a guess.
+        #
+        # NESTED NAMES (lane soccer-live-anytime-scorer, 2026-10-13): two or more shared
+        # words are tried BEFORE the surname alone, which is weaker evidence -- "joao pedro
+        # junqueira de jesus" must find "Joao Pedro", not a "... Jesus" elsewhere in the game;
+        # a one-word box name equal to the pick's first word comes last.
         want = _folded_tokens(loose_name)
         if want:
-            for key in (lambda t: tuple(t), lambda t: (t[0], t[-1]) if len(t) > 1 else None, lambda t: t[-1]):
-                target = key(want)
-                if target is None:
-                    continue
-                hits = [p for p in players if (lambda t: t and key(t) == target)(_folded_tokens(p.get("name")))]
+            steps = (
+                lambda p: _folded_tokens(p.get("name")) == want,
+                lambda p: len(want) > 1 and (lambda t: len(t) > 1 and (t[0], t[-1]) == (want[0], want[-1]))(_folded_tokens(p.get("name"))),
+                lambda p: _nested_names(want, _folded_tokens(p.get("name")), multi_word=True),
+                lambda p: (lambda t: bool(t) and t[-1] == want[-1])(_folded_tokens(p.get("name"))),
+                lambda p: _nested_names(want, _folded_tokens(p.get("name")), multi_word=False),
+            )
+            for step in steps:
+                hits = [p for p in players if step(p)]
                 if len(hits) == 1:
                     return hits[0], None
                 if len(hits) > 1:
                     return None, "player_name_ambiguous"
     return None, "player_not_in_boxscore"
+
+
+def _void_graded(row: Mapping[str, Any], player: Mapping[str, Any], market_key: str, side: str,
+                 line: float | None, sport: str | None) -> dict[str, Any]:
+    """A push: stake back, no outcome -- what a book does with a non-runner."""
+    return {
+        "sport": row.get("sport") or sport, "game_id": row.get("game_id"), "game_pk": row.get("game_pk"),
+        "market": market_key, "segment": SEGMENT_FULL, "selection": side, "player": player.get("name"),
+        "player_id": player.get("id"), "team": player.get("team"), "home": row.get("home"), "away": row.get("away"),
+        "title": row.get("title"), "line": line, "actual": None, "odds": None, "result": "push", "pnl": None,
+        "graded_from": "box_score_did_not_appear",
+    }
+
+
+def _grade_soccer_scorer_race(
+    record_id: SettlementIdentity, recommendation: Mapping[str, Any], row: Mapping[str, Any], stat: str, market_key: str
+) -> tuple[dict[str, Any] | None, str]:
+    """First / last goalscorer off the box row's ordered goals (user decision 2026-10-13).
+
+    OWN GOALS DO NOT COUNT: the first (last) goal that is not an own goal decides, the
+    common US-book rule. No such goal -> every player pick loses and "no scorer" wins. A
+    squad player who never came on is void; a player not in the box refuses. The goals
+    list is the poller's `match_box["goals"]`, in match order; a box without one (the
+    match-log fallback) refuses rather than guesses.
+    """
+    goals = row.get("goals")
+    if not isinstance(goals, list):
+        return None, "scorer_order_unavailable"
+    raw_side = normalize(recommendation.get("side") or record_id.side)
+    if raw_side not in {"yes", "no"}:
+        return None, "prop_side_unmapped"
+    counted = [g for g in goals if isinstance(g, Mapping) and not g.get("own_goal")]
+    decisive = (counted[0] if stat == "first_goal_scorer" else counted[-1]) if counted else None
+    players = [p for p in (row.get("players") or ()) if isinstance(p, Mapping)]
+    name = recommendation.get("player_name") or record_id.player
+    graded_player: Mapping[str, Any] = {"name": name}
+    if " ".join(_folded_tokens(name)) in _NO_SCORER_NAMES:
+        hit = decisive is None
+    else:
+        player, refusal = _find_box_player(players, ids=(), name_key=player_name_key(name), loose_name=name)
+        if player is None:
+            return None, refusal or "player_not_in_boxscore"
+        if player.get("appeared") is False:
+            return _void_graded(row, player, market_key, raw_side, None, "soccer"), "graded_did_not_appear_void"
+        graded_player = player
+        hit = False
+        if decisive is not None:
+            scorer, refusal = _find_box_player(players, ids=(), name_key=player_name_key(decisive.get("scorer")),
+                                               loose_name=decisive.get("scorer"))
+            if scorer is None:
+                return None, "decisive_scorer_not_in_boxscore"
+            hit = scorer is player
+    won = hit if raw_side == "yes" else not hit
+    return {
+        "sport": row.get("sport") or "soccer", "game_id": row.get("game_id"), "game_pk": row.get("game_pk"),
+        "market": market_key, "segment": SEGMENT_FULL, "selection": raw_side, "player": graded_player.get("name"),
+        "player_id": graded_player.get("id"), "team": graded_player.get("team"), "home": row.get("home"),
+        "away": row.get("away"), "title": row.get("title"), "line": None, "actual": 1.0 if hit else 0.0,
+        "odds": None, "result": "win" if won else "loss", "pnl": None, "graded_from": "box_score_goal_order",
+    }, "graded"
+
+
+def _nested_names(want: tuple[str, ...], have: tuple[str, ...], *, multi_word: bool) -> bool:
+    """One name's words inside the other's: books write full names, ESPN the playing
+    name ("joao pedro junqueira de jesus" / "Joao Pedro"). `multi_word`: both share two
+    or more words. Otherwise a ONE-word box name equal to the pick's first word
+    ("antony matheus dos santos" / "Antony")."""
+    if not want or not have or want == have:
+        return False
+    if not multi_word:
+        return len(have) == 1 and want[0] == have[0]
+    small, large = (have, want) if len(have) <= len(want) else (want, have)
+    return len(small) >= 2 and set(small) <= set(large)
 
 
 def _folded_tokens(value: Any) -> tuple[str, ...]:
@@ -1078,6 +1165,8 @@ def grade_record_on_player_box(
         return None, refusal or "prop_market_unmapped"
     group, stat, market_key = mapped
     recommendation = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else {}
+    if stat in _SOCCER_SCORER_RACES:
+        return _grade_soccer_scorer_race(record_id, recommendation, rows[0], stat, market_key)
     side = record_id.side
     if stat in _YES_NO_PROP_STATS:
         # "Anytime TD: yes" is over 0.5 touchdowns; "no" is under.
@@ -1101,6 +1190,10 @@ def grade_record_on_player_box(
     )
     if player is None:
         return None, refusal or "player_not_in_boxscore"
+    if player.get("appeared") is False and normalize(sport) == "soccer":
+        # IN THE MATCHDAY SQUAD, NEVER ON THE PITCH: books void the bet. Only the soccer
+        # match box states this; everywhere else the player is simply absent.
+        return _void_graded(row, player, market_key, side, line, sport), "graded_did_not_appear_void"
     group_stats = player.get(group)
     if not isinstance(group_stats, Mapping):
         return None, "player_group_absent"

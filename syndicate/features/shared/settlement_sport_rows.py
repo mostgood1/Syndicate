@@ -644,19 +644,91 @@ def _soccer_players(stamp: tuple[str, int, int]) -> dict[str, list[dict[str, Any
             event = str(row.get("event_id") or "").strip()
             if not minutes or not name or not event:
                 continue  # unused substitute: absent, not zero
-            stats = {k: (_num(row.get(k)) or 0.0) for k in ("shots", "shots_on_target", "goals", "assists")}
-            stats["goals_scorer"] = stats["goals"]
-            stats["goals_assists"] = stats["goals"] + stats["assists"]
+            stats = _soccer_box_stats(row.get("goals"), row.get("shots"), row.get("shots_on_target"), row.get("assists"))
             out[event].append({"id": str(row.get("player_id") or ""), "name": name, "name_key": _name_key(name),
                                "team": row.get("team"), PROP_GROUP: stats})
     return dict(out)
 
 
+def _soccer_box_stats(goals: Any, shots: Any, sot: Any, assists: Any) -> dict[str, float]:
+    stats = {"shots": _num(shots) or 0.0, "shots_on_target": _num(sot) or 0.0,
+             "goals": _num(goals) or 0.0, "assists": _num(assists) or 0.0}
+    stats["goals_scorer"] = stats["goals"]
+    stats["goals_assists"] = stats["goals"] + stats["assists"]
+    return stats
+
+
+@lru_cache(maxsize=64)
+def _soccer_live_state_box(stamp: tuple[str, int, int]) -> dict[str, dict[str, Any]]:
+    """event id -> {players, goals} from one live-state file's FINAL `match_box` records.
+
+    Every MATCHDAY-SQUAD player is listed: one who appeared carries their stats, one who did
+    not carries `appeared: False` and NO stats (absent, never zero) -- `settlement_identity`
+    voids a prop on him, as books do. `goals` is the match's goals in order, with the
+    `own_goal` flag first/last-goalscorer grading needs.
+    """
+    payload = json.loads(Path(stamp[0]).read_text(encoding="utf-8"))
+    out: dict[str, dict[str, Any]] = {}
+    for event, record in ((payload or {}).get("match_box") or {}).items():
+        if not isinstance(record, Mapping) or not (record.get("final") or str(record.get("status_state") or "") == "post"):
+            continue
+        players: list[dict[str, Any]] = []
+        for side in ("home", "away"):
+            block = (record.get("players") or {}).get(side) or {}
+            for row in block.get("players") or []:
+                name = str((row or {}).get("player_name") or "").strip()
+                if not name:
+                    continue
+                entry: dict[str, Any] = {"id": str(row.get("player_id") or ""), "name": name,
+                                         "name_key": _name_key(name), "team": block.get("team"),
+                                         "appeared": bool(row.get("appeared"))}
+                if entry["appeared"]:
+                    entry[PROP_GROUP] = _soccer_box_stats(row.get("goals"), row.get("shots"),
+                                                          row.get("shots_on_target"), row.get("assists"))
+                players.append(entry)
+        goals = [dict(g) for g in (record.get("goals") or []) if isinstance(g, Mapping)]
+        if players:
+            out[str(record.get("event_id") or event)] = {"players": players, "goals": goals}
+    return out
+
+
+def _soccer_match_boxes(date_str: str) -> dict[str, dict[str, Any]]:
+    """event id -> {players, goals} from the poller's `match_box`, for the date and its neighbours
+    (the poller files a match under ESPN's date, which differs from the ET date across midnight)."""
+    from datetime import date, timedelta
+
+    out: dict[str, dict[str, Any]] = {}
+    try:
+        day = date.fromisoformat(str(date_str)[:10])
+    except ValueError:
+        return out
+    for offset in (0, -1, 1):
+        stamp_date = (day + timedelta(days=offset)).isoformat()
+        for path in _soccer_files(f"*/api/live_state/live_state_{stamp_date}.json"):
+            stamp = _stamp(path)
+            if stamp is None:
+                continue
+            try:
+                for event, box in _soccer_live_state_box(stamp).items():
+                    out.setdefault(event, box)
+            except Exception:  # noqa: BLE001 -- an unreadable file never costs the others
+                continue
+    return out
+
+
 def soccer_rows_for_date(date_str: str) -> list[dict[str, Any]]:
     """Full-time score rows from every league's `api/schedule/schedule_<season>.json`
-    (`status_state == post`) and player-box rows from `history/player_match_log_<season>.csv`,
-    joined on ESPN's event id."""
+    (`status_state == post`) and player-box rows, joined on ESPN's event id.
+
+    THE BOX COMES FROM THE POLLER'S `match_box` FIRST (lane soccer-live-anytime-scorer,
+    2026-10-13), `history/player_match_log_<season>.csv` second. Their stat lines agree
+    (948 vs 941 players on 10-11); the match box ALSO lists the matchday squad's unused
+    players and the goals in order, which the log cannot: measured on the 10-11 board,
+    314 of 1,181 pending soccer prop picks were on squad players who never came on (books
+    void them), and 501 were first/last goalscorer, which needs the goal order.
+    """
     rows: list[dict[str, Any]] = []
+    match_boxes = _soccer_match_boxes(date_str)
     for schedule in _soccer_files("*/api/schedule/schedule_*.json"):
         league_dir = schedule.parents[2]
         season = schedule.stem.split("_")[-1]
@@ -671,9 +743,14 @@ def soccer_rows_for_date(date_str: str) -> list[dict[str, Any]]:
             if hs is None or as_ is None or not home or not away or not event:
                 continue
             rows.append(_score_row("soccer", event, home, away, hs, as_, "espn_schedule", game_date=date_str))
-            box = players.get(event) or []
-            if box:
-                rows.append(_box_row("soccer", event, home, away, box, "espn_player_match_log", game_date=date_str))
+            match_box = match_boxes.get(event)
+            if match_box:
+                box_row = _box_row("soccer", event, home, away, match_box["players"], "espn_match_box", game_date=date_str)
+                box_row["goals"] = match_box["goals"]
+                rows.append(box_row)
+            elif players.get(event):
+                rows.append(_box_row("soccer", event, home, away, players[event], "espn_player_match_log",
+                                     game_date=date_str))
     return rows
 
 
