@@ -1060,6 +1060,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### layer2-score-study-suggested — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- **RESULT 2026-10-13: H1 REJECTED (s2 behind sc on H2-half CLV 1.08 vs 1.41); H2 NOT FALSIFIED (model-edge ordering CLV diff +0.37 [-0.54, +1.47], ROI sign flips by half); H3 SUPPORTED (no ranker's top-bottom CI excludes 0). Suggested set: ROI -2.5% [-9.4, +4.4], pregame CLV +0.95 pp, 2,030 bets / 282 games, 09-30..10-12. Findings: `findings_2026-10-13_score_study_suggested.md`.**
 - Goal: Decide, on out-of-sample recorder data 09-21..10-12, which ranking of the Suggested set (current sc, score_v2 expected growth, fee-net market EV) best orders lines by pregame CLV and by ROI; recommend the rank for the Suggested view and the portfolio cut
 - Files: .syndicate/findings_2026-10-13_score_study_suggested.md (NEW)
 - Hypothesis: H1: within Suggested (per sport x date x phase), the top tercile by score_v2 beats the top tercile by sc on same-book pregame CLV, in BOTH halves (09-21..10-03 and 10-04..10-12). H2: sc's extra terms over EV (capped sim term, movement) do not predict CLV or ROI inside Suggested. H3: no ranking's top tercile beats the Suggested set's own average ROI by more than its CI, i.e. selection, not ordering, carries the return.
