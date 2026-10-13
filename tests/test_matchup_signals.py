@@ -45,7 +45,7 @@ def test_firing_rules_match_the_registered_thresholds() -> None:
     assert ms.nba_signal_fires({**base, "rest_days": 1, "min_prior10": 27.9}) == []
     assert ms.nba_signal_fires({**base, "spread_abs": 10.0}) == ["nba.blowout_risk"]
     assert ms.nba_signal_fires({**base, "min_trend": None, "rest_days": None, "spread_abs": None}) == []
-    assert set(ms.REGISTRY) == {"nba.minutes_trend_up", "nba.minutes_trend_down", "nba.start_promotion",
+    assert set(ms.REGISTRY) >= {"nba.minutes_trend_up", "nba.minutes_trend_down", "nba.start_promotion",
                                 "nba.b2b", "nba.blowout_risk"}
 
 

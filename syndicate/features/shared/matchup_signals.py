@@ -94,6 +94,18 @@ REGISTRY: dict[str, SignalSpec] = {
                    "Lopsided spread: starters sit late.", _NBA_LOGS,
                    "pregame consensus |spread| >= 10 AND prior-10 mean MIN >= 30",
                    status="null", evidence={"tested": "2026-10-13 lane signal-engine-nba, 2025-26 regular season backfill", "discover_residual": 0.0079, "confirm_residual": 0.0295, "confirm_ci95": [-0.0003, 0.0604], "confirm_n": 14473, "confirm_games": 163, "confirm_hit_lift_vs_baseline": 0.0045, "verdict": "NOT SUPPORTED"}),
+        SignalSpec("nba.under_bias", "nba", "under", NBA_COUNTING_MARKETS,
+                   "NBA prop UNDERS are priced too long: the de-vigged market under-rates them. A LIKELIHOOD "
+                   "adjustment (raise p_under), not a bet on its own -- blind unders still lose to the hold.",
+                   "pre-tip prop prices (8 US books), stats.nba outcomes",
+                   "every main-line prop, UNDER side (H6a); strongest on prior-10 MIN >= 30 late in the season (H6b)",
+                   status="supported",
+                   evidence={"tested": "2026-10-13 lane signal-engine-nba H6 (pre-registered 804f11d5), 2025-26 regular season, main lines",
+                             "discover_residual": 0.0101, "discover_ci95": [0.0038, 0.0157],
+                             "confirm_residual": 0.0161, "confirm_ci95": [0.0078, 0.0235], "confirm_n": 46262, "confirm_games": 488,
+                             "roi_best_price_confirm": -0.75, "roi_best_price_confirm_ci95": [-2.31, 0.70],
+                             "min30_confirm_residual": 0.0258, "min30_confirm_ci95": [0.0108, 0.0407],
+                             "verdict": "SUPPORTED as likelihood; NOT profitable blind"}),
     )
 }
 

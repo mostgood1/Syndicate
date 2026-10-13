@@ -56,3 +56,31 @@ the board surfaces success indicators, a null signal is shown as research (label
 - Pace-adjusted defense vs position and opponent-allowed rebound / three-point-attempt / assist opportunity.
 - Forward tables for 2026-27 from `player_game_log_2026.csv` (needs a daily job entry; `scripts/local_production.py`
   SCHEDULED_JOBS is claimed by other lanes -- ask before adding).
+
+## H6 -- the UNDER effect, tested as pre-registered (`804f11d5`; script `scripts/nba_unders_test.py`, `9365082e`)
+
+Main lines only (per event-market-player: the point quoted by the most books), one row per player-game-market, Shin fair,
+2025-26 regular season. 132,129 main lines, 127,657 graded (4,472 no outcome, 0 pushes).
+
+| test | DISCOVER residual [95% CI] | CONFIRM residual [95% CI] | CONFIRM ROI at best price [CI] | CONFIRM ROI at median price | verdict |
+|---|---|---|---|---|---|
+| H6a all main lines (n 81,395 / 46,262; 721 / 488 games) | **+1.01% [+0.38, +1.57]** | **+1.61% [+0.78, +2.35]** | -0.75% [-2.31, +0.70] | -3.25% | **SUPPORTED** |
+| H6b prior-10 MIN >= 30 (n 28,337 / 15,883) | +0.12% [-0.95, +1.34] | **+2.58% [+1.08, +4.07]** | +1.37% [-1.54, +4.32] | -1.53% | SUPPORTED (bar met; discover ~0 -- a late-season effect) |
+
+Sensitivity: the residual is the same under a multiplicative fair (+1.04% / +1.63%), so it is not an artifact of the de-vig.
+Discover ROI at best price: H6a -1.84% [-2.96, -0.73], H6b -3.07%.
+
+CONFIRM by market (BH q = 0.10 survivors marked *): threes +2.90% [+1.49, +4.05]* (ROI best +2.68%), rebounds+assists
++2.70%* (+0.71%), rebounds +1.73%* (+0.46%), assists +1.72%* (-0.52%), PRA +1.41%* (-1.56%), points+rebounds +1.13%*,
+points+assists +1.06%*, points +0.53% [-0.53, +1.58] (-2.15%).
+
+**Reading.** The market under-rates NBA prop unders by ~1-1.6 probability points, in both halves of the season and under
+both de-vig methods -- the first matchup-side effect in this programme to pass a pre-registered bar. It is SMALLER than
+the hold: blind unders lose ~1% at the best of 8 US books and 3-4% at the median book. So it is a LIKELIHOOD adjustment
+(the board's p_under should be ~1-1.6 pts higher than the Shin fair says), not a stand-alone bet. It becomes value only
+in combination: best-price shopping, the strongest markets (threes, rebounds, rebounds+assists), heavy-minutes starters
+late in the season, and other signals. Registered as `nba.under_bias`, status `supported`.
+
+**Limits.** One season; 8 US books at one snapshot ~45 min pre-tip (no sharp book, no close); per-market and the min-30
+cut are secondary (BH applied to markets). Next-season confirmation runs forward from the 10-20 opener on the live quote
+logs.
