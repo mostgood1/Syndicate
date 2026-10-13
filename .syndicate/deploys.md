@@ -49011,3 +49011,5 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **smoke (fleet, manual):** `build_nba_signals.py --as-of today` -> `season=2026-27 date=2026-10-13 logs=0 players=0` (the 2026-27 regular-season log is header-only until the opener) -- the path, season derivation and table write work.
 - **verify (owed):** after the next `up`: supervisor log shows `[job:nba-signals] ... finished rc=0` at/after 11:50Z; from 10-20, `nba_source/signals/2026-27/<date>.jsonl` non-empty; after the next refresh-worker restart, served NBA prop rows carry `likelihood.mode == "shadow"` and recorder records carry `lk`.
 - **rollback:** `SYNDICATE_NBA_UNDER_BIAS_DELTA=0` turns the shadow off; remove the SCHEDULED_JOBS line to stop the job.
+
+- **CORRECTION 2026-10-13 22:5xZ (session 9e18a0e7):** the entry headed `~21:4xZ (4:4x PM CT) -- LOCAL FLEET ff 939aee6a -> 131a7626` happened at ~22:4xZ (5:4x PM CT); the clock read 22:50:00Z when it was written. Time was estimated, not read -- the learning "read the clock before stamping" applies.
