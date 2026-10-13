@@ -49013,3 +49013,22 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **rollback:** `SYNDICATE_NBA_UNDER_BIAS_DELTA=0` turns the shadow off; remove the SCHEDULED_JOBS line to stop the job.
 
 - **CORRECTION 2026-10-13 22:5xZ (session 9e18a0e7):** the entry headed `~21:4xZ (4:4x PM CT) -- LOCAL FLEET ff 939aee6a -> 131a7626` happened at ~22:4xZ (5:4x PM CT); the clock read 22:50:00Z when it was written. Time was estimated, not read -- the learning "read the clock before stamping" applies.
+
+## 2026-10-13 23:13:18Z (6:13 PM CT) -- READING, no deploy: P3 shadow mode on its first LIVE NBA games (preseason CLE@ORL, NYK@TOR) -- **served lens reads `live_resim`: MET**; full-slate reading OWED (lane `nba-native-live-resim`, session 6c348b8f)
+
+- **Closes** the first owed reading of the 14:07:45Z entry.
+- **Ticks** (live-odds-worker, emitter-anchored `NBA_LIVE_RESIM_TICK`):
+  - 23:13:18Z games=1 resimmed=1 bytes=5,563 elapsed 8.4 s;
+  - 23:15:37Z games=2 resimmed=2 bytes=10,672 elapsed 19.6 s;
+  - 23:18:07Z games=2 resimmed=2 bytes=10,774 elapsed 30.0 s.
+  - refusals={} on all three. 0 `NBA_LIVE_RESIM_TICK_ERROR` and 0 `KEYVALUE_WRITE_REJECTED` since 22:00Z.
+- **Resim snapshot** (`live/nba_live_resim.json`, read through the store with live-odds-worker's derived env, values never printed): each game has one lane, `source: live_resim`, `simsRun: 100`, `resumeEngine: nba:stack=False`, live mechanisms none (k=0), and segments q1-q4/h1/h2 with totalRunsDist/marginDist.
+  - CLE@ORL: Q1 9:10, 5-12, projected total 240.8, home margin +4.1, pHome 0.59.
+  - NYK@TOR: Q1 9:49, 2-5, projected total 223.0, margin +10.4, pHome 0.71.
+- **Served page** (`live/nba_live_lens.json`, built 18:18:14 CT): `native_resim = {merged: 2, refusals: {}}`; CLE@ORL and NYK@TOR `gameLens` sources = `['live_resim']`. Games not yet started carry none.
+- **Observations, not verdicts:**
+  - `scoreSource = pbp_lagging_header` on both games: the ESPN header was ahead of the play log, within `MAX_HEADER_LEAD = 3`.
+  - On-floor names matched 5/4 and 4/3 of 5. These are preseason rosters with players the pregame frame lacks; the resume still ran.
+  - Live props: 0 rows. `lines_available: 0` for the preseason slate, so this path is unexercised tonight.
+  - nba is still NOT in `_LIVE_GAMELINE_SPORTS`; nothing is priced.
+- **OWED (after the last final, ~05:00Z):** the full-slate aggregate (max concurrent games, max elapsed_s vs the 120 s interval and 240 s budget, max bytes, refusal tally, and the `pbp_lagging_header` / partial on-floor rates) over all five games.
