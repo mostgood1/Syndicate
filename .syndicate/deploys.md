@@ -48883,3 +48883,11 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **USER-APPROVED CROSS-LANE OVERRIDE** (chat 2026-10-13, "Override, add my entry"): the file is claimed by `basketball-native-live-state` (rotation-stints entry only) and `ncaab-native-live-tier` (ncaab-player-priors entry only). One NEW 6-line entry added after `ncaab-team-ratings`; no other line touched. lane-guard has no override switch, so the insert was a scripted edit; the post-write check flagged it as expected.
 - **loads at the next supervisor `up`** -- until then `fetch_basketball_linescores.py` does not run on its own (files exist through 10-12 from the 15:2xZ backfill).
 - **next reading:** after the next full up, `linescores_<yesterday>.json` written ~10:35Z for nba (and wnba on Finals nights).
+
+## 2026-10-13 15:46:38Z-15:47:04Z (10:47 AM CT) -- LOCAL FLEET full supervisor down/up onto 75b1a269 (lane `games-rail-full-detail`, session d4409ac4, user "restart the fleet so the schedule loads") -- web OUTAGE 26 s
+- **why:** load the `basketball-linescores` SCHEDULED_JOBS entry (75b1a269; supervisor reads the schedule at `up`).
+- **ride-alongs:** none (d1a933f2..75b1a269 = that commit only).
+- **gate:** claims web / refresh-worker / live-odds-worker 15:38:51Z; CLEAR 15:46:36Z (`Board build idle`, shortlist 15:42:07Z > worker start 15:27:25Z); `watchdog_no_autostart` set.
+- **sequence:** `down` 15:46:38-15:46:50Z (1 odds job stopped, 0 SIGKILL); task state polled to `Ready` 15:46:54Z BEFORE `Start-ScheduledTask` 15:46:56Z (learning 2026-10-12 applied); `/healthz` 200 15:47:04Z. Marker removed, claims released 15:47:07Z. (My script's ff line ran in the worktree cwd and failed harmlessly; the fleet checkout was already 75b1a269 -- verified `git rev-parse` there.)
+- **verify:** all three roles `code=75b1a269`, restarts=0; supervisor log `[job:basketball-linescores] started pid=115819` -> `finished rc=0` (catch-up run for today's slot): nba 2026-10-12 games=5 written 15:47:02Z, wnba 0 (kept existing).
+- **next reading:** 2026-10-14 ~10:35Z: `linescores_2026-10-13.json` for nba (tonight's preseason slate).
