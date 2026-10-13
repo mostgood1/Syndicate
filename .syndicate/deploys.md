@@ -48734,3 +48734,10 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - (a) The first NBA props run after 13:17Z must log `-m syndicate.features.nba.source_cli.cli export-game-cards` with no `nba_betting.cli` line. The once-per-date bootstrap for a new slate must run its steps through the same module and write `predictions_<date>.csv`.
   - (b) A live-odds-worker started after 13:17:05Z (self-recycle ~6 h; the current pid started ~10:10Z) runs the ported ticks. NBA writes only once live lines exist (2026-10-20); WNBA is checked at Finals G1 on 2026-10-17 by scheduled task `wnba-1017-live-tick-parity`.
 - **Rollback:** revert 18587150..c9844865 and ff. No restart.
+
+## 2026-10-13 13:23:39Z -- READING (a) for the 13:17:05Z ff (lane `nba-source-cli-native`): **MET** for the full export; bootstrap still owed
+
+- **The reading.** The first NBA props run after the ff logged `$ python -m syndicate.features.nba.source_cli.cli export-game-cards --date 2026-10-13` (13:23:39Z). It wrote `game_cards_2026-10-13.csv` with `'rows': 3`, the same as the last two vendored runs for that date (12:19:02Z and 12:49:09Z, `'rows': 3` each). No `nba_betting.cli` line follows it.
+- **Still owed.**
+  - The once-per-date bootstrap for a NEW slate through the same module: every step exit 0 and `predictions_<date>.csv` written.
+  - Reading (b): a live-odds-worker started after 13:17:05Z.
