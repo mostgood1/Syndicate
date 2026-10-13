@@ -48891,3 +48891,18 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **sequence:** `down` 15:46:38-15:46:50Z (1 odds job stopped, 0 SIGKILL); task state polled to `Ready` 15:46:54Z BEFORE `Start-ScheduledTask` 15:46:56Z (learning 2026-10-12 applied); `/healthz` 200 15:47:04Z. Marker removed, claims released 15:47:07Z. (My script's ff line ran in the worktree cwd and failed harmlessly; the fleet checkout was already 75b1a269 -- verified `git rev-parse` there.)
 - **verify:** all three roles `code=75b1a269`, restarts=0; supervisor log `[job:basketball-linescores] started pid=115819` -> `finished rc=0` (catch-up run for today's slot): nba 2026-10-12 games=5 written 15:47:02Z, wnba 0 (kept existing).
 - **next reading:** 2026-10-14 ~10:35Z: `linescores_2026-10-13.json` for nba (tonight's preseason slate).
+
+## 2026-10-13 15:55:43Z (10:55 AM CT) -- LOCAL FLEET ff 75b1a269 -> 2dd21810 (exact SHA), NO restart: a slate that grows after the first bootstrap reaches game_odds, game_cards and predictions (NBA + WNBA) -- **MET** 16:09:03Z (lane `nba-source-cli-native`, session 2d413211)
+
+- **User decision 2026-10-13 ("Yes, fix both refreshes", then "Yes, ff now after props idle").** Reported by games-rail (session d4409ac4): IND@OKC and POR@SAC on 2026-10-13 had no game card or prediction. game_odds was seeded once (03:48Z, 3 of 5 priced), and predictions were accepted once they existed.
+- **Change, 2dd21810:**
+  - Both refreshes merge snapshot-priced games that game_odds lacks (existing rows kept).
+  - When predictions lack games that game_odds has, they rebuild game_cards (predict-date reads its slate from game_cards first) and re-run predict-date. That re-run sits behind `.predict_date_slate_grew_<date>.json`, a 60 min cooldown (`SYNDICATE_PREDICT_DATE_SLATE_GREW_COOLDOWN_MINUTES`).
+  - WNBA's repair accepted ANY overlap, so the step runs before it.
+- **Ride-alongs:** none. The fleet was already at 75b1a269, which another ff had taken there.
+- **Claim:** refresh-worker token fafd4902..., released at 15:56Z.
+- **Safety read in full first:** NOT CLEAR, because an MLB sim, MLB daily_update children, soccer refreshes and a board build were in flight. None of them loads the two refresh scripts, and an ff without restart kills nothing. Basketball props jobs: 0.
+- **VERIFY:**
+  - Deployed checkout: test_basketball_slate_growth + test_nba_source_cli_reachability, 12 passed.
+  - Production, the first NBA props run after the ff: `[16:09:03] Added 2 newly priced game(s) to the game_odds slate game_odds_2026-10-13.csv: ['indiana pacers@oklahoma city thunder', 'portland trail blazers@sacramento kings']`, then `predictions_2026-10-13.csv lacks 2 game(s) ...: rebuilding game_cards and re-running predict-date`. Rows: game_odds 3 -> 5, game_cards 3 -> 5, predictions 3 -> 5.
+- **Rollback:** revert 2dd21810 and ff. No restart.
