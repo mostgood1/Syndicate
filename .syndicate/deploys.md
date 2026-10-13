@@ -48906,3 +48906,9 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
   - Deployed checkout: test_basketball_slate_growth + test_nba_source_cli_reachability, 12 passed.
   - Production, the first NBA props run after the ff: `[16:09:03] Added 2 newly priced game(s) to the game_odds slate game_odds_2026-10-13.csv: ['indiana pacers@oklahoma city thunder', 'portland trail blazers@sacramento kings']`, then `predictions_2026-10-13.csv lacks 2 game(s) ...: rebuilding game_cards and re-running predict-date`. Rows: game_odds 3 -> 5, game_cards 3 -> 5, predictions 3 -> 5.
 - **Rollback:** revert 2dd21810 and ff. No restart.
+
+## 2026-10-13 16:13Z-16:15Z (11:13 AM CT) -- READING + rolling `reload-web` onto 1cfb11f8 (lane `games-rail-full-detail`, session d4409ac4) -- NO outage
+- **reading (nba-source-cli-native's 2dd21810, their entry 2831a581):** served `/api/board/game-chips?date=2026-10-13&sports=nba` (worker_artifact) 16:13:08Z -- IND@OKC start 2026-10-14T00:00Z, footer 'OKC −9.6875 · o/u 228.062'; POR@SAC 02:00Z, 'POR −1.4 · o/u 228.188'. Start time + footer: PASS (were None). The values are consensus AVERAGES from the newly merged game_odds rows -- not a posted line.
+- **change:** 1cfb11f8 -- pregame footer rounds spread / total to the nearest half point (quarter for soccer, whose o/u 3.25 is a real line).
+- **reload:** 16:15:03Z, 2.9 s, 0 failures; fleet ff 6f1c912e -> 1cfb11f8 (exact SHA, no ride-alongs); released.
+- **not forced:** today's chips are the refresh-worker's artifact; the rounding reaches them at its next restart (no third worker restart today for a display rounding).
