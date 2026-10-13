@@ -1343,7 +1343,7 @@ unsaved anywhere.
   read the shortlist with `read_layer2_shortlist(date)`. Before the fix the shortlist was 40.8 of
   42.4 MB raw per date-snapshot, so every write with 2-3 board-window dates was refused (11.7-13.6 MB),
   and the raw-byte trim fallback wrote `kept_full=0`, a cache with NO responses. After: 446,206 B on the wire
-  with 1 snapshot (18:28Z). The 2-3 snapshot reading across a rollover is owed.
+  with 1 snapshot (18:28Z). Measured 2026-10-09 18:17Z..10-13 00:16Z (78 h, 3 rollovers): 0 KEYVALUE_WRITE_REJECTED / 0 TRIMMED / 0 FAILED with 2-5 snapshots held; wire size 405,202..884,658 B (5 snapshots at 10-13 00:18Z, all with responses). Snapshot count grows by 1 per rollover with no eviction (lead, cap not near).
 - **`render.yaml`'s web `envVars:` anchor is never referenced anywhere**, so
   nothing was ever shared and worker-only keys accumulated on web for months.
   Web block cut 62 → 52. Blueprint drift: 0 values a sync would revert — a
