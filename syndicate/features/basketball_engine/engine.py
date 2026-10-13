@@ -58,6 +58,12 @@ class EventSimConfig:
     # of regulation elapsed). Real games revert (line-adjusted H2-on-H1 margin slope -0.17); the sim's halves were
     # independent (0.00). 0.0 = off: the factor is exactly 1.0 and no RNG draw is made, so output is byte-identical.
     score_effect_k: float = 0.0
+    # Blowout bench rest (lane basketball-scenario-calibration, Phase 2 #4b, pre-registered cc00ed23; LOAN from
+    # nba-native-live-resim). In blowout possessions the per-possession sampler de-weights the top-5 by minutes and
+    # boosts the bench by `bench_weight_boost` (the existing sample_lineup_minutes_weighted branch, previously hard-coded
+    # off at both call sites). Real starters lose 4.38 min from close games to >=20-pt finals; the sim lost 1.17.
+    # False = off: the sampler gets blowout_boost_bench=False exactly as before (weights only; same RNG draws).
+    blowout_bench_rest: bool = False
     # P3 LIVE MECHANISMS (lane nba-native-live-resim, LOAN from basketball-native-engine, user-approved 2026-10-09).
     # Every field defaults OFF; unset, the loop is `range(q_poss)` and no extra RNG draw is made (byte-identical).
     # Read with getattr defaults, because production passes its own frozen config class that lacks these fields.
@@ -1466,7 +1472,7 @@ def simulate_pbp_game_boxscore(
                     home_players,
                     home_context_w,
                     k=5,
-                    blowout_boost_bench=False,
+                    blowout_boost_bench=bool(blowout and getattr(cfg, "blowout_bench_rest", False)),
                     bench_boost=cfg.bench_weight_boost,
                 )
             if not a_line:
@@ -1475,7 +1481,7 @@ def simulate_pbp_game_boxscore(
                     away_players,
                     away_context_w,
                     k=5,
-                    blowout_boost_bench=False,
+                    blowout_boost_bench=bool(blowout and getattr(cfg, "blowout_bench_rest", False)),
                     bench_boost=cfg.bench_weight_boost,
                 )
 
