@@ -607,3 +607,51 @@ Real foul-outs: 0.193/game.
 4. **Q4 reversion:** calibration's full FIT left Q4 at −0.093 vs real −0.141 with k = 0.002. The effect of M-EG on that
    slope is to be measured in the gate's 5:00 Q4 cells, not assumed.
 - **Engine-edit gate on the MERGED file** (P3 foul mechanisms + P4 bonus free throws, 3dcc513e): corpus replay **5,400/5,400**, mismatched_cases 0, PASS, 2,669 s (2026-10-13 00:06Z).
+
+## 9. THE GATE — native resumed sim vs `pregame_rate` and the vendored tick (2025-26, read 2026-10-13 ~04:2xZ)
+
+**Setup.**
+- Inputs: v4 as-of engine inputs (#473 team quality + starter flags, 2024-25 prior in player_logs, lineup pools
+  from stints history copied as-of), 1,294 games.
+- `native_resim`, 100 sims per checkpoint, through the live code path on summaries cut at the checkpoint.
+- **NO live mechanisms enabled** (end-game, foul-out and foul-trouble all OFF).
+- Two arms: `score_effect_k = 0.002` (proposed) and `k = 0` (production pregame today).
+- Paired game-resampled 95% CIs vs `pregame_rate`.
+- `vendored_replay` only in the FIT window (n ≈ 780).
+- Refusals named: `no_pregame_inputs` 25-26/checkpoint, `pbp_score_mismatch` ≤ 6, `on_floor_incomplete` 2.
+
+**REGULAR SEASON (n = 1,176-1,196 per checkpoint).** native − pregame_rate (MAE; Brier for ML):
+
+| checkpoint | total, k=.002 | total, k=0 | margin, k=.002 | margin, k=0 | ML, k=.002 | ML, k=0 |
+|---|---|---|---|---|---|---|
+| end Q1 | **+0.69** [+0.44, +0.94] | **+0.63** [+0.39, +0.86] | +0.13 n.s. | **+0.28** [+0.15, +0.42] | −0.001 n.s. | +0.004 n.s. |
+| end Q2 | **+0.26** [+0.09, +0.43] | **+0.31** [+0.14, +0.47] | −0.09 n.s. | **+0.14** [+0.03, +0.25] | −0.003 n.s. | **+0.004** [+0.000, +0.008] |
+| end Q3 | **+0.21** [+0.12, +0.31] | **+0.25** [+0.15, +0.35] | **−0.10** [−0.20, −0.01] | **+0.08** [+0.02, +0.15] | −0.002 n.s. | −0.000 n.s. |
+| 5:00 Q4 | +0.04 n.s. | +0.06 n.s. | **−0.11** [−0.17, −0.05] | −0.03 n.s. | −0.002 n.s. | −0.000 n.s. |
+
+**Context:**
+- **Total bias** (k = .002, native / pregame_rate): Q1 +3.2 / +0.3, Q2 +2.0 / +0.3, Q3 +2.0 / +1.2, Q4 −0.1 / −1.0. The
+  native sim over-projects rest-of-game scoring early: a LEVEL problem, not variance.
+- **Distributions:** 80% interval coverage is 0.79-0.80 on totals and 0.85 on margins (slightly wide); 50% coverage
+  is 0.50-0.57.
+- **Next-quarter total:** worse after Q1 (+0.19) and Q3 (+0.31) in both arms.
+- **vs the vendored tick** (vendored − pregame_rate, FIT window): margin end Q1 **+0.86**, end Q2 **+0.58**. Native
+  is far better on early margins. On totals vendored is +0.44 at Q1 and native +0.69 (not paired head-to-head).
+  ML: vendored +0.015/+0.014 worse at Q2/Q4, native ties.
+
+**POSTSEASON (n = 83-85):**
+- Totals and ML n.s. throughout.
+- MARGIN with k = .002 is WORSE at end Q2 (+0.78 [+0.26, +1.30]) and end Q3 (+0.44 [+0.11, +0.75]). With k = 0,
+  n.s.
+- This matches §3b: no measurable reversion in the playoffs, so imposing the regular-season reversion hurts there.
+  `score_effect_k` should be population-specific (0 in the postseason) if it ships at all.
+
+**VERDICT against the pre-registered gate (design §5):**
+- **NOT PASSED.**
+- Totals lose to `pregame_rate` at end Q1/Q2/Q3 in both arms.
+- ML ties `pregame_rate` (and ESPN) everywhere.
+- Margin with k = .002 ties or beats `pregame_rate`, and beats the vendored tick early.
+- Coverage is acceptable.
+- What is missing for a priced switch-on is a source of information BEYOND the naive baseline on ML and totals.
+- The live-close comparison (did the native number beat the live MARKET line?) is the bar for edges. It is being
+  completed: 2,500 of ~2,521 snapshots cached, rows being written.
