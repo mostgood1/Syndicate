@@ -48741,3 +48741,12 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **Still owed.**
   - The once-per-date bootstrap for a NEW slate through the same module: every step exit 0 and `predictions_<date>.csv` written.
   - Reading (b): a live-odds-worker started after 13:17:05Z.
+
+## 2026-10-13 14:08:40Z -- READING (b) for the 13:17:05Z ff (lane `nba-live-tick-native`): **MET** (loaded); live-game behaviour owed
+
+- **The reading.** P3's user-approved full `down`/`up` onto 18587150 (supervisor: `LOCAL PRODUCTION UP ... commit=185871506f9a`, lane `nba-native-live-resim`) started live-odds-worker pid 92894 at 14:08:40Z. That is the first process to load the ported ticks: its `nba/live_lens.py` and `wnba/live_lens.py` on disk import `syndicate.features.{nba,wnba}.live_tick.tick`, which `tests/test_basketball_live_tick_reachability.py` pinned on that checkout at 13:18Z.
+- Env, keys and enums only: `SYNDICATE_ENABLE_LIVE_LENS_LOOP=true`, `SYNDICATE_NBA_LIVE_RESIM=on` (P3's shadow mode). The `live_lens_loop` is logging; there are no basketball live games, so the tick has nothing to write.
+- **Still owed.**
+  - WNBA live: Finals G1, 2026-10-17 (scheduled task `wnba-1017-live-tick-parity`).
+  - NBA live writes: once live lines exist (2026-10-20).
+  - The NBA once-per-date bootstrap for a new slate through `source_cli`.
