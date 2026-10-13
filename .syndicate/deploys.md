@@ -48878,3 +48878,8 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **reload:** 38.3 s, 0 healthz failures / 20 probes, max 0.56 s; released.
 - **verify (served):** wnba 10-09 GSV@LVA 87-77 [1,2,3,4,OT], ATL@NYL 85-83; 10-07 NYL@ATL 98-101 [..,OT]; nba 10-12 4/4 finals with quarters + scores.
 - **NOT DONE -- the daily schedule:** the `ScheduledJob("basketball-linescores", 10, 35, ...)` line is BLOCKED by lane-guard: `scripts/local_production.py` is claimed by OPEN lane `basketball-native-live-state` (its claim text: SCHEDULED_JOBS basketball-rotation-stints entry ONLY; the guard enforces the whole file). Until a session with that file adds the entry (and a supervisor `up` loads it), no new linescores files are written after 10-12.
+
+## 2026-10-13 15:4xZ -- CODE ONLY, no deploy: 75b1a269 schedules `basketball-linescores` (10:35Z daily) in `scripts/local_production.py` SCHEDULED_JOBS (lane `games-rail-full-detail`, session d4409ac4)
+- **USER-APPROVED CROSS-LANE OVERRIDE** (chat 2026-10-13, "Override, add my entry"): the file is claimed by `basketball-native-live-state` (rotation-stints entry only) and `ncaab-native-live-tier` (ncaab-player-priors entry only). One NEW 6-line entry added after `ncaab-team-ratings`; no other line touched. lane-guard has no override switch, so the insert was a scripted edit; the post-write check flagged it as expected.
+- **loads at the next supervisor `up`** -- until then `fetch_basketball_linescores.py` does not run on its own (files exist through 10-12 from the 15:2xZ backfill).
+- **next reading:** after the next full up, `linescores_<yesterday>.json` written ~10:35Z for nba (and wnba on Finals nights).
