@@ -1454,3 +1454,21 @@ engine.py LOAN is RETURNED to nba-native-live-resim.
 - Still a PROPOSAL (production unchanged).
 - **Remaining Phase 2:** #3 FT bonus (P4's bonus-FT mechanism exists; S6 FTA still −2.3/team), #5 volume
   (S1 pace / S9 3PA now inside or near), the end-of-Phase-2 VALIDATION read.
+
+**#695 READING (P3, findings_2026-10-09 §10a; production config, skip_def ON vs OFF, same seeds, 100 sims from the tip):**
+
+| | n | ON (live) total bias | OFF total bias | paired OFF − ON | \|err\| change |
+|---|---|---|---|---|---|
+| regular season | 1,205 | +3.14 | +1.93 | −1.21 [−1.35, −1.08] | −0.01 [−0.16, +0.14] (MAE 15.49 vs 15.48) |
+| postseason | 85 | +8.70 | +8.33 | −0.37 [−0.82, +0.08] n.s. | — |
+
+- Minus the market: +3.89 / +2.68. Market MAE 14.60 beats both. Margin MAE n.s.
+- This lane predicted +2.7 / +1.2: confirmed.
+- **The #695 revert rule** (published totals ≥ ~+2 worse than OFF) **is NOT met**: a 1.2-pt level shift at zero MAE
+  cost. **Keep the data file.**
+- The remaining +1.9 regular-season overshoot is the engine overshooting its target with EXACT_TARGET_CALIBRATION
+  off. Its fix is the Phase 2 totals stack (EXACT + the NBA calibration builder): full-FIT total bias −0.22.
+- **The postseason +8.7 is NOT skip_def.** It is a separate open defect.
+- **Integrity** (P3): 40 sampled pickle pairs differ only in targets/quarters, except 1/40 (code drift between the
+  recording days, noise-level).
+- Part 2, the in-game grade, is owed by P3 (~02:00Z).

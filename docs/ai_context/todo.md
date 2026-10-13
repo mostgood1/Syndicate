@@ -42,6 +42,7 @@ The 08:00Z `ci-suite` job (`local_production.py ci-run` -> `run_ci_suite.py` in 
 - **The reading (condition of the user's ff approval, relayed by d48f3a34, 2026-10-10):** once the 2026-27 regular season (opener ~10-20) has >= 30 NBA finals graded under this config, re-read published total minus market and total MAE vs actual against a same-seed OFF arm (`scripts/measure_nba_team_inputs_shift.py`; OFF arm = no data file + `SYNDICATE_NBA_TEAM_INPUTS=0`, or no data file only to isolate skip_def). Regular-season games only.
 - **Decision rule:** if published totals stay >= ~+2 worse than OFF, revert skip_def ALONE by deleting the data file (no code change, no deploy). The team inputs and no-stack stay.
 - **Rollbacks:** skip_def = delete the data file; team inputs + no-stack = `SYNDICATE_NBA_TEAM_INPUTS=0` in the refresh-worker role env (needs a restart to re-inject).
+- **READING 2026-10-13 on HISTORICAL regular-season data** (P3 findings_2026-10-09 §10a, production config, n = 1,205): skip_def ON +3.14 vs OFF +1.93 total bias, paired −1.21 [−1.35, −1.08], |err| −0.01 [−0.16, +0.14]. The decision rule (≥ ~+2 worse) is NOT met: KEEP the data file. The +1.9 left is the engine overshoot with EXACT off (fix: the Phase 2 totals stack); postseason +8.7 is separate and not skip_def. Whether the 2026-27 ≥ 30-finals confirmation is still wanted is the user's call.
 
 ### `#694` — **WNBA NATIVE LIVE LENS: the LIVE reading is OWED at the 2027 season opener (May 2027); P5 itself is blocked on P1-P3** — lane `wnba-native-live-cutover`, session 99686b8c
 
