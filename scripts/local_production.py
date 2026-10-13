@@ -959,6 +959,12 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # games are final; in the offseason it re-reads a complete season and
     # fetches nothing.
     ScheduledJob("ncaab-team-ratings", 10, 45, ("scripts/build_ncaab_team_ratings.py",)),
+    # `basketball-linescores` (lane `games-rail-full-detail`, user 2026-10-13 "keep the pbp step
+    # for the line scores"; added under a USER-APPROVED cross-lane override -- this file is claimed by
+    # `basketball-native-live-state` for its rotation-stints entry only): yesterday's NBA + WNBA
+    # quarter scores from ESPN's scoreboard (one request per league) into
+    # <league>_source/data/processed/linescores_<date>.json, read by the games-rail line score.
+    ScheduledJob("basketball-linescores", 10, 35, ("scripts/fetch_basketball_linescores.py",)),
     # `mlb-matchup-splits` + `nfl-defense-vs-position` (lane
     # `intelligence-evidence-coverage`, phase 2, 2026-10-08, user "focus on
     # recency and matchups"): batter vs LHP/RHP / vs team + the full-season
