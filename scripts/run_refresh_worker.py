@@ -4643,6 +4643,34 @@ def _nfl_pbp_fetch_interval_seconds() -> int:
     return max(3600, value)
 
 
+def _nfl_pbp_fetch_morning_hour_utc() -> int:
+    raw = str(os.environ.get("NFL_PBP_FETCH_MORNING_HOUR_UTC") or "").strip()
+    try:
+        value = int(raw or 10)
+    except ValueError:
+        value = 10
+    return max(0, min(23, value))
+
+
+def _nfl_pbp_fetch_morning_due(*, now_epoch: float, last_attempt_epoch: float) -> bool:
+    """True once per UTC day after the morning hour, if the last attempt predates it.
+
+    Lane `nfl-mnf-settlement-lag`, measured 2026-10-13: the 24 h interval had
+    drifted to ~03:30Z, which is DURING Sunday- and Monday-night games, so those
+    games reached the fleet a full day late and settled a day late (nfl:2026-10-12
+    left 1,609 picks pending in the 12:00Z settle). nflverse rebuilds pbp at
+    04:30Z and 09:00Z daily in season (its `update_data.yaml` dispatch runs,
+    each ~6 min). 10:00Z is after the 09:00Z build and before the settlement
+    (7 AM CT = 12:00Z / 13:00Z). A morning fetch resets the interval, so the
+    schedule converges to one fetch a day near 10:00Z instead of adding one.
+    """
+    if last_attempt_epoch <= 0.0:
+        return False  # the interval branch already launches a first fetch
+    now = datetime.fromtimestamp(now_epoch, tz=timezone.utc)
+    boundary = now.replace(hour=_nfl_pbp_fetch_morning_hour_utc(), minute=0, second=0, microsecond=0)
+    return now >= boundary and last_attempt_epoch < boundary.timestamp()
+
+
 def _nfl_pbp_fetch_state_path() -> Path:
     return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "nfl_pbp_fetch.json"
 
@@ -4944,8 +4972,11 @@ def _launch_autorun_nfl_pbp_fetch(
         except (TypeError, ValueError):
             last_attempt = 0.0
     age = time.time() - last_attempt
-    if last_attempt > 0.0 and age < interval:
+    morning_due = _nfl_pbp_fetch_morning_due(now_epoch=time.time(), last_attempt_epoch=last_attempt)
+    if last_attempt > 0.0 and age < interval and not morning_due:
         return _skip("rate_limited", f"marker_age_s={int(age)}/interval_s={interval}")
+    if morning_due and age < interval:
+        print(f"[refresh_worker] NFL_PBP_FETCH_MORNING_DUE hour_utc={_nfl_pbp_fetch_morning_hour_utc()} last_attempt_age_s={int(age)}", flush=True)
 
     season = date.today().year
     # Marker BEFORE the launch: a run that dies costs one interval rather than
