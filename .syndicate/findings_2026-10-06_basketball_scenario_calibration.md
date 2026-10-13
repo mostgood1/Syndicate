@@ -1383,3 +1383,39 @@ native re-sim over-projecting rest-of-game totals by ~+3. Hypothesis (d48f3a34):
 - P3 has been asked to grade skip_def ON vs OFF in the PRODUCTION config only (vary only the data file).
 - The likely decision for the user: revert the file as an interim fix, or ship the Phase 2 totals stack (EXACT +
   builder) with it. Owed when P3's numbers land.
+
+### Phase 2 #4b — RESULT (sweep done 2026-10-13 02:00Z; read 13:45Z)
+
+**Off proof:** corpus parity on code with 1e85bbc5: 5,400/5,400, 0 mismatched (NBA 3,000, WNBA 2,400), PASS. The
+engine.py LOAN is RETURNED to nba-native-live-resim.
+
+**Sweep:** 8 arms, 12 dates, 87/87 games each, 17,400/17,400 engine calls with levers, --track-oncourt.
+
+| arm (rest b × P3 FT) | top-5 min ≤ 6 / 7-19 / ≥ 20 | drop (real −4.38) | foul-outs (real 0.193) | H2 | Q4 | S8 margin (real 15.21) | blowouts (real 0.253) | mkt slope | total bias |
+|---|---|---|---|---|---|---|---|---|---|
+| off, P3 off | 32.29 / 31.95 / 31.15 | −1.14 | 0.383 | −0.171 | −0.090 | 14.86 | 0.224 | 0.945 | −0.23 |
+| 1.35, P3 off | 32.13 / 31.74 / 30.48 | −1.65 | 0.374 | −0.189 | −0.098 | 14.82 | 0.224 | 0.929 | −0.08 |
+| 2, P3 off | 32.12 / 31.42 / 29.59 | −2.53 | 0.365 | −0.176 | −0.089 | 14.95 | 0.221 | 0.920 | −0.09 |
+| **3, P3 off** | 32.00 / 31.15 / 28.98 | **−3.02** | 0.372 | −0.174 | −0.096 | 14.89 | 0.221 | 0.907 | −0.23 |
+| off, P3 on | 31.63 / 31.35 / 30.44 | −1.19 | 0.151 | −0.174 | −0.088 | 14.93 | 0.224 | 0.930 | −0.36 |
+| 1.35, P3 on | 31.51 / 31.06 / 29.92 | −1.59 | 0.146 | −0.190 | −0.098 | 14.67 | 0.218 | 0.921 | −0.26 |
+| 2, P3 on | 31.46 / 30.83 / 29.02 | −2.44 | 0.150 | −0.164 | −0.085 | 14.93 | 0.220 | 0.909 | −0.26 |
+| **3, P3 on** | 31.32 / 30.56 / 28.29 | **−3.03** | 0.154 | −0.198 | −0.100 | **14.75** | **0.216** | 0.896 | +0.00 |
+
+- Real starters (same 87 games): 31.06 / 30.77 / 26.69.
+
+**VERDICT by the letter:**
+- **P3 OFF, b = 3: CONFIRMED.** The drop is within ±1.5 min of real (−3.02 vs −4.38). The ≤ 6 bucket moves −0.29
+  (≤ 0.5). H2, Q4, S8 margin, S5, total bias and foul-outs are all within noise or better.
+- **P3 ON, b = 3: GUARD FAIL** (the decisive arm, since P3's c9d6795e landed first). The drop passes (−3.03), but:
+  - S8 margin 14.93 → 14.75 (−0.18 vs noise ~0.13) and S5 0.224 → 0.216 (−0.008 vs ~0.006), both away from THESE 87
+    games' real values (15.21 / 0.253);
+  - the H2 overshoot −0.198 is within ±0.05.
+- b = 2 misses the drop in both arms (−2.53 / −2.44).
+- **Not re-scored, argument for the user:** on the full FIT the real S8 margin is 14.00 and blowouts 0.230 (sim
+  full-FIT 14.91 / 0.228). The same −0.18 / −0.008 moves would be TOWARD the full-FIT real values.
+- P3's foul-trouble ON brings foul-outs to ~0.15 vs real 0.193 (P3's own fit read 0.213).
+- **User decision owed:**
+  - accept b = 3 with P3 on (override the two small guard misses on the 12-date sample);
+  - or run the joint arm on the full FIT first, where the reals are tighter;
+  - or keep the lever off.
