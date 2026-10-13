@@ -1087,6 +1087,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### news-collectors-backfill — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- **STATUS 2026-10-13 19:53Z: GOAL MET for both halves.** Collectors live (task SyndicateNewsCollector every 10 min; 4 runs, 0 errors, 0 OddsAPI; first real change logged at 19:31:15Z). Backfill: 6 sets / 32,732 files / ~3.0 GB / 0 hash mismatches on the fleet data root. OPEN follow-ups (not this lane's goal): NBA pre-tip lineups (no free pre-tip source wired), NCAAF conference availability reports, DFO line combos; first consumer of the change-logs is the matchup-signal lift harness.**
 - Goal: Free, timestamped, append-only news collectors (ESPN injuries NBA/NHL/NFL/WNBA, NBA referee assignments, NHL referee crews) running every 10 min on the fleet host, and the dev-machine backfill sets (NBA 2025-26 prop prices, NHL 2023-26 caches + DFO history + 2025-26 lines, NFL 2023-25 prop closes, NCAAF 2024-25 props) copied onto the fleet disk with a checksum manifest -- zero OddsAPI credits, zero spend
 - Files: scripts/collect_news_snapshots.py (NEW), tests/test_collect_news_snapshots.py (NEW), deploy/local/install_news_collector_task.ps1 (NEW), scripts/copy_backfill_to_fleet.py (NEW)
 - Hypothesis: n/a
