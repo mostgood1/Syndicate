@@ -1372,3 +1372,14 @@ b ∈ {1.35, 2.0, 3.0}.
 - **Running since 00:19Z 10-13:**
   - the 5,400-call corpus parity proof on code with the edit;
   - the 8-arm #4b sweep: b ∈ {off, 1.35, 2, 3} × P3 foul-trouble fields off/on, --track-oncourt, 12 dates.
+
+**#695 note (2026-10-13):** P3's partial regular-season gate (~375 games, k = 0.002, live mechanisms off) shows the
+native re-sim over-projecting rest-of-game totals by ~+3. Hypothesis (d48f3a34): skip_def is the source.
+- **This lane's reading:** skip_def's effect depends on the CONFIG.
+  - **In production today** (EXACT_TARGET_CALIBRATION off, no NBA calibration file): the engine overshoots its target
+    by ~+5.7. Without skip_def the target is ~−4.5, so published ≈ +1.2 over actual. With skip_def the target is
+    ~−3.0, so published ≈ +2.7 over actual. That is consistent with P3's +3.
+  - **In the accepted Phase 2 config** (EXACT + the six ports + calibration + skip_def): full-FIT total bias −0.22.
+- P3 has been asked to grade skip_def ON vs OFF in the PRODUCTION config only (vary only the data file).
+- The likely decision for the user: revert the file as an interim fix, or ship the Phase 2 totals stack (EXACT +
+  builder) with it. Owed when P3's numbers land.
