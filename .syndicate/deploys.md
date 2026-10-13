@@ -48669,3 +48669,22 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **Reading:** 12 dates (2025-11-12..2026-04-09) / 90 games / 1,776 player-games, 2025-26 NBA regular season, as-of tables (regular only, < D), ON applied 166/166 sides, OFF 0/166; seed determinism 194/194 identical. Paired dMAE ON-OFF (game-clustered 95% CI): pts +0.0018 [+0.0005,+0.0032], pra +0.0031 [+0.0011,+0.0050], reb +0.0001 [-0.0005,+0.0008], ast -0.0002 [-0.0005,+0.0002], blk -0.0005 [-0.0010,+0.0000], tov -0.0004 [-0.0010,-0.00004], threes/stl ~0. Mean |ON-OFF| pts 0.014, pra 0.021 (MAE pts 4.80). Pre-registered rule -> RETIRE (pts and pra CIs entirely above 0, i.e. favour OFF).
 - **Why so small (code read, consistent with the reading, not isolated):** the engine uses the nudged `_prior_*_pm` as within-team shares and pct ratios (engine.py:347-351, :494, :819-822). Makes are nudged by the attempts multiplier, so pct cannot move, and team totals are pinned by targets / the market anchor. Nudges were large (often at the 0.85/1.15 clip) and outputs barely moved.
 - **Production is unaffected:** the mechanism is already off (0/60 NBA sides, e79c6ece). Nothing changed. Retiring it is a user decision (step 4).
+
+## 2026-10-13 04:37:07Z -- FLEET OUTAGE: Windows Update installed WSL 3.0.3.0 and stopped the VM; recovered 04:38:51Z via the scheduled task `[session b9bb5f37, lane soccer-live-anytime-scorer, found by its watcher dying]`
+- **Cause (Windows System log, times CDT):**
+  - 23:36:30 WindowsUpdateClient 43, "Installation Started: Windows Subsystem for Linux 3.0.3.0";
+  - 23:37:04 SCM 7040, "WSL Service ... changed from auto start to disabled";
+  - 23:37:07 the VmSwitch NIC disconnected; the last stamped worker lines are 04:37:07Z;
+  - 23:37:31 WindowsUpdateClient 19, "Installation Successful".
+  - Nobody ran `down`, and all three claims were free.
+- **Recovery:**
+  - The first `wsl` call afterwards booted a fresh VM (uptime 0 min at 04:37:36Z) with no fleet.
+  - `SyndicateLocalProduction` was `Ready` (its wsl process had ended, LastResult 1). The watchdog would have started it after two down checks (~04:46Z); I ran `Start-ScheduledTask SyndicateLocalProduction` at 04:38:51Z instead, which is the same action.
+  - Supervisor pid 460: web `/healthz` 200 by 04:38:56Z, refresh-worker pid 540, live-odds-worker pid 541.
+- **What loaded:**
+  - every role on 3d852ba9 (fleet HEAD), with env re-derived at `up`;
+  - the refresh-worker's last restart was 22:06:24Z on 264b38df, so this also loads the d5f52b14 ride-alongs (`basketball_engine` blowout bench rest + foul-out, both default OFF);
+  - web loads everything since its previous start.
+  - The refresh-worker restart is cold: board rebuild ~20 min. Downtime was ~2 min for web and the workers, plus the cold board build.
+- **Recurrence risk:** automatic WSL updates through Windows Update will do this again. Preventing it is a Windows Update policy change for the user (e.g. pause updates, or set active hours to cover the overnight slate). It is not a code change, and I did not change any system setting.
+- **verify:** the supervisor log shows all three roles spawned and `/healthz 200`; a `STATE_PERSIST_BEGIN` from the new refresh-worker is OWED (next ~20 min).
