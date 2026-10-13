@@ -908,6 +908,12 @@ def _build_game_chips_uncached(date_value, normalized_sports, cache_key, now):
                 games = provider.games(context, is_active_today=is_active_today)
         except Exception:
             continue
+        if slug == "wnba":
+            # A past date's WNBA games never flip to final on their own
+            # (`game_chip_finals` docstring, 2026-10-13).
+            from syndicate.features.shared.game_chip_finals import apply_wnba_recorded_finals
+
+            games = apply_wnba_recorded_finals(list(games or []), date_value)
         for game in games or []:
             if isinstance(game, dict):
                 chips.append(build_game_chip(slug, game))
