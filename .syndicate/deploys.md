@@ -48643,3 +48643,23 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - Tests: 213 soccer/live tests pass, including tests/test_soccer_live_on_pitch.py (reachability: off != on).
 - **verify -- OWED, needs live soccer (next: Championship 2026-10-13 18:45Z):** in `live_state_<date>.json`, `live_player_props[].lineup_basis` should be `on_pitch` on most rows; each side's banked `goals_so_far` should equal its score minus own goals; and published rows per match should be >12. `LIVE_PROJECTION_JOIN sport=soccer` `miss_player` should fall.
 - **Rollback:** revert 8fd8d83b and d5f52b14 on main, ff the fleet to that SHA. No restart needed.
+
+## 2026-10-13 01:39:46Z -- fleet ff 8fd8d83b -> 3d852ba9 (exact SHA), no restart: live soccer sim uses the league's calibrated profile `[lane soccer-live-anytime-scorer, session b9bb5f37]`
+- **What:** `poll_soccer_live_state.poll_league` now passes `profile=get_league_profile(league)` to `simulate_live_paths`, `project_live_match` and `project_live_player_props`. Before this, every league simulated live on SOCCER_CALIBRATION_PROFILE. The props now resume with `profile` (was pinned to the default) so they keep sharing the paths. The goal windows read the same paths, so they inherit the profile too. Taken under a `live-odds-worker` claim, released by token. The poller is a fresh child per tick, so no restart.
+- **Ride-alongs:** none; only this lane's two files.
+- **Pre-deploy evidence (replay, not production):**
+  - Data: 98 final matches 09-30..10-12, 588 points (15-min buckets) from `projection_history` against final scores; 40 sims per point, paired seeds.
+  - Sanity check: the default arm reproduces the logged projection within 0.124 goals (mean abs).
+  - Default -> league profile:
+    - weighted |per-league bias| 0.516 -> 0.372;
+    - Brier P(>=1 more goal) 0.1278 -> 0.1216;
+    - Poisson NLL 1.621 -> 1.566;
+    - better in all six buckets.
+  - Pooled remaining goals 1.62 -> 1.73 vs actual 1.96, so about half the gap remains.
+  - Caveats: the window was goal-rich (3.3/match); per-league n is 8-15 matches. Eredivisie overshoots after the change (1.93 vs 1.76); primeira_liga and belgian are slightly worse on Brier.
+  - Tests: 67 pass, including `tests/test_soccer_live_league_profile.py` (profile reaches `simulate_match` at the poller; one path set per match, no SHARED_PATHS_MISMATCH).
+- **verify -- OWED, needs live soccer (next: 2026-10-13):**
+  - `projection_history[].projected_final_total` should differ by league at equal states;
+  - no `SHARED_PATHS_MISMATCH` in `live-odds-worker.log`;
+  - then re-grade remaining goals once >=30 new final matches have the change.
+- **Rollback:** revert 3d852ba9 on main, ff the fleet. No restart.
