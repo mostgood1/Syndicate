@@ -2022,3 +2022,13 @@ prefer single-quoted arguments there.
 - **Rule: never write a goal clause the lane cannot control.** With ~15 sessions able to deploy at will, "no restart in the window" is a property of the schedule, not of the change. Write it as an exclusion instead -- *measure only windows with no deploy, and report how many windows that left* -- so a disturbed window is DISCARDED rather than scored as a failure. State the discard count; if it is most of them, that IS the finding.
 - **Corollary:** the same reading is why the lane's primary number survived and its secondary clauses did not. Look-to-serve (362 s -> 241 s, a 33% cut) is measured per card and is robust to a mid-window restart; a boolean "restart-free" clause is destroyed by one. **Prefer a continuous measure over a boolean gate when the environment is shared.**
 - Same family as [[feedback_absence_in_a_window_is_not_absence]] and [[feedback_measure_same_instant]]: say what the window was, and what the window admitted.
+
+## 2026-10-13 OVERTURNED: "`--check` passed, so the generated port is what the generator produces" -- it passed on the Windows checkout only `[lanes nba-live-tick-native / nba-source-cli-native, session 2d413211]`
+
+- **Measured.** All three port generators (P6's orchestrator, the live ticks and the NBA CLI) stamp each generated file with a hash of the vendored source's RAW bytes. A Windows checkout (CRLF) and the fleet's Linux checkout (LF) stamp different hashes. `--check` and the tests that run it passed on Windows and failed on the fleet for every generated file after the 18587150 ff. P6's had been failing there unseen since 2026-10-10. Fixed in a82f821a (the hash is over LF-normalised bytes; code unchanged).
+- **Rule.** A byte-exact self-check belongs on the DEPLOYED checkout, not only on the machine that generated the files. Anything that hashes or compares file bytes must normalise line endings, or say why not.
+
+## 2026-10-13 A 0-diff parity run proves only what the run exercised: count the leaves, and read what the arm WROTE `[lane nba-live-tick-native, session 2d413211]`
+
+- **Measured.** Two live NBA preseason recordings of the vendored tick (10-12 23:45Z, 01:45Z) came back 0 diffs over 18 and 17 leaves, with no file written. The tick gates every in-game write on a live total line or a prop line, and preseason has neither; production wrote no NBA signal that day either. The real evidence came from a doctored replay of 2026-10-05, a slate production had written 17+17 on: 3,717 leaves, signals, projections and the props registry.
+- **Rule.** Report the leaf count and files_written next to every "0 diffs". When the arm writes nothing, pick inputs that exercise the write paths (a slate production wrote on), and say that the inputs are doctored.
