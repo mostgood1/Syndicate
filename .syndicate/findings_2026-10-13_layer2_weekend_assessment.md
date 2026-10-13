@@ -208,3 +208,23 @@ Caveat that must travel with this: `[layer2-score-outcomes]` (09-01..09-20) foun
    the board.
 4. Re-read after the next two weekends. Every positive cell above rests on one weekend.
 
+## 8. Suggested, backtested over the week 10-06..10-12 (recorder, read-only) `[added same session, 2026-10-13 ~17:4xZ]`
+
+Rule applied to every priced record as `_stamp_suggested` would have: opportunity lane, market EV in [+2, +5.26]
+(plausibility cut), two-sided fair, fee-net >= 2 where a fee applies, one side per line per capture day; graded on the
+FIRST QUALIFYING sighting (the price the paper book would have taken). Baseline = deterministic 1-in-10 sample of all
+opportunity-lane rows under the same plausibility cut. 385,117 records; script `sg_backtest.py` (scratchpad, wraps
+`score_ranking_backtest.py pull`).
+
+| set | bets | games | hit / break-even | ROI [95%, by game] |
+|---|---|---|---|---|
+| **Suggested** | 843 (~120/day) | 162 | 42.6 / 43.2 | **-4.1% [-12.8, +7.5]** (-34.6 units) |
+| baseline (board) | 10,317 | 251 | 42.2 / 47.2 | -16.8% [-21.0, -13.4] |
+
+Suggested cells (all intervals span zero): exchange-priced +8.2% (237), props +4.7% (284), game lines -8.6% (559), NFL live
++7.7% (204), NCAAF pregame +6.4% (201), soccer -19.4% (122), WNBA -28.2% (87, 4 games), NHL live -29.7% (20).
+
+- **The flag removes most of the loss (about -17% -> -4%) but is NOT shown profitable over this week.** It is a better bet
+  list than the board, not yet a winning one.
+- Limits: 111 suggested rows (mostly NCAAF) fell out `extra_team_unresolved` because the worktree has no `data/` team
+  registry; flat 1-unit staking; fees are not netted in `pnl` (only 9 fee-venue rows qualified).
