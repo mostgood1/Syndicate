@@ -276,3 +276,63 @@ at three things: a calibrated fair price, speed, and coverage.
 | NBA / WNBA player game logs for role minutes | 0 rows | minutes is the base layer of every basketball prop |
 | Weather join (NWS) / umpire producer | no reader / neutral | weather has the best academic prior |
 | Execution: sportsbook adapters, limits | paper only, US books manual | edge is capped by limits; size must be shown |
+
+## 8. RESTRUCTURED PLAN `[2026-10-13, user direction: "why isn't DATA our edge?" ... "we need syndicate to allow us to identify the best opportunities for success. This won't always be +EV and that is important to know ... a batter has a historical edge against a pitcher, better statcast data against that pitcher's arsenal, and recency of the batter performance show a positive streak ... Its THESE edges we need."]`
+
+**What changed.** §7 treated edge as one number, measured where data is least likely to show it (public stats, global
+terms, efficient main lines). The restructure makes DATA the engine and keeps two separate readings on every
+opportunity, because the user wants both:
+
+- **Likelihood of success** -- the probability the bet wins, from the calibrated market fair PLUS any validated
+  situational signals (a convergence of matchup data).
+- **Value** -- whether the PRICE already reflects that likelihood (+EV) or not.
+
+A line can be a strong matchup that is already priced (high likelihood, no value), a strong matchup the price has not
+caught up to (both), or a signal that does not actually predict anything (neither). Showing likelihood and value apart
+is the honest version of "best opportunities for success".
+
+### Track A -- Fair price v2 (the measuring stick; IN PROGRESS, lane `fair-price-v2`)
+Every signal's lift is measured against the market's probability, so the market probability must be right first.
+`scripts/fair_price_eval.py` scores de-vig methods against outcomes from the quote logs (flip criterion pre-registered in
+the lane). Weekend reading: power calibration slope 1.05 vs multiplicative 1.19; EV >= 2 picked by today's fair worth
+-2.2% [-3.7, -0.5] at the close, by power +0.4% [-1.2, +2.1]. 3-week reading pending.
+
+### Track B -- Situational edge engine ("success indicators") -- the user's core ask
+1. **Signal registry.** Named, point-in-time signals per sport x prop type, each with a definition, data source, and
+   the moment it is known. First family (the user's example), MLB batter hits / total bases:
+   - batter vs this pitcher history (PA, hits, xwOBA; regressed -- raw BvP is tiny-sample);
+   - batter quality vs the pitcher's ARSENAL (batter xwOBA / whiff vs each pitch type, weighted by the pitcher's pitch mix);
+   - recency / streak (rolling hits, hard-hit rate, xwOBA over the last N games vs season);
+   - platoon (regressed), park, weather, lineup slot / projected PA.
+   Equivalents per sport: NBA/WNBA role minutes, pace-up spot, usage shift when teammates sit, opponent vs position
+   (pace-adjusted); NFL target / route / snap share trend, opponent coverage vs position, game script; NHL TOI / PP unit,
+   opponent shot suppression, goalie; soccer expected XI, opponent shots conceded.
+2. **Lift measurement.** For every signal (and every combination that a convergence rule names), grade the lines it
+   fires on: hit rate vs (a) the baseline hit rate and (b) the calibrated market probability. (a) says the signal
+   predicts; (b) says the price already knows. Discover on some dates, confirm on held-out dates, false-discovery
+   control across the search; report n, games, and the interval.
+3. **Board surface.** Each line shows its market probability, the signals that fire with their MEASURED lift, an
+   adjusted likelihood, and value at the price -- flagged as "strong matchup, already priced" vs "strong matchup,
+   underpriced". Unvalidated signals are shown as research, labelled unvalidated.
+4. **Data the first study needs (MLB hits).** The fleet holds only season-aggregate Statcast and hitter-prop prices
+   since ~09-30. Backfill the 2026 season: pitch-level Statcast (free; `vendor/mlb_bettingv2/tools/statcast/
+   fetch_statcast_raw_pitches_x64.py` already fetches it), per-game box scores (StatsAPI, free), historical batter_hits
+   prices (OddsAPI historical; cost to be probed before buying). Point-in-time snapshots so no feature sees the future.
+   In-season NOW: NFL (weekly) and NBA (opens 10-20) run the same engine forward.
+
+### Track C -- the sims as data, blended with the market per cell
+Fit, per sport x market, how much weight the sim's probability deserves ON TOP OF the calibrated market fair (logistic
+of outcome on logit(market) + logit(sim)). Keep the sim term only where its weight's interval excludes zero. Today the
+weight is a fixed 0.125 everywhere; "loses alone" was measured, "adds nothing in combination" mostly was not.
+
+### Track D -- timing from our own logs
+Per book and event type (lineup posted, injury, sharp move, goalie confirmed), measure minutes to reprice from the
+quote change log. This sizes the speed edge and feeds the slow-book alerts.
+
+### Track E -- live (the strongest lead), and the product layer
+Unchanged from §7 items 10-12: live latency and live prop repricing; matchup research cards (now driven by Track B's
+measured signals); a public CLV / realized-vs-expected ledger; limit-aware sizing.
+
+### Order
+A first (it is the measuring stick, days). B and C start on existing data immediately (NFL / soccer / NHL in season;
+MLB via backfill). D needs only the logs we have. Coverage additions (§7 item 4) go in as credits allow.
