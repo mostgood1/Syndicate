@@ -1,4 +1,4 @@
-"""Parity gate: Syndicate NBA source CLI (syndicate/features/nba/source_cli) == the vendored nba_betting.cli.
+"""Parity gate: Syndicate source CLI (syndicate/features/<league>/source_cli) == the vendored <league>_betting.cli (`--league`).
 
 Lane nba-source-cli-native (2026-10-12). Record/replay, one arm per PROCESS, built on scripts/basketball_live_tick_parity.py
 (call-counted clock, frozen datetime, `requests` tape with the OddsAPI key stripped, file-open audit).
@@ -15,9 +15,9 @@ parity wants every code path).
            each command's outcome, the clock-call count and the tape misses; `--plant` is the positive control
 
 Usage (fleet, at Idle):
-  nice -n 19 python scripts/nba_source_cli_parity.py record --date 2026-10-13 --data-root A/data --tape T.json --out v.json
-  nice -n 19 python scripts/nba_source_cli_parity.py replay --arm port --date 2026-10-13 --data-root B/data --tape T.json --out p.json
-  python scripts/nba_source_cli_parity.py compare v.json p.json [--plant]
+  nice -n 19 python scripts/basketball_source_cli_parity.py record --date 2026-10-13 --data-root A/data --tape T.json --out v.json
+  nice -n 19 python scripts/basketball_source_cli_parity.py replay --arm port --date 2026-10-13 --data-root B/data --tape T.json --out p.json
+  python scripts/basketball_source_cli_parity.py compare v.json p.json [--plant]
 """
 from __future__ import annotations
 
@@ -40,11 +40,21 @@ tp = importlib.util.module_from_spec(_spec)
 sys.modules["_tick_parity"] = tp
 _spec.loader.exec_module(tp)
 
-VENDOR_REPO = ROOT / "vendor" / "nba_betting_repo"
 
 
-def bootstrap_steps(date_str: str) -> list[list[str]]:
-    # update-pbp-espn-history / build-lineup-teammate-effects left the bootstrap 2026-10-13 (lineup effects retired).
+def bootstrap_steps(date_str: str, league: str = "nba") -> list[list[str]]:
+    """The commands each refresh's game-input bootstrap runs, in its order."""
+    if league == "wnba":
+        # refresh_wnba_oddsapi_props: _ensure_source_game_inputs + _ensure_rotation_inputs_for_props_refresh + predict-date
+        return [
+            ["fetch-schedule"],
+            ["fetch", "--years", "1"],
+            ["build-features"],
+            ["fetch-injuries", "--date", date_str],
+            ["write-pregame-expected-minutes", "--date", date_str],
+            ["predict-date", "--date", date_str],
+        ]
+    # update-pbp-espn-history / build-lineup-teammate-effects left the NBA bootstrap 2026-10-13 (lineup effects retired).
     return [
         ["fetch-schedule"],
         ["fetch", "--years", "1"],
@@ -53,7 +63,6 @@ def bootstrap_steps(date_str: str) -> list[list[str]]:
         ["export-game-cards", "--date", date_str],
         ["predict-date", "--date", date_str],
     ]
-
 
 def _file_value(p: Path) -> Any:
     raw = p.read_bytes()
@@ -87,10 +96,14 @@ def snapshot(data_root: Path) -> dict[str, str]:
 
 def run_arm(args, mode: str, arm: str) -> int:
     data_root = Path(args.data_root).resolve()
-    os.environ["NBA_BETTING_DATA_ROOT"] = str(data_root)
+    league = args.league
+    up = league.upper()
+    vendor_repo = ROOT / "vendor" / f"{league}_betting_repo"
+    os.environ[f"{up}_BETTING_DATA_ROOT"] = str(data_root)
     os.environ["NBA_BETTING_RECONCILE_REPO_DATA"] = "0"
+    os.environ["WNBA_BETTING_RECONCILE_REPO_DATA"] = "0"
     tape_path = Path(args.tape)
-    tape: dict[str, Any] = tp.load_tape(tape_path) if mode == "replay" else {"date": args.date, "league": "nba", "kind": "nba_source_cli"}
+    tape: dict[str, Any] = tp.load_tape(tape_path) if mode == "replay" else {"date": args.date, "league": league, "kind": f"{league}_source_cli"}
     base = float(tape.get("clock_base") or _time_mod.time())
     tape["clock_base"] = base
     if mode == "record":
@@ -108,17 +121,17 @@ def run_arm(args, mode: str, arm: str) -> int:
     tp.install_open_audit({"data": data_root}, opened)
     before = snapshot(data_root)
     if arm == "vendored":
-        sys.path.insert(0, str(VENDOR_REPO / "src"))
-        os.chdir(VENDOR_REPO)
-        mod = importlib.import_module("nba_betting.cli")
+        sys.path.insert(0, str(vendor_repo / "src"))
+        os.chdir(vendor_repo)
+        mod = importlib.import_module(f"{league}_betting.cli")
     else:
         sys.path.insert(0, str(ROOT))
         os.chdir(ROOT)
-        mod = importlib.import_module("syndicate.features.nba.source_cli.cli")
+        mod = importlib.import_module(f"syndicate.features.{league}.source_cli.cli")
     tp.CLOCK.calls = 0
     steps = []
     t0 = _time_mod.perf_counter()
-    for argv in bootstrap_steps(args.date):
+    for argv in bootstrap_steps(args.date, league):
         buf = io.StringIO()
         try:
             with redirect_stdout(buf):
@@ -156,6 +169,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     for name in ("record", "replay"):
         p = sub.add_parser(name)
+        p.add_argument("--league", choices=("nba", "wnba"), default="nba")
         p.add_argument("--date", required=True)
         p.add_argument("--data-root", required=True)
         p.add_argument("--tape", required=True)

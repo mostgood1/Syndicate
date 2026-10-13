@@ -1,4 +1,5 @@
-"""Generator for syndicate/features/nba/source_cli/ -- Syndicate's port of the vendored `nba_betting.cli` commands that
+"""Generator for syndicate/features/<league>/source_cli/ -- Syndicate's port of the vendored `<league>_betting.cli` commands that
+the props refreshes run (NBA since 2026-10-12; WNBA added 2026-10-13, `--league`). The NBA story below is the original;
 the NBA props refresh's game-input bootstrap runs (lane nba-source-cli-native, 2026-10-12).
 
 `scripts/refresh_nba_oddsapi_props.py::_ensure_source_game_inputs` (once per date, when predictions_<date>.csv is
@@ -19,9 +20,9 @@ METHOD (shared with scripts/port_basketball_live_tick.py, whose helpers it impor
 Every module is validated: each global a function reads is bound, and nothing vendored is imported.
 
 Usage:
-  py -3 scripts/port_nba_source_cli.py            # write the package
-  py -3 scripts/port_nba_source_cli.py --check    # exit 1 if the package on disk differs
-  py -3 scripts/port_nba_source_cli.py --report   # closure sizes + dropped top-level statements
+  py -3 scripts/port_basketball_source_cli.py            # write the package
+  py -3 scripts/port_basketball_source_cli.py --check    # exit 1 if the package on disk differs
+  py -3 scripts/port_basketball_source_cli.py --report   # closure sizes + dropped top-level statements
 """
 from __future__ import annotations
 
@@ -39,14 +40,15 @@ _tg = importlib.util.module_from_spec(_spec)
 sys.modules["_tick_gen"] = _tg
 _spec.loader.exec_module(_tg)
 
-PKG_NAME = "nba_betting"
-PKG = ROOT / "vendor" / "nba_betting_repo" / "src" / PKG_NAME
-OUT = ROOT / "syndicate" / "features" / "nba" / "source_cli"
+#: Per-league configuration; `configure(code)` installs one as the module globals the generator reads.
+LEAGUES: dict[str, dict] = {}
+
+_NBA_PKG_NAME = "nba_betting"
 
 #: The commands the props refresh runs (`_ensure_source_game_inputs`, `_run_source_predict_date`, and the full export's
 #: export-game-cards). update-pbp-espn-history and build-lineup-teammate-effects were dropped 2026-10-13: lineup
 #: teammate effects were retired (user decision; bf5718d3 removed their only reader) and the refreshes no longer run them.
-COMMANDS = {
+_NBA_COMMANDS = {
     "fetch-schedule": "fetch_schedule_cmd",
     "fetch": "fetch",
     "build-features": "build_features_cmd",
@@ -56,7 +58,7 @@ COMMANDS = {
 }
 
 #: Anchored edits: (module, why, old, new). The ONLY hand-written behaviour in the port.
-EDITS: list[tuple[str, str, str, str]] = [
+_NBA_EDITS: list[tuple[str, str, str, str]] = [
     (
         "config",
         "the vendored repo root is vendor/nba_betting_repo (parents[2] of nba_betting/config.py). The port's repo root "
@@ -70,15 +72,69 @@ EDITS: list[tuple[str, str, str, str]] = [
 ]
 
 #: Top-level statements that bind nothing but change behaviour: kept, at their source position in the header.
-KEEP_STATEMENTS = {
+_NBA_KEEP_STATEMENTS = {
     ("cli", "os.environ.setdefault('ONNXRUNTIME_LOG_SEVERITY_LEVEL', '3')"),
     ("cli", "os.environ.setdefault('ORT_DISABLE_CPUINFO', '1')"),
     ("games_npu", "warnings.filterwarnings('ignore')"),
 }
 
 #: The vendored models the port reads through paths.models, copied byte-for-byte.
-MODELS_SRC = ROOT / "vendor" / "nba_betting_repo" / "models"
 MODELS_DST = "repo/models"
+
+LEAGUES["nba"] = dict(pkg_name=_NBA_PKG_NAME, commands=_NBA_COMMANDS, edits=_NBA_EDITS, keep=_NBA_KEEP_STATEMENTS,
+                      refresh="NBA props refresh")
+
+#: WNBA (lane nba-source-cli-native, user decision 2026-10-13): the commands scripts/refresh_wnba_oddsapi_props.py
+#: runs on EVERY refresh (`_ensure_source_game_inputs`, `_ensure_rotation_inputs_for_props_refresh`,
+#: `_run_source_predict_date`). Its CPU `daily-update` fallback never fired in the 30 days measured (0 "predict-date
+#: failed" lines) and is not ported; the refresh drops that fallback.
+LEAGUES["wnba"] = dict(
+    pkg_name="wnba_betting",
+    commands={
+        "fetch-schedule": "fetch_schedule_cmd",
+        "fetch": "fetch",
+        "build-features": "build_features_cmd",
+        "fetch-injuries": "fetch_injuries",
+        "write-pregame-expected-minutes": "write_pregame_expected_minutes_cmd",
+        "predict-date": "predict_date_cmd",
+    },
+    edits=[
+        (
+            "config",
+            "the vendored repo root is vendor/wnba_betting_repo (parents[2] of wnba_betting/config.py). The port's repo root "
+            "is source_cli/repo/: its models/ is a byte-identical copy of the vendored models. The root's other reads -- .env, "
+            "data/raw/injuries.csv and league_status's data/overrides/roster_overrides.csv -- do not exist in the vendored repo "
+            "(git or the fleet, checked 2026-10-13), and the import-time reconcile copy is not ported (fleet dry-run: 0 of 288).",
+            "def _repo_root() -> Path:\n    return Path(__file__).resolve().parents[2]\n",
+            "def _repo_root() -> Path:\n    return Path(__file__).resolve().parent / \"repo\"  # EDIT: Syndicate-owned repo root (models/)\n",
+        ),
+    ],
+    keep={  # same three as NBA, same reasons
+        ("cli", "os.environ.setdefault('ONNXRUNTIME_LOG_SEVERITY_LEVEL', '3')"),
+        ("cli", "os.environ.setdefault('ORT_DISABLE_CPUINFO', '1')"),
+        ("games_npu", "warnings.filterwarnings('ignore')"),
+    },
+    refresh="WNBA props refresh",
+)
+
+MODELS_DST = "repo/models"
+
+
+def configure(code: str) -> None:
+    """Install league `code` as the module globals the generator reads."""
+    global LEAGUE_CODE, PKG_NAME, PKG, OUT, COMMANDS, EDITS, KEEP_STATEMENTS, MODELS_SRC
+    cfg = LEAGUES[code]
+    LEAGUE_CODE = code
+    PKG_NAME = cfg["pkg_name"]
+    PKG = ROOT / "vendor" / f"{code}_betting_repo" / "src" / PKG_NAME
+    OUT = ROOT / "syndicate" / "features" / code / "source_cli"
+    COMMANDS = cfg["commands"]
+    EDITS = cfg["edits"]
+    KEEP_STATEMENTS = cfg["keep"]
+    MODELS_SRC = ROOT / "vendor" / f"{code}_betting_repo" / "models"
+
+
+configure("nba")
 
 CLI_FOOTER = '\n\nif __name__ == "__main__":\n    cli()\n'
 
@@ -233,7 +289,7 @@ def generate_module(mod: str, roots: set[str]) -> tuple[str, list[str]]:
             raise SystemExit(f"[{mod}] EDIT ({why}) matched {text_body.count(old)}x")
         text_body = text_body.replace(old, new)
     sha = hashlib.sha256(src.read_bytes().replace(b"\r\n", b"\n")).hexdigest()[:16]  # LF-normalised: a Windows (CRLF) and a Linux checkout must stamp the same hash, or --check fails on one of them
-    doc = ('"""GENERATED by scripts/port_nba_source_cli.py -- do not edit by hand (`--check` fails on a hand edit).\n\n'
+    doc = ('"""GENERATED by scripts/port_basketball_source_cli.py -- do not edit by hand (`--check` fails on a hand edit).\n\n'
            f"Source: {src.relative_to(ROOT).as_posix()} (sha256 {sha}...), {'whole module' if whole else str(len(selected)) + ' top-level statements'},\n"
            "copied verbatim except for the import header and the EDITS listed in the generator.\n"
            '"""\n')
@@ -272,10 +328,10 @@ def generate() -> tuple[dict[str, str], list[str]]:
         parts = rel.split("/")[:-1]
         for i in range(1, len(parts) + 1):
             init = "/".join(parts[:i]) + "/__init__.py"
-            files.setdefault(init, '"""GENERATED by scripts/port_nba_source_cli.py (package marker)."""\n')
-    files.setdefault("__init__.py", '"""Syndicate port of the vendored nba_betting CLI commands the NBA props refresh runs.\n\n'
-                     'GENERATED by scripts/port_nba_source_cli.py (lane nba-source-cli-native, 2026-10-12). Run as\n'
-                     '`python -m syndicate.features.nba.source_cli.cli <command>`.\n"""\n')
+            files.setdefault(init, '"""GENERATED by scripts/port_basketball_source_cli.py (package marker)."""\n')
+    files.setdefault("__init__.py", f'"""Syndicate port of the vendored {PKG_NAME} CLI commands the {LEAGUES[LEAGUE_CODE]["refresh"]} runs.\n\n'
+                     'GENERATED by scripts/port_basketball_source_cli.py (lane nba-source-cli-native, 2026-10-12). Run as\n'
+                     f'`python -m syndicate.features.{LEAGUE_CODE}.source_cli.cli <command>`.\n"""\n')
     return files, dropped_all
 
 
@@ -295,9 +351,11 @@ def model_files() -> dict[str, bytes]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--league", choices=sorted(LEAGUES), default="nba")
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--report", action="store_true")
     args = ap.parse_args()
+    configure(args.league)
     files, dropped = generate()
     if args.report:
         for rel, text in sorted(files.items()):

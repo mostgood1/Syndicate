@@ -1,7 +1,7 @@
 """The NBA props refresh's game-input bootstrap runs Syndicate's CLI, not the vendored one (lane nba-source-cli-native).
 
 Static and cheap:
-  * the package is exactly what scripts/port_nba_source_cli.py generates (a hand edit fails here), models included;
+  * the package is exactly what scripts/port_basketball_source_cli.py generates (a hand edit fails here), models included;
   * nothing in it imports the vendored package (`nba_betting`) or `vendor`;
   * its CLI registers exactly the six commands the refresh runs, and its models dir resolves to the Syndicate copy;
   * the refresh launches `python -m syndicate.features.nba.source_cli.cli` for every bootstrap step and predict-date.
@@ -23,7 +23,7 @@ COMMANDS = {"fetch-schedule", "fetch", "build-features", "fetch-injuries", "expo
 def test_package_matches_generator():
     if not (ROOT / "vendor" / "nba_betting_repo" / "src" / "nba_betting" / "cli.py").exists():
         pytest.skip("vendor tree removed: nothing to regenerate from")
-    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "port_nba_source_cli.py"), "--check"], capture_output=True, text=True, cwd=ROOT)
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "port_basketball_source_cli.py"), "--check"], capture_output=True, text=True, cwd=ROOT)
     assert r.returncode == 0, r.stdout + r.stderr
 
 
