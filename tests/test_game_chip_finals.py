@@ -38,6 +38,10 @@ class RecordedFinals(unittest.TestCase):
         self.assertEqual((added["away_tri"], added["home_tri"]), ("ATL", "NYL"))
         self.assertTrue(added["status"]["final"])
         self.assertEqual(added["live_state"]["away_pts"], 85.0)
+        from syndicate.features.shared.game_chip_scoreboard import build_game_chip
+
+        chip = build_game_chip("wnba", added)
+        self.assertEqual((chip["away"]["name"], chip["home"]["name"]), ("Atlanta Dream", "New York Liberty"))
 
     def test_today_is_left_to_the_live_merge(self) -> None:
         games = [_pregame("GSV", "LVA")]

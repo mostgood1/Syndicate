@@ -27,6 +27,17 @@ from typing import Any
 
 from syndicate.features.shared.timezone import central_today_iso
 
+# Full club names for a game this module ADDS (the score row carries only
+# ESPN's abbreviation). The same 15 clubs as `wnba/live_period_lines.py`'s
+# built-in list; the shared basketball map cannot be inverted (PHX / POR / TOR
+# are NBA and WNBA clubs alike).
+_WNBA_FULL_NAMES = {
+    "ATL": "Atlanta Dream", "CHI": "Chicago Sky", "CON": "Connecticut Sun", "DAL": "Dallas Wings",
+    "GSV": "Golden State Valkyries", "IND": "Indiana Fever", "LAS": "Los Angeles Sparks",
+    "LVA": "Las Vegas Aces", "MIN": "Minnesota Lynx", "NYL": "New York Liberty", "PHX": "Phoenix Mercury",
+    "POR": "Portland Fire", "SEA": "Seattle Storm", "TOR": "Toronto Tempo", "WSH": "Washington Mystics",
+}
+
 
 def _final_rows(date_value: str) -> list[dict[str, Any]]:
     from syndicate.features.shared.settlement_sport_rows import SCORE_ROW_MARKET, wnba_rows_for_date
@@ -66,8 +77,8 @@ def apply_wnba_recorded_finals(games: list[dict[str, Any]], date_value: str) -> 
                 _game_from_row(
                     {
                         "event_id": row.get("game_id") or f"{away_tri}@{home_tri}",
-                        "visitor_team": away_tri,
-                        "home_team": home_tri,
+                        "visitor_team": _WNBA_FULL_NAMES.get(away_tri, away_tri),
+                        "home_team": _WNBA_FULL_NAMES.get(home_tri, home_tri),
                         "away_tri": away_tri,
                         "home_tri": home_tri,
                         "bookmaker": "ESPN",
