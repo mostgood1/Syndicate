@@ -136,10 +136,43 @@ def build(logs: list[dict[str, Any]], starts: dict[tuple[str, str], int],
     return tables
 
 
+def build_as_of(logs: list[dict[str, Any]], starts: dict[tuple[str, str], int],
+                spreads: dict[tuple[str, str], float], day: str) -> list[dict[str, Any]]:
+    """FORWARD mode: one row per player with history, features from games strictly before `day` -- written before
+    `day`'s games so the board can read them pregame. A player whose team does not play on `day` simply joins no line."""
+    target = date.fromisoformat(day)
+    prior_logs = [g for g in logs if g["date"] < day]
+    by_player: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    team_dates: dict[str, set[date]] = defaultdict(set)
+    for g in prior_logs:
+        by_player[g["key"]].append(g)
+        team_dates[g["team"]].add(date.fromisoformat(g["date"]))
+    rows = []
+    for key, games in by_player.items():
+        games.sort(key=lambda g: g["date"])
+        last = games[-1]
+        feats: dict[str, Any] = {"date": day, "player": last["player"], "player_key": key, "team": last["team"],
+                                 "game_id": None, "as_of": True}
+        feats.update(minutes_features([p["min"] for p in games]))
+        feats.update(start_features([starts.get((key, p["date"])) for p in games]))
+        feats["rest_days"] = team_rest_days(sorted(team_dates.get(last["team"], [])), target)
+        feats["spread_abs"] = spreads.get((day, norm_player(last["team"])))
+        feats["fires"] = nba_signal_fires(feats)
+        rows.append(feats)
+    return rows
+
+
+def _season_for(day: str) -> tuple[str, int]:
+    d = date.fromisoformat(day)
+    start = d.year if d.month >= 8 else d.year - 1
+    return f"{start}-{(start + 1) % 100:02d}", start
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-root", default=os.environ.get("SYNDICATE_DATA_ROOT") or "")
-    ap.add_argument("--season", required=True)
+    ap.add_argument("--season", default=None, help="e.g. 2025-26; derived from --as-of when omitted")
+    ap.add_argument("--as-of", default=None, help="FORWARD mode: write ONE table for this date (YYYY-MM-DD, or 'today' = US Central date)")
     ap.add_argument("--logs-statsnba", default=None)
     ap.add_argument("--logs-espn", default=None)
     ap.add_argument("--games-odds-dir", default=None)
@@ -147,9 +180,31 @@ def main(argv: list[str] | None = None) -> int:
     if not args.data_root:
         print("REFUSING: no --data-root", flush=True)
         return 2
+    if args.as_of:
+        if args.as_of == "today":
+            from datetime import datetime, timedelta, timezone
+            args.as_of = (datetime.now(timezone.utc) - timedelta(hours=5)).date().isoformat()  # US Central (CDT)
+        season, start_year = _season_for(args.as_of)
+        args.season = args.season or season
+        if not args.logs_espn and not args.logs_statsnba:
+            args.logs_espn = str(Path(os.path.expanduser(args.data_root)) / "nba_source" / "data" / "processed"
+                                 / f"player_game_log_{start_year}.csv")
+    if not args.season:
+        print("REFUSING: no --season and no --as-of", flush=True)
+        return 2
     espn_logs, starts = load_espn(Path(os.path.expanduser(args.logs_espn))) if args.logs_espn else ([], {})
     logs = load_statsnba(Path(os.path.expanduser(args.logs_statsnba))) if args.logs_statsnba else espn_logs
     spreads = load_spreads(Path(os.path.expanduser(args.games_odds_dir)) if args.games_odds_dir else None)
+    if args.as_of:
+        rows = build_as_of(logs, starts, spreads, args.as_of)
+        write_signal_table(os.path.expanduser(args.data_root), "nba", args.season, args.as_of, rows)
+        fired_now: dict[str, int] = defaultdict(int)
+        for r in rows:
+            for name in r["fires"]:
+                fired_now[name] += 1
+        print(f"NBA_SIGNALS_AS_OF season={args.season} date={args.as_of} logs={len(logs)} players={len(rows)} "
+              f"fired={dict(sorted(fired_now.items()))}", flush=True)
+        return 0
     tables = build(logs, starts, spreads)
     fired: dict[str, int] = defaultdict(int)
     for day, rows in sorted(tables.items()):

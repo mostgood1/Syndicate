@@ -100,3 +100,48 @@ def test_unders_main_line_is_the_most_quoted_point_and_roi_uses_the_price(tmp_pa
     roi = ut.roi_stats([{"y": 1.0, "under_dec_best": 2.0, "game": "g1"}, {"y": 0.0, "under_dec_best": 2.0, "game": "g2"}],
                        "under_dec_best", B=50)
     assert roi["roi_pct"] == 0.0
+
+
+def test_forward_as_of_table_uses_only_earlier_games_and_covers_every_player() -> None:
+    bns = _load("build_nba_signals")
+    logs = [{"player": "A B", "key": "a b", "team": "T", "game_id": str(i), "date": f"2026-11-{i + 1:02d}", "min": 30.0}
+            for i in range(14)]
+    logs.append({"player": "A B", "key": "a b", "team": "T", "game_id": "x", "date": "2026-11-15", "min": 99.0})
+    rows = bns.build_as_of(logs, starts={}, spreads={}, day="2026-11-15")
+    assert len(rows) == 1 and rows[0]["date"] == "2026-11-15" and rows[0]["as_of"] is True
+    assert rows[0]["min_trend"] == 0.0           # the 99-minute game ON the date is never read
+    assert rows[0]["rest_days"] == 1
+    assert bns._season_for("2026-11-15") == ("2026-27", 2026) and bns._season_for("2027-03-01") == ("2026-27", 2026)
+
+
+def test_under_bias_adjusts_nba_prop_likelihood_only_and_is_switchable(monkeypatch) -> None:
+    monkeypatch.delenv("SYNDICATE_NBA_UNDER_BIAS_DELTA", raising=False)
+    under = {"sport": "nba", "kind": "prop", "market": "player_threes", "side": "under"}
+    over = dict(under, side="over")
+    assert ms.likelihood_adjustments(under) == [{"signal": "nba.under_bias", "delta": 0.0123}]
+    assert ms.likelihood_adjustments(over) == [{"signal": "nba.under_bias", "delta": -0.0123}]
+    assert ms.likelihood_adjustments(dict(under, sport="nfl")) == []
+    assert ms.likelihood_adjustments(dict(under, market="player_double_double")) == []
+    assert ms.likelihood_adjustments({"sport": "nba", "kind": "game", "market": "totals", "side": "under"}) == []
+    monkeypatch.setenv("SYNDICATE_NBA_UNDER_BIAS_DELTA", "0")
+    assert ms.likelihood_adjustments(under) == []
+    monkeypatch.setenv("SYNDICATE_NBA_UNDER_BIAS_DELTA", "garbage")
+    assert ms.nba_under_bias_delta() == 0.0123
+
+
+def test_board_stamps_the_shadow_likelihood_and_the_recorder_keeps_it(monkeypatch) -> None:
+    from syndicate.features.shared import layer2_board as lb
+    from syndicate.features.shared.opportunity_population_ledger import population_record
+
+    monkeypatch.delenv("SYNDICATE_NBA_UNDER_BIAS_DELTA", raising=False)
+    row = {"sport": "nba", "kind": "prop", "market": "player_rebounds", "side": "under",
+           "quote": {"fair_probability": 0.5, "fair_method": "consensus", "price": -110}}
+    one_sided = {"sport": "nba", "kind": "prop", "market": "player_rebounds", "side": "under",
+                 "quote": {"fair_probability": 0.5, "fair_method": "book_margin_model", "price": -110}}
+    assert lb._stamp_likelihood_shadow([row, one_sided]) == {"nba": 1}
+    lk = row["likelihood"]
+    assert lk["mode"] == "shadow" and lk["p"] == 0.5123 and lk["p_market"] == 0.5
+    assert lk["ev_pct"] is not None and "likelihood" not in one_sided
+    assert row["quote"]["fair_probability"] == 0.5  # the market fair the score reads is untouched
+    rec = population_record(row, "k", "2026-10-13T00:00:00Z", sport="nba")
+    assert rec["lk"] == 0.5123 and rec["lke"] == lk["ev_pct"]

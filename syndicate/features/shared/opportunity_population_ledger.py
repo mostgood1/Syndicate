@@ -44,6 +44,7 @@ identity lives in `k` in `KEY_FIELDS` order; `parse_population_key` splits it ba
     ln board_lane  gs game_state   la live_aware (only when true)
     s2 score_v2    n2 score_v2's fee-net EV %   fb its fee basis   bk the priced bookmaker
     sg suggested (the board's per-line bet flag; None before 2026-10-13)
+    lk / lke  SHADOW likelihood p and its EV at the price (matchup-signal adjusted; None where none applies)
 Values are copied from the candidate, never re-derived; an absent value records null.
 
 `s2`/`n2`/`fb`/`bk` `[2026-09-21, lane layer2-score-outcome-calibration, user decision "take
@@ -214,6 +215,10 @@ def population_record(row: Mapping[str, Any], key: str, captured_at: str, *, spo
         # flag, so the nightly grade can read Suggested against the whole priced population.
         # None on a row built before the flag existed -- never read as False.
         "sg": row.get("suggested") if isinstance(row.get("suggested"), bool) else None,
+        # SHADOW likelihood (lane `signal-engine-nba`, 2026-10-13): market fair + supported matchup-signal
+        # adjustments, and the EV at the row's price under it. None where no signal adjusts the row.
+        "lk": _as_float((row.get("likelihood") or {}).get("p")) if isinstance(row.get("likelihood"), Mapping) else None,
+        "lke": _as_float((row.get("likelihood") or {}).get("ev_pct")) if isinstance(row.get("likelihood"), Mapping) else None,
     }
 
 

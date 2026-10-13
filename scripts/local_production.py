@@ -1007,6 +1007,11 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # re-reads a complete season and fetches nothing. 11:40Z: after the night's finals.
     ScheduledJob("ncaab-player-priors", 11, 40, ("scripts/build_ncaab_player_priors.py",)),
     ScheduledJob("basketball-rotation-stints", 11, 45, ("scripts/build_basketball_rotation_stints.py",)),
+    # `nba-signals` (lane `signal-engine-nba`, user 2026-10-13 "yes go ahead with all three"): the dated, as-of
+    # matchup-signal table for TODAY's slate (US Central date) from `player_game_log_<season>.csv`, written before
+    # tip-off to `nba_source/signals/<season>/<date>.jsonl`. Read by nothing that sizes or ranks yet. 11:50Z: after
+    # `basketball-player-game-log` (11:20Z) has appended last night's games.
+    ScheduledJob("nba-signals", 11, 50, ("scripts/build_nba_signals.py", "--as-of", "today")),
 )
 
 

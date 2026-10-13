@@ -252,3 +252,42 @@ def nba_signal_fires(features: Mapping[str, Any]) -> list[str]:
     if spread is not None and spread >= 10 and min10 is not None and min10 >= 30:
         fired.append("nba.blowout_risk")
     return fired
+
+
+# ----------------------------------------------------------------------------- likelihood (SHADOW on the board)
+#
+# `[2026-10-13, user "yes go ahead with all three"]`, lane `signal-engine-nba`. A SUPPORTED signal adjusts the
+# board's LIKELIHOOD -- the probability the bet wins -- and nothing else: the score, Suggested and the portfolio still
+# read the market's Shin fair. The board stamps `likelihood` beside the fair so the two can be graded on the same
+# rows (recorder `lk` / `lke`) before any consumer is switched to it.
+#
+# nba.under_bias delta: the pooled H6 residual over both windows, (81,395 x 1.01% + 46,262 x 1.61%) / 127,657
+# = 1.23 probability points (findings_2026-10-13_nba_signals_v1.md). `SYNDICATE_NBA_UNDER_BIAS_DELTA` overrides it;
+# 0 switches the adjustment off; an unparseable or negative value falls back to the measured default.
+NBA_UNDER_BIAS_DELTA = 0.0123
+
+
+def nba_under_bias_delta() -> float:
+    raw = str(os.environ.get("SYNDICATE_NBA_UNDER_BIAS_DELTA") or "").strip()
+    if raw:
+        try:
+            value = float(raw)
+        except ValueError:
+            return NBA_UNDER_BIAS_DELTA
+        if value == value and 0.0 <= value <= 0.10:
+            return value
+    return NBA_UNDER_BIAS_DELTA
+
+
+def likelihood_adjustments(row: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Probability-point adjustments the SUPPORTED signals make to this row's side, by name."""
+    adjustments: list[dict[str, Any]] = []
+    sport = str(row.get("sport") or "").strip().lower()
+    side = str(row.get("side") or "").strip().lower()
+    market = str(row.get("market") or "").strip().lower()
+    if sport == "nba" and str(row.get("kind") or "") == "prop" and side in ("over", "under") \
+            and market in REGISTRY["nba.under_bias"].markets:
+        delta = nba_under_bias_delta()
+        if delta:
+            adjustments.append({"signal": "nba.under_bias", "delta": round(delta if side == "under" else -delta, 5)})
+    return adjustments

@@ -3359,6 +3359,7 @@ def build_layer2_rows(
     # SUGGESTED is stamped on EVERY candidate before the population sink, so the
     # recorder grades the flag on the same rows the board and the portfolio read.
     suggested_by_sport = _stamp_suggested(candidates)
+    likelihood_by_sport = _stamp_likelihood_shadow(candidates)
 
     # THE WHOLE PRICED POPULATION, for grading without the publication filter
     # (`opportunity_population_ledger`). Every candidate, every lane, scored or not,
@@ -3384,6 +3385,7 @@ def build_layer2_rows(
         "stale_book_skipped_by_sport": dict(sorted(stale_book_skipped_by_sport.items())),
         "bettable_books": list(book_shortlist.DEFAULT_BOOKS),
         "suggested_by_sport": suggested_by_sport,
+        "likelihood_shadow_by_sport": likelihood_by_sport,
     }
 
 
@@ -3494,6 +3496,37 @@ def _stamp_suggested(rows: list[dict[str, Any]]) -> dict[str, int]:
         if row.get("suggested"):
             sport = str(row.get("sport") or "unknown").strip().lower() or "unknown"
             counts[sport] = counts.get(sport, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _stamp_likelihood_shadow(rows: list[dict[str, Any]]) -> dict[str, int]:
+    """SHADOW: stamp `likelihood` (market Shin fair + SUPPORTED matchup-signal adjustments) beside the fair.
+
+    Lane `signal-engine-nba` (2026-10-13). Read by the recorder (`lk` / `lke`) and nothing else -- the score, the
+    Suggested flag and the portfolio still read `quote.fair_probability`. One-sided `book_margin_model` fairs are
+    skipped: an adjustment on an overstated fair would compound the error.
+    """
+    from syndicate.features.shared.matchup_signals import likelihood_adjustments
+
+    counts: dict[str, int] = {}
+    for row in rows:
+        quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
+        fair = _as_float(quote.get("fair_probability"))
+        if fair is None or str(quote.get("fair_method") or "") in _SUGGESTED_ONE_SIDED_FAIRS:
+            continue
+        adjustments = likelihood_adjustments(row)
+        if not adjustments:
+            continue
+        p = min(0.99, max(0.01, fair + sum(a["delta"] for a in adjustments)))
+        row["likelihood"] = {
+            "mode": "shadow",
+            "p": round(p, 5),
+            "p_market": round(fair, 5),
+            "adjustments": adjustments,
+            "ev_pct": expected_value_pct(quote.get("price"), p),
+        }
+        sport = str(row.get("sport") or "unknown").strip().lower() or "unknown"
+        counts[sport] = counts.get(sport, 0) + 1
     return dict(sorted(counts.items()))
 
 
