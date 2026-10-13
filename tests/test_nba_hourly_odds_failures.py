@@ -207,7 +207,9 @@ class _StopAtGameCards(BaseException):
     """BaseException so the run function's `except Exception` cannot swallow it."""
 
 
-def test_game_cards_export_runs_the_vendored_package_from_a_data_root(tmp_path, monkeypatch):
+def test_game_cards_export_runs_the_syndicate_cli_from_a_data_root(tmp_path, monkeypatch):
+    """Since 2026-10-12 (lane nba-source-cli-native) export-game-cards runs Syndicate's port of the vendored CLI,
+    from this repo, with no vendored src on PYTHONPATH -- whatever source_root is (a data bundle on the fleet)."""
     mod = _load_refresh_nba()
     source_root = tmp_path / "data" / "nba_source"  # the fleet's shape: a DATA bundle, not a code checkout
     (source_root / "data" / "processed").mkdir(parents=True)
@@ -227,6 +229,6 @@ def test_game_cards_export_runs_the_vendored_package_from_a_data_root(tmp_path, 
             do_edges=False, do_export=True, do_push=False, log_file=tmp_path / "run.log",
         )
     cmd, cwd = calls[-1]
-    assert cmd[1:3] == ["-m", "nba_betting.cli"], cmd
-    assert Path(cwd) == mod._vendor_code_root("nba_betting")
-    assert Path(cwd).name == "nba_betting_repo"
+    assert cmd[1:3] == ["-m", "syndicate.features.nba.source_cli.cli"], cmd
+    assert Path(cwd) == mod.REPO_ROOT
+    assert "vendor" not in str(mod._native_cli_env().get("PYTHONPATH", "")).replace("\\", "/").split("/")
