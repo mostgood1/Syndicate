@@ -1059,7 +1059,7 @@ death, never life — do not invert it.
 - Verification: 24 h of worker logs after the change: JOB_CAP_THROTTLED share vs baseline; settlement launches within one tick of its 12:00Z/13:00Z due time and the NFL pbp fetch within one tick of 10:00Z on a day with odds jobs running; odds job concurrency unchanged (no extra parallel odds jobs)
 - Blocked by: none
 
-### layer2-score-study-suggested — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+### layer2-score-study-suggested — CLOSED 2026-10-13 (findings_2026-10-13_score_study_suggested.md written; H1 rejected, H2 not falsified, H3 supported) — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
 - **RESULT 2026-10-13: H1 REJECTED (s2 behind sc on H2-half CLV 1.08 vs 1.41); H2 NOT FALSIFIED (model-edge ordering CLV diff +0.37 [-0.54, +1.47], ROI sign flips by half); H3 SUPPORTED (no ranker's top-bottom CI excludes 0). Suggested set: ROI -2.5% [-9.4, +4.4], pregame CLV +0.95 pp, 2,030 bets / 282 games, 09-30..10-12. Findings: `findings_2026-10-13_score_study_suggested.md`.**
 - Goal: Decide, on out-of-sample recorder data 09-21..10-12, which ranking of the Suggested set (current sc, score_v2 expected growth, fee-net market EV) best orders lines by pregame CLV and by ROI; recommend the rank for the Suggested view and the portfolio cut
 - Files: .syndicate/findings_2026-10-13_score_study_suggested.md (NEW)
@@ -1068,7 +1068,7 @@ death, never life — do not invert it.
 - Verification: findings file with per-ranker top/bottom-tercile CLV + ROI, both halves, game-clustered CIs, sample sizes
 - Blocked by: none
 
-### layer2-edge-deep-dive — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+### layer2-edge-deep-dive — CLOSED 2026-10-13 (findings_2026-10-13_layer2_edge_deep_dive.md written + report artifact; ranked plan delivered) — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
 - **RESULT 2026-10-13: H1 NOT SUPPORTED; H2 NOT SUPPORTED (barely testable, Pinnacle on 356/21,426 lines); H3 MIXED (props move but are -EV at the close); H4 WEAK SUPPORT; H5 NOT SUPPORTED on game lines. Headline: the board's +EV is a multiplicative-devig artifact (Suggested pregame +1.86% vs mult close, -3.63% vs power close; 94% plus-money); live is the only positive cell. Plan: findings_2026-10-13_layer2_edge_deep_dive.md section 7.**
 - Goal: Find where Layer 2 has real, measurable edge (CLV + ROI) and what inputs/odds/timing are missing; deliver a ranked plan (internal audit + external practice) to make the board profitable
 - Files: .syndicate/findings_2026-10-13_layer2_edge_deep_dive.md (NEW)
