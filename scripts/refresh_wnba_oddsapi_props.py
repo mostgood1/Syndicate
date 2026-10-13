@@ -3795,10 +3795,6 @@ def _ensure_rotation_inputs_for_props_refresh(
     marker_path = processed_root / f"_rotation_inputs_{date_str}.json"
     if _path_has_meaningful_content(marker_path):
         return
-    try:
-        yesterday = (dt.date.fromisoformat(str(date_str)) - dt.timedelta(days=1)).isoformat()
-    except Exception:
-        return
     results: dict[str, int] = {}
     steps = (
         # `update-rotations-espn-history` (the VENDORED stints builder) was removed 2026-10-09, lane
@@ -3806,9 +3802,10 @@ def _ensure_rotation_inputs_for_props_refresh(
         # play_context_history now come from scripts/build_basketball_rotation_stints.py (scheduled
         # `basketball-rotation-stints`, 11:45Z). The vendored step appended its own, differently keyed
         # stints for yesterday into the parquet the sim reads first -- duplicating that day's minutes.
-        (["update-pbp-espn-history", "--date", yesterday], 10 * 60),
+        # update-pbp-espn-history and build-lineup-teammate-effects were removed 2026-10-13 (lane nba-source-cli-native):
+        # lineup teammate effects were RETIRED (user decision 2026-10-13, lane basketball-pregame-teammate-effects;
+        # bf5718d3 deleted their only reader, connected_game.py) and nothing else on main reads their outputs.
         (["write-pregame-expected-minutes", "--date", date_str], 5 * 60),
-        (["build-lineup-teammate-effects"], 10 * 60),
     )
     for command_parts, timeout_s in steps:
         rc = _run_source_subprocess_cli_command(

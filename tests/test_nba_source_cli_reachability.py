@@ -3,7 +3,7 @@
 Static and cheap:
   * the package is exactly what scripts/port_nba_source_cli.py generates (a hand edit fails here), models included;
   * nothing in it imports the vendored package (`nba_betting`) or `vendor`;
-  * its CLI registers exactly the eight commands the refresh runs, and its models dir resolves to the Syndicate copy;
+  * its CLI registers exactly the six commands the refresh runs, and its models dir resolves to the Syndicate copy;
   * the refresh launches `python -m syndicate.features.nba.source_cli.cli` for every bootstrap step and predict-date.
 """
 from __future__ import annotations
@@ -17,8 +17,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 PKG = ROOT / "syndicate" / "features" / "nba" / "source_cli"
-COMMANDS = {"fetch-schedule", "fetch", "build-features", "fetch-injuries", "update-pbp-espn-history",
-            "build-lineup-teammate-effects", "export-game-cards", "predict-date"}
+COMMANDS = {"fetch-schedule", "fetch", "build-features", "fetch-injuries", "export-game-cards", "predict-date"}
 
 
 def test_package_matches_generator():
@@ -38,7 +37,7 @@ def test_port_imports_nothing_vendored():
     assert not bad, bad
 
 
-def test_cli_registers_the_eight_commands_and_uses_syndicate_models():
+def test_cli_registers_the_six_commands_and_uses_syndicate_models():
     from syndicate.features.nba.source_cli import cli, config
 
     assert set(cli.cli.commands) == COMMANDS

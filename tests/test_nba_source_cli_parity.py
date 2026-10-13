@@ -1,6 +1,6 @@
 """NBA source CLI parity, the in-repo half (lane nba-source-cli-native, 2026-10-12).
 
-The gate of record is scripts/nba_source_cli_parity.py on the fleet: the whole eight-command bootstrap recorded through
+The gate of record is scripts/nba_source_cli_parity.py on the fleet: the whole bootstrap (eight commands at the time, 2026-10-13) recorded through
 the vendored CLI against the real network and replayed through the port, every written file compared (deploys.md).
 A recording reads the whole data root, so the suite keeps a smaller real-data check instead: `build-features` --
 the bootstrap step that turns the games history into the model features -- run through the vendored CLI and through

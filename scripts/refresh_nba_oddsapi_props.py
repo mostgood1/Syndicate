@@ -2451,60 +2451,6 @@ def _run_source_subprocess_cli_command(
     return _run_native_cli_command(list(command_parts), log_file=log_file, heartbeat_cb=heartbeat_cb, timeout_s=timeout_s)
 
 
-def _ensure_rotation_inputs_for_props_refresh(
-    *,
-    source_root: Path,
-    package_name: str,
-    date_str: str,
-    log_file: Path,
-    heartbeat_cb: callable | None,
-) -> None:
-    """Build the rotation/lineup artifacts the smart sim silently degrades without.
-
-    Mirrors refresh_wnba_oddsapi_props.py (minus write-pregame-expected-minutes,
-    which only the WNBA fork's CLI provides). All steps are non-fatal and
-    once-per-date via a marker file.
-    """
-    processed_root = source_root / "data" / "processed"
-    marker_path = processed_root / f"_rotation_inputs_{date_str}.json"
-    if _path_has_meaningful_content(marker_path):
-        return
-    try:
-        yesterday = (dt.date.fromisoformat(str(date_str)) - dt.timedelta(days=1)).isoformat()
-    except Exception:
-        return
-    results: dict[str, int] = {}
-    steps = (
-        # `update-rotations-espn-history` (the VENDORED stints builder) was removed 2026-10-09, lane
-        # `basketball-native-live-state`: rotation_stints_history / pair_minutes_history /
-        # play_context_history now come from scripts/build_basketball_rotation_stints.py (scheduled
-        # `basketball-rotation-stints`, 11:45Z). The vendored step appended its own, differently keyed
-        # stints for yesterday into the parquet the sim reads first -- duplicating that day's minutes.
-        (["update-pbp-espn-history", "--date", yesterday], 10 * 60),
-        (["build-lineup-teammate-effects"], 10 * 60),
-    )
-    for command_parts, timeout_s in steps:
-        rc = _run_source_subprocess_cli_command(
-            source_root=source_root,
-            package_name=package_name,
-            command_parts=list(command_parts),
-            log_file=log_file,
-            heartbeat_cb=heartbeat_cb,
-            timeout_s=timeout_s,
-        )
-        results[command_parts[0]] = int(rc)
-        if int(rc) != 0:
-            _append_log(log_file, f"rotation input step {command_parts[0]} failed with exit code {int(rc)}; continuing")
-    try:
-        marker_path.parent.mkdir(parents=True, exist_ok=True)
-        marker_path.write_text(
-            json.dumps({"date": date_str, "built_at": dt.datetime.utcnow().isoformat(), "results": results}),
-            encoding="utf-8",
-        )
-    except Exception:
-        pass
-
-
 def _ensure_source_game_inputs(
     *,
     source_root: Path,
@@ -2608,13 +2554,10 @@ def _ensure_source_game_inputs(
     if int(rc_injuries) != 0:
         _append_log(log_file, f"fetch-injuries failed with exit code {int(rc_injuries)}; continuing without fresh injury data")
 
-    _ensure_rotation_inputs_for_props_refresh(
-        source_root=source_root,
-        package_name=package_name,
-        date_str=date_str,
-        log_file=log_file,
-        heartbeat_cb=heartbeat_cb,
-    )
+    # `_ensure_rotation_inputs_for_props_refresh` (update-pbp-espn-history + build-lineup-teammate-effects) was
+    # removed 2026-10-13 (lane nba-source-cli-native): lineup teammate effects were RETIRED (user decision
+    # 2026-10-13, lane basketball-pregame-teammate-effects, bf5718d3 deleted their only reader, connected_game.py)
+    # and nothing else on main reads lineup_teammate_effects / lineup_player_baselines / pbp_espn_history.
 
     game_cards_path = processed_root / f"game_cards_{date_str}.csv"
     if not game_cards_path.exists() or not game_cards_path.is_file() or _count_csv_rows_quick(game_cards_path) <= 0:

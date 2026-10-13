@@ -31,7 +31,6 @@ import os
 import sys
 import time as _time_mod
 from contextlib import redirect_stdout
-from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -45,14 +44,12 @@ VENDOR_REPO = ROOT / "vendor" / "nba_betting_repo"
 
 
 def bootstrap_steps(date_str: str) -> list[list[str]]:
-    yesterday = (date.fromisoformat(date_str) - timedelta(days=1)).isoformat()
+    # update-pbp-espn-history / build-lineup-teammate-effects left the bootstrap 2026-10-13 (lineup effects retired).
     return [
         ["fetch-schedule"],
         ["fetch", "--years", "1"],
         ["build-features"],
         ["fetch-injuries", "--date", date_str],
-        ["update-pbp-espn-history", "--date", yesterday],
-        ["build-lineup-teammate-effects"],
         ["export-game-cards", "--date", date_str],
         ["predict-date", "--date", date_str],
     ]

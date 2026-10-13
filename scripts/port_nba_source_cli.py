@@ -43,15 +43,14 @@ PKG_NAME = "nba_betting"
 PKG = ROOT / "vendor" / "nba_betting_repo" / "src" / PKG_NAME
 OUT = ROOT / "syndicate" / "features" / "nba" / "source_cli"
 
-#: The commands the props refresh runs (`_ensure_source_game_inputs`, `_ensure_rotation_inputs_for_props_refresh`,
-#: `_run_source_predict_date`, and the full export's export-game-cards).
+#: The commands the props refresh runs (`_ensure_source_game_inputs`, `_run_source_predict_date`, and the full export's
+#: export-game-cards). update-pbp-espn-history and build-lineup-teammate-effects were dropped 2026-10-13: lineup
+#: teammate effects were retired (user decision; bf5718d3 removed their only reader) and the refreshes no longer run them.
 COMMANDS = {
     "fetch-schedule": "fetch_schedule_cmd",
     "fetch": "fetch",
     "build-features": "build_features_cmd",
     "fetch-injuries": "fetch_injuries",
-    "update-pbp-espn-history": "update_pbp_espn_history_cmd",
-    "build-lineup-teammate-effects": "build_lineup_teammate_effects_cmd",
     "export-game-cards": "export_game_cards_cmd",
     "predict-date": "predict_date_cmd",
 }
