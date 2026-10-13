@@ -110,3 +110,14 @@ Oct-Jan). H7's bar is a FULL-season ROI CI above 0, which its own selection seas
 expected to fail even if 2025-26 repeats exactly; it tests "the effect is now season-long", not "the effect repeats".
 H7 is NOT amended here. A late-season variant, if wanted, must be registered as its own hypothesis before 2027-02-01's
 first outcome, with a multiplicity correction across the two.
+
+## H7-late registered (2026-10-13 23:11Z, user decision) -- and what the family rule would have said in-sample
+
+H7-late = the H7 bet on games 2027-02-01..2027-04-11 only. Adding it made {H7, H7-late} one family, so H7's single-test
+bar was REPLACED (before any 2026-27 outcome) by Holm at family-wise one-sided alpha 0.025 on bootstrap p-values
+(B 2000, seed 20261013) -- this supersedes "H7 is NOT amended" above. Read once, at the final read 2027-04-11.
+
+The same rule on 2025-26 (in-sample, the selection season): H7 p 0.925 (ROI -1.29%), H7-late p 0.030 (ROI +2.76%
+[-0.08, +5.46], 7,801 bets / 471 games). Neither passes; H7-late would fail even alone at 0.025. If the true late-season
+ROI equals that in-sample estimate (likely an overstatement), the chance of passing is ~0.4. The residual (secondary)
+is the far more sensitive measure -- in-sample late +3.14% [+1.65, +4.56] -- but money is the ROI, so ROI stays the bar.

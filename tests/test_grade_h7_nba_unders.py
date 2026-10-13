@@ -164,3 +164,35 @@ def test_cli_writes_the_report(tmp_path) -> None:
     assert g.main(["--data-root", str(tmp_path), "--through", "2026-11-04", "--out", str(out)]) == 0
     assert json.loads(out.read_text(encoding="utf-8"))["counts"]["graded"] == 3
     assert g.main(["--data-root", "", "--out", str(out)]) == 2
+
+
+def test_holm_family_rule_is_step_down_and_missing_p_never_passes() -> None:
+    g = _load()
+    assert g.holm({"H7": 0.010, "H7_late": 0.020}) == {"H7": True, "H7_late": True}
+    assert g.holm({"H7": 0.020, "H7_late": 0.010}) == {"H7": True, "H7_late": True}
+    assert g.holm({"H7": 0.900, "H7_late": 0.012}) == {"H7": False, "H7_late": True}
+    assert g.holm({"H7": 0.900, "H7_late": 0.013}) == {"H7": False, "H7_late": False}  # alone, 0.013 < 0.025 would pass
+    assert g.holm({"H7": 0.001, "H7_late": None}) == {"H7": True, "H7_late": False}
+
+
+def test_roi_p_value_is_the_bootstrap_share_at_or_below_zero() -> None:
+    g = _load()
+    wins = [{"game": f"g{i}", "pnl": 1.0} for i in range(10)]
+    assert g.roi(wins, B=200)["p_one_sided"] == round(1 / 201, 5)   # no resample can reach ROI <= 0
+    losses = [{"game": f"g{i}", "pnl": -1.0} for i in range(10)]
+    assert g.roi(losses, B=200)["p_one_sided"] == 1.0
+    assert g.roi(wins[:4], B=200)["p_one_sided"] is None            # < 5 games: no bootstrap, no p
+
+
+def test_h7_late_grades_only_games_on_or_after_its_start(tmp_path, monkeypatch) -> None:
+    g = _load()
+    _fixture(tmp_path)
+    monkeypatch.setattr(g, "LATE_START", "2026-11-03")
+    rep = g.grade(tmp_path, "2026-11-04")
+    late = rep["h7_late"]
+    assert late["primary_roi_best_us_price"]["n"] == 1 and late["primary_roi_best_us_price"]["roi_pct"] == -100.0
+    assert rep["primary_roi_best_us_price"]["n"] == 3                 # H7 keeps the whole season
+    assert late["verdict"].startswith("INTERIM") and "supported" not in rep["family"]
+    final = g.grade(tmp_path, "2027-06-30")
+    assert final["family"]["supported"] == {"H7": False, "H7_late": False}
+    assert final["h7_late"]["verdict"] == "NOT SUPPORTED"

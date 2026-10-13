@@ -11,8 +11,15 @@ THE BET (per game date, regular season from the 2026-10-20 opener):
   4. Player prior-10 mean MIN >= 30, from the as-of signal table for that date (`nba_source/signals/<season>/`).
   5. Bet the UNDER at the BEST price among US sportsbooks quoting that main line two-sided.
   6. Outcome from the season's player game log (regular season); DNP / missing -> void; push -> void.
-PRIMARY: flat 1-unit ROI at that price, 95% CI bootstrapped over games. SECONDARY: residual vs the median per-book Shin
-fair. BAR: ROI CI above 0 at the FINAL read (through 2027-04-11). Any read before that is INTERIM: reported, no verdict.
+PRIMARY: flat 1-unit ROI at that price, bootstrapped over games. SECONDARY: residual vs the median per-book Shin fair.
+
+H7-LATE (lane block "H7-LATE PRE-REGISTERED", 2026-10-13, before any 2026-27 outcome): the identical bet restricted to
+games dated 2027-02-01..2027-04-11 -- in 2025-26 the effect lived only in Feb-Apr.
+
+BAR (the family rule, which replaced H7's single-test "95% CI above 0" when H7-late was added): each hypothesis's
+one-sided p = (#{game-clustered bootstrap ROI <= 0} + 1) / (B + 1), B = 2000, seed 20261013; Holm at family-wise
+one-sided alpha 0.025 -- the smaller p must be <= 0.0125, the other <= 0.025. Read ONCE, at the FINAL read (through
+2027-04-11). Any read before that is INTERIM: reported, no verdict, no stopping.
 
 Consequences of the registration, not choices made here: the tier is the as-of table's `min_prior10`, the mean of UP TO
 the last 10 games of THIS season's log -- so opening night grades nothing (no prior game) and the first weeks rest on
@@ -53,6 +60,10 @@ FINAL_READ = "2027-04-11"
 MARKETS = ("player_threes", "player_rebounds", "player_rebounds_assists", "player_assists")
 MIN_PRIOR10 = 30.0
 SNAPSHOT_LEAD = timedelta(minutes=45)
+LATE_START = "2027-02-01"   # H7-late: the same bet on games 2027-02-01..FINAL_READ (registered 2026-10-13)
+FAMILY_ALPHA = 0.025        # Holm over {H7, H7-late}, family-wise one-sided -- read ONCE, at the final read
+BOOTSTRAP_B = 2000
+BOOTSTRAP_SEED = 20261013
 US_BOOKS = frozenset({
     "draftkings", "fanduel", "betmgm", "williamhill_us", "betrivers", "fanatics", "espnbet", "hardrockbet", "ballybet",
     "betparx", "fliff", "bovada", "betonlineag", "mybookieag", "betus", "lowvig",
@@ -195,9 +206,10 @@ def load_outcomes(path: Path) -> dict[tuple[str, str], dict[str, float]]:
     return out
 
 
-def roi(rows: list[Mapping[str, Any]], B: int = 1000, seed: int = 20261013) -> dict[str, Any]:
+def roi(rows: list[Mapping[str, Any]], B: int = BOOTSTRAP_B, seed: int = BOOTSTRAP_SEED) -> dict[str, Any]:
+    """Flat-stake ROI with a game-clustered bootstrap: 95% CI and the one-sided p = (#{boot ROI <= 0} + 1) / (B + 1)."""
     if not rows:
-        return {"n": 0}
+        return {"n": 0, "p_one_sided": None}
     groups: dict[str, list] = defaultdict(list)
     for r in rows:
         groups[r["game"]].append(r)
@@ -210,7 +222,20 @@ def roi(rows: list[Mapping[str, Any]], B: int = 1000, seed: int = 20261013) -> d
             boots.append(100 * sum(r["pnl"] for r in sample) / len(sample))
         boots.sort()
     return {"n": len(rows), "games": len(keys), "roi_pct": round(100 * sum(r["pnl"] for r in rows) / len(rows), 2),
-            "ci95": [round(boots[int(0.025 * B)], 2), round(boots[int(0.975 * B) - 1], 2)] if boots else None}
+            "ci95": [round(boots[int(0.025 * B)], 2), round(boots[int(0.975 * B) - 1], 2)] if boots else None,
+            "p_one_sided": round((sum(1 for b in boots if b <= 0) + 1) / (B + 1), 5) if boots else None}
+
+
+def holm(pvals: Mapping[str, float | None], alpha: float = FAMILY_ALPHA) -> dict[str, bool]:
+    """Holm step-down at family-wise one-sided `alpha`; a missing p (too few games) counts as 1.0 -- never supported."""
+    ordered = sorted(pvals, key=lambda k: 1.0 if pvals[k] is None else pvals[k])
+    out = {k: False for k in pvals}
+    for i, k in enumerate(ordered):
+        p = 1.0 if pvals[k] is None else pvals[k]
+        if p > alpha / (len(ordered) - i):
+            break
+        out[k] = True
+    return out
 
 
 def tiers_for(data_root: Path, day: str, espn: tuple[list, dict] | None, counts: dict[str, int]) -> dict[str, Any]:
@@ -270,17 +295,28 @@ def grade(data_root: Path, through: str) -> dict[str, Any]:
                          "point": line["point"], "price": line["best_us_under"], "y": y, "p": 1.0 - line["p_over"], "pnl": pnl})
             counts["graded"] += 1
     final = through >= FINAL_READ
-    primary = roi(bets)
-    verdict = ("INTERIM (no verdict before the final read)" if not final
-               else ("SUPPORTED" if primary.get("ci95") and primary["ci95"][0] > 0 else "NOT SUPPORTED"))
+    late = [b for b in bets if b["date"] >= LATE_START]
+    primary, primary_late = roi(bets), roi(late)
+    family = {"method": "holm", "alpha_one_sided": FAMILY_ALPHA,
+              "p_one_sided": {"H7": primary["p_one_sided"], "H7_late": primary_late["p_one_sided"]}}
+    if final:
+        family["supported"] = holm(family["p_one_sided"])
+    interim = "INTERIM (no verdict before the final read)"
+    verdict_of = lambda name: interim if not final else ("SUPPORTED" if family["supported"][name] else "NOT SUPPORTED")  # noqa: E731
     return {
-        "season": SEASON, "through": through, "final_read": final, "verdict": verdict,
+        "season": SEASON, "through": through, "final_read": final, "verdict": verdict_of("H7"),
         "primary_roi_best_us_price": primary,
         "secondary_residual_vs_shin": residual_stats(bets) if bets else {"n": 0},
         "by_market": {m: roi([b for b in bets if b["market"] == m], B=400) for m in MARKETS},
+        "h7_late": {"verdict": verdict_of("H7_late"), "window": [LATE_START, FINAL_READ],
+                    "primary_roi_best_us_price": primary_late,
+                    "secondary_residual_vs_shin": residual_stats(late) if late else {"n": 0},
+                    "by_market": {m: roi([b for b in late if b["market"] == m], B=400) for m in MARKETS}},
+        "family": family,
         "counts": dict(counts), "price_sources_by_date": dict(sources),
         "registration": {"markets": MARKETS, "min_prior10": MIN_PRIOR10, "snapshot_lead_min": 45,
-                         "us_books": sorted(US_BOOKS), "opener": OPENER, "final_read": FINAL_READ},
+                         "us_books": sorted(US_BOOKS), "opener": OPENER, "late_start": LATE_START,
+                         "final_read": FINAL_READ, "bootstrap_b": BOOTSTRAP_B, "bootstrap_seed": BOOTSTRAP_SEED},
     }
 
 
@@ -296,9 +332,11 @@ def main(argv: list[str] | None = None) -> int:
     through = args.through or (datetime.now(timezone.utc) - timedelta(hours=5) - timedelta(days=1)).date().isoformat()
     report = grade(Path(os.path.expanduser(args.data_root)), through)
     Path(args.out).write_text(json.dumps(report, indent=1), encoding="utf-8")
-    p = report["primary_roi_best_us_price"]
-    print(f"H7 {report['verdict']} through={report['through']} n={p.get('n')} games={p.get('games')} "
-          f"ROI={p.get('roi_pct')} ci={p.get('ci95')} counts={report['counts']} sources={report['price_sources_by_date']}", flush=True)
+    for name, block in (("H7", report), ("H7-late", report["h7_late"])):
+        p = block["primary_roi_best_us_price"]
+        print(f"{name} {block['verdict']} through={report['through']} n={p.get('n')} games={p.get('games')} "
+              f"ROI={p.get('roi_pct')} ci={p.get('ci95')} p={p.get('p_one_sided')}", flush=True)
+    print(f"counts={report['counts']} sources={report['price_sources_by_date']}", flush=True)
     return 0
 
 
