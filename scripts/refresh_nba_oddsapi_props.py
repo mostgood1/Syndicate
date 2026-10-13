@@ -39,7 +39,6 @@ from syndicate.features.shared.timezone import central_date_from_iso
 from syndicate.features.shared.atomic_artifact_write import atomic_write_csv
 
 
-
 def _json_ready(value):
     if isinstance(value, Path):
         return str(value)
@@ -635,18 +634,6 @@ def _source_worker_env(source_root: Path) -> dict[str, str]:
     return env
 
 
-def _vendor_code_root(package_name: str) -> Path:
-    # The hosted "source_root" for a sport (e.g. SYNDICATE_NBA_SOURCE_ROOT on
-    # Render) is a persistent *data* disk, not a code checkout -- the vendored
-    # nba_betting/wnba_betting package only ever lives in this repo's own
-    # vendor/<package>_repo checkout, so subprocess invocations of it must use
-    # this root for cwd/PYTHONPATH regardless of where source_root resolves.
-    override = str(os.environ.get(f"SYNDICATE_VENDOR_ROOT_{package_name.upper()}") or "").strip()
-    if override:
-        return Path(override).expanduser().resolve()
-    return REPO_ROOT / "vendor" / f"{package_name}_repo"
-
-
 def _games_history_max_date(path: Path) -> str | None:
     try:
         if not path.exists() or not path.is_file() or path.stat().st_size <= 0:
@@ -746,22 +733,31 @@ def _csv_has_column(path: Path, column: str) -> bool:
         return False
 
 
+NBA_GAMES_HISTORY_SEED = REPO_ROOT / "syndicate" / "features" / "nba" / "seed_data" / "games_nba_api.csv"
+
+
 def _seed_games_history_from_checkout_if_fresher(
     *, raw_path: Path, package_name: str, date_str: str, feature_candidates: tuple[Path, ...], log_file: Path
 ) -> bool:
-    """Heal a missing/stale raw games history from the vendored checkout copy.
+    """Heal a missing/stale raw games history from a committed seed copy.
 
-    Mirrors refresh_wnba_oddsapi_props.py: the checkout ships a committed
-    full-history games_nba_api.csv, a reliable offline fallback when the
-    network fetch fails or returns a partial file (a --years 10 fetch on a
-    cold/stale start can exceed the pipeline's subprocess timeout -- see
-    _games_history_fetch_years_needed). Only overwrites when the checkout's
-    newest game date is strictly fresher, and invalidates derived features
-    files so they rebuild from the new data.
+    Mirrors refresh_wnba_oddsapi_props.py: a committed full-history games_nba_api.csv
+    is a reliable offline fallback when the network fetch fails or returns a partial
+    file (a --years 10 fetch on a cold/stale start can exceed the pipeline's
+    subprocess timeout -- see _games_history_fetch_years_needed). Only overwrites
+    when the seed's newest game date is strictly fresher, and invalidates derived
+    features files so they rebuild from the new data.
+
+    The seed is Syndicate's own since 2026-10-12 (lane nba-source-cli-native):
+    NBA_GAMES_HISTORY_SEED, a byte-identical copy of the vendored checkout's
+    data/raw/games_nba_api.csv (11,969 games, newest 2026-04-12 -- the same as the
+    fleet's history that day, so only a cold start can use it).
     """
+    if package_name != "nba_betting":
+        raise ValueError(f"the NBA refresh seeds NBA history only, got {package_name!r}")
     if not _games_history_is_stale(raw_path, date_str=date_str):
         return False
-    checkout_path = _vendor_code_root(package_name) / "data" / "raw" / "games_nba_api.csv"
+    checkout_path = NBA_GAMES_HISTORY_SEED
     checkout_max = _games_history_max_date(checkout_path)
     if not checkout_max:
         return False
@@ -776,7 +772,7 @@ def _seed_games_history_from_checkout_if_fresher(
         return False
     _append_log(
         log_file,
-        f"Seeded games history from vendored checkout: {checkout_path} -> {raw_path} "
+        f"Seeded games history from the committed seed: {checkout_path} -> {raw_path} "
         f"(checkout max date {checkout_max}, previous max date {current_max or 'none'})",
     )
     for stale_feature_path in feature_candidates:
@@ -2541,7 +2537,7 @@ def _ensure_source_game_inputs(
     # WNBA twin: a single-season stub) satisfy this forever, which fed the
     # models multi-year rest-day outliers and produced garbage predictions.
     # Fetch when the history is missing OR stale, then heal from the
-    # vendored checkout's committed copy if the fetch still left us stale.
+    # committed seed copy (NBA_GAMES_HISTORY_SEED) if the fetch still left us stale.
     #
     # NBA's fetch prefers a bulk LeagueGameLog call (one per season) and
     # only falls back to walking ESPN/ScoreboardV2 one day at a time when
@@ -2959,9 +2955,11 @@ def _ensure_game_predictions_for_props_refresh(*, source_root: Path, date_str: s
         log_file=log_file,
         heartbeat_cb=heartbeat_cb,
     )
-    code_root = _vendor_code_root("nba_betting")
+    # The vendored checkout's data/processed/predictions_<date>.csv used to be tried first. The vendored tree
+    # holds no predictions_* file (tracked or on the fleet, checked 2026-10-12), and since the bootstrap runs
+    # Syndicate's CLI against NBA_BETTING_DATA_ROOT nothing writes one there, so it was removed (lane
+    # nba-source-cli-native).
     for repo_pred_path in (
-        code_root / "data" / "processed" / f"predictions_{date_str}.csv",
         source_root / f"predictions_{date_str}.csv",
     ):
         if (not pred_path.exists() or _count_csv_rows_quick(pred_path) <= 0) and repo_pred_path.exists() and repo_pred_path.is_file():
