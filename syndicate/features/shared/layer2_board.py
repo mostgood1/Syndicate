@@ -3352,6 +3352,10 @@ def build_layer2_rows(
     # negative rows (blended_score's own reasoning).
     opportunities.sort(key=lambda item: item["score"]["score"], reverse=True)
 
+    # SUGGESTED is stamped on EVERY candidate before the population sink, so the
+    # recorder grades the flag on the same rows the board and the portfolio read.
+    suggested_by_sport = _stamp_suggested(candidates)
+
     # THE WHOLE PRICED POPULATION, for grading without the publication filter
     # (`opportunity_population_ledger`). Every candidate, every lane, scored or not,
     # AFTER scoring -- `select_shortlist` has not cut anything yet. Optional and
@@ -3375,7 +3379,118 @@ def build_layer2_rows(
         "stale_book_skipped": stale_book_skipped,
         "stale_book_skipped_by_sport": dict(sorted(stale_book_skipped_by_sport.items())),
         "bettable_books": list(book_shortlist.DEFAULT_BOOKS),
+        "suggested_by_sport": suggested_by_sport,
     }
+
+
+# ---------------------------------------------------------------- SUGGESTED
+#
+# `[2026-10-13, user decisions: "Build it, default All" and "Yes, one definition"]`,
+# lane `layer2-suggested-opps`. The board keeps serving EVERY line (PRIME DIRECTIVE,
+# `learnings.md` 2026-10-05: no market is withheld). `suggested` is a second, line-level
+# selection on top of it -- the lines the board puts forward as bets -- computed ONCE
+# here so the board's All / Suggested filter, the paper portfolio's eligibility and the
+# nightly grader read the same flag and cannot drift.
+#
+# EVERY CRITERION IS A PROPERTY OF THE LINE (price, fair, quote), never of its sport,
+# market or a model verdict. Measured on the 2026-10-10/11 weekend (published rows,
+# `findings_2026-10-13_layer2_weekend_assessment.md` §7): all published -10.0%
+# [-12.2, -8.0] on 177 games; published at market EV >= +2% +4.6% [-4.1, +14.0] (live
+# +9.9% [+1.7, +18.0], exchange-priced +9.6% [+1.2, +17.8]); one-sided
+# `book_margin_model` fairs at EV >= 2: 0 of 16 won. Model agreement added nothing
+# measurable at that sample, so it is not a criterion (it still ranks and sizes).
+# One weekend: the threshold is a setting, re-graded on the recorder's `sg` field.
+SUGGESTED_MIN_EV_PCT = 2.0
+# Fairs priced from a two-sided market (consensus de-vig, a sharp or exchange anchor).
+# `book_margin_model` is the ONE-sided fallback whose EV is a restatement of the hold
+# and whose fair was measured 8.5pp overstated (`[layer2-score-outcomes]`).
+_SUGGESTED_ONE_SIDED_FAIRS = frozenset({"book_margin_model"})
+
+
+def _suggested_min_ev_pct() -> float:
+    return _env_float("SYNDICATE_SUGGESTED_MIN_EV_PCT", SUGGESTED_MIN_EV_PCT)
+
+
+def _suggested_reasons(row: Mapping[str, Any], min_ev: float) -> list[str]:
+    """Why a line is NOT suggested; empty when it is. Each reason names a line property."""
+    reasons: list[str] = []
+    if row.get("board_lane") != opportunity_gate.LANE_OPPORTUNITY:
+        reasons.append("not_opportunity_lane")
+    ev = _as_float(row.get("ev_pct"))
+    if ev is None:
+        reasons.append("no_market_ev")
+    else:
+        if ev < min_ev:
+            reasons.append("ev_below_min")
+        implied_total = _implied_book_total_pct(ev)
+        if implied_total is not None and implied_total < _MIN_IMPLIED_BOOK_TOTAL_PCT:
+            reasons.append("implausible_book")
+    # NET OF THE VENUE'S FEE where one is charged: the same number the fee-net score
+    # ranks on (`score_v2.ev_net_pct`), so a Kalshi row cannot qualify on a gross EV
+    # it never pays out.
+    v2 = row.get("score_v2") if isinstance(row.get("score_v2"), Mapping) else {}
+    if v2 and str(v2.get("fee_basis") or "none") != "none":
+        net = _as_float(v2.get("ev_net_pct"))
+        if net is None or net < min_ev:
+            reasons.append("ev_net_of_fee_below_min")
+    quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
+    fair_method = str(quote.get("fair_method") or "").strip()
+    if not fair_method:
+        reasons.append("no_fair_method")
+    elif fair_method in _SUGGESTED_ONE_SIDED_FAIRS:
+        reasons.append("one_sided_fair")
+    if quote.get("suspect_stale"):
+        reasons.append("suspect_stale_quote")
+    return reasons
+
+
+def _suggested_line_key(row: Mapping[str, Any]) -> tuple:
+    """One betting line, both sides: a spread's `-3.5`/`+3.5` and a total's over/under share it."""
+    line = _as_float(row.get("line"))
+    return (
+        str(row.get("sport") or "").strip().lower(),
+        str(row.get("event_id") or ""),
+        str(row.get("market") or "").strip().lower(),
+        str(row.get("segment") or "full").strip().lower() or "full",
+        str(row.get("player_name") or "").strip().lower(),
+        None if line is None else abs(line),
+    )
+
+
+def _stamp_suggested(rows: list[dict[str, Any]]) -> dict[str, int]:
+    """Stamp `suggested` / `suggested_reasons` on every row; return the count per sport.
+
+    ONE SIDE PER LINE: if both sides of a line qualify (a cross-book arb), only the
+    side with the higher net EV is suggested; the other carries `other_side_suggested`.
+    A row is never removed here -- this only labels.
+    """
+    min_ev = _suggested_min_ev_pct()
+    best: dict[tuple, dict[str, Any]] = {}
+    for row in rows:
+        reasons = _suggested_reasons(row, min_ev)
+        row["suggested_reasons"] = reasons
+        row["suggested"] = not reasons
+        if row["suggested"]:
+            key = _suggested_line_key(row)
+            incumbent = best.get(key)
+            if incumbent is None:
+                best[key] = row
+                continue
+            def _net(item: Mapping[str, Any]) -> float:
+                v2 = item.get("score_v2") if isinstance(item.get("score_v2"), Mapping) else {}
+                net = _as_float(v2.get("ev_net_pct")) if v2 else None
+                return net if net is not None else (_as_float(item.get("ev_pct")) or 0.0)
+            loser = row if _net(row) <= _net(incumbent) else incumbent
+            if loser is incumbent:
+                best[key] = row
+            loser["suggested"] = False
+            loser["suggested_reasons"] = ["other_side_suggested"]
+    counts: dict[str, int] = {}
+    for row in rows:
+        if row.get("suggested"):
+            sport = str(row.get("sport") or "unknown").strip().lower() or "unknown"
+            counts[sport] = counts.get(sport, 0) + 1
+    return dict(sorted(counts.items()))
 
 
 def _score_of(row: Mapping[str, Any]) -> float:
@@ -3811,6 +3926,11 @@ def layer2_rows_to_board_cards(
                     row.get("movement") if isinstance(row.get("movement"), Mapping) else _movement_from_opening(row, openings, openings_by_line),
                 ),
                 **_live_projection_columns(row),
+                # The board's All / Suggested filter reads these (lane `layer2-suggested-opps`).
+                # Absent on a row built before the flag existed -- the filter treats that as
+                # not suggested, never as suggested.
+                "suggested": bool(row.get("suggested")),
+                "suggested_reasons": list(row.get("suggested_reasons") or []),
                 # `layer2-row-parity`: the face and the sentence the legacy rows
                 # had, built from THIS row's own numbers.
                 **row_identity(row, row_context),

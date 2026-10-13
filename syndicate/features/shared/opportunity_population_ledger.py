@@ -43,6 +43,7 @@ identity lives in `k` in `KEY_FIELDS` order; `parse_population_key` splits it ba
     ss model_skill.status   vc verdict_class   el established_loss_rel
     ln board_lane  gs game_state   la live_aware (only when true)
     s2 score_v2    n2 score_v2's fee-net EV %   fb its fee basis   bk the priced bookmaker
+    sg suggested (the board's per-line bet flag; None before 2026-10-13)
 Values are copied from the candidate, never re-derived; an absent value records null.
 
 `s2`/`n2`/`fb`/`bk` `[2026-09-21, lane layer2-score-outcome-calibration, user decision "take
@@ -209,6 +210,10 @@ def population_record(row: Mapping[str, Any], key: str, captured_at: str, *, spo
         "n2": _as_float(shadow.get("ev_net_pct")),
         "fb": shadow.get("fee_basis"),
         "bk": quote.get("bookmaker"),
+        # `suggested` (lane `layer2-suggested-opps`, 2026-10-13): the board's per-line bet
+        # flag, so the nightly grade can read Suggested against the whole priced population.
+        # None on a row built before the flag existed -- never read as False.
+        "sg": row.get("suggested") if isinstance(row.get("suggested"), bool) else None,
     }
 
 

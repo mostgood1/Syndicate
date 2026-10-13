@@ -1038,6 +1038,14 @@ death, never life — do not invert it.
 - Verification: 2026-10-20 ~12:00Z autorun: nfl:2026-10-19 pending -> settled (count + denominator); pbp_2026.csv mtime before 12:00Z and after the MNF final; no extra nflverse fetch cost beyond one morning fetch
 - Blocked by: none
 
+### layer2-suggested-opps — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: Every Layer 2 row carries a per-line suggested flag (market EV >= +2% net of venue fee, two-sided fair, plausible + fresh quote, one side per line) computed once at build; the board offers All / Suggested (default All) and the paper portfolio stakes only suggested rows, so the graded set is the shown set. No line is withheld from All.
+- Files: syndicate/features/shared/layer2_board.py (`_stamp_suggested` + its call in `build_layer2_rows` + the `suggested` card columns in `layer2_rows_to_board_cards` ONLY), syndicate/features/shared/opportunity_population_ledger.py (the `sg` record field ONLY), tests/test_layer2_suggested_opps.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit tests; on the fleet board after restart, suggested rows all have ev_pct>=2 and fair_method two-sided, count per sport logged; portfolio refusals show not_suggested; after 2 weekends grade suggested vs all on recorder sg
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
