@@ -995,6 +995,14 @@ death, never life — do not invert it.
 - Verification: Parity harness PASS on mocked + recorded-live inputs (with positive control); after deploy, the live-odds-worker's NBA live_lens_signals/projections JSONL keep being written by the port with no tick errors.
 - Blocked by: none
 
+### nba-source-cli-native — OPEN — opened 2026-10-12 — session 2d413211
+- Goal: Move the NBA props refresh's game-input bootstrap off vendor: the 8 vendored nba_betting.cli commands it runs (fetch-schedule, fetch, build-features, fetch-injuries, update-pbp-espn-history, build-lineup-teammate-effects, export-game-cards, predict-date) become a generated, verbatim Syndicate port with Syndicate-owned models, proven by per-command parity on the files they write, switched in refresh_nba_oddsapi_props.py, deployed with a measurement.
+- Files: syndicate/features/nba/source_cli/, scripts/port_nba_source_cli.py, scripts/nba_source_cli_parity.py, tests/test_nba_source_cli_parity.py, tests/test_nba_source_cli_reachability.py, tests/fixtures/nba_source_cli/, scripts/refresh_nba_oddsapi_props.py (the vendored CLI subprocess helpers + game-input bootstrap section only), docs/ai_context/basketball_live_native_plan.md (P6 vendored-uses table section only)
+- Hypothesis: The 8 commands close over ~8k lines across ~15 vendored modules plus the scrapers package and a 604K models dir; a module-mirroring closure port with only path edits (repo root -> Syndicate) reproduces every written file byte- or frame-identically.
+- Falsification test: Any written-file difference between vendored and port on the same replayed network and the same data copy, or a positive control that fails to detect a planted difference.
+- Verification: Per-command parity PASS (vendored record vs port replay, plus vendored self-replay and a planted control) on the fleet's data; after a fleet ff, the next once-per-date bootstrap runs syndicate.features.nba.source_cli (log line) with every step exit 0 and predictions_<date>.csv written.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
