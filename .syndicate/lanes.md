@@ -1077,6 +1077,14 @@ death, never life — do not invert it.
 - Verification: findings file with per-hypothesis CLV (probability points, same-book pregame closes) and ROI where graded, CIs by game, sample sizes; ranked plan
 - Blocked by: none
 
+### fair-price-v2 — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: Replace the board's fair price (median of multiplicative per-book devigs) with a measured-better one -- power (or Shin) devig, shared-feed books counted once, book weights fitted on closing accuracy -- chosen by an out-of-sample evaluator over the quote logs, run in SHADOW on the board first, flipped only when the pre-registered criterion passes
+- Files: scripts/fair_price_eval.py (NEW), tests/test_fair_price_eval.py (NEW), syndicate/features/shared/layer2_board.py (`_resolve_fair` + `_consensus_fair` + fair_v2 shadow stamping ONLY), syndicate/features/shared/opportunity_signals.py (devig helpers ONLY), syndicate/features/shared/opportunity_population_ledger.py (fair_v2 record fields ONLY)
+- Hypothesis: H1 power-devig consensus has lower log loss than multiplicative on pregame lines at sighting time, pooled over 09-30..10-12. H2 the multiplicative fair over-rates plus-money sides (calibration slope of outcome on logit(fair) > 1 / intercept negative on longshots) and power removes most of it. H3 books that share an origination feed (identical prices most of the time) double-count in the median; counting each feed once improves log loss. H4 EV >= 2 selected on the v2 fair has higher EV at the v2 close than EV >= 2 selected on today's fair.
+- Falsification test: FLIP CRITERION (pre-registered): v2 is adopted only if pooled log-loss improvement vs multiplicative has a game-clustered 95% CI excluding 0 AND v2 is not worse (point estimate) in any of the 4 sports with the most graded pregame lines; otherwise keep multiplicative and report. H3 false if dedup changes log loss by less than its CI.
+- Verification: evaluator report committed as findings; shadow fields present on served rows; after flip: EV-at-close of Suggested measured on 1 week
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
