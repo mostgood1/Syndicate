@@ -48855,3 +48855,8 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **change:** `game_chip_detail._book_grid_main` also reads the next day's grid -- SOCCER ONLY (an MLB series puts the same pair in tomorrow's file); `soccer/cards._live_state_block` stamps `codedGameState: "D"` on an unplayed match, which the chip maps to PPD.
 - **sequence:** web claim 14:38Z; `reload-web` 14:38:36Z, 40.1 s (an old worker draining), 0 healthz failures / 21 probes, max 1.1 s; released.
 - **verify (served, web-built date 2026-10-12):** PHI@CHI 'o/u 3.25', VAN@STL 'o/u 3.25', POR@LA 'o/u 3.5', ATX@LAF 'o/u 3', HOU@SD 'o/u 3'; ATH@RAY `postponed` / `PPD`. TODAY's rail is the refresh-worker's artifact and still shows the old values (footer None / pregame) until refresh-worker loads >= 3e7b2e53 -- its claim is held by `soccer-live-anytime-scorer` at 14:38Z.
+
+## 2026-10-13 14:41Z (9:41 AM CT) -- READING for the 14:38:36Z reload: TODAY's rail fixed too (lane `games-rail-full-detail`, session d4409ac4)
+- refresh-worker was restarted by lane `soccer-live-anytime-scorer` (~14:39Z, their claim) onto 3e7b2e53 -- my soccer `_live_state_block` change RODE THEIR RESTART (it was on the checkout from my 14:38Z ff).
+- Served `/api/board/game-chips?date=2026-10-13&sports=soccer` (source `worker_artifact`) 14:40:46Z: PHI@CHI 'o/u 3.25', HOU@SD 'o/u 3', ATH@RAY `postponed` / PPD.
+- 1440 screenshot of /intelligence taken (32 chips in the rail, pregame footers e.g. "CAR −159 · o/u 3"). Gap seen there: NBA IND@OKC (172 plays) and POR@SAC (168 plays) carry no start time and so no footer -- the NBA game-cards export holds 3 of today's 5 games (13:23:39Z reading, lane nba-source-cli-native).
