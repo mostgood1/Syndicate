@@ -584,22 +584,52 @@ def _remaining_match_fraction(live_state: dict[str, Any]) -> float:
 _MIN_MATCHED_ON_PITCH = 6
 
 
-def _live_lineup(rows: list[dict[str, Any]], player_stats: dict[str, Any]) -> tuple[
+def _live_stats_by_row(rows: list[dict[str, Any]], player_stats: dict[str, Any], team: str) -> dict[str, dict[str, Any]]:
+    """Each row's live stats entry, keyed by the row's `player_id`.
+
+    BY ID, THEN BY NAME WITHIN THE TEAM. `player_stats` is keyed by ESPN athlete id;
+    the season rows carry ESPN ids only where ESPN is the stats source (primeira_liga).
+    Elsewhere they are `understat_<n>` / `asa_<id>`, so an id lookup found nothing and
+    every banked shot, goal and assist read 0 -- a player who had already scored was
+    priced as if they had not (measured 2026-10-13 on 10-12 serie_a/epl/la_liga
+    summaries). Names are folded with the PREGAME starter matcher's own normaliser
+    (`lineups._norm_player_name`), and a name two roster entries share is skipped."""
+    from syndicate.features.soccer.features.lineups import _norm_player_name
+
+    by_name: dict[str, list[dict[str, Any]]] = {}
+    for entry in (player_stats or {}).values():
+        if isinstance(entry, dict) and (not team or not entry.get("team") or entry.get("team") == team):
+            by_name.setdefault(_norm_player_name(entry.get("player_name") or ""), []).append(entry)
+    out: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        pid = str(row.get("player_id"))
+        entry = (player_stats or {}).get(pid)
+        if not isinstance(entry, dict):
+            matches = by_name.get(_norm_player_name(row.get("player_name") or ""), [])
+            entry = matches[0] if len(matches) == 1 else None
+        if entry is not None:
+            out[pid] = entry
+    return out
+
+
+def _live_lineup(rows: list[dict[str, Any]], stats_by_row: dict[str, dict[str, Any]]) -> tuple[
         list[dict[str, Any]], set[str], list[dict[str, Any]], str]:
     """(rows that share the remainder, their starter set, rows that have LEFT the
     match, basis). On-pitch players are the starters; matchday-squad players not
     yet on are bench (discounted by `build_usage_profiles`); season-squad players
     outside the matchday squad, and anyone subbed off or sent off, share nothing."""
     every = {str(row.get("player_id")) for row in rows}
-    if not any(isinstance(s, dict) and "on_pitch" in s for s in (player_stats or {}).values()):
+    if not any("on_pitch" in s for s in stats_by_row.values()):
         return rows, every, [], "squad"
-    on_pitch = {pid for pid, s in player_stats.items() if isinstance(s, dict) and s.get("on_pitch")}
-    if len(on_pitch & every) < _MIN_MATCHED_ON_PITCH:
+    on_pitch = {pid for pid, s in stats_by_row.items() if s.get("on_pitch")}
+    if len(on_pitch) < _MIN_MATCHED_ON_PITCH:
         return rows, every, [], "squad"
-    left = {pid for pid, s in player_stats.items() if isinstance(s, dict) and s.get("entered") and not s.get("on_pitch")}
-    sharing = [row for row in rows if str(row.get("player_id")) in player_stats and str(row.get("player_id")) not in left]
+    left = {pid for pid, s in stats_by_row.items() if s.get("entered") and not s.get("on_pitch")}
+    sharing = [row for row in rows if str(row.get("player_id")) in stats_by_row and str(row.get("player_id")) not in left]
     gone = [row for row in rows if str(row.get("player_id")) in left]
-    return sharing, on_pitch & every, gone, "on_pitch"
+    return sharing, on_pitch, gone, "on_pitch"
+
+
 # IMPORTED, NOT RESTATED. These define what the PREGAME tier means by an
 # assist line and by "share of goals that are assisted". A second copy here
 # would let the two tiers drift into answering the same market with different
@@ -693,11 +723,13 @@ def project_live_player_props(
     ):
         if not rows:
             continue
-        sharing, starters, gone, basis = _live_lineup(rows, player_stats)
+        team_name = str(live_state.get(f"{side}_team") or "")
+        stats_by_row = _live_stats_by_row(rows, player_stats, team_name)
+        sharing, starters, gone, basis = _live_lineup(rows, stats_by_row)
         # A player who has LEFT the match keeps what is banked and adds nothing:
         # every remainder is 0, so each line reads 1.0 if already cleared, else 0.0.
         for row in gone:
-            stats = player_stats.get(str(row.get("player_id")), {}) or {}
+            stats = stats_by_row.get(str(row.get("player_id")), {})
             shots, sot = int(stats.get("shots_so_far") or 0), int(stats.get("shots_on_target_so_far") or 0)
             assists, goals = int(stats.get("assists_so_far") or 0), int(stats.get("goals_so_far") or 0)
             projections.append(LivePlayerPropProjection(
@@ -715,7 +747,7 @@ def project_live_player_props(
             continue
         usage_profiles = build_usage_profiles(sharing, side=side, starters=starters)
         for profile_row in usage_profiles:
-            stats = player_stats.get(profile_row.player_id, {}) or {}
+            stats = stats_by_row.get(str(profile_row.player_id), {})
             already = int(stats.get("shots_so_far") or 0)
             remainder = team_remainder * profile_row.shot_share
             final_mean = already + remainder

@@ -226,8 +226,27 @@ def build_live_state(
             "goals_so_far": 0,
             "assists_so_far": 0,
         }
+    # SHOTS CARRY A NAME, NOT AN ID. Measured 2026-10-13 on 10-12 summaries (serie_a, epl,
+    # la_liga, primeira_liga): 134 of 134 commentary shot events had `player_id == ""`, so
+    # an id lookup credited nobody and every live player read 0 shots, 0 goals, 0
+    # assists -- a scorer was priced as if they had not scored, a player on 3 shots as
+    # if on 0. Fall back to the name within the shot's team, folded with the pregame
+    # starter matcher's normaliser; a name two roster entries share is not credited.
+    from syndicate.features.soccer.features.lineups import _norm_player_name
+
+    by_name: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for entry in player_stats.values():
+        by_name.setdefault((str(entry.get("team") or ""), _norm_player_name(entry.get("player_name") or "")), []).append(entry)
+
+    def _credit(player_id: str, player_name: Any, team: Any) -> dict[str, Any] | None:
+        entry = player_stats.get(str(player_id or ""))
+        if entry is not None or not player_name:
+            return entry
+        matches = by_name.get((str(team or ""), _norm_player_name(player_name)), [])
+        return matches[0] if len(matches) == 1 else None
+
     for shot in shot_events:
-        entry = player_stats.get(shot["player_id"])
+        entry = _credit(shot["player_id"], shot.get("player_name"), shot.get("team"))
         if entry is None:
             continue
         entry["shots_so_far"] += 1
@@ -235,7 +254,7 @@ def build_live_state(
             entry["shots_on_target_so_far"] += 1
         if shot["outcome"] == "goal":
             entry["goals_so_far"] += 1
-        assist_entry = player_stats.get(shot["assist_player_id"])
+        assist_entry = _credit(shot["assist_player_id"], shot.get("assist_player_name"), shot.get("team"))
         if shot["outcome"] == "goal" and assist_entry is not None:
             assist_entry["assists_so_far"] += 1
 

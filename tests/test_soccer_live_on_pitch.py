@@ -88,9 +88,9 @@ def test_off_is_not_on_without_the_roster_flags_the_whole_squad_shares():
     assert "99" in props
 
 
-def test_too_few_matched_ids_falls_back_to_the_squad():
+def test_too_few_matched_players_falls_back_to_the_squad():
     state = build_live_state(_summary(), event_id="e1", as_of_seconds=4000.0)
-    rows = [dict(r, player_id="x" + r["player_id"]) for r in _rows()]
+    rows = [dict(r, player_id="x" + r["player_id"], player_name="Unknown " + r["player_id"]) for r in _rows()]
     props = LL.project_live_player_props(state, home_rating=_NEUTRAL, away_rating=_NEUTRAL,
                                          home_player_rows=rows, away_player_rows=[], simulations=20, seed=3)
     assert props and {p.lineup_basis for p in props} == {"squad"}
@@ -107,3 +107,39 @@ def test_publisher_keeps_every_lineup_row_and_caps_only_squad_fallback_rows():
     ids = {r["player_id"] for r in published}
     assert {f"l{i}" for i in range(20)} <= ids
     assert len(ids - {f"l{i}" for i in range(20)}) == poller._SQUAD_FALLBACK_PROP_ROWS
+
+
+def test_understat_ids_resolve_to_espn_stats_by_name_so_a_banked_goal_counts():
+    """Most leagues' rows carry `understat_<n>` / `asa_<id>` ids, never ESPN's. Without
+    the name bridge the stats lookup missed, the scorer read goals_so_far 0, and no
+    lineup was found (squad fallback)."""
+    state = build_live_state(_summary(), event_id="e1", as_of_seconds=4000.0)
+    state["player_stats"]["5"]["goals_so_far"] = 1
+    rows = [dict(r, player_id="understat_" + r["player_id"]) for r in _rows()]
+    props = {p.player_id: p for p in LL.project_live_player_props(
+        state, home_rating=_NEUTRAL, away_rating=_NEUTRAL, home_player_rows=rows, away_player_rows=[],
+        simulations=20, seed=3)}
+    assert props["understat_5"].goals_so_far == 1
+    assert props["understat_5"].goals_over_probabilities["0.5"] == 1.0
+    assert props["understat_5"].lineup_basis == "on_pitch"
+    assert props["understat_1"].on_pitch is False          # subbed off, found by name
+    assert "understat_99" not in props
+
+
+def test_an_ambiguous_name_is_not_bridged():
+    stats = {"a": {"player_name": "Joao Silva", "team": "T"}, "b": {"player_name": "João Silva", "team": "T"}}
+    assert LL._live_stats_by_row([{"player_id": "understat_1", "player_name": "Joao Silva"}], stats, "T") == {}
+
+
+def test_a_shot_with_no_athlete_id_is_credited_by_name_within_its_team():
+    """ESPN commentary shot events carried `player_id == ""` on 134 of 134 shots
+    (10-12, four leagues), so every live player read 0 shots and 0 goals."""
+    summary = _summary()
+    summary["commentary"] = [{"play": {
+        "type": {"text": "Goal", "type": "goal"}, "period": {"number": 1}, "clock": {"value": 1200.0},
+        "team": {"displayName": "Home FC"},
+        "participants": [{"athlete": {"displayName": "Home 5"}}, {"athlete": {"displayName": "Home 6"}}],
+        "text": "Goal! Home 5 shot from the centre of the box. Assisted by Home 6."}}]
+    stats = build_live_state(summary, event_id="e1", as_of_seconds=4000.0)["player_stats"]
+    assert stats["5"]["shots_so_far"] == 1 and stats["5"]["goals_so_far"] == 1
+    assert stats["6"]["assists_so_far"] == 1
