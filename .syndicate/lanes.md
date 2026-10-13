@@ -1096,6 +1096,14 @@ death, never life — do not invert it.
 - Verification: collector change-logs grow on the fleet disk across >= 3 polls with capture timestamps; OddsAPI quota identical before/after; backfill manifest sha256 matches source for every file
 - Blocked by: none
 
+### signal-engine-nba — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: Shared matchup-signal engine (registry + dated as-of signal tables + lift harness) and the first NBA signals (minutes/role, rest/B2B, blowout risk), lift-tested on the 2025-26 backfill against the Shin market fair, ready to compute forward from the 10-20 opener
+- Files: syndicate/features/shared/matchup_signals.py (NEW), scripts/build_nba_signals.py (NEW), scripts/signal_lift.py (NEW), tests/test_matchup_signals.py (NEW)
+- Hypothesis: PRE-REGISTERED (2026-10-13, before any outcome is read). Population: 2025-26 NBA REGULAR SEASON prop lines (asof props_odds_hist, one snapshot ~45 min pre-tip), markets points / rebounds / assists / threes / PRA / PR / PA / RA, two-sided per book, Shin fair = median per-book Shin de-vig, integer-line pushes dropped; outcome from stats.nba game logs. Residual = y(side) - p_shin(side). Signals computed as-of (games strictly before the game date). H1 minutes_trend_up: last-3 avg MIN minus the prior-10 avg >= +4.0 -> OVER residual > 0. H2 minutes_trend_down: <= -4.0 -> UNDER residual > 0. H3 start_promotion: started the previous game AND started <= 3 of the 10 before it -> OVER residual > 0. H4 b2b: player's team on the 2nd night of a back-to-back, player prior-10 avg MIN >= 28 -> UNDER residual > 0. H5 blowout_risk: pregame consensus |spread| >= 10 and player prior-10 avg MIN >= 30 -> UNDER residual > 0.
+- Falsification test: A hypothesis is SUPPORTED only if the mean residual's game-clustered 95% CI is above 0 in the CONFIRM window (2026-02-01..2026-04-12) AND its point estimate is > 0 in the DISCOVER window (2025-10-21..2026-01-31); otherwise NOT SUPPORTED. Hit-rate lift vs the signal-off baseline reported beside it (does it predict at all) -- a signal can predict and still be priced.
+- Verification: signal tables written under <data root>/nba_source/signals/; scripts/signal_lift.py report committed as findings with n, games, residual + CI per hypothesis per window
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
