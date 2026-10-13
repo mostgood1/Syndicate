@@ -283,10 +283,42 @@ baseline at every second-half checkpoint.
   minutes alone. The bonus mechanism with late-game fouling is the next candidate, measured against
   this arm.
 
+### Late-game arms on top of half split + exact: measured 2026-10-13
+
+`SYNDICATE_NCAAB_LIVE_MECHANISMS`, the same 608 games and seeds, paired against half+exact. Reports:
+`C:	mp\syndicate-data
+caab_bt_e1.json`, `ncaab_bt_e2.json`.
+- E1 = P3's end-game intentional fouling, set from NCAAB's own measurement:
+  `{"endgame_foul_window_s": 120, "endgame_foul_max_deficit": 10, "endgame_foul_p_by_deficit": [0.25, 0.5, 0.6], "endgame_extend_possessions": true}`.
+- E2 = E1 + bonus free throws (`bonus_nonshoot_foul_per_poss` 0.08, `bonus_second_half_mult` 1.5).
+
+abs total error, arm minus half+exact, 95% CI (negative = better):
+
+| arm, phase | tip | half | H2 10:00 | H2 5:00 | H2 2:00 |
+|---|---|---|---|---|---|
+| E1, regular | -0.07 | -0.04 | -0.12 | **-0.25** | **-0.73** |
+| E1, tournaments | **+0.21** | +0.11 | **-0.13** | **-0.40** | **-0.72** |
+| E2, regular | +0.13 | +0.05 | -0.09 | **-0.48** | **-0.76** |
+| E2, tournaments | **+0.68** | **+0.36** | -0.16 | **-0.51** | **-0.82** |
+
+- **E1, regular:** late bias -4.39 -> -2.98 at 2:00. No checkpoint worse. Tip margin better (-0.26).
+- **E1, tournaments:** small costs: tip total +0.21; halftime and 5:00 margin +0.08..+0.12; 5:00 Brier +0.007.
+- **E1 vs naive:** E1 beats the naive baseline by 0.6-1.0 at every second-half checkpoint.
+- **E2:** pushes early totals back up (tournament tip bias +6.2) and worsens regular-season margin at H2 10:00 / 5:00 (+0.23 / +0.15). Its late gain is only marginally above E1's.
+
+**FINAL recommended switch-on config:**
+- `SYNDICATE_NCAAB_LIVE_RESIM=1`
+- `SYNDICATE_NCAAB_HALF_SPLIT=1`
+- `SYNDICATE_NCAAB_EXACT_TARGET=1`
+- `SYNDICATE_NCAAB_LIVE_MECHANISMS` = the E1 JSON.
+
+The bonus mechanism stays in the engine, default OFF; it is not adopted for NCAAB. Remaining: the late total
+bias is about -3.
+
 ## What is owed, in order
 
-1. **Early-game total overshoot**: exact target calibration was MEASURED and REJECTED alone (above).
-   The fix is the bonus mechanism (item 4) plus exact calibration, re-backtested together.
+1. **Settled 2026-10-13:** HALF_SPLIT + EXACT_TARGET + end-game fouling (E1). See the measurements
+   above. Bonus free throws: measured, not adopted.
 2. **Fleet switch-on** before opening week (~11-03): fast-forward the fleet to main, restart the
    role that runs `live_lens_loop` with the env set (user approval + deploy claim), and check that
    the 11:40Z priors job loaded.
