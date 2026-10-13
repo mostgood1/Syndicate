@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1381 rules `[generated]`
+## Index — 1382 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 515**
+**FORBIDDEN — 516**
 
 - [2026-09-21 FORBIDDEN: diagnosing a failure from its most vivid example `[lane layer2-li…](#2026-09-21-forbidden-diagnosing-a-failure-from-its-most-vivid-example-lane-layer2-line-move-magnitude)
 - [2026-09-21 FORBIDDEN: verifying that a signal was COMPUTED as verifying that it is REAL…](#2026-09-21-forbidden-verifying-that-a-signal-was-computed-as-verifying-that-it-is-real-lane-layer2-line-move-magnitude)
@@ -80,6 +80,7 @@
 - [2026-10-12 REPEAT of the 2026-10-06 FORBIDDEN (text-mode ledger rewrite), and a committ…](#2026-10-12-repeat-of-the-2026-10-06-forbidden-text-mode-ledger-rewrite-and-a-committed-merge-marker-found-by-the-same-check-lane-basketball-props-models-native-session-2d413211)
 - [2026-10-12 FORBIDDEN: reading a tool's EMPTY output as a negative result -- a tool that…](#2026-10-12-forbidden-reading-a-tools-empty-output-as-a-negative-result----a-tool-that-refused-and-a-tool-that-found-nothing-print-the-same-thing-lane-lane-claims-new-marker-session-4ab694ed)
 - [2026-10-12 FORBIDDEN: bounding a block in a structured ledger file by the next SAME-LEV…](#2026-10-12-forbidden-bounding-a-block-in-a-structured-ledger-file-by-the-next-same-level-heading-lane-lanes-archive-20261012-session-4ab694ed)
+- [2026-10-13 FORBIDDEN: a goal clause that requires an undisturbed production window, on…](#2026-10-13-forbidden-a-goal-clause-that-requires-an-undisturbed-production-window-on-a-fleet-where-any-session-can-deploy-lane-live-inplay-board-cadence-closed-goal-not-met-session-a1e40980-closed-by-4ab694ed)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`

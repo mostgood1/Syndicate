@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1381 rules `[generated]`
+## Index — 1382 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -2015,3 +2015,10 @@ prefer single-quoted arguments there.
 - **Rule: before building features for a market, test whether any available input adds to the de-vigged price -- and if the answer is no across the inputs you have, the deficit is INFORMATION, not engineering.** A projection that ties a GF/GA average is not short of features. Shipping two more layers that each reach production and move nothing (score-adjusted xG ML dBrier -0.00017 [-0.00036, +0.00002]; GSAx ML +0.00056 [-0.00118, +0.00238]) costs real deploys and buys no edge.
 - **Corollary on how to read a "ships" verdict:** both of those layers passed their stop conditions and SHIPPED, because the stop condition was "do not deploy if the CI is entirely worse", not "deploy only if it is better". A pre-registered gate phrased as a floor admits anything that is merely harmless -- which is correct for a calibration fix and misleading for an edge claim. Say which you are testing.
 - Same shape as the MLB finding that nothing added to the starter outs/K de-vigged price, and as [[feedback_a_projection_is_not_a_model_edge]]. Also [[feedback_check_the_stat_is_priced]]: parity with the book IS the ceiling once the book prices the same information.
+
+## 2026-10-13 FORBIDDEN: a goal clause that requires an undisturbed production window, on a fleet where any session can deploy `[lane live-inplay-board-cadence, CLOSED GOAL: NOT MET; session a1e40980 / closed by 4ab694ed]`
+
+- **Measured.** The goal required live rows to refresh *"without a full board build and **without a restart during a live slate**"*. Across its three readings, clause G2 FAILED in 2 of 3 because a DIFFERENT session deployed refresh-worker mid-window (`ce9be1ea` 23:56Z, `d5449df7` 02:32-02:35Z), and the third window carried 5 HTTP 502s plus 5 web `oomKilled`. **Not one of those was the lane's own change.** G2 therefore measured the FLEET's deploy rate, not the work under test, and no amount of effort inside the lane could turn it green.
+- **Rule: never write a goal clause the lane cannot control.** With ~15 sessions able to deploy at will, "no restart in the window" is a property of the schedule, not of the change. Write it as an exclusion instead -- *measure only windows with no deploy, and report how many windows that left* -- so a disturbed window is DISCARDED rather than scored as a failure. State the discard count; if it is most of them, that IS the finding.
+- **Corollary:** the same reading is why the lane's primary number survived and its secondary clauses did not. Look-to-serve (362 s -> 241 s, a 33% cut) is measured per card and is robust to a mid-window restart; a boolean "restart-free" clause is destroyed by one. **Prefer a continuous measure over a boolean gate when the environment is shared.**
+- Same family as [[feedback_absence_in_a_window_is_not_absence]] and [[feedback_measure_same_instant]]: say what the window was, and what the window admitted.
