@@ -138,7 +138,6 @@ def writer(monkeypatch):
 
     monkeypatch.setattr(module, "_keyvalue_write_json_file", lambda path, record: writes.__setitem__(Path(path).name, record))
     monkeypatch.setattr(module, "_keyvalue_read_json_file", lambda _path: None)
-    monkeypatch.setattr(module, "_source_app_fallback_enabled", lambda: False)
     monkeypatch.setattr(module, "_build_local_live_snapshot_payload", _local)
     monkeypatch.setattr(module, "_build_source_live_lines_payload", lambda **_k: None)
     monkeypatch.setattr(module, "_build_bundle_local_live_snapshot_payload", lambda **_k: None)

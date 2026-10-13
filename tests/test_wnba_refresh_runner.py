@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import importlib.util
+from contextlib import nullcontext
 import json
 import os
 import sys
@@ -67,22 +68,6 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        # _load_source_app's REPO_ROOT/vendor/wnba_betting_repo fallback
-        # (added 2026-08-01) means every existing test's fake source_root
-        # (which has no app.py) no longer safely gets None back the way
-        # they all assumed when written -- it now finds and execs THIS
-        # repo's real, 40000+-line vendored Flask app, registering it in
-        # sys.modules with whatever top-level side effects that module has,
-        # which measurably leaked into unrelated later tests in the same
-        # process (confirmed live: test_optional_tool_exports_use_local_
-        # vendored_builders only failed when an earlier test's real load
-        # was allowed to happen -- tracking down every individual call site
-        # one at a time kept surfacing new ones). Default every fresh
-        # module to a safe no-op here instead, preserving the real
-        # implementation under a different name so the tests that actually
-        # want to exercise it (test_load_source_app_*) still can.
-        module._real_load_source_app = module._load_source_app
-        module._load_source_app = lambda source_root: None
         # Same rail for the live period-lines seam (lane wnba-live-period-lines-native): the real one calls OddsAPI
         # when a key is in the environment. Tests that want lines patch it explicitly.
         module._real_live_oddsapi_period_totals_for_game = module._live_oddsapi_period_totals_for_game
@@ -1201,7 +1186,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                     }
                 )
 
-            with patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+            with nullcontext():
                 slate_path = module._export_recommendations_slate_snapshot(source_root=source_root, date_str=date_str, processed_root=processed_root)
                 props_path = module._export_cards_props_snapshot(source_root=source_root, date_str=date_str, processed_root=processed_root)
                 top_path = module._export_top_by_game_snapshot(source_root=source_root, date_str=date_str, processed_root=processed_root)
@@ -1274,7 +1259,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+            with nullcontext():
                 out = module._export_recon_games_artifact(source_root=source_root, date_str=date_str, processed_root=processed_root)
 
             self.assertEqual(out, str(processed_root / f"recon_games_{date_str}.csv"))
@@ -2060,7 +2045,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             for name in expected:
                 (processed_source / name).write_text("id\n1\n", encoding="utf-8")
 
-            with patch.object(module, "_load_source_cli", side_effect=AssertionError("source CLI should not load")):
+            with nullcontext():
                 for name, exporter in expected.items():
                     out = exporter(source_root=source_root, date_str=date_str, processed_root=processed_root)
                     self.assertEqual(out, str(processed_root / name))
@@ -2107,7 +2092,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             (processed_source / f"live_lens_projections_{date_str}.jsonl").write_text('{"kind":"projection"}\n', encoding="utf-8")
             (processed_source / "live_lens_tuning_override.json").write_text('{"alpha":1.25}\n', encoding="utf-8")
 
-            with patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+            with nullcontext():
                 for name, exporter in expected.items():
                     out = exporter(source_root=source_root, date_str=date_str, processed_root=processed_root)
                     self.assertEqual(out, str(processed_root / name))
@@ -2179,7 +2164,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             (processed_source / f"live_lens_signals_{date_str}.jsonl").write_text('{"kind":"signal"}\n', encoding="utf-8")
             (processed_source / f"live_lens_projections_{date_str}.jsonl").write_text('{"kind":"projection"}\n', encoding="utf-8")
 
-            with patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+            with nullcontext():
                 copied = module._export_live_lens_artifacts(
                     source_root=source_root,
                     date_str=date_str,
@@ -2233,7 +2218,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+            with nullcontext():
                 copied = module._export_live_lens_artifacts(
                     source_root=source_root,
                     date_str=date_str,
@@ -2309,7 +2294,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+            with nullcontext():
                 copied = module._export_live_lens_artifacts(
                     source_root=source_root,
                     date_str=date_str,
@@ -2349,7 +2334,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+            with nullcontext():
                 props_path = module._export_cards_props_snapshot(source_root=source_root, date_str=date_str, processed_root=processed_root)
                 top_path = module._export_top_by_game_snapshot(source_root=source_root, date_str=date_str, processed_root=processed_root)
 
@@ -2440,7 +2425,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+            with nullcontext():
                 copied = module._export_live_lens_artifacts(
                     source_root=source_root,
                     date_str=date_str,
@@ -2533,57 +2518,12 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.object(module, "_copy_existing_processed_artifact", return_value=None), patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+            with patch.object(module, "_copy_existing_processed_artifact", return_value=None), nullcontext():
                 out = module._export_cards_sim_detail_snapshot(source_root=source_root, date_str="2026-05-29", processed_root=processed_root)
 
             self.assertEqual(out, str(processed_root / "cards_sim_detail_2026-05-29.json"))
             payload = json.loads((processed_root / "cards_sim_detail_2026-05-29.json").read_text(encoding="utf-8"))
             self.assertEqual(payload["games"][0]["sim"]["quarters"][0]["away_pts_mu"], 21.4)
-
-    def test_cards_sim_detail_export_uses_source_cards_api_fallback(self) -> None:
-        module = self._load_module()
-
-        class _FakeResponse:
-            def get_json(self):
-                return {
-                    "games": [
-                        {
-                            "home_tri": "LVA",
-                            "away_tri": "CHI",
-                            "sim": {
-                                "players_summary": {"home": 1, "away": 1},
-                                "players": {"home": [{"player_name": "Home Player"}], "away": [{"player_name": "Away Player"}]},
-                                "missing_prop_players": {"home": [], "away": []},
-                                "injuries": {"home": [], "away": []},
-                                "quarters": [{"q": 1, "away_pts_mu": 19.5, "home_pts_mu": 22.5}],
-                            },
-                        }
-                    ]
-                }
-
-        class _FakeClient:
-            def get(self, query):
-                self.query = query
-                return _FakeResponse()
-
-        class _FakeApp:
-            def test_client(self):
-                return _FakeClient()
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_root = Path(tmp_dir)
-            source_root = tmp_root / "source"
-            processed_root = source_root / "data" / "processed"
-            processed_root.mkdir(parents=True, exist_ok=True)
-
-            with patch.object(module, "_copy_existing_processed_artifact", return_value=None), patch.object(module, "_load_source_app", return_value=types.SimpleNamespace(app=_FakeApp())):
-                out = module._export_cards_sim_detail_snapshot(source_root=source_root, date_str="2026-05-22", processed_root=processed_root)
-
-            self.assertEqual(out, str(processed_root / "cards_sim_detail_2026-05-22.json"))
-            payload = json.loads((processed_root / "cards_sim_detail_2026-05-22.json").read_text(encoding="utf-8"))
-            self.assertEqual(payload["date"], "2026-05-22")
-            self.assertEqual(payload["games"][0]["home_tri"], "LVA")
-            self.assertEqual(payload["games"][0]["away_tri"], "CHI")
 
     def test_cards_sim_detail_export_rebuilds_sparse_existing_artifact(self) -> None:
         module = self._load_module()
@@ -2631,7 +2571,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+            with nullcontext():
                 out = module._export_cards_sim_detail_snapshot(source_root=source_root, date_str="2026-05-29", processed_root=processed_root)
 
             self.assertEqual(out, str(processed_root / "cards_sim_detail_2026-05-29.json"))
@@ -2863,11 +2803,11 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                     return {"ok": True, "games": [{"event_id": "401856963", "rows": [{"player": "Aneesah Morrow"}]}]}
                 return None
 
-            with patch.object(module, "_source_app_fallback_enabled", return_value=False), patch.object(
+            with nullcontext(), patch.object(
                 module,
                 "_build_local_live_snapshot_payload",
                 side_effect=_fake_local_payload,
-            ), patch.object(module, "_load_source_app", return_value=None):
+            ), nullcontext():
                 copied = module._export_live_snapshot_artifacts(
                     source_root=source_root,
                     date_str="2026-06-05",
@@ -2877,82 +2817,6 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             self.assertIn("live_player_lens_path", copied)
             payload = module._read_live_snapshot_payload(processed_root / "live_snapshots" / "live_player_lens_2026-06-05.jsonl")
             self.assertEqual((((payload or {}).get("games") or [{}])[0].get("rows") or [{}])[0].get("player"), "Aneesah Morrow")
-
-    def test_load_source_app_falls_back_to_the_vendor_code_root(self) -> None:
-        # Root-caused live 2026-08-01: refresh_odds_sources.py's
-        # _basketball_source_root always returns the HOSTED DATA root on
-        # Render (e.g. /opt/render/project/data/wnba_source), never the
-        # vendor CODE root, whenever the Render data-root env var is set --
-        # regardless of whether that directory actually has a vendored
-        # app.py. _load_source_app used to check ONLY source_root / "app.py",
-        # so it silently returned None on every single production call,
-        # meaning _live_oddsapi_period_totals_for_game (confirmed correct in
-        # isolation by two earlier fixes this session) could never be
-        # reached from this process at all. Confirmed via a live diagnostic:
-        # source_app_loaded=false for a real in-progress game, every cycle.
-        module = self._load_module()
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_root = Path(tmp_dir)
-            data_root_without_app = tmp_root / "data_root"
-            data_root_without_app.mkdir(parents=True, exist_ok=True)
-            fake_repo_root = tmp_root / "repo"
-            vendor_dir = fake_repo_root / "vendor" / "wnba_betting_repo"
-            vendor_dir.mkdir(parents=True, exist_ok=True)
-            (vendor_dir / "app.py").write_text("MARKER = 'real_vendor_app'\n", encoding="utf-8")
-
-            try:
-                with patch.object(module, "REPO_ROOT", fake_repo_root):
-                    loaded = module._real_load_source_app(data_root_without_app)
-
-                self.assertIsNotNone(loaded)
-                self.assertEqual(getattr(loaded, "MARKER", None), "real_vendor_app")
-            finally:
-                # _load_module_from_path registers this fake module under a
-                # fixed, shared name (sys.modules["syndicate_wnba_source_app"])
-                # -- leaving it there would leak into every other test in
-                # this process that checks sys.modules for that key instead
-                # of calling _load_source_app fresh.
-                sys.modules.pop("syndicate_wnba_source_app", None)
-
-    def test_load_source_app_prefers_source_root_when_it_has_its_own_app(self) -> None:
-        # Local/dev case: source_root IS the vendor root (the fallback
-        # branch of _basketball_source_root that's only reached off
-        # Render) -- must still work exactly as before, not just fall
-        # through to REPO_ROOT/vendor unconditionally.
-        module = self._load_module()
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_root = Path(tmp_dir)
-            source_root_with_app = tmp_root / "source_root_is_vendor"
-            source_root_with_app.mkdir(parents=True, exist_ok=True)
-            (source_root_with_app / "app.py").write_text("MARKER = 'source_root_app'\n", encoding="utf-8")
-            fake_repo_root = tmp_root / "repo"
-            (fake_repo_root / "vendor" / "wnba_betting_repo").mkdir(parents=True, exist_ok=True)
-
-            try:
-                with patch.object(module, "REPO_ROOT", fake_repo_root):
-                    loaded = module._real_load_source_app(source_root_with_app)
-
-                self.assertIsNotNone(loaded)
-                self.assertEqual(getattr(loaded, "MARKER", None), "source_root_app")
-            finally:
-                sys.modules.pop("syndicate_wnba_source_app", None)
-
-    def test_load_source_app_returns_none_when_neither_root_has_an_app(self) -> None:
-        module = self._load_module()
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_root = Path(tmp_dir)
-            empty_source_root = tmp_root / "empty_source"
-            empty_source_root.mkdir(parents=True, exist_ok=True)
-            fake_repo_root = tmp_root / "repo"
-            (fake_repo_root / "vendor" / "wnba_betting_repo").mkdir(parents=True, exist_ok=True)
-
-            with patch.object(module, "REPO_ROOT", fake_repo_root):
-                loaded = module._real_load_source_app(empty_source_root)
-
-            self.assertIsNone(loaded)
 
     def test_export_live_snapshot_artifacts_populates_diagnostic_sink_for_live_lines(self) -> None:
         # Found live 2026-08-01: every print() diagnostic inside main() is
@@ -2993,7 +2857,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 ],
             }
 
-            with patch.object(module, "_source_app_fallback_enabled", return_value=False), patch.object(
+            with nullcontext(), patch.object(
                 module,
                 "_build_source_live_lines_payload",
                 return_value=fake_source_payload,
@@ -3149,11 +3013,11 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 {"ok": True, "games": [{"event_id": "401856963", "rows": []}]},
             )
 
-            with patch.object(module, "_source_app_fallback_enabled", return_value=False), patch.object(
+            with nullcontext(), patch.object(
                 module,
                 "_build_local_live_snapshot_payload",
                 return_value=None,
-            ), patch.object(module, "_load_source_app", return_value=None):
+            ), nullcontext():
                 copied = module._export_live_snapshot_artifacts(
                     source_root=source_root,
                     date_str="2026-06-05",
@@ -3211,9 +3075,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
 
             cards_module._local_live_snapshot_payload.cache_clear()
             cards_module._local_live_state_payload.cache_clear()
-            with patch.dict(os.environ, {"SYNDICATE_WNBA_SOURCE_ROOT": str(tmp_root / "bundle")}), patch.object(
-                module, "_source_app_fallback_enabled", return_value=False
-            ), patch.object(module, "_load_source_app", return_value=None), patch(
+            with patch.dict(os.environ, {"SYNDICATE_WNBA_SOURCE_ROOT": str(tmp_root / "bundle")}), nullcontext(), nullcontext(), patch(
                 "syndicate.features.wnba.cards.build_live_player_boxscore_payload",
                 return_value={"games": [{"event_id": "401856963", "players": []}]},
             ):
@@ -3233,86 +3095,6 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertIsNotNone(((((lines_payload or {}).get("games") or [{}])[0].get("lines") or {}).get("total")))
         self.assertEqual((((lens_payload or {}).get("games") or [{}])[0].get("rows") or [{}])[0].get("player"), "Breanna Stewart")
         self.assertEqual((((lens_payload or {}).get("games") or [{}])[0].get("rows") or [{}])[0].get("line_source"), "live_lens_projection_artifact")
-
-    def test_export_live_snapshot_artifacts_prefers_richer_local_live_lines(self) -> None:
-        module = self._load_module()
-
-        class _FakeResponse:
-            def __init__(self, payload):
-                self.status_code = 200
-                self._payload = payload
-
-            def get_json(self):
-                return self._payload
-
-        class _FakeClient:
-            def get(self, query):
-                if query.startswith("/api/live_state"):
-                    return _FakeResponse({"ok": True, "games": [{"event_id": "401856963", "status": "Live"}]})
-                if query.startswith("/api/live_lines"):
-                    return _FakeResponse(
-                        {
-                            "ok": True,
-                            "games": [{"event_id": "401856963", "found": True, "lines": {"total": 163.5, "period_totals": {}, "period_spreads": {}}}],
-                        }
-                    )
-                return _FakeResponse({"ok": True, "games": []})
-
-        class _FakeSourceApp:
-            class app:
-                @staticmethod
-                def test_client():
-                    return _FakeClient()
-
-        def _fake_local_payload(*, kind, date_str, event_ids):
-            if kind != "live_lines":
-                return None
-            return {
-                "ok": True,
-                "games": [
-                    {
-                        "event_id": "401856963",
-                        "found": True,
-                        "lines": {
-                            "total": 162.5,
-                            "period_totals": {"q1": 40.5},
-                            "period_spreads": {"q1": -2.5},
-                        },
-                    }
-                ],
-            }
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_root = Path(tmp_dir)
-            source_root = tmp_root / "source"
-            processed_root = tmp_root / "bundle" / "data" / "processed"
-            processed_root.mkdir(parents=True, exist_ok=True)
-
-            with patch.object(module, "_source_app_fallback_enabled", return_value=True), patch.object(
-                module,
-                "_load_source_app",
-                return_value=_FakeSourceApp(),
-            ), patch.object(
-                module,
-                "_build_local_live_snapshot_payload",
-                side_effect=_fake_local_payload,
-            ), patch.object(
-                module,
-                "_build_bundle_local_live_snapshot_payload",
-                return_value=None,
-            ):
-                copied = module._export_live_snapshot_artifacts(
-                    source_root=source_root,
-                    date_str="2026-06-05",
-                    processed_root=processed_root,
-                )
-
-            self.assertIn("live_lines_path", copied)
-            lines_payload = module._read_live_snapshot_payload(processed_root / "live_snapshots" / "live_lines_2026-06-05.jsonl")
-
-        lines = ((((lines_payload or {}).get("games") or [{}])[0].get("lines") or {}))
-        self.assertEqual((lines.get("period_totals") or {}).get("q1"), 40.5)
-        self.assertEqual((lines.get("period_spreads") or {}).get("q1"), -2.5)
 
     def test_export_live_snapshot_artifacts_builds_live_lines_from_processed_game_odds(self) -> None:
         module = self._load_module()
@@ -3354,7 +3136,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.object(module, "_source_app_fallback_enabled", return_value=False), patch.object(
+            with nullcontext(), patch.object(
                 module,
                 "_live_oddsapi_period_totals_for_game",
                 _FakeSourceApp._live_oddsapi_period_totals_for_game,
@@ -3527,64 +3309,6 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 "--do-edges",
                 "--do-export",
             ]
-            class _FakeSourceApp:
-                class _Client:
-                    @staticmethod
-                    def get(query):
-                        class _Response:
-                            @staticmethod
-                            def get_json():
-                                if "cron/reconcile-games" in query:
-                                    recon_source = tmp_root / "recon_games_2026-05-22.csv"
-                                    recon_source.write_text("game_id\n123\n", encoding="utf-8")
-                                    return {"output": str(recon_source), "rows": 1}
-                                if "view=slate" in query:
-                                    return {"games": [{"home_tri": "ATL", "away_tri": "DAL"}]}
-                                if "/api/cards" in query:
-                                    return {
-                                        "games": [
-                                            {
-                                                "home_tri": "ATL",
-                                                "away_tri": "DAL",
-                                                "prop_recommendations": {
-                                                    "home": [{"player": "Home WNBA Prop"}],
-                                                    "away": [{"player": "Away WNBA Prop"}],
-                                                },
-                                                "sim": {
-                                                    "players": {
-                                                        "home": [{"player": "Home WNBA Sim"}],
-                                                        "away": [{"player": "Away WNBA Sim"}],
-                                                    },
-                                                    "missing_prop_players": {
-                                                        "home": [{"player": "Missing Home WNBA"}],
-                                                        "away": [{"player": "Missing Away WNBA"}],
-                                                    },
-                                                    "injuries": {
-                                                        "home": [{"player": "Injured Home WNBA"}],
-                                                        "away": [{"player": "Injured Away WNBA"}],
-                                                    },
-                                                },
-                                            }
-                                        ]
-                                    }
-                                return {"data": [{"player": "Test WNBA Player"}]}
-
-                            @staticmethod
-                            def get_data():
-                                if "download_live_lens_signals" in query:
-                                    return b'{"kind":"signal"}\n'
-                                if "download_live_lens_projections" in query:
-                                    return b'{"kind":"projection"}\n'
-                                if "download_live_lens_tuning" in query:
-                                    return b'{"alpha": 1.25}\n'
-                                return b""
-
-                            status_code = 200
-
-                        return _Response()
-
-                app = type("_App", (), {"test_client": staticmethod(lambda: _FakeSourceApp._Client())})()
-
             def _fake_optional_artifacts(*, source_root, date_str, processed_root):
                 recon_path = processed_root / f"recon_players_{date_str}.csv"
                 tuning_path = processed_root / f"live_player_lens_tuning_{date_str}.csv"
@@ -3677,7 +3401,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                     "live_lens_tuning_override_live_lens_path": str(tuning_live_lens),
                 }
 
-            with patch.object(module, "_run_refresh_via_cli", return_value=_FakeSourceModule().run_refresh_oddsapi_props_job(log_file=tmp_root / "refresh.log")), patch.object(module, "_load_source_app", return_value=_FakeSourceApp()), patch.object(module, "_build_optional_player_recon_artifacts", side_effect=_fake_optional_artifacts), patch.object(module, "_export_recon_games_artifact", side_effect=_fake_recon_games_artifact), patch.object(module, "_export_game_cards_artifact", side_effect=_fake_game_cards_artifact), patch.object(module, "_export_boxscores_artifact", side_effect=_fake_boxscores_artifact), patch.object(module, "_export_recommendations_artifact", side_effect=_fake_recommendations_artifact), patch.object(module, "_export_recommendations_slate_snapshot", side_effect=_fake_recommendations_slate_artifact), patch.object(module, "_export_cards_props_snapshot", side_effect=_fake_cards_props_snapshot_artifact), patch.object(module, "_export_cards_sim_detail_snapshot", side_effect=_fake_cards_sim_detail_artifact), patch.object(module, "_export_top_by_game_snapshot", side_effect=_fake_top_by_game_artifact), patch.object(module, "_export_live_lens_artifacts", side_effect=_fake_live_lens_artifacts), patch.object(module, "_export_recon_quarters_artifact", side_effect=_fake_recon_quarters_artifact), patch.object(module, "_export_recon_props_artifact", side_effect=_fake_recon_props_artifact), patch("sys.argv", argv):
+            with patch.object(module, "_run_refresh_via_cli", return_value=_FakeSourceModule().run_refresh_oddsapi_props_job(log_file=tmp_root / "refresh.log")), nullcontext(), patch.object(module, "_build_optional_player_recon_artifacts", side_effect=_fake_optional_artifacts), patch.object(module, "_export_recon_games_artifact", side_effect=_fake_recon_games_artifact), patch.object(module, "_export_game_cards_artifact", side_effect=_fake_game_cards_artifact), patch.object(module, "_export_boxscores_artifact", side_effect=_fake_boxscores_artifact), patch.object(module, "_export_recommendations_artifact", side_effect=_fake_recommendations_artifact), patch.object(module, "_export_recommendations_slate_snapshot", side_effect=_fake_recommendations_slate_artifact), patch.object(module, "_export_cards_props_snapshot", side_effect=_fake_cards_props_snapshot_artifact), patch.object(module, "_export_cards_sim_detail_snapshot", side_effect=_fake_cards_sim_detail_artifact), patch.object(module, "_export_top_by_game_snapshot", side_effect=_fake_top_by_game_artifact), patch.object(module, "_export_live_lens_artifacts", side_effect=_fake_live_lens_artifacts), patch.object(module, "_export_recon_quarters_artifact", side_effect=_fake_recon_quarters_artifact), patch.object(module, "_export_recon_props_artifact", side_effect=_fake_recon_props_artifact), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)
@@ -3785,8 +3509,8 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             # that no longer exercises the gate at all.
             with patch.object(module, "should_recompute", return_value=False) as recompute_gate, \
                     patch.object(module, "_run_refresh_via_cli", side_effect=AssertionError("cli refresh path should not load")), \
-                    patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")), \
-                    patch.object(module, "_load_source_cli", side_effect=AssertionError("source cli should not load")), \
+                    nullcontext(), \
+                    nullcontext(), \
                     patch.object(module, "_load_module_from_path", side_effect=AssertionError("source tools should not load")), \
                     patch("sys.argv", argv):
                 rc = module.main()

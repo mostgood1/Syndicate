@@ -109,10 +109,6 @@ def _canonical_wnba_tri(value: object) -> str:
     return mapped.get(text, mapped.get(compact, text))
 
 
-def _source_app_fallback_enabled() -> bool:
-    return str(os.environ.get("SYNDICATE_WNBA_SOURCE_APP_FALLBACK") or "").strip().lower() in {"1", "true", "yes", "on"}
-
-
 def _copy_if_exists(source_path: str | None, destination_path: Path) -> bool:
     source_text = str(source_path or "").strip()
     if not source_text:
@@ -520,7 +516,7 @@ def _build_source_live_lines_payload(
     period_by_matchup = _load_period_lines_rows_by_matchup(source_root=source_root, processed_root=processed_root, date_str=date_str)
     # Live OddsAPI period totals/spreads come from Syndicate's port (syndicate/features/wnba/live_period_lines.py,
     # lane wnba-live-period-lines-native, 2026-10-12). This used to import the whole vendored Flask app
-    # (vendor/wnba_betting_repo/app.py, via _load_source_app) on every live-snapshot export to reach one function.
+    # (vendor/wnba_betting_repo/app.py, via the since-deleted source-app loader) on every live-snapshot export to reach one function.
     if diagnostic_sink is not None:
         diagnostic_sink["period_lines_source"] = "syndicate_native"
         diagnostic_sink["per_game"] = {}
@@ -822,35 +818,6 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
         copied["live_state_path"] = existing_state
         state_payload = _read_live_snapshot_payload(state_destination)
 
-    source_app = None
-    client = None
-
-    def _ensure_client():
-        nonlocal source_app, client
-        if client is not None:
-            return client
-        source_app = _load_source_app(source_root)
-        if source_app is None:
-            return None
-        client = source_app.app.test_client()
-        return client
-
-    def _fetch_json(query: str) -> dict[str, object] | None:
-        test_client = _ensure_client()
-        if test_client is None:
-            return None
-        try:
-            response = test_client.get(query)
-            if int(getattr(response, "status_code", 0) or 0) != 200:
-                return None
-            payload = response.get_json() if response is not None else None
-        except Exception:
-            payload = None
-        return payload if isinstance(payload, dict) else None
-
-    refreshed_state_payload = _fetch_json(f"/api/live_state?date={date_str}") if _source_app_fallback_enabled() else None
-    if _payload_has_snapshot_content("live_state", refreshed_state_payload):
-        state_payload = refreshed_state_payload
     if not _payload_has_snapshot_content("live_state", state_payload):
         local_state_payload = _build_local_live_snapshot_payload(kind="live_state", date_str=date_str, event_ids=[])
         if _payload_has_snapshot_content("live_state", local_state_payload):
@@ -868,7 +835,6 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
         for game in ((state_payload or {}).get("games") or [])
         if isinstance(game, dict) and str(game.get("event_id") or "").strip()
     ]
-    joined_event_ids = ",".join(dict.fromkeys(event_ids))
 
     for kind, copied_key in snapshot_specs[1:]:
         file_name = f"{kind}_{date_str}.jsonl"
@@ -879,11 +845,6 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
             destination=destination,
         )
         payload = None
-        if joined_event_ids and _source_app_fallback_enabled():
-            query = f"/api/{kind}?date={date_str}&event_ids={joined_event_ids}"
-            if kind == "live_lines":
-                query = f"{query}&include_period_totals=1"
-            payload = _fetch_json(query)
         if kind == "live_lines":
             source_payload_diag: dict[str, object] = {}
             source_payload = _build_source_live_lines_payload(
@@ -4872,60 +4833,6 @@ def _predict_props_cli_args(*, source_root: Path, date_str: str, out_path: Path)
     return args
 
 
-def _run_source_cli_command(
-    source_root: Path,
-    args: list[str],
-    log_file: Path,
-    *,
-    heartbeat_cb: callable | None,
-    heartbeat_every_s: float = 15.0,
-) -> int:
-    cmd_text = " ".join(shlex.quote(str(a)) for a in args)
-    _append_log(log_file, f"$ source-cli {cmd_text}")
-
-    cli_module = _load_source_cli(source_root)
-    stop_event = threading.Event()
-    heartbeat_thread = None
-    if heartbeat_cb is not None:
-        def _heartbeat_loop() -> None:
-            while not stop_event.wait(max(1.0, float(heartbeat_every_s))):
-                try:
-                    heartbeat_cb()
-                except Exception:
-                    pass
-
-        heartbeat_thread = threading.Thread(target=_heartbeat_loop, daemon=True)
-        heartbeat_thread.start()
-
-    previous_cwd = Path.cwd()
-    log_file.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        with log_file.open("a", encoding="utf-8", errors="ignore") as out:
-            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
-                os.chdir(source_root)
-                try:
-                    cli_module.cli.main(args, standalone_mode=False)  # type: ignore[attr-defined]
-                    return 0
-                except SystemExit as exc:
-                    code = exc.code
-                    if code is None:
-                        return 0
-                    if isinstance(code, int):
-                        return int(code)
-                    return 1
-                except Exception:
-                    traceback.print_exc(file=out)
-                    return 1
-    finally:
-        try:
-            os.chdir(previous_cwd)
-        except Exception:
-            pass
-        stop_event.set()
-        if heartbeat_thread is not None:
-            heartbeat_thread.join(timeout=1.0)
-
-
 def _run_refresh_via_cli(
     *,
     source_root: Path,
@@ -5845,39 +5752,6 @@ def _target_refresh_dates(*, date_str: str, days_ahead: int) -> list[str]:
     return [(parsed + dt.timedelta(days=offset)).isoformat() for offset in range(0, max(0, int(days_ahead)) + 1)]
 
 
-def _load_source_app(source_root: Path):
-    # Root-caused live 2026-08-01: on Render, refresh_odds_sources.py's
-    # _basketball_source_root("wnba", "wnba_betting_repo") always returns the
-    # HOSTED DATA root (e.g. /opt/render/project/data/wnba_source) whenever
-    # _render_data_root_text() is truthy -- which it always is on Render --
-    # regardless of whether that directory has a vendored app.py at all. The
-    # vendor-code fallback branch inside that function is only ever reached
-    # locally, off Render. So source_root here is legitimately the DATA
-    # root, not the vendor CODE root, and app_path below never existed on
-    # Render -- _load_source_app has been returning None on every single
-    # production call for as long as this data/code root split has existed,
-    # meaning _live_oddsapi_period_totals_for_game (the function two earlier
-    # fixes this session confirmed correct in isolation) could never be
-    # reached from this call chain at all. Confirmed via a live diagnostic:
-    # source_app_loaded=false, source_app_has_period_fn=false, attempted=false
-    # for a real in-progress game, every cycle.
-    candidate_roots = [source_root, REPO_ROOT / "vendor" / "wnba_betting_repo"]
-    for candidate in candidate_roots:
-        app_path = candidate / "app.py"
-        if app_path.exists() and app_path.is_file():
-            # The vendored app imports `wnba_betting` from whatever is first on sys.path (it never inserts its own
-            # src/). The props steps earlier in this process put <data_root>/wnba_source/src first, a copy that
-            # bootstrap_data_root.py no longer maintains (lane wnba-bootstrap-src-off-vendor, 2026-10-12). Put the
-            # app's OWN src first so it imports the package it ships with, never a stale data-disk copy.
-            own_src = str(candidate / "src")
-            if (candidate / "src" / "wnba_betting").is_dir():
-                if own_src in sys.path:
-                    sys.path.remove(own_src)
-                sys.path.insert(0, own_src)
-            return _load_module_from_path("syndicate_wnba_source_app", app_path)
-    return None
-
-
 def _build_optional_player_recon_artifacts(*, source_root: Path, date_str: str, processed_root: Path) -> dict[str, str]:
     copied: dict[str, str] = {}
     existing_specs = (
@@ -6156,31 +6030,6 @@ def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, proce
     out_path = processed_root / f"cards_sim_detail_{date_str}.json"
     games_out = _build_cards_sim_detail_from_local_smart_sim(processed_root=processed_root, date_str=date_str)
     if not games_out:
-        source_app = _load_source_app(source_root)
-        if source_app is not None:
-            try:
-                client = source_app.app.test_client()
-                response = client.get(f"/api/cards?date={date_str}&include_players=1")
-                payload = response.get_json() if response is not None else None
-            except Exception:
-                payload = None
-            games = payload.get("games") if isinstance(payload, dict) and isinstance(payload.get("games"), list) else []
-            for game in games:
-                if not isinstance(game, dict):
-                    continue
-                home_tri = str(game.get("home_tri") or "").strip().upper()
-                away_tri = str(game.get("away_tri") or "").strip().upper()
-                sim = game.get("sim") if isinstance(game.get("sim"), dict) else None
-                if not home_tri or not away_tri or not isinstance(sim, dict):
-                    continue
-                games_out.append(
-                    {
-                        "home_tri": home_tri,
-                        "away_tri": away_tri,
-                        "sim": sim,
-                    }
-                )
-    if not games_out:
         return None
 
     out = {"date": date_str, "games": games_out}
@@ -6277,37 +6126,7 @@ def _export_recon_games_artifact(*, source_root: Path, date_str: str, processed_
     local_rows, local_path = _build_local_recon_games_artifact(processed_root=processed_root, date_str=date_str)
     if local_rows > 0 and local_path is not None:
         return str(local_path)
-    if not _source_app_fallback_enabled():
-        return None
-    source_app = _load_source_app(source_root)
-    if source_app is None:
-        return None
-    if hasattr(source_app, "_cron_auth_ok"):
-        try:
-            source_app._cron_auth_ok = lambda _request: True
-        except Exception:
-            pass
-    client = source_app.app.test_client()
-    response = client.get(f"/api/cron/reconcile-games?date={date_str}")
-    try:
-        payload = response.get_json() if response is not None else None
-    except Exception:
-        payload = None
-    if not isinstance(payload, dict):
-        return None
-    output_path = str(payload.get("output") or "").strip()
-    if not output_path:
-        return None
-    source = Path(output_path)
-    if not source.exists() or not source.is_file():
-        return None
-    destination = processed_root / source.name
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    # Same-path safe: source_root and artifact_root are the same directory in
-    # production, so a raw copy2 here raises SameFileError (crashed the whole
-    # export stage live on 7/17).
-    _copy_file_with_fallback(source, destination)
-    return str(destination)
+    return None
 
 
 def _build_local_live_lens_tuning_artifact(*, processed_root: Path, live_lens_root: Path) -> dict[str, str]:
@@ -6337,7 +6156,6 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
     exports = (
         (
             f"live_lens_signals_{date_str}.jsonl",
-            f"/api/download_live_lens_signals?date={date_str}",
             (
                 (processed_root / f"live_lens_signals_{date_str}.jsonl", "live_lens_signals_path"),
                 (live_lens_root / f"live_lens_signals_{date_str}.jsonl", None),
@@ -6345,7 +6163,6 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
         ),
         (
             f"live_lens_projections_{date_str}.jsonl",
-            f"/api/download_live_lens_projections?date={date_str}",
             (
                 (processed_root / f"live_lens_projections_{date_str}.jsonl", "live_lens_projections_path"),
                 (live_lens_root / f"live_lens_projections_{date_str}.jsonl", None),
@@ -6353,7 +6170,6 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
         ),
         (
             "live_lens_tuning_override.json",
-            "/api/download_live_lens_tuning",
             (
                 (processed_root / "live_lens_tuning_override.json", "live_lens_tuning_override_path"),
                 (live_lens_root / "live_lens_tuning_override.json", "live_lens_tuning_override_live_lens_path"),
@@ -6361,8 +6177,7 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
         ),
     )
     copied: dict[str, str] = {}
-    missing_exports: list[tuple[str, str, tuple[tuple[Path, str | None], ...]]] = []
-    for file_name, query, destinations in exports:
+    for file_name, destinations in exports:
         existing = _copy_existing_live_lens_artifact(source_root=source_root, file_name=file_name, destinations=destinations)
         if existing:
             copied.update(existing)
@@ -6382,38 +6197,6 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
             if local:
                 copied.update(local)
                 continue
-        missing_exports.append((file_name, query, destinations))
-    if not missing_exports:
-        return copied
-
-    if not _source_app_fallback_enabled():
-        return copied
-
-    source_app = _load_source_app(source_root)
-    if source_app is None:
-        return copied
-    client = source_app.app.test_client()
-    for _file_name, query, destinations in missing_exports:
-        try:
-            response = client.get(query)
-            status_code = int(getattr(response, "status_code", 0) or 0)
-            if status_code != 200:
-                continue
-            raw = b""
-            get_data = getattr(response, "get_data", None)
-            if callable(get_data):
-                raw = get_data()
-            elif hasattr(response, "data"):
-                raw = getattr(response, "data") or b""
-            if not isinstance(raw, (bytes, bytearray)) or not raw:
-                continue
-            for out_path, copied_key in destinations:
-                out_path.parent.mkdir(parents=True, exist_ok=True)
-                out_path.write_bytes(bytes(raw))
-                if copied_key:
-                    copied[copied_key] = str(out_path)
-        except Exception:
-            continue
     return copied
 
 
@@ -6501,10 +6284,6 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
     if advanced_stats_paths:
         copied["team_advanced_stats_paths"] = advanced_stats_paths
     return copied
-
-
-def _load_source_cli(source_root: Path):
-    raise RuntimeError("source CLI fallback removed; use local artifacts or local Syndicate builders")
 
 
 def _export_recon_quarters_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:

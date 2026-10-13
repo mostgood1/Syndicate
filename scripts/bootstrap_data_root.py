@@ -48,7 +48,7 @@ BOOTSTRAP_ROOTS = (
 # EMPTY BY DESIGN since 2026-10-12 (lane wnba-bootstrap-src-off-vendor). This used to copy
 # vendor/wnba_betting_repo/src onto <data_root>/wnba_source/src (OVERWRITE) at every boot. Its one real consumer, the
 # vendored playoff transition imported from that copy, was removed in 1cbaf4ab: it could never fire for WNBA data.
-# The remaining vendored-app fallbacks load the vendor tree's own src (`refresh_wnba_oddsapi_props._load_source_app`).
+# The vendored-app fallbacks that read it were deleted 2026-10-13 (lane nba-source-cli-native), so nothing loads a vendored src.
 # Vendored code is not copied onto the data disk. (source, data-relative destination) pairs would go here.
 BOOTSTRAP_VENDOR_ROOTS: tuple[tuple[Path, Path], ...] = ()
 
