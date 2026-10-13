@@ -48827,3 +48827,25 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 
 **VERDICT: MET.** Week 5 complete, target rolled to 6, the e04f6738 branch fired with `reason=artifact_is_preseason_backfill` for wk6, and the rebuilt file is all current-season, not backfill, and served (weeks [1,4,5,6], cards 200).
 **Correction to the premise:** this was NOT the branch's first live firing. The 2026-10-06 entry above already records `SEASON_PROJECTION_LAUNCHING sport=nfl season=2026 week=5 reason=artifact_is_preseason_backfill` at 03:38:25Z. wk6 is the second firing and the first at the predicted wk5->wk6 rollover.
+
+## 2026-10-13 14:38:58Z (9:38 AM CT) -- refresh-worker restart (local fleet): soccer board-pick prop settlement aa8a2d98 + paper-order prop grader ce19bf50; loaded HEAD 3e7b2e53 `[lane soccer-live-anytime-scorer, session b9bb5f37]`
+- **What:**
+  - Claimed `refresh-worker` (holder soccer-live-anytime-scorer). FF to exact aa8a2d98 at 14:27:22Z.
+  - Scoped gate: blockers ran until 14:38:58Z (a board build, then an odds job, then a second board build), then `Board build idle ... persisted`, `Odds refresh: idle`, no refresh-worker children.
+  - TERM pid 92893 at 14:38:58.224Z; new pid 100486 at 14:39:07Z. Released by token.
+- **A PEER FF'D DURING MY CLAIM:**
+  - reflog shows `merge 3e7b2e53: Fast-forward` at 14:38:36Z (09:38:36 CDT), 22 s before my TERM. The restart therefore loaded 3e7b2e53, not aa8a2d98.
+  - 3e7b2e53 contains aa8a2d98. Its only extra runtime files are `game_chip_detail.py` and `soccer/cards.py` (games-rail soccer footer / void-match PPD, 3e7b2e53).
+  - That peer's commit is now live on refresh-worker; its owner should know.
+  - The refresh-worker claim does not cover a checkout ff. This is the "serialisation is not composition" gap again, on the fleet.
+- **Ride-alongs from my ff (5ad6656d -> aa8a2d98):** bf5718d3, basketball orchestrator RETIRE lineup teammate effects ("outputs unchanged"). The mechanism it removes was OFF in production. `tests/test_basketball_orchestrator_parity.py` 8/8 pass on the target; nothing imports the deleted `connected_game.py`.
+- **What loads:**
+  - Evaluation settlement (aa8a2d98, `settlement_identity` on loan + `settlement_sport_rows`):
+    - soccer box rows come from the poller's `match_box` first;
+    - a squad player who never appeared is a push;
+    - first/last goalscorer graded off the goal order, own goals skipped (user decision);
+    - nested-name fallback.
+  - Paper settlement soccer props (ce19bf50).
+- **Pre-deploy reading:** a worker-env dry run of 10-11 soccer on aa8a2d98 graded 925 of 1,181 pending prop picks (`player_not_in_boxscore` 676 -> 253, `prop_market_unmapped` 501 -> 0). First scorer 9 W / 214 L, at most one winner per match; 414 pushes. Tests: 89 existing settlement + 6 new + 81 soccer bet-status pass.
+- **verify -- OWED:** the next evaluation-settlement autorun (~11:00Z 2026-10-14) should settle 10-11's pending soccer props: soccer prop pending falls from 1,181 toward ~256. It also needs a re-read of the served 10-11 games-rail soccer prop W-L (now 1-6 + 68 pending).
+- **Rollback:** revert aa8a2d98 on main, ff, then restart refresh-worker under a claim.
