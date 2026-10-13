@@ -84,3 +84,29 @@ late in the season, and other signals. Registered as `nba.under_bias`, status `s
 **Limits.** One season; 8 US books at one snapshot ~45 min pre-tip (no sharp book, no close); per-market and the min-30
 cut are secondary (BH applied to markets). Next-season confirmation runs forward from the 10-20 opener on the live quote
 logs.
+
+## H7 grader + a 2025-26 dry run (2026-10-13 23:06Z) -- a format / join check, NOT evidence
+
+Grader: `scripts/grade_h7_nba_unders.py` (tests `tests/test_grade_h7_nba_unders.py`; three mutation checks -- per-row
+cutoff, stale change-log point, snapshot carry-forward -- each fail a test). It reads the registration literally: each
+book's LAST quote at or before the SCHEDULED tip minus 45 min (earliest commence per event -- OddsAPI rewrites
+commence_time to the actual start in play, measured 02:00:00Z -> 02:10:53Z on 2026-10-05), main line by two-sided book
+count, best price over the 16 US books, prior-10 MIN >= 30 from the as-of table (a date the daily job missed is rebuilt
+with `build_as_of`, counted `signal_tables_rebuilt`), voids for push / DNP, INTERIM before 2027-04-11.
+
+Pointed at 2025-26 (backfill snapshots ~T-49 min, the season's own log and tables) the joins are clean: 64,083 main
+lines, 21,844 graded, 2,059 without a table row (early season), 180 on another slate date. The same rule, by window:
+
+| 2025-26 window (in-sample; H7 was SELECTED on this season) | n / games | ROI at best US price [95% CI] | residual vs Shin [CI] |
+|---|---|---|---|
+| 2025-10-21..2026-01-31 | 14,043 / 704 | **-3.54% [-5.62, -1.30]** | -0.25% [-1.31, +0.91] |
+| 2026-02-01..2026-04-12 | 7,801 / 471 | **+2.76% [-0.20, +5.47]** | +3.14% [+1.65, +4.56] |
+| full season | 21,844 / 1,175 | -1.29% [-3.04, +0.49] | +0.96% [+0.07, +1.84] |
+
+By market, full season: threes +1.22%, rebounds -0.65%, rebounds+assists -1.91%, assists -3.75% [-6.15, -1.44].
+
+**Reading.** On heavy-minutes players the under effect was ENTIRELY a Feb-Apr phenomenon in 2025-26 (zero residual
+Oct-Jan). H7's bar is a FULL-season ROI CI above 0, which its own selection season fails (-1.29%). So H7 as registered is
+expected to fail even if 2025-26 repeats exactly; it tests "the effect is now season-long", not "the effect repeats".
+H7 is NOT amended here. A late-season variant, if wanted, must be registered as its own hypothesis before 2027-02-01's
+first outcome, with a multiplicity correction across the two.
