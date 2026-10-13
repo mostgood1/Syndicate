@@ -2352,6 +2352,115 @@ def _build_game_odds_rows_from_snapshot_frame(frame, *, date_str: str):
     return pd.DataFrame(rows_out)
 
 
+def _slate_matchups(path: Path) -> set[tuple[str, str]]:
+    """(home, away) of every game in a game_odds / game_cards / predictions CSV, case- and space-normalised."""
+    import pandas as pd
+
+    try:
+        frame = pd.read_csv(path)
+    except Exception:
+        return set()
+    home_col = "home_team" if "home_team" in frame.columns else None
+    away_col = "visitor_team" if "visitor_team" in frame.columns else ("away_team" if "away_team" in frame.columns else None)
+    if frame.empty or not home_col or not away_col:
+        return set()
+    out = set()
+    for home, away in zip(frame[home_col], frame[away_col]):
+        h, a = str(home or "").strip().lower(), str(away or "").strip().lower()
+        if h and a and h != "nan" and a != "nan":
+            out.add((h, a))
+    return out
+
+
+def _merge_new_snapshot_matchups_into_game_odds(*, processed_path: Path, snapshot_candidates, date_str: str, log_file: Path) -> int:
+    """Append the snapshot's priced games that game_odds lacks; never rewrite or drop an existing row.
+
+    The slate is seeded once, at the first bootstrap of the date (03:48Z for 2026-10-13, when only 3 of 5 NBA games
+    had lines). Without this, games priced later never reach game_odds -> game_cards -> predictions (lane
+    nba-source-cli-native, 2026-10-13). Existing rows are kept because a game can drop out of the snapshot once it
+    starts.
+    """
+    import pandas as pd
+
+    have = _slate_matchups(processed_path)
+    for candidate in snapshot_candidates:
+        if not candidate.exists() or not candidate.is_file():
+            continue
+        try:
+            frame = pd.read_csv(candidate)
+        except Exception:
+            continue
+        if frame.empty or not {"home_team", "away_team"}.issubset(frame.columns):
+            continue
+        built = _build_game_odds_rows_from_snapshot_frame(frame, date_str=date_str)
+        if built is None or built.empty:
+            continue
+        away_col = "visitor_team" if "visitor_team" in built.columns else "away_team"
+        keys = [(str(h or "").strip().lower(), str(a or "").strip().lower()) for h, a in zip(built["home_team"], built[away_col])]
+        new_rows = built[[k not in have for k in keys]]
+        if new_rows.empty:
+            return 0
+        existing = pd.read_csv(processed_path)
+        merged = pd.concat([existing, new_rows.reindex(columns=existing.columns)], ignore_index=True)
+        atomic_write_csv(processed_path, merged)
+        added = sorted(f"{a}@{h}" for (h, a), keep in zip(keys, [k not in have for k in keys]) if keep)
+        _append_log(log_file, f"Added {len(new_rows)} newly priced game(s) to the game_odds slate {processed_path.name}: {added}")
+        print(f"SLATE_GAME_ODDS_GREW date={date_str} added={len(new_rows)} games={added}", flush=True)
+        return int(len(new_rows))
+    return 0
+
+
+def _slate_grew_cooldown_minutes() -> float:
+    try:
+        return max(0.0, float(os.environ.get("SYNDICATE_PREDICT_DATE_SLATE_GREW_COOLDOWN_MINUTES", "60")))
+    except Exception:
+        return 60.0
+
+
+def _rerun_predictions_if_slate_grew(*, source_root: Path, date_str: str, log_file: Path, heartbeat_cb) -> dict[str, object]:
+    """Predictions exist, but cover fewer games than game_odds now does: rebuild game_cards and re-run predict-date.
+
+    predict-date takes its slate from game_cards first, and game_cards are built from game_odds. Gated by its own
+    cooldown (predict-date loads the game models, ~175 MB), so a game that is still missing does not re-trigger it
+    every cycle. Never raises.
+    """
+    processed_root = source_root / "data" / "processed"
+    pred_path = processed_root / f"predictions_{date_str}.csv"
+    out: dict[str, object] = {"date": date_str, "ran": False}
+    try:
+        try:
+            _seed_game_odds_from_props_snapshot(source_root=source_root, date_str=date_str, log_file=log_file)
+        except Exception as exc:
+            _append_log(log_file, f"slate-growth game_odds seed failed (non-fatal): {exc}")
+        missing = sorted(_slate_matchups(processed_root / f"game_odds_{date_str}.csv") - _slate_matchups(pred_path))
+        out["missing"] = [f"{a}@{h}" for h, a in missing]
+        if not missing:
+            return out
+        marker = processed_root / f".predict_date_slate_grew_{date_str}.json"
+        cooldown = _slate_grew_cooldown_minutes()
+        try:
+            last = dt.datetime.fromisoformat(json.loads(marker.read_text(encoding="utf-8"))["started_at"])
+            if (dt.datetime.now(dt.timezone.utc) - last).total_seconds() < cooldown * 60.0:
+                out["skipped"] = f"re-run within the last {cooldown:.0f} min"
+                return out
+        except Exception:
+            pass
+        marker.write_text(json.dumps({"started_at": dt.datetime.now(dt.timezone.utc).isoformat(), "missing": out["missing"]}), encoding="utf-8")
+        _append_log(log_file, f"predictions_{date_str}.csv lacks {len(missing)} game(s) game_odds now has {out['missing']}: rebuilding game_cards and re-running predict-date")
+        cards_rows, _cards_path = _build_local_game_cards_artifact(source_root=source_root, processed_root=processed_root, date_str=date_str, log_file=log_file)
+        out["game_cards_rows"] = int(cards_rows or 0)
+        rc = _run_source_predict_date(source_root=source_root, package_name='nba_betting', date_str=date_str, log_file=log_file, heartbeat_cb=heartbeat_cb)
+        out.update(ran=True, rc=int(rc), predictions_rows=_count_csv_rows_quick(pred_path),
+                   still_missing=[f"{a}@{h}" for h, a in sorted(_slate_matchups(processed_root / f"game_odds_{date_str}.csv") - _slate_matchups(pred_path))])
+        return out
+    except Exception as exc:
+        out["error"] = f"{type(exc).__name__}: {str(exc)[:160]}"
+        return out
+    finally:
+        if out.get("missing"):
+            print("PREDICTIONS_SLATE_GREW " + json.dumps(out, default=str), flush=True)
+
+
 def _seed_game_odds_from_props_snapshot(*, source_root: Path, date_str: str, log_file: Path) -> bool:
     processed_path = source_root / "data" / "processed" / f"game_odds_{date_str}.csv"
     snapshot_candidates = (
@@ -2376,6 +2485,11 @@ def _seed_game_odds_from_props_snapshot(*, source_root: Path, date_str: str, log
             existing = pd.read_csv(processed_path)
         except Exception:
             existing = pd.DataFrame()
+        if snapshot_has_market_rows and _game_odds_frame_has_prices(existing):
+            _merge_new_snapshot_matchups_into_game_odds(
+                processed_path=processed_path, snapshot_candidates=snapshot_candidates, date_str=date_str, log_file=log_file
+            )
+            return True
         if snapshot_has_market_rows and not _game_odds_frame_has_prices(existing):
             # A price-less skeleton (the old seeder's output) would otherwise
             # satisfy the reuse check forever, keeping the sim's market
@@ -2859,6 +2973,7 @@ def _ensure_game_predictions_for_props_refresh(*, source_root: Path, date_str: s
     processed_root = source_root / "data" / "processed"
     pred_path = processed_root / f"predictions_{date_str}.csv"
     if pred_path.exists() and pred_path.is_file() and _count_csv_rows_quick(pred_path) > 0:
+        _rerun_predictions_if_slate_grew(source_root=source_root, date_str=date_str, log_file=log_file, heartbeat_cb=heartbeat_cb)
         return True, None
 
     fallback_candidates = [
