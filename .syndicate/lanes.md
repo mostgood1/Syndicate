@@ -1086,6 +1086,14 @@ death, never life — do not invert it.
 - Verification: evaluator report committed as findings; shadow fields present on served rows; after flip: EV-at-close of Suggested measured on 1 week
 - Blocked by: none
 
+### news-collectors-backfill — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: Free, timestamped, append-only news collectors (ESPN injuries NBA/NHL/NFL/WNBA, NBA referee assignments, NHL referee crews) running every 10 min on the fleet host, and the dev-machine backfill sets (NBA 2025-26 prop prices, NHL 2023-26 caches + DFO history + 2025-26 lines, NFL 2023-25 prop closes, NCAAF 2024-25 props) copied onto the fleet disk with a checksum manifest -- zero OddsAPI credits, zero spend
+- Files: scripts/collect_news_snapshots.py (NEW), tests/test_collect_news_snapshots.py (NEW), deploy/local/install_news_collector_task.ps1 (NEW), scripts/copy_backfill_to_fleet.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: collector change-logs grow on the fleet disk across >= 3 polls with capture timestamps; OddsAPI quota identical before/after; backfill manifest sha256 matches source for every file
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
