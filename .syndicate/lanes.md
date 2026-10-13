@@ -1058,6 +1058,14 @@ death, never life — do not invert it.
 - Verification: 24 h of worker logs after the change: JOB_CAP_THROTTLED share vs baseline; settlement launches within one tick of its 12:00Z/13:00Z due time and the NFL pbp fetch within one tick of 10:00Z on a day with odds jobs running; odds job concurrency unchanged (no extra parallel odds jobs)
 - Blocked by: none
 
+### layer2-score-study-suggested — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: Decide, on out-of-sample recorder data 09-21..10-12, which ranking of the Suggested set (current sc, score_v2 expected growth, fee-net market EV) best orders lines by pregame CLV and by ROI; recommend the rank for the Suggested view and the portfolio cut
+- Files: .syndicate/findings_2026-10-13_score_study_suggested.md (NEW)
+- Hypothesis: H1: within Suggested (per sport x date x phase), the top tercile by score_v2 beats the top tercile by sc on same-book pregame CLV, in BOTH halves (09-21..10-03 and 10-04..10-12). H2: sc's extra terms over EV (capped sim term, movement) do not predict CLV or ROI inside Suggested. H3: no ranking's top tercile beats the Suggested set's own average ROI by more than its CI, i.e. selection, not ordering, carries the return.
+- Falsification test: H1 false if sc's top-tercile CLV >= score_v2's in the holdout half; H2 false if (sc - ev) top tercile shows CLV above bottom tercile with CI excluding 0; H3 false if any ranking's top-tercile ROI exceeds the set average with CI excluding 0.
+- Verification: findings file with per-ranker top/bottom-tercile CLV + ROI, both halves, game-clustered CIs, sample sizes
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
