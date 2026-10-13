@@ -48813,3 +48813,17 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **Tests:** 26 orchestrator / pool / name-map tests pass; orchestrator input checklist alarms=0. Parity vs the vendored orchestrator: only $.lineup_effects differs (>5,000 leaves identical).
 - **Fleet:** not ff'd. It takes effect on the next owner-enumerated ff. Production behaviour was already "off", so the expected reading after any ff is: sims show lineup_effects.reason=retired, and nothing else moves.
 - **Left with the owning lanes (asked):** `build-lineup-teammate-effects` and `update-pbp-espn-history` in both props refreshes (nba-source-cli-native, wnba-live-period-lines-native) now produce data nothing reads.
+
+## 2026-10-13 14:26Z (09:26 CT) -- READING, no deploy -- LOCAL PRODUCTION: NFL wk6 backfill-gate first live firing (lane nfl-backfill-autorun-gate)
+
+Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, launched or edited on the fleet. Readings taken 2026-10-13T14:26:28Z.
+
+1. **Week-5 completeness:** `schedule_2026.csv` wk5 rows 15, blank home/away score **0**. First week with a blank score = **6** (14 rows) -> `nfl_target_week` = 6.
+2. **wk6 file:** `-rwxrwxrwx 3069 2026-10-12T23:23:59-0500 .../nfl_source/smartsim2_projections_2026_wk6.csv` (= 2026-10-13T04:23:59Z).
+3. **Content:** 14 rows; `rating_source` Counter `{'nflverse_pbp_epa_rolling[current_season_blend/current_season_blend]+level_shrink_0.3': 14}` (all contain `current_season`); `is_preseason_backfill_projection(Path(...))` -> **False**. (Passing a `str` raises `AttributeError: 'str' object has no attribute 'name'` at sources.py:462 -- the helper takes a `Path`; the task prompt's call shape was wrong, not the fleet.)
+4. **Launch line (verbatim):** `2026-10-13T04:23:04.623Z [refresh_worker] SEASON_PROJECTION_LAUNCHING sport=nfl season=2026 week=6 reason=artifact_is_preseason_backfill path=/home/amyn/syndicate-prod/data/nfl_source/smartsim2_projections_2026_wk6.csv`. File landed 55s later. Preceding nfl lines: wk5 `artifact_stale` daily relaunches 10-09..10-12. **0** nfl `RELAUNCH_HELD`/`ARTIFACT_MISSING` lines with `preseason_backfill=1`.
+5. **Web:** WEEK_SUBSTITUTED taken BEFORE the probe: last two at web.log lines 18444 (`requested=5 resolved=4 available=[1, 4]`) and 176612 (2026-10-05T11:32:17Z `requested=3 resolved=4`) of 555177 -- none since 10-05. `/nfl/api/weeks` `available_weeks` **[1, 4, 5, 6]**; `/nfl/cards?week=6` -> **200**; no new WEEK_SUBSTITUTED after the probe.
+6. **Fleet:** supervisor pid=92823 since 2026-10-13T14:08:39Z; web up code=5ad6656d; refresh-worker and live-odds-worker up code=18587150, flagged STALE vs HEAD 5ad6656d (61 runtime files) -- not touched, out of scope. `/healthz` 200.
+
+**VERDICT: MET.** Week 5 complete, target rolled to 6, the e04f6738 branch fired with `reason=artifact_is_preseason_backfill` for wk6, and the rebuilt file is all current-season, not backfill, and served (weeks [1,4,5,6], cards 200).
+**Correction to the premise:** this was NOT the branch's first live firing. The 2026-10-06 entry above already records `SEASON_PROJECTION_LAUNCHING sport=nfl season=2026 week=5 reason=artifact_is_preseason_backfill` at 03:38:25Z. wk6 is the second firing and the first at the predicted wk5->wk6 rollover.
