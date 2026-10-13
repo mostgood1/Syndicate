@@ -27,6 +27,7 @@ import os
 import re
 import shutil
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -55,11 +56,33 @@ def sha256(path: Path, chunk: int = 1 << 20) -> str:
     return h.hexdigest()
 
 
+def _listdir(directory: Path, attempts: int = 5) -> list[os.DirEntry]:
+    """`scandir` with retries. Over the Windows 9p mount a listing can fail TRANSIENTLY with ENOMEM while the fleet
+    holds most of WSL's memory in page cache (measured 2026-10-13: `/mnt/c/tmp/nhllines/...` failed once, listed
+    fine seconds later). Give up loudly after `attempts`."""
+    for attempt in range(attempts):
+        try:
+            with os.scandir(directory) as it:
+                return list(it)
+        except OSError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(2.0 * (attempt + 1))
+    return []
+
+
 def iter_files(source: Path, pattern: str | None) -> Iterable[Path]:
     rx = re.compile(pattern) if pattern else None
-    for path in sorted(source.rglob("*")):
-        if path.is_file() and (rx is None or rx.search(path.name)):
-            yield path
+    stack = [source]
+    found: list[Path] = []
+    while stack:
+        directory = stack.pop()
+        for entry in _listdir(directory):
+            if entry.is_dir(follow_symlinks=False):
+                stack.append(Path(entry.path))
+            elif entry.is_file(follow_symlinks=False) and (rx is None or rx.search(entry.name)):
+                found.append(Path(entry.path))
+    yield from sorted(found)
 
 
 def copy_set(name: str, source: Path, pattern: str | None, dest_root: Path, *, dry_run: bool) -> dict[str, Any]:
