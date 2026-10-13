@@ -68,3 +68,20 @@ def test_flag_reaches_the_recorder() -> None:
     record = population_record(row, "k", "2026-10-13T00:00:00Z", sport="ncaaf")
     assert record["sg"] is True
     assert population_record({"quote": {}}, "k", "2026-10-13T00:00:00Z", sport="ncaaf")["sg"] is None
+
+
+def test_paper_book_stakes_only_suggested_rows() -> None:
+    from pipeline.portfolio_commit import suggested_rows
+
+    kept, gate = suggested_rows([{"suggested": True, "id": 1}, {"suggested": False}, {"no": "flag"}, "junk"])
+    assert [row["id"] for row in kept] == [1]
+    assert gate == {"rows_in": 4, "suggested": 1, "not_suggested": 1, "flag_absent": 2}
+
+
+def test_board_template_offers_all_and_suggested_with_all_default() -> None:
+    from pathlib import Path
+
+    html = (Path(__file__).resolve().parents[1] / "syndicate" / "templates" / "intelligence.html").read_text(encoding="utf-8")
+    assert 'id="board-suggested-tabs"' in html
+    assert 'suggestedOnly: urlParams.get("opps") === "suggested"' in html   # default All: only the param turns it on
+    assert "if (state.suggestedOnly && item.suggested !== true) return false;" in html

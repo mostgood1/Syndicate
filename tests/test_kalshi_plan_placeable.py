@@ -257,7 +257,7 @@ def _run_commit(monkeypatch, *, venues: str):
     monkeypatch.setenv("SYNDICATE_PAPER2_VENUES", venues)
     board = [_board_row("agg-1", 9.9), _board_row("agg-2", 9.8), _board_row("feed-1", 5.0)]
     monkeypatch.setattr(
-        "pipeline.intelligence_state.read_layer2_shortlist", lambda date: {"rows": board}
+        "pipeline.intelligence_state.read_layer2_shortlist", lambda date: {"rows": [{**r, "suggested": True} for r in board]}
     )
     from pipeline import portfolio_commit as mod
 

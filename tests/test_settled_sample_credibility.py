@@ -429,7 +429,7 @@ def test_run_portfolio_commit_ACTUALLY_PASSES_the_derived_map(tmp_path, monkeypa
     monkeypatch.setenv("SYNDICATE_PORTFOLIO_COMMIT_ENABLED", "1")
     monkeypatch.setattr(
         "pipeline.intelligence_state.read_layer2_shortlist",
-        lambda date: {"rows": [_row()]},
+        lambda date: {"rows": [{**_row(), "suggested": True}]},
     )
     monkeypatch.setattr(
         "syndicate.features.shared.execution_ledger._load",
@@ -462,7 +462,7 @@ def test_an_explicit_map_is_not_overwritten_by_the_derivation(tmp_path, monkeypa
     monkeypatch.setenv("SYNDICATE_PORTFOLIO_COMMIT_ENABLED", "1")
     monkeypatch.setattr(
         "pipeline.intelligence_state.read_layer2_shortlist",
-        lambda date: {"rows": [_row()]},
+        lambda date: {"rows": [{**_row(), "suggested": True}]},
     )
     monkeypatch.setattr(
         "syndicate.features.shared.execution_ledger._load",

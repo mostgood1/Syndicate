@@ -86,7 +86,7 @@ def _write_live_plan(monkeypatch, rows, venue="kalshi"):
 def _write_plan(monkeypatch, rows):
     monkeypatch.setenv("SYNDICATE_PORTFOLIO_COMMIT_ENABLED", "1")
     monkeypatch.setattr(
-        "pipeline.intelligence_state.read_layer2_shortlist", lambda date: {"rows": rows}
+        "pipeline.intelligence_state.read_layer2_shortlist", lambda date: {"rows": [{**r, "suggested": True} for r in rows]}
     )
     from pipeline import portfolio_commit as commit
 

@@ -46,6 +46,10 @@
          before it is made; a zero option is dimmed, never hidden. -->
     <div class="board-filter-grid" id="board-filter-grid">
       <div class="board-filter-sheet-head"><strong>Filters</strong><button type="button" class="board-filter-sheet-clear" data-filter-sheet-clear>Clear all</button></div>
+      {# ALL vs SUGGESTED `[user 2026-10-13, lane layer2-suggested-opps]`: Suggested is the
+         per-line flag the worker stamps (`layer2_board._stamp_suggested`); All stays the
+         default and every line stays on the board. #}
+      <div class="board-filter-group"><span class="board-filter-label">Opps</span><div class="board-tabs cards-tabs" id="board-suggested-tabs" role="tablist" aria-label="All or suggested opportunities"></div></div>
       <div class="board-filter-group"><span class="board-filter-label">State</span><div class="board-tabs cards-tabs" id="board-state-tabs" role="tablist" aria-label="Game state filter"></div></div>
       <div class="board-filter-group"><span class="board-filter-label">Market</span><div class="board-tabs cards-tabs" id="board-market-tabs" role="tablist" aria-label="Market family filter"></div></div>
       <div class="board-filter-group"><span class="board-filter-label">Period</span><div class="board-tabs cards-tabs" id="board-period-tabs" role="tablist" aria-label="Full game or game intervals"></div></div>
@@ -238,6 +242,11 @@
     return SEGMENT_SUFFIX_RE.test(market);
   }
 
+  // `item.suggested === true` only: a row built before the flag existed is NOT suggested.
+  const SUGGESTED_TABS = [
+    { value: "all", label: "All opps" },
+    { value: "suggested", label: "✓ Suggested opps" },
+  ];
   const STEAM_TABS = [
     { value: "all", label: "All opportunities" },
     { value: "steam", label: "⚡ Steam moves only" },
@@ -565,6 +574,7 @@
       ? urlParams.get("lane")
       : "opportunity",
     steamOnly: urlParams.get("steam") === "1",
+    suggestedOnly: urlParams.get("opps") === "suggested",
     // DEFAULT "main" -- alt lines are hidden until asked for `[user decision,
     // 2026-08-22]`. This is the opposite of the odds range's default, and the
     // difference is that hiding alt lines LEAVES A POPULATED BOARD: the main
@@ -750,6 +760,7 @@
     if (state.lane && state.lane !== "opportunity") url.searchParams.set("lane", state.lane); else url.searchParams.delete("lane");
     if (state.game && state.game !== "all") url.searchParams.set("game", state.game); else url.searchParams.delete("game");
     if (state.steamOnly) url.searchParams.set("steam", "1"); else url.searchParams.delete("steam");
+    if (state.suggestedOnly) url.searchParams.set("opps", "suggested"); else url.searchParams.delete("opps");
     // "main" is the DEFAULT now, so "all" and "alt" are the states worth
     // putting in the URL. Writing the default would make every shared link
     // carry a parameter that changes nothing.
@@ -920,6 +931,10 @@
       state.steamOnly = value === "steam";
       rerenderAfterFilter();
     });
+    renderTabs("board-suggested-tabs", withCounts(SUGGESTED_TABS, (v) => ({ suggestedOnly: v === "suggested" })), state.suggestedOnly ? "suggested" : "all", (value) => {
+      state.suggestedOnly = value === "suggested";
+      rerenderAfterFilter();
+    });
     updateFilterDisclosure();
   }
 
@@ -941,6 +956,7 @@
     if (state.altLines !== "all") out.push({ key: "alt", text: label(ALT_LINE_TABS, state.altLines), open: { altLines: "all" } });
     if (state.lane !== "all") out.push({ key: "lane", text: label(LANE_TABS, state.lane), open: { lane: "all" } });
     if (state.steamOnly) out.push({ key: "steam", text: "Steam moves only", open: { steamOnly: false } });
+    if (state.suggestedOnly) out.push({ key: "opps", text: "Suggested opps", open: { suggestedOnly: false } });
     if (state.betType !== "all") out.push({ key: "bet_type", text: betTypeLabel(state.betType), open: { betType: "all" } });
     return out;
   }
@@ -950,6 +966,7 @@
   const FILTER_DEFAULTS = {
     sport: "all", game: "all", gameState: "all", marketFamily: "all", period: "all",
     minEdge: 0, altLines: "main", lane: "opportunity", steamOnly: false, betType: "all",
+    suggestedOnly: false,
   };
 
   function filtersAtDefault() {
@@ -1875,6 +1892,7 @@
       if (state.period === "intervals" && !interval) return false;
     }
     if (state.steamOnly && !isSteamCandidate(item)) return false;
+    if (state.suggestedOnly && item.suggested !== true) return false;
     if (state.altLines !== "all") {
       const alt = isAltLine(item);
       if (state.altLines === "main" && alt) return false;
@@ -2117,6 +2135,7 @@
     if (itemState === "live") badges.push('<span class="board-badge board-badge--live">Live</span>');
     if (itemState === "pregame") badges.push('<span class="board-badge board-badge--pregame">Pregame</span>');
     if (isSteamCandidate(item)) badges.push('<span class="board-badge board-badge--steam" title="Steam move: a sharp, fast line/price move detected by the odds tracker">⚡ Steam</span>');
+    if (item.suggested === true) badges.push('<span class="board-badge board-badge--suggested" title="Suggested: market EV of +2% or more (net of venue fee) against a two-sided fair, on a fresh quote">✓ Suggested</span>');
     if (confidence !== null && confidence >= 0.7) badges.push('<span class="board-badge board-badge--confidence">High confidence</span>');
     const sport = rowSportLabel(item);
     // THE ATTRIBUTE IS NOT THE LABEL, AND IT MUST NOT BECOME ONE.
@@ -4173,7 +4192,8 @@
               const updatedDisplay = formatRelativeTime(updatedIso);
               const rowAttrs = `data-pick-id="${escapeHtml(pickKey(item))}" data-syndicate-name="${escapeHtml(title)}" data-syndicate-sport="${escapeHtml(sport)}" data-syndicate-market="${escapeHtml(item.market || item.market_label || "")}" data-syndicate-selection="${escapeHtml(item.selection || item.pick || "")}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}" data-syndicate-odds="${escapeHtml(oddsText)}" data-syndicate-prop-line="${escapeHtml(propText)}" data-syndicate-event-id="${escapeHtml(String(item.event_id || item.game_id || ""))}" data-syndicate-game-date="${escapeHtml(item.context_label || "")}" data-syndicate-matchup="${escapeHtml(matchup || "")}" ${askIdentityAttrs(item)}`;
               const headshot = playerHeadshot(item);
-              const steamBadge = isSteamCandidate(item) ? '<span class="board-badge board-badge--steam" title="Steam move: a sharp, fast line/price move detected by the odds tracker">⚡ Steam</span>' : "";
+              const steamBadge = (isSteamCandidate(item) ? '<span class="board-badge board-badge--steam" title="Steam move: a sharp, fast line/price move detected by the odds tracker">⚡ Steam</span>' : "")
+                + (item.suggested === true ? '<span class="board-badge board-badge--suggested" title="Suggested: market EV of +2% or more (net of venue fee) against a two-sided fair, on a fresh quote">✓ Suggested</span>' : "");
               // OUR OWN SIM RATES THIS ROW WORSE THAN ITS PRICE IMPLIES.
               //
               // 32 of 108 served rows carried a negative `model_edge_pct` on

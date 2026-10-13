@@ -1300,6 +1300,34 @@ def _settled_sample_size_by_sport() -> dict[str, int]:
         return {}
 
 
+def suggested_rows(rows: list) -> tuple[list, dict[str, int]]:
+    """The shortlist rows the paper book may stake: those the board flagged `suggested`.
+
+    `[user decision 2026-10-13, "Yes, one definition"]`, lane `layer2-suggested-opps`.
+    The board stamps a per-LINE flag (`layer2_board._stamp_suggested`: market EV >= +2%
+    net of venue fee, two-sided fair, plausible fresh quote, one side per line) and the
+    paper book stakes exactly that set, so the graded set IS the shown set. Applied here,
+    on the production read of the shortlist, and not inside the pure
+    `commit_portfolio` sizer: every sizing gate, refusal name and test of that function
+    is unchanged.
+
+    A row with NO flag (built before it existed) is counted `flag_absent` and NOT
+    staked -- unknown must not take the permissive branch.
+    """
+    kept: list = []
+    gate = {"rows_in": 0, "suggested": 0, "not_suggested": 0, "flag_absent": 0}
+    for row in rows or ():
+        gate["rows_in"] += 1
+        if not isinstance(row, Mapping) or "suggested" not in row:
+            gate["flag_absent"] += 1
+        elif row.get("suggested") is True:
+            gate["suggested"] += 1
+            kept.append(row)
+        else:
+            gate["not_suggested"] += 1
+    return kept, gate
+
+
 def run_portfolio_commit(
     selected_date: str,
     *,
@@ -1329,6 +1357,19 @@ def run_portfolio_commit(
     rows = shortlist.get("rows")
     if not isinstance(rows, list):
         return {"status": "skipped", "reason": "shortlist_has_no_rows_key", "date": normalized}
+
+    # SUGGESTED ONLY -- see `suggested_rows`. A shortlist built entirely before the
+    # flag existed leaves the previous plan standing instead of writing an empty one.
+    rows, suggested_gate = suggested_rows(rows)
+    print(
+        "[portfolio_commit] SUGGESTED_GATE date=%s rows_in=%d suggested=%d not_suggested=%d flag_absent=%d"
+        % (normalized, suggested_gate["rows_in"], suggested_gate["suggested"],
+           suggested_gate["not_suggested"], suggested_gate["flag_absent"]),
+        flush=True,
+    )
+    if suggested_gate["rows_in"] and suggested_gate["flag_absent"] == suggested_gate["rows_in"]:
+        return {"status": "skipped", "reason": "shortlist_predates_suggested_flag", "date": normalized,
+                "suggested_gate": suggested_gate}
 
     # THE GATE. Pure computation, no I/O, so it runs before every plan write.
     #
@@ -1413,6 +1454,7 @@ def run_portfolio_commit(
     # and filled orders -- true of the web service, useless to a reader, and
     # exactly backwards as a status line. The flags are worker-side facts, so
     # the worker records them.
+    plan["suggested_gate"] = suggested_gate
     plan["job_state"] = {
         "commit_enabled": True,
         "execution_enabled": _execution_enabled(),

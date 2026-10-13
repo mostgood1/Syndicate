@@ -325,7 +325,7 @@ def test_enabling_the_job_makes_the_plan_appear_for_the_same_date(tmp_path, monk
 
     monkeypatch.setattr(
         "pipeline.intelligence_state.read_layer2_shortlist",
-        lambda date: {"rows": [_row()]},
+        lambda date: {"rows": [{**_row(), "suggested": True}]},
     )
     result = runner.run_portfolio_commit("2026-08-22")
     assert result["status"] == "ok"
@@ -360,7 +360,7 @@ def test_a_failing_input_checklist_blocks_the_plan_write(tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "pipeline.intelligence_state.read_layer2_shortlist",
-        lambda date: {"rows": [_row()]},
+        lambda date: {"rows": [{**_row(), "suggested": True}]},
     )
     import portfolio_commit_input_checklist as checklist
 
