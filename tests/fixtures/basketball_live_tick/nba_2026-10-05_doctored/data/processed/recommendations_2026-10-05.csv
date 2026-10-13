@@ -1,0 +1,7 @@
+market,side,home,away,date,ev,price,implied_prob,edge,line,pred_margin,market_home_margin,pred_total,tier
+ATS,Atlanta Hawks,Atlanta Hawks,Memphis Grizzlies,2026-10-05,0.182345,-110.0,0.52381,3.65,5.5,9.15,-5.5,,Medium
+TOTAL,Over,Atlanta Hawks,Memphis Grizzlies,2026-10-05,0.037522,-110.0,0.52381,1.83,231.5,,,233.33,Low
+ATS,New York Knicks,Philadelphia 76ers,New York Knicks,2026-10-05,0.070431,-110.0,0.52381,1.83,1.5,0.33,-1.5,,Low
+TOTAL,Over,Philadelphia 76ers,New York Knicks,2026-10-05,0.265926,-110.0,0.52381,7.11,226.5,,,233.61,High
+ATS,Detroit Pistons,Detroit Pistons,Phoenix Suns,2026-10-05,0.141119,-110.0,0.52381,2.97,3.5,6.47,-3.5,,Medium
+TOTAL,Over,Detroit Pistons,Phoenix Suns,2026-10-05,0.301167,-110.0,0.52381,7.99,219.5,,,227.49,High

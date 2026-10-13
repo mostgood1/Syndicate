@@ -1,0 +1,4 @@
+date,commence_time,home_team,visitor_team,home_ml,away_ml,home_spread,away_spread,total,bookmaker
+2026-10-05,2026-10-05T23:00:00Z,Atlanta Hawks,Memphis Grizzlies,-160.69516962462998,160.69516962463007,-5.5,5.5,231.5,oddsapi_consensus
+2026-10-05,2026-10-05T23:00:00Z,Philadelphia 76ers,New York Knicks,-107.66724528373295,107.667245283733,-1.5,1.5,226.5,oddsapi_consensus
+2026-10-05,2026-10-05T23:00:00Z,Detroit Pistons,Phoenix Suns,-134.39207290965808,134.39207290965808,-3.5,3.5,219.5,oddsapi_consensus

@@ -1,0 +1,6 @@
+league,season,season_type,date,event_id,home,away,official_home,official_away,pbp_home,pbp_away,running_home,running_away,score_match,plays,stints,anomalies,notes,source
+nba,2027,preseason,2026-10-05,401898388,ATL,MEM,123,132,123,132,123,132,1,529,40,0,,syndicate_espn_pbp_v1
+nba,2027,preseason,2026-10-05,401908947,DET,PHX,109,107,109,107,109,107,1,538,38,0,,syndicate_espn_pbp_v1
+nba,2027,preseason,2026-10-05,401914101,PHI,NYK,120,97,120,97,120,97,1,538,44,0,,syndicate_espn_pbp_v1
+nba,2027,preseason,2026-10-05,401914102,MIL,MIN,97,116,97,116,97,116,1,531,47,0,,syndicate_espn_pbp_v1
+nba,2027,preseason,2026-10-05,401898716,SAC,LAL,103,127,100,127,100,127,0,522,37,0,,syndicate_espn_pbp_v1

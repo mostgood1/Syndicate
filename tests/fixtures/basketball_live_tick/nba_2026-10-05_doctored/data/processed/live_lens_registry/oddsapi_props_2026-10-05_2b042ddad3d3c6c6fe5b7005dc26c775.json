@@ -1,0 +1,346 @@
+{
+  "all_markets": {
+    "JALEN BRUNSON|player_assists": {
+      "first_line": 6.5,
+      "first_prices": {
+        "over": -114.0,
+        "under": -114.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 6.5,
+      "last_prices": {
+        "over": -114.0,
+        "under": -114.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "JALEN BRUNSON|player_assists_alternate": {
+      "first_line": 8.5,
+      "first_prices": {
+        "over": 274.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 8.5,
+      "last_prices": {
+        "over": 274.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "JALEN BRUNSON|player_points": {
+      "first_line": 25.5,
+      "first_prices": {
+        "over": -125.0,
+        "under": -106.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 25.5,
+      "last_prices": {
+        "over": -125.0,
+        "under": -106.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "JALEN BRUNSON|player_points_alternate": {
+      "first_line": 32.0,
+      "first_prices": {
+        "over": 282.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 32.0,
+      "last_prices": {
+        "over": 282.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "JALEN BRUNSON|player_points_assists": {
+      "first_line": 32.5,
+      "first_prices": {
+        "over": -128.0,
+        "under": -104.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 32.5,
+      "last_prices": {
+        "over": -128.0,
+        "under": -104.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "JALEN BRUNSON|player_points_rebounds": {
+      "first_line": 29.5,
+      "first_prices": {
+        "over": -108.0,
+        "under": -122.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 29.5,
+      "last_prices": {
+        "over": -108.0,
+        "under": -122.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "JALEN BRUNSON|player_points_rebounds_assists": {
+      "first_line": 36.5,
+      "first_prices": {
+        "over": -106.0,
+        "under": -125.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 36.5,
+      "last_prices": {
+        "over": -106.0,
+        "under": -125.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "JALEN BRUNSON|player_points_rebounds_assists_alternate": {
+      "first_line": 49.5,
+      "first_prices": {
+        "over": 830.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 49.5,
+      "last_prices": {
+        "over": 830.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "JALEN BRUNSON|player_rebounds": {
+      "first_line": 2.5,
+      "first_prices": {
+        "over": -172.0,
+        "under": 128.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 2.5,
+      "last_prices": {
+        "over": -172.0,
+        "under": 128.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "JALEN BRUNSON|player_rebounds_alternate": {
+      "first_line": 4.5,
+      "first_prices": {
+        "over": 454.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 4.5,
+      "last_prices": {
+        "over": 454.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "JALEN BRUNSON|player_rebounds_assists": {
+      "first_line": 9.5,
+      "first_prices": {
+        "over": -122.0,
+        "under": -108.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 9.5,
+      "last_prices": {
+        "over": -122.0,
+        "under": -108.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "JALEN BRUNSON|player_threes": {
+      "first_line": 2.5,
+      "first_prices": {
+        "over": 116.0,
+        "under": -154.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 2.5,
+      "last_prices": {
+        "over": 116.0,
+        "under": -154.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "JALEN BRUNSON|player_threes_alternate": {
+      "first_line": 3.5,
+      "first_prices": {
+        "over": 300.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 3.5,
+      "last_prices": {
+        "over": 300.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    }
+  },
+  "date": "2026-10-05",
+  "event_id": "2b042ddad3d3c6c6fe5b7005dc26c775",
+  "markets": {
+    "JALEN BRUNSON|ast": {
+      "first_line": 6.5,
+      "first_prices": {
+        "over": -114.0,
+        "under": -114.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 6.5,
+      "last_prices": {
+        "over": -114.0,
+        "under": -114.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "JALEN BRUNSON|pra": {
+      "first_line": 36.5,
+      "first_prices": {
+        "over": -106.0,
+        "under": -125.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 36.5,
+      "last_prices": {
+        "over": -106.0,
+        "under": -125.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "JALEN BRUNSON|pts": {
+      "first_line": 25.5,
+      "first_prices": {
+        "over": -125.0,
+        "under": -106.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 25.5,
+      "last_prices": {
+        "over": -125.0,
+        "under": -106.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "JALEN BRUNSON|reb": {
+      "first_line": 2.5,
+      "first_prices": {
+        "over": -172.0,
+        "under": 128.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 2.5,
+      "last_prices": {
+        "over": -172.0,
+        "under": 128.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "JALEN BRUNSON|threes": {
+      "first_line": 2.5,
+      "first_prices": {
+        "over": 116.0,
+        "under": -154.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 2.5,
+      "last_prices": {
+        "over": 116.0,
+        "under": -154.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    }
+  },
+  "short_markets": {
+    "BRUNSONJ|ast": {
+      "first_line": 6.5,
+      "first_prices": {
+        "over": -114.0,
+        "under": -114.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 6.5,
+      "last_prices": {
+        "over": -114.0,
+        "under": -114.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "BRUNSONJ|pra": {
+      "first_line": 36.5,
+      "first_prices": {
+        "over": -106.0,
+        "under": -125.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 36.5,
+      "last_prices": {
+        "over": -106.0,
+        "under": -125.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "BRUNSONJ|pts": {
+      "first_line": 25.5,
+      "first_prices": {
+        "over": -125.0,
+        "under": -106.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 25.5,
+      "last_prices": {
+        "over": -125.0,
+        "under": -106.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "BRUNSONJ|reb": {
+      "first_line": 2.5,
+      "first_prices": {
+        "over": -172.0,
+        "under": 128.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 2.5,
+      "last_prices": {
+        "over": -172.0,
+        "under": 128.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    },
+    "BRUNSONJ|threes": {
+      "first_line": 2.5,
+      "first_prices": {
+        "over": 116.0,
+        "under": -154.0
+      },
+      "first_seen_at": "2026-10-05T23:14:07Z",
+      "last_line": 2.5,
+      "last_prices": {
+        "over": 116.0,
+        "under": -154.0
+      },
+      "last_seen_at": "2026-10-06T01:24:19Z",
+      "observations": 46
+    }
+  },
+  "updated_at": "2026-10-06T01:24:29Z"
+}

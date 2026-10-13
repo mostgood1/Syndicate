@@ -1,0 +1,17 @@
+snapshot_ts,event_id,commence_time,bookmaker,bookmaker_title,market,outcome_name,player_name,point,price,last_update,home_team,away_team
+2026-10-06T04:51:22.802582+00:00,31379f34c94a9796f13110df92cb5cc7,2026-10-06T02:10:53Z,draftkings,DraftKings,spreads,Los Angeles Lakers,,-25.5,-160,2026-10-06T04:42:46Z,Sacramento Kings,Los Angeles Lakers
+2026-10-06T04:51:22.802582+00:00,31379f34c94a9796f13110df92cb5cc7,2026-10-06T02:10:53Z,draftkings,DraftKings,spreads,Sacramento Kings,,25.5,124,2026-10-06T04:42:46Z,Sacramento Kings,Los Angeles Lakers
+2026-10-06T04:51:22.802582+00:00,31379f34c94a9796f13110df92cb5cc7,2026-10-06T02:10:53Z,draftkings,DraftKings,totals,Over,,228.5,124,2026-10-06T04:42:46Z,Sacramento Kings,Los Angeles Lakers
+2026-10-06T04:51:22.802582+00:00,31379f34c94a9796f13110df92cb5cc7,2026-10-06T02:10:53Z,draftkings,DraftKings,totals,Under,,228.5,-160,2026-10-06T04:42:46Z,Sacramento Kings,Los Angeles Lakers
+2026-10-06T04:51:22.802582+00:00,31379f34c94a9796f13110df92cb5cc7,2026-10-06T02:10:53Z,fanduel,FanDuel,spreads,Los Angeles Lakers,,-23.5,-106,2026-10-06T04:41:48Z,Sacramento Kings,Los Angeles Lakers
+2026-10-06T04:51:22.802582+00:00,31379f34c94a9796f13110df92cb5cc7,2026-10-06T02:10:53Z,fanduel,FanDuel,spreads,Sacramento Kings,,23.5,-125,2026-10-06T04:41:48Z,Sacramento Kings,Los Angeles Lakers
+2026-10-06T04:51:22.802582+00:00,31379f34c94a9796f13110df92cb5cc7,2026-10-06T02:10:53Z,fanduel,FanDuel,totals,Over,,224.5,114,2026-10-06T04:41:48Z,Sacramento Kings,Los Angeles Lakers
+2026-10-06T04:51:22.802582+00:00,31379f34c94a9796f13110df92cb5cc7,2026-10-06T02:10:53Z,fanduel,FanDuel,totals,Under,,224.5,-152,2026-10-06T04:41:48Z,Sacramento Kings,Los Angeles Lakers
+2026-10-06T04:51:22.802582+00:00,31379f34c94a9796f13110df92cb5cc7,2026-10-06T02:10:53Z,williamhill_us,Caesars,spreads,Los Angeles Lakers,,-24.5,170,2026-10-06T04:42:01Z,Sacramento Kings,Los Angeles Lakers
+2026-10-06T04:51:22.802582+00:00,31379f34c94a9796f13110df92cb5cc7,2026-10-06T02:10:53Z,williamhill_us,Caesars,spreads,Sacramento Kings,,24.5,-210,2026-10-06T04:42:01Z,Sacramento Kings,Los Angeles Lakers
+2026-10-06T04:51:22.802582+00:00,31379f34c94a9796f13110df92cb5cc7,2026-10-06T02:10:53Z,williamhill_us,Caesars,totals,Over,,226.5,165,2026-10-06T04:42:01Z,Sacramento Kings,Los Angeles Lakers
+2026-10-06T04:51:22.802582+00:00,31379f34c94a9796f13110df92cb5cc7,2026-10-06T02:10:53Z,williamhill_us,Caesars,totals,Under,,226.5,-200,2026-10-06T04:42:01Z,Sacramento Kings,Los Angeles Lakers
+2026-10-06T04:51:22.802582+00:00,31379f34c94a9796f13110df92cb5cc7,2026-10-06T02:10:53Z,mybookieag,MyBookie.ag,spreads,Los Angeles Lakers,,-27.5,-105,2026-10-06T04:38:42Z,Sacramento Kings,Los Angeles Lakers
+2026-10-06T04:51:22.802582+00:00,31379f34c94a9796f13110df92cb5cc7,2026-10-06T02:10:53Z,mybookieag,MyBookie.ag,spreads,Sacramento Kings,,27.5,-133,2026-10-06T04:38:42Z,Sacramento Kings,Los Angeles Lakers
+2026-10-06T04:51:22.802582+00:00,31379f34c94a9796f13110df92cb5cc7,2026-10-06T02:10:53Z,mybookieag,MyBookie.ag,totals,Over,,222.5,-125,2026-10-06T04:38:42Z,Sacramento Kings,Los Angeles Lakers
+2026-10-06T04:51:22.802582+00:00,31379f34c94a9796f13110df92cb5cc7,2026-10-06T02:10:53Z,mybookieag,MyBookie.ag,totals,Under,,222.5,-105,2026-10-06T04:38:42Z,Sacramento Kings,Los Angeles Lakers
