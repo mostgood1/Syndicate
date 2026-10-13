@@ -48867,3 +48867,14 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **reloads:** 15:16:03Z 2.6 s, 15:19:20Z 12.0 s; 0 healthz failures; web claims released.
 - **verify (served + browser at 1440, /intelligence?date=2026-10-12&view=cards):** 15 of 15 rail cards render a line score; NBA "OKC 28 21 30 31 110 / ATL 29 27 23 34 113"; NHL "FLA 1 2 0 3 / BUF 2 1 2 5"; MLB "LAD 4 3 2 / MIL 7 12 2" (R H E); soccer 1H/2H/T. Fleet sweep: finals with a line score mlb 2/2, nba 5/5, nhl 3/3 + 3/3 + 14/14, nfl 15/15, ncaaf 46/46, soccer 84/84; period sums equal the finals.
 - **pending:** today's (worker-built) live/final chips need refresh-worker on >= 4eb66400 -- restart-after-save in progress (claim games-rail-full-detail).
+
+## 2026-10-13 15:27:17Z (10:27 AM CT) -- LOCAL FLEET refresh-worker restart onto 92e2271e, right after a save (lane `games-rail-full-detail`, session d4409ac4; standing user rule: restart right after a save is OK)
+- **gate:** claim refresh-worker; `Board build idle`; newest shortlist 15:15:25Z > worker start 14:39:07Z. TERM 15:27:17Z pid 100486 -> respawned 15:27:26Z pid 111351. 4 child jobs stopped (2 odds refresh, build_soccer_artifacts epl wk8, fetch_espn_live_status) -- they re-run on their next tick. Claim released.
+- **why:** today's (worker-built) live/final chips carry the line score only on >= 4eb66400.
+
+## 2026-10-13 15:31:36Z (10:32 AM CT) -- LOCAL FLEET ff 92e2271e -> d1a933f2 (exact SHA, no ride-alongs) + rolling `reload-web` (lane `games-rail-full-detail`, session d4409ac4, user "keep the pbp step for the line scores") -- NO outage
+- **change:** `scripts/fetch_basketball_linescores.py` NEW -- yesterday's NBA + WNBA quarter scores from ESPN's SCOREBOARD (one request per league; completed games only) into `<league>_source/data/processed/linescores_<date>.json`; `game_chip_linescore` prefers it (ESPN id, then team pair), pbp files second. Same purpose as the retired `update-pbp-espn-history` step at ~1/10th the requests, and it covers WNBA.
+- **backfill (fleet, 15:2xZ):** nba 10-07 5, 10-09 2, 10-11 4, 10-12 5 games; wnba 10-07 2, 10-09 2.
+- **reload:** 38.3 s, 0 healthz failures / 20 probes, max 0.56 s; released.
+- **verify (served):** wnba 10-09 GSV@LVA 87-77 [1,2,3,4,OT], ATL@NYL 85-83; 10-07 NYL@ATL 98-101 [..,OT]; nba 10-12 4/4 finals with quarters + scores.
+- **NOT DONE -- the daily schedule:** the `ScheduledJob("basketball-linescores", 10, 35, ...)` line is BLOCKED by lane-guard: `scripts/local_production.py` is claimed by OPEN lane `basketball-native-live-state` (its claim text: SCHEDULED_JOBS basketball-rotation-stints entry ONLY; the guard enforces the whole file). Until a session with that file adds the entry (and a supervisor `up` loads it), no new linescores files are written after 10-12.
