@@ -95,6 +95,22 @@ class EventSimConfig:
     # per 4 minutes 2.0-3.2 in NCAAB first halves vs 3.4-4.8 in second halves, and a constant rate leaves the half
     # split at ~0 whatever its level (fit 2026-10-12). 1.0 = off.
     bonus_second_half_mult: float = 1.0
+    # In-sim FOUL-OUT disqualification (P3, the first half of foul trouble). Without it a player reaching the league
+    # foul limit inside a draw keeps playing and fouling: full-FIT sim foul-outs 0.473/game vs real 0.193
+    # (basketball-scenario-calibration, 2026-10-12). On: at each possession start, a player whose fouls (carried from
+    # a resumed GameState + this draw's) reach `personal_foul_limit` gets no further lineup weight and his units leave
+    # the pool -- the same treatment a resumed state's fouled-out players already get. Off = byte-identical.
+    foul_out_in_sim: bool = False
+    # FOUL-TROUBLE BENCHING (P3). Real starters sit once in foul trouble (findings §2d, 2025-26 regular season: on-floor
+    # share of the rest of the period after 2 PF in Q1 / 3 in Q2 / 4 in Q3 / 5 in Q4 is 0.19 / 0.21 / 0.21 / 0.46 vs
+    # 0.45 / 0.74 / 0.49 / 0.60 for other starters), which is why real foul-outs are 0.19/game and the sim's 0.75.
+    # A player whose fouls (carried + this draw's) reach the period's threshold has his lineup weight multiplied by
+    # `foul_trouble_bench_mult` and his side samples its lineup by weight that possession (the pre-built pool ignores
+    # weights). In the final regulation period, inside `foul_trouble_release_s`, nobody is benched (closers play).
+    # 1.0 = off: no change, no extra draw.
+    foul_trouble_bench_mult: float = 1.0
+    foul_trouble_thresholds: Tuple[int, ...] = (2, 3, 4, 5)
+    foul_trouble_release_s: int = 240
 
     # Outcome priors (fallbacks when player priors are missing)
     base_tov_per_poss: float = 0.125
@@ -1054,6 +1070,38 @@ def simulate_pbp_game_boxscore(
 
         bonus_rules = _bonus_rules_for(lp.code)
     bonus_tf: Dict[str, Any] = {"h": [0, 0], "a": [0, 0], "late": {"h": None, "a": None}}
+    fo_on = bool(getattr(cfg, "foul_out_in_sim", False))
+    h_pf0 = np.zeros(len(home_players), dtype=int)
+    a_pf0 = np.zeros(len(away_players), dtype=int)
+    if fo_on and not opening_tip:
+        for i, nm in enumerate(_player_names(home_players)):
+            h_pf0[i] = int((state.home_player_fouls or {}).get(nm, 0))
+        for i, nm in enumerate(_player_names(away_players)):
+            a_pf0[i] = int((state.away_player_fouls or {}).get(nm, 0))
+
+    ft_mult = float(getattr(cfg, "foul_trouble_bench_mult", 1.0) or 1.0)
+    ft_thr = tuple(int(x) for x in (getattr(cfg, "foul_trouble_thresholds", (2, 3, 4, 5)) or (2, 3, 4, 5)))
+    ft_release = int(getattr(cfg, "foul_trouble_release_s", 240) or 0)
+    if ft_mult < 1.0 and opening_tip:
+        h_pf0 = np.zeros(len(home_players), dtype=int)
+        a_pf0 = np.zeros(len(away_players), dtype=int)
+    elif ft_mult < 1.0 and not fo_on:
+        h_pf0 = np.asarray([int((state.home_player_fouls or {}).get(nm, 0)) for nm in _player_names(home_players)], dtype=int)
+        a_pf0 = np.asarray([int((state.away_player_fouls or {}).get(nm, 0)) for nm in _player_names(away_players)], dtype=int)
+
+    def _apply_in_sim_foul_outs() -> None:
+        nonlocal home_lineups, home_lineup_weights, away_lineups, away_lineup_weights
+        limit = int(lp.personal_foul_limit)
+        for side, box, pf0, out_idx in (("h", h, h_pf0, h_out_idx), ("a", a, a_pf0, a_out_idx)):
+            total = np.asarray(box["pf"], dtype=int) + pf0
+            new = [int(i) for i in np.flatnonzero(total >= limit) if int(i) not in out_idx]
+            if not new:
+                continue
+            out_idx.extend(new)
+            if side == "h":
+                home_lineups, home_lineup_weights = _drop_lineups_with(home_lineups, home_lineup_weights, set(out_idx))
+            else:
+                away_lineups, away_lineup_weights = _drop_lineups_with(away_lineups, away_lineup_weights, set(out_idx))
 
     home_score = int(state.home_score)
     away_score = int(state.away_score)
@@ -1181,6 +1229,13 @@ def simulate_pbp_game_boxscore(
             lead = float(home_score - away_score) if off_home else float(away_score - home_score)
             expected = (tgt_margin if off_home else -tgt_margin) * share
             return float(np.clip(1.0 - se_k * (lead - expected), 0.85, 1.15))
+
+        def _foul_trouble_idx(box: Dict[str, Any], pf0: np.ndarray, out_idx: List[int]) -> List[int]:
+            if int(q) == N_PERIODS and int(q_remaining) <= ft_release:
+                return []  # closers play: no foul-trouble benching inside the final release window
+            thr = ft_thr[min(int(q), len(ft_thr)) - 1] if int(q) <= N_PERIODS else ft_thr[-1]
+            total = np.asarray(box["pf"], dtype=int) + pf0
+            return [int(i) for i in np.flatnonzero(total >= thr) if int(i) not in out_idx]
 
         def _endgame_intentional_foul(off_home: bool, h_line_: List[int], a_line_: List[int]) -> None:
             """P3 mechanism: the trailing defense fouls on purpose. Two FTs (same FT% formula as the shooting-foul
@@ -1341,6 +1396,8 @@ def simulate_pbp_game_boxscore(
             else:
                 offense_home = not offense_home if bool(rng.random() < float(getattr(cfg, "possession_alternation", 0.85))) else bool(rng.random() < 0.5)
 
+            if fo_on:
+                _apply_in_sim_foul_outs()
             margin_now = int(home_score - away_score)
             flags = _windows(q=int(q), period_seconds=int(period_seconds), q_remaining=int(q_remaining), margin=int(margin_now))
             home_context_w = _contextual_minutes_weights(
@@ -1368,6 +1425,17 @@ def simulate_pbp_game_boxscore(
             if a_out_idx:
                 away_context_w = np.asarray(away_context_w, dtype=float).copy()
                 away_context_w[a_out_idx] = 0.0
+            h_trouble: List[int] = []
+            a_trouble: List[int] = []
+            if ft_mult < 1.0:
+                h_trouble = _foul_trouble_idx(h, h_pf0, h_out_idx)
+                a_trouble = _foul_trouble_idx(a, a_pf0, a_out_idx)
+                if h_trouble:
+                    home_context_w = np.asarray(home_context_w, dtype=float).copy()
+                    home_context_w[h_trouble] *= ft_mult
+                if a_trouble:
+                    away_context_w = np.asarray(away_context_w, dtype=float).copy()
+                    away_context_w[a_trouble] *= ft_mult
 
             use_contextual_lineups = bool(
                 blowout
@@ -1383,8 +1451,11 @@ def simulate_pbp_game_boxscore(
             h_line = None
             a_line = None
             if (not blowout) and (not use_contextual_lineups):
-                h_line = _pick_lineup_from_pool(home_lineups, home_lineup_weights, n_players=len(home_players))
-                a_line = _pick_lineup_from_pool(away_lineups, away_lineup_weights, n_players=len(away_players))
+                # A side with a player in foul trouble samples by weight instead (the pool ignores weights).
+                if not h_trouble:
+                    h_line = _pick_lineup_from_pool(home_lineups, home_lineup_weights, n_players=len(home_players))
+                if not a_trouble:
+                    a_line = _pick_lineup_from_pool(away_lineups, away_lineup_weights, n_players=len(away_players))
             if pidx == 0 and first_h_line:
                 h_line = list(first_h_line)
             if pidx == 0 and first_a_line:

@@ -108,3 +108,70 @@ def test_empty_bucket_tuple_is_the_scalar_path():
     a = _run(_with_cfg(kw, **ENDGAME_ON), DOWN5_2MIN, 9)
     b = _run(_with_cfg(kw, **ENDGAME_ON, endgame_foul_p_by_deficit=()), DOWN5_2MIN, 9)
     assert a[0][2] == b[0][2] and a[1] == b[1]
+
+
+# ------------------------------------------------------------------------------------------- in-sim foul-outs
+
+def _over_limit_share(kw, state, draws, seed0=0):
+    over = n = 0
+    for s in range(draws):
+        (hb, ab, _hq, _aq), _ = _run(kw, state, seed0 + s)
+        for box in (hb, ab):
+            for r in box.get("players") or []:
+                n += 1
+                over += int(r.get("pf") or 0) > NBA.personal_foul_limit
+    return over / max(1, n)
+
+
+def test_foul_out_in_sim_benches_players_at_the_league_limit():
+    """Reachability: with fouls forced high, OFF lets many players foul past 6; ON almost never does. Not exactly
+    never: the check runs at possession start (one multi-foul possession can add two), and a team short of eligible
+    players must field fouled-out ones -- the real rule too."""
+    kw = _kw()
+    hot = dict(base_nonshooting_foul_per_poss=0.45, base_shooting_foul_per_fga=0.4)
+    off = _over_limit_share(_with_cfg(kw, **hot), None, 12)
+    on = _over_limit_share(_with_cfg(kw, **hot, foul_out_in_sim=True), None, 12)
+    assert off > 0.05 and on < off / 5
+
+
+def test_foul_out_in_sim_counts_fouls_carried_from_a_resumed_state():
+    kw = _with_cfg(_kw(), base_nonshooting_foul_per_poss=0.45, base_shooting_foul_per_fga=0.4, foul_out_in_sim=True)
+    name = str(kw["home_players"]["player_name"].iloc[0])
+    st = GameState(period=3, seconds_remaining=600, home_period_pts=(25, 25, 10), away_period_pts=(25, 25, 10),
+                   home_player_fouls={name: 5})
+    for s in range(12):
+        (hb, _ab, _hq, _aq), _ = _run(kw, st, s)
+        row = next(r for r in hb["players"] if r["player_name"] == name)
+        assert int(row.get("pf") or 0) <= 1  # 5 carried + at most 1 more, then out
+
+
+def test_foul_out_off_is_byte_identical():
+    kw = _kw()
+    a = _run(_with_cfg(kw), DOWN5_2MIN, 4)
+    b = _run(_with_cfg(kw, foul_out_in_sim=False), DOWN5_2MIN, 4)
+    assert a[0][2] == b[0][2] and a[1] == b[1]
+
+
+# ------------------------------------------------------------------------------------------- foul-trouble benching
+
+def _foul_outs(kw, draws, seed0=0):
+    n = 0
+    for s in range(draws):
+        (hb, ab, _hq, _aq), _ = _run(kw, None, seed0 + s)
+        n += sum(1 for b in (hb, ab) for r in b.get("players") or [] if int(r.get("pf") or 0) >= NBA.personal_foul_limit)
+    return n / draws
+
+
+def test_foul_trouble_benching_is_reachable_and_cuts_foul_outs():
+    kw = _kw()
+    warm = dict(base_nonshooting_foul_per_poss=0.2, base_shooting_foul_per_fga=0.2)
+    off = _foul_outs(_with_cfg(kw, **warm), 20)
+    on = _foul_outs(_with_cfg(kw, **warm, foul_trouble_bench_mult=0.05), 20)
+    assert off > 0.5 and on < off * 0.7
+
+
+def test_foul_trouble_off_is_byte_identical():
+    kw = _kw()
+    a = _run(_with_cfg(kw), None, 6)
+    b = _run(_with_cfg(kw, foul_trouble_bench_mult=1.0, foul_trouble_thresholds=(1, 1, 1, 1)), None, 6)
+    assert a[0][2] == b[0][2] and a[1] == b[1]

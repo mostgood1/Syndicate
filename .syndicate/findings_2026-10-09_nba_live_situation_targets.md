@@ -541,3 +541,69 @@ score_effect_k = 0.002):**
 **Secondary (reported, not gated):** the live-resume check. From real states where a starter has just reached
 the threshold (§2d), the sim's share of the rest of the period with that player on the floor vs real
 0.19 / 0.21 / 0.21 / 0.46. Needs per-possession lineup recording; deferred if the engine cannot report it.
+
+### 8a. RESULT — foul-out + foul-trouble benching (read 2026-10-12 ~22:3xZ, pre-registered §8)
+
+**Setup:** 60 FIT + 60 VALIDATION games, 20 pregame draws each, v4 inputs, k = 0.002, `foul_out_in_sim` ON in
+every arm, common random numbers.
+
+| bench mult | FIT foul-outs/g | VALID foul-outs/g | VALID team PF/g |
+|---|---|---|---|
+| 1.0 (off) | 0.548 | 0.536 | 29.64 |
+| 0.5 | 0.338 | 0.349 | 29.65 |
+| 0.3 | 0.268 | 0.308 | 29.74 |
+| 0.15 | 0.241 | 0.248 | 29.56 |
+| **0.05 (chosen)** | **0.240** | **0.213** | **29.68** |
+
+Real foul-outs: 0.193/game.
+
+**SHIP under the rule:**
+- VALID |0.213 − 0.193| = 0.020 ≤ 0.05;
+- team PF/game +0.1% vs mult 1.0 (≤ 5%).
+
+**Caveats:**
+- FIT floors at ~0.24 even at near-total benching, so some excess comes from foul ALLOCATION inside a stint, not
+  from who plays. The fit does not close it.
+- A 0.05 lineup-weight multiplier is stronger than the real on-floor ratios (§2d: 0.19 / 0.45, 0.21 / 0.74, ...).
+  Weight ≠ on-floor share, but the minutes side MUST be read with basketball-scenario-calibration's
+  `--track-oncourt` (47216656) before enabling.
+
+**Enabling** stays off. Pregame enablement is the user's decision. Live enablement goes with the switch-on.
+
+**Engine-edit gate:** P1's production-corpus replay on the code with both fields (default-off), in flight.
+- **Engine-edit gate:** P1's corpus replay on the code with `foul_out_in_sim` + `foul_trouble_*` (default-off):
+  **5,400/5,400**, mismatched_cases 0 (NBA 3,000 / WNBA 2,400), PASS, 3,010 s.
+
+### 7b. RESULT — end-game fouling re-fit (read 2026-10-12 ~23:5xZ, pre-registered §7; VALIDATION read once)
+
+**Setup:**
+- v4 inputs (pools + #473 + the 2024-25 prior), `score_effect_k = 0.002` in every arm.
+- Game-matched at 2:00 Q4, 40 draws, common random numbers.
+- 518 regular-season games graded.
+- Named refusals: `pbp_score_mismatch` 8, `on_floor_incomplete` 11; 26 without inputs/summary.
+
+**Per trailing-deficit bucket at 2:00.** REAL = regulation points after 2:00; error = mean(SIM − REAL).
+
+| bucket | FIT n | FIT err @p=0 / @chosen | chosen p | VALID n | VALID err @p=0 / @chosen | REAL VALID 95% CI | ship |
+|---|---|---|---|---|---|---|---|
+| 1-3 | 157 | −1.01 / +0.57 | **0.2** | 41 | −1.19 / **+0.45** | [10.15, 12.98] (half-width 1.41) | **yes** |
+| 4-6 | 108 | −0.76 / −0.76 | **0.0** | 45 | −1.84 / −1.84 | [11.33, 13.62] (half-width 1.14) | **no → p = 0** |
+| 7-10 | 123 | −1.19 / −0.04 | **0.2** | 44 | −1.38 / **−0.12** | [10.41, 13.50] (half-width 1.55) | **yes** |
+
+**Shipping values:** `endgame_foul_p_by_deficit = (0.2, 0.0, 0.2)`; window 120 s; extension on.
+- Off by default.
+- Live enablement is with the switch-on, through `SYNDICATE_NBA_LIVE_MECHANISMS`.
+
+**Reading:**
+1. With p = 0 the sim UNDER-scores the last 2:00 in every bucket (−0.8 to −1.8 points), consistent with §2c.
+2. In 1-3 and 7-10, p = 0.2 removes it on held-out games.
+3. **4-6 is a SHAPE miss.** On FIT, p = 0.2 already over-shoots points (+0.79) while sim FTA stays far below real
+   (3.48 vs real 5.25 FTA after 2:00). So the sim's foul trips convert to points differently from real ones.
+   - Candidate causes: real fouls are concentrated and immediate; the sim has 5-s trips but fewer of them; the
+     extension adds shot possessions as well as FT trips.
+   - A per-bucket p cannot fix a shape miss. The pre-registered rule leaves 4-6 at p = 0.
+   - Follow-up (not done): fit on FTA and points JOINTLY, or make the foul trip replace the shot possession rather
+     than extend.
+4. **Q4 reversion:** calibration's full FIT left Q4 at −0.093 vs real −0.141 with k = 0.002. The effect of M-EG on that
+   slope is to be measured in the gate's 5:00 Q4 cells, not assumed.
+- **Engine-edit gate on the MERGED file** (P3 foul mechanisms + P4 bonus free throws, 3dcc513e): corpus replay **5,400/5,400**, mismatched_cases 0, PASS, 2,669 s (2026-10-13 00:06Z).
