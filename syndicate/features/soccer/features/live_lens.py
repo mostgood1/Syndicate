@@ -519,6 +519,13 @@ class LivePlayerPropProjection:
     goals_so_far: int = 0
     projected_final_goals: float = 0.0
     goals_over_probabilities: dict[str, float] = field(default_factory=dict)
+    # LINEUP BASIS (2026-10-13). "on_pitch": the remainder was allocated over the
+    # players on the pitch at the cutoff (bench at the bench discount; a player
+    # subbed off or sent off gets none). "squad": the live state carried no
+    # lineup, or too few of its on-pitch ids matched the player rows, so the
+    # whole season squad shared it -- the behaviour before this field existed.
+    lineup_basis: str = "squad"
+    on_pitch: bool | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -538,6 +545,8 @@ class LivePlayerPropProjection:
             "goals_so_far": self.goals_so_far,
             "projected_final_goals": self.projected_final_goals,
             "goals_over_probabilities": dict(self.goals_over_probabilities),
+            "lineup_basis": self.lineup_basis,
+            "on_pitch": self.on_pitch,
         }
 
 
@@ -567,6 +576,30 @@ def _remaining_match_fraction(live_state: dict[str, Any]) -> float:
         return 0.0
     total = remaining + (_MATCH_SECONDS / 2.0 if half == 1 else 0.0)
     return min(1.0, max(0.0, total / _MATCH_SECONDS))
+
+
+# Fewer matched on-pitch ids than this for one side means the live roster and the
+# player rows do not share ids (or the roster is missing): fall back to the squad
+# rather than allocate a team's whole remainder over two or three players.
+_MIN_MATCHED_ON_PITCH = 6
+
+
+def _live_lineup(rows: list[dict[str, Any]], player_stats: dict[str, Any]) -> tuple[
+        list[dict[str, Any]], set[str], list[dict[str, Any]], str]:
+    """(rows that share the remainder, their starter set, rows that have LEFT the
+    match, basis). On-pitch players are the starters; matchday-squad players not
+    yet on are bench (discounted by `build_usage_profiles`); season-squad players
+    outside the matchday squad, and anyone subbed off or sent off, share nothing."""
+    every = {str(row.get("player_id")) for row in rows}
+    if not any(isinstance(s, dict) and "on_pitch" in s for s in (player_stats or {}).values()):
+        return rows, every, [], "squad"
+    on_pitch = {pid for pid, s in player_stats.items() if isinstance(s, dict) and s.get("on_pitch")}
+    if len(on_pitch & every) < _MIN_MATCHED_ON_PITCH:
+        return rows, every, [], "squad"
+    left = {pid for pid, s in player_stats.items() if isinstance(s, dict) and s.get("entered") and not s.get("on_pitch")}
+    sharing = [row for row in rows if str(row.get("player_id")) in player_stats and str(row.get("player_id")) not in left]
+    gone = [row for row in rows if str(row.get("player_id")) in left]
+    return sharing, on_pitch & every, gone, "on_pitch"
 # IMPORTED, NOT RESTATED. These define what the PREGAME tier means by an
 # assist line and by "share of goals that are assisted". A second copy here
 # would let the two tiers drift into answering the same market with different
@@ -594,10 +627,13 @@ def project_live_player_props(
 ) -> tuple[LivePlayerPropProjection, ...]:
     """Already-accumulated shots this match + a starter-aware allocation of
     the *projected remainder* team shot volume from a resumed Monte Carlo
-    loop. Uses the confirmed lineup automatically: mid-match, who started
-    is no longer in question, so every player in ``*_player_rows`` who
-    accumulated any minutes is treated as a starter for allocation
-    purposes (pass only players who actually appeared)."""
+    loop. The remainder goes to the players ON THE PITCH at the cutoff, read
+    from ``live_state["player_stats"]`` (``on_pitch``/``entered``, built by
+    ``espn_live_state.build_live_state``): matchday bench at the bench
+    discount, nothing for anyone subbed off or sent off (``_live_lineup``).
+    This docstring used to say so while the poller passed the whole season
+    squad as starters; without a usable roster that is still the fallback,
+    and ``lineup_basis`` on each row says which one ran."""
     home_remainder_shots: list[float] = []
     away_remainder_shots: list[float] = []
     # Assists derive from GOALS, not shots -- pregame computes
@@ -638,6 +674,18 @@ def project_live_player_props(
     mean_away_remainder_goals = mean(away_remainder_goals) if away_remainder_goals else 0.0
 
     remaining_fraction = _remaining_match_fraction(live_state)
+    player_stats = live_state.get("player_stats") or {}
+    def _over(remaining: float, banked: int, lines) -> dict[str, float]:
+        # `int(line + 0.5)` is the smallest whole count that CLEARS the
+        # line; subtracting what is banked leaves what still has to
+        # happen. A player already past the line needs 0 more, and
+        # `poisson_at_least(x, 0)` is 1.0 -- which is correct and is why
+        # this is not clamped away.
+        return {
+            f"{line:g}": round(poisson_at_least(remaining, max(0, int(line + 0.5) - banked)), 4)
+            for line in lines
+        }
+
     projections: list[LivePlayerPropProjection] = []
     for side, rows, team_remainder, team_remainder_goals in (
         ("home", home_player_rows, mean_home_remainder, mean_home_remainder_goals),
@@ -645,10 +693,29 @@ def project_live_player_props(
     ):
         if not rows:
             continue
-        starters = {str(row.get("player_id")) for row in rows}
-        usage_profiles = build_usage_profiles(rows, side=side, starters=starters)
+        sharing, starters, gone, basis = _live_lineup(rows, player_stats)
+        # A player who has LEFT the match keeps what is banked and adds nothing:
+        # every remainder is 0, so each line reads 1.0 if already cleared, else 0.0.
+        for row in gone:
+            stats = player_stats.get(str(row.get("player_id")), {}) or {}
+            shots, sot = int(stats.get("shots_so_far") or 0), int(stats.get("shots_on_target_so_far") or 0)
+            assists, goals = int(stats.get("assists_so_far") or 0), int(stats.get("goals_so_far") or 0)
+            projections.append(LivePlayerPropProjection(
+                player_id=str(row.get("player_id")), player_name=str(row.get("player_name") or ""), side=side,
+                shots_so_far=shots, projected_remainder_shots=0.0, projected_final_shots=float(shots),
+                shots_over_probabilities=_over(0.0, shots, _SHOT_LINES),
+                shots_on_target_so_far=sot, projected_final_shots_on_target=float(sot),
+                shots_on_target_over_probabilities=_over(0.0, sot, _SHOT_LINES),
+                assists_so_far=assists, projected_final_assists=float(assists),
+                assists_over_probabilities=_over(0.0, assists, _ASSIST_LINES),
+                goals_so_far=goals, projected_final_goals=float(goals),
+                goals_over_probabilities=_over(0.0, goals, _GOAL_LINES),
+                lineup_basis=basis, on_pitch=False))
+        if not sharing:
+            continue
+        usage_profiles = build_usage_profiles(sharing, side=side, starters=starters)
         for profile_row in usage_profiles:
-            stats = live_state.get("player_stats", {}).get(profile_row.player_id, {}) or {}
+            stats = player_stats.get(profile_row.player_id, {}) or {}
             already = int(stats.get("shots_so_far") or 0)
             remainder = team_remainder * profile_row.shot_share
             final_mean = already + remainder
@@ -683,17 +750,6 @@ def project_live_player_props(
             if getattr(profile_row, "penalty_taker", False):
                 goal_remainder += _PENALTY_TAKER_GOALS_PER_MATCH * remaining_fraction
 
-            def _over(remaining: float, banked: int, lines) -> dict[str, float]:
-                # `int(line + 0.5)` is the smallest whole count that CLEARS the
-                # line; subtracting what is banked leaves what still has to
-                # happen. A player already past the line needs 0 more, and
-                # `poisson_at_least(x, 0)` is 1.0 -- which is correct and is why
-                # this is not clamped away.
-                return {
-                    f"{line:g}": round(poisson_at_least(remaining, max(0, int(line + 0.5) - banked)), 4)
-                    for line in lines
-                }
-
             projections.append(
                 LivePlayerPropProjection(
                     player_id=profile_row.player_id,
@@ -712,6 +768,8 @@ def project_live_player_props(
                     goals_so_far=goals_already,
                     projected_final_goals=round(goals_already + goal_remainder, 4),
                     goals_over_probabilities=_over(goal_remainder, goals_already, _GOAL_LINES),
+                    lineup_basis=basis,
+                    on_pitch=(profile_row.player_id in starters) if basis == "on_pitch" else None,
                 )
             )
     return tuple(projections)

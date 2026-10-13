@@ -239,6 +239,27 @@ def build_live_state(
         if shot["outcome"] == "goal" and assist_entry is not None:
             assist_entry["assists_so_far"] += 1
 
+    # WHO IS ON THE PITCH AT THE CUTOFF (lane `soccer-live-anytime-scorer`, 2026-10-13).
+    # The live props allocated the team's remaining shots and goals over the whole
+    # season squad, so a player subbed off at 60' kept a full share of the rest
+    # of the match. `key_events` is already cut at `as_of_seconds`, so a replay
+    # sees only the substitutions made by then. ESPN orders a substitution's
+    # participants [player_in, player_out] (`compute_minutes_played`); a red card
+    # uses the same `"red" in type` test as the team red-card count above.
+    came_on: set[str] = set()
+    went_off: set[str] = set()
+    for event in key_events:
+        participants = event.get("participants") or []
+        if event["type"] == "substitution" and len(participants) >= 2:
+            came_on.add(str(participants[0].get("athlete_id") or ""))
+            went_off.add(str(participants[1].get("athlete_id") or ""))
+        elif "red" in event["type"]:
+            went_off.update(str(p.get("athlete_id") or "") for p in participants)
+    for player_id, entry in player_stats.items():
+        entered = bool(entry.get("starter")) or player_id in came_on
+        entry["entered"] = entered
+        entry["on_pitch"] = entered and player_id not in went_off
+
     state = {
         "event_id": event_id,
         "home_team": home_team,

@@ -81,6 +81,22 @@ def _team_player_rows(player_rows: list[dict[str, Any]], team_name: str) -> list
     return rows
 
 
+# Rows published per match. With the lineup known (`lineup_basis == "on_pitch"`) every matchday-squad
+# player is published -- the remainder is already limited to who can still play, and a 12-row cap
+# left most anytime-scorer lines with no live price (`miss_player`, lane soccer-live-anytime-scorer).
+# Without it the whole season squad shares the remainder, so the old top-12-by-shots cap stays.
+_SQUAD_FALLBACK_PROP_ROWS = 12
+
+
+def _published_live_props(live_props) -> list[dict[str, Any]]:
+    # Per row, not per match: one side can fall back to the squad while the other has its lineup.
+    ordered = sorted(live_props, key=lambda r: r.projected_final_shots, reverse=True)
+    lineup = [r for r in ordered if getattr(r, "lineup_basis", "squad") == "on_pitch"]
+    squad = [r for r in ordered if getattr(r, "lineup_basis", "squad") != "on_pitch"]
+    keep = {id(r) for r in lineup + squad[:_SQUAD_FALLBACK_PROP_ROWS]}
+    return [row.to_dict() for row in ordered if id(row) in keep]
+
+
 def _rating_for(ratings: dict[str, dict[str, float]], team_name: str) -> dict[str, float]:
     matched = match_team_name(team_name, list(ratings))
     if matched is None:
@@ -438,7 +454,7 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
                     as_of_seconds=as_of_seconds,
                     _resolve=_resolve_match_id,
                 ),
-                "live_player_props": [row.to_dict() for row in sorted(live_props, key=lambda r: r.projected_final_shots, reverse=True)[:12]],
+                "live_player_props": _published_live_props(live_props),
             }
 
     match_box = _build_match_boxes(league, iso_date, out_path=out_path, summaries=summaries)
