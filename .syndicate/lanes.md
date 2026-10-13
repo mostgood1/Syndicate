@@ -1068,6 +1068,14 @@ death, never life — do not invert it.
 - Verification: findings file with per-ranker top/bottom-tercile CLV + ROI, both halves, game-clustered CIs, sample sizes
 - Blocked by: none
 
+### layer2-edge-deep-dive — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: Find where Layer 2 has real, measurable edge (CLV + ROI) and what inputs/odds/timing are missing; deliver a ranked plan (internal audit + external practice) to make the board profitable
+- Files: .syndicate/findings_2026-10-13_layer2_edge_deep_dive.md (NEW)
+- Hypothesis: H1 prop UNDERS carry more CLV than overs at equal market EV (books shade overs for public demand). H2 +EV priced against a sharp anchor holds CLV better than +EV against the consensus median. H3 CLV concentrates in thin markets (props, alts, 1-2 books quoting) and specific soft books, not main lines. H4 earlier first sightings (more hours before start) carry more CLV than late ones. H5 within props, a model edge that AGREES with market EV adds CLV vs market EV alone.
+- Falsification test: H1 false if under-minus-over CLV CI includes or is below 0 on pooled props; H2 false if sharp_anchor CLV <= consensus CLV at matched EV; H3 false if main-line CLV >= prop CLV at matched EV; H4 false if CLV does not rise with hours-to-start; H5 false if model-agree CLV - model-none CLV CI includes 0
+- Verification: findings file with per-hypothesis CLV (probability points, same-book pregame closes) and ROI where graded, CIs by game, sample sizes; ranked plan
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
