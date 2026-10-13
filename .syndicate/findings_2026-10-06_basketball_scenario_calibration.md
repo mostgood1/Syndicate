@@ -1357,3 +1357,18 @@ b ∈ {1.35, 2.0, 3.0}.
   foul_trouble_bench_mult 0.05, P3's chosen value).
 - Read foul-outs in each arm too (real 0.193; P3's fit alone 0.213).
 - Same readings and confirmation rule otherwise.
+
+**#4b lever BUILT (1e85bbc5)** on P3's c9d6795e; the engine.py loan is covered.
+- `EventSimConfig.blowout_bench_rest` (default False); the two sampler calls pass `blowout and cfg.blowout_bench_rest`.
+- **Off checks:** synthetic parity 0 mismatches; parity tests 23/23; new tests 3/3.
+- **Effect** (fixture with real minutes): blowout lineups' top-5 on court go 3.05 → 1.73 per lineup at boost 3.
+- **Two facts found while testing:**
+  1. The boost ranks its "top-5" by the weights it is handed, which in blowouts are already blowout-adjusted
+     (starters ×0.76-0.92, bench ×1.34). A heavy-minutes 6th man (24 min → weight 32.2) outranks a starter
+     (36 → 27.4), so the boost can penalise him and spare a starter. That is the engine's existing design; it is
+     recorded, not changed.
+  2. A test frame with only `min` (no `_sim_min`) gives every player equal base weight. The boost then ranks the
+     BENCH as top-5 and INVERTS (top-5 on court rose 1.9 → 4.2). The tests now use `_sim_min`, as the engine does.
+- **Running since 00:19Z 10-13:**
+  - the 5,400-call corpus parity proof on code with the edit;
+  - the 8-arm #4b sweep: b ∈ {off, 1.35, 2, 3} × P3 foul-trouble fields off/on, --track-oncourt, 12 dates.
