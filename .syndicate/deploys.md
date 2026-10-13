@@ -48781,3 +48781,22 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **verify (served `/api/board/game-chips?sports=wnba`, 14:14Z):** 10-07 LVA@GSV FINAL 81-83, NYL@ATL FINAL 98-101 (new chip); 10-09 GSV@LVA FINAL 87-77 lines 85-119 props 98-119, ATL@NYL FINAL 85-83 (new chip) lines 51-105-2 props 93-88 (6 pending). Before: 1 chip per date, `pregame`, no score.
 - **cosmetic left:** the added chips show the abbreviation as the team name ("ATL") and the ESPN id as `game_key`.
 - **next reading:** 2026-10-14 ~12:00Z settle autorun: epoch at/after 12:00Z, and the 10-13 NHL slate settled the same morning.
+
+## 2026-10-13 14:13:52Z (9:13 AM CT) -- LOCAL FLEET ff 18587150 -> 454c795c (exact SHA), NO restart: NBA games-history seed + predictions copy off vendor; ride-alongs approved -- **MET** (code); seed reading n/a (cold start only) (lane `nba-source-cli-native`, session 2d413211)
+
+- **Decision:** the user approved this ff with its ride-alongs ("Yes, ff with ride-alongs"). It waited for P3's full down/up onto 18587150 (claims released ~14:13Z). Claim refresh-worker token e93ba49e..., released right after.
+- **Change, 454c795c:**
+  - `_seed_games_history_from_checkout_if_fresher` reads `syndicate/features/nba/seed_data/games_nba_api.csv` (blob-identical to the vendored one).
+  - The vendored `predictions_<date>.csv` candidate is removed (the vendored tree holds none).
+  - The dead `_vendor_code_root` is removed.
+- **Ride-alongs (listed to the user before approval):**
+  - a82f821a: generator LF-normalised hashes, hash lines only;
+  - 44409a08: ncaab live resim, `SYNDICATE_NCAAB_LIVE_MECHANISMS`, default OFF;
+  - ca575c62: games-rail, past-date WNBA chips take finals from settlement rows. Its lane reloaded the web onto 454c795c at 14:13:58Z (their entry).
+- **Safety read in full first (14:13:26Z):** NOT CLEAR, only a live-odds-worker soccer pregame child in flight (not affected by an ff without restart); refresh-worker had no children; board idle; basketball props jobs 0.
+- **VERIFY on the deployed checkout (454c795c):**
+  - All three generator `--check`: OK (P6's orchestrator, both ticks, the NBA CLI). This closes the 18587150 entry's 3 `--check` failures.
+  - Tests: 68 passed, 1 failed. The failure was `test_fix_writes_the_registry...`, whose wall-clock `generated_at` straddled a second; test-only, fixed on main in 1ba982dc, not on the fleet. The ride-alongs' own tests (test_ncaab_live_resim, test_game_chip_finals) passed.
+- **Reading:** the seed can only fire on a cold start (the fleet history equals the seed: 11,969 games, newest 2026-04-12), and the removed predictions path could never copy. So no production reading changes; the deployed tests are the measurement.
+- **Not in this ff:** 9f05dcb2 (NBA recon tools off vendor), landed after the approval; it needs its own decision.
+- **Rollback:** revert 454c795c and ff. No restart.
