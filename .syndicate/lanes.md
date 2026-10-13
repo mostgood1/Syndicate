@@ -1047,6 +1047,14 @@ death, never life — do not invert it.
 - Verification: unit tests; on the fleet board after restart, suggested rows all have ev_pct>=2 and fair_method two-sided, count per sport logged; portfolio refusals show not_suggested; after 2 weekends grade suggested vs all on recorder sg
 - Blocked by: none
 
+### refresh-worker-odds-job-slot — OPEN — opened 2026-10-13 — session d4409ac4-6318-47ee-87d5-fa88304fd907
+- Goal: Detached odds refresh jobs no longer starve the refresh-worker's autorun chain: evaluation settlement, the NFL pbp fetch and the other light autoruns launch on their due tick while odds jobs run, measured as JOB_CAP_THROTTLED share of worker ticks (baseline 2026-10-13: ~30-50% overnight, ~80% 15-16Z) and settlement / NFL fetch launch latency after their due time
+- Files: scripts/run_refresh_worker.py (active-job count + JOB_CAP throttle + autorun dispatch-order section only), tests/test_refresh_worker_odds_job_slot.py (NEW)
+- Hypothesis: The refresh-worker cap (max_active_jobs=1) counts every live run_refresh_odds_job.py of its own service, including jobs left running by earlier worker incarnations (2026-10-13 16:56Z: 3 alive, started 16:04 / 16:41 / 16:46Z, after restarts at 16:13 / 16:33 / 16:49Z); while >=1 runs, the whole elif chain below  is skipped, so settlement and the NFL pbp fetch wait for an odds-free tick.
+- Falsification test: Throttled ticks with ZERO live run_refresh_odds_job.py processes (then something else holds the cap); or the NFL fetch / settlement still not launching on ticks where active_jobs < max (then the chain order, not the cap, starves them).
+- Verification: 24 h of worker logs after the change: JOB_CAP_THROTTLED share vs baseline; settlement launches within one tick of its 12:00Z/13:00Z due time and the NFL pbp fetch within one tick of 10:00Z on a day with odds jobs running; odds job concurrency unchanged (no extra parallel odds jobs)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
