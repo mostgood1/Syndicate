@@ -88,7 +88,6 @@ def main(argv=None) -> int:
     import resim_nba_availability as rs
     from record_nba_engine_inputs_asof import _add_473_inputs
     from syndicate.features.basketball_engine.orchestrator import boxscores as ob
-    from syndicate.features.basketball_engine.orchestrator import connected_game as ocg
     from syndicate.features.shared import basketball_props_smart_sim as bpss
     from syndicate.features.shared.basketball_props_predictions import export_props_predictions_local
 
@@ -96,9 +95,9 @@ def main(argv=None) -> int:
 
     orig_bpss_summary = bpss._espn_summary_local
     bpss._espn_summary_local = lambda **kw: _strip_box(orig_bpss_summary(**kw))
-    orig_ob_summary = ob._espn_summary
-    ob._espn_summary = lambda *a, **kw: _strip_box(orig_ob_summary(*a, **kw))
-    ocg._espn_summary = ob._espn_summary
+    if hasattr(ob, "_espn_summary"):  # removed with the retired teammate effects (2026-10-13)
+        orig_ob_summary = ob._espn_summary
+        ob._espn_summary = lambda *a, **kw: _strip_box(orig_ob_summary(*a, **kw))
 
     cur: Dict[str, Any] = {"date": "", "rows": []}
     orig_map = bpss._espn_name_to_id_map_for_game_local

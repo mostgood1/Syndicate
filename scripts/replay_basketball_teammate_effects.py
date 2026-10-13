@@ -122,7 +122,12 @@ def run(args) -> int:
     import resim_nba_availability as rs
     from record_nba_engine_inputs_asof import _add_473_inputs
     from syndicate.features.basketball_engine.orchestrator import boxscores as ob
-    from syndicate.features.basketball_engine.orchestrator import connected_game as cg
+    try:
+        from syndicate.features.basketball_engine.orchestrator import connected_game as cg
+    except ImportError:  # retired 2026-10-13 by this A/B; the ON arm needs the code it ran on (5568ac6e)
+        cg = None
+        if any(a in ("ON",) for a in args.arms.split(",")):
+            raise SystemExit("ON arm: teammate effects were retired after this A/B; run it from commit 5568ac6e")
     from syndicate.features.basketball_engine.orchestrator import hooks
     from syndicate.features.shared import basketball_props_smart_sim as bpss
     from syndicate.features.shared.basketball_props_predictions import export_props_predictions_local
@@ -130,9 +135,11 @@ def run(args) -> int:
     bpss._resolve_smart_sim_roster_mode_local = lambda **_k: "pregame"
     orig_bs = bpss._espn_summary_local
     bpss._espn_summary_local = lambda **kw: _strip_box(orig_bs(**kw))
-    orig_os = ob._espn_summary
-    ob._espn_summary = lambda *a, **kw: _strip_box(orig_os(*a, **kw))
-    cg._espn_summary = ob._espn_summary
+    if hasattr(ob, "_espn_summary"):  # gone with the retired teammate-effects name map
+        orig_os = ob._espn_summary
+        ob._espn_summary = lambda *a, **kw: _strip_box(orig_os(*a, **kw))
+        if cg is not None:
+            cg._espn_summary = ob._espn_summary
 
     orig_run = bpss._smart_sim_run_date_local
 
@@ -144,7 +151,7 @@ def run(args) -> int:
 
     bpss._smart_sim_run_date_local = seeded_run
 
-    off_map = cg._espn_name_to_id_map_for_game
+    off_map = cg._espn_name_to_id_map_for_game if cg is not None else None
 
     def on_map(date_str, home_tri, away_tri, event_id=None, *, orch):
         return hooks._espn_name_to_id_map_for_game(date_str, home_tri, away_tri, event_id, orch=orch)
@@ -163,7 +170,8 @@ def run(args) -> int:
         tables = _build_tables(code, processed, d)
         print(f"TABLES {d} {json.dumps(inputs)} {json.dumps(tables)}", flush=True)
         for arm in [a for a in args.arms.split(",") if a]:
-            cg._espn_name_to_id_map_for_game = on_map if arm == "ON" else off_map
+            if cg is not None:
+                cg._espn_name_to_id_map_for_game = on_map if arm == "ON" else off_map
             for f in processed.glob(f"smart_sim_{d}_*.json"):
                 f.unlink()
             try:

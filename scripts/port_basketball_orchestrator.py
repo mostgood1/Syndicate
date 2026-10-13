@@ -60,7 +60,6 @@ DST = ROOT / "syndicate" / "features" / "basketball_engine" / "orchestrator"
 MODULES: dict[str, str] = {
     "sim.smart_sim": "smart_sim",
     "sim.quarters": "quarters",
-    "sim.connected_game": "connected_game",
     "boxscores": "boxscores",
     "prob_calibration": "prob_calibration",
     "prop_ladders": "prop_ladders",
@@ -92,9 +91,7 @@ DIVERGENT: dict[tuple[str, str], str] = {
     ("sim.smart_sim", "_regularize_rotation_minutes"): "total_target=240.0 (NBA) vs LEAGUE.regulation_team_minutes",
     ("sim.smart_sim", "_rotation_minutes_signal_guardrail"): "total_target=240.0 (NBA) vs LEAGUE.regulation_team_minutes",
     ("boxscores", "_tri_to_espn"): "team-code table per league -> OrchestratorLeague.espn_tri_fix",
-    ("boxscores", "_espn_to_tri"): "team-code table per league -> OrchestratorLeague.espn_abbr_fix",
     ("boxscores", "_espn_scoreboard"): "sports/basketball/nba literal vs LEAGUE.espn_sport_path",
-    ("boxscores", "_espn_summary"): "sports/basketball/nba literal vs LEAGUE.espn_sport_path",
     ("boxscores", "_http_get_json"): "'nba-betting/1.0' literal vs LEAGUE.user_agent_product",
 }
 # Emitted, and present only in the WNBA fork.
@@ -185,12 +182,6 @@ EDITS: list[Edit] = [
         "    fix = dict(LEAGUE.espn_tri_fix)\n",
         why="team-code table per league",
     ),
-    Edit(
-        "boxscores", "_espn_to_tri",
-        "    fix = {\n        \"GS\": \"GSV\",\n        \"LV\": \"LVA\",\n        \"LA\": \"LAS\",\n        \"NY\": \"NYL\",\n        \"WSH\": \"WSH\",\n    }\n",
-        "    fix = dict(LEAGUE.espn_abbr_fix)\n",
-        why="team-code table per league",
-    ),
     # --- prob_calibration: the caches are per data root; the vendored repo tree is not read -----------------------
     Edit(
         "prob_calibration", "_PROB_CALIBRATION_INDEX",
@@ -237,7 +228,77 @@ EDITS: list[Edit] = [
             "Measured 2026-10-09 on the fleet: it holds 0 calibration_period_probs_*.json for either league"
         ),
     ),
+    # --- smart_sim: lineup TEAMMATE EFFECTS retired (lane basketball-pregame-teammate-effects, user decision
+    # 2026-10-13). Off in production on 0/60 NBA sides (no pregame name map, 3-team tables). Off-vs-on A/B on 2025-26
+    # regular season, 90 games / 1,776 player-games, as-of tables: pts dMAE +0.0018 [+0.0005, +0.0032], pra +0.0031
+    # [+0.0011, +0.0050] (ON worse), mean |ON-OFF| 0.014 pts. deploys.md 2026-10-13 01:40Z. -----------------------
+    Edit(
+        "sim.smart_sim", "simulate_smart_game",
+        "    # Best-effort ESPN event id for this matchup (useful for lineup teammate effects even pregame).\n"
+        "    eid_matchup: Optional[str] = None\n"
+        "    try:\n"
+        "        from ..boxscores import _espn_event_id_for_matchup  # type: ignore\n"
+        "\n"
+        "        eid_matchup = _espn_event_id_for_matchup(str(date_str), home_tri=str(home_tri), away_tri=str(away_tri))\n"
+        "        eid_matchup = str(eid_matchup or \"\").strip() or None\n"
+        "    except Exception:\n"
+        "        eid_matchup = None\n"
+        "\n",
+        "",
+        why="its only reader was the retired teammate-effects block (one ESPN scoreboard lookup per game, saved)",
+    ),
+    Edit(
+        "sim.smart_sim", "simulate_smart_game",
+        "    # Optional: lineup-conditioned teammate effects (learned from historical play context + rotation pairs).\n"
+        "    lineup_effects_diag: dict[str, Any] = {\"home\": None, \"away\": None}\n"
+        "    try:\n"
+        "        from .connected_game import _apply_lineup_teammate_effects_to_priors  # type: ignore\n"
+        "\n"
+        "        eid = str(eid_matchup or rot_home_diag.get(\"event_id\") or rot_away_diag.get(\"event_id\") or \"\").strip() or None\n"
+        "        home_players = _apply_lineup_teammate_effects_to_priors(\n"
+        "            home_players,\n"
+        "            team_tri=str(home_tri),\n"
+        "            date_str=str(date_str),\n"
+        "            home_tri=str(home_tri),\n"
+        "            away_tri=str(away_tri),\n"
+        "            event_id=eid,\n"
+        "        )\n"
+        "        away_players = _apply_lineup_teammate_effects_to_priors(\n"
+        "            away_players,\n"
+        "            team_tri=str(away_tri),\n"
+        "            date_str=str(date_str),\n"
+        "            home_tri=str(home_tri),\n"
+        "            away_tri=str(away_tri),\n"
+        "            event_id=eid,\n"
+        "        )\n"
+        "\n"
+        "        try:\n"
+        "            lineup_effects_diag[\"home\"] = dict(getattr(home_players, \"attrs\", {}).get(\"_lineup_effects\", {}) or {})\n"
+        "        except Exception:\n"
+        "            lineup_effects_diag[\"home\"] = None\n"
+        "        try:\n"
+        "            lineup_effects_diag[\"away\"] = dict(getattr(away_players, \"attrs\", {}).get(\"_lineup_effects\", {}) or {})\n"
+        "        except Exception:\n"
+        "            lineup_effects_diag[\"away\"] = None\n"
+        "    except Exception:\n"
+        "        lineup_effects_diag = {\"home\": None, \"away\": None}\n",
+        "    # Lineup teammate effects are RETIRED (lane basketball-pregame-teammate-effects, 2026-10-13): no measurable\n"
+        "    # value in an off-vs-on A/B. The diag key stays so a reader of old and new sims sees why it is off.\n"
+        "    lineup_effects_diag: dict[str, Any] = {\n"
+        "        side: {\"attempted\": False, \"applied\": False, \"reason\": \"retired\"} for side in (\"home\", \"away\")\n"
+        "    }\n",
+        why="mechanism retired by measurement (off-vs-on A/B: no value; production already ran it off)",
+    ),
 ]
+
+# Definitions RETIRED by measurement: the closure stops at them even though the vendored text still reaches them,
+# and the anchored EDITS above remove their call sites. Each entry carries its reason.
+RETIRED: dict[tuple[str, str], str] = {
+    ("sim.connected_game", "_apply_lineup_teammate_effects_to_priors"): (
+        "lineup teammate effects: no value in an off-vs-on A/B (lane basketball-pregame-teammate-effects, "
+        "deploys.md 2026-10-13 01:40Z); user decision 2026-10-13"
+    ),
+}
 
 # Applied to the first body line of _cap_and_redistribute_minutes after the signature edit above.
 CAP_BODY_ANCHOR = '    """'
@@ -329,6 +390,8 @@ def closure(pkg: Package, roots: list[tuple[str, str]], hooks: set[str]) -> dict
         if rel == "sim.smart_sim" and name in hooks:
             continue
         if (rel, name) in EXTERNAL_IMPORTS:
+            continue
+        if (rel, name) in RETIRED:
             continue
         if rel not in MODULES and rel != "league" and rel != "config":
             raise SystemExit(f"closure reached an unmapped vendored module: {rel}.{name}")

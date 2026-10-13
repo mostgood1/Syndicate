@@ -75,7 +75,6 @@ class OrchestratorLeague:
     espn_sport_path: str
     user_agent_product: str
     espn_tri_fix: tuple[tuple[str, str], ...]  # our tricode -> ESPN abbreviation (`_tri_to_espn`)
-    espn_abbr_fix: tuple[tuple[str, str], ...]  # ESPN abbreviation -> our tricode (`_espn_to_tri`)
     # WNBA-fork-only steps. The NBA fork has neither.
     prune_pregame_pool: bool  # `_prune_pregame_rotation_pool` + `ctx.pregame_rotation_pool`
     stamp_team_opponent: bool  # `_stamp_team_opponent` on the players block
@@ -94,7 +93,6 @@ NBA = OrchestratorLeague(
     espn_sport_path="sports/basketball/nba",
     user_agent_product="nba-betting/1.0",
     espn_tri_fix=(("GSW", "GS"), ("NOP", "NO"), ("NYK", "NY"), ("UTA", "UTAH"), ("WAS", "WSH"), ("SAS", "SA"), ("PHX", "PHO")),
-    espn_abbr_fix=(("GS", "GSW"), ("NO", "NOP"), ("NY", "NYK"), ("UTAH", "UTA"), ("WSH", "WAS"), ("SA", "SAS"), ("PHO", "PHX")),
     prune_pregame_pool=False,
     stamp_team_opponent=False,
 )
@@ -113,7 +111,6 @@ WNBA = OrchestratorLeague(
     espn_sport_path="sports/basketball/wnba",
     user_agent_product="wnba-betting/1.0",
     espn_tri_fix=(("GSV", "GS"), ("LVA", "LV"), ("LAS", "LA"), ("NYL", "NY")),
-    espn_abbr_fix=(("GS", "GSV"), ("LV", "LVA"), ("LA", "LAS"), ("NY", "NYL"), ("WSH", "WSH")),
     prune_pregame_pool=True,
     stamp_team_opponent=True,
 )

@@ -25,11 +25,13 @@ Anchored edits:
   * _stamp_team_opponent: NBA: the same dict object, untouched
   * _scale_minutes_to_target: default argument -> per-call league value
   * _cap_and_redistribute_minutes: default argument -> per-call league value (resolved on the first body line, below)
+  * simulate_smart_game: its only reader was the retired teammate-effects block (one ESPN scoreboard lookup per game, saved)
+  * simulate_smart_game: mechanism retired by measurement (off-vs-on A/B: no value; production already ran it off)
 
 Mechanical edits: global `paths` / `LEAGUE` reads -> `orch.paths` / `orch.league` (runtime.OrchestratorEnv);
 a keyword-only `orch` on every function that needs it, passed at every call; relative imports re-pointed
 at this package. Calls to the 29 names Syndicate replaced go to hooks.py.
-Counts for this package: {'call_sites': 73, 'global_reads': 41, 'local_imports': 6, 'signatures': 26}.
+Counts for this package: {'call_sites': 63, 'global_reads': 34, 'local_imports': 3, 'signatures': 21}.
 
 PARITY: scripts/basketball_orchestrator_parity.py replays recorded REAL production games through this
 orchestrator and the vendored one, same seed, and compares every leaf of the output.
@@ -46,8 +48,6 @@ import numpy as np
 import pandas as pd
 
 from ..engine import EventSimConfig
-from .boxscores import _espn_event_id_for_matchup
-from .connected_game import _apply_lineup_teammate_effects_to_priors
 from .hooks import _apply_player_priors, _coalesce_team_player_frames, _compute_player_priors_cached, _derive_sim_minutes, _filter_team_players_against_processed_roster, _infer_game_id, _load_intervals_band_calibration, _load_intervals_time_profile, _load_player_stat_calibration, _load_smartsim_total_calibration, _market_lines_from_processed_odds, _market_player_names_for_matchup, _merge_pregame_expected_minutes_for_team, _period_lines_from_processed, _prune_pregame_rotation_pool, _rotation_sim_minutes_for_team, _team_adj_from_advanced_stats, _team_players_from_espn_boxscore, _team_players_from_processed_boxscores, _team_players_from_processed_rosters, _team_players_from_props, simulate_event_level_boxscore, simulate_pbp_game_boxscore, simulate_quarters
 from .player_priors import _norm_player_key
 from .prob_calibration import calibrate_prob
@@ -1494,16 +1494,6 @@ def simulate_smart_game(
     except Exception:
         pregame_pool_diag = {"home": None, "away": None}
 
-    # Best-effort ESPN event id for this matchup (useful for lineup teammate effects even pregame).
-    eid_matchup: Optional[str] = None
-    try:
-        from .boxscores import _espn_event_id_for_matchup  # type: ignore
-
-        eid_matchup = _espn_event_id_for_matchup(str(date_str), home_tri=str(home_tri), away_tri=str(away_tri), orch=orch)
-        eid_matchup = str(eid_matchup or "").strip() or None
-    except Exception:
-        eid_matchup = None
-
     rot_date_str = str(asof_date_str) if pregame_safe else str(date_str)
 
     rot_home_min, home_lineups, home_lineup_w, rot_home_diag = _rotation_sim_minutes_for_team(
@@ -1528,39 +1518,11 @@ def simulate_smart_game(
     home_players = _apply_player_priors(home_raw, pri, team_tri=home_tri, sim_minutes=rot_home_min, date_str=str(rot_date_str), orch=orch)
     away_players = _apply_player_priors(away_raw, pri, team_tri=away_tri, sim_minutes=rot_away_min, date_str=str(rot_date_str), orch=orch)
 
-    # Optional: lineup-conditioned teammate effects (learned from historical play context + rotation pairs).
-    lineup_effects_diag: dict[str, Any] = {"home": None, "away": None}
-    try:
-        from .connected_game import _apply_lineup_teammate_effects_to_priors  # type: ignore
-
-        eid = str(eid_matchup or rot_home_diag.get("event_id") or rot_away_diag.get("event_id") or "").strip() or None
-        home_players = _apply_lineup_teammate_effects_to_priors(
-            home_players,
-            team_tri=str(home_tri),
-            date_str=str(date_str),
-            home_tri=str(home_tri),
-            away_tri=str(away_tri),
-            event_id=eid, orch=orch,
-        )
-        away_players = _apply_lineup_teammate_effects_to_priors(
-            away_players,
-            team_tri=str(away_tri),
-            date_str=str(date_str),
-            home_tri=str(home_tri),
-            away_tri=str(away_tri),
-            event_id=eid, orch=orch,
-        )
-
-        try:
-            lineup_effects_diag["home"] = dict(getattr(home_players, "attrs", {}).get("_lineup_effects", {}) or {})
-        except Exception:
-            lineup_effects_diag["home"] = None
-        try:
-            lineup_effects_diag["away"] = dict(getattr(away_players, "attrs", {}).get("_lineup_effects", {}) or {})
-        except Exception:
-            lineup_effects_diag["away"] = None
-    except Exception:
-        lineup_effects_diag = {"home": None, "away": None}
+    # Lineup teammate effects are RETIRED (lane basketball-pregame-teammate-effects, 2026-10-13): no measurable
+    # value in an off-vs-on A/B. The diag key stays so a reader of old and new sims sees why it is off.
+    lineup_effects_diag: dict[str, Any] = {
+        side: {"attempted": False, "applied": False, "reason": "retired"} for side in ("home", "away")
+    }
 
     if home_players.empty or away_players.empty:
         return {

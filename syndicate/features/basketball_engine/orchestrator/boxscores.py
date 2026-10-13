@@ -4,18 +4,15 @@ Native port of the definitions production EXECUTES from
   vendor/wnba_betting_repo/src/wnba_betting/boxscores.py (sha256 4f53a621d8638e9c...)
 checked definition by definition against
   vendor/nba_betting_repo/src/nba_betting/boxscores.py (sha256 0bf58cf6cba0d252...)
-Ported: _tri_to_espn, _espn_to_tri, _espn_cache_dir, _read_json, _write_json, _http_get_json, _espn_scoreboard, _espn_summary, _espn_event_id_for_matchup.
+Ported: _tri_to_espn, _espn_cache_dir, _read_json, _write_json, _http_get_json, _espn_scoreboard, _espn_event_id_for_matchup.
 
 Where the two forks differ, and how one text serves both:
   * _tri_to_espn: team-code table per league -> OrchestratorLeague.espn_tri_fix
-  * _espn_to_tri: team-code table per league -> OrchestratorLeague.espn_abbr_fix
   * _http_get_json: 'nba-betting/1.0' literal vs LEAGUE.user_agent_product
   * _espn_scoreboard: sports/basketball/nba literal vs LEAGUE.espn_sport_path
-  * _espn_summary: sports/basketball/nba literal vs LEAGUE.espn_sport_path
 
 Anchored edits:
   * _tri_to_espn: team-code table per league
-  * _espn_to_tri: team-code table per league
 
 Mechanical edits: global `paths` / `LEAGUE` reads -> `orch.paths` / `orch.league` (runtime.OrchestratorEnv);
 a keyword-only `orch` on every function that needs it, passed at every call; relative imports re-pointed
@@ -39,12 +36,6 @@ import requests
 def _tri_to_espn(tri: str, *, orch) -> str:
     s = str(tri or "").strip().upper()
     fix = dict(orch.league.espn_tri_fix)
-    return fix.get(s, s)
-
-
-def _espn_to_tri(abbr: str, *, orch) -> str:
-    s = str(abbr or "").strip().upper()
-    fix = dict(orch.league.espn_abbr_fix)
     return fix.get(s, s)
 
 
@@ -92,19 +83,6 @@ def _espn_scoreboard(date_str: str, *, force: bool = False, orch) -> dict[str, A
         if jd:
             return jd
     url = f"https://site.web.api.espn.com/apis/site/v2/{orch.league.espn_sport_path}/scoreboard?dates={ymd}"
-    jd = _http_get_json(url, timeout=18, orch=orch)
-    if jd:
-        _write_json(cache, jd)
-    return jd
-
-
-def _espn_summary(event_id: str, *, force: bool = False, orch) -> dict[str, Any]:
-    cache = _espn_cache_dir(orch=orch) / f"summary_{str(event_id).strip()}.json"
-    if (not force) and cache.exists():
-        jd = _read_json(cache)
-        if jd:
-            return jd
-    url = f"https://site.web.api.espn.com/apis/site/v2/{orch.league.espn_sport_path}/summary?event={event_id}"
     jd = _http_get_json(url, timeout=18, orch=orch)
     if jd:
         _write_json(cache, jd)

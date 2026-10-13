@@ -29,7 +29,7 @@ from syndicate.features.shared import basketball_props_smart_sim as bps
 
 ROOT = Path(__file__).resolve().parents[1]
 PKG = "syndicate.features.basketball_engine.orchestrator"
-GENERATED = ("smart_sim", "quarters", "connected_game", "boxscores", "prob_calibration", "prop_ladders", "roster_files", "player_names", "player_priors", "league_config", "advanced_stats_boxscores", "advanced_stats_player_logs", "wnba_teams")
+GENERATED = ("smart_sim", "quarters", "boxscores", "prob_calibration", "prop_ladders", "roster_files", "player_names", "player_priors", "league_config", "advanced_stats_boxscores", "advanced_stats_player_logs", "wnba_teams")
 
 
 def _game(tmp_path: Path, league: str, seed: int = 11):
@@ -88,7 +88,10 @@ def test_native_equals_vendored_every_leaf(league, tmp_path, vendored_available)
     b = _run("native", processed, league, kw)
     n, diffs = par.leaf_compare(a, b)
     assert n > 5000, n
-    assert diffs == []
+    # Lineup teammate effects are retired natively (lane basketball-pregame-teammate-effects, 2026-10-13); the vendored
+    # orchestrator still runs them. Only their diag may differ, and every other leaf must stay identical.
+    assert [d for d in diffs if not d.startswith("$.lineup_effects.")] == []
+    assert b["lineup_effects"] == {s: {"attempted": False, "applied": False, "reason": "retired"} for s in ("home", "away")}
     assert len(b["players"]["home"]) == 10
 
 

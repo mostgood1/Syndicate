@@ -92,7 +92,7 @@ def _src(name: str) -> str:
 
 def consumed_from_source() -> dict[str, set[str]]:
     out: dict[str, set[str]] = {"cfg": set(), "league": set(), "paths": set(), "param": set(), "ctx": set()}
-    trees = {n: ast.parse(_src(n)) for n in ("smart_sim.py", "hooks.py", "view.py", "connected_game.py", "boxscores.py", "prob_calibration.py")}
+    trees = {n: ast.parse(_src(n)) for n in ("smart_sim.py", "hooks.py", "view.py", "boxscores.py", "prob_calibration.py")}
     sim_fn = next(n for n in trees["smart_sim.py"].body if isinstance(n, ast.FunctionDef) and n.name == "simulate_smart_game")
     params = {a.arg for a in sim_fn.args.args + sim_fn.args.kwonlyargs}
     for name, tree in trees.items():
