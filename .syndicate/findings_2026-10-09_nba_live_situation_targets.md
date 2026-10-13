@@ -655,3 +655,16 @@ Real foul-outs: 0.193/game.
 - What is missing for a priced switch-on is a source of information BEYOND the naive baseline on ML and totals.
 - The live-close comparison (did the native number beat the live MARKET line?) is the bar for edges. It is being
   completed: 2,500 of ~2,521 snapshots cached, rows being written.
+
+## 10. PRE-REGISTERED 2026-10-13 13:37Z (before any result): skip_def_subtraction ON vs OFF in the PRODUCTION config (#695)
+
+- **Asked by:** d48f3a34 relaying the user, spec superseded by lane `basketball-scenario-calibration` (owner of #695 and `nba_sim_total_inputs.json`).
+- **Hypothesis (theirs, written before the result):** production overshoots its own target by ~+5.7 (EXACT_TARGET_CALIBRATION off, no NBA calibration file); skip_def adds ~+1.5 to the target, so published totals sit ~+2.7 over actual with it versus ~+1.2 without. The native re-sim's early rest-of-game overshoot (§9, bias +2 to +3 at end Q1-Q3) is the same level problem.
+- **Arms:** ON = `inputs_v4` (recorded 2026-10-12 with the live file `{"skip_def_subtraction": true}`). OFF = `inputs_v5nosd`, same recorder/pristine/as-of/props snapshots, `--no-total-inputs` (file absent). Production engine object, SYNDICATE_NBA_TEAM_INPUTS absent (= on), EXACT off, no calibration file, live mechanisms OFF (k=0). Same seed per game in both arms.
+- **Readings:** (1) pregame from the tip (`scripts/nba_pregame_total_bias.py`, 100 sims): total bias vs actual, MAE, minus pre-tip market total, paired ON-OFF with game bootstrap; (2) in-game: k=0 grade of OFF at the four checkpoints vs pregame_rate, paired with the existing `gate_v4_k0` (ON). Regular and postseason separate; n stated.
+- **Decision rule (calibration lane's):** if ON is >= ~+2 worse on pregame total bias/MAE than OFF in this config, it proposes the revert to the user. If the in-game overshoot does NOT shrink with OFF, the level problem lies elsewhere (per-quarter targets or remaining-possession count) and #695 keeps waiting.
+- **Caveat recorded up front:** the OFF inputs are recorded on today's worktree code; ON on 10-12's. A sample of pickles will be diffed field by field and any difference outside team-rating/target fields reported before the result is read.
+
+### §8 follow-up (2026-10-13 13:44Z, reported by basketball-scenario-calibration, NOT re-derived here)
+- On its #4b sample (12 FIT dates, 87 games; Phase 2 config), foul_out_in_sim + foul_trouble_bench_mult 0.05 ON reads foul-outs ~0.15/game in every arm, against real 0.193 and §8a's VALID 0.213. A different config and sample from §8a; it is not a contradiction until re-measured on the same games. OWED: P3 re-measures foul-outs/game for M-FT on those 12 dates in both configs before M-FT is proposed for production.
+- The engine.py loan to that lane is returned (blowout_bench_rest, 1e85bbc5): corpus parity 5,400/5,400 by that lane.

@@ -48750,3 +48750,26 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
   - WNBA live: Finals G1, 2026-10-17 (scheduled task `wnba-1017-live-tick-parity`).
   - NBA live writes: once live lines exist (2026-10-20).
   - The NBA once-per-date bootstrap for a new slate through `source_cli`.
+
+## 2026-10-13 14:07:45Z-14:08:53Z (9:07-9:08 AM CT) -- LOCAL FLEET full supervisor down/up onto 18587150 + `SYNDICATE_NBA_LIVE_RESIM=on` (P3 SHADOW MODE) -- **loop MET; live-game readings OWED** (lane `nba-native-live-resim`, session 6c348b8f, user-approved "Approve, with ride-alongs")
+
+- **why:** P3's gate (findings_2026-10-09 §9) did not pass, so the user chose shadow mode: the native live re-sim loop runs and publishes its own snapshot, nba stays OFF `_LIVE_GAMELINE_SPORTS`, and nothing is priced. The env is derived once at `up`, so this needed a full down/up.
+- **change (config):** appended to `~/syndicate-prod/local_production.env`: `SYNDICATE_NBA_LIVE_RESIM=on` and `SYNDICATE_NBA_LIVE_RESIM_SIMS=100`. Backup: `local_production.env.bak_nbaliveresim_20261013T132212Z`, 96 -> 99 lines. `SYNDICATE_NBA_LIVE_MECHANISMS` stays absent, so live k=0, matching pregame.
+- **code:** no ff. The fleet checkout was already 18587150 (on origin/main); all roles had been running 3d852ba9. Ride-alongs 3d852ba9..18587150, 9 commits, user-approved: the NBA/WNBA live-tick ports (c9844865, 74a16106, a2587a29), NBA CLI/history off vendor (9e7c20a1, 73848ed5), the tick parity fixture (18587150), ledger. Their readings are their lanes' (see the 14:08:40Z entry above).
+- **locks:** web + refresh-worker + live-odds-worker acquired 13:23Z and renewed 14:02Z (release + acquire); `watchdog_no_autostart` set before `down` and removed 14:08:56Z; all three released 14:13:1xZ. Lane nba-source-cli-native (2d413211) held its ff until the release, by agreement.
+- **safety:** fired the first moment `check_deploy_safety` read `Board build idle (last completed 2 log lines ago (next LOOP_ITERATION, i.e. persisted))` at 14:07:45Z, with MLB sim finished and no live games. One detached odds job was stopped (0 SIGKILL); odds jobs re-run on their next cycle.
+- **MISTAKE, said plainly: TWO downs.** My first 30 s watcher (Git Bash loop) survived `TaskStop`. It and the replacement continuous poller both fired. Down #1 ran 14:07:45-14:08:04Z, then `Start-ScheduledTask`. Down #2 ran 14:08:17-14:08:30Z and stopped the supervisor that #1's start had just launched (its live-odds-worker logged `NBA_LIVE_RESIM_LOOP_STARTED` at 14:08:19Z). Then a second `Start-ScheduledTask`. `role_restarts.jsonl` shows two `down` events (14:07:46, 14:08:18), both claimed by this lane. Cost: ~25 s more downtime and one extra cold start; the outage was ~68 s end to end. Lesson: `TaskStop` on a Git Bash loop does not kill it; kill its pid and confirm with `ps` before arming a replacement.
+- **reading (MET):**
+  - `/healthz` 200 at 14:08:53Z.
+  - `status`: supervisor 92823 since 14:08:34Z; web 92849, refresh-worker 92893, live-odds-worker 92894, all `code=18587150`, restarts 0.
+  - `/proc/<pid>/environ` carries both `SYNDICATE_NBA_LIVE_RESIM*` keys on both workers (key names only read).
+  - live-odds-worker log, emitter-anchored: `NBA_LIVE_RESIM_LOOP_STARTED interval_s=120.0` at 14:08:42Z, then `NBA_LIVE_RESIM_TICK date=2026-10-13 games=0 resimmed=0 refusals={} bytes=194 written=True` at 14:08:43, 14:10:43 and 14:12:43Z.
+  - 0 `NBA_LIVE_RESIM_TICK_ERROR`, 0 `KEYVALUE_WRITE_REJECTED` since 14:08:39Z.
+  - `live_lens_loop TICK_COMPLETE results={... 'nba': True, 'wnba': True ...}` at 14:09:21Z.
+- **verify (OWED, tonight; preseason slate, first tip CLE@ORL / NY@TOR 23:00Z):**
+  - `NBA_LIVE_RESIM_TICK` with `resimmed>0`, plus its refusals, bytes and elapsed_s;
+  - the page snapshot's `native_resim.merged`;
+  - 0 `KEYVALUE_WRITE_REJECTED`;
+  - the header-score lead vs `MAX_HEADER_LEAD` and the `on_floor_incomplete` rate.
+  Preseason is its own population; nothing from it enters the regular-season gate.
+- **rollback:** remove the two keys from `local_production.env` (or restore the backup) and do a full down/up. Code needs nothing: absent = off.
