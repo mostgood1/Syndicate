@@ -76,5 +76,24 @@ class LineScores(unittest.TestCase):
         self.assertIsNone(gl.linescore("nfl", {"live_state": {}}, "2026-10-11"))
 
 
+class FinalWithoutScore(unittest.TestCase):
+    def test_final_with_null_scores_takes_the_period_sums(self) -> None:
+        from syndicate.features.shared import game_chip_scoreboard as gs
+
+        chip = {"state": "final", "away": {"abbr": "OKC", "score": None}, "home": {"abbr": "ATL", "score": None}}
+        box = {"kind": "periods", "labels": ["1", "2", "3", "4"], "away": [28, 21, 30, 31], "home": [29, 27, 23, 34]}
+        with mock.patch.object(gl, "linescore", return_value=box):
+            gs._attach_linescore("nba", {}, chip, "2026-10-12")
+        self.assertEqual((chip["away"]["score"], chip["home"]["score"], chip["leader"]), ("110", "113", "home"))
+
+    def test_live_game_scores_are_never_filled(self) -> None:
+        from syndicate.features.shared import game_chip_scoreboard as gs
+
+        chip = {"state": "live", "away": {"score": None}, "home": {"score": None}}
+        with mock.patch.object(gl, "linescore", return_value={"kind": "periods", "labels": ["1"], "away": [20], "home": [18]}):
+            gs._attach_linescore("nba", {}, chip, "2026-10-12")
+        self.assertIsNone(chip["away"]["score"])
+
+
 if __name__ == "__main__":
     unittest.main()

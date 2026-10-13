@@ -745,6 +745,19 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
         box = linescore(sport, game, day, away_abbr=(chip.get("away") or {}).get("abbr") or "", home_abbr=(chip.get("home") or {}).get("abbr") or "")
         if box:
             chip["linescore"] = box
+            # A FINAL with no score but a complete period line takes the sum:
+            # past-date NBA chips served FINAL with both scores null (measured
+            # 2026-10-13 on all four 10-12 games) while their pbp quarters were
+            # all there. Never on a live game -- its periods are still moving.
+            if chip.get("state") == "final" and box.get("kind") == "periods":
+                away, home = chip.get("away") or {}, chip.get("home") or {}
+                a_vals, h_vals = box.get("away") or [], box.get("home") or []
+                if (away.get("score") in (None, "") and home.get("score") in (None, "")
+                        and a_vals and h_vals and None not in a_vals and None not in h_vals):
+                    a_sum, h_sum = sum(a_vals), sum(h_vals)
+                    away["score"], home["score"] = str(a_sum), str(h_sum)
+                    if a_sum != h_sum:
+                        chip["leader"] = "away" if a_sum > h_sum else "home"
     except Exception:  # noqa: BLE001 -- a line score must never break a chip
         return
 
