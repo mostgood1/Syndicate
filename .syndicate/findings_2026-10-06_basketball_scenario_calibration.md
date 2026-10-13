@@ -1419,3 +1419,11 @@ engine.py LOAN is RETURNED to nba-native-live-resim.
   - accept b = 3 with P3 on (override the two small guard misses on the 12-date sample);
   - or run the joint arm on the full FIT first, where the reals are tighter;
   - or keep the lever off.
+
+**USER DECISION 2026-10-13: "accept bench rest b=3 with P3's fixes on".**
+- The two P3-ON guard misses (S8 margin −0.18, S5 −0.008 on the 12-date sample) are overridden as the user's decision.
+- The accepted Phase 2 config now adds `blowout_bench_rest = True`, `bench_weight_boost = 3.0`, together with P3's
+  `foul_out_in_sim = True` + `foul_trouble_bench_mult = 0.05`.
+- Not enabled in production. Adoption follows the end-of-Phase-2 VALIDATION read; P3's own enablement decision is
+  separate.
+- **Next per protocol:** the full FIT re-run of the accepted config with these on, then Phase 2 #3 / #5.
