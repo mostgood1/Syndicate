@@ -95,5 +95,32 @@ class FinalWithoutScore(unittest.TestCase):
         self.assertIsNone(chip["away"]["score"])
 
 
+class DailyLineScores(unittest.TestCase):
+    def test_scoreboard_parse_keeps_completed_games_only(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("fbl", Path(__file__).resolve().parents[1] / "scripts" / "fetch_basketball_linescores.py")
+        mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        team = lambda abbr, side, per: {"homeAway": side, "team": {"abbreviation": abbr}, "linescores": [{"value": v} for v in per]}  # noqa: E731
+        payload = {"events": [
+            {"id": "401", "status": {"type": {"completed": True}}, "competitions": [{"competitors": [team("NY", "away", [26, 28, 20, 14, 10]), team("ATL", "home", [26, 30, 19, 13, 13])]}]},
+            {"id": "402", "status": {"type": {"completed": False}}, "competitions": [{"competitors": [team("A", "away", [1]), team("B", "home", [2])]}]},
+        ]}
+        got = mod.parse_scoreboard(payload)
+        self.assertEqual(list(got), ["401"])
+        self.assertEqual(got["401"]["home_periods"], [26, 30, 19, 13, 13])
+
+    def test_daily_file_wins_and_joins_by_team_pair(self) -> None:
+        gl._CACHE.clear()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict("os.environ", {"SYNDICATE_DATA_ROOT": tmp}):
+            path = Path(tmp) / "wnba_source" / "data" / "processed"
+            path.mkdir(parents=True)
+            (path / "linescores_2026-10-07.json").write_text(json.dumps({"games": {"401918297": {
+                "away": "NY", "home": "ATL", "away_periods": [26, 28, 20, 14, 10], "home_periods": [26, 30, 19, 13, 13]}}}), encoding="utf-8")
+            got = gl.linescore("wnba", {"away_tri": "NYL", "home_tri": "ATL", "game_id": "oddsapi-x"}, "2026-10-07")
+        self.assertEqual(got["labels"], ["1", "2", "3", "4", "OT"])
+        self.assertEqual(sum(got["home"]), 101)
+
+
 if __name__ == "__main__":
     unittest.main()

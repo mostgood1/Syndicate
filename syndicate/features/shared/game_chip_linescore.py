@@ -116,6 +116,22 @@ def _pbp_quarters(path: str) -> dict[str, tuple[list[int], list[int]]]:
     return out
 
 
+def _canon(sport: str, abbr: Any) -> str:
+    """One spelling for a club across ESPN ("NY", "GS") and the cards ("NYK", "GSW")."""
+    text = str(abbr or "").strip()
+    try:
+        from syndicate.features.shared.team_aliases import chip_join_key
+
+        return chip_join_key(sport, text) or text.lower()
+    except Exception:  # noqa: BLE001
+        return text.lower()
+
+
+def _tri(sport: str, game: Mapping[str, Any], side: str) -> str:
+    container = game.get(side) if isinstance(game.get(side), Mapping) else {}
+    return _canon(sport, game.get(f"{side}_tri") or container.get("abbr") or container.get("name"))
+
+
 def _basketball(sport: str, game: Mapping[str, Any], date: str) -> dict[str, Any] | None:
     live = game.get("live_state") if isinstance(game.get("live_state"), Mapping) else {}
     periods = live.get("periods") if isinstance(live.get("periods"), list) else []
@@ -123,7 +139,18 @@ def _basketball(sport: str, game: Mapping[str, Any], date: str) -> dict[str, Any
         got = _periods([p.get("away") for p in periods], [p.get("home") for p in periods], 4)
         if got:
             return got
-    path = _data_root() / f"{sport}_source" / "data" / "processed" / f"pbp_espn_{date}.csv"
+    processed = _data_root() / f"{sport}_source" / "data" / "processed"
+    daily = processed / f"linescores_{date}.json"
+    if daily.is_file():
+        st = daily.stat()
+        games = _cached(("ls", str(daily), st.st_mtime_ns), lambda: json.loads(daily.read_text(encoding="utf-8")).get("games") or {}) or {}
+        hit = next((games.get(str(game.get(k) or "")) for k in ("game_id", "event_id", "gamePk") if games.get(str(game.get(k) or ""))), None)
+        if hit is None:
+            want = (_tri(sport, game, "away"), _tri(sport, game, "home"))
+            hit = next((g for g in games.values() if (_canon(sport, g.get("away")), _canon(sport, g.get("home"))) == want), None)
+        if hit:
+            return _periods(hit.get("away_periods") or [], hit.get("home_periods") or [], 4)
+    path = processed / f"pbp_espn_{date}.csv"
     if not path.is_file():
         return None
     st = path.stat()
