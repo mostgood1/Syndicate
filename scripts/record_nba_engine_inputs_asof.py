@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 
-def _add_473_inputs(live_processed: Path, dst: Path, d: str) -> None:
+def _add_473_inputs(live_processed: Path, dst: Path, d: str, *, total_inputs: bool = True) -> None:
     """#473 (a31ba2bf) feeds NBA team quality and starter flags. The scratch recipe copies only top-level processed
     files, so without this every as-of game would replay the PRE-#473 (team-neutral) sim:
       * `rotation_stints/player_checks_<date>.csv` dated BEFORE the slate (starter flags read date < slate);
@@ -45,8 +45,10 @@ def _add_473_inputs(live_processed: Path, dst: Path, d: str) -> None:
             shutil.copy2(f, stints / f.name)
             n += 1
     ti = live_processed / "nba_sim_total_inputs.json"
-    if ti.exists():
+    if total_inputs and ti.exists():
         shutil.copy2(ti, dst / ti.name)
+    elif not total_inputs:
+        (dst / ti.name).unlink(missing_ok=True)  # --no-total-inputs: the default-subtraction path (#695 arm)
     # LINEUP POOLS. `resim_nba_availability.REMOVE_ALWAYS` deletes rotation_stints_history / pair_minutes_history from
     # every scratch (the old vendored builder leaked future games into them), so every replay hit
     # `no_rotation_stints_history` and recorded home/away_lineups = None on 2,588/2,588 sides (nba-lineup-pools,
@@ -75,7 +77,7 @@ def _add_473_inputs(live_processed: Path, dst: Path, d: str) -> None:
                     writer.writerow(row)
                     kept += 1
         hist[name] = kept
-    print(f"INPUTS_473 {d} player_checks={n} total_inputs={'yes' if ti.exists() else 'NO'} history_rows={hist}", flush=True)
+    print(f"INPUTS_473 {d} player_checks={n} total_inputs={'yes' if (dst / ti.name).exists() else 'NO'} history_rows={hist}", flush=True)
 
 
 def main(argv=None) -> int:
@@ -93,6 +95,8 @@ def main(argv=None) -> int:
                     help="READ-ONLY source of #473's inputs the pristine copy lacks (player_checks, total-inputs file)")
     ap.add_argument("--worker", type=int, default=0)
     ap.add_argument("--workers", type=int, default=1)
+    ap.add_argument("--no-total-inputs", action="store_true",
+                    help="leave nba_sim_total_inputs.json OUT of the scratch (skip_def_subtraction off) -- #695 A/B arm")
     args = ap.parse_args(argv)
 
     code, pristine, asof = Path(args.code), Path(args.pristine).expanduser(), Path(args.asof)
@@ -152,7 +156,8 @@ def main(argv=None) -> int:
             print(f"REC_SKIP {d} no props snapshot", flush=True)
             continue
         rs.prepare_scratch(pristine, scratch, d, asof, props_csv)
-        _add_473_inputs(Path(args.live_processed).expanduser(), scratch / "nba_source" / "data" / "processed", d)
+        _add_473_inputs(Path(args.live_processed).expanduser(), scratch / "nba_source" / "data" / "processed", d,
+                        total_inputs=not args.no_total_inputs)
         cur["date"] = d
         seen.clear()
         before = written["n"]
