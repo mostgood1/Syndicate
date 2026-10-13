@@ -5607,17 +5607,20 @@ def _build_local_optional_player_recon_artifacts(*, processed_root: Path, date_s
 
     copied: dict[str, str] = {}
     data_root = processed_root.parent
-    vendor_root = REPO_ROOT / "vendor" / "wnba_betting_repo"
+    # Syndicate's verbatim copies of the vendored tools/ scripts since 2026-10-13 (lane nba-source-cli-native;
+    # tests/test_wnba_recon_tools_native.py pins their bodies). Still loaded by path, fresh each call, because their
+    # module globals read the data-root env at load time.
+    tools_root = REPO_ROOT / "syndicate" / "features" / "wnba" / "recon_tools"
     tool_specs = (
         (
-            vendor_root / "tools" / "build_recon_players.py",
+            tools_root / "build_recon_players.py",
             "syndicate_wnba_vendor_build_recon_players",
             "build_recon_players",
             processed_root / f"recon_players_{date_str}.csv",
             "recon_players_path",
         ),
         (
-            vendor_root / "tools" / "build_live_player_lens_tuning.py",
+            tools_root / "build_live_player_lens_tuning.py",
             "syndicate_wnba_vendor_build_live_player_lens_tuning",
             "build_live_player_lens_tuning",
             processed_root / f"live_player_lens_tuning_{date_str}.csv",
