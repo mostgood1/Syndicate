@@ -83,3 +83,20 @@ def test_lift_evaluate_joins_lines_outcomes_and_signals() -> None:
     assert rep["lines_joined"] == 2
     assert up["fired"]["n"] == 1 and up["fired"]["hit_rate"] == 1.0 and up["fired"]["residual"] == 0.5
     assert up["baseline"]["n"] == 1 and up["baseline"]["hit_rate"] == 0.0
+
+
+def test_unders_main_line_is_the_most_quoted_point_and_roi_uses_the_price(tmp_path) -> None:
+    ut = _load("nba_unders_test")
+    csv_path = tmp_path / "2026-02-10.csv"
+    header = "snapshot_ts,event_id,commence_time,bookmaker,bookmaker_title,market,outcome_name,player_name,point,price,last_update,home_team,away_team\n"
+    rows = []
+    for book in ("dk", "fd", "mgm"):
+        rows += [f"t,e1,c,{book},B,player_points,Over,A B,20.5,-110,t,H,A", f"t,e1,c,{book},B,player_points,Under,A B,20.5,-110,t,H,A"]
+    rows += ["t,e1,c,dk,B,player_points,Over,A B,22.5,120,t,H,A", "t,e1,c,dk,B,player_points,Under,A B,22.5,-150,t,H,A"]
+    csv_path.write_text(header + "\n".join(rows) + "\n")
+    lines = ut.main_lines(csv_path)
+    assert len(lines) == 1 and lines[0]["point"] == 20.5 and lines[0]["books"] == 3
+    assert abs(lines[0]["p_over"] - 0.5) < 1e-9
+    roi = ut.roi_stats([{"y": 1.0, "under_dec_best": 2.0, "game": "g1"}, {"y": 0.0, "under_dec_best": 2.0, "game": "g2"}],
+                       "under_dec_best", B=50)
+    assert roi["roi_pct"] == 0.0
