@@ -253,7 +253,7 @@ def _norm(text: str) -> str:
 
 
 def _sha(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()[:16]  # LF-normalised: a Windows (CRLF) and a Linux checkout must stamp the same hash, or --check fails on one of them
 
 
 def _resolve(curmod: str, node: ast.ImportFrom) -> str:
