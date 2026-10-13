@@ -165,6 +165,14 @@ def devig(prices: Sequence[Any], *, method: str = "multiplicative") -> list[floa
     price them -- worth using on player props, where a +390 side and a -450 side
     are routinely two halves of one market and multiplicative de-vig leaves the
     longshot overstated.
+
+    `shin` (Shin 1993) solves for the share z of insider money that makes the
+    implied fair probabilities sum to 1. Like `power` it takes more margin from
+    the longshot. `[2026-10-13, lane fair-price-v2]` it is the one method that
+    passed the pre-registered test against multiplicative on the board's own
+    consensus: 76,831 graded pregame lines / 394 games, 09-30..10-12, log loss
+    -0.00087 [-0.00143, -0.00026], not worse in any of the four largest sports
+    (`scripts/fair_price_eval.py`; power missed: CI upper +0.00008).
     """
     implied = [implied_probability(price) for price in prices]
     if not implied or any(value is None for value in implied):
@@ -181,7 +189,45 @@ def devig(prices: Sequence[Any], *, method: str = "multiplicative") -> list[floa
         solved = _solve_power(values)
         if solved is not None:
             return solved
+    if method == "shin":
+        solved = _solve_shin(values)
+        if solved is not None:
+            return solved
     return [value / total for value in values]
+
+
+def _solve_shin(values: Sequence[float], *, iterations: int = 80) -> list[float] | None:
+    """Shin's fair probabilities: find z in [0, 0.4) so the implied fairs sum to 1.
+
+    p_i(z) = (sqrt(z^2 + 4 (1 - z) q_i^2 / S) - z) / (2 (1 - z)), q_i the implied
+    probabilities, S their sum. sum p_i(z) falls as z rises, so bisection cannot
+    diverge. A book with no overround (S <= 1) has no margin to remove: None, and
+    the caller falls back to multiplicative.
+    """
+    if any(not (0.0 < value < 1.0) for value in values):
+        return None
+    total = sum(values)
+    if total <= 1.0:
+        return None
+
+    def fairs(z: float) -> list[float]:
+        return [
+            (math.sqrt(z * z + 4.0 * (1.0 - z) * (q * q) / total) - z) / (2.0 * (1.0 - z))
+            for q in values
+        ]
+
+    low, high = 0.0, 0.4
+    for _ in range(iterations):
+        mid = (low + high) / 2.0
+        if sum(fairs(mid)) > 1.0:
+            low = mid
+        else:
+            high = mid
+    fair = fairs((low + high) / 2.0)
+    norm = sum(fair)
+    if norm <= 0:
+        return None
+    return [value / norm for value in fair]
 
 
 def _solve_power(values: Sequence[float], *, iterations: int = 60) -> list[float] | None:

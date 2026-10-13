@@ -55,73 +55,24 @@ _EVENT_RE = re.compile(r'"event_id"\s*:\s*"([^"]*)"')
 
 
 # ----------------------------------------------------------------------------- de-vig
+#
+# THE PRODUCTION CONVERTERS, imported -- never re-implemented here. The evaluator must score exactly the de-vig the
+# board runs (`opportunity_signals.devig`, which `layer2_board._consensus_fair` calls per book), and the repo's
+# probability-differential harness forbids unregistered copies of converters for the same reason.
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from syndicate.features.shared.opportunity_signals import devig, expected_value_pct, implied_probability  # noqa: E402
+
+_METHOD_NAME = {"mult": "multiplicative", "power": "power", "shin": "shin", "power_dedup": "power"}
 
 
-def implied(price: Any) -> float | None:
-    try:
-        p = float(price)
-    except (TypeError, ValueError):
-        return None
-    if p == 0 or p != p:
-        return None
-    return 100.0 / (p + 100.0) if p > 0 else -p / (-p + 100.0)
-
-
-def decimal_odds(price: Any) -> float | None:
-    try:
-        p = float(price)
-    except (TypeError, ValueError):
-        return None
-    if p == 0:
-        return None
-    return 1.0 + p / 100.0 if p > 0 else 1.0 + 100.0 / -p
-
-
-def devig_mult(imps: Mapping[str, float]) -> dict[str, float]:
-    total = sum(imps.values())
-    return {k: v / total for k, v in imps.items()}
-
-
-def devig_power(imps: Mapping[str, float]) -> dict[str, float]:
-    """fair_i = imp_i ** k with sum 1. k > 1 when the book is overround (removes more from longshots)."""
-    lo, hi = 0.2, 5.0
-    for _ in range(80):
-        k = (lo + hi) / 2.0
-        if sum(v ** k for v in imps.values()) > 1.0:
-            lo = k
-        else:
-            hi = k
-    k = (lo + hi) / 2.0
-    out = {s: v ** k for s, v in imps.items()}
-    total = sum(out.values())
-    return {s: v / total for s, v in out.items()}
-
-
-def devig_shin(imps: Mapping[str, float]) -> dict[str, float]:
-    """Shin (1993): insider-trading share z solved so the implied fairs sum to 1."""
-    total = sum(imps.values())
-    if total <= 1.0:
-        return devig_mult(imps)
-
-    def fairs(z: float) -> dict[str, float]:
-        return {
-            s: (math.sqrt(z * z + 4.0 * (1.0 - z) * (q * q) / total) - z) / (2.0 * (1.0 - z))
-            for s, q in imps.items()
-        }
-
-    lo, hi = 0.0, 0.4
-    for _ in range(80):
-        z = (lo + hi) / 2.0
-        if sum(fairs(z).values()) > 1.0:
-            lo = z
-        else:
-            hi = z
-    out = fairs((lo + hi) / 2.0)
-    t = sum(out.values())
-    return {s: v / t for s, v in out.items()}
-
-
-_DEVIG = {"mult": devig_mult, "power": devig_power, "shin": devig_shin, "power_dedup": devig_power}
+def ev_at(price: Any, prob: Any) -> float | None:
+    """EV as a FRACTION at `price` if `prob` is the truth (production `expected_value_pct` / 100)."""
+    value = expected_value_pct(price, prob)
+    return None if value is None else value / 100.0
 
 
 # ----------------------------------------------------------------------------- identity
@@ -208,13 +159,11 @@ def fair_for(per_book: Mapping[str, Mapping[str, Any]], side: str, method: str,
         need = outcome_set(sides)
         if not need or not need <= set(sides) or side not in need:
             continue
-        imps = {s: implied(sides[s]) for s in need}
-        if any(v is None for v in imps.values()):
+        order = sorted(need)
+        fair = devig([sides[x] for x in order], method=_METHOD_NAME[method])
+        if not fair:  # production refuses an impossible hold; so do we
             continue
-        hold = sum(imps.values())
-        if hold < 0.90 or hold > 1.35:
-            continue
-        p = _DEVIG[method](imps)[side]
+        p = fair[order.index(side)]
         key = (clusters or {}).get(book, book) if method == "power_dedup" else book
         votes[key].append(p)
     if not votes:
@@ -307,19 +256,19 @@ def selection_test(rows: list[dict], threshold: float = 0.02) -> dict[str, Any]:
     out = {}
     for m in METHODS:
         sel = [r for r in rows if r.get(f"sight_{m}") is not None and r.get("close_power") is not None
-               and r.get("dec") and r[f"sight_{m}"] * r["dec"] - 1 >= threshold
-               and r[f"sight_{m}"] * r["dec"] - 1 <= 0.0526]
+               and ev_at(r["px"], r[f"sight_{m}"]) is not None
+               and threshold <= ev_at(r["px"], r[f"sight_{m}"]) <= 0.0526]
         if not sel:
             out[m] = {"n": 0}
             continue
 
         def ev_close(s):
-            return 100 * sum(r["close_power"] * r["dec"] - 1 for r in s) / len(s) if s else None
+            return 100 * sum(ev_at(r["px"], r["close_power"]) for r in s) / len(s) if s else None
 
         def roi(s):
             return 100 * sum(r["pnl"] for r in s) / len(s) if s else None
         out[m] = {"n": len(sel), "games": len({r["game"] for r in sel}),
-                  "plus_money_share": round(sum(1 for r in sel if r["dec"] > 2.0) / len(sel), 3),
+                  "plus_money_share": round(sum(1 for r in sel if float(r["px"]) > 0) / len(sel), 3),
                   "ev_at_power_close_pct": round(ev_close(sel), 3), "ev_ci95": [round(x, 3) for x in boot_ci(sel, ev_close)],
                   "roi_pct": round(roi(sel), 2), "roi_ci95": [round(x, 2) for x in boot_ci(sel, roi)]}
     return out
@@ -340,7 +289,6 @@ def load_graded(path: Path) -> list[dict]:
         r["sport"], r["event_id"] = sport, event
         r["gkey"] = group_key(event, r.get("market"), r.get("segment"), r.get("player"), r.get("side"), r.get("line"))
         r["sd"] = str(r.get("side") or "").strip().lower()
-        r["dec"] = decimal_odds(r["px"])
         rows.append(r)
     return rows
 
@@ -411,9 +359,10 @@ def evaluate(rows: list[dict], hist: Mapping[tuple, list[tuple]], *, max_age_h: 
         report["by_sport"][sport] = summarize([r for r in scored if r["sport"] == sport], "sight")
     for kind in ("game", "prop"):
         report["by_kind"][kind] = summarize([r for r in scored if bool(r.get("player")) == (kind == "prop")], "sight")
-    for lbl, lo, hi in (("fav <-200", 1.0, 1.5), ("-200..-110", 1.5, 1.91), ("-110..+150", 1.91, 2.5),
-                        ("+150..+400", 2.5, 5.0), ("+400 or longer", 5.0, 1e9)):
-        report["by_price"][lbl] = summarize([r for r in scored if r["dec"] and lo <= r["dec"] < hi], "sight")
+    for lbl, lo, hi in (("fav <-200", 0.6667, 1.01), ("-200..-110", 0.5238, 0.6667), ("-110..+150", 0.4, 0.5238),
+                        ("+150..+400", 0.2, 0.4), ("+400 or longer", 0.0, 0.2)):
+        report["by_price"][lbl] = summarize(
+            [r for r in scored if (implied_probability(r["px"]) or -1) >= lo and (implied_probability(r["px"]) or -1) < hi], "sight")
     return report
 
 

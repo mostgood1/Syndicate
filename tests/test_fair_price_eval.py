@@ -1,10 +1,16 @@
-"""`scripts/fair_price_eval.py` -- the de-vig methods, shared-feed detection and calibration it scores with."""
+"""`scripts/fair_price_eval.py` -- grouping, shared-feed detection, the per-book fair it scores, and calibration.
+
+The de-vig itself is production's (`opportunity_signals.devig`); its properties are tested in
+`tests/test_fair_devig_shin.py`. Here: that the evaluator calls it the way the board does.
+"""
 from __future__ import annotations
 
 import importlib.util
 import math
 import random
 from pathlib import Path
+
+from syndicate.features.shared.opportunity_signals import devig
 
 _SPEC = importlib.util.spec_from_file_location(
     "fair_price_eval", Path(__file__).resolve().parents[1] / "scripts" / "fair_price_eval.py"
@@ -13,27 +19,11 @@ fpe = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(fpe)
 
 
-def _imps(fav: int, dog: int) -> dict[str, float]:
-    return {"home": fpe.implied(fav), "away": fpe.implied(dog)}
-
-
-def test_every_devig_sums_to_one_and_keeps_order() -> None:
-    imps = _imps(-400, 300)
-    for method in ("mult", "power", "shin"):
-        fair = fpe._DEVIG[method](imps)
-        assert math.isclose(sum(fair.values()), 1.0, abs_tol=1e-9)
-        assert fair["home"] > fair["away"]
-
-
-def test_power_and_shin_take_more_from_the_longshot_than_multiplicative() -> None:
-    imps = _imps(-400, 300)
-    mult, power, shin = (fpe._DEVIG[m](imps)["away"] for m in ("mult", "power", "shin"))
-    assert power < mult and shin < mult
-
-
-def test_balanced_market_is_identical_across_methods() -> None:
-    imps = _imps(-110, -110)
-    assert all(math.isclose(fpe._DEVIG[m](imps)["home"], 0.5, abs_tol=1e-9) for m in ("mult", "power", "shin"))
+def test_fair_is_productions_devig_per_book_then_the_median() -> None:
+    per_book = {"a": {"home": -400, "away": 300}}
+    for method, name in (("mult", "multiplicative"), ("power", "power"), ("shin", "shin")):
+        fair, n = fpe.fair_for(per_book, "away", method)
+        assert n == 1 and math.isclose(fair, devig([300, -400], method=name)[0])
 
 
 def test_spread_sides_share_one_group_on_the_home_line() -> None:
@@ -64,7 +54,12 @@ def test_shared_feed_books_are_detected_and_vote_once() -> None:
 
 def test_incomplete_or_impossible_books_are_refused() -> None:
     assert fpe.fair_for({"a": {"over": -110}}, "over", "mult") == (None, 0)
-    assert fpe.fair_for({"a": {"over": 200, "under": 200}}, "over", "mult") == (None, 0)  # 67% total: underround
+    assert fpe.fair_for({"a": {"over": 200, "under": 200}}, "over", "mult") == (None, 0)  # underround
+
+
+def test_ev_at_is_productions_expected_value_as_a_fraction() -> None:
+    assert math.isclose(fpe.ev_at(100, 0.55), 0.10, abs_tol=1e-9)
+    assert fpe.ev_at(None, 0.5) is None
 
 
 def test_calibration_recovers_a_known_slope() -> None:

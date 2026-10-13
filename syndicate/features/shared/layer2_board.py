@@ -1298,7 +1298,11 @@ _LIVE_GAME_STATES = frozenset({"live", "in", "in_progress", "inprogress"})
 #: anchor. The median can be taken over power-de-vigged books with no sharp
 #: anchor at all, and the anchor tiers are power-de-vigged regardless of this.
 FAIR_DEVIG_METHOD_ENV = "SYNDICATE_FAIR_DEVIG_METHOD"
-_FAIR_DEVIG_METHODS: tuple[str, ...] = ("multiplicative", "power")
+#: `shin` added `[2026-10-13, lane fair-price-v2]`: the one method that passed the
+#: pre-registered test against multiplicative (reading in `opportunity_signals.devig`).
+#: Enabled on the fleet by env, NOT by changing the default: two suites pin the
+#: multiplicative default as their legacy baseline.
+_FAIR_DEVIG_METHODS: tuple[str, ...] = ("multiplicative", "power", "shin")
 
 #: The anchor tiers' de-vig. POWER, because an anchor is ONE book, and a single
 #: book puts more of its margin on the longshot side than on the favourite --
