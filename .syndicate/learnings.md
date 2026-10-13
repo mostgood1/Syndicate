@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1380 rules `[generated]`
+## Index — 1381 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -2007,3 +2007,11 @@ prefer single-quoted arguments there.
 - Third instance of one shape: **from my marker to EOF is only safe when your
   section IS at EOF.** The other two were a land script that duplicated 104,199
   B of `lanes.md`, and a prefix rewrite that clobbered 1,125 lines.
+
+## 2026-10-13 OVERTURNED: "the NHL game-line model needs better inputs to beat the as-of GF/GA baseline on moneyline" -- eight were tried and none did `[lane nhl-game-lines-model, CLOSED GOAL: NOT MET, session 9ed26377 / closed by 4ab694ed]`
+
+- **Measured over the 2025-26 regular season, walk-forward with as-of fits only** (`docs/reports/nhl_game_lines_model_experiments_2026-10-02.md`, 609 lines, 971 CIs, 265 `n=` values; OOS n=681, full regular n=1,132, playoffs holdout n=82). **Eight candidate inputs, NOT ONE with a CI excluding zero on ML**: sim machinery, save%, GSAx, prior-season GSAx, recency weighting, dispersion, score-adjusted xG, confirmed starters. Against the BOOK the model is at parity on ML, puck line, totals and the regulation 3-way.
+- **The calibration half of the same lane SUCCEEDED, which is the contrast that matters:** settled total bias went **+0.111 -> +0.008** by fixing mis-settlement (full-game OT/SO, regulation tie mass, empty net, regulation pace) and reading the modal pregame totals line. **Calibration defects are findable and fixable from the inside; DISCRIMINATION was not improvable by any input in hand.**
+- **Rule: before building features for a market, test whether any available input adds to the de-vigged price -- and if the answer is no across the inputs you have, the deficit is INFORMATION, not engineering.** A projection that ties a GF/GA average is not short of features. Shipping two more layers that each reach production and move nothing (score-adjusted xG ML dBrier -0.00017 [-0.00036, +0.00002]; GSAx ML +0.00056 [-0.00118, +0.00238]) costs real deploys and buys no edge.
+- **Corollary on how to read a "ships" verdict:** both of those layers passed their stop conditions and SHIPPED, because the stop condition was "do not deploy if the CI is entirely worse", not "deploy only if it is better". A pre-registered gate phrased as a floor admits anything that is merely harmless -- which is correct for a calibration fix and misleading for an edge claim. Say which you are testing.
+- Same shape as the MLB finding that nothing added to the starter outs/K de-vigged price, and as [[feedback_a_projection_is_not_a_model_edge]]. Also [[feedback_check_the_stat_is_priced]]: parity with the book IS the ceiling once the book prices the same information.
