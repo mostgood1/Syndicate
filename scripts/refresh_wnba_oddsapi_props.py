@@ -1135,18 +1135,6 @@ def _source_python(source_root: Path) -> str:
     return "python"
 
 
-def _vendor_code_root(package_name: str) -> Path:
-    # The hosted "source_root" for a sport (e.g. SYNDICATE_WNBA_SOURCE_ROOT on
-    # Render) is a persistent *data* disk, not a code checkout -- the vendored
-    # wnba_betting/nba_betting package only ever lives in this repo's own
-    # vendor/<package>_repo checkout, so subprocess invocations of it must use
-    # this root for cwd/PYTHONPATH regardless of where source_root resolves.
-    override = str(os.environ.get(f"SYNDICATE_VENDOR_ROOT_{package_name.upper()}") or "").strip()
-    if override:
-        return Path(override).expanduser().resolve()
-    return REPO_ROOT / "vendor" / f"{package_name}_repo"
-
-
 def _games_history_max_date(path: Path) -> str | None:
     try:
         if not path.exists() or not path.is_file() or path.stat().st_size <= 0:
@@ -1256,6 +1244,9 @@ def _csv_has_column(path: Path, column: str) -> bool:
         return False
 
 
+WNBA_GAMES_HISTORY_SEED = REPO_ROOT / "syndicate" / "features" / "wnba" / "seed_data" / "games_nba_api.csv"
+
+
 def _seed_games_history_from_checkout_if_fresher(
     *, raw_path: Path, package_name: str, date_str: str, feature_candidates: tuple[Path, ...], log_file: Path
 ) -> bool:
@@ -1271,7 +1262,12 @@ def _seed_games_history_from_checkout_if_fresher(
     """
     if not _games_history_is_stale(raw_path, date_str=date_str):
         return False
-    checkout_path = _vendor_code_root(package_name) / "data" / "raw" / "games_nba_api.csv"
+    # Syndicate's committed seed since 2026-10-13 (lane nba-source-cli-native): a byte-identical copy of the vendored
+    # checkout's data/raw/games_nba_api.csv (2,388 games, newest 2026-08-10; the fleet's history reached 2026-10-02 that
+    # day, so only a cold start can use it).
+    if package_name != "wnba_betting":
+        raise ValueError(f"the WNBA refresh seeds WNBA history only, got {package_name!r}")
+    checkout_path = WNBA_GAMES_HISTORY_SEED
     checkout_max = _games_history_max_date(checkout_path)
     if not checkout_max:
         return False
@@ -4519,9 +4515,10 @@ def _ensure_game_predictions_for_props_refresh(*, source_root: Path, date_str: s
         log_file=log_file,
         heartbeat_cb=heartbeat_cb,
     )
-    code_root = _vendor_code_root("wnba_betting")
+    # The vendored checkout's data/processed/predictions_<date>.csv used to be tried first. The vendored tree holds them only
+    # for 2026-05-27, 05-28 and 10-01 (past slates; checked on the fleet 2026-10-13), and the bootstrap now runs
+    # Syndicate's CLI against WNBA_BETTING_DATA_ROOT, so nothing writes one there: removed (lane nba-source-cli-native).
     for repo_pred_path in (
-        code_root / "data" / "processed" / f"predictions_{date_str}.csv",
         source_root / f"predictions_{date_str}.csv",
     ):
         if (not pred_path.exists() or _count_csv_rows_quick(pred_path) <= 0) and repo_pred_path.exists() and repo_pred_path.is_file():
