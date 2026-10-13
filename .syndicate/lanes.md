@@ -650,6 +650,7 @@ death, never life — do not invert it.
   - **Harness fix 2026-10-06 ~00:30Z (reported by lane nhl-pp-time, session dd07cae9):** `backtest_nhl_game_lines.py sim` asserted its legacy-machinery replica == production `predict_game`. Since 7865b26e (10-03) production defaults to the CALIBRATED sim, so it failed on the first game (2025-11-01 / 2025020181: 0.379175 vs 0.389478). It was NOT caused by GSAx or score-adjusted xG, which live in `_predictions_and_markets`, not `predict_game`. Workers now set production's own legacy switch (SYNDICATE_NHL_GAME_MARKET_CALIBRATION=off), restoring the assertion's meaning (the raw layer the experiments calibrate on top of). Re-run on the reporter's roots: 2025-11-01, 13/13 games pass. No earlier conclusion rested on it (those used the 10-02 games.json and applied the calibration themselves).
 - Blocked by: no tested signal beats the GF/GA baseline on ML; every in-hand input (team xG blend + score state, goalie identity + GSAx, rest) is now shipped -- the next ML candidate needs information the book does not already price
 ### soccer-skill-registry-line-weighting — OPEN — opened 2026-10-02 — session 43e4d5fe-e05e-41bc-aae6-6d6986460b22
+- **CROSS-LANE WRITE 2026-10-13 (lane soccer-segment-projection-guard, session 9e18a0e7, user-approved "Cross-lane write")**: `attach_soccer_projections` now SKIPS any row whose `normalize_segment(segment) != "full"` (new counter `non_full_segment_rows` in the coverage dict) before the match lookup. Every index number is full-match, so h1/h2 rows were priced with full-match probabilities (served 10-10: h1 over 0.5 p=0.945; h1 handicap model_edge +11.68). No full-match pricing, `_price_against_market`, `_apply_line_skill_weight` or ladder code changed.
 - **CROSS-LANE WRITE 2026-10-08 ~20:20Z (lane layer2-board-ui-redesign, session d4409ac4, user-approved "Soccer BTTS + handicaps")**: soccer_projections.py now PRICES `btts` (from `total_distribution.both_teams_scored_probability`, scoreline fallback; new `_BTTS_MARKETS`, `_btts_prob_from_scorelines`) and Asian-handicap `spreads`/`spreads_alt` from `scoreline_probabilities` (new `_scoreline_outcomes`, `_handicap_prob_from_scorelines`: away-frame line, quarter lines split, p = W/(1-U)), basis `scoreline_handicap`, falling back to the margin mean as before. These go through `_price_against_market` unchanged, so `_apply_line_skill_weight` covers spreads when this lane's env is on; BTTS has NO entry in `_LINE_SKILL_WEIGHTS` (unmeasured). User was told the h2h/totals/spreads skill reading was w=0.000 and chose to price them.
 - **CROSS-LANE WRITE 2026-10-08 (lane layer2-board-ui-redesign, session d4409ac4, user-approved "build it all", landed 04d9047a)**: added display-only `projection["ladder"]` / `ladder_kind` keys (chart data; nothing scores on them) to soccer_projections.py (prop exact branch, totals, h2h; new `_scoreline_ladder`). No probability, gate or selection code changed.
 - **GOAL VERDICT (checkpoint 2026-10-04 ~21:30Z / 4:30 PM CT).** Goal, verbatim: "Soccer's measured-skill registry carries this season's readings (pregame totals LOSES on n 492; h2h/spreads re-measured; totals_alt/h2h_3_way/spreads_alt read the same verdicts) and every soccer line's model edge is scaled by a per-market weight FITTED out-of-sample on 2026-27 (edge = w x (model - de-vigged fair)), so each line is still judged on its own EV; verified on the fleet board as soccer rows carrying skill_edge_weight with edges = w x raw. No market is removed." **GOAL: NOT MET -- registry half MET and served; weighting built flag-OFF, held by user decision.** Registry served (deploys.md 2026-10-03 15:56:55Z). Per-line weight built behind `SYNDICATE_SOCCER_LINE_SKILL_WEIGHT` (absent = off; 8 tests) with fitted w = 0.000 for h2h/totals/AH, so on = zero edges -- held until a model fix earns weight. LEFT: (1) a model fix that refits w > 0; (2) the h2h draw/away legs in `layer2_board._three_way_leg_edge` (held by lane layer2-freshness-1h).
@@ -1011,6 +1012,22 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET — owner_liveness --idle-min 240 returned SAFE for 1 of 9 CLOSED blocks; 8 WAIT (live owners / fresh edits). Table in log/2026-10-13.md.
 - Moved: query-state-cache-oversize
+
+### soccer-segment-projection-guard — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: Soccer h1/h2 rows on the Layer 2 board no longer carry a full-match projection or model_edge_pct: attach_soccer_projections skips non-full segments and counts them (non_full_segment_rows)
+- Files: tests/test_soccer_segment_projection_guard.py (NEW). CROSS-LANE WRITE (not claimed here): syndicate/features/shared/soccer_projections.py is held by OPEN lane soccer-skill-registry-line-weighting; the guard is recorded in that lane's block
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit test: h1/h2 rows get no projection while full rows still do; on the fleet board after reload, 0 soccer rows with segment!=full carry projection.basis
+- Blocked by: none
+
+### layer2-live-segment-actuals — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: Live period game rows (h1/h2/q1-q4/p1-p3/first5) on the Layer 2 board show the period's own score-so-far in the Actual column, from segment_actuals, never the full-game score
+- Files: syndicate/features/shared/board_enrichment.py (live segment actual attach ONLY), tests/test_layer2_live_segment_actuals.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit test over a live NFL/NCAAF state: q2 total row actual_so_far == q2 points so far; on the fleet during a live slate a q2/h1 row renders a period number
+- Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

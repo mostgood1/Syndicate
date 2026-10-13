@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.prop_projections import _norm_name as _base_norm_name
+from syndicate.features.shared.market_segments import normalize_segment
 
 
 def _norm_name(value: Any) -> str:
@@ -1243,6 +1244,16 @@ def attach_soccer_projections(
     unmatched_match = 0
     unmatched_player = 0
     unsupported_market = 0
+    # A HALF IS A DIFFERENT BET (lane `soccer-segment-projection-guard`, 2026-10-13).
+    # Every number this index carries -- `win_probability`, `scoreline_probabilities`,
+    # the handicap and BTTS reads, corners -- is FULL-MATCH, and nothing below read
+    # `row["segment"]`. Measured on the served 2026-10-10 board: an h1 over 0.5 goals
+    # carried p(over) 0.945 and an h1 over 1.0 0.934 (full-match figures; a first half
+    # is ~0.70-0.75 for over 0.5), and an h1 handicap was stamped model_edge_pct
+    # +11.68 off the full-match scoreline. NFL, NCAAF and NHL already skip their
+    # non-full rows the same way; price halves again only once the match sim
+    # publishes per-half scorelines.
+    non_full_segment = 0
     # ATTRIBUTION FOR `unmatched_match_rows`, which until now was a bare total.
     #
     # It has read ~99.6% of the grid for days (`state.md`: 1,138 of 1,142) and
@@ -1402,6 +1413,9 @@ def attach_soccer_projections(
         considered += 1
         row_league = str(row.get("league") or "").strip() or "?"
         rows_by_league[row_league] = rows_by_league.get(row_league, 0) + 1
+        if normalize_segment(row.get("segment")) != "full":
+            non_full_segment += 1
+            continue
         match = index.match_for(row)
         if match is None:
             unmatched_match += 1
@@ -1793,6 +1807,9 @@ def attach_soccer_projections(
         "unmatched_match_rows": unmatched_match,
         "unmatched_player_rows": unmatched_player,
         "unsupported_market_rows": unsupported_market,
+        # Reported even at zero, so "no half rows today" and "the guard never ran"
+        # cannot share a reading.
+        "non_full_segment_rows": non_full_segment,
         "pct_projected": round(100.0 * projected / considered, 1) if considered else 0.0,
         "note": "probability only where the source has one; totals price any line from the scoreline distribution (2.5 still from the published summary)",
         "source_artifacts": index.source_paths,
