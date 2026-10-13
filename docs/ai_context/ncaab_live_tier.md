@@ -254,6 +254,35 @@ Pinning the engine to its targets removes that compensation, so the second half 
 by more. **Decision: OFF.** Add the bonus mechanism first, then re-test exact calibration together
 with it, on these same games and seeds.
 
+### Half split, and half split + exact calibration: measured 2026-10-12
+
+The engine split each game's target evenly, so it projected first halves ~7.5 too high (real H1 share
+47.43%). Possessions are equal by half (34.2 / 34.9 per team), so the split is scoring per possession.
+`SYNDICATE_NCAAB_HALF_SPLIT` feeds the engine's own per-period targets (`quarters`) with that share.
+Same 608 games and seeds as the default run; paired, arm minus DEFAULT, abs total error, 95% CI.
+Reports: `C:	mp\syndicate-data
+caab_bt_half.json`, `ncaab_bt_half_exact.json`.
+
+| arm, phase | tip | half | H2 10:00 | H2 5:00 | H2 2:00 |
+|---|---|---|---|---|---|
+| half, regular | -0.01 | -0.07 | **-0.38** | **-0.29** | **-0.15** |
+| half, tournaments | **+0.18** | **+0.85** | -0.16 | **-0.28** | **-0.12** |
+| half + exact, regular | **-0.78** | +0.01 | -0.10 | -0.03 | -0.03 |
+| half + exact, tournaments | **-2.03** | +0.04 | **-0.13** | **-0.07** | -0.04 |
+
+Total bias, regular, default -> half -> half+exact: tip +6.42 / +6.41 / +1.06; H2 10:00 -3.90 / -2.01 / -3.53.
+Margin and Brier: no change in any arm (Brier stays = ESPN WP). Both arms still beat the naive
+baseline at every second-half checkpoint.
+
+**Recommended switch-on configuration: HALF_SPLIT=1 + EXACT_TARGET=1.**
+- It removes the early-game over-lean (tip overshoot -> +1.1 regular / +4.0 tournaments).
+- It does not significantly worsen ANY in-game checkpoint.
+- Half split ALONE improves second-half totals more in the regular season, but it leaves the tip
+  overshoot and is worse at tournament halftime.
+- Remaining: second-half totals still run ~-4 low late. Real games put ~+3 FT points in the last 4
+  minutes alone. The bonus mechanism with late-game fouling is the next candidate, measured against
+  this arm.
+
 ## What is owed, in order
 
 1. **Early-game total overshoot**: exact target calibration was MEASURED and REJECTED alone (above).
