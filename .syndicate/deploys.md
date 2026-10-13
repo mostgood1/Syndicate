@@ -48985,3 +48985,21 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **verify -- MET:** all roles `code=939aee6a`, restarts 0; refresh-worker AND live-odds-worker `/proc/<pid>/environ` carry `SYNDICATE_FAIR_DEVIG_METHOD=shin`. First board after the up (written 21:06:04Z): `quote.fair_devig_method == "shin"` on 1,412 of 1,412 consensus rows. Suggested 26 of 4,485 (16:59Z multiplicative board: 43 of 5,096); share priced longer than +110 63% -> 23%, median price +119 -> +110 (different slate times: a direction, not a controlled A/B).
 - **next reading:** EV at the Shin close and realized ROI of Suggested over the 10-17/18 weekend (`scripts/fair_price_eval.py` selection test + the recorder `sg` field).
 - **rollback:** set `SYNDICATE_FAIR_DEVIG_METHOD=multiplicative` in `~/syndicate-prod/local_production.env` (backup `.bak-20261013-fairv2`) + down/up under claims.
+
+
+## 2026-10-13 18:51Z (1:51 PM CT) -- LOCAL FLEET ENV, NO RESTART: NCAAB live re-sim switched ON in `local_production.env` (live-odds-worker only), loads at the next supervisor `up` (lane `ncaab-native-live-tier`, session e48a0f9b)
+- **User decisions 2026-10-13:** "switch it on with the final config"; then, for loading, "next natural `up`, deadline 10-30".
+- **Why no restart now:** the supervisor derives each role's env ONCE at `up` (`local_production.py` cmd_up: `Supervised(role, command, env, ...)`), and a killed or crashed role respawns with that SAME env. A `kill -TERM` of live-odds-worker would come back WITHOUT the keys. No per-role reload exists. A full down/up restarts all three roles. check_deploy_safety at 18:50:46Z was NOT CLEAR (board build + odds children); there were no live games.
+- **Change:** backup `local_production.env.bak-ncaab-20261013T185...Z` (101 lines), then appended 4 role-scoped keys (108 lines):
+  - `LIVE_ODDS_WORKER__SYNDICATE_NCAAB_LIVE_RESIM=1`
+  - `LIVE_ODDS_WORKER__SYNDICATE_NCAAB_HALF_SPLIT=1`
+  - `LIVE_ODDS_WORKER__SYNDICATE_NCAAB_EXACT_TARGET=1`
+  - `LIVE_ODDS_WORKER__SYNDICATE_NCAAB_LIVE_MECHANISMS=<the E1 end-game fouling JSON>`
+  This is the backtested final config (`docs/ai_context/ncaab_live_tier.md`). Claim live-odds-worker token 8e7f20f5... acquired 18:50:46Z, released 18:52:09Z.
+- **Verify (parse) -- MET:** `role_local_view` gives the 4 keys to live-odds-worker ONLY (refresh-worker [], web []). `ncaab_live_resim_enabled`, `half_split_enabled`, `exact_target_enabled` all True; mechanisms parse to the 4 end-game fields. Fleet checkout df892324 carries every switch (incl. 2d16b6b8).
+- Measured: <pending> -- after the next supervisor `up` (DEADLINE 2026-10-30, before the ~11-03 opener):
+  - `NCAAB_LIVE_RESIM_LOOP_STARTED` in `live-odds-worker.log`;
+  - a `NCAAB_LIVE_RESIM_TICK ... written=True` line;
+  - `live/ncaab_live_resim.json` readable.
+  If no `up` has happened by 10-30, ask the user for a planned down/up at a quiet window. Opening week: the served lens reads `live_resim`, edges are published, 0 `[refresh_state_store] KEYVALUE_WRITE_REJECTED key=` lines.
+- **Rollback:** delete the 4 keys (or restore the backup) before the next `up`. After an `up`, delete them and take a further `up`.
