@@ -49003,3 +49003,11 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
   - `live/ncaab_live_resim.json` readable.
   If no `up` has happened by 10-30, ask the user for a planned down/up at a quiet window. Opening week: the served lens reads `live_resim`, edges are published, 0 `[refresh_state_store] KEYVALUE_WRITE_REJECTED key=` lines.
 - **Rollback:** delete the 4 keys (or restore the backup) before the next `up`. After an `up`, delete them and take a further `up`.
+
+## 2026-10-13 ~21:4xZ (4:4x PM CT) -- LOCAL FLEET ff 939aee6a -> 131a7626, NO restart: the NBA signal job + the SHADOW likelihood load at the next restart (lane `signal-engine-nba`, session 9e18a0e7, user "yes go ahead with all three")
+- **what:** (1) `scripts/build_nba_signals.py --as-of today` -- the dated as-of matchup-signal table for each day's slate; (2) `SCHEDULED_JOBS` entry `nba-signals` 11:50Z (cross-lane write recorded in games-rail-full-detail and ncaab-native-live-tier) -- **loads at the next supervisor `up`**; (3) `layer2_board._stamp_likelihood_shadow` + recorder `lk` / `lke` -- NBA prop rows carry `likelihood` = Shin fair +/- 1.23 pts (`nba.under_bias`, the pooled H6 residual), mode `shadow`; score / Suggested / portfolio unchanged -- **loads at the next refresh-worker restart**.
+- **why no restart now:** batching request (watcher, 10-13); a full `up` already ran at 21:02Z; NBA regular season opens 10-20, so both only need to be loaded before then.
+- **ride-alongs:** none -- 939aee6a..131a7626 runtime diff is this lane's files only.
+- **smoke (fleet, manual):** `build_nba_signals.py --as-of today` -> `season=2026-27 date=2026-10-13 logs=0 players=0` (the 2026-27 regular-season log is header-only until the opener) -- the path, season derivation and table write work.
+- **verify (owed):** after the next `up`: supervisor log shows `[job:nba-signals] ... finished rc=0` at/after 11:50Z; from 10-20, `nba_source/signals/2026-27/<date>.jsonl` non-empty; after the next refresh-worker restart, served NBA prop rows carry `likelihood.mode == "shadow"` and recorder records carry `lk`.
+- **rollback:** `SYNDICATE_NBA_UNDER_BIAS_DELTA=0` turns the shadow off; remove the SCHEDULED_JOBS line to stop the job.
