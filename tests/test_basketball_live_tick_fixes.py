@@ -120,4 +120,6 @@ def test_fix_writes_the_registry_and_the_verbatim_text_does_not(unfixed_pkg, mon
     assert all(out_v.get(k) == {} for k in registry_maps), {k: out_v.get(k) for k in registry_maps if out_v.get(k)}
     # Nothing else moves: same keys, and every non-registry key carries the same value.
     assert set(out_f) == set(out_v)
-    assert {k: v for k, v in out_f.items() if k not in registry_maps} == {k: v for k, v in out_v.items() if k not in registry_maps}
+    # `generated_at` is the wall clock at each call (the two runs can straddle a second boundary; seen on the fleet).
+    skip = registry_maps | {"generated_at"}
+    assert {k: v for k, v in out_f.items() if k not in skip} == {k: v for k, v in out_v.items() if k not in skip}
