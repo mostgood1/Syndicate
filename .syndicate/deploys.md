@@ -48957,3 +48957,15 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **ride-alongs in the ff:** df892324 (refresh-worker odds-job slot fix -- its own entry says "loads at the next refresh-worker restart", so it rides by design) and WNBA refresh / recon-tool / seed commits of lane `nba-source-cli-native` (71e99a9a, b352158c, 9b97b4c6; WNBA offseason).
 - **verify (owed, after the up):** refresh-worker `/proc/<pid>/environ` carries `SYNDICATE_FAIR_DEVIG_METHOD=shin`; served shortlist rows read `quote.fair_devig_method == "shin"` on consensus rows; Suggested count / plus-money share before vs after.
 - **rollback:** set the key to `multiplicative` (or delete it) in `~/syndicate-prod/local_production.env` (backup `local_production.env.bak-20261013-fairv2`) and do a supervisor down/up under claims.
+
+## 2026-10-13 19:41Z -- READING: first live soccer slate after d5f52b14 / 8fd8d83b / 3d852ba9 / 2c9dd444 (Championship, 8 matches) `[lane soccer-live-anytime-scorer, session b9bb5f37]`
+- **Live state** (`championship/api/live_state/live_state_2026-10-13.json`, generated 19:40:03Z, about 45'):
+  - `lineup_basis` is `on_pitch` on **274 of 274** rows. Published rows run 32-37 per match (was 12).
+  - Banked player goals equal every non-own goal in **8 of 8** matches. Cardiff's 4-0 banks 3; the fourth is Pollock's 41' own goal, correctly uncredited. Before 8fd8d83b every live player read 0.
+  - **MET** for d5f52b14 and 8fd8d83b.
+- **Join** (`LIVE_PROJECTION_JOIN sport=soccer`, 19:18-19:35Z, 6 builds): `lens_indexed=3562 lens_live_games=8`, but `considered=0` every build.
+  - **This is not a defect: no bookmaker quotes Championship player props.**
+  - `championship/props/<date>.csv` is 1 byte on 10-10, 10-11, 10-12 and 10-13 (belgian_pro_league and primeira_liga too), while the other 7 leagues hold 0.1-2.3 MB today.
+  - A direct Odds API probe of Bristol City v Blackburn (in play since 18:45Z): `books_with_player_props=0` for regions `us` and `uk,eu` (anytime / shots / SOT; x-requests-last 0).
+  - The soccer live lane itself ran (`SOCCER_LIVE_AUTORUN_LAUNCHED ... in_play=championship` every ~2.5 min), and the live game lines were on the grid (24 totals, 17 spreads, 8 h2h, 7 btts).
+- **verify for 2c9dd444 (the anytime join) is still OWED**: the first live slate in a props league is MLS 2026-10-14 23:30Z (6 matches). A watcher waits for `considered>0`.
