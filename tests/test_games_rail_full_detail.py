@@ -169,5 +169,68 @@ class BoardPlays(unittest.TestCase):
         self.assertEqual(n, 1)
 
 
+class BookGridNextDay(unittest.TestCase):
+    """An evening CT kickoff is priced in the NEXT date's soccer grid (2026-10-13)."""
+
+    def _grid(self, root, day, rows):
+        import json
+        from pathlib import Path
+
+        path = Path(root) / "soccer_source" / "data" / "book_grid"
+        path.mkdir(parents=True, exist_ok=True)
+        (path / f"book_grid_{day}.json").write_text(json.dumps({"rows": rows}), encoding="utf-8")
+
+    def _total(self, sport, line=3.5):
+        return {"kind": "game", "segment": "full", "market": "totals", "line": line, "home_team": "Chicago Fire",
+                "away_team": "Philadelphia Union", "consensus": {"over": -110, "under": -110}}
+
+    def test_soccer_reads_the_next_utc_day(self) -> None:
+        import tempfile
+        from unittest import mock
+
+        from syndicate.features.shared import game_chip_detail as gd
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict("os.environ", {"SYNDICATE_DATA_ROOT": tmp}):
+            self._grid(tmp, "2026-10-14", [])
+            self._grid(tmp, "2026-10-15", [self._total("soccer")])
+            got = gd._book_grid_main("soccer", "2026-10-14", "Chicago Fire", "Philadelphia Union")
+            self.assertEqual(got["total"], 3.5)
+
+    def test_other_sports_never_borrow_tomorrows_line(self) -> None:
+        import json
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+
+        from syndicate.features.shared import game_chip_detail as gd
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict("os.environ", {"SYNDICATE_DATA_ROOT": tmp}):
+            path = Path(tmp) / "mlb_source" / "data" / "book_grid"
+            path.mkdir(parents=True)
+            (path / "book_grid_2026-10-15.json").write_text(json.dumps({"rows": [self._total("mlb", 8.5)]}), encoding="utf-8")
+            got = gd._book_grid_main("mlb", "2026-10-14", "Chicago Fire", "Philadelphia Union")
+            self.assertIsNone(got["total"])
+
+
 if __name__ == "__main__":
     unittest.main()
+
+
+class SoccerUnplayedChip(unittest.TestCase):
+    def test_void_match_reads_postponed_not_pregame(self) -> None:
+        from syndicate.features.shared.game_chip_scoreboard import build_game_chip
+        from syndicate.features.soccer.cards import _live_state_block
+        from syndicate.features.soccer.ingestion.espn_lineups import UNPLAYED_STATE
+
+        game = {"gamePk": "401882849", "league": "la_liga",
+                "away": {"abbr": "ATH", "name": "Athletic Club"}, "home": {"abbr": "RAY", "name": "Rayo Vallecano"},
+                "status": "Sat, Oct 10 - 7:00 AM CT", "scheduled_start_utc": "2026-10-10T12:00Z",
+                "live_state": _live_state_block(UNPLAYED_STATE, "2026-10-10T12:00Z")}
+        chip = build_game_chip("soccer", game)
+        self.assertEqual(chip["status_token"], "PPD")
+        self.assertNotEqual(chip["state"], "pregame")
+
+    def test_played_states_carry_no_code(self) -> None:
+        from syndicate.features.soccer.cards import _live_state_block
+
+        self.assertNotIn("codedGameState", _live_state_block("pre", "2030-01-01T12:00Z"))

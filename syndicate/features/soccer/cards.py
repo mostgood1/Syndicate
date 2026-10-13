@@ -287,6 +287,14 @@ def _live_state_block(
         "in_progress": state == "in",
         "final": state == "post",
     }
+    # AN UNPLAYED MATCH SAYS SO, structurally. `void` is neither `in` nor
+    # `post`, so without this the games-rail chip read it as `pregame` with
+    # its old kickoff time -- measured 2026-10-13 on la_liga ATH @ RAY
+    # `401882849` (10-10, `status_state: void`), still "Sat Oct 10 7:00A CT"
+    # three days later. `codedGameState: "D"` is the code
+    # `game_chip_scoreboard._not_played_token` already maps to POSTPONED.
+    if str(status_state or "").strip().lower() == UNPLAYED_STATE:
+        block["codedGameState"] = "D"
     # THE CLOCK AND PERIOD, which nothing published and every reader wanted.
     #
     # `publication_adapter._shared_game_state` builds `shared_game_state` by

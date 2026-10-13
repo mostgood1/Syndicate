@@ -256,10 +256,29 @@ def _load_book_grid_lines(sport: str) -> Callable[[Path], dict]:
 def _book_grid_main(sport: str, day: str | None, home_name: str, away_name: str) -> dict[str, float | None]:
     if not day:
         return {}
-    table = _cached(_first(f"{sport}_source/data/book_grid/book_grid_{day}.json"), _load_book_grid_lines(sport)) or {}
     hk, ak = _team_key(sport, home_name), _team_key(sport, away_name)
-    away_line = table.get((hk, ak, "spreads"))  # grid lines are in the AWAY frame (#262)
-    ml = table.get((hk, ak, "h2h")) or (None, None)
+    # The CT day first, then the next day: an evening CT kickoff is already the
+    # next UTC date, and that is the file the soccer grid prices it in
+    # (measured 2026-10-13: PHI @ CHI, 7:30 PM CT 10-14 -- the 10-14 file held
+    # one book's moneyline, the 10-15 file both totals and the full h2h).
+    # SOCCER ONLY: an MLB series (and an NHL/NBA home-and-home) puts the SAME
+    # pair in tomorrow's file, whose line would then be shown for today's game.
+    from datetime import date as _date, timedelta
+
+    days = [day]
+    if sport == "soccer":
+        days.append((_date.fromisoformat(day) + timedelta(days=1)).isoformat())
+    tables = [
+        _cached(_first(f"{sport}_source/data/book_grid/book_grid_{d}.json"), _load_book_grid_lines(sport)) or {}
+        for d in days
+    ]
+
+    def pick(market: str) -> Any:
+        return next((t[(hk, ak, market)] for t in tables if t.get((hk, ak, market)) is not None), None)
+
+    away_line = pick("spreads")  # grid lines are in the AWAY frame (#262)
+    ml = pick("h2h") or (None, None)
+    table = {(hk, ak, "totals"): pick("totals")}
     return {
         "home_spread": -away_line if away_line is not None else None,
         "total": table.get((hk, ak, "totals")),
