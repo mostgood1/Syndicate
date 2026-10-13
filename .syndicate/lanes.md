@@ -1069,6 +1069,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### layer2-edge-deep-dive — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- **RESULT 2026-10-13: H1 NOT SUPPORTED; H2 NOT SUPPORTED (barely testable, Pinnacle on 356/21,426 lines); H3 MIXED (props move but are -EV at the close); H4 WEAK SUPPORT; H5 NOT SUPPORTED on game lines. Headline: the board's +EV is a multiplicative-devig artifact (Suggested pregame +1.86% vs mult close, -3.63% vs power close; 94% plus-money); live is the only positive cell. Plan: findings_2026-10-13_layer2_edge_deep_dive.md section 7.**
 - Goal: Find where Layer 2 has real, measurable edge (CLV + ROI) and what inputs/odds/timing are missing; deliver a ranked plan (internal audit + external practice) to make the board profitable
 - Files: .syndicate/findings_2026-10-13_layer2_edge_deep_dive.md (NEW)
 - Hypothesis: H1 prop UNDERS carry more CLV than overs at equal market EV (books shade overs for public demand). H2 +EV priced against a sharp anchor holds CLV better than +EV against the consensus median. H3 CLV concentrates in thin markets (props, alts, 1-2 books quoting) and specific soft books, not main lines. H4 earlier first sightings (more hours before start) carry more CLV than late ones. H5 within props, a model edge that AGREES with market EV adds CLV vs market EV alone.
