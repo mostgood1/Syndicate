@@ -132,6 +132,53 @@ def _game_block_from_capture(game: dict, *, fetched_at: float | None, now: float
     }
 
 
+def _segment_score_for_row(sport: str, row: dict, chip: dict) -> dict | None:
+    """The row's OWN interval score so far -- q2 for a q2 total, never the game's.
+
+    Lane `layer2-live-segment-actuals` (2026-10-13). A live q2 or h1 total rendered a
+    dash in the board's Actual column and the only score on the card was the
+    full-game chip score -- so an interval line could not be read against its own
+    interval. The chip already carries per-period scores on live and final games
+    (`game_chip_scoreboard._attach_linescore`), and `segment_actuals` owns what each
+    segment means per sport (football `h2` includes overtime; soccer halves), so
+    nothing is fetched or re-derived here.
+
+    Stamped on the row's own `game` block because that block is built per row, and
+    `build_layer2_rows` copies it onto the candidate. None -- never the full-game
+    score -- when the segment is full, unsupported for the sport (`segment_periods`
+    covers nfl/ncaaf/soccer), not started, or the line score is missing.
+    """
+    try:
+        from syndicate.features.shared.market_segments import normalize_segment
+        from syndicate.features.shared.segment_actuals import segment_actuals
+
+        segment = normalize_segment(row.get("segment"))
+        state = str(chip.get("state") or "").strip().lower()
+        box = chip.get("linescore")
+        if segment == "full" or state not in ("live", "final") or not isinstance(box, dict):
+            return None
+        if box.get("kind") != "periods":
+            return None
+        home, away = box.get("home") or [], box.get("away") or []
+        got = segment_actuals(sport, segment, {
+            "home_linescores": home,
+            "away_linescores": away,
+            "final": state == "final",
+            "in_progress": state == "live",
+            "period": max(len(home), len(away)) or None,
+        })
+        if got.get("unavailable_reason") or not got.get("started"):
+            return None
+        return {
+            "segment": segment,
+            "home": got.get("home_score"),
+            "away": got.get("away_score"),
+            "is_final": bool(got.get("is_final")),
+        }
+    except Exception:  # noqa: BLE001 -- display only; must never break the join
+        return None
+
+
 def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
     """Stamp start time (pregame) or live status (in-progress) onto grid rows.
 
@@ -375,6 +422,9 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
             # tell a doubleheader's halves apart.
             "game_key": chip.get("game_key") or None,
         }
+        segment_score = _segment_score_for_row(sport, row, chip)
+        if segment_score is not None:
+            row["game"]["segment_score"] = segment_score
         matched += 1
 
     # NCAAF ROWS THE CHIPS MISSED FALL BACK TO THE ESPN CAPTURE. The NCAAF chip

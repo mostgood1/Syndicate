@@ -1023,7 +1023,7 @@ death, never life — do not invert it.
 
 ### layer2-live-segment-actuals — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
 - Goal: Live period game rows (h1/h2/q1-q4/p1-p3/first5) on the Layer 2 board show the period's own score-so-far in the Actual column, from segment_actuals, never the full-game score
-- Files: syndicate/features/shared/board_enrichment.py (live segment actual attach ONLY), tests/test_layer2_live_segment_actuals.py (NEW)
+- Files: syndicate/features/shared/board_enrichment.py (live segment actual attach ONLY), syndicate/features/shared/layer2_board.py (`_game_total_actual` + its call in `_live_projection_columns` ONLY), tests/test_layer2_live_segment_actuals.py (NEW)
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: unit test over a live NFL/NCAAF state: q2 total row actual_so_far == q2 points so far; on the fleet during a live slate a q2/h1 row renders a period number

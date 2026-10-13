@@ -3469,6 +3469,42 @@ def _row_team(row: Mapping[str, Any], home: str, away: str) -> str | None:
     return None
 
 
+_TOTALS_ACTUAL_MARKETS = frozenset({"totals", "totals_alt", "alternate_totals"})
+
+
+def _game_total_actual(row: Mapping[str, Any]) -> float | None:
+    """Points so far for a GAME TOTALS row, over the row's own interval.
+
+    Lane `layer2-live-segment-actuals` (2026-10-13). Interval totals (q1-q4, h1/h2)
+    showed a dash in the Actual column, and a full-game total did too: the live
+    GAMELINE join never writes `actual_so_far` (only the prop join does).
+
+    - Interval row: `game.segment_score`, stamped by
+      `board_enrichment._segment_score_for_row` from the chip's per-period scores.
+      Absent stays absent -- a q2 row NEVER falls back to the game score, the same
+      rule `segment_actuals` states for grading.
+    - Full-game row: the chip's home + away score, on a live or final game only.
+    """
+    if str(row.get("kind") or "").strip().lower() != "game":
+        return None
+    if str(row.get("market") or "").strip().lower() not in _TOTALS_ACTUAL_MARKETS:
+        return None
+    game = row.get("game") if isinstance(row.get("game"), Mapping) else {}
+    segment = str(row.get("segment") or "").strip().lower() or "full"
+    if segment != "full":
+        score = game.get("segment_score") if isinstance(game.get("segment_score"), Mapping) else None
+        if not score or str(score.get("segment") or "").strip().lower() != segment:
+            return None
+        home, away = _as_float(score.get("home")), _as_float(score.get("away"))
+    else:
+        if str(game.get("state") or "").strip().lower() not in ("live", "final"):
+            return None
+        home, away = _as_float(game.get("home_score")), _as_float(game.get("away_score"))
+    if home is None or away is None:
+        return None
+    return home + away
+
+
 def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
     """The LIVE re-sim's number and the live actual, under the names the
     board's Live and Actual columns read.
@@ -3576,6 +3612,8 @@ def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
     # to the same em dash as "we have no live data for this row" -- same
     # class of bug the `live_projection` handling above already avoids.
     actual_value = _as_float(projection.get("actual_so_far"))
+    if actual_value is None:
+        actual_value = _game_total_actual(row)
     if actual_value is not None:
         out["actual"] = actual_value
 
