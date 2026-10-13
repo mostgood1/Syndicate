@@ -33,6 +33,25 @@ def _patch_matches(monkeypatch, records):
     monkeypatch.setattr(soccer, "_load_matches", lambda _date: records)
 
 
+def _patch_boxes(monkeypatch, boxes):
+    monkeypatch.setattr(soccer, "_load_player_boxes", lambda _date: boxes)
+
+
+def _player(name, *, appeared=True, goals=0.0, shots=0.0, sot=0.0, assists=0.0):
+    return {"player_name": name, "appeared": appeared, "goals": goals, "shots": shots,
+            "shots_on_target": sot, "assists": assists}
+
+
+def _box(final=True, state="post", **over):
+    box = {"home_team": "Chelsea", "away_team": "Fulham", "final": final, "status_state": state,
+           "players": {"home": {"players": [_player("Cole Palmer", goals=1.0, shots=4.0, sot=2.0),
+                                            _player("Son Heung-Min", shots=1.0),
+                                            _player("Unused Sub", appeared=False)]},
+                       "away": {"players": [_player("Raúl Jiménez", goals=0.0, shots=2.0, assists=1.0)]}}}
+    box.update(over)
+    return box
+
+
 def test_a_finished_match_grades_the_moneyline(monkeypatch):
     _patch_matches(monkeypatch, [
         {"home_team": "Chelsea", "away_team": "Fulham",
@@ -126,20 +145,17 @@ def test_an_unreadable_live_state_is_NOT_the_same_as_no_matches(monkeypatch):
     ] == soccer.REASON_MATCH_NOT_FOUND
 
 
-def test_a_player_prop_refuses_with_the_CAP_named_not_as_an_unknown_market(monkeypatch):
-    """`poll_soccer_live_state` keeps `sorted(...)[:12]` players per match, so a
-    player outside the cap is ABSENT rather than at zero. Grading that as "0
-    shots, the under is fine" is the worst available wrong answer and the cap
-    makes it systematic. The reason names the capture, because that is where the
-    fix is."""
-    _patch_matches(monkeypatch, [
-        {"home_team": "Chelsea", "away_team": "Fulham",
-         "home_score": 1, "away_score": 0, "final": True},
-    ])
+def test_a_player_prop_grades_off_the_match_box_not_the_capped_projections(monkeypatch):
+    """Props used to refuse outright: `live_player_props` was capped at twelve players,
+    so a player outside it was ABSENT rather than at zero. The match box lists every
+    boxed player, so it grades -- and `_load_matches` (the projections' side) is not
+    what answers."""
+    _patch_matches(monkeypatch, [])
+    _patch_boxes(monkeypatch, [_box()])
     verdict = soccer.soccer_status_resolver("2026-08-25")(
         _order(market="player_shots", side="over", line=2.5, player_name="Cole Palmer")
     )
-    assert verdict["unavailable_reason"] == soccer.REASON_PROPS
+    assert verdict == {"current_value": 4.0, "is_final": True, "started": True, "source": "soccer_match_box"}
 
 
 def test_the_market_check_runs_BEFORE_the_artifact_read(monkeypatch):
@@ -150,10 +166,13 @@ def test_the_market_check_runs_BEFORE_the_artifact_read(monkeypatch):
         raise AssertionError("the artifact was read for an ungradeable market")
 
     monkeypatch.setattr(soccer, "_load_matches", explode)
-    verdict = soccer.soccer_status_resolver("2026-08-25")(
-        _order(market="player_shots", player_name="Cole Palmer")
-    )
-    assert verdict["unavailable_reason"] == soccer.REASON_PROPS
+    monkeypatch.setattr(soccer, "_load_player_boxes", explode)
+    for market, reason in (("player_first_goal_scorer", soccer.REASON_SCORER_RACE),
+                           ("player_to_receive_card", soccer.REASON_PROP_MARKET)):
+        verdict = soccer.soccer_status_resolver("2026-08-25")(
+            _order(market=market, side="yes", player_name="Cole Palmer")
+        )
+        assert verdict["unavailable_reason"] == reason
 
 
 def test_a_non_soccer_order_is_not_reported_as_a_soccer_failure(monkeypatch):
@@ -427,3 +446,105 @@ def test_an_unfinished_match_is_never_kept(_isolated, monkeypatch):
     _aggregate(monkeypatch, None)
     verdict = soccer.soccer_status_resolver("2026-08-25")(_order())
     assert verdict["unavailable_reason"] == soccer.REASON_NO_LIVE_STATE
+
+
+# ---------------------------------------------------------------------------- player props off the match box
+
+def test_anytime_scorer_grades_goals_against_half_a_goal(monkeypatch):
+    _patch_boxes(monkeypatch, [_box()])
+    resolve = soccer.soccer_status_resolver("2026-08-25")
+    scored = resolve(_order(market="player_goal_scorer_anytime", side="yes", player_name="Cole Palmer"))
+    assert scored["current_value"] == 1.0 and scored["line"] == 0.5 and scored["is_final"]
+    blank = resolve(_order(market="player_goal_scorer_anytime", side="yes", player_name="Raul Jimenez"))
+    assert blank["current_value"] == 0.0 and blank["line"] == 0.5     # accents folded
+
+
+def test_a_reordered_name_still_finds_the_player(monkeypatch):
+    _patch_boxes(monkeypatch, [_box()])
+    verdict = soccer.soccer_status_resolver("2026-08-25")(
+        _order(market="player_shots", side="over", line=0.5, player_name="Heung-Min Son"))
+    assert verdict["current_value"] == 1.0
+
+
+def test_a_player_not_in_the_box_is_refused_not_zero(monkeypatch):
+    _patch_boxes(monkeypatch, [_box()])
+    verdict = soccer.soccer_status_resolver("2026-08-25")(
+        _order(market="player_shots", side="under", line=0.5, player_name="Somebody Else"))
+    assert verdict["unavailable_reason"] == soccer.REASON_PLAYER_NOT_IN_BOX
+
+
+def test_a_boxed_player_who_never_appeared_is_void_once_final_and_zero_while_live(monkeypatch):
+    _patch_boxes(monkeypatch, [_box()])
+    final = soccer.soccer_status_resolver("2026-08-25")(
+        _order(market="player_shots", side="under", line=0.5, player_name="Unused Sub"))
+    assert final["unavailable_reason"] == soccer.REASON_DNP_VOID
+    _patch_boxes(monkeypatch, [_box(final=False, state="in")])
+    live = soccer.soccer_status_resolver("2026-08-25")(
+        _order(market="player_shots", side="under", line=0.5, player_name="Unused Sub"))
+    assert live == {"current_value": 0.0, "is_final": False, "started": True, "source": "soccer_match_box"}
+
+
+def test_before_kickoff_a_prop_has_not_started(monkeypatch):
+    _patch_boxes(monkeypatch, [_box(final=False, state="pre")])
+    verdict = soccer.soccer_status_resolver("2026-08-25")(
+        _order(market="player_assists", side="over", line=0.5, player_name="Cole Palmer"))
+    assert verdict == {"current_value": None, "is_final": False, "started": False}
+
+
+def test_no_box_for_the_match_is_named(monkeypatch):
+    _patch_boxes(monkeypatch, [])
+    verdict = soccer.soccer_status_resolver("2026-08-25")(
+        _order(market="player_shots", side="over", line=0.5, player_name="Cole Palmer"))
+    assert verdict["unavailable_reason"] == soccer.REASON_NO_BOX
+
+
+def test_a_prop_settles_end_to_end_through_paper_settlement(monkeypatch):
+    """Reachability: the resolver output reaches the grader and a WON / LOST comes out."""
+    from syndicate.features.shared.paper_settlement import _our_verdict
+
+    _patch_boxes(monkeypatch, [_box()])
+    resolve = soccer.soccer_status_resolver("2026-08-25")
+    filled = {"status": "filled", "fill_stake_dollars": 10.0, "fill_price": 0.5}
+    won, _, why = _our_verdict(
+        _order(market="player_goal_scorer_anytime", side="yes", player_name="Cole Palmer", **filled), resolve)
+    lost, _, why2 = _our_verdict(
+        _order(market="player_shots", side="over", line=2.5, player_name="Raul Jimenez", **filled), resolve)
+    assert not why and not why2
+    assert won["outcome"] == "won" and lost["outcome"] == "lost"
+
+
+def test_a_books_full_name_finds_espns_playing_name_only_when_unique(monkeypatch):
+    box = _box()
+    box["players"]["home"]["players"].append(_player("Erling Haaland", shots=5.0))
+    _patch_boxes(monkeypatch, [box])
+    resolve = soccer.soccer_status_resolver("2026-08-25")
+    found = resolve(_order(market="player_shots", side="over", line=2.5, player_name="erling braut haaland"))
+    assert found["current_value"] == 5.0
+    box["players"]["away"]["players"].append(_player("Erling Braut", shots=1.0))
+    assert soccer._names_nest("erling braut haaland", "erling braut")
+    twice = soccer.soccer_status_resolver("2026-08-25")(
+        _order(market="player_shots", side="over", line=2.5, player_name="erling braut haaland"))
+    assert twice["unavailable_reason"] == soccer.REASON_PLAYER_AMBIGUOUS
+
+
+def test_one_word_espn_names_match_only_the_books_first_word():
+    assert soccer._names_nest("estevao oliveira goncalves", "estevao")
+    assert not soccer._names_nest("joao estevao", "estevao")
+
+
+def test_the_box_is_read_from_the_orders_date_first_then_its_neighbours(monkeypatch, tmp_path):
+    """Measured 2026-10-13: 1,410 prop rows dated 10-11 had their box only in the 10-10 file."""
+    import json
+    from syndicate.features.shared import refresh_state_store
+
+    def write(stamp, score):
+        path = tmp_path / "soccer_source" / "epl" / "api" / "live_state" / f"live_state_{stamp}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"match_box": {"1": dict(_box(), score_home=score)}}), encoding="utf-8")
+
+    monkeypatch.setattr(refresh_state_store, "data_root", lambda: tmp_path)
+    write("2026-10-10", "9")
+    boxes = soccer._load_player_boxes("2026-10-11")
+    assert [b["score_home"] for b in boxes] == ["9"]
+    write("2026-10-11", "1")
+    assert [b["score_home"] for b in soccer._load_player_boxes("2026-10-11")][0] == "1"   # own date first

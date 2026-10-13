@@ -70,15 +70,23 @@ a push, which is exactly right for a total landing on its line. This is the
 opposite of the three-way moneyline case, where the half-point trick exists
 precisely BECAUSE a push would be wrong.
 
-Soccer player props do NOT grade here: the live-state artifact carries `live_player_props`
-capped at twelve players per match (`poll_soccer_live_state.py`:
-`sorted(...)[:12]`), so a player outside the cap is ABSENT rather than at zero.
+PLAYER PROPS GRADE OFF THE MATCH BOX, never off `live_player_props` (lane
+`soccer-live-anytime-scorer`, 2026-10-13). Those projections were capped at twelve
+players per match, so a player outside the cap was ABSENT rather than at zero,
+and grading that as "0 shots, the under is fine" is the exact failure
+`bet_status_wnba` names -- "the worst possible wrong answer". Props refused
+outright until then, and soccer had no player-prop results at all.
 
-Reporting a capped-out player as "0 shots, the under is fine" would be the
-exact failure `bet_status_wnba` names for a missing player -- "the worst
-possible wrong answer" -- with the added trap that the cap makes it systematic
-rather than occasional. So props refuse as `soccer_props_not_gradeable_from_
-capped_live_state` and the fix is upstream in the capture, not a table here.
+The poller's per-match `match_box` (`espn_match_box`) lists EVERY player ESPN
+boxed for the match -- starters, used and unused subs -- with goals, shots,
+shots on target and assists. So:
+  shots / shots on target / assists   the box value against the line;
+  anytime goalscorer                  box goals against 0.5 (yes/no);
+  a boxed player who never appeared   void once the match is final, as books do;
+  a player NOT in the box             refused by name -- a spelling the box does
+                                      not share is not the same as zero;
+  first / last goalscorer, cards      refused by name: a race with book-specific
+                                      own-goal rules, and the box carries no cards.
 
 --------------------------------------------------------------------------
 FINAL IS ASSERTED, NEVER INFERRED FROM THE CLOCK
@@ -113,7 +121,14 @@ REASON_NOT_SOCCER = "not_a_soccer_order"
 REASON_NO_MATCHUP = "no_home_away_teams_on_order"
 REASON_NO_LIVE_STATE = "no_soccer_live_state_for_date"
 REASON_MATCH_NOT_FOUND = "match_not_in_soccer_live_state"
-REASON_PROPS = "soccer_props_not_gradeable_from_capped_live_state"
+# Player props (see the module docstring).
+REASON_PROP_MARKET = "soccer_prop_market_not_graded"
+REASON_SCORER_RACE = "soccer_first_last_scorer_not_graded"
+REASON_NO_BOX = "no_soccer_player_box_for_match"
+REASON_PLAYER_NOT_IN_BOX = "player_not_in_soccer_box"
+REASON_PLAYER_AMBIGUOUS = "player_name_ambiguous_in_soccer_box"
+REASON_DNP_VOID = "soccer_player_did_not_appear_void"
+REASON_STAT_UNAVAILABLE = "soccer_box_stat_unavailable"
 REASON_UNKNOWN_MARKET = "unmapped_market"
 # A team total is ONE side's goals. Grading it off the combined score would
 # roughly double the value and settle overs that lost, so it refuses until the
@@ -134,6 +149,18 @@ REASON_FINALS_WINDOW_CLOSED = "soccer_finals_window_closed"
 # -- prices any line).
 _GAME_TOTAL_MARKETS = frozenset({"totals", "total", "totals_alt", "alternate_totals"})
 _TEAM_TOTAL_MARKETS = frozenset({"team_totals", "team_total", "team_totals_alt"})
+# Prop market -> `match_box` player field. Anytime is goals against 0.5.
+_PROP_STATS = {
+    "player_shots": "shots",
+    "player_shots_on_target": "shots_on_target",
+    "player_assists": "assists",
+    "player_goals": "goals",
+}
+_ANYTIME_MARKETS = frozenset({
+    "player_goal_scorer_anytime", "player_anytime_goal_scorer", "anytime_goal_scorer", "anytime_goalscorer",
+})
+_SCORER_RACE_MARKETS = frozenset({"player_first_goal_scorer", "player_last_goal_scorer"})
+_ANYTIME_LINE = 0.5
 
 
 def _norm(value: Any) -> str:
@@ -168,6 +195,11 @@ def soccer_status_resolver(selected_date: str):
         cache["matches"] = _load_matches(selected_date)
         return cache["matches"]
 
+    def boxes() -> list[dict[str, Any]]:
+        if "boxes" not in cache:
+            cache["boxes"] = _load_player_boxes(selected_date)
+        return cache["boxes"]
+
     def resolve(order: Mapping[str, Any]) -> dict[str, Any]:
         if _norm(order.get("sport")) != "soccer":
             # This resolver is handed every order; a non-soccer one is not a
@@ -197,10 +229,19 @@ def soccer_status_resolver(selected_date: str):
         # grade one team's goals against the whole scoreline.
         if canonical in _TEAM_TOTAL_MARKETS:
             return {"unavailable_reason": REASON_TEAM_TOTAL}
+        if order.get("player_name"):
+            # A PLAYER PROP. Classified before any read, for the same reason.
+            if canonical in _SCORER_RACE_MARKETS:
+                return {"unavailable_reason": REASON_SCORER_RACE}
+            anytime = canonical in _ANYTIME_MARKETS
+            stat = "goals" if anytime else _PROP_STATS.get(canonical)
+            if stat is None or segment != FULL_GAME_SEGMENT:
+                return {"unavailable_reason": REASON_PROP_MARKET}
+            return _resolve_prop(order, stat, anytime, boxes())
         is_total = canonical in _GAME_TOTAL_MARKETS
         is_line = is_game_line_market("soccer", market)
         if not (is_total or is_line):
-            return {"unavailable_reason": REASON_PROPS if order.get("player_name") else REASON_UNKNOWN_MARKET}
+            return {"unavailable_reason": REASON_UNKNOWN_MARKET}
 
         home_team, away_team = order.get("home_team"), order.get("away_team")
         if not home_team or not away_team:
@@ -289,6 +330,117 @@ def soccer_status_resolver(selected_date: str):
 
     return resolve
 
+
+
+def _load_player_boxes(selected_date: str) -> list[dict[str, Any]]:
+    """Every `match_box` record for the date, then the day before, then the day after.
+
+    The same per-league files `_segment_fields_by_matchup` walks. They are a
+    live-odds-worker filesystem write: readable here on the local fleet (one disk),
+    NOT on a split deployment, where every prop refuses as `no_soccer_player_box_for_match`
+    rather than grading off something else.
+
+    WHY THREE DATES. The poller files a match under ESPN's date, and an order's date
+    is the board's. They differ across midnight UTC: measured 2026-10-13 on the 10-10..12
+    board, 1,410 prop rows dated 10-11 found their box only in the 10-10 file. The
+    order's own date is read FIRST, so a match is never answered from a neighbouring
+    day while its own day has it; a team pair cannot recur within three days.
+    Never raises.
+    """
+    from datetime import date, timedelta
+
+    out: list[dict[str, Any]] = []
+    try:
+        from syndicate.features.shared.refresh_state_store import data_root, read_json_file
+        from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES
+
+        day = date.fromisoformat(str(selected_date)[:10])
+        root = data_root()
+        for offset in (0, -1, 1):
+            stamp = (day + timedelta(days=offset)).isoformat()
+            for league in list(LEAGUE_DISPLAY_NAMES):
+                payload = read_json_file(
+                    root / "soccer_source" / str(league) / "api" / "live_state" / f"live_state_{stamp}.json"
+                )
+                match_box = payload.get("match_box") if isinstance(payload, Mapping) else None
+                if isinstance(match_box, Mapping):
+                    out.extend(dict(r) for r in match_box.values() if isinstance(r, Mapping))
+    except Exception:
+        return out
+    return out
+
+
+def _name_keys(name: Any) -> tuple[str, str]:
+    """(folded name, folded name with its tokens sorted). The second catches a book
+    that writes "Heung-Min Son" for ESPN's "Son Heung-Min". Folding is the pregame
+    starter matcher's own, so the two cannot drift."""
+    from syndicate.features.soccer.features.lineups import _norm_player_name
+
+    folded = _norm_player_name(str(name or ""))
+    return folded, " ".join(sorted(folded.split()))
+
+
+def _names_nest(book: str, espn: str) -> bool:
+    """One name's words inside the other's, the way books and ESPN differ.
+
+    Books write full names, ESPN the playing name: measured 2026-10-13 on the 10-10..12
+    board, "erling braut haaland" / "Erling Haaland", "joao pedro junqueira de jesus" /
+    "João Pedro", "antony matheus dos santos" / "Antony" were 11% of prop rows refused
+    as not in the box. A nested pair of two or more words is accepted; a ONE-word ESPN
+    name only as the book name's first word. The caller still requires the match to be
+    unique within the match's box, so two candidates refuse rather than guess.
+    """
+    b, e = book.split(), espn.split()
+    if not b or not e or b == e:
+        return False
+    if len(e) == 1:
+        return b[0] == e[0]
+    small, large = (e, b) if len(e) <= len(b) else (b, e)
+    return len(small) >= 2 and set(small) <= set(large)
+
+
+def _resolve_prop(order: Mapping[str, Any], stat: str, anytime: bool, boxes: list[dict[str, Any]]) -> dict[str, Any]:
+    from syndicate.features.shared.team_aliases import teams_match
+
+    home_team, away_team = order.get("home_team"), order.get("away_team")
+    if not home_team or not away_team:
+        return {"unavailable_reason": REASON_NO_MATCHUP}
+    record = next((b for b in boxes if teams_match("soccer", home_team, b.get("home_team"))
+                   and teams_match("soccer", away_team, b.get("away_team"))), None)
+    if record is None:
+        return {"unavailable_reason": REASON_NO_BOX}
+    state = str(record.get("status_state") or "").strip().lower()
+    if state == "pre":
+        return {"current_value": None, "is_final": False, "started": False}
+    # FINAL IS ASSERTED by the artifact, never read off the clock (module docstring).
+    final = bool(record.get("final")) or state == "post"
+
+    wanted = _name_keys(order.get("player_name"))
+    rows: list[Mapping[str, Any]] = []
+    for side in ("home", "away"):
+        block = (record.get("players") or {}).get(side) or {}
+        rows.extend(r for r in (block.get("players") or []) if isinstance(r, Mapping))
+    exact = [r for r in rows if _name_keys(r.get("player_name"))[0] == wanted[0]]
+    found = exact or [r for r in rows if _name_keys(r.get("player_name"))[1] == wanted[1]]
+    if not found:
+        found = [r for r in rows if _names_nest(wanted[0], _name_keys(r.get("player_name"))[0])]
+    if not found:
+        return {"unavailable_reason": REASON_PLAYER_NOT_IN_BOX}
+    if len(found) > 1:
+        return {"unavailable_reason": REASON_PLAYER_AMBIGUOUS}
+    row = found[0]
+    if final and not row.get("appeared"):
+        return {"unavailable_reason": REASON_DNP_VOID}
+    value = _as_float(row.get(stat))
+    if value is None:
+        if row.get("appeared"):
+            return {"unavailable_reason": REASON_STAT_UNAVAILABLE}
+        value = 0.0  # an unused sub mid-match: nothing yet, and nothing missing
+    resolved: dict[str, Any] = {"current_value": value, "is_final": final, "started": True,
+                                "source": "soccer_match_box"}
+    if anytime and _as_float(order.get("line")) is None:
+        resolved["line"] = _ANYTIME_LINE
+    return resolved
 
 
 def _finals_record_path(root, selected_date: str):
