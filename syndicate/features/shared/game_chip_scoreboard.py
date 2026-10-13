@@ -731,6 +731,24 @@ def _chip_footer(sport: str, game: dict[str, Any], start_utc: datetime | None) -
         return None
 
 
+def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], date_value: str) -> None:
+    """Per-interval scores (R/H/E for MLB) on a live or final chip
+    (`game_chip_linescore`, user 2026-10-13). The game's OWN Central date,
+    not the requested one: the rail carries other days' games too."""
+    try:
+        from syndicate.features.shared.game_chip_linescore import linescore
+
+        start = chip.get("start_time_utc")
+        day = date_value
+        if start:
+            day = datetime.fromisoformat(str(start).replace("Z", "+00:00")).astimezone(CENTRAL_TIMEZONE).date().isoformat()
+        box = linescore(sport, game, day, away_abbr=(chip.get("away") or {}).get("abbr") or "", home_abbr=(chip.get("home") or {}).get("abbr") or "")
+        if box:
+            chip["linescore"] = box
+    except Exception:  # noqa: BLE001 -- a line score must never break a chip
+        return
+
+
 def _attach_board_plays(chips: list[dict[str, Any]], date_value: str, sports: tuple[str, ...]) -> None:
     """Our board plays per game, and on finals how they did (mockup 4, lane
     games-rail-full-detail; `game_chip_plays`).
@@ -916,7 +934,10 @@ def _build_game_chips_uncached(date_value, normalized_sports, cache_key, now):
             games = apply_wnba_recorded_finals(list(games or []), date_value)
         for game in games or []:
             if isinstance(game, dict):
-                chips.append(build_game_chip(slug, game))
+                chip = build_game_chip(slug, game)
+                if chip.get("state") in ("live", "final"):
+                    _attach_linescore(slug, game, chip, date_value)
+                chips.append(chip)
 
     _attach_board_plays(chips, date_value, normalized_sports)
 

@@ -2926,6 +2926,34 @@
     `;
   }
 
+  // The line score on a live / final card (user 2026-10-13): a column per
+  // period plus T, or R / H / E for baseball, where R is the score itself.
+  // Absent when the sport's source has no period scores for the game; the
+  // plain team rows render instead.
+  function chipLineScore(chip) {
+    const ls = chip.linescore;
+    if (!ls || !Array.isArray(ls.labels) || !ls.labels.length) return "";
+    const rhe = ls.kind === "rhe";
+    const cols = ls.labels.length + (rhe ? 0 : 1);
+    const label = (text) => `<span class="game-mini-card__box-label">${escapeHtml(text)}</span>`;
+    const row = (side) => {
+      const team = chip[side] || {};
+      const lead = chip.leader === side ? " is-leader" : "";
+      const values = Array.isArray(ls[side]) ? ls[side] : [];
+      const score = team.score == null || team.score === "" ? "–" : team.score;
+      const cells = ls.labels.map((_l, i) => {
+        const v = values[i];
+        const strong = rhe && i === 0 ? lead : "";
+        return `<span class="game-mini-card__box-cell${strong}">${v == null ? "–" : escapeHtml(String(v))}</span>`;
+      }).join("");
+      return `
+        <span class="game-mini-card__box-team${lead}">
+          ${team.logo ? `<img class="game-mini-card__logo" src="${escapeHtml(team.logo)}" alt="" width="18" height="18" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}${escapeHtml(team.abbr || "")}
+        </span>${cells}${rhe ? "" : `<span class="game-mini-card__box-total${lead}">${escapeHtml(String(score))}</span>`}`;
+    };
+    return `<div class="game-mini-card__box" style="--box-cols:${cols}"><span></span>${ls.labels.map(label).join("")}${rhe ? "" : label("T")}${row("away")}${row("home")}</div>`;
+  }
+
   // One mini card per underlying game (not per opportunity) so a user can
   // scan today's slate and jump straight to a specific matchup's
   // opportunities, instead of scrolling the full board looking for it.
@@ -3639,8 +3667,7 @@
             return `
               <button type="button" class="game-mini-card${game.count ? "" : " game-mini-card--empty"}" data-game-key="${escapeHtml(game.key)}" aria-pressed="${isSelected}" title="${game.count} opportunit${game.count === 1 ? "y" : "ies"}">
                 <div class="game-mini-card__head"><span>${headLeft}</span><span>${stateLabel}</span></div>
-                ${chipTeamRow("away", chip)}
-                ${chipTeamRow("home", chip)}
+                ${(isLive || chip.state === "final") && chipLineScore(chip) ? chipLineScore(chip) : `${chipTeamRow("away", chip)}${chipTeamRow("home", chip)}`}
                 ${isLive && chip.situation ? `<div class="game-mini-card__situation">${escapeHtml(chip.situation)}</div>` : ""}
                 ${footer ? `<div class="game-mini-card__footer">${escapeHtml(footer)}</div>` : ""}
                 <div class="game-mini-card__meta">${chipPlaysText(chip) || (game.count ? `${game.count} play${game.count === 1 ? "" : "s"}` : "no plays")}</div>
