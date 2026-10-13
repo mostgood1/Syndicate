@@ -48703,3 +48703,10 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **cause: UNKNOWN.** No deploy claim was held at 04:37Z. A transcript search found no session running `wsl --shutdown` then; the one hit is advice in session "NCAAF backtesting session", last active 04:11Z. Windows Hyper-V compute events are not readable from this account.
 - **code loaded by the boot that had never run:** the roles had been on 264b38df (refresh-worker since 22:06Z). The boot loaded disk HEAD 3d852ba9: soccer live props d5f52b14, 8fd8d83b and 3d852ba9 (league-calibrated live profile), and basketball engine 1e85bbc5 + c9d6795e (both default-off). Their owners should confirm those readings.
 - **this lane's actions:** none on the fleet. The question went to the user at ~04:40Z and was answered "restore" at 13:16Z; web + live-odds-worker claims were taken at 13:16:57Z, the fleet was found already up, and both were released at once (refresh-worker was held by nba-live-tick-native).
+
+
+## 2026-10-13 13:25Z (8:25 AM CT) -- VERIFY READING, NO DEPLOY: the fleet built the 2026-27 NCAAB PRESEASON player priors -- **MET** (lane `ncaab-native-live-tier`, owed by the 2026-10-12 22:01:47Z ff entry)
+- The scheduled `ncaab-player-priors` job (11:40Z) ran on fleet checkout 264b38df+ and finished rc=0 at 11:42:44Z.
+- Reading (`~/syndicate-prod/logs/job-ncaab-player-priors.log`): `teams_rostered=362 roster_errors=0 teams_stale_excluded=225 teams_in_table=137 prev_box_rows=196865 preseason_players=2048` (returning 628 / transfer 609 / newcomer 811).
+- Written: `player_preseason_2027_asof_20261013.csv` and `player_priors_2027_asof_20261013.csv`, both 395,170 B.
+- Stale-roster exclusion is shrinking as ESPN loads rosters: 254 -> 225 in one day. The NCAAB live re-sim stays OFF.
