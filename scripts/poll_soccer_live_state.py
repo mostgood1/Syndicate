@@ -41,6 +41,7 @@ from syndicate.features.soccer.ingestion.fotmob_shots import matches_for_date
 from syndicate.features.soccer.features.live_lens import goal_window_probabilities
 from syndicate.features.soccer.features.live_lens import project_live_match
 from syndicate.features.soccer.features.live_lens import project_live_player_props
+from syndicate.features.soccer.sim_engine.soccersim.league_profiles import get_league_profile
 from syndicate.features.soccer.features.live_lens import simulate_live_paths
 from syndicate.features.soccer.features.live_corners import apply_live_corners
 from syndicate.features.soccer.features.live_projection_history import HISTORY_KEY
@@ -375,9 +376,16 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
             # ONE set of simulated paths for the projection AND the player props: both used to run the same
             # `simulations` matches from the same state and seeds, one after the other (25% of a live tick, timed
             # 2026-09-19). Each consumer checks the paths were built from its own inputs, so no number moves.
-            paths = simulate_live_paths(live_state, home_rating=home_rating, away_rating=away_rating, simulations=simulations)
+            # THE LEAGUE'S CALIBRATED PROFILE, as pregame uses. Every league ran SOCCER_CALIBRATION_PROFILE live:
+            # over 98 final matches 09-30..10-12 the projected remaining goals sat at 1.52-1.57 in every league
+            # against actuals of 1.17-2.52. Replaying the same 588 points with `get_league_profile(league)` cut the
+            # weighted |per-league bias| 0.516 -> 0.372 and Brier 0.1278 -> 0.1216, better in all six 15-min
+            # buckets (lane soccer-live-anytime-scorer, deploys.md 2026-10-13).
+            profile = get_league_profile(league)
+            paths = simulate_live_paths(live_state, home_rating=home_rating, away_rating=away_rating,
+                                        simulations=simulations, profile=profile)
             projection = project_live_match(live_state, home_rating=home_rating, away_rating=away_rating,
-                                            simulations=simulations, paths=paths)
+                                            simulations=simulations, profile=profile, paths=paths)
             # H29 (log/2026-09-17.md ~13:55 CT): the sim's remaining corners carry MAE 1.951 and a +0.46
             # bias on 320 held-out matches against 1.876 and +0.07 for the pregame estimate over the clock.
             # The sim's own values are kept on the returned projection as `sim_*`, and H32 grades the pair.
@@ -396,6 +404,7 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
                 away_rating=away_rating,
                 home_player_rows=home_players,
                 away_player_rows=away_players,
+                profile=profile,
                 simulations=simulations,
                 paths=paths,
             )

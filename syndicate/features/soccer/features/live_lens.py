@@ -675,12 +675,11 @@ def project_live_player_props(
     away_remainder_goals: list[float] = []
     score_home_now = int(live_state.get("score_home") or 0)
     score_away_now = int(live_state.get("score_away") or 0)
-    # `resume_profile` is the DEFAULT profile, not `profile`: this function always built its resumed clock with
-    # `build_resume_state`'s defaults (stoppage base from SOCCER_CALIBRATION_PROFILE) whatever profile it simulated
-    # with, and keeping that is what keeps its numbers identical. In production `profile` is that default too, so
-    # its inputs equal `project_live_match`'s and the poller's shared paths are used.
+    # `resume_profile` is `profile`, as in `project_live_match`. It was pinned to SOCCER_CALIBRATION_PROFILE, which
+    # matched only while the poller passed the default profile; with the league profile (2026-10-13) a pinned
+    # default would refuse the shared paths and re-simulate every match a second time.
     outputs = _live_outputs(paths, "project_live_player_props", live_state, home_rating=home_rating,
-                            away_rating=away_rating, profile=profile, resume_profile=SOCCER_CALIBRATION_PROFILE,
+                            away_rating=away_rating, profile=profile, resume_profile=profile,
                             simulations=simulations, seed=seed, possession_owner=possession_owner, include_stoppage=True)
     for output in outputs:
         home_shots = sum(
