@@ -48710,3 +48710,27 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - Reading (`~/syndicate-prod/logs/job-ncaab-player-priors.log`): `teams_rostered=362 roster_errors=0 teams_stale_excluded=225 teams_in_table=137 prev_box_rows=196865 preseason_players=2048` (returning 628 / transfer 609 / newcomer 811).
 - Written: `player_preseason_2027_asof_20261013.csv` and `player_priors_2027_asof_20261013.csv`, both 395,170 B.
 - Stale-roster exclusion is shrinking as ESPN loads rosters: 254 -> 225 in one day. The NCAAB live re-sim stays OFF.
+
+## 2026-10-13 13:17:05Z (8:17 AM CT) -- LOCAL FLEET ff 3d852ba9 -> 18587150 (exact SHA), NO restart: NBA + WNBA live-lens ticks, NBA history-refresh fetch and NBA CLI game-input bootstrap off vendor -- **PARTIAL** (lanes `nba-live-tick-native`, `nba-source-cli-native`, session 2d413211)
+
+- **User decisions 2026-10-12/13:**
+  - The requests, in order: "move nba live lens tick off vendor" (faithful port), "also port the wnba live lens tick", "fix the wnba registry bug too", "move nba history refresh off vendor", "move the nba cli game-input bootstrap off vendor".
+  - The ff: "Yes, ff after props idle". Claim refresh-worker token 4b09e042..., released 13:21Z.
+- **Change:** 7 commits, c9844865..18587150. **Ride-alongs: none** (HEAD..18587150 = those 7 plus ledger 890c8461).
+  - `syndicate/features/{nba,wnba}/live_tick/`: generated ports (`scripts/port_basketball_live_tick.py`) of the vendored `_live_lens_tick_payload` plus the 4 routes it calls through `app.test_client()` and their closures (NBA 112 app.py defs, WNBA 119). `nba/live_lens.py` and `wnba/live_lens.py` import them.
+  - WNBA FIX (the only deliberate change): `_update_registry_bucket` lost `current_last_updates`. Every call raised TypeError inside a `try`, so the WNBA live-props registry was never written (fleet: 12 WNBA live days, no registry dir).
+  - `shared/nba_player_logs_fetch.py`: verbatim copy of the stats.nba season player-log fetch. `nba_history_refresh._vendor_fetch` uses it (loan from nba-season-phase).
+  - `nba/source_cli/`: generated port (`scripts/port_nba_source_cli.py`) of the 8 `nba_betting.cli` commands the props refresh runs, 21 modules / 7,553 lines. The models are copied byte-identical to `source_cli/repo/models` (120 files). `refresh_nba_oddsapi_props` launches `python -m syndicate.features.nba.source_cli.cli` from the repo.
+- **Parity (P3's loan condition 3), all on the fleet at nice 19:**
+  - Method: vendored arm recorded against the live network; port + vendored self-replay from the tape on their own data copies; call-counted clock; planted-change positive control.
+  - NBA tick, live 2026-10-12 23:45Z and 01:45Z: 0 diffs (18 / 17 leaves). THIN: in preseason the tick writes nothing, because game totals need a live total line and props need prop lines. Production wrote no NBA signal on 10-12 either.
+  - NBA tick, doctored-live 2026-10-05 slate (production wrote 17+17 that day): 3,717 leaves, 0 diffs, including signals, projections and the props registry.
+  - WNBA tick, doctored-live 2026-10-09: 9,297 leaves, 0 diffs (before the FIX; that slate never reaches the fixed code).
+  - NBA CLI, the full 8-command bootstrap for the 2026-10-13 slate: 8/8 steps ok in both arms, 804,491 leaves, 0 diffs.
+  - History fetch, a live A/B over 2025-26: 26,651 rows, identical frames (an earlier A/B differed, cause not captured; most likely row order).
+  - In-suite: one reduced fixture per league plus a `build-features` real-data parity.
+- **VERIFY on the deployed checkout (18587150), 13:18Z:** the new test files gave 39 passed, 3 failed. The 3 failures were all `--check` (the generator's source hash was CRLF-dependent; P6's orchestrator generator has the same bug). FIXED on main in a82f821a (hash lines only, code identical), NOT ff'd: main now carries 44409a08 (another lane's NCAAB code), so it rides with the next fleet ff.
+- **READINGS OWED** (no restart, so nothing has run the new code yet):
+  - (a) The first NBA props run after 13:17Z must log `-m syndicate.features.nba.source_cli.cli export-game-cards` with no `nba_betting.cli` line. The once-per-date bootstrap for a new slate must run its steps through the same module and write `predictions_<date>.csv`.
+  - (b) A live-odds-worker started after 13:17:05Z (self-recycle ~6 h; the current pid started ~10:10Z) runs the ported ticks. NBA writes only once live lines exist (2026-10-20); WNBA is checked at Finals G1 on 2026-10-17 by scheduled task `wnba-1017-live-tick-parity`.
+- **Rollback:** revert 18587150..c9844865 and ff. No restart.
