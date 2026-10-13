@@ -1029,6 +1029,14 @@ death, never life — do not invert it.
 - Verification: unit test over a live NFL/NCAAF state: q2 total row actual_so_far == q2 points so far; on the fleet during a live slate a q2/h1 row renders a period number
 - Blocked by: none
 
+### nfl-mnf-settlement-lag — OPEN — opened 2026-10-13 — session d4409ac4-6318-47ee-87d5-fa88304fd907
+- Goal: Monday-night NFL board picks settle in the NEXT morning's settlement autorun (the 7 AM CT run the morning after the game), not a day later: nfl:<MNF date> pending -> settled in that run, measured on the 2026-10-19 MNF (settled by the 2026-10-20 run)
+- Files: scripts/run_refresh_worker.py (NFL pbp fetch autorun cadence section only), syndicate/features/shared/settlement_sport_rows.py (NFL score/box rows section only), tests/test_nfl_mnf_settlement_lag.py (NEW)
+- Hypothesis: MNF misses the next settle because nflverse pbp (the NFL grader's source) is fetched once per 24 h by the refresh-worker autorun at a drifting time -- last 2026-10-13 03:34Z, before the MNF final -- so the 12:00Z settle reads pbp without the game. measured 10-13: nfl:2026-10-12 1,609 pending, 0 graded games.
+- Falsification test: pbp_2026.csv mtime falls between the MNF final and 12:00Z and the game is STILL unsettled (then the cause is the grader, not fetch timing); or nflverse's own release lacks the MNF game at 12:00Z (then no fetch timing fixes it -- needs a non-pbp score source, e.g. ESPN, for game lines)
+- Verification: 2026-10-20 ~12:00Z autorun: nfl:2026-10-19 pending -> settled (count + denominator); pbp_2026.csv mtime before 12:00Z and after the MNF final; no extra nflverse fetch cost beyond one morning fetch
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
