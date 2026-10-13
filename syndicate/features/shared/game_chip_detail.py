@@ -309,6 +309,12 @@ def pregame_footer(
         sport = str(sport or "").lower()
         day = _ct_date(start_utc)
         lines = _fill_from_grid(sport, _market_lines(game), day, home_name, away_name)
+        # A consensus line averaged across books is not a line anyone posted
+        # (measured 2026-10-13: IND @ OKC served "OKC −9.6875 · o/u 228.062").
+        # Show the nearest real increment -- half points, quarters for soccer's
+        # Asian lines (o/u 3.25 is a real soccer total).
+        step = 0.25 if sport == "soccer" else 0.5
+        lines = {k: (round(v / step) * step if k in ("home_spread", "total") and v is not None else v) for k, v in lines.items()}
         parts: list[str | None] = []
         if sport == "mlb":
             parts = [_mlb_probables(game), _favourite_ml(lines, away, home)]

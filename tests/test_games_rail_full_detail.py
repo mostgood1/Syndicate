@@ -234,3 +234,18 @@ class SoccerUnplayedChip(unittest.TestCase):
         from syndicate.features.soccer.cards import _live_state_block
 
         self.assertNotIn("codedGameState", _live_state_block("pre", "2030-01-01T12:00Z"))
+
+
+class FooterRoundsConsensusLines(unittest.TestCase):
+    def _footer(self, sport, spread, total):
+        from syndicate.features.shared import game_chip_detail as gd
+
+        with __import__("unittest.mock").mock.patch.object(gd, "_market_lines", return_value={"home_ml": None, "away_ml": None, "home_spread": spread, "total": total}), \
+                __import__("unittest.mock").mock.patch.object(gd, "_book_grid_main", return_value={}):
+            return gd.pregame_footer(sport, {}, away="IND", home="OKC", away_name="Indiana Pacers", home_name="Oklahoma City Thunder", start_utc=None)
+
+    def test_basketball_rounds_to_half_points(self) -> None:
+        self.assertEqual(self._footer("nba", -9.6875, 228.062), "OKC −9.5 · o/u 228")
+
+    def test_soccer_keeps_quarter_lines(self) -> None:
+        self.assertIn("o/u 3.25", self._footer("soccer", None, 3.25))
