@@ -1157,7 +1157,9 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   (3d1fd556). Not enabled.
 - **blowout_bench_rest** (native engine, default False, 1e85bbc5): b = 3 ACCEPTED by the user 2026-10-13 as a PROPOSAL, with
   P3's foul_out_in_sim + foul_trouble_bench_mult 0.05 on. 12 FIT dates: starters' blowout drop −3.03 vs real −4.38 (was
-  −1.19); foul-outs ~0.15 vs real 0.193. NOT enabled.
+  −1.19); foul-outs ~0.15 vs real 0.193. Full FIT of the combined config (791 games, 2026-10-13): starter minutes
+  30.89/30.08/27.63 vs real 31.32/29.98/26.87 by final margin, foul-outs 0.206 (real 0.193), no guard row moved
+  beyond noise. NOT enabled.
 - **score_effect_k** (late-game catch-up, native engine, default 0): k = 0.002 ACCEPTED by the user 2026-10-10 as a
   PROPOSAL (fine grid 48cb10ff; Q4 tolerance overridden, Q4 remainder to P3). NOT enabled: nothing sets it in
   production. Confirmed on the full 2025-26 FIT window WITH lineup pools + #473 inputs 2026-10-12 (791 games):

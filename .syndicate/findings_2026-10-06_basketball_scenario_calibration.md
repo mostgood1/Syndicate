@@ -1427,3 +1427,30 @@ engine.py LOAN is RETURNED to nba-native-live-resim.
 - Not enabled in production. Adoption follows the end-of-Phase-2 VALIDATION read; P3's own enablement decision is
   separate.
 - **Next per protocol:** the full FIT re-run of the accepted config with these on, then Phase 2 #3 / #5.
+
+### Phase 2 #4 — FULL FIT of the combined config (read 2026-10-13 ~19:25Z, 2:25 PM CDT)
+
+**Run:** fit_rest3, 14:00Z-19:21Z, 109 dates (the 2 Cup dates fail as always), all engine calls with levers, paired 791.
+- Config: accepted Phase 2 + k = 0.002 + blowout_bench_rest b = 3 + P3 foul_out_in_sim + foul_trouble_bench_mult 0.05,
+  lineup pools, #473 inputs, walk-forward calibration files.
+
+| 791 FIT games | real | k = 0.002 full FIT (no rest, no P3 FT) | **combined (fit_rest3)** |
+|---|---|---|---|
+| sim top-5 minutes, ≤ 6 / 7-19 / ≥ 20 final margin | 31.32 / 29.98 / 26.87 | (INPUT 31.7 flat) | **30.89 / 30.08 / 27.63** |
+| game-script drop | −4.45 | ~−1.2 (12-date) | **−3.26** (within 1.5) |
+| foul-outs/game | 0.193 [0.162, 0.226] | 0.473 | **0.206 IN** |
+| H2-on-H1 / Q4 | −0.174 / −0.141 | −0.172 / −0.093 | −0.171 / −0.092 |
+| S8 margin SD | 14.00 [13.19, 14.71] | 14.91 | 14.96 |
+| S5 blowouts, all | 0.230 | 0.228 | **0.230** |
+| total bias | — | −0.22 | −0.22 |
+
+- Other guard rows vs the k = 0.002 full FIT: all moves ≤ 0.05 (S1 −0.01, S3 ≤ +0.05, S8 total +0.07, S9 −0.03,
+  S7 ≤ 0.001), within run noise.
+- The 12-date P3-ON guard misses (S8 margin −0.18, S5 −0.008) do NOT reproduce on the full FIT (+0.05 / +0.002).
+- **VERDICT:** Phase 2 #4 DONE.
+  - Simulated starter minutes now follow game script, within ~0.8 min of real in every bucket.
+  - Foul-outs are inside the real CI.
+  - Nothing else moves.
+- Still a PROPOSAL (production unchanged).
+- **Remaining Phase 2:** #3 FT bonus (P4's bonus-FT mechanism exists; S6 FTA still −2.3/team), #5 volume
+  (S1 pace / S9 3PA now inside or near), the end-of-Phase-2 VALIDATION read.
