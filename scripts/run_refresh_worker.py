@@ -4299,6 +4299,52 @@ def _running_job_process_count(proc_root: Path | None = None) -> int | None:
         return None
 
 
+def _cap_exempt_autoruns() -> tuple:
+    """Autoruns that may launch while the odds-job cap is full, in chain order.
+
+    Lane `refresh-worker-odds-job-slot`, measured 2026-10-13: the cap counts the
+    worker's live `run_refresh_odds_job.py` trees -- including ones a previous
+    worker incarnation left running (16:56Z: 3, started 16:04 / 16:41 / 16:46Z,
+    one alive 65 min) -- and at cap the WHOLE chain was skipped, so the daily
+    settlement and the 10:00Z NFL pbp fetch waited for an odds-free tick.
+    Every entry here is self-rate-limited by its own marker / daily gate and
+    starts no odds job: settlement and ledger projection run in this process
+    (settlement's window peaked at 3.6 GB of 6.1 GB on 10-13; odds trees are
+    ~200-250 MB each), the NFL / NCAAF fetchers are small subprocesses.
+    NOT here: reconciliation and the accuracy summary (in-process, cost not yet
+    measured), the NFL fantasy artifact, and the mlb / weekly / soccer /
+    projection refreshes, which start refresh jobs of their own.
+    """
+    return (
+        _launch_autorun_evaluation_settlement,
+        _launch_autorun_ledger_projection,
+        _launch_autorun_nfl_pbp_fetch,
+        _launch_autorun_nfl_injuries_fetch,
+        _launch_autorun_nfl_roster_snapshot,
+        _launch_autorun_nfl_depth_chart_snapshot,
+        _launch_autorun_nfl_news_capture,
+        _launch_autorun_nfl_game_injuries_fetch,
+        _launch_autorun_ncaaf_player_stats,
+    )
+
+
+def _launch_cap_exempt_autorun(*, latest_manifest_path: Path, worker_status_path: Path, refresh_cycle: dict) -> str | None:
+    """Launch the first DUE cap-exempt autorun (one per tick, like the chain); its name, or None."""
+    for fn in _cap_exempt_autoruns():
+        try:
+            if fn is _launch_autorun_ledger_projection:
+                launched = fn()
+            else:
+                launched = fn(latest_manifest_path=latest_manifest_path, worker_status_path=worker_status_path, refresh_cycle=refresh_cycle)
+        except Exception as exc:  # noqa: BLE001 -- one autorun failing must not stop the loop
+            print(f"[refresh_worker] CAP_EXEMPT_AUTORUN_FAILED fn={fn.__name__} error={type(exc).__name__}: {exc}", flush=True)
+            continue
+        if launched:
+            print(f"[refresh_worker] CAP_EXEMPT_AUTORUN launched={fn.__name__}", flush=True)
+            return fn.__name__
+    return None
+
+
 def _resolve_active_job_count(latest_manifest_path: Path) -> tuple[int, str]:
     """How many refresh jobs are running, and which instrument said so.
 
@@ -8084,6 +8130,16 @@ def main() -> int:
             )
             if args.run_once:
                 return 0
+            # Lane `refresh-worker-odds-job-slot`: the cap bounds ODDS jobs; it
+            # used to starve every autorun below it too (settlement, the NFL
+            # pbp fetch) while any odds job ran -- ~80% of ticks on 2026-10-13
+            # 15-16Z. These never start an odds job, so they cannot grow the
+            # count the cap guards.
+            _launch_cap_exempt_autorun(
+                latest_manifest_path=latest_manifest_path,
+                worker_status_path=worker_status_path,
+                refresh_cycle=refresh_cycle,
+            )
         elif _has_pending_external_contract(latest_manifest_path):
             refresh_cycle["claimed_count"] = 1
             _mark_claimed_external_contract(latest_manifest_path)
