@@ -977,3 +977,11 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
   - An Ask probe must use the button's payload (nested `context`, "What's the case for and against ...") and a shortlist fetched after the last rebuild: `resolve_board_row` is exact-or-nothing.
   - Offline `read_layer2_shortlist` needs the web's `SYNDICATE_REFRESH_STATE_*` + `SYNDICATE_REPORTS_ROOT` keys. They are set at supervisor `up`, not in local_production.env.
 - **Not built:** past-line overlays (closing lines exist only from 2026-09-30).
+
+## [layer2-suggested-opps] SUGGESTED OPPS -- a per-line bet flag on top of the full board; the paper book stakes only it `[2026-10-13, lane layer2-suggested-opps, session 9e18a0e7; LIVE on the fleet 16:49:10Z, verified served]`
+
+- **What it is:** `layer2_board._stamp_suggested` stamps `suggested` / `suggested_reasons` on every candidate at build: market EV >= +2% (`SYNDICATE_SUGGESTED_MIN_EV_PCT`), fee-net (`score_v2.ev_net_pct`) where a venue fee applies, a two-sided fair (NOT `book_margin_model`), plausible + non-stale quote, one side per line. Recorder field `sg`. Board `Opps` filter (All default, `?opps=suggested`). `pipeline/portfolio_commit.suggested_rows` -> the paper book stakes only suggested rows (`SUGGESTED_GATE` log line, `plan.suggested_gate`).
+- **Why (user decisions 2026-10-13: "Build it, default All", "Yes, one definition"):** weekend 10-10/11 published rows: all -10.0% [-12.2, -8.0] (177 games); EV >= +2% +4.6% [-4.1, +14.0], live +9.9% [+1.7, +18.0], exchange-priced +9.6% [+1.2, +17.8]; staked paper 10-10..14 -2.5%. `findings_2026-10-13_layer2_weekend_assessment.md` §7.
+- **NOT a withhold:** every criterion is a line property; All still serves every line (PRIME DIRECTIVE, learnings 2026-10-05). A first-draft "drop model-against rows / EV floor 0 where no model" was withdrawn for exactly that reason.
+- **First reading (16:59:10Z build):** 43 of 5,096 suggested (0.8%); reasons ev_below_min 1,909 / one_sided_fair 601 / ev_net_of_fee_below_min 292.
+- **Caveat that travels with it:** pregame EV 2-5.27% graded -21.2% [-37, -3] over 09-01..09-20 (`[layer2-score-outcomes]`); the weekend's pregame EV >= 2 was -7.5% (n.s.). Live and exchange are the strongest cells. One weekend: re-grade on `sg` before moving the threshold.

@@ -462,15 +462,12 @@ once this index exists: re-splitting would orphan the parts.
 | [wnba-settlement-live] | WNBA SETTLES AGAIN — all three causes fixed, deployed and verified on the served payload `[verified 2026-09-01 | `state_basketball.md` |
 | [wnba-instruments-all-zero] | THE THREE CAUSES, AS FOUND `[historical, 2026-08-31; all three now fixed — see above]` | `state_basketball.md` |
 | [wnba-model-vs-board-mismatch] | THE WNBA SIM'S ONE EDGE IS THE MONEYLINE, AND THE BOARD BET IT TWICE ALL SEASON `[verified 2026-08-31, lane wn | `state_basketball.md` |
-| [wnba-live-native-cutover] | WNBA LIVE PATH: 14 VENDORED CALLS INVENTORIED; THE PLAN'S END-STATE GREP CANNOT SEE TWO; 2026 CHECKPOINT CORPUS + LINEAR-LENS BAR BUILT `[verified 2026-10-09, lane wnba-native-live-cutover]` | `state_basketball.md` |
+| [wnba-live-native-cutover] | WNBA LIVE PATH: 14 VENDORED CALLS INVENTORIED; THE PLAN'S END-STATE GREP CANNOT SEE TWO; 2026 CHECKPOINT CORPU | `state_basketball.md` |
 | [wnba-live-edge-is-leakage] | THE WNBA LIVE ENGINE'S +41% ROI IS AN ARTEFACT — no live line has ever been captured `[verified 2026-08-31, la | `state_basketball.md` |
 | [wnba-execution-disconnect] | THE WNBA BOARD NEVER SEES THE VENUE IT TRADES ON, AND LAYER 2 NEVER SEES WNBA `[verified 2026-08-31, lane wnba | `state_basketball.md` |
 | [wnba-game-lines-gradeable] | WNBA GAME LINES CAN BE GRADED — a player box gives the team score, and always could `[verified 2026-08-28, lan | `state_basketball.md` |
 | [espn-egress-and-wnba-boxscores] | ESPN SERVES RENDER FROM ONE OF TWO HOSTS, and the WNBA boxscore had no producer `[verified 2026-08-26, lane ka | `state_basketball.md` |
 | [wnba] | WNBA | `state_basketball.md` |
-| [wnba-props-model-skill] | WNBA PROPS: NO MARKET BEATS THE BOOK; ALL FOUR ESTIMATORS + INJURY EXCLUSIONS LIVE ON | `state_basketball.md` |
-| [basketball-native-live-state] | SYNDICATE OWNS BASKETBALL PLAY-BY-PLAY: typed LiveGameState + the rotation-stints producer (P2) -- built, back | `state_basketball.md` |
-| [nba-live-native-p3] | NBA LIVE (P3): native re-sim BUILT, engine-neutral, persisting pregame inputs IN PRODUCTION (8/8); NOT switched on; vendored tick loses to pregame_rate `[verified 2026-10-12 13:35Z, lane nba-native-live-resim]` | `state_basketball.md` |
 | [wnba-game-state] | WNBA GAME-STATE AND FIXTURE COVERAGE — 2026-08-17 (lane `wnba-live-tier`) — **ARCHIVED 2026-08-19 to `state_ar | `state_basketball.md` |
 | [wnba-fixture-identity] | WNBA fixture identity + the sweep ownership gap - VERIFIED 2026-08-17 — **ARCHIVED 2026-08-19 to `state_archiv | `state_basketball.md` |
 | [wnba-sweep-ownership-gate] | WNBA SWEEP OWNERSHIP GATE + PHASE 2 AUTORUN `[collapsed 2026-08-18 from three 2026-08-17/18 snapshots; newest  | `state_basketball.md` |
@@ -478,9 +475,12 @@ once this index exists: re-splitting would orphan the parts.
 | [wnba-cards-fallback-recursion] | `_artifact_bundle` RE-ENTERED ITSELF 247 FRAMES DEEP AND REPORTED NOTHING — FIXED `[2026-09-03, lane wnba-card | `state_basketball.md` |
 | [nba-model-skill-2025-26] | THE NBA MODEL IS LESS ACCURATE THAN THE PLAYER'S OWN AVERAGE, AND THE REASONS ARE MEASURED — as-of 2025-26 bac | `state_basketball.md` |
 | [nba-layer2-projections] | NBA LINES CARRY THE MODEL ON LAYER 2 -- game lines LIVE and VERIFIED; props wired but no NBA prop quote exists | `state_basketball.md` |
-| [basketball-native-engine] | THE BASKETBALL POSSESSION ENGINE IS SYNDICATE'S -- live on the fleet, parity-proven on 5,400 real production calls | `state_basketball.md` |
-| [basketball-native-orchestrator] | THE BASKETBALL SMART-SIM ORCHESTRATOR IS SYNDICATE'S; the sim path imports no vendored module -- live on the fleet, parity-proven on 35 real production games | `state_basketball.md` |
-| [nba-sim-totals-and-strength] | NBA SMART-SIM TOTALS + TEAM STRENGTH: measured defects, fixes built DEFAULT-OFF, nothing enabled | `state_basketball.md` |
+| [wnba-props-model-skill] | WNBA PROPS: NO MARKET BEATS THE BOOK; ALL FOUR ESTIMATORS (AVAILABILITY, RATE SHRINK, SHAPE, DISPERSION) + INJ | `state_basketball.md` |
+| [basketball-native-live-state] | SYNDICATE OWNS BASKETBALL PLAY-BY-PLAY: typed LiveGameState + the rotation-stints producer (P2) -- built, back | `state_basketball.md` |
+| [nba-live-native-p3] | NBA LIVE (P3): native resumed re-sim BUILT, engine-neutral, persisting pregame inputs IN PRODUCTION; NOT switc | `state_basketball.md` |
+| [basketball-native-engine] | THE BASKETBALL POSSESSION ENGINE IS SYNDICATE'S -- live on the fleet, parity-proven on 5,400 real production c | `state_basketball.md` |
+| [basketball-native-orchestrator] | THE BASKETBALL SMART-SIM ORCHESTRATOR IS SYNDICATE'S; the sim path imports no vendored module -- live on the f | `state_basketball.md` |
+| [nba-sim-totals-and-strength] | NBA SMART-SIM TOTALS + TEAM STRENGTH: measured defects, fixes built DEFAULT-OFF, nothing enabled `[2026-10-10, | `state_basketball.md` |
 | [board-freshness] | BOARD FRESHNESS AND STALENESS | `state_board.md` |
 | [board-intelligence-engine] | BOARD / INTELLIGENCE ENGINE — structural facts, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19. | `state_board.md` |
 | [locked-cards-retuned-no-autorun] | `locked_cards_retuned` HAS NO AUTOMATIC TRIGGER, ANYWHERE `[measured 2026-08-18]` | `state_board.md` |
@@ -495,7 +495,7 @@ once this index exists: re-splitting would orphan the parts.
 | [combined-board-state-rows-lost] | THE COMBINED BOARD DROPS EVERY PERSISTED STATE ROW; ITS AGE IS TOMORROW'S SHORTLIST — FIXED, LIVE ON WEB `b6a0 | `state_board.md` |
 | [board-per-date-freshness] | THE COMBINED BOARD DATES EACH WINDOW DATE ON ITS OWN; THE CHIP SHOWS TODAY APART FROM TOMORROW — LIVE ON WEB ` | `state_board.md` |
 | [inplay-overlay-board-cadence] | THE BOARD'S IN-PLAY ROWS COME FROM THE BOOK GRID EVERY TICK, NOT THE SHORTLIST — LIVE ON ALL THREE SERVICES `[ | `state_board.md` |
-| [intelligence-season-evidence] | INTELLIGENCE EXPLANATIONS NAMED METRICS THEY NEVER READ, AND THE READINESS GATE COULD NOT SEE THE DATA ROOT -- fixed on main `ced2618f`, NOT LOADED | `state_board.md` |
+| [intelligence-season-evidence] | INTELLIGENCE EXPLANATIONS NAMED METRICS THEY NEVER READ, AND THE READINESS GATE COULD NOT SEE THE DATA ROOT -- | `state_board.md` |
 | [nfl-model-accuracy-backtest] | NFL GAME LINES AND PROPS LOSE TO THE CLOSE IN EVERY MARKET; THE PROP PROBABILITY CARRIES NO INFORMATION AT THE | `state_football.md` |
 | [ncaaf-sim-view-coverage] | NCAAF GAME LINES CARRY A SIM VIEW ON EVERY MARKET; EDGES ARE BOUNDED BY THE 15-POINT CAP; STAKES STAY ON PRICE | `state_football.md` |
 | [nfl-live-prop-capture] | NFL PER-QUARTER PLAYER PRODUCTION IS CAPTURED AND RETRIEVABLE — the allowlist alone moved ZERO bytes `[verifie | `state_football.md` |
@@ -570,8 +570,9 @@ once this index exists: re-splitting would orphan the parts.
 | [nhl-chip-start-time] | NHL CHIPS CARRIED NO START TIME AND NO STATUS TOKEN UNTIL 2026-09-22 — FIXED AND LIVE -- BOTH HALVES MEASURED  | `state_layer2.md` |
 | [ncaaf-kickoff-cache] | AN UPCOMING NCAAF CARD READ "TBD" BECAUSE THE COMMITTED CFBD CACHE WAS THE JULY SNAPSHOT — FIXED BOTH HALVES,  | `state_layer2.md` |
 | [mlb-live-gameline-venue-segment] | MLB LIVE GAME LINES SERVE NO SIM EDGE BECAUSE THE VENUES QUOTE FULL-GAME CONTRACTS AND THE LIVE BOARD IS MOSTL | `state_layer2.md` |
-| [layer2-board-redesign] | LAYER 2 BOARD PAGE: ONE NAV, VISIBLE FILTERS, RESEARCH RAIL + SLIP TRAY, LOGOS, AND AN EMBED THAT PARSES -- LIVE on web `2735d39a`, refresh-worker `6eae7e0a` | `state_layer2.md` |
-| [layer2-history-charts] | LAYER 2 + ASK HISTORY CHARTS: DATED PROP FORM, TEAM TRENDS VS TODAY'S LINE, NO GOAL HISTORY ON CORNERS -- LIVE `64909dba` | `state_layer2.md` |
+| [layer2-board-redesign] | LAYER 2 BOARD PAGE: ONE NAV, VISIBLE FILTERS, RESEARCH RAIL + SLIP TRAY, LOGOS, AND AN EMBED THAT PARSES -- LI | `state_layer2.md` |
+| [layer2-history-charts] | LAYER 2 + ASK HISTORY CHARTS: DATED PROP FORM, TEAM TRENDS VS TODAY'S LINE, NO GOAL HISTORY ON CORNERS -- LIVE | `state_layer2.md` |
+| [layer2-suggested-opps] | SUGGESTED OPPS -- a per-line bet flag on top of the full board; the paper book stakes only it `[2026-10-13, la | `state_layer2.md` |
 | [segment-misgrade-regrade] | 53 OF 173 SETTLED SEGMENT ORDERS WERE GRADED AGAINST THE WRONG ACTUAL — 30.6%, AND THE ERRORS NEARLY CANCEL `[ | `state_ledger.md` |
 | [stale-test-triage] | "THE TEST IS STALE" IS A HYPOTHESIS, AND IT WAS WRONG FOR 4 OF 18 `[2026-09-05, lane stale-test-repair, commit | `state_ledger.md` |
 | [full-suite-completes] | THE FULL SUITE RAN TO COMPLETION FOR THE FIRST TIME -- 15,307 tests, 61m06s, and the 27 "NEW" failures are 6 p | `state_ledger.md` |
@@ -619,16 +620,16 @@ once this index exists: re-splitting would orphan the parts.
 | [lane-ledger-conflict-guard] | THE LANE CHECKER USED TO PASS A FILE WITH CONFLICT MARKERS IN IT `[fixed 2026-08-30, `10f45a0c`; scope MEASURE | `state_model.md` |
 | [settlement-resolver-coverage] | SETTLEMENT: NFL CAN BE GRADED, NCAAF IS WIRED-BUT-UNVERIFIED, and three sports still cannot settle a bet `[ver | `state_model.md` |
 | [execution-ledger-lost-live-rows] | 30 LIVE FILLS PLACED 2026-09-01..09-04 ARE MISSING FROM THE EXECUTION LEDGER, BY DESIGN NOT RESTORED — correct | `state_model.md` |
+| [execution-ledger-archive] | THE EXECUTION LEDGER'S RECORD CAP (3,000) MOVES ROWS TO A DISK ARCHIVE; FULL-HISTORY READERS READ BOTH `[verif | `state_model.md` |
 | [execution-ledger-cross-service-race] | THE MONEY LEDGER IS WRITTEN BY THREE SERVICES, AND SINCE 2026-09-11 EVERY WRITE IS ONE COMPARE-AND-SWAP (#656) | `state_model.md` |
-| [execution-ledger-archive] | THE EXECUTION LEDGER'S RECORD CAP (3,000) MOVES ROWS TO A DISK ARCHIVE; FULL-HISTORY READERS READ BOTH `[verified on the fleet 2026-10-08T17:01Z, lane execution-ledger-keyvalue-growth]` | `state_model.md` |
 | [probability-statistic-ownership] | PROBABILITY-STATISTIC OWNERSHIP `[measured 08-15, shipped `2ac3c6bc`]` | `state_model.md` |
 | [nhl-sim-engine] | NHL SIM (hockeysim) — `nhl_sim_input_checklist.py` PASSES, exit 0 `[measured 2026-08-20, lane nhl-model-owner] | `state_model.md` |
-| [nhl-player-props] | NHL PLAYER PROPS PROJECTED AND PRICED, PER-LINE GATED; PP/PK units from real PP/SH minutes; engine still loses to player average in most markets (ice-time and per-minute errors cancel) `[verified 2026-10-05, lanes nhl-player-props-projection / nhl-pp-units-real-toi]` | `state_model.md` |
 | [model-skill] | MODEL SKILL (`#428`) — measured vs not | `state_model.md` |
 | [sim-scheduling-blocker] | 2026-08-17 02:1xZ — VERIFIED (sim-scheduling): the primary goal has ONE blocker — **ARCHIVED 2026-08-19 to `st | `state_model.md` |
 | [sim-edge-analysis-2026-09-01] | FULL-PLATFORM SIM-ENGINE EDGE ANALYSIS — strategy synthesis + new from-code facts `[2026-09-01, session syndic | `state_model.md` |
 | [accuracy-autorun-rearm-state] | `#626`(h) IS ARMED, RAN, AND PASSED. The budget, not memory, is now the constraint. `[2026-09-04, lane accurac | `state_model.md` |
 | [nhl-live-resim] | NHL HAS A LIVE RE-SIM AND IT CAN NOW SEE ITS SLATE -- but no NHL game has yet reached the board with a probabi | `state_model.md` |
+| [nhl-player-props] | NHL PLAYER PROPS ARE PROJECTED AND PRICED ON THE BOARD, PER-LINE GATED -- and the engine still loses to a play | `state_model.md` |
 | [polymarket-live-totals-quote-names-no-game] | 26 OF 28 LIVE POLYMARKET TOTALS QUOTES ON THE BOARD ARE SHARED ACROSS GAMES — one price per LINE, no game iden | `state_polymarket.md` |
 | [polymarket-fill-price-is-reported] | THE VENUE REPORTS `avgPx`. "This path has no fill price" was FALSE and cost a 12h live halt `[verified 2026-08 | `state_polymarket.md` |
 | [polymarket-capital-is-margin-held] | POLYMARKET'S CASH IS NOT ITS BUYING POWER: `marginRequirement` HOLDS IT, and the venue tells us in a field we  | `state_polymarket.md` |
@@ -734,4 +735,4 @@ once this index exists: re-splitting would orphan the parts.
 | [refresh-worker-heavy-build-refusal] | refresh-worker's heavy build is refused for hours once the MAIN PROCESS settles above ~2.2 GB after its first  | `state_worker.md` |
 | [refresh-run-lanes] | Refresh-run lane topology, and refusals are now LOGGED [verified 2026-09-25/26] | `state_worker.md` |
 | [pregame-sweep-cadence] | THE IDLE LOOP NOW WAKES WHEN A SPORT'S OWN PREGAME SWEEP IS DUE; soccer schedules refetch a near window betwee | `state_worker.md` |
-| [web-oom-leak] | WEB SERVICE MEMORY GROWTH — the UPDATE 1..44 chain from 2026-09-04; was UNINDEXED until 2026-10-04 | `state_worker.md` |
+| [web-oom-leak] | WEB SERVICE MEMORY GROWTH — LIVE: UPDATE 37..44 + the 2026-09-09 block; UPDATE 1..36 archived to state_archive | `state_worker.md` |

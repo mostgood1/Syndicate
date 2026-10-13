@@ -1015,6 +1015,7 @@ death, never life — do not invert it.
 - Moved: query-state-cache-oversize
 
 ### soccer-segment-projection-guard — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- **STATUS 2026-10-13 17:0xZ: SHIPPED + LIVE on the fleet (995d5b47, refresh-worker 16:13:25Z); reachability MET (`non_full_segment_rows` key served, =0 -- no h1/h2 soccer markets today). OWED: first soccer h1/h2 row on the served board carries no `projection`. Close on that reading.**
 - Goal: Soccer h1/h2 rows on the Layer 2 board no longer carry a full-match projection or model_edge_pct: attach_soccer_projections skips non-full segments and counts them (non_full_segment_rows)
 - Files: tests/test_soccer_segment_projection_guard.py (NEW). CROSS-LANE WRITE (not claimed here): syndicate/features/shared/soccer_projections.py is held by OPEN lane soccer-skill-registry-line-weighting; the guard is recorded in that lane's block
 - Hypothesis: n/a
@@ -1023,6 +1024,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### layer2-live-segment-actuals — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- **STATUS 2026-10-13 17:0xZ: SHIPPED + LIVE (d6a5ffc5; web reload 16:04Z, refresh-worker 16:13:25Z). OWED: during a live NFL/NCAAF/soccer slate, an interval totals card's `actual` equals that interval's points (and a full-game total shows the game total). Close on that reading. NOT covered: NHL periods / NBA quarters (`segment_periods` has no entry), spreads/h2h interval actuals.**
 - Goal: Live period game rows (h1/h2/q1-q4/p1-p3/first5) on the Layer 2 board show the period's own score-so-far in the Actual column, from segment_actuals, never the full-game score
 - Files: syndicate/features/shared/board_enrichment.py (live segment actual attach ONLY), syndicate/features/shared/layer2_board.py (`_game_total_actual` + its call in `_live_projection_columns` ONLY), tests/test_layer2_live_segment_actuals.py (NEW)
 - Hypothesis: n/a
@@ -1040,6 +1042,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### layer2-suggested-opps — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- **STATUS 2026-10-13 17:0xZ: SHIPPED + LIVE (2b93b145 + 2ecf7c2e; web reload 16:36Z, refresh-worker 16:49:10Z). VERIFIED served: 43 suggested of 5,096, all EV >= 2.0 on two-sided fairs, 0 double-sided lines; SUGGESTED_GATE rows_in=5096 suggested=43 flag_absent=0. OWED: grade sg=true vs all after the 10-17/18 weekend (recorder) + paper settled ROI; then decide the threshold.**
 - Goal: Every Layer 2 row carries a per-line suggested flag (market EV >= +2% net of venue fee, two-sided fair, plausible + fresh quote, one side per line) computed once at build; the board offers All / Suggested (default All) and the paper portfolio stakes only suggested rows, so the graded set is the shown set. No line is withheld from All.
 - Files: syndicate/features/shared/layer2_board.py (`_stamp_suggested` + its call in `build_layer2_rows` + the `suggested` card columns in `layer2_rows_to_board_cards` ONLY), syndicate/features/shared/opportunity_population_ledger.py (the `sg` record field ONLY), pipeline/portfolio_commit.py (`suggested_rows` + its call in `run_portfolio_commit` ONLY), tests/test_layer2_suggested_opps.py (NEW). CROSS-LANE WRITE (not claimed here): syndicate/templates/intelligence.html, held by games-rail-full-detail -- recorded in that lane's block
 - Hypothesis: n/a
