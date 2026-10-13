@@ -669,3 +669,34 @@ Real foul-outs: 0.193/game.
 - On its #4b sample (12 FIT dates, 87 games; Phase 2 config), foul_out_in_sim + foul_trouble_bench_mult 0.05 ON reads foul-outs ~0.15/game in every arm, against real 0.193 and §8a's VALID 0.213. A different config and sample from §8a; it is not a contradiction until re-measured on the same games. OWED: P3 re-measures foul-outs/game for M-FT on those 12 dates in both configs before M-FT is proposed for production.
 - The engine.py loan to that lane is returned (blowout_bench_rest, 1e85bbc5): corpus parity 5,400/5,400 by that lane.
 - **Resolved (2026-10-13, reported by basketball-scenario-calibration, full FIT 791 games, combined Phase 2 config incl. M-FT):** foul-outs 0.206/game vs real 0.193 [0.162, 0.226] -- inside the real CI and consistent with §8a's 0.213. The 0.15 reading came from the 12-date subsample and did not reproduce. Top-5 starter minutes by final margin (≤6/7-19/≥20): sim 30.89/30.08/27.63 vs real 31.32/29.98/26.87. The owed P3 re-measure is withdrawn; M-FT remains a production PROPOSAL, default off.
+
+### §10a RESULT, part 1: pregame total, skip_def ON vs OFF, production config (read 2026-10-13 22:00Z)
+
+`scripts/nba_pregame_total_bias.py`, 100 sims from the tip, same seed per game in both arms, pre-tip OddsAPI consensus total. `/home/amyn/nba_live_bt/pgb_695/`.
+
+| population | n | arm | total bias vs actual | total MAE | minus market | margin MAE |
+|---|---|---|---|---|---|---|
+| regular | 1,205 | ON (live file) | **+3.14** | 15.49 | +3.89 | 11.29 |
+| regular | 1,205 | OFF | **+1.93** | 15.48 | +2.68 | 11.24 |
+| regular | 1,205 | market | -0.75 | 14.60 | -- | -- |
+| postseason | 85 | ON | +8.70 | 14.42 | +9.15 | 13.57 |
+| postseason | 85 | OFF | +8.33 | 14.20 | +8.77 | 13.61 |
+| postseason | 85 | market | -0.45 | 13.40 | -- | -- |
+
+Paired OFF minus ON, game bootstrap:
+- **Regular:** total level -1.21 [-1.35, -1.08]; |total err| -0.01 [-0.16, +0.14] (n.s.); |margin err| -0.04 [-0.17, +0.08] (n.s.).
+- **Postseason:** total level -0.37 [-0.82, +0.08]; |err| -0.22 [-0.64, +0.22] (n.s.).
+
+Reading:
+- **The level moved as predicted.** The calibration lane predicted ON ~+2.7, OFF ~+1.2. Measured: ON +3.14, OFF +1.93, a gap of 1.2 against its predicted +1.5. Both arms run ~0.5-0.7 pt above its estimate.
+- **Accuracy did not move.** MAE is identical. skip_def is a level shift of ~1.2 pt that the MAE is blind to; the remaining +1.9 is the engine's own overshoot with EXACT off.
+- **The pre-registered revert rule ("ON ≥ ~+2 worse") is NOT met.** On bias the gap is 1.2 pt; on MAE it is 0.0.
+- **Postseason:** both arms are ~+8.5 over actual, and skip_def is not the cause there (-0.37, n.s.).
+- **Market:** the market beats both arms on total MAE by ~0.9 pt, regular season.
+
+Pickle-integrity check (pre-registered caveat), 40 random games, field by field:
+- 40/40 differ only in `target_home_points`, `target_away_points` and `quarters`, as expected.
+- 1/40 (2026-01-15 HOU_OKC) also differs in the home side's `_prior_*_pm` columns (max |Δ| 0.8 pts/min). This is code drift between the 10-12 and 10-13 recordings, not skip_def.
+- At ~2.5% of games it cannot move a paired mean of -1.21 with a CI of ±0.14 by more than noise.
+
+Part 2 (in-game k=0 grade of OFF, paired against gate_v4_k0) is running; ETA ~02:00Z.
