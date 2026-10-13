@@ -314,3 +314,18 @@ def test_half_split_is_off_unless_set_and_shifts_the_halves(tmp_path, monkeypatc
     off_h1, off_h2 = halves(off)
     on_h1, on_h2 = halves(on)
     assert (on_h2 - on_h1) > (off_h2 - off_h1) + 2, ((off_h1, off_h2), (on_h1, on_h2))
+
+
+def test_mechanisms_env_is_off_unless_valid_and_reaches_the_cfg(tmp_path, monkeypatch):
+    monkeypatch.delenv("SYNDICATE_NCAAB_LIVE_MECHANISMS", raising=False)
+    assert lr.live_mechanisms_from_env() == {}
+    assert lr.live_mechanisms_from_env({"SYNDICATE_NCAAB_LIVE_MECHANISMS": "{not json"}) == {}
+    assert lr.live_mechanisms_from_env({"SYNDICATE_NCAAB_LIVE_MECHANISMS": '{"no_such_field": 1}'}) == {}
+    got = lr.live_mechanisms_from_env({"SYNDICATE_NCAAB_LIVE_MECHANISMS": '{"endgame_foul_window_s": 120, "endgame_foul_p_by_deficit": [0.25, 0.5, 0.6]}'})
+    assert got == {"endgame_foul_window_s": 120, "endgame_foul_p_by_deficit": (0.25, 0.5, 0.6)}
+    _write_priors(tmp_path, "2026-01-10")
+    pri = lr.load_player_priors(dt.date(2026, 1, 10), dirs=[tmp_path])
+    monkeypatch.setenv("SYNDICATE_NCAAB_LIVE_MECHANISMS", '{"bonus_free_throws": true, "bonus_nonshoot_foul_per_poss": 0.08}')
+    inputs = lr.build_engine_inputs("2026-01-10", "10", "20", neutral=False, priors=pri, team_prior=_team_prior())
+    assert inputs["cfg"].bonus_free_throws is True and inputs["cfg"].bonus_nonshoot_foul_per_poss == 0.08
+    assert inputs["_provenance"]["mechanisms"] == ["bonus_free_throws", "bonus_nonshoot_foul_per_poss"]

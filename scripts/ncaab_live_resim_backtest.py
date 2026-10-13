@@ -299,6 +299,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--min-games", type=int, default=5)
     ap.add_argument("--max-games", type=int, default=None, help="smoke runs: only the first N tasks")
     ap.add_argument("--half-split", action="store_true", help="SYNDICATE_NCAAB_HALF_SPLIT=1 in every worker")
+    ap.add_argument("--mechanisms", default="", help="JSON for SYNDICATE_NCAAB_LIVE_MECHANISMS in every worker")
     ap.add_argument("--exact-target", action="store_true",
                     help="run the engine with EXACT_TARGET_CALIBRATION (SYNDICATE_NCAAB_EXACT_TARGET=1 in every worker)")
     ap.add_argument("--out", type=Path, required=True, help="results JSONL (resumable: finished games are skipped)")
@@ -310,6 +311,8 @@ def main(argv: list[str] | None = None) -> int:
         os.environ["SYNDICATE_NCAAB_EXACT_TARGET"] = "1"  # spawned workers inherit it
     if args.half_split:
         os.environ["SYNDICATE_NCAAB_HALF_SPLIT"] = "1"
+    if args.mechanisms:
+        os.environ["SYNDICATE_NCAAB_LIVE_MECHANISMS"] = args.mechanisms
     tasks, skipped = build_tasks(args.season, regular_sample=args.regular_sample, sims=args.sims, seed=args.seed, min_games=args.min_games)
     # INTERLEAVED BY PHASE (seeded), so a partial run -- this takes hours at Idle on a shared host --
     # is a balanced read of every phase rather than November's regular season only.
@@ -346,7 +349,7 @@ def main(argv: list[str] | None = None) -> int:
     report = {
         "substrate": f"LOCAL: corpus {corpus.corpus_path(args.season)}, player box {players_mod.box_path(args.season)}",
         "season": args.season, "sims": args.sims, "regular_sample": args.regular_sample, "seed": args.seed,
-        "min_games": args.min_games, "skipped_before_sim": skipped, "exact_target": bool(args.exact_target), "half_split": bool(args.half_split),
+        "min_games": args.min_games, "skipped_before_sim": skipped, "exact_target": bool(args.exact_target), "half_split": bool(args.half_split), "mechanisms": os.environ.get("SYNDICATE_NCAAB_LIVE_MECHANISMS", ""),
         "live_close": "NOT GRADED: ESPN keeps no in-play line history; needs OddsAPI in-play snapshots (user decision)",
         "phases": summarize(results),
     }

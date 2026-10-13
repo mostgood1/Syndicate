@@ -229,12 +229,13 @@ def build_engine_inputs(date: str, home_id: str, away_id: str, *, neutral: bool,
     return {
         "home_players": frames["home"],
         "away_players": frames["away"],
-        "cfg": EventSimConfig(possessions_per_game=float(team_prior.possessions)),
+        "cfg": EventSimConfig(possessions_per_game=float(team_prior.possessions), **live_mechanisms_from_env()),
         "target_home_points": float(team_prior.home_points),
         "target_away_points": float(team_prior.away_points),
         "quarters": half_targets(team_prior.home_points, team_prior.away_points) if half_split_enabled() else None,
         "_provenance": {
             "halfSplit": half_split_enabled(),
+            "mechanisms": sorted(live_mechanisms_from_env()),
             "ratingsAsOf": team_prior.ratings_as_of.isoformat(),
             "priorSeasonFallback": bool(team_prior.prior_season_fallback),
             "playerPriorsAsOf": priors.as_of.isoformat(),
@@ -288,6 +289,31 @@ _ENGINE_KWARGS = ("home_players", "away_players", "cfg", "target_home_points", "
 HALF_SPLIT_ENV = "SYNDICATE_NCAAB_HALF_SPLIT"
 H1_SHARE = 0.4743
 _HALF_SIGMA_FRAC = 0.02
+
+
+# ENGINE MECHANISMS (default OFF): `SYNDICATE_NCAAB_LIVE_MECHANISMS='{"endgame_foul_window_s": 120, ...}'` sets
+# EventSimConfig fields on the NCAAB engine config -- P3's end-game intentional fouling and the bonus free-throw
+# mechanism among them. Absent, empty, unparseable or naming a field the engine does not have -> {} (OFF), never a
+# partial guess (NBA's `live_mechanisms_from_env` rule). Lists become tuples (`endgame_foul_p_by_deficit`).
+LIVE_MECHANISMS_ENV = "SYNDICATE_NCAAB_LIVE_MECHANISMS"
+
+
+def live_mechanisms_from_env(env: Optional[Mapping[str, str]] = None) -> dict[str, Any]:
+    from dataclasses import fields as _fields
+
+    from syndicate.features.basketball_engine.engine import EventSimConfig
+
+    raw = (env if env is not None else os.environ).get(LIVE_MECHANISMS_ENV, "")
+    if not str(raw or "").strip():
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        return {}
+    known = {f.name for f in _fields(EventSimConfig)}
+    if not isinstance(parsed, dict) or not parsed or set(parsed) - known:
+        return {}
+    return {k: tuple(v) if isinstance(v, list) else v for k, v in parsed.items()}
 
 
 def half_split_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
