@@ -58,9 +58,6 @@ def _refresh_state_scope_path(path: Path | None) -> str:
         return str(Path(path))
 
 
-def _source_app_fallback_enabled() -> bool:
-    return str(os.environ.get("SYNDICATE_NBA_SOURCE_APP_FALLBACK") or "").strip().lower() in {"1", "true", "yes", "on"}
-
 
 def _copy_if_exists(source_path: str | None, destination_path: Path) -> bool:
     source_text = str(source_path or "").strip()
@@ -1494,99 +1491,6 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
             "pred_total": round(pred_total, 3) if pred_total is not None else None,
         }
 
-    def _build_from_source_cards_api() -> tuple[int, Path | None]:
-        if not _source_app_fallback_enabled():
-            return 0, None
-        source_app = _load_source_app(source_root)
-        if source_app is None:
-            return 0, None
-        try:
-            client = source_app.app.test_client()
-            response = client.get(f"/api/cards?date={date_str}&props_source=source")
-            if int(getattr(response, "status_code", 0) or 0) != 200:
-                return 0, None
-            payload = response.get_json() if response is not None else None
-        except Exception as exc:
-            _append_log(log_file, f"Source app cards fallback failed for {date_str}: {exc}")
-            return 0, None
-        games = []
-        if isinstance(payload, dict):
-            if isinstance(payload.get("games"), list):
-                games = [game for game in payload.get("games") if isinstance(game, dict)]
-            elif isinstance(payload.get("cards"), list):
-                games = [game for game in payload.get("cards") if isinstance(game, dict)]
-        if not games:
-            return 0, None
-
-        def _team_name(side: dict[str, object], fallback_abbr: str) -> str:
-            name = str(side.get("name") or side.get("team_name") or side.get("full_name") or side.get("abbr") or fallback_abbr).strip()
-            return name or fallback_abbr
-
-        def _market_value(markets: dict[str, object], primary_key: str, *fallback_keys: str) -> object:
-            section = markets.get(primary_key) if isinstance(markets.get(primary_key), dict) else {}
-            for key in ("line", "market_line", "homeLine", "awayLine", *fallback_keys):
-                value = section.get(key)
-                if value is not None:
-                    return value
-            return None
-
-        rows_out: list[dict[str, object]] = []
-        for index, game in enumerate(games, start=1):
-            home = game.get("home") if isinstance(game.get("home"), dict) else {}
-            away = game.get("away") if isinstance(game.get("away"), dict) else {}
-            markets = game.get("markets") if isinstance(game.get("markets"), dict) else {}
-            ml = markets.get("ml") if isinstance(markets.get("ml"), dict) else {}
-            totals = markets.get("totals") if isinstance(markets.get("totals"), dict) else {}
-            spreads = markets.get("spreads") if isinstance(markets.get("spreads"), dict) else {}
-            game_id = str(game.get("game_id") or game.get("game_pk") or game.get("gamePk") or f"{away.get('abbr') or away.get('teamTricode') or 'AWY'}@{home.get('abbr') or home.get('teamTricode') or 'HOM'}").strip()
-            home_abbr = str(home.get("abbr") or home.get("teamTricode") or home.get("tricode") or "HOM").strip().upper() or "HOM"
-            away_abbr = str(away.get("abbr") or away.get("teamTricode") or away.get("tricode") or "AWY").strip().upper() or "AWY"
-            rows_out.append(
-                {
-                    "date": date_str,
-                    "game_id": game_id,
-                    "home_team": _team_name(home, home_abbr),
-                    "visitor_team": _team_name(away, away_abbr),
-                    "commence_time": str(game.get("commence_time") or game.get("startTime") or game.get("detail") or "").strip(),
-                    "home_ml": ml.get("home_odds") if isinstance(ml, dict) else None,
-                    "away_ml": ml.get("away_odds") if isinstance(ml, dict) else None,
-                    "home_spread": spreads.get("home_line") if isinstance(spreads, dict) else None,
-                    "away_spread": spreads.get("away_line") if isinstance(spreads, dict) else None,
-                    "total": totals.get("line") if isinstance(totals, dict) else None,
-                    "bookmaker": str(ml.get("bookmaker") or totals.get("bookmaker") or game.get("bookmaker") or "source_app").strip() or "source_app",
-                    "home_tri": home_abbr,
-                    "away_tri": away_abbr,
-                    **_sim_projection_fields(home_abbr, away_abbr),
-                }
-            )
-
-        if not rows_out:
-            return 0, None
-
-        header_order = [
-            "date",
-            "game_id",
-            "home_team",
-            "visitor_team",
-            "commence_time",
-            "home_ml",
-            "away_ml",
-            "home_spread",
-            "away_spread",
-            "total",
-            "bookmaker",
-            "home_tri",
-            "away_tri",
-            *projection_price_columns,
-        ]
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        with out_path.open("w", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(handle, fieldnames=header_order)
-            writer.writeheader()
-            for current in rows_out:
-                writer.writerow({field: current.get(field, "") for field in header_order})
-        _append_log(log_file, f"Built game_cards from source app cards fallback: {out_path} (rows={len(rows_out)})")
-        return len(rows_out), out_path
 
     raw_candidates = [
         source_root / "data" / "raw" / f"odds_nba_current_{date_str}.csv",
@@ -1598,7 +1502,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         game_odds_path = source_root / "data" / "processed" / f"game_odds_{date_str}.csv"
         if not game_odds_path.exists() or not game_odds_path.is_file() or _count_csv_rows_quick(game_odds_path) <= 0:
             _append_log(log_file, f"Local game_cards build skipped for {date_str}: no raw team odds snapshot found")
-            return _build_from_source_cards_api()
+            return 0, None
 
         espn_game_ids: dict[tuple[str, str], str] | None = None
         rows_out: list[dict[str, object]] = []
@@ -1649,7 +1553,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
 
         if not rows_out:
             _append_log(log_file, f"Local game_cards build skipped for {date_str}: processed game_odds had no usable rows")
-            return _build_from_source_cards_api()
+            return 0, None
 
         header_order = [
             "date",
@@ -1686,15 +1590,15 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
             raw_frame = pd.read_csv(raw_path)
     except Exception as exc:
         _append_log(log_file, f"Failed to read raw team odds snapshot {raw_path}: {exc}")
-        return _build_from_source_cards_api()
+        return 0, None
 
     if raw_frame.empty:
-        return _build_from_source_cards_api()
+        return 0, None
 
     required_columns = {"event_id", "commence_time", "market", "outcome_name", "point", "price", "home_team", "away_team"}
     if not required_columns.issubset(set(str(column) for column in raw_frame.columns)):
         _append_log(log_file, f"Local game_cards build skipped for {date_str}: raw team odds snapshot missing required columns")
-        return _build_from_source_cards_api()
+        return 0, None
 
     working = raw_frame.copy()
     working["commence_time"] = working["commence_time"].astype(str)
@@ -1710,7 +1614,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         _target_date = None
     working = working[working["commence_time"].apply(lambda value: central_date_from_iso(value) == _target_date)].copy()
     if working.empty:
-        return _build_from_source_cards_api()
+        return 0, None
 
     rows_out: list[dict[str, object]] = []
     grouped = working.groupby(["event_id", "commence_time", "home_team", "away_team"], dropna=False, sort=True)
@@ -3086,59 +2990,6 @@ def _predict_props_cli_args(*, source_root: Path, date_str: str, out_path: Path)
     return args
 
 
-def _run_source_cli_command(
-    source_root: Path,
-    args: list[str],
-    log_file: Path,
-    *,
-    heartbeat_cb: callable | None,
-    heartbeat_every_s: float = 15.0,
-) -> int:
-    cmd_text = " ".join(shlex.quote(str(a)) for a in args)
-    _append_log(log_file, f"$ source-cli {cmd_text}")
-
-    cli_module = _load_source_cli(source_root)
-    stop_event = threading.Event()
-    heartbeat_thread = None
-    if heartbeat_cb is not None:
-        def _heartbeat_loop() -> None:
-            while not stop_event.wait(max(1.0, float(heartbeat_every_s))):
-                try:
-                    heartbeat_cb()
-                except Exception:
-                    pass
-
-        heartbeat_thread = threading.Thread(target=_heartbeat_loop, daemon=True)
-        heartbeat_thread.start()
-
-    previous_cwd = Path.cwd()
-    log_file.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        with log_file.open("a", encoding="utf-8", errors="ignore") as out:
-            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
-                os.chdir(source_root)
-                try:
-                    cli_module.cli.main(args, standalone_mode=False)  # type: ignore[attr-defined]
-                    return 0
-                except SystemExit as exc:
-                    code = exc.code
-                    if code is None:
-                        return 0
-                    if isinstance(code, int):
-                        return int(code)
-                    return 1
-                except Exception:
-                    traceback.print_exc(file=out)
-                    return 1
-    finally:
-        try:
-            os.chdir(previous_cwd)
-        except Exception:
-            pass
-        stop_event.set()
-        if heartbeat_thread is not None:
-            heartbeat_thread.join(timeout=1.0)
-
 
 def _run_refresh_via_cli(
     *,
@@ -3845,12 +3696,6 @@ def _export_recommendations_artifact(*, source_root: Path, date_str: str, proces
     return str(destination)
 
 
-def _load_source_app(source_root: Path):
-    app_path = source_root / "app.py"
-    if not app_path.exists() or not app_path.is_file():
-        return None
-    return _load_module_from_path("syndicate_nba_source_app", app_path)
-
 
 def _resolve_nba_season_year(date_str: str) -> int:
     parsed = dt.datetime.strptime(date_str, "%Y-%m-%d")
@@ -4055,39 +3900,6 @@ def _export_season_betting_card_artifacts(*, source_root: Path, date_str: str, p
     if len(copied) == 4:
         return copied
 
-    if not _source_app_fallback_enabled():
-        return copied
-
-    source_app = _load_source_app(source_root)
-    if source_app is None:
-        return copied
-    client = source_app.app.test_client()
-
-    def _fetch_json(query: str) -> dict[str, object]:
-        response = client.get(query)
-        try:
-            payload = response.get_json() if response is not None else None
-        except Exception:
-            payload = None
-        if not isinstance(payload, dict):
-            payload = {"error": "no_json", "status": int(getattr(response, "status_code", 0) or 0)}
-        return payload
-
-    artifacts = {
-        manifest_path: _fetch_json(f"/api/season/{season}/betting-card?profile={profile}&date={date_str}"),
-        day_path: _fetch_json(f"/api/season/{season}/betting-card/day/{date_str}?profile={profile}"),
-        day_insights_path: _fetch_json(
-            f"/api/season/{season}/betting-card/day/{date_str}?profile={profile}&include_prop_insights=1"
-        ),
-    }
-    for out_path, payload in artifacts.items():
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    shutil.copy2(manifest_path, generic_manifest_path)
-    copied["season_betting_card_manifest_path"] = str(manifest_path)
-    copied["season_betting_card_manifest_generic_path"] = str(generic_manifest_path)
-    copied["season_betting_card_day_path"] = str(day_path)
-    copied["season_betting_card_day_insights_path"] = str(day_insights_path)
     return copied
 
 
@@ -4194,51 +4006,6 @@ def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, proce
         return existing
     out_path = processed_root / f"cards_sim_detail_{date_str}.json"
     games_out = _build_cards_sim_detail_from_local_smart_sim(processed_root=processed_root, date_str=date_str)
-    if not games_out and _source_app_fallback_enabled():
-        source_app = _load_source_app(source_root)
-        if source_app is not None:
-            client = source_app.app.test_client()
-            try:
-                response = client.get(f"/api/cards?date={date_str}&include_players=1&include_sim_ladders=1")
-                if int(getattr(response, "status_code", 0) or 0) == 200:
-                    payload = response.get_json() if response is not None else None
-                    games = payload.get("games") if isinstance(payload, dict) and isinstance(payload.get("games"), list) else []
-                    for game in games:
-                        if not isinstance(game, dict):
-                            continue
-                        home_tri = str(game.get("home_tri") or "").strip().upper()
-                        away_tri = str(game.get("away_tri") or "").strip().upper()
-                        sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
-                        if not home_tri or not away_tri or not isinstance(sim, dict):
-                            continue
-                        players = sim.get("players") if isinstance(sim.get("players"), dict) else {"home": [], "away": []}
-                        missing = sim.get("missing_prop_players") if isinstance(sim.get("missing_prop_players"), dict) else {"home": [], "away": []}
-                        injuries = sim.get("injuries") if isinstance(sim.get("injuries"), dict) else {"home": [], "away": []}
-                        summary = sim.get("players_summary") if isinstance(sim.get("players_summary"), dict) else {}
-                        games_out.append(
-                            {
-                                "home_tri": home_tri,
-                                "away_tri": away_tri,
-                                "sim": {
-                                    "players_loaded": True,
-                                    "players_summary": dict(summary),
-                                    "players": {
-                                        "home": [row for row in (players.get("home") or []) if isinstance(row, dict)],
-                                        "away": [row for row in (players.get("away") or []) if isinstance(row, dict)],
-                                    },
-                                    "missing_prop_players": {
-                                        "home": [row for row in (missing.get("home") or []) if isinstance(row, dict)],
-                                        "away": [row for row in (missing.get("away") or []) if isinstance(row, dict)],
-                                    },
-                                    "injuries": {
-                                        "home": [row for row in (injuries.get("home") or []) if isinstance(row, dict)],
-                                        "away": [row for row in (injuries.get("away") or []) if isinstance(row, dict)],
-                                    },
-                                },
-                            }
-                        )
-            except Exception:
-                pass
     if not games_out:
         return None
 
@@ -4336,37 +4103,7 @@ def _export_recon_games_artifact(*, source_root: Path, date_str: str, processed_
     local_rows, local_path = _build_local_recon_games_artifact(processed_root=processed_root, date_str=date_str)
     if local_rows > 0 and local_path is not None:
         return str(local_path)
-    if not _source_app_fallback_enabled():
-        return None
-    source_app = _load_source_app(source_root)
-    if source_app is None:
-        return None
-    if hasattr(source_app, "_cron_auth_ok"):
-        try:
-            source_app._cron_auth_ok = lambda _request: True
-        except Exception:
-            pass
-    client = source_app.app.test_client()
-    response = client.get(f"/api/cron/reconcile-games?date={date_str}")
-    try:
-        payload = response.get_json() if response is not None else None
-    except Exception:
-        payload = None
-    if not isinstance(payload, dict):
-        return None
-    output_path = str(payload.get("output") or "").strip()
-    if not output_path:
-        return None
-    source = Path(output_path)
-    if not source.exists() or not source.is_file():
-        return None
-    destination = processed_root / source.name
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    # Same-path safe: source_root and artifact_root are the same directory in
-    # production, so a raw copy2 here raises SameFileError (crashed the WNBA
-    # twin's export stage live on 7/17).
-    _copy_file_with_fallback(source, destination)
-    return str(destination)
+    return None
 
 
 def _build_local_live_lens_tuning_artifact(*, processed_root: Path, live_lens_root: Path) -> dict[str, str]:
@@ -4396,7 +4133,6 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
     exports = (
         (
             f"live_lens_signals_{date_str}.jsonl",
-            f"/api/download_live_lens_signals?date={date_str}",
             (
                 (processed_root / f"live_lens_signals_{date_str}.jsonl", "live_lens_signals_path"),
                 (live_lens_root / f"live_lens_signals_{date_str}.jsonl", None),
@@ -4404,7 +4140,6 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
         ),
         (
             f"live_lens_projections_{date_str}.jsonl",
-            f"/api/download_live_lens_projections?date={date_str}",
             (
                 (processed_root / f"live_lens_projections_{date_str}.jsonl", "live_lens_projections_path"),
                 (live_lens_root / f"live_lens_projections_{date_str}.jsonl", None),
@@ -4412,7 +4147,6 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
         ),
         (
             "live_lens_tuning_override.json",
-            "/api/download_live_lens_tuning",
             (
                 (processed_root / "live_lens_tuning_override.json", "live_lens_tuning_override_path"),
                 (live_lens_root / "live_lens_tuning_override.json", "live_lens_tuning_override_live_lens_path"),
@@ -4420,8 +4154,7 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
         ),
     )
     copied: dict[str, str] = {}
-    missing_exports: list[tuple[str, str, tuple[tuple[Path, str | None], ...]]] = []
-    for file_name, query, destinations in exports:
+    for file_name, destinations in exports:
         existing = _copy_existing_live_lens_artifact(source_root=source_root, file_name=file_name, destinations=destinations)
         if existing:
             copied.update(existing)
@@ -4441,38 +4174,6 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
             if local:
                 copied.update(local)
                 continue
-        missing_exports.append((file_name, query, destinations))
-    if not missing_exports:
-        return copied
-
-    if not _source_app_fallback_enabled():
-        return copied
-
-    source_app = _load_source_app(source_root)
-    if source_app is None:
-        return copied
-    client = source_app.app.test_client()
-    for _file_name, query, destinations in missing_exports:
-        try:
-            response = client.get(query)
-            status_code = int(getattr(response, "status_code", 0) or 0)
-            if status_code != 200:
-                continue
-            raw = b""
-            get_data = getattr(response, "get_data", None)
-            if callable(get_data):
-                raw = get_data()
-            elif hasattr(response, "data"):
-                raw = getattr(response, "data") or b""
-            if not isinstance(raw, (bytes, bytearray)) or not raw:
-                continue
-            for out_path, copied_key in destinations:
-                out_path.parent.mkdir(parents=True, exist_ok=True)
-                out_path.write_bytes(bytes(raw))
-                if copied_key:
-                    copied[copied_key] = str(out_path)
-        except Exception:
-            continue
     return copied
 
 
@@ -4499,35 +4200,6 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
         copied["live_state_path"] = existing_state
         state_payload = _read_live_snapshot_payload(state_destination)
 
-    source_app = None
-    client = None
-
-    def _ensure_client():
-        nonlocal source_app, client
-        if client is not None:
-            return client
-        source_app = _load_source_app(source_root)
-        if source_app is None:
-            return None
-        client = source_app.app.test_client()
-        return client
-
-    def _fetch_json(query: str) -> dict[str, object] | None:
-        test_client = _ensure_client()
-        if test_client is None:
-            return None
-        try:
-            response = test_client.get(query)
-            if int(getattr(response, "status_code", 0) or 0) != 200:
-                return None
-            payload = response.get_json() if response is not None else None
-        except Exception:
-            payload = None
-        return payload if isinstance(payload, dict) else None
-
-    refreshed_state_payload = _fetch_json(f"/api/live_state?date={date_str}") if _source_app_fallback_enabled() else None
-    if _payload_has_snapshot_content("live_state", refreshed_state_payload):
-        state_payload = refreshed_state_payload
     if not _payload_has_snapshot_content("live_state", state_payload):
         local_state_payload = _build_local_live_snapshot_payload(kind="live_state", date_str=date_str, event_ids=[])
         if _payload_has_snapshot_content("live_state", local_state_payload):
@@ -4545,7 +4217,6 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
         for game in ((state_payload or {}).get("games") or [])
         if isinstance(game, dict) and str(game.get("event_id") or "").strip()
     ]
-    joined_event_ids = ",".join(dict.fromkeys(event_ids))
 
     for kind, copied_key in snapshot_specs[1:]:
         file_name = f"{kind}_{date_str}.jsonl"
@@ -4556,11 +4227,6 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
             destination=destination,
         )
         payload = None
-        if joined_event_ids and _source_app_fallback_enabled():
-            query = f"/api/{kind}?date={date_str}&event_ids={joined_event_ids}"
-            if kind == "live_lines":
-                query = f"{query}&include_period_totals=1"
-            payload = _fetch_json(query)
         local_payload = _build_local_live_snapshot_payload(kind=kind, date_str=date_str, event_ids=event_ids)
         if kind == "live_lines":
             payload = _prefer_live_lines_payload(payload, local_payload)
@@ -4675,9 +4341,6 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         copied.setdefault("playoff_transition_paths", []).append(str(destination))
     return copied
 
-
-def _load_source_cli(source_root: Path):
-    raise RuntimeError("source CLI fallback removed; use local artifacts or local Syndicate builders")
 
 
 def _export_recon_quarters_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
