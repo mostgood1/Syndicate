@@ -2032,3 +2032,9 @@ prefer single-quoted arguments there.
 
 - **Measured.** Two live NBA preseason recordings of the vendored tick (10-12 23:45Z, 01:45Z) came back 0 diffs over 18 and 17 leaves, with no file written. The tick gates every in-game write on a live total line or a prop line, and preseason has neither; production wrote no NBA signal that day either. The real evidence came from a doctored replay of 2026-10-05, a slate production had written 17+17 on: 3,717 leaves, signals, projections and the props registry.
 - **Rule.** Report the leaf count and files_written next to every "0 diffs". When the arm writes nothing, pick inputs that exercise the write paths (a slate production wrote on), and say that the inputs are doctored.
+
+## 2026-10-13 -- A seed fixes the RNG, not the process: cross-process sim comparisons need PYTHONHASHSEED `[session ee14e4ec / 7693274b, lane basketball-pregame-teammate-effects]`
+
+- **Measured:** the basketball smart sim with a fixed seed is identical WITHIN a process (OFF vs OFF-repeat, 194/194 players). ACROSS processes it was not: identical code, same seed and inputs, differed on 102,817 of 137,481 output leaves. With PYTHONHASHSEED=0 on both, the only differences were 6 scratch-path strings. String-hash randomisation changes set/dict iteration order, and so the order draws are consumed.
+- **Cost if missed:** a refactor's "is it neutral?" check reads as a large regression (or hides one inside noise).
+- **Rule:** for any sim A/B or neutrality check split across processes (two code versions, two worktrees, before/after a deploy), set PYTHONHASHSEED to the same value in both, and run a same-code control under the same setting first. Arms in ONE process need only the seed.
