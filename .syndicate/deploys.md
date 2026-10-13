@@ -48800,3 +48800,9 @@ Taken by hand by session af3cc595 on user instruction (the scheduled task `live-
 - **Reading:** the seed can only fire on a cold start (the fleet history equals the seed: 11,969 games, newest 2026-04-12), and the removed predictions path could never copy. So no production reading changes; the deployed tests are the measurement.
 - **Not in this ff:** 9f05dcb2 (NBA recon tools off vendor), landed after the approval; it needs its own decision.
 - **Rollback:** revert 454c795c and ff. No restart.
+
+## 2026-10-13 14:21:49Z (9:22 AM CT) -- LOCAL FLEET ff 454c795c -> 5ad6656d (exact SHA) + rolling `reload-web` (lane `games-rail-full-detail`, session d4409ac4, user "fix the team names too") -- NO outage
+- **change:** 5ad6656d -- WNBA final chips ADDED by `game_chip_finals` carry full club names (showed "ATL" / "NYL").
+- **ride-alongs (on the checkout now; read before the ff, none touch vendor/ or render.yaml):** 9f05dcb2 NBA recon tools off vendor (verbatim copies, fleet A/B identical; reaches `refresh_nba_oddsapi_props.py` subprocess runs from now), ce19bf50 soccer paper-settlement props off the match box (in-process on refresh-worker: loads at its next restart, not by this ff), ff955e51 research scripts only. Web itself loaded all of them.
+- **sequence:** web claim 14:21Z; `reload-web` 14:21:49Z, 2.5 s, 0 healthz failures, max 0.51 s, workers [94790, 94791] -> [96466, 96467]; released.
+- **verify (served `/api/board/game-chips?sports=wnba`):** 10-07 NYL@ATL "New York Liberty 98 @ Atlanta Dream 101", 10-09 ATL@NYL "Atlanta Dream 85 @ New York Liberty 83"; the provider's own chips unchanged (LVA@GSV 81-83, GSV@LVA 87-77).
