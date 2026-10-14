@@ -742,7 +742,7 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
         day = date_value
         if start:
             day = datetime.fromisoformat(str(start).replace("Z", "+00:00")).astimezone(CENTRAL_TIMEZONE).date().isoformat()
-        box = linescore(sport, game, day, away_abbr=(chip.get("away") or {}).get("abbr") or "", home_abbr=(chip.get("home") or {}).get("abbr") or "")
+        box = linescore(sport, game, day, away_abbr=(chip.get("away") or {}).get("abbr") or "", home_abbr=(chip.get("home") or {}).get("abbr") or "", live=chip.get("state") == "live")
         if box:
             chip["linescore"] = box
             # A FINAL with no score but a complete period line takes the sum:

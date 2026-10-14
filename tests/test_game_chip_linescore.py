@@ -122,5 +122,29 @@ class DailyLineScores(unittest.TestCase):
         self.assertEqual(sum(got["home"]), 101)
 
 
+class LiveFromEspn(unittest.TestCase):
+    BOARD = {"401898403": {"away": "CLE", "home": "ORL", "away_periods": [28, 24, 17], "home_periods": [35, 37, 23]},
+             "401892489": {"away": "FLA", "home": "CBJ", "away_periods": [0, 4, 2], "home_periods": [1, 0, 1]},
+             "401892500": {"away": "UTAH", "home": "NJ", "away_periods": [1, 0, 0, 1], "home_periods": [0, 1, 0, 0]}}
+
+    def _live(self, sport, game, **kw):
+        gl._CACHE.clear()
+        with mock.patch.object(gl, "_espn_board", return_value=self.BOARD):
+            return gl.linescore(sport, game, "2026-10-13", live=True, **kw)
+
+    def test_live_nba_by_espn_id(self) -> None:
+        got = self._live("nba", {"game_id": "401898403"})
+        self.assertEqual((got["labels"], got["away"], got["home"]), (["1", "2", "3"], [28, 24, 17], [35, 37, 23]))
+
+    def test_live_nhl_by_team_pair_with_espn_abbreviations(self) -> None:
+        got = self._live("nhl", {"gamePk": "1"}, away_abbr="FLA", home_abbr="CBJ")
+        self.assertEqual(got["away"], [0, 4, 2])
+        got = self._live("nhl", {"gamePk": "2"}, away_abbr="UTA", home_abbr="NJD")
+        self.assertEqual(got["labels"], ["1", "2", "3", "OT"])
+
+    def test_live_unknown_game_has_no_line_score(self) -> None:
+        self.assertIsNone(self._live("nhl", {"gamePk": "3"}, away_abbr="BOS", home_abbr="SJS"))
+
+
 if __name__ == "__main__":
     unittest.main()

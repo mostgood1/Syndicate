@@ -260,15 +260,77 @@ def _mlb(game: Mapping[str, Any], date: str) -> dict[str, Any] | None:
     return _cached(("mlb", str(path), st.st_mtime_ns), lambda: _mlb_rhe(str(path)))
 
 
-def linescore(sport: str, game: Mapping[str, Any], date: str, *, away_abbr: str = "", home_abbr: str = "") -> dict[str, Any] | None:
+# --------------------------------------------------------- live (ESPN board)
+
+# User report 2026-10-13 ~00:50Z: live NBA / NHL cards showed no periods. The
+# finals sources above are daily files; the live sources drop the per-period
+# numbers (NBA's ESPN-built live state hard-codes `periods: []`, NHL's schedule
+# feed has none, and NHL's /score endpoint 403s a plain client). ESPN's
+# scoreboard carries `competitors[].linescores` DURING play, one request per
+# league per date -- measured that night: NBA CLE @ ORL 28 24 17 / 35 37 23,
+# NHL FLA @ CBJ 0 4 2 / 1 0 1.
+_ESPN_PATHS = {"nba": "basketball/nba", "wnba": "basketball/wnba", "nhl": "hockey/nhl"}
+_ESPN_ABBR_FIX = {"UTAH": "UTA"}
+_LIVE_TTL_S = 45.0
+
+
+def _espn_board(sport: str, date: str) -> dict[str, dict]:
+    import urllib.request
+
+    url = f"https://site.api.espn.com/apis/site/v2/sports/{_ESPN_PATHS[sport]}/scoreboard?dates={date.replace('-', '')}"
+    # No custom User-Agent: ESPN 403s some UA strings (wnba/cards._public_scoreboard_live_state_payload).
+    with urllib.request.urlopen(url, timeout=6) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    out: dict[str, dict] = {}
+    for event in payload.get("events") or []:
+        comp = (event.get("competitions") or [{}])[0]
+        sides = {c.get("homeAway"): c for c in comp.get("competitors") or [] if isinstance(c, Mapping)}
+        away, home = sides.get("away") or {}, sides.get("home") or {}
+        out[str(event.get("id"))] = {
+            "away": (away.get("team") or {}).get("abbreviation"),
+            "home": (home.get("team") or {}).get("abbreviation"),
+            "away_periods": [_int(x.get("value")) for x in away.get("linescores") or []],
+            "home_periods": [_int(x.get("value")) for x in home.get("linescores") or []],
+        }
+    return out
+
+
+def _espn_linescore(sport: str, game: Mapping[str, Any], date: str, away_abbr: str, home_abbr: str) -> dict[str, Any] | None:
+    key = ("espn", sport, date, int(time.monotonic() // _LIVE_TTL_S))
+    board = _cached(key, lambda: _espn_board(sport, date)) or {}
+    hit = next((board[str(game.get(k))] for k in ("game_id", "event_id", "gamePk") if str(game.get(k) or "") in board), None)
+    if hit is None:
+        want = (_canon(sport, away_abbr or _tri(sport, game, "away")), _canon(sport, home_abbr or _tri(sport, game, "home")))
+        hit = next((g for g in board.values()
+                    if (_canon(sport, _ESPN_ABBR_FIX.get(str(g.get("away")), g.get("away"))),
+                        _canon(sport, _ESPN_ABBR_FIX.get(str(g.get("home")), g.get("home")))) == want), None)
+    if not hit or not hit["away_periods"] or not hit["home_periods"]:
+        return None
+    return _periods(hit["away_periods"], hit["home_periods"], 3 if sport == "nhl" else 4)
+
+
+def _recent(date: str) -> bool:
+    from datetime import date as _date, timedelta
+
+    from syndicate.features.shared.timezone import central_today_iso
+
+    today = _date.fromisoformat(central_today_iso())
+    return today - timedelta(days=1) <= _date.fromisoformat(date) <= today
+
+
+def linescore(sport: str, game: Mapping[str, Any], date: str, *, away_abbr: str = "", home_abbr: str = "", live: bool = False) -> dict[str, Any] | None:
     sport = str(sport or "").lower()
     try:
         if sport in ("nfl", "ncaaf"):
             return _football(game)
+        if sport in _ESPN_PATHS and live:
+            return _espn_linescore(sport, game, date, away_abbr, home_abbr)
         if sport in ("nba", "wnba"):
-            return _basketball(sport, game, date)
+            got = _basketball(sport, game, date)
+            return got or (_espn_linescore(sport, game, date, away_abbr, home_abbr) if _recent(date) else None)
         if sport == "nhl":
-            return _nhl(game, date, away_abbr.upper(), home_abbr.upper())
+            got = _nhl(game, date, away_abbr.upper(), home_abbr.upper())
+            return got or (_espn_linescore(sport, game, date, away_abbr, home_abbr) if _recent(date) else None)
         if sport == "soccer":
             return _soccer(game, date)
         if sport == "mlb":
