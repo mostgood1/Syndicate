@@ -1997,3 +1997,33 @@ hunks (applied cleanly; the engine equals origin/main apart from the research-on
 - total bias +0.93 → +1.40 (reading; the totals re-fit is required).
 
 **Remaining gaps:** the 5th-PF event rate is still 1.5× real, and P(6th | 5th) is high. foul_mult acts on the second.
+
+### Phase 2 #3h — PRE-REGISTRATION 2026-10-14 05:41Z (before any run): foul_mult re-sweep ON TOP of fouler_per_minute
+
+**Why:** #3e's foul_mult was fitted on a biased fouler allocation. #3g removed most of that bias, so the rate is re-fit
+(mechanism vs estimator).
+
+**Config:** the #3g ON config (fouler_per_minute = 1, release 240, bench 0.05, bonus 0.04, end-game on), the same 12
+dates, 200 sims.
+
+**Grid:** foul_trouble_foul_mult ∈ {0.7, 0.5, 0.4, 0.35, 0.3}. 1.0 = `PG_on`, already read.
+
+**Objective:** foul-outs 0.193 ± 0.04.
+
+**Pass/fail guards, the #3e set unchanged:**
+- FTA 22.69 ± 0.7;
+- H2 inside [−0.19, −0.155];
+- Q4 slope ≥ −0.101;
+- S8 14.81 ± 0.6;
+- Q4 FTA share no further from 0.279 than 0.254;
+- closers-on [0.375, 0.535];
+- P(6th | 5th) [0.1607, 0.2643].
+
+**Readings:** top-5 PF share (0.585), 5th-PF events (0.29), P(top ≥ 5) (0.414), team PF, total bias.
+
+**Pick:** among passing points, the smallest |foul-outs − 0.193|; ties go to the larger mult.
+- PROVISIONAL. Before any adoption read, the totals calibration is RE-FIT on the picked config.
+- Then a full-FIT re-run must hold foul-outs within 0.193 ± 0.04 and the guards (P3's amendment).
+- Then P3's game-matched §7 end-game check.
+
+**If no point passes:** report the failing guard. No override.
