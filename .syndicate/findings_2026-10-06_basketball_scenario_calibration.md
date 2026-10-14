@@ -1973,3 +1973,27 @@ prior built on a minutes denominator other than the sim's `_sim_min`). That is c
 
 **Then, if CONFIRMED:** a pre-registered foul_mult re-sweep on top, including ~0.35, with the #3e guard set. A
 provisional pick needs the full FIT and the totals re-fit.
+
+**#3g CO-SIGN (P3, as pre-registered at 95794e11, before the run).** Mechanism landed in f9a2617b, corpus parity
+5,400/5,400.
+
+### Phase 2 #3g — RESULT 2026-10-14 05:40Z (done 05:40Z): CONFIRMED, fouler_per_minute fixes the starter over-allocation
+
+**Run:** `PG_on`, 17,400/17,400 calls with levers, 0 errors. Research copy `code_pg` = code_ps + f9a2617b's engine
+hunks (applied cleanly; the engine equals origin/main apart from the research-only diag).
+
+| reading | OFF (`PS_base`) | ON (`PG_on`) | real | condition |
+|---|---|---|---|---|
+| top-5 PF share | 0.658 | **0.597** | 0.585 | ± 0.03 ✓ |
+| 5th-PF-in-Q4 starter events/game | 0.636 | **0.439** | 0.29 | ≤ 0.465 ✓ |
+| P(top fouler ≥ 5) | 0.540 | 0.460 | 0.414 | toward ✓ |
+| team PF | 19.22 | 19.23 | 19.67 | ± 0.3 of OFF ✓ |
+| FTA / H2 / Q4 slope / S8 | 23.19 / −0.172 / −0.090 / 14.95 | 23.15 / −0.186 / −0.094 / 14.90 | — | all ✓ |
+
+**Readings:**
+- foul-outs 0.406 → **0.298** (Q4 ≤ 4:00 0.366 → 0.270);
+- closers-on 0.363 → 0.372;
+- P(6th | 5th) 0.343 → 0.325 (real 0.212). Still the in-trouble foul rate, which is foul_mult's job;
+- total bias +0.93 → +1.40 (reading; the totals re-fit is required).
+
+**Remaining gaps:** the 5th-PF event rate is still 1.5× real, and P(6th | 5th) is high. foul_mult acts on the second.
