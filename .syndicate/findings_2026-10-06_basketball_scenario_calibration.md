@@ -1903,3 +1903,45 @@ vs real 0.29 5th-PF-in-Q4 starter events/game, and P(top ≥ 5) 0.54 vs 0.41.
 - Otherwise the starter excess lies elsewhere.
 
 Diagnostic only, no parameter choice.
+
+### Phase 2 #3e — RESULT 2026-10-14 04:57Z (done 04:56Z, co-signed): NOT CONFIRMED by the letter; foul_mult 0.3 misses one guard by 0.0008
+
+**Run:** 5 points × 12 dates, 17,400/17,400 calls with levers, 0 errors. Release 240, bench 0.05.
+
+| foul_mult | foul-outs (0.193 ± 0.04) | Q4 ≤ 4:00 | closers-on [0.375, 0.535] | P(6th\|5th) [0.1607, 0.2643] | FTA | H2 | Q4 slope | S8 | Q4 FTA sh | total bias |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1.0 | 0.404 ✗ | 0.364 | 0.361 ✗ | 0.348 ✗ | 23.13 | −0.182 | −0.088 | 14.81 | 0.262 | +1.14 |
+| 0.7 | 0.337 ✗ | 0.304 | 0.376 ✓ | 0.282 ✗ | 23.18 | −0.171 | −0.087 | 14.93 | 0.264 | +1.25 |
+| 0.5 | 0.273 ✗ | 0.248 | 0.390 ✓ | 0.232 ✓ | 23.20 | −0.176 | −0.091 | 14.78 | 0.264 | +1.37 |
+| **0.3** | **0.188 ✓** | 0.174 | **0.405 ✓** | **0.1599 ✗ (by 0.0008)** | 23.21 ✓ | −0.168 ✓ | −0.085 ✓ | 15.07 ✓ | 0.264 ✓ | +1.37 |
+| 0.15 | 0.112 ✗ | 0.104 | 0.421 ✓ | 0.097 ✗ | 23.15 | −0.175 | −0.084 | 14.90 | 0.264 | +1.18 |
+
+**Reading:**
+- The mechanism works as designed. P(6th | 5th) and foul-outs fall together, closers STAY ON (0.361 → 0.405, into
+  the real band), and team PF is unchanged (19.2).
+- At 0.3 every guard passes except P(6th | 5th): 1,804/11,282 = 0.1599 (SE 0.0035), against a band lower edge of
+  0.1607. Statistically indistinguishable from the band, but by the pre-registered letter it FAILS. No point passes;
+  nothing is overridden here.
+- The interpolated point between 0.3 and 0.5 (~0.35) would plausibly pass both.
+
+**But see #3f:**
+- The fouler allocation upstream is biased. The 5th-PF-in-Q4 starter events did NOT fall with foul_mult (~0.64/game
+  at every point vs real 0.29).
+- A foul_mult fitted on top of that bias would be absorbing it (mechanism vs estimator).
+
+### Phase 2 #3f — RESULT 2026-10-14 04:57Z (`PS_base`, done 04:57Z): the minutes blend in the fouler draw IS implicated
+
+- Sim top-5-by-expected-minutes PF share **0.659** (34,800 team-draws, pooled 0.658), against real **0.585**: +0.074,
+  past the pre-registered +0.03 threshold.
+- PS_base reproduces FA_f100: foul-outs 0.406 vs 0.404, P(6th | 5th) 0.343 vs 0.348.
+- Real starters foul LESS per minute than the bench (PF/48 3.70 vs 4.32). The minutes-blended `_prior_pf_pm` weight
+  pushes the other way.
+
+**Next, by #3f's rule:**
+1. P3 builds the pure per-minute fouler weight (a separate default-off field).
+2. A pre-registered sweep reads the top-5 share (target 0.585), the 5th-PF-in-Q4 event rate (0.29/game) and
+   P(top ≥ 5) (0.414).
+3. Then foul_mult is RE-SWEPT on top of it (re-fitting the rate that was absorbing the bias). That includes the
+   ~0.35 point.
+
+#3e's 0.3 is NOT carried forward as a pick.
