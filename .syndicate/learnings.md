@@ -2055,3 +2055,7 @@ prefer single-quoted arguments there.
 **How to apply:**
 - If `uptime -s` is within ~2 min of now, the read is a boot, not a steady state. Wait ~2 min, re-read `status` + healthz, and only then call it an outage.
 - Any approval that arrives long after the question is asked is an approval of the state AS DESCRIBED. Re-read the state and every claim before acting on it, and act on nothing that has changed.
+
+## 2026-10-14 -- nflverse spells the Rams `LA`, not `LAR`: grep a game by DATE, never by a guessed game_id `[lane nfl-mnf-settlement-lag, session d4409ac4]`
+- I checked "is MNF in the fleet pbp" with `grep -c 2026_05_BUF_LAR` four times over ~4 h and reported 0 each time; the game is `2026_05_BUF_LA` (199 rows, present since 18:57Z). A zero from a guessed key is the empty-output trap the 10-12 FORBIDDEN names.
+- **Rule:** select by `game_date` (or the schedule's own game_id) and print what is there before concluding a game is absent.
