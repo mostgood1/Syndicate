@@ -221,5 +221,27 @@ class BasketballBonus(unittest.TestCase):
         self.assertEqual(self._serve({"away": {"foulsToGive": 3}, "home": {"foulsToGive": 1}}), "OKC on a 9–4 run")
 
 
+class BasketballLiveClock(unittest.TestCase):
+    def _serve(self, status_name, clock, token="Q4 7:57"):
+        from syndicate.features.shared import game_chip_scoreboard as gs
+
+        board = {"401908621": {"id": "401908621", "away": "IND", "home": "OKC", "away_periods": [33, 28, 23, 10], "home_periods": [25, 34, 26, 12],
+                               "period": 4 if status_name != "STATUS_HALFTIME" else 2, "clock": clock, "status_name": status_name}}
+        chip = {"sport": "nba", "state": "live", "game_key": "401908621", "status_token": token, "away": {"abbr": "IND"}, "home": {"abbr": "OKC"}}
+        gl._CACHE.clear()
+        with mock.patch.object(gl, "_espn_board", return_value=board), mock.patch.object(gl, "_espn_fouls", return_value={}):
+            gs.attach_served_linescores([chip], "2026-10-13")
+        return chip["status_token"]
+
+    def test_stale_worker_clock_is_replaced(self) -> None:
+        self.assertEqual(self._serve("STATUS_IN_PROGRESS", "5:40"), "Q4 5:40")
+
+    def test_sub_minute_clock(self) -> None:
+        self.assertEqual(self._serve("STATUS_IN_PROGRESS", "45.3", token="Q4 1:02"), "Q4 45.3")
+
+    def test_halftime(self) -> None:
+        self.assertEqual(self._serve("STATUS_HALFTIME", "0.0", token="Q2 0:00"), "HALF")
+
+
 if __name__ == "__main__":
     unittest.main()

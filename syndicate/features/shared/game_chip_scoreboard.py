@@ -745,7 +745,7 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
         away_abbr, home_abbr = (chip.get("away") or {}).get("abbr") or "", (chip.get("home") or {}).get("abbr") or ""
         box = linescore(sport, game, day, away_abbr=away_abbr, home_abbr=home_abbr, live=chip.get("state") == "live")
         # NHL's live feed carries the period but no clock ("P3"); ESPN has it.
-        if sport == "nhl" and chip.get("state") == "live" and ":" not in str(chip.get("status_token") or ""):
+        if sport in ("nhl", "nba", "wnba") and chip.get("state") == "live" and ":" not in str(chip.get("status_token") or ""):
             from syndicate.features.shared.game_chip_linescore import live_clock_token
 
             token = live_clock_token(sport, game, day, away_abbr=away_abbr, home_abbr=home_abbr)
@@ -805,7 +805,7 @@ def attach_served_linescores(chips: list[dict[str, Any]], date_value: str) -> No
         # during games), and the clock / periods move faster than that.
         if chip.get("linescore") and chip.get("state") != "live":
             continue
-        if chip.get("state") == "live" and chip.get("sport") == "nhl":
+        if chip.get("state") == "live":
             chip["status_token"] = re.sub(r"\s*\d{1,2}:\d{2}$", "", str(chip.get("status_token") or "")).replace("END ", "") or None
         key = chip.get("game_key")
         chip.pop("linescore", None) if chip.get("state") == "live" else None

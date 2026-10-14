@@ -327,6 +327,8 @@ def live_clock_token(sport: str, game: Mapping[str, Any], date: str, *, away_abb
     prefix = "P" if sport == "nhl" else "Q"
     period = hit["period"]
     label = f"{prefix}{period}" if not (sport == "nhl" and period >= 4) else ("OT" if period == 4 else "SO")
+    if hit.get("status_name") == "STATUS_HALFTIME":
+        return "HALF"
     if hit.get("status_name") == "STATUS_END_PERIOD":
         return f"END {label}"
     return f"{label} {hit['clock']}".strip() if hit.get("clock") else label
