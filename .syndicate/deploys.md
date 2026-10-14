@@ -49376,3 +49376,23 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - Measured: `-TestPush` from the installed copy -> `TEST_PUSH push=sent` 15:13:05 CT (HTTP POST accepted by ntfy.sh). Failure path tested on a temp state dir: unreachable server -> `PUSH_FAILED`, topic absent from the log; no topic file -> `push=off`. First scheduled run of the new copy 15:15:54 CT: result 0, `OK status=degraded findings=4`.
 - verify: the user's phone shows the test push (owed, user to confirm). The first real alert line will read `ALERT shown=... push=sent`.
 - Gap: nothing runs while the machine is off or asleep, so no push then; only an external heartbeat could cover that.
+
+## 2026-10-14 20:18:56Z (3:18 PM CT) -- LOCAL FLEET ff 6fa2673e -> 44508f56 (exact SHA), NO restart: WNBA fixture identity reads the data-root schedule -- deployed-checkout reading MET; production game_cards reading OWED at Finals G1 (lane `wnba-fixture-identity-native`, session 2d413211)
+
+- **User decisions 2026-10-14:** "move the wnba fixture identity off vendor", then "Ff now with ride-alongs".
+- **Claim:** refresh-worker token 7b5f64f5... was acquired, gated on its exit code with `status` naming my holder. Released at ~20:19Z.
+- **Safety read in full (20:18Z):** NOT CLEAR. Live soccer; soccer/NBA/NHL odds jobs; a board build. Basketball props jobs: 0. An ff without restart kills nothing.
+- **Ride-alongs:**
+  - **12828120 past-line-overlays** (closing_line_history, layer2_board `_chart_columns`, intelligence.html, prop_evidence/football, intelligence_recent_matchup). That lane planned to load it at the next natural restart; its code is now on disk early. No restart or web reload was done. Its session was messaged.
+  - 5a9c9f69: a research script.
+- **Change:**
+  - `wnba_fixture_identity.schedule_path()`: override, then the newest `schedule_*.csv` under `WNBA_BETTING_DATA_ROOT/processed`, then the data root's `wnba_source/data`, then the repo's cold-start mirror.
+  - Before, it read the VENDORED `schedule_2026.csv` first. That file ends 2026-09-24, so on the fleet playoff game_cards carried a blank fixture_id, and the 2-game dates 10-04/07/09 kept 1 row.
+  - Tests are pinned to `tests/fixtures/wnba_fixture_identity/schedule_2026.csv` (the vendored blob, c3d680aa).
+- **Pre-merge (fleet, read-only):** all 351 regular-season fixtures are identical on id/date/teams (two past tip times corrected in the newer file); +23 post-season fixtures.
+- **VERIFY (deployed checkout, refresh env, 20:19Z):**
+  - `schedule_path()` = `/home/amyn/syndicate-prod/data/wnba_source/data/processed/schedule_2026.csv` (374 fixtures).
+  - `resolve_fixture_id("2026-10-17","GSV","ATL")` = 401918305; 10-09 NYL v ATL = 401918299.
+  - 48 tests passed.
+- **Production reading OWED:** the first `game_cards_2026-10-17.csv` written after 20:18:56Z should carry `fixture_id=401918305` (the newest WNBA game_cards is 10-09, written 23:53 CT).
+- **Rollback:** revert 44508f56 and ff. No restart.
