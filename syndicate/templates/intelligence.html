@@ -4954,15 +4954,21 @@
     const rawValues = Array.isArray(item && item.recent_values) ? item.recent_values : [];
     const rawDates = Array.isArray(item && item.recent_dates) && item.recent_dates.length >= rawValues.length ? item.recent_dates : null;
     const rawOpps = Array.isArray(item && item.recent_opponents) && item.recent_opponents.length >= rawValues.length ? item.recent_opponents : null;
+    // `recent_lines` (lane past-line-overlays): each game's OWN main closing
+    // line, aligned with the dates; null where that game had none.
+    const rawLines = Array.isArray(item && item.recent_lines) && item.recent_lines.length >= rawValues.length ? item.recent_lines : null;
     const values = [];
     const dates = [];
     const opps = [];
+    const pastLines = [];
     rawValues.forEach((raw, i) => {
       const v = Number(raw);
       if (!Number.isFinite(v)) return;
       values.push(v);
       dates.push(rawDates ? String(rawDates[i] || "") : "");
       opps.push(rawOpps ? String(rawOpps[i] || "") : "");
+      const pl = rawLines && rawLines[i] !== null && rawLines[i] !== undefined ? Number(rawLines[i]) : NaN;
+      pastLines.push(Number.isFinite(pl) ? pl : null);
     });
     const line = numericValue(Number(item && item.line));
     const side = String((item && item.side) || "").toLowerCase();
@@ -4970,7 +4976,13 @@
     const hit = (v) => (side === "over" ? v > line : v < line);
     const l5 = values.slice(0, 5);
     const l10 = values.slice(0, 10);
+    const own = pastLines.slice(0, 10);
+    // Against each game's own line: only the games that HAD one count.
+    const ownPairs = l10.map((v, i) => [v, own[i]]).filter(([, pl]) => pl !== null);
+    const ownHit = ownPairs.filter(([v, pl]) => (side === "over" ? v > pl : v < pl)).length;
     return { values: l10, dates: dates.slice(0, 10), opps: opps.slice(0, 10), line, side, hit,
+      pastLines: own, linesFrom: String((item && item.recent_lines_from) || ""),
+      ownRecord: ownPairs.length ? `${ownHit}/${ownPairs.length}` : "",
       l5: `${l5.filter(hit).length}/${l5.length}`, l10: `${l10.filter(hit).length}/${l10.length}` };
   }
 
@@ -4993,17 +5005,24 @@
     const oldestFirst = form.values.slice().reverse();
     const datesOldestFirst = (form.dates || []).slice().reverse();
     const oppsOldestFirst = (form.opps || []).slice().reverse();
+    // Past lines are drawn on the full chart only; the compact spark keeps
+    // today's line alone (too small to read a tick per bar).
+    const ownOldestFirst = compact ? [] : (form.pastLines || []).slice().reverse();
     const gap = compact ? 1.5 : 3;
     const barW = (width - gap * (oldestFirst.length - 1)) / oldestFirst.length;
-    const max = Math.max(...oldestFirst, form.line * 1.5, 1);
+    const max = Math.max(...oldestFirst, form.line * 1.5, ...ownOldestFirst.filter((pl) => pl !== null), 1);
     const base = compact ? height : height - 12;
     const lineY = base - (form.line / max) * (base - 2);
     const bars = oldestFirst.map((v, i) => {
       const h = Math.max(1.5, (v / max) * (base - 2));
       const x = i * (barW + gap);
+      const pl = ownOldestFirst[i];
+      const ownTip = pl === null || pl === undefined ? "" : ` (that game's line ${pl})`;
       const when = [datesOldestFirst[i], oppsOldestFirst[i]].filter(Boolean).join(" ");
-      const tip = when ? `${when}: ${v}` : String(v);
+      const tip = (when ? `${when}: ${v}` : String(v)) + ownTip;
+      const tickY = pl === null || pl === undefined ? null : base - (pl / max) * (base - 2);
       return `<rect x="${x.toFixed(1)}" y="${(base - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" class="${form.hit(v) ? "chart-bar chart-bar--side" : "chart-bar"}"><title>${escapeHtml(tip)}</title></rect>`
+        + (tickY === null ? "" : `<line x1="${(x - 1).toFixed(1)}" x2="${(x + barW + 1).toFixed(1)}" y1="${tickY.toFixed(1)}" y2="${tickY.toFixed(1)}" class="chart-tick" stroke="currentColor" stroke-width="2"><title>${escapeHtml(`that game's line ${pl}`)}</title></line>`)
         + (compact ? "" : `<text x="${(x + barW / 2).toFixed(1)}" y="${height - 1}" class="chart-axis" text-anchor="middle">${escapeHtml(String(Math.round(v * 10) / 10))}</text>`);
     }).join("");
     const lineMark = `<line x1="0" x2="${width}" y1="${lineY.toFixed(1)}" y2="${lineY.toFixed(1)}" class="chart-line" />`;
@@ -5012,7 +5031,12 @@
     const span = form.dates && form.dates.length && form.dates[0]
       ? ` · ${escapeHtml(form.dates[form.dates.length - 1] || "")} → ${escapeHtml(form.dates[0])}`
       : "";
-    return `<figure class="prop-chart"><figcaption>Recent form · <b>L5 ${form.l5} · L10 ${form.l10}</b> ${escapeHtml(form.side)} ${escapeHtml(String(form.line))}${span}</figcaption>${svg}</figure>`;
+    // Against each game's own line, with the window those lines cover: closing
+    // lines exist only from `recent_lines_from` on, so older bars carry none.
+    const own = form.ownRecord
+      ? ` · vs each game's own line <b>${escapeHtml(form.ownRecord)}</b>${form.linesFrom ? ` (lines from ${escapeHtml(form.linesFrom.slice(5))})` : ""} · tick = that game's line`
+      : "";
+    return `<figure class="prop-chart"><figcaption>Recent form · <b>L5 ${form.l5} · L10 ${form.l10}</b> ${escapeHtml(form.side)} ${escapeHtml(String(form.line))}${span}${own}</figcaption>${svg}</figure>`;
   }
 
   function propChartsBlock(item) {

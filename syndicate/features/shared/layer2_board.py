@@ -4044,6 +4044,25 @@ def _chart_columns(row: Mapping[str, Any]) -> dict[str, Any]:
                 labels = recent.get(src)
                 if isinstance(labels, (list, tuple)) and len(labels) >= len(values):
                     out[dst] = [str(x) for x in list(labels)[: len(values)]]
+            # Each bar's OWN main closing line (lane past-line-overlays), aligned
+            # with the dates; emitted only when at least one bar has one, with the
+            # first date any closing line exists so the page can label the window.
+            # The join key is the game's ISO date: `game_dates` where the bar label
+            # is not a date (NFL / NCAAF are labelled by season + week), else the label.
+            game_dates = recent.get("game_dates")
+            join_dates = (list(game_dates)[: len(values)]
+                          if isinstance(game_dates, (list, tuple)) and len(game_dates) >= len(values)
+                          else out.get("recent_dates"))
+            if join_dates:
+                try:
+                    from syndicate.features.shared.closing_line_history import past_main_lines, window_start
+
+                    lines = past_main_lines(row.get("sport"), row.get("player_name"), row.get("market"), join_dates)
+                    if any(line is not None for line in lines):
+                        out["recent_lines"] = lines
+                        out["recent_lines_from"] = window_start()
+                except Exception:  # noqa: BLE001 -- a chart must never break a card
+                    pass
     elif str(row.get("kind") or "").lower() == "game":
         # Game lines (mockup board 11): each team's last-10 final scores; the
         # page derives over/under, covers and W/L against TODAY's line.

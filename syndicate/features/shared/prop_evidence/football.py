@@ -309,6 +309,70 @@ def _week_label(season: Any, week: Any) -> str:
         return f"W{week}"
 
 
+# EACH GAME'S DATE, for joining a recent-form bar to that day's closing line (lane
+# past-line-overlays, 2026-10-14). The bars are labelled by season + week, which no
+# closing-line file is keyed on. Parsed once per (path, mtime); "" where unknown.
+_GAME_DATE_CACHE: dict[str, tuple[int, dict[str, str]]] = {}
+
+
+def _cached_dates(path: Path | None, build) -> dict[str, str]:
+    if path is None:
+        return {}
+    try:
+        stamp = int(path.stat().st_mtime_ns)
+    except OSError:
+        return {}
+    hit = _GAME_DATE_CACHE.get(str(path))
+    if hit and hit[0] == stamp:
+        return hit[1]
+    try:
+        dates = build(path)
+    except Exception:  # noqa: BLE001 -- a label must never break the evidence
+        logger.exception("prop_evidence football: unreadable game dates %s", path)
+        dates = {}
+    _GAME_DATE_CACHE[str(path)] = (stamp, dates)
+    return dates
+
+
+def _nfl_game_dates(lines: list[dict[str, Any]]) -> list[str]:
+    """nflverse `game_id` -> the schedule's `gameday` (ET date), aligned with `lines`."""
+    by_id: dict[str, str] = {}
+    for season in sorted({int(C.to_float(g.get("season")) or 0) for g in lines} - {0}):
+        _rows, path = _nfl_schedule(season)
+        by_id.update(_cached_dates(path, lambda p: {str(r.get("game_id") or ""): str(r.get("gameday") or "")[:10]
+                                                    for r in C.iter_csv(p)}))
+    return [by_id.get(str(g.get("game_id") or ""), "") for g in lines]
+
+
+def _ncaaf_game_dates(games: list[dict[str, Any]]) -> list[str]:
+    """CFBD game id -> the US Central date of its UTC `startDate` (the board's slate day), aligned with `games`."""
+    import gzip
+    import json
+    from zoneinfo import ZoneInfo
+
+    central = ZoneInfo("America/Chicago")
+
+    def build(path: Path) -> dict[str, str]:
+        with gzip.open(path, "rt", encoding="utf-8") as fh:
+            payload = json.load(fh)
+        out: dict[str, str] = {}
+        for g in payload if isinstance(payload, list) else (payload.get("games") or []):
+            start = str(g.get("startDate") or "") if isinstance(g, dict) else ""
+            try:
+                when = datetime.fromisoformat(start.replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=timezone.utc)
+            out[str(g.get("id"))] = when.astimezone(central).date().isoformat()
+        return out
+
+    by_id: dict[str, str] = {}
+    for season in sorted({int(C.to_float(g.get("season")) or 0) for g in games} - {0}):
+        by_id.update(_cached_dates(C.first_existing(NCAAF_DIR, f"historical_truth/games_{season}.json.gz"), build))
+    return [by_id.get(str(g.get("game_id") or ""), "") for g in games]
+
+
 def _form_chart(points: list[tuple[str, float | None]], *, label: str, player: str, line: float | None,
                 layer: Layer = Layer.RECENT_FORM) -> dict[str, Any] | None:
     """Chronological bar chart of the stat per game with the board line marked."""
@@ -765,7 +829,9 @@ def _nfl_recent_form(subject: PropSubject, stat: str | None, label: str, player:
         # aligned with `values`, newest first -- the board chart's bar labels (lane board-history-charts).
         facts={"games": len(last), "hit_rate": rate, "values": values, "seasons": seasons, "source_file": path.name,
                "game_labels": [_week_label(g.get("season"), g.get("week")) for g in last],
-               "opponents": [_usage_opponent(g) for g in last]},
+               "opponents": [_usage_opponent(g) for g in last],
+               # each game's ISO date, for the board's past-line join (lane past-line-overlays)
+               "game_dates": _nfl_game_dates(last)},
         source="nfl:nfl_fantasy_usage", as_of=C.mtime_iso(path))
 
 
@@ -1385,7 +1451,9 @@ def _ncaaf_recent_form(subject: PropSubject, stat: str | None, label: str, box: 
                "season_to_date": season_fact, "other_school_games": sum(1 for g in last if g.get("team") != box.team),
                "other_schools": other_schools,
                # Aligned with `values`, newest first -- the board chart's bar labels (lane board-history-charts).
-               "game_labels": [_game_label(g) for g in last], "opponents": [g.get("opponent") or "" for g in last]},
+               "game_labels": [_game_label(g) for g in last], "opponents": [g.get("opponent") or "" for g in last],
+               # each game's Central slate date, for the board's past-line join (lane past-line-overlays)
+               "game_dates": _ncaaf_game_dates(last)},
         source="ncaaf:player_game_stats_snapshot", as_of=through if through != "—" else C.mtime_iso(box.path))
 
 

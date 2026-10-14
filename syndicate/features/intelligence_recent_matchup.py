@@ -804,8 +804,13 @@ def _record_values(
     values: list[Any],
     dates: list[Any] | None = None,
     opponents: list[Any] | None = None,
+    game_dates: list[Any] | None = None,
 ) -> None:
-    """Keep `values` (+ `dates` / `opponents` when they are ALIGNED with them) for the board chart.
+    """Keep `values` (+ `dates` / `opponents` / `game_dates` when they are ALIGNED with them) for the board chart.
+
+    `game_dates` (lane past-line-overlays): each game's ISO date where the bar's
+    label is not one (NFL / NCAAF bars are labelled by season + week); the board
+    joins each bar to that date's closing line through it.
 
     Labels are filtered TOGETHER with the values: dropping a `None` value used to
     happen after the fact, so one game with no stat silently cost the whole row
@@ -817,6 +822,7 @@ def _record_values(
     raw = list(values)[:_RECENT_VALUES_N]
     labels = list(dates)[:_RECENT_VALUES_N] if dates and len(dates) >= len(raw) else None
     opps = list(opponents)[:_RECENT_VALUES_N] if opponents and len(opponents) >= len(raw) else None
+    gdates = list(game_dates)[:_RECENT_VALUES_N] if game_dates and len(game_dates) >= len(raw) else None
     keep = [i for i, v in enumerate(raw) if v is not None]
     if not keep:
         return
@@ -829,6 +835,8 @@ def _record_values(
         entry["dates"] = [str(labels[i]) for i in keep]
     if opps is not None:
         entry["opponents"] = [str(opps[i] or "") for i in keep]
+    if gdates is not None:
+        entry["game_dates"] = [str(gdates[i] or "") for i in keep]
     RECENT_VALUES[_memo_key(row)] = entry
 
 
@@ -876,7 +884,7 @@ def prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str, memo
             try:  # the chart side-channel must never cost the sentence
                 facts = getattr(recent, "facts", None) or {}
                 if getattr(recent, "filled", True) and isinstance(facts.get("values"), list):
-                    _record_values(row, facts["values"], facts.get("game_labels"), facts.get("opponents"))
+                    _record_values(row, facts["values"], facts.get("game_labels"), facts.get("opponents"), facts.get("game_dates"))
             except Exception:  # noqa: BLE001
                 pass
             match_facts = match.facts if match is not None else None

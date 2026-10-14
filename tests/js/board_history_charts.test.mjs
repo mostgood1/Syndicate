@@ -64,5 +64,18 @@ ok('misaligned dates are not used (aligned opponents still are)', s.includes('<t
 const week = { ...dated, recent_dates: ['2026 W5', '2026 W4', '2026 W3'], recent_opponents: ['BUF', 'MIA', 'NYJ'] };
 ok('season+week labels render', api.recentFormChart(week).includes('<title>2026 W5 BUF: 3</title>'));
 
+// Each game's own closing line (lane past-line-overlays, 2026-10-14).
+const owned = { ...dated, recent_lines: [2.5, null, 1.5], recent_lines_from: '2026-09-30' };
+const of = api.recentForm(owned);
+ok('own lines kept aligned, null where a game had none', JSON.stringify(of.pastLines) === '[2.5,null,1.5]');
+ok('record vs own lines counts only games that had one (3>2.5, 2>1.5)', of.ownRecord === '2/2');
+const os = api.recentFormChart(owned);
+ok('one tick per game that had a line', (os.match(/class="chart-tick"/g) || []).length === 2);
+ok('tooltip names that game\'s line', os.includes("<title>2026-10-04 v Arsenal: 3 (that game's line 2.5)</title>"));
+ok('caption gives the own-line record and the window', os.includes('own line <b>2/2</b>') && os.includes('lines from 09-30'));
+ok('compact spark draws no ticks', !api.recentFormChart(owned, { compact: true }).includes('chart-tick'));
+ok('no recent_lines: no own-line caption, no ticks', !api.recentFormChart(dated).includes('own line') && !api.recentFormChart(dated).includes('chart-tick'));
+ok('misaligned recent_lines are not used', !api.recentFormChart({ ...owned, recent_lines: [2.5] }).includes('chart-tick'));
+
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASS');
 process.exit(failures ? 1 : 0);
