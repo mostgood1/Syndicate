@@ -1472,3 +1472,18 @@ engine.py LOAN is RETURNED to nba-native-live-resim.
 - **Integrity** (P3): 40 sampled pickle pairs differ only in targets/quarters, except 1/40 (code drift between the
   recording days, noise-level).
 - Part 2, the in-game grade, is owed by P3 (~02:00Z).
+
+**#695 part 2 (P3 §10b, in-game, k = 0, production config, regular season, paired n ~1,180 per checkpoint):**
+
+| | end Q1 | end Q2 | end Q3 | 5:00 Q4 |
+|---|---|---|---|---|
+| skip_def OFF − ON, level | −0.92 | −0.64 | −0.29 | −0.11 |
+| \|err\| change | −0.06 n.s. | −0.12 [−0.21, −0.03] | −0.07 [−0.13, −0.02] | −0.02 n.s. |
+| bias ON → OFF | +2.94 → +2.02 | +1.82 → +1.17 | +1.99 → +1.70 | −0.14 → −0.26 |
+
+- Margin n.s.; postseason all n.s.
+- OFF still loses to pregame_rate on total at Q1-Q3.
+- **Reading, with part 1:** skip_def is ~1/3 of the level and almost none of the accuracy (in-game |err| gains at Q2/Q3
+  ≤ 0.12). The remaining overshoot is the EXACT-off engine term.
+- **#695 stays KEEP.** The fix for the overshoot is the Phase 2 totals stack (EXACT + NBA calibration builder), a
+  user decision. P3 re-gates on Phase 2-config inputs once the user accepts it.
