@@ -186,3 +186,22 @@ def test_foul_trouble_mult_zero_is_full_benching_not_off():
     small = _foul_outs(_with_cfg(kw, **warm, foul_trouble_bench_mult=0.05), 20)
     assert zero < off * 0.7
     assert zero <= small + 0.25
+
+
+# ------------------------------------------------------------------------------------------- foul avoidance in trouble
+
+def test_foul_avoidance_off_is_byte_identical():
+    kw = _kw()
+    a = _run(_with_cfg(kw), None, 6)
+    b = _run(_with_cfg(kw, foul_trouble_foul_mult=1.0, foul_trouble_thresholds=(1, 1, 1, 1)), None, 6)
+    assert a[0][2] == b[0][2] and a[1] == b[1]
+
+
+def test_foul_avoidance_is_reachable_and_cuts_foul_outs_without_benching():
+    """off != on, and it works in the release window too: benching is OFF here (bench_mult 1.0)."""
+    kw = _kw()
+    warm = dict(base_nonshooting_foul_per_poss=0.2, base_shooting_foul_per_fga=0.2, foul_out_in_sim=True)
+    off = _foul_outs(_with_cfg(kw, **warm), 20)
+    on = _foul_outs(_with_cfg(kw, **warm, foul_trouble_foul_mult=0.2), 20)
+    assert on != off
+    assert on < off * 0.8

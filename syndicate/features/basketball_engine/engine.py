@@ -117,6 +117,11 @@ class EventSimConfig:
     foul_trouble_bench_mult: float = 1.0
     foul_trouble_thresholds: Tuple[int, ...] = (2, 3, 4, 5)
     foul_trouble_release_s: int = 240
+    # FOUL AVOIDANCE IN TROUBLE (P3, 2026-10-14). Real players at/over the period threshold stay on late but foul LESS
+    # (calibration lane #3c: 81% of the sim's excess foul-outs land in the last 4:00 of Q4, where benching is released).
+    # Multiplies such a player's weight in every FOULER draw (shooting, non-shooting/bonus, end-game intentional), in
+    # every window including the release window. Same thresholds as benching. 1.0 = off: byte-identical.
+    foul_trouble_foul_mult: float = 1.0
 
     # Outcome priors (fallbacks when player priors are missing)
     base_tov_per_poss: float = 0.125
@@ -1091,10 +1096,12 @@ def simulate_pbp_game_boxscore(
     ft_mult = 1.0 if _ft_raw is None else float(np.clip(float(_ft_raw), 0.0, 1.0))
     ft_thr = tuple(int(x) for x in (getattr(cfg, "foul_trouble_thresholds", (2, 3, 4, 5)) or (2, 3, 4, 5)))
     ft_release = int(getattr(cfg, "foul_trouble_release_s", 240) or 0)
-    if ft_mult < 1.0 and opening_tip:
+    _ff_raw = getattr(cfg, "foul_trouble_foul_mult", 1.0)
+    ff_mult = 1.0 if _ff_raw is None else float(np.clip(float(_ff_raw), 0.0, 1.0))
+    if (ft_mult < 1.0 or ff_mult < 1.0) and opening_tip:
         h_pf0 = np.zeros(len(home_players), dtype=int)
         a_pf0 = np.zeros(len(away_players), dtype=int)
-    elif ft_mult < 1.0 and not fo_on:
+    elif (ft_mult < 1.0 or ff_mult < 1.0) and not fo_on:
         h_pf0 = np.asarray([int((state.home_player_fouls or {}).get(nm, 0)) for nm in _player_names(home_players)], dtype=int)
         a_pf0 = np.asarray([int((state.away_player_fouls or {}).get(nm, 0)) for nm in _player_names(away_players)], dtype=int)
 
@@ -1246,6 +1253,19 @@ def simulate_pbp_game_boxscore(
             total = np.asarray(box["pf"], dtype=int) + pf0
             return [int(i) for i in np.flatnonzero(total >= thr) if int(i) not in out_idx]
 
+        def _pf_w(players: pd.DataFrame, line: List[int], box: Dict[str, Any], pf0: np.ndarray) -> np.ndarray:
+            """Fouler-draw weights. Off (ff_mult 1.0) = exactly `_usage_w(..., '_prior_pf_pm', ...)`."""
+            w = _usage_w(players, "_prior_pf_pm", line)
+            if ff_mult >= 1.0:
+                return w
+            thr = ft_thr[min(int(q), len(ft_thr)) - 1] if int(q) <= N_PERIODS else ft_thr[-1]
+            trouble = (np.asarray(box["pf"], dtype=int) + pf0) >= thr
+            if not trouble.any():
+                return w
+            w2 = np.asarray(w, dtype=float).copy()
+            w2[trouble] *= ff_mult
+            return w2 if float(np.sum(w2)) > 0.0 else w  # everyone on court in trouble at mult 0: draw as before
+
         def _endgame_intentional_foul(off_home: bool, h_line_: List[int], a_line_: List[int]) -> None:
             """P3 mechanism: the trailing defense fouls on purpose. Two FTs (same FT% formula as the shooting-foul
             path), the fouler's PF, and ~endgame_foul_seconds off the clock. Only reachable when enabled."""
@@ -1278,7 +1298,7 @@ def simulate_pbp_game_boxscore(
                     away_score += made_
                     _add_q_seg(away_q_seg_pts, q, seg_, made_)
                     _add_q_min(away_q_min_pts, q, min_, made_)
-            pf_w_ = _usage_w(def_players, "_prior_pf_pm", def_line)
+            pf_w_ = _pf_w(def_players, def_line, def_box, a_pf0 if off_home else h_pf0)
             didx_ = _pick_weighted(rng, list(range(len(def_players))), pf_w_)
             if didx_ is not None:
                 def_box["pf"][int(didx_)] += 1
@@ -1319,7 +1339,7 @@ def simulate_pbp_game_boxscore(
 
         def _bonus_pf(def_side: str, h_line_: List[int], a_line_: List[int]) -> None:
             def_players, def_line, def_box = (away_players, a_line_, a) if def_side == "a" else (home_players, h_line_, h)
-            pf_w_ = _usage_w(def_players, "_prior_pf_pm", def_line)
+            pf_w_ = _pf_w(def_players, def_line, def_box, a_pf0 if def_side == "a" else h_pf0)
             didx_ = _pick_weighted(rng, list(range(len(def_players))), pf_w_)
             if didx_ is not None:
                 def_box["pf"][int(didx_)] += 1
@@ -1625,12 +1645,12 @@ def simulate_pbp_game_boxscore(
                         return
                     try:
                         if offense_home:
-                            pf_w = _usage_w(away_players, "_prior_pf_pm", a_line)
+                            pf_w = _pf_w(away_players, a_line, a, a_pf0)
                             didx = _pick_weighted(rng, list(range(len(away_players))), pf_w)
                             if didx is not None:
                                 a["pf"][int(didx)] += 1
                         else:
-                            pf_w = _usage_w(home_players, "_prior_pf_pm", h_line)
+                            pf_w = _pf_w(home_players, h_line, h, h_pf0)
                             didx = _pick_weighted(rng, list(range(len(home_players))), pf_w)
                             if didx is not None:
                                 h["pf"][int(didx)] += 1
@@ -1692,7 +1712,7 @@ def simulate_pbp_game_boxscore(
                                 home_score += 1
                                 _add_q_seg(home_q_seg_pts, q, seg, 1)
                                 _add_q_min(home_q_min_pts, q, minute_idx, 1)
-                            pf_w = _usage_w(away_players, "_prior_pf_pm", a_line)
+                            pf_w = _pf_w(away_players, a_line, a, a_pf0)
                             didx = _pick_weighted(rng, list(range(len(away_players))), pf_w)
                             if didx is not None:
                                 a["pf"][int(didx)] += 1
@@ -1721,7 +1741,7 @@ def simulate_pbp_game_boxscore(
                             home_score += made_fts
                             _add_q_seg(home_q_seg_pts, q, seg, int(made_fts))
                             _add_q_min(home_q_min_pts, q, minute_idx, int(made_fts))
-                        pf_w = _usage_w(away_players, "_prior_pf_pm", a_line)
+                        pf_w = _pf_w(away_players, a_line, a, a_pf0)
                         didx = _pick_weighted(rng, list(range(len(away_players))), pf_w)
                         if didx is not None:
                             a["pf"][int(didx)] += 1
@@ -1816,7 +1836,7 @@ def simulate_pbp_game_boxscore(
                                 away_score += 1
                                 _add_q_seg(away_q_seg_pts, q, seg, 1)
                                 _add_q_min(away_q_min_pts, q, minute_idx, 1)
-                            pf_w = _usage_w(home_players, "_prior_pf_pm", h_line)
+                            pf_w = _pf_w(home_players, h_line, h, h_pf0)
                             didx = _pick_weighted(rng, list(range(len(home_players))), pf_w)
                             if didx is not None:
                                 h["pf"][int(didx)] += 1
@@ -1845,7 +1865,7 @@ def simulate_pbp_game_boxscore(
                             away_score += made_fts
                             _add_q_seg(away_q_seg_pts, q, seg, int(made_fts))
                             _add_q_min(away_q_min_pts, q, minute_idx, int(made_fts))
-                        pf_w = _usage_w(home_players, "_prior_pf_pm", h_line)
+                        pf_w = _pf_w(home_players, h_line, h, h_pf0)
                         didx = _pick_weighted(rng, list(range(len(home_players))), pf_w)
                         if didx is not None:
                             h["pf"][int(didx)] += 1
