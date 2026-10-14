@@ -323,3 +323,43 @@ def test_a_staked_cell_that_loses_well_below_its_admitted_ev_gets_a_bounded_stak
     assert "nfl|h2h|full|pregame" in overlay["stake_scale"]
     assert opt.FACTOR_FLOOR <= overlay["stake_scale"]["nfl|h2h|full|pregame"]["factor"] < 1.0
     assert report["staked_summary"]["books1-2"]["bets"] == 270
+
+
+# ---------------------------------------------------------------------------
+# sport-level props tier (lane optimizer-props-tier, 2026-10-14)
+# ---------------------------------------------------------------------------
+
+def test_props_tier_classifies_every_market_seen_on_the_fleet_report():
+    for game in ("h2h", "h2h_3_way", "spreads", "spreads_alt", "totals", "totals_alt", "btts",
+                 "alternate_totals_corners", "team_totals"):
+        assert opt.props_tier_cell(f"soccer|{game}|full|pregame") is None, game
+    for prop in ("batter_total_bases", "receptions", "anytime td", "sog", "player_shots", "player_points"):
+        assert opt.props_tier_cell(f"mlb|{prop}|full|live") == "mlb|player_props|*|*", prop
+    assert opt.props_tier_cell("mlb|player_props|*|*") is None, "the tier never nests"
+    assert opt.is_tier_cell("mlb|player_props|*|*") and not opt.is_tier_cell("mlb|batter_hits|full|pregame")
+
+
+def test_losses_spread_over_small_prop_cells_reach_a_sport_tier_and_are_counted_once():
+    rng = random.Random(7)
+    state = opt.empty_state("sig")
+    markets = ("batter_hits", "batter_total_bases", "batter_rbis", "strikeouts")
+    state["orders"] = {m: {"cell": f"mlb|{m}|full|pregame", "books": 2, "seen": "2026-09-10"} for m in markets}
+    state["orders"]["gl"] = {"cell": "mlb|h2h|full|pregame", "books": 8, "seen": "2026-09-10"}
+    orders = []
+    for g in range(100):
+        day = f"2026-09-{10 + g % 9:02d}"
+        won = rng.random() < 0.40
+        orders.append(_order(markets[g % 4], day=day, event=f"e{g}", outcome="won" if won else "lost",
+                             pnl=9.1 if won else -10.0, ev=4.0, sport="mlb"))
+        orders.append(_order("gl", day=day, event=f"e{g}", outcome="won" if g % 2 else "lost",
+                             pnl=10.0 if g % 2 else -10.0, ev=4.0, sport="mlb"))
+    report, overlay = opt.build_report(state, today="2026-09-25", now=NOW, resamples=300, orders=orders)
+    tier = "mlb|player_props|*|*"
+    assert tier in overlay["stake_scale"], "25 games per prop cell is below MIN_GAMES; the pooled 100 is not"
+    assert opt.FACTOR_FLOOR <= overlay["stake_scale"][tier]["factor"] < 1.0
+    assert not any(c.startswith("mlb|batter") for c in overlay["stake_scale"]), "each own cell is below the floor"
+    assert "mlb|h2h|full|pregame" not in overlay["stake_scale"], "game lines never enter the props tier"
+    assert report["staked_summary"]["all"]["bets"] == 200, "the tier must not double count"
+    assert [r["bets"] for r in report["staked"] if r["cell"] == tier and r["band"] == opt.ALL_BAND] == [100]
+    table, why = opt.validate_overlay(json.loads(opt.dumps(overlay)), now=NOW)
+    assert why == "ok" and tier in table["stake_scale"]

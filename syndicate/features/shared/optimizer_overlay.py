@@ -114,7 +114,12 @@ def factor_for_row(row: Any, *, now: datetime | None = None, path: Path | None =
         if not table:
             return 1.0
         cell = cell_of_row(row, now=now)
-        factor = float(table["edge_shrink"].get(cell, 1.0)) * float(table["stake_scale"].get(cell, 1.0))
+        stakes = table["stake_scale"]
+        # A prop's own cell wins; the sport's pooled props tier applies only when the cell has no entry.
+        stake = stakes.get(cell)
+        if stake is None:
+            stake = stakes.get(opt.props_tier_cell(cell) or "", 1.0)
+        factor = float(table["edge_shrink"].get(cell, 1.0)) * float(stake)
         return max(opt.FACTOR_FLOOR, min(1.0, factor))
     except Exception as exc:
         meta = {"reason": f"error:{type(exc).__name__}"}

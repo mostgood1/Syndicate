@@ -93,6 +93,36 @@ EV_BANDS: tuple[tuple[float | None, float | None, str], ...] = (
 )
 ALL_BAND = "all"
 
+# PROPS TIER [2026-10-14, lane optimizer-props-tier, user decision "Add a sport-level props tier"]. Staked
+# player props lost against their admitted EV in four sports (MLB/NFL/NHL/WNBA, 10-14 report) while only 4
+# of 101 staked cells reached MIN_GAMES, so no per-cell `stake_scale` could fire. Every staked prop is ALSO
+# accumulated into one pooled cell per sport, `<sport>|player_props|*|*`, graded under the same rails
+# (MIN_GAMES/MIN_DATES, BH, leave-one-date-out). The consumer uses it only for a prop row whose own cell has
+# no `stake_scale` entry. A multiplier on rank/stake, floored -- never a withhold (2026-10-05 PRIME DIRECTIVE).
+PROPS_TIER_MARKET = "player_props"
+_GAME_MARKETS = frozenset({"h2h", "h2h_3_way", "spreads", "spreads_alt", "spreads_3_way", "totals", "totals_alt",
+                           "totals_3_way", "team_totals", "btts", "draw_no_bet", "double_chance", "outrights"})
+
+
+def is_prop_market(market: Any) -> bool:
+    text = str(market or "").strip().lower()
+    if not text or text == PROPS_TIER_MARKET:
+        return False
+    return not (text in _GAME_MARKETS or text.startswith("alternate_") or "spreads" in text or "totals" in text)
+
+
+def props_tier_cell(cell: Any) -> str | None:
+    """The pooled props cell for a `sport|market|segment|phase` cell, or None for a game-line market."""
+    parts = str(cell or "").split("|")
+    if len(parts) != 4 or not parts[0] or not is_prop_market(parts[1]):
+        return None
+    return f"{parts[0]}|{PROPS_TIER_MARKET}|*|*"
+
+
+def is_tier_cell(cell: Any) -> bool:
+    parts = str(cell or "").split("|")
+    return len(parts) == 4 and parts[1] == PROPS_TIER_MARKET
+
 
 # ---------------------------------------------------------------------------
 # small helpers
@@ -554,8 +584,13 @@ def staked_games(state: Mapping[str, Any], orders: Iterable[Mapping[str, Any]], 
         event = str(order.get("event_id") or order.get("position_key") or "")
         game = games.setdefault((day, event), {"date": day, "key": f"{day}|{event}",
                                                "sport": str(order.get("sport") or "").lower(), STAKED_FIELD: {}})
-        for band in (ALL_BAND, books_band(info.get("books")), basis):
-            acc = game[STAKED_FIELD].setdefault(f"{info['cell']}|{band}", [0, 0, 0.0, 0.0, 0, 0.0, 0.0])
+        keys = [f"{info['cell']}|{band}" for band in (ALL_BAND, books_band(info.get("books")), basis)]
+        tier = props_tier_cell(info["cell"])
+        if tier:
+            # `all` band only: the tier is a second view of the same bets, so every summary skips it.
+            keys.append(f"{tier}|{ALL_BAND}")
+        for key in keys:
+            acc = game[STAKED_FIELD].setdefault(key, [0, 0, 0.0, 0.0, 0, 0.0, 0.0])
             acc[0] += 1
             acc[1] += win
             acc[2] += unit_pnl
@@ -676,6 +711,8 @@ def build_report(state: Mapping[str, Any], *, today: str, now: datetime, run: Ma
         staked_rows = grade_bands(staked_list, STAKED_FIELD, resamples=resamples)
     stakes = stake_scales(staked_rows)
     overlay = overlay_payload(calibration, stakes, now=now, window=f"{WINDOW_DAYS}d")
+    # Summaries count each bet once: the props tier re-counts bets already in their own cells.
+    staked_cells = [r for r in staked_rows if not is_tier_cell(r["cell"])]
 
     by_sport: dict[str, dict[str, Any]] = {}
     for sport in sorted({str(g.get("sport")) for g in games}):
@@ -692,7 +729,7 @@ def build_report(state: Mapping[str, Any], *, today: str, now: datetime, run: Ma
             "cells": len(cal_rows),
             "cells_overconfident": sum(1 for r in cal_rows if r["verdict"] == "overconfident"),
             "cells_with_w": len(sdd_weighted),
-            "staked": _pooled_bands([r for r in staked_rows if r["cell"].startswith(sport + "|")], ALL_BAND),
+            "staked": _pooled_bands([r for r in staked_cells if r["cell"].startswith(sport + "|")], ALL_BAND),
             "recommended": _sum_bands([r for r in rec if r["band"] == ALL_BAND and r["cell"].startswith(sport + "|")]),
             "pooled": _sum_bands([r for r in pool if r["band"] == ALL_BAND and r["cell"].startswith(sport + "|")]),
         }
@@ -710,7 +747,7 @@ def build_report(state: Mapping[str, Any], *, today: str, now: datetime, run: Ma
         "pooled": pool,
         "staked": staked_rows,
         "staked_counts": staked_counts,
-        "staked_summary": {band: _pooled_bands(staked_rows, band) for band in
+        "staked_summary": {band: _pooled_bands(staked_cells, band) for band in
                            (ALL_BAND, "market_only", "model", "books1-2", "books3-4", "books5-7", "books8+", "books_na")},
         "overlay": overlay,
         "run": dict(run or {}),

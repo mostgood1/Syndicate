@@ -6,7 +6,8 @@ did not already publish (the `daily-accuracy` skill's rule: never a second grade
     py -3 .claude/skills/daily-optimizer/review.py            # fleet default, token from WSL
     py -3 .claude/skills/daily-optimizer/review.py --json
 
-Exit codes: 0 fresh · 2 stale (generated_at older than --max-age-hours) · 4 unreadable · 5 no token.
+Exit codes: 0 fresh · 2 stale (older than --max-age-hours, or today's 11:30Z run not landed by 12:15Z)
+· 4 unreadable · 5 no token.
 """
 
 from __future__ import annotations
@@ -80,7 +81,12 @@ def main(argv: list[str] | None = None) -> int:
         return 4
     generated = datetime.fromisoformat(str(report.get("generated_at")).replace("Z", "+00:00"))
     age_h = (datetime.now(timezone.utc) - generated).total_seconds() / 3600.0
-    stale = age_h > args.max_age_hours
+    # The cron fires at 11:30Z; once that slot plus a grace has passed, an older report means today's run
+    # has not landed (2026-10-14: host Modern Standby 07:37-12:02Z, a 25.3 h report read as fresh by age alone).
+    now = datetime.now(timezone.utc)
+    due = now.replace(hour=11, minute=30, second=0, microsecond=0)
+    missed_today = now >= due.replace(hour=12, minute=15) and generated < due
+    stale = age_h > args.max_age_hours or missed_today
 
     try:
         previous = json.loads(LAST_SEEN.read_text(encoding="utf-8"))
@@ -98,7 +104,8 @@ def main(argv: list[str] | None = None) -> int:
                           "edge_shrink": overlay.get("edge_shrink"), "stake_scale": overlay.get("stake_scale"),
                           "overlay_changes": changes, "resets": report.get("resets")}, indent=1, sort_keys=True))
     else:
-        print(f"generated_at {report.get('generated_at')} ({age_h:.1f} h old){'  ** STALE **' if stale else ''}")
+        print(f"generated_at {report.get('generated_at')} ({age_h:.1f} h old){'  ** STALE **' if stale else ''}"
+              f"{'  (today 11:30Z run not landed)' if missed_today else ''}")
         print(report.get("markdown") or "(no markdown in report)")
         print("Overlay changes since last review:" if changes else
               "Overlay changes since last review: none" + ("" if previous is not None else " (no previous copy)"))

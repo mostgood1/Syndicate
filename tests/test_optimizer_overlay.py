@@ -110,3 +110,29 @@ def test_the_cron_writes_the_consumer_overlay_beside_the_report(tmp_path):
     report, overlay = opt.build_report(opt.empty_state("sig"), today="2026-10-05", now=NOW, resamples=20)
     table, why = opt.validate_overlay(json.loads(opt.dumps(overlay)), now=NOW)
     assert why == "ok" and table == {"edge_shrink": {}, "stake_scale": {}}
+
+
+TIER = "nfl|player_props|*|*"
+
+
+def _tiered(own: float | None, tier: float) -> dict:
+    payload = _overlay(shrink=None, scale=own)
+    payload["stake_scale"][TIER] = {"factor": tier, "games": 120, "dates": 9}
+    return payload
+
+
+def test_a_prop_row_without_its_own_entry_takes_the_sport_props_tier(disk):
+    _write(disk, _tiered(None, 0.6))
+    assert oo.factor_for_row(_row()) == pytest.approx(0.6)
+    assert pc._sizing_skill_factor(_row()) == pytest.approx(0.6), "reachability: the stake path sees the tier"
+
+
+def test_the_own_cell_entry_wins_over_the_tier(disk):
+    _write(disk, _tiered(0.9, 0.6))
+    assert oo.factor_for_row(_row()) == pytest.approx(0.9)
+
+
+def test_the_props_tier_never_touches_a_game_line_or_another_sport(disk):
+    _write(disk, _tiered(None, 0.6))
+    assert oo.factor_for_row(dict(_row(), market="h2h")) == 1.0
+    assert oo.factor_for_row(dict(_row(), sport="mlb", market="batter_hits")) == 1.0
