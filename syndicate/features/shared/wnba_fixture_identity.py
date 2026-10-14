@@ -15,7 +15,8 @@ said to stop and establish one before building a coverage fix on top.
 
 **THE IDENTITY ALREADY EXISTED; NOBODY WAS USING IT.**
 `schedule_2026.csv` is keyed by the ESPN event id, and that is the SAME
-namespace the live feed uses. Measured 2026-08-17, both sources, same instant:
+namespace the live feed uses. (WHICH copy is read changed 2026-10-14 -- see
+`schedule_path`: the refresh's own data-root file, not the vendored one.) Measured 2026-08-17, both sources, same instant:
 
     schedule_2026.csv            ESPN scoreboard?dates=20260816
     401857148 CHI @ SEA    ==    401857148 CHI @ SEA
@@ -67,10 +68,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-# Candidate locations, most authoritative first. The vendored repo holds the
-# git-tracked master; the mirror under data/wnba_source is refreshed copy.
+# COLD-START fallbacks only, relative to the repo root: the git-tracked mirror under data/wnba_source. The live
+# source is the data root's schedule (`_data_root_schedule`). Off vendor since 2026-10-14 (lane
+# wnba-fixture-identity-native, user request): this list used to START with the vendored
+# vendor/wnba_betting_repo/data/processed/schedule_2026.csv, frozen at the vendor pull (ends 2026-09-24), so on the
+# fleet every postseason fixture was unresolvable -- playoff game_cards carried a blank fixture_id, and 2-game dates
+# (10-04/07/09) kept 1 row because the backfill could not see the second game.
 _SCHEDULE_RELATIVE_PATHS: tuple[str, ...] = (
-    "vendor/wnba_betting_repo/data/processed/schedule_2026.csv",
     "data/wnba_source/source_artifacts/data/processed/schedule_2026.csv",
     "data/wnba_source/data/processed/schedule_2026.csv",
 )
@@ -109,12 +113,38 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
+def _data_root_schedule() -> Path | None:
+    """The schedule the WNBA props refresh's `fetch-schedule` rewrites each run: the newest `schedule_*.csv` under
+    WNBA_BETTING_DATA_ROOT/processed (set on every refresh role), else under the data root's wnba_source/data.
+    Newest by mtime because older snapshots under other names linger there (schedule_2025_26.csv and
+    schedule_2026_27.csv were stale 2026 copies on the fleet, 2026-10-14)."""
+    raw = os.environ.get("WNBA_BETTING_DATA_ROOT", "").strip()
+    if raw:
+        processed = Path(raw) / "processed"
+    else:
+        try:
+            from syndicate.features.shared.refresh_state_store import data_root
+
+            processed = data_root() / "wnba_source" / "data" / "processed"
+        except Exception:
+            return None
+    try:
+        candidates = [path for path in processed.glob("schedule_*.csv") if path.is_file()]
+        return max(candidates, key=lambda path: path.stat().st_mtime) if candidates else None
+    except OSError:
+        return None
+
+
 def schedule_path() -> Path | None:
-    """First schedule file that exists, or None. An override wins outright."""
+    """The schedule to read, or None. An override wins outright; then the data root's live schedule; then the
+    repo's cold-start mirror."""
     override = os.environ.get("SYNDICATE_WNBA_SCHEDULE_PATH", "").strip()
     if override:
         candidate = Path(override)
         return candidate if candidate.is_file() else None
+    live = _data_root_schedule()
+    if live is not None:
+        return live
     root = _repo_root()
     for rel in _SCHEDULE_RELATIVE_PATHS:
         candidate = root / rel

@@ -14,24 +14,34 @@ silent.
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 import pytest
 
 from syndicate.features.shared import wnba_fixture_identity as ident
 
 
+#: The 2026 regular-season schedule these tests were written against (351 fixtures, 04-25..09-24): a byte-identical
+#: copy of the vendored file the module used to read first. Since 2026-10-14 the module reads the data root's live
+#: schedule (lane wnba-fixture-identity-native), so the tests pin THIS file instead of whatever a checkout has.
+FIXTURE_SCHEDULE = Path(__file__).resolve().parent / "fixtures" / "wnba_fixture_identity" / "schedule_2026.csv"
+
+
 @pytest.fixture(autouse=True)
-def _clean():
+def _clean(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_WNBA_SCHEDULE_PATH", str(FIXTURE_SCHEDULE))  # a test's own setenv still wins
     ident._clear_cache()
     yield
     ident._clear_cache()
 
 
 def _has_schedule() -> bool:
-    return ident.schedule_path() is not None
+    return FIXTURE_SCHEDULE.is_file()
 
 
 requires_schedule = pytest.mark.skipif(
-    not _has_schedule(), reason="schedule_2026.csv not present in this checkout"
+    not _has_schedule(), reason="tests/fixtures/wnba_fixture_identity/schedule_2026.csv missing"
 )
 
 
@@ -369,3 +379,48 @@ def test_a_full_slate_backfills_nothing_and_is_left_alone(monkeypatch):
     out, report = ident.stamp_and_backfill_game_cards_rows("2026-08-16", rows)
     assert (report["covered"], report["backfilled"], report["unresolved"]) == (3, 0, 0)
     assert len(out) == 3
+
+
+# --------------------------------------------------------------------------
+# Which schedule is read (lane wnba-fixture-identity-native, 2026-10-14).
+# --------------------------------------------------------------------------
+
+
+def test_the_data_root_schedule_wins_and_the_newest_file_is_read(tmp_path, monkeypatch):
+    monkeypatch.delenv("SYNDICATE_WNBA_SCHEDULE_PATH", raising=False)
+    processed = tmp_path / "processed"
+    processed.mkdir()
+    stale = processed / "schedule_2026_27.csv"
+    stale.write_text("game_id\n", encoding="utf-8")
+    os.utime(stale, (1, 1))
+    live = processed / "schedule_2026.csv"
+    live.write_text(FIXTURE_SCHEDULE.read_text(encoding="utf-8"), encoding="utf-8")
+    monkeypatch.setenv("WNBA_BETTING_DATA_ROOT", str(tmp_path))
+    assert ident.schedule_path() == live
+
+
+def test_the_vendored_schedule_is_never_a_candidate(tmp_path, monkeypatch):
+    monkeypatch.delenv("SYNDICATE_WNBA_SCHEDULE_PATH", raising=False)
+    monkeypatch.setenv("WNBA_BETTING_DATA_ROOT", str(tmp_path / "empty"))
+    assert not any("vendor" in rel for rel in ident._SCHEDULE_RELATIVE_PATHS)
+    path = ident.schedule_path()
+    assert path is None or "vendor" not in path.parts
+
+
+@requires_schedule
+def test_a_postseason_fixture_resolves_from_a_schedule_that_has_it(tmp_path, monkeypatch):
+    rows = FIXTURE_SCHEDULE.read_text(encoding="utf-8").rstrip("\n").split("\n")
+    header = rows[0].split(",")
+    finals = dict.fromkeys(header, "")
+    finals.update({"game_id": "401918305", "date_est": "2026-10-17", "date_utc": "2026-10-17", "datetime_utc": "2026-10-17T19:30:00Z",
+                   "home_tricode": "GSV", "away_tricode": "ATL", "season_type_slug": "post-season"})
+    for k in ("home_name", "home_team", "away_name", "away_team"):
+        if k in finals:
+            finals[k] = "Valkyries" if k.startswith("home") else "Dream"
+    live = tmp_path / "processed" / "schedule_2026.csv"
+    live.parent.mkdir()
+    live.write_text("\n".join(rows + [",".join(finals[h] for h in header)]) + "\n", encoding="utf-8")
+    monkeypatch.delenv("SYNDICATE_WNBA_SCHEDULE_PATH", raising=False)
+    monkeypatch.setenv("WNBA_BETTING_DATA_ROOT", str(tmp_path))
+    assert ident.resolve_fixture_id("2026-10-17", "GSV", "ATL") == "401918305"
+    assert ident.resolve_fixture_id("2026-10-17", "ATL", "GSV") is None  # orientation is identity

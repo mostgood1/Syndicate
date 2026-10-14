@@ -67,7 +67,9 @@ def _run(module, tmp_path, *, with_schedule: bool = False):
     if not with_schedule:
         os.environ["SYNDICATE_WNBA_SCHEDULE_PATH"] = str(tmp_path / "no_schedule.csv")
     else:
-        os.environ.pop("SYNDICATE_WNBA_SCHEDULE_PATH", None)
+        # The 2026 regular-season schedule (2026-08-11 is a 3-game date in it). This used to fall through to the repo's
+        # vendored master, which the module no longer reads (lane wnba-fixture-identity-native, 2026-10-14).
+        os.environ["SYNDICATE_WNBA_SCHEDULE_PATH"] = str(_REPO / "tests" / "fixtures" / "wnba_fixture_identity" / "schedule_2026.csv")
     buf = io.StringIO()
     try:
         with contextlib.redirect_stdout(buf):
