@@ -60,3 +60,16 @@ def test_off_is_not_on_exact_matching_alone_misses_these(monkeypatch):
     rows = _rows("Eren Sami Dinkci", "Woo-Yeong Jeong")
     monkeypatch.setattr(L, "_NAME_FORM_STEPS", ())
     assert _resolve(rows, "Eren Dinkci", "Jeong Woo-yeong") == set()
+
+
+def test_an_espn_id_pins_the_starter_whatever_the_names():
+    """Primeira Liga rows carry ESPN ids; the deduped row keeps the season with the most minutes, so it reads
+    "Jonathan Buatu" while ESPN's starter is "Buatu" (10-09..12: Buatu, Gorby, Chissumba, Vinicius Lopes)."""
+    rows = [{"player_id": "183070", "player_name": "Jonathan Buatu"}, {"player_id": "1", "player_name": "Other Player"}]
+    assert L.resolve_starter_ids(rows, {"buatu"}, {"183070": "buatu"}) == {"183070"}
+    assert L.resolve_starter_ids(rows, {"buatu"}) == set()          # off != on: names alone cannot pin a one-word name
+
+
+def test_an_id_does_not_cross_sources():
+    rows = [{"player_id": "understat_183070", "player_name": "Somebody Else"}]
+    assert L.resolve_starter_ids(rows, {"buatu"}, {"183070": "buatu"}) == set()

@@ -51,7 +51,11 @@ def _norm_player_name(name: str) -> str:
     return " ".join(text.lower().replace(".", " ").replace("-", " ").split())
 
 
-def resolve_starter_ids(player_rows: list[dict[str, Any]], starter_names: set[str]) -> set[str]:
+def resolve_starter_ids(
+    player_rows: list[dict[str, Any]],
+    starter_names: set[str],
+    starter_espn_ids: dict[str, str] | None = None,
+) -> set[str]:
     """Map normalized ESPN starter names onto the identity keys
     ``build_usage_profiles`` actually uses (player_id when present, else a
     name-based key) -- so a ``starters`` set built from this function lines
@@ -59,9 +63,20 @@ def resolve_starter_ids(player_rows: list[dict[str, Any]], starter_names: set[st
     (Understat, ASA, ...) those rows came from."""
     resolved: set[str] = set()
     matched_names: set[str] = set()
+    # BY ESPN ID FIRST (lane soccer-starter-name-match, 2026-10-14). Where the
+    # season rows are ESPN-sourced (championship, eredivisie, belgian_pro_league,
+    # primeira_liga) a row's `player_id` IS the ESPN athlete id, and the id pins the
+    # player whatever either side calls them: the deduped row keeps the season with
+    # the most minutes, so it reads "Jonathan Buatu" while ESPN's starter is "Buatu".
+    # `starter_espn_ids` maps ESPN id -> normalized starter name.
+    for index, row in enumerate(player_rows):
+        espn_name = (starter_espn_ids or {}).get(str(row.get("player_id") or ""))
+        if espn_name is not None:
+            resolved.add(player_row_key(row, index, "_"))
+            matched_names.add(espn_name)
     for index, row in enumerate(player_rows):
         name = _norm_player_name(row.get("player_name"))
-        if name in starter_names:
+        if name in starter_names and player_row_key(row, index, "_") not in resolved:
             resolved.add(player_row_key(row, index, "_"))
             matched_names.add(name)
     # NAME-FORM FALLBACK (lane soccer-starter-name-match, 2026-10-13). ESPN's
@@ -173,8 +188,13 @@ def fetch_confirmed_starter_ids(
     if len(home_names) < min_starters or len(away_names) < min_starters:
         return None
 
-    home_ids = resolve_starter_ids(home_player_rows, home_names)
-    away_ids = resolve_starter_ids(away_player_rows, away_names)
+    starter_ids = {
+        side: {str(row["player_id"]): _norm_player_name(row["player_name"])
+               for row in rows if row["side"] == side and row["starter"] and row.get("player_id")}
+        for side in ("home", "away")
+    }
+    home_ids = resolve_starter_ids(home_player_rows, home_names, starter_ids["home"])
+    away_ids = resolve_starter_ids(away_player_rows, away_names, starter_ids["away"])
     # PER SIDE, NOT PER FIXTURE. This used to `return None` when EITHER side
     # resolved fewer than `min_starters`, which discards a side whose lineup
     # matched perfectly well because the OTHER side did not.
