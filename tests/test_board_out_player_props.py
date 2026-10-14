@@ -82,9 +82,19 @@ class OutPlayerBoardTests(unittest.TestCase):
     def test_other_sports_are_not_swept(self) -> None:
         with patch.object(be, "_injury_feed_root", return_value=self.root) as feed_root, \
                 patch.object(be, "_attach_projections_by_sport", return_value={"supported": True}):
-            coverage = be.attach_projections(self.grid, sport="nfl", selected_date=DATE)
+            coverage = be.attach_projections(self.grid, sport="mlb", selected_date=DATE)
         feed_root.assert_not_called()
         self.assertNotIn("out_player_props", coverage)
+
+    def test_nfl_and_nhl_use_the_news_feed_not_the_basketball_file(self) -> None:
+        # Lane `news-availability-gate` (2026-10-14): NFL / NHL are swept from the news collector, never the basketball
+        # injuries.csv path (`tests/test_news_availability_gate.py` covers the matching).
+        for sport in ("nfl", "nhl"):
+            with patch.object(be, "_injury_feed_root", return_value=self.root) as feed_root, \
+                    patch.object(be, "_attach_projections_by_sport", return_value={"supported": True}):
+                coverage = be.attach_projections(self.grid, sport=sport, selected_date=DATE)
+            feed_root.assert_not_called()
+            self.assertEqual(coverage["out_player_props"]["source"], "news")
 
     def test_sweep_failure_is_loud(self) -> None:
         with patch.object(be, "_flag_out_player_props", side_effect=RuntimeError("boom")), \

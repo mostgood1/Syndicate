@@ -1475,6 +1475,17 @@ def attach_projections(grid: list, *, sport: str, selected_date: str) -> dict:
             # Loud in the payload, not just the log: if this fails, OUT players' quotes stay unflagged.
             _LOGGER.exception("OUT_PLAYER_PROPS_FAILURE sport=%s", sport)
             coverage["out_player_props"] = {"feed_status": "failed", "rows_flagged": 0}
+    else:
+        # NHL / NFL: the same flag from the news collector's ESPN injuries + NHL scratches, matched on team + name
+        # (lane `news-availability-gate`). Same failure rule as above.
+        from syndicate.features.shared import news_availability
+
+        if sport in news_availability.SPORTS:
+            try:
+                coverage.update(news_availability.flag_out_player_props(grid, sport=sport))
+            except Exception:
+                _LOGGER.exception("OUT_PLAYER_PROPS_FAILURE sport=%s source=news", sport)
+                coverage["out_player_props"] = {"source": "news", "feed_status": "failed", "rows_flagged": 0}
     try:
         degeneracy = detect_degenerate_projections(grid, sport=sport)
     except Exception:
