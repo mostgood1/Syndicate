@@ -67,6 +67,14 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### basketball-games-history-freshness — OPEN — opened 2026-10-14 — session 2d413211
+- Goal: Re-fetch the NBA/WNBA games history (raw/games_nba_api.csv) when the league's schedule lists a final game after the history's newest one, instead of only when the newest game is >30 days old; deployed with a measurement (user request 2026-10-13: "fix the 30-day history rule").
+- Files: syndicate/features/shared/basketball_games_history_freshness.py (NEW), tests/test_basketball_games_history_freshness.py (NEW), scripts/refresh_wnba_oddsapi_props.py (games history refetch trigger section only), scripts/refresh_nba_oddsapi_props.py (games history refetch trigger section only)
+- Hypothesis: The 30-day rule (`_games_history_is_stale`, stale_days=30) is the only fetch trigger, so a file a few games behind is never refreshed: WNBA history stops at 10-02 (written 10-04) while the schedule has 6 final playoff games 10-04..10-09.
+- Falsification test: After the fleet ff, a WNBA full refresh logs GAMES_HISTORY_BEHIND_SCHEDULE and games_nba_api.csv still lacks the 10-04..10-09 games (the fetch does not capture them), or the trigger re-fires inside its cooldown.
+- Verification: WNBA games_nba_api.csv newest date >= 2026-10-09 after the next full WNBA refresh following the ff, with the trigger line in that run's log; features.csv rebuilt after it.
+- Blocked by: none
+
 ### nba-native-live-resim — OPEN — opened 2026-10-09 — session 6c348b8f-56fa-4e5f-9fe9-ce6752ad27bb
 - **GOAL VERDICT `[checkpoint 2026-10-12 13:3xZ]`.** Goal (verbatim): "P3 of docs/ai_context/basketball_live_native_plan.md: NBA live lens from a resumed native sim (live_resim), vendored tick deleted. P1+P2 NOT LANDED at open (2026-10-09) -> this session does ONLY the prerequisite-free part: pbp checkpoint backtest harness, measured score-effect / garbage-time / end-game-foul targets, refusal design." -> **GOAL: NOT MET.** Built on main and gated engine-neutral (parity 5,400/5,400; e2e A/B 22/22); pregame-input persist VERIFIED in production 8/8 (deploys.md 2026-10-12 13:35Z). NOT switched on, NOT on the board, vendored tick NOT deleted. Left: the regular-season native gate (inputs ready: 201 dates / 1,294 games with #473 + 2024-25 prior), the mechanism re-fits (#473 hold LIFTED), the user's approval to turn SYNDICATE_NBA_LIVE_RESIM on + a live reading, then the cut-over. Blocking: none external; the only native reading (preseason, n=16-18) loses to pregame_rate on totals.
 - Goal: P3 of docs/ai_context/basketball_live_native_plan.md: NBA live lens from a resumed native sim (live_resim), vendored tick deleted. P1+P2 NOT LANDED at open (2026-10-09) -> this session does ONLY the prerequisite-free part: pbp checkpoint backtest harness, measured score-effect / garbage-time / end-game-foul targets, refusal design.
