@@ -2203,3 +2203,10 @@ with EXACT on AND its mechanism on.
    are RE-MEASURED on the #3j dates at the joint fit's chosen point (same measure-then-freeze, same disjoint dates)
    BEFORE the full FIT. Otherwise the full FIT runs a stale s.
 - P4 has been cc'd on the bonus term (P3's design, two-shot award), to OK or veto it.
+
+**#3j M1 (s) — MEASURED 2026-10-14 15:08Z** (`MJ_m1`, 12 measure dates, 16,400 draws, all calls with levers, 0 errors):
+- **s = 0.00709** bonus trips per team possession, i.e. 0.719 trips/team-game over 101.29 possessions/team-game.
+- Intentional end-game trips: 0.180/team-game. Points 116.86/team-game.
+- s is FROZEN at 0.00709.
+- M2/M3 (end-game ON/OFF, s applied, Δ term 0; research copy `code_pk` = code_pj + 6f092c74's engine hunks) started
+  15:09Z.
