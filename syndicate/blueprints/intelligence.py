@@ -3292,6 +3292,14 @@ def board_game_chips_api():
 
     if artifact_is_fresh:
         chips = _from_artifact()
+        # Lane games-rail-full-detail 2026-10-14: a worker artifact built by
+        # older code has no line score on live NBA / WNBA / NHL chips.
+        try:
+            from syndicate.features.shared.game_chip_scoreboard import attach_served_linescores
+
+            attach_served_linescores(chips, selected_date)
+        except Exception:  # noqa: BLE001 -- never cost the scoreboard
+            pass
     else:
         source = (
             "inline_artifact_stale" if has_artifact else "inline_artifact_missing"

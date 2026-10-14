@@ -762,6 +762,30 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
         return
 
 
+_SERVE_TIME_LINESCORE_SPORTS = {"nba", "wnba", "nhl"}
+
+
+def attach_served_linescores(chips: list[dict[str, Any]], date_value: str) -> None:
+    """Line scores on WORKER-BUILT chips at serve time (NBA / WNBA / NHL only).
+
+    Measured 2026-10-14 01:5xZ: tonight's live NBA / NHL chips came from the
+    refresh-worker's artifact, built by code from before the live line score,
+    and the worker rebuilt the board every 3-4 min during the games -- no idle
+    window to restart it in. These three sports need only the chip's own key
+    and tri-codes (ESPN id / team pair), so the web can add the line score
+    itself; the 45 s-cached ESPN read is one request per league. Sports whose
+    line score needs the provider's game dict (MLB feed, soccer box, football
+    live_state) wait for the worker's own build.
+    """
+    for chip in chips or []:
+        if not isinstance(chip, dict) or chip.get("linescore"):
+            continue
+        if chip.get("sport") not in _SERVE_TIME_LINESCORE_SPORTS or chip.get("state") not in ("live", "final"):
+            continue
+        key = chip.get("game_key")
+        _attach_linescore(chip["sport"], {"game_id": key, "event_id": key}, chip, date_value)
+
+
 def _attach_board_plays(chips: list[dict[str, Any]], date_value: str, sports: tuple[str, ...]) -> None:
     """Our board plays per game, and on finals how they did (mockup 4, lane
     games-rail-full-detail; `game_chip_plays`).

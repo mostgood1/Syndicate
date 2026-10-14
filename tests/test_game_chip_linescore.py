@@ -146,5 +146,22 @@ class LiveFromEspn(unittest.TestCase):
         self.assertIsNone(self._live("nhl", {"gamePk": "3"}, away_abbr="BOS", home_abbr="SJS"))
 
 
+class ServedChipLineScores(unittest.TestCase):
+    def test_worker_chips_get_live_line_scores_at_serve_time(self) -> None:
+        from syndicate.features.shared import game_chip_scoreboard as gs
+
+        chips = [{"sport": "nhl", "state": "live", "game_key": "1", "start_time_utc": "2026-10-14T00:00:00Z",
+                  "away": {"abbr": "FLA", "score": "6"}, "home": {"abbr": "CBJ", "score": "2"}},
+                 {"sport": "mlb", "state": "live", "game_key": "2", "away": {"abbr": "A"}, "home": {"abbr": "B"}},
+                 {"sport": "nba", "state": "pregame", "game_key": "3", "away": {"abbr": "GSW"}, "home": {"abbr": "LAL"}}]
+        board = {"401892489": {"away": "FLA", "home": "CBJ", "away_periods": [0, 4, 2], "home_periods": [1, 0, 1]}}
+        gl._CACHE.clear()
+        with mock.patch.object(gl, "_espn_board", return_value=board):
+            gs.attach_served_linescores(chips, "2026-10-13")
+        self.assertEqual(chips[0]["linescore"]["away"], [0, 4, 2])
+        self.assertNotIn("linescore", chips[1])  # MLB waits for the worker's own build
+        self.assertNotIn("linescore", chips[2])  # pregame
+
+
 if __name__ == "__main__":
     unittest.main()
