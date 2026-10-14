@@ -2305,3 +2305,32 @@ same 12 sweep dates.
 - Both are FROZEN.
 - The PK2 check (sweep dates, s′, Δ′) was due at 17:48Z. The PLANNED WINDOWS REBOOT (deploys.md 17:48Z, session d4409ac4)
   will kill it. If it dies, it is relaunched UNREAD with the same values after the fleet is back.
+
+### Phase 2 #3l — PK2 CHECK RESULT 2026-10-14 18:35Z (relaunched unread 18:04Z after the planned reboot killed it at 1/12; done 18:33Z): CONFIRMED
+
+**Run:** `PK2_check`, the 12 sweep dates, the #3l pick with s′ = 0.00802 and Δ′ = 0.138. 17,400/17,400 calls with
+levers, 0 errors.
+
+| reading | PK2 | target | |
+|---|---|---|---|
+| total bias | **+0.08** | \|·\| < 0.5 | ✓ |
+| FTA/team | 22.79 | 22.69 ± 0.3 | ✓ |
+| team PF | 19.72 | real 19.67 | (reading) |
+| foul-outs | 0.212 | [0.153, 0.233] | ✓ |
+| P(6th \| 5th) | 0.2142 (8,617 events) | [0.1607, 0.2643] | ✓ |
+| closers-on | 0.400 | [0.375, 0.535] | ✓ |
+| H2 / Q4 slope / S8 | −0.179 / −0.088 / 14.83 | inside / ≥ −0.101 / ± 0.6 | ✓ |
+| Q4 FTA share | 0.264 | ≥ 0.254 | ✓ |
+
+- Trips/possession in-run 0.00802 equals the frozen s′.
+- P(top fouler ≥ 5) 0.482 (real 0.414).
+
+**PHASE 2 #3 CONFIG (provisional, 12-date confirmed):**
+- bonus_free_throws = 1, bonus rate 0.03;
+- base_nonshooting_foul_per_poss 0.065;
+- end-game (window 120, max deficit 10, p by deficit (0.2, 0.0, 0.2), seconds 5, extend = 1);
+- foul_out_in_sim = 1, thresholds (2, 3, 4, 5), bench 0.05, release 240;
+- fouler_per_minute = 1, foul_trouble_foul_mult 0.5;
+- solver_bonus_trip_share 0.00802, solver_endgame_pts_per_team 0.138.
+
+**Next:** the full FIT (P3's amendment: foul-outs 0.193 ± 0.04 plus the guards), then P3's §7.
