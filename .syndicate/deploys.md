@@ -49057,3 +49057,13 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **Safety:** none of the 17 destination paths existed (the script refuses to overwrite). Each was copied to `.tmp` and then renamed. Nothing on the fleet writes these paths.
 - **Verify -- MET:** 17/17 sha256 equal source; 49,020,611 B; corpus sha256 `d3784b55012d8192`.
 - **Effect:** the analysis scripts (`ncaab_corpus_baseline.py`, `ncaab_live_resim_backtest.py`, `fit_ncaab_bonus_rate.py`) can now run on the fleet against `SYNDICATE_DATA_ROOT`, and the substrate is no longer this one Windows machine. The 2025-26 player box was already there (2026-10-12 16:27Z).
+
+## 2026-10-14 00:52Z (7:52 PM CT 10-13) -- LOCAL FLEET: WNBA recon tools off vendor (9b97b4c6) ALREADY LIVE via another lane's ff -- no ff of mine; production reading OWED 2026-10-17 (lane `nba-source-cli-native`, session 2d413211)
+
+- **User decision 2026-10-13:** "move the wnba recon tools off vendor", then "Yes, ff after props idle".
+- **Finding before acting:** the fleet was at 82f9d695. 9b97b4c6 has been an ancestor of every fleet HEAD since the ff to d1189be2 at 19:15:00Z (reflog `2026-10-13T14:15:00-05:00`), which another lane ran. So I did no ff, took no claim, and restarted nothing. 71e99a9a (the WNBA seed/predictions copy) went out in the same ff.
+- **Change:** `_build_local_optional_player_recon_artifacts` loads `syndicate/features/wnba/recon_tools/{build_recon_players,build_live_player_lens_tuning}.py`: the vendored bytes under a comment header, with the lens-tuning tool's UTF-8 BOM moved above the header.
+- **Pre-merge parity (fleet, prod WNBA data, read-only, nice 19):** vendored vs copy on 10-02/04/07/09, both tools: 8/8 frames equal (recon_players 22/44/20/39 rows, lens tuning 57/56/31/42).
+- **VERIFY (deployed checkout, 00:51Z):** `syndicate/features/wnba/recon_tools/` is present, `tools_root` is at refresh line 5613, and `tests/test_wnba_recon_tools_native.py` gives 3 passed.
+- **Production reading OWED:** the newest recon files are still 10-09 (written 21:04 CT). The builder fires only when a date's recon CSVs are missing and box scores exist, so the first write through the copy is expected after Finals G1, 2026-10-17. Read `recon_players_2026-10-17.csv` / `live_player_lens_tuning_2026-10-17.csv`: mtime after 19:15Z 10-13, and non-empty.
+- **Rollback:** revert 9b97b4c6 and ff. No restart needed.
