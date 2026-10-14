@@ -1075,6 +1075,14 @@ death, never life — do not invert it.
 - Verification: TEST_PUSH push=sent in C:\SyndicateProd\watchdog\watchdog.log and the user confirms receipt; the next scheduled run logs status with the new copy; task LogonType Password
 - Blocked by: none
 
+### ci-env-home-sandbox — OPEN — opened 2026-10-14 — session feaf967d-56d0-48b5-96f4-b5bd61392109
+- Goal: no nightly ci-suite test can read or write fleet production state: ci_env() sandboxes HOME + SYNDICATE_LOCAL_HOME; measured before/after over prod claim dir, data root, run dir
+- Files: scripts/local_production.py (ci_env + CI_ENV_PASSTHROUGH + cmd_ci_run section only), tests/test_local_production_ci_env.py (NEW)
+- Hypothesis: the 10-13/10-14 stray web claims reached prod via HOME -> ~/syndicate-prod/local_production.env SYNDICATE_DEPLOY_CLAIM_DIR, not an inherited env var (ci_env scrubs that)
+- Falsification test: a suite run with sandboxed HOME still changes the prod claim dir / data root / run dir
+- Verification: snapshot diff of prod dirs before/after one Idle suite run
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
