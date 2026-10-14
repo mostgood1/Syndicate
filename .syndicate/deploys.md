@@ -49342,3 +49342,9 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
     - 2026-10-20: BOS@DET, PHI@NYK, OKC@SAS.
   - 18:11:32Z: no `nba_betting.cli` / `wnba_betting.cli` process; one `source_cli.cli fetch-schedule`.
 - **Rollback:** revert a78aab9c (and 63631afb) and ff; then TERM the live-odds-worker.
+
+## 2026-10-14 18:15Z -- READING for the 17:48Z planned reboot: the fleet STARTS AT BOOT WITH NO LOGON -- MET (session d4409ac4)
+- **timeline (CT):** fleet `down` 12:48:17-12:48:27; `shutdown /r` 12:48:27 (event 1074); LastBootUpTime 12:50:35; task `SyndicateLocalProduction` LastRun 12:51:47 (BootTrigger + PT1M); gunicorn "Listening at http://127.0.0.1:10000" 12:51:51; refresh-worker BOOTED 12:51:53; FIRST LOGON 12:53:47 (event 7001). Web outage 12:48:17 -> 12:51:51 = 3 m 34 s.
+- **roles 18:12Z:** web pid 391 and refresh-worker pid 455 restarts=0, code=63631afb (the boot-time checkout); live-odds-worker pid 3293 restarts=1 code=a78aab9c. /healthz 200. Note: `status` "supervisor ... since 18:05:02Z" is the pidfile rewrite on the live-odds respawn, NOT the boot.
+- **inside my claim, by another lane (their message, not mine):** session 2d413211 / lane basketball-schedule-adapter-native at 18:04:42Z `git merge --ff-only a78aab9c` (63631afb -> a78aab9c, 9 other lanes' commits) and 18:04:52Z TERM of live-odds-worker pid 456 (respawned 3293 at 18:05:03Z); their acquire was refused and their script did not stop on it. Nothing of this reading depends on it. web / refresh-worker carry a78aab9c only at their next restart.
+- **claims released** 18:13:0xZ (web, refresh-worker, live-odds-worker; holder games-rail-full-detail).
