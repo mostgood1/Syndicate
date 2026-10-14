@@ -2032,3 +2032,36 @@ dates, 200 sims.
 - Ordering amendment: P3's game-matched §7 end-game check runs AFTER the totals re-fit. Last-2:00 points depend on the
   team targets, so a §7 read before the re-fit would test a config that will not ship.
 - The order is therefore: pick (provisional) → totals re-fit → full FIT → §7.
+
+### Phase 2 #3h — RESULT 2026-10-14 06:19Z (done 06:18Z, co-signed): CONFIRMED, provisional pick foul_mult = 0.5 (on fouler_per_minute)
+
+**Run:** 5 points × 12 dates, 17,400/17,400 calls with levers, 0 errors.
+
+| foul_mult | foul-outs [0.153, 0.233] | closers-on [0.375, 0.535] | P(6th\|5th) [0.1607, 0.2643] | FTA ± 0.7 | H2 [−0.19, −0.155] | Q4 ≥ −0.101 | S8 ± 0.6 | Q4 FTA sh | total bias | verdict |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 0.7 | 0.234 ✗ | 0.388 | 0.2553 | 23.11 | −0.162 | −0.084 | 15.02 | 0.264 | +0.98 | fail (by 0.001) |
+| **0.5** | **0.194 ✓** | **0.400 ✓** | **0.2145 ✓** | 23.22 ✓ | −0.188 ✓ | −0.094 ✓ | 14.79 ✓ | 0.265 ✓ | +1.23 | **PASS** |
+| 0.4 | 0.155 ✓ | 0.409 ✓ | 0.1715 ✓ | 23.22 ✓ | −0.178 ✓ | −0.091 ✓ | 14.94 ✓ | 0.265 ✓ | +1.29 | PASS |
+| 0.35 | 0.145 ✗ | 0.413 | 0.1642 | 23.21 | −0.175 | −0.094 | 14.89 | 0.264 | +1.26 | fail |
+| 0.3 | 0.125 ✗ | 0.416 | 0.1333 ✗ | 23.17 | −0.190 | −0.093 | 14.76 | 0.264 | +0.86 | fail |
+
+**Pick by the rule: 0.5**, |foul-outs − 0.193| = 0.001 (0.4 gives 0.038).
+- P(6th | 5th) 0.2145 against real 0.2125.
+- Closers-on 0.400 against real 0.455, inside the band but still low.
+- Unchanged by foul_mult: top-5 PF share 0.596, 5th-PF events 0.44–0.46/game (real 0.29), P(top ≥ 5) 0.45, team PF
+  19.2.
+
+**PROVISIONAL CONFIG for the rest of Phase 2 #3:**
+- bonus_free_throws = 1, bonus_nonshoot_foul_per_poss = 0.04;
+- end-game (window 120, max deficit 10, p by deficit (0.2, 0.0, 0.2), seconds 5, extend = 1);
+- foul_out_in_sim = 1, thresholds (2, 3, 4, 5), bench_mult 0.05, release 240;
+- **fouler_per_minute = 1, foul_trouble_foul_mult = 0.5**.
+
+**Next, in order** (P3's amendment + ordering):
+1. Re-fit the NBA totals calibration on this config (total bias +1.23 here).
+2. Full-FIT re-run, which must hold foul-outs 0.193 ± 0.04 and the guards.
+3. P3's §7 game-matched end-game check.
+
+**Open, carried:**
+- the Q4 FTA share is still 0.265 vs 0.279;
+- 5th-PF events are 1.5× real.
