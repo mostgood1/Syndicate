@@ -2065,3 +2065,30 @@ dates, 200 sims.
 **Open, carried:**
 - the Q4 FTA share is still 0.265 vs 0.279;
 - 5th-PF events are 1.5× real.
+
+### Phase 2 #3 — CORRECTION 2026-10-14 06:20Z: "re-fit the totals calibration" is ILL-POSED for the foul-mechanism overshoot; the cause is FT volume
+
+**The pre-registered step 1 cannot act on this overshoot** (#3d onward, carried into #3h).
+- `build_nba_totals_calibration.py` fits actual − `market_anchor.model_total_raw`. That is the RAW model total from
+  ratings × pace, UPSTREAM of the engine, so the foul mechanisms do not change it.
+- The +1.2 is the ENGINE exceeding its own target. A re-fit would reproduce the same terms and leave it in place.
+
+**Decomposition** (same 87 games; totals, FTA, FTM and non-FT points per game, both teams):
+
+| run | total | FTA | FTM | non-FT pts |
+|---|---|---|---|---|
+| FT_b000 (no bonus) | 230.67 | 42.08 | 33.29 | 197.38 |
+| FT_b004 (bonus 0.04) | 231.31 | 45.75 | 36.20 | 195.11 |
+| JF_m005 (+ end-game) | 231.75 | 46.49 | 36.80 | 194.96 |
+| PG_on (+ per-minute fouler) | 232.02 | 46.46 | 36.79 | 195.23 |
+| PH_f050 (+ foul_mult 0.5) | 231.85 | 46.57 | 36.82 | 195.03 |
+
+- Real FTA is 45.38/game (22.69 × 2). The picked config sits at **46.57, +1.2 FTA ≈ +0.9 points over real**.
+- The bonus rate 0.04 was fitted in #3 WITHOUT end-game fouling. End-game adds ~0.7 FTA/game on top, so the bonus rate
+  must be re-fitted with end-game ON (mechanism vs estimator, again).
+- The rest (~+0.3) is bonus trips replacing shot possessions at a higher points-per-possession, which the
+  EXACT_TARGET solver (`_solve_eff_mult`) does not account for. That is an engine change, the bonus owner's domain
+  (P4/P3), and only worth it if a residual remains after the re-fit.
+
+**Corrected step 1:** re-fit bonus_nonshoot_foul_per_poss with end-game ON (#3i). The totals calibration re-fit is
+dropped from the sequence (P3's §7-after-re-fit ordering then applies to #3i).
