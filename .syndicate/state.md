@@ -472,7 +472,6 @@ once this index exists: re-splitting would orphan the parts.
 | [wnba-fixture-identity] | WNBA fixture identity + the sweep ownership gap - VERIFIED 2026-08-17 — **ARCHIVED 2026-08-19 to `state_archiv | `state_basketball.md` |
 | [wnba-sweep-ownership-gate] | WNBA SWEEP OWNERSHIP GATE + PHASE 2 AUTORUN `[collapsed 2026-08-18 from three 2026-08-17/18 snapshots; newest  | `state_basketball.md` |
 | [basketball-smart-sim-engine] | NBA/WNBA smart-sim: allowlist, dead-gate fix, and an open staleness question — 2026-08-18 (lane `basketball-mo | `state_basketball.md` |
-| [basketball-props-refresh-off-vendor] | Basketball props refreshes off vendor path by path; WNBA games history tracks the schedule (NBA half inert: schedule_2025_26 only) | `state_basketball.md` |
 | [wnba-cards-fallback-recursion] | `_artifact_bundle` RE-ENTERED ITSELF 247 FRAMES DEEP AND REPORTED NOTHING — FIXED `[2026-09-03, lane wnba-card | `state_basketball.md` |
 | [nba-model-skill-2025-26] | THE NBA MODEL IS LESS ACCURATE THAN THE PLAYER'S OWN AVERAGE, AND THE REASONS ARE MEASURED — as-of 2025-26 bac | `state_basketball.md` |
 | [nba-layer2-projections] | NBA LINES CARRY THE MODEL ON LAYER 2 -- game lines LIVE and VERIFIED; props wired but no NBA prop quote exists | `state_basketball.md` |
@@ -482,6 +481,7 @@ once this index exists: re-splitting would orphan the parts.
 | [basketball-native-engine] | THE BASKETBALL POSSESSION ENGINE IS SYNDICATE'S -- live on the fleet, parity-proven on 5,400 real production c | `state_basketball.md` |
 | [basketball-native-orchestrator] | THE BASKETBALL SMART-SIM ORCHESTRATOR IS SYNDICATE'S; the sim path imports no vendored module -- live on the f | `state_basketball.md` |
 | [nba-sim-totals-and-strength] | NBA SMART-SIM TOTALS + TEAM STRENGTH: measured defects, fixes built DEFAULT-OFF, nothing enabled `[2026-10-10, | `state_basketball.md` |
+| [basketball-props-refresh-off-vendor] | BASKETBALL PROPS REFRESHES: vendored uses retired path by path; WNBA history now tracks the schedule `[verifie | `state_basketball.md` |
 | [board-freshness] | BOARD FRESHNESS AND STALENESS | `state_board.md` |
 | [board-intelligence-engine] | BOARD / INTELLIGENCE ENGINE — structural facts, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19. | `state_board.md` |
 | [locked-cards-retuned-no-autorun] | `locked_cards_retuned` HAS NO AUTOMATIC TRIGGER, ANYWHERE `[measured 2026-08-18]` | `state_board.md` |
@@ -574,6 +574,7 @@ once this index exists: re-splitting would orphan the parts.
 | [layer2-board-redesign] | LAYER 2 BOARD PAGE: ONE NAV, VISIBLE FILTERS, RESEARCH RAIL + SLIP TRAY, LOGOS, AND AN EMBED THAT PARSES -- LI | `state_layer2.md` |
 | [layer2-history-charts] | LAYER 2 + ASK HISTORY CHARTS: DATED PROP FORM, TEAM TRENDS VS TODAY'S LINE, NO GOAL HISTORY ON CORNERS -- LIVE | `state_layer2.md` |
 | [layer2-suggested-opps] | SUGGESTED OPPS -- a per-line bet flag on top of the full board; the paper book stakes only it `[2026-10-13, la | `state_layer2.md` |
+| [layer2-likelihood-shadow] | SHADOW LIKELIHOOD -- the measured under tilt stamped beside the fair on NBA and NCAAF prop rows; nothing consu | `state_layer2.md` |
 | [segment-misgrade-regrade] | 53 OF 173 SETTLED SEGMENT ORDERS WERE GRADED AGAINST THE WRONG ACTUAL — 30.6%, AND THE ERRORS NEARLY CANCEL `[ | `state_ledger.md` |
 | [stale-test-triage] | "THE TEST IS STALE" IS A HYPOTHESIS, AND IT WAS WRONG FOR 4 OF 18 `[2026-09-05, lane stale-test-repair, commit | `state_ledger.md` |
 | [full-suite-completes] | THE FULL SUITE RAN TO COMPLETION FOR THE FIRST TIME -- 15,307 tests, 61m06s, and the 27 "NEW" failures are 6 p | `state_ledger.md` |
