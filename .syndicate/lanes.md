@@ -658,6 +658,7 @@ death, never life — do not invert it.
 - **GOAL VERDICT (checkpoint 2026-10-04 ~21:30Z / 4:30 PM CT).** Goal, verbatim: "The local fleet recovers by itself from a supervisor that is not running: the 5-minute watchdog, on a supervisor FAIL for >= 9 min (two consecutive checks), starts SyndicateLocalProduction (capped 3 attempts/hour, then alert-only; paused by a no_autostart file for deliberate maintenance). Verified by unit tests of the decision and a fleet reading; would have ended the 2026-10-04 08:39-13:53Z outage in ~10 min (postmortem, user decision 'Watchdog auto-recovery')" **GOAL: NOT MET -- built, tested, installed; live recovery branch unexercised.** `local_watchdog.recovery` + 7 tests; installed copy carries RECOVERY_START; live healthy reading recover False (deploys.md 2026-10-04 17:4xZ). LEFT: the first real supervisor-down >= 9 min must log RECOVERY_START and a healthy fleet. No deliberate outage to test it.
 - Goal: The local fleet recovers by itself from a supervisor that is not running: the 5-minute watchdog, on a supervisor FAIL for >= 9 min (two consecutive checks), starts SyndicateLocalProduction (capped 3 attempts/hour, then alert-only; paused by a no_autostart file for deliberate maintenance). Verified by unit tests of the decision and a fleet reading; would have ended the 2026-10-04 08:39-13:53Z outage in ~10 min (postmortem, user decision 'Watchdog auto-recovery')
 - Files: scripts/local_watchdog.py, tests/test_local_watchdog.py, deploy/local/watchdog.ps1, docs/ai_context/local_production_runbook.md (watchdog section only)
+- LOANED 2026-10-14 ~20:15Z (3:15 PM CT) to lane `watchdog-ntfy-alerts` (session e48a0f9b), on the user's request in chat "Set up watchdog alerts that work when logged off" (choice: ntfy push): `deploy/local/watchdog.ps1` scoped to the ntfy push calls only (Send-Push / Send-Alert beside each Show-Toast; -TestPush) and the runbook's watchdog alert paragraph only. Taken without asking this lane: its session no longer exists and the lane is 10 days idle. `recovery()` / auto-recovery untouched. Return on that lane's close.
 - LOAN RETURNED 2026-10-06 ~19:15 CT by web-restart-healthz: local_watchdog.py + its test restored to this Files line after 3ca31f9b (healthz REFUSED vs healthz:slow; recovery() untouched).
 - LOANED 2026-10-06 ~15:00 CT to lane `web-restart-healthz` (session 46e09dbb), USER-APPROVED in chat ("Approve loan"): `scripts/local_watchdog.py` + `tests/test_local_watchdog.py`, scoped to the /healthz refused-vs-slow classification and its tests ONLY; `recovery()` / auto-recovery untouched. Restore both paths to this lane's Files line when the loan is returned.
 - Hypothesis: n/a
@@ -1057,6 +1058,14 @@ death, never life — do not invert it.
 - Hypothesis: K=1's wrongly dropped players are mostly established regulars (prior-lane test: 79 players, mean 19.5 actual min); a regular-protection clause re-admits them at little cost in non-player minutes, raising net removal.
 - Falsification test: If no candidate beats K=1 on net removal on train AND holds on test, or the engine re-run makes played-player minutes MAE or any priced market's Brier worse with a CI excluding 0, K=1 stays.
 - Verification: Offline table (train/test/playoffs) per candidate; engine re-run --compare paired table; reachability test; findings file.
+- Blocked by: none
+
+### watchdog-ntfy-alerts — OPEN — opened 2026-10-14 — session e48a0f9b-f667-43d8-8c65-7d743b31624c
+- Goal: Fleet watchdog alerts reach the user's phone while they are logged off: every alert watchdog.ps1 raises is also pushed to a private random ntfy topic, and SyndicateFleetWatchdog runs whether logged on or not. Verified by a real test push received and a scheduled run of the installed copy logging push status.
+- Files: deploy/local/install_watchdog_task.ps1, deploy/local/watchdog.ps1 (LOAN from fleet-watchdog-auto-recovery, ntfy push calls only), docs/ai_context/local_production_runbook.md (LOAN from fleet-watchdog-auto-recovery, watchdog alert paragraph only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: TEST_PUSH push=sent in C:\SyndicateProd\watchdog\watchdog.log and the user confirms receipt; the next scheduled run logs status with the new copy; task LogonType Password
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
