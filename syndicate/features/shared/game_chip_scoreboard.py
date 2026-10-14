@@ -751,6 +751,16 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
             token = live_clock_token(sport, game, day, away_abbr=away_abbr, home_abbr=home_abbr)
             if token:
                 chip["status_token"] = token
+        # Basketball bonus on the live line, after the run (user 2026-10-14).
+        # Rebuilt each pass: the serve-time re-read must replace, not stack.
+        if sport in ("nba", "wnba") and chip.get("state") == "live":
+            from syndicate.features.shared.game_chip_linescore import live_bonus_text
+
+            parts = [p for p in str(chip.get("situation") or "").split(" · ") if p and "bonus" not in p]
+            bonus = live_bonus_text(sport, game, day, away_abbr=away_abbr, home_abbr=home_abbr)
+            if bonus:
+                parts.append(bonus)
+            chip["situation"] = " · ".join(parts) or None
         if box:
             chip["linescore"] = box
             # A FINAL with no score but a complete period line takes the sum:

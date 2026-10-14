@@ -288,6 +288,7 @@ def _espn_board(sport: str, date: str) -> dict[str, dict]:
         away, home = sides.get("away") or {}, sides.get("home") or {}
         status = event.get("status") or {}
         out[str(event.get("id"))] = {
+            "id": str(event.get("id")),
             "away": (away.get("team") or {}).get("abbreviation"),
             "home": (home.get("team") or {}).get("abbreviation"),
             "away_periods": [_int(x.get("value")) for x in away.get("linescores") or []],
@@ -329,6 +330,52 @@ def live_clock_token(sport: str, game: Mapping[str, Any], date: str, *, away_abb
     if hit.get("status_name") == "STATUS_END_PERIOD":
         return f"END {label}"
     return f"{label} {hit['clock']}".strip() if hit.get("clock") else label
+
+
+def _espn_fouls(sport: str, event_id: str) -> dict[str, dict]:
+    """{"away"|"home": competitor `fouls` block} from ESPN's live game summary."""
+    import urllib.request
+
+    url = f"https://site.api.espn.com/apis/site/v2/sports/{_ESPN_PATHS[sport]}/summary?event={event_id}"
+    with urllib.request.urlopen(url, timeout=6) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    comp = (((payload.get("header") or {}).get("competitions")) or [{}])[0]
+    return {str(c.get("homeAway")): (c.get("fouls") or {}) for c in comp.get("competitors") or [] if isinstance(c, Mapping)}
+
+
+def live_bonus_text(sport: str, game: Mapping[str, Any], date: str, *, away_abbr: str = "", home_abbr: str = "") -> str | None:
+    """"OKC in bonus" / "both in bonus" for a live NBA / WNBA game, or None.
+
+    User report 2026-10-14 ~02:10Z: the basketball card's live line had the run
+    but no bonus. ESPN's summary header gives each team's `fouls` block --
+    measured that night on IND @ OKC: {"teamFouls": 18, "teamFoulsCurrent": 1,
+    "foulsToGive": 3, "bonusState": "NONE"}. A team with NO fouls to give puts
+    its OPPONENT in the bonus; that one field already folds in the 5th-foul and
+    last-two-minutes rules, so nothing is re-derived here.
+    """
+    if sport not in ("nba", "wnba"):
+        return None
+    try:
+        hit = _espn_game(sport, game, date, away_abbr, home_abbr)
+        if not hit or not hit.get("id"):
+            return None
+        key = ("fouls", sport, hit["id"], int(time.monotonic() // _LIVE_TTL_S))
+        fouls = _cached(key, lambda: _espn_fouls(sport, hit["id"])) or {}
+    except Exception:  # noqa: BLE001 -- a bonus line must never break a chip
+        return None
+
+    def no_fouls_left(side: str) -> bool:
+        value = _int((fouls.get(side) or {}).get("foulsToGive"))
+        return value is not None and value <= 0
+
+    away_in, home_in = no_fouls_left("home"), no_fouls_left("away")
+    if away_in and home_in:
+        return "both in bonus"
+    if away_in:
+        return f"{away_abbr or hit.get('away')} in bonus"
+    if home_in:
+        return f"{home_abbr or hit.get('home')} in bonus"
+    return None
 
 
 def _espn_linescore(sport: str, game: Mapping[str, Any], date: str, away_abbr: str, home_abbr: str) -> dict[str, Any] | None:

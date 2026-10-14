@@ -197,5 +197,29 @@ class NhlLiveClock(unittest.TestCase):
         self.assertEqual(chip["linescore"]["away"], [1, 1])
 
 
+class BasketballBonus(unittest.TestCase):
+    BOARD = {"401908621": {"id": "401908621", "away": "IND", "home": "OKC", "away_periods": [33, 28], "home_periods": [25, 34],
+                           "period": 4, "clock": "7:57", "status_name": "STATUS_IN_PROGRESS"}}
+
+    def _serve(self, fouls, situation="OKC on a 9–4 run"):
+        from syndicate.features.shared import game_chip_scoreboard as gs
+
+        chip = {"sport": "nba", "state": "live", "game_key": "401908621", "status_token": "Q4 7:57", "situation": situation,
+                "away": {"abbr": "IND"}, "home": {"abbr": "OKC"}}
+        gl._CACHE.clear()
+        with mock.patch.object(gl, "_espn_board", return_value=self.BOARD), mock.patch.object(gl, "_espn_fouls", return_value=fouls):
+            gs.attach_served_linescores([chip], "2026-10-13")
+            gs.attach_served_linescores([chip], "2026-10-13")  # a second serve must not stack it
+        return chip["situation"]
+
+    def test_team_with_no_fouls_to_give_puts_the_opponent_in_bonus(self) -> None:
+        got = self._serve({"away": {"foulsToGive": 0}, "home": {"foulsToGive": 2}})
+        self.assertEqual(got, "OKC on a 9–4 run · OKC in bonus")
+
+    def test_both_and_neither(self) -> None:
+        self.assertEqual(self._serve({"away": {"foulsToGive": 0}, "home": {"foulsToGive": 0}}, situation=None), "both in bonus")
+        self.assertEqual(self._serve({"away": {"foulsToGive": 3}, "home": {"foulsToGive": 1}}), "OKC on a 9–4 run")
+
+
 if __name__ == "__main__":
     unittest.main()
