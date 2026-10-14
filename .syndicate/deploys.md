@@ -49244,3 +49244,8 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
   WSL in a non-interactive session is UNPROVEN on this host; if it fails, the task's `LastTaskResult` and the absence of a supervisor say so.
 - **Rollback:** Task Scheduler -> SyndicateLocalProduction -> "Run only when user is logged on" + an "At log on" trigger.
 - **Not changed:** `SyndicateFleetWatchdog` stays Interactive (its job is desktop notifications), so its auto-recovery still runs only while logged on.
+
+## 2026-10-14 17:28Z (12:28 PM CT) -- HOST CONFIG (user-run, admin): task `SyndicateLocalProduction` now starts the fleet AT BOOT (session d4409ac4; follow-up to the 13:05Z Windows Update outage entry)
+- **change (the user ran an elevated script; Claude wrote it, did not run it):** BootTrigger with Delay PT1M; principal LogonType Password (runs whether or not anyone is logged on). Read back 17:2xZ: `triggers: BootTrigger(delay=PT1M)`, `logonType=Password`, user Amyn, MultipleInstances IgnoreNew. The old LogonTrigger is gone -- not needed with LogonType Password. A first attempt via `Set-ScheduledTask -User/-Password` printed DONE but did NOT persist (stored XML still InteractiveToken + LogonTrigger); the export -> edit XML -> `Register-ScheduledTask -Xml -Force` route did.
+- **fleet unaffected:** supervisor pid 318 since 12:47:59Z, roles up, restarts=0, /healthz 200.
+- **NOT YET MEASURED:** that WSL + the supervisor actually start from a boot in session 0 with no logon. Needs one reboot at a quiet time (user OK required). `SyndicateFleetWatchdog` is still Interactive (runs only after a logon).
