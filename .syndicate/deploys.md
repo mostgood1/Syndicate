@@ -49271,3 +49271,16 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **gate:** claims web / refresh-worker / live-odds-worker held by `games-rail-full-detail` 17:47:28Z (expire ~18:32Z; release after the reading); no live games (all sports 2026-10-14); MLB sim finished; one live-odds WNBA props refresh in flight (re-runs).
 - **sequence (planned):** `local_production.py down`, then `shutdown /r /t 30`.
 - **reading owed (next session):** Win32_OperatingSystem LastBootUpTime vs first logon (event 7001 / 4624) vs supervisor `since` and /healthz 200; supervisor start EARLIER than the logon = boot start proven. Then release the three claims.
+
+## 2026-10-14 17:59Z (12:59 PM CT) -- FLEET OUTAGE 17:48:22Z -> 17:51:53Z: Windows host reboot (3rd host-level outage in ~36 h) -- READING, no action by me `[session b9bb5f37]`
+- **Evidence:**
+  - The last stamped refresh-worker line before the gap is 17:48:22Z.
+  - Windows `LastBootUpTime` is 2026-10-14 12:50:35 CDT. WSL `uptime -s` reads 12:51:26 CDT.
+  - `[refresh_worker] BOOTED` at 17:51:53Z. The supervisor respawned web (/healthz 200), refresh-worker pid 455 and live-odds-worker pid 456 on 63631afb.
+  - Short this time because a logon followed the reboot; the 06:30-12:47Z gap waited ~6 h for one.
+- **Series:**
+  - 10-13 04:37Z: Windows Update installed WSL 3.0.3.0 and stopped the VM.
+  - 10-14 ~06:30Z: host reboot.
+  - 10-14 17:50Z: host reboot.
+  - Each restarts the refresh-worker cold (board rebuild) and kills every WSL background job.
+- **The prevention is the user's** (Windows Update active hours / pause; "run whether user is logged on or not"). No system setting was changed. My MLS live-join watcher was re-armed at 17:59Z.
