@@ -49219,3 +49219,15 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
   - 10-10: 239 pending remain.
 - **Served** (`/api/board/game-chips?date=2026-10-11`, finals): soccer prop plays went from 1-6 + 68 pending to **1 W / 29 L / 22 push / 23 pending**. The pushes are squad players who never came on.
 - **My earlier 12:52Z "1,181 still pending" was read 3 min BEFORE the 12:54:54Z persist.** It was a too-early read, not a failure; the catch-up was already running.
+
+## 2026-10-14 13:18:20Z (8:18 AM CT) -- LOCAL FLEET ff 1e1385ba -> e1954b4a (exact SHA), NO restart: confirmed soccer starters resolve across name forms `[lane soccer-starter-name-match, session b9bb5f37]`
+- **What:** `lineups.resolve_starter_ids` gains a unique-only name-form fallback after exact matching: word order, first+last, two-plus nested words, a one-word ESPN name = the row's first word, and no surname-only step. It runs in `build_soccer_artifacts`' confirmed-XI step inside the per-run odds jobs, so the next pre-kickoff run loads it from disk. Taken under a `live-odds-worker` claim, released by token.
+- **Ride-alongs:** `basketball_engine/engine.py` f9a2617b (`fouler_per_minute`) and 917b40a8 (`foul_trouble_foul_mult`), both default OFF in the diff. The rest is scripts; `vendor/` has no diff.
+- **Pre-deploy reading (offline, 10-09..10-12: 101 matches, 202 confirmed sides, match_box starters vs season rows):**
+  - starters resolved 2,058 -> **2,099** of 2,222 (92.6% -> 94.5%);
+  - sides with all 11 recognised 87 -> **109** (43% -> 54%);
+  - 41 new pairings, hand-checked; one ("Daniel" -> Daniel Job, FC Dallas) is unique but not independently confirmed.
+  - **113 of the 164 exact misses are ABSENT from the league's season rows** (e.g. Tomas Soucek, Dayot Upamecano), and 6 are under another team. That is a squad-data gap no name rule closes; it is the larger lever.
+  - Tests: 55 lineup tests pass, including the off != on test in tests/test_soccer_starter_name_match.py.
+- **verify -- OWED:** `scripts/soccer_season_audit/lineup_reach.py` over the next slate's pre-kickoff freezes (MLS 2026-10-14 23:30Z first). The `confirmed_sides_by_starters_recognised_of_11` mass should shift toward 11 against the 10-09..12 reading (11: 64, 10: 82, 9: 29 of 190).
+- **Rollback:** revert e1954b4a, ff. No restart.
