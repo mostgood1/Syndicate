@@ -167,6 +167,62 @@ def _load_local_schedule_fallback(season_year: str = "2025-26") -> pd.DataFrame:
     return out
 
 
+def _current_nba_season(today=None) -> str:
+    """EDIT: the season in play on `today` ('2026-27' from July 2026), the one the schedule should carry."""
+    import datetime as _dt
+
+    d = today or _dt.date.today()
+    start = d.year if d.month >= 7 else d.year - 1
+    return f"{start}-{str(start + 1)[-2:]}"
+
+
+_STATS_SCHEDULE_CACHE: dict[str, dict[str, Any]] = {}
+
+
+def _stats_schedule_payload(season: str | None = None) -> dict[str, Any]:
+    """EDIT: the CDN schedule payload rebuilt from stats.nba.com ScheduleLeagueV2, which carries the same game-level fields.
+
+    cdn.nba.com/static/json/staticData/scheduleLeagueV2*.json answers 403 to this host (fleet and Windows, with or
+    without browser headers, measured 2026-10-14), so the vendored command always took the local fallback and rewrote
+    the previous season's file. One request per process (cached). Raises when the season has no games yet (e.g. before
+    the schedule is published), which leaves the local fallback in charge exactly as before.
+    """
+    season = season or _current_nba_season()
+    if season in _STATS_SCHEDULE_CACHE:
+        return _STATS_SCHEDULE_CACHE[season]
+    from nba_api.stats.endpoints.scheduleleaguev2 import ScheduleLeagueV2
+
+    frame = ScheduleLeagueV2(league_id="00", season=season, timeout=60).get_data_frames()[0]
+    if frame is None or frame.empty:
+        raise RuntimeError(f"ScheduleLeagueV2 returned no games for {season}")
+
+    def _v(row, col):
+        val = row.get(col)
+        if val is None or (isinstance(val, float) and pd.isna(val)) or (isinstance(val, str) and val == ""):
+            return None
+        return val
+
+    by_date: dict[str, list[dict[str, Any]]] = {}
+    for _, row in frame.iterrows():
+        national = [{"broadcasterName": _v(row, f"nationalBroadcasters_{i}_broadcasterDisplay")} for i in range(5)
+                    if _v(row, f"nationalBroadcasters_{i}_broadcasterDisplay")]
+        game = {
+            "gameId": _v(row, "gameId"), "gameLabel": _v(row, "gameLabel"), "gameSubtype": _v(row, "gameSubtype"),
+            "gameStatus": _v(row, "gameStatus"), "gameStatusText": _v(row, "gameStatusText"),
+            "gameDateTimeUTC": _v(row, "gameDateTimeUTC"), "gameDateUTC": _v(row, "gameDateUTC"), "gameTimeUTC": _v(row, "gameTimeUTC"),
+            "gameDateTimeEst": _v(row, "gameDateTimeEst"), "gameDateEst": _v(row, "gameDateEst"), "gameTimeEst": _v(row, "gameTimeEst"),
+            "homeTeam": {k: _v(row, f"homeTeam_{k}") for k in ("teamId", "teamTricode", "teamCity", "teamName")},
+            "awayTeam": {k: _v(row, f"awayTeam_{k}") for k in ("teamId", "teamTricode", "teamCity", "teamName")},
+            "arenaName": _v(row, "arenaName"), "arenaCity": _v(row, "arenaCity"), "arenaState": _v(row, "arenaState"),
+            "broadcasters": {"national": national},
+        }
+        by_date.setdefault(str(_v(row, "gameDate") or ""), []).append(game)
+    payload = {"leagueSchedule": {"seasonYear": str(frame["seasonYear"].iloc[0] or season),
+                                  "gameDates": [{"gameDate": d, "games": g} for d, g in by_date.items()]}}
+    _STATS_SCHEDULE_CACHE[season] = payload
+    return payload
+
+
 def fetch_schedule_2025_26() -> pd.DataFrame:
     """Fetch and normalize the 2025-26 NBA schedule from the public CDN feed.
 
@@ -186,7 +242,10 @@ def fetch_schedule_2025_26() -> pd.DataFrame:
     try:
         payload = _request_schedule_payload()
     except Exception:
-        return _load_local_schedule_fallback()
+        try:  # EDIT: the CDN answers 403 to this host; stats.nba.com serves the same feed
+            payload = _stats_schedule_payload()
+        except Exception:
+            return _load_local_schedule_fallback()
     ls = payload.get("leagueSchedule", {})
     season_year = ls.get("seasonYear") or "2025-26"
     game_dates = ls.get("gameDates", []) or []

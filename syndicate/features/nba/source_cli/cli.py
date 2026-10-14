@@ -114,7 +114,7 @@ def _load_schedule_day(date_str: str) -> pd.DataFrame:
     def _filter_day(frame: pd.DataFrame | None) -> pd.DataFrame:
         if frame is None or not isinstance(frame, pd.DataFrame) or frame.empty:
             return pd.DataFrame()
-        day_col = next((col for col in ("date_utc", "date_est", "date") if col in frame.columns), None)
+        day_col = next((col for col in ("date_est", "date_utc", "date") if col in frame.columns), None)  # EDIT: ET game date first (as the WNBA fork)
         if not day_col:
             return pd.DataFrame()
         day_frame = frame.copy()
@@ -238,6 +238,11 @@ def fetch_schedule_cmd(season: str):
         df.to_json(json_path, orient="records", date_format="iso")
         # Save CSV
         df.to_csv(csv_path, index=False)
+        # EDIT: the season's own name too (schedule_2026_27.*); schedule_2025_26.* stays the alias read by name
+        season_token = str(df["season_year"].dropna().iloc[0]).replace("-", "_") if "season_year" in df.columns and df["season_year"].notna().any() else ""
+        if season_token and season_token != "2025_26":
+            df.to_json(out_dir / f"schedule_{season_token}.json", orient="records", date_format="iso")
+            df.to_csv(out_dir / f"schedule_{season_token}.csv", index=False)
         console.print(f"Saved schedule to {json_path} and {csv_path}")
         # Quick stats for sanity
         total_games = len(df)
