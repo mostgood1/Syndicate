@@ -1850,3 +1850,9 @@ engine equals origin/main apart from the research-only diag) + patch v3 (fouled-
 PROVISIONAL until the full FIT (P3's amendment).
 
 **Launch:** after the #3d sweep finishes (shared host memory). #3d and #3e are read as separate pre-registrations.
+
+**#3e CO-SIGN (P3, as pre-registered at 8994c21c, before any reading):**
+- Accepted as written.
+- No real in-trouble PF/48 exists: §2d measured on-floor shares, not foul rates.
+- If #3e passes with a borderline closers-on guard, P3 computes PF/48 from the P2 stints as a follow-up reading. #3e is
+  not held for it.
