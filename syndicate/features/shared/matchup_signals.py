@@ -267,16 +267,31 @@ def nba_signal_fires(features: Mapping[str, Any]) -> list[str]:
 NBA_UNDER_BIAS_DELTA = 0.0123
 
 
-def nba_under_bias_delta() -> float:
-    raw = str(os.environ.get("SYNDICATE_NBA_UNDER_BIAS_DELTA") or "").strip()
+# ncaaf.under_bias delta `[2026-10-14, user "yes wire the NCAAF unders into the shadow likelihood"]`, lane
+# `signal-engine-football`: the pooled HU-NCAAF residual over both 2025 windows, (3,737 x 2.35% + 3,219 x 2.42%) / 6,956
+# = 2.38 probability points (findings_2026-10-14_football_signals_v1.md, v2). `SYNDICATE_NCAAF_UNDER_BIAS_DELTA`
+# overrides it with the same rules as the NBA switch.
+NCAAF_UNDER_BIAS_DELTA = 0.0238
+
+
+def _bias_delta(env_key: str, default: float) -> float:
+    raw = str(os.environ.get(env_key) or "").strip()
     if raw:
         try:
             value = float(raw)
         except ValueError:
-            return NBA_UNDER_BIAS_DELTA
+            return default
         if value == value and 0.0 <= value <= 0.10:
             return value
-    return NBA_UNDER_BIAS_DELTA
+    return default
+
+
+def nba_under_bias_delta() -> float:
+    return _bias_delta("SYNDICATE_NBA_UNDER_BIAS_DELTA", NBA_UNDER_BIAS_DELTA)
+
+
+def ncaaf_under_bias_delta() -> float:
+    return _bias_delta("SYNDICATE_NCAAF_UNDER_BIAS_DELTA", NCAAF_UNDER_BIAS_DELTA)
 
 
 def likelihood_adjustments(row: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -290,4 +305,12 @@ def likelihood_adjustments(row: Mapping[str, Any]) -> list[dict[str, Any]]:
         delta = nba_under_bias_delta()
         if delta:
             adjustments.append({"signal": "nba.under_bias", "delta": round(delta if side == "under" else -delta, 5)})
+    if sport == "ncaaf" and str(row.get("kind") or "") == "prop" and side in ("over", "under"):
+        from syndicate.features.shared.matchup_signals_football import FOOTBALL_MARKET_STATS, FOOTBALL_REGISTRY
+
+        # board rows carry the quote-log display name ("Rushing Yards"); accept the stat key too
+        stat = {k.lower(): v for k, v in FOOTBALL_MARKET_STATS.items()}.get(market, market)
+        delta = ncaaf_under_bias_delta()
+        if delta and stat in FOOTBALL_REGISTRY["ncaaf.under_bias"].markets:
+            adjustments.append({"signal": "ncaaf.under_bias", "delta": round(delta if side == "under" else -delta, 5)})
     return adjustments

@@ -254,7 +254,8 @@ V1_SIGNALS: tuple[str, ...] = tuple(_V1_RESULTS)
 # (`scripts/grade_football_fade_leads.py`). Findings: findings_2026-10-14_football_signals_v1.md, section "v2".
 NFL_OU_MARKETS = ("receptions", "receiving_yards", "rushing_yards", "rushing_attempts", "passing_yards",
                   "passing_attempts", "passing_tds", "interceptions")
-NCAAF_OU_MARKETS = ("receptions", "receiving_yards", "rushing_yards", "passing_yards", "passing_tds")
+# the markets HU-NCAAF actually graded (2025 backfill): every two-sided market present, rushing attempts included
+NCAAF_OU_MARKETS = ("receptions", "receiving_yards", "rushing_yards", "rushing_attempts", "passing_yards", "passing_tds")
 _FWD = "registered forward test, lane signal-engine-football v2 (817efce7); graded by scripts/grade_football_fade_leads.py"
 FOOTBALL_REGISTRY.update({spec.name: spec for spec in (
     SignalSpec("ncaaf.under_bias", "ncaaf", "under", NCAAF_OU_MARKETS,

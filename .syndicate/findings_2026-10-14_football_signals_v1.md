@@ -112,3 +112,8 @@ window (NFL 4-5, NCAAF 4-6; not evidence) joined live files end to end: F9 72 li
 only from week 6). It caught one real defect, fixed before any window game: the 2026 NCAAF box leaves `opponent` empty,
 so games are now paired by the box's own game id (unjoined 407 -> 13). Retention keeps `book_quotes` 120 days, past the
 final read; the grader also reads the compacted `.gz` form.
+
+**Wired (2026-10-14 00:26Z, user decision):** `ncaaf.under_bias` joins `nba.under_bias` in the board's SHADOW likelihood
+(`matchup_signals.likelihood_adjustments`): NCAAF prop rows in the six graded markets get p_under + 0.0238 / p_over -
+0.0238 beside the Shin fair (switch `SYNDICATE_NCAAF_UNDER_BIAS_DELTA`, 0 = off). The score, Suggested and the portfolio
+still read the fair; the recorder keeps `lk` / `lke` so the shadow can be graded on the same rows.

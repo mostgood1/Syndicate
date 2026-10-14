@@ -155,3 +155,31 @@ def test_v1_results_mark_every_football_signal_null_with_its_evidence() -> None:
     assert fb.FOOTBALL_REGISTRY["ncaaf.under_bias"].status == "supported"
     assert fb.FOOTBALL_REGISTRY["nfl.under_bias"].status == "candidate"
     assert {"nfl.fade_vacated_targets", "nfl.fade_carry_spike", "ncaaf.fade_carry_spike"} <= set(fb.FOOTBALL_REGISTRY)
+
+
+def test_ncaaf_under_bias_adjusts_ncaaf_prop_likelihood_and_is_switchable(monkeypatch) -> None:
+    from syndicate.features.shared import matchup_signals as ms
+
+    monkeypatch.delenv("SYNDICATE_NCAAF_UNDER_BIAS_DELTA", raising=False)
+    under = {"sport": "ncaaf", "kind": "prop", "market": "Rushing Yards", "side": "under"}
+    assert ms.likelihood_adjustments(under) == [{"signal": "ncaaf.under_bias", "delta": 0.0238}]
+    assert ms.likelihood_adjustments(dict(under, side="over")) == [{"signal": "ncaaf.under_bias", "delta": -0.0238}]
+    assert ms.likelihood_adjustments(dict(under, market="rushing_attempts"))[0]["signal"] == "ncaaf.under_bias"
+    assert ms.likelihood_adjustments(dict(under, market="Anytime TD", side="yes")) == []   # not tested: yes-only
+    assert ms.likelihood_adjustments(dict(under, market="Interceptions")) == []            # not in the NCAAF data
+    assert ms.likelihood_adjustments(dict(under, sport="nfl")) == []                       # NFL is a candidate only
+    assert ms.likelihood_adjustments(dict(under, kind="game", market="totals")) == []
+    monkeypatch.setenv("SYNDICATE_NCAAF_UNDER_BIAS_DELTA", "0")
+    assert ms.likelihood_adjustments(under) == []
+    monkeypatch.setenv("SYNDICATE_NCAAF_UNDER_BIAS_DELTA", "0.5")  # out of range -> the measured default
+    assert ms.ncaaf_under_bias_delta() == 0.0238
+
+
+def test_board_stamps_the_ncaaf_shadow_likelihood(monkeypatch) -> None:
+    from syndicate.features.shared import layer2_board as lb
+
+    monkeypatch.delenv("SYNDICATE_NCAAF_UNDER_BIAS_DELTA", raising=False)
+    row = {"sport": "ncaaf", "kind": "prop", "market": "Passing Yards", "side": "under",
+           "quote": {"fair_probability": 0.5, "fair_method": "consensus", "price": -110}}
+    assert lb._stamp_likelihood_shadow([row]) == {"ncaaf": 1}
+    assert row["likelihood"]["p"] == 0.5238 and row["quote"]["fair_probability"] == 0.5
