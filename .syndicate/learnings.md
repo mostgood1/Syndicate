@@ -2138,3 +2138,11 @@ and before calling a writer fixed, enumerate EVERY writer of that file (`grep` t
 - **Belief:** `test_deploy_claim_holder_identity` was safe because it copied `deploy_claim.py` into tmp_path, so REPO_ROOT pointed at the sandbox.
 - **Overturned by:** c3a5f11b made `deploy_claim.py` read `SYNDICATE_DEPLOY_CLAIM_DIR`, then `local_production.env`, BEFORE its repo root. The test passed `os.environ` through, so wherever that var is set (the WSL fleet, nightly ci-suite) it wrote a live 45-min `web` claim held by `lane-a`/`session-aaa` into the production claim dir -- seen in `status` 10-13 and 10-14. Reproduced against a scratch dir.
 - **Rule:** a test that shells out to a repo script must build its env by subtraction then pinning: drop every var the script resolves a path from, set each one into tmp_path, and assert the artifact landed under tmp_path. When a script gains a new path source, grep tests/ for subprocess callers of it in the same change.
+
+### A scripted claim acquire must gate on its exit code, never on grepped output `[2026-10-14, session 2d413211, lane basketball-schedule-adapter-native]`
+
+`deploy_claim.py acquire ... | grep -E "ACQUIRED|token|REFUSED|held"` printed NOTHING when the claim was refused (the refusal's
+wording matched none of the patterns), and the script carried on: ff + a live-odds-worker restart landed inside another lane's
+claims, taken for a planned reboot test. Silence was read as success. **How to apply:** in any deploy script, run
+`acquire` unfiltered, `|| exit` on its status, and re-read `status --service <svc>` naming YOUR holder before the first mutating
+command. A filter on a guard's output is a way to not see the guard.

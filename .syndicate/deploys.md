@@ -49318,3 +49318,27 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
   - `/healthz` 200 at 18:04Z.
 - **Note:** `ps -o lstart` showed the supervisor at 12:52:33, AFTER its roles. There is ONE `LOCAL PRODUCTION UP` and every role has a single `restarts=0` start, so this reads as the WSL clock settling after boot, not a second supervisor.
 - RECONCILED: the 2026-10-14 boot-trigger entry's owed reading (WSL from a non-interactive session at boot, roles up before any logon). Measured above.
+
+## 2026-10-14 18:04:42Z (1:04 PM CT) -- LOCAL FLEET ff 63631afb -> a78aab9c (exact SHA) + live-odds-worker restart 18:04:52Z: basketball schedule fallback off vendor -- **MET** 18:11:24Z; **DONE INSIDE ANOTHER LANE'S CLAIMS** (lanes `basketball-schedule-adapter-native` + `nba-schedule-current-season`, session 2d413211)
+
+- **User decision 2026-10-14:** "Ff with ride-alongs + restart the live-odds-worker".
+- **CLAIM BREACH (mine):** refresh-worker AND live-odds-worker were HELD by `games-rail-full-detail` (session d4409ac4 = desktop "Layer 2 Syndicate page UI", acquired ~17:53Z, reason: planned Windows reboot / start-at-boot test).
+  - My `deploy_claim.py acquire` was refused. The script grepped its output, so the refusal was invisible, and it did not check the exit code; it went on to ff and restart.
+  - The holder was messaged at ~18:13Z with the exact actions and times.
+- **Safety read in full (18:04:01Z):** NOT CLEAR, for refresh-worker soccer jobs and a board build. Basketball props jobs: 0. No live games.
+- **Ride-alongs (9 other lanes, user-approved):**
+  - b4108767 daily_optimizer props stake tier;
+  - 0fef1ad0 soccer lineups;
+  - c7030750 + 86646cfb preserve-forward-inputs script + a local_production job (loads at the next `up`);
+  - 6f092c74 engine solver terms (default off);
+  - research and grading scripts: 0195f364, caab303b, a50b2b4a, f66cdbc5.
+- **Restart:** live-odds-worker pid 456 had 0 children at 18:04:52Z and got `kill -TERM`. The supervisor respawned it as pid 3293 at 18:05:03Z (runbook: same env; the worker recycles every 6 h by design).
+- **VERIFY, production:**
+  - 18:11:24Z: the new worker's adapter fallback ran `python -m syndicate.features.nba.source_cli.cli fetch-schedule` and wrote `schedule_2026_27.{csv,json}` and the `schedule_2025_26` alias.
+    - 1,274 games, 2026-10-03..2027-04-11, statuses {1: 1228, 3: 46}.
+    - Before: `schedule_2025_26` held 2024-10-22..2026-04-12 with empty statuses, last rewritten 17:53Z by the vendored fallback.
+  - `_read_basketball_schedule_rows("nba", ...)`:
+    - 2026-10-14: 7 rows, 7 distinct (BKN@MIA, CHA@BOS, NOP@DAL, CHI@MIL, DET@MIN, PHX@SAS, DEN@LAC). Before: 0.
+    - 2026-10-20: BOS@DET, PHI@NYK, OKC@SAS.
+  - 18:11:32Z: no `nba_betting.cli` / `wnba_betting.cli` process; one `source_cli.cli fetch-schedule`.
+- **Rollback:** revert a78aab9c (and 63631afb) and ff; then TERM the live-odds-worker.
