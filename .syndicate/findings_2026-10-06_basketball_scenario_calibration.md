@@ -2118,3 +2118,7 @@ bonus rate. PROVISIONAL.
 `_solve_eff_mult`). Report it, and propose that engine change to the bonus owner. No override.
 
 **Then:** full FIT → P3's §7.
+
+**#3i CO-SIGN (P3, as pre-registered at c3bb5143, before any reading).**
+- P3 agrees with the correction: the totals calibration sits upstream of the engine, so the +1.2 is engine FT volume.
+- The bonus rate moves team PF, so the foul_mult pick can drift. The (0.03, 0.6) point and the #3e guards cover that.
