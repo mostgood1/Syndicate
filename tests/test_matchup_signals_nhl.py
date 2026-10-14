@@ -119,3 +119,49 @@ def test_v1_saves_results_are_recorded_and_skaters_stay_candidates() -> None:
         assert nhl.NHL_REGISTRY[name].status == "null" and nhl.NHL_REGISTRY[name].evidence["confirm_n"] > 0
     for name in ("nhl.toi_up", "nhl.toi_down", "nhl.opp_allows_shots", "nhl.opp_suppresses_shots", "nhl.skater_under_bias"):
         assert nhl.NHL_REGISTRY[name].status == "candidate" and "registered" in nhl.NHL_REGISTRY[name].evidence
+
+
+def _snap(*books):
+    return {"snap": {"data": {"bookmakers": [{"key": k, "markets": ms} for k, ms in books]}}}
+
+
+def _mk(key, player, point, over, under=None):
+    outs = [{"name": "Over", "description": player, "price": over, "point": point}]
+    if under is not None:
+        outs.append({"name": "Under", "description": player, "price": under, "point": point})
+    return {"key": key, "outcomes": outs}
+
+
+def test_history_main_lines_per_player_market_two_sided_only() -> None:
+    h = _load("nhl_skater_history_lift")
+    snap = _snap(("draftkings", [_mk("player_shots_on_goal", "Brad Marchand", 2.5, -110, -110),
+                                 _mk("player_goals", "Brad Marchand", 0.5, 150)]),          # one-sided: never a line
+                 ("fanduel", [_mk("player_shots_on_goal", "Brad Marchand", 2.5, -120, 100),
+                              _mk("player_shots_on_goal", "Brad Marchand", 3.5, 140, -180)]))
+    lines = h.snapshot_main_lines(snap)
+    assert len(lines) == 1 and lines[0]["stat"] == "shots" and lines[0]["point"] == 2.5 and lines[0]["books"] == 2
+    assert lines[0]["under_dec_best"] == 2.0
+
+
+def test_history_evaluate_splits_windows_and_k5_takes_every_line() -> None:
+    h = _load("nhl_skater_history_lift")
+    recs = []
+    for i in range(12):
+        w = "discover" if i < 6 else "confirm"
+        recs.append({"window": w, "game": f"a{i}", "stat": "shots", "y_over": 1.0, "p_over": 0.5,
+                     "under_dec_best": 1.9, "under_dec_median": 1.9, "feats": {"toi_trend": 3.0, "opp_sa_pg": 26.0}})
+        recs.append({"window": w, "game": f"b{i}", "stat": "assists", "y_over": 0.0, "p_over": 0.5,
+                     "under_dec_best": 1.9, "under_dec_median": 1.9, "feats": {"toi_trend": 0.0, "opp_sa_pg": None}})
+    rep = h.evaluate(recs)
+    k1 = rep["signals"]["K1"]
+    assert k1["confirm"]["fired"]["n"] == 6 and k1["confirm"]["fired"]["residual"] == 0.5 and k1["verdict"] == "SUPPORTED"
+    assert k1["confirm"]["baseline"]["n"] == 0   # the 0.0-trend lines are assists, not a K1 market
+    assert rep["K5_unders"]["all"]["confirm"]["residual"]["n"] == 12
+    assert rep["K5_unders"]["assists"]["confirm"]["residual"]["residual"] == 0.5
+
+
+def test_pull_summarizes_a_snapshot_without_secrets() -> None:
+    p = _load("nhl_skater_props_pull")
+    s = p.summarize({"timestamp": "t", "data": {"bookmakers": [{"key": "dk", "markets": [_mk("player_points", "A", 0.5, -110, -110)]}]}})
+    assert s == {"timestamp": "t", "books": ["dk"], "outcomes_by_market": {"player_points": 2}}
+    assert p.CREDITS_PER_GAME == 40
