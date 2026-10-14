@@ -98,6 +98,7 @@ not answer is worse than one that says nothing.
 """
 import difflib
 import os
+import re
 import subprocess
 import sys
 
@@ -120,6 +121,12 @@ except Exception as exc:
     sys.stderr.write("check_lane_claims: cannot import the shared lane parser "
                      "(%s); not checking.\n" % exc)
     sys.exit(0)
+
+
+#: A standalone CLOSED token in the status field. The near-miss check excludes it,
+#: because a closed lane's Files line is a historical record and not an unenforced
+#: claim -- which this file's own docstring says and its predicate did not.
+CLOSED_RE = re.compile(r"\bCLOSED\b")
 
 
 def _tracked(root):
@@ -198,7 +205,34 @@ def _near_miss_open(text):
             m = LANE_RE.match(line) or ASCII_LANE_RE.match(line)
             if m:
                 slug, status = m.group(1), m.group(2)
-                near = ("OPEN" in status.upper()) and not OPEN_RE.search(status)
+                # NOT `status.upper()`, and NOT without the CLOSED test. Measured
+                # 2026-10-14: the case-insensitive containment fired on lane
+                # `nba-pregame-lineup-pools`, whose CLOSED status reads
+                # `CLOSED 2026-10-14 (GOAL MET via the pre-opener as-of replay; ...)`
+                # -- the substring `open` inside the PROSE word "pre-opener" matched,
+                # while `OPEN_RE` (case-sensitive \bOPEN\b) correctly did not. That one
+                # false positive made `check_lane_claims.py` exit 1 on origin/main, so
+                # EVERY session's start digest read `LEDGER INCOHERENT` for a lane with
+                # nothing wrong with it. Only the first em-dash segment is the status,
+                # which is why one lane trips it and the other CLOSED blocks do not:
+                # they carry a bare `CLOSED` there.
+                #
+                # Uppercase containment is the right test because the near-miss class
+                # this exists for is written uppercase in this ledger (`REOPENED`,
+                # `OPENED`) -- the worked example was `**REOPENED 2026-09-03 for the
+                # READ side**`. A mixed-case `Reopened` would be missed here, and that
+                # is deliberate rather than overlooked: `OPEN_RE` does not enforce it
+                # either, so the REPORT now matches the ENFORCEMENT instead of being
+                # wider than it.
+                #
+                # The CLOSED test implements what the docstring above already promises
+                # -- "A CLOSED lane with a Files block is a normal historical record and
+                # is not reported" -- which the predicate never actually checked.
+                near = (
+                    "OPEN" in status
+                    and not OPEN_RE.search(status)
+                    and not CLOSED_RE.search(status)
+                )
             else:
                 slug = status = None
                 near = False

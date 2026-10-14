@@ -1063,6 +1063,14 @@ death, never life — do not invert it.
 - Verification: snapshot diff of prod dirs before/after one Idle suite run
 - Blocked by: none
 
+### near-miss-open-false-positive — OPEN — opened 2026-10-14 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: check_lane_claims.py stops reporting a CLOSED lane as a near-miss-OPEN header because its status prose contains the substring "open", while still reporting a genuine REOPENED or OPENED header that declares files.
+- Files: scripts/check_lane_claims.py,tests/test_check_lane_claims.py
+- Hypothesis: Line 201 made the containment case-insensitive via status.upper(), so lowercase prose matched while OPEN_RE did not; and the docstring already promised a CLOSED lane is not reported, which the predicate never checked.
+- Falsification test: If the status field captured more than the first em-dash segment, or OPEN_RE were case-insensitive, the cause would be elsewhere. Both checked.
+- Verification: check_lane_claims.py exits 0 on origin/main; 13 tests pass; three mutants each caught (.upper() alone 1 failure, dropping CLOSED_RE alone 1, dropping both 3).
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

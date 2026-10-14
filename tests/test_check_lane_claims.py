@@ -142,3 +142,105 @@ def test_marked_new_at_reads_the_marker_not_a_section_qualifier():
         assert m._marked_new_at(line, at) is expected, path
     # and no control byte survived into the module
     assert chr(8) not in SCRIPT.read_text(encoding="utf-8")
+# ---------------------------------------------------------------------------
+# The near-miss-OPEN header check, and the false positive it had.
+#
+# Measured 2026-10-14: lane `nba-pregame-lineup-pools` carried the status
+# `CLOSED 2026-10-14 (GOAL MET via the pre-opener as-of replay; ...)`. The
+# predicate was `("OPEN" in status.upper()) and not OPEN_RE.search(status)`, so
+# the substring `open` inside the PROSE word "pre-opener" matched while
+# `OPEN_RE` (case-sensitive) did not -- and that single false positive made this
+# script exit 1 on origin/main, which is why EVERY session's start digest read
+# `LEDGER INCOHERENT`. Only the first em-dash segment is the status field, which
+# is why one lane tripped it and every other CLOSED block did not.
+# ---------------------------------------------------------------------------
+
+
+def _hdr(slug, status, sess="00000000-0000-0000-0000-000000000000"):
+    return "### %s %s %s %s opened 2026-10-12 %s session %s" % (slug, EM, status, EM, EM, sess)
+
+
+def _lanes(header, claimed="tests/test_thing.py"):
+    """The near-miss block PLUS a genuinely OPEN companion that holds a claim.
+
+    Load-bearing, not padding: with only the near-miss lane the claim set is
+    legitimately EMPTY and the script's `[FATAL] the parser found ZERO claims
+    while lanes.md holds N header(s) reading OPEN` alarm fires first, returning
+    before the near-miss section is reported. That alarm is correct, so the
+    fixture gives it a real claim to find.
+    """
+    return _doc_lines([
+        "## OPEN", "",
+        _hdr("companion-open-lane", "OPEN"),
+        "- Goal: a real OPEN lane so the claim set is not empty",
+        "- Files: tests/test_companion.py",
+        "- Blocked by: none", "",
+        header, "- Goal: fixture", "- Files: %s" % claimed, "- Blocked by: none",
+    ])
+
+
+def _doc_lines(lines):
+    return chr(10).join(lines)
+
+
+def _near_miss_reported(out):
+    return "DECLARE files under a header" in out
+
+
+def test_a_closed_lane_whose_status_prose_says_pre_opener_is_NOT_a_near_miss(tmp_path):
+    """The real false positive: lowercase `open` inside a prose word."""
+    repo = _repo(
+        tmp_path,
+        ["tests/test_thing.py", "tests/test_companion.py"],
+        _lanes(_hdr("closed-prose-lane",
+                    "CLOSED 2026-10-14 (GOAL MET via the pre-opener as-of replay; handed to todo #696)")),
+    )
+    code, out = _run(repo)
+    assert not _near_miss_reported(out), out
+    assert "closed-prose-lane" not in out, out
+
+
+def test_a_real_REOPENED_header_declaring_files_is_STILL_reported(tmp_path):
+    """The worked example this check exists for must keep firing."""
+    repo = _repo(
+        tmp_path,
+        ["tests/test_thing.py", "tests/test_companion.py"],
+        _lanes(_hdr("reopened-lane", "**REOPENED 2026-09-03 for the READ side**")),
+    )
+    code, out = _run(repo)
+    assert _near_miss_reported(out), out
+    assert "reopened-lane" in out
+    assert code == 1
+
+
+def test_an_OPENED_header_declaring_files_is_STILL_reported(tmp_path):
+    repo = _repo(
+        tmp_path,
+        ["tests/test_thing.py", "tests/test_companion.py"],
+        _lanes(_hdr("opened-lane", "OPENED 2026-10-01")),
+    )
+    code, out = _run(repo)
+    assert _near_miss_reported(out), out
+    assert "opened-lane" in out
+
+
+def test_a_plain_CLOSED_header_declaring_files_is_a_historical_record(tmp_path):
+    """The docstring's own promise, which the predicate never actually checked."""
+    repo = _repo(
+        tmp_path,
+        ["tests/test_thing.py", "tests/test_companion.py"],
+        _lanes(_hdr("plain-closed-lane", "CLOSED")),
+    )
+    code, out = _run(repo)
+    assert not _near_miss_reported(out), out
+
+
+def test_a_standalone_OPEN_header_is_not_a_near_miss_either(tmp_path):
+    """Control: a genuinely OPEN lane is enforced, so it is not in this class."""
+    repo = _repo(
+        tmp_path,
+        ["tests/test_thing.py", "tests/test_companion.py"],
+        _lanes(_hdr("open-lane", "OPEN")),
+    )
+    code, out = _run(repo)
+    assert not _near_miss_reported(out), out
