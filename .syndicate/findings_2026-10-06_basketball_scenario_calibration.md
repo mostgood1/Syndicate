@@ -2165,3 +2165,34 @@ first is a decision for the user and P3.
 - Before the full FIT, the EXACT_TARGET solver (`_solve_eff_mult`) must account for bonus and end-game possessions.
   That work is asked of P3/P4 (engine owners): default-off, with a reachability test and the parity gate.
 - Then a 12-date check of the #3i pick, with |total bias| < 1.0 and every #3i guard; then the full FIT; then P3's §7.
+
+### Phase 2 #3j/#3k — PRE-REGISTRATION 2026-10-14 14:40Z (before any run): measure-then-freeze the two solver constants, then check
+
+**Mechanism (P3, commit to follow after corpus parity):** two EventSimConfig fields, both default 0.0. Each is used only
+with EXACT on AND its mechanism on.
+- `solver_bonus_trip_share` s: bonus FT trips per team possession. The solve models
+  (1 − s)·loop_ppp + s·2·ftp.
+- `solver_endgame_pts_per_team` Δ: subtracted from each team target before the solve.
+- Off / 0 = the old solve, byte-identical.
+
+**#3j MEASURE** (FIT only, on 12 FIT dates DISJOINT from the 12 sweep dates: seed 8 from the other 97 FIT dates):
+2025-11-06, 11-15, 11-22, 11-23, 12-01, 12-03, 12-06, 12-08, 12-30, 12-31, 2026-01-17, 02-20.
+- Config: the #3i pick (bonus 0.03, foul_mult 0.5, fouler_per_minute, end-game as fitted, bench 0.05, release 240).
+- Counters: research-only patch v4 (`code_pj`). They count possessions per side, bonus trips and intentional trips in
+  the engine, not from the capped event list. Smoke test: counters = events (21/21, 6/6).
+- **M1:** both solver terms 0 → **s = Σ bonus trips / Σ team possessions.**
+- **M2 / M3:** end-game ON / OFF, with s applied and the end-game term 0, the same seeds →
+  **Δ = mean team points (ON − OFF).**
+- M1 can run on the current code. M2/M3 need P3's commit.
+- **Flag to P3:** if Δ > 1.5/team, the extension itself over-runs.
+
+**#3k CHECK** (the 12 sweep dates, so the constants are measured on different dates from the check):
+- the #3i pick with s and Δ frozen;
+- PASS = |total bias| < 0.5 ("well inside 1.0");
+- every #3i guard still holds: FTA 22.69 ± 0.3, foul-outs [0.153, 0.233], P(6th | 5th) [0.1607, 0.2643],
+  closers-on [0.375, 0.535], H2 [−0.19, −0.155], Q4 ≥ −0.101, S8 14.81 ± 0.6, Q4 FTA share ≥ 0.254.
+
+**Then:**
+1. The joint base_nonshooting_foul_per_poss + bonus fit against FTA 22.69 and PF 19.67 (its own pre-registration).
+2. The full FIT.
+3. P3's §7.

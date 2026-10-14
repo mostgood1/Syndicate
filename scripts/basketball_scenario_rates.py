@@ -288,6 +288,9 @@ def _compact_draw(h_box: Dict[str, Any], a_box: Dict[str, Any], hq: Any, aq: Any
         # #3d: [on-floor possessions, Q4 possessions] after a starter's 5th PF in Q4 with >= 240 s left; Q4 starters on floor.
         out["fot5"] = h_box.get("fo_t5")
         out["foq4"] = h_box.get("fo_q4st")
+    if h_box.get("fo_cnt") is not None:
+        # #3j: per-side possessions, bonus FT trips and end-game intentional trips (engine counters, not the capped event list).
+        out["foc"] = h_box.get("fo_cnt")
     ev = h_box.get("events")
     if isinstance(ev, list) and ev:
         # Phase 2 #3: FTA by quarter from the engine's diagnostic events (cfg.record_events). Index 4 = overtime.
