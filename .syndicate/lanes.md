@@ -67,9 +67,10 @@ death, never life — do not invert it.
 
 ## OPEN
 
-### nba-recon-boxscores-import-native — OPEN — opened 2026-10-14 — session 2d413211
+### nba-recon-boxscores-import-native — CLOSED 2026-10-14 (GOAL MET) — opened 2026-10-14 — session 2d413211
+- GOAL VERDICT. Goal (verbatim): "Remove the vendored `from nba_betting.boxscores import _nba_gid_to_tricodes` from Syndicate's NBA recon-tools copy (`syndicate/features/nba/recon_tools/build_live_player_lens_tuning.py`) without changing what production computes, keeping the copy pinned to the vendored body except for that one documented edit (user request 2026-10-14)." -- **GOAL: MET** `[2026-10-14 23:05Z]`. c6225f6e live on the fleet since abed0ccc 22:46:59Z (news-availability-gate's ff carried it; mine was refused on their claim, not forced). Deployed checkout carries the marked edit; 5 tests pass. Output-identical by construction (the import raises on the fleet); the A/B population was empty, recorded as such. deploys.md 22:46:59Z.
 - Goal: Remove the vendored `from nba_betting.boxscores import _nba_gid_to_tricodes` from Syndicate's NBA recon-tools copy (`syndicate/features/nba/recon_tools/build_live_player_lens_tuning.py`) without changing what production computes, keeping the copy pinned to the vendored body except for that one documented edit (user request 2026-10-14).
-- Files: syndicate/features/nba/recon_tools/build_live_player_lens_tuning.py, tests/test_nba_recon_tools_native.py
+- Files: none (released at close)
 - Hypothesis: the import can never succeed in production (the NBA refresh puts only the repo root on sys.path; no *betting package in the venv; no vendor path in the worker env -- measured on the fleet 2026-10-14), so replacing the try block with its fallback start is output-identical.
 - Falsification test: a fleet A/B (old copy vs edited, prod NBA data, the recon move's dates 10-05/08/11) shows any frame difference.
 - Verification: A/B identical; tests pin body == vendored with the one edit reversed; after a fleet ff the deployed checkout carries the edit (per-run subprocess, no restart).

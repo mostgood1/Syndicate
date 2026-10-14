@@ -49448,3 +49448,17 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
   - refresh-worker log: 0 Tracebacks in the last 40k lines.
 - **owed:** an NHL SCRATCH flag on a live slate (tonight's lists post ~30 min before 23:30Z / 00:30Z puck drops).
 - **rollback:** `SYNDICATE_NEWS_OUT_GATE=off` (refresh-worker env, loads at a restart), or revert e937a0d1 / abed0ccc / dc61042f and restart under a claim. The collector change reverts with an ff (no restart).
+
+## 2026-10-14 22:46:59Z (5:46 PM CT) -- LOCAL FLEET: NBA recon boxscores import removed (c6225f6e) LIVE, carried by lane `news-availability-gate`'s ff e937a0d1 -> abed0ccc -- no ff of mine (lane `nba-recon-boxscores-import-native`, session 2d413211)
+
+- **User decisions 2026-10-14:** "move the nba recon tools boxscores import off vendor", then "Ff after props idle".
+- **What happened:**
+  - My gated acquire at ~22:20Z was refused: refresh-worker was HELD by `news-availability-gate`. Nothing changed and I did not force it.
+  - A status-only poller (no re-acquire) waited. The lock freed at 23:01:41Z, but by then the fleet was at dc61042f.
+  - Reflog: `abed0ccc` (22:46:59Z) is the first HEAD containing c6225f6e. So the holder's own ff carried it, and my job stopped on its "HEAD moved past" guard.
+- **Change:** the NBA recon lens-tuning copy's `try: from nba_betting.boxscores import _nba_gid_to_tricodes ...` was replaced by its fallback start, marked `SYNDICATE EDIT`. The test reverses that one edit and still requires the vendored bytes.
+- **Equivalence:**
+  - By construction: on the fleet that import raises ModuleNotFoundError, and the old `except` then started from `game_ids = []`, exactly as the edited copy does.
+  - The fleet A/B (10-07/08/11/12/13/14) matched, but its population is EMPTY: `_load_actuals_long` gives 0 rows on every date, and no NBA lens-tuning file has ever been written in production. So it is not evidence.
+- **VERIFY (deployed checkout at dc61042f):** the edit marker is present; 5 tests passed.
+- **Rollback:** revert c6225f6e and ff.
