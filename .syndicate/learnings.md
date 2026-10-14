@@ -2085,3 +2085,7 @@ prefer single-quoted arguments there.
 ## 2026-10-14 -- RULE: register a lead ALONE unless the family is the claim; a pairing chosen for tidiness cost a pass `[lane signal-engine-nhl, session 9e18a0e7]`
 - **Measured:** the two NHL saves leads were registered as one Holm family for the out-of-sample test (v3). `saves_opp_volume_high` repeated (+9.1% [+0.8, +17.5], p 0.0185 on 138 unseen games; +10.6% before) but needed p <= 0.0125 as the stronger of two; its partner (`saves_team_leaky`) reversed. Alone at 0.025 it would have passed. The bar stood, and the lead went to a third, single-hypothesis forward test (S1F), costing a season.
 - **Rule:** pair hypotheses under a family correction only when the CLAIM is the family. Two leads with separate evidence get separate registrations (and, if both run, a split alpha decided up front). Holm across a strong and a weak lead charges the strong one for the weak one.
+
+## 2026-10-14 -- a Windows Update restart takes the fleet down until someone LOGS ON: the task's only trigger is at-logon `[session d4409ac4]`
+- 1:29 AM CT MoUsoCoreWorker restarted the PC; `SyndicateLocalProduction` (MSFT_TaskLogonTrigger, Interactive) did not run until the 7:47 AM logon -> 6 h 19 m outage, settlement 51 min late. Read like a slow settlement; it was a host event.
+- **Rule:** when a scheduled fleet job is late, check `uptime -s` in WSL and Windows event 1074 BEFORE reading the job's own code.
