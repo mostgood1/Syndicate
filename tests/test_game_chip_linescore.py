@@ -125,7 +125,8 @@ class DailyLineScores(unittest.TestCase):
 class LiveFromEspn(unittest.TestCase):
     BOARD = {"401898403": {"away": "CLE", "home": "ORL", "away_periods": [28, 24, 17], "home_periods": [35, 37, 23]},
              "401892489": {"away": "FLA", "home": "CBJ", "away_periods": [0, 4, 2], "home_periods": [1, 0, 1]},
-             "401892500": {"away": "UTAH", "home": "NJ", "away_periods": [1, 0, 0, 1], "home_periods": [0, 1, 0, 0]}}
+             "401892500": {"away": "UTAH", "home": "NJ", "away_periods": [1, 0, 0, 1], "home_periods": [0, 1, 0, 0]},
+             "401892501": {"away": "BUF", "home": "MTL", "away_periods": [1, 0, 2, 0, 0], "home_periods": [1, 2, 0, 0, 1]}}
 
     def _live(self, sport, game, **kw):
         gl._CACHE.clear()
@@ -141,6 +142,10 @@ class LiveFromEspn(unittest.TestCase):
         self.assertEqual(got["away"], [0, 4, 2])
         got = self._live("nhl", {"gamePk": "2"}, away_abbr="UTA", home_abbr="NJD")
         self.assertEqual(got["labels"], ["1", "2", "3", "OT"])
+
+    def test_nhl_shootout_is_labelled_so(self) -> None:
+        got = self._live("nhl", {"gamePk": "4"}, away_abbr="BUF", home_abbr="MTL")
+        self.assertEqual(got["labels"], ["1", "2", "3", "OT", "SO"])
 
     def test_live_unknown_game_has_no_line_score(self) -> None:
         self.assertIsNone(self._live("nhl", {"gamePk": "3"}, away_abbr="BOS", home_abbr="SJS"))

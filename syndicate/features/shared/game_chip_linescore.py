@@ -306,7 +306,13 @@ def _espn_linescore(sport: str, game: Mapping[str, Any], date: str, away_abbr: s
                         _canon(sport, _ESPN_ABBR_FIX.get(str(g.get("home")), g.get("home")))) == want), None)
     if not hit or not hit["away_periods"] or not hit["home_periods"]:
         return None
-    return _periods(hit["away_periods"], hit["home_periods"], 3 if sport == "nhl" else 4)
+    got = _periods(hit["away_periods"], hit["home_periods"], 3 if sport == "nhl" else 4)
+    if got and sport == "nhl" and len(got["labels"]) == 5:
+        # Regular season / preseason: one 5-minute OT, then the shootout, which
+        # ESPN lists as a fifth "period" worth the one deciding goal (measured
+        # 2026-10-13 BUF @ MTL 3-4: home 1 2 0 0 1). Not a second overtime.
+        got["labels"] = ["1", "2", "3", "OT", "SO"]
+    return got
 
 
 def _recent(date: str) -> bool:
