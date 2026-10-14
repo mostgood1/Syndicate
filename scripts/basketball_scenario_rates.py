@@ -277,6 +277,10 @@ def _compact_draw(h_box: Dict[str, Any], a_box: Dict[str, Any], hq: Any, aq: Any
            "hot": int(sum(int(x or 0) for x in (h_box.get("ot_pts") or []) if x is not None)),
            "aot": int(sum(int(x or 0) for x in (a_box.get("ot_pts") or []) if x is not None)),
            "h": team(h_box), "a": team(a_box), "hx": team_x(h_box), "ax": team_x(a_box), "fo": fo}
+    # Phase 2 #3c: top fouler PF per side, and the engine's foul-out diagnosis rows when cfg.diag_foul_outs is on.
+    out["pfmax"] = [max([int(p.get("pf") or 0) for p in (b.get("players") or [])] or [0]) for b in (h_box, a_box)]
+    if h_box.get("fo_diag") is not None:
+        out["fod"] = h_box.get("fo_diag")
     ev = h_box.get("events")
     if isinstance(ev, list) and ev:
         # Phase 2 #3: FTA by quarter from the engine's diagnostic events (cfg.record_events). Index 4 = overtime.
