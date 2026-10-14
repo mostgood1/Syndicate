@@ -755,3 +755,30 @@ Production sequence (`resume_from_summary` -> `map_state_names`) on the pickled 
 - This is a **PREGAME** defect first: the pregame sim itself runs without those players, and the live resume inherits it. Live props for them cannot exist.
 - Preseason is extreme (camp invitees). The regular-season ramp in (a) predicts ~45% real fives in the first weeks after 10-20.
 - **Owner: not P3.** The pregame frame / roster mode belongs to the smart-sim roster path (lanes nba-pregame-lineup-pools / basketball props). Filed as a lead. P3's resume can only report it. A partial-five resume (place the matched 4, sample 1) would hide a missing starter, not fix it.
+
+## 12. PRE-REGISTERED 2026-10-14 (before any measurement): live re-gate on the Phase 2 config, FIT window only
+
+**Why:** the §9 gate failed on totals level in the PRODUCTION config (EXACT off, overshoot +2..+3 early). The calibration lane's Phase 2 config fixes the pregame level (PK2 bias +0.08). This gate asks whether the live resume, run in THAT config, beats `pregame_rate`.
+
+**Config:** `fit_f3_config.json` (calibration lane, findings_2026-10-06 "FULL-FIT ENGINE CONFIG, machine-readable"), applied verbatim by `--phase2-config` (5a9c9f69) at BOTH stages:
+- as-of inputs re-recorded with its env, flags, total-input keys, availability/prop-calibration copies and all 105 walk-forward calibration files;
+- the resume runs with its engine flags and EventSimConfig fields.
+
+**Population:** 2025-26 REGULAR season, **FIT window 2025-11-01..2026-02-28 only**. The VALIDATION window (03-01..04-12) and the postseason are graded ONCE, in the same pass as the calibration lane's single VALID read (agreed with that lane). Pbp/linescore-consistent games only, as §9. n stated per checkpoint.
+
+**Checkpoints:** end Q1, end Q2, end Q3, 5:00 Q4. 100 sims, seeds as §9.
+
+**PASS (all required, per checkpoint):**
+- Total MAE: native − pregame_rate paired game-bootstrap CI upper bound < 0 at end Q1, Q2 and Q3 (better). At 5:00 Q4, not worse (CI lower bound ≥ −0.05 … upper ≤ +0.05 counts as a tie).
+- Margin MAE: not worse than pregame_rate at any checkpoint (CI upper ≤ +0.05).
+- ML (p_home log-loss): not worse than pregame_rate at any checkpoint.
+- Total bias |·| < 1.0 at every checkpoint.
+
+**Also read (not gated):**
+- Paired native Phase 2 vs native production config (gate_v4_k0) on the same games, total and margin.
+- 80% coverage.
+- Refusal tally.
+- The on-floor real-five share (§11).
+
+**If PASS:** report to the user. Shadow -> priced remains the user's decision, and production must also run the Phase 2 pregame config.
+**If FAIL:** name the failing market/checkpoint and stop. No re-fit inside this gate.
