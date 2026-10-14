@@ -67,6 +67,14 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### wnba-live-commence-times-native — OPEN — opened 2026-10-14 — session 2d413211
+- Goal: Move the live loop's WNBA commence-time source (`live_refresh_loop._wnba_commence_times`, the T-window provider) off the vendored `vendor/wnba_betting_repo/data/processed/schedule_2026.json` onto the data-root WNBA schedule the refresh's fetch-schedule writes; deployed with a measurement (user request 2026-10-14: "move the wnba live lens schedule off vendor").
+- Files: syndicate/features/shared/live_refresh_loop.py (_wnba_commence_times section only), tests/test_wnba_commence_times_native.py (NEW)
+- Hypothesis: the vendored file ends 2026-09-24 (frozen at the vendor pull), so the provider returned [] for the whole postseason (measured on the fleet: [] for 10-09 and for Finals G1 10-17); the data-root schedule_2026.json has every game through 10-31.
+- Falsification test: after the switch the provider still returns [] for 2026-10-17 on the fleet, or returns times that disagree with the data-root datetime_utc (G1 = 2026-10-17T19:30:00Z, game 401918305).
+- Verification: on the deployed checkout with the workers' env, `_wnba_commence_times("2026-10-17")` == [("401918305", epoch of 2026-10-17T19:30Z)]; the live-odds-worker restarted onto the new code before G1.
+- Blocked by: none
+
 ### basketball-schedule-adapter-native — CLOSED 2026-10-14 (GOAL MET) — opened 2026-10-14 — session 2d413211
 - GOAL VERDICT. Goal (verbatim): "Move the NBA/WNBA live-lens schedule fallback (`schedule_adapter._fetch_basketball_schedule_via_cli`, used by the live loop's slate phase and T-window via `fetch_schedule_for_date`) off the vendored `<sport>_betting.cli` onto Syndicate's `source_cli` port, and stop the reader returning a game twice; deployed with a measurement (user request 2026-10-14: "move the nba live lens schedule off vendor")." -- **GOAL: MET** `[2026-10-14 18:11Z]`. Fleet ff a78aab9c 18:04:42Z + live-odds-worker TERM/respawn 18:04:52Z (pid 456 -> 3293). Its fallback ran the Syndicate CLI and healed the schedule at 18:11:24Z; adapter NBA rows 2026-10-14: 0 -> 7 (7 distinct); no vendored *_betting.cli process at 18:11:32Z. Done INSIDE games-rail-full-detail's claims (my acquire was refused, unchecked) -- holder messaged; deploys.md 18:04:42Z. Still owed: tests/test_data_mirror_write_guard.py on a checkout with data/.
 - Goal: Move the NBA/WNBA live-lens schedule fallback (`schedule_adapter._fetch_basketball_schedule_via_cli`, used by the live loop's slate phase and T-window via `fetch_schedule_for_date`) off the vendored `<sport>_betting.cli` onto Syndicate's `source_cli` port, and stop the reader returning a game twice; deployed with a measurement (user request 2026-10-14: "move the nba live lens schedule off vendor").
