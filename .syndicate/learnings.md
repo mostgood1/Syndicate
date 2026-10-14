@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1382 rules `[generated]`
+## Index — 1395 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -2102,3 +2102,10 @@ prefer single-quoted arguments there.
   - A full `up` is `supervisor.log`'s `stopping roles ... stopped.` + `LOCAL PRODUCTION UP ... commit=<sha>`, plus every role's `==== start <ts> restarts=0`.
   - A `restarts>=1` start is a single-role respawn that REUSES the env from `up`.
   - Before calling any fleet change "unrecorded", grep `deploys.md` for the exact seconds and the SHA, not only today's headers.
+
+## 2026-10-14 CORRECTION to 2026-10-13's own block-boundary rule: it prescribed the WRONG regex, and the rule was broken the day after it was written `[lane ledger-io-block-bounds, session 4ab694ed, commit 48328ada]`
+
+- **The 2026-10-13 entry says "bound a block by the next heading of ANY level (`^#{1,6} `)". That overshoots.** Measured on `lanes_history.md`: `^#{1,6}` truncates **26 of 887** archived blocks, one from **259 lines to 15**, because archived blocks legitimately carry `####` sub-headings. A heading DEEPER than the block's own level is CONTENT. **The correct boundary is `^#{1,3}`** -- stop at the next `#`, `##` or `###`. `lanes.md` has 2 such lines and 0 of its 75 blocks contains one, so the two boundaries agree there and ONLY the archive exposes the difference; a rule verified on `lanes.md` alone reads correct and is not.
+- **The rule was also broken one day after it was written, by me.** A fresh verification harness bounded by `###` only, read a 12-line block as **785 lines / 120,001 chars**, and reported a correctly-archived block as ALTERED. Its gate refused the commit, so the cost was minutes -- but prose plainly did not transfer.
+- **Rule: when a boundary rule recurs, move it out of prose and into a shared helper.** `scripts/ledger_io.py` now owns it: `block_spans` / `block_bounds` / `block_text`, with `block_bounds` RAISING on an absent slug and on a duplicated one (naming both line numbers) rather than picking a copy. Call it; do not re-derive the regex in the next ad-hoc script.
+- **Corollary on where to look for the defect:** the production tools were already right (`archive_state_subject.py` scans inside `subject_span`, which bounds at the next `## `; `check_trimmed_contracts.py` independently chose `^#{2,3}`). Both failures were in throwaway harnesses, which get no tests and no review -- so a rule that only tools obey is a rule that fails exactly where nothing is watching.

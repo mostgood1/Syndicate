@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 1382 rules `[generated]`
+## Index — 1395 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -537,7 +537,7 @@
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 - [2026-09-03 — EXONERATED: `deploys.md` and `learnings.md` ARE guarded. Two sessions file…](learnings_archive.md#2026-09-03-exonerated-deploysmd-and-learningsmd-are-guarded-two-sessions-filed-the-same-false-gap-and-the-second-re-derived-it-with-the-same-blind-spot) `[evidence]`
 
-**Rules and corrections — 859**
+**Rules and corrections — 872**
 
 - [2026-09-16 — a detector that matches a FORMULA at published precision has a FALSE-POSIT…](#2026-09-16-a-detector-that-matches-a-formula-at-published-precision-has-a-false-positive-rate-and-mine-fired-at-about-1-row-per-1200-session-abacd435-lane-soccer-anytime-scorer)
 - [2026-09-16 — OVERTURNED: "the pre-registered criterion is the safe part, the risk is in…](#2026-09-16-overturned-the-pre-registered-criterion-is-the-safe-part-the-risk-is-in-the-mechanism-two-hypotheses-in-one-night-died-on-the-criterion-session-abacd435-fixes-4-and-5a-no-lane)
@@ -758,6 +758,19 @@
 - [2026-10-12 -- Before building features for a market, test whether ANY available input a…](#2026-10-12----before-building-features-for-a-market-test-whether-any-available-input-adds-to-the-de-vigged-price-lanes-mlb-pitcher-outs-k-dist-mlb-starter-workload-signal)
 - [2026-10-12 -- RULE: a calibrated engine's known bias may be ABSORBING a missing mechani…](#2026-10-12----rule-a-calibrated-engines-known-bias-may-be-absorbing-a-missing-mechanism-fix-one-and-the-other-shows-test-the-pair-never-one-alone-lane-ncaab-native-live-tier-session-e48a0f9b)
 - [2026-10-13 OVERTURNED: "the NHL game-line model needs better inputs to beat the as-of G…](#2026-10-13-overturned-the-nhl-game-line-model-needs-better-inputs-to-beat-the-as-of-gfga-baseline-on-moneyline----eight-were-tried-and-none-did-lane-nhl-game-lines-model-closed-goal-not-met-session-9ed26377-closed-by-4ab694ed)
+- [2026-10-13 OVERTURNED: "`--check` passed, so the generated port is what the generator p…](#2026-10-13-overturned---check-passed-so-the-generated-port-is-what-the-generator-produces----it-passed-on-the-windows-checkout-only-lanes-nba-live-tick-native-nba-source-cli-native-session-2d413211)
+- [2026-10-13 A 0-diff parity run proves only what the run exercised: count the leaves, an…](#2026-10-13-a-0-diff-parity-run-proves-only-what-the-run-exercised-count-the-leaves-and-read-what-the-arm-wrote-lane-nba-live-tick-native-session-2d413211)
+- [2026-10-13 -- A seed fixes the RNG, not the process: cross-process sim comparisons need…](#2026-10-13----a-seed-fixes-the-rng-not-the-process-cross-process-sim-comparisons-need-pythonhashseed-session-ee14e4ec-7693274b-lane-basketball-pregame-teammate-effects)
+- [2026-10-14 -- RULE: a fail-open guard must PROVE it ran; and a hook fix on main is NOT…](#2026-10-14----rule-a-fail-open-guard-must-prove-it-ran-and-a-hook-fix-on-main-is-not-live-until-the-primary-tree-is-fast-forwarded-lane-precommit-python-probe-session-e48a0f9b)
+- [2026-10-14 RULE: a fleet status read right after YOUR OWN `wsl` call boots WSL is not a…](#2026-10-14-rule-a-fleet-status-read-right-after-your-own-wsl-call-boots-wsl-is-not-an-outage-reading----wait-for-the-boot-path-then-re-read)
+- [2026-10-14 -- nflverse spells the Rams `LA`, not `LAR`: grep a game by DATE, never by a…](#2026-10-14----nflverse-spells-the-rams-la-not-lar-grep-a-game-by-date-never-by-a-guessed-game_id-lane-nfl-mnf-settlement-lag-session-d4409ac4)
+- [2026-10-14 -- RULE: before "re-fit the calibration", check WHERE in the pipeline the ca…](#2026-10-14----rule-before-re-fit-the-calibration-check-where-in-the-pipeline-the-calibration-reads-its-residual-lane-basketball-scenario-calibration-session-e0a3e383)
+- [2026-10-14 — RULE: ESPN soccer commentary shot events carry NO athlete id; key a per-pl…](#2026-10-14-rule-espn-soccer-commentary-shot-events-carry-no-athlete-id-key-a-per-player-join-on-the-name-within-the-team-lane-soccer-live-anytime-scorer-session-b9bb5f37)
+- [2026-10-14 -- RULE: register a lead ALONE unless the family is the claim; a pairing cho…](#2026-10-14----rule-register-a-lead-alone-unless-the-family-is-the-claim-a-pairing-chosen-for-tidiness-cost-a-pass-lane-signal-engine-nhl-session-9e18a0e7)
+- [2026-10-14 -- a Windows Update restart takes the fleet down until someone LOGS ON: the…](#2026-10-14----a-windows-update-restart-takes-the-fleet-down-until-someone-logs-on-the-tasks-only-trigger-is-at-logon-session-d4409ac4)
+- [2026-10-14 -- OVERTURNED: "TaskStop stops a Git Bash watcher loop" (lane nba-native-liv…](#2026-10-14----overturned-taskstop-stops-a-git-bash-watcher-loop-lane-nba-native-live-resim)
+- [2026-10-14 -- RULE: `local_production.py status`'s supervisor `since` is NOT the superv…](#2026-10-14----rule-local_productionpy-statuss-supervisor-since-is-not-the-supervisors-start-judge-a-fleet-up-by-supervisorlog-and-role-restarts-lane-ncaab-native-live-tier-session-e48a0f9b)
+- [2026-10-14 CORRECTION to 2026-10-13's own block-boundary rule: it prescribed the WRONG…](#2026-10-14-correction-to-2026-10-13s-own-block-boundary-rule-it-prescribed-the-wrong-regex-and-the-rule-was-broken-the-day-after-it-was-written-lane-ledger-io-block-bounds-session-4ab694ed-commit-48328ada)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
