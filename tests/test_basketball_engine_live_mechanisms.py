@@ -205,3 +205,32 @@ def test_foul_avoidance_is_reachable_and_cuts_foul_outs_without_benching():
     on = _foul_outs(_with_cfg(kw, **warm, foul_trouble_foul_mult=0.2), 20)
     assert on != off
     assert on < off * 0.8
+
+
+# ------------------------------------------------------------------------------------------- per-minute fouler
+
+def _top5_pf_share(kw, draws, seed0=0):
+    top = tot = 0
+    for s in range(draws):
+        (hb, ab, _hq, _aq), _ = _run(kw, None, seed0 + s)
+        for b in (hb, ab):
+            rows = sorted(b.get("players") or [], key=lambda r: -float(r.get("min") or 0))
+            pf = [int(r.get("pf") or 0) for r in rows]
+            top += sum(pf[:5]); tot += sum(pf)
+    return top / max(tot, 1)
+
+
+def test_fouler_per_minute_off_is_byte_identical():
+    kw = _kw()
+    a = _run(_with_cfg(kw), None, 6)
+    b = _run(_with_cfg(kw, fouler_per_minute=False), None, 6)
+    assert a[0][2] == b[0][2] and a[1] == b[1]
+
+
+def test_fouler_per_minute_is_reachable_and_lowers_the_starter_pf_share():
+    """The blended weight's 0.25 minutes share tilts fouls toward high-minute players; per-minute removes it."""
+    kw = _kw()
+    off = _top5_pf_share(_with_cfg(kw), 20)
+    on = _top5_pf_share(_with_cfg(kw, fouler_per_minute=True), 20)
+    assert on != off
+    assert on < off

@@ -122,6 +122,12 @@ class EventSimConfig:
     # Multiplies such a player's weight in every FOULER draw (shooting, non-shooting/bonus, end-game intentional), in
     # every window including the release window. Same thresholds as benching. 1.0 = off: byte-identical.
     foul_trouble_foul_mult: float = 1.0
+    # PER-MINUTE FOULER (P3, 2026-10-14). The fouler draw uses `_player_usage_weights`, which blends the PF prior 0.75
+    # with a 0.25 MINUTES share -- that tilts fouls toward high-minute players beyond their rate. Real starters foul
+    # LESS per minute than the bench (3.70 vs 4.32 PF/48) and commit 0.585 of team PF; the sim gave them 0.659
+    # (calibration lane #3f). On: weight on-court players by `_prior_pf_pm` alone (raw, no log, no minutes); a missing
+    # or zero prior takes the on-court median. Only the FOULER draw. Off = byte-identical.
+    fouler_per_minute: bool = False
 
     # Outcome priors (fallbacks when player priors are missing)
     base_tov_per_poss: float = 0.125
@@ -1098,6 +1104,7 @@ def simulate_pbp_game_boxscore(
     ft_release = int(getattr(cfg, "foul_trouble_release_s", 240) or 0)
     _ff_raw = getattr(cfg, "foul_trouble_foul_mult", 1.0)
     ff_mult = 1.0 if _ff_raw is None else float(np.clip(float(_ff_raw), 0.0, 1.0))
+    pf_per_min = bool(getattr(cfg, "fouler_per_minute", False))
     if (ft_mult < 1.0 or ff_mult < 1.0) and opening_tip:
         h_pf0 = np.zeros(len(home_players), dtype=int)
         a_pf0 = np.zeros(len(away_players), dtype=int)
@@ -1253,9 +1260,22 @@ def simulate_pbp_game_boxscore(
             total = np.asarray(box["pf"], dtype=int) + pf0
             return [int(i) for i in np.flatnonzero(total >= thr) if int(i) not in out_idx]
 
+        def _pf_rate_w(players: pd.DataFrame, line: List[int]) -> np.ndarray:
+            n_ = int(len(players))
+            w = np.zeros(n_, dtype=float)
+            idx = [int(i) for i in (line or []) if 0 <= int(i) < n_]
+            if not idx:
+                return w
+            pm = np.asarray(_usage_w.keywords["cols"](players, "_prior_pf_pm"), dtype=float)[idx]
+            pm = np.where(np.isfinite(pm) & (pm > 0), pm, np.nan)
+            fill = float(np.nanmedian(pm)) if np.isfinite(pm).any() else 1.0
+            pm = np.where(np.isfinite(pm), pm, fill)
+            w[idx] = pm / float(pm.sum())
+            return w
+
         def _pf_w(players: pd.DataFrame, line: List[int], box: Dict[str, Any], pf0: np.ndarray) -> np.ndarray:
-            """Fouler-draw weights. Off (ff_mult 1.0) = exactly `_usage_w(..., '_prior_pf_pm', ...)`."""
-            w = _usage_w(players, "_prior_pf_pm", line)
+            """Fouler-draw weights. Off (ff_mult 1.0, fouler_per_minute False) = exactly `_usage_w(..., '_prior_pf_pm', ...)`."""
+            w = _pf_rate_w(players, line) if pf_per_min else _usage_w(players, "_prior_pf_pm", line)
             if ff_mult >= 1.0:
                 return w
             thr = ft_thr[min(int(q), len(ft_thr)) - 1] if int(q) <= N_PERIODS else ft_thr[-1]
