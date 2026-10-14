@@ -128,7 +128,8 @@ def price_rows(data_root: Path, day: str) -> tuple[str | None, list[dict[str, An
     return None, []
 
 
-def main_lines(rows: Iterable[Mapping[str, Any]], *, change_log: bool = False) -> list[dict[str, Any]]:
+def main_lines(rows: Iterable[Mapping[str, Any]], *, change_log: bool = False, lead: timedelta = SNAPSHOT_LEAD,
+               fair_books: frozenset[str] | None = None) -> list[dict[str, Any]]:
     """Each book's LAST quote before the cutoff, then the main line per (event, market, player) with the best US under.
 
     Tip-off is the EARLIEST commence_time seen for the event: OddsAPI rewrites commence_time to the actual start once a
@@ -138,7 +139,10 @@ def main_lines(rows: Iterable[Mapping[str, Any]], *, change_log: bool = False) -
     "Last quote" per (event, market, player, book) = the points present at that book's latest observation <= cutoff. In a
     SNAPSHOT file (props CSVs) every side must be in that snapshot; a point the book has since dropped is gone. The
     `book_quotes` CHANGE LOG appends only on a price change and never records a removal, so there a point counts if
-    observed at the book's latest capture, and a side that did not change is carried forward from its last value."""
+    observed at the book's latest capture, and a side that did not change is carried forward from its last value.
+
+    `lead` and `fair_books` exist for the rebounds-unders forward grader (tip - 10 min; the fair over US books +
+    Pinnacle only); their defaults are H7's registration exactly (tip - 45 min; the fair over every two-sided book)."""
     rows = list(rows)
     commence_of: dict[str, datetime] = {}
     for r in rows:
@@ -155,7 +159,7 @@ def main_lines(rows: Iterable[Mapping[str, Any]], *, change_log: bool = False) -
             point, price = float(r.get("point")), float(r.get("price"))
         except (TypeError, ValueError):
             continue
-        if snap is None or event not in commence_of or side not in ("over", "under") or snap > commence_of[event] - SNAPSHOT_LEAD:
+        if snap is None or event not in commence_of or side not in ("over", "under") or snap > commence_of[event] - lead:
             continue
         bk = (event, r["market"], norm_player(r.get("player_name")), str(r.get("bookmaker") or "").lower())
         key = bk + (point, side)
@@ -174,7 +178,8 @@ def main_lines(rows: Iterable[Mapping[str, Any]], *, change_log: bool = False) -
     candidates: dict[tuple, list[dict[str, Any]]] = defaultdict(list)
     for (event, market, player, point), books in by_point.items():
         two = {b: s for b, s in books.items() if "over" in s and "under" in s}
-        fairs = [f[0] for f in (devig([s["over"], s["under"]], method="shin") for s in two.values()) if f]
+        fairs = [f[0] for f in (devig([s["over"], s["under"]], method="shin") for b, s in two.items()
+                                if fair_books is None or b in fair_books) if f]
         if not fairs:
             continue
         us_unders = [s["under"] for b, s in two.items() if b in US_BOOKS]
