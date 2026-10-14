@@ -49231,3 +49231,16 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
   - Tests: 55 lineup tests pass, including the off != on test in tests/test_soccer_starter_name_match.py.
 - **verify -- OWED:** `scripts/soccer_season_audit/lineup_reach.py` over the next slate's pre-kickoff freezes (MLS 2026-10-14 23:30Z first). The `confirmed_sides_by_starters_recognised_of_11` mass should shift toward 11 against the 10-09..12 reading (11: 64, 10: 82, 9: 29 of 190).
 - **Rollback:** revert e1954b4a, ff. No restart.
+
+
+## 2026-10-14 14:47:34Z -- WINDOWS TASK CHANGE (by the user), NO RESTART: `SyndicateLocalProduction` now starts AT BOOT, whether or not anyone is logged on (session e48a0f9b recorded and verified the read)
+- **Why:** two Windows-Update outages in 26 h (2026-10-13 04:37Z; 2026-10-14 ~06:30-12:47Z). The task's ONLY trigger was "At log on" with logonType Interactive, so after an unattended reboot the fleet waited for a human logon (~6 h on 10-14).
+- **Change (made by the user in Task Scheduler; I do not enter credentials):** General -> "Run whether user is logged on or not" (password stored); Triggers -> "At startup" with a 1-min delay. The old "At log on" trigger is no longer listed. The first save failed on credentials (Microsoft-account / passwordless sign-in) and the user resolved it.
+- **Verify (read) -- MET** (`Get-ScheduledTask`): `Principal.LogonType = Password`; one trigger `MSFT_TaskBootTrigger enabled=True delay=PT1M`; `MultipleInstances=IgnoreNew`, `RestartCount=999`, interval PT1M unchanged; state Running (fleet unaffected).
+- Measured: <pending> -- after the NEXT host reboot, with NOBODY logged on:
+  - WSL `uptime -s` within a few minutes of Windows `LastBootUpTime`;
+  - `supervisor.log` `LOCAL PRODUCTION UP`;
+  - every role `==== start ... restarts=0`, `/healthz` 200, BEFORE any logon (Kernel-Power / Winlogon session events give the logon time).
+  WSL in a non-interactive session is UNPROVEN on this host; if it fails, the task's `LastTaskResult` and the absence of a supervisor say so.
+- **Rollback:** Task Scheduler -> SyndicateLocalProduction -> "Run only when user is logged on" + an "At log on" trigger.
+- **Not changed:** `SyndicateFleetWatchdog` stays Interactive (its job is desktop notifications), so its auto-recovery still runs only while logged on.
