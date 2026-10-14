@@ -25,6 +25,11 @@ edge; Layer 2 does not seat it. Reported even when zero, and the state's age is 
 visible. A state older than STATE_MAX_AGE is treated as a dead feed: reported `stale`, nothing flagged.
 
 Switch: `SYNDICATE_NEWS_OUT_GATE=off` disables it (default on).
+
+MLB (user 2026-10-14: "collect MLB injuries now, flag in 2027"): ESPN's injured-list statuses (7/10/15/60-Day IL) count
+as OUT, Day-To-Day stays priced -- but an MLB row is flagged ONLY when its game day falls inside a regular season listed
+in REGULAR_SEASONS (dates from statsapi `/api/v1/seasons/<year>`). No postseason, no spring training, and a season not
+listed flags nothing and says so (`season_gate`). Add each season's window when its schedule is published.
 """
 from __future__ import annotations
 
@@ -37,8 +42,14 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from zoneinfo import ZoneInfo
 
-SPORTS = ("nhl", "nfl")
+SPORTS = ("nhl", "nfl", "mlb")
 STATE_MAX_AGE = timedelta(hours=24)
+# Sports flagged only inside a listed regular season (game day, Central, inclusive). statsapi /seasons/2027 (read
+# 2026-10-14): regular season 2027-03-25..2027-09-26, postseason from 2027-09-27.
+REGULAR_SEASONS: dict[str, dict[int, tuple[str, str]]] = {
+    "mlb": {2027: ("2027-03-25", "2027-09-26")},
+}
+_IL_STATUS = re.compile(r"\d+-DAY[- ]IL")
 SWITCH_ENV = "SYNDICATE_NEWS_OUT_GATE"
 CENTRAL = ZoneInfo("America/Chicago")
 
@@ -54,6 +65,25 @@ OUT_STATUS: dict[str, str] = {
     "SUSPENDED": "SUSPENDED",
 }
 SCRATCH_STATUS = "INACTIVE"
+
+
+def availability_status(status: object) -> str | None:
+    """ESPN status -> OUT / SUSPENDED, or None (still priced). MLB injured lists (`10-Day-IL`, `7-Day IL`) are OUT."""
+    text = str(status or "").strip().upper()
+    return OUT_STATUS.get(text) or ("OUT" if _IL_STATUS.fullmatch(text) else None)
+
+
+def season_window(sport: str, game_day: str | None) -> str:
+    """'open' (flag), 'outside' (a listed season, but not inside it), 'unknown' (season not listed), 'ungated'."""
+    seasons = REGULAR_SEASONS.get(sport)
+    if seasons is None:
+        return "ungated"
+    if not game_day:
+        return "unknown"
+    window = seasons.get(int(game_day[:4]))
+    if window is None:
+        return "unknown"
+    return "open" if window[0] <= game_day <= window[1] else "outside"
 
 
 def enabled() -> bool:
@@ -161,7 +191,7 @@ def out_index(sport: str, *, root: Path | None = None, now: datetime | None = No
     for item in (state.values() if isinstance(state, Mapping) else []):
         if not isinstance(item, Mapping):
             continue
-        status = OUT_STATUS.get(str(item.get("status") or "").strip().upper())
+        status = availability_status(item.get("status"))
         team = team_key(sport, item.get("team"))
         if status and team and item.get("athlete"):
             out[(team, player_key(item.get("athlete")))] = {
@@ -181,6 +211,7 @@ def flag_out_player_props(grid: list, *, sport: str, now: datetime | None = None
     index = out_index(sport, root=root, now=now)
     out, scratches = index.get("out") or {}, index.get("scratches") or {}
     flagged, by_source = 0, {"espn_injuries": 0, "nhl_gameinfo": 0}
+    season_counts: dict[str, int] = {}
     players: set[str] = set()
     for row in grid:
         if not isinstance(row, dict) or str(row.get("kind") or "") != "prop":
@@ -190,6 +221,10 @@ def flag_out_player_props(grid: list, *, sport: str, now: datetime | None = None
             continue
         teams = [team_key(sport, row.get(side)) for side in ("home_team", "away_team")]
         game_day = _game_day(row.get("commence_time"))
+        gate = season_window(sport, game_day)
+        season_counts[gate] = season_counts.get(gate, 0) + 1
+        if gate not in ("open", "ungated"):
+            continue  # e.g. MLB before 2027-03-25 or in any postseason: the row is left exactly as it was
         entry = None
         for team in teams:
             if not team:
@@ -225,6 +260,9 @@ def flag_out_player_props(grid: list, *, sport: str, now: datetime | None = None
         "rows_flagged_by_source": by_source,
         "players": sorted(players),
     }
+    if sport in REGULAR_SEASONS:
+        summary["season_gate"] = {"windows": {str(y): list(w) for y, w in REGULAR_SEASONS[sport].items()},
+                                  "prop_rows_by_gate": dict(sorted(season_counts.items()))}
     print(
         f"[board_enrichment] OUT_PLAYER_PROPS_FLAGGED sport={sport} source=news feed={summary['feed_status']} "
         f"age_min={summary['state_age_minutes']} out_on_feed={len(out)} scratches={len(scratches)} rows={flagged} "

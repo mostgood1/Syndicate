@@ -102,6 +102,27 @@ def test_one_failing_source_does_not_stop_the_others_and_no_oddsapi_is_called(tm
     assert json.loads((tmp_path / "news" / "_status" / "last_run.json").read_text())["requests"] == 1
 
 
+def test_mlb_injuries_are_collected_by_default(tmp_path: Path) -> None:
+    # User 2026-10-14: "collect MLB injuries now, flag in 2027". The scheduled task passes no --sports, so the
+    # default is what runs on the fleet.
+    import unittest.mock as mock
+
+    seen = {}
+
+    def fake_run(root, sports, kinds, **kw):
+        seen["sports"] = sports
+        return {"results": {}, "errors": {}, "requests": 0, "oddsapi_requests": 0}
+
+    with mock.patch.object(cns, "run", fake_run):
+        cns.main(["--data-root", str(tmp_path)])
+    assert seen["sports"] == ["nba", "nhl", "nfl", "wnba", "mlb"]
+    fetch = _fetcher({"baseball/mlb/injuries": _espn(("7", "10-Day-IL", "hamstring"))})
+    status = cns.run(tmp_path, ["mlb"], ["injuries"], fetch=fetch, now=T0)
+    assert status["results"]["mlb_injuries"]["listed"] == 1
+    rows = _lines(tmp_path / "news" / "mlb" / "injuries" / "2026-10-13.jsonl")
+    assert rows[0]["status"] == "10-Day-IL" and rows[0]["event"] == "new"
+
+
 # ----------------------------------------------------------------------------- backfill copy
 
 _BSPEC = importlib.util.spec_from_file_location(

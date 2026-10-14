@@ -9,8 +9,11 @@ referee crew's foul rate) need to know WHEN each fact became public. Nothing on 
 10-01 with no practice-week history. That history cannot be rebuilt later, so it is collected from now on.
 
 WHAT, every run (cheap, free, no keys, NO OddsAPI):
-  injuries   ESPN `site.api.espn.com/apis/site/v2/sports/<path>/injuries` for nba, nhl, nfl, wnba: 1 request each.
-             (ESPN's college-football feed is dead -- newest entry 2020 -- so NCAAF is not polled.)
+  injuries   ESPN `site.api.espn.com/apis/site/v2/sports/<path>/injuries` for nba, nhl, nfl, wnba, mlb: 1 request
+             each. (MLB added 2026-10-14, user: "collect MLB injuries now, flag in 2027" -- the history builds through
+             the offseason; the board flag waits for the 2027 regular season, `news_availability.REGULAR_SEASONS`.)
+             (ESPN's college-football feed is dead -- newest entry 2022 -- so NCAAF is not polled; the
+             men's college basketball and soccer feeds were empty on 2026-10-14.)
   referees   nba: official.nba.com/referee-assignments/ (1 request; posted ~9am ET).
              nhl: api-web.nhle.com schedule + one `right-rail` request per game starting within 4 h, until it starts:
              referees, linesmen AND each team's scratches (logged whenever they change).
@@ -48,6 +51,7 @@ ESPN_INJURY_PATHS = {
     "nhl": "hockey/nhl",
     "nfl": "football/nfl",
     "wnba": "basketball/wnba",
+    "mlb": "baseball/mlb",
 }
 NBA_REFEREES_URL = "https://official.nba.com/referee-assignments/"
 NHL_SCHEDULE_URL = "https://api-web.nhle.com/v1/schedule/now"
@@ -321,7 +325,7 @@ def run(data_root: Path, sports: list[str], kinds: list[str], fetch: Fetcher = h
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-root", default=os.environ.get("SYNDICATE_DATA_ROOT") or "")
-    ap.add_argument("--sports", default="nba,nhl,nfl,wnba")
+    ap.add_argument("--sports", default="nba,nhl,nfl,wnba,mlb")
     ap.add_argument("--kinds", default="injuries,referees")
     args = ap.parse_args(argv)
     if not args.data_root:

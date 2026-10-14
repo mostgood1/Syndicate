@@ -82,14 +82,14 @@ class OutPlayerBoardTests(unittest.TestCase):
     def test_other_sports_are_not_swept(self) -> None:
         with patch.object(be, "_injury_feed_root", return_value=self.root) as feed_root, \
                 patch.object(be, "_attach_projections_by_sport", return_value={"supported": True}):
-            coverage = be.attach_projections(self.grid, sport="mlb", selected_date=DATE)
+            coverage = be.attach_projections(self.grid, sport="soccer", selected_date=DATE)
         feed_root.assert_not_called()
         self.assertNotIn("out_player_props", coverage)
 
-    def test_nfl_and_nhl_use_the_news_feed_not_the_basketball_file(self) -> None:
-        # Lane `news-availability-gate` (2026-10-14): NFL / NHL are swept from the news collector, never the basketball
-        # injuries.csv path (`tests/test_news_availability_gate.py` covers the matching).
-        for sport in ("nfl", "nhl"):
+    def test_nfl_nhl_mlb_use_the_news_feed_not_the_basketball_file(self) -> None:
+        # Lane `news-availability-gate` (2026-10-14): NFL / NHL / MLB are swept from the news collector, never the
+        # basketball injuries.csv path (`tests/test_news_availability_gate.py` covers the matching and MLB's season gate).
+        for sport in ("nfl", "nhl", "mlb"):
             with patch.object(be, "_injury_feed_root", return_value=self.root) as feed_root, \
                     patch.object(be, "_attach_projections_by_sport", return_value={"supported": True}):
                 coverage = be.attach_projections(self.grid, sport=sport, selected_date=DATE)

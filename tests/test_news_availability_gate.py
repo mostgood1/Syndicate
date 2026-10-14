@@ -135,6 +135,40 @@ def test_absent_stale_and_disabled_flag_nothing_and_say_so(root, monkeypatch):
     assert na.flag_out_player_props([row], sport="nfl", now=NOW)["out_player_props"]["rows_flagged"] == 1
 
 
+def test_mlb_is_flagged_only_inside_the_2027_regular_season(root):
+    # User 2026-10-14: "collect MLB injuries now, flag in 2027". Injured lists are OUT, Day-To-Day stays priced, and
+    # nothing moves during the 2026 postseason, 2027 spring training or the 2027 postseason.
+    _write_state(root, "mlb", [
+        {"athlete": "Mookie Betts", "team": "Los Angeles Dodgers", "status": "10-Day-IL"},
+        {"athlete": "Aaron Judge", "team": "New York Yankees", "status": "7-Day IL"},
+        {"athlete": "Juan Soto", "team": "New York Mets", "status": "Day-To-Day"},
+    ])
+    def mlb(player, home, away, commence):
+        return _prop(player, home, away, "mlb", commence=commence, market="batter_hits")
+    april = [mlb("Mookie Betts", "Los Angeles Dodgers", "San Diego Padres", "2027-04-10T02:10:00Z"),
+             mlb("Aaron Judge", "Boston Red Sox", "New York Yankees", "2027-04-10T23:05:00Z"),
+             mlb("Juan Soto", "New York Mets", "Atlanta Braves", "2027-04-10T23:10:00Z")]
+    postseason_now = mlb("Mookie Betts", "Los Angeles Dodgers", "Philadelphia Phillies", "2026-10-15T00:08:00Z")
+    spring = mlb("Mookie Betts", "Los Angeles Dodgers", "Chicago Cubs", "2027-03-10T20:05:00Z")
+    postseason_2027 = mlb("Mookie Betts", "Los Angeles Dodgers", "Chicago Cubs", "2027-10-05T00:08:00Z")
+    unlisted = mlb("Mookie Betts", "Los Angeles Dodgers", "Chicago Cubs", "2028-04-10T23:05:00Z")
+    grid = april + [postseason_now, spring, postseason_2027, unlisted]
+    summary = na.flag_out_player_props(grid, sport="mlb", now=NOW)["out_player_props"]
+    assert [_status(r) for r in april] == ["OUT", "OUT", None]
+    assert all(_status(r) is None for r in (postseason_now, spring, postseason_2027, unlisted))
+    assert postseason_now["projection"]["edge_vs_market_pct"] == 5.0          # untouched, not just unflagged
+    # 2026 is not a listed season at all (unknown); 2027 spring and postseason are outside its window; 2028 unknown.
+    assert summary["season_gate"]["prop_rows_by_gate"] == {"open": 3, "outside": 2, "unknown": 2}
+    assert summary["season_gate"]["windows"] == {"2027": ["2027-03-25", "2027-09-26"]}
+
+
+def test_il_statuses_map_to_out_and_others_stay_priced():
+    for status in ("10-Day-IL", "15-Day-IL", "60-Day-IL", "7-Day IL"):
+        assert na.availability_status(status) == "OUT"
+    for status in ("Day-To-Day", "Questionable", "Doubtful", "Active", "", None):
+        assert na.availability_status(status) is None
+
+
 def test_every_status_written_is_one_layer2_refuses():
     assert set(na.OUT_STATUS.values()) | {na.SCRATCH_STATUS} <= {"OUT", "SUSPENDED", "INACTIVE"}
 

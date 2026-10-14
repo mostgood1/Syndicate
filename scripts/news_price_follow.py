@@ -8,7 +8,8 @@ book leaves up still worth betting against what the fast books now say.
 
 EVENTS (material only):
   to_out   a listed status crosses from playable (Active / Questionable / Doubtful / Day-To-Day / not listed) to
-           unplayable (`news_availability.OUT_STATUS`: Out, Injured Reserve, Suspension, ...), or an NHL scratch.
+           unplayable (`news_availability.availability_status`: Out, Injured Reserve, Suspension, MLB injured lists),
+           or an NHL scratch.
   to_in    unplayable -> playable, or an unplayable player cleared from the list.
   The collector's FIRST run per sport wrote every current injury as `new` -- a baseline, not news -- and is skipped.
   t0 = the collector's `captured_at` (within 10 min of the source; `source_updated_at` is reported beside it).
@@ -45,10 +46,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from syndicate.features.shared.basketball_props_availability import player_key  # noqa: E402
-from syndicate.features.shared.news_availability import OUT_STATUS, team_key  # noqa: E402
+from syndicate.features.shared.news_availability import availability_status, team_key  # noqa: E402
 from syndicate.features.shared.opportunity_signals import devig  # noqa: E402
 
-SPORTS = ("nfl", "nhl", "nba", "wnba")
+SPORTS = ("nfl", "nhl", "nba", "wnba", "mlb")
 GAME_MARKETS = {"h2h", "spreads", "totals"}
 NEXT_GAME_WINDOW = timedelta(days=8)
 PLACEBO_OFFSET = timedelta(hours=24)
@@ -80,7 +81,7 @@ def _read_jsonl(path: Path) -> Iterable[dict[str, Any]]:
 
 
 def unplayable(status: object) -> bool:
-    return str(status or "").strip().upper() in OUT_STATUS
+    return availability_status(status) is not None  # incl. MLB injured lists (10-Day-IL ...)
 
 
 # ----------------------------------------------------------------------------- events
