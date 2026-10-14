@@ -202,3 +202,71 @@ def test_a_partial_latest_snapshot_does_not_read_as_everyone_returned(tmp_path):
     excl, _s = _run_readmit(_layout(tmp_path, HIST, rows))
     assert _norm_name_key("Dana Evans").upper() in excl            # falls back to 10-05, where she is still OUT
 
+
+
+# ---- rule variants (lane wnba-availability-recency-tune, 2026-10-14) ------------------------------------------------
+
+def _regulars(root):
+    # LVA, 5 prior games. Wilson: starter, 30+ min, sits ONLY the last game (g5). Bench: 8 min in g1-g3, sits g4 + g5.
+    # Fringe: one 4-minute cameo in g1, then absent. Plays-every-game Hamby is never excluded.
+    rows = []
+    for i, d in enumerate(["2026-07-01", "2026-07-03", "2026-07-05", "2026-07-07", "2026-07-09"], start=1):
+        g = f"g{i}"
+        rows.append((g, d, "LVA", "Dearica Hamby", 28))
+        if i <= 4:
+            rows.append((g, d, "LVA", "A'ja Wilson", 32))
+        if i <= 3:
+            rows.append((g, d, "LVA", "Bench Player", 8))
+        if i == 1:
+            rows.append((g, d, "LVA", "Fringe Player", 4))
+    return _history(root, rows)
+
+
+def _excluded(root, rule, k="1"):
+    m = {}
+    s = A.add_recency_exclusions(m, processed_root=root, date_str="2026-07-11", league_code="wnba", props_df=None,
+                                 name_key=_norm_name_key, env={**ON, A.K_ENV: k, **({A.RULE_ENV: rule} if rule else {})})
+    return m.get("LVA", set()), s
+
+
+K = lambda n: _norm_name_key(n).upper()  # noqa: E731
+
+
+def test_default_rule_is_exactly_k(tmp_path):
+    root = _regulars(tmp_path)
+    unset, s_unset = _excluded(root, None)
+    k, _ = _excluded(root, "k")
+    assert unset == k == {K("A'ja Wilson"), K("Bench Player"), K("Fringe Player")}
+    assert s_unset["rule"] == "k"
+
+
+def test_variants_are_reachable_and_only_ever_keep(tmp_path):
+    root = _regulars(tmp_path)
+    k, _ = _excluded(root, "k")
+    reg, s_reg = _excluded(root, "regular_k2_min20")
+    apps, s_apps = _excluded(root, "exempt_apps3of5")
+    assert reg != k and apps != k                                  # off != on, per variant
+    assert reg <= k and apps <= k                                  # a variant never excludes a player k keeps
+    # Wilson: 32-min regular who sat one game -> kept by both variants
+    assert K("A'ja Wilson") not in reg and K("A'ja Wilson") not in apps
+    # Bench (8 min, 3 of last 5 apps) sat two games: min20 does not call her a regular; apps3of5 does
+    assert K("Bench Player") in reg and K("Bench Player") not in apps
+    assert K("Fringe Player") in reg and K("Fringe Player") in apps
+    assert s_reg["rule"] == "regular_k2_min20" and s_apps["rule"] == "exempt_apps3of5"
+
+
+def test_regular_k2_still_excludes_a_regular_who_missed_two(tmp_path):
+    root = _history(tmp_path, [
+        ("g1", "2026-07-01", "LVA", "A'ja Wilson", 32), ("g2", "2026-07-03", "LVA", "A'ja Wilson", 31),
+        ("g3", "2026-07-05", "LVA", "Dearica Hamby", 28), ("g4", "2026-07-07", "LVA", "Dearica Hamby", 28),
+    ])
+    reg, _ = _excluded(root, "regular_k2_min20")
+    assert K("A'ja Wilson") in reg                                 # out for the last 2: excluded again
+
+
+def test_unrecognised_rule_falls_back_to_k_never_looser(tmp_path, capsys):
+    root = _regulars(tmp_path)
+    k, _ = _excluded(root, "k")
+    bad, s = _excluded(root, "keep_everyone")
+    assert bad == k and s["rule"] == "k"
+    assert "rule_fallback" in capsys.readouterr().out

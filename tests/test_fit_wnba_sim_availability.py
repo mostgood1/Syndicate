@@ -27,8 +27,20 @@ def test_features_are_as_of_and_per_team():
     assert th.features("LVA", "wilson", "2026-07-05T23:00Z")["missed_last_1"] is False
     assert th.features("LVA", "bell", "2026-07-01T23:00Z") == {"team_games_prior": 0, "missed_last_1": False,
                                                                "missed_last_2": False, "missed_last_3": False,
-                                                               "since_last": 0, "ever_played_for_team": False}
+                                                               "since_last": 0, "ever_played_for_team": False,
+                                                               "apps_last5": 0, "mean_min_last5_apps": 0.0}
     # game 3 itself must not inform a feature taken at its own tip
     assert th.features("LVA", "bell", "2026-07-05T23:00Z")["team_games_prior"] == 2
     # another team's games never count
     assert th.features("IND", "bell", "2026-07-05T23:00Z")["ever_played_for_team"] is False
+
+
+def test_regular_features_use_only_prior_team_appearances():
+    box = {"1": {"LVA": {"wilson": 34.0, "bell": 12.0}, "IND": {"clark": 35.0}},
+           "2": {"LVA": {"wilson": 33.0, "bell": 0.0}, "SEA": {}},
+           "3": {"LVA": {"wilson": 30.0, "bell": 25.0}, "MIN": {}}}
+    th = F.TeamHistory(_games(), box)
+    f = th.features("LVA", "bell", "2026-07-05T23:00Z")          # prior: g1 (12 min), g2 (DNP); g3 is NOT prior
+    assert f["apps_last5"] == 1 and f["mean_min_last5_apps"] == 12.0
+    w = th.features("LVA", "wilson", "2026-07-05T23:00Z")
+    assert w["apps_last5"] == 2 and w["mean_min_last5_apps"] == 33.5

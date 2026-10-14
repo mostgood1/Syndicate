@@ -67,8 +67,8 @@ class TeamHistory:
             if g["id"] not in box_all:
                 continue
             for team in (g["home"], g["away"]):
-                played = {k for k, m in box_all[g["id"]].get(team, {}).items() if m > 0}
-                self.by_team[team].append((g["tip"], played))
+                mins = {k: m for k, m in box_all[g["id"]].get(team, {}).items() if m > 0}
+                self.by_team[team].append((g["tip"], mins))
 
     def features(self, team: str, player: str, tip: str) -> Dict:
         prior = [p for t, p in self.by_team.get(team, []) if t < tip]
@@ -83,6 +83,11 @@ class TeamHistory:
                 break
         f["since_last"] = since if since is not None else len(prior)
         f["ever_played_for_team"] = any(player in s for s in prior)
+        # Lane wnba-availability-recency-tune (2026-10-14): is this an ESTABLISHED REGULAR? As-of only.
+        last5 = prior[-5:]
+        f["apps_last5"] = sum(1 for s in last5 if player in s)
+        apps = [s[player] for s in prior if player in s][-5:]
+        f["mean_min_last5_apps"] = (sum(apps) / len(apps)) if apps else 0.0
         return f
 
 
@@ -121,6 +126,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     rules = {"missed_last_1": lambda r: r["missed_last_1"], "missed_last_2": lambda r: r["missed_last_2"],
              "missed_last_3": lambda r: r["missed_last_3"],
              "never_played_for_team": lambda r: (not r["ever_played_for_team"]) and r["team_games_prior"] >= 3}
+    # Lane wnba-availability-recency-tune (2026-10-14): K=1 with an ESTABLISHED-REGULAR exemption. A regular is
+    # defined as-of from the team's earlier box scores only. Pre-registered grid; selection on train by net removal.
+    def _reg_apps(r, n):
+        return r["apps_last5"] >= n
+    def _reg_min(r, m):
+        return r["mean_min_last5_apps"] >= m
+    for n in (2, 3):
+        rules[f"k1_exempt_apps{n}of5"] = (lambda n: lambda r: r["missed_last_1"] and not _reg_apps(r, n))(n)
+    for m in (10, 15, 20):
+        rules[f"k1_exempt_min{m}"] = (lambda m: lambda r: r["missed_last_1"] and not _reg_min(r, m))(m)
+        rules[f"k1_regular_k2_min{m}"] = (lambda m: lambda r: (r["missed_last_2"] if _reg_min(r, m) else r["missed_last_1"]))(m)
+        rules[f"k1_regular_k3_min{m}"] = (lambda m: lambda r: (r["missed_last_3"] if _reg_min(r, m) else r["missed_last_1"]))(m)
     report: Dict = {"split": args.split, "rows": len(rows), "periods": {}}
     periods = {"train": lambda r: r["phase"] == "regular" and r["date"] < args.split,
                "test_regular": lambda r: r["phase"] == "regular" and r["date"] >= args.split,
@@ -140,7 +157,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                 "dropped_rows": len(drop),
                 "nonplayer_sim_min_removed_per_team_game": round(sum(r["sim_min"] for r in drop if not r["played"]) / tg, 2),
                 "real_player_sim_min_removed_per_team_game": round(sum(r["sim_min"] for r in drop if r["played"]) / tg, 2),
+                "net_removed_per_team_game": round((sum(r["sim_min"] for r in drop if not r["played"])
+                                                    - sum(r["sim_min"] for r in drop if r["played"])) / tg, 2),
                 "real_players_wrongly_dropped": sum(1 for r in drop if r["played"]),
+                "wrongly_dropped_ge20_actual_min": sum(1 for r in drop if r["played"] and r["act_min"] >= 20),
                 "their_actual_minutes_mean": round(statistics.fmean(r["act_min"] for r in drop if r["played"]), 2)
                 if any(r["played"] for r in drop) else None,
                 "precision_nonplayer": round(sum(1 for r in drop if not r["played"]) / len(drop), 4) if drop else None,

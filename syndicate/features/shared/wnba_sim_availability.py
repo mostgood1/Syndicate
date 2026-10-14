@@ -24,6 +24,20 @@ switch that wins over everything; UNSET -> on only if `wnba_sim_availability.jso
 SmartSim subprocess reads the file, so turning it on needs no role restart -- cf. the 2026-10-04 08:39Z outage, which
 was an env flip's restart). Unknown never means on. K from `SYNDICATE_WNBA_SIM_AVAILABILITY_MISSED_GAMES` (default 1,
 bounded 1..5).
+
+RULE VARIANTS (lane `wnba-availability-recency-tune`, user decision 2026-10-14 "tune the rule"). K=1 also drops
+established regulars returning from ONE missed game: at 5:00 Q4 of the 2026 season 217 of 261 on-court players absent
+from the pregame frame had sat out the team's previous game (median 19 min that night).
+`SYNDICATE_WNBA_SIM_AVAILABILITY_RULE` selects how a regular is treated; the DEFAULT `k` is exactly the rule above, so
+nothing changes unless it is set:
+  * `k`                 -- every player: excluded after missing the team's last K games (unchanged default);
+  * `regular_k2_min20`  -- a regular (mean MIN >= 20 over the player's last 5 appearances for the team) is excluded
+                           only after missing the last max(K, 2) games; everyone else uses K;
+  * `exempt_apps3of5`   -- a regular (appeared in >= 3 of the team's last 5 games) is never excluded by recency.
+Features are as-of (games strictly before the slate) and match `scripts/fit_wnba_sim_availability.py`. An unrecognised
+value logs and falls back to `k` -- today's production behaviour, never a looser one. Offline (May-Jul select,
+Aug-Sep test) NEITHER variant beat `k` on net non-player minutes removed; they exist so the held-out ENGINE re-run can
+decide (findings_2026-10-14_wnba_availability_recency_tune.md).
 """
 from __future__ import annotations
 
@@ -35,6 +49,8 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Set, Tuple
 
 FLAG = "SYNDICATE_WNBA_SIM_AVAILABILITY"
 K_ENV = "SYNDICATE_WNBA_SIM_AVAILABILITY_MISSED_GAMES"
+RULE_ENV = "SYNDICATE_WNBA_SIM_AVAILABILITY_RULE"
+RULES = ("k", "regular_k2_min20", "exempt_apps3of5")
 HISTORY_FILE = "boxscores_history.csv"
 TEAM_ALIASES = {"GS": "GSV", "LV": "LVA", "LA": "LAS", "NY": "NYL", "CONN": "CON", "WAS": "WSH", "PHO": "PHX"}
 
@@ -83,8 +99,19 @@ def missed_games_k(env: Optional[Mapping[str, str]] = None) -> int:
     return max(1, min(5, k))
 
 
-def _read_history(path: Path, date_str: str) -> Tuple[Optional[Dict[str, List[Tuple[str, Set[str]]]]], Dict[str, Set[str]], str]:
-    """({team: [(game_key, players_who_played)] in date order}, {team: every name seen}, reason)."""
+def rule_name(env: Optional[Mapping[str, str]] = None) -> Tuple[str, str]:
+    """(rule, note). Unset -> `k`. An unrecognised value -> `k` (today's behaviour, never looser), with a note."""
+    raw = str((env if env is not None else os.environ).get(RULE_ENV) or "").strip().lower()
+    if not raw:
+        return "k", "default"
+    if raw in RULES:
+        return raw, "set"
+    return "k", f"unrecognised {RULE_ENV}={raw!r}; using k"
+
+
+def _read_history(path: Path, date_str: str) -> Tuple[Optional[Dict[str, List[Tuple[str, Dict[str, float]]]]], Dict[str, Set[str]], str]:
+    """({team: [(game_key, {player who played: minutes})] in date order}, {team: every name seen}, reason).
+    The per-game value is a dict so membership reads exactly as the old set did; minutes feed the RULE variants."""
     if not path.is_file():
         return None, {}, f"history absent: {path}"
     games: Dict[Tuple[str, str], Dict[str, Any]] = {}
@@ -104,25 +131,37 @@ def _read_history(path: Path, date_str: str) -> Tuple[Optional[Dict[str, List[Tu
                 name = str(r.get("PLAYER_NAME") or "")
                 if not team or not name:
                     continue
-                g = games.setdefault((team, gid), {"date": d, "played": set()})
+                g = games.setdefault((team, gid), {"date": d, "played": {}})
                 seen[team].add(name)
                 try:
-                    if float(r.get("MIN") or 0) > 0:
-                        g["played"].add(name)
+                    mins = float(r.get("MIN") or 0)
+                    if mins > 0:
+                        g["played"][name] = mins
                 except ValueError:
                     pass
     except Exception as exc:  # noqa: BLE001
         return None, {}, f"history unreadable: {type(exc).__name__}"
-    by_team: Dict[str, List[Tuple[str, Set[str]]]] = defaultdict(list)
+    by_team: Dict[str, List[Tuple[str, Dict[str, float]]]] = defaultdict(list)
     for (team, gid), g in sorted(games.items(), key=lambda kv: (kv[1]["date"], kv[0][1])):
         by_team[team].append((g["date"], g["played"]))
     return dict(by_team), dict(seen), "ok"
 
 
+def is_regular(rows: List[Tuple[str, Dict[str, float]]], name: str, rule: str) -> bool:
+    """As-of 'established regular' test for a rule variant, over the team's prior games `rows` (date order)."""
+    if rule == "regular_k2_min20":
+        apps = [played[name] for _d, played in rows if name in played][-5:]
+        return bool(apps) and (sum(apps) / len(apps)) >= 20.0
+    if rule == "exempt_apps3of5":
+        return sum(1 for _d, played in rows[-5:] if name in played) >= 3
+    return False
+
+
 def recency_exclusions(*, processed_root: Path, date_str: str, k: int, name_key: Callable[[object], str],
-                       window_dates: Optional[Dict[str, List[str]]] = None) -> Tuple[Dict[str, Set[str]], str]:
+                       window_dates: Optional[Dict[str, List[str]]] = None, rule: str = "k") -> Tuple[Dict[str, Set[str]], str]:
     """{team: {player keys}} for players with team history who did not play in any of the team's last k games.
-    `window_dates`, when given, is filled with {team: [dates of those last k games]} (the games the player missed)."""
+    `window_dates`, when given, is filled with {team: [dates of those last k games]} (the games the player missed).
+    `rule` (see RULE VARIANTS) only ever KEEPS a player `k` would exclude; it never excludes one `k` keeps."""
     by_team, seen, reason = _read_history(Path(processed_root) / HISTORY_FILE, str(date_str)[:10])
     if by_team is None:
         return {}, reason
@@ -134,9 +173,15 @@ def recency_exclusions(*, processed_root: Path, date_str: str, k: int, name_key:
             window_dates[team] = [d for d, _p in rows[-k:]]
         recent: Set[str] = set()
         for _d, played in rows[-k:]:
-            recent |= played
+            recent |= set(played)
         for name in seen.get(team, set()):
             if name not in recent:
+                if rule != "k" and is_regular(rows, name, rule):
+                    if rule == "exempt_apps3of5":
+                        continue
+                    k2 = max(k, 2)
+                    if len(rows) >= k2 and any(name in played for _d, played in rows[-k2:]):
+                        continue
                 key = name_key(name)
                 if key:
                     out.setdefault(team, set()).add(str(key).strip().upper())
@@ -233,9 +278,13 @@ def add_recency_exclusions(excluded_map: Dict[str, Set[str]], *, processed_root:
                 return summary
         summary["switch"] = "env" if state == "on" else "file"
         k = missed_games_k(env)
+        rule, rule_note = rule_name(env)
+        summary["rule"] = rule
+        if rule_note.startswith("unrecognised"):
+            print(f"[wnba_sim_availability] SIM_AVAILABILITY rule_fallback {rule_note}", flush=True)
         window: Dict[str, List[str]] = {}
         add, reason = recency_exclusions(processed_root=processed_root, date_str=date_str, k=k, name_key=name_key,
-                                         window_dates=window)
+                                         window_dates=window, rule=rule)
         if not add:
             summary["reason"] = reason if reason != "ok" else "nobody to exclude"
             print(f"[wnba_sim_availability] SIM_AVAILABILITY skipped reason={summary['reason']}", flush=True)
@@ -261,7 +310,7 @@ def add_recency_exclusions(excluded_map: Dict[str, Set[str]], *, processed_root:
                     bucket.add(key)
                     summary["added"] += 1
         summary.update(applied=summary["added"] > 0, k=k, reason="ok")
-        print(f"[wnba_sim_availability] SIM_AVAILABILITY applied date={date_str} k={k} added={summary['added']} "
+        print(f"[wnba_sim_availability] SIM_AVAILABILITY applied date={date_str} k={k} rule={rule} added={summary['added']} "
               f"readmitted_injury_return={len(returned)} ({why})", flush=True)
     except Exception as exc:  # noqa: BLE001 -- availability must never cost the sim its run
         summary["reason"] = f"failed: {type(exc).__name__}: {exc}"
