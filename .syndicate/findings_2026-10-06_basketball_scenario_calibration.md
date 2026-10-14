@@ -2210,3 +2210,12 @@ with EXACT on AND its mechanism on.
 - s is FROZEN at 0.00709.
 - M2/M3 (end-game ON/OFF, s applied, Δ term 0; research copy `code_pk` = code_pj + 6f092c74's engine hunks) started
   15:09Z.
+
+**#3j M2/M3 (Δ) — MEASURED 2026-10-14 15:37Z** (end-game ON / OFF, s = 0.00709 applied, Δ term 0, 12 measure
+dates, 80 paired games, 16,400 draws each, 0 errors):
+- **Δ = +0.108 points/team/game (SE 0.107)**, frozen at 0.108. Well under P3's 1.5 flag.
+- Breakdown: extension possessions +0.057/team-game; intentional trips 0.175/team-game (OFF 0).
+- Applying s alone took points from 116.86 (M1) to 116.40/team-game (M2): **−0.46/team, −0.92/game**. So the bonus
+  term carries almost all of the correction, and end-game fouling adds very little once the solver knows the bonus.
+- s is stable across runs: 0.00707 / 0.00706.
+- **#3k CHECK launched 15:36Z** on the 12 sweep dates (s = 0.00709, Δ = 0.108).
