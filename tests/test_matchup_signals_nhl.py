@@ -225,3 +225,42 @@ def test_saves_forward_grades_the_high_volume_opponent_over_end_to_end(tmp_path,
     assert recs[0]["price"] == 105                      # best US over; Pinnacle's +150 is not a US book
     rep = g.report(recs, final=False, counts=counts)
     assert rep["verdict"].startswith("INTERIM") and rep["primary_residual_over"]["n"] == 1
+
+
+def test_saves_forward_grades_a_home_and_home_against_each_lines_own_game(tmp_path, monkeypatch) -> None:
+    """Regression (2026-10-14): files d-2..d+1 are read, so the walk must map a line to ITS start date's game -- not the
+    day being walked -- or a home-and-home's second line is graded against the first game and then never again."""
+    import json as _json
+    from collections import defaultdict
+
+    from syndicate.features.shared import team_aliases
+
+    g = _load("grade_nhl_saves_forward")
+    alias = {"FLA": "fla", "Florida Panthers": "fla", "CHI": "chi", "Chicago Blackhawks": "chi"}
+    monkeypatch.setattr(team_aliases, "canonical_team", lambda sport, name: alias.get(str(name)))
+    raw = tmp_path / "nhl_source" / "source_artifacts" / "data" / "raw"
+    raw.mkdir(parents=True)
+    games = []
+    for i in range(8):  # day 7 (2026-11-10) and day 8 (2026-11-11): the same two clubs, back to back
+        day = f"2026-11-{i + 4:02d}"
+        saves = {6: 32, 7: 20}.get(i, 30)
+        games.append((f"20260200{i + 10:02d}", day, [
+            ("CHI", "3", "C. Bedard", "skater", 35, "20:00", "", 0, 0),
+            ("FLA", "1", "B. Marchand", "skater", 25, "20:00", "", 0, 0),
+            ("FLA", "2", "S. Bobrovsky", "goalie", 0, "60:00", saves, 0, 0),
+            ("CHI", "4", "S. Knight", "goalie", 0, "60:00", 22, 0, 0)]))
+    _log(raw / "player_game_stats.csv", games)
+    bq = tmp_path / "nhl_source" / "tracking" / "book_quotes"
+    bq.mkdir(parents=True)
+    for day, tip, event in (("2026-11-10", "2026-11-11T00:00:00Z", "e7"), ("2026-11-11", "2026-11-12T00:00:00Z", "e8")):
+        rows = []
+        for book, over, under in (("draftkings", -110, -110), ("fanduel", 105, -125)):
+            for sel, price in (("over", over), ("under", under)):
+                rows.append({"kind": "prop", "event_id": event, "commence_time": tip, "captured_at": f"{day}T22:00:00Z",
+                             "bookmaker": book, "market": "SAVES", "selection": sel, "player_name": "Sergei Bobrovsky",
+                             "line": 29.5, "price": price, "home_team": "Florida Panthers", "away_team": "Chicago Blackhawks"})
+        (bq / f"{day}.jsonl").write_text("\n".join(_json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    recs = g.collect(tmp_path, "2026-11-11", False, defaultdict(int))
+    by_day = {r["day"]: r for r in recs}
+    assert set(by_day) == {"2026-11-10", "2026-11-11"}
+    assert by_day["2026-11-10"]["y"] == 1.0 and by_day["2026-11-11"]["y"] == 0.0   # 32 > 29.5, then 20 < 29.5

@@ -106,6 +106,11 @@ def collect(root: Path, through: str, ignore_registration: bool, counts: dict[st
                 counts["pre_registration_start"] += 1
                 continue
             teams = frozenset(canonical_team("nhl", str(line.get(k) or "")) for k in ("home_team", "away_team"))
+            # A line belongs to the game on ITS OWN start date (Eastern game day), never to the day being walked:
+            # files d-2..d+1 are read and a home-and-home puts the same two clubs on consecutive days
+            # (correction 2026-10-14, before any window game was graded).
+            if (line["kickoff"] - timedelta(hours=5)).date().isoformat() != d:
+                continue
             game = games_by_day.get((d, teams))
             if game is None:
                 continue  # another day's game
