@@ -1794,3 +1794,23 @@ PROVISIONAL until the full FIT, per P3's amendment.
 **If no point passes:** release_s is insufficient. The next candidate is the more faithful mechanism, "foul avoidance
 in trouble" (a lower fouler-draw weight for a player at or over the threshold). It is unbuilt, P3's domain, and gets its
 own pre-registration.
+
+**#3d AMENDMENT + CO-SIGN (P3; recorded before any reading; the first launch was killed unread to add this):**
+
+1. **New pass/fail guard: closers stay on.** For starters who reach a 5th PF in Q4 with ≥ 4:00 left, the on-floor share
+   of the rest of Q4 must sit inside real **0.455 [CI 0.409, 0.501]**, widened to ±0.08 → **[0.375, 0.535]**.
+   - Source: P3 findings_2026-10-09 §2d, `targets_fit/targets.json` `foul_trouble.5pf_in_q4.event_on_share`, n = 208.
+   - P3's message quoted "real 0.60". That is the CONTROL (other starters, same clock, 0.601), not the event share.
+     Corrected here from the file.
+   - A release_s point that reaches 0.193 by sitting closers down FAILS.
+2. **Reading:** mean starters on the floor in Q4, per possession, vs real `rotation_starters_on_floor_by_minute`
+   minutes 37-48: close finals (≤ 10) 3.15, blowouts (≥ 20) 1.56.
+3. **Instrumentation:** the research-only patch v2 (`fo_diag_patch2.py`, WSL copy only). Starters = the top 5 by
+   minutes weight. It is possession-weighted, and a fouled-out player counts as off the floor.
+   - Smoke test, synthetic 60 games: release 240 → share 0.354; release 0 → 0.121.
+   - Harness keys `fot5`/`foq4` are committed.
+4. **Grid extended to release_s ∈ {0, 60, 120, 180, 240}.** 240 is re-run, because the earlier `JF_diag` has no
+   on-floor data.
+5. The totals re-fit is a REQUIRED step before the full FIT. Ties go to the larger release_s.
+6. **P3 is building `foul_trouble_foul_mult`** (foul avoidance in trouble, all windows, every fouler draw), default
+   off, with a reachability test and the parity gate. It gets its own pre-registered sweep.

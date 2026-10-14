@@ -281,6 +281,10 @@ def _compact_draw(h_box: Dict[str, Any], a_box: Dict[str, Any], hq: Any, aq: Any
     out["pfmax"] = [max([int(p.get("pf") or 0) for p in (b.get("players") or [])] or [0]) for b in (h_box, a_box)]
     if h_box.get("fo_diag") is not None:
         out["fod"] = h_box.get("fo_diag")
+    if h_box.get("fo_t5") is not None:
+        # #3d: [on-floor possessions, Q4 possessions] after a starter's 5th PF in Q4 with >= 240 s left; Q4 starters on floor.
+        out["fot5"] = h_box.get("fo_t5")
+        out["foq4"] = h_box.get("fo_q4st")
     ev = h_box.get("events")
     if isinstance(ev, list) and ev:
         # Phase 2 #3: FTA by quarter from the engine's diagnostic events (cfg.record_events). Index 4 = overtime.
