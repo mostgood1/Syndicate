@@ -1,8 +1,8 @@
 """Confirmed ESPN starters resolve to season rows across name forms (lane soccer-starter-name-match, 2026-10-13).
 
 Measured on 10-09..10-12 (101 matches, 202 confirmed sides, match_box starters vs season rows): exact names resolved
-2,058 of 2,222 starters (92.6%), 87 sides all 11; with the fallback 2,099 (94.5%), 109 sides all 11. Of the 164 left
-unmatched by exact name, 113 are absent from the league's rows -- a squad-data gap no name rule can close.
+2,058 of 2,222 starters (92.6%), 87 sides all 11; with the fallback 2,130 (95.9%), 123 sides all 11 (2026-10-14,
+after the one-word step was removed for a wrong pairing and the short-first-name step added).
 """
 from __future__ import annotations
 
@@ -18,8 +18,8 @@ def _resolve(rows, *espn):
 
 
 def test_name_forms_resolve():
-    rows = _rows("Eren Sami Dinkci", "Woo-Yeong Jeong", "Lukas Pinckert", "Djené Dakonam", "Pape Sarr")
-    got = _resolve(rows, "Eren Dinkci", "Jeong Woo-yeong", "Lukas Finn Pinckert", "Djené", "Pape Matar Sarr")
+    rows = _rows("Eren Sami Dinkci", "Woo-Yeong Jeong", "Lukas Pinckert", "Dayotchanculle Upamecano", "Pape Sarr")
+    got = _resolve(rows, "Eren Dinkci", "Jeong Woo-yeong", "Lukas Finn Pinckert", "Dayot Upamecano", "Pape Matar Sarr")
     assert got == {"understat_0", "understat_1", "understat_2", "understat_3", "understat_4"}
 
 
@@ -29,8 +29,23 @@ def test_exact_names_still_win_and_no_row_is_claimed_twice():
 
 
 def test_two_candidates_refuse_rather_than_guess():
-    rows = _rows("Daniel Job", "Daniel Pereira")
-    assert _resolve(rows, "Daniel") == set()
+    rows = _rows("Matthew Cash", "Matteo Cash")
+    assert _resolve(rows, "Matt Cash") == set()
+
+
+def test_a_one_word_name_never_matches():
+    """10-10 FC Dallas: ESPN's starting goalkeeper "Daniel" is NOT the squad's attacking midfielder Daniel Job
+    (both in the same box). A one-word step matched them; it is gone."""
+    assert _resolve(_rows("Daniel Job"), "Daniel") == set()
+
+
+def test_short_and_legal_first_names_with_the_same_surname():
+    rows = _rows("Matthew Cash", "Santiago Comesaña", "Mat Ryan")
+    assert _resolve(rows, "Matty Cash", "Santi Comesaña", "Mathew Ryan") == {"understat_0", "understat_1", "understat_2"}
+
+
+def test_html_entities_are_decoded():
+    assert L._norm_player_name("Ngal&#039;ayel Mukau") == L._norm_player_name("Ngal'ayel Mukau")
 
 
 def test_a_shared_surname_alone_never_matches():

@@ -38,10 +38,15 @@ def _norm_player_name(name: str) -> str:
     the departed-player roster rescue (`build_soccer_artifacts._drop_departed_players`)
     missed him, and he was dropped from every ligue_1 squad. Uses the board's own
     table (`prop_projections._LIGATURE_FOLD`) so the two normalisers cannot drift.
+
+    HTML ENTITIES ARE DECODED FIRST (lane soccer-starter-name-match, 2026-10-14): a
+    stats row reads `Ngal&#039;ayel Mukau` where ESPN has `Ngal'ayel Mukau`.
     """
+    import html
+
     from syndicate.features.shared.prop_projections import _LIGATURE_FOLD
 
-    text = unicodedata.normalize("NFKD", str(name or "").translate(_LIGATURE_FOLD))
+    text = unicodedata.normalize("NFKD", html.unescape(str(name or "")).translate(_LIGATURE_FOLD))
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
     return " ".join(text.lower().replace(".", " ").replace("-", " ").split())
 
@@ -86,14 +91,29 @@ def _nested(want: list[str], have: list[str]) -> bool:
     return len(small) >= 2 and set(small) <= set(large) and want != have
 
 
-# Strongest first. Word order; first and last name; two or more nested words; a
-# one-word ESPN name equal to the row's first word. No surname-only step: within
-# one squad a shared surname (siblings, common names) is too easy a false match.
+def _short_first_name(want: list[str], have: list[str]) -> bool:
+    """Same surname, first names sharing 3+ leading letters: a short or legal first
+    name ("Matty" / "Matthew" Cash, "Dayot" / "Dayotchanculle" Upamecano, "Santi" /
+    "Santiago"). Measured 2026-10-14: 34 confirmed starters on 10-09..10-12."""
+    if len(want) < 2 or len(have) < 2 or want[-1] != have[-1] or want == have:
+        return False
+    a, b = want[0], have[0]
+    n = 0
+    while n < min(len(a), len(b)) and a[n] == b[n]:
+        n += 1
+    return n >= 3
+
+
+# Strongest first. Word order; first and last name; two or more nested words; same
+# surname with a short/legal first name. NO ONE-WORD STEP: it matched FC Dallas'
+# starting goalkeeper "Daniel" to the squad's attacking midfielder "Daniel Job"
+# (both in the same ESPN box, 10-10) -- a one-word name carries too little to pin
+# a player. NO SURNAME-ONLY STEP: siblings and common surnames (the Kalulus).
 _NAME_FORM_STEPS = (
     lambda want, have: sorted(want) == sorted(have),
     lambda want, have: len(want) > 1 and len(have) > 1 and (want[0], want[-1]) == (have[0], have[-1]),
     _nested,
-    lambda want, have: len(want) == 1 and bool(have) and have[0] == want[0],
+    _short_first_name,
 )
 
 
