@@ -861,6 +861,15 @@ death, never life — do not invert it.
 - Verification: unit tests incl. same-name-other-team and a reachability test through attach_projections; on the fleet after a refresh-worker restart, per_sport_ingest nfl / nhl out_player_props report feed_status ok with rows_flagged equal to the offline prediction from the same state, and rows_player_out_on_feed_by_sport carries nfl / nhl with named samples that are Out / IR / scratched on the collector
 - Blocked by: none
 
+### venue-segment-addressable — OPEN — opened 2026-10-14 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- **STATUS 2026-10-14 22:1xZ — PREGAME HALF MEASURED, LIVE HALF ARMED NOT GUESSED; the goal is NOT MET yet by design.** Off the served board with the row cap defeated (every sport `rows == total_rows`): **3,979 pregame rows, 99.3% `segment=full`** (3,953) — mlb **88.0%** (150 rows), nba 100% (21), nhl 100% (238), nfl 100% (1,185), ncaaf 100% (428), soccer 99.6% (1,957); ncaab and wnba out of season. **MLB is the sole outlier**, which supports the hypothesis that segment markets are an MLB market-structure property rather than a venue-quoting one. **THE LIVE HALF WAS NOT MEASURED BECAUSE THE FRAME WAS EMPTY, proven three ways rather than assumed:** all 238 NHL rows carry `is_live: False` and `market_state: pregame`; `/api/board/game-chips` returned 230 chips as 158 pregame / 71 final / 1 postponed and **0 in play**; and `check_e2e_coverage.py` reported `live_games` as `attributed_zero` for all six in-season sports (zero WITH a stated reason). 22:0xZ is 5:0x PM CDT, between slates. **No share over zero live rows is reported.** **ARMED:** one-time task `venue-segment-live-reading-1014` fires **2026-10-14 19:45 CDT (2026-10-15 00:45Z)** during tonight's NHL slate; its prompt REFUSES to report a share if nothing is in play and re-arms instead, and is told not to conclude anything about MLB from a postseason slate. Numbers and the decision rule in `.syndicate/findings_2026-10-14_venue_segment_addressable.md`.
+- Goal: For every sport on the served Layer 2 board, the share of LIVE rows whose segment is full -- hence priceable against the full-game contracts Kalshi and Polymarket actually quote -- versus segment markets, measured with the row cap defeated and total_rows compared, so the lead decision rests on the size of the addressable population rather than on one postseason MLB slate.
+- Files: .syndicate/findings_2026-10-14_venue_segment_addressable.md
+- Hypothesis: The 2026-09-24 MLB reading is MLB-SPECIFIC rather than a property of venue quoting; other sports live boards should be predominantly segment=full.
+- Falsification test: If LIVE rows across the other sports are also predominantly segment markets, the constraint is general and the lead resolves the other way.
+- Verification: Per sport off the served board with rows == total_rows: LIVE rows by segment, the full share with its denominator, pregame as a control.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
