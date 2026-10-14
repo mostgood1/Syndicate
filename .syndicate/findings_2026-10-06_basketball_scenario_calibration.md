@@ -2160,3 +2160,8 @@ bonus rate. PROVISIONAL.
 
 **Next:** full FIT (P3's amendment: foul-outs 0.193 ± 0.04 plus the guards) → P3's §7. Whether to do the solver change
 first is a decision for the user and P3.
+
+**USER DECISION 2026-10-14 (after #3i): "Fix the solver first".**
+- Before the full FIT, the EXACT_TARGET solver (`_solve_eff_mult`) must account for bonus and end-game possessions.
+  That work is asked of P3/P4 (engine owners): default-off, with a reachability test and the parity gate.
+- Then a 12-date check of the #3i pick, with |total bias| < 1.0 and every #3i guard; then the full FIT; then P3's §7.
