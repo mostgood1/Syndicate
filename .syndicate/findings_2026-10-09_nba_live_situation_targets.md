@@ -700,3 +700,30 @@ Pickle-integrity check (pre-registered caveat), 40 random games, field by field:
 - At ~2.5% of games it cannot move a paired mean of -1.21 with a CI of ±0.14 by more than noise.
 
 Part 2 (in-game k=0 grade of OFF, paired against gate_v4_k0) is running; ETA ~02:00Z.
+
+### §10b RESULT, part 2: in-game rest-of-game total, skip_def ON vs OFF, k=0 production config (read 2026-10-14 00:15Z)
+
+Paired on the same 5,078 (game, checkpoint) projections. ON = `gate_v4_k0`, OFF = `gate_v5nosd_k0`; 100 sims, same seeds. Truth is the final total.
+
+| pop | checkpoint | n | bias ON | bias OFF | level OFF-ON | total MAE ON / OFF | d|total err| | d|margin err| |
+|---|---|---|---|---|---|---|---|---|
+| regular | end Q1 | 1,196 | +2.94 | +2.02 | -0.92 [-1.04,-0.81] | 13.33 / 13.27 | -0.06 [-0.18,+0.07] n.s. | -0.03 n.s. |
+| regular | end Q2 | 1,188 | +1.82 | +1.17 | -0.64 [-0.73,-0.56] | 11.27 / 11.15 | **-0.12 [-0.21,-0.03]** | -0.07 n.s. |
+| regular | end Q3 | 1,183 | +1.99 | +1.70 | -0.29 [-0.35,-0.24] | 8.33 / 8.25 | **-0.07 [-0.13,-0.02]** | +0.01 n.s. |
+| regular | 5:00 Q4 | 1,176 | -0.14 | -0.26 | -0.11 [-0.14,-0.09] | 5.71 / 5.69 | -0.02 n.s. | +0.00 n.s. |
+| postseason | Q1/Q2/Q3/Q4-5 | 83-85 | +6.45/+4.67/+2.00/-0.05 | +6.42/+4.54/+1.97/-0.02 | all n.s. | -- | all n.s. | Q1 -0.31 [-0.61,-0.01], rest n.s. |
+
+OFF against `pregame_rate` (regular, native-minus-pr total MAE):
+
+| | end Q1 | end Q2 | end Q3 | 5:00 Q4 |
+|---|---|---|---|---|
+| ON | +0.63 | +0.31 | +0.25 | +0.06 n.s. |
+| OFF | **+0.57 [+0.34,+0.80]** | **+0.19 [+0.03,+0.34]** | **+0.17 [+0.08,+0.27]** | +0.03 n.s. |
+
+OFF is still WORSE than pregame_rate at Q1-Q3.
+
+Reading:
+- **skip_def is about a third of the in-game overshoot.** The level shift scales with the remaining game (−0.9 / −0.6 / −0.3 / −0.1). It buys a small, significant accuracy gain at end Q2 and end Q3, and nothing at end Q1.
+- **The rest of the overshoot is not skip_def.** Bias of +2.0 / +1.2 / +1.7 remains with skip_def OFF. That is the engine-overshoot term (EXACT off), as the pregame part found.
+- **The in-game gate does not pass either way.** P3's totals level fix is NOT "turn skip_def off". It needs the target/calibration stack, which is the calibration lane's Phase 2 config: total bias −0.22 on its full FIT. Next P3 step: re-gate on Phase 2-config inputs once that config is accepted.
+- **Postseason:** skip_def does not explain its +6.5 early overshoot.
