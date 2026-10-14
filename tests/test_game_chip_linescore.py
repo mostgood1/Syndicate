@@ -260,5 +260,31 @@ class MlbLive(unittest.TestCase):
         self.assertEqual((chip["linescore"]["away"], chip["linescore"]["home"]), ([1, 6, 1], [3, 7, 0]))
 
 
+class FootballLive(unittest.TestCase):
+    BOARD = {"401": {"id": "401", "away": "KC", "home": "BUF", "away_names": {"kansas city", "kansas city chiefs"},
+                     "home_names": {"buffalo", "buffalo bills"}, "away_team_id": "12", "home_team_id": "2",
+                     "away_periods": [7, 3, 0], "home_periods": [0, 10, 7], "period": 3, "clock": "8:12",
+                     "status_name": "STATUS_IN_PROGRESS", "down_distance": "3rd & 4 at BUF 32", "possession": "12", "red_zone": False}}
+
+    def test_served_football_chip_refreshes_clock_quarters_and_situation(self) -> None:
+        from syndicate.features.shared import game_chip_scoreboard as gs
+
+        chip = {"sport": "nfl", "state": "live", "game_key": "2026_06_KC_BUF", "status_token": "Q2 1:05", "situation": "stale",
+                "away": {"abbr": "KC", "key": "kansas city chiefs"}, "home": {"abbr": "BUF", "key": "buffalo bills"}}
+        gl._CACHE.clear()
+        with mock.patch.object(gl, "_espn_board", return_value=self.BOARD):
+            gs.attach_served_linescores([chip], "2026-10-18")
+        self.assertEqual(chip["status_token"], "Q3 8:12")
+        self.assertEqual(chip["linescore"]["away"], [7, 3, 0])
+        self.assertEqual(chip["situation"], "KC ball · 3rd & 4 at BUF 32")
+
+    def test_overtime_label(self) -> None:
+        board = {"401": {**self.BOARD["401"], "period": 5, "clock": "6:30"}}
+        gl._CACHE.clear()
+        with mock.patch.object(gl, "_espn_board", return_value=board):
+            got = gl.live_clock_token("nfl", {"_away_key": "kansas city chiefs", "_home_key": "buffalo bills"}, "2026-10-18")
+        self.assertEqual(got, "OT 6:30")
+
+
 if __name__ == "__main__":
     unittest.main()

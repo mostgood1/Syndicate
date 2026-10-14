@@ -743,9 +743,10 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
         if start:
             day = datetime.fromisoformat(str(start).replace("Z", "+00:00")).astimezone(CENTRAL_TIMEZONE).date().isoformat()
         away_abbr, home_abbr = (chip.get("away") or {}).get("abbr") or "", (chip.get("home") or {}).get("abbr") or ""
+        game = {**game, "_away_key": (chip.get("away") or {}).get("key"), "_home_key": (chip.get("home") or {}).get("key")}
         box = linescore(sport, game, day, away_abbr=away_abbr, home_abbr=home_abbr, live=chip.get("state") == "live")
         # NHL's live feed carries the period but no clock ("P3"); ESPN has it.
-        if sport in ("nhl", "nba", "wnba") and chip.get("state") == "live" and ":" not in str(chip.get("status_token") or ""):
+        if sport in ("nhl", "nba", "wnba", "nfl", "ncaaf") and chip.get("state") == "live" and ":" not in str(chip.get("status_token") or ""):
             from syndicate.features.shared.game_chip_linescore import live_clock_token
 
             token = live_clock_token(sport, game, day, away_abbr=away_abbr, home_abbr=home_abbr)
@@ -759,6 +760,14 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
             token = mlb_inning_token(game, day)
             if token:
                 chip["status_token"] = token
+        # Football: possession + down & distance from ESPN, replacing the
+        # worker's copy (as old as its build) each pass (user 2026-10-14).
+        if sport in ("nfl", "ncaaf") and chip.get("state") == "live":
+            from syndicate.features.shared.game_chip_linescore import football_situation
+
+            fresh = football_situation(sport, game, day, away_abbr=away_abbr, home_abbr=home_abbr)
+            if fresh:
+                chip["situation"] = fresh
         # Basketball bonus on the live line, after the run (user 2026-10-14).
         # Rebuilt each pass: the serve-time re-read must replace, not stack.
         if sport in ("nba", "wnba") and chip.get("state") == "live":
@@ -788,7 +797,7 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
         return
 
 
-_SERVE_TIME_LINESCORE_SPORTS = {"nba", "wnba", "nhl", "mlb"}
+_SERVE_TIME_LINESCORE_SPORTS = {"nba", "wnba", "nhl", "mlb", "nfl", "ncaaf"}
 
 
 def _chip_day(chip: dict[str, Any], date_value: str) -> str:

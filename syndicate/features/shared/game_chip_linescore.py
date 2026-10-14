@@ -314,7 +314,11 @@ def _mlb(game: Mapping[str, Any], date: str) -> dict[str, Any] | None:
 # scoreboard carries `competitors[].linescores` DURING play, one request per
 # league per date -- measured that night: NBA CLE @ ORL 28 24 17 / 35 37 23,
 # NHL FLA @ CBJ 0 4 2 / 1 0 1.
-_ESPN_PATHS = {"nba": "basketball/nba", "wnba": "basketball/wnba", "nhl": "hockey/nhl"}
+_ESPN_PATHS = {"nba": "basketball/nba", "wnba": "basketball/wnba", "nhl": "hockey/nhl",
+               "nfl": "football/nfl", "ncaaf": "football/college-football"}
+# All FBS games for college football (the default board is a curated subset);
+# NOT for the NFL, where `groups` returns no events at all (measured 2026-10-14).
+_ESPN_QUERY = {"ncaaf": "&groups=80&limit=300"}
 _ESPN_ABBR_FIX = {"UTAH": "UTA"}
 _LIVE_TTL_S = 45.0
 
@@ -322,7 +326,7 @@ _LIVE_TTL_S = 45.0
 def _espn_board(sport: str, date: str) -> dict[str, dict]:
     import urllib.request
 
-    url = f"https://site.api.espn.com/apis/site/v2/sports/{_ESPN_PATHS[sport]}/scoreboard?dates={date.replace('-', '')}"
+    url = f"https://site.api.espn.com/apis/site/v2/sports/{_ESPN_PATHS[sport]}/scoreboard?dates={date.replace('-', '')}{_ESPN_QUERY.get(sport, '')}"
     # No custom User-Agent: ESPN 403s some UA strings (wnba/cards._public_scoreboard_live_state_payload).
     with urllib.request.urlopen(url, timeout=6) as resp:
         payload = json.loads(resp.read().decode("utf-8"))
@@ -332,8 +336,17 @@ def _espn_board(sport: str, date: str) -> dict[str, dict]:
         sides = {c.get("homeAway"): c for c in comp.get("competitors") or [] if isinstance(c, Mapping)}
         away, home = sides.get("away") or {}, sides.get("home") or {}
         status = event.get("status") or {}
+        names = lambda c: {str(v).strip().lower() for v in ((c.get("team") or {}).get(k) for k in ("location", "displayName")) if v}  # noqa: E731
+        situation = comp.get("situation") or {}
         out[str(event.get("id"))] = {
             "id": str(event.get("id")),
+            "away_names": names(away),
+            "home_names": names(home),
+            "away_team_id": str((away.get("team") or {}).get("id") or ""),
+            "home_team_id": str((home.get("team") or {}).get("id") or ""),
+            "down_distance": str(situation.get("downDistanceText") or "").strip(),
+            "possession": str(situation.get("possession") or ""),
+            "red_zone": bool(situation.get("isRedZone")),
             "away": (away.get("team") or {}).get("abbreviation"),
             "home": (home.get("team") or {}).get("abbreviation"),
             "away_periods": [_int(x.get("value")) for x in away.get("linescores") or []],
@@ -349,6 +362,13 @@ def _espn_game(sport: str, game: Mapping[str, Any], date: str, away_abbr: str, h
     key = ("espn", sport, date, int(time.monotonic() // _LIVE_TTL_S))
     board = _cached(key, lambda: _espn_board(sport, date)) or {}
     hit = next((board[str(game.get(k))] for k in ("game_id", "event_id", "gamePk") if str(game.get(k) or "") in board), None)
+    if hit is None and game.get("_away_key") and game.get("_home_key"):
+        # Football card keys are nflverse ids / composite names, and NCAAF
+        # tri-codes are the card's own ("TAM", "MIS"): join on the full name the
+        # card carries (NFL "tampa bay buccaneers" == ESPN displayName, NCAAF
+        # "west virginia" == ESPN location).
+        ak, hk = str(game["_away_key"]).lower(), str(game["_home_key"]).lower()
+        hit = next((g for g in board.values() if ak in g.get("away_names", ()) and hk in g.get("home_names", ())), None)
     if hit is None:
         want = (_canon(sport, away_abbr or _tri(sport, game, "away")), _canon(sport, home_abbr or _tri(sport, game, "home")))
         hit = next((g for g in board.values()
@@ -371,7 +391,12 @@ def live_clock_token(sport: str, game: Mapping[str, Any], date: str, *, away_abb
         return None
     prefix = "P" if sport == "nhl" else "Q"
     period = hit["period"]
-    label = f"{prefix}{period}" if not (sport == "nhl" and period >= 4) else ("OT" if period == 4 else "SO")
+    if sport == "nhl" and period >= 4:
+        label = "OT" if period == 4 else "SO"
+    elif sport in ("nfl", "ncaaf") and period >= 5:
+        label = "OT" if period == 5 else f"OT{period - 4}"
+    else:
+        label = f"{prefix}{period}"
     if hit.get("status_name") == "STATUS_HALFTIME":
         return "HALF"
     if hit.get("status_name") == "STATUS_END_PERIOD":
@@ -425,6 +450,25 @@ def live_bonus_text(sport: str, game: Mapping[str, Any], date: str, *, away_abbr
     return None
 
 
+def football_situation(sport: str, game: Mapping[str, Any], date: str, *, away_abbr: str = "", home_abbr: str = "") -> str | None:
+    """"KC ball · 3rd & 4 at BUF 32 · red zone" for a live NFL / NCAAF game."""
+    try:
+        hit = _espn_game(sport, game, date, away_abbr, home_abbr) if sport in ("nfl", "ncaaf") else None
+    except Exception:  # noqa: BLE001
+        return None
+    if not hit or not hit.get("down_distance"):
+        return None
+    side = "away" if hit.get("possession") and hit["possession"] == hit.get("away_team_id") else (
+        "home" if hit.get("possession") and hit["possession"] == hit.get("home_team_id") else None)
+    parts = []
+    if side:
+        parts.append(f"{away_abbr if side == 'away' else home_abbr} ball")
+    parts.append(hit["down_distance"])
+    if hit.get("red_zone"):
+        parts.append("red zone")
+    return " · ".join(parts)
+
+
 def espn_event_id(sport: str, game: Mapping[str, Any], date: str, *, away_abbr: str = "", home_abbr: str = "") -> str | None:
     """ESPN's event id for a live game (the NHL card's own key is a slate index)."""
     try:
@@ -460,6 +504,10 @@ def linescore(sport: str, game: Mapping[str, Any], date: str, *, away_abbr: str 
     sport = str(sport or "").lower()
     try:
         if sport in ("nfl", "ncaaf"):
+            if live:
+                got = _espn_linescore(sport, game, date, away_abbr, home_abbr)
+                if got:
+                    return got
             return _football(game)
         if sport in _ESPN_PATHS and live:
             return _espn_linescore(sport, game, date, away_abbr, home_abbr)
