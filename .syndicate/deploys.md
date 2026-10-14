@@ -49134,3 +49134,19 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **change:** live NFL / NCAAF chips re-read each serve from ESPN's scoreboard (45 s cache; NCAAF `groups=80&limit=300` for all FBS -- the NFL board returns NO events with `groups`): clock "Q3 8:12" / HALF / END Qn / OT, quarter line, live line "KC ball · 3rd & 4 at BUF 32 · red zone" from `competitions[].situation`. Football joins on the card's full team key (NFL key == ESPN displayName, NCAAF key == ESPN location) -- the cards' own keys are nflverse ids / composite names and NCAAF tri-codes are the card's own ("TAM", "MIS").
 - **ride-alongs (on the checkout, web-loaded where imported):** 6d275680 / ab6d34de basketball scenario harness + engine `foul_trouble_bench_mult=0.0` semantics (sim code -- runs on the worker, not used by web routes), a0980962 / 650d6c3d NHL research, 98ca3ba7 basketball games-history refetch (script).
 - **verify:** unit tests (Q3 8:12, quarters, "KC ball · 3rd & 4 at BUF 32", OT 6:30); real ESPN matching: NFL 10-11 BAL @ ATL by name -> quarters incl. OT; NCAAF 10-10 ARI @ WV -> 14 10 14 14 / 3 14 7 7. Served smoke 02:58Z: 10-11 NFL 15/15 chips with a line score; 10-13 mixed 23/24. No live football at 02:58Z -- the live path is NOT YET MEASURED on a served card (next: NCAAF Thu 10-15 / NFL Thu 10-15).
+
+## 2026-10-14 02:55:51Z (9:55 PM CT 10-13) -- LOCAL FLEET ff 16e2e242 -> 98ca3ba7 (exact SHA), NO restart: games history re-fetched when the schedule has newer finals -- **MET** 02:58:56Z (lane `basketball-games-history-freshness`, session 2d413211)
+
+- **User decisions 2026-10-13:** "yes, fix the 30-day history rule", "Yes, ff after props idle".
+- **Claim:** refresh-worker token d88226bc..., released at 02:56Z. The reflog shows my own `merge 98ca3ba7: Fast-forward`.
+- **Ride-alongs:** none (HEAD..98ca3ba7 held only this commit).
+- **Safety read in full (02:55:41Z):** NOT CLEAR. In flight: live NBA/NHL/WNBA/NFL/NCAAF odds refresh (in NHL at the time), an ESPN status fetch, a board build. Basketball props jobs: 0. An ff without restart kills nothing.
+- **Change:** both props refreshes' `_ensure_source_game_inputs` now also re-fetch `raw/games_nba_api.csv` when the newest `schedule_*.csv` lists a FINAL game after the history's newest. Preseason/All-Star and NBA post-season are ignored. Cooldown 360 min (marker `processed/.games_history_behind_schedule_attempt.json`). The 30-day rule is unchanged.
+- **Pre-merge:** read-only on prod: WNBA due (6 finals, 10-04/07/09), NBA not due. The native `fetch --years 1` on a copy took 155 s: +6 games, exactly those; 2,484 old rows unchanged; 10 seasons kept.
+- **VERIFY, production:**
+  - 02:56:25Z: the first WNBA export after the ff logged `[wnba] GAMES_HISTORY_BEHIND_SCHEDULE {"dates": ["2026-10-04", "2026-10-07", "2026-10-09"], "finals_after": 6, "newest": "2026-10-02"}`.
+  - 02:58:36Z: `games_nba_api.csv` newest 2026-10-02 -> **2026-10-09**, 2,484 -> 2,490 games.
+  - 02:58:55Z: `build-features` ran; `features.csv` (was 10-04 14:00Z) was rewritten at 02:58:56Z, 2,490 rows, newest 2026-10-09.
+  - The deployed checkout passed 7 tests.
+- **Known limit (NBA):** inert until the NBA `fetch-schedule` writes the 2026-27 season. It is hard-wired to `schedule_2025_26.csv` ("Only 2025-26 is supported right now"), and on the fleet that file ends 04-12. Not fixed here.
+- **Rollback:** revert 98ca3ba7 and ff. No restart.

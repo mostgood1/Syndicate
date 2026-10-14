@@ -67,9 +67,10 @@ death, never life — do not invert it.
 
 ## OPEN
 
-### basketball-games-history-freshness — OPEN — opened 2026-10-14 — session 2d413211
+### basketball-games-history-freshness — CLOSED 2026-10-14 (GOAL MET) — opened 2026-10-14 — session 2d413211
+- GOAL VERDICT. Goal (verbatim): "Re-fetch the NBA/WNBA games history (raw/games_nba_api.csv) when the league's schedule lists a final game after the history's newest one, instead of only when the newest game is >30 days old; deployed with a measurement (user request 2026-10-13: "fix the 30-day history rule")." -- **GOAL: MET** `[2026-10-14 02:59Z]`. Fleet ff 98ca3ba7 at 02:55:51Z; the first WNBA export logged GAMES_HISTORY_BEHIND_SCHEDULE at 02:56:25Z (6 finals); games_nba_api.csv newest 10-02 -> 10-09 (2,490 games) at 02:58:36Z; features.csv rebuilt 02:58:56Z (newest 10-09). deploys.md entry 02:55:51Z. NBA half is wired but inert until NBA fetch-schedule writes 2026-27 (hard-wired to schedule_2025_26.csv) -- separate, unfixed.
 - Goal: Re-fetch the NBA/WNBA games history (raw/games_nba_api.csv) when the league's schedule lists a final game after the history's newest one, instead of only when the newest game is >30 days old; deployed with a measurement (user request 2026-10-13: "fix the 30-day history rule").
-- Files: syndicate/features/shared/basketball_games_history_freshness.py (NEW), tests/test_basketball_games_history_freshness.py (NEW), scripts/refresh_wnba_oddsapi_props.py (games history refetch trigger section only), scripts/refresh_nba_oddsapi_props.py (games history refetch trigger section only)
+- Files: none (released at close)
 - Hypothesis: The 30-day rule (`_games_history_is_stale`, stale_days=30) is the only fetch trigger, so a file a few games behind is never refreshed: WNBA history stops at 10-02 (written 10-04) while the schedule has 6 final playoff games 10-04..10-09.
 - Falsification test: After the fleet ff, a WNBA full refresh logs GAMES_HISTORY_BEHIND_SCHEDULE and games_nba_api.csv still lacks the 10-04..10-09 games (the fetch does not capture them), or the trigger re-fires inside its cooldown.
 - Verification: WNBA games_nba_api.csv newest date >= 2026-10-09 after the next full WNBA refresh following the ff, with the trigger line in that run's log; features.csv rebuilt after it.
