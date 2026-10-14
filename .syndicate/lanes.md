@@ -1004,6 +1004,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - **STATUS 2026-10-14T17:39Z:** script `86646cfb` (and `c7030750`) on main; production matcher test passes (mirror path matches no rule; the original matches `book_quotes`); seeded by hand on the fleet -- 2.4 MB under `research/forward_inputs/` (mlb / nba / nhl daily 10-13, nfl wk4, ncaaf wk4-6 + daily 10-13; open weeks wait). NOT fast-forwarded to the fleet: the 35 commits to main carry OTHER lanes' unshipped runtime code (basketball engine, daily optimizer / overlay, soccer lineups, optimizer skill; a peer lane already notes 'fleet ff owed behind 63631afb'). **OWED: after the owners' next fleet ff + supervisor `up`, read `job preserve-forward-inputs last_run=... rc=0` and `research/forward_inputs/_status.json` -- deadline 2027-02-10 (the 10-13 files' 120th day); until then a hand run of `scripts/preserve_forward_inputs.py --data-root ~/syndicate-prod/data` is the fallback.**
 
+### deploy-claim-test-sandbox — CLOSED 2026-10-14 (test env pinned to tmp_path; 33/33 with and without SYNDICATE_DEPLOY_CLAIM_DIR, scratch dir stayed empty) — opened 2026-10-14 — session 9ed1222d-5ffd-4d2b-8c34-2d1aa8b2dc5d
+- Goal: tests that run deploy_claim.py never write a claim outside tmp_path, even with SYNDICATE_DEPLOY_CLAIM_DIR set or a real local_production.env present
+- Files: tests/test_deploy_claim_holder_identity.py tests/test_deploy_lock_worktree.py
+- Hypothesis: stray 'web HELD by lane-a, session-aaa' claims (10-13, 10-14) come from test_deploy_claim_holder_identity._run inheriting SYNDICATE_DEPLOY_CLAIM_DIR (c3a5f11b)
+- Falsification test: with SYNDICATE_DEPLOY_CLAIM_DIR pointed at a scratch dir, the unpatched test writes no claim there
+- Verification: run the test with SYNDICATE_DEPLOY_CLAIM_DIR=<scratch dir>: scratch dir stays empty, claim file asserted under tmp_path
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

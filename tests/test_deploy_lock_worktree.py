@@ -36,8 +36,15 @@ def _load(name: str):
 
 
 @pytest.fixture(scope="module")
-def claim_mod():
-    return _load("deploy_claim")
+def claim_mod(tmp_path_factory):
+    # These tests pin the git-worktree FALLBACK. `SYNDICATE_DEPLOY_CLAIM_DIR` or a
+    # real local_production.env (the WSL fleet sets both) pre-empts it by design
+    # (c3a5f11b, tested in test_deploy_claim_dir.py), so scrub them for the
+    # import or this file is red on the fleet and green everywhere else.
+    with pytest.MonkeyPatch.context() as mp:
+        mp.delenv("SYNDICATE_DEPLOY_CLAIM_DIR", raising=False)
+        mp.setenv("SYNDICATE_LOCAL_HOME", str(tmp_path_factory.mktemp("no-local-home")))
+        return _load("deploy_claim")
 
 
 @pytest.fixture(scope="module")

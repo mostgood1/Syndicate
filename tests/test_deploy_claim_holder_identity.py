@@ -14,9 +14,18 @@ from an escape hatch into the default outcome, which defeats the lock.
 The load-bearing assertion is `"pid" not in claim`. A test that only checked for
 `holder_session` would pass while the misleading field sat right beside it.
 """
+
+# THE SANDBOX MUST BE AIRTIGHT. Since c3a5f11b `deploy_claim.py` resolves its
+# claim dir from `SYNDICATE_DEPLOY_CLAIM_DIR`, then `<SYNDICATE_LOCAL_HOME or
+# ~/syndicate-prod>/local_production.env`, and only then from its own repo root.
+# Copying the script into tmp_path covers only the last of those. `_run` used to
+# pass the real environment through, so on the WSL fleet (nightly ci-suite) this
+# file wrote a live 45-min `web` claim -- `HELD by lane-a, session: session-aaa`
+# -- into the production claim dir, seen 2026-10-13 and 2026-10-14.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -27,22 +36,48 @@ SCRIPT = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "deploy_claim
 
 def _sandbox(tmp_path):
     """A throwaway repo root, so a test never touches real deploy claims."""
-    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts").mkdir(parents=True)
     shutil.copy(SCRIPT, tmp_path / "scripts" / "deploy_claim.py")
-    (tmp_path / ".syndicate").mkdir()
+    # Must exist: a named dir that does not is ignored, and the resolver falls
+    # through to the next source.
+    (tmp_path / ".syndicate" / "deploy_claims").mkdir(parents=True)
     return tmp_path / "scripts" / "deploy_claim.py"
+
+
+def _env(root, session):
+    """Pin every claim-dir source inside the sandbox; inherit nothing that names one."""
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("SYNDICATE_DEPLOY_CLAIM_DIR", "SYNDICATE_LOCAL_HOME")}
+    env["SYNDICATE_DEPLOY_CLAIM_DIR"] = str(root / ".syndicate" / "deploy_claims")
+    env["SYNDICATE_LOCAL_HOME"] = str(root / "no-local-home")  # no local_production.env
+    env["CLAUDE_CODE_SESSION_ID"] = session
+    return env
 
 
 def _run(script, *args, session="session-aaa"):
     return subprocess.run(
         [sys.executable, str(script), *args],
         cwd=script.parents[1], capture_output=True, text=True,
-        env={**__import__("os").environ, "CLAUDE_CODE_SESSION_ID": session},
+        env=_env(script.parents[1], session),
     )
 
 
 def _claim_file(tmp_path):
-    return next((tmp_path / ".syndicate" / "deploy_claims").glob("*.json"))
+    claims = list((tmp_path / ".syndicate" / "deploy_claims").glob("*.json"))
+    assert claims, "acquire wrote no claim under tmp_path -- it went somewhere real"
+    return claims[0]
+
+
+def test_claim_lands_in_the_sandbox_even_with_a_real_claim_dir_set(tmp_path, monkeypatch):
+    """THE LEAK. A claim dir in the parent environment must not be inherited."""
+    real = tmp_path / "pretend-production-claims"
+    real.mkdir()
+    monkeypatch.setenv("SYNDICATE_DEPLOY_CLAIM_DIR", str(real))
+    script = _sandbox(tmp_path / "repo")
+    r = _run(script, "acquire", "--service", "web", "--holder", "lane-a")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert (tmp_path / "repo" / ".syndicate" / "deploy_claims" / "web.json").is_file()
+    assert not any(real.iterdir()), "the test wrote into the inherited claim dir"
 
 
 def test_records_session_and_no_pid(tmp_path):
