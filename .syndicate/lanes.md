@@ -67,6 +67,14 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### basketball-lineup-injuries-native — OPEN — opened 2026-10-14 — session 2d413211
+- Goal: Move the live loop's lineup-check injuries fetch (`live_refresh_loop._fetch_injuries`, run for NBA and WNBA every lineup-check interval) off the vendored `<pkg>.cli fetch-injuries` onto Syndicate's `source_cli` ports; deployed with a measurement (user request 2026-10-14: "move the nba injuries fetch off vendor"; WNBA rides the same shared function).
+- Files: syndicate/features/shared/live_refresh_loop.py (_fetch_injuries + _LINEUP_INJURY_FETCH_PACKAGES + vendored launcher helpers sections only), tests/test_lineup_injuries_native.py (NEW)
+- Hypothesis: a launcher swap: the port's fetch-injuries is already parity-proven (source_cli bootstrap parity, NBA 804,491 / WNBA 202,372 leaves, 0 diffs) and both workers set NBA_/WNBA_BETTING_DATA_ROOT, so the written raw/injuries.csv is the same file.
+- Falsification test: after the switch a vendored `*_betting.cli fetch-injuries` process still appears from a worker on the new code, or the injury fingerprint stops moving (raw/injuries.csv not rewritten) across lineup-check intervals.
+- Verification: after the fleet ff + restart of the worker that runs the lineup check, a `syndicate.features.<sport>.source_cli.cli fetch-injuries` child is observed (or raw/injuries.csv rewritten after the restart) and no vendored fetch-injuries process in a sampling window.
+- Blocked by: none
+
 ### wnba-fixture-identity-native — OPEN — opened 2026-10-14 — session 2d413211
 - GOAL VERDICT. Goal (verbatim): "Move `wnba_fixture_identity.schedule_path()` off the vendored `vendor/wnba_betting_repo/data/processed/schedule_2026.csv` onto the data-root WNBA schedule the refresh's fetch-schedule writes, keeping its tests running on a committed fixture; deployed with a measurement (user request 2026-10-14: "move the wnba fixture identity off vendor")." -- **GOAL: NOT MET** `[2026-10-14 ~20:22Z]`. On the fleet (44508f56, ff 20:18:56Z, no restart needed). Deployed checkout + refresh env: schedule_path() = data-root schedule_2026.csv, resolve 10-17 GSV v ATL = 401918305; 48 tests pass. Left: the production reading -- the first game_cards_2026-10-17.csv written after the ff carries fixture_id=401918305 (WNBA cards are written per game date; newest is 10-09).
 - Goal: Move `wnba_fixture_identity.schedule_path()` off the vendored `vendor/wnba_betting_repo/data/processed/schedule_2026.csv` onto the data-root WNBA schedule the refresh's fetch-schedule writes, keeping its tests running on a committed fixture; deployed with a measurement (user request 2026-10-14: "move the wnba fixture identity off vendor").
