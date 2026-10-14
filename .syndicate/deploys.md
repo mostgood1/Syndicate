@@ -49348,3 +49348,25 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **roles 18:12Z:** web pid 391 and refresh-worker pid 455 restarts=0, code=63631afb (the boot-time checkout); live-odds-worker pid 3293 restarts=1 code=a78aab9c. /healthz 200. Note: `status` "supervisor ... since 18:05:02Z" is the pidfile rewrite on the live-odds respawn, NOT the boot.
 - **inside my claim, by another lane (their message, not mine):** session 2d413211 / lane basketball-schedule-adapter-native at 18:04:42Z `git merge --ff-only a78aab9c` (63631afb -> a78aab9c, 9 other lanes' commits) and 18:04:52Z TERM of live-odds-worker pid 456 (respawned 3293 at 18:05:03Z); their acquire was refused and their script did not stop on it. Nothing of this reading depends on it. web / refresh-worker carry a78aab9c only at their next restart.
 - **claims released** 18:13:0xZ (web, refresh-worker, live-odds-worker; holder games-rail-full-detail).
+
+## 2026-10-14 19:42:57Z (2:42 PM CT) -- LOCAL FLEET ff a78aab9c -> 6fa2673e (exact SHA) + live-odds-worker restart 19:53:23Z: WNBA commence times off vendor -- **MET** 19:53:37Z (lane `wnba-live-commence-times-native`, session 2d413211)
+
+- **User decision 2026-10-14:** "move the wnba live lens schedule off vendor", then "Ff + restart now".
+- **Claims:**
+  - refresh-worker (token 51453762...) and live-odds-worker (token 7d191fb4...) were ACQUIRED; each acquire was gated on its exit code.
+  - `status` named my holder before the first mutating command; that was the fix for the 18:04Z breach.
+  - Both were released at ~19:54Z.
+- **Safety read in full (19:42Z):** NOT CLEAR. Live soccer games; soccer/NBA/NHL odds jobs; a board build. Basketball props jobs: 0.
+- **Ride-along:** 2ac45acd, soccer lineups match confirmed starters by ESPN id (same lane as the 18:04Z ride-along 0fef1ad0).
+- **Change:** `live_refresh_loop._wnba_commence_times`, the T-window WNBA provider:
+  - It now reads the newest `schedule_*.json` under `WNBA_BETTING_DATA_ROOT/processed` from disk.
+  - Before, it read `vendor/wnba_betting_repo/data/processed/schedule_2026.json`, which ends 2026-09-24, so it returned [] for the whole postseason.
+- **Restart:**
+  - The live-odds-worker had live soccer and waited 10.4 min for 0 children.
+  - pid 3293 got TERM at 19:53:23Z; the supervisor respawned it as pid 29646 at 19:53:32Z (`==== start 19:53:31Z restarts=2`).
+  - A child job was already running at 19:53:50Z, and no traceback.
+- **VERIFY:**
+  - Under pid 29646's own env (read from /proc as a dict), `_wnba_commence_times("2026-10-17")` == [("401918305", 2026-10-17T19:30:00Z)]. That is Finals G1; before, it was [].
+  - The provider resolves to `/home/amyn/Syndicate/.../live_refresh_loop.py` at 6fa2673e.
+  - Pre-merge dry run: 10-09 gives 2 games; 10-14 gives []; 10-19 gives 401918306.
+- **Rollback:** revert 6fa2673e and ff, then TERM the live-odds-worker.

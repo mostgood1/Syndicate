@@ -67,9 +67,10 @@ death, never life — do not invert it.
 
 ## OPEN
 
-### wnba-live-commence-times-native — OPEN — opened 2026-10-14 — session 2d413211
+### wnba-live-commence-times-native — CLOSED 2026-10-14 (GOAL MET) — opened 2026-10-14 — session 2d413211
+- GOAL VERDICT. Goal (verbatim): "Move the live loop's WNBA commence-time source (`live_refresh_loop._wnba_commence_times`, the T-window provider) off the vendored `vendor/wnba_betting_repo/data/processed/schedule_2026.json` onto the data-root WNBA schedule the refresh's fetch-schedule writes; deployed with a measurement (user request 2026-10-14: "move the wnba live lens schedule off vendor")." -- **GOAL: MET** `[2026-10-14 19:54Z]`. Fleet ff 6fa2673e 19:42:57Z; live-odds-worker TERM 19:53:23Z -> pid 29646; under its env `_wnba_commence_times('2026-10-17')` == [('401918305', 2026-10-17T19:30Z)] (was []). deploys.md 19:42:57Z. Claims gated on exit code this time.
 - Goal: Move the live loop's WNBA commence-time source (`live_refresh_loop._wnba_commence_times`, the T-window provider) off the vendored `vendor/wnba_betting_repo/data/processed/schedule_2026.json` onto the data-root WNBA schedule the refresh's fetch-schedule writes; deployed with a measurement (user request 2026-10-14: "move the wnba live lens schedule off vendor").
-- Files: syndicate/features/shared/live_refresh_loop.py (_wnba_commence_times section only), tests/test_wnba_commence_times_native.py (NEW)
+- Files: none (released at close)
 - Hypothesis: the vendored file ends 2026-09-24 (frozen at the vendor pull), so the provider returned [] for the whole postseason (measured on the fleet: [] for 10-09 and for Finals G1 10-17); the data-root schedule_2026.json has every game through 10-31.
 - Falsification test: after the switch the provider still returns [] for 2026-10-17 on the fleet, or returns times that disagree with the data-root datetime_utc (G1 = 2026-10-17T19:30:00Z, game 401918305).
 - Verification: on the deployed checkout with the workers' env, `_wnba_commence_times("2026-10-17")` == [("401918305", epoch of 2026-10-17T19:30Z)]; the live-odds-worker restarted onto the new code before G1.
