@@ -244,3 +244,43 @@ def test_a_standalone_OPEN_header_is_not_a_near_miss_either(tmp_path):
     )
     code, out = _run(repo)
     assert not _near_miss_reported(out), out
+def test_a_CLOSED_lane_mentioning_REOPENED_in_prose_is_still_a_historical_record(tmp_path):
+    """Makes the CLOSED_RE clause load-bearing.
+
+    Without it, an UPPERCASE non-standalone `OPEN` inside a CLOSED lane's status
+    -- here the word REOPENED in prose -- satisfies `"OPEN" in status` and gets
+    reported. The docstring's promise is that a CLOSED lane with a Files block is
+    a historical record, so this is the test that holds the predicate to it. The
+    pre-opener fixture alone does NOT exercise this clause, because that prose is
+    lowercase and fails the containment anyway.
+    """
+    repo = _repo(
+        tmp_path,
+        ["tests/test_thing.py", "tests/test_companion.py"],
+        _lanes(_hdr("closed-mentions-reopened",
+                    "CLOSED 2026-10-14 (superseded; the REOPENED plan was dropped)")),
+    )
+    code, out = _run(repo)
+    assert not _near_miss_reported(out), out
+    assert "closed-mentions-reopened" not in out, out
+
+
+def test_a_non_closed_status_with_lowercase_open_prose_is_not_a_near_miss(tmp_path):
+    """Pins the .upper() removal, which the pre-opener fixture does NOT.
+
+    Measured 2026-10-14 by mutation: with only the pre-opener fixture, restoring
+    `status.upper()` still passed, because that status carries a CLOSED token and
+    the CLOSED_RE clause saves it independently. EITHER change alone fixes the
+    real-world case, so neither was pinned. This fixture drops the CLOSED token
+    -- a BLOCKED lane whose prose happens to contain "pre-opener" -- so only the
+    case-sensitive containment can keep it out of the report.
+    """
+    repo = _repo(
+        tmp_path,
+        ["tests/test_thing.py", "tests/test_companion.py"],
+        _lanes(_hdr("blocked-prose-lane",
+                    "BLOCKED 2026-10-14 (waiting on the pre-opener replay)")),
+    )
+    code, out = _run(repo)
+    assert not _near_miss_reported(out), out
+    assert "blocked-prose-lane" not in out, out
