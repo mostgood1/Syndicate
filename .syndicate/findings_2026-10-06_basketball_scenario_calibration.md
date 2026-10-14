@@ -2219,3 +2219,53 @@ dates, 80 paired games, 16,400 draws each, 0 errors):
   term carries almost all of the correction, and end-game fouling adds very little once the solver knows the bonus.
 - s is stable across runs: 0.00707 / 0.00706.
 - **#3k CHECK launched 15:36Z** on the 12 sweep dates (s = 0.00709, Δ = 0.108).
+
+### Phase 2 #3k — RESULT 2026-10-14 16:00Z (done 16:00Z): CONFIRMED, the solver terms remove the total bias
+
+**Run:** `PK_check`, the 12 sweep dates (disjoint from the measure dates), the #3i pick + s = 0.00709, Δ = 0.108;
+17,400/17,400 calls with levers, 0 errors.
+
+| reading | #3i pick without solver terms (`PI_b030_f05`) | **with s, Δ (`PK_check`)** | target |
+|---|---|---|---|
+| total bias | +0.99 | **+0.11** | \|·\| < 0.5 ✓ |
+| FTA/team | 22.62 | 22.74 | 22.69 ± 0.3 ✓ |
+| foul-outs | 0.155 | 0.159 | [0.153, 0.233] ✓ |
+| P(6th \| 5th) | 0.196 | 0.201 | [0.1607, 0.2643] ✓ |
+| closers-on | 0.407 | 0.405 | [0.375, 0.535] ✓ |
+| H2 / Q4 slope / S8 | −0.181 / −0.093 / 14.79 | −0.167 / −0.095 / 14.97 | all ✓ |
+| Q4 FTA share | 0.264 | 0.265 | ≥ 0.254 ✓ |
+
+- Team PF: 18.36 (real 19.67).
+- **Next, pre-registered below:** #3l, the joint base-nonshoot-PF + bonus fit; then s and Δ re-measured at its point
+  (P3's ordering); then the full FIT; then P3's §7.
+
+### Phase 2 #3l — PRE-REGISTRATION 2026-10-14 16:00Z (before any run): joint base non-shooting PF + bonus rate, against FTA and team PF
+
+**Why:**
+- Team PF is 18.36 against real 19.67 at FTA 22.74.
+- The bonus rate alone cannot match both: lowering it to fit FTA (#3i) took PF away.
+- `base_nonshooting_foul_per_poss` (default 0.05, a draw per shot iteration) adds PF only, and those fouls count toward
+  the bonus.
+
+**Config:** the #3k config (s = 0.00709 and Δ = 0.108 held for the grid; they are re-measured after the pick), the
+same 12 sweep dates.
+
+**Grid:** base_nonshooting_foul_per_poss ∈ {0.065, 0.08} × bonus ∈ {0.02, 0.025, 0.03}. Six runs; (0.05, 0.03) is
+`PK_check`.
+
+**Objective, PASS = all of these:**
+- FTA/team 22.69 ± 0.3;
+- team PF 19.67 ± 0.4;
+- the #3i guards except total bias and foul-outs: P(6th | 5th), closers-on, H2, Q4, S8, Q4 FTA share.
+
+**Readings, not gated here:**
+- foul-outs, re-gated at the final check; more PF may need a foul_mult re-fit, its own step;
+- total bias, re-gated after s/Δ are re-measured.
+
+**Pick:** among passing points, the smallest |FTA − 22.69| + |PF − 19.67| / 2. Ties go to the smaller base.
+
+**Then:**
+1. Re-measure s and Δ at the pick on the #3j dates.
+2. Run a #3k-style check (|bias| < 0.5, all #3i guards incl. foul-outs).
+3. The full FIT.
+4. §7.
