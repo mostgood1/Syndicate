@@ -23,7 +23,9 @@ on n_sims). Run in WSL with the fleet venv, at nice 19, never against the produc
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Dict
@@ -95,6 +97,12 @@ def main(argv=None) -> int:
                     help="READ-ONLY source of #473's inputs the pristine copy lacks (player_checks, total-inputs file)")
     ap.add_argument("--worker", type=int, default=0)
     ap.add_argument("--workers", type=int, default=1)
+    ap.add_argument("--phase2-config", default=None,
+                    help="calibration lane full-FIT config JSON (fit_f3_config.json): its env, engine module flags and data files "
+                         "(nba_sim_total_inputs keys, availability/prop-calibration fleet copies, ALL walk-forward "
+                         "calibration_totals files) are applied to every recorded date. The reader picks the latest file "
+                         "dated <= D-1 and caches its index per processed root, so every file is copied up front.")
+    ap.add_argument("--calfiles-dir", default=None, help="walk-forward calibration_totals_<date>.json directory (with --phase2-config)")
     ap.add_argument("--no-total-inputs", action="store_true",
                     help="leave nba_sim_total_inputs.json OUT of the scratch (skip_def_subtraction off) -- #695 A/B arm")
     args = ap.parse_args(argv)
@@ -114,6 +122,9 @@ def main(argv=None) -> int:
     for k in [k for k in os.environ if any(m in k.upper() for m in ("KEYVALUE", "REDIS", "VALKEY", "ODDS_API", "ODDSAPI"))]:
         os.environ.pop(k, None)
 
+    p2 = json.loads(Path(args.phase2_config).read_text(encoding="utf-8")) if args.phase2_config else None
+    if p2:
+        os.environ.update({k: str(v) for k, v in (p2.get("env") or {}).items()})
     import backtest_nba_lines_props as bt
     import resim_nba_availability as rs
     from syndicate.features.nba import live_resim as lr
@@ -125,6 +136,13 @@ def main(argv=None) -> int:
 
     # Same as the calibration harness: as-of runs use the PREGAME roster mode.
     bpss._resolve_smart_sim_roster_mode_local = lambda **_k: "pregame"
+    if p2:
+        eng = bpss._engine_for_league_local("nba")
+        for name, val in (p2.get("engine_module_flags") or {}).items():
+            if not hasattr(eng, name):
+                raise SystemExit(f"PHASE2_FAIL engine flag {name} is not an attribute of the native engine object")
+            setattr(eng, name, val)
+        print(f"PHASE2_ENGINE_FLAGS {p2.get('engine_module_flags')}", flush=True)
     seen: Dict[Any, bool] = {}
     written = {"n": 0}
     orig = bpss._simulate_pbp_game_boxscore_local
@@ -158,6 +176,23 @@ def main(argv=None) -> int:
         rs.prepare_scratch(pristine, scratch, d, asof, props_csv)
         _add_473_inputs(Path(args.live_processed).expanduser(), scratch / "nba_source" / "data" / "processed", d,
                         total_inputs=not args.no_total_inputs)
+        if p2:
+            proc = scratch / "nba_source" / "data" / "processed"
+            files = p2.get("data_files_in_scratch_processed_root") or {}
+            ti = files.get("nba_sim_total_inputs.json")
+            if isinstance(ti, dict):
+                (proc / "nba_sim_total_inputs.json").write_text(json.dumps(ti), encoding="utf-8")
+            for name in ("nba_sim_availability.json", "nba_prop_calibration.json"):
+                if name in files:
+                    src = Path(args.live_processed).expanduser() / name
+                    if not src.exists():
+                        raise SystemExit(f"PHASE2_FAIL fleet copy missing: {src}")
+                    shutil.copy2(src, proc / name)
+            n_cal = 0
+            for f in sorted(Path(args.calfiles_dir).glob("calibration_totals_*.json")):
+                shutil.copy2(f, proc / f.name)
+                n_cal += 1
+            print(f"PHASE2_FILES {d} total_inputs={ti} calfiles={n_cal}", flush=True)
         cur["date"] = d
         seen.clear()
         before = written["n"]

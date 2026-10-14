@@ -1402,6 +1402,39 @@ def _jsonable(o: Any) -> Any:
     raise TypeError(type(o))
 
 
+# Fields a research harness uses as outcome-neutral counters; never part of the engine config being graded.
+_PHASE2_COUNTER_FIELDS = ("record_events", "diag_foul_outs")
+
+
+def apply_phase2_config(path: Path) -> Dict[str, Any]:
+    """Apply the calibration lane's machine-readable full-FIT config (fit_f3_config.json): its env and the native
+    engine module flags, set on THE engine object the live resume uses (`_engine_for_league_local("nba")`) -- the same
+    object and attributes the calibration harness sets. Returns its EventSimConfig fields (counters dropped, lists ->
+    tuples) for `--native-mechanisms`. Fails loudly on a flag the engine object lacks."""
+    import os
+
+    cfg = json.loads(Path(path).read_text(encoding="utf-8"))
+    os.environ.update({k: str(v) for k, v in (cfg.get("env") or {}).items()})
+    from syndicate.features.shared.basketball_props_smart_sim import _engine_for_league_local
+
+    eng = _engine_for_league_local("nba")
+    for name, val in (cfg.get("engine_module_flags") or {}).items():
+        if not hasattr(eng, name):
+            raise SystemExit(f"PHASE2_FAIL engine flag {name} is not an attribute of the native engine object")
+        setattr(eng, name, val)
+    fields = {k: (tuple(v) if isinstance(v, list) else v) for k, v in (cfg.get("event_sim_config") or {}).items()
+              if k not in _PHASE2_COUNTER_FIELDS}
+    print(f"PHASE2_CONFIG flags={cfg.get('engine_module_flags')} fields={len(fields)}", flush=True)
+    return fields
+
+
+def _native_mechanisms(args: argparse.Namespace) -> Dict[str, Any]:
+    mech = json.loads(args.native_mechanisms or "{}")
+    if getattr(args, "phase2_config", None):
+        mech = {**apply_phase2_config(Path(args.phase2_config)), **mech}
+    return mech
+
+
 def run_grade(args: argparse.Namespace) -> int:
     games = load_games(Path(args.games))
     if args.population:
@@ -1419,7 +1452,7 @@ def run_grade(args: argparse.Namespace) -> int:
             projectors.append(NativeResimProjector(inputs_root=Path(args.engine_inputs) if args.engine_inputs else None,
                                                    summary_caches=caches, sims=args.resim_sims,
                                                    cache_dir=Path(args.native_cache) if args.native_cache else None,
-                                                   mechanisms=json.loads(args.native_mechanisms or "{}")))
+                                                   mechanisms=_native_mechanisms(args)))
         else:
             projectors.append(PROJECTORS[n]())
     rep = grade(games, projectors, lines=lines, sims=sims, live_close=live, baseline=args.baseline)
@@ -1462,6 +1495,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     g.add_argument("--resim-sims", type=int, default=100)
     g.add_argument("--native-cache", help="dir caching native_resim projections per (game, checkpoint)")
     g.add_argument("--native-mechanisms", default="{}", help='JSON EventSimConfig fields for native_resim, e.g. {"score_effect_k": 0.002}')
+    g.add_argument("--phase2-config", default=None, help="calibration lane full-FIT config JSON: env + engine flags + EventSimConfig fields for native_resim (explicit --native-mechanisms override)")
     g.add_argument("--shard", help="i/n: grade only games whose crc32(event_id) %% n == i (fill the cache in parallel)")
     g.add_argument("--baseline", default="vendored_replay")
     g.add_argument("--out", required=True)
