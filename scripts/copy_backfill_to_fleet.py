@@ -48,6 +48,9 @@ SETS: dict[str, tuple[str, str | None, str]] = {
     "wnba_props_2026": ("/mnt/c/tmp/wnba_props_2026", r"^(?!player_game_log)",
                         "WNBA 2026 regular-season prop closes, 8 markets at tip - 10 min (bought 2026-10-14, "
                         "`wnba_props_pull.py`) + the per-day historical events; the game log is the fleet's own"),
+    "mlb_props_2026": ("/mnt/c/tmp/mlb_props_2026", r"^(?!mlb_player_game_log)",
+                       "MLB 2026 regular-season prop closes: batter_hits / batter_total_bases / pitcher_strikeouts at first "
+                       "pitch - 10 min (bought 2026-10-14, `mlb_props_pull.py`) + the per-day historical events"),
 }
 
 

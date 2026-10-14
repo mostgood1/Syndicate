@@ -63,20 +63,20 @@ def regular_season_games(game_log: Path) -> dict[str, dict[str, Any]]:
             if None not in g["teams"] and len(g["teams"]) == 2}
 
 
-def _get(path: str, params: dict[str, Any], key: str, budget: Any) -> Any:
-    """`backtest_nhl_game_lines._odds_get`, with the quota attributed to WNBA."""
+def _get(path: str, params: dict[str, Any], key: str, budget: Any, sport: str = "wnba") -> Any:
+    """`backtest_nhl_game_lines._odds_get`, with the quota attributed to `sport` (the MLB pull reuses it)."""
     url = f"{BGL.ODDS_BASE}{path}?{urllib.parse.urlencode(dict(params, apiKey=key))}"
     for attempt in range(3):
         try:
             with urllib.request.urlopen(urllib.request.Request(url), timeout=120) as r:
                 h = {k.lower(): v for k, v in r.headers.items()}
                 budget.charge(h)
-                _record(h, path)
+                _record(h, path, sport)
                 return json.loads(r.read())
         except urllib.error.HTTPError as exc:
             h = {k.lower(): v for k, v in (exc.headers or {}).items()}
             budget.charge(h)
-            _record(h, path)
+            _record(h, path, sport)
             if exc.code in (404, 422):
                 return None
         except RuntimeError:
@@ -87,10 +87,10 @@ def _get(path: str, params: dict[str, Any], key: str, budget: Any) -> Any:
     return None
 
 
-def _record(h: dict[str, str], path: str) -> None:
+def _record(h: dict[str, str], path: str, sport: str = "wnba") -> None:
     try:
         from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
-        record_oddsapi_quota(h, sport="wnba", endpoint=f"historical{path}")
+        record_oddsapi_quota(h, sport=sport, endpoint=f"historical{path}")
     except Exception:  # noqa: BLE001
         pass
 

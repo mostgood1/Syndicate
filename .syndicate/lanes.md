@@ -887,6 +887,7 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: collector change-logs grow on the fleet disk across >= 3 polls with capture timestamps; OddsAPI quota identical before/after; backfill manifest sha256 matches source for every file
 - Blocked by: none
+- **CROSS-LANE WRITE 2026-10-14T13:13Z from `signal-engine-mlb` (same session; marker switched for the edit, then back):** `scripts/copy_backfill_to_fleet.py` gains the SET `mlb_props_2026` (the bought 2026 MLB prop closes + events; the copied game log excluded by pattern).
 - **CROSS-LANE WRITE 2026-10-14T03:09Z from `signal-engine-wnba` (same session; marker switched to this lane for the edit, then back):** `scripts/copy_backfill_to_fleet.py` gains the SET `wnba_props_2026` (the bought 2026 WNBA prop closes + events, game log excluded by pattern); copied 446 files to `backfill/wnba_props_2026` with a sha256 MANIFEST.
 
 ### signal-engine-nba — OPEN — opened 2026-10-13 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
@@ -963,6 +964,15 @@ death, never life — do not invert it.
 - Files: scripts/ledger_io.py,tests/test_ledger_block_bounds.py
 - Outcome: the boundary now has one definition. The hypothesis held — no production tool was defective (`archive_state_subject.py` scans inside `subject_span`; `check_trimmed_contracts.py` uses `^#{2,3}`), so this is a helper for the next ad-hoc harness, not a migration. It also CORRECTED the rule it came from: `learnings.md` 2026-10-13 prescribes `^#{1,6}`, which truncates 26 of 887 archived blocks.
 - Blocked by: none
+
+### signal-engine-mlb — OPEN — opened 2026-10-14 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: MLB matchup signals v1: buy the 2026 regular-season batter_hits / batter_total_bases / pitcher_strikeouts closes (tip - 10 min, probe first), build as-of batter-vs-pitcher, batter-vs-arsenal and recency features from Statcast pitches + game logs, and test -- pre-registered -- the user's matchup stack (BvP + arsenal + recency) plus the pitcher-K signals against the Shin fair
+- Files: scripts/mlb_props_pull.py (NEW), scripts/build_mlb_signals.py (NEW), scripts/mlb_signal_tests.py (NEW), tests/test_mlb_signals.py (NEW), .syndicate/findings_2026-10-14_mlb_signals_v1.md (NEW), scripts/wnba_props_pull.py (`_get` / `_record` sport parameter ONLY; lane signal-engine-wnba is closed)
+- Hypothesis: A batter with a good history against this pitcher, a pitch-type profile that beats this pitcher's arsenal, and a hot recent run is more likely to get a hit than the close implies (the user's example); pitcher K props move with the pitcher's recent K rate and the opponent's K rate. Prior from NBA/NFL/NCAAF/NHL/WNBA: role and form are priced; a stack of several may not be.
+- Falsification test: Each signal: confirm fired residual 95% game-clustered CI touching or below 0, or discover <= 0 -> NOT SUPPORTED; BH q=0.10 across the family.
+- Verification: Purchase probe + full run with credits recorded; registration committed before any close is joined to an outcome; lift report with per-signal n / games / residual CI / verdict; findings.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
