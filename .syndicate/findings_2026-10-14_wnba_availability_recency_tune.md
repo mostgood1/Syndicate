@@ -53,3 +53,31 @@ held-out regular season (paired, game-clustered CI via `fit_wnba_sim_availabilit
 3. at least one of {minutes MAE, points/PRA book-line Brier} is better with a CI excluding 0.
 If both variants qualify, the one with the larger minutes-MAE gain. Otherwise `k` stays. Playoffs (9 games) are
 reported, not decisive. Enabling in production is a separate user decision either way.
+
+## 4. RESULT (2026-10-14 22:1xZ): `k` STAYS -- no variant meets the pre-registered rule
+
+Arms finished 22:14Z: 42 held-out dates x 124 game sims per arm, identical sets, 0 errors (3 of the 45 archive dates
+lack the phase-1 game predictions and were skipped by every arm). Scored with `fit_wnba_sim_availability.py --compare
+--n-boot 2000` (k = baseline) and `scripts/evaluate_wnba_availability_arms.py` (the §3 rule, applied mechanically).
+
+Held-out REGULAR season (115 games), variant - k (negative = variant better), 95% game-clustered CI:
+
+| | `regular_k2_min20` | `exempt_apps3of5` |
+|---|---|---|
+| played-player minutes MAE | -0.014 [-0.089, +0.058] (n 2,038) | +0.031 [-0.081, +0.137] (n 2,016) |
+| minutes bias (k -> variant) | +0.152 -> -0.425 | +0.189 -> -0.941 |
+| points book-line Brier | +0.0002 [-0.0024, +0.0030] | +0.0027 [-0.0015, +0.0072] |
+| PRA book-line Brier | -0.0004 [-0.0042, +0.0038] | +0.0049 [-0.0006, +0.0104] |
+| any market Brier worse (CI > 0) | none | none |
+| player-games projected (k 2,266) | 2,306 (+40 net; k-projected games it lost: 15 played, 4 did not) | 2,412 (+146 net; lost: 37 played, 18 did not) |
+| clause 1 / 2 / 3 | yes / yes / **no** | yes / yes / **no** |
+
+**Neither variant shows a measurable gain** (clause 3): both are statistically indistinguishable from `k` on pregame
+minutes and on every priced market. `exempt_apps3of5` widens coverage most but spreads minutes thinner (bias -0.94).
+Playoffs (9 games) point the same way and are not decisive. **Pre-registered outcome: `k` stays.** Nothing in
+production changed: the rule selector's default IS `k`, and no switch was set.
+
+NOT measured by the pre-registered criteria: the LIVE lens. More rotation players in the pregame frame means more
+on-court fives the native re-sim can resume (P5: 30% of 5:00-Q4 sides sampled under `k`). That benefit is real but
+unquantified here; it can be measured inside P5's backtest (re-record inputs under a variant, compare real-five rate
+and the paired live metrics) once P3's re-fits land.
