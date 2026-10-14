@@ -409,6 +409,9 @@ residual) sigma is justified; a constant rescale is not.
   consecutive plays); the play sum reaches the official final on every kept game. Score a cut from the play sum.
 - As-of WNBA engine inputs recorded for all 340 anchored 2026 games (fleet `~/wnba_live_bt/engine_inputs_asof/`,
   2026-10-12, code `d74f1387` + `record_wnba_engine_inputs_asof.py`), for the P5 native re-sim backtest.
+- WNBA pregame engine frames omit on-court players: at 5:00 Q4 over the 340 recorded 2026 games, 261 of 3,400
+  on-floor players (7.7%) are absent from the frame, so 203/680 sides resume `live_resim` with a SAMPLED five;
+  median frame 10 players all season (NBA's grows 12.5->17). Measured 2026-10-14, findings_2026-10-09_wnba_live_vendored_inventory.md.
 - ESPN pbp `sequenceNumber` is NOT chronological; the `plays` list order is.
 
 ## [wnba-live-edge-is-leakage] THE WNBA LIVE ENGINE'S +41% ROI IS AN ARTEFACT — no live line has ever been captured `[verified 2026-08-31, lane wnba-accuracy-assessment]`
