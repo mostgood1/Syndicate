@@ -1070,7 +1070,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **NOT enabled:**
   - nba is not in `_LIVE_GAMELINE_SPORTS` (shadow: nothing priced);
   - the vendored tick import is gone from `syndicate/features/nba` (the ported `nba/live_tick` runs, lane nba-live-tick-native);
-  - `endgame_foul_*`, `foul_out_in_sim`, `foul_trouble_*`, `fouler_per_minute` and the EXACT-solver terms `solver_bonus_trip_share` / `solver_endgame_pts_per_team` (6f092c74) are default off; all parity 5,400/5,400. Joint Phase 2 re-fit with basketball-scenario-calibration: #3k bias +0.11, #3l PF/FTA CONFIRMED, full FIT pending.
+  - `endgame_foul_*`, `foul_out_in_sim`, `foul_trouble_*`, `fouler_per_minute` and the EXACT-solver terms `solver_bonus_trip_share` / `solver_endgame_pts_per_team` (6f092c74) are default off; all parity 5,400/5,400. Joint Phase 2 re-fit with basketball-scenario-calibration: #3k bias +0.11, #3l PF/FTA CONFIRMED, PK2 at re-measured s'/Δ' bias +0.08 (provisional Phase 2 #3 config); full FIT pending.
 - **Native vs pregame_rate on totals, preseason with #473 (n=16-18):** WORSE (+2.6 / +2.5 / +1.7 MAE at end Q1 / Q2 / Q3).
 - **Regular-season gate (findings_2026-10-09 §9, n~1,180/checkpoint): NOT PASSED.** Native total worse than `pregame_rate` at end Q1/Q2/Q3 (bias +2.9/+1.8/+2.0). Margin is better than pregame_rate late, and ties on ML. #695 (§10a/b): skip_def explains ~1/3 of it, the rest is engine FT volume with EXACT off. The user kept skip_def and chose "validate first" for Phase 2; P3 re-gates on Phase 2 inputs after that.
 - **Baseline:** the vendored replay is worse than `pregame_rate` on margin at end Q1/Q2 and on ML at end Q2 / 5:00 Q4 (n~780). `pregame_rate` ML ties ESPN.
