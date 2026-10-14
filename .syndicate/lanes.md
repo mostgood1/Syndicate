@@ -857,6 +857,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - **CROSS-LANE WRITE 2026-10-14 ~22:45Z from `news-availability-gate` (same session):** `scripts/news_price_follow.py` now treats MLB injured lists as unplayable (`news_availability.availability_status`) and includes mlb in its default sports.
 
+### cheat-sheets — OPEN — opened 2026-10-14 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: Daily per-sport cheat sheets (NFL, NCAAF, NHL, soccer now; NBA from 10-20, NCAAB 11-02, MLB/WNBA 2027) built from Syndicate's own evidence -- model distribution, recent form on the exact line, matchup / defense-vs-position, game script, injuries, model track record -- where EVERY row carries a price check (market implied probability, model probability, market-anchored consistency posterior, EV at the best book), written by a worker-side generator to the data root and rendered by the web app without request-time compute
+- Files: scripts/build_cheat_sheets.py (NEW), tests/test_build_cheat_sheets.py (NEW), syndicate/features/shared/cheat_sheets.py (NEW), syndicate/blueprints/cheat_sheets.py (NEW), syndicate/templates/cheat_sheets.html (NEW), syndicate/app.py (the cheat_sheets blueprint registration ONLY)
+- Hypothesis: n/a (product surface; the consistency verdict uses a beta-binomial posterior anchored on the market price, so a streak counts only beyond what the price already implies)
+- Falsification test: n/a
+- Verification: generator tests on synthetic evidence; a fleet run writes <data root>/cheatsheets/<sport>/<date>.json for the in-season sports with row counts and timing; a sample sheet published for the user; the page serves the JSON with no request-time evidence building
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
