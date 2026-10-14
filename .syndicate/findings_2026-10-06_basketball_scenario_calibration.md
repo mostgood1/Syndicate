@@ -1882,3 +1882,24 @@ PROVISIONAL until the full FIT (P3's amendment).
 - Together with P(top fouler ≥ 5) of 0.54 vs 0.41, fouls are concentrated on starters BEFORE the foul-out stage.
 - Foul avoidance (#3e) acts from each period's threshold on, so it should also cut this. #3e reads the event rate.
 - The JR runs used patch v2, so P(6th | 5th) is not available for #3d (the readout printed 0.000; that means n/a).
+
+### Phase 2 #3f — PRE-REGISTRATION (diagnostic reading, before any run): is the fouler draw over-weighting starters? (P3's suspect)
+
+**Suspect (P3):** the fouler draw `_usage_w(players, "_prior_pf_pm", line)` blends the per-minute PF prior with a
+minutes weight, so it tilts fouls toward high-minute players BEYOND their per-minute rate. That would explain sim 0.64
+vs real 0.29 5th-PF-in-Q4 starter events/game, and P(top ≥ 5) 0.54 vs 0.41.
+
+**Real** (ESPN box, 1,632 FIT team-games):
+- the top 5 by minutes commit **0.585** of team PF (starters 0.583);
+- starters foul LESS per minute than the bench: PF/48 3.70 vs 4.32.
+
+**Sim:** one run, `PS_base`.
+- The #3e control config (release 240, bench 0.05, foul_mult 1.0, bonus 0.04, end-game on), the same 12 dates.
+- New harness field `pft5`: [PF of the top 5 by expected minutes, team PF] per side.
+
+**Reading:** the sim top-5 PF share vs 0.585.
+- If the sim exceeds it by > 0.03, the minutes blend is implicated → P3's separate default-off field (a pure per-minute
+  fouler weight over the on-court five).
+- Otherwise the starter excess lies elsewhere.
+
+Diagnostic only, no parameter choice.

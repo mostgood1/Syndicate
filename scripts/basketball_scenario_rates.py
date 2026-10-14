@@ -279,6 +279,9 @@ def _compact_draw(h_box: Dict[str, Any], a_box: Dict[str, Any], hq: Any, aq: Any
            "h": team(h_box), "a": team(a_box), "hx": team_x(h_box), "ax": team_x(a_box), "fo": fo}
     # Phase 2 #3c: top fouler PF per side, and the engine's foul-out diagnosis rows when cfg.diag_foul_outs is on.
     out["pfmax"] = [max([int(p.get("pf") or 0) for p in (b.get("players") or [])] or [0]) for b in (h_box, a_box)]
+    # P3 fouler-weight check: [PF of the top 5 by expected minutes, team PF] per side (real top-5 share 0.585).
+    out["pft5"] = [[sum(int(p.get("pf") or 0) for p in sorted(b.get("players") or [], key=lambda p: -float(p.get("min") or 0))[:5]),
+                    sum(int(p.get("pf") or 0) for p in (b.get("players") or []))] for b in (h_box, a_box)]
     if h_box.get("fo_diag") is not None:
         out["fod"] = h_box.get("fo_diag")
     if h_box.get("fo_t5") is not None:
