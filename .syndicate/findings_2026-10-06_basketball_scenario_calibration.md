@@ -1759,3 +1759,38 @@ scales to the box total.
   the player's current PF.
 - release_s trades closers' minutes for foul-outs. A "foul avoidance in trouble" weight on the fouler draw would be
   the more faithful mechanism (P3's domain; not built).
+
+### Phase 2 #3d — PRE-REGISTRATION 2026-10-14 03:28Z (before any run): foul_trouble_release_s sweep (the lever #3c's mapping selected)
+
+**Config:** the #3b config at bench_mult = 0.05, the same 12 dates.
+
+**Grid:** foul_trouble_release_s ∈ {0, 60, 120, 180}. 240 is already measured (`JF_diag`/`JF_m005`, foul-outs
+0.410/0.415).
+
+**Objective:** foul-outs 0.193 ± 0.04 per game.
+
+**Pass/fail guards, as in #3b:**
+- FTA 22.69 ± 0.7;
+- H2 inside [−0.19, −0.155];
+- Q4 slope ≥ −0.101;
+- S8 14.81 ± 0.6;
+- Q4 FTA share no further from 0.279 than 0.254.
+
+**One guard moved to a reading, disclosed:**
+- |total bias| < 1.0 is now a READING. It failed at every #3b point (+0.97..+1.23) from the bonus + end-game points
+  themselves, which the release window cannot move.
+- This is a mechanism-vs-estimator debt: the NBA totals calibration was fitted without bonus or end-game fouling, so it
+  must be RE-FIT on the chosen config before adoption.
+- That re-fit is a REQUIRED step before the full-FIT read, not optional.
+
+**Readings:**
+- foul-outs in the Q4 ≤ 4:00 window vs real 0.107 and Q4 > 4:00 vs 0.059 (pbp scaled);
+- P(top fouler ≥ 5) vs 0.414;
+- starter minutes (`--track-oncourt` is not on in this config, so not read).
+
+**Pick:** among passing points, the smallest |foul-outs − 0.193|; ties go to the LARGER release_s (closers play).
+PROVISIONAL until the full FIT, per P3's amendment.
+
+**If no point passes:** release_s is insufficient. The next candidate is the more faithful mechanism, "foul avoidance
+in trouble" (a lower fouler-draw weight for a player at or over the threshold). It is unbuilt, P3's domain, and gets its
+own pre-registration.
