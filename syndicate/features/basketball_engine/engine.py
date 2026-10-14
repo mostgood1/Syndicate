@@ -128,6 +128,18 @@ class EventSimConfig:
     # (calibration lane #3f). On: weight on-court players by `_prior_pf_pm` alone (raw, no log, no minutes); a missing
     # or zero prior takes the on-court median. Only the FOULER draw. Off = byte-identical.
     fouler_per_minute: bool = False
+    # EXACT-TARGET SOLVER TERMS for the mechanisms (P3, 2026-10-14; user: "fix the solver first, then run the full FIT").
+    # `_solve_eff_mult` models a fixed count of loop possessions (shots, fouled-shot FTs, OREB). A bonus trip REPLACES
+    # a loop possession with free throws, and end-game fouling adds clock-governed possessions + FT points; neither was in
+    # the solve, so EXACT_TARGET overshot by ~+1.0 total with both on (calibration lane #3i). Both terms are MEASURED
+    # constants (fit once on FIT sims, then frozen), used only when EXACT_TARGET is on AND their mechanism is on:
+    #  - solver_bonus_trip_share: bonus FT trips per team possession; the solve then models
+    #    (1 - s) * loop_ppp(eff) + s * 2 * ftp(eff)  (two-shot award; NBA/WNBA).
+    #  - solver_endgame_pts_per_team: mean extra points per team per game from end-game fouling (on minus off);
+    #    subtracted from the team target before solving.
+    # 0.0 = off: the solve is byte-identical.
+    solver_bonus_trip_share: float = 0.0
+    solver_endgame_pts_per_team: float = 0.0
 
     # Outcome priors (fallbacks when player priors are missing)
     base_tov_per_poss: float = 0.125
@@ -512,19 +524,32 @@ def _loop_shot_share(players: pd.DataFrame, minutes: np.ndarray, col_pm: str) ->
     return share / share.sum()
 
 
-def _solve_eff_mult(target_ppp: float, p_tov: float, p3: float, fg2: float, fg3: float, foul: float, ft: float, oreb: float, lo: float = 0.70, hi: float = 1.30) -> float:
-    """Bisection for eff with _loop_points_per_possession(eff) == target_ppp, clipped to [lo, hi]."""
+def _solve_eff_mult(target_ppp: float, p_tov: float, p3: float, fg2: float, fg3: float, foul: float, ft: float, oreb: float, lo: float = 0.70, hi: float = 1.30,
+                    *, bonus_trip_share: float = 0.0, bonus_ft: Optional[float] = None) -> float:
+    """Bisection for eff with the modelled points per possession == target_ppp, clipped to [lo, hi].
+
+    `bonus_trip_share` s > 0 (bonus mechanism on): a share s of possessions are two-shot FT trips at `bonus_ft` x eff
+    instead of loop possessions. s = 0 is exactly `_loop_points_per_possession`."""
     if not np.isfinite(target_ppp) or target_ppp <= 0:
         return 1.0
     args = (p_tov, p3, fg2, fg3, foul, ft, oreb)
-    if _loop_points_per_possession(*args, lo) >= target_ppp:
+    sb = float(np.clip(bonus_trip_share, 0.0, 0.5)) if np.isfinite(bonus_trip_share) else 0.0
+    bft = float(ft if bonus_ft is None else bonus_ft)
+
+    def model(e: float) -> float:
+        loop = _loop_points_per_possession(*args, e)
+        if sb <= 0.0:
+            return loop
+        return (1.0 - sb) * loop + sb * 2.0 * float(np.clip(bft * e, 0.45, 0.95))
+
+    if model(lo) >= target_ppp:
         return float(lo)
-    if _loop_points_per_possession(*args, hi) <= target_ppp:
+    if model(hi) <= target_ppp:
         return float(hi)
     a, b = lo, hi
     for _ in range(40):
         mid = 0.5 * (a + b)
-        if _loop_points_per_possession(*args, mid) < target_ppp:
+        if model(mid) < target_ppp:
             a = mid
         else:
             b = mid
@@ -958,6 +983,10 @@ def simulate_pbp_game_boxscore(
     except Exception:
         eff_mult_h = 1.0
         eff_mult_a = 1.0
+    # Solver terms for the mechanisms -- each only when its mechanism is on (else 0.0 = byte-identical solve).
+    sv_bonus_share = float(getattr(cfg, "solver_bonus_trip_share", 0.0) or 0.0) if (bool(getattr(cfg, "bonus_free_throws", False)) and float(getattr(cfg, "bonus_nonshoot_foul_per_poss", 0.0) or 0.0) > 0.0) else 0.0
+    _eg_cfg_on = int(getattr(cfg, "endgame_foul_window_s", 0) or 0) > 0 and (float(getattr(cfg, "endgame_foul_p", 0.0) or 0.0) > 0.0 or any(float(x) > 0.0 for x in (getattr(cfg, "endgame_foul_p_by_deficit", ()) or ())))
+    sv_eg_pts = float(getattr(cfg, "solver_endgame_pts_per_team", 0.0) or 0.0) if _eg_cfg_on else 0.0
     if EXACT_TARGET_CALIBRATION:
         try:
             def _vol_avg(pct: np.ndarray, players: pd.DataFrame, mins: np.ndarray, att_cols: Tuple[str, ...], default: float) -> float:
@@ -977,8 +1006,11 @@ def simulate_pbp_game_boxscore(
                 shot_share = _loop_shot_share(players, mins, "_prior_fga_pm")
                 ft_mult = (h_ft_mult if side == "h" else a_ft_mult) if SHOOTER_FT_RATE else np.ones(len(shot_share))
                 foul_share = shot_share * np.asarray(ft_mult, dtype=float)
+                tpp_eff = float(tpp)
+                if sv_eg_pts > 0.0:
+                    tpp_eff = max(0.01, tpp_eff - sv_eg_pts / poss)
                 solved = _solve_eff_mult(
-                    float(tpp),
+                    tpp_eff,
                     p_tov=float(rates["p_tov"]),
                     p3=float(rates["p3"]),
                     # 2PA shooters are picked by TOTAL FGA usage in the loop.
@@ -987,6 +1019,8 @@ def simulate_pbp_game_boxscore(
                     foul=float(rates["foul_per_fga"]) * float(foul_share.sum()),
                     ft=_team_avg(ftv, foul_share, 0.78),
                     oreb=float(cfg.base_oreb_rate) * float(oreb_m),
+                    bonus_trip_share=sv_bonus_share,
+                    bonus_ft=(_team_avg(ftv, _loop_shot_share(players, mins, "_prior_fta_pm"), 0.78) if sv_bonus_share > 0.0 else None),
                 )
                 if side == "h":
                     eff_mult_h = solved

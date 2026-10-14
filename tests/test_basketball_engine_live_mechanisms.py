@@ -234,3 +234,52 @@ def test_fouler_per_minute_is_reachable_and_lowers_the_starter_pf_share():
     on = _top5_pf_share(_with_cfg(kw, fouler_per_minute=True), 20)
     assert on != off
     assert on < off
+
+
+# ------------------------------------------------------------------------------------------- solver terms (EXACT target)
+
+def test_solver_bonus_share_zero_is_the_old_solve():
+    from syndicate.features.basketball_engine.engine import _solve_eff_mult
+    args = dict(p_tov=0.13, p3=0.39, fg2=0.53, fg3=0.36, foul=0.11, ft=0.78, oreb=0.25)
+    assert _solve_eff_mult(1.14, **args) == _solve_eff_mult(1.14, **args, bonus_trip_share=0.0, bonus_ft=0.9)
+
+
+def test_solver_bonus_share_lowers_eff_when_trips_outscore_loop_possessions():
+    """A two-shot trip at 78% (1.56 pts) beats a ~1.1 ppp loop possession, so hitting the same target needs less eff."""
+    from syndicate.features.basketball_engine.engine import _solve_eff_mult
+    args = dict(p_tov=0.13, p3=0.39, fg2=0.53, fg3=0.36, foul=0.11, ft=0.78, oreb=0.25)
+    assert _solve_eff_mult(1.14, **args, bonus_trip_share=0.05, bonus_ft=0.78) < _solve_eff_mult(1.14, **args)
+
+
+def _exact_total(kw, draws, **fields):
+    lp = dataclasses.replace(NBA, exact_target_calibration=True)
+    t = 0.0
+    for s in range(draws):
+        rng = np.random.default_rng(100 + s)
+        (_hb, _ab, hq, aq) = simulate_pbp_game_boxscore(rng=rng, **_with_cfg(kw, **fields), league=lp, state=None)
+        t += sum(hq) + sum(aq)
+    return t / draws
+
+
+def test_solver_terms_are_inert_when_their_mechanism_is_off():
+    kw = _kw()
+    lp = dataclasses.replace(NBA, exact_target_calibration=True)
+    a = simulate_pbp_game_boxscore(rng=np.random.default_rng(3), **_with_cfg(kw), league=lp, state=None)
+    b = simulate_pbp_game_boxscore(rng=np.random.default_rng(3), **_with_cfg(kw, solver_bonus_trip_share=0.05, solver_endgame_pts_per_team=1.0), league=lp, state=None)
+    assert a[2] == b[2] and a[3] == b[3]
+
+
+def test_solver_endgame_offset_is_reachable_and_lowers_totals():
+    kw = _kw()
+    eg = dict(ENDGAME_ON)
+    off = _exact_total(kw, 30, **eg)
+    on = _exact_total(kw, 30, **eg, solver_endgame_pts_per_team=3.0)
+    assert on != off and on < off
+
+
+def test_solver_bonus_term_is_reachable_with_the_bonus_on():
+    kw = _kw()
+    bonus = dict(bonus_free_throws=True, bonus_nonshoot_foul_per_poss=0.04)
+    off = _exact_total(kw, 30, **bonus)
+    on = _exact_total(kw, 30, **bonus, solver_bonus_trip_share=0.05)
+    assert on != off and on < off
