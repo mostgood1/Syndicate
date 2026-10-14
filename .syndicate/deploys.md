@@ -49150,3 +49150,15 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
   - The deployed checkout passed 7 tests.
 - **Known limit (NBA):** inert until the NBA `fetch-schedule` writes the 2026-27 season. It is hard-wired to `schedule_2025_26.csv` ("Only 2025-26 is supported right now"), and on the fleet that file ends 04-12. Not fixed here.
 - **Rollback:** revert 98ca3ba7 and ff. No restart.
+
+
+## 2026-10-14 03:12Z (10:12 PM CT 10-13) -- READING, NO DEPLOY, NO RESTART: the NCAAB live re-sim is LIVE on the fleet -- **MET** (lane `ncaab-native-live-tier`, session e48a0f9b; closes the 2026-10-13 18:51Z env entry)
+- **The user asked for a planned down/up; I did NOT do one, because it was not needed.** `local_production.py status` showed supervisor pid 202264 `since 2026-10-14T02:30:28Z`, AFTER the 18:51Z env write, so that `up` had already loaded the keys.
+- **Readings (live-odds-worker, pid 262096, `==== start 2026-10-14T02:30:28Z`):**
+  - process environ carries `SYNDICATE_NCAAB_LIVE_RESIM=1`, `_HALF_SPLIT=1`, `_EXACT_TARGET=1`, `_LIVE_MECHANISMS=<set>` (names and state only);
+  - log line 2685: `NCAAB_LIVE_RESIM_LOOP_STARTED interval_s=120.0` at 02:30:30Z;
+  - 20 `NCAAB_LIVE_RESIM_TICK` lines since then, every `written=True`, `live=0` (no NCAAB games before the ~11-03 opener), bytes=340;
+  - 0 `NCAAB_LIVE_RESIM_TICK_ERROR`; 0 `[refresh_state_store] KEYVALUE_WRITE_REJECTED key=` lines naming ncaab since the start.
+- **UNATTRIBUTED:** the 02:30:28Z supervisor `up` has NO deploys.md entry. WSL has been up since 2026-10-12 23:37 and the watchdog logged no `RECOVERY_START`, so it was a deliberate restart by some session. The 01:16-02:00Z games-rail entry records a refresh-worker restart that "TIMED OUT"; that is a candidate, not a finding. All three roles run code from that restart (refresh-worker 82f9d695 and live-odds-worker 658ecbe2 per `status` at 03:09Z, both STALE vs HEAD 1e1385ba).
+- **Still owed:** the opening-week reading (~11-03): `live>0`, `resimmed>0`, lanes `source: live_resim`, edges published, 0 ncaab keyvalue rejections over a full slate.
+- RECONCILED: the 2026-10-13 18:51Z `local_production.env` NCAAB switch-on entry's owed post-`up` reading (thread started, ticks written, snapshot written). Measured above at 03:12Z on the 02:30:28Z `up`.
