@@ -1493,3 +1493,38 @@ engine.py LOAN is RETURNED to nba-native-live-resim.
   #5 volume), read the held-out VALIDATION window once for the whole proposed config, then the user decides on
   production.
 - Production NBA totals stay ~+2-3 high until then (known, measured by #695).
+
+## Phase 2 #3 — FREE-THROW BONUS, PRE-REGISTERED 2026-10-13 (user: "start phase 2 #3 free-throw bonus"), BEFORE measuring
+
+**Gap:** S6 FTA/team, full FIT combined config 21.04 vs real 23.35 [22.95, 23.76] (−2.3/team, outside the CI).
+- The sim has no team-foul bonus: non-shooting fouls are PF only (`base_nonshooting_foul_per_poss`), never free
+  throws.
+- **Real targets (ESPN, regulation-only team-games):**
+  - 12 sweep dates: FTA/team 22.69 (n 162), Q4 FTA/team 6.38, Q4 share 0.279;
+  - full FIT: 23.41, Q4 share 0.291 (uniform would be 0.25).
+
+**Mechanism (exists, default off; lane ncaab-native-live-tier, 3dcc513e; NBA rules in basketball_league_rules):**
+- A bonus-eligible non-shooting foul is drawn at the start of a possession with rate `bonus_nonshoot_foul_per_poss`.
+- In the NBA bonus (5th team foul per quarter, 4th in OT, 2nd in the last 2:00) it is a 2-shot trip that ENDS the
+  possession; otherwise it is a PF.
+- `bonus_second_half_mult` scales the rate after halftime.
+- All three are EventSimConfig fields, so the levers need no engine change and no loan.
+
+**Instrument:** `record_events` (an existing diagnostics cfg field, off in production) logs FTA events with their
+quarter. The harness adds per-quarter team FTA to the compact draw when events are present. Reachability: the summed
+event FTA equals box `team_total_fta` on every draw.
+
+**Sweep** (the accepted config incl. k = 0.002 + rest b = 3 + P3 FT fixes; 12 dates):
+- control (bonus off) + bonus on with rate ∈ {0.02, 0.04, 0.06}, h2_mult 1.0;
+- plus the rate nearest real FTA re-run with h2_mult 1.5 (a second step, only if the Q4 share is short).
+
+**Readings:**
+- PRIMARY: FTA/team vs 22.69, and Q4 FTA share vs 0.279.
+- **Guards** (run noise): total bias (bonus FTs add points the EXACT target solve does not know about), S8
+  total/margin, H2/Q4 slopes, foul-outs (bonus fouls are PF), S1 pace.
+
+**Calls:**
+- **Confirmed** for a rate with FTA within ±0.5 of real AND Q4 share within ±0.02, with all guards within noise.
+- If FTA fits but total bias rises > 1 pt, the mechanism is right but needs a target-solve interaction (recorded,
+  user decision).
+- **Refuted** if even 0.06 leaves FTA > 1 short: the shortfall is shooting-foul rate, not bonus.
