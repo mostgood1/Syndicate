@@ -49400,3 +49400,37 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 ## 2026-10-14 ~20:35Z (3:35 PM CT) -- LOCAL WATCHDOG: ntfy phone push REMOVED (user: "forget the push notification"; lane `watchdog-ntfy-alerts`, session e48a0f9b) -- no fleet role touched
 - What: b59dfa1f reverts 0475bd47's push; installer re-run copied the pre-push watchdog.ps1 to C:\SyndicateProd\watchdog\ and kept the task (LogonType Password); ntfy_topic.txt deleted.
 - Measured: installed copy sha256 == repo file; 0 'ntfy' references in it; topic file absent; task LogonType Password. The 20:13Z entry's owed phone-receipt reading is moot.
+
+## 2026-10-14 21:34:56Z (4:34 PM CT) -- LOCAL FLEET ff 44508f56 -> b308154b + live-odds-worker restart: lineup-check injuries fetch off vendor (NBA + WNBA) -- **MET for NBA** 21:56:40Z (lane `basketball-lineup-injuries-native`, session 2d413211)
+
+- **User decisions 2026-10-14:** "move the nba injuries fetch off vendor", then "Ff + restart now".
+- **Two aborted attempts first, both with NOTHING changed:**
+  - A WNBA props refresh was running, so the gate released both claims.
+  - The props-job match then counted the CI `pytest` run, whose argv lists `test_*refresh_nba_oddsapi_props*` files. It waited 20 min and stopped. The pattern is now `scripts/[r]efresh_(nba|wnba)_oddsapi_props[.]py`.
+- **Claims:** refresh-worker + live-odds-worker, each acquire gated on its exit code, with `status` naming my holder. Released at ~21:35Z.
+- **Ride-along:** 1c353e05, WNBA availability recency-rule variants (default unchanged) + research runners.
+- **Change:** `live_refresh_loop._fetch_injuries` runs `python -m syndicate.features.<sport>.source_cli.cli fetch-injuries` from the repo, guarded on `<SPORT>_BETTING_DATA_ROOT`. Before, it ran the vendored `<pkg>.cli` from vendor/.
+- **Restart:** live-odds-worker pid 29646 had 0 children at 21:34:56Z and got TERM; it respawned as pid 144583 at 21:35:07Z.
+- **Pre-merge:** the new launcher on the fleet with a scratch data root: NBA ok, 137 rows (9.6 s); WNBA ok, 48 rows (10.2 s).
+- **VERIFY:**
+  - 21:56:40Z: **pid 144583 (the worker) spawned `python -m syndicate.features.nba.source_cli.cli fetch-injuries`**. `nba_source/data/raw/injuries.csv` was rewritten at 21:56:42Z (1,497 rows).
+  - `wnba_source/data/raw/injuries.csv` was rewritten at 21:56:41Z (640 rows). The WNBA fetch observed at 21:56:39Z had a different parent (182665), so the worker's own WNBA call (same function, right after NBA) was NOT directly observed.
+  - Vendored `fetch-injuries` processes: 0.
+- **Rollback:** revert b308154b and ff, then TERM the live-odds-worker.
+
+## 2026-10-14 22:03:39Z (5:03 PM CT) -- LOCAL FLEET ff b308154b -> 1cf8a2ba (exact SHA), NO restart: vendored boxscores import removed from the WNBA recon lens-tuning copy -- **MET** (lane `wnba-recon-boxscores-import-native`, session 2d413211)
+
+- **User decisions 2026-10-14:** "move the wnba recon tools boxscores import off vendor", then "Ff after props idle".
+- **Claim:** refresh-worker, gated on its exit code; released.
+- **Safety read in full (22:03Z):** nothing in flight listed. Props jobs: 0.
+- **Change:** the copy's `try: from wnba_betting.boxscores import _nba_gid_to_tricodes ...` was replaced by its fallback start, marked `SYNDICATE EDIT`.
+  - Measured on the fleet: that import could never succeed. Only the repo root is on sys.path, no *betting package is installed in the venv, and the worker env has no vendor path.
+  - The test reverses the one edit and still requires the vendored bytes.
+- **Pre-merge A/B (prod WNBA data):** identical frames on 10-02/04/07/09 (57/56/31/42 rows); no vendored module loaded.
+- **VERIFY (deployed checkout):** the edit marker is present; 5 tests passed.
+- **Ride-alongs (FULL list -- my path filter missed `deploy/`):**
+  - bba1144c `scripts/check_lane_claims.py` (+test);
+  - **`deploy/local/watchdog.ps1` and `install_watchdog_task.ps1`** (a peer's Windows-host watchdog change; not imported by any service, inert unless the Windows task runs them from this checkout);
+  - `docs/ai_context/local_production_runbook.md`;
+  - ledger files.
+- **Rollback:** revert 1cf8a2ba and ff.

@@ -67,17 +67,19 @@ death, never life — do not invert it.
 
 ## OPEN
 
-### wnba-recon-boxscores-import-native — OPEN — opened 2026-10-14 — session 2d413211
+### wnba-recon-boxscores-import-native — CLOSED 2026-10-14 (GOAL MET) — opened 2026-10-14 — session 2d413211
+- GOAL VERDICT. Goal (verbatim): "Remove the vendored `from wnba_betting.boxscores import _nba_gid_to_tricodes` from Syndicate's WNBA recon-tools copy (`syndicate/features/wnba/recon_tools/build_live_player_lens_tuning.py`) without changing what production computes, keeping the copy pinned to the vendored body except for that one documented edit (user request 2026-10-14)." -- **GOAL: MET** `[2026-10-14 22:04Z]`. Fleet ff 1cf8a2ba 22:03:39Z (no restart). A/B identical on 4 dates; deployed checkout carries the marked edit, 5 tests pass. deploys.md 22:03:39Z (incl. the deploy/ ride-alongs my path filter missed).
 - Goal: Remove the vendored `from wnba_betting.boxscores import _nba_gid_to_tricodes` from Syndicate's WNBA recon-tools copy (`syndicate/features/wnba/recon_tools/build_live_player_lens_tuning.py`) without changing what production computes, keeping the copy pinned to the vendored body except for that one documented edit (user request 2026-10-14).
-- Files: syndicate/features/wnba/recon_tools/build_live_player_lens_tuning.py, tests/test_wnba_recon_tools_native.py
+- Files: none (released at close)
 - Hypothesis: the import can never succeed in production -- the refresh puts only the repo root on sys.path, no *betting package is installed in the venv, and the worker env has no vendor path (all measured on the fleet 2026-10-14) -- so the tool always takes its smart_sim_* fallback; replacing the try block with that fallback is output-identical.
 - Falsification test: a fleet A/B (old copy vs new copy, prod WNBA data, same dates as the recon move: 10-02/04/07/09) shows any frame difference.
 - Verification: A/B identical on all 4 dates; tests pin body == vendored with the one edit reversed; after a fleet ff the next WNBA refresh that builds lens tuning loads the edited copy (code-only change, no restart: per-run subprocess).
 - Blocked by: none
 
-### basketball-lineup-injuries-native — OPEN — opened 2026-10-14 — session 2d413211
+### basketball-lineup-injuries-native — CLOSED 2026-10-14 (GOAL MET) — opened 2026-10-14 — session 2d413211
+- GOAL VERDICT. Goal (verbatim): "Move the live loop's lineup-check injuries fetch (`live_refresh_loop._fetch_injuries`, run for NBA and WNBA every lineup-check interval) off the vendored `<pkg>.cli fetch-injuries` onto Syndicate's `source_cli` ports; deployed with a measurement (user request 2026-10-14: "move the nba injuries fetch off vendor"; WNBA rides the same shared function)." -- **GOAL: MET** `[2026-10-14 21:57Z]`. Fleet ff b308154b 21:34:56Z + live-odds-worker restart (-> pid 144583). 21:56:40Z the worker itself spawned `syndicate.features.nba.source_cli.cli fetch-injuries`; nba injuries.csv rewritten 21:56:42Z (1,497 rows); 0 vendored fetch-injuries. WNBA: its injuries.csv was rewritten 21:56:41Z, but the worker's own WNBA call was not directly observed (the one seen had another parent) -- same function, next iteration. deploys.md 21:34:56Z.
 - Goal: Move the live loop's lineup-check injuries fetch (`live_refresh_loop._fetch_injuries`, run for NBA and WNBA every lineup-check interval) off the vendored `<pkg>.cli fetch-injuries` onto Syndicate's `source_cli` ports; deployed with a measurement (user request 2026-10-14: "move the nba injuries fetch off vendor"; WNBA rides the same shared function).
-- Files: syndicate/features/shared/live_refresh_loop.py (_fetch_injuries + _LINEUP_INJURY_FETCH_PACKAGES + vendored launcher helpers sections only), tests/test_lineup_injuries_native.py (NEW)
+- Files: none (released at close)
 - Hypothesis: a launcher swap: the port's fetch-injuries is already parity-proven (source_cli bootstrap parity, NBA 804,491 / WNBA 202,372 leaves, 0 diffs) and both workers set NBA_/WNBA_BETTING_DATA_ROOT, so the written raw/injuries.csv is the same file.
 - Falsification test: after the switch a vendored `*_betting.cli fetch-injuries` process still appears from a worker on the new code, or the injury fingerprint stops moving (raw/injuries.csv not rewritten) across lineup-check intervals.
 - Verification: after the fleet ff + restart of the worker that runs the lineup check, a `syndicate.features.<sport>.source_cli.cli fetch-injuries` child is observed (or raw/injuries.csv rewritten after the restart) and no vendored fetch-injuries process in a sampling window.
