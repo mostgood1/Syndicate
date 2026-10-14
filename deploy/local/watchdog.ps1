@@ -8,13 +8,6 @@ Normally run every 5 minutes by the task `install_watchdog_task.ps1` registers.
 
   powershell -NoProfile -ExecutionPolicy Bypass -File watchdog.ps1              # one check
   powershell -NoProfile -ExecutionPolicy Bypass -File watchdog.ps1 -TestToast   # prove notifications show
-  powershell -NoProfile -ExecutionPolicy Bypass -File watchdog.ps1 -TestPush    # prove the phone push arrives
-
-PHONE PUSH (lane watchdog-ntfy-alerts, 2026-10-14). A toast needs a logged-on desktop, so an outage while you are
-logged off reached nobody. Every alert is ALSO posted to an ntfy topic (https://ntfy.sh) when -NtfyTopicFile
-exists; subscribe to that topic in the ntfy phone app. The topic is the only access control -- anyone who knows it
-can read the alerts -- so it is long and random, lives only in that file, and is never written to the log. Alerts
-carry fleet status text only. No topic file = toast only, exactly as before.
 
 Windows-side state and a one-line-per-run log live in -StateDir (default C:\SyndicateProd\watchdog).
 #>
@@ -26,10 +19,7 @@ param(
     [string] $StateDir = 'C:\SyndicateProd\watchdog',
     [int] $TimeoutSeconds = 120,
     [string] $FleetTaskName = 'SyndicateLocalProduction',
-    [string] $NtfyServer = 'https://ntfy.sh',
-    [string] $NtfyTopicFile = '',
-    [switch] $TestToast,
-    [switch] $TestPush
+    [switch] $TestToast
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,7 +27,6 @@ $RealertSeconds = 6 * 3600
 New-Item -ItemType Directory -Force -Path $StateDir | Out-Null
 $logPath = Join-Path $StateDir 'watchdog.log'
 $statePath = Join-Path $StateDir 'wsl_state.json'
-if (-not $NtfyTopicFile) { $NtfyTopicFile = Join-Path $StateDir 'ntfy_topic.txt' }
 
 function Write-Log([string] $line) {
     if ((Test-Path $logPath) -and ((Get-Item $logPath).Length -gt 5MB)) {
@@ -64,40 +53,6 @@ function Show-Toast([string] $Title, [string] $Body) {
         Write-Log "TOAST_FAILED $($_.Exception.Message)"
         return $false
     }
-}
-
-# Phone push via ntfy. Returns 'sent', 'off' (no topic file) or 'failed'. Never logs the topic.
-function Send-Push([string] $Title, [string] $Body, [string] $Priority = 'default', [string] $Tags = '') {
-    if (-not (Test-Path $NtfyTopicFile)) { return 'off' }
-    try {
-        $topic = (Get-Content $NtfyTopicFile -Raw).Trim()
-        if (-not $topic) { return 'off' }
-        if ($Body.Length -gt 3000) { $Body = $Body.Substring(0, 2997) + '...' }
-        # Header values must be ASCII; the body is sent as UTF-8.
-        $headers = @{ Title = ($Title -replace '[^ -~]', '?'); Priority = $Priority }
-        if ($Tags) { $headers.Tags = $Tags }
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-RestMethod -Method Post -Uri ($NtfyServer.TrimEnd('/') + '/' + $topic) -Headers $headers `
-            -Body ([Text.Encoding]::UTF8.GetBytes($Body)) -ContentType 'text/plain; charset=utf-8' -TimeoutSec 20 | Out-Null
-        return 'sent'
-    } catch {
-        Write-Log "PUSH_FAILED $($_.Exception.Message -replace [regex]::Escape($topic), '<topic>')"
-        return 'failed'
-    }
-}
-
-# Every alert goes to both channels: the toast for the desk, the push for when nobody is logged on.
-function Send-Alert([string] $Title, [string] $Body, [string] $Priority = 'default', [string] $Tags = '') {
-    $shown = Show-Toast $Title $Body
-    $push = Send-Push $Title $Body $Priority $Tags
-    return "shown=$shown push=$push"
-}
-
-if ($TestPush) {
-    $push = Send-Push 'Syndicate fleet watchdog' 'Test push: if you can read this on your phone, fleet alerts will reach you while logged off.' 'default' 'white_check_mark'
-    Write-Log "TEST_PUSH push=$push"
-    Write-Host "test push=$push"
-    return
 }
 
 if ($TestToast) {
@@ -163,16 +118,16 @@ if ($reason) {
     $state.reason = $reason
     if ($sendIt) {
         $state.last_alert = $now.ToString('o')
-        $sent = Send-Alert 'Syndicate fleet: UNREACHABLE' "$reason (since $($state.unreachable_since))" 'high' 'rotating_light'
-    } else { $sent = '' }
-    Write-Log "UNREACHABLE alert=$sendIt $sent $reason"
+        Show-Toast 'Syndicate fleet: UNREACHABLE' "$reason (since $($state.unreachable_since))" | Out-Null
+    }
+    Write-Log "UNREACHABLE alert=$sendIt $reason"
     $state | ConvertTo-Json | Set-Content -Path $statePath -Encoding utf8
     return
 }
 
 if ($state.unreachable_since) {
-    $sent = Send-Alert 'Syndicate fleet: reachable again' "WSL answered again (was unreachable since $($state.unreachable_since): $($state.reason))" 'default' 'white_check_mark'
-    Write-Log "REACHABLE_AGAIN $sent after $($state.unreachable_since)"
+    Show-Toast 'Syndicate fleet: reachable again' "WSL answered again (was unreachable since $($state.unreachable_since): $($state.reason))" | Out-Null
+    Write-Log "REACHABLE_AGAIN after $($state.unreachable_since)"
     @{ unreachable_since = $null; last_alert = $null; reason = $null } | ConvertTo-Json | Set-Content -Path $statePath -Encoding utf8
 }
 
@@ -188,10 +143,8 @@ if ($result.recover) {
 }
 
 if ($result.alert) {
-    $prio = if ($result.status -eq 'down') { 'high' } else { 'default' }
-    $tags = if ($result.status -eq 'down') { 'rotating_light' } elseif ($result.status -eq 'ok') { 'white_check_mark' } else { 'warning' }
-    $sent = Send-Alert $result.title $result.message $prio $tags
-    Write-Log "ALERT $sent status=$($result.status) $($result.title) | $($result.message -replace "`n", ' | ')"
+    $shown = Show-Toast $result.title $result.message
+    Write-Log "ALERT shown=$shown status=$($result.status) $($result.title) | $($result.message -replace "`n", ' | ')"
 } else {
     Write-Log "OK status=$($result.status) findings=$(@($result.findings).Count)"
 }
