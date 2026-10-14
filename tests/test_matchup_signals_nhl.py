@@ -187,3 +187,41 @@ def test_v3_out_of_sample_evidence_is_recorded_and_statuses_stay_null() -> None:
     spec = nhl.NHL_REGISTRY["nhl.saves_opp_volume_high"]
     assert spec.status == "null" and spec.evidence["v3_out_of_sample"]["new_n"] == 138
     assert spec.evidence["v3_out_of_sample"]["holm_pass"] is False and spec.evidence["confirm_n"] == 34
+
+
+def test_saves_forward_grades_the_high_volume_opponent_over_end_to_end(tmp_path, monkeypatch) -> None:
+    import json as _json
+    from collections import defaultdict
+
+    from syndicate.features.shared import team_aliases
+
+    g = _load("grade_nhl_saves_forward")
+    alias = {"FLA": "fla", "Florida Panthers": "fla", "CHI": "chi", "Chicago Blackhawks": "chi"}
+    monkeypatch.setattr(team_aliases, "canonical_team", lambda sport, name: alias.get(str(name)))
+    raw = tmp_path / "nhl_source" / "source_artifacts" / "data" / "raw"
+    raw.mkdir(parents=True)
+    games = []
+    for i in range(7):  # CHI shoots 35 a game for six games; game 7 (day 2026-11-10) is the graded one
+        day = f"2026-11-{i + 4:02d}"
+        games.append((f"20260200{i + 10:02d}", day, [
+            ("CHI", "3", "C. Bedard", "skater", 35, "20:00", "", 0, 0),
+            ("FLA", "1", "B. Marchand", "skater", 25, "20:00", "", 0, 0),
+            ("FLA", "2", "S. Bobrovsky", "goalie", 0, "60:00", 32 if i == 6 else 30, 0, 0),
+            ("CHI", "4", "S. Knight", "goalie", 0, "60:00", 22, 0, 0)]))
+    _log(raw / "player_game_stats.csv", games)
+    bq = tmp_path / "nhl_source" / "tracking" / "book_quotes"
+    bq.mkdir(parents=True)
+    rows = []
+    for book, over, under in (("draftkings", -110, -110), ("fanduel", 105, -125), ("pinnacle", 150, -170)):
+        for sel, price in (("over", over), ("under", under)):
+            rows.append({"kind": "prop", "event_id": "e7", "commence_time": "2026-11-11T00:00:00Z",
+                         "captured_at": "2026-11-10T22:00:00Z", "bookmaker": book, "market": "SAVES", "selection": sel,
+                         "player_name": "Sergei Bobrovsky", "line": 29.5, "price": price,
+                         "home_team": "Florida Panthers", "away_team": "Chicago Blackhawks"})
+    (bq / "2026-11-10.jsonl").write_text("\n".join(_json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    counts: dict = defaultdict(int)
+    recs = g.collect(tmp_path, "2026-11-10", False, counts)
+    assert len(recs) == 1 and recs[0]["fires"] is True and recs[0]["y"] == 1.0 and recs[0]["opp_sf_pg"] == 35.0
+    assert recs[0]["price"] == 105                      # best US over; Pinnacle's +150 is not a US book
+    rep = g.report(recs, final=False, counts=counts)
+    assert rep["verdict"].startswith("INTERIM") and rep["primary_residual_over"]["n"] == 1

@@ -120,10 +120,12 @@ def close_main_lines(rows: Iterable[Mapping[str, Any]], *, books: frozenset[str]
         two = {b: s for b, s in bks.items() if "over" in s and "under" in s}
         fairs = [f[0] for f in (devig([s["over"], s["under"]], method="shin") for s in two.values()) if f]
         priced = [s["under"] for b, s in two.items() if b in price_books]
+        priced_over = [s["over"] for b, s in two.items() if b in price_books]
         if fairs:
             candidates[(e, stat, player)].append({
                 "event": e, "stat": stat, "player": player, "point": point, "books": len(fairs),
-                "p_over": statistics.median(fairs), "best_under": max(priced, key=decimal) if priced else None, **meta[e]})
+                "p_over": statistics.median(fairs), "best_under": max(priced, key=decimal) if priced else None,
+                "best_over": max(priced_over, key=decimal) if priced_over else None, **meta[e]})
     out = []
     for cands in candidates.values():
         cands.sort(key=lambda c: (-c["books"], abs(c["p_over"] - 0.5)))
