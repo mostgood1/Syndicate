@@ -49094,3 +49094,9 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **change:** `live_clock_token` from ESPN's scoreboard (period + displayClock; STATUS_END_PERIOD -> "END P2"; OT / SO labels) on live NHL chips whose token has no clock; at serve time live NBA / WNBA / NHL chips are re-read every request (clock + periods), not kept from the worker's build.
 - **ride-alongs (web-loaded):** 7990e51b nhl v2 pre-registration, f5427e38 wnba history builders off vendor, ca7a0aa4 githooks probe -- scripts / research, not imported by web routes.
 - **verify (served 02:07Z):** STL@OTT 'P3 1:51', VAN@NYI 'P3 5:30', PIT@CHI 'P3 18:45', MIN@WPG 'END P2', COL@DAL 'P2 9:51', VGK@NSH 'P2 10:40', TOR@UTA 'P2 16:24', CGY@ANA 'P1 11:58'. Reload 2.0 s, 0 failures, claim released.
+
+## 2026-10-14 02:11:2xZ + 02:12:5xZ (9:11 / 9:13 PM CT 10-13) -- rolling `reload-web` onto a38e6580 then dfe49575: basketball bonus + live clock (lane `games-rail-full-detail`, session d4409ac4, user "basketball cards are missing the bonus indicator") -- NO outage
+- **a38e6580:** live NBA / WNBA line gets "<TEAM> in bonus" / "both in bonus" from ESPN's summary header `competitors[].fouls.foulsToGive` (a team with none left puts the opponent in the bonus; folds in the 5th-foul and last-2-min rules). One summary request per live game, 45 s cache; rebuilt each serve (no stacking).
+- **dfe49575:** live NBA / WNBA clock refreshed from ESPN at serve time (served 'Q4 7:57' while ESPN read 5:40 -- the worker's build is minutes old during games); HALF / END Qn between periods.
+- **verify:** 02:13Z served IND@OKC 'Q4 5:16' (fresh). Bonus: ESPN 02:11Z foulsToGive IND@OKC 1 / 2, GS@LAL 4 / 4, POR@SAC 3 / 4 -- nobody in the bonus, so the served line correctly shows none. The POSITIVE case is NOT YET MEASURED; a poll is watching for a team at foulsToGive 0.
+- **reloads:** 2.0 s each, 0 failures, claims released. Ride-alongs: none.
