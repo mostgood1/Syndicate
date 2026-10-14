@@ -678,6 +678,7 @@ death, never life — do not invert it.
 - Goal: The local fleet recovers by itself from a supervisor that is not running: the 5-minute watchdog, on a supervisor FAIL for >= 9 min (two consecutive checks), starts SyndicateLocalProduction (capped 3 attempts/hour, then alert-only; paused by a no_autostart file for deliberate maintenance). Verified by unit tests of the decision and a fleet reading; would have ended the 2026-10-04 08:39-13:53Z outage in ~10 min (postmortem, user decision 'Watchdog auto-recovery')
 - Files: scripts/local_watchdog.py, tests/test_local_watchdog.py, deploy/local/watchdog.ps1, docs/ai_context/local_production_runbook.md (watchdog section only)
 - LOANED 2026-10-14 ~20:15Z (3:15 PM CT) to lane `watchdog-ntfy-alerts` (session e48a0f9b), on the user's request in chat "Set up watchdog alerts that work when logged off" (choice: ntfy push): `deploy/local/watchdog.ps1` scoped to the ntfy push calls only (Send-Push / Send-Alert beside each Show-Toast; -TestPush) and the runbook's watchdog alert paragraph only. Taken without asking this lane: its session no longer exists and the lane is 10 days idle. `recovery()` / auto-recovery untouched. Return on that lane's close.
+- LOAN RETURNED 2026-10-14 ~20:35Z by watchdog-ntfy-alerts (closed; push removed by user decision, b59dfa1f): watchdog.ps1 byte-identical to before the loan; runbook keeps only a factual fix (the watchdog task runs logged off).
 - LOAN RETURNED 2026-10-06 ~19:15 CT by web-restart-healthz: local_watchdog.py + its test restored to this Files line after 3ca31f9b (healthz REFUSED vs healthz:slow; recovery() untouched).
 - LOANED 2026-10-06 ~15:00 CT to lane `web-restart-healthz` (session 46e09dbb), USER-APPROVED in chat ("Approve loan"): `scripts/local_watchdog.py` + `tests/test_local_watchdog.py`, scoped to the /healthz refused-vs-slow classification and its tests ONLY; `recovery()` / auto-recovery untouched. Restore both paths to this lane's Files line when the loan is returned.
 - Hypothesis: n/a
@@ -1051,13 +1052,8 @@ death, never life — do not invert it.
 - Verification: Offline table (train/test/playoffs) per candidate; engine re-run --compare paired table; reachability test; findings file.
 - Blocked by: none
 
-### watchdog-ntfy-alerts — OPEN — opened 2026-10-14 — session e48a0f9b-f667-43d8-8c65-7d743b31624c
-- Goal: Fleet watchdog alerts reach the user's phone while they are logged off: every alert watchdog.ps1 raises is also pushed to a private random ntfy topic, and SyndicateFleetWatchdog runs whether logged on or not. Verified by a real test push received and a scheduled run of the installed copy logging push status.
-- Files: deploy/local/install_watchdog_task.ps1, deploy/local/watchdog.ps1 (LOAN from fleet-watchdog-auto-recovery, ntfy push calls only), docs/ai_context/local_production_runbook.md (LOAN from fleet-watchdog-auto-recovery, watchdog alert paragraph only)
-- Hypothesis: n/a
-- Falsification test: n/a
-- Verification: TEST_PUSH push=sent in C:\SyndicateProd\watchdog\watchdog.log and the user confirms receipt; the next scheduled run logs status with the new copy; task LogonType Password
-- Blocked by: none
+### watchdog-ntfy-alerts — CLOSED — opened 2026-10-14, closed 2026-10-14 — session e48a0f9b-f667-43d8-8c65-7d743b31624c
+- GOAL VERDICT. Goal, verbatim: "Fleet watchdog alerts reach the user's phone while they are logged off: every alert watchdog.ps1 raises is also pushed to a private random ntfy topic, and SyndicateFleetWatchdog runs whether logged on or not. Verified by a real test push received and a scheduled run of the installed copy logging push status." **GOAL: DRIFTED -- dropped by the user** ("forget the push notification", ~20:30Z). Built and test-pushed (0475bd47), then removed (b59dfa1f): watchdog.ps1 is byte-identical to its pre-push version, the installed copy matches it, the topic file is deleted. Kept: the installer no longer re-registers a logged-off task back to Interactive, and the runbook no longer says the watchdog runs only while logged on (the task is LogonType Password). Loan returned to fleet-watchdog-auto-recovery. No files held.
 
 ### ci-env-home-sandbox — OPEN — opened 2026-10-14 — session feaf967d-56d0-48b5-96f4-b5bd61392109
 - Goal: no nightly ci-suite test can read or write fleet production state: ci_env() sandboxes HOME + SYNDICATE_LOCAL_HOME; measured before/after over prod claim dir, data root, run dir

@@ -49396,3 +49396,7 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
   - 48 tests passed.
 - **Production reading OWED:** the first `game_cards_2026-10-17.csv` written after 20:18:56Z should carry `fixture_id=401918305` (the newest WNBA game_cards is 10-09, written 23:53 CT).
 - **Rollback:** revert 44508f56 and ff. No restart.
+
+## 2026-10-14 ~20:35Z (3:35 PM CT) -- LOCAL WATCHDOG: ntfy phone push REMOVED (user: "forget the push notification"; lane `watchdog-ntfy-alerts`, session e48a0f9b) -- no fleet role touched
+- What: b59dfa1f reverts 0475bd47's push; installer re-run copied the pre-push watchdog.ps1 to C:\SyndicateProd\watchdog\ and kept the task (LogonType Password); ntfy_topic.txt deleted.
+- Measured: installed copy sha256 == repo file; 0 'ntfy' references in it; topic file absent; task LogonType Password. The 20:13Z entry's owed phone-receipt reading is moot.
