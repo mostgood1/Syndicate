@@ -728,3 +728,30 @@ Reading:
 - **The in-game gate does not pass either way.** P3's totals level fix is NOT "turn skip_def off". It needs the target/calibration stack, which is the calibration lane's Phase 2 config: total bias −0.22 on its full FIT. Next P3 step: re-gate on Phase 2-config inputs once that config is accepted.
 - **Postseason:** skip_def does not explain its +6.5 early overshoot.
 - **Decision (2026-10-14 ~00:3xZ, relayed by basketball-scenario-calibration, user choice "validate first"):** #695 = KEEP the skip_def file. The Phase 2 totals stack (EXACT + NBA calibration builder) goes to production only after Phase 2 finishes (#3 FT bonus, #5 volume) and its held-out VALIDATION window is read once. Until then the production config stays EXACT-off. P3 treats the ~+2 regular / +6.5 early-postseason in-game overshoot as a known production term and re-gates on Phase 2 inputs after that decision. **OPEN on both sides:** the postseason pregame +8.7 total bias, which is not skip_def.
+
+## 11. On-floor match RATES -- the live resume cannot place players the PREGAME frame never admitted (read 2026-10-14 ~13:4xZ; lead from P5's WNBA reading)
+
+Production sequence (`resume_from_summary` -> `map_state_names`) on the pickled pregame engine frames. A side with ANY unmatched on-floor player resumes with a SAMPLED five (by design).
+
+**(a) 2025-26 as-of replay (inputs_v4, 5:00 Q4):**
+- REGULAR, 2,392 sides: player match **0.910**; sides resumed with the real five **0.689** (745 sampled).
+- POSTSEASON, 168 sides: 1.000 / 1.000.
+- Misses: 1,038 / 1,081 (96%) are ABSENT from the frame, not name normalisation (43 near-name). Missed players' final-box minutes: median 25; 758 of 1,081 played >= 20.
+- By month (real-five share / mean frame size):
+
+| Oct | Nov | Dec | Jan | Feb | Mar | Apr |
+|---|---|---|---|---|---|---|
+| 0.45 / 12.5 | 0.57 / 13.4 | 0.53 / 13.6 | 0.62 / 13.9 | 0.80 / 15.3 | 0.92 / 16.8 | 0.89 / 17.3 |
+
+- At end Q1/Q2/Q3 the on-floor list is empty (period break), so the engine samples the next period's five by design. Match 0/0 there is not a defect.
+
+**(b) PRODUCTION persisted frames** (`engine_inputs/2026-10-11..13`, 13 final preseason games, 26 frames of 14-18 players):
+- **165 of 375 players who logged minutes (44%) are absent from their team's pregame frame**; 43 of them played >= 20 min.
+- Frame/box overlap is ~half per team (e.g. OKC 1 of 9, SAC 4 of 14). Team mapping was checked per frame (frame_team = box_team on 26/26).
+- Examples: MIL Herro 23, Ware 24, Jaquez 20; CHA Naz Reid 20.
+
+**Reading:**
+- The pregame frame is built from players with HISTORY for that team. Offseason arrivals and early-season roster changes are missing, and the frame fills in as games accrue. Matches P5's WNBA finding (92.3% / 30% sampled).
+- This is a **PREGAME** defect first: the pregame sim itself runs without those players, and the live resume inherits it. Live props for them cannot exist.
+- Preseason is extreme (camp invitees). The regular-season ramp in (a) predicts ~45% real fives in the first weeks after 10-20.
+- **Owner: not P3.** The pregame frame / roster mode belongs to the smart-sim roster path (lanes nba-pregame-lineup-pools / basketball props). Filed as a lead. P3's resume can only report it. A partial-five resume (place the matched 4, sample 1) would hide a missing starter, not fix it.
