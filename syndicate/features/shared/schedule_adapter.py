@@ -164,15 +164,27 @@ def _fetch_mlb_schedule(date_str: str, *, timeout_s: float = 20.0) -> list[dict[
 
 # ---------------------------------------------------------------------------
 # NBA / WNBA: a whole-season schedule file already gets written by the
-# vendored `fetch-schedule` CLI as a pre-step of the normal props refresh.
+# `fetch-schedule` CLI as a pre-step of the normal props refresh.
 # Read whatever's on disk; only invoke the CLI ourselves if nothing usable is
 # there yet (first run on a fresh disk, or the season file is missing).
+#
+# Off vendor since 2026-10-14 (lane basketball-schedule-adapter-native, user
+# request): the fallback runs Syndicate's port, `python -m
+# syndicate.features.<sport>.source_cli.cli fetch-schedule`, from this repo. It
+# used to run the vendored `<sport>_betting.cli` from vendor/ (its src on
+# PYTHONPATH), and the NBA one could not reach the season in play (cdn.nba.com
+# answers 403 here), so every NBA miss rewrote last season's file. Measured on
+# the fleet 2026-10-14: 0 NBA rows for a 7-game preseason date, with the
+# live-odds-worker spawning the vendored CLI. The port fetches the current
+# season (stats.nba.com fallback), so a miss now heals the file it reads.
 # ---------------------------------------------------------------------------
 
 _BASKETBALL_ENV_VAR = {"nba": "SYNDICATE_NBA_SOURCE_ROOT", "wnba": "SYNDICATE_WNBA_SOURCE_ROOT"}
 _BASKETBALL_LOCAL_DIR = {"nba": "nba_source", "wnba": "wnba_source"}
-_BASKETBALL_VENDOR_DIR = {"nba": "nba_betting_repo", "wnba": "wnba_betting_repo"}
-_BASKETBALL_PACKAGE = {"nba": "nba_betting", "wnba": "wnba_betting"}
+_BASKETBALL_CLI_MODULE = {"nba": "syndicate.features.nba.source_cli.cli", "wnba": "syndicate.features.wnba.source_cli.cli"}
+#: The port writes under this root (as every refresh role sets it). Without it the port would write into its own
+#: repo-default data dir inside this checkout, so the fallback does nothing instead.
+_BASKETBALL_DATA_ROOT_ENV = {"nba": "NBA_BETTING_DATA_ROOT", "wnba": "WNBA_BETTING_DATA_ROOT"}
 
 
 def _basketball_processed_roots(sport: str) -> list[Path]:
@@ -186,10 +198,18 @@ def _basketball_processed_roots(sport: str) -> list[Path]:
 
 def _read_basketball_schedule_rows(sport: str, date_str: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+    # One row per game. The same processed dir can be listed twice (roots overlap), and the NBA dir carries the
+    # season file AND the schedule_2025_26 alias the vendored readers open by name, so de-duplicate by file and by game.
+    seen_files: set[str] = set()
+    seen_games: set[str] = set()
     for processed_root in _basketball_processed_roots(sport):
         if not processed_root.exists():
             continue
         for path in glob.glob(str(processed_root / "schedule_*.json")):
+            resolved = str(Path(path).resolve())
+            if resolved in seen_files:
+                continue
+            seen_files.add(resolved)
             try:
                 payload = json.loads(Path(path).read_text(encoding="utf-8"))
             except Exception:
@@ -211,6 +231,10 @@ def _read_basketball_schedule_rows(sport: str, date_str: str) -> list[dict[str, 
                 status_text = str(row.get("game_status_text") or "").strip().lower()
                 if status_text in {"postponed", "cancelled", "canceled", "suspended"}:
                     continue
+                game_key = str(row.get("game_id") or "").strip() or f"{row.get('home_tricode')}|{row.get('away_tricode')}|{row_date}"
+                if game_key in seen_games:
+                    continue
+                seen_games.add(game_key)
                 rows.append(
                     {
                         "event_id": row.get("game_id"),
@@ -223,19 +247,17 @@ def _read_basketball_schedule_rows(sport: str, date_str: str) -> list[dict[str, 
 
 
 def _fetch_basketball_schedule_via_cli(sport: str, *, timeout_s: float = 60.0) -> bool:
-    source_root = REPO_ROOT / "vendor" / _BASKETBALL_VENDOR_DIR[sport]
-    if not source_root.exists():
+    if not str(os.environ.get(_BASKETBALL_DATA_ROOT_ENV[sport]) or "").strip():
         return False
     python_exe = sys.executable if (sys.executable and Path(sys.executable).exists()) else "python"
     env = dict(os.environ)
-    src_dir = str(source_root / "src")
     existing = str(env.get("PYTHONPATH") or "").strip()
-    env["PYTHONPATH"] = src_dir if not existing else f"{src_dir}{os.pathsep}{existing}"
+    env["PYTHONPATH"] = str(REPO_ROOT) if not existing else f"{REPO_ROOT}{os.pathsep}{existing}"
     env.setdefault("PYTHONUNBUFFERED", "1")
     try:
         result = subprocess.run(
-            [python_exe, "-m", f"{_BASKETBALL_PACKAGE[sport]}.cli", "fetch-schedule"],
-            cwd=str(source_root),
+            [python_exe, "-m", _BASKETBALL_CLI_MODULE[sport], "fetch-schedule"],
+            cwd=str(REPO_ROOT),
             env=env,
             capture_output=True,
             text=True,
