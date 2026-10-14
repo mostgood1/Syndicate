@@ -286,16 +286,20 @@ def _espn_board(sport: str, date: str) -> dict[str, dict]:
         comp = (event.get("competitions") or [{}])[0]
         sides = {c.get("homeAway"): c for c in comp.get("competitors") or [] if isinstance(c, Mapping)}
         away, home = sides.get("away") or {}, sides.get("home") or {}
+        status = event.get("status") or {}
         out[str(event.get("id"))] = {
             "away": (away.get("team") or {}).get("abbreviation"),
             "home": (home.get("team") or {}).get("abbreviation"),
             "away_periods": [_int(x.get("value")) for x in away.get("linescores") or []],
             "home_periods": [_int(x.get("value")) for x in home.get("linescores") or []],
+            "period": _int(status.get("period")),
+            "clock": str(status.get("displayClock") or "").strip(),
+            "status_name": str((status.get("type") or {}).get("name") or ""),
         }
     return out
 
 
-def _espn_linescore(sport: str, game: Mapping[str, Any], date: str, away_abbr: str, home_abbr: str) -> dict[str, Any] | None:
+def _espn_game(sport: str, game: Mapping[str, Any], date: str, away_abbr: str, home_abbr: str) -> dict | None:
     key = ("espn", sport, date, int(time.monotonic() // _LIVE_TTL_S))
     board = _cached(key, lambda: _espn_board(sport, date)) or {}
     hit = next((board[str(game.get(k))] for k in ("game_id", "event_id", "gamePk") if str(game.get(k) or "") in board), None)
@@ -304,6 +308,31 @@ def _espn_linescore(sport: str, game: Mapping[str, Any], date: str, away_abbr: s
         hit = next((g for g in board.values()
                     if (_canon(sport, _ESPN_ABBR_FIX.get(str(g.get("away")), g.get("away"))),
                         _canon(sport, _ESPN_ABBR_FIX.get(str(g.get("home")), g.get("home")))) == want), None)
+    return hit
+
+
+def live_clock_token(sport: str, game: Mapping[str, Any], date: str, *, away_abbr: str = "", home_abbr: str = "") -> str | None:
+    """`P2 11:26`, or `END P2` between periods, from ESPN -- for a live chip whose
+    own feed has no clock. NHL's schedule feed carries the period only (user
+    report 2026-10-14 ~02:05Z: every live NHL card read "P3" while NBA read
+    "Q4 9:33"); ESPN measured the same night: COL @ DAL 2 '11:26', MIN @ WPG
+    2 '0:00' STATUS_END_PERIOD."""
+    try:
+        hit = _espn_game(sport, game, date, away_abbr, home_abbr) if sport in _ESPN_PATHS else None
+    except Exception:  # noqa: BLE001 -- a clock must never break a chip
+        return None
+    if not hit or not hit.get("period"):
+        return None
+    prefix = "P" if sport == "nhl" else "Q"
+    period = hit["period"]
+    label = f"{prefix}{period}" if not (sport == "nhl" and period >= 4) else ("OT" if period == 4 else "SO")
+    if hit.get("status_name") == "STATUS_END_PERIOD":
+        return f"END {label}"
+    return f"{label} {hit['clock']}".strip() if hit.get("clock") else label
+
+
+def _espn_linescore(sport: str, game: Mapping[str, Any], date: str, away_abbr: str, home_abbr: str) -> dict[str, Any] | None:
+    hit = _espn_game(sport, game, date, away_abbr, home_abbr)
     if not hit or not hit["away_periods"] or not hit["home_periods"]:
         return None
     got = _periods(hit["away_periods"], hit["home_periods"], 3 if sport == "nhl" else 4)

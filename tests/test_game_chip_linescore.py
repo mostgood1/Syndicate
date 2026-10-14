@@ -168,5 +168,34 @@ class ServedChipLineScores(unittest.TestCase):
         self.assertNotIn("linescore", chips[2])  # pregame
 
 
+class NhlLiveClock(unittest.TestCase):
+    BOARD = {"401": {"away": "COL", "home": "DAL", "away_periods": [1, 1], "home_periods": [1, 0], "period": 2, "clock": "11:26", "status_name": "STATUS_IN_PROGRESS"},
+             "402": {"away": "MIN", "home": "WPG", "away_periods": [2, 0], "home_periods": [2, 1], "period": 2, "clock": "0:00", "status_name": "STATUS_END_PERIOD"}}
+
+    def _serve(self, chip):
+        from syndicate.features.shared import game_chip_scoreboard as gs
+
+        gl._CACHE.clear()
+        with mock.patch.object(gl, "_espn_board", return_value=self.BOARD):
+            gs.attach_served_linescores([chip], "2026-10-13")
+        return chip
+
+    def test_live_nhl_gets_period_and_clock(self) -> None:
+        chip = self._serve({"sport": "nhl", "state": "live", "game_key": "1", "status_token": "P2", "away": {"abbr": "COL"}, "home": {"abbr": "DAL"}})
+        self.assertEqual(chip["status_token"], "P2 11:26")
+        self.assertEqual(chip["linescore"]["away"], [1, 1])
+
+    def test_intermission_reads_end_of_period(self) -> None:
+        chip = self._serve({"sport": "nhl", "state": "live", "game_key": "1", "status_token": "P2", "away": {"abbr": "MIN"}, "home": {"abbr": "WPG"}})
+        self.assertEqual(chip["status_token"], "END P2")
+
+    def test_worker_built_clock_is_refreshed_not_kept(self) -> None:
+        chip = self._serve({"sport": "nhl", "state": "live", "game_key": "1", "status_token": "P2 15:00",
+                            "linescore": {"kind": "periods", "labels": ["1"], "away": [0], "home": [0]},
+                            "away": {"abbr": "COL"}, "home": {"abbr": "DAL"}})
+        self.assertEqual(chip["status_token"], "P2 11:26")
+        self.assertEqual(chip["linescore"]["away"], [1, 1])
+
+
 if __name__ == "__main__":
     unittest.main()

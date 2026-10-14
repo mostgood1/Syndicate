@@ -742,7 +742,15 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
         day = date_value
         if start:
             day = datetime.fromisoformat(str(start).replace("Z", "+00:00")).astimezone(CENTRAL_TIMEZONE).date().isoformat()
-        box = linescore(sport, game, day, away_abbr=(chip.get("away") or {}).get("abbr") or "", home_abbr=(chip.get("home") or {}).get("abbr") or "", live=chip.get("state") == "live")
+        away_abbr, home_abbr = (chip.get("away") or {}).get("abbr") or "", (chip.get("home") or {}).get("abbr") or ""
+        box = linescore(sport, game, day, away_abbr=away_abbr, home_abbr=home_abbr, live=chip.get("state") == "live")
+        # NHL's live feed carries the period but no clock ("P3"); ESPN has it.
+        if sport == "nhl" and chip.get("state") == "live" and ":" not in str(chip.get("status_token") or ""):
+            from syndicate.features.shared.game_chip_linescore import live_clock_token
+
+            token = live_clock_token(sport, game, day, away_abbr=away_abbr, home_abbr=home_abbr)
+            if token:
+                chip["status_token"] = token
         if box:
             chip["linescore"] = box
             # A FINAL with no score but a complete period line takes the sum:
@@ -778,11 +786,19 @@ def attach_served_linescores(chips: list[dict[str, Any]], date_value: str) -> No
     live_state) wait for the worker's own build.
     """
     for chip in chips or []:
-        if not isinstance(chip, dict) or chip.get("linescore"):
+        if not isinstance(chip, dict):
             continue
         if chip.get("sport") not in _SERVE_TIME_LINESCORE_SPORTS or chip.get("state") not in ("live", "final"):
             continue
+        # A live chip is re-read every serve even when it already has a line
+        # score: the worker's copy is as old as its last board build (3-4 min
+        # during games), and the clock / periods move faster than that.
+        if chip.get("linescore") and chip.get("state") != "live":
+            continue
+        if chip.get("state") == "live" and chip.get("sport") == "nhl":
+            chip["status_token"] = re.sub(r"\s*\d{1,2}:\d{2}$", "", str(chip.get("status_token") or "")).replace("END ", "") or None
         key = chip.get("game_key")
+        chip.pop("linescore", None) if chip.get("state") == "live" else None
         _attach_linescore(chip["sport"], {"game_id": key, "event_id": key}, chip, date_value)
 
 
