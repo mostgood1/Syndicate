@@ -11,6 +11,18 @@ under one of them. That is the point: the rule was written in prose on
   * any heading (`#{1,6}`) -- truncates a block that legitimately contains a
     `####` sub-heading. Measured on lanes_history.md: 26 of 887 archived blocks,
     one from 259 lines to 15.
+
+And a third, found 2026-10-14 the same day `#{1,3}` shipped: a column-0
+`# comment` INSIDE a ```fenced``` code block is byte-for-byte a level-1 heading.
+Measured over 1,360 blocks in the three lane files -- 386 fenced lines, 1 false
+boundary, cutting `soccer-projection-collapse` from 60 lines to 9. The level
+rule alone cannot settle this, because a `## ` line in a sample would fool
+`#{2,3}` the same way: the fence has to be tracked.
+
+Note what the property test at the bottom did when the fix landed -- it FAILED,
+naming that exact line, because it encoded "any `#{1,3}` line in a span is a
+swallowed heading". A guard that asserts the defect is indistinguishable from a
+guard that asserts the invariant until something changes underneath it.
 """
 import pathlib
 import re
@@ -143,8 +155,101 @@ def test_no_span_on_the_real_ledger_contains_a_section_heading(rel):
     lines = text.split(LF)
     spans = block_spans(text)
     assert spans, "no blocks parsed out of %s" % rel
+    fenced = _fenced_lines(lines)
     for slug, got in spans.items():
         for start, end in got:
-            inner = lines[start + 1:end]
-            bad = [l for l in inner if re.match(r"^#{1,3} ", l)]
+            bad = [lines[i] for i in range(start + 1, end)
+                   if re.match(r"^#{1,3} ", lines[i]) and i not in fenced]
             assert not bad, "%s block %s swallowed %r" % (rel, slug, bad[:2])
+
+
+def _fenced_lines(lines):
+    """Independent re-implementation, on purpose.
+
+    Calling `ledger_io._fenced` here would make this test agree with the code by
+    construction -- it would pass against a `_fenced` that returned every line.
+    """
+    inside, tok = set(), None
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            mark = stripped[:3]
+            if tok is None:
+                tok = mark
+            elif mark == tok:
+                tok = None
+            continue
+        if tok is not None:
+            inside.add(i)
+    return inside
+
+
+def test_a_hash_comment_in_a_fenced_block_is_not_a_boundary():
+    """The 2026-10-14 case, in miniature: a file path in a ```python sample."""
+    doc = _doc(
+        "### fenced-lane %s OPEN" % EM,
+        "- Goal: x",
+        "```python",
+        "# syndicate/features/shared/board_enrichment.py:678",
+        "index = load_soccer_projections(roots, selected_date)",
+        "```",
+        "- Files: a.py",
+        "## next section",
+    )
+    start, end = block_bounds(doc, "fenced-lane")
+    assert (start, end) == (0, 7), (start, end)
+    assert "- Files: a.py" in block_text(doc, "fenced-lane")
+
+
+def test_a_hash_hash_comment_in_a_fence_is_not_a_boundary_either():
+    """What `^#{2,3}` alone would still get wrong, so the fix is not level-tuning."""
+    doc = _doc(
+        "### other-lane %s OPEN" % EM,
+        "~~~",
+        "## a markdown sample inside a tilde fence",
+        "~~~",
+        "- Files: b.py",
+        "### next-lane %s OPEN" % EM,
+    )
+    assert block_text(doc, "other-lane").splitlines()[-1] == "- Files: b.py"
+
+
+def test_a_block_heading_inside_a_fence_does_not_open_a_block():
+    doc = _doc(
+        "### real-lane %s OPEN" % EM,
+        "```",
+        "### not-a-lane %s OPEN" % EM,
+        "```",
+        "- Files: c.py",
+    )
+    spans = block_spans(doc)
+    assert sorted(spans) == ["real-lane"], sorted(spans)
+
+
+def test_the_real_history_case_reads_its_full_length():
+    """Anchored on content, not on a line count a peer's archive pass would move."""
+    p = ROOT / ".syndicate/lanes_history.md"
+    if not p.exists():
+        pytest.skip("lanes_history.md not in this checkout")
+    text = p.read_bytes().decode("utf-8", "replace").replace(chr(13) + LF, LF)
+    got = block_spans(text).get("soccer-projection-collapse")
+    if not got:
+        pytest.skip("that block has since been removed from the archive")
+    bodies = [LF.join(text.split(LF)[s:e]) for s, e in got]
+    hit = [b for b in bodies if "board_enrichment.py:678" in b]
+    assert hit, "no archived copy carries the fenced sample any more"
+    # the sample is mid-block: text after it must still be inside the span
+    assert any("Soccer shards by KICKOFF date" in b for b in hit)
+
+
+def test_an_unclosed_fence_runs_long_not_short():
+    """The safe direction: visible in a diff rather than a silent truncation."""
+    doc = _doc(
+        "### open-fence %s OPEN" % EM,
+        "```python",
+        "# a comment",
+        "## another",
+        "- Files: d.py",
+    )
+    start, end = block_bounds(doc, "open-fence")
+    assert (start, end) == (0, 5), (start, end)

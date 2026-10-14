@@ -72,7 +72,7 @@ import types
 # mid-line bare CR to a line break -- that split a peer's line in lanes.md -- and
 # write_text with no newline= churns every line ending, which rewrote 4MB of
 # lanes_history.md LF -> CRLF. Both measured 2026-10-09. See scripts/ledger_io.py.
-from ledger_io import read_ledger, write_ledger
+from ledger_io import fenced_lines, read_ledger, write_ledger
 
 # THE CAP COMES FROM `session-start.sh`, the only component that ENFORCES it.
 # A local copy drifts silently in the worst direction: it keeps reporting a file
@@ -103,7 +103,16 @@ HISTORY = pathlib.Path(".syndicate/lanes_history.md")
 GUARD = pathlib.Path(".claude/hooks/lane_claims.py")
 
 HEADER_RE = re.compile(r"^###\s+(\S+)\s")
-BOUNDARY_RE = re.compile(r"^#{2,3}\s")
+# WHERE A BLOCK ENDS IS NOT THIS TOOL'S RULE TO HOLD. It used to carry
+# `^#{2,3}\s` here, which agrees with `ledger_io`'s `^#{1,3}` on `lanes.md`
+# (measured 2026-10-14: 0 of 70 blocks differ, because the file has exactly one
+# level-1 heading, its title) and DISAGREES on `lanes_history.md`, the file this
+# tool appends to -- 1 block of 658, read 51 lines too long. Both rules are also
+# fence-blind on their own, which is the defect that prompted this: a column-0
+# `# path/to/file.py:678` inside a ```python sample is byte-for-byte a level-1
+# heading. One implementation, in `ledger_io`, pinned by
+# `tests/test_ledger_block_bounds.py`.
+BOUNDARY_RE = re.compile(r"^#{1,3}[ \t]")
 OPEN_RE = re.compile(r"\bOPEN\b")
 
 
@@ -116,12 +125,20 @@ def guard_claims(text):
 
 
 def blocks(lines):
-    """(start, end, slug, header) for every `### ` block, end-exclusive."""
-    bounds = [i for i, l in enumerate(lines) if BOUNDARY_RE.match(l)]
+    """(start, end, slug, header) for every `### ` block, end-exclusive.
+
+    `slug` is the RAW header token, backticks/asterisks included, because this
+    tool reports and matches on what the file actually says; `ledger_io`'s own
+    `block_spans` normalises it, which is right for a caller that looks a lane
+    up by name and wrong for one that has to echo a malformed header back.
+    So the TOKEN is local and the BOUNDARY is shared.
+    """
+    fenced = fenced_lines(lines)
+    bounds = [i for i, l in enumerate(lines) if BOUNDARY_RE.match(l) and i not in fenced]
     out = []
     for i, line in enumerate(lines):
         m = HEADER_RE.match(line)
-        if not m:
+        if not m or i in fenced:
             continue
         end = next((b for b in bounds if b > i), len(lines))
         out.append((i, end, m.group(1), line))

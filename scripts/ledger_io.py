@@ -104,23 +104,63 @@ def lone_cr_count(raw: str) -> int:
 # reason; this adds level 1 so a document's own title also closes a block.
 _HEADING_1_3 = re.compile(r"^#{1,3}[ \t]")
 _BLOCK_HEAD = re.compile(r"^###[ \t]+\**([a-z0-9][a-z0-9-]*)")
+# ...AND A `#` LINE INSIDE A FENCED CODE BLOCK IS NOT A HEADING AT ALL.
+# A column-0 `# comment` in a ```python block is byte-for-byte a level-1
+# Markdown heading, and this module shipped blind to that on 2026-10-14.
+# Measured the same day over 1,360 blocks in lanes.md + lanes_history.md +
+# lanes_closed.md: 386 fenced lines, 1 of them a false boundary, and it
+# truncated `soccer-projection-collapse` from its real 60 lines to 9 -- cut
+# at `# syndicate/features/shared/board_enrichment.py:678`, a file path in a
+# code sample. lanes.md has 0 fenced lines today, so a lane close that only
+# needs `start` was never wrong; an ARCHIVE pass reading bodies out of
+# lanes_history.md was. The narrower `^#{2,3}` that archive_released_lanes.py
+# chose is immune to this one case and not to a `## ` line in a sample, so
+# neither regex alone is the answer: the fence has to be tracked.
+_FENCE = re.compile(r"^[ \t]*(```|~~~)")
+
+
+def fenced_lines(lines):
+    """Indices of lines INSIDE a fenced code block (fence lines excluded).
+
+    Closes only on the fence character that opened, so a ``` sample inside a
+    ~~~ block does not end it. An UNCLOSED fence makes every line to EOF
+    fenced, which is the safe direction: a block then runs LONG (visible in
+    any diff) rather than SHORT (silent, and the failure mode measured here).
+    """
+    inside = set()
+    tok = None
+    for i, line in enumerate(lines):
+        m = _FENCE.match(line)
+        if m:
+            if tok is None:
+                tok = m.group(1)
+            elif line.strip().startswith(tok):
+                tok = None
+            continue
+        if tok is not None:
+            inside.add(i)
+    return inside
 
 
 def block_spans(text: str) -> dict[str, list[tuple[int, int]]]:
     """slug -> [(start, end)] line spans of every `### <slug>` block, end-exclusive.
 
-    `text` must be LF-normalised, i.e. what `read_ledger` returns. Duplicate
-    slugs are RETURNED, not collapsed: one lane is supposed to have one block,
+    `text` must be LF-normalised, i.e. what `read_ledger` returns. Lines
+    inside a fenced code block are CONTENT: they neither start a block nor
+    end one, so a `### foo` or a `# comment` in a code sample is invisible
+    here. Duplicate slugs are RETURNED, not collapsed: one lane is supposed to have one block,
     and a caller that silently joined two would reproduce the defect this exists
     to prevent.
     """
     lines = text.split(LF)
+    fenced = fenced_lines(lines)
     out: dict[str, list[tuple[int, int]]] = {}
     for i, line in enumerate(lines):
         m = _BLOCK_HEAD.match(line)
-        if not m:
+        if not m or i in fenced:
             continue
-        end = next((j for j in range(i + 1, len(lines)) if _HEADING_1_3.match(lines[j])),
+        end = next((j for j in range(i + 1, len(lines))
+                    if _HEADING_1_3.match(lines[j]) and j not in fenced),
                    len(lines))
         out.setdefault(m.group(1), []).append((i, end))
     return out
