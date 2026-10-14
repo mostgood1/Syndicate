@@ -3907,7 +3907,24 @@ def _ensure_source_game_inputs(
     # season can have new games, cutting steady-state fetches from ~80
     # minutes to a few minutes.
     rc_fetch = 0
-    if _games_history_is_stale(raw_candidates[0], date_str=date_str):
+    # The 30-day rule above only catches a missing/partial file; a history a few games behind never tripped it, so
+    # new results waited up to a month (WNBA 2026-10-13: history at 10-02, six final playoff games after it). Also
+    # re-fetch when this league's schedule lists a final game after the history's newest one, with a cooldown
+    # (lane basketball-games-history-freshness; syndicate/features/shared/basketball_games_history_freshness.py).
+    history_stale = _games_history_is_stale(raw_candidates[0], date_str=date_str)
+    behind_schedule = None
+    if not history_stale:
+        try:
+            from syndicate.features.shared import basketball_games_history_freshness as history_freshness
+
+            behind_schedule = history_freshness.due(raw_candidates[0], processed_root, league="wnba")
+        except Exception as exc:  # noqa: BLE001 - never block the bootstrap on this check
+            _append_log(log_file, f"games history schedule check failed (non-fatal): {exc!r}")
+        if behind_schedule:
+            line = f"[wnba] GAMES_HISTORY_BEHIND_SCHEDULE {json.dumps(behind_schedule, sort_keys=True)}"
+            print(line, flush=True)
+            _append_log(log_file, line)
+    if history_stale or behind_schedule:
         fetch_years = _games_history_fetch_years_needed(raw_candidates[0])
         rc_fetch = _run_source_subprocess_cli_command(
             source_root=source_root,
