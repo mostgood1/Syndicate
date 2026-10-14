@@ -2046,3 +2046,12 @@ prefer single-quoted arguments there.
 - **How to apply:**
   - A fail-open check must distinguish "checked, clean" from "could not run", and SAY the latter (probe the interpreter; warn when nothing starts).
   - Verify a hook or guard fix by running it from where it actually executes (the primary tree), not from the worktree where it was written.
+
+## 2026-10-14 RULE: a fleet status read right after YOUR OWN `wsl` call boots WSL is not an outage reading -- wait for the boot path, then re-read
+**Evidence (session 43e4d5fe, 2026-10-13):**
+- WSL had stopped at ~04:37:10Z. My next `wsl -e` call booted it (`uptime -s` 04:37:32Z), and `status` 4 s later read all three roles DOWN, with SyndicateLocalProduction "not running".
+- I escalated a restore decision to the user. The boot path had already brought every role back at 04:38:47Z (pids 476/540), 75 s after my read.
+- The user's answer arrived 8.5 h later. Only a re-read before acting kept it from becoming a second, unneeded fleet restart under a peer's live claim (nba-live-tick-native had just taken refresh-worker).
+**How to apply:**
+- If `uptime -s` is within ~2 min of now, the read is a boot, not a steady state. Wait ~2 min, re-read `status` + healthz, and only then call it an outage.
+- Any approval that arrives long after the question is asked is an approval of the state AS DESCRIBED. Re-read the state and every claim before acting on it, and act on nothing that has changed.
