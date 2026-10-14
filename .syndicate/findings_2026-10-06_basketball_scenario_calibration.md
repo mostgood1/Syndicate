@@ -2269,3 +2269,9 @@ same 12 sweep dates.
 2. Run a #3k-style check (|bias| < 0.5, all #3i guards incl. foul-outs).
 3. The full FIT.
 4. §7.
+
+**#3l CO-SIGN (P3, as pre-registered at e1715d13, before any reading).**
+- Added reading: bonus trips per possession at each grid point, next to s = 0.00709 (base PF counts toward the bonus),
+  to show how stale s is before the re-measure.
+- A passing point more than ~20% off s should move the re-gated total bias by about that share of the 0.92/game the
+  term carries.
