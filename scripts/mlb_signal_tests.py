@@ -53,9 +53,18 @@ MARKET_STAT = {"batter_hits": "h", "batter_total_bases": "tb", "pitcher_strikeou
 BATTER_MARKETS = ("batter_hits", "batter_total_bases")
 # Registered thresholds (lane block "MLB v1 PRE-REGISTERED"): the DISCOVER p90 / p10 (stack: p75) of each feature over
 # its eligible quoted main lines, from `--mode distributions` (features only). 0.0 = not registered -> refuses to lift.
-THRESHOLDS: dict[str, float] = {"bvp_edge": 0.0, "arsenal_hi": 0.0, "arsenal_lo": 0.0, "recency": 0.0,
-                                "stack_bvp": 0.0, "stack_arsenal": 0.0, "stack_recency": 0.0,
-                                "k_trend": 0.0, "opp_k_hi": 0.0, "opp_k_lo": 0.0}
+THRESHOLDS: dict[str, float] = {
+    "bvp_edge": 0.168,      # BvP hits/PA - season hits/PA >= p90 (+0.1683; 3,056 eligible discover lines)
+    "arsenal_hi": 0.023,    # arsenal wOBA edge >= p90 (+0.0227; 23,957)
+    "arsenal_lo": -0.017,   # <= p10 (-0.0166)
+    "recency": 0.113,       # last-7 hits/PA - earlier >= p90 (+0.1133; 21,189)
+    "stack_bvp": 0.088,     # the user's stack: all three >= their p75
+    "stack_arsenal": 0.013,
+    "stack_recency": 0.059,
+    "k_trend": 0.074,       # starter K/BF last 3 - earlier >= p90 (+0.0739; 786)
+    "opp_k_hi": 0.246,      # opposing lineup SO/PA >= p90 (0.2462; 1,835)
+    "opp_k_lo": 0.199,      # <= p10 (0.1989)
+}
 SIGNALS = {  # name -> (side, markets)
     "mlb.bvp_edge": ("over", BATTER_MARKETS), "mlb.arsenal_edge": ("over", BATTER_MARKETS),
     "mlb.arsenal_bad": ("under", BATTER_MARKETS), "mlb.hot_streak": ("over", BATTER_MARKETS),

@@ -68,7 +68,8 @@ def test_rules_need_registered_thresholds() -> None:
     f = {"bvp_edge": 0.12, "arsenal": 0.03, "recency": 0.09}
     assert set(m.fires(f, t)) == {"mlb.bvp_edge", "mlb.arsenal_edge", "mlb.hot_streak", "mlb.matchup_stack"}
     assert m.fires({"arsenal": -0.03, "opp_k": 0.19}, t) == ["mlb.arsenal_bad", "mlb.opp_k_low"]
-    assert m.fires(f) == []                                  # unregistered thresholds never fire
+    assert m.fires(f, {k: 0.0 for k in t}) == []             # unregistered (0.0) thresholds never fire
+    assert set(m.fires(f)) == {"mlb.arsenal_edge", "mlb.matchup_stack"}   # the registered values
     assert m.eligible("mlb.matchup_stack", f) and not m.eligible("mlb.matchup_stack", {"bvp_edge": 0.1})
 
 
