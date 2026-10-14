@@ -23,7 +23,11 @@ The anchor is `--date` minus one day: the reader takes the newest file dated on 
 the day before the slate, so a missed run falls back to the previous day's file.
 
 Usage: python scripts/build_wnba_totals_calibration.py --date 2026-10-01 [--force]
-       (WNBA_BETTING_DATA_ROOT selects the data tree, as for every vendor command)
+       (WNBA_BETTING_DATA_ROOT selects the data tree)
+
+Off vendor since 2026-10-13 (lane nba-source-cli-native, user decision): the game model, feature build and paths
+come from `syndicate.features.wnba.source_cli`, the generated port that `predict-date` already runs from (its
+`repo/models` is a byte-identical copy of the vendored models). tests/test_wnba_totals_calibration_native.py.
 """
 from __future__ import annotations
 
@@ -98,14 +102,13 @@ def _season_predictions(slate_date: str):
     import numpy as np
     import pandas as pd
 
-    src = REPO_ROOT / "vendor" / "wnba_betting_repo" / "src"
-    if str(src) not in sys.path:
-        sys.path.insert(0, str(src))
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
     import joblib
-    from wnba_betting import cli
-    from wnba_betting.config import paths
-    from wnba_betting.features_enhanced import build_features_enhanced
-    from wnba_betting.games_npu import NPUGamePredictor
+    from syndicate.features.wnba.source_cli import cli
+    from syndicate.features.wnba.source_cli.config import paths
+    from syndicate.features.wnba.source_cli.features_enhanced import build_features_enhanced
+    from syndicate.features.wnba.source_cli.games_npu import NPUGamePredictor
 
     slate = pd.Timestamp(slate_date).normalize()
     hist = cli._load_prediction_feature_history()
@@ -127,8 +130,6 @@ def _season_predictions(slate_date: str):
     part["pred_total"] = [float(r["totals"]) for r in res]
     part["pred_margin"] = [float(r["spread_margin"]) for r in res]
     # The reader looks teams up by the smart sim's own tricodes, so key them the same way.
-    if str(REPO_ROOT) not in sys.path:
-        sys.path.insert(0, str(REPO_ROOT))
     from syndicate.features.shared.basketball_props_smart_sim import _to_tricode_local as tri
     part["home_team"] = part["home_team"].astype(str).map(tri)
     part["visitor_team"] = part["visitor_team"].astype(str).map(tri)
@@ -143,10 +144,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--force", action="store_true", help="Rebuild even if the anchor file already exists")
     args = ap.parse_args(argv)
     anchor = (pd.Timestamp(args.date) - pd.Timedelta(days=1)).date().isoformat()
-    src = REPO_ROOT / "vendor" / "wnba_betting_repo" / "src"
-    if str(src) not in sys.path:
-        sys.path.insert(0, str(src))
-    from wnba_betting.config import paths
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    from syndicate.features.wnba.source_cli.config import paths
 
     out = Path(paths.data_processed) / f"calibration_totals_{anchor}.json"
     if out.is_file() and out.stat().st_size > 0 and not args.force:
