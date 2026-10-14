@@ -386,16 +386,18 @@ def test_rotate_running_log_keeps_the_writers_handle_working(tmp_path):
     assert lp.rotate_running_log(log, max_bytes=10_000) is False
 
 
-def test_ci_env_carries_nothing_that_reaches_the_fleet():
+def test_ci_env_carries_nothing_that_reaches_the_fleet(tmp_path: Path):
     base = {
         "PATH": "/usr/bin", "HOME": "/home/x", "RENDER": "true", "ADMIN_TOKEN": "t",
         "SYNDICATE_REFRESH_STATE_URL": "redis://127.0.0.1:6379/0", "SYNDICATE_DATA_ROOT": "/d",
         "KALSHI_PRIVATE_KEY": "k", "ODDS_API_KEY": "o", "PYTHONPATH": "/repo",
+        "SYNDICATE_DEPLOY_CLAIM_DIR": "/claims",
     }
-    env = lp.ci_env(base)
-    assert env["PATH"] == "/usr/bin" and env["HOME"] == "/home/x"
+    env = lp.ci_env(tmp_path / "ci-home", base)
+    # HOME is sandboxed, not passed through: see tests/test_local_production_ci_env.py.
+    assert env["PATH"] == "/usr/bin" and env["HOME"] == str(tmp_path / "ci-home")
     for key in ("RENDER", "ADMIN_TOKEN", "SYNDICATE_REFRESH_STATE_URL", "SYNDICATE_DATA_ROOT",
-                "KALSHI_PRIVATE_KEY", "ODDS_API_KEY", "PYTHONPATH"):
+                "KALSHI_PRIVATE_KEY", "ODDS_API_KEY", "PYTHONPATH", "SYNDICATE_DEPLOY_CLAIM_DIR"):
         assert key not in env
 
 

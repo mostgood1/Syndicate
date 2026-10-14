@@ -1787,15 +1787,42 @@ def cmd_backup(args: argparse.Namespace) -> int:
 # Keys that make a process act on the fleet's state or on a venue. The CI run
 # gets none of them: a test suite run with the fleet's env would read and write
 # the live Redis and data root.
-CI_ENV_PASSTHROUGH = ("PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "TMPDIR", "TERM", "SHELL")
+#
+# HOME is NOT passed through either. Scrubbing env vars is not enough while HOME
+# is real: code that falls back to `~/syndicate-prod/local_production.env`
+# (deploy_claim.py `_local_production_env_claim_dir`, default_home(),
+# check_deploy_safety's fleet log) reaches production from a "clean" env. On
+# 10-13 and 10-14 a ci-suite run wrote live 45-min `web` deploy claims held by
+# lane-a/session-aaa into the production claim dir that way -- the fleet's
+# local_production.env names it in SYNDICATE_DEPLOY_CLAIM_DIR. ci_env() points
+# HOME (and USERPROFILE, Path.home() on Windows) at a throwaway dir and
+# SYNDICATE_LOCAL_HOME at a path under it that does not exist. The interpreter
+# is the venv's absolute sys.executable and the fleet has no ~/.local site
+# packages, so imports do not depend on HOME; git in the ci-checkout needs no
+# global config (same owner, so no safe.directory).
+CI_ENV_PASSTHROUGH = ("PATH", "USER", "LOGNAME", "LANG", "LC_ALL", "TMPDIR", "TERM", "SHELL")
 
 
-def ci_env(base: dict[str, str] | None = None) -> dict[str, str]:
+def ci_env(home: Path, base: dict[str, str] | None = None) -> dict[str, str]:
     base = dict(os.environ if base is None else base)
     env = {key: base[key] for key in CI_ENV_PASSTHROUGH if key in base}
+    home = Path(home)
+    env["HOME"] = str(home)
+    env["USERPROFILE"] = str(home)
+    env["SYNDICATE_LOCAL_HOME"] = str(home / "no-local-production-home")
+    # oddsapi_quota forwards to redis://127.0.0.1 from an off-fleet process; its
+    # pytest guard does not cover the unittest archive suite.
+    env["SYNDICATE_ODDSAPI_QUOTA_FORWARD"] = "0"
     env["PYTHONUNBUFFERED"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
     return env
+
+
+def reset_ci_home(home: Path) -> Path:
+    """A fresh, empty HOME for one ci-suite run."""
+    shutil.rmtree(home, ignore_errors=True)
+    home.mkdir(parents=True, exist_ok=True)
+    return home
 
 
 def cmd_ci_run(args: argparse.Namespace) -> int:
@@ -1827,8 +1854,9 @@ def cmd_ci_run(args: argparse.Namespace) -> int:
     command = [sys.executable, "scripts/run_ci_suite.py", "--pytest-chunks", "8", "--pytest-workers", "0", "--json", str(summary)]
     if shutil.which("nice") and not IS_WINDOWS:
         command = ["nice", "-n", "15"] + command
-    print(f"ci-suite at {head[:12]} in {checkout} (env scrubbed to {sorted(ci_env())})", flush=True)
-    return subprocess.run(command, cwd=str(checkout), env=ci_env()).returncode
+    env = ci_env(reset_ci_home(settings.home / "ci-home"))
+    print(f"ci-suite at {head[:12]} in {checkout} (env scrubbed to {sorted(env)}, HOME={env['HOME']})", flush=True)
+    return subprocess.run(command, cwd=str(checkout), env=env).returncode
 
 
 def role_loaded_commit(pid: int | None) -> str | None:
