@@ -1814,3 +1814,39 @@ own pre-registration.
 5. The totals re-fit is a REQUIRED step before the full FIT. Ties go to the larger release_s.
 6. **P3 is building `foul_trouble_foul_mult`** (foul avoidance in trouble, all windows, every fouler draw), default
    off, with a reachability test and the parity gate. It gets its own pre-registered sweep.
+
+### Phase 2 #3e — PRE-REGISTRATION 2026-10-14 03:55Z (before any run): foul avoidance in trouble, `foul_trouble_foul_mult` (P3, 917b40a8)
+
+**Mechanism:** P3, 917b40a8 on origin/main, corpus parity 5,400/5,400, default 1.0 = off.
+- A player at or over the period threshold has his weight multiplied in EVERY fouler draw (shooting, non-shooting/bonus,
+  end-game), in all windows, including the Q4 release window.
+- It reallocates WHO fouls, not team PF.
+
+**Config:** release_s = 240 (closers play), bench_mult = 0.05, thresholds (2, 3, 4, 5), bonus 0.04, end-game ON as
+fitted, the same 12 dates, 200 sims.
+
+**Grid:** foul_trouble_foul_mult ∈ {1.0, 0.7, 0.5, 0.3, 0.15}. 1.0 is the in-run control.
+
+**Objective:** foul-outs 0.193 ± 0.04 per game.
+
+**Pass/fail guards:**
+- the #3d set: FTA 22.69 ± 0.7, H2 inside [−0.19, −0.155], Q4 slope ≥ −0.101, S8 14.81 ± 0.6, Q4 FTA share no further
+  from 0.279 than 0.254;
+- closers stay on: the 5th-PF-in-Q4 starter on-floor share inside [0.375, 0.535];
+- **NEW, the mechanism's own target:** P(a starter fouls out by game end | his 5th PF lands in Q4 with ≥ 4:00 left)
+  inside real **0.212 [0.161, 0.264]**.
+  - Source: ESPN pbp + box starter flag, 240 events in 816 FIT games (P3's §2d counted 239 for the same state).
+  - All players: 0.221.
+
+**Readings:** total bias (the totals re-fit is a REQUIRED step before the full FIT), team PF vs real 19.67, foul-outs by
+window vs real, P(top fouler ≥ 5) vs 0.414, Q4 starters on the floor vs 3.15 / 1.56.
+
+**Instrumentation:** research copy `code_fa` = `code_diag` + P3's 917b40a8 engine hunks (patch applied cleanly; the
+engine equals origin/main apart from the research-only diag) + patch v3 (fouled-out flag per 5th-PF event).
+- Smoke test, synthetic 60 games, mult 1.0 → 0.3: P(6th | 5th) 0.328 → 0.154, foul-outs 0.867 → 0.467, team PF
+  23.62 → 23.62 (unchanged).
+
+**Pick:** among passing points, the smallest |foul-outs − 0.193|; ties go to the LARGER mult (less intervention).
+PROVISIONAL until the full FIT (P3's amendment).
+
+**Launch:** after the #3d sweep finishes (shared host memory). #3d and #3e are read as separate pre-registrations.
