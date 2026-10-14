@@ -53,10 +53,48 @@ def resolve_starter_ids(player_rows: list[dict[str, Any]], starter_names: set[st
     up with the rows passed into it, regardless of which ingestion source
     (Understat, ASA, ...) those rows came from."""
     resolved: set[str] = set()
+    matched_names: set[str] = set()
     for index, row in enumerate(player_rows):
-        if _norm_player_name(row.get("player_name")) in starter_names:
+        name = _norm_player_name(row.get("player_name"))
+        if name in starter_names:
             resolved.add(player_row_key(row, index, "_"))
+            matched_names.add(name)
+    # NAME-FORM FALLBACK (lane soccer-starter-name-match, 2026-10-13). ESPN's
+    # starter and the season row can name one player two ways -- "Eren Dinkci" /
+    # "Eren Sami Dinkci", "Jeong Woo-yeong" / "Woo-Yeong Jeong". Tried only for a
+    # starter no row matched exactly, against rows no starter claimed, in order of
+    # strength; a step that finds two rows refuses rather than guesses.
+    free = [(index, row) for index, row in enumerate(player_rows)
+            if player_row_key(row, index, "_") not in resolved]
+    for name in sorted(starter_names - matched_names):
+        want = name.split()
+        if not want:
+            continue
+        for step in _NAME_FORM_STEPS:
+            hits = [(index, row) for index, row in free if step(want, _norm_player_name(row.get("player_name")).split())]
+            if len(hits) == 1:
+                resolved.add(player_row_key(hits[0][1], hits[0][0], "_"))
+                free.remove(hits[0])
+                break
+            if hits:
+                break
     return resolved
+
+
+def _nested(want: list[str], have: list[str]) -> bool:
+    small, large = (have, want) if len(have) <= len(want) else (want, have)
+    return len(small) >= 2 and set(small) <= set(large) and want != have
+
+
+# Strongest first. Word order; first and last name; two or more nested words; a
+# one-word ESPN name equal to the row's first word. No surname-only step: within
+# one squad a shared surname (siblings, common names) is too easy a false match.
+_NAME_FORM_STEPS = (
+    lambda want, have: sorted(want) == sorted(have),
+    lambda want, have: len(want) > 1 and len(have) > 1 and (want[0], want[-1]) == (have[0], have[-1]),
+    _nested,
+    lambda want, have: len(want) == 1 and bool(have) and have[0] == want[0],
+)
 
 
 def find_event_for_fixture(
