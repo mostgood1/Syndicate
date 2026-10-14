@@ -2092,3 +2092,29 @@ dates, 200 sims.
 
 **Corrected step 1:** re-fit bonus_nonshoot_foul_per_poss with end-game ON (#3i). The totals calibration re-fit is
 dropped from the sequence (P3's §7-after-re-fit ordering then applies to #3i).
+
+### Phase 2 #3i — PRE-REGISTRATION 2026-10-14 06:22Z (before any run): re-fit the bonus rate with end-game ON
+
+**Config:** the #3h pick (fouler_per_minute = 1, foul_mult 0.5, release 240, bench 0.05, end-game on), the same 12
+dates, 200 sims.
+
+**Grid:**
+- bonus_nonshoot_foul_per_poss ∈ {0.025, 0.03, 0.035} at foul_mult 0.5;
+- plus (0.03, foul_mult 0.6). Fewer bonus fouls means fewer foul-outs, which may need a weaker foul_mult.
+- 0.04 is `PH_f050`, already read.
+- The expected landing comes from #3's slope (+0.26 FTA/team per +0.005): ~0.028 for FTA 22.69.
+
+**Pass/fail, all of these:**
+- FTA/team **22.69 ± 0.3** (tightened: the FTA level is now the objective);
+- foul-outs 0.193 ± 0.04;
+- **|total bias| < 1.0** (restored as a pass guard; this step exists to fix it);
+- the #3e guard set: H2 inside [−0.19, −0.155], Q4 ≥ −0.101, S8 14.81 ± 0.6, Q4 FTA share no further from 0.279 than
+  0.254, closers-on [0.375, 0.535], P(6th | 5th) [0.1607, 0.2643].
+
+**Pick:** among passing points, the smallest |FTA − 22.69|, then the smallest |foul-outs − 0.193|. Ties go to the larger
+bonus rate. PROVISIONAL.
+
+**If |total bias| ≥ 1.0 at the FTA-matched rate:** the residual is the solver's (bonus possessions not in
+`_solve_eff_mult`). Report it, and propose that engine change to the bonus owner. No override.
+
+**Then:** full FIT → P3's §7.
