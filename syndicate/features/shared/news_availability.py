@@ -63,6 +63,13 @@ OUT_STATUS: dict[str, str] = {
     "NON-FOOTBALL INJURY": "OUT",
     "SUSPENSION": "SUSPENDED",
     "SUSPENDED": "SUSPENDED",
+    # MLB's other unavailable lists (seen on ESPN 2026-10-14 as lower-case "paternity" / "suspension").
+    "PATERNITY": "OUT",
+    "PATERNITY LIST": "OUT",
+    "BEREAVEMENT": "OUT",
+    "BEREAVEMENT LIST": "OUT",
+    "RESTRICTED": "OUT",
+    "RESTRICTED LIST": "OUT",
 }
 SCRATCH_STATUS = "INACTIVE"
 

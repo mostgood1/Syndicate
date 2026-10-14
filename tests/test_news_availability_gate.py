@@ -163,8 +163,9 @@ def test_mlb_is_flagged_only_inside_the_2027_regular_season(root):
 
 
 def test_il_statuses_map_to_out_and_others_stay_priced():
-    for status in ("10-Day-IL", "15-Day-IL", "60-Day-IL", "7-Day IL"):
+    for status in ("10-Day-IL", "15-Day-IL", "60-Day-IL", "7-Day IL", "paternity", "Bereavement List", "restricted"):
         assert na.availability_status(status) == "OUT"
+    assert na.availability_status("suspension") == "SUSPENDED"   # ESPN MLB sends it lower-case
     for status in ("Day-To-Day", "Questionable", "Doubtful", "Active", "", None):
         assert na.availability_status(status) is None
 
