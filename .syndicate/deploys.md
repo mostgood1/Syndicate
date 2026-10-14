@@ -49088,3 +49088,9 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **VERIFY (deployed checkout, 02:03Z):** both `_schedule_path`s are at the data root (player_logs :77, HCA :76). 8 tests passed.
 - **Production reading OWED:** the builders run only in a full WNBA refresh with snapshot_rows > 0 (`refresh_wnba_oddsapi_props.py` ~4870-4903). No WNBA game since 10-09, so the first rebuild comes once Finals G1 lines post. Read `wnba_source/data/processed/player_logs.csv`: mtime after 02:03Z 10-14, max GAME_DATE >= 2026-10-09, about 8,984+ rows. `home_court_advantage.json`: games_used 313 (unchanged).
 - **Rollback:** revert f5427e38 and ff. No restart.
+
+## 2026-10-14 02:06:4xZ (9:07 PM CT 10-13) -- rolling `reload-web` onto b4f218ee: live NHL game clock (lane `games-rail-full-detail`, session d4409ac4, user "nhl is missing game clock") -- NO outage
+- **cause:** NHL live chips read "P3" -- `NhlWebClient.scoreboard_day` uses NHL's /schedule feed (period, no clock); NBA read "Q4 9:33".
+- **change:** `live_clock_token` from ESPN's scoreboard (period + displayClock; STATUS_END_PERIOD -> "END P2"; OT / SO labels) on live NHL chips whose token has no clock; at serve time live NBA / WNBA / NHL chips are re-read every request (clock + periods), not kept from the worker's build.
+- **ride-alongs (web-loaded):** 7990e51b nhl v2 pre-registration, f5427e38 wnba history builders off vendor, ca7a0aa4 githooks probe -- scripts / research, not imported by web routes.
+- **verify (served 02:07Z):** STL@OTT 'P3 1:51', VAN@NYI 'P3 5:30', PIT@CHI 'P3 18:45', MIN@WPG 'END P2', COL@DAL 'P2 9:51', VGK@NSH 'P2 10:40', TOR@UTA 'P2 16:24', CGY@ANA 'P1 11:58'. Reload 2.0 s, 0 failures, claim released.
