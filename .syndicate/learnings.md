@@ -2089,3 +2089,8 @@ prefer single-quoted arguments there.
 ## 2026-10-14 -- a Windows Update restart takes the fleet down until someone LOGS ON: the task's only trigger is at-logon `[session d4409ac4]`
 - 1:29 AM CT MoUsoCoreWorker restarted the PC; `SyndicateLocalProduction` (MSFT_TaskLogonTrigger, Interactive) did not run until the 7:47 AM logon -> 6 h 19 m outage, settlement 51 min late. Read like a slow settlement; it was a host event.
 - **Rule:** when a scheduled fleet job is late, check `uptime -s` in WSL and Windows event 1074 BEFORE reading the job's own code.
+
+## 2026-10-14 -- OVERTURNED: "TaskStop stops a Git Bash watcher loop" (lane nba-native-live-resim)
+- **Belief:** `TaskStop` on a background Git Bash `until/for` loop ends it.
+- **Reality:** the loop's bash process survived. It and its replacement both fired a fleet `down` (14:07:45Z and 14:08:17Z on 2026-10-13); the second killed a supervisor the first had just started. That cost ~25 s of extra outage and one extra cold start. Both events are visible in `role_restarts.jsonl`.
+- **Rule:** before arming a replacement for any loop that can take an outward action (down/up, deploy, push), kill the old loop by pid and confirm with `ps -ef | grep [a]uto_cycle` that it is gone. Never let two armed actors share a trigger.

@@ -1054,21 +1054,21 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **NBA PREGAME LINEUP POOLS `[verified 2026-10-12 by as-of replay, lane nba-pregame-lineup-pools, 63e802bb]`:** production 0% now is the nba-season-phase guard BY DESIGN (24/24 sides 10-09..10-12 die at `no_recent_history`/`team_not_in_history` before any name map; pregame always takes the history path, `fallback_reason=missing_game_id`). The REGULAR-season path works today: `scripts/replay_nba_pregame_lineup_pools.py` (production export, roster_mode pregame = production's, ESPN box stripped, history < D) over 2025-26, 9 dates / 84 games: 119/168 sides applied, 119/119 reached the engine, 68/84 games with a pool; from the 3rd regular slate 118/140. Refusals are named guards only (no_recent_history 26 at season start, rotation_mapping_too_sparse 14, signal-guard conflict 9). Checklist on its corpus (25 games, 3 dates): `call.lineup_pools` 96%. Ramp: 2nd regular slate 0/24, 3rd 15/24. The name map is native-only since 63e802bb (vendored pbp_espn_history reader removed: 0 keys added for players who played, WNBA 0/7,399, NBA 0/31,936; 24/24 sides identical before/after). Pregame passes asof D-1 and the window keeps date < D-1, so D-1's games never enter a pregame pool (applied flips 1/168; nba-lineup-pools' decision).
 - **OWED:** the PRODUCTION reading: `basketball_engine_input_checklist.py` on a fresh post-opener NBA corpus (from the 3rd regular slate, ~10-23/10-24) shows `call.lineup_pools` on most games, population stated.
 
-## [nba-live-native-p3] NBA LIVE (P3): native resumed re-sim BUILT, engine-neutral, persisting pregame inputs IN PRODUCTION; NOT switched on; the vendored live tick loses to "score + pregame line pro rata" `[verified 2026-10-12 13:35Z, lane nba-native-live-resim, c9971e75 / 5cec5802]`
+## [nba-live-native-p3] NBA LIVE (P3): native resumed re-sim LIVE IN SHADOW MODE on the fleet (served lens reads `live_resim`, nba NOT priced); regular-season gate NOT PASSED on totals level `[verified 2026-10-14 05:05Z, lane nba-native-live-resim]`
 
 - **Built** (on main, off by default):
   - `syndicate/features/nba/live_resim.py`: resumes P1's engine (production's `_engine_for_league_local("nba")`, #473 no-stack) from P2's LiveGameState on the persisted pregame inputs;
   - named refusals, including `on_floor_incomplete` and `pbp_score_mismatch` (a header up to 3 ahead of the log resumes from the log);
   - histograms and live props;
-  - a loop writing `live/nba_live_resim.json`, run only if `SYNDICATE_NBA_LIVE_RESIM` is set (absent = off; verified absent on the fleet).
+  - a loop writing `live/nba_live_resim.json`, run only if `SYNDICATE_NBA_LIVE_RESIM` is set. **ON on the fleet since 2026-10-13 14:08Z** (`local_production.env`, + `_SIMS=100`); it survived another lane's 02:30Z down/up. First slate (5 preseason games): 309/311 game-ticks resimmed (2 `regulation_over`), max 66.3 s / 13,335 B, 0 TICK_ERROR, 0 anchored KEYVALUE_WRITE_REJECTED; page `native_resim.merged` = live games (deploys.md 2026-10-14 05:05Z).
 - **Persist in production:** `_call_native_engine_local` writes `engine_inputs/<date>/<H>_<A>.pkl` (~65 KB) per newly simulated NBA game. 8/8 games since the 10-10 15:39Z load (deploys.md 2026-10-12 13:35Z). A reused sim has none (`no_pregame_inputs`).
 - **Engine-neutral:** parity 5,400/5,400; same-seed e2e A/B 22/22 (deploys.md 2026-10-10 01:13Z). The column memo roughly halves ms/draw.
 - **NOT enabled:**
-  - nba is not in `_LIVE_GAMELINE_SPORTS`;
-  - the vendored tick (`nba/live_lens.py:97`) is not deleted;
-  - `endgame_foul_*` is off.
+  - nba is not in `_LIVE_GAMELINE_SPORTS` (shadow: nothing priced);
+  - the vendored tick import is gone from `syndicate/features/nba` (the ported `nba/live_tick` runs, lane nba-live-tick-native);
+  - `endgame_foul_*`, `foul_out_in_sim`, `foul_trouble_*`, `fouler_per_minute` are default off (joint re-fit with basketball-scenario-calibration in progress).
 - **Native vs pregame_rate on totals, preseason with #473 (n=16-18):** WORSE (+2.6 / +2.5 / +1.7 MAE at end Q1 / Q2 / Q3).
-- **Regular-season gate:** not yet run; inputs ready (201 dates / 1,294 games with #473 + the 2024-25 prior).
+- **Regular-season gate (findings_2026-10-09 §9, n~1,180/checkpoint): NOT PASSED.** Native total worse than `pregame_rate` at end Q1/Q2/Q3 (bias +2.9/+1.8/+2.0). Margin is better than pregame_rate late, and ties on ML. #695 (§10a/b): skip_def explains ~1/3 of it, the rest is engine FT volume with EXACT off. The user kept skip_def and chose "validate first" for Phase 2; P3 re-gates on Phase 2 inputs after that.
 - **Baseline:** the vendored replay is worse than `pregame_rate` on margin at end Q1/Q2 and on ML at end Q2 / 5:00 Q4 (n~780). `pregame_rate` ML ties ESPN.
 - **Targets:**
   - Regular-season reversion -0.24 / -0.17 / -0.13 / -0.09; postseason not detectable.
