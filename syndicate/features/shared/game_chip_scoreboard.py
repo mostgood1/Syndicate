@@ -801,6 +801,36 @@ def _chip_day(chip: dict[str, Any], date_value: str) -> str:
     return date_value
 
 
+def _refresh_soccer_live(chip: dict[str, Any]) -> None:
+    """Minute, score and halves on a live soccer chip at serve time; a match
+    ESPN calls completed becomes FINAL. Display only."""
+    try:
+        from syndicate.features.shared.game_chip_trend import soccer_live_state
+
+        state = soccer_live_state(chip.get("league"), chip.get("game_key"))
+        if not state:
+            return
+        away, home = chip.get("away") or {}, chip.get("home") or {}
+        if state.get("away_score") not in (None, "") and state.get("home_score") not in (None, ""):
+            away["score"], home["score"] = str(state["away_score"]), str(state["home_score"])
+            a, h = _score_value(away["score"]), _score_value(home["score"])
+            try:
+                chip["leader"] = None if a == h else ("away" if float(a) > float(h) else "home")
+            except (TypeError, ValueError):
+                pass
+        ah, hh = state.get("away_halves") or [], state.get("home_halves") or []
+        if ah and hh and None not in ah and None not in hh:
+            labels = ["1H", "2H", "ET1", "ET2", "PK"][: max(len(ah), len(hh))]
+            chip["linescore"] = {"kind": "periods", "labels": labels, "away": ah, "home": hh}
+        if state.get("completed"):
+            chip["state"], chip["status_token"] = "final", "FINAL"
+            chip["situation"] = None
+        elif state.get("token"):
+            chip["status_token"] = state["token"]
+    except Exception:  # noqa: BLE001 -- never cost the scoreboard
+        return
+
+
 def _attach_trend(sport: str, game: dict[str, Any], chip: dict[str, Any], date_value: str) -> None:
     """NHL / soccer pressure on the live line -- their "on a 9-2 run" (user
     2026-10-14; `game_chip_trend`). Rebuilt each pass, never stacked."""
@@ -846,6 +876,7 @@ def attach_served_linescores(chips: list[dict[str, Any]], date_value: str) -> No
             continue
         if chip.get("sport") == "soccer" and chip.get("state") == "live":
             key = chip.get("game_key")
+            _refresh_soccer_live(chip)
             _attach_trend("soccer", {"event_id": key, "league": chip.get("league")}, chip, date_value)
             continue
         if chip.get("sport") not in _SERVE_TIME_LINESCORE_SPORTS or chip.get("state") not in ("live", "final"):

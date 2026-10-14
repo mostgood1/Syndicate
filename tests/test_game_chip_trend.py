@@ -61,5 +61,32 @@ class ChipLine(unittest.TestCase):
         self.assertEqual(chip["situation"], "VAN pressing · 6–2 shots, last 10'")
 
 
+class SoccerLiveRefresh(unittest.TestCase):
+    def _payload(self, name, completed, clock, a, h, ah, hh):
+        return {"header": {"competitions": [{"status": {"displayClock": clock, "type": {"name": name, "completed": completed, "shortDetail": clock}},
+                                             "competitors": [{"homeAway": "away", "score": a, "linescores": [{"displayValue": v} for v in ah]},
+                                                             {"homeAway": "home", "score": h, "linescores": [{"displayValue": v} for v in hh]}]}]}}
+
+    def _serve(self, payload):
+        from syndicate.features.shared import game_chip_scoreboard as gs
+
+        chip = {"sport": "soccer", "state": "live", "league": "serie_a", "game_key": "401", "status_token": "52'",
+                "away": {"abbr": "VEN", "score": "0"}, "home": {"abbr": "ATA", "score": "1"}}
+        with mock.patch.object(gt, "_soccer_payload", return_value=payload), mock.patch.object(gt, "live_trend", return_value=None):
+            gs.attach_served_linescores([chip], "2026-10-12")
+        return chip
+
+    def test_live_minute_score_and_halves(self) -> None:
+        chip = self._serve(self._payload("STATUS_SECOND_HALF", False, "67'", "1", "2", ["0", "1"], ["2", "0"]))
+        self.assertEqual((chip["status_token"], chip["away"]["score"], chip["home"]["score"]), ("67'", "1", "2"))
+        self.assertEqual(chip["linescore"], {"kind": "periods", "labels": ["1H", "2H"], "away": [0, 1], "home": [2, 0]})
+        self.assertEqual(chip["leader"], "home")
+
+    def test_halftime_and_full_time(self) -> None:
+        self.assertEqual(self._serve(self._payload("STATUS_HALFTIME", False, "45'+2'", "0", "1", ["0"], ["1"]))["status_token"], "HT")
+        done = self._serve(self._payload("STATUS_FULL_TIME", True, None, "1", "3", ["1", "0"], ["3", "0"]))
+        self.assertEqual((done["state"], done["status_token"]), ("final", "FINAL"))
+
+
 if __name__ == "__main__":
     unittest.main()

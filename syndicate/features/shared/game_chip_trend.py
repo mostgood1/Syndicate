@@ -140,6 +140,50 @@ def soccer_pressure(payload: Mapping[str, Any], away_abbr: str, home_abbr: str) 
     return f"{team} pressing · {', '.join(parts)}, last {_SOCCER_WINDOW_MIN}'"
 
 
+def _soccer_payload(league: str | None, event_id: str | None) -> dict | None:
+    from syndicate.features.soccer.ingestion.espn_lineups import LEAGUE_ESPN_SLUGS
+
+    slug = LEAGUE_ESPN_SLUGS.get(str(league or "").strip().lower())
+    return _summary(f"soccer/{slug}", str(event_id)) if slug and event_id else None
+
+
+def soccer_live_state(league: str | None, event_id: str | None) -> dict | None:
+    """Minute / score / per-half goals for a live soccer chip, from the same
+    cached summary the pressure line reads (user 2026-10-14: "soccer cards need
+    the same live refresh" -- the worker's chip is as old as its last build).
+
+    {"token": "67'" | "HT" | "FT", "completed": bool, "away_score", "home_score",
+     "away_halves", "home_halves"}, or None.
+    """
+    try:
+        payload = _soccer_payload(league, event_id)
+    except Exception:  # noqa: BLE001
+        return None
+    if not payload:
+        return None
+    comp = (((payload.get("header") or {}).get("competitions")) or [{}])[0]
+    status = comp.get("status") or {}
+    stype = status.get("type") or {}
+    sides = {str(c.get("homeAway")): c for c in comp.get("competitors") or [] if isinstance(c, Mapping)}
+    if "away" not in sides or "home" not in sides:
+        return None
+
+    def halves(c):
+        out = []
+        for x in c.get("linescores") or []:
+            try:
+                out.append(int(float(x.get("displayValue") if x.get("displayValue") is not None else x.get("value"))))
+            except (TypeError, ValueError):
+                out.append(None)
+        return out
+
+    name = str(stype.get("name") or "")
+    token = "HT" if name == "STATUS_HALFTIME" else (str(status.get("displayClock") or "").strip() or str(stype.get("shortDetail") or "").strip() or None)
+    return {"token": token, "completed": bool(stype.get("completed")),
+            "away_score": sides["away"].get("score"), "home_score": sides["home"].get("score"),
+            "away_halves": halves(sides["away"]), "home_halves": halves(sides["home"])}
+
+
 def live_trend(sport: str, *, event_id: str | None, league: str | None, away_abbr: str, home_abbr: str) -> str | None:
     """The pressure line for a live NHL / soccer game, or None."""
     try:
