@@ -1046,6 +1046,14 @@ death, never life — do not invert it.
 - Verification: Served /intelligence embed after a board build on the new code, read only once EVERY horizon date's stored shortlist was rewritten after the deploy: per sport, prop rows with recent_lines / with recent_values and bars with a non-null past line / bars; 3 hand-checked bars against the closing file; payload delta measured; tests pass incl. a reachability test that recent_lines reach _chart_columns' output.
 - Blocked by: none
 
+### wnba-availability-recency-tune — OPEN — opened 2026-10-14 — session 99686b8c-f37e-47fa-90ed-c129c73e7dd7
+- Goal: User decision 2026-10-14 ('tune the rule'): the WNBA SmartSim recency availability rule (wnba_sim_availability, K=1, enabled 2026-10-05) stops dropping established regulars returning from a single missed game. A candidate re-inclusion rule, selected on May-Jul by the original lane's criterion (net non-player sim minutes removed per team-game) and confirmed on Aug-Sep + playoffs, cuts real players wrongly dropped (and their minutes) vs K=1 without lowering net removal; then through the real engine, held out and paired vs K=1: played-player minutes bias/MAE and prop book-line Brier not worse (game-clustered CI); behind a flag/param with an off!=on reachability test. Production enable only on a user decision.
+- Files: syndicate/features/shared/wnba_sim_availability.py, tests/test_wnba_sim_availability.py, scripts/fit_wnba_sim_availability.py, tests/test_fit_wnba_sim_availability.py, .syndicate/findings_2026-10-14_wnba_availability_recency_tune.md (NEW)
+- Hypothesis: K=1's wrongly dropped players are mostly established regulars (prior-lane test: 79 players, mean 19.5 actual min); a regular-protection clause re-admits them at little cost in non-player minutes, raising net removal.
+- Falsification test: If no candidate beats K=1 on net removal on train AND holds on test, or the engine re-run makes played-player minutes MAE or any priced market's Brier worse with a CI excluding 0, K=1 stays.
+- Verification: Offline table (train/test/playoffs) per candidate; engine re-run --compare paired table; reachability test; findings file.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
