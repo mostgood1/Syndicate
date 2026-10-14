@@ -111,3 +111,23 @@ def test_first_and_last_scorer_are_not_mapped_onto_goals():
     """They are races, not a goal count."""
     assert "player_first_goal_scorer" not in J._YES_NO_LINE_KEYS
     assert "player_last_goal_scorer" not in J._YES_NO_LINE_KEYS
+
+
+def test_a_live_anytime_row_reaches_a_MODELLED_EDGE_not_just_a_projection():
+    """The lane's point is the EDGE, and anytime is a yes-only market: no de-vig can answer, so the one-sided
+    branch must price it against the pregame modelled fair (10-12 20:55Z: 25 of 26 projected soccer rows were
+    withheld `no_fair_value_one_sided_quote`). Live P(score) 0.27 vs modelled fair 0.12 -> +15.0 points."""
+    from syndicate.features.shared.book_margin_model import EDGE_FIELD
+
+    row = _anytime_row(modelled_fair={"yes": {"fair_method": "book_margin_model", "fair_probability": 0.12,
+                                              "basis": "measured_hold", "assumed_hold_pct": 8.0}})
+    row["projection"] = {"basis": "soccer_sim", "side": "yes", "market_fair_unavailable_reason": "one_sided_quote"}
+    indexed = {"index": {("home striker", "player_goals", 0.5): {
+                   "live_prob_over": 0.27, "live_projection": 0.31, "model_prob_over": None,
+                   "actual_so_far": 0, "side": "over"}},
+               "players_seen": {"home striker"},
+               "lines_by_player_market": {("home striker", "player_goals"): {0.5}}}
+    coverage = J.attach_live_projections([row], indexed)
+    assert coverage["rows_live_projected"] == 1
+    assert coverage.get("rows_live_edged_modelled") == 1
+    assert row["projection"].get(EDGE_FIELD) == pytest.approx(15.0)
