@@ -69,7 +69,7 @@ death, never life — do not invert it.
 
 ### wnba-fixture-identity-native — OPEN — opened 2026-10-14 — session 2d413211
 - Goal: Move `wnba_fixture_identity.schedule_path()` off the vendored `vendor/wnba_betting_repo/data/processed/schedule_2026.csv` onto the data-root WNBA schedule the refresh's fetch-schedule writes, keeping its tests running on a committed fixture; deployed with a measurement (user request 2026-10-14: "move the wnba fixture identity off vendor").
-- Files: syndicate/features/shared/wnba_fixture_identity.py, tests/test_wnba_fixture_identity.py, tests/fixtures/wnba_fixture_identity/ (NEW)
+- Files: syndicate/features/shared/wnba_fixture_identity.py, tests/test_wnba_fixture_identity.py, tests/fixtures/wnba_fixture_identity/ (NEW), tests/test_wnba_game_cards_census.py (_run with_schedule section only)
 - Hypothesis: the vendored file ends 2026-09-24, so every postseason fixture is unresolvable: production playoff game_cards carry a blank fixture_id and 1 row on 2-game dates (10-04/07/09); the data-root schedule resolves them (10-09 NYL v ATL -> 401918299; 10-17 GSV v ATL -> 401918305) and is identical for the regular season.
 - Falsification test: after the switch the deployed resolver still returns None for 10-17 GSV v ATL, or a regular-season date resolves differently from the vendored file.
 - Verification: on the deployed checkout with the refresh env, schedule_path() is the data-root file and resolve_fixture_id("2026-10-17","GSV","ATL") == "401918305"; the next WNBA game_cards write carries fixture_id.
