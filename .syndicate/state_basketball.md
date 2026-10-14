@@ -1170,7 +1170,12 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - **fouler_per_minute** (f9a2617b): top-5 PF share 0.658 → 0.597, real 0.585;
   - **foul_trouble_foul_mult = 0.5** (917b40a8): foul-outs 0.194 (real 0.193), P(6th | 5th in Q4) 0.2145 (real 0.2125),
     closers-on 0.400 (real 0.455). PROVISIONAL pick.
-  - Open: total +1.2 over actual from FT volume (46.6 vs 45.4 FTA/game; bonus rate not re-fit with end-game on, #3i).
+  - The +1.2 total overshoot was STRUCTURAL: bonus / end-game points that the EXACT solver did not model. P3's
+    solver terms (6f092c74: `solver_bonus_trip_share`, `solver_endgame_pts_per_team`, default 0) fix it: bias
+    +0.99 → +0.11 (#3k).
+  - Joint fit (#3l): base_nonshooting 0.065 + bonus 0.03 → FTA 22.76 (real 22.69), PF 19.68 (19.67).
+  - Solver constants re-measured at that point on disjoint FIT dates: s 0.00802, Δ 0.138.
+  - Final 12-date check and full FIT pending.
   - The totals calibration CANNOT absorb engine overshoot: it fits `model_total_raw`, upstream of the engine.
 - **score_effect_k** (late-game catch-up, native engine, default 0): k = 0.002 ACCEPTED by the user 2026-10-10 as a
   PROPOSAL (fine grid 48cb10ff; Q4 tolerance overridden, Q4 remainder to P3). NOT enabled: nothing sets it in
