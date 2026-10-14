@@ -1085,7 +1085,10 @@ def simulate_pbp_game_boxscore(
         for i, nm in enumerate(_player_names(away_players)):
             a_pf0[i] = int((state.away_player_fouls or {}).get(nm, 0))
 
-    ft_mult = float(getattr(cfg, "foul_trouble_bench_mult", 1.0) or 1.0)
+    # `is None`, never `or`: 0.0 is a real setting (bench outright, the same zero weight a fouled-out player gets) and
+    # `or 1.0` silently read it as OFF (calibration lane #3b, 2026-10-14: the 0.0 grid point ran with no benching).
+    _ft_raw = getattr(cfg, "foul_trouble_bench_mult", 1.0)
+    ft_mult = 1.0 if _ft_raw is None else float(np.clip(float(_ft_raw), 0.0, 1.0))
     ft_thr = tuple(int(x) for x in (getattr(cfg, "foul_trouble_thresholds", (2, 3, 4, 5)) or (2, 3, 4, 5)))
     ft_release = int(getattr(cfg, "foul_trouble_release_s", 240) or 0)
     if ft_mult < 1.0 and opening_tip:

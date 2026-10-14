@@ -175,3 +175,14 @@ def test_foul_trouble_off_is_byte_identical():
     a = _run(_with_cfg(kw), None, 6)
     b = _run(_with_cfg(kw, foul_trouble_bench_mult=1.0, foul_trouble_thresholds=(1, 1, 1, 1)), None, 6)
     assert a[0][2] == b[0][2] and a[1] == b[1]
+
+
+def test_foul_trouble_mult_zero_is_full_benching_not_off():
+    """0.0 must bench outright -- `x or 1.0` once read it as OFF (calibration lane #3b, 2026-10-14)."""
+    kw = _kw()
+    warm = dict(base_nonshooting_foul_per_poss=0.2, base_shooting_foul_per_fga=0.2)
+    off = _foul_outs(_with_cfg(kw, **warm), 20)
+    zero = _foul_outs(_with_cfg(kw, **warm, foul_trouble_bench_mult=0.0), 20)
+    small = _foul_outs(_with_cfg(kw, **warm, foul_trouble_bench_mult=0.05), 20)
+    assert zero < off * 0.7
+    assert zero <= small + 0.25
