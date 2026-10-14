@@ -49124,3 +49124,8 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **cause:** CLE @ TB (gamePk 849813) live in the 7th served R/H/E 0 0 / 0 0 0 0 -- the day's cached feed_live file was a PRE-game copy -- and "TOP 7" while StatsAPI read Bottom 7th (worker build minutes old). Team scores 1-3 were right.
 - **change:** today / yesterday MLB R/H/E from StatsAPI `schedule?hydrate=linescore` (one request per date, 45 s cache); inning token TOP / MID / BOT / END n from `inningState`; MLB added to the serve-time refresh. Older dates keep the feed files.
 - **verify (served 02:23Z vs StatsAPI same minute):** 'BOT 7', CLE 1 6 1 / TB 3 7 0 == StatsAPI Bottom 7, away R1 H6 E1 / home R3 H7 E0. Reload 2.0 s, 0 failures, claim released; ride-alongs none.
+
+## 2026-10-14 02:43:3xZ (9:44 PM CT 10-13) -- rolling `reload-web` onto 16e2e242: live soccer refresh at serve time (lane `games-rail-full-detail`, session d4409ac4, user "soccer cards need the same live refresh") -- NO outage
+- **change:** live soccer chips re-read every serve from the ESPN match summary the pressure line already fetches (45 s cache): minute ("67'"), "HT", score + leader, per-half line (1H / 2H / ET); a match ESPN marks completed becomes FINAL. Pressure line re-computed after.
+- **ride-alongs (web-loaded):** 6005fe0e / 59b202fe NHL research pre-registration / result (no web route).
+- **verify:** unit tests (live 67' 1-2 with halves, HT, FT -> FINAL); real ESPN finished match Serie A VEN @ ATA (401875005) through `attach_served_linescores`: stale "52'" 0-1 chip -> FINAL 1-3, halves 1 0 / 3 0, leader home. NO live soccer match at 02:43Z -- the live path is NOT YET MEASURED on a served card. Reload 2.0 s, 0 failures, claim released.
