@@ -1801,6 +1801,7 @@ def cmd_backup(args: argparse.Namespace) -> int:
 # packages, so imports do not depend on HOME; git in the ci-checkout needs no
 # global config (same owner, so no safe.directory).
 CI_ENV_PASSTHROUGH = ("PATH", "USER", "LOGNAME", "LANG", "LC_ALL", "TMPDIR", "TERM", "SHELL")
+CI_DEAD_REDIS_URL = "redis://127.0.0.1:1/0"
 
 
 def ci_env(home: Path, base: dict[str, str] | None = None) -> dict[str, str]:
@@ -1810,9 +1811,14 @@ def ci_env(home: Path, base: dict[str, str] | None = None) -> dict[str, str]:
     env["HOME"] = str(home)
     env["USERPROFILE"] = str(home)
     env["SYNDICATE_LOCAL_HOME"] = str(home / "no-local-production-home")
-    # oddsapi_quota forwards to redis://127.0.0.1 from an off-fleet process; its
-    # pytest guard does not cover the unittest archive suite.
+    # Redis URLs that DEFAULT to redis://127.0.0.1:6379 -- on the fleet host that
+    # is the live store. Measured 2026-10-14: test_oddsapi_quota patched the
+    # forward switch on (bypassing SYNDICATE_ODDSAPI_QUOTA_FORWARD) and wrote its
+    # fake headers into the fleet's quota document, whose `baseline` they still
+    # were. Port 1 refuses at once, so any such path fails instead of landing.
     env["SYNDICATE_ODDSAPI_QUOTA_FORWARD"] = "0"
+    env["SYNDICATE_ODDSAPI_QUOTA_FORWARD_URL"] = CI_DEAD_REDIS_URL
+    env["SYNDICATE_LOCAL_REDIS_URL"] = CI_DEAD_REDIS_URL
     env["PYTHONUNBUFFERED"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
     return env

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import unittest
@@ -542,11 +543,21 @@ class OffFleetAbsentDocumentTests(unittest.TestCase):
 
     # `_fleet_forward_enabled` is deliberately False under pytest (fake headers
     # must never reach the fleet), so off-fleet-ness is patched rather than
-    # enabled via the env -- which also keeps `_forward_to_fleet` a no-op here.
+    # enabled via the env. Patching it True does NOT make `_forward_to_fleet` a
+    # no-op: it goes on to `_fleet_forward_target`, which connects to
+    # redis://127.0.0.1:6379 -- the WSL fleet's live Redis -- and applies
+    # HEADERS to the fleet's quota document. Measured 2026-10-14 (lane
+    # ci-env-home-sandbox): the fleet's `baseline` WAS these fake headers
+    # (used=398169, endpoint historical/events, observedAt 2026-10-11T08:15:50Z,
+    # a nightly ci-suite window). So the target is patched out too.
     @staticmethod
+    @contextlib.contextmanager
     def _off_fleet(enabled: bool):
-        return patch("syndicate.features.shared.oddsapi_quota._fleet_forward_enabled",
-                     return_value=enabled)
+        with patch("syndicate.features.shared.oddsapi_quota._fleet_forward_enabled", return_value=enabled), \
+                patch("syndicate.features.shared.oddsapi_quota._fleet_forward_target", return_value=None) as target:
+            yield
+        if enabled:
+            assert target.called, "the forward path was not exercised; this patch no longer guards anything"
 
     def test_off_fleet_with_no_document_creates_nothing(self) -> None:
         with self._off_fleet(True):

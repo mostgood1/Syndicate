@@ -53,6 +53,27 @@ def test_ci_env_replaces_home_with_the_sandbox(tmp_path: Path):
     assert "LOCALAPPDATA" not in env
     assert env["SYNDICATE_ODDSAPI_QUOTA_FORWARD"] == "0"
     assert "HOME" not in lp.CI_ENV_PASSTHROUGH
+    # Every Redis URL that defaults to the fleet's 127.0.0.1:6379 is redirected.
+    for key in ("SYNDICATE_ODDSAPI_QUOTA_FORWARD_URL", "SYNDICATE_LOCAL_REDIS_URL"):
+        assert env[key] == lp.CI_DEAD_REDIS_URL and ":6379" not in env[key]
+
+
+def test_ci_child_quota_forward_cannot_reach_a_redis_even_when_forced_on(tmp_path: Path):
+    # The 2026-10-14 leak: a test patched `_fleet_forward_enabled` True. Even
+    # then, the ci env must leave `_fleet_forward_target` nothing to connect to.
+    probe = (
+        "import sys; sys.path.insert(0, sys.argv[1]); "
+        "from syndicate.features.shared import oddsapi_quota as q; "
+        "print(q._fleet_forward_target(), q._FLEET_FORWARD_STATE['failed'])"
+    )
+    env = lp.ci_env(lp.reset_ci_home(tmp_path / "ci-home"), {"PATH": os.environ.get("PATH", "")})
+    if "SYSTEMROOT" in os.environ:
+        env["SYSTEMROOT"] = os.environ["SYSTEMROOT"]
+    done = subprocess.run([sys.executable, "-c", probe, str(REPO_ROOT)], env=env,
+                          capture_output=True, text=True, timeout=60)
+    assert done.returncode == 0, done.stderr
+    target, failed = done.stdout.split()[:2]
+    assert target == "None" and failed.startswith("unreachable:"), done.stdout
 
 
 def test_ci_child_cannot_reach_the_fleet_claim_dir_through_home(tmp_path: Path):
