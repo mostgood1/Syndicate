@@ -2038,3 +2038,11 @@ prefer single-quoted arguments there.
 - **Measured:** the basketball smart sim with a fixed seed is identical WITHIN a process (OFF vs OFF-repeat, 194/194 players). ACROSS processes it was not: identical code, same seed and inputs, differed on 102,817 of 137,481 output leaves. With PYTHONHASHSEED=0 on both, the only differences were 6 scratch-path strings. String-hash randomisation changes set/dict iteration order, and so the order draws are consumed.
 - **Cost if missed:** a refactor's "is it neutral?" check reads as a large regression (or hides one inside noise).
 - **Rule:** for any sim A/B or neutrality check split across processes (two code versions, two worktrees, before/after a deploy), set PYTHONHASHSEED to the same value in both, and run a same-code control under the same setting first. Arms in ONE process need only the seed.
+
+
+## 2026-10-14 -- RULE: a fail-open guard must PROVE it ran; and a hook fix on main is NOT live until the PRIMARY tree is fast-forwarded `[lane precommit-python-probe, session e48a0f9b]`
+- **Measured:** `.githooks/pre-commit` ran the first `python3` on PATH. On Windows that was the WindowsApps App Execution Alias, which from a backgrounded Git Bash could not start ("Permission denied", exit 126). The hook treats every non-1 exit as fail-open, so commit 857ec54b went in with NO ledger check and no warning. The same hook had blocked commits all day from a foreground shell, so "it has been catching things" was no evidence it ran.
+- **Second half:** `core.hooksPath` points at the primary tree's `.githooks`. The fix (ca7a0aa4) was on main and inert until the primary tree (891 behind) was fast-forwarded.
+- **How to apply:**
+  - A fail-open check must distinguish "checked, clean" from "could not run", and SAY the latter (probe the interpreter; warn when nothing starts).
+  - Verify a hook or guard fix by running it from where it actually executes (the primary tree), not from the worktree where it was written.
