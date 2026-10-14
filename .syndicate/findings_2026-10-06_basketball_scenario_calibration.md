@@ -1709,3 +1709,53 @@ is treated as excess, since real has no comparable split.
 - no category ≥ 40% → per-player PF assignment concentration, checked with the top-fouler share.
 
 Diagnosis only: no parameter is chosen from this run. The chosen lever gets its own pre-registered sweep.
+
+### Phase 2 #3c — RESULT 2026-10-14 03:27Z (runs done 03:26Z): the excess foul-outs are in the Q4 release window
+
+**Fallback trigger, as written** (`JF_m000b`, mult 0.0 = full benching after P3's fix ab6d34de):
+- foul-outs **0.386**/game (target 0.193 ± 0.04). The saturation is STRUCTURAL; the mult cannot fix it.
+- FTA 23.08, H2 −0.181, Q4 −0.092, S8 14.81; total bias +1.17.
+
+**Sim diagnosis** (`JF_diag`, mult 0.05, research-only instrumentation): 7,131 foul-outs logged over 17,400 draws.
+The rows match the box foul-outs exactly (0.410/game both); smoke test 47 = 47.
+
+| category (priority order) | sim/game | share |
+|---|---|---|
+| (b) end-game intentional possession | 0.037 | 0.09 |
+| **(a) Q4 release window, last 240 s, no benching** | **0.331** | **0.81** |
+| (d) multi-foul jump from below the threshold | 0.013 | 0.03 |
+| (c) at/over the threshold, benching failed (all on the trouble list) | 0.029 | 0.07 |
+
+**Timing vs real** (ESPN pbp, 816 FIT games). Real pbp finds 141 of the 158 box foul-outs; the second real column
+scales to the box total.
+
+| window | sim/game | real/game (pbp) | real scaled | sim − real |
+|---|---|---|---|---|
+| Q1–Q3 | 0.005 | 0.002 | 0.003 | +0.002 |
+| Q4 > 4:00 | 0.035 | 0.053 | 0.059 | −0.024 |
+| **Q4 ≤ 4:00** | **0.368** | 0.096 | **0.107** | **+0.261** |
+| (Q4 ≤ 2:00, inside the row above) | — | 0.067 | 0.075 | — |
+| OT | 0.002 | 0.022 | 0.025 | −0.023 |
+| total | 0.410 | 0.173 | 0.194 | +0.216 |
+
+- pbp counting excludes technicals and the duplicate "Offensive Foul Turnover" rows; including those had double-counted
+  (390).
+- The whole excess is in the last 4:00 of Q4: +0.261 of +0.216 (the other windows are slightly UNDER).
+- **By the pre-registered mapping: (a), 81% → the lever is foul_trouble_release_s.**
+
+**Top fouler** (pbp-independent, box):
+- sim top-fouler PF 4.58, 24.4% of team PF, P(≥ 5) 0.541;
+- real 4.30, 22.4%, P(≥ 5) 0.414.
+- Mild concentration, secondary.
+
+**CORRECTION to #3:**
+- Real team PERSONAL fouls are **19.67**/team-game (ESPN player-box PF sum, 1,632 team-games).
+- The 20.52 used in #3/#3b was ESPN's team "fouls" stat, which likely includes technicals.
+- So the sim at 19.2 is only ~0.45 under real. "The sim under-fouls by ~5" was an artefact of the wrong target. The
+  pre-bonus sim (15.2) was still ~4.5 under.
+
+**Mechanism note (belief, untested):**
+- Real players at 5 PF late in Q4 stay on the floor but foul less. The sim assigns a foul by `_prior_pf_pm` whatever
+  the player's current PF.
+- release_s trades closers' minutes for foul-outs. A "foul avoidance in trouble" weight on the fouler draw would be
+  the more faithful mechanism (P3's domain; not built).
