@@ -45,6 +45,9 @@ SETS: dict[str, tuple[str, str | None, str]] = {
                                 "NFL 2023-25 prop closes (kickoff-10min book quotes, per week)"),
     "nfl_injuries_2009_25": (f"{PRIMARY}/data/nfl_source/tracking/nflverse/injuries", None, "nflverse weekly injury reports 2009-25"),
     "ncaaf_props_2024_25": ("/mnt/c/tmp/football_scenarios/ncaaf_props", None, "NCAAF 2024-25 props (1,095 games)"),
+    "wnba_props_2026": ("/mnt/c/tmp/wnba_props_2026", r"^(?!player_game_log)",
+                        "WNBA 2026 regular-season prop closes, 8 markets at tip - 10 min (bought 2026-10-14, "
+                        "`wnba_props_pull.py`) + the per-day historical events; the game log is the fleet's own"),
 }
 
 
