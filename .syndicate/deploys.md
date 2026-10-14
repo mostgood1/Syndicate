@@ -49304,3 +49304,17 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
   - `schedule_2026_27.csv` should be written by a native `fetch-schedule`.
   - Blocker: the still-vendored `schedule_adapter` fallback in the live-odds-worker keeps rewriting `schedule_2025_26.*` with last season's content (17:53Z). The adapter fix a78aab9c is on main, not on the fleet.
 - **Rollback:** revert 63631afb and ff. No restart.
+
+
+## 2026-10-14 18:04:57Z -- READING, NO DEPLOY: the fleet STARTED AT BOOT BEFORE ANY LOGON -- **MET** (session e48a0f9b; closes the boot-trigger entry e770583f)
+- **Event:** a user-initiated restart (`shutdown.exe` on behalf of ClarkAndAddison\Amyn, 12:48:27 CDT). Windows `LastBootUpTime` 12:50:35 CDT.
+- **Timeline (CDT, 2026-10-14):**
+  - task `SyndicateLocalProduction` LastRunTime 12:51:47 (boot trigger + PT1M);
+  - WSL `uptime -s` 12:51:48;
+  - web / refresh-worker / live-odds-worker `==== start 17:51:51-53Z restarts=0`;
+  - `supervisor.log` `LOCAL PRODUCTION UP ... commit=63631afb`;
+  - `NCAAB_LIVE_RESIM_LOOP_STARTED` 17:51:53Z;
+  - **first user logon (Winlogon 7001) 12:53:47** -- the fleet was up ~2 min BEFORE it.
+  - `/healthz` 200 at 18:04Z.
+- **Note:** `ps -o lstart` showed the supervisor at 12:52:33, AFTER its roles. There is ONE `LOCAL PRODUCTION UP` and every role has a single `restarts=0` start, so this reads as the WSL clock settling after boot, not a second supervisor.
+- RECONCILED: the 2026-10-14 boot-trigger entry's owed reading (WSL from a non-interactive session at boot, roles up before any logon). Measured above.
