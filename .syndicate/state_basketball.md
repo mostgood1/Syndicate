@@ -1167,3 +1167,24 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   adoption after the end-of-Phase-2 VALIDATION read.
 - **Production today is right on totals only because errors cancel:** target −4.5 plus engine overshoot +6.
   Enabling EXACT_TARGET_CALIBRATION alone would lower NBA totals ~5.
+
+## [basketball-props-refresh-off-vendor] BASKETBALL PROPS REFRESHES: vendored uses retired path by path; WNBA history now tracks the schedule `[verified 2026-10-14, lanes nba-source-cli-native + basketball-games-history-freshness]`
+
+- **Off vendor and on the fleet** (each A/B'd on production data, 0 differences unless noted):
+  - NBA + WNBA game-input bootstrap: `python -m syndicate.features.<league>.source_cli.cli`.
+  - Recon / lens-tuning tools: `syndicate/features/<league>/recon_tools/`.
+  - History seed + predictions copy: `seed_data/games_nba_api.csv`.
+  - WNBA totals calibration: imports from the `source_cli` port.
+  - Source-app fallbacks and playoff transitions: deleted.
+  - The current row-by-row table is `docs/ai_context/basketball_live_native_plan.md` P6 "Vendored uses that REMAIN".
+- **Verified 2026-10-14 05:31Z:** the NBA once-per-date bootstrap for a new slate ran every step through the native CLI and wrote `predictions_2026-10-14.csv` (7 rows).
+- **The history builders read the data-root schedule** (`build_basketball_{player_logs,home_court_advantage}.py`):
+  - The vendored copy was frozen at 09-25, so `player_logs.csv` stopped at 09-24 for the whole WNBA postseason.
+  - player_logs now keeps post-season games. HCA stays regular-season only (user decision 2026-10-13); its value is unchanged.
+- **Games history is re-fetched when the schedule shows newer finals,** not only when the newest game is more than 30 days old (`basketball_games_history_freshness.py`, 360-min cooldown).
+  - WNBA in production 02:56-02:59Z 10-14: history 10-02 -> 10-09 (2,490 games); `features.csv` rebuilt.
+  - **NBA half inert:** NBA `fetch-schedule` only writes `schedule_2025_26.csv` (fleet file ends 04-12). The 2026-27 season starts 10-20. Unfixed.
+- **Readings owed at WNBA Finals G1 (10-17) lines:**
+  - `player_logs.csv` rewritten through 10-09+.
+  - A new `calibration_totals_*.json`.
+  - `recon_players_2026-10-17.csv` written.

@@ -472,6 +472,7 @@ once this index exists: re-splitting would orphan the parts.
 | [wnba-fixture-identity] | WNBA fixture identity + the sweep ownership gap - VERIFIED 2026-08-17 — **ARCHIVED 2026-08-19 to `state_archiv | `state_basketball.md` |
 | [wnba-sweep-ownership-gate] | WNBA SWEEP OWNERSHIP GATE + PHASE 2 AUTORUN `[collapsed 2026-08-18 from three 2026-08-17/18 snapshots; newest  | `state_basketball.md` |
 | [basketball-smart-sim-engine] | NBA/WNBA smart-sim: allowlist, dead-gate fix, and an open staleness question — 2026-08-18 (lane `basketball-mo | `state_basketball.md` |
+| [basketball-props-refresh-off-vendor] | Basketball props refreshes off vendor path by path; WNBA games history tracks the schedule (NBA half inert: schedule_2025_26 only) | `state_basketball.md` |
 | [wnba-cards-fallback-recursion] | `_artifact_bundle` RE-ENTERED ITSELF 247 FRAMES DEEP AND REPORTED NOTHING — FIXED `[2026-09-03, lane wnba-card | `state_basketball.md` |
 | [nba-model-skill-2025-26] | THE NBA MODEL IS LESS ACCURATE THAN THE PLAYER'S OWN AVERAGE, AND THE REASONS ARE MEASURED — as-of 2025-26 bac | `state_basketball.md` |
 | [nba-layer2-projections] | NBA LINES CARRY THE MODEL ON LAYER 2 -- game lines LIVE and VERIFIED; props wired but no NBA prop quote exists | `state_basketball.md` |
