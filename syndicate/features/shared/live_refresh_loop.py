@@ -641,29 +641,32 @@ def _record_lineup_check(epoch: float, date_str: str, fingerprints: dict[str, st
 	)
 
 
-def _vendor_source_root(sport: str) -> Path:
-	return REPO_ROOT / "vendor" / f"{sport}_betting_repo"
+#: The port writes under this root, as every refresh role sets it. Without it the port would write into its own
+#: repo-default data dir inside this checkout, so the fetch does nothing instead.
+_LINEUP_INJURY_DATA_ROOT_ENV = {"nba": "NBA_BETTING_DATA_ROOT", "wnba": "WNBA_BETTING_DATA_ROOT"}
 
 
-def _vendor_worker_env(source_root: Path) -> dict[str, str]:
+def _syndicate_cli_env() -> dict[str, str]:
 	env = dict(os.environ)
-	src_dir = str(source_root / "src")
 	existing = str(env.get("PYTHONPATH") or "").strip()
-	env["PYTHONPATH"] = src_dir if not existing else f"{src_dir}{os.pathsep}{existing}"
+	env["PYTHONPATH"] = str(REPO_ROOT) if not existing else f"{REPO_ROOT}{os.pathsep}{existing}"
 	env.setdefault("PYTHONUNBUFFERED", "1")
 	return env
 
 
-def _fetch_injuries(sport: str, date_str: str, *, package_name: str, timeout_s: float = 90.0) -> bool:
-	source_root = _vendor_source_root(sport)
-	if not source_root.exists():
+def _fetch_injuries(sport: str, date_str: str, *, cli_module: str, timeout_s: float = 90.0) -> bool:
+	# Off vendor since 2026-10-14 (lane basketball-lineup-injuries-native, user request): this ran the vendored
+	# `<sport>_betting.cli fetch-injuries` from vendor/<sport>_betting_repo with its src on PYTHONPATH. It now runs
+	# Syndicate's port (`syndicate.features.<sport>.source_cli.cli`, fetch-injuries parity-proven in the bootstrap
+	# parity runs) from this repo, writing through the same <SPORT>_BETTING_DATA_ROOT the vendored CLI inherited.
+	if not str(os.environ.get(_LINEUP_INJURY_DATA_ROOT_ENV.get(sport, "")) or "").strip():
 		return False
 	python_exe = sys.executable if (sys.executable and Path(sys.executable).exists()) else "python"
 	try:
 		result = subprocess.run(
-			[python_exe, "-m", f"{package_name}.cli", "fetch-injuries", "--date", date_str],
-			cwd=str(source_root),
-			env=_vendor_worker_env(source_root),
+			[python_exe, "-m", cli_module, "fetch-injuries", "--date", date_str],
+			cwd=str(REPO_ROOT),
+			env=_syndicate_cli_env(),
 			capture_output=True,
 			text=True,
 			timeout=timeout_s,
@@ -778,9 +781,10 @@ def _wnba_lineup_injury_fingerprint_by_game(date_str: str) -> dict[tuple[str, st
 	return fingerprints
 
 
+#: Sport -> the CLI module whose `fetch-injuries` the lineup check runs (the keys are also the sport list).
 _LINEUP_INJURY_FETCH_PACKAGES = {
-	"nba": "nba_betting",
-	"wnba": "wnba_betting",
+	"nba": "syndicate.features.nba.source_cli.cli",
+	"wnba": "syndicate.features.wnba.source_cli.cli",
 }
 
 
@@ -885,8 +889,8 @@ def _should_force_sim_rerun(*, now_epoch: float, date_str: str) -> bool:
 	within_tip_off_window = _any_gated_sport_event_within_force_window(date_str, now_epoch=now_epoch)
 	if not within_tip_off_window and last_epoch > 0.0 and last_date == date_str and (now_epoch - last_epoch) < interval:
 		return False
-	for sport, package_name in _LINEUP_INJURY_FETCH_PACKAGES.items():
-		_fetch_injuries(sport, date_str, package_name=package_name)
+	for sport, cli_module in _LINEUP_INJURY_FETCH_PACKAGES.items():
+		_fetch_injuries(sport, date_str, cli_module=cli_module)
 	current_fingerprints = {
 		"nba": _nba_lineup_injury_fingerprint(date_str),
 		"wnba": _wnba_lineup_injury_fingerprint(date_str),
