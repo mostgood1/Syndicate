@@ -1487,3 +1487,9 @@ engine.py LOAN is RETURNED to nba-native-live-resim.
   ≤ 0.12). The remaining overshoot is the EXACT-off engine term.
 - **#695 stays KEEP.** The fix for the overshoot is the Phase 2 totals stack (EXACT + NBA calibration builder), a
   user decision. P3 re-gates on Phase 2-config inputs once the user accepts it.
+
+**USER DECISION 2026-10-13: "Validate first".**
+- The Phase 2 totals stack is NOT fast-tracked. The pre-registered order stands: finish Phase 2 (#3 FT bonus,
+  #5 volume), read the held-out VALIDATION window once for the whole proposed config, then the user decides on
+  production.
+- Production NBA totals stay ~+2-3 high until then (known, measured by #695).
