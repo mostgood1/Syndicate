@@ -2298,3 +2298,10 @@ same 12 sweep dates.
   2. The #3k-style check: |bias| < 0.5 and every #3i guard, foul-outs included.
   3. The full FIT.
   4. §7.
+
+**#3l follow-up, s′ / Δ′ RE-MEASURED 2026-10-14 17:48Z** (measure dates, at the #3l pick; 16,400 draws each, 0 errors):
+- **s′ = 0.00802** (0.813 trips/team-game; was 0.00709).
+- **Δ′ = 0.138 points/team** (ON − OFF, 80 paired games; was 0.108).
+- Both are FROZEN.
+- The PK2 check (sweep dates, s′, Δ′) was due at 17:48Z. The PLANNED WINDOWS REBOOT (deploys.md 17:48Z, session d4409ac4)
+  will kill it. If it dies, it is relaunched UNREAD with the same values after the fleet is back.
