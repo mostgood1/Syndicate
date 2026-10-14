@@ -2094,3 +2094,11 @@ prefer single-quoted arguments there.
 - **Belief:** `TaskStop` on a background Git Bash `until/for` loop ends it.
 - **Reality:** the loop's bash process survived. It and its replacement both fired a fleet `down` (14:07:45Z and 14:08:17Z on 2026-10-13); the second killed a supervisor the first had just started. That cost ~25 s of extra outage and one extra cold start. Both events are visible in `role_restarts.jsonl`.
 - **Rule:** before arming a replacement for any loop that can take an outward action (down/up, deploy, push), kill the old loop by pid and confirm with `ps -ef | grep [a]uto_cycle` that it is gone. Never let two armed actors share a trigger.
+
+
+## 2026-10-14 -- RULE: `local_production.py status`'s supervisor `since` is NOT the supervisor's start; judge a fleet `up` by `supervisor.log` and role `restarts=` `[lane ncaab-native-live-tier, session e48a0f9b]`
+- **Measured:** `status` printed `supervisor pid=202264 since 2026-10-14T02:30:28Z`. 02:30:28Z was live-odds-worker's own uptime recycle (`RECYCLING after 19641s`, exit 0, respawned `restarts=1`). The real `up` was 2026-10-13 21:02Z (lane fair-price-v2, recorded). I read `since` as a new `up`, called it "unattributed", and wrote that into deploys.md; the correction was appended.
+- **How to apply:**
+  - A full `up` is `supervisor.log`'s `stopping roles ... stopped.` + `LOCAL PRODUCTION UP ... commit=<sha>`, plus every role's `==== start <ts> restarts=0`.
+  - A `restarts>=1` start is a single-role respawn that REUSES the env from `up`.
+  - Before calling any fleet change "unrecorded", grep `deploys.md` for the exact seconds and the SHA, not only today's headers.
