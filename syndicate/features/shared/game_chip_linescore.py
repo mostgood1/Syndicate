@@ -380,6 +380,15 @@ def live_bonus_text(sport: str, game: Mapping[str, Any], date: str, *, away_abbr
     return None
 
 
+def espn_event_id(sport: str, game: Mapping[str, Any], date: str, *, away_abbr: str = "", home_abbr: str = "") -> str | None:
+    """ESPN's event id for a live game (the NHL card's own key is a slate index)."""
+    try:
+        hit = _espn_game(sport, game, date, away_abbr, home_abbr) if sport in _ESPN_PATHS else None
+    except Exception:  # noqa: BLE001
+        return None
+    return (hit or {}).get("id")
+
+
 def _espn_linescore(sport: str, game: Mapping[str, Any], date: str, away_abbr: str, home_abbr: str) -> dict[str, Any] | None:
     hit = _espn_game(sport, game, date, away_abbr, home_abbr)
     if not hit or not hit["away_periods"] or not hit["home_periods"]:

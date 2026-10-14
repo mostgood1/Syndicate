@@ -783,6 +783,44 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
 _SERVE_TIME_LINESCORE_SPORTS = {"nba", "wnba", "nhl"}
 
 
+def _chip_day(chip: dict[str, Any], date_value: str) -> str:
+    start = chip.get("start_time_utc")
+    if start:
+        try:
+            return datetime.fromisoformat(str(start).replace("Z", "+00:00")).astimezone(CENTRAL_TIMEZONE).date().isoformat()
+        except ValueError:
+            pass
+    return date_value
+
+
+def _attach_trend(sport: str, game: dict[str, Any], chip: dict[str, Any], date_value: str) -> None:
+    """NHL / soccer pressure on the live line -- their "on a 9-2 run" (user
+    2026-10-14; `game_chip_trend`). Rebuilt each pass, never stacked."""
+    if sport not in ("nhl", "soccer") or chip.get("state") != "live":
+        return
+    try:
+        from syndicate.features.shared.game_chip_trend import live_trend
+
+        away_abbr, home_abbr = (chip.get("away") or {}).get("abbr") or "", (chip.get("home") or {}).get("abbr") or ""
+        if sport == "nhl":
+            from syndicate.features.shared.game_chip_linescore import espn_event_id
+
+            event_id = espn_event_id(sport, game, _chip_day(chip, date_value), away_abbr=away_abbr, home_abbr=home_abbr)
+        else:
+            event_id = game.get("event_id") or chip.get("game_key")
+        trend = live_trend(sport, event_id=event_id, league=game.get("league") or chip.get("league"), away_abbr=away_abbr, home_abbr=home_abbr)
+        # NHL's raw game state ("CRIT", "LIVE") leaked onto the live line; it is
+        # not a situation. Old trend text is dropped so a re-read replaces it.
+        parts = [p for p in str(chip.get("situation") or "").split(" · ")
+                 if p and "pressing" not in p and not (sport == "nhl" and p.isupper() and p.isalpha())]
+        parts = [p for p in parts if not re.match(r"^\d+–\d+ (shots|corners)", p) and not p.startswith("last ")]
+        if trend:
+            parts.append(trend)
+        chip["situation"] = " · ".join(parts) or None
+    except Exception:  # noqa: BLE001 -- a trend line must never break a chip
+        return
+
+
 def attach_served_linescores(chips: list[dict[str, Any]], date_value: str) -> None:
     """Line scores on WORKER-BUILT chips at serve time (NBA / WNBA / NHL only).
 
@@ -798,6 +836,10 @@ def attach_served_linescores(chips: list[dict[str, Any]], date_value: str) -> No
     for chip in chips or []:
         if not isinstance(chip, dict):
             continue
+        if chip.get("sport") == "soccer" and chip.get("state") == "live":
+            key = chip.get("game_key")
+            _attach_trend("soccer", {"event_id": key, "league": chip.get("league")}, chip, date_value)
+            continue
         if chip.get("sport") not in _SERVE_TIME_LINESCORE_SPORTS or chip.get("state") not in ("live", "final"):
             continue
         # A live chip is re-read every serve even when it already has a line
@@ -810,6 +852,7 @@ def attach_served_linescores(chips: list[dict[str, Any]], date_value: str) -> No
         key = chip.get("game_key")
         chip.pop("linescore", None) if chip.get("state") == "live" else None
         _attach_linescore(chip["sport"], {"game_id": key, "event_id": key}, chip, date_value)
+        _attach_trend(chip["sport"], {"game_id": key, "event_id": key}, chip, date_value)
 
 
 def _attach_board_plays(chips: list[dict[str, Any]], date_value: str, sports: tuple[str, ...]) -> None:
@@ -1000,6 +1043,7 @@ def _build_game_chips_uncached(date_value, normalized_sports, cache_key, now):
                 chip = build_game_chip(slug, game)
                 if chip.get("state") in ("live", "final"):
                     _attach_linescore(slug, game, chip, date_value)
+                    _attach_trend(slug, game, chip, date_value)
                 chips.append(chip)
 
     _attach_board_plays(chips, date_value, normalized_sports)
