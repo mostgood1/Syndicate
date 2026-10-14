@@ -2059,3 +2059,20 @@ prefer single-quoted arguments there.
 ## 2026-10-14 -- nflverse spells the Rams `LA`, not `LAR`: grep a game by DATE, never by a guessed game_id `[lane nfl-mnf-settlement-lag, session d4409ac4]`
 - I checked "is MNF in the fleet pbp" with `grep -c 2026_05_BUF_LAR` four times over ~4 h and reported 0 each time; the game is `2026_05_BUF_LA` (199 rows, present since 18:57Z). A zero from a guessed key is the empty-output trap the 10-12 FORBIDDEN names.
 - **Rule:** select by `game_date` (or the schedule's own game_id) and print what is there before concluding a game is absent.
+
+## 2026-10-14 -- RULE: before "re-fit the calibration", check WHERE in the pipeline the calibration reads its residual `[lane basketball-scenario-calibration, session e0a3e383]`
+- **Measured:** a pre-registered step said "re-fit the NBA totals calibration" to absorb +1.2 points added by new engine
+  foul mechanisms. `build_nba_totals_calibration.py` fits actual − `market_anchor.model_total_raw`, the raw
+  ratings × pace total UPSTREAM of the engine. The engine mechanisms never touch that number, so the re-fit would
+  have reproduced the same terms and "passed" while fixing nothing.
+- **The real cause:** FT volume (+1.2 FTA/game). The bonus rate had been fitted before a second foul mechanism was
+  switched on (mechanism vs estimator again).
+- **Same session, same shape (the target is not what it is labelled):**
+  - ESPN team stat `fouls` (20.52) is NOT personal fouls (19.67 from the player box).
+  - ESPN pbp writes an offensive foul twice ("Offensive Foul" + "Offensive Foul Turnover"), which inflated sixth-foul
+    counts 390 vs 141.
+  - `float(x or 1.0)` turned a lever value of 0.0 into OFF.
+- **How to apply:**
+  - Name the exact field a calibration or target is computed from, and confirm the change you are compensating can
+    move it.
+  - Reconcile any new real target against a second source (box vs pbp) before gating on it.

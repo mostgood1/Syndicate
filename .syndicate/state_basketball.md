@@ -1160,6 +1160,14 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   −1.19); foul-outs ~0.15 vs real 0.193. Full FIT of the combined config (791 games, 2026-10-13): starter minutes
   30.89/30.08/27.63 vs real 31.32/29.98/26.87 by final margin, foul-outs 0.206 (real 0.193), no guard row moved
   beyond noise. NOT enabled.
+- **Foul mechanisms (Phase 2 #3, with P3), all default-off on main, NOT enabled. Measured on 12 FIT dates
+  (87 games) 2026-10-14:**
+  - bonus FTs (bonus_free_throws, rate 0.04) + P3's end-game fouling + foul_out_in_sim / bench_mult 0.05;
+  - **fouler_per_minute** (f9a2617b): top-5 PF share 0.658 → 0.597, real 0.585;
+  - **foul_trouble_foul_mult = 0.5** (917b40a8): foul-outs 0.194 (real 0.193), P(6th | 5th in Q4) 0.2145 (real 0.2125),
+    closers-on 0.400 (real 0.455). PROVISIONAL pick.
+  - Open: total +1.2 over actual from FT volume (46.6 vs 45.4 FTA/game; bonus rate not re-fit with end-game on, #3i).
+  - The totals calibration CANNOT absorb engine overshoot: it fits `model_total_raw`, upstream of the engine.
 - **score_effect_k** (late-game catch-up, native engine, default 0): k = 0.002 ACCEPTED by the user 2026-10-10 as a
   PROPOSAL (fine grid 48cb10ff; Q4 tolerance overridden, Q4 remainder to P3). NOT enabled: nothing sets it in
   production. Confirmed on the full 2025-26 FIT window WITH lineup pools + #473 inputs 2026-10-12 (791 games):
