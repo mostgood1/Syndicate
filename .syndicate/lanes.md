@@ -824,11 +824,12 @@ death, never life — do not invert it.
 
 ### ci-env-home-sandbox — OPEN — opened 2026-10-14 — session feaf967d-56d0-48b5-96f4-b5bd61392109
 - Goal: no nightly ci-suite test can read or write fleet production state: ci_env() sandboxes HOME + SYNDICATE_LOCAL_HOME; measured before/after over prod claim dir, data root, run dir
-- Files: scripts/local_production.py (ci_env + CI_ENV_PASSTHROUGH + cmd_ci_run section only), tests/test_local_production_ci_env.py (NEW)
+- Files: scripts/local_production.py (ci_env + CI_ENV_PASSTHROUGH + cmd_ci_run section only), tests/test_local_production_ci_env.py (NEW), tests/test_local_production.py (test_ci_env_carries_nothing_that_reaches_the_fleet only), tests/test_oddsapi_quota.py (OffFleetAbsentDocumentTests._off_fleet only)
 - Hypothesis: the 10-13/10-14 stray web claims reached prod via HOME -> ~/syndicate-prod/local_production.env SYNDICATE_DEPLOY_CLAIM_DIR, not an inherited env var (ci_env scrubs that)
 - Falsification test: a suite run with sandboxed HOME still changes the prod claim dir / data root / run dir
 - Verification: snapshot diff of prod dirs before/after one Idle suite run
 - Blocked by: none
+- RESULT 2026-10-14 23:55Z: hypothesis CONFIRMED (both stray claims inside nightly windows; HOME was the path). Fixed 921fa58e. Gate run with sandboxed HOME: 0 test-attributable changes in prod claim dir / data root / run dir / keyvalue key set -- BUT a second leak was found and fixed (148947d6): test_oddsapi_quota wrote fake headers into the fleet's quota doc via redis 127.0.0.1:6379 (its baseline is still the fake, since 10-11). Detail: log/2026-10-14.md 23:55Z. Owed: fleet ff >= 148947d6 (user OK needed); hooked chunks 1-6 run in flight.
 
 ### news-availability-gate — OPEN — opened 2026-10-14 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
 - Goal: NHL and NFL prop rows whose player is OUT (ESPN injury status Out / Injured Reserve / Suspension, via the fleet news collector) or SCRATCHED for that NHL game (collector gameinfo) carry player_availability on the served board and are not seated on Layer 2, matched on team + name; questionable / doubtful / day-to-day stay priced
