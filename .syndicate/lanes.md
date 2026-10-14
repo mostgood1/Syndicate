@@ -851,6 +851,14 @@ death, never life — do not invert it.
 - Verification: snapshot diff of prod dirs before/after one Idle suite run
 - Blocked by: none
 
+### news-availability-gate — OPEN — opened 2026-10-14 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: NHL and NFL prop rows whose player is OUT (ESPN injury status Out / Injured Reserve / Suspension, via the fleet news collector) or SCRATCHED for that NHL game (collector gameinfo) carry player_availability on the served board and are not seated on Layer 2, matched on team + name; questionable / doubtful / day-to-day stay priced
+- Files: syndicate/features/shared/news_availability.py (NEW), tests/test_news_availability_gate.py (NEW), syndicate/features/shared/board_enrichment.py (the news out-player call in attach_projections ONLY)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: unit tests incl. same-name-other-team and a reachability test through attach_projections; on the fleet after a refresh-worker restart, per_sport_ingest nfl / nhl out_player_props report feed_status ok with rows_flagged equal to the offline prediction from the same state, and rows_player_out_on_feed_by_sport carries nfl / nhl with named samples that are Out / IR / scratched on the collector
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
