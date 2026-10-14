@@ -49198,3 +49198,15 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **Why it stayed down:** task `SyndicateLocalProduction` has ONE trigger, `MSFT_TaskLogonTrigger`, LogonType Interactive -- nothing starts the fleet after a reboot until someone logs on. First logon 7:47:47 AM CT -> task LastRun 7:47:47 -> WSL booted 12:47:31Z, supervisor up 12:47:59Z.
 - **What ran once it was up (fixes measured):** settlement launched 12:59:14Z via `CAP_EXEMPT_AUTORUN launched=_launch_autorun_evaluation_settlement` (at cap -- before df892324 it would have waited for an odds-free tick); NFL `NFL_PBP_FETCH_MORNING_DUE` + `LAUNCHING` 13:00:26Z (db5fec09; next tick rate_limited -- once a day); pbp_2026.csv mtime 08:00:31 CT.
 - **Not fixed (needs the user, system settings):** boot-time start for the fleet (a startup trigger / non-interactive logon for the task) or Windows Update restart scheduling. Missed during the outage: the 10:00Z NFL fetch and the 10:35Z `basketball-linescores` job ran late (catch-up), 12:00Z settlement ran ~13:00Z, no live games were affected (none 1:29-7:48 AM CT).
+
+
+## 2026-10-14 13:05:58Z -- CORRECTION to my 2026-10-14 03:12Z entry: there was NO unattributed supervisor `up` (lane `ncaab-native-live-tier`, session e48a0f9b; user "find who did the unrecorded fleet restarts")
+- **My 03:12Z entry was WRONG on two points.** (1) The NCAAB keys loaded at the RECORDED 2026-10-13 21:02:39-21:02:55Z full down/up (lane `fair-price-v2`, session 9e18a0e7, entry above: SHIN fair devig). It was NOT a "02:30:28Z `up`". (2) 02:30:28Z was NOT a supervisor `up` and needed no owner.
+- **Evidence (fleet, read 2026-10-14):**
+  - `supervisor.log` shows `stopping roles ... stopped.` then `LOCAL PRODUCTION UP ... commit=939aee6a`.
+  - web, refresh-worker and live-odds-worker all log `==== start 2026-10-13T21:02:5xZ restarts=0`.
+  - The first `NCAAB_LIVE_RESIM_LOOP_STARTED` is 2026-10-13T21:02:57Z.
+  - At 02:30:18Z live-odds-worker logged `LIVE ODDS REFRESH WORKER RECYCLING after 19641s uptime to reset accumulated page cache`. The supervisor printed `[live-odds-worker] exited code=0 after 19648s -- restarting in 5s` and respawned it as `restarts=1` with the same env, so the loop restarted 02:30:30Z. No human involved.
+- **How I got it wrong:** `local_production.py status` printed the supervisor as `since 2026-10-14T02:30:28Z`. That value matches the role respawn, not the supervisor's own start. I read it as a new `up` without checking the role logs' `restarts=` field or `supervisor.log`. Judge a supervisor `up` by `supervisor.log` (`LOCAL PRODUCTION UP`) and role `==== start ... restarts=0`, never by that status field.
+- **The third event is already attributed:** 2026-10-14 ~06:30Z -> 12:47Z was a Windows Update host reboot, after which the logon-triggered task waited for a logon. Recorded at 12:58Z by session b9bb5f37 (lane `soccer-live-anytime-scorer`). The NCAAB loop came back 12:48:01Z.
+- **Net:** all three fleet restarts since the NCAAB switch-on have owners, and none was unrecorded. The NCAAB thread has run since 2026-10-13 21:02:57Z, except during the ~6 h host outage.
