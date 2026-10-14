@@ -1667,3 +1667,45 @@ diagnosis.
 before choosing the pre-registered fallback lever (thresholds or release_s):
 - quarter and clock of foul-outs;
 - the PF share of each team's top fouler, vs ESPN player boxes.
+
+### Phase 2 #3c — PRE-REGISTRATION 2026-10-14 02:55Z (before any run): WHEN and TO WHOM the sixth foul lands (diagnosis, P3 co-design)
+
+**Also queued (P3's request):** re-run grid point bench_mult 0.0 with P3's fix ab6d34de (0.0 = full benching), as
+`JF_m000b`. That evaluates the #3b fallback trigger as written: if 0.0 still overshoots 0.193 by more than 0.04, the
+saturation is structural.
+
+**Diagnosis run:**
+- The #3b config at bench_mult = 0.05 (P3's fitted value), the same 12 dates.
+- Instrumentation: a RESEARCH-ONLY patch on the WSL code copy, never on main. It is gated by a cfg field
+  `diag_foul_outs` (default absent).
+- Each possession snapshots the context: period, clock, release-window flag, each player's PF and the quarter's
+  threshold, the foul-trouble list, the on-court line, and whether the possession was an end-game intentional foul.
+- At the next possession start, or at game end, every player who crossed the foul limit since the snapshot is logged
+  with that context.
+
+**Categories, assigned in this priority order:**
+- (b) end-game intentional foul possession;
+- (a) inside the Q4 release window (the last 240 s, no benching);
+- (d) a possession that added ≥ 2 PF and started BELOW the quarter threshold, so benching could not act;
+- (c) started at or over the threshold outside the release window, so benching failed to remove him: depleted
+  roster, first line, or < 5 eligible. Also logged: whether he was on the flagged trouble list.
+
+This is a complete partition: reaching 6 from below the threshold with a single foul is impossible (thresholds 2/3/4/5,
+OT 5).
+
+**Real comparison** (ESPN cached summaries, FIT regular season, all ~816 games; the 87-game subsample has only ~9 real
+foul-outs):
+- Foul-out timing from play-by-play: the sixth personal foul, excluding technicals, by Q1–Q3, Q4 > 4:00, Q4 ≤ 4:00 and
+  OT, against the sim's same windows.
+- Top-fouler share: max player PF / team PF, and P(top fouler ≥ 5 PF), against the sim (a harness field `pfmax`, committed).
+
+**Decision rule (P3's mapping):** compare categories by their share of the sim's EXCESS foul-outs per game over
+real. Where real has the same window (a), the excess is sim − real in that window. For (b)/(c)/(d) the whole sim count
+is treated as excess, since real has no comparable split.
+- (a) largest and ≥ 40% → foul_trouble_release_s;
+- (c) → roster depth / eligibility;
+- (d) → foul_trouble_thresholds;
+- (b) → end-game fouler choice;
+- no category ≥ 40% → per-player PF assignment concentration, checked with the top-fouler share.
+
+Diagnosis only: no parameter is chosen from this run. The chosen lever gets its own pre-registered sweep.
