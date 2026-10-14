@@ -2146,3 +2146,8 @@ wording matched none of the patterns), and the script carried on: ff + a live-od
 claims, taken for a planned reboot test. Silence was read as success. **How to apply:** in any deploy script, run
 `acquire` unfiltered, `|| exit` on its status, and re-read `status --service <svc>` naming YOUR holder before the first mutating
 command. A filter on a guard's output is a way to not see the guard.
+
+## 2026-10-14 — RULE: an offline soccer squad/lineup measurement must run with SYNDICATE_DATA_ROOT set, or the departed filter's roster rescue is EMPTY `[lane soccer-starter-name-match, session b9bb5f37]`
+- **Belief overturned:** I reported confirmed-starter resolution as 2,058 -> 2,130 of 2,222, and 14 starters "dropped by the departed filter", from `_load_player_rows(league, root)` with an explicit root.
+- **What was true:** `_current_roster_names` reads through the data root, not the `source_root` argument. Without `SYNDICATE_DATA_ROOT` it returned 0 names (roster_size=0 in every league), so the filter rescued nobody and dropped 10 starters that production keeps. With it set, the figures are 2,069 -> 2,142, and only 4 "dropped" remained. Those were not drops either: the deduped row kept an older season's name ("Jonathan Buatu" vs ESPN "Buatu").
+- **Rule:** when calling a loader with an explicit root, PRINT a size for every side input it reads (the roster set here) before trusting the output. An empty rescue list looks exactly like a working filter.
