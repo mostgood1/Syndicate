@@ -49119,3 +49119,8 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **VERIFY (deployed checkout, 02:18Z):** HEAD e2a76b85 contains 30f19ca8. 6 `source_cli` references in the script. 8 tests passed.
 - **Production reading OWED:** the next `WNBA_TOTALS_CALIBRATION rc=0 {"status": "wrote" ...}` line in a WNBA props log after 02:18Z, and the matching `calibration_totals_<slate-1>.json`. The newest is `calibration_totals_2026-10-08.json`; the step runs when a full WNBA refresh reaches it, which is expected with Finals G1 (10-17) lines.
 - **Rollback:** revert 30f19ca8 and ff. No restart.
+
+## 2026-10-14 02:23:0xZ (9:23 PM CT 10-13) -- rolling `reload-web` onto 658ecbe2: live MLB R/H/E + inning (lane `games-rail-full-detail`, session d4409ac4, user "mlb score is wrong") -- NO outage
+- **cause:** CLE @ TB (gamePk 849813) live in the 7th served R/H/E 0 0 / 0 0 0 0 -- the day's cached feed_live file was a PRE-game copy -- and "TOP 7" while StatsAPI read Bottom 7th (worker build minutes old). Team scores 1-3 were right.
+- **change:** today / yesterday MLB R/H/E from StatsAPI `schedule?hydrate=linescore` (one request per date, 45 s cache); inning token TOP / MID / BOT / END n from `inningState`; MLB added to the serve-time refresh. Older dates keep the feed files.
+- **verify (served 02:23Z vs StatsAPI same minute):** 'BOT 7', CLE 1 6 1 / TB 3 7 0 == StatsAPI Bottom 7, away R1 H6 E1 / home R3 H7 E0. Reload 2.0 s, 0 failures, claim released; ride-alongs none.
