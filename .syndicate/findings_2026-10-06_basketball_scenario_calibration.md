@@ -2027,3 +2027,8 @@ dates, 200 sims.
 - Then P3's game-matched §7 end-game check.
 
 **If no point passes:** report the failing guard. No override.
+
+**#3h CO-SIGN (P3, as pre-registered at 97e35b18, before any reading).**
+- Ordering amendment: P3's game-matched §7 end-game check runs AFTER the totals re-fit. Last-2:00 points depend on the
+  team targets, so a §7 read before the re-fit would test a config that will not ship.
+- The order is therefore: pick (provisional) → totals re-fit → full FIT → §7.
