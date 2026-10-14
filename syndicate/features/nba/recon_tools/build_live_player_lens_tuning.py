@@ -1,4 +1,5 @@
-# Syndicate copy of vendor/nba_betting_repo/tools/build_live_player_lens_tuning.py (sha256 45e4de3b4f4cf65f..., LF), byte-for-byte below this header.
+# Syndicate copy of vendor/nba_betting_repo/tools/build_live_player_lens_tuning.py (sha256 45e4de3b4f4cf65f..., LF), byte-for-byte below this header except ONE marked
+# `SYNDICATE EDIT` (2026-10-14, lane nba-recon-boxscores-import-native): the vendored boxscores import is removed.
 # Lane nba-source-cli-native, 2026-10-12: scripts/refresh_nba_oddsapi_props.py loads it by path (as it loaded
 # the vendored file) with NBA_BETTING_DATA_ROOT set. tests/test_nba_recon_tools_native.py pins the body.
 """Build daily tuning dataset for Player Live Lens (props).
@@ -296,16 +297,9 @@ def _load_preds_long(date_str: str) -> pd.DataFrame:
 def _load_actuals_long(date_str: str) -> pd.DataFrame:
     # Try to use the repo's schedule mapping (fast + precise)
     game_ids: list[str] = []
-    try:
-        from nba_betting.boxscores import _nba_gid_to_tricodes
-
-        gid_map = _nba_gid_to_tricodes(str(date_str)) or {}
-        for gid in gid_map.keys():
-            g = _canon_nba_game_id(gid)
-            if g:
-                game_ids.append(g)
-    except Exception:
-        game_ids = []
+    # SYNDICATE EDIT (2026-10-14): the vendored `nba_betting.boxscores._nba_gid_to_tricodes` lookup that stood here is
+    # removed. It could never import in production (the refresh puts only the repo root on sys.path; checked on the
+    # fleet), so the game ids always came from the smart_sim fallback below, which is all that runs now.
 
     # Fallback: use smart_sim files to discover game ids
     if not game_ids:

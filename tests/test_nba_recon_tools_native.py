@@ -17,6 +17,32 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ("build_recon_players", "build_live_player_lens_tuning")
 
+#: The ONE documented edit in a copy (lane nba-recon-boxscores-import-native, 2026-10-14): the vendored
+#: `nba_betting.boxscores` lookup was removed from the lens-tuning tool. It could never import in production (the refresh
+#: puts only the repo root on sys.path), so the tool always used its smart_sim fallback. The body test reverses this edit
+#: and then requires the vendored bytes exactly.
+EDITS = {
+    "build_live_player_lens_tuning": [(
+        b"""    game_ids: list[str] = []
+    # SYNDICATE EDIT (2026-10-14): the vendored `nba_betting.boxscores._nba_gid_to_tricodes` lookup that stood here is
+    # removed. It could never import in production (the refresh puts only the repo root on sys.path; checked on the
+    # fleet), so the game ids always came from the smart_sim fallback below, which is all that runs now.
+""",
+        b"""    game_ids: list[str] = []
+    try:
+        from nba_betting.boxscores import _nba_gid_to_tricodes
+
+        gid_map = _nba_gid_to_tricodes(str(date_str)) or {}
+        for gid in gid_map.keys():
+            g = _canon_nba_game_id(gid)
+            if g:
+                game_ids.append(g)
+    except Exception:
+        game_ids = []
+""",
+    )],
+}
+
 
 def _blob(path: str) -> bytes | None:
     r = subprocess.run(["git", "show", f"HEAD:{path}"], capture_output=True, cwd=ROOT)
@@ -32,7 +58,20 @@ def test_copy_body_is_the_vendored_file(name):
     vendored = _blob(f"vendor/nba_betting_repo/tools/{name}.py")
     if vendored is None:
         pytest.skip("vendor tree removed")
+    for edited, original in EDITS.get(name, []):
+        assert body.count(edited) == 1, f"{name}: the documented edit is missing or duplicated"
+        body = body.replace(edited, original)
     assert body == vendored
+
+
+@pytest.mark.parametrize("name", TOOLS)
+def test_no_vendored_package_is_imported(name):
+    import ast
+
+    tree = ast.parse((ROOT / "syndicate" / "features" / "nba" / "recon_tools" / f"{name}.py").read_text(encoding="utf-8-sig"))
+    mods = [a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names]
+    mods += [n.module or "" for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)]
+    assert not [m for m in mods if m.split(".")[0] in {"wnba_betting", "nba_betting", "vendor"}], mods
 
 
 def test_refresh_loads_the_syndicate_copies(tmp_path, monkeypatch):
