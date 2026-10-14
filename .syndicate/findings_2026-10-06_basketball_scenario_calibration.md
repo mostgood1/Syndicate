@@ -2275,3 +2275,26 @@ same 12 sweep dates.
   to show how stale s is before the re-measure.
 - A passing point more than ~20% off s should move the re-gated total bias by about that share of the 0.92/game the
   term carries.
+
+### Phase 2 #3l — RESULT 2026-10-14 16:46Z (done 16:45Z, co-signed): CONFIRMED, pick base_nonshooting 0.065 + bonus 0.03
+
+**Run:** 6 points × 12 dates, 17,400/17,400 calls with levers, 0 errors. s = 0.00709 and Δ = 0.108 held during the grid.
+
+| base / bonus | FTA (22.69 ± 0.3) | team PF (19.67 ± 0.4) | trips/poss (s held 0.00709) | foul-outs (read) | P(6th\|5th) | closers-on | H2 / Q4 / S8 | total bias (read) | verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| 0.065 / 0.02 | 22.30 ✗ | 18.79 ✗ | 0.00489 | 0.176 | 0.206 | 0.404 | −0.156 / −0.077 / 15.11 | −0.33 | fail |
+| 0.065 / 0.025 | 22.56 | 19.23 ✗ | 0.00630 | 0.194 | 0.212 | 0.400 | −0.176 / −0.090 / 14.86 | −0.03 | fail |
+| **0.065 / 0.03** | **22.76 ✓** | **19.68 ✓** | **0.00802 (+13%)** | 0.211 | 0.214 ✓ | 0.401 ✓ | −0.169 / −0.084 / 14.96 ✓ | +0.10 | **PASS** |
+| 0.08 / 0.02 | 22.39 | 20.19 ✗ | 0.00550 | 0.227 | 0.216 | 0.397 | −0.169 / −0.084 / 15.03 | −0.09 | fail |
+| 0.08 / 0.025 | 22.74 | 20.73 ✗ | 0.00712 | 0.258 | 0.219 | 0.399 | −0.175 / −0.088 / 14.92 | +0.11 | fail |
+| 0.08 / 0.03 | 23.03 ✗ | 21.13 ✗ | 0.00889 | 0.275 | 0.224 | 0.396 | −0.167 / −0.087 / 14.94 | +0.05 | fail |
+
+- The Q4 FTA share is 0.263–0.264 everywhere (passes).
+- **Pick: base 0.065 / bonus 0.03**, the only passing point. FTA and PF both on real, foul-outs 0.211 (inside its
+  band), total bias +0.10.
+- Its trips/possession is 0.00802, +13% over the frozen s (under P3's 20% flag).
+- **Next, as pre-registered:**
+  1. Re-measure s and Δ at the pick on the #3j measure dates (M1′, then M2′/M3′).
+  2. The #3k-style check: |bias| < 0.5 and every #3i guard, foul-outs included.
+  3. The full FIT.
+  4. §7.
