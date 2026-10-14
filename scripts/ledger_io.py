@@ -44,6 +44,7 @@ caught it. Refer to the siblings by ROLE here, not by filename.
 from __future__ import annotations
 
 import pathlib
+import re
 
 CR = chr(13)
 LF = chr(10)
@@ -77,3 +78,73 @@ def write_ledger(path, text: str, eol: str) -> None:
 def lone_cr_count(raw: str) -> int:
     """CRs that are not part of a CRLF -- the thing to assert is conserved."""
     return raw.count(CR) - raw.count(CRLF)
+# A lane block ends at the next heading of level 1-3 -- NOT at the next level-3
+# heading, and NOT at any heading whatsoever.
+#
+# BOTH halves of that are measured, and both mistakes have been made here.
+#
+# Bounding by the next `### ` alone: the LAST block in `lanes.md` then runs to
+# EOF and swallows every trailing `## ` section. Done twice, a day apart, by the
+# author of the rule against it -- 2026-10-13 a lane close rewrote 765 lines as
+# 7, deleting 114,376 chars of `## Archive pointers` / `## Archived lanes`
+# (caught by a line-count print, not by a guard); 2026-10-14 a verification
+# harness read `signal-engine-wnba` as 785 lines / 120,001 chars instead of 12 /
+# 4,101 and reported a correctly-moved block as ALTERED.
+#
+# Bounding by ANY heading (`#{1,6}`), which is what `learnings.md` 2026-10-13
+# prescribes, overshoots: measured on `lanes_history.md`, it truncates 26 of 887
+# archived blocks, one of them from 259 lines to 15, because those blocks
+# legitimately contain `####` sub-headings. A heading DEEPER than the block's own
+# level is CONTENT. `lanes.md` itself has 2 such lines and 0 of its 75 blocks
+# contains one, so the two boundaries agree there and only the archive exposes
+# the difference -- which is why the narrower rule has to be the default rather
+# than a special case someone remembers.
+#
+# `scripts/check_trimmed_contracts.py` independently chose `^#{2,3}` for the same
+# reason; this adds level 1 so a document's own title also closes a block.
+_HEADING_1_3 = re.compile(r"^#{1,3}[ \t]")
+_BLOCK_HEAD = re.compile(r"^###[ \t]+\**([a-z0-9][a-z0-9-]*)")
+
+
+def block_spans(text: str) -> dict[str, list[tuple[int, int]]]:
+    """slug -> [(start, end)] line spans of every `### <slug>` block, end-exclusive.
+
+    `text` must be LF-normalised, i.e. what `read_ledger` returns. Duplicate
+    slugs are RETURNED, not collapsed: one lane is supposed to have one block,
+    and a caller that silently joined two would reproduce the defect this exists
+    to prevent.
+    """
+    lines = text.split(LF)
+    out: dict[str, list[tuple[int, int]]] = {}
+    for i, line in enumerate(lines):
+        m = _BLOCK_HEAD.match(line)
+        if not m:
+            continue
+        end = next((j for j in range(i + 1, len(lines)) if _HEADING_1_3.match(lines[j])),
+                   len(lines))
+        out.setdefault(m.group(1), []).append((i, end))
+    return out
+
+
+def block_bounds(text: str, slug: str) -> tuple[int, int]:
+    """The single (start, end) span for `slug`, end-exclusive.
+
+    REFUSES rather than guesses: raises if the slug is absent, and raises if it
+    appears more than once, because a duplicated lane block is itself a ledger
+    defect and picking one of them hides it.
+    """
+    spans = block_spans(text).get(slug, [])
+    if not spans:
+        raise KeyError("no '### %s' block found" % slug)
+    if len(spans) > 1:
+        raise ValueError(
+            "'### %s' appears %d times at lines %s -- one lane, one block; "
+            "refusing to choose" % (slug, len(spans), [s + 1 for s, _ in spans])
+        )
+    return spans[0]
+
+
+def block_text(text: str, slug: str) -> str:
+    """The block's own lines, joined with LF. Same refusals as `block_bounds`."""
+    start, end = block_bounds(text, slug)
+    return LF.join(text.split(LF)[start:end])

@@ -955,6 +955,14 @@ death, never life — do not invert it.
 - Verification: offline before/after on 10-09..10-12 match_box starters: per-side recognised counts, all-11 share, plus a hand-checked sample of every new pairing; tests incl. off != on
 - Blocked by: none
 
+### ledger-io-block-bounds — OPEN — opened 2026-10-14 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: scripts/ledger_io.py exposes a block-boundary helper that bounds a lane block by the next heading of level 1-3 and never by the next level-3 heading alone, refuses an absent or duplicated slug rather than guessing, and is covered by tests that fail against both boundary mistakes measured on the live ledger.
+- Files: scripts/ledger_io.py,tests/test_ledger_block_bounds.py
+- Hypothesis: Prose did not prevent the recurrence: the rule was written 2026-10-13 and violated by its author 2026-10-14, because every ad-hoc script re-derives the boundary.
+- Falsification test: No production tool re-implements it wrongly (archive_state_subject.py scans inside subject_span; check_trimmed_contracts.py uses ^#{2,3}), so the fix is a helper, not a migration.
+- Verification: tests/test_ledger_block_bounds.py 8/8, proved non-vacuous by mutation (###-only fails 3, #{1,6} fails 1); 45 pass across the five files importing ledger_io.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
