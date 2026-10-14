@@ -218,3 +218,24 @@ recency, but after May the real-five rate is FLAT ~0.7 while the median frame ne
 reading (findings_2026-10-09 §11) ramps 0.45 -> 0.92 as frames grow 12.5 -> 17. For WNBA the leading candidate is
 a frame-size cap of ~10 (below a real 11-12-player rotation), with recency on top in May. UNVERIFIED which code
 sets it -- for the smart-sim roster/frame owner (P3 filed the lead).
+
+### CORRECTION (2026-10-14 17:3xZ): the WNBA on-floor gap is the K=1 RECENCY rule, not the frame cap
+
+Code (read, file:line): WNBA alone runs `_prune_pregame_rotation_pool` (`orchestrator/runtime.py:114`
+`prune_pregame_pool=True`, NBA `:96` False; called `orchestrator/smart_sim.py:1481`) with `max_keep = 11` for WNBA
+(`basketball_props_smart_sim.py:1693`); before it, `_drop_excluded` removes the WNBA recency exclusions
+(`wnba_sim_availability.recency_exclusions`, K=1 = absent from the team's previous game; ON via file switch since
+2026-10-05); and the pool is topped up from the roster ONLY when the props pool has < 8 players (`smart_sim.py:1358`).
+
+Measured -- each of the 261 absent on-court players (5:00 Q4, 340 games) classified against the team's previous
+game in the corpus: **217 (83%) sat out the team's previous game** (the recency rule's trigger), 19 had no prior
+team game (opener), **12 (5%) played it with the frame at the 11 cap**, 13 played it with a frame < 11. The side's
+frame held 8-10 players for 197 of the 261 -- **the cap rarely binds; frames sit near 10 because the recency rule
+thins the props pool first.** Every month is recency-dominated (May 34 / Jun 41 / Jul 46 / Aug 60 / Sep 36).
+**My 13:2xZ "frame capped at ~10" reading was wrong** (corrected to P3 the same hour). Caveat: "sat out the previous
+game" is the rule's TRIGGER; that the rule (not some other filter) removed each player is not verified per player
+(it has `playing_today` / injury re-inclusions).
+
+Implication beyond P5: the availability rule (enabled 2026-10-05 by user decision on its pregame minutes gain) also
+gives ZERO pregame minutes to players who then play ~19 median minutes after sitting one game -- 217 such on-court
+instances at 5:00 Q4 alone. That is a pregame trade-off for the rule's owner, not something P5 changes.
