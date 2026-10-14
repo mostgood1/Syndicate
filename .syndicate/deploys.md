@@ -49265,3 +49265,9 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **NOT FF'D, by user decision 2026-10-14:** main is linear, and the only ff that reaches 0fef1ad0 also carries b4108767 (daily optimizer props stake tier). Lane `optimizer-props-tier` records that as "NOT ON THE FLEET" under an open rule check.
   - The fleet (63631afb) therefore still runs e1954b4a's one-word step. It affects only one-word ESPN starter names with a unique first-name row in the squad, including tonight's MLS pre-kickoff runs.
   - It loads with whichever ff next carries b4108767. The optimizer lane's owner (scheduled session "Daily model + betting accuracy review") cannot be messaged; the ask is in log/2026-10-14.md.
+
+## 2026-10-14 17:48Z (12:48 PM CT) -- PLANNED WINDOWS REBOOT (user "reboot now and check the fleet comes back"), session d4409ac4 -- written BEFORE the reboot (the session dies with it)
+- **why:** prove `SyndicateLocalProduction` (BootTrigger PT1M, LogonType Password, no LogonTrigger) starts WSL + the supervisor at boot with NO logon.
+- **gate:** claims web / refresh-worker / live-odds-worker held by `games-rail-full-detail` 17:47:28Z (expire ~18:32Z; release after the reading); no live games (all sports 2026-10-14); MLB sim finished; one live-odds WNBA props refresh in flight (re-runs).
+- **sequence (planned):** `local_production.py down`, then `shutdown /r /t 30`.
+- **reading owed (next session):** Win32_OperatingSystem LastBootUpTime vs first logon (event 7001 / 4624) vs supervisor `since` and /healthz 200; supervisor start EARLIER than the logon = boot start proven. Then release the three claims.
