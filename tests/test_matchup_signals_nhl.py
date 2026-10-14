@@ -166,3 +166,18 @@ def test_pull_summarizes_a_snapshot_without_secrets() -> None:
     s = p.summarize({"timestamp": "t", "data": {"bookmakers": [{"key": "dk", "markets": [_mk("player_points", "A", 0.5, -110, -110)]}]}})
     assert s == {"timestamp": "t", "books": ["dk"], "outcomes_by_market": {"player_points": 2}}
     assert p.CREDITS_PER_GAME == 40
+
+
+def test_saves_v3_tests_only_new_games_and_holms_the_two_leads() -> None:
+    lift = _load("nhl_saves_lift")
+    graded = []
+    for i in range(20):
+        for source, y in (("odds_saves_rest", 1.0), ("odds_saves", 0.0)):
+            graded.append({"source": source, "game": f"{source}{i}", "y_over": y, "p_over": 0.5, "under_dec_best": 1.9,
+                           "under_dec_median": 1.9, "feats": {"opp_sf_pg": 31.0, "team_sa_trend": 4.0, "team_rest_days": 2}})
+    rep = lift.lift_new(graded)
+    assert rep["graded"] == {"new": 20, "full_season": 40}
+    leaky = rep["new_games"]["nhl.saves_team_leaky"]["fired"]
+    assert leaky["n"] == 20 and leaky["residual"] == 0.5          # the v1 games (all lost) are not in the test
+    assert rep["full_season"]["nhl.saves_team_leaky"]["fired"]["residual"] == 0.0
+    assert rep["verdicts"] == {"nhl.saves_team_leaky": "SUPPORTED", "nhl.saves_opp_volume_high": "SUPPORTED"}

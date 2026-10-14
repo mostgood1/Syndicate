@@ -79,7 +79,7 @@ def saves_main_lines(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
-def collect(root: Path) -> tuple[list[dict[str, Any]], dict[str, int]]:
+def collect(root: Path, dirs: tuple[str, ...] = ("odds_saves",)) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Joined lines {game, date, goalie, team, opp, point, p_over, prices, feats, saves(row)} -- no grading here."""
     log = load_game_log([root / "nhl_source" / "source_artifacts" / "data" / "raw" / "player_game_log_20252026.csv"])
     asof = AsOf(log)
@@ -89,7 +89,8 @@ def collect(root: Path) -> tuple[list[dict[str, Any]], dict[str, int]]:
             goalies_in[r["game"]].append(r)
     counts: dict[str, int] = defaultdict(int)
     out = []
-    for path in sorted((root / "backfill" / "nhl_lines_2025_26" / "odds_saves").glob("*.json")):
+    paths = [(d, p) for d in dirs for p in sorted((root / "backfill" / "nhl_lines_2025_26" / d).glob("*.json"))]
+    for source, path in paths:
         game = path.stem
         snapshot = json.loads(path.read_text(encoding="utf-8"))
         for line in saves_main_lines(snapshot):
@@ -105,7 +106,7 @@ def collect(root: Path) -> tuple[list[dict[str, Any]], dict[str, int]]:
             feats = {"opp_sf_pg": (opp or {}).get("sf_pg"), "team_sa_trend": team.get("sa_trend"),
                      "team_rest_days": team.get("rest_days"), "team_sa_pg": team.get("sa_pg")}
             out.append({**line, "game": game, "date": g["date"], "team": g["team"], "opp": opp_team, "feats": feats,
-                        "_row": g})
+                        "_row": g, "source": source})
             counts["joined"] += 1
     return out, dict(counts)
 
@@ -179,10 +180,50 @@ def lift(graded: list[dict[str, Any]]) -> dict[str, Any]:
     return report
 
 
+# ---- v3 (lane block "NHL v3 PRE-REGISTERED"): the two v1 over-side leads on the games bought AFTER v1 -------------
+V3_LEADS = ("nhl.saves_team_leaky", "nhl.saves_opp_volume_high")
+V3_SEED, V3_B, V3_ALPHA = 20261014, 2000, 0.025
+
+
+def lift_new(graded: list[dict[str, Any]]) -> dict[str, Any]:
+    """PRIMARY: each lead's fired residual on the NEW games (`odds_saves_rest`), Holm over the two at one-sided 0.025.
+    SECONDARY: the other signals and the pooled UNDER on the new games; every signal on the full season (v1 + new)."""
+    from grade_h7_nba_unders import holm
+
+    def stats(rows: list[dict[str, Any]]) -> dict[str, Any]:
+        out: dict[str, Any] = {}
+        for name in SAVES_SIGNALS:
+            side = NHL_REGISTRY[name].side
+            fired, base = [], []
+            for r in rows:
+                if not saves_eligible(name, r["feats"]):
+                    continue
+                rec = {"y": r["y_over"] if side == "over" else 1.0 - r["y_over"],
+                       "p": r["p_over"] if side == "over" else 1.0 - r["p_over"], "game": r["game"]}
+                (fired if name in saves_fires(r["feats"]) else base).append(rec)
+            f, b = residual_stats(fired, B=V3_B, seed=V3_SEED), residual_stats(base, B=300)
+            out[name] = {"side": side, "fired": f, "baseline": b,
+                         "hit_lift_vs_baseline": None if not f.get("n") or not b.get("n") else round(f["hit_rate"] - b["hit_rate"], 4)}
+        unders = [{"y": 1.0 - r["y_over"], "p": 1.0 - r["p_over"], "game": r["game"], "under_dec_best": r["under_dec_best"],
+                   "under_dec_median": r["under_dec_median"]} for r in rows]
+        out["nhl.saves_under_bias"] = {"residual": residual_stats(unders, B=V3_B, seed=V3_SEED),
+                                       "roi_best_price": roi_stats(unders, "under_dec_best", B=600) if unders else {}}
+        return out
+
+    new = [r for r in graded if r["source"] == "odds_saves_rest"]
+    report = {"new_games": stats(new), "full_season": stats(graded),
+              "graded": {"new": len(new), "full_season": len(graded)},
+              "games": {"new": len({r["game"] for r in new}), "full_season": len({r["game"] for r in graded})}}
+    pvals = {name: report["new_games"][name]["fired"].get("p_one_sided") for name in V3_LEADS}
+    report["holm_primary"] = holm(pvals, alpha=V3_ALPHA)
+    report["verdicts"] = {name: "SUPPORTED" if report["holm_primary"][name] else "NOT SUPPORTED" for name in V3_LEADS}
+    return report
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-root", default=os.environ.get("SYNDICATE_DATA_ROOT") or "")
-    ap.add_argument("--mode", choices=("distributions", "lift"), required=True)
+    ap.add_argument("--mode", choices=("distributions", "lift", "lift-new"), required=True)
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)
     if not args.data_root:
@@ -192,6 +233,19 @@ def main(argv: list[str] | None = None) -> int:
                                                                                    "saves_sa_trend_up"))):
         print("REFUSING: split date / saves thresholds are not registered yet", flush=True)
         return 3
+    if args.mode == "lift-new":
+        lines, counts = collect(Path(os.path.expanduser(args.data_root)), ("odds_saves", "odds_saves_rest"))
+        rep = {"counts": counts, **lift_new(grade(lines, counts))}
+        Path(args.out).write_text(json.dumps(rep, indent=1, default=str), encoding="utf-8")
+        print(json.dumps({k: rep[k] for k in ("counts", "graded", "games", "holm_primary", "verdicts")}), flush=True)
+        for scope in ("new_games", "full_season"):
+            for name, e in rep[scope].items():
+                f = e.get("fired") or e.get("residual") or {}
+                print(f"  {scope:11s} {name:26s} n={f.get('n')} g={f.get('games')} hit={f.get('hit_rate')} "
+                      f"p={f.get('mean_p')} resid={f.get('residual')} ci={f.get('ci95')} p1={f.get('p_one_sided')} "
+                      f"| base resid={(e.get('baseline') or {}).get('residual')} "
+                      f"ROI={(e.get('roi_best_price') or {}).get('roi_pct')}", flush=True)
+        return 0
     lines, counts = collect(Path(os.path.expanduser(args.data_root)))
     if args.mode == "distributions":
         report: dict[str, Any] = {"counts": counts, "distributions": distributions(lines)}
