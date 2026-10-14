@@ -273,3 +273,31 @@ NHL_REGISTRY: dict[str, SignalSpec] = {
                    "every main-line two-sided skater prop, UNDER side"),
     )
 }
+
+
+# ----------------------------------------------------------------------------- v1 saves result (2026-10-14)
+#
+# The registered saves test (`scripts/nhl_saves_lift.py --mode lift`, after the 01:16:45Z registration): all four
+# signals NOT SUPPORTED -- underpowered as stated (~25-70 fired lines per window) -- and the saves UNDER tilt is NOT
+# there: confirm residual -5.4% [-10.2, -0.4] (the over beat the close Dec-Feb). Tuple: (discover residual, discover n,
+# confirm residual, confirm CI, confirm n, confirm games). Skater K1-K5 stay `candidate` until the forward final read.
+from dataclasses import replace as _replace  # noqa: E402
+
+_SAVES_V1 = {
+    "nhl.saves_opp_volume_high": (0.0354, 31, 0.1057, [-0.0549, 0.2588], 34, 32),
+    "nhl.saves_opp_volume_low": (-0.0224, 34, -0.0218, [-0.1735, 0.1438], 40, 39),
+    "nhl.saves_team_leaky": (0.0969, 25, 0.1023, [-0.0344, 0.2351], 53, 50),
+    "nhl.saves_team_b2b": (-0.0218, 62, 0.0365, [-0.0926, 0.1606], 72, 64),
+    "nhl.saves_under_bias": (0.0259, 405, -0.0537, [-0.1023, -0.0039], 405, 224),
+}
+NHL_REGISTRY.update({
+    name: _replace(NHL_REGISTRY[name], status="null", evidence={
+        "tested": "2026-10-14 lane signal-engine-nhl v1, 2025-26 saves closes, discover < 2025-12-09 <= confirm",
+        "discover_residual": r[0], "discover_n": r[1], "confirm_residual": r[2], "confirm_ci95": r[3],
+        "confirm_n": r[4], "confirm_games": r[5], "verdict": "NOT SUPPORTED"})
+    for name, r in _SAVES_V1.items()
+})
+_FWD = "registered forward test K1-K5 on 2026-27 (lane signal-engine-nhl, 2026-10-14T01:16:45Z); final read 2026-12-31"
+NHL_REGISTRY.update({name: _replace(NHL_REGISTRY[name], evidence={"registered": _FWD})
+                     for name in ("nhl.toi_up", "nhl.toi_down", "nhl.opp_allows_shots", "nhl.opp_suppresses_shots",
+                                  "nhl.skater_under_bias")})

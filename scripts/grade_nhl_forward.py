@@ -117,8 +117,10 @@ def collect(root: Path, final_read: str, ignore_registration: bool, counts: dict
         games_by_day[(day, frozenset(canonical_team("nhl", t) for t in teams))] = game
     graded_days = {r["date"] for r in asof.rows}
     records = []
-    start = date.fromisoformat((REGISTERED_AT - timedelta(days=1)).date().isoformat())
-    day = start
+    first = (REGISTERED_AT - timedelta(days=1)).date().isoformat()
+    if ignore_registration and graded_days:  # a format check reads the season from its first game
+        first = min(graded_days)
+    day = date.fromisoformat(first)
     seen_lines: set[tuple] = set()
     while day.isoformat() <= final_read:
         d = day.isoformat()

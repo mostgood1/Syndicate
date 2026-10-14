@@ -111,3 +111,11 @@ def test_registry_covers_every_rule() -> None:
              "nhl.saves_under_bias", "nhl.toi_up", "nhl.toi_down", "nhl.opp_allows_shots", "nhl.opp_suppresses_shots",
              "nhl.skater_under_bias"}
     assert set(nhl.NHL_REGISTRY) == names
+
+
+def test_v1_saves_results_are_recorded_and_skaters_stay_candidates() -> None:
+    for name in ("nhl.saves_opp_volume_high", "nhl.saves_opp_volume_low", "nhl.saves_team_leaky", "nhl.saves_team_b2b",
+                 "nhl.saves_under_bias"):
+        assert nhl.NHL_REGISTRY[name].status == "null" and nhl.NHL_REGISTRY[name].evidence["confirm_n"] > 0
+    for name in ("nhl.toi_up", "nhl.toi_down", "nhl.opp_allows_shots", "nhl.opp_suppresses_shots", "nhl.skater_under_bias"):
+        assert nhl.NHL_REGISTRY[name].status == "candidate" and "registered" in nhl.NHL_REGISTRY[name].evidence
