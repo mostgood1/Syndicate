@@ -887,6 +887,14 @@ death, never life — do not invert it.
 - Verification: Per sport with rows == total_rows: non-null projection and model_edge_pct with denominators, the union of row keys, and the key set one nesting level down.
 - Blocked by: none
 
+### news-price-follow — OPEN — opened 2026-10-14 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: Measure, from the news collector's injury / scratch events and the fleet quote logs, how many minutes each book takes to move a player's props and his team's game lines after a material status change (to Out / back in, NHL scratch), against a no-news placebo window, and the EV of stale prices still up after the first book moves -- a reusable script, a first read with its coverage stated, and a scheduled re-read once weeks of events exist
+- Files: scripts/news_price_follow.py (NEW), tests/test_news_price_follow.py (NEW), .syndicate/findings_2026-10-14_news_price_follow.md (NEW)
+- Hypothesis: Books do not all move at once: after a material injury change some books keep the pre-news price for minutes, and those stale prices carry positive EV against the movers' devigged fair
+- Falsification test: Pooled over events, the stale prices' EV vs the movers' Shin fair has a game-clustered 95% CI touching or below 0, or the news-window move rate is not above the placebo rate
+- Verification: tests on synthetic news + quote logs; first read on the fleet printing events found, events with pre-news quotes, per-book latency and placebo lift, stale-quote EV with n; a scheduled task re-runs it after weeks of data
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
