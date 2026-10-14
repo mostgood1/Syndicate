@@ -81,3 +81,24 @@ NOT measured by the pre-registered criteria: the LIVE lens. More rotation player
 on-court fives the native re-sim can resume (P5: 30% of 5:00-Q4 sides sampled under `k`). That benefit is real but
 unquantified here; it can be measured inside P5's backtest (re-record inputs under a variant, compare real-five rate
 and the paired live metrics) once P3's re-fits land.
+
+## 5. Live-lens structure under each rule (2026-10-14 23:4xZ; user decision: keep the selector for this)
+
+Engine inputs re-recorded for all 340 anchored 2026 games under each variant (P5's recorder, frozen `1c353e05`,
+production switches, 0 failures, each variant's `rule=` confirmed on all 116 dates), then P3's own
+`resume_from_summary` -> `load_engine_inputs` -> name mapping at 5:00 Q4 (680 sides), same games for every rule:
+
+| rule | real five resumed | player match | on-court players absent from the frame | mean frame |
+|---|---|---|---|---|
+| k (today) | 477 / 680 = **0.701** | 0.923 | 261 | 9.87 |
+| regular_k2_min20 | 511 / 680 = **0.751** | 0.935 | 221 | 10.02 |
+| exempt_apps3of5 | 535 / 680 = **0.787** | 0.946 | 183 | 10.51 |
+
+By month (real five) -- k / regular_k2_min20 / exempt_apps3of5: May 0.57 / 0.63 / 0.65; Jun 0.79 / 0.82 / 0.84;
+Jul 0.69 / 0.77 / 0.84; Aug 0.72 / 0.76 / 0.81; Sep 0.70 / 0.72 / 0.75. The k row reproduces P5's earlier reading
+exactly (477/680, 261 absent).
+
+**The trade-off, measured:** pregame the variants are neutral (§4: no gain, no loss with CI); live, they let the native
+re-sim resume the REAL late-game five on +34 / +58 of 680 sides. Whether that becomes better LIVE projections (paired
+live MAE/Brier vs k) is the remaining question -- it needs P3's re-fits and runs inside P5's backtest on these inputs
+(`~/wnba_live_bt/engine_inputs_asof_<rule>/`).
