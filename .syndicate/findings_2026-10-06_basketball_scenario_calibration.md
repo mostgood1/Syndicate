@@ -2122,3 +2122,41 @@ bonus rate. PROVISIONAL.
 **#3i CO-SIGN (P3, as pre-registered at c3bb5143, before any reading).**
 - P3 agrees with the correction: the totals calibration sits upstream of the engine, so the +1.2 is engine FT volume.
 - The bonus rate moves team PF, so the foul_mult pick can drift. The (0.03, 0.6) point and the #3e guards cover that.
+
+### Phase 2 #3i — RESULT 2026-10-14 13:53Z (relaunched 13:04Z after the WSL restart killed the first run at 3/12 unread; done 13:52Z): CONFIRMED by the letter at bonus 0.03 / foul_mult 0.5. The total bias is NOT fixed.
+
+**Run:** 4 points × 12 dates, 17,400/17,400 calls with levers, 0 errors.
+
+| bonus / foul_mult | FTA/team (22.69 ± 0.3) | foul-outs [0.153, 0.233] | total bias (< 1.0) | P(6th\|5th) | closers-on | team PF | H2 / Q4 / S8 | verdict |
+|---|---|---|---|---|---|---|---|---|
+| 0.025 / 0.5 | 22.46 | 0.145 ✗ | +1.16 ✗ | 0.206 | 0.406 | 17.84 | −0.179 / −0.089 / 14.97 | fail |
+| **0.03 / 0.5** | **22.62** | **0.155** | **+0.99** | 0.196 | 0.407 | 18.28 | −0.181 / −0.093 / 14.79 | **PASS** |
+| 0.035 / 0.5 | 22.91 | 0.175 | +1.16 ✗ | 0.214 | 0.402 | 18.75 | −0.172 / −0.082 / 14.98 | fail |
+| 0.03 / 0.6 | 22.65 | 0.175 | +1.10 ✗ | 0.222 | 0.397 | 18.28 | −0.179 / −0.088 / 14.92 | fail |
+| (0.04 / 0.5, `PH_f050`) | 23.29 | 0.194 | +1.23 | 0.2145 | 0.400 | 19.26 | — | — |
+
+- The Q4 FTA share is 0.262–0.265 at every point (passes its no-worse guard).
+- **Pick by the rule: bonus 0.03 / foul_mult 0.5**, the only passing point.
+
+**HONEST READING, the belief overturned:**
+- The total bias barely responds to the bonus rate: +0.99..+1.16 across the grid at FTA 22.46..22.91, vs +1.23 at 23.29.
+- Dropping FTA by 1.7/game removed ~0.1–0.2 points, not the ~0.9 that CORRECTION 06:20Z attributed to FT volume.
+- A bonus trip that does not happen becomes a shot possession worth most of the same points. So the overshoot is
+  STRUCTURAL: points from mechanism possessions the EXACT_TARGET solver does not model (end-game extension
+  possessions + the bonus-vs-shot points-per-possession gap).
+- +0.99 passes by the letter but is within noise of the failing +1.10 / +1.16. Expect the full FIT to sit near +1.0–1.2,
+  and the |bias| < 1.0 guard to be at risk there.
+- The fix for that is the solver change (count bonus / end-game possessions in `_solve_eff_mult`), in the bonus /
+  end-game owners' code (P4/P3).
+- Team PF falls to 18.28 at 0.03 (real 19.67). The FTA level now matches, but the PF volume moved away. The bonus rate
+  cannot match both, which suggests the non-bonus PF base is ~1.4 low.
+
+**PROVISIONAL CONFIG** (supersedes #3h's bonus 0.04):
+- bonus 0.03;
+- end-game as fitted;
+- foul_out_in_sim, thresholds (2, 3, 4, 5), bench 0.05, release 240;
+- fouler_per_minute = 1;
+- foul_mult 0.5.
+
+**Next:** full FIT (P3's amendment: foul-outs 0.193 ± 0.04 plus the guards) → P3's §7. Whether to do the solver change
+first is a decision for the user and P3.
