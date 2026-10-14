@@ -2196,3 +2196,10 @@ with EXACT on AND its mechanism on.
 1. The joint base_nonshooting_foul_per_poss + bonus fit against FTA 22.69 and PF 19.67 (its own pre-registration).
 2. The full FIT.
 3. P3's §7.
+
+**#3j/#3k CO-SIGN (P3, as pre-registered at f66cdbc5, before any reading), with two additions:**
+1. Report what Δ is made of: extension possessions and intentional trips per team-game (from the same counters).
+2. Ordering: the joint base-nonshoot-PF + bonus fit comes AFTER #3k. Changing the bonus rate changes s, so s and Δ
+   are RE-MEASURED on the #3j dates at the joint fit's chosen point (same measure-then-freeze, same disjoint dates)
+   BEFORE the full FIT. Otherwise the full FIT runs a stale s.
+- P4 has been cc'd on the bonus term (P3's design, two-shot award), to OK or veto it.
