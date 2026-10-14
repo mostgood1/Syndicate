@@ -1613,3 +1613,19 @@ diagnosis.
 **Co-sign:** P3 co-signs this before the readings are read. The runs may start first; nothing is read until then.
 
 **Harness change:** `--lever` takes a comma list as a tuple (scripts/basketball_scenario_rates.py, this commit).
+
+**#3b AMENDMENT + CO-SIGN (P3, read at 18baf568; added 2026-10-14 02:00Z, before any reading):**
+
+1. **The pick is PROVISIONAL.** The 12-date subsample is the one whose 0.15 foul-out reading did not reproduce (full FIT
+   0.206).
+   - The planned full-FIT re-run must also land foul-outs within 0.193 ± 0.04, with the FTA, H2/Q4/S8 and total guards
+     holding.
+   - If it does not, re-pick from the grid ON THE FULL FIT; never ship the subsample pick.
+2. **Unit correction:** foul-outs are per GAME (both teams), not per team-game.
+   - The sim's `fo` is per draw and real S11 0.193 is per game, so the comparison was already like for like. Only the
+     pre-reg's label was wrong.
+3. **Subsample base rate, real** (`real_nba.jsonl`, regular season):
+   - FIT: 816 games, **0.194** foul-outs/game.
+   - The 87 sweep games: **0.103**.
+   - The subsample's own real rate is about half the FIT's (binomial SE on 87 games ≈ 0.047). The target stays the FIT
+     0.193, but a subsample hit is weaker evidence, which is why (1) gates on the full FIT.
