@@ -49284,3 +49284,23 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
   - 10-14 17:50Z: host reboot.
   - Each restarts the refresh-worker cold (board rebuild) and kills every WSL background job.
 - **The prevention is the user's** (Windows Update active hours / pause; "run whether user is logged on or not"). No system setting was changed. My MLS live-join watcher was re-armed at 17:59Z.
+
+## 2026-10-14 14:35:18Z (9:35 AM CT) -- LOCAL FLEET ff e1954b4a -> 63631afb (exact SHA), NO restart: NBA fetch-schedule writes the season in play -- reading OWED (lane `nba-schedule-current-season`, session 2d413211; entry written at the 18:05Z checkpoint)
+
+- **User decisions 2026-10-14:** "fix the nba fetch-schedule to write 2026-27", "Yes, ff after props idle".
+- **Claim:** refresh-worker token f5fd1be8..., released at ~14:36Z. The reflog shows my own `merge 63631afb: Fast-forward`.
+- **Ride-along:** 48328ada, `scripts/ledger_io.py` (ledger tooling, imported by no runtime code).
+- **Safety read in full (14:35:07Z):** NOT CLEAR, for a board build only. Props jobs: 0. No live games.
+- **Change:** 4 generator EDITS in the NBA source_cli port:
+  - stats.nba.com `ScheduleLeagueV2` when cdn.nba.com refuses (403 here);
+  - `schedule_<season>.*` written alongside the `schedule_2025_26.*` alias;
+  - `_load_schedule_day` prefers `date_est` (vendored D+1 defect).
+- **Pre-merge A/B (fleet copies):**
+  - Schedule: 1,274 2026-27 games.
+  - predict-date 10-14: frame-identical.
+  - predict-date 10-20: old none; new the 3 opener games.
+- **VERIFY (deployed checkout 14:35Z):** `--check` OK; 5 tests passed.
+- **Production reading OWED, not yet seen at 18:00Z:**
+  - `schedule_2026_27.csv` should be written by a native `fetch-schedule`.
+  - Blocker: the still-vendored `schedule_adapter` fallback in the live-odds-worker keeps rewriting `schedule_2025_26.*` with last season's content (17:53Z). The adapter fix a78aab9c is on main, not on the fleet.
+- **Rollback:** revert 63631afb and ff. No restart.

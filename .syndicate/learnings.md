@@ -2123,3 +2123,13 @@ WNBA pregame engine frames had a median of 10 players all season and real rotati
 - **Measured:** `session_worktree.py prune` labelled two `.git/worktrees/*` dirs "free, 0 HELD (the last pointer to a commit)". They had no HEAD file, but their ORIG_HEAD + `logs/HEAD` named 9 commits reachable from neither origin/main nor any branch. Deleting the dir drops that last reference, and gc can then collect them.
 - **Here it cost nothing:** all 9 had landed under rebased SHAs (6 patch-id identical; 3 differing only by a correctly dropped stale `deploys.md` hunk).
 - **Rule:** before `prune --apply`, list every SHA in each stale dir's ORIG_HEAD and `logs/HEAD`. Any SHA unreachable from origin/main or a branch must be matched on main by patch-id or `git range-diff` (git cherry semantics), or rescued with `git branch rescue/<id> <sha>`. The tool's "free" does not do this.
+
+### A "Saved schedule" line is not a fetch -- read the content's date range `[2026-10-14, session 2d413211, lanes nba-schedule-current-season + basketball-schedule-adapter-native]`
+
+The NBA `fetch-schedule` printed "Saved schedule to ..." and exited 0 on every run, so it read as working. It had not fetched in this
+season: cdn.nba.com answers 403 here, and the command's local fallback re-reads `schedule_2025_26.csv` and writes it back. A
+fresh mtime on a file holding 2024-10-22..2026-04-12 with empty statuses. The give-away was in the payload (empty `game_status`,
+the date range), not the log or the exit code. A second writer (the schedule_adapter fallback in a long-lived worker) kept
+re-asserting the stale content after the fix shipped, so even the fixed path's output can be overwritten by an unfixed sibling.
+**How to apply:** for any fetched artifact, check its newest date and a status/provenance field before calling the fetch healthy;
+and before calling a writer fixed, enumerate EVERY writer of that file (`grep` the filename across syndicate/ and scripts/).
