@@ -49210,3 +49210,12 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **How I got it wrong:** `local_production.py status` printed the supervisor as `since 2026-10-14T02:30:28Z`. That value matches the role respawn, not the supervisor's own start. I read it as a new `up` without checking the role logs' `restarts=` field or `supervisor.log`. Judge a supervisor `up` by `supervisor.log` (`LOCAL PRODUCTION UP`) and role `==== start ... restarts=0`, never by that status field.
 - **The third event is already attributed:** 2026-10-14 ~06:30Z -> 12:47Z was a Windows Update host reboot, after which the logon-triggered task waited for a logon. Recorded at 12:58Z by session b9bb5f37 (lane `soccer-live-anytime-scorer`). The NCAAB loop came back 12:48:01Z.
 - **Net:** all three fleet restarts since the NCAAB switch-on have owners, and none was unrecorded. The NCAAB thread has run since 2026-10-13 21:02:57Z, except during the ~6 h host outage.
+
+## 2026-10-14 13:09Z (8:09 AM CT) -- READING: soccer board-pick prop settlement (aa8a2d98) -- **MET** `[lane soccer-live-anytime-scorer, session b9bb5f37; closes the 2026-10-13 14:38:58Z entry's owed verify]`
+- **The run:** the evaluation-settlement autorun CAUGHT UP after the 06:30-12:47Z outage, as `_evaluation_settlement_should_run_now` is designed to. `SETTLE_PERSIST date=2026-10-11 records=925` at 12:54:54Z equals the dry run's 925 to the record. Also 10-10 363, 10-12 2,786, 10-13 4,601 (all sports).
+- **Ledger** (`evaluation_ledger_chunks/<date>.jsonl`, soccer props, 13:1xZ):
+  - 10-11: pending **1,181 -> 256**, settled 2,045 -> 2,970; 455 first/last goalscorer settled.
+  - 10-12: pending 820 -> 59.
+  - 10-10: 239 pending remain.
+- **Served** (`/api/board/game-chips?date=2026-10-11`, finals): soccer prop plays went from 1-6 + 68 pending to **1 W / 29 L / 22 push / 23 pending**. The pushes are squad players who never came on.
+- **My earlier 12:52Z "1,181 still pending" was read 3 min BEFORE the 12:54:54Z persist.** It was a too-early read, not a failure; the catch-up was already running.
