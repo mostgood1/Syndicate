@@ -1560,3 +1560,56 @@ real 20.5, still 19.1 at rate 0.04.
 - bonus 0.04 + P3's end-game fouling ON (its fitted p by deficit) + a joint re-fit of P3's foul_trouble_bench_mult
   against foul-outs 0.193 and team PF 20.5.
 - Readings: FTA level and Q4 share, team PF, foul-outs, the guards.
+
+### Phase 2 #3b — PRE-REGISTRATION 2026-10-14 ~02:00Z (before any run): joint foul re-fit with P3 (nba-native-live-resim)
+
+**Why:** #3 showed the bonus fits the FTA level at 0.04/poss, but foul-outs reach 0.379, because P3's
+foul_trouble_bench_mult = 0.05 was fitted when the sim committed ~5 fewer team fouls a game than real teams.
+
+**Config:**
+- The accepted Phase 2 config (k = 0.002, rest b = 3, P3 FT fixes, record_events), plus bonus_free_throws = 1 and
+  bonus_nonshoot_foul_per_poss = 0.04.
+- P3's end-game fouling ON, exactly as P3 fitted it (§7b), held FIXED and not re-fitted here:
+  - endgame_foul_window_s = 120, endgame_foul_max_deficit = 10, endgame_foul_p_by_deficit = (0.2, 0.0, 0.2),
+    endgame_foul_seconds = 5, endgame_extend_possessions = 1, endgame_foul_p = 0.
+- foul_out_in_sim = 1, foul_trouble_thresholds = (2, 3, 4, 5), foul_trouble_release_s = 240.
+
+**Grid:** foul_trouble_bench_mult ∈ {0.0, 0.01, 0.02, 0.05, 0.1}. The same 12 seed-7 sweep dates (87 games, 200 sims).
+
+**Objective:** foul-outs per team-game, real FIT 0.193.
+
+**A point PASSES only if all of these hold:**
+- foul-outs within 0.193 ± 0.04;
+- FTA/team within 22.69 ± 0.7;
+- H2-on-H1 slope inside the real CI [-0.19, -0.155];
+- Q4 slope no worse than #3's −0.091 by more than 0.01;
+- S8 margin within 14.81 ± 0.6;
+- |total bias| < 1.0;
+- Q4 FTA share no further from 0.279 than #3's 0.254.
+
+**Readings reported, not gated:**
+- team PF/game against real 20.52. The bench mult is not expected to move volume.
+- Q4 FTA share against 0.279.
+
+**Pick:** among passing points, the smallest |foul-outs − 0.193|; ties go to the larger mult (less intervention).
+
+**Then:**
+1. P3 re-runs its game-matched §7 check (last-2:00 points + trailer FTA by deficit bucket, FIT only) at the picked point.
+   A bucket outside the §7 FIT tolerance is re-fitted there.
+2. A full FIT re-run.
+
+**Fallback, pre-registered:** if mult 0.0 still overshoots foul-outs by more than 0.04, the next lever is
+foul_trouble_thresholds (e.g. (2, 3, 4, 4)) or foul_trouble_release_s, not the mult. That gets its own pre-registration.
+If no point passes for a reason other than foul-outs, #3b is NOT CONFIRMED and the failing reading is the next
+diagnosis.
+
+**Windows (double-dip disclosure):**
+- P3's §7 VALIDATION 2026-03-01..04-12 is exactly this lane's held-out regular-season window, and P3 has already read it
+  once for the end-game p.
+- So the end-of-Phase-2 VALID read is NOT a first look for the end-game component. It stays a first look for
+  everything else, and the 2026 play-in/playoffs part is untouched by both lanes.
+- Report the end-game buckets on VALID as already-seen.
+
+**Co-sign:** P3 co-signs this before the readings are read. The runs may start first; nothing is read until then.
+
+**Harness change:** `--lever` takes a comma list as a tuple (scripts/basketball_scenario_rates.py, this commit).

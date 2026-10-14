@@ -335,7 +335,9 @@ def run_sim(args) -> int:
     from syndicate.features.shared.basketball_props_predictions import export_props_predictions_local
 
     bpss._resolve_smart_sim_roster_mode_local = lambda **_k: "pregame"
-    levers = {k: float(v) for k, v in (x.split("=", 1) for x in (args.lever or []))}
+    # A comma makes a tuple lever (endgame_foul_p_by_deficit=0.2,0.0,0.2; foul_trouble_thresholds=2,3,4,5).
+    levers = {k: (tuple(float(x) for x in v.split(",")) if "," in v else float(v))
+              for k, v in (x.split("=", 1) for x in (args.lever or []))}
     games: List[Dict[str, Any]] = []
     cur: Dict[str, Any] = {}
     orig_call, orig_rec = bpss._call_source_simulate_smart_game_local, bpss._recording_sim_draws_local
