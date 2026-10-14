@@ -301,3 +301,25 @@ _FWD = "registered forward test K1-K5 on 2026-27 (lane signal-engine-nhl, 2026-1
 NHL_REGISTRY.update({name: _replace(NHL_REGISTRY[name], evidence={"registered": _FWD})
                      for name in ("nhl.toi_up", "nhl.toi_down", "nhl.opp_allows_shots", "nhl.opp_suppresses_shots",
                                   "nhl.skater_under_bias")})
+
+
+# ----------------------------------------------------------------------------- v2 skater history (2026-10-14)
+#
+# The registered 2025-26 skater test on the BOUGHT closes (`scripts/nhl_skater_history_lift.py`, 67,737 graded main
+# lines, 1,312 games, split 2026-01-04): K1-K5 all NOT SUPPORTED, BH none, and no under tilt (-0.4% / -0.1%). The
+# forward family on 2026-27 still runs to its 2026-12-31 read; these statuses record the history result.
+_SKATER_V2 = {  # (discover residual, discover n, confirm residual, confirm CI, confirm n, confirm games)
+    "nhl.toi_up": (0.0154, 1531, 0.0061, [-0.0176, 0.0293], 2022, 502),
+    "nhl.toi_down": (-0.0062, 1055, -0.0093, [-0.0388, 0.0177], 1532, 443),
+    "nhl.opp_allows_shots": (-0.0078, 1166, 0.0142, [-0.0268, 0.0572], 701, 89),
+    "nhl.opp_suppresses_shots": (-0.0054, 809, 0.0351, [-0.002, 0.0735], 737, 113),
+    "nhl.skater_under_bias": (-0.0041, 33957, -0.001, [-0.0096, 0.0078], 33780, 656),
+}
+NHL_REGISTRY.update({
+    name: _replace(NHL_REGISTRY[name], status="null", evidence={
+        "tested": "2026-10-14 lane signal-engine-nhl v2, bought 2025-26 skater closes (start - 10 min, US books), "
+                  "discover < 2026-01-04 <= confirm", "discover_residual": r[0], "discover_n": r[1],
+        "confirm_residual": r[2], "confirm_ci95": r[3], "confirm_n": r[4], "confirm_games": r[5],
+        "verdict": "NOT SUPPORTED", "forward": _FWD})
+    for name, r in _SKATER_V2.items()
+})

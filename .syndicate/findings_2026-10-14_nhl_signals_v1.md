@@ -53,3 +53,36 @@ end: 5,463 graded lines over 85 games, 316 void (5.5%). It found one defect, fix
 - The two over-side saves leads, if wanted, as their own forward registration on 2026-27 saves (the fleet logs them).
 - Plan §6 items not yet built: PP1 deployment (needs per-game PP TOI), opponent goalie / GSAx for skater props, injuries
   and scratches (the collector is running since 10-13).
+
+## v2 -- the bought 2025-26 skater season (2026-10-14T02:24Z): K1-K5 NOT SUPPORTED, no under tilt
+
+**Purchase** (user: "yes buy the 2025-26 skater props, probe one game first"): `scripts/nhl_skater_props_pull.py`, OddsAPI
+historical event odds, US region, shots on goal / points / assists / goals at start - 10 min. Probe: 1 game, 40 credits, 7
+books. Full run: 1,311 games, **52,430 credits** (52,470 with the probe; estimate 52,480), 0 failed calls. Files:
+`backfill/nhl_lines_2025_26/odds_skater_props/<gamePk>.json` on the fleet (copied, 1,312), source `C:/tmp/nhllines`.
+
+**Test** (registered at `7990e51b` before any close was joined to an outcome; thresholds the forward family's, set from
+features): 73,652 main lines, **67,737 graded** over 1,312 games (5,915 void: no game-log row / ambiguous name), split
+2026-01-04 (656 games each side).
+
+| signal (side) | discover resid (n) | confirm resid [95% CI] (n / games) | confirm hit lift vs base | verdict |
+|---|---|---|---|---|
+| K1 toi_up (over; SOG, points) | +1.5% (1,531) | +0.6% [-1.8, +2.9] (2,022 / 502) | -0.1 pts | NOT SUPPORTED |
+| K2 toi_down (under; SOG, points) | -0.6% (1,055) | -0.9% [-3.9, +1.8] (1,532 / 443) | +0.7 | NOT SUPPORTED |
+| K3 opp_allows_shots (over; SOG) | -0.8% (1,166) | +1.4% [-2.7, +5.7] (701 / 89) | +2.1 | NOT SUPPORTED |
+| K4 opp_suppresses_shots (under; SOG) | -0.5% (809) | +3.5% [-0.2, +7.4] (737 / 113) | +3.4 | NOT SUPPORTED |
+| K5 every line, UNDER | -0.4% [-1.2, +0.5] (33,957) | -0.1% [-1.0, +0.8] (33,780 / 656) | -- | NOT SUPPORTED |
+
+K5 by market (discover / confirm): shots -0.1% / +0.8%, points -0.5% / -0.7%, assists +0.1% / +0.2%, goals **-1.8%
+[-2.8, -0.7]** / -1.4% (the goal OVER ran slightly long). Blind skater unders at the best book: -5.3% / -4.9%.
+
+**Reading.** The NHL skater close prices ice-time trends and the opponent's shot suppression -- consistent with the plan's
+note that SOG is "the one skater market at parity with the book". Unlike NBA and NCAAF props there is **no under tilt** in
+NHL skater or saves props; the cross-sport under effect is a basketball / college-football effect, not a universal one.
+K4 (fade shot-suppressing opponents' SOG overs) is the nearest miss (+3.5% in confirm, discover -0.5%) -- a lead at most.
+The forward family (K1-K5 on 2026-27) still runs to its 2026-12-31 read at no cost; on this history its prior is weak.
+
+**Next (NHL), if wanted:** PP1 deployment and line-mate changes need per-game PP TOI / line data (not in the game log);
+injuries and scratches are being collected since 10-13 (an absence test needs a few weeks of it); the 2025-26 saves
+history covers only 449 games -- the remaining ~860 would cost ~8,600 credits (saves, 10 per game) and would roughly double
+the saves sample for the two over-side leads.
