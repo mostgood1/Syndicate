@@ -184,3 +184,24 @@ Method: an AST scan (imports, `importlib`/`sys.path`/`spec_from_file_location` c
 | 6-8 vendored `simulate_smart_game` / `sim.events` / advanced-stats imports | the WNBA sim | **GONE** -- P1 engine + P6 native orchestrator; the scan finds no vendored import on the sim path |
 | 12 `sys.path.insert(source_root/src)` in props predictions/edges | no-op in prod | unchanged: `basketball_props_predictions.py:158/202/434`, `basketball_props_edges.py:672`. No-op in production (data root has no `src/`); in an as-of SCRATCH the pristine `src/` IS on the path -- harmless while nothing imports from it (P6: "the bridge loads no vendored module") |
 | new: `shared/wnba_fixture_identity.py:73` | -- | reads `vendor/wnba_betting_repo/data/processed/schedule_2026.csv` (DATA, fixture identity / board) -- off the live and sim path; belongs to the plan's "outside" list |
+
+## Native re-sim harness + smoke, and the on-floor match gap (2026-10-14 13:0xZ)
+
+`scripts/backtest_wnba_live_resim.py` runs production's per-game `live_resim` sequence (league="wnba") at every
+corpus row: resume from the corpus's own as-of summary -> recorded inputs -> `map_state_names` -> mechanisms from
+the COMMAND LINE -> `resim_live_game` (stable seed). `score_wnba_live_checkpoint_baseline.py --native` pairs it with
+the linear lens on the same rows (refusals counted). **SMOKE ONLY (user decision: the scoring run waits for P3's
+re-fits):** 2 games x 4 checkpoints, 100 sims, engine defaults, PYTHONHASHSEED=0 -> 8/8 resimmed, 0 refusals,
+3.5-10.6 s per 100 sims. Not a result.
+
+**On-floor match gap (all 340 games, 5:00 Q4, read 2026-10-14):** 3,139 of 3,400 on-floor players (92.3%) map
+onto the engine frame; **261 (7.7%) are ABSENT from the frame entirely** (name normalization is not the cause --
+the 15 "variants" are first-name coincidences, e.g. Nia Brodie / Nia Coffey). `map_state_names` drops a side's whole
+five on ANY miss, so **203 of 680 sides (30%) resume with a sampled lineup**, not the real one. Examples on
+2026-05-08: Julie Vanloo, Betnijah Laney-Hamilton, Marina Mabrey, Shakira Austin, Gabby Williams (frames of 10-11
+players). End-of-period checkpoints have no on-floor five by design (40/40 sampled: next period starts at a tip).
+**Hypothesis, UNVERIFIED:** the pregame pool (as-of availability rule + pool cap) omits players with no recent
+appearance for that team (opening day, trades, signings) -- production's own behaviour, so a live WNBA re-sim in
+production would hit the same gap, and those players can get no live prop at all. Next: the rate by month and by
+reason (availability exclusion vs pool cap vs not on the roster file), before deciding whether P5 needs a live
+pool top-up from the box.
