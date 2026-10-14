@@ -1528,3 +1528,35 @@ event FTA equals box `team_total_fta` on every draw.
 - If FTA fits but total bias rises > 1 pt, the mechanism is right but needs a target-solve interaction (recorded,
   user decision).
 - **Refuted** if even 0.06 leaves FTA > 1 short: the shortfall is shooting-foul rate, not bonus.
+
+### Phase 2 #3 — RESULT 2026-10-14 ~02:00Z (sweep done 01:53Z): bonus FT level fits; shape and foul-outs do not
+
+**Run:** accepted config (k = 0.002, rest b = 3, P3 FT fixes, record_events), 12 dates, 87 games each, 17,400/17,400
+engine calls with levers.
+
+| bonus rate | FTA/team (real 22.69) | Q4 FTA share (real 0.279) | foul-outs (real 0.193) | sim team PF | total bias | H2 / Q4 slope | S8 margin |
+|---|---|---|---|---|---|---|---|
+| off | 20.99 | 0.252 | 0.154 | 15.21 | +0.05 | −0.170 / −0.097 | 14.81 |
+| 0.02 | 21.78 | 0.254 | 0.252 | — | +0.26 | −0.176 / −0.089 | 14.95 |
+| **0.04** | **22.83** | 0.254 | **0.379** | 19.05 | +0.69 | −0.165 / −0.091 | 14.89 |
+| 0.06 | 24.26 | 0.253 | 0.529 | — | +1.52 | −0.180 / −0.093 | 14.85 |
+
+- Real team fouls (ESPN `fouls`, 800 FIT team-games): **20.52/game**.
+
+**VERDICT by the letter: NOT CONFIRMED.**
+- Rate 0.04 fits the FTA level (+0.14), but the Q4 share stays flat (0.254 vs 0.279, off 0.025) and foul-outs rise to
+  0.379.
+- The H2/Q4 slopes, S8 margin and blowouts are within noise. Total bias +0.69 (< 1).
+
+**What it showed (a belief overturned):** the foul-out rise is NOT too many fouls. The sim UNDER-fouls: team PF 15.2 vs
+real 20.5, still 19.1 at rate 0.04.
+- Foul-outs rise because realistic foul volume lands on too few players.
+- P3's foul_trouble_bench_mult = 0.05 was fitted at ~5 too few team fouls a game, so it needs a re-fit WITH the bonus
+  on (mechanism vs estimator).
+- The flat Q4 share is the late-game fouling that P3's end-game intentional-foul mechanism models (off in this
+  config).
+
+**Next (to pre-register jointly with P3, nba-native-live-resim):**
+- bonus 0.04 + P3's end-game fouling ON (its fitted p by deficit) + a joint re-fit of P3's foul_trouble_bench_mult
+  against foul-outs 0.193 and team PF 20.5.
+- Readings: FTA level and Q4 share, team PF, foul-outs, the guards.
