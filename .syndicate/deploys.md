@@ -49370,3 +49370,9 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
   - The provider resolves to `/home/amyn/Syndicate/.../live_refresh_loop.py` at 6fa2673e.
   - Pre-merge dry run: 10-09 gives 2 games; 10-14 gives []; 10-19 gives 401918306.
 - **Rollback:** revert 6fa2673e and ff, then TERM the live-odds-worker.
+
+## 2026-10-14 20:13Z-20:16Z (3:13-3:16 PM CT) -- LOCAL WATCHDOG: ntfy phone push installed (lane `watchdog-ntfy-alerts`, session e48a0f9b) -- no fleet role touched
+- What: `install_watchdog_task.ps1 -NewNtfyTopic` from 0475bd47's content (committed 3e85c37b, landed 0475bd47): copied the new `watchdog.ps1` to `C:\SyndicateProd\watchdog\` (sha256 equal to the repo file) and wrote a random topic to `ntfy_topic.txt` (not recorded here). The task registration was NOT changed: it was already LogonType Password (runs logged off), and the installer now keeps such a registration.
+- Measured: `-TestPush` from the installed copy -> `TEST_PUSH push=sent` 15:13:05 CT (HTTP POST accepted by ntfy.sh). Failure path tested on a temp state dir: unreachable server -> `PUSH_FAILED`, topic absent from the log; no topic file -> `push=off`. First scheduled run of the new copy 15:15:54 CT: result 0, `OK status=degraded findings=4`.
+- verify: the user's phone shows the test push (owed, user to confirm). The first real alert line will read `ALERT shown=... push=sent`.
+- Gap: nothing runs while the machine is off or asleep, so no push then; only an external heartbeat could cover that.
