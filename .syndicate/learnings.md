@@ -2133,3 +2133,8 @@ the date range), not the log or the exit code. A second writer (the schedule_ada
 re-asserting the stale content after the fix shipped, so even the fixed path's output can be overwritten by an unfixed sibling.
 **How to apply:** for any fetched artifact, check its newest date and a status/provenance field before calling the fetch healthy;
 and before calling a writer fixed, enumerate EVERY writer of that file (`grep` the filename across syndicate/ and scripts/).
+
+## 2026-10-14 -- OVERTURNED: "copying a script into tmp_path sandboxes it" -- not once the script resolves paths from the ENVIRONMENT `[lane deploy-claim-test-sandbox, session 9ed1222d, commit ff304ae1]`
+- **Belief:** `test_deploy_claim_holder_identity` was safe because it copied `deploy_claim.py` into tmp_path, so REPO_ROOT pointed at the sandbox.
+- **Overturned by:** c3a5f11b made `deploy_claim.py` read `SYNDICATE_DEPLOY_CLAIM_DIR`, then `local_production.env`, BEFORE its repo root. The test passed `os.environ` through, so wherever that var is set (the WSL fleet, nightly ci-suite) it wrote a live 45-min `web` claim held by `lane-a`/`session-aaa` into the production claim dir -- seen in `status` 10-13 and 10-14. Reproduced against a scratch dir.
+- **Rule:** a test that shells out to a repo script must build its env by subtraction then pinning: drop every var the script resolves a path from, set each one into tmp_path, and assert the artifact landed under tmp_path. When a script gains a new path source, grep tests/ for subprocess callers of it in the same change.

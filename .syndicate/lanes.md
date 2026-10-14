@@ -1009,6 +1009,7 @@ death, never life — do not invert it.
 
 ### deploy-claim-test-sandbox — CLOSED 2026-10-14 (test env pinned to tmp_path; 33/33 with and without SYNDICATE_DEPLOY_CLAIM_DIR, scratch dir stayed empty) — opened 2026-10-14 — session 9ed1222d-5ffd-4d2b-8c34-2d1aa8b2dc5d
 - Goal: tests that run deploy_claim.py never write a claim outside tmp_path, even with SYNDICATE_DEPLOY_CLAIM_DIR set or a real local_production.env present
+- GOAL: MET -- reading: 33/33 across the 5 deploy_claim test files with SYNDICATE_DEPLOY_CLAIM_DIR=<scratch> (scratch dir stayed EMPTY; unpatched file wrote web.json lane-a/session-aaa there) and 33/33 unset. The local_production.env clause is covered by precedence (env var is pinned, so the file is never read; SYNDICATE_LOCAL_HOME also pinned to a non-existent dir) -- read from the code, not run separately. Landed ff304ae1.
 - Files: tests/test_deploy_claim_holder_identity.py tests/test_deploy_lock_worktree.py
 - Hypothesis: stray 'web HELD by lane-a, session-aaa' claims (10-13, 10-14) come from test_deploy_claim_holder_identity._run inheriting SYNDICATE_DEPLOY_CLAIM_DIR (c3a5f11b)
 - Falsification test: with SYNDICATE_DEPLOY_CLAIM_DIR pointed at a scratch dir, the unpatched test writes no claim there
