@@ -273,10 +273,37 @@ def _compact_draw(h_box: Dict[str, Any], a_box: Dict[str, Any], hq: Any, aq: Any
                                              "team_total_blk", "team_total_stl", "team_total_ast")]
 
     fo = sum(1 for b in (h_box, a_box) for p in (b.get("players") or []) if int(p.get("pf") or 0) >= foul_limit)
-    return {"hq": [int(x or 0) for x in list(hq or [])[:4]], "aq": [int(x or 0) for x in list(aq or [])[:4]],
-            "hot": int(sum(int(x or 0) for x in (h_box.get("ot_pts") or []) if x is not None)),
-            "aot": int(sum(int(x or 0) for x in (a_box.get("ot_pts") or []) if x is not None)),
-            "h": team(h_box), "a": team(a_box), "hx": team_x(h_box), "ax": team_x(a_box), "fo": fo}
+    out = {"hq": [int(x or 0) for x in list(hq or [])[:4]], "aq": [int(x or 0) for x in list(aq or [])[:4]],
+           "hot": int(sum(int(x or 0) for x in (h_box.get("ot_pts") or []) if x is not None)),
+           "aot": int(sum(int(x or 0) for x in (a_box.get("ot_pts") or []) if x is not None)),
+           "h": team(h_box), "a": team(a_box), "hx": team_x(h_box), "ax": team_x(a_box), "fo": fo}
+    ev = h_box.get("events")
+    if isinstance(ev, list) and ev:
+        # Phase 2 #3: FTA by quarter from the engine's diagnostic events (cfg.record_events). Index 4 = overtime.
+        # And-one free throws are NOT logged as FTA events (engine ~:1682 adds the FTA, the FGM event carries no flag),
+        # so each side's and-ones (box FTA minus event FTA) are spread over quarters in proportion to its made shots.
+        fq = {"H": [0.0] * 5, "A": [0.0] * 5}
+        fgm = {"H": [0] * 5, "A": [0] * 5}
+        for e_ in ev:
+            side_ = e_.get("off")
+            if side_ not in fq:
+                continue
+            qi = min(int(e_.get("q") or 1), 5) - 1
+            if e_.get("type") == "FTA":
+                fq[side_][qi] += int(e_.get("fta") or 0)
+            elif str(e_.get("type") or "").startswith("FGM"):
+                fgm[side_][qi] += 1
+        andone = {}
+        for side_, box_ in (("H", h_box), ("A", a_box)):
+            extra = int(box_.get("team_total_fta") or 0) - int(sum(fq[side_]))
+            andone[side_] = extra
+            tot_fgm = sum(fgm[side_])
+            if extra > 0 and tot_fgm > 0:
+                for qi in range(5):
+                    fq[side_][qi] += extra * fgm[side_][qi] / tot_fgm
+        out["fq"] = [[round(x, 3) for x in fq["H"]], [round(x, 3) for x in fq["A"]]]
+        out["and1"] = [andone["H"], andone["A"]]
+    return out
 
 
 def run_sim(args) -> int:
