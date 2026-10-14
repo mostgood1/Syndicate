@@ -67,6 +67,14 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### basketball-schedule-adapter-native — OPEN — opened 2026-10-14 — session 2d413211
+- Goal: Move the NBA/WNBA live-lens schedule fallback (`schedule_adapter._fetch_basketball_schedule_via_cli`, used by the live loop's slate phase and T-window via `fetch_schedule_for_date`) off the vendored `<sport>_betting.cli` onto Syndicate's `source_cli` port, and stop the reader returning a game twice; deployed with a measurement (user request 2026-10-14: "move the nba live lens schedule off vendor").
+- Files: syndicate/features/shared/schedule_adapter.py (NBA / WNBA basketball schedule section only), tests/test_schedule_adapter_basketball_native.py (NEW)
+- Hypothesis: on the fleet the adapter reads 0 NBA rows for 2026-10-14 (7 preseason games) because the NBA schedule file is last season's, and every miss spawns the vendored CLI (live-odds-worker pid 546 seen spawning `wnba_betting.cli fetch-schedule`), which cannot fetch the current NBA season (CDN 403).
+- Falsification test: after the switch, an NBA miss on the fleet does not write the 2026-27 schedule, or the adapter returns duplicate game ids, or a vendored `*_betting.cli` process still appears from a worker running the new code.
+- Verification: after the fleet ff and the live-odds-worker's next start on the new code, `fetch_schedule_for_date("nba", <today>)` returns today's games once each, schedule_2026_27.json exists, and no `nba_betting.cli`/`wnba_betting.cli` process is seen in a sampling window.
+- Blocked by: none
+
 ### nba-schedule-current-season — OPEN — opened 2026-10-14 — session 2d413211
 - Goal: Make the NBA `fetch-schedule` (syndicate/features/nba/source_cli) write the CURRENT season (2026-27) schedule with real game statuses, so the props refresh, the live tick's gid index and the games-history freshness trigger see 2026-27 games before the 2026-10-20 opener; deployed with a measurement (user request 2026-10-14).
 - Files: scripts/port_basketball_source_cli.py (NBA EDITS section only), syndicate/features/nba/source_cli/schedule.py, syndicate/features/nba/source_cli/cli.py, tests/test_nba_schedule_current_season.py (NEW)
