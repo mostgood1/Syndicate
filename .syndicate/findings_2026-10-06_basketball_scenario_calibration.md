@@ -1856,3 +1856,29 @@ PROVISIONAL until the full FIT (P3's amendment).
 - No real in-trouble PF/48 exists: §2d measured on-floor shares, not foul rates.
 - If #3e passes with a borderline closers-on guard, P3 computes PF/48 from the P2 stints as a follow-up reading. #3e is
   not held for it.
+
+### Phase 2 #3d — RESULT 2026-10-14 04:15Z (done 04:12Z, co-signed): NOT CONFIRMED; release_s reaches 0.193 only by benching closers
+
+**Run:** 5 points × 12 dates, 17,400/17,400 calls with levers, 0 errors.
+
+| release_s | foul-outs (0.193 ± 0.04) | Q4 ≤ 4:00 | closers-on [0.375, 0.535] | FTA | H2 | Q4 slope | S8 | Q4 FTA share | total bias |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 | **0.182 ✓** | 0.138 | **0.126 ✗** | 23.16 | −0.163 | −0.088 | 14.98 | 0.265 | +1.22 |
+| 60 | 0.267 ✗ | 0.222 | 0.188 ✗ | 23.19 | −0.165 | −0.089 | 14.95 | 0.265 | +1.26 |
+| 120 | 0.331 ✗ | 0.290 | 0.251 ✗ | 23.14 | −0.173 | −0.083 | 15.00 | 0.264 | +1.12 |
+| 180 | 0.378 ✗ | 0.334 | 0.310 ✗ | 23.17 | −0.171 | −0.091 | 14.98 | 0.263 | +1.37 |
+| 240 | 0.413 ✗ | 0.370 | 0.359 ✗ | 23.23 | −0.182 | −0.099 | 14.85 | 0.263 | +1.16 |
+
+- Q4 starters on the floor: close 3.16–3.20 (real 3.15 ✓); blowout 2.32–2.34 (real 1.56, the known blowout gap).
+- P(top fouler ≥ 5) is 0.54 at every point (real 0.414). Team PF 19.2.
+- **Verdict:** the only point inside the foul-out band (release 0) gets there by keeping 5-PF starters on the floor
+  12.6% of the rest of Q4, against real 45.5%. That is the failure P3's amended guard exists to catch. No point
+  passes, so release_s is rejected as the lever.
+- Even the current 240 s sits just under the band (0.359).
+
+**New discrepancy (reading, not a guard): the sim produces too MANY 5th-PF-in-Q4 events.**
+- Starters reaching their 5th PF in Q4 with ≥ 4:00 left: sim ~0.64/game (11,181 events / 17,400 draws), against real
+  0.29/game (240 / 816).
+- Together with P(top fouler ≥ 5) of 0.54 vs 0.41, fouls are concentrated on starters BEFORE the foul-out stage.
+- Foul avoidance (#3e) acts from each period's threshold on, so it should also cut this. #3e reads the event rate.
+- The JR runs used patch v2, so P(6th | 5th) is not available for #3d (the readout printed 0.000; that means n/a).
