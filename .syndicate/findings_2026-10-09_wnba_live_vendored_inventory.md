@@ -205,3 +205,16 @@ appearance for that team (opening day, trades, signings) -- production's own beh
 production would hit the same gap, and those players can get no live prop at all. Next: the rate by month and by
 reason (availability exclusion vs pool cap vs not on the roster file), before deciding whether P5 needs a live
 pool top-up from the box.
+
+### On-floor gap by month: WNBA's pregame frame looks CAPPED at ~10, not only recency-limited (2026-10-14 13:2xZ)
+
+5:00 Q4, all 340 recorded games (680 sides): real five resumed / player match / median frame size --
+May 0.57 / 0.887 / 10; Jun 0.79 / 0.948 / 10; Jul 0.69 / 0.934 / 10; Aug 0.72 / 0.925 / 10; Sep 0.70 / 0.905 / 10
+(Oct 2 sides). Regular 463/662, playoffs 14/18. The 261 absent players are NOT fringe: median 19 final minutes, 125
+of them >= 20 min.
+
+**This partly OVERTURNS my 13:0xZ hypothesis** ("players with no recent team games are excluded"): the May dip fits
+recency, but after May the real-five rate is FLAT ~0.7 while the median frame never leaves 10 players. P3's NBA
+reading (findings_2026-10-09 §11) ramps 0.45 -> 0.92 as frames grow 12.5 -> 17. For WNBA the leading candidate is
+a frame-size cap of ~10 (below a real 11-12-player rotation), with recency on top in May. UNVERIFIED which code
+sets it -- for the smart-sim roster/frame owner (P3 filed the lead).
