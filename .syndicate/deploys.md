@@ -49047,3 +49047,13 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **verify -- MET (served):** shortlist rebuilt `written_at 2026-10-14T00:47:24Z` (2m53s after the new pid). `/api/board/layer2-shortlist?sport=ncaaf`: **62 of 62 NCAAF prop rows** carry `likelihood.mode == "shadow"` (baseline 00:24Z: 0 of 62). Default view (2,000 rows): 5 NCAAF props stamped -- 4 unders `+0.0238`, 1 over `-0.0238`; sample Receptions under fair 0.5947 -> p 0.6185, `ev_pct` +0.76, `quote.fair_probability` unchanged. Recorder `opportunity_population/2026-10-13__ncaaf__part000.jsonl`: 4 records with `lk` and `lke` (new sightings since the restart).
 - **owed:** NBA -- 0 NBA prop rows on the board now (preseason); read the `nba.under_bias` stamp when NBA props appear (by the 10-20 opener). `nba-signals` job -- next supervisor `up`.
 - **rollback:** `SYNDICATE_NCAAF_UNDER_BIAS_DELTA=0` / `SYNDICATE_NBA_UNDER_BIAS_DELTA=0` (refresh-worker env), restart under a claim.
+
+
+## 2026-10-14 00:51:30Z -- FLEET DATA, NO DEPLOY, NO RESTART: NCAAB 2025-26 pbp corpus and the P4 backtest reports copied to the fleet data root -- **MET** (lane `ncaab-native-live-tier`, session e48a0f9b)
+- **User:** "copy the corpus and backtest reports to the fleet".
+- **Where:**
+  - `~/syndicate-prod/data/ncaab_source/data/pbp_corpus/pbp_corpus_2026.jsonl.gz` (+ `.dates.json`), 6,275 games;
+  - `~/syndicate-prod/data/ncaab_source/data/backtests/live_resim_2026/`: 15 files, the default / exact / half / half+exact / E1 / E2 backtests (.json + per-game .jsonl), the corpus baseline report, and both bonus-rate fits.
+- **Safety:** none of the 17 destination paths existed (the script refuses to overwrite). Each was copied to `.tmp` and then renamed. Nothing on the fleet writes these paths.
+- **Verify -- MET:** 17/17 sha256 equal source; 49,020,611 B; corpus sha256 `d3784b55012d8192`.
+- **Effect:** the analysis scripts (`ncaab_corpus_baseline.py`, `ncaab_live_resim_backtest.py`, `fit_ncaab_bonus_rate.py`) can now run on the fleet against `SYNDICATE_DATA_ROOT`, and the substrate is no longer this one Windows machine. The 2025-26 player box was already there (2026-10-12 16:27Z).

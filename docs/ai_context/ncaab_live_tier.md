@@ -344,7 +344,8 @@ bias is about -3.
    team enters the table when ESPN loads its real one. Until then its games refuse
    (`team_has_no_player_priors`). KNOWN WEAKNESS: an impact freshman projects at the newcomer
    default (Duke's freshmen at 6.8 min) until he has played.
-8. Copy the corpus and the 2025-26 player box to the fleet's data root. Both were built
+8. **DONE 2026-10-14:** the corpus, the 2025-26 player box and every backtest/fit report are on the fleet data root
+   (`ncaab_source/data/pbp_corpus/`, `ncaab_source/data/backtests/live_resim_2026/`; sha256-verified, deploys.md). Was: copy the corpus and the 2025-26 player box to the fleet's data root. Both were built
    locally, and next season's priors use 2025-26 as the prior-season carryover.
 9. Collapse `ncaab/live_resim.resume_from_summary` into P3's league-parametric one (P3 added
    `league=` on 2026-10-12).
