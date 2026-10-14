@@ -77,8 +77,11 @@ def _ts(v: Any) -> datetime | None:
 
 
 def close_main_lines(rows: Iterable[Mapping[str, Any]], *, books: frozenset[str] = US_BOOKS,
-                     lead: timedelta = CLOSE_LEAD) -> list[dict[str, Any]]:
-    """Closing main lines from an append-on-change quote log (see module docstring)."""
+                     lead: timedelta = CLOSE_LEAD, market_stats: Mapping[str, str] = FOOTBALL_MARKET_STATS,
+                     price_books: frozenset[str] | None = None) -> list[dict[str, Any]]:
+    """Closing main lines from an append-on-change quote log (see module docstring). `books` form the fair; the best
+    under is taken over `price_books` (default: the same books) -- the NHL grader adds Pinnacle to the fair only."""
+    price_books = books if price_books is None else price_books
     rows = [r for r in rows if str(r.get("kind") or "prop") == "prop"]
     kickoff: dict[str, datetime] = {}
     for r in rows:
@@ -89,7 +92,7 @@ def close_main_lines(rows: Iterable[Mapping[str, Any]], *, books: frozenset[str]
     book_ts: dict[tuple, datetime] = {}
     meta: dict[str, dict[str, Any]] = {}
     for r in rows:
-        stat = FOOTBALL_MARKET_STATS.get(str(r.get("market") or ""))
+        stat = market_stats.get(str(r.get("market") or ""))
         side = str(r.get("selection") or "").strip().lower()
         book = str(r.get("bookmaker") or "").lower()
         e, seen = str(r.get("event_id") or ""), _ts(r.get("captured_at") or r.get("snapshot_ts"))
@@ -114,12 +117,13 @@ def close_main_lines(rows: Iterable[Mapping[str, Any]], *, books: frozenset[str]
             by_point[(e, stat, player, point)][book][side] = price
     candidates: dict[tuple, list[dict[str, Any]]] = defaultdict(list)
     for (e, stat, player, point), bks in by_point.items():
-        two = [s for s in bks.values() if "over" in s and "under" in s]
-        fairs = [f[0] for f in (devig([s["over"], s["under"]], method="shin") for s in two) if f]
+        two = {b: s for b, s in bks.items() if "over" in s and "under" in s}
+        fairs = [f[0] for f in (devig([s["over"], s["under"]], method="shin") for s in two.values()) if f]
+        priced = [s["under"] for b, s in two.items() if b in price_books]
         if fairs:
             candidates[(e, stat, player)].append({
                 "event": e, "stat": stat, "player": player, "point": point, "books": len(fairs),
-                "p_over": statistics.median(fairs), "best_under": max((s["under"] for s in two), key=decimal), **meta[e]})
+                "p_over": statistics.median(fairs), "best_under": max(priced, key=decimal) if priced else None, **meta[e]})
     out = []
     for cands in candidates.values():
         cands.sort(key=lambda c: (-c["books"], abs(c["p_over"] - 0.5)))
