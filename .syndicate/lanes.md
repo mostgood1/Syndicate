@@ -67,6 +67,14 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### nba-schedule-current-season — OPEN — opened 2026-10-14 — session 2d413211
+- Goal: Make the NBA `fetch-schedule` (syndicate/features/nba/source_cli) write the CURRENT season (2026-27) schedule with real game statuses, so the props refresh, the live tick's gid index and the games-history freshness trigger see 2026-27 games before the 2026-10-20 opener; deployed with a measurement (user request 2026-10-14).
+- Files: scripts/port_basketball_source_cli.py (NBA EDITS section only), syndicate/features/nba/source_cli/schedule.py, syndicate/features/nba/source_cli/cli.py, tests/test_nba_schedule_current_season.py (NEW)
+- Hypothesis: cdn.nba.com answers 403 to this host (fleet and Windows, with or without browser headers, measured 2026-10-14), so `fetch_schedule_2025_26` always takes the local fallback and rewrites the old 2024-26 file (dates 2024-10-22..2026-04-12, empty statuses). stats.nba.com `ScheduleLeagueV2(season="2026-27")` answers (1,274 games, statuses 1/3).
+- Falsification test: after the change, a fleet `fetch-schedule` on a data copy writes no 2026-27 games, or the 10-20 slate it yields differs from ESPN's (BOS@DET, PHI@NY, OKC@SA), or predict-date for a date with game_cards changes output.
+- Verification: after the fleet ff, the next NBA bootstrap's fetch-schedule writes schedule_2026_27.csv (and the schedule_2025_26 alias) with 2026-27 games and statuses; 10-20 games present.
+- Blocked by: none
+
 ### basketball-games-history-freshness — CLOSED 2026-10-14 (GOAL MET) — opened 2026-10-14 — session 2d413211
 - GOAL VERDICT. Goal (verbatim): "Re-fetch the NBA/WNBA games history (raw/games_nba_api.csv) when the league's schedule lists a final game after the history's newest one, instead of only when the newest game is >30 days old; deployed with a measurement (user request 2026-10-13: "fix the 30-day history rule")." -- **GOAL: MET** `[2026-10-14 02:59Z]`. Fleet ff 98ca3ba7 at 02:55:51Z; the first WNBA export logged GAMES_HISTORY_BEHIND_SCHEDULE at 02:56:25Z (6 finals); games_nba_api.csv newest 10-02 -> 10-09 (2,490 games) at 02:58:36Z; features.csv rebuilt 02:58:56Z (newest 10-09). deploys.md entry 02:55:51Z. NBA half is wired but inert until NBA fetch-schedule writes 2026-27 (hard-wired to schedule_2025_26.csv) -- separate, unfixed.
 - Goal: Re-fetch the NBA/WNBA games history (raw/games_nba_api.csv) when the league's schedule lists a final game after the history's newest one, instead of only when the newest game is >30 days old; deployed with a measurement (user request 2026-10-13: "fix the 30-day history rule").
