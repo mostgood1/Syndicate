@@ -181,3 +181,9 @@ def test_saves_v3_tests_only_new_games_and_holms_the_two_leads() -> None:
     assert leaky["n"] == 20 and leaky["residual"] == 0.5          # the v1 games (all lost) are not in the test
     assert rep["full_season"]["nhl.saves_team_leaky"]["fired"]["residual"] == 0.0
     assert rep["verdicts"] == {"nhl.saves_team_leaky": "SUPPORTED", "nhl.saves_opp_volume_high": "SUPPORTED"}
+
+
+def test_v3_out_of_sample_evidence_is_recorded_and_statuses_stay_null() -> None:
+    spec = nhl.NHL_REGISTRY["nhl.saves_opp_volume_high"]
+    assert spec.status == "null" and spec.evidence["v3_out_of_sample"]["new_n"] == 138
+    assert spec.evidence["v3_out_of_sample"]["holm_pass"] is False and spec.evidence["confirm_n"] == 34

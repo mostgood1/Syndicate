@@ -323,3 +323,24 @@ NHL_REGISTRY.update({
         "verdict": "NOT SUPPORTED", "forward": _FWD})
     for name, r in _SKATER_V2.items()
 })
+
+
+# ----------------------------------------------------------------------------- v3 saves out of sample (2026-10-14)
+#
+# The two v1 leads on the 863 games bought after v1 (`nhl_saves_lift.py --mode lift-new`, registered 6005fe0e):
+# Holm over {saves_team_leaky, saves_opp_volume_high} at one-sided 0.025 -> NEITHER passes. saves_opp_volume_high
+# repeated (+9.1% [+0.8, +17.5], p 0.0185 on 138 new lines; v1 confirm +10.6%) but needed p <= 0.0125 as the stronger of
+# two; saves_team_leaky reversed (-3.2%). Secondary: saves_team_b2b +7.5% [+1.5, +13.3] on the new games. Statuses stay
+# null; the evidence records the out-of-sample numbers.
+for _sig, _v3 in {
+    "nhl.saves_opp_volume_high": {"new_residual": 0.0906, "new_ci95": [0.0079, 0.1754], "new_n": 138, "new_p_one_sided": 0.0185,
+                                  "full_season_residual": 0.0847, "full_season_n": 203,
+                                  "roi_best_over_full_season_descriptive": 11.17, "holm_pass": False},
+    "nhl.saves_team_leaky": {"new_residual": -0.0323, "new_ci95": [-0.1083, 0.0441], "new_n": 164, "new_p_one_sided": 0.7851,
+                             "holm_pass": False},
+    "nhl.saves_team_b2b": {"new_residual": 0.0745, "new_ci95": [0.0145, 0.1334], "new_n": 240, "new_p_one_sided": 0.0085,
+                           "full_season_residual": 0.0512, "full_season_n": 374, "secondary_not_in_family": True},
+    "nhl.saves_opp_volume_low": {"new_residual": -0.0129, "new_n": 146},
+    "nhl.saves_under_bias": {"new_residual": -0.0114, "new_ci95": [-0.0362, 0.0136], "new_n": 1510, "roi_best_under_new": -7.27},
+}.items():
+    NHL_REGISTRY[_sig] = _replace(NHL_REGISTRY[_sig], evidence={**NHL_REGISTRY[_sig].evidence, "v3_out_of_sample": _v3})

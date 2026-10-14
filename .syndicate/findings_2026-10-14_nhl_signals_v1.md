@@ -86,3 +86,33 @@ The forward family (K1-K5 on 2026-27) still runs to its 2026-12-31 read at no co
 injuries and scratches are being collected since 10-13 (an absence test needs a few weeks of it); the 2025-26 saves
 history covers only 449 games -- the remaining ~860 would cost ~8,600 credits (saves, 10 per game) and would roughly double
 the saves sample for the two over-side leads.
+
+## v3 -- the two saves leads OUT OF SAMPLE on the rest of 2025-26 (2026-10-14T02:50Z): neither passes Holm; one repeated
+
+**Purchase** (user: "buy the remaining saves history"): `nhl_skater_props_pull.py --kind saves`, the 863 games the v1
+pull did not cover, same market and 3-min snapshot, into a separate `odds_saves_rest/`. Probe 1 game = 10 credits; full
+run 862 games = 8,620; **8,630 credits** in all (estimate 8,630), 0 failed calls. Registered at `6005fe0e` before any
+new game met an outcome.
+
+**Test** (`nhl_saves_lift.py --mode lift-new`): 1,510 graded new lines over 854 games (2,320 / 1,301 with v1).
+
+| | new games: n | residual [95% CI] | one-sided p | ROI best over (descriptive) | full season (v1 + new) |
+|---|---|---|---|---|---|
+| **PRIMARY** saves_opp_volume_high (over) | 138 | **+9.1% [+0.8, +17.5]** | 0.0185 | +12.2% [-3.5, +28.2] | +8.5% [+1.2, +14.9], n 203; ROI +11.2% |
+| **PRIMARY** saves_team_leaky (over) | 164 | -3.2% [-10.8, +4.4] | 0.785 | -11.2% | +1.0%, n 242 |
+| secondary saves_team_b2b (over) | 240 | +7.5% [+1.5, +13.3] | 0.0085 | +9.2% [-2.0, +20.4] | +5.1% [+0.2, +10.0], n 374 |
+| secondary saves_opp_volume_low (under) | 146 | -1.3% | 0.62 | -- | -1.6% |
+| secondary saves UNDER (every line) | 1,510 | -1.1% [-3.6, +1.4] | 0.82 | under ROI -7.3% | -1.2% |
+
+**Verdict as registered: neither lead passes** (Holm needs the stronger p <= 0.0125; opp_volume_high has 0.0185). The
+registration pre-committed to that pairing, so the bar stands.
+
+**Reading.** The high-volume-opponent saves OVER is the strongest matchup lead in the NHL work: +10.6% in the v1 confirm
+half, +9.1% on 138 games nobody had looked at, +11% ROI at the best over price across 203 bets -- the closing saves line
+under-reacts to how much the opponent shoots. The leaky-defence lead did not replicate. A back-to-back over showed up on
+the new games (+7.5%) after a flat v1 -- secondary, not tested as primary. Saves unders confirm the earlier read: no under
+tilt in NHL props.
+
+**What would make it a finding:** a single-hypothesis forward test of saves_opp_volume_high on 2026-27 (the fleet logs
+saves quotes since 09-30; ~12-16 saves lines a day, ~10% fire -> roughly 100 fired lines by Dec 31, ~250 by the season's
+end in April) -- registered before the games, one-sided 0.025, no pairing.
