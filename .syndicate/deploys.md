@@ -49254,3 +49254,14 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **change:** principal LogonType Password; trigger unchanged (TimeTrigger every PT5M). Script log: 12:33:24 "READ BACK: triggers=TimeTrigger(every PT5M) logonType=Password / DONE -- verified by read-back".
 - **measured in the new mode:** run 12:35:54 PM CT, LastTaskResult 0; watchdog.log "2026-10-14T12:35:55-05:00 OK status=degraded findings=3" (same as prior runs) -- a no-logon task REACHES WSL. Partial evidence for the fleet task's boot start; the boot itself is still untested.
 - **why the first two attempts silently did nothing:** the system execution policy blocks .ps1 ("cannot be loaded because running scripts is disabled", PowerShell/Operational 4100 at 12:31:30); "Run with PowerShell" does not bypass it. A `.cmd` launcher running `powershell -ExecutionPolicy Bypass -File ...` works without changing the policy.
+
+## 2026-10-14 17:47Z (12:47 PM CT) -- CORRECTION to the 13:18:20Z ff entry (e1954b4a): one of its 41 "hand-checked" pairings is WRONG; the fix 0fef1ad0 is on main and NOT on the fleet `[lane soccer-starter-name-match (reopened), session b9bb5f37]`
+- **The wrong pairing:** ESPN's FC Dallas starter "Daniel" (10-10) is a **Goalkeeper**, and "Daniel Job" is a different FC Dallas player (AM, listed in the SAME box as a Substitute). The one-word step matched them. The 13:18Z entry called it "unique but not independently confirmed"; it was in fact wrong.
+- **Fix 0fef1ad0 (main):**
+  - removes the one-word step;
+  - adds same-surname + 3-letter first-name prefix (Matty/Matthew Cash, Dayot/Dayotchanculle Upamecano);
+  - HTML-decodes names (`Ngal&#039;ayel`).
+  - Offline 10-09..12: resolved 2,058 -> **2,130** of 2,222; all-11 sides 87 -> **123**; 69 pairings hand-checked; "Daniel" unmatched.
+- **NOT FF'D, by user decision 2026-10-14:** main is linear, and the only ff that reaches 0fef1ad0 also carries b4108767 (daily optimizer props stake tier). Lane `optimizer-props-tier` records that as "NOT ON THE FLEET" under an open rule check.
+  - The fleet (63631afb) therefore still runs e1954b4a's one-word step. It affects only one-word ESPN starter names with a unique first-name row in the squad, including tonight's MLS pre-kickoff runs.
+  - It loads with whichever ff next carries b4108767. The optimizer lane's owner (scheduled session "Daily model + betting accuracy review") cannot be messaged; the ask is in log/2026-10-14.md.
