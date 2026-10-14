@@ -244,6 +244,51 @@ def _mlb_rhe(path: str) -> dict[str, Any] | None:
     return {"kind": "rhe", "labels": ["R", "H", "E"], "away": row(away), "home": row(home)}
 
 
+def _mlb_live_board(date: str) -> dict[str, dict]:
+    """{gamePk: {away / home [R, H, E], inning, half}} from StatsAPI's schedule
+    with the linescore hydrated -- one request per date.
+
+    User report 2026-10-14 ~02:25Z ("mlb score is wrong"): CLE @ TB live in the
+    7th showed R/H/E 0 0 0 -- the cached feed_live file for a game that day is
+    the PRE-game copy -- and "TOP 7" while StatsAPI read Bottom 7th, R/H/E
+    1 6 1 / 3 7 0.
+    """
+    import urllib.request
+
+    url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={date}&hydrate=linescore"
+    with urllib.request.urlopen(url, timeout=6) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    out: dict[str, dict] = {}
+    for day in payload.get("dates") or []:
+        for g in day.get("games") or []:
+            ls = g.get("linescore") or {}
+            teams = ls.get("teams") or {}
+            row = lambda t: [_int((teams.get(t) or {}).get(k)) for k in ("runs", "hits", "errors")]  # noqa: E731
+            out[str(g.get("gamePk"))] = {"away": row("away"), "home": row("home"),
+                                         "inning": _int(ls.get("currentInning")), "state": str(ls.get("inningState") or "")}
+    return out
+
+
+def _mlb_live(game: Mapping[str, Any], date: str) -> dict | None:
+    pk = str(game.get("gamePk") or game.get("game_pk") or game.get("game_id") or "").strip()
+    if not pk.isdigit():
+        return None
+    board = _cached(("mlb_live", date, int(time.monotonic() // _LIVE_TTL_S)), lambda: _mlb_live_board(date)) or {}
+    return board.get(pk)
+
+
+def mlb_inning_token(game: Mapping[str, Any], date: str) -> str | None:
+    """"TOP 7" / "MID 7" / "BOT 7" / "END 7" from StatsAPI for a live game."""
+    try:
+        hit = _mlb_live(game, date)
+    except Exception:  # noqa: BLE001
+        return None
+    if not hit or not hit.get("inning"):
+        return None
+    half = {"top": "TOP", "middle": "MID", "bottom": "BOT", "end": "END"}.get(hit["state"].lower())
+    return f"{half} {hit['inning']}" if half else None
+
+
 def _mlb(game: Mapping[str, Any], date: str) -> dict[str, Any] | None:
     pk = str(game.get("gamePk") or game.get("game_pk") or "").strip()
     if not pk.isdigit():
@@ -427,6 +472,12 @@ def linescore(sport: str, game: Mapping[str, Any], date: str, *, away_abbr: str 
         if sport == "soccer":
             return _soccer(game, date)
         if sport == "mlb":
+            # Today / yesterday from StatsAPI (live R/H/E; the day's feed file can
+            # be a pre-game copy); older dates from the cached feed files.
+            if live or _recent(date):
+                hit = _mlb_live(game, date)
+                if hit and None not in hit["away"] and None not in hit["home"]:
+                    return {"kind": "rhe", "labels": ["R", "H", "E"], "away": hit["away"], "home": hit["home"]}
             return _mlb(game, date)
     except Exception:  # noqa: BLE001 -- a line score must never break a chip
         return None

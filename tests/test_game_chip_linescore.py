@@ -62,7 +62,8 @@ class LineScores(unittest.TestCase):
         with gzip.open(feed / "849820.json.gz", "wt", encoding="utf-8") as fh:
             json.dump({"liveData": {"linescore": {"teams": {"home": {"runs": 3, "hits": 7, "errors": 0},
                                                             "away": {"runs": 7, "hits": 14, "errors": 1}}}}}, fh)
-        got = gl.linescore("mlb", {"gamePk": 849820}, "2026-10-12")
+        with mock.patch.object(gl, "_mlb_live_board", return_value={}):  # older-date path: the feed file
+            got = gl.linescore("mlb", {"gamePk": 849820}, "2026-10-12")
         self.assertEqual((got["kind"], got["labels"], got["away"], got["home"]), ("rhe", ["R", "H", "E"], [7, 14, 1], [3, 7, 0]))
 
     def test_soccer_halves_from_the_match_box(self) -> None:
@@ -241,6 +242,22 @@ class BasketballLiveClock(unittest.TestCase):
 
     def test_halftime(self) -> None:
         self.assertEqual(self._serve("STATUS_HALFTIME", "0.0", token="Q2 0:00"), "HALF")
+
+
+class MlbLive(unittest.TestCase):
+    BOARD = {"849813": {"away": [1, 6, 1], "home": [3, 7, 0], "inning": 7, "state": "Bottom"}}
+
+    def test_live_mlb_takes_statsapi_rhe_and_inning(self) -> None:
+        from syndicate.features.shared import game_chip_scoreboard as gs
+
+        chip = {"sport": "mlb", "state": "live", "game_key": "849813", "status_token": "TOP 7",
+                "linescore": {"kind": "rhe", "labels": ["R", "H", "E"], "away": [0, 0, 0], "home": [0, 0, 0]},
+                "away": {"abbr": "CLE", "score": "1"}, "home": {"abbr": "TB", "score": "3"}}
+        gl._CACHE.clear()
+        with mock.patch.object(gl, "_mlb_live_board", return_value=self.BOARD):
+            gs.attach_served_linescores([chip], "2026-10-13")
+        self.assertEqual(chip["status_token"], "BOT 7")
+        self.assertEqual((chip["linescore"]["away"], chip["linescore"]["home"]), ([1, 6, 1], [3, 7, 0]))
 
 
 if __name__ == "__main__":

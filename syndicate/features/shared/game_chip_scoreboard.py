@@ -751,6 +751,14 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
             token = live_clock_token(sport, game, day, away_abbr=away_abbr, home_abbr=home_abbr)
             if token:
                 chip["status_token"] = token
+        # MLB inning from StatsAPI's live linescore (the worker's token is as old
+        # as its build: "TOP 7" served while the game was in the bottom 7th).
+        if sport == "mlb" and chip.get("state") == "live":
+            from syndicate.features.shared.game_chip_linescore import mlb_inning_token
+
+            token = mlb_inning_token(game, day)
+            if token:
+                chip["status_token"] = token
         # Basketball bonus on the live line, after the run (user 2026-10-14).
         # Rebuilt each pass: the serve-time re-read must replace, not stack.
         if sport in ("nba", "wnba") and chip.get("state") == "live":
@@ -780,7 +788,7 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
         return
 
 
-_SERVE_TIME_LINESCORE_SPORTS = {"nba", "wnba", "nhl"}
+_SERVE_TIME_LINESCORE_SPORTS = {"nba", "wnba", "nhl", "mlb"}
 
 
 def _chip_day(chip: dict[str, Any], date_value: str) -> str:
