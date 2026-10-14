@@ -865,6 +865,14 @@ death, never life — do not invert it.
 - Verification: generator tests on synthetic evidence; a fleet run writes <data root>/cheatsheets/<sport>/<date>.json for the in-season sports with row counts and timing; a sample sheet published for the user; the page serves the JSON with no request-time evidence building
 - Blocked by: none
 
+### play-cards — OPEN — opened 2026-10-14 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: A branded (Syndicate ROI) play-card generator: cards rendered as 1080x1350 PNGs from cheat-sheet rows ONLY where the price check passes (best price beats the no-vig fair, multi-book, plausible EV), each card showing best price, no-vig fair, edge, the evidence and the risks, and every generated card appended to a ledger that a grader settles at the close (EV at the Shin close) and on the result
+- Files: syndicate/features/shared/play_cards.py (NEW), scripts/build_play_cards.py (NEW), scripts/grade_play_cards.py (NEW), syndicate/templates/play_cards/card.html (NEW), syndicate/static/brand/syndicate_roi_badge.webp (NEW), tests/test_play_cards.py (NEW)
+- Hypothesis: n/a (product; selection uses only the price check, not model or form)
+- Falsification test: n/a
+- Verification: unit tests for selection and card fields; a fleet run renders PNGs for tonight's / this weekend's slates with the ledger written; the user reviews the cards; the grader settles at least one slate
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
