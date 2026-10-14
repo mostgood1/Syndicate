@@ -1002,6 +1002,7 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: Production's retention matcher returns no rule for the mirror path (test); a manual fleet run mirrors the existing closed days with counts per sport; the SCHEDULED_JOBS entry is on main and the fleet checkout; first scheduled run rc=0 after the next supervisor up.
 - Blocked by: none
+- **STATUS 2026-10-14T17:39Z:** script `86646cfb` (and `c7030750`) on main; production matcher test passes (mirror path matches no rule; the original matches `book_quotes`); seeded by hand on the fleet -- 2.4 MB under `research/forward_inputs/` (mlb / nba / nhl daily 10-13, nfl wk4, ncaaf wk4-6 + daily 10-13; open weeks wait). NOT fast-forwarded to the fleet: the 35 commits to main carry OTHER lanes' unshipped runtime code (basketball engine, daily optimizer / overlay, soccer lineups, optimizer skill; a peer lane already notes 'fleet ff owed behind 63631afb'). **OWED: after the owners' next fleet ff + supervisor `up`, read `job preserve-forward-inputs last_run=... rc=0` and `research/forward_inputs/_status.json` -- deadline 2027-02-10 (the 10-13 files' 120th day); until then a hand run of `scripts/preserve_forward_inputs.py --data-root ~/syndicate-prod/data` is the fallback.**
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
