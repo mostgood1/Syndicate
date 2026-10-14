@@ -15,6 +15,7 @@ least 2), `trend` = l3 - base (None when base is unknown).
 """
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any, Mapping, Sequence
 
 from syndicate.features.shared.matchup_signals import SignalSpec
@@ -211,4 +212,37 @@ FOOTBALL_REGISTRY: dict[str, SignalSpec] = {
                    "Both offenses run many plays: more snaps for everyone.", _NCAAF_SRC,
                    "team + opponent offensive plays per game (rush att + pass att, season to date) >= ncaaf_pace"),
     )
+}
+
+
+# ----------------------------------------------------------------------------- v1 result (registered test, 2026-10-14)
+#
+# All 13 NOT SUPPORTED against the closing Shin fair (findings_2026-10-14_football_signals_v1.md, lift run after the
+# registration at ceff4ed3). Tuple: (discover residual, discover n, confirm residual, confirm 95% CI, confirm n,
+# confirm games, confirm one-sided p, confirm hit-rate lift vs baseline). A null signal is shown as research
+# ("tested: no edge"), never as an edge. Two came out significantly NEGATIVE -- the market over-reacts the other way;
+# those are leads for their own registration, not a status here.
+_V1_RESULTS: dict[str, tuple] = {
+    "nfl.target_share_up": (-0.0015, 609, -0.0174, [-0.0878, 0.0575], 342, 115, 0.6913, 0.0038),
+    "nfl.target_share_down": (0.0008, 545, -0.0463, [-0.1134, 0.0204], 304, 95, 0.9141, -0.07),
+    "nfl.carry_share_up": (-0.0991, 246, -0.0193, [-0.1155, 0.0837], 146, 64, 0.6194, 0.011),
+    "nfl.carry_share_down": (0.0019, 236, 0.032, [-0.07, 0.1299], 133, 59, 0.2637, 0.0038),
+    "nfl.vacated_targets": (-0.0155, 557, -0.1052, [-0.1744, -0.0343], 364, 58, 1.0, -0.083),
+    "nfl.vacated_carries": (-0.0134, 165, 0.041, [-0.0846, 0.173], 107, 28, 0.2597, 0.0794),
+    "nfl.team_pass_heavy": (-0.042, 139, -0.096, [-0.2258, 0.0429], 72, 32, 0.9011, -0.1041),
+    "nfl.team_run_heavy": (-0.0159, 132, -0.1401, [-0.3066, 0.0501], 25, 13, 0.9271, -0.1485),
+    "ncaaf.carry_share_up": (-0.1222, 18, -0.1024, [-0.2001, -0.0002], 88, 77, 0.977, -0.0785),
+    "ncaaf.carry_share_down": (-0.0605, 25, 0.0261, [-0.1062, 0.1703], 53, 49, 0.3756, -0.007),
+    "ncaaf.reception_share_up": (-0.1083, 53, -0.053, [-0.1337, 0.0356], 190, 104, 0.8761, -0.0496),
+    "ncaaf.reception_share_down": (-0.1012, 50, 0.0264, [-0.0795, 0.1281], 111, 62, 0.3277, 0.0184),
+    "ncaaf.fast_game": (0.0088, 240, -0.0396, [-0.1392, 0.0566], 113, 11, 0.7882, -0.0178),
+}
+_V1_TESTED = {"nfl": "2026-10-14 lane signal-engine-football v1: closes 2023-24 discover / 2025 confirm",
+              "ncaaf": "2026-10-14 lane signal-engine-football v1: closes 2025 weeks 1-8 discover / 9-16 confirm"}
+FOOTBALL_REGISTRY = {
+    name: replace(spec, status="null", evidence={
+        "tested": _V1_TESTED[spec.sport], "discover_residual": r[0], "discover_n": r[1], "confirm_residual": r[2],
+        "confirm_ci95": r[3], "confirm_n": r[4], "confirm_games": r[5], "confirm_p_one_sided": r[6],
+        "confirm_hit_lift_vs_baseline": r[7], "verdict": "NOT SUPPORTED"})
+    for name, spec in FOOTBALL_REGISTRY.items() for r in (_V1_RESULTS[name],)
 }

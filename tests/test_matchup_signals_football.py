@@ -145,3 +145,9 @@ def test_lift_mode_refuses_until_thresholds_are_registered(tmp_path) -> None:
         return  # registered: the guard no longer applies
     assert lf.main(["--sport", "nfl", "--mode", "lift", "--data-root", str(tmp_path), "--quotes-dir", str(tmp_path),
                     "--out", str(tmp_path / "x.json")]) == 3
+
+
+def test_v1_results_mark_every_football_signal_null_with_its_evidence() -> None:
+    assert set(fb._V1_RESULTS) == set(fb.FOOTBALL_REGISTRY)
+    for spec in fb.FOOTBALL_REGISTRY.values():
+        assert spec.status == "null" and spec.evidence["verdict"] == "NOT SUPPORTED" and spec.evidence["confirm_n"] > 0
