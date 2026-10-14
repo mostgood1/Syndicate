@@ -1945,3 +1945,31 @@ Diagnostic only, no parameter choice.
    ~0.35 point.
 
 #3e's 0.3 is NOT carried forward as a pick.
+
+### Phase 2 #3g — PRE-REGISTRATION 2026-10-14 05:00Z (before any run): per-minute fouler weight `fouler_per_minute` (P3)
+
+**Mechanism (P3, commit to follow after its corpus parity gate):** `EventSimConfig.fouler_per_minute: bool = False`.
+- On: every fouler draw weights the on-court players by raw `_prior_pf_pm` alone (no minutes blend). A missing or zero
+  prior takes the on-court median.
+- foul_mult still multiplies on top. Team PF volume is unchanged.
+- P3's synthetic fixture: top-5 share 0.454 → 0.411.
+
+**Run:** ON only (`PG_on`). OFF = `PS_base`: the identical config, already read (top-5 share 0.659, foul-outs 0.406,
+5th-PF-in-Q4 starter events ~0.64/game, P(top ≥ 5) 0.540).
+- Config: release 240, bench 0.05, foul_mult 1.0, bonus 0.04, end-game on, the same 12 dates, 200 sims.
+
+**CONFIRMED if ALL of these hold:**
+- top-5 PF share within **0.585 ± 0.03**;
+- 5th-PF-in-Q4 starter events/game move at least half the way from 0.64 toward real **0.29** (≤ 0.465);
+- P(top ≥ 5) moves toward 0.414;
+- team PF within ±0.3 of PS_base (19.22). Allocation only.
+- Guards: FTA 22.69 ± 0.7, H2 inside [−0.19, −0.155], Q4 slope ≥ −0.101, S8 14.81 ± 0.6.
+
+**Foul-outs:** read, not gated. foul_mult is re-swept on top afterwards.
+
+**If the share stays above 0.615 with it ON:** the next suspect is `_prior_pf_pm` itself for starters (a per-minute
+prior built on a minutes denominator other than the sim's `_sim_min`). That is checked before anything else is touched
+(P3's caveat).
+
+**Then, if CONFIRMED:** a pre-registered foul_mult re-sweep on top, including ~0.35, with the #3e guard set. A
+provisional pick needs the full FIT and the totals re-fit.
