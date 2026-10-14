@@ -1629,3 +1629,41 @@ diagnosis.
    - The 87 sweep games: **0.103**.
    - The subsample's own real rate is about half the FIT's (binomial SE on 87 games ≈ 0.047). The target stays the FIT
      0.193, but a subsample hit is weaker evidence, which is why (1) gates on the full FIT.
+
+### Phase 2 #3b — RESULT 2026-10-14 02:50Z (sweep done 02:49Z; read after P3's co-sign): NOT CONFIRMED, no grid point passes
+
+**Run:** 5 points, 12 dates, 87 games, 17,400/17,400 engine calls carrying the levers, 0 errors.
+
+| bench_mult | foul-outs/game (target 0.193 ± 0.04) | FTA/team (22.69 ± 0.7) | Q4 FTA share (≥ 0.254 toward 0.279) | team PF (real 20.52) | H2 | Q4 slope (≥ −0.101) | S8 margin | total bias (< 1.0) |
+|---|---|---|---|---|---|---|---|---|
+| 0.0 † | 0.908 | 23.13 | 0.265 | 19.23 | −0.175 | −0.083 | 15.02 | +1.14 ✗ |
+| 0.01 | 0.390 ✗ | 23.17 | 0.264 | 19.23 | −0.184 | −0.093 | 14.79 | +0.97 |
+| 0.02 | 0.398 ✗ | 23.14 | 0.264 | 19.23 | −0.178 | −0.091 | 14.86 | +1.17 ✗ |
+| 0.05 | 0.415 ✗ | 23.17 | 0.264 | 19.21 | −0.163 | −0.080 | 15.05 | +1.13 ✗ |
+| 0.1 | 0.440 ✗ | 23.19 | 0.264 | 19.27 | −0.184 | −0.094 | 14.82 | +1.23 ✗ |
+| #3 0.04 (end-game off, mult 0.05) | 0.379 | 22.83 | 0.254 | 19.05 | −0.165 | −0.091 | 14.89 | +0.69 |
+
+- The real 87-game subsample base rate is 0.103; FIT is 0.194.
+- FTA, H2, Q4 slope and S8 pass at every point. The Q4 FTA share moved toward real (0.254 → 0.264), so end-game fouling
+  adds Q4 FTs, but it does not reach 0.279.
+
+**† mult 0.0 is NOT "strongest benching". It is benching OFF.**
+- engine.py:1088 reads `float(getattr(cfg, "foul_trouble_bench_mult", 1.0) or 1.0)`, so 0.0 becomes 1.0.
+- 0.908 is the no-benching foul-out rate with the bonus and end-game on.
+- A falsy-zero lever (learning: unknown/absent must not default permissive). The pre-registered fallback trigger
+  ("if 0.0 still overshoots") was therefore not evaluable as written. P3 owns the code and has been told.
+
+**What it showed:**
+- The mult is SATURATED. From 0.1 down to 0.01 (near-total benching of a player in foul trouble) foul-outs only fall
+  0.440 → 0.390.
+- The excess is not something possession-level benching can reach. Candidates, untested:
+  - the 240 s release window (nobody is benched late);
+  - end-game intentional fouls charged to on-court players. End-game adds about +0.04 (0.379 → 0.415 at mult 0.05);
+  - per-player PF concentration from the bonus foul assignment.
+- Team PF stays 19.2 vs real 20.5, so volume is not the excess.
+- End-game + bonus add about +0.45 total points (bias +0.69 → +1.13), which fails the total guard at 4 of 5 points.
+
+**Next (not run, needs its own pre-registration):** diagnose WHEN and TO WHOM the sixth foul lands in the sim vs real
+before choosing the pre-registered fallback lever (thresholds or release_s):
+- quarter and clock of foul-outs;
+- the PF share of each team's top fouler, vs ESPN player boxes.
