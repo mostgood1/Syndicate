@@ -1012,6 +1012,11 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # tip-off to `nba_source/signals/<season>/<date>.jsonl`. Read by nothing that sizes or ranks yet. 11:50Z: after
     # `basketball-player-game-log` (11:20Z) has appended last night's games.
     ScheduledJob("nba-signals", 11, 50, ("scripts/build_nba_signals.py", "--as-of", "today")),
+    # `preserve-forward-inputs` (lane `forward-input-preservation`, user 2026-10-14 "yes set up the quote file copy
+    # job"): mirrors each CLOSED day's quote log, filtered to the markets the registered forward tests read, to
+    # `research/forward_inputs/<sport>/quotes/` -- a path no retention rule matches -- so the season-long reads (H7, R1,
+    # S1F, M1/M2) outlive the 120-day `book_quotes` rule. Read by nothing until a final read runs `--restore`.
+    ScheduledJob("preserve-forward-inputs", 12, 5, ("scripts/preserve_forward_inputs.py",)),
 )
 
 
