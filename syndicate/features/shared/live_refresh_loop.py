@@ -4200,12 +4200,31 @@ def _mlb_commence_times(date_str: str) -> list[tuple[str, float]]:
 	return []
 
 
+def _wnba_schedule_processed_dir() -> Path:
+	"""Where the WNBA props refresh's `fetch-schedule` writes `schedule_<season>.json`: WNBA_BETTING_DATA_ROOT (set on
+	every refresh role) else the data root's `wnba_source/data`."""
+	raw = str(os.environ.get("WNBA_BETTING_DATA_ROOT") or "").strip()
+	return (Path(raw) if raw else data_root() / "wnba_source" / "data") / "processed"
+
+
 def _wnba_commence_times(date_str: str) -> list[tuple[str, float]]:
-	payload = read_json_file(REPO_ROOT / "vendor" / "wnba_betting_repo" / "data" / "processed" / "schedule_2026.json")
+	# Off vendor since 2026-10-14 (lane wnba-live-commence-times-native, user request). This read the VENDORED
+	# vendor/wnba_betting_repo/data/processed/schedule_2026.json, frozen at the vendor pull (ends 2026-09-24), so it
+	# returned [] for the whole postseason -- measured on the fleet for 10-09 and for Finals G1 10-17. It now reads the
+	# newest schedule_*.json the refresh's fetch-schedule rewrites each run (older snapshots under other names linger),
+	# straight from disk: it is a worker-written file, not a state-store key. Same filter (date_est) and same epoch
+	# (datetime_utc) as before; one entry per game.
+	try:
+		candidates = [path for path in _wnba_schedule_processed_dir().glob("schedule_*.json") if path.is_file()]
+		newest = max(candidates, key=lambda path: path.stat().st_mtime) if candidates else None
+		payload = json.loads(newest.read_text(encoding="utf-8")) if newest is not None else None
+	except (OSError, ValueError):
+		return []
 	rows = payload if isinstance(payload, list) else (payload.get("games") if isinstance(payload, dict) else None)
 	if not isinstance(rows, list):
 		return []
 	out: list[tuple[str, float]] = []
+	seen: set[str] = set()
 	for row in rows:
 		if not isinstance(row, dict):
 			continue
@@ -4213,7 +4232,8 @@ def _wnba_commence_times(date_str: str) -> list[tuple[str, float]]:
 			continue
 		epoch = _parse_commence_epoch(row.get("datetime_utc"))
 		game_id = str(row.get("game_id") or "").strip()
-		if epoch is not None and game_id:
+		if epoch is not None and game_id and game_id not in seen:
+			seen.add(game_id)
 			out.append((game_id, epoch))
 	return out
 
