@@ -947,6 +947,14 @@ death, never life — do not invert it.
 - Verification: Unit tests for tier accumulation, no double counting in by_sport/staked_summary, consumer fallback precedence; fleet model-scorecard run (manual or 11:30Z) lists tier rows in the report and the overlay, and refresh-worker logs [optimizer_overlay] stake_scale count incl. tier entries.
 - Blocked by: none
 
+### soccer-starter-name-match — OPEN — opened 2026-10-14 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: Confirmed ESPN starters resolve to the soccer season player rows despite name-form differences: lineups.resolve_starter_ids adds unique-only fallback matching, and the share of confirmed sides with all 11 starters recognised rises on the 10-09..10-12 matches (offline, match_box starters vs season rows), with zero starters resolved to a different player
+- Files: syndicate/features/soccer/features/lineups.py (resolve_starter_ids fallback ONLY), tests/test_soccer_starter_name_match.py (NEW)
+- Hypothesis: 64 of 190 confirmed sides had all 11 starters recognised (lineup_reach 10-09..12); the unmatched starters are name-form differences (full vs playing names, word order), not absent players
+- Falsification test: the fallback recovers <25% of the unmatched starters, or any recovered pairing is wrong on a hand check
+- Verification: offline before/after on 10-09..10-12 match_box starters: per-side recognised counts, all-11 share, plus a hand-checked sample of every new pairing; tests incl. off != on
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
