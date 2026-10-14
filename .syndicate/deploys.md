@@ -49162,3 +49162,15 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **UNATTRIBUTED:** the 02:30:28Z supervisor `up` has NO deploys.md entry. WSL has been up since 2026-10-12 23:37 and the watchdog logged no `RECOVERY_START`, so it was a deliberate restart by some session. The 01:16-02:00Z games-rail entry records a refresh-worker restart that "TIMED OUT"; that is a candidate, not a finding. All three roles run code from that restart (refresh-worker 82f9d695 and live-odds-worker 658ecbe2 per `status` at 03:09Z, both STALE vs HEAD 1e1385ba).
 - **Still owed:** the opening-week reading (~11-03): `live>0`, `resimmed>0`, lanes `source: live_resim`, edges published, 0 ncaab keyvalue rejections over a full slate.
 - RECONCILED: the 2026-10-13 18:51Z `local_production.env` NCAAB switch-on entry's owed post-`up` reading (thread started, ticks written, snapshot written). Measured above at 03:12Z on the 02:30:28Z `up`.
+
+## 2026-10-14 05:05Z (12:05 AM CT) -- READING, no deploy: P3 shadow mode, FULL first slate (preseason, 5 games, 2026-10-13) -- **MET** (lane `nba-native-live-resim`, session 6c348b8f)
+
+- **Closes** the full-slate reading owed by the 23:13:18Z entry.
+- **Source:** all rotated live-odds-worker logs. The first aggregate read only the current file and undercounted, since the log rotated at ~00:04Z. Window 22:00Z-05:05Z, emitter-anchored `^<ts> NBA_LIVE_RESIM_TICK`.
+- **Reading:**
+  - 196 ticks, no gap > 300 s; 141 ticks carried live games (first 23:13Z, last 04:26Z).
+  - 311 game-ticks, **309 resimmed (99.4%)**. The other 2 were named refusals `regulation_over` (a game in the final seconds/OT; refusal by design).
+  - Max concurrent games 3. Max snapshot **13,335 bytes** (cap 6,000,000). **Max elapsed 66.3 s** against the 120 s interval and 240 s budget. 0 `budget_exhausted`; `written=True` on every tick.
+  - **0 `NBA_LIVE_RESIM_TICK_ERROR`; 0 emitter-anchored `KEYVALUE_WRITE_REJECTED`.** An unanchored grep showed 2, which were text inside `ALL_PROCESS_MEMORY` lines.
+- **Continuity:** another lane's full supervisor down/up at 02:30:28Z (supervisor 202264; roles now on 1e1385ba/82f9d695/658ecbe2) restarted the loop (`NBA_LIVE_RESIM_LOOP_STARTED` 02:30:30Z). The env flag survived because it lives in `local_production.env`; no tick gap > 300 s.
+- **Not measured tonight:** the `pbp_lagging_header` / partial on-floor RATES. The tick line doesn't carry them; the two snapshots read at 23:17Z were both `pbp_lagging_header` with 3-5/5 matched. Live props: no preseason prop lines, so that path is unexercised until regular-season lines exist (10-20+).
