@@ -77,3 +77,38 @@ BH (q = 0.10) on the confirm p-values: none survive, in either sport.
   2026 NFL weeks 7+ and NCAAF weeks 8+ with the fleet's own quote logs (opens and closes).
 - **H6-style football unders test** (main lines, pooled) on 2023-25 NFL and 2025 NCAAF.
 - Then the plan's remaining items: snap counts (download), opponent-adjusted defense vs position, weather on totals.
+
+## v2 -- football UNDERS test + the fade leads registered forward (2026-10-14T00:23Z)
+
+Registered at `817efce7` (2026-10-14 00:14Z, lane block "FOOTBALL v2 PRE-REGISTERED") before any outcome below was loaded.
+
+### Unders test (`scripts/football_unders_test.py`, the NBA H6 twin): main lines, every two-sided market, closing quotes
+
+| test | discover residual [95% CI] (n / games) | confirm residual [95% CI] (n / games) | ROI at best price (disc / conf) | verdict |
+|---|---|---|---|---|
+| HU-NCAAF (2025 wk 1-8 / 9-16) | **+2.35% [+0.21, +4.47]** (3,737 / 257) | **+2.42% [+0.25, +4.48]** (3,219 / 226) | -0.82% / -0.91% | **SUPPORTED** |
+| HU-NFL (2023-24 / 2025), registered void rule | +0.13% [-1.11, +1.28] (14,980 / 366) | +1.18% [-0.16, +2.59] (9,633 / 226) | -3.64% / -1.75% | NOT SUPPORTED |
+| HU-NFL sensitivity (no-report zero-play graded 0; 668 lines) | +1.43% [+0.27, +2.53] | +2.46% [+1.12, +3.82] | -1.15% / +0.72% | (would pass; not the bar) |
+
+Confirm by market (BH q = 0.10 survivors *): NCAAF passing yards +6.8%* (ROI best +7.5%), rushing yards +3.7%* (+1.5%),
+passing TDs +4.3%, receptions +3.4%, receiving yards -0.2%, rushing attempts -0.3%. NFL rushing attempts +3.2%*
+(+1.8%), rushing yards +2.5%* (+0.4%), passing attempts +2.3%, receptions +1.0%, receiving yards +0.8%, interceptions
++0.1%, passing TDs -1.1%, passing yards -2.3%.
+
+**Reading.** The NBA finding (prop unders under-priced by 1-2.5 probability points) repeats in NCAAF in both halves of
+2025, and in NFL once zero-stat games are graded the way books settle them. The registered NFL void rule drops exactly
+those under wins (it was stated as conservative in the registration), so NFL stays a candidate rather than supported.
+In every sport the effect is smaller than the hold: blind unders lose at the best book (NCAAF -0.9%, NFL -1.8%, NBA
+-0.75%). It is a LIKELIHOOD adjustment that makes an under more likely than the fair says -- value appears only where it
+stacks with best-price shopping and the strongest markets (NCAAF passing yards; NFL rushing).
+
+### Forward fade tests (F9 / F10a / F10b) -- registered, grader built, nothing graded yet
+
+`scripts/grade_football_fade_leads.py` reads the registration literally: fleet quote logs (`2026_wk<W>.jsonl[.gz]`),
+each US book's last observation at or before kickoff - 10 min (change-log rule), scheduled kickoff, as-of features built
+in memory from 2026 data with weeks < W, Holm over the three at one-sided 0.025, verdict only once NFL week 18 and NCAAF
+week 16 are graded. Today it reports INTERIM with 0 graded (week 6 not played). A format check on 2026 weeks OUTSIDE the
+window (NFL 4-5, NCAAF 4-6; not evidence) joined live files end to end: F9 72 lines / 8 games, F10b 7 lines (trends exist
+only from week 6). It caught one real defect, fixed before any window game: the 2026 NCAAF box leaves `opponent` empty,
+so games are now paired by the box's own game id (unjoined 407 -> 13). Retention keeps `book_quotes` 120 days, past the
+final read; the grader also reads the compacted `.gz` form.

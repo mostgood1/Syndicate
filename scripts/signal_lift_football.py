@@ -21,6 +21,7 @@ for (game, player); none -> void. Pushes void.
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import os
 import re
@@ -40,6 +41,7 @@ from syndicate.features.shared.matchup_signals_football import (  # noqa: E402
     FOOTBALL_MARKET_STATS,
     FOOTBALL_REGISTRY,
     THRESHOLDS,
+    V1_SIGNALS,
     ncaaf_eligible,
     ncaaf_signal_fires,
     nfl_eligible,
@@ -72,6 +74,10 @@ def quote_files(directory: Path) -> list[tuple[int, int, Path]]:
     return sorted(out)
 
 
+def decimal(price: float) -> float:
+    return 1.0 + price / 100.0 if price > 0 else 1.0 + 100.0 / -price
+
+
 def main_lines(quotes: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """One record per (event, market, player): the most two-sided-quoted point, median Shin p_over."""
     by_point: dict[tuple, dict[str, dict[str, float]]] = defaultdict(lambda: defaultdict(dict))
@@ -91,12 +97,14 @@ def main_lines(quotes: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
                                 "cfbd_game_id": q.get("cfbd_game_id"), "commence_time": q.get("commence_time")})
     candidates: dict[tuple, list[dict[str, Any]]] = defaultdict(list)
     for (event, stat, player, point), books in by_point.items():
-        fairs = [f[0] for f in (devig([s["over"], s["under"]], method="shin") for s in books.values()
-                                if "over" in s and "under" in s) if f]
+        two = [s for s in books.values() if "over" in s and "under" in s]
+        fairs = [f[0] for f in (devig([s["over"], s["under"]], method="shin") for s in two) if f]
         if fairs:
+            unders = [decimal(s["under"]) for s in two]
             candidates[(event, stat, player)].append({"event": event, "stat": stat, "player": player, "point": point,
                                                       "books": len(fairs), "p_over": statistics.median(fairs),
-                                                      **meta[event]})
+                                                      "under_dec_best": max(unders),
+                                                      "under_dec_median": statistics.median(unders), **meta[event]})
     out = []
     for cands in candidates.values():
         cands.sort(key=lambda c: (-c["books"], abs(c["p_over"] - 0.5)))
@@ -105,7 +113,9 @@ def main_lines(quotes: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
-    with path.open(encoding="utf-8") as fh:
+    """Plain or gzip (the daily compaction gzips closed `book_quotes` shards)."""
+    opener = gzip.open if path.suffix == ".gz" else open
+    with opener(path, "rt", encoding="utf-8") as fh:
         return [json.loads(line) for line in fh if line.strip()]
 
 
@@ -264,7 +274,7 @@ def distributions(sport: str, records: list[dict[str, Any]]) -> dict[str, Any]:
 
 def lift(sport: str, records: list[dict[str, Any]]) -> dict[str, Any]:
     fires_fn, eligible_fn = (nfl_signal_fires, nfl_eligible) if sport == "nfl" else (ncaaf_signal_fires, ncaaf_eligible)
-    specs = {n: s for n, s in FOOTBALL_REGISTRY.items() if s.sport == sport}
+    specs = {n: s for n, s in FOOTBALL_REGISTRY.items() if s.sport == sport and n in V1_SIGNALS}
     fired_rows: dict[tuple[str, str], list] = defaultdict(list)
     base_rows: dict[tuple[str, str], list] = defaultdict(list)
     for r in records:

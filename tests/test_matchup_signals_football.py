@@ -148,6 +148,10 @@ def test_lift_mode_refuses_until_thresholds_are_registered(tmp_path) -> None:
 
 
 def test_v1_results_mark_every_football_signal_null_with_its_evidence() -> None:
-    assert set(fb._V1_RESULTS) == set(fb.FOOTBALL_REGISTRY)
-    for spec in fb.FOOTBALL_REGISTRY.values():
+    assert set(fb.V1_SIGNALS) <= set(fb.FOOTBALL_REGISTRY)
+    for name in fb.V1_SIGNALS:
+        spec = fb.FOOTBALL_REGISTRY[name]
         assert spec.status == "null" and spec.evidence["verdict"] == "NOT SUPPORTED" and spec.evidence["confirm_n"] > 0
+    assert fb.FOOTBALL_REGISTRY["ncaaf.under_bias"].status == "supported"
+    assert fb.FOOTBALL_REGISTRY["nfl.under_bias"].status == "candidate"
+    assert {"nfl.fade_vacated_targets", "nfl.fade_carry_spike", "ncaaf.fade_carry_spike"} <= set(fb.FOOTBALL_REGISTRY)

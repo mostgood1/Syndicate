@@ -246,3 +246,49 @@ FOOTBALL_REGISTRY = {
         "confirm_hit_lift_vs_baseline": r[7], "verdict": "NOT SUPPORTED"})
     for name, spec in FOOTBALL_REGISTRY.items() for r in (_V1_RESULTS[name],)
 }
+V1_SIGNALS: tuple[str, ...] = tuple(_V1_RESULTS)
+
+# ----------------------------------------------------------------------------- v2 (2026-10-14, registered at 817efce7)
+#
+# The football UNDERS test (`scripts/football_unders_test.py`, the H6 twin) and the three forward FADE tests
+# (`scripts/grade_football_fade_leads.py`). Findings: findings_2026-10-14_football_signals_v1.md, section "v2".
+NFL_OU_MARKETS = ("receptions", "receiving_yards", "rushing_yards", "rushing_attempts", "passing_yards",
+                  "passing_attempts", "passing_tds", "interceptions")
+NCAAF_OU_MARKETS = ("receptions", "receiving_yards", "rushing_yards", "passing_yards", "passing_tds")
+_FWD = "registered forward test, lane signal-engine-football v2 (817efce7); graded by scripts/grade_football_fade_leads.py"
+FOOTBALL_REGISTRY.update({spec.name: spec for spec in (
+    SignalSpec("ncaaf.under_bias", "ncaaf", "under", NCAAF_OU_MARKETS,
+               "NCAAF prop UNDERS are priced too long at the close. A LIKELIHOOD adjustment, not a bet on its own -- "
+               "blind unders still lose about 0.9% at the best book.", "closing prop quotes (kickoff - 10 min), CFBD box",
+               "every main-line two-sided prop, UNDER side", status="supported",
+               evidence={"tested": "2026-10-14 HU-NCAAF, 2025 weeks 1-8 / 9-16, main lines",
+                         "discover_residual": 0.0235, "discover_ci95": [0.0021, 0.0447], "discover_n": 3737,
+                         "confirm_residual": 0.0242, "confirm_ci95": [0.0025, 0.0448], "confirm_n": 3219,
+                         "confirm_games": 226, "roi_best_price_confirm": -0.91, "roi_best_price_confirm_ci95": [-5.18, 3.27],
+                         "bh_markets_confirm": ["passing_yards +6.8%", "rushing_yards +3.7%"],
+                         "verdict": "SUPPORTED as likelihood; NOT profitable blind"}),
+    SignalSpec("nfl.under_bias", "nfl", "under", NFL_OU_MARKETS,
+               "NFL prop UNDERS may be priced too long at the close -- supported only when a no-play player who was on "
+               "no injury report is graded as 0 (how books settle a snap), not under the registered void rule.",
+               "closing prop quotes (kickoff - 10 min), nflverse play-by-play", "every main-line two-sided prop, UNDER side",
+               status="candidate",
+               evidence={"tested": "2026-10-14 HU-NFL, 2023-24 discover / 2025 confirm, main lines",
+                         "discover_residual": 0.0013, "discover_ci95": [-0.0111, 0.0128], "discover_n": 14980,
+                         "confirm_residual": 0.0118, "confirm_ci95": [-0.0016, 0.0259], "confirm_n": 9633,
+                         "confirm_games": 226, "roi_best_price_confirm": -1.75,
+                         "sensitivity_discover_residual": 0.0143, "sensitivity_discover_ci95": [0.0027, 0.0253],
+                         "sensitivity_confirm_residual": 0.0246, "sensitivity_confirm_ci95": [0.0112, 0.0382],
+                         "sensitivity_roi_best_price_confirm": 0.72,
+                         "bh_markets_confirm": ["rushing_attempts +3.2%", "rushing_yards +2.5%"],
+                         "verdict": "NOT SUPPORTED (registered void rule); SUPPORTED under the registered sensitivity"}),
+    SignalSpec("nfl.fade_vacated_targets", "nfl", "under", NFL_REC_MARKETS,
+               "Fade the 'next man up': when a material teammate is fresh OUT, the remaining receivers' overs are "
+               "overpriced (v1: -10.5% residual for the over in 2025).", _NFL_SRC,
+               "UNDER when nfl.vacated_targets fires (F9)", status="candidate", evidence={"registered": _FWD}),
+    SignalSpec("nfl.fade_carry_spike", "nfl", "under", NFL_RUSH_MARKETS,
+               "Fade a carry-share spike (v1 NFL discover -9.9% for the over; did not replicate in 2025).", _NFL_SRC,
+               "UNDER when nfl.carry_share_up fires (F10a)", status="candidate", evidence={"registered": _FWD}),
+    SignalSpec("ncaaf.fade_carry_spike", "ncaaf", "under", NCAAF_RUSH_MARKETS,
+               "Fade a carry-share spike (v1 NCAAF -12.2% / -10.2% for the over).", _NCAAF_SRC,
+               "UNDER when ncaaf.carry_share_up fires (F10b)", status="candidate", evidence={"registered": _FWD}),
+)})
