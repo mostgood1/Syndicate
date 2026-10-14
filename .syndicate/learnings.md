@@ -2076,3 +2076,8 @@ prefer single-quoted arguments there.
   - Name the exact field a calibration or target is computed from, and confirm the change you are compensating can
     move it.
   - Reconcile any new real target against a second source (box vs pbp) before gating on it.
+
+## 2026-10-14 — RULE: ESPN soccer commentary shot events carry NO athlete id; key a per-player join on the name within the team `[lane soccer-live-anytime-scorer, session b9bb5f37]`
+- **Belief overturned:** `espn_live_state.build_live_state` credited shots, goals and assists to `player_stats` by `shot["player_id"]`, and the live props looked fine because every row still had a projection.
+- **What was true:** 134 of 134 shot events on four 10-12 summaries had `player_id == ""`, so every live player read 0 shots, 0 goals and 0 assists in production. A scorer was priced as if they had not scored. Separately, serie_a/epl/la_liga/bundesliga/mls player rows are keyed `understat_<n>`/`asa_<id>`, so even an id-bearing stat could never meet its row.
+- **Rule:** before trusting a per-player join across ESPN and another source, COUNT the populated key on real payloads (non-empty ids, ids shared with the other side). A probe at a mid-match cutoff that compares banked goals with the scoreline (minus own goals) is the cheapest positive control. Fixed in 8fd8d83b (name within team, unique only).

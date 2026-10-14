@@ -49180,3 +49180,15 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **NBA sims (prod data root, read-only):** the newest 12 production smart_sim JSONs. The 3 written before the ff (10-13 03:49-03:50Z) read lineup_effects `no_espn_id_map`. All 9 written after it (10-13 16:11Z .. 10-14 05:33Z) read `{applied: False, reason: "retired"}` on both sides. Players per game 32-35 before and after; pool reasons unchanged (preseason guard, no_recent_history). Nothing else moved in the fields read.
 - **NBA producer stopped:** lineup_teammate_effects / lineup_player_baselines / pbp_espn_history.parquet unchanged since 2026-10-13 03:48Z (pre-ff), though the props refresh has run since (sims written 10-14 05:31Z). No `_rotation_inputs_*` marker after 2026-10-13: the NBA function is gone.
 - **WNBA producer: OWED, not failed.** The last WNBA marker (`_rotation_inputs_2026-10-15.json`, still listing both steps) and the table rewrite are from 2026-10-13 15:10:54Z, 5 min BEFORE 2708dbe3 reached the fleet. No WNBA refresh has run since. Reading: the first WNBA marker written after 15:16Z must not list update-pbp-espn-history / build-lineup-teammate-effects, and lineup_teammate_effects.parquet (WNBA) must keep its 2026-10-13 15:10Z mtime. Due at the next WNBA props refresh (Finals G1 2026-10-17).
+
+## 2026-10-14 12:58Z (7:58 AM CT) -- FLEET OUTAGE ~06:30Z -> 12:47Z: Windows host reboot; the fleet waited for a logon -- READING, no action by me `[session b9bb5f37, lane soccer-live-anytime-scorer]`
+- **Evidence:**
+  - The last stamped refresh-worker line before the gap is 06:29:29Z (MEMORY_WATCHDOG).
+  - Windows `LastBootUpTime` is 2026-10-14 01:37:27 CDT (06:37Z), after WindowsUpdateClient installs that night (WindowsAppRuntime 04:40 CDT, logged after the boot).
+  - WSL `uptime -s` reads 07:47:43 CDT (12:47:43Z). Kernel-Power 566 shows a session transition at 07:02 CDT.
+  - At 12:5xZ the supervisor, refresh-worker (pid 545), live-odds-worker and web `/healthz 200` were all up on 1e1385ba.
+- **Why ~6 h:** `SyndicateLocalProduction` and the watchdog are AT-LOGON tasks (runbook section 4). A host reboot with nobody signed in leaves the fleet down until a logon.
+- **Consequence:**
+  - The 2026-10-14 ~11:00Z evaluation-settlement autorun did not run in the window. 10-11 soccer prop picks still read 1,181 pending / 2,045 settled at 12:52Z, so aa8a2d98's effect is UNMEASURED.
+  - My MLS live-join watcher died with the VM (exit 4).
+- **Recurrence:** the second Windows-Update-driven outage in 26 h (10-13 04:37Z was WSL 3.0.3.0). The prevention is the user's call (Windows Update active hours / pause, or "run whether user is logged on or not"). No system setting was changed.

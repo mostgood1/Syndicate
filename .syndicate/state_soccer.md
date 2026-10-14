@@ -655,6 +655,8 @@ disagreeing projections for one match. 29 new tests. Deploy measurement:
 
 ## [soccer-live-tier] SOCCER'S LIVE TIER — VERIFIED, AND WHAT IS NOT
 
+**LIVE PLAYER PROPS: ON-PITCH LINEUP AND BANKED STATS WORK; CHAMPIONSHIP HAS NO PLAYER PROPS AT THE SOURCE** `[measured 2026-10-13 ~19:40Z on the fleet, lane soccer-live-anytime-scorer]`. `live_player_props` carry `lineup_basis` (on_pitch 274/274 rows over 8 Championship matches) and publish the matchday squad (32-37 rows/match, was a top-12 cap). Banked `goals_so_far` equal each side's non-own goals 8/8; before 8fd8d83b EVERY live player read 0 shots/goals/assists because ESPN commentary shots carry no athlete id (134/134). The live sim runs the league's calibrated profile since 3d852ba9 (replay over 98 finals: |per-league bias| 0.516 -> 0.372; pooled remaining goals still ~12% low). Odds API quotes NO player props for EFL Championship (probe 2026-10-13, regions us + uk/eu), and `championship|belgian_pro_league|primeira_liga/props/<date>.csv` are empty every day 10-10..10-13 -- a live soccer prop join can only be read on the other 7 leagues.
+
 **SOCCER LIVE GAME-LINES CRASHED IN EVERY LIVE WINDOW UNTIL 2026-09-30 — FIXED IN
 CODE, TESTED, RUNNING ON THE LOCAL FLEET; THE IN-PLAY READING IS OWED (`#693`)**
 `[2026-10-01, lane soccer-live-gameline-index-diag, CLOSED]`.
