@@ -26,12 +26,21 @@ DIR=$(dirname "$0")
 CHECK="$DIR/ledger_precommit.py"
 [ -f "$CHECK" ] || exit 0
 
-for PY in python3 python py; do
-    command -v "$PY" >/dev/null 2>&1 || continue
-    "$PY" "$CHECK"
+# PROBE BEFORE USE (lane precommit-python-probe, 2026-10-14). On Windows `python3` is often the WindowsApps App
+# Execution Alias: it is on PATH, and from some shells (a backgrounded Git Bash, measured on commit 857ec54b) it
+# cannot start at all -- "Permission denied", exit 126. The old loop ran the FIRST name found and treated that 126
+# as fail-open, so the ledger check was skipped with no trace. A candidate now has to run `import sys` before it is
+# trusted, so a broken alias falls through to `python` / `py -3`.
+for PY in python3 python "py -3"; do
+    set -- $PY
+    command -v "$1" >/dev/null 2>&1 || continue
+    "$@" -c "import sys" >/dev/null 2>&1 || continue
+    "$@" "$CHECK"
     rc=$?
     # ONLY 1 blocks. 0 = clean; anything else = the checker itself failed.
     [ "$rc" -eq 1 ] && exit 1
     exit 0
 done
+# Still fail-open (see the header), but NOT silent: a commit that skipped the guard says so.
+echo "WARN: pre-commit ledger guard did NOT run -- no Python could start (tried python3, python, py -3)." >&2
 exit 0
