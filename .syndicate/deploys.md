@@ -49075,3 +49075,16 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **db27e4c2:** web adds the NBA / WNBA / NHL line score to WORKER-BUILT chips at serve time (`attach_served_linescores`, route `/api/board/game-chips` artifact branch). Verified 01:59Z (worker_artifact): every live/final NBA + NHL chip carried one, e.g. IND@OKC live 33 28 23 0 / 25 34 26 2, STL@OTT live 1 2 2 / 0 1 0.
 - **5d18515b:** NHL fifth ESPN period = shootout -> labels 1 2 3 OT SO (BUF@MTL 3-4: home 1 2 0 0 1). Verified 02:00:34Z: BUF@MTL and SEA@PHI ['1','2','3','OT','SO'].
 - **reloads:** 01:16:3xZ, 01:59:0xZ, 02:00:3xZ -- 2.0 s each, 0 failures. MLB / soccer / football live line scores on today's chips still wait for the worker's own build (they need the provider's game dict).
+
+## 2026-10-14 02:03:27Z (9:03 PM CT 10-13) -- LOCAL FLEET ff 5d18515b -> f5427e38 (exact SHA), NO restart: WNBA history builders' schedule off vendor -- reading OWED when Finals G1 (10-17) props lines post (lane `nba-source-cli-native`, session 2d413211)
+
+- **User decisions 2026-10-13:** "move the wnba history refresh off vendor"; "Logs: all games; HCA: reg season"; "Yes, ff after props idle".
+- **Claim:** refresh-worker token d712f5ad..., released at 02:04Z.
+- **Change:** `scripts/build_basketball_{player_logs,home_court_advantage}.py` `_schedule_path` now reads the data-root `schedule_<season>.csv` (rewritten by every run's `fetch-schedule`). It used to read the vendored `schedule_2026.csv`, which is frozen at 09-25 with no post-season. HCA gets `include_postseason=False`.
+- **The defect this fixes:** production `player_logs.csv` (mtime 10-10 02:53Z) stops at **09-24**. 490 rows / 16 playoff games were unjoinable, and the WNBA props features prefer that file.
+- **Ride-alongs:** none in syndicate/pipeline/scripts/vendor (HEAD..f5427e38 = this commit; the ff also brought `tests/test_githooks_precommit_probe.py`). The fleet's dirty `vendor/mlb_bettingv2/data/statcast/features/*.json` was untouched.
+- **Safety read in full (02:03:12Z):** NOT CLEAR. In flight: soccer refresh, a board build, an ESPN status fetch. Basketball props jobs: 0. An ff without restart kills nothing.
+- **Pre-merge A/B (fleet, prod data, read-only, nice 19):** player_logs 8,653 -> 8,984 rows; the old 8,653 rows are identical (frame equality); +331 rows / 13 games, 09-27..10-09; 0 unjoinable. HCA bit-identical: 313 games, delta 0.008167275179987976.
+- **VERIFY (deployed checkout, 02:03Z):** both `_schedule_path`s are at the data root (player_logs :77, HCA :76). 8 tests passed.
+- **Production reading OWED:** the builders run only in a full WNBA refresh with snapshot_rows > 0 (`refresh_wnba_oddsapi_props.py` ~4870-4903). No WNBA game since 10-09, so the first rebuild comes once Finals G1 lines post. Read `wnba_source/data/processed/player_logs.csv`: mtime after 02:03Z 10-14, max GAME_DATE >= 2026-10-09, about 8,984+ rows. `home_court_advantage.json`: games_used 313 (unchanged).
+- **Rollback:** revert f5427e38 and ff. No restart.
