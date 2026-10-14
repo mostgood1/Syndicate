@@ -67,8 +67,14 @@ def _processed_root(league_code: str) -> Path:
 
 
 def _schedule_path(league_code: str, season: int) -> Path:
-    code = str(league_code or "").strip().lower()
-    return REPO_ROOT / "vendor" / f"{code}_betting_repo" / "data" / "processed" / f"schedule_{int(season)}.csv"
+    """The schedule the refresh's `fetch-schedule` rewrites on every run, beside boxscores_history.csv.
+
+    It used to be the VENDORED checkout's `schedule_<season>.csv`, frozen at the last vendor pull (WNBA 2026: ends
+    09-25, no post-season), so every game after that was dropped as unjoinable -- measured on the fleet 2026-10-13:
+    490 player rows / 16 playoff games, and player_logs.csv stuck at 09-24. Off vendor since then (lane
+    nba-source-cli-native, user decision); the data-root copy joined 11,082 of 11,082 rows.
+    """
+    return _processed_root(league_code) / f"schedule_{int(season)}.csv"
 
 
 def build_player_logs(*, league_code: str, season: int, min_rows: int = 200) -> dict:

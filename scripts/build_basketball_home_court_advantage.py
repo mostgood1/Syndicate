@@ -66,8 +66,19 @@ def _processed_root(league_code: str) -> Path:
 
 
 def _schedule_path(league_code: str, season: int) -> Path:
-    code = str(league_code or "").strip().lower()
-    return REPO_ROOT / "vendor" / f"{code}_betting_repo" / "data" / "processed" / f"schedule_{int(season)}.csv"
+    """The schedule the refresh's `fetch-schedule` rewrites on every run, beside boxscores_history.csv.
+
+    It used to be the VENDORED checkout's `schedule_<season>.csv`, frozen at the last vendor pull (WNBA 2026: ends
+    09-25, no post-season), so every game after that was dropped as unjoinable -- measured on the fleet 2026-10-13:
+    490 player rows / 16 playoff games, and player_logs.csv stuck at 09-24. Off vendor since then (lane
+    nba-source-cli-native, user decision); the data-root copy joined 11,082 of 11,082 rows.
+    """
+    return _processed_root(league_code) / f"schedule_{int(season)}.csv"
+
+
+#: Post-season slugs. The vendored schedule this used to read had none, so HCA was always a regular-season fit; the
+#: data-root schedule carries them, and they stay out by default (user decision 2026-10-13: one season phase per fit).
+POSTSEASON_SLUGS = frozenset({"post-season", "postseason", "playoffs", "playoff", "play-in"})
 
 
 def compute_home_court_advantage(
@@ -75,6 +86,7 @@ def compute_home_court_advantage(
     league_code: str,
     season: int,
     include_preseason: bool = False,
+    include_postseason: bool = False,
     min_games: int = 40,
     min_t_stat: float = 1.0,
 ) -> dict:
@@ -92,6 +104,7 @@ def compute_home_court_advantage(
         "boxscores_history": str(history_path),
         "schedule": str(schedule_path),
         "include_preseason": bool(include_preseason),
+        "include_postseason": bool(include_postseason),
         "min_games": int(min_games),
         "min_t_stat": float(min_t_stat),
     }
@@ -130,6 +143,8 @@ def compute_home_court_advantage(
             continue
         season_type = str(group["season_type_slug"].iloc[0]).strip().lower() if "season_type_slug" in group.columns else ""
         if (not include_preseason) and season_type == "preseason":
+            continue
+        if (not include_postseason) and season_type in POSTSEASON_SLUGS:
             continue
         home_tri = str(group["home_tricode"].iloc[0]).strip().upper()
         away_tri = str(group["away_tricode"].iloc[0]).strip().upper()
