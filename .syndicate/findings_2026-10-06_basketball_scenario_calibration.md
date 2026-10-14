@@ -2341,3 +2341,76 @@ levers, 0 errors.
   research copy `~/bball_sc/code_pk`.
 - Pass rule (P3's amendment): foul-outs 0.193 ± 0.04, with the guards (FTA, H2/Q4/S8, total bias, P(6th | 5th),
   closers-on) on the full window. Then P3's §7.
+
+**FULL-FIT ENGINE CONFIG, machine-readable** (for P3's live re-gate, which loads it verbatim; copy at `C:	mpball_scit_f3_config.json`):
+
+```json
+{
+ "_what": "basketball-scenario-calibration full FIT fit_f3 (launched 2026-10-14 19:27Z), engine config exactly as the harness applies it",
+ "harness": "scripts/basketball_scenario_rates.py sim (levers -> _lever_cfg rebuilds the frozen EventSimConfig per engine call, ~:252/:338/:359; engine flags -> setattr on the native engine module, ~:535-545)",
+ "engine_code": "origin/main native engine incl. 6f092c74 (+ research-only diag patches v1-v4: diag_foul_outs counters, no RNG draws, outcome-neutral; omit them)",
+ "env": {
+  "SYNDICATE_NBA_TEAM_INPUTS": "1"
+ },
+ "engine_module_flags": {
+  "SHOOTER_FT_RATE": true,
+  "FOULED_MISS_NOT_FGA": true,
+  "EXACT_TARGET_CALIBRATION": true,
+  "TOV_PER_ATTEMPT": true,
+  "PLAYER_REBOUND_CREDIT": true,
+  "BLOCK_MODE": "team_prior",
+  "BLOCK_ALLOC_BY_RATE": true
+ },
+ "event_sim_config": {
+  "possession_alternation": 1.0,
+  "possessions_jitter": 0.0,
+  "team_prior_stacks_on_target": false,
+  "score_effect_k": 0.002,
+  "blowout_bench_rest": true,
+  "bench_weight_boost": 3.0,
+  "foul_out_in_sim": true,
+  "foul_trouble_thresholds": [
+   2,
+   3,
+   4,
+   5
+  ],
+  "foul_trouble_bench_mult": 0.05,
+  "foul_trouble_release_s": 240,
+  "fouler_per_minute": true,
+  "foul_trouble_foul_mult": 0.5,
+  "bonus_free_throws": true,
+  "bonus_nonshoot_foul_per_poss": 0.03,
+  "base_nonshooting_foul_per_poss": 0.065,
+  "endgame_foul_window_s": 120,
+  "endgame_foul_max_deficit": 10,
+  "endgame_foul_p_by_deficit": [
+   0.2,
+   0.0,
+   0.2
+  ],
+  "endgame_foul_seconds": 5.0,
+  "endgame_extend_possessions": true,
+  "endgame_foul_p": 0.0,
+  "solver_bonus_trip_share": 0.00802,
+  "solver_endgame_pts_per_team": 0.138,
+  "record_events": true,
+  "diag_foul_outs": true
+ },
+ "data_files_in_scratch_processed_root": {
+  "nba_sim_total_inputs.json": {
+   "skip_def_subtraction": true,
+   "skip_outs_penalties": true
+  },
+  "nba_sim_availability.json": "fleet copy (enabled, k=2, readmit_with_prop_line)",
+  "nba_prop_calibration.json": "fleet copy",
+  "calibration_totals_<date>.json": "walk-forward, C:/tmp/bball_sc/calfiles_sw_all, 105 files 2025-11-02..2026-02-27 (FIT ONLY; switched raw, both total-input keys)"
+ },
+ "replay_inputs": "scripts/resim_nba_availability.py prepare_scratch as-of: player_checks < slate, rotation_stints_history truncated as-of; lineup_teammate_effects REMOVED (known gap)",
+ "sims": 200,
+ "window": "2025-11-01..2026-02-28 regular season"
+}
+```
+- Unlike production, `nba_sim_total_inputs.json` here has BOTH keys true (production: skip_def only).
+- The walk-forward calibration files cover FIT dates only. VALID dates need their own walk-forward files before the VALID read.
+- Windows (agreed with P3): P3's Phase 2 re-gate grades FIT only until this lane's single VALID read. Its VALID part runs once, in the same pass. The postseason is graded once, at the end, by both.
