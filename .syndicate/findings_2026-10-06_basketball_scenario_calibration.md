@@ -2334,3 +2334,10 @@ levers, 0 errors.
 - solver_bonus_trip_share 0.00802, solver_endgame_pts_per_team 0.138.
 
 **Next:** the full FIT (P3's amendment: foul-outs 0.193 ± 0.04 plus the guards), then P3's §7.
+
+**FULL FIT LAUNCHED 2026-10-14 19:27Z (user: "yes, run the full FIT").**
+- The Phase 2 #3 config exactly as written under the PK2 result; FIT window 2025-11-01..2026-02-28.
+- 3 workers at nice 19, 200 sims, `--track-oncourt`. Out `C:	mpball_scit_f3`, logs `~/bball_sc/fit_f3_w*.log`,
+  research copy `~/bball_sc/code_pk`.
+- Pass rule (P3's amendment): foul-outs 0.193 ± 0.04, with the guards (FTA, H2/Q4/S8, total bias, P(6th | 5th),
+  closers-on) on the full window. Then P3's §7.
