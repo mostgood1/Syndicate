@@ -67,6 +67,14 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### wnba-recon-boxscores-import-native — OPEN — opened 2026-10-14 — session 2d413211
+- Goal: Remove the vendored `from wnba_betting.boxscores import _nba_gid_to_tricodes` from Syndicate's WNBA recon-tools copy (`syndicate/features/wnba/recon_tools/build_live_player_lens_tuning.py`) without changing what production computes, keeping the copy pinned to the vendored body except for that one documented edit (user request 2026-10-14).
+- Files: syndicate/features/wnba/recon_tools/build_live_player_lens_tuning.py, tests/test_wnba_recon_tools_native.py
+- Hypothesis: the import can never succeed in production -- the refresh puts only the repo root on sys.path, no *betting package is installed in the venv, and the worker env has no vendor path (all measured on the fleet 2026-10-14) -- so the tool always takes its smart_sim_* fallback; replacing the try block with that fallback is output-identical.
+- Falsification test: a fleet A/B (old copy vs new copy, prod WNBA data, same dates as the recon move: 10-02/04/07/09) shows any frame difference.
+- Verification: A/B identical on all 4 dates; tests pin body == vendored with the one edit reversed; after a fleet ff the next WNBA refresh that builds lens tuning loads the edited copy (code-only change, no restart: per-run subprocess).
+- Blocked by: none
+
 ### basketball-lineup-injuries-native — OPEN — opened 2026-10-14 — session 2d413211
 - Goal: Move the live loop's lineup-check injuries fetch (`live_refresh_loop._fetch_injuries`, run for NBA and WNBA every lineup-check interval) off the vendored `<pkg>.cli fetch-injuries` onto Syndicate's `source_cli` ports; deployed with a measurement (user request 2026-10-14: "move the nba injuries fetch off vendor"; WNBA rides the same shared function).
 - Files: syndicate/features/shared/live_refresh_loop.py (_fetch_injuries + _LINEUP_INJURY_FETCH_PACKAGES + vendored launcher helpers sections only), tests/test_lineup_injuries_native.py (NEW)
