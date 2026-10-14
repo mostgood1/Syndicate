@@ -49108,3 +49108,14 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 
 ## 2026-10-14 02:17:56Z -- READING: basketball bonus positive case (lane `games-rail-full-detail`, session d4409ac4; for the 02:11Z a38e6580 entry)
 - ESPN summary IND @ OKC foulsToGive home (OKC) 0 / away 1 -> served `/api/board/game-chips?sports=nba` IND@OKC 'Q4 3:30', situation "IND in bonus". MET.
+
+## 2026-10-14 02:18:18Z (9:18 PM CT 10-13) -- LOCAL FLEET: WNBA totals calibration off vendor (30f19ca8) LIVE, carried by the games-rail lane's ff dfe49575 -> e2a76b85 in the same second as mine -- reading OWED at the next WNBA full refresh (lane `nba-source-cli-native`, session 2d413211)
+
+- **User decisions 2026-10-13:** "move the wnba totals calibration off vendor", "Yes, ff after props idle".
+- **Safety read in full (02:18:08Z):** NOT CLEAR. In flight: live MLB/NBA/NHL/NCAAF odds refresh, soccer, NCAAF poll, a board build. Basketball props and totals-calibration jobs: 0.
+- **What happened:** I acquired refresh-worker (token 7da7a537...) and ran `git merge --ff-only 30f19ca8`, which printed "Already up to date". The reflog shows `merge e2a76b85: Fast-forward` at 21:18:18-05:00: in that same second, the games-rail lane's ff to e2a76b85 (NHL/soccer pressure line; see its `reload-web` entry above), whose parent is 30f19ca8, landed. **That ff landed while my claim was held.** No harm here, because e2a76b85 contains my commit and nothing restarted, but the claim did not serialise it. Claim released at 02:18Z.
+- **Change:** `scripts/build_wnba_totals_calibration.py` now imports `cli`, `config.paths`, `features_enhanced` and `games_npu` from `syndicate.features.wnba.source_cli`, not the vendored `wnba_betting`.
+- **Pre-merge A/B (fleet, two copies of prod WNBA data, nice 19):** slates 08-15/09-20/10-07/10-17. Prediction CSVs and terms JSONs byte-identical (8/8); bias 13.282/11.024/10.334/11.304. The new arm imported no `wnba_betting`. Neither data copy differs from the other afterwards.
+- **VERIFY (deployed checkout, 02:18Z):** HEAD e2a76b85 contains 30f19ca8. 6 `source_cli` references in the script. 8 tests passed.
+- **Production reading OWED:** the next `WNBA_TOTALS_CALIBRATION rc=0 {"status": "wrote" ...}` line in a WNBA props log after 02:18Z, and the matching `calibration_totals_<slate-1>.json`. The newest is `calibration_totals_2026-10-08.json`; the step runs when a full WNBA refresh reaches it, which is expected with Finals G1 (10-17) lines.
+- **Rollback:** revert 30f19ca8 and ff. No restart.
