@@ -49825,3 +49825,8 @@ The copy has no cache, `trust_env` off unless `STATSAPI_TRUST_ENV`, an (8 s, 8 s
 ## 2026-10-15 18:05:28Z (1:05 PM CT) -- web ff 1973c1f1 -> 845f589d + `reload-web` (2.0 s, 0 failures): recent form says where once ("4 vs SF", not "4 v vs SF") (lane `cheat-sheets`, session 9e18a0e7) -- NO outage, no restart
 - **claim:** web by cheat-sheets token e2b7293a..., acquire exit 0. Ride-alongs: 1d248edd (`scripts/check_lane_claims.py` -- ledger tooling, never run by a service) + ledger commits.
 - **verify:** NFL + NCAAF sheets rebuilt 18:05Z on 845f589d (NFL 65 groups / 158 rows, NCAAF 44 / 102); the live NFL picks export reads "under 1.5 in 3 of 5 (newest first: 4 vs SF, 1 vs LAC, 5 @WAS, 1 @ARI, 0 vs NE)"; NHL labels keep their "v" (test).
+
+## 2026-10-15 18:19:45Z (1:19 PM CT) -- web ff 845f589d -> 9abdb64a + `reload-web` (2.0 s, 0 failures): Syndicate picks and price plays keep separate records (lane `cheat-sheets`, session 9e18a0e7) -- NO outage, no restart
+- **ask:** user 2026-10-15 "split the season record into picks vs price plays".
+- **claim:** web by cheat-sheets token 93c47089..., acquire exit 0. Ride-alongs: ledger commits only.
+- **verify:** `record.json` rebuilt on the fleet's new code 18:20Z (write_record, no grading): sections now "Syndicate picks", "Price plays", ... ; official days 0 -- the first official numbers, and the first graded picks/price plays, arrive with the 11:50 PM CT reconcile (10-15 = first official day). Tests: a sheet with one backed pick + two price plays (one by the stamped label, one by the rule) tallies 1-0 / 1-1 apart and 3 bets in All featured.
