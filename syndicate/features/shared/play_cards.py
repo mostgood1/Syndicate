@@ -218,13 +218,15 @@ def pick_card_fields(pick: Mapping[str, Any], *, sport: str, date: str, number: 
     said = [(pt.get("tone"), f"{pt['label']}: {pt['text']}" if pt.get("label") else pt["text"]) for pt in points]
     backing = sorted((x for x in said if x[0] != "against"), key=lambda x: x[0] != "for")   # what backs it, first
     why += [text for _tone, text in backing][:4]
+    why_tones = ["for"] + [tone or "" for tone, _text in backing][:4]
     risk: list[str] = [text for tone, text in said if tone == "against"][:2]
     if play:
         risk.append("A price edge closes fast: re-check the price before betting")
     elif isinstance(p_model, (int, float)) and isinstance(p_mkt, (int, float)) and abs(p_model - p_mkt) >= 0.10:
         risk.append(f"Sim and market are far apart ({p_model:.0%} vs {p_mkt:.0%}): we size on the price, not the gap")
     if books and books < 4:
-        risk.append(f"Only {books} books quote it, so the fair rests on few prices")
+        risk.append("Only one book quotes it, so the fair rests on one price" if books == 1
+                    else f"Only {books} books quote it, so the fair rests on few prices")
     is_prop = pick.get("kind") == "prop"
     fields = {
         "id": pick.get("pick_id"), "label": label, "number": number, "sport": SPORT_LABELS.get(sport, sport.upper()),
@@ -236,7 +238,7 @@ def pick_card_fields(pick: Mapping[str, Any], *, sport: str, date: str, number: 
         "win_prob": f"{p_mkt:.0%}" if isinstance(p_mkt, (int, float)) else "",
         "model_prob": None if p_model is None else f"{p_model:.0%}",
         "form_values": list(form_values or [])[:10], "form_labels": list(form_labels or [])[:10],
-        "line": pick.get("line"), "side": pick.get("side"), "why": why[:5],
+        "line": pick.get("line"), "side": pick.get("side"), "why": why[:5], "why_tones": why_tones[:5],
         "risk": risk[:3] or ["Lines move: re-check the price before betting"],
         "headshot": pick.get("headshot_url") if is_prop else None, "team_logo": pick.get("team_logo"),
         "home_logo": pick.get("home_logo"), "away_logo": pick.get("away_logo"),
@@ -402,6 +404,8 @@ def card_text(fields: Mapping[str, Any]) -> dict[str, str]:
 
 
 def render_card(fields: Mapping[str, Any], logo_uri: str, template: str | None = None) -> str:
+    from syndicate.features.shared.cheat_sheets import book_name
+
     matchup = fields.get("matchup") or ""
     away, _, home = matchup.partition(" @ ")
     e = lambda s: html.escape(str(s if s is not None else ""))
@@ -422,14 +426,17 @@ def render_card(fields: Mapping[str, Any], logo_uri: str, template: str | None =
         player=e(fields["player"]), headline=e(text["headline"]), subline=e(text["subline"]), betline=e(text["betline"]),
         strip_bet=e(text["strip"]), hero=hero_html(fields),
         away_crest=crest(fields.get("away_logo")), home_crest=crest(fields.get("home_logo")),
-        bet=e(fields["bet"]), price=e(fields["price"]), book=e(fields["book"]), books=e(fields["books"]),
+        bet=e(fields["bet"]), price=e(fields["price"]), book=e(book_name(fields["book"])), books=e(fields["books"]),
+        bks="bk" if fields.get("books") == 1 else "bks",
         fair=e(fields["fair"]), edge=e(fields["edge"]), win_prob=e(fields["win_prob"]),
         tile3_k=e(fields.get("tile3_k") or "SmartSim"), tile3_v=e(fields.get("tile3_v") or fields.get("model_prob") or "–"),
         tile3_s=e(fields.get("tile3_s") or sim_note),
         outlook_title="Market outlook" if fields.get("price_play") else "SmartSim outlook",
         chart=fields.get("chart_svg") or chart_svg(values, fields["form_labels"], line, side),
         chart_title=e(fields.get("chart_title") or "Last games"),
-        chart_caption=e(caption), why="".join(f"<li>{e(w)}</li>" for w in fields["why"]),
+        chart_caption=e(caption),
+        why="".join(f'<li class="{"for" if (tones[i] if i < len(tones) else "for") == "for" else "ctx"}">{e(w)}</li>'
+                    for tones in [fields.get("why_tones") or []] for i, w in enumerate(fields["why"])),
         risk="".join(f"<li>{e(r)}</li>" for r in fields["risk"]))
 
 

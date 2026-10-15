@@ -1165,8 +1165,10 @@ def price_case(pick: Mapping[str, Any]) -> str:
     def american(p: Any) -> str:
         return f"{float(p):+g}" if isinstance(p, (int, float)) else str(p or "")
     books, p_market = pick.get("books"), pick.get("p_market")
-    consensus = f"{int(books)} books put it at {p_market:.0%}" if isinstance(books, (int, float)) and books and \
-        isinstance(p_market, (int, float)) else "the market puts it"
+    if isinstance(books, (int, float)) and books and isinstance(p_market, (int, float)):
+        consensus = f"{int(books)} books put it at {p_market:.0%}" if int(books) > 1 else f"its one book's no-vig price is {p_market:.0%}"
+    else:
+        consensus = "the market puts it"
     return f"The edge is the price: {consensus} (fair {american(pick.get('fair_price'))}); {book_name(pick.get('book')) or 'the best book'} " \
            f"pays {american(pick.get('price'))}"
 

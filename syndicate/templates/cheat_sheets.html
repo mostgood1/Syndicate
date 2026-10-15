@@ -321,7 +321,7 @@ function pickRow(p, i) {
   const off = p.on_board === false && !started(p.commence_time) ? `<span class="chip neutral" title="The board no longer suggests this at the current price">Not on the board now</span>` : "";
   const proj = p.kind === "prop" && typeof p.projected === "number" ? `proj ${p.projected.toFixed(1)} vs ${p.line}` : "sim win rate";
   const why = [play
-    ? `<li><b>Price</b>The edge is the price: ${p.books ? `${p.books} books put it at ` : "the market puts it at "}${pct(p.p_market)} (fair ${odds(p.fair_price)}); ${esc(p.book_name || p.book || "the best book")} pays ${odds(p.price)}, ${evs(p.ev_pct)}</li>`
+    ? `<li><b>Price</b>The edge is the price: ${p.books > 1 ? `${p.books} books put it at ` : p.books === 1 ? "its one book's no-vig price is " : "the market puts it at "}${pct(p.p_market)} (fair ${odds(p.fair_price)}); ${esc(p.book_name || p.book || "the best book")} pays ${odds(p.price)}, ${evs(p.ev_pct)}</li>`
     : `<li><b>Price</b>${odds(p.price)} beats the no-vig fair ${odds(p.fair_price)} by ${evs(p.ev_pct)}</li>`]
     .concat((p.points || []).map(pt => `<li class="${pt.tone === "for" ? "for" : pt.tone === "against" ? "against" : "ctx"}">${pt.label ? `<b>${esc(pt.label)}</b>` : ""}${esc(pt.text)}</li>`));
   return `<div class="prop pick" data-pk="${i}">

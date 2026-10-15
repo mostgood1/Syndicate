@@ -115,6 +115,8 @@ li { font: 600 var(--li, 21px)/1.24 var(--body); padding-left: 34px; position: r
 .why li::before { content: ""; position: absolute; left: 0; top: .1em; width: 24px; height: 24px; border-radius: 50%;
   background: var(--green) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4 8-9' fill='none' stroke='%23041006' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/18px no-repeat;
   box-shadow: 0 0 10px rgba(140,255,46,.55); }
+.why li.ctx::before { background: rgba(31,168,255,.18); box-shadow: none; border: 2px solid var(--blue);
+  background-image: radial-gradient(circle, var(--blue) 0 4px, transparent 5px); }
 .risk li::before { content: "!"; position: absolute; left: 0; top: .1em; width: 24px; height: 24px; border-radius: 50%;
   background: var(--amber); color: #1a1000; font: 900 17px/24px var(--display); text-align: center; }
 
@@ -212,7 +214,7 @@ li { font: 600 var(--li, 21px)/1.24 var(--body); padding-left: 34px; position: r
   </section>
 
   <section class="outlook panel blue"><div class="tab blue">$outlook_title</div>
-    <div class="tile"><div class="k">Best price</div><div class="v">$price</div><div class="s">$book · $books bks</div>
+    <div class="tile"><div class="k">Best price</div><div class="v">$price</div><div class="s">$book · $books $bks</div>
       <svg class="ic" viewBox="0 0 24 24"><path d="M12 2v20M17 6.5c0-2-2.2-3.2-5-3.2s-5 1.3-5 3.4c0 4.8 10 2.5 10 7.6 0 2.2-2.3 3.5-5 3.5s-5.2-1.3-5.2-3.4" fill="none" stroke="#8cff2e" stroke-width="2.2" stroke-linecap="round"/></svg></div>
     <div class="tile"><div class="k">Fair line</div><div class="v">$fair</div><div class="s">no-vig $win_prob</div>
       <svg class="ic" viewBox="0 0 24 24"><path d="M12 3v18M5 7h14M5 7l-3 7a3.5 3.5 0 0 0 6 0zM19 7l-3 7a3.5 3.5 0 0 0 6 0z" fill="none" stroke="#1fa8ff" stroke-width="2" stroke-linejoin="round"/></svg></div>
