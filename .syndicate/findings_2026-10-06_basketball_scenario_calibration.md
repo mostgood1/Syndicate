@@ -2897,3 +2897,13 @@ daily totals-calibration job + seed +2.50.
 - Tests: 5 new + 4 updated, 61 neighbouring pass.
 - "Absent = identical" is proven by a DETERMINISTIC unit test: the same engine object and the same draws as a direct
   call. A harness A/B cannot show it, by the measurement above.
+
+**VALID calibration files BUILT 2026-10-15 19:36Z** (`C:	mpball_sc\calfiles_sw_valid`, `DONE` marker written):
+- Real VALID boxes extracted into `realv`: 422 games. Regular 335 (03: 239, 04: 96); play-in 6; playoffs 81.
+  4 ESPN summary 404s (events 401869402, 401871334, 401871337, 401873343).
+- Raw-inputs pass: 42 VALID slate dates, 334 regular-season jobs, 0 tracebacks. Its sim draws were DELETED unread.
+- Identity: the recomputed switched raw equals the recorded raw on 334/334 VALID games (within 0.05).
+- **42 files**, one per VALID slate date (anchored the day before), from FIT + VALID jobs with the #1f recipe. The global
+  term ranges −1.34..+12.08, inside the ±15 clip; that is wider than FIT's −1.79..+7.17.
+- No VALID performance number was computed.
+- P3 is notified to record its VALID live inputs.
