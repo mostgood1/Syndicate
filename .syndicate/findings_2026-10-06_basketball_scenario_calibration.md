@@ -2414,3 +2414,38 @@ levers, 0 errors.
 - Unlike production, `nba_sim_total_inputs.json` here has BOTH keys true (production: skip_def only).
 - The walk-forward calibration files cover FIT dates only. VALID dates need their own walk-forward files before the VALID read.
 - Windows (agreed with P3): P3's Phase 2 re-gate grades FIT only until this lane's single VALID read. Its VALID part runs once, in the same pass. The postseason is graded once, at the end, by both.
+
+### Phase 2 #3 — FULL FIT RESULT 2026-10-15 00:40Z (done 00:38Z): PASSES P3's amendment; the Phase 2 #3 config holds on the whole FIT window
+
+**Run:** `fit_f3`, 109/109 dates, 791 paired games, 161,200 draws, 0 errors, every engine call carrying the levers.
+Compared with `fit_rest3` (the Phase 2 config before #3).
+
+| reading | fit_rest3 (before #3) | **fit_f3 (#3 config)** | real FIT | rule |
+|---|---|---|---|---|
+| foul-outs/game | 0.206 | **0.201** | 0.194 | ± 0.04 ✓ |
+| FTA/team (games without OT) | — | **22.83** | 23.07 (779 games) | ± 0.3 ✓ |
+| team PF | — | 19.69 | 19.67 | ✓ |
+| total bias | −0.22 | **−0.08** | 0 | \|·\| < 0.5 ✓ |
+| P(6th \| 5th in Q4) | — | **0.2117** (78,753 events) | 0.212 | [0.1607, 0.2643] ✓ |
+| closers-on | — | 0.396 | 0.455 | [0.375, 0.535] ✓ |
+| H2-on-H1 | −0.171 | −0.166 [−0.172, −0.161] | −0.174 | inside [−0.19, −0.155] ✓ |
+| Q4 slope | −0.092 | −0.086 | −0.141 | ≥ −0.101 ✓ (the Q4 remainder stays with P3) |
+| S8 margin SD | 14.96 | 15.00 | (readout label 15.21) | ✓ |
+| blowouts | 0.230 | 0.228 | 0.253 | — |
+
+**Other readings:**
+- foul-outs by window: Q4 last 4:00 0.186, Q4 > 4:00 0.014, OT 0.001 (real 0.107 / 0.059 / 0.025 scaled). The late
+  concentration remains, at the right total.
+- bonus trips/possession 0.00798 (frozen s′ 0.00802);
+- Q4 starters on the floor: close 3.18 (real 3.15), blowout 2.27 (real 1.56, known);
+- P(top fouler ≥ 5) 0.475 (real 0.414).
+
+**The Phase 2 #3 config is now CONFIRMED on the full FIT** (provisional; not enabled; the held-out VALID read is still
+owed for the whole Phase 2 config).
+
+**Next:**
+1. P3's §7 game-matched end-game check, FIT only (P3 has the machine-readable config, e9e8c31f).
+2. Phase 2 #5 (volume).
+3. Build the walk-forward calibration files for the VALID dates.
+4. The single end-of-Phase-2 VALID read.
+5. A user decision on production.
