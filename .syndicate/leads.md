@@ -1100,3 +1100,24 @@ that is not a fix.
 - 2026-10-15 (session 4ab694ed, same lane — a small concrete defect): **`soccer|player_assists` is a SKILL-VERDICT PROPAGATION GAP: the nightly grader validated it as a skill pocket and 129 served rows say "model never backtested -- projection is unvalidated".** The overlay carries `soccer|player_assists|full|pregame|*` as `skill_pocket` on 74 games with a CI excluding zero (several slices), and the served rows' `projection.model_skill` reads `status=unmeasured`. Its sibling `player_shots_on_target` is NOT this bug — its 416 served rows carry the ROI-at-the-price verdict (`parity`), which is a different instrument from Brier and is a true statement. So the trace is narrow: overlay -> `measured_market_skill` -> the row's `model_skill`, for `player_assists` specifically. No ranking cost today (both read 1.0), but a reader filtering on `status` is told the model is unvalidated when it is the best-measured bucket on the board. Unowned.
 
 - 2026-10-15 (session 4ab694ed): **STRUCK — the `soccer|player_assists` skill-verdict propagation-gap lead filed earlier today is RESOLVED by my own fix, do not pick it up.** It said 129 served rows read "model never backtested" for a bucket the nightly grader had validated. Commit `1cef9c79` registered `("soccer", "player_assists", "full", PHASE_PREGAME)` in `measured_market_skill`, and the restart at 20:25:06Z (`28ded758`) loaded it. **Verified on the served board 20:40:45Z, cap defeated: `player_assists` 130 rows now read `status=measured`, `verdict_class=parity`, factor 1.0** — the label is fixed and the score is unchanged, which is what a straddling CI should do. Striking it here rather than deleting the original, because this file is append-only and a lead nobody struck is work someone repeats.
+
+- 2026-10-15 (session 9e18a0e7, lane sim-gap-ev-study) -> **lane `football-scenario-calibration` (owner 20aa7f5b, parked): HYPOTHESIS + FIT-season test, NOT a correction factor.**
+  - **Measured:** pregame football probabilities show an outcome-on-sim slope below 1 in production. NCAAF 0.40 [-0.19, 0.96] (106 games / 1,768 rows, 10-01..10-14). NFL game lines 0.42 [-0.15, 0.94] (30 games / 1,118 rows, 10-01..10-12). |gap| <= 15 rows only; 2 NFL weeks, 2 NCAAF Saturdays.
+  - **Signature:** mean noise, not a narrow sd. k(sim on market) is 1.0-1.1, residual sd 0.07-0.09, and the sim sd is within ~10% of realised error. Implied: mu_adj = line + w*(mu - line), w ~ 0.3-0.5, CI roughly 0..1.
+  - **Knob:** the pricers run fixed ratings with no rating uncertainty: `scripts/generate_smartsim2_nfl_projections.py:1090`, `generate_smartsim2_ncaaf_projections.py:1457`; sd = `pstdev` over seeds. Prior art: `nfl/live_resim.py:305-351` `rating_sd`.
+  - **Falsification:**
+    1. Compute the production-arm slope on your FIT seasons (NFL 2022-24, NCAAF 2023-24). If its CI contains 1.0, drop this.
+    2. Otherwise fit w on FIT only, on sims WITH the level shrinks, which already absorbed part of this.
+    3. Check off != on, then read 2026 once.
+  - **Do not fit on the 2026 slopes:** 2026 is the clean held-out set, and a +/-0.15 slope needs ~4,000 games per market.
+  - Detail: `.syndicate/findings_2026-10-15_sim_gap_ev_study.md` (Mean vs spread, corrected); scratch `footcal/`.
+- 2026-10-15 (session 9e18a0e7) -> **lane `fair-price-v2` (mine): the EV fair counts STALE quotes; the projection anchor does not.** Found while checking NBA's "two fairs" (one statistic, two owners).
+  - **Two fairs:**
+    - The QUOTE fair (`ev_pct`, Suggested, score, sizer, cheat-sheet `p_market`, recorder `fp`) is the median of per-book Shin devigs over EVERY grid cell, stale included (`layer2_board._resolve_fair` -> `_two_sided_prices_by_book`).
+    - The GRID fair (`book_grid.py:663-702`, the projection blend's anchor) uses FRESH cells only: within 900 s of the freshest on the line.
+  - **Example, Knicks total 225.5 at 10-15 ~6 PM CT:** 7 of the 8 books' -110 cells were last seen 8:17 AM and have since moved to 226.5-228.5. The quote fair (.500) makes betrivers' +107 under +3.5% EV, the ONLY Suggested NBA row. Fresh-only, it is about -4.6%.
+  - **Stale share inside the quote fair, 6:08 PM CDT served board:** MLB game 34% / prop 46%, NCAAF game 40%, NFL prop 78%, soccer game 78%.
+  - **Outcomes cannot decide it yet:** NBA preseason gives ~30 differing items, Brier delta +.019 (-.006..+.046).
+  - **Next:** pre-register H5, "a fresh-only quote fair (per-book Shin, median, cells within the freshness window) beats the stale-inclusive one on log loss and on EV-at-close of EV >= 2 selections", and run it OFFLINE with `scripts/fair_price_eval.py` over the quote logs. No board or shadow change while MLB is in its postseason.
+  - **Replay check before any flip:** the Knicks-under-type row moves 3-8 EV points and leaves Suggested.
+  - Scratch: `nbafair/`.

@@ -36,18 +36,27 @@ squares slope of outcome on the sim's probability, 1 = right, < 1 = overconfiden
 
 | sport, pregame | games | Brier diff (one-off / backfill) | w | slope sim (one-off / backfill) | read |
 |---|---|---|---|---|---|
-| nfl | 31 / 30 | +0.010 [0.003, 0.018] / +0.012 | ~0 | 0.25 [0.09, 0.44] / 0.40 [0.04, 0.75] | overconfident ~2.5-4x, mean unbiased |
-| ncaaf | 118 / 106 | +0.012 [0.006, 0.018] / +0.008 | ~0 | 0.34 [0.17, 0.49] / 0.51 [0.03, 0.97] | overconfident; spreads 0.35, totals 0.08, h2h 0.89 |
+| nfl | 31 / 30 | +0.010 [0.003, 0.018] / +0.012 | ~0 | 0.25 [0.09, 0.44] / 0.38 [-0.01, 0.76] (82% props); game lines 0.42 [-0.15, 0.94] | slope < 1, NOT established -- CI reaches ~1 (CORRECTED 22:xxZ, see below) |
+| ncaaf | 118 / 106 | +0.012 [0.006, 0.018] / +0.008 | ~0 | 0.34 [0.17, 0.49] / 0.40 [-0.19, 0.96] (installed /2, two-sided) | slope < 1, NOT established on the installed state; spreads 0.30 [-0.55, 1.12], totals 0.47 [-0.42, 1.31] |
 | nhl | 93 / 93 | +0.005 [0.001, 0.008] / +0.004 | ~0 | 0.98 [0.84, 1.13] / 1.02 [0.93, 1.12] | shape right, no information beyond the line; sog slope 0.37 |
 | soccer | 130 / 110 | +0.012 [0.001, 0.025] / -0.002 | -0.05 / 0.65 | 0.59 [0.35, 0.86] / 1.00 | DISAGREE: one-off two-sided only, backfill /1 pooled one-sided fairs |
 | mlb | 24 / 24 | +0.003 / +0.004 | ~0 | 1.39 / 1.10 | thin, postseason |
 | nba | 41 / 41 | -- | -- | -- | preseason; sim == market on 5,590 of 6,492 rows |
 | wnba | 10 / 10 | +0.004 / +0.004 | -- | 1.14 / 1.06 | too few games |
 
-- **Mean vs spread.** No pregame mean bias at the 50/50 line in any sport (CIs span 0). The defect is
-  extremity: football probabilities sit 2.5-4x too far from 0.5. The one-off could not separate "sigma
-  too narrow" from "mean inputs noisy". Recalibrating removes the overconfidence; with w ~ 0 the sim
-  would still add nothing beyond the market until its INPUTS improve.
+- **Mean vs spread -- CORRECTED 2026-10-15 ~23:15Z** (football per-market read, scratch `footcal/`, recomputed
+  from the installed state to 5 digits). "2.5-4x overconfident" and "mean unbiased" were overstated, both:
+  - The football slopes are BELOW 1 but not established. NCAAF pooled 0.40 [-0.19, 0.96] (106 games, 1,768 rows);
+    NFL game lines 0.42 [-0.15, 0.94] (30 games, 1,118 rows), whose CI contains the lane's own 2023-24 backtest
+    slope of 0.88. The NFL 0.38 headline is 82% props (5,085 of 6,203 rows).
+  - "No mean bias" is vacuous: both sides of every line are in the sample, so the means are 0.500 by construction.
+  - The signature is MEAN NOISE, not a narrow sd. Regressing sim on market gives k = 1.10 (NCAAF) / 1.01 (NFL),
+    residual sd 0.086 / 0.069, and the sim sd is within ~10% of realised error. Knob, from the code: the pricers run
+    fixed ratings with no rating uncertainty (`scripts/generate_smartsim2_{nfl,ncaaf}_projections.py`); prior art is
+    `nfl/live_resim.py` `rating_sd`.
+  - Sample: |gap| <= 15 rows only, 26-43% of priced football rows. Slopes are probably optimistic.
+  Handed to lane `football-scenario-calibration` as a HYPOTHESIS plus a FIT-season test (leads.md), not a correction
+  factor: the 2026 slopes stay out of any fit.
 - **H2 (w falls with gap) not supported** broadly: one-off 15 of 17 sport-phase contrasts inconclusive;
   supported for soccer pregame (w 2.33 at 0-5 -> 0.06 at 10+, 130 games), falsified for wnba live.
 - **Lead time.** No consistent late staleness, except soccer: < 1 h +0.063 [0.005, 0.135] (28 games),
