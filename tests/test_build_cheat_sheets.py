@@ -429,3 +429,16 @@ def test_a_nickname_matches_by_initial_and_last_name_only_when_unique(monkeypatc
                                                                "wilsonsmith": {"id": 2, "name": "Wilson Smith", "position": "P"}})
     rows = [{"player": "Willie Smith"}]                       # "wsmith" names two players: never guessed
     assert m.fill_identity("mlb", rows, "2026-10-14", tmp_path) == {"headshots": 0, "positions": 0} and rows == [{"player": "Willie Smith"}]
+
+
+def test_the_old_streak_note_is_reworded_on_published_rows_and_nothing_else_moves():
+    # User 2026-10-15: "update the old reason text on past sheets too". New sheets and old ones read the same.
+    rows = [{"check": {"verdict": "streak_with_room", "price": -150, "ev_market": -4.0,
+                       "reasons": ["4/5 on this line and the price still leaves +3.0%", "model 61% vs market 58% (above)"]}},
+            {"check": {"verdict": "value", "reasons": ["best price beats the fair by +2.4%"]}},
+            {"check": {"verdict": "neutral"}}]
+    assert cs.reword_streak_reasons(rows) == 1
+    assert rows[0]["check"]["reasons"] == [cs.streak_room_reason("4", "5", 3.0), "model 61% vs market 58% (above)"]
+    assert rows[0]["check"]["reasons"][0] == "4/5 on this line; form alone says +3.0% vs the price, but streaks like this have run below the fair price"
+    assert rows[0]["check"]["price"] == -150 and rows[1]["check"]["reasons"] == ["best price beats the fair by +2.4%"]
+    assert cs.reword_streak_reasons(rows) == 0                                    # a second pass changes nothing

@@ -19,6 +19,7 @@ EV is computed at the best US price for each probability. Pure functions only: t
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -71,6 +72,34 @@ def taker_fee(row: Mapping[str, Any], book: Any, price: Any) -> float:
         return float(fee or 0.0)
     except Exception:  # noqa: BLE001
         return 0.0
+
+
+def streak_room_reason(hits: Any, games: Any, ev_post: float) -> str:
+    """The note on a streak whose FORM-ADJUSTED estimate beats the price. It used to read "... and the price still
+    leaves +3.0%" -- an endorsement next to a negative EV, when streaks like this ran 2.6 points BELOW the fair price in
+    our backtest (user 2026-10-15 on the streak colours). The old text on past sheets is `OLD_STREAK_ROOM_REASON`."""
+    return (f"{hits}/{games} on this line; form alone says {ev_post:+.1f}% vs the price, "
+            "but streaks like this have run below the fair price")
+
+
+# The wording before 2026-10-15, as past sheets carry it: "4/5 on this line and the price still leaves +3.0%".
+OLD_STREAK_ROOM_REASON = re.compile(r"^(\d+)/(\d+) on this line and the price still leaves ([+-]?\d+(?:\.\d+)?)%$")
+
+
+def reword_streak_reasons(rows: Iterable[dict[str, Any]]) -> int:
+    """Rewrite the old streak note on already-published rows in place (user 2026-10-15: "update the old reason text on
+    past sheets too"). Only that sentence changes -- no price, verdict or number -- and it returns how many moved."""
+    changed = 0
+    for row in rows:
+        reasons = (row.get("check") or {}).get("reasons")
+        if not isinstance(reasons, list):
+            continue
+        for k, text in enumerate(reasons):
+            m = OLD_STREAK_ROOM_REASON.match(str(text))
+            if m:
+                reasons[k] = streak_room_reason(m.group(1), m.group(2), float(m.group(3)))
+                changed += 1
+    return changed
 
 
 def implied_from_price(american: float | int | None) -> float | None:
@@ -193,10 +222,7 @@ def price_check(row: Mapping[str, Any], form_values: Sequence[float] | None) -> 
         reasons.append(f"best price beats the fair by {ev_m:+.1f}%")
     elif streak and ev_post is not None and ev_post >= 0:
         verdict = "streak_with_room"
-        # "Still leaves room" read as an endorsement next to a negative EV; the form-adjusted number is optimistic --
-        # streaks like this ran 2.6 points BELOW the fair price in our backtest (user 2026-10-15 on the streak colours).
-        reasons.append(f"{form5['hits']}/{form5['games']} on this line; form alone says {ev_post:+.1f}% vs the price, "
-                       "but streaks like this have run below the fair price")
+        reasons.append(streak_room_reason(form5["hits"], form5["games"], ev_post))
     elif streak:
         verdict = "streak_priced_in"
         imp = implied_from_price(price)
