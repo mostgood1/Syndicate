@@ -356,8 +356,12 @@ def test_consistency_and_matchup_sections():
     assert cs.vs_opponent_record(vs, 3.5, "over") == {"games": 2, "hits": 2, "same_line": True}
     assert cs.vs_opponent_record(vs, 4.5, "over") == {"games": 2, "hits": None, "same_line": False}   # another line: no rate
     with_values = {"vs_opponent": {"games": 4, "values": [5, 2, 4, 3], "hit_rate": {"line": 3.5, "side": "over"}}}
-    assert cs.vs_opponent_record(with_values, 2.5, "over") == {"games": 4, "hits": 3, "same_line": True}   # any line, graded
-    assert cs.vs_opponent_record(with_values, 3.0, "under") == {"games": 3, "hits": 1, "same_line": True}  # the 3.0 push drops
+    got = cs.vs_opponent_record(with_values, 2.5, "over")                                 # any line, graded
+    assert (got["games"], got["hits"], got["same_line"]) == (4, 3, True)
+    got = cs.vs_opponent_record(with_values, 3.0, "under")                                # the 3.0 push drops
+    assert (got["games"], got["hits"]) == (3, 1)
+    one = {"vs_opponent": {"games": 1, "values": [228.0], "labels": ["24-W16"]}}           # one meeting: show what happened
+    assert cs.vs_opponent_record(one, 199.5, "under")["results"] == [{"label": "24-W16", "value": 228.0, "hit": 0}]
 
 
 def test_featured_sections_keep_a_sane_price_and_one_line_per_bet():

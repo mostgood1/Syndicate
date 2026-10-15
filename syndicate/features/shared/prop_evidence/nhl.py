@@ -721,7 +721,8 @@ def _matchup(subject: PropSubject, market: NhlMarket | None, line: float | None,
             rate = C.hit_rate([_stat(g, market.log_columns) for g in vs], line, _effective_side(subject.side))
             if rate:
                 rows.append([f"Hit rate vs {C.fmt_line(line)}", "", C.hit_rate_text(rate)])
-            facts["vs_opponent"] = {"games": len(vs), "hit_rate": rate, "values": [_stat(g, market.log_columns) for g in vs]}
+            facts["vs_opponent"] = {"games": len(vs), "hit_rate": rate, "values": [_stat(g, market.log_columns) for g in vs],
+                                    "labels": [str(g.get("date") or "") for g in vs]}
             tables.append(table(f"{subject.player_name} vs {opponent} ({len(vs)} meeting{'s' if len(vs) != 1 else ''}, player_game_stats)",
                                 ["Date", "TOI", market.label], rows, Layer.MATCHUP))
     xg, _ = teams["team_xg_latest.csv"]

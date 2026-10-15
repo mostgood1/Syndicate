@@ -903,7 +903,8 @@ def _nfl_matchup(subject: PropSubject, stat: str | None, label: str, game: NflGa
             tables.append(table(f"{subject.player_name} vs {opponent} ({len(vs)} game line{'s' if len(vs) != 1 else ''})", ["Game", label], vrows, Layer.MATCHUP))
             # `values` lets a consumer grade ANY line of the group, not just this subject's (cheat sheets, 2026-10-15)
             facts["vs_opponent"] = {"games": len(vs), "hit_rate": rate,
-                                    "values": [_sum_columns(g, columns, event=stat == "anytime_td") for g in vs]}
+                                    "values": [_sum_columns(g, columns, event=stat == "anytime_td") for g in vs],
+                                    "labels": [_week_label(g.get("season"), g.get("week")) for g in vs]}
     if not tables:
         return absent(Layer.MATCHUP, f"{ABSENT_NO_MATCH}:no completed {opponent} game in schedule_{game.season}.csv and no engine row for {subject.player_name}")
     return LayerEvidence(Layer.MATCHUP, tables=tables, facts=facts, source="nfl:schedule+nfl_fantasy_projections")
@@ -1623,7 +1624,8 @@ def _ncaaf_matchup(subject: PropSubject, stat: str | None, label: str, box: Ncaa
         rate = C.hit_rate([_value(g) for g in vs], _line_for(subject, stat), _norm_side(subject.side))
         if rate:
             vrows.append([f"Hit rate vs {C.fmt_line(_line_for(subject, stat))}", C.hit_rate_text(rate)])
-            facts["vs_opponent"] = {"games": len(vs), "hit_rate": rate, "values": [_value(g) for g in vs]}
+            facts["vs_opponent"] = {"games": len(vs), "hit_rate": rate, "values": [_value(g) for g in vs],
+                                    "labels": [_week_label(g.get("season"), g.get("week")) for g in vs]}
         tables.append(table(f"{subject.player_name} vs {opponent} (snapshot + prior-season history)", ["Game", label], vrows, Layer.MATCHUP))
         facts["vs_opponent_games"] = len(vs)
     if not tables:

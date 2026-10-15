@@ -432,10 +432,16 @@ def vs_opponent_record(matchup: Mapping[str, Any] | None, line: Any, side: Any) 
     values = vs.get("values")
     side = str(side or "").lower()
     if isinstance(values, list) and values and (line is not None or side == "yes"):
-        rec = form_record(values, 0.5 if line is None else line, side, len(values))      # every value, this line
-        if not rec["games"]:
+        grade_line = 0.5 if line is None else float(line)
+        rec = form_record(values, grade_line, side, len(values))      # every value, this line
+        labels = list(vs.get("labels") or [])
+        # The actual meetings, newest first -- one game is still worth showing as what happened, not as a rate.
+        results = [{"label": labels[i] if i < len(labels) else "", "value": v,
+                    "hit": side_hit(float(v), grade_line, side) if v is not None else None}
+                   for i, v in enumerate(values[:3])]
+        if not rec["games"] and not results:
             return None
-        return {"games": rec["games"], "hits": rec["hits"], "same_line": True}
+        return {"games": rec["games"], "hits": rec["hits"], "same_line": True, "results": results}
     hr = vs.get("hit_rate") or {}
     games = int(hr.get("games") or vs.get("games") or 0)
     if not games:

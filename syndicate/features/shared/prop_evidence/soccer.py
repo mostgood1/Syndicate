@@ -1020,7 +1020,8 @@ def _matchup(subject: PropSubject, ctx: Resolved, scan: BoxScan | None, spec: Ma
             line, side = _form_line_side(subject, spec)
             rate = C.hit_rate([_form_value(g, spec) for g in vs], line, side)
             if rate:
-                facts["vs_opponent"] = {"games": len(vs), "hit_rate": rate, "values": [_form_value(g, spec) for g in vs]}
+                facts["vs_opponent"] = {"games": len(vs), "hit_rate": rate, "values": [_form_value(g, spec) for g in vs],
+                                        "labels": [str(g.get("date") or "") for g in vs]}
                 vs_rows = [[g["date"], C.fmt_num(g.get("minutes"), 0), C.fmt_num(_form_value(g, spec), 0)] for g in vs[:6]]
                 vs_rows.append([f"Hit rate vs {C.fmt_line(line)}", "", C.hit_rate_text(rate)])
                 noun = "meeting" if len(vs) == 1 else "meetings"

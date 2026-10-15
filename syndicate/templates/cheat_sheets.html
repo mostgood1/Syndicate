@@ -115,6 +115,7 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .chip.one_sided_fair { color: #c7b8ff; background: rgba(181,155,255,.14); }
 .chip.suspect_price { color: #ff8a7a; background: rgba(255,90,74,.14); }
 table.every td { vertical-align: middle; }
+.vsr { font-weight: 700; white-space: nowrap; } .vsr.hit { color: var(--accent); } .vsr.miss { color: var(--price); }
 .tr { font-weight: 700; white-space: nowrap; } .tr.up { color: var(--accent); } .tr.down { color: var(--price); } .tr.flat { color: var(--muted); }
 th.sortable { cursor: pointer; user-select: none; white-space: nowrap; } th.sortable:hover, th.sortable.on { color: var(--accent); } .ep { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
 img.mini { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: #0f2233; } .bk { color: var(--muted); font-size: 12px; }
@@ -258,8 +259,15 @@ function consistencyTable(d, ids) {
     ids.map(i => { const r = d.rows[i], c = r.check || {}, onesided = c.verdict === "one_sided_fair";
       return `<tr><td><span class="ep">${img(src(r.headshot_src, r.headshot_url), "mini")}${esc(r.player)}${r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}</span></td><td>${esc(betText(r))}</td><td class="n"><b>${f(c.form5)}</b></td><td class="n"><b>${f(c.form10)}</b></td><td>${trend(c)}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</td></tr>`; }).join("")}</tbody></table></div>`;
 }
-// A record vs one opponent shows only over 3+ meetings on THIS line (user 2026-10-15: "1 game, other line ... is not helpful").
-const vsText = r => { const v = r.vs_opponent; return v && v.same_line && v.hits != null && v.games >= 3 ? `<b>${v.hits}/${v.games}</b> on this line` : "–"; };
+// Against this opponent: the actual previous results on THIS line, newest first ("1 game is fine but give something
+// helpful, like previous result"), and the record once there are a few meetings.
+const vsText = r => {
+  const v = r.vs_opponent;
+  if (!v || !v.same_line) return "–";
+  const res = (v.results || []).map(x => `<span class="vsr ${x.hit === 1 ? "hit" : x.hit === 0 ? "miss" : ""}">${x.value == null ? "–" : Number(x.value).toFixed(Number.isInteger(x.value) ? 0 : 1)} ${x.hit === 1 ? "✓" : x.hit === 0 ? "✗" : "·"}</span> <span class="bk">${esc(x.label || "")}</span>`).join("<br>");
+  const rec = v.games >= 2 && v.hits != null ? `<b>${v.hits}/${v.games}</b> on this line<br>` : "";
+  return rec + (res || "–");
+};
 // Matchups: the opponent's rank at allowing this stat, 1 = allows the most; and the player's record vs this opponent.
 function matchupTable(d, ids) {
   if (!ids.length) return `<div class="empty">No prop here faces a defense in the softest (or, for an under, toughest) fifth for its stat.</div>`;

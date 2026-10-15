@@ -428,7 +428,8 @@ def _matchup(subject: PropSubject, found, games: list[dict[str, Any]], columns: 
         if rate:
             rows.append([f"Hit rate vs {C.fmt_line(subject.line)}", "", C.hit_rate_text(rate)])
         facts["vs_opponent"] = {"games": len(vs), "hit_rate": rate, "since": vs[-1]["date"],
-                                "values": [_stat_value(g, columns) for g in vs]}
+                                "values": [_stat_value(g, columns) for g in vs],
+                                "labels": [str(g.get("date") or "") for g in vs]}
         tables.append(table(f"{subject.player_name} vs {opponent} ({len(vs)} meeting{'s' if len(vs) != 1 else ''} since {vs[-1]['date']})",
                             ["Date", "MIN", label], rows, Layer.MATCHUP))
     team = str(player.get("team") or "").upper()
