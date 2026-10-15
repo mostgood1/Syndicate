@@ -785,14 +785,26 @@ def _apply_nba_engine_config_local(cfg: SmartSimConfigLocal, *, processed_root: 
     values = {f.name: getattr(base, f.name) for f in _dc.fields(base)}
     values.update(conf["event_sim_config"])
     values["league_params_overrides"] = conf["league_params"]
+    return _dc.replace(cfg, event_cfg=_rebuild_nba_configured_cfg_local(type(base), values))
+
+
+def _rebuild_nba_configured_cfg_local(base_cls: type, values: dict[str, Any]) -> Any:
+    """Instantiate the configured cfg: `base_cls` plus the fields it lacks. Module-level, so the runtime class can be
+    pickled and deep-copied by VALUE (its `__reduce__` points here) -- P3 measured that the bare make_dataclass class
+    failed to pickle, which would have cost every NBA game its persisted live inputs."""
+    import dataclasses as _dc
+
+    have = {f.name for f in _dc.fields(base_cls)}
     extra = tuple(sorted(k for k in values if k not in have))
-    key = (type(base), extra)
+    key = (base_cls, extra)
     cls = _NBA_CONFIGURED_CFG_CLASSES.get(key)
     if cls is None:
-        cls = _dc.make_dataclass(f"{type(base).__name__}NbaConfigured", [(k, Any, None) for k in extra],
-                                 bases=(type(base),), frozen=True)
+        cls = _dc.make_dataclass(f"{base_cls.__name__}NbaConfigured", [(k, Any, None) for k in extra],
+                                 bases=(base_cls,), frozen=True)
+        cls.__reduce__ = lambda self: (_rebuild_nba_configured_cfg_local,
+                                       (base_cls, {f.name: getattr(self, f.name) for f in _dc.fields(self)}))
         _NBA_CONFIGURED_CFG_CLASSES[key] = cls
-    return _dc.replace(cfg, event_cfg=cls(**values))
+    return cls(**values)
 
 
 def _clean_id_str_local(value: object) -> str:

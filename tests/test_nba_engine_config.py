@@ -128,3 +128,17 @@ def test_without_overrides_the_call_uses_the_unchanged_engine_and_output():
                                            cfg=ev, target_home_points=112.0, target_away_points=108.0, quarters=_quarters())
         h.update(json.dumps(g, sort_keys=True, default=str).encode())
     assert h.hexdigest() == _run(ev)
+
+
+def test_configured_cfg_pickles_and_deepcopies_by_value(tmp_path):
+    # P3, 2026-10-15: the bare make_dataclass class failed to pickle ("attribute lookup ... on types failed"), and
+    # _persist_engine_inputs_once_local swallows errors -- every NBA game would have silently lost its live inputs.
+    import copy
+    import pickle
+
+    (tmp_path / bpss.NBA_ENGINE_CONFIG_FILE_LOCAL).write_text(json.dumps(CONF))
+    ev = bpss._apply_nba_engine_config_local(_base_cfg(), processed_root=tmp_path, league_code="nba").event_cfg
+    for back in (pickle.loads(pickle.dumps(ev, protocol=4)), copy.deepcopy(ev)):
+        assert dataclasses.asdict(back) == dataclasses.asdict(ev)
+        assert back.league_params_overrides == ev.league_params_overrides
+        assert _run(back) == _run(ev)
