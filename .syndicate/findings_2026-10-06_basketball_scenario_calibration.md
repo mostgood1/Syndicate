@@ -2539,7 +2539,7 @@ tests/test_basketball_engine_two_point_split.py (NEW). P3 is told; it is a share
 6. Write `fit_f5_config.json` for P3's §7c / live re-gate re-run.
 7. The single VALID read.
 
-### Phase 2 #5a — RESULT 2026-10-15 02:00Z: NOT CONFIRMED by the letter (3P% misses its band by +0.008); every other target met
+### Phase 2 #5a — RESULT 2026-10-15 01:52Z: NOT CONFIRMED by the letter (3P% misses its band by +0.008); every other target met
 
 **Run:** `P5_on`, the 12 sweep dates, the PK2 config + `fg2_from_two_point_split`. 17,400/17,400 calls with levers,
 0 errors.
