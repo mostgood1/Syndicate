@@ -152,3 +152,17 @@ def test_the_template_has_exports_game_sheets_graphics_and_no_utc():
                    "r.kickoff_ct", "r.headshot_src", "r.team_logo_src", "slateBlock", "<!--__SITE_HEADER__-->", "/*__META__*/null"):
         assert needle in text, needle
     assert "UTC" not in text and "k = ${" not in text and "provisional" not in text
+
+
+def test_tomorrow_is_offered_as_an_early_look_and_game_lines_reach_the_page(http):
+    client, root = http
+    lines = [{"event_id": "e1", "market": "spreads", "side": "home", "side_name": "Los Angeles Rams", "line": -3.5,
+              "check": {"verdict": "value", "ev_market": 3.1, "price": 105}},
+             {"event_id": "e1", "market": "totals", "side": "over", "side_name": "over", "line": 44.5,
+              "check": {"verdict": "neutral", "ev_market": -2.0, "price": -110}}]
+    _write(root, _sheet(day="2026-10-15", rows=[], sections={}, game_lines=lines))
+    _write(root, _sheet())
+    meta = _js(client.get("/cheatsheets").data.decode(), "META")
+    assert meta["dates"] == ["2026-10-15", TODAY]                              # tomorrow is offered
+    nfl = _js(client.get("/cheatsheets?date=2026-10-15").data.decode(), "DATA")["nfl"]   # a lines-only sheet still shows
+    assert nfl["game_line_sections"]["value"] == [0] and nfl["game_line_sections_by_game"]["e1"]["all"] == [0, 1]

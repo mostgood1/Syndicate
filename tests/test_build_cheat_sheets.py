@@ -291,3 +291,46 @@ def test_exchange_prices_are_valued_net_of_the_taker_fee(monkeypatch):
     assert net == round(100 * (0.65 - q - 0.02) / (q + 0.02), 2) and net < gross
     book = dict(row, quote=dict(row["quote"], bookmaker="draftkings"))
     assert cs.price_check(book, []).ev_market == gross                      # a sportsbook pays no fee on top
+
+
+def test_game_lines_are_price_checked_and_kept_as_a_record(monkeypatch):
+    m = _script()
+    from datetime import datetime, timezone
+
+    monkeypatch.setattr(m, "evidence_facts", lambda row, selected_date: {})
+    base = {"kind": "game", "game_state": "pregame", "segment": "full", "event_id": "g1", "home_team": "Denver Broncos",
+            "away_team": "Seattle Seahawks", "commence_time": "2026-10-16T00:15:00Z"}
+    rows = [dict(base, market="spreads", side="home", line=-3.5, model_probability_cal=0.55, projection={"projected": 4.1, "side": "Denver Broncos"},
+                 quote={"price": 105, "fair_probability": 0.52, "fair_method": "consensus", "bookmaker": "fanduel",
+                        "book_prices": {"fanduel": 105, "draftkings": -110, "betmgm": -115}}),
+            dict(base, market="totals", side="over", line=44.5, quote={"price": -110, "fair_probability": 0.5, "bookmaker": "dk"}),
+            dict(base, market="h2h", segment="h1", side="home", quote={"price": -120, "fair_probability": 0.5}),     # not full game
+            dict(base, game_state="live", market="h2h", side="home", quote={"price": -120, "fair_probability": 0.5})]  # in play
+    sheet = m.build_sport("nfl", rows, selected_date="2026-10-15", cap=10, dvp={})
+    assert [(g["market"], g["side_name"]) for g in sheet["game_lines"]] == [("spreads", "Denver Broncos"), ("totals", "over")]
+    spread = sheet["game_lines"][0]
+    assert spread["check"]["verdict"] == "value" and spread["check"]["ev_market"] == round(100 * (0.52 * 2.05 - 1), 2)
+    assert spread["check"]["p_model"] == 0.55 and spread["projected"] == 4.1 and spread["shop"]["books"] == 3
+    assert sheet["games"][0]["matchup"] == "Seattle Seahawks @ Denver Broncos"        # a game with no props still listed
+    fresh = dict(sheet, rows=[], game_lines=[], games=[], sections={})                # later build: the game has started
+    merged = m.merge_with_record(fresh, sheet, now=datetime(2026, 10, 16, 1, 0, tzinfo=timezone.utc))
+    assert len(merged["game_lines"]) == 2 and merged["games"][0]["event_id"] == "g1"
+
+
+def test_the_day_ahead_is_tomorrow_in_central(monkeypatch):
+    m = _script()
+    monkeypatch.setattr(m, "central_today", lambda: "2026-10-14")
+    seen = {}
+    monkeypatch.setattr(m, "fetch_rows", lambda base, sport: [])
+    monkeypatch.setattr(m, "latest_nfl_dvp", lambda root: {})
+    real = m.build_sport
+
+    def spy(sport, rows, *, selected_date, **kw):
+        seen["date"] = selected_date
+        return real(sport, rows, selected_date=selected_date, **kw)
+
+    monkeypatch.setattr(m, "build_sport", spy)
+    import tempfile
+    with tempfile.TemporaryDirectory() as root:
+        m.main(["--data-root", root, "--date", "tomorrow", "--sports", "nfl"])
+    assert seen["date"] == "2026-10-15"

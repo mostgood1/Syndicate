@@ -362,6 +362,34 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
     ordered = sorted(groups.items(), key=lambda kv: priority(kv[1]), reverse=True)[:cap]
     out_rows: list[dict[str, Any]] = []
     games: dict[str, dict[str, Any]] = {}
+    # Game lines: every pregame full-game spread / moneyline / total the board prices today (user 2026-10-15: "we also
+    # need game lines/ml/totals as a cheat sheet"). No evidence call -- the board row already carries the model and
+    # the sim projection.
+    game_lines: list[dict[str, Any]] = []
+    for r in rows:
+        if r.get("kind") != "game" or (r.get("game_state") or "pregame") != "pregame":
+            continue
+        if str(r.get("segment") or "full") != "full" or r.get("market") not in cs.GAME_MARKETS:
+            continue
+        event_id = r.get("event_id")
+        home, away = r.get("home_team") or "", r.get("away_team") or ""
+        if event_id not in games:
+            games[event_id] = {"event_id": event_id, "matchup": f"{away} @ {home}", "commence_time": r.get("commence_time"),
+                               "kickoff_ct": kickoff_ct(r.get("commence_time")), "home_team": home, "away_team": away,
+                               "home_logo": logo_url(sport, home, r.get("home_key")),
+                               "away_logo": logo_url(sport, away, r.get("away_key")), "rebuilt": bool(r.get("rebuilt"))}
+        quote = r.get("quote") or {}
+        proj = r.get("projection") or {}
+        side = str(r.get("side") or "")
+        side_name = home if side == "home" else away if side == "away" else side
+        game_lines.append({
+            "event_id": event_id, "market": r.get("market"), "side": side, "side_name": side_name, "line": r.get("line"),
+            "books_quoting": len(quote.get("book_prices") or {}), "shop": cs.shop_gap(quote.get("book_prices")),
+            "suggested": bool(r.get("suggested")), "fair_method": quote.get("fair_method"),
+            "projected": proj.get("projected"), "projection_basis": proj.get("basis"), "projection_side": proj.get("side"),
+            "commence_time": r.get("commence_time"), "kickoff_ct": games[event_id]["kickoff_ct"],
+            "check": cs.game_line_check(r),
+        })
     for (event_id, player, market), grp in ordered:
         rep = max(grp, key=lambda r: len((r.get("quote") or {}).get("book_prices") or {}))
         facts = evidence_facts(rep, selected_date)
@@ -414,7 +442,7 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
         "schema": "cheat_sheet_v1", "sport": sport, "date": selected_date,
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "groups_on_board": len(groups), "groups_built": len(ordered), "rows": out_rows,
-        "games": list(games.values()), "sections": cs.sections(out_rows),
+        "games": list(games.values()), "sections": cs.sections(out_rows), "game_lines": game_lines,
         "dvp_file": dvp.get("_file") if sport == "nfl" else None,
         "method": {"prior_strength_k": cs.PRIOR_STRENGTH, "k_is_provisional": cs.K_IS_PROVISIONAL, "streak_rate": cs.STREAK_RATE,
                    "streak_min_games": cs.STREAK_MIN_GAMES, "value_ev_pct": cs.VALUE_EV_PCT},
@@ -465,7 +493,14 @@ def merge_with_record(sheet: dict[str, Any], prior: dict[str, Any] | None, *, no
     kept_games = [g for g in prior.get("games") or [] if g.get("event_id") in kept_events]
     for g in kept_games:
         g.setdefault("frozen_at", prior.get("generated_at"))
-    if not kept_rows:
+    priced_lines = {g.get("event_id") for g in sheet.get("game_lines") or []}
+    kept_lines = [g for g in prior.get("game_lines") or []
+                  if g.get("event_id") not in priced_lines and central_day(g.get("commence_time")) == day]
+    if kept_lines:
+        line_events = {g.get("event_id") for g in kept_lines} - {g.get("event_id") for g in sheet["games"]} - kept_events
+        kept_games += [g for g in prior.get("games") or [] if g.get("event_id") in line_events]
+        sheet = dict(sheet, game_lines=list(sheet.get("game_lines") or []) + kept_lines)
+    if not kept_rows and not kept_lines:
         return sheet
     merged = dict(sheet)
     merged["rows"] = sheet["rows"] + kept_rows
@@ -486,7 +521,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-root", default=os.environ.get("SYNDICATE_DATA_ROOT") or "")
     ap.add_argument("--sports", default="nfl,ncaaf,nhl,soccer,nba,ncaab,wnba,mlb")
-    ap.add_argument("--date", default=None, help="selected date (default: today, US Central)")
+    ap.add_argument("--date", default=None, help="selected date (default: today, US Central; 'tomorrow' = the day ahead)")
     ap.add_argument("--base-url", default=os.environ.get("SYNDICATE_BASE_URL") or "http://127.0.0.1:10000")
     ap.add_argument("--cap", type=int, default=None, help="override the per-sport group cap")
     ap.add_argument("--from-quotes", action="store_true",
@@ -497,6 +532,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     data_root = Path(os.path.expanduser(args.data_root))
     selected = args.date or central_today()
+    if selected == "tomorrow":                      # the day ahead (user 2026-10-15): an early look, refreshed later
+        selected = (datetime.fromisoformat(central_today()) + timedelta(days=1)).date().isoformat()
     dvp = latest_nfl_dvp(data_root)
     from syndicate.features.shared.layer2_row_context import load_layer2_row_context
 
@@ -530,7 +567,7 @@ def main(argv: list[str] | None = None) -> int:
                             context=context, positions=positions)
         sheet = merge_with_record(sheet, prior, now=datetime.now(timezone.utc))
         sheet["phase"] = season_phase(sport, selected)
-        if not sheet["rows"] and prior is None:
+        if not sheet["rows"] and not sheet.get("game_lines") and prior is None:
             print(f"CHEAT_SHEET {sport} date={selected} no {selected} games with pregame props -- nothing written", flush=True)
             continue
         images = attach_images(sheet, data_root / "cheatsheets" / ".img_cache")

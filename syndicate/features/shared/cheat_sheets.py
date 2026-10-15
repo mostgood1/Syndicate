@@ -256,6 +256,59 @@ def shop_gap(book_prices: Mapping[str, float] | None) -> dict[str, Any] | None:
             "best_implied": round(best, 4), "median_implied": round(median, 4)}
 
 
+# ----------------------------------------------------------------------------- game lines
+
+GAME_MARKETS = ("spreads", "h2h", "totals")
+
+
+def game_line_check(row: Mapping[str, Any]) -> dict[str, Any]:
+    """The price check for a spread / moneyline / total: best price vs the no-vig fair, net of the venue fee.
+
+    The model probability is the board's own calibrated number for THIS side (`model_probability_cal`, else raw); it
+    is shown, never the reason -- the game models were measured to trail the close (findings_2026-10-1[34]_*)."""
+    quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
+    price, book = quote.get("price"), quote.get("bookmaker")
+    p_market = quote.get("fair_probability")
+    p_market = float(p_market) if isinstance(p_market, (int, float)) else None
+    p_model = row.get("model_probability_cal")
+    if not isinstance(p_model, (int, float)):
+        p_model = row.get("model_probability_raw")
+    p_model = float(p_model) if isinstance(p_model, (int, float)) else None
+    fee = taker_fee(row, book, price)
+    ev_m, ev_mod = ev_pct(p_market, price, fee), ev_pct(p_model, price, fee)
+    one_sided = str(quote.get("fair_method") or "") in ONE_SIDED_FAIR_METHODS or quote.get("assumed_hold_pct") is not None
+    reasons: list[str] = []
+    if one_sided:
+        verdict = "one_sided_fair"
+    elif ev_m is not None and ev_m > SUSPECT_EV_PCT:
+        verdict = "suspect_price"
+        reasons.append(f"best price beats the fair by {ev_m:+.1f}% -- too big to trust: check the price is still up")
+    elif ev_m is not None and ev_m >= VALUE_EV_PCT:
+        verdict = "value"
+        reasons.append(f"best price beats the fair by {ev_m:+.1f}%")
+    else:
+        verdict = "neutral"
+    if fee:
+        reasons.append(f"after the {book} fee ({100 * fee:.1f}c a contract)")
+    if p_model is not None and p_market is not None and abs(p_model - p_market) * 100 >= MODEL_LEAN_PP:
+        reasons.append(f"model {p_model:.0%} vs market {p_market:.0%} ({'above' if p_model > p_market else 'below'})")
+    return {"price": price, "book": book, "p_market": p_market, "p_model": p_model, "ev_market": ev_m,
+            "ev_model": ev_mod, "verdict": verdict, "reasons": reasons}
+
+
+def game_line_sections(lines: Sequence[Mapping[str, Any]], *, top: int = 25) -> dict[str, list[int]]:
+    idx = range(len(lines))
+    ev = lambda i: (lines[i].get("check") or {}).get("ev_market")
+    verdict = lambda i: (lines[i].get("check") or {}).get("verdict")
+    return {
+        "value": sorted((i for i in idx if verdict(i) == "value"), key=lambda i: -(ev(i) or 0))[:top],
+        "shop": sorted((i for i in idx if (lines[i].get("shop") or {}).get("gap_pp", 0) >= 2.0),
+                       key=lambda i: -(lines[i].get("shop") or {}).get("gap_pp", 0))[:top],
+        "all": sorted(idx, key=lambda i: (GAME_MARKETS.index(lines[i]["market"]) if lines[i].get("market") in GAME_MARKETS else 9,
+                                           str(lines[i].get("side"))))[:300],
+    }
+
+
 # ----------------------------------------------------------------------------- matchup extremes (NFL DvP)
 
 
@@ -349,6 +402,15 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
         doc["rows"] = rows
         doc["sections"] = sections(rows)
         doc["games"] = [dict(g, props=len(by_game.get(g.get("event_id"), []))) for g in sheet.get("games") or []]
+        lines = list(sheet.get("game_lines") or [])
+        lines_by_game: dict[Any, list[int]] = {}
+        for i, line in enumerate(lines):
+            lines_by_game.setdefault(line.get("event_id"), []).append(i)
+        doc["game_lines"] = lines
+        doc["game_line_sections"] = game_line_sections(lines)
+        doc["game_line_sections_by_game"] = {
+            str(event): {k: [idx[j] for j in ids] for k, ids in game_line_sections([lines[i] for i in idx]).items()}
+            for event, idx in lines_by_game.items()}
         doc["game_sections"] = {
             str(event): {k: [idx[j] for j in ids] for k, ids in sections([rows[i] for i in idx]).items()}
             for event, idx in by_game.items()}

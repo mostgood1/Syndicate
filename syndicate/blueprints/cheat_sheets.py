@@ -53,6 +53,12 @@ def _today() -> str:
     return pc.central(datetime.now(timezone.utc)).date().isoformat()
 
 
+def _tomorrow(today: str) -> str:
+    from datetime import date, timedelta
+
+    return (date.fromisoformat(today) + timedelta(days=1)).isoformat()
+
+
 def _dates(sport: str) -> list[str]:
     folder = _sheet_dir() / sport
     if not folder.is_dir():
@@ -114,14 +120,14 @@ def cheat_sheets_page():
         have = _dates(sport)
         dates.update(have)
         doc = _read(sport, day) if day in have else None
-        if doc and doc.get("rows"):
+        if doc and (doc.get("rows") or doc.get("game_lines")):
             sheets.append(doc)
     try:
         template = TEMPLATE.read_text(encoding="utf-8")
     except OSError:
         return jsonify({"ok": False, "error": "template missing"}), 500
     meta = {"mode": "app", "date": day, "today": today, "beta": day < pc.OFFICIAL_START,
-            "dates": sorted({d for d in dates if d <= today} | {today}, reverse=True)[:14]}
+            "dates": sorted({d for d in dates if d <= _tomorrow(today)} | {today}, reverse=True)[:14]}
     page = cs.render_page(template, sheets, logo_src=LOGO_SRC, meta=meta)
     # The site menu, the same header every standalone page includes. The page template itself stays plain HTML so
     # `scripts/render_cheat_sheets.py` can render the identical page without Flask (the published artifact).

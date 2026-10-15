@@ -251,6 +251,25 @@ function shopTable(d, ids) {
   return `<div class="tbl"><table><thead><tr><th>Player</th><th>Bet</th><th>Best book</th><th>Books</th><th>Best implied</th><th>Median implied</th><th>Given away</th></tr></thead><tbody>${
     ids.map(i => { const r = d.rows[i], s = r.shop; return `<tr><td>${esc(r.player)}</td><td>${esc(betText(r))}</td><td>${esc(s.best_book)}</td><td class="n">${s.books}</td><td class="n">${pct(s.best_implied)}</td><td class="n">${pct(s.median_implied)}</td><td class="n">${s.gap_pp.toFixed(1)} pts</td></tr>`; }).join("")}</tbody></table></div>`;
 }
+const LINE_MARKET = {spreads: "Spread", h2h: "Moneyline", totals: "Total"};
+function lineBet(g) {
+  if (g.market === "totals") return `${g.side === "under" ? "Under" : "Over"} ${g.line ?? ""}`;
+  if (g.market === "spreads") return `${esc(g.side_name)} ${g.line > 0 ? "+" : ""}${g.line ?? ""}`;
+  return `${esc(g.side_name)} ML`;
+}
+function lineSim(g) {
+  if (typeof g.projected !== "number") return "–";
+  if (g.market === "totals") return `total ${g.projected.toFixed(1)}`;
+  if (g.market === "spreads") return `${esc(g.projection_side || "")} ${g.projected >= 0 ? "+" : ""}${g.projected.toFixed(1)}`;
+  return "–";
+}
+function linesTable(d, ids, withGame) {
+  if (!ids.length) return `<div class="empty">No game line qualifies here.</div>`;
+  const games = Object.fromEntries((d.games || []).map(g => [g.event_id, g]));
+  return `<div class="tbl"><table class="every"><thead><tr>${withGame ? "<th>Game</th>" : ""}<th>Market</th><th>Bet</th><th>Best price</th><th>Implies</th><th>Fair</th><th>EV</th><th>Model</th><th>Sim</th><th>Read</th></tr></thead><tbody>${
+    ids.map(i => { const g = d.game_lines[i], c = g.check || {}, gm = games[g.event_id] || {};
+      return `<tr>${withGame ? `<td><span class="ep">${img(src(gm.away_logo_src, gm.away_logo), "mini")}${img(src(gm.home_logo_src, gm.home_logo), "mini")}<span class="kick">${esc(gm.kickoff_ct || "")}</span></span></td>` : ""}<td>${LINE_MARKET[g.market] || esc(g.market)}</td><td><b>${lineBet(g)}</b></td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")} · ${g.books_quoting} bks</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${c.verdict === "one_sided_fair" ? "one-sided" : pct(c.p_market)}</td><td class="n"><span class="ev ${c.ev_market > 0 ? "pos" : "neg"}">${c.verdict === "one_sided_fair" ? "–" : evs(c.ev_market)}</span></td><td class="n">${pct(c.p_model)}</td><td class="n">${lineSim(g)}</td><td><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span></td></tr>`; }).join("")}</tbody></table></div>`;
+}
 function everyTable(d, ids) {
   if (!ids.length) return `<div class="empty">No props priced for this game.</div>`;
   const f = x => x ? `${x.hits}/${x.games}` : "–";
@@ -293,7 +312,9 @@ function render() {
   document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.sport === sport ? "true" : "false"));
   const record = META.today && META.date !== META.today;
   document.getElementById("asOf").innerHTML = (d.phase === "postseason" ? `<span class="chip phase">Postseason</span> ` : "") + esc(d.generated_at
-    ? (record ? `Final sheet · prices as of ${ctTime(d.generated_at)}` : `Prices as of ${ctTime(d.generated_at)} · lines move, check before betting`) : "");
+    ? (record && META.date < META.today ? `Final sheet · prices as of ${ctTime(d.generated_at)}`
+       : META.date > META.today ? `Early look · prices as of ${ctTime(d.generated_at)} · these lines will move`
+       : `Prices as of ${ctTime(d.generated_at)} · lines move, check before betting`) : "");
   const game = STATE.game ? (d.games || []).find(g => g.event_id === STATE.game) : null;
   if (STATE.game && !game) STATE.game = null;
   const secs = sectionsFor(d);
@@ -305,6 +326,13 @@ function render() {
     if (!ids.length && key !== "value") return "";
     return sectionShell(key, title, blurb, `${ids.length} rows`, `<div class="rowlist">${ids.length ? ids.map(i => propRow(d.rows[i])).join("") : `<div class="empty">Nothing qualifies on this ${game ? "game" : "slate"}.</div>`}</div>`);
   }).join("");
+  const lineSecs = game ? ((d.game_line_sections_by_game || {})[STATE.game] || {}) : (d.game_line_sections || {});
+  if (game) {
+    if ((lineSecs.all || []).length) html += sectionShell("lines", "Game lines", "Spread, moneyline and total for this game: the best price against the no-vig fair, net of any exchange fee, with the model and the sim's projection as context.", `${lineSecs.all.length} lines`, linesTable(d, lineSecs.all, false));
+  } else {
+    if ((d.game_lines || []).length) html += sectionShell("lines_value", "Game lines: value at the best price", "Spreads, moneylines and totals where the best price beats the no-vig fair by 2% or more, net of exchange fees. Pick a game for its full line card.", `${(lineSecs.value || []).length} lines`, linesTable(d, lineSecs.value || [], true));
+    if ((lineSecs.shop || []).length) html += sectionShell("lines_shop", "Game lines: shop the number", "Same game line, same side: the books disagree by 2 points or more of implied probability.", `${lineSecs.shop.length} lines`, linesTable(d, lineSecs.shop, true));
+  }
   if (game) html += sectionShell("every", "Every prop on the board", "Everything priced for this game: the best price, what it implies, the no-vig fair where both sides are quoted, the model, and recent form.", `${(secs.every_prop || []).length} props`, everyTable(d, secs.every_prop || []));
   if ((secs.shop_gaps || []).length) html += sectionShell("shop", "Price shopping", "Same line, same side: what betting the median book gives away against the best one.", "", shopTable(d, secs.shop_gaps));
   html += gamesBlock(d, game ? [game] : (d.games || []));
@@ -401,11 +429,12 @@ async function exportSection(btn) {
 
 (function init() {
   const sports = Object.keys(DATA || {});
-  if (META.date) document.getElementById("dayLabel").innerHTML = esc((META.date === META.today ? "Today · " : "") + dayName(META.date))
-    + (META.beta ? ` <span class="chip beta">Beta</span>` : "");
+  const ahead = META.today && META.date > META.today;
+  if (META.date) document.getElementById("dayLabel").innerHTML = esc((META.date === META.today ? "Today · " : ahead ? "Tomorrow · " : "") + dayName(META.date))
+    + (META.beta ? ` <span class="chip beta">Beta</span>` : "") + (ahead ? ` <span class="chip phase">Early look</span>` : "");
   if (META.mode === "app" && (META.dates || []).length) {
     document.getElementById("days").innerHTML = META.dates.slice(0, 8).map(day =>
-      `<a class="btn ${day === META.date ? "on" : ""}" href="${day === META.today ? "?" : "?date=" + day}">${day === META.today ? "Today" : esc(dayShort(day))}</a>`).join("");
+      `<a class="btn ${day === META.date ? "on" : ""}" href="${day === META.today ? "?" : "?date=" + day}">${day === META.today ? "Today" : day > META.today ? "Tomorrow" : esc(dayShort(day))}</a>`).join("");
   }
   document.getElementById("tabs").innerHTML = sports.map(s => `<button class="tab" role="tab" data-sport="${s}">${SPORT_NAMES[s] || s}</button>`).join("");
   document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => go(t.dataset.sport, null, true)));
