@@ -854,3 +854,19 @@ Run: fit_f5_config.json via `--phase2-config`, inputs_p2, 100 sims; n = 786 / 78
   - the §11 frame gap (31% of sides resume with a sampled five at 5:00 Q4).
 - **Verdict:** shadow -> priced is NOT supported on totals by this gate. On ML (and margin late) the native lens is now measurably better than pregame_rate. Whether to price ML only is a user decision; the gate as written says no.
 - VALID and postseason are untouched, and are graded once with the calibration lane's single VALID read.
+
+## 13. PRE-REGISTERED 2026-10-15 (before any VALID measurement): G3, P3's live part of THE VALID READ
+
+Co-signed into findings_2026-10-06 "THE VALID READ — PRE-REGISTRATION". It runs ONCE, in the same pass as the calibration lane's read.
+
+- **Population:** REGULAR VALID 2026-03-01..04-12, pbp/linescore-consistent. Game-clustered paired bootstrap.
+- **Arms (FINAL − PROD), same seeds, 100 sims:**
+  - FINAL = fit_f5_config.json on `inputs_p2` re-recorded for VALID dates with the walk-forward VALID calibration files.
+  - PROD = gate_v4_k0 projections (production recipe; v4 inputs with #473 + skip_def; native defaults, EXACT off, k=0). **Disclosed:** PROD's VALID values were seen once in §9; FINAL on VALID is unseen.
+- **PASS needs both:**
+  - (a) pooled over end Q1/Q2/Q3: total |err|, margin |err| and ML log-loss each with 95% CI upper < 0;
+  - (b) at 5:00 Q4: each not worse (CI upper ≤ +0.05).
+- **Reported once, not gated by G3:**
+  - §12 rule on VALID (FINAL native vs pregame_rate per checkpoint) and total bias;
+  - postseason as a separate stratum on the calibration lane's terms.
+- **No re-tuning after the read.**
