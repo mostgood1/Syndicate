@@ -134,6 +134,19 @@ def _series_adapter(fn: Any, value: Any) -> Any:
     return float(result)
 
 
+def _pd_na_refusal_adapter(fn: Any, value: Any) -> Any:
+    """A converter whose refusal is pandas' missing scalar -> None.
+
+    `source_cli/cli.py`'s `implied_prob_american` feeds `res['home_ml'].apply(...)`, so it refuses with pd.NA, not
+    None. `_normalize` would print that as the string 'NAType:<NA>' and score every refusal as a failure. This reads
+    pd.NA as the refusal it is, as `_series_adapter` reads NaN; any number passes through, so a mis-priced 0 still
+    reads 1.0."""
+    import pandas as pd  # local import so the harness degrades without pandas
+
+    result = fn(value)
+    return None if result is pd.NA else result
+
+
 AMERICAN_TO_PROBABILITY: list[Impl] = [
     # ADDED 2026-09-05 by the unregistered-converter sweep. Genuine scalar
     # american -> probability implementations that the tripwire had caught.
@@ -246,6 +259,10 @@ AMERICAN_TO_PROBABILITY: list[Impl] = [
          "`_num` coercion (None/''/NaN -> None) + zero guard"),
     Impl("american_to_probability", "syndicate.features.shared.cheat_sheets", "implied_from_price",
          "1/decimal_odds(price): refuses None and 0, RAISES on '' (bare float())"),
+    # ADDED 2026-10-15 (lane source-cli-implied-prob-zero-guard): landed in d139116c three minutes after the sweep
+    # closed, which turned test_every_converter_is_registered_or_excused red on main.
+    Impl("american_to_probability", "syndicate.features.shared.play_cards", "_implied",
+         "float() coercion, NO zero guard (0 -> -0.0); feeds the pick card's probability chart only"),
     Impl("american_to_probability", "syndicate.features.nba.live_tick.tick", "_american_to_implied_prob",
          "float() coercion + finite + zero guard"),
     Impl("american_to_probability", "syndicate.features.wnba.live_tick.tick", "_american_to_implied_prob",
@@ -257,9 +274,11 @@ AMERICAN_TO_PROBABILITY: list[Impl] = [
     Impl("american_to_probability", "syndicate.features.shared.basketball_market_board", "_devig_over.implied",
          "NESTED, the scalar half of `_devig_over`; refuses |price| < 100"),
     Impl("american_to_probability", "syndicate.features.nba.source_cli.cli", "_merge_odds_df.implied_prob_american",
-         "NESTED, generated port; pd.NA on refusal; NO zero guard (0 -> 1.0)"),
+         "NESTED, generated port; pd.NA on refusal; zero guard is a generator EDIT since 2026-10-15 (was 0 -> 1.0)",
+         adapter=_pd_na_refusal_adapter),
     Impl("american_to_probability", "syndicate.features.wnba.source_cli.cli", "_merge_odds_df.implied_prob_american",
-         "NESTED, generated port; pd.NA on refusal; NO zero guard (0 -> 1.0)"),
+         "NESTED, generated port; pd.NA on refusal; zero guard is a generator EDIT since 2026-10-15 (was 0 -> 1.0)",
+         adapter=_pd_na_refusal_adapter),
     Impl("american_to_probability", "syndicate.features.nba.source_cli.odds_api",
          "consensus_lines_at_close._implied_prob_from_american_or_prob",
          "NESTED, generated port; DUAL SCALE (a value in (0, 1) passes through) and clips to [1e-6, 1-1e-6]"),

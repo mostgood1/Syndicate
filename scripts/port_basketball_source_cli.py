@@ -117,6 +117,24 @@ def _stats_schedule_payload(season: str | None = None) -> dict[str, Any]:
 def fetch_schedule_2025_26() -> pd.DataFrame:
 '''
 
+#: Lane source-cli-implied-prob-zero-guard (2026-10-15). Both vendored CLIs carry the same nested converter
+#: `predict_date_cmd -> _merge_odds_df -> implied_prob_american`, which priced an American 0 as 100/(0+100) = 1.0 and
+#: fed it to `edge_win` (scripts/probability_differential.py, measured 2026-10-15). Hardening, not a live misprice:
+#: production runs predict-date with no --merge-odds, the OddsAPI consensus it merges never emits 0, and nothing in
+#: Syndicate reads home_implied_prob or edge_win (fleet 2026-10-15: 0 of 166 numeric moneylines were 0 across 26
+#: game_odds files). The same guard went upstream; once a re-pulled vendor/ carries it, this anchor matches 0x and the
+#: generator stops on it, which is the cue to delete this EDIT.
+_IMPLIED_PROB_ZERO_GUARD_EDIT = (
+    "cli",
+    "VENDORED DEFECT FIXED: _merge_odds_df's implied_prob_american priced an American 0 as 1.0 (100/(0+100)); 0 is not "
+    "a price, so it is refused with pd.NA, the converter's existing refusal (it feeds res['home_ml'].apply)",
+    "        def implied_prob_american(odds):\n            try:\n                o = float(odds)\n"
+    "            except Exception:\n                return pd.NA\n            if pd.isna(o):\n                return pd.NA\n",
+    "        def implied_prob_american(odds):\n            try:\n                o = float(odds)\n"
+    "            except Exception:\n                return pd.NA\n"
+    "            if pd.isna(o) or o == 0:  # EDIT: 0 is not an American price (it priced as 1.0)\n                return pd.NA\n",
+)
+
 #: Anchored edits: (module, why, old, new). The ONLY hand-written behaviour in the port.
 _NBA_EDITS: list[tuple[str, str, str, str]] = [
     (
@@ -173,6 +191,7 @@ _NBA_EDITS: list[tuple[str, str, str, str]] = [
         "        day_col = next((col for col in (\"date_est\", \"date_utc\", \"date\") if col in frame.columns), None)  # EDIT: ET game date first (as the WNBA fork)\n"
         "        if not day_col:\n            return pd.DataFrame()\n        day_frame = frame.copy()\n",
     ),
+    _IMPLIED_PROB_ZERO_GUARD_EDIT,
 ]
 
 #: Top-level statements that bind nothing but change behaviour: kept, at their source position in the header.
@@ -212,6 +231,7 @@ LEAGUES["wnba"] = dict(
             "def _repo_root() -> Path:\n    return Path(__file__).resolve().parents[2]\n",
             "def _repo_root() -> Path:\n    return Path(__file__).resolve().parent / \"repo\"  # EDIT: Syndicate-owned repo root (models/)\n",
         ),
+        _IMPLIED_PROB_ZERO_GUARD_EDIT,  # the WNBA fork carries the same converter, byte for byte
     ],
     keep={  # same three as NBA, same reasons
         ("cli", "os.environ.setdefault('ONNXRUNTIME_LOG_SEVERITY_LEVEL', '3')"),

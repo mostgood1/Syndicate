@@ -74,14 +74,19 @@ KNOWN_FAILING = {
         # 39-name backlog was registered. RAISES ValueError on '' only (bare
         # float()); refuses None and 0, and never returns a wrong number.
         "syndicate.features.shared.cheat_sheets:implied_from_price",
-        # ADDED 2026-10-15, same registration -- and the one row of that sweep
-        # that returns a WRONG NUMBER rather than raising: price 0 -> 1.0. Not
-        # fixed here because both are GENERATED ports (`port_basketball_source_cli.py`,
-        # `--check` fails on a hand edit) of the vendored NBA/WNBA CLIs; the guard
-        # belongs in the generator's EDITS and upstream. Its refusal is pd.NA,
-        # not None, because it feeds a DataFrame `.apply` on `home_ml`.
-        "syndicate.features.nba.source_cli.cli:_merge_odds_df.implied_prob_american",
-        "syndicate.features.wnba.source_cli.cli:_merge_odds_df.implied_prob_american",
+        # 2026-10-15: the two generated `source_cli/cli.py` copies of
+        # `_merge_odds_df.implied_prob_american` were ADDED here by lane
+        # `probability-differential-sweep-1015` (price 0 -> 1.0, the one row of
+        # that sweep returning a WRONG NUMBER) and GUARDED + REMOVED the same day
+        # by lane `source-cli-implied-prob-zero-guard`: a zero-guard EDIT in
+        # `port_basketball_source_cli.py`, plus a harness adapter that reads their
+        # pd.NA refusal as None. Deliberately not re-listed.
+        # ADDED 2026-10-15 (lane `source-cli-implied-prob-zero-guard`), on
+        # registration: landed in d139116c (lane `play-cards`) after the sweep.
+        # Prices 0 as -0.0 (no zero guard); meets the other 4 requirements. Its
+        # one caller draws the pick card's probability chart. The guard is
+        # `play-cards`' to add.
+        "syndicate.features.shared.play_cards:_implied",
     },
     "american_to_decimal": {
         # ADDED 2026-10-02, same registration. Four copies of the unguarded
