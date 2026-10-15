@@ -792,3 +792,25 @@ Production sequence (`resume_from_summary` -> `map_state_names`) on the pickled 
   - Where it equals the shipped p, the bucket holds.
   - Where it differs, that bucket is re-fitted to it, and the solver's Δ (solver_endgame_pts_per_team) must then be re-measured by the calibration lane before the VALID read.
   - Trailer FTA (sim vs real) is READ, not gated. The 4-6 shape miss from §7b is expected to persist.
+
+### §7c RESULT (read 2026-10-15 01:3xZ): Phase 2 #3 config, FIT only -- 2 of 3 buckets RE-FIT
+
+Inputs `inputs_p2` (795 FIT games; the same 2 REC_FAIL dates as v4). 388 graded (40 draws per p, same seeds). Refusals: `pbp_score_mismatch` 6, `on_floor_incomplete` 10; 387 outside |1..10| at 2:00; 360 without inputs (VALID window, by design).
+
+| bucket | FIT n | err @p=0 | err @shipped | FIT-optimal p (err) | verdict | real FTA after 2:00 | sim FTA @optimal |
+|---|---|---|---|---|---|---|---|
+| 1-3 | 157 | −1.26 | +0.17 (0.2) | **0.2** (+0.17) | holds | 4.76 | 3.59 |
+| 4-6 | 108 | −1.10 | −1.10 (0.0) | **0.2** (+0.40) | **re-fit 0.0 -> 0.2** | 5.25 | 3.74 |
+| 7-10 | 123 | −1.47 | −0.27 (0.2) | **0.3** (+0.09) | **re-fit 0.2 -> 0.3** | 4.52 | 4.03 |
+
+**New end-game p by deficit (Phase 2): (0.2, 0.2, 0.3).**
+
+Reading:
+- In the Phase 2 config, p = 0 under-scores the last 2:00 in every bucket by 1.1-1.5 pts.
+- **4-6 no longer over-shoots at 0.2** (+0.40 here vs +0.79 in §7b). The bonus, EXACT and foul fixes changed its shape enough for the rule to pick 0.2.
+- 7-10's move (0.2 -> 0.3) is small: |−0.27| vs |+0.09|.
+- **Shape caveat (READ, not gated):** at the chosen p, sim FTA after 2:00 is still 0.5-1.5 BELOW real in every bucket, while points match. The sim reaches the right points with too few FTs, so intentional-foul trips are too rare and too much scoring comes from shots. A per-possession foul p cannot fix both; a two-parameter version (fouling probability AND the trailer's quick-shot share) is the follow-up, if anyone needs late-game FTA props.
+- **Consequences:**
+  - (1) `solver_endgame_pts_per_team` (Δ′ = 0.138) was measured at (0.2, 0.0, 0.2) and must be re-measured at (0.2, 0.2, 0.3) on the calibration lane's disjoint dates, as pre-registered.
+  - (2) The Phase 2 live re-gate (§12) must run on the config that carries the new p and Δ (and #5 if adopted). Its projection cache from the #3 config is stale for every checkpoint, since every resume plays through the last 2:00.
+  - (3) VALID untouched.
