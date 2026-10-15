@@ -352,6 +352,17 @@ def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25) -> dict[str, l
         # no fair price exists to measure the streak against, so it is shown as form and model -- never as edge.
         "hot_form": sorted((i for i in idx if verdict(i) == "one_sided_fair" and _hot(rows[i])),
                            key=lambda i: (-_form(rows[i], "form10").get("rate", 0), -_form(rows[i], "form5").get("hits", 0)))[:top],
+        # Consistency (user 2026-10-15: "a consistency section for every sport to show the recent hit rate trends"):
+        # every row with a full L10 sample and a 70%+ hit rate, best record first, whatever its price says -- the page
+        # shows the trend (L5 vs L10) and the price beside it, and says plainly that streaks measured as priced in.
+        "consistency": sorted((i for i in idx if _form(rows[i], "form10").get("games", 0) >= 8
+                               and (_form(rows[i], "form10").get("rate") or 0) >= 0.7),
+                              key=lambda i: (-(_form(rows[i], "form10").get("rate") or 0),
+                                             -(_form(rows[i], "form5").get("rate") or 0)))[:top],
+        # Matchups (user 2026-10-15: "matchup based cheat sheets"): the opponent ranks in the softest fifth at allowing
+        # this stat for an over (toughest fifth for an under), most extreme first.
+        "matchup_spots": sorted((i for i in idx if matchup_favors_side(rows[i]) or vs_opponent_strong(rows[i])),
+                                key=lambda i: _matchup_extremity(rows[i]))[:top],
         # Everything on the board, for a game's own sheet (the page shows it there only).
         "every_prop": sorted(idx, key=lambda i: (str(rows[i].get("market")), str(rows[i].get("player")),
                                                  rows[i].get("line") if isinstance(rows[i].get("line"), (int, float)) else 0,
@@ -360,6 +371,65 @@ def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25) -> dict[str, l
 
 
 EVERY_PROP_CAP = 200
+
+
+def matchup_summary(sport: str, matchup: Mapping[str, Any] | None, dvp: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """One shape for every sport's matchup: the opponent, where it ranks at allowing this stat (1 = allows the MOST),
+    out of how many, and per game. NFL reads the defense-vs-position table; any evidence layer that reports
+    `allowed_rank` as "N of M (1 = fewest allowed)" (NCAAF, NHL, basketball) is read the same way. None when the
+    sport's evidence carries no rank (soccer reports ratings, not ranks)."""
+    m = dict(matchup or {})
+    if dvp and dvp.get("nth_most"):
+        return {"opponent": m.get("opponent"), "nth_most": int(dvp["nth_most"]), "of": int(dvp.get("of") or 32),
+                "per_game": dvp.get("per_game"), "stat": dvp.get("stat"), "pos": dvp.get("pos"), "source": "dvp"}
+    raw = str(m.get("allowed_rank") or "")
+    import re
+
+    hit = re.match(r"\s*(\d+)\s+of\s+(\d+)", raw)
+    if not hit:
+        return None
+    fewest, of = int(hit.group(1)), int(hit.group(2))
+    if not 0 < fewest <= of:
+        return None
+    return {"opponent": m.get("opponent"), "nth_most": of - fewest + 1, "of": of,
+            "per_game": m.get("allowed_per_game"), "stat": None, "pos": None, "source": "allowed_rank"}
+
+
+def vs_opponent_record(matchup: Mapping[str, Any] | None, line: Any, side: Any) -> dict[str, Any] | None:
+    """The player's record on THIS line + side against today's opponent (user 2026-10-15: "matchups should include
+    performance against the opposing team"). The evidence computes it for its group's representative line and side
+    only, so another line in the group gets the game count but no hit rate -- a record on a different line is not
+    this bet's record."""
+    vs = (matchup or {}).get("vs_opponent") or {}
+    hr = vs.get("hit_rate") or {}
+    games = int(hr.get("games") or vs.get("games") or 0)
+    if not games:
+        return None
+    same = hr.get("line") == line and str(hr.get("side") or "").lower() == str(side or "").lower()
+    return {"games": games, "hits": int(hr.get("hits") or 0) if same else None, "same_line": same}
+
+
+def matchup_favors_side(row: Mapping[str, Any]) -> bool:
+    mu = row.get("matchup") or {}
+    k, n = mu.get("nth_most"), mu.get("of")
+    if not k or not n:
+        return vs_opponent_strong(row)
+    fifth = max(1, round(n / 5))
+    side = str(row.get("side") or "").lower()
+    return (side in ("over", "yes") and k <= fifth) or (side == "under" and k > n - fifth)
+
+
+def vs_opponent_strong(row: Mapping[str, Any]) -> bool:
+    vs = row.get("vs_opponent") or {}
+    return bool(vs.get("same_line")) and vs.get("games", 0) >= 2 and (vs.get("hits") or 0) / vs["games"] >= 2 / 3
+
+
+def _matchup_extremity(row: Mapping[str, Any]) -> float:
+    mu = row.get("matchup") or {}
+    if not mu.get("nth_most"):
+        return 0.5                                   # a vs-opponent record alone sorts after the defensive extremes
+    k, n = mu.get("nth_most") or 0, mu.get("of") or 1
+    return k / n if str(row.get("side") or "").lower() in ("over", "yes") else (n - k + 1) / n
 
 
 def _form(row: Mapping[str, Any], key: str) -> Mapping[str, Any]:

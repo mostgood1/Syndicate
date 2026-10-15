@@ -427,6 +427,11 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
                 "suggested": bool(r.get("suggested")), "books_quoting": len(quote.get("book_prices") or {}),
                 "book_prices": dict(sorted((quote.get("book_prices") or {}).items(), key=lambda kv: -kv[1])[:6]),
                 "opponent": match.get("opponent") or ident["opponent_name"], "dvp": dvp_cell,
+                "matchup": cs.matchup_summary(sport, match, dvp_cell),
+                "vs_opponent": cs.vs_opponent_record(match, r.get("line"), r.get("side")),
+                "matchup_ratings": ({"opp_xga": (match.get("opponent_rating") or {}).get("xg_against_per_match"),
+                                     "opp_ga": (match.get("opponent_rating") or {}).get("goals_against_per_match")}
+                                    if sport == "soccer" and match.get("opponent_rating") else None),
                 "form_labels": (form.get("game_labels") or [])[:10],
                 "injury": env.get("player_injury_status"),
                 "shop": cs.shop_gap(quote.get("book_prices")),

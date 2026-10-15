@@ -334,3 +334,23 @@ def test_the_day_ahead_is_tomorrow_in_central(monkeypatch):
     with tempfile.TemporaryDirectory() as root:
         m.main(["--data-root", root, "--date", "tomorrow", "--sports", "nfl"])
     assert seen["date"] == "2026-10-15"
+
+
+def test_consistency_and_matchup_sections():
+    def row(player, side="over", f5=(5, 5), f10=(10, 9), matchup=None, vs=None):
+        return {"player": player, "side": side, "line": 2.5, "matchup": matchup, "vs_opponent": vs,
+                "check": {"verdict": "neutral", "form5": {"games": f5[0], "hits": f5[1], "rate": f5[1] / f5[0]},
+                          "form10": {"games": f10[0], "hits": f10[1], "rate": f10[1] / f10[0]}}}
+
+    rows = [row("A", f10=(10, 8)), row("B", f10=(10, 10)), row("C", f10=(6, 6)), row("D", f10=(10, 6)),
+            row("E", matchup={"nth_most": 2, "of": 32}), row("F", side="under", matchup={"nth_most": 2, "of": 32}),
+            row("G", side="under", matchup={"nth_most": 31, "of": 32}), row("H", vs={"games": 3, "hits": 3, "same_line": True}),
+            row("I", vs={"games": 3, "hits": None, "same_line": False})]
+    s = cs.sections(rows)
+    assert [rows[i]["player"] for i in s["consistency"]][:2] == ["B", "E"] and 2 not in s["consistency"] and 3 not in s["consistency"]
+    assert {rows[i]["player"] for i in s["matchup_spots"]} == {"E", "G", "H"}       # soft D for an over, tough D for an under, 3/3 vs opp
+    assert cs.matchup_summary("ncaaf", {"opponent": "Memphis", "allowed_rank": "79 of 138 (1 = fewest allowed)", "allowed_per_game": 219.7}, None) == \
+        {"opponent": "Memphis", "nth_most": 60, "of": 138, "per_game": 219.7, "stat": None, "pos": None, "source": "allowed_rank"}
+    vs = {"vs_opponent": {"games": 2, "hit_rate": {"games": 2, "hits": 2, "line": 3.5, "side": "over"}}}
+    assert cs.vs_opponent_record(vs, 3.5, "over") == {"games": 2, "hits": 2, "same_line": True}
+    assert cs.vs_opponent_record(vs, 4.5, "over") == {"games": 2, "hits": None, "same_line": False}   # another line: no rate
