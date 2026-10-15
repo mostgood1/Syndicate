@@ -264,3 +264,84 @@ def test_nhl_saves_board_code_reaches_its_measured_loss():
     assert note is not None and note["verdict_class"] == mms.VERDICT_LOSES and note["sample_games"] == 435
     assert note["established_loss_rel"] > 0                      # an established loss: it moves the row's score
     assert mms.skill_note(sport="nhl", market="SAVES", segment="full", phase=mms.PHASE_LIVE) is None
+
+
+# --------------------------------------------------------------------------
+# soccer player_shots / player_assists, registered 2026-10-15
+# (lane soccer-prop-skill-registry-gap)
+#
+# These two were DELIBERATELY omitted on 2026-10-05 with the reason stated in
+# the module: "no board row carries `player_shots` or `player_assists`". That was
+# true then and expired when the rows appeared. Measured on the served board
+# 2026-10-15 19:20Z with the row cap defeated (1,406 == total_rows):
+# player_shots 383 rows, player_assists 130 rows, both reading
+# `status=unmeasured` while this module documented their readings four lines
+# above the omission.
+#
+# The asymmetry is the part worth pinning: assists' CI straddles zero so it
+# scores 1.0 either way and only its LABEL changed, while shots is an
+# ESTABLISHED loss (CI upper -1.7%) whose 383 rows were ranking at 1.0 where the
+# table's own rule gives 0.915.
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("market", ["player_shots", "player_assists"])
+def test_the_two_late_registered_soccer_props_are_reachable(market):
+    """Reachability first: an entry no row can reach is this module's own stated failure."""
+    from syndicate.features.shared.projection_skill import normalize_existing_note
+
+    note = mms.skill_note(sport="soccer", market=market, segment="full")
+    assert note is not None, "%s must reach its entry by the board's spelling" % market
+    # `skill_note` deliberately carries NO `status` (see
+    # test_note_is_compact_and_carries_no_status) -- it is added when the note is
+    # normalised onto a row, which is where the board reads it.
+    assert normalize_existing_note(note).get("status") == "measured"
+
+
+def test_player_shots_is_an_established_loss_and_earns_a_discount():
+    """The one with a scoring consequence: 0.915, not 1.0."""
+    from syndicate.features.shared.projection_skill import normalize_existing_note
+
+    note = normalize_existing_note(
+        mms.skill_note(sport="soccer", market="player_shots", segment="full"))
+    assert note["verdict_class"] == mms.VERDICT_LOSES
+    assert note["established_loss_rel"] == pytest.approx(0.017, abs=1e-6)
+    factor = mms.skill_reliability(note)
+    assert factor == pytest.approx(1.0 - mms.SKILL_GAIN * 0.017, abs=1e-6)
+    assert 0.5 < factor < 1.0, factor
+
+
+def test_player_assists_is_parity_so_the_registration_changed_only_the_label():
+    """Its CI straddles zero: the score was 1.0 as `unmeasured` and is 1.0 as `parity`.
+
+    Pinned because a reader could reasonably assume registering a market must move
+    its score, and here it must NOT -- the value of the fix is that the row stops
+    claiming "model never backtested" for a market that was backtested.
+    """
+    from syndicate.features.shared.projection_skill import normalize_existing_note
+
+    note = normalize_existing_note(
+        mms.skill_note(sport="soccer", market="player_assists", segment="full"))
+    assert note["verdict_class"] == mms.VERDICT_PARITY
+    assert note["established_loss_rel"] == 0.0
+    assert mms.skill_reliability(note) == 1.0
+    assert "never backtested" not in note.get("verdict", "")
+
+
+@pytest.mark.parametrize("market,roi,ci_upper", [
+    ("player_shots", -0.224, -0.017),
+    ("player_assists", -0.084, 0.348),
+])
+def test_the_late_registered_numbers_match_the_backtest_table(market, roi, ci_upper):
+    """Pins the two rows read off `findings_2026-10-02_soccer_lines_props_backtest.md`.
+
+    My reading of that table was calibrated against the ALREADY-registered SOT and
+    anytime rows before being trusted; this keeps the stored values tied to it, so a
+    future edit that drifts from the source fails here rather than silently rescoring
+    the board.
+    """
+    entry = mms.MEASURED_MARKET_SKILL[("soccer", market, "full", mms.PHASE_PREGAME)]
+    assert entry["roi_model"] == pytest.approx(roi, abs=1e-9)
+    assert entry["roi_ci95"][1] == pytest.approx(ci_upper, abs=1e-9)
+    assert entry["source"] is mms._SOCCER_PROPS_PRICE_SOURCE, (
+        "must cite the same source as its SOT/anytime siblings")

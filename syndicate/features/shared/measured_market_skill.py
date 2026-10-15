@@ -363,10 +363,22 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
     # ESTABLISHED loss moves a score (`established_loss_rel`): for ROI that is the CI's
     # UPPER bound below zero. Anytime's point estimate is -29.5% but its CI reaches +0.8%;
     # SOT's reaches +31.1%. A weight taken from a point estimate would be the invented
-    # midpoint `skill_reliability` refuses. Shots (-22.4% [-40.6, -1.7]) and assists DO
-    # have readings but are NOT registered: no board row carries `player_shots` or
-    # `player_assists` (an entry no row can reach is the failure the key-shape block
-    # below describes).
+    # midpoint `skill_reliability` refuses.
+    #
+    # SHOTS AND ASSISTS ARE NOW REGISTERED, and the sentence that used to sit here is
+    # why they were not: "no board row carries `player_shots` or `player_assists` (an
+    # entry no row can reach is the failure the key-shape block below describes)".
+    # That was a fact about 2026-10-05 and it EXPIRED the day the rows appeared.
+    # Measured on the served board 2026-10-15 19:20Z, row cap defeated (1,406 ==
+    # total_rows): player_shots 383 rows and player_assists 130 rows, both reading
+    # `status=unmeasured` / "model never backtested" while this module documented
+    # their readings four lines above.
+    #
+    # THE CONSEQUENCE WAS NOT SYMMETRIC, which is why it is worth stating. Assists'
+    # CI straddles zero, so it scores 1.0 either way and only its LABEL was wrong.
+    # Shots is an ESTABLISHED loss by this table's own rule (CI upper -1.7% < 0), so
+    # its 383 rows were ranking at 1.0 where the rule gives 0.915 -- scores ~9.3%
+    # higher than the measurement allows. A documented caveat is a scheduled defect.
     #
     # FIRST / LAST SCORER `[2026-10-05, graded by lane soccer-scorer-race-grade, bc51b24c]`:
     # the board's `scorer_race` probability, same at-the-price method, outcome = ESPN goal
@@ -391,6 +403,30 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
         "roi_ci95": (-0.413, 0.311),
         "bets": 210,
         "verdict": "at the price: no established loss, ROI on model EV>0 -7.1% [-41.3%, +31.1%] over 210 bets, 143 matches",
+        "verdict_class": VERDICT_PARITY,
+        "source": _SOCCER_PROPS_PRICE_SOURCE,
+    },
+    # `player_shots`: the ONE established loss among the four at-the-price soccer prop
+    # readings. Same table, same source constant as SOT and anytime above.
+    ("soccer", "player_shots", "full", PHASE_PREGAME): {
+        "sample_games": 143,
+        "seasons": "2026-27 pre-kickoff builds 07-22..09-30, all versions; 199 EV>0 bets over 143 matches; OVER-only prices, no de-vig possible",
+        "roi_model": -0.224,
+        "roi_ci95": (-0.406, -0.017),
+        "bets": 199,
+        "verdict": "at the price: LOSES, ROI on model EV>0 -22.4% [-40.6%, -1.7%] over 199 bets, 143 matches",
+        "verdict_class": VERDICT_LOSES,
+        "source": _SOCCER_PROPS_PRICE_SOURCE,
+    },
+    # `player_assists`: CI straddles zero, so PARITY -- the registration changes the
+    # LABEL (was "never backtested") and not the score, which was 1.0 either way.
+    ("soccer", "player_assists", "full", PHASE_PREGAME): {
+        "sample_games": 115,
+        "seasons": "2026-27 pre-kickoff builds 07-22..09-30, all versions; 93 EV>0 bets over 115 matches; OVER-only prices, no de-vig possible",
+        "roi_model": -0.084,
+        "roi_ci95": (-0.470, 0.348),
+        "bets": 93,
+        "verdict": "at the price: no established loss, ROI on model EV>0 -8.4% [-47.0%, +34.8%] over 93 bets, 115 matches",
         "verdict_class": VERDICT_PARITY,
         "source": _SOCCER_PROPS_PRICE_SOURCE,
     },
