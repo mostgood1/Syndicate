@@ -49894,3 +49894,10 @@ The copy has no cache, `trust_env` off unless `STATSAPI_TRUST_ENV`, an (8 s, 8 s
   - (1) After the next live-odds-worker soccer pregame autorun (interval env 2700 s), `/home/amyn/syndicate-prod/data/soccer_source/{ucl,uel,uecl}/api/schedule/schedule_2026.json` and `api/odds/game_odds_current.csv` exist with rows. A watcher (`C:/tmp/uefa_fleet_watch.sh`, 75-min deadline from ~20:50Z) is armed for it.
   - (2) On the next UCL matchday (2026-10-20/21), after the workers next restart, a UCL in-play `live_state` with `projection: null` and no `LEAGUE_POLL_FAILED`.
 
+### CORRECTION to the verify line above (the 20:25:06Z soccer-shots reprice) `[lane skill-pocket-reward-reachability, 2026-10-15 21:3xZ]`
+
+That entry's `verify:` reads **"382 rows, `measured`, factor 0.9150"**. True of the `projection.model_skill` NOTE; **overstated as the APPLIED factor.** Measured on the served score: `player_shots` 373 rows split **244 with `skill_reliability=None` / `skill_source=None`** and **129 with `0.915` / `category`**.
+
+The 244 are cancelled by the validated pocket `soccer|player_shots|full|pregame|price=long` — 244 is exactly that bucket's row count — because `layer2_board` consults `measured_bucket_skill.bucket_factor` FIRST and *"a validated bucket outranks the category"*. **This is the designed interaction, not a regression:** the demotion applies where no validated pocket covers the row.
+
+So the reprice did land, and its reach is **~129 rows applied** rather than 382. The error is the one this repo already names — **count the field the CONSUMER reads**; the note is not the applied factor.
