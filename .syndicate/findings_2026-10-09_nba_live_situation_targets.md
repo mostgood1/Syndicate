@@ -814,3 +814,43 @@ Reading:
   - (1) `solver_endgame_pts_per_team` (Δ′ = 0.138) was measured at (0.2, 0.0, 0.2) and must be re-measured at (0.2, 0.2, 0.3) on the calibration lane's disjoint dates, as pre-registered.
   - (2) The Phase 2 live re-gate (§12) must run on the config that carries the new p and Δ (and #5 if adopted). Its projection cache from the #3 config is stale for every checkpoint, since every resume plays through the last 2:00.
   - (3) VALID untouched.
+
+### §7c on the FINAL config (fit_f5_config.json, sha 7fe3d0b70d0d; read 2026-10-15 16:04Z): HOLDS
+FIT-optimal p = **(0.2, 0.2, 0.3)**, unchanged. Last-2:00 points error at it: −0.00 / +0.31 / −0.01 (n 157 / 108 / 123); at p=0: −1.30 / −1.20 / −1.49. Trailer FTA still low (sim 3.55 / 3.71 / 4.04 vs real 4.76 / 5.25 / 4.52), read-only. Δ″ = 0.262 stands.
+
+### §12 RESULT (read 2026-10-15 18:35Z): live re-gate on the FINAL Phase 2 config, REGULAR FIT window -- **NOT PASSED** by the pre-registered rule, but the totals LEVEL is fixed
+
+Run: fit_f5_config.json via `--phase2-config`, inputs_p2, 100 sims; n = 786 / 780 / 777 / 772. Refused: `no_pregame_inputs` 24-25 (the 2 REC_FAIL dates), `pbp_score_mismatch` ≤ 4, `on_floor_incomplete` 2.
+
+| checkpoint | total: native − pregame_rate | total bias native (pr) | margin: nat − pr | ML log-loss: nat − pr | 80% cov total |
+|---|---|---|---|---|---|
+| end Q1 | **+0.23 [+0.02, +0.44] worse** | **+0.19** (+0.95) | −0.07 [−0.25, +0.11] | **−0.006 [−0.011, −0.001] better** | 0.78 |
+| end Q2 | +0.18 [−0.01, +0.36] n.s. | +0.11 (+0.74) | −0.00 [−0.17, +0.16] | **−0.005 better** | 0.77 |
+| end Q3 | +0.08 [−0.04, +0.21] n.s. | **+1.14** (+1.31) | −0.11 [−0.23, +0.01] | **−0.005 better** | 0.75 |
+| 5:00 Q4 | +0.06 [−0.06, +0.18] n.s. | +0.06 (−1.08) | **−0.09 [−0.17, −0.00] better** | +0.002 n.s. | 0.77 |
+
+**Pre-registered rule, line by line:**
+- Total better at Q1-Q3: FAIL (Q1 worse; Q2/Q3 not separable).
+- Margin not worse (CI upper ≤ +0.05): Q1 and Q2 FAIL by the letter (ties with upper +0.11 / +0.16). Q3 and Q4 pass.
+- ML not worse: PASS everywhere, and BETTER at Q1-Q3.
+- |total bias| < 1.0: FAIL at end Q3 (+1.14). pregame_rate's +1.31 there points to the remaining-period truth at that checkpoint, not to native alone. Still a fail as written.
+
+**Native Phase 2 vs native PRODUCTION config, paired on the same games (read, not gated):**
+
+| checkpoint | total |err| P2 − prod | margin |err| P2 − prod | total bias prod -> P2 |
+|---|---|---|---|---|
+| end Q1 | **−0.52 [−0.83, −0.21]** | **−0.38 [−0.59, −0.16]** | +3.98 -> +0.19 |
+| end Q2 | −0.12 [−0.36, +0.12] | −0.14 [−0.34, +0.05] | +2.57 -> +0.11 |
+| end Q3 | **−0.16 [−0.31, −0.03]** | **−0.18 [−0.30, −0.04]** | +2.23 -> +1.14 |
+| 5:00 Q4 | −0.00 n.s. | −0.02 n.s. | −0.10 -> +0.06 |
+
+**Reading:**
+- Phase 2 removes the overshoot that failed §9: early bias goes from +4 / +2.6 to +0.2 / +0.1. It improves native on both total and margin, significantly at Q1 and Q3.
+- It now **beats pregame_rate on win probability at Q1-Q3** and on margin at 5:00 Q4.
+- It does NOT yet beat the naive "score + pregame line pro rata" on TOTAL; it ties from Q2 on.
+- The remaining total gap is accuracy, not level. Plausible contributors, unmeasured:
+  - REB −1.4/team (fewer OREB continuations);
+  - the trailer-FTA shape;
+  - the §11 frame gap (31% of sides resume with a sampled five at 5:00 Q4).
+- **Verdict:** shadow -> priced is NOT supported on totals by this gate. On ML (and margin late) the native lens is now measurably better than pregame_rate. Whether to price ML only is a user decision; the gate as written says no.
+- VALID and postseason are untouched, and are graded once with the calibration lane's single VALID read.
