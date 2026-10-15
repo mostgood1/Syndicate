@@ -753,8 +753,7 @@ function renderRecordPage() {
   }
   const scope = R[REC.scope] || {totals: {}, by_sport: {}, series: [], days: 0};
   const lastDay = (scope.series[scope.series.length - 1] || {}).date;
-  document.getElementById("dayLabel").innerHTML = esc(REC.scope === "beta" ? "Beta record" : `Official record · since ${dayShort(R.official_start)}`)
-    + (REC.scope === "beta" ? ` <span class="chip beta">Beta</span>` : "");
+  document.getElementById("dayLabel").innerHTML = esc(REC.scope === "beta" ? `Beta record · before ${dayShort(R.official_start)}` : `Official record · since ${dayShort(R.official_start)}`);
   document.getElementById("asOf").textContent = lastDay ? `Through ${dayName(lastDay)} · updated ${ctDateTime(R.generated_at)}` : "";
   document.getElementById("viewbar").innerHTML = ["official", "beta"].map(k =>
     `<button type="button" class="btn ${REC.scope === k ? "on" : ""}" data-scope="${k}" aria-pressed="${REC.scope === k}">${k === "official" ? "Official" : "Beta (before " + esc(dayShort(R.official_start)) + ")"}</button>`).join("");
