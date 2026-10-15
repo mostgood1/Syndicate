@@ -2946,3 +2946,45 @@ for G4; no VALID number computed):
 - **Bootstrap:** 2,000 resamples of games, seed 20261015. PASS = 95% CI upper < 0.
 - **Postseason:** the same metrics, with season_type 3 and 5. Reported; "worse beyond SE" = CI lower > 0.
 - **G3:** P3's, as specified.
+
+## THE VALID READ — RESULT 2026-10-15 23:12Z (read ONCE): **FAIL**. FINAL does not clear every gate; nothing is enabled
+
+**Population:** regular VALID 2026-03-01..04-12, 334 of 335 games paired. PROD vs FINAL, game-clustered paired
+bootstrap (2,000). Raw output is in `C:	mpball_scalid_read_regular.txt` / `valid_read_post.txt`.
+
+| gate | n | PROD | FINAL | FINAL − PROD [95% CI] | verdict |
+|---|---|---|---|---|---|
+| **G1** period lines Brier (q1–q4, h1 totals + spreads) | 96 games, 706 markets | 0.2679 | 0.2720 | **+0.0040** [−0.0016, +0.0096] | **FAIL** |
+| G2 full-game Brier (spread + total) | 321 | 0.2578 | 0.2561 | −0.0017 [−0.0079, +0.0044] | ✗ |
+| G2 \|margin err\| | 334 | 11.37 | 11.05 | **−0.32** [−0.64, −0.005] | ✓ |
+| G2 \|total err\| | 334 | 14.98 | 14.94 | −0.05 [−0.44, +0.36] | ✗ |
+| **G2** | | | | | **FAIL** |
+| **G4** player mean \|err\| (min, pts, reb, ast, threes) | 334 games, 6,592 player-games | 3.1375 | 3.1365 | −0.0010 [−0.0017, −0.0004] | **PASS** (negligible size) |
+| G3 (live, P3) | — | — | — | P3 runs it now, in the same pass | — |
+
+**Readings, regular VALID:**
+- total bias PROD −2.44 vs FINAL −2.82;
+- margin-error SD (draws vs actual) 23.24 → 20.06;
+- G4 per stat: min 6.297 / 6.297 (minutes are inputs, identical), pts 4.867 / 4.863, reb 1.914 / 1.913,
+  ast 1.419 / 1.418, threes 0.912 / 0.912.
+
+**Postseason** (play-in + playoffs, 82 of 87 games paired; reported, not gated):
+- G1: −0.0072 [−0.0170, +0.0022], n.s.
+- G2: Brier −0.0150 [−0.0288, −0.0010] ✓, |margin| −0.53 [−0.96, −0.07] ✓, **|total| −2.43 [−3.79, −0.98] ✓**.
+- G4: −0.0007 [−0.0014, −0.0000].
+- Total bias PROD **+10.45** vs FINAL **+3.89**.
+- FINAL is never worse beyond its SE, so nothing is blocked for the postseason. It is clearly better on full-game totals
+  and margins, but that is not the gated population.
+
+**VERDICT by the pre-registered rule: FAIL.**
+- G1 (FINAL nominally worse on period lines) and G2 (only margin clears) fail on regular VALID; G4 passes trivially.
+- **Per the user's rule, NOTHING is enabled in production.** No re-tuning on this window.
+
+**What the read says:**
+- FINAL fixed the margin SPREAD: margin |err| −0.32, error SD 23.2 → 20.1. It is much better on postseason totals.
+- On regular-season VALID the period-line and full-game PRICING gains are not there. Period-line Brier is, if anything,
+  slightly worse.
+- Together with P3's FIT disclosure (late-Q4 ML worse), the Phase 2 mechanisms improved the simulated game's SHAPE
+  more than its betting probabilities.
+- Candidates for a later round, NOT on this window: the late-game win-probability regression (P3's lead), and period
+  shares (the Q4 slope residual).
