@@ -977,6 +977,7 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
   - An Ask probe must use the button's payload (nested `context`, "What's the case for and against ...") and a shortlist fetched after the last rebuild: `resolve_board_row` is exact-or-nothing.
   - Offline `read_layer2_shortlist` needs the web's `SYNDICATE_REFRESH_STATE_*` + `SYNDICATE_REPORTS_ROOT` keys. They are set at supervisor `up`, not in local_production.env.
 - **Not built:** past-line overlays (closing lines exist only from 2026-09-30).
+- **Past-game lines on prop bars `[verified 2026-10-15 00:45Z, lane past-line-overlays, 12828120]`:** each bar carries that game's OWN main closing line (`recent_lines`, from `settlement_inputs/closing_lines_<date>.csv`, exact date; main = closing over price closest to even; tie, unpriced, alternate or interval = none), drawn as a tick with the hit rate against those lines and the window (`recent_lines_from`, first file 2026-09-30). NFL/NCAAF join through `game_dates` (schedule game_id / CFBD id -> Central date). Served: NHL 164/168, MLB 180/180, NFL 521/829, soccer 1,020/1,362 dated props with a line; a player whose past closes had no line (e.g. NCAAF Anytime-TD-only) correctly gets none.
 
 ## [layer2-suggested-opps] SUGGESTED OPPS -- a per-line bet flag on top of the full board; the paper book stakes only it `[2026-10-13, lane layer2-suggested-opps, session 9e18a0e7; LIVE on the fleet 16:49:10Z, verified served]`
 

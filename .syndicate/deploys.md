@@ -49497,3 +49497,29 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
   - Top anytime model edges: Lucas Bartlett +12.67 (market EV -6.40), Kimito Nono +12.06, German Berterame +10.26.
 - **Board:** the served `/api/board/layer2-shortlist?date=2026-10-14` (200 rows) holds NO live soccer prop. Its live soccer rows are corners and h2h. The anytime rows now carry a model edge and are ranked, but they rank below on market EV (the best has EV -6.4%). That is the board's ranking policy, not this join.
 - **Still OPEN, as a lead:** calibration of live P(score) against settled outcomes (the lane's falsification test asks for it "before relying on them for ranking"). Soccer prop settlement now grades anytime (aa8a2d98), so it can be read from the ledger after a few slates.
+
+## 2026-10-15 00:45Z -- past-line overlays on the served board -- past-line-overlays reading (MET)
+- **Code:** 12828120 (on main 10-14 ~19:40Z). Loaded by OTHER lanes' restarts, no deploy by this lane (user: "next restart"). Fleet disk got it at 20:18:56Z (wnba-fixture-identity-native ff to 44508f56). Refresh-worker was restarted under a claim by news-availability-gate at 22:53:13Z and runs code=abed0ccc; web runs code=3dcbb4fb. Both contain 12828120 (`merge-base --is-ancestor`, read 00:44Z).
+- **Gate:**
+  - Stored shortlists rewritten after the 22:53Z restart: 10-14 at 00:36:51Z and 10-15 at 23:10:57Z; none exist for 10-16/10-17.
+  - STATE_PERSIST_BEGIN 00:38:22Z was followed by LOOP_ITERATION 00:39:36Z. Page fetched 00:45:28Z, 20,719,700 B.
+  - The template caption "own line" is served; every row carries `recent_lines_from` = 2026-09-30 (1,885 rows).
+- **Served `ranked_all` prop rows:**
+
+  | Sport | Dated props with `recent_lines` | Bars with a line | Note |
+  |---|---|---|---|
+  | NHL | 164/168 | 899/1,637 | |
+  | MLB | 180/180 | 1,013/1,800 | |
+  | NFL | 521/829 | 844/5,016 | via the new `game_dates`; weeks <= 3 predate 09-30 |
+  | Soccer | 1,020/1,362 | 1,175/9,149 | |
+  | NCAAF | 0/41 | 0 | CORRECT, see below |
+  | NBA | -- | -- | no dated props; opener 10-20 |
+  | WNBA | -- | -- | season over |
+
+  - **NCAAF 0/41 is correct.** All 41 are Thursday/Friday games. All 41 get game_dates and all 41 players are in the closing files, but only as line-less "Anytime TD" rows (e.g. Quinn Henicle 10-03 and 10-10). Their dates align exactly. The offline Saturday sample was 30/40.
+- **Hand-checks vs settlement_inputs (all MATCH):**
+  - MacKinnon SOG 10-10: lines 3.5 (over -165) and 4.5 (over +133), so the main line is 4.5; served 4.5. This case exercises the main-line rule.
+  - Freeman batter_hits 10-12: single line 0.5; served 0.5.
+  - Daniel Jones Passing TDs W5 (game date 10-04): single line 1.5; served 1.5.
+- **Verdict: MET.**
+- **Instrument note:** `ps -o lstart` prints CENTRAL time. Parsing it with `date -u -d` made the 22:52Z refresh-worker look started at 17:52Z, i.e. before the ff. `role_restarts.jsonl` gave the true restart (22:53:13Z).
