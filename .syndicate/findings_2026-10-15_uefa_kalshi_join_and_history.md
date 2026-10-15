@@ -60,3 +60,11 @@ The belief listed as UNVERIFIED in the Stage 0 checkpoint ("Kalshi UEFA markets 
 - (a) Ratings for out-of-scope clubs are feasible from results plus shots.
 - (b) League offsets are feasible for the 8 European leagues: strong for the big 5, thin for Belgium/Eredivisie, none for MLS/Championship.
 - Fetch cost: about 60 scoreboard requests for results, and about 2,500–6,800 summaries for team stats (2021–25 vs 2014–25).
+
+## CORRECTION 2026-10-15 23:40Z — "Kalshi moneylines never price in any sport" was TOO STRONG
+
+- **Measured on the served fleet board** (`/api/board/layer2-shortlist?sport=soccer`, read ~23:39Z, after the refresh-worker restart at 23:36:42Z onto the alias code): 46 rows belong to UCL events (by event_id against the fleet's `ucl/api/odds/game_odds_current.csv`). **24 UCL h2h rows across 16 of 18 fixtures carry `price_source=kalshi`** (also `quote_source`, `best_any_book.bookmaker`, `venue_basis.venue`).
+- **The board path is `venue_quote_fanin.py`, not `join_kalshi_to_board`.** The `None` vs `0.0` h2h key bug (reproduced) is real INSIDE `join_kalshi_to_board`. That function feeds `pipeline/portfolio_commit.py`'s Kalshi price and ticker resolvers and the `[kalshi_odds] BOARD_JOIN` report, not the board's venue quotes.
+- **So the real gap** [inference from code, NOT measured]: the board can show Kalshi as the best moneyline price while the commit step cannot resolve a Kalshi contract for it. What `portfolio_commit` does with such a row is the first thing to measure. That is the corrected session card, replacing the earlier one.
+- Fleet BOARD_JOIN at 23:37:37Z (first build on the alias code): matched=308, no_matching_board_row=3076. The line has no per-series breakdown, so the UCL share of the 308 is NOT read from it.
+
