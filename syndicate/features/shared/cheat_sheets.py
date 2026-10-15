@@ -1133,16 +1133,22 @@ PICK_RECENT_FIELDS = ("recent_values", "recent_dates", "recent_opponents", "rece
 SIM_BACKS = frozenset({"agrees", "live_agrees"})
 SIM_AGAINST = frozenset({"disagrees", "live_disagrees", "contradicts", "live_contradicts", "neutral"})
 PICK_LABEL, PRICE_PLAY_LABEL = "SYNDICATE PICK", "PRICE PLAY"
+# BACKING IS A MARGIN, NOT A SIGN (user 2026-10-15, "1-point floor"). The board's `sim_view` has no floor: any edge above
+# zero reads `agrees`. From 10-20 NBA totals serve a market-anchored blend with 5% weight on the sim (preseason 0), so
+# the served sim sits ~0.2 pts off the market and would read as backing on a view that is 95% the market's. The sim
+# must clear the market by a full point. Without both probabilities the margin is unknown: PRICE PLAY, never PICK.
+SIM_BACKING_FLOOR = 0.01
 
 
 def sim_backs_pick(pick: Mapping[str, Any]) -> bool:
     view = str(pick.get("sim_view") or "").strip().lower()
-    if view in SIM_BACKS:
-        return True
     if view in SIM_AGAINST:
         return False
     p_model, p_market = pick.get("p_model"), pick.get("p_market")
-    return isinstance(p_model, (int, float)) and isinstance(p_market, (int, float)) and p_model > p_market
+    if not (isinstance(p_model, (int, float)) and isinstance(p_market, (int, float))):
+        return False
+    # `agrees` and the no-view fallback (past the board's 15-point cap) alike: the sim's probability over the market's.
+    return p_model - p_market >= SIM_BACKING_FLOOR - 1e-9
 
 
 def pick_label(pick: Mapping[str, Any]) -> str:
