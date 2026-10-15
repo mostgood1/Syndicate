@@ -2277,3 +2277,9 @@ command. A filter on a guard's output is a way to not see the guard.
 - **Rule: read the mutation before believing the survival.** A survivor is a claim about three different things and only the diff distinguishes them. Checking the anchor count is not enough — mine matched, applied cleanly, and mutated nothing that mattered.
 - **Corollary that saved this lane from a worse error:** the existing suite caught MY test asserting `skill_note(...)["status"] == "measured"` when `test_note_is_compact_and_carries_no_status` documents that the note deliberately carries no status (it is added by `normalize_existing_note` at the row). **When a new test fails against old code, suspect the new test first** — the old one has survived more days.
 - **And the substrate lesson, which is the reason the lane existed:** the omission this fix closed was CORRECT when written and carried its own reason ("no board row carries `player_shots`"). A reason that is a fact about today is an **expiry date**, and nothing watches it. 383 rows ranked ~9.3% too high for ten days because a true sentence stopped being true. Same family as `documented caveat is a scheduled defect`, now with a measured cost.
+
+## 2026-10-15 — A ledger entry written BEFORE `session_worktree.py land` cites SHAs the land's rebase replaces `[lane soccer-uefa-competitions]`
+
+- **What happened:** twice in one session, a checkpoint cited the branch's SHAs (`61415354` -> `a0954c2e` -> `f9d06686`). Each rebase (one manual, then `land`'s own) rewrote them, so the ledger named commits that never reached main.
+- **Rule:** cite a commit by SHA only after it is on origin/main. Read the SHA off `git log origin/main` after the land, never from the branch. If the ledger must ship in the same land, cite the commit SUBJECT, then correct it to the SHA in a follow-up ledger commit. Repeats the memory rule "never write an unseen SHA"; this is its rebase form.
+
