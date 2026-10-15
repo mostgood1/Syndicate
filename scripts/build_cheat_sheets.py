@@ -441,16 +441,24 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
             })
     # Player vs player (user 2026-10-15: "add player vs player matchups like batter vs pitcher"): MLB batter vs the
     # probable starter, pitcher vs the opposing roster -- StatsAPI, cached for the day on the data root.
-    if sport == "mlb" and out_rows and pvp_cache is not None:
-        from syndicate.features.mlb import batter_vs_pitcher as bvp
-
+    # NHL (user 2026-10-15: "add skater vs goalie for NHL"): skater vs the opposing likely starter, goalie vs today's
+    # opponent -- the NHL's public API; finished games' shot lists cached for good.
+    if sport in ("mlb", "nhl") and out_rows and pvp_cache is not None:
         try:
-            pvp = bvp.matchups(out_rows, date=selected_date, api=bvp.StatsApi(pvp_cache))
+            if sport == "mlb":
+                from syndicate.features.mlb import batter_vs_pitcher as pvp_mod
+
+                pvp = pvp_mod.matchups(out_rows, date=selected_date, api=pvp_mod.StatsApi(pvp_cache))
+            else:
+                from syndicate.features.nhl import skater_vs_goalie as pvp_mod
+
+                pvp = pvp_mod.matchups(out_rows, date=selected_date,
+                                       api=pvp_mod.NhlApi(pvp_cache, pvp_cache.parent.parent / ".nhl_pbp"))
         except Exception as exc:  # noqa: BLE001 -- a missing matchup is a blank cell, never a failed sheet
-            print(f"CHEAT_SHEET mlb player-vs-player failed: {type(exc).__name__}: {exc}", flush=True)
-            pvp = {}
+            print(f"CHEAT_SHEET {sport} player-vs-player failed: {type(exc).__name__}: {exc}", flush=True)
+            pvp, pvp_mod = {}, None
         for r in out_rows:
-            r["pvp"] = pvp.get((bvp._norm(r.get("player")), str(r.get("market") or "").strip().lower()))
+            r["pvp"] = pvp.get((pvp_mod._norm(r.get("player")), str(r.get("market") or "").strip().lower())) if pvp_mod else None
     for g in games.values():
         codes = sorted(g.pop("team_codes", set()))
         if sport == "nfl" and dvp.get("teams"):
@@ -582,7 +590,7 @@ def main(argv: list[str] | None = None) -> int:
             continue
         sheet = build_sport(sport, rows, selected_date=selected, cap=args.cap or DEFAULT_CAPS.get(sport, 80), dvp=dvp,
                             context=context, positions=positions,
-                            pvp_cache=data_root / "cheatsheets" / ".mlb_cache" / selected)
+                            pvp_cache=data_root / "cheatsheets" / f".{sport}_cache" / selected)
         sheet = merge_with_record(sheet, prior, now=datetime.now(timezone.utc))
         sheet["phase"] = season_phase(sport, selected)
         if not sheet["rows"] and not sheet.get("game_lines") and prior is None:

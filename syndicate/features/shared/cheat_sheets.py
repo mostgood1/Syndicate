@@ -395,6 +395,15 @@ def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25) -> dict[str, l
             key=lambda i: -_pvp_pa(rows[i])))[:top],
         "pvp_pitchers": _one_per_pitcher(rows, [i for i in idx if _pvp_kind(rows[i]) == "pitcher_vs_lineup"
                                                 and _pvp_pa(rows[i]) >= PVP_MIN_PA and featurable(rows[i])])[:top],
+        # NHL: skaters vs the opposing likely starter (2+ meetings), goalies vs today's opponent -- one row a player.
+        "pvp_skaters": _one_per_player(rows, sorted(
+            (i for i in idx if _pvp_kind(rows[i]) == "skater_vs_goalie" and _pvp_games(rows[i]) >= PVP_MIN_GAMES
+             and featurable(rows[i])),
+            key=lambda i: (-_pvp_games(rows[i]), -(((rows[i].get("pvp") or {}).get("line") or {}).get("sog") or 0))))[:top],
+        "pvp_goalies": _one_per_player(rows, sorted(
+            (i for i in idx if _pvp_kind(rows[i]) == "goalie_vs_team" and _pvp_games(rows[i]) >= PVP_MIN_GAMES
+             and featurable(rows[i])),
+            key=lambda i: -_pvp_games(rows[i])))[:top],
         # Everything on the board, for a game's own sheet (the page shows it there only).
         "every_prop": sorted(idx, key=lambda i: (str(rows[i].get("market")), str(rows[i].get("player")),
                                                  rows[i].get("line") if isinstance(rows[i].get("line"), (int, float)) else 0,
@@ -487,6 +496,13 @@ def _matchup_extremity(row: Mapping[str, Any]) -> float:
 
 
 PVP_MIN_PA = 3     # a batter-vs-pitcher line under 3 plate appearances is not shown as a matchup
+
+
+PVP_MIN_GAMES = 2   # NHL meetings: one game against a goalie is a box score, not a matchup line
+
+
+def _pvp_games(row: Mapping[str, Any]) -> int:
+    return int((((row.get("pvp") or {}).get("line")) or {}).get("games") or 0)
 
 
 def _pvp_kind(row: Mapping[str, Any]) -> str | None:
