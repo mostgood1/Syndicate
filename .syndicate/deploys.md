@@ -49858,3 +49858,24 @@ The copy has no cache, `trust_env` off unless `STATSAPI_TRUST_ENV`, an (8 s, 8 s
 ## 2026-10-15 20:12Z -- NOTE: bffcaebf (soccer starter club moves + comma-joined club labels) is LIVE, carried by the 20:05:48Z ff 1cef9c79 -> cce22975 `[lane soccer-starter-club-move (closed), session b9bb5f37]`
 - **Check:** `git merge-base --is-ancestor bffcaebf HEAD` on `~/Syndicate` returns true (fleet HEAD cce22975). Per-run code: the next pre-kickoff odds run loads it, with no restart.
 - **verify -- OWED:** on the next slate with a moved starter, `SOCCER_STARTER_CLUB_MOVED` appears in the odds-job output, and `lineup_reach.py` shows more confirmed sides at 11 (10-14 baseline {11: 10, 10: 12}). The first candidates are the 10-17/18 slates.
+
+## 2026-10-15 20:25:06Z — refresh-worker TERM/respawn (pid 524658 -> 606824): the soccer-shots reprice `[lane soccer-shots-reprice-restart, session 4ab694ed]`
+
+**WHAT.** Fleet fast-forwarded `05d30fe9 -> 1cef9c79` (my commit, on `origin/main`), then `kill -TERM` on the refresh-worker so the supervisor respawned it with the new code. Supervisor confirmed it: `[refresh-worker] exited code=0 after 16148s -- restarting in 5s` then **`CLAIMED_RESTART code=0 holder=soccer-shots-reprice-restart`**, new pid 606824.
+
+**WHY.** `1cef9c79` registers `soccer|player_shots` (ESTABLISHED loss, ROI -22.4% CI [-40.6%, -1.7%]) and `soccer|player_assists` (parity) in `measured_market_skill`. Until a restart the running process had no entry for either and the rows read `unmeasured` at factor 1.0 — `player_shots` ~9.3% above what its own measurement allows.
+
+**verify: THE SERVED BOARD, before and after, cap defeated both times.**
+
+| market | 19:55:12Z (before) | 20:32:49Z (after) |
+|---|---|---|
+| `player_shots` | 364 rows, `unmeasured`, factor **1.0** | **382 rows, `measured`, factor 0.9150** |
+| `player_assists` | 121 rows, `unmeasured`, factor 1.0 | **130 rows, `measured`, factor 1.0** |
+
+`player_assists` moving to `measured` at the SAME 1.0 is the predicted outcome, not a non-event: its CI straddles zero, so the registration fixed the LABEL ("model never backtested") and left the score alone. The reprice landed **7m43s** after the TERM, which is inside the board build's 11.3min typical.
+
+**SAFETY, and one deliberate narrowing stated plainly.** Claim acquired (gated on exit code) before anything. `check_deploy_safety` at 20:07Z read **NOT CLEAR** — an MLB sim (`run_mlb_daily_sim_job.py --sims 1000`, `reason=fingerprint_change`, 3min old), a `daily_update` chain under it, three live-odds jobs and an unpersisted board build. **I did not restart then.** I watched for 10 minutes: by 20:20Z sims were 0 and stayed 0 for five consecutive cycles, leaving the board build as the only blocker. **That blocker is structural, not transient** — this worker writes continuously (measured: no 45s gap in 7 minutes of polling), so `check_deploy_safety` can never return CLEAR on it. Waiting for CLEAR would have meant never restarting, so I narrowed the condition to **no sim and no non-resumable job**, accepting the loss of one mid-cycle board build the next tick rebuilds. The guard's own message contemplates this ("Wait, or proceed deliberately"); re-verified in the SAME step as the kill, because a sim can start between a reading and a TERM.
+
+**RIDE-ALONG, checked before the ff.** 29 commits, `vendor/` untouched (0 files). The NBA work is default-off (`b5ee66cb` env-gated `SYNDICATE_NBA_LIVE_PRICED`; `9beb1677` "default absent = unchanged"), and `bffcaebf` (soccer lineup club labels) was already recorded by its owner as "rides the next ff". No unverified default-on board change.
+
+**WHAT THIS DOES NOT DO.** The `skill_pocket` reward asymmetry is unchanged: a bucket measured to BEAT the market still earns factor 1.0, same as never-backtested. This completes the penalty side only.
