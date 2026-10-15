@@ -2538,3 +2538,37 @@ tests/test_basketball_engine_two_point_split.py (NEW). P3 is told; it is a share
 5. The full FIT on the final config.
 6. Write `fit_f5_config.json` for P3's §7c / live re-gate re-run.
 7. The single VALID read.
+
+### Phase 2 #5a — RESULT 2026-10-15 02:00Z: NOT CONFIRMED by the letter (3P% misses its band by +0.008); every other target met
+
+**Run:** `P5_on`, the 12 sweep dates, the PK2 config + `fg2_from_two_point_split`. 17,400/17,400 calls with levers,
+0 errors.
+- Code: 361a5286 (main), corpus parity 5,400/5,400 PASS with it off.
+- Paired against `PK2_check` (the same config, switch off), 166 team-games without OT. The subsample's real is shown
+  beside the FIT real.
+
+| reading | PK2 (off) | **P5 (on)** | real (subsample / FIT) | rule | |
+|---|---|---|---|---|---|
+| 3P% | 0.3978 | **0.3748** | 0.3611 / 0.3594 | 0.3594 ± 0.008 | **✗ (+0.015)** |
+| 2P% | 0.5152 | **0.5545** | 0.5446 / 0.547 | ± 0.012 | ✓ |
+| 3PM/team | 14.42 | **13.45** | 13.28 / 13.26 | ± 0.4 | ✓ |
+| total bias | +0.08 | +0.32 | 0 | < 0.5 | ✓ |
+| FTA / foul-outs / P(6th \| 5th) / closers-on | 22.79 / 0.212 / 0.214 / 0.400 | 22.67 / 0.205 / 0.208 / 0.400 | — | #3 guards | ✓ |
+| H2 / Q4 / S8 | −0.179 / −0.088 / 14.83 | −0.178 / −0.095 / 14.59 | — | | ✓ |
+| FGA / 3PA | 88.24 / 36.24 | 88.01 / 35.89 | 89.08 / 36.77 | reading | |
+| AST / REB / STL / BLK | 23.91 / 43.52 / 7.92 / 5.11 | 24.55 / 42.25 / 7.97 / 5.13 | 27.20 / 43.81 / 8.32 / 4.94 | reading | |
+
+**Reading:**
+- The switch does what it was built for. 3P% error falls 0.037 → 0.014, 2P% is fixed (−0.029 → +0.010), and **3PM
+  (the props quantity) is fixed: +1.14 → +0.17/team.**
+- 3P% still runs +1.4 points over its subsample real. 3PM matches only because 3PA fell 0.35 (more 2P makes, fewer
+  offensive-rebound continuations).
+- Relative to real, 2P% runs 1.018× and 3P% 1.038×. Since the EXACT multiplier is shared, the residual sits in the
+  per-player 3P% PRIOR itself.
+- Suspect (untested): low-volume shooters' per-minute 3P% priors are unshrunk and clipped up to 0.50.
+- REB fell 1.3 (fewer misses) to −1.56 vs real. AST is still −2.65 (#5b, its own step).
+- Trips/possession 0.00792 against the frozen s′ 0.00802 (−1%, well inside 20%).
+
+**Not overridden.** The user decides between:
+- (a) carrying #5a into the final config with the 3P% guard overridden (3PM, the priced quantity, passes);
+- (b) pre-registering #5c, 3P% prior shrinkage for low-volume shooters, on top of #5a first.
