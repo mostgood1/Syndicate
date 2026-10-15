@@ -181,6 +181,11 @@ tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first
 .checks { grid-column: 1 / -1; list-style: none; margin: 2px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 4px 18px; }
 .checks li { font-size: 13px; padding-left: 20px; position: relative; }
 .checks li::before { content: "✓"; position: absolute; left: 2px; color: var(--accent); font-weight: 800; }
+/* A point's tone: a record that backs the side is ticked, one that argues against it is flagged, the rest is context
+   (user 2026-10-15: a 0-in-3 record vs this team is shown, never ticked). */
+.checks li.ctx::before { content: "•"; color: var(--accent2); left: 5px; }
+.checks li.against::before { content: "!"; color: #ffbe3d; left: 6px; }
+.checks li.against b { color: #ffbe3d; }
 .checks li b { color: var(--accent2); font: 800 11.5px var(--display); letter-spacing: .06em; text-transform: uppercase; margin-right: 5px; }
 .xframe .ptile b { font-size: 26px; } .xframe .ptile span { font-size: 13px; } .xframe .checks li { font-size: 16px; }
 @media (max-width: 760px) { .prop.pick { grid-template-columns: 1fr; } .ptiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -300,7 +305,7 @@ function pickRow(p, i) {
   const off = p.on_board === false && !started(p.commence_time) ? `<span class="chip neutral" title="The board no longer suggests this at the current price">Not on the board now</span>` : "";
   const proj = p.kind === "prop" && typeof p.projected === "number" ? `proj ${p.projected.toFixed(1)} vs ${p.line}` : "sim win rate";
   const why = [`<li><b>Price</b>${odds(p.price)} beats the no-vig fair ${odds(p.fair_price)} by ${evs(p.ev_pct)}</li>`]
-    .concat((p.points || []).map(pt => `<li>${pt.label ? `<b>${esc(pt.label)}</b>` : ""}${esc(pt.text)}</li>`));
+    .concat((p.points || []).map(pt => `<li class="${pt.tone === "for" ? "for" : pt.tone === "against" ? "against" : "ctx"}">${pt.label ? `<b>${esc(pt.label)}</b>` : ""}${esc(pt.text)}</li>`));
   return `<div class="prop pick" data-pk="${i}">
     <div class="who">${face({...p, player: p.display_name})}
       <div class="line1"><span class="chip value">Syndicate pick</span>${sim}${off}${live}${card}</div>
@@ -313,7 +318,7 @@ function pickRow(p, i) {
       <div class="ptile"><span>SmartSim</span><b>${pct(p.p_model)}</b><i>${esc(proj)}</i></div>
       <div class="ptile"><span>Edge</span><b class="${p.ev_pct > 0 ? "pos" : ""}">${evs(p.ev_pct)}</b><i>vs the fair price</i></div>
     </div>
-    <ul class="checks">${why.slice(0, 6).join("")}</ul>
+    <ul class="checks">${why.slice(0, 8).join("")}</ul>
   </div>`;
 }
 function picksBlock(d, game) {

@@ -48,17 +48,17 @@ body { background: radial-gradient(900px 520px at 12% -6%, rgba(31,168,255,.28),
 .stat .s { font: 600 18px/1.15 var(--body); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .stat.hot .v { color: var(--green); text-shadow: 0 0 16px rgba(140,255,46,.4); }
 .lower { display: grid; grid-template-columns: 1fr 1.25fr; gap: 16px; flex: 1; min-height: 0; }
-.box { border: 2px solid var(--edge); border-radius: 14px; background: var(--panel); padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.box { border: 2px solid var(--edge); border-radius: 14px; background: var(--panel); padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: hidden; }
 .box h3 { font: 900 28px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--green); }
 .box.risk h3 { color: var(--amber); }
 .box ul { list-style: none; padding: 0; display: grid; gap: 9px; }
-.box li { font: 600 21px/1.25 var(--body); padding-left: 32px; position: relative; color: #dfe8ee; }
+.box li { font: 600 var(--li, 21px)/1.25 var(--body); padding-left: 32px; position: relative; color: #dfe8ee; }
 .box li::before { content: "\2714"; position: absolute; left: 0; top: 0; color: #04110a; background: var(--green); width: 22px; height: 22px;
   border-radius: 5px; font-size: 15px; display: grid; place-items: center; }
 .box.risk li::before { content: "!"; background: var(--amber); font-weight: 800; }
 .chart svg { width: 100%; height: auto; display: block; }
 .chart .cap { font: 700 18px/1.2 var(--body); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
-.right { display: grid; gap: 16px; grid-template-rows: auto auto; }
+.right { display: grid; gap: 16px; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; }
 .foot { border-top: 3px solid var(--green); padding-top: 14px; display: flex; justify-content: space-between; align-items: center;
   font: 800 25px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .foot b { color: var(--white); } .foot .x { color: var(--blue); }
@@ -84,4 +84,18 @@ body { background: radial-gradient(900px 520px at 12% -6%, rgba(31,168,255,.28),
   </div>
   <div class="foot"><span><b>Data driven</b> · <b>Discipline</b> · <b>Long-term edge</b></span><span class="x">@SyndicateROI</span></div>
   <div class="fine"><span>Every play is graded at the closing line and the result. We post the wins. We post the losses.</span><span>21+ · Bet responsibly</span></div>
+  <script>
+  // Every bullet is a whole statement, never cut with "..." (user 2026-10-15), so a long case shrinks the list type
+  // until both boxes fit the 1080 x 1350 frame -- 21px down to 15px.
+  (function () {
+    function fit() {
+      var boxes = document.querySelectorAll(".lower .box:not(.chart)"), size = 21;
+      var over = function () { return Array.prototype.some.call(boxes, function (b) { return b.scrollHeight > b.clientHeight + 1; }); };
+      document.documentElement.style.setProperty("--li", size + "px");
+      while (over() && size > 15) { size -= 1; document.documentElement.style.setProperty("--li", size + "px"); }
+    }
+    fit();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+  })();
+  </script>
 </body></html>

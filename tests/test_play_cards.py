@@ -149,12 +149,36 @@ def test_ask_the_syndicates_case_becomes_short_labelled_points():
               "Season metrics, 2,880 pitches: xwOBA Junior Caminero 0.410 (73rd of 461); Barrel rate Junior Caminero 13.3% (41st of 461); "
               "Hard-hit rate Junior Caminero 50.4% (27th of 461).")
     pts = cs.ask_points(detail, subject="Junior Caminero", limit=8)
-    assert pts == [{"label": "Recent form", "text": "over 0.5 in 7 of the last 10 games (avg 1)"},
-                   {"label": "Splits", "text": "vs RHP .265 AVG, 72 HR in 1140 PA"},
-                   {"label": "Vs this team", "text": "over 0.5 in 12 of 19 games since 2024-09-12"},
-                   {"label": "Matchup", "text": "vs Gavin Williams (career) 2 hits in 10 PA, 1 HR, 3 K, 0 BB"},
-                   {"label": "Season", "text": "Hard-hit rate 50.4% (27th of 461)"},
-                   {"label": "Season", "text": "Barrel rate 13.3% (41st of 461)"}]
+    assert pts == [{"label": "Recent form", "text": "over 0.5 in 7 of the last 10 games (avg 1)", "tone": "for"},
+                   {"label": "Splits", "text": "vs RHP .265 AVG, 72 HR in 1140 PA", "tone": ""},
+                   {"label": "Vs this team", "text": "over 0.5 in 12 of 19 games since 2024-09-12", "tone": "for"},
+                   {"label": "Matchup", "text": "vs Gavin Williams (career) 2 hits in 10 PA, 1 HR, 3 K, 0 BB", "tone": ""},
+                   {"label": "Season", "text": "Hard-hit rate 50.4% (27th of 461)", "tone": ""},
+                   {"label": "Season", "text": "Barrel rate 13.3% (41st of 461)", "tone": ""}]
     nfl = cs.ask_points("Matchup: over 1.5 in 4 of 6 vs ARI; ARI has allowed 32.4 points a game (5 games).")
-    assert nfl == [{"label": "Matchup", "text": "over 1.5 in 4 of 6 vs ARI"}, {"label": "Opponent", "text": "ARI has allowed 32.4 points a game (5 games)"}]
-    assert all(len(p["text"]) <= 72 for p in cs.ask_points("Recent form: " + "x " * 200))
+    assert nfl == [{"label": "Vs ARI", "text": "over 1.5 in 4 of 6 meetings", "tone": "for"},
+                   {"label": "Opponent", "text": "ARI has allowed 32.4 points a game (5 games)", "tone": ""}]
+    # User 2026-10-15: "we still have bullets that end with ... instead of full explanations" -- nothing is cut.
+    assert not any(p["text"].endswith(("…", "...")) for p in cs.ask_points("Recent form: " + "x " * 200))
+
+
+def test_a_pick_card_ticks_what_backs_it_and_flags_what_argues_against_it():
+    # A 0-in-3 record vs this team is a RISK on the card, never a tick; what backs the side is listed first, and every
+    # bullet is a whole statement -- the card shrinks its type to fit rather than cutting one short.
+    from syndicate.features.shared import play_cards as pc
+
+    points = [{"label": "Last 10", "text": "over 1.5 in 5 of 10, averaging 1.5 (low 0, high 4)", "tone": ""},
+              {"label": "Last 5", "text": "over 1.5 in 5 of 5 (newest first: 4 v NJD, 2 v MTL, 2 v SEA, 2 v OTT, 2 v WPG)", "tone": "for"},
+              {"label": "Vs PHI", "text": "over 1.5 in 0 of 3 meetings", "tone": "against"},
+              {"label": "Vs position", "text": "PHI allows 24.8 shots on goal a game to forwards, the most of 32 (8 games this season)",
+               "tone": "for"}]
+    pick = _pick(kind="prop", player_name="Emmitt Finnie", display_name="Emmitt Finnie", market="SOG", side="over", line=1.5,
+                 segment="full", points=points, recent_values=[4, 2, 2, 2, 2, 1], recent_opponents=["NJD", "MTL", "SEA", "OTT", "WPG", "NYR"])
+    f = pc.pick_card_fields(pick, sport="nhl", date="2026-10-15", number=1)
+    assert f["why"][1:] == ["Last 5: over 1.5 in 5 of 5 (newest first: 4 v NJD, 2 v MTL, 2 v SEA, 2 v OTT, 2 v WPG)",
+                            "Vs position: PHI allows 24.8 shots on goal a game to forwards, the most of 32 (8 games this season)",
+                            "Last 10: over 1.5 in 5 of 10, averaging 1.5 (low 0, high 4)"]
+    assert f["risk"][0] == "Vs PHI: over 1.5 in 0 of 3 meetings"
+    values, labels = pc.pick_form({"rows": []}, pick)                     # its kept games draw the chart, oldest left
+    assert values == [1, 2, 2, 2, 2, 4] and labels == ["NYR", "WPG", "OTT", "SEA", "MTL", "NJD"]
+    assert "--li" in pc.render_card(f, "data:,")                           # the fit-to-frame script ships with the card

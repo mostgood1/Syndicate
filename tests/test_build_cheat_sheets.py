@@ -374,7 +374,7 @@ def test_featured_sections_keep_a_sane_price_and_one_line_per_bet():
             row("Waddle", 250, 2.1), row("Mims", -251, 2.2)]
     s = cs.sections(rows)
     assert [rows[i]["player"] for i in s["value"]] == ["Shaheed", "Nix", "Waddle"]      # -400 and -251 out; one Nix
-    assert rows[s["value"][1]]["line"] == 197.5                                          # the best-EV Nix rung
+    assert rows[s["value"][1]]["line"] == 199.5                                          # the main Nix rung (the median)
     assert len(s["every_prop"]) == 7                                                     # the full table stays complete
 
 
@@ -489,3 +489,101 @@ def test_a_pick_reads_like_the_board_and_keeps_its_first_price_on_the_record():
     assert [p["pick_id"] for p in merged] == ["l2_seg", "l2_jax"] and merged[0]["price"] == 138   # first price kept; Jax stays
     assert merged[0]["on_board"] is True and merged[1]["on_board"] is False                  # Jax is no longer suggested
     assert cs.pick_result_key(picks[0]).endswith("|first3") and cs.pick_result_key(picks[1]).startswith("p:")
+
+
+def test_one_line_per_player_and_stat_across_every_featured_section():
+    # User 2026-10-15: "reduce some of duplicate player/lines across the sheets. players with o4.5 and o5.5 lines and
+    # pick one". Measured that day: Rodriguez u30.5 in Hot streaks and u32.5 in Streaks with room; Humphrey over 6.5
+    # in Hot streaks and under 6.5 in Matchups. One rung per player + stat everywhere: the MAIN line (most books, the
+    # board's rule), then the side whose price beats its fair by more -- never the best-EV rung across the ladder.
+    def row(player, side, line, verdict, ev, market="Receiving Yards", books=5, **extra):
+        f = {"games": 10, "hits": 9, "rate": 0.9}
+        return {"player": player, "market": market, "side": side, "line": line, "books_quoting": books,
+                "check": {"verdict": verdict, "ev_market": ev, "ev_posterior": 1.0, "price": -110, "form5": f, "form10": f}} | extra
+
+    rows = [row("Rodriguez", "under", 30.5, "streak_with_room", 1.0, books=9),
+            row("Rodriguez", "under", 32.5, "streak_with_room", 2.5, books=4),          # better EV, but an alt rung
+            row("Humphrey", "over", 6.5, "streak_with_room", -1.0),
+            row("Humphrey", "under", 6.5, "neutral", 0.5, matchup={"nth_most": 31, "of": 32}),
+            row("Kupp", "under", 2.5, "value", 3.0, market="Receptions"),
+            row("Kupp", "under", 2.5, "value", 4.0, market="Receptions_alternate")]
+    s = cs.sections(rows)
+    featured = [i for key, ids in s.items() if key != "every_prop" for i in ids]
+    by_stat = {}
+    for i in featured:
+        by_stat.setdefault(cs._stat_key(rows[i]), set()).add(i)
+    assert all(len(ids) == 1 for ids in by_stat.values())                       # one rung per player + stat, sheet-wide
+    assert set(featured) == {0, 3, 5}                       # Rodriguez's main line; Humphrey's better side; one Kupp
+    assert 0 in s["hot_streaks"] and 1 not in s["hot_streaks"] and 2 not in s["hot_streaks"]
+    assert 3 in s["matchup_spots"] and len(s["every_prop"]) == 6                 # every prop stays complete
+
+
+def test_a_picks_case_is_whole_statements_with_recency_vs_opponent_and_player_matchups():
+    # User 2026-10-15: "bullets that end with ... instead of full explanations. We also need to feature relevant player
+    # vs opponent stats" + "and recency/consistency". Nothing is cut; a record AGAINST the side is flagged, never ticked.
+    detail = ("Our sim has Emmitt Finnie over 1.5 sog at 41.2%; the no-vig market says 54.2%. "
+              "Recent form: over 1.5 in 5 of the last 10 (avg 1.5). "
+              "Matchup: over 1.5 in 0 of 3 vs PHI; PHI allows 3.33 xG/60 (blended with this season); this season 3.94 xG a game, "
+              "32 of 32 (1 = stingiest), 8 GP. "
+              "Vs position: PHI allows 24.8 shots on goal a game to forwards (rank 32 of 32, 1 = fewest; 8 games this season). "
+              "It projects an average of 1.4 against the 1.5 line.")
+    pick = {"kind": "prop", "player_name": "Emmitt Finnie", "display_name": "Emmitt Finnie", "market": "SOG", "side": "over",
+            "line": 1.5, "detail": detail, "recent_values": [4.0, 2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0, 0.0, 0.0],
+            "recent_opponents": ["NJD", "MTL", "SEA", "OTT", "WPG", "NYR", "CBJ", "BUF", "PIT", "FLA"]}
+    rows = [{"player": "Emmitt Finnie", "market": "SOG", "side": "over", "line": 2.5, "opponent": "PHI",
+             "pvp": {"kind": "skater_vs_goalie", "opponent": "D. Vladar (likely starter)", "line": {"games": 2, "sog": 1, "goals": 0},
+                     "summary": "0 G on 1 SOG in 2 games vs D. Vladar"}}]
+    pts = cs.pick_points(pick, rows=rows)
+    assert pts == [
+        {"label": "Last 5", "text": "over 1.5 in 5 of 5 (newest first: 4 v NJD, 2 v MTL, 2 v SEA, 2 v OTT, 2 v WPG)", "tone": "for"},
+        {"label": "Last 10", "text": "over 1.5 in 5 of 10, averaging 1.5 (low 0, high 4)", "tone": ""},
+        {"label": "Vs PHI", "text": "over 1.5 in 0 of 3 meetings", "tone": "against"},
+        {"label": "Vs goalie", "text": "0 G on 1 SOG in 2 games vs D. Vladar (likely starter)", "tone": ""},
+        {"label": "Opponent", "text": "PHI allows 3.33 xG/60; this season 3.94 xG a game, the most generous of 32 (8 games)", "tone": "for"},
+        {"label": "Vs position", "text": "PHI allows 24.8 shots on goal a game to forwards, the most of 32 (8 games this season)",
+         "tone": "for"}]
+    long = cs.ask_points("Recent form: " + "x " * 200)
+    assert long[0]["text"].endswith("x") and len(long[0]["text"]) > 300 and "…" not in long[0]["text"]   # never cut
+    # No case on the board, no kept games: the sheet row's last games are re-read at the pick's own rung.
+    bare = {"kind": "prop", "player_name": "A", "market": "Receptions", "side": "over", "line": 4.5}
+    row = {"player": "A", "market": "Receptions", "side": "over", "line": 3.5, "check": {"form10": {"values": [5, 6, 4, 7, 5]}},
+           "vs_opponent": {"games": 3, "hits": 3, "same_line": True, "results": [{"value": 6}, {"value": 4}, {"value": 5}]},
+           "opponent": "ARI"}
+    assert cs.pick_points(bare, rows=[row]) == [
+        {"label": "Last 5", "text": "over 4.5 in 4 of 5 (newest first: 5, 6, 4, 7, 5)", "tone": "for"},
+        {"label": "Vs ARI", "text": "over 4.5 in 2 of 3 meetings (latest 6, 4, 5)", "tone": "for"}]
+
+
+def test_a_game_picks_case_reads_its_teams_recent_games_and_starters():
+    recent = {"away": [["2026-10-10", 24, 27], ["2026-10-03", 31, 24], ["2026-09-26", 28, 42], ["2026-09-19", 27, 31]],
+              "home": [["2026-10-10", 10, 3], ["2026-10-03", 10, 42], ["2026-09-26", 20, 46], ["2026-09-19", 17, 20]]}
+    total = {"kind": "game", "market": "totals", "side": "over", "line": 47.5, "segment": "full", "home_team": "ODU",
+             "away_team": "GASO", "team_recent": recent, "detail": ""}
+    assert cs.pick_points(total) == [
+        {"label": "GASO", "text": "its games went over 47.5 in 4 of the last 4, averaging 58.5 points", "tone": "for"},
+        {"label": "ODU", "text": "its games went over 47.5 in 2 of the last 4, averaging 42.0 points", "tone": ""}]
+    spread = dict(total, market="spreads", side="home", line=-5.5, display_name="ODU")
+    assert cs.pick_points(spread)[0] == {"label": "ODU", "text": "1-3 in its last 4, average margin -13.5; would have covered -5.5 in 1 of 4",
+                                         "tone": "against"}
+    assert cs.pick_points(dict(spread, segment="first3")) == []                 # full-game scores say nothing of an inning
+    starter = {"player": "Tyler Glasnow", "event_id": "e7", "pvp": {"kind": "pitcher_vs_lineup", "opponent": "Milwaukee Brewers",
+               "line": {"plateAppearances": 76}, "summary": "Milwaukee Brewers hitters 9-for-72, 1 HR, 41% K (76 PA, 10 hitters)"}}
+    ml = {"kind": "game", "event_id": "e7", "market": "h2h", "side": "away", "segment": "first3", "detail": ""}
+    assert cs.pick_points(ml, rows=[starter, dict(starter, market="outs")]) == [
+        {"label": "Tyler Glasnow", "text": "Milwaukee Brewers hitters 9-for-72, 1 HR, 41% K (76 PA, 10 hitters)", "tone": ""}]
+    nba = cs.ask_points("Season metrics: Net rating Toronto Raptors +1.6 (11th of 30) vs New York Knicks +4.0 (5th of 30).")
+    assert nba[0]["text"] == "Net rating Toronto Raptors +1.6 (11th of 30) vs New York Knicks +4.0 (5th of 30)"
+
+
+def test_a_kept_pick_rereads_its_case_and_its_recent_games_from_the_board():
+    m = _script()
+    from datetime import datetime, timezone
+    now = datetime(2026, 10, 15, 14, 0, tzinfo=timezone.utc)
+    card = _card("l2_jax", player="Griffin Jax", market="strikeouts", side="over", line=3.5) | {"recent_values": [5, 4, 6]}
+    picks = m.build_picks([card], {"rows": []}, sport="mlb", day="2026-10-15", now=now)
+    assert picks[0]["recent_values"] == [5, 4, 6] and picks[0]["points"][0]["label"] == "Last 5"
+    stale = dict(picks[0], recent_values=None, points=[])
+    still_on_board = dict(card, suggested=False, recent_values=[2, 2, 2, 2, 2])     # dropped from Suggested, still listed
+    merged = m.merge_picks([], {"picks": [stale]}, rows=[], cards=[still_on_board])
+    assert merged[0]["on_board"] is False and merged[0]["recent_values"] == [2, 2, 2, 2, 2]
+    assert merged[0]["points"][0] == {"label": "Last 5", "text": "over 3.5 in 0 of 5 (newest first: 2, 2, 2, 2, 2)", "tone": "against"}

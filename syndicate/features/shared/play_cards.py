@@ -21,7 +21,6 @@ from __future__ import annotations
 import hashlib
 import html
 import json
-import re
 import string
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -150,23 +149,6 @@ def card_fields(row: Mapping[str, Any], *, sport: str, date: str, number: int, g
 # suggested opps as a picks section with pick graphics"). A pick can be a game line or a segment, so its card draws the
 # sim against the market where a prop draws its last games, and its reasons come from the board's own written case.
 # --------------------------------------------------------------------------------------------------------------------
-_SENTENCE = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
-_MODEL_LEADS = ("Our sim has", "The live re-sim has", "No sim view", "It projects")
-
-
-def detail_points(detail: Any, limit: int = 3) -> list[str]:
-    """The board's written case, as card bullets: whole sentences, the first `limit`, none over ~170 characters."""
-    out = []
-    for sentence in _SENTENCE.split(str(detail or "").strip()):
-        sentence = sentence.strip()
-        if not sentence:
-            continue
-        out.append(sentence if len(sentence) <= 170 else sentence[:167].rsplit(" ", 1)[0] + "...")
-        if len(out) >= limit:
-            break
-    return out
-
-
 def prob_svg(model: float | None, market: float | None, implied: float | None) -> str:
     """Three bars: our sim, the no-vig market, and what the price implies -- the card's case at a glance."""
     bars = [(label, v, color) for label, v, color in (("Our sim", model, "#8cff2e"), ("No-vig market", market, "#eef3f7"),
@@ -205,12 +187,16 @@ def pick_card_fields(pick: Mapping[str, Any], *, sport: str, date: str, number: 
     # `why_and_risk`); the chart already sets the sim against the market. Form, matchup, splits and history stay.
     points = pick.get("points")
     if points is None:                          # a pick stored before its case was broken into points
-        from syndicate.features.shared.cheat_sheets import ask_points
+        from syndicate.features.shared.cheat_sheets import pick_points
 
-        points = ask_points(pick.get("detail"), subject=pick.get("display_name"))
-    # Ask the Syndicate's case as the X.com sheets show it: short labelled checks (user 2026-10-15).
-    why += [f"{pt['label']}: {pt['text']}" if pt.get("label") else pt["text"] for pt in points][:4]
-    risk: list[str] = []
+        points = pick_points(pick)
+    # Ask the Syndicate's case as the X.com sheets show it: labelled checks, each a whole statement (user 2026-10-15:
+    # "bullets that end with ... instead of full explanations"). A point that argues AGAINST the side -- 0 in 3 vs
+    # this team -- is a risk, never a tick.
+    said = [(pt.get("tone"), f"{pt['label']}: {pt['text']}" if pt.get("label") else pt["text"]) for pt in points]
+    backing = sorted((x for x in said if x[0] != "against"), key=lambda x: x[0] != "for")   # what backs it, first
+    why += [text for _tone, text in backing][:4]
+    risk: list[str] = [text for tone, text in said if tone == "against"][:2]
     if str(pick.get("sim_view") or "") in ("disagrees", "contradicts"):
         risk.append("Our sim does not back this side: the edge is the price against the market")
     if isinstance(p_model, (int, float)) and isinstance(p_mkt, (int, float)) and abs(p_model - p_mkt) >= 0.10:
@@ -261,7 +247,13 @@ def ledger_record(fields: Mapping[str, Any], row: Mapping[str, Any], *, sport: s
 
 
 def pick_form(sheet: Mapping[str, Any], pick: Mapping[str, Any]) -> tuple[list[float], list[str]]:
-    """A prop pick's last games, from the sheet row for the same bet (oldest left, like a row's card)."""
+    """A prop pick's last games (oldest left, like a row's card): the board card's own recent games, kept on the pick,
+    else the sheet row for the same bet."""
+    recent = [v for v in pick.get("recent_values") or [] if isinstance(v, (int, float))][:10]
+    if recent:
+        labels = [str(x) for x in (pick.get("recent_opponents") or [])][:10] or \
+            [str(d)[5:10] for d in (pick.get("recent_dates") or [])][:10]
+        return recent[::-1], labels[::-1] if len(labels) == len(recent) else []
     for r in sheet.get("rows") or []:
         if (r.get("player") == pick.get("player_name") and str(r.get("market")) == str(pick.get("market"))
                 and r.get("side") == pick.get("side") and r.get("line") == pick.get("line")):

@@ -631,18 +631,20 @@ def build_picks(cards: list[dict[str, Any]], sheet: dict[str, Any], *, sport: st
     return out
 
 
-_PICK_PRESENTATION = ("display_name", "detail", "points", "team_logo", "home_logo", "away_logo", "headshot_url",
-                      "team", "pos", "kickoff_ct", "segment_label", "bet")
+_PICK_PRESENTATION = ("display_name", "detail", "team_logo", "home_logo", "away_logo", "headshot_url",
+                      "team", "pos", "kickoff_ct", "segment_label", "bet") + cs.PICK_RECENT_FIELDS
 
 
-def merge_picks(fresh: list[dict[str, Any]], prior: dict[str, Any] | None) -> list[dict[str, Any]]:
+def merge_picks(fresh: list[dict[str, Any]], prior: dict[str, Any] | None, *, rows: list[dict[str, Any]] | None = None,
+                cards: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """A day's picks are a RECORD: one promoted earlier keeps its first price and stays when the board drops it later
     (its line moved, its game started); a new one joins. Board score order, earliest promotions first on ties."""
     kept = {p.get("pick_id"): dict(p) for p in (prior or {}).get("picks") or [] if p.get("pick_id")}
+    on_board = {c.get("pick_id"): c for c in cards or [] if c.get("pick_id")}
     for p in fresh:
         if p.get("pick_id") in kept:
-            # The PRICE is frozen at first promotion; how the pick READS (its name, the case's points, its crests)
-            # follows the board while the board still carries it.
+            # The PRICE is frozen at first promotion; how the pick READS (its name, its case, its crests, its recent
+            # games) follows the board while the board still carries it.
             kept[p["pick_id"]].update({k: p[k] for k in _PICK_PRESENTATION if p.get(k) is not None})
         else:
             kept[p.get("pick_id")] = p
@@ -652,11 +654,15 @@ def merge_picks(fresh: list[dict[str, Any]], prior: dict[str, Any] | None) -> li
     live = {p.get("pick_id") for p in fresh}
     for pick_id, p in kept.items():
         p["on_board"] = pick_id in live
-        if "points" not in p:     # promoted before the case was broken into points (2026-10-15)
-            p["points"] = cs.ask_points(p.get("detail"), subject=p.get("display_name"))
+        card = on_board.get(pick_id)
+        if card is not None and pick_id not in live:     # still on the board, just not suggested: its games still read
+            p.update({k: card[k] for k in cs.PICK_RECENT_FIELDS if card.get(k)})
         if p.get("kind") != "prop" and str(p.get("market") or "").startswith(("totals", "alternate_totals")) and p.get("matchup"):
             p["display_name"] = p["matchup"]          # a total reads by its game
             p["team_logo"] = p.get("team_logo") or p.get("home_logo")
+        # The case is re-read at every build (user 2026-10-15: full explanations, player vs opponent, recency and
+        # consistency) from the pick's kept games, the sheet's row for the player, and the board's written case.
+        p["points"] = cs.pick_points(p, rows=rows or [])
     return sorted(kept.values(), key=lambda p: (-(p.get("board_score") or 0), str(p.get("promoted_at"))))
 
 
@@ -769,7 +775,7 @@ def main(argv: list[str] | None = None) -> int:
                 prior = None
             sheet = build_sport(sport, [], selected_date=selected, cap=1, dvp=dvp, context=context, positions=positions)
             sheet["picks"] = merge_picks(build_picks(board_cards, sheet, sport=sport, day=selected,
-                                                     now=datetime.now(timezone.utc)), prior)
+                                                     now=datetime.now(timezone.utc)), prior, cards=board_cards)
             sheet["phase"] = season_phase(sport, selected) or "preseason"
             sheet["picks_only"] = True
             attach_images(sheet, data_root / "cheatsheets" / ".img_cache")
@@ -794,7 +800,8 @@ def main(argv: list[str] | None = None) -> int:
                             pvp_cache=data_root / "cheatsheets" / f".{sport}_cache" / selected)
         sheet = merge_with_record(sheet, prior, now=datetime.now(timezone.utc))
         try:
-            sheet["picks"] = merge_picks(build_picks(board_cards, sheet, sport=sport, day=selected, now=datetime.now(timezone.utc)), prior)
+            sheet["picks"] = merge_picks(build_picks(board_cards, sheet, sport=sport, day=selected, now=datetime.now(timezone.utc)),
+                                         prior, rows=sheet.get("rows"), cards=board_cards)
         except Exception as exc:  # noqa: BLE001 -- a missing picks section is a gap, never a failed sheet
             print(f"CHEAT_SHEET {sport} picks failed: {type(exc).__name__}: {exc}", flush=True)
             sheet["picks"] = list((prior or {}).get("picks") or [])
