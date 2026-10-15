@@ -86,13 +86,37 @@ def _unique(pairs: Iterable[tuple[str, str]]) -> dict[str, str]:
     return out
 
 
+_NHL_SNAPSHOTS_READ = 60
+
+
 @lru_cache(maxsize=1)
 def _nhl_rows() -> list[dict[str, str]]:
+    """One row per player across the newest snapshots, newest first.
+
+    The dated `roster_snapshot_<date>.csv` files are PER SLATE -- only the teams playing that date (measured
+    2026-10-14: the newest, 10-17, held no Colorado row, so MacKinnon / Makar / Necas had no face and no side on
+    any board). Reading only the newest file therefore dropped every team off that slate. The newest file a player
+    appears in wins, so a traded player carries his current team; a name on two players within ONE file is dropped
+    (never guessed), as before."""
     for root in _roots("nhl"):
         found = sorted(Path(root).glob("source_artifacts/data/processed/roster_snapshot_*.csv"))
         found += sorted(Path(root).glob("data/processed/roster_snapshot_*.csv"))
-        if found:
-            return list(_read_csv(max(found, key=lambda p: p.name)))
+        if not found:
+            continue
+        seen: dict[str, dict[str, str] | None] = {}
+        for path in sorted(found, key=lambda p: p.name, reverse=True)[:_NHL_SNAPSHOTS_READ]:
+            in_file: dict[str, dict[str, str] | None] = {}
+            for r in _read_csv(path):
+                name = _norm(r.get("full_name") or r.get("player"))
+                if not name:
+                    continue
+                if name not in in_file:
+                    in_file[name] = r
+                elif in_file[name] is not None and str(in_file[name].get("player_id") or "") != str(r.get("player_id") or ""):
+                    in_file[name] = None                     # two players, one name, one file: ambiguous
+            for name, r in in_file.items():
+                seen.setdefault(name, r)
+        return [r for r in seen.values() if r is not None]
     return []
 
 
@@ -103,14 +127,8 @@ def _nhl_teams() -> dict[str, str]:
 
 @lru_cache(maxsize=1)
 def _nhl_ids() -> dict[str, str]:
-    for root in _roots("nhl"):
-        found = sorted(Path(root).glob("source_artifacts/data/processed/roster_snapshot_*.csv"))
-        found += sorted(Path(root).glob("data/processed/roster_snapshot_*.csv"))
-        if found:
-            newest = max(found, key=lambda p: p.name)
-            return _unique((_norm(r.get("full_name") or r.get("player")), str(r.get("player_id") or "").strip())
-                           for r in _read_csv(newest) if str(r.get("player_id") or "").strip().isdigit())
-    return {}
+    return _unique((_norm(r.get("full_name") or r.get("player")), str(r.get("player_id") or "").strip())
+                   for r in _nhl_rows() if str(r.get("player_id") or "").strip().isdigit())
 
 
 @lru_cache(maxsize=1)

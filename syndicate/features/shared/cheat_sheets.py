@@ -288,5 +288,5 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
 
 def render_page(template: str, sheets: Iterable[Mapping[str, Any]], *, logo_src: str) -> str:
     """The branded page with the data inlined. `</` is escaped so no string in the data can close the script."""
-    data = json.dumps(page_payload(sheets), default=str).replace("</", "<\/")
+    data = json.dumps(page_payload(sheets), default=str).replace("</", "<\\/")
     return template.replace("/*__DATA__*/null", data, 1).replace("__LOGO_SRC__", logo_src, 1)
