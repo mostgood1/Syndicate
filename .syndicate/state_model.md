@@ -746,6 +746,8 @@ map with the tool, not the prose.
 
 ---
 
+- **VERIFIED 2026-10-15 00:45:59Z on the served shortlist (lane `model-edge-gap-attribution`, session 4ab694ed): EVERY established-loss row IS penalised, and `verdict_class` is NOT the field that does it.** Deployed `skill_reliability` over the served notes, n=2,716 rows carrying a `model_edge_pct`: all **1,011** rows whose verdict text says "loses to" carry `status: measured` AND `established_loss_rel > 0`, and all 1,011 get a factor below 1.0 (0.5 on 421, 0.514 on 43, 0.606 on 148) — **0 unpenalised**. 37.2% of edged rows are down-weighted. The other grades sit at 1.0: *at the price: no established loss* 899, **unmeasured 740 (by explicit design — "unknown must not be punished with an invented midpoint")**, parity 62. **The factor keys on `status` + `established_loss_rel`, never on `verdict_class`** — which is why **308 rows whose verdict text says "loses to" while their `verdict_class` reads `measured` (305) or `parity` (3)** are still scored correctly. That mislabel is a hazard for any CONSUMER filtering on the class, not a scoring fault. **Open as a risk question, not a defect: nba 32/32 and nhl 174/183 rows are entirely `unmeasured`, so their edges rank at full confidence.** Repeatable: `py -3 scripts/audit_model_edge_gap.py`.
+
 ## [sim-scheduling-blocker] 2026-08-17 02:1xZ — VERIFIED (sim-scheduling): the primary goal has ONE blocker — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19.md`, verbatim.**
 
 ## [sim-edge-analysis-2026-09-01] FULL-PLATFORM SIM-ENGINE EDGE ANALYSIS — strategy synthesis + new from-code facts `[2026-09-01, session syndicate-8d, read-only]`

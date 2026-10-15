@@ -170,3 +170,64 @@ slate (ncaaf 463 → 613 rows) and both are shown rather than the friendlier one
 `ncaab` and `wnba` returned zero rows (out of season) and contribute to no share.
 Every skill grade is read from a field the board already serves; none is inferred
 from a model name or a sport.
+
+---
+
+## CORRECTION, 2026-10-15 00:45:59Z: the board DOES act on skill, and the penalty lands on 100% of established-loss rows
+
+`state_model.md` contradicted a sentence above, so I checked it rather than
+checkpointing it. **The sentence was wrong.** I wrote:
+
+> *"using such a model's edge as a ranking term requires naming that subset,
+> and nothing in the board does."*
+
+`layer2_board._apply_skill_reliability` (line 937) is exactly that mechanism,
+`measured_market_skill.skill_reliability` is its factor, and
+`daily_optimizer.optimizer_overlay.factor_for_row` multiplies it into both rank
+and stake. All three were already recorded in `state_model.md`. I measured a
+population and asserted the absence of a response **without looking for the
+responder**.
+
+### Measured, with the deployed `skill_reliability` over the served notes (n=2,716 rows carrying a model edge)
+
+| verdict-text grade | rows | factor | `status` | `established_loss_rel > 0` |
+|---|---|---|---|---|
+| LOSES to the market/close | 1,011 | **0.5 on 421, 0.514 on 43, 0.606 on 148, …** | measured 1,011 | **1,011 (100%)** |
+| *at the price: no established loss* | 899 | 1.0 | measured 899 | 0 (0%) |
+| NEVER BACKTESTED | 740 | 1.0 | unmeasured 740 | 0 (0%) |
+| parity with the market | 62 | 1.0 | measured 62 | 0 (0%) |
+| no verdict text | 4 | 1.0 | measured 4 | 0 (0%) |
+
+**Every row whose verdict says it loses is penalised. Zero are not.** 1,011 of
+2,716 (37.2%) carry a factor below 1.0, down to the 0.5 floor.
+
+### Three consequences, and each changes what the lead above is worth
+
+1. **The headline survives as a POPULATION fact and loses its implied
+   criticism.** 72.7% of the ranking's model edges still come from a model that
+   loses or was never measured. But 37.2% of all edged rows are actively
+   down-weighted for it, and the remainder is a **documented policy choice**, not
+   an oversight: `skill_reliability`'s own docstring says *"Unknown must not be
+   punished with an invented midpoint any more than it may be rewarded with
+   one."* The 740 NEVER BACKTESTED rows get 1.0 deliberately.
+2. **Instrument defect (A) does NOT reach the score, and that is why it
+   survived.** `skill_reliability` keys on `status == "measured"` and
+   `established_loss_rel > 0` — **never on `verdict_class`**. So the 308
+   mis-classed rows are scored correctly despite the wrong class name. The
+   defect is real for any CONSUMER that filters on `verdict_class` (this lane's
+   own first grading pass did, and under-counted the losses by 308), and it is
+   NOT a live scoring fault. Reporting it as one would have been the error this
+   correction exists to avoid.
+3. **What is actually left open is a risk question, not a defect.** NBA (32 of
+   32 rows) and NHL (174 of 183) are entirely `unmeasured`, so their edges rank
+   at full confidence by the stated policy. Whether an unbacktested model should
+   carry 1.0 rather than a haircut is a decision someone has already made
+   explicitly; it is worth revisiting with a number, not worth filing as a bug.
+
+### Why this got through
+
+The measurement was sound and the inference was not. Every number above this
+correction stands; one sentence of interpretation did not, and it was the
+sentence the lead was built on. **An absence-of-response claim needs its own
+check, exactly like an absence-of-data claim does** — and `state.md` existing
+is why the cost here was one reading rather than a lane someone else picks up.
