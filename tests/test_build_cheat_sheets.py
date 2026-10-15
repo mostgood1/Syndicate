@@ -376,3 +376,16 @@ def test_featured_sections_keep_a_sane_price_and_one_line_per_bet():
     assert [rows[i]["player"] for i in s["value"]] == ["Shaheed", "Nix", "Waddle"]      # -400 and -251 out; one Nix
     assert rows[s["value"][1]]["line"] == 197.5                                          # the best-EV Nix rung
     assert len(s["every_prop"]) == 7                                                     # the full table stays complete
+
+
+def test_the_evidence_layer_reads_the_same_data_root_as_the_generator(monkeypatch, tmp_path):
+    # A hand run without SYNDICATE_DATA_ROOT read the checkout's data/ mirror: sheets with no positions or matchups,
+    # and no error (2026-10-15). Unset -> set from --data-root; a different root -> refused, never mixed.
+    m = _script()
+    monkeypatch.delenv("SYNDICATE_DATA_ROOT", raising=False)
+    assert m.align_data_root(tmp_path) is None
+    import os
+    assert os.environ["SYNDICATE_DATA_ROOT"] == str(tmp_path)
+    assert m.align_data_root(tmp_path) is None                                   # the same root again is fine
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path / "elsewhere"))
+    assert "different root" in m.align_data_root(tmp_path)

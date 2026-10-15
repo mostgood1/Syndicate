@@ -350,6 +350,20 @@ news_root: Path | None = None
 PVP_SPORTS = ("mlb", "nhl", "nba", "nfl")
 
 
+def align_data_root(data_root: Path) -> str | None:
+    """Make the evidence layer read the SAME data root as `--data-root`, or say why not.
+
+    The evidence layer finds its data through SYNDICATE_DATA_ROOT, not through `--data-root`. A hand run without it
+    (2026-10-15) read the checkout's `data/` mirror and wrote sheets with no positions, no matchups and no player
+    profiles -- and no error, because every layer reported a clean `absent_reason`. So an unset variable is set from
+    `--data-root`, and one that names a DIFFERENT root is refused rather than silently mixed."""
+    env_root = os.environ.get("SYNDICATE_DATA_ROOT")
+    if env_root and Path(os.path.expanduser(env_root)).resolve() != Path(data_root).resolve():
+        return f"SYNDICATE_DATA_ROOT={env_root} names a different root than --data-root {data_root}"
+    os.environ["SYNDICATE_DATA_ROOT"] = str(data_root)
+    return None
+
+
 def player_vs_player(sport: str, rows: list[dict[str, Any]], date: str, cache: Path) -> tuple[Any, dict]:
     """(module, {(normalized player, market): block}) for a sport's player-vs-player source. `cache` is
     `<data root>/cheatsheets/.<sport>_cache/<date>`; long-lived caches sit beside it under `cheatsheets/`."""
@@ -573,6 +587,10 @@ def main(argv: list[str] | None = None) -> int:
         print("REFUSING: no --data-root", flush=True)
         return 2
     data_root = Path(os.path.expanduser(args.data_root))
+    refusal = align_data_root(data_root)
+    if refusal:
+        print(f"REFUSING: {refusal}", flush=True)
+        return 2
     selected = args.date or central_today()
     if selected == "tomorrow":                      # the day ahead (user 2026-10-15): an early look, refreshed later
         selected = (datetime.fromisoformat(central_today()) + timedelta(days=1)).date().isoformat()
