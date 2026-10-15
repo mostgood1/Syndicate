@@ -43,6 +43,8 @@ LEAGUE_SPORT_KEYS: dict[str, str] = {
     "primeira_liga": "soccer_portugal_primeira_liga",
     "championship": "soccer_efl_champ",
     "belgian_pro_league": "soccer_belgium_first_div",
+    "uel": "soccer_uefa_europa_league",
+    "uecl": "soccer_uefa_europa_conference_league",
 }
 
 DEFAULT_PLAYER_MARKETS = [

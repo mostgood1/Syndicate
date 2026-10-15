@@ -657,11 +657,15 @@ def test_the_soccer_title_gate_is_a_prefix_and_not_a_substring():
     """
     from syndicate.features.shared.kalshi_catalogue import soccer_league_from_title
 
+    # The UEFA club competitions WERE in the list below until 2026-10-15, when
+    # the user brought them onto the board (lane `soccer-uefa-competitions`).
+    # They now resolve to their own slugs -- never to the Championship.
+    assert soccer_league_from_title("UEFA Champions League 1st Half Total") == "ucl"
+    assert soccer_league_from_title("UEFA Europa Conference League Final Score") == "uecl"
+
     # Competitions Syndicate does not model stay unmapped -- and stay in the
     # COVERAGE_GAPS work queue, which is the point.
     for title in (
-        "UEFA Champions League 1st Half Total",
-        "UEFA Europa Conference League Final Score",
         "EFL Cup Total",
         "Nuclear test in 2026",
         "MLSomething Total",

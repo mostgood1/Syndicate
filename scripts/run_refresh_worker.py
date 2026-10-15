@@ -591,6 +591,7 @@ def _soccer_refresh_units(selected_date: str) -> tuple[list[dict[str, str]], str
     from syndicate.features.soccer.sources import active_leagues_for_date
     from syndicate.features.soccer.sources import default_season
     from syndicate.features.soccer.sources import default_week
+    from syndicate.features.soccer.sources import league_has_sim
     from syndicate.features.soccer.sources import week_dates_within_horizon
 
     horizon_raw = str(os.environ.get("SYNDICATE_SOCCER_SIM_HORIZON_DAYS") or "").strip()
@@ -602,6 +603,13 @@ def _soccer_refresh_units(selected_date: str) -> tuple[list[dict[str, str]], str
     units: list[dict[str, str]] = []
     scope_kind = "league_date"
     for league in active_leagues_for_date(selected_date):
+        # A unit is the SIM for one league-date, confirmed by its
+        # `recommendations_<date>.json` (`_soccer_unit_wrote_since`). A competition
+        # with no model (the UEFA cups) never writes one, so its unit would read
+        # unconfirmed and relaunch forever, holding the spacing gate against real
+        # leagues. Its schedule/odds come from live-odds-worker's pregame autorun.
+        if not league_has_sim(league):
+            continue
         try:
             season = default_season(league)
             week = default_week(league, season, reference_date=selected_date)

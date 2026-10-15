@@ -65,6 +65,7 @@ from syndicate.features.nhl.sources import available_dates as nhl_available_date
 from syndicate.features.soccer.sources import active_leagues_for_date as soccer_active_leagues_for_date
 from syndicate.features.soccer.sources import default_season as soccer_default_season
 from syndicate.features.soccer.sources import default_week as soccer_default_week
+from syndicate.features.soccer.sources import league_has_sim as soccer_league_has_sim
 from syndicate.features.soccer.sources import week_date_list as soccer_week_date_list
 from syndicate.features.soccer.features.schedule import season_date_range as soccer_season_date_range
 from syndicate.features.shared.timezone import central_today
@@ -1435,6 +1436,12 @@ _SOCCER_LEAGUE_SLUGS = (
     "primeira_liga",
     "championship",
     "belgian_pro_league",
+    # UEFA club competitions: schedule, game odds and live scoreboard state
+    # only -- `_build_soccer_steps` gives them no ratings history, roster,
+    # props, sim or picks step (`soccer.sources.UEFA_COMPETITIONS`).
+    "ucl",
+    "uel",
+    "uecl",
 )
 
 
@@ -2125,6 +2132,8 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 description=f"LIVE {league} game odds ({len(event_ids)} in play).",
             )
         )
+        if not soccer_league_has_sim(league):
+            continue
         live_steps.append(
             RefreshStep(
                 name=f"soccer_{league}_props_live",
@@ -2177,7 +2186,14 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
 
     steps: list[RefreshStep] = []
     steps.extend(live_steps)
-    for league in league_slugs:
+    # Competitions registered WITHOUT a model (the UEFA cups, lane
+    # `soccer-uefa-competitions`) take only the model-free steps: schedule,
+    # game odds and live state. Ratings history, rosters, player props (one
+    # OddsAPI call per event, with nothing to price them against), the sim and
+    # picks all need per-league ratings these competitions do not have -- a
+    # sim here would rate every club at a silent league-average 0.0.
+    sim_league_slugs = tuple(league for league in league_slugs if soccer_league_has_sim(league))
+    for league in sim_league_slugs:
         history_step = _soccer_history_step(league, soccer_root, python_exe)
         if history_step is not None:
             steps.append(history_step)
@@ -2187,7 +2203,7 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
     # BEFORE the schedule/sim steps below, because those READ the roster this
     # writes. A refetch that lands after the sim has already run is a refetch
     # that takes a day to matter.
-    for league in league_slugs:
+    for league in sim_league_slugs:
         players_step = _soccer_players_step(league, soccer_root, python_exe)
         if players_step is not None:
             steps.append(players_step)
@@ -2263,7 +2279,7 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 description=f"Capture {league} game-level odds (h2h/totals/spreads) from The Odds API.",
             )
         )
-    for league in league_slugs:
+    for league in sim_league_slugs:
         steps.append(
             RefreshStep(
                 name=f"soccer_{league}_props",
@@ -2280,7 +2296,7 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 description=f"Capture {league} player-prop odds (anytime scorer, shots, etc.) from The Odds API.",
             )
         )
-    for league in league_slugs:
+    for league in sim_league_slugs:
         steps.append(
             RefreshStep(
                 name=f"soccer_{league}_artifacts",
@@ -2330,7 +2346,7 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 description=f"Refresh {league}'s current-week simulation, props, and recommendation artifacts.",
             )
         )
-    for league in league_slugs:
+    for league in sim_league_slugs:
         steps.append(
             RefreshStep(
                 name=f"soccer_{league}_picks",

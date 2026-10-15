@@ -42,6 +42,9 @@ _ESPN_SPORT_LEAGUE = {
     "primeira_liga": ("soccer", "por.1"),
     "championship": ("soccer", "eng.2"),
     "belgian_pro_league": ("soccer", "bel.1"),
+    "ucl": ("soccer", "uefa.champions"),
+    "uel": ("soccer", "uefa.europa"),
+    "uecl": ("soccer", "uefa.europa.conf"),
 }
 
 

@@ -732,7 +732,7 @@ _SPORT_TOKENS: tuple[tuple[str, str], ...] = (
 # token.
 def _soccer_league_prefixes() -> tuple[tuple[str, str], ...]:
     try:
-        from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES
+        from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES, LEAGUE_TITLE_ALIASES
     except Exception:
         # A soccer module that cannot import is a real failure, and returning
         # an empty table says "no soccer competition matched" -- which is
@@ -742,6 +742,13 @@ def _soccer_league_prefixes() -> tuple[tuple[str, str], ...]:
         # registered against a guess.
         return ()
     pairs = [(slug, str(name).strip().lower()) for slug, name in LEAGUE_DISPLAY_NAMES.items()]
+    # Kalshi titles UEFA series both "UEFA Champions League Game" and
+    # "Champions League Total Goals"; the aliases cover the first spelling.
+    pairs += [
+        (slug, str(alias).strip().lower())
+        for slug, aliases in LEAGUE_TITLE_ALIASES.items()
+        for alias in aliases
+    ]
     pairs.sort(key=lambda pair: len(pair[1]), reverse=True)
     return tuple(pairs)
 
@@ -1700,6 +1707,12 @@ _SOCCER_SERIES_TOKENS: dict[str, str] = {
     "BUNDESLIGA": "bundesliga",
     "EREDIVISIE": "eredivisie",
     "BELGIANPL": "belgian_pro_league",
+    # UEFA codes are short enough to sit inside unrelated tickers (`UCL` is in
+    # `KXNUCLEARTEST`) and this is a SUBSTRING scan, so they carry the `KX`
+    # anchor. `KXUECL` before `KXUCL`/`KXUEL`: longest first.
+    "KXUECL": "uecl",
+    "KXUCL": "ucl",
+    "KXUEL": "uel",
     "PRIMEIRA": "primeira_liga",
     "LALIGA": "la_liga",
     "LIGUE1": "ligue_1",

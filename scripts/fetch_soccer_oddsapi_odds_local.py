@@ -124,6 +124,9 @@ LEAGUE_SPORT_KEYS: dict[str, str] = {
     "primeira_liga": "soccer_portugal_primeira_liga",
     "championship": "soccer_efl_champ",
     "belgian_pro_league": "soccer_belgium_first_div",
+    "ucl": "soccer_uefa_champs_league",
+    "uel": "soccer_uefa_europa_league",
+    "uecl": "soccer_uefa_europa_conference_league",
 }
 
 # CORRECTED 2026-08-22. This block previously read "btts/draw_no_bet/

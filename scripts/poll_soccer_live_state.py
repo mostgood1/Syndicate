@@ -57,6 +57,7 @@ from syndicate.features.soccer.ingestion.espn_lineups import fetch_match_summary
 from syndicate.features.soccer.ingestion.espn_live_state import build_live_state
 from syndicate.features.soccer.ingestion.espn_match_box import build_match_box
 from syndicate.features.soccer.sources import active_leagues_for_date
+from syndicate.features.soccer.sources import league_has_sim
 
 _GOAL_WINDOWS_SECONDS = {"next_10_min": 600.0, "next_5_min": 300.0}
 
@@ -228,6 +229,43 @@ def _build_match_boxes(
 # production, still an honest description of what it computes.
 
 
+def _scoreboard_only_game(event_id: str, event: dict[str, Any], live_state: dict[str, Any],
+                          summary: Any) -> dict[str, Any]:
+    """An in-play entry for a competition with no model: state, clock and box, no projection.
+
+    Same keys as the simulated entry so readers need no second shape; every reader of
+    `projection` / `goal_windows` / `live_player_props` / `live_corners` already tolerates
+    None or an empty list (audited 2026-10-15, lane `soccer-uefa-competitions`).
+    """
+    return {
+        "event_id": event_id,
+        "live_corners": None,
+        "home_team": live_state["home_team"],
+        "away_team": live_state["away_team"],
+        "half": live_state["half"],
+        "clock_remaining": live_state["clock_remaining"],
+        "status_display_clock": event.get("status_display_clock"),
+        "status_period": event.get("status_period"),
+        "status_detail": event.get("status_detail"),
+        "score_home": live_state["score_home"],
+        "score_away": live_state["score_away"],
+        **_linescore_fields(summary),
+        "home_red_cards": live_state["home_red_cards"],
+        "away_red_cards": live_state["away_red_cards"],
+        "home_shots_so_far": live_state["home_shots_so_far"],
+        "away_shots_so_far": live_state["away_shots_so_far"],
+        "home_shots_on_target_so_far": live_state["home_shots_on_target_so_far"],
+        "away_shots_on_target_so_far": live_state["away_shots_on_target_so_far"],
+        "home_corners_so_far": live_state["home_corners_so_far"],
+        "away_corners_so_far": live_state["away_corners_so_far"],
+        "corners_source": live_state.get("corners_source"),
+        "projection": None,
+        "goal_windows": None,
+        "momentum": {"supported": False, "reason": "competition_not_modelled"},
+        "live_player_props": [],
+    }
+
+
 def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path, simulations: int,
                 fixture_cache: dict[str, Any] | None = None) -> dict[str, Any]:
     # ESPN's SINGLE-DATE scoreboard (`dates=YYYYMMDD`), NOT the one-day RANGE
@@ -320,14 +358,21 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
         # change needs a caller census, not a spot-check of the caller you just
         # edited -- `validate_soccer_vs_market.py:316` and `:449` are still
         # wrong on the same footing and are NOT fixed here.
-        ratings = _load_team_ratings(league, source_root, iso_date)
-        team_names = [event["home_team"] for event in live_events] + [event["away_team"] for event in live_events]
-        _fill_promoted(ratings, team_names)
-        player_rows = _load_player_rows(league, source_root)
-        # The PRE-KICKOFF corners estimate, read once per league tick. `recommendations_<date>.json` is
-        # rewritten as matches go pre -> in -> post, so the freeze is what still holds a pregame number
-        # for a match that has already started.
-        pregame_payload = load_pregame_payload(source_root, league, iso_date)
+        # NO-MODEL COMPETITIONS (the UEFA cups, `sources.UEFA_COMPETITIONS`) have no
+        # ratings history at all, and `_load_team_ratings` answers that with
+        # `SystemExit` -- a BaseException, which passes `poll_active_leagues_for_tick`'s
+        # `except Exception` and would end the shared live-lens thread for every sport.
+        # They get the scoreboard fields below and no projection.
+        has_sim = league_has_sim(league)
+        if has_sim:
+            ratings = _load_team_ratings(league, source_root, iso_date)
+            team_names = [event["home_team"] for event in live_events] + [event["away_team"] for event in live_events]
+            _fill_promoted(ratings, team_names)
+            player_rows = _load_player_rows(league, source_root)
+            # The PRE-KICKOFF corners estimate, read once per league tick. `recommendations_<date>.json` is
+            # rewritten as matches go pre -> in -> post, so the freeze is what still holds a pregame number
+            # for a match that has already started.
+            pregame_payload = load_pregame_payload(source_root, league, iso_date)
 
         for event in live_events:
             event_id = str(event.get("event_id") or "")
@@ -369,6 +414,10 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
                 )
             except Exception as error:
                 print(f"skip {event_id}: {error}")
+                continue
+
+            if not has_sim:
+                games[event_id] = _scoreboard_only_game(event_id, event, live_state, summary)
                 continue
 
             home_rating = _rating_for(ratings, live_state["home_team"])

@@ -17,6 +17,7 @@ from syndicate.features.soccer.sources import default_season
 from syndicate.features.soccer.sources import default_week
 from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES
 from syndicate.features.soccer.sources import league_display_name
+from syndicate.features.soccer.sources import league_has_sim
 from syndicate.features.soccer.sources import league_select_control
 from syndicate.features.soccer.sources import game_markets_rows
 from syndicate.features.soccer.sources import board_live_state_payload
@@ -431,7 +432,7 @@ def _result_text(away_team: str, home_team: str, away_score: Any, home_score: An
     return f"{away_team} {away_goals:.0f} - {home_team} {home_goals:.0f}"
 
 
-def _placeholder_summary(*, away_team, home_team, week, status_state, away_score, home_score) -> str:
+def _placeholder_summary(*, away_team, home_team, week, status_state, away_score, home_score, league="") -> str:
     if status_state == "post":
         result = _result_text(away_team, home_team, away_score, home_score)
         if result:
@@ -441,6 +442,9 @@ def _placeholder_summary(*, away_team, home_team, week, status_state, away_score
         result = _result_text(away_team, home_team, away_score, home_score)
         if result:
             return f"In progress: {result}. This match was not simulated, so there is no live model line for it."
+    if league and not league_has_sim(league):
+        return (f"{away_team} at {home_team}, Week {week}. {league_display_name(league)} has no model yet, "
+                "so this match shows market odds only.")
     return f"{away_team} at {home_team} is on the schedule for Week {week} but has not been simulated yet."
 
 
@@ -478,6 +482,20 @@ def _placeholder_panels(*, away_team, home_team, league, date_str, status_state,
                 "title": f"{away_team} @ {home_team}",
                 "body": "The score as it stands. No simulation was run for this fixture, so no live model line is available.",
                 "items": [f"Current score: {result}"],
+            }
+        ]
+    if not league_has_sim(league):
+        # NOT the operator instruction below: building artifacts for a competition
+        # with no cross-league ratings would rate every club at league average
+        # (`sources.UEFA_COMPETITIONS`), and `build_soccer_artifacts.py` refuses it.
+        return [
+            {
+                "eyebrow": "No model for this competition",
+                "title": f"{away_team} @ {home_team}",
+                "body": (f"{league_display_name(league)} fixtures are carried for odds and venue prices only. "
+                         "Team ratings are fit per domestic league, and comparing clubs across leagues "
+                         "needs its own measured model before a projection is shown."),
+                "items": [],
             }
         ]
     return [
@@ -565,6 +583,7 @@ def _unsimulated_game(fixture: dict[str, Any], *, league: str, week: int, season
         "summary": _placeholder_summary(
             away_team=away_team,
             home_team=home_team,
+            league=league,
             week=week,
             status_state=status_state,
             away_score=fixture.get("away_score"),

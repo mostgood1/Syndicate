@@ -762,6 +762,9 @@ def _launch_autorun_ncaaf_lines_refresh() -> None:
 _SOCCER_LIVE_LEAGUES = (
     "epl", "la_liga", "bundesliga", "serie_a", "ligue_1", "mls",
     "eredivisie", "primeira_liga", "championship", "belgian_pro_league",
+    # UEFA club competitions: in-play GAME odds only (refresh_odds_sources
+    # gives them no live props step -- no model to price them against).
+    "ucl", "uel", "uecl",
 )
 
 

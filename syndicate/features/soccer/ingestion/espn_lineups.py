@@ -115,6 +115,11 @@ LEAGUE_ESPN_SLUGS: dict[str, str] = {
     "primeira_liga": "por.1",
     "championship": "eng.2",
     "belgian_pro_league": "bel.1",
+    # UEFA club competitions -- fixtures/live state only, no sim (see
+    # `sources.UEFA_COMPETITIONS`). Scoreboard read 200 for all three 2026-10-15.
+    "ucl": "uefa.champions",
+    "uel": "uefa.europa",
+    "uecl": "uefa.europa.conf",
 }
 
 

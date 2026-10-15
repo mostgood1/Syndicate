@@ -35,7 +35,40 @@ LEAGUE_DISPLAY_NAMES: dict[str, str] = {
     "primeira_liga": "Primeira Liga",
     "championship": "Championship",
     "belgian_pro_league": "Belgian Pro League",
+    "ucl": "Champions League",
+    "uel": "Europa League",
+    "uecl": "Conference League",
 }
+
+# UEFA CLUB COMPETITIONS `[2026-10-15, lane soccer-uefa-competitions]`.
+#
+# Registered for FIXTURES, ODDS AND VENUE JOINS ONLY -- not the sim. Every team
+# rating in this module is fit per domestic league and centred on THAT league's
+# mean (`compute_team_ratings`), so an EPL +0.2 and a Belgian +0.2 are different
+# strengths with nothing converting between them, and a club from a league we do
+# not carry (Galatasaray, Celtic, Salzburg...) would fall through `_rating_for`
+# to a silent league-average 0.0. A projection built on that is fabricated.
+#
+# So `league_has_sim` is False for these and the refresh never builds sim
+# artifacts for them; the competition page renders "no projection" from the
+# missing artifact, which is the documented degraded state. Stage 1 (cross-league
+# offsets + ratings fit from UEFA results) flips this per competition, after its
+# own backtest -- not before.
+UEFA_COMPETITIONS: tuple[str, ...] = ("ucl", "uel", "uecl")
+
+# Other spellings the outside world titles a competition with. Kalshi writes
+# BOTH "UEFA Champions League Game" and "Champions League Total Goals" (series
+# KXUCLGAME / KXUCLTOTAL, read 2026-10-15), so a title-prefix matcher needs both.
+LEAGUE_TITLE_ALIASES: dict[str, tuple[str, ...]] = {
+    "ucl": ("UEFA Champions League",),
+    "uel": ("UEFA Europa League",),
+    "uecl": ("UEFA Conference League", "UEFA Europa Conference League", "Europa Conference League"),
+}
+
+
+def league_has_sim(league: str) -> bool:
+    """False for competitions registered without a model (see UEFA_COMPETITIONS)."""
+    return str(league or "").strip().lower() not in UEFA_COMPETITIONS
 
 # ---------------------------------------------------------------------------
 # CALL-SCOPED READ MEMO  `[2026-08-29]`

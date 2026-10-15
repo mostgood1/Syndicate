@@ -1139,6 +1139,12 @@ def _empty_overwrite_refusal(league: str, iso_date: str, rec_path: Path) -> str 
 def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: Path, simulations: int) -> dict[str, Any]:
     if league not in LEAGUE_ESPN_SLUGS:
         raise SystemExit(f"unknown league {league!r}; choices: {sorted(LEAGUE_ESPN_SLUGS)}")
+    # Registered for fixtures/odds only (the UEFA cups): every rating here is fit per
+    # domestic league, so a build would rate each club at a silent league average.
+    from syndicate.features.soccer.sources import league_has_sim
+
+    if not league_has_sim(league):
+        raise SystemExit(f"{league!r} has no model (soccer.sources.UEFA_COMPETITIONS); refusing to simulate it")
 
     fixtures_raw = _fetch_fixtures(league, iso_date)
     api_root = _api_root(league, out_root)
