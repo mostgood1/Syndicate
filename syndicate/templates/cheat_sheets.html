@@ -401,8 +401,10 @@ function matchupTable(d, ids) {
       return `<tr data-ri="${i}"><td><span class="ep">${img(src(r.headshot_src, r.headshot_url), "mini")}${esc(r.player)}${r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}</span></td><td>${esc(betText(r))}</td><td><span class="tm">${img(src(r.opponent_logo_src, r.opponent_logo))}${esc(mu.opponent || r.opponent || "")}</span></td><td class="n">${mu.nth_most ? `<b>${ordinal(mu.nth_most)}</b> most of ${mu.of}` : "–"}</td><td class="n">${typeof mu.per_game === "number" ? mu.per_game.toFixed(1) : "–"}</td><td class="n">${vsText(r)}</td><td class="n">${c.form10 && c.form10.games ? c.form10.hits + "/" + c.form10.games : "–"}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</td></tr>`; }).join("")}</tbody></table></div>`;
 }
 const exportBtn = name => `<button type="button" class="btn no-export" data-export="${esc(name)}">Export image</button>`;
+// "1 rows" -> "1 row", "1 games" -> "1 game": a count of one reads singular, on the sheet and in an export.
+const singular = text => String(text).replace(/^1 ([A-Za-z]+?)s\b/, "1 $1");
 function sectionShell(key, title, blurb, count, inner) {
-  return `<section class="sheet" data-section="${esc(key)}" data-title="${esc(title)}"><header><h2>${title}</h2><p>${blurb}</p><span class="count">${count}</span>${exportBtn(key)}</header>${inner}</section>`;
+  return `<section class="sheet" data-section="${esc(key)}" data-title="${esc(title)}"><header><h2>${title}</h2><p>${blurb}</p><span class="count">${singular(count)}</span>${exportBtn(key)}</header>${inner}</section>`;
 }
 function shopTable(d, ids) {
   if (!ids.length) return `<div class="empty">No line with three or more books and a gap of 2 points or more.</div>`;
@@ -477,7 +479,7 @@ function gamesBlock(d, games) {
   const called = checked.filter(g => Math.sign(g.script.margin_mean) === Math.sign(g.final.home - g.final.away)).length;
   const avgMiss = checked.length ? checked.reduce((t, g) => t + Math.abs(g.script.margin_mean - (g.final.home - g.final.away)), 0) / checked.length : null;
   const scriptRecap = rec ? `<div class="recap">Recap: ${checked.length ? `the sim's leader won <b>${called} of ${checked.length}</b><span class="sep">·</span>its margin was off by <b>${avgMiss.toFixed(1)}</b> points on average` : "no game here is final yet"}</div>` : "";
-  return sectionShell("script", "Game script and matchups", "Expected game script from Syndicate's simulations, and where each defense allows the most. Context, not picks.", `${games.length} games`,
+  return sectionShell("script", "Game script and matchups", "Expected game script from Syndicate's simulations, and where each defense allows the most. Context, not picks.", `${games.length} game${games.length === 1 ? "" : "s"}`,
     scriptRecap + `<div class="games">${games.map(g => `<div class="game"><div class="m">${matchupLine(g)}${g.kickoff_ct ? ` · <span class="kick">${esc(g.kickoff_ct)}</span>` : ""}</div>${rec ? finalLine(g) + scriptCheck(g) : ""}${g.script ? `<div class="read">${esc(g.script.read)}${g.script.total_mean ? ` · total ${Number(g.script.total_mean).toFixed(1)}` : ""}</div>${g.script.helped ? `<ul><li>Helped: ${g.script.helped.map(esc).join(", ")}</li><li>Hurt: ${g.script.hurt.map(esc).join(", ")}</li></ul>` : ""}` : ""}${
       g.defense_allows_most ? Object.entries(g.defense_allows_most).map(([def, cells]) => `<ul>${cells.map(c => `<li>${esc(def)} allow the ${ordinal(c.nth_most)} most ${esc(String(c.stat).replace("_", " "))} to ${esc(c.pos)} (${c.per_game}/g)</li>`).join("")}</ul>`).join("") : ""}</div>`).join("")}</div>`);
 }
@@ -772,11 +774,50 @@ async function buildExport(section) {
   body.querySelectorAll(".rowlist").forEach(list => [...list.children].slice(10).forEach(n => n.remove()));
   body.querySelectorAll("tbody").forEach(tb => [...tb.children].slice(12).forEach(n => n.remove()));
   body.querySelectorAll(".slate").forEach(s => [...s.children].slice(16).forEach(n => n.remove()));
+  recountExport(body, d);
   frame.querySelector(".xbody").appendChild(body);
   document.body.appendChild(frame);
   await settle(frame);
   if (document.fonts && document.fonts.ready) await document.fonts.ready;
   return frame;
+}
+// The exported image's numbers describe the EXPORTED rows (user 2026-10-15: "when we export these to use as social
+// graphics, we need to make sure the counts match what is exported"). The export keeps the first 10 rows of a list,
+// 12 of a table and 16 of the slate, but the header still said the whole section's count ("20 props" over 12 rows)
+// and a reconciled recap / record chip still added up rows the image no longer shows. All three are re-read here from
+// what is left -- the rows kept are the section's own order (set before any result), never chosen by outcome.
+function recountExport(sec, d) {
+  const items = [], seen = new Set();
+  sec.querySelectorAll("[data-ri],[data-li],[data-pk]").forEach(el => {
+    const isPick = el.dataset.pk != null, isLine = el.dataset.li != null;
+    const idx = +(isPick ? el.dataset.pk : isLine ? el.dataset.li : el.dataset.ri);
+    const key = (isPick ? "k" : isLine ? "l" : "r") + idx;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const row = ((isPick ? d.picks : isLine ? d.game_lines : d.rows) || [])[idx] || {};
+    items.push({row, res: row.result, isLine, isPick});
+  });
+  const cnt = sec.querySelector("header .count");
+  if (cnt) {
+    const text = cnt.textContent.trim(), slate = sec.querySelector(".slate"), body = sec.querySelector("tbody");
+    if (sec.dataset.section === "picks" && items.length) {
+      const plays = items.filter(x => isPricePlay(x.row)).length, sims = items.length - plays;
+      cnt.textContent = [sims ? `${sims} pick${sims === 1 ? "" : "s"}` : "", plays ? `${plays} price play${plays === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ");
+    } else if (slate && /^\d+/.test(text)) {
+      cnt.textContent = text.replace(/^\d+/, String(slate.children.length));
+    } else if (items.length && /^\d+/.test(text)) {
+      cnt.textContent = text.replace(/^\d+/, String(items.length));
+    } else if (body && /^\d+/.test(text)) {
+      cnt.textContent = text.replace(/^\d+/, String(body.children.length));
+    }
+    cnt.textContent = singular(cnt.textContent);
+  }
+  if (d && reconciledView(d) && items.length) {
+    const recap = sec.querySelector(".recap");
+    if (recap) recap.outerHTML = sectionRecap(sec.dataset.section, items);
+    const chip = sec.querySelector("header .rec");
+    if (chip) chip.outerHTML = recChip(recordOf(items.map(x => x.res)));
+  }
 }
 async function exportSection(btn) {
   const section = btn.closest("section.sheet");

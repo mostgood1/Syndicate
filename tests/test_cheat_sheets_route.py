@@ -74,6 +74,8 @@ def test_the_page_is_todays_sheet_with_the_site_menu_and_past_days_as_records(ht
     record = client.get("/cheatsheets?date=2026-10-13").data.decode()
     assert _js(record, "DATA")["nfl"]["generated_at"] == "2026-10-13T21:30:00Z"
     assert "__LOGO_SRC__" not in html and "<!--__SITE" not in html and "/*__META__*/" not in html
+    # An exported image re-counts what it exports (user 2026-10-15: "make sure the counts match what is exported").
+    assert "recountExport(body, d);" in html and "function recountExport(sec, d)" in html
 
 
 def test_no_sheet_yet_today_is_an_empty_page_not_yesterdays(http):

@@ -175,6 +175,42 @@ def fetch_rows(base_url: str, sport: str) -> list[dict[str, Any]]:
     return [r for r in doc.get("rows") or [] if isinstance(r, dict)]
 
 
+def _day_groups(rows: list[dict[str, Any]], day: str) -> set[tuple]:
+    """(event, player, market) prop groups the sheet would build for `day` from a board read."""
+    return {(r.get("event_id"), r.get("player_name"), r.get("market")) for r in rows
+            if r.get("kind") == "prop" and (r.get("game_state") or "pregame") == "pregame"
+            and str(r.get("segment") or "full").lower() in ("full", "full_game") and central_day(r.get("commence_time")) == day}
+
+
+def steady_rows(fetch: Any, rows: list[dict[str, Any]], prior: dict[str, Any] | None, day: str, *, now: datetime,
+                tries: int = 3, wait_s: float = 50.0, sleep: Any = time.sleep) -> list[dict[str, Any]]:
+    """Never build a sheet off a COLLAPSED board read. Measured 2026-10-15: the NFL sheet went 157 -> 28 rows (63 -> 20
+    groups) on the 12:30 PM CT build and 66 -> 21 groups at 10:57 AM, both while the refresh-worker was mid board
+    build; minutes later the board served ~64 groups again. A sheet REPLACES its pregame rows on every build, so one
+    unlucky read wiped most of it. When a read holds under 60% of the prior sheet's groups for games not yet started,
+    re-read (up to `tries` more, `wait_s` apart) and keep the fullest read."""
+    started = lambda r: str(r.get("commence_time") or "") <= now.isoformat()
+    before = {(r.get("event_id"), r.get("player"), r.get("market")) for r in (prior or {}).get("rows") or [] if not started(r)}
+    best, have = rows, len(_day_groups(rows, day))
+    if len(before) < 10 or have >= 0.6 * len(before):
+        return rows
+    for attempt in range(1, tries + 1):
+        print(f"CHEAT_SHEET board read looks collapsed: {have} groups vs {len(before)} on the prior sheet -- re-read {attempt}/{tries} "
+              f"in {wait_s:.0f}s", flush=True)
+        sleep(wait_s)
+        try:
+            again = fetch()
+        except Exception as exc:  # noqa: BLE001
+            print(f"CHEAT_SHEET re-read failed: {type(exc).__name__}: {exc}", flush=True)
+            continue
+        n = len(_day_groups(again, day))
+        if n > have:
+            best, have = again, n
+        if have >= 0.6 * len(before):
+            break
+    return best
+
+
 def latest_nfl_dvp(data_root: Path) -> dict[str, Any]:
     files = sorted(glob.glob(str(data_root / "nfl_source" / "tracking" / "derived" / "nfl_defense_vs_position_*.json")))
     if not files:
@@ -898,7 +934,8 @@ def main(argv: list[str] | None = None) -> int:
                 kept = {str(r.get("event_id")) for r in (prior or {}).get("rows") or []}
                 rows = quote_rows(data_root, sport, selected, skip_events=kept, now=datetime.now(timezone.utc))
             else:
-                rows = fetch_rows(args.base_url, sport)
+                rows = steady_rows(lambda: fetch_rows(args.base_url, sport), fetch_rows(args.base_url, sport), prior,
+                                   selected, now=datetime.now(timezone.utc))
         except Exception as exc:  # noqa: BLE001
             print(f"CHEAT_SHEET {sport} fetch failed: {type(exc).__name__}: {exc}", flush=True)
             continue

@@ -693,3 +693,21 @@ def test_a_price_edge_the_sim_backs_is_a_syndicate_pick_and_one_it_does_not_is_a
     merged = m.merge_picks([pick("a", "contradicts", 9.0), pick("b", "agrees", 1.0)], None)
     assert [(p["pick_id"], p["label"], p["book_name"]) for p in merged] == [("b", "SYNDICATE PICK", "ProphetX"),
                                                                         ("a", "PRICE PLAY", "ProphetX")]   # picks first
+
+
+def test_a_collapsed_board_read_is_re_read_not_built():
+    # 2026-10-15: the NFL sheet went 157 -> 28 rows on the 12:30 PM CT build (20 of ~64 groups, read mid board build).
+    m = _script()
+    from datetime import datetime, timezone
+    now = datetime(2026, 10, 15, 17, 30, tzinfo=timezone.utc)
+    row = lambda i: {"kind": "prop", "event_id": "e1", "player_name": f"P{i}", "market": "Receptions",
+                     "commence_time": "2026-10-16T00:15:00Z", "segment": "full"}
+    prior = {"rows": [{"event_id": "e1", "player": f"P{i}", "market": "Receptions", "commence_time": "2026-10-16T00:15:00Z"}
+                      for i in range(60)]}
+    full, thin = [row(i) for i in range(64)], [row(i) for i in range(20)]
+    reads, waits = iter([full]), []
+    got = m.steady_rows(lambda: next(reads), thin, prior, "2026-10-15", now=now, sleep=waits.append)
+    assert got is full and waits == [50.0]                                   # re-read once, kept the full read
+    assert m.steady_rows(lambda: 1 / 0, full, prior, "2026-10-15", now=now, sleep=waits.append) is full and waits == [50.0]
+    started = {"rows": [dict(r, commence_time="2026-10-15T17:00:00Z") for r in prior["rows"]]}   # a started game: no baseline
+    assert m.steady_rows(lambda: 1 / 0, thin, started, "2026-10-15", now=now, sleep=waits.append) is thin
