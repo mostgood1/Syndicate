@@ -56,6 +56,14 @@ def resolve_starter_ids(
     starter_names: set[str],
     starter_espn_ids: dict[str, str] | None = None,
 ) -> set[str]:
+    return _resolve_starters(player_rows, starter_names, starter_espn_ids)[0]
+
+
+def _resolve_starters(
+    player_rows: list[dict[str, Any]],
+    starter_names: set[str],
+    starter_espn_ids: dict[str, str] | None = None,
+) -> tuple[set[str], set[str]]:
     """Map normalized ESPN starter names onto the identity keys
     ``build_usage_profiles`` actually uses (player_id when present, else a
     name-based key) -- so a ``starters`` set built from this function lines
@@ -119,7 +127,7 @@ def resolve_starter_ids(
             resolved.add(player_row_key(row, index, "_"))
             matched_names.add(owners[0])
             left.remove(owners[0])
-    return resolved
+    return resolved, matched_names
 
 
 def _nested(want: list[str], have: list[str]) -> bool:
@@ -173,6 +181,61 @@ def find_event_for_fixture(
     return None
 
 
+def _move_starters_from_other_clubs(
+    league: str,
+    unmatched: set[str],
+    espn_ids: dict[str, str],
+    team_label: str,
+    side_rows: list[dict[str, Any]],
+    other_club_rows: list[dict[str, Any]],
+) -> set[str]:
+    """Confirmed starters this club's rows do not hold, found under ANOTHER club in
+    the same league, and RE-FILED under the club that started them (lane
+    soccer-starter-club-move, 2026-10-15).
+
+    A within-league move the stats source has not caught up with: Matias Galarza
+    starts for Inter Miami, but the row still says Atlanta, so the sim gave Atlanta
+    his share and Inter Miami nobody. 9 confirmed starters on 10-09..10-12, mostly MLS.
+
+    STRICT: a multi-word starter name only, matched by ESPN id, else exact name, else
+    a name-form step; exactly ONE row in the whole pool or nothing moves. The row
+    object is shared with the league's `player_rows`, so setting its `team` moves
+    the player for the sim (`adapters._players_for_side` keys on it) -- out of the
+    old squad and into the new one.
+    """
+    by_id = {str(espn_id): name for espn_id, name in (espn_ids or {}).items()}
+    moved: set[str] = set()
+    for name in sorted(unmatched):
+        if len(name.split()) < 2:
+            continue
+        want_ids = {i for i, n in by_id.items() if n == name}
+        hits = [row for row in other_club_rows if str(row.get("player_id") or "") in want_ids]
+        if not hits:
+            hits = [row for row in other_club_rows if _norm_player_name(row.get("player_name")) == name]
+        if not hits:
+            for step in _NAME_FORM_STEPS:
+                hits = [row for row in other_club_rows
+                        if step(name.split(), _norm_player_name(row.get("player_name")).split())]
+                if hits:
+                    break
+        if len(hits) != 1:
+            continue
+        row = hits[0]
+        if "," in str(row.get("team") or ""):
+            # A comma-joined label ("Everton,Manchester City") is already filed under
+            # each club it names (`build_soccer_artifacts._attach_confirmed_starters`),
+            # so finding it HERE means it names neither club in this fixture -- not a
+            # move this pass can make with confidence.
+            continue
+        print(f"[lineups] SOCCER_STARTER_CLUB_MOVED league={league} player={row.get('player_name')!r} "
+              f"from={row.get('team')!r} to={team_label!r}", flush=True)
+        row["team"] = team_label
+        other_club_rows.remove(row)
+        side_rows.append(row)
+        moved.add(player_row_key(row, len(side_rows) - 1, "_"))
+    return moved
+
+
 def fetch_confirmed_starter_ids(
     league: str,
     *,
@@ -183,6 +246,9 @@ def fetch_confirmed_starter_ids(
     events: list[dict[str, Any]] | None = None,
     date_windows: list[str] | None = None,
     min_starters: int = _DEFAULT_MIN_STARTERS,
+    other_club_rows: list[dict[str, Any]] | None = None,
+    home_team_label: str | None = None,
+    away_team_label: str | None = None,
 ) -> tuple[set[str], set[str]] | None:
     """Confirmed starter id sets for one fixture, or ``None`` if no matching
     event was found or its lineup isn't posted yet (fewer than
@@ -214,8 +280,15 @@ def fetch_confirmed_starter_ids(
                for row in rows if row["side"] == side and row["starter"] and row.get("player_id")}
         for side in ("home", "away")
     }
-    home_ids = resolve_starter_ids(home_player_rows, home_names, starter_ids["home"])
-    away_ids = resolve_starter_ids(away_player_rows, away_names, starter_ids["away"])
+    home_ids, home_matched = _resolve_starters(home_player_rows, home_names, starter_ids["home"])
+    away_ids, away_matched = _resolve_starters(away_player_rows, away_names, starter_ids["away"])
+    if other_club_rows:
+        for side, names, matched, ids, label, side_rows in (
+            ("home", home_names, home_matched, home_ids, home_team_label or home_team, home_player_rows),
+            ("away", away_names, away_matched, away_ids, away_team_label or away_team, away_player_rows),
+        ):
+            ids |= _move_starters_from_other_clubs(
+                league, names - matched, starter_ids[side], label, side_rows, other_club_rows)
     # PER SIDE, NOT PER FIXTURE. This used to `return None` when EITHER side
     # resolved fewer than `min_starters`, which discards a side whose lineup
     # matched perfectly well because the OTHER side did not.
@@ -259,6 +332,20 @@ def attach_confirmed_starters(
     Fetches the league's event list once and reuses it across all fixtures.
     """
     events = fetch_events(league, date_windows=date_windows, statuses={"pre", "in"})
+    # EVERY CLUB A COMMA-JOINED LABEL NAMES (lane soccer-starter-club-move,
+    # 2026-10-15). The caller keys rows by the whole `team` string, so a row filed
+    # "Everton,Manchester City" sat under a key no fixture matches and its player
+    # could never be matched as a confirmed starter -- while the sim itself binds
+    # such a row to whichever part is playing (`loaders._bind_player_team`).
+    # Measured 10-09..10-12: 53 such rows in five leagues (31 are ligue_1's
+    # "Paris Saint Germain,Rennes", an upstream label fault). Re-keyed here so the
+    # starter step reads the same clubs the sim does.
+    expanded: dict[str, list[dict[str, Any]]] = {}
+    for key, rows in player_rows_by_team.items():
+        for part in dict.fromkeys(p.strip() for p in str(key).split(",")):
+            if part:
+                expanded.setdefault(part, []).extend(rows)
+    player_rows_by_team = expanded
     team_names = list(player_rows_by_team)
     updated: list[dict[str, Any]] = []
     for fixture in fixtures:
@@ -270,6 +357,9 @@ def attach_confirmed_starters(
         if home_key is None or away_key is None:
             updated.append(new_fixture)
             continue
+        others = [row for team, rows in player_rows_by_team.items() if team not in (home_key, away_key)
+                  for row in rows]
+        pool = list(others)
         result = fetch_confirmed_starter_ids(
             league,
             home_team=home_team,
@@ -278,7 +368,17 @@ def attach_confirmed_starters(
             away_player_rows=player_rows_by_team[away_key],
             events=events,
             min_starters=min_starters,
+            other_club_rows=pool,
+            home_team_label=home_key,
+            away_team_label=away_key,
         )
+        # A moved row left its old club: drop it from that club's list too, so a later
+        # fixture of the old club cannot claim it again.
+        for row in others:
+            if row not in pool:
+                for team, rows in player_rows_by_team.items():
+                    if team not in (home_key, away_key) and row in rows:
+                        rows.remove(row)
         if result is not None:
             home_ids, away_ids = result
             # An EMPTY side means "not confirmed", and must stay absent rather
