@@ -2312,3 +2312,24 @@ command. A filter on a guard's output is a way to not see the guard.
 - **What happened:** a ledger helper wrote `open(p, "wb").write(fn(s))`. Python evaluates `open()`, which TRUNCATES, before `fn()`. `fn` raised on a failed assert, so `.syndicate/state.md` went to 0 bytes: 744 deleted lines staged, with no error naming the file. It was caught by reading `git diff --cached --numstat` (0 added / 744 deleted), restored from HEAD, and never committed.
 - **The one-line form is the trap:** `open(p, "wb").write(build())` LOOKS like build-then-write. Always build into a variable first, then `with open(p, "wb")`. Check `--numstat` deletions before EVERY ledger commit.
 
+
+## 2026-10-15 RULE: the null for a ONE-SIDEDNESS claim is the MEASURED directional base rate, never 50/50 `[lane model-edge-ceiling-implied-probability]`
+
+- **What happened:** the ceiling study found six player-prop families whose
+  large-gap rows were 100% on the UNDER side (ncaaf rushing yards 0/16, nhl
+  assists 0/14, nhl points 0/10, nfl passing tds 0/9, ncaaf passing yards 0/8,
+  nhl saves 0/6). My instinct was to score these against a fair coin, which
+  gives 1.5e-05 for the 0/16 and reads as overwhelming proof of a defect.
+- **The measured base rate was p(over) = 0.334, not 0.5** -- the large-gap
+  population is ALREADY 2:1 under platform-wide. Against the real null the same
+  families are only p = 1.5e-03 .. 8.7e-02, and the weakest is unremarkable.
+  The 50/50 null overstated the strongest case by **two orders of magnitude**.
+- **Rule:** before claiming a split is one-sided, compute the direction's base
+  rate IN THE SAME POPULATION and score against that. A platform-wide skew is
+  exactly the kind of thing that makes every subgroup look one-sided.
+- **And report the aggregate as the finding when no single cell survives:** six
+  co-occurring one-sided families is the real signal here, so it is stated that
+  way rather than by quoting the smallest p-value in the table.
+- **Companion:** the same-day rule that a betting cell's null is its own
+  predicted EV, not 0. Both are the same mistake -- assuming a null instead of
+  deriving it from the population in hand.
