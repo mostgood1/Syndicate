@@ -349,8 +349,27 @@ function slateBlock(d) {
   return sectionShell("slate", "The slate", "Every game on this sheet in kickoff order. Pick a game for its own sheet.", `${games.length} game${games.length === 1 ? "" : "s"}`,
     `<div class="slate">${games.map(g => `<a class="sg" href="${gameHref(g.event_id)}" data-game="${esc(g.event_id)}"><div class="when">${esc(g.kickoff_ct || "")}${started(g.commence_time) ? ` <span class="chip started">Started</span>` : ""}</div><div class="teams"><div class="t">${img(src(g.away_logo_src, g.away_logo))}${esc(g.away_team || "")}</div><div class="t">${img(src(g.home_logo_src, g.home_logo))}${esc(g.home_team || "")}</div></div><div class="n">${g.props || 0} props on this sheet</div></a>`).join("")}</div>`);
 }
+// One row per player: the NET change from the earliest status in the window to the latest, at the latest capture.
+// A player who flapped back to where he started (Out -> Questionable -> Out) is no news and drops out
+// (user 2026-10-15: "news impact needs some dedup work").
+function dedupNews(items) {
+  const by = new Map();
+  for (const n of items) {
+    const key = `${String(n.player || "").toLowerCase()}|${String(n.team || "").toLowerCase()}`;
+    const t = Date.parse(n.captured_at || "") || 0;
+    const cur = by.get(key);
+    if (!cur) { by.set(key, {...n, _first: t, _last: t, _from: n.previous_status || null, _changes: 1}); continue; }
+    cur._changes += 1;
+    if (t < cur._first) { cur._first = t; cur._from = n.previous_status || null; }
+    if (t >= cur._last) { Object.assign(cur, n, {_first: cur._first, _from: cur._from, _changes: cur._changes, _last: t}); }
+  }
+  return [...by.values()]
+    .filter(n => String(n._from || "").toLowerCase() !== String(n.status || "").toLowerCase())
+    .map(n => ({...n, previous_status: n._from}))
+    .sort((a, b) => b._last - a._last);
+}
 function newsBlock(d) {
-  const news = d.news || [];
+  const news = dedupNews(d.news || []);
   if (!news.length) return "";
   return sectionShell("news", "News impact", "Status changes captured by Syndicate's news collector in the last day, with that team's game props on the board.", `${news.length}`,
     `<div class="tbl"><table><thead><tr><th>Player</th><th>Team</th><th>Change</th><th>Captured</th><th>Game props on board</th></tr></thead><tbody>${
@@ -505,7 +524,9 @@ async function exportSection(btn) {
   if (META.date) document.getElementById("dayLabel").innerHTML = esc((META.date === META.today ? "Today · " : ahead ? "Tomorrow · " : "") + dayName(META.date))
     + (META.beta ? ` <span class="chip beta">Beta</span>` : "") + (ahead ? ` <span class="chip phase">Early look</span>` : "");
   if (META.mode === "app" && (META.dates || []).length) {
-    document.getElementById("days").innerHTML = META.dates.slice(0, 8).map(day =>
+    // Today first, then tomorrow, then the records newest first (user 2026-10-15: "today should be first, then tomorrow").
+    const order = [META.today, ...META.dates.filter(x => x > META.today).sort(), ...META.dates.filter(x => x < META.today)];
+    document.getElementById("days").innerHTML = order.slice(0, 8).map(day =>
       `<a class="btn ${day === META.date ? "on" : ""}" href="${day === META.today ? "?" : "?date=" + day}">${day === META.today ? "Today" : day > META.today ? "Tomorrow" : esc(dayShort(day))}</a>`).join("");
   }
   document.getElementById("tabs").innerHTML = sports.map(s => `<button class="tab" role="tab" data-sport="${s}">${SPORT_NAMES[s] || s}</button>`).join("");
