@@ -49830,3 +49830,8 @@ The copy has no cache, `trust_env` off unless `STATSAPI_TRUST_ENV`, an (8 s, 8 s
 - **ask:** user 2026-10-15 "split the season record into picks vs price plays".
 - **claim:** web by cheat-sheets token 93c47089..., acquire exit 0. Ride-alongs: ledger commits only.
 - **verify:** `record.json` rebuilt on the fleet's new code 18:20Z (write_record, no grading): sections now "Syndicate picks", "Price plays", ... ; official days 0 -- the first official numbers, and the first graded picks/price plays, arrive with the 11:50 PM CT reconcile (10-15 = first official day). Tests: a sheet with one backed pick + two price plays (one by the stamped label, one by the rule) tallies 1-0 / 1-1 apart and 3 bets in All featured.
+
+## 2026-10-15 18:46:09Z (1:46 PM CT) -- web ff 9abdb64a -> 05d30fe9 + `reload-web` (2.0 s, 0 failures): a positive number is `gain`, not `pos` (lane `cheat-sheets`, session 9e18a0e7) -- NO outage, no restart
+- **ask:** user 2026-10-15 "show me the season record page" -- the page painted every positive units/ROI cell (and the picks Edge tile, and EV chips) as a blue player-position badge, because `.pos` is the position-badge class.
+- **claim:** web by cheat-sheets token 5e023b3e..., acquire exit 0. Ride-alongs: 79fa4682 / 30d7a4fb / 4482f8ff / e19a6274 (basketball-scenario ledger + docs) and f5da9920 (deploys); code diff outside .syndicate/docs = `syndicate/templates/cheat_sheets.html` only.
+- **verify:** live /cheatsheets/record (Beta tab) read at 18:46Z: positive cells `td.n.gain` render rgb(140,255,46) on transparent background (+0.18u, +1.1%, +0.51u, +51.0%); negatives `td.n.neg` rgb(255,107,87); `.rtab td.n.pos` count 0. Screenshots sent to the user.
