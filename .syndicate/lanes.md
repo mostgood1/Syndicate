@@ -902,6 +902,14 @@ death, never life — do not invert it.
 - Verification: Per sport and market with rows == total_rows: count of rows with a non-null projection and a null model_edge_pct, the reason histogram over exactly those rows, and the share of them carrying no reason at all.
 - Blocked by: none
 
+### live-market-fair-cells — OPEN — opened 2026-10-14 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: In-play market-fair rows in exactly two cells -- live NFL player props and live NCAAF totals (any segment; families as the 10-14 live re-grade defined them) -- are staked on the paper portfolio instead of refused in_play_market_fair, through a per-cell allowlist in which every other in-play market-fair cell stays refused, with the forward read pre-registered before the first bet
+- Files: syndicate/features/shared/portfolio_commit.py (LOAN from published-negative-ev - user 2026-10-15 in chat: go ahead and stake live NFL props and NCAAF totals - the in-play market-fair cell allowlist ONLY) + tests/test_in_play_market_fair_cells.py (NEW)
+- Hypothesis: Live market-fair rows in these two cells are positive forward: live re-grade 09-30..10-13 NFL props +11.5% [+0.6, +23.1] as shown / +13.7% [0.0, +27.5] on the Shin fair; NCAAF totals +17.2% [+0.4, +34.0] / +18.0% [+2.6, +33.8] -- the only cells positive under both fairs
+- Falsification test: KILL read at >= 400 pooled Tier 1 bets with >= 40 NFL-props games and >= 40 NCAAF-totals games (first possible Tue 2026-11-03): re-refuse if the pooled flat-unit ROI's game-clustered 95% upper bound is below 0. PROMOTE read at >= 1,000 bets and >= 150 games (first possible 2026-11-24): only if the lower bound is above 0, the 120-second delayed-price ROI is above 0, and realised vs Shin-expected wins have |z| < 2; else the cells stay paper-only as unproven. Cells are never re-cut after seeing forward data
+- Verification: unit tests (admitted cells sized, spreads / h2h / other games and other sports still refused, env none restores the refusal, an unparseable value refuses); on the fleet after the refresh-worker restart the plans show in_play_market_fair refusals only outside the two cells and staked paper positions in them; instrument of record is flat-unit grading of recorder sg rows for the two cells, recorded price, first live sighting, bootstrapped by game, clock from 2026-10-13 16:03 CT
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
