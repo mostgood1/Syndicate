@@ -49484,3 +49484,16 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **verify (7:2x PM CT, sheet rebuilt by the fleet checkout at d79a1ad5):** NHL identity team 47/47, position 47, headshot 47, logo 47 (was 18 of 49 before the roster union); NCAAF team 89/89, position 81, headshot 87, logo 89 (the short-name side match). MET for the sheets; the board half loads at the next refresh-worker restart.
 - **00:18:39Z, same claim:** fleet ff d79a1ad5 -> 3dcbb4fb (this lane only: the play-card template's kickoff tag; read by no role, only by the 9:15 AM card task). No reload.
 - **schedules (Windows Task Scheduler, the SyndicateNewsCollector pattern, fleet checkout):** `SyndicateCheatSheets` daily 8:30 AM / 12:30 PM / 4:30 PM CT (WSL, nice 19, `build_cheat_sheets.py`, log `~/syndicate-prod/logs/cheat_sheets.log`, 50 min limit); `SyndicatePlayCards` daily 9:15 AM CT (Windows py over \wsl.localhost for the Playwright PNGs: `build_play_cards.py` then `grade_play_cards.py`, log `logs/play_cards.log`). No OddsAPI in either.
+
+## 2026-10-15 00:31Z -- READING: live anytime-goalscorer join on the first props-league slate (MLS 10-14, 6 matches) -- **MET** `[lane soccer-live-anytime-scorer, session b9bb5f37; closes the owed verify of the 2026-10-12 22:06:24Z restart entry]`
+- **Join** (`LIVE_PROJECTION_JOIN sport=soccer`, 23:42-00:28Z, 6 builds), 6 live games at 23:51Z:
+  - considered 2,441, **projected 1,157 (47%)**, **edged_modelled 890-980**, lens_indexed 2,795;
+  - miss_line 590, miss_not_live 651;
+  - edge_why: devig_failed 77, one_sided_quote 99-137, over_already_decided 1-53.
+  - Last MLS window before the change (10-11 ~00:01Z, 1 live game): considered 439, projected 28, edged_modelled 23, miss_line 166.
+- **Population ledger** (live soccer props recorded since 23:00Z, distinct candidates):
+  - anytime 276 rows: **68 with a model edge, 14 positive** (10-11: anytime live rows with a model edge = **0**). Lane: 89 opportunity, 187 dead (stale quote).
+  - shots 95/859, SOT 73/490, assists 50/194 with an edge; first/last goalscorer 0 (no live race model).
+  - Top anytime model edges: Lucas Bartlett +12.67 (market EV -6.40), Kimito Nono +12.06, German Berterame +10.26.
+- **Board:** the served `/api/board/layer2-shortlist?date=2026-10-14` (200 rows) holds NO live soccer prop. Its live soccer rows are corners and h2h. The anytime rows now carry a model edge and are ranked, but they rank below on market EV (the best has EV -6.4%). That is the board's ranking policy, not this join.
+- **Still OPEN, as a lead:** calibration of live P(score) against settled outcomes (the lane's falsification test asks for it "before relying on them for ranking"). Soccer prop settlement now grades anytime (aa8a2d98), so it can be read from the ledger after a few slates.
