@@ -57,10 +57,15 @@ def test_no_starter_announced_means_no_batter_matchup(tmp_path):
     assert got == {}
 
 
-def test_the_sheet_section_needs_three_plate_appearances_and_a_sane_price():
-    def row(player, pa, price=-110):
-        return {"player": player, "market": "batter_hits", "side": "over",
-                "pvp": {"line": {"plateAppearances": pa}}, "check": {"verdict": "neutral", "price": price}}
+def test_the_sheet_sections_split_batters_from_pitchers_and_stay_compact():
+    def row(player, pa, price=-110, market="batter_hits", side="over", ev=0.0, kind="batter_vs_pitcher"):
+        return {"player": player, "market": market, "side": side, "pvp": {"kind": kind, "line": {"plateAppearances": pa}},
+                "check": {"verdict": "neutral", "price": price, "ev_market": ev}}
 
-    rows = [row("A", 15), row("B", 2), row("C", 30, price=-400), row("D", 6)]
-    assert [rows[i]["player"] for i in cs.sections(rows)["pvp"]] == ["A", "D"]
+    rows = [row("A", 15), row("A", 15, side="under", ev=2.0), row("B", 2), row("C", 30, price=-400), row("D", 6),
+            row("Snell", 53, market="strikeouts", ev=-2.4, kind="pitcher_vs_lineup"),
+            row("Snell", 53, market="strikeouts", side="under", ev=-4.9, kind="pitcher_vs_lineup"),
+            row("Snell", 53, market="outs", ev=-1.8, kind="pitcher_vs_lineup")]
+    s = cs.sections(rows)
+    assert [(rows[i]["player"], rows[i]["side"]) for i in s["pvp_batters"]] == [("A", "under"), ("D", "over")]
+    assert [(rows[i]["player"], rows[i]["market"], rows[i]["side"]) for i in s["pvp_pitchers"]] == [("Snell", "strikeouts", "over")]

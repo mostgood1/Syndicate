@@ -387,15 +387,21 @@ def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25) -> dict[str, l
         # this stat for an over (toughest fifth for an under), most extreme first.
         "matchup_spots": sorted((i for i in idx if matchup_favors_side(rows[i]) or vs_opponent_strong(rows[i])),
                                 key=lambda i: _matchup_extremity(rows[i])),
-        # Player vs player (MLB: batter vs the probable starter, pitcher vs the opposing roster), biggest sample first.
-        "pvp": sorted((i for i in idx if _pvp_pa(rows[i]) >= PVP_MIN_PA), key=lambda i: -_pvp_pa(rows[i])),
+        # Player vs player (MLB). Batters vs the probable starter: one row per hitter + stat (the better-EV side),
+        # biggest sample first. Pitchers vs the opposing roster: ONE row per pitcher -- his strikeout line when he has
+        # one -- because the lineup line is the same for every market he is priced in.
+        "pvp_batters": _best_side_per_market(rows, sorted(
+            (i for i in idx if _pvp_kind(rows[i]) == "batter_vs_pitcher" and _pvp_pa(rows[i]) >= PVP_MIN_PA and featurable(rows[i])),
+            key=lambda i: -_pvp_pa(rows[i])))[:top],
+        "pvp_pitchers": _one_per_pitcher(rows, [i for i in idx if _pvp_kind(rows[i]) == "pitcher_vs_lineup"
+                                                and _pvp_pa(rows[i]) >= PVP_MIN_PA and featurable(rows[i])])[:top],
         # Everything on the board, for a game's own sheet (the page shows it there only).
         "every_prop": sorted(idx, key=lambda i: (str(rows[i].get("market")), str(rows[i].get("player")),
                                                  rows[i].get("line") if isinstance(rows[i].get("line"), (int, float)) else 0,
                                                  str(rows[i].get("side"))))[:EVERY_PROP_CAP],
     }
     for key in ("value", "hot_streaks", "streaks_with_room", "streaks_priced_in", "hot_form", "consistency",
-                "matchup_spots", "shop_gaps", "pvp"):
+                "matchup_spots", "shop_gaps"):
         out[key] = _one_per_bet(rows, [i for i in out[key] if featurable(rows[i])])[:top]
     return out
 
@@ -481,6 +487,40 @@ def _matchup_extremity(row: Mapping[str, Any]) -> float:
 
 
 PVP_MIN_PA = 3     # a batter-vs-pitcher line under 3 plate appearances is not shown as a matchup
+
+
+def _pvp_kind(row: Mapping[str, Any]) -> str | None:
+    return (row.get("pvp") or {}).get("kind")
+
+
+def _ev_of(row: Mapping[str, Any]) -> float:
+    ev = (row.get("check") or {}).get("ev_market")
+    return float(ev) if isinstance(ev, (int, float)) else float("-inf")
+
+
+def _best_side_per_market(rows: Sequence[Mapping[str, Any]], ids: Sequence[int]) -> list[int]:
+    """Keep ids in order, one per player + market: the side with the better EV."""
+    best: dict[tuple, int] = {}
+    order: list[tuple] = []
+    for i in ids:
+        key = (rows[i].get("player"), rows[i].get("market"))
+        if key not in best:
+            order.append(key)
+            best[key] = i
+        elif _ev_of(rows[i]) > _ev_of(rows[best[key]]):
+            best[key] = i
+    return [best[k] for k in order]
+
+
+def _one_per_pitcher(rows: Sequence[Mapping[str, Any]], ids: Sequence[int]) -> list[int]:
+    by_player: dict[Any, list[int]] = {}
+    for i in ids:
+        by_player.setdefault(rows[i].get("player"), []).append(i)
+    picked = []
+    for group in by_player.values():
+        ks = [i for i in group if "strikeout" in str(rows[i].get("market") or "").lower()]
+        picked.append(max(ks or group, key=lambda i: _ev_of(rows[i])))
+    return sorted(picked, key=lambda i: -_pvp_pa(rows[i]))
 
 
 def _pvp_pa(row: Mapping[str, Any]) -> int:
