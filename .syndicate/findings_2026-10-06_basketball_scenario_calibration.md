@@ -2918,3 +2918,15 @@ announced):
   are outcome-neutral).
 - The wiring parity job was stopped (it exercises the engine only, not the wiring) to free memory. Wiring identity rests
   on the deterministic unit test.
+
+**P3 DISCLOSURE (before any VALID number exists): G3, as registered, FAILS on the FIT window** (P3's grader smoke test,
+FIT only, FINAL − PROD).
+- Pooled Q1–Q3: total |err| −0.26 [−0.44, −0.08] ✓, margin −0.23 [−0.37, −0.10] ✓, but ML log-loss −0.008
+  [−0.020, +0.006] ✗ (not significant).
+- At 5:00 Q4: total −0.004 [−0.08, +0.08] fails the +0.05 bar on noise. **ML +0.010 [+0.000, +0.021]: FINAL is
+  significantly WORSE on late win probability.**
+- G3 is NOT amended (no fitting the gate to the data). Expect G3 to fail on VALID unless VALID differs materially. The
+  VALID read proceeds unchanged. Under the user's rule a G3 fail means nothing is enabled.
+- **Lead for this lane (a real finding, independent of the read):** the end-game / bonus fouling in the final config
+  shifts LATE win probabilities the wrong way. To diagnose after the read: late-Q4 sim P(win) vs real by margin
+  bucket, mechanism on vs off. Not acted on before the read.
