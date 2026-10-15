@@ -20,7 +20,10 @@ from syndicate.features.shared.play_cards import OFFICIAL_START
 
 # (key, label) in page order. Row sections first, then the game-line value section.
 FEATURED: tuple[tuple[str, str], ...] = (
-    ("picks", "Syndicate picks"),          # the board's suggested opps, promoted (2026-10-15) -- the headline section
+    ("picks", "Syndicate picks"),          # the board's suggested opps the sim BACKS (2026-10-15) -- the headline section
+    # ... and the ones it does not: the same price edge without the sim's backing. Kept apart so the record itself says
+    # whether the sim's backing adds anything (user 2026-10-15: "split the season record into picks vs price plays").
+    ("price_plays", "Price plays"),
     ("value", "Value at the best price"),
     ("hot_streaks", "Hot streaks"),
     ("hot_form", "Hot form, one-sided"),
@@ -81,9 +84,10 @@ def day_record(sheet: Mapping[str, Any], reconciled: Mapping[str, Any]) -> dict[
     tallies: dict[str, dict[str, float]] = {}
     # Every featured bet ONCE, keyed the grader's way: a Syndicate pick that is also a value row is one bet.
     featured: dict[str, Mapping[str, Any] | None] = {}
+    play = [(pk.get("label") or cs.pick_label(pk)) == cs.PRICE_PLAY_LABEL for pk in picks]
     for key, _label in FEATURED:
-        if key == "picks":
-            ids = list(range(len(picks)))
+        if key in ("picks", "price_plays"):
+            ids = [i for i in range(len(picks)) if play[i] == (key == "price_plays")]
             results = [pick_result[i] for i in ids]
             featured.update({cs.pick_result_key(picks[i]): pick_result[i] for i in ids})
         elif key == "lines_value":

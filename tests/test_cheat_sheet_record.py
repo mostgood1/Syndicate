@@ -65,3 +65,20 @@ def test_the_record_page_only_reads_the_file(tmp_path, monkeypatch):
     page = client.get("/cheatsheets/record").get_data(as_text=True)
     assert "function renderRecordPage" in page and '"official_start": "2026-10-15"' in page
     assert client.get("/api/cheatsheets/record").get_json()["official"]["days"] == 1
+
+
+def test_picks_the_sim_backs_and_price_plays_keep_separate_records():
+    # User 2026-10-15: "split the season record into picks vs price plays" -- so the record says whether the sim's
+    # backing adds anything. A pick stamped before the label existed is read by the same rule (cs.pick_label).
+    pick = lambda pid, line, **kw: {"pick_id": pid, "kind": "game", "event_id": "e7", "market": "totals", "side": "over",
+                                     "line": line, "segment": "full", "price": 110, "p_market": 0.5, **kw}
+    picks = [pick("a", 47.5, label="SYNDICATE PICK"), pick("b", 48.5, label="PRICE PLAY"),
+             pick("c", 49.5, sim_view="contradicts", p_model=0.12)]                     # no label: a price play by the rule
+    sheet = {"sport": "ncaaf", "date": "2026-10-15", "rows": [], "picks": picks}
+    graded = {cs.pick_result_key(picks[0]): {"y": 1}, cs.pick_result_key(picks[1]): {"y": 0}, cs.pick_result_key(picks[2]): {"y": 1}}
+    d = csr.day_record(sheet, {"picks": graded, "props": {}, "lines": {}, "counts": {"picks": 3, "picks_graded": 3}})
+    assert d["sections"]["picks"]["w"] == 1 and d["sections"]["picks"]["n"] == 1
+    assert (d["sections"]["price_plays"]["w"], d["sections"]["price_plays"]["l"]) == (1, 1)
+    assert d["featured"]["n"] == 3                                                     # all of them, once each
+    keys = [k for k, _ in csr.FEATURED]
+    assert keys[:2] == ["picks", "price_plays"]

@@ -113,10 +113,11 @@ def featured_bets(sheet: Mapping[str, Any], reconciled: Mapping[str, Any]) -> li
     for pk in sheet.get("picks") or []:                         # the Syndicate picks: the board's suggested opps
         res = cs.result_for(pk.get("price"), pick_results.get(cs.pick_result_key(pk)))
         if res is not None and res.get("y") in (0.0, 1.0):
-            out.append({"section": "picks", "sport": sheet.get("sport"), "date": sheet.get("date"), "price": pk.get("price"),
+            section = "price_plays" if (pk.get("label") or cs.pick_label(pk)) == cs.PRICE_PLAY_LABEL else "picks"
+            out.append({"section": section, "sport": sheet.get("sport"), "date": sheet.get("date"), "price": pk.get("price"),
                         "ev": pk.get("ev_pct"), "y": res["y"], "units": res["units"] or 0.0})
     for key, _label in csr.FEATURED:
-        if key in ("lines_value", "picks"):
+        if key in ("lines_value", "picks", "price_plays"):
             continue
         for i in secs.get(key) or []:
             r = rows[i]

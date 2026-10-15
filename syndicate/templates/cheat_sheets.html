@@ -686,8 +686,9 @@ function scriptCheck(g) {
 }
 function recordBar(d, secs, lineSecs, game) {
   const rows = ids => (ids || []).map(i => (d.rows[i] || {}).result), lines = ids => (ids || []).map(i => (d.game_lines[i] || {}).result);
-  const picks = (d.picks || []).filter(p => !game || p.event_id === game.event_id).map(p => p.result);
-  const items = [["Syndicate picks", picks], ["Value", rows(secs.value)], ["Hot streaks", rows(secs.hot_streaks)], ["Hot form", rows(secs.hot_form)],
+  const mine = (d.picks || []).filter(p => !game || p.event_id === game.event_id);
+  const picks = mine.filter(p => !isPricePlay(p)).map(p => p.result), plays = mine.filter(p => isPricePlay(p)).map(p => p.result);
+  const items = [["Syndicate picks", picks], ["Price plays", plays], ["Value", rows(secs.value)], ["Hot streaks", rows(secs.hot_streaks)], ["Hot form", rows(secs.hot_form)],
     ["Consistency", rows(secs.consistency)], ["Matchups", rows(secs.matchup_spots)],
     ["Game lines: value", lines(game ? null : lineSecs.value)]].filter(([, r]) => r.length);
   const c = d.reconciled.counts || {};
