@@ -220,3 +220,25 @@ gain is **broad and partial**, not narrow and total. The pregame numbers in this
 file are unaffected — they were measured on the served board, which is the right
 denominator for "what does the board show pregame", and MLB really is the
 pregame outlier at 88.0%.
+
+---
+
+## SECOND CORRECTION, 2026-10-15 03:0xZ: the full-game gain is NARROW, not broad
+
+Lane `venue-no-quote-attribution` attributed the 404. They are a **coverage
+ceiling** — no listed contract for the market, segment and line the board priced
+— and `offered -> present` is the dominant gap in all six sports (77.9%-96.7% of
+live offers). Not a join fault, not a guard, not ingestion.
+
+**And every reprice that actually lands, in every sport, is `full|<venue>|<*GAME or
+*TOTAL>` or Polymarket.** Nothing segment, nothing spread, no prop series. So the
+ceiling is **full-game h2h + full-game totals = 8.6% of 218,054 live priced
+sides**, against measured actuals of ncaaf 9.8%, nfl 3.6%, nhl 2.2%, mlb 1.7%.
+
+The correction above says the full-game gain is *"broad and partial"*. It is
+**narrow and partial**: at most ~8.6% of live sides is reachable, a third to a half
+of that is already reached, and the remaining headroom is ~4-9pp concentrated in
+NCAAF and NBA. For MLB the whole remaining headroom is ~2.9pp.
+
+Segment refusal is correctly second-order: 27 of MLB's 33 present sides against
+431 lost to coverage. Fixing it recovers at most the 27.
