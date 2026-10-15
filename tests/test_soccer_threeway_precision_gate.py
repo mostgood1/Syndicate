@@ -91,7 +91,9 @@ def _row(*, market="h2h_3_way", side="home", home_odds=-140, draw_odds=260, away
         "kind": "game",
         "market": market,
         "side": side,
-        "segment": "full_game",
+        # "full", as the served board writes it. "full_game" normalizes to itself and the
+        # half-row guard (995d5b47) skips it -- ci-suite #697, 2026-10-15.
+        "segment": "full",
         "league": "la_liga",
         "home_team": "Real Sociedad",
         "away_team": "Getafe",

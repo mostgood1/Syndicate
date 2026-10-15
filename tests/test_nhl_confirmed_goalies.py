@@ -94,15 +94,17 @@ def test_name_key_matches_initials_accents_and_hyphens():
 
 
 def test_refresh_never_raises_and_has_an_off_switch(tmp_path, monkeypatch):
+    # `now` is pinned: the refresh only acts on today +/- 1, so with the wall clock this test
+    # passed until 10-07 and failed every day after (ci-suite #697, 2026-10-15).
     root = _proc(tmp_path).parent.parent
 
     def boom(url):
         raise OSError("network down")
-    assert C.refresh_confirmed_goalies(root, DAY, fetch_html=boom)["reason"].startswith("error=")
-    assert C.refresh_confirmed_goalies(root, DAY, fetch_html=lambda u: "<html>no data</html>")["reason"].startswith("error=")
+    assert C.refresh_confirmed_goalies(root, DAY, now=NOW, fetch_html=boom)["reason"].startswith("error=")
+    assert C.refresh_confirmed_goalies(root, DAY, now=NOW, fetch_html=lambda u: "<html>no data</html>")["reason"].startswith("error=")
     monkeypatch.setenv(C.ENV, "off")
     calls = []
-    st = C.refresh_confirmed_goalies(root, DAY, fetch_html=lambda u: calls.append(u))
+    st = C.refresh_confirmed_goalies(root, DAY, now=NOW, fetch_html=lambda u: calls.append(u))
     assert calls == [] and st["reason"] == f"{C.ENV}=off"
 
 

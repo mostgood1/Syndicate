@@ -48,7 +48,7 @@ PROP_ROWS = [
     # Same selection at three books, deliberately disagreeing.
     {"player": "Benjamin Hall", "market": "Anytime TD", "line": "", "over_price": "160", "under_price": "", "book": "draftkings", "home_team": "TCU Horned Frogs", "away_team": "North Carolina Tar Heels"},
     {"player": "Benjamin Hall", "market": "Anytime TD", "line": "", "over_price": "185", "under_price": "", "book": "fanduel", "home_team": "TCU Horned Frogs", "away_team": "North Carolina Tar Heels"},
-    {"player": "Benjamin Hall", "market": "Anytime TD", "line": "", "over_price": "140", "under_price": "", "book": "bovada", "home_team": "TCU Horned Frogs", "away_team": "North Carolina Tar Heels"},
+    {"player": "Benjamin Hall", "market": "Anytime TD", "line": "", "over_price": "140", "under_price": "", "book": "mybookieag", "home_team": "TCU Horned Frogs", "away_team": "North Carolina Tar Heels"},
     {"player": "Jordan Shipp", "market": "Receiving Yards", "line": "34.5", "over_price": "-110", "under_price": "-120", "book": "draftkings", "home_team": "TCU Horned Frogs", "away_team": "North Carolina Tar Heels"},
     # On an NC State roster; must NOT appear on this card at all.
     {"player": "Wolfpack Player", "market": "Anytime TD", "line": "", "over_price": "300", "under_price": "", "book": "fanduel", "home_team": "TCU Horned Frogs", "away_team": "North Carolina Tar Heels"},
@@ -141,14 +141,15 @@ def test_best_price_across_books_wins_and_names_the_book(ncaaf_root):
     hall = next(row for row in recs["home"] if row["player"] == "Benjamin Hall")
     assert hall["tier"] == "+185"
     assert hall["book"] == "fanduel"
-    # TWO, not three. bovada quoted this selection at +140 and is filtered as
+    # TWO, not three. mybookieag quoted this selection at +140 and is filtered as
     # unbettable before the count is taken, so the card never advertises a
-    # book count the reader cannot act on.
+    # book count the reader cannot act on. (This fixture used `bovada`, which
+    # 30ea06eb made bettable on purpose; ci-suite #697, 2026-10-15.)
     assert "2 books" in hall["display_pick"]
 
 
 def test_unbettable_books_are_excluded_by_default(ncaaf_root):
-    """`bovada` is quoted here and is not a book the operator holds."""
+    """`mybookieag` is quoted here and is not a book the operator holds."""
     rows = ncaaf_root._find_captured_game(
         ncaaf_root._rows_by_game(2026, 1), home_team="TCU", away_team="North Carolina"
     )

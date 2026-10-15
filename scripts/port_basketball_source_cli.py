@@ -241,8 +241,6 @@ LEAGUES["wnba"] = dict(
     refresh="WNBA props refresh",
 )
 
-MODELS_DST = "repo/models"
-
 
 def configure(code: str) -> None:
     """Install league `code` as the module globals the generator reads."""
