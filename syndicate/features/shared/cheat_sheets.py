@@ -193,7 +193,10 @@ def price_check(row: Mapping[str, Any], form_values: Sequence[float] | None) -> 
         reasons.append(f"best price beats the fair by {ev_m:+.1f}%")
     elif streak and ev_post is not None and ev_post >= 0:
         verdict = "streak_with_room"
-        reasons.append(f"{form5['hits']}/{form5['games']} on this line and the price still leaves {ev_post:+.1f}%")
+        # "Still leaves room" read as an endorsement next to a negative EV; the form-adjusted number is optimistic --
+        # streaks like this ran 2.6 points BELOW the fair price in our backtest (user 2026-10-15 on the streak colours).
+        reasons.append(f"{form5['hits']}/{form5['games']} on this line; form alone says {ev_post:+.1f}% vs the price, "
+                       "but streaks like this have run below the fair price")
     elif streak:
         verdict = "streak_priced_in"
         imp = implied_from_price(price)

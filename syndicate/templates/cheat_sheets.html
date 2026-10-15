@@ -12,7 +12,7 @@
   --bg: #04070c; --bg2: #08111c; --card: #0a141f; --ink: #eef3f7; --muted: #8fa3b3; --rule: #183044; --track: #1a2b3b;
   --accent: #8cff2e; --accent2: #1fa8ff; --accent-soft: rgba(140,255,46,.12);
   --price: #ff6b57; --fair: #eef3f7; --model: #b59bff; --form: #1fa8ff;
-  --v-value: #8cff2e; --v-value-bg: rgba(140,255,46,.14); --v-room: #39c6ff; --v-room-bg: rgba(31,168,255,.15);
+  --v-value: #8cff2e; --v-value-bg: rgba(140,255,46,.14);
   --v-priced: #ffbe3d; --v-priced-bg: rgba(255,190,61,.13); --v-neutral: #93a4b2; --v-neutral-bg: rgba(147,164,178,.14);
   --hit: #8cff2e; --miss: #33475a;
   --display: "Saira Condensed", "Arial Narrow", Impact, sans-serif;
@@ -53,7 +53,7 @@ section.sheet { background: linear-gradient(180deg, var(--bg2), var(--card)); bo
 .who b { font-weight: 600; } .who .meta { color: var(--muted); font-size: 12.5px; }
 .bet { font: 500 13px var(--mono); margin-top: 2px; }
 .chip { display: inline-block; font: 800 12px/1 var(--display); letter-spacing: .07em; text-transform: uppercase; padding: 4px 7px; border-radius: 4px; margin-right: 6px; }
-.chip.value { color: var(--v-value); background: var(--v-value-bg); } .chip.streak_with_room { color: var(--v-room); background: var(--v-room-bg); }
+.chip.value { color: var(--v-value); background: var(--v-value-bg); }
 .chip.streak_priced_in { color: var(--v-priced); background: var(--v-priced-bg); } .chip.neutral { color: var(--v-neutral); background: var(--v-neutral-bg); }
 .strip { position: relative; height: 26px; }
 .strip .track { position: absolute; left: 0; right: 0; top: 11px; height: 4px; background: var(--track); border-radius: 2px; }
@@ -227,6 +227,15 @@ const MARKET_WORDS = {player_goal_scorer_anytime: "Anytime goalscorer", player_f
 const marketName = m => MARKET_WORDS[m] || String(m || "").replace(/^(player|batter|pitcher)_/, "").replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
 const betText = r => `${marketName(r.market)}${r.side && r.side !== "yes" ? " " + r.side : ""}${r.line != null ? " " + r.line : ""}`;
 const VERDICT = {value: "Value", streak_with_room: "Hot streak", streak_priced_in: "Hot streak", neutral: "Neutral", one_sided_fair: "One-sided price", suspect_price: "Check price"};
+// Every streak gets ONE colour and its count (user 2026-10-15: "explain the color differences for the hot streaks").
+// Blue "with room" leaned on the form-adjusted estimate, which our backtest says overrates streaks (they ran 2.6 points
+// below the fair price), and both chips read "Hot streak" -- a colour difference nothing explained. The verdict stays
+// in the data; the page says what was measured: the count, and the EV against the fair price.
+const STREAKS = new Set(["streak_with_room", "streak_priced_in"]);
+function verdictChip(c) {
+  if (STREAKS.has(c.verdict)) return `<span class="chip streak_priced_in">Hot streak${c.form5 && c.form5.games ? ` ${c.form5.hits}/${c.form5.games}` : ""}</span>`;
+  return `<span class="chip ${esc(c.verdict)}">${VERDICT[c.verdict] || esc(c.verdict)}</span>`;
+}
 const STATE = {sport: null, game: null, view: new URLSearchParams(location.search).get("view") === "reconciled" ? "reconciled" : "pregame"};
 
 function face(r) {
@@ -256,18 +265,18 @@ function propRow(r, i) {
   const live = started(r.commence_time) ? `<span class="chip started">Started</span>` : "";
   return `<div class="prop"${i != null ? ` data-ri="${i}"` : ""}>
     <div class="who">${face(r)}
-      <div class="line1"><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span>${live}<b>${esc(r.player)}</b>${r.pos ? `<span class="pos">${esc(r.pos)}</span>` : ""}${card}</div>
+      <div class="line1">${verdictChip(c)}${live}<b>${esc(r.player)}</b>${r.pos ? `<span class="pos">${esc(r.pos)}</span>` : ""}${card}</div>
       <div class="meta"><span class="tm">${img(src(r.team_logo_src, r.team_logo))}${esc(r.team || "")}</span>${r.opponent ? ` vs <span class="tm">${img(src(r.opponent_logo_src, r.opponent_logo))}${esc(r.opponent)}</span>` : ""}${r.kickoff_ct ? ` · <span class="kick">${esc(r.kickoff_ct)}</span>` : ""}${dvp}${r.injury ? " · " + esc(r.injury) : ""}</div>
       <div class="bet">${esc(betText(r))} · ${odds(c.price)} ${esc(c.book || "")}</div></div>
     <div>${strip(c)}<div class="nums"><span>price <b>${pct(implied(c.price))}</b></span><span>fair <b>${pct(c.p_market)}</b></span><span>model <b>${pct(c.p_model)}</b></span><span>form-adj <b>${pct(c.p_posterior)}</b></span></div></div>
-    <div><div class="form">${formDots(r)}</div><div class="nums"><span>L5 <b>${c.form5 ? c.form5.hits + "/" + c.form5.games : "–"}</b></span><span>L10 <b>${c.form10 ? c.form10.hits + "/" + c.form10.games : "–"}</b></span>
+    <div><div class="form" title="The last 10 games on this line, newest first: green cleared it, grey did not">${formDots(r)}</div><div class="nums"><span>L5 <b>${c.form5 ? c.form5.hits + "/" + c.form5.games : "–"}</b></span><span>L10 <b>${c.form10 ? c.form10.hits + "/" + c.form10.games : "–"}</b></span>
       <span class="ev ${ev == null ? "" : ev > 0 ? "pos" : "neg"}">${ev == null ? "no fair line" : "EV " + evs(ev)}</span></div></div>
     ${c.reasons && c.reasons.length ? `<div class="why">${c.reasons.map(esc).join(" · ")}</div>` : ""}
   </div>`;
 }
 const SECTIONS = [
   ["value", "Value at the best price", "The best available price beats the no-vig fair price by 2% or more."],
-  ["hot_streaks", "Hot streaks: already in the price", "Cleared this line in at least 4 of the last 5. We tested streaks like these across NFL, NBA and MLB: they hit about 2.6 points less often than the no-vig price says. A streak alone is not a bet; the EV shown is the price against the fair."],
+  ["hot_streaks", "Hot streaks: already in the price", "Cleared this line in at least 4 of the last 5. We tested streaks like these across NFL, NBA and MLB: they hit about 2.6 points less often than the no-vig price says. A streak alone is not a bet; the EV shown is the price against the fair. Dots: the last 10 games on this line, newest first -- green cleared it, grey did not."],
   ["hot_form", "Hot form, one-sided prices", "Strong recent form where only one side is quoted, so there is no fair price to measure it against. Form and model, not a price edge."],
 ];
 // Consistency: the recent hit-rate trend (L5 vs L10) with the price beside it.
