@@ -49992,3 +49992,8 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - (1) The first refresh-built `mlb_source/data/live_lens/render_sync/live_lens_reports_<date>.json` after 22:04:04Z (the last write was pre-ff, 22:02:22Z).
   - (2) A live-MC tick by the port on a LIVE game; no game was live at record time, so that branch bailed in both parity arms.
 - **Rollback.** `git revert b9542acb` alone restores all three vendored imports. The port package can stay.
+
+## 2026-10-15 22:48:58Z (5:48 PM CT) -- web ff 9f9c6ba7 -> 8eca7258 + `reload-web` (2.3 s, 0 failures): NHL puckline picks are PRICE PLAY until graded (lane `cheat-sheets`, session 9e18a0e7) -- NO outage, no restart
+- **ask:** user 2026-10-15 "Puckline picks are price until graded" -- the puckline sim went live 21:54Z (lane nhl-puckline-orientation) and leaned +1.5 on its first slate (below the fair on home -1.5 in 9 of 10).
+- **claim:** web by cheat-sheets token 617f540a..., acquire exit 0. Ride-alongs: dd3c0085 (my own test-only env-leak fix); code diff = cheat_sheets.py + its test.
+- **verify:** fleet venv `cs.pick_label`: NHL spreads, sim 56.6 vs 51.1 (Calgary +1.5) -> PRICE PLAY; the same margin on NHL h2h -> SYNDICATE PICK; the 24 picks on 10-15/10-16 sheets -> 0 relabels (none is an NHL puckline). Lift: drop ("nhl", "spreads") from `UNGRADED_SIM_MARKETS` once `model_scorecard_simgap.json` shows nhl|spreads sim cells at >= 30 games.
