@@ -49942,3 +49942,8 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **history is contaminated, and stays that way:** every NHL spreads row before 21:54:34Z at grid line -1.5 carries P(away +1.5) on the away -1.5 leg and P(home -1.5) on the home +1.5 leg. Any study of NHL spreads sim-vs-market must drop NHL `spreads` rows at line -1.5 from before this time; the line +1.5 rows had no sim at all.
 - **released:** refresh-worker claim, with `--token`, after this entry.
 
+
+## 2026-10-15 22:04:56Z (5:04 PM CT) -- web ff b9542acb -> 280c8100 + `reload-web` (2.9 s, 0 failures): SYNDICATE PICK needs the sim a full point above the market (lane `cheat-sheets`, session 9e18a0e7) -- NO outage, no restart
+- **ask:** user 2026-10-15 chose "1-point floor (Recommended)" after the H-NBA diagnostic (lane `sim-gap-ev-study`): from 10-20 NBA totals serve a 5%-weight sim blend ~0.2 pts off the market that `layer2_board` reads `agrees`.
+- **claim:** web by cheat-sheets token f10af584..., acquire exit 0. Ride-alongs: none (code diff b9542acb..280c8100 = cheat_sheets.py + its test only).
+- **verify:** on the fleet venv, `cs.pick_label`: agrees at +0.21 pts -> PRICE PLAY, agrees at +1.0 pt -> SYNDICATE PICK; the 24 picks on the 10-15 sheets: stamped label == fleet rule on 24 of 24 (0 flips, measured before the change too). Labels are re-read at every build, so the next sheet build carries it.
