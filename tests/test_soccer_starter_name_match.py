@@ -73,3 +73,25 @@ def test_an_espn_id_pins_the_starter_whatever_the_names():
 def test_an_id_does_not_cross_sources():
     rows = [{"player_id": "understat_183070", "player_name": "Somebody Else"}]
     assert L.resolve_starter_ids(rows, {"buatu"}, {"183070": "buatu"}) == set()
+
+
+def test_a_single_name_row_matches_the_one_starter_containing_it():
+    """Understat 'Gabriel' / ESPN 'Gabriel Magalhaes' (lane soccer-single-name-starters, 2026-10-15)."""
+    rows = _rows("Gabriel", "Gabriel Martinelli", "Alisson")
+    got = _resolve(rows, "Gabriel Magalhães", "Gabriel Martinelli", "Alisson Becker")
+    assert got == {"understat_0", "understat_1", "understat_2"}
+
+
+def test_single_name_refuses_when_two_starters_contain_the_word():
+    rows = _rows("Gabriel")
+    assert _resolve(rows, "Gabriel Magalhães", "Gabriel Jesus") == set()
+
+
+def test_single_name_refuses_when_two_rows_carry_the_word():
+    rows = _rows("Gabriel", "Gabriel")
+    assert _resolve(rows, "Gabriel Magalhães") == set()
+
+
+def test_a_one_word_ESPN_name_still_never_matches_a_longer_row():
+    """The other direction stays closed (FC Dallas 'Daniel' vs 'Daniel Job')."""
+    assert _resolve(_rows("Daniel Job"), "Daniel") == set()

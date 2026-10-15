@@ -95,9 +95,30 @@ def resolve_starter_ids(
             if len(hits) == 1:
                 resolved.add(player_row_key(hits[0][1], hits[0][0], "_"))
                 free.remove(hits[0])
+                matched_names.add(name)
                 break
             if hits:
                 break
+    # SINGLE-NAME ROWS (lane soccer-single-name-starters, 2026-10-15). Understat
+    # lists some players by one name -- "Gabriel" for ESPN's "Gabriel Magalhaes",
+    # "Alisson" for "Alisson Becker", "Thiago" for "Igor Thiago" (12 confirmed
+    # starters on 10-09..10-12). The REVERSE of the rejected one-word step, so it
+    # must be unique BOTH ways: exactly one free single-name row carries the word,
+    # and exactly one still-unresolved multi-word starter contains it. Two Arsenal
+    # Gabriels starting, or two "Gabriel" rows, refuse.
+    singles = [(index, row) for index, row in free
+               if len(_norm_player_name(row.get("player_name")).split()) == 1]
+    left = [name for name in sorted(starter_names - matched_names) if len(name.split()) >= 2]
+    for index, row in singles:
+        word = _norm_player_name(row.get("player_name"))
+        if len(word) < 3:
+            continue
+        owners = [name for name in left if word in name.split()]
+        rivals = [other for _, other in singles if _norm_player_name(other.get("player_name")) == word]
+        if len(owners) == 1 and len(rivals) == 1:
+            resolved.add(player_row_key(row, index, "_"))
+            matched_names.add(owners[0])
+            left.remove(owners[0])
     return resolved
 
 
