@@ -930,6 +930,14 @@ death, never life — do not invert it.
 - Findings: .syndicate/findings_2026-10-15_ceiling_implied_probability.md
 
 
+### live-winpct-blank — OPEN — opened 2026-10-15 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: Live NFL and NCAAF board rows whose projection is pregame show no sim probability (Win%, model_probability, explainer 'Our sim has...') and no direction-contradiction tag against an in-play line, keep the pregame projection visible and labelled as the pregame sim, and live re-sim rows are untouched
+- Files: syndicate/features/shared/board_enrichment.py (`_enforce_live_edge_policy` live-probability withholding section ONLY), syndicate/features/shared/layer2_board.py (`_sim_direction_contradiction` ONLY), syndicate/templates/intelligence.html (the blotter proj cell label and the `cardFacts` Projected fact section ONLY), syndicate/features/shared/live_edge_policy.py (module docstring THE PROJECTION IS STILL SHOWN paragraph ONLY), tests/test_live_winpct_blank.py (NEW)
+- Hypothesis: User decision 2026-10-15 'Blank the live Win%' after diagnostic H-NFL (lane sim-gap-ev-study): the live edge is refused but model_prob_over stays, so 11,999 of 12,563 live-first NFL ledger rows (10-11/10-12) carry a pregame probability at an in-play line (sim 0.9-1.0 realised 0.458). Scope NFL + NCAAF only: MLB is in its postseason (no board changes) and the decision named these two.
+- Falsification test: Fails if a served live NFL/NCAAF row without a live re-sim still carries model_probability, or if a live re-sim (live_aware) row loses its probability.
+- Verification: Unit: a live non-live-aware NFL row loses model_prob_over (kept as sim_model_prob_over with a reason) and the contradiction tag, keeps projected; a live_aware row and an MLB live row are untouched. Production: on the SEA@DEN 10-15 TNF live board, live NFL rows with model_probability = 0 except live-aware ones, and the ledger's live-first share with a probability falls from ~95% toward 0.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
