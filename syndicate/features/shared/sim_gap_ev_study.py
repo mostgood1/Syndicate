@@ -376,7 +376,6 @@ def wrap_grade(grade: Callable[..., tuple[list[dict[str, Any]], dict[str, int]]]
     `quiet` wraps those extra calls (the cron passes `keep_counters(settler, ...)`): the settler counts
     every call, and the scorecard logs those counts as ITS grading.
     """
-    candidates = state.setdefault("candidates", {})
     regrade = base or grade
 
     def graded_with_study(records: Sequence[Mapping[str, Any]], chips: Any, **kwargs: Any) -> Any:
@@ -390,7 +389,9 @@ def wrap_grade(grade: Callable[..., tuple[list[dict[str, Any]], dict[str, int]]]
                     if lead:
                         entry["lead"] = lead_sums(records, chips, regrade, side)
                     entry["big"], entry["bigc"] = big_misses(records, chips, regrade, side)
-                candidates[gk] = entry
+                # Looked up per call, never held: `commit` POPS the dict, and a caller that commits more than
+                # once per wrapper (the backfill, sport by sport) would otherwise fill a detached copy.
+                state.setdefault("candidates", {})[gk] = entry
         except Exception as exc:  # the study must never break the scorecard
             log(f"ACCUMULATE_FAILED {type(exc).__name__}: {exc}")
         return graded, ungraded

@@ -113,6 +113,18 @@ def test_wrap_grade_returns_exactly_what_grade_returns_and_regrades_only_through
     assert entry["big"][0]["gap_pts"] == pytest.approx(11.0)
 
 
+def test_regression_one_wrapper_committed_twice_keeps_both_batches():
+    """2026-10-15: the backfill wraps once and commits sport by sport. The wrapper held the candidates
+    dict that `commit` pops, so every batch after the first went to a detached copy (NBA: 53 graded, 0 kept)."""
+    state = sge.empty_state("sig")
+    wrapped = sge.wrap_grade(lambda records, chips, **kw: ([], {}), state, game_key=lambda r: r["g"])
+    wrapped([{"g": "mlb|a"}], {})
+    assert sge.commit(state, {"mlb|a": {"date": "2026-10-10"}}) == {"committed": 1}
+    wrapped([{"g": "nba|b"}], {})
+    assert sge.commit(state, {"nba|b": {"date": "2026-10-11"}}) == {"committed": 1}
+    assert set(state["games"]) == {"mlb|a", "nba|b"}
+
+
 def test_wrap_grade_never_breaks_the_scorecard_when_the_study_fails():
     state: dict = {}
     wrapped = sge.wrap_grade(lambda records, chips, **kw: ([{"buckets": 5}], {}), state, game_key=lambda r: "x|1")
