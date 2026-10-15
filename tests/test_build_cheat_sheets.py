@@ -389,3 +389,16 @@ def test_the_evidence_layer_reads_the_same_data_root_as_the_generator(monkeypatc
     assert m.align_data_root(tmp_path) is None                                   # the same root again is fine
     monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path / "elsewhere"))
     assert "different root" in m.align_data_root(tmp_path)
+
+
+def test_mlb_rows_get_faces_and_positions_from_the_days_rosters(monkeypatch, tmp_path):
+    # 10-14: a face for 1 of 21 MLB players and a position for none -- the board carries an id only on props the sim
+    # projected, and a sheet rebuilt from quotes carries none. Only EMPTY fields are filled.
+    m = _script()
+    from syndicate.features.mlb import batter_vs_pitcher as bvp
+    monkeypatch.setattr(bvp, "player_ids", lambda api, date: {"blakesnell": {"id": 605483, "position": "P"},
+                                                               "shoheiohtani": {"id": 660271, "position": "TWP"}})
+    rows = [{"player": "Blake Snell"}, {"player": "Shohei Ohtani", "headshot_url": "kept", "pos": "DH"}, {"player": "Nobody"}]
+    assert m.fill_mlb_identity(rows, "2026-10-14", tmp_path) == {"headshots": 1, "positions": 1}
+    assert rows[0]["headshot_url"].endswith("/people/605483/headshot/67/current") and rows[0]["pos"] == "P"
+    assert rows[1] == {"player": "Shohei Ohtani", "headshot_url": "kept", "pos": "DH"} and rows[2] == {"player": "Nobody"}

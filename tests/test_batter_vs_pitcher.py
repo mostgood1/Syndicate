@@ -69,3 +69,14 @@ def test_the_sheet_sections_split_batters_from_pitchers_and_stay_compact():
     s = cs.sections(rows)
     assert [(rows[i]["player"], rows[i]["side"]) for i in s["pvp_batters"]] == [("A", "under"), ("D", "over")]   # one row per hitter
     assert [(rows[i]["player"], rows[i]["market"], rows[i]["side"]) for i in s["pvp_pitchers"]] == [("Snell", "strikeouts", "over")]
+
+
+def test_roster_ids_cover_the_days_players_and_drop_a_name_on_two_rosters():
+    # The faces on MLB sheet rows (user 2026-10-15: "fix the MLB headshots"). Will Smith is a real two-team name.
+    smith = lambda pid, pos: {"person": {"id": pid, "fullName": "Will Smith"}, "position": {"abbreviation": pos}}
+    rosters = {119: {"roster": ROSTERS[119]["roster"] + [smith(1, "C")]}, 158: {"roster": ROSTERS[158]["roster"] + [smith(2, "P")]}}
+    api = bvp.StatsApi(None, fetch=lambda u: SCHEDULE if "/schedule" in u else rosters[int(u.split("/teams/")[1].split("/")[0])])
+    ids = bvp.player_ids(api, "2026-10-15")
+    assert ids["shoheiohtani"] == {"id": 660271, "name": "Shohei Ohtani", "position": "DH", "team": "Los Angeles Dodgers"}
+    assert ids["freddyperalta"]["team"] == "Milwaukee Brewers"
+    assert "willsmith" not in ids                                                   # never guessed

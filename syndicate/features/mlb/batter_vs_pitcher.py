@@ -115,6 +115,29 @@ def roster(api: StatsApi, team_id: Any) -> dict[str, dict[str, Any]]:
 _STAT_KEYS = ("plateAppearances", "atBats", "hits", "doubles", "triples", "homeRuns", "strikeOuts", "baseOnBalls")
 
 
+def player_ids(api: StatsApi, date: str) -> dict[str, dict[str, Any]]:
+    """normalized name -> {id, name, position, team} for every player on the day's active rosters. A name on two of
+    the day's rosters is dropped (never guessed): a wrong face on a betting row is worse than none."""
+    out: dict[str, dict[str, Any]] = {}
+    clash: set[str] = set()
+    seen_teams: set[Any] = set()
+    for g in slate(api, date):
+        for side in ("home", "away"):
+            team_id = g[side]["team_id"]
+            if not team_id or team_id in seen_teams:
+                continue
+            seen_teams.add(team_id)
+            for key, who in roster(api, team_id).items():
+                if key in clash:
+                    continue
+                if key in out:
+                    clash.add(key)
+                    out.pop(key, None)
+                    continue
+                out[key] = {**who, "team": g[side]["team"]}
+    return out
+
+
 def career_vs(api: StatsApi, batter_id: Any, pitcher_id: Any) -> dict[str, Any] | None:
     doc = api.get(f"people/{batter_id}/stats?stats=vsPlayer&opposingPlayerId={pitcher_id}&group=hitting&sportId=1") or {}
     for block in doc.get("stats") or []:

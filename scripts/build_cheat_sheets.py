@@ -364,6 +364,34 @@ def align_data_root(data_root: Path) -> str | None:
     return None
 
 
+def fill_mlb_identity(rows: list[dict[str, Any]], date: str, cache: Path) -> dict[str, int]:
+    """MLB faces and positions from the day's StatsAPI rosters (user 2026-10-15: "fix the MLB headshots").
+
+    The board carries an MLB player id only on props the sim projected, and a sheet rebuilt from quotes carries none:
+    the 10-14 sheet had a face for 1 of 21 players and a position for none. The rosters are the ones batter vs
+    pitcher already fetches, cached for the day. Fills only what is empty; a name on two rosters is left alone."""
+    from syndicate.features.mlb import batter_vs_pitcher as bvp
+    from syndicate.features.mlb.cards import _mlb_headshot_url
+
+    try:
+        ids = bvp.player_ids(bvp.StatsApi(cache), date)
+    except Exception as exc:  # noqa: BLE001 -- a missing face is a crest on the page, never a failed sheet
+        print(f"CHEAT_SHEET mlb roster ids failed: {type(exc).__name__}: {exc}", flush=True)
+        return {"headshots": 0, "positions": 0}
+    filled = {"headshots": 0, "positions": 0}
+    for r in rows:
+        who = ids.get(bvp._norm(r.get("player")))
+        if not who:
+            continue
+        if not r.get("headshot_url") and str(who.get("id") or "").isdigit():
+            r["headshot_url"] = _mlb_headshot_url(int(who["id"]))
+            filled["headshots"] += 1
+        if not r.get("pos") and who.get("position"):
+            r["pos"] = who["position"]
+            filled["positions"] += 1
+    return filled
+
+
 def player_vs_player(sport: str, rows: list[dict[str, Any]], date: str, cache: Path) -> tuple[Any, dict]:
     """(module, {(normalized player, market): block}) for a sport's player-vs-player source. `cache` is
     `<data root>/cheatsheets/.<sport>_cache/<date>`; long-lived caches sit beside it under `cheatsheets/`."""
@@ -627,6 +655,9 @@ def main(argv: list[str] | None = None) -> int:
                             context=context, positions=positions,
                             pvp_cache=data_root / "cheatsheets" / f".{sport}_cache" / selected)
         sheet = merge_with_record(sheet, prior, now=datetime.now(timezone.utc))
+        if sport == "mlb" and sheet.get("rows"):          # after the merge, so a kept row gets its face too
+            print(f"CHEAT_SHEET mlb identity filled {fill_mlb_identity(sheet['rows'], selected, data_root / 'cheatsheets' / '.mlb_cache' / selected)}",
+                  flush=True)
         sheet["phase"] = season_phase(sport, selected)
         if not sheet["rows"] and not sheet.get("game_lines") and prior is None:
             print(f"CHEAT_SHEET {sport} date={selected} no {selected} games with pregame props -- nothing written", flush=True)
