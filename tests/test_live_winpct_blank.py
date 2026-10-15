@@ -71,6 +71,16 @@ def test_downstream_no_win_pct_no_our_sim_sentence_no_contradiction_tag():
     assert "Our sim has" not in text and "16.8%" not in text
 
 
+def test_the_board_card_carries_the_flag_the_page_labels_on():
+    """The page's cards carry no projection dict (measured on the 10-15 6:47 PM build), so the flag is a column."""
+    live, pregame, resim = _row(), _row(state="pregame"), _row(live_aware=True)
+    be._enforce_live_edge_policy([live, pregame, resim])
+    quote = {"fair_probability": 0.5, "price": -110}
+    assert lb._layer2_board_columns(live, quote, {}).get("pregame_on_live") is True
+    assert "pregame_on_live" not in lb._layer2_board_columns(pregame, quote, {})
+    assert "pregame_on_live" not in lb._layer2_board_columns(resim, quote, {})
+
+
 def test_the_pregame_row_keeps_its_contradiction_tag():
     row = _row(state="pregame", side="under", line=29.5)
     be._enforce_live_edge_policy([row])

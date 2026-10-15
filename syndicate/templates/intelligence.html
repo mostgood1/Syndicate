@@ -1242,7 +1242,10 @@
   // keeps the projection, which must SAY it is the pregame number. A live re-sim row is `live_aware` and is not one.
   const PREGAME_ON_LIVE_TITLE = "The sim's projection from before the game. It is not re-simulated in play, so no live probability is shown against this line.";
   function projectionIsPregameOnLive(item) {
-    const projection = item && item.projection;
+    if (!item) return false;
+    // Board cards carry the flag as a column (`layer2_board._layer2_board_columns`); a raw row carries its projection.
+    if (item.pregame_on_live === true) return true;
+    const projection = item.projection;
     return !!(projection && projection.pregame_on_live && !projection.live_aware);
   }
 

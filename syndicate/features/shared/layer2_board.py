@@ -5108,6 +5108,10 @@ def _layer2_board_columns(
     if projected is not None:
         columns["projected"] = projected
         columns["sim_projection"] = projected
+    # THE PROJECTION IS THE PREGAME SIM ON AN IN-PLAY LINE `[2026-10-15, lane live-winpct-blank]`: the page labels it
+    # "pregame proj". The card carries no projection dict, so the flag the sweep set travels as a column.
+    if projection.get("pregame_on_live") and not projection.get("live_aware"):
+        columns["pregame_on_live"] = True
 
     # SIDE-CORRECT, via `_model_prob_for_side`. Publishing
     # `projection["model_prob_over"]` here was wrong on every row whose side is
