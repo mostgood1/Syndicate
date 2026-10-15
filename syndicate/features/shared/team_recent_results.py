@@ -35,8 +35,12 @@ game interval charts are actually showing interval historical results and not
 full game?" -- they were not: 65 first-5 / half / quarter rows were drawn
 against full-game finals). ``segment`` other than full returns ``[]`` except
 NCAAF, whose game files carry per-quarter line scores (h1 = q1+q2,
-h2 = q3+q4+OT, qN = that quarter). MLB innings and NFL quarters have no
-single-file source, so those rows get no team history at all.
+h2 = q3+q4+OT, qN = that quarter). Every other sport's intervals -- MLB
+innings, NFL / NBA / WNBA quarters and halves, NCAAB halves, NHL periods --
+come from ``interval_history``'s per-date disk cache, which the cheat sheet
+build warms (user 2026-10-15: "add the interval charts to the board segment
+rows too"); the board reads it offline and never fetches. Soccer halves have
+no source yet (ESPN's scoreboard carries no soccer linescores).
 
 Only games inside ``_WINDOW_DAYS`` before the slate count, so an early-season
 "last 10" is honestly short ("last 4") instead of reaching into last season.
@@ -325,7 +329,16 @@ def team_recent_results(sport: Any, team: Any, before: Any, n: int = 10, *, segm
         return []
     segment = str(segment or "full").strip().lower() or "full"
     if segment not in {"full", "game"}:
-        if sport != "ncaaf" or segment not in _NCAAF_SEGMENTS:
+        if sport != "ncaaf":
+            # Every other sport's intervals come from `interval_history`'s disk cache (innings, quarters, halves,
+            # periods), read OFFLINE: a board build never fetches. `[]` for a sport / segment it does not carry.
+            from syndicate.features.shared.interval_history import cached_team_results
+
+            try:
+                return cached_team_results(sport, team, before, segment, n)
+            except Exception:  # noqa: BLE001 -- a chart must never break a board build
+                return []
+        if segment not in _NCAAF_SEGMENTS:
             return []
         key = f"{key}|{segment}"
     floor = (cutoff - timedelta(days=_WINDOW_DAYS)).isoformat()

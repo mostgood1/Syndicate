@@ -72,3 +72,30 @@ def test_ncaaf_defers_to_its_local_line_scores(monkeypatch, tmp_path):
     monkeypatch.setattr(trr, "team_recent_results", lambda sport, team, before, n=10, *, segment="full": [["2026-10-10", 7.0, 3.0]])
     h = ih.IntervalHistory(tmp_path, today="2026-10-15", fetch=lambda url: (_ for _ in ()).throw(AssertionError(url)))
     assert h.team_results("ncaaf", "Texas State Bobcats", "2026-10-15", "h1") == [["2026-10-10", 7.0, 3.0]]
+
+
+def test_the_board_reads_the_cache_offline_and_never_fetches(tmp_path, monkeypatch):
+    # User 2026-10-15: "add the interval charts to the board segment rows too". The board build reads only what the
+    # cheat sheet build warmed; a board build that fetched would put ESPN on the board's critical path.
+    payload = {"dates": [{"date": "2026-10-13", "games": [_mlb_game("2026-10-13", "Los Angeles Dodgers", "Milwaukee Brewers",
+                                                                    [0, 2, 0, 1, 0], [1, 0, 0, 0, 0], game_type="L")]}]}
+    warmer = ih.IntervalHistory(tmp_path / "interval_history", today="2026-10-15", fetch=lambda url: payload)
+    assert warmer.warm("mlb", "2026-10-15") == ih.DEFAULT_WINDOW_DAYS and warmer.fetches == 1    # one range call
+    monkeypatch.setattr(ih, "_get", lambda url: (_ for _ in ()).throw(AssertionError("the board fetched " + url)))
+    monkeypatch.setattr("syndicate.features.shared.prop_evidence.common.data_root", lambda: tmp_path)
+    ih._READERS.clear()
+    from syndicate.features.shared.team_recent_results import team_recent_results
+
+    assert team_recent_results("mlb", "Milwaukee Brewers", "2026-10-16T00:00:00Z", segment="first3") == [["2026-10-13", 1.0, 2.0]]
+    assert team_recent_results("nhl", "Toronto Maple Leafs", "2026-10-16", segment="p1") == []    # not warmed: absent, no fetch
+    assert team_recent_results("soccer", "Arsenal", "2026-10-16", segment="h1") == []             # no source
+
+
+def test_an_offline_reader_rechecks_an_absent_date_after_its_ttl(tmp_path, monkeypatch):
+    reader = ih.IntervalHistory(tmp_path, today="2026-10-15", offline=True)
+    assert reader.games_on("nhl", "2026-10-14") == []
+    (tmp_path / "nhl").mkdir()
+    (tmp_path / "nhl" / "2026-10-14.json").write_text(json.dumps([{"home": "A", "away": "B", "final": True}]))
+    assert reader.games_on("nhl", "2026-10-14") == []                            # inside the TTL: not re-read
+    monkeypatch.setattr(ih, "_MISS_TTL_S", 0.0)
+    assert reader.games_on("nhl", "2026-10-14")[0]["home"] == "A"                 # the warmer's write shows up

@@ -826,10 +826,19 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:  # noqa: BLE001 -- no picks this run; every sheet still builds
         print(f"CHEAT_SHEET board cards unavailable: {type(exc).__name__}: {exc}", flush=True)
         board_cards = []
-    # Interval scores for segment picks (first-3-innings, Q1, P1 ...), cached per date: finals never change.
-    from syndicate.features.shared.interval_history import IntervalHistory
+    # Interval scores (first-3-innings, Q1, P1 ...), cached per date -- finals never change. This build is what WARMS
+    # the cache the Layer 2 board's segment charts read offline (user 2026-10-15: "add the interval charts to the
+    # board segment rows too"), so every in-season sport is warmed here, not only the sports with a segment pick.
+    from syndicate.features.shared.interval_history import IntervalHistory, cache_root
 
-    intervals = IntervalHistory(data_root / "cheatsheets" / ".interval_cache", today=central_today())
+    intervals = IntervalHistory(cache_root(data_root), today=central_today())
+    for sport in [s.strip() for s in args.sports.split(",") if s.strip()]:
+        if in_season(sport, selected):
+            try:
+                held = intervals.warm(sport, central_today())
+                print(f"CHEAT_SHEET interval history {sport}: {held} dates cached, fetches so far {intervals.fetches}", flush=True)
+            except Exception as exc:  # noqa: BLE001 -- the board shows no interval chart; the sheet still builds
+                print(f"CHEAT_SHEET interval history {sport} failed: {type(exc).__name__}: {exc}", flush=True)
     for sport in [s.strip() for s in args.sports.split(",") if s.strip()]:
         target = data_root / "cheatsheets" / sport / f"{selected}.json"
         if not in_season(sport, selected):

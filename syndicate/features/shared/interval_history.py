@@ -16,13 +16,20 @@ A segment means what the grader settles it on (`segment_actuals`, `live_gameline
 = innings 1..N; qN / pN = that period alone; h1 = periods 1-2; h2 = 3-4 AND every overtime (NCAAB: period 2 and
 overtime). A period missing from a final linescore is a hole and the game is skipped -- never read as zero.
 
-Each date is cached under ``<cache_dir>/<sport>/<date>.json`` once it is in the past and every game on it is decided;
-finals do not change, so a date is fetched once. Display only: nothing scores on these.
+Each date is cached under ``<data root>/interval_history/<sport>/<date>.json`` once it is in the past and every game
+on it is decided; finals do not change, so a date is fetched once. Display only: nothing scores on these.
+
+TWO READERS, ONE CACHE (user 2026-10-15: "add the interval charts to the board segment rows too"):
+* the cheat sheet build fetches -- `warm()` for every in-season sport, then a pick's own teams on demand;
+* the Layer 2 board reads OFFLINE (`cached_team_results`, through `team_recent_results`): a board build never
+  touches the network, and a date the warmer has not written yet is simply absent (re-checked after
+  `_MISS_TTL_S`, so the next warm shows up without a worker restart).
 """
 
 from __future__ import annotations
 
 import json
+import time
 import urllib.request
 from datetime import date, timedelta
 from pathlib import Path
@@ -44,6 +51,16 @@ WINDOW_DAYS = {"nfl": 80}
 DEFAULT_WINDOW_DAYS = 40
 MLB_GAME_TYPES = frozenset({"R", "F", "D", "L", "W"})       # regular season and every postseason round
 _MAX_FETCHES = 90                                          # per call; the next build continues a cold cache
+_MISS_TTL_S = 600.0                                        # an offline reader re-checks an absent date this often
+
+
+def cache_root(data_root: Path | str | None = None) -> Path:
+    """`<data root>/interval_history`: shared by the cheat sheet build (writes) and the board (reads)."""
+    if data_root is None:
+        from syndicate.features.shared.prop_evidence.common import data_root as _root
+
+        data_root = _root()
+    return Path(data_root) / "interval_history"
 
 
 def _int(value: Any) -> int | None:
@@ -126,12 +143,15 @@ def segment_sum(periods: Sequence[int | None], spans: tuple[int | None, ...]) ->
 class IntervalHistory:
     """Per-date games for one data root, cached on disk; `fetch` is injectable for tests."""
 
-    def __init__(self, cache_dir: Path | str, *, today: str | None = None, fetch: Callable[[str], Any] | None = None):
+    def __init__(self, cache_dir: Path | str, *, today: str | None = None, fetch: Callable[[str], Any] | None = None,
+                 offline: bool = False):
         self.cache_dir = Path(cache_dir)
         self.today = today or date.today().isoformat()
         self.fetch = fetch or _get
+        self.offline = offline                    # the board: disk only, never a fetch
         self.fetches = 0
         self._mem: dict[tuple[str, str], list[dict[str, Any]]] = {}
+        self._miss: dict[tuple[str, str], float] = {}
 
     def _path(self, sport: str, day: str) -> Path:
         return self.cache_dir / sport / f"{day}.json"
@@ -148,16 +168,19 @@ class IntervalHistory:
     def _cached(self, sport: str, day: str) -> list[dict[str, Any]] | None:
         if (sport, day) in self._mem:
             return self._mem[(sport, day)]
+        if self.offline and time.monotonic() - self._miss.get((sport, day), -1e9) < _MISS_TTL_S:
+            return None
         try:
             games = json.loads(self._path(sport, day).read_text(encoding="utf-8"))
         except (OSError, ValueError):
+            self._miss[(sport, day)] = time.monotonic()
             return None
         self._mem[(sport, day)] = games
         return games
 
     def _prefetch_mlb(self, days: list[str]) -> None:
         missing = [d for d in days if self._cached("mlb", d) is None]
-        if not missing or self.fetches >= _MAX_FETCHES:
+        if self.offline or not missing or self.fetches >= _MAX_FETCHES:
             return
         self.fetches += 1
         url = ("https://statsapi.mlb.com/api/v1/schedule?sportId=1&hydrate=linescore"
@@ -173,6 +196,8 @@ class IntervalHistory:
         hit = self._cached(sport, day)
         if hit is not None:
             return hit
+        if self.offline:
+            return []
         if sport == "mlb":
             self._prefetch_mlb([day])
             return self._cached("mlb", day) or []
@@ -222,3 +247,36 @@ class IntervalHistory:
             if len(out) >= n:
                 break
         return out[:n]
+
+    def warm(self, sport: Any, before: Any) -> int:
+        """Fetch every missing past date in ``sport``'s window before ``before`` -- the board reads only what this
+        wrote. MLB is one range call; an ESPN sport is one call per missing date, capped per run. Returns how many
+        dates the cache now holds for the window."""
+        sport = str(sport or "").lower()
+        if sport not in SEGMENTS or self.offline:
+            return 0
+        try:
+            first = date.fromisoformat(str(before or "")[:10])
+        except ValueError:
+            return 0
+        days = [(first - timedelta(days=k)).isoformat() for k in range(1, WINDOW_DAYS.get(sport, DEFAULT_WINDOW_DAYS) + 1)]
+        if sport == "mlb":
+            self._prefetch_mlb(days)
+        else:
+            for day in days:
+                if self._cached(sport, day) is None:
+                    self.games_on(sport, day)
+        return sum(1 for d in days if self._path(sport, d).is_file())
+
+
+_READERS: dict[str, IntervalHistory] = {}
+
+
+def cached_team_results(sport: Any, team: Any, before: Any, segment: Any, n: int = 10) -> list[list[Any]]:
+    """The board's reader: `IntervalHistory.team_results` over the disk cache only -- never a fetch in a board
+    build. ``[]`` until the cheat sheet build has warmed the sport."""
+    root = cache_root()
+    reader = _READERS.get(str(root))
+    if reader is None:
+        reader = _READERS[str(root)] = IntervalHistory(root, offline=True)
+    return reader.team_results(sport, team, before, segment, n)

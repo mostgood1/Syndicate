@@ -1002,6 +1002,14 @@ death, never life — do not invert it.
 - Verification: Served board after reload: count MLB pitcher prop cards with recent_values (was 0 of 11); a sample card's Recent form sentence matches the pitcher log
 - Blocked by: none
 
+### board-interval-charts — OPEN — opened 2026-10-15 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: Layer 2 board segment game rows (MLB first1/first3/first5, NFL/NBA/WNBA quarters and halves, NCAAB halves, NHL periods) carry team_recent for their OWN interval, read from a disk cache with no network in the board build
+- Files: syndicate/features/shared/team_recent_results.py (the non-NCAAF segment branch + docstring ONLY), syndicate/features/shared/interval_history.py (NEW), tests/test_interval_history.py (NEW), tests/test_team_recent_results.py (the interval-segment test ONLY)
+- Hypothesis: n/a (feature)
+- Falsification test: n/a
+- Verification: Served board after the refresh-worker restart and one cache warm: count segment game cards with team_recent by sport (was 0 outside NCAAF); a sample MLB first3 card's history matches StatsAPI linescores
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
