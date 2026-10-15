@@ -2884,7 +2884,7 @@ VALID read.**
   - (iii) `nba_sim_total_inputs.json` with skip_outs_penalties added.
 - Built default-off while the VALID runs go, so that a pass can ship.
 
-**VALID READ — AMENDMENT 2026-10-15 19:20Z (before any VALID run or read): "the same seeds per game" is NOT achievable as
+**VALID READ — AMENDMENT 2026-10-15 19:14Z (before any VALID run or read): "the same seeds per game" is NOT achievable as
 written.**
 - Measured: the harness pipeline is run-to-run NONDETERMINISTIC. The same code, the same date, PYTHONHASHSEED=0, run
   twice gave 0/11 games with identical draws (the smart sim's seed is not fixed per game).
