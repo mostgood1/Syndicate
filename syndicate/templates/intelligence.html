@@ -1237,6 +1237,15 @@
     return String(odds).trim() || null;
   }
 
+  // A PREGAME projection on an IN-PLAY row (lane live-winpct-blank, user 2026-10-15 "Blank the live Win%"):
+  // the backend withholds its probability (`board_enrichment._withhold_pregame_probability`, NFL + NCAAF) and
+  // keeps the projection, which must SAY it is the pregame number. A live re-sim row is `live_aware` and is not one.
+  const PREGAME_ON_LIVE_TITLE = "The sim's projection from before the game. It is not re-simulated in play, so no live probability is shown against this line.";
+  function projectionIsPregameOnLive(item) {
+    const projection = item && item.projection;
+    return !!(projection && projection.pregame_on_live && !projection.live_aware);
+  }
+
   function displayProjection(item) {
     const projection = item.sim_projection ?? item.projected ?? item.projected_sim;
     if (projection !== null && projection !== undefined && projection !== "" && projection !== "-") {
@@ -1942,7 +1951,7 @@
     const liveActual = displayLiveActual(item);
     if (matchup) facts.push(["Matchup", matchup]);
     if (odds) facts.push(["Odds", odds]);
-    if (projection) facts.push(["Projected", projection]);
+    if (projection) facts.push([projectionIsPregameOnLive(item) ? "Projected (pregame sim)" : "Projected", projection]);
     if (liveProjection) facts.push(["Live proj.", liveProjection]);
     if (liveActual) facts.push(["Live actual", liveActual]);
     // Same look-ahead-preview distinction as the blotter table: a future
@@ -4277,7 +4286,7 @@
                   <td data-label="EV" title="Edge ${(edge * 100).toFixed(1)}%">${renderBlotterEv(item)}</td>
                   <td data-label="Sim" class="board-blotter__sim">
                     <div class="board-blotter__sim-prob${offScaleGap !== null ? " board-blotter__muted" : ""}">${confidence !== null ? Math.round(confidence * 100) + "%" + (offScaleGap !== null ? " (set aside)" : "") : "&mdash;"}</div>
-                    ${projectedDisplay && !/%$/.test(projectedDisplay) ? `<div class="board-blotter__muted">proj ${escapeHtml(projectedDisplay)}</div>` : ""}
+                    ${projectedDisplay && !/%$/.test(projectedDisplay) ? `<div class="board-blotter__muted"${projectionIsPregameOnLive(item) ? ` title="${escapeHtml(PREGAME_ON_LIVE_TITLE)}"` : ""}>${projectionIsPregameOnLive(item) ? "pregame proj" : "proj"} ${escapeHtml(projectedDisplay)}</div>` : ""}
                     ${simBadge}${simRailed}${simNoView}
                   </td>
                   <td data-label="Move">${movementHtml || "&mdash;"}</td>

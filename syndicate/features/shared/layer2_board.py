@@ -2232,7 +2232,15 @@ def _sim_direction_contradiction(row: Mapping[str, Any], projection: Mapping[str
     sign would invert the verdict while looking plausible -- the exact failure
     `_model_prob_for_side` exists to prevent. Moneylines have no line at all;
     their degeneracy is reported separately, by `sim_probability_railed`.
+
+    NOT ON AN IN-PLAY LINE FROM A PREGAME PROJECTION `[2026-10-15, lane live-winpct-blank]`. Mid-game a total's line
+    has moved with the score, so a pregame mean on the "wrong" side of it says nothing about the bet: TEN@HOU's 41.2
+    against a live 29.5 tagged every under as contradicted. `board_enrichment._withhold_pregame_probability` marks
+    those rows `pregame_on_live` (NFL + NCAAF, user decision "Blank the live Win%"); a live re-sim row is
+    `live_aware` and keeps its tag.
     """
+    if projection.get("pregame_on_live") and not projection.get("live_aware"):
+        return None
     projected = _as_float(projection.get("projected"))
     if projected is None:
         projected = _as_float(row.get("projected"))

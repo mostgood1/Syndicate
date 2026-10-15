@@ -21,6 +21,15 @@ because that number would be meaningless -- and, critically, because it RANKS: a
 unsuppressed live edge does not merely display wrong, it sorts to the top of a
 board built to surface the biggest edges.
 
+AND FOR NFL + NCAAF, THE PROBABILITY TOO `[2026-10-15, lane live-winpct-blank]`.
+User decision in chat, "Blank the live Win%": the pregame PROJECTION stays,
+labelled as the pregame sim, but a pregame PROBABILITY at an in-play line is not
+shown. It was shown as Win% and as "Our sim has the over 29.5 at 83.2%", the
+pregame normal read at a mid-game line. Sims of 0.9-1.0 realised 0.458 over
+664 live-first NFL rows. `board_enrichment._withhold_pregame_probability` moves
+it to `sim_model_prob_over`. Other sports keep the edge-only rule until decided
+separately (MLB is in its postseason).
+
 This is deliberately a policy module with no imports. Every sport's projection
 attach can depend on it without depending on each other.
 """

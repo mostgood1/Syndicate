@@ -1121,3 +1121,20 @@ that is not a fix.
   - **Next:** pre-register H5, "a fresh-only quote fair (per-book Shin, median, cells within the freshness window) beats the stale-inclusive one on log loss and on EV-at-close of EV >= 2 selections", and run it OFFLINE with `scripts/fair_price_eval.py` over the quote logs. No board or shadow change while MLB is in its postseason.
   - **Replay check before any flip:** the Knicks-under-type row moves 3-8 EV points and leaves Suggested.
   - Scratch: `nbafair/`.
+
+- 2026-10-15 (session 9e18a0e7) -> **lane `fair-price-v2` (mine): the ONE-SIDED soccer fair is mis-levelled ~6x, and the sim beats it.**
+  - **The fair:** `book_margin_model` assumes ~7% hold because soccer props have no two-sided pairs, so `hold_for` (`book_margin_model.py:102`) falls back to the book's game-line median. Realised margin is 44.1% [41.1, 47.0] (21,622 bets, 89 games, 09-30..10-14), rising by price band from 35.7% (<2.0) to 69.4% (20-40). This is the cause of the 09-21 "8.5 points overstated" finding.
+  - **The sim:** it is the closer probability on 5 of 6 one-sided markets: pooled Brier -.0025 [-.0036, -.0015], w .72 [.63, .80], 9,942 rows / 88 games. Two-sided soccer is the contrast: +.0097, w -0.2. The sim runs 1.3 pts low.
+  - **Recalibration:**
+    - A per-market logistic on logit(fair), plus logit(sim) where one exists, gives no-sim rows a LODO Brier .1169 -> .1011 (-.0158 [-.0187, -.0129]) and predicted EV -7.2% -> -50.8% vs -51.8% realised.
+    - Adding the sim to a recalibrated fair gains a further -.0032 [-.0047, -.0017].
+  - **Surfaces:**
+    - Never Suggested, staked or carded (`layer2_board.py:3458`, `portfolio_commit.py:1303`, `play_cards.py:73`).
+    - Board rows serve `ev_pct` = -hold (~-7%) and sim rows rank on sim minus margin fair (`:2019`).
+    - The cheat-sheet line "model X% vs market Y%" (`cheat_sheets.py:235`) is ungated; whether it renders is UNVERIFIED.
+  - **Next, pre-registered as H6:**
+    - Build a recalibrated `fair_probability_recal` beside the existing fair, never replacing it. Keep the `book_margin_model` label (four allowlists key on it) and `assumed_hold_pct` (the shortlist floor reads it).
+    - Fit it in the scorecard cron, reporting only, until the MLB postseason ends; then shadow it on the board.
+    - Pass if, over >= 14 new kickoff dates and >= 30 games per market: (a) |predicted EV - realised ROI| <= 5 pts (baseline 44.6); (b) its Brier beats the margin fair with a CI excluding 0; (c) the blend beats the recalibrated fair, else drop the sim term; (d) band factors are stable across date halves. No market withheld.
+  - **Lead, not an edge (not pre-registered, ~11 sub-cuts):** sim FOR -3% vs AGAINST -54% replicates (+51.1 [+22, +93]), above 3.0 decimal only. FOR realised about what the fair predicted.
+  - Scratch: `soccerfair/`.

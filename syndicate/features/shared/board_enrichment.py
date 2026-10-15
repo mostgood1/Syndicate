@@ -1336,6 +1336,7 @@ def _enforce_live_edge_policy(grid: list) -> dict:
     from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
 
     cleared = 0
+    withheld = 0
     reasons: dict[str, int] = {}
     for row in grid:
         # `dict`, not `Mapping`: this module does not import `Mapping`, and the
@@ -1346,25 +1347,58 @@ def _enforce_live_edge_policy(grid: list) -> dict:
         projection = row.get("projection")
         if not isinstance(projection, dict):
             continue
-        if projection.get("edge_vs_market_pct") is None and projection.get("edge_vs_line") is None:
+        has_edge = projection.get("edge_vs_market_pct") is not None or projection.get("edge_vs_line") is not None
+        in_scope = str(row.get("sport") or "").strip().lower() in LIVE_PROBABILITY_WITHHELD_SPORTS
+        if not has_edge and not in_scope:
             continue
         reason = live_edge_unavailable_reason(row)
         if not reason:
             continue
-        projection["edge_vs_market_pct"] = None
-        projection["edge_vs_line"] = None
-        # Do not overwrite a producer's own, more specific reason if it managed
-        # to set one and still left an edge behind -- that would erase the more
-        # informative message. In practice a row reaching here has none.
-        projection.setdefault("edge_unavailable_reason", reason)
-        cleared += 1
-        reasons[reason] = reasons.get(reason, 0) + 1
+        if has_edge:
+            projection["edge_vs_market_pct"] = None
+            projection["edge_vs_line"] = None
+            # Do not overwrite a producer's own, more specific reason if it managed
+            # to set one and still left an edge behind -- that would erase the more
+            # informative message. In practice a row reaching here has none.
+            projection.setdefault("edge_unavailable_reason", reason)
+            cleared += 1
+            reasons[reason] = reasons.get(reason, 0) + 1
+        if in_scope:
+            withheld += _withhold_pregame_probability(projection, reason)
     # Reported even when zero: a counter that only appears on failure cannot
     # confirm the sweep ran, which is the rule this repo keeps relearning.
     return {
         "live_edge_enforced_rows": cleared,
         "live_edge_enforced_reasons": reasons,
+        "live_probability_withheld_rows": withheld,
     }
+
+
+# THE LIVE WIN% IS WITHHELD TOO, NOT ONLY THE EDGE `[2026-10-15, lane live-winpct-blank]`. User decision in chat,
+# "Blank the live Win%": keep the pregame projection, labelled as the pregame sim, but show no probability on an
+# in-play line unless a live re-sim priced it. The edge refusal above left `model_prob_over` in place, and
+# `layer2_board` served it as Win% and as "Our sim has the over 29.5 at 83.2%": the pregame normal (TEN@HOU
+# 41.18 / 12.14) evaluated at a mid-game line. On 10-11/10-12, 11,999 of 12,563 NFL ledger rows first seen live
+# carried one, and sims of 0.9-1.0 realised 0.458 (diagnostic H-NFL, lane sim-gap-ev-study). NCAAF: 5,289 of 10,737 on 10-10.
+# NFL + NCAAF ONLY: the decision named these two, and MLB is in its postseason, where the board does not change.
+# A live re-sim row is untouched -- the policy allows `live_aware` projections, and `live_projection_join` (which
+# runs after this sweep in `book_grid_artifact`) gives a row it prices its live number back.
+LIVE_PROBABILITY_WITHHELD_SPORTS = frozenset({"nfl", "ncaaf"})
+
+
+def _withhold_pregame_probability(projection: dict, reason: str) -> int:
+    """Move a pregame probability off an in-play row, the way `live_projection_join` does. 1 if one moved."""
+    projection["pregame_on_live"] = True
+    probability = projection.get("model_prob_over")
+    if probability is None:
+        return 0
+    projection.setdefault("sim_model_prob_over", probability)
+    projection["model_prob_over"] = None
+    projection.setdefault(
+        "model_prob_over_unavailable_reason",
+        f"pregame sim probability withheld on an in-play line ({reason}); kept as `sim_model_prob_over`",
+    )
+    return 1
 
 
 _OUT_PLAYER_FEED_ROOTS = {
