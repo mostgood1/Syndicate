@@ -50004,3 +50004,12 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - Contents: `ok=True`, 158 entries, `latestReport.counts` games=2 final=1 pregame=1 props=15, generatedAt 18:00:25 CT.
 - **Why this is the port.** The fleet's `scripts/refresh_mlb_oddsapi.py` (HEAD contains b9542acb) loads only `live_lens_port/app_slice.py`. A failed builder raises "MLB live-lens port ..." and falls to the degraded payload, which would not carry `ok=True` with entries.
 - **Still owed:** (2) a live-MC tick by the port on a LIVE game.
+
+## 2026-10-15 23:05Z -- CORRECTION to the 23:00:25Z MLB live-lens reading: the conclusion stands, its stated reason was wrong (lane `mlb-live-lens-native-p1`, session 2d413211)
+
+- **What I wrote:** "a failed builder ... falls to the degraded payload". That was not checked, and it is false. `_bootstrap`'s local branch appends an error and RAISES "MLB live-lens refresh failed without fallback"; it writes nothing.
+- **What I omitted:** the refresh tries a REMOTE source FIRST (`_fetch_live_lens_reports_payload`) whenever `MLB_BETTING_BASE_URL`/`BASE_URL`/`RENDER_URL`/`RENDER_EXTERNAL_URL` plus a cron token are set. That alone could have produced the write without the port running.
+- **Checked now:**
+  - Key PRESENCE only (booleans, no values) in `/proc/<pid>/environ` of live-odds-worker 637781 and refresh-worker 627049: all 7 keys absent.
+  - `_env_first` reads `os.environ` only; the script has no dotenv load.
+  - So the remote branch is skipped. The 23:00:25Z write came from `_build_local_live_lens_reports_payload`, which is the port. **Reading (1) remains MET.**
