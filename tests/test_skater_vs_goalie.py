@@ -71,3 +71,24 @@ def test_the_sheet_sections_need_two_meetings_one_row_a_player():
     s = cs.sections(rows)
     assert [(rows[i]["player"], rows[i]["market"]) for i in s["pvp_skaters"]] == [("Matthews", "Points"), ("Dahlin", "SOG")]
     assert [rows[i]["player"] for i in s["pvp_goalies"]] == ["Luukkonen"]
+
+
+def test_a_started_game_uses_the_goalie_who_was_in_net(tmp_path):
+    def started(url: str):
+        if "/landing" in url:
+            return {"gameState": "LIVE"}                                   # no matchup block once the game starts
+        if "/boxscore" in url:
+            return {"playerByGameStats": {
+                "homeTeam": {"goalies": [{"playerId": BOB, "name": {"default": "S. Bobrovsky"}, "toi": "40:00"}]},
+                "awayTeam": {"goalies": [{"playerId": UPL, "name": {"default": "U. Luukkonen"}, "toi": "00:00"},
+                                         {"playerId": ELLIS, "name": {"default": "C. Ellis"}, "toi": "57:14"}]}}}
+        if "/player/8481551/game-log/20252026/" in url:                      # Ellis was in net for game 1
+            return {"gameLog": [{"gameId": 1, "teamAbbrev": "BUF", "opponentAbbrev": "TOR"}]}
+        return fake(url)
+
+    api = svg.NhlApi(tmp_path / "d", tmp_path / "p", fetch=started)
+    goalies = svg.likely_goalies(api, 9)
+    assert goalies["away"]["name"] == "C. Ellis" and goalies["away"]["started"] is True    # Ellis played, UPL did not
+    got = svg.matchups([{"player": "Auston Matthews", "market": "SOG"}], date="2026-10-15", api=api)
+    assert got[("austonmatthews", "sog")]["opponent"] == "C. Ellis (started)"
+    assert got[("austonmatthews", "sog")]["line"] == {"games": 1, "sog": 1, "goals": 0}     # his one shot with Ellis in net

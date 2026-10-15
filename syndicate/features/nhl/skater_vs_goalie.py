@@ -111,8 +111,28 @@ def likely_goalies(api: NhlApi, game_id: Any) -> dict[str, dict[str, Any]]:
         if leaders:
             top = max(leaders, key=lambda x: int(x.get("gamesPlayed") or 0))
             out[side] = {"id": top.get("playerId"), "name": (top.get("name") or {}).get("default"),
-                         "games": int(top.get("gamesPlayed") or 0)}
+                         "games": int(top.get("gamesPlayed") or 0), "started": False}
+    if out:
+        return out
+    # Once the game starts the pre-game matchup block is gone (measured 2026-10-14); the box score then names who was
+    # actually in net -- the goalie with the most time on ice -- which is better than a guess for the day's record.
+    box = api.get(f"gamecenter/{game_id}/boxscore") or {}
+    stats = box.get("playerByGameStats") or {}
+    for side, key in (("home", "homeTeam"), ("away", "awayTeam")):
+        goalies = [g for g in ((stats.get(key) or {}).get("goalies")) or [] if _toi_seconds(g.get("toi")) > 0]
+        if goalies:
+            top = max(goalies, key=lambda g: _toi_seconds(g.get("toi")))
+            out[side] = {"id": top.get("playerId"), "name": (top.get("name") or {}).get("default"), "games": None,
+                         "started": True}
     return out
+
+
+def _toi_seconds(toi: Any) -> int:
+    try:
+        minutes, seconds = str(toi or "0:0").split(":")
+        return int(minutes) * 60 + int(seconds)
+    except ValueError:
+        return 0
 
 
 def roster(api: NhlApi, team: str) -> dict[str, dict[str, Any]]:
@@ -221,7 +241,8 @@ def matchups(rows: list[dict[str, Any]], *, date: str, api: NhlApi) -> dict[tupl
             continue
         line = skater_vs_goalie(api, who["id"], goalie["id"], seasons)
         if line:
-            out[(key, market)] = {"kind": "skater_vs_goalie", "opponent": f"{goalie['name']} (likely starter)", "line": line,
+            tag = "started" if goalie.get("started") else "likely starter"
+            out[(key, market)] = {"kind": "skater_vs_goalie", "opponent": f"{goalie['name']} ({tag})", "line": line,
                                   "summary": f"{line['goals']} G on {line['sog']} SOG in {line['games']} game"
                                              f"{'s' if line['games'] != 1 else ''} vs {goalie['name']}"}
     return out
