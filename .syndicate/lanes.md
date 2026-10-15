@@ -67,6 +67,14 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### mlb-injuries-fetch-native — OPEN — opened 2026-10-15 — session 2d413211
+- Goal: Move scripts/fetch_mlb_injuries.py (run by the live loop's MLB lineup check, `_fetch_mlb_injuries`) off the vendored `vendor/mlb_bettingv2` `sim_engine.data.statsapi` (StatsApiClient, fetch_schedule_for_date, fetch_team_roster) onto a faithful Syndicate copy, with identical output; deployed with a measurement (user request 2026-10-15).
+- Files: scripts/fetch_mlb_injuries.py, tests/test_fetch_mlb_injuries_native.py (NEW)
+- Hypothesis: the script uses only StatsApiClient.get without a disk cache plus two thin wrappers (/schedule, /teams/{id}/roster); a copy of exactly that is output-identical.
+- Falsification test: on the fleet, old vs new script for the same date (back to back) produce different JSON.
+- Verification: A/B identical on the fleet; after a fleet ff the live-odds-worker's next MLB lineup check writes the MLB injuries artifact via the new script (fresh subprocess each run; no restart).
+- Blocked by: none
+
 ### nhl-refresh-dead-vendored-cli — CLOSED 2026-10-15 (GOAL MET) — opened 2026-10-15 — session 2d413211
 - GOAL VERDICT. Goal (verbatim): "Delete the dead vendored `nhl_betting.cli` launcher from scripts/refresh_nhl_oddsapi.py (`_default_source_root`, `_source_python_executable`, `_source_data_root`, `_run_source_cli`, `_run_source_generation`, `_run_source_generation_multi`, `_pushd`) and the test patches that reference it, with no behaviour change (user decision 2026-10-15, from "move the nhl schedule commence times off vendor")." -- **GOAL: MET** `[2026-10-15 14:07Z]`. Fleet ff d217efff 13:55:00Z; 9 tests pass on the deployed checkout; the next NHL refresh ran 14:03:13-14:06:58Z and wrote fresh artifacts. deploys.md 13:55:00Z.
 - Goal: Delete the dead vendored `nhl_betting.cli` launcher from scripts/refresh_nhl_oddsapi.py (`_default_source_root`, `_source_python_executable`, `_source_data_root`, `_run_source_cli`, `_run_source_generation`, `_run_source_generation_multi`, `_pushd`) and the test patches that reference it, with no behaviour change (user decision 2026-10-15, from "move the nhl schedule commence times off vendor").
