@@ -175,6 +175,15 @@ class NflGraderTests(unittest.TestCase):
 
 
 class NcaafGraderTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # These tests grade the CFBD lines files only. Since 10-12 `graded_rows_for_date`
+        # also appends score/box rows from `settlement_sport_rows`, which read the
+        # repo's real `data/` -- present in the CI checkout, absent in a worktree -- so
+        # the same test saw 1,198 real rows in CI and 6 here (ci-suite #697, 2026-10-15).
+        patcher = patch("syndicate.features.shared.settlement_sport_rows.rows_for_ledger_date", return_value=[])
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def _write_lines_file(self, root: Path, filename: str, games: list[dict]) -> None:
         data_dir = root / "data"
         data_dir.mkdir(parents=True, exist_ok=True)

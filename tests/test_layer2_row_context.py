@@ -184,7 +184,13 @@ def test_a_modelled_prop_reads_sim_against_market_then_projection():
     assert "It projects an average of 14.8 against the 11.5 line." in text
 
 
-def test_the_write_up_context_follows_but_its_price_sentence_does_not():
+def test_the_write_up_context_follows_but_its_price_sentence_does_not(monkeypatch):
+    # Isolate from the season/recency evidence read from `data/`: present in the CI
+    # checkout, it is appended after the write-up and the text no longer ENDS with it
+    # (ci-suite #697, 2026-10-15). Placement of the write-up is what is under test.
+    from syndicate.features.shared import layer2_row_context as _ctx
+    monkeypatch.setattr(_ctx, "row_season_text", lambda row, context: "")
+    monkeypatch.setattr(_ctx, "row_recent_matchup_text", lambda row, context: "")
     context = {"narratives": {("prop", "kyle freeland", "outs", "over", 11.5): {"text": CONTEXT_SENTENCES, "player_id": None}}}
     text = row_explainer(_prop_row(), _quote(), context)
     assert text.endswith(CONTEXT_SENTENCES)

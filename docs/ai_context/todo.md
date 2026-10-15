@@ -51,7 +51,13 @@ The 08:00Z `ci-suite` job (`local_production.py ci-run` -> `run_ci_suite.py` in 
 **Close when** the job reads `0 NEW FAILURE(S)` and the archive suite is `ok`, or each remaining failure is a deliberate `--update` named in a commit.
 
 **STATUS 2026-10-15 22:17Z (lane `ci-suite-red-1015`, session b9bb5f37), against the 08:48Z run on 11bbdbcf: 42 NEW FAILURE(S).**
-- **Already green on origin/main (11):** test_graded_outcomes NcaafGrader x6, test_layer2_row_context, test_layer2_row_parity, test_nfl_market_board shapes, test_nfl_props anytime-td, test_probability_differential.
+- **~~Already green on origin/main (11)~~ -- CORRECTION 2026-10-15 23:2xZ: FALSE.** That was read in a session worktree, which has NO `data/`; in CI's checkout (full repo `data/`) 10 of the 11 still FAILED. They read real repo data the fixtures never pinned. Fixed by this lane, test-only:
+  - graded_outcomes NcaafGrader x6: since 10-12 `graded_rows_for_date` also appends `settlement_sport_rows.rows_for_ledger_date` rows (real `data/`) -> patched to [] in setUp;
+  - layer2_row_context + layer2_row_parity write-up tests: `row_season_text` / `row_recent_matchup_text` found real season data -> monkeypatched to '';
+  - nfl_market_board shapes: `nfl_props_rows_for_week` read the real wk props CSV -> patched to ([], []);
+  - nfl_props anytime-td: the club guard reads `nfl_roster_snapshot_path`, which ignores the temp `SYNDICATE_NFL_SOURCE_ROOT`; the real 2025 roster refused the fixture's player (0 sim rows in CI, 1 in a worktree) -> pinned to a missing file in setUp.
+  - **VERIFIED in CI's environment:** the 5 files copied into `~/syndicate-prod/ci-checkout` (8eca7258), run under `run_ci_suite._step_env()` with the fleet venv: **89 passed**, then restored (`git checkout`, clean). The 11th, test_probability_differential, was fixed separately by `probability-differential-sweep-1015` (`b2f40e6f`, above).
+  - **Rule:** "green in my worktree" is not evidence about CI -- the worktree has no `data/`. Verify a CI fix in ci-checkout under `_step_env`.
 - **Fixed by this lane (17), test drift; code under test unchanged except one dead binding:**
   - nhl_confirmed_goalies off-switch: pinned `now` (refresh acts only on today +/- 1);
   - ncaaf_props_board x2: the stand-in unbettable book was bovada, which 30ea06eb made bettable;

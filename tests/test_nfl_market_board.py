@@ -233,6 +233,12 @@ class NflMarketBoardBuilderTests(unittest.TestCase):
             "syndicate.features.nfl.cards._nfl_real_lines_for_matchup", return_value=fake_lines,
         ), patch(
             "syndicate.features.nfl.cards._resolve_branding", side_effect=fake_resolve_branding,
+        ), patch(
+            # Game-line shape only. Player props come from `nfl_props_rows_for_week`, which
+            # reads the repo's real data (present in the CI checkout, so 9 prop markets
+            # appeared there and none in a worktree -- ci-suite #697, 2026-10-15); they are
+            # covered by test_build_nfl_market_board_folds_in_prop_rows.
+            "syndicate.features.nfl.cards.nfl_props_rows_for_week", return_value=([], []),
         ):
             board = build_nfl_market_board(2025, 10)
 

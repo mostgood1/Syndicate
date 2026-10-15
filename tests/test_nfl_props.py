@@ -41,6 +41,14 @@ class NflPropsTests(unittest.TestCase):
         self._player_stats_root_patch = patch.object(player_stats, "default_nfl_source_root", return_value=Path(self.nfl_root))
         self._player_stats_root_patch.start()
         self.addCleanup(self._player_stats_root_patch.stop)
+        # The club guard reads `nfl_roster_snapshot_path`, which does not follow the
+        # temp root: in the CI checkout it found the repo's real 2025 roster, on which
+        # the fixture's "R. One" is not a Patriot, and refused the row (0 sim rows in
+        # CI, 1 in a worktree -- ci-suite #697, 2026-10-15). No roster here = no guard.
+        self._roster_patch = patch.object(props, "nfl_roster_snapshot_path",
+                                          return_value=Path(self.nfl_root) / "no_roster_snapshot.csv")
+        self._roster_patch.start()
+        self.addCleanup(self._roster_patch.stop)
         # AND THE DEPTH CHART, for the SAME reason as the pbp above -- this one
         # was missed. `SYNDICATE_NFL_SOURCE_ROOT` PREPENDS the temp root to the
         # candidate list rather than replacing it, so a file the temp root does

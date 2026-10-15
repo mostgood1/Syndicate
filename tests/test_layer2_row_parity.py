@@ -89,7 +89,13 @@ def test_no_price_move_means_no_sparkline():
     assert "movement_series" not in card
 
 
-def test_the_row_context_brings_the_write_up():
+def test_the_row_context_brings_the_write_up(monkeypatch):
+    # Isolate from the season/recency evidence read from `data/`: present in the CI
+    # checkout, it is appended after the write-up and the text no longer ENDS with it
+    # (ci-suite #697, 2026-10-15). Placement of the write-up is what is under test.
+    from syndicate.features.shared import layer2_row_context as _ctx
+    monkeypatch.setattr(_ctx, "row_season_text", lambda row, context: "")
+    monkeypatch.setattr(_ctx, "row_recent_matchup_text", lambda row, context: "")
     text = "His modeled workload cap still reaches roughly 115 pitches."
     context = {"narratives": {("prop", "sean manaea", "strikeouts", "over", 6.5): {"text": text, "player_id": None}}}
     card = layer2_rows_to_board_cards([_row()], row_context=context)[0]
