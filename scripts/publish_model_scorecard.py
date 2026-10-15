@@ -53,6 +53,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from syndicate.features.shared import daily_optimizer as opt  # noqa: E402
 from syndicate.features.shared import model_scorecard as msc  # noqa: E402
+from syndicate.features.shared import sim_gap_ev_study as sge  # noqa: E402
 
 # Sports with recorder parts to read.
 #
@@ -311,6 +312,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--optimizer", choices=("on", "off"), default="on",
                         help="the daily optimizer (lane daily-optimizer): calibration + recommendation grading "
                              "and the rank/stake overlay. Fail-soft: it can never stop the scorecard publishing.")
+    parser.add_argument("--simgap", choices=("on", "off"), default="on",
+                        help="the sim-gap x EV study (lane sim-gap-ev-study): ROI by sim gap x EV band and the "
+                             "engine read. Reporting only, fail-soft: it can never stop the scorecard publishing.")
     args = parser.parse_args(argv)
 
     now = datetime.now(timezone.utc)
@@ -361,6 +365,17 @@ def main(argv: list[str] | None = None) -> int:
             log(f"OPTIMIZER_STATE games={len(opt_state['games'])} pub={len(opt_state['pub'])} reset={opt_reset}")
         except Exception as exc:
             log(f"OPTIMIZER_DISABLED state read failed: {type(exc).__name__}: {exc}")
+
+    # The sim-gap x EV study's own state (lane `sim-gap-ev-study`), on the optimizer's rule: a FAILED read
+    # disables it for this run rather than publishing an empty state over a real one.
+    sg_state = None
+    if args.simgap == "on":
+        try:
+            sg_state, sg_reset = sge.load_state(reader.json(sge.STATE_PATH), signature,
+                                                sport_versions=sport_versions, now=now)
+            log(f"SIMGAP_STATE games={len(sg_state['games'])} reset={sg_reset}")
+        except Exception as exc:
+            log(f"SIMGAP_DISABLED state read failed: {type(exc).__name__}: {exc}")
 
     # THE STAKED SET (lane `published-negative-ev`, 2026-10-06): the execution ledger's portfolio
     # orders. The job runs with refresh-worker's env, so the ledger is read the way the worker reads it.
@@ -416,10 +431,16 @@ def main(argv: list[str] | None = None) -> int:
         log("REFUSING: every board-date fetch failed; publishing would replace the overlay with an empty table.")
         return 3
 
-    grade = functools.partial(bs.grade_population, prop_settler=mlb.settle, score_source=mlb.final_score,
-                              extra_settler=settler)
+    base_grade = functools.partial(bs.grade_population, prop_settler=mlb.settle, score_source=mlb.final_score,
+                                   extra_settler=settler)
+    grade = base_grade
     if opt_state is not None:
         grade = opt.wrap_grade(grade, opt_state, game_key=msc.game_key)
+    if sg_state is not None:
+        # OUTSIDE the optimizer's wrapper, with its extra grading through the bare grader: through the optimizer's
+        # wrapper a lead-band or single-side call would overwrite that game's optimizer candidate with a part.
+        grade = sge.wrap_grade(grade, sg_state, game_key=msc.game_key, base=base_grade,
+                               quiet=lambda: sge.keep_counters(settler, "handled", "errors"))
     grading = msc.grade_pending(state, today=today, grade=grade,
                                 chips_for=functools.partial(fetch_chips_with_retry, bs),
                                 central_date=bs.SCORECARD.central_date)
@@ -472,6 +493,24 @@ def main(argv: list[str] | None = None) -> int:
             log(f"OPTIMIZER_FAILED {type(exc).__name__}: {exc} -- scorecard publishes without it")
             scorecard["optimizer"] = {"error": f"{type(exc).__name__}: {exc}"}
 
+    simgap_outputs: dict[str, str] = {}
+    if sg_state is not None:
+        try:
+            sg_committed = sge.commit(sg_state, state["games"])
+            sge.prune(sg_state, today)
+            sg_report = sge.build_report(sg_state, today=today, now=now, run={"committed": sg_committed},
+                                         resamples=args.resamples or sge.RESAMPLES)
+            simgap_outputs = {sge.STATE_PATH: sge.dumps_state(sg_state), sge.REPORT_PATH: sge.dumps(sg_report),
+                              sge.MARKDOWN_PATH: sge.markdown(sg_report)}
+            scorecard["sim_gap_ev"] = {"path": sge.REPORT_PATH, "window": sg_report["window"],
+                                       "tested": sg_report["betting"]["tested"],
+                                       "signals": len(sg_report["betting"]["signals"])}
+            log(f"SIMGAP committed={sg_committed} window_games={sg_report['window']['games']} "
+                f"tested={sg_report['betting']['tested']} signals={len(sg_report['betting']['signals'])}")
+        except Exception as exc:
+            log(f"SIMGAP_FAILED {type(exc).__name__}: {exc} -- scorecard publishes without it")
+            scorecard["sim_gap_ev"] = {"error": f"{type(exc).__name__}: {exc}"}
+
     weekly = None
     if weekly_due(args.weekly, today):
         weekly = run_weekly(today, token, publish_outputs=args.publish)
@@ -493,6 +532,12 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as exc:
             log(f"OPTIMIZER_WRITE_FAILED {relative} {type(exc).__name__}: {exc}")
             optimizer_outputs.pop(relative)
+    for relative, content in list(simgap_outputs.items()):
+        try:
+            log(f"WROTE {relative} bytes={write(relative, content).stat().st_size}")
+        except Exception as exc:
+            log(f"SIMGAP_WRITE_FAILED {relative} {type(exc).__name__}: {exc}")
+            simgap_outputs.pop(relative)
     for label, window in scorecard["windows"].items():
         log(f"WINDOW {label} {json.dumps(window['coverage']['by_sport'])} cells={len(window['cells'])} "
             f"changes={len(window['verdict_changes'])}")
@@ -513,6 +558,12 @@ def main(argv: list[str] | None = None) -> int:
             log(f"OPTIMIZER_PUBLISHED {relative} ok={publish(relative, token)}")
         except Exception as exc:
             log(f"OPTIMIZER_PUBLISH_FAILED {relative} {type(exc).__name__}: {exc}")
+    for relative in simgap_outputs:
+        # Same rule as the optimizer: after the scorecard, never fatal.
+        try:
+            log(f"SIMGAP_PUBLISHED {relative} ok={publish(relative, token)}")
+        except Exception as exc:
+            log(f"SIMGAP_PUBLISH_FAILED {relative} {type(exc).__name__}: {exc}")
     if args.verify:
         try:
             echoed = reader.json(msc.LATEST_PATH)

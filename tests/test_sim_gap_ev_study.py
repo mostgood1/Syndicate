@@ -186,7 +186,7 @@ def test_state_resets_on_a_new_grader_and_drops_only_the_changed_sport():
 
 def _row(p_market, p_model, y, price=100):
     edge = None if p_model is None else 100.0 * (p_model - p_market)
-    pnl = (sge._decimal_odds(price) - 1.0) if y else -1.0
+    pnl = (msc._decimal_odds(price) - 1.0) if y else -1.0
     return {"buckets": [f"{CELL}|x=y"], "y": float(y), "p_market": p_market, "p_model": p_model,
             "model_edge_pct": edge, "pnl": pnl, "price": price}
 
@@ -275,3 +275,84 @@ def test_the_window_excludes_today_and_games_older_than_the_window():
     for key, day in (("mlb|old", "2026-09-10"), ("mlb|in", "2026-10-01"), ("mlb|today", "2026-10-15")):
         state["games"][key] = {"sport": "mlb", "date": day}
     assert [g["key"] for g in sge.window_games(state, "2026-10-15")] == ["mlb|in"]
+
+
+# ---------------------------------------------------------------------------
+# reachability: the cron (scripts/publish_model_scorecard.py, on loan from lane published-negative-ev)
+# ---------------------------------------------------------------------------
+
+import importlib.util  # noqa: E402
+import pathlib  # noqa: E402
+from datetime import timedelta  # noqa: E402
+
+from syndicate.features.shared import daily_optimizer as opt  # noqa: E402
+
+_SRC = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "publish_model_scorecard.py"
+
+
+@pytest.fixture()
+def cron(monkeypatch, tmp_path):
+    spec = importlib.util.spec_from_file_location("publish_model_scorecard_simgap", _SRC)
+    pms = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(pms)
+    real_bs = pms.msc.load_bucket_search()
+    played = (datetime.now(timezone.utc) - timedelta(days=2))
+    start = played.strftime("%Y-%m-%dT23:00:00Z")
+    records = [_record(_candidate(commence_time=start, model_edge_pct=12.0), t=played.strftime("%Y-%m-%dT18:00:00Z")),
+               _record(_candidate(commence_time=start, side="under", model_edge_pct=11.0),
+                       t=played.strftime("%Y-%m-%dT18:00:00Z"))]
+    chips = [_chip("Home Team", "Away Team", 4, 6)]
+    calls = {"grade": 0}
+    original = real_bs.grade_population
+
+    def grade_population(recs, chips_by_date, *a, **kw):
+        calls["grade"] += 1
+        kw.pop("prop_settler", None), kw.pop("score_source", None), kw.pop("extra_settler", None)
+        return original(recs, chips_by_date, **kw)
+
+    monkeypatch.setattr(pms, "admin_token", lambda: "t")
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    monkeypatch.setattr(pms.WebReader, "json", lambda self, relative: None)
+    monkeypatch.setattr(pms.WebReader, "bytes", lambda self, relative: None)
+    monkeypatch.setattr(pms.WebReader, "text", lambda self, relative: None)
+    monkeypatch.setattr(pms, "fetch_board_date", lambda reader, b, day, sports: (records, {"mlb": 1}))
+    monkeypatch.setattr(pms, "fetch_chips_with_retry", lambda b, day: chips)
+    monkeypatch.setattr(pms, "grader_signature", lambda b, s: ("sig", {}, {}))
+    monkeypatch.setattr(real_bs, "grade_population", grade_population)
+    monkeypatch.setattr(pms.msc, "load_bucket_search", lambda: real_bs)
+    monkeypatch.setattr(pms.msc, "build_scorecard", lambda state, **kw: (
+        {"windows": {}, "overlay": {}, "generated_at": "x"}, {"buckets": {}, "buckets_validated": 0}))
+    monkeypatch.setattr(pms.msc, "markdown", lambda scorecard: "")
+    return pms, tmp_path, calls
+
+
+def test_reachability_on_writes_the_study_from_the_crons_own_grading(cron):
+    pms, root, calls = cron
+    assert pms.main(["--weekly", "off", "--sports", "mlb", "--resamples", "50"]) == 0
+    report = json.loads((root / sge.REPORT_PATH).read_text(encoding="utf-8"))
+    assert report["window"]["games"] == 1 and report["coverage"]["mlb"]["bets"] == 2
+    assert report["engine"]["big_misses"]["by_market"] == [
+        {"sport": "mlb", "market": "totals", "graded": 2, "market_right": 1, "market_right_rate": 0.5}]
+    state = json.loads((root / sge.STATE_PATH).read_text(encoding="utf-8"))
+    assert list(state["games"]) == ["mlb|evt-1"] and "candidates" not in state
+    assert (root / sge.MARKDOWN_PATH).read_text(encoding="utf-8").startswith("# Sim gap x EV")
+    scorecard = json.loads((root / pms.msc.LATEST_PATH).read_text(encoding="utf-8"))
+    assert scorecard["sim_gap_ev"]["window"]["games"] == 1
+    assert calls["grade"] > 1, "the study's lead-band and big-miss regrades ran"
+
+
+def test_reachability_off_writes_nothing_and_leaves_the_optimizer_exactly_as_it_was(cron):
+    pms, root, calls = cron
+    assert pms.main(["--weekly", "off", "--sports", "mlb", "--simgap", "off", "--resamples", "50"]) == 0
+    assert not (root / sge.REPORT_PATH).exists() and not (root / sge.STATE_PATH).exists()
+    off_calls = calls["grade"]
+    off_state = json.loads((root / opt.OPT_STATE_PATH).read_text(encoding="utf-8"))
+    assert "sim_gap_ev" not in json.loads((root / pms.msc.LATEST_PATH).read_text(encoding="utf-8"))
+    for path in root.rglob("*"):
+        if path.is_file():
+            path.unlink()
+    calls["grade"] = 0
+    assert pms.main(["--weekly", "off", "--sports", "mlb", "--resamples", "50"]) == 0
+    assert calls["grade"] > off_calls, "on is a different run from off"
+    on_state = json.loads((root / opt.OPT_STATE_PATH).read_text(encoding="utf-8"))
+    assert on_state["games"] == off_state["games"], "the study wraps OUTSIDE the optimizer and never feeds it a part"

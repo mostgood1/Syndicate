@@ -551,6 +551,7 @@ NOT_A_SCALAR_CONVERTER: dict[str, str] = {
     "scripts/build_ncaab_pbp_corpus.py:_american": "walks a key path through a payload Mapping and parses the price found there; a parser, not a conversion",
     "syndicate/features/shared/basketball_market_board.py:_devig_over": "two-sided proportional devig; two PRICES in, fair P(Over) out. Its scalar half, the nested `implied`, IS registered",
     "syndicate/features/shared/play_cards.py:fmt_american": "display formatting ('+150', '-'); returns a str",
+    "syndicate/features/shared/cheat_sheets.py:price_case.american": "NESTED; display formatting ('+130') inside a sentence; returns a str",
     "syndicate/features/nba/live_tick/odds_bovada.py:_extract_period_markets._to_american": "NESTED; parses a Bovada price string to an int ('+150' -> 150); a parser, not a conversion",
     "syndicate/features/wnba/live_tick/odds_bovada.py:_extract_period_markets._to_american": "NESTED; parses a Bovada price string to an int ('+150' -> 150); a parser, not a conversion",
 }

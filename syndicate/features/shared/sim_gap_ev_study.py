@@ -60,6 +60,7 @@ from typing import Any
 import numpy as np
 
 from syndicate.features.shared import measured_bucket_skill as mbs
+from syndicate.features.shared import model_scorecard as msc
 
 VERSION = "sim_gap_ev/1"
 REPORT_DIR = "reports/model_scorecard"
@@ -159,10 +160,6 @@ def cell_of(row: Mapping[str, Any]) -> str | None:
     """The scorecard's cell, `sport|market|segment|phase` -- the prefix `msc._accumulate` keys on."""
     buckets = list(row.get("buckets") or [])
     return "|".join(str(buckets[0]).split("|")[:4]) if buckets else None
-
-
-def _decimal_odds(american: float) -> float:
-    return 1.0 + (american / 100.0 if american > 0 else 100.0 / -american)
 
 
 def minutes_before_start(record: Mapping[str, Any]) -> float | None:
@@ -280,7 +277,8 @@ def accumulate(graded: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, list[
         price, pnl = row.get("price"), row.get("pnl")
         if price in (None, 0) or pnl is None:
             continue
-        ev = q * _decimal_odds(float(price)) - 1.0
+        # The scorecard's own converter -- the one its `pnl` is priced with -- so EV and ROI share one price.
+        ev = q * msc._decimal_odds(float(price)) - 1.0  # noqa: SLF001
         key = f"{cell}|{gap}|{direction(d) if has_sim else 'none'}|{ev_band(100.0 * ev)}"
         acc = bet.setdefault(key, [0, 0, 0.0, 0.0])
         _add(acc, (1, 1 if y >= 1.0 else 0, float(pnl), ev))
@@ -855,3 +853,8 @@ def markdown(report: Mapping[str, Any]) -> str:
 
 def dumps(payload: Any) -> str:
     return json.dumps(payload, indent=1, sort_keys=True, default=str)
+
+
+def dumps_state(state: Mapping[str, Any]) -> str:
+    """Compact: the state carries a month of per-game sums and is read back on every run."""
+    return json.dumps(state, separators=(",", ":"), sort_keys=True, default=str)
