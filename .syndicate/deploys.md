@@ -49774,3 +49774,24 @@ Pressure lines were the same text on both dates and across reads 30 s apart; not
 - **17:06:22Z:** claim web token d1902cfb... (cheat-sheets), acquire exit 0. Ride-alongs listed first: **caede38a** (`fetch_mlb_live_game_pks_for_date.py` off the vendored StatsAPI client, OPEN lane `mlb-live-game-pks-native`, session 2d413211) -- the user approved it in this session ("Deploy now, include it") while that session sat on a question to the user; told that session, its reading stays its own. Plus df7a46f4 / 1365c3a7 / e35990df / c754ab47 (ledger). Guarded ff eb824cb5 -> 25bac568, `RELOAD_WEB` 2.1 s, 0 failures.
 - **verify (live route, Playwright, 17:07Z):** every 10-15 pick renders the new card; labels: **5 SYNDICATE PICK** (Brewers ML 1st 3, Jax o11.5 outs, Jax o3.5 K, Tavares u2.5 SOG, Texas State -15) and **7 PRICE PLAY** (Dodgers 3-way 1st inn, Guardians ML 1st 5, Finnie o1.5 SOG, GASO@ODU o47.5, NBA x3); a price play's card carries no SmartSim tile and no sim number. Pre-deploy render of the same code: every why and risk bullet shown on all 12, at 18-21px.
 - **rollback:** revert e2e7dfcc / 25bac568 (label) or eb824cb5 (design) and reload-web.
+
+## 2026-10-15 -- MLB StatsAPI helpers off vendor: three scripts (lanes `mlb-injuries-fetch-native`, `mlb-schedule-fetch-native`, `mlb-live-game-pks-native`, session 2d413211)
+
+All three scripts put `vendor/mlb_bettingv2` on sys.path for `sim_engine.data.statsapi` (a bare `StatsApiClient()` plus the `/schedule` and roster wrappers). Each now uses a faithful copy:
+- an inline copy for the injuries script;
+- `syndicate/features/mlb/statsapi_http.py` for the other two.
+The copy has no cache, `trust_env` off unless `STATSAPI_TRUST_ENV`, an (8 s, 8 s) timeout, and 2 retries with jittered backoff on timeouts/connection/5xx. All three run as fresh subprocesses, so no restart is needed.
+
+- **0c2c4b9d `scripts/fetch_mlb_injuries.py`** -- live since 15:44:48Z, carried by the cheat-sheets session's ff to 6c31a410 (user-approved there; I replied "ride along OK").
+  - Pre-merge A/B, deployed vs new back to back: identical JSON on 10-13/14/15/16 (2-4 teams, 5-15 injured).
+  - **MET 16:54:25Z:** the refresh-worker (pid 524658, owner of the MLB tick) spawned the deployed script for 2026-10-15. It finished in ~3 s with no `sim_engine` mapped. It ran again at 17:10:43Z.
+- **be66391e `scripts/fetch_mlb_schedule_for_date.py` + `syndicate/features/mlb/statsapi_http.py`** -- MY ff 24e00269 -> be66391e at 16:26:16Z, no ride-alongs.
+  - The acquire **replaced `mlb-pitcher-recent-form`'s claim, which had EXPIRED at 43.5 min**; the tool permits that and printed it.
+  - Pre-merge A/B: identical on 09-27 (14 games), 10-13/14/15/16/18.
+  - Deployed checkout: the script returns 10-15 (TB@CLE 17:00Z first); 4 tests passed.
+  - **Reading OWED:** a worker spawn of the deployed script. A watcher is running.
+- **caede38a `scripts/fetch_mlb_live_game_pks_for_date.py`** -- live since 17:06:22Z, carried by the cheat-sheets session's ff eb824cb5 -> 25bac568 (approved by the user in that session).
+  - Pre-merge A/B on 4 dates was identical but ALL EMPTY (no live game), so not evidence by itself.
+  - **MET 17:07:09Z, with a game live:** old (vendored, from caede38a~1) vs deployed vs old again, for 2026-10-15 -> `{"live_game_pks": [849818]}` all three. 10-14 empty in all.
+- **Test note:** 13 `test_live_refresh_loop.py` MLB daily-sim tests error IN THE WORKTREE ONLY. The data-mirror guard flags their `mkdir` under `data/mlb_source/source_artifacts/data/daily` because the worktree has no `data/`. They patch the live check and never run these scripts.
+- **Rollback:** revert the relevant commit and ff. No restart.

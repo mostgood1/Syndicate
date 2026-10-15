@@ -67,15 +67,17 @@ death, never life — do not invert it.
 
 ## OPEN
 
-### mlb-live-game-pks-native — OPEN — opened 2026-10-15 — session 2d413211
+### mlb-live-game-pks-native — CLOSED 2026-10-15 (GOAL MET) — opened 2026-10-15 — session 2d413211
+- GOAL VERDICT. Goal (verbatim): "Move scripts/fetch_mlb_live_game_pks_for_date.py (the live loop's authoritative "is an MLB game live" signal) off the vendored `vendor/mlb_bettingv2` `sim_engine.data.statsapi` onto `syndicate.features.mlb.statsapi_http`, live-state logic unchanged, with identical output; deployed with a measurement (user request 2026-10-15)." -- **GOAL: MET** `[2026-10-15 17:07Z]`. caede38a live 17:06:22Z (via 25bac568); with TB@CLE live, old vs deployed both returned [849818]. deploys.md (MLB StatsAPI helpers).
 - Goal: Move scripts/fetch_mlb_live_game_pks_for_date.py (the live loop's authoritative "is an MLB game live" signal) off the vendored `vendor/mlb_bettingv2` `sim_engine.data.statsapi` onto `syndicate.features.mlb.statsapi_http`, live-state logic unchanged, with identical output; deployed with a measurement (user request 2026-10-15).
-- Files: scripts/fetch_mlb_live_game_pks_for_date.py, tests/test_fetch_mlb_live_game_pks_native.py (NEW)
+- Files: none (released at close)
 - Hypothesis: the script uses only a bare StatsApiClient + fetch_schedule_for_date, which statsapi_http copies faithfully (proven identical for the schedule helper on 6 dates).
 - Falsification test: on the fleet, old vs new script for the same dates (back to back) produce different JSON.
 - Verification: A/B identical on the fleet; after a fleet ff the deployed script runs and returns the same live_game_pks (fresh subprocess per check; no restart).
 - Blocked by: none
 
 ### mlb-schedule-fetch-native — OPEN — opened 2026-10-15 — session 2d413211
+- GOAL VERDICT. Goal (verbatim): "Move scripts/fetch_mlb_schedule_for_date.py (the schedule adapter's MLB source: fixture clock, slate phase, lineup force window, MLB event lists) off the vendored `vendor/mlb_bettingv2` `sim_engine.data.statsapi` onto a faithful Syndicate StatsAPI module, with identical output; deployed with a measurement (user request 2026-10-15: "move the mlb schedule commence times off vendor")." -- **GOAL: NOT MET** `[2026-10-15 17:12Z]`. be66391e deployed by my ff 16:26:16Z; A/B identical on 6 dates; deployed-checkout run OK. Left: a worker spawn of the deployed script (watcher running).
 - Goal: Move scripts/fetch_mlb_schedule_for_date.py (the schedule adapter's MLB source: fixture clock, slate phase, lineup force window, MLB event lists) off the vendored `vendor/mlb_bettingv2` `sim_engine.data.statsapi` onto a faithful Syndicate StatsAPI module, with identical output; deployed with a measurement (user request 2026-10-15: "move the mlb schedule commence times off vendor").
 - Files: syndicate/features/mlb/statsapi_http.py (NEW), scripts/fetch_mlb_schedule_for_date.py, tests/test_fetch_mlb_schedule_native.py (NEW)
 - Hypothesis: the script uses only StatsApiClient.get without a cache plus fetch_schedule_for_date; a copy of exactly that is output-identical.
@@ -83,9 +85,10 @@ death, never life — do not invert it.
 - Verification: A/B identical on the fleet; after a fleet ff the adapter's next MLB schedule read runs the new script (fresh subprocess; no restart) and returns the day's games.
 - Blocked by: none
 
-### mlb-injuries-fetch-native — OPEN — opened 2026-10-15 — session 2d413211
+### mlb-injuries-fetch-native — CLOSED 2026-10-15 (GOAL MET) — opened 2026-10-15 — session 2d413211
+- GOAL VERDICT. Goal (verbatim): "Move scripts/fetch_mlb_injuries.py (run by the live loop's MLB lineup check, `_fetch_mlb_injuries`) off the vendored `vendor/mlb_bettingv2` `sim_engine.data.statsapi` (StatsApiClient, fetch_schedule_for_date, fetch_team_roster) onto a faithful Syndicate copy, with identical output; deployed with a measurement (user request 2026-10-15)." -- **GOAL: MET** `[2026-10-15 17:12Z]`. 0c2c4b9d live 15:44:48Z (via 6c31a410); A/B identical on 4 dates; the refresh-worker ran the deployed script 16:54:25Z and 17:10:43Z, clean. deploys.md (MLB StatsAPI helpers).
 - Goal: Move scripts/fetch_mlb_injuries.py (run by the live loop's MLB lineup check, `_fetch_mlb_injuries`) off the vendored `vendor/mlb_bettingv2` `sim_engine.data.statsapi` (StatsApiClient, fetch_schedule_for_date, fetch_team_roster) onto a faithful Syndicate copy, with identical output; deployed with a measurement (user request 2026-10-15).
-- Files: scripts/fetch_mlb_injuries.py, tests/test_fetch_mlb_injuries_native.py (NEW)
+- Files: none (released at close)
 - Hypothesis: the script uses only StatsApiClient.get without a disk cache plus two thin wrappers (/schedule, /teams/{id}/roster); a copy of exactly that is output-identical.
 - Falsification test: on the fleet, old vs new script for the same date (back to back) produce different JSON.
 - Verification: A/B identical on the fleet; after a fleet ff the live-odds-worker's next MLB lineup check writes the MLB injuries artifact via the new script (fresh subprocess each run; no restart).
