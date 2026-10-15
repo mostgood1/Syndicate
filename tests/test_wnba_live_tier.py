@@ -73,7 +73,11 @@ def test_wnba_source_is_accepted_and_mlbs_is_not_weakened():
     # and broke the moment the stamp landed. `ncaab` has no live tier of any
     # kind (`scripts/live_tier_coverage_check.py` declares it `none`), so it is
     # the honest stand-in now.
-    assert lens_sources_for_sport("ncaab") == (LIVE_STATE_LENS_SOURCE,)
+    #
+    # MOVED AGAIN (ci-suite #697, 2026-10-15): NCAAB got its own `live_resim` stamp
+    # (3c45f78f), so it no longer exercises the default either. A sport no code
+    # registers cannot be overtaken by a later lane.
+    assert lens_sources_for_sport("lacrosse") == (LIVE_STATE_LENS_SOURCE,)
     assert lens_sources_for_sport(None) == (LIVE_STATE_LENS_SOURCE,)
     # And the sports that DO have a looked-at shape carry their own stamp, which
     # is what keeps a refusal lane (`pregame`) from being admitted as live.

@@ -3713,7 +3713,10 @@ class HomeBoardTests(unittest.TestCase):
         body = response.get_data(as_text=True)
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn('class="board-date-input" value="2026-05-20"', body)
+        # Attribute ORDER is not the contract (the 10-08 redesign put aria-label
+        # between class and value -- ci-suite #697, 2026-10-15); the date input
+        # carrying the requested date is.
+        self.assertRegex(body, r'<input[^>]*class="board-date-input"[^>]*value="2026-05-20"')
         # c86d9d86 (#111 follow-up) deliberately dropped the
         # document.getElementById("board-date").value fallback here -- a
         # tab left open since a prior day restores that stale input value
