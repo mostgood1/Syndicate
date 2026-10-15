@@ -2857,3 +2857,29 @@ substance (P3 findings_2026-10-09 §13, 6741818e):**
   - The postseason is a separate stratum, on the last regular-season calibration file (the same as this lane).
 - **Order:** this lane's DONE marker → P3 records the VALID inputs and fills its cache. No grade is computed by either
   lane until this lane announces THE READ; then G1/G2/G4 here and G3 at P3 run in the same pass.
+
+**USER DECISION 2026-10-15 ~18:55Z (given in d48f3a34, CONFIRMED in this chat): production enablement, CONDITIONAL on the
+VALID read.**
+- If THE VALID READ passes EVERY pre-registered gate, switch the FINAL config (fit_f5) on for NBA PREGAME production in
+  ONE coordinated deploy with P3's full NBA live switch-on (the user overrode P3's §12 gate for live). Target: the
+  2026-10-20 opener.
+- If any gate fails: enable nothing; report to the user.
+- **Deploy mechanics, required:**
+  - exact-SHA fast-forward; claims; `check_deploy_safety` read in full; env change via a full supervisor down/up;
+  - a `deploys.md` entry with the published-output A/B on the same games and seed (the #473 lesson), every ride-along
+    and env change listed, rollbacks named;
+  - the post-deploy input checklist on fresh production sims.
+- Known residuals, stated: REB −1.4, 3P% +1.6, AST −2.1.
+
+**PREREQUISITE FOUND (production wiring, not yet built):**
+- Production builds the engine cfg from `EventSimConfigLocal()` DEFAULTS (basketball_props_smart_sim.py ~:725), and the
+  LeagueParams flags (EXACT and the six ports) are fixed per league.
+- No production path applies the fit_f5 levers or flags. The totals-calibration builder is not wired into the NBA
+  refresh.
+- **Before any enablement:**
+  - (i) a data-file switch (e.g. `nba_engine_config.json` in the NBA processed root) that applies the fit_f5
+    EventSimConfig fields + the LeagueParams overrides. Absent = byte-identical (tests + corpus parity). Shared with
+    P3's live re-sim so both read one config.
+  - (ii) `build_nba_totals_calibration.py` scheduled daily on the fleet, with its opening seed.
+  - (iii) `nba_sim_total_inputs.json` with skip_outs_penalties added.
+- Built default-off while the VALID runs go, so that a pass can ship.
