@@ -483,6 +483,47 @@ def _in_play_market_fair_allowed() -> bool:
     return raw == "allow"
 
 
+# Per-CELL exceptions to the in-play market-fair refusal (user 2026-10-15: "go ahead and stake live NFL props and
+# NCAAF totals"; lane `live-market-fair-cells`). Evidence: live Suggested re-graded on the Shin fair, 09-30..10-13
+# (C:\tmp\edge-analyses\live-regrade) -- the only two cells positive under BOTH the fair in force and the Shin fair:
+#     live NFL player props   +11.5% [+0.6, +23.1] (368 bets / 31 games)  /  +13.7% [0.0, +27.5] (302 / 31)
+#     live NCAAF totals       +17.2% [+0.4, +34.0] (170 / 83)             /  +18.0% [+2.6, +33.8] (137 / 76)
+# Every other in-play market-fair cell stays refused: live spreads read negative in 3 of 3 readings, h2h flips sign with
+# the fair. Families exactly as that read defined them (`_market_fair_family`). The kill / promote reads are
+# pre-registered in the lane; the cells are never re-cut after seeing forward data.
+#     SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR_CELLS=nfl:prop,ncaaf:totals    (the default when unset)
+#     SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR_CELLS=none                     (the full refusal again)
+# A value that does not parse admits NOTHING: an unknown must not land on the permissive branch.
+IN_PLAY_MARKET_FAIR_CELLS = frozenset({("nfl", "prop"), ("ncaaf", "totals")})
+_MARKET_FAIR_FAMILIES = frozenset({"prop", "totals", "spreads", "h2h", "other_game"})
+
+
+def _in_play_market_fair_cells() -> frozenset[tuple[str, str]]:
+    raw = os.environ.get("SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR_CELLS")
+    if raw is None or not raw.strip():
+        return IN_PLAY_MARKET_FAIR_CELLS
+    cells = set()
+    for part in raw.strip().lower().split(","):
+        sport, _, family = part.strip().partition(":")
+        if sport and family in _MARKET_FAIR_FAMILIES:
+            cells.add((sport, family))
+    return frozenset(cells)
+
+
+def _market_fair_family(row: Mapping[str, Any]) -> str:
+    """prop / totals / spreads / h2h / other_game -- the live re-grade's own definition, any segment."""
+    if str(row.get("player_name") or "").strip() or str(row.get("kind") or "").strip().lower() == "prop":
+        return "prop"
+    market = str(row.get("market") or "").strip().lower()
+    if market.startswith("totals") or (market.startswith("alternate_totals") and "corner" not in market):
+        return "totals"
+    if market.startswith("spreads") or market.startswith("alternate_spreads"):
+        return "spreads"
+    if market.startswith("h2h"):
+        return "h2h"
+    return "other_game"
+
+
 def _refuses_in_play_market_fair(row: Mapping[str, Any]) -> bool:
     """True for an in-play row that would otherwise be sized on market fair alone.
 
@@ -502,7 +543,11 @@ def _refuses_in_play_market_fair(row: Mapping[str, Any]) -> bool:
     # to pregame before it reads `is_live`, and an in-play row whose state text
     # is missing must not land on the permissive branch.
     market_state = str(row.get("market_state") or "").strip().lower()
-    return market_state == "live" or row.get("is_live") is True or game_state_of(row) == "live"
+    in_play = market_state == "live" or row.get("is_live") is True or game_state_of(row) == "live"
+    if not in_play:
+        return False
+    sport = str(row.get("sport") or "").strip().lower()
+    return (sport, _market_fair_family(row)) not in _in_play_market_fair_cells()
 
 
 def sizing_basis_of(row: Mapping[str, Any]) -> str:

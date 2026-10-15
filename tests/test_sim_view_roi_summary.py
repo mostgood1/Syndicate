@@ -338,7 +338,10 @@ def test_the_market_fair_only_set_is_exactly_the_rows_with_no_sim_edge(monkeypat
         assert positions[0]["sizing"]["basis"] == "market_fair"
         assert positions[0]["sim_view"] == verdict
 
-        # Sport allowlisted, in play: refused unless in-play market fair is allowed.
+        # Sport allowlisted, in play: refused unless in-play market fair is allowed. The generic refusal is pinned
+        # here (cells off): live NCAAF totals / NFL props are admitted by the per-cell allowlist since 2026-10-15,
+        # which has its own tests (tests/test_in_play_market_fair_cells.py).
+        monkeypatch.setenv("SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR_CELLS", "none")
         live = dict(row, market_state="live", is_live=True)
         out = commit_portfolio([live], selected_date="2026-09-03")
         assert not out["positions"], f"{verdict} placed in play"
