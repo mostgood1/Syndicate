@@ -190,11 +190,19 @@ def _implied(american: Any) -> float | None:
     return 100 / (a + 100) if a > 0 else -a / (-a + 100)
 
 
-def pick_card_fields(pick: Mapping[str, Any], *, sport: str, date: str, number: int, label: str = "SYNDICATE PICK",
+def pick_card_fields(pick: Mapping[str, Any], *, sport: str, date: str, number: int, label: str | None = None,
                      form_values: list[float] | None = None, form_labels: list[str] | None = None) -> dict[str, Any]:
+    from syndicate.features.shared import cheat_sheets as cs
+
     ev, p_model, p_mkt, books = pick.get("ev_pct"), pick.get("p_model"), pick.get("p_market"), int(pick.get("books") or 0)
+    # SYNDICATE PICK when the sim backs the price edge, PRICE PLAY when it does not (user 2026-10-15: "if i tout our
+    # sim and we show something like this it dvalues our work"). A price play's graphic never shows the sim's number.
+    label = label or pick.get("label") or cs.pick_label(pick)
+    play = label == cs.PRICE_PLAY_LABEL
     why: list[str] = []
-    if isinstance(ev, (int, float)):
+    if play:
+        why.append(cs.price_case(pick) + (f", {ev:+.1f}%" if isinstance(ev, (int, float)) else ""))
+    elif isinstance(ev, (int, float)):
         why.append(f"Best price {fmt_american(pick.get('price'))} beats the no-vig fair "
                    f"({fmt_american(pick.get('fair_price'))}) by {ev:+.1f}%")
     # The board's case minus its model sentences: the model is context or risk on a card, never the reason (see
@@ -211,10 +219,10 @@ def pick_card_fields(pick: Mapping[str, Any], *, sport: str, date: str, number: 
     backing = sorted((x for x in said if x[0] != "against"), key=lambda x: x[0] != "for")   # what backs it, first
     why += [text for _tone, text in backing][:4]
     risk: list[str] = [text for tone, text in said if tone == "against"][:2]
-    if str(pick.get("sim_view") or "") in ("disagrees", "contradicts"):
-        risk.append("Our sim does not back this side: the edge is the price against the market")
-    if isinstance(p_model, (int, float)) and isinstance(p_mkt, (int, float)) and abs(p_model - p_mkt) >= 0.10:
-        risk.append(f"Sim {p_model:.0%} vs market {p_mkt:.0%}: gaps this big are usually model error, not edge")
+    if play:
+        risk.append("A price edge closes fast: re-check the price before betting")
+    elif isinstance(p_model, (int, float)) and isinstance(p_mkt, (int, float)) and abs(p_model - p_mkt) >= 0.10:
+        risk.append(f"Sim and market are far apart ({p_model:.0%} vs {p_mkt:.0%}): we size on the price, not the gap")
     if books and books < 4:
         risk.append(f"Only {books} books quote it, so the fair rests on few prices")
     is_prop = pick.get("kind") == "prop"
@@ -234,11 +242,14 @@ def pick_card_fields(pick: Mapping[str, Any], *, sport: str, date: str, number: 
         "home_logo": pick.get("home_logo"), "away_logo": pick.get("away_logo"),
         "kickoff_ct": pick.get("kickoff_ct"), "hide_number": True,
         "kind": pick.get("kind"), "market": pick.get("market"), "segment_label": pick.get("segment_label"),
-        "projected": pick.get("projected"),
+        "projected": pick.get("projected"), "price_play": play,
     }
+    if play:     # the third tile is the market's consensus, never the sim
+        fields.update({"tile3_k": "Books", "tile3_v": str(books or "–"), "tile3_s": f"consensus {fields['win_prob']}"})
+        fields["model_prob"] = None
     if not fields["form_values"]:
-        fields["chart_title"] = "Sim vs market"
-        fields["chart_svg"] = prob_svg(p_model, p_mkt, _implied(pick.get("price")))
+        fields["chart_title"] = "Market vs price" if play else "Sim vs market"
+        fields["chart_svg"] = prob_svg(None if play else p_model, p_mkt, _implied(pick.get("price")))
         fields["chart_caption"] = "the best price has to beat the no-vig market"
     return fields
 
@@ -283,11 +294,15 @@ def pick_cards(sheets: Iterable[Mapping[str, Any]], *, per_sport: int = 3, label
     first -- the board's suggested opps (2026-10-15) -- and a sheet without any falls back to its value rows."""
     out, n = [], 0
     for sheet in sheets:
-        picks = [p for p in sheet.get("picks") or [] if p.get("pick_id")][:per_sport]
+        from syndicate.features.shared.cheat_sheets import pick_label
+
+        # The picks the sim backs first, then the price plays (user 2026-10-15).
+        picks = sorted((p for p in sheet.get("picks") or [] if p.get("pick_id")),
+                       key=lambda p: (p.get("label") or pick_label(p)) != "SYNDICATE PICK")[:per_sport]
         for pick in picks:
             n += 1
             values, labels = pick_form(sheet, pick) if pick.get("kind") == "prop" else ([], [])
-            out.append((pick_card_fields(pick, sport=sheet["sport"], date=sheet["date"], number=n, label="SYNDICATE PICK",
+            out.append((pick_card_fields(pick, sport=sheet["sport"], date=sheet["date"], number=n,
                                          form_values=values, form_labels=labels), pick, sheet["sport"]))
         if picks:
             continue
@@ -409,7 +424,9 @@ def render_card(fields: Mapping[str, Any], logo_uri: str, template: str | None =
         away_crest=crest(fields.get("away_logo")), home_crest=crest(fields.get("home_logo")),
         bet=e(fields["bet"]), price=e(fields["price"]), book=e(fields["book"]), books=e(fields["books"]),
         fair=e(fields["fair"]), edge=e(fields["edge"]), win_prob=e(fields["win_prob"]),
-        sim_value=e(fields.get("model_prob") or "–"), sim_note=e(sim_note),
+        tile3_k=e(fields.get("tile3_k") or "SmartSim"), tile3_v=e(fields.get("tile3_v") or fields.get("model_prob") or "–"),
+        tile3_s=e(fields.get("tile3_s") or sim_note),
+        outlook_title="Market outlook" if fields.get("price_play") else "SmartSim outlook",
         chart=fields.get("chart_svg") or chart_svg(values, fields["form_labels"], line, side),
         chart_title=e(fields.get("chart_title") or "Last games"),
         chart_caption=e(caption), why="".join(f"<li>{e(w)}</li>" for w in fields["why"]),

@@ -675,3 +675,21 @@ def test_the_boards_narrative_never_makes_the_model_a_reason_or_repeats_recent_f
     pick = {"kind": "prop", "player_name": "Griffin Jax", "market": "outs", "side": "over", "line": 11.5, "detail": detail,
             "recent_values": [9, 15, 15, 15, 8]}
     assert [p["label"] for p in cs.pick_points(pick)] == ["Last 5", ""]           # its own record replaces the narrative
+
+
+def test_a_price_edge_the_sim_backs_is_a_syndicate_pick_and_one_it_does_not_is_a_price_play():
+    # User 2026-10-15: "if i tout our sim and we show something like this it dvalues our work" -- the GASO@ODU over at
+    # +109 was a Syndicate pick beside "SmartSim 12%". The board's sim_view decides; past its 15-point cap the sim has
+    # no priced view, and its probability against the market decides (Jax over 3.5 K: 75% vs 50% IS backed).
+    assert cs.pick_label({"sim_view": "agrees", "p_model": 0.51, "p_market": 0.44}) == "SYNDICATE PICK"
+    assert cs.pick_label({"sim_view": "contradicts", "p_model": 0.12, "p_market": 0.50}) == "PRICE PLAY"
+    assert cs.pick_label({"sim_view": "neutral", "p_model": 0.24, "p_market": 0.24}) == "PRICE PLAY"
+    assert cs.pick_label({"sim_view": "unpriced", "p_model": 0.75, "p_market": 0.50}) == "SYNDICATE PICK"
+    assert cs.pick_label({"sim_view": None, "p_model": None, "p_market": 0.50}) == "PRICE PLAY"   # no sim: never touted
+    assert cs.price_case({"books": 24, "p_market": 0.5, "fair_price": 100, "book": "prophetx", "price": 109}) ==         "The edge is the price: 24 books put it at 50% (fair +100); ProphetX pays +109"
+    m = _script()
+    pick = lambda pid, view, score: {"pick_id": pid, "kind": "game", "market": "totals", "sim_view": view, "board_score": score,
+                                     "p_model": 0.12 if view == "contradicts" else 0.6, "p_market": 0.5, "book": "prophetx"}
+    merged = m.merge_picks([pick("a", "contradicts", 9.0), pick("b", "agrees", 1.0)], None)
+    assert [(p["pick_id"], p["label"], p["book_name"]) for p in merged] == [("b", "SYNDICATE PICK", "ProphetX"),
+                                                                        ("a", "PRICE PLAY", "ProphetX")]   # picks first

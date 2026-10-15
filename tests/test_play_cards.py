@@ -193,3 +193,20 @@ def test_the_badge_holds_the_sports_ball():
     assert pc.badge_name("wnba") == "syndicate_roi_badge_basketball.webp" and pc.badge_name("nhl") == "syndicate_roi_badge_puck.webp"
     assert pc.badge_name("cricket") == "syndicate_roi_badge.webp"                    # a sport with no ball keeps the plain one
     assert all((pc.BRAND_DIR / pc.badge_name(s)).is_file() for s in pc.SPORT_BALL)
+
+
+def test_a_price_play_graphic_never_shows_the_sims_number():
+    # User 2026-10-15: touting the sim beside "SmartSim 12%" devalues the work. A price edge the sim does not back posts
+    # as a PRICE PLAY: Books in place of SmartSim, the market against the price in the chart, the price as the reason.
+    from syndicate.features.shared import play_cards as pc
+
+    pick = _pick(market="totals", side="over", line=47.5, display_name="GASO @ ODU", bet="Over 47.5", sim_view="contradicts",
+                 p_model=0.12, p_market=0.5, price=109, fair_price=100, book="prophetx", books=24, ev_pct=4.5, points=[])
+    f = pc.pick_card_fields(pick, sport="ncaaf", date="2026-10-15", number=1)
+    assert f["label"] == "PRICE PLAY" and f["tile3_k"] == "Books" and f["tile3_v"] == "24" and f["model_prob"] is None
+    assert f["why"][0].startswith("The edge is the price: 24 books put it at 50% (fair +100); ProphetX pays +109")
+    html = pc.render_card(f, "data:,").split("</style>", 1)[1]                # what renders, not the CSS comments
+    assert "Market outlook" in html and "SmartSim" not in html and ">12%<" not in html and "Sim 12" not in html \
+        and "Our sim" not in html                                                # 12% as TEXT (the background has cx="12%")
+    backed = pc.pick_card_fields(_pick(), sport="mlb", date="2026-10-15", number=1)          # sim agrees: a pick
+    assert backed["label"] == "SYNDICATE PICK" and "SmartSim outlook" in pc.render_card(backed, "data:,")

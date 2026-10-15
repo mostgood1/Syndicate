@@ -54,6 +54,7 @@ section.sheet { background: linear-gradient(180deg, var(--bg2), var(--card)); bo
 .bet { font: 500 13px var(--mono); margin-top: 2px; }
 .chip { display: inline-block; font: 800 12px/1 var(--display); letter-spacing: .07em; text-transform: uppercase; padding: 4px 7px; border-radius: 4px; margin-right: 6px; }
 .chip.value { color: var(--v-value); background: var(--v-value-bg); }
+.chip.playchip { color: var(--accent2); background: rgba(31,168,255,.14); }
 .chip.streak_priced_in { color: var(--v-priced); background: var(--v-priced-bg); } .chip.neutral { color: var(--v-neutral); background: var(--v-neutral-bg); }
 .strip { position: relative; height: 26px; }
 .strip .track { position: absolute; left: 0; right: 0; top: 11px; height: 4px; background: var(--track); border-radius: 2px; }
@@ -300,27 +301,40 @@ function propRow(r, i) {
 }
 // ---- Syndicate picks (user 2026-10-15: "add the suggested opps as a picks section with pick graphics"): the Layer 2
 // board's suggested opps for this day's games, promoted at the price shown and kept on the record at that price.
+// SYNDICATE PICK = a price edge the sim backs; PRICE PLAY = the same price edge without it (user 2026-10-15: touting
+// the sim beside "SmartSim 12%" devalues the work). The builder stamps `label`; an older pick is read by the same rule.
+const SIM_BACKS = ["agrees", "live_agrees"], SIM_AGAINST = ["disagrees", "live_disagrees", "contradicts", "live_contradicts", "neutral"];
+function isPricePlay(p) {
+  if (p.label) return p.label === "PRICE PLAY";
+  const v = String(p.sim_view || "").toLowerCase();
+  if (SIM_BACKS.includes(v)) return false;
+  if (SIM_AGAINST.includes(v)) return true;
+  return !(typeof p.p_model === "number" && typeof p.p_market === "number" && p.p_model > p.p_market);
+}
 function pickRow(p, i) {
-  const sim = p.sim_view === "agrees" ? `<span class="chip value">Sim agrees</span>`
-    : (p.sim_view === "disagrees" || p.sim_view === "contradicts") ? `<span class="chip suspect_price">Sim disagrees</span>` : "";
+  const play = isPricePlay(p);
+  const sim = !play && SIM_BACKS.includes(String(p.sim_view || "")) ? `<span class="chip value">Sim agrees</span>` : "";
   const card = META.mode === "app" && p.pick_id
     ? `<a class="btn no-export" href="/cheatsheets/card/${esc(STATE.sport)}/${esc(META.date)}/${esc(p.pick_id)}" target="_blank" rel="noopener">Pick graphic</a>` : "";
   const live = started(p.commence_time) ? `<span class="chip started">Started</span>` : "";
   // The board's suggested set moves with prices; a pick it no longer backs keeps its record price and says so.
   const off = p.on_board === false && !started(p.commence_time) ? `<span class="chip neutral" title="The board no longer suggests this at the current price">Not on the board now</span>` : "";
   const proj = p.kind === "prop" && typeof p.projected === "number" ? `proj ${p.projected.toFixed(1)} vs ${p.line}` : "sim win rate";
-  const why = [`<li><b>Price</b>${odds(p.price)} beats the no-vig fair ${odds(p.fair_price)} by ${evs(p.ev_pct)}</li>`]
+  const why = [play
+    ? `<li><b>Price</b>The edge is the price: ${p.books ? `${p.books} books put it at ` : "the market puts it at "}${pct(p.p_market)} (fair ${odds(p.fair_price)}); ${esc(p.book_name || p.book || "the best book")} pays ${odds(p.price)}, ${evs(p.ev_pct)}</li>`
+    : `<li><b>Price</b>${odds(p.price)} beats the no-vig fair ${odds(p.fair_price)} by ${evs(p.ev_pct)}</li>`]
     .concat((p.points || []).map(pt => `<li class="${pt.tone === "for" ? "for" : pt.tone === "against" ? "against" : "ctx"}">${pt.label ? `<b>${esc(pt.label)}</b>` : ""}${esc(pt.text)}</li>`));
   return `<div class="prop pick" data-pk="${i}">
     <div class="who">${face({...p, player: p.display_name})}
-      <div class="line1"><span class="chip value">Syndicate pick</span>${sim}${off}${live}${card}</div>
+      <div class="line1">${play ? `<span class="chip playchip">Price play</span>` : `<span class="chip value">Syndicate pick</span>`}${sim}${off}${live}${card}</div>
       <div class="line1"><b>${esc(p.display_name || "")}</b>${p.pos ? `<span class="pos">${esc(p.pos)}</span>` : ""}</div>
       <div class="bet">${esc(p.bet || "")}</div>
       <div class="meta">${[p.display_name === p.matchup ? "" : esc(p.matchup || ""), p.kickoff_ct ? `<span class="kick">${esc(p.kickoff_ct)}</span>` : ""].filter(Boolean).join(" · ")}</div></div>
     <div class="ptiles">
       <div class="ptile"><span>Best price</span><b>${odds(p.price)}</b><i>${esc(p.book || "")}${p.books ? ` · ${p.books} bks` : ""}</i></div>
       <div class="ptile"><span>Fair line</span><b>${odds(p.fair_price)}</b><i>no-vig ${pct(p.p_market)}</i></div>
-      <div class="ptile"><span>SmartSim</span><b>${pct(p.p_model)}</b><i>${esc(proj)}</i></div>
+      ${play ? `<div class="ptile"><span>Books</span><b>${p.books || "–"}</b><i>consensus ${pct(p.p_market)}</i></div>`
+             : `<div class="ptile"><span>SmartSim</span><b>${pct(p.p_model)}</b><i>${esc(proj)}</i></div>`}
       <div class="ptile"><span>Edge</span><b class="${p.ev_pct > 0 ? "pos" : ""}">${evs(p.ev_pct)}</b><i>vs the fair price</i></div>
     </div>
     <ul class="checks">${why.slice(0, 8).join("")}</ul>
@@ -329,8 +343,10 @@ function pickRow(p, i) {
 function picksBlock(d, game) {
   const picks = (d.picks || []).map((p, i) => [p, i]).filter(([p]) => !game || p.event_id === game.event_id);
   if (!picks.length) return "";
-  return sectionShell("picks", "Syndicate picks", "The Layer 2 board's suggested plays for these games: the best price beats the no-vig fair by 2% or more, net of any exchange fee, on a fresh quote. Each is promoted at the price shown and stays on the record at that price.",
-    `${picks.length} pick${picks.length === 1 ? "" : "s"}`, `<div class="rowlist">${picks.map(([p, i]) => pickRow(p, i)).join("")}</div>`);
+  const plays = picks.filter(([p]) => isPricePlay(p)).length, sims = picks.length - plays;
+  return sectionShell("picks", "Syndicate picks", "The Layer 2 board's suggested plays for these games: the best price beats the no-vig fair by 2% or more, net of any exchange fee, on a fresh quote. A SYNDICATE PICK is one our sim backs too; a PRICE PLAY is the same price edge without the sim's backing. Each is promoted at the price shown and stays on the record at that price.",
+    [sims ? `${sims} pick${sims === 1 ? "" : "s"}` : "", plays ? `${plays} price play${plays === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · "),
+    `<div class="rowlist">${picks.map(([p, i]) => pickRow(p, i)).join("")}</div>`);
 }
 const SECTIONS = [
   ["value", "Value at the best price", "The best available price beats the no-vig fair price by 2% or more."],

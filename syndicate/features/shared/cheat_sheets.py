@@ -1123,6 +1123,54 @@ def pick_record(card: Mapping[str, Any], *, promoted_at: str) -> dict[str, Any]:
 PICK_RECENT_FIELDS = ("recent_values", "recent_dates", "recent_opponents", "recent_lines", "team_recent", "team_recent_segment")
 
 
+# A SYNDICATE PICK is a price edge the sim BACKS; a price edge it does not back is a PRICE PLAY (user 2026-10-15: "if i
+# tout our sim and we show something like this it dvalues our work" -- a pick posted beside "SmartSim 12%"). Both stay
+# on the sheet and on the record; only the label and what the graphic shows differ. The board's own `sim_view` decides
+# (`layer2_board`: the sign of the priced model edge); past the board's 15-point cap it has no priced view
+# ("unpriced"), and the sim's probability against the market's decides instead -- Jax over 3.5 K, 75% vs 50%, IS backed.
+SIM_BACKS = frozenset({"agrees", "live_agrees"})
+SIM_AGAINST = frozenset({"disagrees", "live_disagrees", "contradicts", "live_contradicts", "neutral"})
+PICK_LABEL, PRICE_PLAY_LABEL = "SYNDICATE PICK", "PRICE PLAY"
+
+
+def sim_backs_pick(pick: Mapping[str, Any]) -> bool:
+    view = str(pick.get("sim_view") or "").strip().lower()
+    if view in SIM_BACKS:
+        return True
+    if view in SIM_AGAINST:
+        return False
+    p_model, p_market = pick.get("p_model"), pick.get("p_market")
+    return isinstance(p_model, (int, float)) and isinstance(p_market, (int, float)) and p_model > p_market
+
+
+def pick_label(pick: Mapping[str, Any]) -> str:
+    return PICK_LABEL if sim_backs_pick(pick) else PRICE_PLAY_LABEL
+
+
+BOOK_NAMES = {"draftkings": "DraftKings", "fanduel": "FanDuel", "betmgm": "BetMGM", "prophetx": "ProphetX",
+              "betrivers": "BetRivers", "kalshi": "Kalshi", "polymarket": "Polymarket", "williamhill_us": "Caesars",
+              "espnbet": "ESPN BET", "fanatics": "Fanatics", "bovada": "Bovada", "betonlineag": "BetOnline", "lowvig": "LowVig",
+              "mybookieag": "MyBookie", "ballybet": "Bally Bet", "hardrockbet": "Hard Rock Bet", "betparx": "betPARX",
+              "pinnacle": "Pinnacle", "novig": "Novig", "betanysports": "BetAnySports", "fliff": "Fliff"}
+
+
+def book_name(key: Any) -> str:
+    """A book's display name ("prophetx" -> "ProphetX"); an unknown key is title-cased, never dropped."""
+    k = str(key or "").strip()
+    return BOOK_NAMES.get(k.lower(), k.replace("_", " ").title() if k else "")
+
+
+def price_case(pick: Mapping[str, Any]) -> str:
+    """A price play's reason in one sentence: the market's consensus against the price on offer."""
+    def american(p: Any) -> str:
+        return f"{float(p):+g}" if isinstance(p, (int, float)) else str(p or "")
+    books, p_market = pick.get("books"), pick.get("p_market")
+    consensus = f"{int(books)} books put it at {p_market:.0%}" if isinstance(books, (int, float)) and books and \
+        isinstance(p_market, (int, float)) else "the market puts it"
+    return f"The edge is the price: {consensus} (fair {american(pick.get('fair_price'))}); {book_name(pick.get('book')) or 'the best book'} " \
+           f"pays {american(pick.get('price'))}"
+
+
 def pick_result_key(pick: Mapping[str, Any]) -> str:
     """A pick's key in the reconciled file -- the grader's own fields WITH the segment (a pick can be a 1st-3-innings
     moneyline): props by player, game picks by event."""

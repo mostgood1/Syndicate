@@ -751,7 +751,12 @@ def merge_picks(fresh: list[dict[str, Any]], prior: dict[str, Any] | None, *, ro
         # The case is re-read at every build (user 2026-10-15: full explanations, player vs opponent, recency and
         # consistency) from the pick's kept games, the sheet's row for the player, and the board's written case.
         p["points"] = cs.pick_points(p, rows=rows or [])
-    return sorted(kept.values(), key=lambda p: (-(p.get("board_score") or 0), str(p.get("promoted_at"))))
+        # SYNDICATE PICK when the sim backs the price edge, PRICE PLAY when it does not (user 2026-10-15) -- re-read
+        # every build, since the sim's view moves with the board.
+        p["label"] = cs.pick_label(p)
+        p["book_name"] = cs.book_name(p.get("book"))
+    return sorted(kept.values(), key=lambda p: (p["label"] != cs.PICK_LABEL, -(p.get("board_score") or 0),
+                                                str(p.get("promoted_at"))))
 
 
 def attach_images(sheet: dict[str, Any], cache: Path) -> dict[str, int]:
