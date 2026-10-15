@@ -156,3 +156,85 @@ The third is the case in one line: a 31% probability, refused as implausible.
 - Market class is `market in {h2h, h2h_3_way, spreads, totals, spreads_alt,
   totals_alt, moneyline, btts}` -> game line, else player prop.
 - Script: `scratchpad/ceiling_implied.py` and `ceiling_by_sport.py`.
+
+## ENGINE READ (added 2026-10-15 22:3xZ, owed by the standing rule)
+
+The sections above are a BETTING read: the guard is miscalibrated against its
+own criterion. That is only half of what this data says, and the half that
+matters less. A >15-point disagreement with the market is far more likely a
+MODEL DEFECT than a 15-point edge, so the 525 rejected rows are better read as
+a **large-gap bug list** — and the ceiling has been suppressing the symptom
+while leaving the cause in place.
+
+Restricted to player props (461 of the 525; game lines excluded because the
+engine question is per stat family):
+
+| sport | family | rej | acc | rej% | over/under | mean abs edge | max |
+|---|---|---:|---:|---:|---:|---:|---:|
+| nfl | receiving yards | 108 | 261 | 29% | 45/63 | 27.9 | 49.9 |
+| nfl | rushing yards | 79 | 122 | 39% | 25/54 | 24.9 | 53.1 |
+| nfl | receptions | 46 | 145 | 24% | 20/26 | 24.5 | 48.1 |
+| nhl | sog | 33 | 298 | 10% | 6/27 | 21.1 | 30.6 |
+| ncaaf | receiving yards | 33 | 48 | 41% | 8/25 | 20.2 | 31.9 |
+| nfl | rushing attempts | 25 | 38 | 40% | 2/23 | 24.2 | 34.8 |
+| nfl | passing yards | 22 | 102 | 18% | 10/12 | 23.0 | 30.8 |
+| ncaaf | rushing yards | 16 | 26 | 38% | **0/16** | 25.2 | 41.0 |
+| nhl | assists | 14 | 268 | 5% | **0/14** | 18.1 | 21.4 |
+| ncaaf | passing yards | 8 | 15 | 35% | **0/8** | **32.8** | 35.9 |
+| mlb | strikeouts | **5** | **0** | **100%** | **5/0** | 26.4 | 43.4 |
+
+(22 families have at least one rejected row; the full table is in
+`scratchpad/ceiling_engine_read.py` output.)
+
+**1. The gaps are CONCENTRATED, which is the defect signature.** Top 1 family
+= 23% of rejected prop rows, top 3 = **51%**, top 5 = 65%. NFL
+receiving/rushing/receptions alone is 233 of 461. Diffuse disagreement would
+not pile up like that.
+
+**2. The large-gap population is DIRECTIONALLY SHIFTED.** Among rejected prop
+rows the model is over the market on **33.4%** (154/461); among accepted rows
+it is over on **43.8%** (888/2028). The tail is skewed under, which is a bias
+signature rather than a spread of independent disagreements.
+
+**3. Six families are 100% one-sided, all under.** Scored against the
+*measured* base rate p(over)=0.334 — **not** a 50/50 null, which would have
+overstated this by two orders of magnitude:
+
+```
+  ncaaf rushing yards   0/16   P=1.50e-03
+  nhl   assists         0/14   P=3.37e-03
+  nhl   points          0/10   P=1.72e-02
+  nfl   passing tds      0/9   P=2.58e-02
+  ncaaf passing yards    0/8   P=3.87e-02
+  nhl   saves            0/6   P=8.72e-02
+```
+
+No single family is decisive — the weakest is p=0.087. **Six at once, all in
+the same direction, is the finding**, and it is stated that way rather than by
+quoting the smallest number.
+
+**4. `mlb strikeouts` is the cleanest single item: 5 of 5 rows rejected, 100%
+of the family, all OVER, mean abs edge 26.4, max 43.4.** A family where every
+row exceeds the plausibility ceiling in the same direction is a scale or
+denominator bug, not an edge. `mlb walks_allowed` is 1 of 1 the same way.
+These two are the only families the ceiling rejects outright, and they are
+invisible on the board precisely because it does.
+
+**5. What the ceiling costs the engine.** Dropping `model_edge_pct` on these
+rows removes them from ranking, which also removes them from every
+accuracy/CLV surface that reads the edge. So the families with the worst
+projection error are the ones the evaluation layer can least see — the guard is
+load-bearing for the blind spot. This is the same shape as the repo's own rule
+that a guard assuming HOW it fails is silent in the real failure.
+
+### Leads this opens (not taken here)
+
+- **`mlb strikeouts` / `walks_allowed` scale check** — 100%-rejected families,
+  one direction. Highest value per unit effort of anything in this table.
+- **A one-sided-tail check as a standing engine instrument** — the 33.4% vs
+  43.8% split and the six all-under families were free to compute from a board
+  fetch, and nothing currently watches for them.
+- **NCAAF passing yards carries the largest mean gap (32.8 points)** on only 8
+  rows, which is a small enough population to inspect row by row.
+
+None of these is a betting change; all three are projection-input questions.
