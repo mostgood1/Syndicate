@@ -90,7 +90,7 @@ def test_card_shows_headshot_team_crest_position_and_both_logos():
     assert 'class="head" src="data:image/webp;base64,HEAD"' in html_text and "base64,ATL" in html_text
     assert html_text.index("base64,ARI") < html_text.index("base64,LAR") and "ATL · RB" in html_text
     assert "Sun Oct 18 · 3:05 PM CT" in html_text and "$" not in html_text.replace("$$", "")
-    no_face = m.face_html({"player": "Tyler Allgeier"})
+    no_face = m.hero_html({"player": "Tyler Allgeier"})
     assert ">TA<" in no_face and "img" not in no_face
 
 

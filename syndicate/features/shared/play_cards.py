@@ -154,6 +154,7 @@ def card_fields(row: Mapping[str, Any], *, sport: str, date: str, number: int, g
         "pos": row.get("pos"), "headshot": row.get("headshot_url"), "team_logo": row.get("team_logo"),
         "home_logo": (game or {}).get("home_logo"), "away_logo": (game or {}).get("away_logo"),
         "kickoff_ct": (game or {}).get("kickoff_ct") or row.get("kickoff_ct"),
+        "kind": "prop", "market": row.get("market"),
     }
 
 
@@ -167,15 +168,15 @@ def prob_svg(model: float | None, market: float | None, implied: float | None) -
     bars = [(label, v, color) for label, v, color in (("Our sim", model, "#8cff2e"), ("No-vig market", market, "#eef3f7"),
                                                        ("Price implies", implied, "#ff6b57")) if isinstance(v, (int, float))]
     if not bars:
-        return ('<svg viewBox="0 0 400 230"><text x="200" y="120" fill="#9db0bf" font-size="22" text-anchor="middle" '
+        return ('<svg viewBox="0 0 400 300"><text x="200" y="150" fill="#9db0bf" font-size="24" text-anchor="middle" '
                 'font-family="Barlow">No sim view on this pick</text></svg>')
-    parts = ['<svg viewBox="0 0 400 230" xmlns="http://www.w3.org/2000/svg">']
+    parts = ['<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">']
     for i, (label, v, color) in enumerate(bars):
-        y = 22 + i * 68
+        y = 26 + i * 96
         width = max(4.0, 300 * float(v))
-        parts.append(f'<text x="0" y="{y}" fill="#9db0bf" font-size="17" font-family="Barlow" font-weight="600">{label}</text>')
-        parts.append(f'<rect x="0" y="{y + 10}" width="{width:.1f}" height="30" rx="4" fill="{color}"/>')
-        parts.append(f'<text x="{width + 10:.1f}" y="{y + 33}" fill="#f4f7fa" font-size="22" font-weight="800" '
+        parts.append(f'<text x="0" y="{y}" fill="#b9c8d4" font-size="22" font-family="Barlow" font-weight="700">{label}</text>')
+        parts.append(f'<rect x="0" y="{y + 12}" width="{width:.1f}" height="44" rx="6" fill="{color}"/>')
+        parts.append(f'<text x="{width + 10:.1f}" y="{y + 45}" fill="#f4f7fa" font-size="30" font-weight="800" '
                      f'font-family="Barlow">{float(v):.0%}</text>')
     parts.append("</svg>")
     return "".join(parts)
@@ -232,6 +233,8 @@ def pick_card_fields(pick: Mapping[str, Any], *, sport: str, date: str, number: 
         "headshot": pick.get("headshot_url") if is_prop else None, "team_logo": pick.get("team_logo"),
         "home_logo": pick.get("home_logo"), "away_logo": pick.get("away_logo"),
         "kickoff_ct": pick.get("kickoff_ct"), "hide_number": True,
+        "kind": pick.get("kind"), "market": pick.get("market"), "segment_label": pick.get("segment_label"),
+        "projected": pick.get("projected"),
     }
     if not fields["form_values"]:
         fields["chart_title"] = "Sim vs market"
@@ -323,8 +326,8 @@ def kickoff_label(commence: Any) -> str:
 def chart_svg(values: list[float], labels: list[str], line: float | None, side: str | None) -> str:
     """Last-N bars (oldest left), the line dashed; green = cleared the bet's side, red = missed."""
     if not values or line is None:
-        return '<svg viewBox="0 0 400 230"><text x="200" y="120" fill="#9db0bf" font-size="22" text-anchor="middle" font-family="Barlow">No recent games on file</text></svg>'
-    w, h, pad, base = 400, 230, 10, 190
+        return '<svg viewBox="0 0 400 300"><text x="200" y="150" fill="#9db0bf" font-size="24" text-anchor="middle" font-family="Barlow">No recent games on file</text></svg>'
+    w, h, pad, base = 400, 300, 10, 258
     top = max(max(values), float(line)) * 1.15 or 1.0
     n = len(values)
     bw = (w - 2 * pad) / n
@@ -344,16 +347,43 @@ def chart_svg(values: list[float], labels: list[str], line: float | None, side: 
     return "".join(parts)
 
 
-def face_html(fields: Mapping[str, Any]) -> str:
-    """Headshot with the team crest as a badge; the crest alone when there is no headshot; initials last."""
+def _is_total(fields: Mapping[str, Any]) -> bool:
+    return (fields.get("kind") or "prop") != "prop" and str(fields.get("market") or "").lower().startswith(("totals", "alternate_totals"))
+
+
+def hero_html(fields: Mapping[str, Any]) -> str:
+    """The card's hero, as the X.com posts carry one (user 2026-10-15: the design "isnt as 'drippy' as" them): the player
+    large over his team's crest (a prop), the backed side's crest (a side), both crests (a total); initials last."""
     e = lambda s: html.escape(str(s if s is not None else ""), quote=True)
-    badge = f'<span class="badge"><img src="{e(fields["team_logo"])}" alt=""></span>' if fields.get("team_logo") else ""
+    logo = fields.get("team_logo")
     if fields.get("headshot"):
-        return f'<div class="face"><img class="head" src="{e(fields["headshot"])}" alt="">{badge}</div>'
-    if fields.get("team_logo"):
-        return f'<div class="face"><img class="solo" src="{e(fields["team_logo"])}" alt=""></div>'
+        crest = f'<img class="crestbg" src="{e(logo)}" alt="">' if logo else ""
+        return f'<div class="hero">{crest}<img class="head" src="{e(fields["headshot"])}" alt=""></div>'
+    if _is_total(fields) and (fields.get("away_logo") or fields.get("home_logo")):
+        crests = "".join(f'<img class="crest-{k}" src="{e(fields[f"{k}_logo"])}" alt="">'
+                         for k in ("away", "home") if fields.get(f"{k}_logo"))
+        return f'<div class="hero duo">{crests}<span class="vs">VS</span></div>'
+    if logo:
+        return f'<div class="hero solo"><img class="crest-big" src="{e(logo)}" alt=""></div>'
     initials = "".join(w[0] for w in str(fields.get("player") or "").split()[:2]).upper()
-    return f'<div class="face"><span class="ini">{e(initials)}</span></div>'
+    return f'<div class="hero solo"><span class="ini">{e(initials)}</span></div>'
+
+
+def card_text(fields: Mapping[str, Any]) -> dict[str, str]:
+    """Headline / subline / bet line / the bottom strip's bet, by what the pick is. A TOTAL is no team's bet, so its
+    headline is the bet itself ("OVER 47.5") -- the game's two names in the headline crushed the card (2026-10-15)."""
+    bet = str(fields.get("bet") or "")
+    name = str(fields.get("player") or "")
+    if (fields.get("kind") or "prop") == "prop":
+        meta = " · ".join(str(x) for x in (fields.get("team"), fields.get("pos")) if x)
+        return {"headline": name, "subline": meta, "betline": bet, "strip": f"{name} {bet}".strip()}
+    seg = str(fields.get("segment_label") or "Full game")
+    if _is_total(fields):
+        return {"headline": bet, "subline": f"Game total · {seg}", "betline": "", "strip": f"{bet} · {seg}"}
+    rest = bet[len(name):].strip(" ·") if name and bet.upper().startswith(name.upper()) else bet
+    if str(fields.get("market") or "").lower().startswith("spreads") and "SPREAD" not in rest.upper():
+        rest = f"{rest} spread"
+    return {"headline": name, "subline": "", "betline": rest, "strip": f"{name} {rest}".strip()}
 
 
 def render_card(fields: Mapping[str, Any], logo_uri: str, template: str | None = None) -> str:
@@ -361,21 +391,25 @@ def render_card(fields: Mapping[str, Any], logo_uri: str, template: str | None =
     away, _, home = matchup.partition(" @ ")
     e = lambda s: html.escape(str(s if s is not None else ""))
     crest = lambda src: f'<img class="crest" src="{html.escape(src, quote=True)}" alt="">' if src else ""
-    meta = " · ".join(str(x) for x in (fields.get("team"), fields.get("pos")) if x)
+    text = card_text(fields)
     values, line, side = fields["form_values"], fields["line"], fields["side"]
     hits = sum(1 for v in values if v != line and ((v > line) if side in ("over", "yes") else (v < line))) \
         if values and line is not None else 0
     caption = fields.get("chart_caption") or (f"{hits} of last {len(values)} cleared {side} {line:g}" if values and line is not None else "")
+    proj = fields.get("projected")
+    sim_note = (f"proj {float(proj):.1f} vs {float(line):g}" if isinstance(proj, (int, float)) and isinstance(line, (int, float))
+                else "sim win rate")
     return string.Template(template if template is not None else TEMPLATE.read_text(encoding="utf-8")).safe_substitute(
         logo=logo_uri, label=e(fields["label"]), number=fields["number"], away=e(away), home=e(home),
         # "FREE PLAY #3"; a Syndicate pick is just "SYNDICATE PICK" (user 2026-10-15: "remove the number").
         tag=e(fields["label"]) if fields.get("hide_number") else f'{e(fields["label"])} #{fields["number"]}',
         sport=e(fields["sport"]), kickoff=e(fields.get("kickoff_ct") or kickoff_label(fields.get("commence_time"))),
-        player=e(fields["player"]), player_meta=e(meta), face=face_html(fields),
+        player=e(fields["player"]), headline=e(text["headline"]), subline=e(text["subline"]), betline=e(text["betline"]),
+        strip_bet=e(text["strip"]), hero=hero_html(fields),
         away_crest=crest(fields.get("away_logo")), home_crest=crest(fields.get("home_logo")),
         bet=e(fields["bet"]), price=e(fields["price"]), book=e(fields["book"]), books=e(fields["books"]),
         fair=e(fields["fair"]), edge=e(fields["edge"]), win_prob=e(fields["win_prob"]),
-        model_note=e(f" · model {fields['model_prob']}" if fields.get("model_prob") else ""),
+        sim_value=e(fields.get("model_prob") or "–"), sim_note=e(sim_note),
         chart=fields.get("chart_svg") or chart_svg(values, fields["form_labels"], line, side),
         chart_title=e(fields.get("chart_title") or "Last games"),
         chart_caption=e(caption), why="".join(f"<li>{e(w)}</li>" for w in fields["why"]),

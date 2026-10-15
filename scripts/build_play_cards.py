@@ -36,7 +36,7 @@ def central_today() -> str:
 
 chart_svg = pc.chart_svg
 kickoff_label = pc.kickoff_label
-face_html = pc.face_html
+hero_html = pc.hero_html
 append_ledger = pc.append_ledger
 
 

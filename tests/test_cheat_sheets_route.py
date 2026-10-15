@@ -204,8 +204,10 @@ def test_a_syndicate_pick_gets_a_pick_graphic_and_a_picks_only_sheet_is_served(h
     card = client.get(f"/cheatsheets/card/nba/{TODAY}/l2_129acb8c9c927fb9")
     assert card.status_code == 200
     html = card.get_data(as_text=True)
-    assert "NEW YORK KNICKS -5.5" in html and "Sim vs market" in html and "Season: Net rating NYK +4.0" in html
-    assert "SYNDICATE PICK</div>" in html and "SYNDICATE PICK #" not in html                      # no number
+    # The side is the headline and its number the bet line (the 2026-10-15 X-style card); the strip repeats both.
+    assert ">New York Knicks</div>" in html and ">-5.5 spread</div>" in html and "New York Knicks -5.5 spread" in html
+    assert "Sim vs market" in html and "Season: Net rating NYK +4.0" in html
+    assert ">SYNDICATE PICK</span>" in html and "SYNDICATE PICK #" not in html                     # no number
     assert "Our sim has New York Knicks" not in html.split("Why we like it", 1)[1].split("</ul>", 1)[0]   # never the reason
     assert "Only 2 books quote it" in html
     assert client.get(f"/cheatsheets/card/nba/{TODAY}/l2_ffffffffffffffff").status_code == 404
