@@ -962,6 +962,14 @@ death, never life — do not invert it.
 - Verification: Served board before and after: player_shots row count and their model_skill status / derived factor; plus the fleet commit and the restart timestamp in deploys.md.
 - Blocked by: none
 
+### nhl-puckline-orientation — OPEN — opened 2026-10-15 — session 1eabcf3d-1963-4c85-956c-5615af44619e
+- Goal: NHL spreads rows carry hockeysim's P(home -1.5) only on the market it prices -- the grid row at away-frame line +1.5 (home -1.5 / away +1.5) -- and the line -1.5 row (away -1.5 / home +1.5) carries a probability_unavailable_reason, so no away -1.5 leg is served P(away +1.5) (~0.76 on 21 of 21 away-favoured games 09-30..10-14, lane sim-gap-ev-study)
+- Files: syndicate/features/nhl/game_projections.py, tests/test_nhl_game_projections.py
+- Hypothesis: _game_projection reads the grid row's spreads line as the HOME team's point, but book_grid._canonical_line states it in the AWAY frame (book_grid.py:870, #262). So line -1.5 is the away -1.5 / home +1.5 market, it gets P(home -1.5) framed on home, and the board serves P(home -1.5) on home +1.5 and 1-P(home -1.5)=P(away +1.5) on away -1.5; the market hockeysim actually prices arrives at line +1.5 and is refused. Every other spreads producer (NCAAF, NFL segments, WNBA/NBA dist pricer, MLB project_game_market, soccer handicap, live_gameline_join) already uses margin > L in the away frame; NHL is the only one that hard-codes a line
+- Falsification test: On the served board, an away-favoured NHL game's line -1.5 spreads row quotes the AWAY team at -1.5 in its cells (if instead it quotes HOME at -1.5, the line is home-frame and this hypothesis is wrong)
+- Verification: Unit: an away-favoured game -- line -1.5 row has model_prob_over None with the named reason, line +1.5 row carries P(home -1.5) and the board serves home=p, away=1-p. Served board after deploy (refresh-worker, NHL slate): spreads rows at line -1.5 priced 0, rows at line +1.5 priced where the artifact has p_home_pl_-1.5, and 0 games where a served away -1.5 probability exceeds the same game's away moneyline probability
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
