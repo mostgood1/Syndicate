@@ -44,3 +44,12 @@ def test_one_name_on_two_players_in_one_file_is_dropped_not_guessed(roster):
     roster("2026-10-14", "Sebastian Aho,8478427,CAR,F,\nSebastian Aho,8480222,NYI,D,\n")
     roster("2026-06-29", "Sebastian Aho,8478427,CAR,F,\n")                           # an older file cannot rescue it
     assert "sebastianaho" not in ph._nhl_ids() and "sebastianaho" not in ph._nhl_teams()
+
+
+def test_accented_names_match_the_plain_spelling_a_book_prints():
+    # "Slafkovský" used to normalise to "slafkovsk" -- no face for 2 of 42 NHL and 3 of 100 soccer players (2026-10-15).
+    from syndicate.features.shared import player_headshots as ph
+
+    assert ph._norm("Juraj Slafkovský") == ph._norm("Juraj Slafkovsky") == "jurajslafkovsky"
+    assert ph._norm("Martin Fehérváry") == ph._norm("Martin Fehervary")
+    assert ph._norm("Agustín Bouzat") == "agustinbouzat"

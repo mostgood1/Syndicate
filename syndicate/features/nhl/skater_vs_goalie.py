@@ -149,7 +149,25 @@ def roster(api: NhlApi, team: str) -> dict[str, dict[str, Any]]:
                 clash.add(key)
                 out.pop(key, None)
                 continue
-            out[key] = {"id": p.get("id"), "name": name, "goalie": group == "goalies"}
+            out[key] = {"id": p.get("id"), "name": name, "goalie": group == "goalies",
+                        "position": {"forwards": "F", "defensemen": "D", "goalies": "G"}[group]}
+    return out
+
+
+def player_ids(api: NhlApi, date: str) -> dict[str, dict[str, Any]]:
+    """normalized name -> {id, name, goalie, position, team} for every player on the day's rosters (the faces on the
+    cheat-sheet rows). A name on two of the day's rosters is dropped, never guessed."""
+    out: dict[str, dict[str, Any]] = {}
+    clash: set[str] = set()
+    for team in dict.fromkeys(t for g in slate(api, date) for t in (g["home"], g["away"]) if t):
+        for key, who in roster(api, team).items():
+            if key in clash:
+                continue
+            if key in out:
+                clash.add(key)
+                out.pop(key, None)
+                continue
+            out[key] = {**who, "team": team}
     return out
 
 

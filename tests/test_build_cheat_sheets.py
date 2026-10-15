@@ -391,14 +391,41 @@ def test_the_evidence_layer_reads_the_same_data_root_as_the_generator(monkeypatc
     assert "different root" in m.align_data_root(tmp_path)
 
 
-def test_mlb_rows_get_faces_and_positions_from_the_days_rosters(monkeypatch, tmp_path):
-    # 10-14: a face for 1 of 21 MLB players and a position for none -- the board carries an id only on props the sim
-    # projected, and a sheet rebuilt from quotes carries none. Only EMPTY fields are filled.
+def test_mlb_and_nhl_rows_get_faces_and_positions_from_the_days_rosters(monkeypatch, tmp_path):
+    # 10-14: a face on 60 of 214 MLB rows and a position on none -- the board carries an id only on props the sim
+    # projected, and a sheet rebuilt from quotes carries none. Only EMPTY fields are filled; the play cards read them.
     m = _script()
     from syndicate.features.mlb import batter_vs_pitcher as bvp
+    from syndicate.features.nhl import skater_vs_goalie as svg
     monkeypatch.setattr(bvp, "player_ids", lambda api, date: {"blakesnell": {"id": 605483, "position": "P"},
                                                                "shoheiohtani": {"id": 660271, "position": "TWP"}})
-    rows = [{"player": "Blake Snell"}, {"player": "Shohei Ohtani", "headshot_url": "kept", "pos": "DH"}, {"player": "Nobody"}]
-    assert m.fill_mlb_identity(rows, "2026-10-14", tmp_path) == {"headshots": 1, "positions": 1}
-    assert rows[0]["headshot_url"].endswith("/people/605483/headshot/67/current") and rows[0]["pos"] == "P"
+    board = "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/1/headshot/67/current"
+    rows = [{"player": "Blake Snell"}, {"player": "Shohei Ohtani", "headshot_url": "kept", "pos": "DH"},
+            {"player": "Nobody"}, {"player": "Mookie Betts", "headshot_url": board}]
+    assert m.fill_identity("mlb", rows, "2026-10-14", tmp_path) == {"headshots": 1, "positions": 1}
+    assert rows[0]["headshot_url"] == m.MLB_FACE.format(id=605483) and "/w_360," in rows[0]["headshot_url"] and rows[0]["pos"] == "P"
     assert rows[1] == {"player": "Shohei Ohtani", "headshot_url": "kept", "pos": "DH"} and rows[2] == {"player": "Nobody"}
+    assert rows[3]["headshot_url"] == board.replace("/w_180,", "/w_360,")      # the board's 180 px is upscaled on a card
+    # The board's own index gets a second look first (a kept row must see a lookup fix too); the roster fills the rest.
+    from syndicate.features.shared import player_headshots as ph
+    monkeypatch.setattr(ph, "headshot_url", lambda row: f"idx:{row['player_name']}" if row["player_name"] in ("Agustin Bouzat", "Cole Caufield") else None)
+    monkeypatch.setattr(svg, "player_ids", lambda api, date: {   # the book's "Zack" is the roster's "Zachary"
+        "zacharybolduc": {"id": 8482737, "name": "Zachary Bolduc", "position": "F"}})
+    nhl = [{"player": "Zack Bolduc"}, {"player": "Cole Caufield"}]
+    assert m.fill_identity("nhl", nhl, "2026-10-14", tmp_path) == {"headshots": 2, "positions": 1}
+    assert nhl == [{"player": "Zack Bolduc", "headshot_url": "https://assets.nhle.com/mugs/nhl/latest/8482737.png", "pos": "F"},
+                   {"player": "Cole Caufield", "headshot_url": "idx:Cole Caufield"}]
+    soccer = [{"player": "Agustin Bouzat"}, {"player": "X"}]
+    assert m.fill_identity("soccer", soccer, "2026-10-14", tmp_path) == {"headshots": 1, "positions": 0}
+    assert soccer == [{"player": "Agustin Bouzat", "headshot_url": "idx:Agustin Bouzat"}, {"player": "X"}]
+
+
+def test_a_nickname_matches_by_initial_and_last_name_only_when_unique(monkeypatch, tmp_path):
+    m = _script()
+    from syndicate.features.mlb import batter_vs_pitcher as bvp
+    assert m._initial_last("Zack Bolduc") == m._initial_last("Zachary Bolduc") == "zbolduc"
+    assert m._initial_last("Alejandro Alvarado Jr.") == "aalvarado" and m._initial_last("Pele") == ""
+    monkeypatch.setattr(bvp, "player_ids", lambda api, date: {"willsmith": {"id": 1, "name": "Will Smith", "position": "C"},
+                                                               "wilsonsmith": {"id": 2, "name": "Wilson Smith", "position": "P"}})
+    rows = [{"player": "Willie Smith"}]                       # "wsmith" names two players: never guessed
+    assert m.fill_identity("mlb", rows, "2026-10-14", tmp_path) == {"headshots": 0, "positions": 0} and rows == [{"player": "Willie Smith"}]

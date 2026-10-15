@@ -18,6 +18,7 @@ import argparse
 import glob
 import json
 import os
+import re
 import statistics
 import sys
 import time
@@ -364,27 +365,74 @@ def align_data_root(data_root: Path) -> str | None:
     return None
 
 
-def fill_mlb_identity(rows: list[dict[str, Any]], date: str, cache: Path) -> dict[str, int]:
-    """MLB faces and positions from the day's StatsAPI rosters (user 2026-10-15: "fix the MLB headshots").
+_NAME_SUFFIX = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
 
-    The board carries an MLB player id only on props the sim projected, and a sheet rebuilt from quotes carries none:
-    the 10-14 sheet had a face for 1 of 21 players and a position for none. The rosters are the ones batter vs
-    pitcher already fetches, cached for the day. Fills only what is empty; a name on two rosters is left alone."""
-    from syndicate.features.mlb import batter_vs_pitcher as bvp
-    from syndicate.features.mlb.cards import _mlb_headshot_url
 
-    try:
-        ids = bvp.player_ids(bvp.StatsApi(cache), date)
-    except Exception as exc:  # noqa: BLE001 -- a missing face is a crest on the page, never a failed sheet
-        print(f"CHEAT_SHEET mlb roster ids failed: {type(exc).__name__}: {exc}", flush=True)
-        return {"headshots": 0, "positions": 0}
+def _initial_last(name: Any) -> str:
+    """'Zack Bolduc' / 'Zachary Bolduc' -> 'zbolduc'; suffixes ignored ('Jr.'); '' for a one-word name."""
+    import unicodedata
+
+    text = unicodedata.normalize("NFKD", str(name or "")).encode("ascii", "ignore").decode().lower()
+    parts = [p for p in re.findall(r"[a-z][a-z'\-]*", text) if p.strip(".") not in _NAME_SUFFIX]
+    return re.sub(r"[^a-z]", "", parts[0][:1] + parts[-1]) if len(parts) >= 2 else ""
+
+
+IDENTITY_SPORTS = ("mlb", "nhl", "soccer", "nba", "wnba")
+INDEX_FACE_SPORTS = ("nhl", "soccer", "nba", "wnba")   # name-only lookups in player_headshots (NCAAF needs the teams)
+MLB_FACE = "https://img.mlbstatic.com/mlb-photos/image/upload/w_360,q_auto:best/v1/people/{id}/headshot/67/current"
+NHL_FACE = "https://assets.nhle.com/mugs/nhl/latest/{id}.png"
+
+
+def fill_identity(sport: str, rows: list[dict[str, Any]], date: str, cache: Path) -> dict[str, int]:
+    """Faces and positions from the day's league rosters, for rows that have none -- the faces on the sheets AND on
+    the play cards built from them (users 2026-10-15: "fix the MLB headshots", "add player headshots to the play
+    cards too").
+
+    MLB: the board carries a player id only on props the sim projected, and a sheet rebuilt from quotes carries none
+    (10-14: a face on 60 of 214 rows, a position on none). NHL: the board's roster snapshot misses traded players.
+    The rosters are the ones player-vs-player already fetches, cached for the day. Fills only what is empty; a name on
+    two rosters is left alone. MLB faces are asked for at 360 px -- the board's 180 px is upscaled on a 260 px card.
+    Rows kept from an earlier build also get a second look in the board's own index (`player_headshots`), so a lookup
+    fix reaches the day's record and not only rows built after it."""
     filled = {"headshots": 0, "positions": 0}
+    if sport in INDEX_FACE_SPORTS:
+        from syndicate.features.shared import player_headshots as ph
+
+        for r in rows:
+            if not r.get("headshot_url"):
+                url = ph.headshot_url({"sport": sport, "player_name": r.get("player")})
+                if url:
+                    r["headshot_url"] = url
+                    filled["headshots"] += 1
+    try:
+        if sport == "mlb":
+            from syndicate.features.mlb import batter_vs_pitcher as mod
+
+            ids, face = mod.player_ids(mod.StatsApi(cache), date), MLB_FACE
+        elif sport == "nhl":
+            from syndicate.features.nhl import skater_vs_goalie as mod
+
+            ids, face = mod.player_ids(mod.NhlApi(cache, cache.parent.parent / ".nhl_pbp"), date), NHL_FACE
+        else:
+            return filled
+    except Exception as exc:  # noqa: BLE001 -- a missing face is a crest on the page, never a failed sheet
+        print(f"CHEAT_SHEET {sport} roster ids failed: {type(exc).__name__}: {exc}", flush=True)
+        return filled
+    # A book's "Zack Bolduc" is the roster's "Zachary Bolduc": a second key, first initial + last name, used only when
+    # exactly ONE player on the day's rosters carries it.
+    by_initial: dict[str, Any] = {}
+    for who in ids.values():
+        key = _initial_last(who.get("name"))
+        if key:
+            by_initial[key] = None if key in by_initial else who
     for r in rows:
-        who = ids.get(bvp._norm(r.get("player")))
+        if sport == "mlb" and "mlbstatic.com" in str(r.get("headshot_url") or "") and "/w_180," in r["headshot_url"]:
+            r["headshot_url"] = r["headshot_url"].replace("/w_180,", "/w_360,")
+        who = ids.get(mod._norm(r.get("player"))) or by_initial.get(_initial_last(r.get("player")))
         if not who:
             continue
         if not r.get("headshot_url") and str(who.get("id") or "").isdigit():
-            r["headshot_url"] = _mlb_headshot_url(int(who["id"]))
+            r["headshot_url"] = face.format(id=int(who["id"]))
             filled["headshots"] += 1
         if not r.get("pos") and who.get("position"):
             r["pos"] = who["position"]
@@ -655,9 +703,9 @@ def main(argv: list[str] | None = None) -> int:
                             context=context, positions=positions,
                             pvp_cache=data_root / "cheatsheets" / f".{sport}_cache" / selected)
         sheet = merge_with_record(sheet, prior, now=datetime.now(timezone.utc))
-        if sport == "mlb" and sheet.get("rows"):          # after the merge, so a kept row gets its face too
-            print(f"CHEAT_SHEET mlb identity filled {fill_mlb_identity(sheet['rows'], selected, data_root / 'cheatsheets' / '.mlb_cache' / selected)}",
-                  flush=True)
+        if sport in IDENTITY_SPORTS and sheet.get("rows"):   # after the merge, so a kept row gets its face too
+            filled = fill_identity(sport, sheet["rows"], selected, data_root / "cheatsheets" / f".{sport}_cache" / selected)
+            print(f"CHEAT_SHEET {sport} identity filled {filled}", flush=True)
         sheet["phase"] = season_phase(sport, selected)
         if not sheet["rows"] and not sheet.get("game_lines") and prior is None:
             print(f"CHEAT_SHEET {sport} date={selected} no {selected} games with pregame props -- nothing written", flush=True)

@@ -92,3 +92,9 @@ def test_a_started_game_uses_the_goalie_who_was_in_net(tmp_path):
     got = svg.matchups([{"player": "Auston Matthews", "market": "SOG"}], date="2026-10-15", api=api)
     assert got[("austonmatthews", "sog")]["opponent"] == "C. Ellis (started)"
     assert got[("austonmatthews", "sog")]["line"] == {"games": 1, "sog": 1, "goals": 0}     # his one shot with Ellis in net
+
+
+def test_roster_ids_carry_position_and_team_for_the_sheet_faces(tmp_path):
+    ids = svg.player_ids(svg.NhlApi(tmp_path / "d", tmp_path / "p", fetch=fake), "2026-10-15")
+    assert ids["austonmatthews"] == {"id": MATTHEWS, "name": "Auston Matthews", "goalie": False, "position": "F", "team": "TOR"}
+    assert ids["ukkopekkaluukkonen"]["position"] == "G" and ids["ukkopekkaluukkonen"]["team"] == "BUF"

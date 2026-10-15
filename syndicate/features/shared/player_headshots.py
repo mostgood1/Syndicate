@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import csv
 import re
+import unicodedata
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -41,7 +42,10 @@ _REPO_DATA = Path(__file__).resolve().parents[3] / "data"
 
 
 def _norm(text: Any) -> str:
-    return re.sub(r"[^a-z0-9]", "", str(text or "").lower())
+    # Accents are TRANSLITERATED, not dropped: "Slafkovský" -> "slafkovsky", the same key as the "Slafkovsky" a book
+    # prints. Dropping them ("slafkovsk") lost the face for 2 of 42 NHL and 3 of 100 soccer players (2026-10-15).
+    text = unicodedata.normalize("NFKD", str(text or "")).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]", "", text.lower())
 
 
 def _roots(sport: str) -> list[Path]:
