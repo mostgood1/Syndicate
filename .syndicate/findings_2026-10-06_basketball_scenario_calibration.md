@@ -2723,3 +2723,43 @@ draws each, 0 errors):
  ]
 }
 ```
+
+### FINAL CONFIG — FULL FIT RESULT 2026-10-15 18:30Z (done 18:24Z): PASSES; the final Phase 2 config holds on the whole FIT window
+
+**Run:** `fit_f5`, 109/109 dates, 791 paired games, 161,200 draws, 0 errors, every engine call carrying the levers.
+Against `fit_f3` (the #3 config). Team-game rows are for games without OT (1,510).
+
+| reading | fit_f3 | **fit_f5 (final)** | real FIT | rule |
+|---|---|---|---|---|
+| foul-outs/game | 0.201 | **0.209** | 0.194 | ± 0.04 ✓ |
+| FTA/team | 22.81 | **22.87** | 23.13 | ± 0.3 ✓ |
+| total bias | −0.08 | **+0.12** | 0 | < 0.5 ✓ |
+| P(6th \| 5th) | 0.212 | 0.220 (77,583 events) | 0.212 | ✓ |
+| closers-on | 0.396 | 0.395 | 0.455 | ✓ |
+| H2 / Q4 slope / S8 | −0.166 / −0.086 / 15.00 | −0.175 / −0.089 / 14.70 | −0.174 / −0.141 / — | ✓ |
+| **3PM/team** | 14.61 | **13.58** | 13.26 | +0.32 (was +1.35) |
+| 3P% | 0.4008 | 0.3756 | 0.3594 | +0.016, KNOWN residual (user-accepted) |
+| 2P% | 0.5122 | **0.5524** | 0.5465 | +0.006 |
+| FGA / 3PA / TOV | 88.20 / 36.46 / 14.46 | 87.95 / 36.15 / 14.52 | 88.84 / 36.90 / 14.44 | |
+| AST | 23.85 | 24.47 | 26.57 | −2.1 (#5b, open) |
+| **REB** | 43.58 | **42.35** | 43.77 | **−1.4: NEW residual** (fewer misses after #5a) |
+| STL / BLK | 7.95 / 5.30 | 7.98 / 5.30 | 8.42 / 4.86 | |
+| team PF | 19.69 | 19.66 | 19.67 | |
+
+- Bonus trips/possession in-run 0.00782 (frozen s″ 0.00791).
+
+**Residuals carried into the VALID read** (none gated here):
+- 3P% +1.6 points (engine-side, user-accepted);
+- AST −2.1;
+- REB −1.4 (new: with 2P% now right there are fewer misses, and the rebound rates were fitted on the old miss
+  volume — mechanism vs estimator, a candidate for later);
+- the Q4 slope (P3);
+- blowout starters on the floor 2.27 vs 1.56.
+
+**Phase 2 build is COMPLETE** (#1–#5 with #5b/#5c residuals recorded).
+
+**Owed before the single VALID read:**
+1. P3's §7c re-run + live re-gate on fit_f5 (running).
+2. Walk-forward calibration files for the VALID dates (2026-03-01..04-12).
+3. Pre-register the VALID read itself against the lane goal's gates (quarter/half margin + total Brier vs book,
+   live-interval replay Brier, player minutes / prop MAE, each clearing its own SE vs production).
