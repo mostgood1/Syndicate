@@ -1,9 +1,13 @@
 """Print the MLB schedule for a given date as normalized JSON on stdout.
 
 Isolated in its own process (invoked via subprocess by
-syndicate/features/shared/schedule_adapter.py) so a bug in the vendored MLB
+syndicate/features/shared/schedule_adapter.py) so a bug in the StatsAPI
 client can't take down the shared schedule adapter every sport's gating
 logic depends on.
+
+Off vendor since 2026-10-15 (lane mlb-schedule-fetch-native, user request): this imported StatsApiClient and
+fetch_schedule_for_date from the vendored vendor/mlb_bettingv2 sim_engine.data.statsapi. It now uses
+syndicate.features.mlb.statsapi_http, a faithful copy of exactly that (no cache, same requests and retries).
 """
 
 from __future__ import annotations
@@ -14,9 +18,8 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-_MLB_ROOT = REPO_ROOT / "vendor" / "mlb_bettingv2"
-if str(_MLB_ROOT) not in sys.path:
-    sys.path.insert(0, str(_MLB_ROOT))
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 
 def main() -> int:
@@ -24,11 +27,10 @@ def main() -> int:
     parser.add_argument("--date", required=True)
     args = parser.parse_args()
 
-    from sim_engine.data.statsapi import StatsApiClient, fetch_schedule_for_date
+    from syndicate.features.mlb.statsapi_http import fetch_schedule_for_date
 
-    client = StatsApiClient()
     try:
-        games = fetch_schedule_for_date(client, str(args.date))
+        games = fetch_schedule_for_date(str(args.date))
     except Exception as exc:
         print(json.dumps({"error": f"{type(exc).__name__}: {exc}"}), file=sys.stderr)
         return 1
