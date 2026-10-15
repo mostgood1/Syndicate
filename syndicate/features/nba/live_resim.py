@@ -331,6 +331,7 @@ def decode_inputs(kw: Mapping[str, Any]) -> dict[str, Any]:
         names = {f.name for f in _fields(EventSimConfig)}
         rebuilt = EventSimConfig(**{k: v for k, v in vals.items() if k in names})
         object.__setattr__(rebuilt, "league_params_overrides", vals.get("league_params_overrides"))
+        object.__setattr__(rebuilt, "config_sha", vals.get("config_sha"))
         out["cfg"] = rebuilt
     return out
 
@@ -451,10 +452,13 @@ def with_live_mechanisms(inputs: Mapping[str, Any], mechanisms: Mapping[str, Any
     ov = getattr(base, "league_params_overrides", None)
     if ov:  # keep the pregame engine choice (nba_engine_config.json) through the rebuild
         object.__setattr__(cfg, "league_params_overrides", ov)
+    sha = getattr(base, "config_sha", None)
+    if sha:
+        object.__setattr__(cfg, "config_sha", sha)
     return {**dict(inputs), "cfg": cfg}
 
 
-def resume_engine_label(league: str = LEAGUE, overrides: Optional[tuple] = None) -> str:
+def resume_engine_label(league: str = LEAGUE, overrides: Optional[tuple] = None, config_sha: Optional[str] = None) -> str:
     """Which engine a live resume runs: the league, the #473 no-stack switch and, when nba_engine_config.json set
     LeagueParams overrides on the pregame call, a short digest of them -- the lane's audit trail."""
     try:
@@ -466,6 +470,8 @@ def resume_engine_label(league: str = LEAGUE, overrides: Optional[tuple] = None)
         label = f"{params.code}:stack={'cfg' if value is None else bool(value)}"
         if overrides:
             label += f":lp={zlib.crc32(repr(tuple(overrides)).encode('utf-8')) & 0xFFFFFFFF:08x}"
+        if config_sha:  # sha256 of nba_engine_config.json's bytes, stamped on the pregame cfg (calibration lane)
+            label += f":cfg={str(config_sha)[:8]}"
         return label
     except Exception as exc:  # noqa: BLE001
         return f"unknown:{type(exc).__name__}"
@@ -811,7 +817,8 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         gs, match = map_state_names(gs, inputs["home_players"], inputs["away_players"])
         mechanisms = live_mechanisms_from_env()
         inputs = with_live_mechanisms(inputs, mechanisms)
-        match = {**match, "mechanisms": sorted(mechanisms), "resumeEngine": resume_engine_label(league, league_params_overrides_of(inputs))}
+        match = {**match, "mechanisms": sorted(mechanisms), "resumeEngine": resume_engine_label(league, league_params_overrides_of(inputs),
+                                                                   getattr(inputs.get("cfg"), "config_sha", None))}
         if clock() >= deadline:
             games.append(_lane_row(event_id, home, away, facts, NbaResimRefusal("budget_exhausted", "before_start"),
                                    league=league))

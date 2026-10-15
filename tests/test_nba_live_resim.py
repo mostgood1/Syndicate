@@ -466,6 +466,8 @@ def test_a_configured_cfg_persists_and_the_resume_picks_the_same_engine(tmp_path
     assert ov == (("exact_target_calibration", True),)
     assert _engine_for_league_local("nba", ov).params.exact_target_calibration is True
     assert ":lp=" in lr.resume_engine_label("nba", ov)
+    sha = getattr(back["cfg"], "config_sha", None)
+    assert sha and lr.resume_engine_label("nba", ov, sha).endswith(f":cfg={sha[:8]}")
     # live mechanisms rebuild the cfg; the engine choice survives it
     assert lr.league_params_overrides_of(lr.with_live_mechanisms(back, {"score_effect_k": 0.0})) == ov
 
