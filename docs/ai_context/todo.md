@@ -49,6 +49,21 @@ The 08:00Z `ci-suite` job (`local_production.py ci-run` -> `run_ci_suite.py` in 
 
 **Close when** the job reads `0 NEW FAILURE(S)` and the archive suite is `ok`, or each remaining failure is a deliberate `--update` named in a commit.
 
+**STATUS 2026-10-15 22:17Z (lane `ci-suite-red-1015`, session b9bb5f37), against the 08:48Z run on 11bbdbcf: 42 NEW FAILURE(S).**
+- **Already green on origin/main (11):** test_graded_outcomes NcaafGrader x6, test_layer2_row_context, test_layer2_row_parity, test_nfl_market_board shapes, test_nfl_props anytime-td, test_probability_differential.
+- **Fixed by this lane (17), test drift; code under test unchanged except one dead binding:**
+  - nhl_confirmed_goalies off-switch: pinned `now` (refresh acts only on today +/- 1);
+  - ncaaf_props_board x2: the stand-in unbettable book was bovada, which 30ea06eb made bettable;
+  - soccer_threeway_precision_gate x11: segment 'full_game' -> 'full', the board's own value;
+  - wnba_live_tier: the default-stamp example moved off NCAAB (now `live_resim`);
+  - archive suite date input: attribute order;
+  - duplicate MODELS_DST in port_basketball_source_cli.py.
+  - Commits 15898c1a, 0eefe038.
+- **Owned by OPEN lanes, NOT edited (14):**
+  - **test_ncaaf_oddsapi_game_lines x12 -> lane `cheat-sheets`.** test_build_cheat_sheets::test_the_day_ahead_is_tomorrow_in_central calls main(--data-root <tempdir>) unguarded, and `align_data_root` sets os.environ['SYNDICATE_DATA_ROOT'] for the rest of the process. NCAAF roots then point at a deleted dir and the registry vanishes. Reproduced in CI's chunk (files[i%8], -n 0, _step_env): 12 failed. A bisect over 111 files named it, confirmed alone. One-line fix (`monkeypatch.delenv` first) messaged to the owner session.
+  - test_slate_date_timezone_discipline -> `nba-live-tick-native` (nba/ + wnba/live_tick/tick.py), `nhl-season-inputs-in-season` (inseason_*.py), `board-interval-charts` (shared/interval_history.py).
+  - test_intelligence blotter Odds/Projected/Live columns -> the intelligence.html lanes (`games-rail-full-detail`, `layer2-suggested-opps`, `dh-state-aware-pairing`). The 10-08 redesign replaced those columns with Best price/Fair/EV/Sim/Move/Age. Whether live projection must still show is a product call; the test was left.
+
 ### `#696` — **NBA engine lineup pools: the first REGULAR-SEASON production reading is OWED (preseason is unfed by design, user decision 2026-10-12)** — lane `nba-lineup-pools`, session eb2ba139
 - **SCHEDULED:** local scheduled task `nba-lineup-pools-696-reading` fires 2026-10-25 10:00 CDT (15:00Z), one-time; it reads, writes the ledger, and closes the lane if MET. Runs only while the desktop app is open (else on next launch).
 - **State:** pools come from `_rotation_sim_minutes_from_history_local` (basketball_props_smart_sim.py). Production preseason sims are 0/16 sides fed (`rotation_minutes.reason=no_recent_history`): the nba-season-phase guard admits no stints for a preseason slate. User decision 2026-10-12: leave as designed (no preseason admission, no phase mixing).
