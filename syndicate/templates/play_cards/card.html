@@ -27,7 +27,7 @@ body { background: radial-gradient(900px 520px at 12% -6%, rgba(31,168,255,.28),
 .pick { grid-template-columns: 210px 1fr; column-gap: 26px; align-items: center; }
 .pick .face { grid-row: span 3; width: 210px; height: 210px; border-radius: 50%; position: relative; background: #0f2233;
   border: 4px solid var(--green); box-shadow: 0 0 30px rgba(140,255,46,.35); display: grid; place-items: center; }
-.pick .face > img.head { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.pick .face > img.head { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; border-radius: 50%; }
 .pick .face > img.solo { width: 72%; height: 72%; object-fit: contain; }
 .pick .face .ini { font: 900 84px/1 var(--display); color: var(--muted); }
 .pick .face .badge { position: absolute; right: -6px; bottom: -6px; width: 74px; height: 74px; border-radius: 50%; background: #04070c;
