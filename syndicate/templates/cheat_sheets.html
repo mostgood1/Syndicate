@@ -199,7 +199,7 @@ const started = iso => { const t = Date.parse(iso || ""); return !isNaN(t) && t 
 const MARKET_WORDS = {player_goal_scorer_anytime: "Anytime goalscorer", player_first_goal_scorer: "First goalscorer",
   player_last_goal_scorer: "Last goalscorer", player_shots_on_target: "Shots on target", player_shots: "Shots",
   player_assists: "Assists", player_to_receive_card: "To be carded", player_to_receive_red_card: "Red card"};
-const marketName = m => MARKET_WORDS[m] || String(m || "").replace(/^player_/, "").replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
+const marketName = m => MARKET_WORDS[m] || String(m || "").replace(/^(player|batter|pitcher)_/, "").replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
 const betText = r => `${marketName(r.market)}${r.side && r.side !== "yes" ? " " + r.side : ""}${r.line != null ? " " + r.line : ""}`;
 const VERDICT = {value: "Value", streak_with_room: "Hot streak", streak_priced_in: "Hot streak", neutral: "Neutral", one_sided_fair: "One-sided price", suspect_price: "Check price"};
 const STATE = {sport: null, game: null};
@@ -423,7 +423,7 @@ function render() {
   }).join("");
   if ((secs.consistency || []).length) html += sectionShell("consistency", "Consistency: recent hit rates", "Every prop with a full 10-game sample that cleared its line 70% of the time or more, with the trend (last 5 against last 10). We tested consistency across NFL, NBA and MLB: the price already accounts for it, so read the EV column, not the streak.", `${secs.consistency.length} props`, consistencyTable(d, secs.consistency));
   if ((secs.matchup_spots || []).length) html += sectionShell("matchups", "Matchups: where the defense gives it up", "Overs facing a defense in the softest fifth at allowing that stat, unders facing the toughest fifth, and players who have cleared this exact line in two-thirds or more of their games against this opponent. Matchups are mostly priced in too -- context next to the price, not a pick.", `${secs.matchup_spots.length} props`, matchupTable(d, secs.matchup_spots));
-  if ((secs.pvp_batters || []).length) html += sectionShell("pvp_batters", "Batter vs pitcher", "Each hitter's career line against today's probable starter (3+ plate appearances), from MLB. Small samples the price already knows: context next to the price, not a pick.", `${secs.pvp_batters.length} props`, pvpTable(d, secs.pvp_batters));
+  if ((secs.pvp_batters || []).length) html += sectionShell("pvp_batters", "Batter vs pitcher", "Each hitter's career line against today's probable starter (3+ plate appearances), from MLB, shown with his best-priced prop. Small samples the price already knows: context next to the price, not a pick.", `${secs.pvp_batters.length} props`, pvpTable(d, secs.pvp_batters));
   if ((secs.pvp_pitchers || []).length) html += sectionShell("pvp_pitchers", "Pitcher vs lineup", "Each starter against the opposing roster's hitters combined -- career lines from MLB -- shown with his strikeout line.", `${secs.pvp_pitchers.length} pitchers`, pvpTable(d, secs.pvp_pitchers));
   const lineSecs = game ? ((d.game_line_sections_by_game || {})[STATE.game] || {}) : (d.game_line_sections || {});
   if (game) {

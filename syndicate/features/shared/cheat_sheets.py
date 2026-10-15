@@ -390,7 +390,7 @@ def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25) -> dict[str, l
         # Player vs player (MLB). Batters vs the probable starter: one row per hitter + stat (the better-EV side),
         # biggest sample first. Pitchers vs the opposing roster: ONE row per pitcher -- his strikeout line when he has
         # one -- because the lineup line is the same for every market he is priced in.
-        "pvp_batters": _best_side_per_market(rows, sorted(
+        "pvp_batters": _one_per_player(rows, sorted(
             (i for i in idx if _pvp_kind(rows[i]) == "batter_vs_pitcher" and _pvp_pa(rows[i]) >= PVP_MIN_PA and featurable(rows[i])),
             key=lambda i: -_pvp_pa(rows[i])))[:top],
         "pvp_pitchers": _one_per_pitcher(rows, [i for i in idx if _pvp_kind(rows[i]) == "pitcher_vs_lineup"
@@ -510,6 +510,21 @@ def _best_side_per_market(rows: Sequence[Mapping[str, Any]], ids: Sequence[int])
         elif _ev_of(rows[i]) > _ev_of(rows[best[key]]):
             best[key] = i
     return [best[k] for k in order]
+
+
+def _one_per_player(rows: Sequence[Mapping[str, Any]], ids: Sequence[int]) -> list[int]:
+    """One row per batter (his career line vs the starter is the same for every prop he has): the best-EV prop,
+    in the caller's order."""
+    best: dict[Any, int] = {}
+    order: list[Any] = []
+    for i in ids:
+        who = rows[i].get("player")
+        if who not in best:
+            order.append(who)
+            best[who] = i
+        elif _ev_of(rows[i]) > _ev_of(rows[best[who]]):
+            best[who] = i
+    return [best[w] for w in order]
 
 
 def _one_per_pitcher(rows: Sequence[Mapping[str, Any]], ids: Sequence[int]) -> list[int]:
