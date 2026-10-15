@@ -487,4 +487,5 @@ def test_a_pick_reads_like_the_board_and_keeps_its_first_price_on_the_record():
     later = [dict(picks[0], price=150, promoted_at="later")]                        # the board's price moved
     merged = m.merge_picks(later, {"picks": picks})
     assert [p["pick_id"] for p in merged] == ["l2_seg", "l2_jax"] and merged[0]["price"] == 138   # first price kept; Jax stays
+    assert merged[0]["on_board"] is True and merged[1]["on_board"] is False                  # Jax is no longer suggested
     assert cs.pick_result_key(picks[0]).endswith("|first3") and cs.pick_result_key(picks[1]).startswith("p:")

@@ -284,9 +284,11 @@ function pickRow(p, i) {
   const card = META.mode === "app" && p.pick_id
     ? `<a class="btn no-export" href="/cheatsheets/card/${esc(STATE.sport)}/${esc(META.date)}/${esc(p.pick_id)}" target="_blank" rel="noopener">Pick graphic</a>` : "";
   const live = started(p.commence_time) ? `<span class="chip started">Started</span>` : "";
+  // The board's suggested set moves with prices; a pick it no longer backs keeps its record price and says so.
+  const off = p.on_board === false && !started(p.commence_time) ? `<span class="chip neutral" title="The board no longer suggests this at the current price">Not on the board now</span>` : "";
   return `<div class="prop pick" data-pk="${i}">
     <div class="who">${face({...p, player: p.display_name})}
-      <div class="line1"><span class="chip value">Syndicate pick</span>${sim}${live}<b>${esc(p.display_name || "")}</b>${p.pos ? `<span class="pos">${esc(p.pos)}</span>` : ""}${card}</div>
+      <div class="line1"><span class="chip value">Syndicate pick</span>${sim}${off}${live}<b>${esc(p.display_name || "")}</b>${p.pos ? `<span class="pos">${esc(p.pos)}</span>` : ""}${card}</div>
       <div class="meta">${esc(p.matchup || "")}${p.kickoff_ct ? ` · <span class="kick">${esc(p.kickoff_ct)}</span>` : ""}</div>
       <div class="bet">${esc(p.bet || "")} · ${odds(p.price)} ${esc(p.book || "")}</div></div>
     <div>${strip({price: p.price, p_market: p.p_market, p_model: p.p_model})}<div class="nums"><span>price <b>${pct(implied(p.price))}</b></span><span>fair <b>${pct(p.p_market)}</b></span><span>sim <b>${pct(p.p_model)}</b></span></div></div>

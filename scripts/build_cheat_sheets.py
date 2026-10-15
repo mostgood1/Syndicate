@@ -634,9 +634,15 @@ def build_picks(cards: list[dict[str, Any]], sheet: dict[str, Any], *, sport: st
 def merge_picks(fresh: list[dict[str, Any]], prior: dict[str, Any] | None) -> list[dict[str, Any]]:
     """A day's picks are a RECORD: one promoted earlier keeps its first price and stays when the board drops it later
     (its line moved, its game started); a new one joins. Board score order, earliest promotions first on ties."""
-    kept = {p.get("pick_id"): p for p in (prior or {}).get("picks") or [] if p.get("pick_id")}
+    kept = {p.get("pick_id"): dict(p) for p in (prior or {}).get("picks") or [] if p.get("pick_id")}
     for p in fresh:
         kept.setdefault(p.get("pick_id"), p)
+    # Whether the board STILL suggests it at this build: the suggested set moves with prices within minutes
+    # (measured 2026-10-15: 3 of 7 dropped and 1 joined between a build and the next read), and a pick the board
+    # no longer backs must say so before anyone posts it.
+    live = {p.get("pick_id") for p in fresh}
+    for pick_id, p in kept.items():
+        p["on_board"] = pick_id in live
     return sorted(kept.values(), key=lambda p: (-(p.get("board_score") or 0), str(p.get("promoted_at"))))
 
 
