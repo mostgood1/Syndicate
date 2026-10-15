@@ -113,3 +113,63 @@ inferred.
 - NHL had 2 live games and 0 shortlist rows at all (pregame also 0) -- a zero, not a share. NFL had nothing in play (Wednesday); its 1,211 rows are all pregame.
 - This is the served Layer 2 shortlist, i.e. after the value/quote-age gates -- not the full live odds grid.
 - **`full` is necessary, not sufficient.** By market, ex-MLB live full rows: h2h 16, totals 31, spreads 17 (= 64 of 90) vs soccer alternate_totals_corners 21, btts 4, player_goal_scorer_anytime 1. Whether Kalshi/Polymarket quote corners/btts was not checked here; the addressable share for plain game-line contracts is therefore 64/101 (63.4%), still a majority.
+
+---
+
+## THE LIVE HALF, ANSWERED on a live frame: 2026-10-15 00:55:01Z
+
+The 22:0xZ attempt could not answer this — **0 live rows, proven empty three
+ways** — so the reading was armed rather than guessed. The task
+`venue-segment-live-reading-1014` fired at **00:45:20Z** and succeeded; this is
+an independent re-reading nine minutes later, because a number from another run
+is a claim until I measure it.
+
+**The frame was live, and that is checked rather than assumed:**
+`/api/board/game-chips` returned 230 chips — **137 pregame, 71 final, 21 LIVE, 1
+postponed**. 21 games in play is a population; the 22:0xZ frame had 0.
+
+### Measured, live rows only, row cap defeated (`rows == total_rows` per sport)
+
+| sport | rows | live | `segment=full` | share | other segments on live rows |
+|---|---|---|---|---|---|
+| nba | 22 | 19 | 19 | **100%** | — |
+| soccer | 1,930 | 157 | 154 | **98.1%** | h1=2, h2=1 |
+| nhl | 1 | 1 | 1 | 100% | — |
+| ncaaf | 346 | 12 | 7 | **58.3%** | **h1=3, q2=1, q1=1** |
+| nfl / ncaab / wnba | 1,207 / 0 / 0 | 0 | — | — | no live rows |
+| **NON-MLB TOTAL** | | **189** | **181** | **95.8%** | |
+| mlb (postseason) | 3 | 3 | 3 | 100% | *not a conclusion — see below* |
+
+### The decision rule, applied
+
+The findings above committed to a rule before the reading: *"If LIVE rows are
+predominantly `full` — the constraint was MLB-specific, venue full-game quotes
+can price most of the live board, and wiring full-game venue pricing is worth
+it."*
+
+**95.8% of non-MLB live rows are full-game. The rule fires: the segment
+constraint is MLB-specific, and wiring full-game venue pricing is worth it.**
+That is consistent with the pregame half (99.3% full, MLB the sole outlier at
+88.0%) and with the lane's hypothesis.
+
+### Three caveats, each of which narrows the claim
+
+1. **NCAAF is the exception and it is a real one:** 58.3% full over 12 live rows,
+   with `h1`, `q1` and `q2` present. Segment markets DO appear live there. n=12
+   is small, so this is a flag for a second reading rather than a finding — but
+   it means "the live board is full-game" is a statement about nba and soccer,
+   which supplied 173 of the 189 rows.
+2. **Nothing is concluded about MLB, which is the sport the whole lead came
+   from.** MLB is in the postseason: 3 live rows tonight, all full-game. The
+   original finding — 427 live MLB sides, 23 matching a venue quote, 17 of those
+   refused `SEGMENT_MISMATCH_GRID` on `mlb|first5|h2h` — was a regular-season
+   slate and **stands unchallenged**. A postseason sample cannot speak to it, and
+   the task was told so explicitly.
+3. **TWO READINGS NINE MINUTES APART DISAGREE, and the gap is worth more than
+   either number.** The 00:45:20Z task run reported **89.1% non-MLB full (90 of
+   101)**; this 00:55:01Z reading reports **95.8% (181 of 189)**. Same frame,
+   same question, **88 more rows and 6.7 points apart**. The live board gains and
+   loses rows as games progress, so a single live reading carries more variance
+   than its own denominator suggests. Both support the same verdict, which is why
+   the verdict survives — had they pointed opposite ways, neither would have
+   been enough.
