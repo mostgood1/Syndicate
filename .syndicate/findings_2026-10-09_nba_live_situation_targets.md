@@ -782,3 +782,13 @@ Production sequence (`resume_from_summary` -> `map_state_names`) on the pickled 
 
 **If PASS:** report to the user. Shadow -> priced remains the user's decision, and production must also run the Phase 2 pregame config.
 **If FAIL:** name the failing market/checkpoint and stop. No re-fit inside this gate.
+
+## 7c. PRE-REGISTERED 2026-10-14 (before any measurement): §7 game-matched end-game check in the Phase 2 #3 config (FIT only)
+
+- **Why:** P3's end-game p by deficit (0.2, 0.0, 0.2) was fitted (§7b) in the production config, without bonus, foul fixes or EXACT. The calibration lane's full FIT passed with it held fixed. This checks it still fits at the game-matched 2:00 state in the config that will ship.
+- **Method:** identical to §7 (`scripts/fit_nba_endgame_fouling.py`, 40 draws, grid {0, .2, .3, .4, .5, .6, .7}, same seeds). Base config = `fit_f3_config.json` via `--phase2-config`; the grid overrides endgame_*, and p=0 turns end-game OFF. Inputs = `inputs_p2` (Phase 2 as-of recording).
+- **Population:** REGULAR, **FIT 2025-11-01..2026-02-28 only**, |margin| 1..10 at 2:00 Q4. VALID is untouched.
+- **Rule (the §7 selection rule):** per bucket, the p minimising |mean(SIM − REAL)| on last-2:00 points over FIT.
+  - Where it equals the shipped p, the bucket holds.
+  - Where it differs, that bucket is re-fitted to it, and the solver's Δ (solver_endgame_pts_per_team) must then be re-measured by the calibration lane before the VALID read.
+  - Trailer FTA (sim vs real) is READ, not gated. The 4-6 shape miss from §7b is expected to persist.

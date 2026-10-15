@@ -50,6 +50,7 @@ def run(args: argparse.Namespace) -> int:
         games = [g for g in games if zlib.crc32(g.event_id.encode()) % n == i]
     inputs_index = bt.index_engine_inputs(Path(args.engine_inputs))
     caches = [Path(c) for c in args.summary_cache]
+    phase2 = bt.apply_phase2_config(Path(args.phase2_config)) if args.phase2_config else {}
     engine = _engine_for_league_local("nba")
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -85,9 +86,11 @@ def run(args: argparse.Namespace) -> int:
             real_fta = sum(1 for p in g.plays if p.period == 4 and p.clock_s < 120 and p.kind == "ft")
             seed = zlib.crc32(f"eg|{g.event_id}".encode()) & 0x7FFFFFFF
             sims: Dict[str, Any] = {}
-            base = json.loads(args.base_mechanisms or "{}")
+            base = {**phase2, **json.loads(args.base_mechanisms or "{}")}
             for p in GRID:
                 mech = {"record_events": True, **base}
+                if p == 0:
+                    mech["endgame_foul_window_s"] = 0  # off, even when the base config (Phase 2) has it on
                 if p > 0:
                     mech.update(endgame_foul_window_s=120, endgame_foul_max_deficit=10, endgame_foul_p=0.0,
                                 endgame_foul_p_by_deficit=(p, p, p), endgame_foul_seconds=5.0,
@@ -161,6 +164,8 @@ def main(argv=None) -> int:
     r.add_argument("--out", required=True)
     r.add_argument("--draws", type=int, default=40)
     r.add_argument("--shard")
+    r.add_argument("--phase2-config", default=None,
+                   help="calibration lane full-FIT config JSON: env + engine flags + EventSimConfig fields as the base (the grid overrides endgame_*)")
     r.add_argument("--base-mechanisms", default="{}",
                    help='JSON EventSimConfig fields in EVERY arm, e.g. {"score_effect_k": 0.002} (the shipping config)')
     s = sub.add_parser("summarize")
