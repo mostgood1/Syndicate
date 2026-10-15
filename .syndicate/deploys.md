@@ -49721,3 +49721,27 @@ Pressure lines were the same text on both dates and across reads 30 s apart; not
 - **ask:** user 2026-10-15 "update the old reason text on past sheets too".
 - **what:** `cheat_sheets.streak_room_reason()` is now the one wording (price_check writes it); `reword_streak_reasons()` rewrites the old "N/M on this line and the price still leaves +X%" in place -- that sentence only, idempotent. Fleet HEAD was d217efff (a peer moved it); ride-along listed first: this commit only. `RELOAD_WEB` 2.0 s, 0 failures. Claim web token 08b9c739....
 - **migration (8:57 AM CT, no sheet job running -- checked):** 65 notes reworded across 5 sheets (NCAAF 10-14 6, NCAAF 10-15 14, NFL 10-15 13, NHL 10-14 21, NHL 10-15 11); a check asserted nothing but `check.reasons` differs per row and nothing outside `rows`; written atomically; old wording left on disk: **0**; originals in `cheatsheets/.backup_reasons_20261015T085734/`. Play cards carried none of it.
+
+## 2026-10-15 03:28:45Z -- READING: NBA T-window provider (fd7f2a2d) LOADED at the live-odds-worker's self-recycle (lane `nba-t-window-provider`, session 2d413211)
+
+- The live-odds-worker logged `RECYCLING after 21509s uptime` at 03:28:45Z and `==== start 2026-10-15T03:28:54Z restarts=4`; pid 144583 -> 378860. Fleet HEAD 88fce6f7.
+- Under pid 378860's own env (dict from /proc):
+  - `_T_WINDOW_COMMENCE_PROVIDERS` = ['mlb', 'nba', 'soccer', 'wnba'];
+  - `_nba_commence_times('2026-10-20')` = 0022600001 19:00Z, 0022600002 23:00Z, 0022600003 01:30Z (10-21).
+- Two watchers recorded it: a tool background task and a detached WSL one (`/mnt/c/tmp/p7/recycle.out`).
+- **Still owed:** the first `nba:ramp:` / `nba:closing:` T-window marker on a real NBA slate.
+
+## 2026-10-15 13:55:00Z (8:55 AM CT) -- LOCAL FLEET ff 4a2fd29d -> d217efff (exact SHA), NO restart: dead vendored nhl_betting.cli launcher deleted -- **MET** 14:06:58Z (lane `nhl-refresh-dead-vendored-cli`, session 2d413211)
+
+- **User decisions 2026-10-15:**
+  - "move the nhl schedule commence times off vendor": nothing vendored; NHL has no T-window provider.
+  - "Delete the dead vendored NHL CLI code", then "Ff after NHL refresh idle".
+- **Claim:** refresh-worker, gated on its exit code; released. Ride-alongs: none (every non-ledger path checked).
+- **Change:**
+  - `scripts/refresh_nhl_oddsapi.py` lost `_default_source_root`, `_source_python_executable`, `_source_data_root`, `_run_source_cli`, `_run_source_generation`, `_run_source_generation_multi` and `_pushd`, plus the `subprocess`/`contextlib` imports only they used. All unreachable: `source_root = None` since the Phase 5 cutover.
+  - `tests/test_nhl_refresh_runner.py`: 4 patches removed, and a test pins the absence.
+  - The pre-existing unused `ZoneInfo` import was left.
+- **VERIFY:**
+  - The deployed checkout has no `_run_source_cli`; 9 tests passed.
+  - The next NHL refresh (`--date 2026-10-16 --days-ahead 1`) ran 14:03:13-14:06:58Z on the new code and wrote fresh artifacts at 14:06:56-58Z: `props_recommendations_2026-10-17.csv`, `odds_nhl_team_odds_{opening,movement_signals}_2026-10-16.csv`, `odds_history/2026-10-15.json`.
+- **Rollback:** revert d217efff and ff.
