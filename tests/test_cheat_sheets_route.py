@@ -32,7 +32,7 @@ def _value_row(**extra):
 def _sheet(sport="nfl", day=TODAY, **extra):
     rows = [_value_row(),
             {"event_id": "e1", "player": "Bench Guy", "commence_time": "2026-10-14T23:15:00Z", "check": {"verdict": "neutral"}},
-            _value_row(event_id="e2", player="Other Game", check={"verdict": "streak_priced_in", "ev_posterior": -2.0})]
+            _value_row(event_id="e2", player="Other Game", check={"verdict": "streak_priced_in", "ev_posterior": -2.0, "price": -120})]
     doc = {"sport": sport, "date": day, "generated_at": "2026-10-14T23:39:44Z", "rows": rows,
            "sections": cs.sections(rows),
            "games": [{"event_id": "e1", "matchup": "Arizona Cardinals @ Los Angeles Rams", "commence_time": "2026-10-14T23:15:00Z",

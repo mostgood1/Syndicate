@@ -301,8 +301,8 @@ def game_line_sections(lines: Sequence[Mapping[str, Any]], *, top: int = 25) -> 
     ev = lambda i: (lines[i].get("check") or {}).get("ev_market")
     verdict = lambda i: (lines[i].get("check") or {}).get("verdict")
     return {
-        "value": sorted((i for i in idx if verdict(i) == "value"), key=lambda i: -(ev(i) or 0))[:top],
-        "shop": sorted((i for i in idx if (lines[i].get("shop") or {}).get("gap_pp", 0) >= 2.0),
+        "value": sorted((i for i in idx if verdict(i) == "value" and featurable(lines[i])), key=lambda i: -(ev(i) or 0))[:top],
+        "shop": sorted((i for i in idx if (lines[i].get("shop") or {}).get("gap_pp", 0) >= 2.0 and featurable(lines[i])),
                        key=lambda i: -(lines[i].get("shop") or {}).get("gap_pp", 0))[:top],
         "all": sorted(idx, key=lambda i: (GAME_MARKETS.index(lines[i]["market"]) if lines[i].get("market") in GAME_MARKETS else 9,
                                            str(lines[i].get("side"))))[:300],
@@ -327,6 +327,30 @@ def dvp_extremes(dvp_teams: Mapping[str, Any], defense: str, *, top: int = 4) ->
 # ----------------------------------------------------------------------------- sections
 
 
+# Featured sections show a bet a reader would actually take (user 2026-10-15: "we need some sort of sanity cap on the
+# lines being featured odds-wise"): a price inside this band, and ONE line per player + stat + side -- the
+# best-EV rung -- not five ladder rungs of the same bet. "Every prop on the board" stays complete.
+FEATURED_MIN_PRICE = -250
+FEATURED_MAX_PRICE = 250
+
+
+def featurable(row: Mapping[str, Any]) -> bool:
+    price = (row.get("check") or {}).get("price")
+    return isinstance(price, (int, float)) and FEATURED_MIN_PRICE <= price <= FEATURED_MAX_PRICE
+
+
+def _one_per_bet(rows: Sequence[Mapping[str, Any]], ids: Iterable[int]) -> list[int]:
+    """Keep the first index (the caller's order) for each player + market + side."""
+    seen, out = set(), []
+    for i in ids:
+        key = (rows[i].get("player"), rows[i].get("market"), str(rows[i].get("side") or "").lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(i)
+    return out
+
+
 def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25) -> dict[str, list[int]]:
     """Index lists into `rows` for each sheet section, each sorted by the number that matters for it."""
     rows = list(rows)
@@ -335,39 +359,43 @@ def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25) -> dict[str, l
         return float(v) if isinstance(v, (int, float)) else float("-inf")
     idx = range(len(rows))
     verdict = lambda i: (rows[i].get("check") or {}).get("verdict")
-    return {
-        "value": sorted((i for i in idx if verdict(i) == "value"), key=lambda i: -ev(i, "ev_market"))[:top],
+    out = {
+        "value": sorted((i for i in idx if verdict(i) == "value"), key=lambda i: -ev(i, "ev_market")),
         "streaks_with_room": sorted((i for i in idx if verdict(i) == "streak_with_room"),
-                                    key=lambda i: -ev(i, "ev_posterior"))[:top],
+                                    key=lambda i: -ev(i, "ev_posterior")),
         "streaks_priced_in": sorted((i for i in idx if verdict(i) == "streak_priced_in"),
-                                    key=lambda i: ev(i, "ev_posterior"))[:top],
+                                    key=lambda i: ev(i, "ev_posterior")),
         "shop_gaps": sorted((i for i in idx if (rows[i].get("shop") or {}).get("gap_pp", 0) >= 2.0),
-                            key=lambda i: -(rows[i].get("shop") or {}).get("gap_pp", 0))[:top],
+                            key=lambda i: -(rows[i].get("shop") or {}).get("gap_pp", 0)),
         # Streaks are shown as what they measured to be: already in the price (consistency backtest 2026-10-14, NFL +
         # NBA + MLB, 2,197 tout-style 5/5 rungs: hit 2.6 pts BELOW the Shin fair [-4.9, -0.3], ROI -8.5%; a shrunk
         # streak estimate added nothing out of sample). One section, ordered by the record, EV = price vs fair.
         "hot_streaks": sorted((i for i in idx if verdict(i) in ("streak_with_room", "streak_priced_in")),
-                              key=lambda i: (-_form(rows[i], "form10").get("rate", 0), -_form(rows[i], "form5").get("hits", 0)))[:top],
+                              key=lambda i: (-_form(rows[i], "form10").get("rate", 0), -_form(rows[i], "form5").get("hits", 0))),
         # Strong form where only one side is quoted (soccer shots / SOT / assists are almost all one book, over only):
         # no fair price exists to measure the streak against, so it is shown as form and model -- never as edge.
         "hot_form": sorted((i for i in idx if verdict(i) == "one_sided_fair" and _hot(rows[i])),
-                           key=lambda i: (-_form(rows[i], "form10").get("rate", 0), -_form(rows[i], "form5").get("hits", 0)))[:top],
+                           key=lambda i: (-_form(rows[i], "form10").get("rate", 0), -_form(rows[i], "form5").get("hits", 0))),
         # Consistency (user 2026-10-15: "a consistency section for every sport to show the recent hit rate trends"):
         # every row with a full L10 sample and a 70%+ hit rate, best record first, whatever its price says -- the page
         # shows the trend (L5 vs L10) and the price beside it, and says plainly that streaks measured as priced in.
         "consistency": sorted((i for i in idx if _form(rows[i], "form10").get("games", 0) >= 8
                                and (_form(rows[i], "form10").get("rate") or 0) >= 0.7),
                               key=lambda i: (-(_form(rows[i], "form10").get("rate") or 0),
-                                             -(_form(rows[i], "form5").get("rate") or 0)))[:top],
+                                             -(_form(rows[i], "form5").get("rate") or 0))),
         # Matchups (user 2026-10-15: "matchup based cheat sheets"): the opponent ranks in the softest fifth at allowing
         # this stat for an over (toughest fifth for an under), most extreme first.
         "matchup_spots": sorted((i for i in idx if matchup_favors_side(rows[i]) or vs_opponent_strong(rows[i])),
-                                key=lambda i: _matchup_extremity(rows[i]))[:top],
+                                key=lambda i: _matchup_extremity(rows[i])),
         # Everything on the board, for a game's own sheet (the page shows it there only).
         "every_prop": sorted(idx, key=lambda i: (str(rows[i].get("market")), str(rows[i].get("player")),
                                                  rows[i].get("line") if isinstance(rows[i].get("line"), (int, float)) else 0,
                                                  str(rows[i].get("side"))))[:EVERY_PROP_CAP],
     }
+    for key in ("value", "hot_streaks", "streaks_with_room", "streaks_priced_in", "hot_form", "consistency",
+                "matchup_spots", "shop_gaps"):
+        out[key] = _one_per_bet(rows, [i for i in out[key] if featurable(rows[i])])[:top]
+    return out
 
 
 EVERY_PROP_CAP = 200
@@ -401,12 +429,24 @@ def vs_opponent_record(matchup: Mapping[str, Any] | None, line: Any, side: Any) 
     only, so another line in the group gets the game count but no hit rate -- a record on a different line is not
     this bet's record."""
     vs = (matchup or {}).get("vs_opponent") or {}
+    values = vs.get("values")
+    side = str(side or "").lower()
+    if isinstance(values, list) and values and (line is not None or side == "yes"):
+        rec = form_record(values, 0.5 if line is None else line, side, len(values))      # every value, this line
+        if not rec["games"]:
+            return None
+        return {"games": rec["games"], "hits": rec["hits"], "same_line": True}
     hr = vs.get("hit_rate") or {}
     games = int(hr.get("games") or vs.get("games") or 0)
     if not games:
         return None
-    same = hr.get("line") == line and str(hr.get("side") or "").lower() == str(side or "").lower()
+    same = hr.get("line") == line and str(hr.get("side") or "").lower() == side
     return {"games": games, "hits": int(hr.get("hits") or 0) if same else None, "same_line": same}
+
+
+# A record against one opponent means something only over a few meetings (user 2026-10-15: "vs opponent needs to be
+# better than just 1 game, other line. that is not helpful").
+VS_OPPONENT_MIN_GAMES = 3
 
 
 def matchup_favors_side(row: Mapping[str, Any]) -> bool:
@@ -421,7 +461,7 @@ def matchup_favors_side(row: Mapping[str, Any]) -> bool:
 
 def vs_opponent_strong(row: Mapping[str, Any]) -> bool:
     vs = row.get("vs_opponent") or {}
-    return bool(vs.get("same_line")) and vs.get("games", 0) >= 2 and (vs.get("hits") or 0) / vs["games"] >= 2 / 3
+    return bool(vs.get("same_line")) and vs.get("games", 0) >= VS_OPPONENT_MIN_GAMES and (vs.get("hits") or 0) / vs["games"] >= 2 / 3
 
 
 def _matchup_extremity(row: Mapping[str, Any]) -> float:

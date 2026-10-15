@@ -74,9 +74,10 @@ def test_game_script_reads_the_sim_margin():
 
 
 def test_sections_sort_by_the_number_that_matters():
-    rows = [{"check": {"verdict": "value", "ev_market": 3.0}}, {"check": {"verdict": "value", "ev_market": 9.0}},
-            {"check": {"verdict": "streak_priced_in", "ev_posterior": -5.0}},
-            {"check": {"verdict": "streak_priced_in", "ev_posterior": -12.0}}]
+    rows = [{"player": "A", "check": {"verdict": "value", "ev_market": 3.0, "price": -110}},
+            {"player": "B", "check": {"verdict": "value", "ev_market": 9.0, "price": 120}},
+            {"player": "C", "check": {"verdict": "streak_priced_in", "ev_posterior": -5.0, "price": -150}},
+            {"player": "D", "check": {"verdict": "streak_priced_in", "ev_posterior": -12.0, "price": -200}}]
     s = cs.sections(rows)
     assert s["value"] == [1, 0] and s["streaks_priced_in"] == [3, 2] and s["streaks_with_room"] == []
 
@@ -186,7 +187,7 @@ def test_a_days_sheet_is_a_record_started_games_keep_their_last_rows():
     from datetime import datetime, timezone
 
     def row(event, player, start):
-        return {"event_id": event, "player": player, "commence_time": start, "check": {"verdict": "value", "ev_market": 3.0}}
+        return {"event_id": event, "player": player, "commence_time": start, "check": {"verdict": "value", "ev_market": 3.0, "price": -110}}
 
     prior = {"date": "2026-10-14", "generated_at": "2026-10-14T14:00:00Z",
              "rows": [row("early", "A", "2026-10-14T18:00:00Z"), row("late", "B", "2026-10-15T00:40:00Z"),
@@ -243,9 +244,9 @@ def test_started_games_rebuild_from_their_last_pregame_quotes(tmp_path):
 
 def test_one_sided_hot_form_gets_its_own_section_and_every_prop_is_listed():
     hot = {"player": "Shooter", "market": "player_shots", "line": 0.5, "side": "over",
-           "check": {"verdict": "one_sided_fair", "form5": {"games": 5, "hits": 5}, "form10": {"games": 10, "hits": 9, "rate": 0.9}}}
-    cold = dict(hot, player="Bench", check={"verdict": "one_sided_fair", "form5": {"games": 5, "hits": 1}, "form10": {"games": 10, "hits": 2, "rate": 0.2}})
-    priced = dict(hot, player="Priced", check={"verdict": "streak_priced_in", "form5": {"games": 5, "hits": 5}, "form10": {"games": 10, "hits": 9, "rate": 0.9}})
+           "check": {"verdict": "one_sided_fair", "price": 120, "form5": {"games": 5, "hits": 5}, "form10": {"games": 10, "hits": 9, "rate": 0.9}}}
+    cold = dict(hot, player="Bench", check={"verdict": "one_sided_fair", "price": 120, "form5": {"games": 5, "hits": 1}, "form10": {"games": 10, "hits": 2, "rate": 0.2}})
+    priced = dict(hot, player="Priced", check={"verdict": "streak_priced_in", "price": -120, "form5": {"games": 5, "hits": 5}, "form10": {"games": 10, "hits": 9, "rate": 0.9}})
     s = cs.sections([hot, cold, priced])
     assert s["hot_form"] == [0]                                  # only one-sided rows: a priced streak has its own section
     assert sorted(s["every_prop"]) == [0, 1, 2] and s["value"] == []
@@ -339,18 +340,35 @@ def test_the_day_ahead_is_tomorrow_in_central(monkeypatch):
 def test_consistency_and_matchup_sections():
     def row(player, side="over", f5=(5, 5), f10=(10, 9), matchup=None, vs=None):
         return {"player": player, "side": side, "line": 2.5, "matchup": matchup, "vs_opponent": vs,
-                "check": {"verdict": "neutral", "form5": {"games": f5[0], "hits": f5[1], "rate": f5[1] / f5[0]},
+                "check": {"verdict": "neutral", "price": -115, "form5": {"games": f5[0], "hits": f5[1], "rate": f5[1] / f5[0]},
                           "form10": {"games": f10[0], "hits": f10[1], "rate": f10[1] / f10[0]}}}
 
     rows = [row("A", f10=(10, 8)), row("B", f10=(10, 10)), row("C", f10=(6, 6)), row("D", f10=(10, 6)),
             row("E", matchup={"nth_most": 2, "of": 32}), row("F", side="under", matchup={"nth_most": 2, "of": 32}),
             row("G", side="under", matchup={"nth_most": 31, "of": 32}), row("H", vs={"games": 3, "hits": 3, "same_line": True}),
-            row("I", vs={"games": 3, "hits": None, "same_line": False})]
+            row("I", vs={"games": 3, "hits": None, "same_line": False}), row("J", vs={"games": 2, "hits": 2, "same_line": True})]
     s = cs.sections(rows)
     assert [rows[i]["player"] for i in s["consistency"]][:2] == ["B", "E"] and 2 not in s["consistency"] and 3 not in s["consistency"]
-    assert {rows[i]["player"] for i in s["matchup_spots"]} == {"E", "G", "H"}       # soft D for an over, tough D for an under, 3/3 vs opp
+    assert {rows[i]["player"] for i in s["matchup_spots"]} == {"E", "G", "H"}       # soft D for an over, tough D for an under, 3/3 vs opp (2/2: too few)
     assert cs.matchup_summary("ncaaf", {"opponent": "Memphis", "allowed_rank": "79 of 138 (1 = fewest allowed)", "allowed_per_game": 219.7}, None) == \
         {"opponent": "Memphis", "nth_most": 60, "of": 138, "per_game": 219.7, "stat": None, "pos": None, "source": "allowed_rank"}
     vs = {"vs_opponent": {"games": 2, "hit_rate": {"games": 2, "hits": 2, "line": 3.5, "side": "over"}}}
     assert cs.vs_opponent_record(vs, 3.5, "over") == {"games": 2, "hits": 2, "same_line": True}
     assert cs.vs_opponent_record(vs, 4.5, "over") == {"games": 2, "hits": None, "same_line": False}   # another line: no rate
+    with_values = {"vs_opponent": {"games": 4, "values": [5, 2, 4, 3], "hit_rate": {"line": 3.5, "side": "over"}}}
+    assert cs.vs_opponent_record(with_values, 2.5, "over") == {"games": 4, "hits": 3, "same_line": True}   # any line, graded
+    assert cs.vs_opponent_record(with_values, 3.0, "under") == {"games": 3, "hits": 1, "same_line": True}  # the 3.0 push drops
+
+
+def test_featured_sections_keep_a_sane_price_and_one_line_per_bet():
+    def row(player, price, ev, line=2.5, market="Receptions"):
+        return {"player": player, "market": market, "side": "under", "line": line,
+                "check": {"verdict": "value", "ev_market": ev, "price": price}}
+
+    rows = [row("Nix", -112, 3.0, 199.5, "Passing Yards"), row("Nix", -113, 4.0, 197.5, "Passing Yards"),
+            row("Nix", -117, 2.5, 201.5, "Passing Yards"), row("Shaheed", 163, 6.0, 1.5), row("Kupp", -400, 5.0),
+            row("Waddle", 250, 2.1), row("Mims", -251, 2.2)]
+    s = cs.sections(rows)
+    assert [rows[i]["player"] for i in s["value"]] == ["Shaheed", "Nix", "Waddle"]      # -400 and -251 out; one Nix
+    assert rows[s["value"][1]]["line"] == 197.5                                          # the best-EV Nix rung
+    assert len(s["every_prop"]) == 7                                                     # the full table stays complete
