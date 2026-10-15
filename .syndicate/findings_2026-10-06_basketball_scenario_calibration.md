@@ -2883,3 +2883,17 @@ VALID read.**
   - (ii) `build_nba_totals_calibration.py` scheduled daily on the fleet, with its opening seed.
   - (iii) `nba_sim_total_inputs.json` with skip_outs_penalties added.
 - Built default-off while the VALID runs go, so that a pass can ship.
+
+**VALID READ — AMENDMENT 2026-10-15 19:20Z (before any VALID run or read): "the same seeds per game" is NOT achievable as
+written.**
+- Measured: the harness pipeline is run-to-run NONDETERMINISTIC. The same code, the same date, PYTHONHASHSEED=0, run
+  twice gave 0/11 games with identical draws (the smart sim's seed is not fixed per game).
+- So PROD and FINAL draws are independent. The pairing is BY GAME, and the game-clustered bootstrap CI includes the
+  200-draw simulation noise of both arms (conservative: it widens the CI and never favours FINAL).
+- Every gate and threshold is unchanged.
+
+**PRODUCTION WIRING landed (9beb1677, nothing enabled):** `nba_engine_config.json` (absent = unchanged) + a gated
+daily totals-calibration job + seed +2.50.
+- Tests: 5 new + 4 updated, 61 neighbouring pass.
+- "Absent = identical" is proven by a DETERMINISTIC unit test: the same engine object and the same draws as a direct
+  call. A harness A/B cannot show it, by the measurement above.
