@@ -191,6 +191,12 @@ const ctDateTime = iso => { const t = Date.parse(iso || ""); return isNaN(t) ? "
 const dayName = day => new Date(day + "T17:00:00Z").toLocaleDateString("en-US", {timeZone: TZ, weekday: "long", month: "long", day: "numeric"});
 const dayShort = day => new Date(day + "T17:00:00Z").toLocaleDateString("en-US", {timeZone: TZ, weekday: "short", month: "short", day: "numeric"});
 const started = iso => { const t = Date.parse(iso || ""); return !isNaN(t) && t <= Date.now(); };
+// Board market keys read as words: "player_goal_scorer_anytime" -> "Anytime goalscorer".
+const MARKET_WORDS = {player_goal_scorer_anytime: "Anytime goalscorer", player_first_goal_scorer: "First goalscorer",
+  player_last_goal_scorer: "Last goalscorer", player_shots_on_target: "Shots on target", player_shots: "Shots",
+  player_assists: "Assists", player_to_receive_card: "To be carded", player_to_receive_red_card: "Red card"};
+const marketName = m => MARKET_WORDS[m] || String(m || "").replace(/^player_/, "").replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
+const betText = r => `${marketName(r.market)}${r.side && r.side !== "yes" ? " " + r.side : ""}${r.line != null ? " " + r.line : ""}`;
 const VERDICT = {value: "Value", streak_with_room: "Hot streak", streak_priced_in: "Hot streak", neutral: "Neutral", one_sided_fair: "One-sided price"};
 const STATE = {sport: null, game: null};
 
@@ -223,7 +229,7 @@ function propRow(r) {
     <div class="who">${face(r)}
       <div class="line1"><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span>${live}<b>${esc(r.player)}</b>${r.pos ? `<span class="pos">${esc(r.pos)}</span>` : ""}${card}</div>
       <div class="meta"><span class="tm">${img(src(r.team_logo_src, r.team_logo))}${esc(r.team || "")}</span>${r.opponent ? ` vs <span class="tm">${img(src(r.opponent_logo_src, r.opponent_logo))}${esc(r.opponent)}</span>` : ""}${r.kickoff_ct ? ` · <span class="kick">${esc(r.kickoff_ct)}</span>` : ""}${dvp}${r.injury ? " · " + esc(r.injury) : ""}</div>
-      <div class="bet">${esc(r.market)} ${esc(r.side)} ${r.line ?? ""} · ${odds(c.price)} ${esc(c.book || "")}</div></div>
+      <div class="bet">${esc(betText(r))} · ${odds(c.price)} ${esc(c.book || "")}</div></div>
     <div>${strip(c)}<div class="nums"><span>price <b>${pct(implied(c.price))}</b></span><span>fair <b>${pct(c.p_market)}</b></span><span>model <b>${pct(c.p_model)}</b></span><span>form-adj <b>${pct(c.p_posterior)}</b></span></div></div>
     <div><div class="form">${formDots(r)}</div><div class="nums"><span>L5 <b>${c.form5 ? c.form5.hits + "/" + c.form5.games : "–"}</b></span><span>L10 <b>${c.form10 ? c.form10.hits + "/" + c.form10.games : "–"}</b></span>
       <span class="ev ${ev == null ? "" : ev > 0 ? "pos" : "neg"}">${ev == null ? "no fair line" : "EV " + evs(ev)}</span></div></div>
@@ -242,14 +248,14 @@ function sectionShell(key, title, blurb, count, inner) {
 function shopTable(d, ids) {
   if (!ids.length) return `<div class="empty">No line with three or more books and a gap of 2 points or more.</div>`;
   return `<div class="tbl"><table><thead><tr><th>Player</th><th>Bet</th><th>Best book</th><th>Books</th><th>Best implied</th><th>Median implied</th><th>Given away</th></tr></thead><tbody>${
-    ids.map(i => { const r = d.rows[i], s = r.shop; return `<tr><td>${esc(r.player)}</td><td>${esc(r.market)} ${esc(r.side)} ${r.line ?? ""}</td><td>${esc(s.best_book)}</td><td class="n">${s.books}</td><td class="n">${pct(s.best_implied)}</td><td class="n">${pct(s.median_implied)}</td><td class="n">${s.gap_pp.toFixed(1)} pts</td></tr>`; }).join("")}</tbody></table></div>`;
+    ids.map(i => { const r = d.rows[i], s = r.shop; return `<tr><td>${esc(r.player)}</td><td>${esc(betText(r))}</td><td>${esc(s.best_book)}</td><td class="n">${s.books}</td><td class="n">${pct(s.best_implied)}</td><td class="n">${pct(s.median_implied)}</td><td class="n">${s.gap_pp.toFixed(1)} pts</td></tr>`; }).join("")}</tbody></table></div>`;
 }
 function everyTable(d, ids) {
   if (!ids.length) return `<div class="empty">No props priced for this game.</div>`;
   const f = x => x ? `${x.hits}/${x.games}` : "–";
   return `<div class="tbl"><table class="every"><thead><tr><th>Player</th><th>Bet</th><th>Best price</th><th>Implies</th><th>Fair</th><th>Model</th><th>L5</th><th>L10</th><th>Read</th></tr></thead><tbody>${
     ids.map(i => { const r = d.rows[i], c = r.check || {}, onesided = c.verdict === "one_sided_fair";
-      return `<tr><td><span class="ep">${img(src(r.headshot_src, r.headshot_url), "mini")}${esc(r.player)}${r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}</span></td><td>${esc(r.market)} ${esc(r.side)} ${r.line ?? ""}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n">${pct(c.p_model)}</td><td class="n">${f(c.form5)}</td><td class="n">${f(c.form10)}</td><td><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span></td></tr>`; }).join("")}</tbody></table></div>`;
+      return `<tr><td><span class="ep">${img(src(r.headshot_src, r.headshot_url), "mini")}${esc(r.player)}${r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}</span></td><td>${esc(betText(r))}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n">${pct(c.p_model)}</td><td class="n">${f(c.form5)}</td><td class="n">${f(c.form10)}</td><td><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span></td></tr>`; }).join("")}</tbody></table></div>`;
 }
 const matchupLine = g => `${img(src(g.away_logo_src, g.away_logo))}${esc(g.away_team || "")} @ ${img(src(g.home_logo_src, g.home_logo))}${esc(g.home_team || g.matchup || "")}`;
 function gamesBlock(d, games) {
@@ -295,10 +301,11 @@ function render() {
   let html = game ? "" : slateBlock(d);
   html += SECTIONS.map(([key, title, blurb]) => {
     const ids = secs[key] || [];
+    if (!ids.length && key !== "value") return "";
     return sectionShell(key, title, blurb, `${ids.length} rows`, `<div class="rowlist">${ids.length ? ids.map(i => propRow(d.rows[i])).join("") : `<div class="empty">Nothing qualifies on this ${game ? "game" : "slate"}.</div>`}</div>`);
   }).join("");
   if (game) html += sectionShell("every", "Every prop on the board", "Everything priced for this game: the best price, what it implies, the no-vig fair where both sides are quoted, the model, and recent form.", `${(secs.every_prop || []).length} props`, everyTable(d, secs.every_prop || []));
-  html += sectionShell("shop", "Price shopping", "Same line, same side: what betting the median book gives away against the best one.", "", shopTable(d, secs.shop_gaps || []));
+  if ((secs.shop_gaps || []).length) html += sectionShell("shop", "Price shopping", "Same line, same side: what betting the median book gives away against the best one.", "", shopTable(d, secs.shop_gaps));
   html += gamesBlock(d, game ? [game] : (d.games || []));
   if (!game) html += newsBlock(d);
   document.getElementById("sheet").innerHTML = html;
