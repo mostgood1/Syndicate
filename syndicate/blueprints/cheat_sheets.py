@@ -71,7 +71,16 @@ def _read(sport: str, day: str) -> dict[str, Any] | None:
         doc = json.loads((_sheet_dir() / sport / f"{day}.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    return doc if isinstance(doc, dict) and doc.get("sport") == sport else None
+    if not (isinstance(doc, dict) and doc.get("sport") == sport):
+        return None
+    # The results, when `scripts/reconcile_cheat_sheets.py` has graded the day: `cs.page_payload` attaches them.
+    try:
+        rec = json.loads((_sheet_dir() / sport / f"{day}.reconciled.json").read_text(encoding="utf-8"))
+        if isinstance(rec, dict) and rec.get("sport") == sport and rec.get("date") == day:
+            doc["reconciled"] = rec
+    except (OSError, ValueError):
+        pass
+    return doc
 
 
 def _sports() -> list[str]:

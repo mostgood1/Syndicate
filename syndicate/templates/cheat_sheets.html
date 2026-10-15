@@ -150,6 +150,19 @@ a.sg:hover { border-color: var(--accent); transform: translateY(-1px); }
 .xfoot { display: flex; justify-content: space-between; gap: 16px; border-top: 3px solid var(--accent); padding-top: 12px;
   font: 800 17px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .xfoot .x { color: var(--accent2); }
+/* Reconciled view (user 2026-10-15): the sheet as published, with each bet's result and each section's record. */
+.viewbar { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.viewbar .vnote { color: var(--muted); font-size: 13px; }
+.res { font: 700 13px var(--mono); white-space: nowrap; } .res.w { color: var(--accent); } .res.l { color: var(--price); } .res.p { color: var(--muted); }
+tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first-child { box-shadow: inset 3px 0 0 var(--price); }
+.prop.rw { box-shadow: inset 3px 0 0 var(--accent); padding-left: 10px; } .prop.rl { box-shadow: inset 3px 0 0 var(--price); padding-left: 10px; }
+.rec { font: 800 13px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px; border-radius: 4px; white-space: nowrap; color: var(--accent); background: var(--v-value-bg); }
+.rec.neg { color: var(--price); background: rgba(255,107,87,.14); } .rec.none { color: var(--muted); background: var(--v-neutral-bg); }
+.recbar { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid #1d3a55; border-radius: 10px; background: linear-gradient(180deg, var(--bg2), var(--card)); }
+.recbar .items { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+.recbar .it { display: inline-flex; gap: 8px; align-items: center; font-weight: 600; }
+.recbar p { margin: 0; color: var(--muted); font-size: 12.5px; }
+.xframe .res { font-size: 17px; } .xframe .rec { font-size: 16px; }
 @media (max-width: 760px) { .prop { grid-template-columns: 1fr; } }
 </style></head><body>
 <!--__SITE_HEADER__-->
@@ -159,6 +172,7 @@ a.sg:hover { border-color: var(--accent); transform: translateY(-1px); }
     <div class="brand"><img alt="Syndicate ROI" src="__LOGO_SRC__">
       <div class="wordmark"><span class="w1 slant">Syndicate ROI</span><span class="w2 slant">Cheat Sheets</span></div></div>
     <div class="dayline"><span class="day" id="dayLabel"></span><span class="asof" id="asOf"></span></div>
+    <div class="viewbar" id="viewbar"></div>
     <nav class="days" id="days" aria-label="Sheet date"></nav>
     <p class="sub">Every row puts the bet next to what the price already says. A streak or a matchup only counts when the best available price leaves room for it.</p>
     <div class="tabs" role="tablist" id="tabs"></div>
@@ -202,7 +216,7 @@ const MARKET_WORDS = {player_goal_scorer_anytime: "Anytime goalscorer", player_f
 const marketName = m => MARKET_WORDS[m] || String(m || "").replace(/^(player|batter|pitcher)_/, "").replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
 const betText = r => `${marketName(r.market)}${r.side && r.side !== "yes" ? " " + r.side : ""}${r.line != null ? " " + r.line : ""}`;
 const VERDICT = {value: "Value", streak_with_room: "Hot streak", streak_priced_in: "Hot streak", neutral: "Neutral", one_sided_fair: "One-sided price", suspect_price: "Check price"};
-const STATE = {sport: null, game: null};
+const STATE = {sport: null, game: null, view: new URLSearchParams(location.search).get("view") === "reconciled" ? "reconciled" : "pregame"};
 
 function face(r) {
   const head = src(r.headshot_src, r.headshot_url), crest = src(r.team_logo_src, r.team_logo);
@@ -223,13 +237,13 @@ function formDots(r) {
   }).join("");
 }
 const ordinal = n => n + (["th", "st", "nd", "rd"][((n % 100) - 20) % 10] || ["th", "st", "nd", "rd"][n % 100] || "th");
-function propRow(r) {
+function propRow(r, i) {
   const c = r.check, dvp = r.dvp ? ` · opp allows the ${ordinal(r.dvp.nth_most)} most ${esc(String(r.dvp.stat).replace("_", " "))} to ${esc(r.pos)}` : "";
   const ev = c.verdict === "one_sided_fair" ? null : c.ev_market;     // price vs fair -- never the streak-adjusted number
   const card = r.card_ok && META.mode === "app"
     ? `<a class="btn no-export" href="/cheatsheets/card/${esc(STATE.sport)}/${esc(META.date)}/${esc(r.card_id)}" target="_blank" rel="noopener">Pick graphic</a>` : "";
   const live = started(r.commence_time) ? `<span class="chip started">Started</span>` : "";
-  return `<div class="prop">
+  return `<div class="prop"${i != null ? ` data-ri="${i}"` : ""}>
     <div class="who">${face(r)}
       <div class="line1"><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span>${live}<b>${esc(r.player)}</b>${r.pos ? `<span class="pos">${esc(r.pos)}</span>` : ""}${card}</div>
       <div class="meta"><span class="tm">${img(src(r.team_logo_src, r.team_logo))}${esc(r.team || "")}</span>${r.opponent ? ` vs <span class="tm">${img(src(r.opponent_logo_src, r.opponent_logo))}${esc(r.opponent)}</span>` : ""}${r.kickoff_ct ? ` · <span class="kick">${esc(r.kickoff_ct)}</span>` : ""}${dvp}${r.injury ? " · " + esc(r.injury) : ""}</div>
@@ -257,7 +271,7 @@ function consistencyTable(d, ids) {
   const f = x => x && x.games ? `${x.hits}/${x.games}` : "–";
   return `<div class="tbl"><table class="every"><thead><tr><th>Player</th><th>Bet</th><th>L5</th><th>L10</th><th>Trend</th><th>Best price</th><th>Implies</th><th>Fair</th><th>EV</th></tr></thead><tbody>${
     ids.map(i => { const r = d.rows[i], c = r.check || {}, onesided = c.verdict === "one_sided_fair";
-      return `<tr><td><span class="ep">${img(src(r.headshot_src, r.headshot_url), "mini")}${esc(r.player)}${r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}</span></td><td>${esc(betText(r))}</td><td class="n"><b>${f(c.form5)}</b></td><td class="n"><b>${f(c.form10)}</b></td><td>${trend(c)}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</td></tr>`; }).join("")}</tbody></table></div>`;
+      return `<tr data-ri="${i}"><td><span class="ep">${img(src(r.headshot_src, r.headshot_url), "mini")}${esc(r.player)}${r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}</span></td><td>${esc(betText(r))}</td><td class="n"><b>${f(c.form5)}</b></td><td class="n"><b>${f(c.form10)}</b></td><td>${trend(c)}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</td></tr>`; }).join("")}</tbody></table></div>`;
 }
 // Against this opponent: the actual previous results on THIS line, newest first ("1 game is fine but give something
 // helpful, like previous result"), and the record once there are a few meetings.
@@ -283,14 +297,14 @@ function pvpTable(d, ids, heads) {
         : p.kind === "receiver_vs_defenders" ? `${ln.plays} plays: ${ln.catches} rec, ${ln.yards} yds · ${ln.pbu} PBU · ${ln.int} INT`
         : p.kind === "qb_vs_defenders" ? ((ln.hawks || []).map(h => `${shortName(h.name)} ${h.int} INT ${h.pbu} PBU`).join(" · ") || "–")
         : `${ln.avg || "–"} / ${ln.ops || "–"}`;
-      return `<tr><td><span class="ep">${img(src(r.headshot_src, r.headshot_url), "mini")}${esc(r.player)}</span></td><td>${esc(betText(r))}</td><td>${esc(p.opponent || "")}</td><td>${esc(p.summary || "")}</td><td class="n">${esc(rate)}</td><td class="n">${c.form10 && c.form10.games ? c.form10.hits + "/" + c.form10.games : "–"}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</td></tr>`; }).join("")}</tbody></table></div>`;
+      return `<tr data-ri="${i}"><td><span class="ep">${img(src(r.headshot_src, r.headshot_url), "mini")}${esc(r.player)}</span></td><td>${esc(betText(r))}</td><td>${esc(p.opponent || "")}</td><td>${esc(p.summary || "")}</td><td class="n">${esc(rate)}</td><td class="n">${c.form10 && c.form10.games ? c.form10.hits + "/" + c.form10.games : "–"}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</td></tr>`; }).join("")}</tbody></table></div>`;
 }
 // Matchups: the opponent's rank at allowing this stat, 1 = allows the most; and the player's record vs this opponent.
 function matchupTable(d, ids) {
   if (!ids.length) return `<div class="empty">No prop here faces a defense in the softest (or, for an under, toughest) fifth for its stat.</div>`;
   return `<div class="tbl"><table class="every"><thead><tr><th>Player</th><th>Bet</th><th>Opponent</th><th>Allows</th><th>Per game</th><th>Vs this opponent</th><th>L10</th><th>Best price</th><th>Fair</th><th>EV</th></tr></thead><tbody>${
     ids.map(i => { const r = d.rows[i], c = r.check || {}, mu = r.matchup || {}, onesided = c.verdict === "one_sided_fair";
-      return `<tr><td><span class="ep">${img(src(r.headshot_src, r.headshot_url), "mini")}${esc(r.player)}${r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}</span></td><td>${esc(betText(r))}</td><td><span class="tm">${img(src(r.opponent_logo_src, r.opponent_logo))}${esc(mu.opponent || r.opponent || "")}</span></td><td class="n">${mu.nth_most ? `<b>${ordinal(mu.nth_most)}</b> most of ${mu.of}` : "–"}</td><td class="n">${typeof mu.per_game === "number" ? mu.per_game.toFixed(1) : "–"}</td><td class="n">${vsText(r)}</td><td class="n">${c.form10 && c.form10.games ? c.form10.hits + "/" + c.form10.games : "–"}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</td></tr>`; }).join("")}</tbody></table></div>`;
+      return `<tr data-ri="${i}"><td><span class="ep">${img(src(r.headshot_src, r.headshot_url), "mini")}${esc(r.player)}${r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}</span></td><td>${esc(betText(r))}</td><td><span class="tm">${img(src(r.opponent_logo_src, r.opponent_logo))}${esc(mu.opponent || r.opponent || "")}</span></td><td class="n">${mu.nth_most ? `<b>${ordinal(mu.nth_most)}</b> most of ${mu.of}` : "–"}</td><td class="n">${typeof mu.per_game === "number" ? mu.per_game.toFixed(1) : "–"}</td><td class="n">${vsText(r)}</td><td class="n">${c.form10 && c.form10.games ? c.form10.hits + "/" + c.form10.games : "–"}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</td></tr>`; }).join("")}</tbody></table></div>`;
 }
 const exportBtn = name => `<button type="button" class="btn no-export" data-export="${esc(name)}">Export image</button>`;
 function sectionShell(key, title, blurb, count, inner) {
@@ -299,7 +313,7 @@ function sectionShell(key, title, blurb, count, inner) {
 function shopTable(d, ids) {
   if (!ids.length) return `<div class="empty">No line with three or more books and a gap of 2 points or more.</div>`;
   return `<div class="tbl"><table><thead><tr><th>Player</th><th>Bet</th><th>Best book</th><th>Books</th><th>Best implied</th><th>Median implied</th><th>Given away</th></tr></thead><tbody>${
-    ids.map(i => { const r = d.rows[i], s = r.shop; return `<tr><td>${esc(r.player)}</td><td>${esc(betText(r))}</td><td>${esc(s.best_book)}</td><td class="n">${s.books}</td><td class="n">${pct(s.best_implied)}</td><td class="n">${pct(s.median_implied)}</td><td class="n">${s.gap_pp.toFixed(1)} pts</td></tr>`; }).join("")}</tbody></table></div>`;
+    ids.map(i => { const r = d.rows[i], s = r.shop; return `<tr data-ri="${i}"><td>${esc(r.player)}</td><td>${esc(betText(r))}</td><td>${esc(s.best_book)}</td><td class="n">${s.books}</td><td class="n">${pct(s.best_implied)}</td><td class="n">${pct(s.median_implied)}</td><td class="n">${s.gap_pp.toFixed(1)} pts</td></tr>`; }).join("")}</tbody></table></div>`;
 }
 const LINE_MARKET = {spreads: "Spread", h2h: "Moneyline", totals: "Total"};
 function lineBet(g) {
@@ -318,7 +332,7 @@ function linesTable(d, ids, withGame) {
   const games = Object.fromEntries((d.games || []).map(g => [g.event_id, g]));
   return `<div class="tbl"><table class="every"><thead><tr>${withGame ? "<th>Game</th>" : ""}<th>Market</th><th>Bet</th><th>Best price</th><th>Implies</th><th>Fair</th><th>EV</th><th>Model</th><th>Sim</th><th>Read</th></tr></thead><tbody>${
     ids.map(i => { const g = d.game_lines[i], c = g.check || {}, gm = games[g.event_id] || {};
-      return `<tr>${withGame ? `<td><span class="ep">${img(src(gm.away_logo_src, gm.away_logo), "mini")}${img(src(gm.home_logo_src, gm.home_logo), "mini")}<span class="kick">${esc(gm.kickoff_ct || "")}</span></span></td>` : ""}<td>${LINE_MARKET[g.market] || esc(g.market)}</td><td><b>${lineBet(g)}</b></td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")} · ${g.books_quoting} bks</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${c.verdict === "one_sided_fair" ? "one-sided" : pct(c.p_market)}</td><td class="n"><span class="ev ${c.ev_market > 0 ? "pos" : "neg"}">${c.verdict === "one_sided_fair" ? "–" : evs(c.ev_market)}</span></td><td class="n">${pct(c.p_model)}</td><td class="n">${lineSim(g)}</td><td><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span></td></tr>`; }).join("")}</tbody></table></div>`;
+      return `<tr data-li="${i}">${withGame ? `<td><span class="ep">${img(src(gm.away_logo_src, gm.away_logo), "mini")}${img(src(gm.home_logo_src, gm.home_logo), "mini")}<span class="kick">${esc(gm.kickoff_ct || "")}</span></span></td>` : ""}<td>${LINE_MARKET[g.market] || esc(g.market)}</td><td><b>${lineBet(g)}</b></td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")} · ${g.books_quoting} bks</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${c.verdict === "one_sided_fair" ? "one-sided" : pct(c.p_market)}</td><td class="n"><span class="ev ${c.ev_market > 0 ? "pos" : "neg"}">${c.verdict === "one_sided_fair" ? "–" : evs(c.ev_market)}</span></td><td class="n">${pct(c.p_model)}</td><td class="n">${lineSim(g)}</td><td><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span></td></tr>`; }).join("")}</tbody></table></div>`;
 }
 // "Every prop on the board" sorts on any column (user 2026-10-15: "ability to sort columns, esp the L5 and L10 so we
 // can see the highest hit rates across everything"). A hit rate needs its sample: a row with fewer than 5 (L5) / 8
@@ -359,7 +373,7 @@ function everyTable(d, ids) {
   }).join("");
   return `<div class="tbl"><table class="every"><thead><tr>${head}</tr></thead><tbody>${
     sortedIds(d, ids, sort).map(i => { const r = d.rows[i], c = r.check || {}, onesided = c.verdict === "one_sided_fair";
-      return `<tr><td><span class="ep">${img(src(r.headshot_src, r.headshot_url), "mini")}${esc(r.player)}${r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}</span></td><td>${esc(betText(r))}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n"><span class="ev ${!onesided && c.ev_market > 0 ? "pos" : "neg"}">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</span></td><td class="n">${pct(c.p_model)}</td><td class="n">${f(c.form5)}</td><td class="n">${f(c.form10)}</td><td><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span></td></tr>`; }).join("")}</tbody></table></div>`;
+      return `<tr data-ri="${i}"><td><span class="ep">${img(src(r.headshot_src, r.headshot_url), "mini")}${esc(r.player)}${r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}</span></td><td>${esc(betText(r))}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n"><span class="ev ${!onesided && c.ev_market > 0 ? "pos" : "neg"}">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</span></td><td class="n">${pct(c.p_model)}</td><td class="n">${f(c.form5)}</td><td class="n">${f(c.form10)}</td><td><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span></td></tr>`; }).join("")}</tbody></table></div>`;
 }
 const matchupLine = g => `${img(src(g.away_logo_src, g.away_logo))}${esc(g.away_team || "")} @ ${img(src(g.home_logo_src, g.home_logo))}${esc(g.home_team || g.matchup || "")}`;
 function gamesBlock(d, games) {
@@ -405,6 +419,7 @@ function gameHref(id) {
   const q = new URLSearchParams();
   if (META.date && META.date !== META.today) q.set("date", META.date);
   q.set("sport", STATE.sport); if (id) q.set("game", id);
+  if (STATE.view === "reconciled") q.set("view", "reconciled");
   return "?" + q.toString();
 }
 function sectionsFor(d) {
@@ -427,7 +442,7 @@ function render() {
   html += SECTIONS.map(([key, title, blurb]) => {
     const ids = secs[key] || [];
     if (!ids.length && key !== "value") return "";
-    return sectionShell(key, title, blurb, `${ids.length} rows`, `<div class="rowlist">${ids.length ? ids.map(i => propRow(d.rows[i])).join("") : `<div class="empty">Nothing qualifies on this ${game ? "game" : "slate"}.</div>`}</div>`);
+    return sectionShell(key, title, blurb, `${ids.length} rows`, `<div class="rowlist">${ids.length ? ids.map(i => propRow(d.rows[i], i)).join("") : `<div class="empty">Nothing qualifies on this ${game ? "game" : "slate"}.</div>`}</div>`);
   }).join("");
   if ((secs.consistency || []).length) html += sectionShell("consistency", "Consistency: recent hit rates", "Every prop with a full 10-game sample that cleared its line 70% of the time or more, with the trend (last 5 against last 10). We tested consistency across NFL, NBA and MLB: the price already accounts for it, so read the EV column, not the streak.", `${secs.consistency.length} props`, consistencyTable(d, secs.consistency));
   if ((secs.matchup_spots || []).length) html += sectionShell("matchups", "Matchups: where the defense gives it up", "Overs facing a defense in the softest fifth at allowing that stat, unders facing the toughest fifth, and players who have cleared this exact line in two-thirds or more of their games against this opponent. Matchups are mostly priced in too -- context next to the price, not a pick.", `${secs.matchup_spots.length} props`, matchupTable(d, secs.matchup_spots));
@@ -450,7 +465,70 @@ function render() {
   if ((secs.shop_gaps || []).length) html += sectionShell("shop", "Price shopping", "Same line, same side: what betting the median book gives away against the best one.", "", shopTable(d, secs.shop_gaps));
   html += gamesBlock(d, game ? [game] : (d.games || []));
   if (!game) html += newsBlock(d);
-  document.getElementById("sheet").innerHTML = html;
+  const rec = reconciledView(d);
+  document.getElementById("viewbar").innerHTML = viewbar(d);
+  document.getElementById("sheet").innerHTML = (rec ? recordBar(d, secs, lineSecs, game) : "") + html;
+  if (rec) applyResults();
+}
+// ---- Reconciled view (user 2026-10-15: "toggles between pregame sheets and reconciled sheets"). The sheet is never
+// changed: `<sport>/<date>.reconciled.json` (scripts/reconcile_cheat_sheets.py, production's grader) puts a result on
+// each bet, and this pass adds a Result column, a won/lost edge and a record to each section. 1 unit a bet at the
+// sheet's best price.
+const reconciledView = d => STATE.view === "reconciled" && !!(d && d.reconciled);
+const unitsText = u => u == null ? "" : (u > 0 ? "+" : "") + u.toFixed(2) + "u";
+function resCell(res) {
+  if (!res) return `<span class="res p" title="No result: a push, a void (did not play), or not final yet">–</span>`;
+  return res.y === 1 ? `<span class="res w">✓ Won ${unitsText(res.units)}</span>` : res.y === 0 ? `<span class="res l">✗ Lost ${unitsText(res.units)}</span>` : `<span class="res p">Push</span>`;
+}
+function recordOf(results) {
+  let w = 0, l = 0, u = 0;
+  for (const r of results) { if (!r) continue; if (r.y === 1) { w++; u += r.units || 0; } else if (r.y === 0) { l++; u -= 1; } }
+  return {w, l, u};
+}
+function recChip(rec) {
+  if (!rec.w && !rec.l) return `<span class="rec none">No results yet</span>`;
+  return `<span class="rec ${rec.u < 0 ? "neg" : ""}">${rec.w}-${rec.l} · ${unitsText(rec.u)}</span>`;
+}
+// Both-sided lists (every prop, price shopping) hold the over AND the under: a record there is the vig, not a read.
+const NO_RECORD = new Set(["every", "shop"]);
+function applyResults() {
+  const d = DATA[STATE.sport];
+  if (!reconciledView(d)) return;
+  document.querySelectorAll("#sheet section.sheet").forEach(sec => {
+    const items = [...sec.querySelectorAll("[data-ri],[data-li]")];
+    if (!items.length) return;
+    sec.querySelectorAll("table thead tr").forEach(hr => { if (!hr.querySelector(".resh")) hr.insertAdjacentHTML("beforeend", `<th class="resh">Result</th>`); });
+    const seen = new Set(), results = [];
+    items.forEach(el => {
+      const isLine = el.dataset.li != null, idx = +(isLine ? el.dataset.li : el.dataset.ri);
+      const res = ((isLine ? d.game_lines : d.rows)[idx] || {}).result;
+      const key = (isLine ? "l" : "r") + idx;
+      if (!seen.has(key)) { seen.add(key); results.push(res); }
+      el.classList.toggle("rw", !!res && res.y === 1); el.classList.toggle("rl", !!res && res.y === 0);
+      if (el.tagName === "TR") { if (!el.querySelector("td.resd")) el.insertAdjacentHTML("beforeend", `<td class="n resd">${resCell(res)}</td>`); }
+      else { const l1 = el.querySelector(".line1"); if (l1 && !l1.querySelector(".res")) l1.insertAdjacentHTML("beforeend", resCell(res)); }
+    });
+    const head = sec.querySelector("header");
+    if (head && !NO_RECORD.has(sec.dataset.section) && !head.querySelector(".rec")) {
+      const cnt = head.querySelector(".count");
+      (cnt || head.querySelector("p") || head).insertAdjacentHTML("afterend", recChip(recordOf(results)));
+    }
+  });
+}
+function recordBar(d, secs, lineSecs, game) {
+  const rows = ids => (ids || []).map(i => (d.rows[i] || {}).result), lines = ids => (ids || []).map(i => (d.game_lines[i] || {}).result);
+  const items = [["Value", rows(secs.value)], ["Hot streaks", rows(secs.hot_streaks)], ["Hot form", rows(secs.hot_form)],
+    ["Consistency", rows(secs.consistency)], ["Matchups", rows(secs.matchup_spots)],
+    ["Game lines: value", lines(game ? null : lineSecs.value)]].filter(([, r]) => r.length);
+  const c = d.reconciled.counts || {};
+  return `<section class="sheet recbar" data-section="record" data-title="Reconciled"><header><h2>Reconciled: how the ${game ? "game's" : "sheet's"} picks did</h2>${exportBtn("record")}</header>
+    <div class="items">${items.map(([label, r]) => `<span class="it">${esc(label)} ${recChip(recordOf(r))}</span>`).join("") || `<span class="vnote">No featured picks on this ${game ? "game" : "sheet"}.</span>`}</div>
+    <p>Graded ${c.props_graded ?? 0} of ${c.props ?? 0} props${c.lines ? ` and ${c.lines_graded ?? 0} of ${c.lines} game lines` : ""} by Syndicate's settlement from final box scores, ${esc(ctDateTime(d.reconciled.reconciled_at))}. 1 unit a bet at the sheet's best price. A push, a void (did not play) or a game not yet final shows "–".</p></section>`;
+}
+function viewbar(d) {
+  if (!d || !d.reconciled) return META.date && META.today && META.date < META.today ? `<span class="vnote">Results not reconciled yet.</span>` : "";
+  const on = STATE.view === "reconciled";
+  return `<button type="button" class="btn ${on ? "" : "on"}" data-view="pregame" aria-pressed="${!on}">Pregame sheet</button><button type="button" class="btn ${on ? "on" : ""}" data-view="reconciled" aria-pressed="${on}">Reconciled</button>`;
 }
 function go(sport, game, push) {
   STATE.sport = sport; STATE.game = game || null;
@@ -465,6 +543,7 @@ function sortBy(th) {
   const section = th.closest("section.sheet"), d = DATA[STATE.sport];
   const ids = STATE.game ? (((d.game_sections || {})[STATE.game] || {}).every_prop || []) : ((d.sections || {}).every_prop || []);
   section.querySelector(".tbl").outerHTML = everyTable(d, ids);
+  applyResults();
 }
 document.addEventListener("keydown", ev => { const th = ev.target.closest && ev.target.closest("th[data-sort]"); if (th && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); sortBy(th); } });
 document.addEventListener("click", ev => {
@@ -472,6 +551,8 @@ document.addEventListener("click", ev => {
   if (th) { sortBy(th); return; }
   const g = ev.target.closest("[data-game]");
   if (g && !ev.metaKey && !ev.ctrlKey) { ev.preventDefault(); go(STATE.sport, g.dataset.game, true); return; }
+  const v = ev.target.closest("[data-view]");
+  if (v) { STATE.view = v.dataset.view; if (META.mode === "app") { try { history.replaceState({sport: STATE.sport, game: STATE.game}, "", gameHref(STATE.game)); } catch (e) {} } render(); return; }
   const x = ev.target.closest("[data-export]");
   if (x) { ev.preventDefault(); exportSection(x); }
 });
@@ -515,7 +596,7 @@ async function buildExport(section) {
   frame.innerHTML = `<div class="xhead"><img src="${esc(LOGO_SRC)}" alt=""><div><div class="w1 slant">Syndicate ROI</div><div class="w2 slant">${esc(SPORT_NAMES[STATE.sport] || STATE.sport)} cheat sheet</div></div>
       <div class="xday"><b>${esc(dayName(META.date || d.date))}</b>${game ? `<span class="xgame">${matchupLine(game)}</span>` : ""}</div></div>
     <div class="xbody"></div>
-    <div class="xfoot"><span>Prices as of ${esc(ctTime(d.generated_at))} · lines move</span><span class="x">@SyndicateROI</span><span>21+ · Bet responsibly</span></div>`;
+    <div class="xfoot"><span>${reconciledView(d) ? `Reconciled · results from final box scores · prices as of ${esc(ctTime(d.generated_at))}` : `Prices as of ${esc(ctTime(d.generated_at))} · lines move`}</span><span class="x">@SyndicateROI</span><span>21+ · Bet responsibly</span></div>`;
   const body = section.cloneNode(true);
   body.querySelectorAll(".no-export").forEach(n => n.remove());
   body.querySelectorAll(".rowlist").forEach(list => [...list.children].slice(10).forEach(n => n.remove()));
@@ -560,7 +641,7 @@ async function exportSection(btn) {
     // Today first, then tomorrow, then the records newest first (user 2026-10-15: "today should be first, then tomorrow").
     const order = [META.today, ...META.dates.filter(x => x > META.today).sort(), ...META.dates.filter(x => x < META.today)];
     document.getElementById("days").innerHTML = order.slice(0, 8).map(day =>
-      `<a class="btn ${day === META.date ? "on" : ""}" href="${day === META.today ? "?" : "?date=" + day}">${day === META.today ? "Today" : day > META.today ? "Tomorrow" : esc(dayShort(day))}</a>`).join("");
+      `<a class="btn ${day === META.date ? "on" : ""}" href="${day === META.today ? (STATE.view === "reconciled" ? "?view=reconciled" : "?") : "?date=" + day + (STATE.view === "reconciled" ? "&view=reconciled" : "")}">${day === META.today ? "Today" : day > META.today ? "Tomorrow" : esc(dayShort(day))}</a>`).join("");
   }
   document.getElementById("tabs").innerHTML = sports.map(s => `<button class="tab" role="tab" data-sport="${s}">${SPORT_NAMES[s] || s}</button>`).join("");
   document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => go(t.dataset.sport, null, true)));

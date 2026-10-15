@@ -166,3 +166,23 @@ def test_tomorrow_is_offered_as_an_early_look_and_game_lines_reach_the_page(http
     assert meta["dates"] == ["2026-10-15", TODAY]                              # tomorrow is offered
     nfl = _js(client.get("/cheatsheets?date=2026-10-15").data.decode(), "DATA")["nfl"]   # a lines-only sheet still shows
     assert nfl["game_line_sections"]["value"] == [0] and nfl["game_line_sections_by_game"]["e1"]["all"] == [0, 1]
+
+
+def test_a_reconciled_day_serves_each_bets_result_and_the_toggle(http):
+    # User 2026-10-15: "a button that toggles between pregame sheets and reconciled sheets". The page reads the file
+    # the reconcile script wrote; with none, the sheet is served exactly as published.
+    client, root = http
+    doc = _sheet(day="2026-10-13")
+    _write(root, doc)
+    page = client.get("/cheatsheets?date=2026-10-13").get_data(as_text=True)
+    assert "result" not in _js(page, "DATA")["nfl"]["rows"][0]
+    rec = {"sport": "nfl", "date": "2026-10-13", "reconciled_at": "2026-10-14T13:00:00+00:00", "source": "test",
+           "props": {cs.prop_result_key(doc["rows"][0]): {"y": 1.0}}, "lines": {},
+           "counts": {"props": 3, "props_graded": 1, "lines": 0, "lines_graded": 0}}
+    (root / "cheatsheets" / "nfl" / "2026-10-13.reconciled.json").write_text(json.dumps(rec), encoding="utf-8")
+    page = client.get("/cheatsheets?date=2026-10-13&view=reconciled").get_data(as_text=True)
+    data = _js(page, "DATA")["nfl"]
+    assert data["rows"][0]["result"] == {"y": 1.0, "units": round(100 / 139, 3)}             # 1 unit at -139
+    assert data["rows"][1]["result"] is None and data["reconciled"]["counts"]["props_graded"] == 1
+    assert 'id="viewbar"' in page and 'data-view="reconciled"' in page and "function applyResults" in page
+    assert _js(page, "META")["dates"] == ["2026-10-14", "2026-10-13"]                       # the results file is not a date

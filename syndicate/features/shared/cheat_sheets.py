@@ -599,6 +599,38 @@ SPORT_ORDER = ("nfl", "ncaaf", "nba", "nhl", "soccer", "ncaab", "wnba", "mlb")
 _ROW_DROP = ("book_prices", "evidence_error")
 
 
+def _line_text(line: Any) -> str:
+    try:
+        return f"{float(line):g}"
+    except (TypeError, ValueError):
+        return ""
+
+
+def prop_result_key(row: Mapping[str, Any]) -> str:
+    """A sheet prop's key in `<sport>/<date>.reconciled.json` -- the production grader's own match key
+    (`grade_play_cards.match_key`: player_key, market and side lower-cased, line as a number), as text."""
+    from syndicate.features.shared.basketball_props_availability import player_key
+
+    return "|".join((player_key(row.get("player")), str(row.get("market") or "").strip().lower(),
+                     str(row.get("side") or "").strip().lower(), _line_text(row.get("line"))))
+
+
+def line_result_key(line: Mapping[str, Any]) -> str:
+    """A game line's key in the reconciled file: the event, market, side (home/away/over/under) and line."""
+    return "|".join((str(line.get("event_id") or ""), str(line.get("market") or "").strip().lower(),
+                     str(line.get("side") or "").strip().lower(), _line_text(line.get("line"))))
+
+
+def result_for(price: Any, graded: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """{y, units}: 1 unit at the sheet's best price -- a win pays the price, a loss costs the unit."""
+    if not graded or graded.get("y") is None:
+        return None
+    y = float(graded["y"])
+    dec = decimal_odds(price)
+    units = (round(dec - 1, 3) if dec else None) if y == 1 else (-1.0 if y == 0 else 0.0)
+    return {"y": y, "units": units}
+
+
 def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
     """sport -> the sheet as the page shows it, sports in board order.
 
@@ -610,11 +642,19 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
     out: dict[str, dict[str, Any]] = {}
     for sheet in sorted(sheets, key=lambda d: SPORT_ORDER.index(d["sport"]) if d.get("sport") in SPORT_ORDER else 99):
         sport, day = str(sheet.get("sport")), str(sheet.get("date"))
+        # The reconciled file (scripts/reconcile_cheat_sheets.py) rides in on the sheet; each row and line takes its
+        # result, and the page keeps only the summary (user 2026-10-15: "toggles between pregame sheets and
+        # reconciled sheets").
+        rec = sheet.get("reconciled") if isinstance(sheet.get("reconciled"), Mapping) else None
+        graded_props = (rec or {}).get("props") or {}
+        graded_lines = (rec or {}).get("lines") or {}
         rows = []
         for r in sheet.get("rows") or []:
             row = {k: v for k, v in r.items() if k not in _ROW_DROP}
             row["card_id"] = pc.card_id(sport, day, r)
             row["card_ok"] = pc.eligible(r)
+            if rec is not None:
+                row["result"] = result_for((r.get("check") or {}).get("price"), graded_props.get(prop_result_key(r)))
             rows.append(row)
         by_game: dict[Any, list[int]] = {}
         for i, r in enumerate(rows):
@@ -624,6 +664,10 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
         doc["sections"] = sections(rows)
         doc["games"] = [dict(g, props=len(by_game.get(g.get("event_id"), []))) for g in sheet.get("games") or []]
         lines = list(sheet.get("game_lines") or [])
+        if rec is not None:
+            lines = [dict(line, result=result_for((line.get("check") or {}).get("price"), graded_lines.get(line_result_key(line))))
+                     for line in lines]
+            doc["reconciled"] = {k: rec.get(k) for k in ("reconciled_at", "source", "counts")}
         lines_by_game: dict[Any, list[int]] = {}
         for i, line in enumerate(lines):
             lines_by_game.setdefault(line.get("event_id"), []).append(i)
