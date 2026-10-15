@@ -994,6 +994,14 @@ death, never life — do not invert it.
 - Verification: Per sport off the served board with the row cap defeated: rows, segment rows, refusable by the 09-06 predicate, and of those the displayable and servable counts, each with its denominator; plus the fan-in segment_mismatch_detected per tick as a second instrument.
 - Blocked by: none
 
+### mlb-pitcher-recent-form — OPEN — opened 2026-10-15 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: MLB pitcher props on the Layer 2 board (markets strikeouts / outs / walks_allowed / hits_allowed / earned_runs) carry recent form -- recent_values on the card and the Recent form sentence -- read off the served board
+- Files: syndicate/features/intelligence_recent_matchup.py (the MLB pitcher market alias in mlb_prop_recent_matchup_text ONLY), tests/test_intelligence_recent_matchup.py (the board-name pitcher test ONLY)
+- Hypothesis: The board names MLB pitcher markets bare while _MLB_PITCHER_STAT keys them pitcher_*, so is_pitcher is False and no column matches: 0 of 11 pitcher cards carried recent_values on 2026-10-15
+- Falsification test: After the alias, pitcher cards on the served board still carry no recent_values while their players have starts in the pitcher log
+- Verification: Served board after reload: count MLB pitcher prop cards with recent_values (was 0 of 11); a sample card's Recent form sentence matches the pitcher log
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

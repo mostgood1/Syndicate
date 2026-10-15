@@ -134,6 +134,22 @@ def test_mlb_pitcher_gets_recent_form_from_starts(tmp_path, monkeypatch):
     assert text == "Recent form: over 5.5 in 1 of the last 2 logged games (avg 5.5; log since 2026-09-20)."
 
 
+def test_mlb_pitcher_props_by_the_boards_own_market_names_get_recent_form(tmp_path, monkeypatch):
+    # The board names pitcher markets BARE ("strikeouts", "outs", ...). The test above used the provider's own
+    # "pitcher_strikeouts" and passed while 0 of the board's 11 pitcher props got recent form (2026-10-15).
+    _mlb_root(tmp_path, monkeypatch)
+    base = {"kind": "prop", "sport": "mlb", "side": "over", "player_name": "Nick Martinez",
+            "home_team": "New York Yankees", "away_team": "Tampa Bay Rays", "projection": {"player_id": "607259"}}
+    for market, line, expect in (("strikeouts", 5.5, "over 5.5 in 1 of the last 2 logged games (avg 5.5;"),
+                                 ("outs", 16.5, "over 16.5 in 1 of the last 2 logged games (avg 16.5;"),
+                                 ("walks_allowed", 1.5, "over 1.5 in 1 of the last 2 logged games (avg 1.5;"),
+                                 ("hits_allowed", 4.5, "over 4.5 in 2 of the last 2 logged games (avg 5.5;"),
+                                 ("earned_runs", 2.5, "over 2.5 in 1 of the last 2 logged games (avg 2.5;")):
+        row = dict(base, market=market, line=line)
+        assert expect in (rm.mlb_prop_recent_matchup_text(row, selected_date="2026-10-07") or ""), market
+        assert rm.recent_values_for(row)["values"][0] is not None, market        # the card's chart gets its games
+
+
 def test_mlb_first_meeting_and_missing_id(tmp_path, monkeypatch):
     _mlb_root(tmp_path, monkeypatch)
     row = {"kind": "prop", "sport": "mlb", "market": "batter_hits", "line": 0.5, "side": "over", "player_name": "X",

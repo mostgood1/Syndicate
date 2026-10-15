@@ -160,6 +160,15 @@ _MLB_PITCHER_STAT = {
     "pitcher_strikeouts": ("k",), "pitcher_outs": ("outs",), "pitcher_hits_allowed": ("h",),
     "pitcher_earned_runs": ("er",), "pitcher_walks": ("bb",),
 }
+# The Layer 2 board names MLB pitcher markets BARE. Without these, a pitcher prop
+# was read as a batter's (`is_pitcher` False, no column): measured 2026-10-15,
+# 0 of the board's 11 pitcher props carried recent form while every batter
+# market matched (lane mlb-pitcher-recent-form, user "fix the pitcher market
+# naming on the board too").
+_MLB_MARKET_ALIASES = {
+    "strikeouts": "pitcher_strikeouts", "outs": "pitcher_outs", "hits_allowed": "pitcher_hits_allowed",
+    "earned_runs": "pitcher_earned_runs", "walks_allowed": "pitcher_walks",
+}
 _MLB_LAST_N = 10
 
 
@@ -337,6 +346,7 @@ def mlb_prop_recent_matchup_text(row: Mapping[str, Any], *, selected_date: str) 
     """MLB prop: recent form from the game log + batter-vs-starter (career). Never raises."""
     try:
         market = str(row.get("market") or "").strip().lower()
+        market = _MLB_MARKET_ALIASES.get(market, market)
         projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
         player_id = str(projection.get("player_id") or row.get("player_id") or "").strip()
         if not player_id:
