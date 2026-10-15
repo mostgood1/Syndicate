@@ -48,8 +48,22 @@ ONLY ONE PUCKLINE IS PRICED. `p_home_pl_-1.5` and `p_away_pl_+1.5` are exact
 complements (0.18635 / 0.81365 on 2026-09-26) -- the same bet stated twice, not
 two lines. P(home covers +1.5) needs the probability of losing by exactly one
 goal, which this artifact does not carry. So a puckline probability is published
-at the home -1.5 line and nowhere else; the projected margin still goes out on
-every spread row.
+on the home -1.5 / away +1.5 market and nowhere else; the projected margin still
+goes out on every spread row.
+
+THE ROW'S `line` IS THE AWAY TEAM'S POINT, NOT THE HOME TEAM'S
+`[2026-10-15, lane nhl-puckline-orientation]`. `book_grid._canonical_line`
+(`#262`) states every spreads row from the away side, so home -1.5 / away +1.5
+arrives as `line = +1.5`, and `line = -1.5` is the OTHER market, away -1.5 /
+home +1.5. This module used to match `line == -1.5`, which put P(home -1.5) on
+the away -1.5 market framed on home: the board then served P(home -1.5) on home
++1.5 and its complement P(away +1.5) on away -1.5. Measured by lane
+`sim-gap-ev-study` on 42 rows over 21 games (09-30..10-14), all of them
+away-favoured: sim(away -1.5) 0.764 against the sim's OWN away moneyline 0.543,
+higher in 21 of 21 games -- impossible, since winning by two implies winning.
+The market hockeysim actually prices was refused on every game. Every other
+spreads producer prices "home covers when margin > L" in this frame; this was
+the only one that hard-coded a line.
 
 SKILL IS UNMEASURED, AND THAT IS SAID RATHER THAN IMPLIED. Unlike NCAAF's model,
 which is measured as LOSING to the close, hockeysim has no powered market
@@ -149,9 +163,11 @@ class NhlGameProjectionEntry:
             p_home_ml=None if self.p_home_ml is None else 1.0 - self.p_home_ml,
             model_total=self.model_total,
             model_spread=None if self.model_spread is None else -self.model_spread,
-            # The away side of a home -1.5 puckline is NOT the complement of
-            # this number (see the module docstring), so it is dropped rather
-            # than converted. A wrong puckline is worse than no puckline.
+            # hockeysim's home is the board's AWAY here, so this number is
+            # P(board away -1.5), and the board's home -1.5 is not its
+            # complement (see the module docstring). Spreads are framed on the
+            # board's home, so it is dropped rather than re-framed. A wrong
+            # puckline is worse than no puckline.
             p_home_pl_minus_1_5=None,
             p_over=self.p_over,
             totals_line_used=self.totals_line_used,
@@ -296,14 +312,34 @@ def _game_projection(
             "model_prob_over": None,
         }
         if line is not None:
+            # `line` is the AWAY point, so home covers when margin > line and
+            # this is the home side's projected cover margin.
             projection["edge_vs_line"] = round(entry.model_spread - line, 3)
-        if line is not None and abs(line + PUCKLINE) <= 1e-9 and entry.p_home_pl_minus_1_5 is not None:
-            # home -1.5, the one puckline this artifact prices.
-            projection["model_prob_over"] = round(entry.p_home_pl_minus_1_5, 4)
+        if line is not None and abs(line - PUCKLINE) <= 1e-9:
+            # Away +1.5 is home -1.5: the one puckline this artifact prices. The
+            # board serves the away leg 1 - p, which IS `p_away_pl_+1.5`.
+            if entry.p_home_pl_minus_1_5 is not None:
+                projection["model_prob_over"] = round(entry.p_home_pl_minus_1_5, 4)
+            elif entry.orientation_flipped:
+                projection["probability_unavailable_reason"] = (
+                    "no cover probability at home -1.5 / away +1.5: the board's home is hockeysim's away, "
+                    "and hockeysim prices only its own home -1.5"
+                )
+            else:
+                projection["probability_unavailable_reason"] = (
+                    "no cover probability at home -1.5 / away +1.5: hockeysim wrote no p_home_pl_-1.5 for this game"
+                )
+        elif line is not None and abs(line + PUCKLINE) <= 1e-9:
+            projection["probability_unavailable_reason"] = (
+                "no cover probability at away -1.5 / home +1.5: hockeysim prices only the home -1.5 "
+                "puckline, and P(away wins by 2+) needs P(away wins by exactly 1), which it does not carry"
+            )
+        elif line is None:
+            projection["probability_unavailable_reason"] = "no cover probability: the row carries no line"
         else:
             projection["probability_unavailable_reason"] = (
-                "no cover probability at " + str(line) + ": hockeysim prices only the home -1.5 "
-                "puckline, and its away +1.5 column is that same bet restated, not a second line"
+                "no cover probability at away " + str(line) + ": hockeysim prices only the home -1.5 "
+                "puckline, not alternate lines"
             )
         return projection
 

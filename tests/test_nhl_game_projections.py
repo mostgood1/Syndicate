@@ -15,7 +15,11 @@ THE THREE REFUSALS, each from a measured property of the real artifact:
      `totals_line_used`; at any other number it answers a different question.
   3. A puckline anywhere but home -1.5. `p_home_pl_-1.5` and `p_away_pl_+1.5`
      are exact complements -- the same bet stated twice -- so P(home covers
-     +1.5) is simply not in this artifact.
+     +1.5) is simply not in this artifact. A spreads row's `line` is the AWAY
+     point (`book_grid._canonical_line`, `#262`), so home -1.5 is the row at
+     `line = +1.5`. Reading it as the home point put P(away +1.5) on the away
+     -1.5 leg: 0.764 against the sim's own away moneyline 0.543, higher in 21
+     of 21 away-favoured games (lane sim-gap-ev-study, 09-30..10-14).
 
 The live rule is NOT a fourth refusal here: `#340` is owned by the shared
 `live_edge_unavailable_reason`. A per-sport belt lived in this module on
@@ -143,14 +147,16 @@ def test_the_projected_total_is_published_at_every_line():
 
 def test_puckline_probability_only_at_home_minus_1_5():
     entry = _entry()
-    home_lay = gp._game_projection(_row("spreads", -1.5), "spreads", entry)
-    home_take = gp._game_projection(_row("spreads", 1.5), "spreads", entry)
+    # The row's line is the AWAY point: +1.5 is away +1.5 / home -1.5.
+    home_lay = gp._game_projection(_row("spreads", 1.5), "spreads", entry)
+    away_lay = gp._game_projection(_row("spreads", -1.5), "spreads", entry)
     assert home_lay["model_prob_over"] == pytest.approx(0.18635, abs=1e-4)
-    assert home_take["model_prob_over"] is None
-    assert "same bet restated" in home_take["probability_unavailable_reason"]
+    assert home_lay["side"] == "Nashville Predators", "framed on the home team"
+    assert away_lay["model_prob_over"] is None
+    assert "away -1.5 / home +1.5" in away_lay["probability_unavailable_reason"]
     # The projected margin still goes out on both.
     assert home_lay["projected"] == pytest.approx(-0.792, abs=1e-3)
-    assert home_take["projected"] == pytest.approx(-0.792, abs=1e-3)
+    assert away_lay["projected"] == pytest.approx(-0.792, abs=1e-3)
 
 
 def test_alternate_pucklines_get_no_probability():
@@ -158,6 +164,74 @@ def test_alternate_pucklines_get_no_probability():
     for line in (-2.5, 2.5, -5.5, -6.5):
         projection = gp._game_projection(_row("spreads", line), "spreads", entry)
         assert projection["model_prob_over"] is None, f"line {line} was priced"
+        assert "alternate lines" in projection["probability_unavailable_reason"]
+
+
+def test_a_flipped_game_prices_no_puckline_and_says_why():
+    """hockeysim's home -1.5 is the board's AWAY -1.5 here, and spreads are
+    framed on the board's home -- so it is refused, never re-framed."""
+    index = gp.NhlGameProjectionIndex(date="2026-09-26")
+    index.by_pair[("nashvillepredators", "carolinahurricanes")] = _entry()
+    flipped = index.lookup("Carolina Hurricanes", "Nashville Predators")
+    row = dict(_row("spreads", 1.5), home_team="Carolina Hurricanes", away_team="Nashville Predators")
+    projection = gp._game_projection(row, "spreads", flipped)
+    assert projection["model_prob_over"] is None
+    assert "hockeysim's away" in projection["probability_unavailable_reason"]
+
+
+def test_an_away_favourite_puckline_is_never_priced_above_its_moneyline():
+    """THE DEFECT, end to end through the REAL grid, join and board resolver.
+
+    CAR (away) is the -1.5 favourite at CHI. Books quote the main market
+    (away -1.5 / home +1.5) and the alternate (home -1.5 / away +1.5); the grid
+    files them under away-frame lines -1.5 and +1.5. Before the fix the board
+    served away -1.5 at 0.852 -- P(away +1.5) -- above the sim's own away
+    moneyline of 0.656, and the market hockeysim prices got nothing.
+    """
+    from datetime import datetime, timezone
+
+    from syndicate.features.shared import layer2_board as lb
+    from syndicate.features.shared.book_grid import build_book_grid
+
+    def quote(selection: str, line: float, price: int) -> dict:
+        return {
+            "sport": "nhl", "kind": "game", "event_id": "car-chi", "segment": "full",
+            "market": "spreads", "player_name": "", "selection": selection, "line": line,
+            "price": price, "bookmaker": "draftkings",
+            "home_team": "Chicago Blackhawks", "away_team": "Carolina Hurricanes",
+            "commence_time": FUTURE, "snapshot_ts": "2099-01-01T11:55:00Z",
+        }
+
+    grid = build_book_grid(
+        [
+            quote("away", -1.5, +150), quote("home", 1.5, -180),   # main
+            quote("home", -1.5, +330), quote("away", 1.5, -450),   # alternate
+        ],
+        now=datetime(2099, 1, 1, 12, tzinfo=timezone.utc),
+    )
+    index = gp.NhlGameProjectionIndex(date="2099-01-01")
+    index.by_pair[("chicagoblackhawks", "carolinahurricanes")] = _entry(
+        home="Chicago Blackhawks", away="Carolina Hurricanes",
+        p_home_ml=0.344, model_spread=-0.55, p_home_pl_minus_1_5=0.148,
+    )
+    coverage = gp.attach_nhl_game_projections(grid, index, selected_date="2099-01-01")
+    by_line = {float(row["line"]): row for row in grid}
+    assert set(by_line) == {-1.5, 1.5}
+    # The frame this test rests on: at away-frame -1.5 the AWAY team lays 1.5.
+    assert by_line[-1.5]["cells"]["draftkings"]["away"]["line"] == -1.5
+
+    main, alternate = by_line[-1.5], by_line[1.5]
+    # away -1.5 / home +1.5: hockeysim cannot price it, so neither leg gets a number.
+    assert lb._model_prob_for_side(main, "away") is None
+    assert lb._model_prob_for_side(main, "home") is None
+    assert main["projection"]["edge_vs_market_pct"] is None
+    # home -1.5 / away +1.5: exactly the artifact's two columns.
+    assert lb._model_prob_for_side(alternate, "home") == pytest.approx(0.148)
+    assert lb._model_prob_for_side(alternate, "away") == pytest.approx(0.852)
+    # Winning by two implies winning.
+    assert lb._model_prob_for_side(alternate, "home") <= 0.344
+    assert coverage["rows_with_probability"] == 1
+    assert coverage["probability_refusals"] == {"no cover probability at away -1.5 / home +1.5": 1}
 
 
 # --------------------------------------------------------------------------
@@ -267,7 +341,7 @@ def test_counters_separate_projected_from_priced():
     index.by_pair[("nashvillepredators", "carolinahurricanes")] = _entry(
         p_over=None, totals_line_used=None, anchor_state="no_market"
     )
-    grid = [_row("h2h"), _row("totals", 6.5), _row("spreads", -1.5)]
+    grid = [_row("h2h"), _row("totals", 6.5), _row("spreads", 1.5)]
     coverage = gp.attach_nhl_game_projections(grid, index, selected_date="2099-01-01")
     assert coverage["supported"] is True
     assert coverage["rows_with_projection"] == 3
