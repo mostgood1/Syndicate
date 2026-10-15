@@ -13,7 +13,7 @@ Same rules as state.md: when a fact changes, EDIT THE LINE.
   - One UCL game-odds capture returned 830 rows, 18 events and 9 US books (h2h 474, totals 216, spreads 140), and appended to the book_quotes tape. This was written into a scratch root, not into production.
   - Kalshi titles UEFA series in two styles, read from the public API: `KXUCLGAME` = "UEFA Champions League Game", but `KXUCLTOTAL` = "Champions League Total Goals". `KXUELGAME` and `KXUECLGAME` follow the same pattern.
 - **Why there is no sim:** team ratings are fit per domestic league and centred on that league's mean (`compute_team_ratings`). `_rating_for` returns a silent 0.0 for any club it cannot find. Stage 1 is `#699`.
-- **Not yet in production.** The code sits on branch `session/soccer-uefa-competitions` (`61415354`, `c5758e50`). Until it is landed and the fleet runs it, nothing UEFA is served.
+- **Not yet in production.** The code sits on branch `session/soccer-uefa-competitions` (`a0954c2e`, `44e546e8`). Until it is landed and the fleet runs it, nothing UEFA is served.
 
 ## [soccer-roster-only-players] SOCCER SIM SQUADS: ADDING ROSTER-ONLY PLAYERS (TEAM TOTALS FIXED) FAILED ITS PRE-REGISTERED TEST, AND THE ESPN ROSTERS ARE A JULY SEED `[measured 2026-10-06, lane soccer-roster-only-players, NOT SHIPPED]`
 
