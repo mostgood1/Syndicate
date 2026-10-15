@@ -3,36 +3,54 @@
 Read-only, like `model_scorecard.py`: every route returns what the generator already wrote to
 `<data root>/cheatsheets/<sport>/<date>.json`. The evidence behind a sheet costs 1-12 s per player on the
 fleet, so it is never built on a request (the web/worker split in CLAUDE.md); a missing sheet is a 404 that
-names what is missing, or an empty page, never an on-request rebuild.
+names what is missing, or an empty page, never an on-request rebuild. Images are the generator's cached copies.
 
-    /cheatsheets                      the branded page, newest sheet per sport (?date=YYYY-MM-DD for one day)
-    /api/cheatsheets                  which sports and dates exist
-    /api/cheatsheets/<sport>/<date>   one sheet as written
+    /cheatsheets                          TODAY's sheets (US Central); ?date= opens a past day's record,
+                                          ?sport= / ?game= open one sport / one game's own sheet
+    /cheatsheets/card/<sport>/<date>/<id> one pick's branded graphic (only rows whose price check passes)
+    /cheatsheets/img/<key>.webp           a cached headshot / logo
+    /api/cheatsheets                      which sports and dates exist
+    /api/cheatsheets/<sport>/<date>       one sheet as written
+    POST /api/cheatsheets/cards           a pick graphic was exported: append it to the graded play-card ledger
+
+A day's sheet is a record: games that started keep the rows the last build gave them (the generator merges).
 """
 
 from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from flask import Blueprint, Response, jsonify, render_template_string, request
+from flask import Blueprint, Response, jsonify, render_template_string, request, send_file
 
+from syndicate.features.shared import cheat_sheet_images as images
 from syndicate.features.shared import cheat_sheets as cs
+from syndicate.features.shared import play_cards as pc
 
 cheat_sheets_bp = Blueprint("cheat_sheets", __name__)
 
 _DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _SPORT = re.compile(r"^[a-z]{2,8}$")
+_CARD = re.compile(r"^[0-9a-f]{12}$")
 TEMPLATE = Path(__file__).resolve().parents[1] / "templates" / "cheat_sheets.html"
 LOGO_SRC = "/static/brand/syndicate_roi_badge.webp"
 
 
-def _sheet_dir() -> Path:
+def _data_root() -> Path:
     from syndicate.features.shared.refresh_state_store import data_root
 
-    return Path(data_root()) / "cheatsheets"
+    return Path(data_root())
+
+
+def _sheet_dir() -> Path:
+    return _data_root() / "cheatsheets"
+
+
+def _today() -> str:
+    return pc.central(datetime.now(timezone.utc)).date().isoformat()
 
 
 def _dates(sport: str) -> list[str]:
@@ -59,7 +77,7 @@ def _sports() -> list[str]:
 
 @cheat_sheets_bp.get("/api/cheatsheets")
 def cheat_sheets_index():
-    return jsonify({"ok": True, "sports": {s: _dates(s)[-14:] for s in _sports()}}), 200
+    return jsonify({"ok": True, "today": _today(), "sports": {s: _dates(s)[-14:] for s in _sports()}}), 200
 
 
 @cheat_sheets_bp.get("/api/cheatsheets/<sport>/<day>")
@@ -72,23 +90,39 @@ def cheat_sheet_one(sport: str, day: str):
     return jsonify(doc), 200
 
 
+@cheat_sheets_bp.get("/cheatsheets/img/<key>.webp")
+def cheat_sheet_image(key: str):
+    if not images.KEY_RE.match(key):
+        return jsonify({"ok": False, "error": "bad key"}), 400
+    path = images.cache_dir(_data_root()) / f"{key}.bin"
+    if not path.is_file() or not path.stat().st_size:
+        return jsonify({"ok": False, "error": "not cached"}), 404
+    head = path.read_bytes()[:4]
+    mime = "image/webp" if head == b"RIFF" else "image/png" if head == b"\x89PNG" else "image/jpeg"
+    response = send_file(path, mimetype=mime, max_age=7 * 86400)
+    return response
+
+
 @cheat_sheets_bp.get("/cheatsheets")
 def cheat_sheets_page():
-    day = str(request.args.get("date") or "").strip()
-    if day and not _DAY.match(day):
+    today = _today()
+    day = str(request.args.get("date") or "").strip() or today
+    if not _DAY.match(day):
         return jsonify({"ok": False, "error": "date must be YYYY-MM-DD"}), 400
-    sheets = []
+    sheets, dates = [], set()
     for sport in _sports():
-        dates = _dates(sport)
-        pick = day if day else (dates[-1] if dates else None)
-        doc = _read(sport, pick) if pick and pick in dates else None
-        if doc:
+        have = _dates(sport)
+        dates.update(have)
+        doc = _read(sport, day) if day in have else None
+        if doc and doc.get("rows"):
             sheets.append(doc)
     try:
         template = TEMPLATE.read_text(encoding="utf-8")
     except OSError:
         return jsonify({"ok": False, "error": "template missing"}), 500
-    page = cs.render_page(template, sheets, logo_src=LOGO_SRC)
+    meta = {"mode": "app", "date": day, "today": today, "beta": day < pc.OFFICIAL_START,
+            "dates": sorted({d for d in dates if d <= today} | {today}, reverse=True)[:14]}
+    page = cs.render_page(template, sheets, logo_src=LOGO_SRC, meta=meta)
     # The site menu, the same header every standalone page includes. The page template itself stays plain HTML so
     # `scripts/render_cheat_sheets.py` can render the identical page without Flask (the published artifact).
     page = page.replace("<!--__SITE_HEAD__-->", render_template_string(_SITE_HEAD), 1)
@@ -96,6 +130,89 @@ def cheat_sheets_page():
     return Response(page, mimetype="text/html")
 
 
+def _card_row(sport: str, day: str, card: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None, str]:
+    """(row, game, reason) -- the sheet row whose card id this is, re-derived from the sheet (never the client)."""
+    if not _SPORT.match(sport) or not _DAY.match(day) or not _CARD.match(card):
+        return None, None, "bad request"
+    doc = _read(sport, day)
+    if doc is None:
+        return None, None, "no sheet for that sport and day"
+    for r in doc.get("rows") or []:
+        if pc.card_id(sport, day, r) == card:
+            if not pc.eligible(r):
+                return None, None, "this pick's price does not clear the fair, so it gets no pick graphic"
+            game = next((g for g in doc.get("games") or [] if g.get("event_id") == r.get("event_id")), None)
+            return r, game, ""
+    return None, None, "no such pick on that sheet"
+
+
+def _local_images(row: dict[str, Any], game: dict[str, Any] | None) -> tuple[dict[str, Any], dict[str, Any]]:
+    """The card draws the generator's cached copies (same origin, so the PNG export can read them)."""
+    row = dict(row, headshot_url=row.get("headshot_card_src") or row.get("headshot_src") or row.get("headshot_url"),
+               team_logo=row.get("team_logo_src") or row.get("team_logo"))
+    if game:
+        game = dict(game, home_logo=game.get("home_logo_src") or game.get("home_logo"),
+                    away_logo=game.get("away_logo_src") or game.get("away_logo"))
+    return row, game
+
+
+@cheat_sheets_bp.get("/cheatsheets/card/<sport>/<day>/<card>")
+def cheat_sheet_card(sport: str, day: str, card: str):
+    row, game, reason = _card_row(sport, day, card)
+    if row is None:
+        return jsonify({"ok": False, "error": reason}), 404
+    row, game = _local_images(row, game)
+    number = pc.card_number(pc.read_ledger(pc.ledger_path(_data_root())), day, card)
+    fields = pc.card_fields(row, sport=sport, date=day, number=number, game=game)
+    html = pc.render_card(fields, LOGO_SRC)
+    back = f"/cheatsheets?{'date=' + day + '&' if day != _today() else ''}sport={sport}"
+    toolbar = _CARD_TOOLBAR.replace("__SPORT__", sport).replace("__DAY__", day).replace("__CARD__", card) \
+        .replace("__BACK__", back).replace("__FILE__", f"syndicate-{sport}-{day}-pick-{number}.png")
+    return Response(html.replace("</body>", toolbar + "</body>", 1), mimetype="text/html")
+
+
+@cheat_sheets_bp.post("/api/cheatsheets/cards")
+def cheat_sheet_card_logged():
+    body = request.get_json(silent=True) or {}
+    sport, day, card = str(body.get("sport") or ""), str(body.get("date") or ""), str(body.get("card_id") or "")
+    row, game, reason = _card_row(sport, day, card)
+    if row is None:
+        return jsonify({"ok": False, "error": reason}), 404
+    path = pc.ledger_path(_data_root())
+    number = pc.card_number(pc.read_ledger(path), day, card)
+    fields = pc.card_fields(row, sport=sport, date=day, number=number, game=game)
+    record = pc.ledger_record(fields, row, sport=sport, generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                              source="exported")
+    added = pc.append_ledger(path, [record])
+    return jsonify({"ok": True, "card_id": card, "logged": bool(added), "number": number}), 200
+
+
 _SITE_HEAD = """<link rel="icon" href="{{ url_for('static', filename='shared/favicon-32.png') }}" sizes="32x32" type="image/png">
 <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css') }}">"""
 _SITE_HEADER = "{% include 'shared/_standalone_app_header.html' %}"
+
+# The export toolbar for a pick graphic: outside the captured area, so the PNG is exactly the 1080 x 1350 card.
+_CARD_TOOLBAR = """<div id="pc-toolbar" style="position:fixed;top:14px;right:14px;z-index:50;display:flex;gap:8px;font:700 15px Barlow,Arial,sans-serif">
+  <button id="pc-dl" style="background:#8cff2e;color:#04110a;border:0;border-radius:8px;padding:10px 16px;font:inherit;cursor:pointer">Download PNG</button>
+  <a href="__BACK__" style="background:#0a1520;color:#eef3f7;border:1px solid #1d3a55;border-radius:8px;padding:10px 16px;text-decoration:none">Back to the sheet</a>
+  <span id="pc-msg" style="align-self:center;color:#9db0bf"></span>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+<script>
+document.getElementById("pc-dl").addEventListener("click", async function () {
+  var msg = document.getElementById("pc-msg");
+  msg.textContent = "Rendering...";
+  try {
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    var url = await window.htmlToImage.toPng(document.body, {width: 1080, height: 1350, pixelRatio: 1, backgroundColor: "#04070c",
+      filter: function (node) { return node.id !== "pc-toolbar"; }});
+    var a = document.createElement("a"); a.href = url; a.download = "__FILE__"; document.body.appendChild(a); a.click(); a.remove();
+    window.__lastCard = url;
+    var r = await fetch("/api/cheatsheets/cards", {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({sport: "__SPORT__", date: "__DAY__", card_id: "__CARD__"})});
+    var j = await r.json();
+    msg.textContent = j.logged ? "Saved, and added to the graded record." : "Saved (already on the graded record).";
+  } catch (e) { msg.textContent = "Export failed: " + e.message; }
+});
+</script>
+"""

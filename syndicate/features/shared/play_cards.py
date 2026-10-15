@@ -19,9 +19,19 @@ result -- the public record is what makes "we post the losses" true.
 from __future__ import annotations
 
 import hashlib
+import html
+import json
+import string
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+TEMPLATE = Path(__file__).resolve().parents[2] / "templates" / "play_cards" / "card.html"
+
 MIN_EV = 2.0
+# The public record starts here (user 2026-10-14: "today [is] our beta with tomorrow as the first official day where I
+# will start posting them on X"). Cards dated earlier are BETA: kept on the ledger, never counted in the record.
+OFFICIAL_START = "2026-10-15"
 MAX_EV = 10.0
 MIN_BOOKS = 3
 ONE_SIDED = frozenset({"book_margin_model", "one_sided", "assumed_hold"})
@@ -137,14 +147,15 @@ def card_fields(row: Mapping[str, Any], *, sport: str, date: str, number: int, g
     }
 
 
-def ledger_record(fields: Mapping[str, Any], row: Mapping[str, Any], *, sport: str, generated_at: str) -> dict[str, Any]:
+def ledger_record(fields: Mapping[str, Any], row: Mapping[str, Any], *, sport: str, generated_at: str,
+                  source: str = "auto") -> dict[str, Any]:
     c = row.get("check") or {}
-    return {"card_id": fields["id"], "generated_at": generated_at, "sport": sport, "date": fields["date"],
+    return {"card_id": fields["id"], "generated_at": generated_at, "source": source, "sport": sport, "date": fields["date"],
             "event_id": row.get("event_id"), "matchup": fields["matchup"], "commence_time": fields["commence_time"],
             "player": row.get("player"), "market": row.get("market"), "line": row.get("line"), "side": row.get("side"),
             "price": c.get("price"), "book": c.get("book"), "books_quoting": row.get("books_quoting"),
             "p_market": c.get("p_market"), "p_model": c.get("p_model"), "ev_market": c.get("ev_market"),
-            "result": None, "close": None}
+            "beta": str(fields["date"]) < OFFICIAL_START, "result": None, "close": None}
 
 
 def pick_cards(sheets: Iterable[Mapping[str, Any]], *, per_sport: int = 3, label: str = "FREE PLAY") -> list[tuple[dict, dict, str]]:
@@ -157,3 +168,119 @@ def pick_cards(sheets: Iterable[Mapping[str, Any]], *, per_sport: int = 3, label
             out.append((card_fields(row, sport=sheet["sport"], date=sheet["date"], number=n,
                                     game=games.get(row.get("event_id")), label=label), row, sheet["sport"]))
     return out
+
+
+# --------------------------------------------------------------------------------------------------------------------
+# Rendering (the card HTML) and the ledger. Used by scripts/build_play_cards.py (PNG on the Windows host) and by the
+# app's /cheatsheets card page (PNG in the browser), so both draw the same card.
+# --------------------------------------------------------------------------------------------------------------------
+
+
+def central(moment: datetime) -> datetime:
+    """US Central with DST where tzdata exists (the fleet); CDT otherwise. Nothing user-facing is shown in UTC."""
+    try:
+        from zoneinfo import ZoneInfo
+
+        return moment.astimezone(ZoneInfo("America/Chicago"))
+    except Exception:  # noqa: BLE001
+        return moment.astimezone(timezone(timedelta(hours=-5)))
+
+
+def kickoff_label(commence: Any) -> str:
+    try:
+        t = central(datetime.fromisoformat(str(commence).replace("Z", "+00:00")))
+    except (TypeError, ValueError):
+        return ""
+    return f"{t:%a %b} {t.day} · {t.hour % 12 or 12}:{t:%M} {'AM' if t.hour < 12 else 'PM'} CT"
+
+
+def chart_svg(values: list[float], labels: list[str], line: float | None, side: str | None) -> str:
+    """Last-N bars (oldest left), the line dashed; green = cleared the bet's side, red = missed."""
+    if not values or line is None:
+        return '<svg viewBox="0 0 400 230"><text x="200" y="120" fill="#9db0bf" font-size="22" text-anchor="middle" font-family="Barlow">No recent games on file</text></svg>'
+    w, h, pad, base = 400, 230, 10, 190
+    top = max(max(values), float(line)) * 1.15 or 1.0
+    n = len(values)
+    bw = (w - 2 * pad) / n
+    y = lambda v: base - (v / top) * (base - 20)
+    parts = [f'<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg">']
+    for i, v in enumerate(values):
+        hit = v != line and ((v > line) if side in ("over", "yes") else (v < line))
+        x = pad + i * bw + bw * 0.14
+        color = "#8cff2e" if hit else "#ff5a4a"
+        parts.append(f'<rect x="{x:.1f}" y="{y(v):.1f}" width="{bw * 0.72:.1f}" height="{base - y(v):.1f}" rx="3" fill="{color}"/>')
+        parts.append(f'<text x="{x + bw * 0.36:.1f}" y="{y(v) - 6:.1f}" fill="#f4f7fa" font-size="17" font-weight="700" text-anchor="middle" font-family="Barlow">{v:g}</text>')
+        lab = html.escape(str(labels[i] if i < len(labels) else "").split("-")[-1].split(" ")[-1])[:6]
+        parts.append(f'<text x="{x + bw * 0.36:.1f}" y="{base + 22}" fill="#9db0bf" font-size="13" text-anchor="middle" font-family="Barlow">{lab}</text>')
+    parts.append(f'<line x1="{pad}" x2="{w - pad}" y1="{y(float(line)):.1f}" y2="{y(float(line)):.1f}" stroke="#1fa8ff" stroke-width="3" stroke-dasharray="8 6"/>')
+    parts.append(f'<text x="{w - pad}" y="{y(float(line)) - 8:.1f}" fill="#1fa8ff" font-size="17" font-weight="700" text-anchor="end" font-family="Barlow">line {float(line):g}</text>')
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def face_html(fields: Mapping[str, Any]) -> str:
+    """Headshot with the team crest as a badge; the crest alone when there is no headshot; initials last."""
+    e = lambda s: html.escape(str(s if s is not None else ""), quote=True)
+    badge = f'<span class="badge"><img src="{e(fields["team_logo"])}" alt=""></span>' if fields.get("team_logo") else ""
+    if fields.get("headshot"):
+        return f'<div class="face"><img class="head" src="{e(fields["headshot"])}" alt="">{badge}</div>'
+    if fields.get("team_logo"):
+        return f'<div class="face"><img class="solo" src="{e(fields["team_logo"])}" alt=""></div>'
+    initials = "".join(w[0] for w in str(fields.get("player") or "").split()[:2]).upper()
+    return f'<div class="face"><span class="ini">{e(initials)}</span></div>'
+
+
+def render_card(fields: Mapping[str, Any], logo_uri: str, template: str | None = None) -> str:
+    matchup = fields.get("matchup") or ""
+    away, _, home = matchup.partition(" @ ")
+    e = lambda s: html.escape(str(s if s is not None else ""))
+    crest = lambda src: f'<img class="crest" src="{html.escape(src, quote=True)}" alt="">' if src else ""
+    meta = " · ".join(str(x) for x in (fields.get("team"), fields.get("pos")) if x)
+    values, line, side = fields["form_values"], fields["line"], fields["side"]
+    hits = sum(1 for v in values if v != line and ((v > line) if side in ("over", "yes") else (v < line))) \
+        if values and line is not None else 0
+    caption = f"{hits} of last {len(values)} cleared {side} {line:g}" if values and line is not None else ""
+    return string.Template(template if template is not None else TEMPLATE.read_text(encoding="utf-8")).safe_substitute(
+        logo=logo_uri, label=e(fields["label"]), number=fields["number"], away=e(away), home=e(home),
+        sport=e(fields["sport"]), kickoff=e(fields.get("kickoff_ct") or kickoff_label(fields.get("commence_time"))),
+        player=e(fields["player"]), player_meta=e(meta), face=face_html(fields),
+        away_crest=crest(fields.get("away_logo")), home_crest=crest(fields.get("home_logo")),
+        bet=e(fields["bet"]), price=e(fields["price"]), book=e(fields["book"]), books=e(fields["books"]),
+        fair=e(fields["fair"]), edge=e(fields["edge"]), win_prob=e(fields["win_prob"]),
+        model_note=e(f" · model {fields['model_prob']}" if fields.get("model_prob") else ""),
+        chart=chart_svg(values, fields["form_labels"], line, side),
+        chart_caption=e(caption), why="".join(f"<li>{e(w)}</li>" for w in fields["why"]),
+        risk="".join(f"<li>{e(r)}</li>" for r in fields["risk"]))
+
+
+def ledger_path(data_root: Path | str) -> Path:
+    return Path(data_root) / "playcards" / "ledger.jsonl"
+
+
+def read_ledger(path: Path) -> list[dict[str, Any]]:
+    out = []
+    if path.is_file():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                out.append(json.loads(line))
+            except ValueError:
+                continue
+    return out
+
+
+def append_ledger(path: Path, records: Iterable[Mapping[str, Any]]) -> int:
+    """Append each record whose card_id is not on the ledger yet; returns how many were added."""
+    seen = {r.get("card_id") for r in read_ledger(path)}
+    new = [dict(r) for r in records if r["card_id"] not in seen]
+    if new:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            for r in new:
+                fh.write(json.dumps(r, default=str) + "\n")
+    return len(new)
+
+
+def card_number(ledger: Iterable[Mapping[str, Any]], date: str, card: str) -> int:
+    """The card's number for its day: its place on the ledger, or the next one if it is not there yet."""
+    ids = [r.get("card_id") for r in ledger if r.get("date") == date]
+    return ids.index(card) + 1 if card in ids else len(ids) + 1

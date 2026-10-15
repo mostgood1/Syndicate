@@ -93,11 +93,13 @@ def test_generator_groups_pregame_full_game_props_and_builds_evidence_once_per_g
         "advanced": {"pos": "RB", "team": "BAL"}, "matchup": {"opponent": "CLE"},
         "game_sim": {"home_score_mean": 17.0, "away_score_mean": 26.0}})
     base = {"kind": "prop", "game_state": "pregame", "segment": "full", "event_id": "e1", "home_team": "CLE",
-            "away_team": "BAL", "market": "Rushing Yards", "player_name": "Derrick Henry"}
+            "away_team": "BAL", "market": "Rushing Yards", "player_name": "Derrick Henry", "commence_time": "2026-10-15T00:15:00Z"}
     rows = [dict(base, line=59.5, side="over", quote={"price": -490, "fair_probability": 0.78, "book_prices": {"fd": -490}}),
             dict(base, line=79.5, side="over", quote={"price": -150, "fair_probability": 0.58, "book_prices": {"fd": -150, "dk": -155}}),
             dict(base, game_state="live", line=59.5, side="over", quote={}),
-            dict(base, player_name="Someone", segment="h1", line=9.5, side="over", quote={})]
+            dict(base, player_name="Someone", segment="h1", line=9.5, side="over", quote={}),
+            dict(base, event_id="e2", player_name="Sunday Guy", commence_time="2026-10-18T17:00:00Z", line=9.5,
+                 side="over", quote={"price": -110, "fair_probability": 0.5})]                 # Sunday: not 10-14's sheet
     dvp = {"teams": {"CLE": {"RB": {"rush_yds": {"rank": 30, "of": 32, "per_game": 128.0, "games": 5}}}}, "through_week": 5}
     sheet = m.build_sport("nfl", rows, selected_date="2026-10-14", cap=10, dvp=dvp)
     assert calls == ["Derrick Henry"] and len(sheet["rows"]) == 2           # live and h1 rows dropped; one evidence call
@@ -152,12 +154,13 @@ def test_identity_fills_team_logo_position_and_headshot_without_overriding_the_e
     assert bare["headshot_url"] is None and bare["team_logo"] is None and bare["pos"] == "F"   # unknown side: no crest
 
 
-def test_sports_get_sheets_only_inside_their_regular_season():
+def test_sheets_cover_regular_season_and_postseason_never_preseason():
     m = _script()
-    assert m.in_season("nba", "2026-10-20") and not m.in_season("nba", "2026-10-14")       # preseason: no sheet
+    assert m.season_phase("mlb", "2026-10-14") == "postseason"                               # the LCS gets a sheet
+    assert m.season_phase("nba", "2026-10-14") is None and m.season_phase("nba", "2026-10-20") == "regular"   # preseason: none
     assert not m.in_season("ncaab", "2026-11-01") and m.in_season("ncaab", "2026-11-02")
-    assert not m.in_season("mlb", "2026-10-14") and not m.in_season("wnba", "2026-10-14")   # postseason / offseason
-    assert m.in_season("nfl", "2026-10-14") and m.in_season("soccer", "2026-07-01")         # soccer is never gated
+    assert m.season_phase("wnba", "2026-10-14") is None                                     # offseason
+    assert m.season_phase("nfl", "2026-10-14") == "regular" and m.season_phase("soccer", "2026-07-01") == "regular"
 
 
 def test_a_short_team_name_from_the_evidence_finds_its_side(monkeypatch):
@@ -172,3 +175,30 @@ def test_a_short_team_name_from_the_evidence_finds_its_side(monkeypatch):
     assert got["team_logo"] == "shsu.png" and got["opponent_logo"] == "wku.png" and got["team"] == "Sam Houston"
     nope = m.player_identity(row, sport="ncaaf", team="Houston", pos="QB", context={}, positions={})
     assert nope["team_logo"] is None                                       # "Houston" is neither side: no crest
+
+
+def test_a_days_sheet_is_a_record_started_games_keep_their_last_rows():
+    m = _script()
+    from datetime import datetime, timezone
+
+    def row(event, player, start):
+        return {"event_id": event, "player": player, "commence_time": start, "check": {"verdict": "value", "ev_market": 3.0}}
+
+    prior = {"date": "2026-10-14", "generated_at": "2026-10-14T14:00:00Z",
+             "rows": [row("early", "A", "2026-10-14T18:00:00Z"), row("late", "B", "2026-10-15T00:40:00Z"),
+                      row("sunday", "C", "2026-10-18T17:00:00Z")],                         # a pre-rule row from Sunday
+             "games": [{"event_id": "early"}, {"event_id": "late"}, {"event_id": "sunday"}]}
+    fresh = {"date": "2026-10-14", "rows": [row("late", "B2", "2026-10-15T00:40:00Z")], "games": [{"event_id": "late"}],
+             "sections": {}}
+    merged = m.merge_with_record(fresh, prior, now=datetime(2026, 10, 14, 23, 0, tzinfo=timezone.utc))
+    assert [r["player"] for r in merged["rows"]] == ["B2", "A"]           # fresh prices for 'late', 'early' frozen, Sunday gone
+    assert {g["event_id"] for g in merged["games"]} == {"late", "early"} and merged["rows_frozen"] == 1
+    assert next(g for g in merged["games"] if g["event_id"] == "early")["frozen_at"] == "2026-10-14T14:00:00Z"
+    assert merged["sections"]["value"] == [0, 1]
+    assert m.merge_with_record(fresh, None, now=datetime.now(timezone.utc)) is fresh
+
+
+def test_central_day_is_the_games_date_in_central():
+    m = _script()
+    assert m.central_day("2026-10-15T00:40:00Z") == "2026-10-14"          # 7:40 PM CT on the 14th
+    assert m.central_day("2026-10-15T05:30:00Z") == "2026-10-15" and m.central_day(None) is None

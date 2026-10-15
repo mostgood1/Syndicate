@@ -12,12 +12,9 @@ from __future__ import annotations
 
 import argparse
 import base64
-import hashlib
-import io
 import json
 import os
 import sys
-import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -25,61 +22,34 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from syndicate.features.shared import cheat_sheet_images as img  # noqa: E402
 from syndicate.features.shared import cheat_sheets as cs  # noqa: E402
 
 TEMPLATE = REPO_ROOT / "syndicate" / "templates" / "cheat_sheets.html"
 LOGO = REPO_ROOT / "syndicate" / "static" / "brand" / "syndicate_roi_badge.webp"
-IMAGE_FIELDS = (("rows", ("headshot_url", "team_logo", "opponent_logo")), ("games", ("home_logo", "away_logo")))
-
-
-def shrink(raw: bytes, size: int = 96) -> tuple[bytes, str]:
-    try:
-        from PIL import Image
-    except ImportError:
-        return raw, "image/png"
-    with Image.open(io.BytesIO(raw)) as im:
-        im = im.convert("RGBA")
-        im.thumbnail((size, size))
-        out = io.BytesIO()
-        im.save(out, "WEBP", quality=82)
-    return out.getvalue(), "image/webp"
-
-
-def data_uri(url: str, cache: Path, size: int = 96) -> str | None:
-    """The image as a data URI, fetched once per URL; None when it cannot be fetched (the page then falls back)."""
-    if not url.startswith("https://"):
-        return None
-    key = hashlib.sha1(f"{size}|{url}".encode("utf-8")).hexdigest()
-    hit = cache / f"{key}.bin"
-    if hit.is_file():
-        body = hit.read_bytes()
-        return None if not body else "data:image/webp;base64," + base64.b64encode(body).decode()
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Syndicate cheat sheets)"})
-        with urllib.request.urlopen(req, timeout=12) as resp:
-            body, _mime = shrink(resp.read(), size)
-    except Exception:  # noqa: BLE001 -- a missing face is a fallback, not a failure
-        body = b""
-    cache.mkdir(parents=True, exist_ok=True)
-    hit.write_bytes(body)                       # an empty file remembers a miss
-    return None if not body else "data:image/webp;base64," + base64.b64encode(body).decode()
+IMAGE_FIELDS = (
+    ("rows", (("headshot_url", "headshot_src"), ("team_logo", "team_logo_src"), ("opponent_logo", "opponent_logo_src"))),
+    ("games", (("home_logo", "home_logo_src"), ("away_logo", "away_logo_src"))),
+)
 
 
 def embed_images(sheets: dict[str, dict[str, Any]], cache: Path) -> dict[str, int]:
+    """Point every image at an inlined copy (fetched once into the generator's cache) -- a shared page must not depend
+    on outside image hosts, and inlined images keep the page's own PNG export working."""
     seen: dict[str, str | None] = {}
     counts = {"urls": 0, "embedded": 0}
     for sheet in sheets.values():
         for section, fields in IMAGE_FIELDS:
             for item in sheet.get(section) or []:
-                for field in fields:
-                    url = item.get(field)
+                for url_field, src_field in fields:
+                    url = item.get(url_field)
                     if not url:
                         continue
                     if url not in seen:
-                        seen[url] = data_uri(url, cache)
+                        seen[url] = img.data_uri(img.cache_image(url, cache, img.ROW_SIZE), cache)
                         counts["urls"] += 1
                         counts["embedded"] += seen[url] is not None
-                    item[field] = seen[url]
+                    item[src_field] = seen[url]
     return counts
 
 
@@ -101,11 +71,12 @@ def main(argv: list[str] | None = None) -> int:
         if f.is_file():
             sheets.append(json.loads(f.read_text(encoding="utf-8")))
     payload = cs.page_payload(sheets)
-    counts = embed_images(payload, root / "cheatsheets" / ".img_cache") if args.embed_images else {}
+    counts = embed_images(payload, img.cache_dir(root)) if args.embed_images else {}
     logo = "data:image/webp;base64," + base64.b64encode(LOGO.read_bytes()).decode()
+    meta = {"mode": "static", "date": args.date}
     html = TEMPLATE.read_text(encoding="utf-8")
-    data = json.dumps(payload, default=str).replace("</", "<\\/")
-    html = html.replace("/*__DATA__*/null", data, 1).replace("__LOGO_SRC__", logo, 1)
+    html = html.replace("/*__DATA__*/null", json.dumps(payload, default=str).replace("</", "<\\/"), 1)
+    html = html.replace("/*__META__*/null", json.dumps(meta), 1).replace("__LOGO_SRC__", logo)
     html = html.replace("<!--__SITE_HEAD__-->", "", 1).replace("<!--__SITE_HEADER__-->", "", 1)
     out = Path(args.out)
     out.write_text(html, encoding="utf-8")

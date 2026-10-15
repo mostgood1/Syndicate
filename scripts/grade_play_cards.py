@@ -66,7 +66,9 @@ def _npf():
 
 
 def central_date(ts: datetime) -> str:
-    return (ts - timedelta(hours=5)).date().isoformat()
+    from syndicate.features.shared.play_cards import central
+
+    return central(ts).date().isoformat()
 
 
 def closing_fair(quotes: list[dict[str, Any]], card: dict[str, Any]) -> dict[str, Any] | None:
@@ -148,6 +150,9 @@ def results_for(cards: list[dict[str, Any]], *, work: Path) -> dict[str, dict[st
 
 
 def render_record(cards: list[dict[str, Any]], path: Path) -> None:
+    from syndicate.features.shared.play_cards import OFFICIAL_START
+
+    cards = [c for c in cards if str(c.get("date") or "") >= OFFICIAL_START]     # beta cards are never in the record
     done = [c for c in cards if c.get("result")]
     w = sum(1 for c in done if c["result"]["y"] == 1)
     l = sum(1 for c in done if c["result"]["y"] == 0)

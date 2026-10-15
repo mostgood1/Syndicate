@@ -265,28 +265,43 @@ def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25) -> dict[str, l
 SPORT_ORDER = ("nfl", "ncaaf", "nba", "nhl", "soccer", "ncaab", "wnba", "mlb")
 
 
-def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
-    """sport -> the sheet cut to the rows its sections show (a 400 KB NFL sheet serves at ~1/4), sports in board order.
+_ROW_DROP = ("book_prices", "evidence_error")
 
-    Each game keeps the count of ALL its props on the sheet, so the slate shows depth even though rows are cut."""
+
+def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    """sport -> the sheet as the page shows it, sports in board order.
+
+    Every row is kept (a game's own sheet needs all of its props), minus the fields the page never reads. Each row
+    carries its card id and whether its price check passes (only those get a pick graphic). `game_sections` holds,
+    per game, the same sections the full sheet has, as indexes into `rows`."""
+    from syndicate.features.shared import play_cards as pc
+
     out: dict[str, dict[str, Any]] = {}
     for sheet in sorted(sheets, key=lambda d: SPORT_ORDER.index(d["sport"]) if d.get("sport") in SPORT_ORDER else 99):
-        rows = list(sheet.get("rows") or [])
-        keep = sorted({i for ids in (sheet.get("sections") or {}).values() for i in ids if 0 <= i < len(rows)})
-        remap = {old: new for new, old in enumerate(keep)}
-        per_game: dict[Any, int] = {}
-        for r in rows:
-            per_game[r.get("event_id")] = per_game.get(r.get("event_id"), 0) + 1
+        sport, day = str(sheet.get("sport")), str(sheet.get("date"))
+        rows = []
+        for r in sheet.get("rows") or []:
+            row = {k: v for k, v in r.items() if k not in _ROW_DROP}
+            row["card_id"] = pc.card_id(sport, day, r)
+            row["card_ok"] = pc.eligible(r)
+            rows.append(row)
+        by_game: dict[Any, list[int]] = {}
+        for i, r in enumerate(rows):
+            by_game.setdefault(r.get("event_id"), []).append(i)
         doc = dict(sheet)
-        doc["rows"] = [rows[i] for i in keep]
-        doc["sections"] = {k: [remap[i] for i in ids if i in remap] for k, ids in (sheet.get("sections") or {}).items()}
-        doc["games"] = [dict(g, props=per_game.get(g.get("event_id"), 0)) for g in sheet.get("games") or []]
-        doc["rows_on_sheet"] = len(rows)
-        out[str(sheet.get("sport"))] = doc
+        doc["rows"] = rows
+        doc["games"] = [dict(g, props=len(by_game.get(g.get("event_id"), []))) for g in sheet.get("games") or []]
+        doc["game_sections"] = {
+            str(event): {k: [idx[j] for j in ids] for k, ids in sections([rows[i] for i in idx]).items()}
+            for event, idx in by_game.items()}
+        out[sport] = doc
     return out
 
 
-def render_page(template: str, sheets: Iterable[Mapping[str, Any]], *, logo_src: str) -> str:
+def render_page(template: str, sheets: Iterable[Mapping[str, Any]], *, logo_src: str,
+                meta: Mapping[str, Any] | None = None) -> str:
     """The branded page with the data inlined. `</` is escaped so no string in the data can close the script."""
     data = json.dumps(page_payload(sheets), default=str).replace("</", "<\\/")
-    return template.replace("/*__DATA__*/null", data, 1).replace("__LOGO_SRC__", logo_src, 1)
+    info = json.dumps(dict(meta or {"mode": "static"}), default=str).replace("</", "<\\/")
+    return (template.replace("/*__DATA__*/null", data, 1).replace("/*__META__*/null", info, 1)
+            .replace("__LOGO_SRC__", logo_src))

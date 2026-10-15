@@ -29,94 +29,32 @@ from syndicate.features.shared import play_cards as pc  # noqa: E402
 
 TEMPLATE = REPO_ROOT / "syndicate" / "templates" / "play_cards" / "card.html"
 LOGO = REPO_ROOT / "syndicate" / "static" / "brand" / "syndicate_roi_badge.webp"
-CENTRAL = timezone(timedelta(hours=-5))
 
 
 def central_today() -> str:
-    return (datetime.now(timezone.utc) - timedelta(hours=5)).date().isoformat()
+    return pc.central(datetime.now(timezone.utc)).date().isoformat()
 
 
-def chart_svg(values: list[float], labels: list[str], line: float | None, side: str | None) -> str:
-    """Last-N bars (oldest left), the line dashed; green = cleared the bet's side, red = missed."""
-    if not values or line is None:
-        return '<svg viewBox="0 0 400 230"><text x="200" y="120" fill="#9db0bf" font-size="22" text-anchor="middle" font-family="Barlow">No recent games on file</text></svg>'
-    w, h, pad, base = 400, 230, 10, 190
-    top = max(max(values), float(line)) * 1.15 or 1.0
-    n = len(values)
-    bw = (w - 2 * pad) / n
-    y = lambda v: base - (v / top) * (base - 20)
-    parts = [f'<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg">']
-    for i, v in enumerate(values):
-        hit = v != line and ((v > line) if side in ("over", "yes") else (v < line))
-        x = pad + i * bw + bw * 0.14
-        color = "#8cff2e" if hit else "#ff5a4a"
-        parts.append(f'<rect x="{x:.1f}" y="{y(v):.1f}" width="{bw * 0.72:.1f}" height="{base - y(v):.1f}" rx="3" fill="{color}"/>')
-        parts.append(f'<text x="{x + bw * 0.36:.1f}" y="{y(v) - 6:.1f}" fill="#f4f7fa" font-size="17" font-weight="700" text-anchor="middle" font-family="Barlow">{v:g}</text>')
-        lab = html.escape(str(labels[i] if i < len(labels) else "").split("-")[-1].split(" ")[-1])[:6]
-        parts.append(f'<text x="{x + bw * 0.36:.1f}" y="{base + 22}" fill="#9db0bf" font-size="13" text-anchor="middle" font-family="Barlow">{lab}</text>')
-    parts.append(f'<line x1="{pad}" x2="{w - pad}" y1="{y(float(line)):.1f}" y2="{y(float(line)):.1f}" stroke="#1fa8ff" stroke-width="3" stroke-dasharray="8 6"/>')
-    parts.append(f'<text x="{w - pad}" y="{y(float(line)) - 8:.1f}" fill="#1fa8ff" font-size="17" font-weight="700" text-anchor="end" font-family="Barlow">line {float(line):g}</text>')
-    parts.append("</svg>")
-    return "".join(parts)
-
-
-def kickoff_label(commence: str | None) -> str:
-    if not commence:
-        return ""
-    try:
-        t = datetime.fromisoformat(str(commence).replace("Z", "+00:00")).astimezone(CENTRAL)
-    except ValueError:
-        return ""
-    return t.strftime("%a %-I:%M %p CT") if os.name != "nt" else t.strftime("%a %#I:%M %p CT")
-
-
-def face_html(fields: dict[str, Any]) -> str:
-    """Headshot with the team crest as a badge; the crest alone when there is no headshot; initials last."""
-    e = lambda s: html.escape(str(s if s is not None else ""), quote=True)
-    badge = f'<span class="badge"><img src="{e(fields["team_logo"])}" alt=""></span>' if fields.get("team_logo") else ""
-    if fields.get("headshot"):
-        return f'<div class="face"><img class="head" src="{e(fields["headshot"])}" alt="">{badge}</div>'
-    if fields.get("team_logo"):
-        return f'<div class="face"><img class="solo" src="{e(fields["team_logo"])}" alt=""></div>'
-    initials = "".join(w[0] for w in str(fields.get("player") or "").split()[:2]).upper()
-    return f'<div class="face"><span class="ini">{e(initials)}</span></div>'
+chart_svg = pc.chart_svg
+kickoff_label = pc.kickoff_label
+face_html = pc.face_html
+append_ledger = pc.append_ledger
 
 
 def embed_card_images(fields: dict[str, Any], cache: Path) -> dict[str, Any]:
     """Inline the card's images (a PNG render and a shared HTML card must not depend on outside hosts)."""
-    import importlib.util
+    from syndicate.features.shared import cheat_sheet_images as img
 
-    spec = importlib.util.spec_from_file_location("render_cheat_sheets", REPO_ROOT / "scripts" / "render_cheat_sheets.py")
-    rcs = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(rcs)
     out = dict(fields)
-    for key, size in (("headshot", 260), ("team_logo", 96), ("home_logo", 96), ("away_logo", 96)):
+    for key, size in (("headshot", img.CARD_SIZE), ("team_logo", img.ROW_SIZE), ("home_logo", img.ROW_SIZE),
+                      ("away_logo", img.ROW_SIZE)):
         if out.get(key):
-            out[key] = rcs.data_uri(out[key], cache, size)
+            out[key] = img.data_uri(img.cache_image(out[key], cache, size), cache)
     return out
 
 
 def render_card(fields: dict[str, Any], logo_uri: str) -> str:
-    matchup = fields.get("matchup") or ""
-    away, _, home = matchup.partition(" @ ")
-    e = lambda s: html.escape(str(s if s is not None else ""))
-    crest = lambda src: f'<img class="crest" src="{html.escape(src, quote=True)}" alt="">' if src else ""
-    meta = " · ".join(str(x) for x in (fields.get("team"), fields.get("pos")) if x)
-    hits = sum(1 for v in fields["form_values"] if v != fields["line"] and (
-        (v > fields["line"]) if fields["side"] in ("over", "yes") else (v < fields["line"]))) if fields["form_values"] and fields["line"] is not None else 0
-    caption = (f"{hits} of last {len(fields['form_values'])} cleared {fields['side']} {fields['line']:g}"
-               if fields["form_values"] and fields["line"] is not None else "")
-    return string.Template(TEMPLATE.read_text(encoding="utf-8")).safe_substitute(
-        logo=logo_uri, label=e(fields["label"]), number=fields["number"], away=e(away), home=e(home),
-        sport=e(fields["sport"]), kickoff=e(fields.get("kickoff_ct") or kickoff_label(fields.get("commence_time"))),
-        player=e(fields["player"]), player_meta=e(meta), face=face_html(fields),
-        away_crest=crest(fields.get("away_logo")), home_crest=crest(fields.get("home_logo")),
-        bet=e(fields["bet"]), price=e(fields["price"]), book=e(fields["book"]), books=e(fields["books"]),
-        fair=e(fields["fair"]), edge=e(fields["edge"]), win_prob=e(fields["win_prob"]),
-        model_note=e(f" · model {fields['model_prob']}" if fields.get("model_prob") else ""),
-        chart=chart_svg(fields["form_values"], fields["form_labels"], fields["line"], fields["side"]),
-        chart_caption=e(caption), why="".join(f"<li>{e(w)}</li>" for w in fields["why"]),
-        risk="".join(f"<li>{e(r)}</li>" for r in fields["risk"]))
+    return pc.render_card(fields, logo_uri, TEMPLATE.read_text(encoding="utf-8"))
 
 
 def to_png(cards: list[tuple[Path, Path]]) -> int:
@@ -136,23 +74,6 @@ def to_png(cards: list[tuple[Path, Path]]) -> int:
             done += 1
         browser.close()
     return done
-
-
-def append_ledger(path: Path, records: list[dict[str, Any]]) -> int:
-    seen = set()
-    if path.is_file():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            try:
-                seen.add(json.loads(line)["card_id"])
-            except (ValueError, KeyError):
-                continue
-    new = [r for r in records if r["card_id"] not in seen]
-    if new:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as fh:
-            for r in new:
-                fh.write(json.dumps(r, default=str) + "\n")
-    return len(new)
 
 
 def main(argv: list[str] | None = None) -> int:

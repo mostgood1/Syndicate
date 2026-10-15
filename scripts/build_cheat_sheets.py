@@ -33,13 +33,20 @@ if str(REPO_ROOT) not in sys.path:
 from syndicate.features.shared import cheat_sheets as cs  # noqa: E402
 
 DEFAULT_CAPS = {"nfl": 150, "ncaaf": 80, "soccer": 120, "nhl": 30, "nba": 150, "wnba": 80, "ncaab": 80, "mlb": 100}
-# Regular-season windows (US Central dates). A sport outside its window gets no sheet: preseason and playoff games
-# are different populations, and a sheet's form and model read the regular season (learnings: season-phase models).
+# Season phases (US Central dates). A sheet is built in the regular season AND the postseason, labelled with its
+# phase -- the price check is phase-free, and form is what the player actually did. Preseason gets no sheet: its
+# minutes and lineups are a different population (learnings: season-phase models). User 2026-10-14: "why isnt there
+# an MLB cheat for today" -- the first version gated to regular seasons only and so skipped the MLB playoffs.
 # Sports not listed (soccer: domestic leagues all year) are never gated. Extend each season here.
-REGULAR_SEASONS = {
-    "nfl": ("2026-09-10", "2027-01-10"), "ncaaf": ("2026-08-29", "2026-12-12"), "nhl": ("2026-10-06", "2027-04-17"),
-    "nba": ("2026-10-20", "2027-04-11"), "ncaab": ("2026-11-02", "2027-03-15"), "wnba": ("2027-05-14", "2027-09-12"),
-    "mlb": ("2027-03-25", "2027-09-26"),
+SEASON_PHASES = {
+    "nfl": (("2026-09-10", "2027-01-10", "regular"), ("2027-01-16", "2027-02-14", "postseason")),
+    "ncaaf": (("2026-08-29", "2026-12-12", "regular"), ("2026-12-13", "2027-01-20", "postseason")),
+    "nhl": (("2026-10-06", "2027-04-17", "regular"), ("2027-04-18", "2027-06-25", "postseason")),
+    "nba": (("2026-10-20", "2027-04-11", "regular"), ("2027-04-14", "2027-06-25", "postseason")),
+    "ncaab": (("2026-11-02", "2027-03-15", "regular"), ("2027-03-16", "2027-04-06", "postseason")),
+    "wnba": (("2027-05-14", "2027-09-12", "regular"), ("2027-09-13", "2027-10-25", "postseason")),
+    "mlb": (("2026-09-29", "2026-11-05", "postseason"), ("2027-03-25", "2027-09-26", "regular"),
+            ("2027-09-27", "2027-11-05", "postseason")),
 }
 NFL_DVP_STAT = {
     "Receiving Yards": "rec_yds", "Receptions": "receptions", "Rushing Yards": "rush_yds",
@@ -50,27 +57,40 @@ NFL_DVP_STAT = {
 
 
 def central_today() -> str:
-    return (datetime.now(timezone.utc) - timedelta(hours=5)).date().isoformat()
+    return cs_central(datetime.now(timezone.utc)).date().isoformat()
+
+
+def cs_central(moment: datetime) -> datetime:
+    from syndicate.features.shared.play_cards import central
+
+    return central(moment)
+
+
+def central_day(commence: Any) -> str | None:
+    """The game's date in US Central -- the day whose sheet it belongs to."""
+    try:
+        return cs_central(datetime.fromisoformat(str(commence).replace("Z", "+00:00"))).date().isoformat()
+    except (TypeError, ValueError):
+        return None
+
+
+def season_phase(sport: str, day: str) -> str | None:
+    """'regular' / 'postseason' for a sport on a day, 'regular' when the sport is not gated, None outside both."""
+    windows = SEASON_PHASES.get(sport)
+    if windows is None:
+        return "regular"
+    return next((phase for start, end, phase in windows if start <= day <= end), None)
 
 
 def in_season(sport: str, day: str) -> bool:
-    window = REGULAR_SEASONS.get(sport)
-    return window is None or window[0] <= day <= window[1]
+    return season_phase(sport, day) is not None
 
 
 def kickoff_ct(commence: Any) -> str | None:
     """'Sun Oct 18 · 3:05 PM CT' -- the game's date and time in US Central (DST-aware where tzdata exists)."""
-    try:
-        t = datetime.fromisoformat(str(commence).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    try:
-        from zoneinfo import ZoneInfo
+    from syndicate.features.shared.play_cards import kickoff_label
 
-        t = t.astimezone(ZoneInfo("America/Chicago"))
-    except Exception:  # noqa: BLE001 -- no tzdata (Windows): CDT until 2026-11-01
-        t = t.astimezone(timezone(timedelta(hours=-5)))
-    return f"{t:%a %b} {t.day} · {t.hour % 12 or 12}:{t:%M} {'AM' if t.hour < 12 else 'PM'} CT"
+    return kickoff_label(commence) or None
 
 
 def _position_indexes() -> dict[str, Any]:
@@ -255,6 +275,9 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
     from syndicate.features.shared.team_logos import logo_url
 
     t0 = time.time()
+    # A day's sheet holds that day's games only (US Central), user 2026-10-14: "All cheat sheets should be for the
+    # current day only". Sunday's NFL props wait for Sunday's sheet.
+    rows = [r for r in rows if central_day(r.get("commence_time")) == selected_date]
     groups = group_rows(rows)
     ordered = sorted(groups.items(), key=lambda kv: priority(kv[1]), reverse=True)[:cap]
     out_rows: list[dict[str, Any]] = []
@@ -320,6 +343,57 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
     return sheet
 
 
+IMAGE_FIELDS = (
+    ("rows", (("headshot_url", "headshot_src", 96), ("headshot_url", "headshot_card_src", 260),
+              ("team_logo", "team_logo_src", 96), ("opponent_logo", "opponent_logo_src", 96))),
+    ("games", (("home_logo", "home_logo_src", 96), ("away_logo", "away_logo_src", 96))),
+)
+
+
+def attach_images(sheet: dict[str, Any], cache: Path) -> dict[str, int]:
+    """Cache each headshot / logo once on the data root and point the sheet at the app's same-origin copy."""
+    from syndicate.features.shared import cheat_sheet_images as img
+
+    counts = {"urls": 0, "cached": 0}
+    seen: dict[tuple[str, int], str | None] = {}
+    for section, fields in IMAGE_FIELDS:
+        for item in sheet.get(section) or []:
+            for src_field, out_field, size in fields:
+                url = item.get(src_field)
+                if not url:
+                    continue
+                if (url, size) not in seen:
+                    seen[(url, size)] = img.cache_image(url, cache, size)
+                    counts["urls"] += 1
+                    counts["cached"] += seen[(url, size)] is not None
+                item[out_field] = img.local_src(seen[(url, size)])
+    return counts
+
+
+def merge_with_record(sheet: dict[str, Any], prior: dict[str, Any] | None, *, now: datetime) -> dict[str, Any]:
+    """A day's sheet is a RECORD (user 2026-10-14: "even if games have started, these cheat sheets should be
+    historical records"). A game this build no longer prices -- it started, or left the board -- keeps the rows the
+    last build gave it, frozen at those prices; a game this build prices replaces its rows with the fresher ones."""
+    if not prior:
+        return sheet
+    day = sheet["date"]
+    priced = {r.get("event_id") for r in sheet["rows"]}
+    kept_rows = [r for r in prior.get("rows") or []
+                 if r.get("event_id") not in priced and central_day(r.get("commence_time")) == day]
+    kept_events = {r.get("event_id") for r in kept_rows}
+    kept_games = [g for g in prior.get("games") or [] if g.get("event_id") in kept_events]
+    for g in kept_games:
+        g.setdefault("frozen_at", prior.get("generated_at"))
+    if not kept_rows:
+        return sheet
+    merged = dict(sheet)
+    merged["rows"] = sheet["rows"] + kept_rows
+    merged["games"] = list(sheet["games"]) + kept_games
+    merged["sections"] = cs.sections(merged["rows"])
+    merged["rows_frozen"] = len(kept_rows)
+    return merged
+
+
 def write_atomic(path: Path, doc: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
@@ -353,7 +427,7 @@ def main(argv: list[str] | None = None) -> int:
     news_root = data_root if (data_root / "news").is_dir() else None
     for sport in [s.strip() for s in args.sports.split(",") if s.strip()]:
         if not in_season(sport, selected):
-            print(f"CHEAT_SHEET {sport} date={selected} outside its regular season {REGULAR_SEASONS[sport]} -- skipped", flush=True)
+            print(f"CHEAT_SHEET {sport} date={selected} not in its regular season or postseason -- skipped", flush=True)
             continue
         try:
             rows = fetch_rows(args.base_url, sport)
@@ -362,14 +436,23 @@ def main(argv: list[str] | None = None) -> int:
             continue
         sheet = build_sport(sport, rows, selected_date=selected, cap=args.cap or DEFAULT_CAPS.get(sport, 80), dvp=dvp,
                             context=context, positions=positions)
-        if not sheet["rows"]:
-            print(f"CHEAT_SHEET {sport} date={selected} no pregame props on the board -- nothing written", flush=True)
+        target = data_root / "cheatsheets" / sport / f"{selected}.json"
+        try:
+            prior = json.loads(target.read_text(encoding="utf-8")) if target.is_file() else None
+        except (OSError, ValueError):
+            prior = None
+        sheet = merge_with_record(sheet, prior, now=datetime.now(timezone.utc))
+        sheet["phase"] = season_phase(sport, selected)
+        if not sheet["rows"] and prior is None:
+            print(f"CHEAT_SHEET {sport} date={selected} no {selected} games with pregame props -- nothing written", flush=True)
             continue
-        write_atomic(data_root / "cheatsheets" / sport / f"{selected}.json", sheet)
+        images = attach_images(sheet, data_root / "cheatsheets" / ".img_cache")
+        write_atomic(target, sheet)
         counts = {k: len(v) for k, v in sheet["sections"].items()}
         have = {k: sum(1 for r in sheet["rows"] if r.get(k)) for k in ("team", "pos", "headshot_url", "team_logo")}
         print(f"CHEAT_SHEET {sport} date={selected} groups={sheet['groups_built']}/{sheet['groups_on_board']} "
-              f"rows={len(sheet['rows'])} sections={counts} identity={have} secs={sheet['build_seconds']}", flush=True)
+              f"rows={len(sheet['rows'])} frozen={sheet.get('rows_frozen', 0)} sections={counts} identity={have} "
+              f"images={images} secs={sheet['build_seconds']}", flush=True)
     return 0
 
 

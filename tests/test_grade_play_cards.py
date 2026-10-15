@@ -108,8 +108,8 @@ def test_main_settles_only_started_games_and_writes_the_record(monkeypatch, tmp_
     m = _module()
     led = tmp_path / "playcards" / "ledger.jsonl"
     led.parent.mkdir(parents=True)
-    future = _card(card_id="later", commence_time="2999-01-01T00:00:00Z")
-    led.write_text(json.dumps(_card()) + "\n" + json.dumps(future) + "\n", encoding="utf-8")
+    future = _card(card_id="later", date="2026-10-15", commence_time="2999-01-01T00:00:00Z")
+    led.write_text(json.dumps(_card(date="2026-10-15")) + "\n" + json.dumps(future) + "\n", encoding="utf-8")
     monkeypatch.setattr(m._npf(), "load_quotes", lambda root, sport, start, end: [
         _q("dk", "under", -160, "2026-10-18T19:00:00Z"), _q("dk", "over", 130, "2026-10-18T19:00:00Z")])
     monkeypatch.setattr(m, "results_for", lambda cards, work: {"abc123": {"y": 1.0, "units": 0.719, "graded_game": "g"}})
@@ -121,3 +121,13 @@ def test_main_settles_only_started_games_and_writes_the_record(monkeypatch, tmp_
     assert cards["later"]["result"] is None and cards["later"]["close"] is None
     record = (tmp_path / "playcards" / "record.html").read_text(encoding="utf-8")
     assert "1-0" in record and "+0.72u" in record and "PENDING" in record and "WIN" in record
+
+
+def test_beta_cards_stay_out_of_the_public_record(tmp_path):
+    m = _module()
+    official = _card(card_id="o1", date="2026-10-15", result={"y": 1.0, "units": 0.719}, close={"ev_close_pct": 2.0})
+    beta = _card(card_id="b1", date="2026-10-14", result={"y": 0.0, "units": -1.0}, close={"ev_close_pct": -5.0})
+    out = tmp_path / "record.html"
+    m.render_record([official, beta], out)
+    html = out.read_text(encoding="utf-8")
+    assert "1-0" in html and "+0.72u" in html and "+2.00%" in html and "(1 cards)" in html

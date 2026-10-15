@@ -22,7 +22,7 @@
 body { background: radial-gradient(1200px 500px at 15% -10%, rgba(31,168,255,.16), transparent 60%), radial-gradient(900px 420px at 95% 0%, rgba(140,255,46,.10), transparent 60%), var(--bg); color: var(--ink); font: 15px/1.55 var(--body); font-variant-numeric: tabular-nums; }
 .slant { display: inline-block; transform: skewX(-8deg); }
 .brand { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-.brand img { width: 88px; height: 86px; border-radius: 10px; box-shadow: 0 0 0 2px rgba(140,255,46,.55), 0 0 24px rgba(31,168,255,.35); }
+.brand img { width: 88px; height: 88px; border-radius: 10px; box-shadow: 0 0 0 2px rgba(140,255,46,.55), 0 0 24px rgba(31,168,255,.35); }
 .wordmark { display: grid; gap: 2px; }
 .wordmark .w1 { font: 900 clamp(34px, 6vw, 54px)/.9 var(--display); letter-spacing: .02em; text-transform: uppercase; color: #f4f7fa; text-shadow: 0 2px 0 #1b2a38; }
 .wordmark .w2 { font: 800 clamp(22px, 3.6vw, 30px)/1 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); text-shadow: 0 0 18px rgba(140,255,46,.45); }
@@ -100,6 +100,39 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .sg .n { font-size: 12px; color: var(--muted); }
 .game .m { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .game .m img { width: 20px; height: 20px; object-fit: contain; }
+.dayline { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; }
+.dayline .day { font: 800 24px/1.1 var(--display); letter-spacing: .05em; text-transform: uppercase; color: var(--ink); }
+.dayline .asof { color: var(--accent2); font-weight: 600; font-size: 14px; }
+.days { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; font: 800 13px/1 var(--display); letter-spacing: .07em; text-transform: uppercase;
+  padding: 7px 11px; border-radius: 5px; border: 1px solid var(--rule); background: var(--card); color: var(--ink); cursor: pointer; text-decoration: none; }
+.btn:hover { border-color: var(--accent2); } .btn.on { background: var(--accent); color: #04110a; border-color: var(--accent); }
+.btn[disabled] { opacity: .6; cursor: progress; }
+.sheet header .btn { margin-left: auto; }
+.line1 .btn { padding: 4px 8px; font-size: 11.5px; color: var(--accent); border-color: rgba(140,255,46,.45); }
+.chip.started { color: #ffbe3d; background: rgba(255,190,61,.13); }
+.chip.beta { color: #04110a; background: var(--accent2); vertical-align: 4px; }
+.chip.phase { color: var(--accent2); background: rgba(31,168,255,.14); }
+a.sg { color: inherit; text-decoration: none; cursor: pointer; transition: border-color .15s, transform .15s; }
+a.sg:hover { border-color: var(--accent); transform: translateY(-1px); }
+.gamebar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 12px 14px; border: 1px solid #1d3a55; border-radius: 10px; background: var(--bg2); }
+.gamebar .gm { display: flex; align-items: center; gap: 8px; font: 800 24px/1.1 var(--display); text-transform: uppercase; letter-spacing: .03em; }
+.gamebar .gm img { width: 30px; height: 30px; object-fit: contain; }
+.xframe { position: fixed; left: -30000px; top: 0; width: 1080px; padding: 36px 40px 30px; display: grid; gap: 20px; color: var(--ink); font: 16px/1.5 var(--body);
+  background: radial-gradient(900px 480px at 10% -8%, rgba(31,168,255,.25), transparent 62%), radial-gradient(800px 460px at 100% 6%, rgba(140,255,46,.14), transparent 60%), var(--bg); }
+.xhead { display: grid; grid-template-columns: 110px auto 1fr; gap: 20px; align-items: center; }
+.xhead > img { width: 110px; height: 110px; border-radius: 14px; box-shadow: 0 0 0 3px rgba(140,255,46,.6), 0 0 28px rgba(31,168,255,.4); }
+.xhead .w1 { font: 900 64px/.9 var(--display); letter-spacing: .02em; text-transform: uppercase; }
+.xhead .w2 { margin-top: 6px; font: 900 34px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; color: #04110a; background: var(--accent); padding: 3px 18px 1px; }
+.xday { justify-self: end; text-align: right; display: grid; gap: 6px; font: 800 24px/1.1 var(--display); text-transform: uppercase; letter-spacing: .05em; }
+.xday .xgame { display: flex; gap: 6px; align-items: center; justify-content: flex-end; color: var(--accent2); font-size: 20px; }
+.xday .xgame img { width: 24px; height: 24px; object-fit: contain; }
+.xframe section.sheet { box-shadow: none; }
+.xframe .prop { grid-template-columns: minmax(300px, 1.4fr) minmax(260px, 1.2fr) minmax(170px, .8fr); }
+.xframe .slate { grid-template-columns: repeat(4, 1fr); }
+.xfoot { display: flex; justify-content: space-between; gap: 16px; border-top: 3px solid var(--accent); padding-top: 12px;
+  font: 800 17px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.xfoot .x { color: var(--accent2); }
 @media (max-width: 760px) { .prop { grid-template-columns: 1fr; } }
 </style></head><body>
 <!--__SITE_HEADER__-->
@@ -108,38 +141,52 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
   <header style="display:grid;gap:12px">
     <div class="brand"><img alt="Syndicate ROI" src="__LOGO_SRC__">
       <div class="wordmark"><span class="w1 slant">Syndicate ROI</span><span class="w2 slant">Cheat Sheets</span></div></div>
+    <div class="dayline"><span class="day" id="dayLabel"></span><span class="asof" id="asOf"></span></div>
+    <nav class="days" id="days" aria-label="Sheet date"></nav>
     <p class="sub">Every row puts the bet next to what the price already says. A streak or a matchup only counts when the best available price leaves room for it.</p>
     <div class="tabs" role="tablist" id="tabs"></div>
     <div class="legend">
       <span><i class="tick" style="background:var(--price)"></i>Price implies</span>
       <span><i class="tick" style="background:var(--fair)"></i>Market fair (no vig)</span>
       <span><i style="border:2px solid var(--model);background:transparent"></i>Syndicate model</span>
-      <span><i style="background:var(--form)"></i>Form-adjusted (provisional)</span>
+      <span><i style="background:var(--form)"></i>Form-adjusted estimate</span>
       <span><i style="background:var(--hit)"></i>Hit</span><span><i style="background:var(--miss)"></i>Miss</span>
     </div>
-    <p class="note" id="method"></p>
   </header>
+  <div id="gamebar"></div>
   <main id="sheet" style="display:grid;gap:18px"></main>
   <footer class="foot"><span><b>Data driven</b> · <b>Discipline</b> · <b>Long-term edge</b></span><span class="honest">We post the wins. We post the losses.</span><span class="x">@SyndicateROI</span></footer>
 </div>
 
 <script>
 const DATA = /*__DATA__*/null;
+const META = /*__META__*/null || {mode: "static"};
+const LOGO_SRC = "__LOGO_SRC__";
 const SPORT_NAMES = {nfl: "NFL", ncaaf: "NCAAF", nhl: "NHL", soccer: "Soccer", nba: "NBA", wnba: "WNBA", ncaab: "NCAAB", mlb: "MLB"};
+const TZ = "America/Chicago";
 const pct = p => (p == null ? "–" : (100 * p).toFixed(0) + "%");
 const odds = p => (p == null ? "–" : (p > 0 ? "+" : "") + p);
 const evs = v => (v == null ? "–" : (v > 0 ? "+" : "") + v.toFixed(1) + "%");
 const implied = a => (a == null ? null : (a > 0 ? 100 / (a + 100) : -a / (-a + 100)));
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
-const img = (src, cls) => src ? `<img src="${esc(src)}" alt="" loading="lazy" ${cls ? `class="${cls}"` : ""} onerror="this.remove()">` : "";
-const initials = n => esc(String(n || "").split(/\s+/).map(w => w[0] || "").slice(0, 2).join("").toUpperCase());
+const src = (local, remote) => local || remote || null;
+const img = (s, cls) => s ? `<img src="${esc(s)}" alt="" ${cls ? `class="${cls}"` : ""} onerror="this.remove()">` : "";
+const initials = n => esc(String(n || "").split(/\s+/).map(w => (w[0] || "").replace(/[^A-Za-z]/g, "")).slice(0, 2).join("").toUpperCase());
+// Every date and time a viewer sees is US Central (user 2026-10-14).
+const ctTime = iso => { const t = Date.parse(iso || ""); return isNaN(t) ? "" : new Date(t).toLocaleTimeString("en-US", {timeZone: TZ, hour: "numeric", minute: "2-digit"}) + " CT"; };
+const ctDateTime = iso => { const t = Date.parse(iso || ""); return isNaN(t) ? "" : new Date(t).toLocaleString("en-US", {timeZone: TZ, month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}) + " CT"; };
+const dayName = day => new Date(day + "T17:00:00Z").toLocaleDateString("en-US", {timeZone: TZ, weekday: "long", month: "long", day: "numeric"});
+const dayShort = day => new Date(day + "T17:00:00Z").toLocaleDateString("en-US", {timeZone: TZ, weekday: "short", month: "short", day: "numeric"});
+const started = iso => { const t = Date.parse(iso || ""); return !isNaN(t) && t <= Date.now(); };
+const VERDICT = {value: "Value", streak_with_room: "Streak with room", streak_priced_in: "Priced in", neutral: "Neutral", one_sided_fair: "One-sided price"};
+const STATE = {sport: null, game: null};
+
 function face(r) {
-  if (r.headshot_url) return `<div class="face"><img src="${esc(r.headshot_url)}" alt="" loading="lazy" onerror="this.parentNode.innerHTML='<span class=&quot;ini&quot;>${initials(r.player)}</span>'"></div>`;
-  if (r.team_logo) return `<div class="face crest">${img(r.team_logo)}</div>`;
+  const head = src(r.headshot_src, r.headshot_url), crest = src(r.team_logo_src, r.team_logo);
+  if (head) return `<div class="face"><img src="${esc(head)}" alt="" onerror="this.parentNode.innerHTML='<span class=&quot;ini&quot;>${initials(r.player)}</span>'"></div>`;
+  if (crest) return `<div class="face crest">${img(crest)}</div>`;
   return `<div class="face"><span class="ini">${initials(r.player)}</span></div>`;
 }
-const VERDICT = {value: "Value", streak_with_room: "Streak with room", streak_priced_in: "Priced in", neutral: "Neutral", one_sided_fair: "One-sided price"};
-
 function strip(c) {
   const m = (cls, p, label) => p == null ? "" : `<span class="mk ${cls}" style="left:${(100 * p).toFixed(1)}%" title="${label} ${pct(p)}"></span>`;
   return `<div class="strip" aria-label="price ${pct(implied(c.price))}, fair ${pct(c.p_market)}, model ${pct(c.p_model)}, form ${pct(c.p_posterior)}">
@@ -152,70 +199,175 @@ function formDots(r) {
     return `<span class="dot ${hit ? "hit" : ""}" title="${esc((r.form_labels || [])[i] || "")} ${v}"></span>`;
   }).join("");
 }
+const ordinal = n => n + (["th", "st", "nd", "rd"][((n % 100) - 20) % 10] || ["th", "st", "nd", "rd"][n % 100] || "th");
 function propRow(r) {
-  const c = r.check, dvp = r.dvp ? ` · opp allows the ${r.dvp.nth_most}${["th","st","nd","rd"][((r.dvp.nth_most%100-20)%10)] || ["th","st","nd","rd"][r.dvp.nth_most%100] || "th"} most ${esc(r.dvp.stat.replace("_", " "))} to ${esc(r.pos)}` : "";
+  const c = r.check, dvp = r.dvp ? ` · opp allows the ${ordinal(r.dvp.nth_most)} most ${esc(String(r.dvp.stat).replace("_", " "))} to ${esc(r.pos)}` : "";
   const ev = c.verdict === "value" ? c.ev_market : c.ev_posterior;
+  const card = r.card_ok && META.mode === "app"
+    ? `<a class="btn no-export" href="/cheatsheets/card/${esc(STATE.sport)}/${esc(META.date)}/${esc(r.card_id)}" target="_blank" rel="noopener">Pick graphic</a>` : "";
+  const live = started(r.commence_time) ? `<span class="chip started">Started</span>` : "";
   return `<div class="prop">
     <div class="who">${face(r)}
-      <div class="line1"><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span><b>${esc(r.player)}</b>${r.pos ? `<span class="pos">${esc(r.pos)}</span>` : ""}</div>
-      <div class="meta"><span class="tm">${img(r.team_logo)}${esc(r.team || "")}</span>${r.opponent ? ` vs <span class="tm">${img(r.opponent_logo)}${esc(r.opponent)}</span>` : ""}${r.kickoff_ct ? ` · <span class="kick">${esc(r.kickoff_ct)}</span>` : ""}${dvp}${r.injury ? " · " + esc(r.injury) : ""}</div>
+      <div class="line1"><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span>${live}<b>${esc(r.player)}</b>${r.pos ? `<span class="pos">${esc(r.pos)}</span>` : ""}${card}</div>
+      <div class="meta"><span class="tm">${img(src(r.team_logo_src, r.team_logo))}${esc(r.team || "")}</span>${r.opponent ? ` vs <span class="tm">${img(src(r.opponent_logo_src, r.opponent_logo))}${esc(r.opponent)}</span>` : ""}${r.kickoff_ct ? ` · <span class="kick">${esc(r.kickoff_ct)}</span>` : ""}${dvp}${r.injury ? " · " + esc(r.injury) : ""}</div>
       <div class="bet">${esc(r.market)} ${esc(r.side)} ${r.line ?? ""} · ${odds(c.price)} ${esc(c.book || "")}</div></div>
     <div>${strip(c)}<div class="nums"><span>price <b>${pct(implied(c.price))}</b></span><span>fair <b>${pct(c.p_market)}</b></span><span>model <b>${pct(c.p_model)}</b></span><span>form-adj <b>${pct(c.p_posterior)}</b></span></div></div>
-    <div><div class="form">${formDots(r)}</div><div class="nums"><span>L5 <b>${c.form5.hits}/${c.form5.games}</b></span><span>L10 <b>${c.form10.hits}/${c.form10.games}</b></span>
+    <div><div class="form">${formDots(r)}</div><div class="nums"><span>L5 <b>${c.form5 ? c.form5.hits + "/" + c.form5.games : "–"}</b></span><span>L10 <b>${c.form10 ? c.form10.hits + "/" + c.form10.games : "–"}</b></span>
       <span class="ev ${ev > 0 ? "pos" : "neg"}">EV ${evs(ev)}</span></div></div>
     ${c.reasons && c.reasons.length ? `<div class="why">${c.reasons.map(esc).join(" · ")}</div>` : ""}
   </div>`;
 }
 const SECTIONS = [
-  ["value", "Value at the best price", "The best available price beats the no-vig market fair by 2% or more. This is the board's Suggested rule; form and model are shown, not used."],
-  ["streaks_with_room", "Streaks the price leaves room for", "Cleared this line in at least 4 of the last 5, and the form-adjusted probability still beats the price. Form weight is provisional until the consistency backtest fits it."],
-  ["streaks_priced_in", "Streaks the price already pays for", "Hot on this line, but the price already implies more than the form-adjusted estimate. This is the consistency ticket's blind spot."],
+  ["value", "Value at the best price", "The best available price beats the no-vig fair price by 2% or more."],
+  ["streaks_with_room", "Streaks the price leaves room for", "Cleared this line in at least 4 of the last 5, and the form-adjusted estimate still beats the price."],
+  ["streaks_priced_in", "Streaks the price already pays for", "Hot on this line, but the price already implies more than the form-adjusted estimate."],
 ];
-function shopTable(d) {
-  const ids = (d.sections.shop_gaps || []);
+const exportBtn = name => `<button type="button" class="btn no-export" data-export="${esc(name)}">Export image</button>`;
+function sectionShell(key, title, blurb, count, inner) {
+  return `<section class="sheet" data-section="${esc(key)}" data-title="${esc(title)}"><header><h2>${title}</h2><p>${blurb}</p><span class="count">${count}</span>${exportBtn(key)}</header>${inner}</section>`;
+}
+function shopTable(d, ids) {
   if (!ids.length) return `<div class="empty">No line with three or more books and a gap of 2 points or more.</div>`;
   return `<div class="tbl"><table><thead><tr><th>Player</th><th>Bet</th><th>Best book</th><th>Books</th><th>Best implied</th><th>Median implied</th><th>Given away</th></tr></thead><tbody>${
     ids.map(i => { const r = d.rows[i], s = r.shop; return `<tr><td>${esc(r.player)}</td><td>${esc(r.market)} ${esc(r.side)} ${r.line ?? ""}</td><td>${esc(s.best_book)}</td><td class="n">${s.books}</td><td class="n">${pct(s.best_implied)}</td><td class="n">${pct(s.median_implied)}</td><td class="n">${s.gap_pp.toFixed(1)} pts</td></tr>`; }).join("")}</tbody></table></div>`;
 }
-function gamesBlock(d) {
-  const games = (d.games || []).filter(g => g.script || g.defense_allows_most);
+const matchupLine = g => `${img(src(g.away_logo_src, g.away_logo))}${esc(g.away_team || "")} @ ${img(src(g.home_logo_src, g.home_logo))}${esc(g.home_team || g.matchup || "")}`;
+function gamesBlock(d, games) {
+  games = games.filter(g => g.script || g.defense_allows_most);
   if (!games.length) return "";
-  return `<section class="sheet"><header><h2>Game script and matchups</h2><p>Expected script from Syndicate's game sim, and where each defense allows the most. Context, not picks: these inputs were tested and found mostly priced.</p></header><div class="games">${
-    games.map(g => `<div class="game"><div class="m">${img(g.away_logo)}${esc(g.away_team || "")} @ ${img(g.home_logo)}${esc(g.home_team || g.matchup)}${g.kickoff_ct ? ` · <span class="kick">${esc(g.kickoff_ct)}</span>` : ""}</div>${g.script ? `<div class="read">${esc(g.script.read)}${g.script.total_mean ? ` · total ${Number(g.script.total_mean).toFixed(1)}` : ""}</div>${g.script.helped ? `<ul><li>Helped: ${g.script.helped.map(esc).join(", ")}</li><li>Hurt: ${g.script.hurt.map(esc).join(", ")}</li></ul>` : ""}` : ""}${
-      g.defense_allows_most ? Object.entries(g.defense_allows_most).map(([def, cells]) => `<ul>${cells.map(c => `<li>${esc(def)} allow the ${c.nth_most}${c.nth_most===1?"st":c.nth_most===2?"nd":c.nth_most===3?"rd":"th"} most ${esc(c.stat.replace("_", " "))} to ${esc(c.pos)} (${c.per_game}/g)</li>`).join("")}</ul>`).join("") : ""}</div>`).join("")}</div></section>`;
+  return sectionShell("script", "Game script and matchups", "Expected game script from Syndicate's simulations, and where each defense allows the most. Context, not picks.", `${games.length} games`,
+    `<div class="games">${games.map(g => `<div class="game"><div class="m">${matchupLine(g)}${g.kickoff_ct ? ` · <span class="kick">${esc(g.kickoff_ct)}</span>` : ""}</div>${g.script ? `<div class="read">${esc(g.script.read)}${g.script.total_mean ? ` · total ${Number(g.script.total_mean).toFixed(1)}` : ""}</div>${g.script.helped ? `<ul><li>Helped: ${g.script.helped.map(esc).join(", ")}</li><li>Hurt: ${g.script.hurt.map(esc).join(", ")}</li></ul>` : ""}` : ""}${
+      g.defense_allows_most ? Object.entries(g.defense_allows_most).map(([def, cells]) => `<ul>${cells.map(c => `<li>${esc(def)} allow the ${ordinal(c.nth_most)} most ${esc(String(c.stat).replace("_", " "))} to ${esc(c.pos)} (${c.per_game}/g)</li>`).join("")}</ul>`).join("") : ""}</div>`).join("")}</div>`);
 }
 function slateBlock(d) {
   const games = (d.games || []).slice().sort((a, b) => String(a.commence_time).localeCompare(String(b.commence_time)));
   if (!games.length) return "";
-  const n = {};
-  games.forEach(g => { n[g.event_id] = g.props || 0; });
-  return `<section class="sheet"><header><h2>The slate</h2><p>Every game on this sheet, in kickoff order (US Central).</p><span class="count">${games.length} games</span></header><div class="slate">${
-    games.map(g => `<div class="sg"><div class="when">${esc(g.kickoff_ct || "")}</div><div class="teams"><div class="t">${img(g.away_logo)}${esc(g.away_team || "")}</div><div class="t">${img(g.home_logo)}${esc(g.home_team || "")}</div></div>${n[g.event_id] ? `<div class="n">${n[g.event_id]} props on this sheet</div>` : ""}</div>`).join("")}</div></section>`;
+  return sectionShell("slate", "The slate", "Every game on this sheet in kickoff order. Pick a game for its own sheet.", `${games.length} games`,
+    `<div class="slate">${games.map(g => `<a class="sg" href="${gameHref(g.event_id)}" data-game="${esc(g.event_id)}"><div class="when">${esc(g.kickoff_ct || "")}${started(g.commence_time) ? ` <span class="chip started">Started</span>` : ""}</div><div class="teams"><div class="t">${img(src(g.away_logo_src, g.away_logo))}${esc(g.away_team || "")}</div><div class="t">${img(src(g.home_logo_src, g.home_logo))}${esc(g.home_team || "")}</div></div><div class="n">${g.props || 0} props on this sheet</div></a>`).join("")}</div>`);
 }
 function newsBlock(d) {
   const news = d.news || [];
   if (!news.length) return "";
-  return `<section class="sheet"><header><h2>News impact</h2><p>Status changes captured by Syndicate's news collector in the last day, with that team's game props on the board.</p><span class="count">${news.length}</span></header><div class="tbl"><table><thead><tr><th>Player</th><th>Team</th><th>Change</th><th>Captured</th><th>Game props on board</th></tr></thead><tbody>${
-    news.slice(0, 20).map(n => `<tr><td>${esc(n.player)}</td><td>${esc(n.team)}</td><td>${esc(n.previous_status || "not listed")} → ${esc(n.status || "cleared")}</td><td class="n">${esc((n.captured_at || "").slice(5, 16).replace("T", " "))}Z</td><td class="n">${n.game_props_on_board}</td></tr>`).join("")}</tbody></table></div></section>`;
+  return sectionShell("news", "News impact", "Status changes captured by Syndicate's news collector in the last day, with that team's game props on the board.", `${news.length}`,
+    `<div class="tbl"><table><thead><tr><th>Player</th><th>Team</th><th>Change</th><th>Captured</th><th>Game props on board</th></tr></thead><tbody>${
+      news.slice(0, 20).map(n => `<tr><td>${esc(n.player)}</td><td>${esc(n.team)}</td><td>${esc(n.previous_status || "not listed")} → ${esc(n.status || "cleared")}</td><td class="n">${esc(ctDateTime(n.captured_at))}</td><td class="n">${n.game_props_on_board}</td></tr>`).join("")}</tbody></table></div>`);
 }
-function render(sport) {
-  const d = DATA[sport];
+function gameHref(id) {
+  const q = new URLSearchParams();
+  if (META.date && META.date !== META.today) q.set("date", META.date);
+  q.set("sport", STATE.sport); if (id) q.set("game", id);
+  return "?" + q.toString();
+}
+function sectionsFor(d) {
+  return STATE.game ? ((d.game_sections || {})[STATE.game] || {}) : (d.sections || {});
+}
+function render() {
+  const sport = STATE.sport, d = DATA[sport];
   document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.sport === sport ? "true" : "false"));
-  document.getElementById("method").textContent = `${SPORT_NAMES[sport]} · ${d.date} · generated ${String(d.generated_at || "").replace("T", " ").replace("Z", " UTC")} · ${d.groups_built} of ${d.groups_on_board} player-stat groups built. Form-adjusted = (k × market fair + hits) ÷ (k + games), k = ${d.method.prior_strength_k}${d.method.k_is_provisional ? " (provisional)" : ""}.`;
-  let html = slateBlock(d) + SECTIONS.map(([key, title, blurb]) => {
-    const ids = d.sections[key] || [];
-    return `<section class="sheet"><header><h2>${title}</h2><p>${blurb}</p><span class="count">${ids.length} rows</span></header><div class="rowlist">${ids.length ? ids.map(i => propRow(d.rows[i])).join("") : `<div class="empty">Nothing qualifies on this slate.</div>`}</div></section>`;
+  const record = META.today && META.date !== META.today;
+  document.getElementById("asOf").innerHTML = (d.phase === "postseason" ? `<span class="chip phase">Postseason</span> ` : "") + esc(d.generated_at
+    ? (record ? `Final sheet · prices as of ${ctTime(d.generated_at)}` : `Prices as of ${ctTime(d.generated_at)} · lines move, check before betting`) : "");
+  const game = STATE.game ? (d.games || []).find(g => g.event_id === STATE.game) : null;
+  if (STATE.game && !game) STATE.game = null;
+  const secs = sectionsFor(d);
+  document.getElementById("gamebar").innerHTML = game
+    ? `<div class="gamebar"><a class="btn" href="${gameHref(null)}" data-game="">← Full ${esc(SPORT_NAMES[sport] || sport)} slate</a><div class="gm">${matchupLine(game)}</div><div class="kick">${esc(game.kickoff_ct || "")}${game.frozen_at ? ` · prices frozen at ${esc(ctTime(game.frozen_at))}` : ""}</div></div>` : "";
+  let html = game ? "" : slateBlock(d);
+  html += SECTIONS.map(([key, title, blurb]) => {
+    const ids = secs[key] || [];
+    return sectionShell(key, title, blurb, `${ids.length} rows`, `<div class="rowlist">${ids.length ? ids.map(i => propRow(d.rows[i])).join("") : `<div class="empty">Nothing qualifies on this ${game ? "game" : "slate"}.</div>`}</div>`);
   }).join("");
-  html += `<section class="sheet"><header><h2>Price shopping</h2><p>Same line, same side: what betting the median book gives away against the best one.</p></header>${shopTable(d)}</section>`;
-  html += gamesBlock(d) + newsBlock(d);
+  html += sectionShell("shop", "Price shopping", "Same line, same side: what betting the median book gives away against the best one.", "", shopTable(d, secs.shop_gaps || []));
+  html += gamesBlock(d, game ? [game] : (d.games || []));
+  if (!game) html += newsBlock(d);
   document.getElementById("sheet").innerHTML = html;
 }
+function go(sport, game, push) {
+  STATE.sport = sport; STATE.game = game || null;
+  if (push && META.mode === "app") { try { history.pushState({sport, game}, "", gameHref(STATE.game)); } catch (e) {} }
+  render();
+  if (push) window.scrollTo({top: 0});
+}
+document.addEventListener("click", ev => {
+  const g = ev.target.closest("[data-game]");
+  if (g && !ev.metaKey && !ev.ctrlKey) { ev.preventDefault(); go(STATE.sport, g.dataset.game, true); return; }
+  const x = ev.target.closest("[data-export]");
+  if (x) { ev.preventDefault(); exportSection(x); }
+});
+window.addEventListener("popstate", () => { const q = new URLSearchParams(location.search); if (DATA[q.get("sport")]) go(q.get("sport"), q.get("game"), false); });
+
+// ---- Export: one branded image per section (for X). Images are same-origin (the generator caches them) or inlined,
+// so the canvas is never tainted. html-to-image loads on the first export only.
+let h2i = null;
+function loadH2I() {
+  if (window.htmlToImage) return Promise.resolve();
+  h2i = h2i || new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js";
+    s.onload = resolve; s.onerror = () => reject(new Error("export library did not load"));
+    document.head.appendChild(s);
+  });
+  return h2i;
+}
+const settle = el => Promise.all([...el.querySelectorAll("img")].map(i => i.complete ? null : new Promise(r => { i.onload = i.onerror = r; })));
+async function buildExport(section) {
+  const d = DATA[STATE.sport], game = STATE.game ? (d.games || []).find(g => g.event_id === STATE.game) : null;
+  const frame = document.createElement("div");
+  frame.className = "xframe";
+  frame.innerHTML = `<div class="xhead"><img src="${esc(LOGO_SRC)}" alt=""><div><div class="w1 slant">Syndicate ROI</div><div class="w2 slant">${esc(SPORT_NAMES[STATE.sport] || STATE.sport)} cheat sheet</div></div>
+      <div class="xday"><b>${esc(dayName(META.date || d.date))}</b>${game ? `<span class="xgame">${matchupLine(game)}</span>` : ""}</div></div>
+    <div class="xbody"></div>
+    <div class="xfoot"><span>Prices as of ${esc(ctTime(d.generated_at))} · lines move</span><span class="x">@SyndicateROI</span><span>21+ · Bet responsibly</span></div>`;
+  const body = section.cloneNode(true);
+  body.querySelectorAll(".no-export").forEach(n => n.remove());
+  body.querySelectorAll(".rowlist").forEach(list => [...list.children].slice(10).forEach(n => n.remove()));
+  body.querySelectorAll("tbody").forEach(tb => [...tb.children].slice(12).forEach(n => n.remove()));
+  body.querySelectorAll(".slate").forEach(s => [...s.children].slice(16).forEach(n => n.remove()));
+  frame.querySelector(".xbody").appendChild(body);
+  document.body.appendChild(frame);
+  await settle(frame);
+  if (document.fonts && document.fonts.ready) await document.fonts.ready;
+  return frame;
+}
+async function exportSection(btn) {
+  const section = btn.closest("section.sheet");
+  const label = btn.textContent;
+  btn.textContent = "Rendering…"; btn.disabled = true;
+  let frame = null;
+  try {
+    await loadH2I();
+    frame = await buildExport(section);
+    const url = await window.htmlToImage.toPng(frame, {pixelRatio: 2, backgroundColor: "#04070c"});
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `syndicate-${STATE.sport}-${META.date || DATA[STATE.sport].date}${STATE.game ? "-game" : ""}-${section.dataset.section}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+    window.__lastExport = url;
+  } catch (e) {
+    alert("Export failed: " + e.message);
+  } finally {
+    if (frame) frame.remove();
+    btn.textContent = label; btn.disabled = false;
+  }
+}
+
 (function init() {
   const sports = Object.keys(DATA || {});
+  if (META.date) document.getElementById("dayLabel").innerHTML = esc((META.date === META.today ? "Today · " : "") + dayName(META.date))
+    + (META.beta ? ` <span class="chip beta">Beta</span>` : "");
+  if (META.mode === "app" && (META.dates || []).length) {
+    document.getElementById("days").innerHTML = META.dates.slice(0, 8).map(day =>
+      `<a class="btn ${day === META.date ? "on" : ""}" href="${day === META.today ? "?" : "?date=" + day}">${day === META.today ? "Today" : esc(dayShort(day))}</a>`).join("");
+  }
   document.getElementById("tabs").innerHTML = sports.map(s => `<button class="tab" role="tab" data-sport="${s}">${SPORT_NAMES[s] || s}</button>`).join("");
-  document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => render(t.dataset.sport)));
-  if (sports.length) render(sports[0]);
-  else document.getElementById("sheet").innerHTML = `<section class="sheet"><div class="empty">No cheat sheet has been published for this date yet. Sheets are built by the daily generator, never on a page load.</div></section>`;
+  document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => go(t.dataset.sport, null, true)));
+  if (!sports.length) {
+    document.getElementById("sheet").innerHTML = `<section class="sheet"><div class="empty">${META.date && META.date === META.today
+      ? "Today's sheets publish at 8:30 AM CT and refresh at 12:30 and 4:30 PM CT." : "No cheat sheet was published for this date."}</div></section>`;
+    return;
+  }
+  const q = new URLSearchParams(location.search);
+  go(sports.includes(q.get("sport")) ? q.get("sport") : sports[0], q.get("game"), false);
 })();
 </script>
 </body></html>
