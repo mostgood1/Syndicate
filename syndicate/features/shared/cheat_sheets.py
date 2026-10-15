@@ -259,7 +259,33 @@ def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25) -> dict[str, l
                                     key=lambda i: ev(i, "ev_posterior"))[:top],
         "shop_gaps": sorted((i for i in idx if (rows[i].get("shop") or {}).get("gap_pp", 0) >= 2.0),
                             key=lambda i: -(rows[i].get("shop") or {}).get("gap_pp", 0))[:top],
+        # Streaks are shown as what they measured to be: already in the price (consistency backtest 2026-10-14, NFL +
+        # NBA + MLB, 2,197 tout-style 5/5 rungs: hit 2.6 pts BELOW the Shin fair [-4.9, -0.3], ROI -8.5%; a shrunk
+        # streak estimate added nothing out of sample). One section, ordered by the record, EV = price vs fair.
+        "hot_streaks": sorted((i for i in idx if verdict(i) in ("streak_with_room", "streak_priced_in")),
+                              key=lambda i: (-_form(rows[i], "form10").get("rate", 0), -_form(rows[i], "form5").get("hits", 0)))[:top],
+        # Strong form where only one side is quoted (soccer shots / SOT / assists are almost all one book, over only):
+        # no fair price exists to measure the streak against, so it is shown as form and model -- never as edge.
+        "hot_form": sorted((i for i in idx if verdict(i) == "one_sided_fair" and _hot(rows[i])),
+                           key=lambda i: (-_form(rows[i], "form10").get("rate", 0), -_form(rows[i], "form5").get("hits", 0)))[:top],
+        # Everything on the board, for a game's own sheet (the page shows it there only).
+        "every_prop": sorted(idx, key=lambda i: (str(rows[i].get("market")), str(rows[i].get("player")),
+                                                 rows[i].get("line") if isinstance(rows[i].get("line"), (int, float)) else 0,
+                                                 str(rows[i].get("side"))))[:EVERY_PROP_CAP],
     }
+
+
+EVERY_PROP_CAP = 200
+
+
+def _form(row: Mapping[str, Any], key: str) -> Mapping[str, Any]:
+    return (row.get("check") or {}).get(key) or {}
+
+
+def _hot(row: Mapping[str, Any]) -> bool:
+    f5, f10 = _form(row, "form5"), _form(row, "form10")
+    return (f5.get("games", 0) >= STREAK_MIN_GAMES and f5.get("hits", 0) >= 4) or \
+        (f10.get("games", 0) >= 8 and (f10.get("rate") or 0) >= STREAK_RATE)
 
 
 SPORT_ORDER = ("nfl", "ncaaf", "nba", "nhl", "soccer", "ncaab", "wnba", "mlb")
@@ -290,6 +316,7 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
             by_game.setdefault(r.get("event_id"), []).append(i)
         doc = dict(sheet)
         doc["rows"] = rows
+        doc["sections"] = sections(rows)
         doc["games"] = [dict(g, props=len(by_game.get(g.get("event_id"), []))) for g in sheet.get("games") or []]
         doc["game_sections"] = {
             str(event): {k: [idx[j] for j in ids] for k, ids in sections([rows[i] for i in idx]).items()}

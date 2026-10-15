@@ -18,6 +18,7 @@ import argparse
 import glob
 import json
 import os
+import statistics
 import sys
 import time
 import urllib.request
@@ -199,6 +200,74 @@ def dvp_for(dvp: dict[str, Any], opponent: str | None, pos: str | None, market: 
             "games": cell.get("games"), "through_week": dvp.get("through_week")}
 
 
+def _parse_ts(value: Any) -> datetime | None:
+    try:
+        t = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
+
+
+def quote_rows(data_root: Path, sport: str, day: str, *, skip_events: set[str], now: datetime) -> list[dict[str, Any]]:
+    """Board-shaped pregame prop rows REBUILT from the quote logs, for `day`'s games that have STARTED.
+
+    A game that kicked off before any sheet priced it (user 2026-10-14: "make sure we have sheets for each possible
+    sport for 10-14") gets each book's LAST quote at or before kickoff; each book's two-sided pair is Shin-devigged
+    and the fair is the median across books; the price is the best book's. A one-sided market (an anytime scorer) has
+    no pair to devig and is left out rather than given an assumed hold. These rows carry no model projection."""
+    import importlib.util
+
+    from syndicate.features.shared.opportunity_signals import devig
+
+    spec = importlib.util.spec_from_file_location("news_price_follow", REPO_ROOT / "scripts" / "news_price_follow.py")
+    npf = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(npf)
+    latest: dict[tuple, tuple[datetime, dict[str, Any]]] = {}
+    games: dict[str, dict[str, Any]] = {}
+    for q in npf.load_quotes(data_root, sport, day, day):
+        if q.get("kind") != "prop" or str(q.get("segment") or "full") != "full" or not q.get("player_name"):
+            continue
+        event = str(q.get("event_id"))
+        start, ts = _parse_ts(q.get("commence_time")), _parse_ts(q.get("captured_at"))
+        if event in skip_events or start is None or ts is None or ts > start or start > now:
+            continue
+        if central_day(q.get("commence_time")) != day:
+            continue
+        key = (event, q.get("market"), q.get("player_name"), q.get("line"), q.get("bookmaker"), str(q.get("selection") or "").lower())
+        if key not in latest or ts >= latest[key][0]:
+            latest[key] = (ts, q)
+        games.setdefault(event, q)
+    books: dict[tuple, dict[str, dict[str, float]]] = defaultdict(lambda: defaultdict(dict))
+    for (event, market, player, line, book, side), (_ts, q) in latest.items():
+        books[(event, market, player, line)][book][side] = float(q["price"])
+    rows = []
+    for (event, market, player, line), by_book in books.items():
+        sides = sorted({side for prices in by_book.values() for side in prices})
+        if len(sides) != 2:
+            continue
+        fairs: dict[str, list[float]] = {side: [] for side in sides}
+        for prices in by_book.values():
+            if len(prices) == 2:
+                for side, prob in zip(sides, devig([prices[x] for x in sides], method="shin") or []):
+                    fairs[side].append(prob)
+        if not fairs[sides[0]]:
+            continue
+        g = games[event]
+        for side in sides:
+            quoted = {book: prices[side] for book, prices in by_book.items() if side in prices}
+            best = max(quoted, key=lambda b: cs.decimal_odds(quoted[b]))
+            fair = statistics.median(fairs[side])
+            rows.append({
+                "kind": "prop", "game_state": "pregame", "segment": "full", "sport": sport, "event_id": event,
+                "player_name": player, "market": market, "line": line, "side": side, "home_team": g.get("home_team"),
+                "away_team": g.get("away_team"), "commence_time": g.get("commence_time"), "projection": {}, "rebuilt": True,
+                "ev_pct": round(100 * (fair * cs.decimal_odds(quoted[best]) - 1), 2),
+                "quote": {"price": quoted[best], "bookmaker": best, "fair_probability": fair,
+                          "fair_method": "shin_last_pregame_quotes", "book_prices": quoted},
+            })
+    return rows
+
+
 def group_rows(rows: list[dict[str, Any]]) -> dict[tuple, list[dict[str, Any]]]:
     groups: dict[tuple, list[dict[str, Any]]] = defaultdict(list)
     for r in rows:
@@ -294,7 +363,8 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
         if event_id not in games:
             g = {"event_id": event_id, "matchup": f"{away} @ {home}", "commence_time": rep.get("commence_time"),
                  "kickoff_ct": kickoff_ct(rep.get("commence_time")), "home_team": home, "away_team": away,
-                 "home_logo": logo_url(sport, home, rep.get("home_key")), "away_logo": logo_url(sport, away, rep.get("away_key"))}
+                 "home_logo": logo_url(sport, home, rep.get("home_key")), "away_logo": logo_url(sport, away, rep.get("away_key")),
+                 "rebuilt": bool(rep.get("rebuilt"))}
             if sport in ("nfl", "ncaaf") and sim:
                 margin = sim.get("margin_mean")
                 if isinstance(sim.get("home_score_mean"), (int, float)) and isinstance(sim.get("away_score_mean"), (int, float)):
@@ -408,6 +478,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--date", default=None, help="selected date (default: today, US Central)")
     ap.add_argument("--base-url", default=os.environ.get("SYNDICATE_BASE_URL") or "http://127.0.0.1:10000")
     ap.add_argument("--cap", type=int, default=None, help="override the per-sport group cap")
+    ap.add_argument("--from-quotes", action="store_true",
+                    help="add the day's STARTED games that no sheet priced, rebuilt from their last pregame quotes")
     args = ap.parse_args(argv)
     if not args.data_root:
         print("REFUSING: no --data-root", flush=True)
@@ -429,18 +501,22 @@ def main(argv: list[str] | None = None) -> int:
         if not in_season(sport, selected):
             print(f"CHEAT_SHEET {sport} date={selected} not in its regular season or postseason -- skipped", flush=True)
             continue
-        try:
-            rows = fetch_rows(args.base_url, sport)
-        except Exception as exc:  # noqa: BLE001
-            print(f"CHEAT_SHEET {sport} fetch failed: {type(exc).__name__}: {exc}", flush=True)
-            continue
-        sheet = build_sport(sport, rows, selected_date=selected, cap=args.cap or DEFAULT_CAPS.get(sport, 80), dvp=dvp,
-                            context=context, positions=positions)
         target = data_root / "cheatsheets" / sport / f"{selected}.json"
         try:
             prior = json.loads(target.read_text(encoding="utf-8")) if target.is_file() else None
         except (OSError, ValueError):
             prior = None
+        try:
+            if args.from_quotes:
+                kept = {str(r.get("event_id")) for r in (prior or {}).get("rows") or []}
+                rows = quote_rows(data_root, sport, selected, skip_events=kept, now=datetime.now(timezone.utc))
+            else:
+                rows = fetch_rows(args.base_url, sport)
+        except Exception as exc:  # noqa: BLE001
+            print(f"CHEAT_SHEET {sport} fetch failed: {type(exc).__name__}: {exc}", flush=True)
+            continue
+        sheet = build_sport(sport, rows, selected_date=selected, cap=args.cap or DEFAULT_CAPS.get(sport, 80), dvp=dvp,
+                            context=context, positions=positions)
         sheet = merge_with_record(sheet, prior, now=datetime.now(timezone.utc))
         sheet["phase"] = season_phase(sport, selected)
         if not sheet["rows"] and prior is None:

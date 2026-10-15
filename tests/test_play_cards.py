@@ -43,7 +43,7 @@ def test_select_is_best_ev_first_one_card_per_player_capped():
 def test_why_and_risk_put_the_model_in_the_risk_box_and_thin_books_first():
     why, risk = pc.why_and_risk(_row(books=2, suggested=True), {"script": {"read": "LAR projected ahead by 9.6"}})
     assert why[0].startswith("Best price -139 beats the no-vig fair (-151) by +3.0%")
-    assert "Cleared this line in 9 of the last 10 games" in why and "Sim script: LAR projected ahead by 9.6" in why
+    assert not any("last 10" in w for w in why) and "Sim script: LAR projected ahead by 9.6" in why   # form is context only
     assert risk[0].startswith("Only 2 books quote this side")
     assert any("Model says 55% vs market 60%" in r for r in risk)
 

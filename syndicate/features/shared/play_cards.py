@@ -99,11 +99,8 @@ def why_and_risk(row: Mapping[str, Any], game: Mapping[str, Any] | None) -> tupl
     shop = row.get("shop") or {}
     if shop.get("gap_pp", 0) >= 1.0:
         why.append(f"{shop.get('books')} books quote it; the median book is {shop['gap_pp']:.1f} pts worse than the best")
-    f10 = c.get("form10") or {}
-    if f10.get("games"):
-        line_word = "cleared" if (f10.get("rate") or 0) >= 0.5 else "hit"
-        (why if (f10.get("rate") or 0) >= 0.5 else risk).append(
-            f"{line_word.capitalize()} this line in {f10['hits']} of the last {f10['games']} games")
+    # Recent form is on the card's chart as context, never as a reason: streaks measured as already in the price
+    # (consistency backtest 2026-10-14: 5/5 rungs hit 2.6 pts below the fair across NFL, NBA, MLB).
     dvp = row.get("dvp") or {}
     if dvp.get("nth_most") and row.get("pos"):
         stat = str(dvp.get("stat", "")).replace("_", " ")

@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import statistics
 from pathlib import Path
+
+import pytest
 
 from syndicate.features.shared import cheat_sheets as cs
 
@@ -202,3 +206,46 @@ def test_central_day_is_the_games_date_in_central():
     m = _script()
     assert m.central_day("2026-10-15T00:40:00Z") == "2026-10-14"          # 7:40 PM CT on the 14th
     assert m.central_day("2026-10-15T05:30:00Z") == "2026-10-15" and m.central_day(None) is None
+
+
+def test_started_games_rebuild_from_their_last_pregame_quotes(tmp_path):
+    m = _script()
+    from datetime import datetime, timezone
+
+    from syndicate.features.shared.opportunity_signals import devig
+
+    folder = tmp_path / "mlb_source" / "tracking" / "book_quotes"
+    folder.mkdir(parents=True)
+
+    def q(book, sel, price, t, **extra):
+        rec = {"kind": "prop", "segment": "full", "event_id": "g1", "market": "Hits", "player_name": "Shohei Ohtani",
+               "line": 0.5, "bookmaker": book, "selection": sel, "price": price, "captured_at": t,
+               "commence_time": "2026-10-15T00:10:00Z", "home_team": "Los Angeles Dodgers", "away_team": "Milwaukee Brewers"}
+        rec.update(extra)
+        return rec
+
+    recs = [q("dk", "over", -150, "2026-10-14T20:00:00Z"), q("dk", "under", 120, "2026-10-14T20:00:00Z"),
+            q("dk", "over", -170, "2026-10-14T23:50:00Z"), q("dk", "under", 135, "2026-10-14T23:50:00Z"),   # dk's last pair
+            q("fd", "over", -160, "2026-10-14T23:00:00Z"), q("fd", "under", 130, "2026-10-14T23:00:00Z"),
+            q("fd", "over", -400, "2026-10-15T01:00:00Z"),                                                   # in-play: ignored
+            q("dk", "yes", 900, "2026-10-14T23:00:00Z", market="Anytime HR"),                                 # one-sided: left out
+            q("dk", "over", -110, "2026-10-14T23:00:00Z", event_id="later", commence_time="2026-10-15T02:00:00Z")]
+    (folder / "2026-10-14.jsonl").write_text("".join(json.dumps(r) + "\n" for r in recs), encoding="utf-8")
+    now = datetime(2026, 10, 15, 1, 30, tzinfo=timezone.utc)
+    rows = m.quote_rows(tmp_path, "mlb", "2026-10-14", skip_events=set(), now=now)
+    assert sorted((r["market"], r["side"]) for r in rows) == [("Hits", "over"), ("Hits", "under")]      # not 'later': not started
+    over = next(r for r in rows if r["side"] == "over")
+    fair = statistics.median([devig([-170, 135], method="shin")[0], devig([-160, 130], method="shin")[0]])
+    assert over["quote"]["price"] == -160 and over["quote"]["bookmaker"] == "fd" and over["rebuilt"] is True
+    assert over["quote"]["fair_probability"] == pytest.approx(fair) and over["quote"]["book_prices"] == {"dk": -170.0, "fd": -160.0}
+    assert m.quote_rows(tmp_path, "mlb", "2026-10-14", skip_events={"g1"}, now=now) == []               # the record already has it
+
+
+def test_one_sided_hot_form_gets_its_own_section_and_every_prop_is_listed():
+    hot = {"player": "Shooter", "market": "player_shots", "line": 0.5, "side": "over",
+           "check": {"verdict": "one_sided_fair", "form5": {"games": 5, "hits": 5}, "form10": {"games": 10, "hits": 9, "rate": 0.9}}}
+    cold = dict(hot, player="Bench", check={"verdict": "one_sided_fair", "form5": {"games": 5, "hits": 1}, "form10": {"games": 10, "hits": 2, "rate": 0.2}})
+    priced = dict(hot, player="Priced", check={"verdict": "streak_priced_in", "form5": {"games": 5, "hits": 5}, "form10": {"games": 10, "hits": 9, "rate": 0.9}})
+    s = cs.sections([hot, cold, priced])
+    assert s["hot_form"] == [0]                                  # only one-sided rows: a priced streak has its own section
+    assert sorted(s["every_prop"]) == [0, 1, 2] and s["value"] == []
