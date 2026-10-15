@@ -147,3 +147,36 @@ of use. The ceiling is computed over the population ledger's live sightings
 per sport — different frames, which is why they are placed side by side with
 both denominators rather than divided into one number. No share is reported for
 NFL live, which had no live sides on that tick. Analysis at `nice -n 19`.
+
+---
+
+## CORRECTION, 2026-10-15 14:0xZ: the 8.6% is NOT an exchange ceiling
+
+Lane `venue-prop-series-request-side` took this file's own request-side lead and
+answered it from counters the fleet already prints. **The lead's binary was wrong
+in both branches.** The series are not unrequested and they are not unlisted:
+they are **requested, returned, retained — and nothing asks for them.**
+
+- **Every series is fetched.** `KXMLBKS` 9,957 log mentions, `KXMLBHR` 7,937,
+  `KXMLBSPREAD` 16,706, `KXNFLREC` 10,038; 135 distinct MLB series named.
+- **`demand_rungs = 0`** for all six segment series and for the `KXNFLREC` prop
+  series — 930,553 segment markets fetched, ~470,000 retained, demand zero, while
+  `KXNCAAFSPREAD` (full) demands 2,972,026 rungs.
+- **`KXMLBF5` / `KXMLBF5TOTAL` / `KXMLBF5SPREAD` are fetched every tick.** The
+  originating refusal `mlb|first5|h2h <- kalshi|full|h2h|KXMLBGAME` paired a first5
+  row with a full-game contract **while the first5 contract was in hand**.
+
+So the reason only `full|...` ever appears in `matched` is that only full-game
+shapes are DEMANDED — not that only full-game contracts exist. The 8.6% figure
+above describes **what this pipeline currently asks for**, and reading it as the
+exchange's inventory is exactly the inference this correction retracts.
+
+Three losses sit above the exchange's real inventory, all ours: **demand**
+(`demand_rungs=0`), **matching** (first5 row offered a full-game contract), and
+**eviction** (`TRIM_SELECT mode=arrival` on 2,250 of 2,250 ticks, a median 2,403
+in-window markets cut per tick while the gate below it never cuts a rung at a
+board line).
+
+What survives unchanged: the FUNNEL attribution — `offered -> present` is still the
+dominant gap, and the 404 still found no quote. What changes is WHY: not because
+no contract exists, but because this pipeline never asked for the one that did.
