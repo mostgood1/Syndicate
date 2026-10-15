@@ -67,6 +67,14 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### mlb-live-game-pks-native — OPEN — opened 2026-10-15 — session 2d413211
+- Goal: Move scripts/fetch_mlb_live_game_pks_for_date.py (the live loop's authoritative "is an MLB game live" signal) off the vendored `vendor/mlb_bettingv2` `sim_engine.data.statsapi` onto `syndicate.features.mlb.statsapi_http`, live-state logic unchanged, with identical output; deployed with a measurement (user request 2026-10-15).
+- Files: scripts/fetch_mlb_live_game_pks_for_date.py, tests/test_fetch_mlb_live_game_pks_native.py (NEW)
+- Hypothesis: the script uses only a bare StatsApiClient + fetch_schedule_for_date, which statsapi_http copies faithfully (proven identical for the schedule helper on 6 dates).
+- Falsification test: on the fleet, old vs new script for the same dates (back to back) produce different JSON.
+- Verification: A/B identical on the fleet; after a fleet ff the deployed script runs and returns the same live_game_pks (fresh subprocess per check; no restart).
+- Blocked by: none
+
 ### mlb-schedule-fetch-native — OPEN — opened 2026-10-15 — session 2d413211
 - Goal: Move scripts/fetch_mlb_schedule_for_date.py (the schedule adapter's MLB source: fixture clock, slate phase, lineup force window, MLB event lists) off the vendored `vendor/mlb_bettingv2` `sim_engine.data.statsapi` onto a faithful Syndicate StatsAPI module, with identical output; deployed with a measurement (user request 2026-10-15: "move the mlb schedule commence times off vendor").
 - Files: syndicate/features/mlb/statsapi_http.py (NEW), scripts/fetch_mlb_schedule_for_date.py, tests/test_fetch_mlb_schedule_native.py (NEW)
