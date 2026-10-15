@@ -40,7 +40,7 @@ from syndicate.features.shared.ops_refresh import _active_sports_for_date
 from syndicate.features.shared.ops_refresh import RefreshRunRefused
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.timezone import central_today_iso
-from vendor.mlb_bettingv2.tools.web.flask_frontend import start_live_lens_background_loop
+from syndicate.features.mlb.live_lens_port.app_slice import start_live_lens_background_loop  # port of the vendored app slice (lane mlb-live-lens-native-p1)
 
 
 # #148. Soccer's pregame steps (schedule/odds/props/picks --

@@ -223,9 +223,12 @@ def _fetch_live_lens_reports_payload(*, base_url: str, token: str, date_str: str
 
 
 def _build_local_live_lens_reports_payload(*, source_root: Path, date_str: str) -> dict[str, object]:
-    module_path = (REPO_ROOT / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py").resolve()
+    # Syndicate's generated port of the vendored app's live-lens slice (lane mlb-live-lens-native-p1; parity:
+    # scripts/mlb_live_lens_parity.py). Still loaded FRESH by path under the env below, as the vendored app was: its
+    # data-dir constants are resolved at import, from MLB_BETTING_DATA_ROOT / MLB_LIVE_LENS_DIR.
+    module_path = (REPO_ROOT / "syndicate" / "features" / "mlb" / "live_lens_port" / "app_slice.py").resolve()
     if not module_path.exists() or not module_path.is_file():
-        raise RuntimeError(f"Vendored MLB live-lens source app not found at {module_path}")
+        raise RuntimeError(f"MLB live-lens port not found at {module_path}")
     data_root = (source_root / "data").resolve()
     module_name = f"syndicate_mlb_live_lens_source_{abs(hash((str(module_path), str(data_root))))}"
     with _temporary_env(
@@ -237,10 +240,10 @@ def _build_local_live_lens_reports_payload(*, source_root: Path, date_str: str) 
         source_app = _load_module_from_path(module_name, module_path)
         builder = getattr(source_app, "_live_lens_reports_payload", None)
         if not callable(builder):
-            raise RuntimeError("Vendored MLB live-lens payload builder is unavailable")
+            raise RuntimeError("MLB live-lens port payload builder is unavailable")
         payload = builder(str(date_str), include_archive=False, slim=True)
     if not isinstance(payload, dict):
-        raise RuntimeError("Vendored MLB live-lens payload builder did not return a JSON object")
+        raise RuntimeError("MLB live-lens port payload builder did not return a JSON object")
     return payload
 
 

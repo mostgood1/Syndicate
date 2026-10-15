@@ -87,8 +87,10 @@ def _live_lens_report_needs_refresh(selected_date: str) -> bool:
 
 def _load_vendor_live_frontend() -> tuple[Any | None, Any | None]:
     try:
-        from vendor.mlb_bettingv2.tools.web.flask_frontend import _client as mlb_vendor_client
-        from vendor.mlb_bettingv2.tools.web.flask_frontend import fetch_game_feed_live
+        # Syndicate's port of the vendored app slice (lane mlb-live-lens-native-p1): ONE module, so these share its
+        # state with the live-odds-worker's loop and the refresh's report builder.
+        from syndicate.features.mlb.live_lens_port.app_slice import _client as mlb_vendor_client
+        from syndicate.features.mlb.live_lens_port.app_slice import fetch_game_feed_live
 
         return mlb_vendor_client, fetch_game_feed_live
     except Exception:  # pragma: no cover - vendor import is best-effort in tests
@@ -1645,7 +1647,7 @@ def _live_projection_enhancement_payload(selected_date: str) -> dict[str, Any] |
         return None
 
     try:
-        from vendor.mlb_bettingv2.tools.web.flask_frontend import _live_lens_payload
+        from syndicate.features.mlb.live_lens_port.app_slice import _live_lens_payload  # lane mlb-live-lens-native-p1
     except Exception:
         return None
 

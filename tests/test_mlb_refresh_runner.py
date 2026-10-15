@@ -898,11 +898,11 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 }
 
                 # #150 follow-up: _live_lens_payload lives on the real, shared
-                # vendor.mlb_bettingv2.tools.web.flask_frontend module (not the
+                # syndicate.features.mlb.live_lens_port.app_slice module (not the
                 # importlib-fresh `module` copy above) -- see the matching
                 # comment in test_build_live_lens_snapshot_internal_merges_cards_detail_into_vendor_report
                 # for why a direct assignment here would leak past this test.
-                import vendor.mlb_bettingv2.tools.web.flask_frontend as vendor_frontend
+                import syndicate.features.mlb.live_lens_port.app_slice as vendor_frontend  # the port live_lens.py calls (lane mlb-live-lens-native-p1)
 
                 module.live_lens_report_path = lambda d: report_path
                 module.live_lens_log_path = lambda d: log_path
@@ -1033,7 +1033,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         try:
             with tempfile.TemporaryDirectory() as tmp_dir:
                 spec.loader.exec_module(module)
-                import vendor.mlb_bettingv2.tools.web.flask_frontend as vendor_frontend
+                import syndicate.features.mlb.live_lens_port.app_slice as vendor_frontend  # the port live_lens.py calls (lane mlb-live-lens-native-p1)
                 runtime_root = Path(tmp_dir) / "source" / "data"
                 runtime_live_lens_dir = runtime_root / "live_lens"
                 runtime_live_lens_dir.mkdir(parents=True, exist_ok=True)
@@ -1147,7 +1147,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 }
 
                 # #150 follow-up: these two attributes live on the real, shared
-                # vendor.mlb_bettingv2.tools.web.flask_frontend module (not the
+                # syndicate.features.mlb.live_lens_port.app_slice module (not the
                 # importlib-fresh `module` copy above), so a direct assignment
                 # here would permanently replace them for every later test in
                 # the process -- unlike `module.*`, popping spec.name from
@@ -1157,7 +1157,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 # ran after this test, in this file alone, via unittest's
                 # default alphabetical method order. patch.object scopes the
                 # replacement to this `with` block and restores it on exit.
-                import vendor.mlb_bettingv2.tools.web.flask_frontend as vendor_frontend
+                import syndicate.features.mlb.live_lens_port.app_slice as vendor_frontend  # the port live_lens.py calls (lane mlb-live-lens-native-p1)
 
                 # THE REPORT PATH IS NOT THE ONLY PATH, and the asymmetry is the
                 # bug. `_persist_live_lens_report` resolves
