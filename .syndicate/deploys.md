@@ -49523,3 +49523,11 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
   - Daniel Jones Passing TDs W5 (game date 10-04): single line 1.5; served 1.5.
 - **Verdict: MET.**
 - **Instrument note:** `ps -o lstart` prints CENTRAL time. Parsing it with `date -u -d` made the 22:52Z refresh-worker look started at 17:52Z, i.e. before the ff. `role_restarts.jsonl` gave the true restart (22:53:13Z).
+
+## 2026-10-15 00:49Z -- READING: confirmed-starter matching in production (0fef1ad0 + 2ac45acd) -- **MET** `[lane soccer-starter-name-match, session b9bb5f37; closes the owed verify of the 2026-10-14 13:18:20Z and 17:47Z entries]`
+- **How it reached the fleet:** NOT by me. 0fef1ad0 rode the 2026-10-14 18:04:42Z ff (another lane, user-approved, with b4108767). 2ac45acd was on the fleet by the 22:53:18Z ff (dc61042f; `merge-base --is-ancestor` checked), before the MLS 23:30Z pre-kickoff builds. Per-run code, so no restart was needed. The fleet is now 75c46ba2.
+- **Reading:** `lineup_reach.py --dates 2026-10-14` on the fleet (with SYNDICATE_DATA_ROOT): 14 matches (MLS + Championship), 28 sides, 22 confirmed.
+  - `confirmed_sides_by_starters_recognised_of_11` = {11: 10, 10: 12}, so **no confirmed side below 10**.
+  - The 10-09..12 reading (190 confirmed sides, before the fix) was {11: 64, 10: 82, 9: 29, 8: 8, 7: 7}: 23% of sides at <=9, 34% at 11; now 0% and 45%.
+  - One slate, n = 22: a direction, not a rate.
+- 6 late-MLS sides (Chicago v Philadelphia, Dallas v Seattle, St. Louis v Vancouver) were unconfirmed at their last freeze, 36.2 min before kickoff. That is lineup timing, not name matching.
