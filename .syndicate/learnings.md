@@ -2198,3 +2198,7 @@ command. A filter on a guard's output is a way to not see the guard.
 - **What happened:** `player_headshots._nhl_rows` read only the newest `roster_snapshot_<date>.csv`. Those files are PER SLATE (only that date's teams); the newest (10-17) held no Colorado row, so MacKinnon / Makar / Necas / Kadri had no headshot and no side on the board or the cheat sheets (NHL sheet identity 18 of 49).
 - **Fix (d79a1ad5):** union the newest 60 snapshots, newest file wins per player (a trade shows the new team), a name on two players inside one file is still dropped. NHL identity 47/47 after.
 - **Rule:** before taking "the newest file" of a dated family, check whether each file is a full snapshot or one slate/partition of it.
+
+## 2026-10-15 RULE: `ps -o lstart` in the fleet's WSL prints CENTRAL time -- never feed it to `date -u -d`; use role_restarts.jsonl or `ps -o etimes`
+**Evidence (session 43e4d5fe, lane past-line-overlays):** refresh-worker pid 295247 read as "started 2026-10-14T17:52:37Z" via `date -u -d "$(ps -o lstart= -p $pid)"`. That put the start BEFORE the 20:18:56Z ff carrying the change, contradicting `status`'s code=abed0ccc. The true start was ~22:52Z: role_restarts.jsonl shows a claimed exit at 22:53:13Z. A 5-hour clock error would have called a correctly loaded fix "not loaded" (or the reverse).
+**How to apply:** For a role's start, read `role_restarts.jsonl` (UTC, carries holder) or compute `now - ps -o etimes=` (seconds, zone-free). Treat any lstart-derived timestamp as Central.
