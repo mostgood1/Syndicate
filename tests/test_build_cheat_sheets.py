@@ -119,6 +119,10 @@ def test_shop_gap_is_best_vs_median_book_and_needs_three_books():
     assert gap["best_book"] == "betmgm" and gap["books"] == 3
     assert gap["gap_pp"] == round(100 * (115 / 215 - 100 / 205), 2)      # median -115 vs best +105
     assert cs.shop_gap({"a": -110, "b": -105}) is None
+    # A text price or an American 0 is no price: it neither crashes nor counts (lead probability-differential-sweep-1015).
+    junk = cs.shop_gap({"fanduel": -120, "draftkings": -115, "betmgm": 105, "x": "", "y": 0, "z": True})
+    assert junk == gap
+    assert cs.shop_gap({"a": -110, "b": 0, "c": "n/a"}) is None
 
 
 def test_dvp_extremes_turn_fewest_ranks_into_most_allowed():

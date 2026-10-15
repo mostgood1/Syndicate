@@ -274,14 +274,17 @@ def shop_gap(book_prices: Mapping[str, float] | None) -> dict[str, Any] | None:
     Reported as implied-probability points (median implied minus best implied) -- a cost, not an edge: the board
     already prices at the best book. Needs >= 3 books so the median is not the best book itself.
     """
-    prices = [float(p) for p in (book_prices or {}).values() if isinstance(p, (int, float))]
-    if len(prices) < 3:
+    # ONE filtered list for the count, the median and the best book: a text price used to raise in the best-book pick,
+    # and an American 0 (no price) to crash the sort (lead from probability-differential-sweep-1015).
+    priced = [(book, implied_from_price(float(p))) for book, p in (book_prices or {}).items()
+              if isinstance(p, (int, float)) and not isinstance(p, bool) and float(p) != 0]
+    if len(priced) < 3:
         return None
-    implied = sorted(implied_from_price(p) for p in prices)
+    implied = sorted(imp for _book, imp in priced)
     best = implied[0]
     median = implied[len(implied) // 2]
-    best_book = min((book_prices or {}).items(), key=lambda kv: implied_from_price(kv[1]) or 9)[0]
-    return {"best_book": best_book, "books": len(prices), "gap_pp": round(100.0 * (median - best), 2),
+    best_book = min(priced, key=lambda kv: kv[1])[0]
+    return {"best_book": best_book, "books": len(priced), "gap_pp": round(100.0 * (median - best), 2),
             "best_implied": round(best, 4), "median_implied": round(median, 4)}
 
 
