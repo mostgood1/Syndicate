@@ -173,3 +173,50 @@ That is consistent with the pregame half (99.3% full, MLB the sole outlier at
    than its own denominator suggests. Both support the same verdict, which is why
    the verdict survives — had they pointed opposite ways, neither would have
    been enough.
+
+---
+
+## CORRECTION, 2026-10-15 02:0xZ: "the constraint is MLB-specific" is WRONG, and the served snapshot is why
+
+Lane `ncaaf-live-segment-history` took the NCAAF follow-up this file filed and,
+measuring every sport from the `opportunity_population` ledger instead of a
+served snapshot, refuted the verdict above. **212,665 live priced sides, 16
+dates:**
+
+| sport | live sides | `full` | share |
+|---|---|---|---|
+| ncaaf | 48,873 | 26,457 | **54.1%** |
+| nba | 17,682 | 11,560 | **65.4%** |
+| mlb | 14,173 | 10,571 | **74.6%** |
+| wnba | 18,964 | 14,455 | 76.2% |
+| nfl | 52,610 | 45,346 | 86.2% |
+| soccer | 43,001 | 41,763 | 97.1% |
+| nhl | 17,362 | 17,362 | **100%** |
+
+**MLB is the third-most full-game of the five segment-carrying sports.** NCAAF
+and NBA are worse. Segment markets are platform-wide.
+
+**The served board at 00:55Z is why this read the other way, and NBA is the
+proof:** it was **19 of 19 = 100% full** there, the healthiest sport in the
+snapshot, and it is **65.4%** over 17,682 priced live sides. The served live
+board is a tiny score-ranked subset of what is priced (10-14: 709 NCAAF live
+sides priced, **12** served). Caveat (3) above — that two readings nine minutes
+apart disagreed by 88 rows and 6.7 points — was pointing straight at this and I
+did not follow it far enough: the problem was not variance between two snapshots,
+it was the snapshot being the wrong denominator for the question.
+
+**And the premise this file inherited is false.** It says above: *"Kalshi and
+Polymarket quote full-game contracts. The live MLB board is mostly
+first3/first5."* The second sentence was never measured. MLB live is **74.6%
+full-game, 25.4% segment**. From the originating lane's own numbers — 427 live
+MLB sides, 23 matched a venue quote, 17 of those 23 refused
+`SEGMENT_MISMATCH_GRID` — segment mismatch explains **17 of 427 = 4.0%** of the
+failure, and the **404 (94.6%) that matched no venue quote at all** is the
+dominant loss. `17/23 = 74%` is a share of *matched sides*, not of the board.
+
+**What survives:** wiring full-game venue pricing is still worth doing, because
+full-game is a majority of live sides in all seven sports (54.1% at worst). The
+gain is **broad and partial**, not narrow and total. The pregame numbers in this
+file are unaffected — they were measured on the served board, which is the right
+denominator for "what does the board show pregame", and MLB really is the
+pregame outlier at 88.0%.
