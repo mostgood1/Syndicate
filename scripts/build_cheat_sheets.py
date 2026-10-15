@@ -632,11 +632,74 @@ def build_picks(cards: list[dict[str, Any]], sheet: dict[str, Any], *, sport: st
 
 
 _PICK_PRESENTATION = ("display_name", "detail", "team_logo", "home_logo", "away_logo", "headshot_url",
-                      "team", "pos", "kickoff_ct", "segment_label", "bet") + cs.PICK_RECENT_FIELDS
+                      "team", "pos", "kickoff_ct", "segment_label", "bet", "player_id") + cs.PICK_RECENT_FIELDS
+
+
+# The board's MLB pitcher markets ("strikeouts", "outs", ...) against the names `intelligence_recent_matchup` keys
+# its game-log columns on ("pitcher_strikeouts", ...). Measured 2026-10-15: 0 of the board's 11 pitcher props carried
+# recent games because of the mismatch -- every batter market matched.
+MLB_PITCHER_MARKETS = {"strikeouts": "pitcher_strikeouts", "outs": "pitcher_outs", "hits_allowed": "pitcher_hits_allowed",
+                       "earned_runs": "pitcher_earned_runs", "walks_allowed": "pitcher_walks"}
+
+
+def fill_pick_history(pick: dict[str, Any], *, day: str, intervals: Any) -> str | None:
+    """The recent games a pick's case reads, filled at build time when the board card did not carry them (user
+    2026-10-15: "we should fix the gaps - for example we need the interval data"): a prop's last games from the
+    board's own provider (`intelligence_recent_matchup`, the sentence behind the card's Recent form), a full-game
+    pick's team scores (`team_recent_results`), and a SEGMENT pick's interval scores (`interval_history`). What
+    filled it, or None. A provider that fails leaves the pick as it was -- a gap, never a broken sheet."""
+    sport, when = str(pick.get("sport") or "").lower(), pick.get("commence_time") or day
+    try:
+        if pick.get("kind") == "prop":
+            if pick.get("recent_values"):
+                return None
+            from syndicate.features.intelligence_recent_matchup import prop_recent_matchup_text, recent_values_for
+
+            player_id = pick.get("player_id")
+            if not player_id and (m := re.search(r"/people/(\d+)/", str(pick.get("headshot_url") or ""))):
+                player_id = m.group(1)                # an MLB pick promoted before its id was kept
+            row = {k: pick.get(k) for k in ("sport", "player_name", "market", "side", "line", "event_id",
+                                            "commence_time", "home_team", "away_team")}
+            row.update({"kind": "prop", "player_id": player_id})
+            if sport == "mlb":   # the board names pitcher markets bare; the provider's log keys are prefixed
+                row["market"] = MLB_PITCHER_MARKETS.get(str(row.get("market") or "").lower(), row.get("market"))
+            prop_recent_matchup_text(row, selected_date=day)
+            recent = recent_values_for(row) or {}
+            values = list(recent.get("values") or [])[:10]
+            if not values:
+                return None
+            pick["recent_values"] = values
+            for src, dst in (("dates", "recent_dates"), ("opponents", "recent_opponents")):
+                labels = recent.get(src)
+                if isinstance(labels, (list, tuple)) and len(labels) >= len(values):
+                    pick[dst] = [str(x) for x in list(labels)[: len(values)]]
+            return "prop_recent"
+        segment = cs.full_segment(pick.get("segment"))
+        if pick.get("team_recent") and cs.full_segment(pick.get("team_recent_segment")) == segment:
+            return None
+        if segment == "full":
+            from syndicate.features.shared.team_recent_results import is_score_market, team_recent_results
+
+            if not is_score_market(pick.get("market")):
+                return None
+            home = team_recent_results(sport, pick.get("home_team"), when)
+            away = team_recent_results(sport, pick.get("away_team"), when)
+        else:
+            if intervals is None:
+                return None
+            home = intervals.team_results(sport, pick.get("home_team"), when, segment)
+            away = intervals.team_results(sport, pick.get("away_team"), when, segment)
+    except Exception as exc:  # noqa: BLE001
+        print(f"CHEAT_SHEET pick history {pick.get('pick_id')} failed: {type(exc).__name__}: {exc}", flush=True)
+        return None
+    if not (home or away):
+        return None
+    pick["team_recent"], pick["team_recent_segment"] = {"home": home, "away": away}, segment
+    return f"team_{segment}"
 
 
 def merge_picks(fresh: list[dict[str, Any]], prior: dict[str, Any] | None, *, rows: list[dict[str, Any]] | None = None,
-                cards: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+                cards: list[dict[str, Any]] | None = None, day: str | None = None, intervals: Any = None) -> list[dict[str, Any]]:
     """A day's picks are a RECORD: one promoted earlier keeps its first price and stays when the board drops it later
     (its line moved, its game started); a new one joins. Board score order, earliest promotions first on ties."""
     kept = {p.get("pick_id"): dict(p) for p in (prior or {}).get("picks") or [] if p.get("pick_id")}
@@ -660,6 +723,8 @@ def merge_picks(fresh: list[dict[str, Any]], prior: dict[str, Any] | None, *, ro
         if p.get("kind") != "prop" and str(p.get("market") or "").startswith(("totals", "alternate_totals")) and p.get("matchup"):
             p["display_name"] = p["matchup"]          # a total reads by its game
             p["team_logo"] = p.get("team_logo") or p.get("home_logo")
+        if day:
+            fill_pick_history(p, day=day, intervals=intervals)
         # The case is re-read at every build (user 2026-10-15: full explanations, player vs opponent, recency and
         # consistency) from the pick's kept games, the sheet's row for the player, and the board's written case.
         p["points"] = cs.pick_points(p, rows=rows or [])
@@ -761,6 +826,10 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:  # noqa: BLE001 -- no picks this run; every sheet still builds
         print(f"CHEAT_SHEET board cards unavailable: {type(exc).__name__}: {exc}", flush=True)
         board_cards = []
+    # Interval scores for segment picks (first-3-innings, Q1, P1 ...), cached per date: finals never change.
+    from syndicate.features.shared.interval_history import IntervalHistory
+
+    intervals = IntervalHistory(data_root / "cheatsheets" / ".interval_cache", today=central_today())
     for sport in [s.strip() for s in args.sports.split(",") if s.strip()]:
         target = data_root / "cheatsheets" / sport / f"{selected}.json"
         if not in_season(sport, selected):
@@ -775,7 +844,8 @@ def main(argv: list[str] | None = None) -> int:
                 prior = None
             sheet = build_sport(sport, [], selected_date=selected, cap=1, dvp=dvp, context=context, positions=positions)
             sheet["picks"] = merge_picks(build_picks(board_cards, sheet, sport=sport, day=selected,
-                                                     now=datetime.now(timezone.utc)), prior, cards=board_cards)
+                                                     now=datetime.now(timezone.utc)), prior, cards=board_cards,
+                                         day=selected, intervals=intervals)
             sheet["phase"] = season_phase(sport, selected) or "preseason"
             sheet["picks_only"] = True
             attach_images(sheet, data_root / "cheatsheets" / ".img_cache")
@@ -801,7 +871,7 @@ def main(argv: list[str] | None = None) -> int:
         sheet = merge_with_record(sheet, prior, now=datetime.now(timezone.utc))
         try:
             sheet["picks"] = merge_picks(build_picks(board_cards, sheet, sport=sport, day=selected, now=datetime.now(timezone.utc)),
-                                         prior, rows=sheet.get("rows"), cards=board_cards)
+                                         prior, rows=sheet.get("rows"), cards=board_cards, day=selected, intervals=intervals)
         except Exception as exc:  # noqa: BLE001 -- a missing picks section is a gap, never a failed sheet
             print(f"CHEAT_SHEET {sport} picks failed: {type(exc).__name__}: {exc}", flush=True)
             sheet["picks"] = list((prior or {}).get("picks") or [])

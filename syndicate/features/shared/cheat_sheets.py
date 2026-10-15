@@ -788,11 +788,15 @@ def _rank_words(n: int, of: int, word: str) -> str:
     return f"the {other} of {of}" if back == 1 else f"the {_ordinal(back)} {other} of {of}"
 
 
-def _rate_tone(hits: int, games: int, *, min_games: int = 3) -> str:
-    """'for' / 'against' / '' -- a record that backs this side, argues against it, or says little."""
+def _rate_tone(hits: int, games: int, *, min_games: int = 3, base: Any = None) -> str:
+    """'for' / 'against' / '' -- a record that backs this side, argues against it, or says little. Against the
+    market's own fair probability when it is known (a 3-way first-inning win is a ~25% bet, so 3 of 10 is par, not a
+    warning), else against a coin flip."""
     if games < min_games:
         return ""
     rate = hits / games
+    if isinstance(base, (int, float)) and 0 < base < 1:
+        return "for" if rate - base >= 0.15 else "against" if rate - base <= -0.15 else ""
     return "for" if rate >= 0.6 else "against" if rate <= 0.4 else ""
 
 
@@ -807,7 +811,7 @@ def _defense_tone(n: int, of: int, side: str) -> str:
     return ""
 
 
-def _ask_clean(text: str, side: str = "") -> tuple[str, str]:
+def _ask_clean(text: str, side: str = "", base: Any = None) -> tuple[str, str]:
     """One whole clause, never cut (user 2026-10-15: "we still have bullets that end with ... instead of full
     explanations"): a card has room for a full sentence when the sentence says one thing. Ranks read as words, and
     the tone says whether the clause backs the side."""
@@ -826,11 +830,11 @@ def _ask_clean(text: str, side: str = "") -> tuple[str, str]:
     text = _ASK_FEWEST.sub(lambda m: ranked(m, ", "), text)
     text = _ASK_STINGY.sub(ranked, text)
     if not tone and (rec := _ASK_RECORD.search(text)):
-        tone = _rate_tone(int(rec.group(1)), int(rec.group(2)))
+        tone = _rate_tone(int(rec.group(1)), int(rec.group(2)), base=base)
     return text, tone
 
 
-def ask_points(detail: Any, *, subject: Any = None, side: Any = None, limit: int = 6) -> list[dict[str, str]]:
+def ask_points(detail: Any, *, subject: Any = None, side: Any = None, base: Any = None, limit: int = 6) -> list[dict[str, str]]:
     """Ask the Syndicate's case for a pick -- the board card's `detail`, the paragraph Ask quotes -- as labelled
     points in the style of the X.com sheets (user 2026-10-15: "we also need the 'Ask The Syndicate' data to be cleaner
     in how its represented on these picks"). The sim's own numbers are NOT points: they live in the SmartSim tiles,
@@ -840,7 +844,7 @@ def ask_points(detail: Any, *, subject: Any = None, side: Any = None, limit: int
     name, side = str(subject or "").strip(), str(side or "").lower()
 
     def add(label: str, body: str) -> None:
-        text, tone = _ask_clean(body, side)
+        text, tone = _ask_clean(body, side, base)
         if text:
             points.append({"label": label, "text": text, "tone": tone})
 
@@ -886,7 +890,7 @@ def _side_words(side: str, line: Any) -> str:
 
 
 def recent_points(values: Sequence[Any] | None, *, line: Any, side: Any,
-                  opponents: Sequence[Any] | None = None) -> list[dict[str, str]]:
+                  opponents: Sequence[Any] | None = None, base: Any = None) -> list[dict[str, str]]:
     """Recency and consistency on THIS line (user 2026-10-15: "and recency/consistency"): the last five games as they
     happened, newest first, then the hit record, average and range over the last ten."""
     side = str(side or "").lower()
@@ -898,18 +902,18 @@ def recent_points(values: Sequence[Any] | None, *, line: Any, side: Any,
     f5 = form_record(vals, line, side, 5)
     shown = ", ".join(f"{_g(v)} v {opps[i]}" if i < len(opps) and opps[i] else _g(v) for i, v in enumerate(vals[:5]))
     out = [{"label": "Last 5", "text": f"{words} in {f5['hits']} of {f5['games']} (newest first: {shown})",
-            "tone": _rate_tone(f5["hits"], f5["games"])}]
+            "tone": _rate_tone(f5["hits"], f5["games"], base=base)}]
     if len(vals) >= 8:
         last = vals[:10]
         f10 = form_record(last, line, side, len(last))
         out.append({"label": f"Last {len(last)}",
                     "text": f"{words} in {f10['hits']} of {f10['games']}, averaging {sum(last) / len(last):.1f} "
                             f"(low {_g(min(last))}, high {_g(max(last))})",
-                    "tone": _rate_tone(f10["hits"], f10["games"], min_games=8)})
+                    "tone": _rate_tone(f10["hits"], f10["games"], min_games=8, base=base)})
     return out
 
 
-def vs_team_point(row: Mapping[str, Any] | None, *, line: Any, side: Any) -> dict[str, str] | None:
+def vs_team_point(row: Mapping[str, Any] | None, *, line: Any, side: Any, base: Any = None) -> dict[str, str] | None:
     """The player's meetings with today's opponent on THIS line, from the sheet row (the evidence's `vs_opponent`).
     A row priced at another rung is re-read at this one from its meetings' values."""
     vs = (row or {}).get("vs_opponent") or {}
@@ -930,7 +934,7 @@ def vs_team_point(row: Mapping[str, Any] | None, *, line: Any, side: Any) -> dic
     results = [_g(x["value"]) for x in vs.get("results") or [] if isinstance(x.get("value"), (int, float))]
     tail = f" (latest {', '.join(results)})" if results else ""
     return {"label": f"Vs {opp}", "text": f"{words} in {hits} of {games} meetings{tail}",
-            "tone": _rate_tone(hits, games, min_games=VS_OPPONENT_MIN_GAMES)}
+            "tone": _rate_tone(hits, games, min_games=VS_OPPONENT_MIN_GAMES, base=base)}
 
 
 _PVP_LABEL = {"batter_vs_pitcher": "Vs pitcher", "pitcher_vs_lineup": "Vs lineup", "skater_vs_goalie": "Vs goalie",
@@ -962,17 +966,31 @@ def pvp_point(pvp: Mapping[str, Any] | None) -> dict[str, str] | None:
     return {"label": _PVP_LABEL.get(kind, "Matchup"), "text": summary, "tone": ""}
 
 
+_SCORE_UNIT = {"mlb": "runs", "nhl": "goals", "soccer": "goals"}
+
+
+def full_segment(segment: Any) -> str:
+    seg = str(segment or "full").strip().lower()
+    return "full" if seg in ("", "full", "full_game", "game") else seg
+
+
 def team_form_points(pick: Mapping[str, Any], team_recent: Mapping[str, Any] | None) -> list[dict[str, str]]:
-    """A game pick's recency and consistency, from the board card's `team_recent` (date, scored, allowed; newest
-    first): for a side, its record and margin, and how often it covered THIS number; for a total, how often each
-    team's games went over it. Full-game scores say nothing about an inning, so a segment pick gets none."""
-    if str(pick.get("segment") or "full") not in ("full", "full_game") or not isinstance(team_recent, Mapping):
+    """A game pick's recency and consistency, from each team's recent scores (date, scored, allowed; newest first):
+    for a side, its record and margin and how often it covered THIS number; for a total, how often each team's games
+    went over it. A SEGMENT pick reads its own interval's history (user 2026-10-15: "we need the interval data") and
+    only that: `team_recent_segment` must name the pick's segment, so an inning is never read off a full-game final.
+    Tones are against the market's fair probability when the pick carries it."""
+    segment = full_segment(pick.get("segment"))
+    if not isinstance(team_recent, Mapping) or full_segment(pick.get("team_recent_segment")) != segment:
         return []
+    window = 6 if segment == "full" else 10
     games = {k: [g for g in v if isinstance(g, (list, tuple)) and len(g) >= 3
-                 and isinstance(g[1], (int, float)) and isinstance(g[2], (int, float))][:6]
+                 and isinstance(g[1], (int, float)) and isinstance(g[2], (int, float))][:window]
              for k, v in team_recent.items() if isinstance(v, list)}
     names = {"home": pick.get("home_team") or "Home", "away": pick.get("away_team") or "Away"}
     market, side, line = str(pick.get("market") or ""), str(pick.get("side") or "").lower(), pick.get("line")
+    span = str(pick.get("segment_label") or segment) if segment != "full" else ""
+    unit, base = _SCORE_UNIT.get(str(pick.get("sport") or "").lower(), "points"), pick.get("p_market")
     out: list[dict[str, str]] = []
     if market.startswith(("totals", "alternate_totals")) and isinstance(line, (int, float)):
         for key in ("away", "home"):
@@ -981,25 +999,35 @@ def team_form_points(pick: Mapping[str, Any], team_recent: Mapping[str, Any] | N
                 continue
             totals = [s + a for _, s, a in g]
             rec = form_record(totals, line, side, len(totals))
-            out.append({"label": names[key], "text": f"its games went {side} {_g(line)} in {rec['hits']} of the last "
-                                                     f"{len(g)}, averaging {sum(totals) / len(totals):.1f} points",
-                        "tone": _rate_tone(rec["hits"], rec["games"], min_games=4)})
+            subject = f"its {span}" if span else "its games"
+            out.append({"label": names[key], "text": f"{subject} went {side} {_g(line)} in {rec['hits']} of the last "
+                                                     f"{len(g)}, averaging {sum(totals) / len(totals):.1f} {unit}",
+                        "tone": _rate_tone(rec["hits"], rec["games"], min_games=4, base=base)})
         return out
     key = side if side in ("home", "away") else next((k for k, n in names.items() if n == pick.get("display_name")), None)
     if key is None:
         return []
+    three_way = "3_way" in market
     for k in (key, "away" if key == "home" else "home"):
         g = games.get(k) or []
         if len(g) < 3:
             continue
         margins = [s - a for _, s, a in g]
-        wins = sum(1 for m in margins if m > 0)
-        text = f"{wins}-{len(g) - wins} in its last {len(g)}, average margin {sum(margins) / len(margins):+.1f}"
+        wins, ties = sum(1 for m in margins if m > 0), sum(1 for m in margins if m == 0)
+        average = sum(margins) / len(margins)
+        if span:   # "1st 3 innings: won 4, tied 3, lost 3 of its last 10" -- an interval ends level often
+            text = f"{span}: won {wins}, tied {ties}, lost {len(g) - wins - ties} of its last {len(g)}, average margin {average:+.1f}"
+        else:
+            text = f"{wins}-{len(g) - wins} in its last {len(g)}, average margin {average:+.1f}"
         tone = ""
         if k == key and market.startswith("spreads") and isinstance(line, (int, float)):
             covers = sum(1 for m in margins if m + line > 0)
+            decided = sum(1 for m in margins if m + line != 0)
             text += f"; would have covered {_g(line) if line < 0 else '+' + _g(line)} in {covers} of {len(g)}"
-            tone = _rate_tone(covers, len(g), min_games=4)
+            tone = _rate_tone(covers, decided, min_games=4, base=base)
+        elif k == key and market.startswith("h2h"):
+            # A 2-way interval line pushes on a tie, so ties leave the record; 3-way, a tie is the draw and a loss.
+            tone = _rate_tone(wins, len(g) if three_way else len(g) - ties, min_games=4, base=base)
         out.append({"label": names[k], "text": text, "tone": tone})
     return out
 
@@ -1028,13 +1056,13 @@ def pick_points(pick: Mapping[str, Any], *, rows: Iterable[Mapping[str, Any]] = 
     against this team and against today's opponent player, the defense, then Ask the Syndicate's splits and season.
     Sources: the board card's own recent games (kept on the pick), the sheet's rows for the player (or, for a game
     pick, its starters), and the board's written case. Nothing here is cut short."""
-    side, line = str(pick.get("side") or "").lower(), pick.get("line")
+    side, line, base = str(pick.get("side") or "").lower(), pick.get("line"), pick.get("p_market")
     rows = list(rows or [])
     if pick.get("kind") != "prop":
         # A team pick's case compares two teams ("Net rating Raptors +1.6 vs Knicks +4.0"): no name is dropped.
-        asked = ask_points(pick.get("detail"), side=side, limit=12)
+        asked = ask_points(pick.get("detail"), side=side, base=base, limit=12)
         return (team_form_points(pick, pick.get("team_recent")) + starter_points(pick, rows) + asked)[:limit]
-    asked = ask_points(pick.get("detail"), subject=pick.get("display_name"), side=side, limit=12)
+    asked = ask_points(pick.get("detail"), subject=pick.get("display_name"), side=side, base=base, limit=12)
     mine = _player_rows(rows, pick.get("player_name"))
     exact = next((r for r in mine if prop_result_key(r) == prop_result_key(
         {"player": pick.get("player_name"), "market": pick.get("market"), "side": side, "line": line})), None)
@@ -1043,13 +1071,13 @@ def pick_points(pick: Mapping[str, Any], *, rows: Iterable[Mapping[str, Any]] = 
     if not values:   # a row's last games are the player's stat, whatever rung it prices -- re-read at this line
         values = next((v for r in ([exact] if exact else []) + same_stat
                        if (v := ((r.get("check") or {}).get("form10") or {}).get("values"))), None)
-    points = recent_points(values, line=line, side=side, opponents=opponents)
+    points = recent_points(values, line=line, side=side, opponents=opponents, base=base)
     if points:   # our own record over the same games says more than Ask's one-line summary of it
         asked = [p for p in asked if p["label"] != "Recent form"]
     # The player against this team: Ask's record is on the pick's own line; the sheet row's is the fallback.
     vs = next((p for p in asked if p["label"].startswith("Vs ") and p["label"] != "Vs position"), None)
     if vs is None:
-        vs = vs_team_point(exact or next((r for r in same_stat if r.get("vs_opponent")), None), line=line, side=side)
+        vs = vs_team_point(exact or next((r for r in same_stat if r.get("vs_opponent")), None), line=line, side=side, base=base)
     if vs:
         points.append(vs)
     pvp = next((pt for r in same_stat + mine if (pt := pvp_point(r.get("pvp")))), None)
@@ -1066,8 +1094,8 @@ def pick_record(card: Mapping[str, Any], *, promoted_at: str) -> dict[str, Any]:
     out = {
         "pick_id": card.get("pick_id"), "kind": card.get("kind"), "sport": card.get("sport"), "event_id": card.get("event_id"),
         "matchup": card.get("matchup"), "home_team": card.get("home_team"), "away_team": card.get("away_team"),
-        "player_name": card.get("player_name"), "display_name": card.get("display_name"), "market": card.get("market"),
-        "side": card.get("side"), "line": card.get("line"), "segment": card.get("segment") or "full",
+        "player_name": card.get("player_name"), "player_id": card.get("player_id"), "display_name": card.get("display_name"),
+        "market": card.get("market"), "side": card.get("side"), "line": card.get("line"), "segment": card.get("segment") or "full",
         "segment_label": card.get("segment_label"), "price": card.get("odds"), "book": quote.get("bookmaker"),
         "books": quote.get("books_quoting"), "fair_price": card.get("fair_price"), "p_market": quote.get("fair_probability"),
         "p_model": card.get("model_probability"), "ev_pct": card.get("ev_pct"), "sim_view": card.get("sim_view"),
@@ -1084,7 +1112,7 @@ def pick_record(card: Mapping[str, Any], *, promoted_at: str) -> dict[str, Any]:
     return out
 
 
-PICK_RECENT_FIELDS = ("recent_values", "recent_dates", "recent_opponents", "recent_lines", "team_recent")
+PICK_RECENT_FIELDS = ("recent_values", "recent_dates", "recent_opponents", "recent_lines", "team_recent", "team_recent_segment")
 
 
 def pick_result_key(pick: Mapping[str, Any]) -> str:

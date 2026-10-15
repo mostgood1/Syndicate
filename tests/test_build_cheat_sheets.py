@@ -587,3 +587,51 @@ def test_a_kept_pick_rereads_its_case_and_its_recent_games_from_the_board():
     merged = m.merge_picks([], {"picks": [stale]}, rows=[], cards=[still_on_board])
     assert merged[0]["on_board"] is False and merged[0]["recent_values"] == [2, 2, 2, 2, 2]
     assert merged[0]["points"][0] == {"label": "Last 5", "text": "over 3.5 in 0 of 5 (newest first: 2, 2, 2, 2, 2)", "tone": "against"}
+
+
+def test_a_segment_pick_reads_its_own_intervals_and_is_toned_against_its_market():
+    # User 2026-10-15: "we should fix the gaps - for example we need the interval data". A 1st-3-innings moneyline reads
+    # 1st-3-innings scores, never full-game finals; a 3-way 1st inning is a ~25% bet, so its record is judged on that.
+    recent = {"away": [["2026-10-13", 1, 2], ["2026-10-12", 1, 1], ["2026-10-11", 2, 0], ["2026-10-10", 0, 0], ["2026-10-09", 3, 1],
+                       ["2026-10-08", 2, 1]],
+              "home": [["2026-10-13", 2, 1], ["2026-10-12", 1, 1], ["2026-10-11", 0, 0], ["2026-10-10", 0, 1], ["2026-10-09", 1, 1]]}
+    pick = {"kind": "game", "sport": "mlb", "market": "h2h", "side": "away", "segment": "first3", "segment_label": "1st 3 innings",
+            "home_team": "Los Angeles Dodgers", "away_team": "Milwaukee Brewers", "p_market": 0.44, "detail": "",
+            "team_recent": recent, "team_recent_segment": "first3"}
+    assert cs.pick_points(pick)[0] == {"label": "Milwaukee Brewers", "tone": "for",            # 3 of 4 decided vs 44%
+                                       "text": "1st 3 innings: won 3, tied 2, lost 1 of its last 6, average margin +0.7"}
+    assert cs.pick_points(dict(pick, team_recent_segment="full")) == []                          # never a full-game final
+    three_way = dict(pick, market="h2h_3_way", segment="first1", segment_label="1st inning", team_recent_segment="first1",
+                     p_market=0.24, team_recent={"away": [["d", 0, 0]] * 7 + [["d", 0, 1]] * 3, "home": []})
+    assert cs.pick_points(three_way)[0]["tone"] == "against"                                    # 0 of 10 vs a 24% bet
+    total = dict(pick, market="totals", side="over", line=2.5, p_market=0.5)
+    assert cs.pick_points(total)[0]["text"] == "its 1st 3 innings went over 2.5 in 3 of the last 6, averaging 2.3 runs"
+
+
+def test_a_picks_history_is_filled_from_the_boards_own_providers(monkeypatch):
+    m = _script()
+    from syndicate.features import intelligence_recent_matchup as irm
+    from syndicate.features.shared import team_recent_results as trr
+
+    asked = []
+    monkeypatch.setattr(irm, "prop_recent_matchup_text", lambda row, selected_date: asked.append(dict(row)))
+    monkeypatch.setattr(irm, "recent_values_for", lambda row: {"values": [5, 4, 6], "dates": ["2026-10-10", "2026-10-04", "2026-09-28"]})
+    jax = {"kind": "prop", "sport": "mlb", "player_name": "Griffin Jax", "market": "strikeouts", "side": "over", "line": 3.5,
+           "headshot_url": "https://img.mlbstatic.com/mlb-photos/image/upload/w_360,q_auto:best/v1/people/643377/headshot/67/current"}
+    assert m.fill_pick_history(jax, day="2026-10-15", intervals=None) == "prop_recent"
+    assert asked[0]["market"] == "pitcher_strikeouts" and asked[0]["player_id"] == "643377"     # the provider's names
+    assert jax["recent_values"] == [5, 4, 6] and jax["recent_dates"][0] == "2026-10-10"
+
+    monkeypatch.setattr(trr, "team_recent_results", lambda sport, team, before, n=10, *, segment="full": [["2026-10-10", 31.0, 24.0]])
+    full = {"kind": "game", "sport": "ncaaf", "market": "spreads", "segment": "full", "home_team": "A", "away_team": "B"}
+    assert m.fill_pick_history(full, day="2026-10-15", intervals=None) == "team_full" and full["team_recent_segment"] == "full"
+
+    class Intervals:
+        def team_results(self, sport, team, before, segment):
+            return [["2026-10-13", 1.0, 2.0]] if team == "Milwaukee Brewers" else []
+
+    seg = {"kind": "game", "sport": "mlb", "market": "h2h", "segment": "first3", "home_team": "Los Angeles Dodgers",
+           "away_team": "Milwaukee Brewers"}
+    assert m.fill_pick_history(seg, day="2026-10-15", intervals=Intervals()) == "team_first3"
+    assert seg["team_recent"] == {"home": [], "away": [["2026-10-13", 1.0, 2.0]]} and seg["team_recent_segment"] == "first3"
+    assert m.fill_pick_history(dict(seg, team_recent=None), day="2026-10-15", intervals=None) is None   # no source: a gap
