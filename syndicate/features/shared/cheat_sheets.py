@@ -404,6 +404,21 @@ def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25) -> dict[str, l
             (i for i in idx if _pvp_kind(rows[i]) == "goalie_vs_team" and _pvp_games(rows[i]) >= PVP_MIN_GAMES
              and featurable(rows[i])),
             key=lambda i: -_pvp_games(rows[i])))[:top],
+        # NBA defender matchups: who guarded him, 40+ partial possessions against today's opponent's defenders.
+        "pvp_scorers": _one_per_player(rows, sorted(
+            (i for i in idx if _pvp_kind(rows[i]) == "scorer_vs_defenders"
+             and _pvp_stat(rows[i], "poss") >= PVP_MIN_POSS and featurable(rows[i])),
+            key=lambda i: -_pvp_stat(rows[i], "poss")))[:top],
+        # NFL plays on the ball (NOT coverage): receivers with 2+ plays by today's defenders on their targets, and
+        # every quarterback against today's secondary.
+        "pvp_receivers": _one_per_player(rows, sorted(
+            (i for i in idx if _pvp_kind(rows[i]) == "receiver_vs_defenders"
+             and _pvp_stat(rows[i], "plays") >= PVP_MIN_PLAYS and featurable(rows[i])),
+            key=lambda i: -_pvp_stat(rows[i], "plays")))[:top],
+        "pvp_qbs": _one_per_player(rows, sorted(
+            (i for i in idx if _pvp_kind(rows[i]) == "qb_vs_defenders" and featurable(rows[i])
+             and (_pvp_stat(rows[i], "plays") or (((rows[i].get("pvp") or {}).get("line")) or {}).get("hawks"))),
+            key=lambda i: -_pvp_stat(rows[i], "plays")))[:top],
         # Everything on the board, for a game's own sheet (the page shows it there only).
         "every_prop": sorted(idx, key=lambda i: (str(rows[i].get("market")), str(rows[i].get("player")),
                                                  rows[i].get("line") if isinstance(rows[i].get("line"), (int, float)) else 0,
@@ -501,8 +516,17 @@ PVP_MIN_PA = 3     # a batter-vs-pitcher line under 3 plate appearances is not s
 PVP_MIN_GAMES = 2   # NHL meetings: one game against a goalie is a box score, not a matchup line
 
 
+PVP_MIN_POSS = 40   # NBA: under 40 partial possessions against a team's defenders is a handful of trips
+PVP_MIN_PLAYS = 2   # NFL: one breakup or one tackle is an anecdote, not a matchup line
+
+
 def _pvp_games(row: Mapping[str, Any]) -> int:
     return int((((row.get("pvp") or {}).get("line")) or {}).get("games") or 0)
+
+
+def _pvp_stat(row: Mapping[str, Any], key: str) -> float:
+    value = (((row.get("pvp") or {}).get("line")) or {}).get(key)
+    return float(value) if isinstance(value, (int, float)) else 0.0
 
 
 def _pvp_kind(row: Mapping[str, Any]) -> str | None:

@@ -347,6 +347,29 @@ def news_impact(sport: str, selected_date: str, out_rows: list[dict[str, Any]],
 
 
 news_root: Path | None = None
+PVP_SPORTS = ("mlb", "nhl", "nba", "nfl")
+
+
+def player_vs_player(sport: str, rows: list[dict[str, Any]], date: str, cache: Path) -> tuple[Any, dict]:
+    """(module, {(normalized player, market): block}) for a sport's player-vs-player source. `cache` is
+    `<data root>/cheatsheets/.<sport>_cache/<date>`; long-lived caches sit beside it under `cheatsheets/`."""
+    if sport == "mlb":
+        from syndicate.features.mlb import batter_vs_pitcher as mod
+
+        return mod, mod.matchups(rows, date=date, api=mod.StatsApi(cache))
+    if sport == "nhl":
+        from syndicate.features.nhl import skater_vs_goalie as mod
+
+        return mod, mod.matchups(rows, date=date, api=mod.NhlApi(cache, cache.parent.parent / ".nhl_pbp"))
+    if sport == "nba":
+        from syndicate.features.nba import defender_matchups as mod
+
+        return mod, mod.matchups(rows, date=date, api=mod.NbaApi(cache, cache.parent.parent / ".nba_seasons"))
+    if sport == "nfl":
+        from syndicate.features.nfl import defender_matchups as mod
+
+        return mod, mod.matchups(rows, date=date, source=mod.Source(cache.parent.parent.parent, date))
+    return None, {}
 
 
 def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, cap: int,
@@ -443,17 +466,11 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
     # probable starter, pitcher vs the opposing roster -- StatsAPI, cached for the day on the data root.
     # NHL (user 2026-10-15: "add skater vs goalie for NHL"): skater vs the opposing likely starter, goalie vs today's
     # opponent -- the NHL's public API; finished games' shot lists cached for good.
-    if sport in ("mlb", "nhl") and out_rows and pvp_cache is not None:
+    # NBA / NFL (user 2026-10-15: "add defender matchups for NFL and NBA"): who guarded him (NBA.com tracking); plays
+    # on the ball by today's defenders (nflverse play-by-play on the data root -- NOT coverage, see the module).
+    if sport in PVP_SPORTS and out_rows and pvp_cache is not None:
         try:
-            if sport == "mlb":
-                from syndicate.features.mlb import batter_vs_pitcher as pvp_mod
-
-                pvp = pvp_mod.matchups(out_rows, date=selected_date, api=pvp_mod.StatsApi(pvp_cache))
-            else:
-                from syndicate.features.nhl import skater_vs_goalie as pvp_mod
-
-                pvp = pvp_mod.matchups(out_rows, date=selected_date,
-                                       api=pvp_mod.NhlApi(pvp_cache, pvp_cache.parent.parent / ".nhl_pbp"))
+            pvp_mod, pvp = player_vs_player(sport, out_rows, selected_date, pvp_cache)
         except Exception as exc:  # noqa: BLE001 -- a missing matchup is a blank cell, never a failed sheet
             print(f"CHEAT_SHEET {sport} player-vs-player failed: {type(exc).__name__}: {exc}", flush=True)
             pvp, pvp_mod = {}, None
