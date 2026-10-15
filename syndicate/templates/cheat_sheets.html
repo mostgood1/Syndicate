@@ -261,10 +261,11 @@ function consistencyTable(d, ids) {
 }
 // Against this opponent: the actual previous results on THIS line, newest first ("1 game is fine but give something
 // helpful, like previous result"), and the record once there are a few meetings.
+const meetLabel = x => { const m = /^(\d{2})-W(\d+)$/.exec(String(x || "")); return m ? `Wk ${m[2]} '${m[1]}` : String(x || ""); };
 const vsText = r => {
   const v = r.vs_opponent;
   if (!v || !v.same_line) return "–";
-  const res = (v.results || []).map(x => `<span class="vsr ${x.hit === 1 ? "hit" : x.hit === 0 ? "miss" : ""}">${x.value == null ? "–" : Number(x.value).toFixed(Number.isInteger(x.value) ? 0 : 1)} ${x.hit === 1 ? "✓" : x.hit === 0 ? "✗" : "·"}</span> <span class="bk">${esc(x.label || "")}</span>`).join("<br>");
+  const res = (v.results || []).map(x => `<span class="vsr ${x.hit === 1 ? "hit" : x.hit === 0 ? "miss" : ""}">${x.value == null ? "–" : Number(x.value).toFixed(Number.isInteger(x.value) ? 0 : 1)} ${x.hit === 1 ? "✓" : x.hit === 0 ? "✗" : "·"}</span> <span class="bk">${esc(meetLabel(x.label))}</span>`).join("<br>");
   const rec = v.games >= 2 && v.hits != null ? `<b>${v.hits}/${v.games}</b> on this line<br>` : "";
   return rec + (res || "–");
 };
