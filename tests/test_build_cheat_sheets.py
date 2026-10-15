@@ -661,3 +661,17 @@ def test_mlb_rows_read_their_form_from_the_boards_own_provider(monkeypatch):
     assert sheet["sections"]["consistency"] == [0]                               # 8 of 10: it now has a section
     monkeypatch.setattr(irm, "recent_values_for", lambda row: None)
     assert m.board_recent_form(dict(base), "2026-10-14") == {}                    # no provider games: a blank, not a guess
+
+
+def test_the_boards_narrative_never_makes_the_model_a_reason_or_repeats_recent_form():
+    # 2026-10-15, the Jax outs pick: the board's narrative carried "The model baseline sits around 15.4 outs" (the model
+    # as a reason) and "Across his last 5 starts, he has averaged 12.4 outs" (the Last 5 point said again).
+    detail = ("Our sim has Griffin Jax over 11.5 outs at 82.6%; the no-vig market across 8 books says 54.4%. "
+              "Across his last 5 starts, he has averaged 12.4 outs. "
+              "The model baseline sits around 15.4 outs against a line of 11.5. "
+              "If he stays on his normal starter path, the matchup against CLE gives him a fair shot to reach full workload volume.")
+    pts = cs.ask_points(detail, subject="Griffin Jax", side="over")
+    assert [p["label"] for p in pts] == ["Recent form", ""] and not any("model" in p["text"].lower() for p in pts)
+    pick = {"kind": "prop", "player_name": "Griffin Jax", "market": "outs", "side": "over", "line": 11.5, "detail": detail,
+            "recent_values": [9, 15, 15, 15, 8]}
+    assert [p["label"] for p in cs.pick_points(pick)] == ["Last 5", ""]           # its own record replaces the narrative

@@ -768,7 +768,10 @@ def pick_bet_text(pick: Mapping[str, Any]) -> str:
 
 
 _ASK_SENTENCE = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
-_ASK_MODEL_LEADS = ("Our sim has", "The live re-sim has", "No sim view", "It projects")
+_ASK_MODEL_LEADS = ("Our sim has", "The live re-sim has", "No sim view", "It projects", "The model", "Our model", "The sim ")
+# The board's narrative restating recent form ("Across his last 5 starts, he has averaged 12.4 outs"): read as Recent
+# form, so the pick's own Last 5 / Last 10 replaces it instead of repeating it (2026-10-15, the Jax outs pick).
+_ASK_RECENT_NARRATIVE = re.compile(r"^(Across|Over|In) (his|her|their|the) last \d+\b")
 _ASK_LABEL = re.compile(r"^(Recent form|Matchup|Vs position|History vs this team|Splits(?: \([^)]*\))?|Season metrics[^:]*)\s*:\s*(.*)$")
 _ASK_RANK = re.compile(r"\((\d+)(?:st|nd|rd|th) of (\d+)\)")
 # "rank 6 of 32, 1 = fewest" (vs position) and "9 of 32 (1 = stingiest)" (opponent): where a defense ranks.
@@ -859,6 +862,8 @@ def ask_points(detail: Any, *, subject: Any = None, side: Any = None, base: Any 
             sentence = sentence.replace(f" {name} ", " ")
         m = _ASK_LABEL.match(sentence)
         label, body = (m.group(1), m.group(2)) if m else ("", sentence)
+        if not m and _ASK_RECENT_NARRATIVE.match(sentence):
+            label = "Recent form"
         if label.startswith("Season metrics"):
             items = [x.strip().rstrip(".") for x in body.split(";") if x.strip()]
             ranked = sorted(items, key=lambda x: (int(r.group(1)) / int(r.group(2))) if (r := _ASK_RANK.search(x)) else 9.0)
