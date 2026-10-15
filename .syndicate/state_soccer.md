@@ -5,7 +5,7 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
-## [soccer-uefa-competitions] UEFA CLUB COMPETITIONS (UCL / UEL / UECL): REGISTERED FOR FIXTURES, GAME ODDS, LIVE SCOREBOARD AND VENUE JOINS, WITH NO MODEL. ON MAIN, NOT ON THE FLEET `[verified 2026-10-15, lane soccer-uefa-competitions]`
+## [soccer-uefa-competitions] UEFA CLUB COMPETITIONS (UCL / UEL / UECL): REGISTERED FOR FIXTURES, GAME ODDS, LIVE SCOREBOARD AND VENUE JOINS, WITH NO MODEL. SERVED ON THE FLEET `[verified 2026-10-15, lane soccer-uefa-competitions]`
 
 - **What is verified (2026-10-15, read directly):**
   - The ESPN scoreboards `uefa.champions`, `uefa.europa` and `uefa.europa.conf` answer on the existing URL pattern. `build_soccer_schedule.py` wrote UCL 144 matches across 8 weeks and UECL 108 across 6.
@@ -13,7 +13,16 @@ Same rules as state.md: when a fact changes, EDIT THE LINE.
   - One UCL game-odds capture returned 830 rows, 18 events and 9 US books (h2h 474, totals 216, spreads 140), and appended to the book_quotes tape. This was written into a scratch root, not into production.
   - Kalshi titles UEFA series in two styles, read from the public API: `KXUCLGAME` = "UEFA Champions League Game", but `KXUCLTOTAL` = "Champions League Total Goals". `KXUELGAME` and `KXUECLGAME` follow the same pattern.
 - **Why there is no sim:** team ratings are fit per domestic league and centred on that league's mean (`compute_team_ratings`). `_rating_for` returns a silent 0.0 for any club it cannot find. Stage 1 is `#699`.
-- **On main, not on the fleet** (`f9d06686`, `279db78c`; landed 2026-10-15). Until the fleet runs it, nothing UEFA is served.
+- **Served on the local fleet** (verified 2026-10-15, `deploys.md` 20:47:12Z / 21:33Z / 22:17:31Z):
+  - Code `f9d06686` + `279db78c` + `25fea6ac`.
+  - The fleet's pregame run wrote UCL/UEL/UECL schedules and odds (UCL 830 rows).
+  - `/soccer/{ucl,uel,uecl}/cards` return 200 with the no-model copy.
+  - The live poller wrote UEL/UECL state with 0 `LEAGUE_POLL_FAILED`.
+- **UEFA club identity** (`25fea6ac`, measured with the real join): all 18 UCL fixtures resolve against Kalshi (was 9), and 40 totals price (was 22).
+  - The global alias map gained 89 keys / 55 clubs, with 0 removed and 0 changed.
+  - UEFA branding gives NAMES only; its abbreviations had dropped `cel`/`lev`/`mid`/`slb`.
+  - Workers use it from their next restart. Kalshi moneylines price 0 in EVERY sport (h2h `None` vs `0.0` key), which needs a separate fix.
+- **Not yet read:** a UCL match IN PLAY (projection=null), on the 2026-10-20/21 matchday.
 
 ## [soccer-roster-only-players] SOCCER SIM SQUADS: ADDING ROSTER-ONLY PLAYERS (TEAM TOTALS FIXED) FAILED ITS PRE-REGISTERED TEST, AND THE ESPN ROSTERS ARE A JULY SEED `[measured 2026-10-06, lane soccer-roster-only-players, NOT SHIPPED]`
 
