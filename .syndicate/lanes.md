@@ -900,7 +900,7 @@ death, never life — do not invert it.
 
 ### ci-suite-red-1015 — OPEN — opened 2026-10-15 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
 - Goal: todo #697: every NEW FAILURE in the fleet ci-suite (42 on 2026-10-15 08:48Z, commit 11bbdbcf) is either fixed on main, or attributed to the OPEN lane that owns its file with the reason, or recorded as a deliberate baseline --update named in a commit; the next 08:00Z run reads 0 NEW FAILURE(S) for every item this lane took
-- Files: tests/ (only test files whose owning lane is CLOSED or that no OPEN lane claims; per-file list recorded in this block as taken)
+- Files: tests/ (only test files whose owning lane is CLOSED or that no OPEN lane claims; per-file list recorded in this block as taken) -- TAKEN 2026-10-15: tests/test_nhl_confirmed_goalies.py, tests/test_ncaaf_props_board.py, tests/test_soccer_threeway_precision_gate.py, scripts/port_basketball_source_cli.py (duplicate MODELS_DST ONLY)
 - Hypothesis: n/a (triage)
 - Falsification test: n/a
 - Verification: re-run the 42 on origin/main; per test: fixed / owner-attributed / baseline-update; then the next scheduled ci-suite run's NEW FAILURE list
