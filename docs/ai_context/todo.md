@@ -19,6 +19,7 @@ The 08:00Z `ci-suite` job (`local_production.py ci-run` -> `run_ci_suite.py` in 
 - **Rule checks, in files OTHER open lanes hold:**
   - `test_probability_differential::test_every_converter_is_registered_or_excused` (10-03): `scripts/backtest_ncaaf_attribution_props.py:_devig` (and siblings) not in `scripts/probability_differential.py` REGISTRY / NOT_A_SCALAR_CONVERTER. That file is held by `nba-lines-props-backtest`.
     - **FIXED 2026-10-15, lane `probability-differential-sweep-1015` (`b2f40e6f`):** 10 passed on origin/main. 39 names: 31 registered, 7 excused, BOM read fixed. Not blocked by `nba-lines-props-backtest`: its claim was scoped.
+    - **RED AGAIN 14:16Z, GREEN AGAIN `607b6079` (lane `source-cli-implied-prob-zero-guard`):** `play_cards.py:_implied` (`d139116c`, lane `play-cards`) landed unregistered 3 min after the sweep closed; now registered + KNOWN_FAILING (0 -> -0.0; its guard is `play-cards`'). The 2 source_cli `implied_prob_american` entries were GUARDED (generator EDIT) and REMOVED; upstream NBA-Betting#3, WNBA-Betting#14.
   - `test_slate_date_timezone_discipline` (10-05): `date.today()` in `syndicate/features/nhl/inseason_season_inputs.py` (2x) and `inseason_team_xg.py`. Owner `nhl-season-inputs-in-season`.
   - `test_basketball_orchestrator_reachability::test_the_generated_modules_match_the_port_script` (10-11): PORT_CHECK DIFFERS across smart_sim, quarters, boxscores, ... Owner `basketball-native-orchestrator`.
 - **Behaviour, NCAAF:**
