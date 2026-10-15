@@ -43,6 +43,16 @@ WHAT IT CANNOT SEE. |gap| > 15 points. `layer2_board._MODEL_EDGE_MAX_POINTS` tur
 None before the recorder writes `me`, so those rows reach the grader with no sim probability and
 are counted `nosim`. H3 is reported NOT COMPUTABLE here, never as a null.
 
+AMENDED 2026-10-15, after the first (backfill) run and before any decision rested on it:
+- THE SIGNAL. The registered rule -- a cell's ROI CI excludes 0 -- measured the VIG: 146 of 149
+  passing cells were negative and 142 of those sat in EV < 0, where a fair price loses by design.
+  The headline now asks whether a cell realised its OWN predicted EV (ROI - mean EV, game CI). The
+  registered rule is still computed and reported, labelled, beside it.
+- FAIR TYPE. A cell never pools a two-sided fair (consensus / sharp anchor) with a one-sided one
+  (`book_margin_model`, one book's price less an assumed margin, measured ~8.5 points overstated).
+  Pooled, soccer's sim looked better than a market that was mostly one-sided fairs, and an
+  independent run on two-sided rows only read the opposite.
+
 REPORTING ONLY. No overlay and no consumer: nothing reads this for rank, stake or publication.
 """
 
@@ -62,7 +72,7 @@ import numpy as np
 from syndicate.features.shared import measured_bucket_skill as mbs
 from syndicate.features.shared import model_scorecard as msc
 
-VERSION = "sim_gap_ev/1"
+VERSION = "sim_gap_ev/2"   # /2: fair type in every cell key; /1 states are reset, not mixed
 REPORT_DIR = "reports/model_scorecard"
 # Inside the EXISTING allowlist entries `reports/model_scorecard/model_scorecard_*.json|.md`, and no ISO
 # date in the names, so date-scoped worker pulls skip them (the optimizer's reasoning).
@@ -70,7 +80,15 @@ STATE_PATH = f"{REPORT_DIR}/model_scorecard_simgap_state.json"
 REPORT_PATH = f"{REPORT_DIR}/model_scorecard_simgap.json"
 MARKDOWN_PATH = f"{REPORT_DIR}/model_scorecard_simgap.md"
 SOURCE = "model_scorecard/sim_gap_ev"
-PREREGISTRATION = {"lane": "sim-gap-ev-study", "commit": "ca52ea13", "registered": "2026-10-15"}
+PREREGISTRATION = {
+    "lane": "sim-gap-ev-study", "commit": "ca52ea13", "registered": "2026-10-15",
+    "amendments": [
+        {"date": "2026-10-15", "change": "headline signal = ROI vs the cell's own mean EV; ROI vs 0 kept as prereg_signal",
+         "why": "ROI vs 0 measured the vig: 146 of 149 first-run signals negative, 142 of them in EV < 0"},
+        {"date": "2026-10-15", "change": "fair type (two_sided / one_sided) is part of every cell",
+         "why": "one-sided fairs run ~8.5 pts high; pooled soccer read the reverse of a two-sided-only run"},
+    ],
+}
 
 WINDOW_DAYS = 28
 RETAIN_DAYS = 35
@@ -90,6 +108,9 @@ GAP_BANDS: tuple[tuple[float | None, float | None, str], ...] = (
     (15.0, None, "gap15+"),
 )
 NOSIM = "nosim"
+# `fair_method` -> fair type. Two-sided: a de-vigged market. One-sided: one book's price less an assumed margin.
+TWO_SIDED_METHODS = frozenset({"consensus", "sharp_anchor"})
+ONE_SIDED_METHODS = frozenset({"book_margin_model"})
 SMALL_GAPS = ("gap0-2", "gap2-5")
 LARGE_GAP = "gap10-15"
 # EV of the recorded price against the recorded fair, in percent (gross of any exchange fee).
@@ -156,10 +177,22 @@ def direction(d: float) -> str:
     return "for" if d > 0 else "against" if d < 0 else "flat"
 
 
+def fair_type(row: Mapping[str, Any]) -> str:
+    """two_sided / one_sided / other, from the row's own `fair_method=` bucket; `unknown` without one."""
+    for bucket in row.get("buckets") or []:
+        tail = str(bucket).rsplit("|", 1)[-1]
+        if tail.startswith("fair_method="):
+            method = tail.split("=", 1)[1]
+            return ("two_sided" if method in TWO_SIDED_METHODS else
+                    "one_sided" if method in ONE_SIDED_METHODS else "other")
+    return "unknown"
+
+
 def cell_of(row: Mapping[str, Any]) -> str | None:
-    """The scorecard's cell, `sport|market|segment|phase` -- the prefix `msc._accumulate` keys on."""
+    """`sport|market|segment|phase|fair`: the scorecard's cell (the prefix `msc._accumulate` keys on) plus
+    the fair type, so a two-sided and a one-sided fair are never pooled."""
     buckets = list(row.get("buckets") or [])
-    return "|".join(str(buckets[0]).split("|")[:4]) if buckets else None
+    return "|".join(str(buckets[0]).split("|")[:4] + [fair_type(row)]) if buckets else None
 
 
 def minutes_before_start(record: Mapping[str, Any]) -> float | None:
@@ -489,13 +522,18 @@ def _bet_row(key: str, entries: Entries, *, resamples: int) -> dict[str, Any]:
         "hit_rate": _r(total[1] / bets) if bets else None,
         "roi": _r(total[2] / bets) if bets else None,
         "mean_ev": _r(total[3] / bets) if bets else None,
-        "ci95": None, "tested": False, "signal": False,
+        # Realised minus PREDICTED: did the cell's price deliver the EV its fair said it would?
+        "roi_minus_ev": _r((total[2] - total[3]) / bets) if bets else None,
+        "roi_ci95": None, "roi_minus_ev_ci95": None, "tested": False, "signal": False, "prereg_signal": False,
     }
     if len(entries) >= MIN_GAMES and bets:
         sums = _weights(len(entries), seed=_seed(key, "roi"), resamples=resamples) @ m
-        row["ci95"] = _ci(_ratio(sums, 2, 0))
+        row["roi_ci95"] = _ci(_ratio(sums, 2, 0))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            row["roi_minus_ev_ci95"] = _ci((sums[:, 2] - sums[:, 3]) / sums[:, 0])
         row["tested"] = True
-        row["signal"] = _excludes_zero(row["ci95"])
+        row["signal"] = _excludes_zero(row["roi_minus_ev_ci95"])
+        row["prereg_signal"] = _excludes_zero(row["roi_ci95"])  # ROI vs 0, as registered (measures the vig)
     return row
 
 
@@ -503,8 +541,8 @@ def betting(games: Sequence[Mapping[str, Any]], *, resamples: int = RESAMPLES) -
     """Sport x phase tables (cross, by gap, by EV, by sim view within EV) plus market-level cross rows."""
 
     def keys_for(raw: str) -> list[str]:
-        sport, market, segment, phase, gap, view, ev = raw.split("|")
-        base = f"{sport}|{phase}"
+        sport, market, segment, phase, fair, gap, view, ev = raw.split("|")
+        base = f"{sport}|{phase}|{fair}"
         return [f"cross|{base}|{gap}|{view}|{ev}", f"gap|{base}|{gap}|{view}", f"ev|{base}|{ev}",
                 f"view|{base}|{view}|{ev}", f"cell|{raw}"]
 
@@ -518,27 +556,35 @@ def betting(games: Sequence[Mapping[str, Any]], *, resamples: int = RESAMPLES) -
         row = _bet_row(rest, entries, resamples=resamples)
         parts = rest.split("|")
         if kind == "cell":
-            row.update(zip(("sport", "market", "segment", "phase", "gap", "view", "ev"), parts))
+            row.update(zip(("sport", "market", "segment", "phase", "fair", "gap", "view", "ev"), parts))
         else:
-            row.update(zip(("sport", "phase"), parts[:2]))
+            row.update(zip(("sport", "phase", "fair"), parts[:3]))
             row.update(zip({"cross": ("gap", "view", "ev"), "gap": ("gap", "view"), "ev": ("ev",),
-                            "view": ("view", "ev")}[kind], parts[2:]))
+                            "view": ("view", "ev")}[kind], parts[3:]))
         tables[kind].append(row)
-    tested = sum(1 for t in ("cross", "cell") for r in tables[t] if r["tested"])
-    signals = [r for t in ("cross", "cell") for r in tables[t] if r["signal"]]
+    tested_rows = [r for t in ("cross", "cell") for r in tables[t] if r["tested"]]
+    signals = [r for r in tested_rows if r["signal"]]
+    prereg = [r for r in tested_rows if r["prereg_signal"]]
     h1 = _h1(collected, resamples=resamples)
-    return {**tables, "tested": tested, "signals": [r["key"] for r in signals],
-            "expected_false_signals": _r(0.05 * tested, 1), "h1": h1}
+    return {**tables, "tested": len(tested_rows), "signals": [r["key"] for r in signals],
+            "signals_above_ev": sum(1 for r in signals if (r["roi_minus_ev"] or 0) > 0),
+            "signals_below_ev": sum(1 for r in signals if (r["roi_minus_ev"] or 0) < 0),
+            "expected_false_signals": _r(0.05 * len(tested_rows), 1),
+            "prereg": {"rule": "ROI 95% CI excludes 0", "signals": len(prereg),
+                       "negative": sum(1 for r in prereg if (r["roi"] or 0) < 0),
+                       "negative_in_ev_below_0": sum(1 for r in prereg if (r["roi"] or 0) < 0 and r.get("ev") == "ev<0")},
+            "h1": h1}
 
 
 def _h1(collected: Mapping[str, Entries], *, resamples: int) -> list[dict[str, Any]]:
     """Inside one sport x phase x EV band: ROI(sim FOR) - ROI(sim AGAINST), game-paired bootstrap."""
     out: list[dict[str, Any]] = []
-    for key in sorted(k for k in collected if k.startswith("view|") and k.split("|")[3] == "for"):
-        _, sport, phase, _, ev = key.split("|")
-        other = f"view|{sport}|{phase}|against|{ev}"
+    for key in sorted(k for k in collected if k.startswith("view|") and k.split("|")[4] == "for"):
+        _, sport, phase, fair, _, ev = key.split("|")
+        other = f"view|{sport}|{phase}|{fair}|against|{ev}"
         a, b = collected[key], collected.get(other, [])
-        row: dict[str, Any] = {"sport": sport, "phase": phase, "ev": ev, "for_games": len(a), "against_games": len(b)}
+        row: dict[str, Any] = {"sport": sport, "phase": phase, "fair": fair, "ev": ev, "for_games": len(a),
+                               "against_games": len(b)}
         ta, tb = _matrix(a).sum(axis=0), (_matrix(b).sum(axis=0) if b else np.zeros(4))
         row["for_bets"], row["against_bets"] = int(ta[0]), int(tb[0])
         row["for_roi"] = _r(ta[2] / ta[0]) if ta[0] else None
@@ -584,12 +630,12 @@ def _cal_row(key: str, entries: Entries, *, resamples: int) -> dict[str, Any]:
 
 def trust(games: Sequence[Mapping[str, Any]], *, resamples: int = RESAMPLES) -> dict[str, Any]:
     def keys_for(raw: str) -> list[str]:
-        sport, market, segment, phase, gap = raw.split("|")
-        keys = [f"sport|{sport}|{phase}|{gap}", f"cell|{raw}"]
+        sport, market, segment, phase, fair, gap = raw.split("|")
+        keys = [f"sport|{sport}|{phase}|{fair}|{gap}", f"cell|{raw}"]
         if gap in SMALL_GAPS:
-            keys.append(f"small|{sport}|{phase}")
+            keys.append(f"small|{sport}|{phase}|{fair}")
         elif gap == LARGE_GAP:
-            keys.append(f"large|{sport}|{phase}")
+            keys.append(f"large|{sport}|{phase}|{fair}")
         return keys
 
     collected = _collect(games, "cal", keys_for)
@@ -603,17 +649,17 @@ def trust(games: Sequence[Mapping[str, Any]], *, resamples: int = RESAMPLES) -> 
         row = _cal_row(rest, collected[key], resamples=resamples)
         parts = rest.split("|")
         if kind == "cell":
-            row.update(zip(("sport", "market", "segment", "phase", "gap"), parts))
+            row.update(zip(("sport", "market", "segment", "phase", "fair", "gap"), parts))
             cell_rows.append(row)
         else:
-            row.update(zip(("sport", "phase", "gap"), parts))
+            row.update(zip(("sport", "phase", "fair", "gap"), parts))
             sport_rows.append(row)
     h2 = []
     for key in sorted(k for k in collected if k.startswith("small|")):
-        _, sport, phase = key.split("|")
-        small, large = collected[key], collected.get(f"large|{sport}|{phase}", [])
+        _, sport, phase, fair = key.split("|")
+        small, large = collected[key], collected.get(f"large|{sport}|{phase}|{fair}", [])
         ts, tl = _matrix(small).sum(axis=0), (_matrix(large).sum(axis=0) if large else np.zeros(3))
-        row = {"sport": sport, "phase": phase, "small_games": len(small), "large_games": len(large),
+        row = {"sport": sport, "phase": phase, "fair": fair, "small_games": len(small), "large_games": len(large),
                "w_small": _r(ts[2] / ts[1]) if ts[1] > 0 else None,
                "w_large": _r(tl[2] / tl[1]) if tl[1] > 0 else None, "ci95": None}
         row["diff"] = _r(row["w_large"] - row["w_small"]) if None not in (row["w_small"], row["w_large"]) else None
@@ -657,8 +703,8 @@ def _fit_row(key: str, entries: Entries, *, resamples: int) -> dict[str, Any]:
 
 def calibration(games: Sequence[Mapping[str, Any]], *, resamples: int = RESAMPLES) -> dict[str, Any]:
     def keys_for(cell: str) -> list[str]:
-        sport, market, segment, phase = cell.split("|")
-        return [f"sport|{sport}|{phase}", f"cell|{cell}"]
+        sport, market, segment, phase, fair = cell.split("|")
+        return [f"sport|{sport}|{phase}|{fair}", f"cell|{cell}"]
 
     collected = _collect(games, "fit", keys_for)
     sport_rows, cell_rows = [], []
@@ -669,18 +715,18 @@ def calibration(games: Sequence[Mapping[str, Any]], *, resamples: int = RESAMPLE
         row = _fit_row(rest, collected[key], resamples=resamples)
         parts = rest.split("|")
         if kind == "cell":
-            row.update(zip(("sport", "market", "segment", "phase"), parts))
+            row.update(zip(("sport", "market", "segment", "phase", "fair"), parts))
             cell_rows.append(row)
         else:
-            row.update(zip(("sport", "phase"), parts))
+            row.update(zip(("sport", "phase", "fair"), parts))
             sport_rows.append(row)
     return {"by_sport": sport_rows, "cells": cell_rows}
 
 
 def lead_time(games: Sequence[Mapping[str, Any]], *, resamples: int = RESAMPLES) -> dict[str, Any]:
     def keys_for(raw: str) -> list[str]:
-        sport, market, segment, phase, band = raw.split("|")
-        return [f"sport|{sport}|{band}", f"cell|{raw}"]
+        sport, market, segment, phase, fair, band = raw.split("|")
+        return [f"sport|{sport}|{fair}|{band}", f"cell|{raw}"]
 
     collected = _collect(games, "lead", keys_for)
     sport_rows, cell_rows = [], []
@@ -691,10 +737,10 @@ def lead_time(games: Sequence[Mapping[str, Any]], *, resamples: int = RESAMPLES)
         row = _cal_row(rest, collected[key], resamples=resamples)
         parts = rest.split("|")
         if kind == "cell":
-            row.update(zip(("sport", "market", "segment", "phase", "lead"), parts))
+            row.update(zip(("sport", "market", "segment", "phase", "fair", "lead"), parts))
             cell_rows.append(row)
         else:
-            row.update(zip(("sport", "lead"), parts))
+            row.update(zip(("sport", "fair", "lead"), parts))
             sport_rows.append(row)
     return {"by_sport": sport_rows, "cells": cell_rows}
 
@@ -751,6 +797,9 @@ def build_report(state: Mapping[str, Any], *, today: str, now: datetime, run: Ma
             "slope_sim": "least-squares slope of outcome on the sim's probability; < 1 = overconfident",
             "mid_bias": "mean(outcome - sim) on rows the sim put at 0.40-0.60",
             "lead": "minutes between a side's FIRST pricing that day and the start (pregame only)",
+            "fair": "two_sided = a de-vigged market (consensus / sharp anchor); one_sided = one book's price less an "
+                    "assumed margin (book_margin_model); never pooled",
+            "signal": "a tested cell whose realised ROI minus its own mean EV has a 95% game CI excluding 0",
         },
         "coverage": coverage(games),
         "betting": betting(games, resamples=resamples),
@@ -797,46 +846,56 @@ def markdown(report: Mapping[str, Any]) -> str:
     ]
     for sport, c in report["coverage"].items():
         lines.append(f"| {sport} | {c['games']} | {c['dates']} | {c['bets']} | {c['sim_rows']} |")
+    prereg = bet["prereg"]
     lines += ["", "## (A) Betting", "",
-              f"Cells tested: {bet['tested']}. Signals: {len(bet['signals'])} "
-              f"(about {bet['expected_false_signals']} expected by chance at 5%).", ""]
+              f"Cells tested: {bet['tested']}. Cells whose realised ROI missed or beat their OWN predicted EV: "
+              f"{len(bet['signals'])} ({bet['signals_above_ev']} above, {bet['signals_below_ev']} below; about "
+              f"{bet['expected_false_signals']} expected by chance at 5%).",
+              "",
+              f"Registered rule ({prereg['rule']}): {prereg['signals']} cells, {prereg['negative']} negative, "
+              f"{prereg['negative_in_ev_below_0']} of those in EV < 0 -- the vig, not an edge. Kept for the record.", ""]
+    rows = {r["key"]: r for t in ("cross", "cell") for r in bet[t]}
     for key in bet["signals"][:20]:
-        lines.append(f"- signal: `{key}`")
+        r = rows[key]
+        lines.append(f"- `{key}`: ROI {_pct(r['roi'])} vs predicted {_pct(r['mean_ev'])} "
+                     f"({_pct(r['roi_minus_ev'])}{_range(r['roi_minus_ev_ci95'], _pct)}), {r['games']} games, {r['bets']} bets")
     lines += ["", "### H1 -- sim FOR vs AGAINST inside one EV band", "",
-              "| sport | phase | EV | FOR roi (bets) | AGAINST roi (bets) | diff [CI] | verdict |",
-              "|---|---|---|---|---|---|---|"]
+              "| sport | phase | fair | EV | FOR roi (bets) | AGAINST roi (bets) | diff [CI] | verdict |",
+              "|---|---|---|---|---|---|---|---|"]
     for r in bet["h1"]:
-        lines.append(f"| {r['sport']} | {r['phase']} | {r['ev']} | {_pct(r['for_roi'])} ({r['for_bets']}) | "
+        lines.append(f"| {r['sport']} | {r['phase']} | {r['fair']} | {r['ev']} | {_pct(r['for_roi'])} ({r['for_bets']}) | "
                      f"{_pct(r['against_roi'])} ({r['against_bets']}) | {_pct(r['diff'])}{_range(r['ci95'], _pct)} | "
                      f"{r['verdict']} |")
-    lines += ["", "### By sim view, all EV bands", "", "| sport | phase | gap | view | games | bets | ROI [CI] |",
-              "|---|---|---|---|---|---|---|"]
+    lines += ["", "### By sim view, all EV bands", "",
+              "| sport | phase | fair | gap | view | games | bets | ROI [CI] | ROI - predicted EV [CI] |",
+              "|---|---|---|---|---|---|---|---|---|"]
     for r in bet["gap"]:
-        lines.append(f"| {r['sport']} | {r['phase']} | {r['gap']} | {r['view']} | {r['games']} | {r['bets']} | "
-                     f"{_pct(r['roi'])}{_range(r['ci95'], _pct)} |")
+        lines.append(f"| {r['sport']} | {r['phase']} | {r['fair']} | {r['gap']} | {r['view']} | {r['games']} | {r['bets']} | "
+                     f"{_pct(r['roi'])}{_range(r['roi_ci95'], _pct)} | "
+                     f"{_pct(r['roi_minus_ev'])}{_range(r['roi_minus_ev_ci95'], _pct)} |")
     lines += ["", "## (B) Engine", "", "### Trust in the sim by gap size (w: 1 = trust, 0 = noise, < 0 = wrong way)", "",
-              "| sport | phase | gap | games | rows | w [CI] | Brier sim-market per row |",
-              "|---|---|---|---|---|---|---|"]
+              "| sport | phase | fair | gap | games | rows | w [CI] | Brier sim-market per row |",
+              "|---|---|---|---|---|---|---|---|"]
     for r in eng["trust"]["by_sport"]:
-        lines.append(f"| {r['sport']} | {r['phase']} | {r['gap']} | {r['games']} | {r['rows']} | "
+        lines.append(f"| {r['sport']} | {r['phase']} | {r['fair']} | {r['gap']} | {r['games']} | {r['rows']} | "
                      f"{_num(r['w'], 2)}{_range(r['w_ci95'], lambda v: _num(v, 2))} | {_num(r['brier_sim_minus_market'], 4)} |")
-    lines += ["", "### H2 -- does w fall as the gap grows?", "", "| sport | phase | w 0-5 | w 10-15 | diff [CI] | verdict |",
-              "|---|---|---|---|---|---|"]
+    lines += ["", "### H2 -- does w fall as the gap grows?", "",
+              "| sport | phase | fair | w 0-5 | w 10-15 | diff [CI] | verdict |", "|---|---|---|---|---|---|---|"]
     for r in eng["trust"]["h2"]:
-        lines.append(f"| {r['sport']} | {r['phase']} | {_num(r['w_small'], 2)} | {_num(r['w_large'], 2)} | "
+        lines.append(f"| {r['sport']} | {r['phase']} | {r['fair']} | {_num(r['w_small'], 2)} | {_num(r['w_large'], 2)} | "
                      f"{_num(r['diff'], 2)}{_range(r['ci95'], lambda v: _num(v, 2))} | {r['verdict']} |")
     lines += ["", "### Mean vs spread", "",
-              "| sport | phase | rows | slope sim [CI] | slope market | mid-line bias [CI] | verdict |",
-              "|---|---|---|---|---|---|---|"]
+              "| sport | phase | fair | rows | slope sim [CI] | slope market | mid-line bias [CI] | verdict |",
+              "|---|---|---|---|---|---|---|---|"]
     for r in eng["calibration"]["by_sport"]:
-        lines.append(f"| {r['sport']} | {r['phase']} | {r['rows']} | "
+        lines.append(f"| {r['sport']} | {r['phase']} | {r['fair']} | {r['rows']} | "
                      f"{_num(r['slope_sim'], 2)}{_range(r['slope_sim_ci95'], lambda v: _num(v, 2))} | "
                      f"{_num(r['slope_market'], 2)} | {_pct(r['mid_bias'])}{_range(r['mid_bias_ci95'], _pct)} "
                      f"({r['mid_rows']}) | {r['verdict']} |")
     lines += ["", "### Lead time (pregame; a band = sides FIRST priced that long before the start)", "",
-              "| sport | lead | games | rows | w | Brier sim-market per row [CI] |", "|---|---|---|---|---|---|"]
+              "| sport | fair | lead | games | rows | w | Brier sim-market per row [CI] |", "|---|---|---|---|---|---|---|"]
     for r in eng["lead_time"]["by_sport"]:
-        lines.append(f"| {r['sport']} | {r['lead']} | {r['games']} | {r['rows']} | {_num(r['w'], 2)} | "
+        lines.append(f"| {r['sport']} | {r['fair']} | {r['lead']} | {r['games']} | {r['rows']} | {_num(r['w'], 2)} | "
                      f"{_num(r['brier_sim_minus_market'], 4)}{_range(r['brier_ci95'], lambda v: _num(v, 4))} |")
     big = eng["big_misses"]
     lines += ["", f"### Big disagreements (>= {big['threshold_pts']:.0f} points): how often the market was right", "",

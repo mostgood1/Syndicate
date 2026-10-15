@@ -16,6 +16,8 @@ from syndicate.features.shared.opportunity_population_ledger import population_k
 bs = msc.load_bucket_search()
 NOW = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)
 CELL = "mlb|totals|full|pregame"
+TWO = f"{CELL}|two_sided"     # the fixture quotes a consensus fair
+UNK = f"{CELL}|unknown"       # synthetic rows carry no fair_method bucket
 
 
 def _candidate(**overrides):
@@ -59,18 +61,27 @@ def test_real_graded_rows_carry_every_field_the_study_reads():
         assert {"buckets", "y", "p_market", "p_model", "model_edge_pct", "pnl", "price"} <= set(row)
     sums = sge.accumulate(graded)
     # +100 against a 0.5 fair is EV 0 -> the 0-2 band (lower bound inclusive).
-    assert sums["bet"] == {f"{CELL}|gap5-10|for|ev0-2": [1, 1, 1.0, 0.0],
-                           f"{CELL}|gap5-10|against|ev0-2": [1, 0, -1.0, 0.0]}
-    rows, dd, dr = sums["cal"][f"{CELL}|gap5-10"]
+    assert sums["bet"] == {f"{TWO}|gap5-10|for|ev0-2": [1, 1, 1.0, 0.0],
+                           f"{TWO}|gap5-10|against|ev0-2": [1, 0, -1.0, 0.0]}
+    rows, dd, dr = sums["cal"][f"{TWO}|gap5-10"]
     assert rows == 2 and dd == pytest.approx(2 * 0.06 ** 2) and dr == pytest.approx(2 * 0.06 * 0.5)
-    assert sums["fit"][CELL][0] == 2 and sums["fit"][CELL][8] == 2, "both sims sit in the 0.40-0.60 mid band"
+    assert sums["fit"][TWO][0] == 2 and sums["fit"][TWO][8] == 2, "both sims sit in the 0.40-0.60 mid band"
+
+
+def test_a_two_sided_and_a_one_sided_fair_are_never_pooled():
+    two = _record(_candidate(model_edge_pct=6.0))
+    one = _record(_candidate(market="h2h", side="home", line=None, model_edge_pct=6.0,
+                             quote={"price": 100, "fair_probability": 0.5, "fair_method": "book_margin_model",
+                                    "books_quoting": 1, "book_age_seconds": 60.0}))
+    graded, _ = bs.grade_population([two, one], CHIPS)
+    assert sorted(sge.accumulate(graded)["fit"]) == ["mlb|h2h|full|pregame|one_sided", TWO]
 
 
 def test_a_row_without_a_sim_is_a_nosim_bet_and_never_a_calibration_row():
     row = {"buckets": [f"{CELL}|x=y"], "y": 1.0, "p_market": 0.5, "p_model": None, "model_edge_pct": None,
            "pnl": 1.0, "price": 100}
     sums = sge.accumulate([row])
-    assert sums["bet"] == {f"{CELL}|nosim|none|ev0-2": [1, 1, 1.0, 0.0]}
+    assert sums["bet"] == {f"{UNK}|nosim|none|ev0-2": [1, 1, 1.0, 0.0]}
     assert sums["cal"] == {} and sums["fit"] == {}
 
 
@@ -107,8 +118,8 @@ def test_wrap_grade_returns_exactly_what_grade_returns_and_regrades_only_through
     # one lead band (all three first priced 300 minutes out), then the two big sides regraded alone
     assert calls["base"] == [3, 1, 1]
     entry = state["candidates"]["mlb|evt-1"]
-    assert set(entry["lead"]) == {f"{CELL}|lead2-6h", "mlb|h2h|full|pregame|lead2-6h"}
-    assert entry["bigc"] == {CELL: [2, 1]}
+    assert set(entry["lead"]) == {f"{TWO}|lead2-6h", "mlb|h2h|full|pregame|two_sided|lead2-6h"}
+    assert entry["bigc"] == {TWO: [2, 1]}
     assert [m["k"] for m in entry["big"]] == [under["k"]], "only the disagreement the MARKET won is listed"
     assert entry["big"][0]["gap_pts"] == pytest.approx(11.0)
 
@@ -254,6 +265,19 @@ def test_calibration_slope_flags_a_sim_that_is_twice_as_sure_as_the_outcomes():
     report = sge.build_report(_state(rows, n_games=90), today="2026-10-15", now=NOW, resamples=300)
     (row,) = report["engine"]["calibration"]["by_sport"]
     assert row["verdict"] == "overconfident" and 0.2 < row["slope_sim"] < 0.8
+
+
+def test_a_fairly_priced_cell_below_zero_ev_is_not_a_signal_though_the_registered_rule_flags_it():
+    """The amendment's reason, as a test: at -110 against a 0.5 fair the cell loses ~4.5% BY DESIGN."""
+    def rows(rng):
+        return [_row(0.5, 0.53, rng.random() < 0.5, price=-110) for _ in range(120)]
+
+    report = sge.build_report(_state(rows, n_games=80, seed=11), today="2026-10-15", now=NOW, resamples=400)
+    (cell,) = [r for r in report["betting"]["cross"] if r["ev"] == "ev<0"]
+    assert cell["mean_ev"] == pytest.approx(0.5 * (1 + 100 / 110) - 1, abs=1e-4)  # reported to 5 dp
+    assert cell["prereg_signal"] is True, "ROI vs 0: the vig reads as a signal"
+    assert cell["signal"] is False, "ROI vs its own EV: nothing there"
+    assert report["betting"]["prereg"]["negative_in_ev_below_0"] >= 1
 
 
 def test_every_cell_is_counted_as_tested_and_signals_come_with_their_chance_rate():
