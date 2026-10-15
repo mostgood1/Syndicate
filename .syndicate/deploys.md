@@ -49806,3 +49806,9 @@ The copy has no cache, `trust_env` off unless `STATSAPI_TRUST_ENV`, an (8 s, 8 s
   - Tests: 68 pass, incl. both-ways ambiguity refusals.
 - **verify -- OWED, cheap:** `lineup_reach.py` on the next slate (10-17/18 European weekend). Sides at 11 should rise against 10-14's {11: 10, 10: 12}.
 - **Rollback:** revert f05b1632, ff. No restart.
+
+## 2026-10-15 17:38:16Z (12:38 PM CT) -- web ff f05b1632 -> 1973c1f1 + `reload-web` (2.0 s, 0 failures): exported section images re-count what they export; a collapsed board read is re-read (lane `cheat-sheets`, session 9e18a0e7) -- NO outage, no restart
+- **ask:** user 2026-10-15 "when we export these to use as social graphics, we need to make sure the counts match what is exported".
+- **claim:** web by cheat-sheets token f4b60791..., acquire exit 0. Ride-alongs: c5c0f4f3 / 72e916b9 / 180b55c1 (ledger only).
+- **verify (live page, Playwright, 17:39Z):** for every section of the MLB and NFL sheets, the export frame's header count equals its rows -- MLB Hot streaks 25 on the page -> "10 rows" over 10, Consistency 25 -> 12, Batter vs pitcher 18 -> 12, NFL Every prop 150 -> 12; picks re-split ("3 picks · 3 price plays" over 6). A real PNG from the page's own Export button (MLB Hot streaks) reads "10 rows" over 10 rows. The same check on the static render covered NHL / NCAAF / NBA (slate 17 -> 16, news 17 -> 12).
+- **NFL sheet restored:** the 12:30 PM scheduled build had read the board mid board build (20 of ~64 groups -> 28 rows); rebuilt 17:39Z on 1973c1f1: 64 groups / 150 rows. `steady_rows` now re-reads such a read (3 x 50 s). The board serving a partial state mid-build is a lead for its owner (logged), not fixed here.
