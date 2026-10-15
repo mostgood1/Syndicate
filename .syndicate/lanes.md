@@ -69,7 +69,7 @@ death, never life — do not invert it.
 
 ### nba-t-window-provider — OPEN — opened 2026-10-14 — session 2d413211
 - Goal: Give the live loop's T-window an NBA commence-time provider (`_nba_commence_times`) reading the native data-root NBA schedule, so NBA gets per-game T-75/T-10 pregame odds sweeps; cost measured per slate before deploy; deployed with a measurement (user decision 2026-10-14, from "move the nba schedule commence times off vendor": nothing vendored existed, NBA had no provider).
-- Files: syndicate/features/shared/live_refresh_loop.py (_nba_commence_times + _T_WINDOW_COMMENCE_PROVIDERS + T-window provider comment sections only), tests/test_nba_commence_times.py (NEW)
+- Files: syndicate/features/shared/live_refresh_loop.py (_nba_commence_times + _T_WINDOW_COMMENCE_PROVIDERS + T-window provider comment sections only), tests/test_nba_commence_times.py (NEW), tests/test_slate_phase_wiring.py (test_t_window_reaches_nfl_only_when_on provider stubs section only)
 - Hypothesis: the data-root schedule_2026_27.json carries every 2026-27 game with datetime_utc; registering it adds only the sweeps before each slate's first tip (live NBA skips the T-window), a handful per slate.
 - Falsification test: the provider returns [] for 2026-10-20 on the fleet, or times that disagree with the schedule (opener 0022600001 BOS@DET), or the simulated added sweeps per slate are far above a handful.
 - Verification: after the fleet ff + live-odds-worker restart, under the worker env `_nba_commence_times("2026-10-20")` returns the 3 opener games; the first NBA T-window marker (`nba:ramp:` / `nba:closing:`) is written for the 10-20 opener.
