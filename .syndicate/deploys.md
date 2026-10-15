@@ -49964,3 +49964,31 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   - Still refused: `Inter`->None.
 - **verify (OWED):** the alias map is `lru_cache`d per process. The Kalshi join (`pipeline/kalshi_odds_refresh.py`, `pipeline/portfolio_commit.py`) runs in the workers, so it picks this up at each worker's next restart (live-odds-worker recycles about every 5.9 h). Reading owed by the 10-20 UCL matchday: the Kalshi refresh report counts KXUCLTOTAL matches across ~18 fixtures, not ~9.
 
+## 2026-10-15 22:04:04Z (5:04 PM CT) fleet ff 05dea64e -> b9542acb + 22:28:14Z live-odds-worker TERM/respawn (616172 -> 637781): MLB live lens phase 1, the app slice off the vendored flask_frontend.py (lane `mlb-live-lens-native-p1`, session 2d413211)
+
+- **What changed.**
+  - `scripts/refresh_mlb_oddsapi.py` builds the MLB live-lens reports from `syndicate/features/mlb/live_lens_port/app_slice.py`, a generated, statement-verbatim port (14,728 lines, `--check` OK) instead of loading the 21k-line vendored app. It is still loaded fresh by path under the same env.
+  - The live-odds-worker's `start_live_lens_background_loop` and `syndicate/features/mlb/live_lens.py`'s three imports now come from the port.
+  - Phase 1 still imports the vendored `sim_engine` / `tools` packages.
+- **Locks.** Both worker claims were held by the lane, with status gating on the holder.
+  - Safety was read in full: NOT CLEAR, an odds refresh plus a refresh-worker board build. The refresh-worker was not touched.
+  - The ff waited for props/MLB-refresh idle (0 after 30s).
+  - The first restart attempt found the worker NOT IDLE for 20 min (back-to-back odds jobs) and released the claims.
+  - The retry used a 1 s poll and caught 0 children after 152 s. Claims released with `--token`.
+- **Ride-alongs.**
+  - In the ff: 561112a1 `layer2_board._model_edge_for` refusal reasons (closed lane `model-edge-refusal-reason`), a dropped unused constant in `port_basketball_source_cli.py`, and tests.
+  - Loaded by the restart, from peers' later ffs already on disk (HEAD 9f9c6ba7): 280c8100 (cheat-sheet 1-point floor, already measured live) and 25fea6ac (UEFA aliases).
+- **Parity before deploy.** Fleet, nice 19, PYTHONHASHSEED=0, on ONE frozen copy of production's `mlb_source/source_artifacts/data` for 2026-10-15.
+  - Reports entry (the refresh's call): 545 leaves, 0 diffs.
+  - Live entry, `_live_lens_payload(persist=True)` (the loop's call): 66,999 leaves including 4 written files, 0 diffs beyond 25 `performance.*Ms` wall-clock leaves, all listed by `--ignore`.
+  - Vendored self-checks are identical, and the plants were caught.
+  - The first attempt copied production once per arm while the live-lens log was being appended to, which gave the same 8 diffs in both comparisons. One snapshot fixed it.
+  - In production `SYNDICATE_DATA_ROOT` makes `_resolve_mlb_data_dir` pick `source_artifacts/data` ahead of the refresh's `MLB_BETTING_DATA_ROOT`, so that is the directory the builder reads. The refresh's `mlb_source/data` only receives its render_sync writes.
+- **verify (MEASURED).**
+  - Under the new worker's env, `start_live_lens_background_loop` is imported from the port, and the port's `_DATA_DIR` / `_LIVE_LENS_DIR` / `_ROOT_DIR` equal the vendored app's.
+  - `/proc/locks`: the MLB live-lens loop flock (`source_artifacts/data/live_lens/live_lens_background_loop.lock`, inode 307754) is held by 637781 (fd 4).
+  - First loop write by the port: `live_lens_report_2026_10_15.json` at 22:29:45Z, 79 s after the respawn. games=2, final=1, pregame=1, props=15.
+- **OWED.**
+  - (1) The first refresh-built `mlb_source/data/live_lens/render_sync/live_lens_reports_<date>.json` after 22:04:04Z (the last write was pre-ff, 22:02:22Z).
+  - (2) A live-MC tick by the port on a LIVE game; no game was live at record time, so that branch bailed in both parity arms.
+- **Rollback.** `git revert b9542acb` alone restores all three vendored imports. The port package can stay.
