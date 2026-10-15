@@ -199,7 +199,7 @@ tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first
 
 <div class="wrap">
   <header style="display:grid;gap:12px">
-    <div class="brand"><img alt="Syndicate ROI" src="__LOGO_SRC__">
+    <div class="brand"><img id="brandLogo" alt="Syndicate ROI" src="__LOGO_SRC__">
       <div class="wordmark"><span class="w1 slant">Syndicate ROI</span><span class="w2 slant">Cheat Sheets</span></div></div>
     <div class="dayline"><span class="day" id="dayLabel"></span><span class="asof" id="asOf"></span></div>
     <div class="viewbar" id="viewbar"></div>
@@ -223,6 +223,8 @@ tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first
 const DATA = /*__DATA__*/null;
 const META = /*__META__*/null || {mode: "static"};
 const LOGO_SRC = "__LOGO_SRC__";
+// The badge holds the sport's ball (user 2026-10-15); the season record, across sports, keeps the plain one.
+const logoFor = sport => (META.logos || {})[sport] || LOGO_SRC;
 const SPORT_NAMES = {nfl: "NFL", ncaaf: "NCAAF", nhl: "NHL", soccer: "Soccer", nba: "NBA", wnba: "WNBA", ncaab: "NCAAB", mlb: "MLB"};
 const TZ = "America/Chicago";
 const pct = p => (p == null ? "–" : (100 * p).toFixed(0) + "%");
@@ -505,6 +507,7 @@ function sectionsFor(d) {
 }
 function render() {
   const sport = STATE.sport, d = DATA[sport];
+  document.getElementById("brandLogo").src = logoFor(sport);
   document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.sport === sport ? "true" : "false"));
   const record = META.today && META.date !== META.today;
   document.getElementById("asOf").innerHTML = (d.phase === "postseason" ? `<span class="chip phase">Postseason</span> ` : "") + esc(d.generated_at
@@ -741,7 +744,7 @@ async function buildExport(section) {
   const lastDay = record ? ((DATA[REC.scope] || {}).series || []).slice(-1).map(x => x.date)[0] : null;
   const frame = document.createElement("div");
   frame.className = "xframe";
-  frame.innerHTML = `<div class="xhead"><img src="${esc(LOGO_SRC)}" alt=""><div><div class="w1 slant">Syndicate ROI</div><div class="w2 slant">${record ? "Season record" : esc(SPORT_NAMES[STATE.sport] || STATE.sport) + " cheat sheet"}</div></div>
+  frame.innerHTML = `<div class="xhead"><img src="${esc(record ? LOGO_SRC : logoFor(STATE.sport))}" alt=""><div><div class="w1 slant">Syndicate ROI</div><div class="w2 slant">${record ? "Season record" : esc(SPORT_NAMES[STATE.sport] || STATE.sport) + " cheat sheet"}</div></div>
       <div class="xday"><b>${record ? esc((REC.scope === "beta" ? "Beta" : "Official") + " · " + (REC.sport === "all" ? "All sports" : SPORT_NAMES[REC.sport] || REC.sport) + (lastDay ? " · through " + dayShort(lastDay) : "")) : esc(dayName(META.date || d.date))}</b>${game ? `<span class="xgame">${matchupLine(game)}</span>` : ""}</div></div>
     <div class="xbody"></div>
     <div class="xfoot"><span>${record ? "1 unit a bet at the sheet's best price · graded from final box scores" : reconciledView(d) ? `Reconciled · results from final box scores · prices as of ${esc(ctTime(d.generated_at))}` : `Prices as of ${esc(ctTime(d.generated_at))} · lines move`}</span><span class="x">@SyndicateROI</span><span>21+ · Bet responsibly</span></div>`;

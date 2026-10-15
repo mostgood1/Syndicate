@@ -38,6 +38,18 @@ ONE_SIDED = frozenset({"book_margin_model", "one_sided", "assumed_hold"})
 SPORT_LABELS = {"nfl": "NFL", "ncaaf": "NCAAF", "nhl": "NHL", "soccer": "Soccer", "nba": "NBA", "wnba": "WNBA",
                 "ncaab": "NCAAB", "mlb": "MLB"}
 
+# The badge holds the sport's ball (user 2026-10-15: "the syndicate logo changed the ball being held based on sport").
+# Each is cut from the X.com posts the user supplied; there is no hockey version, so NHL keeps the plain badge.
+BRAND_DIR = Path(__file__).resolve().parents[2] / "static" / "brand"
+SPORT_BALL = {"mlb": "baseball", "nfl": "football", "ncaaf": "football", "nba": "basketball", "wnba": "basketball",
+              "ncaab": "basketball", "soccer": "soccer"}
+
+
+def badge_name(sport: Any) -> str:
+    """The brand badge file for a sport: `syndicate_roi_badge_<ball>.webp`, or the plain badge."""
+    ball = SPORT_BALL.get(str(sport or "").strip().lower())
+    return f"syndicate_roi_badge_{ball}.webp" if ball else "syndicate_roi_badge.webp"
+
 
 def american_from_prob(p: float | None) -> int | None:
     if p is None or not 0 < p < 1:

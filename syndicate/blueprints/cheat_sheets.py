@@ -136,7 +136,8 @@ def cheat_sheets_page():
     except OSError:
         return jsonify({"ok": False, "error": "template missing"}), 500
     meta = {"mode": "app", "date": day, "today": today, "beta": day < pc.OFFICIAL_START,
-            "dates": sorted({d for d in dates if d <= _tomorrow(today)} | {today}, reverse=True)[:14]}
+            "dates": sorted({d for d in dates if d <= _tomorrow(today)} | {today}, reverse=True)[:14],
+            "logos": {sport: f"/static/brand/{pc.badge_name(sport)}" for sport in cs.SPORT_ORDER}}
     page = cs.render_page(template, sheets, logo_src=LOGO_SRC, meta=meta)
     # The site menu, the same header every standalone page includes. The page template itself stays plain HTML so
     # `scripts/render_cheat_sheets.py` can render the identical page without Flask (the published artifact).
@@ -226,7 +227,7 @@ def cheat_sheet_card(sport: str, day: str, card: str):
         return jsonify({"ok": False, "error": reason}), 404
     number = pc.card_number(pc.read_ledger(pc.ledger_path(_data_root())), day, card)
     fields = _fields(row, game, sport=sport, day=day, number=number)
-    html = pc.render_card(fields, LOGO_SRC)
+    html = pc.render_card(fields, f"/static/brand/{pc.badge_name(sport)}")
     back = f"/cheatsheets?{'date=' + day + '&' if day != _today() else ''}sport={sport}"
     toolbar = _CARD_TOOLBAR.replace("__SPORT__", sport).replace("__DAY__", day).replace("__CARD__", card) \
         .replace("__BACK__", back).replace("__FILE__", f"syndicate-{sport}-{day}-pick-{number}.png")

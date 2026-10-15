@@ -73,7 +73,10 @@ def main(argv: list[str] | None = None) -> int:
     payload = cs.page_payload(sheets)
     counts = embed_images(payload, img.cache_dir(root)) if args.embed_images else {}
     logo = "data:image/webp;base64," + base64.b64encode(LOGO.read_bytes()).decode()
-    meta = {"mode": "static", "date": args.date}
+    from syndicate.features.shared import play_cards as pc
+
+    badge = lambda sport: "data:image/webp;base64," + base64.b64encode((pc.BRAND_DIR / pc.badge_name(sport)).read_bytes()).decode()
+    meta = {"mode": "static", "date": args.date, "logos": {sport: badge(sport) for sport in payload}}
     html = TEMPLATE.read_text(encoding="utf-8")
     html = html.replace("/*__DATA__*/null", json.dumps(payload, default=str).replace("</", "<\\/"), 1)
     html = html.replace("/*__META__*/null", json.dumps(meta), 1).replace("__LOGO_SRC__", logo)

@@ -28,7 +28,6 @@ if str(REPO_ROOT) not in sys.path:
 from syndicate.features.shared import play_cards as pc  # noqa: E402
 
 TEMPLATE = REPO_ROOT / "syndicate" / "templates" / "play_cards" / "card.html"
-LOGO = REPO_ROOT / "syndicate" / "static" / "brand" / "syndicate_roi_badge.webp"
 
 
 def central_today() -> str:
@@ -100,14 +99,16 @@ def main(argv: list[str] | None = None) -> int:
     picked = pc.pick_cards(sheets, per_sport=args.per_sport, label=args.label)
     out_dir = root / "playcards" / date
     out_dir.mkdir(parents=True, exist_ok=True)
-    logo_uri = "data:image/webp;base64," + base64.b64encode(LOGO.read_bytes()).decode()
+    logos = {}     # the sport's badge (its ball), embedded once per sport
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     pairs, records = [], []
     cache = root / "cheatsheets" / ".img_cache"
     for fields, row, sport in picked:
         html_path = out_dir / f"{fields['number']:02d}_{sport}_{fields['id']}.html"
         shown = fields if args.no_embed else embed_card_images(fields, cache)
-        html_path.write_text(render_card(shown, logo_uri), encoding="utf-8")
+        if sport not in logos:
+            logos[sport] = "data:image/webp;base64," + base64.b64encode((pc.BRAND_DIR / pc.badge_name(sport)).read_bytes()).decode()
+        html_path.write_text(render_card(shown, logos[sport]), encoding="utf-8")
         pairs.append((html_path, html_path.with_suffix(".png")))
         records.append(pc.ledger_record(fields, row, sport=sport, generated_at=generated_at))
     pngs = 0 if args.no_png else to_png(pairs)

@@ -182,3 +182,13 @@ def test_a_pick_card_ticks_what_backs_it_and_flags_what_argues_against_it():
     values, labels = pc.pick_form({"rows": []}, pick)                     # its kept games draw the chart, oldest left
     assert values == [1, 2, 2, 2, 2, 4] and labels == ["NYR", "WPG", "OTT", "SEA", "MTL", "NJD"]
     assert "--li" in pc.render_card(f, "data:,")                           # the fit-to-frame script ships with the card
+
+
+def test_the_badge_holds_the_sports_ball():
+    # User 2026-10-15: "the syndicate logo changed the ball being held based on sport". Every mapped badge ships; hockey
+    # has no puck version, so it keeps the plain badge.
+    from syndicate.features.shared import play_cards as pc
+
+    assert pc.badge_name("MLB") == "syndicate_roi_badge_baseball.webp" and pc.badge_name("ncaaf") == "syndicate_roi_badge_football.webp"
+    assert pc.badge_name("wnba") == "syndicate_roi_badge_basketball.webp" and pc.badge_name("nhl") == "syndicate_roi_badge.webp"
+    assert all((pc.BRAND_DIR / pc.badge_name(s)).is_file() for s in list(pc.SPORT_BALL) + ["nhl"])

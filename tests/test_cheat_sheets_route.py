@@ -68,6 +68,8 @@ def test_the_page_is_todays_sheet_with_the_site_menu_and_past_days_as_records(ht
     assert "standalone-app-header" in html and 'standalone-app-header__link--active" href="/cheatsheets"' in html
     data, meta = _js(html, "DATA"), _js(html, "META")
     assert list(data) == ["nfl", "nhl"] and data["nfl"]["date"] == TODAY
+    logos = meta.pop("logos")                       # each sport's badge holds its ball; hockey keeps the plain one
+    assert logos["nfl"] == "/static/brand/syndicate_roi_badge_football.webp" and logos["nhl"] == "/static/brand/syndicate_roi_badge.webp"
     assert meta == {"mode": "app", "date": TODAY, "today": TODAY, "beta": True, "dates": [TODAY, "2026-10-13"]}
     record = client.get("/cheatsheets?date=2026-10-13").data.decode()
     assert _js(record, "DATA")["nfl"]["generated_at"] == "2026-10-13T21:30:00Z"
