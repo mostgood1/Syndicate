@@ -49947,3 +49947,20 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **ask:** user 2026-10-15 chose "1-point floor (Recommended)" after the H-NBA diagnostic (lane `sim-gap-ev-study`): from 10-20 NBA totals serve a 5%-weight sim blend ~0.2 pts off the market that `layer2_board` reads `agrees`.
 - **claim:** web by cheat-sheets token f10af584..., acquire exit 0. Ride-alongs: none (code diff b9542acb..280c8100 = cheat_sheets.py + its test only).
 - **verify:** on the fleet venv, `cs.pick_label`: agrees at +0.21 pts -> PRICE PLAY, agrees at +1.0 pt -> SYNDICATE PICK; the 24 picks on the 10-15 sheets: stamped label == fleet rule on 24 of 24 (0 flips, measured before the change too). Labels are re-read at every build, so the next sheet build carries it.
+
+## 2026-10-15 22:17:31Z (5:17 PM CT) -- fleet ff 280c8100 -> 9f9c6ba7 + UEFA branding written to the fleet data root + `reload-web` (2.0 s, 0 failures): UEFA club identity for the Kalshi/OddsAPI joins (lane `soccer-uefa-competitions`, session 15fef1c0) -- NO outage, no worker restart
+- **what:** `25fea6ac`.
+  - UCL/UEL/UECL ESPN branding (36 clubs each) feeds club NAMES, never codes, into `team_aliases._soccer_alias_to_name`.
+  - The UEFA competitions stay out of `_soccer_alias_by_league`.
+  - 23 vendor spellings were added by fixture pairing (evidence in `findings_2026-10-15_uefa_kalshi_join_and_history.md`).
+- **claim:** web, token da70120c..., acquire exit 0, released exit 0 at 22:17:45Z.
+- **ride-alongs:** 5 commits; besides this lane's, ledger/log only; 0 `vendor/` files.
+- **before/after alias map**, over the tracked domestic branding + UEFA snapshots, before any ship: 0 keys removed, 0 changed, +89 keys, +55 clubs; every domestic per-league map identical.
+  - Deriving UEFA ABBREVIATIONS had dropped `cel`/`lev`/`mid`/`slb` (Celta, Levante, Middlesbrough, Benfica). That is why UEFA gives names only.
+- **join measurement (scratch, real `join_kalshi_to_board`, live Kalshi UCL markets vs the UCL odds capture):** 18 of 18 UCL fixtures resolve (was 9), and 40 KXUCLTOTAL markets price (was 22). Moneylines still price 0 (the h2h `None`/`0.0` key bug, proposed as its own session).
+- **verify (now):** a fresh fleet-venv process on `/home/amyn/syndicate-prod/data` gives 597 keys / 259 clubs, identical to the scratch measurement.
+  - Resolves: `Slavia Praha`->slavia prague, `Sabah Masazir`->sabah fk, `Shakhtar`->shakhtar donetsk, `Galatasaray`->galatasaray.
+  - Domestic codes intact: `LEV`->levante, `CEL`->celta vigo, `MID`->middlesbrough, `SLB`->benfica.
+  - Still refused: `Inter`->None.
+- **verify (OWED):** the alias map is `lru_cache`d per process. The Kalshi join (`pipeline/kalshi_odds_refresh.py`, `pipeline/portfolio_commit.py`) runs in the workers, so it picks this up at each worker's next restart (live-odds-worker recycles about every 5.9 h). Reading owed by the 10-20 UCL matchday: the Kalshi refresh report counts KXUCLTOTAL matches across ~18 fixtures, not ~9.
+
