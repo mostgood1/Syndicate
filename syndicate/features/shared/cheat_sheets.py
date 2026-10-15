@@ -45,11 +45,32 @@ def decimal_odds(american: float | int | None) -> float | None:
     return 1.0 + (a / 100.0 if a > 0 else 100.0 / -a)
 
 
-def ev_pct(prob: float | None, american: float | int | None) -> float | None:
+def ev_pct(prob: float | None, american: float | int | None, fee: float = 0.0) -> float | None:
+    """EV per unit staked. `fee` is the venue's taker fee per $1 contract (0 for a sportsbook, whose margin is already
+    in its price): a contract at implied q costs q + fee and pays 1, so EV = (p - q - fee) / (q + fee)."""
     dec = decimal_odds(american)
     if prob is None or dec is None:
         return None
-    return round(100.0 * (prob * dec - 1.0), 2)
+    if not fee:
+        return round(100.0 * (prob * dec - 1.0), 2)
+    q = 1.0 / dec
+    return round(100.0 * (prob - q - fee) / (q + fee), 2)
+
+
+def taker_fee(row: Mapping[str, Any], book: Any, price: Any) -> float:
+    """The board's own fee lookup (`venue_fees.taker_fee_per_contract`: Kalshi per series, Polymarket, ...). 0 when
+    the venue charges none or the lookup fails -- a failed lookup is reported by the caller's reasons, not hidden."""
+    dec = decimal_odds(price)
+    if dec is None or not book:
+        return 0.0
+    try:
+        from syndicate.features.shared import venue_fees
+
+        fee, _basis, _bound = venue_fees.taker_fee_per_contract(
+            book, 1.0 / dec, sport=row.get("sport"), market=row.get("market"), segment=row.get("segment"))
+        return float(fee or 0.0)
+    except Exception:  # noqa: BLE001
+        return 0.0
 
 
 def implied_from_price(american: float | int | None) -> float | None:
@@ -149,8 +170,13 @@ def price_check(row: Mapping[str, Any], form_values: Sequence[float] | None) -> 
     form5 = form_record(form_values, line, side, 5)
     form10 = form_record(form_values, line, side, 10)
     p_post = consistency_posterior(p_market, form10["hits"], form10["games"])
-    ev_m, ev_mod, ev_post = ev_pct(p_market, price), ev_pct(p_model, price), ev_pct(p_post, price)
+    # Every EV here is NET of the venue's taker fee: the exchanges (Kalshi, Polymarket, ...) dominate the best prices,
+    # and the board's own Suggested rule is fee-net -- a gross EV would sell the fee as edge.
+    fee = taker_fee(row, quote.get("bookmaker"), price)
+    ev_m, ev_mod, ev_post = ev_pct(p_market, price, fee), ev_pct(p_model, price, fee), ev_pct(p_post, price, fee)
     reasons: list[str] = []
+    if fee:
+        reasons.append(f"after the {quote.get('bookmaker')} fee ({100 * fee:.1f}c a contract)")
     streak = form5["games"] >= STREAK_MIN_GAMES and (form5["rate"] or 0) >= STREAK_RATE
     one_sided = (str(quote.get("fair_method") or "") in ONE_SIDED_FAIR_METHODS
                  or quote.get("assumed_hold_pct") is not None)

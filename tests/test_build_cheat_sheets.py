@@ -277,3 +277,17 @@ def test_an_implausible_edge_is_a_price_to_check_not_value():
     row = {"side": "under", "line": 5.5, "quote": {"price": 178, "fair_probability": 0.42, "fair_method": "consensus"}, "projection": {}}
     check = cs.price_check(row, [])
     assert check.ev_market > 10 and check.verdict == "suspect_price"
+
+
+def test_exchange_prices_are_valued_net_of_the_taker_fee(monkeypatch):
+    from syndicate.features.shared import venue_fees
+
+    monkeypatch.setattr(venue_fees, "taker_fee_per_contract", lambda book, q, **kw: (0.02, "test", False) if book == "kalshi" else (0.0, "none", False))
+    row = {"side": "over", "line": 0.5, "sport": "mlb", "market": "batter_hits",
+           "quote": {"price": -163, "fair_probability": 0.65, "fair_method": "consensus", "bookmaker": "kalshi"}, "projection": {}}
+    gross = cs.ev_pct(0.65, -163)
+    net = cs.price_check(row, []).ev_market
+    q = 163 / 263
+    assert net == round(100 * (0.65 - q - 0.02) / (q + 0.02), 2) and net < gross
+    book = dict(row, quote=dict(row["quote"], bookmaker="draftkings"))
+    assert cs.price_check(book, []).ev_market == gross                      # a sportsbook pays no fee on top
