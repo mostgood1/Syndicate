@@ -2449,3 +2449,9 @@ owed for the whole Phase 2 config).
 3. Build the walk-forward calibration files for the VALID dates.
 4. The single end-of-Phase-2 VALID read.
 5. A user decision on production.
+
+**P3 §7c pre-registered (findings_2026-10-09 §7c, ff42dd48) and queued.**
+- Method: game-matched at 2:00 Q4, 40 draws, the p grid, FIT only, base = `fit_f3_config.json` verbatim, on as-of inputs
+  re-recorded with this lane's calibration files.
+- If any bucket's FIT-optimal p moves off (0.2, 0.0, 0.2): that bucket is re-fitted, and **Δ is re-measured on the
+  #3j measure dates before the VALID read** (this lane's job).
