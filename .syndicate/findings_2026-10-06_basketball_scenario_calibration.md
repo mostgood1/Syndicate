@@ -2907,3 +2907,14 @@ daily totals-calibration job + seed +2.50.
   term ranges −1.34..+12.08, inside the ±15 clip; that is wider than FIT's −1.79..+7.17.
 - No VALID performance number was computed.
 - P3 is notified to record its VALID live inputs.
+
+**THE VALID ARMS LAUNCHED 2026-10-15 19:37Z** (both co-signed; nothing is read until both finish and THE READ is
+announced):
+- **PROD** (`C:	mpball_scalid_prod`): no levers or engine flags, the total-inputs file {skip_def only}, no
+  calibration files.
+- **FINAL** (`valid_final`): fit_f5 levers + flags, both total-input keys, calfiles_sw_all + calfiles_sw_valid.
+- Shared by both arms: 2026-03-01..2026-06-30 (regular VALID + postseason), 200 draws, 3 workers each at nice 19,
+  SYNDICATE_NBA_TEAM_INPUTS=1, the same availability and prop-calibration files, code copy `code_5a_diag` (diag patches
+  are outcome-neutral).
+- The wiring parity job was stopped (it exercises the engine only, not the wiring) to free memory. Wiring identity rests
+  on the deterministic unit test.
