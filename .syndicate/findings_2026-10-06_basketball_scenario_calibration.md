@@ -2798,3 +2798,44 @@ file on or before the day before):**
    or calibrated-vs-real error on VALID.
 
 **Then:** pre-register the VALID read (gates per the lane goal) as its own entry, co-signed by P3 for the live part.
+
+## THE VALID READ — PRE-REGISTRATION 2026-10-15 18:50Z (read ONCE; before any VALID sim is run or any VALID number is computed)
+
+**Window (lane goal):**
+- **regular** 2026-03-01..2026-04-12, the GATED population;
+- **postseason**: 2026 play-in + playoffs, a separate stratum (a different population per the season-phase learning).
+
+**Arms, both run by this harness on the same as-of replay inputs, 200 draws, the same seeds per game:**
+- **PROD:** the production NBA config as it is today.
+  - Native engine defaults: no levers, no engine flags (EXACT off).
+  - Production switch files: `nba_sim_total_inputs.json` = {skip_def_subtraction: true}, the availability and prop
+    calibration files.
+  - NO calibration_totals files (0 on the fleet). `SYNDICATE_NBA_TEAM_INPUTS=1`.
+- **FINAL:** `fit_f5_config.json` exactly: the levers, engine flags, both total-input keys, and the walk-forward
+  `calfiles_sw_valid`.
+
+**Gates, all on regular VALID. FINAL ships only if EVERY gate's paired difference FINAL − PROD has a 95% CI wholly < 0
+(game-clustered bootstrap, 2,000 resamples). That is "clearing its own SE".**
+- **G1, period lines vs book:** Brier of P(over) on q1–q4 + h1 totals, and of P(home covers) on q1–q4 + h1 spreads,
+  pooled.
+  - Book lines from `asof/period_lines` (pre-tip versions only; 14 VALID dates, ~100 games). Pushes are dropped.
+  - The book's de-vigged probability Brier is reported as the reference.
+- **G2, full-game margin + total:** the same Brier on the full-game spread and total from `asof/game_odds`, plus |error|
+  of the sim mean margin and total vs actual.
+- **G3, live-interval replay:** P3's §12 VALID part, run once in the same pass (P3 owns its method). The FINAL-vs-PROD
+  paired ML log-loss and total/margin |error| at its checkpoints, each CI < 0.
+- **G4, player minutes + props:** paired |error| of the served per-player means (min, pts, reb, ast, threes; harness
+  summary field `players`, committed with this entry) vs ESPN actuals.
+  - Players who played; the mean over the five stats is gated, and each stat is reported.
+
+**Readings, not gated:** total bias, the #3/#5 rows (FTA, foul-outs, 3PM/3P%/2P%, AST, REB), S8 margin SD, and the
+postseason stratum.
+- The postseason must not be WORSE beyond its SE on G1/G2/G4. If it is, that is reported as a block on the postseason,
+  not on regular-season use.
+
+**Hygiene:**
+- The VALID calibration files and the raw-inputs pass print no performance numbers.
+- The VALID sim outputs are read only by the gate script, once, after P3 co-signs this entry.
+- No re-tuning after the read: a failure is a verdict, not a fitting signal.
+
+**Decision:** pass → the user decides production enablement. Fail → nothing ships, and the failing gate is the finding.

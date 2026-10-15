@@ -641,7 +641,12 @@ def run_sim(args) -> int:
                 fh.write(json.dumps({"date": d, "home": j.get("home"), "away": j.get("away"),
                                      "market_anchor": j.get("market_anchor"),
                                      "score": {k: sc.get(k) for k in ("home_mean", "away_mean", "margin_mean", "total_mean")},
-                                     "team_advanced_priors_applied": ((j.get("context") or {}).get("team_advanced_priors") or {}).get("applied")}) + "\n")
+                                     "team_advanced_priors_applied": ((j.get("context") or {}).get("team_advanced_priors") or {}).get("applied"),
+                                     # VALID read: the served per-player means (the prop quantities), for minutes / prop MAE.
+                                     "players": {side: [[p.get("player_name"), p.get("min_mean"), p.get("pts_mean"), p.get("reb_mean"),
+                                                         p.get("ast_mean"), p.get("threes_mean")]
+                                                        for p in ((j.get("players") or {}).get(side) or [])]
+                                                 for side in ("home", "away")}}) + "\n")
     return 0
 
 
