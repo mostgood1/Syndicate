@@ -44,7 +44,9 @@ PROPS AND ABSENCE -- ABSENT IS NOT ZERO
             an inactive player from an active one with no stat line, so it never grades one.
     ncaaf   the weekly CFBD snapshot on web's disk FIRST (`fetch_export`), keyed by ESPN's
             event id (CFBD game ids are ESPN's). It holds only passing / rushing / receiving
-            lines, so a player absent from a game it carries -> (None,
+            lines -- and not all of them (2026-10-15: 286 of 1,030 players it lacked on 10-10
+            had stats in ESPN's box) -- so a player absent from a game it carries is looked up
+            in that game's ESPN summary box; absent from both -> (None,
             'player_absent_unverifiable'). A game the snapshot lacks falls back to the ESPN
             summary, read exactly as NFL's.
     wnba    ESPN summary box; `didNotPlay` or absent -> (None, 'dnp_void').
@@ -759,12 +761,28 @@ class EspnPopulationSettler:
                 matches = [row for row in rows if _player_key(row.get("player_name")) == key]
                 if len(matches) > 1:
                     return None, R_PLAYER_AMBIGUOUS
-                if not matches:
+                if matches:
+                    value = _as_float(matches[0].get(_SNAPSHOT_COLUMNS[field]))
+                    if value is None:
+                        return None, R_STAT_UNAVAILABLE
+                    return self._grade(market, shaped.get("side"), line, value, "cfbd_snapshot")
+                # The snapshot carries this game but not this player -- and it is NOT complete: on 2026-10-10,
+                # 286 of 1,030 such NCAAF sightings were players in ESPN's box with stats (Boogie Woods III, 47
+                # rushing yards on 10-14, was one), voided here until 2026-10-15. So ESPN's box decides, read
+                # exactly as for a game the snapshot lacks: a player in any stat group played and is graded; one
+                # absent from it too stays unverifiable (744 of the 1,030 -- no player of that surname in the box).
+                self.counters["ncaaf_prop_source:espn_after_snapshot_miss"] += 1
+                summary = self._summary(sport, event["event_id"])
+                box = football_box_rows(summary) if summary is not None else None
+                hits = [row for row in box or [] if _player_key(row.get("player_name")) == key]
+                if len(hits) > 1:
+                    return None, R_PLAYER_AMBIGUOUS
+                if not hits:
                     return None, R_ABSENT_UNVERIFIABLE
-                value = _as_float(matches[0].get(_SNAPSHOT_COLUMNS[field]))
+                value = _as_float(hits[0].get("td_any" if field == _ANYTIME_TD_FIELD else field))
                 if value is None:
                     return None, R_STAT_UNAVAILABLE
-                return self._grade(market, shaped.get("side"), line, value, "cfbd_snapshot")
+                return self._grade(market, shaped.get("side"), line, value, "espn_box")
             self.counters["ncaaf_prop_source:espn_summary"] += 1
 
         summary = self._summary(sport, event["event_id"])

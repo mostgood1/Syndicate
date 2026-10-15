@@ -268,6 +268,22 @@ def test_ncaaf_player_absent_from_the_snapshot_game_is_unverifiable(ncaaf_regist
     assert settler(rows["anytime td|michigan wolverines d/st|full|yes|"]) == (None, "non_player_prop_unsupported")
 
 
+def test_ncaaf_a_player_the_snapshot_lacks_is_graded_from_espns_box(ncaaf_registry):
+    """The CFBD snapshot is not complete (2026-10-15: 286 of 1,030 players it lacked on 10-10 had stats in ESPN's
+    box). A player missing from a game it carries is looked up in ESPN's box; absent from both stays unverifiable."""
+    rows = _shaped(_records("ncaaf_records.json", repoint=True))
+    full = (FIX / "ncaaf_player_game_stats_401856679.csv").read_text(encoding="utf-8").splitlines()
+    partial = "\n".join(line for line in full if "Jordan Marshall" not in line) + "\n"
+    assert len(partial.splitlines()) < len(full)                                  # he is really gone from it
+    settler = EspnPopulationSettler(fetch_json=FakeEspn(),
+                                    fetch_export=lambda rel: partial if rel == NCAAF_PLAYER_STATS_SNAPSHOT else None)
+    assert settler(rows["rushing yards|jordan marshall|full|under|103.5"]) == ("win", "espn_box")
+    assert settler(rows["anytime td|jordan marshall|full|yes|"]) == ("win", "espn_box")
+    assert settler(rows["receptions|jj buchanan|full|over|4.5"]) == ("loss", "cfbd_snapshot")       # still the snapshot first
+    assert settler(rows["anytime td|channing goodwin|full|yes|"]) == (None, "player_absent_unverifiable")
+    assert settler.counters["ncaaf_prop_source:espn_after_snapshot_miss"] == 3
+
+
 def test_ncaaf_falls_back_to_the_espn_box_when_the_snapshot_lacks_the_game(ncaaf_registry):
     rows = _shaped(_records("ncaaf_records.json", repoint=True))
     settler = EspnPopulationSettler(fetch_json=FakeEspn(), fetch_export=None)
