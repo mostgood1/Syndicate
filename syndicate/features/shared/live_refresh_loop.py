@@ -4242,6 +4242,43 @@ def _wnba_commence_times(date_str: str) -> list[tuple[str, float]]:
 	return out
 
 
+def _nba_schedule_processed_dir() -> Path:
+	"""Where the NBA props refresh's `fetch-schedule` writes `schedule_<season>.json`: NBA_BETTING_DATA_ROOT (set on
+	every refresh role) else the data root's `nba_source/data`."""
+	raw = str(os.environ.get("NBA_BETTING_DATA_ROOT") or "").strip()
+	return (Path(raw) if raw else data_root() / "nba_source" / "data") / "processed"
+
+
+def _nba_commence_times(date_str: str) -> list[tuple[str, float]]:
+	# NBA's T-window provider, added 2026-10-14 (lane nba-t-window-provider, user decision). There was none: the only
+	# candidate source was a vendored schedule mirror that did not exist. Since 2026-10-14 the NBA fetch-schedule writes
+	# the season in play (schedule_2026_27.* plus the schedule_2025_26 alias, statuses from stats.nba.com), so this
+	# reads the newest schedule_*.json there -- the same shape as _wnba_commence_times: date_est filter, datetime_utc
+	# epoch, one entry per game. Fails open to [] like every provider here.
+	try:
+		candidates = [path for path in _nba_schedule_processed_dir().glob("schedule_*.json") if path.is_file()]
+		newest = max(candidates, key=lambda path: path.stat().st_mtime) if candidates else None
+		payload = json.loads(newest.read_text(encoding="utf-8")) if newest is not None else None
+	except (OSError, ValueError):
+		return []
+	rows = payload if isinstance(payload, list) else (payload.get("games") if isinstance(payload, dict) else None)
+	if not isinstance(rows, list):
+		return []
+	out: list[tuple[str, float]] = []
+	seen: set[str] = set()
+	for row in rows:
+		if not isinstance(row, dict):
+			continue
+		if str(row.get("date_est") or "").strip()[:10] != date_str:
+			continue
+		epoch = _parse_commence_epoch(row.get("datetime_utc"))
+		game_id = str(row.get("game_id") or "").strip()
+		if epoch is not None and game_id and game_id not in seen:
+			seen.add(game_id)
+			out.append((game_id, epoch))
+	return out
+
+
 def _soccer_commence_times(date_str: str) -> list[tuple[str, float]]:
 	"""Kickoff epochs per event, across the leagues in season on `date_str`.
 
@@ -4294,18 +4331,16 @@ def _soccer_commence_times(date_str: str) -> list[tuple[str, float]]:
 	return sorted(by_event.items(), key=lambda item: item[1])
 
 
-# WHY ONLY THESE THREE, and what the other five need. Registering a sport here
+# WHY ONLY THESE FOUR, and what the other four need (nba joined 2026-10-14). Registering a sport here
 # is SAFE regardless of ownership -- the caller intersects the due set with
 # `resolved_launch_sports`, so a provider for a sport this service does not
 # launch can never fire a sweep. What a registration needs is a real
 # commence-time SOURCE and a `_LIVE_STATUS_CHECKERS` entry (without the
 # checker the sport is never skipped while live, which is cost with no data).
 #
-#   nba     -- checker EXISTS; source does NOT. The WNBA provider's mirror
-#              (`vendor/nba_betting_repo/data/processed/schedule_2026.json`)
-#              is absent from the repo, verified 2026-09-01. A provider
-#              written against it would fail open forever, which is an unfed
-#              feature wearing a working one's shape.
+#   nba     -- REGISTERED 2026-10-14 (`_nba_commence_times`, lane nba-t-window-provider). It had no source
+#              then: the only candidate was a vendored NBA schedule mirror absent from the repo. The native
+#              fetch-schedule now writes the season in play (statuses from stats.nba.com), so it reads that.
 #   nhl     -- checker exists; needs its scoreboard/schedule commence times.
 #   nfl     -- checker exists; `nfl_source/schedule_{season}.csv` carries the
 #              slate, and its kickoff column has not been confirmed here.
@@ -4316,6 +4351,7 @@ def _soccer_commence_times(date_str: str) -> list[tuple[str, float]]:
 # exist in production -- not inferred from a filename.
 _T_WINDOW_COMMENCE_PROVIDERS = {
 	"mlb": _mlb_commence_times,
+	"nba": _nba_commence_times,
 	"wnba": _wnba_commence_times,
 	"soccer": _soccer_commence_times,
 }

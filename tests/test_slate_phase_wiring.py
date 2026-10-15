@@ -73,7 +73,7 @@ def _nfl_schedule(sport, date_str, **_):
 def test_t_window_reaches_nfl_only_when_on(monkeypatch):
     monkeypatch.setattr(loop, "fetch_schedule_for_date", _nfl_schedule)
     monkeypatch.setattr(loop, "_read_t_window_markers", lambda date_str: {})
-    for sport in ("mlb", "wnba", "soccer"):
+    for sport in ("mlb", "nba", "wnba", "soccer"):  # every registered provider (nba joined 2026-10-14)
         monkeypatch.setitem(loop._T_WINDOW_COMMENCE_PROVIDERS, sport, lambda date_str: [])
     off = loop._t_window_due_sports(now_epoch=NOW, date_str="2026-09-27")
     loop._COMMENCE_TIMES_CACHE.clear()
