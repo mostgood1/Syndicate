@@ -2525,3 +2525,16 @@ OFF).
 
 **Lane claim added:** engine.py, the fg2_from_two_point_split field + 2P make-rate construction section only, and
 tests/test_basketball_engine_two_point_split.py (NEW). P3 is told; it is a shared file.
+
+**P3 §7c RESULT (findings_2026-10-09 §7c, on main): end-game p RE-FIT to (0.2, 0.2, 0.3)** (was (0.2, 0.0, 0.2)), FIT only.
+- Last-2:00 points error at the new p: +0.17 / +0.40 / +0.09 by bucket (n 157 / 108 / 123).
+- P3's caveat: sim trailer FTA after 2:00 stays 0.5–1.5 below real, while points match.
+
+**Consequence for this lane (the final-config sequence):**
+1. Read #5a (running).
+2. The final config = the #3 config + the new p + #5a (if confirmed).
+3. Re-measure s′ and Δ at that config on the #3j disjoint dates.
+4. A 12-date check on the sweep dates.
+5. The full FIT on the final config.
+6. Write `fit_f5_config.json` for P3's §7c / live re-gate re-run.
+7. The single VALID read.
