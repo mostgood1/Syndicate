@@ -2781,3 +2781,20 @@ n ≈ 780 per checkpoint.
 - End-Q3 total bias is +1.14 native / +1.31 pregame_rate: checkpoint truth, not this config. Whether REB −1.4
   contributes is unmeasured.
 - VALID and the postseason are untouched; both are graded once with this lane's VALID read.
+
+### VALID PREPARATION — plan 2026-10-15 (user: "build the VALID calibration files and pre-register"); NO VALID performance number is computed or printed before the VALID read is pre-registered and co-signed
+
+**Walk-forward calibration files for the VALID dates (2026-03-01..2026-04-12 regular; postseason dates read the newest
+file on or before the day before):**
+1. Extract real ESPN boxes for 2026-03-01..2026-06-30 into `C:	mpball_scealv` (harness `real` phase; FIT's
+   `realx` is untouched). These are needed causally: date D's file uses only games before D, as production would.
+2. A raw-inputs pass on the VALID dates (harness `sim`, n-sims 1, no calibration files) for each game's pregame job
+   (ratings, pace, outs, market).
+   - Its sim draws are NOT read and are deleted after the jobs are copied.
+3. Build the files with the #1f recipe (`wf_switched_all.py`: switched raw = no def subtraction, no outs penalty;
+   `build_nba_totals_calibration.calibration_terms`, 14-day window) over FIT + VALID jobs, one file per VALID date,
+   anchored the day before. Out: `C:	mpball_sc\calfiles_sw_valid`.
+4. Printed: only file counts, global-term ranges and the identity check (recomputed raw = recorded raw). No sim-vs-real
+   or calibrated-vs-real error on VALID.
+
+**Then:** pre-register the VALID read (gates per the lane goal) as its own entry, co-signed by P3 for the live part.
