@@ -18,6 +18,7 @@ The 08:00Z `ci-suite` job (`local_production.py ci-run` -> `run_ci_suite.py` in 
   - `test_refresh_step_modes::test_no_other_sport_gained_a_mode_scope` (10-11): soccer's `modes=("full",)` was deliberate (`soccer-live-lane-priority`, 467a1a6c). The check now carries an explicit allowlist with that reason.
 - **Rule checks, in files OTHER open lanes hold:**
   - `test_probability_differential::test_every_converter_is_registered_or_excused` (10-03): `scripts/backtest_ncaaf_attribution_props.py:_devig` (and siblings) not in `scripts/probability_differential.py` REGISTRY / NOT_A_SCALAR_CONVERTER. That file is held by `nba-lines-props-backtest`.
+    - **FIXED 2026-10-15, lane `probability-differential-sweep-1015` (`b2f40e6f`):** 10 passed on origin/main. 39 names: 31 registered, 7 excused, BOM read fixed. Not blocked by `nba-lines-props-backtest`: its claim was scoped.
   - `test_slate_date_timezone_discipline` (10-05): `date.today()` in `syndicate/features/nhl/inseason_season_inputs.py` (2x) and `inseason_team_xg.py`. Owner `nhl-season-inputs-in-season`.
   - `test_basketball_orchestrator_reachability::test_the_generated_modules_match_the_port_script` (10-11): PORT_CHECK DIFFERS across smart_sim, quarters, boxscores, ... Owner `basketball-native-orchestrator`.
 - **Behaviour, NCAAF:**
