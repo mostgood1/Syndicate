@@ -2930,3 +2930,19 @@ FIT only, FINAL − PROD).
 - **Lead for this lane (a real finding, independent of the read):** the end-game / bonus fouling in the final config
   shifts LATE win probabilities the wrong way. To diagnose after the read: late-Q4 sim P(win) vs real by margin
   bucket, mechanism on vs off. Not acted on before the read.
+
+**THE VALID READ — scoring decisions fixed BEFORE the read** (the arms finished 23:07Z: 83 dates each, 0 errors; the
+script `C:	mpball_sc\diagalid_read.py` was dry-run on FIT data only (fit_f3 vs fit_f5) and on a 1-date FIT pair
+for G4; no VALID number computed):
+- **G1:** per game, the mean Brier over every available q1–q4 + h1 total (P over) and spread (P home covers) line, from
+  `asof/period_lines`. Sim pushes are excluded from P; actual pushes are dropped. One pooled number per game, then the
+  paired FINAL − PROD bootstrap.
+- **G2:** THREE components, EACH must have CI upper < 0:
+  - the per-game mean Brier over the full-game spread + total from `asof/game_odds` (the consensus line);
+  - |sim mean margin − actual| (OT included);
+  - |sim mean total − actual|.
+- **G4:** per game, the mean over common player-games of the mean |error| over (min, pts, reb, ast, threes). Players
+  matched by normalized name; only players who played (MIN > 0). One gated number per game; the five stats reported.
+- **Bootstrap:** 2,000 resamples of games, seed 20261015. PASS = 95% CI upper < 0.
+- **Postseason:** the same metrics, with season_type 3 and 5. Reported; "worse beyond SE" = CI lower > 0.
+- **G3:** P3's, as specified.
