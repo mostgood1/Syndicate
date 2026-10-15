@@ -2591,3 +2591,27 @@ tests/test_basketball_engine_two_point_split.py (NEW). P3 is told; it is a share
   correction: shrink each player's 3P% toward the league rate by attempt volume (empirical-Bayes,
   k = league-fit pseudo-attempts). Built default-off, measured like #5a.
 - If not, the residual is in the engine (shot selection or score effect). Diagnose that instead.
+
+**USER DECISION 2026-10-15 (supersedes "fix the 3P% priors first"; given in session d48f3a34, CONFIRMED in this chat):**
+- ACCEPT #5a (`fg2_from_two_point_split`) as is, OVERRIDING the 3P% guard miss (0.375 vs 0.359 ± 0.008).
+- 3PM (+1.14 → +0.17) and 2P% are fixed. **3P% about +1.5 points high is recorded as a KNOWN RESIDUAL for a later
+  round.**
+
+### Phase 2 #5c — DIAGNOSTIC RESULT 2026-10-15 03:05Z (step 1 only; step 2 dropped by the decision above): the priors are EXONERATED
+
+**Data:** the `--dump-priors` run on the 12 sweep dates, 149 team-sides, the priors exactly as they reach the engine.
+- Prior-implied team 3P%, 3PA-weighted: raw 0.3624, engine-clipped 0.3573. Real 0.3594 (subsample 0.3611).
+- Prior-implied 2P%: 0.5426. Real 0.547 (0.5446).
+- Clip-edge 3PA share 0.063; low-volume (< 1 3PA per game) share 0.024. Player 3P% p10 / p50 / p90:
+  0.261 / 0.35 / 0.50.
+- By the pre-registered rule (prior ≥ real + 0.01 → the prior is the source), **the priors are NOT the source**.
+- The residual is in the ENGINE. Sim ÷ prior is 1.022 for 2P% but 1.049 for 3P%, so something lifts threes more than
+  twos beyond the shared EXACT multiplier. Untested candidates: shot selection, the fouled-miss / and-one bookkeeping,
+  the block path. That is the known-residual lead for the later round.
+
+**FINAL CONFIG SEQUENCE starts now:**
+1. #3 config + P3's end-game p (0.2, 0.2, 0.3) + #5a.
+2. Re-measure s″ and Δ″ on the #3j disjoint dates.
+3. PK3 check on the sweep dates (|bias| < 0.5 + every #3 guard + the #5a readings).
+4. Then, after a user go-ahead, the full FIT on the final config.
+5. `fit_f5_config.json` to P3.
