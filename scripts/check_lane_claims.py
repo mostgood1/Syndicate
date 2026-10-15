@@ -277,6 +277,29 @@ def _impossible(claim):
             or "`" in claim or ("/" not in claim and "." not in claim))
 
 
+def _is_test_of(test_name, module_name):
+    """True when `test_name` is the conventional test file for `module_name`.
+
+    Both spellings this repo uses: a `test_` prefix (`tests/test_foo.py`, which
+    is every test here) and a `_test` suffix, included so the guard does not
+    depend on a convention nobody has broken yet.
+    """
+    # The empty checks are load-bearing (a bare "" would make `"test_" + ""`
+    # equal `"test_"` and match a claim literally named that). An
+    # `test_name == module_name` clause was here too and is GONE: it could
+    # not change any outcome, because `"test_" + X` and `X + "_test"` never
+    # equal `X`. Mutation testing caught it as a survivor -- a branch that
+    # reads like protection and guards nothing is worse than no branch,
+    # because it makes the next reader think the case is handled here.
+    if not test_name or not module_name:
+        return False
+    stem, dot, ext = module_name.rpartition(".")
+    if not dot:
+        stem, ext = module_name, ""
+    suffix = ("." + ext) if dot else ""
+    return test_name in ("test_" + module_name, stem + "_test" + suffix)
+
+
 def _near_miss(claim, by_base):
     """A tracked file this claim was probably MEANT to name, or None.
 
@@ -297,6 +320,29 @@ def _near_miss(claim, by_base):
         return None
     close = difflib.get_close_matches(base, list(by_base), n=1, cutoff=0.85)
     if not close or close[0] == base:
+        return None
+    # A MODULE IS NEVER THE TYPO-CORRECTION FOR ITS OWN TEST.
+    #
+    # `test_team_recent_results.py` against `team_recent_results.py` scores
+    # **0.898** on a 0.85 cutoff, so difflib matched them and this function
+    # reported lane `board-interval-charts`'s deliberate reservation of a test
+    # file as "almost certainly a TYPO for" the module under test. Measured
+    # 2026-10-15 on origin/main: that ONE claim of 381 was the whole reason
+    # `check_lane_claims.py` exited 1, so every session's start digest read
+    # `LEDGER INCOHERENT` -- the same cost the `pre-opener` false positive had
+    # the day before, from the same instrument.
+    #
+    # AND THE PRINTED REMEDY WAS ACTIVELY HARMFUL: that lane already claimed
+    # the module on the same `Files:` line with its own section scope, so
+    # applying the suggestion would have duplicated the module claim and
+    # deleted the test-path reservation.
+    #
+    # DELIBERATELY NARROW. Only the pair that differs by exactly a `test_`
+    # prefix or a `_test` suffix is suppressed, so the typo class this function
+    # exists for is untouched: `test_ncaaf_live_autorun.py` against
+    # `test_ncaaf_lines_autorun.py` (0.943, live -> lines) is still a near miss,
+    # because neither is the test-form of the other.
+    if _is_test_of(base, close[0]) or _is_test_of(close[0], base):
         return None
     for p in by_base[close[0]]:
         # Prefer a neighbour sitting in the same directory as the claim.

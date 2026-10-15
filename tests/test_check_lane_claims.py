@@ -284,3 +284,88 @@ def test_a_non_closed_status_with_lowercase_open_prose_is_not_a_near_miss(tmp_pa
     code, out = _run(repo)
     assert not _near_miss_reported(out), out
     assert "blocked-prose-lane" not in out, out
+
+
+# ---------------------------------------------------------------------------
+# A MODULE IS NEVER THE TYPO-CORRECTION FOR ITS OWN TEST.
+#
+# Measured 2026-10-15 on origin/main: lane `board-interval-charts` reserved
+# `tests/test_team_recent_results.py` while claiming
+# `syndicate/features/shared/team_recent_results.py` on the same `Files:` line
+# with its own section scope. The basenames score 0.898 against the 0.85 cutoff,
+# so difflib matched them and the report called the reservation a typo for the
+# module under test -- the ONE claim of 381 that made this script exit 1, so
+# every session's start digest read `LEDGER INCOHERENT`.
+#
+# The printed remedy was worse than the alarm: applying it would have duplicated
+# the module claim and deleted the test-path reservation.
+# ---------------------------------------------------------------------------
+
+def test_a_module_is_not_a_typo_for_its_own_test_file(tmp_path):
+    """The live board-interval-charts shape, with no (NEW) marker anywhere."""
+    repo = _repo(tmp_path, ["syndicate/features/shared/team_recent_results.py"],
+                 _block("board-interval-charts", "tests/test_team_recent_results.py"))
+    code, out = _run(repo)
+    assert "almost certainly a TYPO" not in out, out
+    assert "does not exist YET" in out, out
+    assert code == 0, out
+
+
+def test_the_suppression_survives_the_lane_also_claiming_the_module(tmp_path):
+    """Both paths on one Files line -- which is what made `held_by` empty.
+
+    `_resolves`'s self-exclusion (`held_by - {slug}`) means a lane holding both
+    the module and the test gets no protection from the held-neighbour clause,
+    so this case needs the test-form guard specifically.
+    """
+    repo = _repo(
+        tmp_path, ["syndicate/features/shared/team_recent_results.py"],
+        _block("board-interval-charts",
+               "syndicate/features/shared/team_recent_results.py (the segment branch ONLY), "
+               "tests/test_team_recent_results.py (the interval-segment test ONLY)"),
+    )
+    code, out = _run(repo)
+    assert "almost certainly a TYPO" not in out, out
+    assert code == 0, out
+
+
+def test_the_reverse_direction_is_suppressed_too(tmp_path):
+    """A claim on the MODULE whose only neighbour is its test file."""
+    repo = _repo(tmp_path, ["tests/test_interval_history.py"],
+                 _block("some-lane", "syndicate/features/shared/interval_history.py"))
+    code, out = _run(repo)
+    assert "almost certainly a TYPO" not in out, out
+    assert code == 0, out
+
+
+def test_is_test_of_covers_both_spellings_and_nothing_else():
+    """Unit-level, because the guard must be narrow or it eats the real typos."""
+    m = _load()
+    assert m._is_test_of("test_team_recent_results.py", "team_recent_results.py")
+    assert m._is_test_of("team_recent_results_test.py", "team_recent_results.py")
+    # the typo class this function exists for: neither is the test-form of the other
+    assert not m._is_test_of("test_ncaaf_live_autorun.py", "test_ncaaf_lines_autorun.py")
+    assert not m._is_test_of("test_foo.py", "test_foo.py")
+    assert not m._is_test_of("test_foo.py", "bar.py")
+    assert not m._is_test_of("", "team_recent_results.py")
+    assert not m._is_test_of("team_recent_results.py", "")
+    # THE one case the empty-string clause actually changes, and the only reason
+    # it is not dead code: without it `"test_" + "" == "test_"` matches and this
+    # returns True. Found by mutation testing -- removing that clause passed all
+    # 18 tests until this line existed, which made a clause whose comment names
+    # the exact case it guards indistinguishable from one that guards nothing.
+    assert not m._is_test_of("test_", "")
+    # an extensionless module name must not crash the rpartition path
+    assert m._is_test_of("test_Makefile", "Makefile")
+
+
+def test_near_miss_still_names_the_real_typo_pair():
+    """Guards the width of the fix at the unit level, not only end to end."""
+    m = _load()
+    by_base = {
+        "team_recent_results.py": ["syndicate/features/shared/team_recent_results.py"],
+        "test_ncaaf_lines_autorun.py": ["tests/test_ncaaf_lines_autorun.py"],
+    }
+    assert m._near_miss("tests/test_team_recent_results.py", by_base) is None
+    assert (m._near_miss("tests/test_ncaaf_live_autorun.py", by_base)
+            == "tests/test_ncaaf_lines_autorun.py")
