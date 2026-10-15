@@ -153,7 +153,7 @@ a.sg:hover { border-color: var(--accent); transform: translateY(-1px); }
 /* Reconciled view (user 2026-10-15): the sheet as published, with each bet's result and each section's record. */
 .viewbar { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
 .viewbar .vnote { color: var(--muted); font-size: 13px; }
-.res { font: 700 13px var(--mono); white-space: nowrap; } .res.w { color: var(--accent); } .res.l { color: var(--price); } .res.p { color: var(--muted); }
+.res { font: 700 13px var(--mono); white-space: nowrap; } td.act, .res.act { font-weight: 700; color: var(--ink); } .res.w { color: var(--accent); } .res.l { color: var(--price); } .res.p { color: var(--muted); }
 tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first-child { box-shadow: inset 3px 0 0 var(--price); }
 .prop.rw { box-shadow: inset 3px 0 0 var(--accent); padding-left: 10px; } .prop.rl { box-shadow: inset 3px 0 0 var(--price); padding-left: 10px; }
 .rec { font: 800 13px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px; border-radius: 4px; white-space: nowrap; color: var(--accent); background: var(--v-value-bg); }
@@ -476,6 +476,9 @@ function render() {
 // sheet's best price.
 const reconciledView = d => STATE.view === "reconciled" && !!(d && d.reconciled);
 const unitsText = u => u == null ? "" : (u > 0 ? "+" : "") + u.toFixed(2) + "u";
+// The number the grader settled on: the player's stat, or a total's combined score (user 2026-10-15: "add the actual
+// stat line too"). Absent for a spread / moneyline (graded on a margin) and soccer's scorer markets.
+const actualText = res => res && typeof res.v === "number" ? (Number.isInteger(res.v) ? String(res.v) : res.v.toFixed(1)) : "–";
 function resCell(res) {
   if (!res) return `<span class="res p" title="No result: a push, a void (did not play), or not final yet">–</span>`;
   return res.y === 1 ? `<span class="res w">✓ Won ${unitsText(res.units)}</span>` : res.y === 0 ? `<span class="res l">✗ Lost ${unitsText(res.units)}</span>` : `<span class="res p">Push</span>`;
@@ -497,7 +500,7 @@ function applyResults() {
   document.querySelectorAll("#sheet section.sheet").forEach(sec => {
     const items = [...sec.querySelectorAll("[data-ri],[data-li]")];
     if (!items.length) return;
-    sec.querySelectorAll("table thead tr").forEach(hr => { if (!hr.querySelector(".resh")) hr.insertAdjacentHTML("beforeend", `<th class="resh">Result</th>`); });
+    sec.querySelectorAll("table thead tr").forEach(hr => { if (!hr.querySelector(".resh")) hr.insertAdjacentHTML("beforeend", `<th class="resh">Actual</th><th class="resh">Result</th>`); });
     const seen = new Set(), results = [];
     items.forEach(el => {
       const isLine = el.dataset.li != null, idx = +(isLine ? el.dataset.li : el.dataset.ri);
@@ -505,8 +508,8 @@ function applyResults() {
       const key = (isLine ? "l" : "r") + idx;
       if (!seen.has(key)) { seen.add(key); results.push(res); }
       el.classList.toggle("rw", !!res && res.y === 1); el.classList.toggle("rl", !!res && res.y === 0);
-      if (el.tagName === "TR") { if (!el.querySelector("td.resd")) el.insertAdjacentHTML("beforeend", `<td class="n resd">${resCell(res)}</td>`); }
-      else { const l1 = el.querySelector(".line1"); if (l1 && !l1.querySelector(".res")) l1.insertAdjacentHTML("beforeend", resCell(res)); }
+      if (el.tagName === "TR") { if (!el.querySelector("td.resd")) el.insertAdjacentHTML("beforeend", `<td class="n resd act">${actualText(res)}</td><td class="n resd">${resCell(res)}</td>`); }
+      else { const l1 = el.querySelector(".line1"); if (l1 && !l1.querySelector(".res")) l1.insertAdjacentHTML("beforeend", (res && typeof res.v === "number" ? `<span class="res act">Actual ${actualText(res)}</span>` : "") + resCell(res)); }
     });
     const head = sec.querySelector("header");
     if (head && !NO_RECORD.has(sec.dataset.section) && !head.querySelector(".rec")) {

@@ -49,7 +49,7 @@ def test_props_and_lines_match_on_the_graders_own_key():
     assert rec["props"][cs.prop_result_key(_sheet()["rows"][2])] == {"y": 1.0}
     assert cs.prop_result_key(_sheet()["rows"][3]) not in rec["props"]                     # never graded: no result
     assert rec["lines"] == {cs.line_result_key(_sheet()["game_lines"][0]): {"y": 0.0}}      # an ungraded h2h is absent
-    assert rec["counts"] == {"props": 4, "props_graded": 3, "lines": 2, "lines_graded": 1}
+    assert rec["counts"] == {"props": 4, "props_graded": 3, "props_valued": 0, "lines": 2, "lines_graded": 1}
 
 
 def test_the_page_payload_puts_a_result_and_units_on_each_bet():
@@ -122,3 +122,56 @@ def test_nothing_settled_yet_writes_no_file(tmp_path, monkeypatch):
     monkeypatch.setattr(m, "_load", lambda name: Grader())
     assert m.main(["--data-root", str(tmp_path), "--date", DAY]) == 0
     assert not (folder / f"{DAY}.reconciled.json").exists()          # no toggle onto a sheet of dashes
+
+
+def test_the_value_tap_reads_the_number_each_settler_graded_on_and_changes_nothing():
+    # User 2026-10-15: "add the actual stat line too". The value must be the one the RESULT was decided on, so it is
+    # read from production's own comparisons -- wrapped for one pull, in this process only, results untouched.
+    m = _script()
+    from syndicate.features.mlb import prop_outcomes
+    from syndicate.features.shared import population_outcomes as po
+    from syndicate.features.shared import population_outcomes_espn as espn
+    from syndicate.features.shared import population_outcomes_mlb as mlbm
+    from syndicate.features.shared import population_outcomes_soccer as soccer
+
+    def fake(shaped, view):                         # stands in for the real settlers, calling the same module functions
+        market = shaped["market"]
+        if market == "receptions":
+            return espn.resolve_bet_status(market="receptions", side=shaped["side"], line=shaped["line"], current_value=6.0, is_final=True)
+        if market == "player_shots":
+            return soccer.settle_over_under(3.0, shaped["side"], shaped["line"])
+        if market == "batter_hits":
+            return prop_outcomes.settle_prop(shaped["side"], shaped["line"], 2)
+        return mlbm.settle_runs(market, shaped["side"], shaped["line"], 4, 5)
+
+    composite = po.CompositeSettler([("fake", fake, "1")])
+    rows = [{"sport": "nfl", "event_id": "e1", "market": "receptions", "side": "over", "line": 4.5, "player_name": "Courtland Sutton"},
+            {"sport": "soccer", "event_id": "e2", "market": "player_shots", "side": "over", "line": 2.5, "player_name": "Agustín Bouzat"},
+            {"sport": "mlb", "event_id": "e3", "market": "batter_hits", "side": "under", "line": 0.5, "player_name": "Andy Pages"},
+            {"sport": "mlb", "event_id": "e3", "market": "totals", "side": "over", "line": 8.5, "player_name": None},
+            {"sport": "mlb", "event_id": "e3", "market": "spreads", "side": "home", "line": -1.5, "player_name": None}]
+    plain = [composite(r, {}) for r in rows]
+    originals = (espn.resolve_bet_status, soccer.settle_over_under, prop_outcomes.settle_prop, mlbm.settle_runs,
+                 po.CompositeSettler.__call__, prop_outcomes.MlbPropGrader.settle)
+    with m.ValueTap() as tap:
+        assert [composite(r, {}) for r in rows] == plain                         # every result unchanged
+    assert tap.missing == []                                                     # every hook found its target
+    assert (espn.resolve_bet_status, soccer.settle_over_under, prop_outcomes.settle_prop, mlbm.settle_runs,
+            po.CompositeSettler.__call__, prop_outcomes.MlbPropGrader.settle) == originals   # and put back
+    key = lambda r: "p:" + cs.prop_result_key({"player": r["player_name"], "market": r["market"], "side": r["side"], "line": r["line"]})
+    assert [tap.values[key(r)]["v"] for r in rows[:3]] == [6.0, 3.0, 2.0]
+    assert tap.values["l:" + cs.line_result_key(rows[3])] == {"v": 9.0}         # a total: the combined score
+    assert "l:" + cs.line_result_key(rows[4]) not in tap.values                   # a spread is graded on a margin: no "actual"
+
+
+def test_values_ride_the_index_the_merge_and_the_page():
+    m = _script()
+    sheet = _sheet()
+    k0 = cs.prop_result_key(sheet["rows"][0])
+    props, lines = m.graded_index(GRADED, {"p:" + k0: {"v": 2.0}, "l:" + cs.line_result_key(sheet["game_lines"][0]): {"v": 5.0}})
+    assert props[k0] == {"y": 1.0, "v": 2.0} and lines[cs.line_result_key(sheet["game_lines"][0])] == {"y": 0.0, "v": 5.0}
+    assert m.merge_results({k0: {"y": 1.0, "v": 2.0}}, {k0: {"y": 1.0}}) == {k0: {"y": 1.0, "v": 2.0}}   # a value is never lost
+    doc = cs.page_payload([dict(sheet, reconciled=m.reconcile(sheet, props, lines, now=__import__("datetime").datetime(2026, 10, 15)))])["nhl"]
+    assert doc["rows"][0]["result"] == {"y": 1.0, "units": 0.909, "v": 2.0}
+    assert doc["game_lines"][0]["result"] == {"y": 0.0, "units": -1.0, "v": 5.0}
+    assert m.reconcile(sheet, props, lines, now=__import__("datetime").datetime(2026, 10, 15))["counts"]["props_valued"] == 1

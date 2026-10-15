@@ -622,13 +622,17 @@ def line_result_key(line: Mapping[str, Any]) -> str:
 
 
 def result_for(price: Any, graded: Mapping[str, Any] | None) -> dict[str, Any] | None:
-    """{y, units}: 1 unit at the sheet's best price -- a win pays the price, a loss costs the unit."""
+    """{y, units[, v]}: 1 unit at the sheet's best price -- a win pays the price, a loss costs the unit -- and `v`, the
+    number the grader settled on (the actual stat; a total's combined score), when the reconcile captured it."""
     if not graded or graded.get("y") is None:
         return None
     y = float(graded["y"])
     dec = decimal_odds(price)
     units = (round(dec - 1, 3) if dec else None) if y == 1 else (-1.0 if y == 0 else 0.0)
-    return {"y": y, "units": units}
+    out = {"y": y, "units": units}
+    if isinstance(graded.get("v"), (int, float)):
+        out["v"] = graded["v"]
+    return out
 
 
 def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
