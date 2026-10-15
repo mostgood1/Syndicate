@@ -49901,3 +49901,16 @@ That entry's `verify:` reads **"382 rows, `measured`, factor 0.9150"**. True of 
 The 244 are cancelled by the validated pocket `soccer|player_shots|full|pregame|price=long` — 244 is exactly that bucket's row count — because `layer2_board` consults `measured_bucket_skill.bucket_factor` FIRST and *"a validated bucket outranks the category"*. **This is the designed interaction, not a regression:** the demotion applies where no validated pocket covers the row.
 
 So the reprice did land, and its reach is **~129 rows applied** rather than 382. The error is the one this repo already names — **count the field the CONSUMER reads**; the note is not the applied factor.
+
+## 2026-10-15 21:33Z -- MEASURED: the UEFA competitions are served by the fleet (follow-up to the 20:47:12Z ff cce22975 -> 553603bf) `[lane soccer-uefa-competitions, session 15fef1c0]`
+- **(1) Files on the fleet disk, written by the real soccer pregame autorun** (watcher fired 21:32:30Z, `/home/amyn/syndicate-prod/data/soccer_source/`):
+  - `ucl` schedule 21:28:25Z (144 matches, 8 weeks), odds 21:32:07Z (**830 rows**, the scratch capture's count);
+  - `uel` schedule 21:29:43Z (144 / 8), odds 21:32:10Z (**6 rows**: 2 fixtures on 10-22, fanduel h2h only);
+  - `uecl` schedule 21:31:08Z (108 / 6), odds 21:32:13Z (**header only**).
+  - The thin UEL/UECL odds are TIMING, not a defect [inference]. Their round 3 finished today, and US books have barely priced round 4 (10-22). The free `/events` endpoint already listed 10 / 9 events. Re-read on 10-21.
+- **(2) Served pages, web on 553603bf:**
+  - `/soccer/ucl/cards` 200, 174,349 B, 18 fixtures carrying "market odds only";
+  - `/soccer/uel/cards` and `/soccer/uecl/cards` 200, ~208 KB, 18 finals each ("Final: ..."). 0 occurrences of `build_soccer_artifacts` or "not been simulated yet" on any of the three.
+- **(3) Live poller on new code** (live-odds-worker recycled itself at ~21:07Z, code 0, its routine ~5.9 h cycle, not a deploy): `live_state_2026-10-15.json` written for uel and uecl (18 box scores each) and ucl (0). `LEAGUE_POLL_FAILED` lines for a UEFA slug in `live-odds-worker.log`: **0**. The no-model in-play branch (`_scoreboard_only_game`) only runs on an IN-PLAY match, so it is still UNREAD.
+- **verify (OWED):** a UCL match in play on 2026-10-20/21: `games` entry with `projection: null`, and live-lens ticks continuing for all sports. refresh-worker still runs pre-ff code (pid 606824, started 20:25:06Z); its `_soccer_refresh_units` guard loads at its next restart, together with the UEFA league list.
+
