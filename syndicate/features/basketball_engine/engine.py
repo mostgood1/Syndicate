@@ -140,6 +140,11 @@ class EventSimConfig:
     # 0.0 = off: the solve is byte-identical.
     solver_bonus_trip_share: float = 0.0
     solver_endgame_pts_per_team: float = 0.0
+    # TWO-POINT MAKE RATE FROM THE 2PA SPLIT (lane basketball-scenario-calibration, Phase 2 #5a, pre-registered 8caf0fca).
+    # Default OFF = today: a 2PA is made at the player's OVERALL FG% (threes included, ~0.47), and the EXACT solver then
+    # lifts one shared efficiency multiplier to hit the target, so 3P% runs +4.1 pts hot and 2P% -3.5 cold (full FIT
+    # 2025-26: 3PM +1.35/team). On: (FGM - 3PM) / (FGA - 3PA) per player, used everywhere the two-point rate is read.
+    fg2_from_two_point_split: bool = False
 
     # Outcome priors (fallbacks when player priors are missing)
     base_tov_per_poss: float = 0.125
@@ -443,6 +448,20 @@ def _player_pct(players: pd.DataFrame, made_pm: str, att_pm: str, default: float
 # The vendored module switches (SHOOTER_FT_RATE, FOULED_MISS_NOT_FGA, EXACT_TARGET_CALIBRATION, TOV_PER_ATTEMPT,
 # PLAYER_REBOUND_CREDIT and its credits, BLOCK_MODE, LEAGUE_BLOCKS_PER_MISSED_2PA, BLOCK_RATE_ASSUMED_FG3_PCT,
 # BLOCK_ALLOC_BY_RATE / _FLOOR_PM) are LeagueParams fields now; see league.py for each one's provenance.
+
+
+def _player_two_pct(players: pd.DataFrame, default: float = 0.53, lo: float = 0.30, hi: float = 0.80) -> np.ndarray:
+    """Per-player two-point make rate, (FGM - 3PM) / (FGA - 3PA) from the per-minute priors; `default` when 2PA <= 0
+    or unknown. `cfg.fg2_from_two_point_split` only."""
+    fgm = _safe_series(players, "_prior_fgm_pm").to_numpy(dtype=float)
+    fga = _safe_series(players, "_prior_fga_pm").to_numpy(dtype=float)
+    tpm = np.nan_to_num(_safe_series(players, "_prior_threes_pm").to_numpy(dtype=float), nan=0.0)
+    tpa = np.nan_to_num(_safe_series(players, "_prior_threes_att_pm").to_numpy(dtype=float), nan=0.0)
+    two_m, two_a = fgm - tpm, fga - tpa
+    with np.errstate(divide="ignore", invalid="ignore"):
+        pct = np.where(np.isfinite(two_a) & (two_a > 0) & np.isfinite(two_m), two_m / two_a, np.nan)
+    pct = np.where(np.isfinite(pct), pct, default)
+    return np.clip(pct, lo, hi)
 
 
 def _ft_rate_multipliers(players: pd.DataFrame, minutes: np.ndarray) -> np.ndarray:
@@ -894,6 +913,9 @@ def simulate_pbp_game_boxscore(
     # Player shooting pcts
     h_fg_pct = _player_pct(home_players, "_prior_fgm_pm", "_prior_fga_pm", default=0.46, lo=0.25, hi=0.75)
     a_fg_pct = _player_pct(away_players, "_prior_fgm_pm", "_prior_fga_pm", default=0.46, lo=0.25, hi=0.75)
+    if bool(getattr(cfg, "fg2_from_two_point_split", False)):
+        h_fg_pct = _player_two_pct(home_players)
+        a_fg_pct = _player_two_pct(away_players)
     h_3p_pct = _player_pct(home_players, "_prior_threes_pm", "_prior_threes_att_pm", default=0.35, lo=0.20, hi=0.50)
     a_3p_pct = _player_pct(away_players, "_prior_threes_pm", "_prior_threes_att_pm", default=0.35, lo=0.20, hi=0.50)
     h_ft_pct = _player_pct(home_players, "_prior_ftm_pm", "_prior_fta_pm", default=0.76, lo=0.45, hi=0.95)
