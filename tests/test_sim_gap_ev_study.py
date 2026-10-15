@@ -356,3 +356,40 @@ def test_reachability_off_writes_nothing_and_leaves_the_optimizer_exactly_as_it_
     assert calls["grade"] > off_calls, "on is a different run from off"
     on_state = json.loads((root / opt.OPT_STATE_PATH).read_text(encoding="utf-8"))
     assert on_state["games"] == off_state["games"], "the study wraps OUTSIDE the optimizer and never feeds it a part"
+
+
+_BACKFILL = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "sim_gap_ev_study.py"
+
+
+def _backfill_module():
+    spec = importlib.util.spec_from_file_location("sim_gap_ev_backfill", _BACKFILL)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_backfill_writes_only_the_studys_files_and_a_rerun_skips_what_it_has(cron, monkeypatch, tmp_path):
+    pms, root, calls = cron
+    bf = _backfill_module()
+    out = tmp_path / "out"
+    args = ["--out", str(out), "--sports", "mlb", "--days", "5", "--resamples", "50"]
+    assert bf.main(args, cron=pms) == 0
+    state = json.loads((out / sge.STATE_PATH).read_text(encoding="utf-8"))
+    assert list(state["games"]) == ["mlb|evt-1"]
+    assert json.loads((out / sge.REPORT_PATH).read_text(encoding="utf-8"))["window"]["games"] == 1
+    assert not [p for p in root.rglob("*.json*") if out not in p.parents],         "never the scorecard's, the optimizer's or the data root's files"
+    monkeypatch.setattr(pms.WebReader, "json", lambda self, relative: state if relative == sge.STATE_PATH else None)
+    calls["grade"] = 0
+    assert bf.main(args, cron=pms) == 0
+    assert calls["grade"] == 0, "games already in the saved state are not regraded"
+
+
+def test_backfill_refuses_when_the_saved_state_cannot_be_read(cron, monkeypatch, tmp_path):
+    pms, _root, _calls = cron
+
+    def unreadable(self, relative):
+        raise pms.FetchError("502")
+
+    monkeypatch.setattr(pms.WebReader, "json", unreadable)
+    assert _backfill_module().main(["--out", str(tmp_path / "o"), "--sports", "mlb"], cron=pms) == 4
+    assert not (tmp_path / "o").exists()
