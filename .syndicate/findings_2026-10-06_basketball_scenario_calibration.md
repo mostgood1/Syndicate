@@ -2455,3 +2455,73 @@ owed for the whole Phase 2 config).
   re-recorded with this lane's calibration files.
 - If any bucket's FIT-optimal p moves off (0.2, 0.0, 0.2): that bucket is re-fitted, and **Δ is re-measured on the
   #3j measure dates before the VALID read** (this lane's job).
+
+### Phase 2 #5 — READING 2026-10-15 00:47Z (existing full-FIT runs, no new sim): the volume flag is GONE; the defect is shot COMPOSITION
+
+**Data:** full FIT, 1,510 team-games (games without OT). `fit_f3` = the Phase 2 #3 config; `fit_rest3` = before #3.
+Real = ESPN box.
+
+| per team-game | fit_f3 | real [95% CI] | diff |
+|---|---|---|---|
+| S1 (FGA + 0.44·FTA + TOV) | 112.70 | 113.46 [113.13, 113.79] | −0.76 |
+| FGA | 88.20 | 88.84 [88.50, 89.18] | −0.65 |
+| 3PA | 36.46 | 36.90 [36.56, 37.25] | −0.45 |
+| **3PM** | **14.61** | **13.26** [13.06, 13.46] | **+1.35** |
+| FGM | 41.11 | 41.65 [41.38, 41.91] | −0.53 |
+| **3P%** | **0.4008** | **0.3594** | **+0.041** |
+| **2P%** ((FGM − 3PM) / (FGA − 3PA)) | **0.512** | **0.547** | **−0.035** |
+| FT% | 0.791 | 0.783 | +0.008 |
+| TOV / REB | 14.46 / 43.58 | 14.44 / 43.77 | ≈ 0 |
+| **AST** | **23.85** | **26.57** [26.31, 26.83] | **−2.72** |
+| STL / BLK | 7.95 / 5.30 | 8.42 / 4.86 | −0.47 / +0.44 |
+| points | 114.88 | 114.67 | +0.22 |
+
+**Reading:**
+- Phase 1's volume flag (+5.6 plays, +2.4 3PA) is gone under the accepted Phase 2 config: S1 −0.76, 3PA −0.45. It is
+  EXONERATED for this config; the #1 jitter/ports/EXACT changes removed it.
+- What remains is make COMPOSITION:
+  - 3P% is +4.1 points too high and 2P% −3.5 too low. Points stay right because EXACT pins the total.
+  - **3PM is +1.35/team (+10%)**, a direct THREES-PROPS bias.
+- AST −2.7/team (−10%) is a second, separate props bias.
+
+**Root cause (code, engine.py ~:895):**
+- The 2PA make probability uses `_player_pct(_prior_fgm_pm / _prior_fga_pm)`, the player's OVERALL FG%, threes
+  included (~0.47), not his 2P% (~0.55).
+- Every consumer reads it as the two-point rate: the loop make probability (:1730/:1854), the EXACT solve's fg2
+  (:1017), the TOV iteration count (:929) and the block rate (:571).
+- The EXACT solver then raises one shared efficiency multiplier (~1.11) to hit the target. That lifts 3P% from
+  ~0.36 to ~0.40 and 2P% only from ~0.47 to ~0.51, exactly as observed.
+- The same construction is in the vendored engine, so production has it too.
+
+### Phase 2 #5a — PRE-REGISTRATION 2026-10-15 00:47Z (before any build or run): two-point make rate from the 2PA split
+
+**Mechanism:** EventSimConfig `fg2_from_two_point_split: bool = False` (native engine, default off, byte-identical).
+- On: a player's two-point make rate = (`_prior_fgm_pm` − `_prior_threes_pm`) / (`_prior_fga_pm` −
+  `_prior_threes_att_pm`), clipped [0.30, 0.80]; 0.53 when 2PA ≤ 0 or unknown.
+- It replaces `h_fg_pct` / `a_fg_pct` at its single construction site, so every consumer listed above uses the
+  2P rate consistently.
+
+**Tests:**
+- off = byte-identical (unset == explicit False);
+- reachability (off ≠ on);
+- corpus parity 5,400 with it off.
+
+**Prediction:** 3P% → ~0.36, 2P% → ~0.55, 3PM −1.3/team, points unchanged (EXACT). FGA may fall slightly (more 2P
+makes means fewer offensive-rebound continuations).
+
+**Measure:** the 12 sweep dates, the fit_f3 config (s′ and Δ′ frozen) with the switch ON vs `PK2_check` (the same config
+OFF).
+
+**CONFIRMED if all of these hold:**
+- 3P% within 0.3594 ± 0.008;
+- 2P% within 0.547 ± 0.012;
+- 3PM/team within real ± 0.4;
+- |total bias| < 0.5;
+- every #3 guard held: FTA ± 0.3, foul-outs [0.153, 0.233], P(6th | 5th), closers-on, H2 / Q4 / S8.
+
+**Readings:** FGA, 3PA, AST, REB, STL, BLK, trips/possession vs s′ (re-measure s′/Δ′ if it moves > 20%).
+
+**Then:** the full FIT. AST (−10%) is a separate later candidate (#5b), pre-registered on its own.
+
+**Lane claim added:** engine.py, the fg2_from_two_point_split field + 2P make-rate construction section only, and
+tests/test_basketball_engine_two_point_split.py (NEW). P3 is told; it is a shared file.
