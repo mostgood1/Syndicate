@@ -2770,3 +2770,14 @@ Against `fit_f3` (the #3 config). Team-game rows are for games without OT (1,510
 - Trailer FTA after 2:00 is still low (sim 3.55 / 3.71 / 4.04 vs real 4.76 / 5.25 / 4.52). A read-only residual.
 - P3's live re-gate (§12) on fit_f5 is in progress. P3 flags that the REB −1.4 residual may read slightly low on live
   remaining points (via offensive-rebound continuation).
+
+**P3 §12 live re-gate on fit_f5 (findings_2026-10-09 §12 RESULT): NOT PASSED by P3's rule.** FIT only, regular season,
+n ≈ 780 per checkpoint.
+- Native live total is worse than `pregame_rate` at end Q1 (+0.23 [+0.02, +0.44]) and ties from Q2 on.
+- The Phase 2 config fixed the LEVEL that the production gate failed on. Native total bias at end Q1/Q2: +3.98/+2.57
+  → +0.19/+0.11.
+- Paired vs native-in-production: total |err| −0.52 (Q1), −0.16 (Q3), both with CI < 0. Margin −0.38 / −0.18.
+- Native now BEATS `pregame_rate` on ML log-loss at Q1–Q3, and on margin at 5:00 Q4.
+- End-Q3 total bias is +1.14 native / +1.31 pregame_rate: checkpoint truth, not this config. Whether REB −1.4
+  contributes is unmeasured.
+- VALID and the postseason are untouched; both are graded once with this lane's VALID read.
