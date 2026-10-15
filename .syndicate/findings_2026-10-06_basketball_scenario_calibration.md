@@ -2597,7 +2597,7 @@ tests/test_basketball_engine_two_point_split.py (NEW). P3 is told; it is a share
 - 3PM (+1.14 → +0.17) and 2P% are fixed. **3P% about +1.5 points high is recorded as a KNOWN RESIDUAL for a later
   round.**
 
-### Phase 2 #5c — DIAGNOSTIC RESULT 2026-10-15 03:05Z (step 1 only; step 2 dropped by the decision above): the priors are EXONERATED
+### Phase 2 #5c — DIAGNOSTIC RESULT 2026-10-15 13:51Z (run done 03:02Z; step 1 only; step 2 dropped by the decision above): the priors are EXONERATED
 
 **Data:** the `--dump-priors` run on the 12 sweep dates, 149 team-sides, the priors exactly as they reach the engine.
 - Prior-implied team 3P%, 3PA-weighted: raw 0.3624, engine-clipped 0.3573. Real 0.3594 (subsample 0.3611).
