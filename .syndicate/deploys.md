@@ -49997,3 +49997,10 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **ask:** user 2026-10-15 "Puckline picks are price until graded" -- the puckline sim went live 21:54Z (lane nhl-puckline-orientation) and leaned +1.5 on its first slate (below the fair on home -1.5 in 9 of 10).
 - **claim:** web by cheat-sheets token 617f540a..., acquire exit 0. Ride-alongs: dd3c0085 (my own test-only env-leak fix); code diff = cheat_sheets.py + its test.
 - **verify:** fleet venv `cs.pick_label`: NHL spreads, sim 56.6 vs 51.1 (Calgary +1.5) -> PRICE PLAY; the same margin on NHL h2h -> SYNDICATE PICK; the 24 picks on 10-15/10-16 sheets -> 0 relabels (none is an NHL puckline). Lift: drop ("nhl", "spreads") from `UNGRADED_SIM_MARKETS` once `model_scorecard_simgap.json` shows nhl|spreads sim cells at >= 30 games.
+
+## 2026-10-15 23:00:25Z (6:00 PM CT) -- READING: MLB live lens phase 1, the refresh's report builder ran on the port in production -- owed reading (1) **MET** (lane `mlb-live-lens-native-p1`, session 2d413211)
+
+- **Reading.** `mlb_source/data/live_lens/render_sync/live_lens_reports_2026_10_15.json` was rewritten at 23:00:25Z, 56 min after the b9542acb ff (last pre-ff write 22:02:22Z).
+  - Contents: `ok=True`, 158 entries, `latestReport.counts` games=2 final=1 pregame=1 props=15, generatedAt 18:00:25 CT.
+- **Why this is the port.** The fleet's `scripts/refresh_mlb_oddsapi.py` (HEAD contains b9542acb) loads only `live_lens_port/app_slice.py`. A failed builder raises "MLB live-lens port ..." and falls to the degraded payload, which would not carry `ok=True` with entries.
+- **Still owed:** (2) a live-MC tick by the port on a LIVE game.
