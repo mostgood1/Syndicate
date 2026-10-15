@@ -49609,3 +49609,9 @@ Pressure lines were the same text on both dates and across reads 30 s apart; not
 - **claim:** web by cheat-sheets, token c3c8cd0a..., target 62e6429f. Ride-along listed in its own call first: this lane's 3 files + af3b6a79 (ledger). Merge script refused to run if HEAD had moved.
 - **reload:** `RELOAD_WEB {"elapsed_s": 2.0, "failures": 0}`.
 - **schedule:** Windows task `SyndicateCheatSheetsTomorrow` (2:00 PM + 9:00 PM CT, `--date tomorrow`); first run started by hand 8:43:29 PM CT to test it end to end.
+
+## 2026-10-15 01:58:55Z (8:58 PM CT 10-14) -- web ff 62e6429f -> 30865af3 + `reload-web`: Consistency + Matchups sections, sortable Every prop, Today-then-Tomorrow tabs, News dedup (lane `cheat-sheets`, session 9e18a0e7) -- NO outage
+- **claim:** web by cheat-sheets, token 941b789b..., target 30865af3. Ride-along listed in its own call first: runtime = this lane's `cheat_sheets.py` + template; the rest ledger / research (basketball scenario #5a, NCAAF live-segment findings). Guarded merge (refuses if HEAD moved).
+- **reload:** `RELOAD_WEB {"elapsed_s": 2.0, "failures": 0}`.
+- **verify (served, 9:00 PM CT, `?date=2026-10-15&sport=nfl` after a `--date tomorrow` rebuild on 30865af3):** tabs "TODAY, TOMORROW"; label "Tomorrow · Thursday, October 15" + Early look; "Early look · prices as of 8:59 PM CT"; sections slate / value 0 / hot streaks 25 / consistency 25 / matchups 25 / game-line value (5 game lines, 0 value) / every prop 128 / shop 22 / news; clicking L5 sorts 5/5 records first (Sutton, Nix); Matchups shows the opponent rank + "vs this opponent" record (e.g. Sutton 0/1 on this line). Matchup EVs are mostly negative -- the priced-in finding, shown not hidden.
+- **day-ahead task:** `SyndicateCheatSheetsTomorrow` manual run 8:43 PM CT exit 0 (NFL / NCAAF 10-15 written; NHL / soccer / MLB 10-15 not yet on the board).
