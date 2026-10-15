@@ -711,3 +711,11 @@ def test_a_collapsed_board_read_is_re_read_not_built():
     assert m.steady_rows(lambda: 1 / 0, full, prior, "2026-10-15", now=now, sleep=waits.append) is full and waits == [50.0]
     started = {"rows": [dict(r, commence_time="2026-10-15T17:00:00Z") for r in prior["rows"]]}   # a started game: no baseline
     assert m.steady_rows(lambda: 1 / 0, thin, started, "2026-10-15", now=now, sleep=waits.append) is thin
+
+
+def test_recent_form_says_where_once():
+    # NFL labels carry their own "vs" / "@" (the George Holani pick read "4 v vs SF, 5 v @WAS", 2026-10-15).
+    nfl = cs.recent_points([4, 1, 5], line=1.5, side="under", opponents=["vs SF", "vs LAC", "@WAS"])
+    assert nfl[0]["text"] == "under 1.5 in 1 of 3 (newest first: 4 vs SF, 1 vs LAC, 5 @WAS)"
+    nhl = cs.recent_points([4, 2, 2], line=1.5, side="over", opponents=["NJD", "MTL", "SEA"])
+    assert nhl[0]["text"] == "over 1.5 in 3 of 3 (newest first: 4 v NJD, 2 v MTL, 2 v SEA)"

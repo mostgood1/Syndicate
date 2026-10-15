@@ -908,7 +908,9 @@ def recent_points(values: Sequence[Any] | None, *, line: Any, side: Any,
         return []
     words, opps = _side_words(side, line), list(opponents or [])
     f5 = form_record(vals, line, side, 5)
-    shown = ", ".join(f"{_g(v)} v {opps[i]}" if i < len(opps) and opps[i] else _g(v) for i, v in enumerate(vals[:5]))
+    # NFL / NCAAF labels already say where ("vs SF", "@WAS"); NHL's are bare ("NJD") and get the "v".
+    against = lambda o: str(o) if str(o).startswith(("vs ", "v ", "@")) else f"v {o}"
+    shown = ", ".join(f"{_g(v)} {against(opps[i])}" if i < len(opps) and opps[i] else _g(v) for i, v in enumerate(vals[:5]))
     out = [{"label": "Last 5", "text": f"{words} in {f5['hits']} of {f5['games']} (newest first: {shown})",
             "tone": _rate_tone(f5["hits"], f5["games"], base=base)}]
     if len(vals) >= 8:
