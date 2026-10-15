@@ -322,7 +322,19 @@ def test_game_lines_are_price_checked_and_kept_as_a_record(monkeypatch):
     assert len(merged["game_lines"]) == 2 and merged["games"][0]["event_id"] == "g1"
 
 
+def _unset_data_root_until_teardown(monkeypatch):
+    """Start the test with SYNDICATE_DATA_ROOT unset AND restore the original on teardown.
+
+    `align_data_root` (reached through `main`) WRITES the variable. `monkeypatch.delenv(..., raising=False)` alone records
+    nothing when the variable is absent, so that write outlived the test: every later test in the process read a deleted
+    temp dir as its data root and 12 NCAAF tests lost their team registry in the daily ci-suite (todo #697, found by lane
+    ci-suite-red-1015). `setenv` first is what makes monkeypatch remember the ORIGINAL state; `delenv` then unsets it."""
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", "set-by-test")
+    monkeypatch.delenv("SYNDICATE_DATA_ROOT")
+
+
 def test_the_day_ahead_is_tomorrow_in_central(monkeypatch):
+    _unset_data_root_until_teardown(monkeypatch)
     m = _script()
     monkeypatch.setattr(m, "central_today", lambda: "2026-10-14")
     seen = {}
@@ -386,7 +398,7 @@ def test_the_evidence_layer_reads_the_same_data_root_as_the_generator(monkeypatc
     # A hand run without SYNDICATE_DATA_ROOT read the checkout's data/ mirror: sheets with no positions or matchups,
     # and no error (2026-10-15). Unset -> set from --data-root; a different root -> refused, never mixed.
     m = _script()
-    monkeypatch.delenv("SYNDICATE_DATA_ROOT", raising=False)
+    _unset_data_root_until_teardown(monkeypatch)
     assert m.align_data_root(tmp_path) is None
     import os
     assert os.environ["SYNDICATE_DATA_ROOT"] == str(tmp_path)
