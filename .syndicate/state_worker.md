@@ -67,7 +67,13 @@ tests as newly FIXED.
 
 **GREEN, AND THE BASELINE IS EMPTY `[verified 2026-10-02, lane ci-red-on-main]`.** With Render suspended the suite
 runs as the local fleet's `ci-suite` job (08:00Z, `local_production.py ci-run`: its own `<home>/ci-checkout`,
-scrubbed env, niced). Full run on `d559535b`: **rc=0, 10/10 steps, pytest 21,615 collected / 0 failing,
+scrubbed env, niced). **SANDBOXED `[verified 2026-10-15, lane ci-env-home-sandbox, 921fa58e + 148947d6]`:** `ci_env()` replaces
+HOME/USERPROFILE with `<home>/ci-home` (emptied each run), points SYNDICATE_LOCAL_HOME at a non-existent path and
+dead-ends `SYNDICATE_ODDSAPI_QUOTA_FORWARD_URL`/`SYNDICATE_LOCAL_REDIS_URL` at `redis://127.0.0.1:1/0`. Before it,
+HOME leaked the production deploy-claim dir (stray `web` claims 10-13/10-14) and `test_oddsapi_quota` wrote the
+fleet's quota doc via 127.0.0.1:6379. All 8 chunks under an audit hook at 148947d6: 0 prod opens, 0 :6379 connects.
+On fleet disk since 00:04Z 10-15 (peer ff f40f520f); first nightly reading owed. At Idle priority the suite
+exceeds the pytest step's 7200 s cap on this host (10-14 nightly at nice 15: 4769 s, rc=1). Full run on `d559535b`: **rc=0, 10/10 steps, pytest 21,615 collected / 0 failing,
 archive suite ok.** `tests/pytest_baseline.json` holds **0** failures, so ANY failure the job reports is new.
 
 **FIRST SCHEDULED RUN (2026-10-02 08:00Z, `4ec1fd72`): rc=1, ONE failure, a flake now fixed `[verified]`.**

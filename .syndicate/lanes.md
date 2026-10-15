@@ -813,6 +813,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### ci-env-home-sandbox — OPEN — opened 2026-10-14 — session feaf967d-56d0-48b5-96f4-b5bd61392109
+- **GOAL VERDICT 2026-10-15 03:05Z.** Goal, verbatim: "no nightly ci-suite test can read or write fleet production state: ci_env() sandboxes HOME + SYNDICATE_LOCAL_HOME; measured before/after over prod claim dir, data root, run dir" -- **GOAL: NOT MET (one reading left).** The lane's Verification ran (before/after snapshot of the prod dirs: 0 test-attributable changes; all 8 chunks audit-hooked at 148947d6: 0 prod records), and the fix is on fleet disk since 00:04Z 10-15. Left: the 10-15 nightly's own reading (job-ci-suite.log header `HOME=.../ci-home`; no lane-a/session-aaa claim; quota `nfl:offfleet` unchanged). Not blocked. Scope grew within the goal (a second leak, the quota test -> fleet Redis; fixed 148947d6), not drift.
 - Goal: no nightly ci-suite test can read or write fleet production state: ci_env() sandboxes HOME + SYNDICATE_LOCAL_HOME; measured before/after over prod claim dir, data root, run dir
 - Files: scripts/local_production.py (ci_env + CI_ENV_PASSTHROUGH + cmd_ci_run section only), tests/test_local_production_ci_env.py (NEW), tests/test_local_production.py (test_ci_env_carries_nothing_that_reaches_the_fleet only), tests/test_oddsapi_quota.py (OffFleetAbsentDocumentTests._off_fleet only)
 - Hypothesis: the 10-13/10-14 stray web claims reached prod via HOME -> ~/syndicate-prod/local_production.env SYNDICATE_DEPLOY_CLAIM_DIR, not an inherited env var (ci_env scrubs that)
