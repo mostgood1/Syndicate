@@ -67,6 +67,12 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### mlb-live-lens-port-scope — CLOSED 2026-10-15 (GOAL MET) — opened 2026-10-15 — session 2d413211
+- GOAL VERDICT. Goal (verbatim): "Scope a port of the MLB live-lens report builder off the vendored vendor/mlb_bettingv2/tools/web/flask_frontend.py (`_live_lens_reports_payload` via refresh_mlb_oddsapi.py, `start_live_lens_background_loop` via the live-odds-worker): measure its closure and propose the port shape; no production change (user decision 2026-10-15, from "move the mlb odds fetch off vendor" -- the odds fetch itself is already native)." -- **GOAL: MET** `[2026-10-15]`. Closure measured: 562 top-level names / 447 functions / 13,609 of 21,040 lines, plus vendored sim_engine.* (incl. live_mc) and tools.* modules; no in-process routes. Shape proposed in findings_2026-10-15_mlb_live_lens_port_scope.md. No code or production change.
+- Goal: Scope a port of the MLB live-lens report builder off the vendored vendor/mlb_bettingv2/tools/web/flask_frontend.py (`_live_lens_reports_payload` via refresh_mlb_oddsapi.py, `start_live_lens_background_loop` via the live-odds-worker): measure its closure and propose the port shape; no production change (user decision 2026-10-15, from "move the mlb odds fetch off vendor" -- the odds fetch itself is already native).
+- Files: none (analysis only; the findings file is ledger)
+- Blocked by: none
+
 ### mlb-live-game-pks-native — CLOSED 2026-10-15 (GOAL MET) — opened 2026-10-15 — session 2d413211
 - GOAL VERDICT. Goal (verbatim): "Move scripts/fetch_mlb_live_game_pks_for_date.py (the live loop's authoritative "is an MLB game live" signal) off the vendored `vendor/mlb_bettingv2` `sim_engine.data.statsapi` onto `syndicate.features.mlb.statsapi_http`, live-state logic unchanged, with identical output; deployed with a measurement (user request 2026-10-15)." -- **GOAL: MET** `[2026-10-15 17:07Z]`. caede38a live 17:06:22Z (via 25bac568); with TB@CLE live, old vs deployed both returned [849818]. deploys.md (MLB StatsAPI helpers).
 - Goal: Move scripts/fetch_mlb_live_game_pks_for_date.py (the live loop's authoritative "is an MLB game live" signal) off the vendored `vendor/mlb_bettingv2` `sim_engine.data.statsapi` onto `syndicate.features.mlb.statsapi_http`, live-state logic unchanged, with identical output; deployed with a measurement (user request 2026-10-15).
