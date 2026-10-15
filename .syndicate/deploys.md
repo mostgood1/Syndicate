@@ -50027,3 +50027,14 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **NOT measured:** a pre-alias baseline of the same count, so "the aliases caused it" is NOT claimed. The reading is: UCL is on the board, and Kalshi prices reach it for 16 of 18 fixtures.
 - **Correction recorded** in `findings_2026-10-15_uefa_kalshi_join_and_history.md`: the moneyline key bug is in `join_kalshi_to_board` (which feeds `portfolio_commit`), not in the board's venue quotes.
 
+
+## 2026-10-15 23:56:36Z (6:56 PM CT) -- web ff e5a87271 -> 6cd9eeb9 + `reload-web` (2.0 s, 0 failures): live Win% blank, the page LABEL (lane `live-winpct-blank`, session 9e18a0e7) -- no restart; the card column loads at the NEXT refresh-worker restart (batched: the last was 23:36:42Z)
+- **MEASURED for the 23:36:35Z deploy (e5a87271):**
+  - The shortlist API, read 23:43:30Z: 6 live NCAAF rows (GASO@ODU, ECU@UAB), 6 `pregame_on_live`, 0 `model_probability`, 6 `sim_model_prob_over` kept, 0 live-aware; 377 NCAAF + 1,360 NFL pregame rows, 0 flagged.
+  - The PAGE, after the first post-restart full build (6:47 PM CT): 22 live NCAAF plays, "Our sim has" 0 (7 on the 6:35 PM pre-restart build), summary "sim agrees 0, disagrees 0". Sim cells read "-- / proj X". The one "SIM CONTRADICTS" left is a live re-sim row (`live_aware`, `live_model_probability` 0.20, `live_total` 35.3) and keeps it by design.
+- **GAP FOUND -> this deploy:** the page's cards carry NO projection dict, so the template's "pregame proj" label never fired (0 of 22). The card now carries `pregame_on_live` (`layer2_board._layer2_board_columns`), and the template reads it.
+- **claim:** web token 4e994710..., acquire exit 0. Ride-alongs: none.
+- **verify (owed):**
+  - After the next refresh-worker restart, live NFL/NCAAF rows read "pregame proj X".
+  - SEA@DEN (7:15 PM CT): live NFL rows have no Win% and no "Our sim has".
+  - The ledger's live-first NFL share with a probability falls from ~95% toward 0.
