@@ -49462,3 +49462,14 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
   - The fleet A/B (10-07/08/11/12/13/14) matched, but its population is EMPTY: `_load_actuals_long` gives 0 rows on every date, and no NBA lens-tuning file has ever been written in production. So it is not evidence.
 - **VERIFY (deployed checkout at dc61042f):** the edit marker is present; 5 tests passed.
 - **Rollback:** revert c6225f6e and ff.
+
+## 2026-10-15 00:04Z (7:04 PM CT 10-14) -- web `reload-web` to f40f520f: `/cheatsheets` in the app + "Cheatsheets" in the site menu (lane `cheat-sheets`, session 9e18a0e7) -- NO outage
+- **ask:** user 10-14: "did we build the location on the syndicate app for these cheatsheets?" then "make sure \"Cheatsheets\" is added to the main menu across the site".
+- **claim:** web by cheat-sheets, token 9d469cc3..., ttl 1800 s, target f40f520f; acquire exit 0.
+- **gate:** `check_deploy_safety` NOT CLEAR at ~00:03Z: live-odds-worker odds / soccer-live / NHL child jobs, the refresh-worker board build (layer2_shortlist_build), live games. None of them is touched by a gunicorn HUP of web (rolling, `reload-web` never refuses), so this went ahead deliberately, as the 10-14 01:16Z reload-webs did. No other role restarted.
+- **ff:** fleet checkout dc61042f -> f40f520f (`git merge --ff-only f40f520f`, 11 commits). Web was on dc61042f, so the only web-loaded diff is this lane's: `syndicate/app.py` (blueprint registration), `syndicate/blueprints/cheat_sheets.py`, `syndicate/templates/cheat_sheets.html`, `syndicate/templates/shared/_site_nav.html` (+1 menu item), `syndicate/features/shared/cheat_sheets.py`, `syndicate/static/brand/`. Other ride-alongs are not loaded by any running role: `scripts/audit_model_edge_gap.py` (research), `scripts/local_production.py` ci_env (supervisor, loads at the next `up`), play-card scripts, ledger. refresh-worker / live-odds-worker stay STALE as they were.
+- **reload:** `RELOAD_WEB {"elapsed_s": 3.8, "failures": 0, "max_latency_s": 1.75}`, workers 313136/313292 -> 316106/316107, /healthz 200 throughout.
+- **expect:** `/cheatsheets` serves the newest sheet per sport from `<data root>/cheatsheets/<sport>/<date>.json`, reading files only (no evidence built on a request); every page's menu carries "Cheatsheets".
+- **verify (00:05Z, served):** GET `/cheatsheets` 200, title "Syndicate ROI Cheat Sheets", tabs NFL / NCAAF / NHL / Soccer, NFL slate 13 games with kickoff times, 26/26 slate logos loaded, 150 row images; the "Cheatsheets" pill is active on `/cheatsheets`; the served HTML of `/` and `/nfl` both carry `href="/cheatsheets"` > Cheatsheets. MET.
+- **rollback:** revert the `app.py` registration + the `_site_nav.html` line, ff, `reload-web`.
+- **owed:** the generator is not scheduled -- these sheets are a manual 10-14 run (NFL rebuilt 23:58Z with team / position / headshot / logo fields; soccer, NCAAF, NHL rebuilding). A daily job is the lane's next step.
