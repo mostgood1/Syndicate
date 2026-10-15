@@ -938,6 +938,14 @@ death, never life — do not invert it.
 - Verification: The VENUE_KEY_SHAPE funnel read from the fleet logs for every sport with live rows, reported as offered/present/taken/repriced per shape with sides_seen as the denominator, plus the market-series coverage comparison; no share reported for a sport with no live sides.
 - Blocked by: none
 
+### probability-differential-sweep-1015 — OPEN — opened 2026-10-15 — session ffbcd001-ec13-4749-b344-537715aced98
+- Goal: tests/test_probability_differential.py passes on origin/main (all tests, including test_every_converter_is_registered_or_excused): every scalar converter the AST sweep finds is REGISTERED so the differential runs it against the reference, every non-scalar is excused in NOT_A_SCALAR_CONVERTER with a one-line reason, and the sweep reads a BOM-prefixed file instead of reporting it UNPARSEABLE
+- Files: scripts/probability_differential.py (the 2026-10-15 sweep registrations and excusals and the nested-def resolver and the BOM read ONLY), tests/test_probability_differential.py (the 2026-10-15 KNOWN_FAILING additions ONLY)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: python -m pytest tests/test_probability_differential.py on a tree equal to origin/main after land: 0 failed; discover_unregistered() == []; import_errors == {}
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
