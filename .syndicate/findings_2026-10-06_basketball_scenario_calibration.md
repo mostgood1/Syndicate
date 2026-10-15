@@ -2623,3 +2623,103 @@ tests/test_basketball_engine_two_point_split.py (NEW). P3 is told; it is a share
 - 3P% is excluded: a known residual by the earlier decision.
 - If PK3 fails ANY guard: do not start; report to the user.
 - Research run only. Production enablement is a separate user decision.
+
+### FINAL CONFIG — s″/Δ″ RE-MEASURED + PK3 CHECK RESULT 2026-10-15 15:45Z (PK3 done 15:42Z): ALL GUARDS PASS → final full FIT STARTED (per the user's conditional approval)
+
+**Re-measure on the #3j disjoint dates** (#3 config + `fg2_from_two_point_split` + end-game p (0.2, 0.2, 0.3); 16,400
+draws each, 0 errors):
+- **s″ = 0.00791** (was 0.00802).
+- **Δ″ = 0.262 points/team** (was 0.138). The 4–6 bucket's p moved 0 → 0.2. Intentional trips are now 0.316 per
+  team-game (was 0.17).
+
+**PK3** (the 12 sweep dates, the final config; 17,400/17,400 calls with levers, 0 errors):
+
+| guard | PK3 | rule | |
+|---|---|---|---|
+| total bias | +0.36 | \|·\| < 0.5 | ✓ |
+| FTA/team | 22.92 | 22.69 ± 0.3 | ✓ |
+| foul-outs | 0.218 | [0.153, 0.233] | ✓ |
+| P(6th \| 5th) | 0.2241 (8,171 events) | [0.1607, 0.2643] | ✓ |
+| closers-on | 0.399 | [0.375, 0.535] | ✓ |
+| H2 / Q4 slope / S8 | −0.183 / −0.093 / 14.65 | inside / ≥ −0.101 / ± 0.6 | ✓ |
+| Q4 FTA share | **0.272** (was 0.265) | ≥ 0.254 | ✓ (P3's new p moves it toward real 0.279) |
+
+- Readings: team PF 19.69; P(top ≥ 5) 0.478.
+- **FULL FIT `fit_f5` STARTED 15:44Z:** 3 workers at nice 19, `--track-oncourt`, out `C:	mpball_scit_f5`, research
+  copy `~/bball_sc/code_5a_diag`.
+- **FINAL CONFIG, machine-readable** (supersedes fit_f3; handed to P3 for §7c / the live re-gate; copy at
+  `C:	mpball_scit_f5_config.json`):
+
+```json
+{
+ "_what": "basketball-scenario-calibration FINAL Phase 2 config fit_f5 (full FIT launched 2026-10-15 15:44Z); supersedes fit_f3_config.json",
+ "harness": "scripts/basketball_scenario_rates.py sim (levers -> _lever_cfg rebuilds the frozen EventSimConfig per engine call, ~:252/:338/:359; engine flags -> setattr on the native engine module, ~:535-545)",
+ "engine_code": "origin/main native engine incl. 6f092c74 + 361a5286 (fg2_from_two_point_split) (+ research-only diag patches v1-v4: outcome-neutral counters; omit them)",
+ "env": {
+  "SYNDICATE_NBA_TEAM_INPUTS": "1"
+ },
+ "engine_module_flags": {
+  "SHOOTER_FT_RATE": true,
+  "FOULED_MISS_NOT_FGA": true,
+  "EXACT_TARGET_CALIBRATION": true,
+  "TOV_PER_ATTEMPT": true,
+  "PLAYER_REBOUND_CREDIT": true,
+  "BLOCK_MODE": "team_prior",
+  "BLOCK_ALLOC_BY_RATE": true
+ },
+ "event_sim_config": {
+  "possession_alternation": 1.0,
+  "possessions_jitter": 0.0,
+  "team_prior_stacks_on_target": false,
+  "score_effect_k": 0.002,
+  "blowout_bench_rest": true,
+  "bench_weight_boost": 3.0,
+  "foul_out_in_sim": true,
+  "foul_trouble_thresholds": [
+   2,
+   3,
+   4,
+   5
+  ],
+  "foul_trouble_bench_mult": 0.05,
+  "foul_trouble_release_s": 240,
+  "fouler_per_minute": true,
+  "foul_trouble_foul_mult": 0.5,
+  "bonus_free_throws": true,
+  "bonus_nonshoot_foul_per_poss": 0.03,
+  "base_nonshooting_foul_per_poss": 0.065,
+  "endgame_foul_window_s": 120,
+  "endgame_foul_max_deficit": 10,
+  "endgame_foul_p_by_deficit": [
+   0.2,
+   0.2,
+   0.3
+  ],
+  "endgame_foul_seconds": 5.0,
+  "endgame_extend_possessions": true,
+  "endgame_foul_p": 0.0,
+  "solver_bonus_trip_share": 0.00791,
+  "solver_endgame_pts_per_team": 0.262,
+  "record_events": true,
+  "diag_foul_outs": true,
+  "fg2_from_two_point_split": true
+ },
+ "data_files_in_scratch_processed_root": {
+  "nba_sim_total_inputs.json": {
+   "skip_def_subtraction": true,
+   "skip_outs_penalties": true
+  },
+  "nba_sim_availability.json": "fleet copy (enabled, k=2, readmit_with_prop_line)",
+  "nba_prop_calibration.json": "fleet copy",
+  "calibration_totals_<date>.json": "walk-forward, C:/tmp/bball_sc/calfiles_sw_all, 105 files 2025-11-02..2026-02-27 (FIT ONLY; switched raw, both total-input keys)"
+ },
+ "replay_inputs": "scripts/resim_nba_availability.py prepare_scratch as-of: player_checks < slate, rotation_stints_history truncated as-of; lineup_teammate_effects REMOVED (known gap)",
+ "sims": 200,
+ "window": "2025-11-01..2026-02-28 regular season",
+ "known_residuals": [
+  "3P% ~+1.5 pts high (engine-side; priors exonerated #5c) -- user-accepted",
+  "AST ~-2.7/team (#5b, not done)",
+  "Q4 margin slope -0.09 vs real -0.14 (P3)"
+ ]
+}
+```
