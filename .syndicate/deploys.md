@@ -49835,3 +49835,15 @@ The copy has no cache, `trust_env` off unless `STATSAPI_TRUST_ENV`, an (8 s, 8 s
 - **ask:** user 2026-10-15 "show me the season record page" -- the page painted every positive units/ROI cell (and the picks Edge tile, and EV chips) as a blue player-position badge, because `.pos` is the position-badge class.
 - **claim:** web by cheat-sheets token 5e023b3e..., acquire exit 0. Ride-alongs: 79fa4682 / 30d7a4fb / 4482f8ff / e19a6274 (basketball-scenario ledger + docs) and f5da9920 (deploys); code diff outside .syndicate/docs = `syndicate/templates/cheat_sheets.html` only.
 - **verify:** live /cheatsheets/record (Beta tab) read at 18:46Z: positive cells `td.n.gain` render rgb(140,255,46) on transparent background (+0.18u, +1.1%, +0.51u, +51.0%); negatives `td.n.neg` rgb(255,107,87); `.rtab td.n.pos` count 0. Screenshots sent to the user.
+
+## 2026-10-15 19:29Z -- ON MAIN, NOT FF'D: bffcaebf comma-joined club labels + within-league starter club moves -- loads at the next fleet ff (per-run code, no restart) `[lane soccer-starter-club-move, session b9bb5f37]`
+- **Why no ff by me:** the ff 05d30fe9 -> bffcaebf would carry other lanes' runtime code that their owners have not deployed: `nba/live_resim.py`, `basketball_props_smart_sim.py`, `board_enrichment.py`, `live_gameline_join.py`. Mine is not urgent, so it rides the next ff, per the 2026-10-13 batching request.
+- **What bffcaebf does (lineups.py only):**
+  - (1) `attach_confirmed_starters` files a comma-joined row under every club it names, matching `loaders._bind_player_team`;
+  - (2) a multi-word confirmed starter this club's rows lack, found under exactly one other club's single-club row in the same league, is re-filed under the starting club (`SOCCER_STARTER_CLUB_MOVED`).
+- **Offline replay, production env, 10-09..12, 2,222 confirmed starters:**
+  - production's exact-team grouping **2,132** -> composite labels **2,156** -> + 8 moves **2,164**;
+  - all 8 moves hand-checked.
+- **CORRECTION:** my earlier "production" figures (2,142 for 2ac45acd, 2,156 for f05b1632; deploys 2026-10-15 17:25:41Z and the 2026-10-14 entries) came from `poll_soccer_live_state._team_player_rows`. It FUZZY-matches the team, so it counted comma-joined rows that production's exact grouping in `build_soccer_artifacts._attach_confirmed_starters` never sees. Production on f05b1632 resolves **2,132**, overstated by 24.
+- **Lead (upstream, not this lane):** ligue_1 `players_2026.csv` labels 31 rows from BOTH clubs `"Paris Saint Germain,Rennes"` (2024/2025 files correct). In a PSG v Rennes match the sim binds those rows to neither side (`_bind_player_team`), so both squads lose them.
+- **verify -- OWED:** after the next ff, grep `SOCCER_STARTER_CLUB_MOVED` in the odds-job logs on a slate with a moved starter, and run `lineup_reach.py` on that slate.
