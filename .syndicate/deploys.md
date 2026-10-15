@@ -49594,3 +49594,18 @@ Pressure lines were the same text on both dates and across reads 30 s apart; not
   2. The first `nba:ramp:` / `nba:closing:` T-window marker on the next NBA slate.
   - A detached watcher (`/mnt/c/tmp/p7/recycle.out`) records reading 1.
 - **Rollback:** revert fd7f2a2d and ff, then TERM the live-odds-worker.
+
+## 2026-10-15 01:42:30Z (8:42 PM CT 10-14) -- refresh-worker CLAIMED restart onto c36fa38b: live NFL props + live NCAAF totals staked on the PAPER portfolio (lane `live-market-fair-cells`, session 9e18a0e7) -- NO outage
+- **ask:** user 2026-10-15 "go ahead and stake live NFL props and NCAAF totals"; restart approved in chat ("Restart now") after the auto-mode classifier blocked the TERM.
+- **money:** none moves. The fleet executes PAPER only -- `SYNDICATE_EXECUTION_MODE` is commented out in `local_production.env` (-> paper), `SYNDICATE_EXECUTION_LIVE_ARMED` unset, the supervisor has never run with `--allow-live-execution`, all 5,431 October orders `mode=paper`. NOTE: `LIVE_PLAN_WRITTEN` plans also read this gate, so if live execution is ever armed these two cells are eligible there too.
+- **claim:** refresh-worker by live-market-fair-cells, token f46e34c6..., target c36fa38b; acquire exit 0.
+- **ride-along (reviewed in its own call before the ff):** abed0ccc..c36fa38b runtime = this session's lanes + `361a5286` basketball engine `fg2_from_two_point_split` (**default False** -- inert) + `fd7f2a2d` NBA T-window provider (registered in `live_refresh_loop`, but `_run_live_refresh_tick` is called only by `run_live_odds_refresh_worker.py` and the background loop, which `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP` leaves off in every role -- so NOT active on refresh-worker) + `scripts/local_production.py` (supervisor, loads at `up`).
+- **restart:** save-gated watcher: board save 01:42:24.415Z, 0 odds jobs under refresh-worker -> TERM 295247 at 01:42:25Z; supervisor `CLAIMED_RESTART code=0 holder=live-market-fair-cells`, new pid 345330.
+- **baseline (01:36:16Z plan, old code):** `in_play_market_fair` 7 refusals, top market h2h:4.
+- **verify (01:50:49Z plan, new code; plan read from the store with the role's env):** the running module has `IN_PLAY_MARKET_FAIR_CELLS` (True); `refusals_by_sport.in_play_market_fair` = soccer 3, nhl 2, nba 1 -- **no NFL or NCAAF refusal**; by market corners 2, h2h 2, spreads 1, totals 1 (the NHL total, outside the cells). 5 positions, all pregame model-edge. **No positive case yet:** no NFL game live tonight and no live NCAAF total in that plan's rows -- first possible: Thu 10-15 NFL (SEA @ DEN 7:15 PM CT). Forward reads pre-registered in the lane (kill >= 11-03, promote >= 11-24).
+- **rollback:** `SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR_CELLS=none` on refresh-worker + a claimed restart, or revert c36fa38b.
+
+## 2026-10-15 01:43:15Z (8:43 PM CT) -- web ff c36fa38b -> 62e6429f + `reload-web`: game lines + the day ahead on /cheatsheets (lane `cheat-sheets`, session 9e18a0e7) -- NO outage
+- **claim:** web by cheat-sheets, token c3c8cd0a..., target 62e6429f. Ride-along listed in its own call first: this lane's 3 files + af3b6a79 (ledger). Merge script refused to run if HEAD had moved.
+- **reload:** `RELOAD_WEB {"elapsed_s": 2.0, "failures": 0}`.
+- **schedule:** Windows task `SyndicateCheatSheetsTomorrow` (2:00 PM + 9:00 PM CT, `--date tomorrow`); first run started by hand 8:43:29 PM CT to test it end to end.
