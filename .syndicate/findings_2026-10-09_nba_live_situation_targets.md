@@ -871,3 +871,9 @@ Co-signed into findings_2026-10-06 "THE VALID READ — PRE-REGISTRATION". It run
   - postseason as a separate stratum on the calibration lane's terms.
 - **No re-tuning after the read.**
 - **§13 amendment, 2026-10-15 (before any VALID read; matches the calibration lane's amendment):** G3 pairs by GAME. FINAL and PROD are different configs, so their draws are independent anyway. The per-game `stable_seed` is NOT assumed to reproduce across processes (PYTHONHASHSEED etc.). Simulation noise is part of the game-clustered CI. Thresholds unchanged.
+- **§13 grader smoke on the FIT window (2026-10-15 ~19:5xZ; NOT VALID; G3 deliberately NOT amended):** the G3 grader (`g3_grade.py`), run on FIT regular (816 games), FINAL − PROD:
+  - pooled Q1-Q3: total −0.26 [−0.44, −0.08] ✓; margin −0.23 [−0.37, −0.10] ✓; ML log-loss −0.008 [−0.020, +0.006] ✗ n.s.;
+  - 5:00 Q4: total −0.004 [−0.08, +0.08] ✗ (bar +0.05, noise-limited); margin −0.02 [−0.10, +0.06] ✗; **ML +0.010 [+0.000, +0.021] ✗, worse**.
+  - => G3 as registered FAILS on FIT. It is left as written: changing it after seeing the FIT shape would fit the gate to the data.
+  - Expect G3 to fail on VALID unless VALID differs materially.
+  - The late-game ML regression is a real FIT finding (end-game/bonus fouling in the final config moves late win probability the wrong way), reported to the calibration lane.
