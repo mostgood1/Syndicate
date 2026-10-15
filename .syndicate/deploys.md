@@ -49795,3 +49795,14 @@ The copy has no cache, `trust_env` off unless `STATSAPI_TRUST_ENV`, an (8 s, 8 s
   - **MET 17:07:09Z, with a game live:** old (vendored, from caede38a~1) vs deployed vs old again, for 2026-10-15 -> `{"live_game_pks": [849818]}` all three. 10-14 empty in all.
 - **Test note:** 13 `test_live_refresh_loop.py` MLB daily-sim tests error IN THE WORKTREE ONLY. The data-mirror guard flags their `mkdir` under `data/mlb_source/source_artifacts/data/daily` because the worktree has no `data/`. They patch the live check and never run these scripts.
 - **Rollback:** revert the relevant commit and ff. No restart.
+
+## 2026-10-15 17:25:41Z (12:25 PM CT) -- LOCAL FLEET ff 25bac568 -> f05b1632 (exact SHA), NO restart: single-name season rows resolve to confirmed starters `[lane soccer-single-name-starters, session b9bb5f37]`
+- **What:** `lineups.resolve_starter_ids` gains a last pass. A free single-name row (Understat "Gabriel", "Alisson") resolves only if exactly one unresolved multi-word starter contains its word AND exactly one free single-name row carries it. Words under 3 letters are skipped. The reverse direction (one-word ESPN name -> longer row, the FC Dallas "Daniel" mistake) stays closed.
+- **Deploy:** per-run code in the confirmed-XI step, so the next pre-kickoff run loads it. Taken under a `live-odds-worker` claim, with the acquire exit code checked, released by token. Ride-alongs: none (runtime diff = lineups.py only); `vendor/`: no diff.
+- **Pre-deploy reading (offline, production env, 10-09..12, 202 confirmed sides):**
+  - resolved 2,142 -> **2,156** of 2,222 (96.4% -> 97.0%);
+  - all-11 sides 132 -> **145**;
+  - 12 new pairings hand-checked (Gabriel/Magalhaes, Thiago/Igor Thiago, Reinildo, Beraldo, Peglow, Nouhou, Guilherme, Alisson, Remiro, Raba, Estupinan, Gimenez). One, Deportivo "Gimenez", is unique both ways but not independently confirmed.
+  - Tests: 68 pass, incl. both-ways ambiguity refusals.
+- **verify -- OWED, cheap:** `lineup_reach.py` on the next slate (10-17/18 European weekend). Sides at 11 should rise against 10-14's {11: 10, 10: 12}.
+- **Rollback:** revert f05b1632, ff. No restart.
