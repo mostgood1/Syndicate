@@ -576,7 +576,8 @@ once this index exists: re-splitting would orphan the parts.
 | [layer2-suggested-opps] | SUGGESTED OPPS -- a per-line bet flag on top of the full board; the paper book stakes only it `[2026-10-13, la | `state_layer2.md` |
 | [layer2-likelihood-shadow] | SHADOW LIKELIHOOD -- the measured under tilt stamped beside the fair on NBA and NCAAF prop rows; nothing consu | `state_layer2.md` |
 | [forward-inputs-mirror] | FORWARD-TEST QUOTE LOGS ARE MIRRORED OUT OF RETENTION'S REACH -- seeded by hand; the daily job is on the fleet | `state_layer2.md` |
-| [news-collectors] | FREE NEWS COLLECTORS (ESPN injuries NBA/NHL/NFL/WNBA, NBA referee crews, NHL officials + scratches) -- accurat | `state_layer2.md` |
+| [news-collectors] | FREE NEWS COLLECTORS (ESPN injuries NBA/NHL/NFL/WNBA/MLB, NBA referee crews, NHL officials + scratches) -- consum | `state_layer2.md` |
+| [cheat-sheets] | CHEAT SHEETS + PLAY CARDS -- served in the app, scheduled daily; 10-14 is BETA, 10-15 the first official day | `state_layer2.md` |
 | [segment-misgrade-regrade] | 53 OF 173 SETTLED SEGMENT ORDERS WERE GRADED AGAINST THE WRONG ACTUAL — 30.6%, AND THE ERRORS NEARLY CANCEL `[ | `state_ledger.md` |
 | [stale-test-triage] | "THE TEST IS STALE" IS A HYPOTHESIS, AND IT WAS WRONG FOR 4 OF 18 `[2026-09-05, lane stale-test-repair, commit | `state_ledger.md` |
 | [full-suite-completes] | THE FULL SUITE RAN TO COMPLETION FOR THE FIRST TIME -- 15,307 tests, 61m06s, and the 27 "NEW" failures are 6 p | `state_ledger.md` |

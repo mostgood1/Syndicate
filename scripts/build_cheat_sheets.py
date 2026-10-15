@@ -208,6 +208,9 @@ def _parse_ts(value: Any) -> datetime | None:
     return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
 
 
+STALE_LINE_MINUTES = 30
+
+
 def quote_rows(data_root: Path, sport: str, day: str, *, skip_events: set[str], now: datetime) -> list[dict[str, Any]]:
     """Board-shaped pregame prop rows REBUILT from the quote logs, for `day`'s games that have STARTED.
 
@@ -223,6 +226,7 @@ def quote_rows(data_root: Path, sport: str, day: str, *, skip_events: set[str], 
     npf = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(npf)
     latest: dict[tuple, tuple[datetime, dict[str, Any]]] = {}
+    book_last: dict[tuple, datetime] = {}
     games: dict[str, dict[str, Any]] = {}
     for q in npf.load_quotes(data_root, sport, day, day):
         if q.get("kind") != "prop" or str(q.get("segment") or "full") != "full" or not q.get("player_name"):
@@ -236,9 +240,16 @@ def quote_rows(data_root: Path, sport: str, day: str, *, skip_events: set[str], 
         key = (event, q.get("market"), q.get("player_name"), q.get("line"), q.get("bookmaker"), str(q.get("selection") or "").lower())
         if key not in latest or ts >= latest[key][0]:
             latest[key] = (ts, q)
+        book_key = (event, q.get("market"), q.get("player_name"), q.get("bookmaker"))
+        book_last[book_key] = max(book_last.get(book_key, ts), ts)
         games.setdefault(event, q)
     books: dict[tuple, dict[str, dict[str, float]]] = defaultdict(lambda: defaultdict(dict))
-    for (event, market, player, line, book, side), (_ts, q) in latest.items():
+    for (event, market, player, line, book, side), (ts, q) in latest.items():
+        # A book that MOVED its line leaves its old line's last quote in the log, and that stale price reads as a big
+        # "edge" (Snell K under 5.5 at +178 = +16%, 10-14). Keep a book's line only if it was quoted within
+        # STALE_LINE_MINUTES of that book's last update for the player + market -- the line it was still offering.
+        if ts < book_last[(event, market, player, book)] - timedelta(minutes=STALE_LINE_MINUTES):
+            continue
         books[(event, market, player, line)][book][side] = float(q["price"])
     rows = []
     for (event, market, player, line), by_book in books.items():

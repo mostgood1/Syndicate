@@ -30,6 +30,8 @@ K_IS_PROVISIONAL = True
 STREAK_RATE = 0.8              # "consistent": cleared the line in >= 80% of the last N
 STREAK_MIN_GAMES = 5
 VALUE_EV_PCT = 2.0             # the board's Suggested threshold
+SUSPECT_EV_PCT = 10.0          # above this an "edge" is a stale or mis-paired quote far more often than a price (the
+                               # board caps plausibility at 5.26%; play cards refuse above 10)
 ONE_SIDED_FAIR_METHODS = frozenset({"book_margin_model", "one_sided", "assumed_hold"})
 MODEL_LEAN_PP = 5.0            # model vs market gap worth showing
 
@@ -157,6 +159,9 @@ def price_check(row: Mapping[str, Any], form_values: Sequence[float] | None) -> 
         # was measured 8.5 pts overstated (findings_2026-09-21_layer2_score_outcomes.md). Never value; say why.
         verdict = "one_sided_fair"
         reasons.append("one-sided market: the fair price assumes a hold, so EV here is not comparable")
+    elif ev_m is not None and ev_m > SUSPECT_EV_PCT:
+        verdict = "suspect_price"
+        reasons.append(f"best price beats the fair by {ev_m:+.1f}% -- too big to trust: check the price is still up")
     elif ev_m is not None and ev_m >= VALUE_EV_PCT:
         verdict = "value"
         reasons.append(f"best price beats the fair by {ev_m:+.1f}%")

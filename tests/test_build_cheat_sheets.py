@@ -249,3 +249,31 @@ def test_one_sided_hot_form_gets_its_own_section_and_every_prop_is_listed():
     s = cs.sections([hot, cold, priced])
     assert s["hot_form"] == [0]                                  # only one-sided rows: a priced streak has its own section
     assert sorted(s["every_prop"]) == [0, 1, 2] and s["value"] == []
+
+
+def test_a_moved_line_does_not_leave_a_stale_price_behind(tmp_path):
+    m = _script()
+    from datetime import datetime, timezone
+
+    folder = tmp_path / "mlb_source" / "tracking" / "book_quotes"
+    folder.mkdir(parents=True)
+
+    def q(book, line, sel, price, t):
+        return {"kind": "prop", "segment": "full", "event_id": "g1", "market": "strikeouts", "player_name": "Blake Snell",
+                "line": line, "bookmaker": book, "selection": sel, "price": price, "captured_at": t,
+                "commence_time": "2026-10-15T00:10:00Z", "home_team": "Los Angeles Dodgers", "away_team": "Milwaukee Brewers"}
+
+    recs = [q("bk", 5.5, "over", -230, "2026-10-14T18:00:00Z"), q("bk", 5.5, "under", 178, "2026-10-14T18:00:00Z"),   # bk moved...
+            q("bk", 6.5, "over", -120, "2026-10-14T23:30:00Z"), q("bk", 6.5, "under", 100, "2026-10-14T23:30:00Z"),   # ...to 6.5
+            q("dk", 5.5, "over", -250, "2026-10-14T23:40:00Z"), q("dk", 5.5, "under", 190, "2026-10-14T23:40:00Z")]
+    (folder / "2026-10-14.jsonl").write_text("".join(json.dumps(r) + "\n" for r in recs), encoding="utf-8")
+    rows = m.quote_rows(tmp_path, "mlb", "2026-10-14", skip_events=set(), now=datetime(2026, 10, 15, 1, 0, tzinfo=timezone.utc))
+    under55 = next(r for r in rows if r["line"] == 5.5 and r["side"] == "under")
+    assert under55["quote"]["book_prices"] == {"dk": 190.0}                       # bk's abandoned 5.5 is gone
+    assert {r["line"] for r in rows} == {5.5, 6.5}
+
+
+def test_an_implausible_edge_is_a_price_to_check_not_value():
+    row = {"side": "under", "line": 5.5, "quote": {"price": 178, "fair_probability": 0.42, "fair_method": "consensus"}, "projection": {}}
+    check = cs.price_check(row, [])
+    assert check.ev_market > 10 and check.verdict == "suspect_price"

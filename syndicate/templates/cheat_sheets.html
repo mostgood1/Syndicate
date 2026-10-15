@@ -113,6 +113,7 @@ td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .chip.started { color: #ffbe3d; background: rgba(255,190,61,.13); }
 .chip.beta { color: #04110a; background: var(--accent2); vertical-align: 4px; }
 .chip.one_sided_fair { color: #c7b8ff; background: rgba(181,155,255,.14); }
+.chip.suspect_price { color: #ff8a7a; background: rgba(255,90,74,.14); }
 table.every td { vertical-align: middle; } .ep { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
 img.mini { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: #0f2233; } .bk { color: var(--muted); font-size: 12px; }
 .chip.phase { color: var(--accent2); background: rgba(31,168,255,.14); }
@@ -197,7 +198,7 @@ const MARKET_WORDS = {player_goal_scorer_anytime: "Anytime goalscorer", player_f
   player_assists: "Assists", player_to_receive_card: "To be carded", player_to_receive_red_card: "Red card"};
 const marketName = m => MARKET_WORDS[m] || String(m || "").replace(/^player_/, "").replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
 const betText = r => `${marketName(r.market)}${r.side && r.side !== "yes" ? " " + r.side : ""}${r.line != null ? " " + r.line : ""}`;
-const VERDICT = {value: "Value", streak_with_room: "Hot streak", streak_priced_in: "Hot streak", neutral: "Neutral", one_sided_fair: "One-sided price"};
+const VERDICT = {value: "Value", streak_with_room: "Hot streak", streak_priced_in: "Hot streak", neutral: "Neutral", one_sided_fair: "One-sided price", suspect_price: "Check price"};
 const STATE = {sport: null, game: null};
 
 function face(r) {
