@@ -49821,3 +49821,7 @@ The copy has no cache, `trust_env` off unless `STATSAPI_TRUST_ENV`, an (8 s, 8 s
   - The 10-16 entry (fetchedAt 16:03:25Z) predates the deploy.
 - A process-spawn watcher (17:11:03-18:01:52Z) saw no spawn: the MLB callers (`live_refresh_loop.py:2113/3224`) reach the adapter only intermittently, and the refresh landed 24 s after the watcher stopped.
   - Instrument note: a spawn watcher with a fixed window is the wrong instrument for a call gated by a TTL cache plus irregular callers. The cache stamp was the field to read.
+
+## 2026-10-15 18:05:28Z (1:05 PM CT) -- web ff 1973c1f1 -> 845f589d + `reload-web` (2.0 s, 0 failures): recent form says where once ("4 vs SF", not "4 v vs SF") (lane `cheat-sheets`, session 9e18a0e7) -- NO outage, no restart
+- **claim:** web by cheat-sheets token e2b7293a..., acquire exit 0. Ride-alongs: 1d248edd (`scripts/check_lane_claims.py` -- ledger tooling, never run by a service) + ledger commits.
+- **verify:** NFL + NCAAF sheets rebuilt 18:05Z on 845f589d (NFL 65 groups / 158 rows, NCAAF 44 / 102); the live NFL picks export reads "under 1.5 in 3 of 5 (newest first: 4 vs SF, 1 vs LAC, 5 @WAS, 1 @ARI, 0 vs NE)"; NHL labels keep their "v" (test).
