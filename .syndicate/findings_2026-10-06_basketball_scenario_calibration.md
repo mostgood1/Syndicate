@@ -2839,3 +2839,21 @@ postseason stratum.
 - No re-tuning after the read: a failure is a verdict, not a fitting signal.
 
 **Decision:** pass → the user decides production enablement. Fail → nothing ships, and the failing gate is the finding.
+
+**THE VALID READ — CO-SIGN (P3, at 9c445774, before anything VALID is read) + the G3 specification, verbatim in
+substance (P3 findings_2026-10-09 §13, 6741818e):**
+- **G3 (live)**: regular VALID 03-01..04-12, game-clustered paired bootstrap, FINAL − PROD.
+  - **PROD arm:** P3's `gate_v4_k0` native projections, the production recipe: v4 as-of inputs with #473 + the skip_def
+    file, native defaults, EXACT off, k = 0, no calibration files.
+  - **DISCLOSED:** P3 has already seen the PROD arm's VALID values once, in its §9 whole-season gate. The FINAL arm on
+    VALID is unseen.
+  - **FINAL arm:** `fit_f5_config.json` on inputs_p2, re-recorded for the VALID dates with this lane's walk-forward
+    VALID calibration files. Same seeds, 100 sims.
+  - **PASS needs both:**
+    - (a) pooled over end Q1/Q2/Q3: total |err|, margin |err| and ML log-loss, each with 95% CI upper < 0;
+    - (b) at 5:00 Q4: each of the three not worse (CI upper ≤ +0.05).
+    - The pooling and the Q4 carve-out come from the FIT pairing's SHAPE, not from VALID values.
+  - Reported once, not gated: P3's §12 rule on VALID (FINAL vs pregame_rate per checkpoint) and total bias.
+  - The postseason is a separate stratum, on the last regular-season calibration file (the same as this lane).
+- **Order:** this lane's DONE marker → P3 records the VALID inputs and fills its cache. No grade is computed by either
+  lane until this lane announces THE READ; then G1/G2/G4 here and G3 at P3 run in the same pass.
