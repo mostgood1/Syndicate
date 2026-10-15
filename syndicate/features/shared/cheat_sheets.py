@@ -387,13 +387,15 @@ def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25) -> dict[str, l
         # this stat for an over (toughest fifth for an under), most extreme first.
         "matchup_spots": sorted((i for i in idx if matchup_favors_side(rows[i]) or vs_opponent_strong(rows[i])),
                                 key=lambda i: _matchup_extremity(rows[i])),
+        # Player vs player (MLB: batter vs the probable starter, pitcher vs the opposing roster), biggest sample first.
+        "pvp": sorted((i for i in idx if _pvp_pa(rows[i]) >= PVP_MIN_PA), key=lambda i: -_pvp_pa(rows[i])),
         # Everything on the board, for a game's own sheet (the page shows it there only).
         "every_prop": sorted(idx, key=lambda i: (str(rows[i].get("market")), str(rows[i].get("player")),
                                                  rows[i].get("line") if isinstance(rows[i].get("line"), (int, float)) else 0,
                                                  str(rows[i].get("side"))))[:EVERY_PROP_CAP],
     }
     for key in ("value", "hot_streaks", "streaks_with_room", "streaks_priced_in", "hot_form", "consistency",
-                "matchup_spots", "shop_gaps"):
+                "matchup_spots", "shop_gaps", "pvp"):
         out[key] = _one_per_bet(rows, [i for i in out[key] if featurable(rows[i])])[:top]
     return out
 
@@ -476,6 +478,14 @@ def _matchup_extremity(row: Mapping[str, Any]) -> float:
         return 0.5                                   # a vs-opponent record alone sorts after the defensive extremes
     k, n = mu.get("nth_most") or 0, mu.get("of") or 1
     return k / n if str(row.get("side") or "").lower() in ("over", "yes") else (n - k + 1) / n
+
+
+PVP_MIN_PA = 3     # a batter-vs-pitcher line under 3 plate appearances is not shown as a matchup
+
+
+def _pvp_pa(row: Mapping[str, Any]) -> int:
+    line = ((row.get("pvp") or {}).get("line") or {})
+    return int(line.get("plateAppearances") or 0)
 
 
 def _form(row: Mapping[str, Any], key: str) -> Mapping[str, Any]:

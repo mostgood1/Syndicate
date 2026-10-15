@@ -351,7 +351,7 @@ news_root: Path | None = None
 
 def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, cap: int,
                 dvp: dict[str, Any], context: dict[str, Any] | None = None,
-                positions: dict[str, Any] | None = None) -> dict[str, Any]:
+                positions: dict[str, Any] | None = None, pvp_cache: Path | None = None) -> dict[str, Any]:
     from syndicate.features.shared.team_logos import logo_url
 
     t0 = time.time()
@@ -439,6 +439,18 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
                 "evidence_error": facts.get("error"),
                 "check": check.as_dict(),
             })
+    # Player vs player (user 2026-10-15: "add player vs player matchups like batter vs pitcher"): MLB batter vs the
+    # probable starter, pitcher vs the opposing roster -- StatsAPI, cached for the day on the data root.
+    if sport == "mlb" and out_rows and pvp_cache is not None:
+        from syndicate.features.mlb import batter_vs_pitcher as bvp
+
+        try:
+            pvp = bvp.matchups(out_rows, date=selected_date, api=bvp.StatsApi(pvp_cache))
+        except Exception as exc:  # noqa: BLE001 -- a missing matchup is a blank cell, never a failed sheet
+            print(f"CHEAT_SHEET mlb player-vs-player failed: {type(exc).__name__}: {exc}", flush=True)
+            pvp = {}
+        for r in out_rows:
+            r["pvp"] = pvp.get((bvp._norm(r.get("player")), str(r.get("market") or "").strip().lower()))
     for g in games.values():
         codes = sorted(g.pop("team_codes", set()))
         if sport == "nfl" and dvp.get("teams"):
@@ -569,7 +581,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"CHEAT_SHEET {sport} fetch failed: {type(exc).__name__}: {exc}", flush=True)
             continue
         sheet = build_sport(sport, rows, selected_date=selected, cap=args.cap or DEFAULT_CAPS.get(sport, 80), dvp=dvp,
-                            context=context, positions=positions)
+                            context=context, positions=positions,
+                            pvp_cache=data_root / "cheatsheets" / ".mlb_cache" / selected)
         sheet = merge_with_record(sheet, prior, now=datetime.now(timezone.utc))
         sheet["phase"] = season_phase(sport, selected)
         if not sheet["rows"] and not sheet.get("game_lines") and prior is None:
