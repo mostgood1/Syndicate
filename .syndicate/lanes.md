@@ -889,6 +889,14 @@ death, never life — do not invert it.
 - Verification: Served board after the refresh-worker restart and one cache warm: count segment game cards with team_recent by sport (was 0 outside NCAAF); a sample MLB first3 card's history matches StatsAPI linescores
 - Blocked by: none
 
+### soccer-single-name-starters — OPEN — opened 2026-10-15 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: Confirmed ESPN starters whose season row carries a single name (Understat 'Gabriel', 'Alisson', 'Remiro') resolve via a rule unique in BOTH directions (one free single-name row with the token, one unresolved starter containing it), measured offline on 10-09..10-12 under the production env with every new pairing hand-checked and none wrong
+- Files: syndicate/features/soccer/features/lineups.py (resolve_starter_ids single-name pass ONLY), tests/test_soccer_starter_name_match.py (single-name tests ONLY)
+- Hypothesis: 12 of the 82 unresolved starters are single-name rows on the same team (2026-10-15 sizing)
+- Falsification test: the rule recovers fewer than 8 of the 12, or any pairing is wrong on a hand check
+- Verification: offline before/after with the production env; hand-check list; tests incl. both-ways ambiguity refusal and off != on
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
