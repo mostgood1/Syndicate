@@ -2763,3 +2763,10 @@ Against `fit_f3` (the #3 config). Team-game rows are for games without OT (1,510
 2. Walk-forward calibration files for the VALID dates (2026-03-01..04-12).
 3. Pre-register the VALID read itself against the lane goal's gates (quarter/half margin + total Brier vs book,
    live-interval replay Brier, player minutes / prop MAE, each clearing its own SE vs production).
+
+**P3 §7c on the FINAL config: HOLDS.**
+- The FIT-optimal end-game p is still (0.2, 0.2, 0.3). Last-2:00 points error −0.00 / +0.31 / −0.01 (n 157 / 108 / 123).
+- **Δ″ = 0.262 stands; no re-measure.**
+- Trailer FTA after 2:00 is still low (sim 3.55 / 3.71 / 4.04 vs real 4.76 / 5.25 / 4.52). A read-only residual.
+- P3's live re-gate (§12) on fit_f5 is in progress. P3 flags that the REB −1.4 residual may read slightly low on live
+  remaining points (via offensive-rebound continuation).
