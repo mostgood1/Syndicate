@@ -235,7 +235,12 @@ def test_no_league_is_served_by_two_sources():
     """
     asa = {"mls"}
     understat = set(UNDERSTAT_LEAGUES)
-    espn = set(LEAGUE_ESPN_SLUGS) - asa - understat
+    # The UEFA cups have an ESPN slug for fixtures but NO player source: no model,
+    # so `_soccer_players_step` never fetches for them (lane soccer-uefa-competitions).
+    from syndicate.features.soccer.sources import UEFA_COMPETITIONS
+
+    no_players = set(UEFA_COMPETITIONS)
+    espn = set(LEAGUE_ESPN_SLUGS) - asa - understat - no_players
 
     assert asa & understat == set()
     assert asa & espn == set()
@@ -244,4 +249,4 @@ def test_no_league_is_served_by_two_sources():
         "a league moved between sources -- re-check that its players_*.csv files "
         "are all from ONE source before shipping"
     )
-    assert asa | understat | espn == set(LEAGUE_ESPN_SLUGS)
+    assert asa | understat | espn | no_players == set(LEAGUE_ESPN_SLUGS)

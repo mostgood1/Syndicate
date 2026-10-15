@@ -697,6 +697,9 @@ def test_soccer_discovery_registers_game_lines_and_refuses_what_we_cannot_price(
         "KXLALIGAGAME": "soccer",
         "KXLALIGATOTAL": "soccer",
         "KXLALIGASPREAD": "soccer",
+        # A UEFA game line registers since 2026-10-15 (lane
+        # `soccer-uefa-competitions`): the board carries UCL game odds now.
+        "KXUCL1HTOTAL": "soccer",
     }
     assert auto_series_from_catalogue(titles) == {"KXLALIGAGOAL": "soccer"}
 
