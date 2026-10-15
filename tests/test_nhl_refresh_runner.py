@@ -47,7 +47,7 @@ class NhlRefreshRunnerTests(unittest.TestCase):
                 "--artifact-root",
                 str(Path(tmp_dir) / "bundle"),
             ]
-            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_source_generation_multi", return_value=None), patch.object(module, "_missing_required_artifacts", return_value=[]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch("sys.argv", argv):
+            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_missing_required_artifacts", return_value=[]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch("sys.argv", argv):
                 rc = module.main()
 
         self.assertEqual(rc, 0)
@@ -65,7 +65,7 @@ class NhlRefreshRunnerTests(unittest.TestCase):
                 str(Path(tmp_dir) / "bundle"),
             ]
             stdout = io.StringIO()
-            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=lambda **kwargs: None), patch.object(module, "_run_source_generation_multi", return_value=None), patch.object(module, "_missing_required_artifacts", return_value=["data/processed/props_predictions_2026-05-22.csv"]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch("sys.argv", argv), patch("sys.stdout", stdout):
+            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=lambda **kwargs: None), patch.object(module, "_missing_required_artifacts", return_value=["data/processed/props_predictions_2026-05-22.csv"]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch("sys.argv", argv), patch("sys.stdout", stdout):
                 rc = module.main()
 
         self.assertEqual(rc, 0)
@@ -193,7 +193,7 @@ class NhlRefreshRunnerTests(unittest.TestCase):
                 "--artifact-root",
                 str(artifact_root),
             ]
-            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_source_generation_multi", return_value=None), patch.object(module, "_missing_required_artifacts", return_value=[]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch("sys.argv", argv):
+            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_missing_required_artifacts", return_value=[]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)
@@ -224,7 +224,7 @@ class NhlRefreshRunnerTests(unittest.TestCase):
                 "--mode",
                 "fast",
             ]
-            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_source_generation_multi", side_effect=AssertionError("source generation should not run in fast mode")), patch.object(module, "_materialize_artifact_bundle", side_effect=AssertionError("full bundle materialization should not run in fast mode")), patch.object(module, "_missing_required_artifacts", return_value=[]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch.object(module, "_write_smart_sim_bundle", side_effect=AssertionError("smart sim bundle should not run in fast mode")), patch("sys.argv", argv):
+            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_materialize_artifact_bundle", side_effect=AssertionError("full bundle materialization should not run in fast mode")), patch.object(module, "_missing_required_artifacts", return_value=[]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch.object(module, "_write_smart_sim_bundle", side_effect=AssertionError("smart sim bundle should not run in fast mode")), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)
@@ -271,3 +271,22 @@ class NhlMarketIdTests(unittest.TestCase):
 
             scoreboard_frame = pd.read_csv(scoreboard_path)
             self.assertEqual(scoreboard_frame.loc[0, "market_id"], "NHL:2026-05-22:TOR@COL:scoreboard:game:5")
+
+
+def test_the_vendored_nhl_cli_launcher_is_gone():
+    """Lane nhl-refresh-dead-vendored-cli (2026-10-15): the vendored `nhl_betting.cli` subprocess was retired in the Phase 5
+    cutover (`source_root` is always None), and its launcher sat in the script unreachable. Removed, not stubbed."""
+    import ast as _ast
+
+    import importlib.util as _ilu
+
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "refresh_nhl_oddsapi.py"
+    spec = _ilu.spec_from_file_location("test_refresh_nhl_oddsapi_dead_cli", script_path)
+    module = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    for name in ("_source_python_executable", "_default_source_root", "_source_data_root", "_run_source_cli",
+                 "_run_source_generation", "_run_source_generation_multi", "_pushd"):
+        assert not hasattr(module, name), name
+    tree = _ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+    strings = {n.value for n in _ast.walk(tree) if isinstance(n, _ast.Constant) and isinstance(n.value, str)}
+    assert "nhl_betting.cli" not in strings and "nhl_betting_repo" not in strings

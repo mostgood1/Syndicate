@@ -7,9 +7,7 @@ import json
 import os
 import shutil
 import sys
-import subprocess
 import pandas as pd
-from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -141,98 +139,9 @@ def _collect_owned_nhl_artifacts(*, artifact_root: Path, date_str: str, team_mar
     return copied
 
 
-def _source_python_executable(source_root: Path) -> str:
-    override = str(os.environ.get("SYNDICATE_PYTHON_EXE") or "").strip()
-    if override and Path(override).exists() and "windowsapps" not in override.lower():
-        return override
-    if sys.executable and Path(sys.executable).exists() and "windowsapps" not in str(sys.executable).lower():
-        return sys.executable
-    for installed in (
-        Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python311" / "python.exe",
-        Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python311-arm64" / "python.exe",
-    ):
-        if installed.exists():
-            return str(installed)
-    candidate = source_root / ".venv" / "Scripts" / "python.exe"
-    if candidate.exists():
-        return str(candidate)
-    return sys.executable
-
-
-def _default_source_root() -> Path | None:
-    candidate = REPO_ROOT / "vendor" / "nhl_betting_repo"
-    cli_path = candidate / "nhl_betting" / "cli.py"
-    if cli_path.exists() and cli_path.is_file():
-        return candidate
-    return None
-
-
-def _source_data_root(source_root: Path) -> Path:
-    return source_root / "data"
-
-
-def _run_source_cli(*, source_root: Path, artifact_root: Path, command_args: list[str]) -> None:
-    env = os.environ.copy()
-    data_dir = _source_data_root(source_root)
-    data_dir.mkdir(parents=True, exist_ok=True)
-    env["NHL_DATA_DIR"] = str(data_dir)
-    env["DATA_DIR"] = str(data_dir)
-    print(json.dumps({"phase": "source_cli", "command": command_args}))
-    completed = subprocess.run(
-        [_source_python_executable(source_root), "-m", "nhl_betting.cli", *command_args],
-        cwd=str(source_root),
-        env=env,
-        capture_output=True,
-        text=True,
-    )
-    if completed.returncode != 0:
-        raise RuntimeError(
-            f"Source NHL CLI failed for {' '.join(command_args)} with exit code {completed.returncode}: {completed.stderr.strip() or completed.stdout.strip()}"
-        )
-
-
-def _run_source_generation(*, source_root: Path, artifact_root: Path, date_str: str, props_boxscore_n_sims: int) -> None:
-    _run_source_generation_multi(source_root=source_root, artifact_root=artifact_root, date_str=date_str, props_boxscore_n_sims=props_boxscore_n_sims, days_ahead=0)
-
-
 def _date_window(*, date_str: str, days_ahead: int) -> list[str]:
     parsed = datetime.strptime(date_str, "%Y-%m-%d").date()
     return [(parsed + timedelta(days=offset)).isoformat() for offset in range(0, max(0, int(days_ahead)) + 1)]
-
-
-def _run_source_generation_multi(*, source_root: Path, artifact_root: Path, date_str: str, props_boxscore_n_sims: int, days_ahead: int) -> None:
-    target_dates = _date_window(date_str=date_str, days_ahead=days_ahead)
-    for index, target_date in enumerate(target_dates):
-        pregame_batches = [
-            ["roster-update", "--date", target_date],
-            ["lineup-update", "--date", target_date, "--prefer-source", "none"],
-            ["team-odds-collect", "--date", target_date],
-            ["props-collect", "--date", target_date],
-            ["props-project-all", "--date", target_date],
-        ]
-        if index == 0:
-            pregame_batches.insert(2, ["shifts-update", "--date", target_date])
-            pregame_batches.insert(3, ["injury-update", "--date", target_date])
-        for command_args in pregame_batches:
-            _run_source_cli(source_root=source_root, artifact_root=artifact_root, command_args=command_args)
-        if index == 0:
-            for command_args in (
-                ["props-simulate-boxscores", "--date", target_date, "--n-sims", str(int(props_boxscore_n_sims))],
-                ["props-recommendations-boxscores", "--date", target_date],
-                ["props-recommendations", "--date", target_date, "--min-ev", "0.0", "--top", "200"],
-                ["game-recommendations-sim", "--date", target_date],
-            ):
-                _run_source_cli(source_root=source_root, artifact_root=artifact_root, command_args=command_args)
-
-
-@contextmanager
-def _pushd(path: Path):
-    previous = Path.cwd()
-    os.chdir(path)
-    try:
-        yield
-    finally:
-        os.chdir(previous)
 
 
 def _materialize_artifact_bundle(*, source_root: Path | None, artifact_root: Path, date_str: str) -> dict[str, object]:
