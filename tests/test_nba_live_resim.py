@@ -392,13 +392,15 @@ def test_live_resume_uses_the_pregame_engine_object_including_the_473_no_stack(m
     seen = {}
     real = bps._engine_for_league_local
 
-    def spy(code):
-        eng = real(code)
+    def spy(code, overrides=None):
+        eng = real(code, overrides)
         seen["params"] = eng.params
+        seen["overrides"] = overrides
         return eng
     monkeypatch.setattr(bps, "_engine_for_league_local", spy)
     lr.resim_live_game(_kwargs(), None, sims=100, base_seed=1)
     assert seen["params"].team_prior_stacks_on_target is False
+    assert seen["overrides"] is None  # no nba_engine_config.json on these inputs: today's engine
     monkeypatch.setenv("SYNDICATE_NBA_TEAM_INPUTS", "0")
     bps._ENGINES_LOCAL.clear()
     assert lr.resume_engine_label() == "nba:stack=cfg"  # off: the league defers to the config (which stacks)
@@ -432,3 +434,47 @@ def test_ncaab_halves_end_regulation_after_period_two():
     g = Game("ncaab", state="in")
     g.shot(1, "15:00", "home", "h1").end_period(2)  # end of the 2nd half, home up 2: decided, not "go to period 3"
     assert lr.resume_from_summary(g.summary(), league="ncaab") == lr.NbaResimRefusal("regulation_over")
+
+
+# ------------------------------------------------------------------------------------------- nba_engine_config.json
+
+def _configured_cfg(tmp_path):
+    import json as _json
+
+    from syndicate.features.shared import basketball_props_smart_sim as bps
+
+    (tmp_path / bps.NBA_ENGINE_CONFIG_FILE_LOCAL).write_text(_json.dumps({
+        "enabled": True, "event_sim_config": {"score_effect_k": 0.002, "fouler_per_minute": True},
+        "league_params": {"exact_target_calibration": True}}), encoding="utf-8")
+    base = bps._build_smart_sim_config_local(n_sims=2, seed=1, use_pbp=True, roster_mode="pregame")
+    return bps._apply_nba_engine_config_local(base, processed_root=tmp_path, league_code="nba").event_cfg
+
+
+def test_a_configured_cfg_persists_and_the_resume_picks_the_same_engine(tmp_path):
+    """The production configured cfg is a runtime class pickle cannot find; it must still persist (silently losing
+    every game's live inputs was the failure), come back as the engine's EventSimConfig with its fields, and steer
+    the resume to the overridden engine."""
+    from syndicate.features.shared.basketball_props_smart_sim import _engine_for_league_local
+
+    cfg = _configured_cfg(tmp_path / "proc" if (tmp_path / "proc").mkdir() is None else tmp_path)
+    kw = {**{k: None for k in lr._INPUT_KEYS}, **_kwargs(), "cfg": cfg}
+    lr.persist_engine_inputs("2026-01-15", "GSW", "NYK", kw, root=tmp_path)
+    back = lr.load_engine_inputs("2026-01-15", "GSW", "NYK", root=tmp_path)
+    assert not isinstance(back, lr.NbaResimRefusal)
+    assert back["cfg"].score_effect_k == 0.002 and back["cfg"].fouler_per_minute is True
+    ov = lr.league_params_overrides_of(back)
+    assert ov == (("exact_target_calibration", True),)
+    assert _engine_for_league_local("nba", ov).params.exact_target_calibration is True
+    assert ":lp=" in lr.resume_engine_label("nba", ov)
+    # live mechanisms rebuild the cfg; the engine choice survives it
+    assert lr.league_params_overrides_of(lr.with_live_mechanisms(back, {"score_effect_k": 0.0})) == ov
+
+
+def test_a_plain_cfg_is_still_pickled_as_the_object_itself(tmp_path):
+    import pickle as _pickle
+
+    kw = {**{k: None for k in lr._INPUT_KEYS}, **_kwargs()}
+    path = lr.persist_engine_inputs("2026-01-15", "GSW", "NYK", kw, root=tmp_path)
+    raw = _pickle.loads(path.read_bytes())["kwargs"]["cfg"]
+    assert type(raw) is type(kw["cfg"])  # today's production bytes: no field encoding
+    assert lr.league_params_overrides_of(lr.load_engine_inputs("2026-01-15", "GSW", "NYK", root=tmp_path)) is None

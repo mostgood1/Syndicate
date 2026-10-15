@@ -283,12 +283,62 @@ def persist_engine_inputs(date: str, home: str, away: str, kwargs: Mapping[str, 
     path = engine_inputs_path(date, home, away, root=root, league=league)
     path.parent.mkdir(parents=True, exist_ok=True)
     body = {k: kwargs[k] for k in _INPUT_KEYS if k in kwargs}
+    if "cfg" in body:
+        body["cfg"] = _encode_cfg(body["cfg"])
     tmp = path.with_suffix(".tmp")
     with tmp.open("wb") as fh:
         pickle.dump({"schema": ENGINE_INPUTS_SCHEMA, "league": str(league).lower(), "date": str(date), "home": str(home).upper(),
                      "away": str(away).upper(), "written_at": _utc_now_iso(), "kwargs": body}, fh, protocol=4)
     tmp.replace(path)
     return path
+
+
+# THE CONFIGURED CFG IS NOT PICKLABLE AS AN OBJECT. With `nba_engine_config.json` enabled, the production pregame
+# cfg is an instance of a class built at runtime (`_apply_nba_engine_config_local` -> make_dataclass), which pickle
+# cannot find by name: measured 2026-10-15, PicklingError "attribute lookup EventSimConfigLocalNbaConfigured on types
+# failed". The persist hook swallows errors, so every game would have lost its live inputs SILENTLY the day the file
+# went on. A cfg that pickles is stored as before (today's production: unchanged bytes); one that does not is stored
+# as its plain field values and rebuilt on load as the engine's own EventSimConfig, carrying
+# `league_params_overrides` so the resume picks the same engine the pregame call did.
+_CFG_FIELDS_TAG = "__nba_cfg_fields__"
+
+
+def _encode_cfg(cfg: Any) -> Any:
+    if cfg is None:
+        return None
+    try:
+        pickle.dumps(cfg, protocol=4)
+        return cfg
+    except Exception:  # noqa: BLE001 -- only an unpicklable cfg takes the field path
+        import dataclasses
+
+        if not dataclasses.is_dataclass(cfg):
+            raise
+        return {_CFG_FIELDS_TAG: {f.name: getattr(cfg, f.name) for f in dataclasses.fields(cfg)}}
+
+
+def decode_inputs(kw: Mapping[str, Any]) -> dict[str, Any]:
+    """Persisted kwargs -> engine kwargs: a field-encoded cfg is rebuilt as the engine's EventSimConfig (unknown
+    fields dropped), with `league_params_overrides` set on it. Anything else is returned unchanged."""
+    out = dict(kw)
+    cfg = out.get("cfg")
+    if isinstance(cfg, Mapping) and _CFG_FIELDS_TAG in cfg:
+        from dataclasses import fields as _fields
+
+        from syndicate.features.basketball_engine.engine import EventSimConfig
+
+        vals = dict(cfg[_CFG_FIELDS_TAG])
+        names = {f.name for f in _fields(EventSimConfig)}
+        rebuilt = EventSimConfig(**{k: v for k, v in vals.items() if k in names})
+        object.__setattr__(rebuilt, "league_params_overrides", vals.get("league_params_overrides"))
+        out["cfg"] = rebuilt
+    return out
+
+
+def league_params_overrides_of(inputs: Mapping[str, Any]) -> Optional[tuple]:
+    """The LeagueParams overrides the pregame call ran with (nba_engine_config.json), else None."""
+    ov = getattr(inputs.get("cfg"), "league_params_overrides", None)
+    return tuple(ov) if ov else None
 
 
 def load_engine_inputs(date: str, home: str, away: str, *, root: Optional[Path] = None, league: str = LEAGUE):
@@ -304,7 +354,7 @@ def load_engine_inputs(date: str, home: str, away: str, *, root: Optional[Path] 
     missing = [k for k in _INPUT_KEYS if not isinstance(kw, Mapping) or k not in kw]
     if missing:
         return NbaResimRefusal("pregame_inputs_incomplete", ",".join(missing))
-    return dict(kw)
+    return decode_inputs(kw)
 
 
 # ------------------------------------------------------------------------------------------- names
@@ -397,18 +447,26 @@ def with_live_mechanisms(inputs: Mapping[str, Any], mechanisms: Mapping[str, Any
     base = inputs.get("cfg")
     names = {f.name for f in _fields(EventSimConfig)}
     vals = {f.name: getattr(base, f.name) for f in (_fields(base) if base is not None else ()) if f.name in names}
-    return {**dict(inputs), "cfg": EventSimConfig(**{**vals, **dict(mechanisms)})}
+    cfg = EventSimConfig(**{**vals, **dict(mechanisms)})
+    ov = getattr(base, "league_params_overrides", None)
+    if ov:  # keep the pregame engine choice (nba_engine_config.json) through the rebuild
+        object.__setattr__(cfg, "league_params_overrides", ov)
+    return {**dict(inputs), "cfg": cfg}
 
 
-def resume_engine_label(league: str = LEAGUE) -> str:
-    """Which engine a live resume runs: the league plus the #473 no-stack switch, for the lane's audit trail."""
+def resume_engine_label(league: str = LEAGUE, overrides: Optional[tuple] = None) -> str:
+    """Which engine a live resume runs: the league, the #473 no-stack switch and, when nba_engine_config.json set
+    LeagueParams overrides on the pregame call, a short digest of them -- the lane's audit trail."""
     try:
         from syndicate.features.shared.basketball_props_smart_sim import _engine_for_league_local
 
-        params = _engine_for_league_local(league).params
+        params = _engine_for_league_local(league, overrides).params
         value = getattr(params, "team_prior_stacks_on_target", None)
         # None = the league defers to the config's own `team_prior_stacks_on_target` (vendored default: stack).
-        return f"{params.code}:stack={'cfg' if value is None else bool(value)}"
+        label = f"{params.code}:stack={'cfg' if value is None else bool(value)}"
+        if overrides:
+            label += f":lp={zlib.crc32(repr(tuple(overrides)).encode('utf-8')) & 0xFFFFFFFF:08x}"
+        return label
     except Exception as exc:  # noqa: BLE001
         return f"unknown:{type(exc).__name__}"
 
@@ -435,7 +493,9 @@ def resim_live_game(inputs: Mapping[str, Any], game_state: Any, *, sims: int = D
         # process env, so both workers must carry the same value; `resumeEngine` on the lane records which ran.
         from syndicate.features.shared.basketball_props_smart_sim import _engine_for_league_local
 
-        engine = _engine_for_league_local(league)
+        # The SAME engine the pregame call picked: nba_engine_config.json's LeagueParams overrides ride on the cfg
+        # (`_call_native_engine_local` does exactly this). None = today's engine.
+        engine = _engine_for_league_local(league, league_params_overrides_of(inputs))
 
         def simulate(rng, gs):  # noqa: E306
             return engine.simulate_pbp_game_boxscore(rng=rng, **dict(inputs), state=gs)
@@ -751,7 +811,7 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         gs, match = map_state_names(gs, inputs["home_players"], inputs["away_players"])
         mechanisms = live_mechanisms_from_env()
         inputs = with_live_mechanisms(inputs, mechanisms)
-        match = {**match, "mechanisms": sorted(mechanisms), "resumeEngine": resume_engine_label(league)}
+        match = {**match, "mechanisms": sorted(mechanisms), "resumeEngine": resume_engine_label(league, league_params_overrides_of(inputs))}
         if clock() >= deadline:
             games.append(_lane_row(event_id, home, away, facts, NbaResimRefusal("budget_exhausted", "before_start"),
                                    league=league))

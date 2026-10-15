@@ -956,7 +956,7 @@ class NativeResimProjector:
             return Projection(refusal=resumed.reason)
         _state, gs, facts = resumed
         with path.open("rb") as fh:
-            inputs = dict(pickle.load(fh)["kwargs"])
+            inputs = lr.decode_inputs(pickle.load(fh)["kwargs"])
         gs, _match = lr.map_state_names(gs, inputs["home_players"], inputs["away_players"])
         inputs = lr.with_live_mechanisms(inputs, self.mechanisms)
         res = lr.resim_live_game(inputs, gs, sims=self.sims, base_seed=lr.stable_seed(facts.event_id, facts.last_seq))

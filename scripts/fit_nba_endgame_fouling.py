@@ -79,7 +79,7 @@ def run(args: argparse.Namespace) -> int:
                 counts["skip_margin_outside_1_10"] = counts.get("skip_margin_outside_1_10", 0) + 1
                 continue
             with path.open("rb") as f:
-                inputs = dict(pickle.load(f)["kwargs"])
+                inputs = lr.decode_inputs(pickle.load(f)["kwargs"])
             gs, _m = lr.map_state_names(gs, inputs["home_players"], inputs["away_players"])
             q4_at = gs.home_period_pts[3] + gs.away_period_pts[3]
             real_pts = sum(g.period_points[3]) - q4_at
