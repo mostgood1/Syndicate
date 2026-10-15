@@ -33,6 +33,14 @@ if str(REPO_ROOT) not in sys.path:
 from syndicate.features.shared import cheat_sheets as cs  # noqa: E402
 
 DEFAULT_CAPS = {"nfl": 150, "ncaaf": 80, "soccer": 120, "nhl": 30, "nba": 150, "wnba": 80, "ncaab": 80, "mlb": 100}
+# Regular-season windows (US Central dates). A sport outside its window gets no sheet: preseason and playoff games
+# are different populations, and a sheet's form and model read the regular season (learnings: season-phase models).
+# Sports not listed (soccer: domestic leagues all year) are never gated. Extend each season here.
+REGULAR_SEASONS = {
+    "nfl": ("2026-09-10", "2027-01-10"), "ncaaf": ("2026-08-29", "2026-12-12"), "nhl": ("2026-10-06", "2027-04-17"),
+    "nba": ("2026-10-20", "2027-04-11"), "ncaab": ("2026-11-02", "2027-03-15"), "wnba": ("2027-05-14", "2027-09-12"),
+    "mlb": ("2027-03-25", "2027-09-26"),
+}
 NFL_DVP_STAT = {
     "Receiving Yards": "rec_yds", "Receptions": "receptions", "Rushing Yards": "rush_yds",
     "Rushing Attempts": "carries", "Passing Yards": "pass_yds", "Passing TDs": "pass_td",
@@ -43,6 +51,11 @@ NFL_DVP_STAT = {
 
 def central_today() -> str:
     return (datetime.now(timezone.utc) - timedelta(hours=5)).date().isoformat()
+
+
+def in_season(sport: str, day: str) -> bool:
+    window = REGULAR_SEASONS.get(sport)
+    return window is None or window[0] <= day <= window[1]
 
 
 def kickoff_ct(commence: Any) -> str | None:
@@ -107,6 +120,13 @@ def player_identity(row: dict[str, Any], *, sport: str, team: Any, pos: Any, con
         ident = {}
     out["headshot_url"] = ident.get("headshot_url")
     side = ident.get("player_side")
+    if side not in ("home", "away") and team:
+        # The evidence layer's team ("Sam Houston") is the short name of one side ("Sam Houston State Bearkats"):
+        # match it by logo, else as the unique side whose name starts with it.
+        mine = logo_url(sport, team)
+        hits = [s for s in ("home", "away") if (mine and mine == logo_url(sport, row.get(f"{s}_team"), row.get(f"{s}_key")))
+                or ph._norm(row.get(f"{s}_team")).startswith(ph._norm(team))]
+        side = hits[0] if len(hits) == 1 else None
     out["player_side"] = side
     if side in ("home", "away"):
         other = "away" if side == "home" else "home"
@@ -310,7 +330,7 @@ def write_atomic(path: Path, doc: dict[str, Any]) -> None:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-root", default=os.environ.get("SYNDICATE_DATA_ROOT") or "")
-    ap.add_argument("--sports", default="nfl,ncaaf,nhl,soccer,nba,wnba,ncaab")
+    ap.add_argument("--sports", default="nfl,ncaaf,nhl,soccer,nba,ncaab,wnba,mlb")
     ap.add_argument("--date", default=None, help="selected date (default: today, US Central)")
     ap.add_argument("--base-url", default=os.environ.get("SYNDICATE_BASE_URL") or "http://127.0.0.1:10000")
     ap.add_argument("--cap", type=int, default=None, help="override the per-sport group cap")
@@ -332,6 +352,9 @@ def main(argv: list[str] | None = None) -> int:
     global news_root
     news_root = data_root if (data_root / "news").is_dir() else None
     for sport in [s.strip() for s in args.sports.split(",") if s.strip()]:
+        if not in_season(sport, selected):
+            print(f"CHEAT_SHEET {sport} date={selected} outside its regular season {REGULAR_SEASONS[sport]} -- skipped", flush=True)
+            continue
         try:
             rows = fetch_rows(args.base_url, sport)
         except Exception as exc:  # noqa: BLE001

@@ -150,3 +150,25 @@ def test_identity_fills_team_logo_position_and_headshot_without_overriding_the_e
     monkeypatch.setattr(layer2_row_context, "row_identity", boom)
     bare = m.player_identity(row, sport="nhl", team=None, pos=None, context={}, positions=positions)
     assert bare["headshot_url"] is None and bare["team_logo"] is None and bare["pos"] == "F"   # unknown side: no crest
+
+
+def test_sports_get_sheets_only_inside_their_regular_season():
+    m = _script()
+    assert m.in_season("nba", "2026-10-20") and not m.in_season("nba", "2026-10-14")       # preseason: no sheet
+    assert not m.in_season("ncaab", "2026-11-01") and m.in_season("ncaab", "2026-11-02")
+    assert not m.in_season("mlb", "2026-10-14") and not m.in_season("wnba", "2026-10-14")   # postseason / offseason
+    assert m.in_season("nfl", "2026-10-14") and m.in_season("soccer", "2026-07-01")         # soccer is never gated
+
+
+def test_a_short_team_name_from_the_evidence_finds_its_side(monkeypatch):
+    m = _script()
+    from syndicate.features.shared import layer2_row_context, team_logos
+
+    monkeypatch.setattr(layer2_row_context, "row_identity", lambda row, ctx: {"headshot_url": None})   # no side known
+    logos = {"Sam Houston State Bearkats": "shsu.png", "Western Kentucky Hilltoppers": "wku.png"}
+    monkeypatch.setattr(team_logos, "logo_url", lambda sport, *names: logos.get(names[0]))
+    row = {"player_name": "Hunter Watson", "home_team": "Sam Houston State Bearkats", "away_team": "Western Kentucky Hilltoppers"}
+    got = m.player_identity(row, sport="ncaaf", team="Sam Houston", pos="QB", context={}, positions={})
+    assert got["team_logo"] == "shsu.png" and got["opponent_logo"] == "wku.png" and got["team"] == "Sam Houston"
+    nope = m.player_identity(row, sport="ncaaf", team="Houston", pos="QB", context={}, positions={})
+    assert nope["team_logo"] is None                                       # "Houston" is neither side: no crest
