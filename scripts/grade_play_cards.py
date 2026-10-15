@@ -117,6 +117,13 @@ def match_key(sport: Any, market: Any, player: Any, side: Any, line: Any) -> tup
             None if line in (None, "") else float(line))
 
 
+def _pick_key(player: Any, market: Any, side: Any, line: Any, segment: Any, event_id: Any) -> str:
+    from syndicate.features.shared.cheat_sheets import pick_result_key
+
+    return pick_result_key({"player_name": player, "market": market, "side": side, "line": line,
+                            "segment": segment or "full", "event_id": event_id})
+
+
 def results_for(cards: list[dict[str, Any]], *, work: Path) -> dict[str, dict[str, Any]]:
     """card_id -> {y, units} through production's grader, one pull per date."""
     srb = _load("score_ranking_backtest")
@@ -135,12 +142,22 @@ def results_for(cards: list[dict[str, Any]], *, work: Path) -> dict[str, dict[st
         graded_path = work / f"graded_{date}.jsonl"
         srb.main(["pull", "--start", date, "--end", date, "--sports", sports, "--source", "recorder", "--out", str(graded_path)])
         index: dict[tuple, dict[str, Any]] = {}
+        by_pick: dict[str, dict[str, Any]] = {}
         for line in graded_path.read_text(encoding="utf-8").splitlines() if graded_path.is_file() else []:
             g = json.loads(line)
-            if str(g.get("segment") or "full") == "full" and g.get("y") is not None:
+            if g.get("y") is None:
+                continue
+            # A Syndicate pick (2026-10-15) can be a game line or a segment: it grades on ITS key, segment included.
+            by_pick.setdefault(_pick_key(g.get("player"), g.get("market"), g.get("side"), g.get("line"), g.get("segment"),
+                                         str(g.get("game") or "").split("|", 1)[-1]), g)
+            if str(g.get("segment") or "full") == "full":
                 index[match_key(g.get("sport"), g.get("market"), g.get("player"), g.get("side"), g.get("line"))] = g
         for c in group:
-            g = index.get(match_key(c["sport"], c["market"], c["player"], c["side"], c["line"]))
+            if c.get("pick_id"):
+                g = by_pick.get(_pick_key(c.get("player"), c.get("market"), c.get("side"), c.get("line"), c.get("segment"),
+                                          c.get("event_id")))
+            else:
+                g = index.get(match_key(c["sport"], c["market"], c["player"], c["side"], c["line"]))
             if g is None or c["card_id"] in out:
                 continue
             y = float(g["y"])

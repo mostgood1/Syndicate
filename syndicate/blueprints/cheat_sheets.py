@@ -34,7 +34,7 @@ cheat_sheets_bp = Blueprint("cheat_sheets", __name__)
 
 _DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _SPORT = re.compile(r"^[a-z]{2,8}$")
-_CARD = re.compile(r"^[0-9a-f]{12}$")
+_CARD = re.compile(r"^(?:[0-9a-f]{12}|l2_[0-9a-f]{8,40})$")   # a row's card id, or a Syndicate pick's board pick_id
 TEMPLATE = Path(__file__).resolve().parents[1] / "templates" / "cheat_sheets.html"
 LOGO_SRC = "/static/brand/syndicate_roi_badge.webp"
 
@@ -129,7 +129,7 @@ def cheat_sheets_page():
         have = _dates(sport)
         dates.update(have)
         doc = _read(sport, day) if day in have else None
-        if doc and (doc.get("rows") or doc.get("game_lines")):
+        if doc and (doc.get("rows") or doc.get("game_lines") or doc.get("picks")):
             sheets.append(doc)
     try:
         template = TEMPLATE.read_text(encoding="utf-8")
@@ -177,12 +177,16 @@ def cheat_sheets_record_page():
 
 
 def _card_row(sport: str, day: str, card: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None, str]:
-    """(row, game, reason) -- the sheet row whose card id this is, re-derived from the sheet (never the client)."""
+    """(row, game, reason) -- the sheet row (or Syndicate pick) whose card id this is, re-derived from the sheet (never
+    the client). A pick is returned with `pick_id` set; its game is None and the sheet rides along as `_sheet`."""
     if not _SPORT.match(sport) or not _DAY.match(day) or not _CARD.match(card):
         return None, None, "bad request"
     doc = _read(sport, day)
     if doc is None:
         return None, None, "no sheet for that sport and day"
+    for p in doc.get("picks") or []:
+        if p.get("pick_id") == card:
+            return dict(p, _sheet=doc), None, ""
     for r in doc.get("rows") or []:
         if pc.card_id(sport, day, r) == card:
             if not pc.eligible(r):
@@ -202,14 +206,26 @@ def _local_images(row: dict[str, Any], game: dict[str, Any] | None) -> tuple[dic
     return row, game
 
 
+def _fields(row: dict[str, Any], game: dict[str, Any] | None, *, sport: str, day: str, number: int) -> dict[str, Any]:
+    """The card for a sheet row, or for a Syndicate pick (the board's suggested opp, 2026-10-15)."""
+    if row.get("pick_id"):
+        sheet = row.pop("_sheet", {}) or {}
+        pick = dict(row, headshot_url=row.get("headshot_card_src") or row.get("headshot_src") or row.get("headshot_url"),
+                    team_logo=row.get("team_logo_src") or row.get("team_logo"),
+                    home_logo=row.get("home_logo_src") or row.get("home_logo"), away_logo=row.get("away_logo_src") or row.get("away_logo"))
+        values, labels = pc.pick_form(sheet, pick) if pick.get("kind") == "prop" else ([], [])
+        return pc.pick_card_fields(pick, sport=sport, date=day, number=number, form_values=values, form_labels=labels)
+    row, game = _local_images(row, game)
+    return pc.card_fields(row, sport=sport, date=day, number=number, game=game)
+
+
 @cheat_sheets_bp.get("/cheatsheets/card/<sport>/<day>/<card>")
 def cheat_sheet_card(sport: str, day: str, card: str):
     row, game, reason = _card_row(sport, day, card)
     if row is None:
         return jsonify({"ok": False, "error": reason}), 404
-    row, game = _local_images(row, game)
     number = pc.card_number(pc.read_ledger(pc.ledger_path(_data_root())), day, card)
-    fields = pc.card_fields(row, sport=sport, date=day, number=number, game=game)
+    fields = _fields(row, game, sport=sport, day=day, number=number)
     html = pc.render_card(fields, LOGO_SRC)
     back = f"/cheatsheets?{'date=' + day + '&' if day != _today() else ''}sport={sport}"
     toolbar = _CARD_TOOLBAR.replace("__SPORT__", sport).replace("__DAY__", day).replace("__CARD__", card) \
@@ -226,7 +242,7 @@ def cheat_sheet_card_logged():
         return jsonify({"ok": False, "error": reason}), 404
     path = pc.ledger_path(_data_root())
     number = pc.card_number(pc.read_ledger(path), day, card)
-    fields = pc.card_fields(row, sport=sport, date=day, number=number, game=game)
+    fields = _fields(row, game, sport=sport, day=day, number=number)
     record = pc.ledger_record(fields, row, sport=sport, generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                               source="exported")
     added = pc.append_ledger(path, [record])

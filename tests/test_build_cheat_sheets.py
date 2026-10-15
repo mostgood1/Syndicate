@@ -442,3 +442,49 @@ def test_the_old_streak_note_is_reworded_on_published_rows_and_nothing_else_move
     assert rows[0]["check"]["reasons"][0] == "4/5 on this line; form alone says +3.0% vs the price, but streaks like this have run below the fair price"
     assert rows[0]["check"]["price"] == -150 and rows[1]["check"]["reasons"] == ["best price beats the fair by +2.4%"]
     assert cs.reword_streak_reasons(rows) == 0                                    # a second pass changes nothing
+
+
+def _card(pick_id, *, sport="mlb", event="e7", market="h2h", side="away", line=None, segment="full", books=5,
+          suggested=True, state="pregame", day="2026-10-15", score=1.0, player=None, lane="opportunity"):
+    return {"pick_id": pick_id, "kind": "prop" if player else "game", "sport": sport, "event_id": event, "market": market,
+            "side": side, "line": line, "segment": segment, "suggested": suggested, "market_state": state, "game_date": day,
+            "board_score": score, "board_lane": lane, "player_name": player, "display_name": player or "Milwaukee Brewers",
+            "matchup": "Milwaukee Brewers @ Los Angeles Dodgers", "home_team": "Los Angeles Dodgers", "away_team": "Milwaukee Brewers",
+            "odds": 138, "quote": {"bookmaker": "betrivers", "books_quoting": books, "fair_probability": 0.437},
+            "fair_price": 129, "ev_pct": 3.9, "model_probability": 0.51, "detail": "Our sim has it.", "commence_time": "2026-10-16T00:00:00Z"}
+
+
+def test_picks_are_the_boards_suggested_main_line_pregame_opps_for_the_day():
+    # User 2026-10-15: "there are 7 suggested opps on the main layer2 board these need to translate ... as picks to
+    # promote". The board's own rules: suggested, pregame, the opportunity lane, MAIN lines only (`isAltLine`).
+    cards = [
+        _card("l2_main", market="totals", side="over", line=8.5, books=9, score=3.0),
+        _card("l2_alt", market="totals", side="over", line=7.5, books=4, score=5.0),     # not the group's most-quoted line
+        _card("l2_altmkt", market="totals_alt", side="over", line=5.5, score=4.0),        # an explicit alt market
+        _card("l2_seg", market="h2h", segment="first3", score=2.0),                       # a segment pick stays
+        _card("l2_live", state="live", score=9.0), _card("l2_tomorrow", day="2026-10-16", score=9.0),
+        _card("l2_plain", suggested=False, score=9.0), _card("l2_other", sport="nhl", score=9.0),
+        _card("l2_watch", lane="watchlist", score=9.0),
+        _card("l2_unsug", market="totals", side="over", line=9.5, books=2, suggested=False),
+    ]
+    assert [c["pick_id"] for c in cs.select_picks(cards, sport="mlb", day="2026-10-15")] == ["l2_main", "l2_seg"]
+    assert cs.is_alt_line(cards[1], cs.alt_primaries(cards)) and not cs.is_alt_line(cards[0], cs.alt_primaries(cards))
+
+
+def test_a_pick_reads_like_the_board_and_keeps_its_first_price_on_the_record():
+    m = _script()
+    from datetime import datetime, timezone
+    now = datetime(2026, 10, 15, 14, 0, tzinfo=timezone.utc)
+    sheet = {"rows": [{"player": "Griffin Jax", "market": "strikeouts", "side": "over", "line": 3.5, "team": "TB", "pos": "P",
+                       "team_logo": "tb.svg", "headshot_url": "row.png"}]}
+    cards = [_card("l2_seg", segment="first3", score=2.0) | {"segment_label": "1st 3 innings"},
+             _card("l2_jax", player="Griffin Jax", market="strikeouts", side="over", line=3.5, score=1.0)
+             | {"headshot_url": "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/643377/headshot/67/current"}]
+    picks = m.build_picks(cards, sheet, sport="mlb", day="2026-10-15", now=now)
+    assert [p["bet"] for p in picks] == ["Milwaukee Brewers moneyline · 1st 3 innings", "Over 3.5 strikeouts"]
+    assert picks[0]["price"] == 138 and picks[0]["book"] == "betrivers" and picks[0]["p_market"] == 0.437
+    assert picks[1]["team"] == "TB" and picks[1]["pos"] == "P" and "/w_360," in picks[1]["headshot_url"]
+    later = [dict(picks[0], price=150, promoted_at="later")]                        # the board's price moved
+    merged = m.merge_picks(later, {"picks": picks})
+    assert [p["pick_id"] for p in merged] == ["l2_seg", "l2_jax"] and merged[0]["price"] == 138   # first price kept; Jax stays
+    assert cs.pick_result_key(picks[0]).endswith("|first3") and cs.pick_result_key(picks[1]).startswith("p:")

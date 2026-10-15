@@ -664,6 +664,120 @@ def result_for(price: Any, graded: Mapping[str, Any] | None) -> dict[str, Any] |
     return out
 
 
+# --------------------------------------------------------------------------------------------------------------------
+# Syndicate picks: the Layer 2 board's SUGGESTED opps, promoted on the sheet (user 2026-10-15: "there are 7 suggested
+# opps on the main layer2 board these need to translate somehow into the cheatsheet section - potentially as picks to
+# promote"; "add the suggested opps as a picks section with pick graphics"). The source is the board's own cards
+# (`/api/intelligence/query` -> response.board_contract.cards), so a pick reads exactly as it does on the board,
+# including its written case (`detail`). The board's default view is the rule: suggested, pregame, the opportunity
+# lane, MAIN lines only -- `is_alt_line` below is a port of the board's `isAltLine` (templates/intelligence.html).
+# --------------------------------------------------------------------------------------------------------------------
+
+
+def _alt_group(card: Mapping[str, Any]) -> str:
+    return "|".join((str(card.get("event_id") or ""), str(card.get("market") or "").strip().lower(),
+                     str(card.get("segment") or "full"), str(card.get("player_name") or "")))
+
+
+def _num(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def alt_primaries(cards: Iterable[Mapping[str, Any]]) -> dict[str, float]:
+    """(event, market, segment, player) -> its PRIMARY line: most books quoting, ties to the line nearest the group
+    median, then the lower line -- the board's own rule, over every card on the board."""
+    groups: dict[str, dict[float, int]] = {}
+    for c in cards:
+        line = _num(c.get("line"))
+        if line is None:
+            continue
+        books = int(_num(((c.get("quote") or {}).get("books_quoting")) or c.get("books_quoting")) or 0)
+        g = groups.setdefault(_alt_group(c), {})
+        g[line] = max(g.get(line, 0), books)
+    out = {}
+    for key, by_line in groups.items():
+        lines = sorted(by_line)
+        if len(lines) <= 1:
+            continue
+        median = lines[len(lines) // 2]
+        out[key] = min(lines, key=lambda ln: (-by_line[ln], abs(ln - median), ln))
+    return out
+
+
+def is_alt_line(card: Mapping[str, Any], primaries: Mapping[str, float]) -> bool:
+    if str(card.get("market") or "").strip().lower().endswith("_alt"):
+        return True
+    key = _alt_group(card)
+    line = _num(card.get("line"))
+    return key in primaries and line is not None and line != primaries[key]
+
+
+def _card_day(card: Mapping[str, Any]) -> str:
+    return str(card.get("game_date") or card.get("source_board_date") or "")[:10]
+
+
+def select_picks(cards: Sequence[Mapping[str, Any]], *, sport: str, day: str) -> list[Mapping[str, Any]]:
+    """The board's suggested, pregame, main-line opportunities for this sport's games on `day`, best score first."""
+    primaries = alt_primaries(cards)
+    chosen = [c for c in cards
+              if c.get("suggested") and str(c.get("sport") or "").lower() == sport and _card_day(c) == day
+              and str(c.get("market_state") or c.get("lane") or "").lower() == "pregame"
+              and str(c.get("board_lane") or "opportunity") == "opportunity" and not is_alt_line(c, primaries)]
+    return sorted(chosen, key=lambda c: -(_num(c.get("board_score") or c.get("score")) or 0))
+
+
+_LINE_WORDS = {"h2h": "Moneyline", "h2h_3_way": "Moneyline (3-way)", "spreads": "Spread", "totals": "Total"}
+
+
+def pick_bet_text(pick: Mapping[str, Any]) -> str:
+    """'Over 3.5 strikeouts' / 'Milwaukee Brewers moneyline · 1st 3 innings' / 'New York Knicks -5.5'."""
+    side, line, market = str(pick.get("side") or ""), pick.get("line"), str(pick.get("market") or "")
+    seg = f" · {pick['segment_label']}" if pick.get("segment_label") else ""
+    if pick.get("kind") == "prop":
+        words = market.replace("player_", "").replace("batter_", "").replace("pitcher_", "").replace("_", " ")
+        return f"{side.title()} {line:g} {words}{seg}" if isinstance(line, (int, float)) else f"{side.title()} {words}{seg}"
+    if market in ("totals", "totals_alt"):
+        return f"{side.title()} {line:g}{seg}" if isinstance(line, (int, float)) else f"{side.title()}{seg}"
+    if market in ("spreads", "spreads_alt") and isinstance(line, (int, float)):
+        return f"{pick.get('display_name')} {line:+g}{seg}"
+    if side == "draw":
+        return f"Draw{seg}"
+    return f"{pick.get('display_name')} {_LINE_WORDS.get(market, market).lower()}{seg}"
+
+
+def pick_record(card: Mapping[str, Any], *, promoted_at: str) -> dict[str, Any]:
+    """The slim pick the sheet keeps -- frozen at the price it was PROMOTED at, like every row of a day's record."""
+    quote = card.get("quote") or {}
+    out = {
+        "pick_id": card.get("pick_id"), "kind": card.get("kind"), "sport": card.get("sport"), "event_id": card.get("event_id"),
+        "matchup": card.get("matchup"), "home_team": card.get("home_team"), "away_team": card.get("away_team"),
+        "player_name": card.get("player_name"), "display_name": card.get("display_name"), "market": card.get("market"),
+        "side": card.get("side"), "line": card.get("line"), "segment": card.get("segment") or "full",
+        "segment_label": card.get("segment_label"), "price": card.get("odds"), "book": quote.get("bookmaker"),
+        "books": quote.get("books_quoting"), "fair_price": card.get("fair_price"), "p_market": quote.get("fair_probability"),
+        "p_model": card.get("model_probability"), "ev_pct": card.get("ev_pct"), "sim_view": card.get("sim_view"),
+        "projected": card.get("projected"), "detail": card.get("detail"), "headshot_url": card.get("headshot_url"),
+        "commence_time": card.get("commence_time"), "board_score": card.get("board_score"), "promoted_at": promoted_at,
+    }
+    out["bet"] = pick_bet_text(out)
+    return out
+
+
+def pick_result_key(pick: Mapping[str, Any]) -> str:
+    """A pick's key in the reconciled file -- the grader's own fields WITH the segment (a pick can be a 1st-3-innings
+    moneyline): props by player, game picks by event."""
+    seg = str(pick.get("segment") or "full").lower()
+    if seg == "full_game":
+        seg = "full"
+    if pick.get("player_name") or pick.get("player"):
+        return "p:" + prop_result_key({"player": pick.get("player_name") or pick.get("player"), "market": pick.get("market"),
+                                       "side": pick.get("side"), "line": pick.get("line")}) + "|" + seg
+    return "l:" + line_result_key(pick) + "|" + seg
+
+
 def void_label(reason: Any) -> str:
     """The grader's reason a bet carries no result, in words a reader can check (user 2026-10-15: "some of the
     section reconciles are missing" -- a bare dash said nothing)."""
@@ -722,6 +836,14 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
             lines = [dict(line, result=result_for((line.get("check") or {}).get("price"), graded_lines.get(line_result_key(line))))
                      for line in lines]
             doc["reconciled"] = {k: rec.get(k) for k in ("reconciled_at", "source", "counts")}
+        picks = [dict(p) for p in sheet.get("picks") or []]
+        if rec is not None:
+            graded_picks, pick_void = rec.get("picks") or {}, rec.get("picks_void") or {}
+            for p in picks:
+                p["result"] = result_for(p.get("price"), graded_picks.get(pick_result_key(p)))
+                if p["result"] is None and pick_result_key(p) in pick_void:
+                    p["result_note"] = void_label(pick_void[pick_result_key(p)])
+        doc["picks"] = picks
         lines_by_game: dict[Any, list[int]] = {}
         for i, line in enumerate(lines):
             lines_by_game.setdefault(line.get("event_id"), []).append(i)

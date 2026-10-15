@@ -186,3 +186,23 @@ def test_a_reconciled_day_serves_each_bets_result_and_the_toggle(http):
     assert data["rows"][1]["result"] is None and data["reconciled"]["counts"]["props_graded"] == 1
     assert 'id="viewbar"' in page and 'data-view="reconciled"' in page and "function applyResults" in page
     assert _js(page, "META")["dates"] == ["2026-10-14", "2026-10-13"]                       # the results file is not a date
+
+
+def test_a_syndicate_pick_gets_a_pick_graphic_and_a_picks_only_sheet_is_served(http):
+    # User 2026-10-15: "add the suggested opps as a picks section with pick graphics".
+    client, root = http
+    pick = {"pick_id": "l2_129acb8c9c927fb9", "kind": "game", "sport": "nba", "event_id": "e9", "matchup": "Toronto Raptors @ New York Knicks",
+            "display_name": "New York Knicks", "market": "spreads", "side": "home", "line": -5.5, "segment": "full", "price": 107,
+            "book": "betrivers", "books": 2, "fair_price": 100, "p_market": 0.5, "p_model": 0.479, "ev_pct": 3.5,
+            "detail": "Our sim has New York Knicks -5.5 at 47.9%; the no-vig market across 2 books says 50.0%. Season metrics: Net rating NYK +4.0.",
+            "bet": "New York Knicks -5.5", "commence_time": "2026-10-14T23:30:00Z"}
+    _write(root, {"sport": "nba", "date": TODAY, "generated_at": "2026-10-14T13:30:00Z", "rows": [], "games": [], "picks": [pick], "picks_only": True})
+    page = client.get("/cheatsheets").get_data(as_text=True)
+    assert _js(page, "DATA")["nba"]["picks"][0]["bet"] == "New York Knicks -5.5" and "function picksBlock" in page
+    card = client.get(f"/cheatsheets/card/nba/{TODAY}/l2_129acb8c9c927fb9")
+    assert card.status_code == 200
+    html = card.get_data(as_text=True)
+    assert "NEW YORK KNICKS -5.5" in html and "Sim vs market" in html and "Season metrics: Net rating NYK +4.0." in html
+    assert "Our sim has New York Knicks" not in html.split("Why we like it", 1)[1].split("</ul>", 1)[0]   # never the reason
+    assert "Only 2 books quote it" in html
+    assert client.get(f"/cheatsheets/card/nba/{TODAY}/l2_ffffffffffffffff").status_code == 404

@@ -109,8 +109,14 @@ def featured_bets(sheet: Mapping[str, Any], reconciled: Mapping[str, Any]) -> li
     props = reconciled.get("props") or {}
     secs = cs.sections(rows)
     out = []
+    pick_results = reconciled.get("picks") or {}
+    for pk in sheet.get("picks") or []:                         # the Syndicate picks: the board's suggested opps
+        res = cs.result_for(pk.get("price"), pick_results.get(cs.pick_result_key(pk)))
+        if res is not None and res.get("y") in (0.0, 1.0):
+            out.append({"section": "picks", "sport": sheet.get("sport"), "date": sheet.get("date"), "price": pk.get("price"),
+                        "ev": pk.get("ev_pct"), "y": res["y"], "units": res["units"] or 0.0})
     for key, _label in csr.FEATURED:
-        if key == "lines_value":
+        if key in ("lines_value", "picks"):
             continue
         for i in secs.get(key) or []:
             r = rows[i]

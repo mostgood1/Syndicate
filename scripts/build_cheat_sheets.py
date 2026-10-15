@@ -588,7 +588,56 @@ IMAGE_FIELDS = (
     ("rows", (("headshot_url", "headshot_src", 96), ("headshot_url", "headshot_card_src", 260),
               ("team_logo", "team_logo_src", 96), ("opponent_logo", "opponent_logo_src", 96))),
     ("games", (("home_logo", "home_logo_src", 96), ("away_logo", "away_logo_src", 96))),
+    ("picks", (("headshot_url", "headshot_src", 96), ("headshot_url", "headshot_card_src", 260),
+               ("team_logo", "team_logo_src", 96), ("home_logo", "home_logo_src", 96), ("away_logo", "away_logo_src", 96))),
 )
+
+
+def fetch_board_cards(base_url: str) -> list[dict[str, Any]]:
+    """The Layer 2 board's own cards -- the request the board page makes (templates/intelligence.html,
+    `intelligenceQueryPayload`) -- so a promoted pick is exactly what the board shows, with its written case."""
+    body = {"question": "top edges today", "mode": "recommendation", "timing": "all", "background": False,
+            "force_refresh": False, "slim_aliases": False, "drop_row_diagnostics": True}
+    req = urllib.request.Request(f"{base_url}/api/intelligence/query", data=json.dumps(body).encode("utf-8"),
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=300) as resp:
+        doc = json.load(resp)
+    cards = (((doc.get("response") or {}).get("board_contract") or {}).get("cards")) or []
+    return [c for c in cards if isinstance(c, dict)]
+
+
+def build_picks(cards: list[dict[str, Any]], sheet: dict[str, Any], *, sport: str, day: str, now: datetime) -> list[dict[str, Any]]:
+    """The board's suggested opps for this sport's games on `day` (user 2026-10-15: "add the suggested opps as a picks
+    section with pick graphics"), each with its crests and, for a prop the sheet also prices, the sheet row's team."""
+    from syndicate.features.shared.team_logos import logo_url
+
+    rows_by_key = {cs.prop_result_key(r): r for r in sheet.get("rows") or []}
+    out = []
+    for card in cs.select_picks(cards, sport=sport, day=day):
+        pick = cs.pick_record(card, promoted_at=now.isoformat(timespec="seconds"))
+        pick["home_logo"], pick["away_logo"] = logo_url(sport, pick.get("home_team")), logo_url(sport, pick.get("away_team"))
+        if pick.get("kind") == "prop":
+            row = rows_by_key.get(cs.prop_result_key({"player": pick["player_name"], "market": pick["market"],
+                                                      "side": pick["side"], "line": pick["line"]}))
+            if row:
+                pick.update({"team": row.get("team"), "pos": row.get("pos"), "team_logo": row.get("team_logo"),
+                             "headshot_url": pick.get("headshot_url") or row.get("headshot_url"), "card_row": True})
+        else:
+            pick["team_logo"] = logo_url(sport, pick.get("display_name"))
+        if "mlbstatic.com" in str(pick.get("headshot_url") or "") and "/w_180," in pick["headshot_url"]:
+            pick["headshot_url"] = pick["headshot_url"].replace("/w_180,", "/w_360,")
+        pick["kickoff_ct"] = kickoff_ct(pick.get("commence_time"))
+        out.append(pick)
+    return out
+
+
+def merge_picks(fresh: list[dict[str, Any]], prior: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """A day's picks are a RECORD: one promoted earlier keeps its first price and stays when the board drops it later
+    (its line moved, its game started); a new one joins. Board score order, earliest promotions first on ties."""
+    kept = {p.get("pick_id"): p for p in (prior or {}).get("picks") or [] if p.get("pick_id")}
+    for p in fresh:
+        kept.setdefault(p.get("pick_id"), p)
+    return sorted(kept.values(), key=lambda p: (-(p.get("board_score") or 0), str(p.get("promoted_at"))))
 
 
 def attach_images(sheet: dict[str, Any], cache: Path) -> dict[str, int]:
@@ -681,11 +730,32 @@ def main(argv: list[str] | None = None) -> int:
         positions = {}
     global news_root
     news_root = data_root if (data_root / "news").is_dir() else None
+    try:
+        board_cards = fetch_board_cards(args.base_url)
+    except Exception as exc:  # noqa: BLE001 -- no picks this run; every sheet still builds
+        print(f"CHEAT_SHEET board cards unavailable: {type(exc).__name__}: {exc}", flush=True)
+        board_cards = []
     for sport in [s.strip() for s in args.sports.split(",") if s.strip()]:
-        if not in_season(sport, selected):
-            print(f"CHEAT_SHEET {sport} date={selected} not in its regular season or postseason -- skipped", flush=True)
-            continue
         target = data_root / "cheatsheets" / sport / f"{selected}.json"
+        if not in_season(sport, selected):
+            # The sheet's sections wait for the regular season, but the board's suggested picks do not: a sport the
+            # board promotes today gets a picks-only sheet (2026-10-15: a preseason NBA spread was one of the board's 7).
+            if not cs.select_picks(board_cards, sport=sport, day=selected):
+                print(f"CHEAT_SHEET {sport} date={selected} not in its regular season or postseason -- skipped", flush=True)
+                continue
+            try:
+                prior = json.loads(target.read_text(encoding="utf-8")) if target.is_file() else None
+            except (OSError, ValueError):
+                prior = None
+            sheet = build_sport(sport, [], selected_date=selected, cap=1, dvp=dvp, context=context, positions=positions)
+            sheet["picks"] = merge_picks(build_picks(board_cards, sheet, sport=sport, day=selected,
+                                                     now=datetime.now(timezone.utc)), prior)
+            sheet["phase"] = season_phase(sport, selected) or "preseason"
+            sheet["picks_only"] = True
+            attach_images(sheet, data_root / "cheatsheets" / ".img_cache")
+            write_atomic(target, sheet)
+            print(f"CHEAT_SHEET {sport} date={selected} picks-only sheet: {len(sheet['picks'])} picks", flush=True)
+            continue
         try:
             prior = json.loads(target.read_text(encoding="utf-8")) if target.is_file() else None
         except (OSError, ValueError):
@@ -703,11 +773,16 @@ def main(argv: list[str] | None = None) -> int:
                             context=context, positions=positions,
                             pvp_cache=data_root / "cheatsheets" / f".{sport}_cache" / selected)
         sheet = merge_with_record(sheet, prior, now=datetime.now(timezone.utc))
+        try:
+            sheet["picks"] = merge_picks(build_picks(board_cards, sheet, sport=sport, day=selected, now=datetime.now(timezone.utc)), prior)
+        except Exception as exc:  # noqa: BLE001 -- a missing picks section is a gap, never a failed sheet
+            print(f"CHEAT_SHEET {sport} picks failed: {type(exc).__name__}: {exc}", flush=True)
+            sheet["picks"] = list((prior or {}).get("picks") or [])
         if sport in IDENTITY_SPORTS and sheet.get("rows"):   # after the merge, so a kept row gets its face too
             filled = fill_identity(sport, sheet["rows"], selected, data_root / "cheatsheets" / f".{sport}_cache" / selected)
             print(f"CHEAT_SHEET {sport} identity filled {filled}", flush=True)
         sheet["phase"] = season_phase(sport, selected)
-        if not sheet["rows"] and not sheet.get("game_lines") and prior is None:
+        if not sheet["rows"] and not sheet.get("game_lines") and not sheet.get("picks") and prior is None:
             print(f"CHEAT_SHEET {sport} date={selected} no {selected} games with pregame props -- nothing written", flush=True)
             continue
         images = attach_images(sheet, data_root / "cheatsheets" / ".img_cache")
@@ -715,7 +790,7 @@ def main(argv: list[str] | None = None) -> int:
         counts = {k: len(v) for k, v in sheet["sections"].items()}
         have = {k: sum(1 for r in sheet["rows"] if r.get(k)) for k in ("team", "pos", "headshot_url", "team_logo")}
         print(f"CHEAT_SHEET {sport} date={selected} groups={sheet['groups_built']}/{sheet['groups_on_board']} "
-              f"rows={len(sheet['rows'])} frozen={sheet.get('rows_frozen', 0)} sections={counts} identity={have} "
+              f"rows={len(sheet['rows'])} frozen={sheet.get('rows_frozen', 0)} picks={len(sheet.get('picks') or [])} sections={counts} identity={have} "
               f"images={images} secs={sheet['build_seconds']}", flush=True)
     return 0
 

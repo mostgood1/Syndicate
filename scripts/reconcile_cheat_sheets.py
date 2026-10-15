@@ -52,10 +52,9 @@ def central_today() -> str:
 
 
 def _key_of(shaped: Mapping[str, Any]) -> str:
-    if shaped.get("player_name"):
-        return "p:" + cs.prop_result_key({"player": shaped.get("player_name"), "market": shaped.get("market"),
-                                          "side": shaped.get("side"), "line": shaped.get("line")})
-    return "l:" + cs.line_result_key(shaped)
+    """ONE key for every graded thing -- props, game lines and Syndicate picks, segment included (a pick can be a
+    1st-3-innings moneyline): `cheat_sheets.pick_result_key`."""
+    return cs.pick_result_key(shaped)
 
 
 class ValueTap:
@@ -226,24 +225,34 @@ def _with_value(graded: dict[str, Any], key: str, values: Mapping[str, Any]) -> 
     return {**graded, "v": tapped["v"]} if tapped else graded
 
 
+def _graded_shape(g: Mapping[str, Any]) -> dict[str, Any]:
+    """A graded population row in a pick's shape (its event id rides in `game`, 'sport|event')."""
+    return {"player_name": g.get("player"), "market": g.get("market"), "side": g.get("side"), "line": g.get("line"),
+            "segment": g.get("segment") or "full", "event_id": str(g.get("game") or "").split("|", 1)[-1]}
+
+
 def graded_index(rows: list[dict[str, Any]], values: Mapping[str, Any] | None = None
-                 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
-    """Graded population rows -> (props by prop key, lines by line key); full game only, graded only. `values`
-    (a `ValueTap`'s) adds the number each was graded on as `v`."""
+                 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    """Graded population rows -> (props by prop key, lines by line key -- both FULL GAME --, and every segment by
+    pick key for the Syndicate picks). `values` (a `ValueTap`'s) adds the number each was graded on as `v`."""
     values = values or {}
     props: dict[str, dict[str, Any]] = {}
     lines: dict[str, dict[str, Any]] = {}
+    picks: dict[str, dict[str, Any]] = {}
     for g in rows:
-        if str(g.get("segment") or "full") not in ("full", "full_game") or g.get("y") is None:
+        if g.get("y") is None:
+            continue
+        shape = _graded_shape(g)
+        key = cs.pick_result_key(shape)
+        entry = _with_value({"y": float(g["y"])}, key, values)
+        picks.setdefault(key, entry)
+        if str(shape["segment"]).lower() not in ("full", "full_game"):
             continue
         if g.get("player"):
-            key = cs.prop_result_key(g)
-            props.setdefault(key, _with_value({"y": float(g["y"])}, "p:" + key, values))
+            props.setdefault(cs.prop_result_key(g), entry)
         else:
-            event = str(g.get("game") or "").split("|", 1)[-1]
-            key = cs.line_result_key({**g, "event_id": event})
-            lines.setdefault(key, _with_value({"y": float(g["y"])}, "l:" + key, values))
-    return props, lines
+            lines.setdefault(cs.line_result_key(shape), entry)
+    return props, lines, picks
 
 
 def merge_results(prior: Mapping[str, Any], fresh: Mapping[str, Any]) -> dict[str, Any]:
@@ -256,22 +265,31 @@ def merge_results(prior: Mapping[str, Any], fresh: Mapping[str, Any]) -> dict[st
 
 
 def reconcile(sheet: dict[str, Any], props: dict[str, Any], lines: dict[str, Any], *, now: datetime,
-              reasons: Mapping[str, str] | None = None, scores: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    """The reconciled file for one sheet: the result of every prop and game line the grader settled, why each one it
-    did NOT settle was left (`void`: did not play, push, not final ...), and each game's final score (`scores`)."""
+              reasons: Mapping[str, str] | None = None, scores: Mapping[str, Any] | None = None,
+              picks: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """The reconciled file for one sheet: the result of every prop, game line and Syndicate pick the grader settled,
+    why each one it did NOT settle was left (`void` / `picks_void`: did not play, push, not final ...), and each
+    game's final score (`scores`). `reasons` is keyed by `pick_result_key`."""
     p_out = {k: props[k] for k in (cs.prop_result_key(r) for r in sheet.get("rows") or []) if k in props}
     l_out = {k: lines[k] for k in (cs.line_result_key(g) for g in sheet.get("game_lines") or []) if k in lines}
-    reasons, scores = reasons or {}, scores or {}
-    void = {k: reasons["p:" + k] for k in (cs.prop_result_key(r) for r in sheet.get("rows") or [])
-            if k not in p_out and "p:" + k in reasons}
-    events = {str(g.get("event_id")) for g in sheet.get("games") or []} | {str(r.get("event_id")) for r in sheet.get("rows") or []}
+    reasons, scores, picks = reasons or {}, scores or {}, picks or {}
+    void = {}
+    for r in sheet.get("rows") or []:
+        k, rk = cs.prop_result_key(r), cs.pick_result_key(r)
+        if k not in p_out and rk in reasons:
+            void[k] = reasons[rk]
+    pick_keys = [cs.pick_result_key(pk) for pk in sheet.get("picks") or []]
+    k_out = {k: picks[k] for k in pick_keys if k in picks}
+    k_void = {k: reasons[k] for k in pick_keys if k not in k_out and k in reasons}
+    events = ({str(g.get("event_id")) for g in sheet.get("games") or []} | {str(r.get("event_id")) for r in sheet.get("rows") or []}
+              | {str(pk.get("event_id")) for pk in sheet.get("picks") or []})
     return {"sport": sheet.get("sport"), "date": sheet.get("date"), "reconciled_at": now.isoformat(timespec="seconds"),
-            "source": SOURCE, "props": p_out, "lines": l_out, "void": void,
+            "source": SOURCE, "props": p_out, "lines": l_out, "void": void, "picks": k_out, "picks_void": k_void,
             "scores": {e: scores[e] for e in sorted(events) if e in scores},
             "counts": {"props": len({cs.prop_result_key(r) for r in sheet.get("rows") or []}), "props_graded": len(p_out),
                        "props_valued": sum(1 for v in p_out.values() if "v" in v),
                        "lines": len({cs.line_result_key(g) for g in sheet.get("game_lines") or []}),
-                       "lines_graded": len(l_out)}}
+                       "lines_graded": len(l_out), "picks": len(set(pick_keys)), "picks_graded": len(k_out)}}
 
 
 def write_record(sheets_dir: Path, *, now: datetime) -> dict[str, Any]:
@@ -354,7 +372,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"RECONCILE date={day} grader pull failed (exit {code}) -- nothing written", flush=True)
                 continue
             graded = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
-        props, lines = graded_index(graded, tap.values)
+        props, lines, pick_results = graded_index(graded, tap.values)
         now = datetime.now(timezone.utc)
         for path, doc in sheets:
             target = path.with_name(f"{day}.reconciled.json")
@@ -363,11 +381,13 @@ def main(argv: list[str] | None = None) -> int:
             except (OSError, ValueError):
                 prior = {}
             # A settled result never changes, so an earlier run's results stay when a re-run grades fewer.
+            # Earlier runs' reasons: `void` is keyed by prop key (full game), `picks_void` already by pick key.
+            earlier = {**{f"p:{k}|full": v for k, v in (prior.get("void") or {}).items()}, **(prior.get("picks_void") or {})}
             rec = reconcile(doc, merge_results(prior.get("props") or {}, props), merge_results(prior.get("lines") or {}, lines),
-                            now=now, reasons={**{"p:" + k: v for k, v in (prior.get("void") or {}).items()}, **tap.reasons},
-                            scores={**(prior.get("scores") or {}), **tap.scores})
+                            now=now, reasons={**earlier, **tap.reasons}, scores={**(prior.get("scores") or {}), **tap.scores},
+                            picks=merge_results(prior.get("picks") or {}, pick_results))
             c = rec["counts"]
-            if not prior and not (c["props_graded"] or c["lines_graded"]):
+            if not prior and not (c["props_graded"] or c["lines_graded"] or c["picks_graded"]):
                 # Nothing final yet: no file, so the page offers no toggle onto a sheet of dashes.
                 print(f"RECONCILE {doc['sport']} date={day} nothing settled yet -- no file", flush=True)
                 continue

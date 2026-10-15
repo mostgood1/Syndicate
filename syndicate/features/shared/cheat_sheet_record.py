@@ -20,6 +20,7 @@ from syndicate.features.shared.play_cards import OFFICIAL_START
 
 # (key, label) in page order. Row sections first, then the game-line value section.
 FEATURED: tuple[tuple[str, str], ...] = (
+    ("picks", "Syndicate picks"),          # the board's suggested opps, promoted (2026-10-15) -- the headline section
     ("value", "Value at the best price"),
     ("hot_streaks", "Hot streaks"),
     ("hot_form", "Hot form, one-sided"),
@@ -73,33 +74,40 @@ def day_record(sheet: Mapping[str, Any], reconciled: Mapping[str, Any]) -> dict[
     props, line_results = reconciled.get("props") or {}, reconciled.get("lines") or {}
     row_result = [cs.result_for((r.get("check") or {}).get("price"), props.get(cs.prop_result_key(r))) for r in rows]
     line_result = [cs.result_for((g.get("check") or {}).get("price"), line_results.get(cs.line_result_key(g))) for g in lines]
+    picks = list(sheet.get("picks") or [])
+    pick_results = reconciled.get("picks") or {}
+    pick_result = [cs.result_for(pk.get("price"), pick_results.get(cs.pick_result_key(pk))) for pk in picks]
     secs = cs.sections(rows)
     tallies: dict[str, dict[str, float]] = {}
-    featured_rows: set[int] = set()
+    # Every featured bet ONCE, keyed the grader's way: a Syndicate pick that is also a value row is one bet.
+    featured: dict[str, Mapping[str, Any] | None] = {}
     for key, _label in FEATURED:
-        if key == "lines_value":
+        if key == "picks":
+            ids = list(range(len(picks)))
+            results = [pick_result[i] for i in ids]
+            featured.update({cs.pick_result_key(picks[i]): pick_result[i] for i in ids})
+        elif key == "lines_value":
             ids = cs.game_line_sections(lines)["value"] if lines else []
             results = [line_result[i] for i in ids]
+            featured.update({cs.pick_result_key(lines[i]): line_result[i] for i in ids})
         else:
             ids = secs.get(key) or []
-            featured_rows.update(ids)
             results = [row_result[i] for i in ids]
+            featured.update({cs.pick_result_key(rows[i]): row_result[i] for i in ids})
         if not ids:
             continue
         t = tallies.setdefault(key, _tally())
         for res in results:
             _add(t, res)
     every = _tally()
-    for i in sorted(featured_rows):
-        _add(every, row_result[i])
-    for i in (cs.game_line_sections(lines)["value"] if lines else []):
-        _add(every, line_result[i])
+    for res in featured.values():
+        _add(every, res)
     day = str(sheet.get("date") or "")
     counts = reconciled.get("counts") or {}
     return {"date": day, "sport": sheet.get("sport"), "beta": day < OFFICIAL_START,
             "sections": {k: finish(t) for k, t in tallies.items()}, ALL: finish(every),
-            "graded": counts.get("props_graded", 0) + counts.get("lines_graded", 0),
-            "bets": counts.get("props", 0) + counts.get("lines", 0)}
+            "graded": counts.get("props_graded", 0) + counts.get("lines_graded", 0) + counts.get("picks_graded", 0),
+            "bets": counts.get("props", 0) + counts.get("lines", 0) + counts.get("picks", 0)}
 
 
 def _scope(days: list[Mapping[str, Any]]) -> dict[str, Any]:

@@ -92,3 +92,44 @@ def test_card_shows_headshot_team_crest_position_and_both_logos():
     assert "Sun Oct 18 · 3:05 PM CT" in html_text and "$" not in html_text.replace("$$", "")
     no_face = m.face_html({"player": "Tyler Allgeier"})
     assert ">TA<" in no_face and "img" not in no_face
+
+
+def _pick(**extra):
+    pick = {"pick_id": "l2_129acb8c9c927fb9", "kind": "game", "sport": "mlb", "event_id": "e7",
+            "matchup": "Milwaukee Brewers @ Los Angeles Dodgers", "home_team": "Los Angeles Dodgers", "away_team": "Milwaukee Brewers",
+            "player_name": None, "display_name": "Milwaukee Brewers", "market": "h2h", "side": "away", "line": None,
+            "segment": "first3", "segment_label": "1st 3 innings", "price": 138, "book": "betrivers", "books": 5,
+            "fair_price": 129, "p_market": 0.437, "p_model": 0.509, "ev_pct": 3.92, "sim_view": "agrees",
+            "detail": "Our sim has Milwaukee Brewers to win (1st 3 innings) at 50.9%; the no-vig market across 5 books says 43.7%. "
+                      "Recent form: Brewers led after 3 in 6 of their last 10.",
+            "bet": "Milwaukee Brewers moneyline · 1st 3 innings", "commence_time": "2026-10-16T00:00:00Z", "board_score": 4.39}
+    pick.update(extra)
+    return pick
+
+
+def test_a_syndicate_pick_card_shows_its_case_without_making_the_model_the_reason():
+    # User 2026-10-15: "add the suggested opps as a picks section with pick graphics". The model is context or risk on
+    # a card, never the reason -- the sim-vs-market sentence becomes the chart, not a bullet.
+    from syndicate.features.shared import play_cards as pc
+
+    f = pc.pick_card_fields(_pick(), sport="mlb", date="2026-10-15", number=1)
+    assert f["bet"] == "MILWAUKEE BREWERS MONEYLINE · 1ST 3 INNINGS" and f["price"] == "+138" and f["fair"] == "+129"
+    assert f["team"] == "1st 3 innings" and f["headshot"] is None and f["edge"] == "+3.9%"
+    assert f["why"][0].startswith("Best price +138 beats the no-vig fair (+129)")
+    assert not any(w.startswith("Our sim has") for w in f["why"]) and "Recent form: Brewers led after 3 in 6 of their last 10." in f["why"]
+    assert f["chart_title"] == "Sim vs market" and "Our sim" in f["chart_svg"] and "51%" in f["chart_svg"]
+    html = pc.render_card(f, "data:,", template="$chart_title|$bet|$chart_caption")
+    assert html.startswith("Sim vs market|MILWAUKEE BREWERS MONEYLINE")
+    rec = pc.ledger_record(f, _pick(), sport="mlb", generated_at="2026-10-15T14:00:00Z")
+    assert rec["segment"] == "first3" and rec["pick_id"] == "l2_129acb8c9c927fb9" and rec["price"] == 138 and rec["kind"] == "game"
+
+
+def test_the_daily_cards_promote_the_syndicate_picks_first():
+    from syndicate.features.shared import play_cards as pc
+
+    value_row = {"event_id": "e1", "player": "Somebody", "market": "Receptions", "line": 2.5, "side": "under", "books_quoting": 5,
+                 "check": {"verdict": "value", "ev_market": 3.0, "price": -110, "p_market": 0.55}}
+    with_picks = {"sport": "mlb", "date": "2026-10-15", "rows": [value_row], "picks": [_pick()]}
+    without = {"sport": "nfl", "date": "2026-10-15", "rows": [value_row], "picks": []}
+    cards = pc.pick_cards([with_picks, without], per_sport=3)
+    assert [(f["label"], f["player"]) for f, _item, _s in cards] == [("SYNDICATE PICK", "Milwaukee Brewers"), ("FREE PLAY", "Somebody")]

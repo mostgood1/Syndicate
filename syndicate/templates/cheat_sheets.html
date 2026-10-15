@@ -170,6 +170,8 @@ tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first
 .recap b { color: var(--accent); font-weight: 700; } .recap .sep { color: var(--muted); margin: 0 6px; }
 .final { font: 700 13px var(--mono); color: var(--ink); } .final b { color: var(--accent); }
 .xframe .recap { font-size: 16px; } .xframe .final { font-size: 15px; }
+.prop.pick { border-left: 3px solid var(--accent); padding-left: 12px; }
+.prop.pick .why { color: var(--ink); opacity: .85; }
 .rtab td.lab { font-weight: 600; } .rtab tr.all td { border-top: 2px solid var(--accent); font-weight: 700; }
 .rtab td.n.pos { color: var(--accent); } .rtab td.n.neg { color: var(--price); }
 .chart svg { width: 100%; height: auto; display: block; } .chart .key { display: flex; gap: 16px; font-size: 12.5px; color: var(--muted); }
@@ -273,6 +275,30 @@ function propRow(r, i) {
       <span class="ev ${ev == null ? "" : ev > 0 ? "pos" : "neg"}">${ev == null ? "no fair line" : "EV " + evs(ev)}</span></div></div>
     ${c.reasons && c.reasons.length ? `<div class="why">${c.reasons.map(esc).join(" · ")}</div>` : ""}
   </div>`;
+}
+// ---- Syndicate picks (user 2026-10-15: "add the suggested opps as a picks section with pick graphics"): the Layer 2
+// board's suggested opps for this day's games, promoted at the price shown and kept on the record at that price.
+function pickRow(p, i) {
+  const sim = p.sim_view === "agrees" ? `<span class="chip value">Sim agrees</span>`
+    : (p.sim_view === "disagrees" || p.sim_view === "contradicts") ? `<span class="chip suspect_price">Sim disagrees</span>` : "";
+  const card = META.mode === "app" && p.pick_id
+    ? `<a class="btn no-export" href="/cheatsheets/card/${esc(STATE.sport)}/${esc(META.date)}/${esc(p.pick_id)}" target="_blank" rel="noopener">Pick graphic</a>` : "";
+  const live = started(p.commence_time) ? `<span class="chip started">Started</span>` : "";
+  return `<div class="prop pick" data-pk="${i}">
+    <div class="who">${face({...p, player: p.display_name})}
+      <div class="line1"><span class="chip value">Syndicate pick</span>${sim}${live}<b>${esc(p.display_name || "")}</b>${p.pos ? `<span class="pos">${esc(p.pos)}</span>` : ""}${card}</div>
+      <div class="meta">${esc(p.matchup || "")}${p.kickoff_ct ? ` · <span class="kick">${esc(p.kickoff_ct)}</span>` : ""}</div>
+      <div class="bet">${esc(p.bet || "")} · ${odds(p.price)} ${esc(p.book || "")}</div></div>
+    <div>${strip({price: p.price, p_market: p.p_market, p_model: p.p_model})}<div class="nums"><span>price <b>${pct(implied(p.price))}</b></span><span>fair <b>${pct(p.p_market)}</b></span><span>sim <b>${pct(p.p_model)}</b></span></div></div>
+    <div><div class="nums"><span>books <b>${p.books || "–"}</b></span><span class="ev ${p.ev_pct > 0 ? "pos" : "neg"}">EV ${evs(p.ev_pct)}</span></div></div>
+    ${p.detail ? `<div class="why">${esc(p.detail)}</div>` : ""}
+  </div>`;
+}
+function picksBlock(d, game) {
+  const picks = (d.picks || []).map((p, i) => [p, i]).filter(([p]) => !game || p.event_id === game.event_id);
+  if (!picks.length) return "";
+  return sectionShell("picks", "Syndicate picks", "The Layer 2 board's suggested plays for these games: the best price beats the no-vig fair by 2% or more, net of any exchange fee, on a fresh quote. Each is promoted at the price shown and stays on the record at that price.",
+    `${picks.length} pick${picks.length === 1 ? "" : "s"}`, `<div class="rowlist">${picks.map(([p, i]) => pickRow(p, i)).join("")}</div>`);
 }
 const SECTIONS = [
   ["value", "Value at the best price", "The best available price beats the no-vig fair price by 2% or more."],
@@ -463,7 +489,14 @@ function render() {
   const secs = sectionsFor(d);
   document.getElementById("gamebar").innerHTML = game
     ? `<div class="gamebar"><a class="btn" href="${gameHref(null)}" data-game="">← Full ${esc(SPORT_NAMES[sport] || sport)} slate</a><div class="gm">${matchupLine(game)}</div><div class="kick">${esc(game.kickoff_ct || "")}${game.frozen_at ? ` · prices frozen at ${esc(ctTime(game.frozen_at))}` : ""}</div></div>` : "";
-  let html = game ? "" : slateBlock(d);
+  if (d.picks_only) {
+    document.getElementById("viewbar").innerHTML = viewbar(d);
+    document.getElementById("sheet").innerHTML = (reconciledView(d) ? recordBar(d, {}, {}, null) : "") + picksBlock(d, null)
+      + `<section class="sheet"><div class="note">${esc(SPORT_NAMES[STATE.sport] || STATE.sport)} cheat sheets start with the regular season; until then this sheet carries the board's suggested picks only.</div></section>`;
+    if (reconciledView(d)) applyResults();
+    return;
+  }
+  let html = picksBlock(d, game) + (game ? "" : slateBlock(d));
   html += SECTIONS.map(([key, title, blurb]) => {
     const ids = secs[key] || [];
     if (!ids.length && key !== "value") return "";
@@ -523,15 +556,16 @@ function applyResults() {
   const d = DATA[STATE.sport];
   if (!reconciledView(d)) return;
   document.querySelectorAll("#sheet section.sheet").forEach(sec => {
-    const items = [...sec.querySelectorAll("[data-ri],[data-li]")];
+    const items = [...sec.querySelectorAll("[data-ri],[data-li],[data-pk]")];
     if (!items.length) return;
     sec.querySelectorAll("table thead tr").forEach(hr => { if (!hr.querySelector(".resh")) hr.insertAdjacentHTML("beforeend", `<th class="resh">Actual</th><th class="resh">Result</th>`); });
     const seen = new Set(), results = [], recapItems = [];
     items.forEach(el => {
-      const isLine = el.dataset.li != null, idx = +(isLine ? el.dataset.li : el.dataset.ri);
-      const row = (isLine ? d.game_lines : d.rows)[idx] || {}, res = row.result;
-      const key = (isLine ? "l" : "r") + idx;
-      if (!seen.has(key)) { seen.add(key); results.push(res); recapItems.push({row, res, isLine}); }
+      const isPick = el.dataset.pk != null, isLine = el.dataset.li != null;
+      const idx = +(isPick ? el.dataset.pk : isLine ? el.dataset.li : el.dataset.ri);
+      const row = (isPick ? (d.picks || []) : isLine ? d.game_lines : d.rows)[idx] || {}, res = row.result;
+      const key = (isPick ? "k" : isLine ? "l" : "r") + idx;
+      if (!seen.has(key)) { seen.add(key); results.push(res); recapItems.push({row, res, isLine, isPick}); }
       el.classList.toggle("rw", !!res && res.y === 1); el.classList.toggle("rl", !!res && res.y === 0);
       if (el.tagName === "TR") { if (!el.querySelector("td.resd")) el.insertAdjacentHTML("beforeend", `<td class="n resd act">${actualText(res)}</td><td class="n resd">${resCell(res, row.result_note)}</td>`); }
       else { const l1 = el.querySelector(".line1"); if (l1 && !l1.querySelector(".res")) l1.insertAdjacentHTML("beforeend", (res && typeof res.v === "number" ? `<span class="res act">Actual ${actualText(res)}</span>` : "") + resCell(res, row.result_note)); }
@@ -550,6 +584,7 @@ function applyResults() {
 // what the best book paid over the median one on the winners.
 const sepJoin = parts => parts.filter(Boolean).join(`<span class="sep">·</span>`);
 function betName(x) {
+  if (x.isPick) return `${esc(x.row.bet || "")}`;
   if (x.isLine) return `${lineBet(x.row)} ${esc(LINE_MARKET[x.row.market] || x.row.market || "")}`;
   return `${esc(x.row.player || "")} ${esc(betText(x.row))}`;
 }
@@ -600,7 +635,8 @@ function scriptCheck(g) {
 }
 function recordBar(d, secs, lineSecs, game) {
   const rows = ids => (ids || []).map(i => (d.rows[i] || {}).result), lines = ids => (ids || []).map(i => (d.game_lines[i] || {}).result);
-  const items = [["Value", rows(secs.value)], ["Hot streaks", rows(secs.hot_streaks)], ["Hot form", rows(secs.hot_form)],
+  const picks = (d.picks || []).filter(p => !game || p.event_id === game.event_id).map(p => p.result);
+  const items = [["Syndicate picks", picks], ["Value", rows(secs.value)], ["Hot streaks", rows(secs.hot_streaks)], ["Hot form", rows(secs.hot_form)],
     ["Consistency", rows(secs.consistency)], ["Matchups", rows(secs.matchup_spots)],
     ["Game lines: value", lines(game ? null : lineSecs.value)]].filter(([, r]) => r.length);
   const c = d.reconciled.counts || {};

@@ -21,6 +21,7 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+import re
 import string
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -144,8 +145,106 @@ def card_fields(row: Mapping[str, Any], *, sport: str, date: str, number: int, g
     }
 
 
+# --------------------------------------------------------------------------------------------------------------------
+# Syndicate picks (the Layer 2 board's suggested opps, promoted on the cheat sheet -- user 2026-10-15: "add the
+# suggested opps as a picks section with pick graphics"). A pick can be a game line or a segment, so its card draws the
+# sim against the market where a prop draws its last games, and its reasons come from the board's own written case.
+# --------------------------------------------------------------------------------------------------------------------
+_SENTENCE = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
+_MODEL_LEADS = ("Our sim has", "The live re-sim has", "No sim view", "It projects")
+
+
+def detail_points(detail: Any, limit: int = 3) -> list[str]:
+    """The board's written case, as card bullets: whole sentences, the first `limit`, none over ~170 characters."""
+    out = []
+    for sentence in _SENTENCE.split(str(detail or "").strip()):
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+        out.append(sentence if len(sentence) <= 170 else sentence[:167].rsplit(" ", 1)[0] + "...")
+        if len(out) >= limit:
+            break
+    return out
+
+
+def prob_svg(model: float | None, market: float | None, implied: float | None) -> str:
+    """Three bars: our sim, the no-vig market, and what the price implies -- the card's case at a glance."""
+    bars = [(label, v, color) for label, v, color in (("Our sim", model, "#8cff2e"), ("No-vig market", market, "#eef3f7"),
+                                                       ("Price implies", implied, "#ff6b57")) if isinstance(v, (int, float))]
+    if not bars:
+        return ('<svg viewBox="0 0 400 230"><text x="200" y="120" fill="#9db0bf" font-size="22" text-anchor="middle" '
+                'font-family="Barlow">No sim view on this pick</text></svg>')
+    parts = ['<svg viewBox="0 0 400 230" xmlns="http://www.w3.org/2000/svg">']
+    for i, (label, v, color) in enumerate(bars):
+        y = 22 + i * 68
+        width = max(4.0, 300 * float(v))
+        parts.append(f'<text x="0" y="{y}" fill="#9db0bf" font-size="17" font-family="Barlow" font-weight="600">{label}</text>')
+        parts.append(f'<rect x="0" y="{y + 10}" width="{width:.1f}" height="30" rx="4" fill="{color}"/>')
+        parts.append(f'<text x="{width + 10:.1f}" y="{y + 33}" fill="#f4f7fa" font-size="22" font-weight="800" '
+                     f'font-family="Barlow">{float(v):.0%}</text>')
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def _implied(american: Any) -> float | None:
+    try:
+        a = float(american)
+    except (TypeError, ValueError):
+        return None
+    return 100 / (a + 100) if a > 0 else -a / (-a + 100)
+
+
+def pick_card_fields(pick: Mapping[str, Any], *, sport: str, date: str, number: int, label: str = "SYNDICATE PICK",
+                     form_values: list[float] | None = None, form_labels: list[str] | None = None) -> dict[str, Any]:
+    ev, p_model, p_mkt, books = pick.get("ev_pct"), pick.get("p_model"), pick.get("p_market"), int(pick.get("books") or 0)
+    why: list[str] = []
+    if isinstance(ev, (int, float)):
+        why.append(f"Best price {fmt_american(pick.get('price'))} beats the no-vig fair "
+                   f"({fmt_american(pick.get('fair_price'))}) by {ev:+.1f}%")
+    # The board's case minus its model sentences: the model is context or risk on a card, never the reason (see
+    # `why_and_risk`); the chart already sets the sim against the market. Form, matchup, splits and history stay.
+    why += [s for s in detail_points(pick.get("detail"), limit=8) if not s.startswith(_MODEL_LEADS)][:3]
+    risk: list[str] = []
+    if str(pick.get("sim_view") or "") in ("disagrees", "contradicts"):
+        risk.append("Our sim does not back this side: the edge is the price against the market")
+    if isinstance(p_model, (int, float)) and isinstance(p_mkt, (int, float)) and abs(p_model - p_mkt) >= 0.10:
+        risk.append(f"Sim {p_model:.0%} vs market {p_mkt:.0%}: gaps this big are usually model error, not edge")
+    if books and books < 4:
+        risk.append(f"Only {books} books quote it, so the fair rests on few prices")
+    is_prop = pick.get("kind") == "prop"
+    fields = {
+        "id": pick.get("pick_id"), "label": label, "number": number, "sport": SPORT_LABELS.get(sport, sport.upper()),
+        "date": date, "matchup": pick.get("matchup") or "", "commence_time": pick.get("commence_time"),
+        "player": pick.get("display_name"), "team": pick.get("team") if is_prop else (pick.get("segment_label") or "Full game"),
+        "pos": pick.get("pos") if is_prop else None, "bet": str(pick.get("bet") or "").upper(),
+        "price": fmt_american(pick.get("price")), "book": pick.get("book"), "books": books or None,
+        "fair": fmt_american(pick.get("fair_price")), "edge": f"{ev:+.1f}%" if isinstance(ev, (int, float)) else "",
+        "win_prob": f"{p_mkt:.0%}" if isinstance(p_mkt, (int, float)) else "",
+        "model_prob": None if p_model is None else f"{p_model:.0%}",
+        "form_values": list(form_values or [])[:10], "form_labels": list(form_labels or [])[:10],
+        "line": pick.get("line"), "side": pick.get("side"), "why": why[:5],
+        "risk": risk[:3] or ["Lines move: re-check the price before betting"],
+        "headshot": pick.get("headshot_url") if is_prop else None, "team_logo": pick.get("team_logo"),
+        "home_logo": pick.get("home_logo"), "away_logo": pick.get("away_logo"),
+        "kickoff_ct": pick.get("kickoff_ct"),
+    }
+    if not fields["form_values"]:
+        fields["chart_title"] = "Sim vs market"
+        fields["chart_svg"] = prob_svg(p_model, p_mkt, _implied(pick.get("price")))
+        fields["chart_caption"] = "the best price has to beat the no-vig market"
+    return fields
+
+
 def ledger_record(fields: Mapping[str, Any], row: Mapping[str, Any], *, sport: str, generated_at: str,
                   source: str = "auto") -> dict[str, Any]:
+    if row.get("pick_id"):                      # a Syndicate pick: its own price, and the segment it is graded on
+        return {"card_id": fields["id"], "generated_at": generated_at, "source": source, "sport": sport, "date": fields["date"],
+                "event_id": row.get("event_id"), "matchup": fields["matchup"], "commence_time": fields["commence_time"],
+                "player": row.get("player_name"), "kind": row.get("kind"), "pick_id": row.get("pick_id"),
+                "market": row.get("market"), "line": row.get("line"), "side": row.get("side"),
+                "segment": row.get("segment") or "full", "price": row.get("price"), "book": row.get("book"),
+                "books_quoting": row.get("books"), "p_market": row.get("p_market"), "p_model": row.get("p_model"),
+                "ev_market": row.get("ev_pct"), "beta": str(fields["date"]) < OFFICIAL_START, "result": None, "close": None}
     c = row.get("check") or {}
     return {"card_id": fields["id"], "generated_at": generated_at, "source": source, "sport": sport, "date": fields["date"],
             "event_id": row.get("event_id"), "matchup": fields["matchup"], "commence_time": fields["commence_time"],
@@ -155,10 +254,29 @@ def ledger_record(fields: Mapping[str, Any], row: Mapping[str, Any], *, sport: s
             "beta": str(fields["date"]) < OFFICIAL_START, "result": None, "close": None}
 
 
+def pick_form(sheet: Mapping[str, Any], pick: Mapping[str, Any]) -> tuple[list[float], list[str]]:
+    """A prop pick's last games, from the sheet row for the same bet (oldest left, like a row's card)."""
+    for r in sheet.get("rows") or []:
+        if (r.get("player") == pick.get("player_name") and str(r.get("market")) == str(pick.get("market"))
+                and r.get("side") == pick.get("side") and r.get("line") == pick.get("line")):
+            values = ((r.get("check") or {}).get("form10") or {}).get("values") or []
+            return list(values)[:10][::-1], list(r.get("form_labels") or [])[:10][::-1]
+    return [], []
+
+
 def pick_cards(sheets: Iterable[Mapping[str, Any]], *, per_sport: int = 3, label: str = "FREE PLAY") -> list[tuple[dict, dict, str]]:
-    """(fields, row, sport) for every card across sheets, numbered per day in sport order."""
+    """(fields, item, sport) for every card across sheets, numbered per day in sport order. The SYNDICATE PICKS come
+    first -- the board's suggested opps (2026-10-15) -- and a sheet without any falls back to its value rows."""
     out, n = [], 0
     for sheet in sheets:
+        picks = [p for p in sheet.get("picks") or [] if p.get("pick_id")][:per_sport]
+        for pick in picks:
+            n += 1
+            values, labels = pick_form(sheet, pick) if pick.get("kind") == "prop" else ([], [])
+            out.append((pick_card_fields(pick, sport=sheet["sport"], date=sheet["date"], number=n, label="SYNDICATE PICK",
+                                         form_values=values, form_labels=labels), pick, sheet["sport"]))
+        if picks:
+            continue
         games = {g.get("event_id"): g for g in sheet.get("games") or []}
         for row in select(sheet, per_sport=per_sport):
             n += 1
@@ -236,7 +354,7 @@ def render_card(fields: Mapping[str, Any], logo_uri: str, template: str | None =
     values, line, side = fields["form_values"], fields["line"], fields["side"]
     hits = sum(1 for v in values if v != line and ((v > line) if side in ("over", "yes") else (v < line))) \
         if values and line is not None else 0
-    caption = f"{hits} of last {len(values)} cleared {side} {line:g}" if values and line is not None else ""
+    caption = fields.get("chart_caption") or (f"{hits} of last {len(values)} cleared {side} {line:g}" if values and line is not None else "")
     return string.Template(template if template is not None else TEMPLATE.read_text(encoding="utf-8")).safe_substitute(
         logo=logo_uri, label=e(fields["label"]), number=fields["number"], away=e(away), home=e(home),
         sport=e(fields["sport"]), kickoff=e(fields.get("kickoff_ct") or kickoff_label(fields.get("commence_time"))),
@@ -245,7 +363,8 @@ def render_card(fields: Mapping[str, Any], logo_uri: str, template: str | None =
         bet=e(fields["bet"]), price=e(fields["price"]), book=e(fields["book"]), books=e(fields["books"]),
         fair=e(fields["fair"]), edge=e(fields["edge"]), win_prob=e(fields["win_prob"]),
         model_note=e(f" · model {fields['model_prob']}" if fields.get("model_prob") else ""),
-        chart=chart_svg(values, fields["form_labels"], line, side),
+        chart=fields.get("chart_svg") or chart_svg(values, fields["form_labels"], line, side),
+        chart_title=e(fields.get("chart_title") or "Last games"),
         chart_caption=e(caption), why="".join(f"<li>{e(w)}</li>" for w in fields["why"]),
         risk="".join(f"<li>{e(r)}</li>" for r in fields["risk"]))
 

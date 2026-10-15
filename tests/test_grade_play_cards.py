@@ -131,3 +131,22 @@ def test_beta_cards_stay_out_of_the_public_record(tmp_path):
     m.render_record([official, beta], out)
     html = out.read_text(encoding="utf-8")
     assert "1-0" in html and "+0.72u" in html and "+2.00%" in html and "(1 cards)" in html
+
+
+def test_a_syndicate_pick_card_grades_on_its_own_segment(monkeypatch, tmp_path):
+    # 2026-10-15: pick graphics for the board's suggested opps -- a 1st-3-innings moneyline settles on that segment.
+    m = _module()
+
+    class FakeSrb:
+        @staticmethod
+        def main(argv):
+            rows = [{"sport": "mlb", "market": "h2h", "player": None, "side": "away", "line": None, "segment": "first3", "y": 1.0, "game": "mlb|e7"},
+                    {"sport": "mlb", "market": "h2h", "player": None, "side": "away", "line": None, "segment": "full", "y": 0.0, "game": "mlb|e7"}]
+            Path(argv[argv.index("--out") + 1]).write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+            return 0
+
+    real_load = m._load
+    monkeypatch.setattr(m, "_load", lambda name: FakeSrb if name == "score_ranking_backtest" else real_load(name))
+    card = _card(card_id="l2_129acb8c9c927fb9", pick_id="l2_129acb8c9c927fb9", sport="mlb", event_id="e7", player=None,
+                 market="h2h", side="away", line=None, segment="first3", price=138, commence_time="2026-10-16T00:00:00Z")
+    assert m.results_for([card], work=tmp_path) == {"l2_129acb8c9c927fb9": {"y": 1.0, "units": 1.38, "graded_game": "mlb|e7"}}
