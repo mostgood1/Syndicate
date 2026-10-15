@@ -49879,3 +49879,18 @@ The copy has no cache, `trust_env` off unless `STATSAPI_TRUST_ENV`, an (8 s, 8 s
 **RIDE-ALONG, checked before the ff.** 29 commits, `vendor/` untouched (0 files). The NBA work is default-off (`b5ee66cb` env-gated `SYNDICATE_NBA_LIVE_PRICED`; `9beb1677` "default absent = unchanged"), and `bffcaebf` (soccer lineup club labels) was already recorded by its owner as "rides the next ff". No unverified default-on board change.
 
 **WHAT THIS DOES NOT DO.** The `skill_pocket` reward asymmetry is unchanged: a bucket measured to BEAT the market still earns factor 1.0, same as never-backtested. This completes the penalty side only.
+
+## 2026-10-15 20:47:12Z (3:47 PM CT) -- fleet ff cce22975 -> 553603bf + `reload-web` (2.7 s, 0 failures): UCL / UEL / UECL registered for fixtures, game odds and venue joins, with NO sim (lane `soccer-uefa-competitions`, session 15fef1c0) -- NO outage, NO worker restart
+- **ask:** user 2026-10-15 "we need to incorporate UCL and Europa into the soccer engine" (staged; + UECL), then "land it", then "proceed next actions".
+- **claim:** web by soccer-uefa-competitions, token 936acb3c..., acquire exit 0; released (exit 0) after the reload.
+- **ride-alongs (checked before the ff):** 11 commits HEAD..553603bf, 0 `vendor/` files. Code outside the ledger is this lane's own files, plus the sim-gap lane's reporting-only `scripts/sim_gap_ev_study.py` and its `sim_gap_ev_study.py` wrapper fix (`c877589e`, no board consumer). The fleet's dirt (2 vendor statcast data files, `deploy_drain.json`) was untouched by the ff.
+- **why no worker restart (and why that is safe):**
+  - Schedule, odds, live-state and artifact steps run as per-run subprocesses (`refresh_odds_sources`, `poll_soccer_live_state` CLI), so they load the new code at their next run.
+  - Both workers keep their OLD `sources` (no UEFA) until a natural restart, so they never see UEFA. They then load the guards (`_soccer_refresh_units`, `_scoreboard_only_game`) in the same restart that adds UEFA to their league list.
+  - Mixed-vintage risk checked: `live_lens_loop` imports the poller at module top (cached since boot), and `soccer.cards` is imported lazily inside a `try` by every board build (cached long ago).
+  - refresh-worker was restarted 20:25:06Z by another lane, so the 60-min restart rule would also have blocked a restart.
+- **verify (now):** fleet HEAD 553603bf, `f9d06686` an ancestor. A fresh fleet-venv process sees `UEFA_COMPETITIONS` and all three active for 2026-10-21. `/soccer/ucl/cards` on 127.0.0.1:10000 returns HTTP 200 (9,901 B; no UEFA schedule on disk yet, so the empty state).
+- **verify (OWED):**
+  - (1) After the next live-odds-worker soccer pregame autorun (interval env 2700 s), `/home/amyn/syndicate-prod/data/soccer_source/{ucl,uel,uecl}/api/schedule/schedule_2026.json` and `api/odds/game_odds_current.csv` exist with rows. A watcher (`C:/tmp/uefa_fleet_watch.sh`, 75-min deadline from ~20:50Z) is armed for it.
+  - (2) On the next UCL matchday (2026-10-20/21), after the workers next restart, a UCL in-play `live_state` with `projection: null` and no `LEAGUE_POLL_FAILED`.
+
