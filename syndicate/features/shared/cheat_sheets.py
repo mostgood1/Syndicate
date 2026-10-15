@@ -1138,11 +1138,20 @@ PICK_LABEL, PRICE_PLAY_LABEL = "SYNDICATE PICK", "PRICE PLAY"
 # the served sim sits ~0.2 pts off the market and would read as backing on a view that is 95% the market's. The sim
 # must clear the market by a full point. Without both probabilities the margin is unknown: PRICE PLAY, never PICK.
 SIM_BACKING_FLOOR = 0.01
+# PRICE PLAY UNTIL GRADED (user 2026-10-15, "Puckline picks are price until graded"). A sim market that has never been
+# graded cannot back a pick. NHL spreads got their first sim number at 21:54Z 10-15, when the puckline orientation fix
+# went live (lane nhl-puckline-orientation). On its first slate it sat below the fair on home -1.5 in 9 of 10 games --
+# a read or a bias, which one slate cannot tell apart. Remove an entry once the sim-gap study (`model_scorecard_simgap.json`,
+# cells `nhl|spreads|...`) shows it graded at >= 30 games.
+UNGRADED_SIM_MARKETS = frozenset({("nhl", "spreads")})
 
 
 def sim_backs_pick(pick: Mapping[str, Any]) -> bool:
     view = str(pick.get("sim_view") or "").strip().lower()
     if view in SIM_AGAINST:
+        return False
+    market = str(pick.get("market") or "").strip().lower()
+    if (str(pick.get("sport") or "").strip().lower(), market.removeprefix("alternate_")) in UNGRADED_SIM_MARKETS:
         return False
     p_model, p_market = pick.get("p_model"), pick.get("p_market")
     if not (isinstance(p_model, (int, float)) and isinstance(p_market, (int, float))):

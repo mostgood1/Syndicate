@@ -704,6 +704,11 @@ def test_a_price_edge_the_sim_backs_is_a_syndicate_pick_and_one_it_does_not_is_a
     assert cs.pick_label({"sim_view": "agrees", "p_model": 0.55, "p_market": 0.54}) == "SYNDICATE PICK"   # exactly 1 pt
     assert cs.pick_label({"sim_view": "agrees", "p_model": None, "p_market": 0.54}) == "PRICE PLAY"      # margin unknown
     assert cs.pick_label({"sim_view": "unpriced", "p_model": 0.505, "p_market": 0.50}) == "PRICE PLAY"
+    # PRICE PLAY UNTIL GRADED (user 2026-10-15): the NHL puckline sim went live 10-15 and is ungraded -- Calgary +1.5
+    # (sim 56.6 vs 51.1) stays a price play; the same margin on an NHL moneyline is a pick.
+    assert cs.pick_label({"sport": "nhl", "market": "spreads", "sim_view": "agrees", "p_model": 0.566, "p_market": 0.511}) == "PRICE PLAY"
+    assert cs.pick_label({"sport": "nhl", "market": "alternate_spreads", "sim_view": "agrees", "p_model": 0.6, "p_market": 0.5}) == "PRICE PLAY"
+    assert cs.pick_label({"sport": "nhl", "market": "h2h", "sim_view": "agrees", "p_model": 0.566, "p_market": 0.511}) == "SYNDICATE PICK"
     assert cs.price_case({"books": 24, "p_market": 0.5, "fair_price": 100, "book": "prophetx", "price": 109}) ==         "The edge is the price: 24 books put it at 50% (fair +100); ProphetX pays +109"
     m = _script()
     pick = lambda pid, view, score: {"pick_id": pid, "kind": "game", "market": "totals", "sim_view": view, "board_score": score,
