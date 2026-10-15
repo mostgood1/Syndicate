@@ -448,6 +448,42 @@ _SOCCER_VENDOR_NAME_ALIASES: dict[str, str] = {
     # chip join. Measured 2026-08-26: `canonical_team("soccer", "Genk")` was
     # None while `teams_match("soccer", "Genk", "Racing Genk")` was True.
     "genk": "Racing Genk",
+    # ------------------------------------------------------------------
+    # UEFA CLUB COMPETITIONS. Lane `soccer-uefa-competitions`, 2026-10-15.
+    # ------------------------------------------------------------------
+    #
+    # OddsAPI and Kalshi spellings of UEFA clubs that ESPN's UCL/UEL/UECL
+    # branding names differently. NOT ONE IS GUESSED: each comes from FIXTURE
+    # PAIRING. The vendor lists a fixture (date, A vs B) in which ONE side
+    # resolves; ESPN's schedule for that competition, within a day, has EXACTLY
+    # ONE fixture containing that club, and its opponent is the identity. Zero
+    # or several candidates refuses, as does a name `#631` refused (`Inter`,
+    # `Enschede`, `St. Truidense`). Evidence per entry is in
+    # `.syndicate/findings_2026-10-15_uefa_kalshi_join_and_history.md`.
+    "Be`er Sheva": "Hapoel Be'er",
+    "Bodoe/Glimt": "Bodo/Glimt",
+    "Bodø/Glimt": "Bodo/Glimt",
+    "Ferencvarosi": "Ferencvaros",
+    "Hajduk": "Hajduk Split",
+    "Jagiellonia": "Jagiellonia Bialystok",
+    "Kairat": "Kairat Almaty",
+    "Kauno": "Kauno Zalgiris",
+    "LASK": "LASK Linz",
+    "Lillestroem": "Lillestrom",
+    "Nordsjaelland": "FC Nordsjælland",
+    "Olympiakos Piraeus": "Olympiacos",
+    "Sabah Masazir": "Sabah FK",
+    "Slavia Praha": "Slavia Prague",
+    "Aarhus": "AGF",
+    "Banja Luka": "Borac Banja Luka",
+    "Egnatia Rrogozhine": "Egnatia",
+    "IC Escaldes": "Inter D'Escaldes",
+    "Iberia": "Iberia 1999",
+    "Kuopion Palloseura": "KuPS Kuopio",
+    "Mjallby": "Mjällby AIF",
+    "Shakhtar": "Shakhtar Donetsk",
+    "Uni Craiova": "CSU Craiova",
+    # END UEFA CLUB COMPETITIONS
 }
 
 
@@ -470,6 +506,7 @@ def _soccer_alias_to_name() -> dict[str, str]:
     """
     try:
         from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES
+        from syndicate.features.soccer.sources import UEFA_COMPETITIONS
         from syndicate.features.soccer.sources import all_teams
     except Exception:
         return {}
@@ -480,11 +517,20 @@ def _soccer_alias_to_name() -> dict[str, str]:
             teams = all_teams(league) or []
         except Exception:
             continue
+        # UEFA COMPETITIONS GIVE NAMES, NOT CODES (lane soccer-uefa-competitions,
+        # 2026-10-15). Their clubs come from every league in Europe, so their ESPN
+        # abbreviations collide with ours: measured on the tracked branding plus
+        # the UCL/UEL/UECL snapshots, deriving them dropped `cel` (Celta Vigo vs
+        # Celtic), `lev` (Levante vs Levski), `mid` (Middlesbrough vs Midtjylland)
+        # and `slb` (Benfica vs Slovan Bratislava) from this map. OddsAPI and
+        # Kalshi both name UEFA clubs in full, so the names are what the joins
+        # need. With names only, the diff was 0 keys removed and 0 changed.
+        fields = ("name", "short_name") if league in UEFA_COMPETITIONS else ("name", "short_name", "abbreviation")
         for team in teams:
             canonical = normalize((team or {}).get("name"))
             if not canonical:
                 continue
-            for raw in (team.get("name"), team.get("short_name"), team.get("abbreviation")):
+            for raw in (team.get(field) for field in fields):
                 for key in (normalize(raw), fold_accents(raw), strip_club_tokens(raw)):
                     if key:
                         candidates.setdefault(key, set()).add(canonical)
@@ -646,12 +692,18 @@ def _soccer_alias_by_league() -> dict[str, dict[str, str]]:
     dropped here, for the same reason as before.
     """
     try:
-        from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES, all_teams
+        from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES, UEFA_COMPETITIONS, all_teams
     except Exception:
         return {}
 
     by_league: dict[str, dict[str, str]] = {}
     for league in LEAGUE_DISPLAY_NAMES:
+        # Not the UEFA competitions: `soccer_fixture_clubs` answers only when
+        # EXACTLY ONE league explains a code pair, and a UEFA map holding
+        # domestic clubs under their own codes would add a second explanation
+        # and turn a resolved domestic pair into None.
+        if league in UEFA_COMPETITIONS:
+            continue
         try:
             teams = all_teams(league) or []
         except Exception:

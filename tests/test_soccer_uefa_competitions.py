@@ -190,3 +190,63 @@ def test_a_uefa_fixture_card_says_odds_only_and_never_prints_the_build_command()
     # Control: a domestic fixture keeps the operator instruction.
     domestic = cards._unsimulated_game(fixture, league="epl", week=3, season=2026)
     assert "build_soccer_artifacts" in repr(domestic)
+
+
+# ---------------------------------------------------------------------------
+# UEFA club identity in the soccer alias map (Kalshi / OddsAPI joins).
+# ---------------------------------------------------------------------------
+
+_BRANDING = {
+    # The real collision measured 2026-10-15: ESPN gives Levante AND Levski Sofia `LEV`.
+    "la_liga": [{"name": "Levante", "short_name": "Levante", "abbreviation": "LEV"}],
+    "uel": [
+        {"name": "Levski Sofia", "short_name": "Levski", "abbreviation": "LEV"},
+        {"name": "Olympiacos", "short_name": "Olympiacos", "abbreviation": "OLY"},
+    ],
+    "ucl": [
+        {"name": "Slavia Prague", "short_name": "Slavia", "abbreviation": "SLP"},
+        {"name": "Sabah FK", "short_name": "Sabah", "abbreviation": "SAB"},
+    ],
+}
+
+
+@pytest.fixture
+def stub_branding(monkeypatch):
+    from syndicate.features.shared import team_aliases as ta
+    from syndicate.features.soccer import sources
+
+    monkeypatch.setattr(sources, "all_teams", lambda league: [dict(r) for r in _BRANDING.get(league, [])])
+    ta._soccer_alias_to_name.cache_clear()
+    ta._soccer_alias_by_league.cache_clear()
+    yield ta
+    ta._soccer_alias_to_name.cache_clear()
+    ta._soccer_alias_by_league.cache_clear()
+
+
+def test_uefa_branding_adds_club_names_but_never_steals_a_domestic_code(stub_branding):
+    ta = stub_branding
+    # Before the fix this key became ambiguous and was DROPPED from the global map.
+    assert ta.canonical_team("soccer", "LEV") == "levante"
+    assert ta.canonical_team("soccer", "Levski Sofia") == "levski sofia"
+    # The UEFA abbreviation contributes nothing.
+    assert ta.canonical_team("soccer", "OLY") is None
+    # Per-league maps (soccer_fixture_clubs' disambiguator) stay domestic-only.
+    assert set(ta._soccer_alias_by_league()) == {"la_liga"}
+
+
+@pytest.mark.parametrize(
+    ("vendor_name", "canonical"),
+    [
+        ("Slavia Praha", "slavia prague"),  # OddsAPI
+        ("Sabah Masazir", "sabah fk"),  # Kalshi
+        ("Olympiakos Piraeus", "olympiacos"),  # OddsAPI
+    ],
+)
+def test_vendor_spellings_of_uefa_clubs_resolve(stub_branding, vendor_name, canonical):
+    assert stub_branding.canonical_team("soccer", vendor_name) == canonical
+
+
+def test_refused_names_stay_refused(stub_branding):
+    # `#631` refused these by name; a UEFA fixture is not evidence enough to map them.
+    for name in ("Inter", "Enschede", "St. Truidense"):
+        assert stub_branding.canonical_team("soccer", name) is None

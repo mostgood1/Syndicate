@@ -70,6 +70,12 @@ SPORT_CONFIG.update(
         "primeira_liga": ("soccer/por.1", "SYNDICATE_SOCCER_SOURCE_ROOT", "soccer_source/primeira_liga"),
         "championship": ("soccer/eng.2", "SYNDICATE_SOCCER_SOURCE_ROOT", "soccer_source/championship"),
         "belgian_pro_league": ("soccer/bel.1", "SYNDICATE_SOCCER_SOURCE_ROOT", "soccer_source/belgian_pro_league"),
+        # UEFA club competitions (lane soccer-uefa-competitions): their branding feeds
+        # `team_aliases._soccer_alias_to_name`, which is what lets Kalshi/OddsAPI UEFA
+        # club names resolve. Current participants only -- ESPN ignores `season=`.
+        "ucl": ("soccer/uefa.champions", "SYNDICATE_SOCCER_SOURCE_ROOT", "soccer_source/ucl"),
+        "uel": ("soccer/uefa.europa", "SYNDICATE_SOCCER_SOURCE_ROOT", "soccer_source/uel"),
+        "uecl": ("soccer/uefa.europa.conf", "SYNDICATE_SOCCER_SOURCE_ROOT", "soccer_source/uecl"),
     }
 )
 
