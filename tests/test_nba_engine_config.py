@@ -96,6 +96,7 @@ def test_present_file_is_reachable_and_equals_the_hand_built_engine(tmp_path):
     assert ev.score_effect_k == 0.002 and ev.fg2_from_two_point_split is True
     assert ev.foul_trouble_thresholds == (2, 3, 4, 5)
     assert dict(ev.league_params_overrides) == {"exact_target_calibration": True, "shooter_ft_rate": True}
+    assert ev.config_sha == hashlib.sha256((tmp_path / bpss.NBA_ENGINE_CONFIG_FILE_LOCAL).read_bytes()).hexdigest()
 
     configured = _run(ev)
     default = _run(_base_cfg().event_cfg)

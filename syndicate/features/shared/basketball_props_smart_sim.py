@@ -744,10 +744,12 @@ def _nba_engine_config_local(*, processed_root: Path | None) -> dict[str, Any]:
         path = Path(processed_root) / NBA_ENGINE_CONFIG_FILE_LOCAL
         if not path.is_file():
             return {}
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        body = path.read_bytes()
+        raw = json.loads(body.decode("utf-8"))
         if not isinstance(raw, dict) or not bool(raw.get("enabled", True)):
             return {}
         import dataclasses as _dc
+        import hashlib as _hl
 
         from syndicate.features.basketball_engine import engine as native_engine
         from syndicate.features.basketball_engine.league import LeagueParams
@@ -760,7 +762,8 @@ def _nba_engine_config_local(*, processed_root: Path | None) -> dict[str, Any]:
             return {}
         tup = lambda v: tuple(v) if isinstance(v, list) else v  # noqa: E731
         return {"event_sim_config": {k: tup(v) for k, v in ev.items()},
-                "league_params": tuple(sorted((k, tup(v)) for k, v in lp.items()))}
+                "league_params": tuple(sorted((k, tup(v)) for k, v in lp.items())),
+                "sha": _hl.sha256(body).hexdigest()}
     except Exception as exc:  # noqa: BLE001
         print(f"NBA_ENGINE_CONFIG_UNREADABLE {type(exc).__name__}: {str(exc)[:200]}", flush=True)
         return {}
@@ -785,6 +788,7 @@ def _apply_nba_engine_config_local(cfg: SmartSimConfigLocal, *, processed_root: 
     values = {f.name: getattr(base, f.name) for f in _dc.fields(base)}
     values.update(conf["event_sim_config"])
     values["league_params_overrides"] = conf["league_params"]
+    values["config_sha"] = conf["sha"]  # sha256 of the file bytes: the audit names the whole file (P3's live label)
     return _dc.replace(cfg, event_cfg=_rebuild_nba_configured_cfg_local(type(base), values))
 
 
