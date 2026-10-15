@@ -192,20 +192,34 @@ _SITE_HEAD = """<link rel="icon" href="{{ url_for('static', filename='shared/fav
 _SITE_HEADER = "{% include 'shared/_standalone_app_header.html' %}"
 
 # The export toolbar for a pick graphic: outside the captured area, so the PNG is exactly the 1080 x 1350 card.
-_CARD_TOOLBAR = """<div id="pc-toolbar" style="position:fixed;top:14px;right:14px;z-index:50;display:flex;gap:8px;font:700 15px Barlow,Arial,sans-serif">
+_CARD_TOOLBAR = r"""<div id="pc-toolbar" style="position:fixed;top:14px;right:14px;z-index:50;display:flex;gap:8px;font:700 15px Barlow,Arial,sans-serif">
   <button id="pc-dl" style="background:#8cff2e;color:#04110a;border:0;border-radius:8px;padding:10px 16px;font:inherit;cursor:pointer">Download PNG</button>
   <a href="__BACK__" style="background:#0a1520;color:#eef3f7;border:1px solid #1d3a55;border-radius:8px;padding:10px 16px;text-decoration:none">Back to the sheet</a>
   <span id="pc-msg" style="align-self:center;color:#9db0bf"></span>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
 <script>
+// Embed the latin font subsets ourselves: html-to-image cannot read the cross-origin Google Fonts sheet.
+async function fontEmbedCSS() {
+  var link = Array.prototype.find.call(document.querySelectorAll('link[rel="stylesheet"]'), function (l) { return l.href.indexOf("fonts.googleapis.com") >= 0; });
+  if (!link) return "";
+  var css = (await (await fetch(link.href)).text()).split("/* ").filter(function (b) { return b.indexOf("latin */") === 0; })
+    .map(function (b) { return b.slice(8); }).join("\n");
+  var urls = Array.from(new Set((css.match(/url\((https:[^)]+)\)/g) || []).map(function (x) { return x.slice(4, -1); })));
+  for (var i = 0; i < urls.length; i++) {
+    var blob = await (await fetch(urls[i])).blob();
+    var data = await new Promise(function (r) { var fr = new FileReader(); fr.onload = function () { r(fr.result); }; fr.readAsDataURL(blob); });
+    css = css.split(urls[i]).join(data);
+  }
+  return css;
+}
 document.getElementById("pc-dl").addEventListener("click", async function () {
   var msg = document.getElementById("pc-msg");
   msg.textContent = "Rendering...";
   try {
     if (document.fonts && document.fonts.ready) await document.fonts.ready;
     var url = await window.htmlToImage.toPng(document.body, {width: 1080, height: 1350, pixelRatio: 1, backgroundColor: "#04070c",
-      filter: function (node) { return node.id !== "pc-toolbar"; }});
+      fontEmbedCSS: await fontEmbedCSS(), filter: function (node) { return node.id !== "pc-toolbar"; }});
     var a = document.createElement("a"); a.href = url; a.download = "__FILE__"; document.body.appendChild(a); a.click(); a.remove();
     window.__lastCard = url;
     var r = await fetch("/api/cheatsheets/cards", {method: "POST", headers: {"Content-Type": "application/json"},

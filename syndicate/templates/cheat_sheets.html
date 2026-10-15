@@ -118,15 +118,25 @@ a.sg:hover { border-color: var(--accent); transform: translateY(-1px); }
 .gamebar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 12px 14px; border: 1px solid #1d3a55; border-radius: 10px; background: var(--bg2); }
 .gamebar .gm { display: flex; align-items: center; gap: 8px; font: 800 24px/1.1 var(--display); text-transform: uppercase; letter-spacing: .03em; }
 .gamebar .gm img { width: 30px; height: 30px; object-fit: contain; }
-.xframe { position: fixed; left: -30000px; top: 0; width: 1080px; padding: 36px 40px 30px; display: grid; gap: 20px; color: var(--ink); font: 16px/1.5 var(--body);
+.xframe { box-sizing: border-box; position: fixed; left: -30000px; top: 0; width: 1080px; padding: 36px 40px 30px; display: grid; gap: 20px; color: var(--ink); font: 16px/1.5 var(--body);
   background: radial-gradient(900px 480px at 10% -8%, rgba(31,168,255,.25), transparent 62%), radial-gradient(800px 460px at 100% 6%, rgba(140,255,46,.14), transparent 60%), var(--bg); }
-.xhead { display: grid; grid-template-columns: 110px auto 1fr; gap: 20px; align-items: center; }
+.xhead { display: grid; grid-template-columns: 110px 1fr; gap: 16px 22px; align-items: center; }
 .xhead > img { width: 110px; height: 110px; border-radius: 14px; box-shadow: 0 0 0 3px rgba(140,255,46,.6), 0 0 28px rgba(31,168,255,.4); }
 .xhead .w1 { font: 900 64px/.9 var(--display); letter-spacing: .02em; text-transform: uppercase; }
 .xhead .w2 { margin-top: 6px; font: 900 34px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; color: #04110a; background: var(--accent); padding: 3px 18px 1px; }
-.xday { justify-self: end; text-align: right; display: grid; gap: 6px; font: 800 24px/1.1 var(--display); text-transform: uppercase; letter-spacing: .05em; }
-.xday .xgame { display: flex; gap: 6px; align-items: center; justify-content: flex-end; color: var(--accent2); font-size: 20px; }
-.xday .xgame img { width: 24px; height: 24px; object-fit: contain; }
+.xday { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 20px;
+  padding: 10px 16px; border: 2px solid #1d3a55; border-radius: 10px; background: rgba(10,21,32,.85);
+  font: 800 28px/1.1 var(--display); text-transform: uppercase; letter-spacing: .05em; }
+.xday .xgame { display: flex; gap: 8px; align-items: center; color: var(--accent2); font-size: 26px; }
+.xday .xgame img { width: 32px; height: 32px; object-fit: contain; }
+.xframe h2 { font-size: 34px; } .xframe .sheet header p { font-size: 16px; max-width: 60ch; } .xframe .count { font-size: 15px; }
+.xframe .prop { padding: 14px 0; gap: 8px 22px; }
+.xframe .who { grid-template-columns: 64px 1fr; } .xframe .who .face { width: 64px; height: 64px; }
+.xframe .who b { font-size: 21px; } .xframe .meta { font-size: 15px; } .xframe .bet { font-size: 17px; }
+.xframe .chip { font-size: 14px; } .xframe .pos { font-size: 13px; } .xframe .nums { font-size: 15px; gap: 12px; }
+.xframe .why { font-size: 14.5px; } .xframe .dot { width: 12px; height: 12px; } .xframe .ev { font-size: 15px; }
+.xframe table { font-size: 17px; } .xframe th { font-size: 14px; }
+.xframe .sg .t { font-size: 18px; } .xframe .sg .when { font-size: 15px; } .xframe .game .read, .xframe .game ul { font-size: 16px; }
 .xframe section.sheet { box-shadow: none; }
 .xframe .prop { grid-template-columns: minmax(300px, 1.4fr) minmax(260px, 1.2fr) minmax(170px, .8fr); }
 .xframe .slate { grid-template-columns: repeat(4, 1fr); }
@@ -309,6 +319,23 @@ function loadH2I() {
   });
   return h2i;
 }
+// html-to-image cannot read the cross-origin Google Fonts sheet, so the export would fall back to a wider face and
+// overlap (measured 10-14). Embed the latin subsets ourselves, once per page.
+let fontCssPromise = null;
+function fontEmbedCSS() {
+  fontCssPromise = fontCssPromise || (async () => {
+    const link = [...document.querySelectorAll('link[rel="stylesheet"]')].find(l => l.href.includes("fonts.googleapis.com"));
+    if (!link) return "";
+    let css = (await (await fetch(link.href)).text()).split("/* ").filter(b => b.startsWith("latin */")).map(b => b.slice(8)).join("\n");
+    for (const u of [...new Set((css.match(/url\((https:[^)]+)\)/g) || []).map(x => x.slice(4, -1)))]) {
+      const blob = await (await fetch(u)).blob();
+      const data = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+      css = css.split(u).join(data);
+    }
+    return css;
+  })().catch(() => "");
+  return fontCssPromise;
+}
 const settle = el => Promise.all([...el.querySelectorAll("img")].map(i => i.complete ? null : new Promise(r => { i.onload = i.onerror = r; })));
 async function buildExport(section) {
   const d = DATA[STATE.sport], game = STATE.game ? (d.games || []).find(g => g.event_id === STATE.game) : null;
@@ -337,7 +364,9 @@ async function exportSection(btn) {
   try {
     await loadH2I();
     frame = await buildExport(section);
-    const url = await window.htmlToImage.toPng(frame, {pixelRatio: 2, backgroundColor: "#04070c"});
+    // The frame sits off-screen while it lays out; the capture puts it back at the origin (else the PNG is blank).
+    const url = await window.htmlToImage.toPng(frame, {pixelRatio: 2, backgroundColor: "#04070c",
+      style: {position: "static", left: "0", top: "0"}, fontEmbedCSS: await fontEmbedCSS()});
     const a = document.createElement("a");
     a.href = url;
     a.download = `syndicate-${STATE.sport}-${META.date || DATA[STATE.sport].date}${STATE.game ? "-game" : ""}-${section.dataset.section}.png`;
