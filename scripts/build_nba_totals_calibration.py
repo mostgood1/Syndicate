@@ -37,8 +37,21 @@ GLOBAL_CLIP = 15.0
 TEAM_CLIP = 4.0
 # Opening-night seed: global bias only (team terms do not carry across seasons). Set from the 2025-26 FIT-window
 # fit (final 14 days) once measured -- None means "no seed": write nothing until 8 regular-season games exist.
-SEED_GAME_TOTAL_BIAS: Optional[float] = None
-SEED_SOURCE = "unset"
+SEED_GAME_TOTAL_BIAS: Optional[float] = 2.50
+SEED_SOURCE = ("2025-26 FIT window, final 14 days, switched raw (no def subtraction, no outs penalty); findings_2026-10-06 "
+               "#1f measurement (1), lane basketball-scenario-calibration")
+# Production gate (user decision 2026-10-15, enable on a passing VALID read): the files change production totals, and
+# they were fitted for the FINAL Phase 2 engine config. So the job writes NOTHING unless `nba_engine_config.json` is
+# present and enabled on the same processed root. No config file = today's fleet (0 calibration files).
+ENGINE_CONFIG_FILE = "nba_engine_config.json"
+
+
+def _engine_config_enabled(processed_root: Path) -> bool:
+    try:
+        f = Path(processed_root) / ENGINE_CONFIG_FILE
+        return f.is_file() and bool(json.loads(f.read_text(encoding="utf-8")).get("enabled", True))
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _clamp(v: Any, lo: float, hi: float) -> float:
@@ -180,11 +193,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     import pandas as pd
 
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
-    ap.add_argument("--date", required=True, help="Slate date YYYY-MM-DD; the file is anchored on the day before")
-    ap.add_argument("--processed-root", required=True, help="<nba_source>/data/processed")
+    ap.add_argument("--date", default="", help="Slate date YYYY-MM-DD (default: today, UTC); the file is anchored on the day before")
+    ap.add_argument("--processed-root", default="", help="<nba_source>/data/processed (default: the NBA source root's)")
     ap.add_argument("--force", action="store_true", help="Rebuild even if the anchor file already exists")
     args = ap.parse_args(argv)
+    if not args.processed_root:
+        if str(REPO_ROOT) not in sys.path:
+            sys.path.insert(0, str(REPO_ROOT))
+        from syndicate.features.shared.basketball_live_state import source_root
+
+        args.processed_root = str(source_root("nba") / "data" / "processed")
+    if not args.date:
+        args.date = pd.Timestamp.now(tz="UTC").date().isoformat()
     root = Path(args.processed_root)
+    if not _engine_config_enabled(root):
+        print(json.dumps({"status": "skipped", "reason": f"{ENGINE_CONFIG_FILE} absent or disabled on {root}"}), flush=True)
+        return 0
     anchor = (pd.Timestamp(args.date) - pd.Timedelta(days=1)).date().isoformat()
     out = root / f"calibration_totals_{anchor}.json"
     if out.is_file() and out.stat().st_size > 0 and not args.force:

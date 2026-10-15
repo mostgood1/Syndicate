@@ -959,6 +959,11 @@ SCHEDULED_JOBS: tuple[ScheduledJob, ...] = (
     # games are final; in the offseason it re-reads a complete season and
     # fetches nothing.
     ScheduledJob("ncaab-team-ratings", 10, 45, ("scripts/build_ncaab_team_ratings.py",)),
+    # `nba-totals-calibration` (lane `basketball-scenario-calibration`, user decision 2026-10-15: enable the FINAL
+    # Phase 2 NBA config on a passing VALID read): the walk-forward game-total calibration file for today's slate
+    # (anchored yesterday) from the regular-season smart sims + recon finals. WRITES NOTHING unless
+    # nba_engine_config.json is present and enabled on the NBA processed root -- so this entry is inert until then.
+    ScheduledJob("nba-totals-calibration", 11, 5, ("scripts/build_nba_totals_calibration.py",)),
     # `basketball-linescores` (lane `games-rail-full-detail`, user 2026-10-13 "keep the pbp step
     # for the line scores"; added under a USER-APPROVED cross-lane override -- this file is claimed by
     # `basketball-native-live-state` for its rotation-stints entry only): yesterday's NBA + WNBA

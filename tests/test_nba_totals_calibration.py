@@ -72,8 +72,15 @@ def test_main_writes_the_anchor_file_atomically_and_respects_exists(tmp_path, re
         for h, a in (("BOS", "NYK"), ("LAL", "GSW")):
             _sim(tmp_path, day, h, a, 215.0)
         _recon(tmp_path, day, [("BOS", "NYK", 115, 115), ("LAL", "GSW", 115, 115)])
+    # Production gate: no engine config on the root -> nothing is written (today's fleet: 0 calibration files).
     assert b.main(["--date", "2025-11-06", "--processed-root", str(tmp_path)]) == 0
     out = tmp_path / "calibration_totals_2025-11-05.json"
+    assert not out.exists()
+    (tmp_path / b.ENGINE_CONFIG_FILE).write_text(json.dumps({"enabled": False}), encoding="utf-8")
+    b.main(["--date", "2025-11-06", "--processed-root", str(tmp_path)])
+    assert not out.exists()
+    (tmp_path / b.ENGINE_CONFIG_FILE).write_text(json.dumps({"enabled": True}), encoding="utf-8")
+    assert b.main(["--date", "2025-11-06", "--processed-root", str(tmp_path)]) == 0
     data = json.loads(out.read_text(encoding="utf-8"))
     assert data["global"]["game_total_bias"] == pytest.approx(15.0) and data["meta"]["anchor"] == "2025-11-05"
     assert not list(tmp_path.glob("*.tmp"))

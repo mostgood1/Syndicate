@@ -726,6 +726,75 @@ def _build_smart_sim_config_local(*, n_sims: int, seed: int | None, use_pbp: boo
     )
 
 
+NBA_ENGINE_CONFIG_FILE_LOCAL = "nba_engine_config.json"
+
+
+def _nba_engine_config_local(*, processed_root: Path | None) -> dict[str, Any]:
+    """NBA engine configuration file (lane basketball-scenario-calibration, Phase 2 production wiring, user decision
+    2026-10-15: enable the FINAL Phase 2 config on a passing VALID read). File `nba_engine_config.json` on the NBA
+    processed root, re-read per game; ABSENT, unreadable, `"enabled": false` or naming ANY unknown field = today's
+    behaviour (a named, printed rejection -- never a partial apply). Shape:
+        {"enabled": true,
+         "event_sim_config": {<native EventSimConfig field>: value, ...},
+         "league_params":    {<LeagueParams field>: value, ...}}
+    JSON lists become tuples (e.g. foul_trouble_thresholds). Never raises."""
+    try:
+        if processed_root is None:
+            return {}
+        path = Path(processed_root) / NBA_ENGINE_CONFIG_FILE_LOCAL
+        if not path.is_file():
+            return {}
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict) or not bool(raw.get("enabled", True)):
+            return {}
+        import dataclasses as _dc
+
+        from syndicate.features.basketball_engine import engine as native_engine
+        from syndicate.features.basketball_engine.league import LeagueParams
+
+        ev = dict(raw.get("event_sim_config") or {})
+        lp = dict(raw.get("league_params") or {})
+        unknown = sorted(set(ev) - {f.name for f in _dc.fields(native_engine.EventSimConfig)}) +             sorted(set(lp) - {f.name for f in _dc.fields(LeagueParams)})
+        if unknown:
+            print(f"NBA_ENGINE_CONFIG_REJECTED unknown fields {unknown} in {path}", flush=True)
+            return {}
+        tup = lambda v: tuple(v) if isinstance(v, list) else v  # noqa: E731
+        return {"event_sim_config": {k: tup(v) for k, v in ev.items()},
+                "league_params": tuple(sorted((k, tup(v)) for k, v in lp.items()))}
+    except Exception as exc:  # noqa: BLE001
+        print(f"NBA_ENGINE_CONFIG_UNREADABLE {type(exc).__name__}: {str(exc)[:200]}", flush=True)
+        return {}
+
+
+_NBA_CONFIGURED_CFG_CLASSES: dict[tuple, type] = {}
+
+
+def _apply_nba_engine_config_local(cfg: SmartSimConfigLocal, *, processed_root: Path | None, league_code: str) -> SmartSimConfigLocal:
+    """The configured NBA event cfg: today's EventSimConfigLocal with the file's fields set, plus
+    `league_params_overrides` (read by `_call_native_engine_local` to pick the engine). Unchanged when the file is
+    absent or rejected, so production without the file is byte-identical."""
+    import dataclasses as _dc
+
+    if str(league_code or "").strip().lower() != "nba":
+        return cfg
+    conf = _nba_engine_config_local(processed_root=processed_root)
+    if not conf:
+        return cfg
+    base = cfg.event_cfg if cfg.event_cfg is not None else EventSimConfigLocal()
+    have = {f.name for f in _dc.fields(base)}
+    values = {f.name: getattr(base, f.name) for f in _dc.fields(base)}
+    values.update(conf["event_sim_config"])
+    values["league_params_overrides"] = conf["league_params"]
+    extra = tuple(sorted(k for k in values if k not in have))
+    key = (type(base), extra)
+    cls = _NBA_CONFIGURED_CFG_CLASSES.get(key)
+    if cls is None:
+        cls = _dc.make_dataclass(f"{type(base).__name__}NbaConfigured", [(k, Any, None) for k in extra],
+                                 bases=(type(base),), frozen=True)
+        _NBA_CONFIGURED_CFG_CLASSES[key] = cls
+    return _dc.replace(cfg, event_cfg=cls(**values))
+
+
 def _clean_id_str_local(value: object) -> str:
     text = str(value or "").strip()
     if not text:
@@ -2984,7 +3053,7 @@ def _local_boxscore_geometry(league_code: str | None = None) -> tuple[int, int, 
 _ENGINES_LOCAL: dict[str, Any] = {}
 
 
-def _engine_for_league_local(league_code: str | None):
+def _engine_for_league_local(league_code: str | None, league_params_overrides: tuple | None = None):
     """The league's possession engine (a `LeagueEngine`: switches as attributes, sampler bound).
 
     Code mapping is the vendored route's, unchanged: "wnba" -> WNBA, anything else -> NBA.
@@ -3004,12 +3073,21 @@ def _engine_for_league_local(league_code: str | None):
 
     no_stack = code == "nba" and nba_team_inputs.enabled()
     key = f"{code}:nostack" if no_stack else code
+    # `nba_engine_config.json` league_params (basketball-scenario-calibration, production wiring): a sorted tuple of
+    # (LeagueParams field, value), applied on top; None/empty = the engine exactly as before.
+    overrides = tuple(league_params_overrides or ()) if code == "nba" else ()
+    if overrides:
+        key = f"{key}:{overrides!r}"
     if key not in _ENGINES_LOCAL:
         params = league_params(code)
         if no_stack:
             import dataclasses
 
             params = dataclasses.replace(params, team_prior_stacks_on_target=False)
+        if overrides:
+            import dataclasses
+
+            params = dataclasses.replace(params, **dict(overrides))
         _ENGINES_LOCAL[key] = LeagueEngine(params, sample_lineup=_sample_lineup_local)
     return _ENGINES_LOCAL[key]
 
@@ -3026,7 +3104,8 @@ def _call_native_engine_local(*, entrypoint_name: str, league_code: str, kwargs:
     call_kwargs = {k: v for k, v in kwargs.items() if k in allowed}
     if league_code == "nba" and entrypoint_name == "simulate_pbp_game_boxscore":
         _persist_engine_inputs_once_local(call_kwargs)
-    return getattr(_engine_for_league_local(league_code), entrypoint_name)(**call_kwargs)
+    overrides = getattr(call_kwargs.get("cfg"), "league_params_overrides", None)
+    return getattr(_engine_for_league_local(league_code, overrides), entrypoint_name)(**call_kwargs)
 
 
 # P3 (lane nba-native-live-resim, LOAN from basketball-native-engine, user-approved 2026-10-09): the NBA live
@@ -4872,6 +4951,7 @@ def _smart_sim_worker_run_local(job: dict) -> dict:
         away_ctx = TeamContextLocal(team=away_tri, pace=away_pace, off_rating=away_off_rtg, def_rating=away_def_rtg, injuries_out=away_outs, back_to_back=away_b2b, rest_days=(int(away_rest_days) if away_rest_days is not None else None), off_rating_from_points=from_points)
         qsum = _simulate_quarters_local(processed_root=out_path.parent, inp=GameInputsLocal(date=date_s, home=home_ctx, away=away_ctx, market_total=market_total_for_quarters, market_home_spread=home_spread), league=LEAGUE, n_samples=3000)
         cfg = _build_smart_sim_config_local(n_sims=int(state.get("n_sims") or job.get("n_sims") or 0), seed=state.get("seed"), use_pbp=bool(state.get("pbp")), roster_mode=str(state.get("roster_mode") or job.get("roster_mode") or "historical"))
+        cfg = _apply_nba_engine_config_local(cfg, processed_root=out_path.parent, league_code=str(state.get("league_code") or "nba"))
         pre_ctx = {
             "home_injuries_out": home_outs,
             "away_injuries_out": away_outs,
