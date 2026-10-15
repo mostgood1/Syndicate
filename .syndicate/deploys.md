@@ -49552,3 +49552,23 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 - **claim:** web by cheat-sheets, token 93f9b5ec..., target 5b7d0086; acquire exit 0. **Ride-alongs listed in a SEPARATE call before the merge** (the 01:03Z lesson): f6fe86bd ledger-only + this lane's `cheat_sheets.py`; the merge script refused to run if HEAD had moved since the listing.
 - **why no reload:** `price_check` runs in the generator only; the web never calls it.
 - **verify (8:10-8:15 PM CT):** the 10-14 rebuilt games re-run on 5b7d0086 -- MLB value rows **10 -> 9 (stale-line guard) -> 3 (fee-net)**: six of the apparent MLB edges were the Kalshi / Polymarket taker fee (Kalshi 0.82c, Polymarket 1.5c, ProphetX 0.47c a contract at q=0.62 from `venue_fees.taker_fee_per_contract`); Snell K under 5.5 (Kalshi +178) reads "Check price" (> 10%). NHL 102 rows (40 kept + rebuilt), NCAAF 118 -- no value rows either way.
+
+## 2026-10-14 01:24Z -- READING: soccer live refresh on served cards (lane games-rail-full-detail)
+
+(Header date is the task's; the reading ran 2026-10-15 01:21-01:24Z = 2026-10-14 20:21-20:24 CT.) READ-ONLY; nothing restarted or deployed. Source: local web `http://127.0.0.1:10000/api/board/game-chips?sports=soccer` (from WSL), vs ESPN `soccer/usa.1/summary?event=<game_key>`.
+
+**Population:** date=2026-10-14 -> 218 chips (136 pregame, 71 final, **10 live**, 1 postponed); date=2026-10-15 returns the same 218. All 10 live are MLS (game_keys 761860-761869): 7 matches in 2H (74'-82'), 3 in 1H (37'-41'). 8 of 10 carry a pressure line, e.g. `MLS · NYR pressing · 7–0 shots, 2–0 corners, last 15'`; ATL@MTL and VAN@STL show plain `MLS`. Linescores are `kind=periods`, labels `["1H"]` or `["1H","2H"]`.
+
+**Comparison (chip fetch and ESPN fetch within 0-3 s of each other):**
+
+| game_key | match | chip date=10-14 | ESPN | chip date=10-15 | verdict (10-14 / 10-15) |
+|---|---|---|---|---|---|
+| 761860 | ORL @ TOR | 80' 2-2, 1H 1-1 / 2H 1-1 | 81' 2-2, [1,1]/[1,1] | **76' 1-2**, 2H 0-1 | MATCH / **STALE: missing goal** |
+| 761863 | NYR @ DC | 78' 1-2, [0,1]/[2,0] | 78' 1-2, [0,1]/[2,0] | 74' 1-2 | MATCH / minute -4' |
+| 761866 | SKC @ NSH | 41' 0-3, 1H [0]/[3] | 41' 0-3, [0]/[3] | 37' 0-3 | MATCH / minute -4' |
+
+**date=2026-10-14 chips: 3 of 3 MATCH** (minute within 1', score and halves identical).
+
+**date=2026-10-15 chips lag the 10-14 chips by 3-5 min for the same matches.** Repeated reads of 761860 at 45 s spacing: 01:22:15Z 10-14 81' 2-2 vs 10-15 76' 1-2; 01:23:06Z 82' vs 79' 2-2; 01:23:53Z 82' vs 81'. So the 10-15 view is NOT stuck -- it refreshes, but on a slower/separate cache cadence, and for ~4 min it served a score missing an equaliser. Not diagnosed which cache (per-date key on the serve-time refresh is the obvious suspect). Relevance: after 00:00Z (19:00 CT) the evening MLS slate is "today" in UTC but "yesterday" in CT; whichever date the board asks for, the two must not disagree on a live score. Lead, not a fix.
+
+Pressure lines were the same text on both dates and across reads 30 s apart; not compared with ESPN (no ESPN field read for it).
