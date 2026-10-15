@@ -549,8 +549,28 @@ def run_sim(args) -> int:
         # engine module carries every switch value at call time.
         orig_real = getattr(bpss, entry_name)
 
+        dumped: set = set()
+
+        def _dump_priors(kwargs) -> None:
+            # Phase 2 #5c: the per-player shooting priors exactly as they reach the engine, one row set per distinct lineup frame.
+            cols = ("_sim_min", "_prior_fga_pm", "_prior_fgm_pm", "_prior_threes_pm", "_prior_threes_att_pm", "_prior_fta_pm", "_prior_ftm_pm")
+            for side in ("home_players", "away_players"):
+                df = kwargs.get(side)
+                if df is None or not hasattr(df, "columns") or "player_name" not in df.columns:
+                    continue
+                key = tuple(sorted(str(x) for x in df["player_name"]))
+                if key in dumped:
+                    continue
+                dumped.add(key)
+                rows = [{c: (float(r[c]) if c in df.columns and r[c] == r[c] else None) for c in cols} | {"player_name": str(r["player_name"])}
+                        for _, r in df.iterrows()]
+                with open(args.dump_priors, "a", encoding="utf-8") as fh:
+                    fh.write(json.dumps({"side": side, "rows": rows}) + "\n")
+
         def real_probe(*, entrypoint_name, league_code, kwargs):
             lever_seen["calls"] += 1
+            if getattr(args, "dump_priors", None):
+                _dump_priors(kwargs)
             c = kwargs.get("cfg")
             cfg_ok = not levers or (c is not None and all(getattr(c, k, None) == v for k, v in levers.items()))
             if cfg_ok and all(getattr(real_events, k) == v for k, v in flags.items()):
@@ -862,6 +882,7 @@ def main(argv=None) -> int:
     ap.add_argument("--lever", action="append", help="EventSimConfig field=value applied to every draw (Phase 2 sweeps)")
     ap.add_argument("--engine-flag", action="append", help="module-level engine switch NAME=VALUE on the real events module (Phase 2 #1d)")
     ap.add_argument("--track-oncourt", action="store_true", help="record per-draw simulated minutes of the top-5 (Phase 2 #4)")
+    ap.add_argument("--dump-priors", help="append the per-player shooting priors reaching the engine to this JSONL (Phase 2 #5c)")
     ap.add_argument("--dates-file", default="", help="only these dates (one per line)")
     args = ap.parse_args(argv)
     if args.phase == "table":

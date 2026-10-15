@@ -2572,3 +2572,22 @@ tests/test_basketball_engine_two_point_split.py (NEW). P3 is told; it is a share
 **Not overridden.** The user decides between:
 - (a) carrying #5a into the final config with the 3P% guard overridden (3PM, the priced quantity, passes);
 - (b) pre-registering #5c, 3P% prior shrinkage for low-volume shooters, on top of #5a first.
+
+**USER DECISION 2026-10-15 (after #5a): "Fix the 3P% priors first".**
+
+### Phase 2 #5c — PRE-REGISTRATION 2026-10-15 02:05Z (before any run): where the residual 3P% (+1.4 pts) comes from
+
+**Step 1, diagnostic (no mechanism yet):** dump the per-player shooting priors exactly as they reach the engine.
+- Harness `--dump-priors`, committed with this entry. Run the P5 config on the 12 sweep dates (20 draws: priors do not
+  depend on draws).
+- Compute, per team-game:
+  - the team 3P% implied by the priors, weighted by expected 3PA (`_sim_min` × `_prior_threes_att_pm`), vs real;
+  - the same for 2P%;
+  - the share of 3PA from players at the clip edges (3P% ≥ 0.50 or ≤ 0.20) and from low-volume shooters
+    (`_prior_threes_att_pm` × `_sim_min` < 1 per game).
+
+**Decision rule:**
+- If the prior-implied team 3P% exceeds real by ≥ 0.01, the PRIOR is the source. Step 2 is a pre-registered prior
+  correction: shrink each player's 3P% toward the league rate by attempt volume (empirical-Bayes,
+  k = league-fit pseudo-attempts). Built default-off, measured like #5a.
+- If not, the residual is in the engine (shot selection or score effect). Diagnose that instead.
