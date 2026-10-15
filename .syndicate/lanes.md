@@ -970,6 +970,14 @@ death, never life — do not invert it.
 - Verification: Unit: an away-favoured game -- line -1.5 row has model_prob_over None with the named reason, line +1.5 row carries P(home -1.5) and the board serves home=p, away=1-p. Served board after deploy (refresh-worker, NHL slate): spreads rows at line -1.5 priced 0, rows at line +1.5 priced where the artifact has p_home_pl_-1.5, and 0 games where a served away -1.5 probability exceeds the same game's away moneyline probability
 - Blocked by: none
 
+### ci-suite-red-1015 — OPEN — opened 2026-10-15 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: todo #697: every NEW FAILURE in the fleet ci-suite (42 on 2026-10-15 08:48Z, commit 11bbdbcf) is either fixed on main, or attributed to the OPEN lane that owns its file with the reason, or recorded as a deliberate baseline --update named in a commit; the next 08:00Z run reads 0 NEW FAILURE(S) for every item this lane took
+- Files: tests/ (only test files whose owning lane is CLOSED or that no OPEN lane claims; per-file list recorded in this block as taken)
+- Hypothesis: n/a (triage)
+- Falsification test: n/a
+- Verification: re-run the 42 on origin/main; per test: fixed / owner-attributed / baseline-update; then the next scheduled ci-suite run's NEW FAILURE list
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
