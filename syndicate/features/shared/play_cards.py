@@ -203,7 +203,13 @@ def pick_card_fields(pick: Mapping[str, Any], *, sport: str, date: str, number: 
                    f"({fmt_american(pick.get('fair_price'))}) by {ev:+.1f}%")
     # The board's case minus its model sentences: the model is context or risk on a card, never the reason (see
     # `why_and_risk`); the chart already sets the sim against the market. Form, matchup, splits and history stay.
-    why += [s for s in detail_points(pick.get("detail"), limit=8) if not s.startswith(_MODEL_LEADS)][:3]
+    points = pick.get("points")
+    if points is None:                          # a pick stored before its case was broken into points
+        from syndicate.features.shared.cheat_sheets import ask_points
+
+        points = ask_points(pick.get("detail"), subject=pick.get("display_name"))
+    # Ask the Syndicate's case as the X.com sheets show it: short labelled checks (user 2026-10-15).
+    why += [f"{pt['label']}: {pt['text']}" if pt.get("label") else pt["text"] for pt in points][:4]
     risk: list[str] = []
     if str(pick.get("sim_view") or "") in ("disagrees", "contradicts"):
         risk.append("Our sim does not back this side: the edge is the price against the market")
@@ -226,7 +232,7 @@ def pick_card_fields(pick: Mapping[str, Any], *, sport: str, date: str, number: 
         "risk": risk[:3] or ["Lines move: re-check the price before betting"],
         "headshot": pick.get("headshot_url") if is_prop else None, "team_logo": pick.get("team_logo"),
         "home_logo": pick.get("home_logo"), "away_logo": pick.get("away_logo"),
-        "kickoff_ct": pick.get("kickoff_ct"),
+        "kickoff_ct": pick.get("kickoff_ct"), "hide_number": True,
     }
     if not fields["form_values"]:
         fields["chart_title"] = "Sim vs market"
@@ -357,6 +363,8 @@ def render_card(fields: Mapping[str, Any], logo_uri: str, template: str | None =
     caption = fields.get("chart_caption") or (f"{hits} of last {len(values)} cleared {side} {line:g}" if values and line is not None else "")
     return string.Template(template if template is not None else TEMPLATE.read_text(encoding="utf-8")).safe_substitute(
         logo=logo_uri, label=e(fields["label"]), number=fields["number"], away=e(away), home=e(home),
+        # "FREE PLAY #3"; a Syndicate pick is just "SYNDICATE PICK" (user 2026-10-15: "remove the number").
+        tag=e(fields["label"]) if fields.get("hide_number") else f'{e(fields["label"])} #{fields["number"]}',
         sport=e(fields["sport"]), kickoff=e(fields.get("kickoff_ct") or kickoff_label(fields.get("commence_time"))),
         player=e(fields["player"]), player_meta=e(meta), face=face_html(fields),
         away_crest=crest(fields.get("away_logo")), home_crest=crest(fields.get("home_logo")),

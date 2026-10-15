@@ -170,8 +170,20 @@ tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first
 .recap b { color: var(--accent); font-weight: 700; } .recap .sep { color: var(--muted); margin: 0 6px; }
 .final { font: 700 13px var(--mono); color: var(--ink); } .final b { color: var(--accent); }
 .xframe .recap { font-size: 16px; } .xframe .final { font-size: 15px; }
-.prop.pick { border-left: 3px solid var(--accent); padding-left: 12px; }
-.prop.pick .why { color: var(--ink); opacity: .85; }
+/* A Syndicate pick reads like the X.com sheets (user 2026-10-15): SmartSim tiles and a "why we like it" checklist,
+   not a paragraph. */
+.prop.pick { border-left: 3px solid var(--accent); padding-left: 12px; grid-template-columns: minmax(200px, 1.1fr) minmax(320px, 2fr); }
+.ptiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.ptile { border: 1px solid #1d3a55; border-radius: 8px; padding: 6px 6px 5px; background: rgba(10,21,32,.75); display: grid; gap: 1px; text-align: center; }
+.ptile span { font: 800 11px/1.2 var(--display); letter-spacing: .07em; text-transform: uppercase; color: var(--accent2); }
+.ptile b { font: 800 21px/1.1 var(--display); color: var(--ink); } .ptile b.pos { color: var(--accent); }
+.ptile i { font-style: normal; font-size: 11.5px; color: var(--muted); }
+.checks { grid-column: 1 / -1; list-style: none; margin: 2px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 4px 18px; }
+.checks li { font-size: 13px; padding-left: 20px; position: relative; }
+.checks li::before { content: "✓"; position: absolute; left: 2px; color: var(--accent); font-weight: 800; }
+.checks li b { color: var(--accent2); font: 800 11.5px var(--display); letter-spacing: .06em; text-transform: uppercase; margin-right: 5px; }
+.xframe .ptile b { font-size: 26px; } .xframe .ptile span { font-size: 13px; } .xframe .checks li { font-size: 16px; }
+@media (max-width: 760px) { .prop.pick { grid-template-columns: 1fr; } .ptiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .rtab td.lab { font-weight: 600; } .rtab tr.all td { border-top: 2px solid var(--accent); font-weight: 700; }
 .rtab td.n.pos { color: var(--accent); } .rtab td.n.neg { color: var(--price); }
 .chart svg { width: 100%; height: auto; display: block; } .chart .key { display: flex; gap: 16px; font-size: 12.5px; color: var(--muted); }
@@ -286,14 +298,22 @@ function pickRow(p, i) {
   const live = started(p.commence_time) ? `<span class="chip started">Started</span>` : "";
   // The board's suggested set moves with prices; a pick it no longer backs keeps its record price and says so.
   const off = p.on_board === false && !started(p.commence_time) ? `<span class="chip neutral" title="The board no longer suggests this at the current price">Not on the board now</span>` : "";
+  const proj = p.kind === "prop" && typeof p.projected === "number" ? `proj ${p.projected.toFixed(1)} vs ${p.line}` : "sim win rate";
+  const why = [`<li><b>Price</b>${odds(p.price)} beats the no-vig fair ${odds(p.fair_price)} by ${evs(p.ev_pct)}</li>`]
+    .concat((p.points || []).map(pt => `<li>${pt.label ? `<b>${esc(pt.label)}</b>` : ""}${esc(pt.text)}</li>`));
   return `<div class="prop pick" data-pk="${i}">
     <div class="who">${face({...p, player: p.display_name})}
-      <div class="line1"><span class="chip value">Syndicate pick</span>${sim}${off}${live}<b>${esc(p.display_name || "")}</b>${p.pos ? `<span class="pos">${esc(p.pos)}</span>` : ""}${card}</div>
-      <div class="meta">${esc(p.matchup || "")}${p.kickoff_ct ? ` · <span class="kick">${esc(p.kickoff_ct)}</span>` : ""}</div>
-      <div class="bet">${esc(p.bet || "")} · ${odds(p.price)} ${esc(p.book || "")}</div></div>
-    <div>${strip({price: p.price, p_market: p.p_market, p_model: p.p_model})}<div class="nums"><span>price <b>${pct(implied(p.price))}</b></span><span>fair <b>${pct(p.p_market)}</b></span><span>sim <b>${pct(p.p_model)}</b></span></div></div>
-    <div><div class="nums"><span>books <b>${p.books || "–"}</b></span><span class="ev ${p.ev_pct > 0 ? "pos" : "neg"}">EV ${evs(p.ev_pct)}</span></div></div>
-    ${p.detail ? `<div class="why">${esc(p.detail)}</div>` : ""}
+      <div class="line1"><span class="chip value">Syndicate pick</span>${sim}${off}${live}${card}</div>
+      <div class="line1"><b>${esc(p.display_name || "")}</b>${p.pos ? `<span class="pos">${esc(p.pos)}</span>` : ""}</div>
+      <div class="bet">${esc(p.bet || "")}</div>
+      <div class="meta">${[p.display_name === p.matchup ? "" : esc(p.matchup || ""), p.kickoff_ct ? `<span class="kick">${esc(p.kickoff_ct)}</span>` : ""].filter(Boolean).join(" · ")}</div></div>
+    <div class="ptiles">
+      <div class="ptile"><span>Best price</span><b>${odds(p.price)}</b><i>${esc(p.book || "")}${p.books ? ` · ${p.books} bks` : ""}</i></div>
+      <div class="ptile"><span>Fair line</span><b>${odds(p.fair_price)}</b><i>no-vig ${pct(p.p_market)}</i></div>
+      <div class="ptile"><span>SmartSim</span><b>${pct(p.p_model)}</b><i>${esc(proj)}</i></div>
+      <div class="ptile"><span>Edge</span><b class="${p.ev_pct > 0 ? "pos" : ""}">${evs(p.ev_pct)}</b><i>vs the fair price</i></div>
+    </div>
+    <ul class="checks">${why.slice(0, 6).join("")}</ul>
   </div>`;
 }
 function picksBlock(d, game) {

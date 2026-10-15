@@ -748,6 +748,50 @@ def pick_bet_text(pick: Mapping[str, Any]) -> str:
     return f"{pick.get('display_name')} {_LINE_WORDS.get(market, market).lower()}{seg}"
 
 
+_ASK_SENTENCE = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
+_ASK_MODEL_LEADS = ("Our sim has", "The live re-sim has", "No sim view", "It projects")
+_ASK_LABEL = re.compile(r"^(Recent form|Matchup|Vs position|History vs this team|Splits(?: \([^)]*\))?|Season metrics[^:]*)\s*:\s*(.*)$")
+_ASK_RANK = re.compile(r"\((\d+)(?:st|nd|rd|th) of (\d+)\)")
+
+
+def _ask_short(text: str, limit: int = 72) -> str:
+    text = re.sub(r"\s+", " ", text).strip().rstrip(".")
+    return text if len(text) <= limit else text[: limit - 1].rsplit(" ", 1)[0] + "…"
+
+
+def ask_points(detail: Any, *, subject: Any = None, limit: int = 5) -> list[dict[str, str]]:
+    """Ask the Syndicate's case for a pick -- the board card's `detail`, the paragraph Ask quotes -- as short labelled
+    points in the style of the X.com sheets (user 2026-10-15: "we also need the 'Ask The Syndicate' data to be cleaner
+    in how its represented on these picks"). The sim's own numbers are NOT points: they live in the SmartSim tiles,
+    and the model is context, never the reason. Season metrics keep their two best ranks."""
+    points: list[dict[str, str]] = []
+    name = str(subject or "").strip()
+    for sentence in _ASK_SENTENCE.split(str(detail or "").strip()):
+        sentence = sentence.strip()
+        if not sentence or sentence.startswith(_ASK_MODEL_LEADS):
+            continue
+        if name:
+            sentence = sentence.replace(f" {name} ", " ")
+        m = _ASK_LABEL.match(sentence)
+        label, body = (m.group(1), m.group(2)) if m else ("", sentence)
+        if label.startswith("Season metrics"):
+            items = [x.strip().rstrip(".") for x in body.split(";") if x.strip()]
+            ranked = sorted(items, key=lambda x: (int(r.group(1)) / int(r.group(2))) if (r := _ASK_RANK.search(x)) else 9.0)
+            points += [{"label": "Season", "text": _ask_short(x)} for x in ranked[:2]]
+            continue
+        body = re.sub(r";\s*log since [0-9-]+", "", body).replace(" logged games", " games")
+        if label.startswith("Splits"):
+            label, body = "Splits", body.split(";")[0]
+        if label == "History vs this team":
+            label = "Vs this team"
+        if label == "Matchup" and ";" in body:
+            first, _, rest = body.partition(";")
+            points.append({"label": "Matchup", "text": _ask_short(first)})
+            label, body = "Opponent", rest.strip()
+        points.append({"label": label, "text": _ask_short(body)})
+    return points[:limit]
+
+
 def pick_record(card: Mapping[str, Any], *, promoted_at: str) -> dict[str, Any]:
     """The slim pick the sheet keeps -- frozen at the price it was PROMOTED at, like every row of a day's record."""
     quote = card.get("quote") or {}
@@ -762,7 +806,11 @@ def pick_record(card: Mapping[str, Any], *, promoted_at: str) -> dict[str, Any]:
         "projected": card.get("projected"), "detail": card.get("detail"), "headshot_url": card.get("headshot_url"),
         "commence_time": card.get("commence_time"), "board_score": card.get("board_score"), "promoted_at": promoted_at,
     }
+    if out.get("kind") != "prop" and str(out.get("market") or "").startswith(("totals", "alternate_totals")):
+        # A total is no team's pick: it reads by its game ("Over 47.5" under "Georgia Southern @ Old Dominion").
+        out["display_name"] = out.get("matchup") or out.get("display_name")
     out["bet"] = pick_bet_text(out)
+    out["points"] = ask_points(card.get("detail"), subject=card.get("display_name"))
     return out
 
 

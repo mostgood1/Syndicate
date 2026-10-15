@@ -622,8 +622,8 @@ def build_picks(cards: list[dict[str, Any]], sheet: dict[str, Any], *, sport: st
             if row:
                 pick.update({"team": row.get("team"), "pos": row.get("pos"), "team_logo": row.get("team_logo"),
                              "headshot_url": pick.get("headshot_url") or row.get("headshot_url"), "card_row": True})
-        else:
-            pick["team_logo"] = logo_url(sport, pick.get("display_name"))
+        else:   # a side's crest; a total (no side) wears the home crest
+            pick["team_logo"] = logo_url(sport, card.get("display_name")) or pick["home_logo"]
         if "mlbstatic.com" in str(pick.get("headshot_url") or "") and "/w_180," in pick["headshot_url"]:
             pick["headshot_url"] = pick["headshot_url"].replace("/w_180,", "/w_360,")
         pick["kickoff_ct"] = kickoff_ct(pick.get("commence_time"))
@@ -631,18 +631,32 @@ def build_picks(cards: list[dict[str, Any]], sheet: dict[str, Any], *, sport: st
     return out
 
 
+_PICK_PRESENTATION = ("display_name", "detail", "points", "team_logo", "home_logo", "away_logo", "headshot_url",
+                      "team", "pos", "kickoff_ct", "segment_label", "bet")
+
+
 def merge_picks(fresh: list[dict[str, Any]], prior: dict[str, Any] | None) -> list[dict[str, Any]]:
     """A day's picks are a RECORD: one promoted earlier keeps its first price and stays when the board drops it later
     (its line moved, its game started); a new one joins. Board score order, earliest promotions first on ties."""
     kept = {p.get("pick_id"): dict(p) for p in (prior or {}).get("picks") or [] if p.get("pick_id")}
     for p in fresh:
-        kept.setdefault(p.get("pick_id"), p)
+        if p.get("pick_id") in kept:
+            # The PRICE is frozen at first promotion; how the pick READS (its name, the case's points, its crests)
+            # follows the board while the board still carries it.
+            kept[p["pick_id"]].update({k: p[k] for k in _PICK_PRESENTATION if p.get(k) is not None})
+        else:
+            kept[p.get("pick_id")] = p
     # Whether the board STILL suggests it at this build: the suggested set moves with prices within minutes
     # (measured 2026-10-15: 3 of 7 dropped and 1 joined between a build and the next read), and a pick the board
     # no longer backs must say so before anyone posts it.
     live = {p.get("pick_id") for p in fresh}
     for pick_id, p in kept.items():
         p["on_board"] = pick_id in live
+        if "points" not in p:     # promoted before the case was broken into points (2026-10-15)
+            p["points"] = cs.ask_points(p.get("detail"), subject=p.get("display_name"))
+        if p.get("kind") != "prop" and str(p.get("market") or "").startswith(("totals", "alternate_totals")) and p.get("matchup"):
+            p["display_name"] = p["matchup"]          # a total reads by its game
+            p["team_logo"] = p.get("team_logo") or p.get("home_logo")
     return sorted(kept.values(), key=lambda p: (-(p.get("board_score") or 0), str(p.get("promoted_at"))))
 
 

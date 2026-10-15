@@ -116,10 +116,10 @@ def test_a_syndicate_pick_card_shows_its_case_without_making_the_model_the_reaso
     assert f["bet"] == "MILWAUKEE BREWERS MONEYLINE · 1ST 3 INNINGS" and f["price"] == "+138" and f["fair"] == "+129"
     assert f["team"] == "1st 3 innings" and f["headshot"] is None and f["edge"] == "+3.9%"
     assert f["why"][0].startswith("Best price +138 beats the no-vig fair (+129)")
-    assert not any(w.startswith("Our sim has") for w in f["why"]) and "Recent form: Brewers led after 3 in 6 of their last 10." in f["why"]
+    assert not any(w.startswith("Our sim has") for w in f["why"]) and "Recent form: Brewers led after 3 in 6 of their last 10" in f["why"]
     assert f["chart_title"] == "Sim vs market" and "Our sim" in f["chart_svg"] and "51%" in f["chart_svg"]
-    html = pc.render_card(f, "data:,", template="$chart_title|$bet|$chart_caption")
-    assert html.startswith("Sim vs market|MILWAUKEE BREWERS MONEYLINE")
+    html = pc.render_card(f, "data:,", template="$chart_title|$bet|$chart_caption|$tag")
+    assert html.startswith("Sim vs market|MILWAUKEE BREWERS MONEYLINE") and html.endswith("|SYNDICATE PICK")   # no number
     rec = pc.ledger_record(f, _pick(), sport="mlb", generated_at="2026-10-15T14:00:00Z")
     assert rec["segment"] == "first3" and rec["pick_id"] == "l2_129acb8c9c927fb9" and rec["price"] == 138 and rec["kind"] == "game"
 
@@ -133,3 +133,28 @@ def test_the_daily_cards_promote_the_syndicate_picks_first():
     without = {"sport": "nfl", "date": "2026-10-15", "rows": [value_row], "picks": []}
     cards = pc.pick_cards([with_picks, without], per_sport=3)
     assert [(f["label"], f["player"]) for f, _item, _s in cards] == [("SYNDICATE PICK", "Milwaukee Brewers"), ("FREE PLAY", "Somebody")]
+
+
+
+def test_ask_the_syndicates_case_becomes_short_labelled_points():
+    # User 2026-10-15: "the 'Ask The Syndicate' data to be cleaner in how its represented on these picks ... refer to
+    # the X.COM sheets". The sim's sentences are tiles, not points; season metrics keep their two best ranks.
+    from syndicate.features.shared import cheat_sheets as cs
+
+    detail = ("Our sim has Junior Caminero over 0.5 hits at 63.7%; the no-vig market across 6 books says 62.1%. "
+              "Recent form: over 0.5 in 7 of the last 10 logged games (avg 1; log since 2026-09-23). "
+              "Splits (2023-26): vs RHP .265 AVG, 72 HR in 1140 PA; vs CLE .227 AVG, 3 HR in 76 PA (2024-26). "
+              "History vs this team: over 0.5 in 12 of 19 games since 2024-09-12. "
+              "Matchup: vs Gavin Williams (career) 2 hits in 10 PA, 1 HR, 3 K, 0 BB. It projects an average of 1.1 against the 0.5 line. "
+              "Season metrics, 2,880 pitches: xwOBA Junior Caminero 0.410 (73rd of 461); Barrel rate Junior Caminero 13.3% (41st of 461); "
+              "Hard-hit rate Junior Caminero 50.4% (27th of 461).")
+    pts = cs.ask_points(detail, subject="Junior Caminero", limit=8)
+    assert pts == [{"label": "Recent form", "text": "over 0.5 in 7 of the last 10 games (avg 1)"},
+                   {"label": "Splits", "text": "vs RHP .265 AVG, 72 HR in 1140 PA"},
+                   {"label": "Vs this team", "text": "over 0.5 in 12 of 19 games since 2024-09-12"},
+                   {"label": "Matchup", "text": "vs Gavin Williams (career) 2 hits in 10 PA, 1 HR, 3 K, 0 BB"},
+                   {"label": "Season", "text": "Hard-hit rate 50.4% (27th of 461)"},
+                   {"label": "Season", "text": "Barrel rate 13.3% (41st of 461)"}]
+    nfl = cs.ask_points("Matchup: over 1.5 in 4 of 6 vs ARI; ARI has allowed 32.4 points a game (5 games).")
+    assert nfl == [{"label": "Matchup", "text": "over 1.5 in 4 of 6 vs ARI"}, {"label": "Opponent", "text": "ARI has allowed 32.4 points a game (5 games)"}]
+    assert all(len(p["text"]) <= 72 for p in cs.ask_points("Recent form: " + "x " * 200))
