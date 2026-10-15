@@ -67,6 +67,14 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### nhl-refresh-dead-vendored-cli — OPEN — opened 2026-10-15 — session 2d413211
+- Goal: Delete the dead vendored `nhl_betting.cli` launcher from scripts/refresh_nhl_oddsapi.py (`_default_source_root`, `_source_python_executable`, `_source_data_root`, `_run_source_cli`, `_run_source_generation`, `_run_source_generation_multi`, `_pushd`) and the test patches that reference it, with no behaviour change (user decision 2026-10-15, from "move the nhl schedule commence times off vendor").
+- Files: scripts/refresh_nhl_oddsapi.py (vendored source-CLI launcher section only), tests/test_nhl_refresh_runner.py (_run_source_generation_multi patches only)
+- Hypothesis: none of these is reachable -- the refresh hard-sets `source_root = None` ("Phase 5 direct cutover: the vendor nhl_betting subprocess is fully retired") and no caller of _run_source_generation exists in syndicate/, scripts/ or tests (only test patches).
+- Falsification test: any non-test reference to a removed name, or any NHL refresh test failing after the removal.
+- Verification: grep shows no reference; NHL refresh tests pass; after a fleet ff the next NHL refresh run completes as before (script-only, per-run subprocess).
+- Blocked by: none
+
 ### nba-t-window-provider — OPEN — opened 2026-10-14 — session 2d413211
 - GOAL VERDICT. Goal (verbatim): "Give the live loop's T-window an NBA commence-time provider (`_nba_commence_times`) reading the native data-root NBA schedule, so NBA gets per-game T-75/T-10 pregame odds sweeps; cost measured per slate before deploy; deployed with a measurement (user decision 2026-10-14, from "move the nba schedule commence times off vendor": nothing vendored existed, NBA had no provider)." -- **GOAL: NOT MET** `[2026-10-15 01:38Z]`. fd7f2a2d on main and ON the fleet's disk (carried by 7921b98b, 01:03:40Z), NOT loaded: the live-odds-worker runs b308154b. Loads at its self-recycle ~03:35Z (user: let the recycle do it). Cost simulated: 2-4 sweeps/slate. Left: the provider check under the recycled worker's env, then the first nba:ramp marker on a slate. deploys.md 01:33:41Z.
 - Goal: Give the live loop's T-window an NBA commence-time provider (`_nba_commence_times`) reading the native data-root NBA schedule, so NBA gets per-game T-75/T-10 pregame odds sweeps; cost measured per slate before deploy; deployed with a measurement (user decision 2026-10-14, from "move the nba schedule commence times off vendor": nothing vendored existed, NBA had no provider).
