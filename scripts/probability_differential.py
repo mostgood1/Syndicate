@@ -231,6 +231,41 @@ AMERICAN_TO_PROBABILITY: list[Impl] = [
     # `scripts.consensus_movement_by_sport:_implied` was registered here the same
     # day and then DELETED (lane `consensus-movement-implied-guard`): it priced 0
     # as 0.0, and the script now imports the owner, `opportunity_signals.implied_probability`.
+    # ADDED 2026-10-15 (lane `probability-differential-sweep-1015`): the tripwire
+    # had 39 unlisted names, red on main. Registered from the HARNESS side only --
+    # every source file belongs to another lane or is a generated port, and none
+    # was edited. Classified from each BODY. The `outer.inner` rows are NESTED
+    # defs, run in place by `_resolve_nested`.
+    Impl("american_to_probability", "scripts.backtest_ncaaf_attribution_props", "_implied",
+         "float() coercion + zero guard"),
+    Impl("american_to_probability", "scripts.grade_wnba_served_props", "implied",
+         "float() coercion + zero guard"),
+    Impl("american_to_probability", "syndicate.features.shared.closing_line_history", "_implied",
+         "DUAL SCALE: 1 < price < 100 is read as DECIMAL odds; refuses 0 and the rest of (-100, 100)"),
+    Impl("american_to_probability", "syndicate.features.shared.game_chip_detail", "_american_prob",
+         "`_num` coercion (None/''/NaN -> None) + zero guard"),
+    Impl("american_to_probability", "syndicate.features.shared.cheat_sheets", "implied_from_price",
+         "1/decimal_odds(price): refuses None and 0, RAISES on '' (bare float())"),
+    Impl("american_to_probability", "syndicate.features.nba.live_tick.tick", "_american_to_implied_prob",
+         "float() coercion + finite + zero guard"),
+    Impl("american_to_probability", "syndicate.features.wnba.live_tick.tick", "_american_to_implied_prob",
+         "float() coercion + finite + zero guard"),
+    Impl("american_to_probability", "syndicate.features.nba.live_tick.tick", "api_live_player_lens._implied_prob_american",
+         "NESTED; float() coercion + finite + zero guard"),
+    Impl("american_to_probability", "syndicate.features.wnba.live_tick.tick", "api_live_player_lens._implied_prob_american",
+         "NESTED; float() coercion + finite + zero guard"),
+    Impl("american_to_probability", "syndicate.features.shared.basketball_market_board", "_devig_over.implied",
+         "NESTED, the scalar half of `_devig_over`; refuses |price| < 100"),
+    Impl("american_to_probability", "syndicate.features.nba.source_cli.cli", "_merge_odds_df.implied_prob_american",
+         "NESTED, generated port; pd.NA on refusal; NO zero guard (0 -> 1.0)"),
+    Impl("american_to_probability", "syndicate.features.wnba.source_cli.cli", "_merge_odds_df.implied_prob_american",
+         "NESTED, generated port; pd.NA on refusal; NO zero guard (0 -> 1.0)"),
+    Impl("american_to_probability", "syndicate.features.nba.source_cli.odds_api",
+         "consensus_lines_at_close._implied_prob_from_american_or_prob",
+         "NESTED, generated port; DUAL SCALE (a value in (0, 1) passes through) and clips to [1e-6, 1-1e-6]"),
+    Impl("american_to_probability", "syndicate.features.wnba.source_cli.odds_api",
+         "consensus_lines_at_close._implied_prob_from_american_or_prob",
+         "NESTED, generated port; DUAL SCALE (a value in (0, 1) passes through) and clips to [1e-6, 1-1e-6]"),
 ]
 
 AMERICAN_TO_DECIMAL: list[Impl] = [
@@ -267,6 +302,38 @@ AMERICAN_TO_DECIMAL: list[Impl] = [
          "float() coercion; refuses 0 AND |price| < 100 (guarded 2026-10-03)"),
     Impl("american_to_decimal", "scripts.backtest_nba_lines_props", "_american_to_dec",
          "via _american(): float() coercion; refuses None/''/text/0 AND |price| < 100 (guarded 2026-10-03)"),
+    # ADDED 2026-10-15, same sweep as the american_to_probability rows above. Ten
+    # more copies of the unguarded one-liner: nine in research/grading scripts, and
+    # `daily_optimizer._decimal_odds`, whose only call site skips `price in (None, 0)`
+    # first (daily_optimizer.py, `_decimal_odds(float(price))`).
+    Impl("american_to_decimal", "scripts.build_ncaaf_recommendation_summary", "_decimal",
+         "float() coercion; refuses |price| < 100"),
+    Impl("american_to_decimal", "scripts.grade_h7_nba_unders", "decimal",
+         "one-liner; NO coercion, NO zero guard"),
+    Impl("american_to_decimal", "scripts.mlb_signal_tests", "decimal",
+         "one-liner; NO coercion, NO zero guard"),
+    Impl("american_to_decimal", "scripts.nba_unders_test", "decimal",
+         "one-liner; NO coercion, NO zero guard"),
+    Impl("american_to_decimal", "scripts.nhl_saves_lift", "decimal",
+         "one-liner; NO coercion, NO zero guard"),
+    Impl("american_to_decimal", "scripts.nhl_skater_history_lift", "decimal",
+         "one-liner; NO coercion, NO zero guard"),
+    Impl("american_to_decimal", "scripts.signal_lift_football", "decimal",
+         "one-liner; NO coercion, NO zero guard"),
+    Impl("american_to_decimal", "scripts.wnba_signal_tests", "decimal",
+         "one-liner; NO coercion, NO zero guard"),
+    Impl("american_to_decimal", "scripts.grade_play_cards", "decimal",
+         "float() then the one-liner; NO zero guard"),
+    Impl("american_to_decimal", "scripts.news_price_follow", "_decimal",
+         "one-liner; NO coercion, NO zero guard"),
+    Impl("american_to_decimal", "syndicate.features.shared.cheat_sheets", "decimal_odds",
+         "refuses None and 0; RAISES on '' (bare float())"),
+    Impl("american_to_decimal", "syndicate.features.shared.daily_optimizer", "_decimal_odds",
+         "one-liner; NO coercion, NO zero guard"),
+    Impl("american_to_decimal", "syndicate.features.nba.live_tick.tick", "api_live_player_lens._american_to_decimal",
+         "NESTED; float() coercion + finite + zero guard"),
+    Impl("american_to_decimal", "syndicate.features.wnba.live_tick.tick", "api_live_player_lens._american_to_decimal",
+         "NESTED; float() coercion + finite + zero guard"),
 ]
 
 def _backfill_card_adapter(fn: Any, value: Any) -> Any:
@@ -299,6 +366,15 @@ PROBABILITY_TO_AMERICAN: list[Impl] = [
          "clamps to [0.02, 0.98]"),
     Impl("probability_to_american", "syndicate.features.nhl.sim_engine.hockeysim.features.market_lines", "_prob_to_american",
          "clamps to [1e-4, 1-1e-4]"),
+    # ADDED 2026-10-15, same sweep.
+    Impl("probability_to_american", "syndicate.features.shared.play_cards", "american_from_prob",
+         "strict 0<p<1, rounds to int; RAISES on '' (str compared with int)"),
+    Impl("probability_to_american", "syndicate.features.nba.source_cli.odds_api",
+         "consensus_lines_at_close._american_from_implied_prob",
+         "NESTED, generated port; strict 0<p<1; returns an UNROUNDED float"),
+    Impl("probability_to_american", "syndicate.features.wnba.source_cli.odds_api",
+         "consensus_lines_at_close._american_from_implied_prob",
+         "NESTED, generated port; strict 0<p<1; returns an UNROUNDED float"),
 ]
 
 REGISTRY: list[Impl] = AMERICAN_TO_PROBABILITY + AMERICAN_TO_DECIMAL + PROBABILITY_TO_AMERICAN
@@ -327,6 +403,10 @@ GRIDS: dict[str, list[tuple[str, Any]]] = {
 # a registered module-level twin (`refresh_wnba_oddsapi_props._implied` ->
 # `_american_price_to_prob`), and one excused as not a tested concept
 # (`intelligence_audit`).
+#
+# 2026-10-15: a nested def that closes over nothing is now REGISTERED in place
+# (`_resolve_nested`), which is what generated ports need -- they cannot be
+# lifted. Only a nested converter with free variables still belongs here.
 NOT_REACHABLE: list[tuple[str, str]] = []
 
 
@@ -445,6 +525,15 @@ NOT_A_SCALAR_CONVERTER: dict[str, str] = {
     "scripts/backtest_nba_lines_props.py:_american": "price VALIDATOR, not a converter: an American price in, the same price (float) or None out -- refuses None/''/text/non-finite/|price| < 100; `_implied` and `_american_to_dec` route through it and ARE registered",
     "scripts/backtest_nba_lines_props.py:_devig": "two-sided proportional devig; two PRICES in (refuses None/0 on either side), fair P(side a) out. Its scalar half, `_implied`, IS registered",
     "scripts/backtest_nfl_lines_props.py:devig":"normalizes two PROBABILITIES (p_side / (p_side + p_other)); two args, no price conversion at all",
+    # ADDED 2026-10-15 (lane `probability-differential-sweep-1015`). The other 31
+    # names that sweep found are REGISTERED above. Classified from each BODY.
+    "scripts/backtest_ncaaf_attribution_props.py:_devig": "normalizes two PROBABILITIES (p_yes / (p_yes + p_no)); two args, no price conversion. Its scalar half, `_implied`, IS registered",
+    "scripts/basketball_live_checkpoint_backtest.py:_devig": "two-sided proportional devig; two PRICES in, fair P(side a) out. NOTE its inner `imp` carries no name hint, so it is NOT swept -- and it prices 0 as 1.0",
+    "scripts/build_ncaab_pbp_corpus.py:_american": "walks a key path through a payload Mapping and parses the price found there; a parser, not a conversion",
+    "syndicate/features/shared/basketball_market_board.py:_devig_over": "two-sided proportional devig; two PRICES in, fair P(Over) out. Its scalar half, the nested `implied`, IS registered",
+    "syndicate/features/shared/play_cards.py:fmt_american": "display formatting ('+150', '-'); returns a str",
+    "syndicate/features/nba/live_tick/odds_bovada.py:_extract_period_markets._to_american": "NESTED; parses a Bovada price string to an int ('+150' -> 150); a parser, not a conversion",
+    "syndicate/features/wnba/live_tick/odds_bovada.py:_extract_period_markets._to_american": "NESTED; parses a Bovada price string to an int ('+150' -> 150); a parser, not a conversion",
 }
 
 _NAME_HINT = ("implied", "american", "decimal", "devig", "no_vig", "novig",
@@ -474,7 +563,12 @@ def _converter_defs(root: str = ROOT) -> list[tuple[str, str]]:
                 full = os.path.join(dirpath, filename)
                 rel = os.path.relpath(full, root).replace("\\", "/")
                 try:
-                    with open(full, encoding="utf-8", errors="replace") as fh:
+                    # `utf-8-sig`, not `utf-8`: a file that starts with a BOM imports
+                    # fine (Python's own reader strips it) but `ast.parse` rejects the
+                    # U+FEFF as a non-printable character. Measured 2026-10-15: the
+                    # WNBA recon-tools copy, which carries its vendored source's BOM,
+                    # was reported UNPARSEABLE and its defs went unswept.
+                    with open(full, encoding="utf-8-sig", errors="replace") as fh:
                         # A file elsewhere in the tree with a stray `\p` is not
                         # this sweep's finding, and surfacing it here would train
                         # the reader to ignore the sweep's output.
@@ -511,12 +605,13 @@ def discover_unregistered(root: str = ROOT) -> list[str]:
     """Converter-shaped defs at ANY scope that are neither registered nor
     explicitly excused. Empty is the passing state.
 
-    A nested or method-scoped def cannot be reached by `getattr(module, attr)`,
-    so it can never be REGISTERED -- its only honest homes are
-    `NOT_A_SCALAR_CONVERTER` (it is not one) or `NOT_REACHABLE` (it is one, and
-    is untestable where it sits). `NOT_REACHABLE` is therefore a FINDING, not an
-    excuse, and the right response to landing in it is to lift the function to
-    module level so the differential can actually run over it.
+    A method-scoped def cannot be reached by `getattr(module, attr)`, so it can
+    never be REGISTERED -- its only honest homes are `NOT_A_SCALAR_CONVERTER` (it
+    is not one) or `NOT_REACHABLE` (it is one, and is untestable where it sits).
+    A NESTED def can be registered under its scoped key (`outer.inner`) since
+    2026-10-15, when `_resolve_nested` rebuilds it -- but only if it closes over
+    nothing; one that does is still a `NOT_REACHABLE` finding, and the right
+    response to that is to lift it to module level.
     """
     registered = {f"{i.module.replace('.', '/')}.py:{i.attr}" for i in REGISTRY}
     excused = set(NOT_A_SCALAR_CONVERTER) | {key for key, _why in NOT_REACHABLE}
@@ -662,10 +757,64 @@ def _resolve(impl: Impl) -> tuple[Any | None, str | None]:
         module = importlib.import_module(impl.module)
     except Exception as exc:  # noqa: BLE001 - reporting, not handling
         return None, f"{type(exc).__name__}: {exc}"
+    if "." in impl.attr:
+        return _resolve_nested(module, impl.attr)
     fn = getattr(module, impl.attr, None)
     if fn is None:
         return None, f"AttributeError: {impl.attr} not found in {impl.module}"
     return fn, None
+
+
+def _resolve_nested(module: Any, dotted: str) -> tuple[Any | None, str | None]:
+    """A def NESTED in a function, keyed the way the sweep keys it (`outer.inner`,
+    the IMMEDIATE parent only), rebuilt from the module's own compiled code and
+    bound to the module's globals.
+
+    ADDED 2026-10-15. Lifting a nested converter to module level is the usual
+    answer (see NOT_REACHABLE), but the ones the sweep found that day sit in
+    GENERATED ports -- `live_tick/tick.py`, `source_cli/*.py` -- whose `--check`
+    fails on a hand edit, so they cannot be lifted where they are.
+
+    The code comes from the module's LOADER (`get_code`), the same object the
+    import executed, and is searched as a tree: `outer` may itself be nested, and
+    may sit under a decorator that hides `__code__` -- `source_cli/cli.py`'s
+    `_merge_odds_df` is inside `predict_date_cmd`, a click command.
+
+    Refused, and therefore reported as an import error, rather than guessed at:
+    an ambiguous key, a method, a def that closes over the enclosing frame (its
+    free variables do not exist outside a call), and one that takes other than
+    exactly one positional argument (its defaults live in the enclosing frame).
+    """
+    import inspect
+    import types
+
+    parts = tuple(dotted.split("."))
+    if inspect.isclass(getattr(module, parts[0], None)):
+        return None, f"NotReachable: {dotted} is a method, not a function"
+    try:
+        root = module.__spec__.loader.get_code(module.__name__)
+    except Exception as exc:  # noqa: BLE001 - reporting, not handling
+        return None, f"{type(exc).__name__}: no code for {module.__name__}: {exc}"
+
+    found: list[types.CodeType] = []
+
+    def walk(code: types.CodeType, names: tuple[str, ...]) -> None:
+        for const in code.co_consts:
+            if isinstance(const, types.CodeType):
+                chain = names + (const.co_name,)
+                if chain[-len(parts):] == parts:
+                    found.append(const)
+                walk(const, chain)
+
+    walk(root, ())
+    if len(found) != 1:
+        return None, f"LookupError: {len(found)} defs match {dotted!r} in {module.__name__}"
+    code = found[0]
+    if code.co_freevars:
+        return None, f"NotReachable: {dotted} closes over {code.co_freevars}"
+    if code.co_argcount != 1 or code.co_kwonlyargcount:
+        return None, f"NotReachable: {dotted} is not a one-argument function"
+    return types.FunctionType(code, vars(module), code.co_name), None
 
 
 def _normalize(value: Any) -> Any:

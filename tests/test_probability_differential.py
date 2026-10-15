@@ -70,6 +70,18 @@ KNOWN_FAILING = {
         # 2026-10-03: the NBA backtest's copy (795d420b) was ADDED here by lane
         # `nhl-props-converter-guard` and GUARDED + REMOVED the same day by lane
         # `nba-lines-props-backtest` (refuses 0/None/''/text/|price| < 100).
+        # ADDED 2026-10-15 (lane `probability-differential-sweep-1015`), when the
+        # 39-name backlog was registered. RAISES ValueError on '' only (bare
+        # float()); refuses None and 0, and never returns a wrong number.
+        "syndicate.features.shared.cheat_sheets:implied_from_price",
+        # ADDED 2026-10-15, same registration -- and the one row of that sweep
+        # that returns a WRONG NUMBER rather than raising: price 0 -> 1.0. Not
+        # fixed here because both are GENERATED ports (`port_basketball_source_cli.py`,
+        # `--check` fails on a hand edit) of the vendored NBA/WNBA CLIs; the guard
+        # belongs in the generator's EDITS and upstream. Its refusal is pd.NA,
+        # not None, because it feeds a DataFrame `.apply` on `home_ml`.
+        "syndicate.features.nba.source_cli.cli:_merge_odds_df.implied_prob_american",
+        "syndicate.features.wnba.source_cli.cli:_merge_odds_df.implied_prob_american",
     },
     "american_to_decimal": {
         # ADDED 2026-10-02, same registration. Four copies of the unguarded
@@ -101,6 +113,24 @@ KNOWN_FAILING = {
         # instead of a fabricated payout, and it meets all five requirements.
         # Deliberately NOT listed: re-listing a fixed implementation would let
         # it silently regress to a fabricated default.
+        #
+        # ADDED 2026-10-15 (lane `probability-differential-sweep-1015`), same
+        # triage as the 2026-10-02 four: every one RAISES on bad input and none
+        # returns a wrong number. `daily_optimizer:_decimal_odds` is the production
+        # one; its only call site skips `price in (None, 0)` first. The rest are
+        # research/grading scripts: a bad price stops the run, it never mis-scores
+        # it. `cheat_sheets:decimal_odds` refuses None and 0 and raises on '' only.
+        "scripts.grade_h7_nba_unders:decimal",
+        "scripts.grade_play_cards:decimal",
+        "scripts.mlb_signal_tests:decimal",
+        "scripts.nba_unders_test:decimal",
+        "scripts.news_price_follow:_decimal",
+        "scripts.nhl_saves_lift:decimal",
+        "scripts.nhl_skater_history_lift:decimal",
+        "scripts.signal_lift_football:decimal",
+        "scripts.wnba_signal_tests:decimal",
+        "syndicate.features.shared.cheat_sheets:decimal_odds",
+        "syndicate.features.shared.daily_optimizer:_decimal_odds",
     },
     "probability_to_american": {
         # ALL THREE `max(0.02, min(0.98, p))` clamp sites are now fixed and are
@@ -121,6 +151,11 @@ KNOWN_FAILING = {
         # so this is triage, not an oversight: it is a sim-internal anchor, not
         # a published price.
         "syndicate.features.nhl.sim_engine.hockeysim.features.market_lines:_prob_to_american",
+        # ADDED 2026-10-15 (lane `probability-differential-sweep-1015`). Fails ONE
+        # requirement, by raising: '' reaches `0 < p < 1` and str-vs-int is a
+        # TypeError. It refuses None, 0, 1 and the percent scale, does not clamp,
+        # and round-trips; its callers pass `p_market`, a float or None.
+        "syndicate.features.shared.play_cards:american_from_prob",
     },
 }
 
