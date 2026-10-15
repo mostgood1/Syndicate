@@ -316,6 +316,27 @@ def evidence_facts(row: dict[str, Any], selected_date: str) -> dict[str, Any]:
     return out
 
 
+def board_recent_form(row: dict[str, Any], selected_date: str) -> dict[str, Any]:
+    """A row's last games from the BOARD's own provider (`intelligence_recent_matchup`, the source of the board card's
+    Recent form sentence and chart), for a sport the evidence layer has no provider for. MLB is that sport: measured
+    2026-10-15, 0 of 140 MLB sheet rows (0 of 214 on 10-14) carried any form, so its Consistency and Hot streaks
+    sections were always empty (user: "look into any sports (like MLB) where consistency sections are missing").
+    Values newest first, with their dates; {} when the provider has none."""
+    try:
+        from syndicate.features.intelligence_recent_matchup import prop_recent_matchup_text, recent_values_for
+
+        prop_recent_matchup_text(row, selected_date=selected_date)
+        rec = recent_values_for(row) or {}
+    except Exception:  # noqa: BLE001 -- a missing form is a blank cell, never a failed sheet
+        return {}
+    values = [v for v in list(rec.get("values") or [])[:10]]
+    if not values:
+        return {}
+    dates = list(rec.get("dates") or [])
+    return {"values": values, "game_labels": dates[: len(values)] if len(dates) >= len(values) else [],
+            "source": "board_recent_form"}
+
+
 def news_impact(sport: str, selected_date: str, out_rows: list[dict[str, Any]],
                 board_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Material status changes in the last ~36 h (news collector), each with its game's props on the board."""
@@ -507,6 +528,8 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
         rep = max(grp, key=lambda r: len((r.get("quote") or {}).get("book_prices") or {}))
         facts = evidence_facts(rep, selected_date)
         form = facts.get("recent_form") or {}
+        if not form.get("values") and facts.get("error") == "no evidence provider":
+            form = board_recent_form(rep, selected_date)      # MLB: the board's own game logs
         adv = facts.get("advanced") or {}
         match = facts.get("matchup") or {}
         env = facts.get("environment") or {}

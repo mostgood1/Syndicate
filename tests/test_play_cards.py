@@ -190,5 +190,6 @@ def test_the_badge_holds_the_sports_ball():
     from syndicate.features.shared import play_cards as pc
 
     assert pc.badge_name("MLB") == "syndicate_roi_badge_baseball.webp" and pc.badge_name("ncaaf") == "syndicate_roi_badge_football.webp"
-    assert pc.badge_name("wnba") == "syndicate_roi_badge_basketball.webp" and pc.badge_name("nhl") == "syndicate_roi_badge.webp"
-    assert all((pc.BRAND_DIR / pc.badge_name(s)).is_file() for s in list(pc.SPORT_BALL) + ["nhl"])
+    assert pc.badge_name("wnba") == "syndicate_roi_badge_basketball.webp" and pc.badge_name("nhl") == "syndicate_roi_badge_puck.webp"
+    assert pc.badge_name("cricket") == "syndicate_roi_badge.webp"                    # a sport with no ball keeps the plain one
+    assert all((pc.BRAND_DIR / pc.badge_name(s)).is_file() for s in pc.SPORT_BALL)

@@ -39,10 +39,11 @@ SPORT_LABELS = {"nfl": "NFL", "ncaaf": "NCAAF", "nhl": "NHL", "soccer": "Soccer"
                 "ncaab": "NCAAB", "mlb": "MLB"}
 
 # The badge holds the sport's ball (user 2026-10-15: "the syndicate logo changed the ball being held based on sport").
-# Each is cut from the X.com posts the user supplied; there is no hockey version, so NHL keeps the plain badge.
+# Baseball / football / basketball / soccer are cut from the X.com posts the user supplied; the puck was drawn onto the
+# plain badge (user 2026-10-15: "add a hockey puck version of the logo"), since no post carried one.
 BRAND_DIR = Path(__file__).resolve().parents[2] / "static" / "brand"
 SPORT_BALL = {"mlb": "baseball", "nfl": "football", "ncaaf": "football", "nba": "basketball", "wnba": "basketball",
-              "ncaab": "basketball", "soccer": "soccer"}
+              "ncaab": "basketball", "soccer": "soccer", "nhl": "puck"}
 
 
 def badge_name(sport: Any) -> str:

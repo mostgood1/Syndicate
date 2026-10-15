@@ -635,3 +635,25 @@ def test_a_picks_history_is_filled_from_the_boards_own_providers(monkeypatch):
     assert m.fill_pick_history(seg, day="2026-10-15", intervals=Intervals()) == "team_first3"
     assert seg["team_recent"] == {"home": [], "away": [["2026-10-13", 1.0, 2.0]]} and seg["team_recent_segment"] == "first3"
     assert m.fill_pick_history(dict(seg, team_recent=None), day="2026-10-15", intervals=None) is None   # no source: a gap
+
+
+def test_mlb_rows_read_their_form_from_the_boards_own_provider(monkeypatch):
+    # User 2026-10-15: "look into any sports (like MLB) where consistency sections are missing". The evidence layer has
+    # no MLB provider, so every MLB row had no form (0 of 140 that day) and Consistency / Hot streaks were always empty.
+    m = _script()
+    from syndicate.features import intelligence_recent_matchup as irm
+
+    monkeypatch.setattr(m, "evidence_facts", lambda row, selected_date: {"error": "no evidence provider"})
+    monkeypatch.setattr(irm, "prop_recent_matchup_text", lambda row, selected_date: None)
+    monkeypatch.setattr(irm, "recent_values_for", lambda row: {"values": [2, 1, 3, 2, 2, 1, 2, 3, 2, 2],
+                                                               "dates": [f"2026-10-{d:02d}" for d in range(14, 4, -1)]})
+    base = {"kind": "prop", "game_state": "pregame", "segment": "full", "event_id": "e1", "home_team": "Los Angeles Dodgers",
+            "away_team": "Milwaukee Brewers", "market": "batter_total_bases", "player_name": "Shohei Ohtani",
+            "commence_time": "2026-10-15T00:15:00Z", "projection": {"player_id": "660271"}}
+    rows = [dict(base, line=1.5, side="over", quote={"price": -110, "fair_probability": 0.5, "book_prices": {"fd": -110, "dk": -115}})]
+    sheet = m.build_sport("mlb", rows, selected_date="2026-10-14", cap=10, dvp={})
+    check = sheet["rows"][0]["check"]
+    assert check["form10"]["games"] == 10 and check["form10"]["hits"] == 8 and sheet["rows"][0]["form_labels"][0] == "2026-10-14"
+    assert sheet["sections"]["consistency"] == [0]                               # 8 of 10: it now has a section
+    monkeypatch.setattr(irm, "recent_values_for", lambda row: None)
+    assert m.board_recent_form(dict(base), "2026-10-14") == {}                    # no provider games: a blank, not a guess
