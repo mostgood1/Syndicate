@@ -915,6 +915,14 @@ death, never life — do not invert it.
 - Verification: The one-off reading is written to the findings file with n rows, n games and the date window per cell, then the daily job's first fleet output is read back from the data root.
 - Blocked by: none
 
+### soccer-starter-club-move — OPEN — opened 2026-10-15 — session b9bb5f37-63b9-43e2-b07d-5ca0255fa39f
+- Goal: A confirmed ESPN starter whose stats row sits under ANOTHER club in the same league (a within-league move, mostly MLS) is resolved and their row moves to the club that started them, only when the name match is unique across the league; measured offline on 10-09..10-12 under the production env with every move hand-checked and none wrong
+- Files: syndicate/features/soccer/features/lineups.py (attach_confirmed_starters / fetch_confirmed_starter_ids club-move pass ONLY), tests/test_soccer_starter_club_move.py (NEW)
+- Hypothesis: 9 of the 82 unresolved confirmed starters (10-09..12) sit under another club's row in the same league (Galarza Atlanta->Inter Miami, Padelford Minnesota->RBNY)
+- Falsification test: fewer than 5 of the 9 resolve, or any move is wrong on a hand check
+- Verification: offline before/after (production env): resolved count, moved rows listed and hand-checked; tests incl. ambiguity refusal and off != on
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
