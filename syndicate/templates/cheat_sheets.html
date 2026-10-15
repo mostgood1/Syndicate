@@ -552,7 +552,7 @@ document.addEventListener("click", ev => {
   const g = ev.target.closest("[data-game]");
   if (g && !ev.metaKey && !ev.ctrlKey) { ev.preventDefault(); go(STATE.sport, g.dataset.game, true); return; }
   const v = ev.target.closest("[data-view]");
-  if (v) { STATE.view = v.dataset.view; if (META.mode === "app") { try { history.replaceState({sport: STATE.sport, game: STATE.game}, "", gameHref(STATE.game)); } catch (e) {} } render(); return; }
+  if (v) { STATE.view = v.dataset.view; if (META.mode === "app") { try { history.replaceState({sport: STATE.sport, game: STATE.game}, "", gameHref(STATE.game)); } catch (e) {} } daysNav(); render(); return; }
   const x = ev.target.closest("[data-export]");
   if (x) { ev.preventDefault(); exportSection(x); }
 });
@@ -632,17 +632,21 @@ async function exportSection(btn) {
   }
 }
 
+// The date links carry the view, so they are rebuilt whenever it changes.
+function daysNav() {
+  if (!(META.mode === "app" && (META.dates || []).length)) return;
+  // Today first, then tomorrow, then the records newest first (user 2026-10-15: "today should be first, then tomorrow").
+  const order = [META.today, ...META.dates.filter(x => x > META.today).sort(), ...META.dates.filter(x => x < META.today)];
+  const view = STATE.view === "reconciled" ? "view=reconciled" : "";
+  document.getElementById("days").innerHTML = order.slice(0, 8).map(day =>
+    `<a class="btn ${day === META.date ? "on" : ""}" href="${day === META.today ? "?" + view : "?date=" + day + (view ? "&" + view : "")}">${day === META.today ? "Today" : day > META.today ? "Tomorrow" : esc(dayShort(day))}</a>`).join("");
+}
 (function init() {
   const sports = Object.keys(DATA || {});
   const ahead = META.today && META.date > META.today;
   if (META.date) document.getElementById("dayLabel").innerHTML = esc((META.date === META.today ? "Today · " : ahead ? "Tomorrow · " : "") + dayName(META.date))
     + (META.beta ? ` <span class="chip beta">Beta</span>` : "") + (ahead ? ` <span class="chip phase">Early look</span>` : "");
-  if (META.mode === "app" && (META.dates || []).length) {
-    // Today first, then tomorrow, then the records newest first (user 2026-10-15: "today should be first, then tomorrow").
-    const order = [META.today, ...META.dates.filter(x => x > META.today).sort(), ...META.dates.filter(x => x < META.today)];
-    document.getElementById("days").innerHTML = order.slice(0, 8).map(day =>
-      `<a class="btn ${day === META.date ? "on" : ""}" href="${day === META.today ? (STATE.view === "reconciled" ? "?view=reconciled" : "?") : "?date=" + day + (STATE.view === "reconciled" ? "&view=reconciled" : "")}">${day === META.today ? "Today" : day > META.today ? "Tomorrow" : esc(dayShort(day))}</a>`).join("");
-  }
+  daysNav();
   document.getElementById("tabs").innerHTML = sports.map(s => `<button class="tab" role="tab" data-sport="${s}">${SPORT_NAMES[s] || s}</button>`).join("");
   document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => go(t.dataset.sport, null, true)));
   if (!sports.length) {
