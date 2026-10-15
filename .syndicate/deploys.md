@@ -49812,3 +49812,12 @@ The copy has no cache, `trust_env` off unless `STATSAPI_TRUST_ENV`, an (8 s, 8 s
 - **claim:** web by cheat-sheets token f4b60791..., acquire exit 0. Ride-alongs: c5c0f4f3 / 72e916b9 / 180b55c1 (ledger only).
 - **verify (live page, Playwright, 17:39Z):** for every section of the MLB and NFL sheets, the export frame's header count equals its rows -- MLB Hot streaks 25 on the page -> "10 rows" over 10, Consistency 25 -> 12, Batter vs pitcher 18 -> 12, NFL Every prop 150 -> 12; picks re-split ("3 picks · 3 price plays" over 6). A real PNG from the page's own Export button (MLB Hot streaks) reads "10 rows" over 10 rows. The same check on the static render covered NHL / NCAAF / NBA (slate 17 -> 16, news 17 -> 12).
 - **NFL sheet restored:** the 12:30 PM scheduled build had read the board mid board build (20 of ~64 groups -> 28 rows); rebuilt 17:39Z on 1973c1f1: 64 groups / 150 rows. `steady_rows` now re-reads such a read (3 x 50 s). The board serving a partial state mid-build is a lead for its owner (logged), not fixed here.
+
+## 2026-10-15 18:02:16Z -- READING: MLB schedule helper (be66391e) ran in production -- **MET** (lane `mlb-schedule-fetch-native`, session 2d413211)
+
+- The schedule adapter's MLB cache entry for 2026-10-15 (`reports_root()/schedule_adapter/mlb_2026-10-15.json`) has `fetchedAt` 1792087336.79 = **18:02:16Z**, with 2 rows.
+  - Read with `read_json_file` under BOTH workers' own env (refresh-worker pid 524658 and live-odds-worker pid 514088); TTL 900 s.
+  - The deploy was 16:26:16Z. The adapter's only MLB fetcher is `_fetch_mlb_schedule` -> `scripts/fetch_mlb_schedule_for_date.py`, so the deployed, vendor-free script produced it.
+  - The 10-16 entry (fetchedAt 16:03:25Z) predates the deploy.
+- A process-spawn watcher (17:11:03-18:01:52Z) saw no spawn: the MLB callers (`live_refresh_loop.py:2113/3224`) reach the adapter only intermittently, and the refresh landed 24 s after the watcher stopped.
+  - Instrument note: a spawn watcher with a fixed window is the wrong instrument for a call gated by a TTL cache plus irregular callers. The cache stamp was the field to read.

@@ -76,10 +76,10 @@ death, never life — do not invert it.
 - Verification: A/B identical on the fleet; after a fleet ff the deployed script runs and returns the same live_game_pks (fresh subprocess per check; no restart).
 - Blocked by: none
 
-### mlb-schedule-fetch-native — OPEN — opened 2026-10-15 — session 2d413211
-- GOAL VERDICT. Goal (verbatim): "Move scripts/fetch_mlb_schedule_for_date.py (the schedule adapter's MLB source: fixture clock, slate phase, lineup force window, MLB event lists) off the vendored `vendor/mlb_bettingv2` `sim_engine.data.statsapi` onto a faithful Syndicate StatsAPI module, with identical output; deployed with a measurement (user request 2026-10-15: "move the mlb schedule commence times off vendor")." -- **GOAL: NOT MET** `[2026-10-15 17:12Z]`. be66391e deployed by my ff 16:26:16Z; A/B identical on 6 dates; deployed-checkout run OK. Left: a worker spawn of the deployed script (watcher running).
+### mlb-schedule-fetch-native — CLOSED 2026-10-15 (GOAL MET) — opened 2026-10-15 — session 2d413211
+- GOAL VERDICT. Goal (verbatim): "Move scripts/fetch_mlb_schedule_for_date.py (the schedule adapter's MLB source: fixture clock, slate phase, lineup force window, MLB event lists) off the vendored `vendor/mlb_bettingv2` `sim_engine.data.statsapi` onto a faithful Syndicate StatsAPI module, with identical output; deployed with a measurement (user request 2026-10-15: "move the mlb schedule commence times off vendor")." -- **GOAL: MET** `[2026-10-15 18:03Z]`. be66391e deployed 16:26:16Z; the adapter's MLB cache for 10-15 was refreshed 18:02:16Z (2 rows) -- only the deployed script fills it. deploys.md 18:02:16Z.
 - Goal: Move scripts/fetch_mlb_schedule_for_date.py (the schedule adapter's MLB source: fixture clock, slate phase, lineup force window, MLB event lists) off the vendored `vendor/mlb_bettingv2` `sim_engine.data.statsapi` onto a faithful Syndicate StatsAPI module, with identical output; deployed with a measurement (user request 2026-10-15: "move the mlb schedule commence times off vendor").
-- Files: syndicate/features/mlb/statsapi_http.py (NEW), scripts/fetch_mlb_schedule_for_date.py, tests/test_fetch_mlb_schedule_native.py (NEW)
+- Files: none (released at close)
 - Hypothesis: the script uses only StatsApiClient.get without a cache plus fetch_schedule_for_date; a copy of exactly that is output-identical.
 - Falsification test: on the fleet, old vs new script for the same dates (back to back) produce different JSON.
 - Verification: A/B identical on the fleet; after a fleet ff the adapter's next MLB schedule read runs the new script (fresh subprocess; no restart) and returns the day's games.
