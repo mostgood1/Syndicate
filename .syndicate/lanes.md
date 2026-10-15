@@ -67,6 +67,14 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### nba-t-window-provider — OPEN — opened 2026-10-14 — session 2d413211
+- Goal: Give the live loop's T-window an NBA commence-time provider (`_nba_commence_times`) reading the native data-root NBA schedule, so NBA gets per-game T-75/T-10 pregame odds sweeps; cost measured per slate before deploy; deployed with a measurement (user decision 2026-10-14, from "move the nba schedule commence times off vendor": nothing vendored existed, NBA had no provider).
+- Files: syndicate/features/shared/live_refresh_loop.py (_nba_commence_times + _T_WINDOW_COMMENCE_PROVIDERS + T-window provider comment sections only), tests/test_nba_commence_times.py (NEW)
+- Hypothesis: the data-root schedule_2026_27.json carries every 2026-27 game with datetime_utc; registering it adds only the sweeps before each slate's first tip (live NBA skips the T-window), a handful per slate.
+- Falsification test: the provider returns [] for 2026-10-20 on the fleet, or times that disagree with the schedule (opener 0022600001 BOS@DET), or the simulated added sweeps per slate are far above a handful.
+- Verification: after the fleet ff + live-odds-worker restart, under the worker env `_nba_commence_times("2026-10-20")` returns the 3 opener games; the first NBA T-window marker (`nba:ramp:` / `nba:closing:`) is written for the 10-20 opener.
+- Blocked by: none
+
 ### nba-recon-boxscores-import-native — CLOSED 2026-10-14 (GOAL MET) — opened 2026-10-14 — session 2d413211
 - GOAL VERDICT. Goal (verbatim): "Remove the vendored `from nba_betting.boxscores import _nba_gid_to_tricodes` from Syndicate's NBA recon-tools copy (`syndicate/features/nba/recon_tools/build_live_player_lens_tuning.py`) without changing what production computes, keeping the copy pinned to the vendored body except for that one documented edit (user request 2026-10-14)." -- **GOAL: MET** `[2026-10-14 23:05Z]`. c6225f6e live on the fleet since abed0ccc 22:46:59Z (news-availability-gate's ff carried it; mine was refused on their claim, not forced). Deployed checkout carries the marked edit; 5 tests pass. Output-identical by construction (the import raises on the fleet); the A/B population was empty, recorded as such. deploys.md 22:46:59Z.
 - Goal: Remove the vendored `from nba_betting.boxscores import _nba_gid_to_tricodes` from Syndicate's NBA recon-tools copy (`syndicate/features/nba/recon_tools/build_live_player_lens_tuning.py`) without changing what production computes, keeping the copy pinned to the vendored body except for that one documented edit (user request 2026-10-14).
