@@ -870,3 +870,4 @@ Co-signed into findings_2026-10-06 "THE VALID READ — PRE-REGISTRATION". It run
   - §12 rule on VALID (FINAL native vs pregame_rate per checkpoint) and total bias;
   - postseason as a separate stratum on the calibration lane's terms.
 - **No re-tuning after the read.**
+- **§13 amendment, 2026-10-15 (before any VALID read; matches the calibration lane's amendment):** G3 pairs by GAME. FINAL and PROD are different configs, so their draws are independent anyway. The per-game `stable_seed` is NOT assumed to reproduce across processes (PYTHONHASHSEED etc.). Simulation noise is part of the game-clustered CI. Thresholds unchanged.
