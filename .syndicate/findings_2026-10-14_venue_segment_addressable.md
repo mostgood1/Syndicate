@@ -86,3 +86,30 @@ The pregame number leans hard toward the first, but pregame is not live: a live
 board can be re-shaped into segment markets precisely because that is where
 in-play trading concentrates. That is why the reading is being taken rather than
 inferred.
+
+## LIVE reading -- 2026-10-15T00:49Z (2026-10-14 19:46 CDT), scheduled task `venue-segment-live-reading-1014`
+
+**Live population existed.** `/api/board/game-chips` at 00:46:03Z (artifact age 5.5s): 230 chips, **20 live** -- mlb 1, nba 6, nhl 2, ncaaf 2, soccer 9 (plus nba 1 / soccer 137 pregame, soccer 71 final, 1 postponed).
+
+`/api/board/layer2-shortlist?sport=<s>&limit=5000`, fetched 00:46:47-00:46:54Z, one shortlist build (`written_at` 00:44:05Z). **Row cap defeated for every sport: `rows == total_rows`** (per_sport_limit 2000; soccer 1,942 is the largest). Live = `is_live` true / `market_state == live` (the two agreed on every row).
+
+| sport | LIVE full / LIVE rows | non-full LIVE mix | live games | PREGAME full / rows |
+|---|---|---|---|---|
+| mlb | 4/4 (100%) | -- | 1 | 0/0 |
+| nba | 18/18 (100%) | -- | 6 | 3/3 |
+| nhl | 0/0 (2 games live, **0 rows**) | -- | 0 | 0/0 |
+| nfl | 0/0 (nothing in play) | -- | 0 | 1,211/1,211 |
+| ncaaf | 6/12 (50.0%) | h1 2, q1 1, q2 1, q3 1, q4 1 | 2 | 332/332 |
+| ncaab | 0/0 (off-season) | -- | 0 | 0/0 |
+| wnba | 0/0 (off-season) | -- | 0 | 0/0 |
+| soccer | 66/71 (93.0%) | h1 3, h2 2 | 9 | 1,867/1,871 (h1 4) |
+| **pooled ex-MLB** | **90/101 (89.1%)** | h1 5, h2 2, q1-q4 4 | 17 | 3,413/3,417 (99.9%) |
+| pooled incl. MLB | 94/105 (89.5%) | | 18 | |
+
+**Answer to the lead:** LIVE rows are predominantly `segment=full` (89.1% of 101, over nba/soccer/ncaaf), so the 2026-09-24 SEGMENT_MISMATCH_GRID constraint is MLB-specific, venue full-game quotes can in principle price most of the live board, and wiring full-game venue pricing is worth it. NCAAF is the one sport where live segments are material (half its 12 live rows), on 2 games.
+
+**Limits, stated rather than pooled:**
+- **No MLB conclusion.** Postseason, 1 live game, 4 rows (3 batter_hits, 1 batter_hits_runs_rbis -- player props, which no venue quotes). The 427-side MLB board of the closed lane is a different population.
+- NHL had 2 live games and 0 shortlist rows at all (pregame also 0) -- a zero, not a share. NFL had nothing in play (Wednesday); its 1,211 rows are all pregame.
+- This is the served Layer 2 shortlist, i.e. after the value/quote-age gates -- not the full live odds grid.
+- **`full` is necessary, not sufficient.** By market, ex-MLB live full rows: h2h 16, totals 31, spreads 17 (= 64 of 90) vs soccer alternate_totals_corners 21, btts 4, player_goal_scorer_anytime 1. Whether Kalshi/Polymarket quote corners/btts was not checked here; the addressable share for plain game-line contracts is therefore 64/101 (63.4%), still a majority.
