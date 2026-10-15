@@ -45,6 +45,87 @@ def central_today() -> str:
     return (datetime.now(timezone.utc) - timedelta(hours=5)).date().isoformat()
 
 
+def kickoff_ct(commence: Any) -> str | None:
+    """'Sun Oct 18 · 3:05 PM CT' -- the game's date and time in US Central (DST-aware where tzdata exists)."""
+    try:
+        t = datetime.fromisoformat(str(commence).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    try:
+        from zoneinfo import ZoneInfo
+
+        t = t.astimezone(ZoneInfo("America/Chicago"))
+    except Exception:  # noqa: BLE001 -- no tzdata (Windows): CDT until 2026-11-01
+        t = t.astimezone(timezone(timedelta(hours=-5)))
+    return f"{t:%a %b} {t.day} · {t.hour % 12 or 12}:{t:%M} {'AM' if t.hour < 12 else 'PM'} CT"
+
+
+def _position_indexes() -> dict[str, Any]:
+    """Roster positions the evidence layer does not carry: NHL (F/D/G), NCAAF (by team), soccer (G/D/M/F).
+
+    The same files and the same drop-don't-guess rule as `player_headshots` (a name on two players is dropped)."""
+    from syndicate.features.shared import player_headshots as ph
+
+    nhl = ph._unique((ph._norm(r.get("full_name")), str(r.get("position") or "").strip()) for r in ph._nhl_rows())
+    ncaaf: dict[tuple[str, str], str] = {}
+    for root in ph._roots("ncaaf"):
+        roster = Path(root) / "source_artifacts" / "data" / "processed" / "roster" / "ncaaf_roster_snapshot.csv"
+        if roster.exists():
+            for r in ph._read_csv(roster):
+                key = (str(r.get("team_id") or "").strip(), ph._norm(r.get("player_name")))
+                if key[1] and str(r.get("position") or "").strip():
+                    ncaaf.setdefault(key, str(r["position"]).strip())
+            break
+    soccer: dict[tuple[str, str], str] = {}
+    for root in ph._roots("soccer"):
+        files = sorted(Path(root).glob("*/api/rosters/rosters_*.csv"))
+        for path in files:
+            for r in ph._read_csv(path):
+                pos = str(r.get("position_abbreviation") or r.get("position") or "").strip()
+                if pos:
+                    soccer.setdefault((ph._norm(r.get("team")), ph._norm(r.get("player_name"))), pos)
+        if files:
+            break
+    return {"nhl": nhl, "ncaaf": ncaaf, "soccer": soccer}
+
+
+def player_identity(row: dict[str, Any], *, sport: str, team: Any, pos: Any, context: dict[str, Any],
+                    positions: dict[str, Any]) -> dict[str, Any]:
+    """Headshot, which side the player is on, his team (name + logo), position, and the opponent's logo.
+
+    Every lookup is name-based and drops ambiguity rather than guessing (a wrong face or crest reads as a wrong bet).
+    `team` / `pos` from the evidence layer win; the rosters only fill what it left empty."""
+    from syndicate.features.shared import player_headshots as ph
+    from syndicate.features.shared.layer2_row_context import row_identity
+    from syndicate.features.shared.team_logos import logo_url
+
+    out: dict[str, Any] = {"headshot_url": None, "player_side": None, "team_name": None, "team_logo": None,
+                           "opponent_name": None, "opponent_logo": None, "team": team, "pos": pos}
+    try:
+        ident = row_identity({**row, "sport": sport}, context)
+    except Exception:  # noqa: BLE001 -- identity is decoration; it must never cost the sheet
+        ident = {}
+    out["headshot_url"] = ident.get("headshot_url")
+    side = ident.get("player_side")
+    out["player_side"] = side
+    if side in ("home", "away"):
+        other = "away" if side == "home" else "home"
+        out["team_name"], out["opponent_name"] = row.get(f"{side}_team"), row.get(f"{other}_team")
+        out["team_logo"] = logo_url(sport, out["team_name"], row.get(f"{side}_key"))
+        out["opponent_logo"] = logo_url(sport, out["opponent_name"], row.get(f"{other}_key"))
+        out["team"] = out["team"] or out["team_name"]
+    name = ph._norm(row.get("player_name"))
+    if not out["pos"]:
+        if sport == "nhl":
+            out["pos"] = positions.get("nhl", {}).get(name) or None
+        elif sport == "ncaaf" and out["team_name"]:
+            tid = ph._ncaaf_index()[2].get(ph._norm(out["team_name"]))
+            out["pos"] = positions.get("ncaaf", {}).get((tid or "", name)) or None
+        elif sport == "soccer" and out["team_name"]:
+            out["pos"] = positions.get("soccer", {}).get((ph._norm(out["team_name"]), name)) or None
+    return out
+
+
 def fetch_rows(base_url: str, sport: str) -> list[dict[str, Any]]:
     url = f"{base_url}/api/board/layer2-shortlist?limit=5000&sport={sport}"
     with urllib.request.urlopen(url, timeout=180) as resp:
@@ -149,7 +230,10 @@ news_root: Path | None = None
 
 
 def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, cap: int,
-                dvp: dict[str, Any]) -> dict[str, Any]:
+                dvp: dict[str, Any], context: dict[str, Any] | None = None,
+                positions: dict[str, Any] | None = None) -> dict[str, Any]:
+    from syndicate.features.shared.team_logos import logo_url
+
     t0 = time.time()
     groups = group_rows(rows)
     ordered = sorted(groups.items(), key=lambda kv: priority(kv[1]), reverse=True)[:cap]
@@ -165,7 +249,9 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
         sim = facts.get("game_sim") or {}
         home, away = rep.get("home_team") or "", rep.get("away_team") or ""
         if event_id not in games:
-            g = {"event_id": event_id, "matchup": f"{away} @ {home}", "commence_time": rep.get("commence_time")}
+            g = {"event_id": event_id, "matchup": f"{away} @ {home}", "commence_time": rep.get("commence_time"),
+                 "kickoff_ct": kickoff_ct(rep.get("commence_time")), "home_team": home, "away_team": away,
+                 "home_logo": logo_url(sport, home, rep.get("home_key")), "away_logo": logo_url(sport, away, rep.get("away_key"))}
             if sport in ("nfl", "ncaaf") and sim:
                 margin = sim.get("margin_mean")
                 if isinstance(sim.get("home_score_mean"), (int, float)) and isinstance(sim.get("away_score_mean"), (int, float)):
@@ -176,18 +262,23 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
         for code in (adv.get("team"), match.get("opponent")):
             if isinstance(code, str) and code:
                 games[event_id].setdefault("team_codes", set()).add(code)
+        ident = player_identity(rep, sport=sport, team=adv.get("team") or (rep.get("projection") or {}).get("player_team"),
+                                pos=adv.get("pos"), context=context or {}, positions=positions or {})
         for r in grp:
             check = cs.price_check(r, form.get("values"))
             quote = r.get("quote") or {}
             out_rows.append({
-                "event_id": event_id, "player": player, "team": adv.get("team") or (r.get("projection") or {}).get("player_team"),
-                "pos": adv.get("pos"), "market": market, "line": r.get("line"), "side": r.get("side"),
+                "event_id": event_id, "player": player, "team": ident["team"], "pos": ident["pos"],
+                "team_name": ident["team_name"], "team_logo": ident["team_logo"], "headshot_url": ident["headshot_url"],
+                "opponent_logo": ident["opponent_logo"], "kickoff_ct": games[event_id]["kickoff_ct"],
+                "commence_time": rep.get("commence_time"), "market": market, "line": r.get("line"), "side": r.get("side"),
                 "suggested": bool(r.get("suggested")), "books_quoting": len(quote.get("book_prices") or {}),
                 "book_prices": dict(sorted((quote.get("book_prices") or {}).items(), key=lambda kv: -kv[1])[:6]),
-                "opponent": match.get("opponent"), "dvp": dvp_cell,
+                "opponent": match.get("opponent") or ident["opponent_name"], "dvp": dvp_cell,
                 "form_labels": (form.get("game_labels") or [])[:10],
                 "injury": env.get("player_injury_status"),
                 "shop": cs.shop_gap(quote.get("book_prices")),
+                "fair_method": quote.get("fair_method"),
                 "evidence_error": facts.get("error"),
                 "check": check.as_dict(),
             })
@@ -230,6 +321,14 @@ def main(argv: list[str] | None = None) -> int:
     data_root = Path(os.path.expanduser(args.data_root))
     selected = args.date or central_today()
     dvp = latest_nfl_dvp(data_root)
+    from syndicate.features.shared.layer2_row_context import load_layer2_row_context
+
+    context = load_layer2_row_context(selected)
+    try:
+        positions = _position_indexes()
+    except Exception as exc:  # noqa: BLE001
+        print(f"CHEAT_SHEET positions unavailable: {type(exc).__name__}: {exc}", flush=True)
+        positions = {}
     global news_root
     news_root = data_root if (data_root / "news").is_dir() else None
     for sport in [s.strip() for s in args.sports.split(",") if s.strip()]:
@@ -238,14 +337,16 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as exc:  # noqa: BLE001
             print(f"CHEAT_SHEET {sport} fetch failed: {type(exc).__name__}: {exc}", flush=True)
             continue
-        sheet = build_sport(sport, rows, selected_date=selected, cap=args.cap or DEFAULT_CAPS.get(sport, 80), dvp=dvp)
+        sheet = build_sport(sport, rows, selected_date=selected, cap=args.cap or DEFAULT_CAPS.get(sport, 80), dvp=dvp,
+                            context=context, positions=positions)
         if not sheet["rows"]:
             print(f"CHEAT_SHEET {sport} date={selected} no pregame props on the board -- nothing written", flush=True)
             continue
         write_atomic(data_root / "cheatsheets" / sport / f"{selected}.json", sheet)
         counts = {k: len(v) for k, v in sheet["sections"].items()}
+        have = {k: sum(1 for r in sheet["rows"] if r.get(k)) for k in ("team", "pos", "headshot_url", "team_logo")}
         print(f"CHEAT_SHEET {sport} date={selected} groups={sheet['groups_built']}/{sheet['groups_on_board']} "
-              f"rows={len(sheet['rows'])} sections={counts} secs={sheet['build_seconds']}", flush=True)
+              f"rows={len(sheet['rows'])} sections={counts} identity={have} secs={sheet['build_seconds']}", flush=True)
     return 0
 
 

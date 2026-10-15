@@ -24,6 +24,7 @@ from flask import request
 from flask.json.provider import DefaultJSONProvider
 from syndicate.features.shared import memory_observability
 from syndicate.blueprints.ask_the_syndicate import ask_the_syndicate_bp
+from syndicate.blueprints.cheat_sheets import cheat_sheets_bp
 from syndicate.blueprints.home import home_bp
 from syndicate.blueprints.intelligence import intelligence_bp
 from syndicate.blueprints.ops import ops_bp
@@ -496,6 +497,7 @@ def create_app() -> Flask:
     app.register_blueprint(soccer_bp)
     app.register_blueprint(sports_bp)
     app.register_blueprint(model_scorecard_bp)
+    app.register_blueprint(cheat_sheets_bp)
 
     
     @app.route("/")

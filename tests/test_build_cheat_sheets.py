@@ -120,3 +120,33 @@ def test_dvp_extremes_turn_fewest_ranks_into_most_allowed():
     out = cs.dvp_extremes(teams, "MIA")
     assert [(c["pos"], c["stat"], c["nth_most"]) for c in out] == [("RB", "rush_yds", 1), ("WR", "rec_yds", 31)]
     assert cs.dvp_extremes(teams, "XXX") == []
+
+
+def test_kickoff_is_the_games_date_and_time_in_central():
+    m = _script()
+    assert m.kickoff_ct("2026-10-18T20:05:00Z") == "Sun Oct 18 · 3:05 PM CT"
+    assert m.kickoff_ct("2026-10-15T00:40:00Z") == "Wed Oct 14 · 7:40 PM CT"
+    assert m.kickoff_ct(None) is None
+
+
+def test_identity_fills_team_logo_position_and_headshot_without_overriding_the_evidence(monkeypatch):
+    m = _script()
+    from syndicate.features.shared import layer2_row_context, team_logos
+
+    monkeypatch.setattr(layer2_row_context, "row_identity",
+                        lambda row, ctx: {"headshot_url": "https://img/" + row["player_name"], "player_side": "home"})
+    monkeypatch.setattr(team_logos, "logo_url", lambda sport, *names: f"logo:{sport}:{names[0]}")
+    row = {"player_name": "Martin Necas", "home_team": "Colorado Avalanche", "away_team": "Dallas Stars"}
+    positions = {"nhl": {"martinnecas": "F"}}
+    got = m.player_identity(row, sport="nhl", team=None, pos=None, context={}, positions=positions)
+    assert got["team"] == "Colorado Avalanche" and got["pos"] == "F" and got["headshot_url"] == "https://img/Martin Necas"
+    assert got["team_logo"] == "logo:nhl:Colorado Avalanche" and got["opponent_logo"] == "logo:nhl:Dallas Stars"
+    kept = m.player_identity(row, sport="nhl", team="COL", pos="C", context={}, positions=positions)
+    assert kept["team"] == "COL" and kept["pos"] == "C"                       # the evidence layer wins
+
+    def boom(row, ctx):
+        raise RuntimeError("no roster")
+
+    monkeypatch.setattr(layer2_row_context, "row_identity", boom)
+    bare = m.player_identity(row, sport="nhl", team=None, pos=None, context={}, positions=positions)
+    assert bare["headshot_url"] is None and bare["team_logo"] is None and bare["pos"] == "F"   # unknown side: no crest

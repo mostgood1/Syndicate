@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@700;800;900&family=Barlow:wght@500;600;700&display=swap">
+<style>
+/* Syndicate ROI play card, 1080 x 1350 (X 4:5). Tokens: navy ground, neon green, electric blue, white type. */
+:root { --bg: #04070c; --panel: #0a1520; --edge: #1d3a55; --green: #8cff2e; --blue: #1fa8ff; --white: #f4f7fa;
+  --muted: #9db0bf; --red: #ff5a4a; --amber: #ffbe3d;
+  --display: "Saira Condensed", Impact, "Arial Narrow", sans-serif; --body: "Barlow", "Segoe UI", Arial, sans-serif; }
+* { box-sizing: border-box; margin: 0; }
+html, body { width: 1080px; height: 1350px; }
+body { background: radial-gradient(900px 520px at 12% -6%, rgba(31,168,255,.28), transparent 62%),
+  radial-gradient(800px 520px at 100% 8%, rgba(140,255,46,.16), transparent 60%), var(--bg);
+  color: var(--white); font-family: var(--body); padding: 34px 40px; display: flex; flex-direction: column; gap: 22px; overflow: hidden; }
+.slant { transform: skewX(-8deg); display: inline-block; }
+.top { display: flex; align-items: center; gap: 22px; }
+.top img { width: 138px; height: 136px; border-radius: 16px; box-shadow: 0 0 0 3px rgba(140,255,46,.65), 0 0 36px rgba(31,168,255,.45); }
+.brand .w1 { font: 900 84px/.9 var(--display); letter-spacing: .02em; color: var(--white); text-shadow: 0 4px 0 #13202c; }
+.brand .w2 { margin-top: 8px; font: 900 54px/1 var(--display); letter-spacing: .05em; color: #04110a; background: var(--green);
+  padding: 4px 26px 2px; box-shadow: 0 0 28px rgba(140,255,46,.55); }
+.matchup { display: flex; justify-content: space-between; align-items: center; border: 2px solid var(--edge); border-radius: 14px;
+  padding: 14px 22px; background: rgba(10,21,32,.85); font: 800 36px/1 var(--display); letter-spacing: .03em; text-transform: uppercase; }
+.matchup .at { color: var(--green); padding: 0 16px; }
+.matchup .tag { font: 700 22px/1 var(--display); color: var(--blue); letter-spacing: .08em; text-align: right; }
+.matchup .teams { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.matchup .crest { width: 46px; height: 46px; object-fit: contain; filter: drop-shadow(0 0 6px rgba(0,0,0,.6)); }
+.pick { grid-template-columns: 210px 1fr; column-gap: 26px; align-items: center; }
+.pick .face { grid-row: span 3; width: 210px; height: 210px; border-radius: 50%; position: relative; background: #0f2233;
+  border: 4px solid var(--green); box-shadow: 0 0 30px rgba(140,255,46,.35); display: grid; place-items: center; }
+.pick .face > img.head { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.pick .face > img.solo { width: 72%; height: 72%; object-fit: contain; }
+.pick .face .ini { font: 900 84px/1 var(--display); color: var(--muted); }
+.pick .face .badge { position: absolute; right: -6px; bottom: -6px; width: 74px; height: 74px; border-radius: 50%; background: #04070c;
+  border: 3px solid var(--blue); display: grid; place-items: center; }
+.pick .face .badge img { width: 54px; height: 54px; object-fit: contain; }
+.pick .meta { font: 800 30px/1 var(--display); letter-spacing: .06em; color: var(--blue); text-transform: uppercase; }
+.pick .price { grid-column: 2; }
+.pick { border: 2px solid var(--green); border-radius: 18px; padding: 22px 28px 26px; background: linear-gradient(180deg, rgba(140,255,46,.10), rgba(10,21,32,.9));
+  box-shadow: 0 0 40px rgba(140,255,46,.18); display: grid; gap: 6px; }
+.pick .player { font: 900 88px/.92 var(--display); text-transform: uppercase; letter-spacing: .01em; }
+.pick .bet { font: 900 64px/1 var(--display); color: var(--green); text-transform: uppercase; text-shadow: 0 0 22px rgba(140,255,46,.45); }
+.pick .price { justify-self: start; margin-top: 8px; font: 900 48px/1 var(--display); color: #04110a; background: var(--green);
+  padding: 6px 30px 4px; border-radius: 10px; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.stat { border: 2px solid var(--edge); border-radius: 14px; background: var(--panel); padding: 14px 12px; text-align: center; display: grid; gap: 4px; }
+.stat .k { font: 800 22px/1 var(--display); letter-spacing: .08em; color: var(--blue); text-transform: uppercase; }
+.stat .v { font: 900 54px/1 var(--display); color: var(--white); }
+.stat .s { font: 600 18px/1.15 var(--body); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.stat.hot .v { color: var(--green); text-shadow: 0 0 16px rgba(140,255,46,.4); }
+.lower { display: grid; grid-template-columns: 1fr 1.25fr; gap: 16px; flex: 1; min-height: 0; }
+.box { border: 2px solid var(--edge); border-radius: 14px; background: var(--panel); padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.box h3 { font: 900 28px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--green); }
+.box.risk h3 { color: var(--amber); }
+.box ul { list-style: none; padding: 0; display: grid; gap: 9px; }
+.box li { font: 600 21px/1.25 var(--body); padding-left: 32px; position: relative; color: #dfe8ee; }
+.box li::before { content: "\2714"; position: absolute; left: 0; top: 0; color: #04110a; background: var(--green); width: 22px; height: 22px;
+  border-radius: 5px; font-size: 15px; display: grid; place-items: center; }
+.box.risk li::before { content: "!"; background: var(--amber); font-weight: 800; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart .cap { font: 700 18px/1.2 var(--body); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.right { display: grid; gap: 16px; grid-template-rows: auto auto; }
+.foot { border-top: 3px solid var(--green); padding-top: 14px; display: flex; justify-content: space-between; align-items: center;
+  font: 800 25px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.foot b { color: var(--white); } .foot .x { color: var(--blue); }
+.fine { font: 600 16px/1.3 var(--body); color: #7d93a4; display: flex; justify-content: space-between; }
+</style></head>
+<body>
+  <div class="top"><img alt="Syndicate ROI" src="$logo">
+    <div class="brand"><div class="w1 slant">SYNDICATE ROI</div><div class="w2 slant">$label #$number</div></div></div>
+  <div class="matchup"><span class="teams">$away_crest$away<span class="at">@</span>$home_crest$home</span><span class="tag">$sport · $kickoff</span></div>
+  <div class="pick">$face<div><div class="player slant">$player</div><div class="meta">$player_meta</div></div><div class="bet slant">$bet</div><div class="price">($price)</div></div>
+  <div class="stats">
+    <div class="stat"><div class="k">Best price</div><div class="v">$price</div><div class="s">$book · $books bks</div></div>
+    <div class="stat"><div class="k">Fair line</div><div class="v">$fair</div><div class="s">no-vig fair</div></div>
+    <div class="stat hot"><div class="k">Edge</div><div class="v">$edge</div><div class="s">vs fair price</div></div>
+    <div class="stat"><div class="k">Win prob</div><div class="v">$win_prob</div><div class="s">market$model_note</div></div>
+  </div>
+  <div class="lower">
+    <div class="box chart"><h3>Last games</h3>$chart<div class="cap">$chart_caption</div></div>
+    <div class="right">
+      <div class="box"><h3>Why we like it</h3><ul>$why</ul></div>
+      <div class="box risk"><h3>The risk</h3><ul>$risk</ul></div>
+    </div>
+  </div>
+  <div class="foot"><span><b>Data driven</b> · <b>Discipline</b> · <b>Long-term edge</b></span><span class="x">@SyndicateROI</span></div>
+  <div class="fine"><span>Every play is graded at the closing line and the result. We post the wins. We post the losses.</span><span>21+ · Bet responsibly</span></div>
+</body></html>

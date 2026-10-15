@@ -17,7 +17,7 @@ from flask import render_template_string
 from syndicate.app import app
 
 CANONICAL = [
-    "Home", "The Syndicate", "Betting Board", "Portfolio",
+    "Home", "The Syndicate", "Betting Board", "Cheatsheets", "Portfolio",
     "MLB", "NBA", "NHL", "NFL", "WNBA", "NCAAF", "NCAAB", "Soccer",
 ]
 

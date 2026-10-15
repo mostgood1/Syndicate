@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Syndicate ROI Cheat Sheets</title>
+<!--__SITE_HEAD__-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@700;800;900&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: sport tabs, then stacked sheet sections; each row pairs the bet with a probability strip (price vs fair vs model vs form). */
+:root {
+  color-scheme: dark;
+  --bg: #04070c; --bg2: #08111c; --card: #0a141f; --ink: #eef3f7; --muted: #8fa3b3; --rule: #183044; --track: #1a2b3b;
+  --accent: #8cff2e; --accent2: #1fa8ff; --accent-soft: rgba(140,255,46,.12);
+  --price: #ff6b57; --fair: #eef3f7; --model: #b59bff; --form: #1fa8ff;
+  --v-value: #8cff2e; --v-value-bg: rgba(140,255,46,.14); --v-room: #39c6ff; --v-room-bg: rgba(31,168,255,.15);
+  --v-priced: #ffbe3d; --v-priced-bg: rgba(255,190,61,.13); --v-neutral: #93a4b2; --v-neutral-bg: rgba(147,164,178,.14);
+  --hit: #8cff2e; --miss: #33475a;
+  --display: "Saira Condensed", "Arial Narrow", Impact, sans-serif;
+  --body: "Barlow", "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: "Barlow", "Segoe UI", Helvetica, Arial, sans-serif;
+}
+body { background: radial-gradient(1200px 500px at 15% -10%, rgba(31,168,255,.16), transparent 60%), radial-gradient(900px 420px at 95% 0%, rgba(140,255,46,.10), transparent 60%), var(--bg); color: var(--ink); font: 15px/1.55 var(--body); font-variant-numeric: tabular-nums; }
+.slant { display: inline-block; transform: skewX(-8deg); }
+.brand { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.brand img { width: 88px; height: 86px; border-radius: 10px; box-shadow: 0 0 0 2px rgba(140,255,46,.55), 0 0 24px rgba(31,168,255,.35); }
+.wordmark { display: grid; gap: 2px; }
+.wordmark .w1 { font: 900 clamp(34px, 6vw, 54px)/.9 var(--display); letter-spacing: .02em; text-transform: uppercase; color: #f4f7fa; text-shadow: 0 2px 0 #1b2a38; }
+.wordmark .w2 { font: 800 clamp(22px, 3.6vw, 30px)/1 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); text-shadow: 0 0 18px rgba(140,255,46,.45); }
+.foot { display: flex; flex-wrap: wrap; gap: 10px 22px; justify-content: space-between; align-items: center; border-top: 2px solid var(--accent); padding-top: 12px;
+  font: 800 15px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.foot b { color: var(--ink); } .foot .x { color: var(--accent2); }
+.honest { font: 800 16px/1.2 var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 18px; padding-block: 22px 60px; display: grid; gap: 22px; }
+h1 { font: 700 clamp(30px, 5vw, 44px)/1 var(--display); letter-spacing: .01em; margin: 0; text-transform: uppercase; }
+h2 { font: 900 25px/1.05 var(--display); text-transform: uppercase; letter-spacing: .04em; margin: 0; color: var(--accent); transform: skewX(-8deg); text-shadow: 0 0 14px rgba(140,255,46,.35); }
+.sub { color: var(--muted); font-size: 13.5px; max-width: 75ch; }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.tab { font: 800 18px/1 var(--display); letter-spacing: .05em; text-transform: uppercase; padding: 9px 16px; border-radius: 6px;
+  border: 1px solid var(--rule); background: var(--card); color: var(--ink); cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--accent); color: #04110a; border-color: var(--accent); box-shadow: 0 0 16px rgba(140,255,46,.4); }
+.tab:focus-visible, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--muted); align-items: center; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.legend .tick { width: 3px; height: 12px; border-radius: 1px; }
+section.sheet { background: linear-gradient(180deg, var(--bg2), var(--card)); border: 1px solid #1d3a55; border-radius: 10px; padding: 16px 16px 6px; display: grid; gap: 10px; box-shadow: inset 0 0 0 1px rgba(31,168,255,.08), 0 0 24px rgba(31,168,255,.06); }
+.sheet header { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; justify-content: space-between; }
+.sheet header p { margin: 0; color: var(--muted); font-size: 13px; max-width: 70ch; }
+.count { font: 500 12.5px var(--mono); color: var(--muted); }
+.rowlist { display: grid; }
+.prop { display: grid; grid-template-columns: minmax(180px, 1.35fr) minmax(220px, 1.25fr) minmax(150px, .8fr); gap: 6px 18px;
+  padding: 11px 0; border-top: 1px solid var(--rule); align-items: center; }
+.prop > div { min-width: 0; }
+.who b { font-weight: 600; } .who .meta { color: var(--muted); font-size: 12.5px; }
+.bet { font: 500 13px var(--mono); margin-top: 2px; }
+.chip { display: inline-block; font: 800 12px/1 var(--display); letter-spacing: .07em; text-transform: uppercase; padding: 4px 7px; border-radius: 4px; margin-right: 6px; }
+.chip.value { color: var(--v-value); background: var(--v-value-bg); } .chip.streak_with_room { color: var(--v-room); background: var(--v-room-bg); }
+.chip.streak_priced_in { color: var(--v-priced); background: var(--v-priced-bg); } .chip.neutral { color: var(--v-neutral); background: var(--v-neutral-bg); }
+.strip { position: relative; height: 26px; }
+.strip .track { position: absolute; left: 0; right: 0; top: 11px; height: 4px; background: var(--track); border-radius: 2px; }
+.strip .mk { position: absolute; top: 6px; transform: translateX(-50%); }
+.mk.price { width: 3px; height: 14px; background: var(--price); top: 6px; border-radius: 1px; }
+.mk.fair { width: 3px; height: 14px; background: var(--fair); border-radius: 1px; }
+.mk.model { width: 11px; height: 11px; border: 2px solid var(--model); border-radius: 50%; top: 7.5px; background: var(--bg); }
+.mk.form { width: 11px; height: 11px; background: var(--form); border-radius: 50%; top: 7.5px; }
+.nums { display: flex; gap: 10px; font: 12px var(--mono); color: var(--muted); flex-wrap: wrap; }
+.nums b { color: var(--ink); font-weight: 500; }
+.form { display: flex; gap: 3px; align-items: center; flex-wrap: wrap; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--miss); }
+.dot.hit { background: var(--hit); }
+.ev { font: 500 13px var(--mono); }
+.ev.pos { color: var(--v-value); } .ev.neg { color: var(--price); }
+.why { grid-column: 1 / -1; color: var(--muted); font-size: 12.5px; }
+.games { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; padding-bottom: 10px; }
+.game { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; display: grid; gap: 6px; }
+.game .m { font-weight: 600; } .game .read { font-size: 13px; }
+.game ul { margin: 0; padding-left: 16px; font-size: 12.5px; color: var(--muted); }
+.tbl { overflow-x: auto; padding-bottom: 10px; }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 13px; }
+th, td { text-align: left; padding: 7px 10px; border-top: 1px solid var(--rule); }
+th { font: 700 12px var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.empty { color: var(--muted); font-size: 13px; padding: 8px 0 12px; }
+.note { font-size: 13px; color: var(--muted); border-left: 3px solid var(--accent2); padding-left: 10px; }
+.who { display: grid; grid-template-columns: 52px 1fr; gap: 4px 12px; align-items: center; }
+.who .face { width: 52px; height: 52px; border-radius: 50%; background: #0f2233 center/cover no-repeat; border: 2px solid #1d3a55; overflow: hidden; display: grid; place-items: center; grid-row: span 3; }
+.who .face img { width: 100%; height: 100%; object-fit: cover; }
+.who .face.crest img { width: 70%; height: 70%; object-fit: contain; }
+.who .face .ini { font: 800 18px/1 var(--display); color: var(--muted); }
+.who .line1 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.tm { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; color: var(--ink); }
+.tm img { width: 18px; height: 18px; object-fit: contain; }
+.pos { font: 800 11px/1 var(--display); letter-spacing: .08em; color: #04110a; background: var(--accent2); padding: 3px 6px; border-radius: 3px; }
+.kick { color: var(--accent2); font-weight: 600; }
+.slate { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; padding-bottom: 10px; }
+.sg { border: 1px solid var(--rule); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; background: rgba(10,21,32,.6); }
+.sg .teams { display: grid; gap: 4px; }
+.sg .t { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.sg .t img { width: 26px; height: 26px; object-fit: contain; }
+.sg .when { font: 700 13px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--accent2); }
+.sg .n { font-size: 12px; color: var(--muted); }
+.game .m { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.game .m img { width: 20px; height: 20px; object-fit: contain; }
+@media (max-width: 760px) { .prop { grid-template-columns: 1fr; } }
+</style></head><body>
+<!--__SITE_HEADER__-->
+
+<div class="wrap">
+  <header style="display:grid;gap:12px">
+    <div class="brand"><img alt="Syndicate ROI" src="__LOGO_SRC__">
+      <div class="wordmark"><span class="w1 slant">Syndicate ROI</span><span class="w2 slant">Cheat Sheets</span></div></div>
+    <p class="sub">Every row puts the bet next to what the price already says. A streak or a matchup only counts when the best available price leaves room for it.</p>
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <div class="legend">
+      <span><i class="tick" style="background:var(--price)"></i>Price implies</span>
+      <span><i class="tick" style="background:var(--fair)"></i>Market fair (no vig)</span>
+      <span><i style="border:2px solid var(--model);background:transparent"></i>Syndicate model</span>
+      <span><i style="background:var(--form)"></i>Form-adjusted (provisional)</span>
+      <span><i style="background:var(--hit)"></i>Hit</span><span><i style="background:var(--miss)"></i>Miss</span>
+    </div>
+    <p class="note" id="method"></p>
+  </header>
+  <main id="sheet" style="display:grid;gap:18px"></main>
+  <footer class="foot"><span><b>Data driven</b> · <b>Discipline</b> · <b>Long-term edge</b></span><span class="honest">We post the wins. We post the losses.</span><span class="x">@SyndicateROI</span></footer>
+</div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const SPORT_NAMES = {nfl: "NFL", ncaaf: "NCAAF", nhl: "NHL", soccer: "Soccer", nba: "NBA", wnba: "WNBA", ncaab: "NCAAB", mlb: "MLB"};
+const pct = p => (p == null ? "–" : (100 * p).toFixed(0) + "%");
+const odds = p => (p == null ? "–" : (p > 0 ? "+" : "") + p);
+const evs = v => (v == null ? "–" : (v > 0 ? "+" : "") + v.toFixed(1) + "%");
+const implied = a => (a == null ? null : (a > 0 ? 100 / (a + 100) : -a / (-a + 100)));
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const img = (src, cls) => src ? `<img src="${esc(src)}" alt="" loading="lazy" ${cls ? `class="${cls}"` : ""} onerror="this.remove()">` : "";
+const initials = n => esc(String(n || "").split(/\s+/).map(w => w[0] || "").slice(0, 2).join("").toUpperCase());
+function face(r) {
+  if (r.headshot_url) return `<div class="face"><img src="${esc(r.headshot_url)}" alt="" loading="lazy" onerror="this.parentNode.innerHTML='<span class=&quot;ini&quot;>${initials(r.player)}</span>'"></div>`;
+  if (r.team_logo) return `<div class="face crest">${img(r.team_logo)}</div>`;
+  return `<div class="face"><span class="ini">${initials(r.player)}</span></div>`;
+}
+const VERDICT = {value: "Value", streak_with_room: "Streak with room", streak_priced_in: "Priced in", neutral: "Neutral", one_sided_fair: "One-sided price"};
+
+function strip(c) {
+  const m = (cls, p, label) => p == null ? "" : `<span class="mk ${cls}" style="left:${(100 * p).toFixed(1)}%" title="${label} ${pct(p)}"></span>`;
+  return `<div class="strip" aria-label="price ${pct(implied(c.price))}, fair ${pct(c.p_market)}, model ${pct(c.p_model)}, form ${pct(c.p_posterior)}">
+    <span class="track"></span>${m("price", implied(c.price), "Price implies")}${m("fair", c.p_market, "Market fair")}${m("model", c.p_model, "Model")}${m("form", c.p_posterior, "Form-adjusted")}</div>`;
+}
+function formDots(r) {
+  const c = r.check, vals = (c.form10 && c.form10.values) || [], line = r.line == null ? 0.5 : r.line, side = r.side;
+  return vals.map((v, i) => {
+    const hit = v === line ? null : (side === "under" ? v < line : v > line);
+    return `<span class="dot ${hit ? "hit" : ""}" title="${esc((r.form_labels || [])[i] || "")} ${v}"></span>`;
+  }).join("");
+}
+function propRow(r) {
+  const c = r.check, dvp = r.dvp ? ` · opp allows the ${r.dvp.nth_most}${["th","st","nd","rd"][((r.dvp.nth_most%100-20)%10)] || ["th","st","nd","rd"][r.dvp.nth_most%100] || "th"} most ${esc(r.dvp.stat.replace("_", " "))} to ${esc(r.pos)}` : "";
+  const ev = c.verdict === "value" ? c.ev_market : c.ev_posterior;
+  return `<div class="prop">
+    <div class="who">${face(r)}
+      <div class="line1"><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span><b>${esc(r.player)}</b>${r.pos ? `<span class="pos">${esc(r.pos)}</span>` : ""}</div>
+      <div class="meta"><span class="tm">${img(r.team_logo)}${esc(r.team || "")}</span>${r.opponent ? ` vs <span class="tm">${img(r.opponent_logo)}${esc(r.opponent)}</span>` : ""}${r.kickoff_ct ? ` · <span class="kick">${esc(r.kickoff_ct)}</span>` : ""}${dvp}${r.injury ? " · " + esc(r.injury) : ""}</div>
+      <div class="bet">${esc(r.market)} ${esc(r.side)} ${r.line ?? ""} · ${odds(c.price)} ${esc(c.book || "")}</div></div>
+    <div>${strip(c)}<div class="nums"><span>price <b>${pct(implied(c.price))}</b></span><span>fair <b>${pct(c.p_market)}</b></span><span>model <b>${pct(c.p_model)}</b></span><span>form-adj <b>${pct(c.p_posterior)}</b></span></div></div>
+    <div><div class="form">${formDots(r)}</div><div class="nums"><span>L5 <b>${c.form5.hits}/${c.form5.games}</b></span><span>L10 <b>${c.form10.hits}/${c.form10.games}</b></span>
+      <span class="ev ${ev > 0 ? "pos" : "neg"}">EV ${evs(ev)}</span></div></div>
+    ${c.reasons && c.reasons.length ? `<div class="why">${c.reasons.map(esc).join(" · ")}</div>` : ""}
+  </div>`;
+}
+const SECTIONS = [
+  ["value", "Value at the best price", "The best available price beats the no-vig market fair by 2% or more. This is the board's Suggested rule; form and model are shown, not used."],
+  ["streaks_with_room", "Streaks the price leaves room for", "Cleared this line in at least 4 of the last 5, and the form-adjusted probability still beats the price. Form weight is provisional until the consistency backtest fits it."],
+  ["streaks_priced_in", "Streaks the price already pays for", "Hot on this line, but the price already implies more than the form-adjusted estimate. This is the consistency ticket's blind spot."],
+];
+function shopTable(d) {
+  const ids = (d.sections.shop_gaps || []);
+  if (!ids.length) return `<div class="empty">No line with three or more books and a gap of 2 points or more.</div>`;
+  return `<div class="tbl"><table><thead><tr><th>Player</th><th>Bet</th><th>Best book</th><th>Books</th><th>Best implied</th><th>Median implied</th><th>Given away</th></tr></thead><tbody>${
+    ids.map(i => { const r = d.rows[i], s = r.shop; return `<tr><td>${esc(r.player)}</td><td>${esc(r.market)} ${esc(r.side)} ${r.line ?? ""}</td><td>${esc(s.best_book)}</td><td class="n">${s.books}</td><td class="n">${pct(s.best_implied)}</td><td class="n">${pct(s.median_implied)}</td><td class="n">${s.gap_pp.toFixed(1)} pts</td></tr>`; }).join("")}</tbody></table></div>`;
+}
+function gamesBlock(d) {
+  const games = (d.games || []).filter(g => g.script || g.defense_allows_most);
+  if (!games.length) return "";
+  return `<section class="sheet"><header><h2>Game script and matchups</h2><p>Expected script from Syndicate's game sim, and where each defense allows the most. Context, not picks: these inputs were tested and found mostly priced.</p></header><div class="games">${
+    games.map(g => `<div class="game"><div class="m">${img(g.away_logo)}${esc(g.away_team || "")} @ ${img(g.home_logo)}${esc(g.home_team || g.matchup)}${g.kickoff_ct ? ` · <span class="kick">${esc(g.kickoff_ct)}</span>` : ""}</div>${g.script ? `<div class="read">${esc(g.script.read)}${g.script.total_mean ? ` · total ${Number(g.script.total_mean).toFixed(1)}` : ""}</div>${g.script.helped ? `<ul><li>Helped: ${g.script.helped.map(esc).join(", ")}</li><li>Hurt: ${g.script.hurt.map(esc).join(", ")}</li></ul>` : ""}` : ""}${
+      g.defense_allows_most ? Object.entries(g.defense_allows_most).map(([def, cells]) => `<ul>${cells.map(c => `<li>${esc(def)} allow the ${c.nth_most}${c.nth_most===1?"st":c.nth_most===2?"nd":c.nth_most===3?"rd":"th"} most ${esc(c.stat.replace("_", " "))} to ${esc(c.pos)} (${c.per_game}/g)</li>`).join("")}</ul>`).join("") : ""}</div>`).join("")}</div></section>`;
+}
+function slateBlock(d) {
+  const games = (d.games || []).slice().sort((a, b) => String(a.commence_time).localeCompare(String(b.commence_time)));
+  if (!games.length) return "";
+  const n = {};
+  games.forEach(g => { n[g.event_id] = g.props || 0; });
+  return `<section class="sheet"><header><h2>The slate</h2><p>Every game on this sheet, in kickoff order (US Central).</p><span class="count">${games.length} games</span></header><div class="slate">${
+    games.map(g => `<div class="sg"><div class="when">${esc(g.kickoff_ct || "")}</div><div class="teams"><div class="t">${img(g.away_logo)}${esc(g.away_team || "")}</div><div class="t">${img(g.home_logo)}${esc(g.home_team || "")}</div></div>${n[g.event_id] ? `<div class="n">${n[g.event_id]} props on this sheet</div>` : ""}</div>`).join("")}</div></section>`;
+}
+function newsBlock(d) {
+  const news = d.news || [];
+  if (!news.length) return "";
+  return `<section class="sheet"><header><h2>News impact</h2><p>Status changes captured by Syndicate's news collector in the last day, with that team's game props on the board.</p><span class="count">${news.length}</span></header><div class="tbl"><table><thead><tr><th>Player</th><th>Team</th><th>Change</th><th>Captured</th><th>Game props on board</th></tr></thead><tbody>${
+    news.slice(0, 20).map(n => `<tr><td>${esc(n.player)}</td><td>${esc(n.team)}</td><td>${esc(n.previous_status || "not listed")} → ${esc(n.status || "cleared")}</td><td class="n">${esc((n.captured_at || "").slice(5, 16).replace("T", " "))}Z</td><td class="n">${n.game_props_on_board}</td></tr>`).join("")}</tbody></table></div></section>`;
+}
+function render(sport) {
+  const d = DATA[sport];
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.sport === sport ? "true" : "false"));
+  document.getElementById("method").textContent = `${SPORT_NAMES[sport]} · ${d.date} · generated ${String(d.generated_at || "").replace("T", " ").replace("Z", " UTC")} · ${d.groups_built} of ${d.groups_on_board} player-stat groups built. Form-adjusted = (k × market fair + hits) ÷ (k + games), k = ${d.method.prior_strength_k}${d.method.k_is_provisional ? " (provisional)" : ""}.`;
+  let html = slateBlock(d) + SECTIONS.map(([key, title, blurb]) => {
+    const ids = d.sections[key] || [];
+    return `<section class="sheet"><header><h2>${title}</h2><p>${blurb}</p><span class="count">${ids.length} rows</span></header><div class="rowlist">${ids.length ? ids.map(i => propRow(d.rows[i])).join("") : `<div class="empty">Nothing qualifies on this slate.</div>`}</div></section>`;
+  }).join("");
+  html += `<section class="sheet"><header><h2>Price shopping</h2><p>Same line, same side: what betting the median book gives away against the best one.</p></header>${shopTable(d)}</section>`;
+  html += gamesBlock(d) + newsBlock(d);
+  document.getElementById("sheet").innerHTML = html;
+}
+(function init() {
+  const sports = Object.keys(DATA || {});
+  document.getElementById("tabs").innerHTML = sports.map(s => `<button class="tab" role="tab" data-sport="${s}">${SPORT_NAMES[s] || s}</button>`).join("");
+  document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => render(t.dataset.sport)));
+  if (sports.length) render(sports[0]);
+  else document.getElementById("sheet").innerHTML = `<section class="sheet"><div class="empty">No cheat sheet has been published for this date yet. Sheets are built by the daily generator, never on a page load.</div></section>`;
+})();
+</script>
+</body></html>

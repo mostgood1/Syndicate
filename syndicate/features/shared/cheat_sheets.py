@@ -18,6 +18,7 @@ EV is computed at the best US price for each probability. Pure functions only: t
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -29,6 +30,7 @@ K_IS_PROVISIONAL = True
 STREAK_RATE = 0.8              # "consistent": cleared the line in >= 80% of the last N
 STREAK_MIN_GAMES = 5
 VALUE_EV_PCT = 2.0             # the board's Suggested threshold
+ONE_SIDED_FAIR_METHODS = frozenset({"book_margin_model", "one_sided", "assumed_hold"})
 MODEL_LEAN_PP = 5.0            # model vs market gap worth showing
 
 
@@ -148,7 +150,14 @@ def price_check(row: Mapping[str, Any], form_values: Sequence[float] | None) -> 
     ev_m, ev_mod, ev_post = ev_pct(p_market, price), ev_pct(p_model, price), ev_pct(p_post, price)
     reasons: list[str] = []
     streak = form5["games"] >= STREAK_MIN_GAMES and (form5["rate"] or 0) >= STREAK_RATE
-    if ev_m is not None and ev_m >= VALUE_EV_PCT:
+    one_sided = (str(quote.get("fair_method") or "") in ONE_SIDED_FAIR_METHODS
+                 or quote.get("assumed_hold_pct") is not None)
+    if one_sided:
+        # A one-sided market (yes-only scorer / over-only shots) has no de-viggable pair: its "fair" assumes a hold and
+        # was measured 8.5 pts overstated (findings_2026-09-21_layer2_score_outcomes.md). Never value; say why.
+        verdict = "one_sided_fair"
+        reasons.append("one-sided market: the fair price assumes a hold, so EV here is not comparable")
+    elif ev_m is not None and ev_m >= VALUE_EV_PCT:
         verdict = "value"
         reasons.append(f"best price beats the fair by {ev_m:+.1f}%")
     elif streak and ev_post is not None and ev_post >= 0:
@@ -251,3 +260,33 @@ def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25) -> dict[str, l
         "shop_gaps": sorted((i for i in idx if (rows[i].get("shop") or {}).get("gap_pp", 0) >= 2.0),
                             key=lambda i: -(rows[i].get("shop") or {}).get("gap_pp", 0))[:top],
     }
+
+
+SPORT_ORDER = ("nfl", "ncaaf", "nba", "nhl", "soccer", "ncaab", "wnba", "mlb")
+
+
+def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    """sport -> the sheet cut to the rows its sections show (a 400 KB NFL sheet serves at ~1/4), sports in board order.
+
+    Each game keeps the count of ALL its props on the sheet, so the slate shows depth even though rows are cut."""
+    out: dict[str, dict[str, Any]] = {}
+    for sheet in sorted(sheets, key=lambda d: SPORT_ORDER.index(d["sport"]) if d.get("sport") in SPORT_ORDER else 99):
+        rows = list(sheet.get("rows") or [])
+        keep = sorted({i for ids in (sheet.get("sections") or {}).values() for i in ids if 0 <= i < len(rows)})
+        remap = {old: new for new, old in enumerate(keep)}
+        per_game: dict[Any, int] = {}
+        for r in rows:
+            per_game[r.get("event_id")] = per_game.get(r.get("event_id"), 0) + 1
+        doc = dict(sheet)
+        doc["rows"] = [rows[i] for i in keep]
+        doc["sections"] = {k: [remap[i] for i in ids if i in remap] for k, ids in (sheet.get("sections") or {}).items()}
+        doc["games"] = [dict(g, props=per_game.get(g.get("event_id"), 0)) for g in sheet.get("games") or []]
+        doc["rows_on_sheet"] = len(rows)
+        out[str(sheet.get("sport"))] = doc
+    return out
+
+
+def render_page(template: str, sheets: Iterable[Mapping[str, Any]], *, logo_src: str) -> str:
+    """The branded page with the data inlined. `</` is escaped so no string in the data can close the script."""
+    data = json.dumps(page_payload(sheets), default=str).replace("</", "<\/")
+    return template.replace("/*__DATA__*/null", data, 1).replace("__LOGO_SRC__", logo_src, 1)
