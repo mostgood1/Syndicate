@@ -2615,3 +2615,11 @@ tests/test_basketball_engine_two_point_split.py (NEW). P3 is told; it is a share
 3. PK3 check on the sweep dates (|bias| < 0.5 + every #3 guard + the #5a readings).
 4. Then, after a user go-ahead, the full FIT on the final config.
 5. `fit_f5_config.json` to P3.
+
+**USER DECISION 2026-10-15 (given in d48f3a34, CONFIRMED in this chat): the final full FIT is APPROVED, conditional on PK3.**
+- If PK3 passes EVERY pre-registered guard, start the full FIT immediately (nice 19) and hand P3 `fit_f5_config.json`.
+- The PK3 guards: |total bias| < 0.5, FTA 22.69 ± 0.3, foul-outs [0.153, 0.233], P(6th | 5th) [0.1607, 0.2643],
+  closers-on [0.375, 0.535], H2 [−0.19, −0.155], Q4 ≥ −0.101, S8 14.81 ± 0.6, Q4 FTA share ≥ 0.254.
+- 3P% is excluded: a known residual by the earlier decision.
+- If PK3 fails ANY guard: do not start; report to the user.
+- Research run only. Production enablement is a separate user decision.
