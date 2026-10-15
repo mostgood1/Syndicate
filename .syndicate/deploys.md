@@ -49572,3 +49572,25 @@ Scheduled read-only check (`nfl-wk6-backfill-gate-check`). Nothing restarted, la
 **date=2026-10-15 chips lag the 10-14 chips by 3-5 min for the same matches.** Repeated reads of 761860 at 45 s spacing: 01:22:15Z 10-14 81' 2-2 vs 10-15 76' 1-2; 01:23:06Z 82' vs 79' 2-2; 01:23:53Z 82' vs 81'. So the 10-15 view is NOT stuck -- it refreshes, but on a slower/separate cache cadence, and for ~4 min it served a score missing an equaliser. Not diagnosed which cache (per-date key on the serve-time refresh is the obvious suspect). Relevance: after 00:00Z (19:00 CT) the evening MLS slate is "today" in UTC but "yesterday" in CT; whichever date the board asks for, the two must not disagree on a live score. Lead, not a fix.
 
 Pressure lines were the same text on both dates and across reads 30 s apart; not compared with ESPN (no ESPN field read for it).
+
+## 2026-10-15 01:33:41Z (8:33 PM CT 10-14) -- LOCAL FLEET: NBA T-window provider (fd7f2a2d) ON DISK, NOT LOADED -- carried by the cheat-sheets ff to 7921b98b at 01:03:40Z; loads at the live-odds-worker's self-recycle (~03:35Z), by user decision (lane `nba-t-window-provider`, session 2d413211)
+
+- **User decisions 2026-10-14:**
+  - "move the nba schedule commence times off vendor": nothing vendored existed and NBA had no T-window provider. Decision: "Add an NBA provider".
+  - Deploy: "Ff + restart now".
+  - Then, once ride-alongs appeared: "Let the self-recycle load it".
+- **What happened:**
+  - The cheat-sheets session (9e18a0e7) fast-forwarded to its own 7921b98b at 01:03:40Z; fd7f2a2d sat in between. It messaged me and recorded it on its side.
+  - Another ff moved the fleet to 5b7d0086.
+  - My gated script (claims acquired + verified, props idle) printed "Already up to date", saw HEAD != fd7f2a2d, stopped BEFORE the restart, and released both claims. Nothing of mine restarted.
+- **Not loaded:** the live-odds-worker (pid 144583) still runs what it loaded at 21:35:07Z (b308154b).
+  - A restart would load 28 commits since then: news-availability gate, MLB injuries, cheat sheets, play cards, NHL headshots, watchdog, ...
+  - The worker self-recycles at 6 h (~03:35Z) and loads them regardless. The user chose to let that do it.
+- **Cost (simulated on the fleet schedule 10-14..10-27):** 2-4 added NBA sweeps per slate, 32 over 14 days, all before each slate's first tip.
+  - Credits per sweep are NOT measured: the OddsAPI quota ledger stopped updating 2026-09-30.
+  - Estimate: tens to ~150 per sweep.
+- **Verify OWED:**
+  1. After the recycle, under the new worker's env: 'nba' is in `_T_WINDOW_COMMENCE_PROVIDERS`, and `_nba_commence_times('2026-10-20')` returns 0022600001..3.
+  2. The first `nba:ramp:` / `nba:closing:` T-window marker on the next NBA slate.
+  - A detached watcher (`/mnt/c/tmp/p7/recycle.out`) records reading 1.
+- **Rollback:** revert fd7f2a2d and ff, then TERM the live-odds-worker.
