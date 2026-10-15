@@ -69,7 +69,7 @@ section.sheet { background: linear-gradient(180deg, var(--bg2), var(--card)); bo
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--miss); }
 .dot.hit { background: var(--hit); }
 .ev { font: 500 13px var(--mono); }
-.ev.pos { color: var(--v-value); } .ev.neg { color: var(--price); }
+.ev.gain { color: var(--v-value); } .ev.neg { color: var(--price); }
 .why { grid-column: 1 / -1; color: var(--muted); font-size: 12.5px; }
 .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; padding-bottom: 10px; }
 .game { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; display: grid; gap: 6px; }
@@ -180,7 +180,7 @@ tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first
 .prop.pick .who > :not(.face) { grid-column: 2; }
 .ptile { border: 1px solid #1d3a55; border-radius: 8px; padding: 6px 6px 5px; background: rgba(10,21,32,.75); display: grid; gap: 1px; text-align: center; }
 .ptile span { font: 800 11px/1.2 var(--display); letter-spacing: .07em; text-transform: uppercase; color: var(--accent2); }
-.ptile b { font: 800 21px/1.1 var(--display); color: var(--ink); } .ptile b.pos { color: var(--accent); }
+.ptile b { font: 800 21px/1.1 var(--display); color: var(--ink); } .ptile b.gain { color: var(--accent); }
 .ptile i { font-style: normal; font-size: 11.5px; color: var(--muted); }
 .checks { grid-column: 1 / -1; list-style: none; margin: 2px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 4px 18px; }
 .checks li { font-size: 13px; padding-left: 20px; position: relative; }
@@ -194,7 +194,7 @@ tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first
 .xframe .ptile b { font-size: 26px; } .xframe .ptile span { font-size: 13px; } .xframe .checks li { font-size: 16px; }
 @media (max-width: 760px) { .prop.pick { grid-template-columns: 1fr; } .ptiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .rtab td.lab { font-weight: 600; } .rtab tr.all td { border-top: 2px solid var(--accent); font-weight: 700; }
-.rtab td.n.pos { color: var(--accent); } .rtab td.n.neg { color: var(--price); }
+.rtab td.n.gain { color: var(--accent); } .rtab td.n.neg { color: var(--price); }
 .chart svg { width: 100%; height: auto; display: block; } .chart .key { display: flex; gap: 16px; font-size: 12.5px; color: var(--muted); }
 .chart .key i { display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: 3px; }
 @media (max-width: 760px) { .prop { grid-template-columns: 1fr; } }
@@ -295,7 +295,7 @@ function propRow(r, i) {
       <div class="bet">${esc(betText(r))} · ${odds(c.price)} ${esc(c.book || "")}</div></div>
     <div>${strip(c)}<div class="nums"><span>price <b>${pct(implied(c.price))}</b></span><span>fair <b>${pct(c.p_market)}</b></span><span>model <b>${pct(c.p_model)}</b></span><span>form-adj <b>${pct(c.p_posterior)}</b></span></div></div>
     <div><div class="form" title="The last 10 games on this line, newest first: green cleared it, grey did not">${formDots(r)}</div><div class="nums"><span>L5 <b>${c.form5 ? c.form5.hits + "/" + c.form5.games : "–"}</b></span><span>L10 <b>${c.form10 ? c.form10.hits + "/" + c.form10.games : "–"}</b></span>
-      <span class="ev ${ev == null ? "" : ev > 0 ? "pos" : "neg"}">${ev == null ? "no fair line" : "EV " + evs(ev)}</span></div></div>
+      <span class="ev ${ev == null ? "" : ev > 0 ? "gain" : "neg"}">${ev == null ? "no fair line" : "EV " + evs(ev)}</span></div></div>
     ${c.reasons && c.reasons.length ? `<div class="why">${c.reasons.map(esc).join(" · ")}</div>` : ""}
   </div>`;
 }
@@ -335,7 +335,7 @@ function pickRow(p, i) {
       <div class="ptile"><span>Fair line</span><b>${odds(p.fair_price)}</b><i>no-vig ${pct(p.p_market)}</i></div>
       ${play ? `<div class="ptile"><span>Books</span><b>${p.books || "–"}</b><i>consensus ${pct(p.p_market)}</i></div>`
              : `<div class="ptile"><span>SmartSim</span><b>${pct(p.p_model)}</b><i>${esc(proj)}</i></div>`}
-      <div class="ptile"><span>Edge</span><b class="${p.ev_pct > 0 ? "pos" : ""}">${evs(p.ev_pct)}</b><i>vs the fair price</i></div>
+      <div class="ptile"><span>Edge</span><b class="${p.ev_pct > 0 ? "gain" : ""}">${evs(p.ev_pct)}</b><i>vs the fair price</i></div>
     </div>
     <ul class="checks">${why.slice(0, 8).join("")}</ul>
   </div>`;
@@ -428,7 +428,7 @@ function linesTable(d, ids, withGame) {
   const games = Object.fromEntries((d.games || []).map(g => [g.event_id, g]));
   return `<div class="tbl"><table class="every"><thead><tr>${withGame ? "<th>Game</th>" : ""}<th>Market</th><th>Bet</th><th>Best price</th><th>Implies</th><th>Fair</th><th>EV</th><th>Model</th><th>Sim</th><th>Read</th></tr></thead><tbody>${
     ids.map(i => { const g = d.game_lines[i], c = g.check || {}, gm = games[g.event_id] || {};
-      return `<tr data-li="${i}">${withGame ? `<td><span class="ep">${img(src(gm.away_logo_src, gm.away_logo), "mini")}${img(src(gm.home_logo_src, gm.home_logo), "mini")}<span class="kick">${esc(gm.kickoff_ct || "")}</span></span></td>` : ""}<td>${LINE_MARKET[g.market] || esc(g.market)}</td><td><b>${lineBet(g)}</b></td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")} · ${g.books_quoting} bks</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${c.verdict === "one_sided_fair" ? "one-sided" : pct(c.p_market)}</td><td class="n"><span class="ev ${c.ev_market > 0 ? "pos" : "neg"}">${c.verdict === "one_sided_fair" ? "–" : evs(c.ev_market)}</span></td><td class="n">${pct(c.p_model)}</td><td class="n">${lineSim(g)}</td><td><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span></td></tr>`; }).join("")}</tbody></table></div>`;
+      return `<tr data-li="${i}">${withGame ? `<td><span class="ep">${img(src(gm.away_logo_src, gm.away_logo), "mini")}${img(src(gm.home_logo_src, gm.home_logo), "mini")}<span class="kick">${esc(gm.kickoff_ct || "")}</span></span></td>` : ""}<td>${LINE_MARKET[g.market] || esc(g.market)}</td><td><b>${lineBet(g)}</b></td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")} · ${g.books_quoting} bks</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${c.verdict === "one_sided_fair" ? "one-sided" : pct(c.p_market)}</td><td class="n"><span class="ev ${c.ev_market > 0 ? "gain" : "neg"}">${c.verdict === "one_sided_fair" ? "–" : evs(c.ev_market)}</span></td><td class="n">${pct(c.p_model)}</td><td class="n">${lineSim(g)}</td><td><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span></td></tr>`; }).join("")}</tbody></table></div>`;
 }
 // "Every prop on the board" sorts on any column (user 2026-10-15: "ability to sort columns, esp the L5 and L10 so we
 // can see the highest hit rates across everything"). A hit rate needs its sample: a row with fewer than 5 (L5) / 8
@@ -469,7 +469,7 @@ function everyTable(d, ids) {
   }).join("");
   return `<div class="tbl"><table class="every"><thead><tr>${head}</tr></thead><tbody>${
     sortedIds(d, ids, sort).map(i => { const r = d.rows[i], c = r.check || {}, onesided = c.verdict === "one_sided_fair";
-      return `<tr data-ri="${i}"><td><span class="ep">${img(src(r.headshot_src, r.headshot_url), "mini")}${esc(r.player)}${r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}</span></td><td>${esc(betText(r))}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n"><span class="ev ${!onesided && c.ev_market > 0 ? "pos" : "neg"}">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</span></td><td class="n">${pct(c.p_model)}</td><td class="n">${f(c.form5)}</td><td class="n">${f(c.form10)}</td><td><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span></td></tr>`; }).join("")}</tbody></table></div>`;
+      return `<tr data-ri="${i}"><td><span class="ep">${img(src(r.headshot_src, r.headshot_url), "mini")}${esc(r.player)}${r.pos ? ` <span class="pos">${esc(r.pos)}</span>` : ""}</span></td><td>${esc(betText(r))}</td><td class="n">${odds(c.price)} <span class="bk">${esc(c.book || "")}</span></td><td class="n">${pct(implied(c.price))}</td><td class="n">${onesided ? "one-sided" : pct(c.p_market)}</td><td class="n"><span class="ev ${!onesided && c.ev_market > 0 ? "gain" : "neg"}">${onesided || c.ev_market == null ? "–" : evs(c.ev_market)}</span></td><td class="n">${pct(c.p_model)}</td><td class="n">${f(c.form5)}</td><td class="n">${f(c.form10)}</td><td><span class="chip ${c.verdict}">${VERDICT[c.verdict] || esc(c.verdict)}</span></td></tr>`; }).join("")}</tbody></table></div>`;
 }
 const matchupLine = g => `${img(src(g.away_logo_src, g.away_logo))}${esc(g.away_team || "")} @ ${img(src(g.home_logo_src, g.home_logo))}${esc(g.home_team || g.matchup || "")}`;
 function gamesBlock(d, games) {
@@ -849,7 +849,7 @@ async function exportSection(btn) {
 // `cheatsheets/record.json` (syndicate/features/shared/cheat_sheet_record.py), rebuilt by every reconcile run.
 const REC = {scope: "official", sport: "all"};
 const pctText = v => v == null ? "–" : v.toFixed(1) + "%";
-const signClass = v => v == null || v === 0 ? "" : v > 0 ? "pos" : "neg";
+const signClass = v => v == null || v === 0 ? "" : v > 0 ? "gain" : "neg";
 function recordTable(R, totals) {
   const keys = R.sections.filter(sec => totals[sec.key]);
   if (!keys.length) return `<div class="empty">No graded featured picks here yet.</div>`;
