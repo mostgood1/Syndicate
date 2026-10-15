@@ -907,6 +907,14 @@ death, never life — do not invert it.
 - Verification: The report on origin/main before and after: board-interval-charts moves out of the BAD section; the ncaaf live-vs-lines pair still resolves to a near miss in a unit test; mutants that drop the guard fail the suite; check_lane_claims exits 0.
 - Blocked by: none
 
+### sim-gap-ev-study — OPEN — opened 2026-10-15 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
+- Goal: A table of realised ROI, hit rate and fitted sim weight by sim-vs-market gap band x EV band, per sport and season phase, with game-clustered CIs and including the >15-point gap rows the board drops: read once now on the existing graded population, then produced daily on the fleet
+- Files: scripts/sim_gap_ev_study.py (NEW), syndicate/features/shared/sim_gap_ev_study.py (NEW), tests/test_sim_gap_ev_study.py (NEW), .syndicate/findings_2026-10-15_sim_gap_ev_study.md (NEW)
+- Hypothesis: PRE-REGISTERED 2026-10-15 before any run. H1: holding EV band fixed, ROI does not rise when the sim agrees (agree <= disagree). H2: the fitted sim weight w (p = fair + w*(sim - fair)) FALLS as |gap| grows: the sim's small deviations carry information, its large ones are mostly engine error. H3: on the >15-point rows the board drops, the market beats the sim by more than in the 10-15 band. Signal rule: a cell counts only if its game-clustered 95% ROI CI excludes 0 with >= 30 games; the number of cells tested is reported with every result.
+- Falsification test: H1 false if, within one EV band, agree beats disagree with a game-clustered CI excluding 0. H2 false if w(10+) >= w(0-5) with a CI on the difference excluding 0. H3 false if the sim's Brier beats the market's on the >15 rows.
+- Verification: The one-off reading is written to the findings file with n rows, n games and the date window per cell, then the daily job's first fleet output is read back from the data root.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
