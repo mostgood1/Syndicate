@@ -177,3 +177,38 @@ def test_values_ride_the_index_the_merge_and_the_page():
     assert doc["rows"][0]["result"] == {"y": 1.0, "units": 0.909, "v": 2.0}
     assert doc["game_lines"][0]["result"] == {"y": 0.0, "units": -1.0, "v": 5.0}
     assert m.reconcile(sheet, props, lines, now=__import__("datetime").datetime(2026, 10, 15))["counts"]["props_valued"] == 1
+
+
+def test_a_bet_with_no_result_says_why_and_each_game_carries_its_final():
+    # User 2026-10-15: "some of the section reconciles are missing for 10-14" -- a bare dash explained nothing.
+    m = _script()
+    from syndicate.features.shared import game_line_bet
+    from syndicate.features.shared import population_outcomes as po
+    from syndicate.features.shared import population_outcomes_soccer as soccer
+
+    def fake(shaped, view):
+        if shaped["market"] == "assists":
+            return None, "nhl_player_name_unmatched"
+        if shaped["market"] == "player_goal_scorer_anytime":
+            soccer.qualifying_goals({"score_home": 2, "score_away": 1, "goals": []})
+            return None, "dnp_void"
+        return game_line_bet.game_line_view(sport="nhl", market="h2h", side="home", line=None, home_team="WSH", away_team="MTL",
+                                            home_score=4, away_score=2, draw_possible=False) and ("win", "nhl_api")
+
+    rows = [{"sport": "nhl", "event_id": "e1", "market": "assists", "side": "over", "line": 0.5, "player_name": "Zack Bolduc"},
+            {"sport": "soccer", "event_id": "e9", "market": "player_goal_scorer_anytime", "side": "yes", "line": None, "player_name": "Sam Williams"},
+            {"sport": "nhl", "event_id": "e1", "market": "h2h", "side": "home", "line": None, "player_name": None, "segment": "full"}]
+    with m.ValueTap() as tap:
+        for r in rows:
+            po.CompositeSettler([("fake", fake, "1")])(r, {})
+    assert tap.reasons["p:" + cs.prop_result_key({"player": "Zack Bolduc", "market": "assists", "side": "over", "line": 0.5})] == "nhl_player_name_unmatched"
+    assert tap.scores == {"e9": {"home": 2.0, "away": 1.0}, "e1": {"home": 4.0, "away": 2.0}}
+    sheet = dict(_sheet(), games=[{"event_id": "e1", "home_team": "WSH", "away_team": "MTL"}])
+    props, lines = m.graded_index(GRADED)
+    rec = m.reconcile(sheet, props, lines, now=__import__("datetime").datetime(2026, 10, 15), reasons=tap.reasons, scores=tap.scores)
+    assert rec["void"] == {cs.prop_result_key(sheet["rows"][3]): "nhl_player_name_unmatched"} and rec["scores"] == {"e1": {"home": 4.0, "away": 2.0}}
+    doc = cs.page_payload([dict(sheet, reconciled=rec)])["nhl"]
+    assert doc["rows"][3]["result"] is None and doc["rows"][3]["result_note"] == "Not in the box score"
+    assert doc["games"][0]["final"] == {"home": 4.0, "away": 2.0}
+    assert [cs.void_label(r) for r in ("push", "extra_dnp_void", "player_not_in_box", "game_not_final", "odd")] == [
+        "Push", "Void: did not play", "Not in the box score", "Not final", "Not gradeable"]

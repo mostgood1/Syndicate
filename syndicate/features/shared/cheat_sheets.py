@@ -635,6 +635,21 @@ def result_for(price: Any, graded: Mapping[str, Any] | None) -> dict[str, Any] |
     return out
 
 
+def void_label(reason: Any) -> str:
+    """The grader's reason a bet carries no result, in words a reader can check (user 2026-10-15: "some of the
+    section reconciles are missing" -- a bare dash said nothing)."""
+    r = str(reason or "").lower()
+    if r == "push":
+        return "Push"
+    if "dnp" in r or "did_not_play" in r or "void" in r:
+        return "Void: did not play"
+    if any(k in r for k in ("not_in_box", "absent", "not_found", "unmatched", "ambiguous")):
+        return "Not in the box score"
+    if any(k in r for k in ("not_final", "not_started", "not_completed", "not_yet", "pending")):
+        return "Not final"
+    return "Not gradeable"
+
+
 def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
     """sport -> the sheet as the page shows it, sports in board order.
 
@@ -659,6 +674,9 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
             row["card_ok"] = pc.eligible(r)
             if rec is not None:
                 row["result"] = result_for((r.get("check") or {}).get("price"), graded_props.get(prop_result_key(r)))
+                why = (rec.get("void") or {}).get(prop_result_key(r))
+                if row["result"] is None and why:
+                    row["result_note"] = void_label(why)
             rows.append(row)
         by_game: dict[Any, list[int]] = {}
         for i, r in enumerate(rows):
@@ -666,7 +684,10 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
         doc = dict(sheet)
         doc["rows"] = rows
         doc["sections"] = sections(rows)
-        doc["games"] = [dict(g, props=len(by_game.get(g.get("event_id"), []))) for g in sheet.get("games") or []]
+        finals = (rec or {}).get("scores") or {}
+        doc["games"] = [dict(g, props=len(by_game.get(g.get("event_id"), [])),
+                             **({"final": finals[str(g.get("event_id"))]} if str(g.get("event_id")) in finals else {}))
+                        for g in sheet.get("games") or []]
         lines = list(sheet.get("game_lines") or [])
         if rec is not None:
             lines = [dict(line, result=result_for((line.get("check") or {}).get("price"), graded_lines.get(line_result_key(line))))

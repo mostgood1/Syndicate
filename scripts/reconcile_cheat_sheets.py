@@ -76,6 +76,8 @@ class ValueTap:
 
     def __init__(self) -> None:
         self.values: dict[str, dict[str, Any]] = {}
+        self.reasons: dict[str, str] = {}            # why a record was NOT graded: did not play, push, not final ...
+        self.scores: dict[str, dict[str, float]] = {}  # event id -> the full-game final, home and away
         self.missing: list[str] = []
         self._current: Mapping[str, Any] | None = None
         self._restore: list[tuple[Any, str, Any]] = []
@@ -94,10 +96,22 @@ class ValueTap:
         def entry(settler: Any, shaped: Mapping[str, Any], *args: Any, **kwargs: Any) -> Any:
             outer, tap._current = tap._current, shaped
             try:
-                return original(settler, shaped, *args, **kwargs)
+                out = original(settler, shaped, *args, **kwargs)
+                if isinstance(out, tuple) and out and (out[0] is None or out[0] == "push"):
+                    tap.reasons[_key_of(shaped)] = "push" if out[0] == "push" else str(out[1] or "unsettled")
+                return out
             finally:
                 tap._current = outer
         return entry
+
+    def _score(self, home: Any, away: Any) -> None:
+        shaped = self._current
+        if shaped is None or str(shaped.get("segment") or "full") not in ("full", "full_game"):
+            return
+        try:
+            self.scores[str(shaped.get("event_id"))] = {"home": float(home), "away": float(away)}
+        except (TypeError, ValueError):
+            pass
 
     def _record(self, value: Any, **extra: Any) -> None:
         if self._current is None or value is None:
@@ -140,7 +154,29 @@ class ValueTap:
             def wrapped(market: Any, side: Any, line: Any, away_runs: Any, home_runs: Any, *args: Any, **kwargs: Any) -> Any:
                 if "total" in str(market or "").lower():
                     tap._record((away_runs or 0) + (home_runs or 0))
+                tap._score(home_runs, away_runs)
                 return original(market, side, line, away_runs, home_runs, *args, **kwargs)
+            return wrapped
+
+        def via_line_view(original: Any) -> Any:        # ESPN and NHL game lines hand it the final score
+            def wrapped(*args: Any, **kwargs: Any) -> Any:
+                tap._score(kwargs.get("home_score"), kwargs.get("away_score"))
+                return original(*args, **kwargs)
+            return wrapped
+
+        def via_segment_actuals(original: Any) -> Any:  # soccer game lines
+            def wrapped(*args: Any, **kwargs: Any) -> Any:
+                out = original(*args, **kwargs)
+                if isinstance(out, Mapping) and out.get("is_final"):
+                    tap._score(out.get("home_score"), out.get("away_score"))
+                return out
+            return wrapped
+
+        def via_goals(original: Any) -> Any:            # soccer scorer props read the box's final score
+            def wrapped(box: Any, *args: Any, **kwargs: Any) -> Any:
+                if isinstance(box, Mapping):
+                    tap._score(box.get("score_home"), box.get("score_away"))
+                return original(box, *args, **kwargs)
             return wrapped
 
         self._wrap(population_outcomes_espn, "resolve_bet_status", via_status)
@@ -148,6 +184,35 @@ class ValueTap:
         self._wrap(prop_outcomes, "settle_prop", via_args(2))
         self._wrap(population_outcomes_soccer, "settle_over_under", via_args(0))
         self._wrap(population_outcomes_mlb, "settle_runs", via_runs)
+        from syndicate.features.shared import game_line_bet, segment_actuals
+
+        self._wrap(game_line_bet, "game_line_view", via_line_view)
+        self._wrap(segment_actuals, "segment_actuals", via_segment_actuals)
+        self._wrap(population_outcomes_soccer, "qualifying_goals", via_goals)
+
+        def via_found_game(read: Any) -> Callable[[Any], Any]:
+            # Every prop finds its game before it is graded, so every game with a graded prop has its final: MLB through
+            # the schedule (`MlbPropGrader._final_game`), football / basketball through ESPN's scoreboard (`_locate`).
+            def make(original: Any) -> Any:
+                def wrapped(settler: Any, *args: Any, **kwargs: Any) -> Any:
+                    out = original(settler, *args, **kwargs)
+                    game = out[0] if isinstance(out, tuple) and out else None
+                    if isinstance(game, Mapping):
+                        read(game)
+                    return out
+                return wrapped
+            return make
+
+        def mlb_final(game: Mapping[str, Any]) -> None:
+            if str(game.get("state") or "") == "Final":
+                tap._score(game.get("home_score"), game.get("away_score"))
+
+        def espn_final(event: Mapping[str, Any]) -> None:
+            if event.get("completed"):
+                tap._score((event.get("home") or {}).get("score"), (event.get("away") or {}).get("score"))
+
+        self._wrap(prop_outcomes.MlbPropGrader, "_final_game", via_found_game(mlb_final))
+        self._wrap(population_outcomes_espn.EspnPopulationSettler, "_locate", via_found_game(espn_final))
         return self
 
     def __exit__(self, *exc: Any) -> None:
@@ -190,12 +255,19 @@ def merge_results(prior: Mapping[str, Any], fresh: Mapping[str, Any]) -> dict[st
     return out
 
 
-def reconcile(sheet: dict[str, Any], props: dict[str, Any], lines: dict[str, Any], *, now: datetime) -> dict[str, Any]:
-    """The reconciled file for one sheet: the result of every prop and game line the grader settled."""
+def reconcile(sheet: dict[str, Any], props: dict[str, Any], lines: dict[str, Any], *, now: datetime,
+              reasons: Mapping[str, str] | None = None, scores: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """The reconciled file for one sheet: the result of every prop and game line the grader settled, why each one it
+    did NOT settle was left (`void`: did not play, push, not final ...), and each game's final score (`scores`)."""
     p_out = {k: props[k] for k in (cs.prop_result_key(r) for r in sheet.get("rows") or []) if k in props}
     l_out = {k: lines[k] for k in (cs.line_result_key(g) for g in sheet.get("game_lines") or []) if k in lines}
+    reasons, scores = reasons or {}, scores or {}
+    void = {k: reasons["p:" + k] for k in (cs.prop_result_key(r) for r in sheet.get("rows") or [])
+            if k not in p_out and "p:" + k in reasons}
+    events = {str(g.get("event_id")) for g in sheet.get("games") or []} | {str(r.get("event_id")) for r in sheet.get("rows") or []}
     return {"sport": sheet.get("sport"), "date": sheet.get("date"), "reconciled_at": now.isoformat(timespec="seconds"),
-            "source": SOURCE, "props": p_out, "lines": l_out,
+            "source": SOURCE, "props": p_out, "lines": l_out, "void": void,
+            "scores": {e: scores[e] for e in sorted(events) if e in scores},
             "counts": {"props": len({cs.prop_result_key(r) for r in sheet.get("rows") or []}), "props_graded": len(p_out),
                        "props_valued": sum(1 for v in p_out.values() if "v" in v),
                        "lines": len({cs.line_result_key(g) for g in sheet.get("game_lines") or []}),
@@ -243,6 +315,8 @@ def main(argv: list[str] | None = None) -> int:
     root = Path(os.path.expanduser(args.data_root))
     sheets_dir = root / "cheatsheets"
     today = central_today()
+    # One marker a run, so the daily review reads only the LAST run's lines (scripts/review_cheat_sheets.py).
+    print(f"RECONCILE_RUN start {datetime.now(timezone.utc).isoformat(timespec='seconds')}", flush=True)
     days = args.date or [(datetime.fromisoformat(today) - timedelta(days=k)).date().isoformat() for k in range(DAYS_BACK, -1, -1)]
     wanted = {s.strip() for s in args.sports.split(",")} if args.sports else None
     cache = sheets_dir / ".reconcile_cache"
@@ -290,14 +364,16 @@ def main(argv: list[str] | None = None) -> int:
                 prior = {}
             # A settled result never changes, so an earlier run's results stay when a re-run grades fewer.
             rec = reconcile(doc, merge_results(prior.get("props") or {}, props), merge_results(prior.get("lines") or {}, lines),
-                            now=now)
+                            now=now, reasons={**{"p:" + k: v for k, v in (prior.get("void") or {}).items()}, **tap.reasons},
+                            scores={**(prior.get("scores") or {}), **tap.scores})
             c = rec["counts"]
             if not prior and not (c["props_graded"] or c["lines_graded"]):
                 # Nothing final yet: no file, so the page offers no toggle onto a sheet of dashes.
                 print(f"RECONCILE {doc['sport']} date={day} nothing settled yet -- no file", flush=True)
                 continue
             write_atomic(target, rec)
-            print(f"RECONCILE {doc['sport']} date={day} props {c['props_graded']}/{c['props']} (values {c['props_valued']}) "
+            print(f"RECONCILE {doc['sport']} date={day} props {c['props_graded']}/{c['props']} (values {c['props_valued']}, "
+                  f"explained voids {len(rec['void'])}, finals {len(rec['scores'])}) "
                   f"lines {c['lines_graded']}/{c['lines']} graded_population={len(graded)}", flush=True)
     write_record(sheets_dir, now=datetime.now(timezone.utc))
     return 0

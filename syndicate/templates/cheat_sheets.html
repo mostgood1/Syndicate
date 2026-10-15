@@ -163,6 +163,10 @@ tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first
 .recbar .it { display: inline-flex; gap: 8px; align-items: center; font-weight: 600; }
 .recbar p { margin: 0; color: var(--muted); font-size: 12.5px; }
 .xframe .res { font-size: 17px; } .xframe .rec { font-size: 16px; }
+.recap { font-size: 13.5px; line-height: 1.5; border-left: 3px solid var(--accent); padding: 2px 0 2px 10px; color: var(--ink); }
+.recap b { color: var(--accent); font-weight: 700; } .recap .sep { color: var(--muted); margin: 0 6px; }
+.final { font: 700 13px var(--mono); color: var(--ink); } .final b { color: var(--accent); }
+.xframe .recap { font-size: 16px; } .xframe .final { font-size: 15px; }
 .rtab td.lab { font-weight: 600; } .rtab tr.all td { border-top: 2px solid var(--accent); font-weight: 700; }
 .rtab td.n.pos { color: var(--accent); } .rtab td.n.neg { color: var(--price); }
 .chart svg { width: 100%; height: auto; display: block; } .chart .key { display: flex; gap: 16px; font-size: 12.5px; color: var(--muted); }
@@ -383,15 +387,20 @@ const matchupLine = g => `${img(src(g.away_logo_src, g.away_logo))}${esc(g.away_
 function gamesBlock(d, games) {
   games = games.filter(g => g.script || g.defense_allows_most);
   if (!games.length) return "";
+  const rec = reconciledView(d), checked = games.filter(g => g.final && g.script && typeof g.script.margin_mean === "number");
+  const called = checked.filter(g => Math.sign(g.script.margin_mean) === Math.sign(g.final.home - g.final.away)).length;
+  const avgMiss = checked.length ? checked.reduce((t, g) => t + Math.abs(g.script.margin_mean - (g.final.home - g.final.away)), 0) / checked.length : null;
+  const scriptRecap = rec ? `<div class="recap">Recap: ${checked.length ? `the sim's leader won <b>${called} of ${checked.length}</b><span class="sep">·</span>its margin was off by <b>${avgMiss.toFixed(1)}</b> points on average` : "no game here is final yet"}</div>` : "";
   return sectionShell("script", "Game script and matchups", "Expected game script from Syndicate's simulations, and where each defense allows the most. Context, not picks.", `${games.length} games`,
-    `<div class="games">${games.map(g => `<div class="game"><div class="m">${matchupLine(g)}${g.kickoff_ct ? ` · <span class="kick">${esc(g.kickoff_ct)}</span>` : ""}</div>${g.script ? `<div class="read">${esc(g.script.read)}${g.script.total_mean ? ` · total ${Number(g.script.total_mean).toFixed(1)}` : ""}</div>${g.script.helped ? `<ul><li>Helped: ${g.script.helped.map(esc).join(", ")}</li><li>Hurt: ${g.script.hurt.map(esc).join(", ")}</li></ul>` : ""}` : ""}${
+    scriptRecap + `<div class="games">${games.map(g => `<div class="game"><div class="m">${matchupLine(g)}${g.kickoff_ct ? ` · <span class="kick">${esc(g.kickoff_ct)}</span>` : ""}</div>${rec ? finalLine(g) + scriptCheck(g) : ""}${g.script ? `<div class="read">${esc(g.script.read)}${g.script.total_mean ? ` · total ${Number(g.script.total_mean).toFixed(1)}` : ""}</div>${g.script.helped ? `<ul><li>Helped: ${g.script.helped.map(esc).join(", ")}</li><li>Hurt: ${g.script.hurt.map(esc).join(", ")}</li></ul>` : ""}` : ""}${
       g.defense_allows_most ? Object.entries(g.defense_allows_most).map(([def, cells]) => `<ul>${cells.map(c => `<li>${esc(def)} allow the ${ordinal(c.nth_most)} most ${esc(String(c.stat).replace("_", " "))} to ${esc(c.pos)} (${c.per_game}/g)</li>`).join("")}</ul>`).join("") : ""}</div>`).join("")}</div>`);
 }
 function slateBlock(d) {
   const games = (d.games || []).slice().sort((a, b) => String(a.commence_time).localeCompare(String(b.commence_time)));
   if (!games.length) return "";
   return sectionShell("slate", "The slate", "Every game on this sheet in kickoff order. Pick a game for its own sheet.", `${games.length} game${games.length === 1 ? "" : "s"}`,
-    `<div class="slate">${games.map(g => `<a class="sg" href="${gameHref(g.event_id)}" data-game="${esc(g.event_id)}"><div class="when">${esc(g.kickoff_ct || "")}${started(g.commence_time) ? ` <span class="chip started">Started</span>` : ""}</div><div class="teams"><div class="t">${img(src(g.away_logo_src, g.away_logo))}${esc(g.away_team || "")}</div><div class="t">${img(src(g.home_logo_src, g.home_logo))}${esc(g.home_team || "")}</div></div><div class="n">${g.props || 0} props on this sheet</div></a>`).join("")}</div>`);
+    `<div class="slate">${games.map(g => `<a class="sg" href="${gameHref(g.event_id)}" data-game="${esc(g.event_id)}"><div class="when">${esc(g.kickoff_ct || "")}${started(g.commence_time) ? ` <span class="chip started">Started</span>` : ""}</div><div class="teams"><div class="t">${img(src(g.away_logo_src, g.away_logo))}${esc(g.away_team || "")}</div><div class="t">${img(src(g.home_logo_src, g.home_logo))}${esc(g.home_team || "")}</div></div><div class="n">${reconciledView(d) && g.final ? finalLine(g) : `${g.props || 0} props on this sheet`}</div></a>`).join("")}</div>`
+    + (reconciledView(d) ? `<div class="recap">Recap: <b>${games.filter(g => g.final).length} of ${games.length}</b> games final${games.some(g => !g.final) ? " · the rest are not settled yet" : ""}</div>` : ""));
 }
 // One row per player: the NET change from the earliest status in the window to the latest, at the latest capture.
 // A player who flapped back to where he started (Out -> Questionable -> Out) is no news and drops out
@@ -483,8 +492,8 @@ const unitsText = u => u == null ? "" : (u > 0 ? "+" : "") + u.toFixed(2) + "u";
 // The number the grader settled on: the player's stat, or a total's combined score (user 2026-10-15: "add the actual
 // stat line too"). Absent for a spread / moneyline (graded on a margin) and soccer's scorer markets.
 const actualText = res => res && typeof res.v === "number" ? (Number.isInteger(res.v) ? String(res.v) : res.v.toFixed(1)) : "–";
-function resCell(res) {
-  if (!res) return `<span class="res p" title="No result: a push, a void (did not play), or not final yet">–</span>`;
+function resCell(res, note) {
+  if (!res) return note ? `<span class="res p">${esc(note)}</span>` : `<span class="res p" title="No result yet: the grader has not settled this one">–</span>`;
   return res.y === 1 ? `<span class="res w">✓ Won ${unitsText(res.units)}</span>` : res.y === 0 ? `<span class="res l">✗ Lost ${unitsText(res.units)}</span>` : `<span class="res p">Push</span>`;
 }
 function recordOf(results) {
@@ -505,22 +514,77 @@ function applyResults() {
     const items = [...sec.querySelectorAll("[data-ri],[data-li]")];
     if (!items.length) return;
     sec.querySelectorAll("table thead tr").forEach(hr => { if (!hr.querySelector(".resh")) hr.insertAdjacentHTML("beforeend", `<th class="resh">Actual</th><th class="resh">Result</th>`); });
-    const seen = new Set(), results = [];
+    const seen = new Set(), results = [], recapItems = [];
     items.forEach(el => {
       const isLine = el.dataset.li != null, idx = +(isLine ? el.dataset.li : el.dataset.ri);
-      const res = ((isLine ? d.game_lines : d.rows)[idx] || {}).result;
+      const row = (isLine ? d.game_lines : d.rows)[idx] || {}, res = row.result;
       const key = (isLine ? "l" : "r") + idx;
-      if (!seen.has(key)) { seen.add(key); results.push(res); }
+      if (!seen.has(key)) { seen.add(key); results.push(res); recapItems.push({row, res, isLine}); }
       el.classList.toggle("rw", !!res && res.y === 1); el.classList.toggle("rl", !!res && res.y === 0);
-      if (el.tagName === "TR") { if (!el.querySelector("td.resd")) el.insertAdjacentHTML("beforeend", `<td class="n resd act">${actualText(res)}</td><td class="n resd">${resCell(res)}</td>`); }
-      else { const l1 = el.querySelector(".line1"); if (l1 && !l1.querySelector(".res")) l1.insertAdjacentHTML("beforeend", (res && typeof res.v === "number" ? `<span class="res act">Actual ${actualText(res)}</span>` : "") + resCell(res)); }
+      if (el.tagName === "TR") { if (!el.querySelector("td.resd")) el.insertAdjacentHTML("beforeend", `<td class="n resd act">${actualText(res)}</td><td class="n resd">${resCell(res, row.result_note)}</td>`); }
+      else { const l1 = el.querySelector(".line1"); if (l1 && !l1.querySelector(".res")) l1.insertAdjacentHTML("beforeend", (res && typeof res.v === "number" ? `<span class="res act">Actual ${actualText(res)}</span>` : "") + resCell(res, row.result_note)); }
     });
     const head = sec.querySelector("header");
+    if (head && !sec.querySelector(".recap")) head.insertAdjacentHTML("afterend", sectionRecap(sec.dataset.section, recapItems));
     if (head && !NO_RECORD.has(sec.dataset.section) && !head.querySelector(".rec")) {
       const cnt = head.querySelector(".count");
       (cnt || head.querySelector("p") || head).insertAdjacentHTML("afterend", recChip(recordOf(results)));
     }
   });
+}
+// ---- Recaps (user 2026-10-15: "the reconcile should have a recap for each section"): what the section's bets did,
+// the biggest hit, the worst miss (how far the actual landed on the wrong side of the line), and why any bet has no
+// result. The every-prop list holds both sides of a line, so its recap is how often the over hit; price shopping's is
+// what the best book paid over the median one on the winners.
+const sepJoin = parts => parts.filter(Boolean).join(`<span class="sep">·</span>`);
+function betName(x) {
+  if (x.isLine) return `${lineBet(x.row)} ${esc(LINE_MARKET[x.row.market] || x.row.market || "")}`;
+  return `${esc(x.row.player || "")} ${esc(betText(x.row))}`;
+}
+function missBy(x) {
+  const v = x.res && x.res.v, l = x.row.line;
+  if (typeof v !== "number" || l == null) return -Infinity;
+  return x.row.side === "under" ? v - l : l - v;
+}
+function voidText(items) {
+  const counts = {};
+  items.filter(x => !x.res).forEach(x => { const k = x.row.result_note || "Not settled yet"; counts[k] = (counts[k] || 0) + 1; });
+  return Object.entries(counts).map(([k, n]) => `${n} ${esc(k.toLowerCase())}`).join(", ");
+}
+function sectionRecap(key, items) {
+  const graded = items.filter(x => x.res && (x.res.y === 1 || x.res.y === 0));
+  const voids = voidText(items);
+  let body;
+  if (key === "every") {
+    const ou = side => { const xs = graded.filter(x => x.row.side === side), hit = xs.filter(x => x.res.y === 1).length; return xs.length ? `${side === "over" ? "Overs" : "Unders"} hit <b>${hit} of ${xs.length}</b> (${Math.round(100 * hit / xs.length)}%)` : ""; };
+    // The win that cleared its line by the most: the most negative "miss" (missBy is how far it landed on the WRONG side).
+    const beat = graded.filter(x => x.res.y === 1 && missBy(x) !== -Infinity).sort((a, b) => missBy(a) - missBy(b))[0];
+    body = sepJoin([ou("over"), ou("under"), beat ? `Biggest clear: ${betName(beat)} → ${actualText(beat.res)}` : ""]);
+  } else if (key === "shop") {
+    const dec = p => p ? 1 / p : null;
+    const wins = graded.filter(x => x.res.y === 1 && x.row.shop && x.row.shop.best_implied && x.row.shop.median_implied);
+    const extra = wins.reduce((t, x) => t + (dec(x.row.shop.best_implied) - dec(x.row.shop.median_implied)), 0);
+    body = wins.length ? `On the <b>${wins.length}</b> winners, the best book paid <b>${unitsText(extra)}</b> more than the median book` : "No graded winners here yet";
+  } else {
+    const rec = recordOf(graded.map(x => x.res));
+    const hit = graded.filter(x => x.res.y === 1).sort((a, b) => (b.res.units || 0) - (a.res.units || 0))[0];
+    const miss = graded.filter(x => x.res.y === 0).sort((a, b) => missBy(b) - missBy(a))[0];
+    body = graded.length ? sepJoin([`<b>${rec.w}-${rec.l}</b> (${Math.round(100 * rec.w / graded.length)}%) ${unitsText(rec.u)}`,
+      hit ? `Biggest hit: ${betName(hit)} ${odds((hit.row.check || {}).price)}${typeof hit.res.v === "number" ? " → " + actualText(hit.res) : ""}` : "",
+      miss ? `Worst miss: ${betName(miss)}${typeof miss.res.v === "number" ? " → " + actualText(miss.res) : ""}` : ""]) : "Nothing settled here yet";
+  }
+  return `<div class="recap">Recap: ${body}${voids ? `<span class="sep">·</span>No result: ${voids}` : ""}</div>`;
+}
+// The slate's finals, and the sim's script against what happened.
+const finalLine = g => g.final ? `<span class="final">Final ${esc(g.away_team || "Away")} <b>${g.final.away}</b> – ${esc(g.home_team || "Home")} <b>${g.final.home}</b></span>` : "";
+function scriptCheck(g) {
+  if (!g.final || !g.script || typeof g.script.margin_mean !== "number") return "";
+  const sim = g.script.margin_mean, actual = g.final.home - g.final.away;
+  const team = m => m > 0 ? (g.home_team || "Home") : (g.away_team || "Away");
+  const simText = Math.abs(sim) < 0.5 ? "a toss-up" : `${esc(team(sim))} by ${Math.abs(sim).toFixed(1)}`;
+  const actText = actual === 0 ? "a tie" : `${esc(team(actual))} by ${Math.abs(actual)}`;
+  const total = typeof g.script.total_mean === "number" ? ` · total ${g.final.home + g.final.away} vs sim ${Number(g.script.total_mean).toFixed(1)}` : "";
+  return `<div class="read final">Sim had ${simText}; finished ${actText} (off by ${Math.abs(sim - actual).toFixed(1)})${total}</div>`;
 }
 function recordBar(d, secs, lineSecs, game) {
   const rows = ids => (ids || []).map(i => (d.rows[i] || {}).result), lines = ids => (ids || []).map(i => (d.game_lines[i] || {}).result);
