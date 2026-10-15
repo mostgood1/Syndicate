@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import time
 import json
+import os
 import logging
 from pathlib import Path
 from typing import Any
@@ -2128,7 +2129,7 @@ def attach_live_projections_for_sport(grid: list, *, sport: str, selected_date: 
     # cares that `liveModelProbOver` exists and that the interval behind it was
     # measured rather than assumed, which is the bar MLB's 120-sim tier meets
     # too.
-    if sport not in _LIVE_PROP_SPORTS:
+    if sport not in _live_prop_sports():
         return {"supported": False, "reason": f"no live re-sim wired for {sport}", "rows_live_projected": 0}
     try:
         from syndicate.features.shared.live_projection_join import (
@@ -2484,6 +2485,30 @@ _LIVE_PROP_SPORTS = frozenset({"mlb", "wnba", "soccer"})
 # says "no published live-lens snapshot" instead of "no live re-sim wired" until then.
 _LIVE_GAMELINE_SPORTS = frozenset({"mlb", "wnba", "soccer", "ncaaf", "nhl", "nfl", "ncaab"})
 
+# `nba` JOINS ONLY WHEN `SYNDICATE_NBA_LIVE_PRICED` IS SET (lane `nba-native-live-resim`, P3; ABSENT = OFF,
+# checked not assumed). Unlike ncaaf / nhl / ncaab above, the NBA producer ALREADY RUNS on the fleet in shadow
+# (SYNDICATE_NBA_LIVE_RESIM=on since 2026-10-13), so listing the sport would price immediately. The user's
+# decision (2026-10-15) is to switch live pricing on together with the Phase 2 pregame config, and only after the
+# pre-registered VALID read passes (findings_2026-10-09 §13). An env gate makes that switch -- and its rollback --
+# a config change. Game lines read `live/nba_live_resim.json` (the re-sim's own file, `live_resim` lanes); props
+# read the page lens, which merges the re-sim's `liveProps` in (`nba/live_lens._attach_native_resim`).
+NBA_LIVE_PRICED_ENV = "SYNDICATE_NBA_LIVE_PRICED"
+# Sports in the live gates CONDITIONALLY, by env switch. `scripts/live_tier_coverage_check.py` reads this so a
+# gated sport counts as wired (its gate exists) instead of tripping R5 "config without gate".
+ENV_GATED_LIVE_SPORTS: dict[str, str] = {"nba": NBA_LIVE_PRICED_ENV}
+
+
+def _nba_live_priced() -> bool:
+    return str(os.environ.get(NBA_LIVE_PRICED_ENV) or "").strip().lower() in ("1", "true", "on", "yes")
+
+
+def _live_gameline_sports() -> frozenset:
+    return _LIVE_GAMELINE_SPORTS | {"nba"} if _nba_live_priced() else _LIVE_GAMELINE_SPORTS
+
+
+def _live_prop_sports() -> frozenset:
+    return _LIVE_PROP_SPORTS | {"nba"} if _nba_live_priced() else _LIVE_PROP_SPORTS
+
 # WHERE THE BOARD READS EACH SPORT'S LIVE SNAPSHOT, when it is not the default
 # `live/<sport>_live_lens.json`. `nfl` is the one entry and it exists because
 # that sport has TWO producers: `nfl/live_lens.py` builds the pregame-carried
@@ -2498,6 +2523,9 @@ _LIVE_GAMELINE_SPORTS = frozenset({"mlb", "wnba", "soccer", "ncaaf", "nhl", "nfl
 # resolve one path, so a future collision is caught rather than discovered.
 _LIVE_GAMELINE_SNAPSHOT_PATHS: dict[str, str] = {
     "nfl": "nfl_live_resim.json",
+    # NBA: the native re-sim's own file (`nba/live_resim.live_lens_snapshot_path`); the page lens is the other
+    # producer (`nba_live_lens.json`). Read only when `SYNDICATE_NBA_LIVE_PRICED` admits the sport.
+    "nba": "nba_live_resim.json",
     # Its own key, not `ncaab_live_lens.json`: the NCAAB live-lens PAGE has its own mirrored payloads,
     # and one Redis key with two writers is the nfl collision above (R8).
     "ncaab": "ncaab_live_resim.json",
@@ -2675,7 +2703,7 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
 
     Reads the PUBLISHED snapshot. Never triggers the re-sim.
     """
-    if sport not in _LIVE_GAMELINE_SPORTS:
+    if sport not in _live_gameline_sports():
         return {"supported": False, "reason": f"no live re-sim wired for {sport}",
                 "rows_live_gameline_edged": 0,
                 "rows_live_gameline_projected": 0}

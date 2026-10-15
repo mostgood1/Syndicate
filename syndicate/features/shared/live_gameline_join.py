@@ -113,6 +113,9 @@ LIVE_LENS_SOURCES_BY_SPORT: dict[str, tuple[str, ...]] = {
     # "keying on the probability's PRESENCE" failure `live_gameline_from_lens`
     # warns about. The stamp is the discriminator again.
     "nfl": ("live_resim",),
+    # NBA resumes P1's engine from P2's live state (`nba/live_resim.py`, P3). Same stamp and reason; refusals are
+    # `pregame_only` lanes with no probability. Admitted to pricing only by SYNDICATE_NBA_LIVE_PRICED (board_enrichment).
+    "nba": ("live_resim",),
     "ncaaf": ("live_resim",),
     # NCAAB resumes P1's possession engine from P2's live state (`ncaab/live_resim.py`, P4). Same stamp
     # and the same reason: refusals publish `pregame_only` lanes with no probability, rejected here.

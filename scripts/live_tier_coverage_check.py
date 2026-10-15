@@ -106,13 +106,15 @@ DECLARATIONS: dict[str, Declaration] = {
         evidence="mlb/live_lens.py -- in-game Monte Carlo re-sim; lens source `live_mc`",
     ),
     "nba": Declaration(
-        gameline=NONE,
-        props=PROPS_NONE,
-        evidence="in live-lens `skippedSports`; its live tier is a logistic blend "
-                 "whose `sim_mu` equals the pregame number, so it publishes no "
-                 "independent live game-line probability",
-        note="Ticks and is allowlisted; deliberately NOT in the game-line gate. "
-             "Wiring it would be `#340` until the blend is replaced by a re-sim.",
+        gameline=LIVE_RESIM,
+        props=PROPS_WIRED,
+        evidence="nba/live_resim.py resumes P1's engine (_engine_for_league_local('nba')) from P2's LiveGameState on "
+                 "the persisted pregame inputs; refusals publish a `pregame_only` lane with NO probability, which the "
+                 "join rejects. Live props: actual-so-far + re-sim remainder, merged into the page lens",
+        alternate_producer="syndicate/features/nba/live_resim.py (its own thread in live_lens_loop behind "
+                           "SYNDICATE_NBA_LIVE_RESIM, code default OFF; writes live/nba_live_resim.json)",
+        note="PRICED ONLY when SYNDICATE_NBA_LIVE_PRICED is set (board_enrichment.ENV_GATED_LIVE_SPORTS); "
+             "shadow on the fleet since 2026-10-13. The old vendored logistic blend is gone (P3/P6).",
     ),
     "wnba": Declaration(
         gameline=LIVE_PROJECTION,
@@ -221,6 +223,7 @@ def load_registries() -> Registries:
     """Import the real objects. A grep would answer a question about text."""
     from syndicate.features.shared.artifact_publisher import HOT_ARTIFACT_PATTERNS
     from syndicate.features.shared.board_enrichment import (
+        ENV_GATED_LIVE_SPORTS,
         _LIVE_GAMELINE_SPORTS,
         _LIVE_PROP_SPORTS,
     )
@@ -242,8 +245,10 @@ def load_registries() -> Registries:
         builders=frozenset(_LIVE_LENS_BUILDERS),
         validators=frozenset(_LIVE_LENS_VALIDATORS),
         snapshot_paths=frozenset(_LIVE_LENS_SNAPSHOT_PATHS),
-        props=frozenset(_LIVE_PROP_SPORTS),
-        gameline=frozenset(_LIVE_GAMELINE_SPORTS),
+        # An ENV-GATED sport (board_enrichment.ENV_GATED_LIVE_SPORTS) is wired: its gate exists and opens on its
+        # switch. Counting it as absent would fail R5 on a sport that is deliberately priced only when switched on.
+        props=frozenset(_LIVE_PROP_SPORTS) | frozenset(ENV_GATED_LIVE_SPORTS),
+        gameline=frozenset(_LIVE_GAMELINE_SPORTS) | frozenset(ENV_GATED_LIVE_SPORTS),
         sources=frozenset(LIVE_LENS_SOURCES_BY_SPORT),
         allowlisted=frozenset(allowlisted),
     )
