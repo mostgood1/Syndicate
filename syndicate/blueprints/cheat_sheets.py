@@ -145,6 +145,37 @@ def cheat_sheets_page():
     return Response(page, mimetype="text/html")
 
 
+def _record() -> dict[str, Any] | None:
+    try:
+        doc = json.loads((_sheet_dir() / "record.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return doc if isinstance(doc, dict) else None
+
+
+@cheat_sheets_bp.get("/api/cheatsheets/record")
+def cheat_sheets_record_api():
+    doc = _record()
+    if doc is None:
+        return jsonify({"ok": False, "error": "not_published", "path": "cheatsheets/record.json"}), 404
+    return jsonify(doc), 200
+
+
+@cheat_sheets_bp.get("/cheatsheets/record")
+def cheat_sheets_record_page():
+    """The running season record (user 2026-10-15). `scripts/reconcile_cheat_sheets.py` writes `record.json` after
+    every grading run; this only reads it."""
+    try:
+        template = TEMPLATE.read_text(encoding="utf-8")
+    except OSError:
+        return jsonify({"ok": False, "error": "template missing"}), 500
+    meta = {"mode": "app", "page": "record", "today": _today()}
+    page = cs.render_record_page(template, _record(), logo_src=LOGO_SRC, meta=meta)
+    page = page.replace("<!--__SITE_HEAD__-->", render_template_string(_SITE_HEAD), 1)
+    page = page.replace("<!--__SITE_HEADER__-->", render_template_string(_SITE_HEADER, active_sport_slug="cheatsheets"), 1)
+    return Response(page, mimetype="text/html")
+
+
 def _card_row(sport: str, day: str, card: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None, str]:
     """(row, game, reason) -- the sheet row whose card id this is, re-derived from the sheet (never the client)."""
     if not _SPORT.match(sport) or not _DAY.match(day) or not _CARD.match(card):

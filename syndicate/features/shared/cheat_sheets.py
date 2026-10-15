@@ -687,6 +687,14 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
     return out
 
 
+def render_record_page(template: str, record: Mapping[str, Any] | None, *, logo_src: str, meta: Mapping[str, Any]) -> str:
+    """The season record page: the same template, with `record.json` (cheat_sheet_record) inlined as its data."""
+    data = json.dumps(record, default=str).replace("</", "<\\/")
+    info = json.dumps(dict(meta), default=str).replace("</", "<\\/")
+    return (template.replace("/*__DATA__*/null", data, 1).replace("/*__META__*/null", info, 1)
+            .replace("__LOGO_SRC__", logo_src))
+
+
 def render_page(template: str, sheets: Iterable[Mapping[str, Any]], *, logo_src: str,
                 meta: Mapping[str, Any] | None = None) -> str:
     """The branded page with the data inlined. `</` is escaped so no string in the data can close the script."""

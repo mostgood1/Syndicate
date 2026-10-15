@@ -202,6 +202,28 @@ def reconcile(sheet: dict[str, Any], props: dict[str, Any], lines: dict[str, Any
                        "lines_graded": len(l_out)}}
 
 
+def write_record(sheets_dir: Path, *, now: datetime) -> dict[str, Any]:
+    """`<cheatsheets>/record.json` -- the running season record (user 2026-10-15: "add a running season record page")
+    -- rebuilt from EVERY reconciled day on disk, so a late final or a re-graded day always flows through."""
+    from syndicate.features.shared import cheat_sheet_record as csr
+
+    days = []
+    for rec_path in sorted(sheets_dir.glob("*/*.reconciled.json")):
+        day = rec_path.name[: -len(".reconciled.json")]
+        try:
+            reconciled = json.loads(rec_path.read_text(encoding="utf-8"))
+            sheet = json.loads(rec_path.with_name(f"{day}.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        days.append(csr.day_record(sheet, reconciled))
+    record = csr.season_record(days, generated_at=now.isoformat(timespec="seconds"))
+    write_atomic(sheets_dir / "record.json", record)
+    official = record["official"]["totals"].get(csr.ALL) or {}
+    print(f"RECORD days={len(days)} official featured {official.get('w', 0)}-{official.get('l', 0)} "
+          f"{official.get('units', 0):+.2f}u beta days={record['beta']['days']}", flush=True)
+    return record
+
+
 def write_atomic(path: Path, doc: dict[str, Any]) -> None:
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=path.name, suffix=".tmp")
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
@@ -277,6 +299,7 @@ def main(argv: list[str] | None = None) -> int:
             write_atomic(target, rec)
             print(f"RECONCILE {doc['sport']} date={day} props {c['props_graded']}/{c['props']} (values {c['props_valued']}) "
                   f"lines {c['lines_graded']}/{c['lines']} graded_population={len(graded)}", flush=True)
+    write_record(sheets_dir, now=datetime.now(timezone.utc))
     return 0
 
 

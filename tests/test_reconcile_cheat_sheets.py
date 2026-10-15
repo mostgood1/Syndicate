@@ -90,6 +90,8 @@ def test_main_writes_beside_the_sheet_merges_and_never_wipes_on_a_failed_pull(tm
     first = json.loads(target.read_text(encoding="utf-8"))
     assert first["counts"]["props_graded"] == 3 and first["sport"] == "nhl" and first["date"] == DAY
     assert json.loads((folder / f"{DAY}.json").read_text(encoding="utf-8")) == _sheet()        # the sheet is untouched
+    record = json.loads((tmp_path / "cheatsheets" / "record.json").read_text(encoding="utf-8"))  # the season record follows
+    assert record["beta"]["days"] == 1 and record["days"][0]["sport"] == "nhl"
 
     grader.rows = GRADED[:1]                                       # a later run that grades fewer keeps the earlier ones
     m.main(["--data-root", str(tmp_path), "--date", DAY])

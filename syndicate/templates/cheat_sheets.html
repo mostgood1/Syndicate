@@ -163,6 +163,10 @@ tr.rw td:first-child { box-shadow: inset 3px 0 0 var(--accent); } tr.rl td:first
 .recbar .it { display: inline-flex; gap: 8px; align-items: center; font-weight: 600; }
 .recbar p { margin: 0; color: var(--muted); font-size: 12.5px; }
 .xframe .res { font-size: 17px; } .xframe .rec { font-size: 16px; }
+.rtab td.lab { font-weight: 600; } .rtab tr.all td { border-top: 2px solid var(--accent); font-weight: 700; }
+.rtab td.n.pos { color: var(--accent); } .rtab td.n.neg { color: var(--price); }
+.chart svg { width: 100%; height: auto; display: block; } .chart .key { display: flex; gap: 16px; font-size: 12.5px; color: var(--muted); }
+.chart .key i { display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: 3px; }
 @media (max-width: 760px) { .prop { grid-template-columns: 1fr; } }
 </style></head><body>
 <!--__SITE_HEADER__-->
@@ -593,13 +597,15 @@ function fontEmbedCSS() {
 }
 const settle = el => Promise.all([...el.querySelectorAll("img")].map(i => i.complete ? null : new Promise(r => { i.onload = i.onerror = r; })));
 async function buildExport(section) {
-  const d = DATA[STATE.sport], game = STATE.game ? (d.games || []).find(g => g.event_id === STATE.game) : null;
+  const record = META.page === "record";
+  const d = record ? {} : DATA[STATE.sport], game = !record && STATE.game ? (d.games || []).find(g => g.event_id === STATE.game) : null;
+  const lastDay = record ? ((DATA[REC.scope] || {}).series || []).slice(-1).map(x => x.date)[0] : null;
   const frame = document.createElement("div");
   frame.className = "xframe";
-  frame.innerHTML = `<div class="xhead"><img src="${esc(LOGO_SRC)}" alt=""><div><div class="w1 slant">Syndicate ROI</div><div class="w2 slant">${esc(SPORT_NAMES[STATE.sport] || STATE.sport)} cheat sheet</div></div>
-      <div class="xday"><b>${esc(dayName(META.date || d.date))}</b>${game ? `<span class="xgame">${matchupLine(game)}</span>` : ""}</div></div>
+  frame.innerHTML = `<div class="xhead"><img src="${esc(LOGO_SRC)}" alt=""><div><div class="w1 slant">Syndicate ROI</div><div class="w2 slant">${record ? "Season record" : esc(SPORT_NAMES[STATE.sport] || STATE.sport) + " cheat sheet"}</div></div>
+      <div class="xday"><b>${record ? esc((REC.scope === "beta" ? "Beta" : "Official") + " · " + (REC.sport === "all" ? "All sports" : SPORT_NAMES[REC.sport] || REC.sport) + (lastDay ? " · through " + dayShort(lastDay) : "")) : esc(dayName(META.date || d.date))}</b>${game ? `<span class="xgame">${matchupLine(game)}</span>` : ""}</div></div>
     <div class="xbody"></div>
-    <div class="xfoot"><span>${reconciledView(d) ? `Reconciled · results from final box scores · prices as of ${esc(ctTime(d.generated_at))}` : `Prices as of ${esc(ctTime(d.generated_at))} · lines move`}</span><span class="x">@SyndicateROI</span><span>21+ · Bet responsibly</span></div>`;
+    <div class="xfoot"><span>${record ? "1 unit a bet at the sheet's best price · graded from final box scores" : reconciledView(d) ? `Reconciled · results from final box scores · prices as of ${esc(ctTime(d.generated_at))}` : `Prices as of ${esc(ctTime(d.generated_at))} · lines move`}</span><span class="x">@SyndicateROI</span><span>21+ · Bet responsibly</span></div>`;
   const body = section.cloneNode(true);
   body.querySelectorAll(".no-export").forEach(n => n.remove());
   body.querySelectorAll(".rowlist").forEach(list => [...list.children].slice(10).forEach(n => n.remove()));
@@ -624,7 +630,8 @@ async function exportSection(btn) {
       style: {position: "static", left: "0", top: "0"}, fontEmbedCSS: await fontEmbedCSS()});
     const a = document.createElement("a");
     a.href = url;
-    a.download = `syndicate-${STATE.sport}-${META.date || DATA[STATE.sport].date}${STATE.game ? "-game" : ""}-${section.dataset.section}.png`;
+    a.download = META.page === "record" ? `syndicate-season-record-${REC.scope}-${REC.sport}-${section.dataset.section}.png`
+      : `syndicate-${STATE.sport}-${META.date || DATA[STATE.sport].date}${STATE.game ? "-game" : ""}-${section.dataset.section}.png`;
     document.body.appendChild(a); a.click(); a.remove();
     window.__lastExport = url;
   } catch (e) {
@@ -635,6 +642,83 @@ async function exportSection(btn) {
   }
 }
 
+// ---- Season record (user 2026-10-15: "add a running season record page for the cheat sheets"). DATA is
+// `cheatsheets/record.json` (syndicate/features/shared/cheat_sheet_record.py), rebuilt by every reconcile run.
+const REC = {scope: "official", sport: "all"};
+const pctText = v => v == null ? "–" : v.toFixed(1) + "%";
+const signClass = v => v == null || v === 0 ? "" : v > 0 ? "pos" : "neg";
+function recordTable(R, totals) {
+  const keys = R.sections.filter(sec => totals[sec.key]);
+  if (!keys.length) return `<div class="empty">No graded featured picks here yet.</div>`;
+  return `<div class="tbl"><table class="every rtab"><thead><tr><th>Section</th><th>Bets</th><th>W-L</th><th>Win %</th><th>Units</th><th>ROI</th></tr></thead><tbody>${
+    keys.map(sec => { const t = totals[sec.key];
+      return `<tr class="${sec.key === "featured" ? "all" : ""}"><td class="lab">${esc(sec.label)}</td><td class="n">${t.n}</td><td class="n">${t.w}-${t.l}</td><td class="n">${pctText(t.win_pct)}</td><td class="n ${signClass(t.units)}">${unitsText(t.units)}</td><td class="n ${signClass(t.roi_pct)}">${t.roi_pct == null ? "–" : (t.roi_pct > 0 ? "+" : "") + t.roi_pct.toFixed(1) + "%"}</td></tr>`; }).join("")}</tbody></table></div>`;
+}
+function unitsChart(series) {
+  if (series.length < 2) return `<div class="empty">The running line needs two graded days; it starts with the next one.</div>`;
+  const W = 1000, H = 260, pad = 36, vals = series.flatMap(x => [x.cum_units, x.cum_value_units, 0]);
+  const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+  const X = i => pad + (W - 2 * pad) * i / (series.length - 1), Y = v => H - pad - (H - 2 * pad) * (v - lo) / span;
+  const line = (key, color) => `<polyline fill="none" stroke="${color}" stroke-width="3" points="${series.map((x, i) => `${X(i).toFixed(1)},${Y(x[key]).toFixed(1)}`).join(" ")}"/>`;
+  const last = series[series.length - 1];
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Running units: all featured ${unitsText(last.cum_units)}, value ${unitsText(last.cum_value_units)}">
+    <line x1="${pad}" x2="${W - pad}" y1="${Y(0)}" y2="${Y(0)}" stroke="#2a4257" stroke-dasharray="4 4"/>
+    <text x="${pad}" y="${Y(0) - 6}" fill="#8fa3b3" font-size="13">0u</text>
+    ${line("cum_units", "#8cff2e")}${line("cum_value_units", "#1fa8ff")}
+    <text x="${pad}" y="${H - 8}" fill="#8fa3b3" font-size="13">${esc(dayShort(series[0].date))}</text>
+    <text x="${W - pad}" y="${H - 8}" fill="#8fa3b3" font-size="13" text-anchor="end">${esc(dayShort(last.date))}</text></svg>
+    <div class="key"><span><i style="background:#8cff2e"></i>All featured picks ${unitsText(last.cum_units)}</span><span><i style="background:#1fa8ff"></i>Value at the best price ${unitsText(last.cum_value_units)}</span></div></div>`;
+}
+function dayTable(R, days) {
+  if (!days.length) return `<div class="empty">No graded day here yet.</div>`;
+  const chip = t => t && t.n ? `<span class="rec ${t.units < 0 ? "neg" : ""}">${t.w}-${t.l} · ${unitsText(t.units)}</span>` : "–";
+  return `<div class="tbl"><table class="every"><thead><tr><th>Day</th><th>Sport</th><th>All featured</th><th>Value</th><th>Graded</th><th></th></tr></thead><tbody>${
+    days.map(x => `<tr><td>${esc(dayShort(x.date))}</td><td>${esc(SPORT_NAMES[x.sport] || x.sport)}</td><td class="n">${chip(x.featured)}</td><td class="n">${chip((x.sections || {}).value)}</td><td class="n">${x.graded} of ${x.bets}</td>
+      <td><a class="btn no-export" href="/cheatsheets?date=${esc(x.date)}&sport=${esc(x.sport)}&view=reconciled">Reconciled sheet</a></td></tr>`).join("")}</tbody></table></div>`;
+}
+function renderRecordPage() {
+  const R = DATA;
+  document.title = "Syndicate ROI Season Record";
+  document.querySelector(".wordmark .w2").textContent = "Season record";
+  document.querySelector(".legend").style.display = "none";
+  document.querySelector("p.sub").textContent = "Every pick the cheat sheets featured, graded from the final box scores: 1 unit a bet at the sheet's best price. The losses count the same as the wins.";
+  document.getElementById("days").innerHTML = `<a class="btn" href="/cheatsheets">← Today's sheets</a><a class="btn on" href="/cheatsheets/record">Season record</a>`;
+  if (!R) {
+    document.getElementById("sheet").innerHTML = `<section class="sheet"><div class="empty">The record publishes after the first graded day.</div></section>`;
+    return;
+  }
+  const scope = R[REC.scope] || {totals: {}, by_sport: {}, series: [], days: 0};
+  const lastDay = (scope.series[scope.series.length - 1] || {}).date;
+  document.getElementById("dayLabel").innerHTML = esc(REC.scope === "beta" ? "Beta record" : `Official record · since ${dayShort(R.official_start)}`)
+    + (REC.scope === "beta" ? ` <span class="chip beta">Beta</span>` : "");
+  document.getElementById("asOf").textContent = lastDay ? `Through ${dayName(lastDay)} · updated ${ctDateTime(R.generated_at)}` : "";
+  document.getElementById("viewbar").innerHTML = ["official", "beta"].map(k =>
+    `<button type="button" class="btn ${REC.scope === k ? "on" : ""}" data-scope="${k}" aria-pressed="${REC.scope === k}">${k === "official" ? "Official" : "Beta (before " + esc(dayShort(R.official_start)) + ")"}</button>`).join("");
+  const sports = Object.keys(scope.by_sport || {});
+  if (REC.sport !== "all" && !sports.includes(REC.sport)) REC.sport = "all";
+  document.getElementById("tabs").innerHTML = ["all", ...sports].map(x =>
+    `<button class="tab" role="tab" data-rsport="${x}" aria-selected="${REC.sport === x}">${x === "all" ? "All sports" : esc(SPORT_NAMES[x] || x)}</button>`).join("");
+  const days = (R.days || []).filter(x => (REC.scope === "beta") === !!x.beta && (REC.sport === "all" || x.sport === REC.sport));
+  if (!scope.days) {
+    document.getElementById("sheet").innerHTML = `<section class="sheet"><div class="empty">${REC.scope === "official"
+      ? `The official record starts with the ${esc(dayName(R.official_start))} sheets. Results post after the games are final (graded 7:45 AM and 11:50 PM CT).`
+      : "No beta days."}</div></section>`;
+    return;
+  }
+  const totals = REC.sport === "all" ? scope.totals : (scope.by_sport[REC.sport] || {});
+  const label = REC.sport === "all" ? "all sports" : (SPORT_NAMES[REC.sport] || REC.sport);
+  let html = sectionShell("record_totals", "Season record", `Every featured section on the cheat sheets, ${esc(label)}, ${scope.days} graded day${scope.days === 1 ? "" : "s"}. "All featured picks" counts a bet once a day even when two sections featured it. The every-prop list and price shopping hold both sides of a line, so they are not in the record.`, "", recordTable(R, totals));
+  if (REC.sport === "all") html += sectionShell("record_chart", "Running units", "Cumulative units, 1 unit a bet at the sheet's best price, day by day.", "", unitsChart(scope.series));
+  html += sectionShell("record_days", "Day by day", "Each sheet's featured picks and its value section. Open a day to see every bet with its actual stat.", `${days.length} sheets`, dayTable(R, days));
+  html += `<section class="sheet"><div class="note">Graded by Syndicate's settlement from final box scores, the same grading the platform's scorecard uses. A push, a void (did not play) or a bet still pending is not counted. ROI is units per bet. Small samples swing: read the bets column before the win rate.</div></section>`;
+  document.getElementById("sheet").innerHTML = html;
+}
+document.addEventListener("click", ev => {
+  if (META.page !== "record") return;
+  const sc = ev.target.closest("[data-scope]"), sp = ev.target.closest("[data-rsport]");
+  if (sc) { REC.scope = sc.dataset.scope; renderRecordPage(); }
+  if (sp) { REC.sport = sp.dataset.rsport; renderRecordPage(); }
+});
 // The date links carry the view, so they are rebuilt whenever it changes.
 function daysNav() {
   if (!(META.mode === "app" && (META.dates || []).length)) return;
@@ -642,9 +726,11 @@ function daysNav() {
   const order = [META.today, ...META.dates.filter(x => x > META.today).sort(), ...META.dates.filter(x => x < META.today)];
   const view = STATE.view === "reconciled" ? "view=reconciled" : "";
   document.getElementById("days").innerHTML = order.slice(0, 8).map(day =>
-    `<a class="btn ${day === META.date ? "on" : ""}" href="${day === META.today ? "?" + view : "?date=" + day + (view ? "&" + view : "")}">${day === META.today ? "Today" : day > META.today ? "Tomorrow" : esc(dayShort(day))}</a>`).join("");
+    `<a class="btn ${day === META.date ? "on" : ""}" href="${day === META.today ? "?" + view : "?date=" + day + (view ? "&" + view : "")}">${day === META.today ? "Today" : day > META.today ? "Tomorrow" : esc(dayShort(day))}</a>`).join("")
+    + `<a class="btn" href="/cheatsheets/record">Season record</a>`;
 }
 (function init() {
+  if (META.page === "record") { renderRecordPage(); return; }
   const sports = Object.keys(DATA || {});
   const ahead = META.today && META.date > META.today;
   if (META.date) document.getElementById("dayLabel").innerHTML = esc((META.date === META.today ? "Today · " : ahead ? "Tomorrow · " : "") + dayName(META.date))
