@@ -2370,7 +2370,23 @@ def _three_way_leg_edge(projection: Mapping[str, Any], row_side: str, fair: Any)
     return round(direct, 4)
 
 
-def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None) -> float | None:
+def _note_refusal(refusal: dict[str, Any] | None, reason: str, **detail: Any) -> None:
+    """Name a `_model_edge_for` refusal on the caller's out-dict, if it passed one.
+
+    No-ops when `refusal` is None, which is every caller that has not opted in.
+    Carries whatever numbers make the refusal readable without re-deriving it --
+    the ceiling case records the edge it rejected AND the bound it failed, because
+    "dropped, not clamped" is only actionable with both.
+    """
+    if refusal is None:
+        return
+    refusal["reason"] = reason
+    for key, value in detail.items():
+        refusal[key] = value
+
+
+def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None,
+                    refusal: dict[str, Any] | None = None) -> float | None:
     """The sim's disagreement with the market, in POINTS OF PROBABILITY.
 
     Only `edge_vs_market_pct` qualifies. A mean-based `edge_vs_line` (WNBA, and
@@ -2384,9 +2400,25 @@ def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None) -> floa
     it. So the value is now bounded by what it implies as well as by where it
     came from — see `_MODEL_EDGE_MAX_POINTS`. Rejected rows fall back to EV
     alone, which cannot pick a side but also cannot invert one.
+
+    WHY THE REASON IS AN OUT-PARAM AND NOT A STAMP ON `projection`. Every path
+    below that returns None is a REFUSAL, and until 2026-10-15 none of them said
+    which one fired: a coverage count could not tell a refused model opinion from
+    an absent one. Measured that day, 464 of 809 gap rows (57.4%) were the CEILING
+    alone, and naming them took a script that re-derived this function's branches
+    from outside -- the drift this module's own comments keep warning about.
+
+    `projection` is the WRONG place for it: this function receives the GRID row,
+    whose `projection` is SHARED by both sides of a market, while the per-side
+    object is the `candidate` the fan-out builds. Stamping here would leak one
+    side's reason onto the other, last-writer-wins. So the caller passes
+    `refusal` and stamps it on the candidate, and
+    `projection["edge_unavailable_reason"]` -- owned by the PER-SPORT builders --
+    is never touched, so the two provenances cannot be confused.
     """
     projection = row.get("projection")
     if not isinstance(projection, Mapping):
+        _note_refusal(refusal, "no_projection")
         return None
     edge = _as_float(projection.get("edge_vs_market_pct"))
     if edge is None:
@@ -2441,6 +2473,8 @@ def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None) -> floa
             return gated
         return _modelled_fair_edge_for(projection, side)
     if abs(edge) > _MODEL_EDGE_MAX_POINTS:
+        _note_refusal(refusal, "edge_exceeds_plausibility_ceiling",
+                      edge=edge, ceiling=_MODEL_EDGE_MAX_POINTS)
         # Dropped, not clamped. Clamping would keep an unusable number in the
         # ranking at the ceiling value and make every affected row tie at the
         # top -- a wrong answer wearing a plausible one's clothes (#242).
@@ -2452,6 +2486,7 @@ def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None) -> floa
     projected_side = _projection_side_in_row_frame(row, projection)
     row_side = str(side).strip().lower()
     if projected_side == _SIDE_UNPLACEABLE:
+        _note_refusal(refusal, "projection_side_unplaceable_in_row_frame")
         return None
     if not projected_side or projected_side == row_side:
         return edge
@@ -2512,6 +2547,8 @@ def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None) -> floa
     # rule the three-way branch above already applies and the same rule
     # `_model_prob_for_side` states in its own last line.
     if _TWO_WAY_OPPOSITE_SIDE.get(projected_side) != row_side:
+        _note_refusal(refusal, "projection_side_not_an_opposite",
+                      projected_side=projected_side, row_side=row_side)
         return None
     return -edge
 
@@ -3139,7 +3176,15 @@ def build_layer2_rows(
             lanes[lane] = lanes.get(lane, 0) + 1
 
             ev = expected_value_pct(price, fair) if fair is not None else None
-            model_edge = _model_edge_for(row, side, fair)
+            # THE REFUSAL, NAMED. `_model_edge_for` has four `return None` paths and
+            # until 2026-10-15 none said which fired, so a coverage count read a
+            # REFUSED model opinion as an ABSENT one -- 464 of 809 gap rows were the
+            # ceiling alone. Stamped on the CANDIDATE, which is per side;
+            # `row["projection"]` is shared by both sides and must not carry it.
+            _edge_refusal: dict[str, Any] = {}
+            model_edge = _model_edge_for(row, side, fair, refusal=_edge_refusal)
+            if model_edge is None and _edge_refusal.get("reason"):
+                candidate["model_edge_refusal"] = dict(_edge_refusal)
             # THE PRICING-PLANE CALIBRATION SEAM. Inert (same float, no stamps)
             # unless `SYNDICATE_PRICING_CALIBRATION` is on -- see
             # `_calibrate_model_edge`.
