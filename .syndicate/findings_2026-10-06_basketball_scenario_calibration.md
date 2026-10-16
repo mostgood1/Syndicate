@@ -2988,3 +2988,14 @@ bootstrap (2,000). Raw output is in `C:	mpball_scalid_read_regular.txt` / `val
   more than its betting probabilities.
 - Candidates for a later round, NOT on this window: the late-game win-probability regression (P3's lead), and period
   shares (the Q4 slope residual).
+
+**G3 RESULT (P3, findings_2026-10-09 §13 RESULT): FAIL.** Regular VALID, 331 games, FINAL − PROD.
+- Pooled Q1–Q3: total −0.10 [−0.32, +0.13] ✗; margin −0.20 [−0.39, −0.01] ✓; ML −0.017 [−0.032, −0.003] ✓.
+- 5:00 Q4: total upper +0.07 ✗; margin −0.14 ✓; ML −0.021 ✓.
+- **THE VALID READ is FAIL on G1, G2 and G3; G4 passes trivially. Nothing is enabled; no joint deploy.**
+- **Correction:** P3's FIT "late-Q4 ML regression" did NOT replicate. On VALID, FINAL is BETTER late on ML (−0.021
+  [−0.035, −0.008]). The lead recorded above is WITHDRAWN.
+- Reported only: native vs pregame_rate on VALID is worse on total at end Q1/Q2 (+0.47 / +0.28); native's early total
+  bias is −1.67 / −1.42.
+- Consistent picture across both lanes: FINAL improves MARGIN and win-probability skill (G2 margin, G3 margin + ML)
+  but not TOTALS or period-line pricing.
