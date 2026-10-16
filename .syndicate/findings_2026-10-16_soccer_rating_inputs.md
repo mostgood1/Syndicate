@@ -150,6 +150,106 @@ Run at Idle priority. Driver: `scripts/soccer_team_strength_experiments.py stage
 
 ## 3. Results
 
+- **Run:** 2026-10-16 17:55-18:07Z at Idle priority (read back 64).
+- **Driver:** `scripts/soccer_team_strength_experiments.py stage1` (`81749579`).
+- **Output:** `C:/tmp/team-strength/stage1_report.json` and `stage1_run.log`.
+- **Data:** 27,285 held-out FULL matches, 8 leagues, test seasons 2016-2026. Every arm scores the same
+  matches.
+
+### Verdicts (Δ 1X2 log loss vs C\*, walk-forward-selected value; 95% match bootstrap)
+
+| arm | selected value per season | Δ vs C\* | 95% CI | Δ Brier | verdict | Δ vs close | share of C\*'s gap closed | top-decile fav | spread sd |
+|---|---|---|---|---|---|---|---|---|---|
+| C\* (shipped + gate, k refit) | — | 0 | — | — | reference | **+0.0221** | 0 | 0.745 | 0.323 |
+| **W** window | ×2/3 in 2016, then shipped ×1 in 2017-26 | +0.0002 | [−0.0001, +0.0005] | +0.0001 | **FALSIFIED** | +0.0223 | −1% | 0.745 | 0.324 |
+| **R** recency | h 20 in 2016-17, then 40 | −0.0009 | [−0.0015, −0.0004] | −0.0007 | **SUPPORTED** | +0.0212 | 4% | 0.748 | 0.324 |
+| **B** current-season blend | c 20 in 2016, then 40 | **−0.0015** | [−0.0022, −0.0009] | −0.0011 | **SUPPORTED** | +0.0206 | 7% | 0.751 | 0.326 |
+| **S** shrinkage (replaces the gate) | n0 5 in every season | −0.0007 | [−0.0012, −0.0001] | −0.0004 | **SUPPORTED** | +0.0215 | 3% | 0.754 | 0.328 |
+| **P** fitted promoted prior | fitted in every season | −0.0007 | [−0.0012, −0.0003] | −0.0005 | **SUPPORTED** | +0.0214 | 3% | 0.745 | 0.322 |
+| **CUM** W→R→B→S→P | shipped W, h 40, c 40, n0 5, fitted prior (2016: W ×2/3) | **−0.0019** | [−0.0031, −0.0009] | −0.0013 | **SUPPORTED** | **+0.0202** | **9%** | **0.758** | 0.327 |
+| C_nogate (production before 2026-10-07) | — | +0.0013 | [+0.0003, +0.0022] | +0.0008 | worse than C\* | +0.0234 | — | 0.733 | 0.312 |
+| N naive (k = 0) | — | +0.0925 | [+0.0882, +0.0967] | +0.0658 | — | +0.1146 | — | 0.424 | 0.020 |
+| de-vigged close | — | — | — | — | — | 0 | — | 0.805 (actual **0.821**) | **0.364** |
+
+Mean held-out log loss: C\* 0.9777, CUM 0.9758, close 0.9556. Favourites over all matches: actual 0.546,
+close 0.535, C\* 0.517, CUM 0.520.
+
+**Grid points** (descriptive; not verdicts, because picking the best after the fact is not one), Δ vs C\*:
+
+- W ×1/3 +0.0089, ×2/3 +0.0014, ×4/3 +0.0004, ×2 +0.0013. **The shipped window lengths are already at the
+  optimum.**
+- R h 40 −0.0011, h 20 −0.0006, h 10 +0.0031.
+- B c 40 −0.0016, c 20 −0.0010, c 10 +0.0007, c 5 +0.0038.
+- S n0 5 −0.0007, n0 10 −0.0001, n0 20 +0.0024, n0 40 +0.0088.
+- So the gains are only at the MILD end of each grid. Strong recency, blend or shrinkage costs log loss.
+
+### Subsets (secondary), Δ vs C\* [95% CI]
+
+| set | n | C\* − close | B | R | S | P | CUM |
+|---|---|---|---|---|---|---|---|
+| CORE (both ≥ 10 rows) | 25,863 | +0.0216 | −0.0016 [−0.0022, −0.0010] | −0.0010 | −0.0004 | −0.0003 | −0.0014 [−0.0025, −0.0005] |
+| PROMOTED | 1,422 | +0.0311 | −0.0013 | +0.0001 | −0.0047 [−0.0137, +0.0050] | −0.0091 [−0.0172, +0.0007] | **−0.0116 [−0.0230, +0.0009]** |
+| big 5 | 18,231 | +0.0213 | −0.0017 | −0.0011 | −0.0003 | −0.0002 | −0.0019 [−0.0030, −0.0007] |
+| goals leagues | 9,054 | +0.0237 | −0.0012 | −0.0005 | −0.0015 | −0.0018 | −0.0020 [−0.0044, +0.0003] |
+
+- **Per league, CUM ranges −0.0055 to +0.0013.**
+  - Primeira −0.0055 and Ligue 1 −0.0034 have CIs below 0.
+  - Eredivisie +0.0013 [−0.0029, +0.0055] is the only point estimate above 0.
+  - C\* − close is +0.018 to +0.027 in every league.
+- **Per season, CUM is below 0 in 9 of 11 seasons.** The exceptions are 2017 (+0.0021) and 2024 (+0.0003).
+- **2026 alone** (n 512): CUM −0.0004 [−0.0103, +0.0090]. S is +0.0061 there.
+
+### What the numbers say
+
+1. **The rating inputs do carry recoverable information.** It is small. Four of the five families, and the
+   cumulative arm, beat the shipped rating with CIs below 0, every Brier contrast agrees, and the cumulative
+   arm is also wider (sd 0.327 vs 0.323). The largest single piece is the current-season blend: a club's
+   current-season rows get weight `n_cur/(n_cur + 40)` on top of the 45/90-match window, so at mid-season
+   (19 rows) the blend weight is about 0.32. Next is mild recency (half-life 40 matches).
+2. **The families overlap.** The singles sum to −0.0038, but the cumulative arm is −0.0019. Recency and the
+   current-season blend both up-weight recent matches, and shrinkage and the fitted prior both act on
+   few-row clubs.
+3. **The few-match gate production turned on 2026-10-07 is confirmed** on 14 times the earlier sample.
+   Without it (C_nogate), log loss is +0.0013 [+0.0003, +0.0022]. A soft version does better:
+   shrinkage at n0 = 5 toward a FITTED promoted-club prior. On PROMOTED matches, CUM is −0.0116 (CI just
+   spans 0, n 1,422). The fitted prior is the mean raw x of promoted clubs over their promotion seasons in
+   training; it replaces the flat −0.18/−0.18.
+4. **The gap to the close is almost all still there.** The best arm closes **9%** of C\*'s gap: +0.0221
+   becomes +0.0202. Top-decile favourites move 0.745 → 0.758, against a close of 0.805 and an actual win rate
+   of 0.821. That is 17% of the shortfall to actual. The model spread is 0.327, against the close's 0.364.
+
+### Verdicts against the lane
+
+- **H39 (lane): SUPPORTED as a mechanism, FAILED as an explanation.** Under the registered rule, H39
+  survives: CUM is SUPPORTED and its spread (0.327) is wider than C\*'s (0.323). But the size refutes the
+  story that the ratings are badly built. The best set of input changes recovers less than a tenth of the
+  gap, and it leaves top-decile favourites 0.063 below actual.
+- **Lane GOAL: NOT MET, and not meetable through these inputs.** Most of the favourite gap is information the
+  rating never sees: lineups, injuries, squad strength and transfers, the market itself. A 45/90-match xG or
+  goals average cannot carry that, however it is weighted.
+- **Stage 2 candidate (user decision; production rating code is not this lane's):** the cumulative config, in
+  production's shipped transform:
+  - `compute_team_ratings` gains recency weights `0.5^(age/40)`;
+  - a current-season blend `b = n_cur/(n_cur + 40)`;
+  - the hard few-match gate becomes shrinkage `n/(n+5)`, toward 0 for established clubs and toward a
+    per-league fitted promoted prior for promoted clubs.
+  - **Expected gain: −0.0019 log loss on a linear link.** The engine read in the compression study says
+    the sim's gain on the rating is linear, so the direction should transfer. The size in the sim is NOT
+    measured. Under the model-engine standard it needs a roster/artifact rebuild and an `off != on` test.
+    It is modest beside the +0.020 that remains.
+
 ## 4. What cannot be estimated
 
+- **The served sim's 1X2 under the CUM rating.** No sim was run.
+- **Whether information outside the rating closes the rest**, such as lineups, injuries or squad value.
+  None of it is in these inputs. The 0.9 of the gap that remains points there, which is a lead and not a
+  measurement.
+- **MLS and the Championship**, which are not rated here.
+- **2026-27 on its own** (n 512, every CI spans 0).
+- **The share of C\*'s gap that is the close's own skill**, as against noise or hindsight in the closing
+  price. The close is treated as the reference, not decomposed.
+
 ## 5. Deviations from the registration
+
+- None. The grids, selection rule, order and verdict rules ran as registered. The identity and reachability
+  checks passed (section 2).
