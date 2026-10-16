@@ -202,6 +202,54 @@ def _attach_measured_skill(payload: dict[str, Any], market_key: str) -> None:
         payload["model_skill"] = note
 
 
+def _attach_hitter_support(payload: dict[str, Any], row: Mapping[str, Any]) -> None:
+    """Publish the VOLUME and ROLE the hitter payload already carries.
+
+    `[2026-10-16, lane mlb-prop-support-fields]`. Measured that day on the
+    served board: every MLB prop row carried no support field at all, so the
+    only thing able to gate a projection was the 15-point edge-magnitude
+    ceiling in `layer2_board`. The values were never missing -- `ingest_game`
+    keeps the WHOLE payload row (`self._hitters[...] = dict(row)`), so these
+    were always one copy away.
+
+    WHAT EACH FIELD IS WORTH, measured on `daily_summary_2026_10_16.json`
+    (414 hitter rows) BEFORE publishing, because the NFL version of this fix
+    shipped a field that turned out not to discriminate:
+
+      pa_mean / ab_mean   414/414 nonzero, 18 distinct, 3.27..4.74 / 2.98..4.29
+      lineup_order        exactly 46 rows per slot, 1..9 -> the ROLE field
+      is_lineup_batter    True on ALL 414 -> provenance, NOT a discriminator
+
+    **AND THE HONEST LIMIT: MLB DOES NOT HAVE THE NFL PROBLEM.** NFL's gap was
+    rotational players with no role projected far below their line (Braelon
+    Allen, 3.8 yards against a 15.5 line). MLB's hitter payload holds LINEUP
+    BATTERS ONLY, and `pa_mean` is a monotone function of batting slot -- 4.51
+    at slot 1 down to 3.47 at slot 9, a spread of about one plate appearance.
+    So this is useful PROVENANCE and a slot a consumer may gate on; it is not
+    a fix for a low-role population, because MLB has none. Stated here so the
+    field is not mistaken for the NFL one.
+    """
+
+    def _num(key: str) -> float | None:
+        try:
+            value = float(row.get(key))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return None
+        return value if math.isfinite(value) else None
+
+    # None rather than 0.0 when absent: "no projected plate appearances
+    # recorded" and "projected zero" are different claims, and `cards.py`
+    # already treats `pa_mean <= 0.0` as a real signal.
+    payload["pa_mean"] = _num("pa_mean")
+    payload["ab_mean"] = _num("ab_mean")
+    slot = row.get("lineup_order")
+    payload["lineup_order"] = (
+        int(slot) if isinstance(slot, (int, float)) and not isinstance(slot, bool) else None
+    )
+    batter = row.get("is_lineup_batter")
+    payload["is_lineup_batter"] = batter if isinstance(batter, bool) else None
+
+
 def _dist_mean(dist: Mapping[str, Any]) -> float | None:
     total = 0.0
     weighted = 0.0
@@ -745,7 +793,7 @@ class PropProjectionIndex:
                 # not zero -- a 0.0 here would be indistinguishable from "the
                 # model says it will not happen" and would price against it.
                 return None
-            return {
+            hr_payload_out = {
                 "projected": row.get("hr_mean"),
                 "model_prob_over": round(float(prob), 4),
                 "source": "hitter_threshold",
@@ -755,6 +803,8 @@ class PropProjectionIndex:
                     line_value,
                 ),
             }
+            _attach_hitter_support(hr_payload_out, row)
+            return hr_payload_out
 
         if market_key in _HITTER_BUCKETS:
             prefix, mean_key = _HITTER_BUCKETS[market_key]
@@ -806,6 +856,7 @@ class PropProjectionIndex:
                 # rule the rest of this board follows: a value a consumer
                 # cannot tell the provenance of is worse than a labelled one.
                 payload["projected_derived_from"] = derived_from
+            _attach_hitter_support(payload, row)
             _attach_measured_skill(payload, market_key)
             return payload
 
