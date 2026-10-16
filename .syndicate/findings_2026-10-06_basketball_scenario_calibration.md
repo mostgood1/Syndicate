@@ -3011,3 +3011,53 @@ games per checkpoint.
 **Both lanes agree:** FINAL's clearest gain is the POSTSEASON TOTAL LEVEL (pregame |total| −2.43, bias +10.45 → +3.89;
 live total −0.63). On regular-season VALID the shipping gates fail. A postseason-only config would need its own
 pre-registration and an unseen window (2026 is now seen).
+
+# NBA ROUND 2 (user 2026-10-16: "NBA round 2", confirmed in this chat after d48f3a34's relay "keep moving ahead")
+
+## ROUND 2 HELD-OUT TEST — PRE-REGISTRATION 2026-10-16 (before ANY round-2 tuning)
+
+**The 2025-26 windows are all spent.**
+- FIT (11-01..02-28) is the tuning window.
+- VALID (03-01..04-12) and the 2026 postseason were read once (THE VALID READ).
+- October 2025 was excluded: as-of inputs too thin.
+
+So round 2's held-out is FORWARD.
+
+**Window:** 2026-27 NBA REGULAR season, 2026-11-01 onward. October 2026 is excluded for the same thin-input reason as
+2025.
+
+**Read once**, when BOTH hold:
+- ≥ 250 regular-season finals in the window with pre-tip period lines;
+- ≥ 400 with pre-tip full-game lines.
+- Expected: mid-to-late December 2026.
+- Before the read: refresh the replay mirror (pristine + as-of inputs) through the read date. Inputs and finals are
+  pulled, and nothing is scored until the read.
+
+**Arms:**
+- PROD: the production config on the read date;
+- R2: the round-2 config (fit_f5 + whatever round 2 confirms on FIT).
+- The same harness and replay inputs, 200 draws, paired by game.
+
+**Gates: the same as THE VALID READ, verbatim** (G1 period-line Brier, G2 full-game Brier + |margin| + |total|,
+G4 players; P3's G3 if P3 joins).
+- EVERY gate needs FINAL − PROD 95% CI upper < 0, game-clustered bootstrap.
+- Scoring definitions as fixed at ad695e38.
+
+**Tuning:** round-2 work tunes ONLY on FIT. VALID is not re-read as validation. A finding that needs a second window
+waits for this read.
+
+**Production:** only on a pass AND a user decision.
+
+## ROUND 2 WORK PLAN (each step pre-registered on its own, FIT only)
+
+1. **R2-a: quarter shares.**
+   - Phase 1 FLAGGED them and they were NEVER fixed: real Q1 .2546 / Q3 .2538 / Q4 .2411 vs sim .2509 / .2493 / .2486;
+     Q4 +1.71 pts, +2.47 in close games.
+   - It is the period-line target directly (G1 failed).
+   - First a diagnostic on `fit_f5` (existing runs): the current shares vs real, overall and by state entering Q4. Then
+     find where the shares come from (quarters calibration / team splits).
+2. **R2-b: REB −1.4/team** (rebound rates fitted on the old miss volume, before #5a).
+3. **R2-c: 3P% +1.6 pts** (engine-side; the priors were exonerated): shot selection, fouled-miss bookkeeping, block
+   path.
+- The Q4 margin slope (−0.09 vs −0.14) stays with P3. The late-game win-probability lead is WITHDRAWN (it did not
+  replicate).
