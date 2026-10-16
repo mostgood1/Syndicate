@@ -81,6 +81,18 @@ def test_the_board_card_carries_the_flag_the_page_labels_on():
     assert "pregame_on_live" not in lb._layer2_board_columns(resim, quote, {})
 
 
+def test_production_order_sweep_then_live_re_sim_join_keeps_the_live_number_and_the_label():
+    """book_grid_artifact runs the sweep BEFORE live_gameline_join, which then marks the row live-aware, keeps
+    `projected` (the pregame mean) and publishes its own number as `live_model_prob_over` (the Live column)."""
+    row = _row(side="over", line=44.5, prob=0.18)
+    be._enforce_live_edge_policy([row])
+    row["projection"].update({"live_aware": True, "live_model_prob_over": 0.2016})   # what the join writes
+    assert row["projection"]["model_prob_over"] is None, "no pregame Win% on the in-play line"
+    assert row["projection"]["live_model_prob_over"] == 0.2016, "the live re-sim's number survives"
+    assert lb._sim_direction_contradiction(row, row["projection"]) is None, "pregame mean 41.18 vs live 44.5 is no tag"
+    assert lb._layer2_board_columns(row, {"fair_probability": 0.5, "price": -110}, {}).get("pregame_on_live") is True
+
+
 def test_the_pregame_row_keeps_its_contradiction_tag():
     row = _row(state="pregame", side="under", line=29.5)
     be._enforce_live_edge_policy([row])

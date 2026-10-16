@@ -2236,10 +2236,12 @@ def _sim_direction_contradiction(row: Mapping[str, Any], projection: Mapping[str
     NOT ON AN IN-PLAY LINE FROM A PREGAME PROJECTION `[2026-10-15, lane live-winpct-blank]`. Mid-game a total's line
     has moved with the score, so a pregame mean on the "wrong" side of it says nothing about the bet: TEN@HOU's 41.2
     against a live 29.5 tagged every under as contradicted. `board_enrichment._withhold_pregame_probability` marks
-    those rows `pregame_on_live` (NFL + NCAAF, user decision "Blank the live Win%"); a live re-sim row is
-    `live_aware` and keeps its tag.
+    those rows `pregame_on_live` (NFL + NCAAF, user decision "Blank the live Win%"). A live re-sim row
+    (`live_gameline_join`) is no exception: it keeps `projected` as the PREGAME mean by design and carries its
+    live forecast elsewhere, so the tag would still compare the pregame mean with the in-play line
+    (GASO@ODU over 44.5: pregame 34.2 against a live line, 10-15).
     """
-    if projection.get("pregame_on_live") and not projection.get("live_aware"):
+    if projection.get("pregame_on_live"):
         return None
     projected = _as_float(projection.get("projected"))
     if projected is None:
@@ -5109,8 +5111,9 @@ def _layer2_board_columns(
         columns["projected"] = projected
         columns["sim_projection"] = projected
     # THE PROJECTION IS THE PREGAME SIM ON AN IN-PLAY LINE `[2026-10-15, lane live-winpct-blank]`: the page labels it
-    # "pregame proj". The card carries no projection dict, so the flag the sweep set travels as a column.
-    if projection.get("pregame_on_live") and not projection.get("live_aware"):
+    # "pregame proj". The card carries no projection dict, so the flag the sweep set travels as a column. A live
+    # re-sim row keeps `projected` as the pregame mean too (its live number is the Live column), so it is labelled alike.
+    if projection.get("pregame_on_live"):
         columns["pregame_on_live"] = True
 
     # SIDE-CORRECT, via `_model_prob_for_side`. Publishing
