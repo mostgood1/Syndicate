@@ -1016,6 +1016,15 @@ death, never life — do not invert it.
 - Falsification test: Pre-registered in .syndicate/findings_2026-10-16_uefa_offsets_recency_prod.md section 1, committed BEFORE any fit
 - Verification: walk-forward test seasons 2017-2026; paired per-match log-loss bootstrap CI (2000, seed 699); verdict rule of the 2026-10-16 registration
 - Blocked by: none
+### nhl-prop-support-fields — OPEN — opened 2026-10-16 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
+- Goal: NHL prop board rows carry the VOLUME and ROLE fields their producer already writes and the index already holds -- proj_toi and sim_starter -- verified on the served board as a non-zero populated count where all 156 NHL prop rows read NONE today, with a reachability test proving off != on.
+- Files: syndicate/features/nhl/prop_projections.py (the projection dict / support publish ONLY), tests/test_nhl_prop_support_fields.py (NEW)
+- Hypothesis: Same shape as the NFL fix: index.context already stores proj_toi, sim_starter, line_slot and game_type (prop_projections.py:217 reads all four from props_recommendations_all_markets_<date>.csv), and the projection site already FETCHES that context at line 286 for line_refusal -- they are simply never published onto the projection. And these are BETTER support than NFL's sample_games: step 2 measured that sample_games is a calendar count that does not discriminate (median 5.0 both sides), while the discriminating signal is volume/role, which is exactly what proj_toi and sim_starter are.
+- Falsification test: If the served board still reports 0 NHL prop rows with proj_toi after the publish, the loss is DOWNSTREAM of this module (a board-level published-key filter) and not in the projection dict. Separately, if the source CSV's proj_toi is empty or constant across players, the field is published but useless as a gate and the lane must say so rather than claim a win.
+- Verification: Served board, cap defeated, gated on kind=='prop': count of NHL prop rows with projection.proj_toi populated, before (0 of 156, measured 2026-10-16T14:38Z) and after a refresh-worker restart carrying the change. Plus a unit test driving the real attach_nhl_prop_projections, and a reachability test that two different context entries publish two different values.
+- Blocked by: none
+
+
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

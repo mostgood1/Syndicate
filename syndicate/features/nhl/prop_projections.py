@@ -262,6 +262,39 @@ def attach_nhl_prop_projections(
             line = float(row.get("line"))
         except (TypeError, ValueError):
             line = None
+        # THE SUPPORT, PUBLISHED `[2026-10-16, lane nhl-prop-support-fields]`.
+        # Fetched once here instead of only inside the pricing branch below: the
+        # context the producer wrote is support information in its own right, and
+        # a row refused for having no line still deserves to say what it knew.
+        #
+        # WHY, and what each field is actually worth -- measured on
+        # `props_recommendations_all_markets_2026-10-16.csv`, 364 rows, BEFORE
+        # publishing, because the NFL version of this fix shipped a field that
+        # turned out not to discriminate:
+        #   proj_toi     364/364 populated, 76 distinct, 6.77..52.10 (med 17.30)
+        #                -> a real VOLUME signal, and the one worth gating on
+        #   line_slot    360/364, 7 distinct (the PP/even-strength unit)
+        #                -> a real ROLE signal; `line_refusal` already reads it
+        #   sim_starter    4/364, one value -> near-empty, published for
+        #                completeness only, NOT a gate
+        #   game_type    364/364 but CONSTANT ("regular") -> provenance, not a
+        #                discriminator; published so a postseason row says so
+        #
+        # This matters because the 15-point magnitude ceiling was the only gate
+        # the board had: measured 2026-10-16, all 156 served NHL prop rows
+        # carried no support field at all. NFL's `sample_games` turned out to be
+        # a CALENDAR count (median 5.0 on both sides of the ceiling in week 6),
+        # while the discriminating signal was volume/role -- which is exactly
+        # what `proj_toi` and `line_slot` are.
+        _ctx = index.context.get((_norm(row.get("player_name")), code)) or {}
+
+        def _ctx_num(key: str) -> float | None:
+            try:
+                value = float(str(_ctx.get(key) or "").strip())
+            except (TypeError, ValueError):
+                return None
+            return value if math.isfinite(value) else None
+
         projection: dict[str, Any] = {
             "projected": round(lam, 3),
             "source": SOURCE,
@@ -269,6 +302,13 @@ def attach_nhl_prop_projections(
             "model_prob_over": None,
             "edge_vs_market_pct": None,
             "probability_unavailable_reason": "row has no line to price",
+            # None rather than 0.0 when absent: "no projected ice time recorded"
+            # and "projected to play zero minutes" are different claims, and a
+            # consumer gating on volume has to tell them apart.
+            "proj_toi": _ctx_num("proj_toi"),
+            "line_slot": (str(_ctx.get("line_slot") or "").strip() or None),
+            "sim_starter": (str(_ctx.get("sim_starter") or "").strip() or None),
+            "game_type": (str(_ctx.get("game_type") or "").strip() or None),
         }
         if line is None or not math.isfinite(line):
             no_line += 1
@@ -288,7 +328,7 @@ def attach_nhl_prop_projections(
             # The lean is kept, under its own name.
             projection["side"] = "over"
             projection["lean"] = "over" if lam > line else "under"
-            refusal = line_refusal(index.context.get((_norm(row.get("player_name")), code)), code)
+            refusal = line_refusal(_ctx, code)
             if refusal is None:
                 _attach_sim_probability_edge(projection, row=row, model_prob=price_p_over(code, line, lam))
                 # Display ladder for the board's sim-spread chart (lane layer2-board-ui-redesign).
