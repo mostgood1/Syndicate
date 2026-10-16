@@ -119,10 +119,10 @@ def test_a_teammate_stack_is_priced_from_the_measured_correlation_with_fair_and_
     want = 0.25 + math.asin(0.32) / (2 * math.pi)
     assert s["relation"] == "teammate" and s["rho_level"] == "role" and s["p_joint"] == pytest.approx(want, abs=1e-4)
     assert s["book"] == "draftkings"                                   # the one book quoting both legs
-    assert s["fair_odds"] == sheet_sgp.decimal_to_american(1 / s["p_joint"])
+    assert s["fair_odds"] == sheet_sgp.odds_at(1 / s["p_joint"])
     assert s["worth_it_odds"] > s["fair_odds"]                         # a cushion above fair
-    product = sheet_sgp.american_to_decimal(-115) ** 2
-    assert s["est_book_odds"] == sheet_sgp.decimal_to_american(product * (1 - sheet_sgp.ASSUMED_BOOK_DISCOUNT))
+    product = sheet_sgp.payout(-115) ** 2
+    assert s["est_book_odds"] == sheet_sgp.odds_at(product * (1 - sheet_sgp.ASSUMED_BOOK_DISCOUNT))
     assert s["commence_time"] == "2026-10-18T17:00:00Z" and not s["same_player"]
 
 

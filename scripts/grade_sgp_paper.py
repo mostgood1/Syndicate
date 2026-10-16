@@ -31,7 +31,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from syndicate.features.nfl.sgp import american_to_decimal  # noqa: E402
+from syndicate.features.nfl.sgp import payout  # noqa: E402
 from syndicate.features.shared import cheat_sheets as cs  # noqa: E402
 
 
@@ -98,7 +98,7 @@ def summarize(graded: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
                 "gap": round(gap, 4), "gap_se_game_clustered": round(se, 4),
                 "brier": round(sum((w - p) ** 2 for w, p in zip(won, pred)) / n, 4)})
     for label, field in (("worth_it", "worth_it_odds"), ("est_book", "est_book_odds")):
-        pays = [(american_to_decimal(g.get(field)) or 0.0) for g in settled]
+        pays = [(payout(g.get(field)) or 0.0) for g in settled]
         if all(pays):
             out[f"roi_at_{label}_price"] = round(sum(w * d for w, d in zip(won, pays)) / n - 1.0, 4)
     for rel in ("same_player", "teammate", "opponent"):

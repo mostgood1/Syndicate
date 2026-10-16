@@ -52,6 +52,7 @@ if str(ROOT) not in sys.path:
 from syndicate.features.nfl.sgp import (  # noqa: E402,F401 -- shared with the cheat sheet's SGP builder
     bvn_lower, bvn_pdf, bvn_upper, joint_over, load_pbp, player_games, usage_roles)
 from syndicate.features.nfl.sgp import name_key as _nfl_key  # noqa: E402
+from syndicate.features.shared.opportunity_signals import implied_probability  # noqa: E402
 from syndicate.features.shared.team_aliases import _NFL_ALIAS_TO_NAME  # noqa: E402
 
 MARKETS = {"Passing Yards": "pass_yds", "Passing Attempts": "pass_att", "Passing TDs": "pass_td",
@@ -79,9 +80,9 @@ def roles(lines: pd.DataFrame, games: pd.DataFrame) -> dict[tuple[str, str], str
 
 
 # ------------------------------------------------------------------------------------------------ legs
-def american_to_prob(price: float) -> float:
-    price = float(price)
-    return 100.0 / (price + 100.0) if price > 0 else -price / (-price + 100.0)
+# American price -> implied probability: the registered converter, not a second copy
+# (`scripts/probability_differential.py` sweeps every converter-shaped def).
+american_to_prob = implied_probability
 
 
 def load_legs(data_root: Path, season: int) -> pd.DataFrame:

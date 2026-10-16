@@ -190,18 +190,20 @@ def load_cells(data_root: Path) -> dict[str, Any] | None:
         return None
 
 
-def american_to_decimal(price: Any) -> float | None:
-    try:
-        p = float(price)
-    except (TypeError, ValueError):
-        return None
-    if p == 0:
-        return None
-    return 1.0 + (p / 100.0 if p > 0 else 100.0 / -p)
+def payout(price: Any) -> float | None:
+    """Total return per unit staked at an American price (stake included), via the registered
+    `opportunity_signals.implied_probability` -- no second converter (`scripts/probability_differential.py`)."""
+    from syndicate.features.shared.opportunity_signals import implied_probability
+
+    q = implied_probability(price)
+    return 1.0 / q if q else None
 
 
-def decimal_to_american(dec: float) -> int:
-    return int(round((dec - 1.0) * 100.0)) if dec >= 2.0 else int(round(-100.0 / (dec - 1.0)))
+def odds_at(payout_multiple: float) -> int | None:
+    """The American price paying `payout_multiple` per unit, via the registered `opportunity_signals.american_price`."""
+    from syndicate.features.shared.opportunity_signals import american_price
+
+    return american_price(1.0 / payout_multiple) if payout_multiple and payout_multiple > 1.0 else None
 
 
 def rho_for(cells: Mapping[str, Any], type_a: str, type_b: str, relation: str) -> tuple[float, str]:
@@ -326,7 +328,7 @@ def suggest(sheet: Mapping[str, Any], cells: Mapping[str, Any] | None,
                 books = [bk for bk in a["prices"] if bk in b["prices"]]
                 best = None
                 for bk in books:
-                    da, db = american_to_decimal(a["prices"][bk]), american_to_decimal(b["prices"][bk])
+                    da, db = payout(a["prices"][bk]), payout(b["prices"][bk])
                     if da and db and (best is None or da * db > best[1]):
                         best = (bk, da * db)
                 if best is None:
@@ -340,10 +342,10 @@ def suggest(sheet: Mapping[str, Any], cells: Mapping[str, Any] | None,
                     "sgp_id": sgp_id, "event_id": event_id, "legs": [dict(a, bet=_bet_text(a)), dict(b, bet=_bet_text(b))],
                     "relation": relation, "same_player": same_player, "rho": round(rho, 3), "rho_level": level,
                     "p_joint": round(pj, 4), "p_independent": round(indep, 4), "lift": round(pj / indep, 3),
-                    "fair_odds": decimal_to_american(fair_dec),
-                    "worth_it_odds": decimal_to_american(fair_dec * (1.0 + WORTH_IT_CUSHION)),
-                    "book": book, "legs_product_odds": decimal_to_american(product),
-                    "assumed_discount": ASSUMED_BOOK_DISCOUNT, "est_book_odds": decimal_to_american(est_dec),
+                    "fair_odds": odds_at(fair_dec),
+                    "worth_it_odds": odds_at(fair_dec * (1.0 + WORTH_IT_CUSHION)),
+                    "book": book, "legs_product_odds": odds_at(product),
+                    "assumed_discount": ASSUMED_BOOK_DISCOUNT, "est_book_odds": odds_at(est_dec),
                     "est_ev_pct": round((pj * est_dec - 1.0) * 100.0, 1),
                     "matchup": (games.get(event_id) or {}).get("matchup"),
                     "commence_time": (games.get(event_id) or {}).get("commence_time"),
