@@ -21,7 +21,8 @@ Same rules as state.md: when a fact changes, EDIT THE LINE.
 - **UEFA club identity** (`25fea6ac`, measured with the real join): all 18 UCL fixtures resolve against Kalshi (was 9), and 40 totals price (was 22).
   - The global alias map gained 89 keys / 55 clubs, with 0 removed and 0 changed.
   - UEFA branding gives NAMES only; its abbreviations had dropped `cel`/`lev`/`mid`/`slb`.
-  - Workers use it from their next restart. Kalshi moneylines price 0 in EVERY sport (h2h `None` vs `0.0` key), which needs a separate fix.
+  - Workers loaded it at their restarts (live-odds-worker 2026-10-15 22:28:25Z, refresh-worker 23:36:42Z). The served shortlist then carried 46 UCL rows, 24 h2h on 16/18 fixtures priced at Kalshi (via `venue_quote_fanin`).
+  - The `join_kalshi_to_board` moneyline key bug (h2h `None` vs `0.0`, which feeds `portfolio_commit`) was FIXED by lane `kalshi-moneyline-board-join` (CLOSED, GOAL MET; live since 2026-10-16 13:27:56Z; its own measurement is in deploys.md, `1cba9909`).
 - **Not yet read:** a UCL match IN PLAY (projection=null), on the 2026-10-20/21 matchday.
 
 ## [soccer-roster-only-players] SOCCER SIM SQUADS: ADDING ROSTER-ONLY PLAYERS (TEAM TOTALS FIXED) FAILED ITS PRE-REGISTERED TEST, AND THE ESPN ROSTERS ARE A JULY SEED `[measured 2026-10-06, lane soccer-roster-only-players, NOT SHIPPED]`
