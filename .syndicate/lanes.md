@@ -1018,14 +1018,14 @@ death, never life — do not invert it.
 - Blocked by: none
 ### nhl-prop-support-fields — OPEN — opened 2026-10-16 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
 - Goal: NHL prop board rows carry the VOLUME and ROLE fields their producer already writes and the index already holds -- proj_toi and sim_starter -- verified on the served board as a non-zero populated count where all 156 NHL prop rows read NONE today, with a reachability test proving off != on.
-- Files: syndicate/features/nhl/prop_projections.py (the projection dict / support publish ONLY), tests/test_nhl_prop_support_fields.py (NEW)
-- Hypothesis: Same shape as the NFL fix: index.context already stores proj_toi, sim_starter, line_slot and game_type (prop_projections.py:217 reads all four from props_recommendations_all_markets_<date>.csv), and the projection site already FETCHES that context at line 286 for line_refusal -- they are simply never published onto the projection. And these are BETTER support than NFL's sample_games: step 2 measured that sample_games is a calendar count that does not discriminate (median 5.0 both sides), while the discriminating signal is volume/role, which is exactly what proj_toi and sim_starter are.
+- GOAL: NOT MET — code landed (`1ca7041f`: 9 tests, 6 real mutants / 6 caught; 945 tests pass across the 50 prop-projection suites and the 4 failures + 4 errors there are PRE-EXISTING, shown by reverting my change at HEAD and getting an identical 4/4). The goal names the SERVED board and that reading has not landed.
+- What is left: one reading — served NHL prop rows carrying `projection.proj_toi`, after a fleet ff + refresh-worker restart carrying `1ca7041f` (fleet is at `70116f4a`, older).
+- Blocking it: `check_deploy_safety` read **NOT CLEAR** at 15:17Z — odds refresh at 701s, three live-odds-worker children, and a board build IN FLIGHT at `portfolio_commit` ('returned, not yet persisted'). A restart discards that build; an ff mid-build leaves the parent on old code while new children run new code.
+- CONTROL taken so the pending reading is not blind: 2026-10-16T14:38Z, **NHL 0 of 156 (NONE)**, while NCAAF read 723/723 and NFL 1,067/1,067 at the same instant.
+- PREMISE CORRECTED before any code: this lane named `sim_starter` as the role field. Measured on the producer CSV (364 rows) it is only 4/364 and sparse BY DESIGN (read only for `SAVES`/goalies); **`line_slot` is the role field** (360/364, 7 distinct) and `proj_toi` the volume one (364/364, 76 distinct, 6.77..52.10). Measuring first is the lesson the NFL pass paid for.
 - Falsification test: If the served board still reports 0 NHL prop rows with proj_toi after the publish, the loss is DOWNSTREAM of this module (a board-level published-key filter) and not in the projection dict. Separately, if the source CSV's proj_toi is empty or constant across players, the field is published but useless as a gate and the lane must say so rather than claim a win.
-- Verification: Served board, cap defeated, gated on kind=='prop': count of NHL prop rows with projection.proj_toi populated, before (0 of 156, measured 2026-10-16T14:38Z) and after a refresh-worker restart carrying the change. Plus a unit test driving the real attach_nhl_prop_projections, and a reachability test that two different context entries publish two different values.
-- Blocked by: none
-
-
-
+- Files: syndicate/features/nhl/prop_projections.py (the projection dict / support publish ONLY), tests/test_nhl_prop_support_fields.py (NEW)
+- Blocked by: none (waiting on a quiet window, not on another lane).
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

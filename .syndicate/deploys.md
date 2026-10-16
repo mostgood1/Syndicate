@@ -50261,3 +50261,44 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
 - **Nightly ci-suite 10-15 (`11bbdbcf7b45`, 08:00:22Z) and 10-16 (`4a660b3e6cf7`, 08:00:37Z):** `logs/job-ci-suite.log` header on both: `HOME=/home/amyn/syndicate-prod/ci-home`, key list includes `SYNDICATE_LOCAL_HOME`, `SYNDICATE_LOCAL_REDIS_URL`, `SYNDICATE_ODDSAPI_QUOTA_FORWARD(_URL)`, `USERPROFILE` (10-14's header: HOME passed through, none of these).
 - **Claim path, predicate on the fleet host (14:5xZ 10-16, real `~/syndicate-prod/local_production.env`, fleet checkout 70116f4a):** `deploy_claim._local_production_env_claim_dir()` in a child process -- old allowlist env (control) -> `/mnt/c/.../Syndicate/.syndicate/deploy_claims`; `ci_env()` -> `None`. Claim dir empty at the read. Logs hold no lane-a/session-aaa line (weak: the 10-13/10-14 claims were seen in `status`, which is not logged; the only hit was my own grep in the memory monitor's process list).
 - **Quota doc (GET only):** `nfl:offfleet` 127 calls / 164 credits -- unchanged since 02:27Z 10-15, across both nightlies; `baseline` still the fake 10-11 08:15:50Z headers, NOT re-stamped. Repair still the owner's call (leads.md 2026-10-15).
+
+## 2026-10-16T15:17:38Z (10:17 AM CT) -- NHL prop VOLUME/ROLE fields landed on main, NOT staged on the fleet, reading OWED
+
+- **Change.** `1ca7041f` publishes `proj_toi` (volume) + `line_slot` (role), plus
+  `sim_starter`/`game_type` for completeness, onto NHL prop projections.
+  Additive fields, no scoring change. 9 tests, 6 real mutants / 6 caught.
+- **The field set was measured BEFORE shipping**, which is the lesson the NFL
+  pass paid for (there I shipped `sample_games` and step 2 then found it does
+  not discriminate -- a calendar count, median 5.0 on both sides). On
+  `props_recommendations_all_markets_2026-10-16.csv`, 364 rows: `proj_toi`
+  364/364 with 76 distinct values (6.77..52.10, med 17.30) -> a real volume
+  signal; `line_slot` 360/364, 7 distinct -> a real role signal; `sim_starter`
+  only 4/364, sparse BY DESIGN (read only for `SAVES`, i.e. goalies) so
+  published but explicitly not a gate; `game_type` constant ("regular") ->
+  provenance only. **The lane's own premise was corrected by this**: it named
+  `sim_starter` as the role field and the measurement says `line_slot` is.
+- **NOT staged and NOT restarted.** `check_deploy_safety` at 2026-10-16T15:17:38Z read **NOT
+  CLEAR**: three refresh-worker children (odds refresh at 701s), three
+  live-odds-worker children, and a **board build IN FLIGHT at stage
+  `portfolio_commit`, "returned, not yet persisted"**. A restart would discard
+  that build, and an ff mid-build would leave the parent on old code while newly
+  launched children ran new code. Fleet is at `70116f4a`; `1ca7041f` is newer.
+- **verify:** count of served NHL prop rows carrying `projection.proj_toi`.
+  **CONTROL, 2026-10-16T14:38Z: 0 of 156 (NONE)**, while NCAAF read 723 of 723
+  and NFL 1,067 of 1,067 at the same instant -- so the instrument reads non-zero
+  and NHL's 0 is a real 0.
+- **Owed:** re-read after a fleet ff + refresh-worker restart carrying
+  `1ca7041f`. Lane `nhl-prop-support-fields` stays OPEN. Falsification: if NHL
+  still reads 0 afterwards, the loss is downstream of
+  `nhl/prop_projections.py`, not in the dict.
+- **MLB: SCOPED, NOT SHIPPED, deliberately.** Same shape confirmed --
+  `prop_projections.py:471` keeps the whole payload row (`dict(row)`) so any
+  field on it is reachable at the projection site, `pa_mean`/`ab_mean` are
+  documented as genuine on hitter rows (`:541`), and `cards.py:3507` ALREADY
+  gates on `pa_mean <= 0.0` elsewhere. **But I could not locate the live
+  payload to measure `pa_mean`'s population and variability**: none of the 15
+  most recent non-eval `daily_summary_*.json` files carry
+  `hitter_props_likelihood_topn`, while the board serves 161 MLB prop rows from
+  it. Shipping a support field without that measurement is exactly what the NFL
+  pass got wrong, so it waits for the payload to be found. 144-161 MLB prop rows
+  carry no support today.
