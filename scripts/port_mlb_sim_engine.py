@@ -1,60 +1,62 @@
-"""Generator for syndicate/features/mlb/sim_engine/ and syndicate/features/mlb/tools_port/ -- the MLB engine off vendor.
+"""Generator for syndicate/features/mlb/sim_engine/ and syndicate/features/mlb/native/tools/ -- the MLB engine off vendor.
 
-Lane mlb-sim-engine-native-p2 (user decision 2026-10-16: "Native engine package"). Phase 1
-(scripts/port_mlb_live_lens.py) moved the live lens's slice of the vendored Flask app into Syndicate but left it importing
-the vendored `sim_engine` / `tools` packages. This generates both natively:
+Lanes mlb-sim-engine-native-p2 (user decision 2026-10-16: "Native engine package") and mlb-daily-sim-native-p3 ("Native
+tools mirror"). Generates, from vendor/mlb_bettingv2/:
 
-  * syndicate/features/mlb/sim_engine/ -- the WHOLE vendored package vendor/mlb_bettingv2/sim_engine/, every module
-    copied verbatim (one package, so the daily sim can later switch to it and there is one engine, not two);
-  * syndicate/features/mlb/tools_port/<module>.py -- for each vendored `tools.*` module the live lens imports from, the
-    `symtable` closure of exactly the names imported (scripts/port_basketball_live_tick.py's method, whose helpers this
-    imports), statements copied verbatim in source order behind the module's own import statements; a `tools.*` import
-    that closure keeps is ported the same way, recursively.
+  * syndicate/features/mlb/sim_engine/ -- the WHOLE vendored package sim_engine/, every module copied verbatim;
+  * syndicate/features/mlb/native/tools/<same tree> -- every vendored tools/ file the MLB daily sim, the refresh-worker's
+    season-manifest launcher and the live lens reach (imports at any depth plus `"tools"`-rooted script launches,
+    followed to a fixed point), each copied WHOLE and verbatim: they are scripts as much as modules. One copy each.
+    tools/web/flask_frontend.py is not copied: its names come from the live lens's app slice
+    (syndicate/features/mlb/live_lens_port/app_slice.py, scripts/port_mlb_live_lens.py), which roots them.
 
-The only hand-written behaviour is EDITS, all mechanical and listed here:
-  * VENDORED FILE: in a module that calls `Path(__file__)`, that call becomes `Path(_VENDORED_FILE)`, defined as the
-    path the module has in the vendored tree. Every `.resolve().parents[k]` therefore lands on exactly the directory it
-    did in vendor/ -- the copy sits at a different depth, so a plain `__file__` would silently move every data root
-    (`parents[4] / "data"` in sim_engine/data/ is the Syndicate repo's own data dir, for instance).
-  * IMPORT PATHS: `sim_engine...` -> `syndicate.features.mlb.sim_engine...` and `tools.<pkg>.<module>` ->
-    `syndicate.features.mlb.tools_port.<module>` in every import statement, indented ones included.
-  * `sim_engine/data/roster_artifact.py`'s one absolute `from sim_engine.models import` becomes the relative
-    `from ..models import`, as every other intra-package import already is: an absolute path would load a SECOND copy
-    of `models` and two class hierarchies.
+The only hand-written behaviour is EDITS, all mechanical, each counted:
+  * VENDORED FILE: `Path(__file__)` -> `Path(_VENDORED_FILE)`, the module's path in the vendored tree, so every
+    `.resolve().parents[k]` DATA root lands where it did in vendor/ (the copy sits at a different depth).
+  * NATIVE SCRIPTS: a script path rooted at the repo root (`_ROOT_DIR / "tools" / ...`, `_ROOT / "tools" / ...`) is
+    CODE, so it becomes `_NATIVE_ROOT / "tools" / ...` -- the native copy, never the vendored script. The same
+    `_ROOT_DIR` stays the vendored root everywhere else (data, subprocess cwd).
+  * SYS.PATH: each script's `if str(<root>) not in sys.path: sys.path.insert(0, str(<root>))` puts the SYNDICATE repo
+    root on sys.path instead of the vendored one, so the rewritten imports resolve and a missed vendored import fails
+    loudly instead of silently loading vendor.
+  * IMPORT PATHS: `sim_engine...` -> `syndicate.features.mlb.sim_engine...`; `tools.web.flask_frontend` ->
+    `syndicate.features.mlb.live_lens_port.app_slice`; `tools.<x>` -> `syndicate.features.mlb.native.tools.<x>`, in
+    every import statement, indented ones included. (Text inside string literals is not an import statement and is
+    left verbatim -- e.g. daily_update.py's Windows-only `.venv_x64` web-helper fallback.)
+  * `sim_engine/data/roster_artifact.py`'s one absolute `from sim_engine.models import` becomes relative (one `models`).
+`"tool": "tools/<x>.py"` provenance labels are DATA written into outputs and stay verbatim.
 
 Usage:
-  py -3 scripts/port_mlb_sim_engine.py            # write both packages
-  py -3 scripts/port_mlb_sim_engine.py --check    # exit 1 if either package on disk differs
-  py -3 scripts/port_mlb_sim_engine.py --report   # per-module sizes, EDIT sites, and the tools closure sizes
+  py -3 scripts/port_mlb_sim_engine.py            # write both trees
+  py -3 scripts/port_mlb_sim_engine.py --check    # exit 1 if either tree on disk differs
+  py -3 scripts/port_mlb_sim_engine.py --report   # sizes and every EDIT site
 """
 from __future__ import annotations
 
 import argparse
 import ast
-import builtins
-import importlib.util
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-_spec = importlib.util.spec_from_file_location("_tick_gen", ROOT / "scripts" / "port_basketball_live_tick.py")
-_tg = importlib.util.module_from_spec(_spec)
-sys.modules["_tick_gen"] = _tg
-_spec.loader.exec_module(_tg)
 
 VENDOR = ROOT / "vendor" / "mlb_bettingv2"
 SIM_SRC = VENDOR / "sim_engine"
 SIM_OUT = ROOT / "syndicate" / "features" / "mlb" / "sim_engine"
-TOOLS_OUT = ROOT / "syndicate" / "features" / "mlb" / "tools_port"
+NATIVE_OUT = ROOT / "syndicate" / "features" / "mlb" / "native"
 NATIVE_SIM = "syndicate.features.mlb.sim_engine"
-NATIVE_TOOLS = "syndicate.features.mlb.tools_port"
-#: The vendored app whose top-level `tools.*` imports seed the tools closures (the live lens's own import header).
+NATIVE_TOOLS = "syndicate.features.mlb.native.tools"
+WEB_MODULE = "tools.web.flask_frontend"
+WEB_SLICE = "syndicate.features.mlb.live_lens_port.app_slice"
+#: The vendored app (its top-level `tools.*` imports are what the live lens's header asks for).
 APP = VENDOR / "tools" / "web" / "flask_frontend.py"
+#: Entry points that RUN vendored tools today: the daily sim (scripts/run_mlb_daily_sim_job.py) and the refresh-worker's
+#: season-manifest launcher (scripts/run_refresh_worker.py).
+ENTRY_SCRIPTS = ["tools/daily_update.py", "tools/eval/build_season_betting_cards_manifest.py"]
 VENDORED_ROOTS = {"sim_engine", "tools"}
 
-#: Per-file EDITS beyond the mechanical ones: {path relative to sim_engine/: [(anchor, replacement)]}; each anchor must
-#: match exactly once.
+#: Per-file EDITS beyond the mechanical ones, for sim_engine: {path relative to sim_engine/: [(anchor, replacement)]}.
 SIM_EDITS: dict[str, list[tuple[str, str]]] = {
     "data/roster_artifact.py": [
         ("from sim_engine.models import (\n",
@@ -62,21 +64,28 @@ SIM_EDITS: dict[str, list[tuple[str, str]]] = {
     ],
 }
 
-#: Top-level `try:` / `if:` statements a tools closure may copy verbatim, by the name they bind (the shared walker
-#: refuses them by default). Filled only from a measured need.
-ALLOWED_TRY_IF: set[str] = set()
+#: Per-file EDITS for the tools copies, applied AFTER the mechanical ones: {path relative to vendor/mlb_bettingv2: [...]}.
+TOOLS_EDITS: dict[str, list[tuple[str, str]]] = {
+    # A provenance LABEL written into daily_summary_<date>_profile_bundle.json. `daily_update_py` is now the native
+    # script (NATIVE SCRIPTS rule), which `_rel` cannot make relative to the vendored `_ROOT`, so it would record an
+    # absolute path where production records "tools/daily_update.py" -- the same relative path the native tree mirrors.
+    # Measured by scripts/mlb_daily_sim_parity.py 2026-10-16 as the ONE leaf beyond the noise floor; no reader exists.
+    "tools/daily_update_multi_profile.py": [
+        ('"daily_update_tool": _rel(daily_update_py),',
+         '"daily_update_tool": _rel(_ROOT / "tools" / "daily_update.py"),  # EDIT: the label production records'),
+    ],
+}
 
 _IMPORT_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<kw>from|import)[ \t]+(?P<mod>(?:sim_engine|tools)(?:\.[A-Za-z0-9_]+)*)\b",
                         re.M)
+_SCRIPT_JOIN_RE = re.compile(r"\b(?:_ROOT_DIR|_ROOT|REPO_ROOT)(?P<sep>\s*/\s*)\"tools\"")
+_SCRIPT_TARGET_RE = re.compile(r"\b(?:_ROOT_DIR|_ROOT|REPO_ROOT)\s*/\s*\"tools\"((?:\s*/\s*\"[A-Za-z0-9_.]+\")+)")
+_SYS_PATH_RE = re.compile(r"^(?P<i>[ \t]*)if str\((?P<r>_ROOT_DIR|_ROOT|REPO_ROOT)\) not in sys\.path:\n"
+                          r"(?P=i)[ \t]+sys\.path\.insert\(0, str\((?P=r)\)\)\n", re.M)
 
 
 def _read(path: Path) -> str:
     return path.read_bytes().decode("utf-8-sig").replace("\r\n", "\n")
-
-
-def _tools_module_name(dotted: str) -> str:
-    """`tools.eval.build_season_eval_manifest` -> `build_season_eval_manifest` (flat; uniqueness is asserted)."""
-    return dotted.split(".")[-1]
 
 
 def _rewrite_imports(text: str, where: str) -> str:
@@ -86,22 +95,19 @@ def _rewrite_imports(text: str, where: str) -> str:
             raise SystemExit(f"[{where}] `import {mod}` binds a vendored top-level name; only `from ... import` is rewritten")
         if mod.split(".")[0] == "sim_engine":
             return f"{m.group('indent')}from {NATIVE_SIM}{mod[len('sim_engine'):]}"
-        return f"{m.group('indent')}from {NATIVE_TOOLS}.{_tools_module_name(mod)}"
+        if mod == WEB_MODULE:
+            return f"{m.group('indent')}from {WEB_SLICE}"
+        if mod in ("tools", "tools.web"):
+            raise SystemExit(f"[{where}] `from {mod} import ...` -- a package-level import the mapping does not cover")
+        return f"{m.group('indent')}from {NATIVE_TOOLS}{mod[len('tools'):]}"
 
     return _IMPORT_RE.sub(sub, text)
 
 
-def _vendored_file_edit(text: str, out_rel: Path, vendored_rel: Path) -> str:
-    """`Path(__file__)` -> `Path(_VENDORED_FILE)`, `_VENDORED_FILE` being this module's path in the vendored tree."""
-    n = text.count("Path(__file__)")
-    if not n:
+def _insert_header(text: str, lines_to_insert: list[str]) -> str:
+    """Insert lines after the module docstring and `from __future__` imports (before anything that could use them)."""
+    if not lines_to_insert:
         return text
-    if text.count("__file__") != n:
-        raise SystemExit(f"[{out_rel}] __file__ used outside Path(__file__); extend the EDIT rule deliberately")
-    up = len(out_rel.parts) - 1  # parents[up] of the copy is the Syndicate repo root
-    parts = ", ".join(repr(p) for p in ("vendor", "mlb_bettingv2", *vendored_rel.parts))
-    line = (f"_VENDORED_FILE = str(__import__(\"pathlib\").Path(__file__).resolve().parents[{up}].joinpath({parts}))"
-            f"  # EDIT: this module's path in vendor/, so every Path(_VENDORED_FILE).parents[k] is the vendored one\n")
     tree = ast.parse(text)
     insert_after = 0
     for i, node in enumerate(tree.body):
@@ -113,17 +119,66 @@ def _vendored_file_edit(text: str, out_rel: Path, vendored_rel: Path) -> str:
         else:
             break
     lines = text.split("\n")
-    body = "\n".join(lines[insert_after:]).replace("Path(__file__)", "Path(_VENDORED_FILE)")
-    head = "\n".join(lines[:insert_after])
-    return (head + "\n" if head else "") + line + body
+    return "\n".join(lines[:insert_after] + lines_to_insert + lines[insert_after:])
+
+
+def _path_line(name: str, out_rel: Path, target: tuple[str, ...], *, as_str: bool, why: str) -> str:
+    up = len(out_rel.parts) - 1  # parents[up] of the copy is the Syndicate repo root
+    expr = f"__import__(\"pathlib\").Path(__file__).resolve().parents[{up}]"
+    if target:
+        expr += ".joinpath(" + ", ".join(repr(p) for p in target) + ")"
+    return f"{name} = {'str(' + expr + ')' if as_str else expr}  # EDIT: {why}"
+
+
+def _edit_module(text: str, out_rel: Path, vendored_rel: Path, report: dict) -> str:
+    """The mechanical EDITS, in an order where none can see another's output."""
+    header: list[str] = []
+    # NATIVE SCRIPTS (before VENDORED FILE, which leaves _ROOT_DIR / _ROOT on the vendored root).
+    joins = len(_SCRIPT_JOIN_RE.findall(text))
+    if joins:
+        for m in _SCRIPT_TARGET_RE.finditer(text):
+            parts = tuple(re.findall(r"\"([A-Za-z0-9_.]+)\"", m.group(1)))
+            report.setdefault("script_targets", []).append((vendored_rel.as_posix(), "tools/" + "/".join(parts)))
+        text = _SCRIPT_JOIN_RE.sub(lambda m: f"_NATIVE_ROOT{m.group('sep')}\"tools\"", text)
+        header.append(_path_line("_NATIVE_ROOT", out_rel, ("syndicate", "features", "mlb", "native"), as_str=False,
+                                 why="CODE root -- vendored `tools` scripts run from their native copies"))
+        report["script_joins"] = report.get("script_joins", 0) + joins
+    # SYS.PATH
+    n_sys = len(_SYS_PATH_RE.findall(text))
+    if n_sys:
+        if n_sys != 1:
+            raise SystemExit(f"[{out_rel}] {n_sys} sys.path blocks; the rule expects at most one per file")
+        text = _SYS_PATH_RE.sub(lambda m: (f"{m.group('i')}if _SYNDICATE_ROOT not in sys.path:\n"
+                                           f"{m.group('i')}    sys.path.insert(0, _SYNDICATE_ROOT)\n"), text)
+        header.append(_path_line("_SYNDICATE_ROOT", out_rel, (), as_str=True,
+                                 why="the Syndicate repo root goes on sys.path, never the vendored one"))
+        report["sys_path"] = report.get("sys_path", 0) + 1
+    if re.search(r"^\s*sys\.path\.(insert|append)\(", text, re.M) and "_SYNDICATE_ROOT" not in text:
+        raise SystemExit(f"[{out_rel}] a sys.path edit outside the known two-line shape")
+    # IMPORT PATHS
+    text = _rewrite_imports(text, out_rel.as_posix())
+    # VENDORED FILE
+    n_file = text.count("Path(__file__)")
+    if n_file:
+        if text.count("__file__") != n_file:
+            raise SystemExit(f"[{out_rel}] __file__ used outside Path(__file__); extend the EDIT rule deliberately")
+        text = text.replace("Path(__file__)", "Path(_VENDORED_FILE)")
+        header.insert(0, _path_line("_VENDORED_FILE", out_rel, ("vendor", "mlb_bettingv2", *vendored_rel.parts),
+                                    as_str=True, why="this module's path in vendor/, so every DATA root resolves there"))
+        report["vendored_file"] = report.get("vendored_file", 0) + n_file
+    text = _insert_header(text, header)
+    compile(text, str(out_rel), "exec")
+    _check_no_vendored_imports(out_rel.as_posix(), text)
+    return text
 
 
 def _check_no_vendored_imports(name: str, text: str) -> None:
     left = [m.group(0).strip() for m in _IMPORT_RE.finditer(text)]
-    tree = ast.parse(text)
-    for node in ast.walk(tree):
+    for node in ast.walk(ast.parse(text)):
         if isinstance(node, ast.ImportFrom) and node.level == 0 and (node.module or "").split(".")[0] in VENDORED_ROOTS:
             left.append(node.module)
+        elif isinstance(node, ast.Import):
+            left += [a.name for a in node.names if a.name.split(".")[0] in VENDORED_ROOTS]
     if left:
         raise SystemExit(f"[{name}] vendored imports left: {left}")
 
@@ -131,8 +186,9 @@ def _check_no_vendored_imports(name: str, text: str) -> None:
 # ---------------------------------------------------------------------------------------------------------- sim_engine
 
 
-def sim_outputs() -> dict[Path, str]:
+def sim_outputs(report: dict | None = None) -> dict[Path, str]:
     """{path relative to SIM_OUT: text} -- every module of the vendored package."""
+    report = {} if report is None else report
     out: dict[Path, str] = {}
     seen_edits: set[str] = set()
     for src in sorted(SIM_SRC.rglob("*.py")):
@@ -145,12 +201,7 @@ def sim_outputs() -> dict[Path, str]:
                 raise SystemExit(f"[sim_engine/{rel.as_posix()}] EDIT anchor matched {text.count(old)}x: {old!r}")
             text = text.replace(old, new)
             seen_edits.add(rel.as_posix())
-        text = _rewrite_imports(text, f"sim_engine/{rel.as_posix()}")
-        out_rel = SIM_OUT.relative_to(ROOT) / rel
-        text = _vendored_file_edit(text, out_rel, Path("sim_engine") / rel)
-        compile(text, str(out_rel), "exec")
-        _check_no_vendored_imports(str(out_rel), text)
-        out[rel] = text
+        out[rel] = _edit_module(text, SIM_OUT.relative_to(ROOT) / rel, Path("sim_engine") / rel, report)
     missing = set(SIM_EDITS) - seen_edits
     if missing:
         raise SystemExit(f"SIM_EDITS name files that were not generated: {sorted(missing)}")
@@ -160,143 +211,90 @@ def sim_outputs() -> dict[Path, str]:
 # ------------------------------------------------------------------------------------------------------------ tools
 
 
-def _closure(src: Path, lines: list[str], tree: ast.Module, roots: list[str], header_names: set[str]) -> tuple[dict[int, ast.stmt], set[str]]:
-    """scripts/port_mlb_live_lens.py's `_closure` (the shared walker plus ALLOWED_TRY_IF), for one tools module."""
-    binders: dict[str, list[ast.stmt]] = {}
-    for node in tree.body:
-        if _tg._is_import_stmt(node):
-            continue
-        for name in _tg._bound_names(node):
-            binders.setdefault(name, []).append(node)
-    selected: dict[int, ast.stmt] = {}
-    used_header: set[str] = set()
-    seen: set[str] = set()
-    stack = list(roots)
-    while stack:
-        name = stack.pop()
-        if name in seen:
-            continue
-        seen.add(name)
-        if name in header_names:
-            used_header.add(name)
-            continue
-        nodes = binders.get(name)
-        if not nodes:
-            if hasattr(builtins, name) or name in {"__file__", "__name__"}:
+def _module_file(dotted: str) -> Path | None:
+    p = VENDOR.joinpath(*dotted.split("."))
+    if p.with_suffix(".py").is_file():
+        return p.with_suffix(".py")
+    return p / "__init__.py" if (p / "__init__.py").is_file() else None
+
+
+def _tools_refs(src: Path) -> set[Path]:
+    """Vendored tools files `src` imports (any depth, any form) or launches by a `"tools"`-rooted path."""
+    text = _read(src)
+    refs: set[Path] = set()
+    for node in ast.walk(ast.parse(text)):
+        mods: list[str] = []
+        if isinstance(node, ast.ImportFrom) and node.level == 0 and (node.module or "").split(".")[0] == "tools":
+            mods.append(node.module)
+            mods += [f"{node.module}.{a.name}" for a in node.names]  # `from tools.eval import some_module`
+        elif isinstance(node, ast.Import):
+            mods += [a.name for a in node.names if a.name.split(".")[0] == "tools"]
+        for mod in mods:
+            if mod == WEB_MODULE or mod.startswith(WEB_MODULE + "."):
                 continue
-            raise SystemExit(f"[{src.name}] unresolved module name {name!r}")
-        if isinstance(nodes[-1], (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            nodes = [nodes[-1]]  # the LAST def wins at import time
-        for node in nodes:
-            if isinstance(node, (ast.Try, ast.If)) and name not in ALLOWED_TRY_IF:
-                raise SystemExit(f"[{src.name}] {name!r} is bound by a try/if at line {node.lineno}: allow it in ALLOWED_TRY_IF")
-            selected[node.lineno] = node
-            own = node.name if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) else None
-            stack.extend(_tg._module_refs(_tg._segment(lines, node), own))
-    return selected, used_header
+            f = _module_file(mod)
+            if f is not None:
+                refs.add(f)
+    for m in _SCRIPT_TARGET_RE.finditer(text):
+        parts = re.findall(r"\"([A-Za-z0-9_.]+)\"", m.group(1))
+        f = VENDOR.joinpath("tools", *parts)
+        if parts and parts[-1].endswith(".py"):
+            if not f.is_file():
+                raise SystemExit(f"[{src.relative_to(VENDOR)}] launches tools/{'/'.join(parts)}, which does not exist")
+            refs.add(f)
+    return refs
 
 
-def _import_targets(node: ast.stmt) -> list[ast.ImportFrom | ast.Import]:
-    return [s for s in ast.walk(node) if isinstance(s, (ast.Import, ast.ImportFrom))]
-
-
-def _vendored_tools_deps(node: ast.stmt) -> dict[str, set[str]]:
-    """{`tools.x.y`: real names} imported by one import statement (aliases resolved to the name the module defines)."""
-    deps: dict[str, set[str]] = {}
-    for s in _import_targets(node):
-        if isinstance(s, ast.ImportFrom) and s.level == 0 and (s.module or "").split(".")[0] == "tools":
-            deps.setdefault(s.module, set()).update(a.name for a in s.names)
-    return deps
-
-
-def _app_tools_roots() -> dict[str, set[str]]:
-    """The vendored app's own top-level `tools.*` imports -- what the live lens's header asks the tools ports for."""
-    tree = ast.parse(_read(APP))
-    roots: dict[str, set[str]] = {}
-    for node in tree.body:
-        if _tg._is_import_stmt(node):
-            for mod, names in _vendored_tools_deps(node).items():
-                if mod.split(".")[1] == "web":
-                    continue  # the app itself
-                roots.setdefault(mod, set()).update(names)
-    return roots
-
-
-def _port_tools_module(dotted: str, roots: set[str]) -> tuple[str, dict[str, set[str]], dict]:
-    src = VENDOR.joinpath(*dotted.split(".")).with_suffix(".py")
-    raw = _read(src)
-    lines, tree = raw.split("\n"), ast.parse(raw)
-    import_nodes = [n for n in tree.body if _tg._is_import_stmt(n)]
-    header_names = set().union(*[_tg._bound_names(n) for n in import_nodes]) if import_nodes else set()
-    selected, used = _closure(src, lines, tree, sorted(roots), header_names)
-    header_parts: list[str] = []
-    deps: dict[str, set[str]] = {}
-    for node in import_nodes:
-        targets = _import_targets(node)
-        if any(isinstance(s, ast.ImportFrom) and s.module == "__future__" for s in targets):
+def tools_reach() -> list[Path]:
+    seeds = {VENDOR / s for s in ENTRY_SCRIPTS} | _tools_refs(APP)
+    seen: set[Path] = set()
+    stack = sorted(seeds)
+    while stack:
+        f = stack.pop()
+        if f in seen or f == APP:
             continue
-        mods = [(s.module or "") if isinstance(s, ast.ImportFrom) else s.names[0].name for s in targets]
-        vendored = any(m.split(".")[0] in VENDORED_ROOTS for m in mods)
-        if vendored and not (_tg._bound_names(node) & used):
-            continue  # a vendored import the closure never reads: not carried, so nothing has to provide it
-        header_parts.append(_tg._segment(lines, node))
-        for mod, names in _vendored_tools_deps(node).items():
-            deps.setdefault(mod, set()).update(names)
-    body = "\n\n\n".join(_tg._segment(lines, selected[k]) for k in sorted(selected))
-    # Lazy imports inside the selected functions may reach further tools modules too.
-    for k in selected:
-        for s in ast.walk(selected[k]):
-            if isinstance(s, ast.ImportFrom) and s.level == 0 and (s.module or "").split(".")[0] == "tools":
-                deps.setdefault(s.module, set()).update(a.name for a in s.names)
-    vendored_rel = Path(*dotted.split(".")).with_suffix(".py")
-    out_rel = TOOLS_OUT.relative_to(ROOT) / f"{_tools_module_name(dotted)}.py"
-    doc = ('"""GENERATED by scripts/port_mlb_sim_engine.py -- do not edit by hand (`--check` fails on a hand edit).\n\n'
-           f"Closure of {sorted(roots)} in vendor/mlb_bettingv2/{vendored_rel.as_posix()}: {len(selected)} top-level\n"
-           "statements copied verbatim, behind that module's own import statements; EDITS (import paths, the vendored\n"
-           "file path) are listed in the generator.\n"
-           '"""\n')
-    text = doc + "from __future__ import annotations\n\n" + "\n".join(header_parts) + "\n\n\n" + body + "\n"
-    text = _rewrite_imports(text, out_rel.as_posix())
-    text = _vendored_file_edit(text, out_rel, vendored_rel)
-    _tg._validate(out_rel.as_posix(), text)
-    _check_no_vendored_imports(out_rel.as_posix(), text)
-    report = {"source_lines": len(lines), "statements": len(selected), "body_lines": body.count("\n") + 1}
-    return text, deps, report
+        seen.add(f)
+        stack.extend(sorted(_tools_refs(f) - seen))
+    return sorted(seen)
 
 
-def tools_outputs() -> tuple[dict[str, str], dict[str, dict]]:
-    """{file name in TOOLS_OUT: text}, ported to a fixed point over the tools-to-tools imports."""
-    wanted = _app_tools_roots()
-    done: dict[str, set[str]] = {}
-    texts: dict[str, str] = {}
-    reports: dict[str, dict] = {}
-    while True:
-        pending = {m: n for m, n in wanted.items() if not n <= done.get(m, set())}
-        if not pending:
-            break
-        for mod, names in sorted(pending.items()):
-            roots = done.get(mod, set()) | names
-            text, deps, report = _port_tools_module(mod, roots)
-            name = f"{_tools_module_name(mod)}.py"
-            owner = next((m for m in done if m != mod and _tools_module_name(m) == _tools_module_name(mod)), None)
-            if owner:
-                raise SystemExit(f"two tools modules flatten to {name}: {owner}, {mod}")
-            texts[name], reports[mod], done[mod] = text, report, roots
-            for dep, dep_names in deps.items():
-                wanted.setdefault(dep, set()).update(dep_names)
-    texts["__init__.py"] = ('"""Closure ports of the vendored vendor/mlb_bettingv2/tools/* helpers the MLB live lens imports.\n'
-                            "GENERATED by scripts/port_mlb_sim_engine.py (lane mlb-sim-engine-native-p2).\n"
-                            '"""\n')
-    return texts, reports
+def tools_outputs(report: dict | None = None) -> dict[Path, str]:
+    """{path relative to NATIVE_OUT: text}: the reached tools files, whole, plus a docstring `__init__` per package."""
+    report = {} if report is None else report
+    out: dict[Path, str] = {}
+    for src in tools_reach():
+        vendored_rel = src.relative_to(VENDOR)  # tools/...
+        out_rel = NATIVE_OUT.relative_to(ROOT) / vendored_rel
+        text = _edit_module(_read(src), out_rel, vendored_rel, report)
+        for old, new in TOOLS_EDITS.get(vendored_rel.as_posix(), []):  # AFTER the mechanical pass, which they must outlive
+            if text.count(old) != 1:
+                raise SystemExit(f"[{vendored_rel.as_posix()}] TOOLS_EDITS anchor matched {text.count(old)}x: {old!r}")
+            text = text.replace(old, new)
+            report.setdefault("tools_edits", []).append(vendored_rel.as_posix())
+        out[vendored_rel] = text
+        report.setdefault("tools_lines", {})[vendored_rel.as_posix()] = _read(src).count("\n") + 1
+    missing = {k for k in TOOLS_EDITS} - set(report.get("tools_edits", []))
+    if missing:
+        raise SystemExit(f"TOOLS_EDITS name files that were not generated: {sorted(missing)}")
+    packages = {Path()} | {p for rel in list(out) for p in rel.parents if p != Path()}
+    for pkg in sorted(packages):
+        init = pkg / "__init__.py"
+        if init not in out:
+            vendored_init = VENDOR / init
+            out[init] = (_edit_module(_read(vendored_init), NATIVE_OUT.relative_to(ROOT) / init, init, report)
+                         if vendored_init.is_file() and pkg != Path() else
+                         '"""Native copies of the vendored vendor/mlb_bettingv2/' + (pkg.as_posix() + "/" if pkg != Path() else "")
+                         + ' files the MLB daily sim and live lens reach.\nGENERATED by scripts/port_mlb_sim_engine.py '
+                           '(lane mlb-daily-sim-native-p3).\n"""\n')
+    return out
 
 
 # ---------------------------------------------------------------------------------------------------------- driver
 
 
-def outputs() -> dict[Path, str]:
-    out = {SIM_OUT / rel: text for rel, text in sim_outputs().items()}
-    texts, _ = tools_outputs()
-    out.update({TOOLS_OUT / name: text for name, text in texts.items()})
+def outputs(report: dict | None = None) -> dict[Path, str]:
+    out = {SIM_OUT / rel: text for rel, text in sim_outputs(report).items()}
+    out.update({NATIVE_OUT / rel: text for rel, text in tools_outputs(report).items()})
     return out
 
 
@@ -308,21 +306,23 @@ def main() -> int:
     if not SIM_SRC.exists():
         print("vendor tree absent: nothing to generate from")
         return 0
+    report: dict = {}
+    files = outputs(report)
     if args.report:
-        sims = sim_outputs()
-        print(f"sim_engine: {len(sims)} modules, {sum(t.count(chr(10)) for t in sims.values())} lines")
-        for rel, text in sims.items():
-            if "_VENDORED_FILE" in text:
-                print(f"  vendored-file EDIT: sim_engine/{rel.as_posix()} ({text.count('Path(_VENDORED_FILE)')} site(s))")
-        _, reports = tools_outputs()
-        for mod, r in sorted(reports.items()):
-            print(f"tools_port: {mod}: {r['statements']} statements / {r['body_lines']} of {r['source_lines']} lines")
+        tl = report.get("tools_lines", {})
+        print(f"sim_engine: {sum(1 for p in files if SIM_OUT in p.parents)} modules; "
+              f"native tools: {len(tl)} files / {sum(tl.values())} lines")
+        for rel, n in sorted(tl.items(), key=lambda kv: -kv[1]):
+            print(f"  {n:6d}  {rel}")
+        print(f"EDIT counts: vendored-file {report.get('vendored_file', 0)}, script joins {report.get('script_joins', 0)}, "
+              f"sys.path {report.get('sys_path', 0)}")
+        for src, target in report.get("script_targets", []):
+            print(f"  script launch: {src} -> native {target}")
         return 0
-    files = outputs()
     if args.check:
         bad = [str(p.relative_to(ROOT)) for p, t in files.items()
                if not p.exists() or p.read_bytes().replace(b"\r\n", b"\n") != t.encode("utf-8")]
-        extra = sorted(str(p.relative_to(ROOT)) for d in (SIM_OUT, TOOLS_OUT) if d.exists()
+        extra = sorted(str(p.relative_to(ROOT)) for d in (SIM_OUT, NATIVE_OUT) if d.exists()
                        for p in d.rglob("*.py") if "__pycache__" not in p.parts and p not in files)
         print("CHECK OK" if not bad and not extra else f"CHECK FAILED differs={bad} unexpected={extra}")
         return 0 if not bad and not extra else 1

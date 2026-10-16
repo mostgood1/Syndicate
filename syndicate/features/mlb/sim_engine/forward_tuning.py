@@ -1,5 +1,5 @@
 from __future__ import annotations
-_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[4].joinpath('vendor', 'mlb_bettingv2', 'sim_engine', 'forward_tuning.py'))  # EDIT: this module's path in vendor/, so every Path(_VENDORED_FILE).parents[k] is the vendored one
+_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[4].joinpath('vendor', 'mlb_bettingv2', 'sim_engine', 'forward_tuning.py'))  # EDIT: this module's path in vendor/, so every DATA root resolves there
 
 from datetime import date, datetime
 from pathlib import Path

@@ -24,7 +24,7 @@ builder is re-run on another season.
 """
 
 from __future__ import annotations
-_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('vendor', 'mlb_bettingv2', 'sim_engine', 'data', 'conditional_mix.py'))  # EDIT: this module's path in vendor/, so every Path(_VENDORED_FILE).parents[k] is the vendored one
+_VENDORED_FILE = str(__import__("pathlib").Path(__file__).resolve().parents[5].joinpath('vendor', 'mlb_bettingv2', 'sim_engine', 'data', 'conditional_mix.py'))  # EDIT: this module's path in vendor/, so every DATA root resolves there
 
 import json
 import os

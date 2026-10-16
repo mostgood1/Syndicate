@@ -298,7 +298,9 @@ def populated(value, default) -> bool:
 # to silently drop one. Audited empirically 2026-09-04: all 7 pitcher dists
 # multi-bin. If a curated pitcher dict is ever introduced, add it here.
 # --------------------------------------------------------------------------
-DAILY_UPDATE_PY = REPO / "vendor" / "mlb_bettingv2" / "tools" / "daily_update.py"
+# The daily sim production runs: the native copy (lane mlb-daily-sim-native-p3), whose specs are the vendored file's
+# verbatim (scripts/port_mlb_sim_engine.py --check).
+DAILY_UPDATE_PY = REPO / "syndicate" / "features" / "mlb" / "native" / "tools" / "daily_update.py"
 
 
 def output_spec_problems() -> list:
