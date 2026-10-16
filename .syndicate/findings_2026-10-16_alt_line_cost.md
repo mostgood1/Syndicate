@@ -42,3 +42,32 @@ props appear (10-20) it could spend ~15-20K/day by itself. Check before 10-20.
 public list) and whether NCAAF books post alternates at all; the "now" NFL/NHL figures are a runs x events x markets
 model (quote-log floors are 2x / 5x lower; the quota by-sport counter was not read); NBA in-season figures are
 projections; the cost of a `/markets` key check (believed 1 credit).
+
+## Checks run 2026-10-16 afternoon (user: "proceed with option c and check all the items that need to be checked")
+
+Total spent on the checks: **18 credits** (5 `/markets` + 13 on two real alt calls). `/events` costs 0.
+
+- **`/markets` costs 1 credit** -- measured (`x-requests-last` = 1 on each of 5 calls).
+- **Alternate key names VERIFIED** per sport on one upcoming event each (books posting, of our 10-book list):
+  - NFL (HOU @ JAX 10-18): pass_yds / pass_tds / reception_yds / rush_yds alternates at 9 books, receptions 8,
+    rush_attempts 6, pass_completions 5, pass_attempts 4, pass_interceptions 3 (+ minor keys at 1-2 books).
+  - MLB (TB @ CLE 10-16): batter_hits and pitcher_strikeouts alternates at 10 books; rbis / runs_scored 9;
+    total_bases / home_runs 8; hits_runs_rbis / doubles / stolen_bases 5; strikeouts 2.
+  - NHL (PIT @ COL 10-16): goals 7, points 6, assists / shots_on_goal 5, total_saves 3.
+  - NBA (BOS @ DET 10-20 -- opening night is ALREADY posted): points / rebounds / assists 5, PRA / threes / RA 4,
+    PR / PA 3, steals / blocks 2.
+  - **NCAAF: NO player alternates at any book** (FAU @ Army 10-17: two team-total alternates at FanDuel only) --
+    NCAAF is out of option (c).
+- **Billing = markets returned, confirmed on two real calls** through `scripts/fetch_alt_ladders.py`:
+  NHL PIT @ COL 5 credits for 5 markets (1,299 rungs, 39 players, 9 books); NFL HOU @ JAX 8 credits for 8 markets
+  (2,203 rungs, 17 players, 9 books, median 6 rungs per player x side x book). (All requested markets were returned
+  on both, so "requested" vs "returned" is not separated by these two calls.)
+- **NBA live tick** (read-only check, a separate agent): the props stream runs on live-odds-worker only, one fetch per
+  in-progress game per lens cycle (median 78 s overall, 100 s evenings; a 6-game preseason slate 266-313 s). A
+  preseason registry shows 13 market keys on every fetch (a floor). Estimate **~4.5-8K credits per 7-8 game night,
+  ~125-225K per 30 days (2.5-4.5% of the cap), stretch ~400K (8%)** -- billing per call assumed, not read. A second
+  stream, `_live_oddsapi_period_totals_for_game` (`tick.py:340`, called `:8826`), makes an UNCACHED `/markets` call
+  plus up to 13 period markets: ~10-14 credits per game-cycle, ~100K per 30 days (estimate). **Neither stream calls
+  `record_oddsapi_quota`**, so quota `by_sport` never sees them. Not forced before 10-20; stage
+  `LIVE_PLAYER_PROPS_ALL_MARKETS=0` (saves 23-48% per fetch) ready for the opener and measure G1 (10-17) / the
+  opener by sampling `latest.used` vs the `by_sport` sum. Files belong to lane `nba-live-tick-native`.
