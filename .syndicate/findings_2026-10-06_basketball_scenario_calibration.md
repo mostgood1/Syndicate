@@ -2999,3 +2999,15 @@ bootstrap (2,000). Raw output is in `C:	mpball_scalid_read_regular.txt` / `val
   bias is −1.67 / −1.42.
 - Consistent picture across both lanes: FINAL improves MARGIN and win-probability skill (G2 margin, G3 margin + ML)
   but not TOTALS or period-line pricing.
+
+**Postseason live stratum (P3, findings_2026-10-09 §13, 0b2f34d6; informational, user "do it"):** FINAL − PROD, 83–85
+games per checkpoint.
+- Pooled Q1–Q3: total −0.63 [−1.16, −0.12] BETTER; margin +0.20 n.s.; ML −0.016 n.s.
+- Total by checkpoint: end Q1 −1.10 [−2.03, −0.14], end Q2 −0.67 [−1.35, −0.01], end Q3 −0.12 n.s., 5:00 Q4 +0.22
+  [−0.03, +0.49] n.s.
+- ML: end Q2 −0.036 [−0.063, −0.011] better; the rest n.s.
+- Worse beyond SE: NONE.
+
+**Both lanes agree:** FINAL's clearest gain is the POSTSEASON TOTAL LEVEL (pregame |total| −2.43, bias +10.45 → +3.89;
+live total −0.63). On regular-season VALID the shipping gates fail. A postseason-only config would need its own
+pre-registration and an unseen window (2026 is now seen).
