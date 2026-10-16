@@ -3142,3 +3142,41 @@ calls, 0 errors):
 - Then measure "mean" + the real-split file on the 12 dates.
 - CONFIRMED if every quarter's output share is inside its real FIT CI (± ~0.0022) and the #3 guards hold.
 - "full" is measured separately, against S8 / S3 / within-SD.
+
+### R2-a step 1b — RESULT 2026-10-16 18:03Z: CONFIRMED on the 12 sweep dates; quarter shares now match real
+
+**Code:** `quarter_targets_mode` (see the engine commit after d0d30f21, corpus parity 5,400/5,400 PASS with it off).
+
+**Run:** `R2A_mean`, the 12 sweep dates, fit_f5 + `quarter_targets_mode=mean` + `quarters_calibration.json` = the real
+FIT league splits (home / away / total). 17,400/17,400 calls with levers, 0 errors.
+
+| | Q1 | Q2 | Q3 | Q4 |
+|---|---|---|---|---|
+| real FIT share (95% half-width) | .2550 (± .0021) | .2505 (± .0022) | .2537 (± .0022) | .2408 (± .0023) |
+| PK3 (fix off) share | .2500 | .2504 | .2491 | .2504 |
+| **R2A_mean share** | **.2550** | **.2509** | **.2530** | **.2411** |
+| R2A_mean pts − real (12 dates) | +0.66 | −0.22 | −0.26 | **+0.15** (PK3 +2.32) |
+
+- Every quarter is inside its real CI.
+- Elasticity in "mean" mode is about 1: the target split equal to the real split reproduces the real shares, so no
+  T* iteration is needed.
+- **Guards, all pass:**
+  - FTA 22.93;
+  - foul-outs 0.215;
+  - P(6th | 5th) 0.216;
+  - closers-on 0.400;
+  - H2 −0.169;
+  - Q4 slope −0.081 (≥ −0.101; P3's real −0.141 is unchanged, as expected — that is the margin, not the level);
+  - S8 14.75;
+  - total bias +0.14;
+  - Q4 FTA share 0.268.
+- **Provisional round-2 config:** fit_f5 + `quarter_targets_mode=mean` + `quarters_calibration.json` (real FIT
+  splits).
+- The production data file is a DATA change: absent on the fleet today. It ships only through `nba_engine_config.json`
+  + the split file, at a passing round-2 read and a user decision.
+
+**Lane rule (P3, agreed):** quarter_targets_mode, like every Phase 2 field, reaches production ONLY via
+`nba_engine_config.json` (P3's live label carries its sha). Never by flipping the code default.
+
+**Next:** R2-b (REB −1.4) and R2-c (3P% +1.6) on FIT, then ONE full FIT of the round-2 config. The "full" mode (random
+quarter env) is measured separately against S8 / S3 / within-SD, as pre-registered.
