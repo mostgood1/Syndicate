@@ -2349,3 +2349,18 @@ command. A filter on a guard's output is a way to not see the guard.
 - I classed 11 of 42 CI failures "already green on main" from a worktree run. Session worktrees exclude `data/`, CI's checkout has all of it, and 10 of the 11 still failed: they read real repo data the fixtures never pinned (settlement rows, season write-ups, an NFL props CSV, a roster snapshot).
 - 5 more (test_paper_execution_batch) passed in ANY single-file run and failed only in CI's chunk (`files[i % 8]`, `-n 0`). The leaker: a test patched `execution_mode`/`live_execution_armed` BEFORE the first import of a module that binds them BY NAME. That module then kept the lambdas for the rest of the process. Its `write_json_file` patch also missed a LOCAL import inside the function.
 - **Rule:** reproduce in ci-checkout with `_step_env()` and the fleet venv (`/home/amyn/.venvs/syndicate/bin/python`). For pass-alone/fail-in-CI, bisect the chunk prefix. When patching a name that other modules import by name, import those modules FIRST. Patch where the function LOOKS IT UP, not where it is defined.
+
+## 2026-10-16 -- RULE: a swallowed-exception persist path + an object built at runtime = silent TOTAL loss; test the round trip `[lane basketball-scenario-calibration, session e0a3e383]`
+- **Measured (P3's catch):** the new `nba_engine_config.json` cfg was a `make_dataclass` class built at runtime.
+  pickle cannot find such a class by name. `_persist_engine_inputs_once_local` swallows every error, so the day the
+  file went on, every NBA game would silently have lost its live-resume inputs. No test failed; the unit tests never
+  pickled the cfg.
+- **Same session, related:** "same seeds per game" was pre-registered and was false. The harness is run-to-run
+  nondeterministic (the same code twice: 0/11 identical games), and a FIT-only finding (late-Q4 ML worse) did not
+  replicate on VALID.
+- **How to apply:**
+  - Any object that crosses a persist / pickle / process boundary gets a round-trip test, including a load in a fresh
+    process.
+  - A write path that swallows errors needs a test that the write SUCCEEDS.
+  - Measure determinism before claiming a same-seed pairing.
+  - Treat a single-window finding as a lead until a second window agrees.

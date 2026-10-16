@@ -1175,7 +1175,14 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
     +0.99 → +0.11 (#3k).
   - Joint fit (#3l): base_nonshooting 0.065 + bonus 0.03 → FTA 22.76 (real 22.69), PF 19.68 (19.67).
   - Solver constants re-measured at that point on disjoint FIT dates: s 0.00802, Δ 0.138.
-  - Final 12-date check and full FIT pending.
+  - Final config (fit_f5 = #3 + fg2_from_two_point_split + end-game p (0.2, 0.2, 0.3) + s 0.00791 / Δ 0.262) passed
+    the full FIT 2026-10-15.
+- **THE VALID READ 2026-10-15 (regular 2026-03-01..04-12, 334 games): FAIL.** Period-line Brier and full-game
+  total/Brier did not beat production; only margin did, plus G3 margin/ML (P3). **NOTHING ENABLED** (user rule: enable
+  only on a pass).
+  - Postseason: FINAL clearly better on totals (bias +10.45 → +3.89), but not gated.
+  - Production wiring `nba_engine_config.json` (9beb1677) is on main and INERT without the file. So is the gated
+    11:05Z calibration job.
   - The totals calibration CANNOT absorb engine overshoot: it fits `model_total_raw`, upstream of the engine.
 - **score_effect_k** (late-game catch-up, native engine, default 0): k = 0.002 ACCEPTED by the user 2026-10-10 as a
   PROPOSAL (fine grid 48cb10ff; Q4 tolerance overridden, Q4 remainder to P3). NOT enabled: nothing sets it in
