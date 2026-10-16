@@ -159,6 +159,9 @@ class EventSimConfig:
     # leaves 3PA -- the whole residual 3P% excess. A multiplier on the foul probability when the shot is a three; the
     # EXACT solver models it too. 1.0 = off (byte-identical; no extra RNG draw either way).
     foul_3pa_mult: float = 1.0
+    # Its twin for two-point attempts (R2-c step 2, pre-registered d7106013): the sim takes ~half the real two-shot
+    # trips, so the composition is re-fitted jointly. 1.0 = off (byte-identical).
+    foul_2pa_mult: float = 1.0
 
     # Outcome priors (fallbacks when player priors are missing)
     base_tov_per_poss: float = 0.125
@@ -984,9 +987,9 @@ def simulate_pbp_game_boxscore(
                     p3=float(rates["p3"]),
                     fg2=float(np.sum(np.asarray(fg_v, dtype=float) * share)),
                     fg3=float(np.sum(np.asarray(fg3_v, dtype=float) * share3)),
-                    foul=float(rates["foul_per_fga"]) * float(np.sum(foul_share)),
+                    foul=float(rates["foul_per_fga"]) * float(np.sum(foul_share)) * float(getattr(cfg, "foul_2pa_mult", 1.0)),
                     oreb=float(cfg.base_oreb_rate) * float(oreb_m),
-                    foul3_mult=float(getattr(cfg, "foul_3pa_mult", 1.0)),
+                    foul3_mult=float(getattr(cfg, "foul_3pa_mult", 1.0)) / float(getattr(cfg, "foul_2pa_mult", 1.0) or 1.0),
                 )
                 rates["p_tov"] = float(rates["p_tov"]) / max(1.0, iters)
         except Exception:
@@ -1073,12 +1076,12 @@ def simulate_pbp_game_boxscore(
                     # 2PA shooters are picked by TOTAL FGA usage in the loop.
                     fg2=_team_avg(fg2v, shot_share, 0.50),
                     fg3=_vol_avg(fg3v, players, mins, ("_prior_threes_att_pm",), 0.34),
-                    foul=float(rates["foul_per_fga"]) * float(foul_share.sum()),
+                    foul=float(rates["foul_per_fga"]) * float(foul_share.sum()) * float(getattr(cfg, "foul_2pa_mult", 1.0)),
                     ft=_team_avg(ftv, foul_share, 0.78),
                     oreb=float(cfg.base_oreb_rate) * float(oreb_m),
                     bonus_trip_share=sv_bonus_share,
                     bonus_ft=(_team_avg(ftv, _loop_shot_share(players, mins, "_prior_fta_pm"), 0.78) if sv_bonus_share > 0.0 else None),
-                    foul3_mult=float(getattr(cfg, "foul_3pa_mult", 1.0)),
+                    foul3_mult=float(getattr(cfg, "foul_3pa_mult", 1.0)) / float(getattr(cfg, "foul_2pa_mult", 1.0) or 1.0),
                 )
                 if side == "h":
                     eff_mult_h = solved
@@ -1775,7 +1778,7 @@ def simulate_pbp_game_boxscore(
                     except Exception:
                         return
 
-                foul_p = foul_per_fga * (float(getattr(cfg, "foul_3pa_mult", 1.0)) if shot_is_3 else 1.0)
+                foul_p = foul_per_fga * float(getattr(cfg, "foul_3pa_mult", 1.0) if shot_is_3 else getattr(cfg, "foul_2pa_mult", 1.0))
                 foul = bool(rng.random() < foul_p) if not SHOOTER_FT_RATE else False
 
                 if offense_home:

@@ -87,3 +87,15 @@ def test_reachable_and_cuts_three_shot_trips_and_3p_pct():
         return m / a
 
     assert pct3(on) < pct3(off) - 0.005   # fouled missed threes stop leaving 3PA
+
+
+def test_foul_2pa_mult_default_off_and_reachable():
+    eng = bpss._engine_for_league_local("nba")
+    assert eng.EventSimConfig().foul_2pa_mult == 1.0
+    assert _digest(_run(eng, 3)) == _digest(_run(eng, 3, foul_2pa_mult=1.0))
+    e2 = _engine(fouled_miss_not_fga=True)
+
+    def fta(games):
+        return sum(int(p.get("fta") or 0) for hb, ab, _hq, _aq in games for box in (hb, ab) for p in box["players"])
+
+    assert fta(_run(e2, 30, foul_2pa_mult=1.8)) > fta(_run(e2, 30)) * 1.2
