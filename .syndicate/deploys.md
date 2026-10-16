@@ -50534,3 +50534,11 @@ So the reprice did land, and its reach is **~129 rows applied** rather than 382.
   that caught it was reading the payload's own `written_at`/`source` instead of
   trusting the poll; the instrument was never broken.
 - **Claim released** with its token after this entry.
+
+
+## 2026-10-16 20:30:30Z (3:30 PM CT) -- web ff f81f1c2d -> da05271d (+ 20:33:02Z da05271d -> 97075a43) + `reload-web` (2.0 s / 6.0 s, 0 failures): picks refresh, alt ladders, NFL SGP section (lanes `cheat-sheets`, `alt-ladders`, `nfl-sgp-builder`, session 9e18a0e7) -- NO outage, no worker restart
+- **ask:** user 2026-10-16 "for Syndicate picks (from the layer 2 board) we need the cheat sheets to be checking for new opps and adding them on a regular basis"; "proceed with option c and check all the items"; "proceed with recommendation in 2"; then "Deploy all (Recommended)" (an earlier ff attempt at ~20:20Z was blocked by the auto-mode classifier before running; its claim was released unused).
+- **claim:** web by cheat-sheets, token 16eaa029..., acquire exit 0. **Ride-alongs:** 61628cbd + 3285328a (uefa research library/scripts, imported by nothing in production), 2d86c347 (MLB tests + `scripts/mlb_asof_roster_build.py`, referenced by nothing in production); the rest is ledger.
+- **also:** `nfl_source/sgp/nfl_sgp_correlations.json` published to the data root (840 role cells, 108 market cells, seasons 2023-25; read back through `sgp.load_cells`). Two Windows tasks registered, every 15 min, IgnoreNew, 5-min limit, the news collector's principal: `SyndicateCheatSheetPicks` (from 3:37 PM) and `SyndicateAltLadders` (from 3:42 PM; `--env-file` = the repo `.env`, since the fleet keeps its key only in the workers' imported env; 400 credits/day cap).
+- **verify (3:37 PM CT, the first scheduled picks refresh):** `CHEAT_SHEET_PICKS done cards=5760 dates=['2026-10-16', '2026-10-17'] {"sheets": 5, "new": 15, "picks": 25} secs=21.6` -- NHL 10-16 +6, NBA 10-16 +1, MLB 10-16 +2, NCAAF 10-17 +4, soccer 10-17 +2 that the 12:30 PM build had not carried.
+- **owed:** alt ladders' first due game (MLB TB @ CLE 7:00 PM CT -> the ~5:42 PM run; NHL from ~6 PM) -- state file credits + rungs; the SGP section's first live render is the 10-18 sheet (tomorrow-sheet build 10-17 9 PM CT); the 4:30 PM full build must wait on / not clobber the picks lock (log line).
