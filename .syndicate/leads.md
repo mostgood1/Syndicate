@@ -1140,3 +1140,5 @@ that is not a fix.
   - Scratch: `soccerfair/`.
 
 - 2026-10-16 (session 9e18a0e7) -- **RESOLVED: the "EV fair counts STALE quotes" lead (10-15, lane `fair-price-v2`) is FALSIFIED as registered (H5).** Over 77,321 pregame lines / 430 games, dropping books that moved off the line changes log loss by +0.000005 [-0.000012, +0.000023]; such books are on 1.41% of rows and move the fair >= 2 pts on 0.02%. The served board's 34-78% stale share counts old SIGHTINGS, not moved prices. Keep the board's fair. NBA untested (preseason): re-read on the regular season. Do not pick the original lead up.
+
+- 2026-10-16 [oddsapi-quota-fake-baseline-impact, 2e0f] RESOLVES the 2026-10-15 fake-baseline lead: only `/api/ops/oddsapi/quota` (display) and `scripts/diagnose_betting_pipeline.py` read `baseline`; nothing throttled, alerted or refused on it, so the damage is mis-stated burn (14,171/h, 10.2M/30d projected vs ~6,000/h, ~4.3M real) and diagnose's used=398,169 (real 2.25M). Recommendation: let it age out (`_next_baseline` 7-day roll ~10-18 08:15Z); no repair unless the user asks. Detail: log/2026-10-16.md.

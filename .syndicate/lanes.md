@@ -954,6 +954,14 @@ death, never life — do not invert it.
 - Verification: unit test that the default request carries no bookmakers list and regions=us (env override kept); after the fleet ff: distinct books in nhl_source/tracking/odds_nhl_player_props_opening_<date>.csv and the per-event NHL credit cost from the quota recorder, before vs after; the us2 probe's per-sport book lists in the findings file
 - Blocked by: none
 
+### oddsapi-quota-fake-baseline-impact — OPEN — opened 2026-10-16 — session 2e0f
+- Goal: Decide what the fake 10-11 fleet quota baseline affected (readers, any action taken) and recommend repair vs age-out; read-only on Redis
+- Files: .syndicate/log/2026-10-16.md, .syndicate/leads.md
+- Hypothesis: Only the display endpoint and diagnose script read baseline; nothing gates on burn, so the fake baseline mis-states burn/projection but changed no decision
+- Falsification test: Any throttle/alert/guard code or fleet log line that consumed credits_per_hour, projected_30d_credits or baseline.used between 10-11 and now
+- Verification: Reader grep + live doc read + fleet log scan
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
