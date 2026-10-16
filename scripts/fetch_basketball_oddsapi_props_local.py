@@ -105,6 +105,12 @@ def _resolve_bookmakers(raw: str | None) -> tuple[str, ...]:
     return tuple(out)
 
 
+def _league_prop_bookmakers(league: str) -> str | None:
+    from syndicate.features.shared.odds_regions import prop_bookmakers
+
+    return prop_bookmakers(league)
+
+
 def _bookmakers_csv(raw: str | None) -> str | None:
     values = _resolve_bookmakers(raw)
     return ",".join(values) if values else None
@@ -459,7 +465,9 @@ def main(argv: list[str] | None = None) -> int:
         league=args.league,
         date_str=args.date,
         regions=str(args.regions or "us").strip() or "us",
-        bookmakers=args.bookmakers,
+        # No --bookmakers: the league's ten-book list at one region's price (lane props-book-coverage, 2026-10-16; NBA only
+        # -- WNBA has none and keeps its widened regions). `--bookmakers all` still asks the plain region.
+        bookmakers=args.bookmakers if args.bookmakers is not None else _league_prop_bookmakers(args.league),
         markets=(market_list or None),
     )
 

@@ -23,7 +23,7 @@ def _script(name):
     return m
 
 
-@pytest.mark.parametrize("sport", ["nfl", "ncaaf", "mlb"])
+@pytest.mark.parametrize("sport", ["nfl", "ncaaf", "mlb", "nba"])
 def test_ten_books_never_eleven(sport):
     books = orx.prop_bookmakers(sport, env={}).split(",")
     assert len(books) == len(set(books)) <= 10                        # an 11th book bills a second region
@@ -35,7 +35,16 @@ def test_the_knobs():
     assert orx.prop_bookmakers("nfl", env={"SYNDICATE_NFL_PROP_BOOKMAKERS": ""}) is None              # back to the region
     assert orx.prop_bookmakers("nfl", env={"SYNDICATE_NFL_PROP_BOOKMAKERS": "fanduel"}) == "fanduel"
     assert orx.prop_bookmakers("nfl", env={"SYNDICATE_NFL_PROP_REGIONS": "eu"}) is None   # a widened region keeps its meaning
-    assert orx.prop_bookmakers("soccer", env={}) is None and orx.prop_bookmakers("nba", env={}) is None   # not yet listed
+    assert orx.prop_bookmakers("soccer", env={}) is None and orx.prop_bookmakers("wnba", env={}) is None  # not listed
+
+
+def test_the_basketball_fetcher_defaults_to_the_league_list(monkeypatch):
+    # No --bookmakers -> NBA asks its ten; WNBA (widened to the exchanges by its own refresh) asks the region as before.
+    m = _script("fetch_basketball_oddsapi_props_local")
+    for key in ("SYNDICATE_NBA_PROP_BOOKMAKERS", "SYNDICATE_NBA_PROP_REGIONS", "SYNDICATE_WNBA_PROP_BOOKMAKERS"):
+        monkeypatch.delenv(key, raising=False)
+    assert m._league_prop_bookmakers("nba") == orx.PROP_BOOKMAKERS["nba"]
+    assert m._league_prop_bookmakers("wnba") is None
 
 
 class _Resp:

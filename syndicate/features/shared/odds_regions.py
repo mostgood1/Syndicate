@@ -148,8 +148,9 @@ def prop_regions(sport: str, regions: str, *, env: "dict[str, str] | None" = Non
 #: NEVER MORE THAN 10: an 11th book bills a second region (tests/test_prop_bookmakers.py holds the line).
 PROP_BOOKMAKERS = {
     sport: "draftkings,fanduel,betmgm,williamhill_us,betrivers,fanatics,bovada,betonlineag,espnbet,hardrockbet"
-    for sport in ("nfl", "ncaaf", "mlb")
-}
+    for sport in ("nfl", "ncaaf", "mlb", "nba")
+}       # NBA (2026-10-16, before its props start 10-20): its props ask plain `us` -- WNBA, which widens to the `us_ex`
+        # exchanges through `wnba_regions`, gets no list, so ProphetX / Novig there are untouched.
 PROP_BOOKMAKERS_ENV_TEMPLATE = "SYNDICATE_{sport}_PROP_BOOKMAKERS"
 
 
