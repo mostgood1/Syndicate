@@ -12,7 +12,8 @@ def _row(**over) -> dict:
     row = {
         "sport": "ncaaf", "kind": "game", "event_id": "e1", "market": "totals", "segment": "full",
         "side": "over", "line": 52.5, "board_lane": "opportunity", "ev_pct": 3.1,
-        "quote": {"fair_method": "consensus", "suspect_stale": False, "price": 105, "bookmaker": "fanduel"},
+        "quote": {"fair_method": "consensus", "suspect_stale": False, "price": 105, "bookmaker": "fanduel",
+                  "books_quoting": 4},
         "score_v2": {"fee_basis": "none", "ev_net_pct": 3.1},
     }
     row.update(over)
@@ -29,9 +30,11 @@ def test_each_failed_line_property_is_named() -> None:
     cases = {
         "ev_below_min": _row(ev_pct=1.9),
         "no_market_ev": _row(ev_pct=None),
-        "one_sided_fair": _row(quote={"fair_method": "book_margin_model"}),
-        "no_fair_method": _row(quote={}),
-        "suspect_stale_quote": _row(quote={"fair_method": "consensus", "suspect_stale": True}),
+        "one_sided_fair": _row(quote={"fair_method": "book_margin_model", "books_quoting": 4}),
+        "no_fair_method": _row(quote={"books_quoting": 4}),
+        "suspect_stale_quote": _row(quote={"fair_method": "consensus", "suspect_stale": True, "books_quoting": 4}),
+        "single_book_fair": _row(quote={"fair_method": "consensus", "bookmaker": "kalshi", "books_quoting": 1}),
+        "books_quoting_unknown": _row(quote={"fair_method": "consensus", "bookmaker": "fanduel"}),
         "not_opportunity_lane": _row(board_lane="dead"),
         "implausible_book": _row(ev_pct=40.0, score_v2={"fee_basis": "none", "ev_net_pct": 40.0}),
         "ev_net_of_fee_below_min": _row(score_v2={"fee_basis": "kalshi_series", "ev_net_pct": 1.2}),
@@ -85,3 +88,16 @@ def test_board_template_offers_all_and_suggested_with_all_default() -> None:
     assert 'id="board-suggested-tabs"' in html
     assert 'suggestedOnly: urlParams.get("opps") === "suggested"' in html   # default All: only the param turns it on
     assert "if (state.suggestedOnly && item.suggested !== true) return false;" in html
+
+
+def test_a_fair_anchored_on_a_different_book_is_two_venues_and_stays_eligible() -> None:
+    # User 2026-10-16 "Block them": no pick unless the fair comes from 2+ books. A sharp anchor (fair from
+    # Pinnacle, price at FanDuel) is two venues; a venue priced against its own de-vig is one.
+    anchored = _row(quote={"fair_method": "consensus", "bookmaker": "fanduel", "books_quoting": 1,
+                           "fair_anchor_book": "pinnacle"})
+    self_priced = _row(quote={"fair_method": "consensus", "bookmaker": "kalshi", "books_quoting": 1,
+                              "fair_anchor_book": "kalshi"})
+    lb._stamp_suggested([anchored])
+    lb._stamp_suggested([self_priced])
+    assert anchored["suggested"] is True
+    assert self_priced["suggested"] is False and "single_book_fair" in self_priced["suggested_reasons"]

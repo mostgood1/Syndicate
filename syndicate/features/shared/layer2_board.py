@@ -3502,6 +3502,20 @@ def _suggested_reasons(row: Mapping[str, Any], min_ev: float) -> list[str]:
         reasons.append("one_sided_fair")
     if quote.get("suspect_stale"):
         reasons.append("suspect_stale_quote")
+    # ONE VENUE'S OWN FAIR `[2026-10-16, user "Block them (Recommended)"]`: a line whose fair is that same
+    # venue's two sides de-vigged is pricing the venue's hold asymmetry, not the market -- the book grid itself
+    # refuses that consensus ("1 book quoting: a consensus needs at least 2"). Measured 10-16 4:25 PM CT: 23 of
+    # the 66 suggested lines read `books_quoting` 1 (13 ProphetX, Kalshi MLB props incl. the Martinez OVER 2.5 K
+    # card that 10 books quoted), every one `shin` on its own venue, none with a separate anchor book. A fair
+    # anchored on a DIFFERENT book than the price (a sharp anchor) is two venues and stays eligible. An absent
+    # count is UNKNOWN and is not read as enough (0 of the 66 lacked it).
+    books = _as_float(quote.get("books_quoting"))
+    anchor = str(quote.get("fair_anchor_book") or "").strip().lower()
+    price_book = str(quote.get("bookmaker") or "").strip().lower()
+    if books is None:
+        reasons.append("books_quoting_unknown")
+    elif books < 2 and not (anchor and anchor != price_book):
+        reasons.append("single_book_fair")
     return reasons
 
 
