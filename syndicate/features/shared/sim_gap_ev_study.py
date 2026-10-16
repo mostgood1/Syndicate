@@ -113,6 +113,7 @@ TWO_SIDED_METHODS = frozenset({"consensus", "sharp_anchor"})
 ONE_SIDED_METHODS = frozenset({"book_margin_model"})
 SMALL_GAPS = ("gap0-2", "gap2-5")
 LARGE_GAP = "gap10-15"
+HUGE_GAP = "gap15+"
 # EV of the recorded price against the recorded fair, in percent (gross of any exchange fee).
 EV_BANDS: tuple[tuple[float | None, float | None, str], ...] = (
     (None, 0.0, "ev<0"), (0.0, 2.0, "ev0-2"), (2.0, 5.0, "ev2-5"), (5.0, 10.0, "ev5-10"), (10.0, None, "ev10+"),
@@ -397,6 +398,24 @@ def keep_counters(obj: Any, *names: str) -> Iterator[None]:
             setattr(obj, name, value)
 
 
+def with_raw_sim(record: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The record with its CAPPED gap restored from the recorder's raw sim `mp` (lane sim-gap-ev-study, 2026-10-16).
+
+    `me` is None past `layer2_board._MODEL_EDGE_MAX_POINTS`; `mp` is the same sighting's side-correct sim probability,
+    uncapped. `grade_population` builds p_model = fair + me/100, so me = (mp - fp) * 100 hands it exactly `mp`.
+    None when there is nothing to restore (an edge already present, or no `mp`/`fp`)."""
+    if record.get("me") is not None:
+        return None
+    mp, fp = record.get("mp"), record.get("fp")
+    try:
+        mp, fp = float(mp), float(fp)
+    except (TypeError, ValueError):
+        return None
+    if not (0.0 < mp < 1.0 and 0.0 < fp < 1.0):
+        return None
+    return {**record, "me": 100.0 * (mp - fp)}
+
+
 def wrap_grade(grade: Callable[..., tuple[list[dict[str, Any]], dict[str, int]]], state: dict[str, Any], *,
                game_key: Callable[[Mapping[str, Any]], str | None],
                base: Callable[..., Any] | None = None, lead: bool = True,
@@ -417,7 +436,15 @@ def wrap_grade(grade: Callable[..., tuple[list[dict[str, Any]], dict[str, int]]]
             gk = next((key for key in (game_key(r) for r in records) if key), None)
             if gk is not None:
                 side = {k: v for k, v in kwargs.items() if k != "ungraded_by_sport"}
-                entry: dict[str, Any] = {"sport": gk.split("|", 1)[0], **accumulate(graded)}
+                restored = [with_raw_sim(r) for r in records]
+                study_rows, raw_sim_records = graded, sum(1 for x in restored if x is not None)
+                with (quiet() if quiet is not None else contextlib.nullcontext()):
+                    if raw_sim_records:
+                        # The study grades its OWN copy: the scorecard's rows stay exactly as `grade` returned them.
+                        patched = [x if x is not None else r for x, r in zip(restored, records)]
+                        study_rows, _ = regrade(patched, chips, ungraded_by_sport={}, **side)
+                entry: dict[str, Any] = {"sport": gk.split("|", 1)[0], **accumulate(study_rows),
+                                         "raw_sim_records": raw_sim_records}
                 with (quiet() if quiet is not None else contextlib.nullcontext()):
                     if lead:
                         entry["lead"] = lead_sums(records, chips, regrade, side)
@@ -632,6 +659,8 @@ def trust(games: Sequence[Mapping[str, Any]], *, resamples: int = RESAMPLES) -> 
     def keys_for(raw: str) -> list[str]:
         sport, market, segment, phase, fair, gap = raw.split("|")
         keys = [f"sport|{sport}|{phase}|{fair}|{gap}", f"cell|{raw}"]
+        if gap in (LARGE_GAP, HUGE_GAP):
+            keys.append(f"{'b15' if gap == HUGE_GAP else 'b10'}|{sport}|{phase}|{fair}")
         if gap in SMALL_GAPS:
             keys.append(f"small|{sport}|{phase}|{fair}")
         elif gap == LARGE_GAP:
@@ -642,7 +671,7 @@ def trust(games: Sequence[Mapping[str, Any]], *, resamples: int = RESAMPLES) -> 
     sport_rows, cell_rows = [], []
     for key in sorted(collected):
         kind, rest = key.split("|", 1)
-        if kind in ("small", "large"):
+        if kind in ("small", "large", "b15", "b10"):     # paired-test helpers, not table rows
             continue
         if kind == "cell" and len(collected[key]) < CELL_ROW_MIN_GAMES:
             continue
@@ -672,7 +701,43 @@ def trust(games: Sequence[Mapping[str, Any]], *, resamples: int = RESAMPLES) -> 
             ci = row["ci95"]
             row["verdict"] = ("w_falls" if ci and ci[1] < 0 else "w_rises" if ci and ci[0] > 0 else "no_difference")
         h2.append(row)
-    return {"by_sport": sport_rows, "cells": cell_rows, "h2": h2}
+    return {"by_sport": sport_rows, "cells": cell_rows, "h2": h2, "h3": _h3(collected, resamples=resamples)}
+
+
+def _brier_gap(sums: np.ndarray) -> np.ndarray:
+    """Brier(sim) - Brier(market) per row from `cal` sums [rows, sum dd, sum dr]."""
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.where(sums[..., 0] > 0, (sums[..., 1] - 2.0 * sums[..., 2]) / sums[..., 0], np.nan)
+
+
+def _h3(collected: Mapping[str, Entries], *, resamples: int) -> list[dict[str, Any]]:
+    """H3, pre-registered: on |gap| > 15 the market beats the sim by MORE than on 10-15. Game-paired bootstrap of
+    [Brier gap on 15+] - [Brier gap on 10-15]. HOLDS when the CI is above 0; FALSIFIED when the sim beats the market
+    on 15+ (its own Brier gap CI below 0)."""
+    out: list[dict[str, Any]] = []
+    for key in sorted(k for k in collected if k.startswith("b15|")):
+        _, sport, phase, fair = key.split("|")
+        huge, large = collected[key], collected.get(f"b10|{sport}|{phase}|{fair}", [])
+        th, tl = _matrix(huge).sum(axis=0), (_matrix(large).sum(axis=0) if large else np.zeros(3))
+        row: dict[str, Any] = {"sport": sport, "phase": phase, "fair": fair, "games_15": len(huge),
+                               "rows_15": int(th[0]), "games_10": len(large), "rows_10": int(tl[0]),
+                               "brier_gap_15": _r(_brier_gap(th[None, :])[0]),
+                               "brier_gap_10": _r(_brier_gap(tl[None, :])[0]) if large else None,
+                               "ci95": None, "brier_gap_15_ci95": None}
+        if len(huge) < MIN_GAMES:
+            row["verdict"] = "insufficient"
+        else:
+            w15 = _weights(len(huge), seed=_seed(key, "h3_15"), resamples=resamples)
+            row["brier_gap_15_ci95"] = _ci(_brier_gap(w15 @ _matrix(huge)))
+            if len(large) >= MIN_GAMES:
+                mh, ml, n = _paired(huge, large, 3)
+                w = _weights(n, seed=_seed(key, "h3"), resamples=resamples)
+                row["ci95"] = _ci(_brier_gap(w @ mh) - _brier_gap(w @ ml))
+            g15, diff = row["brier_gap_15_ci95"], row["ci95"]
+            row["verdict"] = ("falsified" if g15 and g15[1] < 0 else
+                              "holds" if diff and diff[0] > 0 else "not_proven")
+        out.append(row)
+    return out
 
 
 def _fit_row(key: str, entries: Entries, *, resamples: int) -> dict[str, Any]:
@@ -809,9 +874,11 @@ def build_report(state: Mapping[str, Any], *, today: str, now: datetime, run: Ma
             "lead_time": lead_time(games, resamples=resamples),
             "big_misses": big_miss_report(games),
         },
-        "h3": {"computable": False,
-               "reason": "|gap| > 15 points never reaches the grader: layer2_board._MODEL_EDGE_MAX_POINTS sets "
-                         "the edge to None before the recorder writes `me`, so those rows grade as `nosim`."},
+        "h3": {"computable": True,
+               "source": "the recorder's raw sim `mp` restores |gap| > 15 rows (lane sim-gap-ev-study, 2026-10-16); "
+                         "games recorded before `mp` existed still grade those rows as `nosim`",
+               "games_with_raw_sim": sum(1 for g in games if g.get("raw_sim_records")),
+               "verdicts": "engine.trust.h3"},
         "run": dict(run or {}),
     }
 
@@ -907,7 +974,17 @@ def markdown(report: Mapping[str, Any]) -> str:
     for m in big["top"][:15]:
         lines.append(f"- {m.get('date')} `{m['k']}` sim {_num(m['sim'], 3)} vs fair {_num(m['fair'], 3)} "
                      f"({m['gap_pts']:+.1f} pts), outcome {int(m['y'])}")
-    lines += ["", "## Not computable", "", f"- H3 (|gap| > 15): {report['h3']['reason']}", ""]
+    lines += ["", f"### H3 -- does the market beat the sim by more on 15+ than on 10-15? "
+                  f"(games with the raw sim: {report['h3']['games_with_raw_sim']})", "",
+              "| sport | phase | fair | games / rows 15+ | Brier gap 15+ [CI] | Brier gap 10-15 | diff [CI] | verdict |",
+              "|---|---|---|---|---|---|---|---|"]
+    for r in eng["trust"]["h3"]:
+        lines.append(f"| {r['sport']} | {r['phase']} | {r['fair']} | {r['games_15']} / {r['rows_15']} | "
+                     f"{_num(r['brier_gap_15'], 4)}{_range(r['brier_gap_15_ci95'], lambda v: _num(v, 4))} | "
+                     f"{_num(r['brier_gap_10'], 4)} | "
+                     f"{_num((r['brier_gap_15'] or 0) - (r['brier_gap_10'] or 0), 4) if r['brier_gap_10'] is not None else '-'}"
+                     f"{_range(r['ci95'], lambda v: _num(v, 4))} | {r['verdict']} |")
+    lines.append("")
     return "\n".join(lines)
 
 

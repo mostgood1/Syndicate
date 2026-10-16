@@ -299,10 +299,10 @@ def test_the_report_is_json_and_order_independent_and_says_what_it_cannot_comput
     one = sge.build_report(state, today="2026-10-15", now=NOW, resamples=100)
     two = sge.build_report(shuffled, today="2026-10-15", now=NOW, resamples=100)
     assert sge.dumps(one) == sge.dumps(two)
-    assert json.loads(sge.dumps(one))["h3"]["computable"] is False
+    assert json.loads(sge.dumps(one))["h3"]["computable"] is True
     text = sge.markdown(one)
     for heading in ("## (A) Betting", "### H1", "### Trust in the sim", "### Mean vs spread", "### Lead time",
-                    "### Big disagreements", "## Not computable"):
+                    "### Big disagreements", "### H3"):
         assert heading in text
 
 
@@ -429,3 +429,50 @@ def test_backfill_refuses_when_the_saved_state_cannot_be_read(cron, monkeypatch,
     monkeypatch.setattr(pms.WebReader, "json", unreadable)
     assert _backfill_module().main(["--out", str(tmp_path / "o"), "--sports", "mlb"], cron=pms) == 4
     assert not (tmp_path / "o").exists()
+
+
+
+# ---------------------------------------------------------------------------
+# H3 daily (2026-10-16): the recorder's raw sim `mp` restores the capped gap
+# ---------------------------------------------------------------------------
+
+
+def test_with_raw_sim_restores_only_a_capped_gap():
+    assert sge.with_raw_sim({"me": None, "mp": 0.80, "fp": 0.50})["me"] == pytest.approx(30.0)
+    assert sge.with_raw_sim({"me": 4.0, "mp": 0.80, "fp": 0.50}) is None, "an edge already present is left alone"
+    assert sge.with_raw_sim({"me": None, "mp": None, "fp": 0.50}) is None
+    assert sge.with_raw_sim({"me": None, "mp": 1.0, "fp": 0.50}) is None, "a railed probability is not restored"
+
+
+def test_the_study_grades_the_15_plus_row_while_the_scorecard_keeps_it_nosim():
+    rec = _record(_candidate(model_edge_pct=None))
+    rec["mp"] = 0.80                                      # the sim's own 80% on the over; fair 0.5 -> a 30-point gap
+    state: dict = {}
+    wrapped = sge.wrap_grade(lambda r, c, **kw: bs.grade_population(r, c, **kw), state, game_key=msc.game_key)
+    graded, _ = wrapped([rec], CHIPS, today="2026-09-02", ungraded_by_sport={})
+    assert graded[0]["p_model"] is None, "the scorecard's own row is untouched"
+    entry = state["candidates"]["mlb|evt-1"]
+    assert entry["raw_sim_records"] == 1
+    assert f"{TWO}|gap15+" in entry["cal"] and f"{TWO}|gap15+|for|ev0-2" in entry["bet"]
+
+
+def test_the_recorder_writes_the_side_correct_raw_sim():
+    cand = _candidate(model_edge_pct=None, projection={"model_prob_over": 0.8, "projected": 11.2})
+    assert _record(cand)["mp"] == pytest.approx(0.8)
+    under = _candidate(side="under", model_edge_pct=None, projection={"model_prob_over": 0.8, "projected": 11.2})
+    assert _record(under)["mp"] == pytest.approx(0.2)
+    assert _record(_candidate())["mp"] is None, "no projection, no raw sim"
+    assert "mp" in msc.KEEP_FIELDS, "pending records keep it until the game grades"
+
+
+def test_h3_holds_when_the_market_beats_the_sim_by_more_past_15_points():
+    def rows(rng):
+        out = []
+        for _ in range(20):
+            out.append(_row(0.5, 0.5 + rng.choice((-0.12, 0.12)), rng.random() < 0.5))   # 10-15: noise
+            out.append(_row(0.5, 0.5 + rng.choice((-0.30, 0.30)), rng.random() < 0.5))   # 15+: bigger noise
+        return out
+
+    report = sge.build_report(_state(rows, n_games=60, seed=5), today="2026-10-15", now=NOW, resamples=300)
+    (h3,) = report["engine"]["trust"]["h3"]
+    assert h3["verdict"] == "holds" and h3["brier_gap_15"] > h3["brier_gap_10"] > 0

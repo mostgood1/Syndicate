@@ -219,7 +219,21 @@ def population_record(row: Mapping[str, Any], key: str, captured_at: str, *, spo
         # adjustments, and the EV at the row's price under it. None where no signal adjusts the row.
         "lk": _as_float((row.get("likelihood") or {}).get("p")) if isinstance(row.get("likelihood"), Mapping) else None,
         "lke": _as_float((row.get("likelihood") or {}).get("ev_pct")) if isinstance(row.get("likelihood"), Mapping) else None,
+        # The RAW, side-correct sim probability (lane `sim-gap-ev-study`, 2026-10-16), uncapped and from THIS sighting.
+        # `me` above is None past `layer2_board._MODEL_EDGE_MAX_POINTS`, so the nightly sim-gap study could not grade
+        # the sim's >15-point gaps (H3). The same reader as the board's Win%, so it is None wherever the board serves
+        # no probability (incl. live NFL/NCAAF rows, lane `live-winpct-blank`).
+        "mp": _raw_model_probability(row),
     }
+
+
+def _raw_model_probability(row: Mapping[str, Any]) -> float | None:
+    try:
+        from syndicate.features.shared.layer2_board import _model_prob_for_side
+
+        return _as_float(_model_prob_for_side(row))
+    except Exception:  # the recorder must never fail a build over a diagnostic field
+        return None
 
 
 def _existing_parts(date: Any, sport: Any, root: Path | str | None) -> list[tuple[int, Path]]:
