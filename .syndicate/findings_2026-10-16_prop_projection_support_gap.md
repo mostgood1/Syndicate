@@ -176,3 +176,74 @@ guessed — my first ratio script assumed `projection_value`/`point` and returne
 `projected` and the row-level `line`. Scripts: `scratchpad/dup_and_ratio.py`,
 `ratio_control.py`, `find_bad_projections.py`, `rushyd_shape.py`,
 `support_field.py`.
+
+## STEP 2, run 2026-10-16 14:4xZ: the support I shipped does NOT settle the ceiling question, and the reason is that `sample_games` is a CALENDAR count
+
+Publishing the support made step 2 possible for the first time. It came back
+against my own hypothesis, which was that ceiling-rejected rows would be
+low-support. Distinct (player, market, line, game) NFL prop markets, `kind ==
+"prop"`, cap defeated: **157 rejected, 453 accepted.**
+
+```
+  median sample_games   rejected 5.0      accepted 5.0      <- IDENTICAL
+  rows with <=5 games   156/157 (99%)     453/453 (100%)
+```
+
+**The rejected rows are not low-support. The entire NFL prop population is.**
+It is week 6, so `sample_games` ~= 5 is simply "this season so far" -- a
+**calendar count, not a volume count.** Braelon Allen has 5 team games and
+almost no targets, and the field cannot tell him from a starter. So the field is
+correct provenance and **insufficient as a gate**, which is worth stating
+plainly given I shipped it expecting otherwise.
+
+`projected_sd` is no better on its own (rejected median 10.8 vs accepted 20.8,
+but that is confounded by magnitude -- a small projection carries a small sd;
+the scale-free version, sd/mean, is 0.862 vs 0.757 with heavy overlap).
+
+### What DOES separate them, cleanly
+
+| discriminator | rejected | accepted | enrichment |
+|---|---:|---:|---:|
+| `projected/line` < 0.6 | **30 of 157 (19%)** | 4 of 453 (1%) | **19x** |
+| yardage projection < 8 units | **23 of 101 (23%)** | 4 of 282 (1%) | **23x** |
+
+IQRs tell the same story: `projected/line` runs 0.667..1.614 (median 0.818) for
+rejected rows against 0.967..1.232 (median 1.078) for accepted.
+
+**The separable signal is a low ABSOLUTE projection against a real line -- a
+ROLE disagreement, not a sample-size problem.** Braelon Allen's issue is not 5
+games; it is 3.8 projected yards against a 15.5 line. The model knows he has no
+role and the market is pricing a player who does.
+
+### But it only explains a fifth, which is the honest limit
+
+19-23% is a strong enrichment and still a MINORITY. The other ~80% of
+ceiling-rejected rows carry ordinary ratios and ordinary projections --
+consistent with the prior finding that 89.5% of rejected rows imply an ORDINARY
+probability. So the ceiling is discarding one part role-noise and four parts
+ordinary disagreement.
+
+### Where that leaves the recommendation
+
+The sequenced plan survives with its middle step answered differently than
+expected:
+
+1. **DONE** for NFL -- support published and served (`5457b428`).
+2. **ANSWERED, negatively** -- support does not separate rejected from
+   accepted, because `sample_games` is a season-length count. **Sample size is
+   not the gate.**
+3. **So the ceiling should be replaced by TWO checks, not one:** its own stated
+   criterion (an implied-probability bound, per
+   `findings_2026-10-15_ceiling_implied_probability.md` -- which would refuse 81
+   rows, all extreme, and 0 ordinary), plus a **low-absolute-projection / role
+   check** for the ~20% that are genuinely implausible. A magnitude bound is a
+   poor proxy for either.
+
+Still a decision for the user, not a change I made: it moves money-adjacent
+ranking on ~320 distinct markets.
+
+### What would make support actually usable
+
+A **volume** count rather than a calendar one -- targets, carries, or snaps
+behind the rate, not games the team played. That is a producer change in
+`nfl/props.py`'s rate computation, not a copy, and it is not claimed here.
