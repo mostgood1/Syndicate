@@ -69,7 +69,7 @@ def test_the_card_renders_the_spec_order_and_the_brand_copy():
     assert "--green: #8CFF00;" in html and "$" not in html.replace("$$", "")  # tokens injected, nothing unfilled
     assert ">Why we like it<" in body and ">Case against<" in body and "@SyndicateROI" in body and "Long-term edge" in body
     ticker = body[body.index('class="ticker"'):body.index('class="tagline"')]
-    assert "FREE PLAY #2" in ticker and "TORY HORTON UNDER 3.5 RECEIVING YARDS" in ticker.upper() and "(+105)" in ticker
+    assert "FREE PLAY" in ticker and "#" not in ticker and "TORY HORTON UNDER 3.5 RECEIVING YARDS" in ticker.upper() and "(+105)" in ticker
     assert 'class="head" src="data:image/webp;base64,HEAD"' in body           # the athlete is the hero
 
 

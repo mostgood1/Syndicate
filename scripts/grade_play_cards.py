@@ -11,7 +11,10 @@ For every card in `<data root>/playcards/ledger.jsonl` whose game started > 4 h 
           price (1 unit staked; push 0).
 
 Rewrites the ledger atomically and renders `<data root>/playcards/record.html` (branded): the running record, units,
-mean EV at the close, every card. Read-only otherwise; no OddsAPI.
+mean EV at the close, every card. Then, for every settled card (lane `result-cards`, user 2026-10-16), a RESULT card
+beside its pregame card (`<date>/<nn>_<sport>_<id>_result.png`: the result, the final, line vs sim vs actual, the
+close, what happened and the verdict) and `<data root>/playcards/postmortem.jsonl`, one engine-ledger record per graded
+card, rewritten whole each run. Read-only otherwise; no OddsAPI.
 
     py -3 scripts/grade_play_cards.py --data-root //wsl.localhost/Ubuntu-24.04/home/amyn/syndicate-prod/data
 """
@@ -201,11 +204,73 @@ td.w{{color:#8cff2e;font-weight:600}} td.l{{color:#ff5a4a;font-weight:600}} td.p
                     encoding="utf-8")
 
 
+def _read_json(path: Path) -> dict[str, Any] | None:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def render_results(cards: list[dict[str, Any]], root: Path, *, out_dir: Path | None = None, png: bool = True,
+                   usage: Any = None, cache: Path | None = None) -> dict[str, int]:
+    """A RESULT card for every settled card (rendered once: an existing PNG is kept) and the engine ledger. `usage` is
+    an optional callable (card, item) -> box-score usage dict (opportunity vs efficiency)."""
+    from syndicate.features.shared import play_card_results as pcr
+    from syndicate.features.shared import play_cards as pc
+
+    bpc = _load("build_play_cards")
+    out_dir = out_dir or (root / "playcards")
+    cache = cache or (root / "cheatsheets" / ".img_cache")
+    sheets: dict[tuple[str, str], Any] = {}
+    pairs, post, missing = [], [], 0
+    for c in pcr.iter_due(cards):
+        key = (c["sport"], c["date"])
+        if key not in sheets:
+            base = root / "cheatsheets" / c["sport"]
+            sheets[key] = (_read_json(base / f"{c['date']}.json"), _read_json(base / f"{c['date']}.reconciled.json"))
+        sheet, rec = sheets[key]
+        item = pcr.find_item(sheet or {}, c)
+        if item is None:
+            missing += 1
+            continue
+        number = pc.card_number(cards, c["date"], c["card_id"])
+        if c.get("pick_id"):
+            fields = pc.pick_card_fields(dict(item), sport=c["sport"], date=c["date"], number=number)
+        else:
+            games = {g.get("event_id"): g for g in (sheet or {}).get("games") or []}
+            fields = pc.card_fields(dict(item), sport=c["sport"], date=c["date"], number=number, game=games.get(item.get("event_id")))
+        if not fields.get("hero") and fields.get("headshot"):          # a sheet built before hero caching (10-16)
+            from syndicate.features.shared import brand_kit
+
+            fields["hero"] = brand_kit.hero_url(c["sport"], fields["headshot"])
+        score = ((rec or {}).get("scores") or {}).get(str(c.get("event_id")))
+        found = usage(c, item) if callable(usage) else None
+        overrides, classification = pcr.result_overrides(fields, item, c, entry=pcr.reconciled_entry(rec, item), score=score,
+                                                         usage=found)
+        post.append(pcr.postmortem(c, item, classification))
+        html_path = out_dir / c["date"] / f"{number:02d}_{c['sport']}_{c['card_id']}_result.html"
+        if html_path.with_suffix(".png").exists():
+            continue
+        html_path.parent.mkdir(parents=True, exist_ok=True)
+        badge = pc.BRAND_DIR / pc.badge_name(c["sport"])
+        logo = "data:image/webp;base64," + base64.b64encode(badge.read_bytes()).decode()
+        html_path.write_text(pc.render_card(bpc.embed_card_images(fields, cache), logo, overrides=overrides), encoding="utf-8")
+        pairs.append((html_path, html_path.with_suffix(".png")))
+    pngs = bpc.to_png(pairs) if png and pairs else 0
+    ledger = out_dir / "postmortem.jsonl"
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    tmp = ledger.with_name(ledger.name + ".tmp")
+    tmp.write_text("".join(json.dumps(r, default=str) + "\n" for r in post), encoding="utf-8")
+    os.replace(tmp, ledger)
+    return {"settled": len(post) + missing, "rendered": len(pairs), "png": pngs, "postmortem": len(post), "no_sheet_item": missing}
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-root", default=os.environ.get("SYNDICATE_DATA_ROOT") or "")
     ap.add_argument("--no-results", action="store_true", help="closing-line EV only (no production pull)")
     ap.add_argument("--now", default=None, help="ISO instant to settle as of (default: now)")
+    ap.add_argument("--no-result-cards", action="store_true", help="grade only: no result cards, no postmortem ledger")
     args = ap.parse_args(argv)
     if not args.data_root:
         print("REFUSING: no --data-root", flush=True)
@@ -234,6 +299,11 @@ def main(argv: list[str] | None = None) -> int:
     tmp.write_text("".join(json.dumps(c, default=str) + "\n" for c in cards), encoding="utf-8")
     os.replace(tmp, ledger)
     render_record(cards, root / "playcards" / "record.html")
+    if not args.no_result_cards:
+        from syndicate.features.shared import box_usage
+
+        usage = lambda card, item: box_usage.usage_for(card, item, cache=root / "playcards" / ".usage_cache")
+        print(f"PLAY_CARDS_RESULTS {json.dumps(render_results(cards, root, usage=usage))}", flush=True)
     graded = [c for c in cards if c.get("result")]
     print(f"PLAY_CARDS_GRADE cards={len(cards)} due={len(due)} closed={sum(1 for c in cards if c.get('close'))} "
           f"graded={len(graded)} units={round(sum(c['result']['units'] for c in graded), 2)}", flush=True)

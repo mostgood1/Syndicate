@@ -609,7 +609,8 @@ def card_text(fields: Mapping[str, Any]) -> dict[str, str]:
     return {"headline": name, "subline": "", "betline": rest, "strip": f"{name} {rest}".strip()}
 
 
-def render_card(fields: Mapping[str, Any], logo_uri: str, template: str | None = None) -> str:
+def render_card(fields: Mapping[str, Any], logo_uri: str, template: str | None = None,
+                overrides: Mapping[str, str] | None = None) -> str:
     from syndicate.features.shared.cheat_sheets import book_name
 
     matchup = fields.get("matchup") or ""
@@ -636,11 +637,16 @@ def render_card(fields: Mapping[str, Any], logo_uri: str, template: str | None =
     tile3 = (e(fields.get("tile3_k") or "SmartSim"), e(fields.get("tile3_v") or fields.get("model_prob") or "–"),
              e(fields.get("tile3_s") or sim_note))
     hero = stage(fields)
-    return string.Template(template if template is not None else TEMPLATE.read_text(encoding="utf-8")).safe_substitute(
+    # The label alone -- no play number on any graphic (user 2026-10-16: "we need to stop numbering the plays on the
+    # graphics"; Syndicate picks had already dropped theirs 10-15). `number` still names the day's files and the ledger.
+    tag = e(fields["label"])
+    values_ = dict(
+        # the RESULT card's slots (lane result-cards); a pregame card leaves them at these defaults
+        stamp="", why_panel_cls="green why", why_tab_cls="", against_panel_cls="red against", against_tab_cls="red",
+        t1_cls="", t2_cls="", t3_cls="", t4_cls="", ticker_tag=tag, ticker_tail="",
         brand_css=brand_css, wordmark=e(brand.get("wordmark") or "Syndicate ROI"),
         logo=logo_uri, label=e(fields["label"]), number=fields["number"], away=e(away), home=e(home),
-        # "FREE PLAY #3"; a Syndicate pick is just "SYNDICATE PICK" (user 2026-10-15: "remove the number").
-        tag=e(fields["label"]) if fields.get("hide_number") else f'{e(fields["label"])} #{fields["number"]}',
+        tag=tag,
         sport=e(fields["sport"]), kickoff=e(fields.get("kickoff_ct") or kickoff_label(fields.get("commence_time"))),
         player=e(fields["player"]), headline=e(text["headline"]), subline=e(text["subline"]), betline=e(text["betline"]),
         strip_bet=e(text["strip"]), sep=e(brand.get("ticker_separator") or "|"),
@@ -670,6 +676,8 @@ def render_card(fields: Mapping[str, Any], logo_uri: str, template: str | None =
         why="".join(f'<li class="{"for" if (tones[i] if i < len(tones) else "for") == "for" else "ctx"}">{e(w)}</li>'
                     for tones in [fields.get("why_tones") or []] for i, w in enumerate(fields["why"])),
         risk="".join(f"<li>{e(r)}</li>" for r in fields["risk"]))
+    values_.update(overrides or {})
+    return string.Template(template if template is not None else TEMPLATE.read_text(encoding="utf-8")).safe_substitute(values_)
 
 
 def ledger_path(data_root: Path | str) -> Path:

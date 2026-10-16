@@ -77,7 +77,8 @@ def test_render_card_fills_every_placeholder(tmp_path):
                             game={"matchup": "Arizona Cardinals @ Los Angeles Rams", "commence_time": "2026-10-18T20:05:00Z"})
     html_text = m.render_card(fields, "data:image/webp;base64,AAAA")
     assert "$" not in html_text.replace("$$", "")                                   # no unfilled template field
-    assert "FREE PLAY #2" in html_text and "UNDER 2.5 RECEPTIONS" in html_text and "-151" in html_text
+    assert ">FREE PLAY<" in html_text and "FREE PLAY #" not in html_text                          # never numbered (2026-10-16)
+    assert "UNDER 2.5 RECEPTIONS" in html_text and "-151" in html_text
     assert "<svg" in m.chart_svg([1, 3], ["25-W1", "26-W2"], 2.5, "under") and ">W2<" in m.chart_svg([1, 3], ["25-W1", "26-W2"], 2.5, "under")
 
 
